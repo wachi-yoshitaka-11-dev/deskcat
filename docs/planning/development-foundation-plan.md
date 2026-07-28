@@ -26,7 +26,7 @@
 | 2: リポジトリ構成 | 完了 | ADR-0001、責務 README |
 | 3: ハードウェア基準資料 | 進行中 | 資料作成済み。実部品の型番・回路・実測待ち |
 | 4: README／GitHub 基盤 | 完了 | ラベル、マイルストーン、脆弱性報告、`main`最小保護を適用済み。文書言語を日本語中心に統一し、commit `19853d0`で`origin/main`へ公開済み |
-| 4A: 公開ドキュメント基盤 | 計画済み | [GH-002 #25](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/25)でPages／Wiki方針を決定し、[GH-003 #26](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/26)でPagesを構築する。M1開始のblockerにはしない |
+| 4A: 公開ドキュメント基盤 | 方針確定・実装待ち | [ADR-0003](../decisions/0003-public-documentation-publishing.md)を承認済み。[GH-003 #26](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/26)でPages、[GH-004 #27](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/27)でWiki入口を構築する。M1開始のblockerにはしない |
 | 5: 初期バックログ | 完了 | 初期Issue 24件を[#1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1)〜[#24](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/24)として作成し、GitHubへlive statusを移行済み |
 | 6: 実装開始ゲート | レビュー済み・未通過 | `docs/runbooks/implementation-readiness-review.md` |
 | M1-001a: 開発環境の情報整理 | 完了 | `docs/toolchains/`、役割別 setup runbook、ADR-0002 |
@@ -533,21 +533,24 @@ deskcat/
 - [x] Wikiが有効で、既定の英語`Home.md`だけが存在することを確認した
 - [x] 方針決定を[GH-002 #25](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/25)として作成した
 - [x] Pages構築を[GH-003 #26](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/26)として作成した
+- [x] Wiki入口整備を[GH-004 #27](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/27)として作成した
 
 ### 方針決定と実装
 
-- [ ] `docs/`とPagesの正本関係、公開範囲、navigationを承認する
-- [ ] Wikiを使用、用途限定、無効化のいずれにするか承認する
+- [x] [ADR-0003](../decisions/0003-public-documentation-publishing.md)で`docs/`とPagesの正本関係、公開範囲、navigation方針を承認する
+- [x] Wikiを公開文書への入口ページに限定する
 - [ ] Pages生成方式と追加依存をreviewする
 - [ ] Markdown／link checkをPull Requestで実行する
 - [ ] 最小権限かつversion固定したActions workflowを導入する
 - [ ] `main`からPagesへdeployし、公開結果をread-back確認する
 - [ ] READMEから公開siteへlinkする
+- [ ] Wikiの既定Homeを日本語の入口ページへ置き換える
 
 ### Phase 4A 完了条件
 
-- [ ] GH-002の方針が永続文書へ記録されている
+- [x] GH-002の方針が永続文書へ記録されている
 - [ ] GH-003の受け入れ条件を満たしている
+- [ ] GH-004の受け入れ条件を満たしている
 - [ ] Wikiと`docs/`でlive文書を二重管理していない
 - [ ] Pagesの公開範囲にsecret、local専用資料、再配布不可資料が含まれていない
 

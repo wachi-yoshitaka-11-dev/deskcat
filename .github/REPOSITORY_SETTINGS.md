@@ -59,11 +59,13 @@ workflow追加時:
 - Wiki: 有効
 - Wiki content: 既定の英語`Home.md` 1件だけ
 
-整備方針:
+承認済み方針:
 
-- [ ] [GH-002 #25](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/25)で`docs/`、Pages、Wikiの責務と正本を決定する
-- [ ] Wikiを使用、用途限定、無効化のいずれにするか決定する
-- [ ] [GH-003 #26](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/26)で承認済み方針に基づくPages workflowを実装する
+- [x] [ADR-0003](../docs/decisions/0003-public-documentation-publishing.md)で`docs/`、Pages、Wikiの責務と正本を決定する
+- [x] RootのMarkdownと`docs/`を正本とし、Pagesを正本から生成する
+- [x] Wikiを日本語の入口ページに限定し、独自の技術仕様やlive statusを置かない
+- [ ] [GH-003 #26](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/26)でPages workflowを実装する
+- [ ] [GH-004 #27](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/27)でWikiの既定Homeを入口ページへ置き換える
 - [ ] `main`の承認済み内容だけをdeployする
 - [ ] 公開前にsecret、個人path、local専用資料、再配布権を確認する
 

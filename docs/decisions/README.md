@@ -8,6 +8,7 @@
 |---|---|---|
 | [ADR-0001](0001-monorepo-layout.md) | Accepted | monorepo構成とworkspace境界 |
 | [ADR-0002](0002-role-based-development-environments.md) | Accepted | 役割別の開発環境 |
+| [ADR-0003](0003-public-documentation-publishing.md) | Accepted | Repository、Pages、Wikiの公開文書責務 |
 
 ## 命名
 

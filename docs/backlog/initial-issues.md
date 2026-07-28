@@ -1,7 +1,7 @@
 # 初期Issue
 
 > 状態: GitHub移行済み
-> Remote作成: 2026-07-28に初期Issue 24件（[#1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1)〜[#24](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/24)）と文書公開基盤のfollow-up 2件（[#25](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/25)、[#26](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/26)）を作成した
+> Remote作成: 2026-07-28に初期Issue 24件（[#1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1)〜[#24](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/24)）と文書公開基盤のfollow-up 3件（[#25](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/25)〜[#27](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/27)）を作成した
 
 ## 移行後の運用
 
@@ -12,7 +12,7 @@
 
 | Milestone | GitHub Issues |
 |---|---|
-| M0 | [FND-001 #1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1)、[FND-002 #2](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/2)、[FND-003 #3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)、[FND-004 #4](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/4)、[GH-002 #25](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/25)、[GH-003 #26](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/26) |
+| M0 | [FND-001 #1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1)、[FND-002 #2](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/2)、[FND-003 #3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)、[FND-004 #4](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/4)、[GH-002 #25](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/25)、[GH-003 #26](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/26)、[GH-004 #27](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/27) |
 | M1 | [M1-001 #5](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/5)、[M1-002 #6](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/6)、[M1-003 #7](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/7)、[M1-004 #8](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/8) |
 | M2 | [M2-001 #9](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/9)、[M2-002 #10](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/10)、[M2-003 #11](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11)、[M2-004 #12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12) |
 | M3 | [M3-001 #13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)、[M3-002 #14](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/14)、[M3-003 #15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)、[M3-004 #16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16) |
@@ -30,7 +30,8 @@ M0 foundation
 │  └─ servo safety inputs
 ├─ protocol draft review
 └─ public documentation policy
-   └─ GitHub Pages deployment
+   ├─ GitHub Pages deployment
+   └─ Wiki landing page
 
 M1 ESP32 toolchain
 ├─ minimal build/flash
@@ -324,6 +325,46 @@ GitHub PagesとWikiの責務、正本、公開範囲、更新方法を決定し�
 - [ ] 公開siteの相対link checkが成功する
 - [ ] HTTPSの公開URLをREADMEへ記載した
 - [ ] Pages workflowと公開結果をread-back確認した
+
+---
+
+## GH-004: Wikiを公開文書の入口として整備
+
+- Milestone: M0 Development Foundation
+- Labels: `area:docs`、`type:maintenance`、`priority:normal`、`status:blocked`
+- 状態: [GH-002 #25](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/25)の方針確定済み、[GH-003 #26](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/26)のPages公開待ち
+- 依存関係: [GH-002 #25](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/25)、[GH-003 #26](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/26)
+
+### 目的
+
+Wikiを仕様の正本にせず、DeskCatの公開文書へ案内する日本語の入口ページとして整備する。
+
+### 対象範囲
+
+- 既定の英語`Home.md`を日本語の入口ページへ置き換える
+- GitHub Pages、repository README、主要文書、Issuesへのlink
+- `docs/`が正本であることの明記
+- Wikiへ置いてよい情報と置かない情報の短い案内
+
+### 対象外
+
+- 技術仕様、ADR、runbookのWikiへの複製
+- Live status、Issue checklist、release noteの二重管理
+- 独自の長文Wiki content
+- GitHub Pagesの実装
+
+### 参考資料
+
+- [About wikis](https://docs.github.com/en/communities/documenting-your-project-with-wikis/about-wikis)
+
+### 受け入れ条件
+
+- [ ] 既定の英語Homeを日本語の入口ページへ置き換えた
+- [ ] Pages、README、文書index、Issuesへnavigationできる
+- [ ] `docs/`が正本でありWikiは案内用であると明記した
+- [ ] 技術仕様、設計値、live statusをWikiへ複製していない
+- [ ] Secret、個人path、local専用資料を含まない
+- [ ] 公開linkをread-back確認した
 
 ---
 

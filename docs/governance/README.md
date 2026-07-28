@@ -55,6 +55,8 @@
 | ESP32–Pi間のwire protocol | `docs/protocol/esp32-pi-protocol.md` |
 | 開発端末の役割とtoolchain選定 | `docs/toolchains/` |
 | 開発・運用手順 | `docs/runbooks/` |
+| 公開文書のsource | RootのMarkdownと`docs/` |
+| Pages／Wikiの公開方針 | [ADR-0003](../decisions/0003-public-documentation-publishing.md) |
 
 同じ値を複数の文書で再定義しない。他の文書からは正本の定義へリンクする。
 
