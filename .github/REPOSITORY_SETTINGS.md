@@ -21,8 +21,8 @@
 - [x] `.github/MILESTONES.md`のM0–M6 title／descriptionを同期
 - [x] `main`へのforce pushを禁止
 - [x] `main`の削除を禁止
-- [ ] `develop`へのforce pushを禁止
-- [ ] `develop`の削除を禁止
+- `develop`: Branch protectionを設定しない
+- `develop`へのGit／GitHub操作は、Governanceのforce push禁止、通常作業での直接commit禁止、ユーザー承認で管理する
 
 ## Branch protectionの時期
 
@@ -31,7 +31,7 @@ CI導入前:
 - [x] solo bootstrap中はpull requestを必須にしない
 - [x] 存在しないstatus checkを必須にしない
 - 必須承認review数: solo bootstrap中は`0`
-- `develop`のprotectionはbranch作成後の別変更としてread-backする
+- `develop`はprotection対象外とし、required status checkを設定しない
 
 安定したCI導入後:
 

@@ -77,7 +77,10 @@ DeskCatは、ESP32 firmware、Raspberry Pi software、protocol、hardware文書�
 記録commitをpushした後、そのcommitから`develop`を作成する。
 以後は上記の通常workflowへ移行する。
 
-Branch protectionとrequired status checkの追加は、branch作成とは別のGitHub設定変更として扱う。
+`develop`にはBranch protectionとrequired status checkを設定しない。
+通常作業での直接commit禁止、force push禁止、Git／GitHub操作前のユーザー承認、
+操作前後のbranchとremoteのread-backをGovernanceで強制する。
+これは`main`に適用済みの最小保護を変更しない。
 
 ## 影響
 
@@ -102,13 +105,14 @@ Branch protectionとrequired status checkの追加は、branch作成とは別の
 | `main`と`develop`が意図せず乖離する | `main`へのhotfixと運用変更を`develop`へ直ちに反映する |
 | `develop`へ未検証変更が蓄積する | 一Issue一目的、受け入れ条件、利用可能なcheckを各Pull Requestで要求する |
 | 二段階mergeで履歴が複雑になる | Full GitFlowは導入せず、release branchを常設しない |
-| `develop`が無保護で変更される | Force push、削除、required checkを別のGitHub設定変更として評価する |
+| 無保護の`develop`を誤って直接変更する | 通常作業での直接commitとforce pushを禁止し、Git／GitHub操作にユーザー承認とremoteのread-backを要求する |
 
 ## 検証
 
 - GitHubのdefault branchが`main`のままである。
 - GitHub Pages workflowが`main`だけをdeployする。
 - `develop`が、このADRを含む`main`のcommitから作成されている。
+- `develop`のBranch protectionが意図どおり未設定である。
 - GitHub上で`main`と`develop`のSHAをread-backできる。
 - Development Workflow、CONTRIBUTING、Repository設定のbranch責務が一致している。
 
