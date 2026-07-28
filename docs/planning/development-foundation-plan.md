@@ -26,7 +26,7 @@
 | 2: リポジトリ構成 | 完了 | ADR-0001、責務 README |
 | 3: ハードウェア基準資料 | 進行中 | 資料作成済み。実部品の型番・回路・実測待ち |
 | 4: README／GitHub 基盤 | 完了 | ラベル、マイルストーン、脆弱性報告、`main`最小保護を適用済み。文書言語を日本語中心に統一し、commit `19853d0`で`origin/main`へ公開済み |
-| 5: 初期バックログ | 進行中 | `docs/backlog/initial-issues.md` 作成済み。基盤文書公開後に GitHub Issue 化する |
+| 5: 初期バックログ | 完了 | 初期Issue 24件を[#1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1)〜[#24](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/24)として作成し、GitHubへlive statusを移行済み |
 | 6: 実装開始ゲート | レビュー済み・未通過 | `docs/runbooks/implementation-readiness-review.md` |
 | M1-001a: 開発環境の情報整理 | 完了 | `docs/toolchains/`、役割別 setup runbook、ADR-0002 |
 | M1-001b: 開発端末での検証 | 未着手 | ESP32 Build profile 端末での生成・clean build 待ち |
@@ -523,7 +523,7 @@ deskcat/
 
 ## Phase 5: 初期バックログ
 
-この Phase の 5.1–5.5 にあるチェックは、`docs/backlog/initial-issues.md` に作業項目が定義済みであることを示す。機能実装や GitHub Issue 作成の完了を意味しない。
+この Phase の5.1–5.5にあるcheckは、`docs/backlog/initial-issues.md`に初期定義が揃っていることを示す。2026-07-28にGH-001を除く24件をGitHub Issueへ移行し、以後のlive statusはGitHubで管理する。機能実装の完了を意味しない。
 
 ### 5.1 `M0 Development Foundation`
 
@@ -588,7 +588,7 @@ deskcat/
 - [x] 最初の Issue に受け入れ条件がある
 - [x] ハードウェア未確定の Issue を誤って実装開始しない
 - [x] MVP までの作業をローカル backlog で追跡できる
-- [ ] 基盤文書の公開後、承認した初期 Issue を GitHub に作成して live status を移行する（マイルストーンは作成済み）
+- [x] 基盤文書の公開後、承認した初期Issue 24件をGitHubに作成してlive statusを移行する
 
 ---
 
@@ -625,9 +625,9 @@ deskcat/
 
 ### 6.4 プロジェクト管理
 
-- [ ] GitHub 上に着手 Issue が存在する
-- [ ] 依存 Issue が完了している
-- [ ] 受け入れ条件が測定可能である
+- [x] GitHub上に着手Issue（[M1-001 #5](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/5)）が存在する
+- [x] M1-001の文書上の依存関係が完了している
+- [x] M1-001の受け入れ条件が測定可能である
 - [ ] 必要な実機と計測器が利用できる
 - [x] 作業結果を記録する場所と template がある
 
@@ -679,6 +679,6 @@ deskcat/
 - [ ] Phase 0–5 の完了条件をすべて満たしている
 - [ ] Phase 6 の実装開始ゲートを通過している
 - [x] AI と人間の責務・承認境界が明確である
-- [ ] リポジトリ、ハードウェア資料、GitHub 管理が相互にリンクしている
+- [x] リポジトリ、ハードウェア資料、GitHub管理が相互にリンクしている
 - [ ] 最初の実装 Issue へ安全に着手できる
 - [x] 未確定事項を、推測せず追跡できる
