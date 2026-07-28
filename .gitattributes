@@ -6,6 +6,7 @@
 *.json text eol=lf
 *.toml text eol=lf
 *.rs text eol=lf
+*.ps1 text eol=lf
 
 .editorconfig text eol=lf
 .gitattributes text eol=lf

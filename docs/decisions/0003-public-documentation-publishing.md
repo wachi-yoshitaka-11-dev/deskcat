@@ -70,6 +70,7 @@ Repositoryを唯一の正本とし、PagesとWikiを次の責務に限定する�
 - Wikiに長文または技術情報を追加する必要が生じた場合は、先に正本へ追加し、Wikiからlinkする。
 
 実装は[GH-003 #26](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/26)と[GH-004 #27](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/27)で分離する。
+Pages生成方式、固定Action、検証手順は[GitHub Pages公開runbook](../runbooks/github-pages-publishing.md)を正本とする。
 
 ## 影響
 

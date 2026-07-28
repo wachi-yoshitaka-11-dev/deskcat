@@ -131,6 +131,7 @@ Firmwareが同じcrateをpath dependencyとして直接使用するか、小さ�
 configs/          安全な設定例と秘密でない発話文
 deploy/           Raspberry Pi serviceとinstall用artifact
 docs/             Architecture、decision、governance、hardware、protocol、runbook、toolchain
+pages/            GitHub Pages固有の入口、設定、404
 scripts/          小さく再現可能な開発補助script
 tests/hil/        Hardware-in-the-loopのfixtureと手順
 .github/          GitHub templateとautomation
@@ -170,6 +171,7 @@ deskcat/
 │  ├─ runbooks/
 │  └─ toolchains/
 ├─ hardware/
+├─ pages/
 ├─ scripts/
 ├─ tests/
 │  └─ hil/

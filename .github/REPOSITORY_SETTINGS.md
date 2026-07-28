@@ -39,11 +39,11 @@ CI導入前:
 
 workflow追加時:
 
-- [ ] `GITHUB_TOKEN`のdefaultをcontents read-onlyにする
-- [ ] write権限は必要なjobだけに付与する
-- [ ] 第三者actionをreview済みversionまたはcommitへ固定する
-- [ ] forkからのpull requestへ秘密情報を公開しない
-- [ ] Hardware-in-the-Loopを通常のhosted CIから分離する
+- [x] `GITHUB_TOKEN`のdefaultがread-onlyであることを確認する
+- [x] write権限はPagesのdeploy jobだけに付与する
+- [x] 使用するGitHub公式Actionをreview済みcommitへ固定する
+- [x] Pull Requestのbuild jobにsecretとwrite権限を渡さない
+- [x] Hardware-in-the-Loopを通常のhosted CIから分離する
 
 ## Pages／Wiki
 
@@ -66,8 +66,8 @@ workflow追加時:
 - [x] Wikiを日本語の入口ページに限定し、独自の技術仕様やlive statusを置かない
 - [ ] [GH-003 #26](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/26)でPages workflowを実装する
 - [ ] [GH-004 #27](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/27)でWikiの既定Homeを入口ページへ置き換える
-- [ ] `main`の承認済み内容だけをdeployする
-- [ ] 公開前にsecret、個人path、local専用資料、再配布権を確認する
+- [x] Workflowと`github-pages` environmentの両方でdeploy元を`main`に限定する
+- [x] Whitelist stagingでsecret、個人path、local専用資料、未承認形式を検査する
 
 ## 保留
 

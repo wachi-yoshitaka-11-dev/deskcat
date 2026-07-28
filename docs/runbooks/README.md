@@ -8,6 +8,7 @@
 - [実装開始可否review](implementation-readiness-review.md)
 - [ESP32開発端末セットアップ](esp32-development-machine-setup.md)
 - [Raspberry Pi開発端末セットアップ](raspberry-pi-development-machine-setup.md)
+- [GitHub Pages公開](github-pages-publishing.md)
 
 予定runbook:
 

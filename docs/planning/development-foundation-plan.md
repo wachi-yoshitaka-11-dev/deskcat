@@ -26,7 +26,7 @@
 | 2: リポジトリ構成 | 完了 | ADR-0001、責務 README |
 | 3: ハードウェア基準資料 | 進行中 | 資料作成済み。実部品の型番・回路・実測待ち |
 | 4: README／GitHub 基盤 | 完了 | ラベル、マイルストーン、脆弱性報告、`main`最小保護を適用済み。文書言語を日本語中心に統一し、commit `19853d0`で`origin/main`へ公開済み |
-| 4A: 公開ドキュメント基盤 | 方針確定・実装待ち | [ADR-0003](../decisions/0003-public-documentation-publishing.md)を承認済み。[GH-003 #26](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/26)でPages、[GH-004 #27](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/27)でWiki入口を構築する。M1開始のblockerにはしない |
+| 4A: 公開ドキュメント基盤 | 初回deploy待ち | [ADR-0003](../decisions/0003-public-documentation-publishing.md)とPages workflowを準備済み。[GH-003 #26](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/26)で初回deploy、[GH-004 #27](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/27)でWiki入口を構築する。M1開始のblockerにはしない |
 | 5: 初期バックログ | 完了 | 初期Issue 24件を[#1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1)〜[#24](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/24)として作成し、GitHubへlive statusを移行済み |
 | 6: 実装開始ゲート | レビュー済み・未通過 | `docs/runbooks/implementation-readiness-review.md` |
 | M1-001a: 開発環境の情報整理 | 完了 | `docs/toolchains/`、役割別 setup runbook、ADR-0002 |
@@ -203,7 +203,7 @@
 
 ### 2.2 初期ディレクトリ案の確定
 
-- [x] 次の構成案を採用し、`docs/toolchains/` を追加する
+- [x] 次の構成案を採用し、`docs/toolchains/`とPages公開用`pages/`を追加する
 
 ```text
 deskcat/
@@ -228,6 +228,7 @@ deskcat/
 ├─ configs/
 ├─ deploy/
 ├─ hardware/
+├─ pages/
 ├─ tests/
 │  └─ hil/
 ├─ scripts/
@@ -539,9 +540,9 @@ deskcat/
 
 - [x] [ADR-0003](../decisions/0003-public-documentation-publishing.md)で`docs/`とPagesの正本関係、公開範囲、navigation方針を承認する
 - [x] Wikiを公開文書への入口ページに限定する
-- [ ] Pages生成方式と追加依存をreviewする
-- [ ] Markdown／link checkをPull Requestで実行する
-- [ ] 最小権限かつversion固定したActions workflowを導入する
+- [x] GitHub公式Jekyll Actionを採用し、追加依存、保守状況、license、代替をreviewする
+- [x] Pull RequestでPages buildとlink checkだけを実行するworkflowを準備する
+- [x] 最小権限かつcommit固定したActions workflowを準備する
 - [ ] `main`からPagesへdeployし、公開結果をread-back確認する
 - [ ] READMEから公開siteへlinkする
 - [ ] Wikiの既定Homeを日本語の入口ページへ置き換える

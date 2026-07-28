@@ -1,0 +1,14 @@
+title: DeskCat
+description: ESP32とRaspberry Piで構成する猫型ペットロボットの公開技術文書
+lang: ja
+url: https://wachi-yoshitaka-11-dev.github.io
+baseurl: /deskcat
+repository: wachi-yoshitaka-11-dev/deskcat
+theme: jekyll-theme-cayman
+show_downloads: false
+markdown: kramdown
+kramdown:
+  input: GFM
+relative_links:
+  enabled: true
+  collections: true
