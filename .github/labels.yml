@@ -1,0 +1,81 @@
+# Repositoryに適用するlabelの定義。
+# このfile単体ではlabelを作成しない。2026-07-28にGitHubへ適用済み。
+
+# GitHub標準label。名称を維持し、descriptionを日本語化する。
+- name: bug
+  color: "D73A4A"
+  description: 不具合
+- name: documentation
+  color: "0075CA"
+  description: 文書の改善または追加
+- name: duplicate
+  color: "CFD3D7"
+  description: 重複するIssueまたはPull Request
+- name: enhancement
+  color: "A2EEEF"
+  description: 機能の改善または追加
+- name: good first issue
+  color: "7057FF"
+  description: 初めてのcontributor向け
+- name: help wanted
+  color: "008672"
+  description: 支援が必要
+- name: invalid
+  color: "E4E669"
+  description: 有効なIssueではない
+- name: question
+  color: "D876E3"
+  description: 追加情報が必要
+- name: wontfix
+  color: "FFFFFF"
+  description: 対応予定なし
+
+# DeskCat固有label。
+- name: area:firmware
+  color: "0052CC"
+  description: ESP32のファームウェア
+- name: area:raspberry-pi
+  color: "1D76DB"
+  description: Raspberry Piのホストソフトウェア
+- name: area:protocol
+  color: "5319E7"
+  description: ESP32–Pi間の通信プロトコル
+- name: area:hardware
+  color: "D93F0B"
+  description: 電子回路、電源、配線、センサ、機構
+- name: area:docs
+  color: "0075CA"
+  description: 文書
+- name: type:bug
+  color: "D73A4A"
+  description: 再現可能な誤動作
+- name: type:feature
+  color: "A2EEEF"
+  description: 新しい観測可能な機能
+- name: type:experiment
+  color: "FBCA04"
+  description: 証拠を収集する実験
+- name: type:decision
+  color: "C5DEF5"
+  description: アーキテクチャまたはコンポーネント横断の判断
+- name: type:maintenance
+  color: "EDEDED"
+  description: ツール、依存関係、リポジトリの保守
+- name: priority:critical
+  color: "B60205"
+  description: 安全、セキュリティ、または開発全体の阻害要因
+- name: priority:high
+  color: "D93F0B"
+  description: 現在のマイルストーンで重要
+- name: priority:normal
+  color: "FBCA04"
+  description: 通常の計画作業
+- name: status:blocked
+  color: "000000"
+  description: 明記した依存関係が解決するまで進行不可
+- name: needs:hardware-test
+  color: "E99695"
+  description: 実機ハードウェアの証拠が必要
+- name: needs:decision
+  color: "F9D0C4"
+  description: 人間またはADRによる判断が必要
