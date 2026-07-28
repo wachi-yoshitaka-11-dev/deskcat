@@ -54,8 +54,9 @@ workflow追加時:
 - Build type: GitHub Actions workflow
 - Source metadata: `main`／repository root
 - HTTPS enforcement: 有効
-- Pages workflowとActions実行履歴: なし
-- Custom 404: なし
+- Pages workflow: [run 30338761812](https://github.com/wachi-yoshitaka-11-dev/deskcat/actions/runs/30338761812)でbuild／deploy成功
+- 公開物の`404.html`: HTTP 200でread-back確認済み
+- Pages APIの`custom_404` metadata: `false`
 - Wiki: 有効
 - Wiki content: 既定の英語`Home.md` 1件だけ
 
@@ -64,7 +65,7 @@ workflow追加時:
 - [x] [ADR-0003](../docs/decisions/0003-public-documentation-publishing.md)で`docs/`、Pages、Wikiの責務と正本を決定する
 - [x] RootのMarkdownと`docs/`を正本とし、Pagesを正本から生成する
 - [x] Wikiを日本語の入口ページに限定し、独自の技術仕様やlive statusを置かない
-- [ ] [GH-003 #26](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/26)でPages workflowを実装する
+- [x] [GH-003 #26](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/26)でPages workflowを実装する
 - [ ] [GH-004 #27](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/27)でWikiの既定Homeを入口ページへ置き換える
 - [x] Workflowと`github-pages` environmentの両方でdeploy元を`main`に限定する
 - [x] Whitelist stagingでsecret、個人path、local専用資料、未承認形式を検査する

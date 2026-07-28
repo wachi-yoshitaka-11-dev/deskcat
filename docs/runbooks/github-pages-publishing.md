@@ -1,6 +1,6 @@
 # GitHub Pages公開
 
-> 状態: Draft — GitHub Actionsでの初回build／deploy結果待ち
+> 状態: Verified — 2026-07-28に初回build／deployと公開結果を確認済み
 > 対象Issue: [GH-003 #26](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/26)
 > 方針: [ADR-0003](../decisions/0003-public-documentation-publishing.md)
 
@@ -106,6 +106,28 @@ pwsh -File ./scripts/validate-pages-output.ps1 -SiteRoot ./_site
 5. Top、404、Architecture、Governance、安全、hardware、protocol、runbook、toolchainへ辿れる。
 6. Source commitとdeploymentが対応する。
 7. Secret、個人path、local専用資料、PDFが公開されていない。
+
+### 初回公開の検証記録
+
+2026-07-28に、source commit
+[`5bd2ba3`](https://github.com/wachi-yoshitaka-11-dev/deskcat/commit/5bd2ba38648eae1d0c46696944e4d631b6db582a)
+からの初回公開を確認した。
+
+| 確認対象 | 結果 |
+|---|---|
+| Workflow run | [Pages run 30338761812](https://github.com/wachi-yoshitaka-11-dev/deskcat/actions/runs/30338761812)が成功 |
+| Build | Jekyll build、出力検査、artifact uploadが成功 |
+| Deploy | Deployment `5635863240`が`success` |
+| Pages設定 | `build_type: workflow`、HTTPS強制、公開URLが設定済み |
+| 公開URL | `https://wachi-yoshitaka-11-dev.github.io/deskcat/` |
+| Read-back | Top、404、favicon、Architecture、Governance、安全、Hardware、Protocol、Runbook、ToolchainがHTTP 200 |
+| 公開範囲 | Workflowのwhitelist検査でsecret様pattern、個人path、PDF、未承認形式を拒否 |
+
+最初のrun
+[`30337279379`](https://github.com/wachi-yoshitaka-11-dev/deskcat/actions/runs/30337279379)
+では、Jekyllがdirectory内の`README.md`を`index.html`へ変換する点と、
+themeが参照する`favicon.ico`を出力検査へ反映できておらず失敗した。
+期待pathとfavicon生成を修正し、上記の成功runで再検証した。
 
 ## 失敗時
 
