@@ -19,15 +19,15 @@ if (-not (Test-Path -LiteralPath $siteRootPath -PathType Container)) {
 $requiredFiles = @(
     'index.html',
     '404.html',
-    'README.html',
-    'docs/architecture/README.html',
-    'docs/governance/README.html',
+    'favicon.ico',
+    'docs/architecture/index.html',
+    'docs/governance/index.html',
     'docs/governance/hardware-safety-policy.html',
-    'docs/decisions/README.html',
-    'docs/hardware/README.html',
-    'docs/protocol/README.html',
-    'docs/runbooks/README.html',
-    'docs/toolchains/README.html'
+    'docs/decisions/index.html',
+    'docs/hardware/index.html',
+    'docs/protocol/index.html',
+    'docs/runbooks/index.html',
+    'docs/toolchains/index.html'
 )
 
 $problems = [System.Collections.Generic.List[string]]::new()

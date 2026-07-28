@@ -11,7 +11,7 @@ DeskCatは、ESP32とRaspberry Pi Zero WHで構成する、机上で静かに振
 
 ## はじめに
 
-- [Project概要](README.md)
+- [Project概要（repository README）](https://github.com/wachi-yoshitaka-11-dev/deskcat#readme)
 - [Architecture](docs/architecture/README.md)
 - [開発基盤計画](docs/planning/development-foundation-plan.md)
 - [GitHub repository](https://github.com/wachi-yoshitaka-11-dev/deskcat)
@@ -36,7 +36,7 @@ DeskCatは、ESP32とRaspberry Pi Zero WHで構成する、机上で静かに振
 
 - [Toolchainと端末profile](docs/toolchains/README.md)
 - [Runbook](docs/runbooks/README.md)
-- [Contribution方法](CONTRIBUTING.md)
+- [Contribution方法](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/CONTRIBUTING.md)
 - [Security](SECURITY.md)
 
 ## 文書の正本
