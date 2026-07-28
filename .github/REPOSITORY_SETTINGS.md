@@ -7,6 +7,9 @@
 - Repository: `wachi-yoshitaka-11-dev/deskcat`
 - 公開範囲: public
 - Default branch: `main`
+- Stable／Pages branch: `main`
+- Integration branch: `develop`
+- Branch strategy: [ADR-0004](../docs/decisions/0004-main-develop-branch-strategy.md)
 
 ## 認証後の適用結果
 
@@ -18,6 +21,8 @@
 - [x] `.github/MILESTONES.md`のM0–M6 title／descriptionを同期
 - [x] `main`へのforce pushを禁止
 - [x] `main`の削除を禁止
+- [ ] `develop`へのforce pushを禁止
+- [ ] `develop`の削除を禁止
 
 ## Branch protectionの時期
 
@@ -26,6 +31,7 @@ CI導入前:
 - [x] solo bootstrap中はpull requestを必須にしない
 - [x] 存在しないstatus checkを必須にしない
 - 必須承認review数: solo bootstrap中は`0`
+- `develop`のprotectionはbranch作成後の別変更としてread-backする
 
 安定したCI導入後:
 

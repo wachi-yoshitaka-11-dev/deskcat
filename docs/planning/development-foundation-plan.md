@@ -478,6 +478,8 @@ deskcat/
 ### 4.7 GitHub 設定
 
 - [x] default branch が `main` であることを確認する
+- [x] [ADR-0004](../decisions/0004-main-develop-branch-strategy.md)で`main`を安定版、`develop`を通常開発の統合先と決める
+- [x] GitHub Pagesのdeploy元を`main`だけに維持する
 - [x] branch protection の段階的な導入条件を決める
 - [x] solo bootstrap 中は 0、外部 contribution を受け入れる段階では 1 review と決める
 - [x] status check 必須化の時期を決める

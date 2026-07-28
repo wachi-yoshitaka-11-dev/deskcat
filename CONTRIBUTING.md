@@ -31,7 +31,11 @@ Issueには次を含める。
 
 ## Branches
 
-推奨する名前:
+`main`は安定版とGitHub Pages公開元、`develop`は通常開発の統合先である。
+通常は最新の`develop`からIssue branchを作成し、Pull Requestのbaseも`develop`にする。
+Releaseまたはmilestoneの基準を満たした時点で、`develop`から`main`へPull Requestする。
+
+推奨するIssue branch名:
 
 ```text
 feature/<issue>-<short-name>
@@ -39,9 +43,13 @@ fix/<issue>-<short-name>
 docs/<issue>-<short-name>
 chore/<issue>-<short-name>
 experiment/<issue>-<short-name>
+hotfix/<issue>-<short-name>
 ```
 
-一つのbranchを、一つのreview可能な目的に絞る。
+一つのbranchを、一Issue、一つのreview可能な目的に絞る。
+`main`から緊急hotfixを行った場合は、同じ修正を`develop`にも取り込む。
+詳細は[ADR-0004](docs/decisions/0004-main-develop-branch-strategy.md)と
+[Development Workflow](docs/governance/development-workflow.md)を参照する。
 
 ## 実装
 

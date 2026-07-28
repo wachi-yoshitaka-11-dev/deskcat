@@ -199,7 +199,17 @@ checkを実行できない場合は次を行う。
 
 ### Branch
 
-初期branch命名規則は次のとおり。
+[ADR-0004](../decisions/0004-main-develop-branch-strategy.md)に従い、
+`main`を安定版、`develop`を通常開発の統合先とする。
+
+- GitHubのdefault branchとGitHub Pagesのdeploy元は`main`のまま維持する。
+- 通常のIssue branchは最新の`develop`から作成し、Pull Requestで`develop`へ統合する。
+- Releaseまたはmilestoneの基準を満たした変更は、`develop`から`main`へのPull Requestで昇格する。
+- `main`からhotfixした場合は、同じ修正を直ちに`develop`へ取り込む。
+- 通常作業を`main`または`develop`へ直接commitしない。
+- Repository運用のbootstrapなど例外的な直接変更には、明示的なユーザー承認とread-backを必要とする。
+
+Issue branchの命名規則は次のとおり。
 
 ```text
 feature/<issue>-<short-name>
@@ -207,9 +217,11 @@ fix/<issue>-<short-name>
 docs/<issue>-<short-name>
 chore/<issue>-<short-name>
 experiment/<issue>-<short-name>
+hotfix/<issue>-<short-name>
 ```
 
-個人開発では規則を簡略化してよいが、一つのbranchは一つのreview可能な目的に対応させる。
+一つのbranchは一Issue、一つのreview可能な目的に対応させる。
+Pull Request作成時は、通常のbaseが`develop`であることを確認する。
 
 ### Commit
 
