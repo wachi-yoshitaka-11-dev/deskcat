@@ -1,7 +1,7 @@
 # 初期Issue
 
 > 状態: GitHub移行済み
-> Remote作成: 2026-07-28に初期Issue 24件（[#1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1)〜[#24](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/24)）を作成し、定義との一致を確認した
+> Remote作成: 2026-07-28に初期Issue 24件（[#1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1)〜[#24](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/24)）と文書公開基盤のfollow-up 2件（[#25](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/25)、[#26](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/26)）を作成した
 
 ## 移行後の運用
 
@@ -12,7 +12,7 @@
 
 | Milestone | GitHub Issues |
 |---|---|
-| M0 | [FND-001 #1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1)、[FND-002 #2](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/2)、[FND-003 #3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)、[FND-004 #4](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/4) |
+| M0 | [FND-001 #1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1)、[FND-002 #2](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/2)、[FND-003 #3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)、[FND-004 #4](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/4)、[GH-002 #25](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/25)、[GH-003 #26](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/26) |
 | M1 | [M1-001 #5](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/5)、[M1-002 #6](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/6)、[M1-003 #7](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/7)、[M1-004 #8](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/8) |
 | M2 | [M2-001 #9](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/9)、[M2-002 #10](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/10)、[M2-003 #11](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11)、[M2-004 #12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12) |
 | M3 | [M3-001 #13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)、[M3-002 #14](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/14)、[M3-003 #15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)、[M3-004 #16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16) |
@@ -28,7 +28,9 @@ M0 foundation
 │  ├─ GPIO assignment
 │  ├─ power budget
 │  └─ servo safety inputs
-└─ protocol draft review
+├─ protocol draft review
+└─ public documentation policy
+   └─ GitHub Pages deployment
 
 M1 ESP32 toolchain
 ├─ minimal build/flash
@@ -225,6 +227,103 @@ Review済みのローカルGitHub設定をpublic repositoryへ適用する。
 - [x] `main`でforce pushと削除が無効
 - [x] 存在しないCI statusを必須にしていない
 - [x] 別途決定しない限りrepository visibilityをpublicのまま維持する
+
+---
+
+## GH-002: GitHub Pages／Wikiの運用方針を決定
+
+- Milestone: M0 Development Foundation
+- Labels: `area:docs`、`type:decision`、`priority:normal`
+- 状態: 方針reviewに着手可能
+- 依存関係: なし
+
+### 背景
+
+- Repositoryはpublicで、`docs/`を技術文書の正本として運用している。
+- GitHub Pagesは`build_type: workflow`で有効だが、Pages workflowと実行履歴は存在しない。
+- GitHub Wikiは有効だが、既定の英語`Home.md`だけが存在する。
+
+### 目的
+
+GitHub PagesとWikiの責務、正本、公開範囲、更新方法を決定し、文書の二重管理を防ぐ。
+
+### 対象範囲
+
+- Pagesで公開する文書と公開しない文書
+- `docs/`と公開siteの正本関係
+- Wikiを使用するか、無効化するか、用途を限定するか
+- Review、更新、link、archiveの運用
+- Pages生成物とworkflowの管理方針
+
+### 対象外
+
+- Pages workflowの実装
+- Wikiへの本格的なcontent作成
+- Custom domain
+- Firmwareまたはhardware実装
+
+### 参考資料
+
+- [Configuring a publishing source for your GitHub Pages site](https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site)
+- [About wikis](https://docs.github.com/en/communities/documenting-your-project-with-wikis/about-wikis)
+
+### 受け入れ条件
+
+- [ ] `docs/`を正本として維持するか明記した
+- [ ] Pagesの対象範囲とnavigation方針を決めた
+- [ ] 公開対象外のlocal資料、secret、個人path、再配布不可資料を除外する規則を決めた
+- [ ] Wikiの採用、用途限定、無効化のいずれかを決定した
+- [ ] Wikiを使用する場合、`docs/`との重複を防ぐ昇格・archive規則を決めた
+- [ ] Pagesのbuild方式、Actions権限、version固定方針を決めた
+- [ ] 決定をGovernanceまたはADRへ記録した
+- [ ] [GH-003 #26](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/26)の実装入力が揃った
+
+---
+
+## GH-003: GitHub Pages公開基盤を構築
+
+- Milestone: M0 Development Foundation
+- Labels: `area:docs`、`type:maintenance`、`priority:normal`、`status:blocked`
+- 状態: [GH-002 #25](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/25)の方針承認待ち
+- 依存関係: [GH-002 #25](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/25)
+
+### 目的
+
+承認済みの公開方針に従い、`docs/`を正本とするGitHub Pages siteを再現可能かつ最小権限で公開する。
+
+### 対象範囲
+
+- Static site生成方式の選定と記録
+- Navigation、top page、404 page
+- Pull Requestでのbuild／link検証
+- `main`からのPages deploy
+- GitHub Actions権限とenvironment保護
+- READMEから公開siteへの導線
+
+### 対象外
+
+- Wiki contentの整備
+- Custom domain
+- Firmware／hardwareのbuild CI
+- 再配布権が不明なPDF、image、fontの公開
+
+### 参考資料
+
+- [Using custom workflows with GitHub Pages](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages)
+
+### 受け入れ条件
+
+- [ ] 追加tool／依存の必要性、保守状況、license、代替を記録した
+- [ ] Workflowで使用するActionをreview可能なversionへ固定した
+- [ ] 通常権限はread-onlyとし、deploy jobだけにPages用権限を限定した
+- [ ] Pull Requestではbuild／link checkだけを実行しdeployしない
+- [ ] `main`の承認済み変更だけをPagesへdeployする
+- [ ] Overview、architecture、Governance、安全、文書indexへnavigationできる
+- [ ] Custom 404 pageがある
+- [ ] Secret、個人path、local専用資料、再配布不可資料を公開しない
+- [ ] 公開siteの相対link checkが成功する
+- [ ] HTTPSの公開URLをREADMEへ記載した
+- [ ] Pages workflowと公開結果をread-back確認した
 
 ---
 

@@ -45,6 +45,28 @@ workflow追加時:
 - [ ] forkからのpull requestへ秘密情報を公開しない
 - [ ] Hardware-in-the-Loopを通常のhosted CIから分離する
 
+## Pages／Wiki
+
+2026-07-28のread-back結果:
+
+- GitHub Pagesは有効
+- 公開URL: `https://wachi-yoshitaka-11-dev.github.io/deskcat/`
+- Build type: GitHub Actions workflow
+- Source metadata: `main`／repository root
+- HTTPS enforcement: 有効
+- Pages workflowとActions実行履歴: なし
+- Custom 404: なし
+- Wiki: 有効
+- Wiki content: 既定の英語`Home.md` 1件だけ
+
+整備方針:
+
+- [ ] [GH-002 #25](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/25)で`docs/`、Pages、Wikiの責務と正本を決定する
+- [ ] Wikiを使用、用途限定、無効化のいずれにするか決定する
+- [ ] [GH-003 #26](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/26)で承認済み方針に基づくPages workflowを実装する
+- [ ] `main`の承認済み内容だけをdeployする
+- [ ] 公開前にsecret、個人path、local専用資料、再配布権を確認する
+
 ## 保留
 
 - CODEOWNERS: 安定したreviewer／owner対応が複数になった時点で追加
