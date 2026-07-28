@@ -6,6 +6,7 @@ DeskCat は、机上で静かに振る舞う猫型ペットロボットです。
 > 正確なmodule、GPIO割当て、電力budget、サーボ制限が確定するまで、hardware driverの実装は開始しない。
 
 [公開ドキュメント](https://wachi-yoshitaka-11-dev.github.io/deskcat/)は、repository内の正本からGitHub Pagesへ生成する。
+[Wiki](https://github.com/wachi-yoshitaka-11-dev/deskcat/wiki)は、公開文書への案内専用とする。
 
 ## 初期MVP
 

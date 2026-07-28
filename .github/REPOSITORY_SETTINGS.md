@@ -58,7 +58,10 @@ workflow追加時:
 - 公開物の`404.html`: HTTP 200でread-back確認済み
 - Pages APIの`custom_404` metadata: `false`
 - Wiki: 有効
-- Wiki content: 既定の英語`Home.md` 1件だけ
+- Wiki content: 日本語の案内用`Home.md` 1件だけ
+- Wiki URL: `https://github.com/wachi-yoshitaka-11-dev/deskcat/wiki`
+- Wiki commit: `8402a8e8e2622f27af0d7707709aa66b6d3cd0e1`
+- Wiki運用: [GitHub Wiki入口の保守](../docs/runbooks/github-wiki-home.md)
 
 承認済み方針:
 
@@ -66,7 +69,7 @@ workflow追加時:
 - [x] RootのMarkdownと`docs/`を正本とし、Pagesを正本から生成する
 - [x] Wikiを日本語の入口ページに限定し、独自の技術仕様やlive statusを置かない
 - [x] [GH-003 #26](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/26)でPages workflowを実装する
-- [ ] [GH-004 #27](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/27)でWikiの既定Homeを入口ページへ置き換える
+- [x] [GH-004 #27](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/27)でWikiの既定Homeを入口ページへ置き換える
 - [x] Workflowと`github-pages` environmentの両方でdeploy元を`main`に限定する
 - [x] Whitelist stagingでsecret、個人path、local専用資料、未承認形式を検査する
 
