@@ -25,7 +25,7 @@
 | 1: AI エージェント基盤 | 完了 | `AGENTS.md`、`docs/governance/` |
 | 2: リポジトリ構成 | 完了 | ADR-0001、責務 README |
 | 3: ハードウェア基準資料 | 進行中 | 資料作成済み。実部品の型番・回路・実測待ち |
-| 4: README／GitHub 基盤 | 進行中 | ラベル、マイルストーン、脆弱性報告、`main` 最小保護を適用済み。文書言語を日本語中心に統一済み。最終検証とローカル文書の commit／push 待ち |
+| 4: README／GitHub 基盤 | 完了 | ラベル、マイルストーン、脆弱性報告、`main`最小保護を適用済み。文書言語を日本語中心に統一し、commit `19853d0`で`origin/main`へ公開済み |
 | 5: 初期バックログ | 進行中 | `docs/backlog/initial-issues.md` 作成済み。基盤文書公開後に GitHub Issue 化する |
 | 6: 実装開始ゲート | レビュー済み・未通過 | `docs/runbooks/implementation-readiness-review.md` |
 | M1-001a: 開発環境の情報整理 | 完了 | `docs/toolchains/`、役割別 setup runbook、ADR-0002 |

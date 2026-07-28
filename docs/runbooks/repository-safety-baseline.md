@@ -1,7 +1,9 @@
 # Repository Safety Baseline
 
 > 記録日: 2026-07-27
+> 最終確認日: 2026-07-28
 > Repository: `wachi-yoshitaka-11-dev/deskcat`
+> 基盤commit: `19853d0`
 
 ## 結果
 
@@ -40,10 +42,12 @@ Marker scanは基本的な予防策であり、任意の内容にsecretがない
 
 認証状態は期限切れまたは失効する可能性がある。以後のGitHub書き込み前に毎回確認する。Tokenをproject file、文書、command引数、logへ記載しない。
 
-## 基盤commitへ含める予定の範囲
+## 公開済みの基盤commit範囲
 
-最終diff reviewを前提として、次を対象とする。
+最終diff review後、commit `19853d0`へ次を含め、`origin/main`への反映を確認した。
 
+- `.editorconfig`
+- `.gitattributes`
 - `.gitignore`
 - `AGENTS.md`
 - `docs/planning/development-foundation-plan.md`
