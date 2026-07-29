@@ -31,12 +31,21 @@
   --dc-header-text: #ffffff;
   --dc-shadow: 0 1px 2px rgba(58, 46, 42, 0.06), 0 10px 28px rgba(58, 46, 42, 0.1);
 
-  --dc-font-body: Calibri, "Helvetica Neue", Arial, "Yu Gothic UI",
-    "Hiragino Sans", "Noto Sans JP", Meiryo, system-ui, sans-serif;
-  // 資料と同じく、Latinはserif、日本語はsansへfallbackさせる。
-  // Bookman Old Styleに日本語glyphがないため、資料側も同じ組み合わせになる。
-  --dc-font-heading: "Bookman Old Style", Georgia, "Yu Gothic UI",
-    "Hiragino Sans", "Noto Sans JP", Meiryo, system-ui, sans-serif;
+  // 資料のCalibriとBookman Old StyleはOffice同梱fontであり、macOSやLinux
+  // には存在しない。またBookman Old Styleに日本語glyphがないため、
+  // 「Hardware TBD一覧」のような混在見出しでLatinだけserifになり、
+  // 一つの見出しの中で書体が割れる。資料の見出しはほぼ日本語のみで
+  // この問題が出ないが、この siteの見出しは混在が常態のため採用しない。
+  //
+  // 代わりに各OSのUI fontを使う。Windowsは Segoe UI、macOSとiOSは
+  // SF Pro、AndroidはRobotoが当たる。見出しは書体を変えず、weightと
+  // letter-spacingで本文と差をつける。
+  --dc-font-body: system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI",
+    Meiryo, sans-serif;
+  --dc-font-heading: var(--dc-font-body);
+  --dc-font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", "Courier New", monospace;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -61,6 +70,8 @@ body {
   background-color: var(--dc-bg);
   color: var(--dc-text);
   font-family: var(--dc-font-body);
+  // Cayman既定の1.5は、和文が主体の本文では詰まって見える。
+  line-height: 1.8;
 }
 
 // 資料の表紙と同じdark面にする。
@@ -73,7 +84,8 @@ body {
 .project-name {
   color: var(--dc-header-text);
   font-family: var(--dc-font-heading);
-  letter-spacing: 0.02em;
+  font-weight: 600;
+  letter-spacing: -0.02em;
 }
 
 .project-tagline {
@@ -107,7 +119,9 @@ body {
   h6 {
     color: var(--dc-accent);
     font-family: var(--dc-font-heading);
-    letter-spacing: 0.01em;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    line-height: 1.4;
   }
 
   h2 {
@@ -175,6 +189,7 @@ body {
   pre {
     background-color: var(--dc-surface-alt);
     color: var(--dc-text);
+    font-family: var(--dc-font-mono);
   }
 
   pre {
@@ -198,7 +213,7 @@ body {
     th {
       background-color: var(--dc-surface-alt);
       color: var(--dc-text);
-      font-family: var(--dc-font-heading);
+      font-weight: 600;
     }
 
     td {
