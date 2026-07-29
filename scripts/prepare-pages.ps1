@@ -28,7 +28,8 @@ foreach ($name in $portalFiles) {
     Copy-Item -LiteralPath $source -Destination (Join-Path $outputRoot $name)
 }
 
-# Pages固有のimageだけを`assets/`から公開する。技術文書用のimageはここへ置かない。
+# Pages固有のimageとstylesheetだけを`assets/`から公開する。
+# 技術文書用のimageはここへ置かない。
 $assetsSource = Join-Path $portalRoot 'assets'
 $assetsDestination = Join-Path $outputRoot 'assets'
 if (-not (Test-Path -LiteralPath $assetsSource -PathType Container)) {
@@ -72,7 +73,9 @@ $allowedExtensions = @(
     '.png', '.scss', '.svg', '.txt', '.webp', '.yaml', '.yml'
 )
 $textExtensions = @('.css', '.html', '.markdown', '.md', '.scss', '.svg', '.txt', '.yaml', '.yml')
-$binarySizeLimit = 1MB
+# Extensionを問わず全fileへ適用する。`.svg`はtext扱いだが、image同様に
+# 大きくなり得るため除外しない。現時点の最大fileは76 KiBである。
+$fileSizeLimit = 1MB
 $secretPattern = 'ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|AKIA[0-9A-Z]{16}|-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----'
 $personalPathPattern = 'C:\\Users\\[^\\\s]+|/home/[^/\s]+|file://'
 $problems = [System.Collections.Generic.List[string]]::new()
@@ -90,8 +93,8 @@ foreach ($file in $files) {
         continue
     }
 
-    if ($extension -notin $textExtensions -and -not $isLicense -and $file.Length -gt $binarySizeLimit) {
-        $problems.Add("Binary asset exceeds the Pages size limit: $($file.FullName)")
+    if ($file.Length -gt $fileSizeLimit) {
+        $problems.Add("File exceeds the Pages size limit: $($file.FullName)")
     }
 
     if ($extension -in $textExtensions -or $isLicense) {
