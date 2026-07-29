@@ -6,6 +6,11 @@
 // 配色とtypographyをconcept資料（DeskCat_Modern_Public_10slides）へ合わせる。
 // Cayman themeを差し替えず、公式のstylesheet override機構だけで上書きする。
 //
+// 下の`@import`はCaymanのSCSSを読み込む。CaymanのSCSSはGoogle Fontsへの
+// `@import url(...)`を含み、Caymanのlayoutも同じfontを`<link>`で読み込む。
+// よってPagesは外部fontを取得する。下の`font-family`上書きは適用書体だけを
+// 変え、読み込み自体は止めない。停止にはtheme SCSSとlayoutの自前保守が必要。
+//
 // 資料の実測値をそのまま使う。ただし次の2色は、cream背景に対してWCAG AAの
 // contrast比4.5:1を満たさないため、同系統で暗い値へ寄せる。
 //
@@ -39,6 +44,7 @@
   // 代わりに各OSのUI fontを使う。Windowsは Segoe UI、macOSとiOSは
   // SF Pro、AndroidはRobotoが当たる。見出しは書体を変えず、weightと
   // letter-spacingで本文と差をつける。
+  // CaymanのOpen Sansは読み込まれるが、ここで上書きするため適用されない。
   --dc-font-body: system-ui, -apple-system, "Segoe UI", Roboto,
     "Helvetica Neue", Arial, "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI",
     Meiryo, sans-serif;
@@ -163,6 +169,13 @@ body {
   pre {
     border: 1px solid var(--dc-border);
     border-radius: 12px;
+  }
+
+  // Caymanの`.main-content pre > code`はselectorが1つ強く、上の`code`規則に
+  // 勝つ。結果、code block内の文字だけがCaymanの`#567482`のまま残り、
+  // `--dc-surface-alt`に対して明3.99:1、暗2.90:1でAAを満たさない。
+  pre > code {
+    color: var(--dc-text);
   }
 
   // `border-collapse: collapse`ではtableのborder-radiusが無視され、角が
