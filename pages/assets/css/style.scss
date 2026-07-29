@@ -24,7 +24,6 @@
   --dc-muted: #756661;
   --dc-accent: #af4f69;
   --dc-accent-strong: #8e3d54;
-  --dc-accent-mid: #c96c83;
   --dc-accent-soft: #e08ba0;
   --dc-border: #d9c9c0;
   --dc-header-bg: #2b211e;
@@ -58,7 +57,6 @@
     --dc-muted: #b3a099;
     --dc-accent: #e08ba0;
     --dc-accent-strong: #f0aab9;
-    --dc-accent-mid: #c96c83;
     --dc-accent-soft: #e08ba0;
     --dc-border: #43342f;
     --dc-header-bg: #191311;
@@ -70,8 +68,6 @@ body {
   background-color: var(--dc-bg);
   color: var(--dc-text);
   font-family: var(--dc-font-body);
-  // Cayman既定の1.5は、和文が主体の本文では詰まって見える。
-  line-height: 1.8;
 }
 
 // 資料の表紙と同じdark面にする。
@@ -86,10 +82,12 @@ body {
   font-family: var(--dc-font-heading);
   font-weight: 600;
   letter-spacing: -0.02em;
+  line-height: 1.2;
 }
 
 .project-tagline {
   color: var(--dc-accent-soft);
+  line-height: 1.5;
   opacity: 1;
 }
 
@@ -110,6 +108,8 @@ body {
 
 .main-content {
   color: var(--dc-text);
+  // Cayman既定の1.5は、和文が主体の本文では詰まって見える。
+  line-height: 1.8;
 
   h1,
   h2,
@@ -139,42 +139,10 @@ body {
     }
   }
 
-  p {
-    color: var(--dc-text-2);
-  }
-
-  // 資料の角丸cardと円形iconのmotifを、link一覧へ持ち込む。
-  > ul {
-    margin: 0 0 1.5rem;
-    padding: 0.5rem 0;
-    border: 1px solid var(--dc-border);
-    border-radius: 16px;
-    background-color: var(--dc-surface);
-    box-shadow: var(--dc-shadow);
-    list-style: none;
-
-    > li {
-      position: relative;
-      margin: 0;
-      padding: 0.6rem 1.25rem 0.6rem 2.75rem;
-      border-top: 1px solid var(--dc-border);
-
-      &:first-child {
-        border-top: 0;
-      }
-
-      &::before {
-        position: absolute;
-        top: 50%;
-        left: 1.25rem;
-        width: 0.5rem;
-        height: 0.5rem;
-        margin-top: -0.25rem;
-        border-radius: 50%;
-        background-color: var(--dc-accent-soft);
-        content: "";
-      }
-    }
+  // 箇条書きはPages全ページで使うため、markerの色だけを資料へ合わせる。
+  // Card化すると、40ページ2700行のprose箇条書きまでcardになってしまう。
+  ul li::marker {
+    color: var(--dc-accent-soft);
   }
 
   blockquote {
@@ -197,17 +165,51 @@ body {
     border-radius: 12px;
   }
 
+  // `border-collapse: collapse`ではtableのborder-radiusが無視され、角が
+  // 直角のままになる。`separate`にしてcellの外周角だけを丸める。
+  // Border二重線を避けるため、cellはtopとleftだけに罫を持つ。
   table {
     display: table;
     width: 100%;
-    border-collapse: collapse;
-    overflow: hidden;
+    border: 1px solid var(--dc-border);
+    border-collapse: separate;
+    border-spacing: 0;
     border-radius: 16px;
     box-shadow: var(--dc-shadow);
 
     th,
     td {
-      border: 1px solid var(--dc-border);
+      border-top: 1px solid var(--dc-border);
+      border-left: 1px solid var(--dc-border);
+
+      &:first-child {
+        border-left: 0;
+      }
+    }
+
+    thead tr:first-child {
+      th,
+      td {
+        border-top: 0;
+      }
+
+      th:first-child {
+        border-top-left-radius: 15px;
+      }
+
+      th:last-child {
+        border-top-right-radius: 15px;
+      }
+    }
+
+    tbody tr:last-child {
+      td:first-child {
+        border-bottom-left-radius: 15px;
+      }
+
+      td:last-child {
+        border-bottom-right-radius: 15px;
+      }
     }
 
     th {
@@ -218,7 +220,6 @@ body {
 
     td {
       background-color: var(--dc-surface);
-      color: var(--dc-text-2);
     }
   }
 
