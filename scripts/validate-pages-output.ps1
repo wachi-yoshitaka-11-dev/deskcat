@@ -20,6 +20,8 @@ $requiredFiles = @(
     'index.html',
     '404.html',
     'favicon.ico',
+    'assets/css/style.css',
+    'assets/deskcat-concept.jpg',
     'docs/architecture/index.html',
     'docs/governance/index.html',
     'docs/governance/hardware-safety-policy.html',

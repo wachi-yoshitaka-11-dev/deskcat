@@ -28,6 +28,14 @@ foreach ($name in $portalFiles) {
     Copy-Item -LiteralPath $source -Destination (Join-Path $outputRoot $name)
 }
 
+# Pages固有のimageだけを`assets/`から公開する。技術文書用のimageはここへ置かない。
+$assetsSource = Join-Path $portalRoot 'assets'
+$assetsDestination = Join-Path $outputRoot 'assets'
+if (-not (Test-Path -LiteralPath $assetsSource -PathType Container)) {
+    throw "Required Pages assets directory is missing: $assetsSource"
+}
+Copy-Item -LiteralPath $assetsSource -Destination $assetsDestination -Recurse
+
 # GitHub Pagesのthemeが各pageから参照するfaviconを、依存toolなしで生成する。
 # 1 x 1 pixel、32-bit BGRAの最小ICOであり、公開文書のbuild成否だけに影響する。
 [byte[]]$faviconBytes = @(
@@ -64,6 +72,7 @@ $allowedExtensions = @(
     '.png', '.scss', '.svg', '.txt', '.webp', '.yaml', '.yml'
 )
 $textExtensions = @('.css', '.html', '.markdown', '.md', '.scss', '.svg', '.txt', '.yaml', '.yml')
+$binarySizeLimit = 1MB
 $secretPattern = 'ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|AKIA[0-9A-Z]{16}|-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----'
 $personalPathPattern = 'C:\\Users\\[^\\\s]+|/home/[^/\s]+|file://'
 $problems = [System.Collections.Generic.List[string]]::new()
@@ -79,6 +88,10 @@ foreach ($file in $files) {
     if ($extension -notin $allowedExtensions -and -not $isLicense) {
         $problems.Add("File type is not approved for Pages: $($file.FullName)")
         continue
+    }
+
+    if ($extension -notin $textExtensions -and -not $isLicense -and $file.Length -gt $binarySizeLimit) {
+        $problems.Add("Binary asset exceeds the Pages size limit: $($file.FullName)")
     }
 
     if ($extension -in $textExtensions -or $isLicense) {

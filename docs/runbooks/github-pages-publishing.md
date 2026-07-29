@@ -47,8 +47,13 @@ GitHub公式のJekyll Pages Actionを使用する。
 - `pages/_config.yml`
 - `pages/index.md`
 - `pages/404.md`
+- `pages/assets/`配下のimageとstylesheet
 - Rootの`README.md`、`AGENTS.md`、`CONTRIBUTING.md`、`SECURITY.md`、`LICENSE`
 - `docs/`配下の文書
+
+`pages/assets/`のimageは、`prepare-pages.ps1`が承認拡張子と1 MiBの上限で検査する。追加前に再配布権を確認し、実機写真ではないimageにはその旨をpage上へ明記する。
+
+配色は`pages/assets/css/style.scss`でCayman themeへ上書きする。Jekyll公式のstylesheet override機構を使い、theme自体は差し替えないため新規dependencyは発生しない。Sassのcompileはこの端末では実行できず、GitHub ActionsのPR buildが唯一の検証経路である。
 
 次は公開しない。
 

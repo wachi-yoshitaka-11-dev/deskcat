@@ -3,7 +3,11 @@ layout: default
 title: DeskCat 公開ドキュメント
 ---
 
-# DeskCat
+<figure class="hero">
+  <img src="assets/deskcat-concept.jpg" width="360" height="360"
+       alt="DeskCatのコンセプトイメージ。机上に座る白い猫型ロボットが、顔の前面displayに目と口を表示している。">
+  <figcaption>コンセプトイメージ（完成品の外観、部品構成、動作を示すものではありません）</figcaption>
+</figure>
 
 DeskCatは、ESP32とRaspberry Pi Zero WHで構成する、机上で静かに振る舞う猫型ペットロボットです。
 
