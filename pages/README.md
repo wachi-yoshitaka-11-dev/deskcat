@@ -13,7 +13,7 @@
 - Rootの公開Markdown
 - `docs/`配下のMarkdown
 
-`pages/assets/`には、入口pageが参照するimageとstylesheetだけを置く。Imageは再配布権を確認したものに限り、表示寸法の2倍程度へ縮小してから追加する。1 file 1 MiBを上限とし、hardware写真や技術図のような文書向けimageはここへ置かない。
+`pages/assets/`には、入口pageが参照するimageとstylesheetだけを置く。Imageは[公開asset register](../docs/governance/published-asset-register.md)へ出所と再配布許諾を登録したものに限り、表示寸法の2倍程度へ縮小してから追加する。1 file 1 MiBを上限とし、hardware写真や技術図のような文書向けimageはここへ置かない。
 
 `pages/assets/css/style.scss`は、Cayman themeを差し替えずに配色だけを上書きするstylesheetである。Themeの変更はdependency reviewが必要なため、[ADR-0003](../docs/decisions/0003-public-documentation-publishing.md)に従って独立した変更として扱う。
 
