@@ -3,76 +3,96 @@
 
 @import "{{ site.theme }}";
 
-// DeskCatのconcept image（暖色のcreamとpink）へsiteの配色を合わせる。
+// 配色とtypographyをconcept資料（DeskCat_Modern_Public_10slides）へ合わせる。
 // Cayman themeを差し替えず、公式のstylesheet override機構だけで上書きする。
+//
+// 資料の実測値をそのまま使う。ただし次の2色は、cream背景に対してWCAG AAの
+// contrast比4.5:1を満たさないため、同系統で暗い値へ寄せる。
+//
+// - 見出しとlink: 資料の`#c96c83`は3.17:1。`#af4f69`へ寄せて4.55:1。
+// - Captionとfooter: 資料の`#8a7a74`は3.69:1。`#756661`へ寄せて4.93:1。
+//
+// 文字を載せない装飾（marker、blockquoteの罫、button）には、資料の
+// `#e08ba0`と`#c96c83`をそのまま使う。
 
 :root {
-  --dc-bg: #fdf8f5;
+  --dc-bg: #fbf1ea;
   --dc-surface: #ffffff;
-  --dc-text: #3d302b;
-  --dc-muted: #7c6a62;
-  --dc-accent: #b25563;
-  --dc-accent-strong: #8e3f4c;
-  --dc-border: #efe0d8;
-  --dc-code-bg: #f6ede7;
-  --dc-header-from: #f7cfc2;
-  --dc-header-to: #efa9ae;
-  --dc-header-text: #4a3733;
-  --dc-shadow: 0 1px 2px rgba(61, 48, 43, 0.06), 0 8px 24px rgba(61, 48, 43, 0.08);
+  --dc-surface-alt: #f3e3da;
+  --dc-text: #3a2e2a;
+  --dc-text-2: #5c4f4a;
+  --dc-muted: #756661;
+  --dc-accent: #af4f69;
+  --dc-accent-strong: #8e3d54;
+  --dc-accent-mid: #c96c83;
+  --dc-accent-soft: #e08ba0;
+  --dc-border: #d9c9c0;
+  --dc-header-bg: #2b211e;
+  --dc-header-text: #ffffff;
+  --dc-shadow: 0 1px 2px rgba(58, 46, 42, 0.06), 0 10px 28px rgba(58, 46, 42, 0.1);
+
+  --dc-font-body: Calibri, "Helvetica Neue", Arial, "Yu Gothic UI",
+    "Hiragino Sans", "Noto Sans JP", Meiryo, system-ui, sans-serif;
+  // 資料と同じく、Latinはserif、日本語はsansへfallbackさせる。
+  // Bookman Old Styleに日本語glyphがないため、資料側も同じ組み合わせになる。
+  --dc-font-heading: "Bookman Old Style", Georgia, "Yu Gothic UI",
+    "Hiragino Sans", "Noto Sans JP", Meiryo, system-ui, sans-serif;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --dc-bg: #1e1917;
-    --dc-surface: #272120;
-    --dc-text: #ede3dd;
-    --dc-muted: #b0a099;
-    --dc-accent: #f0a7ae;
-    --dc-accent-strong: #f7c4c9;
-    --dc-border: #3a302d;
-    --dc-code-bg: #2e2725;
-    --dc-header-from: #7b4a4a;
-    --dc-header-to: #a5606a;
-    --dc-header-text: #fdf2ee;
-    --dc-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
+    --dc-bg: #211a17;
+    --dc-surface: #2b211e;
+    --dc-surface-alt: #332723;
+    --dc-text: #f3e3da;
+    --dc-text-2: #d9c9c0;
+    --dc-muted: #b3a099;
+    --dc-accent: #e08ba0;
+    --dc-accent-strong: #f0aab9;
+    --dc-accent-mid: #c96c83;
+    --dc-accent-soft: #e08ba0;
+    --dc-border: #43342f;
+    --dc-header-bg: #191311;
+    --dc-shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 10px 28px rgba(0, 0, 0, 0.4);
   }
 }
 
 body {
   background-color: var(--dc-bg);
   color: var(--dc-text);
-  font-family: "Helvetica Neue", Arial, "Hiragino Sans", "Noto Sans JP",
-    "Yu Gothic UI", Meiryo, system-ui, sans-serif;
+  font-family: var(--dc-font-body);
 }
 
+// 資料の表紙と同じdark面にする。
 .page-header {
-  background-color: var(--dc-header-to);
-  background-image: linear-gradient(135deg, var(--dc-header-from), var(--dc-header-to));
+  background-color: var(--dc-header-bg);
+  background-image: none;
   color: var(--dc-header-text);
 }
 
-.project-name,
-.project-tagline {
+.project-name {
   color: var(--dc-header-text);
+  font-family: var(--dc-font-heading);
+  letter-spacing: 0.02em;
 }
 
 .project-tagline {
-  opacity: 0.85;
+  color: var(--dc-accent-soft);
+  opacity: 1;
 }
 
 .btn {
-  border: 1px solid rgba(74, 55, 51, 0.18);
+  border: 1px solid var(--dc-accent-soft);
   border-radius: 999px;
-  background-color: rgba(255, 255, 255, 0.72);
-  color: var(--dc-accent-strong);
-  transition: background-color 0.2s ease, transform 0.2s ease;
+  background-color: transparent;
+  color: var(--dc-accent-soft);
+  transition: background-color 0.2s ease, color 0.2s ease;
 
   &:hover,
   &:focus-visible {
-    border-color: rgba(74, 55, 51, 0.28);
-    background-color: #ffffff;
-    color: var(--dc-accent-strong);
-    transform: translateY(-1px);
+    border-color: var(--dc-accent-soft);
+    background-color: var(--dc-accent-soft);
+    color: var(--dc-header-bg);
   }
 }
 
@@ -86,13 +106,12 @@ body {
   h5,
   h6 {
     color: var(--dc-accent);
+    font-family: var(--dc-font-heading);
     letter-spacing: 0.01em;
   }
 
   h2 {
-    margin-top: 2.5rem;
-    padding-bottom: 0.4rem;
-    border-bottom: 1px solid var(--dc-border);
+    margin-top: 3rem;
   }
 
   a {
@@ -106,18 +125,55 @@ body {
     }
   }
 
-  ul li::marker {
-    color: var(--dc-header-to);
+  p {
+    color: var(--dc-text-2);
+  }
+
+  // 資料の角丸cardと円形iconのmotifを、link一覧へ持ち込む。
+  > ul {
+    margin: 0 0 1.5rem;
+    padding: 0.5rem 0;
+    border: 1px solid var(--dc-border);
+    border-radius: 16px;
+    background-color: var(--dc-surface);
+    box-shadow: var(--dc-shadow);
+    list-style: none;
+
+    > li {
+      position: relative;
+      margin: 0;
+      padding: 0.6rem 1.25rem 0.6rem 2.75rem;
+      border-top: 1px solid var(--dc-border);
+
+      &:first-child {
+        border-top: 0;
+      }
+
+      &::before {
+        position: absolute;
+        top: 50%;
+        left: 1.25rem;
+        width: 0.5rem;
+        height: 0.5rem;
+        margin-top: -0.25rem;
+        border-radius: 50%;
+        background-color: var(--dc-accent-soft);
+        content: "";
+      }
+    }
   }
 
   blockquote {
-    border-left: 4px solid var(--dc-header-to);
-    color: var(--dc-muted);
+    padding: 0.75rem 1.25rem;
+    border-left: 4px solid var(--dc-accent-soft);
+    border-radius: 0 12px 12px 0;
+    background-color: var(--dc-surface-alt);
+    color: var(--dc-text-2);
   }
 
   code,
   pre {
-    background-color: var(--dc-code-bg);
+    background-color: var(--dc-surface-alt);
     color: var(--dc-text);
   }
 
@@ -131,7 +187,7 @@ body {
     width: 100%;
     border-collapse: collapse;
     overflow: hidden;
-    border-radius: 12px;
+    border-radius: 16px;
     box-shadow: var(--dc-shadow);
 
     th,
@@ -140,12 +196,14 @@ body {
     }
 
     th {
-      background-color: var(--dc-code-bg);
+      background-color: var(--dc-surface-alt);
       color: var(--dc-text);
+      font-family: var(--dc-font-heading);
     }
 
     td {
       background-color: var(--dc-surface);
+      color: var(--dc-text-2);
     }
   }
 
@@ -163,7 +221,7 @@ body {
 }
 
 .hero {
-  margin: 0 0 2rem;
+  margin: 0 0 2.5rem;
   text-align: center;
 
   img {
