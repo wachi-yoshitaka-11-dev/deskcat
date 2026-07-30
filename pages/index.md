@@ -11,7 +11,7 @@ title: DeskCat 公開ドキュメント
 
 DeskCatは、ESP32とRaspberry Pi Zero WHで構成する、机上で静かに振る舞う猫型ペットロボットです。
 
-現在は開発基盤の整備とハードウェア特定を進めています。正確なmodule、GPIO、電源、サーボ制限が確定するまで、未確認値を使った実機駆動は行いません。
+正確なmodule、GPIO、電源、サーボ制限が確定するまで、未確認値を使った実機駆動は行いません。開発の進行状況は[GitHub Issues](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues)で管理しており、このsiteでは複製しません。
 
 ## はじめに
 
