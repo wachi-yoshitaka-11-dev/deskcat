@@ -7,6 +7,16 @@
 *.toml text eol=lf
 *.rs text eol=lf
 *.ps1 text eol=lf
+*.psd1 text eol=lf
+*.scss text eol=lf
+*.css text eol=lf
+
+*.jpg binary
+*.jpeg binary
+*.png binary
+*.webp binary
+*.gif binary
+*.ico binary
 
 .editorconfig text eol=lf
 .gitattributes text eol=lf

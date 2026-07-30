@@ -67,6 +67,12 @@ jobs:
         shell: pwsh
         run: ./scripts/validate-pages-output.ps1 -SiteRoot ./_site
 
+      # 公開境界の回帰test。未宣言asset、追跡外asset、hash不一致、size超過で
+      # stagingが失敗することを確認する。`_site`は既に検証済みで影響しない。
+      - name: Test publish guards
+        shell: pwsh
+        run: ./scripts/test-pages-guards.ps1
+
       - name: Upload Pages artifact
         if: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
         uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4

@@ -47,8 +47,28 @@ GitHub公式のJekyll Pages Actionを使用する。
 - `pages/_config.yml`
 - `pages/index.md`
 - `pages/404.md`
+- `pages/assets-manifest.psd1`が列挙した`pages/assets/`配下のasset
 - Rootの`README.md`、`AGENTS.md`、`CONTRIBUTING.md`、`SECURITY.md`、`LICENSE`
 - `docs/`配下の文書
+
+`pages/assets/`のassetは、`pages/assets-manifest.psd1`が列挙したexact pathだけを公開する。`prepare-pages.ps1`は次を失敗として扱う。
+
+- Manifestに無いfileが`pages/assets/`にある
+- Manifestが列挙したfileがdisk上に無い、またはGitの追跡対象でない
+- Binary assetのSHA-256がmanifestと一致しない、または未記録である
+- Text asset（`.css`、`.scss`、`.svg`、`.txt`）が`Sha256`を記録している。編集ごとに古くなるため記録しない
+- Manifestの`Path`が`..`、絶対path、rooted pathを含む
+- 承認外の拡張子、または1 MiBを超えるfile
+
+これらの回帰testは`scripts/test-pages-guards.ps1`にあり、Pages workflowで実行する。追加toolは不要である。
+
+```powershell
+pwsh -File ./scripts/test-pages-guards.ps1
+```
+
+Asset追加前に[公開asset register](../governance/published-asset-register.md)へ出所と再配布許諾を登録し、実機写真ではないimageにはその旨をpage上へ明記する。
+
+`pages/assets/css/style.scss`はCayman themeへのtheme override stylesheetである。上書き対象は配色、typography、table、blockquote、code block、responsive layoutである。Jekyll公式のstylesheet override機構を使い、theme自体は差し替えないため新規dependencyは発生しない。Sassのcompileはこの端末では実行できず、GitHub ActionsのPR buildが唯一の検証経路である。
 
 次は公開しない。
 
