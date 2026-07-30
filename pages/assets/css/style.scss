@@ -3,8 +3,10 @@
 
 @import "{{ site.theme }}";
 
-// 配色とtypographyをconcept資料（DeskCat_Modern_Public_10slides）へ合わせる。
-// Cayman themeを差し替えず、公式のstylesheet override機構だけで上書きする。
+// Cayman themeへのtheme override stylesheet。
+// 上書き対象は配色、typography、table、blockquote、code block、responsive
+// layoutであり、配色とtypographyはconcept資料（DeskCat_Modern_Public_10slides）
+// へ合わせる。Themeは差し替えず、公式のstylesheet override機構だけを使う。
 //
 // 下の`@import`はCaymanのSCSSを読み込む。CaymanのSCSSはGoogle Fontsへの
 // `@import url(...)`を含み、Caymanのlayoutも同じfontを`<link>`で読み込む。

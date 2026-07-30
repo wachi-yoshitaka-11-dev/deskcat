@@ -68,7 +68,7 @@ pwsh -File ./scripts/test-pages-guards.ps1
 
 Asset追加前に[公開asset register](../governance/published-asset-register.md)へ出所と再配布許諾を登録し、実機写真ではないimageにはその旨をpage上へ明記する。
 
-配色は`pages/assets/css/style.scss`でCayman themeへ上書きする。Jekyll公式のstylesheet override機構を使い、theme自体は差し替えないため新規dependencyは発生しない。Sassのcompileはこの端末では実行できず、GitHub ActionsのPR buildが唯一の検証経路である。
+`pages/assets/css/style.scss`はCayman themeへのtheme override stylesheetである。上書き対象は配色、typography、table、blockquote、code block、responsive layoutである。Jekyll公式のstylesheet override機構を使い、theme自体は差し替えないため新規dependencyは発生しない。Sassのcompileはこの端末では実行できず、GitHub ActionsのPR buildが唯一の検証経路である。
 
 次は公開しない。
 

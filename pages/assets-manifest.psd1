@@ -18,7 +18,7 @@
     Assets = @(
         @{
             Path = 'css/style.scss'
-            Note = 'Cayman themeのoverride stylesheet。配色とtypographyをconcept資料へ合わせる'
+            Note = 'Cayman themeのtheme override stylesheet。配色、typography、table、blockquote、code block、responsive layoutを上書きする'
         }
         @{
             Path   = 'deskcat-concept.jpg'
