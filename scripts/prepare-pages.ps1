@@ -28,14 +28,119 @@ foreach ($name in $portalFiles) {
     Copy-Item -LiteralPath $source -Destination (Join-Path $outputRoot $name)
 }
 
-# Pages固有のimageとstylesheetだけを`assets/`から公開する。
-# 技術文書用のimageはここへ置かない。
+# Pages固有のassetは、review済みmanifestが列挙したexact pathだけを公開する。
+# 再帰copyにすると、許可拡張子でありreviewを経ていないfileまで公開され得る。
+# 特にbinaryは下の内容scanが効かないため、hashで同一性を固定する。
 $assetsSource = Join-Path $portalRoot 'assets'
 $assetsDestination = Join-Path $outputRoot 'assets'
+$assetManifestPath = Join-Path $portalRoot 'assets-manifest.psd1'
+
 if (-not (Test-Path -LiteralPath $assetsSource -PathType Container)) {
     throw "Required Pages assets directory is missing: $assetsSource"
 }
-Copy-Item -LiteralPath $assetsSource -Destination $assetsDestination -Recurse
+if (-not (Test-Path -LiteralPath $assetManifestPath -PathType Leaf)) {
+    throw "Required Pages asset manifest is missing: $assetManifestPath"
+}
+
+# `Import-PowerShellDataFile`はdataだけを読み、manifest内のcodeを実行しない。
+$assetManifest = Import-PowerShellDataFile -LiteralPath $assetManifestPath
+if (-not $assetManifest.ContainsKey('Assets')) {
+    throw "Pages asset manifest has no Assets key: $assetManifestPath"
+}
+
+# Git追跡対象だけを公開する。追跡外のfileをmanifestへ書いても公開しない。
+# 比較はcase-sensitiveにする。CIのubuntu-24.04はcase-sensitive filesystemであり、
+# case違いをOrdinalIgnoreCaseで「追跡済み」と誤判定すると未reviewのfileが公開される。
+$trackedAssets = [System.Collections.Generic.HashSet[string]]::new(
+    [System.StringComparer]::Ordinal)
+$gitAssetOutput = @(& git -C $repositoryRoot ls-files 'pages/assets' 2>$null)
+if ($LASTEXITCODE -ne 0) {
+    throw "Unable to enumerate tracked files under pages/assets/. Run inside a Git checkout."
+}
+foreach ($line in $gitAssetOutput) {
+    $null = $trackedAssets.Add($line)
+}
+
+$assetProblems = [System.Collections.Generic.List[string]]::new()
+$declaredAssets = [System.Collections.Generic.HashSet[string]]::new(
+    [System.StringComparer]::Ordinal)
+$textAssetExtensions = @('.css', '.scss', '.svg', '.txt')
+
+$null = New-Item -ItemType Directory -Path $assetsDestination
+foreach ($entry in @($assetManifest.Assets)) {
+    if (-not $entry.ContainsKey('Path')) {
+        $assetProblems.Add('Asset manifest entry has no Path.')
+        continue
+    }
+    $relative = [string]$entry.Path
+
+    # Manifestの`Path`でstaging先を`assets/`の外へ逃がせないようにする。
+    if (
+        [string]::IsNullOrWhiteSpace($relative) -or
+        $relative.Contains('..') -or
+        $relative.StartsWith('/') -or
+        $relative.StartsWith('\') -or
+        [System.IO.Path]::IsPathRooted($relative)
+    ) {
+        $assetProblems.Add("Asset manifest Path is not a safe relative path: $relative")
+        continue
+    }
+
+    $normalized = $relative.Replace('\', '/')
+    $null = $declaredAssets.Add($normalized)
+    $repoRelative = "pages/assets/$normalized"
+    $source = Join-Path $assetsSource ($normalized -replace '/', [string][System.IO.Path]::DirectorySeparatorChar)
+
+    if (-not (Test-Path -LiteralPath $source -PathType Leaf)) {
+        $assetProblems.Add("Declared asset is missing: $repoRelative")
+        continue
+    }
+    if (-not $trackedAssets.Contains($repoRelative)) {
+        $assetProblems.Add("Declared asset is not tracked by Git: $repoRelative")
+        continue
+    }
+
+    $extension = [System.IO.Path]::GetExtension($normalized).ToLowerInvariant()
+    $isTextAsset = $extension -in $textAssetExtensions
+    $hasHash = $entry.ContainsKey('Sha256')
+
+    if ($isTextAsset -and $hasHash) {
+        $assetProblems.Add("Text asset must not declare Sha256: $repoRelative")
+        continue
+    }
+    if (-not $isTextAsset) {
+        if (-not $hasHash) {
+            $assetProblems.Add("Binary asset must declare Sha256: $repoRelative")
+            continue
+        }
+        $actualHash = (Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash
+        if (-not $actualHash.Equals([string]$entry.Sha256, [System.StringComparison]::OrdinalIgnoreCase)) {
+            $assetProblems.Add("Asset SHA-256 does not match the manifest: $repoRelative (actual $actualHash)")
+            continue
+        }
+    }
+
+    $target = Join-Path $assetsDestination ($normalized -replace '/', [string][System.IO.Path]::DirectorySeparatorChar)
+    $targetDirectory = Split-Path -Parent $target
+    if (-not (Test-Path -LiteralPath $targetDirectory)) {
+        $null = New-Item -ItemType Directory -Path $targetDirectory -Force
+    }
+    Copy-Item -LiteralPath $source -Destination $target
+}
+
+# Manifestに無いfileを検知する。追跡状態にかかわらず失敗させ、localとCIで
+# 同じ結果にする。`pages/assets/`は少数の選定済みassetだけを置く場所である。
+foreach ($item in @(Get-ChildItem -LiteralPath $assetsSource -Recurse -Force -File)) {
+    $onDisk = $item.FullName.Substring($assetsSource.Length).TrimStart('\', '/').Replace('\', '/')
+    if (-not $declaredAssets.Contains($onDisk)) {
+        $assetProblems.Add("Asset is not declared in the manifest: pages/assets/$onDisk")
+    }
+}
+
+if ($assetProblems.Count -gt 0) {
+    $assetProblems | ForEach-Object { [Console]::Error.WriteLine($_) }
+    throw "Pages asset manifest validation failed with $($assetProblems.Count) problem(s)."
+}
 
 # GitHub Pagesのthemeが各pageから参照するfaviconを、依存toolなしで生成する。
 # 1 x 1 pixel、32-bit BGRAの最小ICOであり、公開文書のbuild成否だけに影響する。

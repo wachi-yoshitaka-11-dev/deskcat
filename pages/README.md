@@ -9,11 +9,18 @@
 - `pages/_config.yml`
 - `pages/index.md`
 - `pages/404.md`
-- `pages/assets/`配下のimageとstylesheet
+- `pages/assets-manifest.psd1`が列挙した`pages/assets/`配下のasset
 - Rootの公開Markdown
 - `docs/`配下のMarkdown
 
-`pages/assets/`には、入口pageが参照するimageとstylesheetだけを置く。Imageは[公開asset register](../docs/governance/published-asset-register.md)へ出所と再配布許諾を登録したものに限り、表示寸法の2倍程度へ縮小してから追加する。1 file 1 MiBを上限とし、hardware写真や技術図のような文書向けimageはここへ置かない。
+`pages/assets/`には、入口pageが参照するassetだけを置く。公開対象は`pages/assets-manifest.psd1`が列挙したexact pathに限られ、列挙外のfileを置くとbuildが失敗する。Assetを追加する手順は次のとおり。
+
+1. [公開asset register](../docs/governance/published-asset-register.md)へ出所と再配布許諾を登録する。
+2. Imageは表示寸法の2倍程度へ縮小する。1 fileの上限は1 MiBである。
+3. `pages/assets-manifest.psd1`へpathを追加する。Binaryはあわせて`Sha256`を記録する。
+4. Gitへ追跡させる。追跡外のfileはmanifestへ書いても公開されない。
+
+Hardware写真や技術図のような文書向けimageはここへ置かない。境界の回帰testは`scripts/test-pages-guards.ps1`にある。
 
 `pages/assets/css/style.scss`は、Cayman themeを差し替えずに上書きするtheme override stylesheetである。対象は配色、typography、table、blockquote、code block、responsive layoutである。Themeの差し替えはdependency reviewが必要なため、[ADR-0003](../docs/decisions/0003-public-documentation-publishing.md)に従って独立した変更として扱う。
 

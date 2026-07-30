@@ -8,8 +8,10 @@
 //
 // 下の`@import`はCaymanのSCSSを読み込む。CaymanのSCSSはGoogle Fontsへの
 // `@import url(...)`を含み、Caymanのlayoutも同じfontを`<link>`で読み込む。
-// よってPagesは外部fontを取得する。下の`font-family`上書きは適用書体だけを
-// 変え、読み込み自体は止めない。停止にはtheme SCSSとlayoutの自前保守が必要。
+// よってPagesは外部fontとしてOpen Sansを取得する。これは意図した依存であり、
+// 本stylesheetもLatinへOpen Sansを当てて実際に使用する。読み込むが使わない
+// 状態を避けるため、`--dc-font-body`の先頭へ置いている。
+// 読み込み自体を止める場合はtheme SCSSとlayoutの自前保守が必要になる。
 //
 // 資料の実測値をそのまま使う。ただし次の2色は、cream背景に対してWCAG AAの
 // contrast比4.5:1を満たさないため、同系統で暗い値へ寄せる。
@@ -41,11 +43,12 @@
   // 一つの見出しの中で書体が割れる。資料の見出しはほぼ日本語のみで
   // この問題が出ないが、この siteの見出しは混在が常態のため採用しない。
   //
-  // 代わりに各OSのUI fontを使う。Windowsは Segoe UI、macOSとiOSは
-  // SF Pro、AndroidはRobotoが当たる。見出しは書体を変えず、weightと
-  // letter-spacingで本文と差をつける。
-  // CaymanのOpen Sansは読み込まれるが、ここで上書きするため適用されない。
-  --dc-font-body: system-ui, -apple-system, "Segoe UI", Roboto,
+  // 代わりに、Caymanが既に読み込むOpen SansをLatinへ当て、日本語はOSの
+  // UI fontへ落とす。Open Sansは上の`@import`で必ず読み込まれるため、
+  // stackの先頭へ置くことで追加requestなしに適用できる。
+  // 日本語glyphを持たない点はBookman Old Styleと同じだが、fallback先も
+  // sansであり、一つの見出しの中でserifとsansが混ざる問題は起きない。
+  --dc-font-body: "Open Sans", system-ui, -apple-system, "Segoe UI", Roboto,
     "Helvetica Neue", Arial, "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI",
     Meiryo, sans-serif;
   --dc-font-heading: var(--dc-font-body);
@@ -86,7 +89,7 @@ body {
 .project-name {
   color: var(--dc-header-text);
   font-family: var(--dc-font-heading);
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: -0.02em;
   line-height: 1.2;
 }
@@ -125,7 +128,9 @@ body {
   h6 {
     color: var(--dc-accent);
     font-family: var(--dc-font-heading);
-    font-weight: 600;
+    // CaymanはOpen Sansを400と700だけ読み込む。600を指定すると700へ
+    // 解決されるため、実際に読み込むweightを直接指定する。
+    font-weight: 700;
     letter-spacing: -0.01em;
     line-height: 1.4;
   }

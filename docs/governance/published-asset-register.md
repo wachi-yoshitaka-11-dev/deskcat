@@ -40,6 +40,8 @@ Assetを追加する前に、次をすべて満たす。
 | 再配布許諾の根拠 | 権利者本人による許諾。本repositoryの[MIT License](../../LICENSE)に従って公開・再配布する |
 | 確認日 | 2026-07-29 |
 | SHA-256 | `615063ED60596F55066D602E1C44ACFB46D6D3103B9D234AEB8170E864FBB5B2` |
+
+検証に使うSHA-256の正本は`pages/assets-manifest.psd1`である。`prepare-pages.ps1`はそのhashと実fileを照合し、不一致でbuildを失敗させる。Assetを差し替える場合は、manifestと本文書の両方を更新する。
 | 寸法・size | 720 x 720、77,305 bytes |
 | 実機写真か | いいえ。入口pageのcaptionへ明記済み |
 
