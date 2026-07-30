@@ -12,6 +12,7 @@
 | [AI Agent Policy](ai-agent-policy.md) | 権限、責務、根拠、不確実性、外部操作の境界 |
 | [Development Workflow](development-workflow.md) | Issue、実装、検証、文書化、Gitの作業手順 |
 | [Hardware Safety Policy](hardware-safety-policy.md) | 電気、機構、ベンチ試験に関する必須安全規則 |
+| [公開asset register](published-asset-register.md) | 公開するbinary assetの出所と再配布許諾 |
 
 ルートの[AGENTS.md](../../AGENTS.md)は、AIエージェントが実行時に参照する簡潔な指示である。背景情報を重複させず、このディレクトリのポリシーを参照する。
 
@@ -56,6 +57,7 @@
 | 開発端末の役割とtoolchain選定 | `docs/toolchains/` |
 | 開発・運用手順 | `docs/runbooks/` |
 | 公開文書のsource | RootのMarkdownと`docs/` |
+| 公開binary assetの出所と許諾 | [公開asset register](published-asset-register.md) |
 | Pages／Wikiの公開方針 | [ADR-0003](../decisions/0003-public-documentation-publishing.md) |
 
 同じ値を複数の文書で再定義しない。他の文書からは正本の定義へリンクする。

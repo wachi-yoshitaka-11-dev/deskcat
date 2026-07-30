@@ -3,11 +3,15 @@ layout: default
 title: DeskCat 公開ドキュメント
 ---
 
-# DeskCat
+<figure class="hero">
+  <img src="assets/deskcat-concept.jpg" width="360" height="360"
+       alt="DeskCatのコンセプトイメージ。机上に座る白い猫型ロボットが、顔の前面displayに目と口を表示している。">
+  <figcaption>コンセプトイメージ（完成品の外観、部品構成、動作を示すものではありません）</figcaption>
+</figure>
 
 DeskCatは、ESP32とRaspberry Pi Zero WHで構成する、机上で静かに振る舞う猫型ペットロボットです。
 
-現在は開発基盤の整備とハードウェア特定を進めています。正確なmodule、GPIO、電源、サーボ制限が確定するまで、未確認値を使った実機駆動は行いません。
+正確なmodule、GPIO、電源、サーボ制限が確定するまで、未確認値を使った実機駆動は行いません。開発の進行状況は[GitHub Issues](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues)で管理しており、このsiteでは複製しません。
 
 ## はじめに
 

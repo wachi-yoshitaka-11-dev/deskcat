@@ -1,0 +1,286 @@
+---
+---
+
+@import "{{ site.theme }}";
+
+// Cayman themeへのtheme override stylesheet。
+// 上書き対象は配色、typography、table、blockquote、code block、responsive
+// layoutであり、配色とtypographyはconcept資料（DeskCat_Modern_Public_10slides）
+// へ合わせる。Themeは差し替えず、公式のstylesheet override機構だけを使う。
+//
+// 下の`@import`はCaymanのSCSSを読み込む。CaymanのSCSSはGoogle Fontsへの
+// `@import url(...)`を含み、Caymanのlayoutも同じfontを`<link>`で読み込む。
+// よってPagesは外部fontとしてOpen Sansを取得する。これは意図した依存であり、
+// 本stylesheetもLatinへOpen Sansを当てて実際に使用する。読み込むが使わない
+// 状態を避けるため、`--dc-font-body`の先頭へ置いている。
+// 読み込み自体を止める場合はtheme SCSSとlayoutの自前保守が必要になる。
+//
+// 資料の実測値をそのまま使う。ただし次の2色は、cream背景に対してWCAG AAの
+// contrast比4.5:1を満たさないため、同系統で暗い値へ寄せる。
+//
+// - 見出しとlink: 資料の`#c96c83`は3.17:1。`#af4f69`へ寄せて4.55:1。
+// - Captionとfooter: 資料の`#8a7a74`は3.69:1。`#756661`へ寄せて4.93:1。
+//
+// 文字を載せない装飾（marker、blockquoteの罫、button）には、資料の
+// `#e08ba0`と`#c96c83`をそのまま使う。
+
+:root {
+  --dc-bg: #fbf1ea;
+  --dc-surface: #ffffff;
+  --dc-surface-alt: #f3e3da;
+  --dc-text: #3a2e2a;
+  --dc-text-2: #5c4f4a;
+  --dc-muted: #756661;
+  --dc-accent: #af4f69;
+  --dc-accent-strong: #8e3d54;
+  --dc-accent-soft: #e08ba0;
+  --dc-border: #d9c9c0;
+  --dc-header-bg: #2b211e;
+  --dc-header-text: #ffffff;
+  --dc-shadow: 0 1px 2px rgba(58, 46, 42, 0.06), 0 10px 28px rgba(58, 46, 42, 0.1);
+
+  // 資料のCalibriとBookman Old StyleはOffice同梱fontであり、macOSやLinux
+  // には存在しない。またBookman Old Styleに日本語glyphがないため、
+  // 「Hardware TBD一覧」のような混在見出しでLatinだけserifになり、
+  // 一つの見出しの中で書体が割れる。資料の見出しはほぼ日本語のみで
+  // この問題が出ないが、この siteの見出しは混在が常態のため採用しない。
+  //
+  // 代わりに、Caymanが既に読み込むOpen SansをLatinへ当て、日本語はOSの
+  // UI fontへ落とす。Open Sansは上の`@import`で必ず読み込まれるため、
+  // stackの先頭へ置くことで追加requestなしに適用できる。
+  // 日本語glyphを持たない点はBookman Old Styleと同じだが、fallback先も
+  // sansであり、一つの見出しの中でserifとsansが混ざる問題は起きない。
+  --dc-font-body: "Open Sans", system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI",
+    Meiryo, sans-serif;
+  --dc-font-heading: var(--dc-font-body);
+  --dc-font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", "Courier New", monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --dc-bg: #211a17;
+    --dc-surface: #2b211e;
+    --dc-surface-alt: #332723;
+    --dc-text: #f3e3da;
+    --dc-text-2: #d9c9c0;
+    --dc-muted: #b3a099;
+    --dc-accent: #e08ba0;
+    --dc-accent-strong: #f0aab9;
+    --dc-accent-soft: #e08ba0;
+    --dc-border: #43342f;
+    --dc-header-bg: #191311;
+    --dc-shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 10px 28px rgba(0, 0, 0, 0.4);
+  }
+}
+
+body {
+  background-color: var(--dc-bg);
+  color: var(--dc-text);
+  font-family: var(--dc-font-body);
+}
+
+// 資料の表紙と同じdark面にする。
+.page-header {
+  background-color: var(--dc-header-bg);
+  background-image: none;
+  color: var(--dc-header-text);
+}
+
+.project-name {
+  color: var(--dc-header-text);
+  font-family: var(--dc-font-heading);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.project-tagline {
+  color: var(--dc-accent-soft);
+  line-height: 1.5;
+  opacity: 1;
+}
+
+.btn {
+  border: 1px solid var(--dc-accent-soft);
+  border-radius: 999px;
+  background-color: transparent;
+  color: var(--dc-accent-soft);
+  transition: background-color 0.2s ease, color 0.2s ease;
+
+  &:hover,
+  &:focus-visible {
+    border-color: var(--dc-accent-soft);
+    background-color: var(--dc-accent-soft);
+    color: var(--dc-header-bg);
+  }
+}
+
+.main-content {
+  color: var(--dc-text);
+  // Cayman既定の1.5は、和文が主体の本文では詰まって見える。
+  line-height: 1.8;
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    color: var(--dc-accent);
+    font-family: var(--dc-font-heading);
+    // CaymanはOpen Sansを400と700だけ読み込む。600を指定すると700へ
+    // 解決されるため、実際に読み込むweightを直接指定する。
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    line-height: 1.4;
+  }
+
+  h2 {
+    margin-top: 3rem;
+  }
+
+  a {
+    color: var(--dc-accent);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.18em;
+
+    &:hover,
+    &:focus-visible {
+      color: var(--dc-accent-strong);
+    }
+  }
+
+  // 箇条書きはPages全ページで使うため、markerの色だけを資料へ合わせる。
+  // Card化すると、40ページ2700行のprose箇条書きまでcardになってしまう。
+  ul li::marker {
+    color: var(--dc-accent-soft);
+  }
+
+  blockquote {
+    padding: 0.75rem 1.25rem;
+    border-left: 4px solid var(--dc-accent-soft);
+    border-radius: 0 12px 12px 0;
+    background-color: var(--dc-surface-alt);
+    color: var(--dc-text-2);
+  }
+
+  code,
+  pre {
+    background-color: var(--dc-surface-alt);
+    color: var(--dc-text);
+    font-family: var(--dc-font-mono);
+  }
+
+  pre {
+    border: 1px solid var(--dc-border);
+    border-radius: 12px;
+  }
+
+  // Caymanの`.main-content pre > code`はselectorが1つ強く、上の`code`規則に
+  // 勝つ。結果、code block内の文字だけがCaymanの`#567482`のまま残り、
+  // `--dc-surface-alt`に対して明3.99:1、暗2.90:1でAAを満たさない。
+  pre > code {
+    color: var(--dc-text);
+  }
+
+  // `border-collapse: collapse`ではtableのborder-radiusが無視され、角が
+  // 直角のままになる。`separate`にしてcellの外周角だけを丸める。
+  // Border二重線を避けるため、cellはtopとleftだけに罫を持つ。
+  table {
+    display: table;
+    width: 100%;
+    border: 1px solid var(--dc-border);
+    border-collapse: separate;
+    border-spacing: 0;
+    border-radius: 16px;
+    box-shadow: var(--dc-shadow);
+
+    th,
+    td {
+      border-top: 1px solid var(--dc-border);
+      border-left: 1px solid var(--dc-border);
+
+      &:first-child {
+        border-left: 0;
+      }
+    }
+
+    thead tr:first-child {
+      th,
+      td {
+        border-top: 0;
+      }
+
+      th:first-child {
+        border-top-left-radius: 15px;
+      }
+
+      th:last-child {
+        border-top-right-radius: 15px;
+      }
+    }
+
+    tbody tr:last-child {
+      td:first-child {
+        border-bottom-left-radius: 15px;
+      }
+
+      td:last-child {
+        border-bottom-right-radius: 15px;
+      }
+    }
+
+    th {
+      background-color: var(--dc-surface-alt);
+      color: var(--dc-text);
+      font-weight: 600;
+    }
+
+    td {
+      background-color: var(--dc-surface);
+    }
+  }
+
+  hr {
+    background-color: var(--dc-border);
+  }
+}
+
+// 表はscreenが狭い場合だけ横scrollさせ、行の折り返しを防ぐ。
+@media screen and (max-width: 42em) {
+  .main-content table {
+    display: block;
+    overflow-x: auto;
+  }
+}
+
+.hero {
+  margin: 0 0 2.5rem;
+  text-align: center;
+
+  img {
+    width: 360px;
+    max-width: 100%;
+    height: auto;
+    border-radius: 24px;
+    box-shadow: var(--dc-shadow);
+  }
+
+  figcaption {
+    margin-top: 0.75rem;
+    color: var(--dc-muted);
+    font-size: 0.85rem;
+  }
+}
+
+.site-footer {
+  border-top: 1px solid var(--dc-border);
+  color: var(--dc-muted);
+}
+
+.site-footer-owner,
+.site-footer-credits {
+  color: var(--dc-muted);
+}
