@@ -56,6 +56,7 @@ GitHub公式のJekyll Pages Actionを使用する。
 - Manifestに無いfileが`pages/assets/`にある
 - Manifestが列挙したfileがdisk上に無い、またはGitの追跡対象でない
 - Binary assetのSHA-256がmanifestと一致しない、または未記録である
+- Text asset（`.css`、`.scss`、`.svg`、`.txt`）が`Sha256`を記録している。編集ごとに古くなるため記録しない
 - Manifestの`Path`が`..`、絶対path、rooted pathを含む
 - 承認外の拡張子、または1 MiBを超えるfile
 
