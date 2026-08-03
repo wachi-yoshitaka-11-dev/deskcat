@@ -26,8 +26,16 @@ Concept素材を許すのは、[ADR-0003](../docs/decisions/0003-public-document
 - `pages/index.md`
 - `pages/404.md`
 - `pages/assets-manifest.psd1`が列挙した`pages/assets/`配下のasset
-- Rootの公開Markdown
-- `docs/`配下のMarkdown
+- Rootの公開文書（`README.md`、`AGENTS.md`、`CONTRIBUTING.md`、`SECURITY.md`、`LICENSE`）。`LICENSE`はMarkdownではないため、`prepare-pages.ps1`が個別に扱う
+- `docs/`配下の**Markdownだけ**
+
+`pages/_config.yml`の`baseurl`は、top-levelのplain key `baseurl:`として1件だけ定義する。colonと非空valueの間にはspaceまたはtabを置き、valueは単一行scalarとする。空value、single／double quote、引用符の外側にあるinline comment、末尾slashはvalidatorが明示的に扱う。Quoted key、anchor／alias、block scalar、flow mappingで`baseurl`を定義しない。
+
+複製したfileには、extensionを問わず1 fileあたり1 MiBのsize上限を適用する。
+
+`docs/`配下の非Markdown fileは複製しない。画像はbinaryのため公開前の内容scanが効かず、EXIFや写り込みを検出できない。またGitが追跡していないfileも複製しない。localの下書きが公開へ混ざらないようにし、localとCIのstaging結果を一致させるためである。
+
+文書向けの図版を公開する必要が生じた場合は、`docs/`へ置かず、下記のasset追加手順に従って`pages/assets/`へ登録する。
 
 `pages/assets/`には、入口pageが参照するassetだけを置く。公開対象は`pages/assets-manifest.psd1`が列挙したexact pathに限られ、列挙外のfileを置くとbuildが失敗する。Assetを追加する手順は次のとおり。
 
@@ -45,5 +53,13 @@ Hardware写真や技術図のような文書向けimageはここへ置かない�
 外部fontの読み込み自体を止める場合は、`font-family`の上書きでは足りず、theme SCSSとlayoutを自前で持つ必要がある。theme更新の恩恵を失うため、独立した変更として判断する。
 
 `.pages-src/`と`_site/`は生成物であり、commitしない。
+
+## Link基準の注意
+
+`index.md`と`404.md`の相対linkは、**`.pages-src/`のroot基準**で書く。staging後にこの2 fileはroot直下へ置かれるため、`docs/governance/README.md`のように書く。
+
+このため、`pages/index.md`をGitHubのrepository画面で開くと、相対linkはこのdirectory基準で解決されて404になる。これはlinkの誤りではなく、生成siteでのみ有効な記法である。
+
+`scripts/validate-doc-links.ps1`は、この2 fileだけをstaging root基準で検査する。link先を変更したら同scriptを実行する。
 
 方針は[ADR-0003](../docs/decisions/0003-public-documentation-publishing.md)、操作手順は[GitHub Pages公開runbook](../docs/runbooks/github-pages-publishing.md)を参照する。

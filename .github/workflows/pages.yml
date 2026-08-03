@@ -3,8 +3,7 @@ name: Pages
 on:
   pull_request:
     paths:
-      - ".github/workflows/pages.yml"
-      - ".gitignore"
+      - ".github/**"
       - "AGENTS.md"
       - "CONTRIBUTING.md"
       - "LICENSE"
@@ -12,14 +11,12 @@ on:
       - "SECURITY.md"
       - "docs/**"
       - "pages/**"
-      - "scripts/prepare-pages.ps1"
-      - "scripts/validate-pages-output.ps1"
+      - "scripts/**"
   push:
     branches:
       - main
     paths:
-      - ".github/workflows/pages.yml"
-      - ".gitignore"
+      - ".github/**"
       - "AGENTS.md"
       - "CONTRIBUTING.md"
       - "LICENSE"
@@ -27,8 +24,7 @@ on:
       - "SECURITY.md"
       - "docs/**"
       - "pages/**"
-      - "scripts/prepare-pages.ps1"
-      - "scripts/validate-pages-output.ps1"
+      - "scripts/**"
   workflow_dispatch:
 
 permissions:
@@ -49,6 +45,21 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          # Pull Requestでは、この後のstepがPR側のPowerShellを実行する。
+          # checkoutが.git/configへ残すtokenを、そのscriptから読めないようにする。
+          persist-credentials: false
+
+      - name: Check documentation links
+        shell: pwsh
+        run: ./scripts/validate-doc-links.ps1
+
+      - name: Test link validators
+        shell: pwsh
+        # harnessがrepository rootをcurrent directoryとして暗黙に要求しないことを
+        # CIで回帰させる。script自体はcheckoutの絶対pathから起動する。
+        working-directory: ${{ runner.temp }}
+        run: '& "$env:GITHUB_WORKSPACE/scripts/test-link-validators.ps1"'
 
       - name: Prepare public source
         shell: pwsh
@@ -71,7 +82,10 @@ jobs:
       # stagingが失敗することを確認する。`_site`は既に検証済みで影響しない。
       - name: Test publish guards
         shell: pwsh
-        run: ./scripts/test-pages-guards.ps1
+        # `PAGES_SOURCE=.pages-src`はcallerのCWDではなくrepository root基準で
+        # 解決する。test harness内のexact-path assertionを非root CWDで実行する。
+        working-directory: ${{ runner.temp }}
+        run: '& "$env:GITHUB_WORKSPACE/scripts/test-pages-guards.ps1"'
 
       - name: Upload Pages artifact
         if: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}

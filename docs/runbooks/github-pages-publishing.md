@@ -107,8 +107,8 @@ pwsh -File ./scripts/prepare-pages.ps1
 期待する結果:
 
 ```text
-PAGES_SOURCE=.../.pages-src
-FILES=<count> MARKDOWN=<count>
+PAGES_SOURCE=.pages-src
+FILES=<count> MARKDOWN=<count> DOCS_COPIED=<count> DOCS_SKIPPED=<count>
 ```
 
 Jekyll buildはこの端末では未実施である。GitHub Actionsで`_site/`が生成された後、次を実行する。

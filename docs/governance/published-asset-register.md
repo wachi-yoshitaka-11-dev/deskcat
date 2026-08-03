@@ -23,7 +23,7 @@ Assetを追加する前に、次をすべて満たす。
 
 許諾の根拠は、assetの由来で書き分ける。
 
-- **権利者がrepository所有者本人の場合**: 本repositoryの[MIT License](../../LICENSE)に従って公開・再配布する旨を記録する。個別の許諾文書は不要である。
+- **権利者がrepository所有者本人の場合**: 本repositoryの[MIT License](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/c69f9a7d7767a6b4572e9f6920939529765316fc/LICENSE)に従って公開・再配布する旨を記録する。個別の許諾文書は不要である。linkはcommit固定にする。`main`を指すと、後の変更で法的根拠が黙って書き換わる。
 - **第三者が権利を持つ場合**: license名または書面での許諾と、その取得元を記録する。
 
 いずれかを確認できない場合は、assetをrepositoryへ追加しない。
@@ -36,8 +36,8 @@ Assetを追加する前に、次をすべて満たす。
 |---|---|
 | 用途 | GitHub Pages入口pageのconcept image |
 | 作成者・権利者 | wachi-yoshitaka-11-dev（repository所有者） |
-| 作成方法 | repository所有者が生成AIを用いて作成 |
-| 再配布許諾の根拠 | 権利者本人による許諾。本repositoryの[MIT License](../../LICENSE)に従って公開・再配布する |
+| 作成方法 | repository所有者がChatGPTを用いて生成 |
+| 再配布許諾の根拠 | 権利者本人による許諾。本repositoryの[MIT License](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/c69f9a7d7767a6b4572e9f6920939529765316fc/LICENSE)（commit `c69f9a7d`時点）に従って公開・再配布する |
 | 確認日 | 2026-07-29 |
 | SHA-256 | `615063ED60596F55066D602E1C44ACFB46D6D3103B9D234AEB8170E864FBB5B2` |
 | 寸法・size | 720 x 720、77,305 bytes |

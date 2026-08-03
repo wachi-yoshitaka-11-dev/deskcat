@@ -17,12 +17,47 @@
 - [x] 利用目的が生じるまでDiscussionsを無効
 - [x] Private vulnerability reportingを有効
 - [x] Secret scanningとpush protectionを有効
-- [x] GitHub標準label 9件のdescriptionとDeskCat固有label 16件を`.github/labels.yml`に同期
+- [x] GitHub標準label 9件のdescriptionとDeskCat固有label 17件を`.github/labels.yml`に同期（GitHub側 計26件）
 - [x] `.github/MILESTONES.md`のM0–M6 title／descriptionを同期
 - [x] `main`へのforce pushを禁止
 - [x] `main`の削除を禁止
+- [x] `main`の`enforce_admins`を有効化し、管理者にも上記2つを適用
+- [x] Repository description、homepage、topicsを設定
+- [x] `delete_branch_on_merge`を有効化（2026-07-31に無効化のdriftを検出し、再適用してread-back済み）
 - `develop`: Branch protectionを設定しない
 - `develop`へのGit／GitHub操作は、Governanceのforce push禁止、通常作業での直接commit禁止、ユーザー承認で管理する
+
+### 管理者除外の解消
+
+2026-07-28の初回設定時、`main`は次の状態だった。
+
+```text
+allow_force_pushes: false
+allow_deletions:    false
+enforce_admins:     false   ← 管理者は上記2つの制限を受けなかった
+```
+
+`enforce_admins`が無効な間、force pushと削除の禁止は、**管理者を拘束していなかった**。
+Pull Request必須化と違い、force push／削除の禁止はsolo bootstrapの速度を損なわないため、同日中に有効化した。
+
+read-back結果: `enforce_admins.enabled = true`
+
+これにより[AGENTS.md](../AGENTS.md)の「force pushを行わない」は、**`main`に限って**
+GitHub側でも実効化され、AIエージェントの誤操作に対する防壁になる。
+
+`develop`はprotection対象外とする方針のため、GitHubによる強制は`main`だけに及ぶ。
+`develop`および他のbranchでは、Governanceの規則とユーザー承認だけが歯止めである。
+repository全体で強制されていると読まない。
+
+- [x] `github-pages` environmentの`can_admins_bypass`を無効化
+
+read-back結果: `can_admins_bypass = false`、protection rule は `branch_policy`、
+許可branchは `main` の1件のみ（`deployment-branch-policies`をAPIで確認）
+
+このenvironmentは`branch_policy`による保護が有効である。`can_admins_bypass`が
+`true`のままだと、管理者はその方針の外からdeployできる。workflow側の`main`限定は
+workflowを変更すれば外せるため、環境側の統制の代わりにならない。
+deployは引き続き`main`から実行できる。制限されるのは方針外branchからのdeployだけである。
 
 ## Branch protectionの時期
 
@@ -49,7 +84,106 @@ workflow追加時:
 - [x] write権限はPagesのdeploy jobだけに付与する
 - [x] 使用するGitHub公式Actionをreview済みcommitへ固定する
 - [x] Pull Requestのbuild jobにsecretとwrite権限を渡さない
+- [x] checkoutに`persist-credentials: false`を指定し、`.git/config`へtokenを残さない（PR側scriptが`.git/config`経由でtokenを読めないようにする措置であり、token露出全般を防ぐものではない）
 - [x] Hardware-in-the-Loopを通常のhosted CIから分離する
+- [x] 固定したActionの更新を受け取るため`.github/dependabot.yml`を追加する
+
+- [x] `sha_pinning_required`を有効化し、SHA固定を設定として強制する
+- [x] Vulnerability alertsとDependabot security updatesを有効化する
+
+2026-07-28のread-back結果。`allowed_actions`はこの時点の値であり、
+2026-07-31に`selected`へ変更した。現行値は下の「GitHub Actionsの供給元制限」を参照する。
+
+```text
+allowed_actions:             all      # 2026-07-31に selected へ変更（履歴）
+sha_pinning_required:        true
+dependabot_security_updates: enabled
+```
+
+`Vulnerability alerts`は別endpointのため上のblockに現れない。
+2026-08-01に`GET /repos/{owner}/{repo}/vulnerability-alerts`で確認した。
+
+```text
+GET .../vulnerability-alerts -> HTTP 204 No Content   # 有効
+```
+
+204は有効、404は無効を意味する。bodyを返さないendpointであり、
+他の設定と同じ形式では記録できない。
+
+この確認は「2026-07-31の実行環境」と同一端末・同一profile・同一tool版で行った。
+新しい環境記録は追加しない。
+
+SHA固定は改竄耐性を与えるが、更新機構がなければ修正版が届かない。
+`dependabot.yml`（月次のversion更新）とsecurity updates（脆弱性検知時の更新）は役割が異なるため、両方を使用する。
+
+`.github/dependabot.yml`の[`target-branch`](https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-options-reference#target-branch)
+`develop`が適用されるのはversion updateである。Dependabot security updateは
+repositoryのdefault branchである`main`を対象にする。
+Security updateを`main`へmergeした場合は、[Development Workflow](../docs/governance/development-workflow.md#branch)の
+hotfix規則に従い、同じ修正を直ちに`develop`へ取り込む。両branchへ自動で反映されると仮定しない。
+
+- [x] 外部contributorのPull Requestに承認を必須化する
+
+Pages workflowの`pull_request` jobは、PR側の`scripts/*.ps1`をrunner上で実行する。
+GitHub既定の`first_time_contributors`では、一度merge実績のあるcontributorのPRが
+承認なしで実行される。`all_external_contributors`へ変更し、fork由来のworkflow実行に
+毎回人間の承認を必要とする。
+
+read-back結果: `approval_policy = all_external_contributors`
+
+### GitHub Actionsの供給元制限
+
+- [x] `allowed_actions`を`selected`（GitHub所有Actionのみ）へ絞る
+
+使用中の5 Action（`checkout`、`configure-pages`、`jekyll-build-pages`、`upload-pages-artifact`、`deploy-pages`）はすべて`actions/` namespaceのGitHub所有であり、この制限で影響を受けない。
+
+`all`のままにすると、workflowを1行変えるだけで任意のサードパーティActionを導入できる。
+`sha_pinning_required`は「固定された何か」であることを保証するだけで、供給元は制限しない。
+SHA固定と供給元制限は別の統制であり、片方で他方を代替できない。
+
+read-back結果: `allowed_actions = selected`、`github_owned_allowed = true`、`verified_allowed = false`、`patterns_allowed = []`
+
+Rust CIでサードパーティActionが必要になった場合は、`patterns_allowed`へ個別に追加し、採用理由と確認日を本文書へ記録する。
+
+### 2026-07-31のdrift確認
+
+Pull Request #29の作業中にremoteを再確認したところ、`delete_branch_on_merge`が
+`false`になっていた。適用時のread-backでは`true`だったため、その後に変化している。
+変化の経緯は特定できていない。
+
+再適用し、read-backで`true`を確認した。
+
+```text
+delete_branch_on_merge: true
+```
+
+本設定はmerge可否や安全境界に影響しないため、Pull Request #29のblockerではない。
+repository所有者が意図して無効化していた場合は、無効へ戻し、その判断理由を
+本文書へ記録する。checklistとremoteが食い違ったまま放置しない。
+
+### 実行環境（sanitized）
+
+| 項目 | 値 |
+|---|---|
+| 実施日 | 2026-07-29 |
+| 端末profile | Docs / Review（[Machine Profiles](../docs/toolchains/machine-profiles.md)） |
+| 使用tool | `gh` 2.76.0、`git` 2.44.0、PowerShell 7.6.3 |
+| 対象 | `wachi-yoshitaka-11-dev/deskcat` |
+
+2026-07-31に実施した確認と適用（`allowed_actions`、`delete_branch_on_merge`、
+`github-pages` environmentの`can_admins_bypass`）も、同一端末・同一profile・
+同一tool版で行った。上表の環境をそのまま適用する。
+
+| 項目 | 値 |
+|---|---|
+| 実施日 | 2026-07-31 |
+| 端末profile | 同上 |
+| 使用tool | 同上 |
+| 対象 | 同上 |
+
+端末名、個人path、token、shell履歴は記録しない。
+この記録は実行済みの確認結果であり、候補値や未実行の予定を含まない。
+
 
 ## Pages／Wiki
 
@@ -66,7 +200,10 @@ workflow追加時:
 - Wiki: 有効
 - Wiki content: 日本語の案内用`Home.md` 1件だけ
 - Wiki URL: `https://github.com/wachi-yoshitaka-11-dev/deskcat/wiki`
-- Wiki commit: `8402a8e8e2622f27af0d7707709aa66b6d3cd0e1`
+- Wiki commit（**2026-07-29のgit read-back時点**のhead）: `9ec03b743bbab0b70cdeece179706007b4523a3d`（下記のgit read-backを参照）
+- Wiki commit（履歴）: `8402a8e8e2622f27af0d7707709aa66b6d3cd0e1`。2026-07-29のidentity是正で現在の`master`履歴から到達できなくなった
+
+上の2行は2026-07-28時点の値ではなく、2026-07-29のread-back結果である。
 - Wiki運用: [GitHub Wiki入口の保守](../docs/runbooks/github-wiki-home.md)
 
 承認済み方針:
@@ -77,12 +214,50 @@ workflow追加時:
 - [x] [GH-003 #26](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/26)でPages workflowを実装する
 - [x] [GH-004 #27](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/27)でWikiの既定Homeを入口ページへ置き換える
 - [x] Workflowと`github-pages` environmentの両方でdeploy元を`main`に限定する
-- [x] Whitelist stagingでsecret、個人path、local専用資料、未承認形式を検査する
+- [x] Stagingでsecret、個人path、local専用資料、未承認形式を検査する
+- [x] `docs/`はMarkdownだけを複製し、画像等が人手のreviewを経ずに公開されないようにする
+
+### Wikiのgit read-back（2026-07-29）
+
+Wikiは独立repositoryとしてcloneでき、内容は機械的に確認できる。手順は[GitHub Wiki入口の保守](../docs/runbooks/github-wiki-home.md)を参照する。
+
+- Files: `Home.md` 1件
+- Head commit: `9ec03b743bbab0b70cdeece179706007b4523a3d`
+- Commit identity: 全commitが`wachi-yoshitaka-11-dev`のnoreply address
+- Link: 延べ12件（一意11件）すべてHTTP 200。数え方はrunbookを参照
+- Secret様pattern／個人path: 0件
+- 二重管理: なし（ADR-0003の方針どおり案内のみ）
+
+Wikiのcommit identityは、2026-07-29に既存2 commitを書き換えて是正した。
+経緯と対象SHAはrunbookの「Commit identityの是正記録」を参照する。
+
+### Wikiの編集権限（2026-07-29に目視確認）
+
+- [x] Wikiの「Restrict editing to collaborators only」が有効であること
+
+Settings → Features → Wikis の目視結果:
+
+```text
+[x] Wikis
+[x] Restrict editing to collaborators only
+```
+
+Wikiはcollaboratorだけが編集でき、閲覧はpublicのままである。
+READMEとPagesの両方からWikiへ導線があるため、この設定が無効だと
+任意のGitHubユーザーによる改竄・誘導の経路になる。無効化しない。
+
+この項目はGitHub UIでしか確認できない。REST APIは`has_wiki`、
+GraphQLは`hasWikiEnabled`のみを返し、いずれも機能の有効／無効であって
+編集権限ではない（2026-07-29にschema introspectionで確認）。
+Wikiの設定を変更した場合は、この節を目視結果で更新する。
 
 ## 保留
 
 - CODEOWNERS: 安定したreviewer／owner対応が複数になった時点で追加
 - Code of Conduct: 外部communityへ積極的に参加を求める前に追加
-- Dependabot: Cargo manifest作成後に追加判断
+- Dependabot（cargo）: Cargo manifest作成後に追加。github-actionsは適用済み
 - Release workflow: versionとartifact方針の確定後に追加
 - Discussions: community supportにIssueだけでは不足した場合に追加
+- Signed commit: SSH署名で導入コストが小さいため、次のrepository運用変更で評価する
+- Projects: `has_projects: true`だが未使用。使用しないなら無効化する
+- Milestone due date: M0–M6すべて未設定。blocked Issueの滞留を可視化する目的で設定を検討する
