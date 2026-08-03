@@ -1534,7 +1534,7 @@ Pi から目標角だけを受け、ESP32 が一定周期で補間する構造�
   `stale_session` で拒否する
 - 未知の message type を、`sid` の状態にかかわらず `unknown_type` で拒否し、`unknown_types` を増加させる。retired・未知の `sid` であっても `stale_session` を返さない（判定順序が正本どおりであること）
 - session 遷移の budget と cooldown が働き、超過を `rate_limited` で拒否する
-- retry の終了条件が成立する。`hello` と `boot` の両方について、`(reply_sid, reply_to)` で要求を参照する終端 ACK と、同一 `(sid, id)` の再送に対する保持結果を検証する
+- retry の終了条件が成立する。`hello` と `boot` の両方について、`(reply_sid, reply_to)` **および応答側envelopeの `sid`** で要求を参照する終端 ACK と、同一 `(sid, id)` の再送に対する保持結果を検証する
 - **一般の ACK 必須・非冪等コマンド**についても retry 契約を検証する。`hello`／`boot` だけでは
   Draft 2 の 1 回制限を検証したことにならない。次を fixture で確認する
   - 再送は**同一 payload・同一 `(sid, id)` で最大 1 回**であること
