@@ -1,5 +1,11 @@
 # Repositoryに適用するlabelの定義。
 # このfile単体ではlabelを作成しない。2026-07-28にGitHubへ適用済み。
+#
+# DeskCatのIssueでは、下段の`area:`／`type:`／`priority:`／`status:`／`needs:`を使用する。
+# GitHub標準labelは、外部からのIssueやGitHubのUIが前提とするため削除せず残すが、
+# `bug`／`type:bug`、`documentation`／`area:docs`、`enhancement`／`type:feature`の
+# 重複を避けるため、DeskCat側の体系を優先する。
+# 2026-07-28時点で、標準labelを付与したIssueは存在しない。
 
 # GitHub標準label。名称を維持し、descriptionを日本語化する。
 - name: bug
@@ -70,6 +76,9 @@
 - name: priority:normal
   color: "FBCA04"
   description: 通常の計画作業
+- name: priority:low
+  color: "C2E0C6"
+  description: 着手時期を限定しない改善
 - name: status:blocked
   color: "000000"
   description: 明記した依存関係が解決するまで進行不可

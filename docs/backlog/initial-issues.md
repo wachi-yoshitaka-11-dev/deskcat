@@ -10,9 +10,18 @@
 - GH-001はGitHub基盤整備として直接完了しているため、遡及Issueを作成していない。
 - GitHub Issue本文では依存関係を実際のIssue番号へ置き換えた。ローカル定義からも対応Issueへ辿れるよう、依存関係をlink化している。
 
+> このfile内の`起票時の状態`、`Labels`、受け入れ条件のcheckboxは、**起票時点のsnapshot**である。
+> `status:blocked`等のlabelも当時の値であり、現在の付与状況とは一致しない。
+> 現在の進捗として読まない。closeされたIssueでも、ここのcheckboxは当時のまま残る。
+> 現在の状態は必ずGitHub Issueで確認する。
+
+`GH-005`は本文書にlocal定義を持たない。GH-002〜GH-004の後続として
+GitHub Issue側だけで起票・管理しており、目的と受け入れ条件は[#28](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/28)を参照する。
+本文書は承認した初期backlogの履歴資料であり、後から追加したIssueの定義を遡って複製しない。
+
 | Milestone | GitHub Issues |
 |---|---|
-| M0 | [FND-001 #1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1)、[FND-002 #2](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/2)、[FND-003 #3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)、[FND-004 #4](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/4)、[GH-002 #25](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/25)、[GH-003 #26](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/26)、[GH-004 #27](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/27) |
+| M0 | [FND-001 #1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1)、[FND-002 #2](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/2)、[FND-003 #3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)、[FND-004 #4](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/4)、[GH-002 #25](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/25)、[GH-003 #26](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/26)、[GH-004 #27](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/27)、[GH-005 #28](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/28) |
 | M1 | [M1-001 #5](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/5)、[M1-002 #6](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/6)、[M1-003 #7](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/7)、[M1-004 #8](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/8) |
 | M2 | [M2-001 #9](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/9)、[M2-002 #10](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/10)、[M2-003 #11](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11)、[M2-004 #12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12) |
 | M3 | [M3-001 #13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)、[M3-002 #14](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/14)、[M3-003 #15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)、[M3-004 #16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16) |
@@ -70,7 +79,7 @@ M5 MVP integration
 
 - Milestone: M0 Development Foundation
 - Labels: `area:hardware`、`type:experiment`、`priority:critical`、`needs:hardware-test`
-- 状態: 人間が部品を確認できるまでBlocked
+- 起票時の状態: 人間が部品を確認できるまでBlocked
 - 依存関係: なし
 
 ### 目的
@@ -167,7 +176,7 @@ Boot、flash、UART、board機能、他deviceと競合させず、必要なESP32
 
 - Milestone: M0 Development Foundation
 - Labels: `area:protocol`、`type:decision`、`priority:high`
-- 状態: 文書reviewに着手可能
+- 起票時の状態: 文書reviewに着手可能
 - 依存関係: なし
 
 ### 目的
@@ -205,7 +214,7 @@ Toolchainとprotocol実装のIssueに必要な最小限の意味を承認する�
 
 - Milestone: M0 Development Foundation
 - Labels: `type:maintenance`、`area:docs`、`priority:normal`、`status:blocked`
-- 状態: 2026-07-28に直接完了。監査記録が必要な場合を除き、遡及的なIssueは作成しない
+- 記録: 2026-07-28に直接完了。監査記録が必要な場合を除き、遡及的なIssueは作成しない
 - 依存関係: 有効なGitHub認証 — 解決済み
 
 ### 目的
@@ -235,7 +244,7 @@ Review済みのローカルGitHub設定をpublic repositoryへ適用する。
 
 - Milestone: M0 Development Foundation
 - Labels: `area:docs`、`type:decision`、`priority:normal`
-- 状態: 方針reviewに着手可能
+- 起票時の状態: 方針reviewに着手可能
 - 依存関係: なし
 
 ### 背景
@@ -285,7 +294,7 @@ GitHub PagesとWikiの責務、正本、公開範囲、更新方法を決定し�
 
 - Milestone: M0 Development Foundation
 - Labels: `area:docs`、`type:maintenance`、`priority:normal`、`status:blocked`
-- 状態: [GH-002 #25](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/25)の方針承認待ち
+- 起票時の状態: [GH-002 #25](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/25)の方針承認待ち
 - 依存関係: [GH-002 #25](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/25)
 
 ### 目的
@@ -332,7 +341,7 @@ GitHub PagesとWikiの責務、正本、公開範囲、更新方法を決定し�
 
 - Milestone: M0 Development Foundation
 - Labels: `area:docs`、`type:maintenance`、`priority:normal`、`status:blocked`
-- 状態: [GH-002 #25](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/25)の方針確定済み、[GH-003 #26](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/26)のPages公開待ち
+- 起票時の状態: [GH-002 #25](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/25)の方針確定済み、[GH-003 #26](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/26)のPages公開待ち
 - 依存関係: [GH-002 #25](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/25)、[GH-003 #26](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/26)
 
 ### 目的
@@ -372,7 +381,7 @@ Wikiを仕様の正本にせず、DeskCatの公開文書へ案内する日本語
 
 - Milestone: M1 ESP32 Bring-up
 - Labels: `area:firmware`、`type:experiment`、`priority:high`
-- 状態: 公式情報の調査は完了。ESP32 Build profile端末での生成とbuildは未実施
+- 起票時の状態: 公式情報の調査は完了。ESP32 Build profile端末での生成とbuildは未実施
 - 依存関係: ADR-0001、Governance
 
 ### 準備済みの調査

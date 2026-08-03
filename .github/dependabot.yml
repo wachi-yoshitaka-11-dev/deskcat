@@ -1,0 +1,15 @@
+# ActionはreviewしたcommitのSHAへ固定している。
+# 固定しただけでは修正版が届かないため、更新を独立したPull Requestとして受け取る。
+# Cargo manifest作成後に、cargo ecosystemを別Issueで追加する。
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    target-branch: "develop"
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "chore"
+    labels:
+      - "type:maintenance"
