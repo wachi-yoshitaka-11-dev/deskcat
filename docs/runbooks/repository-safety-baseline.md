@@ -30,6 +30,7 @@
 | `.env`の履歴 | 該当commitなし |
 | `.env`がignore対象か | Yes。`git check-ignore`で確認（2026-07-28に修正。下記の訂正記録を参照） |
 | 下記patternがignore対象か | Yes。`*.pem`、`*.key`、`id_rsa*`、`credentials.json`、`secrets.*`を`git check-ignore`で確認。**検査したのはこの5 patternだけであり、資格情報形式全般を網羅した確認ではない** |
+| `.gitignore`の残りの秘密情報patternがignore対象か | Yes（2026-08-03に確認、commit `d06cdc1`）。`*.p12`、`*.pfx`、`id_ecdsa*`、`id_ed25519*`、`*.local.toml`、`*.local.yml`、`*.local.yaml`、`*.local.json`を`git check-ignore -v`で確認。同時点で`git ls-files`により、これら全patternおよび上記5 patternに一致するtracked fileが無いことも確認した |
 | GitHub secret scanning | 有効 |
 | GitHub push protection | 有効 |
 | Secretらしいmarkerのscan | 対象text fileに一致なし |

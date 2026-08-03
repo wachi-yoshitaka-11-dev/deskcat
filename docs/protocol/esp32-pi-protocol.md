@@ -1164,7 +1164,7 @@ fixtureを作成するまで、この節を「両側が検証済み」の根拠�
 | PROTO-TBD-002 | 最終最大line byte数、および**overflow時にidentity復元のため保持するprefixのbyte数**（`v`、`type`、`sid`、`id`を含みうる大きさ。行長上限より十分小さいこと） | Worst-caseの上限付きpayloadとmemory test。[HW-TBD-014](../hardware/tbd-register.md)と対で確定する。値はProtocol側、実機transport testの実施責任はhardware台帳 |
 | PROTO-TBD-003 | Integer widthとwrap | Rust modelと長時間動作の検討 |
 | PROTO-TBD-004 | ACK timeout | 測定latencyとrecovery test |
-| PROTO-TBD-005 | **現在のsession**のduplicate履歴の保持期間とretry window。下限は遅延messageの最大生存時間＋再送windowを下回らない。`PROTO-TBD-011`のretired session保持期間から導出しない（目的の異なる別モデル。§5.1） | Memory予算とretry window。[HW-TBD-020](../hardware/tbd-register.md)と対で確定する。サーボ出力の有効化条件に含まれる |
+| PROTO-TBD-005 | **現在のsession**のduplicate履歴の保持期間とretry window、および**保持件数の上限と超過時の動作**。期間の下限は遅延messageの最大生存時間＋再送windowを下回らない。件数上限は受理budget（§8.2）と保持する結果の最大sizeから導出する。上限超過時は最も古いentryをevictしてよいが、evictしたentryへの再送は新規commandとして実行しない（`duplicate_expired`で拒否する。§9参照）。`PROTO-TBD-011`のretired session保持期間から導出しない（目的の異なる別モデル。§5.1） | Memory予算とretry window。[HW-TBD-020](../hardware/tbd-register.md)と対で確定する。サーボ出力の有効化条件に含まれる |
 | PROTO-TBD-006 | 最終status field | 診断要件とencode size test |
 | PROTO-TBD-007 | Textとchoiceの制限 | LCD layoutとmemory測定 |
 | PROTO-TBD-008 | Motion名と範囲 | Servo calibrationと動作設計 |

@@ -647,9 +647,12 @@ Wikiの設定を変更した場合は、この節と記録側を同じ変更で�
 ## 失敗時
 
 - Link切れや公開禁止情報を認めた場合は完了扱いにしない。
-- `Home.staged.md`作成後に検査が失敗した場合は、上記の物理path非包含チェックを再実行してから
-  `rm -- "$state_dir/Home.staged.md"`でその1 fileだけを削除し、`test ! -e`でread-backする。
-  検査失敗を理由にcloneやstate directoryを未確認のまま再帰削除しない。
+- `Home.staged.md`作成後に検査が失敗した場合は、上記の絶対path、symlink、実体path、相互包含の
+  各assertionだけを再実行する（`$state_dir`の空directory assertionは、この時点では`before-sha`や
+  `Home.staged.md`が既に存在するため対象外とする。再実行に含めると`set -e`で必ず止まり、
+  削除step自体に到達できない）。そのうえで`rm -- "$state_dir/Home.staged.md"`でその1 fileだけを
+  削除し、`test ! -e`でread-backする。検査失敗を理由にcloneやstate directoryを未確認のまま
+  再帰削除しない。
 - 原因調査と必要な証跡保存が終わった後は、[一時directoryのcleanup](#一時directoryのcleanup)を実行する。
   cleanup側のmarker、実体path、包含関係、想定外entryの検査が失敗したrootは削除しない。
 - Wikiへ仕様を直接追記して修正を急がず、main repositoryの正本を先に更新する。
