@@ -24,7 +24,8 @@
 - [x] `main`の`enforce_admins`を有効化し、管理者にも上記2つを適用
 - [x] Repository description、homepage、topicsを設定
 - [x] `delete_branch_on_merge`を有効化（2026-07-31に無効化のdriftを検出し、再適用してread-back済み）
-- `develop`: Branch protectionを設定しない
+- `develop`: Branch protectionのbundle（必須review、必須status check等）は設定しない
+- [x] `develop`のbranch削除だけをRepository Rulesetで禁止（2026-08-03。経緯は下記「2026-08-03のdevelop branch削除事故と対処」を参照）
 - `develop`へのGit／GitHub操作は、Governanceのforce push禁止、通常作業での直接commit禁止、ユーザー承認で管理する
 
 ### 管理者除外の解消
@@ -45,8 +46,10 @@ read-back結果: `enforce_admins.enabled = true`
 これにより[AGENTS.md](../AGENTS.md)の「force pushを行わない」は、**`main`に限って**
 GitHub側でも実効化され、AIエージェントの誤操作に対する防壁になる。
 
-`develop`はprotection対象外とする方針のため、GitHubによる強制は`main`だけに及ぶ。
-`develop`および他のbranchでは、Governanceの規則とユーザー承認だけが歯止めである。
+`develop`はforce push禁止・削除禁止のbundleとしてのbranch protection対象外とする方針のため、
+このbundleによるGitHubの強制は`main`だけに及ぶ。ただし2026-08-03以降、`develop`は
+branch削除だけを別のRepository Ruleset（下記「2026-08-03のdevelop branch削除事故と対処」）で
+禁止している。force pushの禁止を含む残りは、Governanceの規則とユーザー承認だけが歯止めである。
 repository全体で強制されていると読まない。
 
 - [x] `github-pages` environmentの`can_admins_bypass`を無効化
@@ -160,6 +163,45 @@ delete_branch_on_merge: true
 本設定はmerge可否や安全境界に影響しないため、Pull Request #29のblockerではない。
 repository所有者が意図して無効化していた場合は、無効へ戻し、その判断理由を
 本文書へ記録する。checklistとremoteが食い違ったまま放置しない。
+
+**この評価は2026-08-03に誤りと判明した。**下記「2026-08-03のdevelop branch削除事故と対処」を参照。
+`delete_branch_on_merge`は、PRのheadが使い捨てのfeature branchかどうかを区別せず、
+PR mergeのたびにhead branchを削除する。`develop`のような恒久的なbranchがPRのheadになった
+場合、この設定は安全境界（branchの存続）に直接影響する。
+
+### 2026-08-03のdevelop branch削除事故と対処
+
+[PR #32](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/32)（`develop`→`main`、
+[PR #29](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/29)のmain昇格）をmergeした直後、
+`delete_branch_on_merge`により`origin/develop`が削除された。`develop`はADR-0004が定める
+恒久的な統合branchであり、使い捨てのfeature branchではない。
+
+| 項目 | 内容 |
+|---|---|
+| 発生 | PR #32のmerge（commit `57768b1`）直後、`origin/develop`が削除された |
+| 検出 | merge後の`git fetch --prune`で`- [deleted] (none) -> origin/develop`を観測 |
+| データ損失 | なし。削除されたcommit（`ad7a69c`）はmerge commit経由で`main`の履歴に含まれ、かつlocal repositoryの`develop`branchにも残っていた |
+| 復旧 | localの`develop`（`ad7a69c`）を`git push origin develop`で再作成。新規branchとしてpushされたが、内容はmain昇格直前と同一 |
+| 恒久対処 | `develop`のbranch削除だけを禁止するRepository Rulesetを追加した（下記） |
+
+```text
+ruleset id: 20296953
+name:       Protect develop from deletion
+target:     branch
+enforcement: active
+conditions.ref_name.include: [refs/heads/develop]
+rules:      [{type: deletion}]
+bypass_actors: []（current_user_can_bypass: never。管理者も含めbypassできない）
+```
+
+このrulesetは削除だけを禁止し、review必須化やstatus check必須化は含まない。
+`develop`をbranch protectionのbundle対象外とする既存方針（solo bootstrapの速度を落とさない）は変更しない。
+`delete_branch_on_merge`はrepository全体で有効のままとする。無効化すると、
+merge済みのfeature branch（`chore/repository-hardening`等）の自動削除が失われ、
+手動cleanupの運用に戻るため、ここでは選ばない。
+
+同種の事故は、恒久的なbranchをPRのheadにする運用（develop→mainの昇格PR）を
+続ける限り再発しうる。この節のrulesetがそれを防ぐ。
 
 ### 実行環境（sanitized）
 
