@@ -96,10 +96,32 @@ Firmwareでは次を強制する。
 - 最大角速度
 - 最大角加速度
 - 最大command範囲
+- 単位時間あたりに受理するmotion command数
+- 最大連続動作時間とduty cycle
+- 拘束または過負荷を検知した場合の停止
 - 通信断時の定義済み動作
 - resetまたはdriver故障時の定義済み動作
 
 debug commandでもこれらの制限を迂回してはならない。
+
+**この段落は受理判定にだけ適用する。**上限を超えたcommandは、無言で破棄せず理由を返す。
+
+計数の境界（設定値がNのとき何番目から拒否するか）は
+[Servo Safety Limits](../hardware/servo-safety-limits.md)を正本とする。
+ここでは規則を再掲しない。同じ規範を2箇所に置くと、片方だけが更新されて食い違う。
+
+**実行中の動作に対する安全停止はこれとは別である。**最大連続動作時間、duty cycle、
+拘束・過負荷は、理由を返すだけでは足りず、trajectoryの中止またはPWM disableと
+fault eventを要する。理由を返して動作を続ける実装にしない。
+停止の要件は[Servo Safety Limits](../hardware/servo-safety-limits.md)を正本とする。
+
+正本の分担は次のとおり。
+
+| 対象 | 正本 |
+|---|---|
+| 安全要件（何を満たすか、検知時に何をするか）と計数の規則 | [Servo Safety Limits](../hardware/servo-safety-limits.md) |
+| しきい値・時間・窓・上限の**実測値** | [TBD台帳](../hardware/tbd-register.md) |
+| stale commandの拒否条件 | Protocolの`PROTO-TBD-013` |
 
 可動域は小さいstepで拡大し、電流、電圧、noise、干渉、機械的clearanceを記録する。
 
@@ -143,6 +165,12 @@ ESP32は次を検証する。
 - 該当する場合はcommand age
 
 通信断時、ESP32は承認済みのサーボfail-safe動作に従う。上限のない動作sequenceを継続したり、再接続後に古いrelative commandを再実行したりしてはならない。
+
+この要求が成立する前提として、ESP32が通信断を自力で検知できなければならない。Heartbeat source、loss timeout、fail-safe sequenceが未確定の間は、サーボ出力を有効にしない。追跡は[HW-TBD-017／018](../hardware/tbd-register.md)で行う。
+
+ただしこれは有効化条件の一部である。条件の全体は[Servo Safety Limits](../hardware/servo-safety-limits.md#サーボ出力を有効化してよい条件)を正本とする。ここに挙げた項目だけを満たしても、出力を有効化してよいことにはならない。
+
+また、送信側の再起動によってmessage IDが振り直されるため、duplicate判定はsession境界を考慮しなければならない。詳細は[Protocol](../protocol/esp32-pi-protocol.md)を参照する。
 
 ## 9. Interruptとwatchdogの安全
 

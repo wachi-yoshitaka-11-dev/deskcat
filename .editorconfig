@@ -9,9 +9,19 @@ trim_trailing_whitespace = true
 [*.md]
 trim_trailing_whitespace = false
 
-[*.{rs,toml,yml,yaml,json}]
+[*.{toml,yml,yaml,json}]
 indent_style = space
 indent_size = 2
+
+# rustfmtの既定（tab_spaces = 4）に合わせる。
+# 2にするとエディタと`cargo fmt`が毎回衝突する。
+[*.rs]
+indent_style = space
+indent_size = 4
+
+[*.ps1]
+indent_style = space
+indent_size = 4
 
 [Makefile]
 indent_style = tab
