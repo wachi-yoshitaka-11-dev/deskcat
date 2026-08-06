@@ -48,3 +48,10 @@ cost／risk:
 - [ ] 必要な場合はADRを作成または更新した
 - [ ] 正式文書を更新した
 - [ ] 後続の実装Issueを特定した
+
+## 起票時の設定
+
+- [ ] milestoneを設定した
+- [ ] `priority:*` labelを1つ設定した
+- [ ] assigneeを設定した
+- [ ] Projects v2の`deskcat` boardへ追加し、`Status`を設定した

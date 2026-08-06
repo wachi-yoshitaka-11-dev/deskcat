@@ -47,3 +47,10 @@ PC確認:
 
 - [ ] 明示的な判断なしに秘密情報や外部data flowを追加していない
 - [ ] 既存の安全境界を変更していない
+
+## 起票時の設定
+
+- [ ] milestoneを設定した
+- [ ] `priority:*` labelを1つ設定した
+- [ ] assigneeを設定した
+- [ ] Projects v2の`deskcat` boardへ追加し、`Status`を設定した
