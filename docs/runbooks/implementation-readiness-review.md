@@ -133,4 +133,4 @@ Remote GitHub configuration: BASE SETTINGS APPLIED
 GitHub Issue migration: PENDING foundation document publication
 ```
 
-#1から#4までと、#5の残りの開発端末検証に根拠が揃った後、このreviewを再実行する。
+Issue #1から#4までと、#5の残りの開発端末検証に根拠が揃った後、このreviewを再実行する。

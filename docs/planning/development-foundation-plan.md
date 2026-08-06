@@ -29,8 +29,8 @@
 | 4A: 公開ドキュメント基盤 | 完了 | [ADR-0003](../decisions/0003-public-documentation-publishing.md)に従い、[#26](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/26)のPagesと[#27](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/27)のWiki入口を公開し、read-backを確認済み |
 | 5: 初期バックログ | 完了 | 初期Issue 24件を[#1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1)〜[#24](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/24)として作成し、GitHubへlive statusを移行済み |
 | 6: 実装開始ゲート | レビュー済み・未通過 | `docs/runbooks/implementation-readiness-review.md` |
-| M1-001a: 開発環境の情報整理 | 完了 | `docs/toolchains/`、役割別 setup runbook、ADR-0002 |
-| M1-001b: 開発端末での検証 | 未着手 | ESP32 Build profile 端末での生成・clean build 待ち |
+| #5の作業区分a: 開発環境の情報整理 | 完了 | `docs/toolchains/`、役割別 setup runbook、ADR-0002 |
+| #5の作業区分b: 開発端末での検証 | 未着手 | ESP32 Build profile 端末での生成・clean build 待ち |
 
 ## 2. 参照する基準資料
 
