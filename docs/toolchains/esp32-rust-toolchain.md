@@ -109,7 +109,7 @@ Windows では Rust の MSVC host toolchain と Visual Studio C++ Build Tools �
 - [ ] 正式な format、lint、build command を `AGENTS.md` と root README へ反映した
 - [ ] 別の開発端末または clean environment で再現した
 
-flash、serial monitor、実機起動は M1-002 の範囲であり、この文書の build-only 確定条件には含めない。
+flash、serial monitor、実機起動は #6 の範囲であり、この文書の build-only 確定条件には含めない。
 
 ## 公式資料
 

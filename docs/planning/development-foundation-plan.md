@@ -26,7 +26,7 @@
 | 2: リポジトリ構成 | 完了 | ADR-0001、責務 README |
 | 3: ハードウェア基準資料 | 進行中 | 資料作成済み。実部品の型番・回路・実測待ち |
 | 4: README／GitHub 基盤 | 完了 | ラベル、マイルストーン、脆弱性報告、`main`最小保護を適用済み。文書言語を日本語中心に統一し、commit `19853d0`で`origin/main`へ公開済み |
-| 4A: 公開ドキュメント基盤 | 完了 | [ADR-0003](../decisions/0003-public-documentation-publishing.md)に従い、[GH-003 #26](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/26)のPagesと[GH-004 #27](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/27)のWiki入口を公開し、read-backを確認済み |
+| 4A: 公開ドキュメント基盤 | 完了 | [ADR-0003](../decisions/0003-public-documentation-publishing.md)に従い、[#26](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/26)のPagesと[#27](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/27)のWiki入口を公開し、read-backを確認済み |
 | 5: 初期バックログ | 完了 | 初期Issue 24件を[#1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1)〜[#24](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/24)として作成し、GitHubへlive statusを移行済み |
 | 6: 実装開始ゲート | レビュー済み・未通過 | `docs/runbooks/implementation-readiness-review.md` |
 | M1-001a: 開発環境の情報整理 | 完了 | `docs/toolchains/`、役割別 setup runbook、ADR-0002 |
@@ -193,7 +193,7 @@
 - [x] Raspberry Pi 側ソフトウェアの配置を決める
 - [x] Pi 側の実装言語を Rust と決める
 - [x] 共通プロトコル定義の配置を決める
-- [ ] 共有型・スキーマの生成有無を M2-001 の互換性検証で決める
+- [ ] 共有型・スキーマの生成有無を #9 の互換性検証で決める
 - [x] ハードウェア資料の配置を決める
 - [ ] 実験ログと大容量計測データの正式な保存場所を最初の実験 Issue で決める
 - [x] PC テストと HIL テストの配置を決める
@@ -534,9 +534,9 @@ deskcat/
 - [x] GitHub Pagesが`build_type: workflow`で有効であることを確認した
 - [x] Pages workflowの初回成功runとdeploymentを確認した
 - [x] Wikiが有効で、日本語の案内用`Home.md` 1件だけが存在することを確認した
-- [x] 方針決定を[GH-002 #25](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/25)として作成した
-- [x] Pages構築を[GH-003 #26](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/26)として作成した
-- [x] Wiki入口整備を[GH-004 #27](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/27)として作成した
+- [x] 方針決定を[#25](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/25)として作成した
+- [x] Pages構築を[#26](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/26)として作成した
+- [x] Wiki入口整備を[#27](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/27)として作成した
 
 ### 方針決定と実装
 
@@ -551,9 +551,9 @@ deskcat/
 
 ### Phase 4A 完了条件
 
-- [x] GH-002の方針が永続文書へ記録されている
-- [x] GH-003の受け入れ条件を満たしている
-- [x] GH-004の受け入れ条件を満たしている
+- [x] #25の方針が永続文書へ記録されている
+- [x] #26の受け入れ条件を満たしている
+- [x] #27の受け入れ条件を満たしている
 - [x] Wikiと`docs/`でlive文書を二重管理していない
 - [x] Pagesの公開範囲にsecret、local専用資料、再配布不可資料が含まれていない
 
@@ -561,15 +561,15 @@ deskcat/
 
 ## Phase 5: 初期バックログ
 
-この Phase の5.1–5.5にあるcheckは、`docs/backlog/initial-issues.md`に初期定義が揃っていることを示す。2026-07-28にGH-001を除く24件をGitHub Issueへ移行し、以後のlive statusはGitHubで管理する。機能実装の完了を意味しない。
+この Phase の5.1–5.5にあるcheckは、`docs/backlog/initial-issues.md`に初期定義が揃っていることを示す。2026-07-28にGitHub基盤整備（直接完了、遡及Issue無し）を除く24件をGitHub Issueへ移行し、以後のlive statusはGitHubで管理する。機能実装の完了を意味しない。
 
 ### 5.1 `M0 Development Foundation`
 
-- [x] Phase 0 のリモート残作業を GH-001 に含める
+- [x] Phase 0 のリモート残作業をGitHub基盤整備の直接完了作業に含める
 - [x] 完了済みの AI エージェント基盤設定は遡及 Issue 化せず、永続文書を証拠とする
 - [x] 完了済みの ADR-0001 とリポジトリ構成は遡及 Issue 化せず、ADR と Git 差分を証拠とする
-- [x] ハードウェア基準資料の確定作業を FND-001～FND-003 に定義する
-- [x] GitHub 基盤整備を GH-001 に定義する
+- [x] ハードウェア基準資料の確定作業を #1～#3 に定義する
+- [x] GitHub 基盤整備を直接完了の作業として定義する
 - [x] 各 Issue に依存関係と受け入れ条件を記載する
 
 ### 5.2 `M1 ESP32 Bring-up`
@@ -663,9 +663,9 @@ deskcat/
 
 ### 6.4 プロジェクト管理
 
-- [x] GitHub上に着手Issue（[M1-001 #5](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/5)）が存在する
-- [x] M1-001の文書上の依存関係が完了している
-- [x] M1-001の受け入れ条件が測定可能である
+- [x] GitHub上に着手Issue（[#5](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/5)）が存在する
+- [x] #5の文書上の依存関係が完了している
+- [x] #5の受け入れ条件が測定可能である
 - [ ] 必要な実機と計測器が利用できる
 - [x] 作業結果を記録する場所と template がある
 

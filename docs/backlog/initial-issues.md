@@ -7,7 +7,7 @@
 
 - Issueの状態、担当、議論、追加checklistは[GitHub Issues](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues)を正本とする。
 - このfileは、承認した初期backlogの定義と作成順序を残す履歴資料であり、live statusを重複管理しない。
-- GH-001はGitHub基盤整備として直接完了しているため、遡及Issueを作成していない。
+- Repositoryのlabel、milestone、security設定の適用はGitHub基盤整備として直接完了しているため、遡及Issueを作成していない。
 - GitHub Issue本文では依存関係を実際のIssue番号へ置き換えた。ローカル定義からも対応Issueへ辿れるよう、依存関係をlink化している。
 
 > このfile内の`起票時の状態`、`Labels`、受け入れ条件のcheckboxは、**起票時点のsnapshot**である。
@@ -15,19 +15,19 @@
 > 現在の進捗として読まない。closeされたIssueでも、ここのcheckboxは当時のまま残る。
 > 現在の状態は必ずGitHub Issueで確認する。
 
-`GH-005`は本文書にlocal定義を持たない。GH-002〜GH-004の後続として
+`#28`は本文書にlocal定義を持たない。#25〜#27の後続として
 GitHub Issue側だけで起票・管理しており、目的と受け入れ条件は[#28](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/28)を参照する。
 本文書は承認した初期backlogの履歴資料であり、後から追加したIssueの定義を遡って複製しない。
 
 | Milestone | GitHub Issues |
 |---|---|
-| M0 | [FND-001 #1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1)、[FND-002 #2](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/2)、[FND-003 #3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)、[FND-004 #4](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/4)、[GH-002 #25](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/25)、[GH-003 #26](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/26)、[GH-004 #27](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/27)、[GH-005 #28](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/28) |
-| M1 | [M1-001 #5](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/5)、[M1-002 #6](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/6)、[M1-003 #7](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/7)、[M1-004 #8](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/8) |
-| M2 | [M2-001 #9](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/9)、[M2-002 #10](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/10)、[M2-003 #11](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11)、[M2-004 #12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12) |
-| M3 | [M3-001 #13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)、[M3-002 #14](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/14)、[M3-003 #15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)、[M3-004 #16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16) |
-| M4 | [M4-001 #17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)、[M4-002 #18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)、[M4-003 #19](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/19)、[M4-004 #20](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/20) |
-| M5 | [M5-001 #21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)、[M5-002 #22](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/22)、[M5-003 #23](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/23) |
-| M6 | [M6-001 #24](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/24) |
+| M0 | [#1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1)、[#2](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/2)、[#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)、[#4](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/4)、[#25](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/25)、[#26](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/26)、[#27](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/27)、[#28](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/28) |
+| M1 | [#5](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/5)、[#6](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/6)、[#7](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/7)、[#8](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/8) |
+| M2 | [#9](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/9)、[#10](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/10)、[#11](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11)、[#12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12) |
+| M3 | [#13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)、[#14](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/14)、[#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)、[#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16) |
+| M4 | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)、[#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)、[#19](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/19)、[#20](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/20) |
+| M5 | [#21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)、[#22](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/22)、[#23](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/23) |
+| M6 | [#24](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/24) |
 
 ## 依存関係の概要
 
@@ -75,7 +75,7 @@ M5 MVP integration
 
 ---
 
-## FND-001: ハードウェア現物inventoryの確認
+## #1: ハードウェア現物inventoryの確認
 
 - Milestone: M0 Development Foundation
 - Labels: `area:hardware`、`type:experiment`、`priority:critical`、`needs:hardware-test`
@@ -124,11 +124,11 @@ M5 MVP integration
 
 ---
 
-## FND-002: 初期GPIO割り当ての承認
+## #2: 初期GPIO割り当ての承認
 
 - Milestone: M0 Development Foundation
 - Labels: `area:hardware`、`area:firmware`、`type:decision`、`priority:critical`、`status:blocked`
-- 依存関係: [FND-001 #1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1)
+- 依存関係: [#1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1)
 
 ### 目的
 
@@ -150,11 +150,11 @@ Boot、flash、UART、board機能、他deviceと競合させず、必要なESP32
 
 ---
 
-## FND-003: 電源architectureと予算の完成
+## #3: 電源architectureと予算の完成
 
 - Milestone: M0 Development Foundation
 - Labels: `area:hardware`、`type:decision`、`priority:critical`、`status:blocked`
-- 依存関係: [FND-001 #1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1)
+- 依存関係: [#1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1)
 
 ### 目的
 
@@ -172,7 +172,7 @@ Boot、flash、UART、board機能、他deviceと競合させず、必要なESP32
 
 ---
 
-## FND-004: Draft protocol v1のreview
+## #4: Draft protocol v1のreview
 
 - Milestone: M0 Development Foundation
 - Labels: `area:protocol`、`type:decision`、`priority:high`
@@ -210,7 +210,7 @@ Toolchainとprotocol実装のIssueに必要な最小限の意味を承認する�
 
 ---
 
-## GH-001: Repositoryのlabel、milestone、security設定を適用
+## Repositoryのlabel、milestone、security設定を適用
 
 - Milestone: M0 Development Foundation
 - Labels: `type:maintenance`、`area:docs`、`priority:normal`、`status:blocked`
@@ -240,7 +240,7 @@ Review済みのローカルGitHub設定をpublic repositoryへ適用する。
 
 ---
 
-## GH-002: GitHub Pages／Wikiの運用方針を決定
+## #25: GitHub Pages／Wikiの運用方針を決定
 
 - Milestone: M0 Development Foundation
 - Labels: `area:docs`、`type:decision`、`priority:normal`
@@ -286,16 +286,16 @@ GitHub PagesとWikiの責務、正本、公開範囲、更新方法を決定し�
 - [ ] Wikiを使用する場合、`docs/`との重複を防ぐ昇格・archive規則を決めた
 - [ ] Pagesのbuild方式、Actions権限、version固定方針を決めた
 - [ ] 決定をGovernanceまたはADRへ記録した
-- [ ] [GH-003 #26](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/26)の実装入力が揃った
+- [ ] [#26](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/26)の実装入力が揃った
 
 ---
 
-## GH-003: GitHub Pages公開基盤を構築
+## #26: GitHub Pages公開基盤を構築
 
 - Milestone: M0 Development Foundation
 - Labels: `area:docs`、`type:maintenance`、`priority:normal`、`status:blocked`
-- 起票時の状態: [GH-002 #25](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/25)の方針承認待ち
-- 依存関係: [GH-002 #25](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/25)
+- 起票時の状態: [#25](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/25)の方針承認待ち
+- 依存関係: [#25](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/25)
 
 ### 目的
 
@@ -337,12 +337,12 @@ GitHub PagesとWikiの責務、正本、公開範囲、更新方法を決定し�
 
 ---
 
-## GH-004: Wikiを公開文書の入口として整備
+## #27: Wikiを公開文書の入口として整備
 
 - Milestone: M0 Development Foundation
 - Labels: `area:docs`、`type:maintenance`、`priority:normal`、`status:blocked`
-- 起票時の状態: [GH-002 #25](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/25)の方針確定済み、[GH-003 #26](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/26)のPages公開待ち
-- 依存関係: [GH-002 #25](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/25)、[GH-003 #26](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/26)
+- 起票時の状態: [#25](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/25)の方針確定済み、[#26](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/26)のPages公開待ち
+- 依存関係: [#25](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/25)、[#26](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/26)
 
 ### 目的
 
@@ -377,7 +377,7 @@ Wikiを仕様の正本にせず、DeskCatの公開文書へ案内する日本語
 
 ---
 
-## M1-001: Rust／ESP-IDF toolchainの検証と固定
+## #5: Rust／ESP-IDF toolchainの検証と固定
 
 - Milestone: M1 ESP32 Bring-up
 - Labels: `area:firmware`、`type:experiment`、`priority:high`
@@ -428,11 +428,11 @@ Tool version、完全なbuild log、生成設定、正確な公式文書link。
 
 ---
 
-## M1-002: 最小firmwareをflashしてbootを記録
+## #6: 最小firmwareをflashしてbootを記録
 
 - Milestone: M1 ESP32 Bring-up
 - Labels: `area:firmware`、`type:feature`、`priority:high`、`needs:hardware-test`
-- 依存関係: [M1-001 #5](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/5)、HW-TBD-001
+- 依存関係: [#5](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/5)、HW-TBD-001
 
 ### 目的
 
@@ -450,11 +450,11 @@ Tool version、完全なbuild log、生成設定、正確な公式文書link。
 
 ---
 
-## M1-003: Task heartbeatとhealth snapshotを追加
+## #7: Task heartbeatとhealth snapshotを追加
 
 - Milestone: M1 ESP32 Bring-up
 - Labels: `area:firmware`、`type:feature`、`priority:normal`
-- 依存関係: [M1-002 #6](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/6)
+- 依存関係: [#6](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/6)
 
 ### 目的
 
@@ -470,7 +470,7 @@ Tool version、完全なbuild log、生成設定、正確な公式文書link。
 
 ---
 
-## M1-004: Raspberry Pi Rust環境の検証
+## #8: Raspberry Pi Rust環境の検証
 
 - Milestone: M1 ESP32 Bring-up
 - Labels: `area:raspberry-pi`、`type:experiment`、`priority:high`
@@ -493,11 +493,11 @@ Raspberry Pi Zero WH実機で対応するRust環境を検証し、direct build�
 
 ---
 
-## M2-001: Protocol crateとconformance fixtureの作成
+## #9: Protocol crateとconformance fixtureの作成
 
 - Milestone: M2 ESP32–Pi Protocol
 - Labels: `area:protocol`、`area:raspberry-pi`、`type:feature`、`priority:high`
-- 依存関係: [FND-004 #4](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/4)、root Rust workspace Issue
+- 依存関係: [#4](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/4)、root Rust workspace Issue
 
 ### 目的
 
@@ -515,11 +515,11 @@ Serial I/Oを含めず、純粋なRustによるprotocol type、validation、共�
 
 ---
 
-## M2-002: 上限付きfirmware line parserの実装
+## #10: 上限付きfirmware line parserの実装
 
 - Milestone: M2 ESP32–Pi Protocol
 - Labels: `area:protocol`、`area:firmware`、`type:feature`、`priority:high`
-- 依存関係: [M1-001 #5](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/5)、[M2-001 #9](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/9)
+- 依存関係: [#5](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/5)、[#9](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/9)
 
 ### 目的
 
@@ -537,11 +537,11 @@ Firmware向けに、上限のあるincremental JSON Lines receiverを実装す�
 
 ---
 
-## M2-003: Host serial sessionの実装
+## #11: Host serial sessionの実装
 
 - Milestone: M2 ESP32–Pi Protocol
 - Labels: `area:protocol`、`area:raspberry-pi`、`type:feature`、`priority:high`
-- 依存関係: [M1-004 #8](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/8)、[M2-001 #9](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/9)
+- 依存関係: [#8](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/8)、[#9](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/9)
 
 ### 目的
 
@@ -558,11 +558,11 @@ Firmware向けに、上限のあるincremental JSON Lines receiverを実装す�
 
 ---
 
-## M2-004: Boot、ping、status、ACK、reconnect同期の実装
+## #12: Boot、ping、status、ACK、reconnect同期の実装
 
 - Milestone: M2 ESP32–Pi Protocol
 - Labels: `area:protocol`、`area:firmware`、`area:raspberry-pi`、`type:feature`、`priority:high`、`needs:hardware-test`
-- 依存関係: [M2-002 #10](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/10)、[M2-003 #11](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11)
+- 依存関係: [#10](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/10)、[#11](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11)
 
 ### 目的
 
@@ -581,11 +581,11 @@ Firmware向けに、上限のあるincremental JSON Lines receiverを実装す�
 
 ---
 
-## M3-001: LCDの特定とbring-up
+## #13: LCDの特定とbring-up
 
 - Milestone: M3 Display and Input
 - Labels: `area:hardware`、`area:firmware`、`type:feature`、`priority:high`、`status:blocked`、`needs:hardware-test`
-- 依存関係: [FND-001 #1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1)、[FND-002 #2](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/2)、[FND-003 #3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)、[M1-002 #6](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/6)
+- 依存関係: [#1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1)、[#2](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/2)、[#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)、[#6](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/6)
 
 ### 目的
 
@@ -602,11 +602,11 @@ Firmware向けに、上限のあるincremental JSON Lines receiverを実装す�
 
 ---
 
-## M3-002: Touch入力の特定とbring-up
+## #14: Touch入力の特定とbring-up
 
 - Milestone: M3 Display and Input
 - Labels: `area:hardware`、`area:firmware`、`type:feature`、`priority:high`、`status:blocked`、`needs:hardware-test`
-- 依存関係: [FND-001 #1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1)、[FND-002 #2](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/2)、[FND-003 #3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)、[M3-001 #13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)
+- 依存関係: [#1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1)、[#2](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/2)、[#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)、[#13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)
 
 ### 目的
 
@@ -623,11 +623,11 @@ Raw touch dataを取得し、再現可能な撫でeventを導出する。
 
 ---
 
-## M3-003: Accelerometerの特定とbring-up
+## #15: Accelerometerの特定とbring-up
 
 - Milestone: M3 Display and Input
 - Labels: `area:hardware`、`area:firmware`、`type:feature`、`priority:high`、`status:blocked`、`needs:hardware-test`
-- 依存関係: [FND-001 #1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1)、[FND-002 #2](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/2)、[FND-003 #3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)、[M1-002 #6](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/6)
+- 依存関係: [#1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1)、[#2](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/2)、[#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)、[#6](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/6)
 
 ### 目的
 
@@ -644,11 +644,11 @@ Calibration済みaccelerationを取得し、再現可能な軽打eventを導出�
 
 ---
 
-## M3-004: Environment sensorの特定とbring-up
+## #16: Environment sensorの特定とbring-up
 
 - Milestone: M3 Display and Input
 - Labels: `area:hardware`、`area:firmware`、`type:feature`、`priority:normal`、`status:blocked`、`needs:hardware-test`
-- 依存関係: [FND-001 #1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1)、[FND-002 #2](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/2)、[FND-003 #3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)、[M1-002 #6](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/6)
+- 依存関係: [#1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1)、[#2](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/2)、[#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)、[#6](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/6)
 
 ### 目的
 
@@ -664,11 +664,11 @@ Calibration済みaccelerationを取得し、再現可能な軽打eventを導出�
 
 ---
 
-## M4-001: サーボ電気動作のcharacterization
+## #17: サーボ電気動作のcharacterization
 
 - Milestone: M4 Servo Integration
 - Labels: `area:hardware`、`type:experiment`、`priority:critical`、`status:blocked`、`needs:hardware-test`
-- 依存関係: [FND-001 #1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1)、[FND-003 #3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)
+- 依存関係: [#1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1)、[#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)
 
 ### 目的
 
@@ -685,11 +685,11 @@ Calibration済みaccelerationを取得し、再現可能な軽打eventを導出�
 
 ---
 
-## M4-002: 機械的可動域と動作制限のcalibration
+## #18: 機械的可動域と動作制限のcalibration
 
 - Milestone: M4 Servo Integration
 - Labels: `area:hardware`、`type:experiment`、`priority:critical`、`status:blocked`、`needs:hardware-test`
-- 依存関係: [M4-001 #17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)、首機構の完成
+- 依存関係: [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)、首機構の完成
 
 ### 目的
 
@@ -707,11 +707,11 @@ Neutral、安全可動域、速度、加速度、通信断時動作を確定す�
 
 ---
 
-## M4-003: Servo limiterとtrajectoryの実装
+## #19: Servo limiterとtrajectoryの実装
 
 - Milestone: M4 Servo Integration
 - Labels: `area:firmware`、`type:feature`、`priority:critical`、`status:blocked`
-- 依存関係: [M4-002 #18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)
+- 依存関係: [#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)
 
 ### 目的
 
@@ -729,11 +729,11 @@ Neutral、安全可動域、速度、加速度、通信断時動作を確定す�
 
 ---
 
-## M4-004: Servo fail-safeと統合動作の検証
+## #20: Servo fail-safeと統合動作の検証
 
 - Milestone: M4 Servo Integration
 - Labels: `area:firmware`、`area:hardware`、`type:feature`、`priority:critical`、`status:blocked`、`needs:hardware-test`
-- 依存関係: [M2-004 #12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)、[M3-001 #13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)、[M4-003 #19](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/19)
+- 依存関係: [#12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)、[#13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)、[#19](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/19)
 
 ### 目的
 
@@ -750,11 +750,11 @@ Disconnect、reset、display／sensor同時動作時の安全な動作を検証�
 
 ---
 
-## M5-001: 撫で操作から喜ぶ反応までの統合
+## #21: 撫で操作から喜ぶ反応までの統合
 
 - Milestone: M5 DeskCat MVP
 - Labels: `area:firmware`、`area:raspberry-pi`、`type:feature`、`priority:high`、`status:blocked`、`needs:hardware-test`
-- 依存関係: [M2-004 #12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)、[M3-001 #13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)、[M3-002 #14](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/14)、[M4-004 #20](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/20)
+- 依存関係: [#12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)、[#13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)、[#14](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/14)、[#20](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/20)
 
 ### 受け入れ条件
 
@@ -767,11 +767,11 @@ Disconnect、reset、display／sensor同時動作時の安全な動作を検証�
 
 ---
 
-## M5-002: 軽打から驚く反応までの統合
+## #22: 軽打から驚く反応までの統合
 
 - Milestone: M5 DeskCat MVP
 - Labels: `area:firmware`、`area:raspberry-pi`、`type:feature`、`priority:high`、`status:blocked`、`needs:hardware-test`
-- 依存関係: [M2-004 #12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)、[M3-001 #13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)、[M3-003 #15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)、[M4-004 #20](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/20)
+- 依存関係: [#12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)、[#13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)、[#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)、[#20](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/20)
 
 ### 受け入れ条件
 
@@ -783,11 +783,11 @@ Disconnect、reset、display／sensor同時動作時の安全な動作を検証�
 
 ---
 
-## M5-003: ローカル独り言fallbackの追加
+## #23: ローカル独り言fallbackの追加
 
 - Milestone: M5 DeskCat MVP
 - Labels: `area:raspberry-pi`、`type:feature`、`priority:normal`
-- 依存関係: Root host workspace、[M2-004 #12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)、display text機能
+- 依存関係: Root host workspace、[#12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)、display text機能
 
 ### 受け入れ条件
 
@@ -799,11 +799,11 @@ Disconnect、reset、display／sensor同時動作時の安全な動作を検証�
 
 ---
 
-## M6-001: MVP fault／endurance suiteの実行
+## #24: MVP fault／endurance suiteの実行
 
 - Milestone: M6 Reliability
 - Labels: `area:firmware`、`area:raspberry-pi`、`area:hardware`、`type:experiment`、`priority:high`、`needs:hardware-test`
-- 依存関係: [M5-001 #21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)、[M5-002 #22](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/22)、[M5-003 #23](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/23)
+- 依存関係: [#21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)、[#22](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/22)、[#23](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/23)
 
 ### 目的
 
@@ -830,6 +830,6 @@ Disconnect、reset、display／sensor同時動作時の安全な動作を検証�
 - [x] 依存順にIssueを作成する
 - [x] ローカルのsymbolic IDをGitHub Issue linkへ置き換える
 - [x] ハードウェアTBDにより着手できないIssueへ`status:blocked`を設定する
-- [x] 基盤review後の最初のAI主導実装IssueとしてM1-001を選定する
-- [x] 最初の人間主導ハードウェアIssueとしてFND-001を選定する
+- [x] 基盤review後の最初のAI主導実装Issueとして#5を選定する
+- [x] 最初の人間主導ハードウェアIssueとして#1を選定する
 - [x] 移行後は、このfileでlive statusを重複管理しない

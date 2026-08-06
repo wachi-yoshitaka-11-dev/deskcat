@@ -29,6 +29,34 @@ Issueには次を含める。
 
 無関係なrefactor、新たに見つけた不具合、別実験には別Issueを使う。
 
+## Issueの命名
+
+Issue titleは`[Tag] <概要>`形式にする。`Tag`は使用するIssue templateと1対1で対応する。
+
+| Tag | 対応するIssue template | 対応するlabel |
+|---|---|---|
+| `Bug` | 不具合報告 | `type:bug` |
+| `Feature` | 機能提案 | `type:feature` |
+| `Decision` | 設計判断 | `type:decision` |
+| `Experiment` | ハードウェア実験 | `type:experiment` |
+| `Maintenance` | 保守作業 | `type:maintenance` |
+
+`FND-001`や`GH-005`のような連番付きID形式は使わない。連番による識別が必要な場合は、
+GitHub Issue番号（`#1`等）をそのまま使う。
+
+### 起票時に設定する項目
+
+| 項目 | 必須／任意 | 値の決め方 |
+|---|---|---|
+| title | 必須 | 上記の形式 |
+| milestone | 必須 | 対応するM0〜M6 milestoneを設定する |
+| label（`type:*`／`priority:*`） | 必須 | それぞれ1つ設定する |
+| label（`area:*`） | 対象componentがある場合のみ | 対象componentに対応するlabelを設定する。repository全体の保守作業など特定componentに限らない場合は省略する |
+| label（`status:blocked`／`needs:*`） | 該当時のみ | 依存未解決なら`status:blocked`、実機証拠や人間の判断が必要なら`needs:hardware-test`／`needs:decision`を設定する |
+| assignee | 必須 | 対応を担当する人を設定する。未定でも起票者自身を暫定assigneeとする |
+| project | 必須 | Projects v2 board（`deskcat`、`https://github.com/users/wachi-yoshitaka-11-dev/projects/5`）にitemとして追加し、`Status`を設定する |
+| 開始日／終了日（`Start date`／`Target date`） | 任意 | 着手日・完了目標が具体的に決まった時点でのみProjects v2 board上で設定する。未定なら空欄のままでよい |
+
 ## Branches
 
 `main`は安定版とGitHub Pages公開元、`develop`は通常開発の統合先である。

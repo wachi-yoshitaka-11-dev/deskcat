@@ -1,7 +1,7 @@
 # GitHub Wiki入口の保守
 
 > 状態: Verified — 2026-07-28に初回更新と公開結果を確認済み
-> 対象Issue: [GH-004 #27](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/27)
+> 対象Issue: [#27](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/27)
 > 方針: [ADR-0003](../decisions/0003-public-documentation-publishing.md)
 
 ## 目的

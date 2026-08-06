@@ -154,7 +154,7 @@ Clippy は ESP-IDF target での対応を実行時点で確認し、成功した
 
 ## 9. Flashへの移行
 
-flash と serial monitor は M1-002 で行う。次を満たすまで実行しない。
+flash と serial monitor は #6 で行う。次を満たすまで実行しない。
 
 - exact board と USB-UART を確認済み
 - unknown output を駆動しない firmware
