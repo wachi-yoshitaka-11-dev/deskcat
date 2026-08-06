@@ -306,16 +306,17 @@ Wikiの設定を変更した場合は、この節を目視結果で更新する�
 - `Start date`／`Target date`はProjects v2のcustom fieldであり、Issueの開始日・終了日を設定する運用に対応する
 - Repository REST APIの`has_projects`は`true`
 
-`has_projects`はclassic repository projectの有無を示すflagであり、Projects v2のboardが
-linkされているかどうかを反映しない。両者は別の仕組みである。
+`has_projects`は`has_issues`／`has_wiki`と同種の機能有効化トグルであり、classic project
+（repository単位のclassic project board）が実在するかどうかを示す値ではない。project数0でも
+`true`になり得る。Projects v2のboardがlinkされているかどうかも反映しない。三者は別の仕組みである。
 
 ```text
 GET repos/{owner}/{repo}/projects -> HTTP 404 Not Found
 ```
 
-GitHubはclassic Projects（repository／organization単位のclassic project）のREST APIを
-廃止しており、`has_projects`の値に関わらずこのendpointは404を返す。つまり`has_projects`は
-現在、classic projectの実在を示す情報としてほぼ無意味なlegacy flagである。
+GitHubはProjects（classic）のREST APIを2025-04-01にsunsetしており（機能自体のsunsetは
+2024-08-23）、`has_projects`の値に関わらずこのendpointは404を返す。つまり`has_projects`は
+現在、classic projectの実在や利用可能性を示す情報としてほぼ無意味なlegacy flagである。
 
 方針: `has_projects`は`true`のまま変更しない。classic projectとしては使っていないが、
 このflag自体がGitHub側で実質的な意味を失っているため、無効化のための追加操作は行わない。
