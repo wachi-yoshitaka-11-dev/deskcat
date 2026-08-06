@@ -293,6 +293,35 @@ GraphQLは`hasWikiEnabled`のみを返し、いずれも機能の有効／無効
 編集権限ではない（2026-07-29にschema introspectionで確認）。
 Wikiの設定を変更した場合は、この節を目視結果で更新する。
 
+## Projects
+
+2026-08-06のread-back結果:
+
+- Repositoryは`repository.projectsV2`（GraphQL）で**Projects v2のboard 1件**にlinkされている
+  - Owner: `wachi-yoshitaka-11-dev`（**user**単位。organizationではない）
+  - Number: `5`、Title: `deskcat`、Visibility: Public
+  - URL: `https://github.com/users/wachi-yoshitaka-11-dev/projects/5`
+  - Item数: 35
+  - 使用中のfield: `Status`（single select）、`Milestone`、`Repository`、`Start date`、`Target date`（他にTitle／Assignees／Labels等のdefault field）
+- `Start date`／`Target date`はProjects v2のcustom fieldであり、Issueの開始日・終了日を設定する運用に対応する
+- Repository REST APIの`has_projects`は`true`
+
+`has_projects`は`has_issues`／`has_wiki`と同種の機能有効化トグルであり、classic project
+（repository単位のclassic project board）が実在するかどうかを示す値ではない。project数0でも
+`true`になり得る。Projects v2のboardがlinkされているかどうかも反映しない。三者は別の仕組みである。
+
+```text
+GET repos/{owner}/{repo}/projects -> HTTP 404 Not Found
+```
+
+GitHubはProjects（classic）のREST APIを2025-04-01にsunsetしており（機能自体のsunsetは
+2024-08-23）、`has_projects`の値に関わらずこのendpointは404を返す。つまり`has_projects`は
+現在、classic projectの実在や利用可能性を示す情報としてほぼ無意味なlegacy flagである。
+
+方針: `has_projects`は`true`のまま変更しない。classic projectとしては使っていないが、
+このflag自体がGitHub側で実質的な意味を失っているため、無効化のための追加操作は行わない。
+実際のIssue進行管理は上記Projects v2のboardで行う。
+
 ## 保留
 
 - CODEOWNERS: 安定したreviewer／owner対応が複数になった時点で追加
@@ -301,5 +330,4 @@ Wikiの設定を変更した場合は、この節を目視結果で更新する�
 - Release workflow: versionとartifact方針の確定後に追加
 - Discussions: community supportにIssueだけでは不足した場合に追加
 - Signed commit: SSH署名で導入コストが小さいため、次のrepository運用変更で評価する
-- Projects: `has_projects: true`だが未使用。使用しないなら無効化する
 - Milestone due date: M0–M6すべて未設定。blocked Issueの滞留を可視化する目的で設定を検討する
