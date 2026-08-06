@@ -31,18 +31,12 @@ Issueには次を含める。
 
 ## Issueの命名
 
-Issue titleは`[Tag] <概要>`形式にする。`Tag`は使用するIssue templateと1対1で対応する。
+Issue titleにprefixを付けない。`<概要>`だけの素の説明文にする。
+種別は`type:bug`／`type:feature`／`type:decision`／`type:experiment`／`type:maintenance`labelで表現する。
+GitHubのIssue一覧はlabelを常にtitleの横に表示するため、titleにも同じ情報を重複して書く必要がない。
 
-| Tag | 対応するIssue template | 対応するlabel |
-|---|---|---|
-| `Bug` | 不具合報告 | `type:bug` |
-| `Feature` | 機能提案 | `type:feature` |
-| `Decision` | 設計判断 | `type:decision` |
-| `Experiment` | ハードウェア実験 | `type:experiment` |
-| `Maintenance` | 保守作業 | `type:maintenance` |
-
-`FND-001`や`GH-005`のような連番付きID形式は使わない。連番による識別が必要な場合は、
-GitHub Issue番号（`#1`等）をそのまま使う。
+`[Bug]`のようなbracket prefixや、`FND-001`／`GH-005`のような連番付きID形式は使わない。
+連番による識別が必要な場合は、GitHub Issue番号（`#1`等）をそのまま使う。
 
 ### 起票時に設定する項目
 

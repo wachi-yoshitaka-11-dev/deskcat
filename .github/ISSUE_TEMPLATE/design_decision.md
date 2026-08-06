@@ -1,7 +1,6 @@
 ---
 name: 設計判断
 about: アーキテクチャまたはcomponent横断の疑問を決定する
-title: "[Decision] "
 labels: "type:decision,needs:decision"
 assignees: ""
 ---

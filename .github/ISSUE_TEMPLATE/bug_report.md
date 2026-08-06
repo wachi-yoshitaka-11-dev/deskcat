@@ -1,7 +1,6 @@
 ---
 name: 不具合報告
 about: 再現可能な誤動作を報告する
-title: "[Bug] "
 labels: "type:bug"
 assignees: ""
 ---

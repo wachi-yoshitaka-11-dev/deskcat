@@ -1,7 +1,6 @@
 ---
 name: 機能提案
 about: 観測可能なDeskCat機能を一つ提案する
-title: "[Feature] "
 labels: "type:feature"
 assignees: ""
 ---

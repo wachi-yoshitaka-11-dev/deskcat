@@ -1,7 +1,6 @@
 ---
 name: 保守作業
 about: tool、依存関係、リポジトリ設定の保守作業を一つ実施する
-title: "[Maintenance] "
 labels: "type:maintenance"
 assignees: ""
 ---

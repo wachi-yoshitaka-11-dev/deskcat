@@ -1,7 +1,6 @@
 ---
 name: ハードウェア実験
 about: 記録した条件下で一つのハードウェア疑問を測定する
-title: "[Experiment] "
 labels: "type:experiment,needs:hardware-test"
 assignees: ""
 ---
