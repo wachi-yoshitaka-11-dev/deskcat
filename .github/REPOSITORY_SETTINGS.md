@@ -306,6 +306,27 @@ Wikiの設定を変更した場合は、この節を目視結果で更新する�
 - `Start date`／`Target date`はProjects v2のcustom fieldであり、Issueの開始日・終了日を設定する運用に対応する
 - Repository REST APIの`has_projects`は`true`
 
+2026-08-07のworkflow read-back結果（`user.projectV2(number:5).workflows`）:
+
+| Workflow | 有効 |
+|---|---|
+| `Auto-add sub-issues to project` | true |
+| `Auto-close issue` | true |
+| `Item added to project` | true |
+| `Item closed` | true |
+| `Pull request linked to issue` | true |
+| `Pull request merged` | true |
+
+`Item status changed`という名前のworkflowは存在しない。`Status`が`Done`になったitemの
+Issueをcloseするのは`Auto-close issue`である。
+
+`Pull request merged`が`Status`を`Done`にするのはPull Request item側であり、
+Issue itemには波及しない。実測でも、PR #44 merge（2026-08-06T13:37:11Z）とIssue #43
+close（13:41:05Z）に3分54秒、PR #45 merge（2026-08-07T00:36:45Z）とIssue #39
+close（01:00:20Z）に23分35秒の差があり、workflowによる即時発火ではない。
+mergeだけではIssueがcloseされないため、Issue itemの`Status`を`Done`にする操作が必要である。
+運用手順は[CONTRIBUTING.md](../CONTRIBUTING.md)のPull request節に記載する。
+
 `has_projects`は`has_issues`／`has_wiki`と同種の機能有効化トグルであり、classic project
 （repository単位のclassic project board）が実在するかどうかを示す値ではない。project数0でも
 `true`になり得る。Projects v2のboardがlinkされているかどうかも反映しない。三者は別の仕組みである。
