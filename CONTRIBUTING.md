@@ -151,7 +151,8 @@ Pull Requestのbaseは`develop`であり、その機能はrepositoryのdefault b
 （`main`）へのmerge時にしか働かないため。
 
 代わりに、Projects v2 board（`deskcat`）でcloseを管理する。
-boardで有効なworkflowは`Auto-close issue`と`Pull request merged`であり、次のように働く。
+boardでは6つのworkflowが有効である。全一覧はRepository設定に記録しており、
+このうちcloseに関わるのは`Auto-close issue`と`Pull request merged`の2つである。
 
 - `Pull request merged`: mergeされた**Pull Request item**の`Status`を`Done`にする
 - `Auto-close issue`: **item**の`Status`が`Done`になったとき、そのitemのIssueをcloseする

@@ -83,7 +83,15 @@ espup install
 
 `espup install` は environment export file を生成し、その path を出力する。新しい terminal ごとに、その export file を shell へ読み込む。読み込まないと `espup` が設定した環境変数が反映されない。
 
-export file の既定 path と読み込み command は、実行時点の [The Rust on ESP Book](https://docs.espressif.com/projects/rust/book/getting-started/toolchain.html) と `espup install` の出力で確認する。`espup --export-file` で path を指定した場合はその path を使う。実際に使用した path と command は [Version Record](../toolchains/version-record-template.md) へ記録し、成功を確認した command だけをこの runbook へ反映する。
+[espup の公式 README](https://github.com/esp-rs/espup) は、export file を home directory へ生成し、Unix shell では次で読み込むと記載している。
+
+```bash
+. $HOME/export-esp.sh
+```
+
+path を変える場合は `espup install` の `-f, --export-file <EXPORT_FILE>` を使う。`--export-file` は `espup install` の option であり、`espup` 直下の option ではない。
+
+DeskCat ではまだ実行していないため、この command は候補である。実行時点の README と `espup install --help`、および `espup install` の出力で path と option を再確認し、実際に使用した path と command を [Version Record](../toolchains/version-record-template.md) へ記録する。
 
 導入後に次を記録する。
 
