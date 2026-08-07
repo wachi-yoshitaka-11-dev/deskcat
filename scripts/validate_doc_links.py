@@ -38,7 +38,13 @@ def _zero_tracked_diagnostics(root):
         encoding="utf-8",
         errors="replace",
     )
-    tracked_lines = [line for line in all_tracked.stdout.splitlines() if line]
+    # stderrも混ぜる。gitがrepositoryを見つけられない場合、原因はstdoutではなく
+    # error文言にしか現れない。切り分けのための診断なので握りつぶさない。
+    tracked_lines = [
+        line
+        for line in (all_tracked.stdout + all_tracked.stderr).splitlines()
+        if line
+    ]
     top_level = subprocess.run(
         ["git", "-C", root, "rev-parse", "--show-toplevel"],
         capture_output=True,

@@ -1050,6 +1050,11 @@ class OutputValidatorBaseUrlTests(OutputValidatorTestCase):
             ("single quoted with comment", "baseurl: '/deskcat' # project Pages", deskcat_link),
             ("empty for root Pages", 'baseurl: ""', root_link),
             ("empty before a comment", "baseurl: # root Pages", root_link),
+            # colonの後ろが空のkeyは、YAMLではnull＝空文字列であり、Jekyllも
+            # root Pagesとして扱う。PowerShell実装はここでparameter binding error
+            # になっていたが、それは意図した拒否ではなく事故である。
+            # Python実装は`baseurl: ""`と同じく受理する。
+            ("bare key with no value", "baseurl:", root_link),
         )
         for name, config, html in cases:
             with self.subTest(case=name):

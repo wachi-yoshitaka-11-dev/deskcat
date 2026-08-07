@@ -68,9 +68,20 @@ def _stage_assets(repository_root, portal_root, output_root):
     # JSONはdataだけを表現し、manifest内のcodeを実行する余地がない。
     with open(manifest_path, "r", encoding="utf-8") as handle:
         manifest = json.load(handle)
-    if "assets" not in manifest:
+    if not isinstance(manifest, dict) or "assets" not in manifest:
         raise guards.ValidationError(
             "Pages asset manifest has no Assets key: pages/assets-manifest.json"
+        )
+    # 形を先に確認する。`assets`がlistでない、entryがobjectでない場合、
+    # 下の`"path" not in entry`はstringに対する部分一致へ退化し、宣言していない
+    # assetを宣言済みとして通しうる。公開境界の判定を型で守る。
+    declared_entries = manifest["assets"]
+    if not isinstance(declared_entries, list) or not all(
+        isinstance(entry, dict) for entry in declared_entries
+    ):
+        raise guards.ValidationError(
+            "Pages asset manifest Assets must be a list of objects:"
+            " pages/assets-manifest.json"
         )
 
     # Git追跡対象だけを公開する。追跡外のfileをmanifestへ書いても公開しない。
@@ -81,7 +92,7 @@ def _stage_assets(repository_root, portal_root, output_root):
     declared_assets = set()
 
     os.makedirs(assets_destination, exist_ok=True)
-    for entry in manifest["assets"]:
+    for entry in declared_entries:
         if "path" not in entry:
             problems.append("Asset manifest entry has no Path.")
             continue

@@ -69,6 +69,10 @@ CIで初めて検出される。
 移行が完了するまで、判定logicを変更する場合は新旧の両方へ同じ変更を入れる。
 片方だけを変えると、同等性checkがそこで落ちる。
 
+意図的に一致させない挙動が2点ある。値なしの`baseurl:`と0 byteの`.html`で、
+旧実装はPowerShellのparameter bindingにより検査を中断していた。
+詳細は[ADR-0006](../docs/decisions/0006-validation-script-language.md)を参照する。
+
 規則:
 
 - 前提条件と使用方法を記載する。

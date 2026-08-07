@@ -426,7 +426,10 @@ def iter_tree(root):
     while stack:
         current = stack.pop()
         try:
-            entries = sorted(os.scandir(current), key=lambda entry: entry.name)
+            # `with`で閉じる。Windowsではdirectory handleが開いたままだと、
+            # 走査後にそのdirectoryを削除できず、test fixtureの後始末が失敗する。
+            with os.scandir(current) as scan:
+                entries = sorted(scan, key=lambda entry: entry.name)
         except OSError:
             continue
         for entry in entries:

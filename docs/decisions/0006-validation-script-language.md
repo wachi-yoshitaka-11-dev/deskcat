@@ -99,6 +99,21 @@ secretと個人pathのpatternは`scripts/lib/publish_guards.py`だけで定義�
 | 端末に`python3`が無い | `machine-profiles.md`のDocs / Review profileへ必須要件として記載する |
 | Pythonのversion差で挙動が変わる | 標準ライブラリのみを使い、`ubuntu-24.04`のCIを判定の基準とする |
 
+## 意図的に一致させない挙動
+
+判定logicは同一にするが、次の2点だけはPython実装が旧実装と異なる。
+どちらも旧実装の「意図した拒否」ではなく、PowerShellの`[Parameter(Mandatory)][string]`が
+空文字列をbindできずに検査そのものを中断していた事故である。同じ事故を再現しない。
+
+| 入力 | PowerShell実装 | Python実装 |
+|---|---|---|
+| `pages/_config.yml`に値なしの`baseurl:`（colonの後ろが空） | `Cannot bind argument to parameter 'Value'`で中断 | `baseurl: ""`と同じくroot Pagesとして扱う。YAMLでもJekyllでもnull＝空文字列である |
+| 生成siteに0 byteの`.html` | `Cannot bind argument to parameter 'Content'`で中断 | 空の走査結果として扱い、他のguardを最後まで実行する |
+
+いずれもfail-openではない。中断した旧実装は残りのguardを一切実行しないため、
+Python実装の方が検査範囲は広い。現在の`pages/_config.yml`は`baseurl: /deskcat`であり、
+どちらの入力も現状のrepositoryでは発生しない。
+
 ## 検証
 
 - `validate-doc-links`の新旧実装が、同一checkoutに対して同じ`MARKDOWN=` `LINKS=` `BROKEN=0` `DIGEST=`を出す
