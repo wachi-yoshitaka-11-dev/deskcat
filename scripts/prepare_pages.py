@@ -6,6 +6,7 @@
 
 import json
 import os
+import re
 import shutil
 import sys
 from pathlib import Path
@@ -14,9 +15,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
 
 import publish_guards as guards  # noqa: E402
 
-# Staging対象の全fileへ適用するsize上限。extension条件を付けない。
-# `.svg`はtext扱いだがimage同様に大きくなり得るため、除外すると検査から漏れる。
-FILE_SIZE_LIMIT = 1024 * 1024
+# staging先として許すdirectory名。`_remove_staging`が再帰削除を行う前に、
+# 消そうとしている対象が本当にこれかを確認する。
+STAGING_DIRECTORY_NAME = ".pages-src"
+
+# Windowsのdrive指定。manifestの`path`判定で使う。
+DRIVE_LETTER_RE = re.compile(r"^[A-Za-z]:")
 
 # GitHub Pagesのthemeが各pageから参照するfaviconを、依存toolなしで生成する。
 # 1 x 1 pixel、32-bit BGRAの最小ICOであり、公開文書のbuild成否だけに影響する。
@@ -46,25 +50,42 @@ def _copy(source, destination):
     shutil.copyfile(source, destination)
 
 
-def _remove_staging(path):
+def is_unsafe_manifest_path(relative):
+    """manifestの`path`がstaging先を`assets/`の外へ逃がしうる形かを判定する。
+
+    規則をOSに依存させない。`os.path.isabs`はPOSIXで`C:\\x`を相対pathとして通すため、
+    それに任せると判定がOSごとに変わる。drive letter、slash、backslashを明示して、
+    どのOSでも同じ形を拒否する。公開境界の判定は環境非依存でfail-closedに保つ。
+
+    `os.path.isabs`は使わない。上の3つが、それが拒否していた形（`/x`、`\\x`、UNC、
+    `C:\\x`）をすべて覆う。冗長に残すとWindowsでは常にそちらが先に一致し、明示rule
+    のどれを壊しても結果が変わらないため、回帰をtestで捕まえられなくなる。
+
+    関数として切り出してあるのは、この規則をOSに依存せず直接testできるようにするため。
+    """
+    return bool(
+        not relative.strip()
+        or ".." in relative
+        or relative.startswith("/")
+        or relative.startswith("\\")
+        or DRIVE_LETTER_RE.match(relative)
+    )
+
+
+def _remove_staging(path, repository_root):
     """既存のstaging pathを、file・directory・reparse pointのどれでも取り除く。
 
-    PowerShellの`Remove-Item -Recurse -Force`は形を問わない。`shutil.rmtree`だけだと、
-    そこにfileやreparse pointが置かれていたときに診断ではなくtracebackで落ち、
-    「問題を報告して失敗」ではなく「検査自体がcrash」する側へ倒れる。
+    再帰削除の前に、消そうとしている対象がrepository内の`.pages-src`であることを
+    確認する。pathの組み立てを将来変えたときに、別のdirectoryを消してしまわないための
+    guardである。比較はcase-sensitiveにする。`path_within_root`が同じ方針であり、
+    ここだけcase-insensitiveにすると判定基準が食い違う。
     """
-    if not os.path.exists(path) and not os.path.islink(path):
-        return
-    if guards.is_reparse_point(path):
-        try:
-            os.remove(path)
-        except OSError:
-            os.rmdir(path)
-        return
-    if os.path.isdir(path):
-        shutil.rmtree(path)
-    else:
-        os.remove(path)
+    if os.path.basename(path) != STAGING_DIRECTORY_NAME or not guards.path_within_root(
+        path, repository_root
+    ):
+        raise guards.ValidationError("Unexpected Pages staging path.")
+    if not guards.remove_tree(path):
+        raise guards.ValidationError("Unable to clear the Pages staging directory.")
 
 
 def _stage_assets(repository_root, portal_root, output_root):
@@ -126,13 +147,7 @@ def _stage_assets(repository_root, portal_root, output_root):
         relative = str(entry["path"])
 
         # Manifestの`path`でstaging先を`assets/`の外へ逃がせないようにする。
-        if (
-            not relative.strip()
-            or ".." in relative
-            or relative.startswith("/")
-            or relative.startswith("\\")
-            or os.path.isabs(relative)
-        ):
+        if is_unsafe_manifest_path(relative):
             problems.append(
                 f"Asset manifest Path is not a safe relative path: {relative}"
             )
@@ -245,13 +260,11 @@ def _stage_docs(repository_root, output_root, tracked_symlinks):
 def main(argv=None):
     del argv
     repository_root = guards.full_path(str(Path(__file__).resolve().parent.parent))
-    output_root = guards.full_path(os.path.join(repository_root, ".pages-src"))
-    expected_output = guards.full_path(os.path.join(repository_root, ".pages-src"))
+    output_root = guards.full_path(
+        os.path.join(repository_root, STAGING_DIRECTORY_NAME)
+    )
 
-    if output_root.lower() != expected_output.lower():
-        raise guards.ValidationError("Unexpected Pages staging path.")
-
-    _remove_staging(output_root)
+    _remove_staging(output_root, repository_root)
     os.makedirs(output_root)
 
     # Gitのindexにpathが存在することを確認するguardを、portal fileとroot documentにも
@@ -311,7 +324,7 @@ def main(argv=None):
             problems.append(f"File type is not approved for Pages: {relative_file}")
             continue
 
-        if os.path.getsize(path) > FILE_SIZE_LIMIT:
+        if os.path.getsize(path) > guards.FILE_SIZE_LIMIT:
             problems.append(f"File exceeds the Pages size limit: {relative_file}")
 
         if extension in guards.TEXT_EXTENSIONS or is_license:

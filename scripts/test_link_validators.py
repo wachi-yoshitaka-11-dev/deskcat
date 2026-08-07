@@ -228,47 +228,22 @@ def tearDownModule():
         temporary_root, _state["temporary_parent"]
     ) and os.path.basename(temporary_root).startswith("deskcat-link-validator-tests-"):
         if os.path.exists(temporary_root):
-            _remove_tree(temporary_root)
+            _remove_fixture(temporary_root)
 
 
-def _remove_tree(path):
-    """fixtureのtreeを消す。read-onlyのfileも対象にする。
+def _remove_fixture(path):
+    """fixtureを取り除き、消せなかった事実だけを報告する。
 
-    Gitのobjectはread-onlyで作られるため、`shutil.rmtree`の既定では消せない。
-    PowerShell版が使っていた`Remove-Item -Recurse -Force`と同じ扱いにする。
-    `ignore_errors=True`だけで済ませると失敗を握りつぶし、fixtureが一時directoryへ
-    溜まり続けていることに気付けない。消せなかった事実はstderrへ残す。
-    path自体は名前だけ出す。一時directoryの絶対pathをlogへ書かない。
+    削除の中身は`publish_guards.remove_tree`が持つ。file、directory、reparse point、
+    read-onlyのいずれも扱う。2つのharnessで実装を複製すると、片方のchmodや警告だけを
+    変えたときに、もう片方でfixtureが黙って溜まる。
+    警告にはfile名だけを出す。一時directoryの絶対pathをlogへ書かない。
     """
-    if not os.path.exists(path):
-        return
-    for current, directories, files in os.walk(path):
-        for name in directories + files:
-            target = os.path.join(current, name)
-            try:
-                os.chmod(target, os.stat(target).st_mode | stat.S_IWUSR)
-            except OSError:
-                pass
-    shutil.rmtree(path, ignore_errors=True)
-    if os.path.exists(path):
+    if not guards.remove_tree(path):
         print(
             f"warning: failed to remove the test fixture {os.path.basename(path)}",
             file=sys.stderr,
         )
-
-
-def _remove_path(path):
-    """fixtureの後始末。directory junctionはtargetを消さずlinkだけを外す。"""
-    if guards.is_reparse_point(path):
-        try:
-            os.remove(path)
-        except OSError:
-            os.rmdir(path)
-        return
-    if os.path.isdir(path):
-        _remove_tree(path)
-    elif os.path.exists(path):
-        os.remove(path)
 
 
 class ValidatorAssertions(unittest.TestCase):
@@ -404,7 +379,7 @@ class OutputValidatorTestCase(ValidatorAssertions):
         _write(_state["output_index"], VALID_PAGE)
         _write(_state["nested_output_index"], VALID_PAGE)
         for path in reversed(self._temporary_paths):
-            _remove_path(path)
+            _remove_fixture(path)
 
     def track(self, path):
         self._temporary_paths.append(path)
@@ -1216,7 +1191,7 @@ class FixtureCleanupTests(unittest.TestCase):
             self.assertTrue(
                 os.path.exists(root), "read-only fileが素のrmtreeで消えてしまった"
             )
-        _remove_tree(root)
+        _remove_fixture(root)
         self.assertFalse(os.path.exists(root))
 
     def test_git_fixture_directories_are_removed(self):
@@ -1225,7 +1200,7 @@ class FixtureCleanupTests(unittest.TestCase):
         _write(os.path.join(root, "a.md"), "# A\n")
         _git(root, "init", "--quiet")
         _git(root, "add", "--all")
-        _remove_tree(root)
+        _remove_fixture(root)
         self.assertFalse(os.path.exists(root), "git fixtureが消し残された")
 
 
@@ -1347,6 +1322,11 @@ class NonAsciiQuotingTests(unittest.TestCase):
         self.parent = parent
         self.root = os.path.join(parent, f"deskcat-quote-{uuid.uuid4().hex}")
         os.makedirs(self.root)
+        # 作った直後に登録する。`unittest`は`setUp`が例外を投げたときや
+        # `skipTest`したときに`tearDown`を呼ばない。下の`_git`はどれも失敗しうるし、
+        # quotingのpositive controlはskipへ抜ける。`tearDown`に任せると、
+        # そのどの経路でもfixtureが一時directoryへ残る。
+        self.addCleanup(self._remove_fixture_root)
         _write(os.path.join(self.root, self.NON_ASCII_NAME), "# 見出し")
 
         _git(self.root, "init", "--quiet")
@@ -1375,11 +1355,12 @@ class NonAsciiQuotingTests(unittest.TestCase):
             f"120000,{blob},{self.NON_ASCII_SYMLINK_NAME}",
         )
 
-    def tearDown(self):
+    def _remove_fixture_root(self):
+        # 一時directoryの直下にある、自分で作った名前のものだけを消す。
         if guards.path_within_root(self.root, self.parent) and os.path.basename(
             self.root
         ).startswith("deskcat-quote-"):
-            _remove_tree(self.root)
+            _remove_fixture(self.root)
 
     def test_tracked_file_helper_returns_the_exact_unquoted_set(self):
         tracked = guards.get_tracked_files(self.root, ".")

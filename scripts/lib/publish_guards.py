@@ -11,6 +11,7 @@ import hashlib
 import html
 import os
 import re
+import shutil
 import stat
 import subprocess
 import unicodedata
@@ -122,6 +123,12 @@ DOCS_COPY_EXTENSIONS = (".md", ".markdown")
 # 判定に使う。`DOCS_COPY_EXTENSIONS`とは目的が違うため別に定義する。
 # 一方だけを変えたときに、もう一方が黙って追従しないようにする。
 MARKDOWN_EXTENSIONS = (".md", ".markdown")
+
+# Staging対象の全fileへ適用するsize上限。extension条件を付けない。
+# `.svg`はtext扱いだがimage同様に大きくなり得るため、除外すると検査から漏れる。
+# 上限を超えるfixtureを作るtestもこの値から大きさを決める。testが独自の定数を
+# 持つと、上限を上げたときにtestだけが古い値のまま失敗する。
+FILE_SIZE_LIMIT = 1024 * 1024
 
 
 class ValidationError(Exception):
@@ -458,6 +465,47 @@ def iter_files(root):
     for path, is_directory in iter_tree(root):
         if not is_directory:
             yield path
+
+
+def remove_tree(path):
+    """pathを取り除く。file、directory、reparse pointのどれでもよい。
+
+    read-onlyのfileも対象にする。Gitのobjectはread-onlyで作られるため、素の
+    `shutil.rmtree`では消せない。PowerShellの`Remove-Item -Recurse -Force`が
+    形と属性を問わず消せていたのに合わせる。
+
+    reparse pointは中身を辿らずlinkだけを外す。target側を消さないためである。
+    消せたかどうかをboolで返す。呼び出し側が握りつぶすか報告するかを決める。
+    """
+    if not os.path.exists(path) and not os.path.islink(path):
+        return True
+
+    if is_reparse_point(path):
+        try:
+            os.remove(path)
+        except OSError:
+            try:
+                os.rmdir(path)
+            except OSError:
+                return False
+        return True
+
+    if not os.path.isdir(path):
+        try:
+            os.remove(path)
+        except OSError:
+            return False
+        return True
+
+    for current, directories, files in os.walk(path):
+        for name in directories + files:
+            target = os.path.join(current, name)
+            try:
+                os.chmod(target, os.stat(target).st_mode | stat.S_IWUSR)
+            except OSError:
+                pass
+    shutil.rmtree(path, ignore_errors=True)
+    return not os.path.exists(path)
 
 
 def ordinal_sort_key(value):

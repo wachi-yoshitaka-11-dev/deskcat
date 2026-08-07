@@ -19,7 +19,6 @@ import json
 import os
 import re
 import shutil
-import stat
 import subprocess
 import sys
 import tempfile
@@ -29,6 +28,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import prepare_pages  # noqa: E402
 import publish_guards as guards  # noqa: E402
 
 SCRIPT_DIRECTORY = Path(__file__).resolve().parent
@@ -40,6 +42,10 @@ MANIFEST_PATH = os.path.join(REPOSITORY_ROOT, "pages", "assets-manifest.json")
 ASSETS_ROOT = os.path.join(REPOSITORY_ROOT, "pages", "assets")
 DOCS_ROOT = os.path.join(REPOSITORY_ROOT, "docs")
 PORTAL_PAGE_PATH = os.path.join(REPOSITORY_ROOT, "pages", "404.md")
+
+# stagingが止まったときに、CI jobのtimeoutまで待たずにそのcaseで落とすための上限。
+# 実測は1秒未満であり、遅いrunnerでも十分な余裕がある。
+PREPARE_TIMEOUT_SECONDS = 120
 
 
 def _git(*arguments, check=True):
@@ -68,24 +74,14 @@ def _write(path, content):
         handle.write(content)
 
 
-def _remove_tree(path):
-    """fixtureのtreeを消す。read-onlyのfileも対象にする。
+def _remove_fixture(path):
+    """fixtureを取り除き、消せなかった事実だけを報告する。
 
-    Gitのobjectはread-onlyで作られるため、`shutil.rmtree`の既定では消せない。
-    `ignore_errors=True`だけで済ませると失敗を握りつぶし、消し残しに気付けない。
-    消せなかった事実はstderrへ残す。一時directoryの絶対pathはlogへ書かない。
+    削除の中身は`publish_guards.remove_tree`が持つ。2つのharnessで実装を複製すると、
+    片方のchmodや警告だけを変えたときに、もう片方でfixtureが黙って溜まる。
+    警告にはfile名だけを出す。一時directoryの絶対pathをlogへ書かない。
     """
-    if not os.path.exists(path):
-        return
-    for current, directories, files in os.walk(path):
-        for name in directories + files:
-            target = os.path.join(current, name)
-            try:
-                os.chmod(target, os.stat(target).st_mode | stat.S_IWUSR)
-            except OSError:
-                pass
-    shutil.rmtree(path, ignore_errors=True)
-    if os.path.exists(path):
+    if not guards.remove_tree(path):
         print(
             f"warning: failed to remove the test fixture {os.path.basename(path)}",
             file=sys.stderr,
@@ -111,14 +107,25 @@ class PrepareRun:
         self.output = output
 
 
-def run_prepare():
-    process = subprocess.run(
-        [sys.executable, PREPARE_SCRIPT],
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-    )
+def run_prepare(timeout_seconds=PREPARE_TIMEOUT_SECONDS):
+    """`prepare_pages.py`を子processとして実行する。
+
+    時間を区切る。stagingが止まったときに、CI jobのtimeoutまでこのsuiteが
+    block するのではなく、そのcaseで落として原因をtestの結果として残す。
+    """
+    try:
+        process = subprocess.run(
+            [sys.executable, PREPARE_SCRIPT],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=timeout_seconds,
+        )
+    except subprocess.TimeoutExpired:
+        return PrepareRun(
+            -1, f"Prepare timed out after {timeout_seconds} second(s)."
+        )
     combined = [
         part.rstrip() for part in (process.stdout, process.stderr) if part and part.strip()
     ]
@@ -149,22 +156,26 @@ class PublishGuardTestCase(unittest.TestCase):
         self.manifest_backup = _read(MANIFEST_PATH)
         self.portal_page_backup = _read(PORTAL_PAGE_PATH)
         self.temporary_paths = []
-        self.addCleanup(self._restore)
+        # 復元をstepごとに登録する。1つの関数へまとめると、前半の`_write`が
+        # 失敗した時点で残りが実行されず、実repositoryのfileが書き換わったまま
+        # 残ってcommitへ入りうる。`unittest`は登録した全cleanupを、失敗しても
+        # 最後まで実行する。実行はLIFOのため、登録は「最後に戻したいもの」から行う。
+        self.addCleanup(self._remove_temporary_paths)
+        self.addCleanup(_write, PORTAL_PAGE_PATH, self.portal_page_backup)
+        self.addCleanup(_write, MANIFEST_PATH, self.manifest_backup)
+        self.addCleanup(os.environ.pop, "GIT_INDEX_FILE", None)
 
-    def _restore(self):
-        os.environ.pop("GIT_INDEX_FILE", None)
-        _write(MANIFEST_PATH, self.manifest_backup)
-        _write(PORTAL_PAGE_PATH, self.portal_page_backup)
+    def _remove_temporary_paths(self):
         for path in reversed(self.temporary_paths):
-            if guards.is_reparse_point(path):
-                try:
-                    os.remove(path)
-                except OSError:
-                    os.rmdir(path)
-            elif os.path.isdir(path):
-                _remove_tree(path)
-            elif os.path.exists(path):
-                os.remove(path)
+            try:
+                _remove_fixture(path)
+            except OSError:
+                # 1件の失敗で残りのfixtureを残さない。
+                print(
+                    "warning: failed to remove the test fixture "
+                    f"{os.path.basename(path)}",
+                    file=sys.stderr,
+                )
 
     def track(self, path):
         self.temporary_paths.append(path)
@@ -253,6 +264,56 @@ class PublishGuardTestCase(unittest.TestCase):
                 )
 
 
+class StagingPathGuardTests(unittest.TestCase):
+    """staging pathとmanifest pathの規則を、OSに依存せず直接検査する。
+
+    子process越しの検査だけでは検出力がOSに依存する。`C:\\x`はWindowsでは
+    `os.path.isabs`が先に弾くため、drive letterの規則を外しても結果が変わらず、
+    Linuxでしか回帰を捕まえられない。規則そのものを呼んで両OSで固定する。
+    """
+
+    UNSAFE_PATHS = (
+        "",
+        "   ",
+        "../escape.png",
+        "..\\escape.png",
+        "nested/../../escape.png",
+        "/absolute.png",
+        "\\absolute.png",
+        "C:\\escape.png",
+        "c:/escape.png",
+    )
+    SAFE_PATHS = ("style.css", "css/style.scss", "deskcat-concept.jpg")
+
+    def test_unsafe_manifest_paths_are_rejected(self):
+        for value in self.UNSAFE_PATHS:
+            with self.subTest(path=value):
+                self.assertTrue(prepare_pages.is_unsafe_manifest_path(value))
+
+    def test_safe_manifest_paths_are_accepted(self):
+        for value in self.SAFE_PATHS:
+            with self.subTest(path=value):
+                self.assertFalse(prepare_pages.is_unsafe_manifest_path(value))
+
+    def test_staging_removal_rejects_an_unexpected_path(self):
+        """再帰削除の前に、対象がrepository内の`.pages-src`であることを確かめる。
+
+        pathの組み立てを将来変えたときに、別のdirectoryを消してしまわないための
+        guardである。実際に消えては困るので、存在しないpathで規則だけを見る。
+        """
+        for value in (
+            os.path.join(REPOSITORY_ROOT, "docs"),
+            os.path.join(REPOSITORY_ROOT, ".pages-src-old"),
+            os.path.join(os.path.dirname(REPOSITORY_ROOT), ".pages-src"),
+        ):
+            with self.subTest(path=value):
+                with self.assertRaises(guards.ValidationError) as context:
+                    prepare_pages._remove_staging(value, REPOSITORY_ROOT)
+                self.assertEqual(
+                    str(context.exception), "Unexpected Pages staging path."
+                )
+
+
 class HarnessSelfTests(PublishGuardTestCase):
     """staging path検出器のpositive／negative control。
 
@@ -287,8 +348,7 @@ class BaselineTests(PublishGuardTestCase):
         生成物であり、形が違っても作り直してよい。
         """
         self.track(STAGING_ROOT)
-        if os.path.isdir(STAGING_ROOT):
-            shutil.rmtree(STAGING_ROOT, ignore_errors=True)
+        _remove_fixture(STAGING_ROOT)
         _write(STAGING_ROOT, "staging path occupied by a file")
         staged_root, _ = self.assert_staging_succeeds()
         self.assertTrue(os.path.isdir(staged_root))
@@ -354,8 +414,21 @@ class AssetManifestGuardTests(PublishGuardTestCase):
         self.assertNotIn("Traceback", run.output)
 
     def test_unsafe_manifest_path_fails(self):
-        """Manifestの`path`でstaging先を`assets/`の外へ逃がせないこと。"""
-        for unsafe in ("../escape.png", "/absolute.png"):
+        """Manifestの`path`でstaging先を`assets/`の外へ逃がせないこと。
+
+        backslashとdrive letterも含める。このharnessはWindowsでも走り、
+        `..\\escape.png`や`C:\\escape.png`は現実的な逃げ道の形である。
+        POSIXの`os.path.isabs`は`C:\\x`を相対pathとして通すため、実装側は
+        drive letterを別に見て、判定がOSごとに変わらないようにしている。
+        """
+        for unsafe in (
+            "../escape.png",
+            "/absolute.png",
+            "..\\escape.png",
+            "\\absolute.png",
+            "C:\\escape.png",
+            "c:/escape.png",
+        ):
             with self.subTest(path=unsafe):
                 self.edit_manifest(
                     lambda manifest, value=unsafe: manifest["assets"].append(
@@ -389,7 +462,9 @@ class StagedContentGuardTests(PublishGuardTestCase):
     """
 
     def test_oversized_staged_file_fails(self):
-        filler = ("\n" + "x" * 1000) * 1100
+        # 上限は`publish_guards.FILE_SIZE_LIMIT`が正本である。testが独自の値を持つと、
+        # 上限を上げたときにtestだけが古い前提のまま、理由の分からない失敗になる。
+        filler = "x" * (guards.FILE_SIZE_LIMIT + 1024)
         _write(PORTAL_PAGE_PATH, self.portal_page_backup + filler)
         self.assert_staging_fails("File exceeds the Pages size limit: 404.md")
 
