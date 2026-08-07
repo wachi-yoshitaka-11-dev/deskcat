@@ -155,7 +155,10 @@ Pull Requestのbaseは`develop`であり、その機能はrepositoryのdefault b
 workflowでStatusが`Done`になったIssueをcloseする。この2つのworkflowを
 有効にすることで、`develop`へのmergeでもIssueが自動closeされる。
 
-作成時に、対応するIssueと同じassignee・label・milestoneを設定する。
+作成時に、対応するIssueと同じassignee・label・milestoneを設定し、Projects v2 board
+（`deskcat`、`https://github.com/users/wachi-yoshitaka-11-dev/projects/5`）へitemとして
+追加して`Status`を設定する。boardへ追加しないと、上記の「Pull request merged」workflowが
+そのPull Requestを対象にできず、Issueが自動closeされない。
 
 ## Gitと秘密情報
 
