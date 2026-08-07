@@ -2,14 +2,14 @@
 
 > 状態: Accepted policy
 > 日付: 2026-07-27
-> 更新: 2026-08-06 標準OSを追加（[ADR-0005](../decisions/0005-standard-development-os.md)）
+> 更新: 2026-08-07 標準OSを追加（[ADR-0005](../decisions/0005-standard-development-os.md)、判断日2026-08-06）
 
 DeskCat は複数端末で作業する。すべての端末へ同じツールを導入せず、担当する作業に必要な最小環境だけを用意する。
 
 ## 標準OS
 
-[ADR-0005](../decisions/0005-standard-development-os.md)に従い、開発環境の標準OSは**実機の Linux（x86_64）**とする。
-Windows と macOS は support 対象外であり、DeskCat の検証根拠として扱わない。
+[ADR-0005](../decisions/0005-standard-development-os.md)に従い、開発環境の標準OSは**実機の Linux**とする。
+Windows は support 対象外であり、DeskCat の検証根拠として扱わない。macOS は ADR-0005 で判断していない。
 Raspberry Pi 側の 2 profile は対象外で、引き続き Raspberry Pi OS を使う。
 
 Docker 上の Linux を使ってよいのは、USB を必要としない作業だけである。
@@ -24,8 +24,8 @@ Docker 上の Linux を使ってよいのは、USB を必要としない作業�
 Docker、VM、実機のいずれで実行したかは、[Version Record Template](version-record-template.md) の
 `Container / VM / native:` へ記録する。container で得た結果を、実機の根拠として扱わない。
 
-distribution は固定しない。CI は `ubuntu-24.04` である。開発端末の distribution と version は、
-実際に検証した端末の version record へ記録する。
+distribution と CPU architecture は固定しない。CI は `ubuntu-24.04` の x86_64 である。
+開発端末の distribution、version、architecture は、実際に検証した端末の version record へ記録する。
 
 ## Profile一覧
 

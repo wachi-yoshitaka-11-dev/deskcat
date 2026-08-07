@@ -54,7 +54,7 @@ Linux環境の初期構築が必要になるが、対象範囲が明確で、run
 
 ## 決定
 
-開発環境の標準OSを**実機のLinux（x86_64）**とする。USBを必要としない作業では、
+開発環境の標準OSを**実機のLinux**とする。USBを必要としない作業では、
 Docker上のLinuxも使用する。
 
 - Host Rust Development、ESP32 Build、ESP32 Flash / HIL、Docs / Reviewの各profileは、
@@ -65,10 +65,13 @@ Docker上のLinuxも使用する。
 - Docker、VM、実機のいずれで実行したかは、
   [Version Record](../toolchains/version-record-template.md)の既存field
   `Container / VM / native:`へ記録する。新しいfieldは追加しない。
-- WindowsとmacOSはsupport対象外とする。動作する可能性は否定しないが、
+- Windowsはsupport対象外とする。動作する可能性は否定しないが、
   DeskCatの検証根拠として扱わず、runbookの検証対象にも含めない。
-- distributionは本ADRで固定しない。CIは`ubuntu-24.04`である。開発端末のdistributionと
-  versionは、実際に検証した端末のversion recordで記録する。
+- distributionとCPU architectureは本ADRで固定しない。CIは`ubuntu-24.04`のx86_64であり、
+  [#5](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/5)のclean buildもx86_64で取得した。
+  開発端末のdistribution、version、architectureは、実際に検証した端末のversion recordで記録する。
+- macOSについては本ADRで判断しない。標準はLinuxであるため、macOSを標準として扱わないが、
+  対象外と宣言するかどうかは必要が生じた時点で別途判断する。
 - Raspberry Pi Runtime / Direct Build profileのOSは本ADRの対象外であり、
   引き続きRaspberry Pi OSとする。
 

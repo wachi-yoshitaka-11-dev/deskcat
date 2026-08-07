@@ -7,7 +7,7 @@
 > 調査日: 2026-07-27
 > 標準OS判断: 2026-08-06（[ADR-0005](../decisions/0005-standard-development-os.md)）
 
-- 開発環境の標準OSは実機のLinux（x86_64）で、WindowsとmacOSは対象外
+- 開発環境の標準OSは実機のLinuxで、Windowsは対象外。distributionとarchitectureは未固定
 - USBを必要としない作業ではDocker上のLinuxも使う。flashと実機試験は実機Linuxに限る
 - ESP32とRaspberry Piの候補toolchainは公式資料に基づいて整理済み
 - この調査を行った端末には開発toolを導入していない
