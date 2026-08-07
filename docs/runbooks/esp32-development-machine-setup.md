@@ -2,6 +2,7 @@
 
 > 状態: Draft。DeskCatではcommand未検証
 > 適用範囲: ESP32 Build profileとESP32 Flash / HIL profile
+> 前提OS: 実機のLinux（[ADR-0005](../decisions/0005-standard-development-os.md)）。flashは実機Linuxに限る
 
 ## 目的
 
@@ -21,21 +22,19 @@
 
 ## 1. Host事前要件
 
-### Windows
-
-1. Rust が推奨する MSVC host 環境を使う。
-2. Microsoft Visual Studio Build Tools の C++ build tools と Windows SDK を導入する。
-3. 公式 Python 3 を導入し、Python と venv が使えることを確認する。
-4. Git を導入する。
-5. 変更後に新しい terminal で version を確認する。
-
-導入する Visual Studio component ID や Windows SDK version は、実行時点の Rust と Microsoft の公式資料で再確認する。既存の Visual Studio 環境を無断で変更しない。
-
 ### Linux
 
 ESP-IDF Programming Guide が対象 distribution に指定する package を導入する。一般に Git、Python、pip、venv、CMake、Ninja、C compiler、build utilities、libffi、OpenSSL、libusb が必要になるが、package 名は distribution ごとに公式手順を使う。
 
 Flash profile では `espflash` に必要な `libudev` development package と USB permission も確認する。
+
+build-only 検証は Docker 上の Linux で行ってよい。flash と serial monitor は実機 Linux で実行する。判断基準は [Machine Profiles](../toolchains/machine-profiles.md) の標準OS節を参照する。
+
+### Windows（対象外）
+
+[ADR-0005](../decisions/0005-standard-development-os.md)により、Windows は support 対象外である。この節の手順は実行しない。
+
+2026-07-27 時点では MSVC host 環境と Visual Studio Build Tools を候補として記載していたが、いずれの端末でも実行しておらず、検証根拠は存在しない。Windows 上の VM および Docker は USB passthrough を提供しないため、flash も成立しない。
 
 ## 2. Rust host環境
 
@@ -43,7 +42,7 @@ Flash profile では `espflash` に必要な `libudev` development package と U
 
 導入後、次を記録する。
 
-```powershell
+```bash
 rustup -V
 rustc -Vv
 cargo -V
@@ -52,7 +51,7 @@ rustup show
 
 `rustfmt` と Clippy が不足している場合だけ、選択した host toolchain へ追加する。
 
-```powershell
+```bash
 rustup component add rustfmt clippy
 ```
 
@@ -60,7 +59,7 @@ rustup component add rustfmt clippy
 
 公式 template が要求する Cargo tool を導入し、各 version を記録する。
 
-```powershell
+```bash
 cargo install cargo-generate
 cargo install ldproxy
 cargo install espup
@@ -68,7 +67,7 @@ cargo install espup
 
 Flash / HIL profile の端末だけ追加する。
 
-```powershell
+```bash
 cargo install espflash
 ```
 
@@ -78,15 +77,15 @@ cargo install espflash
 
 ## 4. Espressif Rust toolchain
 
-```powershell
+```bash
 espup install
 ```
 
-Windows では `espup` が必要な設定を処理する。Unix 系では `espup` が出力した export file を、新しい terminal ごとに読み込む。
+`espup` が出力した export file を、新しい terminal ごとに読み込む。
 
 導入後に次を記録する。
 
-```powershell
+```bash
 espup --version
 rustup show
 ```
@@ -97,7 +96,7 @@ rustup show
 
 template の moving branch を直接信頼せず、[記録済み commit](../toolchains/esp32-rust-toolchain.md#調査した公式構成) を checkout した local copy を使う。
 
-```powershell
+```bash
 git clone https://github.com/esp-rs/esp-idf-template.git <reviewed-template-directory>
 git -C <reviewed-template-directory> checkout 08115a069d167a5ee37363e84f168a565f17bbca
 cargo generate --path <reviewed-template-directory>/cargo
@@ -127,7 +126,7 @@ application の `Cargo.lock` を追跡する。template 由来の `.gitignore` �
 
 最小 source が未確認 GPIO、LCD、sensor、servo を初期化しないことを確認してから実行する。
 
-```powershell
+```bash
 cargo fmt --all -- --check
 cargo build
 ```
@@ -156,6 +155,7 @@ Clippy は ESP-IDF target での対応を実行時点で確認し、成功した
 
 flash と serial monitor は #6 で行う。次を満たすまで実行しない。
 
+- 実機 Linux 端末である（VM と container では USB が見えない）
 - exact board と USB-UART を確認済み
 - unknown output を駆動しない firmware
 - servo 電源を切り離している
@@ -167,7 +167,7 @@ flash と serial monitor は #6 で行う。次を満たすまで実行しない
 
 - version と完全な error を保存する。
 - SDK や tool を無計画に upgrade / downgrade しない。
-- `IDF_PATH`、Python environment、MSVC linker、target、lockfile を分けて調べる。
+- `IDF_PATH`、Python environment、host linker、target、lockfile を分けて調べる。
 - 一度成功した cache を根拠にせず、必要に応じて clean environment で再現する。
 - tool の削除や system-wide 設定変更は、対象を確認して別操作として扱う。
 
@@ -177,4 +177,3 @@ flash と serial monitor は #6 で行う。次を満たすまで実行しない
 - [esp-rs/esp-idf-template](https://github.com/esp-rs/esp-idf-template)
 - [ESP-IDF Get Started](https://docs.espressif.com/projects/esp-idf/en/stable/esp32/get-started/)
 - [Rustup installation](https://rustup.rs/)
-- [Rust MSVC prerequisites](https://rust-lang.github.io/rustup/installation/windows-msvc.html)

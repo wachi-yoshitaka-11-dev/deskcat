@@ -10,6 +10,7 @@
 | [ADR-0002](0002-role-based-development-environments.md) | Accepted | 役割別の開発環境 |
 | [ADR-0003](0003-public-documentation-publishing.md) | Accepted | Repository、Pages、Wikiの公開文書責務 |
 | [ADR-0004](0004-main-develop-branch-strategy.md) | Accepted | `main`と`develop`の二段階branch運用 |
+| [ADR-0005](0005-standard-development-os.md) | Accepted | 開発環境の標準OSを実機Linuxとする |
 
 ## 新規作成
 
