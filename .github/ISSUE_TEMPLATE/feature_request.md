@@ -1,7 +1,6 @@
 ---
 name: 機能提案
 about: 観測可能なDeskCat機能を一つ提案する
-title: "[Feature] "
 labels: "type:feature"
 assignees: ""
 ---
@@ -53,3 +52,10 @@ PC確認:
 - [ ] 明示的な判断なしにcamera、microphone、audio、秘密情報、外部data flowを追加しない
 - [ ] ハードウェア値が確定済み、または明確に`TBD`である
 - [ ] サーボと電源の安全境界を維持する
+
+## 起票時の設定
+
+- [ ] milestoneを設定した
+- [ ] `priority:*` labelを1つ設定した
+- [ ] assigneeを設定した
+- [ ] Projects v2の`deskcat` boardへ追加し、`Status`を設定した

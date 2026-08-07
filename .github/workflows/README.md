@@ -17,7 +17,7 @@ Rust／ESP-IDFのbuild commandが確定するまで、それらを実行するGi
 
 ## 現在のworkflow
 
-`pages.yml`は[GH-003 #26](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/26)で追加する公開文書専用workflowである。
+`pages.yml`は[#26](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/26)で追加する公開文書専用workflowである。
 
 - Rust、ESP-IDF、firmware、実機をbuildしない。
 - Pull RequestではPages sourceの生成、Jekyll build、link検査だけを行う。

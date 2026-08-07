@@ -1,7 +1,6 @@
 ---
 name: ハードウェア実験
 about: 記録した条件下で一つのハードウェア疑問を測定する
-title: "[Experiment] "
 labels: "type:experiment,needs:hardware-test"
 assignees: ""
 ---
@@ -59,3 +58,10 @@ assignees: ""
 - [ ] 未加工の証拠を添付または参照した
 - [ ] 結果が記載した疑問へ回答している
 - [ ] 関連する正式文書を更新した
+
+## 起票時の設定
+
+- [ ] milestoneを設定した
+- [ ] `priority:*` labelを1つ設定した
+- [ ] assigneeを設定した
+- [ ] Projects v2の`deskcat` boardへ追加し、`Status`を設定した

@@ -53,7 +53,7 @@ Pi Zero WH は CPU と RAM が限られるため、build 時間と storage 使�
 | Rust channel | stable | 採用候補 |
 | Native host/target | `arm-unknown-linux-gnueabihf` | ABI 確認待ち |
 | Linker | OS の native GNU linker | version 確認待ち |
-| Build method | Pi 上の direct build | M1-004 で検証 |
+| Build method | Pi 上の direct build | #8 で検証 |
 | Cross compilation | 保留 | direct build の計測後に判断 |
 
 ESP32 用の `esp` toolchain を Pi service の build に使わない。

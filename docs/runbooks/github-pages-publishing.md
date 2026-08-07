@@ -1,7 +1,7 @@
 # GitHub Pages公開
 
 > 状態: Verified — 2026-07-28に初回build／deployと公開結果を確認済み
-> 対象Issue: [GH-003 #26](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/26)
+> 対象Issue: [#26](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/26)
 > 方針: [ADR-0003](../decisions/0003-public-documentation-publishing.md)
 
 ## 目的

@@ -1,7 +1,6 @@
 ---
 name: 不具合報告
 about: 再現可能な誤動作を報告する
-title: "[Bug] "
 labels: "type:bug"
 assignees: ""
 ---
@@ -69,3 +68,10 @@ assignees: ""
 - [ ] 資格情報や非公開脆弱性の詳細を含んでいない
 - [ ] 危険な動作があった場合はactuator電源を切った
 - [ ] 追加の再現が安全かつ範囲限定されている
+
+## 起票時の設定
+
+- [ ] milestoneを設定した
+- [ ] `priority:*` labelを1つ設定した
+- [ ] assigneeを設定した
+- [ ] Projects v2の`deskcat` boardへ追加し、`Status`を設定した

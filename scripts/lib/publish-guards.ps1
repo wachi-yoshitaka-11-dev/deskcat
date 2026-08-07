@@ -31,10 +31,12 @@ $script:DeskCatSecretPattern = @(
 ) -join '|'
 
 # 個人を特定しうる絶対path。Windows、Linux、macOS、UNC、file scheme。
+# `github.com/users/<name>`はGitHubのuser-owned resource（Projects等）の正規URL構造であり、
+# ローカルのホームディレクトリpathではないため、直前がgithub.comの場合は除外する。
 $script:DeskCatPersonalPathPattern = @(
     '[A-Za-z]:\\Users\\[^\\\s]+'
     '/home/[^/\s]+'
-    '/Users/[^/\s]+'
+    '(?<!github\.com)/Users/[^/\s]+'
     '\\\\[A-Za-z0-9._-]+\\[A-Za-z0-9$._-]+'
     'file://'
 ) -join '|'

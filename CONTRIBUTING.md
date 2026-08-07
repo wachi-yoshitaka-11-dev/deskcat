@@ -29,6 +29,28 @@ Issueには次を含める。
 
 無関係なrefactor、新たに見つけた不具合、別実験には別Issueを使う。
 
+## Issueの命名
+
+Issue titleにprefixを付けない。`<概要>`だけの素の説明文にする。
+種別は`type:bug`／`type:feature`／`type:decision`／`type:experiment`／`type:maintenance`labelで表現する。
+GitHubのIssue一覧はlabelを常にtitleの横に表示するため、titleにも同じ情報を重複して書く必要がない。
+
+`[Bug]`のようなbracket prefixや、`FND-001`／`GH-005`のような連番付きID形式は使わない。
+連番による識別が必要な場合は、GitHub Issue番号（`#1`等）をそのまま使う。
+
+### 起票時に設定する項目
+
+| 項目 | 必須／任意 | 値の決め方 |
+|---|---|---|
+| title | 必須 | 上記の形式 |
+| milestone | 必須 | 対応するM0〜M6 milestoneを設定する |
+| label（`type:*`／`priority:*`） | 必須 | それぞれ1つ設定する |
+| label（`area:*`） | 対象componentがある場合のみ | 対象componentに対応するlabelを設定する。repository全体の保守作業など特定componentに限らない場合は省略する |
+| label（`status:blocked`／`needs:*`） | 該当時のみ | 依存未解決なら`status:blocked`、実機証拠や人間の判断が必要なら`needs:hardware-test`／`needs:decision`を設定する |
+| assignee | 必須 | 対応を担当する人を設定する。未定でも起票者自身を暫定assigneeとする |
+| project | 必須 | Projects v2 board（`deskcat`、`https://github.com/users/wachi-yoshitaka-11-dev/projects/5`）にitemとして追加し、`Status`を設定する |
+| 開始日／終了日（`Start date`／`Target date`） | 任意 | 着手日・完了目標が具体的に決まった時点でのみProjects v2 board上で設定する。未定なら空欄のままでよい |
+
 ## Branches
 
 `main`は安定版とGitHub Pages公開元、`develop`は通常開発の統合先である。
@@ -115,7 +137,7 @@ PC testはLCD、電気、timing、sensor、機構の検証を代替しない。
 
 Pull requestには次を含める。
 
-- 関連Issueへのlink
+- 関連Issueへのlink（`Closes #N`等）
 - 結果と範囲の説明
 - 仕様変更の特定
 - 検証証拠
@@ -123,6 +145,17 @@ Pull requestには次を含める。
 - 新規dependency
 - 残存riskと`TBD`
 - 無関係なformat変更やrefactorがないこと
+
+`Closes #N`はtraceability目的の記載であり、GitHub純正の自動close機能は使わない。
+Pull Requestのbaseは`develop`であり、その機能はrepositoryのdefault branch
+（`main`）へのmerge時にしか働かないため。
+
+代わりに、Projects v2 board（`deskcat`）のworkflow機能でIssue closeを自動化する。
+「Pull request merged」workflowでStatusを`Done`にし、「Item status changed」
+workflowでStatusが`Done`になったIssueをcloseする。この2つのworkflowを
+有効にすることで、`develop`へのmergeでもIssueが自動closeされる。
+
+作成時に、対応するIssueと同じassignee・label・milestoneを設定する。
 
 ## Gitと秘密情報
 

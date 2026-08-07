@@ -253,8 +253,8 @@ merge済みのfeature branch（`chore/repository-hardening`等）の自動削除
 - [x] [ADR-0003](../docs/decisions/0003-public-documentation-publishing.md)で`docs/`、Pages、Wikiの責務と正本を決定する
 - [x] RootのMarkdownと`docs/`を正本とし、Pagesを正本から生成する
 - [x] Wikiを日本語の入口ページに限定し、独自の技術仕様やlive statusを置かない
-- [x] [GH-003 #26](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/26)でPages workflowを実装する
-- [x] [GH-004 #27](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/27)でWikiの既定Homeを入口ページへ置き換える
+- [x] [#26](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/26)でPages workflowを実装する
+- [x] [#27](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/27)でWikiの既定Homeを入口ページへ置き換える
 - [x] Workflowと`github-pages` environmentの両方でdeploy元を`main`に限定する
 - [x] Stagingでsecret、個人path、local専用資料、未承認形式を検査する
 - [x] `docs/`はMarkdownだけを複製し、画像等が人手のreviewを経ずに公開されないようにする
