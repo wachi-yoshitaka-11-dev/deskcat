@@ -146,10 +146,14 @@ Pull requestには次を含める。
 - 残存riskと`TBD`
 - 無関係なformat変更やrefactorがないこと
 
-`Closes #N`はtraceability目的の記載であり、自動closeを意味しない。
-Pull Requestのbaseは`develop`であり、GitHubのIssue自動close機能はrepositoryの
-default branch（`main`）へのmerge時にしか働かない。該当Issueのcloseは、
-mergeではなく人が判断して行う。
+`Closes #N`はtraceability目的の記載であり、GitHub純正の自動close機能は使わない。
+Pull Requestのbaseは`develop`であり、その機能はrepositoryのdefault branch
+（`main`）へのmerge時にしか働かないため。
+
+代わりに、Projects v2 board（`deskcat`）のworkflow機能でIssue closeを自動化する。
+「Pull request merged」workflowでStatusを`Done`にし、「Item status changed」
+workflowでStatusが`Done`になったIssueをcloseする。この2つのworkflowを
+有効にすることで、`develop`へのmergeでもIssueが自動closeされる。
 
 作成時に、対応するIssueと同じassignee・label・milestoneを設定する。
 
