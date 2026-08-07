@@ -19,7 +19,7 @@ Docker 上の Linux を使ってよいのは、USB を必要としない作業�
 | 文書検証、Markdown link 検査 | 使ってよい | USB と実機を触らない |
 | host Rust の build、test、lint | 使ってよい | USB と実機を触らない |
 | ESP32 の build-only 検証 | 使ってよい | flash しないため USB を必要としない |
-| flash、serial monitor、実機試験 | **使わない** | Hyper-V の VM は `/sys/bus/usb/devices/` が空で USB device が見えず、Docker Desktop on Windows も USB passthrough を提供しない |
+| flash、serial monitor、実機試験 | **使わない** | 実機の USB device と board identity を直接確認する必要があるため、実機 Linux に限る。VM と container 上での実行は [ADR-0005](../decisions/0005-standard-development-os.md) で対象外とした |
 
 Docker、VM、実機のいずれで実行したかは、[Version Record Template](version-record-template.md) の
 `Container / VM / native:` へ記録する。container で得た結果を、実機の根拠として扱わない。

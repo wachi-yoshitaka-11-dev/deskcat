@@ -81,7 +81,9 @@ cargo install espflash
 espup install
 ```
 
-`espup` が出力した export file を、新しい terminal ごとに読み込む。
+`espup install` は environment export file を生成し、その path を出力する。新しい terminal ごとに、その export file を shell へ読み込む。読み込まないと `espup` が設定した環境変数が反映されない。
+
+export file の既定 path と読み込み command は、実行時点の [The Rust on ESP Book](https://docs.espressif.com/projects/rust/book/getting-started/toolchain.html) と `espup install` の出力で確認する。`espup --export-file` で path を指定した場合はその path を使う。実際に使用した path と command は [Version Record](../toolchains/version-record-template.md) へ記録し、成功を確認した command だけをこの runbook へ反映する。
 
 導入後に次を記録する。
 
@@ -155,7 +157,7 @@ Clippy は ESP-IDF target での対応を実行時点で確認し、成功した
 
 flash と serial monitor は #6 で行う。次を満たすまで実行しない。
 
-- 実機 Linux 端末である（VM と container では USB が見えない）
+- 実機 Linux 端末である。VM と container 上での flash は [ADR-0005](../decisions/0005-standard-development-os.md) で対象外とした
 - exact board と USB-UART を確認済み
 - unknown output を駆動しない firmware
 - servo 電源を切り離している
