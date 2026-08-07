@@ -49,8 +49,8 @@ ADR-0002が「Git、Markdownを扱えるエディタ」で足りるとした前�
 
 Python 3はLinuxとmacOSでほぼプリインストールされる。加えてESP32 Build profileでは
 ESP-IDFが既にPythonを必須化している（`idf_tools.py`が`python -m venv`を使う）。
-`pathlib`、`os`、`subprocess`、`re`、`hashlib`、`json`、`html`、`urllib.parse`、`unicodedata`で
-現行機能を賄える。標準ライブラリの`unittest`が、手書き1803行のtest harness
+`pathlib`、`os`、`stat`、`shutil`、`subprocess`、`re`、`hashlib`、`json`、`html`、
+`urllib.parse`、`unicodedata`、`argparse`で現行機能を賄える。標準ライブラリの`unittest`が、手書き1803行のtest harness
 （`test-link-validators.ps1` + `test-pages-guards.ps1`）を置き換える。
 
 MarkdownとYAMLには標準parserが無い。ただし現行のPowerShell実装も、そのために
