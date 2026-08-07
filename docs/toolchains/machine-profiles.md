@@ -3,6 +3,7 @@
 > 状態: Accepted policy
 > 日付: 2026-07-27
 > 更新: 2026-08-07 標準OSを追加（[ADR-0005](../decisions/0005-standard-development-os.md)、判断日2026-08-06）
+> 更新: 2026-08-07 検証script実行 runtime を追加（[ADR-0006](../decisions/0006-validation-script-language.md)、判断日2026-08-06）
 
 DeskCat は複数端末で作業する。すべての端末へ同じツールを導入せず、担当する作業に必要な最小環境だけを用意する。
 
@@ -33,13 +34,18 @@ OS は上記の標準OSに従う。次の表は、標準OS の上で profile ご
 
 | Profile | 用途 | 必須要件 | 不要なもの |
 |---|---|---|---|
-| Docs / Review | 文書、Issue、差分、設計レビュー | Git、Markdown を扱えるエディタ。USB 不要のため Docker 上の Linux でもよい | Rust、ESP-IDF、USB ドライバ、実機 |
-| Host Rust Development | 純粋ロジック、Pi 側 crate、シミュレータ | Git、Rust stable、Cargo、linker、rustfmt、Clippy。USB 不要のため Docker 上の Linux でもよい | ESP32 Xtensa toolchain、実機 |
+| Docs / Review | 文書、Issue、差分、設計レビュー | Git、Markdown を扱えるエディタ、`python3`（標準ライブラリのみ）。USB 不要のため Docker 上の Linux でもよい | Rust、ESP-IDF、USB ドライバ、実機 |
+| Host Rust Development | 純粋ロジック、Pi 側 crate、シミュレータ | Docs / Review 要件、Rust stable、Cargo、linker、rustfmt、Clippy。USB 不要のため Docker 上の Linux でもよい | ESP32 Xtensa toolchain、実機 |
 | ESP32 Build | firmware 生成、format、lint、build | Host Rust 要件、`espup`、`ldproxy`、ESP-IDF の前提ツール。build-only なら Docker 上の Linux でもよい | USB 接続は build-only なら不要 |
 | ESP32 Flash / HIL | flash、serial monitor、実機検証 | ESP32 Build 要件、`espflash`、`libudev` と USB permission、対象ボード、人間の監視。**実機 Linux に限る** | 未確認の周辺回路やサーボ出力、VM と container 上での実行 |
 | Raspberry Pi Runtime | `deskcatd` の実行、実機ログ | Pi Zero WH、対応 Raspberry Pi OS、Rust 実行物、Git または配布物 | ESP32 toolchain |
 | Raspberry Pi Direct Build | Pi 上での最小 build 検証 | Runtime 要件、Rust stable、Cargo、native linker、空き容量 | Cross compiler |
 | CI | 再現可能な自動検証 | 固定 runner（`ubuntu-24.04`）、pin 済み action、秘密情報を使わない build | flash と無人実機駆動 |
+
+`python3` は文書検証 script（`scripts/*.py`）の実行に必要である。Linux と macOS ではほぼプリインストールされる。
+[ADR-0006](../decisions/0006-validation-script-language.md) に従い、これらの script は標準ライブラリだけを使うため、
+package の追加導入も virtualenv も要らない。ESP32 Build 以降の profile は ESP-IDF が Python を必須化するため、
+別途導入する必要はない。
 
 一台の端末が複数 profile を兼ねてもよい。ただし、その場合も各 profile の検証結果を区別する。
 

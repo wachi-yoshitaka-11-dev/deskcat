@@ -36,6 +36,10 @@ secrets.*
 .pages-src/
 _site/
 
+# Python bytecode cache（検証scriptの実行で生成される）
+__pycache__/
+*.py[cod]
+
 # Editors
 .idea/
 .vscode/
