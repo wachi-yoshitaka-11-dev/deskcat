@@ -150,15 +150,23 @@ Pull requestには次を含める。
 Pull Requestのbaseは`develop`であり、その機能はrepositoryのdefault branch
 （`main`）へのmerge時にしか働かないため。
 
-代わりに、Projects v2 board（`deskcat`）のworkflow機能でIssue closeを自動化する。
-「Pull request merged」workflowでStatusを`Done`にし、「Item status changed」
-workflowでStatusが`Done`になったIssueをcloseする。この2つのworkflowを
-有効にすることで、`develop`へのmergeでもIssueが自動closeされる。
+代わりに、Projects v2 board（`deskcat`）でcloseを管理する。
+boardで有効なworkflowは`Auto-close issue`と`Pull request merged`であり、次のように働く。
+
+- `Pull request merged`: mergeされた**Pull Request item**の`Status`を`Done`にする
+- `Auto-close issue`: **item**の`Status`が`Done`になったとき、そのitemのIssueをcloseする
+
+この2つは別のitemに作用する。Pull Requestのmergeで`Done`になるのはPull Request item側
+であり、Issue itemの`Status`は変わらない。したがって**mergeだけではIssueはcloseされない。**
+merge後に、対応するIssue itemの`Status`を`Done`にする。これにより`Auto-close issue`が
+Issueをcloseする。
 
 作成時に、対応するIssueと同じassignee・label・milestoneを設定し、Projects v2 board
 （`deskcat`、`https://github.com/users/wachi-yoshitaka-11-dev/projects/5`）へitemとして
-追加して`Status`を設定する。boardへ追加しないと、上記の「Pull request merged」workflowが
-そのPull Requestを対象にできず、Issueが自動closeされない。
+追加して`Status`を設定する。boardが進行管理の正本であり、boardに無いPull Requestは
+`Pull request merged` workflowの対象にならず、merge済みかどうかがboard上で追えない。
+
+board上のworkflow構成は[Repository設定](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/.github/REPOSITORY_SETTINGS.md)に記録する。
 
 ## Gitと秘密情報
 
