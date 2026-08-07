@@ -140,20 +140,31 @@ def get_file_text(path):
     Python側でも同じ事故を避けるため、読み出しはここへ集約する。
 
     `newline=''`で改行を変換せず、fenceと見出しの走査がCRLFでも同じ行を見るようにする。
-    BOMはPowerShellと同様に取り除き、不正byteは置換文字にして読み出しでは失敗させない。
+    UTF-8のBOMはPowerShellと同様に取り除く。PowerShellはUTF-16のBOMも判別するが、
+    ここでは合わせない。`.gitattributes`が追跡textをUTF-8／LFへ正規化しており、
+    UTF-16のsourceは想定しない。不正byteは置換文字にして、読み出しでは失敗させない。
     """
     with open(path, "r", encoding="utf-8-sig", newline="", errors="replace") as handle:
         return handle.read()
 
 
 def _run_git(arguments):
-    return subprocess.run(
-        ["git", *arguments],
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-    )
+    """gitを呼ぶ。実行file自体が無い場合も診断として報告する。
+
+    `FileNotFoundError`のまま抜けるとtracebackになり、報告すべき前提条件の不足が
+    stack traceに埋もれる。呼び出し側のmessageが想定しているのと同じ「gitが要る」
+    という失敗なので、ここでValidationErrorへ揃える。
+    """
+    try:
+        return subprocess.run(
+            ["git", *arguments],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+    except FileNotFoundError as error:
+        raise ValidationError("Git is not available on PATH.") from error
 
 
 def get_tracked_files(repository_root, pathspec):
