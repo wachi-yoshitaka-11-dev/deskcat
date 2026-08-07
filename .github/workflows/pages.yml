@@ -76,14 +76,26 @@ jobs:
           pwsh -NoProfile -File "$GITHUB_WORKSPACE/scripts/test-link-validators.ps1"
           python3 "$GITHUB_WORKSPACE/scripts/test_link_validators.py"
 
-      # 旧実装を先に実行し、Python実装で`.pages-src/`を上書きする。
+      # 旧実装→snapshot→新実装→snapshotの順で走らせ、生成物の同一性まで確認する。
+      # 続けて実行して上書きするだけでは、旧実装が成功したことしか分からず、
+      # stagingの差分はCIで検出されない。file集合と内容hashの両方を突き合わせる。
       # Jekyllがbuildするのは新実装の出力である。
       - name: Prepare public source
         shell: bash
         run: |
           set -euo pipefail
+          snapshot() {
+            (cd .pages-src && find . -type f -exec sha256sum {} + | LC_ALL=C sort -k 2)
+          }
           pwsh -NoProfile -File ./scripts/prepare-pages.ps1
+          snapshot > "${RUNNER_TEMP}/staging-legacy.txt"
           python3 scripts/prepare_pages.py
+          snapshot > "${RUNNER_TEMP}/staging-current.txt"
+          if ! diff -u "${RUNNER_TEMP}/staging-legacy.txt" "${RUNNER_TEMP}/staging-current.txt"; then
+            echo 'Pages staging output diverged between the PowerShell and Python implementations.' >&2
+            exit 1
+          fi
+          echo "staging matched: $(wc -l < "${RUNNER_TEMP}/staging-current.txt") file(s)"
 
       - name: Configure Pages
         uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
