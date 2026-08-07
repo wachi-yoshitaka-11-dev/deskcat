@@ -50,52 +50,17 @@ jobs:
           # checkoutが.git/configへ残すtokenを、そのscriptから読めないようにする。
           persist-credentials: false
 
-      # PowerShellからPythonへの移行中である（ADR-0006）。旧実装を削除する前に、
-      # 新旧を両方実行して同等性を確認する。`DIGEST`は「件数だけでは環境によって
-      # 走査範囲が変わっても`BROKEN=0`が揃う」という理由で用意されており、
-      # 移行の同等性検査にそのまま使える。出力行全体の一致を必須にする。
       - name: Check documentation links
-        shell: bash
-        run: |
-          set -euo pipefail
-          legacy="$(pwsh -NoProfile -File ./scripts/validate-doc-links.ps1)"
-          current="$(python3 scripts/validate_doc_links.py)"
-          printf 'legacy:  %s\ncurrent: %s\n' "$legacy" "$current"
-          if [ "$legacy" != "$current" ]; then
-            echo 'Documentation link validation diverged between the PowerShell and Python implementations.' >&2
-            exit 1
-          fi
+        run: python3 scripts/validate_doc_links.py
 
       - name: Test link validators
-        shell: bash
         # harnessがrepository rootをcurrent directoryとして暗黙に要求しないことを
         # CIで回帰させる。script自体はcheckoutの絶対pathから起動する。
         working-directory: ${{ runner.temp }}
-        run: |
-          set -euo pipefail
-          pwsh -NoProfile -File "$GITHUB_WORKSPACE/scripts/test-link-validators.ps1"
-          python3 "$GITHUB_WORKSPACE/scripts/test_link_validators.py"
+        run: python3 "$GITHUB_WORKSPACE/scripts/test_link_validators.py"
 
-      # 旧実装→snapshot→新実装→snapshotの順で走らせ、生成物の同一性まで確認する。
-      # 続けて実行して上書きするだけでは、旧実装が成功したことしか分からず、
-      # stagingの差分はCIで検出されない。file集合と内容hashの両方を突き合わせる。
-      # Jekyllがbuildするのは新実装の出力である。
       - name: Prepare public source
-        shell: bash
-        run: |
-          set -euo pipefail
-          snapshot() {
-            (cd .pages-src && find . -type f -exec sha256sum {} + | LC_ALL=C sort -k 2)
-          }
-          pwsh -NoProfile -File ./scripts/prepare-pages.ps1
-          snapshot > "${RUNNER_TEMP}/staging-legacy.txt"
-          python3 scripts/prepare_pages.py
-          snapshot > "${RUNNER_TEMP}/staging-current.txt"
-          if ! diff -u "${RUNNER_TEMP}/staging-legacy.txt" "${RUNNER_TEMP}/staging-current.txt"; then
-            echo 'Pages staging output diverged between the PowerShell and Python implementations.' >&2
-            exit 1
-          fi
-          echo "staging matched: $(wc -l < "${RUNNER_TEMP}/staging-current.txt") file(s)"
+        run: python3 scripts/prepare_pages.py
 
       - name: Configure Pages
         uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
@@ -107,23 +72,15 @@ jobs:
           destination: ./_site
 
       - name: Validate output
-        shell: bash
-        run: |
-          set -euo pipefail
-          pwsh -NoProfile -File ./scripts/validate-pages-output.ps1 -SiteRoot ./_site
-          python3 scripts/validate_pages_output.py --site-root ./_site
+        run: python3 scripts/validate_pages_output.py --site-root ./_site
 
       # 公開境界の回帰test。未宣言asset、追跡外asset、hash不一致、size超過で
       # stagingが失敗することを確認する。`_site`は既に検証済みで影響しない。
       - name: Test publish guards
-        shell: bash
         # `PAGES_SOURCE=.pages-src`はcallerのCWDではなくrepository root基準で
         # 解決する。test harness内のexact-path assertionを非root CWDで実行する。
         working-directory: ${{ runner.temp }}
-        run: |
-          set -euo pipefail
-          pwsh -NoProfile -File "$GITHUB_WORKSPACE/scripts/test-pages-guards.ps1"
-          python3 "$GITHUB_WORKSPACE/scripts/test_pages_guards.py"
+        run: python3 "$GITHUB_WORKSPACE/scripts/test_pages_guards.py"
 
       - name: Upload Pages artifact
         if: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}

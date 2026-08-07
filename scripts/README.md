@@ -57,22 +57,6 @@ Jekyll環境を用意しない端末では、出力検査はPull RequestのCIに
 その場合、build後にしか分からない問題（`.md` linkの未変換、生成siteでの404）は
 CIで初めて検出される。
 
-## PowerShellからの移行中
-
-[ADR-0006](../docs/decisions/0006-validation-script-language.md)に従いPythonへ移行している。
-公開境界のguardを含むため、旧`.ps1`をすぐには消さず、二重化して同等性を確認する。
-
-- Pages CIが新旧を両方実行する
-- `validate-doc-links.ps1`と`validate_doc_links.py`が出力する行（`DIGEST=`を含む）の一致を必須にする
-- CIで一致を確認した後、`.ps1`と`pages/assets-manifest.psd1`を削除する
-
-移行が完了するまで、判定logicを変更する場合は新旧の両方へ同じ変更を入れる。
-片方だけを変えると、同等性checkがそこで落ちる。
-
-意図的に一致させない挙動が2点ある。値なしの`baseurl:`と0 byteの`.html`で、
-旧実装はPowerShellのparameter bindingにより検査を中断していた。
-詳細は[ADR-0006](../docs/decisions/0006-validation-script-language.md)を参照する。
-
 規則:
 
 - 前提条件と使用方法を記載する。
