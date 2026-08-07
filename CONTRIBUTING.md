@@ -137,7 +137,7 @@ PC testはLCD、電気、timing、sensor、機構の検証を代替しない。
 
 Pull requestには次を含める。
 
-- 関連Issueへのlink
+- 関連Issueへのlink（`Closes #N`等）
 - 結果と範囲の説明
 - 仕様変更の特定
 - 検証証拠
@@ -145,6 +145,13 @@ Pull requestには次を含める。
 - 新規dependency
 - 残存riskと`TBD`
 - 無関係なformat変更やrefactorがないこと
+
+`Closes #N`はtraceability目的の記載であり、自動closeを意味しない。
+Pull Requestのbaseは`develop`であり、GitHubのIssue自動close機能はrepositoryの
+default branch（`main`）へのmerge時にしか働かない。該当Issueのcloseは、
+mergeではなく人が判断して行う。
+
+作成時に、対応するIssueと同じassignee・label・milestoneを設定する。
 
 ## Gitと秘密情報
 
