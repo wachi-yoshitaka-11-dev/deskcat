@@ -255,6 +255,19 @@ class BaselineTests(PublishGuardTestCase):
     def test_baseline_staging_succeeds(self):
         self.assert_staging_succeeds()
 
+    def test_staging_path_occupied_by_a_file_is_replaced(self):
+        """staging pathにfileが置かれていても、stagingは成立する。
+
+        `shutil.rmtree`だけで消そうとするとtracebackになる。`.pages-src`は
+        生成物であり、形が違っても作り直してよい。
+        """
+        self.track(STAGING_ROOT)
+        if os.path.isdir(STAGING_ROOT):
+            shutil.rmtree(STAGING_ROOT, ignore_errors=True)
+        _write(STAGING_ROOT, "staging path occupied by a file")
+        staged_root, _ = self.assert_staging_succeeds()
+        self.assertTrue(os.path.isdir(staged_root))
+
 
 class AssetManifestGuardTests(PublishGuardTestCase):
     def test_undeclared_asset_on_disk_fails(self):
@@ -300,6 +313,20 @@ class AssetManifestGuardTests(PublishGuardTestCase):
 
         self.edit_manifest(remove_hashes)
         self.assert_staging_fails("Binary asset must declare Sha256")
+
+    def test_broken_manifest_fails_without_exposing_local_paths(self):
+        """壊れたmanifestを、tracebackではなく診断で落とす。
+
+        JSONのparse例外をそのまま抜けさせると「問題を報告して失敗」ではなく
+        「検査自体がcrash」になる。例外文にはlocal絶対pathやmanifestの中身が
+        載りうるため、repository相対pathだけを報告する。
+        """
+        _write(MANIFEST_PATH, '{ "assets": [ ')
+        run = self.assert_staging_fails(
+            "Pages asset manifest is not valid JSON: pages/assets-manifest.json",
+            forbidden_messages=(MANIFEST_PATH, "Traceback (most recent call last)"),
+        )
+        self.assertNotIn("Traceback", run.output)
 
     def test_unsafe_manifest_path_fails(self):
         """Manifestの`path`でstaging先を`assets/`の外へ逃がせないこと。"""

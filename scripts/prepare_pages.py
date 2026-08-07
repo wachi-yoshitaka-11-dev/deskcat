@@ -46,6 +46,27 @@ def _copy(source, destination):
     shutil.copyfile(source, destination)
 
 
+def _remove_staging(path):
+    """既存のstaging pathを、file・directory・reparse pointのどれでも取り除く。
+
+    PowerShellの`Remove-Item -Recurse -Force`は形を問わない。`shutil.rmtree`だけだと、
+    そこにfileやreparse pointが置かれていたときに診断ではなくtracebackで落ち、
+    「問題を報告して失敗」ではなく「検査自体がcrash」する側へ倒れる。
+    """
+    if not os.path.exists(path) and not os.path.islink(path):
+        return
+    if guards.is_reparse_point(path):
+        try:
+            os.remove(path)
+        except OSError:
+            os.rmdir(path)
+        return
+    if os.path.isdir(path):
+        shutil.rmtree(path)
+    else:
+        os.remove(path)
+
+
 def _stage_assets(repository_root, portal_root, output_root):
     """Pages固有のassetを、review済みmanifestが列挙したexact pathだけ公開する。
 
@@ -66,8 +87,14 @@ def _stage_assets(repository_root, portal_root, output_root):
         )
 
     # JSONはdataだけを表現し、manifest内のcodeを実行する余地がない。
-    with open(manifest_path, "r", encoding="utf-8") as handle:
-        manifest = json.load(handle)
+    # 壊れたmanifestはtracebackではなく診断で落とす。例外文にはlocal絶対pathや
+    # manifestの中身が載りうるため、repository相対pathだけを報告する。
+    try:
+        manifest = json.loads(guards.get_file_text(manifest_path))
+    except (json.JSONDecodeError, ValueError) as error:
+        raise guards.ValidationError(
+            "Pages asset manifest is not valid JSON: pages/assets-manifest.json"
+        ) from error
     if not isinstance(manifest, dict) or "assets" not in manifest:
         raise guards.ValidationError(
             "Pages asset manifest has no Assets key: pages/assets-manifest.json"
@@ -224,8 +251,7 @@ def main(argv=None):
     if output_root.lower() != expected_output.lower():
         raise guards.ValidationError("Unexpected Pages staging path.")
 
-    if os.path.exists(output_root):
-        shutil.rmtree(output_root)
+    _remove_staging(output_root)
     os.makedirs(output_root)
 
     # Gitのindexにpathが存在することを確認するguardを、portal fileとroot documentにも
