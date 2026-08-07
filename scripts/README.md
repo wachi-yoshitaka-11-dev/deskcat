@@ -9,9 +9,9 @@
 | `validate_doc_links.py` | リポジトリ全体のMarkdown相対linkを検査する | Pages workflowとlocal |
 | `prepare_pages.py` | 公開対象を`.pages-src/`へ複製し、公開禁止情報を検査する。診断のfile pathはstaging-root相対で出力する | Pages workflowとlocal |
 | `validate_pages_output.py` | 生成済み`_site/`のlinkと公開禁止情報を検査する。診断のfile pathはsite-root相対で出力する | Pages workflowとlocal |
-| `test_link_validators.py` | source／生成siteのanchor、Pages baseurl（引用、YAML comment、末尾slashを含む）、時間制限付きHTML解析、local URL解決（encoding、unsafe scheme、directory、曖昧候補、case、reparse point、非HTML assetを含む）、公開禁止pattern・local path・値の非露出、Markdown link抽出、追跡file／symlink helperの0・1・複数件、PathSpec、Git quoting前提、非ASCII pathを検証する。link作成不可の環境では対象caseをskipする | Pages workflowとlocal |
+| `test_link_validators.py` | source／生成siteのanchor、Pages baseurl（引用、YAML comment、末尾slashを含む）、時間制限付きHTML解析、local URL解決（encoding、unsafe scheme、directory、曖昧候補、case、reparse point、非HTML assetを含む）、公開禁止pattern・local path・値の非露出、Markdown link抽出、追跡file／symlink helperの0・1・複数件、PathSpec、Git quoting前提、非ASCII pathを検証する。link作成不可の環境では対象caseを成功件数と分けてskipする | Pages workflowとlocal |
 | `test_pages_guards.py` | 公開境界の回帰test（未宣言asset、追跡外file、hash不一致、size超過、公開禁止patternとlocal staging pathの非露出、**Gitのmode 120000によるsymlink除外**、**file属性のreparse point除外**、拡張子）を検証する。symlinkの2 caseは、どちらのguardが働いたかをskip理由で確認する | Pages workflowとlocal |
-| `lib/publish_guards.py` | secret／個人path pattern、path containmentとroot相対表記、追跡file列挙（`core.quotePath=false`で非ASCII pathをescapeさせない）、Gitのmodeによるsymlink判定、見出しanchor生成、Markdown link抽出、null安全な読み出し、reparse pointを跨がないtree走査。上の5 scriptがimportする | import専用 |
+| `lib/publish_guards.py` | secret／個人path pattern、path containmentとroot相対表記、追跡file列挙（`core.quotePath=false`で非ASCII pathをescapeさせない）、Gitのmodeによるsymlink判定、見出しanchor生成、Markdown link抽出、null安全な読み出し、reparse pointを跨がないtree走査。`validate_doc_links.py`、`prepare_pages.py`、`validate_pages_output.py`、`test_link_validators.py`、`test_pages_guards.py`の5本すべてがimportする（PowerShell版では`test-pages-guards.ps1`だけが参照していなかった）。`test_link_validators.py`と`test_pages_guards.py`は、importとは別に対象scriptを子processとして起動し、exit codeと診断出力まで検査する | import専用 |
 
 `lib/publish_guards.py`は単体で実行しない。secretや個人pathのpatternはこのfileだけで定義し、各scriptへ複製しない。
 

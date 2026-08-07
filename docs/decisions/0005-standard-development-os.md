@@ -105,7 +105,9 @@ Docker上のLinuxも使用する。
 この決定は、次を満たすことで検証する。
 
 - ESP32 Build profileのclean buildを、実機Linuxの手順から再現できる。
-- `scripts/validate-doc-links.ps1`の`DIGEST`が、local Linuxと`ubuntu-24.04`のCIで一致する。
+- `scripts/validate_doc_links.py`の`DIGEST`が、local Linuxと`ubuntu-24.04`のCIで一致する。
+  （[ADR-0006](0006-validation-script-language.md)で`scripts/validate-doc-links.ps1`から移行した。
+  上の「検討した選択肢」に残る旧名は、判断時点の事実としてそのままにする）
 - ESP32のbuildとflashを、同一の実機Linux端末で連続して実行できる。
 - version recordの`Container / VM / native:`が、提出されたすべての記録で埋まっている。
 - runbookに、対象外と明記されていないWindows専用手順が残っていない。
