@@ -19,6 +19,7 @@ import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -65,6 +66,30 @@ def _write(path, content):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8", newline="") as handle:
         handle.write(content)
+
+
+def _remove_tree(path):
+    """fixtureのtreeを消す。read-onlyのfileも対象にする。
+
+    Gitのobjectはread-onlyで作られるため、`shutil.rmtree`の既定では消せない。
+    `ignore_errors=True`だけで済ませると失敗を握りつぶし、消し残しに気付けない。
+    消せなかった事実はstderrへ残す。一時directoryの絶対pathはlogへ書かない。
+    """
+    if not os.path.exists(path):
+        return
+    for current, directories, files in os.walk(path):
+        for name in directories + files:
+            target = os.path.join(current, name)
+            try:
+                os.chmod(target, os.stat(target).st_mode | stat.S_IWUSR)
+            except OSError:
+                pass
+    shutil.rmtree(path, ignore_errors=True)
+    if os.path.exists(path):
+        print(
+            f"warning: failed to remove the test fixture {os.path.basename(path)}",
+            file=sys.stderr,
+        )
 
 
 def _resolve_git_index_path():
@@ -137,7 +162,7 @@ class PublishGuardTestCase(unittest.TestCase):
                 except OSError:
                     os.rmdir(path)
             elif os.path.isdir(path):
-                shutil.rmtree(path, ignore_errors=True)
+                _remove_tree(path)
             elif os.path.exists(path):
                 os.remove(path)
 

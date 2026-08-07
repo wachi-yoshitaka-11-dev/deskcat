@@ -16,6 +16,7 @@ harnessをrunnerの一時directoryから絶対pathで起動する。
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -231,7 +232,29 @@ def tearDownModule():
 
 
 def _remove_tree(path):
+    """fixtureのtreeを消す。read-onlyのfileも対象にする。
+
+    Gitのobjectはread-onlyで作られるため、`shutil.rmtree`の既定では消せない。
+    PowerShell版が使っていた`Remove-Item -Recurse -Force`と同じ扱いにする。
+    `ignore_errors=True`だけで済ませると失敗を握りつぶし、fixtureが一時directoryへ
+    溜まり続けていることに気付けない。消せなかった事実はstderrへ残す。
+    path自体は名前だけ出す。一時directoryの絶対pathをlogへ書かない。
+    """
+    if not os.path.exists(path):
+        return
+    for current, directories, files in os.walk(path):
+        for name in directories + files:
+            target = os.path.join(current, name)
+            try:
+                os.chmod(target, os.stat(target).st_mode | stat.S_IWUSR)
+            except OSError:
+                pass
     shutil.rmtree(path, ignore_errors=True)
+    if os.path.exists(path):
+        print(
+            f"warning: failed to remove the test fixture {os.path.basename(path)}",
+            file=sys.stderr,
+        )
 
 
 def _remove_path(path):
@@ -1167,6 +1190,43 @@ class OutputValidatorReparseTests(OutputValidatorTestCase):
             False,
             expected_message="Symbolic or reparse-point output is not allowed at root: .",
         )
+
+
+class FixtureCleanupTests(unittest.TestCase):
+    """後始末が read-only file を残さないこと。
+
+    このharnessはgit repositoryをfixtureとして作る。Gitのobjectはread-onlyで
+    作られるため、素の`shutil.rmtree`では消えず、`ignore_errors=True`と組み合わせると
+    失敗が握りつぶされて一時directoryへ溜まり続ける。実際に1実行あたり3件溜めていた。
+    """
+
+    def test_remove_tree_deletes_read_only_files(self):
+        root = os.path.join(_state["temporary_root"], f"cleanup-probe-{uuid.uuid4().hex}")
+        nested = os.path.join(root, "objects", "ab")
+        os.makedirs(nested)
+        target = os.path.join(nested, "read-only")
+        _write(target, "x")
+        os.chmod(target, stat.S_IREAD)
+        self.assertFalse(os.access(target, os.W_OK), "fixture precondition: read-only")
+        if os.name == "nt":
+            # positive control。Windowsではread-only属性そのものが削除を拒む。
+            # POSIXではunlinkの可否は親directoryの権限で決まり、read-onlyのfileでも
+            # 消せるため、この対照は成立しない。
+            shutil.rmtree(root, ignore_errors=True)
+            self.assertTrue(
+                os.path.exists(root), "read-only fileが素のrmtreeで消えてしまった"
+            )
+        _remove_tree(root)
+        self.assertFalse(os.path.exists(root))
+
+    def test_git_fixture_directories_are_removed(self):
+        root = os.path.join(_state["temporary_root"], f"cleanup-git-{uuid.uuid4().hex}")
+        os.makedirs(root)
+        _write(os.path.join(root, "a.md"), "# A\n")
+        _git(root, "init", "--quiet")
+        _git(root, "add", "--all")
+        _remove_tree(root)
+        self.assertFalse(os.path.exists(root), "git fixtureが消し残された")
 
 
 class SharedHelperTests(unittest.TestCase):
