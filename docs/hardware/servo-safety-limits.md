@@ -13,22 +13,28 @@
 
 ## サーボ識別情報
 
+部品の識別情報の**正本は[hardware-bom.md](hardware-bom.md)のSERVO-01**である。
+この表はそこから引いた値を、安全確認の作業者がここだけで読めるように再掲したものであり、
+値をこの文書で確定させない。BOM側を更新したらこの表も合わせる。
+
 | 項目 | 値 | 根拠 |
 |---|---|---|
-| メーカー | TBD | 現物表示 |
-| 正確なmodel／suffix | TBD | 現物表示 |
-| データシートrevision | TBD | メーカー文書 |
-| 定格電圧範囲 | TBD | データシート |
-| 無負荷電流 | TBD | データシート／測定 |
-| 動作電流 | TBD | データシート／測定 |
-| Stall／peak電流 | TBD | データシート／測定 |
-| 制御logic要件 | TBD | データシート |
-| PWM周期／rate | TBD | データシート |
-| 許容最小pulse | TBD | データシートと無負荷試験 |
-| Neutral pulse | TBD | Calibration |
-| 許容最大pulse | TBD | データシートと無負荷試験 |
+| メーカー | TowerPro | 現物ラベル（`TOWER PRO Micro servo 9g SG90`）。[HW-TBD-006](tbd-register.md)で解決済み |
+| 正確なmodel／suffix | SG90 | 同上 |
+| データシートrevision | [TowerPro公式](https://towerpro.com.tw/product/sg90-7/)、[datasheet](https://www.mouser.com/catalog/specsheets/Soldered_101246.pdf)。revision表記なし | メーカー文書 |
+| 定格電圧範囲 | 4.8–6 V | データシート |
+| 無負荷電流 | **TBD** | データシート／測定 |
+| 動作電流 | **TBD**（データシート値は0.5–2 Aと負荷依存で幅が広い） | データシート／測定 |
+| Stall／peak電流 | **TBD**（実測必須。[HW-TBD-010／011](tbd-register.md)、`power-budget.md`測定計画） | データシート／測定 |
+| 制御logic要件 | **TBD**（ESP32のGPIOは3.3 V。SG90のlogic閾値を現物確認するまで確定しない） | データシート |
+| PWM周期／rate | **TBD**（50 Hzが一般値だが、この表の確定値として採らない） | データシート |
+| 許容最小pulse | **TBD** | データシートと無負荷試験 |
+| Neutral pulse | **TBD** | Calibration |
+| 許容最大pulse | **TBD** | データシートと無負荷試験 |
 
-一般的なhobby servoの値を、この表の確定値として使用しない。
+**modelは確定したが、駆動条件はまだ確定していない。**上表で`TBD`が残る項目は、
+一般的なhobby servoの値やdatasheetの代表値を確定値として使用しない。
+とくにpulse幅とstall電流は、実機のcalibrationと測定で決める。
 
 ## 機械組み立て
 
@@ -328,3 +334,4 @@ recovery／reconnect動作は`HW-TBD-018`の範囲に含める。fail-safe seque
 |---|---|---|
 | 2026-07-27 | 0 | 安全とcalibrationの構造を作成。device固有の制限はすべて引き続きTBD |
 | 2026-08-05 | 1 | `HW-TBD-006`（正確なservo model）が[TBD台帳](tbd-register.md)で解決済み（TowerPro SG90）となったため、有効化gate表の該当行を解決済みとして打ち消し、依存例（`HW-TBD-010`のBlocked元）を`HW-TBD-007`〜`009`へ更新した。**gate自体は開いていない。**残る`TBD`が未解決であり、peak／stall電流の実測も`HW-TBD-010`／`011`で必要である |
+| 2026-08-08 | 2 | `サーボ識別情報`表がメーカー・model・定格電圧をすべて`TBD`のまま残しており、[HW-TBD-006](tbd-register.md)を解決済みとした本文（Revision 1）および[hardware-bom.md](hardware-bom.md) SERVO-01と矛盾していた。安全確認の作業者がservo modelを未確定と誤認する状態だったため、確定済みの値（TowerPro SG90、4.8–6 V、datasheet link）を反映した。**駆動条件は未確定のまま残す。**pulse幅、stall電流、logic閾値は実機のcalibrationと測定で決めるものであり、datasheetの代表値を確定値として採らない旨も明記した。識別情報の正本が`hardware-bom.md`であることも冒頭に記した |
