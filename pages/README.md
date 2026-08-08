@@ -60,6 +60,6 @@ Hardware写真や技術図のような文書向けimageはここへ置かない�
 
 このため、`pages/index.md`をGitHubのrepository画面で開くと、相対linkはこのdirectory基準で解決されて404になる。これはlinkの誤りではなく、生成siteでのみ有効な記法である。
 
-`scripts/validate_doc_links.py`は、この2 fileだけをstaging root基準で検査する。link先を変更したら同scriptを実行する。
+`scripts/validate_doc_links.py`はrepository全体の追跡Markdownを検査する。そのうちlinkをstaging root基準で解決するのは、この2 fileだけである。他のfileのlinkは、そのfile自身の位置から解決する。link先を変更したら同scriptを実行する。
 
 方針は[ADR-0003](../docs/decisions/0003-public-documentation-publishing.md)、操作手順は[GitHub Pages公開runbook](../docs/runbooks/github-pages-publishing.md)を参照する。

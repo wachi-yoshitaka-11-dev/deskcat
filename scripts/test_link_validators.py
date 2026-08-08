@@ -158,6 +158,18 @@ def setUpModule():
     os.makedirs(temporary_root)
     _state["temporary_parent"] = temporary_parent
     _state["temporary_root"] = temporary_root
+    try:
+        _build_fixtures(temporary_root)
+    except BaseException:
+        # `setUpModule`が失敗すると`tearDownModule`は呼ばれない。ここで消さないと、
+        # 下の`_git`が作ったread-onlyのgit objectを含むfixtureが一時directoryへ残る。
+        # 失敗するたびに1件ずつ溜まる。
+        _remove_fixture(temporary_root)
+        _state.clear()
+        raise
+
+
+def _build_fixtures(temporary_root):
     _state["default_pages_config"] = os.path.join(
         temporary_root, "default-pages-config.yml"
     )

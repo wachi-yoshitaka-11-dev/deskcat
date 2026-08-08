@@ -88,11 +88,17 @@ def _remove_staging(path, repository_root):
         raise guards.ValidationError("Unable to clear the Pages staging directory.")
 
 
-def _stage_assets(repository_root, portal_root, output_root):
+def _stage_assets(repository_root, portal_root, output_root, tracked_symlinks):
     """Pages固有のassetを、review済みmanifestが列挙したexact pathだけ公開する。
 
     再帰copyにすると、許可拡張子でありreviewを経ていないfileまで公開され得る。
     特にbinaryは内容scanが効かないため、hashで同一性を固定する。
+
+    symlinkとreparse pointは`docs/`側と同じく拒否する。`os.path.isfile`はlinkを辿り、
+    copyはtarget側の内容を書き出すため、`pages/assets/`配下のsymlink 1本で
+    repository外の内容が公開される。staged側は通常fileになるので、`main`の
+    reparse point検査では捕まえられない。binaryのSHA-256も辿った先から計算されるため
+    一致してしまう。ここで止めるしかない。
     """
     assets_source = os.path.join(portal_root, "assets")
     assets_destination = os.path.join(output_root, "assets")
@@ -164,6 +170,16 @@ def _stage_assets(repository_root, portal_root, output_root):
         if repository_relative not in tracked_assets:
             problems.append(
                 f"Declared asset is not tracked by Git: {repository_relative}"
+            )
+            continue
+        # Gitのmodeを先に見る。`core.symlinks=false`のcheckoutでは、working tree上の
+        # 実体がregular fileになり、属性だけでは判定が環境ごとに変わる。
+        if repository_relative in tracked_symlinks:
+            problems.append(f"Declared asset is a symlink in Git: {repository_relative}")
+            continue
+        if guards.is_reparse_point(source):
+            problems.append(
+                f"Declared asset is a reparse point: {repository_relative}"
             )
             continue
 
@@ -289,7 +305,7 @@ def main(argv=None):
             )
         _copy(source, os.path.join(output_root, name))
 
-    _stage_assets(repository_root, portal_root, output_root)
+    _stage_assets(repository_root, portal_root, output_root, tracked_symlinks)
 
     with open(os.path.join(output_root, "favicon.ico"), "wb") as handle:
         handle.write(FAVICON_BYTES)

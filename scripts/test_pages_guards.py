@@ -299,10 +299,13 @@ class StagingPathGuardTests(unittest.TestCase):
         """再帰削除の前に、対象がrepository内の`.pages-src`であることを確かめる。
 
         pathの組み立てを将来変えたときに、別のdirectoryを消してしまわないための
-        guardである。実際に消えては困るので、存在しないpathで規則だけを見る。
+        guardである。実際に消えては困るので、**存在しないpathだけ**で規則を見る。
+        実在するdirectoryを渡すと、guardが将来弱まったときにこのtestが先に
+        そのdirectoryを再帰削除し、失敗はその後で報告されることになる。
+        `assertRaises`は削除を止められない。
         """
         for value in (
-            os.path.join(REPOSITORY_ROOT, "docs"),
+            os.path.join(REPOSITORY_ROOT, "__guardtest-not-staging"),
             os.path.join(REPOSITORY_ROOT, ".pages-src-old"),
             os.path.join(os.path.dirname(REPOSITORY_ROOT), ".pages-src"),
         ):
@@ -438,6 +441,62 @@ class AssetManifestGuardTests(PublishGuardTestCase):
                 self.assert_staging_fails(
                     "Asset manifest Path is not a safe relative path"
                 )
+
+    def test_symlinked_asset_does_not_publish_outside_content(self):
+        """`pages/assets/`配下のsymlinkでrepository外の内容を公開しない。
+
+        `os.path.isfile`はlinkを辿り、copyはtarget側の内容を書き出す。staged側は
+        通常fileになるため、stagingの最後にあるreparse point検査では捕まえられない。
+        binaryならSHA-256も辿った先から計算されて一致する。asset loopで止めるしかない。
+        """
+        outside = self.track(
+            os.path.join(tempfile.gettempdir(), f"deskcat-outside-{uuid.uuid4().hex}.txt")
+        )
+        secret = "OUTSIDE-CONTENT-THAT-MUST-NOT-BE-PUBLISHED"
+        _write(outside, secret)
+        link = self.track(os.path.join(ASSETS_ROOT, "__guardtest-link.txt"))
+        try:
+            os.symlink(outside, link)
+        except (OSError, NotImplementedError):
+            self.skipTest("symlink creation unavailable")
+        # 追跡checkで弾かれると、どのguardが働いたのか区別できない。追跡済みにする。
+        self.detached_index_with("pages/assets/__guardtest-link.txt")
+        self.add_manifest_entry({"path": "__guardtest-link.txt"})
+        run = self.assert_staging_fails(
+            "Declared asset is a symlink in Git: pages/assets/__guardtest-link.txt",
+            forbidden_messages=(secret,),
+        )
+        staged = os.path.join(STAGING_ROOT, "assets", "__guardtest-link.txt")
+        self.assertFalse(os.path.exists(staged), "symlink assetが公開された")
+        self.assertNotIn(secret, run.output)
+
+    def test_reparse_point_asset_does_not_publish_outside_content(self):
+        """indexがregular fileとして記録していても、実体がlinkなら公開しない。
+
+        `core.symlinks=false`のcheckoutと実体が食い違う場合に相当し、Gitのmode判定
+        では拾えない。ここでだけreparse point checkへ到達する。
+        """
+        outside = self.track(
+            os.path.join(tempfile.gettempdir(), f"deskcat-outside-{uuid.uuid4().hex}.txt")
+        )
+        _write(outside, "OUTSIDE")
+        link = self.track(os.path.join(ASSETS_ROOT, "__guardtest-reparse.txt"))
+        try:
+            os.symlink(outside, link)
+        except (OSError, NotImplementedError):
+            self.skipTest("symlink creation unavailable")
+        blob = _git("rev-parse", "HEAD:README.md").strip()
+        self.new_detached_index()
+        _git(
+            "update-index", "--add", "--cacheinfo",
+            f"100644,{blob},pages/assets/__guardtest-reparse.txt",
+        )
+        self.add_manifest_entry({"path": "__guardtest-reparse.txt"})
+        self.assert_staging_fails(
+            "Declared asset is a reparse point: pages/assets/__guardtest-reparse.txt"
+        )
+        staged = os.path.join(STAGING_ROOT, "assets", "__guardtest-reparse.txt")
+        self.assertFalse(os.path.exists(staged), "reparse point assetが公開された")
 
     def test_disallowed_staged_file_type_fails_with_a_relative_path(self):
         path = self.track(os.path.join(ASSETS_ROOT, "__guardtest-disallowed.pdf"))
