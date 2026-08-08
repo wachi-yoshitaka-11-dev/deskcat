@@ -131,4 +131,4 @@ ADC loggingを使う。
 |---|---|---|
 | 2026-07-27 | 0 | 初期architectureと測定計画を作成。部品値は引き続きTBD |
 | 2026-08-05 | 1 | 単一入力源（秋月M-12001、5V3A）＋breadboard上2rail分岐の構成に確定。負荷表にESP-WROOM-32D／Pi Zero W／ADXL345／BME280／SG90の文献値（実測前の参考値）を記載。Servo bulk capacitor候補（470μF50V×2〜3個）を記載。DISP-01(MSP2807)は未購入のため電流値Blockedのまま | `hardware-bom.md`のRevision履歴4〜6、ESP32／Raspberry Pi公式資料、各部品datasheet |
-| 2026-08-05 | 2 | Oscilloscope未所持のため、測定手段をESP32＋shunt抵抗(セメント抵抗0.1Ω)によるADC loggingに変更。GitHub Issue FND-003(#3)の受け入れ条件も同様に修正（Oscilloscopeを必須から任意に変更） | ユーザーが測定機材を所持していないとの指摘 |
+| 2026-08-05 | 2 | Oscilloscope未所持のため、測定手段をESP32＋shunt抵抗(セメント抵抗0.1Ω)によるADC loggingに変更。GitHub Issue #3の受け入れ条件も同様に修正（Oscilloscopeを必須から任意に変更） | ユーザーが測定機材を所持していないとの指摘 |

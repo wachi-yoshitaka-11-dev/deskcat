@@ -20,7 +20,7 @@
 | 正確なboard revision | 基板自体にrevision表示なし（秋月オリジナル基板のため） | 現物確認済み（`hardware-bom.md` Revision履歴3） |
 | 搭載ESP32 module suffix | ESP-WROOM-32D | 購入履歴（秋月M-13628商品名）、`hardware-bom.md` |
 | 公式回路図revision | 秋月商品ページ添付データシート、および参考として[Espressif ESP32-DevKitC V4 pinout](https://docs.espressif.com/projects/esp-idf/en/v5.1/esp32/hw-reference/esp32/get-started-devkitc.html)。秋月独自基板のため、pin配列がEspressif公式と完全一致するとは限らない点に注意（要現物pin表記との対応確認） | 秋月商品ページ |
-| Firmware board configuration ID | TBD | Toolchain bring-up時（M1-001）に定義する |
+| Firmware board configuration ID | TBD | Toolchain bring-up時（#5）に定義する |
 
 ## ESP32の使用制限pin（Espressif公式資料より、この基板に適用）
 
@@ -60,7 +60,7 @@
 
 | Bus | 候補device | 状態 | 不足している根拠 |
 |---|---|---|---|
-| USB serial／UART | Raspberry Pi | GPIO1／GPIO3に確定（board上USB-UARTブリッジ経由） | Pi上のdevice名（`/dev/ttyUSB*`等）はM1-004で確認 |
+| USB serial／UART | Raspberry Pi | GPIO1／GPIO3に確定（board上USB-UARTブリッジ経由） | Pi上のdevice名（`/dev/ttyUSB*`等）は#8で確認 |
 | SPI display bus | LCD（MSP2807／ILI9341）、touch（同module） | GPIO18／23／19（SCLK／MOSI／MISO）＋CS個別（LCD: GPIO22、Touch: GPIO21）に確定 | Touch controller型番の現物確認、実際のSPI mode／速度の実測 |
 | I2C sensor bus | Accelerometer（ADXL345）、environment sensor（BME280） | GPIO25（SDA）／GPIO26（SCL）に確定 | 両moduleのinterface選択jumper（I2C側になっているか）の現物確認、実効pull-up抵抗の計算 |
 | PWM／timer | Servo（SG90） | GPIO27に確定 | `servo-safety-limits.md`のpulse幅制限確定、起動時安全状態のreview |
