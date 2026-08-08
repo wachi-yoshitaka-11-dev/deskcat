@@ -3,7 +3,7 @@
 > 状態: Accepted
 > 日付: 2026-07-27
 
-> **注記（2026-08-08追記）**: 下の「背景」に書いた機器名のうち、
+> **注記（2026-08-09追記）**: 下の「背景」に書いた機器名のうち、
 > `Raspberry Pi Zero WH`と`ESP32-DevKitC-32E`は、その後の現物確認で
 > それぞれ`Raspberry Pi Zero W`（V1.1）、`ESP-WROOM-32D開発ボード（秋月電子 M-13628）`
 > と判明した（[#55](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/55)）。
