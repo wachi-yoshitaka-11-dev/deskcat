@@ -51,6 +51,27 @@ GitHub公式のJekyll Pages Actionを使用する。
 - Rootの`README.md`、`AGENTS.md`、`CONTRIBUTING.md`、`SECURITY.md`、`LICENSE`
 - `docs/`配下の文書
 
+### 生成siteに含まれるもの
+
+Jekyllは`.md`をHTMLへ変換するだけでなく、**`.md`自体も`_site/`へ複製する**。
+公開siteでは両方が配信される。
+
+```text
+GET /deskcat/docs/protocol/esp32-pi-protocol.html  -> HTTP 200 (text/html)
+GET /deskcat/docs/protocol/esp32-pi-protocol.md    -> HTTP 200 (text/markdown)
+```
+
+内容はHTML版と同一の公開文書であり、`.md`はsecret／個人pathのscan対象でもある。
+公開してよいものだけが`.pages-src/`へ入るため、これ自体は公開境界の問題ではない。
+ただし**公開surfaceは想定の倍になる**ため、非公開にしたい内容を`docs/`へ置かない前提は
+HTMLだけを見て判断しない。
+
+なお`validate_pages_output.py`は`.md`への**link**を`Unconverted Markdown link`として
+拒否する。生成siteでのnavigationはHTML側へ向ける、という規則であり、`.md`が配信されて
+いること自体とは別の話である。
+
+`_site/`の実際の内訳は、Pages CIのlogに毎回出る（`EXTENSIONS=`）。
+
 `pages/assets/`のassetは、`pages/assets-manifest.json`が列挙したexact pathだけを公開する。`prepare_pages.py`は次を失敗として扱う。
 
 - Manifestに無いfileが`pages/assets/`にある
