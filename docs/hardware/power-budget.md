@@ -16,14 +16,18 @@
 
 ```text
 スイッチングACアダプター(USB ACアダプター) MicroBオス 5V3A（秋月 M-12001）— 単一入力源
+│  ※plugをbreadboardへ引き込む変換部品が未購入（`5 V ingress`節）
 ├─ Logic/Pi rail 5V（breadboard上で分岐、追加regulatorなし）
-│  ├─ Raspberry Pi Zero W
-│  ├─ ESP-WROOM-32D開発ボード（秋月 M-13628）
-│  │  └─ board上regulatorが3.3Vを生成し、board上の3V3 pinから出力
-│  │     ├─ ADXL345（VDD 2.0–3.6V。M-06724はregulator非搭載、3.3V直結が必須）
-│  │     ├─ BME280（電源電圧DC1.71～3.6V。5V直結不可）
-│  │     └─ MSP2807（LCD＋touch。VCC 3.3–5V対応だがlogic IOは3.3V TTL。
-│  │        下記理由により3.3Vで給電する）
+│  ├─ Raspberry Pi Zero W（PWR IN portへ）
+│  │  └─ USB OTG port ──[USB cable、Pi link]── ESP-WROOM-32D開発ボード（秋月 M-13628）
+│  │        ※案Aではこのcableのみで給電する
+│  └─ （案Bの場合のみ）ESP-WROOM-32Dの`5V` pinへ直接
+│        ESP32の給電経路は案A／案Bのいずれか未決定（`ESP32の給電経路（未決定）`節）
+│        board上regulatorが3.3Vを生成し、board上の3V3 pinから出力
+│        ├─ ADXL345（VDD 2.0–3.6V。M-06724はregulator非搭載、3.3V直結が必須）
+│        ├─ BME280（電源電圧DC1.71～3.6V。5V直結不可）
+│        └─ MSP2807（LCD＋touch。VCC 3.3–5V対応だがlogic IOは3.3V TTL。
+│              下記理由により3.3Vで給電する）
 └─ Servo rail 5V（breadboard上で分岐、直近にbulk capacitor）
    └─ SERVO-01（TowerPro SG90）
 
@@ -59,9 +63,25 @@ M-12001はMicro-Bオスplugであり、**breadboardへ直接挿せない**。こ
 |---|---|
 | 必要な部品 | Micro-Bメスreceptacleの2.54 mm変換基板（DIP化キット）。M-12001のplugを受け、そこからbreadboard railへ5 V／GNDを引き出す。**未購入・未選定** |
 | 分岐点 | receptacle変換基板の直後にbreadboard railへ入れ、そこからlogic railとservo railへ分ける。**Piの5 V GPIO pinを経由して他へ配らない**（下記の定格問題） |
-| ESP32の5 V入力 | breadboard railからboardの`5V` pinへ入れる。**ESP32のMicro USB portと5V pinを同時に給電しない**。Espressifは3系統（Micro USB／5V pin／3V3 pin）が排他であると明記している |
-| ESP32のUSB portの扱い | Pi linkと flashingに使う（`gpio-assignment.md`のtransport節）。このときUSB VBUSと5V pinの両方から給電される状態になりうる。公式ESP32-DevKitC V4はVBUS保護のSchottky diodeを実装しているが、**この秋月基板が同じ保護を持つかは未確認**。現物の回路確認まで、USB接続と5V pin給電の同時使用を承認しない |
 | Piの5 V入力 | breadboard railからMicro-Bオスcableで`PWR IN`へ入れる。PiのUSB OTG portはPi link専用とし、給電に使わない |
+| Servo railの5 V入力 | breadboard railから分岐し、直近にbulk capacitorを置く |
+| **ESP32の5 V入力** | **未決定。**下記「ESP32の給電経路（未決定）」で選択する |
+
+### ESP32の給電経路（未決定）
+
+Espressifは電源3系統（Micro USB／`5V` pin／`3V3` pin）が**排他**であると明記している。
+一方、Pi linkはUSB serialに確定しており（`gpio-assignment.md`のtransport節）、
+**Pi linkを繋いだ時点でESP32のUSB VBUSは通電する**。したがって「`5V` pinから給電しつつ
+USBでPiと繋ぐ」構成は、そのままでは排他制約に反する。次のどちらかを選ぶ。
+
+| 案 | 内容 | 未解決の点 |
+|---|---|---|
+| A: USB VBUS単独給電 | ESP32はPiからのUSB cableだけで給電し、`5V` pinへは何も接続しない。配線が最も単純で排他制約にも反しない | PiのUSB OTG portが、ESP32のpeak（文献値で最大約500 mA spike）とMSP2807の3V3負荷を合わせた電流を供給できるか。Pi自身の入力電流もその分増える |
+| B: `5V` pin給電＋USBはdata用 | ESP32を`5V` pinから給電し、USBはPi linkにのみ使う | VBUSと`5V` pinが同時に生きる。公式ESP32-DevKitC V4はVBUS保護のSchottky diodeを実装しているが、**この秋月基板が同じ保護を持つかは未確認**。逆流の有無を現物回路で確認するまで承認しない |
+
+**どちらも未検証のため、この行が埋まるまでESP32へ通電しない。**
+案Aを既定候補とするが、PiのUSB port供給能力の実測（`測定計画`）で不足が判明した場合は
+案Bへ切り替え、そのとき秋月基板のVBUS保護有無を回路で確認する。
 
 ### connector定格の制約（未解決）
 
@@ -74,7 +94,7 @@ connector定格を超える。
 - 実測でservoを含む同時peakがconnector定格に対し十分な余裕内に収まることを示す
 - または、servo railのingressをMicro-Bを経由しない経路（より定格の高いconnector）へ変更する
 
-この制約は`受け入れ条件`にも数値として記載する。
+この制約は`受け入れ条件`にも数値として記載している。
 
 ## 負荷表
 
@@ -126,9 +146,9 @@ required_transient_current
 |---|---|---|---|---|
 | 入力電源 | 電圧、連続電流、peak電流 | スイッチングACアダプター MicroBオス 5V／3A（秋月 M-12001） | [秋月商品ページ](https://akizukidenshi.com/catalog/g/g112001/) | Selected（実測でmargin確認要） |
 | **5 V ingress interface** | Micro-Bオスplugを受け、breadboard railへ5 V／GNDを引き出す物理変換 | **未選定**。Micro-Bメスreceptacleの2.54 mm変換基板（DIP化キット）が必要。M-12001のplugはbreadboardへ直接挿せない | `5 V ingress`節 | **Blocked（部品未選定・未購入。これが無いと配線を開始できない）** |
-| ESP32の5 V入力経路 | 3系統（Micro USB／5V pin／3V3 pin）の排他制約を守る | breadboard railから`5V` pinへ入れる。Micro USBはPi linkとflashingに使う | Espressif ESP32-DevKitC V4文書（3系統は排他）。`5 V ingress`節 | **Blocked**（この秋月基板のVBUS保護diode有無が未確認のため、USB接続と5V pin給電の同時使用を未承認） |
+| ESP32の5 V入力経路 | 3系統（Micro USB／5V pin／3V3 pin）の排他制約を守る | **未決定。**案A（PiからのUSB VBUS単独給電、既定候補）と案B（`5V` pin給電＋USBはdata用）のいずれか | Espressif ESP32-DevKitC V4文書（3系統は排他）。`ESP32の給電経路（未決定）`節 | **Blocked**（案AはPiのUSB port供給能力が未実測、案Bはこの秋月基板のVBUS保護diode有無が未確認） |
 | Piの5 V入力経路 | PWR IN portから給電し、USB OTG portはPi link専用とする | breadboard railからMicro-Bオスcableで`PWR IN`へ | Raspberry Pi Zero W公式回路（PWR INはdata線未接続の給電専用） | Selected（cable未購入） |
-| Logic regulator／経路 | Pi／ESP32／周辺deviceの要件 | 追加regulatorなし。M-12001の5Vをbreadboard rail経由でそのまま供給するのは**PiとESP32 boardのみ**。周辺module3点（MSP2807、ADXL345、BME280）は5V railへ直結せず、ESP32 board上の3V3 pinから給電する（理由は`電源rail構成案`参照） | `hardware-bom.md` PSU-PI-01、DISP-01、TOUCH-01、ACCEL-01、ENV-01 | Selected（同時peak margin、および3V3 pinの供給能力の実測待ち） |
+| Logic regulator／経路 | Pi／ESP32／周辺deviceの要件 | 追加regulatorなし。M-12001の5Vをbreadboard rail経由でそのまま供給するのは**Piのみ確定**（ESP32は上行のとおり給電経路が未決定）。周辺module3点（MSP2807、ADXL345、BME280）は5V railへ直結せず、ESP32 board上の3V3 pinから給電する（理由は`電源rail構成案`参照） | `hardware-bom.md` PSU-PI-01、DISP-01、TOUCH-01、ACCEL-01、ENV-01 | Blocked（ESP32の給電経路が未決定。加えて同時peak marginと3V3 pinの供給能力が未実測） |
 | Servo regulator／経路 | 正確なservo要件 | 追加regulatorなし。M-12001の5Vをbreadboard上で別railに分岐し、直近にbulk capacitorを配置 | `hardware-bom.md` PSU-SERVO-01 | Selected（bulk capacitor容量は実測待ち） |
 | Backfeed防止 | USB／外部電源の共存 | TBD | 回路図review | Blocked |
 | Servo bulk capacitor | 測定した過渡電流への対応 | 候補: 電解コンデンサ470μF／16V（秋月、ルビコンWXA、¥10）×2〜3個 | [秋月商品ページ](https://akizukidenshi.com/catalog/g/g108426/)。最終容量はESP32＋shunt抵抗によるADC loggingで確定 | Candidate（実測前） |
@@ -201,6 +221,11 @@ framingを除いても約5.7 kSample/s、text encodeではさらに落ちる。*
 直接加えるとpinを破損する。したがって次を守る。
 
 - shuntは必ず低側に置く。高側（5V側）に置くと両端が5V付近になりESP32 ADCで測定できない。
+- **低電流側の精度に注意する。**0.1Ωのshuntでは、電流0.5 Aで50 mV、0.1 Aで10 mVにしかならない。
+  ESP32のADCは入力0付近の直線性が悪く、減衰0 dBでも実用域はおおむね100 mV以上である。
+  したがってこの構成が素直に測れるのは**約1 A以上**であり、typical電流帯（数十〜数百mA）の
+  絶対値精度は期待しない。servo起動時のpeakとその継続時間を捉えることを主目的とし、
+  小電流の定常値はデジタルテスター（MAS830L）側で確認する。
 - 5V railそのものの電圧を観測する場合は、直接ADCへ入れず**分圧抵抗で3.3V未満へ落としてから**入力する。
   分圧比は1/2（10 kΩ／10 kΩ）を既定とし、`gpio-assignment.md`と一致させる。実施時に実測した抵抗値を記録する。
 - 5V系とESP32のGNDは共通化済みである前提に立つ（`確定している制約`参照）。共通GNDでない状態で
@@ -213,6 +238,7 @@ framingを除いても約5.7 kSample/s、text encodeではさらに落ちる。*
 - [ ] 確認済み部品に適した電流制限を設定する
 - [ ] 無負荷の各railを測定する
 - [ ] ESP32 board上3V3 pinの外部供給可能電流の定格を確認し、周辺module3点（MSP2807、ADXL345、BME280）を接続した状態で3V3 rail電圧と電流を実測する。3V3 pinの供給能力を超える場合は別途3.3V regulatorを追加する
+- [ ] **ESP32の給電経路を確定させる**（`ESP32の給電経路（未決定）`節）。案A: PiのUSB OTG portからESP32＋3V3負荷を給電したときの電流とESP32入力電圧を実測し、undervoltageもPi側のbrownoutも起きないことを確認する。不足する場合は案Bへ切り替え、そのとき秋月基板のVBUS保護diodeの有無を回路で確認してから`5V` pinとUSBを同時接続する
 - [ ] サーボなしでlogicへ給電し、電流を記録する
 - [ ] UndervoltageなしでESP32とPiがbootすることを確認する
 - [ ] 外部電源とUSB間のbackfeed動作を確認する
@@ -267,3 +293,4 @@ framingを除いても約5.7 kSample/s、text encodeではさらに落ちる。*
 | 2026-08-05 | 9 | 自己レビューで検出: 容量計算で`ESP32 3V3出力` railを独立電源のように扱うと入力電源の容量を過小評価するため、3V3 railが5V railから作られている従属関係と、5V側の消費に含める旨を明記。あわせてrail構成図のtree枝記号の誤り（同階層に`└─`が2つ）と冗長行を修正し、「3系統合計」という不正確な表現を「3V3 railに接続する3moduleの合計」へ訂正 | 自己レビュー |
 | 2026-08-05 | 10 | 自己レビューで検出: Revision 8でMSP2807を3.3V給電へ変更した際、配線・保護表の`Logic regulator／経路`行と測定計画の3V3実測項目が5V給電のままで、文書内に矛盾が残っていた。両者を3.3V給電（周辺module3点）に統一 | 自己レビュー |
 | 2026-08-05 | 11 | レビュー指摘3件を反映。(a) M-12001はMicro-Bオスplugでbreadboardへ直接挿せないが、そこからrailまでの物理interfaceが未定義だったため`5 V ingress`節を新設し、必要な変換基板（未購入）、ESP32の3系統排他制約、Piの給電port分離を明記。あわせてMicro-B connector定格（約1.8 A）に対し文献値の最悪同時peakが2 Aを超えうる問題を記載し、実測または高定格connectorへの変更まで電源経路を承認しない旨をConnector定格行へ反映。(b) `数十kHz程度`のsample rateが115200 baud（実効約11.5 kB/s、16 bit連続で約5.7 kSample/s）では到達不能だったため、連続streamingを止めてburst capture＋事後dump方式へ変更し、必須要件1 kSample/s・目標5〜10 kSample/s・buffer長・log形式を規定。(c) 低側shuntの挿入位置とADCの基準nodeが未定義で、共通GNDだとservo電流がESP32のGND基準を動かす問題があったため、`GND topology`節を新設しstar point構成（shuntはservo戻り専用、ESP32 GNDはstar point直結）を図示。許容GND offsetと、topologyが取れない場合は測定しない旨も明記 | [PR #55レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/55)、Raspberry Pi Zero W公式回路（PWR INはdata線未接続）、Espressif ESP32-DevKitC V4文書（電源3系統は排他）、115200 8N1の実効throughput |
+| 2026-08-05 | 12 | 自己レビューで検出: Revision 11で追加した`5 V ingress`節が、ESP32を`5V` pinから給電すると書きながら、同じ節で「USB接続と5V pin給電の同時使用を承認しない」とも書いており矛盾していた。Pi linkがUSB serialである以上、Pi接続時点でVBUSは通電するため、この2つは両立しない。`ESP32の給電経路（未決定）`節を新設して案A（USB VBUS単独給電、既定候補）と案B（`5V` pin給電）を並べ、未決定であることを明示。rail構成図、配線・保護表の2行、測定計画も同じ状態へ揃えた。あわせて0.1Ω shuntの低電流側の精度限界（実用域は約1 A以上）を測定計画へ追記し、`受け入れ条件`への記載を「記載する」から「記載している」へ訂正 | 自己レビュー、Espressif ESP32-DevKitC V4文書（電源3系統は排他）、ESP32 ADCの入力直線性 |
