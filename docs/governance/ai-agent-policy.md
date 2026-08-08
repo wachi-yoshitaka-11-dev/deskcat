@@ -25,7 +25,7 @@ ESP32は、real-time I/Oと即時安全制御を担当する。
 - 通信断時の安全動作
 - ハードウェア状態、fault、counterの報告
 
-### Raspberry Pi Zero WH
+### Raspberry Pi Zero W
 
 Raspberry Piは、高水準の行動制御を担当する。
 

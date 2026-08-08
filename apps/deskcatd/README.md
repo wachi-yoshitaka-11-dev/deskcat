@@ -1,6 +1,6 @@
 # deskcatd
 
-`deskcatd`は、Raspberry Pi Zero WHで動作するRustサービスである。
+`deskcatd`は、Raspberry Pi Zero Wで動作するRustサービスである。
 
 責務:
 

@@ -1,17 +1,17 @@
 # Raspberry Pi開発端末Setup
 
-> 状態: Draft。対象のRaspberry Pi Zero WHでは未実行
+> 状態: Draft。対象のRaspberry Pi Zero Wでは未実行
 > 適用範囲: Raspberry Pi RuntimeとRaspberry Pi Direct Build profile
 
 ## 目的
 
-実物の Raspberry Pi Zero WH で OS、ABI、Rust host を確認し、最小 Rust program の native build と実行を記録する。
+実物の Raspberry Pi Zero W で OS、ABI、Rust host を確認し、最小 Rust program の native build と実行を記録する。
 
 候補と判断基準は [Raspberry Pi Rust Toolchain](../toolchains/raspberry-pi-rust-toolchain.md) を参照する。
 
 ## 開始条件
 
-- [ ] 実物が Raspberry Pi Zero WH であることを外観と model 表示で確認する
+- [ ] 実物が Raspberry Pi Zero W であることを外観と model 表示で確認する（基板裏面silkscreenは`Raspberry Pi Zero W V1.1`。pin headerは別途ハンダ付けしたもの）
 - [ ] microSD の必要データを backup した
 - [ ] OS package の変更が許容される
 - [ ] 安定した電源と network がある
