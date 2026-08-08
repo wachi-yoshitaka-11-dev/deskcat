@@ -127,7 +127,7 @@ hotfix規則に従い、同じ修正を直ちに`develop`へ取り込む。両br
 
 - [x] 外部contributorのPull Requestに承認を必須化する
 
-Pages workflowの`pull_request` jobは、PR側の`scripts/*.ps1`をrunner上で実行する。
+Pages workflowの`pull_request` jobは、PR側の`scripts/*.py`をrunner上で実行する。
 GitHub既定の`first_time_contributors`では、一度merge実績のあるcontributorのPRが
 承認なしで実行される。`all_external_contributors`へ変更し、fork由来のworkflow実行に
 毎回人間の承認を必要とする。

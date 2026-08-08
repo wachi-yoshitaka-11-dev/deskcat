@@ -13,9 +13,9 @@ RootのMarkdownと`docs/`を正本として維持し、公開対象だけをGitH
 GitHub公式のJekyll Pages Actionを使用する。
 
 - この端末へRuby、Jekyll、Bundlerを導入しない。
-- `scripts/prepare-pages.ps1`で公開対象を`.pages-src/`へwhitelist copyする。
+- `scripts/prepare_pages.py`で公開対象を`.pages-src/`へwhitelist copyする。
 - GitHub Actions上でJekyll buildを実行する。
-- `scripts/validate-pages-output.ps1`で必須page、local link、公開禁止patternを検査する。
+- `scripts/validate_pages_output.py`で必須page、local link、公開禁止patternを検査する。
 - Pull Requestではbuildと検査だけを行い、artifactをdeployしない。
 - `main`で成功した場合だけ`github-pages` environmentへdeployする。
 
@@ -47,23 +47,23 @@ GitHub公式のJekyll Pages Actionを使用する。
 - `pages/_config.yml`
 - `pages/index.md`
 - `pages/404.md`
-- `pages/assets-manifest.psd1`が列挙した`pages/assets/`配下のasset
+- `pages/assets-manifest.json`が列挙した`pages/assets/`配下のasset
 - Rootの`README.md`、`AGENTS.md`、`CONTRIBUTING.md`、`SECURITY.md`、`LICENSE`
 - `docs/`配下の文書
 
-`pages/assets/`のassetは、`pages/assets-manifest.psd1`が列挙したexact pathだけを公開する。`prepare-pages.ps1`は次を失敗として扱う。
+`pages/assets/`のassetは、`pages/assets-manifest.json`が列挙したexact pathだけを公開する。`prepare_pages.py`は次を失敗として扱う。
 
 - Manifestに無いfileが`pages/assets/`にある
 - Manifestが列挙したfileがdisk上に無い、またはGitの追跡対象でない
 - Binary assetのSHA-256がmanifestと一致しない、または未記録である
-- Text asset（`.css`、`.scss`、`.svg`、`.txt`）が`Sha256`を記録している。編集ごとに古くなるため記録しない
-- Manifestの`Path`が`..`、絶対path、rooted pathを含む
+- Text asset（`.css`、`.scss`、`.svg`、`.txt`）が`sha256`を記録している。編集ごとに古くなるため記録しない
+- Manifestの`path`が`..`、絶対path、rooted pathを含む
 - 承認外の拡張子、または1 MiBを超えるfile
 
-これらの回帰testは`scripts/test-pages-guards.ps1`にあり、Pages workflowで実行する。追加toolは不要である。
+これらの回帰testは`scripts/test_pages_guards.py`にあり、Pages workflowで実行する。追加toolは不要である。
 
-```powershell
-pwsh -File ./scripts/test-pages-guards.ps1
+```bash
+python3 scripts/test_pages_guards.py
 ```
 
 Asset追加前に[公開asset register](../governance/published-asset-register.md)へ出所と再配布許諾を登録し、実機写真ではないimageにはその旨をpage上へ明記する。
@@ -98,10 +98,10 @@ RepositoryのActions defaultは`read`である。`github-pages` environmentは`m
 
 ## ローカルで可能なcheck
 
-Docs / Review端末では追加toolを導入せず、PowerShellで公開sourceを生成・検査する。
+Docs / Review端末では追加toolを導入せず、`python3`の標準ライブラリだけで公開sourceを生成・検査する。
 
-```powershell
-pwsh -File ./scripts/prepare-pages.ps1
+```bash
+python3 scripts/prepare_pages.py
 ```
 
 期待する結果:
@@ -113,8 +113,8 @@ FILES=<count> MARKDOWN=<count> DOCS_COPIED=<count> DOCS_SKIPPED=<count>
 
 Jekyll buildはこの端末では未実施である。GitHub Actionsで`_site/`が生成された後、次を実行する。
 
-```powershell
-pwsh -File ./scripts/validate-pages-output.ps1 -SiteRoot ./_site
+```bash
+python3 scripts/validate_pages_output.py --site-root ./_site
 ```
 
 ## 初回公開後の確認
