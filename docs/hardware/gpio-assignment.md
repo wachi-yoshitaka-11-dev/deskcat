@@ -1,11 +1,11 @@
 # GPIO Assignment
 
-> 状態: Blocked — 実機での電源off導通check、touch controller型番の現物確認、servo起動時状態の安全review待ち
+> 状態: Blocked — 実機での電源off導通check、touch controller型番とMSP2807のlogic IO levelの現物確認、servo起動時状態の安全review待ち
 > 正本とする情報: ESP32 boardのpin割り当て
 
 ## 割り当て規則
 
-- 正確なESP-WROOM-32D開発ボード（秋月M-13628）と搭載moduleの文書を使用する。
+- 正確な現物board（下記「Board識別情報」参照）と搭載moduleの文書を使用する。
 - flash、bootstrapping、USB-UART、board LED、使用制限のあるpinを考慮する。
 - すべてのmoduleについて、電圧と起動時drive stateを確認する。
 - 物理信号ごとに一行を使用する。
@@ -18,9 +18,18 @@
 |---|---|---|
 | Board family | ESP-WROOM-32D開発ボード（秋月電子 M-13628）。Espressif ESP32-DevKitC V4 wide版（38pin、flash pin露出タイプ）のpin配置に相当 | [hardware-bom.md](hardware-bom.md) MCU-01、現物写真（`D0`–`D3`／`CMD`／`CLK`相当のpin露出）、基板裏面silkscreen「`ESP32_DevkitC_V4`」 |
 | 正確なboard revision | 基板自体にrevision表示なし（秋月オリジナル基板のため） | 現物確認済み（`hardware-bom.md` Revision履歴3） |
-| 搭載ESP32 module suffix | ESP-WROOM-32D | 購入履歴（秋月M-13628商品名）、`hardware-bom.md` |
+| 搭載ESP32 module suffix | ESP-WROOM-32D | 購入履歴（秋月 M-13628商品名）、`hardware-bom.md` |
 | 公式回路図revision | 秋月商品ページ添付データシート、および参考として[Espressif ESP32-DevKitC V4 pinout](https://docs.espressif.com/projects/esp-idf/en/v5.1/esp32/hw-reference/esp32/get-started-devkitc.html)。秋月独自基板のため、pin配列がEspressif公式と完全一致するとは限らない点に注意（要現物pin表記との対応確認） | 秋月商品ページ |
 | Firmware board configuration ID | TBD | Toolchain bring-up時（#5）に定義する |
+
+## 電圧domain（すべての外部pull-upに適用）
+
+**この設計に5V logicは存在しない。**ESP32のGPIOは3.3V系であり、周辺moduleも
+すべて3.3Vで給電する（`power-budget.md`の電源rail構成案を参照）。したがって次を守る。
+
+- この文書で「pull-up」と書いた抵抗は、**すべて3.3Vへ接続する**。5Vへ接続しない。
+- 5Vへpull-upすると、ESP32のGPIOと周辺module双方が定格超過となり破損しうる。
+- 5V railはservoとlogic基板への給電にのみ使用し、信号線には一切現れない。
 
 ## ESP32の使用制限pin（Espressif公式資料より、この基板に適用）
 
@@ -43,7 +52,7 @@
 | LCD-DC | DISP-01 | Data／command | Output | GPIO17 | floating | 外部pull不要（WROOM-32Dのため使用可） | Device固有（要現物確認） | なし | WROOM/SOLO-1専用pin。今回のmoduleはWROOM-32Dのため使用可 |
 | LCD-RST | DISP-01 | Reset | Output | GPIO16 | floating | **外部pull-up推奨**（reset非activeをfirmware初期化前も既定にするため） | Pulse timingは現物確認後に決定 | なし | 起動時glitchを防ぐ。Firmwareが最初にHighを出力するまでの間もHighに保つ設計が望ましい |
 | LCD-BL | DISP-01 | Backlight | Output（PWM調光は将来検討） | GPIO4 | floating（Low相当、非点灯） | 外部pull不要 | 現状はdigital on/off。将来PWM調光も可能なpinを選定 | なし | 回路上のLED電流経路はmodule内蔵に依存。直接大電流をdriveしない（module側で電流制限されている前提、現物確認要） |
-| TOUCH-CS | TOUCH-01 | Chip select（touch controller用、LCD-SPIバスを共有） | Output | GPIO21 | 起動時floating→不定 | **外部10kΩ pull-up推奨**（LCD-CSと同じ理由） | Active-low（要現物のpolarity確認） | LCD-01とSCLK／MOSI／MISOを共有 | Touch controller型番は現物確認待ち（`hardware-bom.md` TOUCH-01） |
+| TOUCH-CS | TOUCH-01 | Chip select（touch controller用、LCD-SPIバスを共有） | Output | GPIO21 | 起動時floating→不定 | **外部10kΩ pull-up推奨**（LCD-CSと同じ理由） | Active-low（要現物のpolarity確認） | DISP-01とSCLK／MOSI／MISOを共有 | Touch controller型番は現物確認待ち（`hardware-bom.md` TOUCH-01） |
 | TOUCH-IRQ | TOUCH-01 | Interrupt（touch検出） | Input | GPIO34 | 入力専用、floating | 外部pull-up推奨（一般的なtouch controllerはactive-low IRQ。要現物確認） | Edge／level要確認 | なし | Input-only pin。Output不可のため他用途に転用できない |
 | ACCEL-SDA | ACCEL-01 | I2C SDA | Bidirectional | GPIO25 | floating（open-drain想定） | 外部4.7kΩ pull-up（ADXL345モジュールのon-board pull-upと合成する場合は実効抵抗を確認） | 400kHz(Fast-mode)を想定、要実測 | ENV-01と共有 | ADXL345はI2C／SPI選択式。Interface選択jumperの現物確認が必要（`hardware-bom.md` ACCEL-01） |
 | ACCEL-SCL | ACCEL-01 | I2C SCL | Bidirectional | GPIO26 | 同上 | 同上 | 同上 | ENV-01と共有 | 同上 |
@@ -73,7 +82,9 @@
 - [x] Input-only制約を守っている（GPIO34/35は入力専用として使用）
 - [x] 共有SPI上の各deviceに個別CSがある（LCD: GPIO22、Touch: GPIO21）
 - [x] I2C deviceのaddressが一意、または明示的な対策がある（ADXL345既定0x53、BME280既定0x76／0x77で衝突なし。要現物のaddress pin設定確認）
+- [ ] すべての外部pull-upが3.3Vへ接続され、5Vへ接続されていない（`電圧domain`節で規定済み。ただし実配線が存在しないため未検証）
 - [ ] Moduleのpull-upを並列合成した実効抵抗が有効範囲内である（ADXL345／BME280双方のon-board pull-up有無を現物確認後に計算）
+- [ ] MSP2807のlogic IOが3.3Vで動作することを現物で確認した（VCC 3.3–5V対応だがlogic IOは3.3V TTL。`power-budget.md`参照）
 - [ ] ESP32の電源投入前に外部moduleがESP32 pinをdriveしない（未検証、実機電源offでの導通checkが必要）
 - [ ] Resetとbacklight lineが安全な状態で起動する（LCD-RST/LCD-CSへの外部pull-up実装が前提。未実装のため要対応）
 - [ ] Servo PWMがdisabledまたは承認済みの安全状態で起動する（`tbd-register.md` HW-TBD-019と連動、未解決）
@@ -91,7 +102,9 @@
 
 ## Revision履歴
 
-| 日付 | Revision | 変更 |
-|---|---|---|
-| 2026-07-27 | 0 | 信号inventoryを作成。実GPIO割り当てはすべて引き続きTBD |
-| 2026-08-05 | 1 | Board識別情報を確定（ESP-WROOM-32D開発ボード、秋月M-13628）。Espressif公式ESP32-DevKitC V4のpin制約（flash pin6-11、strapping pin0/2/5/12/15、input-only pin34/35/36/39、WROOM専用pin16/17）を反映し、全信号にGPIOを割り当てた。LCD/Touch CSとLCD RSTには起動時safe state確保のため外部pull-up追加を推奨。競合checkのうち実機確認が必要な項目（電源off導通、pull-up実効抵抗、servo PWM起動時状態）は未完了のまま残した |
+| 日付 | Revision | 変更 | 根拠 |
+|---|---|---|---|
+| 2026-07-27 | 0 | 信号inventoryを作成。実GPIO割り当てはすべて引き続きTBD | — |
+| 2026-08-05 | 1 | Board識別情報を確定（ESP-WROOM-32D開発ボード、秋月 M-13628）。Espressif公式ESP32-DevKitC V4のpin制約（flash pin6-11、strapping pin0/2/5/12/15、input-only pin34/35/36/39、WROOM専用pin16/17）を反映し、全信号にGPIOを割り当てた。LCD/Touch CSとLCD RSTには起動時safe state確保のため外部pull-up追加を推奨。競合checkのうち実機確認が必要な項目（電源off導通、pull-up実効抵抗、servo PWM起動時状態）は未完了のまま残した | [Espressif ESP32-DevKitC V4 pinout](https://docs.espressif.com/projects/esp-idf/en/v5.1/esp32/hw-reference/esp32/get-started-devkitc.html)、`hardware-bom.md` |
+| 2026-08-05 | 2 | 自己レビューで検出: 外部pull-upの接続先電圧を明記していなかったため、`電圧domain`節を追加し、すべてのpull-upを3.3Vへ接続する（5Vへ接続しない）ことを規定。MSP2807はVCC 3.3–5V対応だがlogic IOが3.3V TTLであり、5V給電時の出力levelがメーカー資料でも不明なため、現物確認項目を競合checkへ追加。存在しないRef ID「LCD-01」を「DISP-01」に訂正 | [LCD Wiki MSP2807](http://www.lcdwiki.com/2.8inch_SPI_Module_ILI9341_SKU:MSP2807)の「Logic IO port voltage: 3.3V(TTL)」記載、自己レビュー |
+| 2026-08-05 | 3 | 自己レビューで検出: pull-up電圧の競合check項目を`[x]`（完了）としていたが、実配線が存在しないため検証不能であり`[ ]`へ訂正。文書冒頭の状態にMSP2807のlogic IO level確認を追加 | 自己レビュー |
