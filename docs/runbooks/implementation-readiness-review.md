@@ -133,4 +133,9 @@ Remote GitHub configuration: BASE SETTINGS APPLIED
 GitHub Issue migration: PENDING foundation document publication
 ```
 
-Issue #1から#4までと、#5の残りの開発端末検証に根拠が揃った後、このreviewを再実行する。
+上のgateが`Fail`／`TBD`としているIssueすべてに根拠が揃った後、このreviewを再実行する。
+対象は#1、#2、#3、#4、#5（開発端末検証の残り）、#6、#9である。
+
+`#6`（再現可能なbuild／flash／monitor command）と`#9`（承認済みprotocol制限とfixture）を
+落とさない。Software gateがこの2件をblockerに挙げており、揃わないまま再実行しても
+同じ`Fail`を繰り返すだけになる。

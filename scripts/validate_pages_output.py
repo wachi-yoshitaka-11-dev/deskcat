@@ -696,10 +696,19 @@ def main(argv=None):
             # ときに、気付かないまま公開せずfail-closedで止めるために置く。
             problems.append(f"File type is not approved for Pages: {relative_file}")
 
-        if os.path.getsize(path) > guards.FILE_SIZE_LIMIT:
-            # 上限は`.pages-src`側と同じ`FILE_SIZE_LIMIT`を使う。2026-08-08時点の
-            # `_site`の最大は205894 byteであり、こちらも現状no-opである。
-            problems.append(f"File exceeds the Pages size limit: {relative_file}")
+        try:
+            size = os.path.getsize(path)
+        except OSError:
+            # `iter_tree`はentryとして列挙できるが属性を読めないfileを返す。target不在の
+            # symlinkが典型である。tracebackで落とすと、ここまでに集めた診断を出さずに
+            # 終わり、「何が駄目だったか」ではなく「crashした」だけがlogへ残る。
+            # 読めない事実を診断にして走査は続ける。read不能を成功にはしない。
+            problems.append(f"File metadata could not be read: {relative_file}")
+        else:
+            if size > guards.FILE_SIZE_LIMIT:
+                # 上限は`.pages-src`側と同じ`FILE_SIZE_LIMIT`を使う。2026-08-08時点の
+                # `_site`の最大は205894 byteであり、こちらも現状no-opである。
+                problems.append(f"File exceeds the Pages size limit: {relative_file}")
 
     # 存在確認だけではWindows上でcase違いのfileを存在扱いにする。実際に列挙した
     # fileのcase-sensitiveな集合と突き合わせ、LinuxのPagesと同じ結果にする。
@@ -727,8 +736,15 @@ def main(argv=None):
         # 使うため、診断と実際のscan範囲が食い違わない。
         if not is_scanned_for_secrets(path):
             continue
-        content = guards.get_file_text(path)
         relative_file = guards.path_relative_to_root(path, site_root_path)
+        try:
+            content = guards.get_file_text(path)
+        except OSError:
+            # size読みと同じ理由。scanできなかった事実を残し、走査を続ける。
+            # scan対象と判定したfileを黙って飛ばすと、`UNSCANNED=`にも現れず
+            # 「検査した」ように見える。
+            problems.append(f"File content could not be read: {relative_file}")
+            continue
         if guards.secret_like(content):
             problems.append(f"Secret-like content detected: {relative_file}")
             sensitive_text_files.add(path)
@@ -748,8 +764,17 @@ def main(argv=None):
             attributes_by_file[html_path] = []
             ids_by_file[html_path] = set()
             continue
+        try:
+            content = guards.get_file_text(html_path)
+        except OSError:
+            # 読めないHTMLからはanchorもlinkも取り出せない。読めなかった事実は上の
+            # 内容scanが既に診断へ出しているため、ここでは走査対象から外す。
+            # `scannable_html_count`へ数えないのは、読めなかったfileを「id 0件」として
+            # 数えると、下の「1件もidが無い＝検査側が壊れている」判定が誤作動するため。
+            attributes_by_file[html_path] = []
+            ids_by_file[html_path] = set()
+            continue
         scannable_html_count += 1
-        content = guards.get_file_text(html_path)
         # text nodeに表示された`href=&quot;...&quot;`やcomment内の例示を、実際の
         # navigation属性として扱わない。scannerはcomment、raw-text／RCDATA、quoted属性を
         # 一度の線形走査で区別し、raw-text要素自身の`src`等は開始tagとして保持する。

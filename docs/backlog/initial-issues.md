@@ -9,6 +9,7 @@
 - このfileは、承認した初期backlogの定義と作成順序を残す履歴資料であり、live statusを重複管理しない。
 - Repositoryのlabel、milestone、security設定の適用はGitHub基盤整備として直接完了しているため、遡及Issueを作成していない。
 - GitHub Issue本文では依存関係を実際のIssue番号へ置き換えた。ローカル定義からも対応Issueへ辿れるよう、依存関係をlink化している。
+- 例外は**cargo workspace root**である。`#9`の`root Rust workspace`と`#23`の`Root host workspace`に対応するIssueは無い。[Implementation Readiness Review](../runbooks/implementation-readiness-review.md)のSoftware gateが「Host／firmware workspaceが存在する」を`設計どおりFail`とし、**着手可能なIssueからのみ作成する**と定めているためである。存在しないIssueを探さない。workspaceは最初に必要とするIssueが作る。
 
 > このfile内の`起票時の状態`、`Labels`、受け入れ条件のcheckboxは、**起票時点のsnapshot**である。
 > `status:blocked`等のlabelも当時の値であり、現在の付与状況とは一致しない。
@@ -497,7 +498,7 @@ Raspberry Pi Zero WH実機で対応するRust環境を検証し、direct build�
 
 - Milestone: M2 ESP32–Pi Protocol
 - Labels: `area:protocol`、`area:raspberry-pi`、`type:feature`、`priority:high`
-- 依存関係: [#4](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/4)、root Rust workspace Issue
+- 依存関係: [#4](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/4)、cargo workspace root（Issue化しない。冒頭の注記を参照）
 
 ### 目的
 
@@ -787,7 +788,7 @@ Disconnect、reset、display／sensor同時動作時の安全な動作を検証�
 
 - Milestone: M5 DeskCat MVP
 - Labels: `area:raspberry-pi`、`type:feature`、`priority:normal`
-- 依存関係: Root host workspace、[#12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)、display text機能
+- 依存関係: cargo workspace root（Issue化しない。冒頭の注記を参照）、[#12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)、display text機能
 
 ### 受け入れ条件
 

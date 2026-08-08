@@ -1328,6 +1328,35 @@ class OutputValidatorReparseTests(OutputValidatorTestCase):
             "Symbolic or reparse-point output is not allowed: extra/reparse-directory",
         )
 
+    def test_unreadable_file_is_reported_instead_of_crashing(self):
+        """属性も内容も読めないfileで、検査自体を落とさない。
+
+        `iter_tree`はtarget不在のsymlinkをfile entryとして返す。`os.path.getsize`と
+        `get_file_text`はそこで例外になる。tracebackで終わると、それまでに集めた診断が
+        一つも出ず、logに残るのは「何が駄目か」ではなく「crashした」だけになる。
+        読めなかった事実を診断にして、走査を最後まで続ける。
+
+        target不在のsymlinkでなければこの経路へ入らない。Windowsのjunction（`mklink /J`）
+        はdirectory専用で、`iter_tree`がreparse pointを跨がないためfileとして列挙されない。
+        そのためfile symlinkを使い、作成できない環境ではskipする。
+        """
+        link_path = os.path.join(_state["extra_root"], "dangling.html")
+        missing_target = os.path.join(_state["temporary_root"], "no-such-target.html")
+        try:
+            os.symlink(missing_target, link_path)
+        except (OSError, NotImplementedError, AttributeError):
+            self.skipTest("link creation is not permitted")
+        self.track(link_path)
+        run = self.run_site()
+        self.assert_outcome(
+            run, False, expected_message="File metadata could not be read: extra/dangling.html"
+        )
+        # scan対象の拡張子なので、内容側の診断も出る。黙って飛ばすと`UNSCANNED=`にも
+        # 現れず「検査した」ように見えてしまう。
+        self.assertIn("File content could not be read: extra/dangling.html", run.output)
+        # crashではなく診断で終わっていること。tracebackが出ていれば例外で落ちている。
+        self.assertNotIn("Traceback (most recent call last)", run.output)
+
     def test_reparse_point_site_root_is_rejected(self):
         alias = os.path.join(_state["temporary_root"], "site-root-alias")
         self._create_link(alias, _state["site_root"])
