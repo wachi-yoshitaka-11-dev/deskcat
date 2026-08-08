@@ -50,6 +50,32 @@
 複数のACアダプターを並列に用意する構成は採用しない（Piの電圧低下riskを避けるための
 rail分離は、adapter本体を分けるのではなくbreadboard上のrail分岐とservo直近のbulk capacitorで行う）。
 
+## 5 V ingress（物理的な引き込み経路）
+
+上図の「単一入力源」から`breadboard上で分岐`までの間には、**まだ実在しない物理interface**がある。
+M-12001はMicro-Bオスplugであり、**breadboardへ直接挿せない**。この節が埋まるまで配線を開始しない。
+
+| 項目 | 内容 |
+|---|---|
+| 必要な部品 | Micro-Bメスreceptacleの2.54 mm変換基板（DIP化キット）。M-12001のplugを受け、そこからbreadboard railへ5 V／GNDを引き出す。**未購入・未選定** |
+| 分岐点 | receptacle変換基板の直後にbreadboard railへ入れ、そこからlogic railとservo railへ分ける。**Piの5 V GPIO pinを経由して他へ配らない**（下記の定格問題） |
+| ESP32の5 V入力 | breadboard railからboardの`5V` pinへ入れる。**ESP32のMicro USB portと5V pinを同時に給電しない**。Espressifは3系統（Micro USB／5V pin／3V3 pin）が排他であると明記している |
+| ESP32のUSB portの扱い | Pi linkと flashingに使う（`gpio-assignment.md`のtransport節）。このときUSB VBUSと5V pinの両方から給電される状態になりうる。公式ESP32-DevKitC V4はVBUS保護のSchottky diodeを実装しているが、**この秋月基板が同じ保護を持つかは未確認**。現物の回路確認まで、USB接続と5V pin給電の同時使用を承認しない |
+| Piの5 V入力 | breadboard railからMicro-Bオスcableで`PWR IN`へ入れる。PiのUSB OTG portはPi link専用とし、給電に使わない |
+
+### connector定格の制約（未解決）
+
+Micro-B connectorの一般的な電流定格は約1.8 Aである。一方、負荷表の文献値から見た最悪同時peakは
+ESP32のspike＋Pi stress＋LCD＋servo stallで**2 Aを超えうる**。この場合、単一のMicro-B ingressでは
+connector定格を超える。
+
+したがって次のいずれかが必要であり、**実測まで電源経路を承認しない**。
+
+- 実測でservoを含む同時peakがconnector定格に対し十分な余裕内に収まることを示す
+- または、servo railのingressをMicro-Bを経由しない経路（より定格の高いconnector）へ変更する
+
+この制約は`受け入れ条件`にも数値として記載する。
+
 ## 負荷表
 
 | Rail | 負荷 | 数量 | Typical電流 | 最大連続電流 | Transient／peak | 根拠 | 確度 |
@@ -59,7 +85,7 @@ rail分離は、adapter本体を分けるのではなくbreadboard上のrail分�
 | ESP32 3V3出力 | MSP2807（LCD＋backlight＋touch） | 1 | TBD（メーカー未公開） | TBD | TBD | 秋月商品ページに電流記載なし。logic IOが3.3V TTLのため3.3V給電とする（`電源rail構成案`参照）。backlight込みの電流次第では3V3 pinの供給能力を超える可能性があり、その場合は別途3.3V regulatorが必要 | Blocked（未購入、実測必須） |
 | ESP32 3V3出力 | ADXL345（accelerometer） | 1 | 数百µA程度（測定mode時） | 無視できるほど小さい想定 | 無視できるほど小さい想定 | [ADXL345解説](https://www.digikey.jp/ja/product-highlight/a/analog-devices/adxl345-3-axis-digital-accelerometer)。M-06724はregulator非搭載のため3.3V直結必須（Logic 5V railへは直結しない） | **文献値。実測前** |
 | ESP32 3V3出力 | BME280（environment sensor） | 1 | 数µA〜1mA未満（測定mode時） | 無視できるほど小さい想定 | 無視できるほど小さい想定 | Bosch公式BME280データシート（一般値）。現物付属説明書の電源電圧DC1.71～3.6Vのため5V直結不可（Logic 5V railへは直結しない） | **文献値。実測前** |
-| Servo | TowerPro SG90 | 1 | 数十〜数百mA（動作時、負荷依存） | TBD | データシート値0.5〜2A（負荷依存の広い範囲） | [SG90 datasheet](https://www.mouser.com/catalog/specsheets/Soldered_101246.pdf) | **文献値。実測必須（`tbd-register.md` HW-TBD-006）** |
+| Servo | TowerPro SG90 | 1 | 数十〜数百mA（動作時、負荷依存） | TBD | データシート値0.5〜2A（負荷依存の広い範囲） | [SG90 datasheet](https://www.mouser.com/catalog/specsheets/Soldered_101246.pdf) | **文献値。実測必須（`tbd-register.md` HW-TBD-010／011。model自体はHW-TBD-006で解決済み）** |
 
 **重要**: 上表の大半は「文献値」であり、この文書の目的である実測値ではない。特にLogic railの同時最大peak
 （ESP32 TX spike＋Pi stress＋LCD backlight）とServoのstall電流が重なる最悪caseは、単一電源(M-12001、5V/3A)の
@@ -99,6 +125,9 @@ required_transient_current
 | 項目 | 要件 | 選定値／部品 | 根拠 | 状態 |
 |---|---|---|---|---|
 | 入力電源 | 電圧、連続電流、peak電流 | スイッチングACアダプター MicroBオス 5V／3A（秋月 M-12001） | [秋月商品ページ](https://akizukidenshi.com/catalog/g/g112001/) | Selected（実測でmargin確認要） |
+| **5 V ingress interface** | Micro-Bオスplugを受け、breadboard railへ5 V／GNDを引き出す物理変換 | **未選定**。Micro-Bメスreceptacleの2.54 mm変換基板（DIP化キット）が必要。M-12001のplugはbreadboardへ直接挿せない | `5 V ingress`節 | **Blocked（部品未選定・未購入。これが無いと配線を開始できない）** |
+| ESP32の5 V入力経路 | 3系統（Micro USB／5V pin／3V3 pin）の排他制約を守る | breadboard railから`5V` pinへ入れる。Micro USBはPi linkとflashingに使う | Espressif ESP32-DevKitC V4文書（3系統は排他）。`5 V ingress`節 | **Blocked**（この秋月基板のVBUS保護diode有無が未確認のため、USB接続と5V pin給電の同時使用を未承認） |
+| Piの5 V入力経路 | PWR IN portから給電し、USB OTG portはPi link専用とする | breadboard railからMicro-Bオスcableで`PWR IN`へ | Raspberry Pi Zero W公式回路（PWR INはdata線未接続の給電専用） | Selected（cable未購入） |
 | Logic regulator／経路 | Pi／ESP32／周辺deviceの要件 | 追加regulatorなし。M-12001の5Vをbreadboard rail経由でそのまま供給するのは**PiとESP32 boardのみ**。周辺module3点（MSP2807、ADXL345、BME280）は5V railへ直結せず、ESP32 board上の3V3 pinから給電する（理由は`電源rail構成案`参照） | `hardware-bom.md` PSU-PI-01、DISP-01、TOUCH-01、ACCEL-01、ENV-01 | Selected（同時peak margin、および3V3 pinの供給能力の実測待ち） |
 | Servo regulator／経路 | 正確なservo要件 | 追加regulatorなし。M-12001の5Vをbreadboard上で別railに分岐し、直近にbulk capacitorを配置 | `hardware-bom.md` PSU-SERVO-01 | Selected（bulk capacitor容量は実測待ち） |
 | Backfeed防止 | USB／外部電源の共存 | TBD | 回路図review | Blocked |
@@ -106,23 +135,74 @@ required_transient_current
 | 電流測定用shunt抵抗 | 波形測定の手段（Oscilloscope代替） | セメント抵抗5W0.1Ω（秋月、SQP5WJ0R1B、¥30）×1〜2個。ESP32 ADCで電圧降下をsamplingし、電流波形を近似する | [秋月商品ページ](https://akizukidenshi.com/catalog/g/g117836/) | Selected（Oscilloscope未所持のため、その購入を避けて低costで対応。**低側に挿入すること**。理由は`測定計画`参照） |
 | Local decoupling | 各deviceのデータシートに従う | TBD | データシート | Blocked |
 | Wire gauge／許容電流 | Peak電流と長さ | TBD | 製品資料／計算 | Blocked |
-| Connector定格 | Peak電流と誤接続防止 | TBD | 製品資料 | Blocked |
+| Connector定格 | Peak電流と誤接続防止 | Micro-B connectorの一般的定格は約1.8 A。文献値の最悪同時peak（2 A超）はこれを上回りうる | `5 V ingress`節の`connector定格の制約` | **Blocked（実測で余裕内に収まることを示すか、servo railのingressを高定格connectorへ変更するまで承認しない）** |
 | 過電流保護 | 故障電流の制限 | TBD | Design review | Blocked |
 | 逆極性保護 | 配線リスク | TBD | Design review | Blocked |
 
 ## 測定計画
 
 **測定手段**: Oscilloscopeは所有していないため使用しない。既定手段は、セメント抵抗0.1Ω（shunt）を
-**GND戻り経路側（低側／low-side）**に挿入し、その両端電圧をESP32のADCで高速sampling（数十kHz程度）して
-PCへserial出力する方法（「ESP32＋shunt抵抗によるADC logging」）とする。定常電流はデジタルテスター
-（MAS830L）でも確認できるが、サーボ起動時のms単位の過渡変化にはADC loggingを使う。
+**servo railのGND戻り経路（低側／low-side）**に挿入し、その両端電圧をESP32のADCでsamplingする方法
+（「ESP32＋shunt抵抗によるADC logging」）とする。定常電流はデジタルテスター（MAS830L）でも確認できるが、
+サーボ起動時のms単位の過渡変化にはADC loggingを使う。使用するADC pinは`gpio-assignment.md`で予約済み
+（`ADC-SHUNT`＝GPIO32、`ADC-5V`＝GPIO33、`ADC-3V3`＝GPIO36。すべてADC1）。
+
+### GND topology（測定前に必ず確定させる）
+
+低側shuntをGND戻り経路に入れると、shunt両端に電位差が生じる。この電位差がESP32のGND基準を
+動かすか否かは、**どこにshuntを入れるかで決まる**。曖昧なまま測ると、ESP32側のGNDが浮いて
+全ADC値がずれるか、あるいはservo電流がshuntを迂回して過小評価になる。次の一つに固定する。
+
+```text
+                    ┌── logic戻り（Pi、ESP32、周辺module）──────────┐
+                    │                                              │
+5V ingress GND ●━━━━┷━━ star point（共通GND基準）●                  │
+   (adapter)                      │  ▲                             │
+                                  │  └── ESP32 GND はここへ直結 ────┘
+                                  │      （shuntを経由させない）
+                                  │
+                          ┌───────┴────────┐
+                          │  shunt 0.1Ω    │  ← servo戻りのみが流れる
+                          └───────┬────────┘
+                                  │
+                            servo GND 端子
+```
+
+- **shuntはservo戻り専用**とし、star pointとservo GND端子の間だけに入れる。
+- **ESP32のGNDはstar pointへ直結**し、shuntを経由させない。これによりservo電流はESP32のGND基準を動かさない。
+- ADCが測るのは、**servo GND端子側のnode（GPIO32）を、ESP32 GND＝star pointを基準とした単端測定**である。
+  この電位差がそのまま `I_servo × 0.1Ω` になる。差動amplifierは使わない。
+- 測定される極性が正になるよう、shuntの向き（どちら側をstar pointに繋ぐか）を配線時に記録する。
+- **許容するGND offset**: shunt両端の電位差は最大で `2 A × 0.1Ω = 0.2 V`。この0.2 Vは
+  **servo側にのみ現れ、logic側には現れない**構成であることを、電源off時の導通checkで確認する。
+  logic GNDとservo GNDの間に0.1Ωが入ってしまっている配線は不可とする。
+
+この構成が取れない場合（star pointを作れない、shuntを迂回する戻り経路が残る等）は、
+**測定を実施しない**。誤ったtopologyでの実測値は、電源承認の根拠にしない。
+
+### Sample rateとlog形式
+
+`115200 8N1`のUSB serialは実効約11.5 kB/sであり、16 bit sampleを連続で流すと
+framingを除いても約5.7 kSample/s、text encodeではさらに落ちる。**したがって連続streamingはしない。**
+
+| 項目 | 方式 |
+|---|---|
+| 取得方式 | **burst capture**。ESP32のRAMへ一定期間ぶんを溜め、取得停止後にserialでdumpする。sample rateをserial帯域から切り離す |
+| 必要な時間分解能 | servo起動の過渡はms order。これを追うため**1 kSample/s以上**を必須要件とする |
+| 目標sample rate | 5〜10 kSample/s（ADC1・oneshot loop、Wi-Fi停止時）。**確定値は実機のtransport testで測って記録する**（`tbd-register.md` HW-TBD-014と対） |
+| Wi-Fiの扱い | capture中はWi-Fiを停止する。Wi-Fi動作中はADC sampling rateが大きく落ちる。ADC2はWi-Fi有効時に使用不可のため、そもそも測定へ割り当てていない |
+| buffer長 | 1回のcaptureで最低200 ms（servo起動の突入を含む長さ）。必要RAMは`sample rate × 2 byte × 0.2 s`で見積もる |
+| log形式 | dump時はCSV（`時刻[us],生ADC値`）とし、生値のまま出す。電流への換算は事後にPC側で行い、換算式と分圧比を実験記録へ残す |
+
+上表の「目標sample rate」は未実測の設計目標であり、受け入れの根拠にしない。実測して
+1 kSample/sの必須要件を満たせない場合は、captureのtriggerを絞るか、より高速なtransportへ変更する。
 
 **ADC入力範囲の制約（必ず守る）**: ESP32のADC入力はおおむね0〜3.3Vであり、これを超える電圧を
 直接加えるとpinを破損する。したがって次を守る。
 
 - shuntは必ず低側に置く。高側（5V側）に置くと両端が5V付近になりESP32 ADCで測定できない。
 - 5V railそのものの電圧を観測する場合は、直接ADCへ入れず**分圧抵抗で3.3V未満へ落としてから**入力する。
-  分圧比と使用する抵抗値は、実施前に記録する。
+  分圧比は1/2（10 kΩ／10 kΩ）を既定とし、`gpio-assignment.md`と一致させる。実施時に実測した抵抗値を記録する。
 - 5V系とESP32のGNDは共通化済みである前提に立つ（`確定している制約`参照）。共通GNDでない状態で
   低側shunt測定を行わない。
 
@@ -140,6 +220,8 @@ PCへserial出力する方法（「ESP32＋shunt抵抗によるADC logging」）
 ### サーボ試験
 
 - [ ] 可能であれば機械負荷を外す
+- [ ] `GND topology`節のstar point構成が実配線で成立していることを、電源off時の導通checkで確認する（logic GNDとservo GNDの間にshuntが入っていないこと）
+- [ ] ADC loggingが必須要件の1 kSample/s以上を満たすことを確認し、実測sample rateを記録する
 - [ ] サーボ5 VとESP32 3.3 Vを同時にcaptureする（5V側は分圧してからADCへ入れる。上記「ADC入力範囲の制約」に従う）
 - [ ] 起動時の電源電流を記録する
 - [ ] 小さく低速な動作時の電流を記録する
@@ -160,6 +242,15 @@ PCへserial出力する方法（「ESP32＋shunt抵抗によるADC logging」）
 - 許容するbrownout／reset回数: 受け入れ試験では0回
 - 電源・connector定格に対する最大電流
 
+次は数値制約として既に確定しており、承認時に実測値がこれを満たすことを確認する。
+
+| 制約 | 値 | 根拠 |
+|---|---|---|
+| 5 V ingressのMicro-B connectorを流れる最大電流 | 約1.8 A以下（余裕を含めて判断する） | Micro-B connectorの一般的定格。`5 V ingress`節 |
+| ADC入力へ加える最大電圧 | 3.3 V以下（5 V／3.3 V railは分圧比1/2を経由） | ESP32のADC入力範囲 |
+| ADC loggingのsample rate | 1 kSample/s以上 | servo起動過渡がms orderであるため。`Sample rateとlog形式`節 |
+| logic GNDとservo GND間に許容する直列抵抗 | 0Ω（star point直結。shuntを経由させない） | `GND topology`節 |
+
 ## Revision履歴
 
 | 日付 | Revision | 変更 | 根拠 |
@@ -175,3 +266,4 @@ PCへserial出力する方法（「ESP32＋shunt抵抗によるADC logging」）
 | 2026-08-05 | 8 | 自己レビューで検出: MSP2807をLogic 5V railへ接続する構成にしていたが、同moduleのlogic IOは3.3V TTLであり、5V給電時に出力が5VになるとESP32 GPIOを破損しうる。level shiftの有無はメーカー資料でも不明なため、安全側に倒して3.3V給電へ変更。あわせて、3V3 railの負荷にMSP2807(backlight込みで電流未確認)が加わったため、3V3 pinの供給能力を超える場合は別途3.3V regulatorを追加する旨を明記 | [LCD Wiki MSP2807](http://www.lcdwiki.com/2.8inch_SPI_Module_ILI9341_SKU:MSP2807)の「Logic IO port voltage: 3.3V(TTL)」記載、自己レビュー |
 | 2026-08-05 | 9 | 自己レビューで検出: 容量計算で`ESP32 3V3出力` railを独立電源のように扱うと入力電源の容量を過小評価するため、3V3 railが5V railから作られている従属関係と、5V側の消費に含める旨を明記。あわせてrail構成図のtree枝記号の誤り（同階層に`└─`が2つ）と冗長行を修正し、「3系統合計」という不正確な表現を「3V3 railに接続する3moduleの合計」へ訂正 | 自己レビュー |
 | 2026-08-05 | 10 | 自己レビューで検出: Revision 8でMSP2807を3.3V給電へ変更した際、配線・保護表の`Logic regulator／経路`行と測定計画の3V3実測項目が5V給電のままで、文書内に矛盾が残っていた。両者を3.3V給電（周辺module3点）に統一 | 自己レビュー |
+| 2026-08-05 | 11 | レビュー指摘3件を反映。(a) M-12001はMicro-Bオスplugでbreadboardへ直接挿せないが、そこからrailまでの物理interfaceが未定義だったため`5 V ingress`節を新設し、必要な変換基板（未購入）、ESP32の3系統排他制約、Piの給電port分離を明記。あわせてMicro-B connector定格（約1.8 A）に対し文献値の最悪同時peakが2 Aを超えうる問題を記載し、実測または高定格connectorへの変更まで電源経路を承認しない旨をConnector定格行へ反映。(b) `数十kHz程度`のsample rateが115200 baud（実効約11.5 kB/s、16 bit連続で約5.7 kSample/s）では到達不能だったため、連続streamingを止めてburst capture＋事後dump方式へ変更し、必須要件1 kSample/s・目標5〜10 kSample/s・buffer長・log形式を規定。(c) 低側shuntの挿入位置とADCの基準nodeが未定義で、共通GNDだとservo電流がESP32のGND基準を動かす問題があったため、`GND topology`節を新設しstar point構成（shuntはservo戻り専用、ESP32 GNDはstar point直結）を図示。許容GND offsetと、topologyが取れない場合は測定しない旨も明記 | [PR #55レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/55)、Raspberry Pi Zero W公式回路（PWR INはdata線未接続）、Espressif ESP32-DevKitC V4文書（電源3系統は排他）、115200 8N1の実効throughput |
