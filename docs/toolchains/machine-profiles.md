@@ -38,7 +38,7 @@ OS は上記の標準OSに従う。次の表は、標準OS の上で profile ご
 | Host Rust Development | 純粋ロジック、Pi 側 crate、シミュレータ | Docs / Review 要件、Rust stable、Cargo、linker、rustfmt、Clippy。USB 不要のため Docker 上の Linux でもよい | ESP32 Xtensa toolchain、実機 |
 | ESP32 Build | firmware 生成、format、lint、build | Host Rust 要件、`espup`、`ldproxy`、ESP-IDF の前提ツール。build-only なら Docker 上の Linux でもよい | USB 接続は build-only なら不要 |
 | ESP32 Flash / HIL | flash、serial monitor、実機検証 | ESP32 Build 要件、`espflash`、`libudev` と USB permission、対象ボード、人間の監視。**実機 Linux に限る** | 未確認の周辺回路やサーボ出力、VM と container 上での実行 |
-| Raspberry Pi Runtime | `deskcatd` の実行、実機ログ | Pi Zero WH、対応 Raspberry Pi OS、Rust 実行物、Git または配布物 | ESP32 toolchain |
+| Raspberry Pi Runtime | `deskcatd` の実行、実機ログ | Pi Zero W、対応 Raspberry Pi OS、Rust 実行物、Git または配布物 | ESP32 toolchain |
 | Raspberry Pi Direct Build | Pi 上での最小 build 検証 | Runtime 要件、Rust stable、Cargo、native linker、空き容量 | Cross compiler |
 | CI | 再現可能な自動検証 | 固定 runner（`ubuntu-24.04`）、pin 済み action、秘密情報を使わない build | flash と無人実機駆動 |
 
