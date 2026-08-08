@@ -63,11 +63,34 @@ M-12001はMicro-Bオスplugであり、breadboardへ直接挿せない。
 
 | 段階 | 引き込み方 | 追加部品 | 通せる電流 |
 |---|---|---|---|
-| bring-up前半（**現在ここ**） | M-12001のplugをPiの`PWR IN`へ直挿しし、Piの5 V GPIO pin（2番／4番）からbreadboard railへ引き出す。PiのPWR INは5 V railと直結している | **不要（手持ちのjumperとpin headerで足りる）** | logic側のみ（文献値で合計0.5 A程度）。**servoは繋がない** |
+| bring-up前半（**現在ここ**） | M-12001のplugをPiの`PWR IN`へ直挿しし、Piの5 V GPIO pin（2番／4番）からbreadboard railへ引き出す。PiのPWR INは5 V railと直結している | **不要（手持ちのjumperとpin headerで足りる）** | 下記のgateまで。**servoは繋がない** |
 | servo試験以降 | 下表の変換基板でMicro-Bを受け、railへ引き出す。Piへは別途Micro-Bオスcableで給電する | Micro-Bメス変換基板、Micro-Bオスcable。**未購入** | ingress定格まで（下記`connector定格の制約`） |
 
-前半でPi経由の給電を許すのは、logic側の合計電流がconnector定格に対して十分小さいためである。
 **servo電流をPiのconnectorとPCB traceへ通してはならない。**servoを繋ぐ前に、必ず下段の構成へ移す。
+
+#### Pi直挿しmodeの電流gate
+
+前半でPi経由の給電を許すのは、logic側だけなら電流が小さいと**見込んでいる**ためであり、
+実測に基づく判断ではない。文献値を足すだけでも次のとおりで、**確定した小さい値は存在しない**。
+
+| 負荷 | 文献値 |
+|---|---|
+| ESP32 board | 定常は約240 mA（Wi-Fi TX）。短時間のspikeは最大約500 mA |
+| Raspberry Pi Zero W | typical 約140 mA。stress時 最大約350 mA |
+| MSP2807（3V3経由、5V側換算） | **未確認**。backlightを含む値がメーカー未公開 |
+
+したがって文献値だけでも瞬時に0.85 Aを超えうるうえ、MSP2807ぶんが未知である。
+「合計0.5 A程度」という見積もりは根拠がないため採らない。代わりにgateを設ける。
+
+- **上限**: PiのPWR INを通る合計電流の実測値が**1.0 Aを超えたら、Pi直挿しmodeを直ちに中止する。**
+  超えた時点で先へ進まず、変換基板構成（下段）へ移してから測定を続ける。
+- **この1.0 Aの根拠（design margin）**: Micro-B connectorの一般的定格は約1.8 A。
+  そこに約1.8倍の余裕を取った値である。Piの内部traceには本projectで確認した定格が無いため、
+  connector定格側だけで判断せず、余裕を厚めに取っている。
+- **測り方**: 一度に全部を繋がず、`測定計画`の順で段階的に足しながら測る。
+  各段階で上限を超えていないことを確認してから次を足す。
+
+このgateは`受け入れ条件`にも数値として記載している。
 
 servo試験以降で用いる構成を次に定める。
 
@@ -164,7 +187,7 @@ required_transient_current
 | 入力電源 | 電圧、連続電流、peak電流 | スイッチングACアダプター MicroBオス 5V／3A（秋月 M-12001） | [秋月商品ページ](https://akizukidenshi.com/catalog/g/g112001/) | Selected（実測でmargin確認要） |
 | **5 V ingress interface** | Micro-Bオスplugを受け、breadboard railへ5 V／GNDを引き出す物理変換 | **未購入**。候補はMicro-Bメスreceptacleの2.54 mm変換基板（秋月 g110972、定格1ピン1.5 A）。bring-up前半はM-12001をPiの`PWR IN`へ直挿しして代用する | `5 V ingress`節の段階表 | **Blocked（servo試験までに購入・実装が必要。前半はPi直挿しで進行可）** |
 | ESP32の5 V入力経路 | 3系統（Micro USB／5V pin／3V3 pin）の排他制約を守る | **未決定。**案A（PiからのUSB VBUS単独給電、既定候補）と案B（`5V` pin給電＋USBはdata用）のいずれか | Espressif ESP32-DevKitC V4文書（3系統は排他）。`ESP32の給電経路（未決定）`節 | **Blocked**（案AはPiのUSB port供給能力が未実測、案Bはこの秋月基板のVBUS保護diode有無が未確認） |
-| Piの5 V入力経路 | PWR IN portから給電し、USB OTG portはPi link専用とする | breadboard railからMicro-Bオスcableで`PWR IN`へ | Raspberry Pi Zero W公式回路（PWR INはdata線未接続の給電専用） | Selected（cable未購入） |
+| Piの5 V入力経路 | PWR IN portから給電し、USB OTG portはPi link専用とする | servo試験以降: breadboard railからMicro-Bオスcableで`PWR IN`へ。bring-up前半: M-12001を`PWR IN`へ直挿しし、Piの5 V GPIO pinからrailを作る。**この前半modeは実測合計1.0 Aを上限とし、超えたら中止する**（`Pi直挿しmodeの電流gate`） | Raspberry Pi Zero W公式回路（PWR INはdata線未接続の給電専用）。上限の根拠は`Pi直挿しmodeの電流gate` | Selected（cable未購入。前半modeはgate付きで承認） |
 | Logic regulator／経路 | Pi／ESP32／周辺deviceの要件 | 追加regulatorなし。M-12001の5Vをbreadboard rail経由でそのまま供給するのは**Piのみ確定**（ESP32は上行のとおり給電経路が未決定）。周辺module3点（MSP2807、ADXL345、BME280）は5V railへ直結せず、ESP32 board上の3V3 pinから給電する（理由は`電源rail構成案`参照） | `hardware-bom.md` PSU-PI-01、DISP-01、TOUCH-01、ACCEL-01、ENV-01 | Blocked（ESP32の給電経路が未決定。加えて同時peak marginと3V3 pinの供給能力が未実測） |
 | Servo regulator／経路 | 正確なservo要件 | 追加regulatorなし。M-12001の5Vをbreadboard上で別railに分岐し、直近にbulk capacitorを配置 | `hardware-bom.md` PSU-SERVO-01 | Selected（bulk capacitor容量は実測待ち） |
 | Backfeed防止 | USB／外部電源の共存 | TBD | 回路図review | Blocked |
@@ -259,9 +282,16 @@ breadboard railを作る（`5 V ingress`節の段階表）。**servoはまだ繋
 - [ ] Connectorの極性を確認する
 - [ ] 確認済み部品に適した電流制限を設定する
 - [ ] 無負荷の各railを測定する
+- [ ] **Pi直挿しmodeの電流gateに従い、段階的に測る。**各段階でPiの`PWR IN`を通る合計電流を記録し、
+      **1.0 Aを超えた時点で中止**して変換基板構成へ移す
+  - [ ] 段階1: Piのみ（ESP32・周辺module未接続）
+  - [ ] 段階2: ＋ESP32（Wi-Fi停止、idle）
+  - [ ] 段階3: ＋ESP32のWi-Fi TXを動作させた状態
+  - [ ] 段階4: ＋MSP2807（backlight点灯を含む）
+  - [ ] 段階5: ＋ADXL345、BME280
 - [ ] ESP32 board上3V3 pinの外部供給可能電流の定格を確認し、周辺module3点（MSP2807、ADXL345、BME280）を接続した状態で3V3 rail電圧と電流を実測する。3V3 pinの供給能力を超える場合は別途3.3V regulatorを追加する
 - [ ] **ESP32の給電経路を確定させる**（`ESP32の給電経路（未決定）`節）。案A: PiのUSB OTG portからESP32＋3V3負荷を給電したときの電流とESP32入力電圧を実測し、undervoltageもPi側のbrownoutも起きないことを確認する。不足する場合は案Bへ切り替え、そのとき秋月基板のVBUS保護diodeの有無を回路で確認してから`5V` pinとUSBを同時接続する
-- [ ] サーボなしでlogicへ給電し、電流を記録する
+- [ ] サーボなしでlogicへ給電し、電流を記録する（上記の段階測定の結果をそのまま用いる）
 - [ ] UndervoltageなしでESP32とPiがbootすることを確認する
 - [ ] 外部電源とUSB間のbackfeed動作を確認する
 
@@ -299,6 +329,7 @@ Pi直挿しのままservoを繋ぐと、servo電流がPiのconnectorとPCB trace
 | 制約 | 値 | 根拠 |
 |---|---|---|
 | 5 V ingressのMicro-B connectorを流れる最大電流 | 約1.8 A以下（余裕を含めて判断する） | Micro-B connectorの一般的定格。`5 V ingress`節 |
+| **bring-up前半（Pi直挿しmode）でPiの`PWR IN`を通る合計電流** | **1.0 A以下。超えたら直ちに中止し、変換基板構成へ移す** | Micro-B定格 約1.8 Aに対し約1.8倍の余裕。Piの内部traceの定格は未確認のため厚めに取った。`Pi直挿しmodeの電流gate` |
 | ADC入力へ加える最大電圧 | 3.3 V以下（5 V／3.3 V railは分圧比1/2を経由） | ESP32のADC入力範囲 |
 | ADC loggingのsample rate | 1 kSample/s以上 | servo起動過渡がms orderであるため。`Sample rateとlog形式`節 |
 | logic GNDとservo GND間に許容する直列抵抗 | 0Ω（star point直結。shuntを経由させない） | `GND topology`節 |
@@ -322,4 +353,5 @@ Pi直挿しのままservoを繋ぐと、servo電流がPiのconnectorとPCB trace
 | 2026-08-05 | 12 | 自己レビューで検出: Revision 11で追加した`5 V ingress`節が、ESP32を`5V` pinから給電すると書きながら、同じ節で「USB接続と5V pin給電の同時使用を承認しない」とも書いており矛盾していた。Pi linkがUSB serialである以上、Pi接続時点でVBUSは通電するため、この2つは両立しない。`ESP32の給電経路（未決定）`節を新設して案A（USB VBUS単独給電、既定候補）と案B（`5V` pin給電）を並べ、未決定であることを明示。rail構成図、配線・保護表の2行、測定計画も同じ状態へ揃えた。あわせて0.1Ω shuntの低電流側の精度限界（実用域は約1 A以上）を測定計画へ追記し、`受け入れ条件`への記載を「記載する」から「記載している」へ訂正 | 自己レビュー、Espressif ESP32-DevKitC V4文書（電源3系統は排他）、ESP32 ADCの入力直線性 |
 | 2026-08-05 | 13 | 自己レビューで検出: `Sample rateとlog形式`表が、ADC sample rateの確定を`HW-TBD-014`と対にすると書いていたが、`HW-TBD-014`はPi linkのbaudと最大line長であり測定treatmentのsample rateとは別物である。誤った対応付けを削除し、dumpに使うbaudは測定用に別途選んでよい旨へ訂正。`GND topology`の図が枝の接続関係を読み取りにくかったため描き直した。`tbd-register.md`側では、BOMで識別済みの`HW-TBD-015`（microSD）と`HW-TBD-016`（color sensor）が識別情報を未反映のまま残っていたため、確定部分と残作業を書き分けた | 自己レビュー、[tbd-register.md](tbd-register.md)、[hardware-bom.md](hardware-bom.md) SD-01／COLOR-01 |
 | 2026-08-08 | 15 | 5 V ingressの記述が「変換基板が無いと配線を開始できない」と過大だったため、段階表を追加して訂正した。bring-up前半はM-12001をPiの`PWR IN`へ直挿しし、Piの5 V GPIO pinからbreadboard railを作れば**追加購入なしで通電できる**（logic側のみ、servoは繋がない）。servo試験の直前に変換基板構成へ移す。候補変換基板（秋月 g110972）の定格が1ピン1.5 Aと、記載していた「Micro-B一般定格 約1.8 A」より低いことも反映した。購入は前半の実測後で足り、実電流に基づいて品を選べる | ユーザーからの指摘（購入済み5点にingress部品が含まれていない）、[秋月 g110972](https://akizukidenshi.com/catalog/g/g110972/)の定格、Raspberry Pi Zero W公式回路（PWR INと5 V GPIO pinは直結） |
+| 2026-08-08 | 16 | レビュー指摘2件を反映。(a) Pi直挿しmodeを「文献値で合計0.5 A程度」と正当化していたが、これは根拠が無い。ESP32のspikeだけで約500 mA、Pi stressで約350 mA、MSP2807は未確認であり、文献値だけでも瞬時に0.85 Aを超えうる。`Pi直挿しmodeの電流gate`節を新設し、実測合計**1.0 Aを上限**として超えたら直ちに中止する条件、その1.0 AをMicro-B定格約1.8 Aに対する約1.8倍の余裕として選んだdesign marginの根拠、および段階的に負荷を足しながら測る手順を定めた。配線・保護表の`Piの5 V入力経路`行、測定計画の`サーボ接続前`、`受け入れ条件`の数値表にも同じgateを反映した。(b) Revision履歴で2026-08-08の行が古い行より前に挿入されていたため日付順へ並べ直した | [PR #57レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/57)、負荷表の文献値 |
 | 2026-08-05 | 14 | レビュー指摘1件を反映。Revision 13で「dumpに使うbaudは測定用に別途選んでよい」と書いたのは誤りだった。Pi–ESP32間のUSB serialは1本しかなく、Protocolがそのbaudを共有transport parameterとして持つため、片側だけ別baudにはできない。dumpは`HW-TBD-014`／`PROTO-TBD-001`が決めるbaudをそのまま使うことにし、baudを変える場合はProtocol側と揃えて決定を変える扱いとした。あわせて、生CSVをJSON Lines channelへ流すとProtocolの「送信するすべてのbyteは有効にframe化されたmessageの一部でなければならない」要件に反するため、CSV出力はProtocolが動作していない専用の測定modeに限る条件を明記した | [PR #55レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/55)、[protocol](../protocol/esp32-pi-protocol.md)§2のtransport表とframing要件 |

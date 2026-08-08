@@ -70,7 +70,7 @@
 
 各行を`Selected`へ変更する前に、次を確認する。
 
-> **現状（2026-08-05）**: 下のchecklistは**どの部品についても未完了**である。
+> **現状（2026-08-08時点）**: 下のchecklistは**どの部品についても未完了**である。
 > `状態`列の`Selected`は「初期製作で使用する予定」（上の状態ラベル定義）を表しており、
 > **受け入れ完了を意味しない**。特に次の点が未了である。
 >
@@ -105,8 +105,9 @@
 | 2026-08-05 | 5 | PSU-PI-01／PSU-SERVO-01を秋月 M-12001（5V3A）1個の単一入力源＋breadboard上での2rail分岐に確定。当初提案した「ACアダプター2個を別々に用意する」設計は誤りのため訂正し、`power-budget.md`のTBD wired source構成（単一入力→logic／servoへ分岐）に合わせた | ユーザーからの指摘、`power-budget.md`の電源rail構成案 |
 | 2026-08-05 | 6 | PROTO-01を手持ちのbreadboard／mini breadboard／クリップ付コード／ピンヘッダに確定 | 現物写真・購入履歴 |
 | 2026-08-05 | 7 | 自己レビューで検出: ACCEL-01(ADXL345, M-06724)とENV-01(BME280)はどちらも定格上限3.6Vのregulator非搭載moduleであるため、`power-budget.md`のLogic 5V railへ直結しないことを明記。ESP32 board上の3.3V出力(3V3 pin)から給電する | Akizuki M-06724商品情報、BME280モジュール付属説明書の電源電圧記載 |
-| 2026-08-08 | 9 | Revision 8で追加した未購入部品3点（`PSU-INGRESS-01`／`CABLE-PI-PWR-01`／`CABLE-PI-LINK-01`）について、「これが無いと配線を開始できない」という記述が過大だったため訂正した。前2者はservo試験の直前まで不要（それまではM-12001をPiの`PWR IN`へ直挿しする）、`CABLE-PI-LINK-01`はM2のprotocol実装まで不要である。`PSU-INGRESS-01`には候補品（秋月 g110972、定格1ピン1.5 A）を記載した | ユーザーからの指摘（購入済み5点にこれらが含まれていない）、[power-budget.md](power-budget.md)の`5 V ingress`節の段階表 |
 | 2026-08-05 | 8 | `power-budget.md`と`gpio-assignment.md`のレビュー対応で必要と判明した部品4点をBOMへ追加した。いずれも未購入である。`PSU-INGRESS-01`（Micro-Bメスreceptacle変換基板。M-12001のplugをbreadboardへ引き込む手段が無かった）、`CABLE-PI-PWR-01`（Piの`PWR IN`への給電cable）、`CABLE-PI-LINK-01`（Pi–ESP32のUSB serial link用OTG cable。案Aではこれが給電も兼ねる）、`MEAS-01`（電流測定用のshunt抵抗と分圧抵抗） | [PR #55レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/55)、[power-budget.md](power-budget.md)の`5 V ingress`節、[gpio-assignment.md](gpio-assignment.md)のtransport節 |
-| 2026-08-05 | 8 | 自己レビューで検出: DISP-01／TOUCH-01(MSP2807)の電源欄が「3.3–5V」だけの記載で、logic IOが3.3V TTLである点が抜けていた。5V給電時にmodule出力が5Vになる場合ESP32 GPIOを破損しうるが、level shiftの有無はメーカー資料でも不明なため、安全側に倒して3.3V給電とすることを明記 | [LCD Wiki MSP2807](http://www.lcdwiki.com/2.8inch_SPI_Module_ILI9341_SKU:MSP2807)の「Logic IO port voltage: 3.3V(TTL)」記載 |
-| 2026-08-05 | 9 | 自己レビューで検出: 本文書の規則は「部品受け入れchecklistを確認してから`Selected`にする」と定めているが、Revision 1〜8で未購入・未実測の部品も`Selected`にしており、checklistは全部品で未完了のままだった。`Selected`が受け入れ完了を意味しないこと、および未了項目をchecklist冒頭に明記した | 自己レビュー |
-| 2026-08-05 | 10 | 自己レビューで検出: PSU-PI-01が`power-budget.md`の既に存在しない文言「TBD wired source」を引用していたため実際の節名へ修正。PSU-SERVO-01のbulk capacitorを「型番・容量はTBD」としていたが、`power-budget.md`では候補（ルビコンWXA 470μF16V）が確定済みで記述がずれていたため揃えた | 自己レビュー |
+| 2026-08-05 | 9 | 自己レビューで検出: DISP-01／TOUCH-01(MSP2807)の電源欄が「3.3–5V」だけの記載で、logic IOが3.3V TTLである点が抜けていた。5V給電時にmodule出力が5Vになる場合ESP32 GPIOを破損しうるが、level shiftの有無はメーカー資料でも不明なため、安全側に倒して3.3V給電とすることを明記 | [LCD Wiki MSP2807](http://www.lcdwiki.com/2.8inch_SPI_Module_ILI9341_SKU:MSP2807)の「Logic IO port voltage: 3.3V(TTL)」記載 |
+| 2026-08-05 | 10 | 自己レビューで検出: 本文書の規則は「部品受け入れchecklistを確認してから`Selected`にする」と定めているが、Revision 1〜8で未購入・未実測の部品も`Selected`にしており、checklistは全部品で未完了のままだった。`Selected`が受け入れ完了を意味しないこと、および未了項目をchecklist冒頭に明記した | 自己レビュー |
+| 2026-08-05 | 11 | 自己レビューで検出: PSU-PI-01が`power-budget.md`の既に存在しない文言「TBD wired source」を引用していたため実際の節名へ修正。PSU-SERVO-01のbulk capacitorを「型番・容量はTBD」としていたが、`power-budget.md`では候補（ルビコンWXA 470μF16V）が確定済みで記述がずれていたため揃えた | 自己レビュー |
+| 2026-08-08 | 12 | Revision 8で追加した未購入部品3点（`PSU-INGRESS-01`／`CABLE-PI-PWR-01`／`CABLE-PI-LINK-01`）について、「これが無いと配線を開始できない」という記述が過大だったため訂正した。前2者はservo試験の直前まで不要（それまではM-12001をPiの`PWR IN`へ直挿しする）、`CABLE-PI-LINK-01`はM2のprotocol実装まで不要である。`PSU-INGRESS-01`には候補品（秋月 g110972、定格1ピン1.5 A）を記載した | ユーザーからの指摘（購入済み5点にこれらが含まれていない）、[power-budget.md](power-budget.md)の`5 V ingress`節の段階表 |
+| 2026-08-08 | 13 | レビュー指摘2件を反映。(a) 受け入れchecklistのsnapshot日付が`2026-08-05`のままで、同じ節に記載した2026-08-08の着荷と食い違っていたため`2026-08-08時点`へ更新した。(b) Revision履歴でRevision 8と9が重複し、2026-08-08の行が古い行より前に挿入されていた。番号を一意にし、日付順へ並べ直した | [PR #57レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/57) |
