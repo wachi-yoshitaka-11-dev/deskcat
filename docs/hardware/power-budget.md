@@ -207,13 +207,17 @@ framingを除いても約5.7 kSample/s、text encodeではさらに落ちる。*
 |---|---|
 | 取得方式 | **burst capture**。ESP32のRAMへ一定期間ぶんを溜め、取得停止後にserialでdumpする。sample rateをserial帯域から切り離す |
 | 必要な時間分解能 | servo起動の過渡はms order。これを追うため**1 kSample/s以上**を必須要件とする |
-| 目標sample rate | 5〜10 kSample/s（ADC1・oneshot loop、Wi-Fi停止時）。**確定値は実機で測って実験記録へ残す**。これは測定treatmentのparameterであり、Pi linkのbaudを決める`HW-TBD-014`とは別物である（dumpに使うbaudは測定用に別途選んでよい） |
+| 目標sample rate | 5〜10 kSample/s（ADC1・oneshot loop、Wi-Fi停止時）。**確定値は実機で測って実験記録へ残す**。sample rate自体は測定treatmentのparameterであり、`HW-TBD-014`が決めるlinkのbaudとは別のfieldである |
+| dumpに使うbaud | **`HW-TBD-014`／`PROTO-TBD-001`で決めるlinkのbaudをそのまま使う。**測定用に別のbaudを勝手に選ばない。Pi–ESP32間のUSB serialは1本しかなく、Protocolがそのbaudを共有transport parameterとして持つ（[protocol](../protocol/esp32-pi-protocol.md)の§2）。別baudを使うなら、Protocolを停止する測定modeと両端の再設定手順、通常channelとの排他を先に定義する必要がある |
 | Wi-Fiの扱い | capture中はWi-Fiを停止する。Wi-Fi動作中はADC sampling rateが大きく落ちる。ADC2はWi-Fi有効時に使用不可のため、そもそも測定へ割り当てていない |
 | buffer長 | 1回のcaptureで最低200 ms（servo起動の突入を含む長さ）。必要RAMは`sample rate × 2 byte × 0.2 s`で見積もる |
 | log形式 | dump時はCSV（`時刻[us],生ADC値`）とし、生値のまま出す。電流への換算は事後にPC側で行い、換算式と分圧比を実験記録へ残す |
+| CSVを出してよい条件 | **Protocolが動作していない専用の測定modeでのみ出力する。**[Protocol](../protocol/esp32-pi-protocol.md)は「channelから送信するすべてのbyteは有効にframe化されたmessageの一部でなければならない」と定めており、生CSVをJSON Lines channelへ混ぜるとこれに反してPi側のparseを壊す。測定firmwareはProtocol sessionを確立せず、同じlinkでJSON LinesとCSVを同時に流さない。Protocol稼働中に採取したい場合はsampleをProtocol messageへ載せる必要があり、それはProtocol側の変更であってこの文書の範囲外である |
 
 上表の「目標sample rate」は未実測の設計目標であり、受け入れの根拠にしない。実測して
-1 kSample/sの必須要件を満たせない場合は、captureのtriggerを絞るか、より高速なtransportへ変更する。
+1 kSample/sの必須要件を満たせない場合は、captureのtriggerを絞るか、buffer長を縮めて対応する。
+**linkのbaudを測定の都合で上げる場合は、`HW-TBD-014`／`PROTO-TBD-001`の決定そのものを
+変える扱いとし、Protocol側と揃えて確定させる。**片側だけ変更しない。
 
 **ADC入力範囲の制約（必ず守る）**: ESP32のADC入力はおおむね0〜3.3Vであり、これを超える電圧を
 直接加えるとpinを破損する。したがって次を守る。
@@ -293,3 +297,4 @@ framingを除いても約5.7 kSample/s、text encodeではさらに落ちる。*
 | 2026-08-05 | 11 | レビュー指摘3件を反映。(a) M-12001はMicro-Bオスplugでbreadboardへ直接挿せないが、そこからrailまでの物理interfaceが未定義だったため`5 V ingress`節を新設し、必要な変換基板（未購入）、ESP32の3系統排他制約、Piの給電port分離を明記。あわせてMicro-B connector定格（約1.8 A）に対し文献値の最悪同時peakが2 Aを超えうる問題を記載し、実測または高定格connectorへの変更まで電源経路を承認しない旨をConnector定格行へ反映。(b) `数十kHz程度`のsample rateが115200 baud（実効約11.5 kB/s、16 bit連続で約5.7 kSample/s）では到達不能だったため、連続streamingを止めてburst capture＋事後dump方式へ変更し、必須要件1 kSample/s・目標5〜10 kSample/s・buffer長・log形式を規定。(c) 低側shuntの挿入位置とADCの基準nodeが未定義で、共通GNDだとservo電流がESP32のGND基準を動かす問題があったため、`GND topology`節を新設しstar point構成（shuntはservo戻り専用、ESP32 GNDはstar point直結）を図示。許容GND offsetと、topologyが取れない場合は測定しない旨も明記 | [PR #55レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/55)、Raspberry Pi Zero W公式回路（PWR INはdata線未接続）、Espressif ESP32-DevKitC V4文書（電源3系統は排他）、115200 8N1の実効throughput |
 | 2026-08-05 | 12 | 自己レビューで検出: Revision 11で追加した`5 V ingress`節が、ESP32を`5V` pinから給電すると書きながら、同じ節で「USB接続と5V pin給電の同時使用を承認しない」とも書いており矛盾していた。Pi linkがUSB serialである以上、Pi接続時点でVBUSは通電するため、この2つは両立しない。`ESP32の給電経路（未決定）`節を新設して案A（USB VBUS単独給電、既定候補）と案B（`5V` pin給電）を並べ、未決定であることを明示。rail構成図、配線・保護表の2行、測定計画も同じ状態へ揃えた。あわせて0.1Ω shuntの低電流側の精度限界（実用域は約1 A以上）を測定計画へ追記し、`受け入れ条件`への記載を「記載する」から「記載している」へ訂正 | 自己レビュー、Espressif ESP32-DevKitC V4文書（電源3系統は排他）、ESP32 ADCの入力直線性 |
 | 2026-08-05 | 13 | 自己レビューで検出: `Sample rateとlog形式`表が、ADC sample rateの確定を`HW-TBD-014`と対にすると書いていたが、`HW-TBD-014`はPi linkのbaudと最大line長であり測定treatmentのsample rateとは別物である。誤った対応付けを削除し、dumpに使うbaudは測定用に別途選んでよい旨へ訂正。`GND topology`の図が枝の接続関係を読み取りにくかったため描き直した。`tbd-register.md`側では、BOMで識別済みの`HW-TBD-015`（microSD）と`HW-TBD-016`（color sensor）が識別情報を未反映のまま残っていたため、確定部分と残作業を書き分けた | 自己レビュー、[tbd-register.md](tbd-register.md)、[hardware-bom.md](hardware-bom.md) SD-01／COLOR-01 |
+| 2026-08-05 | 14 | レビュー指摘1件を反映。Revision 13で「dumpに使うbaudは測定用に別途選んでよい」と書いたのは誤りだった。Pi–ESP32間のUSB serialは1本しかなく、Protocolがそのbaudを共有transport parameterとして持つため、片側だけ別baudにはできない。dumpは`HW-TBD-014`／`PROTO-TBD-001`が決めるbaudをそのまま使うことにし、baudを変える場合はProtocol側と揃えて決定を変える扱いとした。あわせて、生CSVをJSON Lines channelへ流すとProtocolの「送信するすべてのbyteは有効にframe化されたmessageの一部でなければならない」要件に反するため、CSV出力はProtocolが動作していない専用の測定modeに限る条件を明記した | [PR #55レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/55)、[protocol](../protocol/esp32-pi-protocol.md)§2のtransport表とframing要件 |
