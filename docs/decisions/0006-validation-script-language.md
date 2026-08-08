@@ -105,18 +105,27 @@ secretと個人pathのpatternは`scripts/lib/publish_guards.py`だけで定義�
 
 ## 意図的に一致させない挙動
 
-判定logicは同一にするが、次の2点だけはPython実装が旧実装と異なる。
-どちらも旧実装の「意図した拒否」ではなく、PowerShellの`[Parameter(Mandatory)][string]`が
-空文字列をbindできずに検査そのものを中断していた事故である。同じ事故を再現しない。
+判定logicは同一にするが、次の3点はPython実装が旧実装と異なる。
+いずれもPython実装の方が厳しく、fail-openになる差はない。
 
 | 入力 | PowerShell実装 | Python実装 |
 |---|---|---|
+| `pages/assets/`配下のsymlink／reparse pointをmanifestが宣言 | 辿った先の内容を公開する | `docs/`側と同じguardで拒否する |
 | `pages/_config.yml`に値なしの`baseurl:`（colonの後ろが空） | `Cannot bind argument to parameter 'Value'`で中断 | `baseurl: ""`と同じくroot Pagesとして扱う。YAMLでもJekyllでもnull＝空文字列である |
 | 生成siteに0 byteの`.html` | `Cannot bind argument to parameter 'Content'`で中断 | 空の走査結果として扱い、他のguardを最後まで実行する |
 
-いずれもfail-openではない。中断した旧実装は残りのguardを一切実行しないため、
-Python実装の方が検査範囲は広い。現在の`pages/_config.yml`は`baseurl: /deskcat`であり、
-どちらの入力も現状のrepositoryでは発生しない。
+1件目は公開境界の穴を塞ぐための、意図した厳格化である。旧実装は`docs/`側だけに
+symlinkとreparse pointのguardを持ち、asset側には持っていなかった。`Test-Path -PathType Leaf`は
+linkを辿り、`Copy-Item`はtarget側の内容を書き出す。staging先は通常fileになるため、
+stagingの最後にあるreparse point検査でも捕まらない。binaryのSHA-256も辿った先から
+計算されて一致する。`pages/assets/`配下のsymlink 1本でrepository外の内容が公開できた。
+移行時に同じ穴を引き継いでいたが、review（[#47](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/47)）で
+指摘を受けて塞いだ。新旧の差分検証では、両実装に同じ穴があるため検出できなかった。
+
+残る2件は、旧実装の「意図した拒否」ではなく、PowerShellの`[Parameter(Mandatory)][string]`が
+空文字列をbindできずに検査そのものを中断していた事故である。同じ事故を再現しない。
+中断した旧実装は残りのguardを一切実行しないため、Python実装の方が検査範囲は広い。
+現在の`pages/_config.yml`は`baseurl: /deskcat`であり、どちらの入力も現状のrepositoryでは発生しない。
 
 ## 検証
 
