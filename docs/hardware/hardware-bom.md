@@ -26,19 +26,19 @@
 
 | Ref | 機能 | 部品／module | 状態 | 正確なメーカー／suffix | 公式文書 | 電源 | Peak電流 | 根拠／残作業 |
 |---|---|---|---|---|---|---|---|---|
-| MCU-01 | Real-time I/O controller | ESP32-DevKitC-32E | Selected | Board revisionと搭載module suffixはTBD | TBD | Board文書から確認するためTBD | TBD | 実boardの両面を確認する |
-| SBC-01 | 高水準controller | Raspberry Pi Zero WH | Selected | Board revisionはTBD | TBD | 5 V入力。connectorと電流予算はTBD | TBD | 実boardと電源経路を確認する |
-| SD-01 | Piのbootとstorage | microSD | Required | 容量、endurance class、状態はTBD | メーカー資料はTBD | SBCから供給 | TBD | 既存cardの確認または購入 |
+| MCU-01 | Real-time I/O controller | ESP-WROOM-32D開発ボード（秋月電子 M-13628。Espressif公式ESP32-DevKitCではない） | Selected | モジュール: ESP-WROOM-32D。基板silkscreen: `ESP32_DevkitC_V4`（Espressif ESP32-DevKitC V4リファレンスデザイン、38pin／wide版） | [秋月商品ページ](https://akizukidenshi.com/catalog/g/g113628/)（データシート添付）、[Espressif ESP32-DevKitC V4公式guide](https://docs.espressif.com/projects/esp-idf/en/v5.1/esp32/hw-reference/esp32/get-started-devkitc.html)（pinout参照用） | USB Micro-B 5 V入力、board上regulatorで3.3V生成。定格はTBD | TBD（現物測定予定） | 現物写真のpin表記（`D0`–`D3`／`CMD`／`CLK`相当がheaderに露出）、購入履歴、および基板裏面silkscreen「`ESP32_DevkitC_V4`」から機種確定。旧記載の「ESP32-DevKitC-32E」は誤りのため訂正。Flash予約pinの露出をGPIO割当時に要注意 |
+| SBC-01 | 高水準controller | Raspberry Pi Zero W（ヘッダなし版。ピンヘッダを別途ハンダ付け） | Selected | Board revision: `V1.1`（基板裏面silkscreen「Raspberry Pi Zero W V1.1 © Raspberry Pi 2017」で確認） | [Raspberry Pi公式製品ページ](https://www.raspberrypi.com/products/raspberry-pi-zero-w/) | 5 V入力（micro USB）。connectorと電流予算はTBD | TBD | 購入履歴で品名「RPI-ZERO-W」（`WH`ではない）と基板裏面のrevision表示を確認。写真のheaderは別購入の細pin headerを自分でハンダ付けしたものと推定。旧記載の「WH」は訂正 |
+| SD-01 | Piのbootとstorage | Samsung EVO Plus microSDHC 32GB | Selected | Samsung。Speed Class: UHS Speed Class 1（`U1`表示） | メーカー公式ページはTBD | SBCから供給 | TBD | カード本体のprint（`SAMSUNG EVO Plus 32 microSDHC U1`）で確認済み。Piのslotは空だったため、この手持ちcardを新たに使用する。使用前の健全性（health）check未実施 |
 
 ## Display、入力、sensor
 
 | Ref | 機能 | 部品／module | 状態 | 正確なIC／module | Interface | Address／mode | 電源／logic | 公式文書 | 残作業 |
 |---|---|---|---|---|---|---|---|---|---|
-| DISP-01 | LCDの顔 | LCD module | Required | TBD | SPI／I2C／parallelはTBD | TBD | TBD | TBD | controller表示、module、解像度、pinを確認する |
-| TOUCH-01 | 撫で操作／選択入力 | Capacitive touch module／controller | Required | TBD | GPIO／I2C／SPIはTBD | TBD | TBD | TBD | 現物moduleの確認または選定 |
-| ACCEL-01 | 軽打／持ち上げ／姿勢 | Accelerometer module | Required | TBD | I2C／SPIはTBD | TBD | TBD | TBD | 表示とaddress設定を確認する |
-| ENV-01 | 温度／湿度／気圧 | Environmental sensor module | Required | TBD | I2C／SPIはTBD | TBD | TBD | TBD | 表示と対応測定量を確認する |
-| COLOR-01 | 環境色 | Color sensor module | Deferred | TBD | TBD | TBD | TBD | TBD | 初期MVPでは選定しない |
+| DISP-01 | LCDの顔 | MSP2807（2.8インチSPI TFT、ILI9341、タッチパネル付） | Selected | ILI9341（LCD controller）。240×320。裏面にmicroSDスロット搭載 | 4-wire SPI | TBD | VCC 3.3–5V、**logic IOは3.3V TTL**。5V給電時の出力levelがメーカー資料で不明なため、安全側に倒して3.3V給電とする（`power-budget.md`参照） | [秋月商品ページ](https://akizukidenshi.com/catalog/g/g116265/)（[datasheet](https://akizukidenshi.com/goodsaffix/msp2807.pdf)）、[LCD Wiki](http://www.lcdwiki.com/2.8inch_SPI_Module_ILI9341_SKU:MSP2807) | 未購入。購入後に現物のpin配列とtouch controller型番を確認し、受け入れchecklistを完了させる |
+| TOUCH-01 | 撫で操作／選択入力 | MSP2807のタッチパネル部（DISP-01と同一module） | Selected | Touch controller型番は未公開（一般に`XPT2046`系resistive touchとされるが未確認） | 4-wire SPI（LCDと共有、CSは別） | TBD | DISP-01と同一（3.3V給電） | 同上 | DISP-01と一体のため同時購入。撫で動作は連続touch座標(x,y)の変化として検出する想定。Touch controller型番は購入後に現物chip刻印で確認する |
+| ACCEL-01 | 軽打／持ち上げ／姿勢 | ADXL345モジュール（秋月 M-06724） | Selected | Analog Devices ADXL345。I2C／SPI選択式、tap／double-tap／free-fall検出をhardware内蔵 | I2CまたはSPI（3線式／4線式）、選択式 | Address等はTBD（現物のjumper／pin設定確認要） | VDD 2.0–3.6V（別途VDD_IO）。**M-06724はregulator非搭載のため3.3V直結必須、Logic 5V railへは直結しない**（ESP32 board上の3V3 pinから給電。`power-budget.md`参照） | [ADXL345解説](https://www.digikey.jp/ja/product-highlight/a/analog-devices/adxl345-3-axis-digital-accelerometer) | DeskCatの軽打／持ち上げ判定にtap／free-fall検出hardwareが適合するため採用決定。KXR94-2050（同時購入、秋月）は不採用・spare保管。Interface選択jumperと実装済みaddressは現物確認が必要 |
+| ENV-01 | 温度／湿度／気圧 | BME280使用温湿度・気圧センサモジュールキット（秋月 K-09421） | Selected | Bosch BME280 | I2C（最大3.4MHz）またはSPI 3線式／4線式（最大10MHz）、選択式 | 選択jumperの実装状態はTBD（現物確認要） | DC1.71V～3.6V。**5V直結不可**、ESP32 board上の3V3 pinから給電する（`power-budget.md`参照） | 現物付属の製品説明書（写真確認済み） | 説明書記載値を使用。I2C/SPI選択jumperの実装状態と実装済みaddressは現物確認が必要 |
+| COLOR-01 | 環境色 | I2C対応デジタルカラーセンサモジュール S11059-02DT（秋月 K-08316） | Deferred | Hamamatsu S11059-02DT | I2C | TBD | TBD | [Hamamatsu公式](https://www.hamamatsu.com/us/en/product/type/S11059-02DT/index.html) | 初期MVPでは選定しない。将来featureで再検討する際の識別情報として記録 |
 
 部品候補は、正確な現物識別と公式文書の確認後に追加する。候補例や類似部品を採用済みとして扱わない。
 
@@ -46,10 +46,14 @@
 
 | Ref | 機能 | 部品／module | 状態 | 正確なmodel | 定格電圧 | Peak／stall電流 | 公式文書 | 残作業 |
 |---|---|---|---|---|---|---|---|---|
-| SERVO-01 | 首振り | Servo | Required | TBD | 外部5 V系をproject方針とする。正確な定格はTBD | TBD | TBD | model、表示、horn、機械的可動域を確認する |
-| PSU-PI-01 | Piとlogic電源 | Regulated wired supply | Required | TBD | TBD | TBD | TBD | connector、regulation、供給可能電流を確認する |
-| PSU-SERVO-01 | サーボ電源 | Regulated supplyまたはDC/DC | Required | TBD | 5 V候補。正確なサーボ定格に従う | TBD | TBD | 実際のpeak電流から容量を決める |
-| PROTO-01 | 試作用配線 | Breadboard／wire／connector | Required | TBD | 回路に従う | 回路に従う | 該当製品資料 | 許容電流とconnector方向を確認する |
+| SERVO-01 | 首振り | TowerPro Micro servo 9g SG90 | Selected | TowerPro SG90 | 4.8–6V（データシート値。外部5 V系はproject方針） | データシート値0.5–2A（負荷依存）。実測値はTBD | [TowerPro公式](https://towerpro.com.tw/product/sg90-7/)、[datasheet](https://www.mouser.com/catalog/specsheets/Soldered_101246.pdf) | ラベル現物確認済み。Peak／stall電流と機械的可動域は`power-budget.md`の測定計画に従い実測が必要（[tbd-register HW-TBD-010／011](tbd-register.md)） |
+| PSU-PI-01 | Piとlogic電源 | スイッチングACアダプター(USB ACアダプター) MicroBオス 5V3A（秋月 M-12001）— logic／servo共通の単一入力源 | Selected | 秋月 M-12001 | 5V／3A（15W） | TBD（実測でmargin確認） | [秋月商品ページ](https://akizukidenshi.com/catalog/g/g112001/) | この1個を`power-budget.md`の電源rail構成案における単一入力源とし、breadboard上でlogic railとservo railの2本に分岐する（単一入力・内部で分岐、複数ACアダプターは使わない）。分岐後の各railの配線・保護は`power-budget.md`で確定する。手持ちのTA7805S（5V1A×5）はこの構成では不要（adapterが直接5Vを出力するため） |
+| PSU-SERVO-01 | サーボ電源 | PSU-PI-01と同一のACアダプターから分岐したservo rail | Selected（入力源は確定。分岐後の部品はTBD） | 入力はPSU-PI-01と共通（M-12001）。Servo直近のbulk capacitorは候補として電解コンデンサ470μF／16V（秋月 g108426、ルビコンWXA）を想定するが、最終容量は実測待ち（`power-budget.md`配線・保護表） | 5V（共通入力からの分岐） | TBD | [秋月商品ページ](https://akizukidenshi.com/catalog/g/g112001/) | Servo起動時の過渡電流を吸収するbulk capacitorの容量選定と、logic railへの影響評価が必要（`power-budget.md`測定計画、[tbd-register HW-TBD-007](tbd-register.md)） |
+| PSU-INGRESS-01 | ACアダプターのplugをbreadboardへ引き込む物理変換 | Micro-Bメスreceptacleの2.54mm変換基板（DIP化キット） | Required | TBD（未選定） | 5V | ingress全体を通る電流。Micro-B connectorの一般的定格は約1.8Aで、文献値の最悪同時peak（2A超）を下回る | TBD | **未選定・未購入。これが無いと配線を開始できない。**M-12001はMicro-Bオスplugのためbreadboardへ直接挿せない。定格問題の詳細は[power-budget.md](power-budget.md)の`5 V ingress`節 |
+| CABLE-PI-PWR-01 | Piへの給電 | Micro-Bオスcable（breadboard railからPiの`PWR IN`へ） | Required | TBD（未選定） | 5V | Pi＋（案Bでない場合はESP32と3V3負荷も） | — | 未購入。Piの`PWR IN`はdata線未接続の給電専用port |
+| CABLE-PI-LINK-01 | Pi–ESP32間のUSB serial link | USB OTG cableまたはMicro-B ⇔ Micro-B OTG変換（PiのUSB OTG port ⇔ ESP32のMicro USB） | Required | TBD（未選定） | — | 案Aを採る場合、このcableがESP32への給電経路も兼ねる | — | 未購入。transportの確定内容は[gpio-assignment.md](gpio-assignment.md)、給電を兼ねるか否かは[power-budget.md](power-budget.md)の`ESP32の給電経路（未決定）`節 |
+| PROTO-01 | 試作用配線 | ブレッドボード(秋月 EIC-3901、6穴版)、ミニブレッドボードBB-601(スケルトン)×2、クリップ付コード5色45cm×10本、細いピンヘッダ20P×5(Pi header用に一部使用済み) | Selected | 手持ち品。個別の許容電流はメーカー資料未確認 | 回路に従う | 回路に従う（ジャンパー線・ブレッドボード接点の許容電流は一般に小電流用途。Servo peak電流経路には別途太い線を使う想定） | TBD | 現物写真・購入履歴で確認済み。Servo電源のようなpeak電流が流れる経路は、breadboard接点やジャンパー線でなく、より太い専用線を使うことを`power-budget.md`の配線・保護表で検討する |
+| MEAS-01 | 電流波形測定（Oscilloscope代替） | セメント抵抗5W0.1Ω（秋月 g117836、SQP5WJ0R1B、¥30）、および分圧用カーボン抵抗10kΩ | Required | 秋月 SQP5WJ0R1B | — | shuntはservo rail全電流を通す。5W定格に対し0.1Ω×2A²＝0.4Wで余裕あり | [秋月商品ページ](https://akizukidenshi.com/catalog/g/g117836/) | 未購入。servo rail低側へ挿入する。挿入位置とGND topologyの制約は[power-budget.md](power-budget.md)の`GND topology`節、ADC pinは[gpio-assignment.md](gpio-assignment.md) |
 
 ## 初期製作の明示的な対象外
 
@@ -60,10 +64,22 @@
 | Camera | Not used | Projectのprivacyとscopeに関する決定 |
 | Microphone | Not used | Projectのprivacyとscopeに関する決定 |
 | Audio output | Not used | 静かなdesktop動作を維持する |
+| LCDキャラクターディスプレイモジュール（HD44780系、手持ち） | Not used | 文字専用でgraphic表示不可のため、DISP-01の要件（「顔」としての画像表示）を満たさない |
 
 ## 部品受け入れchecklist
 
 各行を`Selected`へ変更する前に、次を確認する。
+
+> **現状（2026-08-05）**: 下のchecklistは**どの部品についても未完了**である。
+> `状態`列の`Selected`は「初期製作で使用する予定」（上の状態ラベル定義）を表しており、
+> **受け入れ完了を意味しない**。特に次の点が未了である。
+>
+> - MSP2807（DISP-01／TOUCH-01）とM-12001（PSU-PI-01／PSU-SERVO-01）は未購入であり、
+>   現物の表示・pin配列・電流を確認できていない。
+> - 全部品でpeak電流が未実測である（`power-budget.md`の測定計画）。
+> - ADXL345とBME280のinterface選択jumper、実装済みaddressが現物未確認である。
+>
+> このchecklistが部品ごとに完了するまで、GPIO割り当てと電源budgetを承認済みとして扱わない。
 
 - [ ] 現物に記載された正確な表示を読んだ
 - [ ] Module boardの識別情報が明確である
@@ -82,3 +98,14 @@
 | 日付 | Revision | 変更 | 根拠 |
 |---|---|---|---|
 | 2026-07-27 | 0 | 初期project方針からinventoryを作成。周辺部品の正確なmodelは引き続きTBD | [DeskCat マイコン開発技術ガイド](../DeskCat_Microcontroller_Development_Guide.md)、ADR-0001 |
+| 2026-08-04 | 1 | MCU-01／SBC-01／ENV-01／SERVO-01／COLOR-01の識別情報を確定、ACCEL-01を2候補（ADXL345／KXR94-2050）に絞り込み。旧「ESP32-DevKitC-32E」「Raspberry Pi Zero WH」表記を訂正。DISP-01／TOUCH-01／PSU-PI-01／PSU-SERVO-01は現物未所持のまま | 現物写真＋購入履歴（秋月電子）を、Akizuki商品ページ／TowerPro公式／Hamamatsu公式情報と照合 |
+| 2026-08-04 | 2 | ACCEL-01をADXL345に確定（KXR94-2050は不採用・spare）。SD-01をSamsung EVO Plus microSDHC 32GBに確定（Pi挿入済みcardは無く、別の手持ちcardを使用） | カード本体print（Samsung EVO Plus 32 microSDHC U1）の写真、ADXL345採用のユーザー決定 |
+| 2026-08-04 | 3 | MCU-01の基板revisionを`ESP32_DevkitC_V4`（Espressif DevKitC V4リファレンスデザイン）、SBC-01のBoard revisionを`V1.1`（2017年製）に確定 | 基板裏面silkscreenの現物確認 |
+| 2026-08-04 | 4 | DISP-01／TOUCH-01を秋月MSP2807（ILI9341 SPI TFT＋タッチパネル）に確定（未購入）。手持ちのcharacter LCDモジュールをNot usedとして記録 | ユーザーの購入方針決定、秋月商品ページ |
+| 2026-08-05 | 5 | PSU-PI-01／PSU-SERVO-01を秋月 M-12001（5V3A）1個の単一入力源＋breadboard上での2rail分岐に確定。当初提案した「ACアダプター2個を別々に用意する」設計は誤りのため訂正し、`power-budget.md`のTBD wired source構成（単一入力→logic／servoへ分岐）に合わせた | ユーザーからの指摘、`power-budget.md`の電源rail構成案 |
+| 2026-08-05 | 6 | PROTO-01を手持ちのbreadboard／mini breadboard／クリップ付コード／ピンヘッダに確定 | 現物写真・購入履歴 |
+| 2026-08-05 | 7 | 自己レビューで検出: ACCEL-01(ADXL345, M-06724)とENV-01(BME280)はどちらも定格上限3.6Vのregulator非搭載moduleであるため、`power-budget.md`のLogic 5V railへ直結しないことを明記。ESP32 board上の3.3V出力(3V3 pin)から給電する | Akizuki M-06724商品情報、BME280モジュール付属説明書の電源電圧記載 |
+| 2026-08-05 | 8 | `power-budget.md`と`gpio-assignment.md`のレビュー対応で必要と判明した部品4点をBOMへ追加した。いずれも未購入である。`PSU-INGRESS-01`（Micro-Bメスreceptacle変換基板。M-12001のplugをbreadboardへ引き込む手段が無かった）、`CABLE-PI-PWR-01`（Piの`PWR IN`への給電cable）、`CABLE-PI-LINK-01`（Pi–ESP32のUSB serial link用OTG cable。案Aではこれが給電も兼ねる）、`MEAS-01`（電流測定用のshunt抵抗と分圧抵抗） | [PR #55レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/55)、[power-budget.md](power-budget.md)の`5 V ingress`節、[gpio-assignment.md](gpio-assignment.md)のtransport節 |
+| 2026-08-05 | 8 | 自己レビューで検出: DISP-01／TOUCH-01(MSP2807)の電源欄が「3.3–5V」だけの記載で、logic IOが3.3V TTLである点が抜けていた。5V給電時にmodule出力が5Vになる場合ESP32 GPIOを破損しうるが、level shiftの有無はメーカー資料でも不明なため、安全側に倒して3.3V給電とすることを明記 | [LCD Wiki MSP2807](http://www.lcdwiki.com/2.8inch_SPI_Module_ILI9341_SKU:MSP2807)の「Logic IO port voltage: 3.3V(TTL)」記載 |
+| 2026-08-05 | 9 | 自己レビューで検出: 本文書の規則は「部品受け入れchecklistを確認してから`Selected`にする」と定めているが、Revision 1〜8で未購入・未実測の部品も`Selected`にしており、checklistは全部品で未完了のままだった。`Selected`が受け入れ完了を意味しないこと、および未了項目をchecklist冒頭に明記した | 自己レビュー |
+| 2026-08-05 | 10 | 自己レビューで検出: PSU-PI-01が`power-budget.md`の既に存在しない文言「TBD wired source」を引用していたため実際の節名へ修正。PSU-SERVO-01のbulk capacitorを「型番・容量はTBD」としていたが、`power-budget.md`では候補（ルビコンWXA 470μF16V）が確定済みで記述がずれていたため揃えた | 自己レビュー |

@@ -15,26 +15,25 @@
 
 | ID | 優先度 | 不足している情報／判断 | 必要な根拠 | 妨げる対象 | Owner | 状態 |
 |---|---|---|---|---|---|---|
-| HW-TBD-001 | P0 | 正確なESP32 board revisionとmodule suffix | 現物確認＋公式board回路図 | 最終GPIO割り当て | Human | Open |
-| HW-TBD-002 | P0 | 正確なLCD module／controller | 現物確認＋公式文書 | LCD driver、SPI pin、電源 | Human | Open |
-| HW-TBD-003 | P0 | 正確なtouch module／controller | 現物確認＋公式文書 | Touch driver、pin、gestureしきい値 | Human | Open |
-| HW-TBD-004 | P0 | 正確なaccelerometer module／IC | 現物確認＋公式文書 | Accelerometer driverとしきい値 | Human | Open |
-| HW-TBD-005 | P0 | 正確なenvironmental sensor module／IC | 現物確認＋公式文書 | Environment driverとbus計画 | Human | Open |
-| HW-TBD-006 | P0 | 正確なservo model | 現物確認＋公式データシート | 電源容量とPWM | Human | Open |
-| HW-TBD-007 | P0 | Logic電源とservo電源のmodel | 表示／仕様＋配線計画 | 初回統合通電 | Human | Open |
-| HW-TBD-008 | P0 | GPIO割り当て | Board／module回路図＋競合review | すべてのhardware driver | Joint | 001–006によりBlocked |
-| HW-TBD-009 | P0 | 電源予算とbackfeed review | 部品電流＋回路図＋測定計画 | Servoと全体統合 | Joint | 001–007によりBlocked |
-| HW-TBD-010 | P1 | サーボの機械的可動域とneutral | 監視下calibration | 首振り動作の受け入れ | Human | 006–009によりBlocked |
+| HW-TBD-001 | P0 | **残: board回路図と現物pin表記の照合。**module suffix（ESP-WROOM-32D）と「基板にrevision表示なし」は現物確認済み。秋月独自基板のためpin配列がEspressif ESP32-DevKitC V4と完全一致する保証がなく、GPIO割り当ての前提が未検証 | 秋月商品ページ添付データシートと現物pin表記の1対1照合。確定済み部分の根拠: [hardware-bom.md](hardware-bom.md) MCU-01、[gpio-assignment.md](gpio-assignment.md#board識別情報) | 最終GPIO割り当て | Human | Open（範囲を縮小） |
+| HW-TBD-002 | P0 | **残: 現物確認。**MSP2807（ILI9341）を選定済みだが**未購入**のため、pin配列・電源pinを現物で確認していない | 購入後の現物確認＋[LCD Wiki](http://www.lcdwiki.com/2.8inch_SPI_Module_ILI9341_SKU:MSP2807)。選定の根拠: [hardware-bom.md](hardware-bom.md) DISP-01 | LCD driver、SPI pin、電源 | Human | Open |
+| HW-TBD-003 | P0 | **残: touch controllerの型番特定。**MSP2807一体のtouch panelを使うと確定したが、controller型番はメーカー未公開（`XPT2046`系と推定、未確認）。**未購入** | 購入後の現物chip刻印の確認。選定の根拠: [hardware-bom.md](hardware-bom.md) TOUCH-01 | Touch driver、pin、gestureしきい値 | Human | Open |
+| HW-TBD-004 | P0 | **残: interface選択jumperと実装済みI2C addressの現物確認。**module／ICはADXL345（秋月 M-06724）と特定済み | 現物のjumper／address pin設定の確認。特定の根拠: [hardware-bom.md](hardware-bom.md) ACCEL-01 | Accelerometer driverとしきい値 | Human | Open（範囲を縮小） |
+| HW-TBD-005 | P0 | **残: I2C／SPI選択jumperの実装状態と実装済みI2C addressの現物確認。**module／ICはBosch BME280（秋月 K-09421）と特定済み | 現物のjumper設定の確認。特定の根拠: [hardware-bom.md](hardware-bom.md) ENV-01 | Environment driverとbus計画 | Human | Open（範囲を縮小） |
+| HW-TBD-007 | P0 | **残: 5 V ingressの物理interfaceの選定と購入、およびconnector定格の検証。**電源modelはM-12001（5 V／3 A）と確定。ただしMicro-Bオスplugをbreadboardへ引き込む変換部品が未選定・未購入であり、Micro-B定格（約1.8 A）に対し文献値の最悪同時peakが2 Aを超えうる | 変換部品の選定＋実測。確定済み部分の根拠: [hardware-bom.md](hardware-bom.md) PSU-PI-01／PSU-SERVO-01、[power-budget.md](power-budget.md#5-v-ingress物理的な引き込み経路) | 初回統合通電 | Human | Open（範囲を縮小） |
+| HW-TBD-008 | P0 | GPIO割り当て | Board／module回路図＋競合review | すべてのhardware driver | Joint | 001–005によりBlocked（006は解決済み。下書きは[gpio-assignment.md](gpio-assignment.md)にあるが、競合checkに未完了項目が残る） |
+| HW-TBD-009 | P0 | 電源予算とbackfeed review | 部品電流＋回路図＋測定計画 | Servoと全体統合 | Joint | 001–005、007によりBlocked（006は解決済み。下書きは[power-budget.md](power-budget.md)にあるが、実測値が皆無） |
+| HW-TBD-010 | P1 | サーボの機械的可動域とneutral | 監視下calibration | 首振り動作の受け入れ | Human | 007–009、および首機構（[#34](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/34)）によりBlocked |
 | HW-TBD-011 | P1 | サーボの速度／加速度制限 | 電流・動作試験 | Motion profile | Joint | 010によりBlocked |
 | HW-TBD-012 | P1 | Touch gestureのしきい値 | 取得したraw sample | 撫で動作の受け入れ | Joint | 003、008によりBlocked |
 | HW-TBD-013 | P1 | 軽打／持ち上げしきい値 | サーボ動作を含む取得済みraw sample | 軽打／持ち上げ動作の受け入れ | Joint | 004、008によりBlocked |
 | HW-TBD-014 | P1 | 最終serial baudと最大line length | Pi／ESP32 transport test | Protocol v1の受け入れ | Joint | 候補値あり |
-| HW-TBD-015 | P1 | Pi microSDの識別情報と状態 | 現物確認／health check | Deployと耐久性 | Human | Open |
-| HW-TBD-016 | P2 | Color sensorの識別情報と役割 | MVP review＋部品選定 | 将来の環境色feature | Human | Deferred |
+| HW-TBD-015 | P1 | **残: health checkと耐久性の確認。**識別情報はSamsung EVO Plus microSDHC 32GB（UHS Speed Class 1）と現物print確認済み。使用前の健全性checkは未実施 | health checkの実施。識別の根拠: [hardware-bom.md](hardware-bom.md) SD-01 | Deployと耐久性 | Human | Open（範囲を縮小） |
+| HW-TBD-016 | P2 | **残: MVPへ含めるかの判断と役割定義。**識別情報はHamamatsu S11059-02DT（秋月 K-08316、I2C）と特定済み | MVP review。特定の根拠: [hardware-bom.md](hardware-bom.md) COLOR-01 | 将来の環境色feature | Human | Deferred（識別は完了、採否判断が残る） |
 | HW-TBD-017 | P0 | 通信断の検知方式（heartbeat source、loss timeout） | Protocol合意＋latency測定。正本: [servo-safety-limits](servo-safety-limits.md#通信断時動作)、[protocol](../protocol/esp32-pi-protocol.md#13-未決定事項) | サーボの実機動作全般 | Joint | Open |
-| HW-TBD-018 | P0 | 通信断時のfail-safe sequenceの選択と検証、および**recovery／reconnect動作**（断からの復帰時にサーボ出力を再有効化してよい条件と手順） | 監視下の機械試験（PWM断時の首の挙動、および復帰時の挙動）。正本: [servo-safety-limits](servo-safety-limits.md#通信断時動作) | #20、MVP受け入れ | Joint | 006、010、017、PROTO-TBD-013によりBlocked |
-| HW-TBD-019 | P0 | 起動時とdriver故障時のサーボ出力状態（PWM driver初期化前のGPIO state、開始mode、enableまでのdelay、Pi未接続時、reset後、driver故障検知時） | 無負荷でのPWM測定＋起動時glitch確認。正本: [servo-safety-limits](servo-safety-limits.md#起動時とdriver故障時の動作) | 初回統合通電 | Joint | 006、010によりBlocked |
-| HW-TBD-020 | P1 | 実行時のサーボ安全制御（採用する検知／予防手段、電流しきい値と判定時間、連続動作時間の上限、duty cycle窓と上限、検知時の物理動作、復帰条件、秒あたり受理command数、単一commandの最大変化量、command timeout、duplicate履歴の保持期間とretry window、retired sessionの保持件数と期間） | 電流測定手段の選定＋温度／電流試験。**正はfield単位**で[下表](#hw-tbd-020のfield単位の正)に定める。要件は[servo-safety-limits](servo-safety-limits.md#拘束stallと過負荷)、link側は[protocol](../protocol/esp32-pi-protocol.md#13-未決定事項) | 長時間動作とM6耐久試験 | Joint | 006、009、全fieldのresolution evidence未記録、およびPROTO-TBD-005／011／012／013／014未解決によりBlocked |
+| HW-TBD-018 | P0 | 通信断時のfail-safe sequenceの選択と検証、および**recovery／reconnect動作**（断からの復帰時にサーボ出力を再有効化してよい条件と手順） | 監視下の機械試験（PWM断時の首の挙動、および復帰時の挙動）。正本: [servo-safety-limits](servo-safety-limits.md#通信断時動作) | #20、MVP受け入れ | Joint | 010、017、PROTO-TBD-013によりBlocked |
+| HW-TBD-019 | P0 | 起動時とdriver故障時のサーボ出力状態（PWM driver初期化前のGPIO state、開始mode、enableまでのdelay、Pi未接続時、reset後、driver故障検知時） | 無負荷でのPWM測定＋起動時glitch確認。正本: [servo-safety-limits](servo-safety-limits.md#起動時とdriver故障時の動作) | 初回統合通電 | Joint | 010によりBlocked |
+| HW-TBD-020 | P1 | 実行時のサーボ安全制御（採用する検知／予防手段、電流しきい値と判定時間、連続動作時間の上限、duty cycle窓と上限、検知時の物理動作、復帰条件、秒あたり受理command数、単一commandの最大変化量、command timeout、duplicate履歴の保持期間とretry window、retired sessionの保持件数と期間） | 電流測定手段の選定＋温度／電流試験。**正はfield単位**で[下表](#hw-tbd-020のfield単位の正)に定める。要件は[servo-safety-limits](servo-safety-limits.md#拘束stallと過負荷)、link側は[protocol](../protocol/esp32-pi-protocol.md#13-未決定事項) | 長時間動作とM6耐久試験 | Joint | 009、全fieldのresolution evidence未記録、およびPROTO-TBD-005／011／012／013／014未解決によりBlocked |
 
 ## 登録範囲
 
@@ -139,4 +138,4 @@ IDを書かずに削除すると、どの`TBD`が解決したのかを後から�
 
 | ID | 解決内容 | 根拠 | Close日 |
 |---|---|---|---|
-| — | — | — | — |
+| HW-TBD-006 | 正確なservo modelを`TowerPro Micro servo 9g SG90`と確定した。定格電圧4.8–6 V、stall電流はデータシート値0.5–2 A（負荷依存）。**Peak／stall電流の実測は本行の範囲外**であり、`power-budget.md`の測定計画と`HW-TBD-010`／`HW-TBD-011`で追跡する | 現物ラベルの写真（`TOWER PRO Micro servo 9g SG90`）、[TowerPro公式](https://towerpro.com.tw/product/sg90-7/)、[datasheet](https://www.mouser.com/catalog/specsheets/Soldered_101246.pdf)。反映先: [hardware-bom.md](hardware-bom.md) SERVO-01、[power-budget.md](power-budget.md)負荷表、[gpio-assignment.md](gpio-assignment.md) SERVO-PWM | 2026-08-05 |

@@ -145,7 +145,7 @@ Piの取るべき動作が異なるためである。拘束は物理的な干渉
 
 | TBD | 内容 | 解決しないと起きること |
 |---|---|---|
-| `HW-TBD-006` | 正確なservo model | 電圧、電流、PWM条件が不明なまま駆動する |
+| ~~`HW-TBD-006`~~ | ~~正確なservo model~~ | **解決済み（2026-08-05、TowerPro SG90）。**このgateは満たした。ただしdatasheet値を得ただけであり、**peak／stall電流の実測は`HW-TBD-010`／`HW-TBD-011`で引き続き必要**である |
 | `HW-TBD-007` | 電源modelとpower budget | 供給能力が不明なまま駆動し、brownoutとESP32のresetを招く |
 | `HW-TBD-009` | backfeed review | サーボ側からESP32へ電流が回り込む経路を検出できない |
 | `HW-TBD-010` | 機械的可動域とneutral | calibration済みの最小・neutral・最大位置が無いまま駆動し、機械端へ衝突する |
@@ -180,7 +180,7 @@ heartbeat方式やstale commandの拒否条件、runtime faultの報告形式が
 対応表は[TBD台帳](tbd-register.md)のfield単位の正に従う。
 
 ここに挙げた`TBD`は、[TBD台帳](tbd-register.md)側で別の`TBD`にBlockedされているものがある
-（例: `HW-TBD-010`は`HW-TBD-006`〜`HW-TBD-009`によりBlocked）。
+（例: `HW-TBD-010`は`HW-TBD-007`〜`HW-TBD-009`によりBlocked）。
 **列挙したIDを解決するには、その前提となるIDも解決している必要がある。**
 ここに現れないIDでも、台帳の依存を辿って未解決であれば、ゲートは通らない。
 
@@ -327,3 +327,4 @@ recovery／reconnect動作は`HW-TBD-018`の範囲に含める。fail-safe seque
 | 日付 | Revision | 変更 |
 |---|---|---|
 | 2026-07-27 | 0 | 安全とcalibrationの構造を作成。device固有の制限はすべて引き続きTBD |
+| 2026-08-05 | 1 | `HW-TBD-006`（正確なservo model）が[TBD台帳](tbd-register.md)で解決済み（TowerPro SG90）となったため、有効化gate表の該当行を解決済みとして打ち消し、依存例（`HW-TBD-010`のBlocked元）を`HW-TBD-007`〜`009`へ更新した。**gate自体は開いていない。**残る`TBD`が未解決であり、peak／stall電流の実測も`HW-TBD-010`／`011`で必要である |
