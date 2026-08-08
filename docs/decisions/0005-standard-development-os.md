@@ -57,11 +57,12 @@ Linux環境の初期構築が必要になるが、対象範囲が明確で、run
 開発環境の標準OSを**実機のLinux**とする。USBを必要としない作業では、
 Docker上のLinuxも使用する。
 
-- Host Rust Development、ESP32 Build、ESP32 Flash / HIL、Docs / Reviewの各profileは、
-  実機Linuxを前提とする。
+- 標準のhostは実機Linuxである。**Dockerは代替hostではなく、標準host上で使う実行環境**として
+  許可する。可否はprofileではなく、USBまたは実機を必要とするかで決まる。
 - **ESP32 Flash / HILと実機試験は実機Linuxで実行する。** VMまたはcontainerで代替しない。
-- USBを必要としない作業では、Docker上のLinuxを使ってよい。文書検証、host Rustのbuildとtest、
-  ESP32のbuild-only検証が該当する。
+- USBを必要としない作業では、Docker上のLinuxを使ってよい。Docs / Review、
+  Host Rust Development、ESP32 Buildのbuild-only検証が該当する。
+  profileごとの可否は[Machine Profiles](../toolchains/machine-profiles.md)を正本とする。
 - Docker、VM、実機のいずれで実行したかは、
   [Version Record](../toolchains/version-record-template.md)の既存field
   `Container / VM / native:`へ記録する。新しいfieldは追加しない。

@@ -74,7 +74,12 @@ build生成物の配布と版固定も、文書検証のためだけには重い
 `scripts/`配下の検証scriptをPython 3で実装し、**標準ライブラリのみを使う**。
 サードパーティ依存を追加しない。
 
-判定logicの仕様は変更しない。診断message、exit code、公開境界の判断は現行と同一にする。
+判定logicの仕様は変更しない。診断message、exit code、公開境界の判断は、
+[意図的に一致させない挙動](#意図的に一致させない挙動)に挙げた3件を除いて現行と同一にする。
+
+**この除外リストが、受容した差分と回帰を区別する唯一の基準である。**
+リストに無い差分は回帰として扱い、修正する。挙動を意図的に変える場合は、
+先にこのリストへ追記してから変更する。
 
 secretと個人pathのpatternは`scripts/lib/publish_guards.py`だけで定義し、各scriptへ複製しない。
 `lib/publish-guards.ps1`が持っていたSingle Source of Truthの方針を維持する。
@@ -98,7 +103,7 @@ secretと個人pathのpatternは`scripts/lib/publish_guards.py`だけで定義�
 
 | リスク | 対策 |
 |---|---|
-| 移行で判定logicが変わり、公開境界が緩む | 二重化してCIで新旧を両方実行し、`validate-doc-links`が出す`DIGEST`の一致を必須にしてから旧実装を削除する |
+| 移行で判定logicが変わり、公開境界が緩む | 二重化してCIで新旧を両方実行し、`validate-doc-links`が出す`DIGEST`の一致を必須にしてから旧実装を削除する。**実施済み。下記「同等性の検証記録」を参照** |
 | .NETとPythonの標準関数の差（ordinal比較、拡張子解釈、reparse point判定）で結果が環境ごとに変わる | 差の出る箇所を`publish_guards.py`のhelperへ集約し、旧実装と同じ規則を明示的に再現する |
 | 端末に`python3`が無い | `machine-profiles.md`のDocs / Review profileへ必須要件として記載する |
 | Pythonのversion差で挙動が変わる | 標準ライブラリのみを使い、`ubuntu-24.04`のCIを判定の基準とする |
@@ -111,7 +116,7 @@ secretと個人pathのpatternは`scripts/lib/publish_guards.py`だけで定義�
 | 入力 | PowerShell実装 | Python実装 |
 |---|---|---|
 | portal file、asset、root documentがsymlink／reparse point | 辿った先の内容を公開する | `docs/`側と同じguardで拒否する |
-| `pages/_config.yml`に値なしの`baseurl:`（colonの後ろが空） | `Cannot bind argument to parameter 'Value'`で中断 | `baseurl: ""`と同じくroot Pagesとして扱う。YAMLでもJekyllでもnull＝空文字列である |
+| `pages/_config.yml`に値なしの`baseurl:`（colonの後ろが空） | `Cannot bind argument to parameter 'Value'`で中断 | `baseurl: ""`と同じくroot Pagesとして扱う |
 | 生成siteに0 byteの`.html` | `Cannot bind argument to parameter 'Content'`で中断 | 空の走査結果として扱い、他のguardを最後まで実行する |
 
 1件目は公開境界の穴を塞ぐための、意図した厳格化である。
@@ -136,12 +141,39 @@ portal fileとroot documentでも再現し、判定を`link_rejection`へ集約�
 中断した旧実装は残りのguardを一切実行しないため、Python実装の方が検査範囲は広い。
 現在の`pages/_config.yml`は`baseurl: /deskcat`であり、どちらの入力も現状のrepositoryでは発生しない。
 
+なお`baseurl:`（値なし）と`baseurl: ""`は、YAMLとしては別の値である。前者はnull、
+後者は空のscalarになる。**同じなのはこのvalidatorの出す結論**で、どちらもbaseurlなし、
+つまりroot Pagesとして扱う。YAML上で同一という意味ではない。
+
 ## 検証
 
 - `validate-doc-links`の新旧実装が、同一checkoutに対して同じ`MARKDOWN=` `LINKS=` `BROKEN=0` `DIGEST=`を出す
 - `prepare-pages`の新旧実装が、`.pages-src/`へ同一のfile集合と同一内容を生成する
 - 既存の回帰caseに相当する検証が`python3 -m unittest`で通る
 - 上記を`ubuntu-24.04`のCIで確認する。localの結果だけをCIの根拠にしない
+
+### 同等性の検証記録
+
+削除前の二重実行は実施済みである。旧実装を削除したのは`b7466ea`で、その**直前**の
+commit `d8f65df`のCI
+[run 31190787234](https://github.com/wachi-yoshitaka-11-dev/deskcat/actions/runs/31190787234)
+が両実装を実行し、一致を確認している。
+
+```text
+legacy:  MARKDOWN=70 LINKS=271 BROKEN=0 DIGEST=2FDF045F0998E5F7
+current: MARKDOWN=70 LINKS=271 BROKEN=0 DIGEST=2FDF045F0998E5F7
+```
+
+このrunのworkflowは`Check documentation links`で両者の標準出力を文字列比較し、
+異なればjobを落とす構成だった。`Test link validators`、`Prepare public source`、
+`Validate output`、`Test publish guards`も同様に両実装を実行し、すべてsuccessである。
+
+比較stepは旧実装の削除とともに撤去した。`.ps1`が存在しない以上、比較対象が無い。
+**したがってこの記録が、削除前に同等性を確認した唯一の根拠である。**
+
+`DIGEST`の値そのものは文書の増減で変わる。2026-08-08時点は`D91ADD6063BA55DF`である。
+以後の判定条件は「特定の値と一致すること」ではなく、**同一checkoutに対して
+WindowsとLinuxで同じ値が出ること**である（ADR-0005）。
 
 見直し条件: Docs / Review profileの必須要件から`python3`を外す必要が生じた場合、
 または標準ライブラリだけでは賄えない検査が必要になった場合に再検討する。

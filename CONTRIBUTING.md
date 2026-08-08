@@ -146,9 +146,15 @@ Pull requestには次を含める。
 - 残存riskと`TBD`
 - 無関係なformat変更やrefactorがないこと
 
-`Closes #N`はtraceability目的の記載であり、GitHub純正の自動close機能は使わない。
-Pull Requestのbaseは`develop`であり、その機能はrepositoryのdefault branch
-（`main`）へのmerge時にしか働かないため。
+### 関連Issueの書き方
+
+Issue branchからのPull Request（base `develop`）では`Closes #N`を使う。これはtraceability
+目的の記載であり、GitHub純正の自動close機能は使わない。closeを起こすのはdefault branch
+（`main`）へのmergeだけであり、base `develop`のmergeでは働かないためである。
+
+**`develop`から`main`への昇格Pull Requestでは`Closes #N`を使わない。** baseが`main`
+なのでGitHubの自動closeが実際に働き、boardによるclose管理と二重になる。昇格Pull Requestに
+含まれるIssueは`Refs #N`かplain linkで列挙する。
 
 代わりに、Projects v2 board（`deskcat`）でcloseを管理する。
 boardでは6つのworkflowが有効である。全一覧はRepository設定に記録しており、
@@ -168,6 +174,22 @@ Issueをcloseする。
 `Pull request merged` workflowの対象にならず、merge済みかどうかがboard上で追えない。
 
 board上のworkflow構成は[Repository設定](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/.github/REPOSITORY_SETTINGS.md)に記録する。
+
+### Merge方式
+
+baseで決まる。
+
+| base | 方式 | 理由 |
+|---|---|---|
+| `develop` | **squash merge** | Issue branchの試行錯誤を1 commitにまとめ、`develop`の履歴を「1 Issue = 1 commit」に保つ |
+| `main` | **squashしない。merge commitにする** | 昇格をsquashすると`develop`側の個々のcommitが`main`の履歴から消え、両branchが別系列になる |
+
+squash mergeしたbranchはcommit hashが変わるため、`git branch -d`が「未merge」と判定する。
+削除前に`git diff <branch> origin/develop`が空であることを確認してから`-D`する。
+
+昇格Pull Requestのmerge後は`origin/develop`が消えていないことを確認する。
+[#33](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/33)で`delete_branch_on_merge`が
+`develop`自体を削除する事故が起きている。Repository Rulesetで禁止済みだが確認はする。
 
 ## Gitと秘密情報
 
