@@ -572,13 +572,21 @@ def _check_links(
                 )
 
 
+def _is_license(path):
+    """`LICENSE`はMarkdownではないため拡張子を持たない。file名で判定する。
+
+    比較はcase-sensitiveにする。`license`のような別fileを例外へ通さない。
+    """
+    return os.path.basename(path) == "LICENSE"
+
+
 def is_scanned_for_secrets(path):
     """その`_site`内のfileが、secret／個人pathのscan対象かを返す。
 
     scanの実処理と同じ条件をここへ書く。診断が実際のscan範囲とずれると、
     「scanされている」と読めるのにされていない、という誤読を生む。
     """
-    if os.path.basename(path) == "LICENSE":
+    if _is_license(path):
         return True
     return guards.get_extension(path).lower() in guards.TEXT_EXTENSIONS
 
@@ -676,8 +684,22 @@ def main(argv=None):
         # 拡張子の判定はcase-insensitiveのままにする。`.PDF`も拒否し、`.HTML`も
         # scan対象に含めるためであり、広く拾う方向がfail-safeになる。
         # 一方、pathのcontainment、base path、存在するfileの突き合わせはcase-sensitiveにする。
-        if guards.get_extension(path).lower() == ".pdf":
+        extension = guards.get_extension(path).lower()
+        if extension == ".pdf":
+            # allowlistでも弾けるが、専用の診断を残す。PDFは過去に明示的な拒否対象と
+            # されており、理由の分かるmessageで落とす方が調べやすい。
             problems.append(f"PDF output is not allowed: {relative_file}")
+        elif extension not in guards.ALLOWED_EXTENSIONS and not _is_license(path):
+            # `.pages-src`側と同じallowlistを最終artifactへも課す。2026-08-08時点の
+            # `_site`は`.html .md .css .ico .jpg`と`LICENSE`だけであり、すべて許可済みの
+            # ためこの判定は現状no-opである。Jekyllやpluginが将来別の拡張子を生成した
+            # ときに、気付かないまま公開せずfail-closedで止めるために置く。
+            problems.append(f"File type is not approved for Pages: {relative_file}")
+
+        if os.path.getsize(path) > guards.FILE_SIZE_LIMIT:
+            # 上限は`.pages-src`側と同じ`FILE_SIZE_LIMIT`を使う。2026-08-08時点の
+            # `_site`の最大は205894 byteであり、こちらも現状no-opである。
+            problems.append(f"File exceeds the Pages size limit: {relative_file}")
 
     # 存在確認だけではWindows上でcase違いのfileを存在扱いにする。実際に列挙した
     # fileのcase-sensitiveな集合と突き合わせ、LinuxのPagesと同じ結果にする。
