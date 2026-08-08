@@ -19,7 +19,7 @@
 │  ※plugをbreadboardへ引き込む変換部品が未購入（`5 V ingress`節）
 ├─ Logic/Pi rail 5V（breadboard上で分岐、追加regulatorなし）
 │  ├─ Raspberry Pi Zero W（PWR IN portへ）
-│  │  └─ USB OTG port ──[USB cable、Pi link]── ESP-WROOM-32D開発ボード（秋月 M-13628）
+│  │  └─ USB OTG port ──[USB cable、Pi link]── ESP-WROOM-32D開発ボード（秋月電子 M-13628）
 │  │        ※案Aではこのcableのみで給電する
 │  └─ （案Bの場合のみ）ESP-WROOM-32Dの`5V` pinへ直接
 │        ESP32の給電経路は案A／案Bのいずれか未決定（`ESP32の給電経路（未決定）`節）
