@@ -28,8 +28,8 @@
 | HW-TBD-012 | P1 | Touch gestureのしきい値 | 取得したraw sample | 撫で動作の受け入れ | Joint | 003、008によりBlocked |
 | HW-TBD-013 | P1 | 軽打／持ち上げしきい値 | サーボ動作を含む取得済みraw sample | 軽打／持ち上げ動作の受け入れ | Joint | 004、008によりBlocked |
 | HW-TBD-014 | P1 | 最終serial baudと最大line length | Pi／ESP32 transport test | Protocol v1の受け入れ | Joint | 候補値あり |
-| HW-TBD-015 | P1 | Pi microSDの識別情報と状態 | 現物確認／health check | Deployと耐久性 | Human | Open |
-| HW-TBD-016 | P2 | Color sensorの識別情報と役割 | MVP review＋部品選定 | 将来の環境色feature | Human | Deferred |
+| HW-TBD-015 | P1 | **残: health checkと耐久性の確認。**識別情報はSamsung EVO Plus microSDHC 32GB（UHS Speed Class 1）と現物print確認済み。使用前の健全性checkは未実施 | health checkの実施。識別の根拠: [hardware-bom.md](hardware-bom.md) SD-01 | Deployと耐久性 | Human | Open（範囲を縮小） |
+| HW-TBD-016 | P2 | **残: MVPへ含めるかの判断と役割定義。**識別情報はHamamatsu S11059-02DT（秋月 K-08316、I2C）と特定済み | MVP review。特定の根拠: [hardware-bom.md](hardware-bom.md) COLOR-01 | 将来の環境色feature | Human | Deferred（識別は完了、採否判断が残る） |
 | HW-TBD-017 | P0 | 通信断の検知方式（heartbeat source、loss timeout） | Protocol合意＋latency測定。正本: [servo-safety-limits](servo-safety-limits.md#通信断時動作)、[protocol](../protocol/esp32-pi-protocol.md#13-未決定事項) | サーボの実機動作全般 | Joint | Open |
 | HW-TBD-018 | P0 | 通信断時のfail-safe sequenceの選択と検証、および**recovery／reconnect動作**（断からの復帰時にサーボ出力を再有効化してよい条件と手順） | 監視下の機械試験（PWM断時の首の挙動、および復帰時の挙動）。正本: [servo-safety-limits](servo-safety-limits.md#通信断時動作) | #20、MVP受け入れ | Joint | 010、017、PROTO-TBD-013によりBlocked |
 | HW-TBD-019 | P0 | 起動時とdriver故障時のサーボ出力状態（PWM driver初期化前のGPIO state、開始mode、enableまでのdelay、Pi未接続時、reset後、driver故障検知時） | 無負荷でのPWM測定＋起動時glitch確認。正本: [servo-safety-limits](servo-safety-limits.md#起動時とdriver故障時の動作) | 初回統合通電 | Joint | 010によりBlocked |
