@@ -47,8 +47,12 @@ ADR-0002が「Git、Markdownを扱えるエディタ」で足りるとした前�
 
 ### Python 3の標準ライブラリだけで実装する
 
-Python 3はLinuxとmacOSでほぼプリインストールされる。加えてESP32 Build profileでは
-ESP-IDFが既にPythonを必須化している（`idf_tools.py`が`python -m venv`を使う）。
+標準OSである実機Linuxと、CIの`ubuntu-24.04`では、Python 3が既に存在する。
+[ADR-0005](0005-standard-development-os.md)はmacOSについて判断していないため、
+ここでもmacOSを前提に置かない。macOSを対象へ加える場合は、その時点で
+Python 3の導入要件を別途記載する。
+加えてESP32 Build profileではESP-IDFが既にPythonを必須化している
+（`idf_tools.py`が`python -m venv`を使う）。
 `pathlib`、`os`、`stat`、`shutil`、`subprocess`、`re`、`hashlib`、`json`、`html`、
 `urllib.parse`、`unicodedata`、`argparse`で現行機能を賄える。標準ライブラリの`unittest`が、手書き1803行のtest harness
 （`test-link-validators.ps1` + `test-pages-guards.ps1`）を置き換える。

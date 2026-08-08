@@ -42,7 +42,7 @@ Concept素材を許すのは、[ADR-0003](../docs/decisions/0003-public-document
 1. [公開asset register](../docs/governance/published-asset-register.md)へ出所と再配布許諾を登録する。
 2. Imageは表示寸法の2倍程度へ縮小する。1 fileの上限は1 MiBである。
 3. `pages/assets-manifest.json`へpathを追加する。Binaryはあわせて`sha256`を記録する。
-4. Gitへ追跡させる。追跡外のfileはmanifestへ書いても公開されない。
+4. Gitへ追跡させる。追跡外のfileをmanifestへ書くと、`prepare_pages.py`が`Declared asset is not tracked by Git`で失敗する。そのassetが公開されないだけでなく、staging全体が止まる。
 
 Hardware写真や技術図のような文書向けimageはここへ置かない。境界の回帰testは`scripts/test_pages_guards.py`にある。
 

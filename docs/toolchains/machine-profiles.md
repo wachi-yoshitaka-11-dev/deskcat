@@ -42,7 +42,8 @@ OS は上記の標準OSに従う。次の表は、標準OS の上で profile ご
 | Raspberry Pi Direct Build | Pi 上での最小 build 検証 | Runtime 要件、Rust stable、Cargo、native linker、空き容量 | Cross compiler |
 | CI | 再現可能な自動検証 | 固定 runner（`ubuntu-24.04`）、pin 済み action、秘密情報を使わない build | flash と無人実機駆動 |
 
-`python3` は文書検証 script（`scripts/*.py`）の実行に必要である。Linux と macOS ではほぼプリインストールされる。
+`python3` は文書検証 script（`scripts/*.py`）の実行に必要である。標準OSである実機 Linux には既に存在する。
+macOS は [ADR-0005](../decisions/0005-standard-development-os.md) で判断していないため、ここでも前提に置かない。
 [ADR-0006](../decisions/0006-validation-script-language.md) に従い、これらの script は標準ライブラリだけを使うため、
 package の追加導入も virtualenv も要らない。ESP32 Build 以降の profile は ESP-IDF が Python を必須化するため、
 別途導入する必要はない。
