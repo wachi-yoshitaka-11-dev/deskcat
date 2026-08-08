@@ -77,7 +77,7 @@ required_transient_current
 | Logic regulator／経路 | Pi／ESP32／周辺deviceの要件 | 追加regulatorなし。M-12001の5Vをbreadboard rail経由でそのまま供給 | `hardware-bom.md` PSU-PI-01 | 選定済み（同時peak margin実測待ち） |
 | Servo regulator／経路 | 正確なservo要件 | 追加regulatorなし。M-12001の5Vをbreadboard上で別railに分岐し、直近にbulk capacitorを配置 | `hardware-bom.md` PSU-SERVO-01 | 選定済み（bulk capacitor容量は実測待ち） |
 | Backfeed防止 | USB／外部電源の共存 | TBD | 回路図review | Blocked |
-| Servo bulk capacitor | 測定した過渡電流への対応 | 候補: 電解コンデンサ470μF／50V（秋月、日本ケミコンLXJ）×2〜3個 | [秋月商品ページ](https://akizukidenshi.com/catalog/g/g107766/)。最終容量はESP32＋shunt抵抗によるADC loggingで確定 | Candidate（実測前） |
+| Servo bulk capacitor | 測定した過渡電流への対応 | 候補: 電解コンデンサ470μF／16V（秋月、ルビコンWXA、¥10）×2〜3個 | [秋月商品ページ](https://akizukidenshi.com/catalog/g/g108426/)。最終容量はESP32＋shunt抵抗によるADC loggingで確定 | Candidate（実測前） |
 | 電流測定用shunt抵抗 | 波形測定の手段（Oscilloscope代替） | セメント抵抗5W0.1Ω（秋月、¥30程度）×1〜2個。ESP32 ADCで電圧降下をsamplingし、電流波形を近似する | [秋月商品ページ](https://akizukidenshi.com/catalog/c/ccementrg/)で該当型番を確認 | 選定済み（追加購入は不要な既存工具の代わりに低coostで対応） |
 | Local decoupling | 各deviceのデータシートに従う | TBD | データシート | Blocked |
 | Wire gauge／許容電流 | Peak電流と長さ | TBD | 製品資料／計算 | Blocked |
