@@ -72,6 +72,28 @@ def is_unsafe_manifest_path(relative):
     )
 
 
+def link_rejection(repository_relative, source, tracked_symlinks):
+    """copyしてよいsourceかを判定し、駄目なら理由を返す。問題なければNone。
+
+    `.pages-src/`へfileを入れる経路は4つある（portal file、asset、root document、
+    `docs/`）。どの経路でも、symlinkとreparse pointは同じ理由で拒否する。
+    `os.path.isfile`はlinkを辿り、copyはtarget側の内容を書き出す。staging先は通常file
+    になるため、stagingの最後にあるreparse point検査では捕まらない。binaryのSHA-256も
+    辿った先から計算されて一致する。link 1本でrepository外の内容が公開できてしまう。
+
+    判定を1箇所に集めるのは、経路ごとに書くと今回のように一部だけguardが抜けるからである。
+    実際、移行元のPowerShell実装は`docs/`にだけguardを持っていた。
+
+    Gitのmodeを先に見る。`core.symlinks=false`のcheckoutでは、working tree上の実体が
+    regular fileになり、属性だけでは判定が環境ごとに変わる。
+    """
+    if repository_relative in tracked_symlinks:
+        return "is a symlink in Git"
+    if guards.is_reparse_point(source):
+        return "is a reparse point"
+    return None
+
+
 def _remove_staging(path, repository_root):
     """既存のstaging pathを、file・directory・reparse pointのどれでも取り除く。
 
@@ -172,15 +194,9 @@ def _stage_assets(repository_root, portal_root, output_root, tracked_symlinks):
                 f"Declared asset is not tracked by Git: {repository_relative}"
             )
             continue
-        # Gitのmodeを先に見る。`core.symlinks=false`のcheckoutでは、working tree上の
-        # 実体がregular fileになり、属性だけでは判定が環境ごとに変わる。
-        if repository_relative in tracked_symlinks:
-            problems.append(f"Declared asset is a symlink in Git: {repository_relative}")
-            continue
-        if guards.is_reparse_point(source):
-            problems.append(
-                f"Declared asset is a reparse point: {repository_relative}"
-            )
+        rejection = link_rejection(repository_relative, source, tracked_symlinks)
+        if rejection:
+            problems.append(f"Declared asset {rejection}: {repository_relative}")
             continue
 
         extension = guards.get_extension(normalized).lower()
@@ -249,13 +265,13 @@ def _stage_docs(repository_root, output_root, tracked_symlinks):
         relative = guards.path_relative_to_root(path, docs_source)
         repository_relative = guards.path_relative_to_root(path, repository_root)
 
-        # Gitのmodeを先に見る。属性だけだと`core.symlinks=false`のcheckoutで
-        # symlinkがregular fileとして複製され、環境ごとに公開物が変わる。
-        if repository_relative in tracked_symlinks:
+        # `docs/`は必須fileではないため、失敗ではなくskipとして記録する。
+        # 判定そのものは他経路と同じhelperを使う。
+        rejection = link_rejection(repository_relative, path, tracked_symlinks)
+        if rejection == "is a symlink in Git":
             skipped.append(f"{relative} (symlink in Git)")
             continue
-
-        if guards.is_reparse_point(path):
+        if rejection == "is a reparse point":
             skipped.append(f"{relative} (reparse point)")
             continue
 
@@ -303,6 +319,11 @@ def main(argv=None):
             raise guards.ValidationError(
                 f"Required Pages source is not tracked by Git: pages/{name}"
             )
+        rejection = link_rejection(f"pages/{name}", source, tracked_symlinks)
+        if rejection:
+            raise guards.ValidationError(
+                f"Required Pages source {rejection}: pages/{name}"
+            )
         _copy(source, os.path.join(output_root, name))
 
     _stage_assets(repository_root, portal_root, output_root, tracked_symlinks)
@@ -318,6 +339,9 @@ def main(argv=None):
             raise guards.ValidationError(
                 f"Required root document is not tracked by Git: {name}"
             )
+        rejection = link_rejection(name, source, tracked_symlinks)
+        if rejection:
+            raise guards.ValidationError(f"Required root document {rejection}: {name}")
         _copy(source, os.path.join(output_root, name))
 
     copied, skipped = _stage_docs(repository_root, output_root, tracked_symlinks)

@@ -586,6 +586,49 @@ class RequiredSourceTrackingTests(PublishGuardTestCase):
             forbidden_messages=(PORTAL_PAGE_PATH,),
         )
 
+    def test_symlinked_portal_file_and_root_document_fail(self):
+        """必須fileの経路でも、symlinkでrepository外の内容を公開しない。
+
+        `.pages-src/`へfileを入れる経路は4つあり、symlinkとreparse pointは
+        どの経路でも同じ理由で拒否する。asset経路だけを塞いでも、portal fileと
+        root documentから同じことができる。実際に両方で外部内容が公開できた。
+        """
+        outside = self.track(
+            os.path.join(tempfile.gettempdir(), f"deskcat-outside-{uuid.uuid4().hex}.txt")
+        )
+        secret = "OUTSIDE-CONTENT-THAT-MUST-NOT-BE-PUBLISHED"
+        _write(outside, secret)
+        cases = (
+            ("pages/404.md", PORTAL_PAGE_PATH, "404.md",
+             "Required Pages source is a symlink in Git: pages/404.md"),
+            ("SECURITY.md", os.path.join(REPOSITORY_ROOT, "SECURITY.md"), "SECURITY.md",
+             "Required root document is a symlink in Git: SECURITY.md"),
+        )
+        for repository_path, real_path, staged_name, expected in cases:
+            with self.subTest(route=repository_path):
+                backup = _read(real_path)
+                try:
+                    os.remove(real_path)
+                    try:
+                        os.symlink(outside, real_path)
+                    except (OSError, NotImplementedError):
+                        _write(real_path, backup)
+                        self.skipTest("symlink creation unavailable")
+                    self.detached_index_with(repository_path)
+                    run = self.assert_staging_fails(
+                        expected, forbidden_messages=(secret,)
+                    )
+                    staged = os.path.join(STAGING_ROOT, staged_name)
+                    self.assertFalse(
+                        os.path.exists(staged) and secret in _read(staged),
+                        f"{repository_path} 経由で外部内容が公開された",
+                    )
+                    self.assertNotIn(secret, run.output)
+                finally:
+                    if guards.is_reparse_point(real_path):
+                        os.remove(real_path)
+                    _write(real_path, backup)
+
     def test_untracked_root_document_fails(self):
         self.detached_index_without("AGENTS.md")
         self.assert_staging_fails(

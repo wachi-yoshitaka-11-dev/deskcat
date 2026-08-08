@@ -110,17 +110,26 @@ secretと個人pathのpatternは`scripts/lib/publish_guards.py`だけで定義�
 
 | 入力 | PowerShell実装 | Python実装 |
 |---|---|---|
-| `pages/assets/`配下のsymlink／reparse pointをmanifestが宣言 | 辿った先の内容を公開する | `docs/`側と同じguardで拒否する |
+| portal file、asset、root documentがsymlink／reparse point | 辿った先の内容を公開する | `docs/`側と同じguardで拒否する |
 | `pages/_config.yml`に値なしの`baseurl:`（colonの後ろが空） | `Cannot bind argument to parameter 'Value'`で中断 | `baseurl: ""`と同じくroot Pagesとして扱う。YAMLでもJekyllでもnull＝空文字列である |
 | 生成siteに0 byteの`.html` | `Cannot bind argument to parameter 'Content'`で中断 | 空の走査結果として扱い、他のguardを最後まで実行する |
 
-1件目は公開境界の穴を塞ぐための、意図した厳格化である。旧実装は`docs/`側だけに
-symlinkとreparse pointのguardを持ち、asset側には持っていなかった。`Test-Path -PathType Leaf`は
-linkを辿り、`Copy-Item`はtarget側の内容を書き出す。staging先は通常fileになるため、
-stagingの最後にあるreparse point検査でも捕まらない。binaryのSHA-256も辿った先から
-計算されて一致する。`pages/assets/`配下のsymlink 1本でrepository外の内容が公開できた。
-移行時に同じ穴を引き継いでいたが、review（[#47](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/47)）で
-指摘を受けて塞いだ。新旧の差分検証では、両実装に同じ穴があるため検出できなかった。
+1件目は公開境界の穴を塞ぐための、意図した厳格化である。
+
+`.pages-src/`へfileを入れる経路は4つある（portal file、asset、root document、`docs/`）。
+旧実装は`docs/`にだけsymlinkとreparse pointのguardを持ち、残る3経路には持っていなかった。
+`Test-Path -PathType Leaf`はlinkを辿り、`Copy-Item`はtarget側の内容を書き出す。
+staging先は通常fileになるため、stagingの最後にあるreparse point検査でも捕まらない。
+binaryのSHA-256も辿った先から計算されて一致する。link 1本でrepository外の内容が公開できた。
+
+移行時に同じ穴を引き継いでいた。review（[#47](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/47)）で
+asset経路の指摘を受けて塞いだ後、同じ欠陥classが他経路にも残っていないかを確認して
+portal fileとroot documentでも再現し、判定を`link_rejection`へ集約した。
+経路ごとに書くと、今回のように一部だけguardが抜ける。
+
+新旧の差分検証ではこの穴を検出できなかった。「Pythonが旧実装と一致するか」しか
+問うていないため、両実装に共通する欠陥は原理的に見えない。移植では、一致の確認とは別に、
+判定そのものの妥当性を確認する必要がある。
 
 残る2件は、旧実装の「意図した拒否」ではなく、PowerShellの`[Parameter(Mandatory)][string]`が
 空文字列をbindできずに検査そのものを中断していた事故である。同じ事故を再現しない。
