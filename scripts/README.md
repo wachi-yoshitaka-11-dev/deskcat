@@ -8,7 +8,7 @@
 |---|---|---|
 | `validate_doc_links.py` | リポジトリ全体のMarkdown相対linkを検査する | Pages workflowとlocal |
 | `prepare_pages.py` | 公開対象を`.pages-src/`へ複製し、公開禁止情報を検査する。診断のfile pathはstaging-root相対で出力する | Pages workflowとlocal |
-| `validate_pages_output.py` | 生成済み`_site/`のlinkと公開禁止情報を検査する。診断のfile pathはsite-root相対で出力する | Pages workflowとlocal |
+| `validate_pages_output.py` | 生成済み`_site/`のlinkと公開禁止情報を検査する。拡張子allowlistとsize上限は`.pages-src/`側と同じ値を使う。診断のfile pathはsite-root相対で出力し、`EXTENSIONS=`／`UNSCANNED=`／`LARGEST=`で公開物の内訳を残す | Pages workflowとlocal |
 | `test_link_validators.py` | source／生成siteのanchor、Pages baseurl（引用、YAML comment、末尾slashを含む）、時間制限付きHTML解析、local URL解決（encoding、unsafe scheme、directory、曖昧候補、case、reparse point、非HTML assetを含む）、公開禁止pattern・local path・値の非露出、Markdown link抽出、追跡file／symlink helperの0・1・複数件、PathSpec、Git quoting前提、非ASCII pathを検証する。link作成不可の環境では対象caseを成功件数と分けてskipする | Pages workflowとlocal |
 | `test_pages_guards.py` | 公開境界の回帰test（未宣言asset、追跡外file、hash不一致、size超過、公開禁止patternとlocal staging pathの非露出、**Gitのmode 120000によるsymlink除外**、**file属性のreparse point除外**、拡張子）を検証する。symlinkの2 caseは、どちらのguardが働いたかをskip理由で確認する | Pages workflowとlocal |
 | `lib/publish_guards.py` | secret／個人path pattern、path containmentとroot相対表記、追跡file列挙（`core.quotePath=false`で非ASCII pathをescapeさせない）、Gitのmodeによるsymlink判定、見出しanchor生成、Markdown link抽出、null安全な読み出し、reparse pointを跨がないtree走査。`validate_doc_links.py`、`prepare_pages.py`、`validate_pages_output.py`、`test_link_validators.py`、`test_pages_guards.py`の5本すべてがimportする。`test_link_validators.py`と`test_pages_guards.py`は、importとは別に対象scriptを子processとして起動し、exit codeと診断出力まで検査する | import専用 |
@@ -56,6 +56,28 @@ CIのPages buildは`actions/jekyll-build-pages`が内部のGemfileで実行す�
 Jekyll環境を用意しない端末では、出力検査はPull RequestのCIに任せる。
 その場合、build後にしか分からない問題（`.md` linkの未変換、生成siteでの404）は
 CIで初めて検出される。
+
+## 公開物のscan範囲
+
+実際にGitHub Pagesへuploadされるartifactは`_site/`である。`.pages-src/`ではない。
+`validate_pages_output.py`のsummaryが、その内訳を毎回logへ残す。
+
+```text
+EXTENSIONS=(none)=1,.css=1,.html=44,.ico=1,.jpg=1,.md=44
+UNSCANNED=.ico=1,.jpg=1
+LARGEST=205894 docs/protocol/esp32-pi-protocol.html
+```
+
+`UNSCANNED=`はsecret／個人pathの内容scanが効かない拡張子である。**binaryは内容scanに
+意味が無いため、意図して対象外にしている。** `favicon.ico`はscriptが固定byteから生成し、
+`.jpg`はmanifestがSHA-256で固定するため、内容は別の手段で押さえている。
+
+`_site/`にも`.pages-src/`と同じ拡張子allowlistとsize上限を課す。2026-08-08時点の
+`_site`は上記の6種類だけで、いずれも許可済み・上限内であり、どちらの判定も現状no-opである。
+Jekyllやpluginが将来別の拡張子を生成したときに、気付かないまま公開せず止めるために置いている。
+
+`TEXT_EXTENSIONS`へ`.xml`や`.json`を加えることは**しない**。`_site`にそれらは存在せず、
+存在しない拡張子へ備えるのは推測になる。`EXTENSIONS=`が変化したら、その時点で判断する。
 
 規則:
 

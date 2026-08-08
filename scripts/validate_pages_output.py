@@ -572,6 +572,63 @@ def _check_links(
                 )
 
 
+def _is_license(path):
+    """`LICENSE`はMarkdownではないため拡張子を持たない。file名で判定する。
+
+    比較はcase-sensitiveにする。`license`のような別fileを例外へ通さない。
+    """
+    return os.path.basename(path) == "LICENSE"
+
+
+def is_scanned_for_secrets(path):
+    """その`_site`内のfileが、secret／個人pathのscan対象かを返す。
+
+    scanの実処理と同じ条件をここへ書く。診断が実際のscan範囲とずれると、
+    「scanされている」と読めるのにされていない、という誤読を生む。
+    """
+    if _is_license(path):
+        return True
+    return guards.get_extension(path).lower() in guards.TEXT_EXTENSIONS
+
+
+def _summarize_output(files, site_root_path):
+    """`_site`の内訳を要約する。
+
+    `FILES=`と`HTML=`だけでは、非HTMLが何であるかが分からない。実際に公開される
+    artifactは`_site`であり、その構成はJekyllとPagesが有効化するpluginが決めるため、
+    sourceからは辿れない。scan対象外の拡張子と最大file sizeを出して、公開物の実態を
+    log へ残す。判定には使わない。
+
+    path は site-root 相対で出す。localの絶対pathをCI logへ書かない。
+    """
+    counts = {}
+    unscanned = {}
+    largest_size = -1
+    largest_path = ""
+    for path in files:
+        extension = guards.get_extension(path).lower() or "(none)"
+        counts[extension] = counts.get(extension, 0) + 1
+        if not is_scanned_for_secrets(path):
+            unscanned[extension] = unscanned.get(extension, 0) + 1
+        try:
+            size = os.path.getsize(path)
+        except OSError:
+            continue
+        if size > largest_size:
+            largest_size = size
+            largest_path = path
+
+    def render(mapping):
+        # 並びを固定する。環境やfilesystemの列挙順でlogが変わると突き合わせられない。
+        return ",".join(f"{key}={mapping[key]}" for key in sorted(mapping)) or "(none)"
+
+    lines = [f"EXTENSIONS={render(counts)}", f"UNSCANNED={render(unscanned)}"]
+    if largest_path:
+        relative = guards.path_relative_to_root(largest_path, site_root_path)
+        lines.append(f"LARGEST={largest_size} {relative}")
+    return lines
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--site-root", default="")
@@ -627,8 +684,22 @@ def main(argv=None):
         # 拡張子の判定はcase-insensitiveのままにする。`.PDF`も拒否し、`.HTML`も
         # scan対象に含めるためであり、広く拾う方向がfail-safeになる。
         # 一方、pathのcontainment、base path、存在するfileの突き合わせはcase-sensitiveにする。
-        if guards.get_extension(path).lower() == ".pdf":
+        extension = guards.get_extension(path).lower()
+        if extension == ".pdf":
+            # allowlistでも弾けるが、専用の診断を残す。PDFは過去に明示的な拒否対象と
+            # されており、理由の分かるmessageで落とす方が調べやすい。
             problems.append(f"PDF output is not allowed: {relative_file}")
+        elif extension not in guards.ALLOWED_EXTENSIONS and not _is_license(path):
+            # `.pages-src`側と同じallowlistを最終artifactへも課す。2026-08-08時点の
+            # `_site`は`.html .md .css .ico .jpg`と`LICENSE`だけであり、すべて許可済みの
+            # ためこの判定は現状no-opである。Jekyllやpluginが将来別の拡張子を生成した
+            # ときに、気付かないまま公開せずfail-closedで止めるために置く。
+            problems.append(f"File type is not approved for Pages: {relative_file}")
+
+        if os.path.getsize(path) > guards.FILE_SIZE_LIMIT:
+            # 上限は`.pages-src`側と同じ`FILE_SIZE_LIMIT`を使う。2026-08-08時点の
+            # `_site`の最大は205894 byteであり、こちらも現状no-opである。
+            problems.append(f"File exceeds the Pages size limit: {relative_file}")
 
     # 存在確認だけではWindows上でcase違いのfileを存在扱いにする。実際に列挙した
     # fileのcase-sensitiveな集合と突き合わせ、LinuxのPagesと同じ結果にする。
@@ -652,8 +723,9 @@ def main(argv=None):
     # 最終artifactを同じ共有拡張子で再検査する。
     sensitive_text_files = set()
     for path in files:
-        is_license = os.path.basename(path) == "LICENSE"
-        if guards.get_extension(path).lower() not in guards.TEXT_EXTENSIONS and not is_license:
+        # 判定は`is_scanned_for_secrets`へ集約する。summaryの`UNSCANNED=`が同じ関数を
+        # 使うため、診断と実際のscan範囲が食い違わない。
+        if not is_scanned_for_secrets(path):
             continue
         content = guards.get_file_text(path)
         relative_file = guards.path_relative_to_root(path, site_root_path)
@@ -721,6 +793,8 @@ def main(argv=None):
 
     print("SITE_ROOT=.")
     print(f"FILES={len(files)} HTML={len(html_files)} BROKEN_LINKS=0")
+    for line in _summarize_output(files, site_root_path):
+        print(line)
     return 0
 
 

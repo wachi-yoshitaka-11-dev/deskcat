@@ -25,8 +25,10 @@ import uuid
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import publish_guards as guards  # noqa: E402
+import validate_pages_output  # noqa: E402
 
 SCRIPT_DIRECTORY = Path(__file__).resolve().parent
 REPOSITORY_ROOT = str(SCRIPT_DIRECTORY.parent)
@@ -476,6 +478,88 @@ class OutputValidatorArtifactTests(OutputValidatorTestCase):
             )
         finally:
             _write(boundary_page, VALID_PAGE)
+
+    def test_summary_reports_the_output_breakdown(self):
+        """`_site`の内訳をsummaryへ出す。
+
+        `FILES=`と`HTML=`だけでは非HTMLが何であるか分からない。実際に公開される
+        artifactは`_site`であり、その構成はJekyllとpluginが決めるためsourceからは辿れない。
+        `UNSCANNED=`は、secret／個人pathのscan対象外になっている拡張子を明示する。
+        """
+        # 拡張子なしのfileも内訳へ出る。`LICENSE`はfile名で許可され、scanもされる。
+        license_file = self.track(os.path.join(_state["extra_root"], "LICENSE"))
+        _write(license_file, "license text")
+        run = self.run_site()
+        self.assert_outcome(run, True, expected_message="EXTENSIONS=")
+
+        extensions = next(
+            line for line in run.output.splitlines() if line.startswith("EXTENSIONS=")
+        )
+        unscanned = next(
+            line for line in run.output.splitlines() if line.startswith("UNSCANNED=")
+        )
+        self.assertIn(".html=", extensions)
+        self.assertIn("(none)=1", extensions)
+        # binaryはscanしても意味が無いためUNSCANNEDへ現れる。textは現れない。
+        self.assertIn(".ico=1", unscanned)
+        self.assertIn(".jpg=1", unscanned)
+        self.assertNotIn(".html", unscanned)
+        self.assertNotIn(".css", unscanned)
+        # `LICENSE`はscan対象なので、拡張子なしでもUNSCANNEDへ入らない。
+        self.assertNotIn("(none)", unscanned)
+        self.assertRegex(run.output, r"LARGEST=\d+ \S+")
+
+    def test_unscanned_extensions_are_really_not_scanned(self):
+        """`UNSCANNED=`の表示と、実際のscan範囲が食い違わないこと。
+
+        `is_scanned_for_secrets`をscan本体と診断の両方で使っているが、scan側が
+        その関数を通さなくなっても、範囲が広がる方向なら既存testは落ちない。
+        その場合`UNSCANNED=`だけが嘘になる。ここで両者の一致を直接固定する。
+
+        binaryを内容scanしないのは意図した範囲である。`.png`はallowlist上は許可だが
+        `TEXT_EXTENSIONS`には無いため、secretらしき文字列を入れても検出されない。
+        """
+        binary_like = self.track(os.path.join(_state["extra_root"], "binary.png"))
+        _write(binary_like, "ghp_" + "f" * 24)
+        run = self.run_site()
+        # scan対象外なので検出されない。ここが失敗するならscan範囲が広がっている。
+        self.assert_outcome(run, True)
+        unscanned = next(
+            line for line in run.output.splitlines() if line.startswith("UNSCANNED=")
+        )
+        self.assertIn(".png=1", unscanned)
+
+    def test_disallowed_output_file_type_is_rejected(self):
+        """`.pages-src`側と同じ拡張子allowlistを`_site`へも課す。
+
+        2026-08-08時点の実`_site`は`.html .md .css .ico .jpg`と`LICENSE`だけであり、
+        この判定は現状no-opである。Jekyllやpluginが将来別の拡張子を生成したときに、
+        気付かないまま公開せず止めるために置いている。
+        """
+        for name, content in (("feed.xml", "<feed/>"), ("app.js", "//"), ("NOTICE", "x")):
+            with self.subTest(name=name):
+                target = self.track(os.path.join(_state["extra_root"], name))
+                _write(target, content)
+                self.assert_outcome(
+                    self.run_site(),
+                    False,
+                    expected_message=f"File type is not approved for Pages: extra/{name}",
+                )
+                os.remove(target)
+
+    def test_oversized_output_file_is_rejected(self):
+        """size上限も`.pages-src`側と同じ`FILE_SIZE_LIMIT`を使う。
+
+        実`_site`の最大は205894 byteであり、こちらも現状no-opである。
+        testが独自の閾値を持つと、上限を変えたときにtestだけが古い前提で失敗する。
+        """
+        oversized = self.track(os.path.join(_state["extra_root"], "big.html"))
+        _write(oversized, VALID_PAGE + "x" * (guards.FILE_SIZE_LIMIT + 1024))
+        self.assert_outcome(
+            self.run_site(),
+            False,
+            expected_message="File exceeds the Pages size limit: extra/big.html",
+        )
 
     def test_pdf_output_is_reported_with_a_relative_path(self):
         pdf_asset = self.track(os.path.join(_state["extra_root"], "manual.PDF"))
@@ -1214,6 +1298,28 @@ class FixtureCleanupTests(unittest.TestCase):
         _git(root, "add", "--all")
         _remove_fixture(root)
         self.assertFalse(os.path.exists(root), "git fixtureが消し残された")
+
+
+class ScanScopeTests(unittest.TestCase):
+    """診断の`UNSCANNED=`と、実際のscan範囲が食い違わないこと。
+
+    2箇所で条件を書くと、片方だけ変えたときに「scanされている」と読める診断が出て、
+    実際にはされていない状態になる。`is_scanned_for_secrets`へ集約してある。
+    """
+
+    def test_scan_scope_matches_the_declared_extensions(self):
+        for name in ("a.html", "a.css", "a.md", "a.svg", "a.txt", "a.yml", "LICENSE"):
+            with self.subTest(name=name):
+                self.assertTrue(validate_pages_output.is_scanned_for_secrets(name))
+        for name in ("a.xml", "a.json", "a.js", "NOTICE", "a.png", "a.ico"):
+            with self.subTest(name=name):
+                self.assertFalse(validate_pages_output.is_scanned_for_secrets(name))
+
+    def test_license_is_matched_by_file_name_not_extension(self):
+        self.assertTrue(validate_pages_output.is_scanned_for_secrets("docs/LICENSE"))
+        self.assertFalse(validate_pages_output.is_scanned_for_secrets("docs/LICENSE.bin"))
+        # 大文字小文字は区別する。`license`は対象にしない。
+        self.assertFalse(validate_pages_output.is_scanned_for_secrets("docs/license"))
 
 
 class SharedHelperTests(unittest.TestCase):
