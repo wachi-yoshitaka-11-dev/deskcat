@@ -25,8 +25,10 @@ import uuid
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import publish_guards as guards  # noqa: E402
+import validate_pages_output  # noqa: E402
 
 SCRIPT_DIRECTORY = Path(__file__).resolve().parent
 REPOSITORY_ROOT = str(SCRIPT_DIRECTORY.parent)
@@ -476,6 +478,29 @@ class OutputValidatorArtifactTests(OutputValidatorTestCase):
             )
         finally:
             _write(boundary_page, VALID_PAGE)
+
+    def test_summary_reports_the_output_breakdown(self):
+        """`_site`の内訳をsummaryへ出す。
+
+        `FILES=`と`HTML=`だけでは非HTMLが何であるか分からない。実際に公開される
+        artifactは`_site`であり、その構成はJekyllとpluginが決めるためsourceからは辿れない。
+        `UNSCANNED=`は、secret／個人pathのscan対象外になっている拡張子を明示する。
+        """
+        self.track(os.path.join(_state["extra_root"], "feed.xml"))
+        _write(self._temporary_paths[-1], "<feed/>")
+        self.track(os.path.join(_state["extra_root"], "NOTICE"))
+        _write(self._temporary_paths[-1], "notice")
+        run = self.run_site()
+        self.assert_outcome(run, True, expected_message="EXTENSIONS=")
+        self.assertIn(".xml=1", run.output)
+        # scan対象外はUNSCANNEDへ現れる。`.html`はscanされるので現れない。
+        unscanned = next(
+            line for line in run.output.splitlines() if line.startswith("UNSCANNED=")
+        )
+        self.assertIn(".xml=1", unscanned)
+        self.assertIn("(none)=1", unscanned)
+        self.assertNotIn(".html", unscanned)
+        self.assertRegex(run.output, r"LARGEST=\d+ \S+")
 
     def test_pdf_output_is_reported_with_a_relative_path(self):
         pdf_asset = self.track(os.path.join(_state["extra_root"], "manual.PDF"))
@@ -1214,6 +1239,28 @@ class FixtureCleanupTests(unittest.TestCase):
         _git(root, "add", "--all")
         _remove_fixture(root)
         self.assertFalse(os.path.exists(root), "git fixtureが消し残された")
+
+
+class ScanScopeTests(unittest.TestCase):
+    """診断の`UNSCANNED=`と、実際のscan範囲が食い違わないこと。
+
+    2箇所で条件を書くと、片方だけ変えたときに「scanされている」と読める診断が出て、
+    実際にはされていない状態になる。`is_scanned_for_secrets`へ集約してある。
+    """
+
+    def test_scan_scope_matches_the_declared_extensions(self):
+        for name in ("a.html", "a.css", "a.md", "a.svg", "a.txt", "a.yml", "LICENSE"):
+            with self.subTest(name=name):
+                self.assertTrue(validate_pages_output.is_scanned_for_secrets(name))
+        for name in ("a.xml", "a.json", "a.js", "NOTICE", "a.png", "a.ico"):
+            with self.subTest(name=name):
+                self.assertFalse(validate_pages_output.is_scanned_for_secrets(name))
+
+    def test_license_is_matched_by_file_name_not_extension(self):
+        self.assertTrue(validate_pages_output.is_scanned_for_secrets("docs/LICENSE"))
+        self.assertFalse(validate_pages_output.is_scanned_for_secrets("docs/LICENSE.bin"))
+        # 大文字小文字は区別する。`license`は対象にしない。
+        self.assertFalse(validate_pages_output.is_scanned_for_secrets("docs/license"))
 
 
 class SharedHelperTests(unittest.TestCase):

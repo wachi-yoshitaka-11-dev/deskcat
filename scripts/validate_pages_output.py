@@ -572,6 +572,55 @@ def _check_links(
                 )
 
 
+def is_scanned_for_secrets(path):
+    """その`_site`内のfileが、secret／個人pathのscan対象かを返す。
+
+    scanの実処理と同じ条件をここへ書く。診断が実際のscan範囲とずれると、
+    「scanされている」と読めるのにされていない、という誤読を生む。
+    """
+    if os.path.basename(path) == "LICENSE":
+        return True
+    return guards.get_extension(path).lower() in guards.TEXT_EXTENSIONS
+
+
+def _summarize_output(files, site_root_path):
+    """`_site`の内訳を要約する。
+
+    `FILES=`と`HTML=`だけでは、非HTMLが何であるかが分からない。実際に公開される
+    artifactは`_site`であり、その構成はJekyllとPagesが有効化するpluginが決めるため、
+    sourceからは辿れない。scan対象外の拡張子と最大file sizeを出して、公開物の実態を
+    log へ残す。判定には使わない。
+
+    path は site-root 相対で出す。localの絶対pathをCI logへ書かない。
+    """
+    counts = {}
+    unscanned = {}
+    largest_size = -1
+    largest_path = ""
+    for path in files:
+        extension = guards.get_extension(path).lower() or "(none)"
+        counts[extension] = counts.get(extension, 0) + 1
+        if not is_scanned_for_secrets(path):
+            unscanned[extension] = unscanned.get(extension, 0) + 1
+        try:
+            size = os.path.getsize(path)
+        except OSError:
+            continue
+        if size > largest_size:
+            largest_size = size
+            largest_path = path
+
+    def render(mapping):
+        # 並びを固定する。環境やfilesystemの列挙順でlogが変わると突き合わせられない。
+        return ",".join(f"{key}={mapping[key]}" for key in sorted(mapping)) or "(none)"
+
+    lines = [f"EXTENSIONS={render(counts)}", f"UNSCANNED={render(unscanned)}"]
+    if largest_path:
+        relative = guards.path_relative_to_root(largest_path, site_root_path)
+        lines.append(f"LARGEST={largest_size} {relative}")
+    return lines
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--site-root", default="")
@@ -652,8 +701,9 @@ def main(argv=None):
     # 最終artifactを同じ共有拡張子で再検査する。
     sensitive_text_files = set()
     for path in files:
-        is_license = os.path.basename(path) == "LICENSE"
-        if guards.get_extension(path).lower() not in guards.TEXT_EXTENSIONS and not is_license:
+        # 判定は`is_scanned_for_secrets`へ集約する。summaryの`UNSCANNED=`が同じ関数を
+        # 使うため、診断と実際のscan範囲が食い違わない。
+        if not is_scanned_for_secrets(path):
             continue
         content = guards.get_file_text(path)
         relative_file = guards.path_relative_to_root(path, site_root_path)
@@ -721,6 +771,8 @@ def main(argv=None):
 
     print("SITE_ROOT=.")
     print(f"FILES={len(files)} HTML={len(html_files)} BROKEN_LINKS=0")
+    for line in _summarize_output(files, site_root_path):
+        print(line)
     return 0
 
 
