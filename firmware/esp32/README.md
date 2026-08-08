@@ -17,4 +17,4 @@
 - [ESP32 Rust toolchain](../../docs/toolchains/esp32-rust-toolchain.md)
 - [ESP32開発端末セットアップ](../../docs/runbooks/esp32-development-machine-setup.md)
 
-これらの候補を検証済みの固定版として扱わない。manifestは、M1-001においてESP32 Build profile端末でのみ作成する。生成fileをreviewし、applicationの`Cargo.lock`を保持し、clean buildを記録する。
+これらの候補を検証済みの固定版として扱わない。manifestは、#5においてESP32 Build profile端末でのみ作成する。生成fileをreviewし、applicationの`Cargo.lock`を保持し、clean buildを記録する。

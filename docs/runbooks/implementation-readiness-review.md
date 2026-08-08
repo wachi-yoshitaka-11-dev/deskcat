@@ -9,8 +9,8 @@ Repository基盤は、管理された開発作業を開始できる状態にあ�
 
 公式資料に基づくtoolchain調査は完了している。適切な端末では、次の二つの作業streamを安全に開始できる。
 
-1. 人間が主導するハードウェア現物inventory: FND-001
-2. ESP32 Build profile端末でのRust／ESP-IDF生成とclean build: M1-001
+1. 人間が主導するハードウェア現物inventory: #1
+2. ESP32 Build profile端末でのRust／ESP-IDF生成とclean build: #5
 
 最初のperipheral driverまたは統合通電までは、これらを独立して進められる。
 
@@ -46,10 +46,10 @@ Peripheral driverまたはservo出力は、いずれもこのgateを通過して
 | Rustを主要言語とする | Pass | 既存project decision |
 | ESP32 workspaceを分離する | ArchitectureとしてPass | ADR-0001 |
 | 公式情報による互換性調査 | Pass | `docs/toolchains/esp32-rust-toolchain.md` |
-| 互換性のあるRust／ESP-IDF version | Candidate／未検証 | 開発端末でのM1-001 clean build |
-| 再現可能なbuild／flash／monitor command | Fail／TBD | M1-001とM1-002 |
-| Draft protocolが存在する | Review用としてPass | FND-004 |
-| 承認済みprotocol制限とfixture | Fail／TBD | FND-004とM2-001 |
+| 互換性のあるRust／ESP-IDF version | Candidate／未検証 | 開発端末での#5 clean build |
+| 再現可能なbuild／flash／monitor command | Fail／TBD | #5と#6 |
+| Draft protocolが存在する | Review用としてPass | #4 |
+| 承認済みprotocol制限とfixture | Fail／TBD | #4と#9 |
 | Host／firmware workspaceが存在する | 設計どおりFail | 着手可能なIssueからのみ作成する |
 
 Toolchainのbuild-only spikeはperipheral pinの選定なしで進められる。Docs / Review端末にtoolchainを導入する必要はない。
@@ -67,7 +67,7 @@ Toolchainのbuild-only spikeはperipheral pinの選定なしで進められる�
 
 ## 承認済みの次作業
 
-### FND-001: ハードウェア現物inventoryの確認
+### #1: ハードウェア現物inventoryの確認
 
 現物部品から次が必要である。
 
@@ -84,7 +84,7 @@ Toolchainのbuild-only spikeはperipheral pinの選定なしで進められる�
 - `docs/hardware/sensor-datasheet-notes.md`
 - `docs/hardware/tbd-register.md`
 
-### M1-001: Rust／ESP-IDF toolchainの検証と固定
+### #5: Rust／ESP-IDF toolchainの検証と固定
 
 完了済みの調査:
 
@@ -115,7 +115,7 @@ Toolchainのbuild-only spikeはperipheral pinの選定なしで進められる�
 - Servo PWM
 - 推測したハードウェア値
 
-### GH-001: GitHub設定の適用
+### GitHub設定の適用
 
 2026-07-28に完了した。Repositoryへtokenを保存せずGitHub認証を復旧した。Label、milestone、private vulnerability reporting、`main`の最小保護を適用し、read-back確認した。
 
@@ -133,4 +133,9 @@ Remote GitHub configuration: BASE SETTINGS APPLIED
 GitHub Issue migration: PENDING foundation document publication
 ```
 
-FND-001からFND-004までと、M1-001の残りの開発端末検証に根拠が揃った後、このreviewを再実行する。
+上のgateが`Fail`／`TBD`としているIssueすべてに根拠が揃った後、このreviewを再実行する。
+対象は#1、#2、#3、#4、#5（開発端末検証の残り）、#6、#9である。
+
+`#6`（再現可能なbuild／flash／monitor command）と`#9`（承認済みprotocol制限とfixture）を
+落とさない。Software gateがこの2件をblockerに挙げており、揃わないまま再実行しても
+同じ`Fail`を繰り返すだけになる。

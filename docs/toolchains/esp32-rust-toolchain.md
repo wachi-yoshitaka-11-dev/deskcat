@@ -81,7 +81,7 @@ xtensa-esp32-espidf
 - `espflash` は flash、monitor を行う端末だけで必須
 - `cargo-espflash` は任意。初期手順では command surface を増やさない
 
-Windows では Rust の MSVC host toolchain と Visual Studio C++ Build Tools を候補とする。Unix 系では、ESP-IDF が公式に列挙する OS package と、`espup` が出力する environment export が必要になる。
+host は [ADR-0005](../decisions/0005-standard-development-os.md) の標準OS である実機 Linux を対象とする。ESP-IDF が公式に列挙する OS package と、`espup` が出力する environment export が必要になる。
 
 詳細は [ESP32 開発端末セットアップ](../runbooks/esp32-development-machine-setup.md) を参照する。
 
@@ -109,7 +109,7 @@ Windows では Rust の MSVC host toolchain と Visual Studio C++ Build Tools �
 - [ ] 正式な format、lint、build command を `AGENTS.md` と root README へ反映した
 - [ ] 別の開発端末または clean environment で再現した
 
-flash、serial monitor、実機起動は M1-002 の範囲であり、この文書の build-only 確定条件には含めない。
+flash、serial monitor、実機起動は #6 の範囲であり、この文書の build-only 確定条件には含めない。
 
 ## 公式資料
 

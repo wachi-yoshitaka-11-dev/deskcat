@@ -127,7 +127,7 @@ hotfix規則に従い、同じ修正を直ちに`develop`へ取り込む。両br
 
 - [x] 外部contributorのPull Requestに承認を必須化する
 
-Pages workflowの`pull_request` jobは、PR側の`scripts/*.ps1`をrunner上で実行する。
+Pages workflowの`pull_request` jobは、PR側の`scripts/*.py`をrunner上で実行する。
 GitHub既定の`first_time_contributors`では、一度merge実績のあるcontributorのPRが
 承認なしで実行される。`all_external_contributors`へ変更し、fork由来のworkflow実行に
 毎回人間の承認を必要とする。
@@ -253,8 +253,8 @@ merge済みのfeature branch（`chore/repository-hardening`等）の自動削除
 - [x] [ADR-0003](../docs/decisions/0003-public-documentation-publishing.md)で`docs/`、Pages、Wikiの責務と正本を決定する
 - [x] RootのMarkdownと`docs/`を正本とし、Pagesを正本から生成する
 - [x] Wikiを日本語の入口ページに限定し、独自の技術仕様やlive statusを置かない
-- [x] [GH-003 #26](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/26)でPages workflowを実装する
-- [x] [GH-004 #27](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/27)でWikiの既定Homeを入口ページへ置き換える
+- [x] [#26](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/26)でPages workflowを実装する
+- [x] [#27](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/27)でWikiの既定Homeを入口ページへ置き換える
 - [x] Workflowと`github-pages` environmentの両方でdeploy元を`main`に限定する
 - [x] Stagingでsecret、個人path、local専用資料、未承認形式を検査する
 - [x] `docs/`はMarkdownだけを複製し、画像等が人手のreviewを経ずに公開されないようにする
@@ -293,6 +293,56 @@ GraphQLは`hasWikiEnabled`のみを返し、いずれも機能の有効／無効
 編集権限ではない（2026-07-29にschema introspectionで確認）。
 Wikiの設定を変更した場合は、この節を目視結果で更新する。
 
+## Projects
+
+2026-08-06のread-back結果:
+
+- Repositoryは`repository.projectsV2`（GraphQL）で**Projects v2のboard 1件**にlinkされている
+  - Owner: `wachi-yoshitaka-11-dev`（**user**単位。organizationではない）
+  - Number: `5`、Title: `deskcat`、Visibility: Public
+  - URL: `https://github.com/users/wachi-yoshitaka-11-dev/projects/5`
+  - Item数: 35
+  - 使用中のfield: `Status`（single select）、`Milestone`、`Repository`、`Start date`、`Target date`（他にTitle／Assignees／Labels等のdefault field）
+- `Start date`／`Target date`はProjects v2のcustom fieldであり、Issueの開始日・終了日を設定する運用に対応する
+- Repository REST APIの`has_projects`は`true`
+
+2026-08-07のworkflow read-back結果（`user.projectV2(number:5).workflows`）:
+
+| Workflow | 有効 |
+|---|---|
+| `Auto-add sub-issues to project` | true |
+| `Auto-close issue` | true |
+| `Item added to project` | true |
+| `Item closed` | true |
+| `Pull request linked to issue` | true |
+| `Pull request merged` | true |
+
+`Item status changed`という名前のworkflowは存在しない。`Status`が`Done`になったitemの
+Issueをcloseするのは`Auto-close issue`である。
+
+`Pull request merged`が`Status`を`Done`にするのはPull Request item側であり、
+Issue itemには波及しない。実測でも、PR #44 merge（2026-08-06T13:37:11Z）とIssue #43
+close（13:41:05Z）に3分54秒、PR #45 merge（2026-08-07T00:36:45Z）とIssue #39
+close（01:00:20Z）に23分35秒の差があり、workflowによる即時発火ではない。
+mergeだけではIssueがcloseされないため、Issue itemの`Status`を`Done`にする操作が必要である。
+運用手順は[CONTRIBUTING.md](../CONTRIBUTING.md)のPull request節に記載する。
+
+`has_projects`は`has_issues`／`has_wiki`と同種の機能有効化トグルであり、classic project
+（repository単位のclassic project board）が実在するかどうかを示す値ではない。project数0でも
+`true`になり得る。Projects v2のboardがlinkされているかどうかも反映しない。三者は別の仕組みである。
+
+```text
+GET repos/{owner}/{repo}/projects -> HTTP 404 Not Found
+```
+
+GitHubはProjects（classic）のREST APIを2025-04-01にsunsetしており（機能自体のsunsetは
+2024-08-23）、`has_projects`の値に関わらずこのendpointは404を返す。つまり`has_projects`は
+現在、classic projectの実在や利用可能性を示す情報としてほぼ無意味なlegacy flagである。
+
+方針: `has_projects`は`true`のまま変更しない。classic projectとしては使っていないが、
+このflag自体がGitHub側で実質的な意味を失っているため、無効化のための追加操作は行わない。
+実際のIssue進行管理は上記Projects v2のboardで行う。
+
 ## 保留
 
 - CODEOWNERS: 安定したreviewer／owner対応が複数になった時点で追加
@@ -301,5 +351,4 @@ Wikiの設定を変更した場合は、この節を目視結果で更新する�
 - Release workflow: versionとartifact方針の確定後に追加
 - Discussions: community supportにIssueだけでは不足した場合に追加
 - Signed commit: SSH署名で導入コストが小さいため、次のrepository運用変更で評価する
-- Projects: `has_projects: true`だが未使用。使用しないなら無効化する
 - Milestone due date: M0–M6すべて未設定。blocked Issueの滞留を可視化する目的で設定を検討する

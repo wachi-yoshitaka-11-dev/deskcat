@@ -46,24 +46,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
-          # Pull Requestでは、この後のstepがPR側のPowerShellを実行する。
+          # Pull Requestでは、この後のstepがPR側の検証scriptを実行する。
           # checkoutが.git/configへ残すtokenを、そのscriptから読めないようにする。
           persist-credentials: false
 
       - name: Check documentation links
-        shell: pwsh
-        run: ./scripts/validate-doc-links.ps1
+        run: python3 scripts/validate_doc_links.py
 
       - name: Test link validators
-        shell: pwsh
         # harnessがrepository rootをcurrent directoryとして暗黙に要求しないことを
         # CIで回帰させる。script自体はcheckoutの絶対pathから起動する。
         working-directory: ${{ runner.temp }}
-        run: '& "$env:GITHUB_WORKSPACE/scripts/test-link-validators.ps1"'
+        run: python3 "$GITHUB_WORKSPACE/scripts/test_link_validators.py"
 
       - name: Prepare public source
-        shell: pwsh
-        run: ./scripts/prepare-pages.ps1
+        run: python3 scripts/prepare_pages.py
 
       - name: Configure Pages
         uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
@@ -75,17 +72,15 @@ jobs:
           destination: ./_site
 
       - name: Validate output
-        shell: pwsh
-        run: ./scripts/validate-pages-output.ps1 -SiteRoot ./_site
+        run: python3 scripts/validate_pages_output.py --site-root ./_site
 
       # 公開境界の回帰test。未宣言asset、追跡外asset、hash不一致、size超過で
       # stagingが失敗することを確認する。`_site`は既に検証済みで影響しない。
       - name: Test publish guards
-        shell: pwsh
         # `PAGES_SOURCE=.pages-src`はcallerのCWDではなくrepository root基準で
         # 解決する。test harness内のexact-path assertionを非root CWDで実行する。
         working-directory: ${{ runner.temp }}
-        run: '& "$env:GITHUB_WORKSPACE/scripts/test-pages-guards.ps1"'
+        run: python3 "$GITHUB_WORKSPACE/scripts/test_pages_guards.py"
 
       - name: Upload Pages artifact
         if: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}

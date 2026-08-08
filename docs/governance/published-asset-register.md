@@ -43,7 +43,7 @@ Assetを追加する前に、次をすべて満たす。
 | 寸法・size | 720 x 720、77,305 bytes |
 | 実機写真か | いいえ。入口pageのcaptionへ明記済み |
 
-検証に使うSHA-256の正本は`pages/assets-manifest.psd1`である。`prepare-pages.ps1`はそのhashと実fileを照合し、不一致でbuildを失敗させる。Assetを差し替える場合は、manifestと本文書の両方を更新する。
+検証に使うSHA-256の正本は`pages/assets-manifest.json`である。`prepare_pages.py`はそのhashと実fileを照合し、不一致でbuildを失敗させる。Assetを差し替える場合は、manifestと本文書の両方を更新する。
 
 ## 履歴
 

@@ -6,44 +6,46 @@
 
 | Script | 用途 | 実行元 |
 |---|---|---|
-| `validate-doc-links.ps1` | リポジトリ全体のMarkdown相対linkを検査する | Pages workflowとlocal |
-| `prepare-pages.ps1` | 公開対象を`.pages-src/`へ複製し、公開禁止情報を検査する。診断のfile pathはstaging-root相対で出力する | Pages workflowとlocal |
-| `validate-pages-output.ps1` | 生成済み`_site/`のlinkと公開禁止情報を検査する。診断のfile pathはsite-root相対で出力する | Pages workflowとlocal |
-| `test-link-validators.ps1` | source／生成siteのanchor、Pages baseurl（引用、YAML comment、末尾slashを含む）、時間制限付きHTML解析、local URL解決（encoding、unsafe scheme、directory、曖昧候補、case、reparse point、非HTML assetを含む）、公開禁止pattern・local path・値の非露出、Markdown link抽出、追跡file／symlink helperの0・1・複数件、PathSpec、Git quoting前提、非ASCII pathを検証する。link作成不可の環境では対象caseを成功件数と分けてskipする | Pages workflowとlocal |
-| `test-pages-guards.ps1` | 公開境界の回帰test（未宣言asset、追跡外file、hash不一致、size超過、公開禁止patternとlocal staging pathの非露出、**Gitのmode 120000によるsymlink除外**、**file属性のreparse point除外**、拡張子）を検証する。symlinkの2 caseは、どちらのguardが働いたかをskip理由で確認する | Pages workflowとlocal |
-| `lib/publish-guards.ps1` | secret／個人path pattern、path containmentとroot相対表記、追跡file列挙（`core.quotePath=false`で非ASCII pathをescapeさせない）、Gitのmodeによるsymlink判定、見出しanchor生成、Markdown link抽出、null安全な読み出し。`validate-doc-links.ps1`、`prepare-pages.ps1`、`validate-pages-output.ps1`、`test-link-validators.ps1`がdot-sourceする（`test-pages-guards.ps1`は`prepare-pages.ps1`を子processとして起動するため直接は参照しない） | dot-source専用 |
+| `validate_doc_links.py` | リポジトリ全体のMarkdown相対linkを検査する。公開対象の判定は`prepare_pages.py`と揃え、Gitのmode 120000のsymlinkを経由するpathは複製されないため未公開として扱う | Pages workflowとlocal |
+| `prepare_pages.py` | 公開対象を`.pages-src/`へ複製し、公開禁止情報を検査する。診断のfile pathはstaging-root相対で出力する | Pages workflowとlocal |
+| `validate_pages_output.py` | 生成済み`_site/`のlinkと公開禁止情報を検査する。拡張子allowlistとsize上限は`.pages-src/`側と同じ値を使う。診断のfile pathはsite-root相対で出力し、`EXTENSIONS=`／`UNSCANNED=`／`LARGEST=`で公開物の内訳を残す | Pages workflowとlocal |
+| `test_link_validators.py` | source／生成siteのanchor、Pages baseurl（引用、YAML comment、末尾slashを含む）、時間制限付きHTML解析、local URL解決（encoding、unsafe scheme、directory、曖昧候補、case、reparse point、非HTML assetを含む）、公開禁止pattern・local path・値の非露出、Markdown link抽出、追跡file／symlink helperの0・1・複数件、PathSpec、Git quoting前提、非ASCII path、**symlinkを途中に挟むpathとsymlink自身へのlinkが未公開として報告されること**を検証する。link作成不可の環境では対象caseを成功件数と分けてskipする | Pages workflowとlocal |
+| `test_pages_guards.py` | 公開境界の回帰test（未宣言asset、追跡外file、hash不一致、size超過、公開禁止patternとlocal staging pathの非露出、**Gitのmode 120000によるsymlink除外**、**file属性のreparse point除外**、拡張子）を検証する。symlinkの2 caseは、どちらのguardが働いたかをskip理由で確認する | Pages workflowとlocal |
+| `lib/publish_guards.py` | secret／個人path pattern、path containmentとroot相対表記、追跡file列挙（`core.quotePath=false`で非ASCII pathをescapeさせない）、Gitのmodeによるsymlink判定、見出しanchor生成、Markdown link抽出、null安全な読み出し、reparse pointを跨がないtree走査。`validate_doc_links.py`、`prepare_pages.py`、`validate_pages_output.py`、`test_link_validators.py`、`test_pages_guards.py`の5本すべてがimportする。`test_link_validators.py`と`test_pages_guards.py`は、importとは別に対象scriptを子processとして起動し、exit codeと診断出力まで検査する | import専用 |
 
-`lib/publish-guards.ps1`は単体で実行しない。secretや個人pathのpatternはこのfileだけで定義し、各scriptへ複製しない。
+`lib/publish_guards.py`は単体で実行しない。secretや個人pathのpatternはこのfileだけで定義し、各scriptへ複製しない。
 
 ## 実行環境の前提
 
-PowerShell 7以降（`pwsh`）を前提とする。Pages workflowも`shell: pwsh`で実行する。
-
-この前提により、非ASCIIを含むscriptにBOMを付けない。`pwsh`はBOMなしをUTF-8として
-読む。Windows PowerShell 5.1はBOMなしをANSIとして読むため日本語コメントが壊れるが、
-5.1は対象外とする。PSScriptAnalyzerの`PSUseBOMForUnicodeEncodedFile`はこの前提のもとで
-意図的に満たしていない。5.1対応が必要になった時点でBOM付与を再検討する。
+**Python 3の標準ライブラリだけ**を前提とする（[ADR-0006](../docs/decisions/0006-validation-script-language.md)）。
+サードパーティpackageを導入しない。virtualenvも要らない。
 
 Localでのbuild前検査:
 
-```powershell
-./scripts/validate-doc-links.ps1
-./scripts/test-link-validators.ps1
-./scripts/prepare-pages.ps1
-./scripts/test-pages-guards.ps1
+```bash
+python3 scripts/validate_doc_links.py
+python3 scripts/test_link_validators.py
+python3 scripts/prepare_pages.py
+python3 scripts/test_pages_guards.py
 ```
 
-Pages CIは`test-link-validators.ps1`と`test-pages-guards.ps1`をrunnerの一時directoryから
+test harnessは`unittest`であり、`unittest`のrunnerからも実行できる。
+
+```bash
+python3 -m unittest discover --start-directory scripts --pattern "test_*.py" --verbose
+```
+
+Pages CIは`test_link_validators.py`と`test_pages_guards.py`をrunnerの一時directoryから
 絶対pathで起動する。両harnessはrepository root以外のcurrent directoryでも成功し、
 `PAGES_SOURCE=.pages-src`をrepository root基準で解決しなければならない。
 
-`validate-pages-output.ps1`は生成済みの`_site/`を対象とするため、上記の検査だけでは実行できない。
+`validate_pages_output.py`は生成済みの`_site/`を対象とするため、上記の検査だけでは実行できない。
 localで実行するにはJekyll build（Ruby、Jekyll、GitHub Pages gem）が必要である。
 
-```powershell
+```bash
 # Jekyll buildを実行できる環境の場合
 jekyll build --source .pages-src --destination _site
-./scripts/validate-pages-output.ps1 -SiteRoot ./_site
+python3 scripts/validate_pages_output.py --site-root ./_site
 ```
 
 `bundle exec`は使わない。このrepositoryは`Gemfile`を追跡しておらず、Bundlerが解決する対象が無い。
@@ -54,6 +56,48 @@ CIのPages buildは`actions/jekyll-build-pages`が内部のGemfileで実行す�
 Jekyll環境を用意しない端末では、出力検査はPull RequestのCIに任せる。
 その場合、build後にしか分からない問題（`.md` linkの未変換、生成siteでの404）は
 CIで初めて検出される。
+
+## 公開物のscan範囲
+
+実際にGitHub Pagesへuploadされるartifactは`_site/`である。`.pages-src/`ではない。
+`validate_pages_output.py`のsummaryが、その内訳を毎回logへ残す。
+
+```text
+EXTENSIONS=(none)=1,.css=1,.html=44,.ico=1,.jpg=1,.md=44
+UNSCANNED=.ico=1,.jpg=1
+LARGEST=205894 docs/protocol/esp32-pi-protocol.html
+```
+
+`UNSCANNED=`はsecret／個人pathの内容scanが効かない拡張子である。**binaryは内容scanに
+意味が無いため、意図して対象外にしている。** `favicon.ico`はscriptが固定byteから生成し、
+`.jpg`はmanifestがSHA-256で固定するため、内容は別の手段で押さえている。
+
+`_site/`にも`.pages-src/`と同じ拡張子allowlistとsize上限を課す。2026-08-08時点の
+`_site`は上記の6種類だけで、いずれも許可済み・上限内であり、どちらの判定も現状no-opである。
+Jekyllやpluginが将来別の拡張子を生成したときに、気付かないまま公開せず止めるために置いている。
+
+`TEXT_EXTENSIONS`へ`.xml`や`.json`を加えることは**しない**。`_site`にそれらは存在せず、
+存在しない拡張子へ備えるのは推測になる。`EXTENSIONS=`が変化したら、その時点で判断する。
+
+## 公開対象の判定を揃える
+
+`validate_doc_links.py`（build前）と`prepare_pages.py`（staging）は、同じ「公開されるか」を
+別々に判定する。ここが食い違うと、link検査を通ったlinkが生成siteで404になる。
+
+食い違いの実体はsymlinkだった。`prepare_pages.py`はreparse point配下へ降りないため複製しないが、
+`os.path.exists`はlinkを辿るため、link検査は「存在する」と判定していた。
+どちらも`guards.get_tracked_symlinks`（Gitのmode 120000）を見るようにして揃えてある。
+
+この件は生成site側でも検出できる。CIの`workflow_dispatch`で実際にJekyll buildを通したところ、
+`Check documentation links`は成功し、`Validate output`が失敗した。
+
+```text
+Unconverted Markdown link in docs/governance/index.html: ../linkdir/target.md
+```
+
+多層で受けている以上、build前の判定は必須ではない。それでも直したのは、この
+messageが「拡張子を`.html`へ直せ」と読め、真因である「そのpathは公開されない」へ
+辿り着かないためである。**原因を出す層で報告する。**
 
 規則:
 

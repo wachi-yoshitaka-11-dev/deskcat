@@ -20,13 +20,13 @@ Concept素材を許すのは、[ADR-0003](../docs/decisions/0003-public-document
 
 ## 公開対象
 
-`scripts/prepare-pages.ps1`は、次を`.pages-src/`へwhitelist copyする。
+`scripts/prepare_pages.py`は、次を`.pages-src/`へwhitelist copyする。
 
 - `pages/_config.yml`
 - `pages/index.md`
 - `pages/404.md`
-- `pages/assets-manifest.psd1`が列挙した`pages/assets/`配下のasset
-- Rootの公開文書（`README.md`、`AGENTS.md`、`CONTRIBUTING.md`、`SECURITY.md`、`LICENSE`）。`LICENSE`はMarkdownではないため、`prepare-pages.ps1`が個別に扱う
+- `pages/assets-manifest.json`が列挙した`pages/assets/`配下のasset
+- Rootの公開文書（`README.md`、`AGENTS.md`、`CONTRIBUTING.md`、`SECURITY.md`、`LICENSE`）。`LICENSE`はMarkdownではないため、`prepare_pages.py`が個別に扱う
 - `docs/`配下の**Markdownだけ**
 
 `pages/_config.yml`の`baseurl`は、top-levelのplain key `baseurl:`として1件だけ定義する。colonと非空valueの間にはspaceまたはtabを置き、valueは単一行scalarとする。空value、single／double quote、引用符の外側にあるinline comment、末尾slashはvalidatorが明示的に扱う。Quoted key、anchor／alias、block scalar、flow mappingで`baseurl`を定義しない。
@@ -37,14 +37,14 @@ Concept素材を許すのは、[ADR-0003](../docs/decisions/0003-public-document
 
 文書向けの図版を公開する必要が生じた場合は、`docs/`へ置かず、下記のasset追加手順に従って`pages/assets/`へ登録する。
 
-`pages/assets/`には、入口pageが参照するassetだけを置く。公開対象は`pages/assets-manifest.psd1`が列挙したexact pathに限られ、列挙外のfileを置くとbuildが失敗する。Assetを追加する手順は次のとおり。
+`pages/assets/`には、入口pageが参照するassetだけを置く。公開対象は`pages/assets-manifest.json`が列挙したexact pathに限られ、列挙外のfileを置くとbuildが失敗する。Assetを追加する手順は次のとおり。
 
 1. [公開asset register](../docs/governance/published-asset-register.md)へ出所と再配布許諾を登録する。
 2. Imageは表示寸法の2倍程度へ縮小する。1 fileの上限は1 MiBである。
-3. `pages/assets-manifest.psd1`へpathを追加する。Binaryはあわせて`Sha256`を記録する。
-4. Gitへ追跡させる。追跡外のfileはmanifestへ書いても公開されない。
+3. `pages/assets-manifest.json`へpathを追加する。Binaryはあわせて`sha256`を記録する。
+4. Gitへ追跡させる。追跡外のfileをmanifestへ書くと、`prepare_pages.py`が`Declared asset is not tracked by Git`で失敗する。そのassetが公開されないだけでなく、staging全体が止まる。
 
-Hardware写真や技術図のような文書向けimageはここへ置かない。境界の回帰testは`scripts/test-pages-guards.ps1`にある。
+Hardware写真や技術図のような文書向けimageはここへ置かない。境界の回帰testは`scripts/test_pages_guards.py`にある。
 
 `pages/assets/css/style.scss`は、Cayman themeを差し替えずに上書きするtheme override stylesheetである。対象は配色、typography、table、blockquote、code block、responsive layoutである。Themeの差し替えはdependency reviewが必要なため、[ADR-0003](../docs/decisions/0003-public-documentation-publishing.md)に従って独立した変更として扱う。
 
@@ -60,6 +60,6 @@ Hardware写真や技術図のような文書向けimageはここへ置かない�
 
 このため、`pages/index.md`をGitHubのrepository画面で開くと、相対linkはこのdirectory基準で解決されて404になる。これはlinkの誤りではなく、生成siteでのみ有効な記法である。
 
-`scripts/validate-doc-links.ps1`は、この2 fileだけをstaging root基準で検査する。link先を変更したら同scriptを実行する。
+`scripts/validate_doc_links.py`はrepository全体の追跡Markdownを検査する。そのうちlinkをstaging root基準で解決するのは、この2 fileだけである。他のfileのlinkは、そのfile自身の位置から解決する。link先を変更したら同scriptを実行する。
 
 方針は[ADR-0003](../docs/decisions/0003-public-documentation-publishing.md)、操作手順は[GitHub Pages公開runbook](../docs/runbooks/github-pages-publishing.md)を参照する。

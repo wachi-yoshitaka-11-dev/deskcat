@@ -29,6 +29,28 @@ Issueには次を含める。
 
 無関係なrefactor、新たに見つけた不具合、別実験には別Issueを使う。
 
+## Issueの命名
+
+Issue titleにprefixを付けない。`<概要>`だけの素の説明文にする。
+種別は`type:bug`／`type:feature`／`type:decision`／`type:experiment`／`type:maintenance`labelで表現する。
+GitHubのIssue一覧はlabelを常にtitleの横に表示するため、titleにも同じ情報を重複して書く必要がない。
+
+`[Bug]`のようなbracket prefixや、`FND-001`／`GH-005`のような連番付きID形式は使わない。
+連番による識別が必要な場合は、GitHub Issue番号（`#1`等）をそのまま使う。
+
+### 起票時に設定する項目
+
+| 項目 | 必須／任意 | 値の決め方 |
+|---|---|---|
+| title | 必須 | 上記の形式 |
+| milestone | 必須 | 対応するM0〜M6 milestoneを設定する |
+| label（`type:*`／`priority:*`） | 必須 | それぞれ1つ設定する |
+| label（`area:*`） | 対象componentがある場合のみ | 対象componentに対応するlabelを設定する。repository全体の保守作業など特定componentに限らない場合は省略する |
+| label（`status:blocked`／`needs:*`） | 該当時のみ | 依存未解決なら`status:blocked`、実機証拠や人間の判断が必要なら`needs:hardware-test`／`needs:decision`を設定する |
+| assignee | 必須 | 対応を担当する人を設定する。未定でも起票者自身を暫定assigneeとする |
+| project | 必須 | Projects v2 board（`deskcat`、`https://github.com/users/wachi-yoshitaka-11-dev/projects/5`）にitemとして追加し、`Status`を設定する |
+| 開始日／終了日（`Start date`／`Target date`） | 任意 | 着手日・完了目標が具体的に決まった時点でのみProjects v2 board上で設定する。未定なら空欄のままでよい |
+
 ## Branches
 
 `main`は安定版とGitHub Pages公開元、`develop`は通常開発の統合先である。
@@ -115,7 +137,7 @@ PC testはLCD、電気、timing、sensor、機構の検証を代替しない。
 
 Pull requestには次を含める。
 
-- 関連Issueへのlink
+- 関連Issueへのlink（`Closes #N`等）
 - 結果と範囲の説明
 - 仕様変更の特定
 - 検証証拠
@@ -123,6 +145,51 @@ Pull requestには次を含める。
 - 新規dependency
 - 残存riskと`TBD`
 - 無関係なformat変更やrefactorがないこと
+
+### 関連Issueの書き方
+
+Issue branchからのPull Request（base `develop`）では`Closes #N`を使う。これはtraceability
+目的の記載であり、GitHub純正の自動close機能は使わない。closeを起こすのはdefault branch
+（`main`）へのmergeだけであり、base `develop`のmergeでは働かないためである。
+
+**`develop`から`main`への昇格Pull Requestでは`Closes #N`を使わない。** baseが`main`
+なのでGitHubの自動closeが実際に働き、boardによるclose管理と二重になる。昇格Pull Requestに
+含まれるIssueは`Refs #N`かplain linkで列挙する。
+
+代わりに、Projects v2 board（`deskcat`）でcloseを管理する。
+boardでは6つのworkflowが有効である。全一覧はRepository設定に記録しており、
+このうちcloseに関わるのは`Auto-close issue`と`Pull request merged`の2つである。
+
+- `Pull request merged`: mergeされた**Pull Request item**の`Status`を`Done`にする
+- `Auto-close issue`: **item**の`Status`が`Done`になったとき、そのitemのIssueをcloseする
+
+この2つは別のitemに作用する。Pull Requestのmergeで`Done`になるのはPull Request item側
+であり、Issue itemの`Status`は変わらない。したがって**mergeだけではIssueはcloseされない。**
+merge後に、対応するIssue itemの`Status`を`Done`にする。これにより`Auto-close issue`が
+Issueをcloseする。
+
+作成時に、対応するIssueと同じassignee・label・milestoneを設定し、Projects v2 board
+（`deskcat`、`https://github.com/users/wachi-yoshitaka-11-dev/projects/5`）へitemとして
+追加して`Status`を設定する。boardが進行管理の正本であり、boardに無いPull Requestは
+`Pull request merged` workflowの対象にならず、merge済みかどうかがboard上で追えない。
+
+board上のworkflow構成は[Repository設定](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/.github/REPOSITORY_SETTINGS.md)に記録する。
+
+### Merge方式
+
+baseで決まる。
+
+| base | 方式 | 理由 |
+|---|---|---|
+| `develop` | **squash merge** | Issue branchの試行錯誤を1 commitにまとめ、`develop`の履歴を「1 Issue = 1 commit」に保つ |
+| `main` | **squashしない。merge commitにする** | 昇格をsquashすると`develop`側の個々のcommitが`main`の履歴から消え、両branchが別系列になる |
+
+squash mergeしたbranchはcommit hashが変わるため、`git branch -d`が「未merge」と判定する。
+削除前に`git diff <branch> origin/develop`が空であることを確認してから`-D`する。
+
+昇格Pull Requestのmerge後は`origin/develop`が消えていないことを確認する。
+[#33](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/33)で`delete_branch_on_merge`が
+`develop`自体を削除する事故が起きている。Repository Rulesetで禁止済みだが確認はする。
 
 ## Gitと秘密情報
 

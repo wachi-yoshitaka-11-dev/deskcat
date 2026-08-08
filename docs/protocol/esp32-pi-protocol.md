@@ -1150,7 +1150,7 @@ fixtureを作成するまで、この節を「両側が検証済み」の根拠�
 `v: 1`が確定版を意味するのは、fixtureが存在し両側のparserが合格した時点である
 （[§11](#11-versioning)）。
 
-作成作業は[初期Issue](../backlog/initial-issues.md)のM2-001が担当する。
+作成作業は[初期Issue](../backlog/initial-issues.md)の#9が担当する。
 [Implementation Readiness Review](../runbooks/implementation-readiness-review.md)も
 「承認済みprotocol制限とfixture」を`Fail／TBD`として記録している。
 `PROTO-TBD-016`はprotocol側の未決事項としての追跡であり、
@@ -1175,7 +1175,7 @@ fixtureを作成するまで、この節を「両側が検証済み」の根拠�
 | PROTO-TBD-013 | Stale commandの拒否条件（command age、session遷移後の未ACK commandの扱い） | Reconnect試験とfail-safe試験。[HW-TBD-018](../hardware/tbd-register.md)の通信断時fail-safe／reconnect条件、および[HW-TBD-020](../hardware/tbd-register.md)のCommand timeout fieldと対で確定する。Command timeoutの実測値はhardware側、stale commandの拒否条件はProtocol側を正とする。**サーボ出力の有効化条件に含まれる**（[servo-safety-limits](../hardware/servo-safety-limits.md#サーボ出力を有効化してよい条件)） |
 | PROTO-TBD-014 | 実行時安全制限の超過を報告するfault eventの名前とpayload schema。拘束／過負荷、最大連続動作時間の超過、duty cycle上限の超過を、payload fieldまたはcodeで**区別できる**こと | [Servo Safety Limits](../hardware/servo-safety-limits.md#拘束stallと過負荷)の検知手段確定後。[HW-TBD-020](../hardware/tbd-register.md)と対で確定する。**サーボ出力の有効化条件に含まれる**（[servo-safety-limits](../hardware/servo-safety-limits.md#サーボ出力を有効化してよい条件)） |
 | PROTO-TBD-015 | Draft schema revisionの表明方法（envelope fieldかout-of-band照合か） | Draft間の相互接続が必要になった時点。fixture一致で足りるなら追加しない |
-| PROTO-TBD-016 | §12のconformance fixtureの実体作成と配置 | Rust workspace生成後。`crates/deskcat-protocol/tests/fixtures/`へ置き、両側の実装が同一fileで合格することを確認する。実施は[初期Issue](../backlog/initial-issues.md)のM2-001 |
+| PROTO-TBD-016 | §12のconformance fixtureの実体作成と配置 | Rust workspace生成後。`crates/deskcat-protocol/tests/fixtures/`へ置き、両側の実装が同一fileで合格することを確認する。実施は[初期Issue](../backlog/initial-issues.md)の#9 |
 | PROTO-TBD-017 | `boot`再送契約のparameter（初期間隔、backoff係数、通常再送の回数、recovery間隔、**無応答時に送出を止めるまでの有限recovery budget**、**同一`(sid, id)`の最大再送回数**、**`rate_limited`で拒否されたときのcooldown後再送を含む上限**）。recovery budgetの総待ち時間は`PROTO-TBD-012`の拒否ACK最悪送出待ち時間以上とする。終了条件そのものは§4.1で確定済み | 起動時のlink確立latency測定とreconnect試験 |
 
 ## Revision履歴
