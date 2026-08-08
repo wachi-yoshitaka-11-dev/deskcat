@@ -364,6 +364,82 @@ class SourceValidatorTests(ValidatorAssertions):
         )
         self.assert_outcome(run, True, expected_message="BROKEN=0")
 
+    def _add_index_symlink(self, root, repository_relative, link_text):
+        """working treeを変えずに、indexへmode 120000のentryを足す。
+
+        判定がfilesystemではなくGitのmodeを見るため、fixtureもindexへ直接登録する。
+        OSのsymlink作成権限に依存させず、Windowsでも同じcaseを実行するためである。
+        """
+        result = subprocess.run(
+            ["git", "-C", root, "hash-object", "-w", "--stdin"],
+            input=link_text,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+        )
+        if result.returncode != 0:
+            raise RuntimeError(f"git hash-object failed: {result.stdout}{result.stderr}")
+        blob = result.stdout.strip()
+        _git(
+            root,
+            "update-index",
+            "--add",
+            "--cacheinfo",
+            f"120000,{blob},{repository_relative}",
+        )
+        self.addCleanup(_git, root, "update-index", "--force-remove", repository_relative)
+
+    def test_links_through_a_symlink_are_reported_as_unpublished(self):
+        """symlinkを経由するlinkは、存在しても公開対象として通さない。
+
+        `prepare_pages.py`はreparse point配下へ降りないため複製しないが、
+        `os.path.exists`はlinkを辿るので存在確認だけでは区別できない。
+        生成site側も`Unconverted Markdown link`として拾うが、そのmessageは
+        「拡張子を直せ」と読める。原因である「未公開」をここで報告する。
+
+        working tree側は通常のdirectoryとfileにしておく。`os.path.exists`が成功する、
+        つまり「存在するのに複製されない」状態でなければこの判定へ到達しない。
+        symlinkがpathの途中にある場合と、target自身である場合の両方を確認する。
+        """
+        root = _state["source_root"]
+        real_directory = os.path.join(_state["source_docs"], "realdir")
+        link_directory = os.path.join(_state["source_docs"], "linkdir")
+        for directory in (real_directory, link_directory):
+            os.makedirs(directory, exist_ok=True)
+            _write(os.path.join(directory, "target.md"), "# Target\n")
+        self.addCleanup(_remove_fixture, link_directory)
+        self.addCleanup(_remove_fixture, real_directory)
+        _write(os.path.join(_state["source_docs"], "linkfile.md"), "# Target\n")
+        self.addCleanup(os.remove, os.path.join(_state["source_docs"], "linkfile.md"))
+        _git(root, "add", "--", "docs/realdir/target.md")
+        self.addCleanup(
+            _git, root, "update-index", "--force-remove", "docs/realdir/target.md"
+        )
+        self._add_index_symlink(root, "docs/linkdir", "realdir")
+        self._add_index_symlink(root, "docs/linkfile.md", "realdir/target.md")
+
+        # 直接参照は公開対象として通る。symlinkを経由しないため。
+        _write(_state["source_page"], "# Existing\n\n[direct](realdir/target.md)")
+        self.assert_outcome(
+            run_validator(VALIDATE_DOCS, ["--repository-root", root]),
+            True,
+            expected_message="BROKEN=0",
+        )
+        # 同じ内容へsymlinkのdirectoryを跨いで辿るlink。
+        _write(_state["source_page"], "# Existing\n\n[via directory](linkdir/target.md)")
+        self.assert_outcome(
+            run_validator(VALIDATE_DOCS, ["--repository-root", root]),
+            False,
+            expected_message="links to unpublished path",
+        )
+        # target自身がsymlinkであるlink。
+        _write(_state["source_page"], "# Existing\n\n[symlink itself](linkfile.md)")
+        self.assert_outcome(
+            run_validator(VALIDATE_DOCS, ["--repository-root", root]),
+            False,
+            expected_message="links to unpublished path",
+        )
+
     def test_unverifiable_anchor_is_reported(self):
         """anchor集合を持たないMarkdownへのfragment linkを、無検査で通さない。
 

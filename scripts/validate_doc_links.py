@@ -76,6 +76,24 @@ def _zero_tracked_diagnostics(root):
     )
 
 
+def _passes_through_symlink(target_normalized, tracked_symlinks):
+    """target自身か、その途中のdirectoryがGit上のsymlinkかを返す。
+
+    `prepare_pages.py`はreparse point配下へ降りないため、symlinkを経由するpathは
+    複製されない。一方`os.path.exists`はlinkを辿るので、存在確認だけでは公開対象と
+    区別できない。判定はfilesystemではなくGitのmode（120000）で行う。作業ツリー上の
+    実体は`core.symlinks=false`のcheckoutで変わるが、indexのmodeは環境に依存しない。
+
+    `target_normalized`はroot相対のslash区切りである。途中のdirectoryも見るのは、
+    `docs/linkdir/target.md`のようにlinkがdirectory側に付いている場合を拾うため。
+    """
+    parts = target_normalized.split("/")
+    for index in range(1, len(parts) + 1):
+        if "/".join(parts[:index]) in tracked_symlinks:
+            return True
+    return False
+
+
 def _collect_anchors(markdown_files):
     """各fileの見出しから生成されるanchor集合を作る。
 
@@ -305,6 +323,15 @@ def main(argv=None):
                 )
                 or target_normalized in published_root_documents
             )
+            # symlinkを経由するpathは、存在しても複製されない。stagingはreparse point
+            # 配下へ降りないためである。ここで見ないと、`os.path.exists`がlinkを辿って
+            # 「公開対象」と判定し、生成siteで404になるlinkを通してしまう。
+            # 生成site側の検査も`Unconverted Markdown link`として拾うが、そのmessageは
+            # 「拡張子を直せ」と読めるため、原因である「未公開」をここで正しく報告する。
+            if is_published_target and _passes_through_symlink(
+                target_normalized, tracked_symlinks
+            ):
+                is_published_target = False
             if not is_published_target:
                 problems.append(
                     f"Published doc {relative_file} links to unpublished path:"
