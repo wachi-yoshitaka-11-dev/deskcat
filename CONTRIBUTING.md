@@ -51,6 +51,10 @@ GitHubのIssue一覧はlabelを常にtitleの横に表示するため、titleに
 | project | 必須 | Projects v2 board（`deskcat`、`https://github.com/users/wachi-yoshitaka-11-dev/projects/5`）にitemとして追加し、`Status`を設定する |
 | 開始日／終了日（`Start date`／`Target date`） | 任意 | 着手日・完了目標が具体的に決まった時点でのみProjects v2 board上で設定する。未定なら空欄のままでよい |
 
+この表はIssue itemの規約である。Pull Request itemでは同じ2 fieldが必須であり、`Start date`は
+作成日という実績、`Target date`はmerge見込み日という予定を表す。`Target date`はmergeまたは
+closeの**完了後**に実績値へ更新する。[Pull request](#pull-request)節を参照する。
+
 ## Branches
 
 `main`は安定版とGitHub Pages公開元、`develop`は通常開発の統合先である。
@@ -146,6 +150,14 @@ Pull requestには次を含める。
 - 残存riskと`TBD`
 - 無関係なformat変更やrefactorがないこと
 
+作成直後に、boardへitemを追加して次を設定する。**空欄を検出する自動化は無いため、
+ここが唯一のgateである**（詳細は[Pull Request itemの開始日／終了日](#pull-request-itemの開始日終了日)の
+[誰がいつ確認するか](#誰がいつ確認するか)）。
+
+- [ ] `Status`
+- [ ] `Start date`（作成日。JSTで判断する）
+- [ ] `Target date`（mergeを見込む日。**merge完了後またはclose完了後**に実績値へ更新する）
+
 ### 関連Issueの書き方
 
 Issue branchからのPull Request（base `develop`）では`Closes #N`を使う。これはtraceability
@@ -174,6 +186,42 @@ Issueをcloseする。
 `Pull request merged` workflowの対象にならず、merge済みかどうかがboard上で追えない。
 
 board上のworkflow構成は[Repository設定](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/.github/REPOSITORY_SETTINGS.md)に記録する。
+
+### Pull Request itemの開始日／終了日
+
+Pull Request itemの`Start date`／`Target date`は必須とし、次の値を設定する。
+Issue itemでは両fieldが予定であり未定なら空欄でよいが、Pull Request itemの`Start date`は
+作成時点で確定した実績であり、空欄にする理由がない。
+
+| field | 値 | 設定時期 |
+|---|---|---|
+| `Start date` | Pull Requestの作成日。作成後は変更しない | 作成時 |
+| `Target date` | 作成時はmergeを見込む日（予定）、mergeまたはclose後はその実績日 | 作成時に見込みを設定し、**merge完了後またはclose完了後**に実績値へ更新する |
+
+`Target date`だけが予定から実績へ変わる。merge時に`Status`を`Done`にするworkflowは
+日付を書き換えないため、実績値への更新は手作業で行う。mergeせずcloseした場合の実績日は
+close日である。
+
+日付はJST（UTC+9）で判断する。GitHubのAPIが返す時刻はUTCであり、JSTの`00:00`から`08:59`に
+作成したPull RequestはUTCでは前日の日付になるため、そのまま転記しない。
+
+#### 誰がいつ確認するか
+
+この2 fieldを強制する自動化は無い。**空欄を検出する仕組みが無いため、次の手作業をgateとする。**
+
+| 時期 | 実施者 | 確認内容 |
+|---|---|---|
+| Pull Request作成直後 | 作成者 | boardへitemを追加し、`Status`・`Start date`・`Target date`を設定する。`Pull request`節の作成時checklist（この文書の上部）に含めてある |
+| **merge後** | merge実施者 | `Target date`をJSTのmerge実績日へ更新する |
+| **close後** | close実施者 | `Target date`をJSTのclose実績日へ更新する |
+| **reopen後** | reopen実施者 | `Target date`を新しいmerge見込み日へ戻す。再度mergeまたはcloseしたら、上の2行に従って実績日へ更新する |
+
+**更新は「後」であって「直前」ではない。**merge前に実績日を確定できないためである。JSTの日付を
+またいだ場合や、mergeを中止した場合に、誤った実績日が残る。
+
+自動化するなら、`Status`を`Done`にするworkflowと同じ場所で`Target date`を書き換えるのが
+自然だが、Projects v2のworkflowは日付fieldを更新できない。GitHub Actionsから
+Projects v2 APIを叩く実装が要るため、**現時点では手作業とし、将来の課題として残す**。
 
 ### Merge方式
 

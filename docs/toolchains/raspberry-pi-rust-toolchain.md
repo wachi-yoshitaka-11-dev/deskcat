@@ -2,11 +2,11 @@
 
 > 状態: 調査済み。Raspberry Pi実機は未検証
 > 調査日: 2026-07-27
-> 対象board: Raspberry Pi Zero WH
+> 対象board: Raspberry Pi Zero W（V1.1。ヘッダなし版にpin headerをハンダ付けした個体）
 
 ## 結論
 
-Raspberry Pi Zero WH は Zero 2 W とは異なる。公式 product information では BCM2835、single-core Arm11 / Armv6、512 MB の機種である。したがって、64-bit Arm や Armv7 を前提にしない。
+Raspberry Pi Zero W は Zero 2 W とは異なる。公式 product information では BCM2835、single-core Arm11 / Armv6、512 MB の機種である。したがって、64-bit Arm や Armv7 を前提にしない。
 
 32-bit Raspberry Pi OS と hard-float ABI を実機で確認できた場合、Rust の candidate target は次である。
 
@@ -18,7 +18,7 @@ Rust 公式の platform support では、この target は Armv6 Linux hard-floa
 
 ## 初期方針
 
-最初は Raspberry Pi Zero WH 上の native build を試す。
+最初は Raspberry Pi Zero W 上の native build を試す。
 
 理由:
 
@@ -26,7 +26,7 @@ Rust 公式の platform support では、この target は Armv6 Linux hard-floa
 - 実際の OS で build と run を同時に確認できる。
 - 初期の小さな service では cross toolchain の保守を先に増やさない。
 
-Pi Zero WH は CPU と RAM が限られるため、build 時間と storage 使用量を必ず記録する。実用上困難と確認できた場合だけ cross compilation を別 Issue で導入する。
+Pi Zero W は CPU と RAM が限られるため、build 時間と storage 使用量を必ず記録する。実用上困難と確認できた場合だけ cross compilation を別 Issue で導入する。
 
 ## 実機で確定する情報
 
@@ -34,7 +34,7 @@ Pi Zero WH は CPU と RAM が限られるため、build 時間と storage 使�
 
 | 項目 | 目的 |
 |---|---|
-| Board model と revision | Zero WH と Zero 2 W の取り違え防止 |
+| Board model と revision | Zero W と Zero 2 W の取り違え防止。現物は`Raspberry Pi Zero W V1.1`（[hardware-bom.md](../hardware/hardware-bom.md) SBC-01） |
 | OS name、release、32/64 bit | 配布物と support の基準 |
 | `uname -m` | kernel architecture |
 | `getconf LONG_BIT` | userspace bitness |
