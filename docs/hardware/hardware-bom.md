@@ -55,6 +55,26 @@
 | PROTO-01 | 試作用配線 | ブレッドボード(秋月 EIC-3901、6穴版)、ミニブレッドボードBB-601(スケルトン)×2、クリップ付コード5色45cm×10本、細いピンヘッダ20P×5(Pi header用に一部使用済み) | Selected | 手持ち品。個別の許容電流はメーカー資料未確認 | 回路に従う | 回路に従う（ジャンパー線・ブレッドボード接点の許容電流は一般に小電流用途。Servo peak電流経路には別途太い線を使う想定） | TBD | 現物写真・購入履歴で確認済み。Servo電源のようなpeak電流が流れる経路は、breadboard接点やジャンパー線でなく、より太い専用線を使うことを`power-budget.md`の配線・保護表で検討する |
 | MEAS-01 | 電流波形測定（Oscilloscope代替） | セメント抵抗5W0.1Ω（秋月 g117836、SQP5WJ0R1B、¥30）、および分圧用カーボン抵抗10kΩ | Required | 秋月 SQP5WJ0R1B | — | shuntはservo rail全電流を通す。5W定格に対し0.1Ω×2A²＝0.4Wで余裕あり | [秋月商品ページ](https://akizukidenshi.com/catalog/g/g117836/) | **入手済み（2026-08-08着荷）**。servo rail低側へ挿入する。挿入位置とGND topologyの制約は[power-budget.md](power-budget.md)の`GND topology`節、ADC pinは[gpio-assignment.md](gpio-assignment.md) |
 
+## 購入待ちリスト
+
+**この表が発注時の唯一の参照先である。**部品が必要と判明したら、判明した時点でここへ行を足す。
+各部品行の`残作業`列に「未購入」と書くだけで終わらせない。**書いた本人以外には発注時に見えないため、
+過去に実際の発注漏れを起こしている**（2026-08-08、下記3点が発注に載らなかった）。
+
+発注は送料がかかるため一度にまとめる。**発注前に、repository全体を
+`未購入`／`Required`／`未選定`で機械的に洗い出し、この表と突き合わせる。**
+記憶や前回の会話に頼らない。
+
+| 部品 | 用途 | 必要になる時期 | 状態 |
+|---|---|---|---|
+| `PSU-INGRESS-01` Micro-Bメスreceptacle変換基板 | M-12001のplugをbreadboard railへ引き込む | **合成給電（ESP32・LCD・sensorをPiの5V GPIOから給電）を始める前。**これが無いとアダプターとPiの間に測定器を挿入できず、`Pi直挿しmodeの電流gate`を測れない | 未購入・品未確定 |
+| `CABLE-PI-PWR-01` Micro-Bオスcable | breadboard rail → Piの`PWR IN` | 同上 | 未購入 |
+| `CABLE-PI-LINK-01` USB OTG変換／cable | Pi ↔ ESP32のUSB serial link | M2（protocol実装）から。ESP32単体のflashingはPCのUSBで足りる | 未購入 |
+| セメント抵抗5W0.1Ω（**2本目**） | 5 V ingress低側のshunt。servo側（`MEAS-01`の1本目）とは別経路で、兼用できない | 合成給電の測定を始める前。`PSU-INGRESS-01`と同時 | **既に2本購入済みなら不要。**1本のみなら追加が要る。手持ち本数を確認する |
+
+品の確定に実測が要るものは、**実測できる状態になってから選ぶ**。定格不足による買い直しを避けるためだが、
+そのぶん発注が後ろへずれる。ずれる場合は、この表に「何を待っているか」を書く。
+
 ## 初期製作の明示的な対象外
 
 | 部品 | 状態 | 理由 |
@@ -116,3 +136,4 @@
 | 2026-08-08 | 12 | Revision 8で追加した未購入部品3点（`PSU-INGRESS-01`／`CABLE-PI-PWR-01`／`CABLE-PI-LINK-01`）について、「これが無いと配線を開始できない」という記述が過大だったため訂正した。前2者はservo試験の直前まで不要（それまではM-12001をPiの`PWR IN`へ直挿しする）、`CABLE-PI-LINK-01`はM2のprotocol実装まで不要である。`PSU-INGRESS-01`には候補品（秋月 g110972、定格1ピン1.5 A）を記載した | ユーザーからの指摘（購入済み5点にこれらが含まれていない）、[power-budget.md](power-budget.md)の`5 V ingress`節の段階表 |
 | 2026-08-08 | 13 | レビュー指摘2件を反映。(a) 受け入れchecklistのsnapshot日付が`2026-08-05`のままで、同じ節に記載した2026-08-08の着荷と食い違っていたため`2026-08-08時点`へ更新した。(b) Revision履歴でRevision 8と9が重複し、2026-08-08の行が古い行より前に挿入されていた。番号を一意にし、日付順へ並べ直した | [PR #57レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/57) |
 | 2026-08-09 | 14 | 昇格PR [#61](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/61)のレビュー指摘を反映。受け入れchecklistの見出しが「各行を`Selected`へ変更する前に確認する」となっており、状態ラベル定義（`Selected`＝「使用する予定」）および「Selectedは受け入れ完了を意味しない」という注記と矛盾していた。この矛盾はrevision 0から存在し、Revision 8の注記追加で表面化した。checklistのgateを`Selected`の付与ではなく**受け入れ（GPIO割り当てと電源budgetの承認）**へ変更した | [PR #61レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/61) |
+| 2026-08-09 | 15 | **`購入待ちリスト`節を新設した。**必要と判明した部品を各行の`残作業`列へ「未購入」と書くだけでは発注時に見えず、2026-08-08に実際の発注漏れを起こしている（`PSU-INGRESS-01`とcable 2点）。発注時の唯一の参照先として1箇所へ集約し、発注前にrepository全体を機械的に洗い出して突き合わせる手順も明記した。あわせて[PR #64](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/64)のレビューで判明した「ingress測定用の2本目のshunt」を同リストへ追加した | 発注漏れの実例、[PR #64レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/64) |

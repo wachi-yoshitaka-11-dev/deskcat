@@ -63,6 +63,7 @@
 | ADC-SHUNT | MEAS-01 | Servo rail低側shuntの電圧 | Input（ADC1_CH4） | GPIO32 | 入力専用扱い、high-Z | 外部pull不要（shunt両端が電位を決める） | ADC1、減衰0 dB（0–1.1 V）。0.1Ω×最大2 A＝0.2 Vがfull scale内 | なし | ADC1のためWi-Fi動作中も使用可。ADC2は**Wi-Fi有効時に使用不可**のため測定へ割り当てない。低電流側の精度限界（実用域は約1 A以上）は`power-budget.md`の測定計画を参照 |
 | ADC-5V | MEAS-01 | 5 V railの電圧 | Input（ADC1_CH5） | GPIO33 | 入力専用扱い、high-Z | 分圧器10 kΩ／10 kΩ（比1/2）。分圧後の最大は約2.5 V | ADC1、減衰11 dB（約0–3.1 V）。分圧なしでは5 VがADC定格3.3 Vを超え破損する | なし | 分圧比は購入する10 kΩ抵抗で構成する（`hardware-bom.md` MEAS-01） |
 | ADC-3V3 | MEAS-01 | ESP32 3.3 V railの電圧 | Input（ADC1_CH0） | GPIO36（VP） | 入力専用、high-Z | 分圧器10 kΩ／10 kΩ（比1/2）。分圧後の最大は約1.65 V | ADC1、減衰11 dB | なし | 3.3 Vは減衰11 dBのfull scale（約3.1 V）を超えるため直結しない。Input-only pinのためoutputへ転用不可 |
+| ADC-INGRESS | MEAS-01 | 5 V ingress低側shuntの電圧（合成給電時の合計電流） | Input（ADC1_CH3） | GPIO39（VN） | 入力専用、high-Z | 外部pull不要（shunt両端が電位を決める） | ADC1、減衰0 dB（0–1.1 V）。0.1Ω×1.2 A＝0.12 Vがfull scale内 | なし | `power-budget.md`の`ingressの電流制限`で定めた上限（最弱部品定格の80%）を、**過渡peakを含めて**確認するために使う。定常値はデジタルテスターで測るが、ESP32のTX spikeとMSP2807の突入を取り逃がすため、この点が必要である。servo側の`ADC-SHUNT`とは別経路であり兼用できない。Input-only pinのためoutputへ転用不可 |
 | UART-TX | Firmware flashingとdebug log（**Pi linkではない**） | TX | Output | GPIO1（固定、board上USB-UARTブリッジへ内部接続） | SDK既定（起動logを出力） | 変更不可（chip内蔵UART0） | 115200 8N1（候補、`esp32-pi-protocol.md`で最終確定） | Boot log | board上のUSB-UARTブリッジが占有するため、**外部配線用のGPIOとして使用しない**。Pi linkは下記のとおりUSB connector経由であり、この2本をPiへ直接配線しない |
 | UART-RX | Firmware flashingとdebug log（**Pi linkではない**） | RX | Input | GPIO3（固定） | 同上 | 変更不可 | 同上 | Flashing | 同上 |
 
@@ -99,8 +100,8 @@ PCからflashingするときは同じUSB portを使うため、Piとの同時接
 - [x] 割り当てたpinがmodule flash用に予約されていない（GPIO6-11を使用していないことを確認済み）
 - [x] Outputがbootstrap要件と競合しない（GPIO0/2/5/12/15を一切使用していない）
 - [x] UART flashingとboot logを引き続き利用できる（GPIO1/3を変更していない）
-- [x] Input-only制約を守っている（GPIO34/35/36は入力専用として使用。GPIO36はADC-3V3、outputへ転用しない）
-- [x] ADC測定pinを予約済みで、ADC2をWi-Fi併用下で使っていない（GPIO32/33/36はすべてADC1）
+- [x] Input-only制約を守っている（GPIO34/35/36/39は入力専用として使用。GPIO36はADC-3V3、GPIO39はADC-INGRESS。いずれもoutputへ転用しない）
+- [x] ADC測定pinを予約済みで、ADC2をWi-Fi併用下で使っていない（GPIO32/33/36/39はすべてADC1）
 - [ ] 5 Vと3.3 V railのADC入力に分圧器が実装され、ADC定格3.3 Vを超えない（分圧比1/2を規定済み。実配線が存在しないため未検証）
 - [x] 共有SPI上の各deviceに個別CSがある（LCD: GPIO22、Touch: GPIO21）
 - [x] I2C deviceのaddressが一意、または明示的な対策がある（ADXL345既定0x53、BME280既定0x76／0x77で衝突なし。要現物のaddress pin設定確認）
@@ -132,3 +133,4 @@ PCからflashingするときは同じUSB portを使うため、Piとの同時接
 | 2026-08-05 | 3 | 自己レビューで検出: pull-up電圧の競合check項目を`[x]`（完了）としていたが、実配線が存在しないため検証不能であり`[ ]`へ訂正。文書冒頭の状態にMSP2807のlogic IO level確認を追加 | 自己レビュー |
 | 2026-08-05 | 4 | レビュー指摘3件を反映。(a) `power-budget.md`のADC測定計画に対応するADC pinが未予約だったため、`ADC-SHUNT`(GPIO32)／`ADC-5V`(GPIO33)／`ADC-3V3`(GPIO36)をADC1で予約し、分圧比1/2と減衰設定を明記。ADC2をWi-Fi併用下で使わない旨も記載。(b) GPIO4／GPIO27のboot stateを「floating（Low相当）」と記載していたが、Lowにdriveされる保証はないため「不定」へ訂正し、`SERVO-PWM`の外部pull-downを推奨から**必須**へ格上げ。(c) Pi linkがUSB serialとGPIO UARTのどちらか曖昧だったため、Protocolの`物理／論理link` を `USB serial` とする決定に合わせUSB serialへ統一し、GPIO1／GPIO3をboard上ブリッジの予約pinと明記。USB OTG変換cableが未購入である旨も記載 | [PR #55レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/55)、[Protocol](../protocol/esp32-pi-protocol.md)の物理link決定、ESP32のreset時GPIO state |
 | 2026-08-05 | 5 | 自己レビューで検出: ADC行の分圧抵抗の参照先が`hardware-bom.md` PROTO-01のままだったが、測定用部品は同fileに新設した`MEAS-01`へ移したため参照を訂正。ADC行の`Device`列を他行と同じRef ID表記（`MEAS-01`）へ揃え、shunt測定の低電流側精度限界への参照を追加 | 自己レビュー、[hardware-bom.md](hardware-bom.md) MEAS-01 |
+| 2026-08-09 | 6 | [PR #64](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/64)のレビューで、`power-budget.md`のingress電流上限を過渡peakまで含めて確認する測定点が無いと判明した。servo側の`ADC-SHUNT`（GPIO32）はservo戻り専用で兼用できないため、`ADC-INGRESS`をGPIO39（VN、ADC1_CH3）へ予約した。これでADC測定点は4つ（GPIO32／33／36／39）となり、いずれもADC1でWi-Fi併用下でも使用できる | [PR #64レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/64)、[power-budget.md](power-budget.md)の`ingressの電流制限` |

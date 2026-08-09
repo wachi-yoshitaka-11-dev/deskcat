@@ -63,48 +63,30 @@ M-12001はMicro-Bオスplugであり、breadboardへ直接挿せない。
 
 | 段階 | 引き込み方 | 追加部品 | 通せる電流 |
 |---|---|---|---|
-| bring-up前半（**現在ここ**） | M-12001のplugをPiの`PWR IN`へ直挿しし、Piの5 V GPIO pin（2番／4番）からbreadboard railへ引き出す。PiのPWR INは5 V railと直結している | **不要（手持ちのjumperとpin headerで足りる）** | 下記のgateまで。**servoは繋がない** |
-| servo試験以降 | 下表の変換基板でMicro-Bを受け、railへ引き出す。Piへは別途Micro-Bオスcableで給電する | Micro-Bメス変換基板、Micro-Bオスcable。**未購入** | ingress定格まで（下記`connector定格の制約`） |
+| bring-up前半（**現在ここ**） | **Piを単体で起動する。**M-12001のplugをPiの`PWR IN`へ直挿しする。**breadboard railを作らず、Piの5V GPIO pinへ何も接続しない** | **不要** | Pi単体のみ。gate不要（下記） |
+| 合成給電以降 | 下表の変換基板でMicro-Bを受け、railへ引き出す。Piへは別途Micro-Bオスcableで給電する | Micro-Bメス変換基板、Micro-Bオスcable。**未購入**（`hardware-bom.md`の購入待ちリスト） | ingress定格まで（下記`ingressの電流制限`） |
 
 **servo電流をPiのconnectorとPCB traceへ通してはならない。**servoを繋ぐ前に、必ず下段の構成へ移す。
 
-### Pi直挿しmodeの電流gate
+### 合成給電を変換基板の到着まで行わない理由
 
-前半でPi経由の給電を許すのは、logic側だけなら電流が小さいと**見込んでいる**ためであり、
-実測に基づく判断ではない。文献値を足すだけでも次のとおりで、**確定した小さい値は存在しない**。
+当初は「bring-up前半ではPiの5V GPIO pinからbreadboard railを作り、ESP32とLCDとsensorを
+合成給電する。合計1.0 Aを超えたら中止する」という段階を置いていた。**これは成立しない。**
 
-| 負荷 | 文献値 |
-|---|---|
-| ESP32 board | 定常は約240 mA（Wi-Fi TX）。短時間のspikeは最大約500 mA |
-| Raspberry Pi Zero W | typical 約140 mA。stress時 最大約350 mA |
-| MSP2807（3V3経由、5V側換算） | **未確認**。backlightを含む値がメーカー未公開 |
+そのgateが見るのはPiの`PWR IN`を通る合計電流だが、M-12001はMicro-Bオスplugの直結cableであり、
+**アダプターとPiの間に測定器を挿入できない**。挿入するには変換基板が要る。
+つまり**合成給電を許可するgateを、合成給電の構成では測れない**。測れないgateはgateではない。
 
-したがって文献値だけでも瞬時に0.85 Aを超えうるうえ、MSP2807ぶんが未知である。
-「合計0.5 A程度」という見積もりは根拠がないため採らない。代わりにgateを設ける。
+したがって段階を次のように分ける。**gateが要る作業と、要らない作業を混ぜない。**
 
-- **上限**: PiのPWR INを通る合計電流の実測値が**1.0 Aを超えたら、Pi直挿しmodeを直ちに中止する。**
-  超えた時点で先へ進まず、変換基板構成（下段）へ移してから測定を続ける。
-- **この1.0 Aの根拠（design margin）**: Micro-B connectorの一般的定格は約1.8 A。
-  そこに約1.8倍の余裕を取った値である。Piの内部traceには本projectで確認した定格が無いため、
-  connector定格側だけで判断せず、余裕を厚めに取っている。
-- **測り方**: 一度に全部を繋がず、`測定計画`の順で段階的に足しながら測る。
-  各段階で上限を超えていないことを確認してから次を足す。
-- **測定点と手段（未確定。測る前に確定させる）**: このgateが見たいのは
-  **PiのPWR INを通る合計電流**であり、servo rail低側のshunt（`GND topology`節）では
-  測れない。あちらはservo戻り専用で、logic側の電流を通さない。
-  またデジタルテスター（MAS830L）は定常値向けで、ESP32のTX spikeや
-  MSP2807のbacklight投入時の突入を取り逃がす。**定常値だけを見てgateを通したと判断しない。**
+| 段階 | 内容 | 電流の扱い | 追加購入 |
+|---|---|---|---|
+| **A** | Piを単体でアダプターから起動する（`PWR IN`へ直挿し、GPIOへ何も繋がない） | gate不要。M-12001は5V/3AでPi用途として定格内であり、Pi単体は通常の使い方である | 不要 |
+| **B** | ESP32を単体でPCのUSBから給電し、flashingとADC loggingを行う | gate不要。**PC hostのUSB portが持つ過電流保護（OCP）が制限として働く**。USB 2.0で公称0.5 A、多くのhostは1 A前後でtripする。ESP32単体の文献値（spike約500 mA）はこの範囲に収まる | 不要 |
+| **C** | ESP32・LCD・sensorをPiの5V GPIOから合成給電する | **gate必要。変換基板が到着し、ingressで実測できるようになるまで実施しない** | 変換基板とcable |
 
-| 測るもの | 手段 | 状態 |
-|---|---|---|
-| 定常電流（各段階の平均的な消費） | デジタルテスター（MAS830L）を`PWR IN`経路へ直列に入れる | 手段あり |
-| **過渡peak（spikeと突入）** | **未確定。**logic側にも低側shuntとADC入力を1系統設ける必要がある。`gpio-assignment.md`のADC予約は現状servo側1点（`ADC-SHUNT`）のみで、logic側の測定点を持たない | **未解決** |
-
-過渡peakの測定手段を決めるまで、**1.0 A gateは「定常値で超えていないこと」しか保証しない**。
-この限界を承知したうえで段階測定を進め、logic側の測定点を追加した時点でgateを本来の
-意味（peakを含む合計電流）で評価し直す。
-
-このgateは`受け入れ条件`にも数値として記載している。
+AとBは通常の使い方であり、測れないgateに依存しない。#8（Pi Rust環境）と
+#40（ESP32 toolchain）はここに収まる。Cだけを部品待ちにする。
 
 servo試験以降で用いる構成を次に定める。
 
@@ -131,37 +113,48 @@ USBでPiと繋ぐ」構成は、そのままでは排他制約に反する。次
 案Aを既定候補とする。PiのUSB port供給能力の実測（`測定計画`）で不足が判明した場合は
 案Bへ切り替え、そのとき秋月基板のVBUS保護有無を回路で確認する。
 
-**通電の可否は「案が確定したか」ではなく「どの経路で通電するか」で決まる。**
-案を選ぶには実測が要り、実測にはESP32への通電が要る。したがって
-「案が確定するまで通電しない」とはしない。代わりに、次の**単一経路のbring-up**だけを許す。
+**案Aと案Bはどちらも段階C（合成給電）の話であり、変換基板が到着するまで実施しない。**
+それまでのESP32への通電は、段階Bの経路（PCのUSBから給電）で行う。3つを混同しない。
 
-| 許すもの | 禁じるもの |
-|---|---|
-| **案Aの経路だけ**を接続する（PiからのUSB cable 1本。`5V` pinへは何も繋がない） | 案Aと案Bの同時接続。VBUSと`5V` pinを同時に生かさない |
-| 電流制限を掛けた状態での通電と、`測定計画`に定めた測定 | 通常運用、servo接続、長時間の連続通電 |
-| 人が電源を落とせる状態での監視付き通電 | 無人での通電 |
+| 経路 | いつ | 電流制限 | 排他制約 |
+|---|---|---|---|
+| **段階B: PC → ESP32のMicro USB** | いま可能 | **PC hostのUSB portのOCP。**USB 2.0の公称は0.5 A、多くのhostは1 A前後でtripする。ESP32単体の文献値（spike約500 mA）はこの範囲に収まる | 満たす（USBのみ。`5V` pinへ何も繋がない） |
+| 案A: Pi → ESP32のMicro USB | 段階Cから | **PiのUSB OTG portの供給能力。**値は未確認で、ingressでの実測とあわせて確かめる。実測するまで案Aを常用しない | 満たす（USBのみ） |
+| 案B: breadboard rail → ESP32の`5V` pin | 段階Cから、かつ回路確認後 | ingressの上限（`ingressの電流制限`） | **満たさない恐れがある。**USBを繋ぐとVBUSと`5V` pinが同時に生きる |
 
-案Aは電源3系統の排他制約に反しないため、この経路単独なら通電してよい。
 **案Bは、秋月基板のVBUS保護diodeの有無を回路で確認するまで通電しない。**
 確認前に`5V` pin給電とUSB接続を同時に行うと、保護が無い場合に逆流経路ができる。
 
-案Aの実測で供給能力が不足した場合にだけ、案Bの検討へ進む。その時点で回路確認を行う。
+段階Cでまず案Aを試し、PiのUSB port供給能力が不足した場合にだけ案Bへ進む。
+その時点で回路確認を行う。いずれの通電も、人が電源を落とせる状態で監視して行う。
 
-### connector定格の制約（未解決）
+### ingressの電流制限（未解決）
 
-Micro-B connectorの一般的な電流定格は約1.8 Aで、**上記の候補変換基板は1ピンあたり1.5 A**とさらに低い。
-一方、負荷表の文献値から見た最悪同時peakはESP32のspike＋Pi stress＋LCD＋servo stallで
-**2 Aを超えうる**。この場合、単一のMicro-B ingressでは定格を超える。
+**上限は経路上の全部品の定格のうち最小値で決まる。**connectorの一般定格ではない。
+候補構成では変換基板の1ピンあたり1.5 Aが最小であり、Micro-B connectorの一般定格
+（約1.8 A）を上限に使うと、1.5〜1.8 Aの測定値が「合格」になってしまう。
 
-したがって次のいずれかが必要であり、**実測まで電源経路を承認しない**。
+**derating: 最弱部品の定格の80%を上限とする。**候補構成なら`1.5 A × 0.8 = 1.2 A`である。
 
-- 実測でservoを含む同時peakが**経路上の最弱部品の定格**に対し十分な余裕内に収まることを示す。
-  収まらない場合は、`servo-safety-limits.md`のtrajectory制限（可動域、速度、duty cycle）で
+80%とする理由は次のとおり。定格は連続通電の条件下で決まる値であり、本projectには
+定格側にも測定側にも不確かさが残る。
+
+- servoのpeakは負荷依存で幅が広く（データシート値0.5〜2 A）、実測してもばらつく
+- ADC loggingは取りこぼしがありうるため、測定した最大値が真のpeakとは限らない
+- breadboard接点と細線の接触抵抗が加わり、部品単体の定格より条件が悪い
+
+一方、負荷表の文献値から見た最悪同時peak（ESP32 spike＋Pi stress＋LCD＋servo stall）は
+**2 Aを超えうる**。候補構成の上限1.2 Aを大きく超える。したがって次のいずれかが要る。
+
+- 実測でservoを含む同時peakが**最弱部品定格の80%以下**に収まることを示す。
+  収まらない場合は`servo-safety-limits.md`のtrajectory制限（可動域、速度、duty cycle）で
   servo電流の上限を下げ、再度実測する
-- または、servo railのingressをMicro-Bを経由しない経路（より定格の高いconnector）へ変更する
+- または、servo railのingressをMicro-Bを経由しない、より定格の高いconnectorへ変更する。
+  その場合も上限は同じ規則（新しい最弱部品の80%）で決め直す
 
-**変換基板は未購入であり、購入前にbring-up前半の実測でingressを通る実電流が分かる。**
-その実測値に基づいて品を選べば、定格不足による買い直しを避けられる。
+**変換基板は未購入である。**上のderating規則を満たす品を選ぶが、servoの実測peakが
+出るまで必要な定格が確定しないため、**品の確定は実測後になる**
+（`hardware-bom.md`の購入待ちリスト）。
 
 この制約は`受け入れ条件`にも数値として記載している。
 
@@ -216,7 +209,7 @@ required_transient_current
 | 入力電源 | 電圧、連続電流、peak電流 | スイッチングACアダプター MicroBオス 5V／3A（秋月 M-12001） | [秋月商品ページ](https://akizukidenshi.com/catalog/g/g112001/) | Selected（実測でmargin確認要） |
 | **5 V ingress interface** | Micro-Bオスplugを受け、breadboard railへ5 V／GNDを引き出す物理変換 | **未購入**。候補はMicro-Bメスreceptacleの2.54 mm変換基板（秋月 g110972、定格1ピン1.5 A）。bring-up前半はM-12001をPiの`PWR IN`へ直挿しして代用する | `5 V ingress`節の段階表 | **Blocked（servo試験までに購入・実装が必要。前半はPi直挿しで進行可）** |
 | ESP32の5 V入力経路 | 3系統（Micro USB／5V pin／3V3 pin）の排他制約を守る | **未決定。**案A（PiからのUSB VBUS単独給電、既定候補）と案B（`5V` pin給電＋USBはdata用）のいずれか | Espressif ESP32-DevKitC V4文書（3系統は排他）。`ESP32の給電経路（未決定）`節 | **Blocked**（案AはPiのUSB port供給能力が未実測、案Bはこの秋月基板のVBUS保護diode有無が未確認） |
-| Piの5 V入力経路 | PWR IN portから給電し、USB OTG portはPi link専用とする | servo試験以降: breadboard railからMicro-Bオスcableで`PWR IN`へ。bring-up前半: M-12001を`PWR IN`へ直挿しし、Piの5 V GPIO pinからrailを作る。**この前半modeは実測合計1.0 Aを上限とし、超えたら中止する**（`Pi直挿しmodeの電流gate`） | Raspberry Pi Zero W公式回路（PWR INはdata線未接続の給電専用）。上限の根拠は`Pi直挿しmodeの電流gate` | Selected（cable未購入。前半modeはgate付きで承認） |
+| Piの5 V入力経路 | PWR IN portから給電し、USB OTG portはPi link専用とする | 段階C以降: breadboard railからMicro-Bオスcableで`PWR IN`へ。段階A（Pi単体起動）: M-12001を`PWR IN`へ直挿しし、**GPIOへは何も接続しない** | Raspberry Pi Zero W公式回路（PWR INはdata線未接続の給電専用） | Selected（cable未購入。段階Aは合成給電ではないため電流gateの対象外） |
 | Logic regulator／経路 | Pi／ESP32／周辺deviceの要件 | 追加regulatorなし。M-12001の5Vをbreadboard rail経由でそのまま供給するのは**Piのみ確定**（ESP32は上行のとおり給電経路が未決定）。周辺module3点（MSP2807、ADXL345、BME280）は5V railへ直結せず、ESP32 board上の3V3 pinから給電する（理由は`電源rail構成案`参照） | `hardware-bom.md` PSU-PI-01、DISP-01、TOUCH-01、ACCEL-01、ENV-01 | Blocked（ESP32の給電経路が未決定。加えて同時peak marginと3V3 pinの供給能力が未実測） |
 | Servo regulator／経路 | 正確なservo要件 | 追加regulatorなし。M-12001の5Vをbreadboard上で別railに分岐し、直近にbulk capacitorを配置 | `hardware-bom.md` PSU-SERVO-01 | Selected（bulk capacitor容量は実測待ち） |
 | Backfeed防止 | USB／外部電源の共存 | TBD | 回路図review | Blocked |
@@ -224,7 +217,7 @@ required_transient_current
 | 電流測定用shunt抵抗 | 波形測定の手段（Oscilloscope代替） | セメント抵抗5W0.1Ω（秋月、SQP5WJ0R1B、¥30）×1〜2個。ESP32 ADCで電圧降下をsamplingし、電流波形を近似する | [秋月商品ページ](https://akizukidenshi.com/catalog/g/g117836/) | Selected（Oscilloscope未所持のため、その購入を避けて低costで対応。**低側に挿入すること**。理由は`測定計画`参照） |
 | Local decoupling | 各deviceのデータシートに従う | TBD | データシート | Blocked |
 | Wire gauge／許容電流 | Peak電流と長さ | TBD | 製品資料／計算 | Blocked |
-| Connector定格 | Peak電流と誤接続防止 | Micro-B connectorの一般的定格は約1.8 A。文献値の最悪同時peak（2 A超）はこれを上回りうる | `5 V ingress`節の`connector定格の制約` | **Blocked（実測で余裕内に収まることを示すか、servo railのingressを高定格connectorへ変更するまで承認しない）** |
+| Connector定格 | Peak電流と誤接続防止 | 上限は**経路上の最弱部品の定格の80%**。候補構成では変換基板の1ピン1.5 Aが最小のため1.2 A。文献値の最悪同時peak（2 A超）はこれを大きく上回る | `5 V ingress`節の`ingressの電流制限` | **Blocked（実測で上限内に収まることを示すか、servo railのingressを高定格connectorへ変更するまで承認しない）** |
 | 過電流保護 | 故障電流の制限 | TBD | Design review | Blocked |
 | 逆極性保護 | 配線リスク | TBD | Design review | Blocked |
 
@@ -316,20 +309,28 @@ framingを除いても約5.7 kSample/s、text encodeではさらに落ちる。*
 
 ### サーボ接続前
 
-この段階は**追加購入なしで実施できる**。M-12001をPiの`PWR IN`へ直挿しし、Piの5 V GPIO pinから
-breadboard railを作る（`5 V ingress`節の段階表）。**servoはまだ繋がない。**
+**この段階は変換基板（`PSU-INGRESS-01`）が到着してから実施する。**合成給電の電流を
+ingressで測る必要があり、それが無いとアダプターとPiの間に測定器を挿入できない
+（`合成給電を変換基板の到着まで行わない理由`）。**servoはまだ繋がない。**
+
+変換基板の到着前にできるのは、`5 V ingress`節の段階Aと段階B（Pi単体の起動、
+ESP32のPC USBからのflashing）だけである。これらは合成給電ではないため、
+下記の測定を必要としない。
 
 - [ ] 電源offで導通と想定した絶縁を確認する
 - [ ] Connectorの極性を確認する
 - [ ] 確認済み部品に適した電流制限を設定する
 - [ ] 無負荷の各railを測定する
-- [ ] **Pi直挿しmodeの電流gateに従い、段階的に測る。**各段階でPiの`PWR IN`を通る合計電流を記録し、
-      **1.0 Aを超えた時点で中止**して変換基板構成へ移す
+- [ ] **ingressを通る合計電流を段階的に測る。**変換基板の直後（アダプター側）に測定点を置き、
+      各段階で記録する。**`ingressの電流制限`の上限（最弱部品定格の80%）を超えた時点で中止**する
   - [ ] 段階1: Piのみ（ESP32・周辺module未接続）
   - [ ] 段階2: ＋ESP32（Wi-Fi停止、idle）
   - [ ] 段階3: ＋ESP32のWi-Fi TXを動作させた状態
   - [ ] 段階4: ＋MSP2807（backlight点灯を含む）
   - [ ] 段階5: ＋ADXL345、BME280
+- [ ] 各段階で**定常値と過渡peakの両方**を記録する。定常値はデジタルテスター（MAS830L）、
+      過渡peakはingress低側へ挿入したshuntとESP32 ADCで測る。**定常値だけで上限内と判断しない**
+      （ESP32のTX spikeとMSP2807の突入を取り逃がすため）
 - [ ] ESP32 board上3V3 pinの外部供給可能電流の定格を確認し、周辺module3点（MSP2807、ADXL345、BME280）を接続した状態で3V3 rail電圧と電流を実測する。3V3 pinの供給能力を超える場合は別途3.3V regulatorを追加する
 - [ ] **ESP32の給電経路を確定させる**（`ESP32の給電経路（未決定）`節）。案A: PiのUSB OTG portからESP32＋3V3負荷を給電したときの電流とESP32入力電圧を実測し、undervoltageもPi側のbrownoutも起きないことを確認する。不足する場合は案Bへ切り替え、そのとき秋月基板のVBUS保護diodeの有無を回路で確認してから`5V` pinとUSBを同時接続する
 - [ ] サーボなしでlogicへ給電し、電流を記録する（上記の段階測定の結果をそのまま用いる）
@@ -369,8 +370,8 @@ Pi直挿しのままservoを繋ぐと、servo電流がPiのconnectorとPCB trace
 
 | 制約 | 値 | 根拠 |
 |---|---|---|
-| 5 V ingressを流れる最大電流 | **経路上の全部品の定格のうち最小値**を上限とする。候補構成では変換基板の1ピン1.5 Aが最小のため**1.5 A以下**。connector一般定格（約1.8 A）を上限に使わない | 最弱部品が経路全体の上限を決める。1.5〜1.8 Aの測定値を「合格」としないため。`5 V ingress`節 |
-| **bring-up前半（Pi直挿しmode）でPiの`PWR IN`を通る合計電流** | **1.0 A以下。超えたら直ちに中止し、変換基板構成へ移す** | Micro-B定格 約1.8 Aに対し約1.8倍の余裕。Piの内部traceの定格は未確認のため厚めに取った。`Pi直挿しmodeの電流gate` |
+| 5 V ingressを流れる最大電流 | 上行に同じ（最弱部品定格の80%）。**connector一般定格（約1.8 A）を上限に使わない** | 最弱部品が経路全体の上限を決める。1.5〜1.8 Aの測定値を「合格」としないため |
+| **合成給電時にingressを通る合計電流（定常値と過渡peakの両方）** | **経路上の最弱部品の定格の80%以下。**候補構成なら`1.5 A × 0.8 = 1.2 A`。超えたら直ちに中止する | 定格・測定の双方に不確かさがあるため。根拠は`ingressの電流制限` |
 | ADC入力へ加える最大電圧 | 3.3 V以下（5 V／3.3 V railは分圧比1/2を経由） | ESP32のADC入力範囲 |
 | ADC loggingのsample rate | 1 kSample/s以上 | servo起動過渡がms orderであるため。`Sample rateとlog形式`節 |
 | logic GNDとservo GND間に許容する直列抵抗 | 0Ω（star point直結。shuntを経由させない） | `GND topology`節 |
@@ -397,3 +398,4 @@ Pi直挿しのままservoを繋ぐと、servo電流がPiのconnectorとPCB trace
 | 2026-08-08 | 15 | 5 V ingressの記述が「変換基板が無いと配線を開始できない」と過大だったため、段階表を追加して訂正した。bring-up前半はM-12001をPiの`PWR IN`へ直挿しし、Piの5 V GPIO pinからbreadboard railを作れば**追加購入なしで通電できる**（logic側のみ、servoは繋がない）。servo試験の直前に変換基板構成へ移す。候補変換基板（秋月 g110972）の定格が1ピン1.5 Aと、記載していた「Micro-B一般定格 約1.8 A」より低いことも反映した。購入は前半の実測後で足り、実電流に基づいて品を選べる | ユーザーからの指摘（購入済み5点にingress部品が含まれていない）、[秋月 g110972](https://akizukidenshi.com/catalog/g/g110972/)の定格、Raspberry Pi Zero W公式回路（PWR INと5 V GPIO pinは直結） |
 | 2026-08-08 | 16 | レビュー指摘2件を反映。(a) Pi直挿しmodeを「文献値で合計0.5 A程度」と正当化していたが、これは根拠が無い。ESP32のspikeだけで約500 mA、Pi stressで約350 mA、MSP2807は未確認であり、文献値だけでも瞬時に0.85 Aを超えうる。`Pi直挿しmodeの電流gate`節を新設し、実測合計**1.0 Aを上限**として超えたら直ちに中止する条件、その1.0 AをMicro-B定格約1.8 Aに対する約1.8倍の余裕として選んだdesign marginの根拠、および段階的に負荷を足しながら測る手順を定めた。配線・保護表の`Piの5 V入力経路`行、測定計画の`サーボ接続前`、`受け入れ条件`の数値表にも同じgateを反映した。(b) Revision履歴で2026-08-08の行が古い行より前に挿入されていたため日付順へ並べ直した | [PR #57レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/57)、負荷表の文献値 |
 | 2026-08-09 | 17 | 昇格PR [#61](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/61)のレビュー指摘4件を反映。(a) **ESP32給電の循環論法を解消。**「案A/Bが確定するまで通電しない」と書きながら、案を決める実測には通電が要る状態だった。通電可否を「案の確定」ではなく「どの経路で通電するか」で決める方式へ変更し、案Aの単一経路・電流制限・監視付きに限ったbring-upを許可した。案Bは秋月基板のVBUS保護diode確認まで通電しない。(b) **1.0 A gateの測定手段が無かった。**servo rail低側shuntはlogic側を通さず、テスターは過渡peakを取り逃がす。定常値と過渡peakで手段を分け、logic側の測定点が未確定であること、確定までgateは定常値しか保証しないことを明記した。(c) ingress上限を「Micro-B一般定格 約1.8 A」から**経路上の最弱部品の定格**（候補構成では変換基板の1ピン1.5 A）へ変更。1.5〜1.8 Aの測定値が合格になる穴を塞いだ。(d) sample rateが必須要件に届かない場合の対処から「buffer長の短縮」を削除。buffer長は時間分解能を改善しないため、ADC改善・要件の見直し・測定手段の追加のいずれかを取ることにした。あわせて見出し階層の飛び（MD001）を修正 | [PR #61レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/61) |
+| 2026-08-09 | 18 | [PR #64](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/64)のレビュー指摘3件を反映。(a) **測れないgateを廃止した。**「Pi直挿しで合成給電し、合計1.0 Aを超えたら中止」としていたが、M-12001はMicro-Bオスplugの直結cableでアダプターとPiの間に測定器を挿入できず、**そのgateを測る手段が無かった**。段階をA（Pi単体起動）／B（ESP32をPCのUSBから給電）／C（合成給電）に分け、AとBはgate不要な通常の使い方、Cは変換基板の到着後とした。これにより「追加購入なしで合成給電できる」という前提が誤りだったことも訂正している。(b) 案Aの「電流制限」が未定義だったため、経路ごとに制限を明示した。段階BはPC hostのUSB port OCP、案AはPiのUSB OTG port供給能力（未確認、ingressで実測）、案Bはingress上限。(c) 「十分な余裕」が曖昧だったため、**最弱部品定格の80%**という数値のderatingを定めた（候補構成で1.2 A）。80%とする理由（servo peakの負荷依存、ADC loggingの取りこぼし、接触抵抗）も記載した。あわせて節名を`connector定格の制約`から`ingressの電流制限`へ変更し、配線・保護表・測定計画・受け入れ条件を揃えた | [PR #64レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/64) |
