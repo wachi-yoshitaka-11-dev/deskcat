@@ -94,7 +94,7 @@
 | `CABLE-PI-PWR-01` Micro-Bオスcable | breadboard rail → Piの`PWR IN` | 同上 | 未購入 |
 | `CABLE-PI-LINK-01` USB OTG変換／cable | Pi ↔ ESP32のUSB serial link | M2（protocol実装）から。ESP32単体のflashingはPCのUSBで足りる | 未購入 |
 | `PROT-OC-01` 過電流保護部品（PTCまたはヒューズ＋ホルダ） | 5 V ingressの往路へ直列。最弱部品が発熱する前に電流を止める | **合成給電（段階C）を始める前。**これが無いと、上限を超えた電流を止める手段がテスターの読みと手動停止しかない | 未購入。**品番とtrip値は発注直前にメーカーの時間-電流特性で確定する**（選定基準は`power-budget.md`の`過電流保護（段階Cのgate）`） |
-| `WIRE-PWR-01` 大電流経路の線材・接続部材 | 5 V ingress → 分岐点 → 各railの往路、およびGND戻り | 同上 | 未購入。**必要な許容電流はingressの上限が決まってから確定する。**公称許容電流が公開されている品だけを選ぶ（breadboard接点・ジャンパー線は資料が無く経路の最小定格を出せない） |
+| `WIRE-PWR-01` 大電流経路の線材・接続部材 | 5 V ingress → 分岐点 → 各railの往路、およびGND戻り | 同上 | 未購入。**許容電流の下限は`許容電流×0.8＞負荷側の想定定常電流の合計`とする。ingressの上限（gate値）から決めない**（gate値はこの品の定格を含む最小値から出るため、循環する。`power-budget.md`の`選定順序（循環にしない）`）。公称許容電流が公開されている品だけを選ぶ（breadboard接点・ジャンパー線は資料が無く経路の最小定格を出せない） |
 | 分圧用カーボン抵抗10kΩ×4（`MEAS-01`の一部） | `ADC-5V`と`ADC-3V3`の分圧器（各2本、分圧比1/2） | **`ADC-5V`／`ADC-3V3`を使う測定すべての前。**段階Cの電圧droop測定とESP32給電経路の判断がこれに依存する | 未購入。分圧比は`gpio-assignment.md`で1/2に確定済みのため、**待っているものは無い。次の発注に載せる** |
 | `RES-PULL-01` GPIOの外部pull-up／pull-down抵抗一式 | `SERVO-PWM`のpull-down（**必須**）、LCD-CS／TOUCH-CS／LCD-RST／LCD-BL／TOUCH-IRQ／I2Cのpull | **サーボ出力を有効化する前。**`SERVO-PWM`のpull-downは、high-Z期間中にservoが動くことを防ぐ唯一の手段である | 未購入。**本数と抵抗値が未選定。**LCD-BLの極性とTOUCH-IRQの論理は現物確認後に決まる（`gpio-assignment.md`）。I2Cはmodule搭載pull-upとの合成抵抗を現物で確認してから決める |
 | Servo bulk capacitor 電解コンデンサ470μF／16V（秋月 g108426、ルビコンWXA）×2〜3 | servo rail分岐の直近。起動時の過渡電流を吸収する | **servo試験の前。**無いとservo起動過渡がlogic railのdroopとして出る | 未購入。**最終容量は実測待ち**（`power-budget.md`の配線・保護表。状態は`Candidate`） |
