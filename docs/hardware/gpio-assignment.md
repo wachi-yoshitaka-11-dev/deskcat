@@ -29,7 +29,8 @@
 
 - この文書で「pull-up」と書いた抵抗は、**すべて3.3Vへ接続する**。5Vへ接続しない。
 - 5Vへpull-upすると、ESP32のGPIOと周辺module双方が定格超過となり破損しうる。
-- 5V railはservoとlogic基板への給電にのみ使用し、信号線には一切現れない。
+- 5V railはservoとlogic基板への給電に使用する。**GPIOへ5Vを直接入力してはならない。**
+- **例外は`ADC-5V`だけである。**5V railの電圧を測るため、**指定した分圧器（10 kΩ／10 kΩ、比1/2）を介して**GPIO33へ入れる。分圧後は約2.5 Vであり、5VがGPIOへ直接掛かることはない。**分圧器を省いて直結すると、ADC定格3.3 Vを超えて破損する。**
 
 ## ESP32の使用制限pin（Espressif公式資料より、この基板に適用）
 
@@ -37,7 +38,7 @@
 |---|---|---|
 | Flash通信専用（**使用禁止**） | 6, 7, 8, 9, 10, 11（`CLK`／`D0`／`D1`／`D2`／`D3`／`CMD`） | 内蔵SPI Flashとの通信に使用。外部回路から絶対に使用しない |
 | Strapping pin（起動modeを決定。用途を厳選） | 0, 2, 5, 12, 15 | GPIO0: boot button。GPIO2: download mode判定。GPIO12(MTDI): flash電圧選択（Highだと起動しない可能性）。GPIO15(MTDO): boot logのsilence制御。今回の割り当てでは**いずれも使用しない**（安全側） |
-| UART0（Flashingとboard上USB-UARTブリッジ専用） | 1（TX）, 3（RX） | Pi linkとfirmware flashingで共用。Pi接続時はPC切断が前提 |
+| UART0（Flashingとboard上USB-UARTブリッジ専用） | 1（TX）, 3（RX） | **firmware flashingとdebug log専用。**board上のUSB-UARTブリッジが占有するため、外部配線用のGPIOとして使わない。**Pi linkはUSB serialであり、この2本は使わない**（下記`Pi–ESP32間のtransport`） |
 | Input-only（出力不可） | 34, 35, 36（VP）, 39（VN） | 純粋なinput信号（interrupt、ADC）にのみ割り当て可 |
 | WROOM/SOLO-1専用（WROVERでは予約） | 16, 17 | 今回のmoduleはESP-WROOM-32Dのため使用可 |
 
