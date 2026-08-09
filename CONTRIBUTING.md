@@ -151,7 +151,8 @@ Pull requestには次を含める。
 - 無関係なformat変更やrefactorがないこと
 
 作成直後に、boardへitemを追加して次を設定する。**空欄を検出する自動化は無いため、
-ここが唯一のgateである**（詳細は[Pull Request itemの日付](#誰がいつ確認するか)）。
+ここが唯一のgateである**（詳細は[Pull Request itemの開始日／終了日](#pull-request-itemの開始日終了日)の
+[誰がいつ確認するか](#誰がいつ確認するか)）。
 
 - [ ] `Status`
 - [ ] `Start date`（作成日。JSTで判断する）
@@ -210,7 +211,7 @@ close日である。
 
 | 時期 | 実施者 | 確認内容 |
 |---|---|---|
-| Pull Request作成直後 | 作成者 | boardへitemを追加し、`Status`・`Start date`・`Target date`を設定する。下の作成時checklistに含める |
+| Pull Request作成直後 | 作成者 | boardへitemを追加し、`Status`・`Start date`・`Target date`を設定する。`Pull request`節の作成時checklist（この文書の上部）に含めてある |
 | merge直前 | merge実施者 | `Target date`が予定のままなら、実績日（merge日）へ更新する |
 | close時 | close実施者 | `Target date`をclose日へ更新する |
 
