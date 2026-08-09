@@ -178,19 +178,25 @@ brownout・resetの有無を見るために使う。connector定格の判定に�
 
 ### 変換基板に必要な定格の見積もり
 
-**変換基板が無くても、必要な定格は先に決められる。**定常電流はbranchごとに測って
-足し合わせてよい（peakと違い、時間的に重ならない前提を置く必要がない）。
+ingressを実測できるのは段階C（変換基板が要る）である。したがって購入前の見積もりは、
+**実測できるbranchは実測し、実測できないbranchは根拠のある保守的な上限を置いて**足す。
+定常電流はこの足し方をしてよい（peakと違い、時間的に重なる前提を置く必要がない）。
+足す値は、**同時に継続しうる動作条件での定常電流**とする。
 
-| branch | 測り方 | 実施できる段階 |
+| branch | 見積もりの根拠 | 値 |
 |---|---|---|
-| Pi | `PWR IN`へテスターを直列。M-12001のplugとPiの間には入れられないため、**Piの5 V GPIO pin側では測れない**。この1点だけはingressが要る | 段階C |
-| ESP32＋LCD＋sensor | ESP32をPCのUSBから給電し、そのUSB経路へテスターを直列に入れる | **段階B。いま可能** |
-| servo | servo railへテスターを直列 | 段階C |
+| ESP32 board | 文献値。Wi-Fi TXを継続した場合 | 240 mA |
+| Raspberry Pi Zero W | 公式specのstress時。上限側を採る | 350 mA |
+| MSP2807（LCD＋backlight＋touch） | **未確認。段階B（ESP32をPCのUSBから給電）で実測できる。ここが唯一の未知数である** | **実測待ち** |
+| SERVO-01（SG90） | **実測できない**（servoへ5 Vを供給する経路がingressしかないため）。連続動作時の電流として広く示される上限値`250 mA`を保守的な上限として置く。stall電流は採らない（connector定格は熱の制限であり、stallは過渡のため） | 250 mA |
 
-Pi単体の定常電流は公式specの約140 mA（stress時350 mA）を上限側の見積もりとして使い、
-実測できる2 branchの値と足して必要な定格を出す。これで**変換基板の品を、
-ingressでの実測を待たずに選べる**。選定後の実測で見積もりを超えていた場合は、
-その時点で定格の見直しを行う。
+servoの250 mAは**割り当てた予算**として扱う。実機がこれを継続して超えないことは、
+`servo-safety-limits.md`のtrajectory制限（可動域、速度、duty cycle）で担保する。
+実測でこれを超えた場合は、制限を締めるか、ingressの定格を上げるかを選ぶ。
+
+未知数はMSP2807の1つだけである。段階Bで測れば合計が確定し、**変換基板の品を
+ingressの実測を待たずに選べる**。選定後の実測で見積もりを超えていた場合は、
+その時点で定格を見直す。
 
 この制約は`受け入れ条件`にも数値として記載している。
 
@@ -441,3 +447,4 @@ Pi直挿しのままservoを繋ぐと、servo電流がPiのconnectorとPCB trace
 | 2026-08-09 | 18 | [PR #64](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/64)のレビュー指摘3件を反映。(a) **測れないgateを廃止した。**「Pi直挿しで合成給電し、合計1.0 Aを超えたら中止」としていたが、M-12001はMicro-Bオスplugの直結cableでアダプターとPiの間に測定器を挿入できず、**そのgateを測る手段が無かった**。段階をA（Pi単体起動）／B（ESP32をPCのUSBから給電）／C（合成給電）に分け、AとBはgate不要な通常の使い方、Cは変換基板の到着後とした。これにより「追加購入なしで合成給電できる」という前提が誤りだったことも訂正している。(b) 案Aの「電流制限」が未定義だったため、経路ごとに制限を明示した。段階BはPC hostのUSB port OCP、案AはPiのUSB OTG port供給能力（未確認、ingressで実測）、案Bはingress上限。(c) 「十分な余裕」が曖昧だったため、**最弱部品定格の80%**という数値のderatingを定めた（候補構成で1.2 A）。80%とする理由（servo peakの負荷依存、ADC loggingの取りこぼし、接触抵抗）も記載した。あわせて節名を`connector定格の制約`から`ingressの電流制限`へ変更し、配線・保護表・測定計画・受け入れ条件を揃えた | [PR #64レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/64) |
 | 2026-08-09 | 19 | [PR #64](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/64)のレビュー指摘を反映。ingress低側shuntをESP32 ADCで測る案が**電気的に成立しない**と判明した。star pointを基準にするとadapter return側は`I × R`だけ負の電位になり、ESP32のADCでは測れない。high-side current sense IC（例: INA219、秋月で¥2,300）で解決できるが、**そもそもpeakで判定する必要が無い**ため部品を追加しない。connectorとtraceの電流定格は`I²R`発熱と放熱の釣り合いで決まる熱の制限であり、時定数は秒から分のorderで、µs〜msのspikeは発熱にほとんど寄与しない。判定量を**定常値（テスター直列）**へ改め、peakによる電圧降下は既存の`ADC-5V`／`ADC-3V3`で捉えることにした。測定計画と受け入れ条件も揃えた | [PR #64レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/64)、connector定格の熱的性質 |
 | 2026-08-09 | 20 | [PR #64](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/64)のレビュー指摘を反映。Revision 19で判定量を定常電流へ改めたが、「実測でservoを含む同時**peak**が80%以下に収まることを示す」という要件が残っており矛盾していた。測定不要としたpeakが、合成給電の許可と部品選定を阻む状態だった。判定を定常電流に統一し、peakは電圧droop・brownout・resetの判定にのみ使う旨を明記した。あわせて`変換基板に必要な定格の見積もり`節を追加し、定常電流はbranchごとに測って足せること（peakと違い時間的重なりを仮定しなくてよい）、ESP32＋LCD＋sensorのbranchは段階Bで測れることを示した。これで変換基板の品をingressの実測を待たずに選べる | [PR #64レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/64) |
+| 2026-08-09 | 21 | [PR #64](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/64)のレビュー指摘を反映。`変換基板に必要な定格の見積もり`が、servo branchの測定を段階C（変換基板が要る）に限定しており、**購入前に見積もれるという主張と循環していた**。実測できるbranchと、できないbranchを分けた。servoは供給経路がingressしかなく実測できないため、連続動作時の上限として広く示される250 mAを**割り当て予算**として置き、実機がこれを超えないことは`servo-safety-limits.md`のtrajectory制限で担保することにした。stall電流は採らない（connector定格は熱の制限のため）。これで未知数はMSP2807の1つだけになり、段階Bの実測で合計が確定する。足す値が「同時に継続しうる動作条件での定常電流」であることも明記した | [PR #64レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/64)、SG90の連続動作電流の一般値 |
