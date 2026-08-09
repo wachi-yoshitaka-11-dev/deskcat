@@ -317,7 +317,8 @@ recovery／reconnect動作は`HW-TBD-018`の範囲に含める。fail-safe seque
 ## 受け入れchecklist
 
 - [ ] 正確なサーボとデータシートを記録した
-- [ ] Peak電流から電源容量を決定した
+- [ ] **定常電流**でingressとconnectorの定格を確認した（[power-budget.md](power-budget.md)の`ingressの電流制限`。定格は熱の制限のため、判定量は定常電流である）
+- [ ] **peak時**の5 V／3.3 Vの電圧droopを測定し、brownoutとresetが起きないことを確認した（peakはこの確認にのみ使う）
 - [ ] サーボ接続前にPWMを測定した
 - [ ] 機械的neutralを記録した
 - [ ] 両方向の物理的境界を記録した
@@ -337,3 +338,4 @@ recovery／reconnect動作は`HW-TBD-018`の範囲に含める。fail-safe seque
 | 2026-08-05 | 1 | `HW-TBD-006`（正確なservo model）が[TBD台帳](tbd-register.md)で解決済み（TowerPro SG90）となったため、有効化gate表の該当行を解決済みとして打ち消し、依存例（`HW-TBD-010`のBlocked元）を`HW-TBD-007`〜`009`へ更新した。**gate自体は開いていない。**残る`TBD`が未解決であり、peak／stall電流の実測も`HW-TBD-010`／`011`で必要である |
 | 2026-08-08 | 2 | `サーボ識別情報`表がメーカー・model・定格電圧をすべて`TBD`のまま残しており、[HW-TBD-006](tbd-register.md)を解決済みとした本文（Revision 1）および[hardware-bom.md](hardware-bom.md) SERVO-01と矛盾していた。安全確認の作業者がservo modelを未確定と誤認する状態だったため、確定済みの値（TowerPro SG90、4.8–6 V、datasheet link）を反映した。**駆動条件は未確定のまま残す。**pulse幅、stall電流、logic閾値は実機のcalibrationと測定で決めるものであり、datasheetの代表値を確定値として採らない旨も明記した。識別情報の正本が`hardware-bom.md`であることも冒頭に記した |
 | 2026-08-09 | 3 | 自己レビューで検出: [power-budget.md](power-budget.md)がservoへ連続電流250 mAを予算として割り当て、その担保をこの文書のtrajectory制限に委ねていたが、**この文書側に該当する制限が無かった**。電源側だけが予算を持ち、firmwareへ渡っていない状態だった。動作制限表へ`最大連続電流`の行を追加し、可動域・速度・duty cycleをこの予算の内側で決めることを明記した |
+| 2026-08-09 | 4 | 受け入れchecklistに`Peak電流から電源容量を決定した`が残っており、[power-budget.md](power-budget.md)の現行規則（ingressとconnectorの定格判定は定常電流で行い、peakは電圧droop・brownout・resetの確認にのみ使う）と矛盾していた。2項目に分けて揃えた |
