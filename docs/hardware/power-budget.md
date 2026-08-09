@@ -136,6 +136,27 @@ USBでPiと繋ぐ」構成は、そのままでは排他制約に反する。次
 
 **derating: 最弱部品の定格の80%を上限とする。**候補構成なら`1.5 A × 0.8 = 1.2 A`である。
 
+**評価するのは定常値（平均電流）であり、過渡peakではない。**connectorとPCB traceの
+電流定格は`I²R`による発熱と放熱の釣り合いで決まる熱の制限であり、時定数は秒から分の
+order である。µsからmsのspikeは発熱にほとんど寄与しないため、peakでこの上限を
+評価すると過剰に厳しくなる。
+
+**したがってingressの電流はデジタルテスター（MAS830L）を直列に入れて定常値で測る。**
+ESP32 ADCによるpeak captureは、この上限の判定には使わない。
+
+peakが問題になるのは別の現象であり、別の量で見る。
+
+| 現象 | 見る量 | 測定点 |
+|---|---|---|
+| connectorとtraceの過熱 | **定常／平均電流** | ingressへテスターを直列 |
+| peakによる電圧降下（Piのbrownout） | **電圧droop** | `ADC-5V`、`ADC-3V3`（`gpio-assignment.md`） |
+| servoのstall電流 | peak電流 | `ADC-SHUNT`（同上） |
+
+ingress低側へshuntを入れてESP32 ADCで測る案は採らない。star pointを基準にすると
+adapter return側は`I × R`だけ**負**の電位になり、ESP32のADCでは測れない
+（pin破損のriskもある）。high-side current sense ICで解決できるが、
+上記のとおりこの上限の判定にpeakが要らないため、部品を追加しない。
+
 80%とする理由は次のとおり。定格は連続通電の条件下で決まる値であり、本projectには
 定格側にも測定側にも不確かさが残る。
 
@@ -328,9 +349,10 @@ ESP32のPC USBからのflashing）だけである。これらは合成給電で�
   - [ ] 段階3: ＋ESP32のWi-Fi TXを動作させた状態
   - [ ] 段階4: ＋MSP2807（backlight点灯を含む）
   - [ ] 段階5: ＋ADXL345、BME280
-- [ ] 各段階で**定常値と過渡peakの両方**を記録する。定常値はデジタルテスター（MAS830L）、
-      過渡peakはingress低側へ挿入したshuntとESP32 ADCで測る。**定常値だけで上限内と判断しない**
-      （ESP32のTX spikeとMSP2807の突入を取り逃がすため）
+- [ ] 各段階で**ingressの定常電流**をデジタルテスター（MAS830L）で記録する。
+      これが`ingressの電流制限`の判定量である（connector定格は熱の制限のため）
+- [ ] 各段階で**5 Vと3.3 Vの電圧droop**を`ADC-5V`／`ADC-3V3`で記録する。
+      peakによる電圧降下はここで捉える。Piのbrownoutとreset reasonもあわせて確認する
 - [ ] ESP32 board上3V3 pinの外部供給可能電流の定格を確認し、周辺module3点（MSP2807、ADXL345、BME280）を接続した状態で3V3 rail電圧と電流を実測する。3V3 pinの供給能力を超える場合は別途3.3V regulatorを追加する
 - [ ] **ESP32の給電経路を確定させる**（`ESP32の給電経路（未決定）`節）。案A: PiのUSB OTG portからESP32＋3V3負荷を給電したときの電流とESP32入力電圧を実測し、undervoltageもPi側のbrownoutも起きないことを確認する。不足する場合は案Bへ切り替え、そのとき秋月基板のVBUS保護diodeの有無を回路で確認してから`5V` pinとUSBを同時接続する
 - [ ] サーボなしでlogicへ給電し、電流を記録する（上記の段階測定の結果をそのまま用いる）
@@ -371,7 +393,7 @@ Pi直挿しのままservoを繋ぐと、servo電流がPiのconnectorとPCB trace
 | 制約 | 値 | 根拠 |
 |---|---|---|
 | 5 V ingressを流れる最大電流 | 上行に同じ（最弱部品定格の80%）。**connector一般定格（約1.8 A）を上限に使わない** | 最弱部品が経路全体の上限を決める。1.5〜1.8 Aの測定値を「合格」としないため |
-| **合成給電時にingressを通る合計電流（定常値と過渡peakの両方）** | **経路上の最弱部品の定格の80%以下。**候補構成なら`1.5 A × 0.8 = 1.2 A`。超えたら直ちに中止する | 定格・測定の双方に不確かさがあるため。根拠は`ingressの電流制限` |
+| **合成給電時にingressを通る定常電流** | **経路上の最弱部品の定格の80%以下。**候補構成なら`1.5 A × 0.8 = 1.2 A`。超えたら直ちに中止する | connector定格は熱の制限であり、評価量は定常値である。80%の根拠は`ingressの電流制限` |
 | ADC入力へ加える最大電圧 | 3.3 V以下（5 V／3.3 V railは分圧比1/2を経由） | ESP32のADC入力範囲 |
 | ADC loggingのsample rate | 1 kSample/s以上 | servo起動過渡がms orderであるため。`Sample rateとlog形式`節 |
 | logic GNDとservo GND間に許容する直列抵抗 | 0Ω（star point直結。shuntを経由させない） | `GND topology`節 |
@@ -399,3 +421,4 @@ Pi直挿しのままservoを繋ぐと、servo電流がPiのconnectorとPCB trace
 | 2026-08-08 | 16 | レビュー指摘2件を反映。(a) Pi直挿しmodeを「文献値で合計0.5 A程度」と正当化していたが、これは根拠が無い。ESP32のspikeだけで約500 mA、Pi stressで約350 mA、MSP2807は未確認であり、文献値だけでも瞬時に0.85 Aを超えうる。`Pi直挿しmodeの電流gate`節を新設し、実測合計**1.0 Aを上限**として超えたら直ちに中止する条件、その1.0 AをMicro-B定格約1.8 Aに対する約1.8倍の余裕として選んだdesign marginの根拠、および段階的に負荷を足しながら測る手順を定めた。配線・保護表の`Piの5 V入力経路`行、測定計画の`サーボ接続前`、`受け入れ条件`の数値表にも同じgateを反映した。(b) Revision履歴で2026-08-08の行が古い行より前に挿入されていたため日付順へ並べ直した | [PR #57レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/57)、負荷表の文献値 |
 | 2026-08-09 | 17 | 昇格PR [#61](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/61)のレビュー指摘4件を反映。(a) **ESP32給電の循環論法を解消。**「案A/Bが確定するまで通電しない」と書きながら、案を決める実測には通電が要る状態だった。通電可否を「案の確定」ではなく「どの経路で通電するか」で決める方式へ変更し、案Aの単一経路・電流制限・監視付きに限ったbring-upを許可した。案Bは秋月基板のVBUS保護diode確認まで通電しない。(b) **1.0 A gateの測定手段が無かった。**servo rail低側shuntはlogic側を通さず、テスターは過渡peakを取り逃がす。定常値と過渡peakで手段を分け、logic側の測定点が未確定であること、確定までgateは定常値しか保証しないことを明記した。(c) ingress上限を「Micro-B一般定格 約1.8 A」から**経路上の最弱部品の定格**（候補構成では変換基板の1ピン1.5 A）へ変更。1.5〜1.8 Aの測定値が合格になる穴を塞いだ。(d) sample rateが必須要件に届かない場合の対処から「buffer長の短縮」を削除。buffer長は時間分解能を改善しないため、ADC改善・要件の見直し・測定手段の追加のいずれかを取ることにした。あわせて見出し階層の飛び（MD001）を修正 | [PR #61レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/61) |
 | 2026-08-09 | 18 | [PR #64](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/64)のレビュー指摘3件を反映。(a) **測れないgateを廃止した。**「Pi直挿しで合成給電し、合計1.0 Aを超えたら中止」としていたが、M-12001はMicro-Bオスplugの直結cableでアダプターとPiの間に測定器を挿入できず、**そのgateを測る手段が無かった**。段階をA（Pi単体起動）／B（ESP32をPCのUSBから給電）／C（合成給電）に分け、AとBはgate不要な通常の使い方、Cは変換基板の到着後とした。これにより「追加購入なしで合成給電できる」という前提が誤りだったことも訂正している。(b) 案Aの「電流制限」が未定義だったため、経路ごとに制限を明示した。段階BはPC hostのUSB port OCP、案AはPiのUSB OTG port供給能力（未確認、ingressで実測）、案Bはingress上限。(c) 「十分な余裕」が曖昧だったため、**最弱部品定格の80%**という数値のderatingを定めた（候補構成で1.2 A）。80%とする理由（servo peakの負荷依存、ADC loggingの取りこぼし、接触抵抗）も記載した。あわせて節名を`connector定格の制約`から`ingressの電流制限`へ変更し、配線・保護表・測定計画・受け入れ条件を揃えた | [PR #64レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/64) |
+| 2026-08-09 | 19 | [PR #64](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/64)のレビュー指摘を反映。ingress低側shuntをESP32 ADCで測る案が**電気的に成立しない**と判明した。star pointを基準にするとadapter return側は`I × R`だけ負の電位になり、ESP32のADCでは測れない。high-side current sense IC（例: INA219、秋月で¥2,300）で解決できるが、**そもそもpeakで判定する必要が無い**ため部品を追加しない。connectorとtraceの電流定格は`I²R`発熱と放熱の釣り合いで決まる熱の制限であり、時定数は秒から分のorderで、µs〜msのspikeは発熱にほとんど寄与しない。判定量を**定常値（テスター直列）**へ改め、peakによる電圧降下は既存の`ADC-5V`／`ADC-3V3`で捉えることにした。測定計画と受け入れ条件も揃えた | [PR #64レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/64)、connector定格の熱的性質 |
