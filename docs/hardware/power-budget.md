@@ -188,10 +188,13 @@ ingressを実測できるのは段階C（変換基板が要る）である。し
 | ESP32 board | 文献値。Wi-Fi TXを継続した場合 | 240 mA |
 | Raspberry Pi Zero W | 公式specのstress時。上限側を採る | 350 mA |
 | MSP2807（LCD＋backlight＋touch） | **未確認。段階B（ESP32をPCのUSBから給電）で実測できる。ここが唯一の未知数である** | **実測待ち** |
-| SERVO-01（SG90） | **実測できない**（servoへ5 Vを供給する経路がingressしかないため）。連続動作時の電流として広く示される上限値`250 mA`を保守的な上限として置く。stall電流は採らない（connector定格は熱の制限であり、stallは過渡のため） | 250 mA |
+| SERVO-01（SG90） | **実測できない**（servoへ5 Vを供給する経路がingressしかないため）。**datasheetの保証値ではなく、設計上の割り当て予算である。**一般に示されるSG90の連続動作電流（概ね100〜250 mA）の上限側を採った。stall電流は採らない（connector定格は熱の制限であり、stallは過渡のため） | 250 mA（**予算**） |
 
-servoの250 mAは**割り当てた予算**として扱う。実機がこれを継続して超えないことは、
-`servo-safety-limits.md`のtrajectory制限（可動域、速度、duty cycle）で担保する。
+servoの250 mAは**割り当てた予算**であり、測って得た値ではない。実機がこれを継続して
+超えないことは、`servo-safety-limits.md`のtrajectory制限（可動域、速度、duty cycle）で
+担保する。**この予算は同文書の動作制限表へ`最大連続電流`として渡してある。**
+渡さずに電源側だけで持つと、firmwareが何を守ればよいか分からないまま実装される。
+
 実測でこれを超えた場合は、制限を締めるか、ingressの定格を上げるかを選ぶ。
 
 未知数はMSP2807の1つだけである。段階Bで測れば合計が確定し、**変換基板の品を
@@ -209,7 +212,7 @@ ingressの実測を待たずに選べる**。選定後の実測で見積もり�
 | ESP32 3V3出力 | MSP2807（LCD＋backlight＋touch） | 1 | TBD（メーカー未公開） | TBD | TBD | 秋月商品ページに電流記載なし。logic IOが3.3V TTLのため3.3V給電とする（`電源rail構成案`参照）。backlight込みの電流次第では3V3 pinの供給能力を超える可能性があり、その場合は別途3.3V regulatorが必要 | Blocked（**入手済み・実測未実施**） |
 | ESP32 3V3出力 | ADXL345（accelerometer） | 1 | 数百µA程度（測定mode時） | 無視できるほど小さい想定 | 無視できるほど小さい想定 | [ADXL345解説](https://www.digikey.jp/ja/product-highlight/a/analog-devices/adxl345-3-axis-digital-accelerometer)。M-06724はregulator非搭載のため3.3V直結必須（Logic 5V railへは直結しない） | **文献値。実測前** |
 | ESP32 3V3出力 | BME280（environment sensor） | 1 | 数µA〜1mA未満（測定mode時） | 無視できるほど小さい想定 | 無視できるほど小さい想定 | Bosch公式BME280データシート（一般値）。現物付属説明書の電源電圧DC1.71～3.6Vのため5V直結不可（Logic 5V railへは直結しない） | **文献値。実測前** |
-| Servo | TowerPro SG90 | 1 | 数十〜数百mA（動作時、負荷依存） | TBD | データシート値0.5〜2A（負荷依存の広い範囲） | [SG90 datasheet](https://www.mouser.com/catalog/specsheets/Soldered_101246.pdf) | **文献値。実測必須（`tbd-register.md` HW-TBD-010／011。model自体はHW-TBD-006で解決済み）** |
+| Servo | TowerPro SG90 | 1 | 数十〜数百mA（動作時、負荷依存） | **250 mAを予算として割り当て**（`変換基板に必要な定格の見積もり`）。実測値はTBD | データシート値0.5〜2A（負荷依存の広い範囲） | [SG90 datasheet](https://www.mouser.com/catalog/specsheets/Soldered_101246.pdf) | **文献値。実測必須（`tbd-register.md` HW-TBD-010／011。model自体はHW-TBD-006で解決済み）** |
 
 **重要**: 上表の大半は「文献値」であり、この文書の目的である実測値ではない。特にLogic railの同時最大peak
 （ESP32 TX spike＋Pi stress＋LCD backlight）とServoのstall電流が重なる最悪caseは、単一電源(M-12001、5V/3A)の
