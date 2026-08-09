@@ -26,7 +26,7 @@
 
 | Ref | 機能 | 部品／module | 状態 | 正確なメーカー／suffix | 公式文書 | 電源 | Peak電流 | 根拠／残作業 |
 |---|---|---|---|---|---|---|---|---|
-| MCU-01 | Real-time I/O controller | ESP-WROOM-32D開発ボード（秋月電子 M-13628。Espressif公式ESP32-DevKitCではない） | Selected | モジュール: ESP-WROOM-32D。基板silkscreen: `ESP32_DevkitC_V4`（Espressif ESP32-DevKitC V4リファレンスデザイン、38pin／wide版） | [秋月商品ページ](https://akizukidenshi.com/catalog/g/g113628/)（データシート添付）、[Espressif ESP32-DevKitC V4公式guide](https://docs.espressif.com/projects/esp-idf/en/v5.1/esp32/hw-reference/esp32/get-started-devkitc.html)（pinout参照用） | USB Micro-B 5 V入力、board上regulatorで3.3V生成。定格はTBD | TBD（現物測定予定） | 現物写真のpin表記（`D0`–`D3`／`CMD`／`CLK`相当がheaderに露出）、購入履歴、および基板裏面silkscreen「`ESP32_DevkitC_V4`」から機種確定。旧記載の「ESP32-DevKitC-32E」は誤りのため訂正。Flash予約pinの露出をGPIO割当時に要注意 |
+| MCU-01 | Real-time I/O controller | ESP-WROOM-32D開発ボード（秋月電子 M-13628。Espressif公式ESP32-DevKitCではない） | Selected | モジュール: ESP-WROOM-32D。基板silkscreen: `ESP32_DevkitC_V4`（Espressif ESP32-DevKitC V4リファレンスデザイン、38pin／wide版） | [秋月商品ページ](https://akizukidenshi.com/catalog/g/g113628/)（データシート添付）、[Espressif ESP32-DevKitC V4公式guide](https://docs.espressif.com/projects/esp-idf/en/v5.1/esp32/hw-reference/esp32/get-started-devkitc.html)（pinout参照用） | USB Micro-B 5 V入力、board上regulatorで3.3V生成。**regulatorの種別（LDO／switching）、`3V3` pinの外部供給可能電流の定格、`3V3` railの許容電圧範囲、過電流／短絡保護の有無はいずれもTBD**（これらの確認は[power-budget.md](power-budget.md)の**段階B-2を実施してよいかのgate**であり、種別は5 V側への換算根拠に使う。`段階B-2の測定`） | TBD（現物測定予定） | 現物写真のpin表記（`D0`–`D3`／`CMD`／`CLK`相当がheaderに露出）、購入履歴、および基板裏面silkscreen「`ESP32_DevkitC_V4`」から機種確定。旧記載の「ESP32-DevKitC-32E」は誤りのため訂正。Flash予約pinの露出をGPIO割当時に要注意 |
 | SBC-01 | 高水準controller | Raspberry Pi Zero W（ヘッダなし版。ピンヘッダを別途ハンダ付け） | Selected | Board revision: `V1.1`（基板裏面silkscreen「Raspberry Pi Zero W V1.1 © Raspberry Pi 2017」で確認） | [Raspberry Pi公式製品ページ](https://www.raspberrypi.com/products/raspberry-pi-zero-w/) | 5 V入力（micro USB）。connectorと電流予算はTBD | TBD | 購入履歴で品名「RPI-ZERO-W」（`WH`ではない）と基板裏面のrevision表示を確認。写真のheaderは別購入の細pin headerを自分でハンダ付けしたものと推定。旧記載の「WH」は訂正 |
 | SD-01 | Piのbootとstorage | Samsung EVO Plus microSDHC 32GB | Selected | Samsung。Speed Class: UHS Speed Class 1（`U1`表示） | メーカー公式ページはTBD | SBCから供給 | TBD | カード本体のprint（`SAMSUNG EVO Plus 32 microSDHC U1`）で確認済み。Piのslotは空だったため、この手持ちcardを新たに使用する。使用前の健全性（health）check未実施 |
 
@@ -49,11 +49,58 @@
 | SERVO-01 | 首振り | TowerPro Micro servo 9g SG90 | Selected | TowerPro SG90 | 4.8–6V（データシート値。外部5 V系はproject方針） | データシート値0.5–2A（負荷依存）。実測値はTBD | [TowerPro公式](https://towerpro.com.tw/product/sg90-7/)、[datasheet](https://www.mouser.com/catalog/specsheets/Soldered_101246.pdf) | ラベル現物確認済み。Peak／stall電流と機械的可動域は`power-budget.md`の測定計画に従い実測が必要（[tbd-register HW-TBD-010／011](tbd-register.md)） |
 | PSU-PI-01 | Piとlogic電源 | スイッチングACアダプター(USB ACアダプター) MicroBオス 5V3A（秋月 M-12001）— logic／servo共通の単一入力源 | Selected | 秋月 M-12001 | 5V／3A（15W） | TBD（実測でmargin確認） | [秋月商品ページ](https://akizukidenshi.com/catalog/g/g112001/) | この1個を`power-budget.md`の電源rail構成案における単一入力源とし、breadboard上でlogic railとservo railの2本に分岐する（単一入力・内部で分岐、複数ACアダプターは使わない）。分岐後の各railの配線・保護は`power-budget.md`で確定する。手持ちのTA7805S（5V1A×5）はこの構成では不要（adapterが直接5Vを出力するため） |
 | PSU-SERVO-01 | サーボ電源 | PSU-PI-01と同一のACアダプターから分岐したservo rail | Selected（入力源は確定。分岐後の部品はTBD） | 入力はPSU-PI-01と共通（M-12001）。Servo直近のbulk capacitorは候補として電解コンデンサ470μF／16V（秋月 g108426、ルビコンWXA）を想定するが、最終容量は実測待ち（`power-budget.md`配線・保護表） | 5V（共通入力からの分岐） | TBD | [秋月商品ページ](https://akizukidenshi.com/catalog/g/g112001/) | Servo起動時の過渡電流を吸収するbulk capacitorの容量選定と、logic railへの影響評価が必要（`power-budget.md`測定計画、[tbd-register HW-TBD-007](tbd-register.md)） |
-| PSU-INGRESS-01 | ACアダプターのplugをbreadboardへ引き込む物理変換 | Micro-Bメスreceptacleの2.54mm変換基板（DIP化キット） | Required | 未購入。候補は秋月 g110972（¥130、電源専用、定格1ピン1.5A） | 5V | ingress全体を通る電流。候補品の定格1.5Aは、文献値の最悪同時peak（2A超）を下回る | [候補の商品ページ](https://akizukidenshi.com/catalog/g/g110972/) | **servo試験の直前までは不要。**それまではM-12001のplugをPiの`PWR IN`へ直挿しし、Piの5V GPIO pinからbreadboard railを作る（[power-budget.md](power-budget.md)の`5 V ingress`節の段階表）。bring-up前半の実測でingressの実電流が分かってから品を確定させ、定格不足による買い直しを避ける |
-| CABLE-PI-PWR-01 | breadboard railからPiへの給電 | Micro-Bオスcable | Required | 未購入 | 5V | Piの消費電流 | — | **servo試験の直前までは不要**（それまではM-12001を直挿しするため）。PSU-INGRESS-01と同時に購入する |
-| CABLE-PI-LINK-01 | Pi–ESP32間のUSB serial link | USB OTG cableまたはMicro-B ⇔ Micro-B OTG変換（PiのUSB OTG port ⇔ ESP32のMicro USB） | Required | 未購入 | — | 案Aを採る場合、このcableがESP32への給電経路も兼ねる | — | **FND-001〜003には不要。**M2（protocol実装）で必要になる。それまでESP32はPCからUSBで給電・flashingする。transportの確定内容は[gpio-assignment.md](gpio-assignment.md)、給電を兼ねるか否かは[power-budget.md](power-budget.md)の`ESP32の給電経路（未決定）`節 |
-| PROTO-01 | 試作用配線 | ブレッドボード(秋月 EIC-3901、6穴版)、ミニブレッドボードBB-601(スケルトン)×2、クリップ付コード5色45cm×10本、細いピンヘッダ20P×5(Pi header用に一部使用済み) | Selected | 手持ち品。個別の許容電流はメーカー資料未確認 | 回路に従う | 回路に従う（ジャンパー線・ブレッドボード接点の許容電流は一般に小電流用途。Servo peak電流経路には別途太い線を使う想定） | TBD | 現物写真・購入履歴で確認済み。Servo電源のようなpeak電流が流れる経路は、breadboard接点やジャンパー線でなく、より太い専用線を使うことを`power-budget.md`の配線・保護表で検討する |
-| MEAS-01 | 電流波形測定（Oscilloscope代替） | セメント抵抗5W0.1Ω（秋月 g117836、SQP5WJ0R1B、¥30）、および分圧用カーボン抵抗10kΩ | Required | 秋月 SQP5WJ0R1B | — | shuntはservo rail全電流を通す。5W定格に対し0.1Ω×2A²＝0.4Wで余裕あり | [秋月商品ページ](https://akizukidenshi.com/catalog/g/g117836/) | **入手済み（2026-08-08着荷）**。servo rail低側へ挿入する。挿入位置とGND topologyの制約は[power-budget.md](power-budget.md)の`GND topology`節、ADC pinは[gpio-assignment.md](gpio-assignment.md) |
+| PSU-INGRESS-01 | ACアダプターのplugをbreadboardへ引き込む物理変換 | Micro-Bメスreceptacleの2.54mm変換基板（DIP化キット） | Required | 未購入。候補は秋月 g110972（¥130、電源専用、定格1ピン1.5A） | 5V | ingress全体を通る電流。上限は経路上の全部品の定格の最小値の80%（候補品の1.5Aが最弱なら1.2A以下。未確定の経路要素が残るため確定値ではない） | [候補の商品ページ](https://akizukidenshi.com/catalog/g/g110972/) | **合成給電（段階C）を始める前に必要。**これが無いとアダプターとPiの間にテスターを直列に入れられず、ingressの電流を測れない。到着までは段階A（Pi単体起動。**GPIOへは何も接続しない**）、段階B-1（ESP32をPCのUSBから給電）、段階B-2（周辺module3点をESP32の`3V3` pinから給電して3.3V側の定常電流を測る）に留める（[power-budget.md](power-budget.md)の`5 V ingress`節）。品の確定には`power-budget.md`の`変換基板に必要な定格の見積もり`に従い、branchごとの**定常電流**を測って足す。LCD＋sensorのbranchは**段階B-2**で測れるため、**ingressの実測を待たずに選べる**。ただし段階B-2の実施には`3V3` pinの外部供給可能電流の定格確認が要り、5V側へ足すにはregulatorの種別確認も要る（`段階B-2の測定`） |
+| CABLE-PI-PWR-01 | breadboard railからPiへの給電 | Micro-Bオスcable | Required | **未購入・未選定。**`WIRE-PWR-01`と同じ規則で、導体の許容電流（またはAWG）が公開されている品を選ぶ。公開されていない品は選ばない（`power-budget.md`の`経路部品と定格`表を埋められないため） | 5V | Piの消費電流。**経路の最小定格を決める要素の一つである** | — | **合成給電（段階C）から必要。**段階Cではbreadboard railからこのcableでPiの`PWR IN`へ入れる（[power-budget.md](power-budget.md)の段階表）。段階A・段階B-1・段階B-2までは不要で、それまではM-12001をPiへ直挿しする。PSU-INGRESS-01と同時に購入する |
+| CABLE-PI-LINK-01 | Pi–ESP32間のUSB serial link | USB OTG cableまたはMicro-B ⇔ Micro-B OTG変換（PiのUSB OTG port ⇔ ESP32のMicro USB） | Required | **未購入。案Aを採る場合はESP32への給電経路を兼ねるため、導体の許容電流（またはAWG）が公開されている品を選ぶ**（`WIRE-PWR-01`と同じ規則）。案Bなら信号線のみ | — | 案Aを採る場合、このcableがESP32の供給電流（board＋3V3負荷）を通す。ingressのgate対象経路ではないが、定格の確認は要る | — | **FND-001〜003には不要。**M2（protocol実装）で必要になる。それまでESP32はPCからUSBで給電・flashingする。transportの確定内容は[gpio-assignment.md](gpio-assignment.md)、給電を兼ねるか否かは[power-budget.md](power-budget.md)の`ESP32の給電経路（未決定）`節 |
+| PROTO-01 | 試作用配線 | ブレッドボード(秋月 EIC-3901、6穴版)、ミニブレッドボードBB-601(スケルトン)×2、クリップ付コード5色45cm×10本、細いピンヘッダ20P×5(Pi header用に一部使用済み) | Selected | 手持ち品。個別の許容電流はメーカー資料未確認 | 回路に従う | **gate対象の大電流経路には使わない**（許容電流がメーカー資料で確認できず、経路の最小定格を出せないため）。信号線と、ESP32の`3V3` pinから取る小電流branchに限る | TBD | 現物写真・購入履歴で確認済み。**大電流経路（5 V ingress → 分岐点 → 各railの往路、およびGND戻り）は`WIRE-PWR-01`で構成し、breadboard接点とジャンパー線を通さない。**決定の根拠は[power-budget.md](power-budget.md)の`大電流経路にbreadboard接点とジャンパー線を使わない` |
+| PROT-OC-01 | 5 V ingressの過電流保護 | ポリスイッチ（PTC）またはガラス管ヒューズ＋ホルダ | Required | **未購入・未選定。**品番とtrip値は発注直前にメーカーの時間-電流特性で確定する（記憶や一般値で置かない）。**選定後は`power-budget.md`の`記録するtrip動作`の5項目（定常電流継続時の動作、trip電流、trip時間、3 Aでの遮断時間、確認方法）を記録する。品番とtrip値だけでは段階Cのgateを通さない** | 5V以上 | 下限は**保持電流×0.8＞想定定常電流の合計**、上限は**保持電流≦保護対象の最弱部品の定格**（`power-budget.md`の`選定基準`と同じ式。単に上回るだけでは、BOM上は合格でもingress gateで不合格になる品を選べる）。遮断能力はM-12001の3A以上 | TBD（選定時に一次資料へlinkする） | **段階C（合成給電）のgate。**M-12001は3Aを供給でき、テスターの読みと手動停止では最弱部品が発熱する前に電流を止められない。選定基準・挿入位置・上限との関係は[power-budget.md](power-budget.md)の`過電流保護（段階Cのgate）`。追跡は[tbd-register HW-TBD-021](tbd-register.md) |
+| WIRE-PWR-01 | 大電流経路の線材・接続部材 | 公称許容電流が公開されている線材と、5 V railの分岐に使う接続部材 | Required | **未購入・未選定。**許容電流の下限は`許容電流×0.8＞負荷側の想定定常電流の合計`とする（合計は`power-budget.md`の`変換基板に必要な定格の見積もり`が出す）。**ingressの上限（gate値）から決めない**（gate値はこの品の定格を含む最小値から出るため、循環する）。選定順序は同文書の`選定順序（循環にしない）` | 5V | 経路の最小定格を決める要素の一つ。定格が公開されている品だけを使う | TBD（選定時に一次資料へlinkする） | breadboard接点とジャンパー線は許容電流がメーカー資料で確認できず、`power-budget.md`の`経路部品と定格`表を埋められない。**gate対象の大電流経路をこの部材へ置き換える**ことで最小定格を確定させる。追跡は[tbd-register HW-TBD-022](tbd-register.md) |
+| RES-PULL-01 | GPIOの外部pull-up／pull-down | 抵抗一式 | Required | **未購入・未選定。**必要な本数と抵抗値は[gpio-assignment.md](gpio-assignment.md)の信号inventoryの`Pull`列に従う。LCD-BLの極性とTOUCH-IRQの論理は現物確認後に決まる | 3.3V | 信号線のみ。大電流経路ではない | TBD | **`SERVO-PWM`の外部pull-downは「推奨」ではなく必須**であり、high-Z期間中にservoが動くことを防ぐ唯一の手段である（[gpio-assignment.md](gpio-assignment.md)）。LCD-CS／TOUCH-CS／LCD-RST／LCD-BL／TOUCH-IRQ／I2Cのpullもここに含める |
+| MEAS-01 | 電流波形測定（Oscilloscope代替） | セメント抵抗5W0.1Ω（秋月 g117836、SQP5WJ0R1B、¥30）、および分圧用カーボン抵抗10kΩ×4 | Required | 秋月 SQP5WJ0R1B（shunt）。**分圧用10kΩは未選定・未購入** | — | shuntはservo rail全電流を通す。5W定格に対し0.1Ω×2A²＝0.4Wで余裕あり。5W／0.1Ωから逆算した電流定格は約7A相当 | [秋月商品ページ](https://akizukidenshi.com/catalog/g/g117836/) | **shuntのみ入手済み（2026-08-08着荷）。分圧用カーボン抵抗10kΩ×4は未購入**（`ADC-5V`と`ADC-3V3`で各2本。[gpio-assignment.md](gpio-assignment.md)が分圧比1/2を規定済み）。**これが無いと`ADC-5V`／`ADC-3V3`を配線できず、電圧droopもESP32給電経路の判断も測れない。**shuntはservo rail低側へ挿入する。挿入位置とGND topologyの制約は[power-budget.md](power-budget.md)の`GND topology`節、ADC pinは[gpio-assignment.md](gpio-assignment.md) |
+
+## 購入待ちリスト
+
+**この表が発注時の唯一の参照先である。**部品が必要と判明したら、判明した時点でここへ行を足す。
+各部品行の`残作業`列に「未購入」と書くだけで終わらせない。**書いた本人以外には発注時に見えないため、
+過去に実際の発注漏れを起こしている**（2026-08-08、`PSU-INGRESS-01`／`CABLE-PI-PWR-01`／
+`CABLE-PI-LINK-01`の3点が発注に載らなかった）。
+
+発注は送料がかかるため一度にまとめる。**発注前に、repository全体を次のパターンで
+機械的に洗い出し、この表と突き合わせる。**記憶や前回の会話に頼らない。
+
+```text
+未購入 / 購入 / 発注 / 未選定 / 未確定 / Required / Blocked / 手配 / 調達
+```
+
+対象は`docs/`だけでなくrepository全体とする。**「走査した」と書くなら、使った
+パターンをここに残す。**過去に狭いパターンで「0件」と誤報告している。
+
+2026-08-09にこのパターンで走査した結果を記録する。
+
+| 追加した部品 | 表から漏れていた理由 |
+|---|---|
+| 分圧用カーボン抵抗10kΩ×4 | `gpio-assignment.md`が「購入する」と書き、`MEAS-01`行が`Required`のままだったが、この表に無かった |
+| `RES-PULL-01` GPIOの外部pull抵抗一式 | `gpio-assignment.md`が`SERVO-PWM`の外部pull-downを**必須**としていたが、BOMに行すら無かった |
+| Servo bulk capacitor | `power-budget.md`で`Candidate`のまま止まっており、着荷記録も無かった |
+| `PROT-OC-01` 過電流保護部品 | [#65](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/65)で新たに必要と判明。従来は`過電流保護`が`TBD`／`Blocked`とだけ書かれ、部品として認識されていなかった |
+| `WIRE-PWR-01` 大電流経路の線材・接続部材 | 同上。従来は`Wire gauge／許容電流`が`TBD`／`Blocked`、`PROTO-01`が「太い専用線を使う想定」とだけ書かれていた |
+
+前3件は**`残作業`列や本文に書くだけでは発注時に見えない**という2026-08-08と同じ失敗の
+再現である。後2件は今回新たに判明したものであり、判明した時点でこの表へ足した。
+
+| 部品 | 用途 | 必要になる時期 | 状態 |
+|---|---|---|---|
+| `PSU-INGRESS-01` Micro-Bメスreceptacle変換基板 | M-12001のplugをbreadboard railへ引き込む | **合成給電（段階C）を始める前。**これが無いとアダプターとPiの間にテスターを直列に入れられず、ingressの電流を測れない | 未購入。**品の確定は段階B-2でのbranch定常電流の実測後**（`power-budget.md`の`変換基板に必要な定格の見積もり`）。**段階B-2の実施自体が`3V3` pinの外部供給可能電流の定格確認をgateにしている。**5V側へ換算するにはregulatorの種別確認も要る |
+| `CABLE-PI-PWR-01` Micro-Bオスcable | breadboard rail → Piの`PWR IN` | 同上 | 未購入。**導体の許容電流（またはAWG）が公開されている品を選ぶ**（`WIRE-PWR-01`と同じ規則。plugの定格は導体の定格を保証しない） |
+| `CABLE-PI-LINK-01` USB OTG変換／cable | Pi ↔ ESP32のUSB serial link | M2（protocol実装）から。ESP32単体のflashingはPCのUSBで足りる | 未購入。**案Aを採る場合はESP32への給電経路を兼ねるため、`WIRE-PWR-01`と同じく導体の許容電流（またはAWG）が公開されている品を選ぶ。**案Bなら信号線のみ |
+| `PROT-OC-01` 過電流保護部品（PTCまたはヒューズ＋ホルダ） | 5 V ingressの往路へ直列。最弱部品が発熱する前に電流を止める | **合成給電（段階C）を始める前。**これが無いと、上限を超えた電流を止める手段がテスターの読みと手動停止しかない | 未購入。**品番とtrip値は発注直前にメーカーの時間-電流特性で確定する**（選定基準は`power-budget.md`の`過電流保護（段階Cのgate）`）。**選定後は同節の`記録するtrip動作`の5項目を記録するまでgateを通さない** |
+| `WIRE-PWR-01` 大電流経路の線材・接続部材 | 5 V ingress → 分岐点 → 各railの往路、およびGND戻り | 同上 | 未購入。**許容電流の下限は`許容電流×0.8＞負荷側の想定定常電流の合計`とする。ingressの上限（gate値）から決めない**（gate値はこの品の定格を含む最小値から出るため、循環する。`power-budget.md`の`選定順序（循環にしない）`）。公称許容電流が公開されている品だけを選ぶ（breadboard接点・ジャンパー線は資料が無く経路の最小定格を出せない） |
+| 分圧用カーボン抵抗10kΩ×4（`MEAS-01`の一部） | `ADC-5V`と`ADC-3V3`の分圧器（各2本、分圧比1/2） | **`ADC-5V`／`ADC-3V3`を使う測定すべての前。**段階Cの電圧droop測定とESP32給電経路の判断がこれに依存する | 未購入。分圧比は`gpio-assignment.md`で1/2に確定済みのため、**待っているものは無い。次の発注に載せる** |
+| `RES-PULL-01` GPIOの外部pull-up／pull-down抵抗一式 | `SERVO-PWM`のpull-down（**必須**）、LCD-CS／TOUCH-CS／LCD-RST／LCD-BL／TOUCH-IRQ／I2Cのpull | **サーボ出力を有効化する前。**`SERVO-PWM`のpull-downは、high-Z期間中にservoが動くことを防ぐ唯一の手段である | 未購入。**本数と抵抗値が未選定。**LCD-BLの極性とTOUCH-IRQの論理は現物確認後に決まる（`gpio-assignment.md`）。I2Cはmodule搭載pull-upとの合成抵抗を現物で確認してから決める |
+| Servo bulk capacitor 電解コンデンサ470μF／16V（秋月 g108426、ルビコンWXA）×2〜3 | servo rail分岐の直近。起動時の過渡電流を吸収する | **servo試験の前。**無いとservo起動過渡がlogic railのdroopとして出る | 未購入。**最終容量は実測待ち**（`power-budget.md`の配線・保護表。状態は`Candidate`） |
+
+品の確定に実測が要るものは、**実測できる状態になってから選ぶ**。定格不足による買い直しを避けるためだが、
+そのぶん発注が後ろへずれる。ずれる場合は、この表に「何を待っているか」を書く。
 
 ## 初期製作の明示的な対象外
 
@@ -68,7 +115,11 @@
 
 ## 部品受け入れchecklist
 
-各行を`Selected`へ変更する前に、次を確認する。
+各部品を**受け入れ済み**として扱う前に、次を確認する。
+
+**このchecklistは`状態`列の`Selected`のgateではない。**`Selected`は上の状態ラベル定義の
+とおり「初期製作で使用する予定」を表すだけであり、部品が特定できた時点で付与する。
+このchecklistは、**GPIO割り当てと電源budgetを承認するためのgate**である。
 
 > **現状（2026-08-08時点）**: 下のchecklistは**どの部品についても未完了**である。
 > `状態`列の`Selected`は「初期製作で使用する予定」（上の状態ラベル定義）を表しており、
@@ -86,6 +137,7 @@
 - [ ] Revision／dateを含む公式データシートへリンクした
 - [ ] Module回路図または検証済みpinoutへリンクした
 - [ ] 供給電圧とlogic電圧が明確である
+- [ ] **Board上regulatorの種別（LDO／switching）、`3V3` pinが外部へ供給できる電流の定格、`3V3` railの許容電圧範囲、および過電流保護／短絡保護の有無と動作を確認した**（`MCU-01`のみ。**これらの確認は[power-budget.md](power-budget.md)の段階B-2を実施してよいかのgateである。**電流定格と電圧範囲は通常動作の上限にすぎず、短絡・配線ミス時の電流を制限するのは過電流／短絡保護である。保護が無いか確認できない場合は、電流制限付きの外部3.3 V電源から周辺moduleへ給電する。PC hostのOCPはUSB入力を制限するだけで`3V3` branchを守らず、先に壊れうるのはboard上のregulatorである。種別は3.3 V側の実測値を5 V側へ換算する根拠にも使う。switchingなら`Iin ≒ Iout + Iq`が成り立たない）
 - [ ] 通常電流とpeak電流が明確、または測定予定がある
 - [ ] Connector方向とpin 1が明確である
 - [ ] Bus設定と起動sequenceが明確である
@@ -111,3 +163,13 @@
 | 2026-08-05 | 11 | 自己レビューで検出: PSU-PI-01が`power-budget.md`の既に存在しない文言「TBD wired source」を引用していたため実際の節名へ修正。PSU-SERVO-01のbulk capacitorを「型番・容量はTBD」としていたが、`power-budget.md`では候補（ルビコンWXA 470μF16V）が確定済みで記述がずれていたため揃えた | 自己レビュー |
 | 2026-08-08 | 12 | Revision 8で追加した未購入部品3点（`PSU-INGRESS-01`／`CABLE-PI-PWR-01`／`CABLE-PI-LINK-01`）について、「これが無いと配線を開始できない」という記述が過大だったため訂正した。前2者はservo試験の直前まで不要（それまではM-12001をPiの`PWR IN`へ直挿しする）、`CABLE-PI-LINK-01`はM2のprotocol実装まで不要である。`PSU-INGRESS-01`には候補品（秋月 g110972、定格1ピン1.5 A）を記載した | ユーザーからの指摘（購入済み5点にこれらが含まれていない）、[power-budget.md](power-budget.md)の`5 V ingress`節の段階表 |
 | 2026-08-08 | 13 | レビュー指摘2件を反映。(a) 受け入れchecklistのsnapshot日付が`2026-08-05`のままで、同じ節に記載した2026-08-08の着荷と食い違っていたため`2026-08-08時点`へ更新した。(b) Revision履歴でRevision 8と9が重複し、2026-08-08の行が古い行より前に挿入されていた。番号を一意にし、日付順へ並べ直した | [PR #57レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/57) |
+| 2026-08-09 | 14 | 昇格PR [#61](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/61)のレビュー指摘を反映。受け入れchecklistの見出しが「各行を`Selected`へ変更する前に確認する」となっており、状態ラベル定義（`Selected`＝「使用する予定」）および「Selectedは受け入れ完了を意味しない」という注記と矛盾していた。この矛盾はrevision 0から存在し、Revision 8の注記追加で表面化した。checklistのgateを`Selected`の付与ではなく**受け入れ（GPIO割り当てと電源budgetの承認）**へ変更した | [PR #61レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/61) |
+| 2026-08-09 | 15 | **`購入待ちリスト`節を新設した。**必要と判明した部品を各行の`残作業`列へ「未購入」と書くだけでは発注時に見えず、2026-08-08に実際の発注漏れを起こしている（`PSU-INGRESS-01`とcable 2点）。発注時の唯一の参照先として1箇所へ集約し、発注前にrepository全体を機械的に洗い出して突き合わせる手順も明記した。あわせて[PR #64](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/64)のレビューで判明した「ingress測定用の2本目のshunt」を同リストへ追加した | 発注漏れの実例、[PR #64レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/64) |
+| 2026-08-09 | 16 | [PR #64](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/64)のレビュー指摘を反映。`PSU-INGRESS-01`行と購入待ちリストが、廃止した合成給電手順（Piの5V GPIO pinからrailを作る）を残しており、`power-budget.md`の段階A／B／Cと矛盾していた。両方を段階の規則へ揃えた。あわせて、ingress測定用に一度追加した「2本目のshunt」を購入待ちリストから削除した。ingressの判定量を定常値へ改めた結果、ESP32 ADCによるpeak captureが不要になったためである（負電圧で測定できない問題も同時に解消した） | [PR #64レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/64) |
+| 2026-08-09 | 17 | [PR #64](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/64)のレビュー指摘を反映。ingressの判定量を定常電流へ改めたにもかかわらず、`PSU-INGRESS-01`行と購入待ちリストが品の確定を「servoの実測peak待ち」としたままだった。測定不要とした量が部品選定を阻む状態だったため、branchごとの定常電流の実測待ちへ改めた。ESP32＋LCD＋sensorのbranchは段階Bで測れるため、ingressの実測を待たずに品を選べる | [PR #64レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/64) |
+| 2026-08-09 | 18 | [PR #64](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/64)のレビュー対応でwire gaugeの判定量を定常電流へ改めたのに合わせ、PROTO-01行の「Servo peak電流経路には別途太い線を使う」も定常電流基準へ改めた。許容電流は熱の制限であり、peakは電圧降下として別に見る | [PR #64レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/64) |
+| 2026-08-09 | 19 | [#65](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/65)で[PR #64](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/64)のレビュー指摘を解消。(a) `PSU-INGRESS-01`行が「ESP32＋LCD＋sensorのbranchは段階Bで測れる」としていたが、`power-budget.md`の段階BはESP32単体の定義であり、**未測定の負荷のまま80%計算が進みうる**状態だった。段階B-2（周辺module3点を`3V3` pinから給電）参照へ改めた。(b) `PROTO-01`のbreadboard接点とジャンパー線を、許容電流がメーカー資料で確認できないことを理由に**gate対象の大電流経路から外した**。(c) `PROT-OC-01`（過電流保護）、`WIRE-PWR-01`（大電流経路の線材・接続部材）、`RES-PULL-01`（GPIOの外部pull）を新設。(d) **発注前の走査（`未購入`／`購入`／`発注`／`未選定`／`未確定`／`Required`／`Blocked`／`手配`／`調達`を全fileへ実行）で、購入待ちリストから5件が漏れていることが判明**した。上記3点に加え、`MEAS-01`の分圧用カーボン抵抗10kΩ×4（`gpio-assignment.md`が「購入する」と書いているのに表に無かった）とservo bulk capacitorを追加した。`MEAS-01`の`入手済み`はshuntのみを指すことも明記した。**この3件は2026-08-08と同じ「`残作業`列に書いただけで発注時に見えない」失敗の再現であり、`PROT-OC-01`と`WIRE-PWR-01`は今回新たに判明したものである。**走査パターン自体も3語から9語へ広げ、使ったパターンを文書へ残す規則にした（過去に狭いパターンで「0件」と誤報告しているため） | [PR #64レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/64)、[#65](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/65)、[gpio-assignment.md](gpio-assignment.md) |
+| 2026-08-09 | 20 | Revision 19に対する[PR #64](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/64)のレビュー指摘2件を反映。(a) `PROT-OC-01`行の保持電流条件が「想定定常電流の合計を上回ること」だけで、`power-budget.md`の`保持電流×0.8＞想定定常電流`と食い違っていた。**BOM上は合格でもingress gateでは不合格になる保護部品を選べる状態**だったため、両文書で同じ式にした。(b) `WIRE-PWR-01`行が許容電流を「ingressの上限が決まってから確定する」としており、上限がその定格から出る以上、循環していた。負荷側の想定定常電流の合計を入力とする式（`許容電流×0.8＞合計`）へ改め、`power-budget.md`の`選定順序（循環にしない）`を参照させた | [PR #64レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/64) |
+| 2026-08-09 | 21 | `/review`と反復自己レビューで検出した5件を修正。(a) **`WIRE-PWR-01`の循環記述の修正が部品表の行にしか当たっておらず、購入待ちリストの行に残っていた。**この表は「発注時の唯一の参照先」であり、発注担当が実際に見る側に循環が温存されていた。(b) `CABLE-PI-PWR-01`の必要時期が「servo試験の直前まで不要」のままで、段階Cで`PWR IN`へ給電する現行構成と食い違っていた。段階Cからへ改めた。(c) `CABLE-PI-PWR-01`と`CABLE-PI-LINK-01`に、導体の許容電流が公開されている品を選ぶ規則が無かった。後者は案Aを採るとESP32への給電経路を兼ねる。`WIRE-PWR-01`と同じ規則へ揃えた。(d) 受け入れchecklistに**Board上regulatorの種別（LDO／switching）と`3V3` pinの外部供給可能電流**の項目を新設した。`power-budget.md`の`段階B-2の測定`がこの種別を5 V側への換算根拠に指定しているのに、確認する項目がどこにも無かった。`MCU-01`行にも同じTBDを明記した | `/review`、自己レビュー |
+| 2026-08-09 | 22 | `0441f10`に対する[PR #64](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/64)のレビュー指摘を反映。(a) 受け入れchecklistの`Board上regulatorの種別`の項目と`MCU-01`行に、**`3V3` pinの外部供給可能電流の定格の確認が`power-budget.md`の段階B-2を実施してよいかのgateである**ことを明記した。従来は5 V側への換算根拠としか書いておらず、**PC hostのOCPが`3V3` branchを守らない**ことも、先に壊れうるのがboard上のregulatorであることも書いていなかった。(b) `PROT-OC-01`行と購入待ちリストへ、選定後に`power-budget.md`の`記録するtrip動作`の5項目を記録するまで段階Cのgateを通さない旨を追記した。品番とtrip値だけでは、最弱部品の熱定格を超える前に止まるかを判定できない | [PR #64レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/64) |
+| 2026-08-09 | 23 | Revision 22に対する[PR #64](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/64)のthread返信で残った指摘を反映。受け入れchecklistの`MCU-01`向け項目と`MCU-01`行が、`3V3`について**電流定格と種別しか確認対象にしていなかった**。`power-budget.md`の段階B-2は通常動作の上限だけでなく**許容電圧範囲**と**故障電流を制限する手段**も要るため、確認対象へ`3V3` railの許容電圧範囲と、**過電流保護／短絡保護の有無と動作**を加えた。保護が無いか確認できない場合は電流制限付きの外部3.3 V電源から周辺moduleへ給電する旨も明記した | [PR #64レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/64) |

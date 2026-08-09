@@ -62,6 +62,7 @@ Software可動域は、明示的なmarginを設けて機械的可動域の内側
 | 最大速度 | TBD | TBD | 動作／電流試験。[HW-TBD-011](tbd-register.md) |
 | 最大加速度 | TBD | TBD | 動作／電流試験。[HW-TBD-011](tbd-register.md) |
 | 単一commandの最大変化量 | TBD | TBD | 動作・安全試験。[HW-TBD-020](tbd-register.md) |
+| **最大連続電流** | **250 mA（予算）** | **firmwareへ直接は設定しない。**電流監視を採用しない構成ではfirmwareが電流を測れないため、強制点はこの表の**可動域・最大速度・最大加速度・最大連続動作時間・最大duty cycle**である。250 mAは、それらを強制した状態での**実測結果として確認する**量である（電流監視を採用する場合の遮断しきい値は`TBD`。[HW-TBD-020](tbd-register.md)） | [power-budget.md](power-budget.md)が5 V ingressの定格を見積もるためにservoへ割り当てた予算。**実測値ではない。**可動域・速度・duty cycleは、実機の連続電流がこの予算を超えないよう決める。**超えた場合の既定の対処は制限を締めることであり、電源側でingressの定格を上げても、この表がfirmwareへ渡す値は変わらない。**予算そのものを変えるには同文書の正式改訂の手順（両文書を同時に改訂し、受け入れchecklistを通し直す）を踏む。確認は`受け入れchecklist`で行う |
 | 最大連続動作時間 | TBD | TBD | 温度／電流試験。[HW-TBD-020](tbd-register.md) |
 | 最大duty cycle（一定時間窓あたりの動作時間比） | TBD | TBD | 温度／電流試験。[HW-TBD-020](tbd-register.md) |
 | 秒あたり受理motion command数 | TBD | TBD | 動作・温度試験。[HW-TBD-020](tbd-register.md) |
@@ -316,7 +317,11 @@ recovery／reconnect動作は`HW-TBD-018`の範囲に含める。fail-safe seque
 ## 受け入れchecklist
 
 - [ ] 正確なサーボとデータシートを記録した
-- [ ] Peak電流から電源容量を決定した
+- [ ] **定常電流**でingressとconnectorの定格を確認した（[power-budget.md](power-budget.md)の`ingressの電流制限`。定格は熱の制限のため、判定量は定常電流である）
+- [ ] **peak時**の5 V／3.3 Vの電圧droopを測定し、brownoutとresetが起きないことを確認した（peakはこの確認にのみ使う）
+- [ ] **承認範囲内の最悪動作**でservo railの**定常電流**を実測し、`動作制限`表の`最大連続電流`の予算（250 mA）以下であることを確認した。超える場合は可動域・速度・duty cycleを締めて再測定した。**[power-budget.md](power-budget.md)でingressの定格を上げただけでは、この項目を合格にしない**（予算はこの表がfirmwareへ渡す値であり、経路側の定格とは別の量である）
+- [ ] 予算そのものを変えた場合は、[power-budget.md](power-budget.md)の`変換基板に必要な定格の見積もり`にある**正式改訂の手順**（両文書の値を同時に改訂し、経路部品とgate値を決め直し、受け入れchecklistを通し直す）を踏んだ。**測定値に合わせて判定を緩めていない**
+- [ ] そのとき**強制していた**可動域、最大速度、最大加速度、最大連続動作時間、最大duty cycleを`動作制限`表へ記録した（予算を守らせているのはこれらの値であり、電流の設定値ではない）
 - [ ] サーボ接続前にPWMを測定した
 - [ ] 機械的neutralを記録した
 - [ ] 両方向の物理的境界を記録した
@@ -335,3 +340,7 @@ recovery／reconnect動作は`HW-TBD-018`の範囲に含める。fail-safe seque
 | 2026-07-27 | 0 | 安全とcalibrationの構造を作成。device固有の制限はすべて引き続きTBD |
 | 2026-08-05 | 1 | `HW-TBD-006`（正確なservo model）が[TBD台帳](tbd-register.md)で解決済み（TowerPro SG90）となったため、有効化gate表の該当行を解決済みとして打ち消し、依存例（`HW-TBD-010`のBlocked元）を`HW-TBD-007`〜`009`へ更新した。**gate自体は開いていない。**残る`TBD`が未解決であり、peak／stall電流の実測も`HW-TBD-010`／`011`で必要である |
 | 2026-08-08 | 2 | `サーボ識別情報`表がメーカー・model・定格電圧をすべて`TBD`のまま残しており、[HW-TBD-006](tbd-register.md)を解決済みとした本文（Revision 1）および[hardware-bom.md](hardware-bom.md) SERVO-01と矛盾していた。安全確認の作業者がservo modelを未確定と誤認する状態だったため、確定済みの値（TowerPro SG90、4.8–6 V、datasheet link）を反映した。**駆動条件は未確定のまま残す。**pulse幅、stall電流、logic閾値は実機のcalibrationと測定で決めるものであり、datasheetの代表値を確定値として採らない旨も明記した。識別情報の正本が`hardware-bom.md`であることも冒頭に記した |
+| 2026-08-09 | 3 | 自己レビューで検出: [power-budget.md](power-budget.md)がservoへ連続電流250 mAを予算として割り当て、その担保をこの文書のtrajectory制限に委ねていたが、**この文書側に該当する制限が無かった**。電源側だけが予算を持ち、firmwareへ渡っていない状態だった。動作制限表へ`最大連続電流`の行を追加し、可動域・速度・duty cycleをこの予算の内側で決めることを明記した |
+| 2026-08-09 | 4 | 受け入れchecklistに`Peak電流から電源容量を決定した`が残っており、[power-budget.md](power-budget.md)の現行規則（ingressとconnectorの定格判定は定常電流で行い、peakは電圧droop・brownout・resetの確認にのみ使う）と矛盾していた。2項目に分けて揃えた |
+| 2026-08-09 | 5 | [PR #64](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/64)のレビュー指摘を反映（[#65](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/65)の6件目）。Revision 3で`最大連続電流`に250 mAの予算を置いたが、`設定可能なhard bound`が`TBD`のままで、受け入れchecklistもtrajectoryに250 mA以下を要求していなかった。**予算があるだけで強制されていなかった。**hard bound列に「firmwareへ直接は設定せず、強制点は可動域・速度・加速度・連続動作時間・duty cycleである」ことを明記し、受け入れchecklistへ「承認範囲内の最悪動作での定常電流の実測」と「そのとき強制していた値の記録」の2項目を追加した |
+| 2026-08-09 | 6 | Revision 5に対する[PR #64](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/64)のレビュー指摘を反映。受け入れchecklistが「可動域・速度・duty cycleを締めて再測定するか、ingressの定格を上げる判断へ戻す」としており、**ingressの定格を上げるだけで250 mAの予算違反を通せる書き方**になっていた。予算はこの表がfirmwareへ渡す値であり経路側の定格とは別の量であるため、既定の対処を「制限を締めて再測定する」に限定し、予算そのものを変える場合は[power-budget.md](power-budget.md)の正式改訂の手順を踏むことを別項目として追加した |
