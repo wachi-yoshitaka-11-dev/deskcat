@@ -68,7 +68,7 @@ M-12001はMicro-Bオスplugであり、breadboardへ直接挿せない。
 
 **servo電流をPiのconnectorとPCB traceへ通してはならない。**servoを繋ぐ前に、必ず下段の構成へ移す。
 
-#### Pi直挿しmodeの電流gate
+### Pi直挿しmodeの電流gate
 
 前半でPi経由の給電を許すのは、logic側だけなら電流が小さいと**見込んでいる**ためであり、
 実測に基づく判断ではない。文献値を足すだけでも次のとおりで、**確定した小さい値は存在しない**。
@@ -89,6 +89,20 @@ M-12001はMicro-Bオスplugであり、breadboardへ直接挿せない。
   connector定格側だけで判断せず、余裕を厚めに取っている。
 - **測り方**: 一度に全部を繋がず、`測定計画`の順で段階的に足しながら測る。
   各段階で上限を超えていないことを確認してから次を足す。
+- **測定点と手段（未確定。測る前に確定させる）**: このgateが見たいのは
+  **PiのPWR INを通る合計電流**であり、servo rail低側のshunt（`GND topology`節）では
+  測れない。あちらはservo戻り専用で、logic側の電流を通さない。
+  またデジタルテスター（MAS830L）は定常値向けで、ESP32のTX spikeや
+  MSP2807のbacklight投入時の突入を取り逃がす。**定常値だけを見てgateを通したと判断しない。**
+
+| 測るもの | 手段 | 状態 |
+|---|---|---|
+| 定常電流（各段階の平均的な消費） | デジタルテスター（MAS830L）を`PWR IN`経路へ直列に入れる | 手段あり |
+| **過渡peak（spikeと突入）** | **未確定。**logic側にも低側shuntとADC入力を1系統設ける必要がある。`gpio-assignment.md`のADC予約は現状servo側1点（`ADC-SHUNT`）のみで、logic側の測定点を持たない | **未解決** |
+
+過渡peakの測定手段を決めるまで、**1.0 A gateは「定常値で超えていないこと」しか保証しない**。
+この限界を承知したうえで段階測定を進め、logic側の測定点を追加した時点でgateを本来の
+意味（peakを含む合計電流）で評価し直す。
 
 このgateは`受け入れ条件`にも数値として記載している。
 
@@ -114,9 +128,24 @@ USBでPiと繋ぐ」構成は、そのままでは排他制約に反する。次
 | A: USB VBUS単独給電 | ESP32はPiからのUSB cableだけで給電し、`5V` pinへは何も接続しない。配線が最も単純で排他制約にも反しない | PiのUSB OTG portが、ESP32のpeak（文献値で最大約500 mA spike）とMSP2807の3V3負荷を合わせた電流を供給できるか。Pi自身の入力電流もその分増える |
 | B: `5V` pin給電＋USBはdata用 | ESP32を`5V` pinから給電し、USBはPi linkにのみ使う | VBUSと`5V` pinが同時に生きる。公式ESP32-DevKitC V4はVBUS保護のSchottky diodeを実装しているが、**この秋月基板が同じ保護を持つかは未確認**。逆流の有無を現物回路で確認するまで承認しない |
 
-**どちらも未検証のため、この行が埋まるまでESP32へ通電しない。**
-案Aを既定候補とするが、PiのUSB port供給能力の実測（`測定計画`）で不足が判明した場合は
+案Aを既定候補とする。PiのUSB port供給能力の実測（`測定計画`）で不足が判明した場合は
 案Bへ切り替え、そのとき秋月基板のVBUS保護有無を回路で確認する。
+
+**通電の可否は「案が確定したか」ではなく「どの経路で通電するか」で決まる。**
+案を選ぶには実測が要り、実測にはESP32への通電が要る。したがって
+「案が確定するまで通電しない」とはしない。代わりに、次の**単一経路のbring-up**だけを許す。
+
+| 許すもの | 禁じるもの |
+|---|---|
+| **案Aの経路だけ**を接続する（PiからのUSB cable 1本。`5V` pinへは何も繋がない） | 案Aと案Bの同時接続。VBUSと`5V` pinを同時に生かさない |
+| 電流制限を掛けた状態での通電と、`測定計画`に定めた測定 | 通常運用、servo接続、長時間の連続通電 |
+| 人が電源を落とせる状態での監視付き通電 | 無人での通電 |
+
+案Aは電源3系統の排他制約に反しないため、この経路単独なら通電してよい。
+**案Bは、秋月基板のVBUS保護diodeの有無を回路で確認するまで通電しない。**
+確認前に`5V` pin給電とUSB接続を同時に行うと、保護が無い場合に逆流経路ができる。
+
+案Aの実測で供給能力が不足した場合にだけ、案Bの検討へ進む。その時点で回路確認を行う。
 
 ### connector定格の制約（未解決）
 
@@ -126,7 +155,7 @@ Micro-B connectorの一般的な電流定格は約1.8 Aで、**上記の候補�
 
 したがって次のいずれかが必要であり、**実測まで電源経路を承認しない**。
 
-- 実測でservoを含む同時peakがingressの定格に対し十分な余裕内に収まることを示す。
+- 実測でservoを含む同時peakが**経路上の最弱部品の定格**に対し十分な余裕内に収まることを示す。
   収まらない場合は、`servo-safety-limits.md`のtrajectory制限（可動域、速度、duty cycle）で
   servo電流の上限を下げ、再度実測する
 - または、servo railのingressをMicro-Bを経由しない経路（より定格の高いconnector）へ変更する
@@ -254,8 +283,20 @@ framingを除いても約5.7 kSample/s、text encodeではさらに落ちる。*
 | log形式 | dump時はCSV（`時刻[us],生ADC値`）とし、生値のまま出す。電流への換算は事後にPC側で行い、換算式と分圧比を実験記録へ残す |
 | CSVを出してよい条件 | **Protocolが動作していない専用の測定modeでのみ出力する。**[Protocol](../protocol/esp32-pi-protocol.md)は「channelから送信するすべてのbyteは有効にframe化されたmessageの一部でなければならない」と定めており、生CSVをJSON Lines channelへ混ぜるとこれに反してPi側のparseを壊す。測定firmwareはProtocol sessionを確立せず、同じlinkでJSON LinesとCSVを同時に流さない。Protocol稼働中に採取したい場合はsampleをProtocol messageへ載せる必要があり、それはProtocol側の変更であってこの文書の範囲外である |
 
-上表の「目標sample rate」は未実測の設計目標であり、受け入れの根拠にしない。実測して
-1 kSample/sの必須要件を満たせない場合は、captureのtriggerを絞るか、buffer長を縮めて対応する。
+上表の「目標sample rate」は未実測の設計目標であり、受け入れの根拠にしない。
+
+**実測が1 kSample/s未満だった場合、buffer長の短縮で代替しない。**buffer長は取得できる
+「期間」を決めるだけで、sample間隔を詰めない。短くしても取り逃がしたpeakは戻らない。
+その場合は次のいずれかを取る。
+
+- ADC側を改善して1 kSample/s以上を達成する（Wi-Fi停止、oneshotからDMA continuousへ、
+  channel数の削減など）。改善後に再測定する
+- または、**必須要件そのものを見直す**。servo起動の過渡が実際には何msなのかを
+  別手段（テスターの応答では足りないため、より低速な現象へ分解する等）で確認し、
+  新しい根拠を添えて要件を書き換える
+
+いずれも取れない場合は、**この測定手段では電源承認の根拠を作れない**と結論し、
+測定機材の追加を検討する。要件を満たさない測定値を、満たしたものとして扱わない。
 **linkのbaudを測定の都合で上げる場合は、`HW-TBD-014`／`PROTO-TBD-001`の決定そのものを
 変える扱いとし、Protocol側と揃えて確定させる。**片側だけ変更しない。
 
@@ -328,7 +369,7 @@ Pi直挿しのままservoを繋ぐと、servo電流がPiのconnectorとPCB trace
 
 | 制約 | 値 | 根拠 |
 |---|---|---|
-| 5 V ingressのMicro-B connectorを流れる最大電流 | 約1.8 A以下（余裕を含めて判断する） | Micro-B connectorの一般的定格。`5 V ingress`節 |
+| 5 V ingressを流れる最大電流 | **経路上の全部品の定格のうち最小値**を上限とする。候補構成では変換基板の1ピン1.5 Aが最小のため**1.5 A以下**。connector一般定格（約1.8 A）を上限に使わない | 最弱部品が経路全体の上限を決める。1.5〜1.8 Aの測定値を「合格」としないため。`5 V ingress`節 |
 | **bring-up前半（Pi直挿しmode）でPiの`PWR IN`を通る合計電流** | **1.0 A以下。超えたら直ちに中止し、変換基板構成へ移す** | Micro-B定格 約1.8 Aに対し約1.8倍の余裕。Piの内部traceの定格は未確認のため厚めに取った。`Pi直挿しmodeの電流gate` |
 | ADC入力へ加える最大電圧 | 3.3 V以下（5 V／3.3 V railは分圧比1/2を経由） | ESP32のADC入力範囲 |
 | ADC loggingのsample rate | 1 kSample/s以上 | servo起動過渡がms orderであるため。`Sample rateとlog形式`節 |
@@ -355,3 +396,4 @@ Pi直挿しのままservoを繋ぐと、servo電流がPiのconnectorとPCB trace
 | 2026-08-05 | 14 | レビュー指摘1件を反映。Revision 13で「dumpに使うbaudは測定用に別途選んでよい」と書いたのは誤りだった。Pi–ESP32間のUSB serialは1本しかなく、Protocolがそのbaudを共有transport parameterとして持つため、片側だけ別baudにはできない。dumpは`HW-TBD-014`／`PROTO-TBD-001`が決めるbaudをそのまま使うことにし、baudを変える場合はProtocol側と揃えて決定を変える扱いとした。あわせて、生CSVをJSON Lines channelへ流すとProtocolの「送信するすべてのbyteは有効にframe化されたmessageの一部でなければならない」要件に反するため、CSV出力はProtocolが動作していない専用の測定modeに限る条件を明記した | [PR #55レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/55)、[protocol](../protocol/esp32-pi-protocol.md)§2のtransport表とframing要件 |
 | 2026-08-08 | 15 | 5 V ingressの記述が「変換基板が無いと配線を開始できない」と過大だったため、段階表を追加して訂正した。bring-up前半はM-12001をPiの`PWR IN`へ直挿しし、Piの5 V GPIO pinからbreadboard railを作れば**追加購入なしで通電できる**（logic側のみ、servoは繋がない）。servo試験の直前に変換基板構成へ移す。候補変換基板（秋月 g110972）の定格が1ピン1.5 Aと、記載していた「Micro-B一般定格 約1.8 A」より低いことも反映した。購入は前半の実測後で足り、実電流に基づいて品を選べる | ユーザーからの指摘（購入済み5点にingress部品が含まれていない）、[秋月 g110972](https://akizukidenshi.com/catalog/g/g110972/)の定格、Raspberry Pi Zero W公式回路（PWR INと5 V GPIO pinは直結） |
 | 2026-08-08 | 16 | レビュー指摘2件を反映。(a) Pi直挿しmodeを「文献値で合計0.5 A程度」と正当化していたが、これは根拠が無い。ESP32のspikeだけで約500 mA、Pi stressで約350 mA、MSP2807は未確認であり、文献値だけでも瞬時に0.85 Aを超えうる。`Pi直挿しmodeの電流gate`節を新設し、実測合計**1.0 Aを上限**として超えたら直ちに中止する条件、その1.0 AをMicro-B定格約1.8 Aに対する約1.8倍の余裕として選んだdesign marginの根拠、および段階的に負荷を足しながら測る手順を定めた。配線・保護表の`Piの5 V入力経路`行、測定計画の`サーボ接続前`、`受け入れ条件`の数値表にも同じgateを反映した。(b) Revision履歴で2026-08-08の行が古い行より前に挿入されていたため日付順へ並べ直した | [PR #57レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/57)、負荷表の文献値 |
+| 2026-08-09 | 17 | 昇格PR [#61](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/61)のレビュー指摘4件を反映。(a) **ESP32給電の循環論法を解消。**「案A/Bが確定するまで通電しない」と書きながら、案を決める実測には通電が要る状態だった。通電可否を「案の確定」ではなく「どの経路で通電するか」で決める方式へ変更し、案Aの単一経路・電流制限・監視付きに限ったbring-upを許可した。案Bは秋月基板のVBUS保護diode確認まで通電しない。(b) **1.0 A gateの測定手段が無かった。**servo rail低側shuntはlogic側を通さず、テスターは過渡peakを取り逃がす。定常値と過渡peakで手段を分け、logic側の測定点が未確定であること、確定までgateは定常値しか保証しないことを明記した。(c) ingress上限を「Micro-B一般定格 約1.8 A」から**経路上の最弱部品の定格**（候補構成では変換基板の1ピン1.5 A）へ変更。1.5〜1.8 Aの測定値が合格になる穴を塞いだ。(d) sample rateが必須要件に届かない場合の対処から「buffer長の短縮」を削除。buffer長は時間分解能を改善しないため、ADC改善・要件の見直し・測定手段の追加のいずれかを取ることにした。あわせて見出し階層の飛び（MD001）を修正 | [PR #61レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/61) |

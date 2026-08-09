@@ -150,6 +150,13 @@ Pull requestには次を含める。
 - 残存riskと`TBD`
 - 無関係なformat変更やrefactorがないこと
 
+作成直後に、boardへitemを追加して次を設定する。**空欄を検出する自動化は無いため、
+ここが唯一のgateである**（詳細は[Pull Request itemの日付](#誰がいつ確認するか)）。
+
+- [ ] `Status`
+- [ ] `Start date`（作成日。JSTで判断する）
+- [ ] `Target date`（mergeを見込む日。merge時またはclose時に実績値へ更新する）
+
 ### 関連Issueの書き方
 
 Issue branchからのPull Request（base `develop`）では`Closes #N`を使う。これはtraceability
@@ -196,6 +203,20 @@ close日である。
 
 日付はJST（UTC+9）で判断する。GitHubのAPIが返す時刻はUTCであり、JSTの`00:00`から`08:59`に
 作成したPull RequestはUTCでは前日の日付になるため、そのまま転記しない。
+
+#### 誰がいつ確認するか
+
+この2 fieldを強制する自動化は無い。**空欄を検出する仕組みが無いため、次の手作業をgateとする。**
+
+| 時期 | 実施者 | 確認内容 |
+|---|---|---|
+| Pull Request作成直後 | 作成者 | boardへitemを追加し、`Status`・`Start date`・`Target date`を設定する。下の作成時checklistに含める |
+| merge直前 | merge実施者 | `Target date`が予定のままなら、実績日（merge日）へ更新する |
+| close時 | close実施者 | `Target date`をclose日へ更新する |
+
+自動化するなら、`Status`を`Done`にするworkflowと同じ場所で`Target date`を書き換えるのが
+自然だが、Projects v2のworkflowは日付fieldを更新できない。GitHub Actionsから
+Projects v2 APIを叩く実装が要るため、**現時点では手作業とし、将来の課題として残す**。
 
 ### Merge方式
 
