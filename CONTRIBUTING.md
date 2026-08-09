@@ -53,7 +53,7 @@ GitHubのIssue一覧はlabelを常にtitleの横に表示するため、titleに
 
 この表はIssue itemの規約である。Pull Request itemでは同じ2 fieldが必須であり、`Start date`は
 作成日という実績、`Target date`はmerge見込み日という予定を表す。`Target date`はmergeまたは
-closeの時点で実績値へ更新する。[Pull request](#pull-request)節を参照する。
+closeの**完了後**に実績値へ更新する。[Pull request](#pull-request)節を参照する。
 
 ## Branches
 
@@ -156,7 +156,7 @@ Pull requestには次を含める。
 
 - [ ] `Status`
 - [ ] `Start date`（作成日。JSTで判断する）
-- [ ] `Target date`（mergeを見込む日。merge時またはclose時に実績値へ更新する）
+- [ ] `Target date`（mergeを見込む日。**merge完了後またはclose完了後**に実績値へ更新する）
 
 ### 関連Issueの書き方
 
@@ -196,7 +196,7 @@ Issue itemでは両fieldが予定であり未定なら空欄でよいが、Pull 
 | field | 値 | 設定時期 |
 |---|---|---|
 | `Start date` | Pull Requestの作成日。作成後は変更しない | 作成時 |
-| `Target date` | 作成時はmergeを見込む日（予定）、mergeまたはclose後はその実績日 | 作成時に見込みを設定し、merge時またはclose時に実績値へ更新する |
+| `Target date` | 作成時はmergeを見込む日（予定）、mergeまたはclose後はその実績日 | 作成時に見込みを設定し、**merge完了後またはclose完了後**に実績値へ更新する |
 
 `Target date`だけが予定から実績へ変わる。merge時に`Status`を`Done`にするworkflowは
 日付を書き換えないため、実績値への更新は手作業で行う。mergeせずcloseした場合の実績日は
@@ -212,8 +212,12 @@ close日である。
 | 時期 | 実施者 | 確認内容 |
 |---|---|---|
 | Pull Request作成直後 | 作成者 | boardへitemを追加し、`Status`・`Start date`・`Target date`を設定する。`Pull request`節の作成時checklist（この文書の上部）に含めてある |
-| merge直前 | merge実施者 | `Target date`が予定のままなら、実績日（merge日）へ更新する |
-| close時 | close実施者 | `Target date`をclose日へ更新する |
+| **merge後** | merge実施者 | `Target date`をJSTのmerge実績日へ更新する |
+| **close後** | close実施者 | `Target date`をJSTのclose実績日へ更新する |
+| **reopen後** | reopen実施者 | `Target date`を新しいmerge見込み日へ戻す。再度mergeまたはcloseしたら、上の2行に従って実績日へ更新する |
+
+**更新は「後」であって「直前」ではない。**merge前に実績日を確定できないためである。JSTの日付を
+またいだ場合や、mergeを中止した場合に、誤った実績日が残る。
 
 自動化するなら、`Status`を`Done`にするworkflowと同じ場所で`Target date`を書き換えるのが
 自然だが、Projects v2のworkflowは日付fieldを更新できない。GitHub Actionsから
