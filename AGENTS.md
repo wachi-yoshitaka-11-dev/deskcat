@@ -120,7 +120,7 @@ cargo build --locked
 
 `--locked` は追跡している `Cargo.lock` からの逸脱を失敗として扱う。`cargo fmt` はこの option を受け付けない。
 
-Linux x86_64 で検証した。初回は 2026-08-06、現行 tree に対する最新の検証は 2026-08-10 である（[Version Record](docs/toolchains/version-records/2026-08-06-esp32-build-linux.md)）。別端末での再現は未検証である。
+Linux x86_64 で検証した。初回は 2026-08-06、現行 tree に対する最新の検証は 2026-08-10 である（[Version Record](docs/toolchains/version-records/2026-08-06-esp32-build-linux.md)）。別端末での再現は CI の `ubuntu-24.04` runner で満たした（#42。[Version Record](docs/toolchains/version-records/2026-08-10-esp32-build-ci.md)）。**build-only であり、flash と実機起動は主張しない。**
 
 host workspace には検証済みコマンドがある。repository root で実行する。ESP32 toolchain は要らない。
 

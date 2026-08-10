@@ -132,7 +132,7 @@ Linux x86_64で検証した。初回は2026-08-06、現行treeに対する最新
 
 初回buildはESP-IDF本体を取得するため時間と容量を要する（検証時は4分33秒、`.embuild`は4.4 GB）。`export-esp.sh`を読み込まずに実行すると失敗する。
 
-別端末での再現は未検証である。標準OSは[ADR-0005](docs/decisions/0005-standard-development-os.md)により実機のLinuxで、Windowsは対象外である。flashとserial monitorは#6の範囲であり、実機の確認が済むまで実行しない。
+別端末での再現はCIの`ubuntu-24.04` runnerで満たした（#42。[Version Record](docs/toolchains/version-records/2026-08-10-esp32-build-ci.md)）。**build-onlyであり、flashと実機起動は主張しない。**標準OSは[ADR-0005](docs/decisions/0005-standard-development-os.md)により実機のLinuxで、Windowsは対象外である。flashとserial monitorは#6の範囲であり、実機の確認が済むまで実行しない。
 
 ### 未確定のcommand
 
