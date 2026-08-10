@@ -152,8 +152,16 @@ error: custom toolchain 'esp-1.95.0.0' specified in override file '.../rust-tool
 生成されることで名前が食い違い、上記のとおり停止する。
 
 版を上げるときは、この `--toolchain-version` と `--name`、および
-`firmware/esp32/rust-toolchain.toml` の `channel` を**同時に**変える。片方だけを変えた場合も
-build は停止するため、取り違えたまま気付かず進むことはない。
+`firmware/esp32/rust-toolchain.toml` の `channel` を**同時に**変える。
+
+**`--toolchain-version` だけを変えて `--name` を据え置くと、この guard は働かない。**
+名前は一致したまま中身だけが別の版に入れ替わるため、build はそのまま成功する。
+これは本節が防ごうとしている状態そのものであり、版上げの際に最も起こりやすい取り違えでもある。
+`--name` は必ず `--toolchain-version` と同じ版を含む名前にする。
+
+`channel` だけを変えて導入を忘れた場合は、その名前の toolchain が無いため停止する。
+逆に導入だけを行って `channel` を据え置いた場合は、旧 toolchain が残っている限り
+旧版で build が続く。**版上げは 3 か所すべてを変えて完了する。**
 
 `espup install` は environment export file を生成し、その path を出力する。新しい terminal ごとに、その export file を shell へ読み込む。読み込まないと `espup` が設定した環境変数が反映されない。
 

@@ -19,15 +19,15 @@
 ```text
 Record ID: VR-2026-08-06-ESP32-BUILD-01
 Date: 2026-08-06（初回検証）
-最終有効な検証日時: 2026-08-10T02:36:17Z
-  現行のsource tree cdcff41c に対する正式なcommandの実行日である。
+最終有効な検証日時: 2026-08-10T02:47:29Z
+  現行のsource tree cf3fcdb4 に対する正式なcommandの実行日である。
   reviewを受けた修正と、developへのrebaseでtreeが変わるたびに再検証している。
   Record IDとfile名は初回検証日のまま維持し、追跡の連続性を保つ。
 Machine profile: ESP32 Build
 Operator role: AIエージェント（ツール導入について人間の事前確認あり）
 Repository commit: 831f4b17fa151ee731eed01abd981fe8feaaffc0（最新検証時点のbase。developのtipと同一）
   初回検証時点のbaseは109f1a90d9688542f9381fb95d4269ef336e23ddであった。
-Build対象のsource tree: cdcff41c56993c1f32c404678d4afe2528924913
+Build対象のsource tree: cf3fcdb4cd4057cbd70e333676cc547632c14bd6
   `firmware/esp32`のtree objectである（`git rev-parse HEAD:firmware/esp32`）。
   この記録は`docs/`配下にあり同じtreeへ含まれないため、記録自体を更新しても値は変わらず、
   commitのhashを書く場合のような循環が起きない。
@@ -133,14 +133,15 @@ Storage delta if measured:
   espup install: 約 +1.8 GB（9.2G→11G）
   firmware/esp32/.embuild: 4.4 GB（ESP-IDFとmanaged tool一式。git管理外）
 Generated artifact identity:
-  現行のsource tree cdcff41c に対応する成果物は次の1つである。
+  現行のsource tree cf3fcdb4 に対応する成果物は次の1つである。
   path: firmware/esp32/target/xtensa-esp32-espidf/debug/deskcat-esp32
   type: ELF 32-bit LSB executable, Tensilica Xtensa, version 1 (SYSV), statically linked, with debug_info, not stripped
   size: 13,660,584 bytes
-  sha256: 11deb6d07a8bdec9e41f51464ba460eb4a4417f9757bf8dd1641bfb01b729bf9
-  実行日時: 2026-08-10T02:36:17Z（「compiler版の固定後のフル再検証log」節）
+  sha256: 0f9d4918526c3e4153d101943ee20c5d9a4ac3d0f08fce6f60569b503e2877f7
+  実行日時: 2026-08-10T02:47:29Z（「compiler版の固定後のフル再検証log」節）
 
   過去のtreeでの実行結果（履歴。現行treeの成果物ではない）:
+    tree cdcff41c / #74の自己review前:  11deb6d07a8bdec9e41f51464ba460eb4a4417f9757bf8dd1641bfb01b729bf9
     tree 815c903f / 表記統一後:      1e9623de74b79b33c85510c41c755093f70a4bf85969f40b90fa47ce7ae69d78
     tree b0120755 / board識別訂正後: 626707014889c5dc83ce0dc453383ee8139fa2d8feded452380fcfed21a96d97
     tree 79351378 / review反映後:    817d55948479097c0389db4bba08140aa7cca2c974c7a04258724ec3cadca442
@@ -150,7 +151,9 @@ Generated artifact identity:
     tree 10bad8e / 再現性実験:   3f0ea82c6539464df2081a57f938f750f640dee55ea35a446386433598c56843
     初回（未pin・未`--locked`）: sha256 prefix 91dd34e9fec0a228
   sizeは、#74でtoolchain名を`esp`から`esp-1.95.0.0`へ変えるまでの8回の実行すべてで
-  13,654,676 bytesであった。#74後の実行では13,660,584 bytes（+5,908）である。
+  13,654,676 bytesであった。#74後の2回はいずれも13,660,584 bytes（+5,908）である。
+  この2回はtreeが違う（cdcff41c と cf3fcdb4）が、差分は`rust-toolchain.toml`の
+  comment行だけであり、sizeは一致してsha256は異なった。
   成果物の文字列には`toolchains/esp-1.95.0.0`を含むものが371件あり、
   toolchain名が9文字伸びたことによる増分は371×9=3,339 bytesとなる。
   増分の向きと桁は説明できるが、**残る2,569 bytesは説明できていない。**
@@ -189,9 +192,9 @@ Log or evidence path: この文書へ全文を掲載する。
   「board識別訂正後のフル再検証log」節: 正式なcommand実行。tree b0120755
   「表記統一後のフル再検証log」節: 正式なcommand実行。tree 815c903f
   「版付きtoolchainの導入log」節: `espup`による導入と`export-esp.sh`の再生成確認。treeに依存しない
-  「compiler版の固定後のフル再検証log」節: 現行treeでの正式なcommand実行。tree cdcff41c。
+  「compiler版の固定後のフル再検証log」節: 現行treeでの正式なcommand実行。tree cf3fcdb4。
     同節の後半に、記録と異なるtoolchainを要求した場合の停止も含む
-  記録本体が挙げるsha256 11deb6d0... は「compiler版の固定後のフル再検証log」節の実行結果である。
+  記録本体が挙げるsha256 0f9d4918... は「compiler版の固定後のフル再検証log」節の実行結果である。
 Known differences from documented profile:
   - 本記録はLinux（bash）で実行した。runbookのWindows節はADR-0005により対象外となり、
     PowerShell表記のcommand例も残っていない
@@ -1126,26 +1129,26 @@ channel = "esp-1.95.0.0"
 ## compiler版の固定後のフル再検証log
 
 `rust-toolchain.toml` の `channel` を版付きへ変えて source tree が
-`cdcff41c56993c1f32c404678d4afe2528924913` へ変わったため、`cargo clean` から
+`cf3fcdb4cd4057cbd70e333676cc547632c14bd6` へ変わったため、`cargo clean` から
 正式な command を再実行した記録である。記録本体の `Generated artifact identity` が
-挙げる sha256 `11deb6d0...` はこの実行の結果である。
+挙げる sha256 `0f9d4918...` はこの実行の結果である。
 同じ実行の後半で、記録と異なる toolchain を要求した場合に compile 前へ停止することも確認している。
 個人 path は `<home>` へ置換した。
 
 ```text
 ########## #74 版付きchannelでのフル再検証 ##########
-date: 2026-08-10T02:36:17Z
+date: 2026-08-10T02:47:29Z
 base: 831f4b1 未解決review threadを残したmergeを防ぐ確認手順を定める (#76)
-source tree(staged): cdcff41c56993c1f32c404678d4afe2528924913
+source tree(staged): cf3fcdb4cd4057cbd70e333676cc547632c14bd6
 IDF_PATH=<unset>
 esp-1.95.0.0 (overridden by '<home>/deskcat/firmware/esp32/rust-toolchain.toml')
-     Removed 3668 files, 1.7GiB total
+     Removed 3648 files, 1.7GiB total
 clean rc=0
 fmt rc=0
 clippy rc=0
 build rc=0
 size_bytes=13660584
-sha256=11deb6d07a8bdec9e41f51464ba460eb4a4417f9757bf8dd1641bfb01b729bf9
+sha256=0f9d4918526c3e4153d101943ee20c5d9a4ac3d0f08fce6f60569b503e2877f7
 Cargo.lock unchanged
 
 --- 強制の実証: 記録と異なるtoolchainを要求した場合 ---

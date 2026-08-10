@@ -7,5 +7,7 @@
 #
 # 導入: espup install --toolchain-version 1.95.0.0 --targets esp32 --name esp-1.95.0.0
 # 版を上げるときは、この値と導入commandの`--name`／`--toolchain-version`を同時に変える。
+# `--toolchain-version`だけを変えて`--name`を据え置くと、名前が一致したまま中身が
+# 入れ替わるため、この停止は起きない。詳細はdocs/runbooks/esp32-development-machine-setup.md。
 [toolchain]
 channel = "esp-1.95.0.0"
