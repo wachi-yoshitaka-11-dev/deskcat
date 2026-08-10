@@ -60,6 +60,12 @@ Closes #
 - [ ] 不正入力・最大長超過を有界に処理する
 - [ ] `unsafe`を追加していない、または別のreviewをlinkした
 
+## 自己レビュー
+
+- [ ] [自己レビュー](../CONTRIBUTING.md#自己レビュー)の観点で見直し、新規指摘0件が2 round続いた
+
+自動reviewを行わないPull Requestでは、これが唯一のreviewである。
+
 ## Review thread
 
 **この節はmerge直前に確認して更新する。**作成時点ではthreadが無いため空欄でよい。
