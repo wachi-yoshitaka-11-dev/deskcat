@@ -1168,7 +1168,7 @@ crates/deskcat-protocol/tests/fixtures/
 合格しなければならない」と定めているためである。同じdirectoryをfirmware側からpath参照するか
 複製するかは、同ADRのcrate共有方針の決定に従う。
 
-fixtureは最低限、次の4群をすべて含む。上の一覧と表がその内訳である。
+fixtureは最低限、次の5群をすべて含む。上の一覧と表がその内訳である。**現時点で揃っているのはSchema群と、Framing／parse群のうちline長境界・CRLF・invalid JSONだけである。**
 
 | 群 | 対象 | 状態 |
 |---|---|---|

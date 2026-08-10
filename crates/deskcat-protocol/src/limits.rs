@@ -2,7 +2,19 @@
 //!
 //! ここに置く値は、`docs/protocol/esp32-pi-protocol.md`が`Candidate`または`TBD`としている
 //! 段階の暫定値である。実測で確定するまで「検証済み」として扱わない。
-//! string上限は勘で置かず、[`MAX_LINE_BYTES`]から導出できることを`tests/limits.rs`が検査する。
+//!
+//! # string上限は行長を保証しない
+//!
+//! string上限はUTF-8 byte長で測る。一方JSON encodeは`"`を`\"`、`\`を`\\`、制御文字を
+//! `\u00XX`（1 byte→6 byte）へ広げる。したがって**全fieldが上限内でも、encode後の行が
+//! [`MAX_LINE_BYTES`]を超えることがある。**
+//!
+//! この場合`encode_line`が[`crate::ErrorCode::LineTooLong`]を返すため、黙って上限を
+//! 超えた行がwireへ出ることはない。しかし「field上限を守れば行長も収まる」とは言えない。
+//! `tests/limits.rs`が検査しているのは、**escapeが起きない文字での**worst caseだけである。
+//! escapeを含むworst caseは同fileが別testで「検出されること」を固定している。
+//!
+//! escape後のwire sizeまで含めた上限の確定は`PROTO-TBD-002`に含める。
 
 /// 実装が受理するwire protocolのmajor version（`v`）。
 ///

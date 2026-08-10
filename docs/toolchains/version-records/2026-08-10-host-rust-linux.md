@@ -72,10 +72,15 @@ Known differences from documented profile:
     host workspace だけを対象とし、ESP32 の build 結果は
     2026-08-06-esp32-build-linux.md を正とする。
 
-Conclusion: Verified。host workspace の format、lint、unit test、integration test が
+Conclusion: Verified。**この記録の対象は、この1台・Host Rust Development profile に
+  限る。**その範囲では未実行の項目が無く、format、lint、unit test、integration test が
   clean build から成功した。firmware workspace の分離も確認した。
 
-Next action: 別端末での再現は未実施。CI での自動実行は #42 の範囲。
+  **別端末での再現はこの記録の対象外である。**README が「一つの記録は、一台の端末と
+  一つの profile に対応させる」と定めており、別端末の結果は別の記録が持つ。
+  したがって未再現であることは、この記録を `Partial` にする理由にならない。
+
+Next action: 別端末での再現は未実施（別記録が必要）。CI での自動実行は #42 の範囲。
 ```
 
 ## 補足

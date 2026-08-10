@@ -1,6 +1,7 @@
 # Implementation Readiness Review
 
 > Review日: 2026-07-27
+> 最終更新: 2026-08-10（Software gateのprotocol関連2行を#9の結果へ更新）
 > 結果: Hardware driver実装のgateは未通過
 
 ## 結論
@@ -140,6 +141,6 @@ GitHub Issue migration: PENDING foundation document publication
 挙げており、揃わないまま再実行しても同じ`Fail`を繰り返すだけになる。
 
 「承認済みprotocol制限とfixture」は#9で`Partial`まで進んだ。**残りをblockerとして扱うのは
-#9ではなく#10と#12である。**#9はschema群のfixtureとhost実装の合格までを担当し、
+Issue #9ではなく#10と#12である。**#9はschema群のfixtureとhost実装の合格までを担当し、
 firmware側の合格は#10、session判定・duplicate replay・budget群のfixtureは#12が担う。
 再実行時に#9を対象へ戻さない。

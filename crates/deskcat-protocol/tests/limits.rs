@@ -19,8 +19,17 @@ fn worst_case_envelope() -> Envelope {
     }
 }
 
+/// JSON encodeで長さが変わらない文字で埋める。
 fn filled(len: usize) -> String {
     "x".repeat(len)
+}
+
+/// JSON encodeで1 byteが6 byteへ広がる文字で埋める。
+///
+/// `U+0001`は、6文字のunicode escapeへ広げられる。引用符やbackslashは
+/// 2 byteへしか広がらないため、膨張率が最大のこの文字をworst caseに使う。
+fn filled_with_escapes(len: usize) -> String {
+    "\u{1}".repeat(len)
 }
 
 fn worst_case_messages() -> Vec<Message> {
@@ -78,8 +87,13 @@ fn worst_case_messages() -> Vec<Message> {
     ]
 }
 
+/// escapeが起きない文字であれば、全fieldを上限まで詰めても行長に収まる。
+///
+/// **これは「string上限を守れば行長も収まる」という意味ではない。**escapeを含む場合は
+/// 収まらないことがあり、それは下の`strings_needing_json_escapes_can_exceed_the_line_limit`が
+/// 固定している。
 #[test]
-fn worst_case_lines_fit_in_the_line_limit() {
+fn worst_case_lines_without_escapes_fit_in_the_line_limit() {
     for message in worst_case_messages() {
         let type_name = message.type_str();
         let frame = Frame::new(worst_case_envelope(), message);
@@ -94,6 +108,51 @@ fn worst_case_lines_fit_in_the_line_limit() {
             limits::MAX_LINE_BYTES
         );
     }
+}
+
+/// string上限を全て満たしていても、JSON escapeで膨らんだ行は上限を超えうる。
+///
+/// このとき`encode_line`が[`ErrorCode::LineTooLong`]を返し、上限を超えた行が黙って
+/// wireへ出ることはない。**field上限は行長の十分条件ではない**という事実をここで固定する。
+/// escape後のwire sizeまで含めた上限の確定は`PROTO-TBD-002`に含める。
+#[test]
+fn strings_needing_json_escapes_can_exceed_the_line_limit() {
+    let message = Message::Status(Box::new(Status {
+        firmware: filled_with_escapes(limits::MAX_FIRMWARE_BYTES),
+        reset_reason: filled_with_escapes(limits::MAX_RESET_REASON_BYTES),
+        display: DisplayStatus {
+            state: filled_with_escapes(limits::MAX_STATE_NAME_BYTES),
+            expression: filled_with_escapes(limits::MAX_STATE_NAME_BYTES),
+        },
+        servo: ServoStatus {
+            state: filled_with_escapes(limits::MAX_STATE_NAME_BYTES),
+        },
+        sensors: SensorStatus {
+            touch: filled_with_escapes(limits::MAX_STATE_NAME_BYTES),
+            acceleration: filled_with_escapes(limits::MAX_STATE_NAME_BYTES),
+            environment: filled_with_escapes(limits::MAX_STATE_NAME_BYTES),
+        },
+        protocol: ProtocolCounters::default(),
+    }));
+
+    // 各fieldは上限内であり、値の範囲検査は通る。
+    message
+        .check_bounds()
+        .expect("every field is within its byte limit");
+
+    let frame = Frame::new(
+        Envelope {
+            v: limits::PROTOCOL_VERSION,
+            sid: 1,
+            id: 1,
+            ts_ms: 0,
+        },
+        message,
+    );
+
+    // それでもencode後の行は上限を超え、errorとして検出される。
+    let err = encode_line(&frame).expect_err("escaped worst case must not fit silently");
+    assert_eq!(err.code(), ErrorCode::LineTooLong);
 }
 
 /// 上限ちょうどのstringは受理し、1 byte超えたら`out_of_range`で拒否する。

@@ -25,6 +25,10 @@ updates:
     labels:
       - "type:maintenance"
       - "area:raspberry-pi"
+      # root workspaceの唯一のmemberは`crates/deskcat-protocol`である。依存更新が
+      # ESP32-Pi間のwire動作へ影響しうるため、protocolのtriageからも見えるようにする。
+      # `.coderabbit.yaml`のauto review allowlistにも含まれる。
+      - "area:protocol"
   - package-ecosystem: "cargo"
     directory: "/firmware/esp32"
     schedule:

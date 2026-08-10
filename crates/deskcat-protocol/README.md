@@ -54,9 +54,15 @@ type固有schemaでdeserializeする。serdeのadjacently tagged enumでは失�
 暫定値であり、確定値として扱わない。
 
 - `MAX_LINE_BYTES`は改行を含む1 lineの上限（§2の候補値、`PROTO-TBD-002`）。
-- string上限は勘で置かず、`MAX_LINE_BYTES`から導出できることを`tests/limits.rs`が検査する。
-  各message typeについて、全string fieldを上限まで、全integerを最大値まで詰めたlineが
-  収まることを確認している。
+- string上限は勘で置かず、**escapeが起きない文字であれば**`MAX_LINE_BYTES`から導出できることを
+  `tests/limits.rs`が検査する。各message typeについて、全string fieldを上限まで、
+  全integerを最大値まで詰めたlineが収まることを確認している。
+
+**string上限を守っても行長は保証されない。**string上限はUTF-8 byte長で測るが、JSON encodeは
+`"`を`\"`、`\`を`\\`、制御文字を`\u00XX`（1 byte→6 byte）へ広げる。全fieldが上限内でも
+encode後の行が`MAX_LINE_BYTES`を超えることがあり、その場合`encode_line`が`line_too_long`を返す。
+黙って上限超過の行がwireへ出ることはないが、field上限は行長の十分条件ではない。
+escape後のwire sizeまで含めた上限の確定は`PROTO-TBD-002`に含める。
 
 integer widthは`PROTO-TBD-003`として保留されていたものを確定した。**値と根拠の正本は仕様§3の表**であり、
 ここには複製しない。実装上の宣言は`src/envelope.rs`の型を見る。

@@ -49,7 +49,8 @@ conformance testに合格しなければならない」と定めているため�
 
 ## 分担
 
-§12は4群のfixtureを要求する。**このdirectoryが現在持つのはschema層だけである。**
+§12は5群のfixtureを要求する。**このdirectoryが現在持つのはSchema群と、Framing／parse群のうち
+line長境界・CRLF・invalid JSONだけである。**
 
 | 群 | 対象 | 担当Issue |
 |---|---|---|
