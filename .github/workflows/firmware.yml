@@ -80,7 +80,10 @@ jobs:
           cargo --version
           cargo fmt --version
           cargo clippy --version
-          ldproxy --version
+          # `ldproxy`はlinker wrapperであり、`--version`を受け付けず
+          # `Cannot locate argument '--ldproxy-linker <linker>'`でpanicする。
+          # 導入されたことの確認はpathの解決までとする。
+          command -v ldproxy
 
       - name: Format
         run: cargo fmt --all -- --check
