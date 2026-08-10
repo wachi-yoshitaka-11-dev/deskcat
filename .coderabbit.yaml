@@ -18,6 +18,11 @@ reviews:
 
     # 既定branch(`main`)以外でauto reviewの対象にするbase。
     # これが無いと base `develop` のPull Requestは対象外になる。
+    #
+    # 既定branchである`main`は、この設定に関わらず常に対象である。これは意図どおりで、
+    # `develop`→`main`の昇格Pull Requestは公開前の最後の関門であり、review対象から外さない。
+    # ただし`enabled: false`のため、昇格Pull Requestも下の`labels`のいずれかが要る。
+    # 昇格Pull Requestには対象範囲に応じたlabelを必ず付ける。
     base_branches:
       - develop
 
