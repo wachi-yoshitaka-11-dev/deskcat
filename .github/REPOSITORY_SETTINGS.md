@@ -78,6 +78,7 @@ CI導入前:
 - [ ] 外部contributionにreviewを必須化
 - 必須承認review数: 外部contribution受付時は`1`
 - [ ] signed commitとlinear historyを別途評価
+- [ ] `Require conversation resolution before merging`を評価する。現状は[CONTRIBUTING.md](../CONTRIBUTING.md#merge前の確認)の手作業gateだけであり、[PR #40](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/40)で未解決thread 1件を残したmergeが起きている
 
 ## Actions権限
 
