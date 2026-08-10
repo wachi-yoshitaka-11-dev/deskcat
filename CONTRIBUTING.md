@@ -237,9 +237,21 @@ close日である。
 **更新は「後」であって「直前」ではない。**merge前に実績日を確定できないためである。JSTの日付を
 またいだ場合や、mergeを中止した場合に、誤った実績日が残る。
 
-自動化するなら、`Status`を`Done`にするworkflowと同じ場所で`Target date`を書き換えるのが
-自然だが、Projects v2のworkflowは日付fieldを更新できない。GitHub Actionsから
-Projects v2 APIを叩く実装が要るため、**現時点では手作業とし、将来の課題として残す**。
+**自動化しない。**理由は2段ある。
+
+1. Projects v2のboard workflowは日付fieldを更新できない。`Status`を`Done`にするworkflowでは書き換えられない
+2. GitHub Actionsから叩く案も採らない。**`GITHUB_TOKEN`はrepository scopeであり、Projects v2へ
+   アクセスできない**（[GitHub Docs](https://docs.github.com/en/issues/planning-and-tracking-with-projects/automating-your-project/using-the-api-to-manage-projects)）。
+   `project` scopeを持つclassic personal access token、またはGitHub Appが必要になる。
+   日付2 fieldのためにCIへ長期secretを持ち込む取引は成立しない
+
+したがって**手作業を正式な手順とする。**これは妥協ではなく判断である。
+以後「自動化できるはず」として再検討しない。前提が変わるのは、Projects v2のworkflowが
+日付fieldを扱えるようになったときだけである。
+
+**忘れることが唯一の失敗モードである。**実際に[#71](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/71)・
+[#72](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/72)・[#73](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/73)で
+3件続けて空のままcloseした。**空欄を検出する仕組みは無い。**closeの操作と同じ場面で設定する。
 
 ### 自己レビュー
 
@@ -257,6 +269,10 @@ pushする前に、作成者自身が差分を見直す。**新規指摘が0件�
 - [ ] **未確認の値を確定として書いていない。**実測していない値、一次資料で確かめていない型番、
       未検証の動作を、断定形で書いていない（[AGENTS.md](AGENTS.md)の推測禁止を自分の差分へ適用する）
 - [ ] **参照先が実在する。**リンク先の文書・節・表が存在し、そこに書いてあると主張した内容が実際にある
+- [ ] **公開されない路への相対linkを張っていない。**`CONTRIBUTING.md`、`.coderabbit.yaml`、
+      `.github/`配下などはGitHub Pagesへ公開されない。公開文書からこれらへ相対linkを張ると
+      `validate_doc_links.py`が失敗する。**絶対URLを使う。**
+      [PR #90](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/90)ではこの誤りだけでCIを3回落とした
 - [ ] **差分に、このPull Requestの目的と無関係な変更が混ざっていない**
 - [ ] **Pull Request本文の記述が、実際の差分と一致している。**対象file数、含まれる変更、
       検証欄の「実行した／していない」が実態と合っている
