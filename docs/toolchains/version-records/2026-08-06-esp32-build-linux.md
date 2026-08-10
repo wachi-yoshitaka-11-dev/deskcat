@@ -5,6 +5,10 @@
 
 [Version Record Template](../version-record-template.md)の形式で、実際に確認した環境を記録する。
 
+> **`Conclusion`の「別端末での再現が未実施」は本記録の作成時点の状態である。**
+> その後、CIの`ubuntu-24.04` runnerで再現した（#42、[CIのVersion Record](2026-08-10-esp32-build-ci.md)）。
+> 詳細は「[未達の確定条件](#未達の確定条件)」の追記を参照する。**実機確認（flash、起動）は依然として未実施である。**
+>
 > **boardの識別情報は本記録の作成後に訂正された。**
 > 以降の本文と log は**実施時点（2026-08-06〜08）の記録**であり、遡って書き換えていない。
 > `Physical board`／`Module marking`／`Board revision` を「未確認」とする記載、および
@@ -266,6 +270,11 @@ root crateの`deskcat-esp32`自身を含むため185 entryになる。両者は�
 - **物理基板がESP32-DevKitC-32Eであり、搭載moduleとrevisionを確認した** — 実機が無いため未実施。[HW-TBD-001](../../hardware/tbd-register.md)として追跡中であり、#6 のflash前提条件でもある。
   公式datasheetによればESP32-WROOM-32Eの中核は`ESP32-D0WD-V3`または`ESP32-D0WDR2-V3`であり、後者は2 MB PSRAMを内蔵する。どちらが実装されているかで利用可能なメモリ構成が変わるため、実機確認まで確定しない。
 - **別の開発端末またはclean environmentで再現した** — 本記録は単一端末の結果である。[Machine Profiles](../machine-profiles.md)の「検証の移送」に従い、別端末では再確認が必要である。
+  **（2026-08-11 追記: この条件はその後満たされた。**CIの`ubuntu-24.04` runnerでclean buildし、
+  `cargo fmt`・`cargo clippy --locked`・`cargo build --locked`がすべて成功している（#42、
+  [CIのVersion Record](2026-08-10-esp32-build-ci.md)）。**build-onlyであり、flashと実機起動は
+  依然として主張しない。**上の本文は実施時点の記録として残す。確定条件のcheckboxは
+  [ESP32 Rust Toolchain](../esp32-rust-toolchain.md)が正本であり、そちらは`[x]`である。**）**
 
 ## Build log
 
