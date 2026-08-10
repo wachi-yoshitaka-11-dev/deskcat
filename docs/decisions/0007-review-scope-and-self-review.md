@@ -60,9 +60,10 @@ Pull Request templateの「検証」表と「安全とsecurity」は、何を確
 
 **選択肢Aを採る。**
 
-1. `.coderabbit.yaml`を新設し、auto reviewを`area:firmware`／`area:protocol`／`area:raspberry-pi`／
-   `area:hardware`／`type:decision`のいずれかを持つPull Requestに限定する。
-   あわせて`auto_incremental_review: false`とし、pushのたびの再reviewを止める
+1. `.coderabbit.yaml`を新設し、auto reviewを**高リスク変更（firmware、protocol、Pi、hardware、設計判断）**
+   を示すlabelを持つPull Requestに限定する。あわせてpushのたびの再reviewを止める。
+   **対象labelと設定値の正本は[`.coderabbit.yaml`](../../.coderabbit.yaml)である。**
+   本ADRは判断を記録するもので、設定値を再掲しない
 2. 自己レビューの観点を`CONTRIBUTING.md`にchecklistとして定める。回数は減らさない
 3. Issueを立てずに直接反映してよい範囲（typo、リンク、表記ゆれ、規約の言い回し、metadata記入漏れ）を定める。
    **変更内容の承認は必ず得る**
@@ -90,7 +91,7 @@ Pull Request templateの「検証」表と「安全とsecurity」は、何を確
 |---|---|
 | 自己レビューが形骸化し、対象外Pull Requestの品質が落ちる | checklistを観点で定義し、各項目を過去の実際の失敗に紐付ける。回数（2 round）は維持する |
 | labelの付け忘れで、高リスク変更がreviewされない | Pull Requestのlabelは既に必須運用である。昇格Pull Requestには対象範囲に応じたlabelを必ず付ける |
-| `Review rate limited`がcheck上`pass`と表示され、reviewされていないのにmergeされる | GitHubは止められない。`CONTRIBUTING.md`の「Merge前の確認」に手作業の確認として明記する |
+| `Review rate limited`がcheck上`pass`と表示され、reviewされていないのにmergeされる | GitHubは止められない。`CONTRIBUTING.md`の「Merge前の確認」に手作業の確認として明記する。**本ADRを入れるPR #90 自身で2回連続して発生し、機械reviewを受けられなかった** |
 | 直接反映の範囲が拡大解釈される | 「Issueを立てない」は「勝手に変えてよい」ではない。承認は必ず得る。迷うものはIssue必須側として扱う |
 
 ## 検証
@@ -98,7 +99,10 @@ Pull Request templateの「検証」表と「安全とsecurity」は、何を確
 - 対象外label（`area:docs`＋`type:maintenance`）のPull Requestで自動reviewが走らないこと。
   [PR #88](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/88)で確認済み
   （`Review skipped: reviews are disabled for this base branch`）
-- 対象labelのPull Requestで自動reviewが走ること。**未確認。**次に該当するPull Requestで確認する
+- 対象labelのPull Requestで自動reviewが走ること。**発火は確認できた。**
+  [PR #90](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/90)（`type:decision`を持つ）では
+  `Review skipped`ではなく`Review rate limited`となり、対象判定を通過してから
+  rate limitで止まったことが分かる。**reviewの完走は未確認である**
 - `develop`で未解決threadがmergeをblockすること。PR #88で確認済み
   （resolved→`CLEAN`、unresolve→`BLOCKED`、再resolve→`CLEAN`）
 - 見直し後の最初の3 Pull Requestについて、merge前に人手で実行した手順の数とreviewの待ち時間を記録し、
