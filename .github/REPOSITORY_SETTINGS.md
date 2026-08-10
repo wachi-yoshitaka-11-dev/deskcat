@@ -167,6 +167,36 @@ read-back結果: `allowed_actions = selected`、`github_owned_allowed = true`、
 
 Rust CIでサードパーティActionが必要になった場合は、`patterns_allowed`へ個別に追加し、採用理由と確認日を本文書へ記録する。
 
+#### `esp-rs/xtensa-toolchain` の許可（2026-08-10、[#42](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/42)）
+
+- [x] `patterns_allowed`へ`esp-rs/xtensa-toolchain@*`を追加する
+
+read-back結果:
+
+```text
+github_owned_allowed: true
+verified_allowed:     false
+patterns_allowed:     ["esp-rs/xtensa-toolchain@*"]
+allowed_actions:      selected
+sha_pinning_required: true
+```
+
+**採用理由**: `firmware.yml`がXtensa Rust toolchainを導入するのに必要である。
+GitHub所有のActionに同等品が無い。shellで`espup`を導入する案も採れるが、
+version、toolchain名、`ldproxy`、環境変数のexportを自前で並べることになり、
+`espup`の仕様変更を追う負担がworkflow側へ移る。**採否は供給元制限を1件緩めることとの比較で判断した。**
+
+**緩めていない統制**:
+
+- `github_owned_allowed`は`true`のまま。既存5 Actionの扱いは変わらない
+- `verified_allowed`は`false`のまま。Verified creatorを一括で許可していない
+- `sha_pinning_required`は`true`のまま。**このAction自身もcommit SHAへの固定が強制される**
+- 追加したのは1 patternだけである。`esp-rs/*`のようなnamespace全体の許可はしていない
+
+**このAction自体はreviewの対象である。**`v1.7.0`（`ec6d365`）へ固定した。
+2026-08-10時点でrepositoryはarchivedでなく、最終pushは2026-04-20である。
+版を上げるときは、上げ先のcommitをreviewしてからSHAを差し替える。
+
 ### 2026-07-31のdrift確認
 
 Pull Request #29の作業中にremoteを再確認したところ、`delete_branch_on_merge`が
