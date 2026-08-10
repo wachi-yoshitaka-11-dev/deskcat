@@ -1,0 +1,42 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+
+# CodeRabbitのreview対象を高リスク変更へ限定する。
+#
+# 背景: 全Pull Requestでreviewを走らせるとrate limitに掛かり、必要なPull Requestで
+# reviewが返らない。PR #55 では再review依頼がrate limitで実行されず、未reviewのcommitを
+# 含んだままmergeされた。判断の経緯は Issue #87 を参照する。
+#
+# 制約: pathでauto reviewの発火は制御できない。`reviews.path_filters`はreviewの中で
+# 見るfileを絞るだけであり、reviewを走らせるかどうかは決めない。発火を制御できるのは
+# `base_branches`、`labels`、`ignore_title_keywords`、`ignore_usernames`の4つである。
+# 本projectはPull Requestにも`area:*`／`type:*` labelを必ず付ける運用のため、labelで制御する。
+
+reviews:
+  auto_review:
+    # 既定では自動reviewを行わない。下の`labels`に一致したときだけ走らせる。
+    enabled: false
+
+    # 既定branch(`main`)以外でauto reviewの対象にするbase。
+    # これが無いと base `develop` のPull Requestは対象外になる。
+    #
+    # 既定branchである`main`は、この設定に関わらず常に対象である。これは意図どおりで、
+    # `develop`→`main`の昇格Pull Requestは公開前の最後の関門であり、review対象から外さない。
+    # ただし`enabled: false`のため、昇格Pull Requestも下の`labels`のいずれかが要る。
+    # 昇格Pull Requestには対象範囲に応じたlabelを必ず付ける。
+    base_branches:
+      - develop
+
+    # このいずれかのlabelが付いたPull Requestだけ自動reviewする。
+    # `area:docs`と`type:maintenance`だけのPull Request（文書の記述修正）は対象外とし、
+    # 自己レビューで通す。自己レビューの観点は CONTRIBUTING.md に定める。
+    labels:
+      - area:firmware
+      - area:protocol
+      - area:raspberry-pi
+      - area:hardware
+      - type:decision
+
+    # pushのたびにreviewを再実行しない。rate limitの主因であり、
+    # 指摘対応のたびに再reviewが走ると1つのPull Requestでreviewを何度も消費する。
+    # 対応後に再reviewが要るときは `@coderabbitai review` を明示的に投げる。
+    auto_incremental_review: false
