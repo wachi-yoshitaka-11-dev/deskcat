@@ -1,2 +1,13 @@
+# `espup`が導入するtoolchainの名前を、版込みで指定する。
+# channel名だけを固定すると、その名前へどの版が入るかは`espup`任せになり、
+# `--toolchain-version`を付け忘れた端末が別の版でbuildできてしまう。
+# 版込みの名前にすると、その名前のtoolchainが無い環境では
+# `error: custom toolchain '...' specified in override file '...' is not installed`
+# としてcompile前に停止する。
+#
+# 導入: espup install --toolchain-version 1.95.0.0 --targets esp32 --name esp-1.95.0.0
+# 版を上げるときは、この値と導入commandの`--name`／`--toolchain-version`を同時に変える。
+# `--toolchain-version`だけを変えて`--name`を据え置くと、名前が一致したまま中身が
+# 入れ替わるため、この停止は起きない。詳細はdocs/runbooks/esp32-development-machine-setup.md。
 [toolchain]
-channel = "esp"
+channel = "esp-1.95.0.0"

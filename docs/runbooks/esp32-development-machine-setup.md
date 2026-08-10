@@ -1,6 +1,6 @@
 # ESP32開発端末Setup
 
-> 状態: Linux x86_64 で検証済み（初回 2026-08-06、現行 tree に対する最新の検証 2026-08-08）。Flash / HIL 手順は未検証
+> 状態: Linux x86_64 で検証済み（初回 2026-08-06、現行 tree に対する最新の検証 2026-08-10）。Flash / HIL 手順は未検証
 > 適用範囲: ESP32 Build profileとESP32 Flash / HIL profile
 > 前提OS: 実機のLinux（[ADR-0005](../decisions/0005-standard-development-os.md)）。flashは実機Linuxに限る
 
@@ -126,13 +126,42 @@ cargo install --list
 対象 chip と compiler 版を明示して導入する。`--targets` の既定は `all` であり、DeskCat で使わない chip の toolchain まで取得する。
 
 ```bash
-espup install --toolchain-version 1.95.0.0 --targets esp32
+espup install --toolchain-version 1.95.0.0 --targets esp32 --name esp-1.95.0.0
 ```
 
-`firmware/esp32/rust-toolchain.toml` が固定するのは channel 名 `esp` だけであり、
-その channel へどの compiler 版が入るかは `espup` が決める。版を固定しなければ、
-同じ repository を checkout しても別の Xtensa Rust で build されうる。
-`--toolchain-version` で、記録した版を明示する。
+`--toolchain-version` は導入する compiler 版を、`--name` はその toolchain へ付ける名前を指定する。
+`--name` の既定は `esp` であり、名前に版が入らない。名前だけを固定しても、その名前へどの版が
+入るかは `espup` 任せになり、`--toolchain-version` を付け忘れた端末が別の Xtensa Rust で
+build できてしまう。
+
+`firmware/esp32/rust-toolchain.toml` は、この版付きの名前を要求する。
+
+```toml
+[toolchain]
+channel = "esp-1.95.0.0"
+```
+
+そのため上記の `--name` を省略すると、build は compile 前に次で停止する。
+
+```text
+error: custom toolchain 'esp-1.95.0.0' specified in override file '.../rust-toolchain.toml' is not installed
+```
+
+これは toolchain 名の一致を強制するものであり、その名前の中身が本当に 1.95.0.0 かまでは
+検査しない。想定している事故は `--toolchain-version` の付け忘れであり、それは既定名 `esp` が
+生成されることで名前が食い違い、上記のとおり停止する。
+
+版を上げるときは、この `--toolchain-version` と `--name`、および
+`firmware/esp32/rust-toolchain.toml` の `channel` を**同時に**変える。
+
+**`--toolchain-version` だけを変えて `--name` を据え置くと、この guard は働かない。**
+名前は一致したまま中身だけが別の版に入れ替わるため、build はそのまま成功する。
+これは本節が防ごうとしている状態そのものであり、版上げの際に最も起こりやすい取り違えでもある。
+`--name` は必ず `--toolchain-version` と同じ版を含む名前にする。
+
+`channel` だけを変えて導入を忘れた場合は、その名前の toolchain が無いため停止する。
+逆に導入だけを行って `channel` を据え置いた場合は、旧 toolchain が残っている限り
+旧版で build が続く。**版上げは 3 か所すべてを変えて完了する。**
 
 `espup install` は environment export file を生成し、その path を出力する。新しい terminal ごとに、その export file を shell へ読み込む。読み込まないと `espup` が設定した環境変数が反映されない。
 
@@ -151,7 +180,7 @@ path を変える場合は `espup install` の `-f, --export-file <EXPORT_FILE>`
 ```bash
 espup --version
 rustup show
-rustup run esp rustc -Vv
+rustup run esp-1.95.0.0 rustc -Vv
 xtensa-esp32-elf-gcc --version
 ```
 

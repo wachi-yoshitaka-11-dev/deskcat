@@ -105,12 +105,12 @@ cargo build --locked
 
 `--locked`は、追跡している`Cargo.lock`から解決結果が逸脱した場合に、lockfileを更新せず失敗させる。`cargo fmt`はこのoptionを受け付けない。
 
-Linux x86_64で検証した。初回は2026-08-06、現行treeに対する最新の検証は2026-08-08である。証拠は[Version Record](docs/toolchains/version-records/2026-08-06-esp32-build-linux.md)にある。確定版は次である。
+Linux x86_64で検証した。初回は2026-08-06、現行treeに対する最新の検証は2026-08-10である。証拠は[Version Record](docs/toolchains/version-records/2026-08-06-esp32-build-linux.md)にある。確定版は次である。
 
 | 項目 | 確定版 |
 |---|---|
 | Rust target | `xtensa-esp32-espidf` |
-| Rust channel | `esp`（Xtensa Rust 1.95.0.0） |
+| Rust channel | `esp-1.95.0.0`（Xtensa Rust 1.95.0.0） |
 | ESP-IDF | `v5.5.3` |
 | linker | `ldproxy` |
 
