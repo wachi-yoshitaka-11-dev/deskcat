@@ -73,11 +73,11 @@ fn invalid_doc() -> InvalidDoc {
 #[test]
 fn fixtures_are_not_empty() {
     assert!(
-        valid_doc().cases.len() >= 14,
+        valid_doc().cases.len() >= 15,
         "valid fixture cases were removed"
     );
     assert!(
-        invalid_doc().cases.len() >= 27,
+        invalid_doc().cases.len() >= 28,
         "invalid fixture cases were removed"
     );
 }

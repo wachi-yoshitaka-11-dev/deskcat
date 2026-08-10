@@ -1220,7 +1220,7 @@ schema層についてhost実装がfixtureに合格することだけである。
 | 2026-07-27 | Draft 1 | 引継ぎprotocolを統合し、検証・recovery要件を追加 |
 | 2026-07-28 | Draft 2 | Envelopeへ`sid`を追加。`hello`、`rate_limited`、`stale_session`を追加。Piの再起動でduplicate判定が誤るcaseを修正し、流量制限とlink-loss検知の未決事項を登録 |
 | 2026-07-31 | Draft 2 review | ACKと完了eventへ`reply_sid`を追加し、要求送信側の再起動後に旧sessionの応答を誤認するcaseを修正 |
-| 2026-08-10 | Draft 2 fixture | §3のinteger widthを確定し、§7へ単一lineの検証で返すcodeの対応付けを追加。§12.1をschema群のfixture作成済みの状態へ更新。wire formatは変更していない |
+| 2026-08-10 | Draft 2 fixture | §3のinteger widthを確定し、§7へ単一lineの検証で決まるcodeの対応付けを追加（分類と送出の判断を分ける）。§12.1をschema群のfixture作成済みの状態へ更新。wire formatは変更していない |
 
 ### Draft schemaの互換性
 

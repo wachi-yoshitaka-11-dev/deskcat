@@ -129,6 +129,12 @@
       "note": "上限+1 byte。上限ちょうどはvalid側のstrings_at_limitにある。"
     },
     {
+      "name": "multibyte_string_over_limit_but_under_char_count",
+      "line": "{\"v\":1,\"sid\":41207,\"id\":1,\"ts_ms\":100,\"type\":\"boot\",\"payload\":{\"firmware\":\"ああああああああああああああああああああああ\",\"board\":\"esp32\",\"reset_reason\":\"power_on\"}}\n",
+      "expect_error": "out_of_range",
+      "note": "上限をbyte数ではなく文字数で数える実装を検出する。66 byteで上限超過だが、22文字なので文字数では通ってしまう。"
+    },
+    {
       "name": "hello_host_over_limit",
       "line": "{\"v\":1,\"sid\":90312,\"id\":1,\"ts_ms\":40,\"type\":\"hello\",\"payload\":{\"host\":\"hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh\",\"version\":\"0.1.0\",\"reason\":\"startup\"}}\n",
       "expect_error": "out_of_range"

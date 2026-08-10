@@ -68,6 +68,9 @@ session判定・duplicate・budgetの群は、単一lineのschema検証ではな
 - `name`はfile全体で一意にする。`fixture_case_names_are_unique` testが検査する。
 - 期待値をRust側のtest codeへ書かない。fileへ書く。
 - 上限の境界は「ちょうど」と「1 byte超過」を対にして入れる。片方だけでは境界を固定できない。
+- **string上限のcaseはASCIIだけで書かない。**上限はUTF-8 byte長であって文字数ではない。
+  ASCIIだけでは両者が一致するため、byte数を文字数と取り違えた実装をfixtureが検出できない。
+  `multibyte_string_over_limit_but_under_char_count`が、その取り違えを名指しで失敗させる。
 - `line`のbyte長に意味があるcaseは、手計算せず生成して確認する。
 - case を削るときは`fixtures_are_not_empty` testの下限も一緒に見直す。下限は、
   fixtureが空でもtestが成功してしまう事故を防ぐためにある。
