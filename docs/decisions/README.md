@@ -12,6 +12,7 @@
 | [ADR-0004](0004-main-develop-branch-strategy.md) | Accepted | `main`と`develop`の二段階branch運用 |
 | [ADR-0005](0005-standard-development-os.md) | Accepted | 開発環境の標準OSを実機Linuxとする |
 | [ADR-0006](0006-validation-script-language.md) | Accepted | 検証scriptの実装言語をPythonとする |
+| [ADR-0007](0007-review-scope-and-self-review.md) | Accepted | 自動reviewを高リスク変更へ限定し、自己レビューを主軸とする |
 
 ## 新規作成
 
