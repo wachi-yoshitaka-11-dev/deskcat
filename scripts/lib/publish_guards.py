@@ -310,6 +310,25 @@ def markdown_outside_fences(content):
             yield line
 
 
+def unclosed_fence(content):
+    """閉じられていないfenceの開始行番号を返す。すべて閉じていればNoneを返す。
+
+    `markdown_outside_fences`はfence行ごとに内外を反転する。fence行が奇数個だと、
+    最後のfence以降のすべての行が「fence内」と見なされ、走査対象から静かに消える。
+    その結果、link検査も見出し収集もその範囲を見ないまま`BROKEN=0`を報告する。
+    検査が働いていないことを成功と区別できないため、走査前に検出する。
+
+    判定は`markdown_outside_fences`と同じ`_FENCE_RE`で行う。ここで独自の
+    fence解析を持つと、guardと被guard対象が別の行をfenceと見なし、
+    「balanceしているのに走査が消える」状態を作りうる。
+    """
+    opened_at = None
+    for number, line in enumerate(content.split("\n"), start=1):
+        if _FENCE_RE.match(line):
+            opened_at = None if opened_at is not None else number
+    return opened_at
+
+
 # GitHubはunderscoreをslugへ残す。除去すると`#some_heading`が解決しない。
 _ANCHOR_STRIP_RE = re.compile(r"[`*\[\]()!\"'.,:;/|<>?~^{}+=&%$#@]")
 _ANCHOR_FULLWIDTH = ("／", "、", "。", "（", "）")

@@ -94,6 +94,21 @@ def _passes_through_symlink(target_normalized, tracked_symlinks):
     return False
 
 
+def _fail_if_any(problems):
+    """1件でもあれば、全件をstderrへ出して失敗させる。
+
+    fence検査とlink検査の2箇所から呼ぶ。同じ整形と例外文言を両方に複製すると、
+    片方だけ変えたときに診断の形式が食い違う。
+    """
+    if not problems:
+        return
+    for problem in guards.sort_unique(problems):
+        print(problem, file=sys.stderr)
+    raise guards.ValidationError(
+        f"Documentation link validation failed with {len(problems)} problem(s)."
+    )
+
+
 def _collect_anchors(markdown_files):
     """各fileの見出しから生成されるanchor集合を作る。
 
@@ -191,6 +206,25 @@ def main(argv=None):
     published_root_documents = guards.ROOT_DOCUMENTS
     unrendered_root_documents = guards.UNRENDERED_ROOT_DOCUMENTS
 
+    # fenceが閉じていないと、それ以降の行がすべて「fence内」と見なされ、link検査も
+    # 見出し収集も静かに素通りする。減るのは`LINKS=`の件数だけで`BROKEN=0`は変わらず、
+    # 結果からは「壊れたlinkが無い」と「そもそも見ていない」を区別できない。
+    # 実際にconflict解消で閉じfenceが1本残り、link 5件が検査対象から消えている。
+    #
+    # anchor収集より前に打ち切る。走査を続けると、fenceが壊れたfileのanchorが
+    # 欠けた状態で他fileのlinkと突き合わされ、無関係な「Broken anchor」が
+    # 連鎖して原因が埋もれる。
+    file_texts = {path: guards.get_file_text(path) for path in markdown_files}
+    for path in markdown_files:
+        unclosed_at = guards.unclosed_fence(file_texts[path])
+        if unclosed_at is not None:
+            problems.append(
+                f"Unclosed code fence in {guards.path_relative_to_root(path, root)}"
+                f" opened at line {unclosed_at}"
+                " (every check silently skips the content after it)"
+            )
+    _fail_if_any(problems)
+
     anchors_by_file = _collect_anchors(markdown_files)
 
     for path in markdown_files:
@@ -200,7 +234,7 @@ def main(argv=None):
         # fenced code block内はlinkの例示でありlinkではない。走査対象から除く。
         # 見出し検出と同じhelperを使い、両者が同じ行を見ることを保証する。
         content = "\n".join(
-            guards.markdown_outside_fences(guards.get_file_text(path))
+            guards.markdown_outside_fences(file_texts[path])
         )
 
         # `pages/index.md`と`pages/404.md`はstaging後のroot基準で解決する。
@@ -343,12 +377,7 @@ def main(argv=None):
                     f" not rendered as HTML: {target} (use an absolute URL)"
                 )
 
-    if problems:
-        for problem in guards.sort_unique(problems):
-            print(problem, file=sys.stderr)
-        raise guards.ValidationError(
-            f"Documentation link validation failed with {len(problems)} problem(s)."
-        )
+    _fail_if_any(problems)
 
     # 並び替えはOrdinalで行う。culture依存の比較はWindowsとLinuxで順序が変わり、
     # digestが一致しない。
