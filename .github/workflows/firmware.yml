@@ -1,0 +1,95 @@
+name: Firmware
+
+on:
+  pull_request:
+    paths:
+      - "firmware/**"
+      - ".github/workflows/firmware.yml"
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - "firmware/**"
+      - ".github/workflows/firmware.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: firmware-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Format, lint, and build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: firmware/esp32
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          # Pages workflowと同じ理由。この後のstepがPR側のcodeをrunner上で扱うため、
+          # checkoutが.git/configへ残すtokenを読めないようにする。
+          persist-credentials: false
+
+      # `.embuild`はcacheしない。`.cargo/config.toml`が
+      # `ESP_IDF_TOOLS_INSTALL_DIR = "workspace"`を固定しており、ESP-IDF本体と
+      # managed toolがここへ入る。#5の実測で4.4 GBであり、repositoryあたりの
+      # cache上限10 GBに対して大きい。LRU evictionで他のcacheを追い出す。
+      - name: Cache cargo registry and target
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            firmware/esp32/target
+          key: esp32-${{ runner.os }}-${{ hashFiles('firmware/esp32/Cargo.lock', 'firmware/esp32/rust-toolchain.toml', 'firmware/esp32/.cargo/config.toml') }}
+          restore-keys: |
+            esp32-${{ runner.os }}-
+
+      # `name`は`rust-toolchain.toml`の`channel`と一致させる。#74で版付きの
+      # `esp-1.95.0.0`へ変更されており、既定の`esp`のままだとrustupが
+      # compile前に`custom toolchain ... is not installed`で停止する。
+      #
+      # `version`の固定はCI runnerの環境を記録済みの版へ合わせる設定であって、
+      # 他端末を拘束するguardではない。手元buildを止める仕組みは#74が
+      # `rust-toolchain.toml`側で持つ。CIがあることを理由にそちらを省かない。
+      - name: Install Xtensa Rust toolchain
+        uses: esp-rs/xtensa-toolchain@ec6d36527049a7f4fb2cb0c1a644668c1bb8a2a4 # v1.7.0
+        with:
+          version: 1.95.0.0
+          name: esp-1.95.0.0
+          buildtargets: esp32
+          ldproxy: true
+          default: true
+
+      # Version Recordへ書く値を、設定値ではなく実際に動いたものから取る。
+      # `version`入力とrust-toolchain.tomlは「要求」であって、runnerに入った
+      # 実体の記録ではない。両者が食い違ったときに気づけるようにする。
+      - name: Record toolchain versions
+        run: |
+          rustup show active-toolchain
+          rustc --version --verbose
+          cargo --version
+          cargo fmt --version
+          cargo clippy --version
+          # `ldproxy`はlinker wrapperであり、`--version`を受け付けず
+          # `Cannot locate argument '--ldproxy-linker <linker>'`でpanicする。
+          # 導入されたことの確認はpathの解決までとする。
+          command -v ldproxy
+
+      - name: Format
+        run: cargo fmt --all -- --check
+
+      - name: Lint
+        run: cargo clippy --all-targets --locked -- -D warnings
+
+      - name: Build
+        run: cargo build --locked
