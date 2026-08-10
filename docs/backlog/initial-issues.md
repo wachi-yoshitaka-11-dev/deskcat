@@ -22,7 +22,7 @@
 - このfileは、承認した初期backlogの定義と作成順序を残す履歴資料であり、live statusを重複管理しない。
 - Repositoryのlabel、milestone、security設定の適用はGitHub基盤整備として直接完了しているため、遡及Issueを作成していない。
 - GitHub Issue本文では依存関係を実際のIssue番号へ置き換えた。ローカル定義からも対応Issueへ辿れるよう、依存関係をlink化している。
-- 例外は**cargo workspace root**である。`#9`の`root Rust workspace`と`#23`の`Root host workspace`に対応するIssueは無い。[ADR-0001](../decisions/0001-monorepo-layout.md)が**着手可能なIssueがある場合だけpackageを作成する**と定めているためである。存在しないIssueを探さない。workspaceは最初に必要とするIssueが作る。実際にfirmware workspaceは`#5`、host workspaceは`#9`が作成しており、[Implementation Readiness Review](../runbooks/implementation-readiness-review.md)のSoftware gate「Host／firmware workspaceが存在する」は現在`Pass`である。
+- 例外は**cargo workspace root**である。これを依存関係に挙げているのは[#9](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/9)と[#23](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/23)の2件だが、**workspace rootを作るための独立したIssueは無い。**[ADR-0001](../decisions/0001-monorepo-layout.md)が**着手可能なIssueがある場合だけpackageを作成する**と定めているためである。存在しないIssueを探さない。workspaceは最初に必要とするIssueが作る。実際に作成したのは、firmware workspaceが[#5](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/5)、host workspaceが[#9](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/9)である（#9は依存として挙げた側でもあり、作った側でもある）。[Implementation Readiness Review](../runbooks/implementation-readiness-review.md)のSoftware gate「Host／firmware workspaceが存在する」は現在`Pass`である。
 
 > このfile内の`起票時の状態`、`Labels`、受け入れ条件のcheckboxは、**起票時点のsnapshot**である。
 > `status:blocked`等のlabelも当時の値であり、現在の付与状況とは一致しない。
