@@ -3,7 +3,7 @@
 buildを実行するworkflowは、そのbuild commandが確定してから追加する。
 再現できないbuildを、検証したとworkflowで主張しない。
 
-追加する順序は次のとおりで、**3までを実施済みである**。
+追加する順序は次のとおりである。**実施済みは`#3`と`#4`で、`#1`と`#2`は未着手である。**
 
 | # | 対象 | 状態 |
 |---|---|---|
@@ -17,7 +17,7 @@ buildを実行するworkflowは、そのbuild commandが確定してから追加
 ### `pages.yml` — 公開文書
 
 - Rust、ESP-IDF、firmware、実機をbuildしない。
-- Pull RequestではPages sourceの生成、Jekyll build、link検査だけを行う。
+- Pull Requestでは、link検査（`validate_doc_links.py`）、validator自身のtest（`test_link_validators.py`）、Pages sourceの生成、Jekyll build、生成物の検査（`validate_pages_output.py`）、公開境界の回帰test（`test_pages_guards.py`）を行う。**deployはしない。**
 - `main`で同じcheckに成功した場合だけPages artifactをdeployする。
 - 通常権限はread-onlyとし、deploy jobだけに`pages: write`と`id-token: write`を付与する。
 - Actionはreview済みのcommit SHAへ固定する。

@@ -155,15 +155,25 @@ read-back結果: `approval_policy = all_external_contributors`
 
 ### GitHub Actionsの供給元制限
 
-- [x] `allowed_actions`を`selected`（GitHub所有Actionのみ）へ絞る
+- [x] `allowed_actions`を`selected`へ絞る（2026-07-31。当時は`patterns_allowed`が空で、GitHub所有Actionのみだった）
 
-使用中の5 Action（`checkout`、`configure-pages`、`jekyll-build-pages`、`upload-pages-artifact`、`deploy-pages`）はすべて`actions/` namespaceのGitHub所有であり、この制限で影響を受けない。
+**2026-08-10時点の実際の方針は「GitHub所有Action＋明示的に許可した`esp-rs/xtensa-toolchain`」である。**
+`patterns_allowed`へ1件追加したため、`selected`＝GitHub所有のみ、ではなくなった（下記）。
+
+使用中のActionは次のとおりである。
+
+| workflow | Action | 供給元 |
+|---|---|---|
+| `pages.yml` | `actions/checkout`、`actions/configure-pages`、`actions/jekyll-build-pages`、`actions/upload-pages-artifact`、`actions/deploy-pages` | GitHub所有 |
+| `firmware.yml` | `actions/checkout`、`actions/cache` | GitHub所有 |
+| `firmware.yml` | `esp-rs/xtensa-toolchain` | **サードパーティ。`patterns_allowed`で個別に許可** |
 
 `all`のままにすると、workflowを1行変えるだけで任意のサードパーティActionを導入できる。
 `sha_pinning_required`は「固定された何か」であることを保証するだけで、供給元は制限しない。
 SHA固定と供給元制限は別の統制であり、片方で他方を代替できない。
 
-read-back結果: `allowed_actions = selected`、`github_owned_allowed = true`、`verified_allowed = false`、`patterns_allowed = []`
+2026-07-31のread-back結果: `allowed_actions = selected`、`github_owned_allowed = true`、`verified_allowed = false`、`patterns_allowed = []`。
+**`patterns_allowed`の現行値は下記のとおり1件である。**
 
 Rust CIでサードパーティActionが必要になった場合は、`patterns_allowed`へ個別に追加し、採用理由と確認日を本文書へ記録する。
 
@@ -188,7 +198,7 @@ version、toolchain名、`ldproxy`、環境変数のexportを自前で並べる�
 
 **緩めていない統制**:
 
-- `github_owned_allowed`は`true`のまま。既存5 Actionの扱いは変わらない
+- `github_owned_allowed`は`true`のまま。上表のGitHub所有Actionの扱いは変わらない
 - `verified_allowed`は`false`のまま。Verified creatorを一括で許可していない
 - `sha_pinning_required`は`true`のまま。**このAction自身もcommit SHAへの固定が強制される**
 - 追加したのは1 patternだけである。`esp-rs/*`のようなnamespace全体の許可はしていない

@@ -70,6 +70,18 @@ jobs:
           ldproxy: true
           default: true
 
+      # Version Recordへ書く値を、設定値ではなく実際に動いたものから取る。
+      # `version`入力とrust-toolchain.tomlは「要求」であって、runnerに入った
+      # 実体の記録ではない。両者が食い違ったときに気づけるようにする。
+      - name: Record toolchain versions
+        run: |
+          rustup show active-toolchain
+          rustc --version --verbose
+          cargo --version
+          cargo fmt --version
+          cargo clippy --version
+          ldproxy --version
+
       - name: Format
         run: cargo fmt --all -- --check
 

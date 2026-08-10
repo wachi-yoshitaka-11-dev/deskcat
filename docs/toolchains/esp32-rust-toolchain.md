@@ -190,8 +190,10 @@ build はそのまま成功する。この取り違えは runbook の版上げ�
 
 **別端末での再現は満たした。**根拠と、そう判断してよい理由を次に示す。
 
-CI（`ubuntu-24.04`）で同じ commit を clean build し、`cargo fmt`、`cargo clippy --locked`、
+CI（`ubuntu-24.04`）で clean build し、`cargo fmt`、`cargo clippy --locked`、
 `cargo build --locked` がすべて成功した（[Version Record](version-records/2026-08-10-esp32-build-ci.md)）。
+**3 回実行しており、うち 2 回は commit `663a486`、1 回は `8889281` である**
+（両者の差分は文書 file だけで、`firmware/` 配下と workflow は同一）。
 [Machine Profiles](machine-profiles.md) の「検証の移送」が別端末へ求める 7 項目
 （OS、architecture、container／VM／実機の別、toolchain と target、linker と SDK、commit、
 lockfile、clean build）をすべて記録している。
