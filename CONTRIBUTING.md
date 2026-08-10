@@ -330,6 +330,18 @@ GitHubはthreadが存在しないものをblockできない。**reviewの到着�
 `true`へ戻さないのは、pushごとの再reviewが1つのPull Requestでreviewを何度も消費し、
 rate limitの主因になるためである。**回数を自分で決められる手動依頼を選んでいる。**
 
+**手動依頼の終了条件を決めておく。**依頼を投げただけでは完了ではない。
+
+| 手動依頼の結果 | 次の行動 |
+|---|---|
+| review報告が届いた（`Review completed`） | **完了。**指摘があれば対応し、対応commitについて再度この表に従う |
+| 新しい指摘が出た | **完了ではない。**対応してから再度手動依頼する。指摘が0件になるまで繰り返す |
+| `Review rate limited` | **完了ではない。**時間を置いて1回だけ再依頼する。それでもrate limitなら下記の代替経路へ |
+| 2回目もrate limited | **機械reviewを断念してよい。**ただし次をすべて行う。(1) Pull Request本文へ「機械reviewを通していない」と、その判断の根拠を書く。(2) [自己レビュー](#自己レビュー)を実施し、検出内容を本文へ記録する。(3) 安全・電気・protocol・firmwareに関わる変更の場合は**断念せず、rate limitが解けるまで待つ** |
+
+**「reviewを依頼した」を「reviewを受けた」と書かない。**`Review rate limited`は`pass`と表示されるため、
+依頼の事実だけで完了扱いにすると検出が抜ける。
+
 #### 未解決を残してmergeする場合
 
 branch protectionの`enforce_admins`は無効であり、管理者は強制mergeできる。その場合は次をすべて行う。
