@@ -230,7 +230,7 @@ Projects v2 APIを叩く実装が要るため、**現時点では手作業とし
 
 pushする前に、作成者自身が差分を見直す。**新規指摘が0件の状態が2 round続くまで繰り返す。**
 
-[`.coderabbit.yaml`](.coderabbit.yaml)により、自動reviewは高リスク変更（`area:firmware`、
+[`.coderabbit.yaml`](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/.coderabbit.yaml)により、自動reviewは高リスク変更（`area:firmware`、
 `area:protocol`、`area:raspberry-pi`、`area:hardware`、`type:decision`）に限定している。
 **それ以外のPull Requestでは、この自己レビューが唯一のreviewである。**
 
