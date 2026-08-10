@@ -191,10 +191,11 @@ Log or evidence path: この文書へ全文を掲載する。
   「review反映後のフル再検証log」節: 正式なcommand実行。tree 79351378
   「board識別訂正後のフル再検証log」節: 正式なcommand実行。tree b0120755
   「表記統一後のフル再検証log」節: 正式なcommand実行。tree 815c903f
-  「版付きtoolchainの導入log」節: `espup`による導入と`export-esp.sh`の再生成確認。treeに依存しない
-  「compiler版の固定後のフル再検証log」節: 現行treeでの正式なcommand実行。tree cf3fcdb4。
-    同節の後半に、記録と異なるtoolchainを要求した場合の停止も含む
-  記録本体が挙げるsha256 0f9d4918... は「compiler版の固定後のフル再検証log」節の実行結果である。
+  「版付きtoolchainの導入log（#74 追記）」節: `espup`による導入と`export-esp.sh`の
+    再生成確認。treeに依存しない
+  「compiler版の固定後のフル再検証log（#74 追記）」節: 現行treeでの正式なcommand実行。
+    tree cf3fcdb4。同節の後半に、記録と異なるtoolchainを要求した場合の停止も含む
+  記録本体が挙げるsha256 0f9d4918... は最後の節の実行結果である。
 Known differences from documented profile:
   - 本記録はLinux（bash）で実行した。runbookのWindows節はADR-0005により対象外となり、
     PowerShell表記のcommand例も残っていない
@@ -1126,44 +1127,6 @@ channel = "esp-1.95.0.0"
 `espup install --name` は `~/export-esp.sh` を再生成し、`PATH` と `LIBCLANG_PATH` を
 新しい toolchain 名の path へ書き換えた（下の log の「導入」節）。既存の `esp` は削除していない。
 
-## compiler版の固定後のフル再検証log
-
-`rust-toolchain.toml` の `channel` を版付きへ変えて source tree が
-`cf3fcdb4cd4057cbd70e333676cc547632c14bd6` へ変わったため、`cargo clean` から
-正式な command を再実行した記録である。記録本体の `Generated artifact identity` が
-挙げる sha256 `0f9d4918...` はこの実行の結果である。
-同じ実行の後半で、記録と異なる toolchain を要求した場合に compile 前へ停止することも確認している。
-個人 path は `<home>` へ置換した。
-
-```text
-########## #74 版付きchannelでのフル再検証 ##########
-date: 2026-08-10T02:47:29Z
-base: 831f4b1 未解決review threadを残したmergeを防ぐ確認手順を定める (#76)
-source tree(staged): cf3fcdb4cd4057cbd70e333676cc547632c14bd6
-IDF_PATH=<unset>
-esp-1.95.0.0 (overridden by '<home>/deskcat/firmware/esp32/rust-toolchain.toml')
-     Removed 3648 files, 1.7GiB total
-clean rc=0
-fmt rc=0
-clippy rc=0
-build rc=0
-size_bytes=13660584
-sha256=0f9d4918526c3e4153d101943ee20c5d9a4ac3d0f08fce6f60569b503e2877f7
-Cargo.lock unchanged
-
---- 強制の実証: 記録と異なるtoolchainを要求した場合 ---
-channel = "esp-9.9.9.9"
-error: custom toolchain 'esp-9.9.9.9' specified in override file '<home>/deskcat/firmware/esp32/rust-toolchain.toml' is not installed
-build rc=1
---- 復元 ---
-channel = "esp-1.95.0.0"
-file type: ELF 32-bit LSB executable, Tensilica Xtensa, version 1 (SYSV), statically linked, with debug_info, not stripped
-```
-
-`build rc=1` の行が受け入れ条件の中核である。`cargo build` は crate を1つも compile せず、
-rustup が toolchain の解決段階で停止している。runbook どおりに
-`--name esp-1.95.0.0` を付けずに `espup install` した端末では、これと同じ停止が起きる。
-
 ## 版付きtoolchainの導入log（#74 追記）
 
 `espup install --name` が `~/export-esp.sh` を正しく再生成するかを、導入の前後で比較した記録である。
@@ -1208,3 +1171,41 @@ rustc 1.95.0-nightly (95e5bda86 2026-04-15) (1.95.0.0)
 
 `espup --version` は 0.17.1 である。この版に設定 file は無く、版の指定は
 `--toolchain-version` という起動 option だけである（`espup install --help`、2026-08-10 確認）。
+
+## compiler版の固定後のフル再検証log（#74 追記）
+
+`rust-toolchain.toml` の `channel` を版付きへ変えて source tree が
+`cf3fcdb4cd4057cbd70e333676cc547632c14bd6` へ変わったため、`cargo clean` から
+正式な command を再実行した記録である。記録本体の `Generated artifact identity` が
+挙げる sha256 `0f9d4918...` はこの実行の結果である。
+同じ実行の後半で、記録と異なる toolchain を要求した場合に compile 前へ停止することも確認している。
+個人 path は `<home>` へ置換した。
+
+```text
+########## #74 版付きchannelでのフル再検証 ##########
+date: 2026-08-10T02:47:29Z
+base: 831f4b1 未解決review threadを残したmergeを防ぐ確認手順を定める (#76)
+source tree(staged): cf3fcdb4cd4057cbd70e333676cc547632c14bd6
+IDF_PATH=<unset>
+esp-1.95.0.0 (overridden by '<home>/deskcat/firmware/esp32/rust-toolchain.toml')
+     Removed 3648 files, 1.7GiB total
+clean rc=0
+fmt rc=0
+clippy rc=0
+build rc=0
+size_bytes=13660584
+sha256=0f9d4918526c3e4153d101943ee20c5d9a4ac3d0f08fce6f60569b503e2877f7
+Cargo.lock unchanged
+
+--- 強制の実証: 記録と異なるtoolchainを要求した場合 ---
+channel = "esp-9.9.9.9"
+error: custom toolchain 'esp-9.9.9.9' specified in override file '<home>/deskcat/firmware/esp32/rust-toolchain.toml' is not installed
+build rc=1
+--- 復元 ---
+channel = "esp-1.95.0.0"
+file type: ELF 32-bit LSB executable, Tensilica Xtensa, version 1 (SYSV), statically linked, with debug_info, not stripped
+```
+
+`build rc=1` の行が受け入れ条件の中核である。`cargo build` は crate を1つも compile せず、
+rustup が toolchain の解決段階で停止している。runbook どおりに
+`--name esp-1.95.0.0` を付けずに `espup install` した端末では、これと同じ停止が起きる。
