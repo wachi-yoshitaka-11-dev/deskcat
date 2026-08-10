@@ -49,11 +49,14 @@ GitHubのIssue一覧はlabelを常にtitleの横に表示するため、titleに
 | label（`status:blocked`／`needs:*`） | 該当時のみ | 依存未解決なら`status:blocked`、実機証拠や人間の判断が必要なら`needs:hardware-test`／`needs:decision`を設定する |
 | assignee | 必須 | 対応を担当する人を設定する。未定でも起票者自身を暫定assigneeとする |
 | project | 必須 | Projects v2 board（`deskcat`、`https://github.com/users/wachi-yoshitaka-11-dev/projects/5`）にitemとして追加し、`Status`を設定する |
-| 開始日／終了日（`Start date`／`Target date`） | 任意 | 着手日・完了目標が具体的に決まった時点でのみProjects v2 board上で設定する。未定なら空欄のままでよい |
+| 開始日／終了日（`Start date`／`Target date`） | 着手時は任意、**close後は必須** | 着手日・完了目標が具体的に決まった時点でProjects v2 board上で設定する。未定なら空欄のままでよい。**closeした後は、close実施者が`Target date`をJSTのclose実績日へ設定する** |
 
 この表はIssue itemの規約である。Pull Request itemでは同じ2 fieldが必須であり、`Start date`は
 作成日という実績、`Target date`はmerge見込み日という予定を表す。`Target date`はmergeまたは
 closeの**完了後**に実績値へ更新する。[Pull request](#pull-request)節を参照する。
+
+boardの`Item closed` workflowは`Status`を`Done`にするが、**日付fieldは更新しない。**
+そのためIssueのclose後は、close実施者が手作業で`Target date`を実績日へ設定する。
 
 ## Branches
 
