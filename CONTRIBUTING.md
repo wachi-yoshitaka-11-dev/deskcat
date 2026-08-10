@@ -314,6 +314,11 @@ reviewは走っていない。**merge前にCodeRabbitのcheckの説明文を読�
 [#88](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/88)で実際に発生し、
 指摘対応後のcommitがreviewを受けないまま`pass`になった。
 
+**thread 0件は、reviewが終わったことを意味しない。**
+[#76](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/76)では0件を確認した**28秒後**に
+reviewが届き、actionable comment 2件がmerge済みPull Requestへ付いた。
+GitHubはthreadが存在しないものをblockできない。**reviewの到着を待たずに0件を「解決済み」と読まない。**
+
 自動reviewの対象は[`.coderabbit.yaml`](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/.coderabbit.yaml)
 で高リスク変更へ限定している。対象外のPull Requestでは[自己レビュー](#自己レビュー)が唯一のreviewである。
 
