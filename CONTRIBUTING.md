@@ -226,6 +226,33 @@ close日である。
 自然だが、Projects v2のworkflowは日付fieldを更新できない。GitHub Actionsから
 Projects v2 APIを叩く実装が要るため、**現時点では手作業とし、将来の課題として残す**。
 
+### 自己レビュー
+
+pushする前に、作成者自身が差分を見直す。**新規指摘が0件の状態が2 round続くまで繰り返す。**
+
+[`.coderabbit.yaml`](.coderabbit.yaml)により、自動reviewは高リスク変更（`area:firmware`、
+`area:protocol`、`area:raspberry-pi`、`area:hardware`、`type:decision`）に限定している。
+**それ以外のPull Requestでは、この自己レビューが唯一のreviewである。**
+
+回数だけを守っても、同じ観点を繰り返しなぞるだけになる。次の観点で見る。
+
+- [ ] **受け入れ条件を1つずつ差分と突き合わせた。**「だいたい満たしている」で通さない
+- [ ] **正本文書と矛盾する記述を新たに作っていない。**同じ定数・同じ規約を2箇所に書いていない。
+      片方だけを見た判断が起きる
+- [ ] **未確認の値を確定として書いていない。**実測していない値、一次資料で確かめていない型番、
+      未検証の動作を、断定形で書いていない（[AGENTS.md](AGENTS.md)の推測禁止を自分の差分へ適用する）
+- [ ] **参照先が実在する。**リンク先の文書・節・表が存在し、そこに書いてあると主張した内容が実際にある
+- [ ] **差分に、このPull Requestの目的と無関係な変更が混ざっていない**
+- [ ] **Pull Request本文の記述が、実際の差分と一致している。**対象file数、含まれる変更、
+      検証欄の「実行した／していない」が実態と合っている
+
+各項目は過去に実際に起きた失敗に対応する。順に
+[#72](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/72)（規則を守っているか一度も照合していなかった）、
+[hardware-bom.md Revision 20](docs/hardware/hardware-bom.md)（同じ条件を2文書に書き、式が食い違った）、
+[#63](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/63)・[#82](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/82)（未検証の動作を断定した）、
+[#82](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/82)（存在しない照合先を参照していた）、
+[#61](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/61)（本文が「4 Pull Request、14 file」のまま、実際は9 commitへ増えていた）である。
+
 ### Merge前の確認
 
 **未解決のreview threadが0件であることを確認するまでmergeしない。**
