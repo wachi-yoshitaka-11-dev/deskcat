@@ -65,8 +65,8 @@ type固有schemaでdeserializeする。serdeのadjacently tagged enumでは失�
   各message typeについて、全string fieldを上限まで、全integerを最大値まで詰めたlineが
   収まることを確認している。
 
-integer widthは`PROTO-TBD-003`として保留されていたものを確定した。`v`は`u16`、
-`sid`と`id`は`u32`、`ts_ms`は`u64`である。根拠は`src/envelope.rs`のdoc commentに書いている。
+integer widthは`PROTO-TBD-003`として保留されていたものを確定した。**値と根拠の正本は仕様§3の表**であり、
+ここには複製しない。実装上の宣言は`src/envelope.rs`の型を見る。
 
 ## 検証
 

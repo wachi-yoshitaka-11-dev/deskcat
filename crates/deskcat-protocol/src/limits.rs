@@ -14,6 +14,9 @@ pub const PROTOCOL_VERSION: u16 = 1;
 ///
 /// §2の候補値であり、`PROTO-TBD-002`で確定する。worst-caseのpayloadとmemory testを
 /// 経るまで確定値として扱わない。
+///
+/// **正本は仕様§2のtransport表である。**この定数はその値の写しであり、
+/// 両者の一致を検査する自動化は無い。§2を変えるときはここも同時に変える。
 pub const MAX_LINE_BYTES: usize = 1024;
 
 /// `boot.firmware`と`status.firmware`のbyte上限。

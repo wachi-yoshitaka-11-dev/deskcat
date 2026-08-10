@@ -6,16 +6,12 @@ use crate::message::Message;
 ///
 /// `type`と`payload`は[`Message`]が保持するため、ここには持たない。
 ///
-/// integer widthは`PROTO-TBD-003`として保留されていたものを、conformance fixtureと
-/// あわせて次のとおり確定する。宣言した幅に収まらない値はenvelopeとして復元できないため
-/// [`crate::ErrorCode::InvalidEnvelope`]で拒否する。
+/// 各fieldのinteger widthは下の型宣言のとおりで、**正本は仕様§3の表である**
+/// （`PROTO-TBD-003`として保留されていたものを、conformance fixtureとあわせて確定した）。
+/// 幅を選んだ根拠はここに複製しない。複製すると、片方だけを見た判断が起きる。
 ///
-/// | Field | 型 | 根拠 |
-/// |---|---|---|
-/// | `v` | `u16` | major versionは増加が遅く、幅を広げる意味がない |
-/// | `sid` | `u32` | session ID |
-/// | `id` | `u32` | session内の単調増加ID |
-/// | `ts_ms` | `u64` | uptime ms。`u32`は約49.7日でwrapし、長時間動作で単調性が崩れる |
+/// 宣言した幅に収まらない値、負数、非整数は、envelopeとして復元できないため
+/// [`crate::ErrorCode::InvalidEnvelope`]で拒否する。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Envelope {
     /// Protocol major version。
