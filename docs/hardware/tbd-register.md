@@ -39,11 +39,11 @@
 | HW-TBD-023 | P0 | **ESP32 boardの`3V3` pinから外部負荷を取ってよい条件。**(a) 外部供給可能電流の定格、(b) board上regulatorの種別（LDO／switching）、(c) **過電流保護／短絡保護の有無と動作**（制限電流、折り返し特性、熱shutdownの有無）。(a)と(b)は通常動作の上限と5 V側への換算に、(c)は短絡・配線ミス時の故障電流の制限に要る。**(c)が無いか確認できない場合、`3V3` pinから外部負荷を取る経路（段階B-2a）は採れない** | 一次資料または現物回路の確認。要件は[power-budget.md](power-budget.md#段階b-2の測定)の`B-2a: 3V3 pinから給電する経路`、確認項目は[hardware-bom.md](hardware-bom.md) `MCU-01`と部品受け入れchecklist | **段階B-2a**。B-2bへ移れば回避できるが、`HW-TBD-024`／`025`は経路によらず必要なため、それらが未解決ならどちらの経路も進まない | Human | Open（`HW-TBD-001`と同じ現物board・同じ資料で確認できるが、**001の完了を待つ必要はない**。pin配列の照合とregulatorの確認は別の問い） |
 | HW-TBD-024 | P0 | **MSP2807が耐えられる電流の上限。**メーカー未公開である。外部の3.3 V電源から給電する経路（段階B-2b）は**設定した電流制限が唯一の保護**であり、その設定値の上限を決めるにはmodule側の安全な上限が要る。**上限が無いままではMSP2807へ給電できない。**これは`HW-TBD-025`の共通条件(b)の一部であり、**B-2bだけでなくB-2aにも掛かる**（B-2aでもregulatorの保護のtrip点がmoduleにとって安全かを判定できない）。ADXL345とBME280だけ測っても未知数は埋まらないため、B-2自体が成立しない | 現物のbacklight回路（電流制限抵抗等）の確認、または一次資料。要件は[power-budget.md](power-budget.md#段階b-2の測定)の`B-2b: 外部の3.3 V電源から給電する経路`の`実施前に満たす条件` | **段階B-2（B-2a／B-2bとも。`HW-TBD-025`の共通条件(b)の一部であるため）**。MSP2807の定常電流の実測と、そこから決まる`PSU-INGRESS-01`の選定が段階Cまで進まない | Human | Open（`HW-TBD-002`と同じ現物moduleの確認で進められるが、**002の完了を待つ必要はない**。pin配列の確認とbacklight回路の確認は別の問い） |
 | HW-TBD-025 | P0 | **段階B-2の共通条件。給電経路によらず必要であり、B-2a／B-2bのどちらを選んでも省略できない。**(a) `3.3 V rail`の許容電圧範囲。周辺module3点の動作電圧範囲の積集合とESP32のlogic levelから決める。(b) 周辺module3点それぞれが耐えられる電流の上限。B-2bでは電源に設定する電流制限値の上限を決めるために、B-2aでは**board上regulatorの保護のtrip点がmoduleにとって安全かを判定する**ために要る。**`HW-TBD-023`（B-2a）や`HW-TBD-024`（B-2b）が解決しても、この行が未解決ならB-2を実施できない** | (a)は公開spec（[hardware-bom.md](hardware-bom.md)の`DISP-01`／`ACCEL-01`／`ENV-01`の電源欄）と[gpio-assignment.md](gpio-assignment.md#電圧domainすべての外部pull-upに適用)から積集合を取るだけで確定でき、**現物確認を待つ必要はない**。(b)は各moduleのdatasheetの絶対最大定格を当たる。**ADXL345とBME280について公開値があるかは未確認であり、「あるはず」と仮定しない。**公開されていなければMSP2807と同じ扱い（現物回路の確認か、上限を得られないなら当該moduleへB-2で給電しない）とする。**MSP2807分は`HW-TBD-024`**。要件は[power-budget.md](power-budget.md#段階b-2の測定)の共通条件表、確認項目は[hardware-bom.md](hardware-bom.md)の部品受け入れchecklist | **段階B-2（B-2a／B-2bとも）** | Human | Open（(a)は公開specから今すぐ確定できる。(b)はまず各datasheetに公開値があるかを確認するところから。MSP2807分は`HW-TBD-024`） |
-| HW-TBD-026 | P0 | **SG90の電気的駆動条件。**(a) 制御logic要件（ESP32のGPIOは3.3 Vだが、SG90のlogic入力閾値がデータシートに無く、3.3 V driveで確実に動作するかが未確定）、(b) PWM周期／rate（50 Hzは一般値であり、確定値として採らない）、(c) 許容最小／最大pulse幅（データシート由来の電気的な駆動範囲。**機械的可動域は`HW-TBD-010`**）。**Stall／peak電流と無負荷／動作電流の実測は`HW-TBD-010`／`HW-TBD-011`の範囲であり、この行では重複させない** | メーカーデータシートと無負荷試験。要件は[servo-safety-limits.md](servo-safety-limits.md#サーボ識別情報)の識別情報表 | `SERVO-PWM`の駆動条件の確定、servoの実機動作全般 | Joint | Open |
-| HW-TBD-027 | P0 | **`RES-PULL-01`（`SERVO-PWM`の外部pull-down）の抵抗値と本数。**GPIO27はreset時にhigh-Zであり、外部pull-downはPWM driver初期化前にservoが不定pulseを受けないための**必須**部品である。それにもかかわらず抵抗値が未選定で、部品も未購入である。**この行は`TBD`セルではなく、同じ行の「未購入・未選定」から登録した**（[本文との照合手順](#区別の基準)） | 抵抗値の選定（ESP32のGPIO駆動能力とservo側入力インピーダンスから決める）。要件は[gpio-assignment.md](gpio-assignment.md#信号inventory)の`SERVO-PWM`行、部品は[hardware-bom.md](hardware-bom.md) `RES-PULL-01` | 初回統合通電、`HW-TBD-019`の起動時状態の確定 | Human | Open |
-| HW-TBD-028 | P1 | **電源品質の数値制限。**(a) Pi入力で許容する最低電圧、(b) ESP32入力／3.3 Vで許容する最低電圧、(c) 最大定常ripple、(d) 最大transient droopと継続時間、(e) connector／wireで許容する最大温度上昇。**許容するbrownout／reset回数は0回で確定済みであり、この行に含めない** | 実測（ADC loggingとテスター、温度は接触測定）。要件は[power-budget.md](power-budget.md#受け入れ条件)が「引き続き`TBD`」と明記している一覧 | 電源系の受け入れ承認、合成給電（段階C）の合否判定 | Joint | Open |
-| HW-TBD-029 | P1 | **各deviceのlocal decouplingの容量と配置。**[power-budget.md](power-budget.md#配線・保護表)の配線・保護表で`TBD`／`Blocked`のまま残っている | 各deviceのデータシートが指定する値と配置。要件は[power-budget.md](power-budget.md#配線・保護表) | 電源系の受け入れ承認、sensor busの安定動作 | Joint | Open |
-| HW-TBD-030 | P1 | **逆極性保護の要否と方式。**[power-budget.md](power-budget.md#配線・保護表)の配線・保護表で`TBD`／`Blocked`のまま残っている。配線ミス時にPi、ESP32、周辺module3点が同時に破損しうる | Design review。要件は[power-budget.md](power-budget.md#配線・保護表) | 合成給電（段階C）の配線承認 | Human | Open |
+| HW-TBD-026 | P0 | **SG90の電気的駆動条件。**(a) 制御logic要件（ESP32のGPIOは3.3 Vだが、SG90のlogic閾値が未確定であり、3.3 V driveで確実に動作するかを判定できない。[servo-safety-limits.md](servo-safety-limits.md#サーボ識別情報)は現物確認まで確定しないとしている）、(b) PWM周期／rate（50 Hzは一般値であり、確定値として採らない）、(c) 許容最小／最大pulse幅（データシート由来の電気的な駆動範囲。**機械的可動域は`HW-TBD-010`**）。**Stall／peak電流と無負荷／動作電流の実測は`HW-TBD-010`／`HW-TBD-011`の範囲であり、この行では重複させない** | メーカーデータシートと無負荷試験。要件は[servo-safety-limits.md](servo-safety-limits.md#サーボ識別情報)の識別情報表 | `SERVO-PWM`の駆動条件の確定、servoの実機動作全般 | Joint | Open（データシートから確定できる部分は今すぐ着手できる。無負荷試験を要する範囲は007／009によりBlocked） |
+| HW-TBD-027 | P0 | **`RES-PULL-01`（`SERVO-PWM`の外部pull-down）の抵抗値と本数。**GPIO27はreset時にhigh-Zであり、外部pull-downはPWM driver初期化前にservoが不定pulseを受けないための**必須**部品である。それにもかかわらず抵抗値が未選定で、部品も未購入である。**この行は`TBD`セルではなく、同じ行の「未購入・未選定」から登録した**（[区別の基準](#区別の基準)） | 抵抗値の選定（ESP32のGPIO駆動能力とservo側入力インピーダンスから決める）。要件は[gpio-assignment.md](gpio-assignment.md#信号inventory)の`SERVO-PWM`行、部品は[hardware-bom.md](hardware-bom.md) `RES-PULL-01` | 初回統合通電、`HW-TBD-019`の起動時状態の確定 | Human | Open |
+| HW-TBD-028 | P1 | **電源品質の数値制限。**(a) Pi入力で許容する最低電圧、(b) ESP32入力／3.3 Vで許容する最低電圧、(c) 最大定常ripple、(d) 最大transient droopと継続時間、(e) connector／wireで許容する最大温度上昇。**許容するbrownout／reset回数は0回で確定済みであり、この行に含めない** | **実測ではなく定義が先である。**各deviceのdatasheetの動作電圧範囲と絶対最大定格、および線材・connectorの温度定格から上限・下限を定める。実測はその後の受け入れ試験で照合する。要件は[power-budget.md](power-budget.md#受け入れ条件)が「承認前に定義する」として挙げている一覧 | 電源系の受け入れ承認、合成給電（段階C）の合否判定 | Joint | Open（定義は現物・実測を待たずに着手できる） |
+| HW-TBD-029 | P1 | **各deviceのlocal decouplingの容量と配置。**[power-budget.md](power-budget.md)の`配線・保護表`で`TBD`／`Blocked`のまま残っている | 各deviceのデータシートが指定する値と配置。要件は[power-budget.md](power-budget.md)の`配線・保護表` | 電源系の受け入れ承認、sensor busの安定動作 | Joint | Open（datasheetから確定でき、現物・実測を待たない） |
+| HW-TBD-030 | P1 | **逆極性保護の要否と方式。**[power-budget.md](power-budget.md)の`配線・保護表`で`TBD`／`Blocked`のまま残っている。配線ミス時にPi、ESP32、周辺module3点が同時に破損しうる | Design review。要件は[power-budget.md](power-budget.md)の`配線・保護表` | 合成給電（段階C）の配線承認 | Human | Open |
 
 ## 登録範囲
 
@@ -188,28 +188,25 @@ grep -rnE "TBD" docs/hardware docs/decisions docs/toolchains \
 
 | 行 | 状態 | 扱い |
 |---|---|---|
-| `HW-TBD-008` | [gpio-assignment.md](gpio-assignment.md)は全信号へGPIOを割り当て済みで、本文に`TBD`表記が残っていない | 競合checkに未完了項目が残るため行を残す。この事情は同行の状態欄に記載済みである |
+| `HW-TBD-008` | [gpio-assignment.md](gpio-assignment.md)は全信号へGPIOを割り当て済みで、**GPIO割り当てそのものについての`TBD`表記は残っていない**（同fileに残る`TBD`は`Firmware board configuration ID`とRevision履歴であり、いずれも別件） | 競合checkに未完了項目が残るため行を残す。この事情は同行の状態欄に記載済みである |
 | `HW-TBD-012`／`HW-TBD-013` | しきい値の正本はこの台帳であり、正本文書側に`TBD`行を持たない | 実測値の正本を台帳側に置く方針（[HW-TBD-020のfield単位の正](#hw-tbd-020のfield単位の正)と同じ構造）に従い、行を残す |
 
 ### 実施記録
 
-件数は`--exclude=tbd-register.md`を足して数える。**この台帳自身の`TBD`はすべて自己言及であり、
-この節を書き足すだけで増える。**含めると照合ごとに数が動き、比較できない。
+下表の件数は、上のcommand 1)と2)の両方へ`--exclude=tbd-register.md`を足して数えた値である。
+**この台帳自身の`TBD`はすべて自己言及であり、この節を書き足すだけで増える。**
+含めると照合ごとに数が動き、前回と比較できない。
 
-```bash
-grep -rn "TBD" docs/hardware docs/decisions docs/toolchains \
-  --include="*.md" --exclude-dir=version-records --exclude=tbd-register.md
-```
-
-| 照合日 | command 1)のhit行 | command 2)のhit行 | 識別子を含む行の再確認 | 追加した行 | 実施 |
+| 照合日 | 1)のhit行 | 2)のhit行 | 識別子を含む行の再確認 | 追加した行 | 実施 |
 |---|---|---|---|---|---|
 | 2026-08-10 | 219 | 136 | 差分30行を目視。いずれも同じ行の`TBD`を指す識別子であり、漏れ0件 | `HW-TBD-026`〜`HW-TBD-030`（5件） | [#72](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/72) |
 
-`grep -n`が数えるのは**出現回数ではなく行数**である。1行に複数の`TBD`があっても1と数える。
-command 2)のhitは候補であって登録対象ではない。上の[区別の基準](#区別の基準)で3段に分けたうえで判定する。
+読み方を2点補う。`grep -n`が数えるのは**出現回数ではなく行数**であり、1行に複数の`TBD`が
+あっても1と数える。また2)のhitは候補であって登録対象ではない。
+[区別の基準](#区別の基準)で3段に分けたうえで判定する。
 
-件数はこの照合を実施したcommitに対する値である。文書を変更すれば変わるため、
-**次に照合するときは件数を突き合わせず、上のcommandを再実行して判定する。**
+件数は照合を実施したcommitに対する値である。文書を変更すれば動くため、
+**次の照合では件数を突き合わせず、commandを再実行して判定する。**
 
 ## 解決手順
 
