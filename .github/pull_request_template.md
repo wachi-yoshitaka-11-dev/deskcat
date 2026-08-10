@@ -60,6 +60,18 @@ Closes #
 - [ ] 不正入力・最大長超過を有界に処理する
 - [ ] `unsafe`を追加していない、または別のreviewをlinkした
 
+## Review thread
+
+**この節はmerge直前に確認して更新する。**作成時点ではthreadが無いため空欄でよい。
+
+- [ ] 自動review（CodeRabbit）のcheckが完了している（`pending`のままmergeしない）
+- [ ] 未解決のreview threadが0件である（GraphQLの`reviewThreads.isResolved`で確認した。REST APIのcomment一覧では判定できない）
+- [ ] 未解決を残す場合は追跡Issueを起票し、下欄と該当threadへ番号を記載した
+
+確認commandと未解決を残す場合の手順は[Merge前の確認](../CONTRIBUTING.md#merge前の確認)に従う。
+
+追跡Issue:
+
 ## Riskと残作業
 
 TBD:

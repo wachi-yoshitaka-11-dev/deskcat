@@ -223,6 +223,87 @@ close日である。
 自然だが、Projects v2のworkflowは日付fieldを更新できない。GitHub Actionsから
 Projects v2 APIを叩く実装が要るため、**現時点では手作業とし、将来の課題として残す**。
 
+### Merge前の確認
+
+**未解決のreview threadが0件であることを確認するまでmergeしない。**
+baseが`develop`でも`main`でも適用する。
+
+判定はGraphQLの`reviewThreads.isResolved`で行う。次はいずれもthreadの解決状態を表さないため、
+判定根拠にしない。
+
+- REST APIのreview comment一覧（`gh api repos/{owner}/{repo}/pulls/{number}/comments`）。
+  返るfieldに解決状態が無く、未解決threadと解決済みthreadを区別できない
+- `gh pr view --comments`の表示。comment本文を並べるだけで、threadの解決状態を示さない
+- inline commentに付く`Addressed in commit`表示、およびthreadへの返信の有無。
+  どちらも「対応した」という主張であり、threadを解決済みにする操作ではない
+- reviewの`APPROVED`。review単位の判定であり、thread単位の解決状態とは別である
+
+確認は次の順で行う。**順序を逆にすると、reviewが届く前の0件を「解決済み」と読み違える。**
+
+1. 自動reviewのcheckが完了していること
+2. 全pageの未解決threadが0件であること
+
+```bash
+PR_NUMBER=76
+
+gh pr checks "$PR_NUMBER"
+```
+
+`PR_NUMBER`には対象のPull Request番号を入れる。`<PR番号>`のようなplaceholderを直接書くと、
+shellが`<`をredirectとして解釈して失敗するため、変数へ代入して渡す。以降のcommandでも同じ
+変数を使う。
+
+**thread 0件は、reviewが終わったことを意味しない。**自動review（CodeRabbit）のcheckが
+`pending`／`Review in progress`の間は、まだthreadが作られていないだけである。
+`pending`のcheckが1件も残っていないことを確認するまでmergeしない。
+[#76](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/76)では0件を確認した28秒後に
+reviewが届き、actionable comment 2件がmerge済みPRへ付いた。
+
+checkの完了を確認したら、threadを確認する。
+
+```bash
+gh api graphql -f query='
+  query($owner: String!, $repo: String!, $number: Int!, $after: String) {
+    repository(owner: $owner, name: $repo) {
+      pullRequest(number: $number) {
+        reviewThreads(first: 100, after: $after) {
+          totalCount
+          pageInfo { hasNextPage endCursor }
+          nodes { isResolved path line }
+        }
+      }
+    }
+  }' -F owner=wachi-yoshitaka-11-dev -F repo=deskcat -F number="$PR_NUMBER" \
+  --jq '.data.repository.pullRequest.reviewThreads
+        | {total: .totalCount, hasNextPage: .pageInfo.hasNextPage, endCursor: .pageInfo.endCursor,
+           unresolved: [.nodes[] | select(.isResolved == false)]}'
+```
+
+**全pageの`unresolved`が空配列であることを確認する。**`hasNextPage`が`true`なら未取得の
+threadが残っている。1つ前の実行が返した`endCursor`の値を`END_CURSOR='Y3Vyc29y…'`のように
+代入し、同じcommandへ`-f after="$END_CURSOR"`を足して再実行する。`hasNextPage`が`false`に
+なるまで繰り返す。1 pageだけを見て0件と判定しない。
+
+**threadのresolveは、reviewerの応答を読んでから行う。**指摘へ返信しただけで自分でresolveしない。
+返信に対する応答（自動reviewなら指摘が解消したかの判定）を読み、解消したと確認できたthreadだけを
+resolveする。自分の返信だけを根拠にresolveすると、`isResolved`が「対応したという主張」に退化し、
+この節の判定が意味を失う。
+
+未解決threadを残したままmergeする場合は、次をすべて行う。**追跡Issueなしにmergeしない。**
+
+1. 追跡Issueを起票する
+2. 該当threadへ返信し、追跡Issue番号を書く
+3. Pull Request本文の`Review thread`節の`追跡Issue`欄へ番号を書く
+4. merge報告に未解決件数と追跡Issue番号を記載する
+
+この確認は手作業のgateである。`main`のbranch protectionはforce pushと削除の禁止だけであり、
+GitHubの`Require conversation resolution before merging`は有効にしていない。`develop`は
+protectionのbundle対象外とする既存方針のため、同じ要求を設定しない。CIによる自動checkも無い。
+[#40](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/40)では26 threadのうち1件が未解決のまま
+mergeされた。merge前の確認がcomment本文と`Addressed in commit`表示だけを見ており、解決状態そのものを
+見ていなかったためである。将来branch protectionを導入する際の候補は
+[Repository設定](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/.github/REPOSITORY_SETTINGS.md)に記録する。
+
 ### Merge方式
 
 baseで決まる。
