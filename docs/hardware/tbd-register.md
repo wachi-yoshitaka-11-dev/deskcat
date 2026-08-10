@@ -143,18 +143,37 @@ version-recordは実施時点のsnapshotであり、遡って改変しない。
 ```bash
 # 1) 対象範囲の全出現
 grep -rn "TBD" docs/hardware docs/decisions docs/toolchains \
-  --include="*.md" --exclude-dir=version-records
+  --include="*.md" --exclude-dir=version-records --exclude=tbd-register.md
 
 # 2) 識別子参照を除いた「本文のTBD」
 grep -rnE "TBD" docs/hardware docs/decisions docs/toolchains \
-  --include="*.md" --exclude-dir=version-records \
+  --include="*.md" --exclude-dir=version-records --exclude=tbd-register.md \
   | grep -vE "(HW|PROTO)-TBD-[0-9]{3}"
 ```
+
+**この台帳自身を`--exclude`で外している。**台帳の`TBD`は行の識別子か、この節のような
+自己言及であり、いずれも登録対象ではない。外さないと、この節を書き足すだけで件数が動き、
+前回と比較できなくなる。台帳の行そのものは、定義上すでに登録済みである。
 
 **command 2)は行単位で除外するため、識別子と本文の`TBD`が同じ行にあると本文側も落ちる。**
 1)と2)の差分（識別子を含む行）を必ず開き、**その行の識別子が、同じ行の`TBD`を
 指しているか**を確認する。指していなければ登録漏れである。この確認を省くと、
 表の1行に複数の`TBD`セルがある文書で漏れが出る。
+
+差分は次の2つに分かれる。目視が要るのは後者だけである。
+
+1. 行に現れる`TBD`が**識別子だけ**の行。本文の`TBD`を含まないため、落ちるものが無い
+2. 識別子を除いても`TBD`が残る行。**この行を開いて、識別子が同じ行の`TBD`の登録先かを確かめる**
+
+2 の絞り込みは次で行う。「TBD台帳」という台帳名も識別子と同じ扱いで外す。
+
+```bash
+grep -rnE "TBD" docs/hardware docs/decisions docs/toolchains \
+  --include="*.md" --exclude-dir=version-records --exclude=tbd-register.md \
+  | grep -E "(HW|PROTO)-TBD-[0-9]{3}" \
+  | sed -E 's/(HW|PROTO)-TBD-[0-9]{3}//g; s/TBD ?台帳|TBD register//g' \
+  | grep "TBD"
+```
 
 ### 区別の基準
 
@@ -193,13 +212,11 @@ grep -rnE "TBD" docs/hardware docs/decisions docs/toolchains \
 
 ### 実施記録
 
-下表の件数は、上のcommand 1)と2)の両方へ`--exclude=tbd-register.md`を足して数えた値である。
-**この台帳自身の`TBD`はすべて自己言及であり、この節を書き足すだけで増える。**
-含めると照合ごとに数が動き、前回と比較できない。
+件数は上のcommandをそのまま実行した値である。
 
-| 照合日 | 1)のhit行 | 2)のhit行 | 識別子を含む行の再確認 | 追加した行 | 実施 |
-|---|---|---|---|---|---|
-| 2026-08-10 | 219 | 136 | 差分30行を目視。いずれも同じ行の`TBD`を指す識別子であり、漏れ0件 | `HW-TBD-026`〜`HW-TBD-030`（5件） | [#72](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/72) |
+| 照合日 | 1) | 2) | 差分（1−2） | 差分のうち目視した行 | 追加した行 | 実施 |
+|---|---|---|---|---|---|---|
+| 2026-08-10 | 219 | 136 | 83 | 30。**いずれも同じ行の`TBD`を指す識別子であり、漏れ0件**。残る53行は行中の`TBD`が識別子だけで、落ちる本文`TBD`が無い | `HW-TBD-026`〜`HW-TBD-030`（5件） | [#72](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/72) |
 
 読み方を2点補う。`grep -n`が数えるのは**出現回数ではなく行数**であり、1行に複数の`TBD`が
 あっても1と数える。また2)のhitは候補であって登録対象ではない。
