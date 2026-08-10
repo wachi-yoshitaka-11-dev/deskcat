@@ -43,6 +43,13 @@ decode／encode、および共有conformance fixtureを提供する。
 
 未知の追加payload fieldは§3に従って無視する。
 
+**返すcodeは分類であって、送出の判断ではない。**そのcodeを相手へ返すかどうかは、方向（§8）と
+§8.2の送出上限に従い、session stateを持つ層（#11、#12）が決める。とくに`line_too_long`は
+§7により`(sid, id)`を復元できた場合にだけ返してよく、`unknown_type`は方向によって
+相関ACKを返すか計数だけにするかが変わる。**このcrateは上限付きprefixからのidentity復元を
+行わない。**行全体を受け取る以上、上限超過時にどこまで保持するかはbyte受信を持つ層（#10）の
+判断だからである。
+
 `unknown_type`と`invalid_payload`を区別するため、envelopeのpayloadは
 `serde_json::value::RawValue`として未解釈のまま受け、`type`を解決してから
 type固有schemaでdeserializeする。serdeのadjacently tagged enumでは失敗理由が

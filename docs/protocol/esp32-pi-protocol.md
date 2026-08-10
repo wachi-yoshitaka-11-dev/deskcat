@@ -789,9 +789,16 @@ ACKは、commandが検証され、処理対象として受け入れられたこ�
 
 Parser counterでは、invalid UTF-8、invalid JSON、invalid envelope、unknown type、oversize line、rate limit超過、session不一致を区別する。
 
-### 単一lineの検証で返すcodeの対応付け
+### 単一lineの検証で決まるcodeの対応付け
 
-同じ「不正」でも、どの段階で落ちたかによって返すcodeが変わる。§12.1のconformance fixtureが次の対応を固定している。
+同じ「不正」でも、どの段階で落ちたかによってcodeが変わる。§12.1のconformance fixtureが次の対応を固定している。
+
+**この表が定めるのは「どのcodeに分類するか」だけである。****そのcodeを実際に相手へ返すかどうかは、この表では決まらない。**送出の可否は方向（§8の拒否時の動作）と、下記`line_too_long`の個別条件、および§8.2の送出上限に従う。とくに次の2つは、分類できても応答しない場合がある。
+
+- `line_too_long`は、下記のとおり`(sid, id)`を復元できた場合にだけ返す。復元できなければ`oversize_lines`の計数だけを行う。
+- `unknown_type`は、§3のとおりPi→ESP32でidentityを復元できる場合に相関ACKを返し、ESP32→Piでは応答せず計数だけを行う。
+
+分類と送出を混同すると、応答してはならない場合に拒否応答を送り、§8.2の送出帯域を消費する。
 
 | 事象 | Code |
 |---|---|
@@ -800,7 +807,9 @@ Parser counterでは、invalid UTF-8、invalid JSON、invalid envelope、unknown
 | `type`が未知 | `unknown_type` |
 | type固有payloadの必須field欠落・型違い・列挙外の値（例: `reason`が`startup`／`port_reopen`／`resync`以外） | `invalid_payload` |
 | 上限のある値が範囲外（string byte長の超過など） | `out_of_range` |
-| 改行を含むlineが最大長を超過 | `line_too_long` |
+| 改行を含むlineが最大長を超過 | `line_too_long`（送出条件は上記の個別規定に従う） |
+
+**string byte長の超過を`out_of_range`とするのは、この節で新たに決めた分類である。**§5.3は「値そのものが許容範囲外」を`out_of_range`としているが、§5.4のtext byte長のように、上限の存在だけを定めて超過時のcodeを書いていない箇所がある。`invalid_payload`（型と必須fieldの問題）と`out_of_range`（型は正しいが値が上限を超える）を分けることで、送信側は「payloadを直す」のか「値を縮める」のかを区別できる。分けない選択もありえたため、変更する場合は§12.1のfixtureも同時に変える。
 
 判定は§8の手順どおりこの表の上から順に行う。**先に落ちたものが返るcodeを決める。**たとえば未対応`v`と未知`type`を同時に持つlineは`unsupported_version`であり、`unknown_type`ではない（§5.1の手順2が手順3より先である）。
 

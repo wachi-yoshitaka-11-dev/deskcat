@@ -68,6 +68,20 @@ struct WireEnvelope<'a> {
 /// | 6 | type固有payload schema | [`ErrorCode::InvalidPayload`] |
 /// | 7 | 上限のある値の範囲 | [`ErrorCode::OutOfRange`] |
 ///
+/// # 分類であって、送出の判断ではない
+///
+/// 返す[`ErrorCode`]は**分類**である。そのcodeを相手へ返すかどうかはこの関数では決まらない。
+/// 送出の可否は方向（§8の拒否時の動作）と§8.2の送出上限に従い、session stateを持つ
+/// 呼び出し側（Issue #11、#12）が判断する。とくに次の2つは、分類できても応答しない場合がある。
+///
+/// - [`ErrorCode::LineTooLong`]は、§7により`(sid, id)`を**復元できた場合にだけ**返してよい。
+///   復元は上限付きprefix（`PROTO-TBD-002`）に対して行う。**この関数はprefixからの
+///   identity復元を行わない。**行全体を受け取る以上、上限を超えた行のどこまでを保持するかは
+///   byte受信を持つ層（Issue #10）の判断だからである。復元できなければ、呼び出し側は
+///   応答せず`oversize_lines`の計数だけを行う。
+/// - [`ErrorCode::UnknownType`]は、§3によりPi→ESP32でidentityを復元できる場合に相関ACKを
+///   返し、ESP32→Piでは応答せず計数だけを行う。方向はこの関数の入力に含まれない。
+///
 /// # Errors
 ///
 /// 上表のいずれかに違反した場合、対応する[`ErrorCode`]を持つ[`DecodeError`]を返す。
