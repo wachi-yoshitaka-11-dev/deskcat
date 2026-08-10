@@ -11,10 +11,10 @@
 > [#8](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/8)（Raspberry Pi Rust環境）の前書きおよび`目的`である。
 > **本文書は承認した初期backlogの履歴資料であるため本文は書き換えない。**
 > 機器の識別の正本は[hardware-bom.md](../hardware/hardware-bom.md)である。
-> `#1`〜`#24`のIssue本文は先頭でこの文書を`定義元`として参照しているため、
+> `#1`〜`#24`のIssue本文はいずれもこの文書を`定義元`として参照しているため、
 > **Issueから辿ってこの文書の旧型番を読んだ場合は、この注記を優先する。**
 > なお、両Issueの受け入れ条件は型番を直接参照していない。訂正が及ぶのは上記の記述であり、
-> 実機の identity は各Issueの範囲で確認する。
+> 実機の識別は各Issueの範囲で確認する。
 
 ## 移行後の運用
 
