@@ -335,6 +335,33 @@ pushしても再reviewは走らない。**ここで`@coderabbitai review`を投�
 | 安全、電気、protocol、firmware | **rate limitが解けるまで待つ。**自己レビューで代替しない |
 | 上記以外 | **自己レビューで通してよい。**Pull Request本文へ機械reviewを通していない旨と、その判断の根拠を書く |
 
+#### 手動で依頼する前に状態を確認する
+
+**投げる前に必ず次を実行する。**これは**reviewを消費せず**、残数と次に空く時刻を返す。
+
+```text
+@coderabbitai rate limit
+```
+
+| 確認結果 | 行動 |
+|---|---|
+| 残数が0 | **投げない。**返ってきた時刻まで待つ |
+| 残数があり、**初回reviewがskipされた** | **`@coderabbitai full review` を使う。**`review`はincrementalであり、skip後は空振りしうる |
+| 残数があり、初回reviewは走ったが対応commitが未review | `@coderabbitai review` |
+
+`review`と`full review`は別物である。`review`は**新しい変更のみ**、`full review`は**全fileを最初から**
+review する。**どちらも同じ毎時上限を消費する。**`full review`は枠を回避する手段ではない。
+
+**同じ状態で2回以上投げない。**空振りなのかrate limitなのかを判別せずに繰り返すと、
+枠だけを消費して**他のPull Requestのreviewを止める。**
+実際、[#88](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/88)・
+[#90](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/90)・
+[#91](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/91)で計4回投げ、3回がrate limitに当たり、
+[#89](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/89)のreviewを遅らせた。
+
+上限は開発者identity単位のrolling windowである（Pro 5件／時、Pro+ 10件／時）。
+一定時刻にまとめて戻るのではなく、古いreviewが枠から抜けるたびに1件ずつ空く。
+
 **「reviewを依頼した」を「reviewを受けた」と書かない。**`Review rate limited`は`pass`と表示されるため、
 依頼の事実だけで完了扱いにすると検出が抜ける。
 
