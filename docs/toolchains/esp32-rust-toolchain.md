@@ -1,9 +1,9 @@
 # ESP32 Rust Toolchain
 
-> 状態: build検証済み（Linux x86_64 の ESP32 Build profile 端末）。実機確認と別端末での再現は未実施
+> 状態: build検証済み（Linux x86_64 の ESP32 Build profile 端末、および CI の `ubuntu-24.04`）。**実機確認は未実施**
 > 調査日: 2026-07-27
-> build 検証日: 2026-08-06（初回）／2026-08-10（現行 tree に対する最新の検証）
-> 証拠: [Version Record](version-records/2026-08-06-esp32-build-linux.md)
+> build 検証日: 2026-08-06（初回）／2026-08-10（現行 tree に対する最新の検証、および CI での再現）
+> 証拠: [開発端末](version-records/2026-08-06-esp32-build-linux.md)／[CI](version-records/2026-08-10-esp32-build-ci.md)
 > 対象family: classic ESP32／Xtensa
 
 ## 結論
@@ -181,13 +181,32 @@ build はそのまま成功する。この取り違えは runbook の版上げ�
 - [x] clean `cargo build` が成功した
 - [x] dependency と lockfile を review した
 - [x] 正式な format、lint、build command を `AGENTS.md` と root README へ反映した
-- [ ] 別の開発端末または clean environment で再現した
+- [x] 別の開発端末または clean environment で再現した（CI の `ubuntu-24.04` runner。[#42](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/42)、[Version Record](version-records/2026-08-10-esp32-build-ci.md)）
 
-未達の 3 項目により、この文書の状態は `検証済み`（`Verified`）ではなく **`build検証済み`** にとどめる。語の定義は [状態ラベル](README.md#状態ラベル) を参照する。
+未達の 2 項目により、この文書の状態は `検証済み`（`Verified`）ではなく **`build検証済み`** にとどめる。語の定義は [状態ラベル](README.md#状態ラベル) を参照する。
 
 - **chip 刻印の読み取り**: 現物写真が反射で判読不能。搭載 module は確定しており、その datasheet が中核 chip を示すため、build への影響は無い。
 - **回路図と現物 pin 表記の照合**: [HW-TBD-001](../hardware/tbd-register.md) として追跡し、#6 の flash 前提条件でもある。物理基板の機種と搭載 module 自体は現物確認で確定済みである。
-- **別端末での再現**: 本記録は Linux x86_64 の 1 台のみである。[Machine Profiles](machine-profiles.md) の「検証の移送」に従い、別端末では OS、toolchain、linker、commit、lockfile、clean build を再確認する。標準OSは [ADR-0005](../decisions/0005-standard-development-os.md) により実機 Linux であり、Windows は対象外のため再現対象に含めない。
+
+**別端末での再現は満たした。**根拠と、そう判断してよい理由を次に示す。
+
+CI（`ubuntu-24.04`）で同じ commit を clean build し、`cargo fmt`、`cargo clippy --locked`、
+`cargo build --locked` がすべて成功した（[Version Record](version-records/2026-08-10-esp32-build-ci.md)）。
+[Machine Profiles](machine-profiles.md) の「検証の移送」が別端末へ求める 7 項目
+（OS、architecture、container／VM／実機の別、toolchain と target、linker と SDK、commit、
+lockfile、clean build）をすべて記録している。
+
+**CI runner を再現対象に含めてよいと判断した理由**は次の 2 点である。
+
+- 同文書は「ESP32 の build-only 検証」について **Docker 上の Linux を使ってよい**と明記している。
+  「container で得た結果を実機の根拠として扱わない」という制限は、**flash と実機試験に掛かる**ものである
+- 本記録は build-only であり、flash、serial monitor、実機起動を一切主張しない。それらは #6 の範囲である
+
+標準OSは [ADR-0005](../decisions/0005-standard-development-os.md) により実機 Linux であり、
+Windows は対象外のため再現対象に含めない。**CI は Windows ではなく Linux であり、この除外に当たらない。**
+
+**それでも状態は `Verified` へ上げない。**残る 2 項目（chip 刻印、回路図と現物 pin 表記の照合）は
+いずれも現物確認を要し、CI では代替できない。**「CI が通ったから昇格できる」とは結論しない。**
 
 flash、serial monitor、実機起動は #6 の範囲であり、この文書の build-only 確定条件には含めない。
 
