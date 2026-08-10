@@ -176,6 +176,33 @@ Pull requestには次を含める。
 - [ ] `Start date`（作成日。JSTで判断する）
 - [ ] `Target date`（mergeを見込む日。**merge完了後またはclose完了後**に実績値へ更新する）
 
+### labelは作成時に付ける
+
+**labelは`gh pr create --label`で作成時に指定する。作成後に付け足さない。**
+
+```bash
+gh pr create --base develop --title "<title>" --body-file <path> \
+  --label "<area:*>" --label "<type:*>" --label "<priority:*>" \
+  --assignee "<login>" --milestone "<milestone>"
+```
+
+自動reviewの対象判定は**Pull Requestの作成直後**に行われる。その時点で
+[`.coderabbit.yaml`](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/.coderabbit.yaml)の
+`labels`に一致するlabelが付いていないと、**後から付けても発火しない。**
+
+| Pull Request | labelを付けた時期 | 結果 |
+|---|---|---|
+| [#91](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/91) | **作成時**（`--label`） | 作成の4分47秒後に自動reviewが提出された |
+| [#89](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/89) | 作成の**33分後** | 作成の**24秒後**にlabel無しで判定され、`Review skipped`になった |
+
+**差はこの順序だけである。**#89 はallowlistに一致するlabel（`area:protocol`、`area:raspberry-pi`）を
+最終的には持っていたが、判定の時点で無かったため一致しようがなかった。
+時系列は[#94](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/94#issuecomment-5242073164)にある。
+
+**作成時でなければ間に合わないのはlabelだけである。**assignee・milestoneも同じcommandで
+指定するが、後から設定しても失うものは無い。boardへのitem追加はPull Requestが存在しないと
+行えないため、上記のとおり作成直後に行う。
+
 ### 関連Issueの書き方
 
 Issue branchからのPull Request（base `develop`）では`Closes #N`を使う。これはtraceability
@@ -202,6 +229,9 @@ Issueをcloseする。
 （`deskcat`、`https://github.com/users/wachi-yoshitaka-11-dev/projects/5`）へitemとして
 追加して`Status`を設定する。boardが進行管理の正本であり、boardに無いPull Requestは
 `Pull request merged` workflowの対象にならず、merge済みかどうかがboard上で追えない。
+
+**このうちlabelだけは作成後では間に合わない。**自動reviewの対象判定が作成直後に終わるためである。
+[labelは作成時に付ける](#labelは作成時に付ける)に従い、`gh pr create --label`で指定する。
 
 board上のworkflow構成は[Repository設定](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/.github/REPOSITORY_SETTINGS.md)に記録する。
 
@@ -257,9 +287,15 @@ close日である。
 
 pushする前に、作成者自身が差分を見直す。**新規指摘が0件の状態が2 round続くまで繰り返す。**
 
-[`.coderabbit.yaml`](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/.coderabbit.yaml)により、自動reviewは高リスク変更（`area:firmware`、
-`area:protocol`、`area:raspberry-pi`、`area:hardware`、`type:decision`）に限定している。
-**それ以外のPull Requestでは、この自己レビューが唯一のreviewである。**
+[`.coderabbit.yaml`](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/.coderabbit.yaml)により、
+自動reviewは高リスク変更（firmware、protocol、Raspberry Pi、hardware）を示すlabelを持つ
+Pull Requestに限定している。**それ以外のPull Requestでは、この自己レビューが唯一のreviewである。**
+**対象labelを持つPull Requestでも、labelを作成後に付けた場合は同じ**
+（[labelは作成時に付ける](#labelは作成時に付ける)）。自動reviewは走らない。
+
+**対象labelの正本は`.coderabbit.yaml`であり、ここでは再掲しない。**値を2箇所に書くと
+片方だけを見た判断が起きる。実際、[#91](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/91)で
+`type:decision`をallowlistから外した後も、この節には5つ目として残っていた。
 
 回数だけを守っても、同じ観点を繰り返しなぞるだけになる。次の観点で見る。
 
@@ -302,17 +338,26 @@ GitHubの強制が意味を失う。
 
 #### GitHubが強制しないもの
 
-**「checkが緑」は「reviewが行われた」を意味しない。**次の2つはcheck状態から見分けられない。
+**「checkが緑」は「reviewが行われた」を意味しない。**次の3つはcheck状態から見分けられない。
 
-| CodeRabbitの状態 | checkの表示 | reviewの実行 |
-|---|---|---|
-| `Review in progress` | `pending` | 未完了 |
-| **`Review rate limited`** | **`pass`** | **実行されていない** |
+| CodeRabbitの状態 | checkの表示 | reviewの実行 | 原因 |
+|---|---|---|---|
+| `Review in progress` | `pending` | 未完了 | — |
+| **`Review rate limited`** | **`pass`** | **実行されていない** | 毎時の枠切れ。**対象判定は通っている** |
+| **`Review skipped`** | **`pass`** | **実行されていない** | 対象判定で外れた。allowlistのlabelが**作成時に**無かった場合を含む |
 
-`pending`のままmergeしないのは当然として、**`pass`でも中身が`Review rate limited`なら
-reviewは走っていない。**merge前にCodeRabbitのcheckの説明文を読む。
-[#88](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/88)で実際に発生し、
+`pending`のままmergeしないのは当然として、**`pass`でも中身が`Review rate limited`または
+`Review skipped`ならreviewは走っていない。**merge前にCodeRabbitのcheckの説明文を読む。
+[#88](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/88)では`Review rate limited`が実際に発生し、
 指摘対応後のcommitがreviewを受けないまま`pass`になった。
+
+**この2つを混同しない。**`Review rate limited`は枠が空けば同じPull Requestで実行できるが、
+`Review skipped`がlabelの後付けによるものなら、**そのPull Requestでは以後も自動reviewは発火しない。**
+[#89](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/89)では**両方が別々の理由で観測されている。**
+skipは判定時点でlabelが無かったこと、rate limitは枠切れであり、原因は無関係である
+（[#94](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/94#issuecomment-5242073164)。
+枠を使い切った経緯は後述の[手動で依頼する前に状態を確認する](#手動で依頼する前に状態を確認する)にある）。
+**「skipされた」と「rate limitに当たった」を同じ言葉で記録しない。**
 
 **thread 0件は、reviewが終わったことを意味しない。**
 [#76](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/76)では0件を確認した**28秒後**に

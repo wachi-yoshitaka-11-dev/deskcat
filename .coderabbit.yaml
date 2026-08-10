@@ -22,7 +22,8 @@ reviews:
     # 既定branchである`main`は、この設定に関わらず常に対象である。これは意図どおりで、
     # `develop`→`main`の昇格Pull Requestは公開前の最後の関門であり、review対象から外さない。
     # ただし`enabled: false`のため、昇格Pull Requestも下の`labels`のいずれかが要る。
-    # 昇格Pull Requestには対象範囲に応じたlabelを必ず付ける。
+    # 昇格Pull Requestには対象範囲に応じたlabelを、作成時に必ず付ける
+    # （下の`labels`の「発火の判定時期」を参照）。
     base_branches:
       - develop
 
@@ -32,6 +33,12 @@ reviews:
     #
     # `type:decision`は入れない。ADRとgovernance文書の変更は本projectで頻出し、
     # 文書変更でreviewを消費し続ける。hardwareやprotocolに関わる決定は`area:*`側で拾える。
+    #
+    # 発火の判定時期: この判定はPull Requestの作成直後に行われる（PR #89 では24秒後）。
+    # その時点でlabelが付いていないと、後から付けても発火しない。最終的にallowlistへ
+    # 一致するlabelを持っていても同じである。`gh pr create --label` で作成時に指定する。
+    # 根拠となる時系列は Issue #94、運用は CONTRIBUTING.md の
+    # 「labelは作成時に付ける」にある。ここでは手順を再掲しない。
     labels:
       - area:firmware
       - area:protocol
