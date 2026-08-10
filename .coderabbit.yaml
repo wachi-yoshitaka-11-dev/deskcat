@@ -34,10 +34,12 @@ reviews:
     # `type:decision`は入れない。ADRとgovernance文書の変更は本projectで頻出し、
     # 文書変更でreviewを消費し続ける。hardwareやprotocolに関わる決定は`area:*`側で拾える。
     #
-    # 発火の判定時期: この判定はPull Requestの作成直後に行われる（PR #89 では24秒後）。
-    # その時点でlabelが付いていないと、後から付けても発火しない。最終的にallowlistへ
-    # 一致するlabelを持っていても同じである。`gh pr create --label` で作成時に指定する。
-    # 根拠となる時系列は Issue #94、運用は CONTRIBUTING.md の
+    # 発火の判定時期: CodeRabbitは対象判定をPull Requestの作成直後に行い、後からのlabel
+    # 追加では再判定しない（Issue #94 でのCodeRabbit自身の回答。こちらの実測ではない）。
+    # したがって `gh pr create --label` で作成時に指定する。作成後に付け足さない。
+    # 実測で確認したのは「作成時にallowlistのlabelを持つPR（#90・#91）が対象判定を通る」
+    # ことと、「labelはあるが一致しないPR（#95・#96）が excluded by label configuration に
+    # なる」ことである。運用と切り分けの記録は CONTRIBUTING.md の
     # 「labelは作成時に付ける」にある。ここでは手順を再掲しない。
     labels:
       - area:firmware
