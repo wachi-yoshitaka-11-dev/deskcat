@@ -1,6 +1,7 @@
 # ActionはreviewしたcommitのSHAへ固定している。
 # 固定しただけでは修正版が届かないため、更新を独立したPull Requestとして受け取る。
-# Cargo manifest作成後に、cargo ecosystemを別Issueで追加する。
+# 同じ理由で、firmware/esp32のCargo依存も対象にする。
+# host workspaceのCargo manifestはまだ存在しない。生成した時点で別途追加する。
 version: 2
 updates:
   - package-ecosystem: "github-actions"
@@ -13,3 +14,14 @@ updates:
       prefix: "chore"
     labels:
       - "type:maintenance"
+  - package-ecosystem: "cargo"
+    directory: "/firmware/esp32"
+    schedule:
+      interval: "monthly"
+    target-branch: "develop"
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "chore"
+    labels:
+      - "type:maintenance"
+      - "area:firmware"

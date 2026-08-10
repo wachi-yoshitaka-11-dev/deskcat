@@ -126,6 +126,24 @@ repositoryのdefault branchである`main`を対象にする。
 Security updateを`main`へmergeした場合は、[Development Workflow](../docs/governance/development-workflow.md#branch)の
 hotfix規則に従い、同じ修正を直ちに`develop`へ取り込む。両branchへ自動で反映されると仮定しない。
 
+- [x] `firmware/esp32`のcargo ecosystemを追加する（2026-08-10、[#41](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/41)）
+
+`schedule`、`target-branch`、`open-pull-requests-limit`、`commit-message.prefix`はgithub-actionsと同じ値へ揃えた。
+`labels`には`area:firmware`を加えている。対象が`firmware/esp32`に限られ、Pull Requestの仕分けに要るためである。
+
+**上の`target-branch`と security update の使い分けは、cargoにもそのまま当てはまる。**
+version updateは`develop`へ、security updateは default branch の`main`へ来る。
+
+label（`type:maintenance`／`area:firmware`）はどちらもGitHub側に実在することを確認した。
+存在しないlabelを指定するとDependabotが付与に失敗する。
+
+**GitHub側が設定を認識したかは、この記録の時点では未確認である。**設定fileのmerge後に、
+Insightsの Dependabot 画面または実際のDependabot Pull Requestの発生で確認する。
+`firmware/esp32`は custom toolchain（`rust-toolchain.toml`）と`build-std`を使うため、
+**Dependabotがlockfileを更新できずに失敗する可能性がある。**その場合はerrorの内容を本文書へ記録する。
+
+host workspaceのCargo manifestは未生成のため対象に含めていない。生成した時点で追加する。
+
 - [x] 外部contributorのPull Requestに承認を必須化する
 
 Pages workflowの`pull_request` jobは、PR側の`scripts/*.py`をrunner上で実行する。
@@ -348,7 +366,6 @@ GitHubはProjects（classic）のREST APIを2025-04-01にsunsetしており（�
 
 - CODEOWNERS: 安定したreviewer／owner対応が複数になった時点で追加
 - Code of Conduct: 外部communityへ積極的に参加を求める前に追加
-- Dependabot（cargo）: Cargo manifest作成後に追加。github-actionsは適用済み
 - Release workflow: versionとartifact方針の確定後に追加
 - Discussions: community supportにIssueだけでは不足した場合に追加
 - Signed commit: SSH署名で導入コストが小さいため、次のrepository運用変更で評価する
