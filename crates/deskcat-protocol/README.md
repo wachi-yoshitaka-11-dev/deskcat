@@ -28,18 +28,11 @@ decode／encode、および共有conformance fixtureを提供する。
 
 ## 検証順序
 
-`decode_line`は次の順で判定する。**順序自体がconformanceの対象**であり、入れ替えると
-返すべきcodeが変わる。§8手順7および§5.1「遷移は完全な検証を通してから確定する」に一致させている。
+`decode_line`は、§8手順7および§5.1「遷移は完全な検証を通してから確定する」に一致する順で判定する。
+**順序自体がconformanceの対象**であり、入れ替えると返すべきcodeが変わる。
 
-| # | 判定 | 失敗時のcode |
-|---|---|---|
-| 1 | 改行を含むline長 | `line_too_long` |
-| 2 | JSONとして解析でき、envelope fieldが型どおり | `invalid_envelope` |
-| 3 | `payload`がobject（`null`不可） | `invalid_envelope` |
-| 4 | `v`が対応major version | `unsupported_version` |
-| 5 | `type`が既知 | `unknown_type` |
-| 6 | type固有payload schema | `invalid_payload` |
-| 7 | 上限のある値の範囲 | `out_of_range` |
+**判定の順序と失敗時のcodeは`decode_line`のdoc commentに表として置き、ここには複製しない。**
+`cargo doc --open`で読む。事象とcodeの対応そのものの正本は仕様§7である。
 
 未知の追加payload fieldは§3に従って無視する。
 
