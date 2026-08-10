@@ -22,7 +22,7 @@
 - このfileは、承認した初期backlogの定義と作成順序を残す履歴資料であり、live statusを重複管理しない。
 - Repositoryのlabel、milestone、security設定の適用はGitHub基盤整備として直接完了しているため、遡及Issueを作成していない。
 - GitHub Issue本文では依存関係を実際のIssue番号へ置き換えた。ローカル定義からも対応Issueへ辿れるよう、依存関係をlink化している。
-- 例外は**cargo workspace root**である。`#9`の`root Rust workspace`と`#23`の`Root host workspace`に対応するIssueは無い。[Implementation Readiness Review](../runbooks/implementation-readiness-review.md)のSoftware gateが「Host／firmware workspaceが存在する」を`設計どおりFail`とし、**着手可能なIssueからのみ作成する**と定めているためである。存在しないIssueを探さない。workspaceは最初に必要とするIssueが作る。
+- 例外は**cargo workspace root**である。`#9`の`root Rust workspace`と`#23`の`Root host workspace`に対応するIssueは無い。[ADR-0001](../decisions/0001-monorepo-layout.md)が**着手可能なIssueがある場合だけpackageを作成する**と定めているためである。存在しないIssueを探さない。workspaceは最初に必要とするIssueが作る。実際にfirmware workspaceは`#5`、host workspaceは`#9`が作成しており、[Implementation Readiness Review](../runbooks/implementation-readiness-review.md)のSoftware gate「Host／firmware workspaceが存在する」は現在`Pass`である。
 
 > このfile内の`起票時の状態`、`Labels`、受け入れ条件のcheckboxは、**起票時点のsnapshot**である。
 > `status:blocked`等のlabelも当時の値であり、現在の付与状況とは一致しない。
