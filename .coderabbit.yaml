@@ -22,7 +22,8 @@ reviews:
     # 既定branchである`main`は、この設定に関わらず常に対象である。これは意図どおりで、
     # `develop`→`main`の昇格Pull Requestは公開前の最後の関門であり、review対象から外さない。
     # ただし`enabled: false`のため、昇格Pull Requestも下の`labels`のいずれかが要る。
-    # 昇格Pull Requestには対象範囲に応じたlabelを必ず付ける。
+    # 昇格Pull Requestには対象範囲に応じたlabelを、作成時に必ず付ける
+    # （下の`labels`の「発火の判定時期」を参照）。
     base_branches:
       - develop
 
@@ -32,6 +33,14 @@ reviews:
     #
     # `type:decision`は入れない。ADRとgovernance文書の変更は本projectで頻出し、
     # 文書変更でreviewを消費し続ける。hardwareやprotocolに関わる決定は`area:*`側で拾える。
+    #
+    # 発火の判定時期: CodeRabbitは対象判定をPull Requestの作成直後に行い、後からのlabel
+    # 追加では再判定しない（Issue #94 でのCodeRabbit自身の回答。こちらの実測ではない）。
+    # したがって `gh pr create --label` で作成時に指定する。作成後に付け足さない。
+    # 実測で確認したのは「作成時にallowlistのlabelを持つPR（#90・#91）が対象判定を通る」
+    # ことと、「labelはあるが一致しないPR（#95・#96）が excluded by label configuration に
+    # なる」ことである。運用と切り分けの記録は CONTRIBUTING.md の
+    # 「labelは作成時に付ける」にある。ここでは手順を再掲しない。
     labels:
       - area:firmware
       - area:protocol

@@ -90,7 +90,7 @@ Pull Request templateの「検証」表と「安全とsecurity」は、何を確
 | リスク | 対策 |
 |---|---|
 | 自己レビューが形骸化し、対象外Pull Requestの品質が落ちる | checklistを観点で定義し、各項目を過去の実際の失敗に紐付ける。回数（2 round）は維持する |
-| labelの付け忘れで、高リスク変更がreviewされない | Pull Requestのlabelは既に必須運用である。昇格Pull Requestには対象範囲に応じたlabelを必ず付ける |
+| labelの付け忘れで、高リスク変更がreviewされない | Pull Requestのlabelは既に必須運用である。昇格Pull Requestには対象範囲に応じたlabelを必ず付ける。**ただしlabelは作成時に付ける。**CodeRabbitは対象判定を作成直後に行い、後からのlabel追加では再判定しない（[#94](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/94)でのCodeRabbitの回答。**こちらの実測ではない**）。`gh pr create --label`で作成時に指定する運用を`CONTRIBUTING.md`へ定めた |
 | **`auto_incremental_review: false`により、指摘対応後のcommitがreviewされない** | **対応commitは自己レビューで見る。`@coderabbitai review`を投げ直さない。**投げ直すと1つのPull Requestでreviewを何度も消費し、`false`にした意味が無くなる（[#91](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/91)で実際に発生）。手動依頼は**初回のreviewが一度も得られなかったときだけ**とし、安全・電気・protocol・firmwareに関わる変更ではrate limitが解けるまで待つ |
 | `Review rate limited`がcheck上`pass`と表示され、reviewされていないのにmergeされる | GitHubは止められない。`CONTRIBUTING.md`の「Merge前の確認」に手作業の確認として明記する。**本ADRを入れるPR #90 自身で2回連続して発生し、機械reviewを受けられなかった** |
 | 直接反映の範囲が拡大解釈される | 「Issueを立てない」は「勝手に変えてよい」ではない。承認は必ず得る。迷うものはIssue必須側として扱う |
@@ -98,12 +98,33 @@ Pull Request templateの「検証」表と「安全とsecurity」は、何を確
 ## 検証
 
 - 対象外label（`area:docs`＋`type:maintenance`）のPull Requestで自動reviewが走らないこと。
-  [PR #88](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/88)で確認済み
-  （`Review skipped: reviews are disabled for this base branch`）
-- 対象labelのPull Requestで自動reviewが走ること。**発火は確認できた。**
-  [PR #90](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/90)（`type:decision`を持つ）では
+  **確認済み。**[PR #95](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/95)と
+  [PR #96](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/96)が
+  `Review skipped: excluded by label configuration` となった。**labelによる除外である旨が
+  文言に表れている。**
+  なお[PR #88](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/88)の観測
+  （`Review skipped: reviews are disabled for this base branch`）は**この確認にはならない。**
+  #88 は本設定を導入したPull Request自身であり、判定の時点で`.coderabbit.yaml`は
+  `develop`に無かった。**base branchによるskipであって、labelによる除外ではない。**
+- 対象labelのPull Requestで自動reviewが走ること。**発火と完走の双方を確認した。**
+  [PR #90](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/90)（`type:decision`を持つ。
+  **当時のallowlistは`type:decision`を含んでいた。#91で外した**）では
   `Review skipped`ではなく`Review rate limited`となり、対象判定を通過してから
-  rate limitで止まったことが分かる。**reviewの完走は未確認である**
+  rate limitで止まったことが分かる。完走は
+  [PR #91](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/91)で得た。
+  作成時にlabelを指定し、作成の4分47秒後に自動reviewが提出されている
+  （手動の`@coderabbitai review`より前である）
+- **`enabled: false`が絶対的に効く、という懸念は否定された。**
+  [#94](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/94)で確認した。
+  allowlistに一致するlabelを作成時に持つPull Requestは、`enabled: false`でも対象判定を通る
+- **[PR #89](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/89)がskipされた原因は確定できない。**
+  #89 は作成の24秒後にlabel無しで`Review skipped`となり、labelは33分後に付いた。
+  しかし**その判定の5秒後に本設定が`develop`へmergeされている**（判定`12:22:00Z`、merge`12:22:05Z`）。
+  判定の時点で`.coderabbit.yaml`はbase branchに無く、**labelの未付与と設定の未反映が交絡している。**
+  #89 を「labelの後付けが原因」の証拠として扱わない。**切り分けのための検証Pull Requestは作らない**
+  （reviewを消費し、運用上の結論が変わらないため）。
+  labelを作成時に付ける運用はCodeRabbitの回答に沿った安全側の選択であり、`CONTRIBUTING.md`の
+  「labelは作成時に付ける」に定めた
 - `develop`で未解決threadがmergeをblockすること。PR #88で確認済み
   （resolved→`CLEAN`、unresolve→`BLOCKED`、再resolve→`CLEAN`）
 - 見直し後の最初の3 Pull Requestについて、merge前に人手で実行した手順の数とreviewの待ち時間を記録し、

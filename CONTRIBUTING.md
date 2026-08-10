@@ -176,6 +176,43 @@ Pull requestには次を含める。
 - [ ] `Start date`（作成日。JSTで判断する）
 - [ ] `Target date`（mergeを見込む日。**merge完了後またはclose完了後**に実績値へ更新する）
 
+### labelは作成時に付ける
+
+**labelは`gh pr create --label`で作成時に指定する。作成後に付け足さない。**
+
+```bash
+gh pr create --base develop --title "<title>" --body-file <path> \
+  --label "<area:*>" --label "<type:*>" --label "<priority:*>" \
+  --assignee "<login>" --milestone "<milestone>"
+```
+
+**CodeRabbitは対象判定をPull Requestの作成直後に行い、後からのlabel追加では再判定しない。**
+[#94](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/94#issuecomment-5242077436)での
+CodeRabbit自身の回答である。**こちらの実測ではない。**
+
+実測で確かめたのは次の2点である。いずれも
+[`.coderabbit.yaml`](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/.coderabbit.yaml)が
+`develop`にある状態で作成したPull Requestである。
+
+| 作成時のlabel | Pull Request | 結果 |
+|---|---|---|
+| allowlistに一致する（当時は`type:decision`） | [#90](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/90)・[#91](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/91) | **対象判定を通過した。**#91 は作成の4分47秒後に自動reviewが提出され、完走した（手動依頼より前） |
+| labelはあるがallowlistに一致しない | [#95](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/95)・[#96](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/96) | `Review skipped: excluded by label configuration` |
+
+**「後から付けたので発火しなかった」ことを実測した記録は無い。**
+[#89](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/89)は作成の24秒後にlabel無しで
+`Review skipped`となり、labelは33分後に付いた。しかし**その判定の5秒後に`.coderabbit.yaml`が
+`develop`へmergeされている**（判定 `12:22:00Z`、merge `12:22:05Z`）。
+**判定の時点でこの設定はbase branchに無く、labelの未付与と設定の未反映が切り分けられない。**
+#89 を「後付けが原因」の証拠として使わない。
+
+**それでも作成時に付ける。**CodeRabbitの回答に沿う運用であり、費用は`--label`を足すだけで、
+取り落としの可能性を消せる。**切り分けられない以上、確実な側に倒す。**
+
+**この規則が要るのはlabelだけである。**assignee・milestoneも同じcommandで指定するが、
+自動reviewの判定に関わらないため、後から設定しても失うものは無い。boardへのitem追加は
+Pull Requestが存在しないと行えないため、上記のとおり作成直後に行う。
+
 ### 関連Issueの書き方
 
 Issue branchからのPull Request（base `develop`）では`Closes #N`を使う。これはtraceability
@@ -202,6 +239,10 @@ Issueをcloseする。
 （`deskcat`、`https://github.com/users/wachi-yoshitaka-11-dev/projects/5`）へitemとして
 追加して`Status`を設定する。boardが進行管理の正本であり、boardに無いPull Requestは
 `Pull request merged` workflowの対象にならず、merge済みかどうかがboard上で追えない。
+
+**このうちlabelだけは作成後では間に合わないおそれがある。**自動reviewの対象判定が
+作成直後に終わるためである。[labelは作成時に付ける](#labelは作成時に付ける)に従い、
+`gh pr create --label`で指定する。
 
 board上のworkflow構成は[Repository設定](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/.github/REPOSITORY_SETTINGS.md)に記録する。
 
@@ -257,9 +298,16 @@ close日である。
 
 pushする前に、作成者自身が差分を見直す。**新規指摘が0件の状態が2 round続くまで繰り返す。**
 
-[`.coderabbit.yaml`](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/.coderabbit.yaml)により、自動reviewは高リスク変更（`area:firmware`、
-`area:protocol`、`area:raspberry-pi`、`area:hardware`、`type:decision`）に限定している。
-**それ以外のPull Requestでは、この自己レビューが唯一のreviewである。**
+[`.coderabbit.yaml`](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/.coderabbit.yaml)により、
+自動reviewは高リスク変更（firmware、protocol、Raspberry Pi、hardware）を示すlabelを持つ
+Pull Requestに限定している。**それ以外のPull Requestでは、この自己レビューが唯一のreviewである。**
+**対象labelを持つPull Requestでも、labelを作成後に付けた場合は自動reviewを
+受けられないおそれがある**（[labelは作成時に付ける](#labelは作成時に付ける)）。
+その場合もこの自己レビューが唯一のreviewになる。
+
+**対象labelの正本は`.coderabbit.yaml`であり、ここでは再掲しない。**値を2箇所に書くと
+片方だけを見た判断が起きる。実際、[#91](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/91)で
+`type:decision`をallowlistから外した後も、この節には5つ目として残っていた。
 
 回数だけを守っても、同じ観点を繰り返しなぞるだけになる。次の観点で見る。
 
@@ -302,17 +350,47 @@ GitHubの強制が意味を失う。
 
 #### GitHubが強制しないもの
 
-**「checkが緑」は「reviewが行われた」を意味しない。**次の2つはcheck状態から見分けられない。
+**「checkが緑」は「reviewが行われた」を意味しない。**次の3つはcheck状態から見分けられない。
 
-| CodeRabbitの状態 | checkの表示 | reviewの実行 |
-|---|---|---|
-| `Review in progress` | `pending` | 未完了 |
-| **`Review rate limited`** | **`pass`** | **実行されていない** |
+| CodeRabbitの状態 | checkの表示 | reviewの実行 | 原因 |
+|---|---|---|---|
+| `Review in progress` | `pending` | 未完了 | — |
+| **`Review rate limited`** | **`pass`** | **実行されていない** | 毎時の枠切れ。**対象判定は通っている** |
+| **`Review skipped`** | **`pass`** | **実行されていない** | 対象判定で外れた。allowlistのlabelが**作成時に**無かった場合を含む |
 
-`pending`のままmergeしないのは当然として、**`pass`でも中身が`Review rate limited`なら
-reviewは走っていない。**merge前にCodeRabbitのcheckの説明文を読む。
-[#88](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/88)で実際に発生し、
+`pending`のままmergeしないのは当然として、**`pass`でも中身が`Review rate limited`または
+`Review skipped`ならreviewは走っていない。**merge前にCodeRabbitのcheckの説明文を読む。
+[#88](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/88)では`Review rate limited`が実際に発生し、
 指摘対応後のcommitがreviewを受けないまま`pass`になった。
+
+**この2つを混同しない。**`Review rate limited`は**対象判定を通過した後**の枠切れであり、
+枠が空けば同じPull Requestで実行できる。`Review skipped`は**対象判定で外れている**ため、
+枠が空いても自動では走らない。
+[#89](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/89)では**両方が別々の理由で観測されている**
+（[#94](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/94#issuecomment-5242073164)。
+枠を使い切った経緯は後述の[手動で依頼する前に状態を確認する](#手動で依頼する前に状態を確認する)にある）。
+**「skipされた」と「rate limitに当たった」を同じ言葉で記録しない。**
+
+**`Review skipped`の説明文で、skipの原因を切り分けられる。**これまでに観測した文言は次のとおりである。
+**文言はCodeRabbit側のものであり、将来変わりうる。**一致しない文言を見たら、推測せず実際の表示を記録する。
+
+| 説明文 | 読み方 | 観測した Pull Request |
+|---|---|---|
+| `excluded by label configuration` | **設定は効いている。**labelは付いていたが、allowlistに一致しなかった。**対象外として正しくskipされた** | [#95](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/95)・[#96](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/96)（`area:docs`＋`type:maintenance`） |
+| `Auto reviews are disabled on this repository.` | **allowlistによる判定に達していない。**[#89](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/89)の判定時点では`.coderabbit.yaml`がまだ`develop`に無かった | #89（判定の5秒後に設定がmergeされた） |
+| `reviews are disabled for this base branch` | baseが対象外と判定された | [#88](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/88)（`.coderabbit.yaml`を`develop`へmergeする前） |
+
+**1行目と、2行目・3行目は意味が違う。**同じ`Review skipped`でも取るべき対応が違う。
+
+- 1行目: `.coderabbit.yaml`の意図どおりのskipである。[自己レビュー](#自己レビュー)で通す。
+  ただし**変更の内容に対してlabelの付け方が誤っていないかは確認する。**安全・電気・protocol・
+  firmwareに関わる変更が`area:docs`だけになっていれば、labelが誤っており1行目に該当しない
+- 2行目・3行目: **allowlistの判定まで届いていない。**設定が`develop`にあるか、baseが
+  `base_branches`に含まれるかを確認する。対象範囲の変更なら
+  [手動で依頼する](#手動で依頼する前に状態を確認する)。安全に関わる変更では自己レビューで代替しない
+
+**2行目・3行目は、いずれも`.coderabbit.yaml`が`develop`に無かった時期の観測である。**
+設定が定着した後にこの文言を見たら、**それは新しい事象である。**推測で1行目と同じ扱いにしない。
 
 **thread 0件は、reviewが終わったことを意味しない。**
 [#76](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/76)では0件を確認した**28秒後**に
