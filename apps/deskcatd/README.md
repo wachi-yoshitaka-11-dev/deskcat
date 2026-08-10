@@ -1,6 +1,9 @@
 # deskcatd
 
-`deskcatd`は、Raspberry Pi Zero Wで動作するRustサービスである。
+`deskcatd`は、Raspberry Pi Zero W（V1.1）**向けに設計する**Rustサービスである。
+**実機での動作は未検証である。**検証状態の正本は
+[Raspberry Pi Rust Toolchain](../../docs/toolchains/raspberry-pi-rust-toolchain.md)であり、
+同文書は状態を「調査済み。Raspberry Pi実機は未検証」としている。
 
 責務:
 
