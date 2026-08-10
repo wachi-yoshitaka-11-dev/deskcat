@@ -359,6 +359,23 @@ skipは判定時点でlabelが無かったこと、rate limitは枠切れであ�
 枠を使い切った経緯は後述の[手動で依頼する前に状態を確認する](#手動で依頼する前に状態を確認する)にある）。
 **「skipされた」と「rate limitに当たった」を同じ言葉で記録しない。**
 
+**`Review skipped`の説明文で、skipの原因を切り分けられる。**これまでに観測した文言は次のとおりである。
+**文言はCodeRabbit側のものであり、将来変わりうる。**一致しない文言を見たら、推測せず実際の表示を記録する。
+
+| 説明文 | 読み方 | 観測した Pull Request |
+|---|---|---|
+| `excluded by label configuration` | labelは付いていたが、allowlistに一致しなかった。**対象外として正しくskipされた** | [#95](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/95)・[#96](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/96)（`area:docs`＋`type:maintenance`） |
+| `Auto reviews are disabled on this repository.` | 判定時点でlabelが無かった。**本来は対象のはずでも発火しない** | [#89](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/89)（label付与は作成の33分後） |
+| `reviews are disabled for this base branch` | baseが対象外と判定された | [#88](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/88)（`.coderabbit.yaml`を`develop`へmergeする前） |
+
+**1行目は想定どおりであり、2行目は取り落としである。**同じ`Review skipped`でも取るべき対応が違う。
+
+- 1行目: `.coderabbit.yaml`の意図どおりのskipである。[自己レビュー](#自己レビュー)で通す。
+  ただし**変更の内容に対してlabelの付け方が誤っていないかは確認する。**安全・電気・protocol・
+  firmwareに関わる変更が`area:docs`だけになっていれば、labelが誤っており1行目に該当しない
+- 2行目: **そのPull Requestでは以後も発火しない。**[手動で依頼する](#手動で依頼する前に状態を確認する)か、
+  次回から作成時にlabelを付ける。安全に関わる変更では自己レビューで代替しない
+
 **thread 0件は、reviewが終わったことを意味しない。**
 [#76](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/76)では0件を確認した**28秒後**に
 reviewが届き、actionable comment 2件がmerge済みPull Requestへ付いた。
