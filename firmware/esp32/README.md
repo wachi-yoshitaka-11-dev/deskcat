@@ -49,7 +49,7 @@ cargo build --locked
 
 機種と搭載moduleは確定している（ESP-WROOM-32D開発ボード／秋月電子 M-13628。基板にrevision表示は無い）。根拠は[hardware-bom.md](../../docs/hardware/hardware-bom.md)のMCU-01である。
 
-未確定なのは**回路図と現物pin表記の照合**である（[HW-TBD-001](../../docs/hardware/tbd-register.md)）。秋月独自基板のため、pin配列がEspressif ESP32-DevKitC V4と完全一致する保証が無い。GPIO割り当てを伴う変更は、この照合が済むまで入れない。chip刻印も未読である。
+未確定なのは**公式pin表と現物pin表記の照合**である（[HW-TBD-001](../../docs/hardware/tbd-register.md)）。現物が公式V4リファレンス設計どおりに実装されている保証は文書だけでは得られないため、照合が要る。照合先は[ESP32-DevKitC V4公式回路図](https://dl.espressif.com/dl/schematics/esp32_devkitc_v4-sch.pdf)と公式guideのpin description表である（秋月商品ページの添付はモジュールとチップのdatasheetのみで、boardのpin配列表を含まない）。GPIO割り当てを伴う変更は、この照合が済むまで入れない。chip刻印も未読である。
 
 ESP-WROOM-32D datasheet v2.7にはPSRAM内蔵variantの記載が無いため、PSRAMを前提とする設定は不要である。
 
