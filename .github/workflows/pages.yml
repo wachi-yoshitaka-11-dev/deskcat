@@ -15,6 +15,12 @@ on:
   push:
     branches:
       - main
+      # `develop`への直接commitはPull Requestを経ないため、これが無いと検査が一切走らない。
+      # 記述の維持管理は承認のみで直接反映してよい運用（CONTRIBUTING）があり、
+      # その変更が素通りする。壊れたlinkは`main`への昇格Pull Requestまで表面化しない。
+      # 成果物のuploadとdeployは`github.ref == 'refs/heads/main'`でgateしているため、
+      # `develop`では検証だけが走り、公開はされない。
+      - develop
     paths:
       - "**/*.md"
       - ".github/**"
