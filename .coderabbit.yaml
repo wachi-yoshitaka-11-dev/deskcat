@@ -29,12 +29,14 @@ reviews:
     # このいずれかのlabelが付いたPull Requestだけ自動reviewする。
     # `area:docs`と`type:maintenance`だけのPull Request（文書の記述修正）は対象外とし、
     # 自己レビューで通す。自己レビューの観点は CONTRIBUTING.md に定める。
+    #
+    # `type:decision`は入れない。ADRとgovernance文書の変更は本projectで頻出し、
+    # 文書変更でreviewを消費し続ける。hardwareやprotocolに関わる決定は`area:*`側で拾える。
     labels:
       - area:firmware
       - area:protocol
       - area:raspberry-pi
       - area:hardware
-      - type:decision
 
     # pushのたびにreviewを再実行しない。rate limitの主因であり、
     # 指摘対応のたびに再reviewが走ると1つのPull Requestでreviewを何度も消費する。

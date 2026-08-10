@@ -322,6 +322,22 @@ GitHubはthreadが存在しないものをblockできない。**reviewの到着�
 自動reviewの対象は[`.coderabbit.yaml`](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/.coderabbit.yaml)
 で高リスク変更へ限定している。対象外のPull Requestでは[自己レビュー](#自己レビュー)が唯一のreviewである。
 
+**指摘に対応したcommitは、自己レビューで見る。**`auto_incremental_review`を`false`にしているため、
+pushしても再reviewは走らない。**ここで`@coderabbitai review`を投げ直さない。**
+投げ直すと1つのPull Requestでreviewを何度も消費し、`false`にした意味が無くなる。
+[#91](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/91)で実際にそうなり、2回目はrate limitで終わった。
+
+**自動reviewが一度も走らなかった場合だけ、手動で依頼する。**該当するのは
+`Review rate limited`または`Review skipped`で初回のreviewが得られなかったときである。
+
+| 変更の種類 | 初回reviewが得られなかったとき |
+|---|---|
+| 安全、電気、protocol、firmware | **rate limitが解けるまで待つ。**自己レビューで代替しない |
+| 上記以外 | **自己レビューで通してよい。**Pull Request本文へ機械reviewを通していない旨と、その判断の根拠を書く |
+
+**「reviewを依頼した」を「reviewを受けた」と書かない。**`Review rate limited`は`pass`と表示されるため、
+依頼の事実だけで完了扱いにすると検出が抜ける。
+
 #### 未解決を残してmergeする場合
 
 branch protectionの`enforce_admins`は無効であり、管理者は強制mergeできる。その場合は次をすべて行う。
