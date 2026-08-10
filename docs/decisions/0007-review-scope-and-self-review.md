@@ -91,6 +91,7 @@ Pull Request templateの「検証」表と「安全とsecurity」は、何を確
 |---|---|
 | 自己レビューが形骸化し、対象外Pull Requestの品質が落ちる | checklistを観点で定義し、各項目を過去の実際の失敗に紐付ける。回数（2 round）は維持する |
 | labelの付け忘れで、高リスク変更がreviewされない | Pull Requestのlabelは既に必須運用である。昇格Pull Requestには対象範囲に応じたlabelを必ず付ける |
+| **`auto_incremental_review: false`により、指摘対応後のcommitがreviewされない** | **対象のPull Requestでは、指摘へ対応したあと`@coderabbitai review`を手で1回投げ、完了を確認してからmergeする。**`true`へ戻すと1つのPull Requestでreviewを何度も消費する元の問題に戻るため、回数を制御できる手動依頼を選ぶ |
 | `Review rate limited`がcheck上`pass`と表示され、reviewされていないのにmergeされる | GitHubは止められない。`CONTRIBUTING.md`の「Merge前の確認」に手作業の確認として明記する。**本ADRを入れるPR #90 自身で2回連続して発生し、機械reviewを受けられなかった** |
 | 直接反映の範囲が拡大解釈される | 「Issueを立てない」は「勝手に変えてよい」ではない。承認は必ず得る。迷うものはIssue必須側として扱う |
 
@@ -106,7 +107,16 @@ Pull Request templateの「検証」表と「安全とsecurity」は、何を確
 - `develop`で未解決threadがmergeをblockすること。PR #88で確認済み
   （resolved→`CLEAN`、unresolve→`BLOCKED`、再resolve→`CLEAN`）
 - 見直し後の最初の3 Pull Requestについて、merge前に人手で実行した手順の数とreviewの待ち時間を記録し、
-  見直し前と比較する。**未実施**
+  見直し前と比較する。**1本目（[PR #90](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/90)）を実施。**
+  記録は[#87](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/87)のコメントにある
+
+### 1本目で分かったこと
+
+**手順数は5から1へ減った。**`reviewThreads`のpaginationループが消えたことが最も効いている。
+
+**待ち時間は改善していない。**rate limit自体が解消していないためである。
+減ったのは「reviewを要求する回数」であり、「1回のreviewが返る速さ」ではない。
+**この点は本ADRを書いた時点の想定と違う。**
 
 見直し条件: 自己レビューを主軸にした結果、対象外Pull Requestで見落としが続けて発生した場合は、
 対象labelの範囲を広げるか、選択肢Bへ戻すことを再検討する。
