@@ -2,7 +2,7 @@
 
 > 状態: build検証済み（Linux x86_64 の ESP32 Build profile 端末）。実機確認と別端末での再現は未実施
 > 調査日: 2026-07-27
-> build 検証日: 2026-08-06（初回）／2026-08-08（現行 tree に対する最新の検証）
+> build 検証日: 2026-08-06（初回）／2026-08-10（現行 tree に対する最新の検証）
 > 証拠: [Version Record](version-records/2026-08-06-esp32-build-linux.md)
 > 対象family: classic ESP32／Xtensa
 
@@ -52,7 +52,7 @@ ESP-WROOM-32D の datasheet v2.7 には **PSRAM を内蔵する variant の記�
 |---|---|---|
 | MCU | `esp32` を選択可能 | `esp32` |
 | Rust target | `xtensa-esp32-espidf` | `xtensa-esp32-espidf` |
-| Rust channel | `esp` | `esp`（Xtensa Rust 1.95.0.0） |
+| Rust channel | `esp` | `esp-1.95.0.0`（Xtensa Rust 1.95.0.0） |
 | ESP-IDF | `v5.5.3` が default | `v5.5.3`（commit `2c211b236707889e8400c4dc5644dd5c4ee071e0`） |
 | Rust edition | `2021` | `2021` |
 | Minimum Rust | `1.82` | manifest の下限は `1.82`。build に使用した compiler は Xtensa Rust 1.95.0.0 |
@@ -124,6 +124,44 @@ host は [ADR-0005](../decisions/0005-standard-development-os.md) の標準OS �
 - `cargo install` した補助ツールは `--version` の出力を保存する。
 - CI action の version は、CI を導入する Issue で別途 review して commit SHA に pin する。
 
+### compiler 版の固定
+
+`rust-toolchain.toml` の `channel` へ、版を含む toolchain 名を指定する。
+
+```toml
+[toolchain]
+channel = "esp-1.95.0.0"
+```
+
+この名前は `espup install --toolchain-version 1.95.0.0 --targets esp32 --name esp-1.95.0.0` が作る。
+`--name` の既定は `esp` で、名前に版が入らない。名前だけを固定した場合、その名前へどの版が入るかは
+`espup` 任せになり、`--toolchain-version` を付け忘れた端末が別の Xtensa Rust で build できてしまう。
+版付きの名前にすると、その toolchain が無い環境では rustup が compile 前に停止する。
+
+これで、再現性を左右する 3 つの入力がいずれも実行時に強制される。
+
+| 入力 | 強制する仕組み |
+|---|---|
+| dependency 解決 | `--locked`（`Cargo.lock` から逸脱したら失敗） |
+| ESP-IDF 版 | `.cargo/config.toml` の `[env]` と `force = true`（環境変数で上書きされない） |
+| Rust compiler 版 | `rust-toolchain.toml` の版付き channel 名（未導入なら compile 前に失敗） |
+
+**これは toolchain 名の一致を強制するものであり、その名前の中身が本当に 1.95.0.0 かは検査しない。**
+想定している事故は `--toolchain-version` の付け忘れであり、その場合は既定名 `esp` が生成されて
+名前が食い違うため停止する。残る穴は「意図して異なる版を同じ名前で導入する」場合だけである。
+
+採らなかった案は次である。
+
+| 案 | 採らなかった理由 |
+|---|---|
+| `espup` 側で版を固定する | `espup` 0.17.1 に設定 file は無く、版の指定は `--toolchain-version` という起動 option だけである（`espup install --help` で確認、2026-08-10）。付け忘れを止める手段が `espup` 側に無い |
+| `build.rs` で実際の compiler 版を検査する | template 由来 file へ独自コードを足すことになり、版を上げるたびに `rust-toolchain.toml` と `build.rs` の両方を直す必要が生じる。塞げる穴が「意図的な偽装」に限られ、費用に見合わない |
+| CI で版を照合する | 手元 build を止められない。[#42](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/42) で CI を導入する際に、多重の検査として別途判断する |
+
+`build.rs` での実版検査は、必要になれば別 Issue で改めて検討する。
+
+実証は [Version Record](version-records/2026-08-06-esp32-build-linux.md) の #74 追記にある。
+
 ## 確定条件
 
 次を満たすまで状態を`Verified`または`Accepted`に変更しない。
@@ -134,6 +172,7 @@ host は [ADR-0005](../decisions/0005-standard-development-os.md) の標準OS �
 - [x] 開発端末の profile と version record を作成した
 - [x] レビュー済み template commit から最小 project を生成した
 - [x] 環境変数による意図しない SDK override がない
+- [x] 記録済みと異なる Rust compiler 版では build が成立しないことを実証した（[#74](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/74)。[compiler 版の固定](#compiler-版の固定)を参照）
 - [x] clean `cargo build` が成功した
 - [x] dependency と lockfile を review した
 - [x] 正式な format、lint、build command を `AGENTS.md` と root README へ反映した

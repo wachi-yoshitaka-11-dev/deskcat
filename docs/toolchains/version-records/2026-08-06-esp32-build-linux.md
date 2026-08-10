@@ -19,14 +19,15 @@
 ```text
 Record ID: VR-2026-08-06-ESP32-BUILD-01
 Date: 2026-08-06（初回検証）
-最終有効な検証日時: 2026-08-08T17:29:16Z
-  現行のsource tree 815c903f に対する正式なcommandの実行日である。
+最終有効な検証日時: 2026-08-10T02:36:17Z
+  現行のsource tree cdcff41c に対する正式なcommandの実行日である。
   reviewを受けた修正と、developへのrebaseでtreeが変わるたびに再検証している。
   Record IDとfile名は初回検証日のまま維持し、追跡の連続性を保つ。
 Machine profile: ESP32 Build
 Operator role: AIエージェント（ツール導入について人間の事前確認あり）
-Repository commit: 109f1a90d9688542f9381fb95d4269ef336e23dd（build時点のbase。developのtipと同一）
-Build対象のsource tree: 815c903fdbe53cd66a7afbdbd1a277d29efc2a37
+Repository commit: 831f4b17fa151ee731eed01abd981fe8feaaffc0（最新検証時点のbase。developのtipと同一）
+  初回検証時点のbaseは109f1a90d9688542f9381fb95d4269ef336e23ddであった。
+Build対象のsource tree: cdcff41c56993c1f32c404678d4afe2528924913
   `firmware/esp32`のtree objectである（`git rev-parse HEAD:firmware/esp32`）。
   この記録は`docs/`配下にあり同じtreeへ含まれないため、記録自体を更新しても値は変わらず、
   commitのhashを書く場合のような循環が起きない。
@@ -58,6 +59,10 @@ Container / VM / native: VM（systemd-detect-virt = microsoft）
 
 Rustup version: 1.29.0 (28d1352db 2026-03-05)
 Rust channel: esp（firmware build用。rust-toolchain.tomlで固定）／host側はstable
+  **この値は初回検証（2026-08-06）時点の記録である。**#74により、現行treeの`channel`は
+  版付きの`esp-1.95.0.0`へ変更されている。compilerの実体（1.95.0.0）は同一であり、
+  変わったのはtoolchainの名前と、その名前が実行時に強制されることである。
+  「[compiler版の固定](#compiler版の固定74-追記)」節を参照する。
 Rust compiler version:
   esp:  rustc 1.95.0-nightly (95e5bda86 2026-04-15) (1.95.0.0) / LLVM 21.1.3
   host: rustc 1.97.1 (8bab26f4f 2026-07-14) / LLVM 22.1.6
@@ -128,14 +133,15 @@ Storage delta if measured:
   espup install: 約 +1.8 GB（9.2G→11G）
   firmware/esp32/.embuild: 4.4 GB（ESP-IDFとmanaged tool一式。git管理外）
 Generated artifact identity:
-  現行のsource tree 815c903f に対応する成果物は次の1つである。
+  現行のsource tree cdcff41c に対応する成果物は次の1つである。
   path: firmware/esp32/target/xtensa-esp32-espidf/debug/deskcat-esp32
   type: ELF 32-bit LSB executable, Tensilica Xtensa, version 1 (SYSV), statically linked, with debug_info, not stripped
-  size: 13,654,676 bytes
-  sha256: 1e9623de74b79b33c85510c41c755093f70a4bf85969f40b90fa47ce7ae69d78
-  実行日時: 2026-08-08T17:29:16Z（「表記統一後のフル再検証log」節）
+  size: 13,660,584 bytes
+  sha256: 11deb6d07a8bdec9e41f51464ba460eb4a4417f9757bf8dd1641bfb01b729bf9
+  実行日時: 2026-08-10T02:36:17Z（「compiler版の固定後のフル再検証log」節）
 
   過去のtreeでの実行結果（履歴。現行treeの成果物ではない）:
+    tree 815c903f / 表記統一後:      1e9623de74b79b33c85510c41c755093f70a4bf85969f40b90fa47ce7ae69d78
     tree b0120755 / board識別訂正後: 626707014889c5dc83ce0dc453383ee8139fa2d8feded452380fcfed21a96d97
     tree 79351378 / review反映後:    817d55948479097c0389db4bba08140aa7cca2c974c7a04258724ec3cadca442
     tree 9e48f340 / rebase後:        678cc201e60bb7376c38c19534d2e4819bdc40e68e20713bcb789b04d3376c24
@@ -143,7 +149,13 @@ Generated artifact identity:
     tree 10bad8e / 最終検証:     b1cb851bdf43ff2449ad394ac234b27a2abb8c59cf37f57837c802ef00180363
     tree 10bad8e / 再現性実験:   3f0ea82c6539464df2081a57f938f750f640dee55ea35a446386433598c56843
     初回（未pin・未`--locked`）: sha256 prefix 91dd34e9fec0a228
-  sizeは8回の実行すべてで13,654,676 bytesであった。
+  sizeは、#74でtoolchain名を`esp`から`esp-1.95.0.0`へ変えるまでの8回の実行すべてで
+  13,654,676 bytesであった。#74後の実行では13,660,584 bytes（+5,908）である。
+  成果物の文字列には`toolchains/esp-1.95.0.0`を含むものが371件あり、
+  toolchain名が9文字伸びたことによる増分は371×9=3,339 bytesとなる。
+  増分の向きと桁は説明できるが、**残る2,569 bytesは説明できていない。**
+  debug_infoのstring tableやsectionのalignmentが関与しうるが切り分けておらず、
+  ここでも原因は断定しない。
   **記録した入力を揃えてもsha256は一致しなかった（実測）。**
   再現性実験では、source tree、toolchain、gcc、path、`IDF_PATH`の有無、command列を
   最終検証と同一にしたうえで`cargo clean`から再buildしたが、sha256は異なった。
@@ -175,8 +187,11 @@ Log or evidence path: この文書へ全文を掲載する。
   「rebase後のフル再検証log」節: 正式なcommand実行。tree 9e48f340
   「review反映後のフル再検証log」節: 正式なcommand実行。tree 79351378
   「board識別訂正後のフル再検証log」節: 正式なcommand実行。tree b0120755
-  「表記統一後のフル再検証log」節: 現行treeでの正式なcommand実行。tree 815c903f
-  記録本体が挙げるsha256 1e9623de... は最後の節の実行結果である。
+  「表記統一後のフル再検証log」節: 正式なcommand実行。tree 815c903f
+  「版付きtoolchainの導入log」節: `espup`による導入と`export-esp.sh`の再生成確認。treeに依存しない
+  「compiler版の固定後のフル再検証log」節: 現行treeでの正式なcommand実行。tree cdcff41c。
+    同節の後半に、記録と異なるtoolchainを要求した場合の停止も含む
+  記録本体が挙げるsha256 11deb6d0... は「compiler版の固定後のフル再検証log」節の実行結果である。
 Known differences from documented profile:
   - 本記録はLinux（bash）で実行した。runbookのWindows節はADR-0005により対象外となり、
     PowerShell表記のcommand例も残っていない
@@ -1063,8 +1078,9 @@ Cargo.lock unchanged
 
 board名とRaspberry Piの表記を正本へ揃えて source tree が
 `815c903fdbe53cd66a7afbdbd1a277d29efc2a37` へ変わったため、`cargo clean` から
-正式な command を再実行した記録である。記録本体の `Generated artifact identity` が
-挙げる sha256 `1e9623de...` はこの実行の結果である。個人 path は `<home>` へ置換した。
+正式な command を再実行した記録である。この実行の成果物は sha256 `1e9623de...` である。
+現行 tree の成果物は記録本体の `Generated artifact identity` を参照する。
+個人 path は `<home>` へ置換した。
 
 ```text
 ########## 表記統一後のフル再検証 ##########
@@ -1082,3 +1098,110 @@ size_bytes=13654676
 sha256=1e9623de74b79b33c85510c41c755093f70a4bf85969f40b90fa47ce7ae69d78
 Cargo.lock unchanged
 ```
+
+## compiler版の固定（#74 追記）
+
+初回検証の時点では `rust-toolchain.toml` が固定していたのは custom channel 名 `esp` だけで、
+その名前へどの Xtensa Rust 版が入るかは `espup` が決めていた。
+[#74](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/74) でこれを版付きの名前へ変更した。
+
+```toml
+[toolchain]
+channel = "esp-1.95.0.0"
+```
+
+導入は `espup install --toolchain-version 1.95.0.0 --targets esp32 --name esp-1.95.0.0` である。
+`--name` の既定は `esp` であり、付け忘れた端末では名前が食い違うため build が compile 前に止まる。
+
+**compiler の実体は変わっていない。** 本記録の `Rust compiler version` が挙げる
+`rustc 1.95.0-nightly (95e5bda86 2026-04-15) (1.95.0.0)` は変更の前後で同一である。
+変わったのは toolchain の名前と、その名前が実行時に強制されるようになったことである。
+
+**これは名前の一致の強制であり、その名前の中身の版検査ではない。**
+採否の理由は [ESP32 Rust Toolchain](../esp32-rust-toolchain.md#compiler-版の固定) に記載する。
+
+`espup install --name` は `~/export-esp.sh` を再生成し、`PATH` と `LIBCLANG_PATH` を
+新しい toolchain 名の path へ書き換えた（下の log の「導入」節）。既存の `esp` は削除していない。
+
+## compiler版の固定後のフル再検証log
+
+`rust-toolchain.toml` の `channel` を版付きへ変えて source tree が
+`cdcff41c56993c1f32c404678d4afe2528924913` へ変わったため、`cargo clean` から
+正式な command を再実行した記録である。記録本体の `Generated artifact identity` が
+挙げる sha256 `11deb6d0...` はこの実行の結果である。
+同じ実行の後半で、記録と異なる toolchain を要求した場合に compile 前へ停止することも確認している。
+個人 path は `<home>` へ置換した。
+
+```text
+########## #74 版付きchannelでのフル再検証 ##########
+date: 2026-08-10T02:36:17Z
+base: 831f4b1 未解決review threadを残したmergeを防ぐ確認手順を定める (#76)
+source tree(staged): cdcff41c56993c1f32c404678d4afe2528924913
+IDF_PATH=<unset>
+esp-1.95.0.0 (overridden by '<home>/deskcat/firmware/esp32/rust-toolchain.toml')
+     Removed 3668 files, 1.7GiB total
+clean rc=0
+fmt rc=0
+clippy rc=0
+build rc=0
+size_bytes=13660584
+sha256=11deb6d07a8bdec9e41f51464ba460eb4a4417f9757bf8dd1641bfb01b729bf9
+Cargo.lock unchanged
+
+--- 強制の実証: 記録と異なるtoolchainを要求した場合 ---
+channel = "esp-9.9.9.9"
+error: custom toolchain 'esp-9.9.9.9' specified in override file '<home>/deskcat/firmware/esp32/rust-toolchain.toml' is not installed
+build rc=1
+--- 復元 ---
+channel = "esp-1.95.0.0"
+file type: ELF 32-bit LSB executable, Tensilica Xtensa, version 1 (SYSV), statically linked, with debug_info, not stripped
+```
+
+`build rc=1` の行が受け入れ条件の中核である。`cargo build` は crate を1つも compile せず、
+rustup が toolchain の解決段階で停止している。runbook どおりに
+`--name esp-1.95.0.0` を付けずに `espup install` した端末では、これと同じ停止が起きる。
+
+## 版付きtoolchainの導入log（#74 追記）
+
+`espup install --name` が `~/export-esp.sh` を正しく再生成するかを、導入の前後で比較した記録である。
+個人 path は `<home>` へ置換した。
+
+```text
+########## 版付きtoolchainの導入 ##########
+date: 2026-08-10T02:27:34Z
+--- 導入前 ---
+stable-x86_64-unknown-linux-gnu (active, default)
+esp
+export-esp.sh(前):
+export PATH="<home>/.rustup/toolchains/esp/xtensa-esp-elf/esp-15.2.0_20250920/xtensa-esp-elf/bin:$PATH"
+export LIBCLANG_PATH="<home>/.rustup/toolchains/esp/xtensa-esp32-elf-clang/esp-20.1.1_20250829/esp-clang/lib"
+--- espup install --toolchain-version 1.95.0.0 --targets esp32 --name esp-1.95.0.0 ---
+[info]: Installing the Espressif Rust ecosystem
+[info]: Checking Rust installation
+[info]: Installing Xtensa Rust 1.95.0.0 toolchain
+[info]: Installing GCC (xtensa-esp-elf)
+[info]: Installing Xtensa LLVM
+[info]: Creating symlink between '<home>/.rustup/toolchains/esp-1.95.0.0/xtensa-esp32-elf-clang/esp-20.1.1_20250829/esp-clang/lib' and '<home>/.espup/esp-clang'
+[info]: Installing 'rust' component for Xtensa Rust toolchain
+[info]: All downloads complete
+[info]: Installing 'rust-src' component for Xtensa Rust toolchain
+[info]: Installation successfully completed!
+real	1m22.496s
+ESPUP_RC=0
+--- 導入後 ---
+stable-x86_64-unknown-linux-gnu (active, default)
+esp
+esp-1.95.0.0
+export-esp.sh(後):
+export LIBCLANG_PATH="<home>/.rustup/toolchains/esp-1.95.0.0/xtensa-esp32-elf-clang/esp-20.1.1_20250829/esp-clang/lib"
+export PATH="<home>/.rustup/toolchains/esp-1.95.0.0/xtensa-esp-elf/esp-15.2.0_20250920/xtensa-esp-elf/bin:$PATH"
+--- 版の確認 ---
+rustc 1.95.0-nightly (95e5bda86 2026-04-15) (1.95.0.0)
+```
+
+`export-esp.sh` の 2 行はいずれも `toolchains/esp-1.95.0.0/` を指す path へ再生成された。
+`gcc`（`esp-15.2.0_20250920`）と `clang`（`esp-20.1.1_20250829`）の版は導入前と同一である。
+実行時間 1分22秒は、既存の download 成果物が再利用されたことによる。
+
+`espup --version` は 0.17.1 である。この版に設定 file は無く、版の指定は
+`--toolchain-version` という起動 option だけである（`espup install --help`、2026-08-10 確認）。

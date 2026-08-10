@@ -20,7 +20,7 @@ Issue #5 でtoolchainを固定し、最小projectのclean buildを確認した�
 |---|---|
 | Crate | `deskcat-esp32` |
 | Rust target | `xtensa-esp32-espidf` |
-| Rust channel | `esp`（Xtensa Rust 1.95.0.0） |
+| Rust channel | `esp-1.95.0.0`（Xtensa Rust 1.95.0.0） |
 | ESP-IDF | `v5.5.3`（tools install dirは`workspace`） |
 | linker | `ldproxy` |
 
