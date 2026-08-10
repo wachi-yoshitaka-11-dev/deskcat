@@ -24,7 +24,7 @@
 - [x] `main`の`enforce_admins`を有効化し、管理者にも上記2つを適用
 - [x] Repository description、homepage、topicsを設定
 - [x] `delete_branch_on_merge`を有効化（2026-07-31に無効化のdriftを検出し、再適用してread-back済み）
-- `develop`: Branch protectionのbundle（必須review、必須status check等）は設定しない
+- [x] `develop`: Branch protectionで`Require conversation resolution before merging`**だけ**を有効化（2026-08-10。下記「2026-08-10のdevelop branch protection」を参照）。**必須reviewと必須status checkは設定しない**
 - [x] `develop`のbranch削除だけをRepository Rulesetで禁止（2026-08-03。経緯は下記「2026-08-03のdevelop branch削除事故と対処」を参照）
 - `develop`へのGit／GitHub操作は、Governanceのforce push禁止、通常作業での直接commit禁止、ユーザー承認で管理する
 
@@ -46,11 +46,11 @@ read-back結果: `enforce_admins.enabled = true`
 これにより[AGENTS.md](../AGENTS.md)の「force pushを行わない」は、**`main`に限って**
 GitHub側でも実効化され、AIエージェントの誤操作に対する防壁になる。
 
-`develop`はforce push禁止・削除禁止のbundleとしてのbranch protection対象外とする方針のため、
-このbundleによるGitHubの強制は`main`だけに及ぶ。ただし2026-08-03以降、`develop`は
-branch削除だけを別のRepository Ruleset（下記「2026-08-03のdevelop branch削除事故と対処」）で
-禁止している。force pushの禁止を含む残りは、Governanceの規則とユーザー承認だけが歯止めである。
-repository全体で強制されていると読まない。
+**この記述は2026-08-10に更新した。**`develop`にもbranch protectionを設定したため、
+force pushとbranch削除はGitHub側で禁止されている（下記「2026-08-10のdevelop branch protection」）。
+
+ただし**必須reviewと必須status checkは設定していない**ため、`develop`への直接commitは引き続き可能である。
+その範囲はGovernanceの規約とユーザー承認だけが歯止めであり、repository全体で強制されていると読まない。
 
 - [x] `github-pages` environmentの`can_admins_bypass`を無効化
 
@@ -69,7 +69,7 @@ CI導入前:
 - [x] solo bootstrap中はpull requestを必須にしない
 - [x] 存在しないstatus checkを必須にしない
 - 必須承認review数: solo bootstrap中は`0`
-- `develop`はprotection対象外とし、required status checkを設定しない
+- `develop`は`Require conversation resolution before merging`のみ有効化し、required status checkと必須reviewは設定しない（2026-08-10）
 
 安定したCI導入後:
 
@@ -227,6 +227,54 @@ repository所有者が意図して無効化していた場合は、無効へ戻�
 `delete_branch_on_merge`は、PRのheadが使い捨てのfeature branchかどうかを区別せず、
 PR mergeのたびにhead branchを削除する。`develop`のような恒久的なbranchがPRのheadになった
 場合、この設定は安全境界（branchの存続）に直接影響する。
+
+### 2026-08-10のdevelop branch protection
+
+`develop`にbranch protectionを設定した。目的は**未解決review threadを残したmergeをGitHub側で止める**ことである。
+
+適用値（`PUT /repos/{owner}/{repo}/branches/develop/protection`）:
+
+| 項目 | 値 | 理由 |
+|---|---|---|
+| `required_conversation_resolution` | **`true`** | 本設定の目的。未解決threadがあると`mergeStateStatus`が`BLOCKED`になる |
+| `required_pull_request_reviews` | **`null`** | **設定しない。**設定すると`develop`への直接commitが塞がり、記述の維持管理を直接反映してよい運用（[CONTRIBUTING](../CONTRIBUTING.md)）と両立しない |
+| `required_status_checks` | `null` | CIの安定を確認してから別途判断する（上記「Branch protectionの時期」） |
+| `allow_force_pushes` | `false` | force pushを禁止 |
+| `allow_deletions` | `false` | 2026-08-03の削除事故と同じ事象を、Rulesetに加えてprotection側でも防ぐ |
+| `enforce_admins` | `false` | 管理者は強制mergeできる。未解決を残す場合の手順は[CONTRIBUTING](../CONTRIBUTING.md)に従う |
+
+動作確認（2026-08-10、[PR #88](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/88)）:
+
+| 操作 | `mergeStateStatus` |
+|---|---|
+| thread resolved | `CLEAN` |
+| thread を unresolve | **`BLOCKED`** |
+| 再び resolve | `CLEAN` |
+
+**設定しただけで確認しない、を避けるため実際にblockされることを確認した。**
+
+これにより`CONTRIBUTING.md`の「Merge前の確認」が要求していた手作業のGraphQL確認は不要になり、同節を縮小した。
+ただし**`Review rate limited`はcheckが`pass`と表示されGitHubは止めない**ため、その確認だけは手作業として残している。
+
+### CodeRabbitのauto review設定（2026-08-10）
+
+[`.coderabbit.yaml`](../.coderabbit.yaml)を新設し、auto reviewを高リスク変更へ限定した
+（[PR #88](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/88)、[#87](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/87)）。
+
+| key | 値 |
+|---|---|
+| `reviews.auto_review.enabled` | `false`（`labels`の正一致でのみ発火） |
+| `reviews.auto_review.base_branches` | `[develop]`。既定branchの`main`は設定に関わらず常に対象 |
+| `reviews.auto_review.labels` | `area:firmware` `area:protocol` `area:raspberry-pi` `area:hardware` `type:decision` |
+| `reviews.auto_review.auto_incremental_review` | `false`（pushのたびの再reviewを止める） |
+
+全Pull Requestでreviewを走らせるとrate limitに掛かる。
+[PR #55](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/55)では再review依頼が実行されず、
+[PR #88](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/88)では2回目の依頼が`Review rate limited`で終わった。
+
+**pathでauto reviewの発火は制御できない。**`reviews.path_filters`はreviewの中で見るfileを絞るだけである
+（公式JSON schemaで確認）。発火を制御できるのは`base_branches`／`labels`／`ignore_title_keywords`／
+`ignore_usernames`の4つだけであり、本projectはPull Requestにもlabelを付ける運用のためlabelで制御している。
 
 ### 2026-08-03のdevelop branch削除事故と対処
 
