@@ -62,7 +62,7 @@ Pull Request templateの「検証」表と「安全とsecurity」は、何を確
 
 1. `.coderabbit.yaml`を新設し、auto reviewを**高リスク変更（firmware、protocol、Pi、hardware、設計判断）**
    を示すlabelを持つPull Requestに限定する。あわせてpushのたびの再reviewを止める。
-   **対象labelと設定値の正本は[`.coderabbit.yaml`](../../.coderabbit.yaml)である。**
+   **対象labelと設定値の正本は[`.coderabbit.yaml`](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/.coderabbit.yaml)である。**
    本ADRは判断を記録するもので、設定値を再掲しない
 2. 自己レビューの観点を`CONTRIBUTING.md`にchecklistとして定める。回数は減らさない
 3. Issueを立てずに直接反映してよい範囲（typo、リンク、表記ゆれ、規約の言い回し、metadata記入漏れ）を定める。
