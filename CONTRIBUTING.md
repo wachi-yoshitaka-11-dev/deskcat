@@ -241,23 +241,38 @@ baseが`develop`でも`main`でも適用する。
 確認は次のcommandで行う。
 
 ```bash
+PR_NUMBER=76
+
 gh api graphql -f query='
-  query($owner: String!, $repo: String!, $number: Int!) {
+  query($owner: String!, $repo: String!, $number: Int!, $after: String) {
     repository(owner: $owner, name: $repo) {
       pullRequest(number: $number) {
-        reviewThreads(first: 100) {
+        reviewThreads(first: 100, after: $after) {
           totalCount
+          pageInfo { hasNextPage endCursor }
           nodes { isResolved path line }
         }
       }
     }
-  }' -F owner=wachi-yoshitaka-11-dev -F repo=deskcat -F number=<PR番号> \
+  }' -F owner=wachi-yoshitaka-11-dev -F repo=deskcat -F number="$PR_NUMBER" \
   --jq '.data.repository.pullRequest.reviewThreads
-        | {total: .totalCount, unresolved: [.nodes[] | select(.isResolved == false)]}'
+        | {total: .totalCount, hasNextPage: .pageInfo.hasNextPage, endCursor: .pageInfo.endCursor,
+           unresolved: [.nodes[] | select(.isResolved == false)]}'
 ```
 
-`unresolved`が空配列であることを確認する。`total`が取得した`nodes`の件数（`first: 100`）を
-超える場合は取得しきれていない。`pageInfo`を辿って残りを取得するまで判定を保留する。
+`PR_NUMBER`には対象のPull Request番号を入れる。`<PR番号>`のようなplaceholderを直接書くと、
+shellが`<`をredirectとして解釈して失敗するため、変数へ代入して渡す。
+
+**全pageの`unresolved`が空配列であることを確認する。**`hasNextPage`が`true`なら未取得の
+threadが残っている。1つ前の実行が返した`endCursor`の値を`END_CURSOR='Y3Vyc29y…'`のように
+代入し、同じcommandへ`-f after="$END_CURSOR"`を足して再実行する。`hasNextPage`が`false`に
+なるまで繰り返す。1 pageだけを見て0件と判定しない。
+
+**thread 0件は、reviewが終わったことを意味しない。**自動review（CodeRabbit）のcheckが
+`pending`／`Review in progress`の間は、まだthreadが作られていないだけである。
+**自動reviewのcheckが完了するまでmergeしない。**
+[#76](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/76)では0件を確認した28秒後に
+reviewが届き、actionable comment 2件がmerge済みPRへ付いた。
 
 未解決threadを残したままmergeする場合は、次をすべて行う。**追跡Issueなしにmergeしない。**
 
