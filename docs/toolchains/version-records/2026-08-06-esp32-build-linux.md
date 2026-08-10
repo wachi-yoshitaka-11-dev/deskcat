@@ -1209,3 +1209,10 @@ file type: ELF 32-bit LSB executable, Tensilica Xtensa, version 1 (SYSV), static
 `build rc=1` の行が受け入れ条件の中核である。`cargo build` は crate を1つも compile せず、
 rustup が toolchain の解決段階で停止している。runbook どおりに
 `--name esp-1.95.0.0` を付けずに `espup install` した端末では、これと同じ停止が起きる。
+
+**この `esp-9.9.9.9` の case が示すのは、`rust-toolchain.toml` が要求する toolchain 名が
+その端末に未導入である、という状態の検出だけである。** 同じ名前へ異なる compiler 版が
+導入されている状態は再現しておらず、**この log は「compiler 版が違えば失敗する」ことの
+証拠にはならない。** 名前が一致していれば中身の版は検査されないため、そもそも失敗しない。
+この区別は [ESP32 Rust Toolchain](../esp32-rust-toolchain.md#compiler-版の固定) の
+「残る穴」に対応する。

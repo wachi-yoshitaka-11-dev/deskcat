@@ -177,7 +177,7 @@ build はそのまま成功する。この取り違えは runbook の版上げ�
 - [x] 開発端末の profile と version record を作成した
 - [x] レビュー済み template commit から最小 project を生成した
 - [x] 環境変数による意図しない SDK override がない
-- [x] 記録済みと異なる Rust compiler 版では build が成立しないことを実証した（[#74](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/74)。[compiler 版の固定](#compiler-版の固定)を参照）
+- [x] 記録済みの toolchain 名が未導入の端末では build が compile 前に停止することを実証した（[#74](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/74)。同じ名前へ異なる版が入っている場合は検出しない。[compiler 版の固定](#compiler-版の固定)を参照）
 - [x] clean `cargo build` が成功した
 - [x] dependency と lockfile を review した
 - [x] 正式な format、lint、build command を `AGENTS.md` と root README へ反映した
