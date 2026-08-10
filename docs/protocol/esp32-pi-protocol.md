@@ -65,7 +65,16 @@ Protocol channelから送信するすべてのbyteは、有効にframe化され�
   - `unknown_type`の送出は§8.2の送出上限の対象とする。
   - この判定は§8の手順7で行い、**session権限判定（手順8）より先**である。retiredな`sid`や未知の`sid`であっても、typeが未知であれば`stale_session`ではなく`unknown_type`を返す。`unknown_types`だけを増やし、`stale_sessions`は増やさない。§5.1の優先順位は、手順7を通過した既知typeに適用する。
 
-正確なinteger widthとwrap動作は、実装を受け入れる前に共有test fixtureで確定する。
+Integer widthは、共有test fixture（§12.1）とあわせて次のとおり確定した。宣言した幅に収まらない値、負数、非整数は、envelopeとして復元できないため`invalid_envelope`で拒否する。
+
+| Field | 型 | 根拠 |
+|---|---|---|
+| `v` | `u16` | major versionは増加が遅く、幅を広げる意味がない |
+| `sid` | `u32` | session ID |
+| `id` | `u32` | 同一session内のmessage ID |
+| `ts_ms` | `u64` | uptime ms。`u32`は約49.7日でwrapし、長時間動作で`ts_ms`の単調性が崩れる |
+
+**送信側が`id`の上限に達したときの動作は未確定である**（`PROTO-TBD-003`）。受信側の判定ではなく送信側の運用であり、session確立とduplicate履歴の扱いに関わるため、host serial session（#11）とACK／reconnect実装（#12）で決める。
 
 ### 3.1 Session IDが必要な理由
 
@@ -780,6 +789,30 @@ ACKは、commandが検証され、処理対象として受け入れられたこ�
 
 Parser counterでは、invalid UTF-8、invalid JSON、invalid envelope、unknown type、oversize line、rate limit超過、session不一致を区別する。
 
+### 単一lineの検証で決まるcodeの対応付け
+
+同じ「不正」でも、どの段階で落ちたかによってcodeが変わる。§12.1のconformance fixtureが次の対応を固定している。
+
+**この表が定めるのは「どのcodeに分類するか」だけである。****そのcodeを実際に相手へ返すかどうかは、この表では決まらない。**送出の可否は方向（§8の拒否時の動作）と、下記`line_too_long`の個別条件、および§8.2の送出上限に従う。とくに次の2つは、分類できても応答しない場合がある。
+
+- `line_too_long`は、下記のとおり`(sid, id)`を復元できた場合にだけ返す。復元できなければ`oversize_lines`の計数だけを行う。
+- `unknown_type`は、§3のとおりPi→ESP32でidentityを復元できる場合に相関ACKを返し、ESP32→Piでは応答せず計数だけを行う。
+
+分類と送出を混同すると、応答してはならない場合に拒否応答を送り、§8.2の送出帯域を消費する。
+
+| 事象 | Code |
+|---|---|
+| top-level typeが不正、envelope必須fieldの欠落、envelope数値が宣言幅・符号・整数性を満たさない、`payload`がobjectでない | `invalid_envelope` |
+| `v`が未対応 | `unsupported_version` |
+| `type`が未知 | `unknown_type` |
+| type固有payloadの必須field欠落・型違い・列挙外の値（例: `reason`が`startup`／`port_reopen`／`resync`以外） | `invalid_payload` |
+| 上限のある値が範囲外（string byte長の超過など） | `out_of_range` |
+| 改行を含むlineが最大長を超過 | `line_too_long`（送出条件は上記の個別規定に従う） |
+
+**string byte長の超過を`out_of_range`とするのは、この節で新たに決めた分類である。**§5.3は「値そのものが許容範囲外」を`out_of_range`としているが、§5.4のtext byte長のように、上限の存在だけを定めて超過時のcodeを書いていない箇所がある。`invalid_payload`（型と必須fieldの問題）と`out_of_range`（型は正しいが値が上限を超える）を分けることで、送信側は「payloadを直す」のか「値を縮める」のかを区別できる。分けない選択もありえたため、変更する場合は§12.1のfixtureも同時に変える。
+
+判定は§8の手順どおりこの表の上から順に行う。**先に落ちたものが返るcodeを決める。**たとえば未対応`v`と未知`type`を同時に持つlineは`unsupported_version`であり、`unknown_type`ではない（§5.1の手順2が手順3より先である）。
+
 `sid`は乱数を含みうるため、受信側は未知の`sid`が「古い」のか「新しい」のかを値の大小で判定できない。したがって`stale_session`は時系列ではなく、**現在のsessionとして承認されていない**ことを意味する。
 
 ## 8. 受信動作
@@ -1123,36 +1156,38 @@ Session境界のfixtureは、遷移の有無で期待結果が逆になる。set
 
 ### 12.1 fixtureの所在
 
-**この節が要求するfixture fileは、現時点で存在しない。**Rust workspaceが未生成であり
-（[ADR-0001](../decisions/0001-monorepo-layout.md)）、置き場所となるcrateがないためである。
-本節は要件の定義であって、実在するfixtureへの参照ではない。
-
-生成後の配置予定は次のとおりとする。
+fixture fileは次にある。
 
 ```text
 crates/deskcat-protocol/tests/fixtures/
 ```
 
-同じdirectoryをfirmware側からもpath参照するか複製するかは、
-[ADR-0001](../decisions/0001-monorepo-layout.md)のcrate共有方針の決定に従う。
-どちらでも、両側が同一fileに対して合格しなければならない。
+形式と追加規則はそのdirectoryのREADMEを参照する。**期待値をRust側のtest codeへ埋め込まず、
+言語に依存しないJSON fileとして持つ。**[ADR-0001](../decisions/0001-monorepo-layout.md)が
+「コードを共有するかどうかにかかわらず、両側が共通JSON fixtureとprotocol conformance testに
+合格しなければならない」と定めているためである。同じdirectoryをfirmware側からpath参照するか
+複製するかは、同ADRのcrate共有方針の決定に従う。
 
-fixtureは最低限、次の4群をすべて含む。上の一覧と表がその内訳である。
+fixtureは最低限、次の5群をすべて含む。上の一覧と表がその内訳である。**現時点で揃っているのはSchema群と、Framing／parse群のうちline長境界・CRLF・invalid JSONだけである。**
 
-| 群 | 対象 |
-|---|---|
-| Framing／parse | 分割受信、CRLF、invalid UTF-8／JSON、line長境界 |
-| Session判定 | 遷移の成否、`stale_session`、retired session、`hello`／`boot`再送、`sid`衝突時の選び直し、retired保持期間、方向が逆のsession確立messageの拒否 |
-| Duplicate replay | 同一`(sid, id)`のretry、保持結果の返却、非idempotent動作の二重実行防止 |
-| Budgetと応答 | 受理上限、遷移budget／cooldown、予約枠、送出上限、ACKの優先 |
+| 群 | 対象 | 状態 |
+|---|---|---|
+| Schema | envelope、type固有payload、上限の境界、未知version／type | **作成済み**（#9） |
+| Framing／parse | 分割受信、CRLF、invalid UTF-8／JSON、line長境界 | line長境界・CRLF・invalid JSONは**作成済み**（#9）。byte単位の分割受信とinvalid UTF-8は#10 |
+| Session判定 | 遷移の成否、`stale_session`、retired session、`hello`／`boot`再送、`sid`衝突時の選び直し、retired保持期間、方向が逆のsession確立messageの拒否 | 未作成（#12） |
+| Duplicate replay | 同一`(sid, id)`のretry、保持結果の返却、非idempotent動作の二重実行防止 | 未作成（#12） |
+| Budgetと応答 | 受理上限、遷移budget／cooldown、予約枠、送出上限、ACKの優先 | 未作成（#12）。値が`PROTO-TBD-011`／`012`／`017`で未確定 |
 
-fixtureを作成するまで、この節を「両側が検証済み」の根拠に使わない。
-`v: 1`が確定版を意味するのは、fixtureが存在し両側のparserが合格した時点である
-（[§11](#11-versioning)）。
+**未作成の3群は、単一lineのschema検証ではなく受信側のstateに依存する。**#9が提供するのは
+stateを持たない単一lineのdecodeであり、これらのcaseを置いても実行できない。budget群は
+parameterの数値自体が未確定である。
 
-作成作業は[初期Issue](../backlog/initial-issues.md)の#9が担当する。
-[Implementation Readiness Review](../runbooks/implementation-readiness-review.md)も
-「承認済みprotocol制限とfixture」を`Fail／TBD`として記録している。
+したがって**この節はまだ「両側が検証済み」の根拠にならない。**現時点で確定したのは、
+schema層についてhost実装がfixtureに合格することだけである。firmware側の合格は#10、
+残る3群は#12を待つ。`v: 1`が確定版を意味するのは、5群すべてが揃い両側のparserが
+合格した時点である（[§11](#11-versioning)）。
+
+作成作業は[初期Issue](../backlog/initial-issues.md)の#9が着手した。
 `PROTO-TBD-016`はprotocol側の未決事項としての追跡であり、
 実施Issueを別に立てるものではない。
 
@@ -1162,7 +1197,7 @@ fixtureを作成するまで、この節を「両側が検証済み」の根拠�
 |---|---|---|
 | PROTO-TBD-001 | 最終baud | Pi／ESP32のthroughput・安定性test。[HW-TBD-014](../hardware/tbd-register.md)と対で確定する。値はProtocol側、実機transport testの実施責任はhardware台帳 |
 | PROTO-TBD-002 | 最終最大line byte数、および**overflow時にidentity復元のため保持するprefixのbyte数**（`v`、`type`、`sid`、`id`を含みうる大きさ。行長上限より十分小さいこと） | Worst-caseの上限付きpayloadとmemory test。[HW-TBD-014](../hardware/tbd-register.md)と対で確定する。値はProtocol側、実機transport testの実施責任はhardware台帳 |
-| PROTO-TBD-003 | Integer widthとwrap | Rust modelと長時間動作の検討 |
+| PROTO-TBD-003 | ~~Integer width~~（§3で確定。`v`=`u16`、`sid`／`id`=`u32`、`ts_ms`=`u64`）と、**送信側が`id`の上限に達したときの動作** | 残るのはwrap時の運用だけである。session確立とduplicate履歴の扱いに関わるため、host serial session（[#11](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11)）とACK／reconnect実装（[#12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)）で決める |
 | PROTO-TBD-004 | ACK timeout | 測定latencyとrecovery test |
 | PROTO-TBD-005 | **現在のsession**のduplicate履歴の保持期間とretry window、および**保持件数の上限と超過時の動作**。期間の下限は遅延messageの最大生存時間＋再送windowを下回らない。件数上限は受理budget（§8.2）と保持する結果の最大sizeから導出する。上限超過時は最も古いentryをevictしてよいが、evictしたentryへの再送は新規commandとして実行しない（`duplicate_expired`で拒否する。§9参照）。`PROTO-TBD-011`のretired session保持期間から導出しない（目的の異なる別モデル。§5.1） | Memory予算とretry window。[HW-TBD-020](../hardware/tbd-register.md)と対で確定する。サーボ出力の有効化条件に含まれる |
 | PROTO-TBD-006 | 最終status field | 診断要件とencode size test |
@@ -1175,7 +1210,7 @@ fixtureを作成するまで、この節を「両側が検証済み」の根拠�
 | PROTO-TBD-013 | Stale commandの拒否条件（command age、session遷移後の未ACK commandの扱い） | Reconnect試験とfail-safe試験。[HW-TBD-018](../hardware/tbd-register.md)の通信断時fail-safe／reconnect条件、および[HW-TBD-020](../hardware/tbd-register.md)のCommand timeout fieldと対で確定する。Command timeoutの実測値はhardware側、stale commandの拒否条件はProtocol側を正とする。**サーボ出力の有効化条件に含まれる**（[servo-safety-limits](../hardware/servo-safety-limits.md#サーボ出力を有効化してよい条件)） |
 | PROTO-TBD-014 | 実行時安全制限の超過を報告するfault eventの名前とpayload schema。拘束／過負荷、最大連続動作時間の超過、duty cycle上限の超過を、payload fieldまたはcodeで**区別できる**こと | [Servo Safety Limits](../hardware/servo-safety-limits.md#拘束stallと過負荷)の検知手段確定後。[HW-TBD-020](../hardware/tbd-register.md)と対で確定する。**サーボ出力の有効化条件に含まれる**（[servo-safety-limits](../hardware/servo-safety-limits.md#サーボ出力を有効化してよい条件)） |
 | PROTO-TBD-015 | Draft schema revisionの表明方法（envelope fieldかout-of-band照合か） | Draft間の相互接続が必要になった時点。fixture一致で足りるなら追加しない |
-| PROTO-TBD-016 | §12のconformance fixtureの実体作成と配置 | Rust workspace生成後。`crates/deskcat-protocol/tests/fixtures/`へ置き、両側の実装が同一fileで合格することを確認する。実施は[初期Issue](../backlog/initial-issues.md)の#9 |
+| PROTO-TBD-016 | §12のconformance fixtureの実体作成と配置。**schema群と一部のframing群は`crates/deskcat-protocol/tests/fixtures/`へ配置済み**（[#9](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/9)）。残るのはsession判定、duplicate replay、budgetと応答の3群と、firmware側の合格確認 | 残る3群は受信側のstateを必要とするため[#12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)、firmware側の合格は[#10](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/10)で確認する。budget群は`PROTO-TBD-011`／`012`／`017`の確定を待つ |
 | PROTO-TBD-017 | `boot`再送契約のparameter（初期間隔、backoff係数、通常再送の回数、recovery間隔、**無応答時に送出を止めるまでの有限recovery budget**、**同一`(sid, id)`の最大再送回数**、**`rate_limited`で拒否されたときのcooldown後再送を含む上限**）。recovery budgetの総待ち時間は`PROTO-TBD-012`の拒否ACK最悪送出待ち時間以上とする。終了条件そのものは§4.1で確定済み | 起動時のlink確立latency測定とreconnect試験 |
 
 ## Revision履歴
@@ -1185,6 +1220,7 @@ fixtureを作成するまで、この節を「両側が検証済み」の根拠�
 | 2026-07-27 | Draft 1 | 引継ぎprotocolを統合し、検証・recovery要件を追加 |
 | 2026-07-28 | Draft 2 | Envelopeへ`sid`を追加。`hello`、`rate_limited`、`stale_session`を追加。Piの再起動でduplicate判定が誤るcaseを修正し、流量制限とlink-loss検知の未決事項を登録 |
 | 2026-07-31 | Draft 2 review | ACKと完了eventへ`reply_sid`を追加し、要求送信側の再起動後に旧sessionの応答を誤認するcaseを修正 |
+| 2026-08-10 | Draft 2 fixture | §3のinteger widthを確定し、§7へ単一lineの検証で決まるcodeの対応付けを追加（分類と送出の判断を分ける）。§12.1をschema群のfixture作成済みの状態へ更新。wire formatは変更していない |
 
 ### Draft schemaの互換性
 

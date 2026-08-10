@@ -1,0 +1,34 @@
+# Host側のroot Cargo workspace。
+#
+# `firmware/esp32`は必ず`exclude`する。firmwareのmanifestは`[workspace]`節を持たないため、
+# excludeしないとcargoがこのworkspaceのpackageとして扱い、firmware専用のtarget、
+# `rust-toolchain.toml`、`.cargo/config.toml`でのbuildが壊れる。
+# 分離自体はADR-0001（docs/decisions/0001-monorepo-layout.md）の決定である。
+[workspace]
+resolver = "3"
+members = ["crates/deskcat-protocol"]
+exclude = ["firmware/esp32"]
+
+# `rust-version`は、実際にbuildとtestを通した版だけを宣言する。
+# 引き下げるときは、対象端末での検証記録（docs/toolchains/version-records/）を伴わせる。
+[workspace.package]
+edition = "2024"
+rust-version = "1.97"
+license = "MIT"
+publish = false
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["raw_value"] }
+
+# lint levelをmanifestで持つ。`unsafe_code = "forbid"`は、AGENTS.mdの
+# 「`unsafe`は原則禁止する」を、command optionの付け忘れに関係なくbuildで強制する。
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+
+# `clippy::all`をdenyにするため、検証commandへ`-D warnings`を付ける必要はない。
+# `pedantic`は偽陽性が多く、`allow`属性が散らばるためwarnに留める。
+[workspace.lints.clippy]
+all = { level = "deny", priority = -1 }
+pedantic = { level = "warn", priority = -1 }

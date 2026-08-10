@@ -110,7 +110,7 @@ hotfix/<issue>-<short-name>
 
 root READMEとcomponent READMEに記載された、関連するcommandをすべて実行する。
 
-workspaceはまだ存在しないため、現段階で有効と断定できるCargo commandはない。toolchain Issueで生成・検証後、command文書を更新する。
+host workspaceはrepository rootで、ESP32 firmwareは`firmware/esp32`で検証する。確定したcommandは[root README](README.md#buildとtest)と`AGENTS.md`の「検証」節にある。Raspberry Pi、HIL、ESP32のflashとserial monitorには、まだ正式なcommandがない。
 
 今後の変更では次を報告する。
 
