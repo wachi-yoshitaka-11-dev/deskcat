@@ -24,7 +24,7 @@ Issueには次を記載する。
 
 **ただし、すべての気づきをIssueにしない。**typo、リンク修正、表記ゆれ、規約の言い回し、
 boardのmetadata記入漏れは、変更内容の承認を得たうえで直接反映してよい。
-判断基準は[CONTRIBUTING](../../CONTRIBUTING.md)に定める。
+判断基準は[CONTRIBUTING](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/CONTRIBUTING.md)に定める。
 
 ## 2. Issueの着手条件
 
