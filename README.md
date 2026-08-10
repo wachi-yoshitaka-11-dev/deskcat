@@ -92,6 +92,22 @@ workspaceの判断は[ADR-0001](docs/decisions/0001-monorepo-layout.md)を参照
 
 文書作成・review専用端末にはRust、ESP-IDF、USB toolを導入しない。[ESP32セットアップrunbook](docs/runbooks/esp32-development-machine-setup.md)または[Raspberry Piセットアップrunbook](docs/runbooks/raspberry-pi-development-machine-setup.md)は、対応profileを割り当てた端末だけで使用し、[version記録template](docs/toolchains/version-record-template.md)で環境を記録する。
 
+### host workspace（検証済みcommand）
+
+Host Rust Development profileの端末で、repository rootにて実行する。ESP32 toolchainは要らない。
+
+```bash
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --locked
+cargo test --workspace --locked
+```
+
+lintの水準はroot `Cargo.toml`の`[workspace.lints]`が持つため、`-D warnings`は付けない。`cargo fmt`は`--locked`を受け付けない。
+
+Linux x86_64、Rust stable 1.97.1で検証した。検証日は2026-08-10である。証拠は[Version Record](docs/toolchains/version-records/2026-08-10-host-rust-linux.md)にある。別端末での再現は未検証である。
+
+`firmware/esp32`はroot workspaceから`exclude`している。firmwareのmanifestは`[workspace]`節を持たないため、excludeを外すとfirmwareのbuildが壊れる。分離自体は[ADR-0001](docs/decisions/0001-monorepo-layout.md)の決定である。
+
 ### ESP32 firmware（検証済みcommand）
 
 ESP32 Build profileの端末で、`firmware/esp32`にて実行する。事前に[ESP32セットアップrunbook](docs/runbooks/esp32-development-machine-setup.md)のtoolchain導入を済ませる。
@@ -122,10 +138,8 @@ Linux x86_64で検証した。初回は2026-08-06、現行treeに対する最新
 
 次はまだ検証済みcommandが無い。対象開発端末でclean buildに成功した後にこの節へ記載する。
 
-- hostのformat、lint、unit test
 - ESP32のflash、serial monitor
 - Raspberry Piのbuildと実行
-- protocol fixture
 - HIL test
 
 このplaceholderからcommandを推測しない。

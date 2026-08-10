@@ -49,8 +49,8 @@ Peripheral driverまたはservo出力は、いずれもこのgateを通過して
 | 互換性のあるRust／ESP-IDF version | Candidate／未検証 | 開発端末での#5 clean build |
 | 再現可能なbuild／flash／monitor command | Fail／TBD | #5と#6 |
 | Draft protocolが存在する | Review用としてPass | #4 |
-| 承認済みprotocol制限とfixture | Fail／TBD | #4と#9 |
-| Host／firmware workspaceが存在する | 設計どおりFail | 着手可能なIssueからのみ作成する |
+| 承認済みprotocol制限とfixture | Partial | #9でschema群のfixtureとhost実装の合格を確認済み。session判定・duplicate replay・budgetの3群は#12、firmware側の合格は#10 |
+| Host／firmware workspaceが存在する | Pass | firmware workspaceは#5／#40、host workspaceは#9で作成した |
 
 Toolchainのbuild-only spikeはperipheral pinの選定なしで進められる。Docs / Review端末にtoolchainを導入する必要はない。
 

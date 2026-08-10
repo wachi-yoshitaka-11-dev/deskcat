@@ -1,0 +1,148 @@
+{
+  "fixture_schema": 1,
+  "cases": [
+    {
+      "name": "not_json",
+      "line": "this is not json\n",
+      "expect_error": "invalid_envelope"
+    },
+    {
+      "name": "top_level_array",
+      "line": "[1,2,3]\n",
+      "expect_error": "invalid_envelope"
+    },
+    {
+      "name": "top_level_string",
+      "line": "\"boot\"\n",
+      "expect_error": "invalid_envelope"
+    },
+    {
+      "name": "payload_is_null",
+      "line": "{\"v\":1,\"sid\":41207,\"id\":1,\"ts_ms\":100,\"type\":\"ping\",\"payload\":null}\n",
+      "expect_error": "invalid_envelope",
+      "note": "§3: 空のpayloadは`null`ではなく`{}`とする。"
+    },
+    {
+      "name": "payload_is_number",
+      "line": "{\"v\":1,\"sid\":41207,\"id\":1,\"ts_ms\":100,\"type\":\"ping\",\"payload\":7}\n",
+      "expect_error": "invalid_envelope"
+    },
+    {
+      "name": "missing_envelope_v",
+      "line": "{\"sid\":41207,\"id\":1,\"ts_ms\":100,\"type\":\"boot\",\"payload\":{\"firmware\":\"0.1.0\",\"board\":\"esp32\",\"reset_reason\":\"power_on\"}}\n",
+      "expect_error": "invalid_envelope"
+    },
+    {
+      "name": "missing_envelope_sid",
+      "line": "{\"v\":1,\"id\":1,\"ts_ms\":100,\"type\":\"boot\",\"payload\":{\"firmware\":\"0.1.0\",\"board\":\"esp32\",\"reset_reason\":\"power_on\"}}\n",
+      "expect_error": "invalid_envelope"
+    },
+    {
+      "name": "missing_envelope_id",
+      "line": "{\"v\":1,\"sid\":41207,\"ts_ms\":100,\"type\":\"boot\",\"payload\":{\"firmware\":\"0.1.0\",\"board\":\"esp32\",\"reset_reason\":\"power_on\"}}\n",
+      "expect_error": "invalid_envelope"
+    },
+    {
+      "name": "missing_envelope_ts_ms",
+      "line": "{\"v\":1,\"sid\":41207,\"id\":1,\"type\":\"boot\",\"payload\":{\"firmware\":\"0.1.0\",\"board\":\"esp32\",\"reset_reason\":\"power_on\"}}\n",
+      "expect_error": "invalid_envelope"
+    },
+    {
+      "name": "missing_envelope_type",
+      "line": "{\"v\":1,\"sid\":41207,\"id\":1,\"ts_ms\":100,\"payload\":{\"firmware\":\"0.1.0\",\"board\":\"esp32\",\"reset_reason\":\"power_on\"}}\n",
+      "expect_error": "invalid_envelope"
+    },
+    {
+      "name": "missing_envelope_payload",
+      "line": "{\"v\":1,\"sid\":41207,\"id\":1,\"ts_ms\":100,\"type\":\"boot\"}\n",
+      "expect_error": "invalid_envelope"
+    },
+    {
+      "name": "envelope_v_wrong_type",
+      "line": "{\"v\":\"1\",\"sid\":41207,\"id\":1,\"ts_ms\":100,\"type\":\"boot\",\"payload\":{\"firmware\":\"0.1.0\",\"board\":\"esp32\",\"reset_reason\":\"power_on\"}}\n",
+      "expect_error": "invalid_envelope"
+    },
+    {
+      "name": "envelope_sid_negative",
+      "line": "{\"v\":1,\"sid\":-1,\"id\":1,\"ts_ms\":100,\"type\":\"ping\",\"payload\":{}}\n",
+      "expect_error": "invalid_envelope"
+    },
+    {
+      "name": "envelope_sid_above_u32",
+      "line": "{\"v\":1,\"sid\":4294967296,\"id\":1,\"ts_ms\":100,\"type\":\"ping\",\"payload\":{}}\n",
+      "expect_error": "invalid_envelope",
+      "note": "宣言した幅に収まらない値はenvelopeとして復元できない。"
+    },
+    {
+      "name": "envelope_ts_ms_above_u64",
+      "line": "{\"v\":1,\"sid\":41207,\"id\":1,\"ts_ms\":18446744073709551616,\"type\":\"ping\",\"payload\":{}}\n",
+      "expect_error": "invalid_envelope"
+    },
+    {
+      "name": "unsupported_major_version",
+      "line": "{\"v\":2,\"sid\":41207,\"id\":1,\"ts_ms\":100,\"type\":\"ping\",\"payload\":{}}\n",
+      "expect_error": "unsupported_version"
+    },
+    {
+      "name": "unknown_message_type",
+      "line": "{\"v\":1,\"sid\":41207,\"id\":1,\"ts_ms\":100,\"type\":\"set_expression\",\"payload\":{\"name\":\"happy\"}}\n",
+      "expect_error": "unknown_type",
+      "note": "今回型を起こさないtype。#13以降で追加する。"
+    },
+    {
+      "name": "unsupported_version_takes_precedence_over_unknown_type",
+      "line": "{\"v\":2,\"sid\":41207,\"id\":1,\"ts_ms\":100,\"type\":\"no_such_type\",\"payload\":{}}\n",
+      "expect_error": "unsupported_version",
+      "note": "§5.1の手順2（version）が手順3（type固有schema）より先である証拠。順序を入れ替えるとunknown_typeになる。"
+    },
+    {
+      "name": "hello_reason_not_in_enum",
+      "line": "{\"v\":1,\"sid\":90312,\"id\":1,\"ts_ms\":40,\"type\":\"hello\",\"payload\":{\"host\":\"deskcatd\",\"version\":\"0.1.0\",\"reason\":\"reboot\"}}\n",
+      "expect_error": "invalid_payload",
+      "note": "§12: payloadが不正な`hello`（`reason`が列挙外）はinvalid_payload。"
+    },
+    {
+      "name": "hello_missing_reason",
+      "line": "{\"v\":1,\"sid\":90312,\"id\":1,\"ts_ms\":40,\"type\":\"hello\",\"payload\":{\"host\":\"deskcatd\",\"version\":\"0.1.0\"}}\n",
+      "expect_error": "invalid_payload"
+    },
+    {
+      "name": "boot_missing_board",
+      "line": "{\"v\":1,\"sid\":41207,\"id\":1,\"ts_ms\":100,\"type\":\"boot\",\"payload\":{\"firmware\":\"0.1.0\",\"reset_reason\":\"power_on\"}}\n",
+      "expect_error": "invalid_payload"
+    },
+    {
+      "name": "boot_firmware_wrong_type",
+      "line": "{\"v\":1,\"sid\":41207,\"id\":1,\"ts_ms\":100,\"type\":\"boot\",\"payload\":{\"firmware\":1,\"board\":\"esp32\",\"reset_reason\":\"power_on\"}}\n",
+      "expect_error": "invalid_payload"
+    },
+    {
+      "name": "ack_rejected_without_code",
+      "line": "{\"v\":1,\"sid\":41207,\"id\":905,\"ts_ms\":53100,\"type\":\"ack\",\"payload\":{\"reply_sid\":90312,\"reply_to\":903,\"status\":\"rejected\"}}\n",
+      "expect_error": "invalid_payload",
+      "note": "§6: rejectedの場合はmachine-readableなcodeを含める。"
+    },
+    {
+      "name": "boot_firmware_over_limit",
+      "line": "{\"v\":1,\"sid\":41207,\"id\":1,\"ts_ms\":100,\"type\":\"boot\",\"payload\":{\"firmware\":\"fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"board\":\"esp32\",\"reset_reason\":\"power_on\"}}\n",
+      "expect_error": "out_of_range",
+      "note": "上限+1 byte。上限ちょうどはvalid側のstrings_at_limitにある。"
+    },
+    {
+      "name": "hello_host_over_limit",
+      "line": "{\"v\":1,\"sid\":90312,\"id\":1,\"ts_ms\":40,\"type\":\"hello\",\"payload\":{\"host\":\"hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh\",\"version\":\"0.1.0\",\"reason\":\"startup\"}}\n",
+      "expect_error": "out_of_range"
+    },
+    {
+      "name": "ack_detail_over_limit",
+      "line": "{\"v\":1,\"sid\":41207,\"id\":905,\"ts_ms\":53100,\"type\":\"ack\",\"payload\":{\"reply_sid\":90312,\"reply_to\":903,\"status\":\"rejected\",\"code\":\"busy\",\"detail\":\"ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\"}}\n",
+      "expect_error": "out_of_range"
+    },
+    {
+      "name": "line_one_byte_over_maximum",
+      "line": "{\"v\":1,\"sid\":41207,\"id\":1,\"ts_ms\":100,\"type\":\"boot\",\"payload\":{\"firmware\":\"0.1.0\",\"board\":\"esp32\",\"reset_reason\":\"power_on\",\"unknown_pad\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}}\n",
+      "expect_error": "line_too_long",
+      "note": "改行を含めて1025 byte。"
+    }
+  ]
+}

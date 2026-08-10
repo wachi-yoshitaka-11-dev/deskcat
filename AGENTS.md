@@ -122,7 +122,21 @@ cargo build --locked
 
 Linux x86_64 で検証した。初回は 2026-08-06、現行 tree に対する最新の検証は 2026-08-10 である（[Version Record](docs/toolchains/version-records/2026-08-06-esp32-build-linux.md)）。別端末での再現は未検証である。
 
-host crate、Raspberry Pi、protocol fixture、HIL、ESP32 の flash と serial monitor には、まだ正式なコマンドが無い。[ツールチェーン一覧](docs/toolchains/README.md) と未検証の runbook 手順を、検証済みコマンドとして扱わない。clean build の成功ごとにこの節を更新する。
+host workspace には検証済みコマンドがある。repository root で実行する。ESP32 toolchain は要らない。
+
+```bash
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --locked
+cargo test --workspace --locked
+```
+
+lint の水準は root `Cargo.toml` の `[workspace.lints]` が持つため、`-D warnings` は付けない。`unsafe_code = "forbid"` もそこで強制している。
+
+Linux x86_64、Rust stable 1.97.1 で検証した。検証日は 2026-08-10 である（[Version Record](docs/toolchains/version-records/2026-08-10-host-rust-linux.md)）。別端末での再現は未検証である。
+
+`firmware/esp32` は root workspace から `exclude` している。firmware の manifest は `[workspace]` 節を持たないため、exclude を外すと firmware の build が壊れる。
+
+Raspberry Pi、HIL、ESP32 の flash と serial monitor には、まだ正式なコマンドが無い。[ツールチェーン一覧](docs/toolchains/README.md) と未検証の runbook 手順を、検証済みコマンドとして扱わない。clean build の成功ごとにこの節を更新する。
 
 実機試験が必要な変更を、PC テストだけで完了扱いにしない。
 

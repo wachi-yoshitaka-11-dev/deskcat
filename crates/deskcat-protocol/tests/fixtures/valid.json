@@ -1,0 +1,150 @@
+{
+  "fixture_schema": 1,
+  "cases": [
+    {
+      "name": "boot_minimal",
+      "line": "{\"v\":1,\"sid\":41207,\"id\":1,\"ts_ms\":100,\"type\":\"boot\",\"payload\":{\"firmware\":\"0.1.0\",\"board\":\"esp32\",\"reset_reason\":\"power_on\"}}\n",
+      "canonical": true,
+      "expect": {
+        "type": "boot",
+        "sid": 41207,
+        "id": 1
+      }
+    },
+    {
+      "name": "hello_startup",
+      "line": "{\"v\":1,\"sid\":90312,\"id\":1,\"ts_ms\":40,\"type\":\"hello\",\"payload\":{\"host\":\"deskcatd\",\"version\":\"0.1.0\",\"reason\":\"startup\"}}\n",
+      "canonical": true,
+      "expect": {
+        "type": "hello",
+        "sid": 90312,
+        "id": 1
+      }
+    },
+    {
+      "name": "hello_port_reopen",
+      "line": "{\"v\":1,\"sid\":90312,\"id\":2,\"ts_ms\":41,\"type\":\"hello\",\"payload\":{\"host\":\"deskcatd\",\"version\":\"0.1.0\",\"reason\":\"port_reopen\"}}\n",
+      "canonical": true,
+      "expect": {
+        "type": "hello",
+        "sid": 90312,
+        "id": 2
+      }
+    },
+    {
+      "name": "hello_resync",
+      "line": "{\"v\":1,\"sid\":90312,\"id\":3,\"ts_ms\":42,\"type\":\"hello\",\"payload\":{\"host\":\"deskcatd\",\"version\":\"0.1.0\",\"reason\":\"resync\"}}\n",
+      "canonical": true,
+      "expect": {
+        "type": "hello",
+        "sid": 90312,
+        "id": 3
+      }
+    },
+    {
+      "name": "ping",
+      "line": "{\"v\":1,\"sid\":90312,\"id\":907,\"ts_ms\":54000,\"type\":\"ping\",\"payload\":{}}\n",
+      "canonical": true,
+      "expect": {
+        "type": "ping",
+        "sid": 90312,
+        "id": 907
+      }
+    },
+    {
+      "name": "get_status",
+      "line": "{\"v\":1,\"sid\":90312,\"id\":906,\"ts_ms\":53500,\"type\":\"get_status\",\"payload\":{}}\n",
+      "canonical": true,
+      "expect": {
+        "type": "get_status",
+        "sid": 90312,
+        "id": 906
+      }
+    },
+    {
+      "name": "status_snapshot",
+      "line": "{\"v\":1,\"sid\":41207,\"id\":26,\"ts_ms\":15100,\"type\":\"status\",\"payload\":{\"firmware\":\"0.1.0\",\"reset_reason\":\"power_on\",\"display\":{\"state\":\"ready\",\"expression\":\"neutral\"},\"servo\":{\"state\":\"disabled\"},\"sensors\":{\"touch\":\"unknown\",\"acceleration\":\"unknown\",\"environment\":\"unknown\"},\"protocol\":{\"parse_errors\":0,\"invalid_payloads\":0,\"unsupported_versions\":0,\"oversize_lines\":0,\"unknown_types\":0,\"rate_limited\":0,\"busy\":0,\"out_of_range\":0,\"stale_sessions\":0,\"session_switches\":0,\"suppressed_responses\":0}}}\n",
+      "canonical": true,
+      "expect": {
+        "type": "status",
+        "sid": 41207,
+        "id": 26
+      }
+    },
+    {
+      "name": "ack_ok",
+      "line": "{\"v\":1,\"sid\":41207,\"id\":905,\"ts_ms\":53100,\"type\":\"ack\",\"payload\":{\"reply_sid\":90312,\"reply_to\":903,\"status\":\"ok\"}}\n",
+      "canonical": true,
+      "expect": {
+        "type": "ack",
+        "sid": 41207,
+        "id": 905
+      }
+    },
+    {
+      "name": "ack_rejected_with_code_and_detail",
+      "line": "{\"v\":1,\"sid\":41207,\"id\":906,\"ts_ms\":53200,\"type\":\"ack\",\"payload\":{\"reply_sid\":90312,\"reply_to\":904,\"status\":\"rejected\",\"code\":\"invalid_payload\",\"detail\":\"reason not in enum\"}}\n",
+      "canonical": true,
+      "expect": {
+        "type": "ack",
+        "sid": 41207,
+        "id": 906
+      }
+    },
+    {
+      "name": "unknown_payload_field_is_ignored",
+      "line": "{\"v\":1,\"sid\":41207,\"id\":2,\"ts_ms\":120,\"type\":\"boot\",\"payload\":{\"firmware\":\"0.1.0\",\"board\":\"esp32\",\"reset_reason\":\"power_on\",\"future_capability\":\"ota\"}}\n",
+      "canonical": false,
+      "expect": {
+        "type": "boot",
+        "sid": 41207,
+        "id": 2
+      },
+      "note": "§3: 同じmajor version内では未知の追加payload fieldを無視してよい。再encodeでは落ちるためcanonicalではない。"
+    },
+    {
+      "name": "envelope_integers_at_maximum",
+      "line": "{\"v\":1,\"sid\":4294967295,\"id\":4294967295,\"ts_ms\":18446744073709551615,\"type\":\"ping\",\"payload\":{}}\n",
+      "canonical": true,
+      "expect": {
+        "type": "ping",
+        "sid": 4294967295,
+        "id": 4294967295
+      },
+      "note": "sidとidはu32、ts_msはu64の最大値。PROTO-TBD-003で確定した幅。"
+    },
+    {
+      "name": "strings_at_limit",
+      "line": "{\"v\":1,\"sid\":41207,\"id\":3,\"ts_ms\":130,\"type\":\"boot\",\"payload\":{\"firmware\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"board\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"reset_reason\":\"rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr\"}}\n",
+      "canonical": true,
+      "expect": {
+        "type": "boot",
+        "sid": 41207,
+        "id": 3
+      },
+      "note": "各string fieldが上限byte長ちょうど。"
+    },
+    {
+      "name": "line_at_maximum_length",
+      "line": "{\"v\":1,\"sid\":41207,\"id\":1,\"ts_ms\":100,\"type\":\"boot\",\"payload\":{\"firmware\":\"0.1.0\",\"board\":\"esp32\",\"reset_reason\":\"power_on\",\"unknown_pad\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}}\n",
+      "canonical": false,
+      "expect": {
+        "type": "boot",
+        "sid": 41207,
+        "id": 1
+      },
+      "note": "改行を含めてちょうど1024 byte。未知fieldで埋めている。"
+    },
+    {
+      "name": "crlf_line_ending",
+      "line": "{\"v\":1,\"sid\":90312,\"id\":908,\"ts_ms\":54100,\"type\":\"ping\",\"payload\":{}}\r\n",
+      "canonical": false,
+      "expect": {
+        "type": "ping",
+        "sid": 90312,
+        "id": 908
+      },
+      "note": "§2: 受信可能なline endingは`\\n`で、直前の`\\r`は除去する。"
+    }
+  ]
+}
