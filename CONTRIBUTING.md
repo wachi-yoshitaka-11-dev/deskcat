@@ -322,22 +322,18 @@ GitHubはthreadが存在しないものをblockできない。**reviewの到着�
 自動reviewの対象は[`.coderabbit.yaml`](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/.coderabbit.yaml)
 で高リスク変更へ限定している。対象外のPull Requestでは[自己レビュー](#自己レビュー)が唯一のreviewである。
 
-**対象のPull Requestで指摘に対応したら、`@coderabbitai review`を手で1回投げる。**
-`auto_incremental_review`を`false`にしているため、**pushしても再reviewは走らない。**
-対応commitがreviewを受けないまま`pass`になる。
-[#90](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/90)で実際に起きた。
+**指摘に対応したcommitは、自己レビューで見る。**`auto_incremental_review`を`false`にしているため、
+pushしても再reviewは走らない。**ここで`@coderabbitai review`を投げ直さない。**
+投げ直すと1つのPull Requestでreviewを何度も消費し、`false`にした意味が無くなる。
+[#91](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/91)で実際にそうなり、2回目はrate limitで終わった。
 
-`true`へ戻さないのは、pushごとの再reviewが1つのPull Requestでreviewを何度も消費し、
-rate limitの主因になるためである。**回数を自分で決められる手動依頼を選んでいる。**
+**自動reviewが一度も走らなかった場合だけ、手動で依頼する。**該当するのは
+`Review rate limited`または`Review skipped`で初回のreviewが得られなかったときである。
 
-**手動依頼の終了条件を決めておく。**依頼を投げただけでは完了ではない。
-
-| 手動依頼の結果 | 次の行動 |
+| 変更の種類 | 初回reviewが得られなかったとき |
 |---|---|
-| review報告が届いた（`Review completed`） | **完了。**指摘があれば対応し、対応commitについて再度この表に従う |
-| 新しい指摘が出た | **完了ではない。**対応してから再度手動依頼する。指摘が0件になるまで繰り返す |
-| `Review rate limited` | **完了ではない。**時間を置いて1回だけ再依頼する。それでもrate limitなら下記の代替経路へ |
-| 2回目もrate limited | **機械reviewを断念してよい。**ただし次をすべて行う。(1) Pull Request本文へ「機械reviewを通していない」と、その判断の根拠を書く。(2) [自己レビュー](#自己レビュー)を実施し、検出内容を本文へ記録する。(3) 安全・電気・protocol・firmwareに関わる変更の場合は**断念せず、rate limitが解けるまで待つ** |
+| 安全、電気、protocol、firmware | **rate limitが解けるまで待つ。**自己レビューで代替しない |
+| 上記以外 | **自己レビューで通してよい。**Pull Request本文へ機械reviewを通していない旨と、その判断の根拠を書く |
 
 **「reviewを依頼した」を「reviewを受けた」と書かない。**`Review rate limited`は`pass`と表示されるため、
 依頼の事実だけで完了扱いにすると検出が抜ける。
