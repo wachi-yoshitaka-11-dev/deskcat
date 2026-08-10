@@ -1,0 +1,7 @@
+/.vscode
+/.embuild
+/target
+
+# applicationのlockfileは再現可能なbuildのため追跡する。
+# templateが出力した`/Cargo.lock`の除外は、docs/runbooks/esp32-development-machine-setup.md
+# の生成物review手順に従って外している。

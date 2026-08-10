@@ -1,6 +1,6 @@
 # DeskCat
 
-DeskCat は、机上で静かに振る舞う猫型ペットロボットです。ESP32 が表示・センサ・サーボなどの実時間 I/O を担当し、Raspberry Pi Zero WH が感情、状態、自律行動、ログ、設定を担当します。
+DeskCat は、机上で静かに振る舞う猫型ペットロボットです。ESP32 が表示・センサ・サーボなどの実時間 I/O を担当し、Raspberry Pi Zero W が感情、状態、自律行動、ログ、設定を担当します。
 
 > 開発状態: 基盤整備とハードウェア特定
 > 正確なmodule、GPIO割当て、電力budget、サーボ制限が確定するまで、hardware driverの実装は開始しない。
@@ -25,7 +25,7 @@ DeskCat は、机上で静かに振る舞う猫型ペットロボットです。
 flowchart LR
     User[User] -->|Touch / tap / choices| ESP[ESP32]
     Sensors[Sensors] --> ESP
-    ESP -->|JSON Lines over USB serial| Pi[Raspberry Pi Zero WH]
+    ESP -->|JSON Lines over USB serial| Pi[Raspberry Pi Zero W]
     Pi -->|Expression / text / motion commands| ESP
     ESP --> LCD[LCD]
     ESP --> Servo[Servo]
@@ -33,8 +33,8 @@ flowchart LR
 
 | 層 | 責務 |
 |---|---|
-| ESP32-DevKitC-32E | LCD、touch、加速度、環境sensor、サーボ、即時安全制御 |
-| Raspberry Pi Zero WH | 感情、行動、独り言、log、設定、API |
+| ESP-WROOM-32D開発ボード（秋月電子 M-13628） | LCD、touch、加速度、環境sensor、サーボ、即時安全制御 |
+| Raspberry Pi Zero W（V1.1） | 感情、行動、独り言、log、設定、API |
 | Protocol | 初期USB serial link上の、version付き・最大長制限付きJSON Lines |
 
 Piから不正なcommandを受け取った場合も、ESP32が物理安全制限を強制する。
@@ -90,16 +90,40 @@ workspaceの判断は[ADR-0001](docs/decisions/0001-monorepo-layout.md)を参照
 
 ## Buildとtest
 
-Rust workspaceは意図的に未生成である。Rust、ESP-IDF、target、crateの正確なversionは、現在の公式資料とbuild結果を使って確定する。
+文書作成・review専用端末にはRust、ESP-IDF、USB toolを導入しない。[ESP32セットアップrunbook](docs/runbooks/esp32-development-machine-setup.md)または[Raspberry Piセットアップrunbook](docs/runbooks/raspberry-pi-development-machine-setup.md)は、対応profileを割り当てた端末だけで使用し、[version記録template](docs/toolchains/version-record-template.md)で環境を記録する。
 
-公式情報の調査結果と現在の候補は[toolchain一覧](docs/toolchains/README.md)に記録している。まだbuild検証済みの固定版ではない。文書作成・review専用端末にはRust、ESP-IDF、USB toolを導入しない。
+### ESP32 firmware（検証済みcommand）
 
-draftの[ESP32セットアップrunbook](docs/runbooks/esp32-development-machine-setup.md)または[Raspberry Piセットアップrunbook](docs/runbooks/raspberry-pi-development-machine-setup.md)は、対応profileを割り当てた端末だけで使用する。[version記録template](docs/toolchains/version-record-template.md)で環境を記録する。
+ESP32 Build profileの端末で、`firmware/esp32`にて実行する。事前に[ESP32セットアップrunbook](docs/runbooks/esp32-development-machine-setup.md)のtoolchain導入を済ませる。
 
-対象開発端末でclean buildに成功した後、この節へ検証済みcommandを記載する。
+```bash
+. "$HOME/export-esp.sh"
+cargo fmt --all -- --check
+cargo clippy --all-targets --locked -- -D warnings
+cargo build --locked
+```
+
+`--locked`は、追跡している`Cargo.lock`から解決結果が逸脱した場合に、lockfileを更新せず失敗させる。`cargo fmt`はこのoptionを受け付けない。
+
+Linux x86_64で検証した。初回は2026-08-06、現行treeに対する最新の検証は2026-08-08である。証拠は[Version Record](docs/toolchains/version-records/2026-08-06-esp32-build-linux.md)にある。確定版は次である。
+
+| 項目 | 確定版 |
+|---|---|
+| Rust target | `xtensa-esp32-espidf` |
+| Rust channel | `esp`（Xtensa Rust 1.95.0.0） |
+| ESP-IDF | `v5.5.3` |
+| linker | `ldproxy` |
+
+初回buildはESP-IDF本体を取得するため時間と容量を要する（検証時は4分33秒、`.embuild`は4.4 GB）。`export-esp.sh`を読み込まずに実行すると失敗する。
+
+別端末での再現は未検証である。標準OSは[ADR-0005](docs/decisions/0005-standard-development-os.md)により実機のLinuxで、Windowsは対象外である。flashとserial monitorは#6の範囲であり、実機の確認が済むまで実行しない。
+
+### 未確定のcommand
+
+次はまだ検証済みcommandが無い。対象開発端末でclean buildに成功した後にこの節へ記載する。
 
 - hostのformat、lint、unit test
-- ESP32のbuild、flash、serial monitor
+- ESP32のflash、serial monitor
 - Raspberry Piのbuildと実行
 - protocol fixture
 - HIL test

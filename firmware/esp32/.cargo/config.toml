@@ -1,0 +1,24 @@
+[build]
+target = "xtensa-esp32-espidf"
+
+[target.'cfg(target_os = "espidf")']
+linker = "ldproxy"
+runner = "espflash flash --monitor"
+rustflags = [ "--cfg",  "espidf_time64"]
+
+[unstable]
+build-std = ["std", "panic_abort"]
+
+# `force = true`が無いと、Cargoは既に環境に存在する変数を上書きしない。
+# 公式仕様: "By default, the variables specified will not override values that
+# already exist in the environment."
+# https://doc.rust-lang.org/cargo/reference/config.html
+# 固定した値を環境変数で黙って差し替えられないよう、明示的に上書きさせる。
+[env]
+MCU = { value = "esp32", force = true }
+ESP_IDF_VERSION = { value = "v5.5.3", force = true }
+ESP_IDF_TOOLS_INSTALL_DIR = { value = "workspace", force = true }
+
+# Uncomment this if you have moved the target dir by setting CARGO_TARGET_DIR or similar.
+# Required for now due to embuild limitations.
+#CARGO_WORKSPACE_DIR = { value = "", relative = true }
