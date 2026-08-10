@@ -258,7 +258,7 @@ PR mergeのたびにhead branchを削除する。`develop`のような恒久的�
 
 ### CodeRabbitのauto review設定（2026-08-10）
 
-[`.coderabbit.yaml`](../.coderabbit.yaml)を新設し、auto reviewを高リスク変更へ限定した
+[`.coderabbit.yaml`](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/.coderabbit.yaml)を新設し、auto reviewを高リスク変更へ限定した
 （[PR #88](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/88)、[#87](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/87)）。
 
 | key | 値 |
