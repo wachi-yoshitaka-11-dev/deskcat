@@ -26,7 +26,8 @@
 │  └─ （案Bの場合のみ）ESP-WROOM-32Dの`5V` pinへ直接
 │        ESP32の給電経路は案A／案Bのいずれか未決定（`ESP32の給電経路（未決定）`節）
 │        board上regulatorが3.3Vを生成し、board上の3V3 pinから出力
-│        ├─ ADXL345（VDD 2.0–3.6V。M-06724はregulator非搭載、3.3V直結が必須）
+│        ├─ ADXL345（VDD 2.0–3.6V。3.3V給電とする。M-06724のregulatorの
+│        │     有無は現物未確認で、根拠資料も入手できない。HW-TBD-004）
 │        ├─ BME280（電源電圧DC1.71～3.6V。5V直結不可）
 │        └─ MSP2807（LCD＋touch。VCC 3.3–5V対応だがlogic IOは3.3V TTL。
 │              下記理由により3.3Vで給電する）
@@ -813,3 +814,4 @@ PiのconnectorとPCB traceを通る。
 | 2026-08-09 | 32 | [#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)。段階B-2のgateを[TBD台帳](tbd-register.md)へ登録（`HW-TBD-023`／`024`）したのに合わせ、**この文書側からも台帳を辿れるようにした。**`HW-TBD-021`（過電流保護）と`HW-TBD-022`（大電流経路の線材）は正本側に「追跡は〜」の1文があるのに、B-2のgateだけ台帳→正本の片方向で、B-2a／B-2bの実施条件を読んだ人が台帳のどの項目かを辿れなかった | 自己レビュー |
 | 2026-08-09 | 33 | 昇格PR[#61](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/61)のレビュー指摘（Minor）を反映。**B-2の共通条件が台帳に登録されておらず、`HW-TBD-023`／`024`が解決しても許容電圧範囲が未確定のままB-2を進められる状態だった。**`HW-TBD-025`を追加し、共通条件表の直後から参照させた。あわせて**この文書とhardware-bom.mdの間にあった不整合を直した。**「周辺module3点それぞれの安全な電流上限」を、この文書はB-2b専用としていたが、`hardware-bom.md`の受け入れchecklistは共通条件としていた。**論理的には共通である**（B-2aでもboard上regulatorの保護のtrip点がmoduleにとって安全かを、module側の上限が無ければ判定できない）。`AGENTS.md`の「矛盾する場合はより安全で厳しい規則を適用する」に従い共通条件へ移した。**その帰結として、MSP2807の上限が未確定である限りB-2aも実施できない** | [PR #61レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/61) |
 | 2026-08-09 | 34 | 昇格PR[#61](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/61)のfull reviewの指摘を反映。**保護部品の選定条件が方式別に分かれていなかった。**`PROT-OC-01`を「PTCまたはガラス管ヒューズ」としながら、判定条件はPTCの用語（保持電流・trip電流・trip時間）だけで書いており、**ヒューズを選ぶ場合に何を見ればよいか定まらなかった。**ヒューズは定格電流・時間-電流特性・遮断定格（breaking capacity）・`I²t`が公開量である。`選定基準`を「先に方式を決める」＋`方式によらない基準`へ再構成し、`記録するtrip動作`をPTC列とヒューズ列に分けた。あわせて`経路部品と定格`表・`選定順序`・derating式のPTC専用語（保持電流）を、方式非依存の「連続通電できる電流」（PTCなら保持電流、ヒューズなら定格電流）へ改めた | [PR #61レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/61) |
+| 2026-08-11 | 35 | [#1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1)。**電源rail構成案の図が「M-06724はregulator非搭載」を確定事項として書いていた。**この前提の根拠は秋月 M-06724の商品ページだが、**現在404で入手できない**（2026-08-10確認）。regulatorの有無を現物確認待ちとし、`HW-TBD-004`を参照させた。**3.3V給電とする規則は変えていない。**IC定格の上限が3.6Vであり、regulatorの有無に関わらず5V直結は不可だからである | [PR #82](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/82)、[hardware-bom.md](hardware-bom.md) Revision 30 |
