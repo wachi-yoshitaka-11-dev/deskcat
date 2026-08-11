@@ -204,7 +204,7 @@ CodeRabbit自身の回答である。**こちらの実測ではない。**
 `Review skipped`となり、labelは33分後に付いた。しかし**その判定の5秒後に`.coderabbit.yaml`が
 `develop`へmergeされている**（判定 `12:22:00Z`、merge `12:22:05Z`）。
 **判定の時点でこの設定はbase branchに無く、labelの未付与と設定の未反映が切り分けられない。**
-#89 を「後付けが原因」の証拠として使わない。
+Issue `#89` を「後付けが原因」の証拠として使わない。
 
 **それでも作成時に付ける。**CodeRabbitの回答に沿う運用であり、費用は`--label`を足すだけで、
 取り落としの可能性を消せる。**切り分けられない以上、確実な側に倒す。**
@@ -342,6 +342,12 @@ base が`develop`でも`main`でも適用する。
 [Repository設定](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/.github/REPOSITORY_SETTINGS.md)）。
 未解決threadが1件でもあれば`mergeStateStatus`が`BLOCKED`になり、mergeできない。
 **手作業でthreadを数える必要はない。**
+
+**ただし強制されるのは管理者以外である。**`develop`は`enforce_admins`を`false`にしており
+（[Repository設定](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/.github/REPOSITORY_SETTINGS.md)）、
+管理者は`BLOCKED`のままmergeできる。**この経路を使う場合は自動化が何も止めないため、
+[未解決を残してmergeする場合](#未解決を残してmergeする場合)の手順を必ず踏む。**
+「GitHubが止めるはずだ」を根拠にしない。
 
 **thread のresolveは、reviewerの応答を読んでから行う。**指摘へ返信しただけで自動でresolveしない。
 返信に対する応答（自動reviewなら指摘を取り下げたかの判定）を読み、解決したと確認できるthreadだけ

@@ -8,7 +8,7 @@ file 名と Record ID は初回検証日で固定し、以後の再検証でも�
 
 | 記録 | Profile | 判定 | 初回検証日 | 最終検証日 |
 |---|---|---|---|---|
-| [ESP32 Build (Linux x86_64)](2026-08-06-esp32-build-linux.md) | ESP32 Build | `Partial` | 2026-08-06 | 2026-08-08 |
+| [ESP32 Build (Linux x86_64)](2026-08-06-esp32-build-linux.md) | ESP32 Build | `Partial` | 2026-08-06 | 2026-08-10 |
 | [ESP32 Build (CI)](2026-08-10-esp32-build-ci.md) | CI | `Partial` | 2026-08-10 | 2026-08-10 |
 | [Host Rust Development (Linux x86_64)](2026-08-10-host-rust-linux.md) | Host Rust Development | `Verified` | 2026-08-10 | 2026-08-10 |
 

@@ -41,7 +41,7 @@ cargo build --locked
 
 `export-esp.sh`を読み込まないと失敗する。`ESP_IDF_TOOLS_INSTALL_DIR=workspace`のため、ESP-IDF本体とmanaged toolは`.embuild/`（約4.4 GB）へ展開される。`.embuild/`と`target/`は`.gitignore`で除外し、applicationの`Cargo.lock`は追跡する。
 
-環境に`IDF_PATH`が設定されていると、`.cargo/config.toml`で選んだESP-IDF versionを上書きする。build前に未設定であることを確認する。
+環境に`IDF_PATH`が設定されていると、`.cargo/config.toml`で選んだESP-IDF versionを上書きする。`[env]`の`force = true`はこの変数を保護できないため、**`build.rs`が設定を検出してbuildを止める。**意図した外部SDKを使う場合だけ`DESKCAT_ALLOW_EXTERNAL_IDF_PATH=1`（値は厳密に`1`。`0`や`false`では通らない）を設定して通し、出力される`cargo:warning`をVersion Recordの`IDF_PATH present`へ記録する。
 
 ## 未確定の前提
 

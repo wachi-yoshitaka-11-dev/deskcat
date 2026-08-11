@@ -7,8 +7,8 @@ buildを実行するworkflowは、そのbuild commandが確定してから追加
 
 | # | 対象 | 状態 |
 |---|---|---|
-| 1 | root Cargo workspace作成後のhost format、lint、unit test | 未着手。workspaceが未生成 |
-| 2 | protocol fixture test | 未着手。[#9](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/9)待ち |
+| 1 | root Cargo workspace作成後のhost format、lint、unit test | **未着手。**workspaceは[#9](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/9)で作成済みであり、前提は揃っている。workflowが無いだけである |
+| 2 | protocol fixture test | **未着手。**fixtureとtestは[#9](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/9)で作成済みで、開発端末では合格している（[Version Record](../../docs/toolchains/version-records/2026-08-10-host-rust-linux.md)）。CIから実行していない |
 | 3 | toolchain固定後のESP32 cross-build | **`firmware.yml`で実施**（[#42](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/42)） |
 | 4 | toolとversion選定後の文書検査 | **`pages.yml`で実施**（[#26](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/26)） |
 

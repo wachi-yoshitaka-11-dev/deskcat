@@ -70,7 +70,8 @@ Closes #
 
 **この節はmerge直前に確認して更新する。**作成時点ではthreadが無いため空欄でよい。
 
-- [ ] 自動review（CodeRabbit）のcheckが完了している（`pending`のままmergeしない）
+- [ ] 自動review（CodeRabbit）の**説明文**を読んだ。checkの色だけで判断しない。allowlistのlabelを持つPull Requestは`Review completed`であること。`Review rate limited`と`Review skipped`は**`pass`と表示されるがreviewは走っていない**（[GitHubが強制しないもの](../CONTRIBUTING.md#githubが強制しないもの)）
+- [ ] reviewが走らなかった場合、[初回reviewが得られなかったとき](../CONTRIBUTING.md#merge前の確認)の表に従った。**安全・電気・protocol・firmwareに関わる変更を自己レビューで代替しない。**`Review skipped: excluded by label configuration`のときは、labelの付け方が変更の内容に対して誤っていないかも確認した
 - [ ] 未解決のreview threadが0件である（GraphQLの`reviewThreads.isResolved`で確認した。REST APIのcomment一覧では判定できない）
 - [ ] 未解決を残す場合は追跡Issueを起票し、下欄と該当threadへ番号を記載した
 
