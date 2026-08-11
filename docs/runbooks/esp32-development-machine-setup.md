@@ -223,7 +223,11 @@ build script が panic し、意図した外部 SDK である場合だけ `DESKC
 記録は [Version Record](../toolchains/version-records/2026-08-06-esp32-build-linux.md)）。
 
 なお `~/export-esp.sh` は `LIBCLANG_PATH` と `PATH` の2行だけを設定し、
-**`IDF_PATH` を設定しない**（同じく #102 で実測）。読み込んでも guard には掛からない。
+**`IDF_PATH` を設定しない**（同じく #102 で実測）。
+
+**ただし `IDF_PATH` を unset するわけでもない。**別の経路で既に設定されていれば
+その値は残り、guard に掛かる。「`export-esp.sh` を読み込んだから安全」とは読まない。
+[開始条件](#開始条件) に「既存の Rust、Python、ESP-IDF、`IDF_PATH` を調査した」があるのはこのためである。
 
 ## 5. Review済みtemplateから生成
 

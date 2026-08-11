@@ -1324,7 +1324,7 @@ IDF_PATH is set to <home>/deskcat/firmware/esp32/.embuild/espressif/esp-idf/v5.5
 | `=1` | `0` | `cargo:warning=IDF_PATH=... overrides the pinned ESP-IDF.` |
 | `=0` | `101` | `panicked at build.rs:26:9` ＋ guard message |
 | `=false` | `101` | `panicked at build.rs:26:9` ＋ guard message |
-| 空文字 | `0` | 出力なし |
+| 空文字 | `0` | `cargo:rerun-if-env-changed=` 2行のみ（未設定と同じ。warningもpanicも無い） |
 
 **6分岐すべてが`build.rs`の設計どおりである。**`cargo:rerun-if-env-changed`の2行は全caseで出ている。
 
