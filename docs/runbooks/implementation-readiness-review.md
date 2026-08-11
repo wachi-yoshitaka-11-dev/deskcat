@@ -1,7 +1,7 @@
 # Implementation Readiness Review
 
 > Review日: 2026-07-27
-> 最終更新: 2026-08-11（Software gateのtoolchain関連2行を#40／#86の結果へ更新）
+> 最終更新: 2026-08-12（`HW-TBD-001`の参照4箇所をPR #82後の正本の表現へ更新）
 > 結果: Hardware driver実装のgateは未通過
 
 ## 結論
@@ -14,7 +14,7 @@ clean buildも#5（PR #40）で完了し、#86でCIから再現した。**この
 本節が挙げた作業streamのうち、いまも独立に開始できるのは、人間が主導するハードウェア現物
 inventory（#1）である。最初のperipheral driverまたは統合通電までは、これを独立して進められる。
 
-**実機へのflashとserial monitor（#6）は、まだ独立に開始できない。**`HW-TBD-001`（board回路図と
+**実機へのflashとserial monitor（#6）は、まだ独立に開始できない。**`HW-TBD-001`（公式pin表と
 現物pin表記の照合）がflashの前提条件であり、その解消は#1に依存する。
 
 ## Repository gate
@@ -56,7 +56,7 @@ Peripheral driverまたはservo出力は、いずれもこのgateを通過して
 | Host／firmware workspaceが存在する | Pass | firmware workspaceは#5／#40、host workspaceは#9で作成した |
 
 **`build検証済み`という状態語の正本は[ESP32 Rust Toolchain](../toolchains/esp32-rust-toolchain.md)である。**
-同文書は確定条件のうちchip刻印の読み取りと、回路図・現物pin表記の照合の2項目が未達であるため、
+同文書は確定条件のうちchip刻印の読み取りと、公式pin表と現物pin表記の照合の2項目が未達であるため、
 状態を`Verified`ではなく`build検証済み`にとどめている。このgateも同じ語を使い、
 **build以外を検証済みとして扱わない。**
 
@@ -116,7 +116,7 @@ checkboxをここで二重管理しない。**同文書で未達なのは次の2
 
 - **chip刻印の読み取り**: 現物写真が反射で判読不能。搭載moduleは確定しており、そのdatasheetが
   中核chipを示すため、**buildへの影響は無い**
-- **board回路図と現物pin表記の照合**: `HW-TBD-001`として追跡し（#1）、#6のflashの前提条件でもある
+- **公式pin表と現物pin表記の照合**: `HW-TBD-001`として追跡し（#1）、#6のflashの前提条件でもある
 
 許可した範囲:
 
@@ -155,7 +155,7 @@ GitHub Issue migration: PENDING foundation document publication
 対象は#1、#2、#3、#6、#10、#12である。
 
 **#5を対象へ戻さない。**PR #40でcloseし、#86でCIから再現した。Software gateの
-「互換性のあるRust／ESP-IDF version」は`build検証済み`である。残るboard回路図とpin表記の照合は
+「互換性のあるRust／ESP-IDF version」は`build検証済み`である。残る公式pin表と現物pin表記の照合は
 Issue `#5`ではなく`HW-TBD-001`（#1）が担い、flashとserial monitorは#6が担う。
 
 `#6`（flashとserial monitor）を落とさない。Software gateの「再現可能なbuild／flash／monitor

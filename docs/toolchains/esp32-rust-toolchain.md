@@ -20,19 +20,21 @@ xtensa-esp32-espidf
 
 | 段階 | 内容 | 出典 |
 |---|---|---|
-| board | ESP-WROOM-32D 開発ボード（秋月電子 M-13628）。基板裏面 silkscreen は `ESP32_DevkitC_V4` で、Espressif ESP32-DevKitC V4 のリファレンスデザインに基づく秋月独自基板である。Espressif 公式の ESP32-DevKitC ではない | [秋月商品ページ M-13628](https://akizukidenshi.com/catalog/g/g113628/)（データシート添付）。確定根拠は [hardware-bom.md](../hardware/hardware-bom.md) の MCU-01 |
+| board | ESP-WROOM-32D 開発ボード（秋月電子 M-13628）。基板裏面 silkscreen は `ESP32_DevkitC_V4` で、Espressif ESP32-DevKitC V4 のリファレンスデザインに基づく | [秋月商品ページ M-13628](https://akizukidenshi.com/catalog/g/g113628/)（**添付はモジュールとチップの datasheet のみ**）、[ESP32-DevKitC V4 公式回路図](https://dl.espressif.com/dl/schematics/esp32_devkitc_v4-sch.pdf)。確定根拠は [hardware-bom.md](../hardware/hardware-bom.md) の MCU-01 |
 | module | ESP-WROOM-32D。中核は `ESP32-D0WD`。Xtensa dual-core 32-bit LX6 | [ESP32-WROOM-32D & ESP32-WROOM-32U Datasheet v2.7](https://documentation.espressif.com/esp32-wroom-32d_esp32-wroom-32u_datasheet_en.pdf)（2026-08-08 取得） |
 | target | MCU `esp32` → arch `xtensa` / rust target `xtensa-esp32-espidf` / gcc target `xtensa-esp32-elf` | [esp-idf-template `08115a06`](https://github.com/esp-rs/esp-idf-template/blob/08115a069d167a5ee37363e84f168a565f17bbca/cargo/pre-script.rhai) の `pre-script.rhai`（2026-08-06 取得） |
 
 同 template は MCU `esp32` の Wokwi board を `board-esp32-devkit-c-v4` と定義しており、対象 board と MCU 選択の対応を裏づける。
 
-本 board は Espressif 公式の ESP32-DevKitC ではないが、silkscreen が示すとおり同じ V4 リファレンスデザインに基づき、搭載 module も classic ESP32 系である。したがって MCU 選択と target は同一になる。
+本 board は silkscreen が示すとおり V4 リファレンスデザインに基づき、搭載 module も classic ESP32 系である。したがって MCU 選択と target は同一になる。
 
 ESP-WROOM-32D の datasheet v2.7 には **PSRAM を内蔵する variant の記載が無い**。同 datasheet が挙げる variant の差は antenna（PCB antenna の 32D と外部 connector の 32U）だけである。したがって PSRAM の有無による構成差は本 board では生じない。
 
 現物確認により、module 種別（購入履歴と基板裏面 silkscreen `ESP32_DevkitC_V4`）と、基板に revision 表示が無いことは確定している。
 
-[HW-TBD-001](../hardware/tbd-register.md) は範囲が縮小し、残る追跡対象は **board 回路図と現物 pin 表記の照合**だけである。**pin 配列が Espressif ESP32-DevKitC V4 と完全に一致する保証は無い**ため、秋月電子の独自基板である本 board では GPIO 割り当ての前に照合する。
+[HW-TBD-001](../hardware/tbd-register.md) は範囲が縮小し、残る追跡対象は **公式 pin 表と現物 pin 表記の照合**だけである。**現物が公式 V4 リファレンス設計どおりに実装されている保証は文書だけでは得られない**ため、GPIO 割り当ての前に照合する。
+
+なお、**旧記載の「Espressif 公式の ESP32-DevKitC ではない／秋月電子の独自基板である」は 2026-08-10 に削除した。**この断定を支持する資料が存在せず、秋月商品ページ自身がメーカーを `Espressif Systems`、型番を `ESP32-DevKitC-32D` と表示していたためである。詳細は [hardware-bom.md](../hardware/hardware-bom.md) の Revision 29。**照合が必要である点は変わらない**（理由が変わっただけである）。
 
 これとは別に、**chip の刻印は未読である**（現物写真が反射で判読不能）。搭載 module が ESP-WROOM-32D であることは購入履歴と silkscreen で確定しており、その datasheet が示す中核 chip は `ESP32-D0WD` である。刻印の読み取りは **2026-08-11 の全数照合で [`HW-TBD-031`](../hardware/tbd-register.md) として TBD 台帳へ登録した**（それまで追跡対象になっていなかった）。
 
@@ -173,7 +175,7 @@ build はそのまま成功する。この取り違えは runbook の版上げ�
 
 - [x] 物理基板の機種と搭載 module を確認した（ESP-WROOM-32D 開発ボード／秋月電子 M-13628。基板に revision 表示は無い）
 - [ ] chip 刻印を読み取った（現物写真が反射で判読不能）
-- [ ] 回路図と現物 pin 表記を照合した
+- [ ] 公式 pin 表と現物 pin 表記を照合した
 - [x] 開発端末の profile と version record を作成した
 - [x] レビュー済み template commit から最小 project を生成した
 - [x] 環境変数による意図しない SDK override がない
@@ -186,7 +188,7 @@ build はそのまま成功する。この取り違えは runbook の版上げ�
 未達の 2 項目により、この文書の状態は `検証済み`（`Verified`）ではなく **`build検証済み`** にとどめる。語の定義は [状態ラベル](README.md#状態ラベル) を参照する。
 
 - **chip 刻印の読み取り**: 現物写真が反射で判読不能。搭載 module は確定しており、その datasheet が中核 chip を示すため、build への影響は無い。
-- **回路図と現物 pin 表記の照合**: [HW-TBD-001](../hardware/tbd-register.md) として追跡し、#6 の flash 前提条件でもある。物理基板の機種と搭載 module 自体は現物確認で確定済みである。
+- **公式 pin 表と現物 pin 表記の照合**: [HW-TBD-001](../hardware/tbd-register.md) として追跡し、#6 の flash 前提条件でもある。物理基板の機種と搭載 module 自体は現物確認で確定済みである。
 
 **別端末での再現は満たした。**根拠と、そう判断してよい理由を次に示す。
 
@@ -207,7 +209,7 @@ lockfile、clean build）をすべて記録している。
 標準OSは [ADR-0005](../decisions/0005-standard-development-os.md) により実機 Linux であり、
 Windows は対象外のため再現対象に含めない。**CI は Windows ではなく Linux であり、この除外に当たらない。**
 
-**それでも状態は `Verified` へ上げない。**残る 2 項目（chip 刻印、回路図と現物 pin 表記の照合）は
+**それでも状態は `Verified` へ上げない。**残る 2 項目（chip 刻印、公式 pin 表と現物 pin 表記の照合）は
 いずれも現物確認を要し、CI では代替できない。**「CI が通ったから昇格できる」とは結論しない。**
 
 flash、serial monitor、実機起動は #6 の範囲であり、この文書の build-only 確定条件には含めない。
