@@ -27,6 +27,12 @@
 
 出典: メーカーdatasheet [`msp2807.pdf`](https://akizukidenshi.com/goodsaffix/msp2807.pdf)（[秋月商品ページ](https://akizukidenshi.com/catalog/g/g116265/) 添付、revision表記なし）、
 [LCD Wiki MSP2807](http://www.lcdwiki.com/2.8inch_SPI_Module_ILI9341_SKU:MSP2807)。2026-08-10取得。
+controllerの挙動は`ILI9341 Datasheet V1.13`（Ilitek、2011-08-05）による。2026-08-12取得。
+**Ilitek公式の配布先は見つかっていないため、[Adafruitがhostする版](https://cdn-shop.adafruit.com/datasheets/ILI9341.pdf)を開いた**
+（PDF metadataのTitleが`ILI9341_DS_V1.13_20110805.doc`。245page）。**mirrorであり、公式配布物との同一性は確認していない。**
+
+> **module datasheetとcontroller datasheetが矛盾する箇所がある**（`DC/RS`の極性）。
+> **その1箇所については後者を正とする。**理由は下表の`Data／command動作`欄に記す。
 
 | 項目 | 値 |
 |---|---|
@@ -40,7 +46,7 @@
 | SPI mode／max clock | TBD（datasheetに記載なし。**現物のbench試験で確認する**） |
 | Reset polarity／timing | polarityは**low activeでreset**（`RESET` pin）。timingはTBD |
 | Chip-select timing | `CS`は**low activeで有効**。timingはTBD |
-| Data／command動作 | `DC/RS` pin。**high＝register、low＝data** |
+| Data／command動作 | `DC/RS` pin。**`low`＝command、`high`＝data。**`ILI9341 Datasheet V1.13`が`When DCX = '1', data is selected. When DCX = '0', command is selected.`と定め、4-line serial interfaceの節も`If the D/CX bit is "low", the transmission byte is interpreted as a command byte`と一致する。**MSP2807のメーカーdatasheetは`high level: register, low level: data`と逆に記載しているが、この値は採らない。**`DC/RS`はcontrollerの`D/CX`へ直結し、送出byteの解釈を決めるのはILI9341であるためである（この表の`Controller IC`欄のとおり、本moduleのcontrollerはILI9341である）。**現物での確認はLCD bring-up（[#13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)）のbench試験で行う** |
 | Backlight回路／電流／polarity | polarityは**highで点灯**（datasheet記載）。**回路と電流は未公開**であり、datasheetの`Power Consumption`欄は`TBD`と印字されている。**配線方法はここに書かない。**`HW-TBD-024`（このmoduleが耐えられる電流の上限）が未解決の間は、`LED` pinへ電源を直結してよいかを判定できない。配線規則の正本は[power-budget.md](power-budget.md)であり、現物のbacklight回路と安全な電流上限を確認した後に定める。追跡は[tbd-register HW-TBD-024](tbd-register.md) |
 | 初期化sequence | TBD（datasheetに記載なし） |
 | 対応orientation command | TBD |
@@ -57,7 +63,7 @@
 | 2 | `GND` | Ground |
 | 3 | `CS` | LCD chip select（low有効） |
 | 4 | `RESET` | LCD reset（low有効） |
-| 5 | `DC/RS` | register（high）／data（low）選択 |
+| 5 | `DC/RS` | command（`low`）／data（`high`）選択。**メーカーdatasheetの14pin表は逆に記載している**（上表`Data／command動作`欄を参照） |
 | 6 | `SDI(MOSI)` | SPI write |
 | 7 | `SCK` | SPI clock |
 | 8 | `LED` | backlight制御（high点灯） |
@@ -76,6 +82,7 @@
 - Rotation
 - 全体更新と部分更新の時間
 - Touchとserialがactiveな状態での動作
+- **`DC/RS`の極性**（module datasheetとcontroller datasheetで記載が逆であるため）
 
 ## Touch controller
 
@@ -117,26 +124,29 @@ ICの値はメーカーdatasheetで決まるが、module boardの値（jumper構
 | 資料 | 状況 |
 |---|---|
 | [Analog Devices ADXL345 Data Sheet](https://www.analog.com/media/en/technical-documentation/data-sheets/adxl345.pdf) | **本作業環境から開けない。**2026-08-10と08-11に`analog.com`（小文字／大文字の両path）とMouser mirrorをWebFetch／curl／PowerShellで試し、いずれもECONNRESETまたはtimeoutであった |
+| [Analog Devices ADXL345製品ページ](https://www.analog.com/en/products/adxl345.html) | **本作業環境から開けない。**2026-08-12に再試行し、45秒でtimeoutした。[hardware-bom.md](hardware-bom.md) `ACCEL-01`が公式文書欄に載せているURLと同じである |
 | 秋月 M-06724 商品ページ | **404**（`gM-06724`／`g106724`とも） |
+| [SparkFunがhostするADXL345 Data Sheet](https://www.sparkfun.com/datasheets/Sensors/Accelerometer/ADXL345.pdf) | **2026-08-12に開けた。**PDF metadataは`/Author: Analog Devices, Inc.`、`/Title: ADXL345 (Rev. 0)`、`/Category: Data Sheet`、作成日2009-05-29。24page。**mirrorであり公式配布物との同一性は確認していない。またRev. 0が現行revisionである保証はない**（`analog.com`へ到達できないため最新版と照合できていない） |
 
-したがって**revisionとpage／table番号は記録しない。**開いていない文書の所在を書くことになるためである
-（[AGENTS.md](../../AGENTS.md) 推測禁止）。下表のICの値は製品名・製品ページの記載から確定できる範囲に限る。
+**下表のICの値は、上記のSparkFun版（Rev. 0）で確認した範囲に限る。**revisionが確認できない以上、
+**この文書の値をもって最新版の内容とはしない。**現行revisionとの照合は`analog.com`へ到達できる環境で行う。
+module boardの値は、これとは別に現物でしか決まらない（[AGENTS.md](../../AGENTS.md) 推測禁止）。
 
 ### ICの値（Analog Devices ADXL345）
 
 | 項目 | 値 |
 |---|---|
 | IC識別情報 | Analog Devices ADXL345 |
-| 供給電圧 | 2.0–3.6 V。interface用の電源は別系統である。**datasheet上の記号名（`VS`／`VDD`／`VDD I/O`のどれか）は記録しない**（開けていないため）。[hardware-bom.md](hardware-bom.md) `ACCEL-01`は`VDD 2.0–3.6V（別途VDD_IO）`と記載している |
-| 測定range | ±2 g／±4 g／±8 g／±16 g 選択式（datasheetの表題に含まれる範囲） |
-| Interface（ICの対応） | I2C／SPI（3線式・4線式）の両対応 |
-| Filter／FIFO機能 | FIFOを内蔵。**段数と動作はTBD**（datasheetを開けていないため値を記録しない） |
+| 供給電圧 | `VS` 2.0–3.6 V（`Supply voltage range: 2.0 V to 3.6 V`）。interface用の電源は別系統の`VDD I/O`で、`VS ≤ 2.5 V`のとき1.7 V–`VS`、`VS ≥ 2.5 V`のとき2.0 V–`VS`である。**記号は`VS`と`VDD I/O`である**（pin 6＝`VS` Supply Voltage、pin 1＝`VDD I/O` Digital Interface Supply Voltage）。**絶対最大定格はこの行では扱わない。**`HW-TBD-025`(b)（Issue [#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)）の範囲である |
+| 測定range | ±2 g／±4 g／±8 g／±16 g 選択式 |
+| Interface（ICの対応） | I2C／SPI（3線式・4線式）の両対応（`SPI (3- and 4-wire) and I2C digital interfaces`） |
+| Filter／FIFO機能 | **32段のFIFOを内蔵**（`embedded 32-level FIFO`）。modeは`bypass`／`FIFO`／`stream`／`trigger`の4種で、`FIFO_CTL` registerの`FIFO_MODE` bitsで選ぶ。**各modeの詳細な挙動と、driverでどれを使うかはTBD** |
 | Device ID register／value | TBD |
 | Sensitivity変換 | TBD |
 | Output data rate | TBD |
-| Interrupt pinと動作 | INT1／INT2の2本。polarityと駆動形式はTBD |
+| Interrupt pinと動作 | INT1（pin 8）／INT2（pin 9）の2本。polarityと駆動形式はTBD |
 | 起動／reset sequence | TBD |
-| I2Cアドレスの選択方式 | TBD。**選択pinの名前もaddressの値も記録しない**（datasheetを開けていないため） |
+| I2Cアドレスの選択方式 | pin 12 `SDO/ALT ADDRESS`で選ぶ。**7-bit addressは`0x1D`（同pinをhigh）／`0x53`（同pinをGNDへ）**。**ただしどちらになるかはmodule board上の実装で決まる**ため、現物確認まで確定しない（下表`実装済みI2C address`と[tbd-register HW-TBD-004](tbd-register.md)） |
 | Calibration要件 | TBD |
 
 ### module boardの値（秋月 M-06724）
@@ -148,8 +158,8 @@ ICの値はメーカーdatasheetで決まるが、module boardの値（jumper構
 | Module識別情報 | ADXL345モジュール（秋月 M-06724） |
 | 実装されているinterface（jumper設定） | TBD |
 | 実装済みI2C address | TBD |
-| board上のregulatorの有無 | TBD。[hardware-bom.md](hardware-bom.md) `ACCEL-01`は「regulator非搭載」としているが、**その根拠資料へ現在アクセスできない**ため現物で確認する |
-| moduleへ入れてよい電圧 | TBD。**ICの上限3.6 Vをboardの許容値と同一視しない**（regulatorやlevel shiftの有無で変わる） |
+| board上のregulatorの有無 | TBD。**旧記載の「regulator非搭載」は根拠資料（秋月 商品ページ。現在404）を失ったため、2026-08-11に現物確認待ちへ改めた**（[hardware-bom.md](hardware-bom.md) Revision 31）。**載っていないことを前提にしない** |
+| moduleへ入れてよい電圧 | TBD。**ICの上限3.6 Vをboardの許容値と同一視しない**（regulatorやlevel shiftの有無で変わる）。**[power-budget.md](power-budget.md)と[hardware-bom.md](hardware-bom.md)が置く「3.3 Vで給電する」は、この行が埋まるまで確定しない。****5 V直結の禁止と、この行は別の主張である。**5 V禁止は「moduleがregulatorを持たなければ5 VがICへ直接掛かる」ことを否定できないための**確認前の安全規則**であって、IC定格からmoduleの許容入力電圧を導いたものではない。3.3 Vをmoduleが受け入れる根拠も同様に別に要る（[tbd-register HW-TBD-004](tbd-register.md)） |
 | Module搭載pull-up | TBD（有無と値） |
 
 必要なベンチ試験の根拠:
@@ -240,3 +250,4 @@ pin配列: 1=`VDD`, 2=`GND`, 3=`CSB`, 4=`SDI`, 5=`SDO`, 6=`SCK`。
 | 2026-08-10 | 1 | [#1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1)。**一次資料を特定し、公開specから確定する欄を埋めた。**LCD module（[msp2807.pdf](https://akizukidenshi.com/goodsaffix/msp2807.pdf)）は14pin定義・`ILI9341`・320×240・VCC 3.3–5V・logic 3.3V TTL・各信号のpolarityを確定し、pin定義表を追加した。Touch controllerは**datasheetに型番の記載が無い**ことを記録した。Environmental sensor（[Bosch Rev 1.24](https://www.bosch-sensortec.com/media/boschsensortec/downloads/datasheets/bst-bme280-ds002.pdf)＋[AE-BME280説明書 v1.1](https://akizukidenshi.com/goodsaffix/AE-BME280_manu_v1.1.pdf)）は電圧範囲・address・Device ID・起動時間・測定range・精度・消費電流・module pull-upを確定し、jumper表とpin配列を追加した。Accelerometerは**`analog.com`へ接続できず、秋月 M-06724の商品ページも404**のため、確定できた欄だけを埋め、残りは推定せず`TBD`のまま残した。**各moduleの絶対最大定格は`HW-TBD-025`(b)（Issue [#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)）の範囲であり、この改訂では扱っていない** |
 | 2026-08-11 | 2 | [PR #82](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/82)のレビュー指摘2件を反映。(a) LCD moduleのbacklight欄に「制御しない場合は3.3 V直結」と**配線方法を書いていた**。`HW-TBD-024`（このmoduleが耐えられる電流の上限）が未解決の間は直結してよいか判定できず、配線規則の正本は`power-budget.md`である。polarityの記録だけに戻し、配線は現物確認後に定めるとした。(b) Accelerometer節が**ICの値とmodule boardの値を1つの表に混ぜていた**。根拠の種類が違う（ICはdatasheet、moduleはboard資料か現物）ため2つの表へ分けた。あわせて`analog.com`とMouser mirrorへ到達できなかった経緯を記録し、**開いていない文書のrevisionとpage番号は記録しない**方針を明示した |
 | 2026-08-11 | 3 | [PR #82](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/82)の自己レビューで検出。**Revision 2が「datasheetを開けていない」と書きながら、そのdatasheet由来の記号名を書いていた。**Accelerometer節で供給電圧の記号を`VS`と表記し、I2Cアドレス選択pinを`ALT ADDRESS`と名指ししていたが、どちらも一次資料で確認していない。記号名とpin名を落とし、値の範囲（2.0–3.6 V）と`hardware-bom.md`の既存表記だけを残した |
+| 2026-08-12 | 4 | 昇格PR[#109](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/109)のレビュー指摘2件を反映。(a) **`DC/RS`の極性が、controllerの実挙動と逆であった。**module datasheetの14pin表は`high level: register, low level: data`と記載しているが、`ILI9341 Datasheet V1.13`は`When DCX = '1', data is selected. When DCX = '0', command is selected.`と定める。`DC/RS`はcontrollerの`D/CX`へ直結するため**ILI9341を正**とし、両者が食い違う事実と理由を記載した。**module datasheetの記載を消していない**（出典との差を辿れなくなるため）。あわせてbench試験の項目へ極性確認を追加した。(b) **ADXL345のICの値に、開いた出典が無かった。**`analog.com`は2026-08-12にも到達できない（45秒timeout）ままだが、**SparkFunがhostするRev. 0版を開けた**ため到達状況表へ追加し、既記載の値（供給電圧、測定range、interface）をその版で確認した。あわせて`VS`／`VDD I/O`の記号名、FIFOの32段と4 mode、`SDO/ALT ADDRESS`による`0x1D`／`0x53`の選択を記録した。**Revision 3で落とした`VS`と`ALT ADDRESS`は、いずれも結果として正しかった。**ただし当時は開いていない資料の内容であり、落とした判断は当時の根拠に照らして正しい。**mirrorであり公式配布物との同一性も現行revisionであることも確認できていない**ため、その旨を明記した。**絶対最大定格は引き続き扱っていない**（`HW-TBD-025`(b)、[#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)） |
