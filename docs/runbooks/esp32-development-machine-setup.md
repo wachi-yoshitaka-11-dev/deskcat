@@ -215,6 +215,20 @@ build script が panic し、意図した外部 SDK である場合だけ `DESKC
 通した場合は `cargo:warning` が出るので、その値を Version Record の
 `IDF_PATH present` へ記録する。**手作業の確認に依存させない。**
 
+**ただし止めるのが `build.rs` とは限らない。**`IDF_PATH` の指す先が実在しない場合は、
+依存の `esp-idf-sys` が先に別の error で失敗し、guard の message は出ない。
+**guard が効くのは「実在する別の ESP-IDF で黙って build が通る」経路である。**
+どちらでも build は止まるため安全側であり、差は診断 message の分かりやすさだけである
+（[#102](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/102) で実測。
+記録は [Version Record](../toolchains/version-records/2026-08-06-esp32-build-linux.md)）。
+
+なお `~/export-esp.sh` は `LIBCLANG_PATH` と `PATH` の2行だけを設定し、
+**`IDF_PATH` を設定しない**（同じく #102 で実測）。
+
+**ただし `IDF_PATH` を unset するわけでもない。**別の経路で既に設定されていれば
+その値は残り、guard に掛かる。「`export-esp.sh` を読み込んだから安全」とは読まない。
+[開始条件](#開始条件) に「既存の Rust、Python、ESP-IDF、`IDF_PATH` を調査した」があるのはこのためである。
+
 ## 5. Review済みtemplateから生成
 
 template の moving branch を直接信頼せず、[記録済み commit](../toolchains/esp32-rust-toolchain.md#調査した公式構成) を checkout した local copy を使う。

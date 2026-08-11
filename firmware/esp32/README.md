@@ -43,6 +43,8 @@ cargo build --locked
 
 環境に`IDF_PATH`が設定されていると、`.cargo/config.toml`で選んだESP-IDF versionを上書きする。`[env]`の`force = true`はこの変数を保護できないため、**`build.rs`が設定を検出してbuildを止める。**意図した外部SDKを使う場合だけ`DESKCAT_ALLOW_EXTERNAL_IDF_PATH=1`（値は厳密に`1`。`0`や`false`では通らない）を設定して通し、出力される`cargo:warning`をVersion Recordの`IDF_PATH present`へ記録する。
 
+**止めるのが`build.rs`とは限らない。**`IDF_PATH`の指す先が実在しない場合は、依存の`esp-idf-sys`が先に別のerror（`could not determine esp-idf version from ...`）で失敗する。どちらでもbuildは止まるが、`build.rs`のguardのmessageは出ない。実測は[Version Record](../../docs/toolchains/version-records/2026-08-06-esp32-build-linux.md)にある。
+
 ## 未確定の前提
 
 機種と搭載moduleは確定している（ESP-WROOM-32D開発ボード／秋月電子 M-13628。基板にrevision表示は無い）。根拠は[hardware-bom.md](../../docs/hardware/hardware-bom.md)のMCU-01である。
