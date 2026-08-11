@@ -41,7 +41,7 @@
 | Reset polarity／timing | polarityは**low activeでreset**（`RESET` pin）。timingはTBD |
 | Chip-select timing | `CS`は**low activeで有効**。timingはTBD |
 | Data／command動作 | `DC/RS` pin。**high＝register、low＝data** |
-| Backlight回路／電流／polarity | polarityは**highで点灯**（制御しない場合は3.3 V直結で常時点灯）。**回路と電流は未公開。**datasheetの`Power Consumption`欄は`TBD`と印字されている。追跡は[tbd-register HW-TBD-024](tbd-register.md) |
+| Backlight回路／電流／polarity | polarityは**highで点灯**（datasheet記載）。**回路と電流は未公開**であり、datasheetの`Power Consumption`欄は`TBD`と印字されている。**配線方法はここに書かない。**`HW-TBD-024`（このmoduleが耐えられる電流の上限）が未解決の間は、`LED` pinへ電源を直結してよいかを判定できない。配線規則の正本は[power-budget.md](power-budget.md)であり、現物のbacklight回路と安全な電流上限を確認した後に定める。追跡は[tbd-register HW-TBD-024](tbd-register.md) |
 | 初期化sequence | TBD（datasheetに記載なし） |
 | 対応orientation command | TBD |
 | Readback機能 | `SDO(MISO)`あり。**read機能が不要なら未接続でよい**とdatasheetが明記 |
@@ -108,26 +108,49 @@
 
 ## Accelerometer
 
-出典: [Analog Devices ADXL345 Data Sheet](https://www.analog.com/media/en/technical-documentation/data-sheets/adxl345.pdf)。
-**`analog.com`へは本作業環境から接続できず（2026-08-10、複数手段でECONNRESET／timeout）、datasheetの内容を未検証である。**
-また**秋月 M-06724の商品ページは404**であり、module board側の資料も入手できていない。
-したがって下表はほぼ全欄が未確定であり、**IC datasheetから推定して埋めない**（[AGENTS.md](../../AGENTS.md) 推測禁止）。
+**ICの値とmodule boardの値を分けて記録する。**根拠の種類が違うためである。
+ICの値はメーカーdatasheetで決まるが、module boardの値（jumper構成、実装済みaddress、
+搭載pull-up、regulatorの有無）は**そのboardの資料か現物でしか決まらない**。
+
+到達状況は次のとおりである。
+
+| 資料 | 状況 |
+|---|---|
+| [Analog Devices ADXL345 Data Sheet](https://www.analog.com/media/en/technical-documentation/data-sheets/adxl345.pdf) | **本作業環境から開けない。**2026-08-10と08-11に`analog.com`（小文字／大文字の両path）とMouser mirrorをWebFetch／curl／PowerShellで試し、いずれもECONNRESETまたはtimeoutであった |
+| 秋月 M-06724 商品ページ | **404**（`gM-06724`／`g106724`とも） |
+
+したがって**revisionとpage／table番号は記録しない。**開いていない文書の所在を書くことになるためである
+（[AGENTS.md](../../AGENTS.md) 推測禁止）。下表のICの値は製品名・製品ページの記載から確定できる範囲に限る。
+
+### ICの値（Analog Devices ADXL345）
 
 | 項目 | 値 |
 |---|---|
-| Module／IC識別情報 | Module: ADXL345モジュール（秋月 M-06724）。IC: Analog Devices ADXL345 |
-| Interface | I2C または SPI（3線式／4線式）、選択式。**現物のjumper設定で確定する**（[tbd-register HW-TBD-004](tbd-register.md)） |
-| 供給／logic電圧 | VDD 2.0–3.6 V（VDD I/Oは別系統）。**M-06724はregulator非搭載とされるが、根拠資料へ現在アクセスできないため現物で確認する** |
-| Address／select pin | TBD（現物のjumper／pin設定確認要） |
-| Device ID register／value | TBD（datasheet未検証のため記載しない） |
+| IC識別情報 | Analog Devices ADXL345 |
+| 供給電圧 | VS 2.0–3.6 V。VDD I/Oは別系統 |
 | 測定range | ±2 g／±4 g／±8 g／±16 g 選択式（datasheetの表題に含まれる範囲） |
+| Interface（ICの対応） | I2C／SPI（3線式・4線式）の両対応 |
+| Filter／FIFO機能 | FIFOを内蔵。**段数と動作はTBD**（datasheetを開けていないため値を記録しない） |
+| Device ID register／value | TBD |
 | Sensitivity変換 | TBD |
-| Filter／FIFO機能 | FIFOを内蔵（Analog Devicesの製品説明による。**深さと動作はdatasheet未検証のためTBD**） |
 | Output data rate | TBD |
-| Interrupt pinと動作 | INT1／INT2。polarityと駆動形式はTBD |
+| Interrupt pinと動作 | INT1／INT2の2本。polarityと駆動形式はTBD |
 | 起動／reset sequence | TBD |
-| Module pull-up | TBD（module搭載pull-upの有無と値を現物で確認する） |
+| I2Cアドレスの選択方式 | TBD（`ALT ADDRESS` pinで切り替わるが、値はdatasheetを開けていないため記録しない） |
 | Calibration要件 | TBD |
+
+### module boardの値（秋月 M-06724）
+
+**すべて現物確認が要る**（[tbd-register HW-TBD-004](tbd-register.md)）。商品ページが404で資料が無い。
+
+| 項目 | 値 |
+|---|---|
+| Module識別情報 | ADXL345モジュール（秋月 M-06724） |
+| 実装されているinterface（jumper設定） | TBD |
+| 実装済みI2C address | TBD |
+| board上のregulatorの有無 | TBD。[hardware-bom.md](hardware-bom.md) `ACCEL-01`は「regulator非搭載」としているが、**その根拠資料へ現在アクセスできない**ため現物で確認する |
+| moduleへ入れてよい電圧 | TBD。ICのVS上限3.6 Vはboardの許容値と同じとは限らない（regulatorやlevel shiftの有無で変わる） |
+| Module搭載pull-up | TBD（有無と値） |
 
 必要なベンチ試験の根拠:
 
@@ -215,3 +238,4 @@ pin配列: 1=`VDD`, 2=`GND`, 3=`CSB`, 4=`SDI`, 5=`SDO`, 6=`SCK`。
 |---|---|---|
 | 2026-07-27 | 0 | 必要なデータシート項目とベンチ試験根拠を作成 |
 | 2026-08-10 | 1 | [#1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1)。**一次資料を特定し、公開specから確定する欄を埋めた。**LCD module（[msp2807.pdf](https://akizukidenshi.com/goodsaffix/msp2807.pdf)）は14pin定義・`ILI9341`・320×240・VCC 3.3–5V・logic 3.3V TTL・各信号のpolarityを確定し、pin定義表を追加した。Touch controllerは**datasheetに型番の記載が無い**ことを記録した。Environmental sensor（[Bosch Rev 1.24](https://www.bosch-sensortec.com/media/boschsensortec/downloads/datasheets/bst-bme280-ds002.pdf)＋[AE-BME280説明書 v1.1](https://akizukidenshi.com/goodsaffix/AE-BME280_manu_v1.1.pdf)）は電圧範囲・address・Device ID・起動時間・測定range・精度・消費電流・module pull-upを確定し、jumper表とpin配列を追加した。Accelerometerは**`analog.com`へ接続できず、秋月 M-06724の商品ページも404**のため、確定できた欄だけを埋め、残りは推定せず`TBD`のまま残した。**各moduleの絶対最大定格は`HW-TBD-025`(b)（Issue [#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)）の範囲であり、この改訂では扱っていない** |
+| 2026-08-11 | 2 | [PR #82](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/82)のレビュー指摘2件を反映。(a) LCD moduleのbacklight欄に「制御しない場合は3.3 V直結」と**配線方法を書いていた**。`HW-TBD-024`（このmoduleが耐えられる電流の上限）が未解決の間は直結してよいか判定できず、配線規則の正本は`power-budget.md`である。polarityの記録だけに戻し、配線は現物確認後に定めるとした。(b) Accelerometer節が**ICの値とmodule boardの値を1つの表に混ぜていた**。根拠の種類が違う（ICはdatasheet、moduleはboard資料か現物）ため2つの表へ分けた。あわせて`analog.com`とMouser mirrorへ到達できなかった経緯を記録し、**開いていない文書のrevisionとpage番号は記録しない**方針を明示した |
