@@ -94,12 +94,31 @@ def _passes_through_symlink(target_normalized, tracked_symlinks):
     return False
 
 
-def _collect_anchors(markdown_files):
+def _fail_if_any(problems):
+    """1件でもあれば、全件をstderrへ出して失敗させる。
+
+    fence検査とlink検査の2箇所から呼ぶ。同じ整形と例外文言を両方に複製すると、
+    片方だけ変えたときに診断の形式が食い違う。
+    """
+    if not problems:
+        return
+    for problem in guards.sort_unique(problems):
+        print(problem, file=sys.stderr)
+    raise guards.ValidationError(
+        f"Documentation link validation failed with {len(problems)} problem(s)."
+    )
+
+
+def _collect_anchors(markdown_files, file_texts):
     """各fileの見出しから生成されるanchor集合を作る。
 
     linkのfragmentがここに無ければ、生成siteでpage内jumpが解決しない。
     fileが存在するだけでは検出できないため、link先の存在確認とは別に突き合わせる。
     過去に見出しの改名で2度壊している。
+
+    本文は`file_texts`から取り、ここでfileを読み直さない。読み直すと、走査中に
+    fileが変わったときにanchor収集とlink収集が別の内容を見る。片方にしか無い
+    見出しが「Broken anchor」として報告され、原因が実在しないlink切れに見える。
     """
     anchors_by_file = {}
     for path in markdown_files:
@@ -110,7 +129,7 @@ def _collect_anchors(markdown_files):
         # fenced code block内の`#`で始まる行はshell commentであり見出しではない。
         # 数えると偽のanchorが増え、同名見出しの`-1`／`-2`採番がずれる。
         # このrepositoryのgithub-wiki-home.mdは、実際にbash commentを10行以上含む。
-        for line in guards.markdown_outside_fences(guards.get_file_text(path)):
+        for line in guards.markdown_outside_fences(file_texts[path]):
             match = HEADING_RE.match(line)
             if not match:
                 continue
@@ -191,7 +210,26 @@ def main(argv=None):
     published_root_documents = guards.ROOT_DOCUMENTS
     unrendered_root_documents = guards.UNRENDERED_ROOT_DOCUMENTS
 
-    anchors_by_file = _collect_anchors(markdown_files)
+    # fenceが閉じていないと、それ以降の行がすべて「fence内」と見なされ、link検査も
+    # 見出し収集も静かに素通りする。減るのは`LINKS=`の件数だけで`BROKEN=0`は変わらず、
+    # 結果からは「壊れたlinkが無い」と「そもそも見ていない」を区別できない。
+    # 実際にconflict解消で閉じfenceが1本残り、link 5件が検査対象から消えている。
+    #
+    # anchor収集より前に打ち切る。走査を続けると、fenceが壊れたfileのanchorが
+    # 欠けた状態で他fileのlinkと突き合わされ、無関係な「Broken anchor」が
+    # 連鎖して原因が埋もれる。
+    file_texts = {path: guards.get_file_text(path) for path in markdown_files}
+    for path in markdown_files:
+        unclosed_at = guards.unclosed_fence(file_texts[path])
+        if unclosed_at is not None:
+            problems.append(
+                f"Unclosed code fence in {guards.path_relative_to_root(path, root)}"
+                f" opened at line {unclosed_at}"
+                " (every check silently skips the content after it)"
+            )
+    _fail_if_any(problems)
+
+    anchors_by_file = _collect_anchors(markdown_files, file_texts)
 
     for path in markdown_files:
         scanned += 1
@@ -200,7 +238,7 @@ def main(argv=None):
         # fenced code block内はlinkの例示でありlinkではない。走査対象から除く。
         # 見出し検出と同じhelperを使い、両者が同じ行を見ることを保証する。
         content = "\n".join(
-            guards.markdown_outside_fences(guards.get_file_text(path))
+            guards.markdown_outside_fences(file_texts[path])
         )
 
         # `pages/index.md`と`pages/404.md`はstaging後のroot基準で解決する。
@@ -343,12 +381,7 @@ def main(argv=None):
                     f" not rendered as HTML: {target} (use an absolute URL)"
                 )
 
-    if problems:
-        for problem in guards.sort_unique(problems):
-            print(problem, file=sys.stderr)
-        raise guards.ValidationError(
-            f"Documentation link validation failed with {len(problems)} problem(s)."
-        )
+    _fail_if_any(problems)
 
     # 並び替えはOrdinalで行う。culture依存の比較はWindowsとLinuxで順序が変わり、
     # digestが一致しない。

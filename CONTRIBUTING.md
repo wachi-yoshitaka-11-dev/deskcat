@@ -29,6 +29,21 @@ Issueには次を含める。
 
 無関係なrefactor、新たに見つけた不具合、別実験には別Issueを使う。
 
+### Issueを立てずに直接反映してよい範囲
+
+**すべての気づきをIssueにしない。**記述の維持管理までIssue化すると、保守Issueが製品作業を追い越す。
+実際、[#84](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/84)は規約の言い回しを直すために
+起票し、直後にcloseした。
+
+| 対象 | 扱い |
+|---|---|
+| typo、リンク修正、表記ゆれ、規約の言い回し、boardのmetadata記入漏れ | **Issue不要。**変更内容の承認を得たうえで`develop`へ直接反映してよい |
+| 仕様、安全、電気、protocol、GPIO、電源、toolchain、CI、依存の変更 | **Issue必須** |
+| 複数のPull Requestに跨る、または他の作業をblockするもの | **Issue必須** |
+
+Issue不要の側でも、**変更内容の承認は必ず得る。**「Issueを立てない」は「勝手に変えてよい」ではない。
+判断に迷うものはIssue必須の側として扱う。安全に関わる範囲は緩めない。
+
 ## Issueの命名
 
 Issue titleにprefixを付けない。`<概要>`だけの素の説明文にする。
@@ -49,11 +64,14 @@ GitHubのIssue一覧はlabelを常にtitleの横に表示するため、titleに
 | label（`status:blocked`／`needs:*`） | 該当時のみ | 依存未解決なら`status:blocked`、実機証拠や人間の判断が必要なら`needs:hardware-test`／`needs:decision`を設定する |
 | assignee | 必須 | 対応を担当する人を設定する。未定でも起票者自身を暫定assigneeとする |
 | project | 必須 | Projects v2 board（`deskcat`、`https://github.com/users/wachi-yoshitaka-11-dev/projects/5`）にitemとして追加し、`Status`を設定する |
-| 開始日／終了日（`Start date`／`Target date`） | 任意 | 着手日・完了目標が具体的に決まった時点でのみProjects v2 board上で設定する。未定なら空欄のままでよい |
+| 開始日／終了日（`Start date`／`Target date`） | 着手時は任意、**close後は必須** | 着手日・完了目標が具体的に決まった時点でProjects v2 board上で設定する。未定なら空欄のままでよい。**closeした後は、close実施者が`Target date`をJSTのclose実績日へ設定する** |
 
 この表はIssue itemの規約である。Pull Request itemでは同じ2 fieldが必須であり、`Start date`は
 作成日という実績、`Target date`はmerge見込み日という予定を表す。`Target date`はmergeまたは
 closeの**完了後**に実績値へ更新する。[Pull request](#pull-request)節を参照する。
+
+boardの`Item closed` workflowは`Status`を`Done`にするが、**日付fieldは更新しない。**
+そのためIssueのclose後は、close実施者が手作業で`Target date`を実績日へ設定する。
 
 ## Branches
 
@@ -92,7 +110,7 @@ hotfix/<issue>-<short-name>
 
 root READMEとcomponent READMEに記載された、関連するcommandをすべて実行する。
 
-workspaceはまだ存在しないため、現段階で有効と断定できるCargo commandはない。toolchain Issueで生成・検証後、command文書を更新する。
+host workspaceはrepository rootで、ESP32 firmwareは`firmware/esp32`で検証する。確定したcommandは[root README](README.md#buildとtest)と`AGENTS.md`の「検証」節にある。Raspberry Pi、HIL、ESP32のflashとserial monitorには、まだ正式なcommandがない。
 
 今後の変更では次を報告する。
 
@@ -158,6 +176,43 @@ Pull requestには次を含める。
 - [ ] `Start date`（作成日。JSTで判断する）
 - [ ] `Target date`（mergeを見込む日。**merge完了後またはclose完了後**に実績値へ更新する）
 
+### labelは作成時に付ける
+
+**labelは`gh pr create --label`で作成時に指定する。作成後に付け足さない。**
+
+```bash
+gh pr create --base develop --title "<title>" --body-file <path> \
+  --label "<area:*>" --label "<type:*>" --label "<priority:*>" \
+  --assignee "<login>" --milestone "<milestone>"
+```
+
+**CodeRabbitは対象判定をPull Requestの作成直後に行い、後からのlabel追加では再判定しない。**
+[#94](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/94#issuecomment-5242077436)での
+CodeRabbit自身の回答である。**こちらの実測ではない。**
+
+実測で確かめたのは次の2点である。いずれも
+[`.coderabbit.yaml`](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/.coderabbit.yaml)が
+`develop`にある状態で作成したPull Requestである。
+
+| 作成時のlabel | Pull Request | 結果 |
+|---|---|---|
+| allowlistに一致する（当時は`type:decision`） | [#90](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/90)・[#91](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/91) | **対象判定を通過した。**#91 は作成の4分47秒後に自動reviewが提出され、完走した（手動依頼より前） |
+| labelはあるがallowlistに一致しない | [#95](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/95)・[#96](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/96) | `Review skipped: excluded by label configuration` |
+
+**「後から付けたので発火しなかった」ことを実測した記録は無い。**
+[#89](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/89)は作成の24秒後にlabel無しで
+`Review skipped`となり、labelは33分後に付いた。しかし**その判定の5秒後に`.coderabbit.yaml`が
+`develop`へmergeされている**（判定 `12:22:00Z`、merge `12:22:05Z`）。
+**判定の時点でこの設定はbase branchに無く、labelの未付与と設定の未反映が切り分けられない。**
+Issue `#89` を「後付けが原因」の証拠として使わない。
+
+**それでも作成時に付ける。**CodeRabbitの回答に沿う運用であり、費用は`--label`を足すだけで、
+取り落としの可能性を消せる。**切り分けられない以上、確実な側に倒す。**
+
+**この規則が要るのはlabelだけである。**assignee・milestoneも同じcommandで指定するが、
+自動reviewの判定に関わらないため、後から設定しても失うものは無い。boardへのitem追加は
+Pull Requestが存在しないと行えないため、上記のとおり作成直後に行う。
+
 ### 関連Issueの書き方
 
 Issue branchからのPull Request（base `develop`）では`Closes #N`を使う。これはtraceability
@@ -184,6 +239,10 @@ Issueをcloseする。
 （`deskcat`、`https://github.com/users/wachi-yoshitaka-11-dev/projects/5`）へitemとして
 追加して`Status`を設定する。boardが進行管理の正本であり、boardに無いPull Requestは
 `Pull request merged` workflowの対象にならず、merge済みかどうかがboard上で追えない。
+
+**このうちlabelだけは作成後では間に合わないおそれがある。**自動reviewの対象判定が
+作成直後に終わるためである。[labelは作成時に付ける](#labelは作成時に付ける)に従い、
+`gh pr create --label`で指定する。
 
 board上のworkflow構成は[Repository設定](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/.github/REPOSITORY_SETTINGS.md)に記録する。
 
@@ -219,9 +278,190 @@ close日である。
 **更新は「後」であって「直前」ではない。**merge前に実績日を確定できないためである。JSTの日付を
 またいだ場合や、mergeを中止した場合に、誤った実績日が残る。
 
-自動化するなら、`Status`を`Done`にするworkflowと同じ場所で`Target date`を書き換えるのが
-自然だが、Projects v2のworkflowは日付fieldを更新できない。GitHub Actionsから
-Projects v2 APIを叩く実装が要るため、**現時点では手作業とし、将来の課題として残す**。
+**自動化しない。**理由は2段ある。
+
+1. Projects v2のboard workflowは日付fieldを更新できない。`Status`を`Done`にするworkflowでは書き換えられない
+2. GitHub Actionsから叩く案も採らない。**`GITHUB_TOKEN`はrepository scopeであり、Projects v2へ
+   アクセスできない**（[GitHub Docs](https://docs.github.com/en/issues/planning-and-tracking-with-projects/automating-your-project/using-the-api-to-manage-projects)）。
+   `project` scopeを持つclassic personal access token、またはGitHub Appが必要になる。
+   日付2 fieldのためにCIへ長期secretを持ち込む取引は成立しない
+
+したがって**手作業を正式な手順とする。**これは妥協ではなく判断である。
+以後「自動化できるはず」として再検討しない。前提が変わるのは、Projects v2のworkflowが
+日付fieldを扱えるようになったときだけである。
+
+**忘れることが唯一の失敗モードである。**実際に[#71](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/71)・
+[#72](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/72)・[#73](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/73)で
+3件続けて空のままcloseした。**空欄を検出する仕組みは無い。**closeの操作と同じ場面で設定する。
+
+### 自己レビュー
+
+pushする前に、作成者自身が差分を見直す。**新規指摘が0件の状態が2 round続くまで繰り返す。**
+
+[`.coderabbit.yaml`](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/.coderabbit.yaml)により、
+自動reviewは高リスク変更（firmware、protocol、Raspberry Pi、hardware）を示すlabelを持つ
+Pull Requestに限定している。**それ以外のPull Requestでは、この自己レビューが唯一のreviewである。**
+**対象labelを持つPull Requestでも、labelを作成後に付けた場合は自動reviewを
+受けられないおそれがある**（[labelは作成時に付ける](#labelは作成時に付ける)）。
+その場合もこの自己レビューが唯一のreviewになる。
+
+**対象labelの正本は`.coderabbit.yaml`であり、ここでは再掲しない。**値を2箇所に書くと
+片方だけを見た判断が起きる。実際、[#91](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/91)で
+`type:decision`をallowlistから外した後も、この節には5つ目として残っていた。
+
+回数だけを守っても、同じ観点を繰り返しなぞるだけになる。次の観点で見る。
+
+- [ ] **受け入れ条件を1つずつ差分と突き合わせた。**「だいたい満たしている」で通さない
+- [ ] **正本文書と矛盾する記述を新たに作っていない。**同じ定数・同じ規約を2箇所に書いていない。
+      片方だけを見た判断が起きる
+- [ ] **未確認の値を確定として書いていない。**実測していない値、一次資料で確かめていない型番、
+      未検証の動作を、断定形で書いていない（[AGENTS.md](AGENTS.md)の推測禁止を自分の差分へ適用する）
+- [ ] **参照先が実在する。**リンク先の文書・節・表が存在し、そこに書いてあると主張した内容が実際にある
+- [ ] **公開されない路への相対linkを張っていない。**`CONTRIBUTING.md`、`.coderabbit.yaml`、
+      `.github/`配下などはGitHub Pagesへ公開されない。公開文書からこれらへ相対linkを張ると
+      `validate_doc_links.py`が失敗する。**絶対URLを使う。**
+      [PR #90](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/90)ではこの誤りだけでCIを3回落とした
+- [ ] **差分に、このPull Requestの目的と無関係な変更が混ざっていない**
+- [ ] **Pull Request本文の記述が、実際の差分と一致している。**対象file数、含まれる変更、
+      検証欄の「実行した／していない」が実態と合っている
+
+各項目は過去に実際に起きた失敗に対応する。順に
+[#72](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/72)（規則を守っているか一度も照合していなかった）、
+[hardware-bom.md Revision 20](docs/hardware/hardware-bom.md)（同じ条件を2文書に書き、式が食い違った）、
+[#63](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/63)・[#82](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/82)（未検証の動作を断定した）、
+[#82](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/82)（存在しない照合先を参照していた）、
+[#61](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/61)（本文が「4 Pull Request、14 file」のまま、実際は9 commitへ増えていた）である。
+
+### Merge前の確認
+
+**未解決のreview threadが0件であることを確認するまでmergeしない。**
+base が`develop`でも`main`でも適用する。
+
+**これはGitHubが強制する。**`main`と`develop`の双方でbranch protectionの
+`Require conversation resolution before merging`を有効にしている（2026-08-10 設定・動作確認済み。
+[Repository設定](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/.github/REPOSITORY_SETTINGS.md)）。
+未解決threadが1件でもあれば`mergeStateStatus`が`BLOCKED`になり、mergeできない。
+**手作業でthreadを数える必要はない。**
+
+**ただし強制されるのは管理者以外である。**`develop`は`enforce_admins`を`false`にしており
+（[Repository設定](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/.github/REPOSITORY_SETTINGS.md)）、
+管理者は`BLOCKED`のままmergeできる。**この経路を使う場合は自動化が何も止めないため、
+[未解決を残してmergeする場合](#未解決を残してmergeする場合)の手順を必ず踏む。**
+「GitHubが止めるはずだ」を根拠にしない。
+
+**thread のresolveは、reviewerの応答を読んでから行う。**指摘へ返信しただけで自動でresolveしない。
+返信に対する応答（自動reviewなら指摘を取り下げたかの判定）を読み、解決したと確認できるthreadだけ
+resolveする。自分の返信をもって直ちにresolveすると、`isResolved`が「対応したという主張」に退化し、
+GitHubの強制が意味を失う。
+
+#### GitHubが強制しないもの
+
+**「checkが緑」は「reviewが行われた」を意味しない。**次の3つはcheck状態から見分けられない。
+
+| CodeRabbitの状態 | checkの表示 | reviewの実行 | 原因 |
+|---|---|---|---|
+| `Review in progress` | `pending` | 未完了 | — |
+| **`Review rate limited`** | **`pass`** | **実行されていない** | 毎時の枠切れ。**対象判定は通っている** |
+| **`Review skipped`** | **`pass`** | **実行されていない** | 対象判定で外れた。allowlistのlabelが**作成時に**無かった場合を含む |
+
+`pending`のままmergeしないのは当然として、**`pass`でも中身が`Review rate limited`または
+`Review skipped`ならreviewは走っていない。**merge前にCodeRabbitのcheckの説明文を読む。
+[#88](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/88)では`Review rate limited`が実際に発生し、
+指摘対応後のcommitがreviewを受けないまま`pass`になった。
+
+**この2つを混同しない。**`Review rate limited`は**対象判定を通過した後**の枠切れであり、
+枠が空けば同じPull Requestで実行できる。`Review skipped`は**対象判定で外れている**ため、
+枠が空いても自動では走らない。
+[#89](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/89)では**両方が別々の理由で観測されている**
+（[#94](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/94#issuecomment-5242073164)。
+枠を使い切った経緯は後述の[手動で依頼する前に状態を確認する](#手動で依頼する前に状態を確認する)にある）。
+**「skipされた」と「rate limitに当たった」を同じ言葉で記録しない。**
+
+**`Review skipped`の説明文で、skipの原因を切り分けられる。**これまでに観測した文言は次のとおりである。
+**文言はCodeRabbit側のものであり、将来変わりうる。**一致しない文言を見たら、推測せず実際の表示を記録する。
+
+| 説明文 | 読み方 | 観測した Pull Request |
+|---|---|---|
+| `excluded by label configuration` | **設定は効いている。**labelは付いていたが、allowlistに一致しなかった。**対象外として正しくskipされた** | [#95](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/95)・[#96](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/96)（`area:docs`＋`type:maintenance`） |
+| `Auto reviews are disabled on this repository.` | **allowlistによる判定に達していない。**[#89](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/89)の判定時点では`.coderabbit.yaml`がまだ`develop`に無かった | #89（判定の5秒後に設定がmergeされた） |
+| `reviews are disabled for this base branch` | baseが対象外と判定された | [#88](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/88)（`.coderabbit.yaml`を`develop`へmergeする前） |
+
+**1行目と、2行目・3行目は意味が違う。**同じ`Review skipped`でも取るべき対応が違う。
+
+- 1行目: `.coderabbit.yaml`の意図どおりのskipである。[自己レビュー](#自己レビュー)で通す。
+  ただし**変更の内容に対してlabelの付け方が誤っていないかは確認する。**安全・電気・protocol・
+  firmwareに関わる変更が`area:docs`だけになっていれば、labelが誤っており1行目に該当しない
+- 2行目・3行目: **allowlistの判定まで届いていない。**設定が`develop`にあるか、baseが
+  `base_branches`に含まれるかを確認する。対象範囲の変更なら
+  [手動で依頼する](#手動で依頼する前に状態を確認する)。安全に関わる変更では自己レビューで代替しない
+
+**2行目・3行目は、いずれも`.coderabbit.yaml`が`develop`に無かった時期の観測である。**
+設定が定着した後にこの文言を見たら、**それは新しい事象である。**推測で1行目と同じ扱いにしない。
+
+**thread 0件は、reviewが終わったことを意味しない。**
+[#76](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/76)では0件を確認した**28秒後**に
+reviewが届き、actionable comment 2件がmerge済みPull Requestへ付いた。
+GitHubはthreadが存在しないものをblockできない。**reviewの到着を待たずに0件を「解決済み」と読まない。**
+
+自動reviewの対象は[`.coderabbit.yaml`](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/.coderabbit.yaml)
+で高リスク変更へ限定している。対象外のPull Requestでは[自己レビュー](#自己レビュー)が唯一のreviewである。
+
+**指摘に対応したcommitは、自己レビューで見る。**`auto_incremental_review`を`false`にしているため、
+pushしても再reviewは走らない。**ここで`@coderabbitai review`を投げ直さない。**
+投げ直すと1つのPull Requestでreviewを何度も消費し、`false`にした意味が無くなる。
+[#91](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/91)で実際にそうなり、2回目はrate limitで終わった。
+
+**自動reviewが一度も走らなかった場合だけ、手動で依頼する。**該当するのは
+`Review rate limited`または`Review skipped`で初回のreviewが得られなかったときである。
+
+| 変更の種類 | 初回reviewが得られなかったとき |
+|---|---|
+| 安全、電気、protocol、firmware | **rate limitが解けるまで待つ。**自己レビューで代替しない |
+| 上記以外 | **自己レビューで通してよい。**Pull Request本文へ機械reviewを通していない旨と、その判断の根拠を書く |
+
+#### 手動で依頼する前に状態を確認する
+
+**投げる前に必ず次を実行する。**これは**reviewを消費せず**、残数と次に空く時刻を返す。
+
+```text
+@coderabbitai rate limit
+```
+
+| 確認結果 | 行動 |
+|---|---|
+| 残数が0 | **投げない。**返ってきた時刻まで待つ |
+| 残数があり、**初回reviewがskipされた** | **`@coderabbitai full review` を使う。**`review`はincrementalであり、skip後は空振りしうる |
+| 残数があり、初回reviewは走ったが対応commitが未review | `@coderabbitai review` |
+
+`review`と`full review`は別物である。`review`は**新しい変更のみ**、`full review`は**全fileを最初から**
+review する。**どちらも同じ毎時上限を消費する。**`full review`は枠を回避する手段ではない。
+
+**同じ状態で2回以上投げない。**空振りなのかrate limitなのかを判別せずに繰り返すと、
+枠だけを消費して**他のPull Requestのreviewを止める。**
+実際、[#88](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/88)・
+[#90](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/90)・
+[#91](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/91)で計4回投げ、3回がrate limitに当たり、
+[#89](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/89)のreviewを遅らせた。
+
+上限は開発者identity単位のrolling windowである（Pro 5件／時、Pro+ 10件／時）。
+一定時刻にまとめて戻るのではなく、古いreviewが枠から抜けるたびに1件ずつ空く。
+
+**「reviewを依頼した」を「reviewを受けた」と書かない。**`Review rate limited`は`pass`と表示されるため、
+依頼の事実だけで完了扱いにすると検出が抜ける。
+
+#### 未解決を残してmergeする場合
+
+branch protectionの`enforce_admins`は無効であり、管理者は強制mergeできる。その場合は次をすべて行う。
+**追跡Issueなしにmergeしない。**
+
+1. 追跡Issueを起票する
+2. 該当threadへ返信し、追跡Issue番号を書く
+3. Pull Request本文の`Review thread`節の`追跡Issue`欄へ番号を書く
+4. merge報告に未解決だったことと追跡Issue番号を記載する
+
+[#40](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/40)では26 threadのうち1件が未解決のまま
+mergeされ、追跡も無かった。後から[#74](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/74)として
+起票し直している。
 
 ### Merge方式
 

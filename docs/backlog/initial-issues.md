@@ -3,18 +3,36 @@
 > 状態: GitHub移行済み
 > Remote作成: 2026-07-28に初期Issue 24件（[#1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1)〜[#24](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/24)）と文書公開基盤のfollow-up 3件（[#25](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/25)〜[#27](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/27)）を作成した
 
+> **注記（2026-08-10追記）**: 下の各Issue定義に書いた機器名のうち、
+> `Raspberry Pi Zero WH`と`ESP32-DevKitC-32E`は、その後の現物確認で
+> それぞれ`Raspberry Pi Zero W`（V1.1）、`ESP-WROOM-32D開発ボード（秋月電子 M-13628）`
+> と判明した（[#55](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/55)）。
+> 該当するのは[#5](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/5)（ESP32 toolchain）の`目的`と、
+> [#8](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/8)（Raspberry Pi Rust環境）の前書きおよび`目的`である。
+> **本文書は承認した初期backlogの履歴資料であるため本文は書き換えない。**
+> 機器の識別の正本は[hardware-bom.md](../hardware/hardware-bom.md)である。
+> `#1`〜`#24`のIssue本文はいずれもこの文書を`定義元`として参照しているため、
+> **Issueから辿ってこの文書の旧型番を読んだ場合は、この注記を優先する。**
+> なお、両Issueの受け入れ条件は型番を直接参照していない。訂正が及ぶのは上記の記述であり、
+> 実機の識別は各Issueの範囲で確認する。
+
 ## 移行後の運用
 
 - Issueの状態、担当、議論、追加checklistは[GitHub Issues](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues)を正本とする。
 - このfileは、承認した初期backlogの定義と作成順序を残す履歴資料であり、live statusを重複管理しない。
 - Repositoryのlabel、milestone、security設定の適用はGitHub基盤整備として直接完了しているため、遡及Issueを作成していない。
 - GitHub Issue本文では依存関係を実際のIssue番号へ置き換えた。ローカル定義からも対応Issueへ辿れるよう、依存関係をlink化している。
-- 例外は**cargo workspace root**である。`#9`の`root Rust workspace`と`#23`の`Root host workspace`に対応するIssueは無い。[Implementation Readiness Review](../runbooks/implementation-readiness-review.md)のSoftware gateが「Host／firmware workspaceが存在する」を`設計どおりFail`とし、**着手可能なIssueからのみ作成する**と定めているためである。存在しないIssueを探さない。workspaceは最初に必要とするIssueが作る。
+- 例外は**cargo workspace root**である。これを依存関係に挙げているのは[#9](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/9)と[#23](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/23)の2件だが、**workspace rootを作るための独立したIssueは無い。**[ADR-0001](../decisions/0001-monorepo-layout.md)が**着手可能なIssueがある場合だけpackageを作成する**と定めているためである。存在しないIssueを探さない。workspaceは最初に必要とするIssueが作る。実際に作成したのは、firmware workspaceが[#5](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/5)、host workspaceが[#9](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/9)である（#9は依存として挙げた側でもあり、作った側でもある）。[Implementation Readiness Review](../runbooks/implementation-readiness-review.md)のSoftware gate「Host／firmware workspaceが存在する」は現在`Pass`である。
 
 > このfile内の`起票時の状態`、`Labels`、受け入れ条件のcheckboxは、**起票時点のsnapshot**である。
 > `status:blocked`等のlabelも当時の値であり、現在の付与状況とは一致しない。
 > 現在の進捗として読まない。closeされたIssueでも、ここのcheckboxは当時のまま残る。
 > 現在の状態は必ずGitHub Issueで確認する。
+>
+> **起票時点のものはこの3項目に限らない。**`### 目的`や`### 対象範囲`などの本文も、
+> 承認した初期backlogの定義そのものであり、当時の記述のまま残す。
+> したがって、**本文に出てくる機器の型番も現在の値とは限らない。**
+> 型番については冒頭の訂正注記を先に読む。正本は[hardware-bom.md](../hardware/hardware-bom.md)である。
 
 `#28`は本文書にlocal定義を持たない。#25〜#27の後続として
 GitHub Issue側だけで起票・管理しており、目的と受け入れ条件は[#28](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/28)を参照する。

@@ -24,7 +24,7 @@
 - [x] `main`の`enforce_admins`を有効化し、管理者にも上記2つを適用
 - [x] Repository description、homepage、topicsを設定
 - [x] `delete_branch_on_merge`を有効化（2026-07-31に無効化のdriftを検出し、再適用してread-back済み）
-- `develop`: Branch protectionのbundle（必須review、必須status check等）は設定しない
+- [x] `develop`: Branch protectionで`Require conversation resolution before merging`**だけ**を有効化（2026-08-10。下記「2026-08-10のdevelop branch protection」を参照）。**必須reviewと必須status checkは設定しない**
 - [x] `develop`のbranch削除だけをRepository Rulesetで禁止（2026-08-03。経緯は下記「2026-08-03のdevelop branch削除事故と対処」を参照）
 - `develop`へのGit／GitHub操作は、Governanceのforce push禁止、通常作業での直接commit禁止、ユーザー承認で管理する
 
@@ -46,11 +46,11 @@ read-back結果: `enforce_admins.enabled = true`
 これにより[AGENTS.md](../AGENTS.md)の「force pushを行わない」は、**`main`に限って**
 GitHub側でも実効化され、AIエージェントの誤操作に対する防壁になる。
 
-`develop`はforce push禁止・削除禁止のbundleとしてのbranch protection対象外とする方針のため、
-このbundleによるGitHubの強制は`main`だけに及ぶ。ただし2026-08-03以降、`develop`は
-branch削除だけを別のRepository Ruleset（下記「2026-08-03のdevelop branch削除事故と対処」）で
-禁止している。force pushの禁止を含む残りは、Governanceの規則とユーザー承認だけが歯止めである。
-repository全体で強制されていると読まない。
+**この記述は2026-08-10に更新した。**`develop`にもbranch protectionを設定したため、
+force pushとbranch削除はGitHub側で禁止されている（下記「2026-08-10のdevelop branch protection」）。
+
+ただし**必須reviewと必須status checkは設定していない**ため、`develop`への直接commitは引き続き可能である。
+その範囲はGovernanceの規約とユーザー承認だけが歯止めであり、repository全体で強制されていると読まない。
 
 - [x] `github-pages` environmentの`can_admins_bypass`を無効化
 
@@ -69,7 +69,7 @@ CI導入前:
 - [x] solo bootstrap中はpull requestを必須にしない
 - [x] 存在しないstatus checkを必須にしない
 - 必須承認review数: solo bootstrap中は`0`
-- `develop`はprotection対象外とし、required status checkを設定しない
+- `develop`は`Require conversation resolution before merging`のみ有効化し、required status checkと必須reviewは設定しない（2026-08-10）
 
 安定したCI導入後:
 
@@ -78,6 +78,7 @@ CI導入前:
 - [ ] 外部contributionにreviewを必須化
 - 必須承認review数: 外部contribution受付時は`1`
 - [ ] signed commitとlinear historyを別途評価
+- [ ] `Require conversation resolution before merging`を評価する。現状は[CONTRIBUTING.md](../CONTRIBUTING.md#merge前の確認)の手作業gateだけであり、[PR #40](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/40)で未解決thread 1件を残したmergeが起きている
 
 ## Actions権限
 
@@ -125,6 +126,24 @@ repositoryのdefault branchである`main`を対象にする。
 Security updateを`main`へmergeした場合は、[Development Workflow](../docs/governance/development-workflow.md#branch)の
 hotfix規則に従い、同じ修正を直ちに`develop`へ取り込む。両branchへ自動で反映されると仮定しない。
 
+- [x] `firmware/esp32`のcargo ecosystemを追加する（2026-08-10、[#41](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/41)）
+
+`schedule`、`target-branch`、`open-pull-requests-limit`、`commit-message.prefix`はgithub-actionsと同じ値へ揃えた。
+`labels`には`area:firmware`を加えている。対象が`firmware/esp32`に限られ、Pull Requestの仕分けに要るためである。
+
+**上の`target-branch`と security update の使い分けは、cargoにもそのまま当てはまる。**
+version updateは`develop`へ、security updateは default branch の`main`へ来る。
+
+label（`type:maintenance`／`area:firmware`）はどちらもGitHub側に実在することを確認した。
+存在しないlabelを指定するとDependabotが付与に失敗する。
+
+**GitHub側が設定を認識したかは、この記録の時点では未確認である。**設定fileのmerge後に、
+Insightsの Dependabot 画面または実際のDependabot Pull Requestの発生で確認する。
+`firmware/esp32`は custom toolchain（`rust-toolchain.toml`）と`build-std`を使うため、
+**Dependabotがlockfileを更新できずに失敗する可能性がある。**その場合はerrorの内容を本文書へ記録する。
+
+host workspaceのCargo manifestは未生成のため対象に含めていない。生成した時点で追加する。
+
 - [x] 外部contributorのPull Requestに承認を必須化する
 
 Pages workflowの`pull_request` jobは、PR側の`scripts/*.py`をrunner上で実行する。
@@ -136,17 +155,57 @@ read-back結果: `approval_policy = all_external_contributors`
 
 ### GitHub Actionsの供給元制限
 
-- [x] `allowed_actions`を`selected`（GitHub所有Actionのみ）へ絞る
+- [x] `allowed_actions`を`selected`へ絞る（2026-07-31。当時は`patterns_allowed`が空で、GitHub所有Actionのみだった）
 
-使用中の5 Action（`checkout`、`configure-pages`、`jekyll-build-pages`、`upload-pages-artifact`、`deploy-pages`）はすべて`actions/` namespaceのGitHub所有であり、この制限で影響を受けない。
+**2026-08-10時点の実際の方針は「GitHub所有Action＋明示的に許可した`esp-rs/xtensa-toolchain`」である。**
+`patterns_allowed`へ1件追加したため、`selected`＝GitHub所有のみ、ではなくなった（下記）。
+
+使用中のActionは次のとおりである。
+
+| workflow | Action | 供給元 |
+|---|---|---|
+| `pages.yml` | `actions/checkout`、`actions/configure-pages`、`actions/jekyll-build-pages`、`actions/upload-pages-artifact`、`actions/deploy-pages` | GitHub所有 |
+| `firmware.yml` | `actions/checkout`、`actions/cache` | GitHub所有 |
+| `firmware.yml` | `esp-rs/xtensa-toolchain` | **サードパーティ。`patterns_allowed`で個別に許可** |
 
 `all`のままにすると、workflowを1行変えるだけで任意のサードパーティActionを導入できる。
 `sha_pinning_required`は「固定された何か」であることを保証するだけで、供給元は制限しない。
 SHA固定と供給元制限は別の統制であり、片方で他方を代替できない。
 
-read-back結果: `allowed_actions = selected`、`github_owned_allowed = true`、`verified_allowed = false`、`patterns_allowed = []`
+2026-07-31のread-back結果: `allowed_actions = selected`、`github_owned_allowed = true`、`verified_allowed = false`、`patterns_allowed = []`。
+**`patterns_allowed`の現行値は下記のとおり1件である。**
 
 Rust CIでサードパーティActionが必要になった場合は、`patterns_allowed`へ個別に追加し、採用理由と確認日を本文書へ記録する。
+
+#### `esp-rs/xtensa-toolchain` の許可（2026-08-10、[#42](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/42)）
+
+- [x] `patterns_allowed`へ`esp-rs/xtensa-toolchain@*`を追加する
+
+read-back結果:
+
+```text
+github_owned_allowed: true
+verified_allowed:     false
+patterns_allowed:     ["esp-rs/xtensa-toolchain@*"]
+allowed_actions:      selected
+sha_pinning_required: true
+```
+
+**採用理由**: `firmware.yml`がXtensa Rust toolchainを導入するのに必要である。
+GitHub所有のActionに同等品が無い。shellで`espup`を導入する案も採れるが、
+version、toolchain名、`ldproxy`、環境変数のexportを自前で並べることになり、
+`espup`の仕様変更を追う負担がworkflow側へ移る。**採否は供給元制限を1件緩めることとの比較で判断した。**
+
+**緩めていない統制**:
+
+- `github_owned_allowed`は`true`のまま。上表のGitHub所有Actionの扱いは変わらない
+- `verified_allowed`は`false`のまま。Verified creatorを一括で許可していない
+- `sha_pinning_required`は`true`のまま。**このAction自身もcommit SHAへの固定が強制される**
+- 追加したのは1 patternだけである。`esp-rs/*`のようなnamespace全体の許可はしていない
+
+**このAction自体はreviewの対象である。**`v1.7.0`（`ec6d365`）へ固定した。
+2026-08-10時点でrepositoryはarchivedでなく、最終pushは2026-04-20である。
+版を上げるときは、上げ先のcommitをreviewしてからSHAを差し替える。
 
 ### 2026-07-31のdrift確認
 
@@ -168,6 +227,54 @@ repository所有者が意図して無効化していた場合は、無効へ戻�
 `delete_branch_on_merge`は、PRのheadが使い捨てのfeature branchかどうかを区別せず、
 PR mergeのたびにhead branchを削除する。`develop`のような恒久的なbranchがPRのheadになった
 場合、この設定は安全境界（branchの存続）に直接影響する。
+
+### 2026-08-10のdevelop branch protection
+
+`develop`にbranch protectionを設定した。目的は**未解決review threadを残したmergeをGitHub側で止める**ことである。
+
+適用値（`PUT /repos/{owner}/{repo}/branches/develop/protection`）:
+
+| 項目 | 値 | 理由 |
+|---|---|---|
+| `required_conversation_resolution` | **`true`** | 本設定の目的。未解決threadがあると`mergeStateStatus`が`BLOCKED`になる |
+| `required_pull_request_reviews` | **`null`** | **設定しない。**設定すると`develop`への直接commitが塞がり、記述の維持管理を直接反映してよい運用（[CONTRIBUTING](../CONTRIBUTING.md)）と両立しない |
+| `required_status_checks` | `null` | CIの安定を確認してから別途判断する（上記「Branch protectionの時期」） |
+| `allow_force_pushes` | `false` | force pushを禁止 |
+| `allow_deletions` | `false` | 2026-08-03の削除事故と同じ事象を、Rulesetに加えてprotection側でも防ぐ |
+| `enforce_admins` | `false` | 管理者は強制mergeできる。未解決を残す場合の手順は[CONTRIBUTING](../CONTRIBUTING.md)に従う |
+
+動作確認（2026-08-10、[PR #88](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/88)）:
+
+| 操作 | `mergeStateStatus` |
+|---|---|
+| thread resolved | `CLEAN` |
+| thread を unresolve | **`BLOCKED`** |
+| 再び resolve | `CLEAN` |
+
+**設定しただけで確認しない、を避けるため実際にblockされることを確認した。**
+
+これにより`CONTRIBUTING.md`の「Merge前の確認」が要求していた手作業のGraphQL確認は不要になり、同節を縮小した。
+ただし**`Review rate limited`はcheckが`pass`と表示されGitHubは止めない**ため、その確認だけは手作業として残している。
+
+### CodeRabbitのauto review設定（2026-08-10）
+
+[`.coderabbit.yaml`](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/.coderabbit.yaml)を新設し、auto reviewを高リスク変更へ限定した
+（[PR #88](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/88)、[#87](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/87)）。
+
+| key | 値 |
+|---|---|
+| `reviews.auto_review.enabled` | `false`（`labels`の正一致でのみ発火） |
+| `reviews.auto_review.base_branches` | `[develop]`。既定branchの`main`は設定に関わらず常に対象 |
+| `reviews.auto_review.labels` | `area:firmware` `area:protocol` `area:raspberry-pi` `area:hardware`。**`type:decision`は[PR #91](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/91)で外した**（ADRとgovernance文書の変更が頻出し、文書変更でreviewを消費し続けるため） |
+| `reviews.auto_review.auto_incremental_review` | `false`（pushのたびの再reviewを止める） |
+
+全Pull Requestでreviewを走らせるとrate limitに掛かる。
+[PR #55](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/55)では再review依頼が実行されず、
+[PR #88](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/88)では2回目の依頼が`Review rate limited`で終わった。
+
+**pathでauto reviewの発火は制御できない。**`reviews.path_filters`はreviewの中で見るfileを絞るだけである
+（公式JSON schemaで確認）。発火を制御できるのは`base_branches`／`labels`／`ignore_title_keywords`／
+`ignore_usernames`の4つだけであり、本projectはPull Requestにもlabelを付ける運用のためlabelで制御している。
 
 ### 2026-08-03のdevelop branch削除事故と対処
 
@@ -347,7 +454,6 @@ GitHubはProjects（classic）のREST APIを2025-04-01にsunsetしており（�
 
 - CODEOWNERS: 安定したreviewer／owner対応が複数になった時点で追加
 - Code of Conduct: 外部communityへ積極的に参加を求める前に追加
-- Dependabot（cargo）: Cargo manifest作成後に追加。github-actionsは適用済み
 - Release workflow: versionとartifact方針の確定後に追加
 - Discussions: community supportにIssueだけでは不足した場合に追加
 - Signed commit: SSH署名で導入コストが小さいため、次のrepository運用変更で評価する

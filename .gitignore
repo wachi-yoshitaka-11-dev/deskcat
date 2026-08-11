@@ -50,3 +50,8 @@ __pycache__/
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+# 作業指示と実行報告（git管理外。作業が終わったら削除してよい）
+# `git add -A`で誤ってcommitする事故が実際に2回起きたため、注意ではなく設定で防ぐ。
+WORK-INSTRUCTIONS-*.md
+WORK-REPORT-*.md

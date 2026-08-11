@@ -1,0 +1,15 @@
+[package]
+name = "deskcat-protocol"
+version = "0.1.0"
+description = "ESP32–Raspberry Pi wire protocolの型、検証、共有conformance fixture"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

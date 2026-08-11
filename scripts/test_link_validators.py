@@ -364,6 +364,45 @@ class SourceValidatorTests(ValidatorAssertions):
         )
         self.assert_outcome(run, True, expected_message="BROKEN=0")
 
+    def test_unclosed_code_fence_is_rejected(self):
+        _write(
+            _state["source_page"],
+            "# Existing\n\n```text\nnever closed\n\n[valid](#existing)\n",
+        )
+        run = run_validator(
+            VALIDATE_DOCS, ["--repository-root", _state["source_root"]]
+        )
+        self.assert_outcome(
+            run, False, expected_message="Unclosed code fence in docs/page.md"
+        )
+
+    def test_unclosed_code_fence_is_rejected_before_it_hides_a_broken_link(self):
+        """fenceの閉じ忘れを、成功として通さないこと。
+
+        guardが無いと、閉じ忘れ以降のlinkは走査されず`BROKEN=0`で成功する。
+        壊れたlinkを閉じ忘れの後ろへ置き、成功しないことを確かめる。
+        """
+        _write(
+            _state["source_page"],
+            "# Existing\n\n```text\nnever closed\n\n[broken](does-not-exist.md)\n",
+        )
+        run = run_validator(
+            VALIDATE_DOCS, ["--repository-root", _state["source_root"]]
+        )
+        self.assert_outcome(
+            run, False, expected_message="Unclosed code fence in docs/page.md"
+        )
+
+    def test_balanced_code_fences_are_accepted(self):
+        _write(
+            _state["source_page"],
+            "# Existing\n\n```text\nclosed\n```\n\n[valid](#existing)\n",
+        )
+        run = run_validator(
+            VALIDATE_DOCS, ["--repository-root", _state["source_root"]]
+        )
+        self.assert_outcome(run, True, expected_message="BROKEN=0")
+
     def _add_index_symlink(self, root, repository_relative, link_text):
         """working treeを変えずに、indexへmode 120000のentryを足す。
 
@@ -1468,6 +1507,42 @@ class SharedHelperTests(unittest.TestCase):
         outside = "\n".join(guards.markdown_outside_fences(fixture))
         self.assertEqual(outside, "# Heading\n[real](real.md)\n## Tail")
         self.assertEqual(list(guards.markdown_link_targets(outside)), ["real.md"])
+
+    def test_unclosed_fence_swallows_everything_after_it(self):
+        """guardが必要な理由そのものを固定する。
+
+        fenceが奇数個だと、以降の行はlinkも見出しも走査対象から消える。
+        `markdown_outside_fences`の仕様であり、これ自体は変えない。
+        検査が働いていないことを`unclosed_fence`で検出する。
+        """
+        fixture = (
+            "# Heading\n"
+            "```text\n"
+            "closed\n"
+            "```\n"
+            "```text\n"
+            "never closed\n"
+            "\n"
+            "[hidden](hidden.md)\n"
+            "## Hidden Heading"
+        )
+        outside = "\n".join(guards.markdown_outside_fences(fixture))
+        self.assertEqual(outside, "# Heading")
+        self.assertEqual(list(guards.markdown_link_targets(outside)), [])
+        self.assertEqual(guards.unclosed_fence(fixture), 5)
+
+    def test_balanced_fences_report_no_unclosed_fence(self):
+        balanced = "# Heading\n```text\na\n```\n~~~\nb\n~~~\ntail"
+        self.assertIsNone(guards.unclosed_fence(balanced))
+        self.assertIsNone(guards.unclosed_fence("# Heading\n\nno fence at all"))
+
+    def test_unclosed_fence_reports_the_opening_line_not_an_earlier_one(self):
+        """報告する行は、閉じていない最後のfenceの開始行であること。
+
+        先に閉じたfenceの行を返すと、直すべき箇所と違う場所を指す。
+        """
+        fixture = "```\na\n```\n\n\n```\nb"
+        self.assertEqual(guards.unclosed_fence(fixture), 6)
 
     def test_publication_path_helper_normalizes_and_rejects(self):
         self.assertEqual(

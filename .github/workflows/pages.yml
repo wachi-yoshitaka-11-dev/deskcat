@@ -2,27 +2,29 @@ name: Pages
 
 on:
   pull_request:
+    # `validate_doc_links.py`は追跡下の**全**Markdownを検査する。top-level
+    # directoryを列挙すると、component READMEの変更が検査を素通りする。
+    # 実際に`apps/`、`crates/`、`firmware/`等の14 fileが対象外だった。
+    # 検査対象と起動条件を一致させるため`**/*.md`で拾う。
     paths:
+      - "**/*.md"
       - ".github/**"
-      - "AGENTS.md"
-      - "CONTRIBUTING.md"
       - "LICENSE"
-      - "README.md"
-      - "SECURITY.md"
-      - "docs/**"
       - "pages/**"
       - "scripts/**"
   push:
     branches:
       - main
+      # `develop`への直接commitはPull Requestを経ないため、これが無いと検査が一切走らない。
+      # 記述の維持管理は承認のみで直接反映してよい運用（CONTRIBUTING）があり、
+      # その変更が素通りする。壊れたlinkは`main`への昇格Pull Requestまで表面化しない。
+      # 成果物のuploadとdeployは`github.ref == 'refs/heads/main'`でgateしているため、
+      # `develop`では検証だけが走り、公開はされない。
+      - develop
     paths:
+      - "**/*.md"
       - ".github/**"
-      - "AGENTS.md"
-      - "CONTRIBUTING.md"
       - "LICENSE"
-      - "README.md"
-      - "SECURITY.md"
-      - "docs/**"
       - "pages/**"
       - "scripts/**"
   workflow_dispatch:
