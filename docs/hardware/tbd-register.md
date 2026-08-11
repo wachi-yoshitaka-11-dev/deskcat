@@ -45,7 +45,7 @@
 | HW-TBD-029 | P1 | **各deviceのlocal decouplingの容量と配置。**[power-budget.md](power-budget.md)の`配線・保護表`で`TBD`／`Blocked`のまま残っている | 各deviceのデータシートが指定する値と配置。要件は[power-budget.md](power-budget.md)の`配線・保護表` | 電源系の受け入れ承認、sensor busの安定動作 | [#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3) | Joint | Open（datasheetから確定でき、現物・実測を待たない） |
 | HW-TBD-030 | P1 | **逆極性保護の要否と方式。**[power-budget.md](power-budget.md)の`配線・保護表`で`TBD`／`Blocked`のまま残っている。配線ミス時にPi、ESP32、周辺module3点が同時に破損しうる | Design review。要件は[power-budget.md](power-budget.md)の`配線・保護表` | 合成給電（段階C）の配線承認 | [#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3) | Human | Open |
 | HW-TBD-031 | P1 | **ESP32 chipの刻印の読み取り。**現物写真が反射で判読不能であり未読である。搭載moduleがESP-WROOM-32Dであることは購入履歴とsilkscreenで確定しており、そのdatasheetが示す中核chipは`ESP32-D0WD`であるが、**現物の刻印で確かめていない。**[ESP32 Rust Toolchain](../toolchains/esp32-rust-toolchain.md)の確定条件の1つであり、同文書の状態が`Verified`ではなく`build検証済み`にとどまる理由の一方である（他方は`HW-TBD-001`）。**この行は2026-08-11の全数照合で登録した。**同文書が「刻印の読み取りはTBD台帳の追跡対象にはなっていない」と自ら書いており、`TBD`の語だけを走査するcommand 2)で検出した | 現物のchip刻印の読み取り（反射を避けた撮影、または実体顕微鏡）。要件は[esp32-rust-toolchain.md](../toolchains/esp32-rust-toolchain.md) | [ESP32 Rust Toolchain](../toolchains/esp32-rust-toolchain.md)の状態を`Verified`にする条件 | [#1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1) | Human | Open（`HW-TBD-001`と同じ現物boardで確認できる。001の完了を待つ必要はない） |
-| HW-TBD-032 | P0 | **`LCD-RST`／`LCD-CS`の外部pull-up（`RES-PULL-01`）の抵抗値と本数。**[gpio-assignment.md](gpio-assignment.md#信号inventory)は`LCD-CS`へ**外部10kΩ pull-up推奨**（active-low CSをfirmware初期化前もinactiveに保つため）としているが、**未実装である。**同文書の受け入れchecklistが「Resetとbacklight lineが安全な状態で起動する（`LCD-RST`/`LCD-CS`への外部pull-up実装が前提。**未実装のため要対応**）」と明記している。未実装のまま通電すると、起動直後の数十ms間bus contentionのriskがある。**`HW-TBD-027`は`SERVO-PWM`のpull-downだけを対象としており、この2信号を含まない。**`RES-PULL-01`は両方をまかなう部品である。**この行は2026-08-11の全数照合で登録した**（`未実装`の語による検出。command 3)の群B） | 抵抗値と本数の選定、購入、実装、および起動時に`LCD-CS`がHighであることの確認。要件は[gpio-assignment.md](gpio-assignment.md#信号inventory)の`LCD-CS`行と受け入れchecklist、部品は[hardware-bom.md](hardware-bom.md) `RES-PULL-01` | 初回統合通電、LCDのbring-up（#13） | [#2](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/2) | Human | Open（`LCD-CS`のpolarityの現物確認は`HW-TBD-002`と同じ機会に行える） |
+| HW-TBD-032 | P0 | **`LCD-RST`／`LCD-CS`の外部pull-upと`LCD-BL`の外部pull-down（`RES-PULL-01`）の抵抗値・本数・極性。**[gpio-assignment.md](gpio-assignment.md#信号inventory)は`LCD-CS`へ**外部10kΩ pull-up推奨**（active-low CSをfirmware初期化前もinactiveに保つため）、`LCD-RST`へ**外部pull-up推奨**（reset非activeを既定にするため）、`LCD-BL`へ**外部pull-down推奨**（backlightをfirmware初期化前もOffに確定させるため）としているが、**3つとも未実装である。**同文書の受け入れchecklistが「Resetとbacklight lineが安全な状態で起動する（`LCD-RST`/`LCD-CS`への外部pull-up実装が前提。**未実装のため要対応**）」と明記している。未実装のまま通電すると、`LCD-CS`では起動直後の数十ms間bus contentionのriskがあり、`LCD-BL`はGPIO4の内部weak pull-downが外部回路に対して弱いためbacklightが点灯しうる。**`HW-TBD-027`は`SERVO-PWM`のpull-downだけを対象としており、この2信号を含まない。**`RES-PULL-01`は両方をまかなう部品である。**この行は2026-08-11の全数照合で登録した**（`未実装`の語による検出。command 3)の群B） | 抵抗値・本数・極性の選定、購入、実装、および起動時の状態確認3点（`LCD-CS`がHigh＝inactive、`LCD-RST`がreset非active、`LCD-BL`がbacklight Off）。**3信号すべてを確認するまでcloseしない。**`LCD-BL`と`LCD-RST`の極性は現物確認後に決まるため、`HW-TBD-002`が先に要る。要件は[gpio-assignment.md](gpio-assignment.md#信号inventory)の`LCD-RST`／`LCD-CS`／`LCD-BL`行と受け入れchecklist、部品は[hardware-bom.md](hardware-bom.md) `RES-PULL-01` | 初回統合通電、LCDのbring-up（#13） | [#2](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/2) | Human | Open（`LCD-CS`のpolarityの現物確認は`HW-TBD-002`と同じ機会に行える） |
 
 ## 対応Issue列
 
@@ -263,7 +263,16 @@ grep -rnE "TBD" docs/hardware docs/decisions docs/toolchains \
 
 1. **識別子**: `HW-TBD-\d{3}`／`PROTO-TBD-\d{3}`の一部。台帳行への参照であり、新規登録の対象ではない。上のcommand 2)で機械的に除く
 2. **本文の`TBD`**: 値または判断が未確定であることを示す記述。表のセル、箇条書き、散文を問わない
-3. 2 のうち**安全・電気・機械項目**に当たるものだけが登録対象である
+3. 2 のうち**安全・電気・機械項目**、および**下記の識別項目**に当たるものだけが登録対象である
+
+**識別項目とは、正本文書が確定条件として挙げている部品・chipの同定である。**安全・電気・機械の
+どれにも当たらないが、**満たされないと正本文書が状態を上げられない**ため追跡する。
+`HW-TBD-031`（ESP32 chipの刻印）がこれに当たり、[ESP32 Rust Toolchain](../toolchains/esp32-rust-toolchain.md)が
+`Verified`ではなく`build検証済み`にとどまる理由の一方である。
+**この段を明記するまで、031は基準3のどれにも当てはまらないまま登録されていた**
+（2026-08-11の全数分類で登録し、[PR #105](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/105)のreviewで基準側の不足を指摘されて補った）。
+`HW-TBD-001`〜`005`も同じ性質を持つが、いずれもGPIO割り当てや給電経路という
+電気項目を直接blockするため、基準3の1つ目で拾えている。
 
 3 に当たらないものは対象外とし、**1件ごとに理由を残す。**次の類型が繰り返し現れる。
 
@@ -373,6 +382,7 @@ commit `52661b9` に対して実行した。**件数は文書を変更すれば�
 | 台帳への参照 | 10 | 「追跡は`HW-TBD-021`で行う」「field単位の正は台帳に定義」等 |
 | firmware／文書運用の項目 | 1 | [gpio-assignment.md](gpio-assignment.md)の`Firmware board configuration ID` |
 | 凡例 | 1 | [toolchains/README.md](../toolchains/README.md)の状態ラベル表 |
+| 未分類 | 0 | — |
 | **新規登録** | **1** | **`HW-TBD-031`**（ESP32 chipの刻印）。[esp32-rust-toolchain.md](../toolchains/esp32-rust-toolchain.md)が「刻印の読み取りはTBD台帳の追跡対象にはなっていない」と**自ら書いていた** |
 
 #### command 3)（`TBD`以外の語）156件
@@ -384,7 +394,8 @@ commit `52661b9` に対して実行した。**件数は文書を変更すれば�
 | 規則文・状態ラベル・確定済み記述 | 23 | 表header、`Required`／`Blocked`の凡例、確定済みの購入履歴への言及など |
 | 発注状態のみ | 21 | 部品は決まっており購入していないだけ。[購入待ちリスト](hardware-bom.md#購入待ちリスト)側で追う |
 | 文書運用・toolchain状態 | 13 | ADR-0002／0004／0007、[machine-profiles.md](../toolchains/machine-profiles.md)、toolchain索引。安全・電気・機械項目ではない |
-| **新規登録** | **2行（1件）** | **`HW-TBD-032`**（`LCD-RST`／`LCD-CS`の外部pull-up）。[gpio-assignment.md](gpio-assignment.md#信号inventory)の受け入れchecklistが「**未実装のため要対応**」と書いていたが、`HW-TBD-027`は`SERVO-PWM`のpull-downだけを対象としており含んでいなかった |
+| 未分類 | 0 |
+| **新規登録** | **2行（1件）** | **`HW-TBD-032`**（`LCD-RST`／`LCD-CS`のpull-upと`LCD-BL`のpull-down）。[gpio-assignment.md](gpio-assignment.md#信号inventory)の受け入れchecklistが「**未実装のため要対応**」と書いていたが、`HW-TBD-027`は`SERVO-PWM`のpull-downだけを対象としており含んでいなかった |
 
 群Aだけなら122件、群Bだけなら41件である（重なる行があるため合計は一致しない）。
 
@@ -395,7 +406,7 @@ commit `52661b9` に対して実行した。**件数は文書を変更すれば�
 | 新規行 | 検出した走査 | もう一方では |
 |---|---|---|
 | `HW-TBD-031`（chip刻印） | command 2)（`TBD`） | 群Bの`未読`は走査語に含めていないため**検出できない** |
-| `HW-TBD-032`（LCD pull-up） | command 3) 群B（`未実装`） | 該当行に`TBD`の語が無いため**検出できない** |
+| `HW-TBD-032`（LCDの外部pull） | command 3) 群B（`未実装`） | 該当行に`TBD`の語が無いため**検出できない** |
 
 **片方だけの走査では、どちらも取り落とす。**`HW-TBD-027`（`未購入・未選定`から登録）に続き、
 `TBD`だけを見る照合では不十分であることが2件目・3件目の実例として確かめられた。
