@@ -15,7 +15,9 @@ fn main() {
     println!("cargo:rerun-if-env-changed={allow_external}");
 
     // 空文字は未設定として扱う。shellの初期化で`export IDF_PATH=`だけが走る場合がある。
-    let external = std::env::var("IDF_PATH").ok().filter(|p| !p.trim().is_empty());
+    let external = std::env::var("IDF_PATH")
+        .ok()
+        .filter(|p| !p.trim().is_empty());
 
     if let Some(path) = external {
         assert!(
