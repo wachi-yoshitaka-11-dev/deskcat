@@ -175,7 +175,7 @@ build はそのまま成功する。この取り違えは runbook の版上げ�
 
 - [x] 物理基板の機種と搭載 module を確認した（ESP-WROOM-32D 開発ボード／秋月電子 M-13628。基板に revision 表示は無い）
 - [ ] chip 刻印を読み取った（現物写真が反射で判読不能）
-- [ ] 回路図と現物 pin 表記を照合した
+- [ ] 公式 pin 表と現物 pin 表記を照合した
 - [x] 開発端末の profile と version record を作成した
 - [x] レビュー済み template commit から最小 project を生成した
 - [x] 環境変数による意図しない SDK override がない
@@ -188,7 +188,7 @@ build はそのまま成功する。この取り違えは runbook の版上げ�
 未達の 2 項目により、この文書の状態は `検証済み`（`Verified`）ではなく **`build検証済み`** にとどめる。語の定義は [状態ラベル](README.md#状態ラベル) を参照する。
 
 - **chip 刻印の読み取り**: 現物写真が反射で判読不能。搭載 module は確定しており、その datasheet が中核 chip を示すため、build への影響は無い。
-- **回路図と現物 pin 表記の照合**: [HW-TBD-001](../hardware/tbd-register.md) として追跡し、#6 の flash 前提条件でもある。物理基板の機種と搭載 module 自体は現物確認で確定済みである。
+- **公式 pin 表と現物 pin 表記の照合**: [HW-TBD-001](../hardware/tbd-register.md) として追跡し、#6 の flash 前提条件でもある。物理基板の機種と搭載 module 自体は現物確認で確定済みである。
 
 **別端末での再現は満たした。**根拠と、そう判断してよい理由を次に示す。
 
@@ -209,7 +209,7 @@ lockfile、clean build）をすべて記録している。
 標準OSは [ADR-0005](../decisions/0005-standard-development-os.md) により実機 Linux であり、
 Windows は対象外のため再現対象に含めない。**CI は Windows ではなく Linux であり、この除外に当たらない。**
 
-**それでも状態は `Verified` へ上げない。**残る 2 項目（chip 刻印、回路図と現物 pin 表記の照合）は
+**それでも状態は `Verified` へ上げない。**残る 2 項目（chip 刻印、公式 pin 表と現物 pin 表記の照合）は
 いずれも現物確認を要し、CI では代替できない。**「CI が通ったから昇格できる」とは結論しない。**
 
 flash、serial monitor、実機起動は #6 の範囲であり、この文書の build-only 確定条件には含めない。
