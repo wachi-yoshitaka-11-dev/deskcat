@@ -11,7 +11,7 @@
 
 Pull Requestも同様で、35件中12件（34%）は題名の時点でレビュー対応または記述修正である。
 昇格Pull Request [#61](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/61) は単体で
-#62〜#70 の9件を派生させた。
+Issue `#62`〜`#70` の9件を派生させた。
 
 同じ2日のうちに、[#36](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/36)で
 「Machine Profilesにpwsh 7以降の要件を追記する」を処理し、

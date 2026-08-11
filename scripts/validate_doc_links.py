@@ -109,12 +109,16 @@ def _fail_if_any(problems):
     )
 
 
-def _collect_anchors(markdown_files):
+def _collect_anchors(markdown_files, file_texts):
     """各fileの見出しから生成されるanchor集合を作る。
 
     linkのfragmentがここに無ければ、生成siteでpage内jumpが解決しない。
     fileが存在するだけでは検出できないため、link先の存在確認とは別に突き合わせる。
     過去に見出しの改名で2度壊している。
+
+    本文は`file_texts`から取り、ここでfileを読み直さない。読み直すと、走査中に
+    fileが変わったときにanchor収集とlink収集が別の内容を見る。片方にしか無い
+    見出しが「Broken anchor」として報告され、原因が実在しないlink切れに見える。
     """
     anchors_by_file = {}
     for path in markdown_files:
@@ -125,7 +129,7 @@ def _collect_anchors(markdown_files):
         # fenced code block内の`#`で始まる行はshell commentであり見出しではない。
         # 数えると偽のanchorが増え、同名見出しの`-1`／`-2`採番がずれる。
         # このrepositoryのgithub-wiki-home.mdは、実際にbash commentを10行以上含む。
-        for line in guards.markdown_outside_fences(guards.get_file_text(path)):
+        for line in guards.markdown_outside_fences(file_texts[path]):
             match = HEADING_RE.match(line)
             if not match:
                 continue
@@ -225,7 +229,7 @@ def main(argv=None):
             )
     _fail_if_any(problems)
 
-    anchors_by_file = _collect_anchors(markdown_files)
+    anchors_by_file = _collect_anchors(markdown_files, file_texts)
 
     for path in markdown_files:
         scanned += 1

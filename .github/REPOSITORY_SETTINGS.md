@@ -265,7 +265,7 @@ PR mergeのたびにhead branchを削除する。`develop`のような恒久的�
 |---|---|
 | `reviews.auto_review.enabled` | `false`（`labels`の正一致でのみ発火） |
 | `reviews.auto_review.base_branches` | `[develop]`。既定branchの`main`は設定に関わらず常に対象 |
-| `reviews.auto_review.labels` | `area:firmware` `area:protocol` `area:raspberry-pi` `area:hardware` `type:decision` |
+| `reviews.auto_review.labels` | `area:firmware` `area:protocol` `area:raspberry-pi` `area:hardware`。**`type:decision`は[PR #91](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/91)で外した**（ADRとgovernance文書の変更が頻出し、文書変更でreviewを消費し続けるため） |
 | `reviews.auto_review.auto_incremental_review` | `false`（pushのたびの再reviewを止める） |
 
 全Pull Requestでreviewを走らせるとrate limitに掛かる。

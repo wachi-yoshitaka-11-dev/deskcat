@@ -156,7 +156,7 @@ GitHub Issue migration: PENDING foundation document publication
 
 **#5を対象へ戻さない。**PR #40でcloseし、#86でCIから再現した。Software gateの
 「互換性のあるRust／ESP-IDF version」は`build検証済み`である。残るboard回路図とpin表記の照合は
-#5ではなく`HW-TBD-001`（#1）が担い、flashとserial monitorは#6が担う。
+Issue `#5`ではなく`HW-TBD-001`（#1）が担い、flashとserial monitorは#6が担う。
 
 `#6`（flashとserial monitor）を落とさない。Software gateの「再現可能なbuild／flash／monitor
 command」が`Partial`にとどまる唯一の理由であり、揃わないまま再実行しても同じ`Partial`を
