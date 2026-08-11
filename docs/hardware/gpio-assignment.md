@@ -109,7 +109,7 @@ PCからflashingするときは同じUSB portを使うため、Piとの同時接
 - [ ] Moduleのpull-upを並列合成した実効抵抗が有効範囲内である（ADXL345／BME280双方のon-board pull-up有無を現物確認後に計算）
 - [ ] MSP2807のlogic IOが3.3Vで動作することを現物で確認した（VCC 3.3–5V対応だがlogic IOは3.3V TTL。`power-budget.md`参照）
 - [ ] ESP32の電源投入前に外部moduleがESP32 pinをdriveしない（未検証、実機電源offでの導通checkが必要）
-- [ ] Resetとbacklight lineが安全な状態で起動する（LCD-RST/LCD-CSへの外部pull-up実装が前提。未実装のため要対応）
+- [ ] Resetとbacklight lineが安全な状態で起動する（LCD-RST/LCD-CSへの外部pull-up実装が前提。未実装のため要対応。[`HW-TBD-032`](tbd-register.md)で追跡する）
 - [ ] Servo PWMがdisabledまたは承認済みの安全状態で起動する（GPIO27はreset時high-Zであり、外部pull-downを**必須**とした。実装・検証とも未了。`tbd-register.md` HW-TBD-019と連動、未解決）
 
 ## Firmwareとの同期

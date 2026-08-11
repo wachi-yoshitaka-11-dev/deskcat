@@ -35,15 +35,17 @@
 | HW-TBD-019 | P0 | 起動時とdriver故障時のサーボ出力状態（PWM driver初期化前のGPIO state、開始mode、enableまでのdelay、Pi未接続時、reset後、driver故障検知時） | 無負荷でのPWM測定＋起動時glitch確認。正本: [servo-safety-limits](servo-safety-limits.md#起動時とdriver故障時の動作) | 初回統合通電 | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17) | Joint | 010、**027**によりBlocked |
 | HW-TBD-020 | P1 | 実行時のサーボ安全制御（採用する検知／予防手段、電流しきい値と判定時間、連続動作時間の上限、duty cycle窓と上限、検知時の物理動作、復帰条件、秒あたり受理command数、単一commandの最大変化量、command timeout、duplicate履歴の保持期間とretry window、retired sessionの保持件数と期間） | 電流測定手段の選定＋温度／電流試験。**正はfield単位**で[下表](#hw-tbd-020のfield単位の正)に定める。要件は[servo-safety-limits](servo-safety-limits.md#拘束stallと過負荷)、link側は[protocol](../protocol/esp32-pi-protocol.md#13-未決定事項) | 長時間動作とM6耐久試験 | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)、[#24](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/24) | Joint | 009、全fieldのresolution evidence未記録、およびPROTO-TBD-005／011／012／013／014未解決によりBlocked |
 | HW-TBD-021 | P0 | **5 V ingressの過電流保護部品（`PROT-OC-01`）の選定とtrip値。**M-12001は3 Aを供給でき、候補構成で定格が判明している部品のうち最小は1.5 Aである（HW-TBD-022が解決するまで、これが真の最小値である保証はない）。現状は「上限を超えたらテスターの読みで人が電源を落とす」だけであり、connectorと線材が発熱する前に電流を止める手段が無い | メーカーの時間-電流特性（一次資料）に基づく選定。選定基準・挿入位置・上限との関係は[power-budget.md](power-budget.md#過電流保護段階cのgate) | **合成給電（段階C）**。保護部品の選定・実装まで実施しない | [#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3) | Human | Open |
-| HW-TBD-022 | P0 | **大電流経路の線材・接続部材（`WIRE-PWR-01`）の選定と許容電流。**手持ちのbreadboardとジャンパー線は個別の許容電流がメーカー資料で確認できず、経路の最小定格を出せない。最小定格が出ないとingressの上限（経路部品の定格の最小値の80%）が確定しない | 公称許容電流が公開されている線材・接続部材の選定。決定の根拠は[power-budget.md](power-budget.md#経路部品と定格) | ingressの上限の確定、**合成給電（段階C）** | [#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3) | Human | Open |
+| HW-TBD-022 | P0 | **大電流経路の線材・接続部材（`WIRE-PWR-01`）と`CABLE-PI-PWR-01`の選定と許容電流。**（`CABLE-PI-PWR-01`は[power-budget.md](power-budget.md#経路部品と定格)で同じ規則の適用対象であり、2026-08-11の照合でこの行に含めることを明示した。）手持ちのbreadboardとジャンパー線は個別の許容電流がメーカー資料で確認できず、経路の最小定格を出せない。最小定格が出ないとingressの上限（経路部品の定格の最小値の80%）が確定しない | 公称許容電流が公開されている線材・接続部材の選定。決定の根拠は[power-budget.md](power-budget.md#経路部品と定格) | ingressの上限の確定、**合成給電（段階C）** | [#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3) | Human | Open |
 | HW-TBD-023 | P0 | **ESP32 boardの`3V3` pinから外部負荷を取ってよい条件。**(a) 外部供給可能電流の定格、(b) board上regulatorの種別（LDO／switching）、(c) **過電流保護／短絡保護の有無と動作**（制限電流、折り返し特性、熱shutdownの有無）。(a)と(b)は通常動作の上限と5 V側への換算に、(c)は短絡・配線ミス時の故障電流の制限に要る。**(c)が無いか確認できない場合、`3V3` pinから外部負荷を取る経路（段階B-2a）は採れない** | 一次資料または現物回路の確認。要件は[power-budget.md](power-budget.md#段階b-2の測定)の`B-2a: 3V3 pinから給電する経路`、確認項目は[hardware-bom.md](hardware-bom.md) `MCU-01`と部品受け入れchecklist | **段階B-2a**。B-2bへ移れば回避できるが、`HW-TBD-024`／`025`は経路によらず必要なため、それらが未解決ならどちらの経路も進まない | [#1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1)、[#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3) | Human | Open（`HW-TBD-001`と同じ現物board・同じ資料で確認できるが、**001の完了を待つ必要はない**。pin配列の照合とregulatorの確認は別の問い） |
 | HW-TBD-024 | P0 | **MSP2807が耐えられる電流の上限。**メーカー未公開である。外部の3.3 V電源から給電する経路（段階B-2b）は**設定した電流制限が唯一の保護**であり、その設定値の上限を決めるにはmodule側の安全な上限が要る。**上限が無いままではMSP2807へ給電できない。**これは`HW-TBD-025`の共通条件(b)の一部であり、**B-2bだけでなくB-2aにも掛かる**（B-2aでもregulatorの保護のtrip点がmoduleにとって安全かを判定できない）。ADXL345とBME280だけ測っても未知数は埋まらないため、B-2自体が成立しない | 現物のbacklight回路（電流制限抵抗等）の確認、または一次資料。要件は[power-budget.md](power-budget.md#段階b-2の測定)の`B-2b: 外部の3.3 V電源から給電する経路`の`実施前に満たす条件` | **段階B-2（B-2a／B-2bとも。`HW-TBD-025`の共通条件(b)の一部であるため）**。MSP2807の定常電流の実測と、そこから決まる`PSU-INGRESS-01`の選定が段階Cまで進まない | [#1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1)、[#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3) | Human | Open（`HW-TBD-002`と同じ現物moduleの確認で進められるが、**002の完了を待つ必要はない**。pin配列の確認とbacklight回路の確認は別の問い） |
 | HW-TBD-025 | P0 | **段階B-2の共通条件。給電経路によらず必要であり、B-2a／B-2bのどちらを選んでも省略できない。**(a) `3.3 V rail`の許容電圧範囲。周辺module3点の動作電圧範囲の積集合とESP32のlogic levelから決める。(b) 周辺module3点それぞれが耐えられる電流の上限。B-2bでは電源に設定する電流制限値の上限を決めるために、B-2aでは**board上regulatorの保護のtrip点がmoduleにとって安全かを判定する**ために要る。**`HW-TBD-023`（B-2a）や`HW-TBD-024`（B-2b）が解決しても、この行が未解決ならB-2を実施できない** | (a)は公開spec（[hardware-bom.md](hardware-bom.md)の`DISP-01`／`ACCEL-01`／`ENV-01`の電源欄）と[gpio-assignment.md](gpio-assignment.md#電圧domainすべての外部pull-upに適用)から積集合を取るだけで確定でき、**現物確認を待つ必要はない**。(b)は各moduleのdatasheetの絶対最大定格を当たる。**ADXL345とBME280について公開値があるかは未確認であり、「あるはず」と仮定しない。**公開されていなければMSP2807と同じ扱い（現物回路の確認か、上限を得られないなら当該moduleへB-2で給電しない）とする。**MSP2807分は`HW-TBD-024`**。要件は[power-budget.md](power-budget.md#段階b-2の測定)の共通条件表、確認項目は[hardware-bom.md](hardware-bom.md)の部品受け入れchecklist | **段階B-2（B-2a／B-2bとも）** | [#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3) | Human | Open（(a)は公開specから今すぐ確定できる。(b)はまず各datasheetに公開値があるかを確認するところから。MSP2807分は`HW-TBD-024`） |
 | HW-TBD-026 | P0 | **SG90の電気的駆動条件。**(a) 制御logic要件（ESP32のGPIOは3.3 Vだが、SG90のlogic閾値が未確定であり、3.3 V driveで確実に動作するかを判定できない。[servo-safety-limits.md](servo-safety-limits.md#サーボ識別情報)は現物確認まで確定しないとしている）、(b) PWM周期／rate（50 Hzは一般値であり、確定値として採らない）、(c) 許容最小／最大pulse幅（データシート由来の電気的な駆動範囲。**機械的可動域は`HW-TBD-010`**）。**Stall／peak電流と無負荷／動作電流の実測は`HW-TBD-010`／`HW-TBD-011`の範囲であり、この行では重複させない** | メーカーデータシートと無負荷試験。要件は[servo-safety-limits.md](servo-safety-limits.md#サーボ識別情報)の識別情報表 | `SERVO-PWM`の駆動条件の確定、servoの実機動作全般 | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17) | Joint | Open（データシートから確定できる部分は今すぐ着手できる。無負荷試験を要する範囲は007／009によりBlocked） |
-| HW-TBD-027 | P0 | **`RES-PULL-01`（`SERVO-PWM`の外部pull-down）の抵抗値と本数。**GPIO27はreset時にhigh-Zであり、外部pull-downはPWM driver初期化前にservoが不定pulseを受けないための**必須**部品である。それにもかかわらず抵抗値が未選定で、部品も未購入である。**この行は`TBD`セルではなく、同じ行の「未購入・未選定」から登録した**（[区別の基準](#区別の基準)） | 抵抗値の選定（ESP32のGPIO駆動能力とservo側入力インピーダンスから決める）。要件は[gpio-assignment.md](gpio-assignment.md#信号inventory)の`SERVO-PWM`行、部品は[hardware-bom.md](hardware-bom.md) `RES-PULL-01`。**選定だけではcloseしない。**必要な根拠は[HW-TBD-027の証拠契約](#hw-tbd-027の証拠契約)に定める。**値を決めた文書だけでcloseすると、pull-downが実装されていないのに`HW-TBD-019`のBlockedが外れる** | 初回統合通電、`HW-TBD-019`の起動時状態の確定 | [#2](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/2) | Human | Open |
+| HW-TBD-027 | P0 | **`RES-PULL-01`（`SERVO-PWM`の外部pull-down）の抵抗値と本数。**GPIO27はreset時にhigh-Zであり、外部pull-downはPWM driver初期化前にservoが不定pulseを受けないための**必須**部品である。それにもかかわらず抵抗値が未選定で、部品も未購入である。**この行は`TBD`セルではなく、同じ行の「未購入・未選定」から登録した**（[区別の基準](#区別の基準)） | 抵抗値の選定（ESP32のGPIO駆動能力とservo側入力インピーダンスから決める）。要件は[gpio-assignment.md](gpio-assignment.md#信号inventory)の`SERVO-PWM`行、部品は[hardware-bom.md](hardware-bom.md) `RES-PULL-01`（**同部品は`LCD-RST`／`LCD-CS`のpull-upもまかなう。そちらは`HW-TBD-032`**）。**選定だけではcloseしない。**必要な根拠は[HW-TBD-027の証拠契約](#hw-tbd-027の証拠契約)に定める。**値を決めた文書だけでcloseすると、pull-downが実装されていないのに`HW-TBD-019`のBlockedが外れる** | 初回統合通電、`HW-TBD-019`の起動時状態の確定 | [#2](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/2) | Human | Open |
 | HW-TBD-028 | P1 | **電源品質の数値制限。**(a) Pi入力で許容する最低電圧、(b) ESP32入力／3.3 Vで許容する最低電圧、(c) 最大定常ripple、(d) 最大transient droopと継続時間、(e) connector／wireで許容する最大温度上昇。**許容するbrownout／reset回数は0回で確定済みであり、この行に含めない** | **実測ではなく定義が先である。**各deviceのdatasheetの動作電圧範囲と絶対最大定格、および線材・connectorの温度定格から上限・下限を定める。実測はその後の受け入れ試験で照合する。要件は[power-budget.md](power-budget.md#受け入れ条件)が「承認前に定義する」として挙げている一覧 | 電源系の受け入れ承認、合成給電（段階C）の合否判定 | [#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3) | Joint | Open（定義は現物・実測を待たずに着手できる） |
 | HW-TBD-029 | P1 | **各deviceのlocal decouplingの容量と配置。**[power-budget.md](power-budget.md)の`配線・保護表`で`TBD`／`Blocked`のまま残っている | 各deviceのデータシートが指定する値と配置。要件は[power-budget.md](power-budget.md)の`配線・保護表` | 電源系の受け入れ承認、sensor busの安定動作 | [#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3) | Joint | Open（datasheetから確定でき、現物・実測を待たない） |
 | HW-TBD-030 | P1 | **逆極性保護の要否と方式。**[power-budget.md](power-budget.md)の`配線・保護表`で`TBD`／`Blocked`のまま残っている。配線ミス時にPi、ESP32、周辺module3点が同時に破損しうる | Design review。要件は[power-budget.md](power-budget.md)の`配線・保護表` | 合成給電（段階C）の配線承認 | [#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3) | Human | Open |
+| HW-TBD-031 | P1 | **ESP32 chipの刻印の読み取り。**現物写真が反射で判読不能であり未読である。搭載moduleがESP-WROOM-32Dであることは購入履歴とsilkscreenで確定しており、そのdatasheetが示す中核chipは`ESP32-D0WD`であるが、**現物の刻印で確かめていない。**[ESP32 Rust Toolchain](../toolchains/esp32-rust-toolchain.md)の確定条件の1つであり、同文書の状態が`Verified`ではなく`build検証済み`にとどまる理由の一方である（他方は`HW-TBD-001`）。**この行は2026-08-11の全数照合で登録した。**同文書が「刻印の読み取りはTBD台帳の追跡対象にはなっていない」と自ら書いており、`TBD`の語だけを走査するcommand 2)で検出した | 現物のchip刻印の読み取り（反射を避けた撮影、または実体顕微鏡）。要件は[esp32-rust-toolchain.md](../toolchains/esp32-rust-toolchain.md) | [ESP32 Rust Toolchain](../toolchains/esp32-rust-toolchain.md)の状態を`Verified`にする条件 | [#1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1) | Human | Open（`HW-TBD-001`と同じ現物boardで確認できる。001の完了を待つ必要はない） |
+| HW-TBD-032 | P0 | **`LCD-RST`／`LCD-CS`の外部pull-up（`RES-PULL-01`）の抵抗値と本数。**[gpio-assignment.md](gpio-assignment.md#信号inventory)は`LCD-CS`へ**外部10kΩ pull-up推奨**（active-low CSをfirmware初期化前もinactiveに保つため）としているが、**未実装である。**同文書の受け入れchecklistが「Resetとbacklight lineが安全な状態で起動する（`LCD-RST`/`LCD-CS`への外部pull-up実装が前提。**未実装のため要対応**）」と明記している。未実装のまま通電すると、起動直後の数十ms間bus contentionのriskがある。**`HW-TBD-027`は`SERVO-PWM`のpull-downだけを対象としており、この2信号を含まない。**`RES-PULL-01`は両方をまかなう部品である。**この行は2026-08-11の全数照合で登録した**（`未実装`の語による検出。command 3)の群B） | 抵抗値と本数の選定、購入、実装、および起動時に`LCD-CS`がHighであることの確認。要件は[gpio-assignment.md](gpio-assignment.md#信号inventory)の`LCD-CS`行と受け入れchecklist、部品は[hardware-bom.md](hardware-bom.md) `RES-PULL-01` | 初回統合通電、LCDのbring-up（#13） | [#2](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/2) | Human | Open（`LCD-CS`のpolarityの現物確認は`HW-TBD-002`と同じ機会に行える） |
 
 ## 対応Issue列
 
@@ -352,28 +354,59 @@ hitは[区別の基準](#区別の基準)の3段に掛けたうえで、次の�
 
 **2026-08-10の記録は、command 2)の136件をどう分類したかを残していない。**上表の「漏れ0件」は
 差分83行についての判定であり、136件の候補そのものについての判定ではない。
-**この記録をもって「本文`TBD`の全数を分類し終えた」と読まない。**次回以降は
-[区別の基準](#区別の基準)の類型ごとの件数を記録する。
+**2026-08-11に、command 2)の136件とcommand 3)の156件を全件分類した。**内訳を下に残す。
 
-command 3) の実施記録は次のとおりである。
+### 2026-08-11の全数分類
 
-| 照合日 | hit | 分類 | 実施 |
-|---|---|---|---|
-| 2026-08-11 | 156（群A＋群B） | **未完了。**patternを定義してhit数を採っただけである。内訳は`power-budget.md` 66、`hardware-bom.md` 50、`servo-safety-limits.md` 13、`gpio-assignment.md` 13、`0007-review-scope-and-self-review.md` 4、`esp32-rust-toolchain.md` 3、`toolchains/README.md` 2、`raspberry-pi-rust-toolchain.md`／`machine-profiles.md`／`sensor-datasheet-notes.md`／`0004-main-develop-branch-strategy.md`／`0002-role-based-development-environments.md` 各1 | [PR #99](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/99)のreview対応 |
+commit `52661b9` に対して実行した。**件数は文書を変更すれば動く。**次回は件数を
+突き合わせず、commandを再実行して判定する。
+
+#### command 2)（本文の`TBD`）136件
+
+| 分類 | 件数 | 内訳 |
+|---|---|---|
+| 既存行が包含する（templateの空欄） | 57 | [sensor-datasheet-notes.md](sensor-datasheet-notes.md)の4 module節。`HW-TBD-002`〜`005`がmodule単位で追跡する |
+| 既存行が包含する（安全・電気・機械） | 32 | servo識別情報と駆動条件 7（`HW-TBD-010`／`011`／`026`）、機械組み立て 8（`HW-TBD-010`。`PWM停止時の重力による動作`は`HW-TBD-018`の監視下機械試験）、拘束・過負荷 6（`HW-TBD-020`）、経路部品と定格 6（`HW-TBD-021`／`022`）、負荷表 1（`HW-TBD-024`）、配線・保護表 3（`HW-TBD-009`／`029`／`030`）、受け入れ条件 1（`HW-TBD-028`） |
+| 既存行が包含する（BOMの列） | 9 | `Address／mode`列 4（`HW-TBD-003`／`004`／`005`／`016`）、`Peak電流`列 4（[power-budget.md](power-budget.md#測定計画)の測定計画が包含。段階ごとに`HW-TBD-007`／`021`／`022`でgate済みであり、部品ごとの行を足すと二重管理になる）、`RES-PULL-01` 1（`HW-TBD-027`／`032`） |
+| Revision履歴・履歴的記述 | 13 | 過去時点の記録。「従来は`TBD`／`Blocked`だった」を含む |
+| 規則文 | 12 | 「不明値は`TBD`とする」「`TBD`が残る項目は一般値を使わない」等。特定の未確定値を指していない |
+| 台帳への参照 | 10 | 「追跡は`HW-TBD-021`で行う」「field単位の正は台帳に定義」等 |
+| firmware／文書運用の項目 | 1 | [gpio-assignment.md](gpio-assignment.md)の`Firmware board configuration ID` |
+| 凡例 | 1 | [toolchains/README.md](../toolchains/README.md)の状態ラベル表 |
+| **新規登録** | **1** | **`HW-TBD-031`**（ESP32 chipの刻印）。[esp32-rust-toolchain.md](../toolchains/esp32-rust-toolchain.md)が「刻印の読み取りはTBD台帳の追跡対象にはなっていない」と**自ら書いていた** |
+
+#### command 3)（`TBD`以外の語）156件
+
+| 分類 | 件数 | 内訳 |
+|---|---|---|
+| 既存行が包含する | 63 | `未購入`／`未選定`／`未確定`の大半は`HW-TBD-007`／`021`／`022`／`023`／`024`／`025`／`027`が追跡する部品と値。`未確認`は`HW-TBD-001`〜`005`の現物確認 |
+| Revision履歴 | 34 | 過去時点の記録。`power-budget.md`と`hardware-bom.md`のRevision履歴が長いため件数が大きい |
+| 規則文・状態ラベル・確定済み記述 | 23 | 表header、`Required`／`Blocked`の凡例、確定済みの購入履歴への言及など |
+| 発注状態のみ | 21 | 部品は決まっており購入していないだけ。[購入待ちリスト](hardware-bom.md#購入待ちリスト)側で追う |
+| 文書運用・toolchain状態 | 13 | ADR-0002／0004／0007、[machine-profiles.md](../toolchains/machine-profiles.md)、toolchain索引。安全・電気・機械項目ではない |
+| **新規登録** | **2行（1件）** | **`HW-TBD-032`**（`LCD-RST`／`LCD-CS`の外部pull-up）。[gpio-assignment.md](gpio-assignment.md#信号inventory)の受け入れchecklistが「**未実装のため要対応**」と書いていたが、`HW-TBD-027`は`SERVO-PWM`のpull-downだけを対象としており含んでいなかった |
 
 群Aだけなら122件、群Bだけなら41件である（重なる行があるため合計は一致しない）。
 
-**次の2つがともに終わるまで、[Implementation Readiness Review](../runbooks/implementation-readiness-review.md)の
-Hardware gateを`Pass`にしない。**片方だけでは足りない。
+### この分類で分かったこと
 
-| 未了の分類 | 件数 | 由来 |
+**2つの走査は、それぞれ相手が拾えないものを拾った。**
+
+| 新規行 | 検出した走査 | もう一方では |
 |---|---|---|
-| command 2) の候補 | 136 | 本文の`TBD`。2026-08-10の照合は差分83行だけを判定し、候補136件の分類を残していない |
-| command 3) のhit | 156 | `TBD`以外の語で書かれた未確定。2026-08-11に走査しただけで未分類 |
+| `HW-TBD-031`（chip刻印） | command 2)（`TBD`） | 群Bの`未読`は走査語に含めていないため**検出できない** |
+| `HW-TBD-032`（LCD pull-up） | command 3) 群B（`未実装`） | 該当行に`TBD`の語が無いため**検出できない** |
 
-**156件だけを分類してgateを開けない。**136件側に安全・電気・機械の未確定が残っていても
-gateが`Pass`になり、この節を設けた意味が消える。`HW-TBD-027`は`TBD`を走査するだけでは
-見つからなかった行であり、**どちらの走査にも同種の取り落としが残っていないことを示せていない。**
+**片方だけの走査では、どちらも取り落とす。**`HW-TBD-027`（`未購入・未選定`から登録）に続き、
+`TBD`だけを見る照合では不十分であることが2件目・3件目の実例として確かめられた。
+
+あわせて`HW-TBD-022`の記述へ`CABLE-PI-PWR-01`を明示した。同じ規則の適用対象でありながら
+行の題名が`WIRE-PWR-01`だけを挙げており、包含関係が読み取れなかったためである。
+
+**両commandの分類が完了したため、[Implementation Readiness Review](../runbooks/implementation-readiness-review.md)の
+Hardware gateに対する本節由来の阻止条件は解消した。**ただしgate自体は
+`HW-TBD-001`以下の未解決項目により`Fail／TBD`のままである。**分類の完了は、
+「取り落としが無いことを示した」だけであって、項目が解決したという意味ではない。**
 
 ## 解決手順
 

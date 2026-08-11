@@ -34,7 +34,7 @@ ESP-WROOM-32D の datasheet v2.7 には **PSRAM を内蔵する variant の記�
 
 [HW-TBD-001](../hardware/tbd-register.md) は範囲が縮小し、残る追跡対象は **board 回路図と現物 pin 表記の照合**だけである。**pin 配列が Espressif ESP32-DevKitC V4 と完全に一致する保証は無い**ため、秋月電子の独自基板である本 board では GPIO 割り当ての前に照合する。
 
-これとは別に、**chip の刻印は未読である**（現物写真が反射で判読不能）。搭載 module が ESP-WROOM-32D であることは購入履歴と silkscreen で確定しており、その datasheet が示す中核 chip は `ESP32-D0WD` である。刻印の読み取りは TBD 台帳の追跡対象にはなっていない。
+これとは別に、**chip の刻印は未読である**（現物写真が反射で判読不能）。搭載 module が ESP-WROOM-32D であることは購入履歴と silkscreen で確定しており、その datasheet が示す中核 chip は `ESP32-D0WD` である。刻印の読み取りは **2026-08-11 の全数照合で [`HW-TBD-031`](../hardware/tbd-register.md) として TBD 台帳へ登録した**（それまで追跡対象になっていなかった）。
 
 いずれも build には影響しないが、flash 後の実機動作には影響する。
 
