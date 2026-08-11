@@ -23,15 +23,16 @@
 ```text
 Record ID: VR-2026-08-06-ESP32-BUILD-01
 Date: 2026-08-06（初回検証）
-最終有効な検証日時: 2026-08-10T02:47:29Z
-  現行のsource tree cf3fcdb4 に対する正式なcommandの実行日である。
+最終有効な検証日時: 2026-08-11T11:13:22Z
+  現行のsource tree fb4425a8 に対する実行日である（#102。下の「`IDF_PATH` guard の検証log」節）。
+  前回は2026-08-10T02:47:29Z、tree cf3fcdb4 であった。
   reviewを受けた修正と、developへのrebaseでtreeが変わるたびに再検証している。
   Record IDとfile名は初回検証日のまま維持し、追跡の連続性を保つ。
 Machine profile: ESP32 Build
 Operator role: AIエージェント（ツール導入について人間の事前確認あり）
-Repository commit: 831f4b17fa151ee731eed01abd981fe8feaaffc0（最新検証時点のbase。developのtipと同一）
-  初回検証時点のbaseは109f1a90d9688542f9381fb95d4269ef336e23ddであった。
-Build対象のsource tree: cf3fcdb4cd4057cbd70e333676cc547632c14bd6
+Repository commit: e20c2a2744903ea6ced9f469fbb74116419455de（最新検証時点のbase。developのtipと同一）
+  前回は831f4b17fa151ee731eed01abd981fe8feaaffc0、初回は109f1a90d9688542f9381fb95d4269ef336e23ddであった。
+Build対象のsource tree: fb4425a82a0ceedca9cd6beb5016551d7a0ef8fa
   `firmware/esp32`のtree objectである（`git rev-parse HEAD:firmware/esp32`）。
   この記録は`docs/`配下にあり同じtreeへ含まれないため、記録自体を更新しても値は変わらず、
   commitのhashを書く場合のような循環が起きない。
@@ -46,8 +47,12 @@ Build対象のsource tree: cf3fcdb4cd4057cbd70e333676cc547632c14bd6
   再現時は`git rev-parse HEAD:firmware/esp32`をこの値と突き合わせ、
   あわせて上記のtoolchain識別子も照合する。
 Working tree clean: no
-  build実行時点では、firmware/esp32配下の生成fileとこの記録自体が未commitであった。
-  上記tree hashは、生成fileをcommitした後のfeature/m1-001-esp32-toolchainで採取している。
+  2026-08-11の検証時点では、**追跡下のfileに内容差分は無く**、untrackedの作業指示file 1件
+  （git管理外）だけが残っていた。前回（2026-08-10）は、firmware/esp32配下の生成fileと
+  この記録自体が未commitであり、tree hashは生成fileをcommitした後のbranchで採取していた。
+  2026-08-11に`git status`が示した44件の`M`は**全件が`mode change 100644 => 100755`**であり、
+  共有mount由来のfile modeの見え方の差で、内容は同一であった
+  （local設定の`core.fileMode`で切り分け、検証後に元へ戻している）。
 
 OS name: Ubuntu
 OS version: 22.04.5 LTS (Jammy Jellyfish) / kernel 5.15.0-187-generic
@@ -96,7 +101,14 @@ ESP32 only:
     実効値が未設定という意味ではない。両者は矛盾しない。
     なおCargoの`[env]`は既定では既存の環境変数を上書きしないため、
     review後に`force = true`を付けて実効性を担保した（「生成条件」節を参照）。
-  IDF_PATH present: no（shell環境。設定されていれば.cargo/config.tomlの選択を上書きしうる）
+  IDF_PATH present: no（shell環境）
+    **2026-08-11に実測へ置き換えた（#102）。**`~/export-esp.sh`の中身を読み、
+    `LIBCLANG_PATH`と`PATH`の2行だけで`IDF_PATH`を設定しないことを確認した。
+    従来この`no`は推測であり、`export-esp.sh`が設定していれば
+    `build.rs`のguardが全buildを止めるという未確認のriskがあった。
+    **「上書きしうる」も推測ではなくなった。**`IDF_PATH`を設定してbuildすると
+    `esp-idf-sys`が`Ignoring configuration setting ESP_IDF_VERSION (Tag v5.5.3):
+    custom esp-idf repository detected via $IDF_PATH`を出し、pinを実際に破棄する。
   IDF_TOOLS_PATH present: no（shell環境）
   Template repository: https://github.com/esp-rs/esp-idf-template
   Template commit: 08115a069d167a5ee37363e84f168a565f17bbca
@@ -137,14 +149,18 @@ Storage delta if measured:
   espup install: 約 +1.8 GB（9.2G→11G）
   firmware/esp32/.embuild: 4.4 GB（ESP-IDFとmanaged tool一式。git管理外）
 Generated artifact identity:
-  現行のsource tree cf3fcdb4 に対応する成果物は次の1つである。
+  現行のsource tree fb4425a8 に対応する成果物は次の1つである。
   path: firmware/esp32/target/xtensa-esp32-espidf/debug/deskcat-esp32
   type: ELF 32-bit LSB executable, Tensilica Xtensa, version 1 (SYSV), statically linked, with debug_info, not stripped
   size: 13,660,584 bytes
-  sha256: 0f9d4918526c3e4153d101943ee20c5d9a4ac3d0f08fce6f60569b503e2877f7
-  実行日時: 2026-08-10T02:47:29Z（「compiler版の固定後のフル再検証log」節）
+  sha256: 54a2adec71f0af045f880af867a36c9cfcf732196cbf7765f65aa02f3ffef375
+  実行日時: 2026-08-11T11:13:22Z（#102の検証後、`IDF_PATH`未設定で復帰buildしたもの）
+    sizeは前回と同一で、sha256だけが異なる。source treeが変わっているうえ、
+    **入力を揃えてもsha256は一致しないことを下の「再現性実験log」で測定済み**であり矛盾しない。
+    cache利用のincremental buildである（`cargo clean`からのfull buildは実施していない）。
 
   過去のtreeでの実行結果（履歴。現行treeの成果物ではない）:
+    tree cf3fcdb4 / #101前:            0f9d4918526c3e4153d101943ee20c5d9a4ac3d0f08fce6f60569b503e2877f7
     tree cdcff41c / #74の自己review前:  11deb6d07a8bdec9e41f51464ba460eb4a4417f9757bf8dd1641bfb01b729bf9
     tree 815c903f / 表記統一後:      1e9623de74b79b33c85510c41c755093f70a4bf85969f40b90fa47ce7ae69d78
     tree b0120755 / board識別訂正後: 626707014889c5dc83ce0dc453383ee8139fa2d8feded452380fcfed21a96d97
@@ -1225,3 +1241,96 @@ rustup が toolchain の解決段階で停止している。runbook どおりに
 証拠にはならない。** 名前が一致していれば中身の版は検査されないため、そもそも失敗しない。
 この区別は [ESP32 Rust Toolchain](../esp32-rust-toolchain.md#compiler-版の固定) の
 「残る穴」に対応する。
+
+## `IDF_PATH` guard の検証log（#102 追記）
+
+`firmware/esp32/build.rs`の`IDF_PATH` guard（[PR #101](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/101)）が
+実際に動くかを確認した記録である。**このguardは導入時点で一度も実行されていなかった。**
+Windows側の作業環境にRust toolchainが無く、CI runnerは`IDF_PATH present: no`で
+発火しない経路だけを通るためである。
+
+- 実行日時: 2026-08-11T11:08:57Z 〜 11:13:22Z
+- Repository commit: `e20c2a2`、source tree `fb4425a8`
+- Container / VM / native: **VM**（`systemd-detect-virt` = `microsoft`）
+- 対象Issue: [#102](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/102)
+
+**この検証はVM上で行った。**[Machine Profiles](../machine-profiles.md)は`ESP32 の build-only 検証`に
+VMの使用を認めているが、**flashと実機試験の根拠にはならない。**実機Linux（bare metal）での
+再現は実施していない。
+
+### 結論
+
+| # | 論点 | 結果 |
+|---|---|---|
+| 1 | guardが通常のbuildを壊すか | **壊さない。**`IDF_PATH`未設定のbuildは`exit=0` |
+| 2 | `~/export-esp.sh`が`IDF_PATH`を設定するか | **設定しない**（実測） |
+| 3 | override判定（`1`完全一致） | **設計どおり。**`0`／`false`は通さない |
+| 4 | guardは実buildで発火するか | **発火する。**ただし`IDF_PATH`が**実在するESP-IDF**を指す場合に限る |
+| 5 | 空文字を未設定として扱う配慮 | **実buildでは到達しない** |
+
+### 依存のbuild scriptが先に走る
+
+`esp-idf-sys`は`deskcat-esp32`の依存であり、**その build script が先に実行される。**
+`esp-idf-sys`は`IDF_PATH`を検出すると、`.cargo/config.toml`がpinした`ESP_IDF_VERSION`を破棄する。
+
+```text
+warning: esp-idf-sys@0.37.2: Ignoring configuration setting `ESP_IDF_VERSION` (Tag v5.5.3): custom esp-idf repository detected via $IDF_PATH
+```
+
+したがって`IDF_PATH`の指す先で挙動が二分される。
+
+| `IDF_PATH`の指す先 | 何が起きるか | guardは |
+|---|---|---|
+| 実在しないpath（`/tmp/fake-idf`、空文字） | `esp-idf-sys`が版を判定できず停止 | **実行されない** |
+| 実在するESP-IDF | `esp-idf-sys`は成功し、`deskcat-esp32`のbuild scriptへ到達 | **発火する** |
+
+**危険なのは後者である。**`esp-idf-sys`は記録に無いESP-IDFでもwarning 1行を出すだけで
+buildを続ける。guardはこの経路を止める。前者はguardが無くてもbuildが止まるため、
+差は診断messageの分かりやすさだけである。
+
+**この順序はCargoが決めるため`build.rs`側では解決できない。**
+
+### 実buildでの結果
+
+`IDF_PATH=/tmp/fake-idf`（実在しない）を使った5 caseは、いずれも`exit=101`で停止したが
+**停止させたのは`esp-idf-sys`であり、guardのpanic messageは全出力に存在しない。**
+`IDF_PATH=`（空文字）も同様で、`esp-idf-sys`が`idf_path: Some("")`と解釈して失敗した。
+**これらのcaseはguardを検証していない。**
+
+guardの発火は、workspaceへ展開済みの実在するESP-IDFを指定して確認した。
+
+| # | 条件 | 結果 |
+|---|---|---|
+| D1 | `IDF_PATH=<workspace>/.embuild/espressif/esp-idf/v5.5.3`、override無し | `exit=101`、`build.rs:26`のpanic。**guardが発火した** |
+| D2 | 同上＋`DESKCAT_ALLOW_EXTERNAL_IDF_PATH=1` | `exit=0`、`cargo:warning=IDF_PATH=... overrides the pinned ESP-IDF.` を出力 |
+
+```text
+thread 'main' panicked at build.rs:26:9:
+IDF_PATH is set to <home>/deskcat/firmware/esp32/.embuild/espressif/esp-idf/v5.5.3. It overrides the ESP_IDF_VERSION pinned in .cargo/config.toml, so this build would not match the recorded toolchain. Unset IDF_PATH, or set DESKCAT_ALLOW_EXTERNAL_IDF_PATH=1 (exactly "1") and record the override in a Version Record.
+```
+
+**D1／D2で指定したESP-IDFはpin済みと同じv5.5.3である。**別版のESP-IDFを指定した検証は
+実施していない。**「記録と異なる版で build される事態を防げる」ことの証明にはなっていない。**
+
+### build script 単体での分岐確認
+
+実buildでguardへ到達しないcaseがあるため、生成済みのbuild scriptを直接起動して
+6分岐すべてを確認した。
+
+| 条件 | exit | 出力 |
+|---|---|---|
+| 未設定 | `0` | `cargo:rerun-if-env-changed=` 2行のみ |
+| `/tmp/fake-idf`・override無し | `101` | `panicked at build.rs:26:9` ＋ guard message |
+| `=1` | `0` | `cargo:warning=IDF_PATH=... overrides the pinned ESP-IDF.` |
+| `=0` | `101` | `panicked at build.rs:26:9` ＋ guard message |
+| `=false` | `101` | `panicked at build.rs:26:9` ＋ guard message |
+| 空文字 | `0` | 出力なし |
+
+**6分岐すべてが`build.rs`の設計どおりである。**`cargo:rerun-if-env-changed`の2行は全caseで出ている。
+
+### この検証で確認できていないこと
+
+- **実機Linux（bare metal）での再現。**本記録はVM上である
+- **別版のESP-IDFに対するguardの有効性。**用意していない
+- `cargo clean`からのfull clean build（cache利用のincremental buildのみ）
+- `cargo fmt`／`cargo clippy`（#102の対象外。CIが判定済み）
