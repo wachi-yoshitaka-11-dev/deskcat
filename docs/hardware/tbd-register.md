@@ -40,7 +40,7 @@
 | HW-TBD-024 | P0 | **MSP2807が耐えられる電流の上限。**メーカー未公開である。外部の3.3 V電源から給電する経路（段階B-2b）は**設定した電流制限が唯一の保護**であり、その設定値の上限を決めるにはmodule側の安全な上限が要る。**上限が無いままではMSP2807へ給電できない。**これは`HW-TBD-025`の共通条件(b)の一部であり、**B-2bだけでなくB-2aにも掛かる**（B-2aでもregulatorの保護のtrip点がmoduleにとって安全かを判定できない）。ADXL345とBME280だけ測っても未知数は埋まらないため、B-2自体が成立しない | 現物のbacklight回路（電流制限抵抗等）の確認、または一次資料。要件は[power-budget.md](power-budget.md#段階b-2の測定)の`B-2b: 外部の3.3 V電源から給電する経路`の`実施前に満たす条件` | **段階B-2（B-2a／B-2bとも。`HW-TBD-025`の共通条件(b)の一部であるため）**。MSP2807の定常電流の実測と、そこから決まる`PSU-INGRESS-01`の選定が段階Cまで進まない | [#1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1)、[#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3) | Human | Open（`HW-TBD-002`と同じ現物moduleの確認で進められるが、**002の完了を待つ必要はない**。pin配列の確認とbacklight回路の確認は別の問い） |
 | HW-TBD-025 | P0 | **段階B-2の共通条件。給電経路によらず必要であり、B-2a／B-2bのどちらを選んでも省略できない。**(a) `3.3 V rail`の許容電圧範囲。周辺module3点の動作電圧範囲の積集合とESP32のlogic levelから決める。(b) 周辺module3点それぞれが耐えられる電流の上限。B-2bでは電源に設定する電流制限値の上限を決めるために、B-2aでは**board上regulatorの保護のtrip点がmoduleにとって安全かを判定する**ために要る。**`HW-TBD-023`（B-2a）や`HW-TBD-024`（B-2b）が解決しても、この行が未解決ならB-2を実施できない** | (a)は公開spec（[hardware-bom.md](hardware-bom.md)の`DISP-01`／`ACCEL-01`／`ENV-01`の電源欄）と[gpio-assignment.md](gpio-assignment.md#電圧domainすべての外部pull-upに適用)から積集合を取るだけで確定でき、**現物確認を待つ必要はない**。(b)は各moduleのdatasheetの絶対最大定格を当たる。**ADXL345とBME280について公開値があるかは未確認であり、「あるはず」と仮定しない。**公開されていなければMSP2807と同じ扱い（現物回路の確認か、上限を得られないなら当該moduleへB-2で給電しない）とする。**MSP2807分は`HW-TBD-024`**。要件は[power-budget.md](power-budget.md#段階b-2の測定)の共通条件表、確認項目は[hardware-bom.md](hardware-bom.md)の部品受け入れchecklist | **段階B-2（B-2a／B-2bとも）** | [#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3) | Human | Open（(a)は公開specから今すぐ確定できる。(b)はまず各datasheetに公開値があるかを確認するところから。MSP2807分は`HW-TBD-024`） |
 | HW-TBD-026 | P0 | **SG90の電気的駆動条件。**(a) 制御logic要件（ESP32のGPIOは3.3 Vだが、SG90のlogic閾値が未確定であり、3.3 V driveで確実に動作するかを判定できない。[servo-safety-limits.md](servo-safety-limits.md#サーボ識別情報)は現物確認まで確定しないとしている）、(b) PWM周期／rate（50 Hzは一般値であり、確定値として採らない）、(c) 許容最小／最大pulse幅（データシート由来の電気的な駆動範囲。**機械的可動域は`HW-TBD-010`**）。**Stall／peak電流と無負荷／動作電流の実測は`HW-TBD-010`／`HW-TBD-011`の範囲であり、この行では重複させない** | メーカーデータシートと無負荷試験。要件は[servo-safety-limits.md](servo-safety-limits.md#サーボ識別情報)の識別情報表 | `SERVO-PWM`の駆動条件の確定、servoの実機動作全般 | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17) | Joint | Open（データシートから確定できる部分は今すぐ着手できる。無負荷試験を要する範囲は007／009によりBlocked） |
-| HW-TBD-027 | P0 | **`RES-PULL-01`（`SERVO-PWM`の外部pull-down）の抵抗値と本数。**GPIO27はreset時にhigh-Zであり、外部pull-downはPWM driver初期化前にservoが不定pulseを受けないための**必須**部品である。それにもかかわらず抵抗値が未選定で、部品も未購入である。**この行は`TBD`セルではなく、同じ行の「未購入・未選定」から登録した**（[区別の基準](#区別の基準)） | 抵抗値の選定（ESP32のGPIO駆動能力とservo側入力インピーダンスから決める）。要件は[gpio-assignment.md](gpio-assignment.md#信号inventory)の`SERVO-PWM`行、部品は[hardware-bom.md](hardware-bom.md) `RES-PULL-01`。**選定だけではcloseしない。**(a) 部品の購入、(b) 実装、(c) reset中のGPIO27がLowであることの実測、の3点を記録するまでOpenのままとする。**値を決めた文書だけでcloseすると、pull-downが実装されていないのに`HW-TBD-019`のBlockedが外れる** | 初回統合通電、`HW-TBD-019`の起動時状態の確定 | [#2](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/2) | Human | Open |
+| HW-TBD-027 | P0 | **`RES-PULL-01`（`SERVO-PWM`の外部pull-down）の抵抗値と本数。**GPIO27はreset時にhigh-Zであり、外部pull-downはPWM driver初期化前にservoが不定pulseを受けないための**必須**部品である。それにもかかわらず抵抗値が未選定で、部品も未購入である。**この行は`TBD`セルではなく、同じ行の「未購入・未選定」から登録した**（[区別の基準](#区別の基準)） | 抵抗値の選定（ESP32のGPIO駆動能力とservo側入力インピーダンスから決める）。要件は[gpio-assignment.md](gpio-assignment.md#信号inventory)の`SERVO-PWM`行、部品は[hardware-bom.md](hardware-bom.md) `RES-PULL-01`。**選定だけではcloseしない。**必要な根拠は[HW-TBD-027の証拠契約](#hw-tbd-027の証拠契約)に定める。**値を決めた文書だけでcloseすると、pull-downが実装されていないのに`HW-TBD-019`のBlockedが外れる** | 初回統合通電、`HW-TBD-019`の起動時状態の確定 | [#2](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/2) | Human | Open |
 | HW-TBD-028 | P1 | **電源品質の数値制限。**(a) Pi入力で許容する最低電圧、(b) ESP32入力／3.3 Vで許容する最低電圧、(c) 最大定常ripple、(d) 最大transient droopと継続時間、(e) connector／wireで許容する最大温度上昇。**許容するbrownout／reset回数は0回で確定済みであり、この行に含めない** | **実測ではなく定義が先である。**各deviceのdatasheetの動作電圧範囲と絶対最大定格、および線材・connectorの温度定格から上限・下限を定める。実測はその後の受け入れ試験で照合する。要件は[power-budget.md](power-budget.md#受け入れ条件)が「承認前に定義する」として挙げている一覧 | 電源系の受け入れ承認、合成給電（段階C）の合否判定 | [#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3) | Joint | Open（定義は現物・実測を待たずに着手できる） |
 | HW-TBD-029 | P1 | **各deviceのlocal decouplingの容量と配置。**[power-budget.md](power-budget.md)の`配線・保護表`で`TBD`／`Blocked`のまま残っている | 各deviceのデータシートが指定する値と配置。要件は[power-budget.md](power-budget.md)の`配線・保護表` | 電源系の受け入れ承認、sensor busの安定動作 | [#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3) | Joint | Open（datasheetから確定でき、現物・実測を待たない） |
 | HW-TBD-030 | P1 | **逆極性保護の要否と方式。**[power-budget.md](power-budget.md)の`配線・保護表`で`TBD`／`Blocked`のまま残っている。配線ミス時にPi、ESP32、周辺module3点が同時に破損しうる | Design review。要件は[power-budget.md](power-budget.md)の`配線・保護表` | 合成給電（段階C）の配線承認 | [#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3) | Human | Open |
@@ -131,6 +131,31 @@ blockedになりうる。逆にhardware Issueが`PROTO-TBD-*`でblockedになる
 | HW-TBD-018 | PROTO-TBD-013 | fail-safe sequenceの選択と機械試験はこの台帳。**recovery／reconnect動作（復帰時の物理的な再有効化条件と手順）もこの台帳**。Stale commandの拒否条件はProtocol側であり、復帰時にどのcommandを受理するかは`PROTO-TBD-013`が決める |
 | HW-TBD-019 | — | この台帳 |
 | HW-TBD-020 | PROTO-TBD-005、PROTO-TBD-011、PROTO-TBD-012、PROTO-TBD-013、PROTO-TBD-014 | `PROTO-TBD-005`はduplicate履歴の保持期間とretry window。`PROTO-TBD-011`はretired sessionの保持件数と期間（`PROTO-TBD-005`とは別モデル。下限は独立に満たす）に加え、`sid`生成・衝突回復・`hello`の有限retry上限を持つ。`PROTO-TBD-013`はCommand timeoutのstale command拒否条件。`HW-TBD-020`をcloseするには、対応IDの一部fieldだけでなく下記の全fieldと各Protocol TBD全体の解決が必要 |
+
+### HW-TBD-027の証拠契約
+
+**closeに必要な記録をここで一意に定める。**「実装した」「測ってLowだった」という主張だけでは
+closeしない。次の4点がすべて揃うまでOpenとする。
+
+| # | 条件 | 記録先 | 記録する内容 |
+|---|---|---|---|
+| 1 | 抵抗値と本数の選定 | [gpio-assignment.md](gpio-assignment.md#信号inventory)の`SERVO-PWM`行 | 決めた抵抗値・本数と、ESP32のGPIO駆動能力およびservo側入力インピーダンスから導いた根拠 |
+| 2 | 購入 | [hardware-bom.md](hardware-bom.md)の`RES-PULL-01` | 型番と入手日。`残作業`の`未購入`を消す |
+| 3 | 実装 | この台帳の`HW-TBD-027`行 | 実装日と接続先（`SERVO-PWM`とGNDの間であること） |
+| 4 | reset中の実測 | この台帳の`HW-TBD-027`行 | 下の測定条件と、測定した電圧値 |
+
+測定条件は次を満たす。**満たさない測定はこの行の根拠にしない。**
+
+- **servoを接続せず**、servo電源も投入しない状態で測る。servo側の入力が並列に入ると、
+  pull-downだけの効果を分離できない
+- **ESP32をresetに保持した状態**で測る。GPIO27がhigh-Zになるのはこの区間であり、
+  通常起動後の測定では何も確認したことにならない
+- 測定点は`SERVO-PWM`の信号線とGNDの間である
+
+**判定閾値は`HW-TBD-026`が決まるまで確定しない。**「Lowである」と言うには、SG90が
+Lowと解釈する電圧の上限が要る。それは`HW-TBD-026`の`制御logic要件`である。
+**したがって`HW-TBD-027`は`HW-TBD-026`より先にcloseできない。**測定値だけを記録して
+「Lowだった」と結論しない。
 
 ### HW-TBD-020のfield単位の正
 
@@ -256,19 +281,27 @@ grep -rnE "TBD" docs/hardware docs/decisions docs/toolchains \
 
 ### command 3) `TBD`以外の語で書かれた未確定
 
-**走査patternの正本は[hardware-bom.md](hardware-bom.md#購入待ちリスト)の発注前の走査である。**
-ここで別のpatternを定義しない。同じ語の一覧を2箇所に置くと、片方だけを広げた状態で
-「走査した」と言えてしまう。実際に過去、狭いpatternで「0件」と誤報告している。
+patternは2群からなる。**群ごとに正本を1つだけ置く。**同じ語の一覧を2箇所に書くと、
+片方だけを広げた状態で「走査した」と言えてしまう。実際に過去、狭いpatternで
+「0件」と誤報告している。
+
+| 群 | 語 | 正本 |
+|---|---|---|
+| A: 調達状態 | `未購入`／`購入`／`発注`／`未選定`／`未確定`／`Required`／`Blocked`／`手配`／`調達` | [hardware-bom.md](hardware-bom.md#購入待ちリスト)の発注前の走査。**この台帳では再定義しない** |
+| B: 検証状態 | `未実装`／`未測定`／`未確認`／`未検証` | **この節。**部品が手元にあっても、実装・測定・確認が済んでいない状態を指す |
+
+**群Bを発注前の走査へ足さない。**あちらの目的は発注漏れの検出であり、`未測定`や`未検証`は
+買う対象を示さない。混ぜると発注時に無関係なhitを読ませることになる。
 
 ```bash
-# patternはhardware-bom.mdの発注前の走査（9語）と同一のものを使う。
-grep -rnE "未購入|購入|発注|未選定|未確定|Required|Blocked|手配|調達" \
+# 群A（正本はhardware-bom.md）と群B（正本はこの節）を合わせて走査する。
+grep -rnE "未購入|購入|発注|未選定|未確定|Required|Blocked|手配|調達|未実装|未測定|未確認|未検証" \
   docs/hardware docs/decisions docs/toolchains \
   --include="*.md" --exclude-dir=version-records --exclude=tbd-register.md
 ```
 
-**2つの走査は出力先が違う。**発注前の走査は`購入待ちリスト`への計上漏れを探し、
-この command 3) は台帳への**登録**漏れを探す。同じpatternでも判定が別であるため、
+**発注前の走査とこの command 3) は出力先が違う。**あちらは`購入待ちリスト`への計上漏れを探し、
+こちらは台帳への**登録**漏れを探す。群Aが重なっていても判定は別であるため、
 一方を実施したことをもって他方を済ませたとしない。
 
 hitは[区別の基準](#区別の基準)の3段に掛けたうえで、次のいずれかへ分類する。**分類結果は
@@ -326,11 +359,21 @@ command 3) の実施記録は次のとおりである。
 
 | 照合日 | hit | 分類 | 実施 |
 |---|---|---|---|
-| 2026-08-11 | 122 | **未完了。**patternを定義してhit数を採っただけである。内訳は`power-budget.md` 53、`hardware-bom.md` 48、`servo-safety-limits.md` 10、`gpio-assignment.md` 8、`esp32-rust-toolchain.md` 2、`sensor-datasheet-notes.md` 1 | [PR #99](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/99)のreview対応 |
+| 2026-08-11 | 156（群A＋群B） | **未完了。**patternを定義してhit数を採っただけである。内訳は`power-budget.md` 66、`hardware-bom.md` 50、`servo-safety-limits.md` 13、`gpio-assignment.md` 13、`0007-review-scope-and-self-review.md` 4、`esp32-rust-toolchain.md` 3、`toolchains/README.md` 2、`raspberry-pi-rust-toolchain.md`／`machine-profiles.md`／`sensor-datasheet-notes.md`／`0004-main-develop-branch-strategy.md`／`0002-role-based-development-environments.md` 各1 | [PR #99](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/99)のreview対応 |
 
-**この122件の分類が終わるまで、[Implementation Readiness Review](../runbooks/implementation-readiness-review.md)の
-Hardware gateを`Pass`にしない。**`HW-TBD-027`は`TBD`を走査するだけでは見つからなかった行であり、
-同種の取り落としが残っていないことを示せていない。
+群Aだけなら122件、群Bだけなら41件である（重なる行があるため合計は一致しない）。
+
+**次の2つがともに終わるまで、[Implementation Readiness Review](../runbooks/implementation-readiness-review.md)の
+Hardware gateを`Pass`にしない。**片方だけでは足りない。
+
+| 未了の分類 | 件数 | 由来 |
+|---|---|---|
+| command 2) の候補 | 136 | 本文の`TBD`。2026-08-10の照合は差分83行だけを判定し、候補136件の分類を残していない |
+| command 3) のhit | 156 | `TBD`以外の語で書かれた未確定。2026-08-11に走査しただけで未分類 |
+
+**156件だけを分類してgateを開けない。**136件側に安全・電気・機械の未確定が残っていても
+gateが`Pass`になり、この節を設けた意味が消える。`HW-TBD-027`は`TBD`を走査するだけでは
+見つからなかった行であり、**どちらの走査にも同種の取り落としが残っていないことを示せていない。**
 
 ## 解決手順
 

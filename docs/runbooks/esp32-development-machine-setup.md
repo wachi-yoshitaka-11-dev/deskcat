@@ -209,8 +209,10 @@ build 前に差異の理由を確認する。
 managed install を前提とするため `IDF_PATH` を固定値にできないからである。
 
 **代わりに `firmware/esp32/build.rs` が build を止める。**`IDF_PATH` が設定されていれば
-build script が panic し、意図した外部 SDK である場合だけ `DESKCAT_ALLOW_EXTERNAL_IDF_PATH`
-を設定して通す。通した場合は `cargo:warning` が出るので、その値を Version Record の
+build script が panic し、意図した外部 SDK である場合だけ `DESKCAT_ALLOW_EXTERNAL_IDF_PATH=1`
+を設定して通す。**値は厳密に `1` である。**存在するだけで通すと `=0` や `=false` でも
+通ってしまい、「無効にしたつもり」の設定が外部 SDK での build を許す。
+通した場合は `cargo:warning` が出るので、その値を Version Record の
 `IDF_PATH present` へ記録する。**手作業の確認に依存させない。**
 
 ## 5. Review済みtemplateから生成

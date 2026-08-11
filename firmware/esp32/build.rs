@@ -20,9 +20,12 @@ fn main() {
         .filter(|p| !p.trim().is_empty());
 
     if let Some(path) = external {
+        // 値が`1`のときだけ通す。存在だけを見ると`=0`や`=false`でも通ってしまい、
+        // 「無効にしたつもり」の設定が外部SDKでのbuildを許してしまう。
+        let allowed = std::env::var(allow_external).is_ok_and(|v| v == "1");
         assert!(
-            std::env::var_os(allow_external).is_some(),
-            "IDF_PATH is set to {path}. It overrides the ESP_IDF_VERSION pinned in .cargo/config.toml, so this build would not match the recorded toolchain. Unset IDF_PATH, or set {allow_external}=1 and record the override in a Version Record."
+            allowed,
+            "IDF_PATH is set to {path}. It overrides the ESP_IDF_VERSION pinned in .cargo/config.toml, so this build would not match the recorded toolchain. Unset IDF_PATH, or set {allow_external}=1 (exactly \"1\") and record the override in a Version Record."
         );
         // 意図した外部SDKでも黙って通さない。build logへ残し、Version Recordの
         // `IDF_PATH present`へ転記できるようにする。
