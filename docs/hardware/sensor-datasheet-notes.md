@@ -159,7 +159,7 @@ module boardの値は、これとは別に現物でしか決まらない（[AGEN
 | 実装されているinterface（jumper設定） | TBD |
 | 実装済みI2C address | TBD |
 | board上のregulatorの有無 | TBD。**旧記載の「regulator非搭載」は根拠資料（秋月 商品ページ。現在404）を失ったため、2026-08-11に現物確認待ちへ改めた**（[hardware-bom.md](hardware-bom.md) Revision 31）。**載っていないことを前提にしない** |
-| moduleへ入れてよい電圧 | TBD。**ICの上限3.6 Vをboardの許容値と同一視しない**（regulatorやlevel shiftの有無で変わる）。**[power-budget.md](power-budget.md)と[hardware-bom.md](hardware-bom.md)が置く「3.3 Vで給電する」は、この行が埋まるまで確定しない。**5 V直結が不可であることはIC定格から動かないが、3.3 Vをmoduleが受け入れることの根拠は別に要る（[tbd-register HW-TBD-004](tbd-register.md)） |
+| moduleへ入れてよい電圧 | TBD。**ICの上限3.6 Vをboardの許容値と同一視しない**（regulatorやlevel shiftの有無で変わる）。**[power-budget.md](power-budget.md)と[hardware-bom.md](hardware-bom.md)が置く「3.3 Vで給電する」は、この行が埋まるまで確定しない。****5 V直結の禁止と、この行は別の主張である。**5 V禁止は「moduleがregulatorを持たなければ5 VがICへ直接掛かる」ことを否定できないための**確認前の安全規則**であって、IC定格からmoduleの許容入力電圧を導いたものではない。3.3 Vをmoduleが受け入れる根拠も同様に別に要る（[tbd-register HW-TBD-004](tbd-register.md)） |
 | Module搭載pull-up | TBD（有無と値） |
 
 必要なベンチ試験の根拠:

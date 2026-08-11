@@ -26,9 +26,10 @@
 │  └─ （案Bの場合のみ）ESP-WROOM-32Dの`5V` pinへ直接
 │        ESP32の給電経路は案A／案Bのいずれか未決定（`ESP32の給電経路（未決定）`節）
 │        board上regulatorが3.3Vを生成し、board上の3V3 pinから出力
-│        ├─ ADXL345（VS 2.0–3.6V。5V直結は不可。3.3Vが唯一の候補だが未確定。
-│        │     M-06724のregulatorの有無とmoduleへ入れてよい電圧は現物未確認で、
-│        │     根拠資料も入手できない。HW-TBD-004）
+│        ├─ ADXL345（ICのVS 2.0–3.6V。5V直結は禁止＝確認前の安全規則。
+│        │     3.3Vが唯一の候補だが未確定。M-06724のregulatorの有無と
+│        │     moduleへ入れてよい電圧は現物未確認で、根拠資料も入手できない。
+│        │     IC定格からmoduleの許容入力電圧は決まらない。HW-TBD-004）
 │        ├─ BME280（電源電圧DC1.71～3.6V。5V直結不可）
 │        └─ MSP2807（LCD＋touch。VCC 3.3–5V対応だがlogic IOは3.3V TTL。
 │              下記理由により3.3Vで給電する）
@@ -38,12 +39,17 @@
 周辺moduleはすべて3.3Vで給電し、5V railへ直結しない。**5V railへ直結しないことは確定した規則である。**
 3.3Vで給電することはBME280とMSP2807では確定しており、**ADXL345だけは未確定である**（下記）。理由は次のとおり。
 
-- ADXL345（M-06724）とBME280は定格上限3.6V。5V直結は定格超過となる。
-  **ただしADXL345については、3.3Vで給電してよいことがまだ確定していない。**上限3.6Vは
-  ICの定格であってmodule boardの許容値ではなく、M-06724のboard資料は入手できない
-  （商品ページが404）。**5V直結が不可であることは動かないが、3.3Vは「IC定格と整合する
-  唯一の候補」であって確定ではない**（`HW-TBD-004`）。BME280は秋月の製品説明書が
-  module boardとして電源電圧DC1.71～3.6Vを示しており、この限りではない。
+- BME280（K-09421）は、秋月の製品説明書が**module boardとして**電源電圧DC1.71～3.6Vを
+  示している。5V直結は定格超過となる。**これはmodule boardの資料に基づく判定である。**
+- ADXL345（M-06724）は**ICの定格上限が3.6V**である。**ただしこれはICの定格であって、
+  module boardの許容入力電圧ではない。**board上のregulatorやlevel shiftの有無で変わり、
+  M-06724のboard資料は入手できない（商品ページが404）。**したがってmoduleの許容入力電圧は
+  IC定格からは決まらない。**
+  **それでも5V直結は禁止する。**moduleがregulatorを持たない場合、5VはICへ直接掛かって
+  定格を超える。**その可能性を否定できない以上、確認前の安全規則として禁止する**
+  （[AGENTS.md](../../AGENTS.md)の「矛盾する場合はより安全で厳しい規則を適用する」）。
+  **3.3Vも同じ理由で確定ではない。**IC定格と整合する唯一の候補ではあるが、moduleが
+  受け入れる根拠は別に要る。どちらも`HW-TBD-004`で確定する。
 - MSP2807はVCC 3.3–5V対応だがlogic IOは3.3V TTLである。5Vで給電した場合に
   module側の出力（MISO等）が5Vになるか3.3Vに留まるかは、メーカー資料でも明示されていない。
   5V出力になるとESP32のGPIOが定格超過となり破損しうる。level shiftの有無を現物の
@@ -535,7 +541,7 @@ servo branchは上記の正式改訂の手順による。それ以外のbranch�
 | Logic | ESP-WROOM-32D board | 1 | 約80〜100mA（WiFi idle） | 約240mA（WiFi TX時、文献値） | 短時間で最大約500mA相当のspikeが報告例あり | [ESP32技術資料](https://www.espressif.com/sites/default/files/documentation/esp32_datasheet_en.pdf)を含む複数の技術資料（[参考](https://lastminuteengineers.com/esp32-sleep-modes-power-consumption/)） | **文献値。実測前** |
 | Logic | Raspberry Pi Zero W | 1 | 約140mA（公式spec） | 実測未定 | Stress時最大約350mAの報告例あり | [Raspberry Pi公式spec](https://www.raspberrypi.com/products/raspberry-pi-zero-w/) | **文献値。実測前** |
 | ESP32 3V3出力 | MSP2807（LCD＋backlight＋touch） | 1 | TBD（メーカー未公開） | TBD | TBD | 秋月商品ページに電流記載なし。logic IOが3.3V TTLのため3.3V給電とする（`電源rail構成案`参照）。backlight込みの電流次第では3V3 pinの供給能力を超える可能性があり、その場合は別途3.3V regulatorが必要 | Blocked（**入手済み・実測未実施**） |
-| ESP32 3V3出力 | ADXL345（accelerometer） | 1 | 数百µA程度（測定mode時） | 無視できるほど小さい想定 | 無視できるほど小さい想定 | 消費電流の文献値の出典は[ADXL345解説](https://www.digikey.jp/ja/product-highlight/a/analog-devices/adxl345-3-axis-digital-accelerometer)。**Logic 5V railへは直結しない**（IC定格上限3.6V）。**3.3Vが唯一の候補だが未確定である**（`HW-TBD-004`）。**旧記載の「M-06724はregulator非搭載のため3.3V直結必須」は、根拠資料（秋月 商品ページ。現在404）を失ったため2026-08-12に削除した**（Revision 36） | **文献値。実測前** |
+| ESP32 3V3出力 | ADXL345（accelerometer） | 1 | 数百µA程度（測定mode時） | 無視できるほど小さい想定 | 無視できるほど小さい想定 | 消費電流の文献値の出典は[ADXL345解説](https://www.digikey.jp/ja/product-highlight/a/analog-devices/adxl345-3-axis-digital-accelerometer)。**Logic 5V railへは直結しない。****確認前の安全規則である**（ICの定格上限3.6Vを超えうるため。**IC定格からmodule boardの許容入力電圧は決まらない**）。**3.3Vも唯一の候補であって確定ではない**（`HW-TBD-004`）。**旧記載の「M-06724はregulator非搭載のため3.3V直結必須」は、根拠資料（秋月 商品ページ。現在404）を失ったため2026-08-12に削除した**（Revision 36） | **文献値。実測前** |
 | ESP32 3V3出力 | BME280（environment sensor） | 1 | 数µA〜1mA未満（測定mode時） | 無視できるほど小さい想定 | 無視できるほど小さい想定 | Bosch公式BME280データシート（一般値）。現物付属説明書の電源電圧DC1.71～3.6Vのため5V直結不可（Logic 5V railへは直結しない） | **文献値。実測前** |
 | Servo | TowerPro SG90 | 1 | 数十〜数百mA（動作時、負荷依存） | **250 mAを予算として割り当て**（`変換基板に必要な定格の見積もり`）。実測値はTBD | データシート値0.5〜2A（負荷依存の広い範囲） | [SG90 datasheet](https://www.mouser.com/catalog/specsheets/Soldered_101246.pdf) | **文献値。実測必須（`tbd-register.md` HW-TBD-010／011。model自体はHW-TBD-006で解決済み）** |
 
@@ -822,4 +828,4 @@ PiのconnectorとPCB traceを通る。
 | 2026-08-09 | 33 | 昇格PR[#61](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/61)のレビュー指摘（Minor）を反映。**B-2の共通条件が台帳に登録されておらず、`HW-TBD-023`／`024`が解決しても許容電圧範囲が未確定のままB-2を進められる状態だった。**`HW-TBD-025`を追加し、共通条件表の直後から参照させた。あわせて**この文書とhardware-bom.mdの間にあった不整合を直した。**「周辺module3点それぞれの安全な電流上限」を、この文書はB-2b専用としていたが、`hardware-bom.md`の受け入れchecklistは共通条件としていた。**論理的には共通である**（B-2aでもboard上regulatorの保護のtrip点がmoduleにとって安全かを、module側の上限が無ければ判定できない）。`AGENTS.md`の「矛盾する場合はより安全で厳しい規則を適用する」に従い共通条件へ移した。**その帰結として、MSP2807の上限が未確定である限りB-2aも実施できない** | [PR #61レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/61) |
 | 2026-08-09 | 34 | 昇格PR[#61](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/61)のfull reviewの指摘を反映。**保護部品の選定条件が方式別に分かれていなかった。**`PROT-OC-01`を「PTCまたはガラス管ヒューズ」としながら、判定条件はPTCの用語（保持電流・trip電流・trip時間）だけで書いており、**ヒューズを選ぶ場合に何を見ればよいか定まらなかった。**ヒューズは定格電流・時間-電流特性・遮断定格（breaking capacity）・`I²t`が公開量である。`選定基準`を「先に方式を決める」＋`方式によらない基準`へ再構成し、`記録するtrip動作`をPTC列とヒューズ列に分けた。あわせて`経路部品と定格`表・`選定順序`・derating式のPTC専用語（保持電流）を、方式非依存の「連続通電できる電流」（PTCなら保持電流、ヒューズなら定格電流）へ改めた | [PR #61レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/61) |
 | 2026-08-11 | 35 | [#1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1)。**電源rail構成案の図が「M-06724はregulator非搭載」を確定事項として書いていた。**この前提の根拠は秋月 M-06724の商品ページだが、**現在404で入手できない**（2026-08-10確認）。regulatorの有無を現物確認待ちとし、`HW-TBD-004`を参照させた。**3.3V給電とする規則は変えていない。**IC定格の上限が3.6Vであり、regulatorの有無に関わらず5V直結は不可だからである | [PR #82](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/82)、[hardware-bom.md](hardware-bom.md) Revision 30 |
-| 2026-08-12 | 36 | 昇格PR[#109](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/109)のレビュー指摘を反映。**Revision 35は電源rail構成案の図に「3.3V給電とする」を確定形で残していた。**regulatorの有無を現物確認待ちへ改めた一方で給電電圧は決定として書いており、[sensor-datasheet-notes.md](sensor-datasheet-notes.md)が同じmoduleの`moduleへ入れてよい電圧`を`TBD`としているのと食い違っていた。**5V直結を不可とする規則は維持**（IC定格上限3.6V）したうえで、3.3Vを「唯一の候補だが未確定」とし、`HW-TBD-004`の確認対象に`moduleへ入れてよい電圧`が含まれることを図から辿れるようにした。**あわせて、負荷表の`ADXL345`行に「M-06724はregulator非搭載のため3.3V直結必須」が生きた記述として残っていたため削除した。**[PR #82](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/82)がRevision 35で図から消した断定と同じものが、同じ文書の別の表に残っていた（Revision履歴の2箇所は過去時点の記録であるため残す）。**この文書が定める配線規則そのものは変えていない。**段階B-2のgateも開いていない | [PR #109レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/109)、[hardware-bom.md](hardware-bom.md) Revision 32 |
+| 2026-08-12 | 36 | 昇格PR[#109](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/109)のレビュー指摘を反映。**Revision 35は電源rail構成案の図に「3.3V給電とする」を確定形で残していた。**regulatorの有無を現物確認待ちへ改めた一方で給電電圧は決定として書いており、[sensor-datasheet-notes.md](sensor-datasheet-notes.md)が同じmoduleの`moduleへ入れてよい電圧`を`TBD`としているのと食い違っていた。**5V直結を不可とする規則は維持**したうえで、3.3Vを「唯一の候補だが未確定」とし、`HW-TBD-004`の確認対象に`moduleへ入れてよい電圧`が含まれることを図から辿れるようにした。**あわせて、負荷表の`ADXL345`行に「M-06724はregulator非搭載のため3.3V直結必須」が生きた記述として残っていたため削除した。**[PR #82](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/82)がRevision 35で図から消した断定と同じものが、同じ文書の別の表に残っていた（Revision履歴の2箇所は過去時点の記録であるため残す）。**あわせて[PR #110](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/110)のレビューで、5V禁止の根拠の書き方も直した。**当初は「定格上限3.6V。5V直結は定格超過となる」とADXL345とBME280を同じ根拠で並べていたが、**BME280は秋月の製品説明書がmodule boardとして電源電圧を示すのに対し、ADXL345のM-06724にはboard資料が無い。**ICの定格からmodule boardの許容入力電圧は決まらないため、ADXL345の5V禁止は**確認前の安全規則**であると書き分けた。**禁止そのものは変えていない。この文書が定める配線規則も変えていない。**段階B-2のgateも開いていない | [PR #109レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/109)、[PR #110レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/110)、[hardware-bom.md](hardware-bom.md) Revision 32 |
