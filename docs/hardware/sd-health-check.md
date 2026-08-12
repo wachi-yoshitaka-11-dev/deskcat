@@ -215,9 +215,8 @@ bus帯域の上限を計算で示さず、実測値だけを根拠に用いる�
 
 ### f3の出力
 
-`docs/`配下にMarkdown以外の証拠fileを置かない規則のため、出力全文をここへ埋め込む。
-`f3write`の`Creating file N.h2w ... OK!`は30行あり、**2〜29番は同一形式のため省略した**
-（省略した旨をここに明記する）。それ以外は未加工である。
+`docs/`配下にMarkdown以外の証拠fileを置かない規則のため、**両commandの出力全文を未加工で埋め込む。**
+**省略はしていない。**
 
 `f3write /media/<user>/F3TEST/`:
 
@@ -228,13 +227,40 @@ This is free software; see the source for copying conditions.
 
 Free space: 29.80 GB
 Creating file 1.h2w ... OK!
-（2.h2w〜29.h2w も同じく OK!。省略）
+Creating file 2.h2w ... OK!
+Creating file 3.h2w ... OK!
+Creating file 4.h2w ... OK!
+Creating file 5.h2w ... OK!
+Creating file 6.h2w ... OK!
+Creating file 7.h2w ... OK!
+Creating file 8.h2w ... OK!
+Creating file 9.h2w ... OK!
+Creating file 10.h2w ... OK!
+Creating file 11.h2w ... OK!
+Creating file 12.h2w ... OK!
+Creating file 13.h2w ... OK!
+Creating file 14.h2w ... OK!
+Creating file 15.h2w ... OK!
+Creating file 16.h2w ... OK!
+Creating file 17.h2w ... OK!
+Creating file 18.h2w ... OK!
+Creating file 19.h2w ... OK!
+Creating file 20.h2w ... OK!
+Creating file 21.h2w ... OK!
+Creating file 22.h2w ... OK!
+Creating file 23.h2w ... OK!
+Creating file 24.h2w ... OK!
+Creating file 25.h2w ... OK!
+Creating file 26.h2w ... OK!
+Creating file 27.h2w ... OK!
+Creating file 28.h2w ... OK!
+Creating file 29.h2w ... OK!
 Creating file 30.h2w ... OK!
 Free space: 0.00 Byte
 Average writing speed: 6.11 MB/s
 ```
 
-`f3read /media/<user>/F3TEST/`（**こちらは全行を掲載する。判定基準①②の根拠であるため**）:
+`f3read /media/<user>/F3TEST/`:
 
 ```text
 F3 read 8.0
@@ -293,6 +319,25 @@ Average reading speed: 19.15 MB/s
 `O_DIRECT`でpage cacheを迂回し、file systemを介さずに`/dev/mmcblk0`へ直接読み書きした。
 先頭2 GiBが対象である。root権限を要するためhumanが実行した。
 
+実行したcommandは次のとおりである。`dd`は`dd (coreutils) 9.4`である。
+**`/dev/mmcblk0`はこの時点で単一FAT32 partitionであり、この試験がそれを破壊した。**
+
+```bash
+sudo sh -c 'echo "=== raw write ==="; dd if=/dev/urandom of=/dev/mmcblk0 bs=1M count=2048 oflag=direct 2>&1 | tail -1; sync; echo 3 > /proc/sys/vm/drop_caches; echo "=== raw read ==="; dd if=/dev/mmcblk0 of=/dev/null bs=1M count=2048 iflag=direct 2>&1 | tail -1'
+```
+
+**各optionの意図。**`oflag=direct`／`iflag=direct`が`O_DIRECT`を指定してpage cacheを迂回する。
+`bs=1M count=2048`で2 GiBを対象とする。書込み後に`sync`し、`drop_caches`へ`3`を書いて
+page cacheとdentry／inode cacheを落としてから読み出す。**速度は`dd`自身の最終行の報告を採る**
+（`tail -1`）。読出しは`of=/dev/null`であり、**書いた内容との照合は行っていない。**
+照合は`f3read`が29.80 GiBに対して実施済みであり、この試験の目的は速度の分離である。
+
+**`/dev/urandom`が律速していないことを事前に確認した。**
+
+```text
+536870912 bytes (537 MB, 512 MiB) copied, 2.37549 s, 226 MB/s
+```
+
 ```text
 === raw write ===
 2147483648 bytes (2.1 GB, 2.0 GiB) copied, 288.841 s, 7.4 MB/s
@@ -304,11 +349,15 @@ Average reading speed: 19.15 MB/s
 
 | 経路 | 書込み | 読出し |
 |---|---|---|
-| FAT32経由（`f3write`／`f3read`、29.80 GiB全域） | 6.11 MB/s | 19.15 MB/s |
+| FAT32経由（`f3write`／`f3read`、`f3`が書いた空き領域29.80 GiB） | 6.11 MB/s | 19.15 MB/s |
 | raw device直接（`dd oflag=direct`、先頭2 GiB） | **7.4 MB/s** | 20.3 MB/s |
 
-**結論: 6.11 MB/sの主因はFAT32ではない。**file systemを完全に外しても7.4 MB/sであり、
-**10 MB/sに届かない。**FAT32の寄与は21%程度（7.4 ÷ 6.11 ＝ 1.21）にとどまる。
+**結論: FAT32だけでは10 MB/s未達を説明できない。**file systemを完全に外しても7.4 MB/sであり、
+**10 MB/sに届かない。**
+
+**「FAT32が主因ではない」とまでは書かない。**また`7.4 ÷ 6.11 ＝ 1.21`は
+**raw経路が21%速いことを示すだけであって、FAT32の寄与率ではない。**下記のとおり
+2つの測定は複数の条件が同時に異なるため、寄与率を算出できる比較になっていない。
 
 **この比較の限界を明記する。**2つの測定はfile systemの有無だけでなく、
 **I/O方式（`O_DIRECT`の同期書込み対 page cache経由のwriteback）と対象範囲
@@ -322,7 +371,7 @@ Average reading speed: 19.15 MB/s
 - **その後のraw device試験により、cardには現在partition tableもfile systemも無い。**
   先頭2 GiBが乱数で上書きされ、`lsblk`は`mmcblk0 29.8G`のみを表示する（partitionなし）。
   **Piで使うにはimageの書き込みかformatが要る。本記録の範囲外である**
-- 検査前に入っていたRockchip向けUbuntu 18.04 imageは、全域を検査対象にするため消去した
+- 検査前に入っていたRockchip向けUbuntu 18.04 imageは、cardの全容量を検査対象にするため消去した
   （消去前に内容を提示し、humanが「消えてもよい」と判断した）
 - **一時導入した`f3`をhumanが撤去した**（`apt remove --purge f3` ＋ `apt autoremove`）。
   撤去後に`command -v f3write`が空を返し、`dpkg -l f3`にpackage登録が無いことを確認した
@@ -331,21 +380,26 @@ Average reading speed: 19.15 MB/s
 
 ## 判定
 
-**`Partial`。**①②⑤は基準を満たしたが、③が未達で原因を切り分けられず、④は取得手段が無い。
+**`Partial`。**①②⑤は基準を満たしたが、③は判定不能で、④は取得手段が無い。
+
+**③の「判定不能」と「未達」を分けて書く。**測定値6.11 MB/sは基準値10 MB/sに達していない。
+これは事実である。**しかしこの測定は`U1`が規定する条件（UHS mode）で行っていないため、
+「cardがU1要件を満たさない」という判定は下せない。**`未達`という語は有効な条件での
+失敗を指すため、この表では使わない。**有効なUHS mode試験を行った場合にのみ`未達`と判定する。**
 
 | # | 観点 | 基準 | 実測 | 判定 |
 |---|---|---|---|---|
 | ① | 容量詐称 | `Data LOST`＝0 sector | 0 sector（3区分とも0） | **合格** |
 | ② | 読み書きの通し | 書込み総量と`Data OK`が一致 | 30 file・29.80 GiB・62,488,704 sectorが一致 | **合格** |
-| ③ | 速度 ≥ 10 MB/s | `f3write`平均書込み速度 | **6.11 MB/s**（raw device直接でも**7.4 MB/s**） | **未達（inconclusive）** |
+| ③ | 速度 ≥ 10 MB/s | `f3write`平均書込み速度 | **6.11 MB/s**（raw device直接でも**7.4 MB/s**） | **判定不能（UHS mode条件外）。**基準値には達していないが、`U1`が規定する条件での測定ではないため、cardがU1要件を満たさないことを意味しない |
 | ④ | SMART相当 | 取得手段の有無を確認 | **この個体には手段が存在しない**（SD Expressではないため） | 確認済み |
 | ⑤ | 識別情報 | 現物printと矛盾しない | `32`／`microSDHC`／`U1`はregisterと一致（**読み方を仕様書Ver 9.10と照合済み**）。**`Samsung`だけは未裏付け**（MIDの登録簿が仕様書に無い） | **合格（1項目のみ未裏付け）** |
 
-**偽造品ではない。**29.80 GiB全域へ位置依存dataを書いて読み戻し、
+**偽造品ではない。**`f3`が書き込んだ全空き領域（29.80 GiB）へ位置依存dataを書いて読み戻し、
 `Corrupted`／`Slightly changed`／`Overwritten`のいずれも0 sectorであった。
 容量が公称どおりであること、および検査範囲に読み書き不良が無いことを確認した。
 
-### ③をinconclusiveとする理由
+### ③を判定不能とする理由
 
 **「たぶん正常」で通さない**（[AGENTS.md](../../AGENTS.md) 推測禁止）。次の3点が同時に成り立つ。
 
@@ -369,16 +423,18 @@ Average reading speed: 19.15 MB/s
    file systemの読み出しが19.15 MB/sを記録している。搭載RAMは3.7 GiB
    （うちbuff/cache 1.2 GiB）に対し読んだのは29.80 GiBであり、
    **page cacheでは19.15 MB/sを説明できない。**
-3. **file systemは主因ではないと確定したが、cardとhostの分離が残っている。**
-   raw deviceへ直接書いても7.4 MB/sで10 MB/sに届かないため、**FAT32は主因ではない**
-   （上の「raw deviceへの直接書込み」）。**残るのはcardの書込み特性とSDHCI controller
-   （Ricoh `1180:E823`）の書込み経路のどちらが効いているかであり、これは分離していない。**
-   分離するには別のhost controllerで同じcardを測る必要がある。
+3. **書込みが遅い原因を、cardとhostとfile systemに分離できていない。**
+   raw deviceへ直接書いても7.4 MB/sで10 MB/sに届かないため、
+   **FAT32だけでは未達を説明できない**（上の「raw deviceへの直接書込み」）。
+   **ただしこれは「FAT32が主因ではない」ことを示すものではない。**2つの測定は
+   条件が複数異なり、寄与率を出せる比較になっていない。**cardの書込み特性、
+   SDHCI controller（Ricoh `1180:E823`）の書込み経路、file systemの寄与のいずれも
+   定量的に分離していない。**分離するには別のhost controllerで同じcardを測る必要がある。
 
 **したがって「cardの劣化・不良」とも「cardは仕様どおり」とも結論しない。**
 
-**当初挙げた3要素のうち1つ（file system）は消えた。**残るcard対hostの分離は、
-別のreaderを用意しない限りこの端末では進められない。
+**raw device試験で分かったのは「file systemを外しても届かない」という一点である。**
+card対hostの分離は、別のreaderを用意しない限りこの端末では進められない。
 
 ### この判定でPiのbootに使ってよいか
 
@@ -397,7 +453,7 @@ bootとstorageの用途で問題になるのはこの2点である。③はDeplo
 | literalな全セクタの読み書き検査 | **実施しなかった** | `badblocks -w`はroot必須かつ完全破壊であり、①（容量詐称）を構造的に検出できない。①を優先して`f3`を選んだ。全セクタのliteralなカバーが要る場合は別途実施する |
 | SMART相当の情報取得 | **手段が存在しない** | この個体の接続経路にSMART相当のcommandが無い（上記④）。実施可能だが行わなかった、ではない。**なおSD Express（NVMe interface）にはSMARTがあるが、この個体はSD Expressではない** |
 | 耐久性（寿命）の評価 | **この記録の対象外** | 1回のhealth checkで書き込み寿命は判定できない。`HW-TBD-015`の`妨げる対象`のうち「耐久性」はこの記録では解決しない |
-| cardとhost controllerの分離 | **実施しなかった** | ③がinconclusiveである残りの理由。**file systemが主因でないことは確定した**（raw device試験）が、cardの書込み特性とSDHCI controllerの書込み経路のどちらが効いているかは分けていない。**分離には別のhost controllerで同じcardを測る必要がある** |
+| 書込み速度の要因の定量的な分離 | **実施しなかった** | ③がinconclusiveである残りの理由。raw device試験で**FAT32だけでは未達を説明できない**ことは示したが、**card・host controller・file systemそれぞれの寄与率は出していない**（2つの測定は条件が複数異なる）。**分離には別のhost controllerで同じcardを測る必要がある** |
 | UHS-I mode下での速度測定 | **実施しなかった** | 本端末の内蔵SDHCI readerが`sd high-speed`（3.30 V signaling）でしか動作せず、UHS-Iに入らない。**`U1`表示の妥当性を保証条件下で検証するには別のreaderが要る** |
 | `manfid`＝`0x1b`がSamsungであることの確認 | **実施しなかった** | Physical Layer Simplified Specification Ver 9.10はMIDを「SD-3C, LLCが管理・定義・割り当てる」番号と規定するのみで、**登録簿を収録していない**（Section 5.1）。**この仕様書では検証できない。**別の一次資料が要る。**`SD-01`のメーカー表示の正は引き続き現物printである** |
 | host controllerのUHS-I対応可否の確定 | **実施しなかった** | `/sys/kernel/debug/mmc0/caps`／`caps2`がroot権限でも`EPERM`を返すため、capability registerを読めなかった。**測定がUHS modeでないことは`ios`と`dmesg`で確定しているが、hostが非対応なのかnegotiationが成立しなかっただけなのかは区別していない** |
@@ -413,3 +469,4 @@ bootとstorageの用途で問題になるのはこの2点である。③はDeplo
 | 2026-08-13 | 4 | **raw deviceへの直接書込みを実施し、③の原因から一つを消した。**`O_DIRECT`でfile systemとpage cacheを迂回した結果は書込み7.4 MB/s、読出し20.3 MB/sである。**file systemを完全に外しても10 MB/sに届かないため、6.11 MB/sの主因はFAT32ではないと確定した。**当初挙げた3要素（card／host controller／file system）のうちfile systemが消え、**残るのはcardとhost controllerの分離だけになった。**これは別のhost controllerで同じcardを測らない限り進まない。**比較の限界も明記した**（2つの測定はfile systemの有無だけでなくI/O方式と対象範囲も異なるため、FAT32の寄与を厳密に切り出したのではなく上界を与えたにとどまる）。**あわせてcardの現状を更新した。**raw試験によりpartition tableとfile systemが失われている | 本記録のraw device試験 |
 | 2026-08-13 | 5 | **自己レビューround 4で検出。Revision 4までは「SMARTはATA／NVMeの機能であり、SD cardには相当する標準interfaceが無い」と書いていたが、これは言い過ぎであった。**手元の仕様書を`SMART`で検索したところ**Section 8.4.7（SD Express CardのPower and Thermal Management）に該当があり**、hostが`SMART / Health Information Log`から得たcomposite temperatureを使ってよいと記されている。**SD ExpressはNVMe interfaceを持つためSMARTが利用できる。**主張の範囲を個体に限り、「この個体の接続経路にSMART相当のcommandが無い」へ改めた。**この個体はSD Expressではない**（`scr`はPhysical Layer Version 3.0X、hostは`sd high-speed`接続）ため、**④の判定`手段が存在しない`は変わらない。****一次資料を手元に置いた状態で、自分が以前に断定した否定命題を検索し直して見つけた誤りである** | [Part 1 Physical Layer Simplified Specification Version 9.10](https://www.sdcard.org/downloads/pls/) Section 8.4.7、自己レビュー |
 | 2026-08-13 | 6 | **自己レビューround 6で検出した日付と基準commitの記述3件を直した。**(a) ヘッダの`実施日`が2026-08-12だけを挙げ、**raw device試験も2026-08-13に行ったことを落としていた。**(b) raw device試験の節に**日付が無く**、`f3`による検査（08-12）と読者が区別できなかった。(c) `Repository commit`が`6f387b6`のままで、rebase後のbase（`cbd6fa7`）と食い違って見えた。**これは測定時点のtreeを指す値であり誤りではない**が、その旨を明記した。測定はrepositoryの内容に依存しないため、rebaseは結果に影響しない | 自己レビュー |
+| 2026-08-13 | 7 | **[PR #115](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/115)のCodeRabbit full reviewの指摘5件を反映した。**(a) `f3write`の出力を2〜29番だけ省略していた。**節自身が「出力全文を埋め込む」と書いており矛盾していたため、30行すべてを未加工で掲載した。**(b) raw device試験の**実行commandを記録していなかった**ため再現できなかった。`dd (coreutils) 9.4`の版とcommand全文、各optionの意図、`/dev/urandom`の事前測定を追記した。(c) **「6.11 MB/sの主因はFAT32ではない」は過剰な断定であった。**同じ節が「上界を与えたにとどまる」と書いており、文書内で矛盾していた。`7.4 ÷ 6.11 ＝ 1.21`も**raw経路が21%速いことを示すだけでFAT32の寄与率ではない。**「FAT32だけでは10 MB/s未達を説明できない」へ改め、寄与率を算出しないことを明記した。`hardware-bom.md`と`tbd-register.md`へも波及させた。(d) ③の判定が`未達（inconclusive）`だった。**`未達`は有効な条件での失敗を指すため、UHS mode条件外の測定に使うのは誤りである。**`判定不能（UHS mode条件外）`へ改め、測定値が基準値に達していないこととcardがU1要件を満たさないことは別である旨を明記した。(e) **検査範囲を「29.80 GiB全域」と書いていたが過大表現であった。**同文書が`f3`はfile systemの空き領域だけを書くと明記しているため、「`f3`が書き込んだ全空き領域（29.80 GiB）」へ改め、3文書で表現を揃えた | [PR #115のCodeRabbit review](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/115) |
