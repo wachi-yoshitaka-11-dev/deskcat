@@ -123,13 +123,30 @@ ICの値はメーカーdatasheetで決まるが、module boardの値（jumper構
 
 | 資料 | 状況 |
 |---|---|
-| [Analog Devices ADXL345 Data Sheet](https://www.analog.com/media/en/technical-documentation/data-sheets/adxl345.pdf) | **本作業環境から開けない。**2026-08-10と08-11に`analog.com`（小文字／大文字の両path）とMouser mirrorをWebFetch／curl／PowerShellで試し、いずれもECONNRESETまたはtimeoutであった |
-| [Analog Devices ADXL345製品ページ](https://www.analog.com/en/products/adxl345.html) | **本作業環境から開けない。**2026-08-12に再試行し、45秒でtimeoutした。[hardware-bom.md](hardware-bom.md) `ACCEL-01`が公式文書欄に載せているURLと同じである |
+| [Analog Devices ADXL345 Data Sheet](https://www.analog.com/media/en/technical-documentation/data-sheets/adxl345.pdf) | **2026-08-12にブラウザで取得した。Rev. G。**PDF metadataは`/Author: Analog Devices, Inc.`、`/Title: ADXL345 (Rev. G)`、`/Subject: 3-Axis, ±2 g/±4 g/±8 g/±16 g Digital Accelerometer`、作成日2022-05-26。36page。sha256は`87ae2212498c35a6759d8732adee0ec9b9d8d60fa95688bc5904f1f07ceb8ff6`。**これを正の出典とする。****ただしCLIからは取得できない**（下行）。取得したPDFは[machine-profiles.md](../toolchains/machine-profiles.md)に従いrepositoryへ置いていない |
+| 同上（CLIからの取得可否） | **curlでは取得できない。**2026-08-10・08-11・08-12に小文字／大文字の両pathをWebFetch／curl／PowerShellで試し、HTTP/2では`stream 0 was not closed cleanly: INTERNAL_ERROR`、`--http1.1`ではbrowser UAを付けても45秒でtimeoutした。**DNSは解決する。****旧記載は「本作業環境から開けない」「egressの問題である」としていたが、ブラウザからは取得できたため誤りである**（2026-08-12訂正。取得した実物のPDFを確認した）。**CLIとブラウザで結果が分かれる理由も、両者の経路が同一かどうかも特定していないため書かない** |
+| [Analog Devices ADXL345製品ページ](https://www.analog.com/en/products/adxl345.html) | curlは上行と同じく失敗する。**このURL自体をブラウザで開いたことは確認していない**（`analog.com`のブラウザ経由の取得はdatasheet PDFで確認した）。[hardware-bom.md](hardware-bom.md) `ACCEL-01`が公式文書欄に載せているURLと同じである |
 | 秋月 M-06724 商品ページ | **404**（`gM-06724`／`g106724`とも） |
-| [SparkFunがhostするADXL345 Data Sheet](https://www.sparkfun.com/datasheets/Sensors/Accelerometer/ADXL345.pdf) | **2026-08-12に開けた。**PDF metadataは`/Author: Analog Devices, Inc.`、`/Title: ADXL345 (Rev. 0)`、`/Category: Data Sheet`、作成日2009-05-29。24page。**mirrorであり公式配布物との同一性は確認していない。またRev. 0が現行revisionである保証はない**（`analog.com`へ到達できないため最新版と照合できていない） |
+| [Octopartがhostする ADXL345 Data Sheet](https://datasheet.octopart.com/ADXL345BCCZ.-Analog-Devices-datasheet-43345133.pdf) | **2026-08-12にcurlで取得した。Rev. E**（`/Author: Analog Devices, Inc.`、作成日2015-05-28、40page）。**公式Rev. Gとの差分照合に用いた。電気的特性はRev. Gと一致した**（Rev. G の`REVISION HISTORY`によれば`5/2022—Rev. F to Rev. G`の変更はpackage情報と推奨はんだ付けprofileのみである） |
+| [SparkFunがhostするADXL345 Data Sheet](https://www.sparkfun.com/datasheets/Sensors/Accelerometer/ADXL345.pdf) | **Rev. 0**（作成日2009-05-29、24page）。2026-08-12に開けた。**Revision 4の時点ではこれが唯一開けた版であり、下表の値の出典であった。現在は公式Rev. Gを正とする**（差は下記のとおり） |
+| Mouser mirror（`mouser.com/datasheet/2/609/ADXL345-1517570.pdf`） | **取得できない。**curlはHTTP 200を返すが、実体はPDFではなく`Access to this page has been denied.`のHTMLである（2026-08-12確認） |
 
-**下表のICの値は、上記のSparkFun版（Rev. 0）で確認した範囲に限る。**revisionが確認できない以上、
-**この文書の値をもって最新版の内容とはしない。**現行revisionとの照合は`analog.com`へ到達できる環境で行う。
+**下表のICの値は、公式のRev. Gで確認した範囲である。**page番号はRev. Gのもので、
+PDFのpage indexと印字page（`Rev. G | N of 36`）は一致する。
+
+**Rev. 0（Revision 4までの出典）とRev. Gには差がある。**
+
+| 項目 | Rev. 0 | Rev. G |
+|---|---|---|
+| 絶対最大定格 `VS`／`VDD I/O` | −0.3 V to +3.6 V | **−0.3 V to +3.9 V** |
+| `Interface Voltage Range (VDD I/O)` | `VS ≤ 2.5 V`／`VS ≥ 2.5 V`の条件分岐 | 1.7 V–`VS`の単一表記 |
+| `Supply Current` | 145 µA（>100 Hz）／40 µA（<10 Hz） | 140 µA（ODR ≥ 100 Hz）／30 µA（ODR < 10 Hz） |
+| `Standby Mode Leakage Current` | 0.1 µA typ／2 µA max | 0.1 µA typ（max欄なし） |
+| `Device Weight` | 20 mg | 30 mg |
+
+Rev. Gの`REVISION HISTORY`に`4/10—Rev. 0 to Rev. A … Changes to Table 2 and Table 3`があり、
+**絶対最大定格はRev. 0→Aで改訂されている。Rev. 0の3.6 Vはsupersededである。**
+
 module boardの値は、これとは別に現物でしか決まらない（[AGENTS.md](../../AGENTS.md) 推測禁止）。
 
 ### ICの値（Analog Devices ADXL345）
@@ -137,17 +154,18 @@ module boardの値は、これとは別に現物でしか決まらない（[AGEN
 | 項目 | 値 |
 |---|---|
 | IC識別情報 | Analog Devices ADXL345 |
-| 供給電圧 | `VS` 2.0–3.6 V（`Supply voltage range: 2.0 V to 3.6 V`）。interface用の電源は別系統の`VDD I/O`で、`VS ≤ 2.5 V`のとき1.7 V–`VS`、`VS ≥ 2.5 V`のとき2.0 V–`VS`である。**記号は`VS`と`VDD I/O`である**（pin 6＝`VS` Supply Voltage、pin 1＝`VDD I/O` Digital Interface Supply Voltage）。**絶対最大定格はこの行では扱わない。**`HW-TBD-025`(b)（Issue [#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)）の範囲である |
+| 供給電圧（動作範囲） | `VS` 2.0–3.6 V（typ 2.5 V）。interface用の電源は別系統の`VDD I/O`で1.7 V–`VS`（typ 1.8 V）である。**記号は`VS`と`VDD I/O`である**（pin 6＝`VS` Supply Voltage、pin 1＝`VDD I/O` Digital Interface Supply Voltage）。Table 1、page 4。**これは動作範囲であって絶対最大定格ではない。**両者は別物であり、下行と混同しない |
+| 絶対最大定格 | `VS`／`VDD I/O`とも**−0.3 V to +3.9 V**。Digital Pinsは`VDD I/O` + 0.3 Vか3.9 Vの**小さい方**、All Other Pinsは−0.3 V to +3.9 V。Acceleration 10,000 g（Unpowered／Poweredとも）。Output Short-Circuit Duration（Any Pin to Ground）は`Indefinite`。Temperature RangeはPowered／Storageとも−40°C to +105°C。Table 2、page 5。**電流の上限はこの表に記載が無い**（`HW-TBD-025`(b)、Issue [#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)。**無いことを2026-08-12に確認した**） |
 | 測定range | ±2 g／±4 g／±8 g／±16 g 選択式 |
 | Interface（ICの対応） | I2C／SPI（3線式・4線式）の両対応（`SPI (3- and 4-wire) and I2C digital interfaces`） |
 | Filter／FIFO機能 | **32段のFIFOを内蔵**（`embedded 32-level FIFO`）。modeは`bypass`／`FIFO`／`stream`／`trigger`の4種で、`FIFO_CTL` registerの`FIFO_MODE` bitsで選ぶ。**各modeの詳細な挙動と、driverでどれを使うかはTBD** |
-| Device ID register／value | TBD |
-| Sensitivity変換 | TBD |
-| Output data rate | TBD |
-| Interrupt pinと動作 | INT1（pin 8）／INT2（pin 9）の2本。polarityと駆動形式はTBD |
-| 起動／reset sequence | TBD |
+| Device ID register／value | `DEVID`（address `0x00`、Read Only）。**reset値`11100101`＝`0xE5`**（`The DEVID register holds a fixed device ID code of 0xE5 (345 octal)`）。Table 19 page 23、Register 0x00節 page 24。**実機で読み出して一致を確認するのは[#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)の受け入れ条件である** |
+| Sensitivity変換 | 全g-rangeのfull resolutionで**256 LSB/g typ**（min 230／max 282）、Scale Factorは**3.9 mg/LSB typ**（min 3.5／max 4.3）。Table 1、page 3。**10-bit固定分解能で使う場合はg-rangeごとに異なる**（同表）。**実測offsetとnoiseの確認は[#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)** |
+| Output data rate | ICは**0.1–3200 Hz**に対応する（Table 1 page 3）。`BW_RATE` register（address `0x2C`）のrate codeで選び、reset値は`00001010`＝100 Hzである（Table 19 page 23）。data rateごとの消費電流はTable 7 page 13。**DeskCatがどのODRを使うかは設計判断であり[#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)で決める** |
+| Interrupt pinと動作 | INT1（pin 8）／INT2（pin 9）の2本。**駆動形式はpush-pull固定である**（`Both interrupt pins are push-pull, low impedance pins`、page 19）。**設定で切り替えられない。**polarityは`DATA_FORMAT` register（address `0x31`）の`INT_INVERT` bitで選び、**同registerのreset値が`00000000`であるため既定はactive-highである**（Table 19 page 23、page 27）。**どちらのpinを使うかは[#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)で決める**（割り当ては[gpio-assignment.md](gpio-assignment.md)） |
+| 起動／reset sequence | 電源投入時は**standby mode**であり、measurement modeへ入るcommandを待つ（Table 6 `Power Sequencing`、page 12）。`VS`がonで`VDD I/O`がoffの状態（`Bus Disabled`）は通信busへ競合を起こすため、**power-up時のこの状態を最短にする**と定めている。**register map（Table 19、page 23）にsoftware reset registerは無い。****bring-up手順の確定は[#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)** |
 | I2Cアドレスの選択方式 | pin 12 `SDO/ALT ADDRESS`で選ぶ。**7-bit addressは`0x1D`（同pinをhigh）／`0x53`（同pinをGNDへ）**。**ただしどちらになるかはmodule board上の実装で決まる**ため、現物確認まで確定しない（下表`実装済みI2C address`と[tbd-register HW-TBD-004](tbd-register.md)） |
-| Calibration要件 | TBD |
+| Calibration要件 | offset補正用に`OFSX`／`OFSY`／`OFSZ` register（address `0x1E`–`0x20`、reset値`00000000`）を持つ。**scale factorは15.6 mg/LSBで、選択したg-rangeに依存しない**（page 24）。手順は`OFFSET CALIBRATION`節（page 30）。**実施要否と実測値は[#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)** |
 
 ### module boardの値（秋月 M-06724）
 
@@ -159,7 +177,7 @@ module boardの値は、これとは別に現物でしか決まらない（[AGEN
 | 実装されているinterface（jumper設定） | TBD |
 | 実装済みI2C address | TBD |
 | board上のregulatorの有無 | TBD。**旧記載の「regulator非搭載」は根拠資料（秋月 商品ページ。現在404）を失ったため、2026-08-11に現物確認待ちへ改めた**（[hardware-bom.md](hardware-bom.md) Revision 31）。**載っていないことを前提にしない** |
-| moduleへ入れてよい電圧 | TBD。**ICの上限3.6 Vをboardの許容値と同一視しない**（regulatorやlevel shiftの有無で変わる）。**[power-budget.md](power-budget.md)と[hardware-bom.md](hardware-bom.md)が置く「3.3 Vで給電する」は、この行が埋まるまで確定しない。****5 V直結の禁止と、この行は別の主張である。**5 V禁止は「moduleがregulatorを持たなければ5 VがICへ直接掛かる」ことを否定できないための**確認前の安全規則**であって、IC定格からmoduleの許容入力電圧を導いたものではない。3.3 Vをmoduleが受け入れる根拠も同様に別に要る（[tbd-register HW-TBD-004](tbd-register.md)） |
+| moduleへ入れてよい電圧 | TBD。**ICの動作上限3.6 Vも絶対最大定格3.9 Vも、boardの許容値と同一視しない**（regulatorやlevel shiftの有無で変わる）。**[power-budget.md](power-budget.md)と[hardware-bom.md](hardware-bom.md)が置く「3.3 Vで給電する」は、この行が埋まるまで確定しない。****5 V直結の禁止と、この行は別の主張である。**5 V禁止は「moduleがregulatorを持たなければ5 VがICへ直接掛かる」ことを否定できないための**確認前の安全規則**であって、IC定格からmoduleの許容入力電圧を導いたものではない。3.3 Vをmoduleが受け入れる根拠も同様に別に要る（[tbd-register HW-TBD-004](tbd-register.md)） |
 | Module搭載pull-up | TBD（有無と値） |
 
 必要なベンチ試験の根拠:
@@ -251,3 +269,4 @@ pin配列: 1=`VDD`, 2=`GND`, 3=`CSB`, 4=`SDI`, 5=`SDO`, 6=`SCK`。
 | 2026-08-11 | 2 | [PR #82](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/82)のレビュー指摘2件を反映。(a) LCD moduleのbacklight欄に「制御しない場合は3.3 V直結」と**配線方法を書いていた**。`HW-TBD-024`（このmoduleが耐えられる電流の上限）が未解決の間は直結してよいか判定できず、配線規則の正本は`power-budget.md`である。polarityの記録だけに戻し、配線は現物確認後に定めるとした。(b) Accelerometer節が**ICの値とmodule boardの値を1つの表に混ぜていた**。根拠の種類が違う（ICはdatasheet、moduleはboard資料か現物）ため2つの表へ分けた。あわせて`analog.com`とMouser mirrorへ到達できなかった経緯を記録し、**開いていない文書のrevisionとpage番号は記録しない**方針を明示した |
 | 2026-08-11 | 3 | [PR #82](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/82)の自己レビューで検出。**Revision 2が「datasheetを開けていない」と書きながら、そのdatasheet由来の記号名を書いていた。**Accelerometer節で供給電圧の記号を`VS`と表記し、I2Cアドレス選択pinを`ALT ADDRESS`と名指ししていたが、どちらも一次資料で確認していない。記号名とpin名を落とし、値の範囲（2.0–3.6 V）と`hardware-bom.md`の既存表記だけを残した |
 | 2026-08-12 | 4 | 昇格PR[#109](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/109)のレビュー指摘2件を反映。(a) **`DC/RS`の極性が、controllerの実挙動と逆であった。**module datasheetの14pin表は`high level: register, low level: data`と記載しているが、`ILI9341 Datasheet V1.13`は`When DCX = '1', data is selected. When DCX = '0', command is selected.`と定める。`DC/RS`はcontrollerの`D/CX`へ直結するため**ILI9341を正**とし、両者が食い違う事実と理由を記載した。**module datasheetの記載を消していない**（出典との差を辿れなくなるため）。あわせてbench試験の項目へ極性確認を追加した。(b) **ADXL345のICの値に、開いた出典が無かった。**`analog.com`は2026-08-12にも到達できない（45秒timeout）ままだが、**SparkFunがhostするRev. 0版を開けた**ため到達状況表へ追加し、既記載の値（供給電圧、測定range、interface）をその版で確認した。あわせて`VS`／`VDD I/O`の記号名、FIFOの32段と4 mode、`SDO/ALT ADDRESS`による`0x1D`／`0x53`の選択を記録した。**Revision 3で落とした`VS`と`ALT ADDRESS`は、いずれも結果として正しかった。**ただし当時は開いていない資料の内容であり、落とした判断は当時の根拠に照らして正しい。**mirrorであり公式配布物との同一性も現行revisionであることも確認できていない**ため、その旨を明記した。**絶対最大定格は引き続き扱っていない**（`HW-TBD-025`(b)、[#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)） |
+| 2026-08-12 | 5 | [#1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1)と[#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)。**メーカー公式のRev. Gを入手し、Revision 4までの前提2つが誤りであったと判明した。**(a) **`analog.com`へ到達できないという判定が誤りであった。**ブラウザからは取得できる。到達できないのはCLI client（WebFetch／curl）であり、「本作業環境から開けない」「egressの問題である」という従来の記述を撤回した。**原因は特定していないため書いていない。**(b) **Revision 4が記録したRev. 0の絶対最大定格3.6 Vはsupersededであった。**Rev. Gは`VS`／`VDD I/O`とも**−0.3 V to +3.9 V**とし、Rev. Gの`REVISION HISTORY`は`4/10—Rev. 0 to Rev. A`で`Table 2`を改訂したと記す。あわせて`Supply Current`（145/40→140/30 µA）、`VDD I/O`の下限表記、`Device Weight`（20→30 mg）も差がある。**動作範囲3.6 Vと絶対最大定格3.9 Vは別物である**ため、供給電圧の行を動作範囲と絶対最大定格に分けた。**`HW-TBD-025`(b)の答えとして、絶対最大定格に電流の上限が記載されていないことを記録した。**「あるはず」と仮定せずに確認した結果である。あわせてRev. Gから`Device ID`（`0x00 DEVID`＝`0xE5`）、`Sensitivity`（256 LSB/g）、`Output data rate`（0.1–3200 Hz）、`起動／reset sequence`（Table 6。software reset registerは無い）、`Calibration要件`（`OFSX`/`OFSY`/`OFSZ`、15.6 mg/LSB）を埋め、**driver設計判断と実機検証に属する部分は[#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)を追跡先として`TBD`のまま残した。**(c) **`Interrupt pinと動作`の駆動形式は、`gpio-assignment.md`が「push-pull／open-drainを設定可能」と書いていたが誤りである。**Rev. Gは`Both interrupt pins are push-pull, low impedance pins`と定める。polarityの既定active-highは正しく、`DATA_FORMAT`のreset値から確定に改めた。**module boardの値（秋月 M-06724）は1欄も変更していない。****ICの3.9 Vをboardの許容入力電圧と同一視しない**（`HW-TBD-004`）。**5 V直結の禁止も変えていない。**3.9 Vであっても5 Vはこれを超える |
