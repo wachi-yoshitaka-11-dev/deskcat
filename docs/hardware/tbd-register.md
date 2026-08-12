@@ -393,7 +393,7 @@ commit `52661b9` に対して実行した。**件数は文書を変更すれば�
 | 規則文・状態ラベル・確定済み記述 | 23 | 表header、`Required`／`Blocked`の凡例、確定済みの購入履歴への言及など |
 | 発注状態のみ | 21 | 部品は決まっており購入していないだけ。[購入待ちリスト](hardware-bom.md#購入待ちリスト)側で追う |
 | 文書運用・toolchain状態 | 13 | ADR-0002／0004／0007、[machine-profiles.md](../toolchains/machine-profiles.md)、toolchain索引。安全・電気・機械項目ではない |
-| 未分類 | 0 |
+| 未分類 | 0 | — |
 | **新規登録** | **2行（1件）** | **`HW-TBD-032`**（`LCD-RST`／`LCD-CS`のpull-upと`LCD-BL`のpull-down）。[gpio-assignment.md](gpio-assignment.md#信号inventory)の受け入れchecklistが「**未実装のため要対応**」と書いていたが、`HW-TBD-027`は`SERVO-PWM`のpull-downだけを対象としており含んでいなかった |
 
 群Aだけなら122件、群Bだけなら41件である（重なる行があるため合計は一致しない）。
