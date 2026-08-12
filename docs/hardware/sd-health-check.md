@@ -2,7 +2,7 @@
 
 > 状態: 実施済み
 > 判定: `Partial`
-> 実施日: 2026-08-12（registerの読み方の一次資料照合は2026-08-13）
+> 実施日: 2026-08-12（`f3`による検査と識別情報の採取）／2026-08-13（registerの読み方の一次資料照合、raw device試験）
 > 対象: [hardware-bom.md](hardware-bom.md) の `SD-01`（Samsung EVO Plus microSDHC 32GB、`U1`表示）
 > 追跡: [tbd-register.md](tbd-register.md) の `HW-TBD-015`、[#114](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/114)
 
@@ -51,10 +51,18 @@ file systemのmetadata領域と予約領域は触らない。**literalな全セ�
 literalな全セクタ検査には`badblocks -w`（root必須・完全破壊）が要るが、
 **今回は実施しない**（下の「実施しなかった項目」に記載する）。
 
-**④の性質。**SMARTはATA／NVMeの機能であり、SD cardには相当する標準interfaceが無い。
-eMMCの`EXT_CSD`が持つhealth statusはeMMC固有であってSD cardには適用されない。
+**④の性質。**SMARTはATA／NVMeの機能である。**この個体には取得手段が無い。**
+`scr`が示すPhysical Layer Version 3.0Xの世代であり、hostも`sd high-speed`で
+接続している。**この経路にSMART相当のcommandは無い。**
 したがって④は**「実施しなかった」のではなく「取得手段が存在しない」**である。
 この区別を結果欄に書く。
+
+> **「SD card全般にSMARTが無い」とは書かない。**この記録は当初そう書いていたが、
+> **誤りである**（Revision 5で訂正）。Physical Layer Simplified Specification Ver 9.10の
+> **Section 8.4.7（SD Express CardのPower and Thermal Management）**は、hostが
+> `SMART / Health Information Log`から得たcomposite temperatureを使ってよいと記している。
+> **SD ExpressはNVMe interfaceを持つため、SMARTが利用できる。**
+> **この個体はSD Expressではない**ので結論は変わらないが、主張の範囲を個体に限る。
 
 ## 実施環境
 
@@ -67,6 +75,9 @@ Machine profile: 該当なし（Machine Profilesに部品health check用のprofi
 Operator role: 開発者（human）の監督下でのAI agent作業。card挿入、
   root権限を要するcommand、tool導入と撤去はhumanが実行した
 Repository commit: 6f387b6bbb2a8a3e080f27c7d4870245b19881b4
+  **これは測定を行った時点のtreeである。**本記録を載せるbranchはその後
+  cbd6fa7（#113のmerge後のdevelop）へrebaseしたが、測定をやり直してはいない。
+  測定はrepositoryの内容に依存しないため、rebaseは結果に影響しない。
 Working tree clean: no（本作業の追加分を含む）
 
 OS name: Ubuntu
@@ -167,7 +178,7 @@ byte 10上位nibbleの`9h`＝4 MBは、**kernelが別経路で報告する
 printの読み取り誤りを排除できた**ことである。
 
 **なお、判定基準①②④はこの解釈に依存しない。**①②は`f3`の出力から直接判定でき、
-④はSD cardにSMART相当の標準interfaceが無いことから判定している。
+④はこの個体の接続経路にSMART相当のcommandが無いことから判定している。
 
 ### Bus modeとclock（③の判定に要る）
 
@@ -277,6 +288,7 @@ Average reading speed: 19.15 MB/s
 
 ### raw deviceへの直接書込み（③の原因切り分け）
 
+**実施日は2026-08-13である**（`f3`による検査は2026-08-12）。
 **目的は、6.11 MB/sのうちfile system（FAT32）が占める分を分離することである。**
 `O_DIRECT`でpage cacheを迂回し、file systemを介さずに`/dev/mmcblk0`へ直接読み書きした。
 先頭2 GiBが対象である。root権限を要するためhumanが実行した。
@@ -326,7 +338,7 @@ Average reading speed: 19.15 MB/s
 | ① | 容量詐称 | `Data LOST`＝0 sector | 0 sector（3区分とも0） | **合格** |
 | ② | 読み書きの通し | 書込み総量と`Data OK`が一致 | 30 file・29.80 GiB・62,488,704 sectorが一致 | **合格** |
 | ③ | 速度 ≥ 10 MB/s | `f3write`平均書込み速度 | **6.11 MB/s**（raw device直接でも**7.4 MB/s**） | **未達（inconclusive）** |
-| ④ | SMART相当 | 取得手段の有無を確認 | **手段が存在しない** | 確認済み |
+| ④ | SMART相当 | 取得手段の有無を確認 | **この個体には手段が存在しない**（SD Expressではないため） | 確認済み |
 | ⑤ | 識別情報 | 現物printと矛盾しない | `32`／`microSDHC`／`U1`はregisterと一致（**読み方を仕様書Ver 9.10と照合済み**）。**`Samsung`だけは未裏付け**（MIDの登録簿が仕様書に無い） | **合格（1項目のみ未裏付け）** |
 
 **偽造品ではない。**29.80 GiB全域へ位置依存dataを書いて読み戻し、
@@ -383,7 +395,7 @@ bootとstorageの用途で問題になるのはこの2点である。③はDeplo
 | 項目 | 状態 | 理由 |
 |---|---|---|
 | literalな全セクタの読み書き検査 | **実施しなかった** | `badblocks -w`はroot必須かつ完全破壊であり、①（容量詐称）を構造的に検出できない。①を優先して`f3`を選んだ。全セクタのliteralなカバーが要る場合は別途実施する |
-| SMART相当の情報取得 | **手段が存在しない** | SD cardにSMART相当の標準interfaceが無い（上記④）。実施可能だが行わなかった、ではない |
+| SMART相当の情報取得 | **手段が存在しない** | この個体の接続経路にSMART相当のcommandが無い（上記④）。実施可能だが行わなかった、ではない。**なおSD Express（NVMe interface）にはSMARTがあるが、この個体はSD Expressではない** |
 | 耐久性（寿命）の評価 | **この記録の対象外** | 1回のhealth checkで書き込み寿命は判定できない。`HW-TBD-015`の`妨げる対象`のうち「耐久性」はこの記録では解決しない |
 | cardとhost controllerの分離 | **実施しなかった** | ③がinconclusiveである残りの理由。**file systemが主因でないことは確定した**（raw device試験）が、cardの書込み特性とSDHCI controllerの書込み経路のどちらが効いているかは分けていない。**分離には別のhost controllerで同じcardを測る必要がある** |
 | UHS-I mode下での速度測定 | **実施しなかった** | 本端末の内蔵SDHCI readerが`sd high-speed`（3.30 V signaling）でしか動作せず、UHS-Iに入らない。**`U1`表示の妥当性を保証条件下で検証するには別のreaderが要る** |
@@ -399,3 +411,5 @@ bootとstorageの用途で問題になるのはこの2点である。③はDeplo
 | 2026-08-12 | 2 | **自己レビューで検出。Revision 1は、registerのbit解釈を一次資料と照合せずに確定形で書いていた**（`SPEED_CLASS`＝Class 10、`UHS_SPEED_GRADE`＝`U1`、CSD Version 2.0 など）。**これは[AGENTS.md](../../AGENTS.md)の推測禁止に反し、この repository が繰り返し是正してきた誤りと同じ型である。**識別情報の節を「読み取った値（観測）」と「解釈（一次資料と未照合）」へ分割し、判定基準⑤を`合格`から`保留`へ改めた。**あわせて、⑤に依存しないこと（①②③④はregisterの解釈を使わずに判定できる）を明記した。**照合できなかった経緯（`dl.php`が0 byteを返す、ブラウザ取得は利用規約への同意を要する）も記録した。`hardware-bom.md`と`tbd-register.md`の「裏取りした」という記述も同時に訂正した。**あわせて判定基準③の説明文から「High Speed（25 MHz）」という未照合のclock値を削除した。判定の閾値10 MB/sはRevision 0から変えていない** | 自己レビュー、[SD Association Simplified Specifications](https://www.sdcard.org/downloads/pls/) |
 | 2026-08-13 | 3 | **一次資料を入手して照合し、Revision 2で`保留`とした解釈を確定させた。**humanが利用規約に同意してPDFを取得した。**Revision 2の解釈は`manfid`を除きすべて正しかった**（`CSD_STRUCTURE`／`SD_SPEC`系／`SPEED_CLASS`／`UHS_SPEED_GRADE`／`AU_SIZE`／`OID`／`PNM`）。byte位置の対応も`AU_SIZE`と`preferred_erase_size`の一致で独立に裏付けた。判定基準⑤を`保留`から`合格`へ戻した。**ただし`manfid`＝`0x1b`＝Samsungだけは確定できない。**仕様書はMIDの登録簿を収録していないためである。**メーカー表示の正は引き続き現物printである。****あわせて③をinconclusiveとする根拠を強化した。**Section 4.13.3の表題が`Speed Grade Specification for UHS-I and UHS-II`であり、`U1`の10 MB/sがUHS bus modeに対する規定であることを一次資料で確認した。**一方で「hostがUHS-I非対応」は確定していないことを明記した**（capability registerがroot権限でも読めない） | [Part 1 Physical Layer Simplified Specification Version 9.10](https://www.sdcard.org/downloads/pls/)（2023-12-01）Table 4-45／4-47／4-52／5-3／5-19、Section 4.10.2.8／4.13.3／5.1 |
 | 2026-08-13 | 4 | **raw deviceへの直接書込みを実施し、③の原因から一つを消した。**`O_DIRECT`でfile systemとpage cacheを迂回した結果は書込み7.4 MB/s、読出し20.3 MB/sである。**file systemを完全に外しても10 MB/sに届かないため、6.11 MB/sの主因はFAT32ではないと確定した。**当初挙げた3要素（card／host controller／file system）のうちfile systemが消え、**残るのはcardとhost controllerの分離だけになった。**これは別のhost controllerで同じcardを測らない限り進まない。**比較の限界も明記した**（2つの測定はfile systemの有無だけでなくI/O方式と対象範囲も異なるため、FAT32の寄与を厳密に切り出したのではなく上界を与えたにとどまる）。**あわせてcardの現状を更新した。**raw試験によりpartition tableとfile systemが失われている | 本記録のraw device試験 |
+| 2026-08-13 | 5 | **自己レビューround 4で検出。Revision 4までは「SMARTはATA／NVMeの機能であり、SD cardには相当する標準interfaceが無い」と書いていたが、これは言い過ぎであった。**手元の仕様書を`SMART`で検索したところ**Section 8.4.7（SD Express CardのPower and Thermal Management）に該当があり**、hostが`SMART / Health Information Log`から得たcomposite temperatureを使ってよいと記されている。**SD ExpressはNVMe interfaceを持つためSMARTが利用できる。**主張の範囲を個体に限り、「この個体の接続経路にSMART相当のcommandが無い」へ改めた。**この個体はSD Expressではない**（`scr`はPhysical Layer Version 3.0X、hostは`sd high-speed`接続）ため、**④の判定`手段が存在しない`は変わらない。****一次資料を手元に置いた状態で、自分が以前に断定した否定命題を検索し直して見つけた誤りである** | [Part 1 Physical Layer Simplified Specification Version 9.10](https://www.sdcard.org/downloads/pls/) Section 8.4.7、自己レビュー |
+| 2026-08-13 | 6 | **自己レビューround 6で検出した日付と基準commitの記述3件を直した。**(a) ヘッダの`実施日`が2026-08-12だけを挙げ、**raw device試験も2026-08-13に行ったことを落としていた。**(b) raw device試験の節に**日付が無く**、`f3`による検査（08-12）と読者が区別できなかった。(c) `Repository commit`が`6f387b6`のままで、rebase後のbase（`cbd6fa7`）と食い違って見えた。**これは測定時点のtreeを指す値であり誤りではない**が、その旨を明記した。測定はrepositoryの内容に依存しないため、rebaseは結果に影響しない | 自己レビュー |
