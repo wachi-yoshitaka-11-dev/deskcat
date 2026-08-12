@@ -201,7 +201,8 @@ module boardの値は、これとは別に現物でしか決まらない（[AGEN
 | Module／IC識別情報 | Module: AE-BME280（秋月 K-09421）。IC: Bosch BME280。6pin SIP（2.54 mmピッチ）、基板16×10 mm |
 | 測定量 | 温度、湿度、気圧 |
 | Interface | I2C（最大3.4 MHz）または SPI 4線式／3線式（最大10 MHz）、選択式。**現物の`J1`／`J2`／`J3`で確定する**（[tbd-register HW-TBD-005](tbd-register.md)） |
-| 供給／logic電圧 | VDD 1.71–3.6 V、VDDIO 1.2–3.6 V。**module上でVDDとVDDIOは接続済み**のため実効は1.71–3.6 V |
+| 供給／logic電圧（動作範囲） | VDD 1.71–3.6 V、VDDIO 1.2–3.6 V。**module上でVDDとVDDIOは接続済み**のため実効は1.71–3.6 V。**これは動作範囲であって絶対最大定格ではない。**両者は別物であり、下行と混同しない |
+| 絶対最大定格 | `Voltage at any supply pin`（VDDとVDDIO）は**−0.3 V to +4.25 V**、`Voltage at any interface pin`は−0.3 V to `VDDIO` + 0.3 V。Storage temperature（≤65 % RH）は−45 °C to +85 °C、Pressureは0 to 20,000 hPa、ESDはHBM ±2 kV／CDM ±500 V／Machine model ±200 V。Bosch datasheet Revision 1.24のTable 5、page 13。**電流の上限はこの表に記載が無い**（`HW-TBD-025`(b)、Issue [#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)。**無いことを2026-08-12に確認した**）。**この行は2026-08-12に追加した。**それまで[hardware-bom.md](hardware-bom.md)と[tbd-register.md](tbd-register.md)がこの確認結果を引用しながら、datasheet由来値の正であるこの文書に元の記録が無かった |
 | Address／select pin | I2C: `0x76`（`SDO`→GND、既定）／`0x77`（`SDO`→VDD）。I2C選択時は`J3`をはんだジャンパする |
 | Device ID | register `0xD0`、reset値 `0x60` |
 | 起動時間 | `t_startup` 2 ms（VDD > 1.58 V かつ VDDIO > 0.65 V を満たしてから最初の通信まで） |
@@ -235,6 +236,38 @@ pin配列: 1=`VDD`, 2=`GND`, 3=`CSB`, 4=`SDI`, 5=`SDO`, 6=`SCK`。
 - 安定した反復sampling
 - Timeout／disconnect動作
 - サーボ動作中の動作
+
+## Local decoupling
+
+**この節がdatasheet由来のdecoupling指定の正である**（[tbd-register HW-TBD-029](tbd-register.md)）。
+**module搭載分で足りるか外付けが要るかという判断は、ここでは行わない。**
+それは[power-budget.md](power-budget.md)の`local decouplingの外付け要否`節にある。
+
+**ICへの指定と、module boardに実装されているものを分けて記録する。**根拠の種類が違う
+（ICはdatasheet、module boardはboard資料か現物）。ADXL345のIC値とmodule値を分けたのと同じ扱いである。
+
+| device | datasheetの指定 | 出典 | module boardの実装 |
+|---|---|---|---|
+| **BME280（IC）** | `C1`／`C2`の推奨値は**100 nF**。`C1`はVDD–GND間、`C2`はVDDIO–GND間 | Bosch Revision 1.24のFigure 17（I2C）／Figure 18（4-wire SPI）／Figure 19（3-wire SPI）のNote。**3つのconnection diagramすべてに同じNoteがある** | **AE-BME280は`C1` 0.1 µF（VDD用）／`C2` 0.1 µF（VDDIO用）を実装済み。**説明書の部品表は「ピンヘッダ以外は、基板にすべて実装済みです」と述べる（[AE-BME280説明書](https://akizukidenshi.com/goodsaffix/AE-BME280_manu_v1.1.pdf) v1.1の◆部品表）。**推奨値100 nFと一致する** |
+| **ADXL345（IC）** | `CS` **1 µF tantalum**を`VS`へ、`CI/O` **0.1 µF ceramic**を`VDD I/O`へ、**supply pinの近くに**置くことを推奨する。追加のdecouplingが要る場合は**100 Ω以下**の抵抗またはferrite beadを`VS`と直列に入れるとよい。さらに`VS`のbypassを**10 µF tantalum ∥ 0.1 µF ceramic**へ増やすとノイズが改善しうる。**あわせて`VS`と`VDD I/O`を別電源にすることを推奨し、それができない場合は上記の追加filteringが要るとする。**ADXL345のGNDからpower supply GNDへの接続を**低impedance**に保つことも求めている（`noise transmitted through ground has an effect similar to noise transmitted through VS`） | Rev. Gの`POWER SUPPLY DECOUPLING`、page 29 | **TBD。**M-06724のboard資料が無く、実装済みの部品を現物でしか読めない（[tbd-register HW-TBD-004](tbd-register.md)）。**`VS`と`VDD I/O`がboard上で結線されているかも未確認である** |
+| **MSP2807（module）** | **記載が無いことを確認した。**[msp2807.pdf](https://akizukidenshi.com/goodsaffix/msp2807.pdf)の`Product Parameters`が持つ電気的仕様は`VCC power voltage`／`Logic IO port voltage`／`Power Consumption`（`TBD`と印字）の3つだけであり、decouplingにもbacklight駆動回路にも触れない | 同上（2026-08-12確認） | **TBD。**現物確認は`HW-TBD-024`のbacklight回路確認と同じ機会に行う |
+
+**`CS`は1 µFと10 µFのどちらを採るか**（Table 1 page 3の測定条件は`CS = 10 µF tantalum, CI/O = 0.1 µF`
+であり、page 29の推奨値1 µFと違う）。
+
+**推奨値の1 µFを採る。**理由は次のとおりである。
+
+- Table 1の`CS = 10 µF`は**datasheetの電気的特性を再現するための測定条件**であって、設計要件として
+  提示されたものではない
+- page 29自身が10 µF ∥ 0.1 µFを「**ノイズが改善しうる**」追加策として位置づけており、
+  1 µFを基本の推奨値としている
+- DeskCatが要求するノイズ性能は、tap判定のしきい値が未決である以上まだ定まっていない
+  （[#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)）。**先に推奨値を採り、
+  実機で不足した場合に10 µF ∥ 0.1 µFへ上げる**
+
+**ただしこれはICへの指定に対する選択であって、外付け部品を発注する決定ではない。**
+M-06724に何が実装済みかが未確認である以上、外付けの要否そのものが決まっていない
+（`HW-TBD-004`）。**ICへの推奨値を、そのまま購入待ちリストへ載せない。**
 
 ## 共有I2Cのreview
 
@@ -270,3 +303,4 @@ pin配列: 1=`VDD`, 2=`GND`, 3=`CSB`, 4=`SDI`, 5=`SDO`, 6=`SCK`。
 | 2026-08-11 | 3 | [PR #82](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/82)の自己レビューで検出。**Revision 2が「datasheetを開けていない」と書きながら、そのdatasheet由来の記号名を書いていた。**Accelerometer節で供給電圧の記号を`VS`と表記し、I2Cアドレス選択pinを`ALT ADDRESS`と名指ししていたが、どちらも一次資料で確認していない。記号名とpin名を落とし、値の範囲（2.0–3.6 V）と`hardware-bom.md`の既存表記だけを残した |
 | 2026-08-12 | 4 | 昇格PR[#109](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/109)のレビュー指摘2件を反映。(a) **`DC/RS`の極性が、controllerの実挙動と逆であった。**module datasheetの14pin表は`high level: register, low level: data`と記載しているが、`ILI9341 Datasheet V1.13`は`When DCX = '1', data is selected. When DCX = '0', command is selected.`と定める。`DC/RS`はcontrollerの`D/CX`へ直結するため**ILI9341を正**とし、両者が食い違う事実と理由を記載した。**module datasheetの記載を消していない**（出典との差を辿れなくなるため）。あわせてbench試験の項目へ極性確認を追加した。(b) **ADXL345のICの値に、開いた出典が無かった。**`analog.com`は2026-08-12にも到達できない（45秒timeout）ままだが、**SparkFunがhostするRev. 0版を開けた**ため到達状況表へ追加し、既記載の値（供給電圧、測定range、interface）をその版で確認した。あわせて`VS`／`VDD I/O`の記号名、FIFOの32段と4 mode、`SDO/ALT ADDRESS`による`0x1D`／`0x53`の選択を記録した。**Revision 3で落とした`VS`と`ALT ADDRESS`は、いずれも結果として正しかった。**ただし当時は開いていない資料の内容であり、落とした判断は当時の根拠に照らして正しい。**mirrorであり公式配布物との同一性も現行revisionであることも確認できていない**ため、その旨を明記した。**絶対最大定格は引き続き扱っていない**（`HW-TBD-025`(b)、[#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)） |
 | 2026-08-12 | 5 | [#1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1)と[#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)。**メーカー公式のRev. Gを入手し、Revision 4までの前提2つが誤りであったと判明した。**(a) **`analog.com`へ到達できないという判定が誤りであった。**ブラウザからは取得できる。到達できないのはCLI client（WebFetch／curl）であり、「本作業環境から開けない」「egressの問題である」という従来の記述を撤回した。**原因は特定していないため書いていない。**(b) **Revision 4が記録したRev. 0の絶対最大定格3.6 Vはsupersededであった。**Rev. Gは`VS`／`VDD I/O`とも**−0.3 V to +3.9 V**とし、Rev. Gの`REVISION HISTORY`は`4/10—Rev. 0 to Rev. A`で`Table 2`を改訂したと記す。あわせて`Supply Current`（145/40→140/30 µA）、`VDD I/O`の下限表記、`Device Weight`（20→30 mg）も差がある。**動作範囲3.6 Vと絶対最大定格3.9 Vは別物である**ため、供給電圧の行を動作範囲と絶対最大定格に分けた。**`HW-TBD-025`(b)の答えとして、絶対最大定格に電流の上限が記載されていないことを記録した。**「あるはず」と仮定せずに確認した結果である。あわせてRev. Gから`Device ID`（`0x00 DEVID`＝`0xE5`）、`Sensitivity`（256 LSB/g）、`Output data rate`（0.1–3200 Hz）、`起動／reset sequence`（Table 6。software reset registerは無い）、`Calibration要件`（`OFSX`/`OFSY`/`OFSZ`、15.6 mg/LSB）を埋め、**driver設計判断と実機検証に属する部分は[#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)を追跡先として`TBD`のまま残した。**(c) **`Interrupt pinと動作`の駆動形式は、`gpio-assignment.md`が「push-pull／open-drainを設定可能」と書いていたが誤りである。**Rev. Gは`Both interrupt pins are push-pull, low impedance pins`と定める。polarityの既定active-highは正しく、`DATA_FORMAT`のreset値から確定に改めた。**module boardの値（秋月 M-06724）は1欄も変更していない。****ICの3.9 Vをboardの許容入力電圧と同一視しない**（`HW-TBD-004`）。**5 V直結の禁止も変えていない。**3.9 Vであっても5 Vはこれを超える |
+| 2026-08-12 | 6 | [#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)。(a) **`Local decoupling`節を新設した**（`HW-TBD-029`）。この文書はdatasheet由来値の正でありながら、decouplingの記載が1件も無かった。BME280は`C1`／`C2`とも推奨100 nF（Bosch Revision 1.24のFigure 17／18／19のNote）で、**AE-BME280は各0.1 µFを実装済みである**（説明書v1.1の部品表。「ピンヘッダ以外は基板にすべて実装済み」）。ADXL345は`CS` 1 µF tantalum＠`VS`／`CI/O` 0.1 µF ceramic＠`VDD I/O`をsupply pin近傍へ、追加が要れば100 Ω以下の抵抗かferrite beadを`VS`と直列に、さらに`VS`のbypassを10 µF tantalum ∥ 0.1 µF ceramicへ増やす（Rev. G page 29）。**同節が`VS`と`VDD I/O`を別電源にすることも推奨している点もあわせて記録した。**MSP2807は**decouplingの記載が無いことを確認した**（`Product Parameters`の電気的仕様は3項目のみ）。**`CS`は推奨値1 µFを採ることを根拠付きで決めた**（Table 1 page 3の`CS = 10 µF`は測定条件であって設計要件ではなく、page 29自身が10 µFを追加策として位置づけている）。**ICへの指定とmodule boardの実装を分けて書き、外付けの要否はこの文書で判断していない**（判断は[power-budget.md](power-budget.md)の`local decouplingの外付け要否`）。(b) **Environmental sensorへ`絶対最大定格`行を追加した。**`Voltage at any supply pin`は−0.3 V to +4.25 V、`Voltage at any interface pin`は−0.3 V to `VDDIO` + 0.3 Vである（Revision 1.24 Table 5 page 13）。**電流の上限が無いことも記録した。****[hardware-bom.md](hardware-bom.md)と[tbd-register.md](tbd-register.md)は2026-08-12にこの確認結果を引用していたが、datasheet由来値の正であるこの文書に元の記録が無かった。**ADXL345には同じ行があり、BME280だけ欠けていた。あわせて既存の供給／logic電圧の行を`（動作範囲）`と明示し、絶対最大定格と混同しない書き分けをADXL345と揃えた。**module boardの値（秋月 M-06724、AE-BME280）は1欄も変更していない** |
