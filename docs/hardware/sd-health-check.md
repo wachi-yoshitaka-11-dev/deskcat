@@ -319,8 +319,19 @@ Average reading speed: 19.15 MB/s
 `O_DIRECT`でpage cacheを迂回し、file systemを介さずに`/dev/mmcblk0`へ直接読み書きした。
 先頭2 GiBが対象である。root権限を要するためhumanが実行した。
 
+**実施順序を先に明示する。**この節は文書上`f3`の出力の後に置いているが、
+**実際にはraw device試験の前に次を済ませてある。**
+
+1. `f3`が書いた`*.h2w` 30 fileを削除し、`sync`した
+2. **`udisksctl unmount -b /dev/mmcblk0p1`でpartitionをunmountした**
+3. その後にraw deviceへの`dd`を実行した
+
+**mount中のpartitionへraw書込みを行ってはいない。**mountしたままだと、
+raw書込みの後にfile systemのmetadataがcacheから書き戻され、
+試験範囲を上書きしうるためである。下の「事後処理」はこの1〜2を再掲している。
+
 実行したcommandは次のとおりである。`dd`は`dd (coreutils) 9.4`である。
-**`/dev/mmcblk0`はこの時点で単一FAT32 partitionであり、この試験がそれを破壊した。**
+**`/dev/mmcblk0`はこの時点で単一FAT32 partition（unmount済み）であり、この試験がそれを破壊した。**
 
 ```bash
 sudo sh -c 'echo "=== raw write ==="; dd if=/dev/urandom of=/dev/mmcblk0 bs=1M count=2048 oflag=direct 2>&1 | tail -1; sync; echo 3 > /proc/sys/vm/drop_caches; echo "=== raw read ==="; dd if=/dev/mmcblk0 of=/dev/null bs=1M count=2048 iflag=direct 2>&1 | tail -1'
@@ -395,9 +406,16 @@ page cacheとdentry／inode cacheを落としてから読み出す。**速度は
 | ④ | SMART相当 | 取得手段の有無を確認 | **この個体には手段が存在しない**（SD Expressではないため） | 確認済み |
 | ⑤ | 識別情報 | 現物printと矛盾しない | `32`／`microSDHC`／`U1`はregisterと一致（**読み方を仕様書Ver 9.10と照合済み**）。**`Samsung`だけは未裏付け**（MIDの登録簿が仕様書に無い） | **合格（1項目のみ未裏付け）** |
 
-**偽造品ではない。**`f3`が書き込んだ全空き領域（29.80 GiB）へ位置依存dataを書いて読み戻し、
-`Corrupted`／`Slightly changed`／`Overwritten`のいずれも0 sectorであった。
-容量が公称どおりであること、および検査範囲に読み書き不良が無いことを確認した。
+**確認できたのは次の2点である。**`f3`が書き込んだ全空き領域（29.80 GiB）へ位置依存dataを
+書いて読み戻し、`Corrupted`／`Slightly changed`／`Overwritten`のいずれも0 sectorであった。
+
+- **容量詐称は確認されなかった。**公称容量に見合う領域へ位置依存dataを書き、巻き戻りなく読み戻せた
+- **検査範囲に読み書き不良は確認されなかった**
+
+**「偽造品ではない」とは書かない。**この検査が見たのはfile systemの空き領域だけであり、
+**metadata領域と予約領域は検査していない。**また`Samsung`というメーカー表示は
+registerで裏付けられていない（`manfid`の登録簿が仕様書に無い）。
+**「容量詐称が確認されなかった」ことと「偽造品でない」ことは同じではない。**
 
 ### ③を判定不能とする理由
 
@@ -470,3 +488,4 @@ bootとstorageの用途で問題になるのはこの2点である。③はDeplo
 | 2026-08-13 | 5 | **自己レビューround 4で検出。Revision 4までは「SMARTはATA／NVMeの機能であり、SD cardには相当する標準interfaceが無い」と書いていたが、これは言い過ぎであった。**手元の仕様書を`SMART`で検索したところ**Section 8.4.7（SD Express CardのPower and Thermal Management）に該当があり**、hostが`SMART / Health Information Log`から得たcomposite temperatureを使ってよいと記されている。**SD ExpressはNVMe interfaceを持つためSMARTが利用できる。**主張の範囲を個体に限り、「この個体の接続経路にSMART相当のcommandが無い」へ改めた。**この個体はSD Expressではない**（`scr`はPhysical Layer Version 3.0X、hostは`sd high-speed`接続）ため、**④の判定`手段が存在しない`は変わらない。****一次資料を手元に置いた状態で、自分が以前に断定した否定命題を検索し直して見つけた誤りである** | [Part 1 Physical Layer Simplified Specification Version 9.10](https://www.sdcard.org/downloads/pls/) Section 8.4.7、自己レビュー |
 | 2026-08-13 | 6 | **自己レビューround 6で検出した日付と基準commitの記述3件を直した。**(a) ヘッダの`実施日`が2026-08-12だけを挙げ、**raw device試験も2026-08-13に行ったことを落としていた。**(b) raw device試験の節に**日付が無く**、`f3`による検査（08-12）と読者が区別できなかった。(c) `Repository commit`が`6f387b6`のままで、rebase後のbase（`cbd6fa7`）と食い違って見えた。**これは測定時点のtreeを指す値であり誤りではない**が、その旨を明記した。測定はrepositoryの内容に依存しないため、rebaseは結果に影響しない | 自己レビュー |
 | 2026-08-13 | 7 | **[PR #115](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/115)のCodeRabbit full reviewの指摘5件を反映した。**(a) `f3write`の出力を2〜29番だけ省略していた。**節自身が「出力全文を埋め込む」と書いており矛盾していたため、30行すべてを未加工で掲載した。**(b) raw device試験の**実行commandを記録していなかった**ため再現できなかった。`dd (coreutils) 9.4`の版とcommand全文、各optionの意図、`/dev/urandom`の事前測定を追記した。(c) **「6.11 MB/sの主因はFAT32ではない」は過剰な断定であった。**同じ節が「上界を与えたにとどまる」と書いており、文書内で矛盾していた。`7.4 ÷ 6.11 ＝ 1.21`も**raw経路が21%速いことを示すだけでFAT32の寄与率ではない。**「FAT32だけでは10 MB/s未達を説明できない」へ改め、寄与率を算出しないことを明記した。`hardware-bom.md`と`tbd-register.md`へも波及させた。(d) ③の判定が`未達（inconclusive）`だった。**`未達`は有効な条件での失敗を指すため、UHS mode条件外の測定に使うのは誤りである。**`判定不能（UHS mode条件外）`へ改め、測定値が基準値に達していないこととcardがU1要件を満たさないことは別である旨を明記した。(e) **検査範囲を「29.80 GiB全域」と書いていたが過大表現であった。**同文書が`f3`はfile systemの空き領域だけを書くと明記しているため、「`f3`が書き込んだ全空き領域（29.80 GiB）」へ改め、3文書で表現を揃えた | [PR #115のCodeRabbit review](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/115) |
+| 2026-08-13 | 8 | **[PR #115](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/115)のCodeRabbit再reviewの指摘3件のうち2件を反映した。**(a) **raw device試験の節が、unmountをいつ行ったか読み取れない構成だった。**`f3`のfile削除とunmountは実際にはraw試験の前に済ませてあるが、それを記した「事後処理」節を後ろに置いていたため、**mount中のpartitionへraw書込みをしたように読めた。**実施順序を同節の冒頭へ明示し、mountしたまま行っていないことと、その理由を書いた。**手順自体は変えていない。文書の構成の問題である。**(b) **「偽造品ではない」は断定しすぎであった。**この検査が見たのはfile systemの空き領域だけで、metadata領域と予約領域は検査しておらず、`Samsung`というメーカー表示もregisterで裏付けられていない。**「容量詐称は確認されなかった」「検査範囲に読み書き不良は確認されなかった」の2点へ言い換え、両者が「偽造品でない」と同じではないことを明記した。**`hardware-bom.md`と`tbd-register.md`の表現も揃えた。**(c) 残る1件（「2026-08-13の結果を2026-08-12基準日で載せるな」）は反映していない。**指摘が前提とする基準日が誤っており、**実施日2026-08-13は実際の日付である**（未来日付ではない）。詳細はPRのthreadに記した | [PR #115のCodeRabbit review](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/115) |
