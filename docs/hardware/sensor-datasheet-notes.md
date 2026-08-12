@@ -239,7 +239,7 @@ pin配列: 1=`VDD`, 2=`GND`, 3=`CSB`, 4=`SDI`, 5=`SDO`, 6=`SCK`。
 
 ## Local decoupling
 
-**この節がdatasheet由来のdecoupling指定の正である**（[tbd-register HW-TBD-029](tbd-register.md)）。
+**この節がdatasheet由来のdecoupling指定の正である**（[tbd-register HW-TBD-029](tbd-register.md)。同行は2026-08-12にcloseした）。
 **module搭載分で足りるか外付けが要るかという判断は、ここでは行わない。**
 それは[power-budget.md](power-budget.md)の`local decouplingの外付け要否`節にある。
 
@@ -249,8 +249,8 @@ pin配列: 1=`VDD`, 2=`GND`, 3=`CSB`, 4=`SDI`, 5=`SDO`, 6=`SCK`。
 | device | datasheetの指定 | 出典 | module boardの実装 |
 |---|---|---|---|
 | **BME280（IC）** | `C1`／`C2`の推奨値は**100 nF**。`C1`はVDD–GND間、`C2`はVDDIO–GND間 | Bosch Revision 1.24のFigure 17（I2C）／Figure 18（4-wire SPI）／Figure 19（3-wire SPI）のNote。**3つのconnection diagramすべてに同じNoteがある** | **AE-BME280は`C1` 0.1 µF（VDD用）／`C2` 0.1 µF（VDDIO用）を実装済み。**説明書の部品表は「ピンヘッダ以外は、基板にすべて実装済みです」と述べる（[AE-BME280説明書](https://akizukidenshi.com/goodsaffix/AE-BME280_manu_v1.1.pdf) v1.1の◆部品表）。**推奨値100 nFと一致する** |
-| **ADXL345（IC）** | `CS` **1 µF tantalum**を`VS`へ、`CI/O` **0.1 µF ceramic**を`VDD I/O`へ、**supply pinの近くに**置くことを推奨する。追加のdecouplingが要る場合は**100 Ω以下**の抵抗またはferrite beadを`VS`と直列に入れるとよい。さらに`VS`のbypassを**10 µF tantalum ∥ 0.1 µF ceramic**へ増やすとノイズが改善しうる。**あわせて`VS`と`VDD I/O`を別電源にすることを推奨し、それができない場合は上記の追加filteringが要るとする。**ADXL345のGNDからpower supply GNDへの接続を**低impedance**に保つことも求めている（`noise transmitted through ground has an effect similar to noise transmitted through VS`） | Rev. Gの`POWER SUPPLY DECOUPLING`、page 29 | **TBD。**M-06724のboard資料が無く、実装済みの部品を現物でしか読めない（[tbd-register HW-TBD-004](tbd-register.md)）。**`VS`と`VDD I/O`がboard上で結線されているかも未確認である** |
-| **MSP2807（module）** | **記載が無いことを確認した。**[msp2807.pdf](https://akizukidenshi.com/goodsaffix/msp2807.pdf)の`Product Parameters`が持つ電気的仕様は`VCC power voltage`／`Logic IO port voltage`／`Power Consumption`（`TBD`と印字）の3つだけであり、decouplingにもbacklight駆動回路にも触れない | 同上（2026-08-12確認） | **TBD。**現物確認は`HW-TBD-024`のbacklight回路確認と同じ機会に行う |
+| **ADXL345（IC）** | `CS` **1 µF tantalum**を`VS`へ、`CI/O` **0.1 µF ceramic**を`VDD I/O`へ、**supply pinの近くに**置くことを推奨する。追加のdecouplingが要る場合は**100 Ω以下**の抵抗またはferrite beadを`VS`と直列に入れるとよい。さらに`VS`のbypassを**10 µF tantalum ∥ 0.1 µF ceramic**へ増やすとノイズが改善しうる。**あわせて`VS`と`VDD I/O`を別電源にすることを推奨し、それができない場合は上記の追加filteringが要るとする。**ADXL345のGNDからpower supply GNDへの接続を**低impedance**に保つことも求めている（`noise transmitted through ground has an effect similar to noise transmitted through VS`） | Rev. Gの`POWER SUPPLY DECOUPLING`、page 29 | **TBD。**M-06724のboard資料が無く、実装済みの部品を現物でしか読めない（[tbd-register HW-TBD-004](tbd-register.md)の確認項目）。**`VS`と`VDD I/O`がboard上で結線されているかも未確認である** |
+| **MSP2807（module）** | **記載が無いことを確認した。**[msp2807.pdf](https://akizukidenshi.com/goodsaffix/msp2807.pdf)の`Product Parameters`が持つ電気的仕様は`VCC power voltage`／`Logic IO port voltage`／`Power Consumption`（`TBD`と印字）の3つだけであり、decouplingにもbacklight駆動回路にも触れない | 同上（2026-08-12確認） | **TBD。**現物確認は[tbd-register HW-TBD-002](tbd-register.md)の確認項目であり、`HW-TBD-024`のbacklight回路確認と同じ機会に行える |
 
 **`CS`は1 µFと10 µFのどちらを採るか**（Table 1 page 3の測定条件は`CS = 10 µF tantalum, CI/O = 0.1 µF`
 であり、page 29の推奨値1 µFと違う）。
