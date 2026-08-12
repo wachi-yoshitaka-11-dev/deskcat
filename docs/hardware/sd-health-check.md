@@ -2,7 +2,7 @@
 
 > 状態: 実施済み
 > 判定: `Partial`
-> 実施日: 2026-08-12
+> 実施日: 2026-08-12（registerの読み方の一次資料照合は2026-08-13）
 > 対象: [hardware-bom.md](hardware-bom.md) の `SD-01`（Samsung EVO Plus microSDHC 32GB、`U1`表示）
 > 追跡: [tbd-register.md](tbd-register.md) の `HW-TBD-015`、[#114](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/114)
 
@@ -121,40 +121,53 @@ Tools:
 個体を識別する値を禁じている。`cid`は`serial`を含むため、そのままは載せず、
 上表のとおり分解済みfieldだけを記載する。
 
-#### 解釈（**一次資料と未照合**）
+#### 解釈（**一次資料と照合済み。1件を除く**）
 
-> **この節の読み方はSD Associationの仕様書と照合していない。**根拠として使う前に照合が要る。
+照合先は[SD Association Simplified Specifications](https://www.sdcard.org/downloads/pls/)が公開する
+**Part 1 Physical Layer Simplified Specification Version 9.10（2023-12-01、409 page）**である。
+**humanが利用規約に同意してPDFを取得し、2026-08-13に該当節を直接読んだ。**
 
-| register | 読み方 | 導かれる内容 |
-|---|---|---|
-| `manfid`＝`0x1b` | Manufacturer ID | Samsung |
-| `oemid`＝`0x534d` | 2 byteをASCIIとして読む（`0x53`＝`S`、`0x4d`＝`M`） | `"SM"`（Samsung） |
-| `csd`先頭byte＝`0x40` | 上位2 bitが`CSD_STRUCTURE`＝`01` | CSD Version 2.0 ＝ SDHC／SDXC |
-| `scr`＝`02b5…` | `SD_SPEC`＝2、`SD_SPEC3`＝1 | Physical Layer Spec 3.0x（UHS-I対応世代） |
-| `ssr` byte 8＝`0x04` | `SPEED_CLASS` | Class 10 |
-| `ssr` byte 14＝`0x1c`の上位nibble＝`1` | `UHS_SPEED_GRADE` | **`U1`** |
+| register | bit位置 | 値 | 導かれる内容 | 照合先 |
+|---|---|---|---|---|
+| `csd`先頭byte＝`0x40` | `CSD_STRUCTURE`＝`[127:126]`＝`01`b | 1 | CSD Version 2.0（High Capacity and Extended Capacity） | Table 5-3 |
+| `scr` | `SD_SPEC`＝`[59:56]`＝2、`SD_SPEC3`＝`[47]`＝1、`SD_SPEC4`＝`[42]`＝0、`SD_SPECX`＝`[41:38]`＝0 | — | **Physical Layer Specification Version 3.0X** | Table 5-19 |
+| `ssr` byte 8 | `SPEED_CLASS`＝`[447:440]` | `04h` | **Class 10** | Table 4-45 |
+| `ssr` byte 14上位nibble | `UHS_SPEED_GRADE`＝`[399:396]` | `1h` | **10MB/sec and above（＝`U1`）** | Table 4-52 |
+| `ssr` byte 10上位nibble | `AU_SIZE`＝`[431:428]` | `9h` | 4 MB | Table 4-47 |
+| `oemid`＝`0x534d` | `OID`＝`[119:104]` | — | OIDは**2文字のASCII文字列**と規定される。`0x53`＝`S`、`0x4d`＝`M` → `"SM"` | Section 5.1 |
+| `name`＝`EB1QT` | `PNM` | — | PNMは**5文字のASCII文字列**と規定される。5文字であり整合する | Section 5.1 |
 
-**照合できなかった経緯**（2026-08-12）。一次資料は
-[SD Association Simplified Specifications](https://www.sdcard.org/downloads/pls/)が公開する
-**Physical Layer Simplified Specification Ver 9.10（2023-12-01）**である。
-**CLI clientからPDFを取得できなかった**（`dl.php`が0 byteを返す。
-[hardware-bom.md](hardware-bom.md)がADXL345のdatasheetで記録したのと同じ現象である）。
-ブラウザからの取得は**利用規約への同意を要するため実施しなかった。**
+**byte位置の対応が正しいことの裏付け。**上表は「sysfsが`ssr`をMSB firstで出力する」ことを
+前提にbyte位置を割り出している。この前提は`AU_SIZE`で独立に検証できた。
+byte 10上位nibbleの`9h`＝4 MBは、**kernelが別経路で報告する
+`preferred_erase_size`＝4194304（4 MiB）と一致する。**
+同じ前提で読んだ`SPEED_CLASS`（byte 8）と`UHS_SPEED_GRADE`（byte 14）も、
+したがって位置の取り違えではない。
+
+##### 照合できなかった1件
+
+| 項目 | 状態 |
+|---|---|
+| `manfid`＝`0x1b`＝Samsung | **未照合。**仕様書はMIDを「SD-3C, LLCが管理・定義・割り当てる」8 bitの番号と規定するのみで、**どの番号がどのメーカーかという登録簿を収録していない**（Section 5.1）。**この仕様書では検証できない。**別の一次資料が要る |
 
 #### 現物printとの照合結果
 
-**上の解釈が正しいという前提でのみ**、`Samsung`／`32`／`microSDHC`／`U1`の各表示は
-card自身のregisterと矛盾しない。
+**`32`／`microSDHC`／`U1`の各表示は、card自身のregisterと一致する。**
 
-**ただし、解釈が未照合である以上、これを「printを裏取りした」とは書かない。**
-[hardware-bom.md](hardware-bom.md)の`SD-01`は「32GB microSDHC版は旧モデルであり、
-現行の公式資料から仕様を引けない。識別は現物printを正とする」としており、
-**この記録はその状態を変えない。**registerの値は将来の照合に使える観測として残すが、
-**現時点で識別の正は引き続き現物printである。**
+- `U1`: `UHS_SPEED_GRADE`＝`1h`。**card自身が`U1`相当を申告している**
+- `microSDHC`: `CSD_STRUCTURE`＝1はHigh CapacityとExtended Capacityの両方を含むため、
+  これだけではSDHCとSDXCを分けられない。**容量29.80 GiB（32 GB未満）と併せてSDHCとなる**
+- `32`: 29.80 GiB ＝ 10進で約32 GBであり整合する
 
-**なお、判定基準①②③④はこの解釈に依存しない。**①②は`f3`の出力から直接判定でき、
-③は`f3`の速度と`ios`の`timing spec`から、④はSD cardにSMART相当の標準interfaceが
-無いことから判定している。**未照合の影響を受けるのは⑤だけである。**
+**`Samsung`の表示だけはregisterで裏付けられていない。**`oemid`が`"SM"`であることは確認したが、
+`"SM"`がSamsungを指すことも`manfid`＝`0x1b`がSamsungであることも、この仕様書では検証できない。
+
+**したがって`SD-01`の識別の正は、引き続き現物printである。**registerが加えたのは、
+**メーカー名を除く各属性（容量区分、speed class、UHS speed grade、spec version）について、
+printの読み取り誤りを排除できた**ことである。
+
+**なお、判定基準①②④はこの解釈に依存しない。**①②は`f3`の出力から直接判定でき、
+④はSD cardにSMART相当の標準interfaceが無いことから判定している。
 
 ### Bus modeとclock（③の判定に要る）
 
@@ -272,8 +285,7 @@ Average reading speed: 19.15 MB/s
 
 ## 判定
 
-**`Partial`。**①②は基準を満たしたが、③が未達で原因を切り分けられず、④は取得手段が無く、
-⑤はregisterの読み方が一次資料と未照合である。
+**`Partial`。**①②⑤は基準を満たしたが、③が未達で原因を切り分けられず、④は取得手段が無い。
 
 | # | 観点 | 基準 | 実測 | 判定 |
 |---|---|---|---|---|
@@ -281,7 +293,7 @@ Average reading speed: 19.15 MB/s
 | ② | 読み書きの通し | 書込み総量と`Data OK`が一致 | 30 file・29.80 GiB・62,488,704 sectorが一致 | **合格** |
 | ③ | 速度 ≥ 10 MB/s | `f3write`平均書込み速度 | **6.11 MB/s** | **未達（inconclusive）** |
 | ④ | SMART相当 | 取得手段の有無を確認 | **手段が存在しない** | 確認済み |
-| ⑤ | 識別情報 | 現物printと矛盾しない | 矛盾は見つからない。**ただしregisterの読み方が一次資料と未照合であり、「裏取りした」とは言えない** | **保留** |
+| ⑤ | 識別情報 | 現物printと矛盾しない | `32`／`microSDHC`／`U1`はregisterと一致（**読み方を仕様書Ver 9.10と照合済み**）。**`Samsung`だけは未裏付け**（MIDの登録簿が仕様書に無い） | **合格（1項目のみ未裏付け）** |
 
 **偽造品ではない。**29.80 GiB全域へ位置依存dataを書いて読み戻し、
 `Corrupted`／`Slightly changed`／`Overwritten`のいずれも0 sectorであった。
@@ -291,9 +303,22 @@ Average reading speed: 19.15 MB/s
 
 **「たぶん正常」で通さない**（[AGENTS.md](../../AGENTS.md) 推測禁止）。次の3点が同時に成り立つ。
 
-1. **`U1`の10 MB/sはUHS-I bus mode下での保証値であり、この測定はその条件を満たしていない。**
-   hostは`sd high-speed`・3.30 V signalingで動作しており、UHS-Iに入っていない。
-   **保証条件を満たさない測定で、cardが保証を満たさないとは言えない。**
+1. **`U1`の10 MB/sはUHS-I／UHS-II bus modeに対する規定であり、この測定はその条件を満たしていない。**
+   **これは一次資料で確認した。**Physical Layer Simplified Specification Ver 9.10の
+   **Section 4.13.3の表題は`Speed Grade Specification for UHS-I and UHS-II`**であり、
+   Speed Grade 1（10MB/sec and above）の性能要件はこの節に置かれている。
+   また`UHS_SPEED_GRADE`自体が**「UHS mode」のSpeed Gradeを示すfield**と定義されている
+   （Section 4.10.2.8）。
+   **この測定はUHS modeで行っていない。**`ios`の`timing spec`は`sd high-speed`、
+   `signal voltage`は3.30 Vであり、`dmesg`も`mmc0: new high speed SDHC card`と記録している
+   （UHS modeで初期化されていれば`ultra high speed`と表示される）。
+   **規定の適用条件を満たさない測定で、cardが規定を満たさないとは言えない。**
+
+   **ただし「hostがUHS-Iに対応していない」とまでは確定していない。**host controllerの
+   capability registerを読めなかったため（`/sys/kernel/debug/mmc0/caps`はroot権限でも
+   `EPERM`を返す）、**非対応なのかnegotiationが成立しなかっただけなのかを区別していない。**
+   ③の判定には影響しない（どちらであってもUHS modeでないことに変わりはない）が、
+   **「UHS-I対応readerを用意すれば解決する」とも断定しない。**
 2. **一方で、host経路が6 MB/s台で頭打ちだとも言えない。**同じhost・同じcard・同じ
    file systemの読み出しが19.15 MB/sを記録している。搭載RAMは3.7 GiB
    （うちbuff/cache 1.2 GiB）に対し読んだのは29.80 GiBであり、
@@ -324,7 +349,8 @@ bootとstorageの用途で問題になるのはこの2点である。③はDeplo
 | 耐久性（寿命）の評価 | **この記録の対象外** | 1回のhealth checkで書き込み寿命は判定できない。`HW-TBD-015`の`妨げる対象`のうち「耐久性」はこの記録では解決しない |
 | 書込み速度が遅い原因の分離 | **実施しなかった** | ③がinconclusiveである直接の原因。card・host controller・FAT32のどれが効いているかを分けるには、**UHS-I対応readerでの再測定**か、**raw deviceへの直接書込みによるfile system分の切り分け**が要る。前者は該当readerを所持していない、後者はroot権限を要し本作業の範囲外とした |
 | UHS-I mode下での速度測定 | **実施しなかった** | 本端末の内蔵SDHCI readerが`sd high-speed`（3.30 V signaling）でしか動作せず、UHS-Iに入らない。**`U1`表示の妥当性を保証条件下で検証するには別のreaderが要る** |
-| registerの読み方の一次資料照合 | **実施しなかった** | ⑤を`保留`とした理由。[Physical Layer Simplified Specification Ver 9.10](https://www.sdcard.org/downloads/pls/)がCLI clientから取得できず（`dl.php`が0 byteを返す）、ブラウザからの取得は利用規約への同意を要するため行わなかった。**registerの値そのものは観測として記録済みであり、照合は後から行える** |
+| `manfid`＝`0x1b`がSamsungであることの確認 | **実施しなかった** | Physical Layer Simplified Specification Ver 9.10はMIDを「SD-3C, LLCが管理・定義・割り当てる」番号と規定するのみで、**登録簿を収録していない**（Section 5.1）。**この仕様書では検証できない。**別の一次資料が要る。**`SD-01`のメーカー表示の正は引き続き現物printである** |
+| host controllerのUHS-I対応可否の確定 | **実施しなかった** | `/sys/kernel/debug/mmc0/caps`／`caps2`がroot権限でも`EPERM`を返すため、capability registerを読めなかった。**測定がUHS modeでないことは`ios`と`dmesg`で確定しているが、hostが非対応なのかnegotiationが成立しなかっただけなのかは区別していない** |
 
 ## Revision履歴
 
@@ -333,3 +359,4 @@ bootとstorageの用途で問題になるのはこの2点である。③はDeplo
 | 2026-08-12 | 0 | 文書を新設し、**実測より前に**判定基準と実施環境を確定した | [tbd-register.md](tbd-register.md) `HW-TBD-015`、[hardware-bom.md](hardware-bom.md) `SD-01` |
 | 2026-08-12 | 1 | 実測を行い結果と判定（`Partial`）を記入した。**あわせて、Revision 0の作業中に一度書いた「bus帯域の上限は33 MHz × 4 bitで約16.5 MB/s」という導出を撤回した。**読み出し実測19.15 MB/sがこの値を超えており、導出が誤っていた。`ios`の`clock`は取得時点の値であって転送中の実効clockと同一である保証がない。**この記録はbus帯域の上限を計算で示さず、実測値だけを根拠に用いる** | 本記録の実測結果 |
 | 2026-08-12 | 2 | **自己レビューで検出。Revision 1は、registerのbit解釈を一次資料と照合せずに確定形で書いていた**（`SPEED_CLASS`＝Class 10、`UHS_SPEED_GRADE`＝`U1`、CSD Version 2.0 など）。**これは[AGENTS.md](../../AGENTS.md)の推測禁止に反し、この repository が繰り返し是正してきた誤りと同じ型である。**識別情報の節を「読み取った値（観測）」と「解釈（一次資料と未照合）」へ分割し、判定基準⑤を`合格`から`保留`へ改めた。**あわせて、⑤に依存しないこと（①②③④はregisterの解釈を使わずに判定できる）を明記した。**照合できなかった経緯（`dl.php`が0 byteを返す、ブラウザ取得は利用規約への同意を要する）も記録した。`hardware-bom.md`と`tbd-register.md`の「裏取りした」という記述も同時に訂正した。**あわせて判定基準③の説明文から「High Speed（25 MHz）」という未照合のclock値を削除した。判定の閾値10 MB/sはRevision 0から変えていない** | 自己レビュー、[SD Association Simplified Specifications](https://www.sdcard.org/downloads/pls/) |
+| 2026-08-13 | 3 | **一次資料を入手して照合し、Revision 2で`保留`とした解釈を確定させた。**humanが利用規約に同意してPDFを取得した。**Revision 2の解釈は`manfid`を除きすべて正しかった**（`CSD_STRUCTURE`／`SD_SPEC`系／`SPEED_CLASS`／`UHS_SPEED_GRADE`／`AU_SIZE`／`OID`／`PNM`）。byte位置の対応も`AU_SIZE`と`preferred_erase_size`の一致で独立に裏付けた。判定基準⑤を`保留`から`合格`へ戻した。**ただし`manfid`＝`0x1b`＝Samsungだけは確定できない。**仕様書はMIDの登録簿を収録していないためである。**メーカー表示の正は引き続き現物printである。****あわせて③をinconclusiveとする根拠を強化した。**Section 4.13.3の表題が`Speed Grade Specification for UHS-I and UHS-II`であり、`U1`の10 MB/sがUHS bus modeに対する規定であることを一次資料で確認した。**一方で「hostがUHS-I非対応」は確定していないことを明記した**（capability registerがroot権限でも読めない） | [Part 1 Physical Layer Simplified Specification Version 9.10](https://www.sdcard.org/downloads/pls/)（2023-12-01）Table 4-45／4-47／4-52／5-3／5-19、Section 4.10.2.8／4.13.3／5.1 |
