@@ -12,8 +12,12 @@
 `Container / VM / native:` が異なるため、[README](README.md) の
 「一つの記録は、一台の端末と一つの profile に対応させる」に従い別記録とする。
 
-**実機 Linux での host Rust 検証記録はこれが初回である。**既存の 2 記録は VM と CI であり、
-[ADR-0005](../../decisions/0005-standard-development-os.md) が標準とする実機 Linux の記録が無かった。
+**実機 Linux で取得した version record は、profile を問わずこれが初めてである。**
+既存 3 記録の `Container / VM / native:` はいずれも `VM` である
+（[ESP32 Build](2026-08-06-esp32-build-linux.md)、[CI](2026-08-10-esp32-build-ci.md)、
+[Host Rust](2026-08-10-host-rust-linux.md)）。
+[ADR-0005](../../decisions/0005-standard-development-os.md) は実機 Linux を標準と定めているが、
+**その標準環境で取得した記録が 1 件も無かった。**
 
 ## 記録
 
@@ -85,10 +89,9 @@ Conclusion: Verified。**この記録の対象は、この 1 台・Host Rust Dev
   限る。**その範囲では未実行の項目が無く、format、lint、unit test、integration test が
   clean build から成功した。
 
-  **実機 Linux で取得した点が既存記録との違いである。**
-  [2026-08-10-host-rust-linux.md](2026-08-10-host-rust-linux.md) は VM 上、
-  [2026-08-10-esp32-build-ci.md](2026-08-10-esp32-build-ci.md) は CI であり、
-  いずれも実機ではない。
+  **実機 Linux で取得した点が既存記録との違いである。**既存 3 記録
+  （2026-08-06-esp32-build-linux、2026-08-10-esp32-build-ci、2026-08-10-host-rust-linux）
+  はいずれも `Container / VM / native:` が `VM` である。
 
 Next action: ESP32 Build profile の記録は別途必要である（本記録の対象外）。
 ```
