@@ -1,6 +1,6 @@
 # microSD（SD-01）health check記録
 
-> 状態: 実施済み
+> 状態: 実施済み。**`HW-TBD-015`は2026-08-15にcloseした**
 > 判定: `Partial`
 > 実施日: 2026-08-12（`f3`による検査と識別情報の採取）／2026-08-13（registerの読み方の一次資料照合、raw device試験）
 > 対象: [hardware-bom.md](hardware-bom.md) の `SD-01`（Samsung EVO Plus microSDHC 32GB、`U1`表示）
@@ -675,7 +675,7 @@ Ricoh `1180:E823` SDHCI controllerを介して行った。**Piでの動作は確
 |---|---|---|
 | literalな全セクタの読み書き検査 | **実施しなかった** | `badblocks -w`はroot必須かつ完全破壊であり、①（容量詐称）を構造的に検出できない。①を優先して`f3`を選んだ。全セクタのliteralなカバーが要る場合は別途実施する |
 | SMART相当の情報取得 | **手段が存在しない** | この個体の接続経路にSMART相当のcommandが無い（上記④）。実施可能だが行わなかった、ではない。**なおSD Express（NVMe interface）にはSMARTがあるが、この個体はSD Expressではない** |
-| 耐久性（寿命）の評価 | **この記録の対象外** | 1回のhealth checkで書き込み寿命は判定できない。`HW-TBD-015`の`妨げる対象`のうち「耐久性」はこの記録では解決しない |
+| 耐久性（寿命）の評価 | **この記録の対象外。求められてもいない** | 1回のhealth checkで書き込み寿命は判定できない。**なお`HW-TBD-015`の`妨げる対象`にある「耐久性」は、同行が未解決だと妨げられる対象であって測定項目ではない。**同行の`必要な根拠`は`health checkの実施`だけであり、耐久性の測定は求められていない（[PR #128](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/128)で誤読を訂正した） |
 | **規定の条件下での速度測定** | **実施しない（追跡を打ち切った）** | ③を判定できない直接の原因は**hostのSD clockが33 MHzで、`Class 10`の測定条件40 MHz（High Speed Mode）にも`U1`の条件（UHS bus mode）にも達しない**ことである（Table 4-61、Section 4.13.3）。**ただし③は何もblockしていない**（`妨げる対象`は耐久性であり速度を含まない）。**別hostを用意して測り直すことはしない** |
 | 書込み速度の各要因の寄与率 | **実施しなかった** | raw device試験で**FAT32だけでは未達を説明できない**ことは示したが、card・host controller・file systemそれぞれの寄与率は出していない（2つの測定は条件が複数異なる） |
 | `manfid`＝`0x1b`がSamsungであることの確認 | **この経路では解ける見込みが無い** | 仕様書もSD-3Cも**MIDと社名の対応表を公開していない**（2026-08-15確認）。**規格を定める側と割り当てる側の両方が公開していないため、追跡を打ち切った。網羅的に探したわけではない。****`SD-01`のメーカー表示の正は引き続き現物printである** |
@@ -734,3 +734,4 @@ version recordは別途要る。本記録の範囲外であり作成していな
 | 2026-08-15 | 14 | **[PR #118](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/118)のCodeRabbit reviewの指摘2件を反映した。**(a) 見出し「MIDの対応表は公開されていない」が、**未確認の資料にも対応表が無いと読める表現だった。**後続の本文は非網羅的な確認であると断っていたが、**見出しがその限定を打ち消していた。**「確認した2つの資料はいずれもMIDの対応表を持たない」へ改めた。(b) [tbd-register.md](tbd-register.md)の`HW-TBD-015`行が`Samsung`を裏付けられない事実だけを記し、**照合を打ち切ったことを書いていなかった。**同じ行の[#117](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/117)が`manfid`照合を継続するIssueにも読めたため、**打ち切りの事実と、#117の範囲が耐久性・速度要因の分離・結果記録・close判断に限られることを明記した** | [PR #118のCodeRabbit review](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/118) |
 | 2026-08-15 | 15 | **③の原因を特定した。判定は`判定不能`のまま変わらないが、理由が変わった。****Revision 14までは`U1`（`UHS_SPEED_GRADE`）の条件だけを見ており、同じcardが申告する`SPEED_CLASS`＝Class 10の測定条件を調べていなかった。**仕様書Table 4-61は**`Class 10`をHigh Speed Modeの40 MHzで測ると定め**、Table 4-62が`Pw min.`10 MB/secを課す。Section 4.13.1.8.1のApplication Noteは`Host needs to use higher frequency clock than that of measurement condition.`と明記する。**本測定のhostは`sd high-speed`の33 MHzであり、40 MHzに達しない。**したがって`U1`の条件（UHS mode）だけでなく**`Class 10`の条件も満たしていない。****この端末ではcardの速度を判定できない。別cardを用意しても解決しない。****あわせて対照測定を実施した。**別card（SanDisk `SU16G`、Class 2）を同じreaderで測ると読み出し8.7 MB/s（Samsungは19〜20 MB/s）で、**host controllerは固定の上限を課していない。**一方**書込みは2枚とも5〜6 MB/sで並ぶ**（規格上2階級違うのに同値）。block sizeを4K〜8Mで変えても差が出ず、**律速はcommand発行回数ではなく持続throughput側にある。****Revision 4が「当初挙げた3要素のうちfile systemが消えた」と書いた整理も、原因がhostのclock不足である以上、不完全であった** | [Part 1 Physical Layer Simplified Specification Version 9.10](https://www.sdcard.org/downloads/pls/) Table 4-61／4-62、Section 4.13.1.8.1、本記録の対照測定 |
 | 2026-08-15 | 16 | **③の追跡を打ち切った。**Revision 15は原因（hostのclock不足）を特定したが、**「40 MHz超のhostで測り直す」を残作業として残していた。これをやめる。**(1) **③は何もblockしていない。**`HW-TBD-015`の`妨げる対象`は耐久性であり速度を含まない。`SD-01`の用途であるPiのbootとstorageで効くのは①②であり、両方とも合格している。(2) **作業指示は③に「検討」を求めていた**のであって確定を求めていない。**検討した結果が「この端末の測定条件では判定できない」であり、それが答えである。****測定結果と原因の記録は残し、残作業としては持ち越さない** | 作業指示、[tbd-register.md](tbd-register.md) `HW-TBD-015`の`妨げる対象` |
+| 2026-08-15 | 17 | **`HW-TBD-015`をcloseした。**同行の`必要な根拠`は**`health checkの実施`だけ**であり、本記録がそれを満たしている。**`妨げる対象`にある「耐久性」は、同行が未解決だと妨げられる対象であって、測定すべき項目ではない。****2026-08-15までこれを「耐久性を別途測定する」と読み違え、同行をopenのまま残し、[#117](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/117)を不要に起票していた。**読み違えを訂正し、行を`解決済み項目`へ移した | [tbd-register.md](tbd-register.md)の`HW-TBD-015`原文（`必要な根拠`列）、[解決手順](tbd-register.md)1〜8 |
