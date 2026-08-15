@@ -56,7 +56,7 @@
 | PROT-OC-01 | 5 V ingressの過電流保護 | ポリスイッチ（PTC）またはガラス管ヒューズ＋ホルダ | Required | **未購入・方式も未決定。**まず方式（PTC／ヒューズ）を決め、品番と数値は発注直前にメーカーの時間-電流特性で確定する（記憶や一般値で置かない）。**選定後は`power-budget.md`の`記録するtrip動作`を、採った方式の欄で記録する**（定常電流継続時の動作、遮断へ移行する電流、遮断までの時間、3 Aでの動作と遮断定格、通過エネルギー、復帰、確認方法）。**品番と数値だけでは段階Cのgateを通さない** | 5V以上 | **先に方式（PTC／ヒューズ）を決める。**公開される量が方式で違う（PTCは保持電流・trip電流・trip時間、ヒューズは定格電流・溶断特性・遮断定格・`I²t`）。方式によらない基準は、下限が**連続通電できる電流×0.8＞想定定常電流の合計**、上限が**その電流≦保護対象の最弱部品の定格**（`power-budget.md`の`選定基準`と同じ式。単に上回るだけでは、BOM上は合格でもingress gateで不合格になる品を選べる）。**PTCなら保持電流、ヒューズなら定格電流がこの「連続通電できる電流」である。**遮断能力はM-12001の3A以上 | TBD（選定時に一次資料へlinkする） | **段階C（合成給電）のgate。**M-12001は3Aを供給でき、テスターの読みと手動停止では最弱部品が発熱する前に電流を止められない。選定基準・挿入位置・上限との関係は[power-budget.md](power-budget.md)の`過電流保護（段階Cのgate）`。追跡は[tbd-register HW-TBD-021](tbd-register.md) |
 | WIRE-PWR-01 | 大電流経路の線材・接続部材 | 公称許容電流が公開されている線材と、5 V railの分岐に使う接続部材 | Required | **未購入・未選定。**許容電流の下限は`許容電流×0.8＞負荷側の想定定常電流の合計`とする（合計は`power-budget.md`の`変換基板に必要な定格の見積もり`が出す）。**ingressの上限（gate値）から決めない**（gate値はこの品の定格を含む最小値から出るため、循環する）。選定順序は同文書の`選定順序（循環にしない）` | 5V | 経路の最小定格を決める要素の一つ。定格が公開されている品だけを使う | TBD（選定時に一次資料へlinkする） | breadboard接点とジャンパー線は許容電流がメーカー資料で確認できず、`power-budget.md`の`経路部品と定格`表を埋められない。**gate対象の大電流経路をこの部材へ置き換える**ことで最小定格を確定させる。追跡は[tbd-register HW-TBD-022](tbd-register.md) |
 | RES-PULL-01 | GPIOの外部pull-up／pull-down | 抵抗一式 | Required | **未購入・未選定。**必要な本数と抵抗値は[gpio-assignment.md](gpio-assignment.md)の信号inventoryの`Pull`列に従う。LCD-BLの極性とTOUCH-IRQの論理は現物確認後に決まる | 3.3V | 信号線のみ。大電流経路ではない | TBD | **`SERVO-PWM`の外部pull-downは「推奨」ではなく必須**であり、high-Z期間中にservoが動くことを防ぐ唯一の手段である（[gpio-assignment.md](gpio-assignment.md)）。LCD-CS／TOUCH-CS／LCD-RST／LCD-BL／TOUCH-IRQ／I2Cのpullもここに含める |
-| MEAS-01 | 電流波形測定（Oscilloscope代替） | セメント抵抗5W0.1Ω（秋月 g117836、SQP5WJ0R1B、¥30）、および分圧用カーボン抵抗10kΩ×4 | Required | 秋月 SQP5WJ0R1B（shunt）×5本。分圧用は**カーボン抵抗1/4W 10kΩ（秋月 125103、`RD25S 10K`）1袋100本入** | — | shuntはservo rail全電流を通す。5W定格に対し0.1Ω×2A²＝0.4Wで余裕あり。5W／0.1Ωから逆算した電流定格は約7A相当 | [秋月商品ページ](https://akizukidenshi.com/catalog/g/g117836/) | **shunt・分圧用抵抗とも入手済み（2026-08-08着荷）。**shuntは5本、分圧用は10kΩ 1袋100本入である（`ADC-5V`と`ADC-3V3`で各2本、計4本を使う。[gpio-assignment.md](gpio-assignment.md)が分圧比1/2を規定済み）。**2026-08-12に購入履歴と照合して訂正した。**それまで「分圧用は未購入」と記載していたが誤りであり、**MSP2807・M-12001と同一の発注に含まれていた。**発注漏れではなく記録漏れである。**したがって`ADC-5V`／`ADC-3V3`の配線は部品待ちではない。**shuntはservo rail低側へ挿入する。挿入位置とGND topologyの制約は[power-budget.md](power-budget.md)の`GND topology`節、ADC pinは[gpio-assignment.md](gpio-assignment.md) |
+| MEAS-01 | 電流波形測定（Oscilloscope代替） | セメント抵抗5W0.1Ω（秋月 g117836、SQP5WJ0R1B、¥30）、および分圧用カーボン抵抗10kΩ×4 | Required | 秋月 SQP5WJ0R1B（shunt）×5本。分圧用は**カーボン抵抗1/4W 10kΩ（秋月 125103、`RD25S 10K`）1袋100本入** | — | shuntはservo rail全電流を通す。5W定格に対し0.1Ω×2A²＝0.4Wで余裕あり。5W／0.1Ωから逆算した電流定格は約7A相当 | shunt: [秋月商品ページ](https://akizukidenshi.com/catalog/g/g117836/)。分圧用: [秋月 125103](https://akizukidenshi.com/catalog/g/g125103/) | **shunt・分圧用抵抗とも入手済み（2026-08-08着荷）。**shuntは5本、分圧用は10kΩ 1袋100本入である（`ADC-5V`と`ADC-3V3`で各2本、計4本を使う。[gpio-assignment.md](gpio-assignment.md)が分圧比1/2を規定済み）。**2026-08-12に購入履歴と照合して訂正した。**それまで「分圧用は未購入」と記載していたが誤りであり、**MSP2807・M-12001と同一の発注に含まれていた。**発注漏れではなく記録漏れである。**したがって`ADC-5V`／`ADC-3V3`の配線は部品待ちではない。**shuntはservo rail低側へ挿入する。挿入位置とGND topologyの制約は[power-budget.md](power-budget.md)の`GND topology`節、ADC pinは[gpio-assignment.md](gpio-assignment.md) |
 
 ## 購入待ちリスト
 
@@ -126,6 +126,9 @@
 >
 > - MSP2807（DISP-01／TOUCH-01）とM-12001（PSU-PI-01／PSU-SERVO-01）は**2026-08-08に着荷したが、
 >   現物の表示・pin配列・電流をまだ確認していない**。
+> - **同じ発注で届いた受動部品も、現物の表示・値を確認していない**（`MEAS-01`のセメント抵抗5本と
+>   カーボン抵抗10kΩ、`RES-PULL-01`向けのカーボン抵抗4.7kΩ、Servo bulk capacitorの電解コンデンサ470μF16V）。
+>   **入手済みであることと、値が表示どおりであることは別である**（2026-08-12に購入履歴と照合して追記した）。
 > - 全部品でpeak電流が未実測である（`power-budget.md`の測定計画）。
 > - ADXL345とBME280のinterface選択jumper、実装済みaddressが現物未確認である。
 >
