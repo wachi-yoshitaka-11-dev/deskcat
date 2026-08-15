@@ -56,7 +56,7 @@ pub const MAX_LINE_BYTES: usize = 1024;
 ///
 /// CRLFで終わる行では、`\r`もbodyとして数える。改行の直前の`\r`は改行を受けた時点で
 /// 取り除くが、それまではbufferを占めるためである。したがってCRLFの行は`\n`だけの行より
-/// body予算を1 byte多く使う。§2は1024 bytesに`\r`を含めるかを書いていないため、
+/// body予算を1 byte多く使う。§2は上限に`\r`を含めるかを書いていないため、
 /// この振る舞いは`PROTO-TBD-002`への入力として記録する。
 pub const MAX_LINE_BODY_BYTES: usize = MAX_LINE_BYTES - 1;
 

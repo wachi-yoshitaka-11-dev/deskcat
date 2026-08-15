@@ -73,7 +73,7 @@ bufferは構築時に`Box<[u8]>`で確保する。`push`が無いため伸びな
 出所がreceiverの1箇所だけになる。両方で判定すると、identityを復元できる経路とできない経路が
 同じcodeで並んでしまう。
 
-CRLFで終わる行では`\r`もbody予算を使う。§2は1024 bytesに`\r`を含めるかを書いていないため、
+CRLFで終わる行では`\r`もbody予算を使う。§2は上限に`\r`を含めるかを書いていないため、
 この振る舞いは`PROTO-TBD-002`への入力として`tests/fixtures/framing.json`が固定している。
 
 ### oversizeは検知した時点で1回だけ返す

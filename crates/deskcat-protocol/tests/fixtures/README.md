@@ -91,7 +91,7 @@ fixtureから確認できない。`cause`はそのためにある。
 firmware側の実装も同じ義務を負う。
 
 `capacity`をcase単位で持たせているのは、oversizeのcaseを`MAX_LINE_BYTES`から切り離すためである。
-`capacity: 64`なら超過caseが人の読める長さで書ける。1024という候補値が動いてもfixtureは生き残る。
+`capacity: 64`なら超過caseが人の読める長さで書ける。§2の候補値が動いてもfixtureは生き残る。
 
 ## 分担
 

@@ -1225,6 +1225,7 @@ Framing／parse層について、**host workspaceのRust実装**がfixtureに合
 | 2026-07-31 | Draft 2 review | ACKと完了eventへ`reply_sid`を追加し、要求送信側の再起動後に旧sessionの応答を誤認するcaseを修正 |
 | 2026-08-10 | Draft 2 fixture | §3のinteger widthを確定し、§7へ単一lineの検証で決まるcodeの対応付けを追加（分類と送出の判断を分ける）。§12.1をschema群のfixture作成済みの状態へ更新。wire formatは変更していない |
 | 2026-08-15 | Draft 2 sync | [PR #122](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/122)。`PROTO-TBD-009`の解決方法が`正確なtouch controllerと実験`のままだったため、**touch controllerが`XPT2046`と確定した**ことを反映した（[HW-TBD-003](../hardware/tbd-register.md)はclose）。**protocolの仕様は変えていない。**残る作業は同ICのdatasheetでのtouch strengthの意味づけと実験である |
+| 2026-08-15 | Draft 2 framing | [Issue #10](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/10)。§12.1のFraming／parse群を**作成済み**へ更新した。byte単位の分割受信とinvalid UTF-8のfixtureが揃い、host workspaceのRust実装が合格する。firmwareは同じ実装をpath dependencyで使う（[ADR-0008](../decisions/0008-firmware-protocol-crate-reuse.md)）が、**実機上でのfixture実行は未実施**である。**wire formatは変更していない。** |
 
 ### Draft schemaの互換性
 

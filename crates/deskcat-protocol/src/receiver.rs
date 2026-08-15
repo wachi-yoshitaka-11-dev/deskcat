@@ -240,6 +240,9 @@ fn interpret(event: Framed<'_>, capacity: usize) -> Outcome {
             Ok(line) => match decode_line(line) {
                 Ok(frame) => Outcome::Frame(frame),
                 Err(error) => Outcome::Rejected(Rejection {
+                    // `with_protocol_limit`の容量では`LineTooLong`は返らない。framerが先に
+                    // 検知するためである。容量をそれより大きく取った場合だけここへ来るので、
+                    // 分類はoversizeへ寄せる。ただしidentityは復元していない。
                     cause: if error.code() == ErrorCode::LineTooLong {
                         Cause::Oversize
                     } else {

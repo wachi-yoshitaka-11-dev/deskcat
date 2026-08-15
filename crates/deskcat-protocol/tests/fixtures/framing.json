@@ -270,7 +270,7 @@
     },
     {
       "name": "crlf_one_byte_over_capacity",
-      "note": "body 72 + CRLF は容量72を超える。§2が1024 bytesに\\rを含めるか書いていないため、この振る舞いはPROTO-TBD-002への入力である。",
+      "note": "body 72 + CRLF は容量72を超える。§2が上限に\\rを含めるか書いていないため、この振る舞いはPROTO-TBD-002への入力である。",
       "capacity": 72,
       "chunks": [
         {
