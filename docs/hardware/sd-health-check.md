@@ -202,7 +202,26 @@ byte 10上位nibbleの`9h`＝4 MBは、**kernelが別経路で報告する
 
 | 項目 | 状態 |
 |---|---|
-| `manfid`＝`0x1b`＝Samsung | **未照合。**仕様書はMIDを「SD-3C, LLCが管理・定義・割り当てる」8 bitの番号と規定するのみで、**どの番号がどのメーカーかという登録簿を収録していない**（Section 5.1）。**この仕様書では検証できない。**別の一次資料が要る |
+| `manfid`＝`0x1b`＝Samsung | **この経路では解ける見込みが無い。**仕様書はMIDを「SD-3C, LLCが管理・定義・割り当てる」8 bitの番号と規定するのみで、**どの番号がどのメーカーかという登録簿を収録していない**（Section 5.1）。**2026-08-15に確認したところ、SD-3Cも登録簿を公開していない**（[Licensees](https://www.sd-3c.com/Licensees.aspx)はライセンシー名の一覧であり、MIDとの対応表を持たない）。**規格を定める側とMIDを割り当てる側の両方が公開していないため、「別の一次資料を当たる」経路に見込みが無い。**詳細は下記 |
+
+**確認した2つの資料はいずれもMIDの対応表を持たない**（2026-08-15確認）。
+
+- **Physical Layer Simplified Specification Ver 9.10**: MIDを「SD-3C, LLCが管理・定義・
+  割り当てる」8 bitの番号と規定する（Section 5.1）。**対応表は収録していない。**
+- **[SD-3C Licensees](https://www.sd-3c.com/Licensees.aspx)**: ライセンシーの**社名一覧**であり、
+  **MIDとの対応表を持たない。**
+
+**確認した2つは、SD規格を定める側とMIDを割り当てる側そのものである。**その両方が対応表を
+公開していない以上、**この経路で解ける見込みは無い。**したがって追跡を打ち切る。
+
+**「一次資料がこの世に存在しない」とまでは書かない。**確認したのは上の2つであり、
+**網羅的に探したわけではない。**打ち切るのは「見込みが無い」からであって、
+「存在しないことを証明した」からではない。
+
+**非公式の集計は存在するが根拠に採らない。**個人が実測から編んだ一覧には
+`0x1b`をSamsung、OEM IDを`534d`（`SM`）とするものがあり、本個体の値と一致する。
+**しかし著者自身が非公式と明記しており、`AGENTS.md`の推測禁止の下で根拠に採れない。**
+一致する事実だけを記し、判定には使わない。
 
 #### 現物printとの照合結果
 
@@ -545,7 +564,7 @@ Ricoh `1180:E823` SDHCI controllerを介して行った。**Piでの動作は確
 | 耐久性（寿命）の評価 | **この記録の対象外** | 1回のhealth checkで書き込み寿命は判定できない。`HW-TBD-015`の`妨げる対象`のうち「耐久性」はこの記録では解決しない |
 | 書込み速度の要因の定量的な分離 | **実施しなかった** | ③がinconclusiveである残りの理由。raw device試験で**FAT32だけでは未達を説明できない**ことは示したが、**card・host controller・file systemそれぞれの寄与率は出していない**（2つの測定は条件が複数異なる）。**分離には別のhost controllerで同じcardを測る必要がある** |
 | UHS-I mode下での速度測定 | **実施しなかった** | 本端末の内蔵SDHCI readerが`sd high-speed`（3.30 V signaling）でしか動作せず、UHS-Iに入らない。**`U1`表示の妥当性を保証条件下で検証するには別のreaderが要る** |
-| `manfid`＝`0x1b`がSamsungであることの確認 | **実施しなかった** | Physical Layer Simplified Specification Ver 9.10はMIDを「SD-3C, LLCが管理・定義・割り当てる」番号と規定するのみで、**登録簿を収録していない**（Section 5.1）。**この仕様書では検証できない。**別の一次資料が要る。**`SD-01`のメーカー表示の正は引き続き現物printである** |
+| `manfid`＝`0x1b`がSamsungであることの確認 | **この経路では解ける見込みが無い** | 仕様書もSD-3Cも**MIDと社名の対応表を公開していない**（2026-08-15確認）。**規格を定める側と割り当てる側の両方が公開していないため、追跡を打ち切った。網羅的に探したわけではない。****`SD-01`のメーカー表示の正は引き続き現物printである** |
 | host controllerのUHS-I対応可否の確定 | **実施しなかった** | `/sys/kernel/debug/mmc0/caps`／`caps2`がroot権限でも`EPERM`を返すため、capability registerを読めなかった。**測定がUHS modeでないことは`ios`と`dmesg`で確定しているが、hostが非対応なのかnegotiationが成立しなかっただけなのかは区別していない** |
 
 ## repository検証
@@ -596,3 +615,6 @@ version recordは別途要る。本記録の範囲外であり作成していな
 | 2026-08-15 | 9 | **自己レビューで検出。Revision 7と8が、訂正した記述をどのRevisionが書いたのか明示していなかった。**この repository の慣行（[hardware-bom.md](hardware-bom.md)の「Revision 29が〜」「Revision 31は〜」）と揃っていない。訂正元をRevision 1（「偽造品ではない」「未達（inconclusive）」「29.80 GiB全域」）とRevision 4（「主因はFAT32ではないと確定した」）へ明示した。**帰属先はいずれもgit履歴で実在を確認しており、推測で番号を書いていない** | 自己レビュー |
 | 2026-08-15 | 10 | **[PR #115](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/115)のCodeRabbit再reviewの指摘6件を反映した。**(a) `mkfs.vfat`／`udisksctl`／`parted`／`wipefs`のversionが無かった。package版で追記し、**`mkfs.vfat`が`--version`を受け付けないため package版を記した**旨も書いた。(b) **registerとbus modeの取得commandを記録しておらず、別のoperatorが観測値を再現できなかった。**`実行したcommand`節を新設し、識別情報・`ios`・`dmesg`・format・mount・後片付けのcommandを載せた。**`caps`／`caps2`がroot権限でも`EPERM`で取得できなかったことも明記した。**(c) **raw device試験の`dd`が失敗を検出できない構成だった。**`dd ... | tail -1`はpipelineで終了statusが`tail`のものになり、`pipefail`も`errexit`も付けていない。**この弱点を明記し、次回は`set -o pipefail`か終了statusの直接確認を行うこととした。**あわせて今回の結果が失敗でないことを、転送byte数が指定値と一致することから示した。**ただしこれは事後確認であって、commandが失敗を検出する仕組みを持っていたわけではない。**(d) **「page cacheでは19.15 MB/sを説明できない」は言い過ぎであった。**29.80 GiBが3.7 GiBのRAMを超えることが示すのは「全dataがcacheだけで処理された結果ではない」ことまでである。page cacheが一部に寄与していないことは示していない（uncached baselineもcache hit率も測っていない）。表現を弱め、raw読出しがcacheを外して20.3 MB/sであったことを併記した。(e) **「この判定でPiのbootに使ってよい」は、host固有の試験結果からdeployの可否を導いていた。**測定はx86_64 Ubuntu host上のRicoh SDHCI controller経由であり、**Piへのimage書き込み、Piでのboot、PiのSD host controllerとの互換性はいずれも未確認である。**節を`この判定が及ぶ範囲`へ改め、確認できたことと確認していないことを分けた。`hardware-bom.md`にも波及させた。(f) `hardware-bom.md`と`tbd-register.md`が2つの実施日を`2026-08-12`へ畳んでいた。`f3`による検査（08-12）とregister照合・raw device試験（08-13）を書き分けた | [PR #115のCodeRabbit review](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/115) |
 | 2026-08-15 | 11 | **[PR #115](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/115)のCodeRabbit reviewの指摘を反映し、`repository検証`節を新設した。****この記録は[Version Record Template](../toolchains/version-record-template.md)の様式に倣うと書きながら、同templateの`Commands run`／`Expected result`／`Actual result`に相当する節を持っていなかった。**hardware試験の未実施理由は書いていたが、repository側の検証（format、lint、test、link検査）の結果がどこにも無かった。実行結果と、`markdownlint`が未導入で未実行であること、ESP32 buildと統合・回帰試験が`N/A`である理由を記録した。**あわせて、この端末へRustを導入した経緯と、本端末のversion recordが別途要ることも明記した** | [PR #115のCodeRabbit review](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/115)、[Version Record Template](../toolchains/version-record-template.md) |
+| 2026-08-15 | 12 | **`manfid`の追跡を打ち切った。**Revision 3以来「別の一次資料が要る」としていたが、**2026-08-15に[SD-3C Licensees](https://www.sd-3c.com/Licensees.aspx)を確認したところ、同社もMIDと社名の対応表を公開していない**（ライセンシーの社名一覧のみ）。仕様書Ver 9.10も対応表を収録していない。**規格を定める側とMIDを割り当てる側の両方が公開していないため、この経路に見込みは無い。****ただし網羅的に探したわけではないので「一次資料が存在しない」とは書かない。**状態を`未照合`から`この経路では解ける見込みが無い`へ改めた。**非公式の実測集計が`0x1b`＝Samsung・OEM ID `534d`とし本個体の値と一致するが、著者自身が非公式と明記しているため根拠に採らない。****`SD-01`のメーカー表示の正は引き続き現物printである** | [SD-3C Licensees](https://www.sd-3c.com/Licensees.aspx)、[Part 1 Physical Layer Simplified Specification Version 9.10](https://www.sdcard.org/downloads/pls/) Section 5.1 |
+| 2026-08-15 | 13 | **自己レビューで検出。Revision 12が「`manfid`から社名を引く一次資料は存在せず」と全称否定で書いていた。****確認したのは仕様書とSD-3Cの2つであり、網羅的に探したわけではない。**「規格を定める側と割り当てる側の両方が公開していないため、この経路に見込みは無い」へ改め、**「存在しないことを証明した」からではなく「見込みが無い」から打ち切る**という区別を明記した。状態名も`一次資料では解けない`から`この経路では解ける見込みが無い`へ揃えた。**これはRevision 5で同じ型の誤り（SMARTの全称否定）を直したばかりであり、繰り返している** | 自己レビュー |
+| 2026-08-15 | 14 | **[PR #118](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/118)のCodeRabbit reviewの指摘2件を反映した。**(a) 見出し「MIDの対応表は公開されていない」が、**未確認の資料にも対応表が無いと読める表現だった。**後続の本文は非網羅的な確認であると断っていたが、**見出しがその限定を打ち消していた。**「確認した2つの資料はいずれもMIDの対応表を持たない」へ改めた。(b) [tbd-register.md](tbd-register.md)の`HW-TBD-015`行が`Samsung`を裏付けられない事実だけを記し、**照合を打ち切ったことを書いていなかった。**同じ行の[#117](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/117)が`manfid`照合を継続するIssueにも読めたため、**打ち切りの事実と、#117の範囲が耐久性・速度要因の分離・結果記録・close判断に限られることを明記した** | [PR #118のCodeRabbit review](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/118) |
