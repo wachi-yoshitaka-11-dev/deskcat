@@ -112,11 +112,13 @@ Toolchainのbuild-only spikeはperipheral pinの選定なしで進められる�
 - Clean buildとdependency lockfileを記録した
 
 **確定条件の正本は[ESP32 Rust Toolchain](../toolchains/esp32-rust-toolchain.md)であり、
-checkboxをここで二重管理しない。**同文書で未達なのは次の1項目である。**あわせて、2026-08-15に達成した項目も記す。
+checkboxをここで二重管理しない。**同文書で未達なのは次の1項目である。**あわせて、2026-08-15に達成した項目も記す。**
 
 - **chipの識別**: **非破壊では刻印を読めないことが2026-08-15に確定した**（シールド内側）。**撮り直しても解決しない。**
   module刻印は読了し、搭載moduleはmodule自身の刻印で確定した。そのdatasheetが中核chipを示すため、
-  **buildへの影響は無い**。要件の再定義が要る（`HW-TBD-031`）
+  **buildへの影響は無い**。**要件は2026-08-15に再定義した**（`esptool`が報告するchip名で確認する。正本は
+  [ESP32 Rust Toolchain](../toolchains/esp32-rust-toolchain.md#chip-識別の満たし方)）。**実施は#6のflash時であり、
+  この項目は未達のままである**（`HW-TBD-031`）
 - **公式pin表と現物pin表記の照合**: **2026-08-13に照合が完了して一致し、2026-08-15にcloseした**（`HW-TBD-001`）
 
 許可した範囲:

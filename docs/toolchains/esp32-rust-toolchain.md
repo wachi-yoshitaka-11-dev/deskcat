@@ -40,7 +40,7 @@ ESP-WROOM-32D の datasheet v2.7 には **PSRAM を内蔵する variant の記�
 
 **module の刻印は 2026-08-13 に読了した**（斜光＋接写）。シールド上面に `ESPRESSIF` と `ESP32-WROOM-32D` が刻印されており、**module 種別の根拠が購入履歴と silkscreen に加えて module 自身の刻印になった。**ただし**これは module の品番であって chip の品番ではない。**中核 chip が `ESP32-D0WD` であるという記載の出典は、上表のとおり ESP-WROOM-32D datasheet v2.7 のままである。
 
-追跡は [`HW-TBD-031`](../hardware/tbd-register.md)（2026-08-11 の全数照合で登録し、2026-08-15 に要件を書き換えた）。**本文書の状態を `Verified` にする条件のうち chip 刻印の項は、非破壊で満たせないため再定義が要る。**候補は `esptool` が flash 時に報告する chip 情報だが、chip 品番の確認に足りるかは未検証であり、実施は実機 Linux 限定の flash（[#6](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/6)）まで進まない。
+追跡は [`HW-TBD-031`](../hardware/tbd-register.md)（2026-08-11 の全数照合で登録し、2026-08-15 に要件を書き換えた）。**本文書の状態を `Verified` にする条件のうち chip 刻印の項は、非破壊で満たせないため 2026-08-15 に満たし方を再定義した。****`esptool` が報告する chip 名で満たす。**一次資料で、`esptool` が品番相当の文字列を返すことを確認した。**`espflash` の出力では満たせない**（family 名しか返さない）。実施は実機 Linux 限定の flash（[#6](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/6)）まで進まないため、**この項目は未達のままである**（[chip 識別の満たし方](#chip-識別の満たし方)）。
 
 いずれも build には影響しないが、flash 後の実機動作には影響する。
 
@@ -113,6 +113,7 @@ ESP-WROOM-32D の datasheet v2.7 には **PSRAM を内蔵する variant の記�
 - `espup`
 - `ldproxy`
 - `espflash` は flash、monitor を行う端末だけで必須
+- `esptool` は flash を行う端末だけで必須。**chip 識別の確認に要る**（[chip 識別の満たし方](#chip-識別の満たし方)）。**`espflash` では代替できない。**ESP-IDF の tool 一式に含まれるかは未検証であり、#6 で確認する
 - `cargo-espflash` は任意。初期手順では command surface を増やさない
 
 host は [ADR-0005](../decisions/0005-standard-development-os.md) の標準OS である実機 Linux を対象とする。ESP-IDF が公式に列挙する OS package と、`espup` が出力する environment export が必要になる。
@@ -179,7 +180,7 @@ build はそのまま成功する。この取り違えは runbook の版上げ�
 
 - [x] 物理基板の機種と搭載 module を確認した（ESP-WROOM-32D 開発ボード／秋月電子 M-13628。基板に revision 表示は無い）
 - [x] **module 刻印を読み取った**（`ESPRESSIF` / `ESP32-WROOM-32D`。2026-08-13、斜光＋接写）
-- [ ] **chip の識別を確認した。****旧項目「chip 刻印を読み取った」は非破壊で満たせないため 2026-08-13 に書き換えた**（chip はシールド内側にある）。満たし方の再定義が要る（[HW-TBD-031](../hardware/tbd-register.md)）
+- [ ] **chip の識別を確認した。****旧項目「chip 刻印を読み取った」は非破壊で満たせないため 2026-08-15 に書き換え、同日に満たし方を再定義した**（chip はシールド内側にある）。**満たし方は [chip 識別の満たし方](#chip-識別の満たし方) に定める。**実施は [#6](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/6)（[HW-TBD-031](../hardware/tbd-register.md)）
 - [x] **公式 pin 表と現物 pin 表記を照合した**（2026-08-13、19pin×2 列すべて一致。[HW-TBD-001](../hardware/tbd-register.md) は close 済み）
 - [x] 開発端末の profile と version record を作成した
 - [x] レビュー済み template commit から最小 project を生成した
@@ -192,7 +193,7 @@ build はそのまま成功する。この取り違えは runbook の版上げ�
 
 **未達は 1 項目になった。**この文書の状態は `検証済み`（`Verified`）ではなく **`build検証済み`** にとどめる。語の定義は [状態ラベル](README.md#状態ラベル) を参照する。
 
-- **chip の識別**: **非破壊では刻印を読めないことが 2026-08-15 に確定した**（シールド内側）。**したがって「撮り直せば満たせる項目」ではない。**module 刻印は読了しており、搭載 module は module 自身の刻印で確定した。その datasheet が中核 chip を示すため、build への影響は無い。**満たし方の再定義が要る**（[HW-TBD-031](../hardware/tbd-register.md)）。
+- **chip の識別**: **非破壊では刻印を読めないことが 2026-08-15 に確定した**（シールド内側）。**したがって「撮り直せば満たせる項目」ではない。**module 刻印は読了しており、搭載 module は module 自身の刻印で確定した。その datasheet が中核 chip を示すため、build への影響は無い。**満たし方は 2026-08-15 に再定義した**（[chip 識別の満たし方](#chip-識別の満たし方)、[HW-TBD-031](../hardware/tbd-register.md)）。
 - **公式 pin 表と現物 pin 表記の照合**: **2026-08-13 に完了し、一致した**（[HW-TBD-001](../hardware/tbd-register.md) は close）。**この項目は未達ではなくなった。**#6 の flash 前提条件も、この照合については満たされる。
 
 **別端末での再現は満たした。**根拠と、そう判断してよい理由を次に示す。
@@ -216,10 +217,56 @@ Windows は対象外のため再現対象に含めない。**CI は Windows で�
 
 **それでも状態は `Verified` へ上げない。**残る 1 項目（chip の識別）は CI では代替できない。**「CI が通ったから昇格できる」とは結論しない。**
 
-**うち chip の識別は、満たし方が未定である。**旧条件は非破壊で成立しないことが判明しており、
-**再定義するまでこの項目を「現物確認すれば満たせるもの」として扱わない。**
+**うち chip の識別は、満たし方を 2026-08-15 に再定義した。**旧条件は非破壊で成立せず、
+満たし方が未定のままだった。**再定義したのは満たし方であって、項目が満たされたわけではない。**
+実施は #6 であり、**この項目は未達のままである**（[chip 識別の満たし方](#chip-識別の満たし方)）。
 
 flash、serial monitor、実機起動は #6 の範囲であり、この文書の build-only 確定条件には含めない。
+
+### chip 識別の満たし方
+
+**2026-08-15 に決定した。**旧項目「chip 刻印を読み取った」は非破壊で成立しない
+（chip はシールド内側にある）ため、次のとおり再定義した。**この節がこの条件の正本である。**
+[HW-TBD-031](../hardware/tbd-register.md) へ内容を再掲しない。
+
+| 項目 | 内容 |
+|---|---|
+| 満たし方 | **実機へ接続したときに `esptool` が報告する chip 名**を記録し、`ESP32-D0WD` または `ESP32-D0WD-V3` であることを確認する |
+| 期待値が 2 つある理由 | `esptool` は major revision 3 の個体へ `-V3` を付ける。**どちらであるかは現物を読むまで決まらない**ため、両方を満たしたものとして扱う |
+| **`espflash` では満たせない** | `espflash` が印字するのは family 名 `esp32` であり、品番を含まない（根拠は下表）。**本文書は runner を `espflash flash --monitor` と記録しているため、その出力を見ただけではこの項目を満たさない** |
+| 使う command | **#6 で確定する。**下表の一次資料が示す例は **flash 時の出力**であり、**他の command でも同じ行が出るかは確認していない。**実行した command と `esptool` の版を [Version Record](version-record-template.md) へ記録する |
+| datasheet の扱い | 中核 chip を `ESP32-D0WD` とする [ESP-WROOM-32D datasheet v2.7](https://documentation.espressif.com/esp32-wroom-32d_esp32-wroom-32u_datasheet_en.pdf) の記載は根拠として維持する。**ただし datasheet の記載だけではこの項目を満たさない** |
+| 期待値と食い違った場合 | `ESP32-D0WD` 系以外が返ったら、datasheet 由来の記載が現物と食い違う。**その訂正**（[hardware-bom.md](../hardware/hardware-bom.md) の `MCU-01` と本文書の [board から target を決めた根拠](#board-から-target-を決めた根拠)）**は別 Issue で行う。**この決定はその訂正を含まない |
+| 実施時期 | [#6](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/6)。**この項目のチェックが埋まるのは #6 のあとである** |
+
+**この決定が担保しないもの**を明示する。
+
+- **efuse は package／variant を示すものであって刻印ではない。**現物の chip に印字された文字を読んだことにはならない
+- 読み出した値が Espressif 出荷時のものであることは検査していない
+- `esptool` が持つ package 値から品番への対応表そのものの正しさは検証していない。**依拠しているのは Espressif 自身の実装である**
+
+根拠は次の一次資料である。
+
+| 主張 | 一次資料 |
+|---|---|
+| `esptool` は品番相当の文字列を報告する。公式 documentation の例は `Chip type:          ESP32-D0WD (revision 1)` である | [esptool: Flashing Firmware](https://docs.espressif.com/projects/esptool/en/latest/esp32/esptool/flashing-firmware.html)（2026-08-15 取得） |
+| その文字列は efuse の package 値、single core を示す bit、major revision から導かれる。対応表は `ESP32-D0WD`／`ESP32-D0WD-V3`／`ESP32-D0WDQ6`／`ESP32-D2WD`／`ESP32-U4WDH`／`ESP32-PICO-D4` などを含む | [esptool v5.3.1 の `esptool/targets/esp32.py`](https://github.com/espressif/esptool/blob/v5.3.1/esptool/targets/esp32.py) にある `get_chip_description()`（2026-08-15 取得） |
+| `espflash` は family 名しか印字しない。`print_board_info` は `Chip type: {info.chip}` を出力し、`Chip` enum は `strum(serialize_all = "lowercase")` により `esp32` になる。package variant 名はこの crate に存在しない | [espflash v4.5.0 の `espflash/src/cli/mod.rs`](https://github.com/esp-rs/espflash/blob/v4.5.0/espflash/src/cli/mod.rs) と [同 `espflash/src/target/mod.rs`](https://github.com/esp-rs/espflash/blob/v4.5.0/espflash/src/target/mod.rs)（2026-08-15 取得） |
+
+**照合するのは chip 名だけである。**上表の 1 行目と 2 行目は revision の書式が食い違っている
+（documentation の例は `(revision 1)`、v5.3.1 の実装は `(revision v<major>.<minor>)`）。
+**行全体を文字列一致で照合しない。**この項目が求めるのは chip 名であって revision の書式ではない。
+
+**版へ固定したのは実装の引用だけである。**上表 2 行目の `esptool` は v5.3.1、3 行目の `espflash` は
+v4.5.0 であり、既定 branch は変わるため tag へ固定した path で確認した。**documentation の link は
+固定していない。**上表 1 行目は `latest` を指しており、**内容が変わりうる**ため取得日を併記した。
+**いずれも採用版として確定したわけではない。**使用する版は Issue
+[#6](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/6) で決め、[Version Record](version-record-template.md) へ記録する。
+
+**この再定義とあわせて日付を 1 件訂正した。**上の確定条件は旧記載で「非破壊で満たせないため
+**2026-08-13 に**書き換えた」としていたが、書き換えたのは **2026-08-15** である。08-13 は
+現物写真を撮った observation の日であって、文書を変更した日ではない。**observation の日付と
+文書変更の日付を同じ日として書いていた**ため、2026-08-15 に訂正した。
 
 ## 公式資料
 
