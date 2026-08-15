@@ -258,14 +258,18 @@ fn interpret(event: Framed<'_>, capacity: usize) -> Outcome {
                     // §4.6がUTF-8／JSON／envelope不正をまとめて`parse_errors`とするため、
                     // wire上の分類は`invalid_envelope`になる。UTF-8固有の情報は`cause`が持つ。
                     ErrorCode::InvalidEnvelope,
-                    format!(
-                        "line is not valid UTF-8: {} bytes were valid, then {} invalid byte(s)",
-                        error.valid_up_to(),
-                        error.error_len().map_or_else(
-                            || "an unexpected end of".to_owned(),
-                            |len| len.to_string()
-                        )
-                    ),
+                    // 生byteは載せない。診断に要るのは位置と長さだけであり、
+                    // 行の中身をそのままlogへ流すと上限のない出力になる。
+                    match error.error_len() {
+                        Some(len) => format!(
+                            "line is not valid UTF-8: {len} invalid byte(s) after {} valid byte(s)",
+                            error.valid_up_to()
+                        ),
+                        None => format!(
+                            "line is not valid UTF-8: it ends with an incomplete sequence after {} valid byte(s)",
+                            error.valid_up_to()
+                        ),
+                    },
                 ),
                 cause: Cause::InvalidUtf8 {
                     valid_up_to: error.valid_up_to(),
@@ -577,6 +581,28 @@ mod tests {
                     );
                 }
             }
+        }
+    }
+
+    /// UTF-8のdetailは、不正byteと「末尾で列が切れた」を別の文として出す。
+    /// 生byteは載せない。
+    #[test]
+    fn invalid_utf8_detail_distinguishes_the_two_shapes() {
+        let mut receiver = LineReceiver::with_protocol_limit();
+
+        let detail = detail_of(&collect(&mut receiver, b"ab\xffcd\n"));
+        assert!(detail.contains("invalid byte"), "{detail}");
+        assert!(detail.contains("after 2 valid byte(s)"), "{detail}");
+
+        let detail = detail_of(&collect(&mut receiver, b"ab\xe3\x81\n"));
+        assert!(detail.contains("incomplete sequence"), "{detail}");
+        assert!(detail.contains("after 2 valid byte(s)"), "{detail}");
+    }
+
+    fn detail_of(outcomes: &[Outcome]) -> String {
+        match outcomes {
+            [Outcome::Rejected(rejection)] => rejection.detail().to_owned(),
+            other => panic!("{other:?}"),
         }
     }
 

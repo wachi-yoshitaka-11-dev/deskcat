@@ -169,7 +169,9 @@ impl LineFramer {
                 Some(i) if i <= room => {
                     self.store(&rest[..i]);
                     consumed += i + 1;
-                    pending = Some(Pending::Line(strip_carriage_return(&self.buf[..self.len])));
+                    pending = Some(Pending::Line(body_len_without_carriage_return(
+                        &self.buf[..self.len],
+                    )));
                     self.len = 0;
                     break;
                 }
@@ -180,8 +182,10 @@ impl LineFramer {
                 }
                 // `\n`が容量の先にある、または`\n`が無いまま容量を超える。どちらもoverflowである。
                 _ => {
-                    self.store(&rest[..room.min(rest.len())]);
-                    consumed += room.min(rest.len());
+                    // 容量まで詰めてからoverflowとする。詰めたぶんがprefixになる。
+                    let fill = room.min(rest.len());
+                    self.store(&rest[..fill]);
+                    consumed += fill;
                     pending = Some(Pending::Oversize(self.prefix_budget.min(self.len)));
                     self.len = 0;
                     self.discarding = true;
@@ -210,8 +214,8 @@ fn find_newline(bytes: &[u8]) -> Option<usize> {
     bytes.iter().position(|&byte| byte == b'\n')
 }
 
-/// 末尾の`\r`を1つだけ落とした長さを返す（§2、§8手順4）。
-fn strip_carriage_return(body: &[u8]) -> usize {
+/// 末尾の`\r`を1つだけ落としたあとのbody長を返す（§2、§8手順4）。
+fn body_len_without_carriage_return(body: &[u8]) -> usize {
     match body {
         [.., b'\r'] => body.len() - 1,
         _ => body.len(),
