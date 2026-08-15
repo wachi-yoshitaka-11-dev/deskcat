@@ -698,7 +698,7 @@ required_transient_current
 | Logic regulator／経路 | Pi／ESP32／周辺deviceの要件 | 追加regulatorなし。M-12001の5Vをbreadboard rail経由でそのまま供給するのは**Piのみ確定**（ESP32は上行のとおり給電経路が未決定）。周辺module3点（MSP2807、ADXL345、BME280）は5V railへ直結せず、ESP32 board上の3V3 pinから給電する（理由は`電源rail構成案`参照） | `hardware-bom.md` PSU-PI-01、DISP-01、TOUCH-01、ACCEL-01、ENV-01 | Blocked（ESP32の給電経路が未決定。加えて定常電流の合計と3V3 pinの供給能力が未実測） |
 | Servo regulator／経路 | 正確なservo要件 | 追加regulatorなし。M-12001の5Vをbreadboard上で別railに分岐し、直近にbulk capacitorを配置 | `hardware-bom.md` PSU-SERVO-01 | Selected（bulk capacitor容量は実測待ち） |
 | Backfeed防止 | USB／外部電源の共存 | TBD | 回路図review | Blocked |
-| Servo bulk capacitor | 測定した過渡電流への対応 | 候補: 電解コンデンサ470μF／16V（秋月、ルビコンWXA、¥10）×2〜3個 | [秋月商品ページ](https://akizukidenshi.com/catalog/g/g108426/)。最終容量はESP32＋shunt抵抗によるADC loggingで確定 | Candidate（実測前） |
+| Servo bulk capacitor | 測定した過渡電流への対応 | 電解コンデンサ470μF／16V（秋月 g108426、ルビコンWXA）。**10個入手済み**（2026-08-08着荷。2026-08-12に購入履歴と照合して訂正した）。使用個数は2〜3個を想定 | [秋月商品ページ](https://akizukidenshi.com/catalog/g/g108426/)。最終容量はESP32＋shunt抵抗によるADC loggingで確定 | Candidate（**部品は入手済み。使用個数が実測待ち**） |
 | 電流測定用shunt抵抗 | 波形測定の手段（Oscilloscope代替） | セメント抵抗5W0.1Ω（秋月、SQP5WJ0R1B、¥30）×1〜2個。ESP32 ADCで電圧降下をsamplingし、電流波形を近似する | [秋月商品ページ](https://akizukidenshi.com/catalog/g/g117836/) | Selected（Oscilloscope未所持のため、その購入を避けて低costで対応。**低側に挿入すること**。理由は`測定計画`参照） |
 | Local decoupling | 各deviceのデータシートに従う | **datasheetが指定する値と配置は確定した**（[HW-TBD-029](tbd-register.md)は2026-08-12にclose）。値の正は[sensor-datasheet-notes.md](sensor-datasheet-notes.md)の`Local decoupling`節であり、ここには再掲しない。**`ENV-01`は外付け不要**（module上に`C1`／`C2`各0.1 µFを実装済み）。**`ACCEL-01`／`DISP-01`／`MCU-01`は外付けの要否がTBD。**判断は`local decouplingの外付け要否`節 | 各deviceのdatasheet（同節に出典を記載）。**要否はboardの実装でしか決まらないため、現物確認に従属する** | **一部確定**（`ENV-01`は外付け不要で確定。残る3点の**現物確認**は`ACCEL-01`が[HW-TBD-004](tbd-register.md)、`DISP-01`が[HW-TBD-002](tbd-register.md)、`MCU-01`が[HW-TBD-023](tbd-register.md)。**gateは維持している**） |
 | Wire gauge／許容電流 | **定常電流**と配線長。許容電流（ampacity）は導体の発熱と放熱で決まる熱の制限であり、判定量は定常電流である。peakは配線長による電圧降下として`ADC-5V`／`ADC-3V3`のdroop測定で確認する | TBD（`WIRE-PWR-01`が未選定）。**gate対象の大電流経路にbreadboard接点とジャンパー線を使わず、公称許容電流のある線材・接続部材で構成する**（`ingressの電流制限`の`大電流経路にbreadboard接点とジャンパー線を使わない`） | 製品資料／計算。判定量の根拠は`ingressの電流制限` | Blocked（[HW-TBD-022](tbd-register.md)） |
@@ -785,10 +785,11 @@ required_transient_current
 
 - **kernel logのundervoltage警告が出ない。**しきい値4.63 Vも、
   Pi Zero Wの動作範囲の下限としては使えない（そもそも検出回路の動作点であって動作範囲の下限ではない）
-- **Pi側の低電圧は`ADC-5V`の実測でしか捉えられない。**その分圧用抵抗（10 kΩ×4）は未購入である
-  （`hardware-bom.md`の購入待ちリスト）。**これが無い間、Piの低電圧を捉える手段は無い。**
-  **さらに、捉えられるようになっても合否は判定できない。**判定に使う最低電圧が`HW-TBD-028`(a)として
-  未確定だからである。**測定系の実装と(a)の確定の両方が揃うまで、Pi側の電圧判定は`Blocked`である**
+- **Pi側の低電圧は`ADC-5V`の実測でしか捉えられない。**分圧用抵抗（10 kΩ×4）は**入手済みである**
+  （`hardware-bom.md`の`MEAS-01`。2026-08-12に購入履歴と照合して訂正した）。**したがって測定系は
+  部品待ちではなく、実装と検証が残るだけである。****ただし実装できても合否は判定できない。**
+  判定に使う最低電圧が`HW-TBD-028`(a)として未確定だからである。
+  **(a)が確定するまで、Pi側の電圧判定は`Blocked`である**
 
 **ESP32側は別である。**ESP32は自身でbrownoutを検出するため、ESP32のbrownoutとreset reasonの
 確認は有効であり、そのまま維持する。**Piと同じ扱いにしない。**
@@ -912,8 +913,8 @@ PC USBからのflashing、周辺module3点の3.3 V側定常電流の実測）だ
 - [ ] 各段階で**ingressの定常電流**をデジタルテスター（MAS830L）で記録する。
       これが`ingressの電流制限`の判定量である（connector定格は熱の制限のため）
 - [ ] 各段階で**5 Vと3.3 Vの電圧droop**を`ADC-5V`／`ADC-3V3`で記録する。
-      **この項目はdivider（10 kΩ／10 kΩ）の実装と検証に従属する**（4本とも未購入。
-      `受け入れ条件`の`定義した値をどの段階で照合するか`）。
+      **この項目はdivider（10 kΩ／10 kΩ）の実装と検証に従属する**（抵抗は入手済み。
+      実装と検証が残る。`受け入れ条件`の`定義した値をどの段階で照合するか`）。
       peakによる電圧降下はここで捉える。**ESP32のbrownoutとreset reasonもあわせて確認する**
       （ESP32は自身でbrownoutを検出する）。**Piのundervoltage警告は当てにしない**
       （`Pi Zero Wには低電圧検出が無い`）
@@ -991,8 +992,8 @@ softwareで数えられないものを数えたことにしないための書き
 （[AGENTS.md](../../AGENTS.md) 推測禁止）。
 
 **帰結: 段階AでPiの低電圧を判定する手段が二重に無い。**判定に使う値が無く、Pi自身の検出回路も無い。
-Pi側の低電圧は**`ADC-5V`の実測でしか捉えられず**、その分圧用抵抗は未購入である
-（`hardware-bom.md`の購入待ちリスト）。
+Pi側の低電圧は**`ADC-5V`の実測でしか捉えられない**。分圧用抵抗は入手済みであり
+（`hardware-bom.md`の`MEAS-01`）、**残るのは実装と検証である。**
 
 **あわせて記録する。**公式documentationが要求するのは**5.1 V**であるのに対し、選定済みの
 `PSU-PI-01`（秋月 M-12001）は**5 V**である。**この差の可否はここでは判断しない**
@@ -1048,18 +1049,19 @@ Pi側の低電圧は**`ADC-5V`の実測でしか捉えられず**、その分圧
 
 | 項目 | 測れる段階 | 測定のgate | **合否判定** |
 |---|---|---|---|
-| (a) Pi入力の最低電圧 | **段階A**（Piを単体でアダプターから起動） | **DMMで直流値を読むだけなら不要**（追加購入も不要）。**`ADC-5V`でdroopまで見るならdividerの実装と検証が要る**（未購入） | **Blocked。**閾値が`HW-TBD-028`(a)として未確定であり、`ADC-5V`の測定系も未実装（分圧抵抗が未購入） |
+| (a) Pi入力の最低電圧 | **段階A**（Piを単体でアダプターから起動） | **DMMで直流値を読むだけなら不要**（追加購入も不要）。**`ADC-5V`でdroopまで見るならdividerの実装と検証が要る**（抵抗は入手済み。実装と検証が残る） | **Blocked。**閾値が`HW-TBD-028`(a)として未確定であり、`ADC-5V`の測定系も未実装（抵抗は入手済み。配線と検証が残る） |
 | (b) ESP32入力／3.3 Vの最低電圧 | 5 V入力側は**段階B-1**。3.3 V rail側は周辺moduleを足す**段階B-2** | 段階B-1は**不要**。段階B-2は**必要** | **Blocked。**5 V入力側の4.6 Vは条件付きの導出値で確定した閾値ではない（`HW-TBD-023`）。3.3 V rail側は閾値そのものが未確定（`HW-TBD-004`と`3.3 V railの許容電圧範囲`の3経路） |
-| (c) 最大定常ripple | 段階A／B-1で各railを単独で、段階Cで合成後を測る。**両者を混ぜない** | **段階を問わず`ADC-5V`／`ADC-3V3`のdivider（10 kΩ／10 kΩ）の実装と検証が要る。**rippleはDMMでは捉えられず、この文書が定める測定手段はADC loggingだけである。**分圧抵抗4本は未購入であり**（`hardware-bom.md`の購入待ちリスト）、**現状は段階A／B-1でも測定に着手できない。**段階Cはこれに加えて段階Cのgateが要る | **Blocked。**許容電圧範囲の下限が決まらないと不等式を評価できない（(a)(b)に従属） |
-| (d) 最大transient droopと継続時間 | **段階C**（servo起動過渡を含む）。段階A／B-1では出ない | **必要。**段階Cのgateに加えて、(c)と同じく`ADC-5V`／`ADC-3V3`のdividerの実装と検証が要る（未購入） | **Blocked。**継続時間0は確定しているが、**深さの判定に使う下限が未確定**（(a)(b)に従属） |
+| (c) 最大定常ripple | 段階A／B-1で各railを単独で、段階Cで合成後を測る。**両者を混ぜない** | **段階を問わず`ADC-5V`／`ADC-3V3`のdivider（10 kΩ／10 kΩ）の実装と検証が要る。**rippleはDMMでは捉えられず、この文書が定める測定手段はADC loggingだけである。**抵抗は入手済みであり**（`hardware-bom.md`の`MEAS-01`）、**残るのは実装と検証である。**段階Cはこれに加えて段階Cのgateが要る | **Blocked。**許容電圧範囲の下限が決まらないと不等式を評価できない（(a)(b)に従属） |
+| (d) 最大transient droopと継続時間 | **段階C**（servo起動過渡を含む）。段階A／B-1では出ない | **必要。**段階Cのgateに加えて、(c)と同じく`ADC-5V`／`ADC-3V3`のdividerの実装と検証が要る（抵抗は入手済み） | **Blocked。**継続時間0は確定しているが、**深さの判定に使う下限が未確定**（(a)(b)に従属） |
 | (e) connector／wireの最大温度上昇 | **段階C**。`HW-TBD-021`／`HW-TBD-022`の部品が揃ってから | **必要** | **Blocked。**経路部品が未選定で、比較対象となるメーカー定義の温度上昇条件が存在しない |
 
 **段階AとB-1の探索的な起動そのものにgateも追加購入も要らない。**DMMで読める直流値は、閾値が
 決まる前でも取ってよい。
 
 **ただしADC loggingを使う測定は別である。**`ADC-5V`／`ADC-3V3`のdivider（10 kΩ／10 kΩ、
-`gpio-assignment.md`が比1/2を規定）は**4本とも未購入**であり（`hardware-bom.md`の購入待ちリスト）、
-**実装して検証するまでrippleもdroopも測定に着手できない。**rippleはDMMで代替できない。
+`gpio-assignment.md`が比1/2を規定）は**抵抗こそ入手済みだが、実装と検証が残る**
+（`hardware-bom.md`の`MEAS-01`）。**実装して検証するまでrippleもdroopも測定に着手できない。**
+rippleはDMMで代替できない。
 
 **ただし5項目とも、現時点で合否は判定できない。**測定値を記録してよいが、**そこから受け入れの
 合否を導かない。**`servo-safety-limits.md`の受け入れchecklistでもPi側の項目を`Blocked`としており、
@@ -1129,3 +1131,4 @@ Pi側の低電圧は**`ADC-5V`の実測でしか捉えられず**、その分圧
 | 2026-08-12 | 37 | [#1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1)と[#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)。ADXL345のメーカー公式datasheet（Rev. G）を入手した結果を反映。(a) **`HW-TBD-025`(b)の前提が変わった。**共通条件表とB-2bの条件表は「ADXL345とBME280に公開値があるかも未確認」と書いていたが、**2026-08-12に確認した結果、両者とも絶対最大定格は公開されているが電流の上限は記載が無い**（ADXL345 Rev. G Table 2 page 5、BME280 Revision 1.24 Table 5 page 13）。**未知数はMSP2807だけではなく3点すべてである。**B-2bが成立しない理由を3点へ広げた。**「1点でも上限が無ければB-2を実施しない」というgateは維持しており、開いていない。**(b) **負荷表のADXL345行の消費電流の出典が、Digi-Keyの解説記事のままであった。**メーカー一次資料へ差し替え、値を`140µA typ（ODR ≥ 100Hz）／standby 0.1µA typ`とした（Rev. G Table 1 page 4、Table 7 page 13）。**datasheetにmax欄は無くtyp値のみである**ことも明記した。これでこの文書からDigi-Keyへの参照は無くなった。(c) **ICの「定格上限3.6V」という記述を、動作上限3.6Vと絶対最大定格3.9Vの書き分けへ訂正した。**従来は両者を混ぜていた。**5V直結の禁止は変えていない。**5Vはそのどちらも超えるため結論に影響せず、禁止が**確認前の安全規則**であるという整理も維持する。**3.3Vが唯一の候補であって未確定であること（`HW-TBD-004`）も変えていない。**この文書が定める配線規則も、段階B-2のgateも変えていない**あわせて[PR #112](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/112)のreviewで、`HW-TBD-025`(a)が`HW-TBD-004`より先に確定できるかのように書かれていた点も直した。**(a)は3 moduleが**moduleとして受け入れてよい電圧**の積集合であって、IC単体の動作範囲の積集合ではない。`ACCEL-01`分は`moduleへ入れてよい電圧`が未確定（`HW-TBD-004`）であるため、**(a)も`HW-TBD-004`が解けるまで確定しない。**「現物確認を待つ必要はない」とした旧記載を撤回した。**gateは厳しくなる方向にのみ変えており、緩めていない。** | [ADXL345 Data Sheet](https://www.analog.com/media/en/technical-documentation/data-sheets/adxl345.pdf) Rev. G（2026-08-12取得）、[BME280 Data Sheet](https://www.bosch-sensortec.com/media/boschsensortec/downloads/datasheets/bst-bme280-ds002.pdf) Revision 1.24、[sensor-datasheet-notes.md](sensor-datasheet-notes.md) Revision 5、[hardware-bom.md](hardware-bom.md) Revision 33 |
 | 2026-08-12 | 38 | [#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)。`HW-TBD-025`(a)／`028`／`029`／`030`を進め、Espressif公式guideの警告を反映した。**どのgateも開いていない。**(a) **`3.3 V railの許容電圧範囲`節を新設し、`HW-TBD-025`(a)の値の正をここに置いた。**暫定の積集合は`DISP-01` 3.3–5 V ∩ `ENV-01` 1.71–3.6 V ∩ ESP-WROOM-32D module 3.0–3.6 Vで**3.3–3.6 V**である。**確定値ではない**（`ACCEL-01`分は`HW-TBD-004`待ち）。**あわせて、この暫定値がそのままでは成立しないことを記録した。**下限3.3 Vはrailの公称値と同一で下振れ余裕が原理的に無く、さらに参照設計の`U2 = AMS1117-3.3`の出力はdatasheetが与える2行のうち広い方で**3.201–3.399 V**、狭い方でも下限3.251 Vであり、**どちらを採っても3.3 Vを割りうる**。`msp2807.pdf`はVCCについて`3.3V~5V`の一行しか持たず、下限が公称値か絶対最小値かを決められない。**解釈で埋めず、`HW-TBD-025`(a)の中身として両立の3経路を明記した**（別の台帳行は立てていない）。(b) **`電源品質の数値制限`節を新設し、`HW-TBD-028`の5項目の正をここに置いた。****5項目とも規則を定義したが、数値が確定したのは(d)の継続時間0だけである。**(a)は**一次資料に最低電圧も許容範囲も無いことを確認した**（公式documentationは`All models require a 5.1V supply`と述べるのみ。低電圧検出の4.63 Vは`except the Zero range`と明記されPi Zero Wに適用されない。Zero W向けproduct brief／reduced schematicsは非公開）。**undervoltage警告のしきい値で代用しない。**(b)のESP32 board 5 V入力は参照設計のdropout最大1.3 Vから**4.6 V**と導いたが、**現物の`U2`は未確認である**（`HW-TBD-023`）。(c)(d)は推奨動作条件が瞬時値の制約であることから導出規則を定めた。**「継続時間0」はdatasheetが時間領域の許容を示していないために安全側へ倒した判定規則であり、メーカーが述べた値ではない。**照合の分解能がADCのsample rateで決まることも明記した。(e)は規則だけを定め、**一次資料に無い温度上昇値を置かなかった**（経路部品が未選定）。**照合段階の対応表**も追加した。(c) **`local decouplingの外付け要否`節を新設し、`HW-TBD-029`を解決手順1〜8に従ってcloseした。**datasheetが指定する値と配置は4 deviceとも確定した（`DISP-01`は記載が無いことの確認）。`ENV-01`は**外付け不要**である（module上に`C1`／`C2`各0.1 µFを実装済みで、Bosch datasheetの推奨100 nFを満たす）。**残る「boardに何が実装済みか」はdatasheetでは決まらないため、`HW-TBD-004`（`ACCEL-01`）／`HW-TBD-002`（`DISP-01`）／`HW-TBD-023`（`MCU-01`）の確認項目へ移した。gateは維持している。****ICへの推奨値を外付け部品として購入待ちリストへ載せていない。**(d) **`逆極性保護のdesign review`節を新設した。**逆接が起こりうるのは手配線区間だけであり、**ingress 1箇所の保護部品では下流を守れない**ことを示した。方式ごとの電圧降下の代償も並べた。**決定は人間の承認待ちであり、`HW-TBD-030`はOpenのままである。**(e) **`ESP32の給電経路（未決定）`節へ公式警告を帰結ごと入れた。**従来は「3系統は排他」までで、**2つ以上から同時に給電するとboardまたは電源が破損しうる**という帰結が無かった。案Aと案Bを同時に満たす配線が禁止対象であること、および**段階B-2aは`3V3` pinから外部へ供給する側であって排他制約の対象ではない**ことも明記した。(f) **`Pi Zero Wには低電圧検出が無い`節を新設し、測定計画の記述を訂正した。**従来は「Piのbrownoutとreset reasonもあわせて確認する」としていたが、公式documentationが低電圧検出回路を`except the Zero range`と明記しており成立しない。**Pi側は`ADC-5V`の実測でしか捉えられず、分圧用抵抗は未購入である。ESP32のbrownout検出は有効なため区別して残した。**(g) 入力電源行へ、公式が要求する5.1 Vと`PSU-PI-01`の5 Vが一致しないことを記録した（可否の判断は`HW-TBD-007`／`HW-TBD-009`） | [ESP32-WROOM-32D & ESP32-WROOM-32U Datasheet](https://documentation.espressif.com/esp32-wroom-32d_esp32-wroom-32u_datasheet_en.pdf) v2.7 Table 13／Table 14 page 26、[AMS1117 datasheet](http://www.advanced-monolithic.com/pdf/ds1117.pdf) Electrical Characteristics、[msp2807.pdf](https://akizukidenshi.com/goodsaffix/msp2807.pdf) Product Parameters、[AE-BME280説明書](https://akizukidenshi.com/goodsaffix/AE-BME280_manu_v1.1.pdf) v1.1 主な仕様・部品表、[BME280 Data Sheet](https://www.bosch-sensortec.com/media/boschsensortec/downloads/datasheets/bst-bme280-ds002.pdf) Revision 1.24 Figure 17–19、[ADXL345 Data Sheet](https://www.analog.com/media/en/technical-documentation/data-sheets/adxl345.pdf) Rev. G `POWER SUPPLY DECOUPLING` page 29、[Raspberry Pi公式documentation](https://www.raspberrypi.com/documentation/computers/raspberry-pi.html) Power supply、[Espressif ESP32-DevKitC V4公式guide](https://docs.espressif.com/projects/esp-idf/en/v5.1/esp32/hw-reference/esp32/get-started-devkitc.html) |
 | 2026-08-12 | 39 | [PR #113](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/113)のreview指摘を反映。**Revision 38は、条件付きの値を無条件の判定基準として2箇所で使っていた。**(a) `逆極性保護のdesign review`の直列Schottkyの行が、4.6 Vを確定した合格下限のように用いて方式を却下していた。**4.6 Vは`IOUT ≤ 0.8 A`かつ参照設計の`U2`という条件付きの導出値である**（同Revisionの`(b)のESP32 board 5 V入力の導出`で自ら述べている）。**現物の`U2`と実負荷を確認するまで採否を決めない**へ改めた。台帳の`HW-TBD-030`側も揃えた。(b) **`定義した値をどの段階で照合するか`表が、(a)を「段階A・gate不要」としていた。**同じRevisionが「判定値が無く`ADC-5V`の測定系も無い」と書いており、[servo-safety-limits.md](servo-safety-limits.md)の受け入れchecklistは同じ項目を`Blocked`としているのに、この表だけ照合可能と読めた。**「測れる」と「合否を判定できる」を書き分け、測定はgate不要・判定は`Blocked`とした。**(c) **段階Aの定義そのものにも同じ問題があった。**「gate不要。Pi単体は通常の使い方である」とだけ書いており、**正常に起動したことをもって電源経路を合格と読める状態だった。**探索的な通電であって受け入れではないこと、M-12001の5 Vが公式要求の5.1 Vを満たすかは未判断（`HW-TBD-007`）であることを明記した。**段階Aを実施してよいこと自体は変えていない。**(d) 台帳の`HW-TBD-028`に、廃止した`HW-TBD-033`への参照が残っていたため削除した（Revision履歴の記載は過去時点の記録として残す）。**どのgateも緩めていない。**(a)(b)(c)はいずれも判定を厳しくする方向の変更である。**(f) rippleとdroopの測定が`ADC-5V`／`ADC-3V3`のdivider（未購入）に従属することを、照合段階表の(a)(c)(d)と測定計画のchecklistへ明記した。**表は段階A／B-1の測定gateを「不要」としていたが、**rippleはDMMで捉えられず、この文書が定める手段はADC loggingだけである。**分圧抵抗4本が未購入である以上、段階A／B-1でも測定に着手できない。**(g) 案Bのbackfeed受け入れ試験を明示した。**従来は「VBUS保護diodeの有無を回路で確認する」までで、**在ることを確かめても逆流しないことを測ったことにはならない。**2つの給電組み合わせで非給電側への電流を測り、両方で逆流が測定分解能の範囲で認められないことを合格条件とした。片方だけの確認では通さない。**あわせて、指摘された事例だけでなく同じ型の箇所を全数で潰した。**(b)の指摘は(a)の行だけを名指ししていたが、**同じ混同が(b)〜(e)の全行に残っていた。**表を`測れる段階`／`測定のgate`／`合否判定`の3列へ分け、**5項目とも合否判定は`Blocked`である**ことを明示した（測定はgateさえ満たせば進められるが、判定には確定した閾値と検証済みの測定系の両方が要り、現状はどの項目も揃っていない）。(e) 台帳の`HW-TBD-028`の状態列に、廃止した`033`への参照が**略記形で**残っていた。**完全形の`HW-TBD-033`だけを検索して「0件」と誤って確認していた**ため見落とした（狭いpatternでの「0件」報告は[hardware-bom.md](hardware-bom.md)の購入待ちリストの節が戒めているのと同じ失敗である）。同文書のRevision 34も`新規HW-TBD-033`のままで、**このPull Requestがもう033を作らない以上、未mergeのrevision記述として誤りだった**ため直した | [PR #113のreview](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/113)、自己レビュー |
+| 2026-08-12 | 40 | [#1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1)。[hardware-bom.md](hardware-bom.md) Revision 35の訂正を反映した。**この文書は`ADC-5V`／`ADC-3V3`の分圧用抵抗とServo bulk capacitorを「未購入」として複数箇所で扱っていたが、いずれも2026-08-08に着荷済みであった。**(a) `Pi Zero Wには低電圧検出が無い`、`(a)の一次資料は存在しない`、測定計画のchecklist、`定義した値をどの段階で照合するか`表の(a)(c)(d)の各行を、**「部品待ち」から「実装と検証が残る」へ改めた。**(b) `配線・保護表`のServo bulk capacitorを、**10個入手済み・使用個数が実測待ち**へ改めた（従来は`Candidate（実測前）`で未購入扱い）。**判定は緩めていない。**rippleとdroopの合否判定は`HW-TBD-028`(a)と3.3 V rail側の閾値が未確定であるため`Blocked`のままであり、変わったのは**部品の入手状況だけ**である | [hardware-bom.md](hardware-bom.md) Revision 35、購入履歴（2026-08-08着荷分） |
