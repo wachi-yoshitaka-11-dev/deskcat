@@ -134,8 +134,9 @@ impl Rejection {
 
 /// [`LineReceiver::feed`]の結果。
 ///
-/// 不変条件は[`crate::framing::Progress`]と同じである。**`outcome`が`None`であることと、
-/// `consumed`が入力長に等しいことは同値である。**
+/// 保証は[`crate::framing::Progress`]と同じで、**片方向である。`outcome`が`None`なら
+/// `consumed`は入力長に等しい。**逆は成り立たず、`outcome`が`Some`でも`consumed`が
+/// 入力長に等しいことも、0であることもある。
 #[derive(Debug)]
 #[must_use = "`consumed`が入力長に満たないことがある。残りを捨てると入力を落とす"]
 pub struct Received {
@@ -561,27 +562,80 @@ mod tests {
         }
     }
 
+    /// 分類はすべて`status`のcounterへ対応づく。
+    ///
+    /// **覆うべきcodeを明示して数える。**容量や終端の改行を間違えると、意図したcodeへ
+    /// 到達しないまま「全件counterがある」で通ってしまう。
     #[test]
     fn every_rejection_maps_to_a_status_counter() {
-        let mut receiver = LineReceiver::new(32);
-        let inputs: [&[u8]; 5] = [
-            b"\n",
-            b"not json\n",
-            b"\xff\xff\n",
-            b"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n",
-            br#"{"v":2,"sid":1,"id":1,"ts_ms":0,"type":"ping","payload":{}}"#,
+        // (容量, 入力)。容量は、その入力が意図したcodeで落ちるように選ぶ。
+        let inputs: [(usize, &[u8]); 6] = [
+            (64, b"\n"),
+            (64, b"not json\n"),
+            (64, b"\xff\xff\n"),
+            (16, b"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n"),
+            (
+                128,
+                b"{\"v\":2,\"sid\":1,\"id\":1,\"ts_ms\":0,\"type\":\"ping\",\"payload\":{}}\n",
+            ),
+            (
+                128,
+                b"{\"v\":1,\"sid\":1,\"id\":1,\"ts_ms\":0,\"type\":\"nope\",\"payload\":{}}\n",
+            ),
         ];
-        for input in inputs {
-            for outcome in collect(&mut receiver, input) {
-                if let Outcome::Rejected(rejection) = outcome {
+
+        let mut seen = Vec::new();
+        for (capacity, input) in inputs {
+            let mut receiver = LineReceiver::new(capacity);
+            let outcomes = collect(&mut receiver, input);
+            assert_eq!(outcomes.len(), 1, "1件だけ返るはず: {outcomes:?}");
+            match &outcomes[0] {
+                Outcome::Rejected(rejection) => {
                     assert!(
                         rejection.counter_field().is_some(),
                         "{} has no status counter",
                         rejection.code()
                     );
+                    seen.push(rejection.code());
                 }
+                other @ Outcome::Frame(_) => panic!("拒否されるはず: {other:?}"),
             }
         }
+
+        for expected in [
+            ErrorCode::InvalidEnvelope,
+            ErrorCode::LineTooLong,
+            ErrorCode::UnsupportedVersion,
+            ErrorCode::UnknownType,
+        ] {
+            assert!(
+                seen.contains(&expected),
+                "{expected} へ到達していない: {seen:?}"
+            );
+        }
+    }
+
+    /// bufferが容量ちょうどで止まった直後の本文は、消費0でoversizeを返す。
+    /// それでも`drain`は止まる。
+    #[test]
+    fn drain_terminates_on_a_zero_consumption_oversize() {
+        let mut receiver = LineReceiver::new(4);
+        assert!(collect(&mut receiver, b"abcd").is_empty());
+        assert_eq!(receiver.pending(), 4);
+
+        let progress = receiver.feed(b"x");
+        assert_eq!(progress.consumed, 0, "1 byteも消費せずに報告する");
+        assert!(progress.outcome.is_some());
+        assert!(receiver.is_discarding());
+
+        // 同じ入力の続きを`drain`へ渡しても止まる。
+        let outcomes = collect(&mut receiver, b"yz\nok\n");
+        assert_eq!(outcomes.len(), 1, "再開後の1行だけ: {outcomes:?}");
+        assert!(matches!(
+            outcomes[0],
+            Outcome::Rejected(_) | Outcome::Frame(_)
+        ));
+        assert_eq!(receiver.pending(), 0);
     }
 
     /// UTF-8のdetailは、不正byteと「末尾で列が切れた」を別の文として出す。

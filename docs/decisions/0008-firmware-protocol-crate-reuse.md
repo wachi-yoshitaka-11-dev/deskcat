@@ -124,10 +124,25 @@ root workspaceの`exclude`は維持し、lockfileは2つに分かれたままに
 次を満たしたとき、この決定を検証済みとする。
 
 - [x] host workspaceで`cargo test --workspace --locked`が通る。
+      根拠は[PR #127](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/127)の検証欄。
 - [x] ESP toolchainのrustc（`esp-1.95.0.0` = rustc 1.95.0-nightly）で、
       host workspaceの`cargo test --workspace --locked`が通る。共有crateのMSRVの根拠である。
+
+      ```bash
+      cargo +esp-1.95.0.0 test --workspace --locked
+      ```
+
+      **このcommandのVersion Recordは無い。**Version Recordは端末とprofileの環境記録であり、
+      ここで確かめたのは「その版のrustcで共有crateが通るか」という一回きりのMSRV確認である。
+      ESP toolchain自体の環境は
+      [2026-08-06 ESP32 Build](../toolchains/version-records/2026-08-06-esp32-build-linux.md)、
+      host環境は
+      [2026-08-10 Host Rust](../toolchains/version-records/2026-08-10-host-rust-linux.md)が記録している。
+      実行結果はPR #127の検証欄にある。**AGENTS.mdの検証済みcommandには加えない。**
+      ESP toolchainの版を上げるときは、この確認をやり直す。
 - [x] `firmware/esp32`で`cargo build --locked`が通る。root workspaceの`exclude`を外さずに
       path dependencyを張れること、lockfileが2つに分かれたままで矛盾しないことを含む。
+      別端末での再現は`.github/workflows/firmware.yml`が`ubuntu-24.04`で行う。
 - [ ] 実機でfirmwareが起動し、共有fixtureに合格する。**未実施。**flashと実機試験は
       [ADR-0005](0005-standard-development-os.md)により実機Linuxに限られ、#6を待つ。
 

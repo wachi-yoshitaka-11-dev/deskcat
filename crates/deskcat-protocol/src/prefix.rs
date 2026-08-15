@@ -98,31 +98,29 @@ pub fn recover_identity(prefix: &[u8]) -> Option<PrefixEnvelope> {
 
         match key {
             b"sid" | b"id" | b"v" => {
+                // **重複の判定はvalueを読む前に行う。**読んでから判定すると、2つ目の値が
+                // prefixの末尾で切れている入力（`{"sid":1,"id":2,"sid":3`）で
+                // `Err(Stop::Truncated)`が先にloopを抜け、重複を見逃して1つ目の値を
+                // 採ってしまう。`serde_json`はlast-winsなので、それは誤ったidentityである。
+                let seen = match key {
+                    b"sid" => &mut saw_sid,
+                    b"id" => &mut saw_message_id,
+                    _ => &mut saw_version,
+                };
+                if core::mem::replace(seen, true) {
+                    return None;
+                }
+
                 let value = match scan.read_integer() {
                     Ok(value) => value,
                     Err(Stop::Truncated) => break,
                     Err(Stop::Malformed) => return None,
                 };
                 match key {
-                    b"sid" => {
-                        if core::mem::replace(&mut saw_sid, true) {
-                            return None;
-                        }
-                        sid = Some(u32::try_from(value).ok()?);
-                    }
-                    b"id" => {
-                        if core::mem::replace(&mut saw_message_id, true) {
-                            return None;
-                        }
-                        id = Some(u32::try_from(value).ok()?);
-                    }
-                    _ => {
-                        if core::mem::replace(&mut saw_version, true) {
-                            return None;
-                        }
-                        // `v`は診断用である。幅に収まらなくても復元自体は続ける。
-                        v = u16::try_from(value).ok();
-                    }
+                    b"sid" => sid = Some(u32::try_from(value).ok()?),
+                    b"id" => id = Some(u32::try_from(value).ok()?),
+                    // `v`は診断用である。幅に収まらなくても復元自体は続ける。
+                    _ => v = u16::try_from(value).ok(),
                 }
             }
             b"type" => {
@@ -345,6 +343,16 @@ mod tests {
     fn rejects_duplicate_keys() {
         assert_eq!(identity(r#"{"sid":1,"id":2,"id":3}"#), None);
         assert_eq!(identity(r#"{"sid":1,"sid":4,"id":2}"#), None);
+    }
+
+    /// 重複keyの値がprefixの末尾で切れていても、identityを採らない。
+    ///
+    /// 値を読んでから重複を判定すると、truncationで先にloopを抜けて見逃す。
+    #[test]
+    fn rejects_a_duplicate_key_whose_value_is_truncated() {
+        assert_eq!(identity(r#"{"sid":1,"id":2,"sid":3"#), None);
+        assert_eq!(identity(r#"{"sid":1,"id":2,"id":3"#), None);
+        assert_eq!(identity(r#"{"v":1,"sid":1,"id":2,"v":2"#), None);
     }
 
     #[test]

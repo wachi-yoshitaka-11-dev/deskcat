@@ -224,6 +224,13 @@ fn valid_fixtures_decode_when_split_at_every_byte_boundary() {
                 }
                 other => panic!("{}: split {split}: {other:?}", case.name),
             }
+            // frameが正しくても、bufferにbyteが残る分割固有の不具合がありうる。
+            assert_eq!(
+                receiver.pending(),
+                0,
+                "{}: split {split}: bufferが残っている",
+                case.name
+            );
         }
     }
 }
