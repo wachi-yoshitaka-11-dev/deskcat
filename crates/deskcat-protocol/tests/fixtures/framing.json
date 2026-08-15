@@ -1,0 +1,470 @@
+{
+  "fixture_schema": 1,
+  "cases": [
+    {
+      "name": "single_line",
+      "note": "1 lineをそのまま受け取る基準case。",
+      "capacity": 64,
+      "chunks": [
+        {
+          "utf8": "{\"v\":1,\"sid\":1,\"id\":1,\"ts_ms\":0,\"type\":\"ping\",\"payload\":{}}\n"
+        }
+      ],
+      "expect": [
+        {
+          "outcome": "frame",
+          "type": "ping",
+          "sid": 1,
+          "id": 1
+        }
+      ],
+      "expect_pending_bytes": 0
+    },
+    {
+      "name": "two_lines_in_one_read",
+      "note": "1回のreadに複数lineが入る（受け入れ条件2）。",
+      "capacity": 128,
+      "chunks": [
+        {
+          "utf8": "{\"v\":1,\"sid\":1,\"id\":1,\"ts_ms\":0,\"type\":\"ping\",\"payload\":{}}\n{\"v\":1,\"sid\":1,\"id\":3,\"ts_ms\":0,\"type\":\"ack\",\"payload\":{\"reply_sid\":1,\"reply_to\":1,\"status\":\"ok\",\"detail\":\"猫\"}}\n"
+        }
+      ],
+      "expect": [
+        {
+          "outcome": "frame",
+          "type": "ping",
+          "sid": 1,
+          "id": 1
+        },
+        {
+          "outcome": "frame",
+          "type": "ack",
+          "sid": 1,
+          "id": 3
+        }
+      ],
+      "expect_pending_bytes": 0
+    },
+    {
+      "name": "crlf_line_ending",
+      "note": "§2「受信可能なline ending」。終端の\\rを落とす。",
+      "capacity": 64,
+      "chunks": [
+        {
+          "utf8": "{\"v\":1,\"sid\":1,\"id\":1,\"ts_ms\":0,\"type\":\"ping\",\"payload\":{}}\r\n"
+        }
+      ],
+      "expect": [
+        {
+          "outcome": "frame",
+          "type": "ping",
+          "sid": 1,
+          "id": 1
+        }
+      ],
+      "expect_pending_bytes": 0
+    },
+    {
+      "name": "multibyte_payload",
+      "note": "multi-byte文字を含む行。任意のbyte境界で割っても同じ結果になる。",
+      "capacity": 128,
+      "chunks": [
+        {
+          "utf8": "{\"v\":1,\"sid\":1,\"id\":3,\"ts_ms\":0,\"type\":\"ack\",\"payload\":{\"reply_sid\":1,\"reply_to\":1,\"status\":\"ok\",\"detail\":\"猫\"}}\n"
+        }
+      ],
+      "expect": [
+        {
+          "outcome": "frame",
+          "type": "ack",
+          "sid": 1,
+          "id": 3
+        }
+      ],
+      "expect_pending_bytes": 0
+    },
+    {
+      "name": "carriage_return_inside_the_line_is_not_stripped",
+      "note": "改行の直前でない\\rはbodyの一部である。JSONの空白として有効なのでdecodeは成功する。",
+      "capacity": 64,
+      "chunks": [
+        {
+          "utf8": "{\"v\":1,\r\"sid\":1,\"id\":1,\"ts_ms\":0,\"type\":\"ping\",\"payload\":{}}\n"
+        }
+      ],
+      "expect": [
+        {
+          "outcome": "frame",
+          "type": "ping",
+          "sid": 1,
+          "id": 1
+        }
+      ],
+      "expect_pending_bytes": 0
+    },
+    {
+      "name": "invalid_utf8_lone_continuation_byte",
+      "note": "0xffはUTF-8のどの列にも現れない。§4.6によりwire上の分類はinvalid_envelopeで、parser counterの区別はcauseが持つ。",
+      "capacity": 64,
+      "chunks": [
+        {
+          "hex": "7b2276223a312cff7d0a"
+        }
+      ],
+      "expect": [
+        {
+          "outcome": "rejected",
+          "code": "invalid_envelope",
+          "cause": "invalid_utf8"
+        }
+      ],
+      "expect_pending_bytes": 0
+    },
+    {
+      "name": "invalid_utf8_truncated_multibyte_sequence",
+      "note": "multi-byte列が3 byte中2 byteで切れている。UTF-8として不完全である。",
+      "capacity": 128,
+      "chunks": [
+        {
+          "hex": "7b2276223a312c22736964223a312c226964223a332c2274735f6d73223a302c2274797065223a2261636b222c227061796c6f6164223a7b227265706c795f736964223a312c227265706c795f746f223a312c22737461747573223a226f6b222c2264657461696c223a22e78c227d7d0a"
+        }
+      ],
+      "expect": [
+        {
+          "outcome": "rejected",
+          "code": "invalid_envelope",
+          "cause": "invalid_utf8"
+        }
+      ],
+      "expect_pending_bytes": 0
+    },
+    {
+      "name": "invalid_utf8_then_valid_line",
+      "note": "§8手順12。不正UTF-8の次の有効lineでparseを再開する（受け入れ条件5）。",
+      "capacity": 64,
+      "chunks": [
+        {
+          "hex": "fffe0a"
+        },
+        {
+          "utf8": "{\"v\":1,\"sid\":1,\"id\":1,\"ts_ms\":0,\"type\":\"ping\",\"payload\":{}}\n"
+        }
+      ],
+      "expect": [
+        {
+          "outcome": "rejected",
+          "code": "invalid_envelope",
+          "cause": "invalid_utf8"
+        },
+        {
+          "outcome": "frame",
+          "type": "ping",
+          "sid": 1,
+          "id": 1
+        }
+      ],
+      "expect_pending_bytes": 0
+    },
+    {
+      "name": "invalid_json_then_valid_line",
+      "note": "不正JSONの次の有効lineでparseを再開する。",
+      "capacity": 64,
+      "chunks": [
+        {
+          "utf8": "not json\n{\"v\":1,\"sid\":1,\"id\":1,\"ts_ms\":0,\"type\":\"ping\",\"payload\":{}}\n"
+        }
+      ],
+      "expect": [
+        {
+          "outcome": "rejected",
+          "code": "invalid_envelope",
+          "cause": "decode"
+        },
+        {
+          "outcome": "frame",
+          "type": "ping",
+          "sid": 1,
+          "id": 1
+        }
+      ],
+      "expect_pending_bytes": 0
+    },
+    {
+      "name": "empty_line",
+      "note": "改行だけの行。port openの雑音がここへ入る。",
+      "capacity": 64,
+      "chunks": [
+        {
+          "utf8": "\n"
+        }
+      ],
+      "expect": [
+        {
+          "outcome": "rejected",
+          "code": "invalid_envelope",
+          "cause": "decode"
+        }
+      ],
+      "expect_pending_bytes": 0
+    },
+    {
+      "name": "body_at_capacity",
+      "note": "容量ちょうどのbodyは受理する。",
+      "capacity": 72,
+      "chunks": [
+        {
+          "utf8": "{\"v\":1,\"sid\":1,\"id\":1,\"ts_ms\":0,\"type\":\"ping\",\"payload\":{\"pad\":\"aaaaa\"}}\n"
+        }
+      ],
+      "expect": [
+        {
+          "outcome": "frame",
+          "type": "ping",
+          "sid": 1,
+          "id": 1
+        }
+      ],
+      "expect_pending_bytes": 0
+    },
+    {
+      "name": "body_one_byte_over_capacity",
+      "note": "1 byte超過はline_too_long。prefixからidentityを復元できる（§8手順6）。",
+      "capacity": 72,
+      "chunks": [
+        {
+          "utf8": "{\"v\":1,\"sid\":1,\"id\":1,\"ts_ms\":0,\"type\":\"ping\",\"payload\":{\"pad\":\"aaaaaa\"}}\n"
+        }
+      ],
+      "expect": [
+        {
+          "outcome": "rejected",
+          "code": "line_too_long",
+          "cause": "oversize",
+          "identity": [
+            1,
+            1
+          ],
+          "type": "ping"
+        }
+      ],
+      "expect_pending_bytes": 0
+    },
+    {
+      "name": "crlf_at_capacity",
+      "note": "\\rもbody予算を使う。body 71 + CRLF は容量72に収まる。",
+      "capacity": 72,
+      "chunks": [
+        {
+          "utf8": "{\"v\":1,\"sid\":1,\"id\":1,\"ts_ms\":0,\"type\":\"ping\",\"payload\":{\"pad\":\"aaaa\"}}\r\n"
+        }
+      ],
+      "expect": [
+        {
+          "outcome": "frame",
+          "type": "ping",
+          "sid": 1,
+          "id": 1
+        }
+      ],
+      "expect_pending_bytes": 0
+    },
+    {
+      "name": "crlf_one_byte_over_capacity",
+      "note": "body 72 + CRLF は容量72を超える。§2が1024 bytesに\\rを含めるか書いていないため、この振る舞いはPROTO-TBD-002への入力である。",
+      "capacity": 72,
+      "chunks": [
+        {
+          "utf8": "{\"v\":1,\"sid\":1,\"id\":1,\"ts_ms\":0,\"type\":\"ping\",\"payload\":{\"pad\":\"aaaaa\"}}\r\n"
+        }
+      ],
+      "expect": [
+        {
+          "outcome": "rejected",
+          "code": "line_too_long",
+          "cause": "oversize",
+          "identity": [
+            1,
+            1
+          ],
+          "type": "ping"
+        }
+      ],
+      "expect_pending_bytes": 0
+    },
+    {
+      "name": "oversize_then_valid_line",
+      "note": "oversizeを次の改行まで破棄し、次の有効lineで再開する（受け入れ条件4と5）。",
+      "capacity": 64,
+      "chunks": [
+        {
+          "utf8": "{\"v\":1,\"sid\":1,\"id\":2,\"ts_ms\":0,\"type\":\"get_status\",\"payload\":{}}\n{\"v\":1,\"sid\":1,\"id\":1,\"ts_ms\":0,\"type\":\"ping\",\"payload\":{}}\n"
+        }
+      ],
+      "expect": [
+        {
+          "outcome": "rejected",
+          "code": "line_too_long",
+          "cause": "oversize",
+          "identity": [
+            1,
+            2
+          ],
+          "type": "get_status"
+        },
+        {
+          "outcome": "frame",
+          "type": "ping",
+          "sid": 1,
+          "id": 1
+        }
+      ],
+      "expect_pending_bytes": 0
+    },
+    {
+      "name": "two_oversize_lines_in_a_row",
+      "note": "破棄中にさらにoversizeが続く。1行につきちょうど1件だけ返す。",
+      "capacity": 64,
+      "chunks": [
+        {
+          "utf8": "{\"v\":1,\"sid\":1,\"id\":2,\"ts_ms\":0,\"type\":\"get_status\",\"payload\":{}}\n{\"v\":1,\"sid\":1,\"id\":2,\"ts_ms\":0,\"type\":\"get_status\",\"payload\":{}}\n"
+        }
+      ],
+      "expect": [
+        {
+          "outcome": "rejected",
+          "code": "line_too_long",
+          "cause": "oversize",
+          "identity": [
+            1,
+            2
+          ],
+          "type": "get_status"
+        },
+        {
+          "outcome": "rejected",
+          "code": "line_too_long",
+          "cause": "oversize",
+          "identity": [
+            1,
+            2
+          ],
+          "type": "get_status"
+        }
+      ],
+      "expect_pending_bytes": 0
+    },
+    {
+      "name": "oversize_recovers_identity_and_type",
+      "note": "§7はoversizeした行がbootのとき返し方を変える。typeまで復元する。",
+      "capacity": 128,
+      "chunks": [
+        {
+          "utf8": "{\"v\":1,\"sid\":90312,\"id\":907,\"ts_ms\":54000,\"type\":\"boot\",\"payload\":{\"firmware\":\"0.1.0\",\"board\":\"esp32\",\"reset_reason\":\"power_on\"}}\n"
+        }
+      ],
+      "expect": [
+        {
+          "outcome": "rejected",
+          "code": "line_too_long",
+          "cause": "oversize",
+          "identity": [
+            90312,
+            907
+          ],
+          "type": "boot"
+        }
+      ],
+      "expect_pending_bytes": 0
+    },
+    {
+      "name": "oversize_with_a_narrow_prefix_budget",
+      "note": "prefixを縮めるとidentityを復元できなくなる。縮めることは純粋な制限である。",
+      "capacity": 128,
+      "prefix_budget": 16,
+      "chunks": [
+        {
+          "utf8": "{\"v\":1,\"sid\":90312,\"id\":907,\"ts_ms\":54000,\"type\":\"boot\",\"payload\":{\"firmware\":\"0.1.0\",\"board\":\"esp32\",\"reset_reason\":\"power_on\"}}\n"
+        }
+      ],
+      "expect": [
+        {
+          "outcome": "rejected",
+          "code": "line_too_long",
+          "cause": "oversize"
+        }
+      ],
+      "expect_pending_bytes": 0
+    },
+    {
+      "name": "oversize_without_a_recoverable_identity",
+      "note": "JSONですらない長い行。復元できないので呼び出し側はoversize_linesの計数だけを行う。",
+      "capacity": 16,
+      "chunks": [
+        {
+          "utf8": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n"
+        }
+      ],
+      "expect": [
+        {
+          "outcome": "rejected",
+          "code": "line_too_long",
+          "cause": "oversize"
+        }
+      ],
+      "expect_pending_bytes": 0
+    },
+    {
+      "name": "partial_line_stays_in_the_buffer",
+      "note": "改行が来るまで結果を返さず、bufferに残す（受け入れ条件1）。",
+      "capacity": 64,
+      "chunks": [
+        {
+          "utf8": "{\"v\":1,\"sid\":1,\"id\":"
+        }
+      ],
+      "expect": [],
+      "expect_pending_bytes": 20
+    },
+    {
+      "name": "byte_order_mark_is_not_stripped",
+      "note": "BOMはUTF-8として妥当だがJSONとしては不正である。黙って落とさない。",
+      "capacity": 64,
+      "chunks": [
+        {
+          "hex": "efbbbf7b2276223a312c22736964223a312c226964223a312c2274735f6d73223a302c2274797065223a2270696e67222c227061796c6f6164223a7b7d7d0a"
+        }
+      ],
+      "expect": [
+        {
+          "outcome": "rejected",
+          "code": "invalid_envelope",
+          "cause": "decode"
+        }
+      ],
+      "expect_pending_bytes": 0
+    },
+    {
+      "name": "raw_newline_inside_a_json_string_splits_the_line",
+      "note": "framerはJSONを解釈しない。string中の生の改行でも行が切れ、2件の不正lineになる。",
+      "capacity": 64,
+      "chunks": [
+        {
+          "utf8": "{\"a\":\"x\ny\"}\n"
+        }
+      ],
+      "expect": [
+        {
+          "outcome": "rejected",
+          "code": "invalid_envelope",
+          "cause": "decode"
+        },
+        {
+          "outcome": "rejected",
+          "code": "invalid_envelope",
+          "cause": "decode"
+        }
+      ],
+      "expect_pending_bytes": 0
+    }
+  ]
+}

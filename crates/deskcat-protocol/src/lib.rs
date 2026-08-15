@@ -12,11 +12,14 @@
 //!   `get_status`、`status`、`ack`）
 //! - error code（§7）と、それを計上するcounterへの対応付け
 //! - 1 lineのdecodeとencode、および検証順序
+//! - byte列からlineを組み立てる上限付きreceiver（§8手順1〜6、Issue #10）。
+//!   分割受信、1回のreadに含まれる複数line、CRLF、invalid UTF-8の分類、
+//!   oversize行の破棄と上限付きprefixからのidentity復元を含む
 //! - 共有conformance fixture（`tests/fixtures/`）
 //!
 //! 含まないもの:
 //!
-//! - serial I/O、byte受信、分割lineの結合、invalid UTF-8の分類（Issue #10、#11）
+//! - serial deviceのopen、read／write、切断と再接続（Issue #11）
 //! - session state、duplicate履歴、受理budget、遷移cooldown（Issue #12）
 //! - hardwareに依存する値と処理
 //!
@@ -48,13 +51,19 @@
 pub mod decode;
 pub mod envelope;
 pub mod error;
+pub mod framing;
 pub mod limits;
 pub mod message;
+pub mod prefix;
+pub mod receiver;
 
 pub use decode::{decode_line, encode_line};
 pub use envelope::{Envelope, Frame};
 pub use error::{DecodeError, ErrorCode};
+pub use framing::{Framed, LineFramer, Progress};
 pub use message::{
     Ack, AckStatus, Boot, DisplayStatus, Hello, HelloReason, Message, ProtocolCounters,
     SensorStatus, ServoStatus, Status,
 };
+pub use prefix::{PrefixEnvelope, recover_identity};
+pub use receiver::{Cause, LineReceiver, Outcome, Received, Rejection};

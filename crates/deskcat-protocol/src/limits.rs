@@ -15,6 +15,20 @@
 //! escapeを含むworst caseは同fileが別testで「検出されること」を固定している。
 //!
 //! escape後のwire sizeまで含めた上限の確定は`PROTO-TBD-002`に含める。
+//!
+//! # oversize時に保持するprefix長の定数は置かない
+//!
+//! §8手順6は、overflowした行を破棄する前に上限付きprefixから`(sid, id)`の復元を試みると定め、
+//! そのprefix長を`PROTO-TBD-002`としている。**仕様は候補値を一つも示していない。**
+//! JSONはkeyの順序を縛らず、未知のkeyが間に入りうるため、「`v`、`type`、`sid`、`id`を
+//! 収めるのに必要なbyte数」に計算可能なworst caseは無い。だからTBDなのである。
+//!
+//! したがってここに`OVERSIZE_PREFIX_BYTES`のような定数を置かない。
+//! [`crate::framing::LineFramer`]は、既に保持している行bufferをそのままprefixとして使う。
+//! これは新しい数を決めずに済む退化した上限であり、追加のmemoryも要らない。
+//! `PROTO-TBD-002`が「行長上限より十分小さいこと」を求めているとおり、後から
+//! [`crate::framing::LineFramer::with_prefix_budget`]で縮められる。**縮めることは純粋な制限**
+//! であり、いま復元できない行が復元できるようになることはない。
 
 /// 実装が受理するwire protocolのmajor version（`v`）。
 ///
@@ -30,6 +44,21 @@ pub const PROTOCOL_VERSION: u16 = 1;
 /// **正本は仕様§2のtransport表である。**この定数はその値の写しであり、
 /// 両者の一致を検査する自動化は無い。§2を変えるときはここも同時に変える。
 pub const MAX_LINE_BYTES: usize = 1024;
+
+/// 終端の改行を除いた、1 lineのbody部の最大byte数。
+///
+/// [`MAX_LINE_BYTES`]から導出した値であり、新しく決めた数ではない。§2の上限は改行を含むため、
+/// 改行1 byteを引いたものがbufferへ蓄えてよいbody長になる。
+///
+/// **受信bufferの容量にはこちらを使う。**[`MAX_LINE_BYTES`]をそのまま容量にすると、
+/// 上限ちょうどの行を1 byte分多く受け入れてしまい、`line_too_long`の判定が
+/// [`crate::decode_line`]側と受信側の2箇所に分かれる。
+///
+/// CRLFで終わる行では、`\r`もbodyとして数える。改行の直前の`\r`は改行を受けた時点で
+/// 取り除くが、それまではbufferを占めるためである。したがってCRLFの行は`\n`だけの行より
+/// body予算を1 byte多く使う。§2は1024 bytesに`\r`を含めるかを書いていないため、
+/// この振る舞いは`PROTO-TBD-002`への入力として記録する。
+pub const MAX_LINE_BODY_BYTES: usize = MAX_LINE_BYTES - 1;
 
 /// `boot.firmware`と`status.firmware`のbyte上限。
 pub const MAX_FIRMWARE_BYTES: usize = 64;

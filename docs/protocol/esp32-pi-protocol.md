@@ -1168,26 +1168,29 @@ crates/deskcat-protocol/tests/fixtures/
 合格しなければならない」と定めているためである。同じdirectoryをfirmware側からpath参照するか
 複製するかは、同ADRのcrate共有方針の決定に従う。
 
-fixtureは最低限、次の5群をすべて含む。上の一覧と表がその内訳である。**現時点で揃っているのはSchema群と、Framing／parse群のうちline長境界・CRLF・invalid JSONだけである。**
+fixtureは最低限、次の5群をすべて含む。上の一覧と表がその内訳である。**現時点で揃っているのはSchema群とFraming／parse群である。**
 
 | 群 | 対象 | 状態 |
 |---|---|---|
 | Schema | envelope、type固有payload、上限の境界、未知version／type | **作成済み**（#9） |
-| Framing／parse | 分割受信、CRLF、invalid UTF-8／JSON、line長境界 | line長境界・CRLF・invalid JSONは**作成済み**（#9）。byte単位の分割受信とinvalid UTF-8は#10 |
+| Framing／parse | 分割受信、CRLF、invalid UTF-8／JSON、line長境界 | **作成済み。**line長境界・CRLF・invalid JSONは#9、byte単位の分割受信とinvalid UTF-8は#10 |
 | Session判定 | 遷移の成否、`stale_session`、retired session、`hello`／`boot`再送、`sid`衝突時の選び直し、retired保持期間、方向が逆のsession確立messageの拒否 | 未作成（#12） |
 | Duplicate replay | 同一`(sid, id)`のretry、保持結果の返却、非idempotent動作の二重実行防止 | 未作成（#12） |
 | Budgetと応答 | 受理上限、遷移budget／cooldown、予約枠、送出上限、ACKの優先 | 未作成（#12）。値が`PROTO-TBD-011`／`012`／`017`で未確定 |
 
-**未作成の3群は、単一lineのschema検証ではなく受信側のstateに依存する。**#9が提供するのは
-stateを持たない単一lineのdecodeであり、これらのcaseを置いても実行できない。budget群は
-parameterの数値自体が未確定である。
+**未作成の3群は、単一lineのschema検証でも1本のbyte streamの組み立てでもなく、session間にまたがる
+受信側のstateに依存する。**#9が提供するのはstateを持たない単一lineのdecodeであり、#10が実装した
+受信器が持つstateも1本のstreamの組み立て途中だけである。これらのcaseを置いても実行できない。
+budget群はparameterの数値自体が未確定である。
 
-したがって**この節はまだ「両側が検証済み」の根拠にならない。**現時点で確定したのは、
-schema層についてhost実装がfixtureに合格することだけである。firmware側の合格は#10、
+したがって**この節はまだ「両側が検証済み」の根拠にならない。**現時点で確定したのは、schema層と
+Framing／parse層について、**host workspaceのRust実装**がfixtureに合格することである。#10が実装した
+受信器はfirmwareからもpath dependencyで使うが（[ADR-0008](../decisions/0008-firmware-protocol-crate-reuse.md)）、
+根拠はcross compileが通ることまでであり、**実機上でのfixture実行はまだ行っていない。**
 残る3群は#12を待つ。`v: 1`が確定版を意味するのは、5群すべてが揃い両側のparserが
 合格した時点である（[§11](#11-versioning)）。
 
-作成作業は[初期Issue](../backlog/initial-issues.md)の#9が着手した。
+作成作業は[初期Issue](../backlog/initial-issues.md)の#9が着手し、Framing／parse群は#10が完了させた。
 `PROTO-TBD-016`はprotocol側の未決事項としての追跡であり、
 実施Issueを別に立てるものではない。
 

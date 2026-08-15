@@ -4,7 +4,7 @@
 //! firmware側の実装（Issue #10）が同じfileで検証できるようにするためである
 //! （ADR-0001「両側が共通JSON fixtureとprotocol conformance testに合格しなければならない」）。
 
-use deskcat_protocol::{decode_line, encode_line};
+use deskcat_protocol::{Cause, LineReceiver, Message, Outcome, decode_line, encode_line};
 use serde::Deserialize;
 
 const VALID: &str = include_str!("fixtures/valid.json");
@@ -174,6 +174,128 @@ fn invalid_fixtures_map_to_a_status_counter() {
             "{}: {} has no status counter",
             case.name,
             err.code()
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// byte経路（Issue #10）を通しても、`decode_line`と同じ結論になることを固定する。
+//
+// #10が足したのはbyte列からlineを組み立てる層だけであり、schemaの解釈は変えていない。
+// 同じfixtureを両方の入口へ流して、そのことを検査する。
+// ---------------------------------------------------------------------------
+
+/// 入力を受信器へ流し、結果を順に集める。
+fn receive(receiver: &mut LineReceiver, input: &[u8]) -> Vec<Outcome> {
+    let mut outcomes = Vec::new();
+    receiver.drain(input, |outcome| outcomes.push(outcome));
+    outcomes
+}
+
+#[test]
+fn valid_fixtures_decode_through_the_byte_path() {
+    for case in valid_doc().cases {
+        let expected = decode_line(&case.line).unwrap_or_else(|err| panic!("{}: {err}", case.name));
+
+        let mut receiver = LineReceiver::with_protocol_limit();
+        match receive(&mut receiver, case.line.as_bytes()).as_slice() {
+            [Outcome::Frame(frame)] => assert_eq!(*frame, expected, "{}", case.name),
+            other => panic!("{}: {other:?}", case.name),
+        }
+        assert_eq!(receiver.pending(), 0, "{}: bufferが残っている", case.name);
+    }
+}
+
+/// すべてのbyte境界で分割しても同じframeになる（§12「すべてのbyte境界で分割したmessage」）。
+#[test]
+fn valid_fixtures_decode_when_split_at_every_byte_boundary() {
+    for case in valid_doc().cases {
+        let expected = decode_line(&case.line).unwrap_or_else(|err| panic!("{}: {err}", case.name));
+        let bytes = case.line.as_bytes();
+
+        for split in 0..=bytes.len() {
+            let mut receiver = LineReceiver::with_protocol_limit();
+            let mut outcomes = receive(&mut receiver, &bytes[..split]);
+            outcomes.extend(receive(&mut receiver, &bytes[split..]));
+
+            match outcomes.as_slice() {
+                [Outcome::Frame(frame)] => {
+                    assert_eq!(*frame, expected, "{}: split {split}", case.name);
+                }
+                other => panic!("{}: split {split}: {other:?}", case.name),
+            }
+        }
+    }
+}
+
+/// 1回のreadに全fixtureのlineを詰めても、順番どおりに取り出せる。
+#[test]
+fn valid_fixtures_decode_when_concatenated_into_one_read() {
+    let cases = valid_doc().cases;
+    let mut input = String::new();
+    for case in &cases {
+        input.push_str(&case.line);
+    }
+
+    let mut receiver = LineReceiver::with_protocol_limit();
+    let outcomes = receive(&mut receiver, input.as_bytes());
+    assert_eq!(outcomes.len(), cases.len(), "取り出せた件数");
+
+    for (outcome, case) in outcomes.iter().zip(&cases) {
+        match outcome {
+            Outcome::Frame(frame) => {
+                assert_eq!(
+                    frame.message.type_str(),
+                    case.expect.type_name,
+                    "{}",
+                    case.name
+                );
+                assert_eq!(
+                    frame.envelope.identity(),
+                    (case.expect.sid, case.expect.id),
+                    "{}",
+                    case.name
+                );
+            }
+            other @ Outcome::Rejected(_) => panic!("{}: {other:?}", case.name),
+        }
+    }
+    assert_eq!(receiver.pending(), 0);
+}
+
+#[test]
+fn invalid_fixtures_fail_the_same_way_through_the_byte_path() {
+    for case in invalid_doc().cases {
+        let mut receiver = LineReceiver::with_protocol_limit();
+        match receive(&mut receiver, case.line.as_bytes()).as_slice() {
+            [Outcome::Rejected(rejection)] => {
+                assert_eq!(
+                    rejection.code().as_str(),
+                    case.expect_error,
+                    "{}: error code (detail: {})",
+                    case.name,
+                    rejection.detail()
+                );
+                // 行長超過は必ずframerが検知したものである。`decode_line`側の
+                // 行長判定は、この容量では到達しない。
+                if rejection.code().as_str() == "line_too_long" {
+                    assert_eq!(rejection.cause(), Cause::Oversize, "{}", case.name);
+                }
+            }
+            other => panic!("{}: {other:?}", case.name),
+        }
+    }
+}
+
+/// `type_str`と`known_type_name`が同じ綴りを使っていることを、fixtureの`expect.type`で固定する。
+#[test]
+fn fixture_type_names_round_trip_through_known_type_name() {
+    for case in valid_doc().cases {
+        assert_eq!(
+            Message::known_type_name(case.expect.type_name.as_bytes()),
+            Some(case.expect.type_name.as_str()),
+            "{}: 既知typeとして解決できない",
+            case.name
         );
     }
 }
