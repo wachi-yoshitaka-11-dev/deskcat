@@ -12,10 +12,13 @@ file 名と Record ID は初回検証日で固定し、以後の再検証でも�
 | [ESP32 Build (CI)](2026-08-10-esp32-build-ci.md) | CI | `Partial` | 2026-08-10 | 2026-08-10 |
 | [Host Rust Development (Linux x86_64)](2026-08-10-host-rust-linux.md) | Host Rust Development | `Verified` | 2026-08-10 | 2026-08-10 |
 | [Host Rust Development (実機 Linux x86_64)](2026-08-15-host-rust-native-linux.md) | Host Rust Development | `Verified` | 2026-08-15 | 2026-08-15 |
+| [ESP32 Build (実機 Linux x86_64)](2026-08-15-esp32-build-native-linux.md) | ESP32 Build | `Partial` | 2026-08-15 | 2026-08-15 |
 
-**同じ profile の記録が2件あるのは、端末が違うためである。**`2026-08-10`は VM 上、
-`2026-08-15`は実機で取得した。`Container / VM / native:`が異なるため、
+**同じ profile の記録が複数あるのは、端末が違うためである。**`2026-08-06`と`2026-08-10`は VM 上、
+`2026-08-15`の2件は実機で取得した。`Container / VM / native:`が異なるため、
 下の規則に従い別記録としている。**片方をもう片方の根拠にしない。**
+
+`2026-08-15`の2件は同じ端末だが profile が違うため、これも別記録である。
 
 CI の記録は開発端末の記録を置き換えない。**別環境で再現したことの記録**であり、
 [ESP32 Rust Toolchain](../esp32-rust-toolchain.md) の確定条件のうち
