@@ -623,9 +623,25 @@ raw deviceへ直接書いても7.4 MB/sで10 MB/sに届かないため、
 **「cardは仕様どおり」とも結論しない。**規定の条件下で測っていない以上、
 満たすことも確認できていない。
 
-**この端末では③を判定できない。**判定するには**40 MHzを超えるHigh Speed Mode**
-（`Class 10`の確認）か、**UHS-I bus mode**（`U1`の確認）で駆動できるhostが要る。
-**別のcardを用意しても解決しない。**
+**この端末では③を判定できない。**判定するには40 MHzを超えるHigh Speed Mode
+（`Class 10`の確認）か、UHS-I bus mode（`U1`の確認）で駆動できるhostが要る。
+別のcardを用意しても解決しない。
+
+#### ③の追跡を打ち切る
+
+**別のhostを用意して測り直すことはしない。**理由は次の2点である。
+
+**1. ③は何もblockしていない。**`HW-TBD-015`の`妨げる対象`は**耐久性**であり、
+速度は含まれない。`SD-01`の用途はRaspberry Piのbootとstorageであり、
+そこで効くのは①（容量詐称なし）と②（検査範囲に読み書き不良なし）である。
+**両方とも合格している。**書込み速度が影響するのはimage書き込みに要する時間だけである。
+
+**2. 作業指示は③に「検討」を求めていた。**元の指示は
+「最低限、次の観点を**検討する**」であり、確定を求めていない。
+**検討した結果が「この端末の測定条件では判定できない」であって、それが答えである。**
+
+**したがって③は`判定不能`のまま確定とし、残作業として持ち越さない。**
+将来この端末以外でcardを使う機会があれば、そのとき自然に分かる。
 
 **raw device試験で分かったのは「file systemを外しても届かない」という一点である。**
 card対hostの分離は、別のreaderを用意しない限りこの端末では進められない。
@@ -660,7 +676,7 @@ Ricoh `1180:E823` SDHCI controllerを介して行った。**Piでの動作は確
 | literalな全セクタの読み書き検査 | **実施しなかった** | `badblocks -w`はroot必須かつ完全破壊であり、①（容量詐称）を構造的に検出できない。①を優先して`f3`を選んだ。全セクタのliteralなカバーが要る場合は別途実施する |
 | SMART相当の情報取得 | **手段が存在しない** | この個体の接続経路にSMART相当のcommandが無い（上記④）。実施可能だが行わなかった、ではない。**なおSD Express（NVMe interface）にはSMARTがあるが、この個体はSD Expressではない** |
 | 耐久性（寿命）の評価 | **この記録の対象外** | 1回のhealth checkで書き込み寿命は判定できない。`HW-TBD-015`の`妨げる対象`のうち「耐久性」はこの記録では解決しない |
-| **規定の条件下での速度測定** | **実施できなかった** | ③を判定できない直接の原因。**hostのSD clockが33 MHzで、`Class 10`の測定条件40 MHz（High Speed Mode）にも`U1`の条件（UHS bus mode）にも達しない**（Table 4-61、Section 4.13.3）。**別cardを用意しても解決しない。40 MHz超のHigh Speed ModeかUHS-Iで駆動できるhostが要る** |
+| **規定の条件下での速度測定** | **実施しない（追跡を打ち切った）** | ③を判定できない直接の原因は**hostのSD clockが33 MHzで、`Class 10`の測定条件40 MHz（High Speed Mode）にも`U1`の条件（UHS bus mode）にも達しない**ことである（Table 4-61、Section 4.13.3）。**ただし③は何もblockしていない**（`妨げる対象`は耐久性であり速度を含まない）。**別hostを用意して測り直すことはしない** |
 | 書込み速度の各要因の寄与率 | **実施しなかった** | raw device試験で**FAT32だけでは未達を説明できない**ことは示したが、card・host controller・file systemそれぞれの寄与率は出していない（2つの測定は条件が複数異なる） |
 | `manfid`＝`0x1b`がSamsungであることの確認 | **この経路では解ける見込みが無い** | 仕様書もSD-3Cも**MIDと社名の対応表を公開していない**（2026-08-15確認）。**規格を定める側と割り当てる側の両方が公開していないため、追跡を打ち切った。網羅的に探したわけではない。****`SD-01`のメーカー表示の正は引き続き現物printである** |
 | host controllerのUHS-I対応可否の確定 | **実施しなかった** | `/sys/kernel/debug/mmc0/caps`／`caps2`がroot権限でも`EPERM`を返すため、capability registerを読めなかった。**測定がUHS modeでないことは`ios`と`dmesg`で確定しているが、hostが非対応なのかnegotiationが成立しなかっただけなのかは区別していない** |
@@ -717,3 +733,4 @@ version recordは別途要る。本記録の範囲外であり作成していな
 | 2026-08-15 | 13 | **自己レビューで検出。Revision 12が「`manfid`から社名を引く一次資料は存在せず」と全称否定で書いていた。****確認したのは仕様書とSD-3Cの2つであり、網羅的に探したわけではない。**「規格を定める側と割り当てる側の両方が公開していないため、この経路に見込みは無い」へ改め、**「存在しないことを証明した」からではなく「見込みが無い」から打ち切る**という区別を明記した。状態名も`一次資料では解けない`から`この経路では解ける見込みが無い`へ揃えた。**これはRevision 5で同じ型の誤り（SMARTの全称否定）を直したばかりであり、繰り返している** | 自己レビュー |
 | 2026-08-15 | 14 | **[PR #118](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/118)のCodeRabbit reviewの指摘2件を反映した。**(a) 見出し「MIDの対応表は公開されていない」が、**未確認の資料にも対応表が無いと読める表現だった。**後続の本文は非網羅的な確認であると断っていたが、**見出しがその限定を打ち消していた。**「確認した2つの資料はいずれもMIDの対応表を持たない」へ改めた。(b) [tbd-register.md](tbd-register.md)の`HW-TBD-015`行が`Samsung`を裏付けられない事実だけを記し、**照合を打ち切ったことを書いていなかった。**同じ行の[#117](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/117)が`manfid`照合を継続するIssueにも読めたため、**打ち切りの事実と、#117の範囲が耐久性・速度要因の分離・結果記録・close判断に限られることを明記した** | [PR #118のCodeRabbit review](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/118) |
 | 2026-08-15 | 15 | **③の原因を特定した。判定は`判定不能`のまま変わらないが、理由が変わった。****Revision 14までは`U1`（`UHS_SPEED_GRADE`）の条件だけを見ており、同じcardが申告する`SPEED_CLASS`＝Class 10の測定条件を調べていなかった。**仕様書Table 4-61は**`Class 10`をHigh Speed Modeの40 MHzで測ると定め**、Table 4-62が`Pw min.`10 MB/secを課す。Section 4.13.1.8.1のApplication Noteは`Host needs to use higher frequency clock than that of measurement condition.`と明記する。**本測定のhostは`sd high-speed`の33 MHzであり、40 MHzに達しない。**したがって`U1`の条件（UHS mode）だけでなく**`Class 10`の条件も満たしていない。****この端末ではcardの速度を判定できない。別cardを用意しても解決しない。****あわせて対照測定を実施した。**別card（SanDisk `SU16G`、Class 2）を同じreaderで測ると読み出し8.7 MB/s（Samsungは19〜20 MB/s）で、**host controllerは固定の上限を課していない。**一方**書込みは2枚とも5〜6 MB/sで並ぶ**（規格上2階級違うのに同値）。block sizeを4K〜8Mで変えても差が出ず、**律速はcommand発行回数ではなく持続throughput側にある。****Revision 4が「当初挙げた3要素のうちfile systemが消えた」と書いた整理も、原因がhostのclock不足である以上、不完全であった** | [Part 1 Physical Layer Simplified Specification Version 9.10](https://www.sdcard.org/downloads/pls/) Table 4-61／4-62、Section 4.13.1.8.1、本記録の対照測定 |
+| 2026-08-15 | 16 | **③の追跡を打ち切った。**Revision 15は原因（hostのclock不足）を特定したが、**「40 MHz超のhostで測り直す」を残作業として残していた。これをやめる。**(1) **③は何もblockしていない。**`HW-TBD-015`の`妨げる対象`は耐久性であり速度を含まない。`SD-01`の用途であるPiのbootとstorageで効くのは①②であり、両方とも合格している。(2) **作業指示は③に「検討」を求めていた**のであって確定を求めていない。**検討した結果が「この端末の測定条件では判定できない」であり、それが答えである。****測定結果と原因の記録は残し、残作業としては持ち越さない** | 作業指示、[tbd-register.md](tbd-register.md) `HW-TBD-015`の`妨げる対象` |
