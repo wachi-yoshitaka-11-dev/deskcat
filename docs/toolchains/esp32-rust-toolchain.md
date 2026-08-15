@@ -257,9 +257,11 @@ flash、serial monitor、実機起動は #6 の範囲であり、この文書の
 （documentation の例は `(revision 1)`、v5.3.1 の実装は `(revision v<major>.<minor>)`）。
 **行全体を文字列一致で照合しない。**この項目が求めるのは chip 名であって revision の書式ではない。
 
-**引用は版へ固定した。**`esptool` は v5.3.1、`espflash` は v4.5.0 である。既定 branch は変わるため、
-tag へ固定した path で確認した。**この 2 つを採用版として確定したわけではない。**使用する版は
-#6 で決め、[Version Record](version-record-template.md) へ記録する。
+**版へ固定したのは実装の引用だけである。**上表 2 行目の `esptool` は v5.3.1、3 行目の `espflash` は
+v4.5.0 であり、既定 branch は変わるため tag へ固定した path で確認した。**documentation の link は
+固定していない。**上表 1 行目は `latest` を指しており、**内容が変わりうる**ため取得日を併記した。
+**いずれも採用版として確定したわけではない。**使用する版は Issue
+[#6](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/6) で決め、[Version Record](version-record-template.md) へ記録する。
 
 **この再定義とあわせて日付を 1 件訂正した。**上の確定条件は旧記載で「非破壊で満たせないため
 **2026-08-13 に**書き換えた」としていたが、書き換えたのは **2026-08-15** である。08-13 は
