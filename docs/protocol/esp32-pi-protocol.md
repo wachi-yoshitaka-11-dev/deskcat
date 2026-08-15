@@ -1203,7 +1203,7 @@ schema層についてhost実装がfixtureに合格することだけである。
 | PROTO-TBD-006 | 最終status field | 診断要件とencode size test |
 | PROTO-TBD-007 | Textとchoiceの制限 | LCD layoutとmemory測定 |
 | PROTO-TBD-008 | Motion名と範囲 | Servo calibrationと動作設計 |
-| PROTO-TBD-009 | Touch strengthの意味 | 正確なtouch controllerと実験 |
+| PROTO-TBD-009 | Touch strengthの意味 | **touch controllerは`XPT2046`と確定した**（2026-08-13の現物確認。[HW-TBD-003](../hardware/tbd-register.md)はclose）。残るのは同ICのdatasheetでの意味づけと実験である |
 | PROTO-TBD-010 | Heartbeat方式とlink-loss判定 | 測定latencyとfail-safe試験。[HW-TBD-017](../hardware/tbd-register.md)と対で確定する。**サーボ出力の有効化条件に含まれる**（[servo-safety-limits](../hardware/servo-safety-limits.md#サーボ出力を有効化してよい条件)） |
 | PROTO-TBD-011 | `sid`の生成方法、衝突許容確率、**retired session**の保持件数と期間（下限は遅延messageの最大生存時間＋再送window。期間は`T_retention`と時間単位を一組で記録する。保持件数は`PROTO-TBD-012`の`N_transition`回／`T_window`から`N_transition × ceil(T_retention / T_window)`件以上とし、端数windowを切り上げる。retired `sid`を`stale_session`で遮蔽するためのものであり、`PROTO-TBD-005`とは目的が異なる）、`stale_session`受信による`sid`選び直し回数の上限、`hello`無応答時のrecovery budgetと同一identityの最大retry回数（`boot`のrecovery再開は`sid`を選び直さない。§4.1） | 再起動試験とRust実装の検討。[HW-TBD-020](../hardware/tbd-register.md)と対で確定する。**サーボ出力の有効化条件に含まれる** |
 | PROTO-TBD-012 | 単位時間あたりの受理上限、応答の送出上限と集約window、**`boot`への拒否ACK専用budget**、**`hello`への拒否ACK専用budget**、**受信側が所有する方向別応答保留table**（ESP32所有のPi→ESP32 `hello` tableと、Pi所有のESP32→Pi `boot` table）の件数上限・TTL・公平性規則、二つの件数上限の和として定義するlink全体の静的上限（entry keyは`(sender_role, sid, id)`。方向間で未使用枠を貸し出さない。TTLは最悪送出待ち時間以上。`rate_limited`は最終結果としてreplayしない）、各保留entryの初回送出機会とsession messageの最大retry回数を合わせた有限送出quota、**`rate_limited`で拒否された`hello`のretry budget**、duplicateへ非ACKの保持結果をreplayする時間窓と回数の上限、**正規retry quota内の保持ACK replay予約容量**（送出総数上限と通常のper-identity上限に優先。通常commandは1回、`hello`は`PROTO-TBD-011`、`boot`は`PROTO-TBD-017`の最大retry回数を使い、各identityの残quotaと同一windowの最大retry到着数から有限容量を算出する）、`hello`／`boot`の受理予約枠割合、session遷移の上限（任意の連続`T_window`あたり`N_transition`回。数値と時間単位を一組で記録し、固定window境界で上限を迂回できない方式にしてPROTO-TBD-011の保持件数式へ渡す）、cooldown、ACK・完了event・fault event・`status`用に確保する帯域 | protocolの負荷試験（throughput、応答遅延、buffer占有、枯渇の有無）。これらはlinkの負荷管理parameterであり、温度／電流試験では決まらない。[HW-TBD-020](../hardware/tbd-register.md)のservoの秒あたり受理command数と対で確定する。その値はhardware台帳が正本であり、ここではlink全体のbudgetへ組み込む条件だけを扱う。**サーボ出力の有効化条件に含まれる**（[servo-safety-limits](../hardware/servo-safety-limits.md#サーボ出力を有効化してよい条件)） |
@@ -1221,6 +1221,7 @@ schema層についてhost実装がfixtureに合格することだけである。
 | 2026-07-28 | Draft 2 | Envelopeへ`sid`を追加。`hello`、`rate_limited`、`stale_session`を追加。Piの再起動でduplicate判定が誤るcaseを修正し、流量制限とlink-loss検知の未決事項を登録 |
 | 2026-07-31 | Draft 2 review | ACKと完了eventへ`reply_sid`を追加し、要求送信側の再起動後に旧sessionの応答を誤認するcaseを修正 |
 | 2026-08-10 | Draft 2 fixture | §3のinteger widthを確定し、§7へ単一lineの検証で決まるcodeの対応付けを追加（分類と送出の判断を分ける）。§12.1をschema群のfixture作成済みの状態へ更新。wire formatは変更していない |
+| 2026-08-15 | Draft 2 sync | [PR #122](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/122)。`PROTO-TBD-009`の解決方法が`正確なtouch controllerと実験`のままだったため、**touch controllerが`XPT2046`と確定した**ことを反映した（[HW-TBD-003](../hardware/tbd-register.md)はclose）。**protocolの仕様は変えていない。**残る作業は同ICのdatasheetでのtouch strengthの意味づけと実験である |
 
 ### Draft schemaの互換性
 

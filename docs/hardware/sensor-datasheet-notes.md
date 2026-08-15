@@ -4,7 +4,7 @@
 > 正本とする情報: Driverに必要な、データシート由来のdevice動作
 >
 > **公開specから確定する欄は2026-08-10に埋めた。**残る`TBD`は次のいずれかである。
-> (a) 現物確認が要るもの（jumper状態、address、touch controller型番、backlight回路）、
+> (a) 現物確認が要るもの（jumper状態、address、backlight回路）。**touch controller型番は2026-08-13に`XPT2046`と確定した**、
 > (b) メーカーが公開していないもの（MSP2807のSPI mode／max clock、初期化sequence、消費電流）、
 > (c) bench試験で決めるもの。**推定で埋めない**（[AGENTS.md](../../AGENTS.md) 推測禁止）。
 
@@ -38,7 +38,7 @@ controllerの挙動は`ILI9341 Datasheet V1.13`（Ilitek、2011-08-05）によ�
 |---|---|
 | Module識別情報 | MSP2807（touch付。touch無しは MSP2806）。PCB 50.0×86.0 mm、AA 43.2×57.6 mm（datasheet記載のまま） |
 | Controller IC | `ILI9341` |
-| 解像度 | **datasheetの表記は`320×240`。**一方[hardware-bom.md](hardware-bom.md) DISP-01は`240×320`と記載している。**向きの取り方が違うだけと思われるが確認していない。**どちらをdriverの基準にするかは現物のbench試験（単色fill、四隅の座標pattern、rotation）で確定する |
+| 解像度 | **現物silkは`2.8 TFT SPI 240X320 V1.2`である**（2026-08-13確認。パネルは`HSD028309 A2`）。[hardware-bom.md](hardware-bom.md) DISP-01の`240×320`と一致する。**一方メーカーdatasheetの表記は`320×240`で向きが逆である。**向きの取り方の違いと思われるが、どちらをdriverの基準にするかは現物のbench試験（単色fill、四隅の座標pattern、rotation）で確定する |
 | Color format／order | RGB 65K color。byte orderはTBD（**現物のbench試験で確認する**） |
 | Interface | 4-wire SPI（14pin。LCDとtouchでbusを共有し、CSを分ける） |
 | 供給電圧 | VCC 3.3–5 V |
@@ -86,13 +86,16 @@ controllerの挙動は`ILI9341 Datasheet V1.13`（Ilitek、2011-08-05）によ�
 
 ## Touch controller
 
-出典: 上記と同じdatasheet。**controllerの型番はdatasheetに記載が無い**ため、多くの欄が現物確認待ちである
-（追跡は[tbd-register HW-TBD-003](tbd-register.md)）。
+出典: 上記と同じdatasheet。**controllerの型番はdatasheetに記載が無い**ため、
+**型番は2026-08-13に現物chip刻印で`XPT2046`と確定した**（追跡は[tbd-register HW-TBD-003](tbd-register.md)）。
+
+**下表の`TBD`は、型番が決まったことで「現物確認待ち」から「`XPT2046`のdatasheetを当てる作業」へ移った。**
+まだ当てていないため値は入れない（[AGENTS.md](../../AGENTS.md) 推測禁止）。
 
 | 項目 | 値 |
 |---|---|
-| Module／controller識別情報 | Moduleは MSP2807（DISP-01と同一）。**controller ICの型番はメーカー未公開。**`XPT2046`系と推定されるが**未確認**であり、現物chip刻印で確定する |
-| Touch方式 | TBD（controller型番の確定待ち。resistiveと推定） |
+| Module／controller識別情報 | Moduleは MSP2807（DISP-01と同一）。**controller ICは`XPT2046`（確定）。**現物裏面`U2`（TSSOP-16）の刻印を2026-08-13に読み取った（`XPT`ロゴ、`XPT2046`、ロット`ABDEAB`）。**メーカーdatasheetには型番の記載が無いため、刻印が唯一の根拠である** |
+| Touch方式 | TBD（`XPT2046`のdatasheetで確認する） |
 | Interface | SPI（LCDとbusを共有し、`T_CS`で分ける）。信号は`T_CLK`／`T_CS`／`T_DIN`／`T_DO`／`T_IRQ` |
 | 供給／logic電圧 | DISP-01と同一（VCC 3.3–5 V、logic 3.3 V TTL） |
 | AddressまたはSPI mode | TBD |
@@ -169,16 +172,18 @@ module boardの値は、これとは別に現物でしか決まらない（[AGEN
 
 ### module boardの値（秋月 M-06724）
 
-**すべて現物確認が要る**（[tbd-register HW-TBD-004](tbd-register.md)）。商品ページが404で資料が無い。
+**商品ページが404で資料が無いため、現物確認が唯一の根拠である**（[tbd-register HW-TBD-004](tbd-register.md)）。
+**2026-08-13に現物を確認し、下表の一部が確定した。**
 
 | 項目 | 値 |
 |---|---|
-| Module識別情報 | ADXL345モジュール（秋月 M-06724） |
-| 実装されているinterface（jumper設定） | TBD |
-| 実装済みI2C address | TBD |
-| board上のregulatorの有無 | TBD。**旧記載の「regulator非搭載」は根拠資料（秋月 商品ページ。現在404）を失ったため、2026-08-11に現物確認待ちへ改めた**（[hardware-bom.md](hardware-bom.md) Revision 31）。**載っていないことを前提にしない** |
+| Module識別情報 | ADXL345モジュール（秋月 M-06724）。**IC刻印は`345B` / `#727` / `750B` / `PHIL`**（2026-08-13読了）。`345B`はAnalog DevicesのADXL345の刻印であり、**ICの根拠がsilkと購入履歴からIC自身の刻印になった** |
+| pin列 | 上段 `CS` `Vs` `GND` `VDD`、下段 `INT1` `INT2` `SDO` `SDA` `SCL`（2026-08-13確認）。**`Vs`と`VDD`が別pinとして表記されている。**ただし**これはheaderのsilkラベルであって、board上の配線ではない。**各pinがICの`VS`／`VDD I/O`へ直結しているか、直列抵抗やlevel shiftが入るか、2系統を独立に給電してよいかは、**パターンを追っていないため未解決である**（導通確認またはPCBパターンの追跡が要る） |
+| 実装されているinterface（jumper設定） | TBD。**裏面の半田ジャンパ2箇所はいずれもオープンである**（2026-08-13確認）。ただし各ジャンパが何を選ぶかはboard資料が無く、パターンも追っていないため不明 |
+| 実装済みI2C address | TBD。**`SDO`はheaderへ出ており、基板上で固定されていない。**したがってaddressは配線時に決まる |
+| board上のregulatorの有無 | **非搭載（確定）。**2026-08-13の現物確認で、IC＋`C1`×2＋抵抗のみであり3端子部品が無いことを確認した。**旧記載は根拠資料（秋月 商品ページ。現在404）を失ってTBDへ戻していたが、現物で確定した** |
 | moduleへ入れてよい電圧 | TBD。**ICの動作上限3.6 Vも絶対最大定格3.9 Vも、boardの許容値と同一視しない**（regulatorやlevel shiftの有無で変わる）。**[power-budget.md](power-budget.md)と[hardware-bom.md](hardware-bom.md)が置く「3.3 Vで給電する」は、この行が埋まるまで確定しない。****5 V直結の禁止と、この行は別の主張である。**5 V禁止は「moduleがregulatorを持たなければ5 VがICへ直接掛かる」ことを否定できないための**確認前の安全規則**であって、IC定格からmoduleの許容入力電圧を導いたものではない。3.3 Vをmoduleが受け入れる根拠も同様に別に要る（[tbd-register HW-TBD-004](tbd-register.md)） |
-| Module搭載pull-up | TBD（有無と値） |
+| Module搭載pull-up | **`01C`（EIA-96で10 kΩ、1%）が4個**（2026-08-13確認）。ほかに`R2`＝`0`（0 Ωジャンパ）が1個。**どのpinへ付くかはパターンを追っていないため未確定であり、I2Cの実効pull-upを計算する前に配線を確認する**（[gpio-assignment.md](gpio-assignment.md)の競合checklist） |
 
 必要なベンチ試験の根拠:
 
@@ -304,3 +309,6 @@ M-06724に何が実装済みかが未確認である以上、外付けの要否�
 | 2026-08-12 | 4 | 昇格PR[#109](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/109)のレビュー指摘2件を反映。(a) **`DC/RS`の極性が、controllerの実挙動と逆であった。**module datasheetの14pin表は`high level: register, low level: data`と記載しているが、`ILI9341 Datasheet V1.13`は`When DCX = '1', data is selected. When DCX = '0', command is selected.`と定める。`DC/RS`はcontrollerの`D/CX`へ直結するため**ILI9341を正**とし、両者が食い違う事実と理由を記載した。**module datasheetの記載を消していない**（出典との差を辿れなくなるため）。あわせてbench試験の項目へ極性確認を追加した。(b) **ADXL345のICの値に、開いた出典が無かった。**`analog.com`は2026-08-12にも到達できない（45秒timeout）ままだが、**SparkFunがhostするRev. 0版を開けた**ため到達状況表へ追加し、既記載の値（供給電圧、測定range、interface）をその版で確認した。あわせて`VS`／`VDD I/O`の記号名、FIFOの32段と4 mode、`SDO/ALT ADDRESS`による`0x1D`／`0x53`の選択を記録した。**Revision 3で落とした`VS`と`ALT ADDRESS`は、いずれも結果として正しかった。**ただし当時は開いていない資料の内容であり、落とした判断は当時の根拠に照らして正しい。**mirrorであり公式配布物との同一性も現行revisionであることも確認できていない**ため、その旨を明記した。**絶対最大定格は引き続き扱っていない**（`HW-TBD-025`(b)、[#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)） |
 | 2026-08-12 | 5 | [#1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1)と[#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)。**メーカー公式のRev. Gを入手し、Revision 4までの前提2つが誤りであったと判明した。**(a) **`analog.com`へ到達できないという判定が誤りであった。**ブラウザからは取得できる。到達できないのはCLI client（WebFetch／curl）であり、「本作業環境から開けない」「egressの問題である」という従来の記述を撤回した。**原因は特定していないため書いていない。**(b) **Revision 4が記録したRev. 0の絶対最大定格3.6 Vはsupersededであった。**Rev. Gは`VS`／`VDD I/O`とも**−0.3 V to +3.9 V**とし、Rev. Gの`REVISION HISTORY`は`4/10—Rev. 0 to Rev. A`で`Table 2`を改訂したと記す。あわせて`Supply Current`（145/40→140/30 µA）、`VDD I/O`の下限表記、`Device Weight`（20→30 mg）も差がある。**動作範囲3.6 Vと絶対最大定格3.9 Vは別物である**ため、供給電圧の行を動作範囲と絶対最大定格に分けた。**`HW-TBD-025`(b)の答えとして、絶対最大定格に電流の上限が記載されていないことを記録した。**「あるはず」と仮定せずに確認した結果である。あわせてRev. Gから`Device ID`（`0x00 DEVID`＝`0xE5`）、`Sensitivity`（256 LSB/g）、`Output data rate`（0.1–3200 Hz）、`起動／reset sequence`（Table 6。software reset registerは無い）、`Calibration要件`（`OFSX`/`OFSY`/`OFSZ`、15.6 mg/LSB）を埋め、**driver設計判断と実機検証に属する部分は[#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)を追跡先として`TBD`のまま残した。**(c) **`Interrupt pinと動作`の駆動形式は、`gpio-assignment.md`が「push-pull／open-drainを設定可能」と書いていたが誤りである。**Rev. Gは`Both interrupt pins are push-pull, low impedance pins`と定める。polarityの既定active-highは正しく、`DATA_FORMAT`のreset値から確定に改めた。**module boardの値（秋月 M-06724）は1欄も変更していない。****ICの3.9 Vをboardの許容入力電圧と同一視しない**（`HW-TBD-004`）。**5 V直結の禁止も変えていない。**3.9 Vであっても5 Vはこれを超える |
 | 2026-08-12 | 6 | [#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)。(a) **`Local decoupling`節を新設した**（`HW-TBD-029`）。この文書はdatasheet由来値の正でありながら、decouplingの記載が1件も無かった。BME280は`C1`／`C2`とも推奨100 nF（Bosch Revision 1.24のFigure 17／18／19のNote）で、**AE-BME280は各0.1 µFを実装済みである**（説明書v1.1の部品表。「ピンヘッダ以外は基板にすべて実装済み」）。ADXL345は`CS` 1 µF tantalum＠`VS`／`CI/O` 0.1 µF ceramic＠`VDD I/O`をsupply pin近傍へ、追加が要れば100 Ω以下の抵抗かferrite beadを`VS`と直列に、さらに`VS`のbypassを10 µF tantalum ∥ 0.1 µF ceramicへ増やす（Rev. G page 29）。**同節が`VS`と`VDD I/O`を別電源にすることも推奨している点もあわせて記録した。**MSP2807は**decouplingの記載が無いことを確認した**（`Product Parameters`の電気的仕様は3項目のみ）。**`CS`は推奨値1 µFを採ることを根拠付きで決めた**（Table 1 page 3の`CS = 10 µF`は測定条件であって設計要件ではなく、page 29自身が10 µFを追加策として位置づけている）。**ICへの指定とmodule boardの実装を分けて書き、外付けの要否はこの文書で判断していない**（判断は[power-budget.md](power-budget.md)の`local decouplingの外付け要否`）。(b) **Environmental sensorへ`絶対最大定格`行を追加した。**`Voltage at any supply pin`は−0.3 V to +4.25 V、`Voltage at any interface pin`は−0.3 V to `VDDIO` + 0.3 Vである（Revision 1.24 Table 5 page 13）。**電流の上限が無いことも記録した。****[hardware-bom.md](hardware-bom.md)と[tbd-register.md](tbd-register.md)は2026-08-12にこの確認結果を引用していたが、datasheet由来値の正であるこの文書に元の記録が無かった。**ADXL345には同じ行があり、BME280だけ欠けていた。あわせて既存の供給／logic電圧の行を`（動作範囲）`と明示し、絶対最大定格と混同しない書き分けをADXL345と揃えた。**module boardの値（秋月 M-06724、AE-BME280）は1欄も変更していない** |
+| 2026-08-15 | 7 | [#1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1)。**現物写真の読み取り結果を反映した。**(a) Touch controllerを**`XPT2046`と確定**した（現物`U2`の刻印。`XPT`ロゴ、ロット`ABDEAB`）。同節の`TBD`は「現物確認待ち」から「`XPT2046`のdatasheetを当てる作業」へ移った。(b) LCD moduleの解像度欄へ、**現物silkが`2.8 TFT SPI 240X320 V1.2`であり`hardware-bom.md`の`240×320`と一致する**ことを追記した。(c) ADXL345のmodule board表を更新し、**IC刻印`345B`によるIC確定**、**regulator非搭載の確定**、**搭載pull-upが`01C`＝10 kΩ×4**であること、`Vs`と`VDD`が別pinに出ていること、裏面の半田ジャンパ2箇所がオープンであること、`SDO`が基板上で固定されておらずaddressが配線時に決まることを記録した。**pull-upがどのpinへ付くかはパターンを追っていないため未確定のままとした** |
+| 2026-08-15 | 8 | [PR #122](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/122)のレビュー指摘を反映。(a) `Touch方式`欄に`resistiveと推定`が残っていたため削除した。**同節は「型番が決まったのでdatasheetを当てる段階へ移った」と書きながら推定値を残しており、矛盾していた。**(b) 文書冒頭の状態行が`touch controller型番`を現物確認待ちに挙げたままだったため、`XPT2046`確定を反映した |
+| 2026-08-15 | 9 | [PR #122](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/122)のレビュー指摘を反映。ADXL345 module boardの`pin列`欄が「**moduleはICの2系統電源を外部から個別に受ける**」と断定していた。**これはheaderのsilkラベルから導けない。**観測できた事実を「`Vs`と`VDD`が別pinとして表記されている」に限定し、ICへの接続・直列抵抗・level shift・独立給電の可否は導通確認またはPCBパターンの追跡まで未解決とした。**`tbd-register.md`の`HW-TBD-004`は同じ指摘で先に直しており、この文書だけが取り残されていた** |
