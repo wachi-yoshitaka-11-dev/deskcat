@@ -3,7 +3,14 @@ name = "deskcat-protocol"
 version = "0.1.0"
 description = "ESP32–Raspberry Pi wire protocolの型、検証、共有conformance fixture"
 edition.workspace = true
-rust-version.workspace = true
+# workspaceの`rust-version`を継承しない。このcrateは`firmware/esp32`からもpath dependencyで
+# 使うため（ADR-0008）、host（1.97.1）とESP toolchain（`esp-1.95.0.0` = rustc 1.95.0-nightly）の
+# 両方を満たす下限を宣言する必要がある。1.97のままにすると、firmware側のbuildが
+# 「rustc 1.95.0-nightly is not supported」でcompile前に停止する。
+#
+# 宣言した1.95は、その版で実際にbuildとtestを通した結果である（PRの検証欄を参照）。
+# 上げるときはESP toolchainの版と同時に判断する。
+rust-version = "1.95"
 license.workspace = true
 publish.workspace = true
 

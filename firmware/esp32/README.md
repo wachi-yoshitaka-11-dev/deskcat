@@ -45,6 +45,28 @@ cargo build --locked
 
 **止めるのが`build.rs`とは限らない。**`IDF_PATH`の指す先が実在しない場合は、依存の`esp-idf-sys`が先に別のerror（`could not determine esp-idf version from ...`）で失敗する。どちらでもbuildは止まるが、`build.rs`のguardのmessageは出ない。実測は[Version Record](../../docs/toolchains/version-records/2026-08-06-esp32-build-linux.md)にある。
 
+## host crateの再利用
+
+`deskcat-protocol`をpath dependencyで使う。wire protocolの実装を両側で1つに保つためであり、
+判断の記録は[ADR-0008](../../docs/decisions/0008-firmware-protocol-crate-reuse.md)にある。
+
+```toml
+deskcat-protocol = { path = "../../crates/deskcat-protocol" }
+```
+
+- root workspaceの`exclude = ["firmware/esp32"]`は**維持する。**lockfileはroot `Cargo.lock`と
+  このディレクトリの`Cargo.lock`の2つに分かれたままでよい。
+- **共有crateの`rust-version`は、host（1.97.1）とESP toolchain（rustc 1.95.0-nightly）の
+  両方を満たす下限にしてある。**`crates/deskcat-protocol/Cargo.toml`が理由込みで宣言している。
+  ここを上げるとfirmwareのbuildが`rustc 1.95.0-nightly is not supported`でcompile前に止まる。
+- `crates/deskcat-protocol/**`の変更でも`.github/workflows/firmware.yml`が発火する。
+  host側だけの変更でfirmware buildが壊れるのを検知するためである。
+
+**`src/main.rs`はまだこのcrateを呼び出していない。**serial taskの配線は
+[#12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)の担当である。
+現時点で示せているのは、固定toolchainで`xtensa-esp32-espidf`向けにcross compileできることまでで、
+**実機上での動作とfixture合格は主張しない。**
+
 ## 未確定の前提
 
 機種と搭載moduleは確定している（ESP-WROOM-32D開発ボード／秋月電子 M-13628。基板にrevision表示は無い）。根拠は[hardware-bom.md](../../docs/hardware/hardware-bom.md)のMCU-01である。

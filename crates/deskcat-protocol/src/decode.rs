@@ -53,8 +53,9 @@ struct WireEnvelope<'a> {
 /// 判定では改行1 byteを加えて数える。§2の「受信可能なline ending」に従い、末尾の`\n`と
 /// その直前の`\r`は取り除く。
 ///
-/// byte列としての受信、分割されたlineの結合、invalid UTF-8の分類はこのcrateの範囲外であり、
-/// firmware側のincremental receiver（Issue #10）が扱う。
+/// byte列としての受信、分割されたlineの結合、invalid UTF-8の分類はこの関数の外側であり、
+/// [`crate::receiver::LineReceiver`]が扱う。**この関数は`&str`を取る。**byte列から`str`への
+/// 境界はreceiver側にある。
 ///
 /// # 検証順序
 ///
@@ -77,8 +78,11 @@ struct WireEnvelope<'a> {
 /// - [`ErrorCode::LineTooLong`]は、§7により`(sid, id)`を**復元できた場合にだけ**返してよい。
 ///   復元は上限付きprefix（`PROTO-TBD-002`）に対して行う。**この関数はprefixからの
 ///   identity復元を行わない。**行全体を受け取る以上、上限を超えた行のどこまでを保持するかは
-///   byte受信を持つ層（Issue #10）の判断だからである。復元できなければ、呼び出し側は
+///   byte受信を持つ層の判断だからである。復元は[`crate::receiver::LineReceiver`]が行い、
+///   結果を[`crate::receiver::Rejection::identity`]で返す。復元できなければ、呼び出し側は
 ///   応答せず`oversize_lines`の計数だけを行う。
+///   なお[`crate::receiver::LineReceiver::with_protocol_limit`]の容量では、この関数の
+///   行長判定へ到達しない。receiver側が先に検知するためである。
 /// - [`ErrorCode::UnknownType`]は、§3によりPi→ESP32でidentityを復元できる場合に相関ACKを
 ///   返し、ESP32→Piでは応答せず計数だけを行う。方向はこの関数の入力に含まれない。
 ///

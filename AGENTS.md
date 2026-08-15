@@ -120,7 +120,7 @@ cargo build --locked
 
 `--locked` は追跡している `Cargo.lock` からの逸脱を失敗として扱う。`cargo fmt` はこの option を受け付けない。
 
-Linux x86_64 で検証した。初回は 2026-08-06、現行 tree に対する最新の検証は 2026-08-10 である（[Version Record](docs/toolchains/version-records/2026-08-06-esp32-build-linux.md)）。別端末での再現は CI の `ubuntu-24.04` runner で満たした（#42。[Version Record](docs/toolchains/version-records/2026-08-10-esp32-build-ci.md)）。**build-only であり、flash と実機起動は主張しない。**
+Linux x86_64 で検証した。初回は 2026-08-06、現行 tree に対する最新の検証は 2026-08-15 である（[Version Record](docs/toolchains/version-records/2026-08-06-esp32-build-linux.md)）。別端末での再現は CI の `ubuntu-24.04` runner で満たした（#42。[Version Record](docs/toolchains/version-records/2026-08-10-esp32-build-ci.md)）。**build-only であり、flash と実機起動は主張しない。**
 
 host workspace には検証済みコマンドがある。repository root で実行する。ESP32 toolchain は要らない。
 
@@ -135,6 +135,8 @@ lint の水準は root `Cargo.toml` の `[workspace.lints]` が持つため、`-
 Linux x86_64、Rust stable 1.97.1 で検証した。検証日は 2026-08-10 である（[Version Record](docs/toolchains/version-records/2026-08-10-host-rust-linux.md)）。別端末での再現は未検証である。
 
 `firmware/esp32` は root workspace から `exclude` している。firmware の manifest は `[workspace]` 節を持たないため、exclude を外すと firmware の build が壊れる。
+
+firmware は `crates/deskcat-protocol` を path dependency で使う（[ADR-0008](docs/decisions/0008-firmware-protocol-crate-reuse.md)）。**同 crate の `rust-version` は host と ESP toolchain の両方を満たす下限にしてある。**上げると firmware の build が compile 前に停止する。`crates/deskcat-protocol/` を変更したら、host だけでなく ESP32 build も回す。
 
 Raspberry Pi、HIL、ESP32 の flash と serial monitor には、まだ正式なコマンドが無い。[ツールチェーン一覧](docs/toolchains/README.md) と未検証の runbook 手順を、検証済みコマンドとして扱わない。clean build の成功ごとにこの節を更新する。
 
