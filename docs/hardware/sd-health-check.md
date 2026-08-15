@@ -93,9 +93,16 @@ Card reader: 内蔵SDHCI（PCI）。driver sdhci-pci、PCI ID 1180:E823（Ricoh�
 
 Tools:
   f3: 8.0（Ubuntu package f3 8.0-2build2）。作業用に一時導入し、作業後に撤去した
-  util-linux (lsblk): 2.39.3
+  util-linux (lsblk, wipefs): 2.39.3
+  dosfstools (mkfs.vfat): 4.2-1.1build1
+  parted: 3.6 (GNU parted)
+  udisks2 (udisksctl): 2.10.1-6ubuntu1.3
+  coreutils (dd): 9.4
   検査用file system: FAT32（mkfs.vfat -F 32）。単一partitionへ再formatした
 ```
+
+**`mkfs.vfat`は`--version`を受け付けない。**上の値はpackage版
+（`dpkg -l dosfstools`）である。`udisksctl`も同様にpackage版を記載した。
 
 **`f3`の一時導入について。**[AGENTS.md](../../AGENTS.md)は「ツール導入は、対象Issue、端末profile、
 人間の確認が揃った開発端末だけで行う」と定める。対象Issueは
@@ -103,6 +110,42 @@ Tools:
 撤去の確認は下の「実測結果」に記載する。
 
 ## 実測結果
+
+### 実行したcommand
+
+**別のoperatorが観測値を再現できるよう、取得に使ったcommandを記録する。**
+root権限を要するものはhumanが実行した。
+
+```bash
+# card識別情報（CID由来field、CSD、SCR、SSR）。root不要
+for f in type manfid oemid name hwrev fwrev date scr ssr ocr cid csd preferred_erase_size; do
+  printf "%-22s " "$f"; cat "/sys/block/mmcblk0/device/$f"
+done
+```
+
+```bash
+# host側のbus modeとclock、およびcapability register。root必須
+sudo sh -c 'for f in /sys/kernel/debug/mmc0/*; do [ -f "$f" ] && echo "--- $f" && cat "$f"; done; echo "=== dmesg ==="; dmesg | grep -i mmc0'
+```
+
+```bash
+# 検査対象を単一partitionにする（既存内容を破壊する）。root必須
+sudo wipefs -a /dev/mmcblk0 && sudo parted -s /dev/mmcblk0 mklabel msdos mkpart primary fat32 1MiB 100% && sudo mkfs.vfat -F 32 -n F3TEST /dev/mmcblk0p1
+```
+
+```bash
+# mount（polkit経由、root不要）→ 検査 → 後片付け
+udisksctl mount -b /dev/mmcblk0p1
+f3write /media/<user>/F3TEST/
+f3read  /media/<user>/F3TEST/
+rm -f /media/<user>/F3TEST/*.h2w && sync
+udisksctl unmount -b /dev/mmcblk0p1
+```
+
+raw device試験のcommandは後述の該当節に置く。
+
+**`caps`と`caps2`はroot権限でも`EPERM`を返し取得できなかった。**
+そのため本記録にhost controllerのcapability registerの値は無い。
 
 ### 識別情報（⑤）
 
@@ -337,6 +380,18 @@ raw書込みの後にfile systemのmetadataがcacheから書き戻され、
 sudo sh -c 'echo "=== raw write ==="; dd if=/dev/urandom of=/dev/mmcblk0 bs=1M count=2048 oflag=direct 2>&1 | tail -1; sync; echo 3 > /proc/sys/vm/drop_caches; echo "=== raw read ==="; dd if=/dev/mmcblk0 of=/dev/null bs=1M count=2048 iflag=direct 2>&1 | tail -1'
 ```
 
+**このcommandの弱点を明記する。**`dd ... 2>&1 | tail -1`はpipelineであり、
+**終了statusは`tail`のものになる。**`sudo sh -c`に`set -o errexit`も`pipefail`も付けていないため、
+**`dd`が失敗しても後続の`sync`・`drop_caches`・読出しへ進みうる。**
+失敗した試験の値を速度として記録してしまう構成である。**次に同じ試験を行うときは
+`set -o pipefail`を付けるか、`dd`の終了statusを直接確認する。**
+
+**今回の結果が失敗でないことは、出力自体から確認できる。**`dd`は完走時に
+転送byte数と所要時間を要約行へ出す。記録した2行はいずれも
+`2147483648 bytes (2.1 GB, 2.0 GiB) copied`であり、**指定した`bs=1M count=2048`＝2 GiBと一致する。**
+途中で失敗していれば転送量がこれを下回る。**ただしこれは事後の確認であって、
+commandが失敗を検出する仕組みを持っていたわけではない。**
+
 **各optionの意図。**`oflag=direct`／`iflag=direct`が`O_DIRECT`を指定してpage cacheを迂回する。
 `bs=1M count=2048`で2 GiBを対象とする。書込み後に`sync`し、`drop_caches`へ`3`を書いて
 page cacheとdentry／inode cacheを落としてから読み出す。**速度は`dd`自身の最終行の報告を採る**
@@ -440,7 +495,11 @@ registerで裏付けられていない（`manfid`の登録簿が仕様書に無�
 2. **一方で、host経路が6 MB/s台で頭打ちだとも言えない。**同じhost・同じcard・同じ
    file systemの読み出しが19.15 MB/sを記録している。搭載RAMは3.7 GiB
    （うちbuff/cache 1.2 GiB）に対し読んだのは29.80 GiBであり、
-   **page cacheでは19.15 MB/sを説明できない。**
+   **19.15 MB/sは全dataがcacheだけで処理された結果ではない。**
+   **ただしpage cacheが一部に寄与していないことまでは示していない。**
+   uncached baselineもcache hit率も測っていないためである。
+   （なおraw device読出しは`iflag=direct`と`drop_caches`でcacheを外して20.3 MB/sであり、
+   cacheを排した経路でも同程度の値が出ている。）
 3. **書込みが遅い原因を、cardとhostとfile systemに分離できていない。**
    raw deviceへ直接書いても7.4 MB/sで10 MB/sに届かないため、
    **FAT32だけでは未達を説明できない**（上の「raw deviceへの直接書込み」）。
@@ -454,13 +513,26 @@ registerで裏付けられていない（`manfid`の登録簿が仕様書に無�
 **raw device試験で分かったのは「file systemを外しても届かない」という一点である。**
 card対hostの分離は、別のreaderを用意しない限りこの端末では進められない。
 
-### この判定でPiのbootに使ってよいか
+### この判定が及ぶ範囲
 
-**使ってよい。**①②が示すのは、全域の読み書きが正しく、容量が公称どおりであることであり、
-bootとstorageの用途で問題になるのはこの2点である。③はDeployの可否を左右しない
-（書込み速度はimage書き込みに要する時間に影響するだけである）。
+**この記録が示すのはhost側の結果だけである。**測定はx86_64のUbuntu host上で、
+Ricoh `1180:E823` SDHCI controllerを介して行った。**Piでの動作は確認していない。**
 
-**ただし「速度を確認済み」とは書かない。**③は未達のままである。
+**確認できたこと。**①②により、`f3`が書き込んだ全空き領域で容量詐称が確認されず、
+読み書き不良も確認されなかった。**これはcardをPiのbootとstorageに使う前提として
+必要な条件であり、この試験環境ではそれを満たしている。**
+
+**確認していないこと。**次はいずれもこの記録の範囲外である。
+
+- **PiへのOS imageの書き込み**
+- **Piでのbootと動作**
+- **PiのSD host controllerとの組合せでの互換性・速度。**本記録のbus mode
+  （`sd high-speed`・3.30 V signaling）はこのhostのものであり、Piでの動作modeとは別である
+- **③の速度。**`U1`が規定するUHS mode条件外の測定であり判定不能である
+  （書込み速度はimage書き込みに要する時間に影響するが、この記録では評価していない）
+
+**「Piのbootに使ってよい」という判断は、この記録だけでは下せない。**
+下すにはPiでの書き込みとbootの確認が要る。
 
 ### 実施しなかった項目
 
@@ -490,3 +562,4 @@ bootとstorageの用途で問題になるのはこの2点である。③はDeplo
 | 2026-08-13 | 7 | **[PR #115](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/115)のCodeRabbit full reviewの指摘5件を反映した。**(a) `f3write`の出力を2〜29番だけ省略していた。**節自身が「出力全文を埋め込む」と書いており矛盾していたため、30行すべてを未加工で掲載した。**(b) raw device試験の**実行commandを記録していなかった**ため再現できなかった。`dd (coreutils) 9.4`の版とcommand全文、各optionの意図、`/dev/urandom`の事前測定を追記した。(c) **Revision 4が書いた「6.11 MB/sの主因はFAT32ではないと確定した」は過剰な断定であった。**同じ節が「上界を与えたにとどまる」と書いており、文書内で矛盾していた。`7.4 ÷ 6.11 ＝ 1.21`も**raw経路が21%速いことを示すだけでFAT32の寄与率ではない。**「FAT32だけでは10 MB/s未達を説明できない」へ改め、寄与率を算出しないことを明記した。`hardware-bom.md`と`tbd-register.md`へも波及させた。(d) **Revision 1以来**③の判定を`未達（inconclusive）`としていた。**`未達`は有効な条件での失敗を指すため、UHS mode条件外の測定に使うのは誤りである。**`判定不能（UHS mode条件外）`へ改め、測定値が基準値に達していないこととcardがU1要件を満たさないことは別である旨を明記した。(e) **Revision 1以来**検査範囲を「29.80 GiB全域」と書いていたが過大表現であった。同文書が`f3`はfile systemの空き領域だけを書くと明記しているため、「`f3`が書き込んだ全空き領域（29.80 GiB）」へ改め、3文書で表現を揃えた | [PR #115のCodeRabbit review](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/115) |
 | 2026-08-13 | 8 | **[PR #115](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/115)のCodeRabbit再reviewの指摘3件のうち2件を反映した。**(a) **raw device試験の節が、unmountをいつ行ったか読み取れない構成だった。**`f3`のfile削除とunmountは実際にはraw試験の前に済ませてあるが、それを記した「事後処理」節を後ろに置いていたため、**mount中のpartitionへraw書込みをしたように読めた。**実施順序を同節の冒頭へ明示し、mountしたまま行っていないことと、その理由を書いた。**手順自体は変えていない。文書の構成の問題である。**(b) **Revision 1が書いた「偽造品ではない」は断定しすぎであった。**この検査が見たのはfile systemの空き領域だけで、metadata領域と予約領域は検査しておらず、`Samsung`というメーカー表示もregisterで裏付けられていない。**「容量詐称は確認されなかった」「検査範囲に読み書き不良は確認されなかった」の2点へ言い換え、両者が「偽造品でない」と同じではないことを明記した。**`hardware-bom.md`と`tbd-register.md`の表現も揃えた。**(c) 残る1件（「2026-08-13の結果を2026-08-12基準日で載せるな」）は反映していない。**指摘が前提とする基準日が誤っており、**実施日2026-08-13は実際の日付である**（未来日付ではない）。詳細はPRのthreadに記した | [PR #115のCodeRabbit review](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/115) |
 | 2026-08-15 | 9 | **自己レビューで検出。Revision 7と8が、訂正した記述をどのRevisionが書いたのか明示していなかった。**この repository の慣行（[hardware-bom.md](hardware-bom.md)の「Revision 29が〜」「Revision 31は〜」）と揃っていない。訂正元をRevision 1（「偽造品ではない」「未達（inconclusive）」「29.80 GiB全域」）とRevision 4（「主因はFAT32ではないと確定した」）へ明示した。**帰属先はいずれもgit履歴で実在を確認しており、推測で番号を書いていない** | 自己レビュー |
+| 2026-08-15 | 10 | **[PR #115](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/115)のCodeRabbit再reviewの指摘6件を反映した。**(a) `mkfs.vfat`／`udisksctl`／`parted`／`wipefs`のversionが無かった。package版で追記し、**`mkfs.vfat`が`--version`を受け付けないため package版を記した**旨も書いた。(b) **registerとbus modeの取得commandを記録しておらず、別のoperatorが観測値を再現できなかった。**`実行したcommand`節を新設し、識別情報・`ios`・`dmesg`・format・mount・後片付けのcommandを載せた。**`caps`／`caps2`がroot権限でも`EPERM`で取得できなかったことも明記した。**(c) **raw device試験の`dd`が失敗を検出できない構成だった。**`dd ... | tail -1`はpipelineで終了statusが`tail`のものになり、`pipefail`も`errexit`も付けていない。**この弱点を明記し、次回は`set -o pipefail`か終了statusの直接確認を行うこととした。**あわせて今回の結果が失敗でないことを、転送byte数が指定値と一致することから示した。**ただしこれは事後確認であって、commandが失敗を検出する仕組みを持っていたわけではない。**(d) **「page cacheでは19.15 MB/sを説明できない」は言い過ぎであった。**29.80 GiBが3.7 GiBのRAMを超えることが示すのは「全dataがcacheだけで処理された結果ではない」ことまでである。page cacheが一部に寄与していないことは示していない（uncached baselineもcache hit率も測っていない）。表現を弱め、raw読出しがcacheを外して20.3 MB/sであったことを併記した。(e) **「この判定でPiのbootに使ってよい」は、host固有の試験結果からdeployの可否を導いていた。**測定はx86_64 Ubuntu host上のRicoh SDHCI controller経由であり、**Piへのimage書き込み、Piでのboot、PiのSD host controllerとの互換性はいずれも未確認である。**節を`この判定が及ぶ範囲`へ改め、確認できたことと確認していないことを分けた。`hardware-bom.md`にも波及させた。(f) `hardware-bom.md`と`tbd-register.md`が2つの実施日を`2026-08-12`へ畳んでいた。`f3`による検査（08-12）とregister照合・raw device試験（08-13）を書き分けた | [PR #115のCodeRabbit review](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/115) |
