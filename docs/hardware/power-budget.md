@@ -65,7 +65,8 @@
   5V出力になるとESP32のGPIOが定格超過となり破損しうる。level shiftの有無を現物の
   回路で確認するまでは、安全側に倒して3.3V給電とする。
 
-3V3 railに接続する3moduleの合計消費電流は、ADXL345とBME280が文献値で数mA未満と小さい一方、
+3V3 railへ接続する予定の3module（**ADXL345は`HW-TBD-004`がcloseするまで接続しないため、
+closeした場合の見積である**）の合計消費電流は、ADXL345とBME280が文献値で数mA未満と小さい一方、
 **MSP2807のbacklightを含む消費電流は未確認**（負荷表参照）である。加えて
 **この基板の3V3 pinが外部へ供給できる電流の定格も未確認**（`hardware-bom.md` MCU-01で
 「定格はTBD」）である。`測定計画`で3V3 railの供給能力とMSP2807の実消費電流を測るまで、
@@ -914,7 +915,7 @@ PC USBからのflashing、周辺module3点の3.3 V側定常電流の実測）だ
   - [ ] 測定2: ＋ESP32（Wi-Fi停止、idle）
   - [ ] 測定3: ＋ESP32のWi-Fi TXを動作させた状態
   - [ ] 測定4: ＋MSP2807（backlight点灯を含む）
-  - [ ] 測定5: ＋ADXL345、BME280
+  - [ ] 測定5: ＋ADXL345、BME280（**ADXL345は`HW-TBD-004`がcloseするまで接続しない**）
 
   （この1〜5は段階C内の測定順序であり、`5 V ingress`節の段階A／B-1／B-2／Cとは別の
   番号体系である。混同しない）
@@ -926,7 +927,7 @@ PC USBからのflashing、周辺module3点の3.3 V側定常電流の実測）だ
       peakによる電圧降下はここで捉える。**ESP32のbrownoutとreset reasonもあわせて確認する**
       （ESP32は自身でbrownoutを検出する）。**Piのundervoltage警告は当てにしない**
       （`Pi Zero Wには低電圧検出が無い`）
-- [ ] ESP32 board上3V3 pinの外部供給可能電流の定格を確認し、周辺module3点（MSP2807、ADXL345、BME280）を接続した状態で3V3 rail電圧と電流を実測する。3V3 pinの供給能力を超える場合は別途3.3V regulatorを追加する。**定格の確認は段階B-2aの実施条件でもある**（`段階B-2の測定`）。実測自体を段階B-2で先に済ませてよい。段階Cで再測するのは、5 V railからの給電に切り替えた後の値を確認するためである
+- [ ] ESP32 board上3V3 pinの外部供給可能電流の定格を確認し、周辺module3点（MSP2807、ADXL345、BME280）を接続した状態で3V3 rail電圧と電流を実測する。**ADXL345を繋ぐのは`HW-TBD-004`がcloseした後である**（`電源rail構成案`の`（接続不可）`）。3V3 pinの供給能力を超える場合は別途3.3V regulatorを追加する。**定格の確認は段階B-2aの実施条件でもある**（`段階B-2の測定`）。実測自体を段階B-2で先に済ませてよい。段階Cで再測するのは、5 V railからの給電に切り替えた後の値を確認するためである
 - [ ] **ESP32の給電経路を確定させる**（`ESP32の給電経路（未決定）`節）。案A: PiのUSB OTG portからESP32＋3V3負荷を給電したときの電流とESP32入力電圧を実測し、ESP32のundervoltageとbrownoutが起きないことを確認する。**Pi側はundervoltage警告が出ないため、`ADC-5V`の実測で見る。ただし合否の判定は`HW-TBD-028`(a)が確定するまでできない**（`Pi Zero Wには低電圧検出が無い`）。不足する場合は案Bへ切り替え、そのとき秋月基板のVBUS保護diodeの有無を回路で確認してから`5V` pinとUSBを同時接続する
 - [ ] サーボなしでlogicへ給電し、電流を記録する（上記の段階測定の結果をそのまま用いる）
 - [ ] UndervoltageなしでESP32とPiがbootすることを確認する
@@ -1150,3 +1151,4 @@ rippleはDMMで代替できない。
 | 2026-08-12 | 41 | [PR #116](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/116)のreview指摘。`Pi Zero Wには低電圧検出が無い`と`(a)の一次資料は存在しない`が「**Pi側の低電圧は`ADC-5V`の実測でしか捉えられない**」と書いており、**同じ文書の`定義した値をどの段階で照合するか`表が「DMMで直流値を読むだけなら不要」としているのと食い違っていた。****量によって手段が違う。**定常電圧はDMMで読め、`ADC-5V`が要るのは**droopとripple**である。両者を書き分けた。**合否判定が`Blocked`である点は変えていない**（閾値が(a)として未確定であるため） | [PR #116のreview](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/116) |
 | 2026-08-15 | 42 | [#1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1)。**現物確認の結果、参照設計を根拠にしていた記述の前提が2箇所崩れたため訂正した。**(a) **`U2`が参照設計と違う部品であることが判明した。**現物の刻印は`LD1117AG` / `33AQVCUV`で、参照設計の`AMS1117-3.3`ではない。pin互換の二次ソースだが部品が違うため、**この文書が`HW-TBD-025`(a)と(b)の導出に使っている`AMS1117`のdatasheet値（出力電圧範囲3.201–3.399 V、dropout最大1.3 V）は現物の値ではない。**`LD1117AG`のメーカーが特定できずdatasheetを当てられないため、**現物のdropout電圧と出力電圧範囲は未確定である。**参照設計に基づく暫定値として残すが、**現物の合格判定には使えない**と明記した。(b) 電源rail構成案の図のADXL345行を更新し、**M-06724のregulator非搭載を現物確認した**ことを反映した（`moduleへ入れてよい電圧`は引き続き未確定）。**どのgateも開いていない。**段階B-2aは`HW-TBD-023`が未解決のままである | 現物写真（斜光＋接写）。詳細は[tbd-register.md](tbd-register.md)の`HW-TBD-023`／`HW-TBD-004` |
 | 2026-08-15 | 43 | [PR #122](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/122)のレビュー指摘を反映。**電源rail構成案の図がADXL345を3.3V railの下に置いたままで、`HW-TBD-004`のclose前に接続を承認したように読めた。**ADXL345の枝を`（接続不可）`とし、**`HW-TBD-004`がcloseするまでこの経路へ接続してはならない**ことを明記した。あわせて本文の「周辺moduleはすべて3.3Vで給電し」という表現を改めた。**未確定のmoduleを含む「すべて」は、接続を承認済みに見せる** | [PR #122レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/122) |
+| 2026-08-15 | 44 | Revision 43の残存を修正。**図でADXL345を`（接続不可）`とした一方、本文と測定checklistが接続を前提にしたままだった。**(a)「3V3 railに接続する3module」→「接続する予定の3module」とし、**ADXL345分は`HW-TBD-004`がcloseした場合の見積である**ことを明記した。(b) 段階Cの`測定5`と3V3 pin定格確認の項目に、**ADXL345を繋ぐのは`HW-TBD-004`のclose後である**ことを追記した。**見積りの数値も測定手順も変えていない** | [PR #122レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/122) |
