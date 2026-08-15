@@ -253,7 +253,7 @@ hostではなくregulatorである**。したがってgateは`3V3`側に置く�
 |---|---|
 | 測定点 | ESP32 boardの`3V3` pinと周辺module3点のrailの間。デジタルテスター（MAS830L）を直列に入れる |
 | 実施条件（定格） | `3V3` pinの外部供給可能電流の定格を一次資料または現物回路で確認する（`hardware-bom.md`の部品受け入れchecklist、`MCU-01`）。**確認できるまでB-2aを実施しない** |
-| 実施条件（保護） | board上regulatorの過電流保護／短絡保護の有無と動作（制限電流、折り返し特性、熱shutdownの有無）を**一次資料または現物回路で確認する**。**保護が無い、または確認できない場合はB-2aを採らない**（B-2bへ移る。**ただしB-2bにも固有の条件があり、共通条件は両経路に掛かる**）。**2026-08-15に確認は完了した。結果はこの経路に不利である。**`U2`＝UMW `LD1117-3.3`は電流制限`Ilimit` min 1.25 A／max 1.6 Aと熱shutdown`TSD` typ 150 ℃を持つが、**短絡保護は無く、折り返し特性の記載も無い。****電流制限のtrip点はこの品の定格1 Aより上にあり、定格超過から1.25 Aまでの区間で電流を絞るものは無い。**したがってこの経路が頼る保護は実質的に熱shutdownだけである（`HW-TBD-023`(c)） |
+| 実施条件（保護） | board上regulatorの過電流保護／短絡保護の有無と動作（制限電流、折り返し特性、熱shutdownの有無）を**一次資料または現物回路で確認する**。**保護が無い、または確認できない場合はB-2aを採らない**（B-2bへ移る。**ただしB-2bにも固有の条件があり、共通条件は両経路に掛かる**）。**2026-08-15時点で確認は完了していない。**`U2`＝UMW `LD1117-3.3`は電流制限`Ilimit` min 1.25 A／max 1.6 Aと熱shutdown`TSD` typ 150 ℃を持つことまでは確定したが、**短絡保護の有無と折り返し特性はdatasheetに記載が無い。記載が無いことを「保護が無い」とも「保護がある」とも読まない**（[AGENTS.md](../../AGENTS.md) 推測禁止）。**この項目が求めているのは短絡・配線ミス時の動作であり、そこが未確定である以上、この条件は満たされていない。****あわせて分かったのは、電流制限のtrip点がこの品の定格1 Aより上にあり、`IOUT` 1.0–1.25 Aの区間は電流制限が動作しない範囲だということである。**この区間で熱shutdownが働くかは放熱条件次第でありdatasheetからは決まらない（`HW-TBD-023`(c)） |
 | 電流の上限 | 上記電流定格の**80%**（この文書のderating規則と揃える）。**定格そのものを上限にしない** |
 | 停止条件（電流） | 3.3 V branchの定常電流がこの上限に達した時点で中止する |
 | 停止条件（電圧） | `3V3` railの電圧が共通の許容電圧範囲を外れた時点で中止する。**下限割れはregulatorが電流を出しきれていない兆候**であり、電流計の読みが上限内でも中止する |
@@ -264,14 +264,15 @@ hostではなくregulatorである**。したがってgateは`3V3`側に置く�
 **2026-08-15に`LDO`と確定した**（`HW-TBD-023`(b)）。
 
 この経路の実施条件（定格、種別、過電流／短絡保護）の追跡は[HW-TBD-023](tbd-register.md)で行う。
-**2026-08-15時点で種別と保護は確定し、残るのは定格である。**その定格は
+**2026-08-15時点で確定したのは種別と、保護のうち制限電流・熱shutdownの有無だけである。****短絡保護と折り返し特性は未確定であり、`実施条件（保護）`は満たされていない。**残るもう一つは定格である。その定格は
 **Espressifがboard levelで公開しておらず、`U2`のdatasheetでも埋まらない。**
 ICの供給能力は上限を与えるだけであり、datasheetのNote 1は`Rθja`が実装方法で変わると明記している。
 **したがってB-2aの`実施条件（定格）`を満たす手段は、現状では現物の実測しか残っていない。**
 **その実測はB-2そのものであるため、この経路は循環している。**
 **経路の選択はここでは決めない**（`HW-TBD-023`のOwnerはHumanである）。
 **判断材料として次の2点を`HW-TBD-009`へ渡す。**(1) B-2aの`実施条件（定格）`は資料では埋まらず循環すること。
-(2) B-2aが頼る保護は熱shutdownだけであること。
+(2) B-2aが頼るregulatorの保護は、**短絡・配線ミス時の動作がdatasheetから決まらず、
+`IOUT` 1.0–1.25 Aの区間は電流制限が動作しない範囲である**こと。
 
 ##### B-2b: 外部の3.3 V電源から給電する経路
 
@@ -1171,4 +1172,4 @@ rippleはDMMで代替できない。
 | 2026-08-15 | 42 | [#1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1)。**現物確認の結果、参照設計を根拠にしていた記述の前提が2箇所崩れたため訂正した。**(a) **`U2`が参照設計と違う部品であることが判明した。**現物の刻印は`LD1117AG` / `33AQVCUV`で、参照設計の`AMS1117-3.3`ではない。pin互換の二次ソースだが部品が違うため、**この文書が`HW-TBD-025`(a)と(b)の導出に使っている`AMS1117`のdatasheet値（出力電圧範囲3.201–3.399 V、dropout最大1.3 V）は現物の値ではない。**`LD1117AG`のメーカーが特定できずdatasheetを当てられないため、**現物のdropout電圧と出力電圧範囲は未確定である。**参照設計に基づく暫定値として残すが、**現物の合格判定には使えない**と明記した。(b) 電源rail構成案の図のADXL345行を更新し、**M-06724のregulator非搭載を現物確認した**ことを反映した（`moduleへ入れてよい電圧`は引き続き未確定）。**どのgateも開いていない。**段階B-2aは`HW-TBD-023`が未解決のままである | 現物写真（斜光＋接写）。詳細は[tbd-register.md](tbd-register.md)の`HW-TBD-023`／`HW-TBD-004` |
 | 2026-08-15 | 43 | [PR #122](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/122)のレビュー指摘を反映。**電源rail構成案の図がADXL345を3.3V railの下に置いたままで、`HW-TBD-004`のclose前に接続を承認したように読めた。**ADXL345の枝を`（接続不可）`とし、**`HW-TBD-004`がcloseするまでこの経路へ接続してはならない**ことを明記した。あわせて本文の「周辺moduleはすべて3.3Vで給電し」という表現を改めた。**未確定のmoduleを含む「すべて」は、接続を承認済みに見せる** | [PR #122レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/122) |
 | 2026-08-15 | 44 | Revision 43の残存を修正。**図でADXL345を`（接続不可）`とした一方、本文と測定checklistが接続を前提にしたままだった。**(a)「3V3 railに接続する3module」→「接続する予定の3module」とし、**ADXL345分は`HW-TBD-004`がcloseした場合の見積である**ことを明記した。(b) 段階Cの`測定5`と3V3 pin定格確認の項目に、**ADXL345を繋ぐのは`HW-TBD-004`のclose後である**ことを追記した。**見積りの数値も測定手順も変えていない** | [PR #122レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/122) |
-| 2026-08-15 | 45 | [#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)。**現物の`U2`のメーカーを特定し、`AMS1117`由来の導出を現物のdatasheetへ差し替えた。**`U2`は**UMW（UTD Semiconductor Co., Limited）の`LD1117-3.3`（SOT-223）**である。根拠は刻印`LD1117AG` / `33AQVCUV`と、UMW datasheetが図示するSOT-223 template（1行目`LD1117AG`、2行目`xxAQwwT S`。`xx`はVoltage）の一致である。**UTC（Unisonic Technologies）も候補に挙げたが外した**（UTCのtemplateは社名行を含み`AQ`を生まない）。(a) `暫定値の下限は、そのままでは成立しない`節の出力電圧行を**3.201–3.399 V（`AMS1117`）から3.234–3.366 V（現物）へ差し替えた。下限が3.3 Vを割るという結論は変わらない。**(b) `(b)のESP32 board 5 V入力の導出`節を書き換えた。**4.6 Vという数値は変わらないが、根拠が別部品の`IOUT ≤ 0.8 A`条件付きの値から、現物の部品の`IOUT = 1 A`でのdropout最大1.30 Vへ変わった。**(c) **regulatorの種別がLDOと確定したため、5 V側への換算`Iin ≒ Iout + Iq`を使ってよいことにした**（`Iq` typ 5 mA／max 10 mA）。(d) **保護の内容を記録した。**電流制限`Ilimit` min 1.25 A／max 1.6 A、熱shutdown`TSD` typ 150 ℃、**短絡保護は無く折り返し特性の記載も無い。****trip点が1 Aの定格より上にあるため、B-2aが頼る保護は実質的に熱shutdownだけである。**この事実をB-2aの`実施条件（保護）`と逆極性保護のdesign reviewへ反映した。**どのgateも開いていない。**B-2aの`実施条件（定格）`は**Espressifがboard levelで公開しておらず、ICのdatasheetでも埋まらないことが確定した**ため、`HW-TBD-023`(a)は未解決のまま残る | [UMW LD1117 datasheet](https://www.umw-ic.com/static/pdf/a5e0c99cefdefaf03cfa7777b369e45b.pdf) Mar.2025（sha256 `5dec5c09027316c375c27108cbac9d088ba94060bebacd614a04a3b8bb18a3d3`、2026-08-15取得）。詳細は[tbd-register.md](tbd-register.md)の`HW-TBD-023` |
+| 2026-08-15 | 45 | [#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)。**現物の`U2`のメーカーを特定し、`AMS1117`由来の導出を現物のdatasheetへ差し替えた。**`U2`は**UMW（UTD Semiconductor Co., Limited）の`LD1117-3.3`（SOT-223）**である。根拠は刻印`LD1117AG` / `33AQVCUV`と、UMW datasheetが図示するSOT-223 template（1行目`LD1117AG`、2行目`xxAQwwT S`。`xx`はVoltage）の一致である。**UTC（Unisonic Technologies）も候補に挙げたが外した**（UTCのtemplateは社名行を含み`AQ`を生まない）。(a) `暫定値の下限は、そのままでは成立しない`節の出力電圧行を**3.201–3.399 V（`AMS1117`）から3.234–3.366 V（現物）へ差し替えた。下限が3.3 Vを割るという結論は変わらない。**(b) `(b)のESP32 board 5 V入力の導出`節を書き換えた。**4.6 Vという数値は変わらないが、根拠が別部品の`IOUT ≤ 0.8 A`条件付きの値から、現物の部品の`IOUT = 1 A`でのdropout最大1.30 Vへ変わった。**(c) **regulatorの種別がLDOと確定したため、5 V側への換算`Iin ≒ Iout + Iq`を使ってよいことにした**（`Iq` typ 5 mA／max 10 mA）。(d) **保護の内容を記録した。**電流制限`Ilimit` min 1.25 A／max 1.6 Aと熱shutdown`TSD` typ 150 ℃までは確定したが、**短絡保護と折り返し特性はdatasheetに記載が無い。記載の不在を保護の不在と読み替えないため、B-2aの`実施条件（保護）`は満たされていないままとした**（[AGENTS.md](../../AGENTS.md) 推測禁止）。**確定したのは、trip点1.25 Aが1 Aの定格より上にあり、`IOUT` 1.0–1.25 Aの区間が電流制限の動作しない範囲だということである。**この事実をB-2aの`実施条件（保護）`と逆極性保護のdesign reviewへ反映した。**どのgateも開いていない。**B-2aの`実施条件（定格）`は**Espressifがboard levelで公開しておらず、ICのdatasheetでも埋まらないことが確定した**ため、`HW-TBD-023`(a)は未解決のまま残る | [UMW LD1117 datasheet](https://www.umw-ic.com/static/pdf/a5e0c99cefdefaf03cfa7777b369e45b.pdf) Mar.2025（sha256 `5dec5c09027316c375c27108cbac9d088ba94060bebacd614a04a3b8bb18a3d3`、2026-08-15取得）。詳細は[tbd-register.md](tbd-register.md)の`HW-TBD-023` |
