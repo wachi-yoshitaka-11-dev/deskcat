@@ -73,9 +73,9 @@ Commands run:
 Expected result: すべて成功する。warning を出さない。
 
 Actual result:
-  cargo fmt --all -- --check                      成功。差分なし
-  cargo clippy --all-targets --locked -D warnings 成功。warning 0 件
-  cargo build --locked                            成功
+  cargo fmt --all -- --check                         成功。差分なし
+  cargo clippy --all-targets --locked -- -D warnings 成功。warning 0 件
+  cargo build --locked                               成功
 
 Build duration:
   cargo clippy（ESP-IDF 本体の compile を含む初回）  16m27s
