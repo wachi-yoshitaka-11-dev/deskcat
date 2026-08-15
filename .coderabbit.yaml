@@ -39,8 +39,14 @@ reviews:
     # したがって `gh pr create --label` で作成時に指定する。作成後に付け足さない。
     # 実測で確認したのは「作成時にallowlistのlabelを持つPR（#90・#91）が対象判定を通る」
     # ことと、「labelはあるが一致しないPR（#95・#96）が excluded by label configuration に
-    # なる」ことである。運用と切り分けの記録は CONTRIBUTING.md の
+    # なる」ことである。#90・#91が一致したのは、当時この一覧にあった`type:decision`であり、
+    # この一覧から外したのはPR #95 である。現在の一覧と照らして「一致していないのに
+    # 通った」と読み替えない。運用と切り分けの記録は CONTRIBUTING.md の
     # 「labelは作成時に付ける」にある。ここでは手順を再掲しない。
+    #
+    # `enabled: false`と`labels`の併用はschema（冒頭の`$schema`）どおりの使い方であり、
+    # 誤設定ではない。allowlistのlabelがあってもskipされた観測（PR #123）は CONTRIBUTING.md の
+    # 「GitHubが強制しないもの」の表の5行目にある。原因は未特定であり、ここを推測で変えない。
     labels:
       - area:firmware
       - area:protocol
