@@ -44,9 +44,11 @@ Linker identity and version: cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
   （host 側。Xtensa 側は esp toolchain と xtensa-esp-elf GCC を使う）
 
 ESP32 only:
-  Physical board: 未接続（build-only のため実機なし。HW-TBD-001）
-  Module marking: 未確認（HW-TBD-001）
-  Board revision: 未確認（HW-TBD-001）
+  Physical board: 未接続（build-only のため、この検証では board を使っていない）
+  Module marking: この検証では未確認（board 未接続のため）。
+    現物の識別自体は [#122](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/122) で
+    確定しており、`HW-TBD-001` は close 済みである。
+  Board revision: 同上
   Rust target: xtensa-esp32-espidf
   espup version: 0.17.1
   cargo-generate version: 0.23.14
@@ -101,8 +103,12 @@ Conclusion: Partial。**build-only の範囲では未実行の項目が無く、
   ESP-IDF v5.5.3 の pin も効いている。
 
   **`Partial` とするのは、flash と実機起動を行っていないためである。**
-  board を接続しておらず、`Physical board`／`Module marking`／`Board revision`／
-  `USB-UART identity` は未確認のまま残る（HW-TBD-001）。
+  board を接続していないため、`Physical board`／`Module marking`／`Board revision`／
+  `USB-UART identity` を**この検証では確認していない。**
+  **ただしこれは board の識別が未確定という意味ではない。**現物の識別は
+  [#122](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/122) で確定し、
+  `HW-TBD-001` は close 済みである。**本記録が確認していないのは、
+  この build に board を使っていないという事実にとどまる。**
   **CLAUDE.md が「build-only であり、flash と実機起動は主張しない」と定めるとおりである。**
 
 Next action: flash と実機起動は ESP32 Flash / HIL profile の範囲であり、別記録が必要である。
