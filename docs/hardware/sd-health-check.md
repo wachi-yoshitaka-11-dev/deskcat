@@ -548,6 +548,38 @@ Ricoh `1180:E823` SDHCI controllerを介して行った。**Piでの動作は確
 | `manfid`＝`0x1b`がSamsungであることの確認 | **実施しなかった** | Physical Layer Simplified Specification Ver 9.10はMIDを「SD-3C, LLCが管理・定義・割り当てる」番号と規定するのみで、**登録簿を収録していない**（Section 5.1）。**この仕様書では検証できない。**別の一次資料が要る。**`SD-01`のメーカー表示の正は引き続き現物printである** |
 | host controllerのUHS-I対応可否の確定 | **実施しなかった** | `/sys/kernel/debug/mmc0/caps`／`caps2`がroot権限でも`EPERM`を返すため、capability registerを読めなかった。**測定がUHS modeでないことは`ios`と`dmesg`で確定しているが、hostが非対応なのかnegotiationが成立しなかっただけなのかは区別していない** |
 
+## repository検証
+
+[Version Record Template](../toolchains/version-record-template.md)の`Commands run`／`Expected result`／
+`Actual result`に相当する記録である。**この記録を載せるcommitに対して実行した。**
+本作業の変更はMarkdown 4 fileのみで、Rust codeに触れていない。
+**したがって下記の多くは「変更していないことの回帰確認」である。**
+
+| 確認 | command | 結果 |
+|---|---|---|
+| 空白・改行の異常 | `git diff --check origin/develop..HEAD` | **問題なし**（出力なし） |
+| 文書link検査 | `python3 scripts/validate_doc_links.py` | **成功。**`MARKDOWN=77 LINKS=623 BROKEN=0`（**この節を追加した後の値である。**節内のlinkも計上されるため、追加前は618であった） |
+| 公開guard test | `python3 scripts/test_pages_guards.py` | **成功。**26件 |
+| link validator test | `python3 scripts/test_link_validators.py` | **成功。**69件 |
+| Format | `cargo fmt --all -- --check` | **成功。**差分なし |
+| Lint | `cargo clippy --workspace --all-targets --locked` | **成功。**warning 0件 |
+| Unit test | `cargo test --workspace --locked` | **成功。**unittests 0件、doc-test 2件 |
+| Host integration test | 同上 | **成功。**`tests/conformance.rs` 6件、`tests/limits.rs` 5件。**合計13件合格・0件失敗** |
+| Markdown lint | `markdownlint` | **未実行。**この端末に未導入である。**repositoryもCIもこのtoolを使っていない** |
+| ESP32 build | — | **N/A。**`firmware/`に触れていない。ESP32 toolchainもこの端末に無い |
+| 実機試験 | — | **本記録そのものが実機試験の記録である**（`f3`とraw device試験） |
+| 統合・回帰試験 | — | **N/A。**hardware記録の追加であり、実行対象のsoftware動作を変えていない |
+
+**host workspaceの3 commandを実行するにあたり、この端末へRustを導入した。**
+実行時点で`cargo`が無く、humanの確認を得たうえで`rustup`経由のstableと
+`build-essential`を導入した（[AGENTS.md](../../AGENTS.md)「ツール導入は、対象Issue、
+端末profile、人間の確認が揃った開発端末だけで行う」）。版は
+[2026-08-10-host-rust-linux.md](../toolchains/version-records/2026-08-10-host-rust-linux.md)と
+一致した（rustup 1.29.0、rustc／cargo 1.97.1）。
+**ただし同recordはVM上の記録であり、本端末は実機である。**
+`Container / VM / native:`が異なるため、**本端末のHost Rust Development profileの
+version recordは別途要る。本記録の範囲外であり作成していない。**
+
 ## Revision履歴
 
 | 日付 | Revision | 変更 | 根拠 |
@@ -563,3 +595,4 @@ Ricoh `1180:E823` SDHCI controllerを介して行った。**Piでの動作は確
 | 2026-08-13 | 8 | **[PR #115](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/115)のCodeRabbit再reviewの指摘3件のうち2件を反映した。**(a) **raw device試験の節が、unmountをいつ行ったか読み取れない構成だった。**`f3`のfile削除とunmountは実際にはraw試験の前に済ませてあるが、それを記した「事後処理」節を後ろに置いていたため、**mount中のpartitionへraw書込みをしたように読めた。**実施順序を同節の冒頭へ明示し、mountしたまま行っていないことと、その理由を書いた。**手順自体は変えていない。文書の構成の問題である。**(b) **Revision 1が書いた「偽造品ではない」は断定しすぎであった。**この検査が見たのはfile systemの空き領域だけで、metadata領域と予約領域は検査しておらず、`Samsung`というメーカー表示もregisterで裏付けられていない。**「容量詐称は確認されなかった」「検査範囲に読み書き不良は確認されなかった」の2点へ言い換え、両者が「偽造品でない」と同じではないことを明記した。**`hardware-bom.md`と`tbd-register.md`の表現も揃えた。**(c) 残る1件（「2026-08-13の結果を2026-08-12基準日で載せるな」）は反映していない。**指摘が前提とする基準日が誤っており、**実施日2026-08-13は実際の日付である**（未来日付ではない）。詳細はPRのthreadに記した | [PR #115のCodeRabbit review](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/115) |
 | 2026-08-15 | 9 | **自己レビューで検出。Revision 7と8が、訂正した記述をどのRevisionが書いたのか明示していなかった。**この repository の慣行（[hardware-bom.md](hardware-bom.md)の「Revision 29が〜」「Revision 31は〜」）と揃っていない。訂正元をRevision 1（「偽造品ではない」「未達（inconclusive）」「29.80 GiB全域」）とRevision 4（「主因はFAT32ではないと確定した」）へ明示した。**帰属先はいずれもgit履歴で実在を確認しており、推測で番号を書いていない** | 自己レビュー |
 | 2026-08-15 | 10 | **[PR #115](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/115)のCodeRabbit再reviewの指摘6件を反映した。**(a) `mkfs.vfat`／`udisksctl`／`parted`／`wipefs`のversionが無かった。package版で追記し、**`mkfs.vfat`が`--version`を受け付けないため package版を記した**旨も書いた。(b) **registerとbus modeの取得commandを記録しておらず、別のoperatorが観測値を再現できなかった。**`実行したcommand`節を新設し、識別情報・`ios`・`dmesg`・format・mount・後片付けのcommandを載せた。**`caps`／`caps2`がroot権限でも`EPERM`で取得できなかったことも明記した。**(c) **raw device試験の`dd`が失敗を検出できない構成だった。**`dd ... | tail -1`はpipelineで終了statusが`tail`のものになり、`pipefail`も`errexit`も付けていない。**この弱点を明記し、次回は`set -o pipefail`か終了statusの直接確認を行うこととした。**あわせて今回の結果が失敗でないことを、転送byte数が指定値と一致することから示した。**ただしこれは事後確認であって、commandが失敗を検出する仕組みを持っていたわけではない。**(d) **「page cacheでは19.15 MB/sを説明できない」は言い過ぎであった。**29.80 GiBが3.7 GiBのRAMを超えることが示すのは「全dataがcacheだけで処理された結果ではない」ことまでである。page cacheが一部に寄与していないことは示していない（uncached baselineもcache hit率も測っていない）。表現を弱め、raw読出しがcacheを外して20.3 MB/sであったことを併記した。(e) **「この判定でPiのbootに使ってよい」は、host固有の試験結果からdeployの可否を導いていた。**測定はx86_64 Ubuntu host上のRicoh SDHCI controller経由であり、**Piへのimage書き込み、Piでのboot、PiのSD host controllerとの互換性はいずれも未確認である。**節を`この判定が及ぶ範囲`へ改め、確認できたことと確認していないことを分けた。`hardware-bom.md`にも波及させた。(f) `hardware-bom.md`と`tbd-register.md`が2つの実施日を`2026-08-12`へ畳んでいた。`f3`による検査（08-12）とregister照合・raw device試験（08-13）を書き分けた | [PR #115のCodeRabbit review](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/115) |
+| 2026-08-15 | 11 | **[PR #115](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/115)のCodeRabbit reviewの指摘を反映し、`repository検証`節を新設した。****この記録は[Version Record Template](../toolchains/version-record-template.md)の様式に倣うと書きながら、同templateの`Commands run`／`Expected result`／`Actual result`に相当する節を持っていなかった。**hardware試験の未実施理由は書いていたが、repository側の検証（format、lint、test、link検査）の結果がどこにも無かった。実行結果と、`markdownlint`が未導入で未実行であること、ESP32 buildと統合・回帰試験が`N/A`である理由を記録した。**あわせて、この端末へRustを導入した経緯と、本端末のversion recordが別途要ることも明記した** | [PR #115のCodeRabbit review](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/115)、[Version Record Template](../toolchains/version-record-template.md) |
