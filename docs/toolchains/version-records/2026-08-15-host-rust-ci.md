@@ -10,17 +10,20 @@ host workspace の検証は、これまで開発端末でしか行っていな�
 本記録は、Pull Request [#130](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/130) の tree を
 GitHub Actions の `ubuntu-24.04` runner で実行した結果である。
 
-run は 2 回ある。**本記録は 2 回目（Pull Request の最終 commit に対する run）を採る。**
+**run は commit ごとに走る。**`host.yml` の `paths` に文書を含めていないにもかかわらず
+文書だけの commit でも走るのは、`pull_request` の `paths` 判定が「その commit の差分」ではなく
+**「Pull Request 全体の差分」**に対して行われるためである。Pull Request が
+`.github/workflows/host.yml` を含む限り、以後の commit すべてで再 run する。
 
-| # | run | commit | 結果 | 所要 |
-|---|---|---|---|---|
-| 1 | 31891323975 | f16472b9（`host.yml` 追加） | success | 31 s |
-| 2 | 31891594404 | a7ae254a（文書追加。最終 commit） | success | 20 s |
+| # | run | commit | 内容 | 結果 | 所要 |
+|---|---|---|---|---|---|
+| 1 | 31891323975 | f16472b9 | `host.yml` の追加 | success | 31 s（cache 無し） |
+| 2 | 31891594404 | a7ae254a | 文書と本記録の追加 | success | 20 s（cache 有り） |
 
-**`host.yml` の `paths` に文書を含めていないのに 2 回目が走ったのは、`pull_request` の
-`paths` 判定が「その commit の差分」ではなく「Pull Request 全体の差分」に対して行われるためである。**
-Pull Request が `.github/workflows/host.yml` を含む限り、文書だけの commit でも再 run する。
-起票時にこれを取り違えていたため、事実に合わせて記録する。
+**本記録は run 2 を根拠とする。**run 2 以降の commit は本記録を含む**文書だけ**であり、
+`host.yml`、`Cargo.toml`、`Cargo.lock`、`crates/` に差分は無い。
+したがって run 2 の結果は、この Pull Request の最終状態に対しても有効である。
+（同じ扱いを [ESP32 Build (CI)](2026-08-10-esp32-build-ci.md) も採っている。）
 
 ## 記録
 
