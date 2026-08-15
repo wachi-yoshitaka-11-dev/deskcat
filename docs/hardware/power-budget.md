@@ -26,19 +26,26 @@
 │  └─ （案Bの場合のみ）ESP-WROOM-32Dの`5V` pinへ直接
 │        ESP32の給電経路は案A／案Bのいずれか未決定（`ESP32の給電経路（未決定）`節）
 │        board上regulatorが3.3Vを生成し、board上の3V3 pinから出力
-│        ├─ ADXL345（ICのVS動作範囲2.0–3.6V、絶対最大定格3.9V。
+│        ├─ （接続不可）ADXL345
+│        │     **HW-TBD-004がcloseするまで、この経路へ接続してはならない。**
+│        │     ICのVS動作範囲2.0–3.6V、絶対最大定格3.9V。
 │        │     5V直結は禁止＝確認前の安全規則。
-│        │     M-06724のregulator非搭載は2026-08-13に現物確認した。
-│        │     ただしmoduleへ入れてよい電圧は未確定。IC定格から
-│        │     moduleの許容入力電圧は決まらない。HW-TBD-004）
+│        │     M-06724のregulator非搭載は2026-08-13に現物確認したが、
+│        │     **moduleへ入れてよい電圧は未確定である。**
+│        │     `Vs`と`VDD`が別pinに出ており、board上でICへ
+│        │     どう配線されているか（直列抵抗、level shiftの有無）を
+│        │     追っていない。IC定格からmoduleの許容入力電圧は決まらない
 │        ├─ BME280（電源電圧DC1.71～3.6V。5V直結不可）
 │        └─ MSP2807（LCD＋touch。VCC 3.3–5V対応だがlogic IOは3.3V TTL。
 │              下記理由により3.3Vで給電する）
 └─ Servo rail 5V（breadboard上で分岐、直近にbulk capacitor）
    └─ SERVO-01（TowerPro SG90）
 
-周辺moduleはすべて3.3Vで給電し、5V railへ直結しない。**5V railへ直結しないことは確定した規則である。**
-3.3Vで給電することはBME280とMSP2807では確定しており、**ADXL345だけは未確定である**（下記）。理由は次のとおり。
+周辺moduleは5V railへ直結しない。**5V railへ直結しないことは確定した規則である。**
+3.3Vで給電することはBME280とMSP2807では確定しているが、**ADXL345は未確定であり、
+`HW-TBD-004`がcloseするまで3.3V railへ接続してはならない**（上図の`（接続不可）`）。
+**「周辺moduleはすべて3.3Vで給電する」とは書かない。**ADXL345を含む表現は、
+未確定のmoduleへの接続を承認済みに見せるためである。理由は次のとおり。
 
 - BME280（K-09421）は、秋月の製品説明書が**module boardとして**電源電圧DC1.71～3.6Vを
   示している。5V直結は定格超過となる。**これはmodule boardの資料に基づく判定である。**
@@ -1142,3 +1149,4 @@ rippleはDMMで代替できない。
 | 2026-08-12 | 40 | [#1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1)。[hardware-bom.md](hardware-bom.md) Revision 37の訂正を反映した。**この文書は`ADC-5V`／`ADC-3V3`の分圧用抵抗とServo bulk capacitorを「未購入」として複数箇所で扱っていたが、いずれも2026-08-08に着荷済みであった。**(a) `Pi Zero Wには低電圧検出が無い`、`(a)の一次資料は存在しない`、測定計画のchecklist、`定義した値をどの段階で照合するか`表の(a)(c)(d)の各行を、**「部品待ち」から「実装と検証が残る」へ改めた。**(b) `配線・保護表`のServo bulk capacitorを、**10個入手済み・使用個数が実測待ち**へ改めた（従来は`Candidate（実測前）`で未購入扱い）。**判定は緩めていない。**rippleとdroopの合否判定は`HW-TBD-028`(a)と3.3 V rail側の閾値が未確定であるため`Blocked`のままであり、変わったのは**部品の入手状況だけ**である | [hardware-bom.md](hardware-bom.md) Revision 37、購入履歴（2026-08-08着荷分） |
 | 2026-08-12 | 41 | [PR #116](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/116)のreview指摘。`Pi Zero Wには低電圧検出が無い`と`(a)の一次資料は存在しない`が「**Pi側の低電圧は`ADC-5V`の実測でしか捉えられない**」と書いており、**同じ文書の`定義した値をどの段階で照合するか`表が「DMMで直流値を読むだけなら不要」としているのと食い違っていた。****量によって手段が違う。**定常電圧はDMMで読め、`ADC-5V`が要るのは**droopとripple**である。両者を書き分けた。**合否判定が`Blocked`である点は変えていない**（閾値が(a)として未確定であるため） | [PR #116のreview](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/116) |
 | 2026-08-15 | 42 | [#1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1)。**現物確認の結果、参照設計を根拠にしていた記述の前提が2箇所崩れたため訂正した。**(a) **`U2`が参照設計と違う部品であることが判明した。**現物の刻印は`LD1117AG` / `33AQVCUV`で、参照設計の`AMS1117-3.3`ではない。pin互換の二次ソースだが部品が違うため、**この文書が`HW-TBD-025`(a)と(b)の導出に使っている`AMS1117`のdatasheet値（出力電圧範囲3.201–3.399 V、dropout最大1.3 V）は現物の値ではない。**`LD1117AG`のメーカーが特定できずdatasheetを当てられないため、**現物のdropout電圧と出力電圧範囲は未確定である。**参照設計に基づく暫定値として残すが、**現物の合格判定には使えない**と明記した。(b) 電源rail構成案の図のADXL345行を更新し、**M-06724のregulator非搭載を現物確認した**ことを反映した（`moduleへ入れてよい電圧`は引き続き未確定）。**どのgateも開いていない。**段階B-2aは`HW-TBD-023`が未解決のままである | 現物写真（斜光＋接写）。詳細は[tbd-register.md](tbd-register.md)の`HW-TBD-023`／`HW-TBD-004` |
+| 2026-08-15 | 43 | [PR #122](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/122)のレビュー指摘を反映。**電源rail構成案の図がADXL345を3.3V railの下に置いたままで、`HW-TBD-004`のclose前に接続を承認したように読めた。**ADXL345の枝を`（接続不可）`とし、**`HW-TBD-004`がcloseするまでこの経路へ接続してはならない**ことを明記した。あわせて本文の「周辺moduleはすべて3.3Vで給電し」という表現を改めた。**未確定のmoduleを含む「すべて」は、接続を承認済みに見せる** | [PR #122レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/122) |

@@ -1,7 +1,7 @@
 # Implementation Readiness Review
 
 > Review日: 2026-07-27
-> 最終更新: 2026-08-12（`HW-TBD-001`の参照4箇所をPR #82後の正本の表現へ更新）
+> 最終更新: 2026-08-15（`HW-TBD-001`のcloseと、chip識別が非破壊で満たせないことを反映）
 > 結果: Hardware driver実装のgateは未通過
 
 ## 結論
@@ -14,7 +14,7 @@ clean buildも#5（PR #40）で完了し、#86でCIから再現した。**この
 本節が挙げた作業streamのうち、いまも独立に開始できるのは、人間が主導するハードウェア現物
 inventory（#1）である。最初のperipheral driverまたは統合通電までは、これを独立して進められる。
 
-**`HW-TBD-001`（公式pin表と現物pin表記の照合）は2026-08-13に完了し、closeした。**
+**`HW-TBD-001`（公式pin表と現物pin表記の照合）は2026-08-13に照合が完了し、2026-08-15にcloseした。**
 flashの前提条件のうちこの1件は解消した。**#6の可否はflash側の残条件で別途判断する。**
 
 ## Repository gate
@@ -56,8 +56,8 @@ Peripheral driverまたはservo出力は、いずれもこのgateを通過して
 | Host／firmware workspaceが存在する | Pass | firmware workspaceは#5／#40、host workspaceは#9で作成した |
 
 **`build検証済み`という状態語の正本は[ESP32 Rust Toolchain](../toolchains/esp32-rust-toolchain.md)である。**
-同文書は確定条件のうちchip刻印の読み取りと、公式pin表と現物pin表記の照合の2項目が未達であるため、
-状態を`Verified`ではなく`build検証済み`にとどめている。このgateも同じ語を使い、
+同文書は確定条件のうち**chipの識別1項目が未達である**ため、
+状態を`Verified`ではなく`build検証済み`にとどめている（**公式pin表と現物pin表記の照合は2026-08-15に達成した**）。このgateも同じ語を使い、
 **build以外を検証済みとして扱わない。**
 
 Toolchainのbuild-only spikeはperipheral pinの選定なしで進められる。Docs / Review端末にtoolchainを導入する必要はない。
@@ -112,12 +112,12 @@ Toolchainのbuild-only spikeはperipheral pinの選定なしで進められる�
 - Clean buildとdependency lockfileを記録した
 
 **確定条件の正本は[ESP32 Rust Toolchain](../toolchains/esp32-rust-toolchain.md)であり、
-checkboxをここで二重管理しない。**同文書で未達なのは次の2項目である。
+checkboxをここで二重管理しない。**同文書で未達なのは次の1項目である。**あわせて、2026-08-15に達成した項目も記す。
 
-- **chipの識別**: **非破壊では刻印を読めないことが2026-08-15に確定した**（シールド内側）。**撮り直しでは解決しない。**
+- **chipの識別**: **非破壊では刻印を読めないことが2026-08-15に確定した**（シールド内側）。**撮り直しても解決しない。**
   module刻印は読了し、搭載moduleはmodule自身の刻印で確定した。そのdatasheetが中核chipを示すため、
   **buildへの影響は無い**。要件の再定義が要る（`HW-TBD-031`）
-- **公式pin表と現物pin表記の照合**: **2026-08-13に完了し、一致した**（`HW-TBD-001`はclose）
+- **公式pin表と現物pin表記の照合**: **2026-08-13に照合が完了して一致し、2026-08-15にcloseした**（`HW-TBD-001`）
 
 許可した範囲:
 

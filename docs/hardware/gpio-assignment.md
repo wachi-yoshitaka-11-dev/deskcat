@@ -1,6 +1,7 @@
 # GPIO Assignment
 
-> 状態: Blocked — 実機での電源off導通check、touch controller型番とMSP2807のlogic IO levelの現物確認、servo起動時状態の安全review待ち
+> 状態: Blocked — 実機での電源off導通check、MSP2807のlogic IO levelの現物確認、servo起動時状態の安全review待ち
+> （**touch controller型番は2026-08-13に`XPT2046`と確定し、`HW-TBD-003`は2026-08-15にcloseした**）
 > 正本とする情報: ESP32 boardのpin割り当て
 
 ## 割り当て規則
@@ -140,3 +141,4 @@ PCからflashingするときは同じUSB portを使うため、Piとの同時接
 | 2026-08-12 | 10 | [#1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1)。`ADC-5V`行が分圧用10 kΩ抵抗を「計4本が必要であり、**未購入である**」とし、`hardware-bom.md`の購入待ちリストを参照していたが、**抵抗は2026-08-08に着荷済みであった**（同文書 Revision 37。発注漏れではなく記録漏れ）。**参照先の購入待ちリストの行も同時に削除されたため、この記述は宛先を失っていた。**「入手済み。残るのは実装と検証」へ改めた。**分圧比1/2もpin割当ても変えていない** | 購入履歴（2026-08-08着荷分）、[hardware-bom.md](hardware-bom.md) Revision 37 |
 | 2026-08-12 | 11 | [PR #116](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/116)のreview指摘。`SERVO-PWM`行が`RES-PULL-01`を「**未購入**・抵抗値未選定」としていたが、**10 kΩと4.7 kΩが各1袋入手済みである**（[hardware-bom.md](hardware-bom.md) Revision 37）。二重発注を招くため「一部の抵抗値は入手済み。ただし必要な本数と抵抗値が未選定であり、手元の2種で足りるとは限らない」へ改めた。**外部pull-downを必須とする規則も`HW-TBD-027`のgateも変えていない** | [PR #116のreview](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/116)、[hardware-bom.md](hardware-bom.md) Revision 37 |
 | 2026-08-15 | 12 | [#1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1)。**現物写真の読み取り結果を反映した。**(a) **`HW-TBD-001`のpin照合が完了し、一致した。**38pinヘッダ両側のsilkが公式`J2`／`J3`と19pin×2列すべてで一致した（GNDの位置を含む）。`Board識別情報`の`公式回路図revision`欄へ読み取った並びを記録した。(b) 基板裏面silkscreenの大文字小文字を**`ESP32_DevKitc_V4`**へ訂正した（旧記載`ESP32_DevkitC_V4`。現物と公式回路図のtitle blockが一致する）。(c) Touch controllerを**`XPT2046`と確定**し、`LCD-MISO`と`TOUCH-CS`の「想定」「現物確認待ち」を確定表現へ改めた。(d) `ACCEL-SDA`と競合checklistへ、**ADXL345が`01C`＝10 kΩのpull-upを4個搭載している**ことを記録した。**ただしどのpinへ付くかはパターンを追っておらず、BME280側は半田の有無が光学判別できないため、実効抵抗は両方が確定するまで計算しない** | 現物写真（斜光＋接写）。詳細は[tbd-register.md](tbd-register.md)の`HW-TBD-001`／`003`／`004`／`005` |
+| 2026-08-15 | 13 | [PR #122](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/122)のレビュー指摘を反映。文書冒頭の状態行が`touch controller型番`を現物確認待ちに挙げたままだったため、**`XPT2046`確定と`HW-TBD-003`のcloseを反映した** | [PR #122レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/122) |
