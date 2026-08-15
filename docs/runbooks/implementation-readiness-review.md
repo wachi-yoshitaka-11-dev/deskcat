@@ -14,8 +14,8 @@ clean buildも#5（PR #40）で完了し、#86でCIから再現した。**この
 本節が挙げた作業streamのうち、いまも独立に開始できるのは、人間が主導するハードウェア現物
 inventory（#1）である。最初のperipheral driverまたは統合通電までは、これを独立して進められる。
 
-**実機へのflashとserial monitor（#6）は、まだ独立に開始できない。**`HW-TBD-001`（公式pin表と
-現物pin表記の照合）がflashの前提条件であり、その解消は#1に依存する。
+**`HW-TBD-001`（公式pin表と現物pin表記の照合）は2026-08-13に完了し、closeした。**
+flashの前提条件のうちこの1件は解消した。**#6の可否はflash側の残条件で別途判断する。**
 
 ## Repository gate
 
@@ -114,9 +114,10 @@ Toolchainのbuild-only spikeはperipheral pinの選定なしで進められる�
 **確定条件の正本は[ESP32 Rust Toolchain](../toolchains/esp32-rust-toolchain.md)であり、
 checkboxをここで二重管理しない。**同文書で未達なのは次の2項目である。
 
-- **chip刻印の読み取り**: 現物写真が反射で判読不能。搭載moduleは確定しており、そのdatasheetが
-  中核chipを示すため、**buildへの影響は無い**
-- **公式pin表と現物pin表記の照合**: `HW-TBD-001`として追跡し（#1）、#6のflashの前提条件でもある
+- **chipの識別**: **非破壊では刻印を読めないことが2026-08-13に確定した**（シールド内側）。**撮り直しでは解決しない。**
+  module刻印は読了し、搭載moduleはmodule自身の刻印で確定した。そのdatasheetが中核chipを示すため、
+  **buildへの影響は無い**。要件の再定義が要る（`HW-TBD-031`）
+- **公式pin表と現物pin表記の照合**: **2026-08-13に完了し、一致した**（`HW-TBD-001`はclose）
 
 許可した範囲:
 
@@ -155,8 +156,8 @@ GitHub Issue migration: PENDING foundation document publication
 対象は#1、#2、#3、#6、#10、#12である。
 
 **#5を対象へ戻さない。**PR #40でcloseし、#86でCIから再現した。Software gateの
-「互換性のあるRust／ESP-IDF version」は`build検証済み`である。残る公式pin表と現物pin表記の照合は
-Issue `#5`ではなく`HW-TBD-001`（#1）が担い、flashとserial monitorは#6が担う。
+「互換性のあるRust／ESP-IDF version」は`build検証済み`である。公式pin表と現物pin表記の照合は`HW-TBD-001`（#1）が担い、**2026-08-13に完了してcloseした。**
+flashとserial monitorは#6が担う。
 
 `#6`（flashとserial monitor）を落とさない。Software gateの「再現可能なbuild／flash／monitor
 command」が`Partial`にとどまる唯一の理由であり、揃わないまま再実行しても同じ`Partial`を

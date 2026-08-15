@@ -180,7 +180,7 @@ build はそのまま成功する。この取り違えは runbook の版上げ�
 - [x] 物理基板の機種と搭載 module を確認した（ESP-WROOM-32D 開発ボード／秋月電子 M-13628。基板に revision 表示は無い）
 - [x] **module 刻印を読み取った**（`ESPRESSIF` / `ESP32-WROOM-32D`。2026-08-13、斜光＋接写）
 - [ ] **chip の識別を確認した。****旧項目「chip 刻印を読み取った」は非破壊で満たせないため 2026-08-13 に書き換えた**（chip はシールド内側にある）。満たし方の再定義が要る（[HW-TBD-031](../hardware/tbd-register.md)）
-- [ ] 公式 pin 表と現物 pin 表記を照合した
+- [x] **公式 pin 表と現物 pin 表記を照合した**（2026-08-13、19pin×2 列すべて一致。[HW-TBD-001](../hardware/tbd-register.md) は close 済み）
 - [x] 開発端末の profile と version record を作成した
 - [x] レビュー済み template commit から最小 project を生成した
 - [x] 環境変数による意図しない SDK override がない
@@ -190,10 +190,10 @@ build はそのまま成功する。この取り違えは runbook の版上げ�
 - [x] 正式な format、lint、build command を `AGENTS.md` と root README へ反映した
 - [x] 別の開発端末または clean environment で再現した（CI の `ubuntu-24.04` runner。[#42](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/42)、[Version Record](version-records/2026-08-10-esp32-build-ci.md)）
 
-未達の 2 項目により、この文書の状態は `検証済み`（`Verified`）ではなく **`build検証済み`** にとどめる。語の定義は [状態ラベル](README.md#状態ラベル) を参照する。
+**未達は 1 項目になった。**この文書の状態は `検証済み`（`Verified`）ではなく **`build検証済み`** にとどめる。語の定義は [状態ラベル](README.md#状態ラベル) を参照する。
 
 - **chip の識別**: **非破壊では刻印を読めないことが 2026-08-13 に確定した**（シールド内側）。**したがって「撮り直せば満たせる項目」ではない。**module 刻印は読了しており、搭載 module は module 自身の刻印で確定した。その datasheet が中核 chip を示すため、build への影響は無い。**満たし方の再定義が要る**（[HW-TBD-031](../hardware/tbd-register.md)）。
-- **公式 pin 表と現物 pin 表記の照合**: [HW-TBD-001](../hardware/tbd-register.md) として追跡し、#6 の flash 前提条件でもある。物理基板の機種と搭載 module 自体は現物確認で確定済みである。
+- **公式 pin 表と現物 pin 表記の照合**: **2026-08-13 に完了し、一致した**（[HW-TBD-001](../hardware/tbd-register.md) は close）。**この項目は未達ではなくなった。**#6 の flash 前提条件も、この照合については満たされる。
 
 **別端末での再現は満たした。**根拠と、そう判断してよい理由を次に示す。
 
@@ -214,8 +214,7 @@ lockfile、clean build）をすべて記録している。
 標準OSは [ADR-0005](../decisions/0005-standard-development-os.md) により実機 Linux であり、
 Windows は対象外のため再現対象に含めない。**CI は Windows ではなく Linux であり、この除外に当たらない。**
 
-**それでも状態は `Verified` へ上げない。**残る 2 項目（chip の識別、公式 pin 表と現物 pin 表記の照合）は
-CI では代替できない。**「CI が通ったから昇格できる」とは結論しない。**
+**それでも状態は `Verified` へ上げない。**残る 1 項目（chip の識別）は CI では代替できない。**「CI が通ったから昇格できる」とは結論しない。**
 
 **うち chip の識別は、満たし方が未定である。**旧条件は非破壊で成立しないことが判明しており、
 **再定義するまでこの項目を「現物確認すれば満たせるもの」として扱わない。**
