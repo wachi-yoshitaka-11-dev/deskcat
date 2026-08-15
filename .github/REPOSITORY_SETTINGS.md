@@ -166,6 +166,7 @@ read-back結果: `approval_policy = all_external_contributors`
 |---|---|---|
 | `pages.yml` | `actions/checkout`、`actions/configure-pages`、`actions/jekyll-build-pages`、`actions/upload-pages-artifact`、`actions/deploy-pages` | GitHub所有 |
 | `firmware.yml` | `actions/checkout`、`actions/cache` | GitHub所有 |
+| `host.yml` | `actions/checkout`、`actions/cache` | GitHub所有 |
 | `firmware.yml` | `esp-rs/xtensa-toolchain` | **サードパーティ。`patterns_allowed`で個別に許可** |
 
 `all`のままにすると、workflowを1行変えるだけで任意のサードパーティActionを導入できる。
