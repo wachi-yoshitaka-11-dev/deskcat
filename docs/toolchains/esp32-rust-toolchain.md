@@ -20,7 +20,7 @@ xtensa-esp32-espidf
 
 | 段階 | 内容 | 出典 |
 |---|---|---|
-| board | ESP-WROOM-32D 開発ボード（秋月電子 M-13628）。基板裏面 silkscreen は `ESP32_DevkitC_V4` で、Espressif ESP32-DevKitC V4 のリファレンスデザインに基づく | [秋月商品ページ M-13628](https://akizukidenshi.com/catalog/g/g113628/)（**添付はモジュールとチップの datasheet のみ**）、[ESP32-DevKitC V4 公式回路図](https://dl.espressif.com/dl/schematics/esp32_devkitc_v4-sch.pdf)。確定根拠は [hardware-bom.md](../hardware/hardware-bom.md) の MCU-01 |
+| board | ESP-WROOM-32D 開発ボード（秋月電子 M-13628）。基板裏面 silkscreen は **`ESP32_DevKitc_V4`**（2026-08-13 に大文字小文字を訂正。旧記載 `ESP32_DevkitC_V4`）で、Espressif ESP32-DevKitC V4 のリファレンスデザインに基づく | [秋月商品ページ M-13628](https://akizukidenshi.com/catalog/g/g113628/)（**添付はモジュールとチップの datasheet のみ**）、[ESP32-DevKitC V4 公式回路図](https://dl.espressif.com/dl/schematics/esp32_devkitc_v4-sch.pdf)。確定根拠は [hardware-bom.md](../hardware/hardware-bom.md) の MCU-01 |
 | module | ESP-WROOM-32D。中核は `ESP32-D0WD`。Xtensa dual-core 32-bit LX6 | [ESP32-WROOM-32D & ESP32-WROOM-32U Datasheet v2.7](https://documentation.espressif.com/esp32-wroom-32d_esp32-wroom-32u_datasheet_en.pdf)（2026-08-08 取得） |
 | target | MCU `esp32` → arch `xtensa` / rust target `xtensa-esp32-espidf` / gcc target `xtensa-esp32-elf` | [esp-idf-template `08115a06`](https://github.com/esp-rs/esp-idf-template/blob/08115a069d167a5ee37363e84f168a565f17bbca/cargo/pre-script.rhai) の `pre-script.rhai`（2026-08-06 取得） |
 
@@ -30,13 +30,17 @@ xtensa-esp32-espidf
 
 ESP-WROOM-32D の datasheet v2.7 には **PSRAM を内蔵する variant の記載が無い**。同 datasheet が挙げる variant の差は antenna（PCB antenna の 32D と外部 connector の 32U）だけである。したがって PSRAM の有無による構成差は本 board では生じない。
 
-現物確認により、module 種別（購入履歴と基板裏面 silkscreen `ESP32_DevkitC_V4`）と、基板に revision 表示が無いことは確定している。
+現物確認により、module 種別と、基板に revision 表示が無いことは確定している。**module 種別の根拠は 2026-08-13 に module 自身の刻印（`ESPRESSIF` / `ESP32-WROOM-32D`）になった。**購入履歴と基板裏面 silkscreen **`ESP32_DevKitc_V4`** もこれと整合する。
 
-[HW-TBD-001](../hardware/tbd-register.md) は範囲が縮小し、残る追跡対象は **公式 pin 表と現物 pin 表記の照合**だけである。**現物が公式 V4 リファレンス設計どおりに実装されている保証は文書だけでは得られない**ため、GPIO 割り当ての前に照合する。
+[HW-TBD-001](../hardware/tbd-register.md) の**照合は 2026-08-13 に完了し、一致した。**38pin ヘッダ両側の silk が公式 `J2`／`J3` と 19pin×2 列すべてで一致した（GND の位置を含む）。**これにより、この文書の確定条件のうち「公式 pin 表と現物 pin 表記を照合した」は満たされる見込みである**（close 判定は台帳の解決手順 1–8 に従う）。
 
 なお、**旧記載の「Espressif 公式の ESP32-DevKitC ではない／秋月電子の独自基板である」は 2026-08-10 に削除した。**この断定を支持する資料が存在せず、秋月商品ページ自身がメーカーを `Espressif Systems`、型番を `ESP32-DevKitC-32D` と表示していたためである。詳細は [hardware-bom.md](../hardware/hardware-bom.md) の Revision 29。**照合が必要である点は変わらない**（理由が変わっただけである）。
 
-これとは別に、**chip の刻印は未読である**（現物写真が反射で判読不能）。搭載 module が ESP-WROOM-32D であることは購入履歴と silkscreen で確定しており、その datasheet が示す中核 chip は `ESP32-D0WD` である。刻印の読み取りは **2026-08-11 の全数照合で [`HW-TBD-031`](../hardware/tbd-register.md) として TBD 台帳へ登録した**（それまで追跡対象になっていなかった）。
+これとは別に、**chip の刻印は非破壊では読めないことが 2026-08-13 に確定した。**中核 chip `ESP32-D0WD` は ESP-WROOM-32D の半田付けされた金属シールドの内側にあり、シールドを外さない限りどのような撮影手段でも見えない。**旧記載の「現物写真が反射で判読不能」は、撮影条件の問題として書いていたが誤りである。**撮り直しでは解決しない。
+
+**module の刻印は 2026-08-13 に読了した**（斜光＋接写）。シールド上面に `ESPRESSIF` と `ESP32-WROOM-32D` が刻印されており、**module 種別の根拠が購入履歴と silkscreen に加えて module 自身の刻印になった。**ただし**これは module の品番であって chip の品番ではない。**中核 chip が `ESP32-D0WD` であるという記載の出典は、上表のとおり ESP-WROOM-32D datasheet v2.7 のままである。
+
+追跡は [`HW-TBD-031`](../hardware/tbd-register.md)（2026-08-11 の全数照合で登録し、2026-08-13 に要件を書き換えた）。**本文書の状態を `Verified` にする条件のうち chip 刻印の項は、非破壊で満たせないため再定義が要る。**候補は `esptool` が flash 時に報告する chip 情報だが、chip 品番の確認に足りるかは未検証であり、実施は実機 Linux 限定の flash（[#6](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/6)）まで進まない。
 
 いずれも build には影響しないが、flash 後の実機動作には影響する。
 
@@ -174,7 +178,8 @@ build はそのまま成功する。この取り違えは runbook の版上げ�
 次を満たすまで状態を`Verified`または`Accepted`に変更しない。
 
 - [x] 物理基板の機種と搭載 module を確認した（ESP-WROOM-32D 開発ボード／秋月電子 M-13628。基板に revision 表示は無い）
-- [ ] chip 刻印を読み取った（現物写真が反射で判読不能）
+- [x] **module 刻印を読み取った**（`ESPRESSIF` / `ESP32-WROOM-32D`。2026-08-13、斜光＋接写）
+- [ ] **chip の識別を確認した。****旧項目「chip 刻印を読み取った」は非破壊で満たせないため 2026-08-13 に書き換えた**（chip はシールド内側にある）。満たし方の再定義が要る（[HW-TBD-031](../hardware/tbd-register.md)）
 - [ ] 公式 pin 表と現物 pin 表記を照合した
 - [x] 開発端末の profile と version record を作成した
 - [x] レビュー済み template commit から最小 project を生成した
@@ -187,7 +192,7 @@ build はそのまま成功する。この取り違えは runbook の版上げ�
 
 未達の 2 項目により、この文書の状態は `検証済み`（`Verified`）ではなく **`build検証済み`** にとどめる。語の定義は [状態ラベル](README.md#状態ラベル) を参照する。
 
-- **chip 刻印の読み取り**: 現物写真が反射で判読不能。搭載 module は確定しており、その datasheet が中核 chip を示すため、build への影響は無い。
+- **chip の識別**: **非破壊では刻印を読めないことが 2026-08-13 に確定した**（シールド内側）。**したがって「撮り直せば満たせる項目」ではない。**module 刻印は読了しており、搭載 module は module 自身の刻印で確定した。その datasheet が中核 chip を示すため、build への影響は無い。**満たし方の再定義が要る**（[HW-TBD-031](../hardware/tbd-register.md)）。
 - **公式 pin 表と現物 pin 表記の照合**: [HW-TBD-001](../hardware/tbd-register.md) として追跡し、#6 の flash 前提条件でもある。物理基板の機種と搭載 module 自体は現物確認で確定済みである。
 
 **別端末での再現は満たした。**根拠と、そう判断してよい理由を次に示す。
@@ -209,8 +214,11 @@ lockfile、clean build）をすべて記録している。
 標準OSは [ADR-0005](../decisions/0005-standard-development-os.md) により実機 Linux であり、
 Windows は対象外のため再現対象に含めない。**CI は Windows ではなく Linux であり、この除外に当たらない。**
 
-**それでも状態は `Verified` へ上げない。**残る 2 項目（chip 刻印、公式 pin 表と現物 pin 表記の照合）は
-いずれも現物確認を要し、CI では代替できない。**「CI が通ったから昇格できる」とは結論しない。**
+**それでも状態は `Verified` へ上げない。**残る 2 項目（chip の識別、公式 pin 表と現物 pin 表記の照合）は
+CI では代替できない。**「CI が通ったから昇格できる」とは結論しない。**
+
+**うち chip の識別は、満たし方が未定である。**旧条件は非破壊で成立しないことが判明しており、
+**再定義するまでこの項目を「現物確認すれば満たせるもの」として扱わない。**
 
 flash、serial monitor、実機起動は #6 の範囲であり、この文書の build-only 確定条件には含めない。
 
