@@ -385,8 +385,9 @@ GitHubの強制が意味を失う。
 | `excluded by label configuration` | **設定は効いている。**labelは付いていたが、allowlistに一致しなかった。**対象外として正しくskipされた** | [#95](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/95)・[#96](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/96)（`area:docs`＋`type:maintenance`） |
 | `Auto reviews are disabled on this repository.` | **allowlistによる判定に達していない。**[#89](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/89)の判定時点では`.coderabbit.yaml`がまだ`develop`に無かった | #89（判定の5秒後に設定がmergeされた） |
 | `reviews are disabled for this base branch` | baseが対象外と判定された | [#88](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/88)（`.coderabbit.yaml`を`develop`へmergeする前） |
+| `manual review required for this OSS repository` | **labelの判定では説明できない。**allowlistのlabel（`area:firmware`＋`area:protocol`）が作成時から付いており、1行目には当たらない。`@coderabbitai rate limit`は`Reviews are available now`を返したためrate limitでもない。**`@coderabbitai full review`を投げると実際にreviewが走った** | [#127](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/127) |
 
-**1行目と、2行目・3行目は意味が違う。**同じ`Review skipped`でも取るべき対応が違う。
+**行ごとに意味が違う。**同じ`Review skipped`でも取るべき対応が違う。
 
 - 1行目: `.coderabbit.yaml`の意図どおりのskipである。[自己レビュー](#自己レビュー)で通す。
   ただし**変更の内容に対してlabelの付け方が誤っていないかは確認する。**安全・電気・protocol・
@@ -394,8 +395,11 @@ GitHubの強制が意味を失う。
 - 2行目・3行目: **allowlistの判定まで届いていない。**設定が`develop`にあるか、baseが
   `base_branches`に含まれるかを確認する。対象範囲の変更なら
   [手動で依頼する](#手動で依頼する前に状態を確認する)。安全に関わる変更では自己レビューで代替しない
+- 4行目: **labelもrate limitも原因ではない。**自動reviewが起動しないだけで、
+  [手動で依頼する](#手動で依頼する前に状態を確認する)と得られる。`review`ではなく
+  **`full review`**を使う。自己レビューで代替しない
 
-**2行目・3行目は、いずれも`.coderabbit.yaml`が`develop`に無かった時期の観測である。**
+**2行目・3行目は、いずれも`.coderabbit.yaml`が`develop`に無かった時期の観測である。**4行目は設定が定着した後の観測であり、原因が別である。
 設定が定着した後にこの文言を見たら、**それは新しい事象である。**推測で1行目と同じ扱いにしない。
 
 **thread 0件は、reviewが終わったことを意味しない。**
