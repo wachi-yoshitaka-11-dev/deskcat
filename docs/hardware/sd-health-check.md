@@ -450,6 +450,57 @@ page cacheとdentry／inode cacheを落としてから読み出す。**速度は
 **上界を与えたにとどまる。**それでも「file systemを外しても10 MB/sに届かない」という
 結論は、この差異に影響されない。
 
+### 対照測定（2026-08-15）
+
+**別cardと block size を変えた測定。**③の原因を切り分けるために実施した。
+いずれもfile system経由（`conv=fsync`）であり、書込み後に一時fileを削除している。
+
+対照cardの識別情報（`/sys/block/mmcblk0/device/`）。
+
+```text
+type                   SD
+manfid                 0x000003
+oemid                  0x5344
+name                   SU16G
+hwrev                  0x8
+fwrev                  0x0
+date                   08/2010
+scr                    0235800000000000
+ssr                    0000000004000000010190000b050000（以降すべて0）
+csd                    400e00325b59000076b27f800a404000
+preferred_erase_size   4194304
+```
+
+`ssr` byte 8＝`0x01`（`SPEED_CLASS`＝Class 2）、byte 14＝`0x00`（`UHS_SPEED_GRADE`＝0）。
+`manfid`＝`0x03`、`oemid`＝`0x5344`（ASCII `"SD"`）。**`manfid`の社名対応は前述のとおり
+一次資料が無いため、メーカー名は判定に使わない。**
+
+Samsung（`SD01` label の空FAT32）へのblock size別書込み。
+
+```text
+4K    268435456 bytes (268 MB, 256 MiB) copied, 44.982 s, 6.0 MB/s
+64K   268435456 bytes (268 MB, 256 MiB) copied, 48.3193 s, 5.6 MB/s
+1M    268435456 bytes (268 MB, 256 MiB) copied, 49.145 s, 5.5 MB/s
+8M    268435456 bytes (268 MB, 256 MiB) copied, 48.4426 s, 5.5 MB/s
+```
+
+SanDisk `SU16G`（既存のext4 partition上の`/tmp`へ書き、測定後に削除）。
+
+```text
+1M   134217728 bytes (134 MB, 128 MiB) copied, 24.8249 s, 5.4 MB/s
+8M   134217728 bytes (134 MB, 128 MiB) copied, 25.9639 s, 5.2 MB/s
+```
+
+SanDiskの読み出し（既存fileを`cat`で通読。**一部fileはpermissionで読めず、
+読めた257,498,296 bytesで算出**）。
+
+```text
+読み出し: 257498296 bytes / 29.54 s = 8.7 MB/s
+```
+
+**対照cardは検査していない。**このcardにはRaspberry Pi向けUbuntu imageが入っており、
+**破壊的な検査を行っていない。**書込みは空き領域への一時fileに限り、測定後に削除した。
+
 ### 事後処理
 
 - `f3`の書いた`*.h2w` 30 fileを削除し、partitionをunmountした
@@ -468,15 +519,16 @@ page cacheとdentry／inode cacheを落としてから読み出す。**速度は
 **`Partial`。**①②⑤は基準を満たしたが、③は判定不能で、④は取得手段が無い。
 
 **③の「判定不能」と「未達」を分けて書く。**測定値6.11 MB/sは基準値10 MB/sに達していない。
-これは事実である。**しかしこの測定は`U1`が規定する条件（UHS mode）で行っていないため、
-「cardがU1要件を満たさない」という判定は下せない。**`未達`という語は有効な条件での
-失敗を指すため、この表では使わない。**有効なUHS mode試験を行った場合にのみ`未達`と判定する。**
+これは事実である。**しかしこの測定はcardが申告する2つの規定のどちらの条件も満たしていない**
+（`Class 10`はHigh Speed Modeで40 MHz、`U1`はUHS bus mode。hostは`sd high-speed`の33 MHz）。
+**したがって「cardが要件を満たさない」という判定は下せない。**`未達`という語は有効な条件での
+失敗を指すため、この表では使わない。**有効な条件で測定した場合にのみ`未達`と判定する。**
 
 | # | 観点 | 基準 | 実測 | 判定 |
 |---|---|---|---|---|
 | ① | 容量詐称 | `Data LOST`＝0 sector | 0 sector（3区分とも0） | **合格** |
 | ② | 読み書きの通し | 書込み総量と`Data OK`が一致 | 30 file・29.80 GiB・62,488,704 sectorが一致 | **合格** |
-| ③ | 速度 ≥ 10 MB/s | `f3write`平均書込み速度 | **6.11 MB/s**（raw device直接でも**7.4 MB/s**） | **判定不能（UHS mode条件外）。**基準値には達していないが、`U1`が規定する条件での測定ではないため、cardがU1要件を満たさないことを意味しない |
+| ③ | 速度 ≥ 10 MB/s | `f3write`平均書込み速度 | **6.11 MB/s**（raw device直接でも**7.4 MB/s**） | **判定不能（測定条件外）。**hostのclockが33 MHzで、`Class 10`の測定条件40 MHzにも`U1`の条件（UHS mode）にも達しない。**この端末ではcardの速度を判定できない** |
 | ④ | SMART相当 | 取得手段の有無を確認 | **この個体には手段が存在しない**（SD Expressではないため） | 確認済み |
 | ⑤ | 識別情報 | 現物printと矛盾しない | `32`／`microSDHC`／`U1`はregisterと一致（**読み方を仕様書Ver 9.10と照合済み**）。**`Samsung`だけは未裏付け**（MIDの登録簿が仕様書に無い） | **合格（1項目のみ未裏付け）** |
 
@@ -493,41 +545,87 @@ registerで裏付けられていない（`manfid`の登録簿が仕様書に無�
 
 ### ③を判定不能とする理由
 
-**「たぶん正常」で通さない**（[AGENTS.md](../../AGENTS.md) 推測禁止）。次の3点が同時に成り立つ。
+**「たぶん正常」で通さない**（[AGENTS.md](../../AGENTS.md) 推測禁止）。
 
-1. **`U1`の10 MB/sはUHS-I／UHS-II bus modeに対する規定であり、この測定はその条件を満たしていない。**
-   **これは一次資料で確認した。**Physical Layer Simplified Specification Ver 9.10の
-   **Section 4.13.3の表題は`Speed Grade Specification for UHS-I and UHS-II`**であり、
-   Speed Grade 1（10MB/sec and above）の性能要件はこの節に置かれている。
-   また`UHS_SPEED_GRADE`自体が**「UHS mode」のSpeed Gradeを示すfield**と定義されている
-   （Section 4.10.2.8）。
-   **この測定はUHS modeで行っていない。**`ios`の`timing spec`は`sd high-speed`、
-   `signal voltage`は3.30 Vであり、`dmesg`も`mmc0: new high speed SDHC card`と記録している
-   （UHS modeで初期化されていれば`ultra high speed`と表示される）。
-   **規定の適用条件を満たさない測定で、cardが規定を満たさないとは言えない。**
+**結論を先に書く。この測定はcardの速度を判定できる条件を満たしていない。**
+hostのSD clockが33 MHzであり、**仕様書が`Class 10`の測定条件として定める40 MHzを下回る**ためである。
 
-   **ただし「hostがUHS-Iに対応していない」とまでは確定していない。**host controllerの
-   capability registerを読めなかったため（`/sys/kernel/debug/mmc0/caps`はroot権限でも
-   `EPERM`を返す）、**非対応なのかnegotiationが成立しなかっただけなのかを区別していない。**
-   ③の判定には影響しない（どちらであってもUHS modeでないことに変わりはない）が、
-   **「UHS-I対応readerを用意すれば解決する」とも断定しない。**
-2. **一方で、host経路が6 MB/s台で頭打ちだとも言えない。**同じhost・同じcard・同じ
-   file systemの読み出しが19.15 MB/sを記録している。搭載RAMは3.7 GiB
-   （うちbuff/cache 1.2 GiB）に対し読んだのは29.80 GiBであり、
-   **19.15 MB/sは全dataがcacheだけで処理された結果ではない。**
-   **ただしpage cacheが一部に寄与していないことまでは示していない。**
-   uncached baselineもcache hit率も測っていないためである。
-   （なおraw device読出しは`iflag=direct`と`drop_caches`でcacheを外して20.3 MB/sであり、
-   cacheを排した経路でも同程度の値が出ている。）
-3. **書込みが遅い原因を、cardとhostとfile systemに分離できていない。**
-   raw deviceへ直接書いても7.4 MB/sで10 MB/sに届かないため、
-   **FAT32だけでは未達を説明できない**（上の「raw deviceへの直接書込み」）。
-   **ただしこれは「FAT32が主因ではない」ことを示すものではない。**2つの測定は
-   条件が複数異なり、寄与率を出せる比較になっていない。**cardの書込み特性、
-   SDHCI controller（Ricoh `1180:E823`）の書込み経路、file systemの寄与のいずれも
-   定量的に分離していない。**分離するには別のhost controllerで同じcardを測る必要がある。
+#### `Class 10`の測定条件を満たしていない（決定的な理由）
 
-**したがって「cardの劣化・不良」とも「cardは仕様どおり」とも結論しない。**
+このcardは`SPEED_CLASS`＝`04h`（**Class 10**）と`UHS_SPEED_GRADE`＝`1h`（**`U1`**）の
+2つを申告している。**両者は別の規定であり、測定条件も別である。**
+
+| 申告 | 要求性能 | 測定条件 | 出典 |
+|---|---|---|---|
+| `SPEED_CLASS`＝Class 10 | `Pw min.` **10 MB/sec** | **High Speed Modeで40 MHz** | Table 4-61／4-62 |
+| `UHS_SPEED_GRADE`＝1 | 10MB/sec and above | **UHS-I／UHS-II bus mode** | Section 4.13.3、Table 4-52 |
+
+**本測定のhostは`sd high-speed`・33 MHzである。**したがって、
+
+- **`U1`の条件（UHS mode）を満たさない。**`ios`の`timing spec`は`sd high-speed`、
+  `signal voltage`は3.30 Vであり、`dmesg`も`mmc0: new high speed SDHC card`と記録している
+  （UHS modeで初期化されていれば`ultra high speed`と表示される）
+- **`Class 10`の条件（High Speed Modeで40 MHz）も満たさない。**mode は合っているが
+  **clockが33 MHzで40 MHzに届かない**
+
+仕様書は測定条件について次のとおり明記している（Section 4.13.1.8.1 Application Note）。
+
+> Host needs to use higher frequency clock than that of measurement condition.
+
+**hostは測定条件より高いclockを使う必要がある。**33 MHzは40 MHzを下回るため、
+**この端末ではそもそも`Class 10`の性能を測れない。**
+
+**したがって6.11 MB/sという値は、cardが規定を満たさないことを示さない。**
+
+#### 別cardでの対照測定
+
+**2026-08-15に別のcardを同じreaderで測った。**目的はhost controllerがどこまで出せるかの確認である。
+
+| | Samsung EVO Plus 32GB | SanDisk `SU16G` |
+|---|---|---|
+| `SPEED_CLASS` | `04h`（**Class 10**） | `01h`（**Class 2**） |
+| `UHS_SPEED_GRADE` | `1h`（`U1`） | `0h`（10MB/sec未満） |
+| 製造 | 07/2018 | 08/2010 |
+| **読み出し** | **19.15〜20.3 MB/s** | **8.7 MB/s** |
+| **書込み** | **5.5〜6.1 MB/s** | **5.2〜5.4 MB/s** |
+
+**読み出しはcardによって2倍以上違う。**host controllerが固定の上限を課しておらず、
+cardの能力に追随していることを示す。
+
+**書込みは2枚とも5〜6 MB/sで並ぶ。**規格上2階級違うcardが同じ値になるのは、
+**hostのclock不足が両者に共通して効いている**とみると整合する。
+なお**SanDiskは`Class 2`の要件（20 MHz Default Speedで`Pw min.` 2 MB/sec）を満たしている。**
+Samsungだけが自分のclassの条件下で測られていない。
+
+#### block size依存性
+
+file system経由で書込みblock sizeを変えても速度が変わらない。
+
+| block size | 4K | 64K | 1M | 8M |
+|---|---|---|---|---|
+| 書込み | 6.0 MB/s | 5.6 MB/s | 5.5 MB/s | 5.5 MB/s |
+
+**block sizeを2000倍変えても差が出ない。**host controllerのper-command overheadが
+律速なら4Kは8Mより大幅に遅くなるはずであり、そうならない。
+**律速はcommand発行の回数ではなく持続throughput側にある。**
+
+#### file systemの寄与
+
+raw deviceへ直接書いても7.4 MB/sで10 MB/sに届かないため、
+**FAT32だけでは未達を説明できない**（上の「raw deviceへの直接書込み」）。
+**ただしこれは「FAT32が主因ではない」ことを示すものではない。**
+2つの測定は条件が複数異なり、寄与率を出せる比較になっていない。
+
+#### 結論
+
+**「cardの劣化・不良」とは結論しない。**測定条件が規定を満たしていないためである。
+
+**「cardは仕様どおり」とも結論しない。**規定の条件下で測っていない以上、
+満たすことも確認できていない。
+
+**この端末では③を判定できない。**判定するには**40 MHzを超えるHigh Speed Mode**
+（`Class 10`の確認）か、**UHS-I bus mode**（`U1`の確認）で駆動できるhostが要る。
+**別のcardを用意しても解決しない。**
 
 **raw device試験で分かったのは「file systemを外しても届かない」という一点である。**
 card対hostの分離は、別のreaderを用意しない限りこの端末では進められない。
@@ -562,8 +660,8 @@ Ricoh `1180:E823` SDHCI controllerを介して行った。**Piでの動作は確
 | literalな全セクタの読み書き検査 | **実施しなかった** | `badblocks -w`はroot必須かつ完全破壊であり、①（容量詐称）を構造的に検出できない。①を優先して`f3`を選んだ。全セクタのliteralなカバーが要る場合は別途実施する |
 | SMART相当の情報取得 | **手段が存在しない** | この個体の接続経路にSMART相当のcommandが無い（上記④）。実施可能だが行わなかった、ではない。**なおSD Express（NVMe interface）にはSMARTがあるが、この個体はSD Expressではない** |
 | 耐久性（寿命）の評価 | **この記録の対象外** | 1回のhealth checkで書き込み寿命は判定できない。`HW-TBD-015`の`妨げる対象`のうち「耐久性」はこの記録では解決しない |
-| 書込み速度の要因の定量的な分離 | **実施しなかった** | ③がinconclusiveである残りの理由。raw device試験で**FAT32だけでは未達を説明できない**ことは示したが、**card・host controller・file systemそれぞれの寄与率は出していない**（2つの測定は条件が複数異なる）。**分離には別のhost controllerで同じcardを測る必要がある** |
-| UHS-I mode下での速度測定 | **実施しなかった** | 本端末の内蔵SDHCI readerが`sd high-speed`（3.30 V signaling）でしか動作せず、UHS-Iに入らない。**`U1`表示の妥当性を保証条件下で検証するには別のreaderが要る** |
+| **規定の条件下での速度測定** | **実施できなかった** | ③を判定できない直接の原因。**hostのSD clockが33 MHzで、`Class 10`の測定条件40 MHz（High Speed Mode）にも`U1`の条件（UHS bus mode）にも達しない**（Table 4-61、Section 4.13.3）。**別cardを用意しても解決しない。40 MHz超のHigh Speed ModeかUHS-Iで駆動できるhostが要る** |
+| 書込み速度の各要因の寄与率 | **実施しなかった** | raw device試験で**FAT32だけでは未達を説明できない**ことは示したが、card・host controller・file systemそれぞれの寄与率は出していない（2つの測定は条件が複数異なる） |
 | `manfid`＝`0x1b`がSamsungであることの確認 | **この経路では解ける見込みが無い** | 仕様書もSD-3Cも**MIDと社名の対応表を公開していない**（2026-08-15確認）。**規格を定める側と割り当てる側の両方が公開していないため、追跡を打ち切った。網羅的に探したわけではない。****`SD-01`のメーカー表示の正は引き続き現物printである** |
 | host controllerのUHS-I対応可否の確定 | **実施しなかった** | `/sys/kernel/debug/mmc0/caps`／`caps2`がroot権限でも`EPERM`を返すため、capability registerを読めなかった。**測定がUHS modeでないことは`ios`と`dmesg`で確定しているが、hostが非対応なのかnegotiationが成立しなかっただけなのかは区別していない** |
 
@@ -618,3 +716,4 @@ version recordは別途要る。本記録の範囲外であり作成していな
 | 2026-08-15 | 12 | **`manfid`の追跡を打ち切った。**Revision 3以来「別の一次資料が要る」としていたが、**2026-08-15に[SD-3C Licensees](https://www.sd-3c.com/Licensees.aspx)を確認したところ、同社もMIDと社名の対応表を公開していない**（ライセンシーの社名一覧のみ）。仕様書Ver 9.10も対応表を収録していない。**規格を定める側とMIDを割り当てる側の両方が公開していないため、この経路に見込みは無い。****ただし網羅的に探したわけではないので「一次資料が存在しない」とは書かない。**状態を`未照合`から`この経路では解ける見込みが無い`へ改めた。**非公式の実測集計が`0x1b`＝Samsung・OEM ID `534d`とし本個体の値と一致するが、著者自身が非公式と明記しているため根拠に採らない。****`SD-01`のメーカー表示の正は引き続き現物printである** | [SD-3C Licensees](https://www.sd-3c.com/Licensees.aspx)、[Part 1 Physical Layer Simplified Specification Version 9.10](https://www.sdcard.org/downloads/pls/) Section 5.1 |
 | 2026-08-15 | 13 | **自己レビューで検出。Revision 12が「`manfid`から社名を引く一次資料は存在せず」と全称否定で書いていた。****確認したのは仕様書とSD-3Cの2つであり、網羅的に探したわけではない。**「規格を定める側と割り当てる側の両方が公開していないため、この経路に見込みは無い」へ改め、**「存在しないことを証明した」からではなく「見込みが無い」から打ち切る**という区別を明記した。状態名も`一次資料では解けない`から`この経路では解ける見込みが無い`へ揃えた。**これはRevision 5で同じ型の誤り（SMARTの全称否定）を直したばかりであり、繰り返している** | 自己レビュー |
 | 2026-08-15 | 14 | **[PR #118](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/118)のCodeRabbit reviewの指摘2件を反映した。**(a) 見出し「MIDの対応表は公開されていない」が、**未確認の資料にも対応表が無いと読める表現だった。**後続の本文は非網羅的な確認であると断っていたが、**見出しがその限定を打ち消していた。**「確認した2つの資料はいずれもMIDの対応表を持たない」へ改めた。(b) [tbd-register.md](tbd-register.md)の`HW-TBD-015`行が`Samsung`を裏付けられない事実だけを記し、**照合を打ち切ったことを書いていなかった。**同じ行の[#117](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/117)が`manfid`照合を継続するIssueにも読めたため、**打ち切りの事実と、#117の範囲が耐久性・速度要因の分離・結果記録・close判断に限られることを明記した** | [PR #118のCodeRabbit review](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/118) |
+| 2026-08-15 | 15 | **③の原因を特定した。判定は`判定不能`のまま変わらないが、理由が変わった。****Revision 14までは`U1`（`UHS_SPEED_GRADE`）の条件だけを見ており、同じcardが申告する`SPEED_CLASS`＝Class 10の測定条件を調べていなかった。**仕様書Table 4-61は**`Class 10`をHigh Speed Modeの40 MHzで測ると定め**、Table 4-62が`Pw min.`10 MB/secを課す。Section 4.13.1.8.1のApplication Noteは`Host needs to use higher frequency clock than that of measurement condition.`と明記する。**本測定のhostは`sd high-speed`の33 MHzであり、40 MHzに達しない。**したがって`U1`の条件（UHS mode）だけでなく**`Class 10`の条件も満たしていない。****この端末ではcardの速度を判定できない。別cardを用意しても解決しない。****あわせて対照測定を実施した。**別card（SanDisk `SU16G`、Class 2）を同じreaderで測ると読み出し8.7 MB/s（Samsungは19〜20 MB/s）で、**host controllerは固定の上限を課していない。**一方**書込みは2枚とも5〜6 MB/sで並ぶ**（規格上2階級違うのに同値）。block sizeを4K〜8Mで変えても差が出ず、**律速はcommand発行回数ではなく持続throughput側にある。****Revision 4が「当初挙げた3要素のうちfile systemが消えた」と書いた整理も、原因がhostのclock不足である以上、不完全であった** | [Part 1 Physical Layer Simplified Specification Version 9.10](https://www.sdcard.org/downloads/pls/) Table 4-61／4-62、Section 4.13.1.8.1、本記録の対照測定 |
