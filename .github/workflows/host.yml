@@ -1,0 +1,92 @@
+name: Host
+
+on:
+  pull_request:
+    paths:
+      - "crates/**"
+      - "apps/**"
+      - "simulator/**"
+      # root workspaceのmanifestとlockfile。memberの増減と依存解決の変更は、
+      # 個々のcrateを触らなくてもhost buildを壊しうる。
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/host.yml"
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - "crates/**"
+      - "apps/**"
+      - "simulator/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/host.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: host-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: Format, lint, and test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          # firmware・Pages workflowと同じ理由。この後のstepがPR側のcodeを
+          # runner上で扱うため、checkoutが.git/configへ残すtokenを読めないようにする。
+          persist-credentials: false
+
+      # サードパーティActionを使わずrustupで導入する。
+      # `.github/REPOSITORY_SETTINGS.md`の現行方針は「GitHub所有Action＋明示的に
+      # 許可した`esp-rs/xtensa-toolchain`」であり、`dtolnay/rust-toolchain`等を
+      # 足すと`patterns_allowed`の変更＝repository設定変更が要る。
+      # rustupはrunner imageに入っているため、shellだけで済む。
+      #
+      # 版を固定するのは、root `Cargo.toml`が「`rust-version`は、実際にbuildと
+      # testを通した版だけを宣言する」と定めているためである。runner imageの
+      # 既定版に任せると、記録した版と違うもので通ったことになる。
+      # 上げるときはこの値とVersion Recordを同時に変える。
+      - name: Install Rust toolchain
+        run: |
+          rustup toolchain install 1.97.1 --profile minimal --component rustfmt,clippy
+          rustup default 1.97.1
+          rustc --version
+          cargo --version
+          cargo fmt --version
+          cargo clippy --version
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: host-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: |
+            host-${{ runner.os }}-
+
+      # `cargo fmt`は`--locked`を受け付けない。
+      - name: Format
+        run: cargo fmt --all -- --check
+
+      # `-D warnings`は付けない。lintの水準はroot `Cargo.toml`の
+      # `[workspace.lints]`が持ち、`clippy::all`が既にdenyである。
+      # commandのoptionで二重に持つと、片方だけ変えたときに水準が食い違う。
+      - name: Lint
+        run: cargo clippy --workspace --all-targets --locked
+
+      # 計画表の#1と#2をここで両方満たす。protocol fixture testは
+      # `tests/`配下にあり`--workspace`に含まれる。
+      - name: Test
+        run: cargo test --workspace --locked
