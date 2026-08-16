@@ -9,6 +9,7 @@
 - `power-budget.md`
 - `servo-safety-limits.md`
 - `sensor-datasheet-notes.md`
+- `sd-health-check.md`
 - 実験記録
 
 正確な部品型番、公式資料、記録済み実測値だけを使用する。不明値は`TBD`とする。

@@ -15,11 +15,12 @@ decode／encode、および共有conformance fixtureを提供する。
   （`boot`、`hello`、`ping`、`get_status`、`status`、`ack`）
 - error code（§7）と、それを計上する`status`のcounterへの対応付け
 - 1 lineのdecodeとencode、およびその検証順序
+- byte列からlineを組み立てる上限付きreceiver（§8手順1〜6、Issue #10）
 - 共有conformance fixture（[`tests/fixtures/`](tests/fixtures/README.md)）
 
 含まないもの:
 
-- serial I/O、byte受信、分割lineの結合、invalid UTF-8の分類（Issue #10、#11）
+- serial deviceのopen、read／write、切断と再接続（Issue #11）
 - session state、duplicate履歴、受理budget、遷移cooldown（Issue #12）
 - hardwareに依存する値と処理
 
@@ -39,14 +40,61 @@ decode／encode、および共有conformance fixtureを提供する。
 **返すcodeは分類であって、送出の判断ではない。**そのcodeを相手へ返すかどうかは、方向（§8）と
 §8.2の送出上限に従い、session stateを持つ層（#11、#12）が決める。とくに`line_too_long`は
 §7により`(sid, id)`を復元できた場合にだけ返してよく、`unknown_type`は方向によって
-相関ACKを返すか計数だけにするかが変わる。**このcrateは上限付きprefixからのidentity復元を
-行わない。**行全体を受け取る以上、上限超過時にどこまで保持するかはbyte受信を持つ層（#10）の
-判断だからである。
+相関ACKを返すか計数だけにするかが変わる。**`decode_line`単体は上限付きprefixからのidentity
+復元を行わない。**行全体を受け取る以上、上限超過時にどこまで保持するかはbyte受信を持つ層の
+判断だからである。復元は下の受信器が行う。
 
 `unknown_type`と`invalid_payload`を区別するため、envelopeのpayloadは
 `serde_json::value::RawValue`として未解釈のまま受け、`type`を解決してから
 type固有schemaでdeserializeする。serdeのadjacently tagged enumでは失敗理由が
 「どのvariantにも一致しない」に潰れ、この区別ができない。
+
+## 受信器（byte列からline、#10）
+
+`src/framing.rs`、`src/prefix.rs`、`src/receiver.rs`の3層に分ける。責務の詳細は
+`cargo doc --open`で読む。ここには**判断の理由だけ**を残す。
+
+| 層 | 役割 |
+|---|---|
+| `framing` | byteを蓄えて`\n`でlineへ切る。JSONもUTF-8も解釈しない |
+| `prefix` | 途中で切れたJSONから`(sid, id)`と`type`の復元を試みる純関数 |
+| `receiver` | UTF-8を検証して`decode_line`へ渡し、結果を§7の分類へ対応づける |
+
+### 上限は型の性質にしている
+
+bufferは構築時に`Box<[u8]>`で確保する。`push`が無いため伸びない。「上限のないbufferを
+作らない」を規律ではなく型で保証するためである。queueは持たない。呼び出し側が1件ずつ
+取り出すので、溜める場所そのものが無い。
+
+### 容量は`MAX_LINE_BODY_BYTES`（改行を除く）
+
+§2の上限は改行を含む。bufferへ蓄えるのはbodyだけなので、容量は`MAX_LINE_BYTES - 1`とする。
+こうすると**bufferを通ったlineは必ず`decode_line`の行長判定も通る**ため、`line_too_long`の
+出所がreceiverの1箇所だけになる。両方で判定すると、identityを復元できる経路とできない経路が
+同じcodeで並んでしまう。
+
+CRLFで終わる行では`\r`もbody予算を使う。§2は上限に`\r`を含めるかを書いていないため、
+この振る舞いは`PROTO-TBD-002`への入力として`tests/fixtures/framing.json`が固定している。
+
+### oversizeは検知した時点で1回だけ返す
+
+終端の`\n`を待たない。待つと、相手が`\n`を送ってこない限り報告が出ず、§4.1の`boot`送信側が
+recovery budgetを無応答のまま使い切る。破棄中にさらに超過が続いても2件目は返さない。
+
+### prefix長の定数は置かない
+
+§8手順6が求める「上限付きprefix」の長さは`PROTO-TBD-002`であり、**仕様は候補値を一つも
+示していない。**JSONはkeyの順序を縛らないため、必要byte数に計算可能なworst caseが無い。
+そこで受信器は、既に保持している行buffer全体をprefixとして使う。新しい数を決めずに済む
+退化した上限である。確定したら`with_prefix_budget`で縮める。縮めることは純粋な制限であり、
+いま復元できない行が復元できるようにはならない。
+
+### UTF-8の不正とJSONの不正を`cause`で分ける
+
+§4.6はUTF-8／JSON／envelopeの不正をまとめて`parse_errors`とするため、wire上の`ErrorCode`だけでは
+両者を区別できない。一方§7は「parser counterでは区別する」と定めている。そこで`Rejection`は
+wireへ出す`code`とは別に`cause`を持つ。**JSONの不正とenvelopeの不正は、まだ区別が付かない。**
+`decode_line`がどちらも`invalid_envelope`として返すためである。
 
 ## 上限
 

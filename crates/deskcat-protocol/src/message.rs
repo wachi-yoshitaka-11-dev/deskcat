@@ -45,6 +45,21 @@ impl Message {
         }
     }
 
+    /// wire上の`type`が既知の名前なら、その`'static`な綴りを返す。
+    ///
+    /// [`Self::type_str`]の逆写像である。上限付きprefixからの復元（[`crate::prefix`]）が、
+    /// 所有権を持たずにtypeを判定するために使う。綴りが両方向で一致していることは、
+    /// `tests/conformance.rs`が共有fixtureの`expect.type`に対して検査する。
+    #[must_use]
+    pub fn known_type_name(name: &[u8]) -> Option<&'static str> {
+        Self::TYPE_NAMES
+            .into_iter()
+            .find(|known| known.as_bytes() == name)
+    }
+
+    /// 受理するtype名の一覧。[`Self::type_str`]と同じ綴りを使う。
+    const TYPE_NAMES: [&'static str; 6] = ["boot", "hello", "ping", "get_status", "status", "ack"];
+
     /// 上限のある値が範囲内かを検査する。
     ///
     /// # Errors

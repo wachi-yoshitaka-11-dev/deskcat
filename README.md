@@ -104,7 +104,7 @@ cargo test --workspace --locked
 
 lintの水準はroot `Cargo.toml`の`[workspace.lints]`が持つため、`-D warnings`は付けない。`cargo fmt`は`--locked`を受け付けない。
 
-Linux x86_64、Rust stable 1.97.1で検証した。検証日は2026-08-10である。証拠は[Version Record](docs/toolchains/version-records/2026-08-10-host-rust-linux.md)にある。別端末での再現は未検証である。
+Linux x86_64、Rust stable 1.97.1で検証した。検証日は2026-08-10である。証拠は[Version Record](docs/toolchains/version-records/2026-08-10-host-rust-linux.md)にある。別端末での再現はCIの`ubuntu-24.04` runnerで満たした（#129。[Version Record](docs/toolchains/version-records/2026-08-15-host-rust-ci.md)）。**CIが実行するのはhost workspaceだけであり、Raspberry Pi上でのbuildと実行は主張しない。**
 
 `firmware/esp32`はroot workspaceから`exclude`している。firmwareのmanifestは`[workspace]`節を持たないため、excludeを外すとfirmwareのbuildが壊れる。分離自体は[ADR-0001](docs/decisions/0001-monorepo-layout.md)の決定である。
 

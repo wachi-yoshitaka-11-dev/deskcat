@@ -219,7 +219,8 @@ Directoryは、説明のない`.gitkeep`ではなく、責務を記載したREAD
 
 - 正確なRust editionとtoolchain version
 - ESP32 templateと依存version
-- Firmwareからの`deskcat-protocol`直接再利用
+- Firmwareからの`deskcat-protocol`直接再利用（[ADR-0008](0008-firmware-protocol-crate-reuse.md)で解決。
+  本文は決定時点の記録として書き換えない）
 - Raspberry Pi向けcross-compile方針
 - Deploy package
 - 設定UI技術

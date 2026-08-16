@@ -1168,26 +1168,29 @@ crates/deskcat-protocol/tests/fixtures/
 合格しなければならない」と定めているためである。同じdirectoryをfirmware側からpath参照するか
 複製するかは、同ADRのcrate共有方針の決定に従う。
 
-fixtureは最低限、次の5群をすべて含む。上の一覧と表がその内訳である。**現時点で揃っているのはSchema群と、Framing／parse群のうちline長境界・CRLF・invalid JSONだけである。**
+fixtureは最低限、次の5群をすべて含む。上の一覧と表がその内訳である。**現時点で揃っているのはSchema群とFraming／parse群である。**
 
 | 群 | 対象 | 状態 |
 |---|---|---|
 | Schema | envelope、type固有payload、上限の境界、未知version／type | **作成済み**（#9） |
-| Framing／parse | 分割受信、CRLF、invalid UTF-8／JSON、line長境界 | line長境界・CRLF・invalid JSONは**作成済み**（#9）。byte単位の分割受信とinvalid UTF-8は#10 |
+| Framing／parse | 分割受信、CRLF、invalid UTF-8／JSON、line長境界 | **作成済み。**line長境界・CRLF・invalid JSONは#9、byte単位の分割受信とinvalid UTF-8は#10 |
 | Session判定 | 遷移の成否、`stale_session`、retired session、`hello`／`boot`再送、`sid`衝突時の選び直し、retired保持期間、方向が逆のsession確立messageの拒否 | 未作成（#12） |
 | Duplicate replay | 同一`(sid, id)`のretry、保持結果の返却、非idempotent動作の二重実行防止 | 未作成（#12） |
 | Budgetと応答 | 受理上限、遷移budget／cooldown、予約枠、送出上限、ACKの優先 | 未作成（#12）。値が`PROTO-TBD-011`／`012`／`017`で未確定 |
 
-**未作成の3群は、単一lineのschema検証ではなく受信側のstateに依存する。**#9が提供するのは
-stateを持たない単一lineのdecodeであり、これらのcaseを置いても実行できない。budget群は
-parameterの数値自体が未確定である。
+**未作成の3群は、単一lineのschema検証でも1本のbyte streamの組み立てでもなく、session間にまたがる
+受信側のstateに依存する。**#9が提供するのはstateを持たない単一lineのdecodeであり、#10が実装した
+受信器が持つstateも1本のstreamの組み立て途中だけである。これらのcaseを置いても実行できない。
+budget群はparameterの数値自体が未確定である。
 
-したがって**この節はまだ「両側が検証済み」の根拠にならない。**現時点で確定したのは、
-schema層についてhost実装がfixtureに合格することだけである。firmware側の合格は#10、
+したがって**この節はまだ「両側が検証済み」の根拠にならない。**現時点で確定したのは、schema層と
+Framing／parse層について、**host workspaceのRust実装**がfixtureに合格することである。#10が実装した
+受信器はfirmwareからもpath dependencyで使うが（[ADR-0008](../decisions/0008-firmware-protocol-crate-reuse.md)）、
+根拠はcross compileが通ることまでであり、**実機上でのfixture実行はまだ行っていない。**
 残る3群は#12を待つ。`v: 1`が確定版を意味するのは、5群すべてが揃い両側のparserが
 合格した時点である（[§11](#11-versioning)）。
 
-作成作業は[初期Issue](../backlog/initial-issues.md)の#9が着手した。
+作成作業は[初期Issue](../backlog/initial-issues.md)の#9が着手し、Framing／parse群は#10が完了させた。
 `PROTO-TBD-016`はprotocol側の未決事項としての追跡であり、
 実施Issueを別に立てるものではない。
 
@@ -1203,14 +1206,14 @@ schema層についてhost実装がfixtureに合格することだけである。
 | PROTO-TBD-006 | 最終status field | 診断要件とencode size test |
 | PROTO-TBD-007 | Textとchoiceの制限 | LCD layoutとmemory測定 |
 | PROTO-TBD-008 | Motion名と範囲 | Servo calibrationと動作設計 |
-| PROTO-TBD-009 | Touch strengthの意味 | 正確なtouch controllerと実験 |
+| PROTO-TBD-009 | Touch strengthの意味 | **touch controllerは`XPT2046`と確定した**（2026-08-13の現物確認。[HW-TBD-003](../hardware/tbd-register.md)はclose）。残るのは同ICのdatasheetでの意味づけと実験である |
 | PROTO-TBD-010 | Heartbeat方式とlink-loss判定 | 測定latencyとfail-safe試験。[HW-TBD-017](../hardware/tbd-register.md)と対で確定する。**サーボ出力の有効化条件に含まれる**（[servo-safety-limits](../hardware/servo-safety-limits.md#サーボ出力を有効化してよい条件)） |
 | PROTO-TBD-011 | `sid`の生成方法、衝突許容確率、**retired session**の保持件数と期間（下限は遅延messageの最大生存時間＋再送window。期間は`T_retention`と時間単位を一組で記録する。保持件数は`PROTO-TBD-012`の`N_transition`回／`T_window`から`N_transition × ceil(T_retention / T_window)`件以上とし、端数windowを切り上げる。retired `sid`を`stale_session`で遮蔽するためのものであり、`PROTO-TBD-005`とは目的が異なる）、`stale_session`受信による`sid`選び直し回数の上限、`hello`無応答時のrecovery budgetと同一identityの最大retry回数（`boot`のrecovery再開は`sid`を選び直さない。§4.1） | 再起動試験とRust実装の検討。[HW-TBD-020](../hardware/tbd-register.md)と対で確定する。**サーボ出力の有効化条件に含まれる** |
 | PROTO-TBD-012 | 単位時間あたりの受理上限、応答の送出上限と集約window、**`boot`への拒否ACK専用budget**、**`hello`への拒否ACK専用budget**、**受信側が所有する方向別応答保留table**（ESP32所有のPi→ESP32 `hello` tableと、Pi所有のESP32→Pi `boot` table）の件数上限・TTL・公平性規則、二つの件数上限の和として定義するlink全体の静的上限（entry keyは`(sender_role, sid, id)`。方向間で未使用枠を貸し出さない。TTLは最悪送出待ち時間以上。`rate_limited`は最終結果としてreplayしない）、各保留entryの初回送出機会とsession messageの最大retry回数を合わせた有限送出quota、**`rate_limited`で拒否された`hello`のretry budget**、duplicateへ非ACKの保持結果をreplayする時間窓と回数の上限、**正規retry quota内の保持ACK replay予約容量**（送出総数上限と通常のper-identity上限に優先。通常commandは1回、`hello`は`PROTO-TBD-011`、`boot`は`PROTO-TBD-017`の最大retry回数を使い、各identityの残quotaと同一windowの最大retry到着数から有限容量を算出する）、`hello`／`boot`の受理予約枠割合、session遷移の上限（任意の連続`T_window`あたり`N_transition`回。数値と時間単位を一組で記録し、固定window境界で上限を迂回できない方式にしてPROTO-TBD-011の保持件数式へ渡す）、cooldown、ACK・完了event・fault event・`status`用に確保する帯域 | protocolの負荷試験（throughput、応答遅延、buffer占有、枯渇の有無）。これらはlinkの負荷管理parameterであり、温度／電流試験では決まらない。[HW-TBD-020](../hardware/tbd-register.md)のservoの秒あたり受理command数と対で確定する。その値はhardware台帳が正本であり、ここではlink全体のbudgetへ組み込む条件だけを扱う。**サーボ出力の有効化条件に含まれる**（[servo-safety-limits](../hardware/servo-safety-limits.md#サーボ出力を有効化してよい条件)） |
 | PROTO-TBD-013 | Stale commandの拒否条件（command age、session遷移後の未ACK commandの扱い） | Reconnect試験とfail-safe試験。[HW-TBD-018](../hardware/tbd-register.md)の通信断時fail-safe／reconnect条件、および[HW-TBD-020](../hardware/tbd-register.md)のCommand timeout fieldと対で確定する。Command timeoutの実測値はhardware側、stale commandの拒否条件はProtocol側を正とする。**サーボ出力の有効化条件に含まれる**（[servo-safety-limits](../hardware/servo-safety-limits.md#サーボ出力を有効化してよい条件)） |
 | PROTO-TBD-014 | 実行時安全制限の超過を報告するfault eventの名前とpayload schema。拘束／過負荷、最大連続動作時間の超過、duty cycle上限の超過を、payload fieldまたはcodeで**区別できる**こと | [Servo Safety Limits](../hardware/servo-safety-limits.md#拘束stallと過負荷)の検知手段確定後。[HW-TBD-020](../hardware/tbd-register.md)と対で確定する。**サーボ出力の有効化条件に含まれる**（[servo-safety-limits](../hardware/servo-safety-limits.md#サーボ出力を有効化してよい条件)） |
 | PROTO-TBD-015 | Draft schema revisionの表明方法（envelope fieldかout-of-band照合か） | Draft間の相互接続が必要になった時点。fixture一致で足りるなら追加しない |
-| PROTO-TBD-016 | §12のconformance fixtureの実体作成と配置。**schema群と一部のframing群は`crates/deskcat-protocol/tests/fixtures/`へ配置済み**（[#9](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/9)）。残るのはsession判定、duplicate replay、budgetと応答の3群と、firmware側の合格確認 | 残る3群は受信側のstateを必要とするため[#12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)、firmware側の合格は[#10](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/10)で確認する。budget群は`PROTO-TBD-011`／`012`／`017`の確定を待つ |
+| PROTO-TBD-016 | §12のconformance fixtureの実体作成と配置。**schema群とframing／parse群は`crates/deskcat-protocol/tests/fixtures/`へ配置済み**（schema群と行長境界・CRLF・invalid JSONは[#9](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/9)、byte単位の分割受信とinvalid UTF-8は[#10](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/10)）。残るのはsession判定、duplicate replay、budgetと応答の3群と、実機上でのfirmware側の合格確認 | 残る3群は受信側のstateを必要とするため[#12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)。firmware側はhost workspaceのRust実装をpath dependencyで再利用しており（[ADR-0008](../decisions/0008-firmware-protocol-crate-reuse.md)）、cross compileまでは確認済みで実機実行は[#6](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/6)を待つ。budget群は`PROTO-TBD-011`／`012`／`017`の確定を待つ |
 | PROTO-TBD-017 | `boot`再送契約のparameter（初期間隔、backoff係数、通常再送の回数、recovery間隔、**無応答時に送出を止めるまでの有限recovery budget**、**同一`(sid, id)`の最大再送回数**、**`rate_limited`で拒否されたときのcooldown後再送を含む上限**）。recovery budgetの総待ち時間は`PROTO-TBD-012`の拒否ACK最悪送出待ち時間以上とする。終了条件そのものは§4.1で確定済み | 起動時のlink確立latency測定とreconnect試験 |
 
 ## Revision履歴
@@ -1221,6 +1224,8 @@ schema層についてhost実装がfixtureに合格することだけである。
 | 2026-07-28 | Draft 2 | Envelopeへ`sid`を追加。`hello`、`rate_limited`、`stale_session`を追加。Piの再起動でduplicate判定が誤るcaseを修正し、流量制限とlink-loss検知の未決事項を登録 |
 | 2026-07-31 | Draft 2 review | ACKと完了eventへ`reply_sid`を追加し、要求送信側の再起動後に旧sessionの応答を誤認するcaseを修正 |
 | 2026-08-10 | Draft 2 fixture | §3のinteger widthを確定し、§7へ単一lineの検証で決まるcodeの対応付けを追加（分類と送出の判断を分ける）。§12.1をschema群のfixture作成済みの状態へ更新。wire formatは変更していない |
+| 2026-08-15 | Draft 2 sync | [PR #122](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/122)。`PROTO-TBD-009`の解決方法が`正確なtouch controllerと実験`のままだったため、**touch controllerが`XPT2046`と確定した**ことを反映した（[HW-TBD-003](../hardware/tbd-register.md)はclose）。**protocolの仕様は変えていない。**残る作業は同ICのdatasheetでのtouch strengthの意味づけと実験である |
+| 2026-08-15 | Draft 2 framing | [Issue #10](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/10)。§12.1のFraming／parse群を**作成済み**へ更新した。byte単位の分割受信とinvalid UTF-8のfixtureが揃い、host workspaceのRust実装が合格する。firmwareは同じ実装をpath dependencyで使う（[ADR-0008](../decisions/0008-firmware-protocol-crate-reuse.md)）が、**実機上でのfixture実行は未実施**である。**wire formatは変更していない。** |
 
 ### Draft schemaの互換性
 

@@ -1,6 +1,6 @@
 # ESP32 firmware
 
-このディレクトリには、ESP-WROOM-32D開発ボード（秋月電子 M-13628）用のRust firmwareを置く。基板裏面silkscreenは`ESP32_DevkitC_V4`である。
+このディレクトリには、ESP-WROOM-32D開発ボード（秋月電子 M-13628）用のRust firmwareを置く。基板裏面silkscreenは`ESP32_DevKitc_V4`である（2026-08-15に大文字小文字を訂正。旧記載 `ESP32_DevkitC_V4`）。
 
 専用のESP-IDF/Xtensa toolchainを使用するため、rootのhost workspaceとは別のCargo workspaceとする。
 
@@ -45,11 +45,33 @@ cargo build --locked
 
 **止めるのが`build.rs`とは限らない。**`IDF_PATH`の指す先が実在しない場合は、依存の`esp-idf-sys`が先に別のerror（`could not determine esp-idf version from ...`）で失敗する。どちらでもbuildは止まるが、`build.rs`のguardのmessageは出ない。実測は[Version Record](../../docs/toolchains/version-records/2026-08-06-esp32-build-linux.md)にある。
 
+## host crateの再利用
+
+`deskcat-protocol`をpath dependencyで使う。wire protocolの実装を両側で1つに保つためであり、
+判断の記録は[ADR-0008](../../docs/decisions/0008-firmware-protocol-crate-reuse.md)にある。
+
+```toml
+deskcat-protocol = { path = "../../crates/deskcat-protocol" }
+```
+
+- root workspaceの`exclude = ["firmware/esp32"]`は**維持する。**lockfileはroot `Cargo.lock`と
+  このディレクトリの`Cargo.lock`の2つに分かれたままでよい。
+- **共有crateの`rust-version`は、host（1.97.1）とESP toolchain（rustc 1.95.0-nightly）の
+  両方を満たす下限にしてある。**`crates/deskcat-protocol/Cargo.toml`が理由込みで宣言している。
+  ここを上げるとfirmwareのbuildが`rustc 1.95.0-nightly is not supported`でcompile前に止まる。
+- `crates/deskcat-protocol/**`の変更でも`.github/workflows/firmware.yml`が発火する。
+  host側だけの変更でfirmware buildが壊れるのを検知するためである。
+
+**`src/main.rs`はまだこのcrateを呼び出していない。**serial taskの配線は
+[#12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)の担当である。
+現時点で示せているのは、固定toolchainで`xtensa-esp32-espidf`向けにcross compileできることまでで、
+**実機上での動作とfixture合格は主張しない。**
+
 ## 未確定の前提
 
 機種と搭載moduleは確定している（ESP-WROOM-32D開発ボード／秋月電子 M-13628。基板にrevision表示は無い）。根拠は[hardware-bom.md](../../docs/hardware/hardware-bom.md)のMCU-01である。
 
-未確定なのは**公式pin表と現物pin表記の照合**である（[HW-TBD-001](../../docs/hardware/tbd-register.md)）。現物が公式V4リファレンス設計どおりに実装されている保証は文書だけでは得られないため、照合が要る。照合先は[ESP32-DevKitC V4公式回路図](https://dl.espressif.com/dl/schematics/esp32_devkitc_v4-sch.pdf)と公式guideのpin description表である（秋月商品ページの添付はモジュールとチップのdatasheetのみで、boardのpin配列表を含まない）。GPIO割り当てを伴う変更は、この照合が済むまで入れない。chip刻印も未読である。
+**公式pin表と現物pin表記の照合は2026-08-15に完了し、[HW-TBD-001](../../docs/hardware/tbd-register.md)はcloseした**（38pinヘッダ両側のsilkが公式`J2`／`J3`と19pin×2列すべてで一致した）。照合先は[ESP32-DevKitC V4公式回路図](https://dl.espressif.com/dl/schematics/esp32_devkitc_v4-sch.pdf)と公式guideのpin description表である（秋月商品ページの添付はモジュールとチップのdatasheetのみで、boardのpin配列表を含まない）。**ただしGPIO割り当てを伴う変更は、まだ入れない。**[gpio-assignment.md](../../docs/hardware/gpio-assignment.md)は実機での電源off導通check、MSP2807のlogic IO levelの現物確認、servo起動時状態の安全review待ちで`Blocked`のままである。**中核chipの識別（`HW-TBD-031`）も未了である。**中核chipは半田付けされた金属シールドの内側にあり刻印を読めないため、要件は2026-08-15にesptoolの報告で満たす形へ再定義された（[esp32-rust-toolchain.md](../../docs/toolchains/esp32-rust-toolchain.md)の`chip識別の満たし方`）。確定はflashとbootを行う#6を待つ。
 
 ESP-WROOM-32D datasheet v2.7にはPSRAM内蔵variantの記載が無いため、PSRAMを前提とする設定は不要である。
 
