@@ -59,6 +59,7 @@ ls -l /lib/ld-linux-armhf.so.3 /lib/ld-linux.so.3
 # B. 実行中systemのbinaryのELFから読む（binutilsが要る）
 readelf -h /bin/sh
 readelf -A /bin/sh
+readelf -l /bin/sh
 
 # B. binutilsが無い場合、interpreterだけはfileで確認できる
 file /bin/sh
@@ -83,7 +84,7 @@ od -An -tx1 -j 36 -N 4 /bin/sh
 - `dpkg --print-architecture` が `arm64` を返した場合、userspace は 64-bit であり、hard/soft 以前に候補 target の前提を満たさない。1節冒頭の `getconf LONG_BIT` と併せて判断する。
 - `ls -l /lib/ld-linux*` の判定は、**system の実行ファイルが要求する interpreter がその path に存在するはずである**という関係に基づく。両方の loader が存在する場合は multiarch 構成であり、この手段では判定できない。手段 B へ進む。
 - `readelf -A` の `Tag_ABI_VFP_args` は、**存在すれば hard-float の強い根拠**である。一方、不在は soft-float の根拠としては弱い（tag を出力しない toolchain の可能性を排除できない）。soft-float 側の判定は `readelf -h` の `Flags:` を優先する。
-- `od` が読むのは ELF32 header の `e_flags`（offset 36、little endian の 4 byte）である。出力は hard-float なら `00 04 00 05`、soft-float なら `00 02 00 05` の形になる。ELF64 では offset が異なるため、`getconf LONG_BIT` が `32` でない場合はこの手段を使わない。
+- `od` が読むのは ELF32 header の `e_flags`（offset 36、little endian の 4 byte）である。hard-float なら `00 04 00 05`、soft-float なら `00 02 00 05` の形になる（**いずれも実際に確認した出力である**）。両 bit が 0 の場合は 2 番目の byte が `00` になる（**この形は未確認であり、次の項の仕様からの帰結である**）。ELF64 では offset が異なるため、`getconf LONG_BIT` が `32` でない場合はこの手段を使わない。
 - `e_flags` の該当 bit は `EF_ARM_ABI_FLOAT_HARD`（`0x00000400`）と `EF_ARM_ABI_FLOAT_SOFT`（`0x00000200`）である。**両方の bit が 0 の場合は base 標準、すなわち soft-float とみなす**（[AAELF32](https://github.com/ARM-software/abi-aa/blob/main/aaelf32/aaelf32.rst) の Arm-specific `e_flags`）。したがって 2 番目の byte が `00` でも判別不能ではない。
 - これらの bit は executable file header（`e_type` が `ET_EXEC` または `ET_DYN`）にのみ設定される。object file や一部の library では判定に使えないため、判定対象には `/bin/sh` のような実行可能ファイルを選ぶ。
 - `file` は float ABI を語として出力しない。`interpreter` の path だけが手掛かりであり、interpreter を持たない静的 link binary では判断できない。その場合は `readelf -h` を使う。
@@ -159,7 +160,7 @@ cc --version
 `rustc -Vv` の `host` が OS と ABI に一致しない場合は先へ進まない。一致は次で判定する。
 
 - host triple の ABI 部分が `gnueabihf` なら hard-float、`gnueabi` なら soft-float を意味する（[Rust Arm Linux targets](https://doc.rust-lang.org/rustc/platform-support/arm-linux.html) の ABI Component）。1節で判定した float ABI と突き合わせる。**eabihf の実行物は eabi の system では正しく動作しない。**
-- host triple の architecture 部分を `uname -m` および `readelf -A` の `Tag_CPU_arch` と突き合わせる。同資料では `arm` が Armv6、`armv7` が Armv7 に対応する。
+- host triple の architecture 部分を `readelf -A` の `Tag_CPU_arch` と突き合わせる。同資料では `arm` が Armv6、`armv7` が Armv7 に対応する。**`uname -m` は kernel 側の値であり、userspace の architecture を示すとは限らないため参考にとどめる。**
 - 突き合わせた結果が食い違う場合は、1節の[ABIを判別できなかったとき](#abiを判別できなかったとき)と同じ扱いにする。rustup が選んだ host を根拠に ABI を確定しない。
 
 ## 4. 最小native検証

@@ -26,9 +26,9 @@ Rust 公式の platform support では、この target は Armv6 Linux hard-floa
 | 1 | board が Raspberry Pi Zero W である | 現物の silkscreen と `/sys/firmware/devicetree/base/model` |
 | 2 | userspace が 32-bit である | `getconf LONG_BIT` が `32` |
 | 3 | float ABI が hard-float である | [runbook の float ABI 判定](../runbooks/raspberry-pi-development-machine-setup.md#float-abiの判定)。複数手段の結果が一致すること |
-| 4 | CPU architecture が Armv6 相当である | `uname -m` と `readelf -A` の `Tag_CPU_arch`。target 名の `arm` が Armv6 を指す |
+| 4 | CPU architecture が Armv6 相当である | `readelf -A` の `Tag_CPU_arch`。target 名の `arm` が Armv6 を指す。**`uname -m` は kernel 側の値であり、64-bit kernel と 32-bit userspace の組合せでは userspace の architecture を示さない。参考にとどめる** |
 | 5 | libc が glibc である | `ldd --version` と `getconf GNU_LIBC_VERSION` |
-| 6 | `rustc -Vv` の `host` が `arm-unknown-linux-gnueabihf` である | 1 から 5 と矛盾しないこと |
+| 6 | `rustc -Vv` の `host` が `arm-unknown-linux-gnueabihf` である | `rustc -Vv` の出力。1 から 5 のいずれとも矛盾しないこと |
 
 条件 3 と条件 4 は独立している。**hard-float であることは Armv6 であることを意味しない。**条件 3 だけを根拠に条件 4 を満たしたと扱うと、Armv7 前提の target と取り違える。根拠となる出力は [runbook の float ABI 判定](../runbooks/raspberry-pi-development-machine-setup.md#float-abiの判定)にある。
 
