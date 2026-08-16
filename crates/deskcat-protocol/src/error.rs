@@ -54,9 +54,34 @@ impl ErrorCode {
         }
     }
 
+    /// 全variantの一覧。
+    ///
+    /// `#[non_exhaustive]`は**同一crate内の`match`には効かない**が、crate外には効く。
+    /// したがって`tests/`のようなdownstream crateで`match`を書いても、wildcard armが
+    /// 必要になりvariant追加時のcompile errorが起きない。網羅性を要求するtestは、
+    /// 自前の`match`ではなくこの配列を走査する。
+    ///
+    /// **この配列自体の網羅性は、下の`const _`がcompilerに守らせる。**
+    pub const ALL: [Self; 11] = [
+        Self::UnsupportedVersion,
+        Self::UnknownType,
+        Self::InvalidEnvelope,
+        Self::InvalidPayload,
+        Self::OutOfRange,
+        Self::LineTooLong,
+        Self::Busy,
+        Self::HardwareUnavailable,
+        Self::DuplicateExpired,
+        Self::RateLimited,
+        Self::StaleSession,
+    ];
+
     /// このcodeを計上する`status.payload.protocol`のfield名を返す。
     ///
-    /// 対応するcounterが定義されていないcodeでは`None`を返す。§4.6のcounter対応表に従う。
+    /// §4.6のcounter対応表に従う。**現在は全codeがcounterを持つ**が、
+    /// 戻り値は`Option`のままにする。将来「counterではなく別の方法で観測する」codeを
+    /// 足す余地を残すためであり、そのときは§4.6へ観測方法を明記する。
+    ///
     /// `invalid_envelope`が`parse_errors`へ向くのは、§4.6が「UTF-8／JSON／envelope不正」を
     /// まとめて`parse_errors`としているためである。
     #[must_use]
@@ -71,10 +96,40 @@ impl ErrorCode {
             Self::Busy => Some("busy"),
             Self::OutOfRange => Some("out_of_range"),
             Self::StaleSession => Some("stale_sessions"),
-            Self::HardwareUnavailable | Self::DuplicateExpired => None,
+            Self::HardwareUnavailable => Some("hardware_unavailable"),
+            Self::DuplicateExpired => Some("duplicate_expired"),
         }
     }
 }
+
+/// [`ErrorCode::ALL`]が全variantを1回ずつ含むことを、compile時に検査する。
+///
+/// `index_of`の`match`は**このcrate内**にあるため網羅性checkが効く。variantを足すと
+/// ここが非網羅になりcompileできない。足したvariantを`ALL`へ入れ忘れれば、
+/// 配列長か`assert!`が合わずcompileできない。**testでは無くcompileで止める。**
+const _: () = {
+    const fn index_of(code: ErrorCode) -> usize {
+        match code {
+            ErrorCode::UnsupportedVersion => 0,
+            ErrorCode::UnknownType => 1,
+            ErrorCode::InvalidEnvelope => 2,
+            ErrorCode::InvalidPayload => 3,
+            ErrorCode::OutOfRange => 4,
+            ErrorCode::LineTooLong => 5,
+            ErrorCode::Busy => 6,
+            ErrorCode::HardwareUnavailable => 7,
+            ErrorCode::DuplicateExpired => 8,
+            ErrorCode::RateLimited => 9,
+            ErrorCode::StaleSession => 10,
+        }
+    }
+
+    let mut i = 0;
+    while i < ErrorCode::ALL.len() {
+        assert!(index_of(ErrorCode::ALL[i]) == i, "ErrorCode::ALL is stale");
+        i += 1;
+    }
+};
 
 impl fmt::Display for ErrorCode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
