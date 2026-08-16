@@ -34,7 +34,7 @@ Rust 公式の platform support では、この target は Armv6 Linux hard-floa
 
 条件 6 と条件 7 の下限は Rust 公式の platform support が示す値である（`arm-unknown-linux-gnueabihf` は `Armv6 Linux, hardfloat (kernel 3.2+, glibc 2.17)`）。
 
-条件 3 と条件 4 は独立している。**hard-float であることは Armv6 であることを意味しない。**条件 3 だけを根拠に条件 4 を満たしたと扱うと、Armv7 前提の target と取り違える。根拠となる出力は [runbook の float ABI 判定](../runbooks/raspberry-pi-development-machine-setup.md#float-abiの判定)にある。
+条件 3 は、条件 4 とも条件 5 とも独立している。**hard-float であることは Armv6 であることを意味しない。**条件 3 だけを根拠に条件 4 または条件 5 を満たしたと扱うと、Armv7 前提の target と取り違える。根拠となる出力は [runbook の float ABI 判定](../runbooks/raspberry-pi-development-machine-setup.md#float-abiの判定)にある。同じ armhf でも、Raspbian の検体は `Tag_CPU_arch` が `v6`、Debian の検体は `v7` であった。
 
 **条件 4 と条件 5 も別物である。**`Tag_CPU_arch` は ELF の build attribute であり、その binary が要求する architecture を示す。**CPU を測定した値ではないため、物理 CPU の証拠に使わない。**同様に `uname -m` は kernel 側の値であり、64-bit kernel と 32-bit userspace の組合せでは userspace の architecture を示さない。物理 CPU の根拠は board model と SoC の公式情報に置く。
 
