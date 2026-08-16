@@ -2,6 +2,7 @@
 
 > 状態: 調査済み。Raspberry Pi実機は未検証
 > 調査日: 2026-07-27
+> 更新: 2026-08-15 float ABIの判定基準と`arm-unknown-linux-gnueabihf`の適用条件を追加（[#62](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/62)）。**実機確認は未実施**
 > 対象board: Raspberry Pi Zero W（V1.1。ヘッダなし版にpin headerをハンダ付けした個体）
 
 ## 結論
@@ -14,7 +15,30 @@ Raspberry Pi Zero W は Zero 2 W とは異なる。公式 product information �
 arm-unknown-linux-gnueabihf
 ```
 
-Rust 公式の platform support では、この target は Armv6 Linux hard-float とされている。実機の OS、ABI、glibc が一致するまでは確定しない。
+Rust 公式の platform support では、この target は Armv6 Linux hard-float とされている。target 名の architecture 部分 `arm` は Armv6 を指し、同資料は Armv6 の実装例として Raspberry Pi Zero の BCM2835 が積む ARM1176JZF-S を挙げている（[Rust Arm Linux targets](https://doc.rust-lang.org/rustc/platform-support/arm-linux.html) の Architecture Component）。実機の OS、ABI、glibc が一致するまでは確定しない。
+
+## `arm-unknown-linux-gnueabihf` を適用してよい条件
+
+次をすべて満たしたときに限り、この target を適用してよい。一つでも満たせない、または確認できない項目があれば適用しない。**`eabihf` の実行物は `eabi` の system では正しく動作しない**ため、条件 3 の判定を省略できない（[Rust Arm Linux targets](https://doc.rust-lang.org/rustc/platform-support/arm-linux.html) の ABI Component）。
+
+| # | 条件 | 確認手段 |
+|---|---|---|
+| 1 | board が Raspberry Pi Zero W である | 現物の silkscreen と `/sys/firmware/devicetree/base/model` |
+| 2 | userspace が 32-bit である | `getconf LONG_BIT` が `32` |
+| 3 | float ABI が hard-float である | [runbook の float ABI 判定](../runbooks/raspberry-pi-development-machine-setup.md#float-abiの判定)。複数手段の結果が一致すること |
+| 4 | **物理 CPU** が Armv6 である | board model と SoC の公式情報（BCM2835 の ARM1176JZF-S）。`/sys/firmware/devicetree/base/model` と条件 1 |
+| 5 | 対象 system の ELF が Armv6 を超える命令セットを要求しない | `readelf -A` の `Tag_CPU_arch`。**これは ELF 側の要件であり、物理 CPU の測定値ではない** |
+| 6 | libc が glibc であり version が **2.17 以上**である | `ldd --version` と `getconf GNU_LIBC_VERSION` |
+| 7 | kernel が **3.2 以上**である | `uname -r`（1節では `uname -a` で採取する） |
+| 8 | `rustc -Vv` の `host` が `arm-unknown-linux-gnueabihf` である | `rustc -Vv` の出力。1 から 7 のいずれとも矛盾しないこと |
+
+条件 6 と条件 7 の下限は Rust 公式の platform support が示す値である（`arm-unknown-linux-gnueabihf` は `Armv6 Linux, hardfloat (kernel 3.2+, glibc 2.17)`）。
+
+条件 3 は、条件 4 とも条件 5 とも独立している。**hard-float であることは Armv6 であることを意味しない。**条件 3 だけを根拠に条件 4 または条件 5 を満たしたと扱うと、Armv7 前提の target と取り違える。根拠となる出力は [runbook の float ABI 判定](../runbooks/raspberry-pi-development-machine-setup.md#float-abiの判定)にある。同じ armhf でも、Raspbian の検体は `Tag_CPU_arch` が `v6`、Debian の検体は `v7` であった。
+
+**条件 4 と条件 5 も別物である。**`Tag_CPU_arch` は ELF の build attribute であり、その binary が要求する architecture を示す。**CPU を測定した値ではないため、物理 CPU の証拠に使わない。**同様に `uname -m` は kernel 側の値であり、64-bit kernel と 32-bit userspace の組合せでは userspace の architecture を示さない。物理 CPU の根拠は board model と SoC の公式情報に置く。
+
+**これは適用してよいかを判断する gate であり、target の確定ではない。**確定は [#8](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/8) の範囲である。条件を満たせない場合、または ABI を判別できない場合の扱いは [runbook](../runbooks/raspberry-pi-development-machine-setup.md#abiを判別できなかったとき)に従い、[「候補 toolchain」表](#候補-toolchain)の状態欄を `ABI 確認待ち` のまま据え置く。
 
 ## 初期方針
 
@@ -38,6 +62,8 @@ Pi Zero W は CPU と RAM が限られるため、build 時間と storage 使用
 | OS name、release、32/64 bit | 配布物と support の基準 |
 | `uname -m` | kernel architecture |
 | `getconf LONG_BIT` | userspace bitness |
+| float ABI（hard-float / soft-float） | 候補 target の適用可否。判定手順は [runbook](../runbooks/raspberry-pi-development-machine-setup.md#float-abiの判定) |
+| `readelf -A` の `Tag_CPU_arch` | 対象 system の ELF が要求する architecture。**物理 CPU の測定値ではない。**float ABI とも物理 CPU とも別の条件 |
 | libc と version | GNU target の互換性 |
 | 空き storage と memory | native build の実用性 |
 | Rust host triple | rustup が選択した host |
@@ -67,12 +93,16 @@ ESP32 用の `esp` toolchain を Pi service の build に使わない。
 - storage 消費や書込み負荷が大きい
 - 複数 Pi への配布を自動化する必要が生じた
 
-cross compilation では Rust target の追加だけでなく、Armv6 hard-float に対応する linker と target libc が必要になる。build host の library へ誤って link しないことを、`file`、ELF metadata、実機実行で確認する。
+cross compilation では Rust target の追加だけでなく、Armv6 hard-float に対応する linker と target libc が必要になる。build host の library へ誤って link しないことを、`file`、ELF metadata、実機実行で確認する。生成物の float ABI と `Tag_CPU_arch` は、[runbook](../runbooks/raspberry-pi-development-machine-setup.md#float-abiの判定)と同じ手段で読む。
 
 ## 確定条件
 
 - [ ] 物理 board model と revision を記録した
 - [ ] OS、kernel、userspace bitness、libc を記録した
+- [ ] float ABI を、判定に使った command と実出力つきで記録した
+- [ ] `Tag_CPU_arch` を記録し、ELF が Armv6 を超える命令セットを要求しないことを float ABI とは別に確認した
+- [ ] 物理 CPU が Armv6 であることを board model と SoC の公式情報で確認した（`Tag_CPU_arch` と `uname -m` を物理 CPU の根拠にしない）
+- [ ] kernel version と glibc version が Rust 公式の下限（kernel 3.2、glibc 2.17）を満たすことを記録した
 - [ ] Rust stable の host triple を記録した
 - [ ] 最小 Rust program が Pi 上で build できた
 - [ ] 生成物が同じ Pi 上で実行できた
