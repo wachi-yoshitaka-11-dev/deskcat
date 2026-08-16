@@ -72,6 +72,8 @@ fn worst_case_messages() -> Vec<Message> {
                 busy: u32::MAX,
                 out_of_range: u32::MAX,
                 stale_sessions: u32::MAX,
+                hardware_unavailable: u32::MAX,
+                duplicate_expired: u32::MAX,
                 session_switches: u32::MAX,
                 suppressed_responses: u32::MAX,
             },
@@ -156,6 +158,10 @@ fn strings_needing_json_escapes_can_exceed_the_line_limit() {
 }
 
 /// 上限ちょうどのstringは受理し、1 byte超えたら`out_of_range`で拒否する。
+///
+/// **拒否は送信側で起きる。**`encode_line`が`check_bounds`を通すため、上限を超えたframeは
+/// そもそもwireへ出ない。以前はencodeが通り、同じcrateのdecoderだけが拒否していた。
+/// 公開APIが自分で受理しないframeを作れる状態だったのを、ここで固定し直している。
 #[test]
 fn string_limits_are_enforced_at_the_boundary() {
     let at_limit = Frame::new(
@@ -185,9 +191,136 @@ fn string_limits_are_enforced_at_the_boundary() {
             reset_reason: filled(limits::MAX_RESET_REASON_BYTES),
         }),
     );
-    let line = encode_line(&over_limit).expect("over limit still fits in a line");
-    let err = deskcat_protocol::decode_line(&line).expect_err("over limit is rejected");
+    let err = encode_line(&over_limit).expect_err("over limit must not reach the wire");
     assert_eq!(err.code(), ErrorCode::OutOfRange);
+}
+
+/// 上限超過について、`encode_line`と`decode_line`が同じcodeを返す。
+///
+/// **encodeに検査を足したことで、decode側の判定が要らなくなったわけではない。**
+/// 他実装が送ってきたlineは受信側でしか止められない。送信側の検査は追加であって
+/// 置き換えではないことを、両経路で同じcodeが返ることとして固定する。
+#[test]
+fn encode_and_decode_reject_over_limit_fields_with_the_same_code() {
+    let over_limit = Frame::new(
+        Envelope {
+            v: limits::PROTOCOL_VERSION,
+            sid: 1,
+            id: 1,
+            ts_ms: 0,
+        },
+        Message::Boot(Boot {
+            firmware: filled(limits::MAX_FIRMWARE_BYTES + 1),
+            board: filled(limits::MAX_BOARD_BYTES),
+            reset_reason: filled(limits::MAX_RESET_REASON_BYTES),
+        }),
+    );
+    let encode_err = encode_line(&over_limit).expect_err("over limit must not reach the wire");
+    assert_eq!(encode_err.code(), ErrorCode::OutOfRange);
+
+    // 同じ内容をwire lineとして手で組む。encodeできない以上、こうしないと
+    // decode側の経路を通せない。
+    let over_limit_line = format!(
+        r#"{{"v":1,"sid":1,"id":1,"ts_ms":0,"type":"boot","payload":{{"firmware":"{}","board":"{}","reset_reason":"{}"}}}}"#,
+        filled(limits::MAX_FIRMWARE_BYTES + 1),
+        filled(limits::MAX_BOARD_BYTES),
+        filled(limits::MAX_RESET_REASON_BYTES),
+    );
+    let decode_err =
+        deskcat_protocol::decode_line(&over_limit_line).expect_err("over limit is rejected");
+    assert_eq!(decode_err.code(), encode_err.code());
+}
+
+/// `rejected`で`code`が無いACKは、encode時点で`invalid_payload`として拒否する。
+///
+/// §6は「`rejected`の場合はmachine-readableな`code`を含める」と定めている。decode側は
+/// 以前からこれを検査していた。encode側にも同じ検査を通し、規則を破ったACKを
+/// wireへ出さない。
+#[test]
+fn rejected_acks_without_a_code_are_refused_by_encode() {
+    let frame = Frame::new(
+        Envelope {
+            v: limits::PROTOCOL_VERSION,
+            sid: 1,
+            id: 1,
+            ts_ms: 0,
+        },
+        Message::Ack(Ack {
+            reply_sid: 1,
+            reply_to: 1,
+            status: AckStatus::Rejected,
+            code: None,
+            detail: None,
+        }),
+    );
+
+    let err = encode_line(&frame).expect_err("a rejected ack without a code must not be encoded");
+    assert_eq!(err.code(), ErrorCode::InvalidPayload);
+}
+
+/// `ok`に`code`が付いていても拒否しない。
+///
+/// §6が要求するのは「`rejected`の場合はcodeを含める」ことだけである。**これ以上に
+/// 厳しくすると、仕様上妥当なpeerが送るACKをencodeできなくなる。**送信前検証を
+/// 足したことで規則が強くなっていないことを、ここで固定する。
+#[test]
+fn ok_acks_may_carry_a_code() {
+    let frame = Frame::new(
+        Envelope {
+            v: limits::PROTOCOL_VERSION,
+            sid: 1,
+            id: 1,
+            ts_ms: 0,
+        },
+        Message::Ack(Ack {
+            reply_sid: 1,
+            reply_to: 1,
+            status: AckStatus::Ok,
+            code: Some(ErrorCode::Busy),
+            detail: None,
+        }),
+    );
+
+    let line = encode_line(&frame).expect("an ok ack with a code is still valid");
+    assert_eq!(
+        deskcat_protocol::decode_line(&line).expect("and decodes back"),
+        frame
+    );
+}
+
+/// shape違反と上限超過を同時に持つframeでは、encodeとdecodeが同じcodeを返す。
+///
+/// **検証順序を揃えていることの検査である。**`check_bounds`を先に呼ぶと、encodeだけが
+/// `out_of_range`を返し、同じ内容のlineをdecodeすると`invalid_payload`になる。
+/// 送受信で分類が食い違うと、counterの計上先も食い違う。
+#[test]
+fn shape_is_checked_before_bounds_on_both_paths() {
+    let frame = Frame::new(
+        Envelope {
+            v: limits::PROTOCOL_VERSION,
+            sid: 1,
+            id: 1,
+            ts_ms: 0,
+        },
+        Message::Ack(Ack {
+            reply_sid: 1,
+            reply_to: 1,
+            status: AckStatus::Rejected,
+            code: None,
+            detail: Some(filled(limits::MAX_DETAIL_BYTES + 1)),
+        }),
+    );
+
+    let encode_err = encode_line(&frame).expect_err("both rules are violated");
+    assert_eq!(encode_err.code(), ErrorCode::InvalidPayload);
+
+    // 同じ内容をwire lineとして手で組み、decode側の分類と突き合わせる。
+    let line = format!(
+        r#"{{"v":1,"sid":1,"id":1,"ts_ms":0,"type":"ack","payload":{{"reply_sid":1,"reply_to":1,"status":"rejected","detail":"{}"}}}}"#,
+        filled(limits::MAX_DETAIL_BYTES + 1),
+    );
+    let decode_err = deskcat_protocol::decode_line(&line).expect_err("both rules are violated");
+    assert_eq!(decode_err.code(), encode_err.code());
 }
 
 /// 改行を含めてちょうど上限のlineは受理し、1 byte超えたら`line_too_long`で拒否する。

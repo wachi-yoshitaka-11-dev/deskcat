@@ -372,7 +372,7 @@ budget値は`PROTO-TBD-017`に含める。
     "display":{"state":"ready","expression":"neutral"},
     "servo":{"state":"disabled"},
     "sensors":{"touch":"unknown","acceleration":"unknown","environment":"unknown"},
-    "protocol":{"parse_errors":0,"invalid_payloads":0,"unsupported_versions":0,"oversize_lines":0,"unknown_types":0,"rate_limited":0,"busy":0,"out_of_range":0,"stale_sessions":0,"session_switches":0,"suppressed_responses":0}
+    "protocol":{"parse_errors":0,"invalid_payloads":0,"unsupported_versions":0,"oversize_lines":0,"unknown_types":0,"rate_limited":0,"busy":0,"out_of_range":0,"stale_sessions":0,"hardware_unavailable":0,"duplicate_expired":0,"session_switches":0,"suppressed_responses":0}
   }
 }
 ```
@@ -390,8 +390,15 @@ budget値は`PROTO-TBD-017`に含める。
 | `busy` | `busy`で拒否した件数。resourceの一時的な占有による拒否 |
 | `out_of_range` | `out_of_range`で拒否した件数 |
 | `stale_sessions` | §5.1の`stale_session`拒否 |
+| `hardware_unavailable` | `hardware_unavailable`で拒否した件数。§7のとおり、対象hardwareの初期化が完了していない状態で受けたdisplay／motion commandに返す。**`busy`と合算しない。**`busy`は待てば受け付けられる状態であり、区別できなければ「待てば直る」と「待っても直らない」を外から見分けられない |
+| `duplicate_expired` | `duplicate_expired`で拒否した件数。codeの意味は§7が定める（保持履歴から失われたduplicateを安全に再実行できない）。**発火条件そのものは未確定である。**§9の`TBD`「Duplicateが保持履歴より古い場合の動作」と、履歴の保持期間・件数・evict後の扱い（`PROTO-TBD-005`）で決まる。**このcounterはそれらの値を先取りしない** |
 | `session_switches` | §5.1の実際に発生したsession遷移 |
 | `suppressed_responses` | **ESP32が受信機会に即時送出しなかった応答の総数。**§8.2で集約・抑制した拒否応答、正規retry quotaを超えた保持ACK、duplicateへの**非ACKの**保持結果、ESP32所有のPi→ESP32保留tableで送出待ちの間に重ねて受信した同一identity、およびtable上限で受け付けなかった新規identityを含む。保留後に送出できても、以前の受信機会で即時送出しなかった計数は戻さない。Piが抑制または保留した`boot`への応答はPi側の同名local counterへ記録し、このfieldへ合算しない。内訳が必要になった時点でfieldを分割する（`PROTO-TBD-006`） |
+
+**§7の全error codeが、この表のいずれかのcounterへ対応する。**`rate_limited`だけが複数の規則を
+合算し、残るcodeは1対1で対応する。`session_switches`と`suppressed_responses`はerror code由来
+ではなく、拒否せずに観測する事象である。この対応が全codeについて成立していることは、
+§12.1のfixtureと同じ場所にあるhost workspaceのRust実装が検査する。
 
 `rate_limited`はreceiver層とservo層の拒否を合算する。層ごとの内訳が必要になった時点で
 fieldを分割する。合算のままにするか分割するかは`PROTO-TBD-006`（最終status field）で決める。
@@ -1226,6 +1233,7 @@ Framing／parse層について、**host workspaceのRust実装**がfixtureに合
 | 2026-08-10 | Draft 2 fixture | §3のinteger widthを確定し、§7へ単一lineの検証で決まるcodeの対応付けを追加（分類と送出の判断を分ける）。§12.1をschema群のfixture作成済みの状態へ更新。wire formatは変更していない |
 | 2026-08-15 | Draft 2 sync | [PR #122](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/122)。`PROTO-TBD-009`の解決方法が`正確なtouch controllerと実験`のままだったため、**touch controllerが`XPT2046`と確定した**ことを反映した（[HW-TBD-003](../hardware/tbd-register.md)はclose）。**protocolの仕様は変えていない。**残る作業は同ICのdatasheetでのtouch strengthの意味づけと実験である |
 | 2026-08-15 | Draft 2 framing | [Issue #10](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/10)。§12.1のFraming／parse群を**作成済み**へ更新した。byte単位の分割受信とinvalid UTF-8のfixtureが揃い、host workspaceのRust実装が合格する。firmwareは同じ実装をpath dependencyで使う（[ADR-0008](../decisions/0008-firmware-protocol-crate-reuse.md)）が、**実機上でのfixture実行は未実施**である。**wire formatは変更していない。** |
+| 2026-08-16 | Draft 2 counters | [Issue #132](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/132)。§4.6の`protocol` counterへ`hardware_unavailable`と`duplicate_expired`を追加し、§7の全error codeがcounterへ対応する状態にした。**これは`status`のwire format変更である。**過去のentryと違い「変更していない」ではない。`status.payload.protocol`に必須fieldが2本増え、旧schemaの`status`は新schemaで`invalid_payload`になる。**Draft schemaは互換性の対象外であり**（下の「Draft schemaの互換性」）、互換の根拠はconformance fixtureの一致であるため`v`は上げない。**`status`を送出する実装はまだ存在しない**（firmwareはcross compileまでで、`src/main.rs`はprotocol crateを呼び出していない）。counterの発火条件と保持parameterは`PROTO-TBD-005`／`PROTO-TBD-006`のままであり、確定させていない |
 
 ### Draft schemaの互換性
 

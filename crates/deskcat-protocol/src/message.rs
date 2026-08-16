@@ -74,6 +74,25 @@ impl Message {
             Self::Ping | Self::GetStatus => Ok(()),
         }
     }
+
+    /// type固有のfield間整合を検査する。
+    ///
+    /// [`Self::check_bounds`]が値の範囲を見るのに対し、こちらはfieldの組み合わせを見る。
+    /// [`crate::decode_line`]と[`crate::encode_line`]の両方がこの関数を呼ぶ。**送信側と
+    /// 受信側で規則を二重実装しないための単一の入口である。**新しいtypeがshape規則を
+    /// 持ったときは、ここへ足せば両経路へ同時に効く。
+    ///
+    /// # Errors
+    ///
+    /// 組み合わせが§6を満たさない場合は[`ErrorCode::InvalidPayload`]を返す。
+    pub(crate) fn check_shape(&self) -> Result<(), DecodeError> {
+        match self {
+            Self::Ack(ack) => ack.check_shape(),
+            Self::Boot(_) | Self::Hello(_) | Self::Status(_) | Self::Ping | Self::GetStatus => {
+                Ok(())
+            }
+        }
+    }
 }
 
 /// 上限のあるstring fieldを検査する。
@@ -247,6 +266,17 @@ pub struct ProtocolCounters {
     pub out_of_range: u32,
     /// 承認されていない`sid`による拒否。
     pub stale_sessions: u32,
+    /// 初期化が完了していないhardwareへのcommandによる拒否。
+    ///
+    /// `busy`と混同しない。§7のとおり`busy`は初期化済みのresourceが一時的に塞がっている
+    /// 状態であり、待てば受け付けられる。こちらは待っても受け付けられない。
+    pub hardware_unavailable: u32,
+    /// 保持履歴から失われたduplicateを再実行できず拒否した件数。
+    ///
+    /// codeの意味は§7が定める。**発火条件は未確定である。**§9の`TBD`
+    /// 「Duplicateが保持履歴より古い場合の動作」と、履歴の保持期間・件数・evict後の
+    /// 扱い（`PROTO-TBD-005`）で決まる。**このcounterはそれらの値を先取りしない。**
+    pub duplicate_expired: u32,
     /// 実際に発生したsession遷移。
     pub session_switches: u32,
     /// 受信機会に即時送出しなかった応答の総数。

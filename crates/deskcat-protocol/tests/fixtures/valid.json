@@ -63,7 +63,7 @@
     },
     {
       "name": "status_snapshot",
-      "line": "{\"v\":1,\"sid\":41207,\"id\":26,\"ts_ms\":15100,\"type\":\"status\",\"payload\":{\"firmware\":\"0.1.0\",\"reset_reason\":\"power_on\",\"display\":{\"state\":\"ready\",\"expression\":\"neutral\"},\"servo\":{\"state\":\"disabled\"},\"sensors\":{\"touch\":\"unknown\",\"acceleration\":\"unknown\",\"environment\":\"unknown\"},\"protocol\":{\"parse_errors\":0,\"invalid_payloads\":0,\"unsupported_versions\":0,\"oversize_lines\":0,\"unknown_types\":0,\"rate_limited\":0,\"busy\":0,\"out_of_range\":0,\"stale_sessions\":0,\"session_switches\":0,\"suppressed_responses\":0}}}\n",
+      "line": "{\"v\":1,\"sid\":41207,\"id\":26,\"ts_ms\":15100,\"type\":\"status\",\"payload\":{\"firmware\":\"0.1.0\",\"reset_reason\":\"power_on\",\"display\":{\"state\":\"ready\",\"expression\":\"neutral\"},\"servo\":{\"state\":\"disabled\"},\"sensors\":{\"touch\":\"unknown\",\"acceleration\":\"unknown\",\"environment\":\"unknown\"},\"protocol\":{\"parse_errors\":0,\"invalid_payloads\":0,\"unsupported_versions\":0,\"oversize_lines\":0,\"unknown_types\":0,\"rate_limited\":0,\"busy\":0,\"out_of_range\":0,\"stale_sessions\":0,\"hardware_unavailable\":0,\"duplicate_expired\":0,\"session_switches\":0,\"suppressed_responses\":0}}}\n",
       "canonical": true,
       "expect": {
         "type": "status",
