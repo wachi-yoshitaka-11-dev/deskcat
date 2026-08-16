@@ -377,6 +377,12 @@ GitHubの強制が意味を失う。
 枠を使い切った経緯は後述の[手動で依頼する前に状態を確認する](#手動で依頼する前に状態を確認する)にある）。
 **「skipされた」と「rate limitに当たった」を同じ言葉で記録しない。**
 
+**`Review skipped`でも`Review rate limited`でもない中断もある。**
+[#125](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/125)では`2026-08-15T16:34:34Z`に
+`Review stopped after lock loss`（`state`は`failure`）を観測した。**これは`pass`ではなくcheckが赤くなる**ため、
+上の3つと違い表示で気付ける。ただし**reviewは完走していない。**
+[手動で依頼する](#手動で依頼する前に状態を確認する)。#125では`full review`で`Review completed`へ到達した。
+
 **`Review skipped`の説明文で、skipの原因を切り分けられる。**これまでに観測した文言は次のとおりである。
 **文言はCodeRabbit側のものであり、将来変わりうる。**一致しない文言を見たら、推測せず実際の表示を記録する。
 
