@@ -76,7 +76,7 @@ od -An -tx1 -j 36 -N 4 /bin/sh
 | `dpkg --print-architecture` | 出力そのもの | `armhf` | `armel` |
 | `ls -l /lib/ld-linux*` | loader の有無 | `/lib/ld-linux-armhf.so.3` がある | `/lib/ld-linux-armhf.so.3` が無い |
 | `readelf -h` | `Flags:` 行 | `hard-float ABI` を含む | `soft-float ABI` を含む |
-| `readelf -A` | `Tag_ABI_VFP_args` の**値** | `VFP registers` | `AAPCS`、`compatible`、または行が出力されない |
+| `readelf -A` | `Tag_ABI_VFP_args` の**値** | `VFP registers` | `AAPCS`。**`compatible`（値3）、`toolchain-specific`（値2）、および行が出力されない場合は判定不能とし、softと読まない。**`readelf -h`の`Flags:`行を優先する |
 | `file -L` / `readelf -l` | `interpreter` の path | `/lib/ld-linux-armhf.so.3` | `/lib/ld-linux.so.3` |
 | `od -An -tx1 -j 36 -N 4` | 4 byte のうち 2 番目 | `04` | `02` または `00` |
 

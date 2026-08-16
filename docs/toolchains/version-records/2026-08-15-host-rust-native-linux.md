@@ -86,8 +86,12 @@ Known differences from documented profile:
     **本記録はその試験の環境記録ではない。**profile が違うためである。
 
 Conclusion: Verified。**この記録の対象は、この 1 台・Host Rust Development profile に
-  限る。**その範囲では未実行の項目が無く、format、lint、unit test、integration test が
-  clean build から成功した。
+  限る。**その範囲では未実行の項目が無く、format と lint、および `cargo test --workspace --locked`
+  の 13 件が成功した。**内訳は integration test（`tests/conformance.rs` 6 件、`tests/limits.rs` 5 件）と
+  doc-test 2 件であり、`unittests src/lib.rs` は 0 件である。unit test を実行した根拠にしない。**
+  **また `cargo test` は clean build ではない。**`cargo clean` の後に `cargo clippy` を流し、
+  その成果物が残る `target` に対して `cargo test` を実行している（`Build duration` 欄）。
+  clean build から成功したと言えるのは `cargo clippy` までである。
 
   **実機 Linux で取得した点が既存記録との違いである。**既存 3 記録
   （2026-08-06-esp32-build-linux、2026-08-10-esp32-build-ci、2026-08-10-host-rust-linux）

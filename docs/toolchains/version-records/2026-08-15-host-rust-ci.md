@@ -40,8 +40,8 @@ GitHub Actions の `ubuntu-24.04` runner で実行した結果である。
 
 ```text
 Record ID: 2026-08-15-host-rust-ci
-Date: 2026-08-15
-最終有効な検証日時: 2026-08-16T02:35:43Z（run 31922245511、commit 3bc4ede0。rebase 後）
+Date: 2026-08-15（記録を作成した日。JST）
+最終有効な検証日時: 2026-08-16T02:35:43Z ＝ **JST 2026-08-16 11:35:43**（run 31922245511、commit 3bc4ede0。rebase 後）。**Record ID の日付は作成日であり、最終検証日と一致しない。**
 Machine profile: CI（[Machine Profiles](../machine-profiles.md)）
 Operator role: 自動実行（人間の介在なし）
 Repository commit: 3bc4ede0（Pull Request #130 の rebase 後の head）。
@@ -122,7 +122,7 @@ runner image の既定版に任せると、記録した版と違うもので通�
 | linker と SDK | runner image 既定の cc／ld。SDK 不要 |
 | repository commit | 3bc4ede0（rebase 後） |
 | lockfile が変更されていないこと | `--locked` が成功 |
-| clean build の結果 | 成功（fresh runner） |
+| clean build の結果 | **clean build ではない。**run 31922245511 は primary key で cache hit し、`target` を含む cache を復元している（log の `Cache hit occurred on the primary key` と `Cache restored successfully`）。**成功したが、clean build の根拠にしない。**主張するには cache miss の run か cache を無効にした検証が要る |
 
 同文書は「host Rust の build、test、lint」について **Docker 上の Linux を使ってよい**と定めており、
 USB と実機を触らないためこの記録は profile の想定内である。

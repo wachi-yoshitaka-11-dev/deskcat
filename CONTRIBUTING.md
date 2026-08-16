@@ -394,7 +394,7 @@ review完走後には最初の文言が残らない。**後から検証できる
 GitHubのcheck欄は文脈ごとの最新1件しか表示しないため、履歴は次で読む。
 
 ```bash
-gh api "repos/<owner>/<repo>/commits/<sha>/statuses?per_page=100" \
+gh api --paginate "repos/<owner>/<repo>/commits/<sha>/statuses?per_page=100" \
   --jq '.[] | select(.context=="CodeRabbit") | [.created_at,.state,.description] | @tsv'
 ```
 
@@ -444,6 +444,8 @@ pushしても再reviewは走らない。**ここで`@coderabbitai review`を投�
 |---|---|
 | 安全、電気、protocol、firmware | **rate limitが解けるまで待つ。**自己レビューで代替しない |
 | 上記以外 | **自己レビューで通してよい。**Pull Request本文へ機械reviewを通していない旨と、その判断の根拠を書く |
+
+**`Review stopped after lock loss`もこの表の対象である。**`state`が`failure`でcheckは赤くなるため`Review rate limited`／`Review skipped`とは表示で見分けられるが、**reviewが完走していない点は同じ**である。したがって初回reviewが得られなかった場合として扱い、上の表に従う。**安全・電気・protocol・firmwareに関わる変更では、`Review completed`へ到達するか手動の`full review`が完走するまでmergeしない。**赤いcheckを「reviewは走ったが失敗しただけ」と読み替えない。観測例は[GitHubが強制しないもの](#githubが強制しないもの)にある。
 
 ##### 5行目の観測
 

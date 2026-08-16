@@ -120,8 +120,11 @@ Next action: flash と実機起動は ESP32 Flash / HIL profile の範囲であ�
 
 `espup` 0.17.1、Xtensa Rust 1.95.0.0、ESP-IDF v5.5.3（commit `2c211b23…`）はいずれも
 [2026-08-06-esp32-build-linux.md](2026-08-06-esp32-build-linux.md) と同じ値である。
-`firmware/esp32/rust-toolchain.toml` と `.cargo/config.toml` が版を固定しているため、
-**別端末でも同じ版が入ることを実機で確認したことになる。**
+**確認できたのは「2 記録で同じ値を観測した」ことまでである。「別端末でも同じ版が入る」ことの根拠にしない。**
+`.cargo/config.toml` は `ESP_IDF_VERSION = v5.5.3` を固定するが、`rust-toolchain.toml` が固定するのは
+**toolchain の名前 `esp-1.95.0.0` だけ**である。同 file のコメント自身が、`--name` を据え置いたまま
+`--toolchain-version` を変えると中身が入れ替わっても停止しないと述べている。`espup` 0.17.1 の版も
+固定していない。導入 command は `espup install --toolchain-version 1.95.0.0 --targets esp32 --name esp-1.95.0.0` である。
 
 ### worktree から実行できない理由
 

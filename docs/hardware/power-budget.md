@@ -108,7 +108,7 @@ M-12001はMicro-Bオスplugであり、breadboardへ直接挿せない。
 
 | 段階 | 内容 | 電流の扱い | 追加購入 |
 |---|---|---|---|
-| **A** | Piを単体でアダプターから起動する（`PWR IN`へ直挿し、GPIOへ何も繋がない） | gate不要。M-12001は5V/3AでPi用途として定格内であり、Pi単体は通常の使い方である。**ただしこれは探索的な通電であって、電源経路の受け入れではない。**Raspberry Pi公式が要求するのは5.1 Vであり、M-12001の5 Vがそれを満たすかは未判断である（`HW-TBD-007`）。判定に使う最低電圧も未確定である（`HW-TBD-028`(a)）。**段階Aが正常に起動したことをもって、Piの電源経路を合格としない** | 不要 |
+| **A** | Piを単体でアダプターから起動する（`PWR IN`へ直挿し、GPIOへ何も繋がない） | gate不要。M-12001は5V/3Aの出力容量を持ち、Pi単体は通常の使い方である。**ただしこれは探索的な通電であって、電源経路の受け入れではない。**Raspberry Pi公式が要求するのは5.1 Vであり、M-12001の5 Vがそれを満たすかは未判断である（`HW-TBD-007`）。判定に使う最低電圧も未確定である（`HW-TBD-028`(a)）。**段階Aが正常に起動したことをもって、Piの電源経路を合格としない** | 不要 |
 | **B-1** | ESP32を単体でPCのUSBから給電し、flashingとADC loggingを行う | gate不要。**board上のUSB portをメーカーが意図した用途で使うだけ**であり、段階Aと同じく通常の使い方である。board自身の消費以外を足さない。**PC hostのOCPは未確認であり、保護として当てにしない**（`段階B-2の測定`） | 不要 |
 | **B-2** | B-1に周辺module3点（MSP2807、ADXL345、BME280）を足し、**選んだ給電経路（B-2aは`3V3` pin、B-2bは外部の3.3 V電源）**から給電して3.3 V側の定常電流を測る。5 V railもPiも使わない | **gate必要。**給電元により**B-2a**（`3V3` pinから。board上regulatorの定格と過電流／短絡保護の確認が条件）と**B-2b**（外部の電流制限付き3.3 V電源から。設定値の根拠と上限が条件）に分かれる。**どちらの条件も満たせない場合は実施しない。**経路ごとの実施条件・測定点・停止条件は`段階B-2の測定` | 不要 |
 | **C** | 変換基板でM-12001を受けてbreadboard railへ引き出し、そこからPi（`PWR IN`へcable）・ESP32・LCD・sensorへ合成給電する。**Piの5 V GPIO pinを経由して配電しない** | **gate必要。右列の部品がすべて揃い、`経路部品と定格`表に未確定の行が無くなり、ingressで実測できるようになるまで実施しない**（`過電流保護（段階Cのgate）`） | 変換基板、Piへの給電cable、過電流保護部品、大電流経路の線材・接続部材 |
@@ -345,8 +345,12 @@ switching regulatorであれば電力比で決まるため、この足し方は�
 したがって`Iin ≒ Iout + Iq`の側が成り立ち、**`Iq`は同datasheetでtyp 5 mA／max 10 mA**である
 （[UMW LD1117 datasheet](https://www.umw-ic.com/static/pdf/a5e0c99cefdefaf03cfa7777b369e45b.pdf)
 Mar.2025の`9.Electrical Characteristics`、`Quiescent Current`行。条件は`4.25V ≤ VIN ≤ 6.5V`）。
-**換算に使ってよい。**ただし**この換算は`U2`を通る分にしか掛からない。**board上で`EXT_5V`から
-直接取られる負荷があれば別に数える必要があり、**その有無は参照設計の回路図でしか見ていない。**
+**ただしこの換算だけで5 V側の必要量を確定しない。**`Iin ≒ Iout + Iq`は**`U2`を通る分にしか掛からない。**
+board上で`EXT_5V`から直接取られる負荷があれば別に数える必要があり、**その有無は参照設計の回路図でしか見ていない。**
+**現物の`U2`は参照設計の`AMS1117-3.3`ではなくUMW `LD1117-3.3`であった**（`HW-TBD-023`）。
+**部品が違った以上、回路図が現物の負荷構成を代表する保証も無い。**現物のboardで`EXT_5V`の直接負荷を
+追跡するまで、**この換算値をingress予算の受け入れ判定に使わない。**直接負荷が実在した場合、この換算は
+その分を落とし、5 V ingressの負荷を過小に見積もる。
 
 servo試験以降で用いる構成を次に定める。
 
@@ -663,7 +667,7 @@ servo branchは上記の正式改訂の手順による。それ以外のbranch�
 | Logic | ESP-WROOM-32D board | 1 | 約80〜100mA（WiFi idle） | 約240mA（WiFi TX時、文献値） | 短時間で最大約500mA相当のspikeが報告例あり | [ESP32技術資料](https://www.espressif.com/sites/default/files/documentation/esp32_datasheet_en.pdf)を含む複数の技術資料（[参考](https://lastminuteengineers.com/esp32-sleep-modes-power-consumption/)） | **文献値。実測前** |
 | Logic | Raspberry Pi Zero W | 1 | 約140mA（公式spec） | 実測未定 | Stress時最大約350mAの報告例あり | [Raspberry Pi公式spec](https://www.raspberrypi.com/products/raspberry-pi-zero-w/) | **文献値。実測前** |
 | ESP32 3V3出力 | MSP2807（LCD＋backlight＋touch） | 1 | TBD（メーカー未公開） | TBD | TBD | 秋月商品ページに電流記載なし。logic IOが3.3V TTLのため3.3V給電とする（`電源rail構成案`参照）。backlight込みの電流次第では3V3 pinの供給能力を超える可能性があり、その場合は別途3.3V regulatorが必要 | Blocked（**入手済み・実測未実施**） |
-| ESP32 3V3出力 | ADXL345（accelerometer） | 1 | 140µA typ（ODR ≥ 100Hz。standbyは0.1µA typ） | 無視できるほど小さい想定 | 無視できるほど小さい想定 | 消費電流の出典は[ADXL345 Data Sheet](https://www.analog.com/media/en/technical-documentation/data-sheets/adxl345.pdf) Rev. G Table 1 page 4およびTable 7 page 13（**data rate別の表で最大は140µAである。ただしtyp値であり、datasheetにmax欄は無い**）。**旧記載はDigi-Keyの解説記事を出典としていたが、2026-08-12にメーカー一次資料へ差し替えた**（Revision 37）。**Logic 5V railへは直結しない。****確認前の安全規則である**（ICの動作上限3.6Vも絶対最大定格3.9Vも超えうるため。**IC定格からmodule boardの許容入力電圧は決まらない**）。**3.3Vも唯一の候補であって確定ではない**（`HW-TBD-004`）。**旧記載の「M-06724はregulator非搭載のため3.3V直結必須」は、根拠資料（秋月 商品ページ。現在404）を失ったため2026-08-12に削除した**（Revision 36） | **文献値。実測前** |
+| ESP32 3V3出力 | ADXL345（accelerometer） | 1 | 140µA typ（ODR ≥ 100Hz。standbyは0.1µA typ） | **TBD**（`HW-TBD-025`(b)） | **TBD**（`HW-TBD-025`(b)） | 消費電流の出典は[ADXL345 Data Sheet](https://www.analog.com/media/en/technical-documentation/data-sheets/adxl345.pdf) Rev. G Table 1 page 4およびTable 7 page 13（**data rate別の表で最大は140µAである。ただしtyp値であり、datasheetにmax欄は無い**）。**旧記載はDigi-Keyの解説記事を出典としていたが、2026-08-12にメーカー一次資料へ差し替えた**（Revision 37）。**Logic 5V railへは直結しない。****確認前の安全規則である**（ICの動作上限3.6Vも絶対最大定格3.9Vも超えうるため。**IC定格からmodule boardの許容入力電圧は決まらない**）。**3.3Vも唯一の候補であって確定ではない**（`HW-TBD-004`）。**旧記載の「M-06724はregulator非搭載のため3.3V直結必須」は、根拠資料（秋月 商品ページ。現在404）を失ったため2026-08-12に削除した**（Revision 36） | **文献値。実測前** |
 | ESP32 3V3出力 | BME280（environment sensor） | 1 | 数µA〜1mA未満（測定mode時） | 無視できるほど小さい想定 | 無視できるほど小さい想定 | Bosch公式BME280データシート（一般値）。現物付属説明書の電源電圧DC1.71～3.6Vのため5V直結不可（Logic 5V railへは直結しない） | **文献値。実測前** |
 | Servo | TowerPro SG90 | 1 | 数十〜数百mA（動作時、負荷依存） | **250 mAを予算として割り当て**（`変換基板に必要な定格の見積もり`）。実測値はTBD | データシート値0.5〜2A（負荷依存の広い範囲） | [SG90 datasheet](https://www.mouser.com/catalog/specsheets/Soldered_101246.pdf) | **文献値。実測必須（`tbd-register.md` HW-TBD-010／011。model自体はHW-TBD-006で解決済み）** |
 
@@ -1074,6 +1078,12 @@ Mar.2025の`9.Electrical Characteristics`、`Dropout Voltage`行。`IOUT = 500 m
 **照合の分解能は測定側で決まる。**`ADC-5V`／`ADC-3V3`のsample rateは1 kSample/s以上と定めており
 （`Sample rateとlog形式`）、それより短いexcursionは捉えられない。**判定は「測定分解能の範囲で
 範囲を外れないこと」であり、それ以上を主張しない。**
+
+**したがってこのsample列は(d)の「継続時間0」規則を合格にできない。**規則はすべての瞬時値を対象に
+するが、1 kSample/sのADCはsample間のより短いexcursionを観測できず、**「観測されなかった」は
+「起きなかった」ではない。**受け入れを開けるには、想定するtransientすべてに対して測定帯域と
+triggerを検証するか、規則自体を測定可能なenvelopeへ定義し直すかのどちらかが要る。
+**それまで(d)の合否判定は`Blocked`のままとし、sampleした測定値から合格を導かない。**
 
 #### 定義した値をどの段階で照合するか
 
