@@ -62,7 +62,8 @@ readelf -A /bin/sh
 readelf -l /bin/sh
 
 # B. binutilsが無い場合、interpreterだけはfileで確認できる
-file /bin/sh
+#    -L が要る。fileは既定でsymlinkを追跡せず、/bin/shは多くのDebian系でsymlinkである
+file -L /bin/sh
 
 # C. binutilsもfileも無い場合の最終手段（coreutilsだけで足りる）
 od -An -tx1 -j 36 -N 4 /bin/sh
@@ -75,21 +76,21 @@ od -An -tx1 -j 36 -N 4 /bin/sh
 | `dpkg --print-architecture` | 出力そのもの | `armhf` | `armel` |
 | `ls -l /lib/ld-linux*` | loader の有無 | `/lib/ld-linux-armhf.so.3` がある | `/lib/ld-linux-armhf.so.3` が無い |
 | `readelf -h` | `Flags:` 行 | `hard-float ABI` を含む | `soft-float ABI` を含む |
-| `readelf -A` | `Tag_ABI_VFP_args` | `VFP registers` | **その行自体が出力されない** |
-| `file` / `readelf -l` | `interpreter` の path | `/lib/ld-linux-armhf.so.3` | `/lib/ld-linux.so.3` |
+| `readelf -A` | `Tag_ABI_VFP_args` の**値** | `VFP registers` | `AAPCS`、`compatible`、または行が出力されない |
+| `file -L` / `readelf -l` | `interpreter` の path | `/lib/ld-linux-armhf.so.3` | `/lib/ld-linux.so.3` |
 | `od -An -tx1 -j 36 -N 4` | 4 byte のうち 2 番目 | `04` | `02` または `00` |
 
 補足:
 
 - `dpkg --print-architecture` が `arm64` を返した場合、userspace は 64-bit であり、hard/soft 以前に候補 target の前提を満たさない。1節冒頭の `getconf LONG_BIT` と併せて判断する。
 - `ls -l /lib/ld-linux*` の判定は、**system の実行ファイルが要求する interpreter がその path に存在するはずである**という関係に基づく。両方の loader が存在する場合は multiarch 構成であり、この手段では判定できない。手段 B へ進む。
-- `readelf -A` の `Tag_ABI_VFP_args` は、**存在すれば hard-float の強い根拠**である。一方、不在は soft-float の根拠としては弱い（tag を出力しない toolchain の可能性を排除できない）。soft-float 側の判定は `readelf -h` の `Flags:` を優先する。
+- `readelf -A` の `Tag_ABI_VFP_args` は、**行の有無ではなく値を見る。**[Addenda32](https://github.com/ARM-software/abi-aa/blob/main/addenda32/addenda32.rst) の tag 28 は値 0 が AAPCS base variant、1 が VFP variant、3 が両変種に互換である。binutils 2.38 の `readelf` はそれぞれ `AAPCS`、`VFP registers`、`compatible` と出力する。**したがって tag が存在することは hard-float を意味しない。**`VFP registers` という値だけが hard-float を示す。tag を出力しない toolchain もあるため、**hard/soft のどちらの判定でも `readelf -h` の `Flags:` を優先する。**
 - `od` が読むのは ELF32 header の `e_flags`（offset 36、little endian の 4 byte）である。hard-float なら `00 04 00 05`、soft-float なら `00 02 00 05` の形になる（**いずれも実際に確認した出力である**）。両 bit が 0 の場合は 2 番目の byte が `00` になる（**この形は未確認であり、次の項の仕様からの帰結である**）。ELF64 では offset が異なるため、`getconf LONG_BIT` が `32` でない場合はこの手段を使わない。
 - `e_flags` の該当 bit は `EF_ARM_ABI_FLOAT_HARD`（`0x00000400`）と `EF_ARM_ABI_FLOAT_SOFT`（`0x00000200`）である。**両方の bit が 0 の場合は base 標準、すなわち soft-float とみなす**（[AAELF32](https://github.com/ARM-software/abi-aa/blob/main/aaelf32/aaelf32.rst) の Arm-specific `e_flags`）。したがって 2 番目の byte が `00` でも判別不能ではない。
 - これらの bit は executable file header（`e_type` が `ET_EXEC` または `ET_DYN`）にのみ設定される。object file や一部の library では判定に使えないため、判定対象には `/bin/sh` のような実行可能ファイルを選ぶ。
-- `file` は float ABI を語として出力しない。`interpreter` の path だけが手掛かりであり、interpreter を持たない静的 link binary では判断できない。その場合は `readelf -h` を使う。
+- `file` は float ABI を語として出力しない。`interpreter` の path だけが手掛かりであり、interpreter を持たない静的 link binary では判断できない。その場合は `readelf -h` または `od` を使う。**`file` には `-L` が要る。**`file` は既定で symbolic link を追跡せず、対象が symlink だと `symbolic link to dash` のように link 自体を報告して interpreter を出さない（Linux x86_64 の `file` 5.41 で実測した）。`readelf` と `od` は path を開くため link を追跡し、`-L` に相当する option は要らない。
 - `readelf -A` の `Tag_ABI_FP_*` は hard-float と soft-float の**両方に出力される**ため、判定に使わない。判定に使うのは `Tag_ABI_VFP_args`（[Addenda32](https://github.com/ARM-software/abi-aa/blob/main/addenda32/addenda32.rst) の tag 28）だけである。
-- **hard-float であることと Armv6 であることは別の条件である。**`readelf -A` の `Tag_CPU_arch` を併せて記録する。
+- **hard-float であることと Armv6 であることは別の条件である。**`readelf -A` の `Tag_CPU_arch` を併せて記録する。ただし **`Tag_CPU_arch` は ELF の build attribute であり、その binary が要求する命令セットを示す。物理 CPU を測定した値ではない。**物理 CPU の確認は board model と SoC の公式情報で行う（[Raspberry Pi Rust Toolchain](../toolchains/raspberry-pi-rust-toolchain.md#arm-unknown-linux-gnueabihf-を適用してよい条件) の条件 4 と 5）。
 
 判定に使う出力の形は次である。
 
@@ -101,7 +102,7 @@ Flags:                             0x5000400, Version5 EABI, hard-float ABI
       [Requesting program interpreter: /lib/ld-linux-armhf.so.3]
 ```
 
-soft-float の場合は次の形になる。`Tag_ABI_VFP_args` が現れない点が hard-float との違いである。
+soft-float の場合は次の形になる。この検体では `Tag_ABI_VFP_args` の行が現れなかったが、**行が無いことではなく `Flags:` が hard/soft を決める。**base variant を明示する toolchain では `Tag_ABI_VFP_args: AAPCS` が出ることがある。
 
 ```text
 Flags:                             0x5000200, Version5 EABI, soft-float ABI
@@ -111,7 +112,7 @@ Flags:                             0x5000200, Version5 EABI, soft-float ABI
 
 > **この節の出力例の出所。**Raspberry Pi 実機の出力ではない。Linux x86_64 の端末（`readelf` は GNU binutils 2.38）で、配布 package から取り出した binary を読んで得た出力である。検体は Raspbian の `coreutils_8.32-4_armhf.deb`、Debian の `coreutils_9.7-3_armhf.deb`、Debian の `coreutils_9.7-3_armel.deb` の 3 種で、armel を soft-float の対照に使った。package の `Architecture` field と ELF の float ABI が対応することも同時に確認した。確認日は 2026-08-15 である。
 >
-> このとき `Tag_CPU_arch` は、同じ armhf でも Raspbian の検体が `v6`、Debian の検体が `v7` であった。**hard-float であることは Armv6 であることを意味しない。**
+> このとき `Tag_CPU_arch` は、同じ armhf でも Raspbian の検体が `v6`、Debian の検体が `v7` であった。**hard-float であることは Armv6 であることを意味しない。**この値は各 distribution が想定する baseline であり、**動かす CPU の値ではない。**
 >
 > **実機で同じ出力が得られることは未確認である。**手順が実際に判別できるかの確認は [#8](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/8) の実機作業で行う。
 
@@ -120,8 +121,10 @@ Flags:                             0x5000200, Version5 EABI, soft-float ABI
 次のいずれかに当てはまる場合、**判別できたものとして扱わない。**
 
 - 実行した手段の結果が互いに食い違う
-- `readelf` と `file` が無く、2節の前提要件としても導入できない
-- 対象 binary が静的 link であり、`readelf -h` も実行できない
+- `readelf`、`file`、`od` の**すべて**が使えず、2節の前提要件としても導入できない
+- 対象 system に ELF32 の実行可能ファイルが無く、`e_flags` を読めない
+
+**`file` が使えないことだけを理由に判別不能としない。**`od` は coreutils に含まれるため通常は使え、静的 link binary でも `e_flags` を読める。`readelf` も静的 link binary で動く。手段 C が残っている限り停止条件に当たらない。
 
 そのときは次を行う。
 
