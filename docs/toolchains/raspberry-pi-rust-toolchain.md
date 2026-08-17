@@ -104,14 +104,14 @@ ESP32 用の `esp` toolchain を Pi service の build に使わない。
 - storage 消費や書込み負荷が大きい
 - 複数 Pi への配布を自動化する必要が生じた
 
-2026-08-17 の実機計測では、**いずれにも当たらなかったため保留を維持する。**根拠は [Version Record](version-records/2026-08-17-pi-direct-build-native.md) にある。
+2026-08-17 の実機計測では、**4 条件のうち評価できた 3 つが当たらず、残る 1 つは未評価であるため、移行する根拠が無いと判断して保留を維持する。****4 条件すべてを否定したのではない。**根拠は [Version Record](version-records/2026-08-17-pi-direct-build-native.md) にある。
 
 | 条件 | 実測 | 判断 |
 |---|---|---|
-| clean build が許容できない | 最小 program の clean build は debug 4〜5 秒台、release 3.5 秒台 | 当たらない |
-| dependency build の memory 不足 | **未評価。**計測した program の依存は 0 件である | **判断できない** |
-| storage 消費や書込み負荷 | toolchain 約 820 MiB、`target/` 4.6 MiB、空き 24.8 GiB | 当たらない |
-| 複数 Pi への配布の自動化 | 対象は 1 台 | 当たらない |
+| clean build が許容できない | 最小 program の clean build は debug 4〜5 秒台、release 3.5 秒台 | 評価した。当たらない |
+| dependency build の memory 不足 | **未評価。**計測した program の依存は 0 件である | **判断できない。**「当たらない」とは言えない |
+| storage 消費や書込み負荷 | toolchain 約 820 MiB、`target/` 4.6 MiB、空き 24.8 GiB | 評価した。当たらない |
+| 複数 Pi への配布の自動化 | 対象は 1 台 | 評価した。当たらない |
 
 **「dependency build が memory 不足で安定しない」は未評価のまま残る。**依存 0 件の program しか測っていないため、426 MiB の機体で依存を伴う build が通るかはこの計測から言えない。cross compilation の判断を確定させるには、依存を持つ crate の build 計測が別途必要である。
 

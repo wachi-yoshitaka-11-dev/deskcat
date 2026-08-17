@@ -70,9 +70,16 @@ Commands run:
   # 対象機の確定（install より前）
   tr -d '\0' < /sys/firmware/devicetree/base/model
   # 1節 環境記録
-  uname -a / uname -m / uname -r / getconf LONG_BIT
-  cat /etc/os-release / ldd --version / getconf GNU_LIBC_VERSION
-  free -h / df -h / systemd-detect-virt
+  uname -a
+  uname -m
+  uname -r
+  getconf LONG_BIT
+  cat /etc/os-release
+  ldd --version
+  getconf GNU_LIBC_VERSION
+  free -h
+  df -h
+  systemd-detect-virt
   # float ABI 判定（手段A・B・Cすべて）
   dpkg --print-architecture
   dpkg --print-foreign-architectures
@@ -90,7 +97,12 @@ Commands run:
   cargo new <work>/hello --name hello
   cargo clean; cargo build            # clean 3回、各回の直後に cache 有り再build
   cargo clean; cargo build --release  # clean 3回、各回の直後に cache 有り再build
-  file / readelf -h / readelf -A / ldd / sha256sum  # 生成物の同一性
+  # 生成物の同一性
+  file target/debug/hello
+  readelf -h target/debug/hello
+  readelf -A target/debug/hello
+  ldd target/debug/hello
+  sha256sum target/debug/hello target/release/hello
   ./target/debug/hello; ./target/release/hello
   # 4節の reboot 後再実行（session が切れる前に応答を返すため timer 経由で起動した）
   sudo -n systemd-run --on-active=2 --timer-property=AccuracySec=100ms /sbin/reboot
@@ -129,6 +141,17 @@ Actual result:
   │   file -L)                     │                                      │      │
   │ C od -An -tx1 -j 36 -N 4       │ 00 04 00 05（2 byte 目が 04）        │ hard │
   └────────────────────────────────┴──────────────────────────────────────┴──────┘
+  **手段 C を実行したのは runbook の手順からの意図的な逸脱である。**runbook は
+  「C を使うのは B を実行できないときだけである」と定めるが、この機体では
+  `readelf` が最初から使えたため B を実行できた。**それでも C を追加の
+  cross-check として実行した。**理由は、#8 が判定手順そのものの判別可能性を
+  確かめる Issue であり、C（`od` による `e_flags` の直読み）が B と同じ結論を
+  出すかを実機で確認する価値があったためである。
+  **したがって「6 手段が一致」は、runbook が要求する手段より多く実行した結果である。**
+  runbook が要求する範囲（A と B）だけでも hard-float と判定できた。
+  **runbook の条件文を書き換えていない。**C を常時実行してよいかは
+  手順の変更にあたるため、人間の判断に委ねる。
+
   検体は /bin/sh（dash への symlink。file には -L を付けた）。
   dpkg --print-foreign-architectures は arm64 を返したが、native architecture は
   armhf であり、32-bit loader は armhf 版だけが存在するため多重解釈は生じない。
@@ -277,12 +300,17 @@ Conclusion: Partial。**この記録の対象は、この 1 台・Raspberry Pi D
     Raspberry Pi Direct Build profile だけを対象とする。
 
   **cross compilation は保留を維持する。**raspberry-pi-rust-toolchain.md の
-  「Cross compilationへ移る条件」4 つに、実測値のいずれも当たらない。
-  - clean build が許容できない → 当たらない。debug 4〜5 秒台、release 3.5 秒台
-  - dependency build の memory 不足 → **未評価**（依存 0 件のため。上記のとおり）
-  - storage 消費や書込み負荷 → 当たらない。toolchain 820 MiB、target 4.6 MiB、
-    空き 24.8 GiB
-  - 複数 Pi への配布の自動化 → 当たらない。現時点で対象は 1 台
+  「Cross compilationへ移る条件」4 つのうち、**評価できたのは 3 つで、いずれも
+  当たらなかった。残る 1 つは未評価である。**
+  - clean build が許容できない → 評価した。当たらない。debug 4〜5 秒台、release 3.5 秒台
+  - dependency build の memory 不足 → **未評価**（依存 0 件のため。上記のとおり）。
+    **「当たらない」とは言えない。**
+  - storage 消費や書込み負荷 → 評価した。当たらない。toolchain 820 MiB、
+    target 4.6 MiB、空き 24.8 GiB
+  - 複数 Pi への配布の自動化 → 評価した。当たらない。現時点で対象は 1 台
+
+  **したがって保留の維持は、4 条件すべてを否定した結論ではない。**評価できた 3 条件が
+  当たらず、残る 1 条件が未評価であるため、**現時点で移行する根拠が無い**という判断である。
 
 Next action:
   - Raspberry Pi Runtime profile（deskcatd の実行）の記録は別途必要である（本記録の対象外）。
