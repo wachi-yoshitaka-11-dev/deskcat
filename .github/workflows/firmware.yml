@@ -47,7 +47,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # Pages workflowと同じ理由。この後のstepがPR側のcodeをrunner上で扱うため、
-          # checkoutが.git/configへ残すtokenを読めないようにする。
+          # checkoutが残すtokenを読めないようにする。保存先はPages workflowの注記を参照する。
           persist-credentials: false
 
       # `.embuild`はcacheしない。`.cargo/config.toml`が
