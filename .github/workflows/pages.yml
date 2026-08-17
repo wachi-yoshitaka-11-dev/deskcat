@@ -49,7 +49,10 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # Pull Requestでは、この後のstepがPR側の検証scriptを実行する。
-          # checkoutが.git/configへ残すtokenを、そのscriptから読めないようにする。
+          # checkoutが残すtokenを、そのscriptから読めないようにする。
+          # v6.0.0以降、tokenは`.git/config`ではなく`$RUNNER_TEMP`配下の別fileへ
+          # 保存され、`includeIf.gitdir`で条件付きincludeされる。保存先は変わったが、
+          # runner上のfileとして読める点は同じであり、この指定は引き続き要る。
           persist-credentials: false
 
       - name: Check documentation links

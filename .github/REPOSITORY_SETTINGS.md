@@ -88,7 +88,7 @@ workflow追加時:
 - [x] write権限はPagesのdeploy jobだけに付与する
 - [x] 使用するGitHub公式Actionをreview済みcommitへ固定する
 - [x] Pull Requestのbuild jobにsecretとwrite権限を渡さない
-- [x] checkoutに`persist-credentials: false`を指定し、`.git/config`へtokenを残さない（PR側scriptが`.git/config`経由でtokenを読めないようにする措置であり、token露出全般を防ぐものではない）
+- [x] checkoutに`persist-credentials: false`を指定し、runner上へtokenを残さない（PR側scriptが残存tokenを読めないようにする措置であり、token露出全般を防ぐものではない。`actions/checkout` v6.0.0以降、tokenの保存先は`.git/config`ではなく`$RUNNER_TEMP`配下の別fileであり、`.git/config`からは`includeIf.gitdir`で条件付きincludeされる）
 - [x] Hardware-in-the-Loopを通常のhosted CIから分離する
 - [x] 固定したActionの更新を受け取るため`.github/dependabot.yml`を追加する
 
