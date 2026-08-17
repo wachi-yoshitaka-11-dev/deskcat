@@ -376,7 +376,7 @@ fn a_stopped_session_refuses_further_sends() {
 /// `Outbox`単体でも、上限を超えたpushが存在しないことを固定する。
 #[test]
 fn the_outbox_never_grows_past_its_capacity() {
-    let mut outbox = Outbox::new(3);
+    let mut outbox = Outbox::new(core::num::NonZeroUsize::new(3).expect("0ではない"));
     for _ in 0..10 {
         let _ = outbox.enqueue(b"line\n".to_vec());
     }

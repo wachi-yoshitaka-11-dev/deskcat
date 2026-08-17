@@ -4,6 +4,7 @@
 //! したがって`VecDeque::push_back`を無条件に呼ぶ経路を1つも残さない。
 //! 溢れは黙って捨てず、**明示的にdropしてcounterを増やす**。
 
+use core::num::NonZeroUsize;
 use std::collections::VecDeque;
 
 /// [`Outbox::enqueue`]の結果。
@@ -42,15 +43,16 @@ pub struct Outbox {
 impl Outbox {
     /// 容量を指定して作る。
     ///
-    /// # Panics
-    ///
-    /// `capacity`が0のときにpanicする。
+    /// **容量を[`NonZeroUsize`]で受け取る。**`Outbox`は公開APIであり、外部から
+    /// 任意の値を渡せる。0を`assert!`で弾くと、公開APIへの不正入力をprocessの
+    /// 終了で扱うことになる。**0を表現できない型にして、失敗する経路そのものを
+    /// 無くす。**呼び出し側の検証は[`crate::SerialConfig::with_outbox_capacity`]が
+    /// 型付きerrorで行う。
     #[must_use]
-    pub fn new(capacity: usize) -> Self {
-        assert!(capacity > 0, "outbox容量は1以上である");
+    pub fn new(capacity: NonZeroUsize) -> Self {
         Self {
-            queue: VecDeque::with_capacity(capacity),
-            capacity,
+            queue: VecDeque::with_capacity(capacity.get()),
+            capacity: capacity.get(),
             dropped: 0,
             written: 0,
         }
@@ -151,10 +153,14 @@ impl Outbox {
 mod tests {
     use super::*;
 
+    fn cap(n: usize) -> NonZeroUsize {
+        NonZeroUsize::new(n).expect("testの容量は0ではない")
+    }
+
     /// 空のpayloadは受け付けない。通すと偽の切断を作る。
     #[test]
     fn an_empty_payload_is_rejected_at_the_boundary() {
-        let mut outbox = Outbox::new(2);
+        let mut outbox = Outbox::new(cap(2));
         assert_eq!(outbox.enqueue(Vec::new()), Enqueued::Empty);
         assert!(outbox.is_empty(), "queueへ入らない");
         assert_eq!(outbox.dropped(), 0, "溢れではないのでcounterを増やさない");
@@ -163,7 +169,7 @@ mod tests {
 
     #[test]
     fn accepts_up_to_capacity_then_drops_and_counts() {
-        let mut outbox = Outbox::new(2);
+        let mut outbox = Outbox::new(cap(2));
         assert_eq!(outbox.enqueue(b"a".to_vec()), Enqueued::Accepted);
         assert_eq!(outbox.enqueue(b"b".to_vec()), Enqueued::Accepted);
         assert_eq!(outbox.enqueue(b"c".to_vec()), Enqueued::Dropped);
@@ -174,7 +180,7 @@ mod tests {
     /// 新しい側を捨てる。既にqueueへ入った送信順序を壊さない。
     #[test]
     fn dropping_removes_the_new_message_not_the_queued_one() {
-        let mut outbox = Outbox::new(1);
+        let mut outbox = Outbox::new(cap(1));
         let _ = outbox.enqueue(b"first".to_vec());
         assert_eq!(outbox.enqueue(b"second".to_vec()), Enqueued::Dropped);
         assert_eq!(outbox.peek(), Some(&b"first"[..]));
@@ -182,7 +188,7 @@ mod tests {
 
     #[test]
     fn advance_tracks_partial_writes_across_calls() {
-        let mut outbox = Outbox::new(2);
+        let mut outbox = Outbox::new(cap(2));
         let _ = outbox.enqueue(b"hello".to_vec());
 
         outbox.advance(2);
@@ -197,7 +203,7 @@ mod tests {
     /// 切断による破棄は、溢れによるdropとは別に数える。
     #[test]
     fn clear_reports_the_discarded_count_without_touching_the_overflow_counter() {
-        let mut outbox = Outbox::new(4);
+        let mut outbox = Outbox::new(cap(4));
         let _ = outbox.enqueue(b"a".to_vec());
         let _ = outbox.enqueue(b"b".to_vec());
         assert_eq!(outbox.clear(), 2, "捨てた件数を返す");
@@ -208,7 +214,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "書けた量が残りを超えている")]
     fn advancing_past_the_front_is_a_contract_violation() {
-        let mut outbox = Outbox::new(1);
+        let mut outbox = Outbox::new(cap(1));
         let _ = outbox.enqueue(b"ab".to_vec());
         outbox.advance(3);
     }

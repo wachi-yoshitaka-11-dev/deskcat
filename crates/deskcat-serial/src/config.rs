@@ -7,6 +7,7 @@
 //! 当面はこのcrate内に置く。移すときも、**既定値を持たないfieldがどれか**という
 //! 性質は保つ。
 
+use core::num::NonZeroUsize;
 use core::time::Duration;
 
 /// 設定値が不正であること。
@@ -61,8 +62,8 @@ pub struct SerialConfig {
     port: String,
     /// Baud rate。確定値は`PROTO-TBD-001`。
     baud: u32,
-    /// 送信queueの容量（message数）。0は許さない。
-    outbox_capacity: usize,
+    /// 送信queueの容量（message数）。**型として0を排除する。**
+    outbox_capacity: NonZeroUsize,
     /// 再接続の方針。
     reconnect: ReconnectPolicy,
 }
@@ -100,7 +101,7 @@ impl SerialConfig {
     /// **正本は`PROTO-TBD-012`（応答の送出上限と保留table）であり、負荷試験待ちである。**
     /// この値は「上限が存在する」という性質を満たすための暫定値であって、
     /// 測定に基づく確定値ではない。
-    pub const DEFAULT_OUTBOX_CAPACITY: usize = 32;
+    pub const DEFAULT_OUTBOX_CAPACITY: NonZeroUsize = NonZeroUsize::new(32).expect("32は0ではない");
 
     /// 送信queueの容量を差し替える。
     ///
@@ -109,10 +110,8 @@ impl SerialConfig {
     /// `capacity`が0なら[`ConfigError::ZeroOutboxCapacity`]を返す。
     /// 0容量のqueueは送信を常にdropする。
     pub fn with_outbox_capacity(mut self, capacity: usize) -> Result<Self, ConfigError> {
-        if capacity == 0 {
-            return Err(ConfigError::ZeroOutboxCapacity);
-        }
-        self.outbox_capacity = capacity;
+        self.outbox_capacity =
+            NonZeroUsize::new(capacity).ok_or(ConfigError::ZeroOutboxCapacity)?;
         Ok(self)
     }
 
@@ -135,9 +134,9 @@ impl SerialConfig {
         self.baud
     }
 
-    /// 送信queueの容量。
+    /// 送信queueの容量。**0になりえない型で返す。**
     #[must_use]
-    pub const fn outbox_capacity(&self) -> usize {
+    pub const fn outbox_capacity(&self) -> NonZeroUsize {
         self.outbox_capacity
     }
 
