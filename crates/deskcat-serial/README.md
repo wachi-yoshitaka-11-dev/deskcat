@@ -50,6 +50,12 @@ USB OTG の変換 cable が未入手のため ESP32 と接続できない。
 確認していない値が設定の既定として固定される。§2の`115200`も`Candidate`であり、
 確定値は`PROTO-TBD-001`である。
 
+**不正な設定はpanicではなく`ConfigError`で返す。**port名が空、baudが0、queue容量が0、
+backoffの初期値が0、backoffの上下が逆、のそれぞれに変種がある。これらは呼び出し側から
+渡る値であり、`assert!`で落とすとhost processごと終わる。分類して返し、初期化側が
+logとcounterへ落とせるようにする。**とくにbackoffの初期値0は、`backoff()`が常に0を返して
+rate limitを実質的に無効化するため受け付けない。**
+
 ## `id`の上限に達したときの動作
 
 仕様§3の`PROTO-TBD-003`をそのまま実装する。

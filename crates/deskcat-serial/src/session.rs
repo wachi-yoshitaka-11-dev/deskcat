@@ -106,6 +106,8 @@ pub enum SendError {
     Stopped(StopReason),
     /// encodeに失敗した。**送出前に自分のmessageを検証している。**
     Encode(DecodeError),
+    /// encode結果が空だった。内部経路では起こらないが、握りつぶさず分類する。
+    EmptyPayload,
 }
 
 impl core::fmt::Display for SendError {
@@ -115,6 +117,7 @@ impl core::fmt::Display for SendError {
             Self::Dropped => f.write_str("送信queueが満杯のため捨てた"),
             Self::Stopped(reason) => write!(f, "sessionが停止している: {reason:?}"),
             Self::Encode(err) => write!(f, "encodeに失敗した: {err}"),
+            Self::EmptyPayload => f.write_str("encode結果が空だった"),
         }
     }
 }
@@ -305,14 +308,18 @@ impl Session {
         if let Some(reason) = self.stopped {
             return Err(SendError::Stopped(reason));
         }
-        let id = match self.ids.allocate() {
+        let id = match self.ids.peek_next() {
             Ok(id) => id,
             Err(exhausted) => {
                 self.stop(StopReason::IdSpaceExhausted);
                 return Err(exhausted.into());
             }
         };
+        // **queueへ入ってから`id`を消費する。**先に消費すると、encode失敗や
+        // queue満杯のたびに`id`が減る。仕様は単調増加を求めるが連続は求めない
+        // ため飛びは問題ないが、失敗を繰り返すと上限へ早く到達する。
         self.encode_and_enqueue(id, ts_ms, message)?;
+        self.ids.commit(id);
         Ok(id)
     }
 
@@ -359,6 +366,9 @@ impl Session {
                 self.counters.dropped_out = self.outbox.dropped();
                 Err(SendError::Dropped)
             }
+            // `encode_line`は必ず改行を含む行を返すため、内部経路では起こらない。
+            // 起きたならencode側の契約が変わっている。握りつぶさず分類して返す。
+            Enqueued::Empty => Err(SendError::EmptyPayload),
         }
     }
 

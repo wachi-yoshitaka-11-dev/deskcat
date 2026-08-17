@@ -35,13 +35,13 @@ impl core::error::Error for IdSpaceExhausted {}
 
 /// 同一session内の`id`を単調増加で採番する。
 ///
-/// 単一の点で直列化するため、`allocate`と`take_terminal`は`&mut self`を取る。
+/// 単一の点で直列化するため、状態を変える操作は`&mut self`を取る。
 #[derive(Debug)]
 pub struct IdAllocator {
     /// 次に払い出す`id`。`None`は終端報告用の`id`も使い切ったことを表す。
     next: Option<u32>,
-    /// 終端報告用に予約した`id`がまだ残っているか。
-    terminal_available: bool,
+    /// 終端報告用の`id`を既に取り出したか。
+    terminal_taken: bool,
 }
 
 impl IdAllocator {
@@ -60,53 +60,79 @@ impl IdAllocator {
     pub const fn starting_at(first: u32) -> Self {
         Self {
             next: Some(first),
-            terminal_available: true,
+            terminal_taken: false,
         }
     }
 
-    /// 通常のmessage用に`id`を1つ払い出す。
+    /// 次に払い出す通常の`id`を、消費せずに覗く。
     ///
-    /// 次に払い出す値が`u32::MAX`になった時点で、その値を終端報告のために予約し、
-    /// **以降の通常の採番をすべて拒否する。**command、event、`status`、完了event、
-    /// fault eventのいずれであっても、新しい`(sid, id)`を要するものはここを通る。
+    /// 送出の準備（encodeやqueueへの投入）が失敗しうる場合、先に消費すると
+    /// **失敗のたびに`id`が減り、上限へ早く到達する。**仕様は`id`の単調増加を
+    /// 求めるが連続は求めないため、飛びは問題にならない。**枯渇が問題である。**
+    /// 準備が成功してから[`Self::commit`]で消費する。
     ///
     /// # Errors
     ///
-    /// 予約に達している場合に[`IdSpaceExhausted`]を返す。
-    pub fn allocate(&mut self) -> Result<u32, IdSpaceExhausted> {
+    /// 上限値が終端報告用に予約されている場合に[`IdSpaceExhausted`]を返す。
+    pub const fn peek_next(&self) -> Result<u32, IdSpaceExhausted> {
         match self.next {
-            Some(id) if id < u32::MAX => {
-                self.next = Some(id + 1);
-                Ok(id)
-            }
+            Some(id) if id < u32::MAX => Ok(id),
             // `u32::MAX`は終端報告用に予約済みである。通常の採番へは払い出さない。
             _ => Err(IdSpaceExhausted),
         }
     }
 
+    /// [`Self::peek_next`]で覗いた`id`を消費する。
+    ///
+    /// # Panics
+    ///
+    /// 覗いた値と違う`id`を渡したときにpanicする。採番点が1つであることを
+    /// 崩した呼び出しであり、そのまま進めると`id`の単調性が壊れる。
+    pub fn commit(&mut self, id: u32) {
+        assert_eq!(
+            self.peek_next().ok(),
+            Some(id),
+            "覗いた`id`と違う値をcommitした"
+        );
+        self.next = Some(id + 1);
+    }
+
+    /// 通常のmessage用に`id`を1つ払い出す。
+    ///
+    /// 失敗しない送出でだけ使う。encodeやqueueへの投入が失敗しうる場合は
+    /// [`Self::peek_next`]と[`Self::commit`]へ分ける。
+    ///
+    /// # Errors
+    ///
+    /// 予約に達している場合に[`IdSpaceExhausted`]を返す。
+    pub fn allocate(&mut self) -> Result<u32, IdSpaceExhausted> {
+        let id = self.peek_next()?;
+        self.commit(id);
+        Ok(id)
+    }
+
     /// 終端報告用に予約した`id`を、消費せずに覗く。
     ///
-    /// 送出の準備（encodeやqueueへの投入）が失敗しうる場合、[`Self::take_terminal`]を
-    /// 先に呼ぶと**予約を失ったまま送れない**状態になる。予約は1件しかないため
-    /// 取り戻せない。準備が成功してから消費する。
+    /// **予約が成立するのは、次に払い出す`id`が`u32::MAX`になったときだけである。**
+    /// 枯渇前に取り出せてしまうと、通常の`id`を終端報告に使ったうえで採番が
+    /// 止まる。予約はあくまで「上限値を通常の送出へ渡さないための取り置き」である。
     #[must_use]
     pub const fn peek_terminal(&self) -> Option<u32> {
-        if self.terminal_available {
-            self.next
-        } else {
-            None
+        if self.terminal_taken {
+            return None;
+        }
+        match self.next {
+            Some(u32::MAX) => Some(u32::MAX),
+            _ => None,
         }
     }
 
     /// 終端報告（`protocol_fault`）用に予約した`id`を取り出す。
     ///
-    /// **ちょうど1件にだけ使う。**2回目以降は`None`を返す。
+    /// **ちょうど1件にだけ使う。**2回目以降と、枯渇前の呼び出しは`None`を返す。
     pub fn take_terminal(&mut self) -> Option<u32> {
-        if !self.terminal_available {
-            return None;
-        }
-        let id = self.next?;
-        self.terminal_available = false;
+        let id = self.peek_terminal()?;
+        self.terminal_taken = true;
         self.next = None;
         Some(id)
     }
@@ -117,13 +143,15 @@ impl IdAllocator {
     /// `(sid, id)`による再送は影響を受けない。
     #[must_use]
     pub const fn is_exhausted(&self) -> bool {
-        matches!(self.next, None | Some(u32::MAX))
+        self.peek_next().is_err()
     }
 
-    /// 終端報告用の`id`がまだ残っているか。
+    /// 終端報告用の`id`が今すぐ取り出せるか。
+    ///
+    /// 枯渇前は`false`である。予約は上限に達してはじめて成立する。
     #[must_use]
     pub const fn terminal_available(&self) -> bool {
-        self.terminal_available
+        self.peek_terminal().is_some()
     }
 }
 
@@ -136,6 +164,38 @@ impl Default for IdAllocator {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// **枯渇前に終端報告用の`id`を取り出せてはならない。**
+    ///
+    /// 取り出せると、通常の`id`（例えば`1`）を終端報告に使ったうえで採番が
+    /// 止まる。予約は「上限値を通常の送出へ渡さないための取り置き」であって、
+    /// 「いつでも1件引ける枠」ではない。
+    #[test]
+    fn the_terminal_id_is_unavailable_until_the_space_is_actually_exhausted() {
+        let mut ids = IdAllocator::new();
+        assert_eq!(ids.peek_terminal(), None, "枯渇前は覗けない");
+        assert!(!ids.terminal_available());
+        assert_eq!(ids.take_terminal(), None, "枯渇前は取り出せない");
+
+        // 採番は壊れていない。
+        assert_eq!(ids.allocate(), Ok(1));
+        assert_eq!(ids.allocate(), Ok(2));
+
+        let mut ids = IdAllocator::starting_at(u32::MAX - 1);
+        assert_eq!(ids.take_terminal(), None, "上限の1つ手前でもまだ早い");
+        assert_eq!(ids.allocate(), Ok(u32::MAX - 1));
+        assert_eq!(ids.peek_terminal(), Some(u32::MAX), "ここで予約が成立する");
+    }
+
+    /// 準備が失敗した場合に`id`を消費しない。飛びではなく枯渇を避けるためである。
+    #[test]
+    fn peeking_does_not_consume_the_id_until_committed() {
+        let mut ids = IdAllocator::new();
+        assert_eq!(ids.peek_next(), Ok(1));
+        assert_eq!(ids.peek_next(), Ok(1), "覗くだけでは進まない");
+        ids.commit(1);
+        assert_eq!(ids.peek_next(), Ok(2));
+    }
 
     #[test]
     fn allocates_monotonically_from_one() {

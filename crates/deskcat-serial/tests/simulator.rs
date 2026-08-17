@@ -12,6 +12,7 @@
 //!
 //! 実deviceは開かない。[`Transport`]へfakeを注入する。
 
+use core::time::Duration;
 use std::collections::VecDeque;
 use std::io;
 
@@ -19,8 +20,8 @@ use deskcat_protocol::{
     Cause, Envelope, Frame, Hello, HelloReason, Message, Outcome, encode_line, limits,
 };
 use deskcat_serial::{
-    ConnectionState, Enqueued, Outbox, Pump, ReconnectPolicy, SendError, SerialConfig, Session,
-    StopReason, Transport,
+    ConfigError, ConnectionState, Enqueued, Outbox, Pump, ReconnectPolicy, SendError, SerialConfig,
+    Session, StopReason, Transport,
 };
 
 /// 台本どおりに振る舞うfake transport。
@@ -88,7 +89,7 @@ impl Transport for Sim {
 fn config() -> SerialConfig {
     // device名は台本の中だけの値である。実機のdevice名は未確認であり、
     // ここで確定させない。
-    SerialConfig::new("/dev/simulated", 115_200)
+    SerialConfig::new("/dev/simulated", 115_200).expect("設定は妥当である")
 }
 
 fn connected_session() -> Session {
@@ -233,7 +234,10 @@ fn an_oversize_line_is_rejected_and_the_next_line_still_decodes() {
 /// 送信queueが満杯なら捨ててcounterを増やす。握りつぶさない。
 #[test]
 fn a_full_outbox_drops_the_send_and_counts_it() {
-    let mut session = Session::new(config().with_outbox_capacity(1), 90_312);
+    let mut session = Session::new(
+        config().with_outbox_capacity(1).expect("容量は1以上である"),
+        90_312,
+    );
     session.note_connected();
 
     assert!(session.send(hello(), 10).is_ok());
@@ -303,7 +307,8 @@ fn reconnect_stops_at_the_attempt_limit() {
         3,
         core::time::Duration::from_millis(10),
         core::time::Duration::from_millis(40),
-    );
+    )
+    .expect("方針は妥当である");
     let mut session = Session::new(config().with_reconnect(policy), 90_312);
     session.note_connected();
 
@@ -471,8 +476,11 @@ fn a_fatal_error_drops_the_link_as_well_as_stopping_the_session() {
 #[test]
 fn a_full_outbox_does_not_consume_the_terminal_reservation() {
     // 容量1のqueueを通常の送信でふさいでから、終端報告を試す。
-    let mut session =
-        Session::with_first_id(config().with_outbox_capacity(1), 90_312, u32::MAX - 1);
+    let mut session = Session::with_first_id(
+        config().with_outbox_capacity(1).expect("容量は1以上である"),
+        90_312,
+        u32::MAX - 1,
+    );
     session.note_connected();
     assert_eq!(session.send(Message::Ping, 10), Ok(u32::MAX - 1));
     assert_eq!(
@@ -494,5 +502,55 @@ fn a_full_outbox_does_not_consume_the_terminal_reservation() {
         session.send_terminal(Message::Ping, 40),
         Ok(u32::MAX),
         "予約は失われていない"
+    );
+}
+
+/// 不正な設定はpanicではなく分類されたerrorになる。
+#[test]
+fn invalid_configuration_is_reported_as_a_typed_error() {
+    assert_eq!(
+        SerialConfig::new("", 115_200).unwrap_err(),
+        ConfigError::EmptyPort
+    );
+    assert_eq!(
+        SerialConfig::new("/dev/simulated", 0).unwrap_err(),
+        ConfigError::ZeroBaud
+    );
+    assert_eq!(
+        config().with_outbox_capacity(0).unwrap_err(),
+        ConfigError::ZeroOutboxCapacity
+    );
+    assert_eq!(
+        ReconnectPolicy::new(3, Duration::ZERO, Duration::from_secs(1)).unwrap_err(),
+        ConfigError::ZeroInitialBackoff,
+        "0のbackoffはrate limitを消すため受け付けない"
+    );
+    assert_eq!(
+        ReconnectPolicy::new(3, Duration::from_secs(2), Duration::from_secs(1)).unwrap_err(),
+        ConfigError::BackoffBoundsInverted
+    );
+}
+
+/// 送出の準備が失敗しても`id`を消費しない。枯渇を早めない。
+#[test]
+fn a_dropped_send_does_not_consume_an_id() {
+    let mut session = Session::new(
+        config().with_outbox_capacity(1).expect("容量は1以上である"),
+        90_312,
+    );
+    session.note_connected();
+
+    assert_eq!(session.send(Message::Ping, 10), Ok(1));
+    for _ in 0..5 {
+        assert_eq!(session.send(Message::Ping, 20), Err(SendError::Dropped));
+    }
+
+    // queueを掃けば、次の`id`は2である。dropで進んでいない。
+    let mut sim = Sim::default();
+    while matches!(session.pump_write(&mut sim), Pump::Progress(_)) {}
+    assert_eq!(
+        session.send(Message::Ping, 30),
+        Ok(2),
+        "dropした5件は`id`を消費していない"
     );
 }

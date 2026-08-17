@@ -15,6 +15,12 @@ use std::collections::VecDeque;
 pub enum Enqueued {
     /// queueへ入った。
     Accepted,
+    /// **空のpayloadだったため受け付けなかった。**
+    ///
+    /// 空を通すと[`Outbox::peek`]が空sliceを返し、`write(&[])`が契約どおり
+    /// `Ok(0)`を返す。呼び出し側はそれをEOF＝切断と読み、偽の切断を記録して
+    /// queueを捨てる。**`Outbox`は公開APIなので、境界で弾く。**
+    Empty,
     /// 容量に達していたため、**この送信を捨てた**。
     ///
     /// 古い側ではなく新しい側を捨てる。既にqueueへ入ったmessageは送信順序の
@@ -51,12 +57,19 @@ impl Outbox {
     }
 
     /// 送信するbyte列を入れる。容量を超える場合は捨ててcounterを増やす。
+    ///
+    /// **空のbyte列は受け付けない**（[`Enqueued::Empty`]）。溢れとは別に扱う。
+    /// 空はcounterへ計上しない。捨てた送信ではなく、呼び出し側の誤りである。
     pub fn enqueue(&mut self, bytes: impl Into<Vec<u8>>) -> Enqueued {
+        let bytes = bytes.into();
+        if bytes.is_empty() {
+            return Enqueued::Empty;
+        }
         if self.queue.len() >= self.capacity {
             self.dropped += 1;
             return Enqueued::Dropped;
         }
-        self.queue.push_back(bytes.into());
+        self.queue.push_back(bytes);
         Enqueued::Accepted
     }
 
@@ -137,6 +150,16 @@ impl Outbox {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 空のpayloadは受け付けない。通すと偽の切断を作る。
+    #[test]
+    fn an_empty_payload_is_rejected_at_the_boundary() {
+        let mut outbox = Outbox::new(2);
+        assert_eq!(outbox.enqueue(Vec::new()), Enqueued::Empty);
+        assert!(outbox.is_empty(), "queueへ入らない");
+        assert_eq!(outbox.dropped(), 0, "溢れではないのでcounterを増やさない");
+        assert_eq!(outbox.peek(), None);
+    }
 
     #[test]
     fn accepts_up_to_capacity_then_drops_and_counts() {

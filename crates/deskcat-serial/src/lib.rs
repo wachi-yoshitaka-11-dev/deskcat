@@ -37,7 +37,7 @@
 //! use deskcat_serial::{ConnectionState, SerialConfig, Session};
 //!
 //! // port名とbaudは呼び出し側が渡す。既定値を持たせない。
-//! let config = SerialConfig::new("/dev/example", 115_200);
+//! let config = SerialConfig::new("/dev/example", 115_200).expect("設定は妥当である");
 //! let mut session = Session::new(config, 90_312);
 //!
 //! assert_eq!(session.state(), ConnectionState::Disconnected);
@@ -60,7 +60,7 @@ pub mod outbox;
 pub mod session;
 pub mod transport;
 
-pub use config::{ReconnectPolicy, SerialConfig};
+pub use config::{ConfigError, ReconnectPolicy, SerialConfig};
 pub use ids::{IdAllocator, IdSpaceExhausted};
 pub use outbox::{Enqueued, Outbox};
 pub use session::{ConnectionState, Pump, SendError, Session, SessionCounters, StopReason};

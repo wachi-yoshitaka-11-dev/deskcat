@@ -9,6 +9,41 @@
 
 use core::time::Duration;
 
+/// 設定値が不正であること。
+///
+/// **panicにしない。**これらは呼び出し側から渡る値であり、`assert!`で落とすと
+/// host processごと終わる。分類して返し、初期化側がlogとcounterへ落とせるように
+/// する（AGENTS.mdの「エラーを握りつぶさず、分類、ログ、カウンタを用意する」）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum ConfigError {
+    /// port pathが空である。
+    EmptyPort,
+    /// baudが0である。
+    ZeroBaud,
+    /// 送信queueの容量が0である。0容量のqueueは送信を常にdropする。
+    ZeroOutboxCapacity,
+    /// backoffの初期値が0である。**0にするとrate limitが実質的に無くなる。**
+    ZeroInitialBackoff,
+    /// backoffの初期値が上限を超えている。
+    BackoffBoundsInverted,
+}
+
+impl core::fmt::Display for ConfigError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let text = match self {
+            Self::EmptyPort => "port pathが空である",
+            Self::ZeroBaud => "baudが0である",
+            Self::ZeroOutboxCapacity => "送信queueの容量が0である",
+            Self::ZeroInitialBackoff => "backoffの初期値が0である",
+            Self::BackoffBoundsInverted => "backoffの初期値が上限を超えている",
+        };
+        f.write_str(text)
+    }
+}
+
+impl core::error::Error for ConfigError {}
+
 /// Serial linkのport設定。
 ///
 /// **既定値を持たない。**`Default`を実装していないのは意図的である。
@@ -39,20 +74,25 @@ impl SerialConfig {
     /// [`Self::with_reconnect`]で置き換える。既定は[`ReconnectPolicy::provisional`]と
     /// [`Self::DEFAULT_OUTBOX_CAPACITY`]であり、**いずれも暫定値である。**
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// `port`が空のときにpanicする。空のpathは設定漏れであり、実行時に
-    /// 「開けなかった」として現れるより、構築時に落とすほうが早く気づける。
-    #[must_use]
-    pub fn new(port: impl Into<String>, baud: u32) -> Self {
+    /// `port`が空なら[`ConfigError::EmptyPort`]、`baud`が0なら
+    /// [`ConfigError::ZeroBaud`]を返す。**panicしない。**呼び出し側から渡る値を
+    /// processの終了で扱わない。
+    pub fn new(port: impl Into<String>, baud: u32) -> Result<Self, ConfigError> {
         let port = port.into();
-        assert!(!port.is_empty(), "port pathが空である");
-        Self {
+        if port.is_empty() {
+            return Err(ConfigError::EmptyPort);
+        }
+        if baud == 0 {
+            return Err(ConfigError::ZeroBaud);
+        }
+        Ok(Self {
             port,
             baud,
             outbox_capacity: Self::DEFAULT_OUTBOX_CAPACITY,
             reconnect: ReconnectPolicy::provisional(),
-        }
+        })
     }
 
     /// 送信queue容量の暫定既定値。
@@ -64,14 +104,16 @@ impl SerialConfig {
 
     /// 送信queueの容量を差し替える。
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// `capacity`が0のときにpanicする。0容量のqueueは送信を常にdropする。
-    #[must_use]
-    pub fn with_outbox_capacity(mut self, capacity: usize) -> Self {
-        assert!(capacity > 0, "outbox容量は1以上である");
+    /// `capacity`が0なら[`ConfigError::ZeroOutboxCapacity`]を返す。
+    /// 0容量のqueueは送信を常にdropする。
+    pub fn with_outbox_capacity(mut self, capacity: usize) -> Result<Self, ConfigError> {
+        if capacity == 0 {
+            return Err(ConfigError::ZeroOutboxCapacity);
+        }
         self.outbox_capacity = capacity;
-        self
+        Ok(self)
     }
 
     /// 再接続方針を差し替える。
@@ -124,20 +166,28 @@ pub struct ReconnectPolicy {
 impl ReconnectPolicy {
     /// 上限とbackoffを指定して方針を作る。
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// `initial_backoff`が`max_backoff`を超えるときにpanicする。
-    #[must_use]
-    pub fn new(max_attempts: u32, initial_backoff: Duration, max_backoff: Duration) -> Self {
-        assert!(
-            initial_backoff <= max_backoff,
-            "initial_backoffがmax_backoffを超えている"
-        );
-        Self {
+    /// `initial_backoff`が0なら[`ConfigError::ZeroInitialBackoff`]を返す。
+    /// **0を許すと[`Self::backoff`]が常に0を返し、rate limitが消える。**
+    /// `initial_backoff`が`max_backoff`を超える場合は
+    /// [`ConfigError::BackoffBoundsInverted`]を返す。
+    pub fn new(
+        max_attempts: u32,
+        initial_backoff: Duration,
+        max_backoff: Duration,
+    ) -> Result<Self, ConfigError> {
+        if initial_backoff.is_zero() {
+            return Err(ConfigError::ZeroInitialBackoff);
+        }
+        if initial_backoff > max_backoff {
+            return Err(ConfigError::BackoffBoundsInverted);
+        }
+        Ok(Self {
             max_attempts,
             initial_backoff,
             max_backoff,
-        }
+        })
     }
 
     /// 暫定の既定値を返す。
@@ -146,8 +196,14 @@ impl ReconnectPolicy {
     /// 「上限が有限である」「試行間隔が単調に伸びる」という性質だけを満たす。
     /// 数値そのものに根拠は無い。
     #[must_use]
-    pub fn provisional() -> Self {
-        Self::new(5, Duration::from_millis(100), Duration::from_secs(5))
+    pub const fn provisional() -> Self {
+        // ここの値は規則（初期値が0でなく、上限以下）を満たすことが自明なため、
+        // [`Self::new`]を通さず直接組む。**panicしうる経路を作らない。**
+        Self {
+            max_attempts: 5,
+            initial_backoff: Duration::from_millis(100),
+            max_backoff: Duration::from_secs(5),
+        }
     }
 
     /// 再接続試行の上限回数。
