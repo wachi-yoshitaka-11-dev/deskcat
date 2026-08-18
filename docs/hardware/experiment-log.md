@@ -55,6 +55,8 @@
   - ADC基準はAV<sub>CC</sub>（`REFS1:0 = 01`。`DS40002061B` Table 24-3）
   - 取得方式は**連続streaming**。burst captureではない
   - `dialout` group追加後、再loginしていないため全serial操作を`sg dialout -c '...'`で実行
+  - **周囲温度: 未測定。**温度計を用意していなかった。**内蔵基準は温度で動くため、
+    基準電圧側の値は温度条件を伴わない測定である**（作業1のsample rateは温度条件を要さない）
 - **手順**:
   1. board無しで parser の自己testを通す（`test_adc_stream_rate.py`、22 case）
   2. sketchをcompileし、`arduino-cli compile --upload`でuploadする
@@ -186,6 +188,13 @@ channel別の生ADC値（10 bit、AV<sub>CC</sub>基準）。
   **burst captureを採らずに済み、SRAM 2 KBの制約は取得方式の障害にならない。**
 - **仮説2: rejected。**上記4のとおり実測は`ADC clock / 13`だった。
 - **仮説3: supported。**上記5のとおり。
+- **作業2の合格条件は満たしていない。**「換算係数と手順が別の人が同じ結果を再現できる形で
+  残っていること」に対し、**周囲温度を記録しておらず**、`DS40002061B`はこの品の内蔵基準の
+  温度図を載せていないため**影響を一次資料から見積もれない**。さらに同文書の
+  `Calibrated Bandgap Voltage vs. V`<sub>`CC`</sub>（Figure 31-365）が示すとおり
+  **内蔵基準はV<sub>CC</sub>にも依存するため、あるAV<sub>CC</sub>で求めた値を
+  別のAV<sub>CC</sub>へ持ち込めない。**正は[power-budget.md](power-budget.md)の
+  `温度とAV`<sub>`CC`</sub>`の依存が、この品では詰めきれない`にある
 - **基準電圧は未解決のままである。**得られたのはAV<sub>CC</sub>に対する比
   （`VBG`が約0.2206）だけで、**絶対電圧にするにはAV<sub>CC</sub>自身の実測が要る。**
   `V_INT_actual = (VBGの生ADC値 / 1024) × AVCC実測`である。
@@ -207,7 +216,9 @@ channel別の生ADC値（10 bit、AV<sub>CC</sub>基準）。
 
 1. **作業2の残り**: MAS830Lで5 V pinの実電圧を測り、`V_INT_actual`を確定する。
    あわせて**テスター自身のrange別確度**（`±(x % + n digit)`）と**確度を保証する基準温度**、
-   および測定時の周囲温度を記録する。**これが揃うまで校正の不確かさは`TBD`である。**
+   および**測定時の周囲温度（温度計を用意する）**を記録する。
+   **AV<sub>CC</sub>依存の扱いも決める**（何Vで校正した値をどこまで適用してよいか）。
+   **これが揃うまで校正の不確かさは`TBD`であり、作業2は合格条件を満たさない。**
 2. **作業3**: GND topologyの確定とDeskCat側への接続。**通電を伴い、人間の立ち会いが要る。**
    配線図を先に書き、電源off時の導通チェックで図どおりであることを確認してから通電する。
    `5 V railをADCへ直結する条件`に従い、**dividerは既定で残す。**
