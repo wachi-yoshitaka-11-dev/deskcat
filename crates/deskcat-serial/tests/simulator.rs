@@ -698,6 +698,10 @@ mod logging {
 
     static CAPTURE: Mutex<Vec<String>> = Mutex::new(Vec::new());
     static INSTALLED: OnceLock<()> = OnceLock::new();
+    /// **loggerはprocessで共有される。**testが並列に走ると、片方の`take`が
+    /// 他方のrecordを持ち去ってflakyになる。このlockで直列化する。
+    /// `CAPTURE`自身は持てない（loggerが記録のたびにlockする）。
+    static TEST_LOCK: Mutex<()> = Mutex::new(());
 
     struct Capture;
 
@@ -733,6 +737,7 @@ mod logging {
     /// 切断は`warn`で、操作の種別とerrorと分類が残る。
     #[test]
     fn a_disconnect_is_logged_with_the_operation_and_disposition() {
+        let _guard = TEST_LOCK.lock().expect("lockは毒されていない");
         install();
         let _ = take();
 
@@ -757,6 +762,7 @@ mod logging {
     /// 再試行できるerrorは`debug`。正常運転で頻発するため水準を上げない。
     #[test]
     fn a_retryable_flush_error_is_logged_at_debug() {
+        let _guard = TEST_LOCK.lock().expect("lockは毒されていない");
         install();
         let _ = take();
 

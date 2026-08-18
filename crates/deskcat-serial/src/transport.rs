@@ -86,8 +86,11 @@ impl IoDisposition {
 
 /// どのI/O操作でerrorが起きたかを表す。**ログにこれが無いと、counterが増えた理由を
 /// 後から辿れない。**read／write／flushは失敗の意味が違う。
+///
+/// **公開しない。**現状は`handle_io_error`（private）へ渡すだけで、公開署名に出ない。
+/// 利用者のいない公開APIを増やさない。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum IoOp {
+pub(crate) enum IoOp {
     /// transportからの読み出し。
     Read,
     /// transportへの書き出し。
