@@ -123,7 +123,7 @@ little endian。header は 24 B 固定。
 | 22 | 1 | cfg。bit0-2 = ADPS、bit3 = (channel 数 == 2)、bit4-7 は 0 で予約 |
 | 23 | 1 | header 全 byte の XOR |
 
-**`dropped` は 32 bit である。**baud 115200 の実測では10秒で41371件に達したため、
+**`dropped` は 32 bit である。**baud 115200 の実測では10秒で約4万件に達したため、
 16 bit では**約16秒で wrap**し、境界で差が0に見えて CSV の guard を誤って通す。
 
 `pending` が要るのは、`taken` が ring 滞留分を含むためである。これが無いと

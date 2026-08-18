@@ -296,7 +296,10 @@ def summarize(blocks, stats, t_start, t_end, discard_blocks: int):
     # **micros() の wrap を跨いだ取得では出さない。**us_delta() は残余しか返せないため、
     # span_taken が全区間を覆う一方で span_us が短く出て、rate が過大になる。
     # 判定にはPCの単調時計を使う（wrap しない）。
-    wrap_risk = wall_s >= MAX_CAPTURE_SECONDS
+    # 判定材料が無いときに「危険なし」と扱わない。wrap の有無はPCの単調時計でしか
+    # 判定できないため、受信時刻が無い場合は**判定不能として危険側へ倒す。**
+    wrap_assessable = wall_s > 0
+    wrap_risk = (not wrap_assessable) or wall_s >= MAX_CAPTURE_SECONDS
     ard_rate = None
     mark_span_taken = (last.mark_taken - first.mark_taken) % (1 << 32)
     if (not wrap_risk) and mark_span_taken > 0 and last.mark_taken != 0 \
@@ -338,6 +341,7 @@ def summarize(blocks, stats, t_start, t_end, discard_blocks: int):
         "wall_s": wall_s,
         "window_s": window_s,
         "wrap_risk": wrap_risk,
+        "wrap_assessable": wrap_assessable,
         # 分子は受信時刻の区間に届いた数。分母の wall_s と同じ区間である。
         "wall_rate_total": (delivered_between_arrivals / wall_s) if wall_s > 0 else None,
         "arduino_rate_taken": ard_rate,
@@ -379,7 +383,12 @@ def print_report(r, baud: int):
                   % (r["arduino_rate_taken"] / r["nch"]))
 
     if r.get("wrap_risk"):
-        print("  **micros() の wrap 周期に近い取得である。Arduino時計基準のrateを出さない。**")
+        if r.get("wrap_assessable"):
+            print("  **micros() の wrap 周期に近い取得である。"
+                  "Arduino時計基準のrateを出さない。**")
+        else:
+            print("  **受信時刻が無いため micros() の wrap を判定できない。"
+                  "Arduino時計基準のrateを出さない。**")
 
     print("=== 取りこぼし ===")
     print("  ISRが捨てたsample   : %d （測定区間）/ %d （boot以降の累計）"
@@ -446,9 +455,14 @@ def write_csv(path: str, r, allow_drops: bool):
         raise SystemExit("micros() mark から周期を出せない。測定時間を延ばす。")
 
     if r.get("wrap_risk"):
+        if r.get("wrap_assessable"):
+            raise SystemExit(
+                "取得が micros() の wrap 周期（約 %.0f s）に近い。時刻を復元できないため "
+                "CSV を書かない。--seconds を短くする。" % US_WRAP_SECONDS
+            )
         raise SystemExit(
-            "取得が micros() の wrap 周期（約 %.0f s）に近い。時刻を復元できないため "
-            "CSV を書かない。--seconds を短くする。" % US_WRAP_SECONDS
+            "受信時刻が無いため micros() の wrap を判定できない。"
+            "時刻の正しさを保証できないため CSV を書かない。"
         )
 
     if first.mark_taken == 0:

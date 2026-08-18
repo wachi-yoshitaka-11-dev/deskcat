@@ -65,7 +65,7 @@ static volatile uint16_t g_ring[RING_SIZE];
 static volatile uint8_t g_head;  // ISRが書く
 static volatile uint8_t g_tail;  // main loopが読む
 // ringが満杯で捨てたsample数。**uint32 である。**baud 115200 の実測では10秒で
-// 41371件に達したため、uint16 では約16秒で wrap し、境界で差が0に見えてしまう。
+// 約4万件に達したため、uint16 では約16秒で wrap し、境界で差が0に見えてしまう。
 static volatile uint32_t g_dropped;
 static volatile uint32_t g_taken;     // ISRが取得したsample数（捨てたぶんを含む）
 static volatile uint32_t g_mark_us;   // g_mark_taken の時点の micros()

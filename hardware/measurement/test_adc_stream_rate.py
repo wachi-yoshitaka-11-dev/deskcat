@@ -318,7 +318,7 @@ class TestWireFormat(unittest.TestCase):
     def test_dropped_is_32bit(self):
         """uint16 を超える取りこぼしを桁落ちなく運べること。
 
-        baud 115200 の実測では10秒で41371件に達した。uint16 では約16秒で wrap し、
+        baud 115200 の実測では10秒で約4万件に達した。uint16 では約16秒で wrap し、
         境界で dropped_delta が0に見えて CSV guard を誤って通す。
         """
         big = 300000  # uint16 では表せない
@@ -361,6 +361,17 @@ class TestWrapGuard(unittest.TestCase):
         r = self._two(asr.MAX_CAPTURE_SECONDS + 1.0)
         self.assertTrue(r["wrap_risk"])
         self.assertIsNone(r["arduino_rate_taken"])
+
+    def test_unassessable_is_treated_as_risky(self):
+        """受信時刻が無いときは、判定不能として危険側へ倒すこと。"""
+        blocks, stats = TestSummary()._two_blocks()
+        r = asr.summarize(blocks, stats, t_start=0.0, t_end=2.0, discard_blocks=0)
+        self.assertFalse(r["wrap_assessable"])
+        self.assertTrue(r["wrap_risk"])
+        self.assertIsNone(r["arduino_rate_taken"])
+        with tempfile.TemporaryDirectory() as d:
+            with self.assertRaises(SystemExit):
+                asr.write_csv(os.path.join(d, "x.csv"), r, allow_drops=True)
 
     def test_long_capture_refuses_csv(self):
         r = self._two(asr.MAX_CAPTURE_SECONDS + 1.0)
