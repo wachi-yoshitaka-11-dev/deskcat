@@ -35,6 +35,11 @@ struct Sim {
     write_errors: VecDeque<io::Error>,
     /// 実際に書けたbyte列。
     written: Vec<u8>,
+    /// `flush`が呼ばれた回数。**bufferを持つtransportでは、`write`が受け取った
+    /// だけではbyteは届かない。**呼ばれていないことを検出できるようにする。
+    flushes: usize,
+    /// `flush`が返すerror。先頭から消費する。
+    flush_errors: VecDeque<io::Error>,
 }
 
 impl Sim {
@@ -82,6 +87,10 @@ impl Transport for Sim {
     }
 
     fn flush(&mut self) -> io::Result<()> {
+        self.flushes += 1;
+        if let Some(err) = self.flush_errors.pop_front() {
+            return Err(err);
+        }
         Ok(())
     }
 }
@@ -213,13 +222,19 @@ fn an_oversize_line_is_rejected_and_the_next_line_still_decodes() {
     oversize.push(b'\n');
     let good = ping_line(9);
 
-    let mut sim = Sim::with_reads(vec![Ok(oversize), Ok(good.into_bytes())]);
+    let good_bytes = good.into_bytes();
+    let oversize_len = oversize.len();
+    let good_len = good_bytes.len();
+    let mut sim = Sim::with_reads(vec![Ok(oversize), Ok(good_bytes)]);
     let mut session = connected_session();
 
     let mut causes = Vec::new();
     let mut frames = 0_usize;
     // oversizeな行は1回のreadに収まらない。読み切るまで回す。
-    for _ in 0..16 {
+    // **回数は入力長から導出する。**定数で置くと`MAX_LINE_BYTES`を変えたときに
+    // 必要な回数が増え、testが黙って落ちる。1回のreadで最低1byteは進むため、
+    // 全入力byte数だけ回せば必ず読み切れる。
+    for _ in 0..=(oversize_len + good_len) {
         let _ = session.pump_read(&mut sim, |outcome| match outcome {
             Outcome::Rejected(rejection) => causes.push(rejection.cause()),
             Outcome::Frame(_) => frames += 1,
@@ -553,4 +568,71 @@ fn a_dropped_send_does_not_consume_an_id() {
         Ok(2),
         "dropした5件は`id`を消費していない"
     );
+}
+
+/// 先頭messageを書き切ったら`flush`する。bufferに残したまま送れたことにしない。
+#[test]
+fn a_completed_message_is_flushed() {
+    let mut session = connected_session();
+    let _ = session.send(hello(), 40).expect("queueへ入る");
+    let mut sim = Sim::default();
+
+    while matches!(session.pump_write(&mut sim), Pump::Progress(_)) {}
+
+    assert_eq!(session.pending_out(), 0, "書き切っている");
+    assert_eq!(sim.flushes, 1, "書き切った時点で1回だけflushする");
+}
+
+/// 書き切っていない間はflushしない。partial writeごとにflushを呼ばない。
+#[test]
+fn a_partial_write_does_not_flush() {
+    let mut session = connected_session();
+    let _ = session.send(hello(), 40).expect("queueへ入る");
+    let mut sim = Sim {
+        write_chunk: Some(1),
+        ..Sim::default()
+    };
+
+    assert_eq!(session.pump_write(&mut sim), Pump::Progress(1));
+
+    assert!(session.pending_out() > 0, "まだ残っている");
+    assert_eq!(sim.flushes, 0, "書き切るまでflushしない");
+}
+
+/// `flush`の失敗を握りつぶさない。`write`のerrorと同じ分類へ通す。
+#[test]
+fn a_flush_failure_is_classified_not_swallowed() {
+    let mut session = connected_session();
+    let _ = session.send(hello(), 40).expect("queueへ入る");
+    let mut sim = Sim {
+        flush_errors: VecDeque::from(vec![io::Error::from(io::ErrorKind::BrokenPipe)]),
+        ..Sim::default()
+    };
+
+    assert_eq!(
+        session.pump_write(&mut sim),
+        Pump::Disconnected,
+        "flushの失敗も切断として分類される"
+    );
+    assert_eq!(session.counters().disconnects, 1);
+}
+
+/// 送出前の自己検証で落ちた送信をcounterに残す。黙って捨てない。
+#[test]
+fn an_unencodable_message_is_counted() {
+    let mut session = connected_session();
+    let too_long = Message::Hello(Hello {
+        host: "h".repeat(limits::MAX_HOST_BYTES + 1),
+        version: "0.1.0".to_owned(),
+        reason: HelloReason::Startup,
+    });
+
+    let err = session
+        .send(too_long, 40)
+        .expect_err("上限を超えたhostはencodeできない");
+
+    assert!(matches!(err, SendError::Encode(_)), "分類はEncodeである");
+    assert_eq!(session.counters().encode_failed, 1);
+    assert_eq!(session.pending_out(), 0, "queueへは入っていない");
+    assert_eq!(session.counters().dropped_out, 0, "輻輳とは別に数える");
 }

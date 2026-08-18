@@ -92,6 +92,11 @@ pub struct SessionCounters {
     pub timeouts: u64,
     /// 進捗が無く再試行になった回数。
     pub retries: u64,
+    /// 送出前の自己検証で送信を却下した回数（encode失敗と空payload）。
+    /// **`dropped_out`とは原因が違う。**あちらは輻輳、こちらは自分のmessageが
+    /// wire規則を満たさないことを表す。継続的に失敗している状況を外から観測できる
+    /// ようにするため分けて数える。
+    pub encode_failed: u64,
 }
 
 /// 送信を受け付けられなかった理由。
@@ -359,7 +364,15 @@ impl Session {
             },
             message,
         );
-        let line = encode_line(&frame).map_err(SendError::Encode)?;
+        let line = match encode_line(&frame) {
+            Ok(line) => line,
+            Err(err) => {
+                // 行長上限超過などで失敗しうる。counterが無いと、送信が継続的に
+                // 失敗している状況を外から観測できない。
+                self.counters.encode_failed += 1;
+                return Err(SendError::Encode(err));
+            }
+        };
         match self.outbox.enqueue(line.into_bytes()) {
             Enqueued::Accepted => Ok(()),
             Enqueued::Dropped => {
@@ -368,7 +381,10 @@ impl Session {
             }
             // `encode_line`は必ず改行を含む行を返すため、内部経路では起こらない。
             // 起きたならencode側の契約が変わっている。握りつぶさず分類して返す。
-            Enqueued::Empty => Err(SendError::EmptyPayload),
+            Enqueued::Empty => {
+                self.counters.encode_failed += 1;
+                Err(SendError::EmptyPayload)
+            }
         }
     }
 
@@ -431,8 +447,20 @@ impl Session {
                 Pump::Disconnected
             }
             Ok(n) => {
+                let pending_before = self.outbox.len();
                 self.outbox.advance(n);
                 self.counters.bytes_out += n as u64;
+                // 先頭messageを書き切った時点で`flush`する。**bufferを持つtransport
+                // では、`write`が受け取っただけでbyteはbufferに残る。**flushしないと
+                // `bytes_out`が増えて`pending_out`が0になり、呼び出し側からは
+                // 送り切ったように見える。
+                if self.outbox.len() < pending_before
+                    && let Err(err) = transport.flush()
+                {
+                    // **byteは既に`write`が受け取っており、取り消せない。**
+                    // 進捗の記録は残したまま、失敗の分類だけを返す。
+                    return self.handle_io_error(&err);
+                }
                 Pump::Progress(n)
             }
             Err(err) => self.handle_io_error(&err),
