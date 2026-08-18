@@ -684,3 +684,96 @@ fn a_disconnect_clears_the_pending_flush() {
         "切断したlinkへflushを持ち越さない"
     );
 }
+
+/// I/O errorを分類とcounterだけで済ませず、記録する。
+///
+/// **`log`のloggerはprocessで1つだけである。**installは`OnceLock`で1回に限り、
+/// 記録の検証は`CAPTURE`の中身で行う。
+mod logging {
+    use std::sync::{Mutex, OnceLock};
+
+    use deskcat_serial::Pump;
+
+    use super::{Sim, VecDeque, connected_session, hello, io};
+
+    static CAPTURE: Mutex<Vec<String>> = Mutex::new(Vec::new());
+    static INSTALLED: OnceLock<()> = OnceLock::new();
+
+    struct Capture;
+
+    impl log::Log for Capture {
+        fn enabled(&self, _: &log::Metadata<'_>) -> bool {
+            true
+        }
+
+        fn log(&self, record: &log::Record<'_>) {
+            let mut sink = CAPTURE.lock().expect("captureは毒されていない");
+            sink.push(format!("{} {}", record.level(), record.args()));
+        }
+
+        fn flush(&self) {}
+    }
+
+    static CAPTURE_LOGGER: Capture = Capture;
+
+    fn install() {
+        // **`set_boxed_logger`は`log`の`std` featureを要する。**libraryが要らない
+        // featureを増やさないため、`&'static`を取る`set_logger`を使う。
+        INSTALLED.get_or_init(|| {
+            log::set_logger(&CAPTURE_LOGGER).expect("loggerは1度だけ入れる");
+            log::set_max_level(log::LevelFilter::Trace);
+        });
+    }
+
+    fn take() -> Vec<String> {
+        let mut sink = CAPTURE.lock().expect("captureは毒されていない");
+        std::mem::take(&mut *sink)
+    }
+
+    /// 切断は`warn`で、操作の種別とerrorと分類が残る。
+    #[test]
+    fn a_disconnect_is_logged_with_the_operation_and_disposition() {
+        install();
+        let _ = take();
+
+        let mut session = connected_session();
+        let _ = session.send(hello(), 40).expect("queueへ入る");
+        let mut sim = Sim {
+            write_errors: VecDeque::from(vec![io::Error::from(io::ErrorKind::BrokenPipe)]),
+            ..Sim::default()
+        };
+
+        assert_eq!(session.pump_write(&mut sim), Pump::Disconnected);
+
+        let lines = take();
+        let hit = lines
+            .iter()
+            .find(|l| l.contains("serial write"))
+            .expect("write経路のerrorが記録される");
+        assert!(hit.starts_with("WARN"), "切断はWARN水準である: {hit}");
+        assert!(hit.contains("Disconnected"), "分類が残る: {hit}");
+    }
+
+    /// 再試行できるerrorは`debug`。正常運転で頻発するため水準を上げない。
+    #[test]
+    fn a_retryable_flush_error_is_logged_at_debug() {
+        install();
+        let _ = take();
+
+        let mut session = connected_session();
+        let _ = session.send(hello(), 40).expect("queueへ入る");
+        let mut sim = Sim {
+            flush_errors: VecDeque::from(vec![io::Error::from(io::ErrorKind::WouldBlock)]),
+            ..Sim::default()
+        };
+        while matches!(session.pump_write(&mut sim), Pump::Progress(_)) {}
+
+        let lines = take();
+        let hit = lines
+            .iter()
+            .find(|l| l.contains("serial flush"))
+            .expect("flush経路のerrorが記録される");
+        assert!(hit.starts_with("DEBUG"), "再試行はDEBUG水準である: {hit}");
+        assert!(hit.contains("Retry"), "分類が残る: {hit}");
+    }
+}

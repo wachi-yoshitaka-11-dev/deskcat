@@ -16,7 +16,7 @@ use deskcat_protocol::{
 use crate::config::SerialConfig;
 use crate::ids::{IdAllocator, IdSpaceExhausted};
 use crate::outbox::{Enqueued, Outbox};
-use crate::transport::{IoDisposition, Transport};
+use crate::transport::{IoDisposition, IoOp, Transport};
 
 /// 接続state。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -428,7 +428,7 @@ impl Session {
                 self.counters.rejected_in += rejected;
                 Pump::Progress(n)
             }
-            Err(err) => self.handle_io_error(&err),
+            Err(err) => self.handle_io_error(IoOp::Read, &err),
         }
     }
 
@@ -446,7 +446,7 @@ impl Session {
         if self.flush_pending {
             match transport.flush() {
                 Ok(()) => self.flush_pending = false,
-                Err(err) => return self.handle_io_error(&err),
+                Err(err) => return self.handle_io_error(IoOp::Flush, &err),
             }
         }
         // 書き出しの結果だけを取り出し、`outbox`のborrowをここで終える。
@@ -480,17 +480,32 @@ impl Session {
                         Ok(()) => self.flush_pending = false,
                         // **byteは既に`write`が受け取っており、取り消せない。**
                         // 進捗の記録とflag は残したまま、失敗の分類だけを返す。
-                        Err(err) => return self.handle_io_error(&err),
+                        Err(err) => return self.handle_io_error(IoOp::Flush, &err),
                     }
                 }
                 Pump::Progress(n)
             }
-            Err(err) => self.handle_io_error(&err),
+            Err(err) => self.handle_io_error(IoOp::Write, &err),
         }
     }
 
-    fn handle_io_error(&mut self, err: &io::Error) -> Pump {
-        match IoDisposition::classify(err) {
+    fn handle_io_error(&mut self, op: IoOp, err: &io::Error) -> Pump {
+        let disposition = IoDisposition::classify(err);
+        // **分類とcounterだけでは足りない。**どのerrorでその分類になったかを残さないと、
+        // counterが増えた理由を後から辿れない（AGENTS.md「分類、ログ、カウンタ」）。
+        // `Retry`は正常運転で頻発するため、`Disconnected`／`Fatal`と同じ水準にしない。
+        match disposition {
+            IoDisposition::Retry | IoDisposition::TimedOut => {
+                log::debug!("serial {op}: {err} -> {disposition:?}");
+            }
+            IoDisposition::Disconnected => {
+                log::warn!("serial {op}: {err} -> {disposition:?}");
+            }
+            IoDisposition::Fatal => {
+                log::error!("serial {op}: {err} -> {disposition:?}");
+            }
+        }
+        match disposition {
             IoDisposition::Retry => {
                 self.counters.retries += 1;
                 Pump::Idle

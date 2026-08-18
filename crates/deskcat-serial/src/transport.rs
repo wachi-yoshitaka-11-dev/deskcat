@@ -8,6 +8,7 @@
 //! ここではtraitだけを置き、testからfakeを注入できるようにする。実deviceの
 //! backendは、このtraitを実装する形で後から足せる。
 
+use std::fmt;
 use std::io;
 
 /// byte列を読み書きする対象。
@@ -80,6 +81,29 @@ impl IoDisposition {
             // 「一時的な失敗」と楽観すると、直らない状態で試行し続ける。
             _ => Self::Fatal,
         }
+    }
+}
+
+/// どのI/O操作でerrorが起きたかを表す。**ログにこれが無いと、counterが増えた理由を
+/// 後から辿れない。**read／write／flushは失敗の意味が違う。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IoOp {
+    /// transportからの読み出し。
+    Read,
+    /// transportへの書き出し。
+    Write,
+    /// bufferの押し出し。
+    Flush,
+}
+
+impl fmt::Display for IoOp {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let name = match self {
+            Self::Read => "read",
+            Self::Write => "write",
+            Self::Flush => "flush",
+        };
+        f.write_str(name)
     }
 }
 

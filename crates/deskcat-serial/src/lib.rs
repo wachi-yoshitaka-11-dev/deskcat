@@ -8,7 +8,7 @@
 //! 含むもの:
 //!
 //! - port名とbaudをsecretではなく設定として扱う型（[`SerialConfig`]）
-//! - byte列を運ぶ層の境界（[`Transport`]）とI/O errorの分類（[`IoDisposition`]）
+//! - byte列を運ぶ層の境界（[`Transport`]）とI/O errorの分類（[`IoDisposition`]・[`IoOp`]）
 //! - 上限のある送信queue（[`Outbox`]）。溢れは明示的にdropしてcounterへ計上する
 //! - 送信側の`id`採番（[`IdAllocator`]）。仕様§3の`PROTO-TBD-003`をそのまま実装する
 //! - 接続stateとcounter（[`Session`]）。partial I/O、切断の観測、
@@ -64,4 +64,4 @@ pub use config::{ConfigError, ReconnectPolicy, SerialConfig};
 pub use ids::{IdAllocator, IdSpaceExhausted};
 pub use outbox::{Enqueued, Outbox};
 pub use session::{ConnectionState, Pump, SendError, Session, SessionCounters, StopReason};
-pub use transport::{IoDisposition, Transport};
+pub use transport::{IoDisposition, IoOp, Transport};
