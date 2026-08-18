@@ -94,9 +94,23 @@ Commands run:
   sh /tmp/rustup-init.sh -y --no-modify-path --profile minimal --default-toolchain stable
   rustup component add rustfmt clippy
   # 最小 program（このrepositoryのcrateは使わない）
-  cargo new <work>/hello --name hello
-  cargo clean; cargo build            # clean 3回、各回の直後に cache 有り再build
-  cargo clean; cargo build --release  # clean 3回、各回の直後に cache 有り再build
+  WORK="$HOME/deskcat-issue8"
+  cargo new "$WORK/hello" --name hello
+  cd "$WORK/hello"
+  # build 計測。実際に回した loop をそのまま示す。debug の 3 回を先に回し、
+  # 続けて release の 3 回を回した。時間は date +%s.%N の差分を awk で算出した
+  # （この機体に bc は無い）。
+  for FLAG in "" "--release"; do
+    for i in 1 2 3; do
+      cargo clean >/dev/null 2>&1; sync
+      t0=$(date +%s.%N); cargo build $FLAG > /tmp/b.log  2>&1; rc=$?; t1=$(date +%s.%N)
+      awk -v a="$t0" -v b="$t1" 'BEGIN{printf "clean  %.2f s\n", b-a}'   # clean build
+      t0=$(date +%s.%N); cargo build $FLAG > /tmp/b2.log 2>&1; rc=$?; t1=$(date +%s.%N)
+      awk -v a="$t0" -v b="$t1" 'BEGIN{printf "cached %.2f s\n", b-a}'   # cache 有り再build
+    done
+  done
+  # peak memory は上記とは別に 1 回ずつ測った。/proc を 0.2 秒間隔で読む sampler を
+  # build と並走させる方式で、内容は `Peak memory if measured` 欄に書いた。
   # 生成物の同一性
   file target/debug/hello
   readelf -h target/debug/hello
