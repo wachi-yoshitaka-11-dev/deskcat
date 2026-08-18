@@ -32,6 +32,9 @@ Machine profile: Raspberry Pi Direct Build
 Operator role: 開発者（human）の監督下でのAI agent作業。SSH経由で実行した。
   rustupの導入とrebootはhumanの確認を得た
 Repository commit: 3a34aeffe6f441738cba14f9a4ef8ac9616cf15e
+  （**測定を行った時点の commit である。**本記録を載せた branch はその後
+  develop の更新へ追従して rebase したが、**測定はやり直していない。**
+  Pi 上の作業はこのrepositoryのcrateを一切使わないため、rebase は測定値に影響しない）
 Working tree clean: no（本記録の追加分を含む）
 
 OS name: Raspbian GNU/Linux
@@ -97,9 +100,9 @@ Commands run:
   WORK="$HOME/deskcat-issue8"
   cargo new "$WORK/hello" --name hello
   cd "$WORK/hello"
-  # build 計測。実際に回した loop をそのまま示す。debug の 3 回を先に回し、
-  # 続けて release の 3 回を回した。時間は date +%s.%N の差分を awk で算出した
-  # （この機体に bc は無い）。
+  # build 計測。実行した順序と内容を再現した形で示す（原文は関数へ切り出していた）。
+  # debug の 3 回を先に回し、続けて release の 3 回を回した。時間は
+  # date +%s.%N の差分を awk で算出した（この機体に bc は無い）。
   for FLAG in "" "--release"; do
     for i in 1 2 3; do
       cargo clean >/dev/null 2>&1; sync
