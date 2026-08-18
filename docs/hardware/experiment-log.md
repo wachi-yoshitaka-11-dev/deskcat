@@ -8,7 +8,7 @@
 
 | 実験 | 対象 | 値の正 |
 |---|---|---|
-| [EXP-001](#exp-001-連続streamingの実効sample rate) | `HW-TBD-034` 作業1・作業2 | [power-budget.md](power-budget.md)の`手持ち候補に固有の制約: SRAMと取得方式`、`基準電圧が未解決である（設計上の論点）` |
+| [EXP-001](#exp-001-連続streamingの実効sample-rate) | `HW-TBD-034` 作業1・作業2 | [power-budget.md](power-budget.md)の`手持ち候補に固有の制約: SRAMと取得方式`、`基準電圧が未解決である（設計上の論点）` |
 
 **大容量の生dataはこのrepositoryへ入れていない。**保存場所は
 [development-foundation-plan.md](../planning/development-foundation-plan.md)の
