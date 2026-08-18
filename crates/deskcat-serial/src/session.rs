@@ -16,7 +16,7 @@ use deskcat_protocol::{
 use crate::config::SerialConfig;
 use crate::ids::{IdAllocator, IdSpaceExhausted};
 use crate::outbox::{Enqueued, Outbox};
-use crate::transport::{IoDisposition, Transport};
+use crate::transport::{IoDisposition, IoOp, Transport};
 
 /// 接続state。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -92,6 +92,11 @@ pub struct SessionCounters {
     pub timeouts: u64,
     /// 進捗が無く再試行になった回数。
     pub retries: u64,
+    /// 送出前の自己検証で送信を却下した回数（encode失敗と空payload）。
+    /// **`dropped_out`とは原因が違う。**あちらは輻輳、こちらは自分のmessageが
+    /// wire規則を満たさないことを表す。継続的に失敗している状況を外から観測できる
+    /// ようにするため分けて数える。
+    pub encode_failed: u64,
 }
 
 /// 送信を受け付けられなかった理由。
@@ -142,6 +147,11 @@ pub struct Session {
     /// あってlinkの切断ではなく、両者を1つのfieldに畳むと、停止後に終端報告を
     /// 書き切れなくなる。
     link_connected: bool,
+    /// 書き切ったmessageの`flush`が未完了か。
+    /// **`WouldBlock`や`TimedOut`は再試行できるerrorであり、1回失敗しただけでは
+    /// bufferの中身は消えない。**flagを残さないと、outboxが空になった後は
+    /// `flush`を呼ぶ契機が無くなり、byteがbufferに残ったままになる。
+    flush_pending: bool,
     /// 停止した理由。停止していなければ`None`。
     stopped: Option<StopReason>,
     counters: SessionCounters,
@@ -180,6 +190,7 @@ impl Session {
             receiver: LineReceiver::with_protocol_limit(),
             outbox,
             link_connected: false,
+            flush_pending: false,
             stopped: None,
             counters: SessionCounters::default(),
             reconnect_attempts: 0,
@@ -252,6 +263,9 @@ impl Session {
         }
         self.link_connected = false;
         self.receiver.reset();
+        // 切断したlinkへはflushできない。保留を持ち越すと再接続後に
+        // 別のlinkへ対して意味のないflushを1回呼ぶことになる。
+        self.flush_pending = false;
         self.counters.discarded_on_disconnect += self.outbox.clear();
     }
 
@@ -359,7 +373,15 @@ impl Session {
             },
             message,
         );
-        let line = encode_line(&frame).map_err(SendError::Encode)?;
+        let line = match encode_line(&frame) {
+            Ok(line) => line,
+            Err(err) => {
+                // 行長上限超過などで失敗しうる。counterが無いと、送信が継続的に
+                // 失敗している状況を外から観測できない。
+                self.counters.encode_failed += 1;
+                return Err(SendError::Encode(err));
+            }
+        };
         match self.outbox.enqueue(line.into_bytes()) {
             Enqueued::Accepted => Ok(()),
             Enqueued::Dropped => {
@@ -368,7 +390,10 @@ impl Session {
             }
             // `encode_line`は必ず改行を含む行を返すため、内部経路では起こらない。
             // 起きたならencode側の契約が変わっている。握りつぶさず分類して返す。
-            Enqueued::Empty => Err(SendError::EmptyPayload),
+            Enqueued::Empty => {
+                self.counters.encode_failed += 1;
+                Err(SendError::EmptyPayload)
+            }
         }
     }
 
@@ -403,7 +428,7 @@ impl Session {
                 self.counters.rejected_in += rejected;
                 Pump::Progress(n)
             }
-            Err(err) => self.handle_io_error(&err),
+            Err(err) => self.handle_io_error(IoOp::Read, &err),
         }
     }
 
@@ -414,6 +439,15 @@ impl Session {
     pub fn pump_write<T: Transport>(&mut self, transport: &mut T) -> Pump {
         if !self.can_pump() {
             return Pump::Idle;
+        }
+        // 前回の書き切りで`flush`が終わっていなければ、先に片付ける。
+        // **outboxが空になると書き込み経路を通らなくなる。**ここで再試行しないと
+        // 再試行できるerrorで落ちたflushが永久に取り残される。
+        if self.flush_pending {
+            match transport.flush() {
+                Ok(()) => self.flush_pending = false,
+                Err(err) => return self.handle_io_error(IoOp::Flush, &err),
+            }
         }
         // 書き出しの結果だけを取り出し、`outbox`のborrowをここで終える。
         // **copyしない。**1回に1byteしか書けない相手では`pump_write`が
@@ -431,16 +465,47 @@ impl Session {
                 Pump::Disconnected
             }
             Ok(n) => {
+                let pending_before = self.outbox.len();
                 self.outbox.advance(n);
                 self.counters.bytes_out += n as u64;
+                // 先頭messageを書き切った時点で`flush`する。**bufferを持つtransport
+                // では、`write`が受け取っただけでbyteはbufferに残る。**flushしないと
+                // `bytes_out`が増えて`pending_out`が0になり、呼び出し側からは
+                // 送り切ったように見える。
+                if self.outbox.len() < pending_before {
+                    self.flush_pending = true;
+                }
+                if self.flush_pending {
+                    match transport.flush() {
+                        Ok(()) => self.flush_pending = false,
+                        // **byteは既に`write`が受け取っており、取り消せない。**
+                        // 進捗の記録とflag は残したまま、失敗の分類だけを返す。
+                        Err(err) => return self.handle_io_error(IoOp::Flush, &err),
+                    }
+                }
                 Pump::Progress(n)
             }
-            Err(err) => self.handle_io_error(&err),
+            Err(err) => self.handle_io_error(IoOp::Write, &err),
         }
     }
 
-    fn handle_io_error(&mut self, err: &io::Error) -> Pump {
-        match IoDisposition::classify(err) {
+    fn handle_io_error(&mut self, op: IoOp, err: &io::Error) -> Pump {
+        let disposition = IoDisposition::classify(err);
+        // **分類とcounterだけでは足りない。**どのerrorでその分類になったかを残さないと、
+        // counterが増えた理由を後から辿れない（AGENTS.md「分類、ログ、カウンタ」）。
+        // `Retry`は正常運転で頻発するため、`Disconnected`／`Fatal`と同じ水準にしない。
+        match disposition {
+            IoDisposition::Retry | IoDisposition::TimedOut => {
+                log::debug!("serial {op}: {err} -> {disposition:?}");
+            }
+            IoDisposition::Disconnected => {
+                log::warn!("serial {op}: {err} -> {disposition:?}");
+            }
+            IoDisposition::Fatal => {
+                log::error!("serial {op}: {err} -> {disposition:?}");
+            }
+        }
+        match disposition {
             IoDisposition::Retry => {
                 self.counters.retries += 1;
                 Pump::Idle

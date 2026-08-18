@@ -35,6 +35,11 @@ struct Sim {
     write_errors: VecDeque<io::Error>,
     /// 実際に書けたbyte列。
     written: Vec<u8>,
+    /// `flush`が呼ばれた回数。**bufferを持つtransportでは、`write`が受け取った
+    /// だけではbyteは届かない。**呼ばれていないことを検出できるようにする。
+    flushes: usize,
+    /// `flush`が返すerror。先頭から消費する。
+    flush_errors: VecDeque<io::Error>,
 }
 
 impl Sim {
@@ -82,6 +87,10 @@ impl Transport for Sim {
     }
 
     fn flush(&mut self) -> io::Result<()> {
+        self.flushes += 1;
+        if let Some(err) = self.flush_errors.pop_front() {
+            return Err(err);
+        }
         Ok(())
     }
 }
@@ -213,13 +222,19 @@ fn an_oversize_line_is_rejected_and_the_next_line_still_decodes() {
     oversize.push(b'\n');
     let good = ping_line(9);
 
-    let mut sim = Sim::with_reads(vec![Ok(oversize), Ok(good.into_bytes())]);
+    let good_bytes = good.into_bytes();
+    let oversize_len = oversize.len();
+    let good_len = good_bytes.len();
+    let mut sim = Sim::with_reads(vec![Ok(oversize), Ok(good_bytes)]);
     let mut session = connected_session();
 
     let mut causes = Vec::new();
     let mut frames = 0_usize;
     // oversizeな行は1回のreadに収まらない。読み切るまで回す。
-    for _ in 0..16 {
+    // **回数は入力長から導出する。**定数で置くと`MAX_LINE_BYTES`を変えたときに
+    // 必要な回数が増え、testが黙って落ちる。1回のreadで最低1byteは進むため、
+    // 全入力byte数だけ回せば必ず読み切れる。
+    for _ in 0..=(oversize_len + good_len) {
         let _ = session.pump_read(&mut sim, |outcome| match outcome {
             Outcome::Rejected(rejection) => causes.push(rejection.cause()),
             Outcome::Frame(_) => frames += 1,
@@ -553,4 +568,220 @@ fn a_dropped_send_does_not_consume_an_id() {
         Ok(2),
         "dropした5件は`id`を消費していない"
     );
+}
+
+/// 先頭messageを書き切ったら`flush`する。bufferに残したまま送れたことにしない。
+#[test]
+fn a_completed_message_is_flushed() {
+    let mut session = connected_session();
+    let _ = session.send(hello(), 40).expect("queueへ入る");
+    let mut sim = Sim::default();
+
+    while matches!(session.pump_write(&mut sim), Pump::Progress(_)) {}
+
+    assert_eq!(session.pending_out(), 0, "書き切っている");
+    assert_eq!(sim.flushes, 1, "書き切った時点で1回だけflushする");
+}
+
+/// 書き切っていない間はflushしない。partial writeごとにflushを呼ばない。
+#[test]
+fn a_partial_write_does_not_flush() {
+    let mut session = connected_session();
+    let _ = session.send(hello(), 40).expect("queueへ入る");
+    let mut sim = Sim {
+        write_chunk: Some(1),
+        ..Sim::default()
+    };
+
+    assert_eq!(session.pump_write(&mut sim), Pump::Progress(1));
+
+    assert!(session.pending_out() > 0, "まだ残っている");
+    assert_eq!(sim.flushes, 0, "書き切るまでflushしない");
+}
+
+/// `flush`の失敗を握りつぶさない。`write`のerrorと同じ分類へ通す。
+#[test]
+fn a_flush_failure_is_classified_not_swallowed() {
+    let mut session = connected_session();
+    let _ = session.send(hello(), 40).expect("queueへ入る");
+    let mut sim = Sim {
+        flush_errors: VecDeque::from(vec![io::Error::from(io::ErrorKind::BrokenPipe)]),
+        ..Sim::default()
+    };
+
+    assert_eq!(
+        session.pump_write(&mut sim),
+        Pump::Disconnected,
+        "flushの失敗も切断として分類される"
+    );
+    assert_eq!(session.counters().disconnects, 1);
+}
+
+/// 送出前の自己検証で落ちた送信をcounterに残す。黙って捨てない。
+#[test]
+fn an_unencodable_message_is_counted() {
+    let mut session = connected_session();
+    let too_long = Message::Hello(Hello {
+        host: "h".repeat(limits::MAX_HOST_BYTES + 1),
+        version: "0.1.0".to_owned(),
+        reason: HelloReason::Startup,
+    });
+
+    let err = session
+        .send(too_long, 40)
+        .expect_err("上限を超えたhostはencodeできない");
+
+    assert!(matches!(err, SendError::Encode(_)), "分類はEncodeである");
+    assert_eq!(session.counters().encode_failed, 1);
+    assert_eq!(session.pending_out(), 0, "queueへは入っていない");
+    assert_eq!(session.counters().dropped_out, 0, "輻輳とは別に数える");
+}
+
+/// 再試行できるerrorで落ちた`flush`を取り残さない。outboxが空になった後も片付ける。
+#[test]
+fn a_retryable_flush_failure_is_retried_until_it_succeeds() {
+    let mut session = connected_session();
+    let _ = session.send(hello(), 40).expect("queueへ入る");
+    let mut sim = Sim {
+        // 書き切った直後のflushだけWouldBlockで落ちる。
+        flush_errors: VecDeque::from(vec![io::Error::from(io::ErrorKind::WouldBlock)]),
+        ..Sim::default()
+    };
+
+    // 書き切りはするが、flushは落ちるため再試行扱いになる。
+    while matches!(session.pump_write(&mut sim), Pump::Progress(_)) {}
+    assert_eq!(session.pending_out(), 0, "byteはtransportへ渡っている");
+    assert_eq!(sim.flushes, 1, "1回目のflushは失敗している");
+    assert_eq!(session.counters().retries, 1, "再試行として分類される");
+
+    // **outboxは空である。**ここで再試行できなければbufferの中身は取り残される。
+    assert_eq!(session.pump_write(&mut sim), Pump::Idle);
+    assert_eq!(sim.flushes, 2, "outboxが空でもflushを片付ける");
+    assert_eq!(session.state(), ConnectionState::Connected);
+}
+
+/// 切断したlinkへflushを持ち越さない。
+#[test]
+fn a_disconnect_clears_the_pending_flush() {
+    let mut session = connected_session();
+    let _ = session.send(hello(), 40).expect("queueへ入る");
+    let mut sim = Sim {
+        flush_errors: VecDeque::from(vec![io::Error::from(io::ErrorKind::WouldBlock)]),
+        ..Sim::default()
+    };
+    while matches!(session.pump_write(&mut sim), Pump::Progress(_)) {}
+    assert_eq!(sim.flushes, 1, "flushは保留になっている");
+
+    // EOFで切断させる。`Ok(0)`は「dataが無い」ではなく切断である。
+    sim.reads.push_back(Ok(Vec::new()));
+    let _ = session.pump_read(&mut sim, |_| {});
+    assert_eq!(session.state(), ConnectionState::Disconnected);
+
+    let flushes_at_disconnect = sim.flushes;
+    assert_eq!(session.pump_write(&mut sim), Pump::Idle, "切断中は送らない");
+    assert_eq!(
+        sim.flushes, flushes_at_disconnect,
+        "切断したlinkへflushを持ち越さない"
+    );
+}
+
+/// I/O errorを分類とcounterだけで済ませず、記録する。
+///
+/// **`log`のloggerはprocessで1つだけである。**installは`OnceLock`で1回に限り、
+/// 記録の検証は`CAPTURE`の中身で行う。
+mod logging {
+    use std::cell::RefCell;
+    use std::sync::OnceLock;
+
+    use deskcat_serial::Pump;
+
+    use super::{Sim, VecDeque, connected_session, hello, io};
+
+    // **captureはthread局所にする。**loggerはprocessで共有されるため、
+    // 共有bufferにすると**このmoduleの外のtest**（`a_flush_failure_is_classified_not_swallowed`
+    // なども`serial flush`を記録する）のrecordが混ざる。lockで直列化しても、
+    // lockを取らないtestからの混入は防げない。cargoはtestごとに別threadで走らせるため、
+    // thread局所にすれば各testは自分のrecordだけを見る。
+    thread_local! {
+        static CAPTURE: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
+    }
+    static INSTALLED: OnceLock<()> = OnceLock::new();
+
+    struct Capture;
+
+    impl log::Log for Capture {
+        fn enabled(&self, _: &log::Metadata<'_>) -> bool {
+            true
+        }
+
+        fn log(&self, record: &log::Record<'_>) {
+            let line = format!("{} {}", record.level(), record.args());
+            // 記録元のthread（=そのtest）へ入る。
+            CAPTURE.with_borrow_mut(|sink| sink.push(line));
+        }
+
+        fn flush(&self) {}
+    }
+
+    static CAPTURE_LOGGER: Capture = Capture;
+
+    fn install() {
+        // **`set_boxed_logger`は`log`の`std` featureを要する。**libraryが要らない
+        // featureを増やさないため、`&'static`を取る`set_logger`を使う。
+        INSTALLED.get_or_init(|| {
+            log::set_logger(&CAPTURE_LOGGER).expect("loggerは1度だけ入れる");
+            log::set_max_level(log::LevelFilter::Trace);
+        });
+    }
+
+    fn take() -> Vec<String> {
+        CAPTURE.with_borrow_mut(std::mem::take)
+    }
+
+    /// 切断は`warn`で、操作の種別とerrorと分類が残る。
+    #[test]
+    fn a_disconnect_is_logged_with_the_operation_and_disposition() {
+        install();
+        let _ = take();
+
+        let mut session = connected_session();
+        let _ = session.send(hello(), 40).expect("queueへ入る");
+        let mut sim = Sim {
+            write_errors: VecDeque::from(vec![io::Error::from(io::ErrorKind::BrokenPipe)]),
+            ..Sim::default()
+        };
+
+        assert_eq!(session.pump_write(&mut sim), Pump::Disconnected);
+
+        let lines = take();
+        let hit = lines
+            .iter()
+            .find(|l| l.contains("serial write"))
+            .expect("write経路のerrorが記録される");
+        assert!(hit.starts_with("WARN"), "切断はWARN水準である: {hit}");
+        assert!(hit.contains("Disconnected"), "分類が残る: {hit}");
+    }
+
+    /// 再試行できるerrorは`debug`。正常運転で頻発するため水準を上げない。
+    #[test]
+    fn a_retryable_flush_error_is_logged_at_debug() {
+        install();
+        let _ = take();
+
+        let mut session = connected_session();
+        let _ = session.send(hello(), 40).expect("queueへ入る");
+        let mut sim = Sim {
+            flush_errors: VecDeque::from(vec![io::Error::from(io::ErrorKind::WouldBlock)]),
+            ..Sim::default()
+        };
+        while matches!(session.pump_write(&mut sim), Pump::Progress(_)) {}
+
+        let lines = take();
+        let hit = lines
+            .iter()
+            .find(|l| l.contains("serial flush"))
+            .expect("flush経路のerrorが記録される");
+        assert!(hit.starts_with("DEBUG"), "再試行はDEBUG水準である: {hit}");
+        assert!(hit.contains("Retry"), "分類が残る: {hit}");
+    }
 }
