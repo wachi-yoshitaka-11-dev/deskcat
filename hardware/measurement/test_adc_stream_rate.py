@@ -175,7 +175,8 @@ class TestSummary(unittest.TestCase):
         # 区間収支が閉じること。先頭 block の sample は first.taken の時点で
         # 既に数え終わっているため、届いた数から先頭 block ぶんを除いて比べる。
         self.assertEqual(r["delivered"], 256)
-        self.assertEqual(r["delivered_in_interval"], 128)
+        # 収支に使うのは snapshot 区間（first..last-1）のぶん。
+        self.assertEqual(r["delivered_between_snapshots"], 128)
         self.assertEqual(r["taken_delta"], 133)
         self.assertEqual(r["unaccounted"], 0)
 
@@ -191,6 +192,28 @@ class TestSummary(unittest.TestCase):
         self.assertEqual(r["lost_blocks"], 1)
         self.assertEqual(r["dropped_delta"], 0)
         self.assertEqual(r["unaccounted"], n)
+
+    def test_two_intervals_differ_when_block_size_varies(self):
+        """block の sample 数が不均一なとき、2つの区間を同じ数として扱わないこと。"""
+        b0 = build_block(0, 100, 0, 1_000_000, 100, alt_values(100), pending=100)
+        b1 = build_block(1, 150, 0, 1_000_000 + 5000, 150, alt_values(50), pending=50)
+        p = asr.BlockParser()
+        blocks = p.feed(b0 + b1)
+        blocks[0].t_recv, blocks[1].t_recv = 0.0, 1.0
+        r = asr.summarize(blocks, p.stats, 0.0, 1.0, discard_blocks=0)
+        self.assertEqual(r["delivered"], 150)
+        # snapshot 区間は last を除く -> 100。受信区間は first を除く -> 50。
+        self.assertEqual(r["delivered_between_snapshots"], 100)
+        self.assertEqual(r["delivered_between_arrivals"], 50)
+        self.assertEqual(r["unaccounted"], 0)
+        self.assertAlmostEqual(r["wall_rate_total"], 50.0, places=6)
+
+    def test_wall_rate_is_none_without_recv_times(self):
+        """受信時刻が無いときは、区間の揃わないrateを出さないこと。"""
+        blocks, stats = self._two_blocks()
+        r = asr.summarize(blocks, stats, t_start=0.0, t_end=2.0, discard_blocks=0)
+        self.assertIsNone(r["wall_rate_total"])
+        self.assertAlmostEqual(r["window_s"], 2.0, places=6)
 
     def test_block_seq_gap_detected(self):
         """block sequence の欠番と失った件数を数えること。"""

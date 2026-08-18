@@ -252,16 +252,20 @@ def summarize(blocks, stats, t_start, t_end, discard_blocks: int):
     dropped_delta = (last.dropped - first.dropped) % (1 << 16)
 
     # taken / dropped / pending は「差」なので、比べる相手も同じ区間に揃える。
-    # 各 block の header は「自分の sample を ring から取り出す前」に採られている。
-    # したがって snapshot first と snapshot last の間に取り出されたのは
-    # first, ..., last-1 の block であり、last block のぶんは含まれない。
-    delivered_in_interval = delivered - last.nsamples
+    # ここで区間が2種類あり、含む block が違う。**block ごとの sample 数が一定でない
+    # 場合に値がずれるため、同じ数として扱わない。**
+    #   - header の snapshot 区間: 各 header は「自分の sample を ring から取り出す前」に
+    #     採られるので、snapshot first と last の間に取り出されたのは first..last-1
+    #   - 受信時刻の区間: first の受信から last の受信までに届いたのは first+1..last
+    delivered_between_snapshots = delivered - last.nsamples
+    delivered_between_arrivals = delivered - first.nsamples
 
     # 区間内の収支。`taken` は ring に滞留していて未送信の sample も含むため、
     # pending の増減を差し引かないと収支が閉じない。
     #   taken の増分 = 届いた数 + ISRが捨てた数 + ring滞留の増減 + 回線上で失った数
     pending_delta = last.pending - first.pending
-    unaccounted = taken_delta - delivered_in_interval - dropped_delta - pending_delta
+    unaccounted = (taken_delta - delivered_between_snapshots - dropped_delta
+                   - pending_delta)
 
     # block seq の欠番。
     seq_gaps = 0
@@ -276,10 +280,13 @@ def summarize(blocks, stats, t_start, t_end, discard_blocks: int):
 
     # 壁時計の区間も、分子と同じ区間に揃える。捨てた block の時間を分母へ入れると
     # rate が blocks_discarded / blocks_total のぶん低く出る。
+    # 受信時刻が無い場合は**区間の揃わない値を出さず**、rate を None にする。
     if first.t_recv is not None and last.t_recv is not None:
         wall_s = last.t_recv - first.t_recv
     else:
-        wall_s = (t_end - t_start) if (t_start is not None and t_end is not None) else 0.0
+        wall_s = 0.0
+    # 取得の総窓（捨てた block を含む）。rate には使わず、参考として報告する。
+    window_s = (t_end - t_start) if (t_start is not None and t_end is not None) else 0.0
 
     # Arduino自身の時計による rate。mark は「取得したsample数」に対して打たれている。
     ard_rate = None
@@ -310,7 +317,8 @@ def summarize(blocks, stats, t_start, t_end, discard_blocks: int):
         "adps": first.adps,
         "nsamples_per_block": first.nsamples,
         "delivered": delivered,
-        "delivered_in_interval": delivered_in_interval,
+        "delivered_between_snapshots": delivered_between_snapshots,
+        "delivered_between_arrivals": delivered_between_arrivals,
         "taken_delta": taken_delta,
         "dropped_delta": dropped_delta,
         "pending_delta": pending_delta,
@@ -319,8 +327,9 @@ def summarize(blocks, stats, t_start, t_end, discard_blocks: int):
         "seq_gaps": seq_gaps,
         "lost_blocks": lost_blocks,
         "wall_s": wall_s,
-        # 分子は delivered_in_interval。分母の wall_s と同じ区間である。
-        "wall_rate_total": (delivered_in_interval / wall_s) if wall_s > 0 else None,
+        "window_s": window_s,
+        # 分子は受信時刻の区間に届いた数。分母の wall_s と同じ区間である。
+        "wall_rate_total": (delivered_between_arrivals / wall_s) if wall_s > 0 else None,
         "arduino_rate_taken": ard_rate,
         "per_ch": per_ch,
         "stats": stats,
@@ -342,7 +351,8 @@ def print_report(r, baud: int):
     print("  block当たりsample数 : %d" % r["nsamples_per_block"])
 
     print("=== 実測 ===")
-    print("  測定時間(壁時計)    : %.3f s" % r["wall_s"])
+    print("  測定時間(壁時計)    : %.3f s（採用区間。総窓は %.3f s）"
+          % (r["wall_s"], r["window_s"]))
     print("  block              : 受信 %d / 採用 %d / 起動直後を捨てた %d"
           % (r["blocks_total"], r["blocks_used"], r["blocks_discarded"]))
     print("  届いたsample数      : %d" % r["delivered"])
@@ -366,7 +376,7 @@ def print_report(r, baud: int):
     # 収支は同じ区間どうしで比べる。先頭 block の sample は first.taken の時点で
     # 既に数え終わっているため、届いた数から先頭 block ぶんを除く。
     print("  区間収支            : 取得 %d = 届いた %d + 捨てた %d + ring滞留増減 %d + 未説明 %d"
-          % (r["taken_delta"], r["delivered_in_interval"], r["dropped_delta"],
+          % (r["taken_delta"], r["delivered_between_snapshots"], r["dropped_delta"],
              r["pending_delta"], r["unaccounted"]))
     expected_lost = r["lost_blocks"] * r["nsamples_per_block"]
     if r["unaccounted"] == expected_lost:
@@ -442,6 +452,9 @@ def write_csv(path: str, r, allow_drops: bool):
             # 回線上で block を失ったときに以降のすべての sample へずれが残り、累積する。
             # header の pending は「この block の sample を取り出す前の ring 滞留数」なので、
             # 先頭 sample の取得 index は taken - pending になる。
+            # **これが厳密なのは取りこぼしが無いときだけである。**ISR が捨てた sample は
+            # ring へ入らないため、捨てた区間を跨ぐと取得 index が連続しない。
+            # 取りこぼしがある場合は上の guard で既定では書かない。
             idx = b.taken - b.pending
             for ch, v in b.values():
                 t = base_us + (idx - base_idx) * period_us

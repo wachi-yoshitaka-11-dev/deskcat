@@ -58,14 +58,15 @@
 - **手順**:
   1. board無しで parser の自己testを通す（`test_adc_stream_rate.py`、12 case）
   2. sketchをcompileし、`arduino-cli compile --upload`でuploadする
-  3. 各条件で8〜10秒streamingを受け、届いたsample数・取りこぼし・block欠番を数える
+  3. 各条件でstreamingを受け、届いたsample数・取りこぼし・block欠番を数える
+     （初回測定は8〜10秒、取り直しは各条件10秒。採用区間は9.85〜9.97秒、受信blockは750〜1502件）
   4. 起動直後の4 blockを捨てる（過渡を除くため。捨てた数も報告させる）
   5. channel別の生ADC値の大小関係が、手順で入れた既知電圧と一致するか確認する
   6. 基準電圧側は単発変換で`GND`／`VBG`／`A0`／`A1`を読み、切替直後の生値も並べて記録する
 
 ### raw data
 
-sample rateの測定（各条件8〜10秒。`ADC clock = F_CPU / 2^ADPS`、F_CPU = 16 MHz）。
+sample rateの測定（各条件10秒。`ADC clock = F_CPU / 2^ADPS`、F_CPU = 16 MHz）。
 
 | channel数 | ADPS | ADC clock | baud | 実効rate 合計 | 1 ch当たり | 取得rate（Arduino時計） | ISRが捨てたsample | block欠番 | 予約bit破れ |
 |---|---|---|---|---|---|---|---|---|---|
@@ -81,6 +82,9 @@ sample rateの測定（各条件8〜10秒。`ADC clock = F_CPU / 2^ADPS`、F_CPU
 「取得rate」はArduino自身の`micros()`基準でISRが取得したsample数から出した。
 **どの条件でも区間収支が閉じた**（`取得 = 届いた + 捨てた + ring滞留の増減 + 回線上の欠落`）。
 header XOR不一致は全条件で0である。
+
+**同じ条件を後で再実行しても0.1 %以内で再現した**
+（125 kHz・2 ch・baud 500000 で合計9617.3 Sample/s、1 chあたり4808.7 Sample/s）。
 
 **この表は2026-08-18に取り直した値である。**2026-08-17の初回測定は、
 壁時計rateの分子と分母の区間が揃っておらず**約0.5 %低く出ていた**（下記`訂正`）。

@@ -72,6 +72,17 @@ sg dialout -c 'PATH="$HOME/.local/bin:$PATH" arduino-cli upload --fqbn arduino:a
 sg dialout -c 'python3 hardware/measurement/adc_stream_rate.py --port /dev/ttyACM0 --baud 1000000 --seconds 10'
 ```
 
+生値を CSV へ出す場合。**取りこぼしか回線上の block 欠落があると既定では書かない**
+（時刻の復元が曖昧になるため）。承知のうえで書くなら `--allow-drops` を付ける。
+**その場合の時刻は近似である。**
+
+```bash
+sg dialout -c 'python3 hardware/measurement/adc_stream_rate.py --port /dev/ttyACM0 --baud 1000000 --seconds 10 --csv out.csv'
+```
+
+CSV は `.gitignore` で追跡対象から外している。保存場所が未確定のためである
+（[development-foundation-plan.md](../../docs/planning/development-foundation-plan.md)）。
+
 ### parameter を振る
 
 sketch 側は compile 時定数である。`arduino-cli` から上書きする。
