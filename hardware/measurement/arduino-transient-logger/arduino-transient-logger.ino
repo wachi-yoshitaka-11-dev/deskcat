@@ -35,7 +35,7 @@
 #define LOGGER_NCH 2
 #endif
 
-// 1 blockで送るsample数。header 22 B に対する payload の割合を決める。
+// 1 blockで送るsample数。header 24 B に対する payload の割合を決める。
 #ifndef LOGGER_BLOCK
 #define LOGGER_BLOCK 128
 #endif
@@ -64,7 +64,9 @@ static const uint8_t MAGIC1 = 0x5A;
 static volatile uint16_t g_ring[RING_SIZE];
 static volatile uint8_t g_head;  // ISRが書く
 static volatile uint8_t g_tail;  // main loopが読む
-static volatile uint16_t g_dropped;   // ringが満杯で捨てたsample数
+// ringが満杯で捨てたsample数。**uint32 である。**baud 115200 の実測では10秒で
+// 41371件に達したため、uint16 では約16秒で wrap し、境界で差が0に見えてしまう。
+static volatile uint32_t g_dropped;
 static volatile uint32_t g_taken;     // ISRが取得したsample数（捨てたぶんを含む）
 static volatile uint32_t g_mark_us;   // g_mark_taken の時点の micros()
 static volatile uint32_t g_mark_taken;
@@ -169,8 +171,8 @@ static inline void put_u32(uint8_t *buf, uint8_t &i, uint32_t v) {
   buf[i++] = (uint8_t)((v >> 24) & 0xFF);
 }
 
-// header は 22 B 固定である。PC側の parser と同じ並びを保つこと。
-#define HEADER_LEN 22
+// header は 24 B 固定である。PC側の parser と同じ並びを保つこと。
+#define HEADER_LEN 24
 
 static void send_block(void) {
   // ring から LOGGER_BLOCK 件そろうまで待つ。
@@ -191,8 +193,7 @@ static void send_block(void) {
   // counter類は32 bitなのでISRに割り込まれないよう一括で取る。
   // pending（ring に滞留していて未送信のsample数）も同じ critical section で採る。
   // これが無いと PC 側の収支が閉じない。`taken` は ring 滞留分を含むためである。
-  uint32_t taken, mark_us, mark_taken;
-  uint16_t dropped;
+  uint32_t taken, mark_us, mark_taken, dropped;
   uint8_t pending;
   {
     const uint8_t sreg = SREG;
@@ -211,7 +212,7 @@ static void send_block(void) {
   put_u8(header, i, MAGIC1);
   put_u16(header, i, g_blkseq);
   put_u32(header, i, taken);
-  put_u16(header, i, dropped);
+  put_u32(header, i, dropped);
   put_u32(header, i, mark_us);
   put_u32(header, i, mark_taken);
   put_u8(header, i, (uint8_t)LOGGER_BLOCK);

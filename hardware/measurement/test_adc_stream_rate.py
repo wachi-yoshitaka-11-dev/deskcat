@@ -34,7 +34,7 @@ def build_block(seq, taken, dropped, mark_us, mark_taken, values, nch=2, adps=7,
     cfg = (adps & 0x07) | (0x08 if nch == 2 else 0x00)
     header = bytearray(asr.MAGIC)
     header += struct.pack(
-        "<HIHIIBBB", seq, taken, dropped, mark_us, mark_taken, len(values), pending, cfg
+        "<HIIIIBBB", seq, taken, dropped, mark_us, mark_taken, len(values), pending, cfg
     )
     x = 0
     for b in header:
@@ -310,6 +310,63 @@ class TestCsv(unittest.TestCase):
         self.assertAlmostEqual(float(rows[2 * n][0]), expect, places=1)
         wrong = base_us + (2 * n - base_idx) * period
         self.assertNotAlmostEqual(float(rows[2 * n][0]), wrong, places=1)
+
+
+class TestWireFormat(unittest.TestCase):
+    """wire format の幅に関する回帰。"""
+
+    def test_dropped_is_32bit(self):
+        """uint16 を超える取りこぼしを桁落ちなく運べること。
+
+        baud 115200 の実測では10秒で41371件に達した。uint16 では約16秒で wrap し、
+        境界で dropped_delta が0に見えて CSV guard を誤って通す。
+        """
+        big = 300000  # uint16 では表せない
+        blk = build_block(0, big + 128, big, 1_000_000, big + 128, alt_values(8))
+        p = asr.BlockParser()
+        got = p.feed(blk)
+        self.assertEqual(len(got), 1)
+        self.assertEqual(got[0].dropped, big)
+
+    def test_header_len_matches_sketch(self):
+        """parser の HEADER_LEN が sketch の #define と一致すること。"""
+        import re
+        ino = io.open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                   "arduino-transient-logger",
+                                   "arduino-transient-logger.ino"),
+                      encoding="utf-8").read()
+        m = re.search(r"#define HEADER_LEN (\d+)", ino)
+        self.assertIsNotNone(m)
+        self.assertEqual(int(m.group(1)), asr.HEADER_LEN)
+
+
+class TestWrapGuard(unittest.TestCase):
+    """micros() の wrap 周期を跨ぐ取得を弾くこと。"""
+
+    def _two(self, wall_s):
+        n = 128
+        b0 = build_block(0, n, 0, 1_000_000, n, alt_values(n))
+        b1 = build_block(1, 2 * n, 0, 1_000_000 + n * 100, 2 * n, alt_values(n))
+        p = asr.BlockParser()
+        blocks = p.feed(b0 + b1)
+        blocks[0].t_recv, blocks[1].t_recv = 0.0, wall_s
+        return asr.summarize(blocks, p.stats, 0.0, wall_s, discard_blocks=0)
+
+    def test_short_capture_reports_arduino_rate(self):
+        r = self._two(1.0)
+        self.assertFalse(r["wrap_risk"])
+        self.assertIsNotNone(r["arduino_rate_taken"])
+
+    def test_long_capture_suppresses_arduino_rate(self):
+        r = self._two(asr.MAX_CAPTURE_SECONDS + 1.0)
+        self.assertTrue(r["wrap_risk"])
+        self.assertIsNone(r["arduino_rate_taken"])
+
+    def test_long_capture_refuses_csv(self):
+        r = self._two(asr.MAX_CAPTURE_SECONDS + 1.0)
+        with tempfile.TemporaryDirectory() as d:
+            with self.assertRaises(SystemExit):
+                asr.write_csv(os.path.join(d, "x.csv"), r, allow_drops=True)
 
 
 class TestUsDelta(unittest.TestCase):

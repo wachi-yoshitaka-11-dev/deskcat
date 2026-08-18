@@ -96,7 +96,7 @@ arduino-cli compile --fqbn arduino:avr:uno --build-property compiler.cpp.extra_f
 | `LOGGER_BAUD` | UART の baud。**PC 側の `--baud` と一致させる** |
 | `LOGGER_ADPS` | ADPS2:0。ADC clock = F_CPU / 2^ADPS。`DS40002061B` §24.4 は最大分解能に 50〜200 kHz を要求する |
 | `LOGGER_NCH` | 1 または 2。2 のとき `A0` と `A1` を交互に読む |
-| `LOGGER_BLOCK` | 1 block の sample 数。header 22 B に対する payload の割合を決める |
+| `LOGGER_BLOCK` | 1 block の sample 数。header 24 B に対する payload の割合を決める |
 
 ## 入力の配線（作業1）
 
@@ -108,20 +108,23 @@ arduino-cli compile --fqbn arduino:avr:uno --build-property compiler.cpp.extra_f
 
 ## block 形式
 
-little endian。header は 22 B 固定。
+little endian。header は 24 B 固定。
 
 | offset | size | field |
 |---|---|---|
 | 0 | 2 | magic `0xA5 0x5A` |
 | 2 | 2 | block sequence（wrap する） |
 | 4 | 4 | `taken`。ISR が取得した sample 数の累計（**捨てたぶんと、ring に滞留中のぶんを含む**） |
-| 8 | 2 | `dropped`。ring が満杯で捨てた sample 数の累計 |
-| 10 | 4 | `mark_us`。`mark_taken` の時点の `micros()` |
-| 14 | 4 | `mark_taken` |
-| 18 | 1 | この block の sample 数 |
-| 19 | 1 | `pending`。**この block の sample を取り出す前の ring 滞留数** |
-| 20 | 1 | cfg。bit0-2 = ADPS、bit3 = (channel 数 == 2)、bit4-7 は 0 で予約 |
-| 21 | 1 | header 全 byte の XOR |
+| 8 | 4 | `dropped`。ring が満杯で捨てた sample 数の累計 |
+| 12 | 4 | `mark_us`。`mark_taken` の時点の `micros()` |
+| 16 | 4 | `mark_taken` |
+| 20 | 1 | この block の sample 数 |
+| 21 | 1 | `pending`。**この block の sample を取り出す前の ring 滞留数** |
+| 22 | 1 | cfg。bit0-2 = ADPS、bit3 = (channel 数 == 2)、bit4-7 は 0 で予約 |
+| 23 | 1 | header 全 byte の XOR |
+
+**`dropped` は 32 bit である。**baud 115200 の実測では10秒で41371件に達したため、
+16 bit では**約16秒で wrap**し、境界で差が0に見えて CSV の guard を誤って通す。
 
 `pending` が要るのは、`taken` が ring 滞留分を含むためである。これが無いと
 PC 側の収支（`taken の増分 = 届いた + 捨てた + ring滞留の増減 + 回線上の欠落`）が閉じず、
@@ -157,6 +160,10 @@ ISR で書く値はそのさらに次の変換に効く、として扱う。
   次の block で自己修復する。**ただし ISR が sample を捨てた場合は、
   取得 index と届いた sample の対応そのものが崩れる。**
   取りこぼしと回線上の block 欠落のどちらかがあれば、既定では CSV を書かない
+- **`micros()` の wrap を跨ぐ長時間取得はできない。**`micros()` は約 4295 秒
+  （約71.6分）で wrap し、それを跨ぐと Arduino 時計基準の rate と CSV の時刻を復元できない。
+  `--seconds` は 4000 未満に制限してあり、超える取得では Arduino 時計基準の rate を出さず
+  CSV も書かない（判定には wrap しない PC の単調時計を使う）
 - **基準電圧の校正は別作業である。**ADC は基準電圧に対する割合を返すので、
   生値のままでは絶対電圧の閾値と照合できない（正本は `基準電圧が未解決である（設計上の論点）`）。
   **電圧へ戻すときの分母は 1024 である。**§24.7 が `ADC = (V_IN * 1024) / V_REF` と定めている。

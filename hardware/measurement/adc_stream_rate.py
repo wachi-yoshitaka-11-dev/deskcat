@@ -21,10 +21,14 @@ import termios
 import time
 
 MAGIC = b"\xa5\x5a"
-HEADER_LEN = 22
+HEADER_LEN = 24
 
 # micros() は uint32 で約71.6分で wrap する。
 US_MODULO = 1 << 32
+# 1 wrap ぶんの秒数。これを超える取得では us_delta() が残余だけを返し、
+# Arduino時計基準のrateとCSVの時刻が誤りになる。余裕を見て下の上限で弾く。
+US_WRAP_SECONDS = US_MODULO / 1e6
+MAX_CAPTURE_SECONDS = 4000.0
 
 
 class Block:
@@ -120,7 +124,7 @@ class BlockParser:
                 continue
 
             (seq, taken, dropped, mark_us, mark_taken, nsamples, pending,
-             cfg) = struct.unpack_from("<HIHIIBBB", header, 2)
+             cfg) = struct.unpack_from("<HIIIIBBB", header, 2)
             if nsamples == 0:
                 self.stats.header_xor_errors += 1
                 del buf[:1]
@@ -249,7 +253,7 @@ def summarize(blocks, stats, t_start, t_end, discard_blocks: int):
 
     delivered = sum(b.nsamples for b in used)
     taken_delta = (last.taken - first.taken) % (1 << 32)
-    dropped_delta = (last.dropped - first.dropped) % (1 << 16)
+    dropped_delta = (last.dropped - first.dropped) % (1 << 32)
 
     # taken / dropped / pending は「差」なので、比べる相手も同じ区間に揃える。
     # ここで区間が2種類あり、含む block が違う。**block ごとの sample 数が一定でない
@@ -289,9 +293,14 @@ def summarize(blocks, stats, t_start, t_end, discard_blocks: int):
     window_s = (t_end - t_start) if (t_start is not None and t_end is not None) else 0.0
 
     # Arduino自身の時計による rate。mark は「取得したsample数」に対して打たれている。
+    # **micros() の wrap を跨いだ取得では出さない。**us_delta() は残余しか返せないため、
+    # span_taken が全区間を覆う一方で span_us が短く出て、rate が過大になる。
+    # 判定にはPCの単調時計を使う（wrap しない）。
+    wrap_risk = wall_s >= MAX_CAPTURE_SECONDS
     ard_rate = None
     mark_span_taken = (last.mark_taken - first.mark_taken) % (1 << 32)
-    if mark_span_taken > 0 and last.mark_taken != 0 and first.mark_taken != 0:
+    if (not wrap_risk) and mark_span_taken > 0 and last.mark_taken != 0 \
+            and first.mark_taken != 0:
         span_us = us_delta(last.mark_us, first.mark_us)
         if span_us > 0:
             ard_rate = mark_span_taken * 1e6 / span_us
@@ -328,6 +337,7 @@ def summarize(blocks, stats, t_start, t_end, discard_blocks: int):
         "lost_blocks": lost_blocks,
         "wall_s": wall_s,
         "window_s": window_s,
+        "wrap_risk": wrap_risk,
         # 分子は受信時刻の区間に届いた数。分母の wall_s と同じ区間である。
         "wall_rate_total": (delivered_between_arrivals / wall_s) if wall_s > 0 else None,
         "arduino_rate_taken": ard_rate,
@@ -367,6 +377,9 @@ def print_report(r, baud: int):
         if r["nch"] > 1:
             print("  同 1 ch当たり        : %.1f Sample/s"
                   % (r["arduino_rate_taken"] / r["nch"]))
+
+    if r.get("wrap_risk"):
+        print("  **micros() の wrap 周期に近い取得である。Arduino時計基準のrateを出さない。**")
 
     print("=== 取りこぼし ===")
     print("  ISRが捨てたsample   : %d （測定区間）/ %d （boot以降の累計）"
@@ -432,6 +445,12 @@ def write_csv(path: str, r, allow_drops: bool):
     if period_us <= 0:
         raise SystemExit("micros() mark から周期を出せない。測定時間を延ばす。")
 
+    if r.get("wrap_risk"):
+        raise SystemExit(
+            "取得が micros() の wrap 周期（約 %.0f s）に近い。時刻を復元できないため "
+            "CSV を書かない。--seconds を短くする。" % US_WRAP_SECONDS
+        )
+
     if first.mark_taken == 0:
         # mark がまだ打たれていない block を anchor にすると時刻の原点がずれる。
         raise SystemExit(
@@ -486,6 +505,12 @@ def main(argv=None):
                    help="取りこぼしがあっても CSV を書く（時刻は近似になる）")
     p.add_argument("--quiet-banner", action="store_true")
     args = p.parse_args(argv)
+    if args.seconds >= MAX_CAPTURE_SECONDS:
+        p.error(
+            "--seconds は %.0f 未満にする。micros() は約 %.0f s で wrap し、"
+            "それを跨ぐと Arduino時計基準のrateとCSVの時刻を復元できない。"
+            % (MAX_CAPTURE_SECONDS, US_WRAP_SECONDS)
+        )
 
     fd = open_serial(args.port, args.baud)
     try:
