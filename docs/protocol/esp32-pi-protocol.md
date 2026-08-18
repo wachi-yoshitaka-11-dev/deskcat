@@ -345,7 +345,7 @@ Piは何度受けても相関ACKを構成できない。通常再送とrecovery�
 安全に停止し、サーボ出力を有効にせず**`protocol_fault`で報告する。**ただし復帰は同じではない。**
 同表の再開はrecovery budgetを作り直すものであって、`id`空間は戻らない。`boot`の再送は同じ
 `(sid, id)`を使うため続けられるが、ACKされた後に新しい`(sid, id)`を要するevent、`status`、
-完了eventは送れないままである。**復帰にはprocessの再起動が要る**（§3）。
+完了eventは送れないままである。**復帰にはprocessの再起動または運用者の明示的なsession resetが要る**（§3、§3.1）。
 
 無限に再送すると、直らない障害のために送出帯域を占有し続ける。
 budget値は`PROTO-TBD-017`に含める。
@@ -1267,6 +1267,7 @@ Framing／parse層について、**host workspaceのRust実装**がfixtureに合
 | PROTO-TBD-015 | Draft schema revisionの表明方法（envelope fieldかout-of-band照合か） | Draft間の相互接続が必要になった時点。fixture一致で足りるなら追加しない |
 | PROTO-TBD-016 | §12のconformance fixtureの実体作成と配置。**schema群とframing／parse群は`crates/deskcat-protocol/tests/fixtures/`へ配置済み**（schema群と行長境界・CRLF・invalid JSONは[#9](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/9)、byte単位の分割受信とinvalid UTF-8は[#10](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/10)）。残るのはsession判定、duplicate replay、budgetと応答の3群と、実機上でのfirmware側の合格確認 | 残る3群は受信側のstateを必要とするため[#12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)。firmware側はhost workspaceのRust実装をpath dependencyで再利用しており（[ADR-0008](../decisions/0008-firmware-protocol-crate-reuse.md)）、cross compileまでは確認済みで実機実行は[#6](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/6)を待つ。budget群は`PROTO-TBD-011`／`012`／`017`の確定を待つ |
 | PROTO-TBD-017 | `boot`再送契約のparameter（初期間隔、backoff係数、通常再送の回数、recovery間隔、**無応答時に送出を止めるまでの有限recovery budget**、**同一`(sid, id)`の最大再送回数**、**`rate_limited`で拒否されたときのcooldown後再送を含む上限**）。recovery budgetの総待ち時間は`PROTO-TBD-012`の拒否ACK最悪送出待ち時間以上とする。終了条件そのものは§4.1で確定済み | 起動時のlink確立latency測定とreconnect試験 |
+| PROTO-TBD-018 | **`protocol_fault`のwire表現**（message type名とpayload schema）。本文は終端報告を`protocol_fault`で行うと複数箇所で定めているが、**`crates/deskcat-protocol`の`Message`にそれを表す variant が無く、現状の実装では符号化できない。**`PROTO-TBD-014`は実行時安全制限のfault eventであり、**これとは別物である**（畳まないこと） | 終端報告を実装する時点で確定する。**§3の`id`枯渇の終端報告は、予約した上限値の`id`でちょうど1件送ると定めているため、payloadに`id`と枯渇の区別を持たせるかを併せて決める。**wire formatの追加になるため、§11のversion規則に従う |
 
 ## Revision履歴
 
@@ -1280,6 +1281,7 @@ Framing／parse層について、**host workspaceのRust実装**がfixtureに合
 | 2026-08-15 | Draft 2 framing | [Issue #10](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/10)。§12.1のFraming／parse群を**作成済み**へ更新した。byte単位の分割受信とinvalid UTF-8のfixtureが揃い、host workspaceのRust実装が合格する。firmwareは同じ実装をpath dependencyで使う（[ADR-0008](../decisions/0008-firmware-protocol-crate-reuse.md)）が、**実機上でのfixture実行は未実施**である。**wire formatは変更していない。** |
 | 2026-08-16 | Draft 2 counters | [Issue #132](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/132)。§4.6の`protocol` counterへ`hardware_unavailable`と`duplicate_expired`を追加し、§7の全error codeがcounterへ対応する状態にした。**これは`status`のwire format変更である。**過去のentryと違い「変更していない」ではない。`status.payload.protocol`に必須fieldが2本増え、旧schemaの`status`は新schemaで`invalid_payload`になる。**Draft schemaは互換性の対象外であり**（下の「Draft schemaの互換性」）、互換の根拠はconformance fixtureの一致であるため`v`は上げない。**`status`を送出する実装はまだ存在しない**（firmwareはcross compileまでで、`src/main.rs`はprotocol crateを呼び出していない）。counterの発火条件と保持parameterは`PROTO-TBD-005`／`PROTO-TBD-006`のままであり、確定させていない |
 | 2026-08-17 | Draft 2 id exhaustion | [Issue #141](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/141)。`PROTO-TBD-003`の残り（送信側が`id`の上限に達したときの動作）を確定した。**wrapさせず、上限で新しい`(sid, id)`を要する送出を止め`protocol_fault`で報告する。**復帰は§3.1が既に定めた停止状態の経路（processの再起動、運用者の明示的なsession reset）に限り、**`sid`変更の契機を増やさない。**wrapを退けたのは、`(sid, id)`の一意性が失われ、§9が挙げる「`id`だけで判定する実装」と同型の失敗を送信側から作り込むためである。`id`枯渇でsessionを張り直す案は退けた。新しい`sid`の`hello`には`reason: startup`が要り（§5.1）、その意味は「Piのprocessを起動した」であって、再起動していないprocessが名乗ると§11の「必須fieldの意味の変更」に当たる。`boot`には`reason`に当たるfieldが無く、同じ問題を`reset_reason`で抱える。**wire formatは変更していない。**envelope field、`hello`の`reason`の値集合、error code、counterのいずれも増やしていない。§5.1のsession遷移契機も増やしていない。`status`のcounterの幅と飽和時の扱いは`PROTO-TBD-006`へ移した。あわせて[PR #142](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/142)のreview指摘により、終端報告用の`id`の予約を採番の直列化として明示し、既存語だった「運用者の明示的なsession reset」の定義を§3.1へ置いた。**どちらも受信側の判定規則を増やしていない** |
+| 2026-08-18 | Draft 2 recovery sync | [PR #146](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/146)のreview指摘。**§4.1の`boot`再送が枯渇した場合の復帰を「processの再起動が要る」としており、§3.1と§12のfixture表の「process再起動または運用者の明示的なsession reset」と食い違っていた。**狭い側だけが§4.1にあり、hostとfirmwareが違う復帰条件を実装しうる。**§3.1とfixture表へ揃えた。**`sid`選び直し上限の行も同じ文言であり、id枯渇だけを狭くする根拠は無い。**あわせて`PROTO-TBD-018`を新設し、`protocol_fault`のwire表現が未定義であることを登録した。**本文は終端報告を`protocol_fault`で行うと定めるが、`Message`に対応するvariantが無く符号化できない。**`PROTO-TBD-014`は実行時安全制限のfault eventであって別物であり、そこへ畳んでいない。****wire formatは変更していない。規則の追加も数値の変更もしていない** |
 
 ### Draft schemaの互換性
 
