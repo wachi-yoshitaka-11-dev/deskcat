@@ -103,15 +103,22 @@ Commands run:
   # build 計測。実行した順序と内容を再現した形で示す（原文は関数へ切り出していた）。
   # debug の 3 回を先に回し、続けて release の 3 回を回した。時間は
   # date +%s.%N の差分を awk で算出した（この機体に bc は無い）。
-  for FLAG in "" "--release"; do
+  for FLAG in "" "--release"; do            # debug の 3 回 → release の 3 回
     for i in 1 2 3; do
       cargo clean >/dev/null 2>&1; sync
       t0=$(date +%s.%N); cargo build $FLAG > /tmp/b.log  2>&1; rc=$?; t1=$(date +%s.%N)
-      awk -v a="$t0" -v b="$t1" 'BEGIN{printf "clean  %.2f s\n", b-a}'   # clean build
+      awk -v a="$t0" -v b="$t1" 'BEGIN{printf "clean  %.2f s", b-a}'; echo " (rc=$rc)"
+      [ $rc -ne 0 ] && tail -5 /tmp/b.log
       t0=$(date +%s.%N); cargo build $FLAG > /tmp/b2.log 2>&1; rc=$?; t1=$(date +%s.%N)
-      awk -v a="$t0" -v b="$t1" 'BEGIN{printf "cached %.2f s\n", b-a}'   # cache 有り再build
+      awk -v a="$t0" -v b="$t1" 'BEGIN{printf "cached %.2f s", b-a}'; echo " (rc=$rc)"
     done
   done
+  # **この loop の限界を 2 点記録する。**どちらも実行時の実態である。
+  # (1) rc を出力するが、失敗しても loop を止めない（fail closed ではない）。
+  #     今回は clean・cached とも全 12 回が rc=0 だったため、失敗した回が
+  #     計測値へ混ざる余地は無かった。**再実行するなら rc!=0 で停止させるべきである。**
+  # (2) loop 内で生成物を hash していない。hash は loop の外で 3 回取った
+  #     （下記 `Generated artifact identity` に取得点を書いた）。
   # peak memory は上記とは別に 1 回ずつ測った。/proc を 0.2 秒間隔で読む sampler を
   # build と並走させる方式で、内容は `Peak memory if measured` 欄に書いた。
   # 生成物の同一性
@@ -258,8 +265,13 @@ Generated artifact identity:
     libgcc_s.so.1、libc.so.6、/lib/ld-linux-armhf.so.3
   **生成物の float ABI は system と一致する。**cross build ではなく native build
   なので build host の library へ誤って link する余地は無い。
-  **同じ sha256 が別々の clean build で再現した。**debug・release とも、
-  cargo clean を挟んだ独立した build で bit 単位で一致し、reboot 後も一致した。
+  **同じ sha256 が別々の clean build で再現した。**取得点は次の 3 つで、
+  いずれも `cargo clean` を挟んだ独立した build の生成物である。
+    1 回目  build 計測 loop の最後の回（debug・release とも）
+    2 回目  peak memory 測定のために測り直した clean build（同上）
+    3 回目  reboot 後（**再 build せず、2 回目の生成物をそのまま hash した**）
+  1 回目と 2 回目が bit 単位で一致し、3 回目で reboot をまたいでも同一であることを確認した。
+  **loop 内で毎回 hash したわけではない。**上の `Commands run` の限界 (2) を参照する。
 
 Log or evidence path: この記録本文
 

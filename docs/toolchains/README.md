@@ -15,7 +15,7 @@
 - **別環境での再現は実施済み。**GitHub Actionsの`ubuntu-24.04` runnerがclean環境でbuildを再現した（[CIのVersion Record](version-records/2026-08-10-esp32-build-ci.md)、#42／PR #86）。**開発端末以外の実機での再現は未実施である**
 - **ESP32の実機確認（物理基板・module・revision）は未実施。**CIでの再現はこれを代替しない
 - Windowsは[ADR-0005](../decisions/0005-standard-development-os.md)により対象外。support対象ではないため「未検証」ではない
-- Raspberry Pi Zero W上のdirect buildは未実施
+- **Raspberry Pi Zero W実機での最小Rust programのdirect buildは成功した**（[Version Record](version-records/2026-08-17-pi-direct-build-native.md)。判定は`Partial`）。候補target`arm-unknown-linux-gnueabihf`はこのとき確定した。**ただし成功したのは依存0件の最小programだけである。****このrepositoryのcrateとworkspaceのbuild、および依存を持つbuildはPi上で未測定**であり、host workspaceの検証済みcommandがPiで通るかは不明である。cross compilationは保留を維持している
 - 実行結果が得られるまで、記載したversionを「検証済み」または「確定」と扱わない
 
 ## 文書
