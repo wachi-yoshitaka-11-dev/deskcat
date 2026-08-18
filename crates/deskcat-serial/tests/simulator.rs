@@ -690,18 +690,22 @@ fn a_disconnect_clears_the_pending_flush() {
 /// **`log`のloggerはprocessで1つだけである。**installは`OnceLock`で1回に限り、
 /// 記録の検証は`CAPTURE`の中身で行う。
 mod logging {
-    use std::sync::{Mutex, OnceLock};
+    use std::cell::RefCell;
+    use std::sync::OnceLock;
 
     use deskcat_serial::Pump;
 
     use super::{Sim, VecDeque, connected_session, hello, io};
 
-    static CAPTURE: Mutex<Vec<String>> = Mutex::new(Vec::new());
+    // **captureはthread局所にする。**loggerはprocessで共有されるため、
+    // 共有bufferにすると**このmoduleの外のtest**（`a_flush_failure_is_classified_not_swallowed`
+    // なども`serial flush`を記録する）のrecordが混ざる。lockで直列化しても、
+    // lockを取らないtestからの混入は防げない。cargoはtestごとに別threadで走らせるため、
+    // thread局所にすれば各testは自分のrecordだけを見る。
+    thread_local! {
+        static CAPTURE: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
+    }
     static INSTALLED: OnceLock<()> = OnceLock::new();
-    /// **loggerはprocessで共有される。**testが並列に走ると、片方の`take`が
-    /// 他方のrecordを持ち去ってflakyになる。このlockで直列化する。
-    /// `CAPTURE`自身は持てない（loggerが記録のたびにlockする）。
-    static TEST_LOCK: Mutex<()> = Mutex::new(());
 
     struct Capture;
 
@@ -711,8 +715,9 @@ mod logging {
         }
 
         fn log(&self, record: &log::Record<'_>) {
-            let mut sink = CAPTURE.lock().expect("captureは毒されていない");
-            sink.push(format!("{} {}", record.level(), record.args()));
+            let line = format!("{} {}", record.level(), record.args());
+            // 記録元のthread（=そのtest）へ入る。
+            CAPTURE.with_borrow_mut(|sink| sink.push(line));
         }
 
         fn flush(&self) {}
@@ -730,14 +735,12 @@ mod logging {
     }
 
     fn take() -> Vec<String> {
-        let mut sink = CAPTURE.lock().expect("captureは毒されていない");
-        std::mem::take(&mut *sink)
+        CAPTURE.with_borrow_mut(std::mem::take)
     }
 
     /// 切断は`warn`で、操作の種別とerrorと分類が残る。
     #[test]
     fn a_disconnect_is_logged_with_the_operation_and_disposition() {
-        let _guard = TEST_LOCK.lock().expect("lockは毒されていない");
         install();
         let _ = take();
 
@@ -762,7 +765,6 @@ mod logging {
     /// 再試行できるerrorは`debug`。正常運転で頻発するため水準を上げない。
     #[test]
     fn a_retryable_flush_error_is_logged_at_debug() {
-        let _guard = TEST_LOCK.lock().expect("lockは毒されていない");
         install();
         let _ = take();
 
