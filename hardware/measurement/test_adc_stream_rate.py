@@ -56,6 +56,23 @@ def alt_values(n, v0=675, v1=0):
     return out
 
 
+def two_blocks(dropped_second=0, seq_second=1):
+    """1 sample = 100 us になる 2 block を作る。"""
+    n = 128
+    b0 = build_block(0, n, 0, 1_000_000, n, alt_values(n))
+    # 2 block目: 取得は 2n、mark は n 進んで 1 sample 100 us の想定にする。
+    b1 = build_block(
+        seq_second,
+        2 * n + dropped_second,
+        dropped_second,
+        1_000_000 + n * 100,
+        2 * n,
+        alt_values(n),
+    )
+    p = asr.BlockParser()
+    return p.feed(b0 + b1), p.stats
+
+
 class TestParser(unittest.TestCase):
     """block の切り出しと framing の破れの扱い。"""
 
@@ -135,24 +152,8 @@ class TestParser(unittest.TestCase):
 class TestSummary(unittest.TestCase):
     """rate・取りこぼし・欠番の集計。"""
 
-    def _two_blocks(self, dropped_second=0, seq_second=1):
-        """1 sample = 100 us になる 2 block を作る。"""
-        n = 128
-        b0 = build_block(0, n, 0, 1_000_000, n, alt_values(n))
-        # 2 block目: 取得は 2n、mark は n 進んで 1 sample 100 us の想定にする。
-        b1 = build_block(
-            seq_second,
-            2 * n + dropped_second,
-            dropped_second,
-            1_000_000 + n * 100,
-            2 * n,
-            alt_values(n),
-        )
-        p = asr.BlockParser()
-        return p.feed(b0 + b1), p.stats
-
     def test_rate_from_arduino_clock(self):
-        blocks, stats = self._two_blocks()
+        blocks, stats = two_blocks()
         blocks[0].t_recv, blocks[1].t_recv = 0.0, 2.0
         r = asr.summarize(blocks, stats, t_start=0.0, t_end=2.0, discard_blocks=0)
         # mark 間 128 sample を 12800 us で進んだので 1 sample = 100 us -> 10000 Sample/s
@@ -168,7 +169,7 @@ class TestSummary(unittest.TestCase):
 
     def test_drop_accounting(self):
         """ISR が捨てた数を区間収支へ正しく載せること。"""
-        blocks, stats = self._two_blocks(dropped_second=5)
+        blocks, stats = two_blocks(dropped_second=5)
         r = asr.summarize(blocks, stats, t_start=0.0, t_end=1.0, discard_blocks=0)
         self.assertEqual(r["dropped_delta"], 5)
         self.assertEqual(r["dropped_total_since_boot"], 5)
@@ -210,21 +211,21 @@ class TestSummary(unittest.TestCase):
 
     def test_wall_rate_is_none_without_recv_times(self):
         """受信時刻が無いときは、区間の揃わないrateを出さないこと。"""
-        blocks, stats = self._two_blocks()
+        blocks, stats = two_blocks()
         r = asr.summarize(blocks, stats, t_start=0.0, t_end=2.0, discard_blocks=0)
         self.assertIsNone(r["wall_rate_total"])
         self.assertAlmostEqual(r["window_s"], 2.0, places=6)
 
     def test_block_seq_gap_detected(self):
         """block sequence の欠番と失った件数を数えること。"""
-        blocks, stats = self._two_blocks(seq_second=3)
+        blocks, stats = two_blocks(seq_second=3)
         r = asr.summarize(blocks, stats, t_start=0.0, t_end=1.0, discard_blocks=0)
         self.assertEqual(r["seq_gaps"], 1)
         self.assertEqual(r["lost_blocks"], 2)
 
     def test_per_channel_split(self):
         """channel ごとに生値を分けて集計すること。"""
-        blocks, stats = self._two_blocks()
+        blocks, stats = two_blocks()
         r = asr.summarize(blocks, stats, t_start=0.0, t_end=1.0, discard_blocks=0)
         self.assertEqual(set(r["per_ch"]), {0, 1})
         self.assertEqual(r["per_ch"][0]["min"], 675)
@@ -364,7 +365,7 @@ class TestWrapGuard(unittest.TestCase):
 
     def test_unassessable_is_treated_as_risky(self):
         """受信時刻が無いときは、判定不能として危険側へ倒すこと。"""
-        blocks, stats = TestSummary()._two_blocks()
+        blocks, stats = two_blocks()
         r = asr.summarize(blocks, stats, t_start=0.0, t_end=2.0, discard_blocks=0)
         self.assertFalse(r["wrap_assessable"])
         self.assertTrue(r["wrap_risk"])
