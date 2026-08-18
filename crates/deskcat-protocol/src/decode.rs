@@ -66,8 +66,10 @@ struct WireEnvelope<'a> {
 /// | 3 | `payload`がobject | [`ErrorCode::InvalidEnvelope`] |
 /// | 4 | `v`が対応major version | [`ErrorCode::UnsupportedVersion`] |
 /// | 5 | `type`が既知 | [`ErrorCode::UnknownType`] |
-/// | 6 | type固有payload schema | [`ErrorCode::InvalidPayload`] |
-/// | 7 | 上限のある値の範囲 | [`ErrorCode::OutOfRange`] |
+/// | 6 | type固有payload schemaと、field間の整合（`Message::check_shape`） | [`ErrorCode::InvalidPayload`] |
+/// | 7 | 上限のある値の範囲（[`Message::check_bounds`]） | [`ErrorCode::OutOfRange`] |
+///
+/// 手順6と7は[`encode_line`]も同じ関数で行う。**送信側と受信側で規則を二重実装しない。**
 ///
 /// # 分類であって、送出の判断ではない
 ///
@@ -130,6 +132,7 @@ pub fn decode_line(line: &str) -> Result<Frame, DecodeError> {
     }
 
     let message = decode_payload(raw.type_name.as_ref(), raw.payload)?;
+    message.check_shape()?;
     message.check_bounds()?;
 
     Ok(Frame::new(
@@ -151,11 +154,7 @@ fn decode_payload(type_name: &str, payload: &RawValue) -> Result<Message, Decode
         "ping" => parse_empty(payload).map(|()| Message::Ping),
         "get_status" => parse_empty(payload).map(|()| Message::GetStatus),
         "status" => parse::<Status>(payload).map(|status| Message::Status(Box::new(status))),
-        "ack" => {
-            let ack = parse::<Ack>(payload)?;
-            ack.check_shape()?;
-            Ok(Message::Ack(ack))
-        }
+        "ack" => parse::<Ack>(payload).map(Message::Ack),
         unknown => Err(DecodeError::new(
             ErrorCode::UnknownType,
             format!("unknown message type `{unknown}`"),
@@ -185,11 +184,29 @@ fn payload_is_object(payload: &RawValue) -> bool {
 ///
 /// field順は§3の例と同じ`v`、`sid`、`id`、`ts_ms`、`type`、`payload`になる。
 ///
+/// # 送信前の検証
+///
+/// serializeの前に`Message::check_shape`（crate内部）と[`Message::check_bounds`]を、
+/// **[`decode_line`]の手順6→7と同じ順で**呼ぶ。この関数が、自分のdecoderが受理しない
+/// frameをwireへ出さないための検査である。
+///
+/// 順序を揃えるのは、両方に違反するframeで返るcodeを送受信で一致させるためである。
+/// 逆順にすると、`rejected`かつ`code`無しで`detail`も上限超過のACKが、encodeでは
+/// [`ErrorCode::OutOfRange`]、decodeでは[`ErrorCode::InvalidPayload`]になる。
+///
+/// 行長は最後に見る。escapeで膨らむ分はserializeしないと分からないためであり、
+/// field上限を満たしても行長を超えることがある（[`limits`]のmodule doc）。
+///
 /// # Errors
 ///
-/// encode結果が[`limits::MAX_LINE_BYTES`]を超える場合は[`ErrorCode::LineTooLong`]を返す。
-/// payloadのserializeに失敗した場合は[`ErrorCode::InvalidPayload`]を返す。
+/// field間の整合に違反する場合は[`ErrorCode::InvalidPayload`]、上限のある値が範囲外の
+/// 場合は[`ErrorCode::OutOfRange`]を返す。encode結果が[`limits::MAX_LINE_BYTES`]を
+/// 超える場合は[`ErrorCode::LineTooLong`]を返す。payloadのserializeに失敗した場合は
+/// [`ErrorCode::InvalidPayload`]を返す。
 pub fn encode_line(frame: &Frame) -> Result<String, DecodeError> {
+    frame.message.check_shape()?;
+    frame.message.check_bounds()?;
+
     let payload = encode_payload(&frame.message)?;
     let payload = RawValue::from_string(payload)
         .map_err(|err| DecodeError::new(ErrorCode::InvalidPayload, err.to_string()))?;

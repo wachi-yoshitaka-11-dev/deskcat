@@ -1,0 +1,28 @@
+[package]
+name = "deskcat-serial"
+version = "0.1.0"
+description = "host側のserial session。上限付きI/O、切断検知、再接続方針、送信queueを持つ"
+edition.workspace = true
+# `deskcat-protocol`と違い、workspaceの`rust-version`をそのまま継承する。
+# 同crateが`1.95`を独自宣言しているのは、ADR-0008により`firmware/esp32`から
+# path dependencyで使われ、ESP toolchain（rustc 1.95.0-nightly）を満たす必要があるためである。
+# このcrateはhost専用であり、firmwareから参照しない。したがってその制約は当てはまらない。
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+deskcat-protocol = { path = "../deskcat-protocol" }
+# **facadeだけに依存する。**実装（logger）の選択はbinary側（`deskcatd`）に残す。
+# libraryが出力先を決めると呼び出し側が制御できない。
+# `tracing`は採らない。この crate は同期I/Oでasync runtimeもspanの入れ子も持たず、
+# 利点が効かないまま重くなる。将来projectが`tracing`を採る場合も、
+# `tracing-log`で`log`のrecordを吸えるため選択を潰さない。
+log = "0.4"
+
+
+# workspaceのlintはmemberへ自動継承されない。これを書き忘れると
+# `unsafe_code = "forbid"`、`missing_docs = "warn"`、`clippy::all = deny`が
+# すべて無効になり、しかもbuildは通るため気づかない。
+[lints]
+workspace = true

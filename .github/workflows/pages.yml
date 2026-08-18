@@ -46,10 +46,13 @@ jobs:
       pages: read
     steps:
       - name: Checkout
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # Pull Requestでは、この後のstepがPR側の検証scriptを実行する。
-          # checkoutが.git/configへ残すtokenを、そのscriptから読めないようにする。
+          # checkoutが残すtokenを、そのscriptから読めないようにする。
+          # v6.0.0以降、tokenは`.git/config`ではなく`$RUNNER_TEMP`配下の別fileへ
+          # 保存され、`includeIf.gitdir`で条件付きincludeされる。保存先は変わったが、
+          # runner上のfileとして読める点は同じであり、この指定は引き続き要る。
           persist-credentials: false
 
       - name: Check documentation links
@@ -65,7 +68,7 @@ jobs:
         run: python3 scripts/prepare_pages.py
 
       - name: Configure Pages
-        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
 
       - name: Build with Jekyll
         uses: actions/jekyll-build-pages@44a6e6beabd48582f863aeeb6cb2151cc1716697 # v1
@@ -86,7 +89,7 @@ jobs:
 
       - name: Upload Pages artifact
         if: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
-        uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: ./_site
 

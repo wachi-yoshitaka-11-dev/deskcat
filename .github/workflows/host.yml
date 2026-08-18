@@ -40,10 +40,11 @@ jobs:
       contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # firmware・Pages workflowと同じ理由。この後のstepがPR側のcodeを
-          # runner上で扱うため、checkoutが.git/configへ残すtokenを読めないようにする。
+          # runner上で扱うため、checkoutが残すtokenを読めないようにする。
+          # 保存先はPages workflowの注記を参照する。
           persist-credentials: false
 
       # サードパーティActionを使わずrustupで導入する。

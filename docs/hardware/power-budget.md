@@ -795,6 +795,10 @@ required_transient_current
 サーボ起動時のms単位の過渡変化にはADC loggingを使う。使用するADC pinは`gpio-assignment.md`で予約済み
 （`ADC-SHUNT`＝GPIO32、`ADC-5V`＝GPIO33、`ADC-3V3`＝GPIO36。すべてADC1）。
 
+**この測定手段そのものが`HW-TBD-034`で再検討の対象になっている**（`電源過渡の測定方式のdesign review`）。
+**方針はここでは変えない。**この測定系で何を保証しないかは
+`ESP32自身のADCは測定対象から独立していない`が定める。
+
 ### Pi Zero Wには低電圧検出が無い
 
 **Piのbrownoutをsoftwareで検出できると仮定しない。**
@@ -821,8 +825,253 @@ required_transient_current
 **ESP32側は別である。**ESP32は自身でbrownoutを検出するため、ESP32のbrownoutとreset reasonの
 確認は有効であり、そのまま維持する。**Piと同じ扱いにしない。**
 
+**ただしそれは「resetが起きた事実」であって、rail waveformを外部から連続観測したことではない。**
+ESP32自身のADCで`ADC-5V`／`ADC-3V3`を測る構成には別の限界があり、
+`ESP32自身のADCは測定対象から独立していない`で扱う。**この2つを混同しない。**
+
 判定に使う電圧の値そのものは`受け入れ条件`の(a)にあり、**現時点で確定していない**
 （一次資料に無いことを確認済み）。
+
+### ESP32自身のADCは測定対象から独立していない
+
+**測定対象がESP32自身の電源であるとき、そのESP32のADCで測った結果を独立した観測として扱わない。**
+
+`測定計画`が定める測定系は、`ADC-5V`（GPIO33）と`ADC-3V3`（GPIO36）をESP32のADC1で読む
+（`gpio-assignment.md`）。**この2つはどちらも、ESP32自身の給電がそこから導かれるrailである。**
+3.3 Vはboard上regulatorの出力そのものである。5 V ingressは、案BならESP32の`5V` pinへ直接入り、
+案AでもPiのUSB OTG portを経てESP32へ届く（`ESP32の給電経路（未決定）`）。
+**どちらの案でも、5 V側の異常はESP32の動作へ直接効く。**そしてESP32が止まればADCも止まる。
+**測りたい区間と、測定器が止まる区間が同じである。**
+
+**この節が述べるのは、観測できない区間があることだけである。**ESP32のbrownout検出が働かないとは
+述べていないし、ADC loggingが無価値だとも述べていない。`reset reason`を取得できることも変わらない。
+**述べるのは、取得できるものが何であるかである。**
+
+**`Pi Zero Wには低電圧検出が無い`とは別の問題である。**あちらはPi自身に検出回路が無いことを述べている。
+こちらは検出回路の有無ではなく、**測定系が測定対象から給電されていること**である。
+**ESP32は検出回路を持つが、この問題からは免れない。**
+
+帰結は2つある。
+
+- **量によって独立性の要否が違う**
+- **未観測区間が3種ある。**どれも「起きなかった」ことの根拠にならない
+
+| 量 | ESP32自身のADCで測ってよいか | 理由 |
+|---|---|---|
+| `ADC-SHUNT`（GPIO32。servo railの電流） | **条件つきで可** | 監視対象はservoでありESP32ではない。**ただしESP32がresetすれば記録はそこで途切れる** |
+| `ADC-5V`（GPIO33。5 V rail） | **独立性が要る** | ESP32の給電はこのrailから導かれる（案Bは`5V` pinへ直接、案AはPiのUSB OTG port経由）。**測りたい区間が、測定器の止まる区間と同じである** |
+| `ADC-3V3`（GPIO36。3.3 V rail） | **独立性が要る** | 同上。ESP32のlogic電源そのものである |
+| ESP32のbrownoutと`reset reason` | 可。**ただし別の量である** | **resetが起きた事実**を示す。rail waveformを外部から連続観測したことにはならない |
+
+未観測区間は次の3種である。
+
+| 区間 | 長さ | 正 |
+|---|---|---|
+| sample間 | sample間隔ぶん。**目標sample rateを達成しても0にはならない** | `Sample rateとlog形式`（sample rateの値は**ここへ再掲しない**） |
+| ESP32のbrownout／reset中から再起動完了まで | **TBD。**この長さ自体を測っていない | — |
+| capture windowの外 | 取得方式が`burst capture`であるため、1回のcaptureの長さの外は観測しない。**連続観測ではない** | `Sample rateとlog形式`（buffer長も同様に**再掲しない**） |
+
+**何を保証しないか。**次を主張しない。
+
+- 「電源過渡をすべて実測済みである」
+- 「sample間隔より短いexcursionは起きなかった」
+- 「ESP32がresetした区間のrail電圧は範囲内だった」。**その区間の波形は記録されていない。
+  `reset reason`はその代わりにならない**
+- 「capture window外の過渡は起きなかった」。**window外は観測対象ですらない**
+
+**したがって`受け入れ条件`の(c)(d)の合否判定は`Blocked`のままである**（`(c)(d)の導出規則`と
+`定義した値をどの段階で照合するか`。**ここへ再掲しない**）。
+**[技術ガイド](../DeskCat_Microcontroller_Development_Guide.md)のゲートAが求める
+「起動時の電源過渡をすべて実測」も、この測定系では満たせない。**
+
+**2026-08-16に方式1（独立した外部観測）を採用した。**ただし**測定器の採否、実装、基準電圧の校正、
+取得方式、GND topology、必要帯域の一次資料は未解決である。**材料と残りは`電源過渡の測定方式のdesign review`にあり、
+追跡は[tbd-register.md](tbd-register.md)の`HW-TBD-034`である。**方式が決まったことを、
+測定できるようになったことと読み替えない。**
+
+### 電源過渡の測定方式のdesign review
+
+**2026-08-16に人間が方式1を採ると決定した。**`HW-TBD-034`のOwnerはHumanであり、この決定に従う。
+**ただし`HW-TBD-034`はcloseしない。**決まったのは方式であって、**測定器の採否も実装も未了である**
+（未解決の全数と close 条件は[tbd-register.md](tbd-register.md)の`HW-TBD-034`が持つ。
+**件数をここで数えない**）。
+
+論点の出所は[#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)の2026-08-16の追記である。
+**「Oscilloscopeを購入する」と先に結論づけるものではない**ことは追記自身が明記しており、
+**実際にoscilloscopeは購入しない。**手持ちのArduino Uno R3を候補とする。
+
+**方式1を採ったことでゲートAの改訂は不要になった。**
+[技術ガイド](../DeskCat_Microcontroller_Development_Guide.md)は現状のままとする。
+
+#### 方式1: 独立した外部観測を導入する — **採用**
+
+監視対象のESP32がresetしている間も含めて、rail waveformを外部から連続観測する。
+**2026-08-16に採用を決定した。**
+
+| 項目 | 現状 |
+|---|---|
+| 必要帯域の根拠 | **TBD。**現在の根拠は「servo起動の過渡はms order」だけであり、`Sample rateとlog形式`はその目標sample rateを**「未実測の設計目標であり、受け入れの根拠にしない」**と自ら述べている。**必要帯域を決めるには、想定するtransientの立ち上がり時間を一次資料または実測で押さえる必要がある。**ここに値を置かない（[AGENTS.md](../../AGENTS.md) 推測禁止） |
+| 候補の種別 | (1) 2 ch以上のdigital oscilloscope、(2) PCへ接続するUSB oscilloscopeまたはdata logger、(3) **監視対象とは別のmicrocontroller＋ADC**。(3)も、監視対象のESP32がresetしても記録が続く点では(1)(2)と同じ性質を持つ。**ただし(3)が塞ぐのは「記録係が監視対象と一緒に止まる」区間だけであり、sample間の未観測区間は残る**（`ESP32自身のADCは測定対象から独立していない`）。**「data logger」を名乗る製品には長時間記録向けの低速品も含まれる。**必要な時間分解能を満たすかを、品ごとにメーカー資料で確かめる |
+| **手持ちの候補（購入不要）** | **Arduino Unoを所持している**（[hardware-bom.md](hardware-bom.md)の`初期製作の明示的な対象外`。同表の`Not used`は**real-time controllerとして採らない**という意味であり、**測定機材として使えないという意味ではない**）。PCのUSBから給電すれば監視対象のESP32とは別電源になるため、****独立給電**の条件は満たしうる（**「独立した観測」の成立は別である。**`電源過渡の測定方式のdesign review`）。**上記(3)にあたる |
+| 手持ち候補の確認項目 | **2026-08-16に(a)(b)(c)を一次資料で確定した**（下記`手持ち候補の現物識別`）。(a) 現物の刻印とArduino公式資料が一致。(b) sample rateは**必須要件を満たす見込み。**(c) 入力範囲は**0〜V<sub>CC</sub>**。**ただし直結の可否は別条件であり、`5 V railをADCへ直結する条件`を満たすまでdividerを外さない。**(d) **USB給電での動作は未確認**（通電していない）。**加えて未解決が3点ある**（`方式1で残っている未解決3点`）。**方式1の採用は決定済みだが、この品の採否は確定していない** |
+| 手持ち候補に固有の論点 | **GND topologyが変わる。**外部の記録係を足すと、その GND を測定対象のどこへ落とすかを決める必要がある。`GND topology（測定前に必ず確定させる）`が定めたstar point構成を崩さないこと、およびPCのGNDが経路へ入ることの影響を、**配線前に確定させる。**未確定のまま測定しない |
+| 品番と概算 | **TBD。**`PROT-OC-01`と同じく、**発注直前にメーカーの一次資料で確定する。**この節では品番を挙げない |
+| 増える部品 | **手持ちのArduino Unoが上記の確認項目を満たせば、購入は不要になりうる。**満たさない場合に限り(1)(2)のいずれか1点と、必要なprobe・配線。**[hardware-bom.md](hardware-bom.md)の購入待ちリストへは、この節では何も足さない。**方式は2026-08-16に決まったが、この品で足りるかは未確認である。**この段階で発注対象へ載せると、要るかどうか決まっていない購入が発注時の唯一の参照先に載る（`local decouplingの外付け要否`節と同じ扱い） |
+
+**方式1を採る場合、[技術ガイド](../DeskCat_Microcontroller_Development_Guide.md)のゲートAは現状のままでよい。**
+
+##### 手持ち候補の現物識別
+
+**2026-08-16に現物の写真で確定した。通電はしていない。**
+
+| 項目 | 読み取った刻印 | 位置 |
+|---|---|---|
+| board model | **`UNO R3`**（`BOARD MODEL` / `UNO R3`。`OPEN-SOURCE ELECTRONICS PROTOTYPING PLATFORM` / `MADE IN ITALY` / `WWW.ARDUINO.CC`） | 裏面silkscreen |
+| microcontroller | **`ATMEGA328P-PU`**（`ATMEL`ロゴ、DIP-28、socket実装。ロット`1344`） | 表面のDIP部品 |
+| USB-serial変換 | **`MEGA16U2`**（`ATMEL`ロゴ、QFN。ロット`1336`） | 表面、USB connector寄り |
+| 電源regulator | `D113rC` / `17-50`（SOT-223） | 表面。**型番は未特定。**この節では使わない |
+| analog入力 | `A0`〜`A5`の6本が`ANALOG IN`として実装されている | 表面silkscreen |
+| その他 | `CE`、`FCC`、`RoHS COMPLIANT`。`SDA` / `SCL`のpad表記あり | 裏面 |
+
+刻印はArduinoの公式資料と一致した。**board側は一次資料で裏付けが取れている。**
+
+| 確認できたこと | 一次資料 |
+|---|---|
+| `ZU4`＝`ATMEGA328P-PU`、`U3`＝`ATMEGA16U2`。**現物の刻印と一致する** | [UNO R3 schematic](https://docs.arduino.cc/resources/schematics/A000066-schematics.pdf)（`UNO-TH_Rev3e`）、[UNO R3 User Manual](https://docs.arduino.cc/resources/datasheets/A000066-datasheet.pdf) SKU A000066 の`3.1 Board Topology` |
+| **USB-B connectorから給電される。**`To connect the UNO R3 to your computer, you'll need a USB-B cable. This also provides power to the board` | User Manual `4.1 Getting Started - IDE` |
+| 給電経路は`USBVCC → OPAMP → +5V → ATMEGA328P-PU`。**監視対象のDeskCat側railを通らない。****これはPower Treeのblock図の粒度の記述である。**同図の`OPAMP`が電源電流経路に直列なのか、MOSFETを制御する側なのかは**この出典からは決まらない。****`F1`、`T1`、GND、backfeed経路のschematic粒度での一致は未確認であり、`HW-TBD-034`で扱う。****独立給電はそれまで候補条件として扱う** | User Manual `3.3 Power Tree`（block図。schematic粒度は未確認） |
+| USB connectorからの最大入力電圧`VUSBMax` **5.5 V** | User Manual `2.2 Power Consumption` |
+| `A0`〜`A5`が`ADC[0]`〜`ADC[5]`（`PC0`〜`PC5`）としてheaderへ出ている。**boardに分圧は入っていない** | User Manual `5.1 JANALOG`、schematic |
+| `AREF`がheaderへ出ており、`C4` 100 nFでGNDへ落ちている。`AVCC`は`+5V`から`L2` 10 µH経由 | schematic |
+| `IOREF`は`Reference for digital logic V - connected to 5V` | User Manual `5.1 JANALOG` |
+
+**この経路図が裏付けるのは「独立給電」だけである。**PCのUSBから給電する限り、Arduino側の`+5V`は
+DeskCatの5 V ingressから導かれない。**したがって監視対象がbrownoutしても記録係は停止しない。**
+
+**これは「独立した観測」が成立したことを意味しない。**独立給電は必要条件の1つにすぎず、
+残る条件は別に検証する。**GND topology**（`手持ち候補に固有の論点`）、**PC groundが経路へ入る影響**、
+**入力headroom**（`5 V railをADCへ直結する条件`）、**実機での動作**である。
+**これらの検証が済むまで`HW-TBD-034`はOpenのままとする。**
+
+**ADCの性能値は`DS40002061B`で確定した。**現物のPDIP-28（同文書の`SPDIP`）を対象に含む版である。
+
+| 項目 | 値 | 出典 |
+|---|---|---|
+| 分解能 | **10 bit** | §24.1 Features、Table 29-15 |
+| channel数 | **6**（`6 Multiplexed Single Ended Input Channels`。`2 Additional`は`TQFP and VQFN Package only`であり**現物には無い**） | §24.1 |
+| sample rate | **最大76.9 kSPS。最大分解能では最大15 kSPS**（`Up to 76.9kSPS (Up to 15kSPS at Maximum Resolution)`） | §24.1 |
+| conversion time | **13〜260 µs**（Free Running Conversion） | §24.1、Table 29-15 |
+| ADC clock | **50〜1000 kHz** | Table 29-15 |
+| 入力電圧範囲 | **0〜V<sub>CC</sub>**。`V_IN`は`GND`〜`V_REF` | §24.1、Table 29-15 |
+| 基準電圧`V_REF` | **1.0 V〜AV<sub>CC</sub>。**AREF外部入力、AV<sub>CC</sub>、内蔵1.1 Vから選ぶ | §24.1、§24.2、Table 29-15 |
+| 内蔵基準`V_INT` | **min 1.0／typ 1.1／max 1.2 V** | Table 29-15 |
+| 絶対確度 | **2 LSB**（`V_REF = 4V, V_CC = 4V, ADC clock = 200kHz`）。**ADC clock 1 MHzでは4.5 LSBへ悪化する** | Table 29-15 |
+| 入力帯域 | typ **38.5 kHz** | Table 29-15 |
+
+出典: [ATmega48A/PA/88A/PA/168A/PA/328/P megaAVR Data Sheet](https://ww1.microchip.com/downloads/en/DeviceDoc/ATmega48A-PA-88A-PA-168A-PA-328-P-DS-DS40002061B.pdf)
+`DS40002061B`（© 2020 Microchip Technology Inc.）§24 `Analog-to-Digital Converter`、§29.8 `ADC Characteristics`。
+sha256 `b9b9d83cda56a95d999ea8d54fe5a540748ae9020e5e7ae19b913d384ba9320e`、2026-08-16取得。
+
+**確認項目(b)(c)はこれで満たされる見込みである。**必須要件の1 kSample/s以上（`Sample rateとlog形式`）に対し
+最大分解能でも15 kSPSあり、目標帯（5〜10 kSample/s）にも入る。入力範囲が0〜V<sub>CC</sub>であるため、
+**AV<sub>CC</sub>を基準に採れば5 V railを分圧なしで測れる可能性がある**（ESP32側で要った10 kΩ×2のdividerが不要になる）。
+**ただし無条件ではない。**下記`5 V railをADCへ直結する条件`を満たすまで、dividerを外さない。
+**ただし下の基準電圧の論点が未解決であり、この品の採否は確定していない。****方式1の採用は決定済みである。方式の決定と測定器の採否を混同しない。**
+
+**2 channelを同時に見る場合、1 channelあたりの実効rateは下がる。**`ADC-5V`相当と`ADC-3V3`相当を
+両方見るなら、上記のrateをchannel数で割った値で評価する。**channel切り替えの扱いは§24.5にあり、未確認である。**
+
+##### 手持ち候補に固有の制約: SRAMと取得方式
+
+**ATmega328PのSRAMは2 KBである**（`DS40002061B` Features `2Kbytes internal SRAM`。
+[UNO R3 User Manual](https://docs.arduino.cc/resources/datasheets/A000066-datasheet.pdf)も`2 kB SRAM`）。
+**これは`Sample rateとlog形式`が定めるburst captureの前提を満たさない。**
+
+同節は1回のcaptureで最低200 msを要求し、必要RAMを`sample rate × 2 byte × 0.2 s`と定めている。
+最大分解能の15 kSPSでは**6 KB**となり、**2 KBに収まらない。**
+**buffer長を短くする代替は同節が既に禁じている**（「短くしても取り逃がしたpeakは戻らない」）。
+
+**ただしburst captureを採る理由自体がArduino側には無い。**ESP32がburst captureにしたのは、
+Pi–ESP32間のUSB serialが1本しかなく、**Protocolがそのbaudを共有transport parameterとして持つ**
+ためである（`Sample rateとlog形式`）。**Arduinoの USBはProtocolと無関係であり、測定に専有できる。**
+
+したがって**連続streamingを選べる。**成立すれば次の2つが同時に片付く。
+
+- SRAM 2 KBの制約が効かなくなる（溜めないため）
+- **未観測区間のうち`capture window外`が消える**（`ESP32自身のADCは測定対象から独立していない`）。
+  **`sample間`は残る**
+
+**実現できるsample rateは未測定である。ここに値を置かない。**連続streamingで何Sample/s出るかを
+測ってから、`Sample rateとlog形式`の必須要件と突き合わせる。**この確認はArduino単体で行え、
+DeskCat側へは接続しない。**
+
+##### 5 V railをADCへ直結する条件
+
+**入力範囲が`0〜V_CC`であることは、DeskCatの5 V railを直結してよい根拠にならない。**
+
+ここでの`V_CC`は**Arduino側のAV<sub>CC</sub>**であり、PCのUSBから作られる
+（`VUSBMax`は5.5 V。`手持ち候補の現物識別`）。一方、監視対象の5 V railは`PSU-PI-01`（M-12001）が供給する。
+**この2つは独立した電源であり、常にどちらが高いとも言えない。**
+
+**帰結**: 監視対象側の過渡がArduinoのAV<sub>CC</sub>を超えると、
+**入力範囲を外れてclippingするか、入力保護へ電流が流れる。**
+**そしてAV<sub>CC</sub>を超える区間こそ、記録したい過渡である場合がある。**
+
+したがって次のいずれかを満たすまで、**dividerを外さない。**
+
+- **divider を残す**（ESP32側と同じ扱い。分圧比は実装時に決める）。**これが既定である**
+- または、**入力保護とheadroomの予算を定義して検証する。**両電源の最大値の差、
+  ADC入力の絶対最大定格、直列抵抗による保護電流の上限を数値で示し、**一次資料で裏付ける。**
+  **`TBD`。この文書には値を置かない**
+
+**未検証のまま直結しない。**[AGENTS.md](../../AGENTS.md)は、電源経路が未確認なら実機駆動しないと定めている。
+
+##### 基準電圧が未解決である（設計上の論点）
+
+**どの基準を採っても、そのままでは絶対電圧の合否判定に使えない。**
+
+| 基準の採り方 | 分圧 | 問題 |
+|---|---|---|
+| AV<sub>CC</sub>（Arduino自身の5 V） | **不要** | その5 VはUSBから作られる（UNO R3 schematic）。**`OPAMP`と`T1`（`FDN340P`）のどちらが電源電流経路に直列で、どちらが制御側かは未確認である**（`手持ち候補の現物識別`のPower Treeの行と同じ扱い。schematic粒度の確認は`HW-TBD-034`で行う）。**精密基準ではない。**測定値はArduino側5 Vに対する相対値になる |
+| 内蔵1.1 V | **必要**（5 V／3.3 Vとも1.1 Vを超えるため） | `V_INT`は**min 1.0／typ 1.1／max 1.2 V**で、**個体差が±約9 %ある**（Table 29-15）。校正なしに絶対値を主張できない |
+| AREFへ外部基準 | 品次第 | 精密基準の追加購入が要る。**品番と定格は未選定** |
+
+**したがって、既知の基準に対する校正か、外部基準の追加のどちらかが要る。**
+**これを解かないまま、絶対電圧の合否判定に使わない。**`HW-TBD-028`(b)の閾値は絶対電圧であり、
+**相対値では照合できない。**
+
+#### 方式1で残っている未解決3点
+
+**方式は決まったが、これらが解けるまで測定を根拠にできない。**`HW-TBD-034`はOpenのままである。
+
+| # | 未解決 | 解けないと何が起きるか | どこで解くか |
+|---|---|---|---|
+| 1 | **基準電圧の校正** | 測定値が基準に対する相対値のままになり、`HW-TBD-028`(b)のような**絶対電圧の閾値と照合できない** | `基準電圧が未解決である（設計上の論点）` |
+| 2 | **SRAM 2 KBに対する取得方式** | burst captureでは200 ms分を溜められない。**連続streamingで何Sample/s出るかが未測定** | `手持ち候補に固有の制約: SRAMと取得方式` |
+| 3 | **GND topologyへの影響** | star point構成を崩すと**全ADC値がずれる。**PCのGNDが経路へ入る影響も未評価 | `GND topology（測定前に必ず確定させる）`と、`電源過渡の測定方式のdesign review`の方式1の表にある`手持ち候補に固有の論点`の行 |
+
+**1と2はArduino単体で確認でき、DeskCat側へ接続しない。**3はDeskCat側の配線を伴う。
+**いずれもUSBを扱える端末が要るため、Docs / Review端末では実施できない**
+（[machine-profiles.md](../toolchains/machine-profiles.md)。**ただしArduinoは測定器であって開発端末ではなく、
+profileの新設は要さない。**デジタルテスターと同じ扱いである）。
+
+**3が済むまで、この測定系で得た値を受け入れ判定に使わない。**
+
+#### 方式2: ADC loggingに限定し、合格主張を狭める — **採らない**
+
+**2026-08-16に人間が方式1を採ると決定したため、この方式は採らない。**
+
+内容は、未観測区間の存在を認めたうえで、ゲートAの合格条件を
+「起動時の電源過渡をすべて実測した」から**「測定分解能とsampling継続区間の範囲で承認範囲内であった」へ
+後退させる**ものだった。**安全側の要求を下げる方向の改訂である。**
+
+**改訂が要る箇所の全数と、その未適用の改訂案は削除した。**方式1では
+[技術ガイド](../DeskCat_Microcontroller_Development_Guide.md)のゲートAを改訂しないため、
+適用先が無い案を正本に残すと、後から誤って適用されうる。**削除の経緯はRevision履歴に残す。**
+
+**方式1を採っても、`ESP32自身のADCは測定対象から独立していない`が挙げた限定は消えない。**
+独立した記録係を入れて`capture window外`と`brownout／reset中`を塞いでも、**`sample間`は残る。**
+「電源過渡をすべて実測済み」と扱わない規則は、方式によらず維持する。
 
 ### GND topology（測定前に必ず確定させる）
 
@@ -885,6 +1134,9 @@ framingを除いても約5.7 kSample/s、text encodeではさらに落ちる。*
 
 いずれも取れない場合は、**この測定手段では電源承認の根拠を作れない**と結論し、
 測定機材の追加を検討する。要件を満たさない測定値を、満たしたものとして扱わない。
+**測定機材の追加は`電源過渡の測定方式のdesign review`の方式1にあたる。**
+**sample rateが要件を満たしても未観測区間は残る**ことは
+`ESP32自身のADCは測定対象から独立していない`が扱う。**この2つは別の論点である。**
 **linkのbaudを測定の都合で上げる場合は、`HW-TBD-014`／`PROTO-TBD-001`の決定そのものを
 変える扱いとし、Protocol側と揃えて確定させる。**片側だけ変更しない。
 
@@ -944,7 +1196,8 @@ PC USBからのflashing、周辺module3点の3.3 V側定常電流の実測）だ
       実装と検証が残る。`受け入れ条件`の`定義した値をどの段階で照合するか`）。
       peakによる電圧降下はここで捉える。**ESP32のbrownoutとreset reasonもあわせて確認する**
       （ESP32は自身でbrownoutを検出する）。**Piのundervoltage警告は当てにしない**
-      （`Pi Zero Wには低電圧検出が無い`）
+      （`Pi Zero Wには低電圧検出が無い`）。**reset reasonはresetの事実であって、その区間の
+      rail波形ではない**（`ESP32自身のADCは測定対象から独立していない`）
 - [ ] ESP32 board上3V3 pinの外部供給可能電流の定格を確認し、周辺module3点（MSP2807、ADXL345、BME280）を接続した状態で3V3 rail電圧と電流を実測する。**ADXL345を繋ぐのは`HW-TBD-004`がcloseした後である**（`電源rail構成案`の`（接続不可）`）。3V3 pinの供給能力を超える場合は別途3.3V regulatorを追加する。**定格の確認は段階B-2aの実施条件でもある**（`段階B-2の測定`）。実測自体を段階B-2で先に済ませてよい。段階Cで再測するのは、5 V railからの給電に切り替えた後の値を確認するためである
 - [ ] **ESP32の給電経路を確定させる**（`ESP32の給電経路（未決定）`節）。案A: PiのUSB OTG portからESP32＋3V3負荷を給電したときの電流とESP32入力電圧を実測し、ESP32のundervoltageとbrownoutが起きないことを確認する。**Pi側はundervoltage警告が出ないため、`ADC-5V`の実測で見る。ただし合否の判定は`HW-TBD-028`(a)が確定するまでできない**（`Pi Zero Wには低電圧検出が無い`）。不足する場合は案Bへ切り替え、そのとき秋月基板のVBUS保護diodeの有無を回路で確認してから`5V` pinとUSBを同時接続する
 - [ ] サーボなしでlogicへ給電し、電流を記録する（上記の段階測定の結果をそのまま用いる）
@@ -972,7 +1225,7 @@ PiのconnectorとPCB traceを通る。
       定格とは別の量である）。予算そのものを変える場合は下記の正式改訂の手順を踏む
 - [ ] **そのとき強制していた可動域、最大速度、最大加速度、最大連続動作時間、最大duty cycleを
       `servo-safety-limits.md`の動作制限表へ記録する**（予算を守らせているのはこれらの値である）
-- [ ] **ESP32の**brownoutまたはreset reasonを記録する。**Piのundervoltage警告は出ないため当てにしない**（`Pi Zero Wには低電圧検出が無い`）
+- [ ] **ESP32の**brownoutまたはreset reasonを記録する。**Piのundervoltage警告は出ないため当てにしない**（`Pi Zero Wには低電圧検出が無い`）。**記録できるのはresetが起きた事実だけであり、その区間のrail波形は残らない**（`ESP32自身のADCは測定対象から独立していない`）
 - [ ] LCDとsensor通信を動作させた状態でも反復する
 - [ ] 正確なsetupと電流制限が承認されるまでstall testを行わない
 
@@ -1085,6 +1338,10 @@ Mar.2025の`9.Electrical Characteristics`、`Dropout Voltage`行。`IOUT = 500 m
 triggerを検証するか、規則自体を測定可能なenvelopeへ定義し直すかのどちらかが要る。
 **それまで(d)の合否判定は`Blocked`のままとし、sampleした測定値から合格を導かない。**
 
+**未観測区間はsample間だけではない。**ESP32自身のADCで測る構成では、**ESP32がbrownout／resetして
+samplingが止まる区間**と、**burst captureのwindowの外**も観測できない。どちらにも同じ結論が及ぶ
+（`ESP32自身のADCは測定対象から独立していない`。**ここへ再掲しない**）。
+
 #### 定義した値をどの段階で照合するか
 
 **照合（実測）はこの文書の定義とは別の作業である。**段階は`合成給電を部品が揃うまで行わない理由`の
@@ -1096,9 +1353,9 @@ triggerを検証するか、規則自体を測定可能なenvelopeへ定義し�
 | 項目 | 測れる段階 | 測定のgate | **合否判定** |
 |---|---|---|---|
 | (a) Pi入力の最低電圧 | **段階A**（Piを単体でアダプターから起動） | **DMMで直流値を読むだけなら不要**（追加購入も不要）。**`ADC-5V`でdroopまで見るならdividerの実装と検証が要る**（抵抗は入手済み。実装と検証が残る） | **Blocked。**閾値が`HW-TBD-028`(a)として未確定であり、`ADC-5V`の測定系も未実装（抵抗は入手済み。配線と検証が残る） |
-| (b) ESP32入力／3.3 Vの最低電圧 | 5 V入力側は**段階B-1**。3.3 V rail側は周辺moduleを足す**段階B-2** | 段階B-1は**不要**。段階B-2は**必要** | **Blocked。**5 V入力側の4.6 Vは**2026-08-15に現物の`U2`のdatasheetによる値になった**ため、部品未確認を理由とするBlockedは解消した（閾値として確定させるかは`HW-TBD-028`で扱う）。3.3 V rail側は閾値そのものが未確定であり、**この項目全体としては引き続きBlockedである**（`HW-TBD-004`と`3.3 V railの許容電圧範囲`の3経路） |
-| (c) 最大定常ripple | 段階A／B-1で各railを単独で、段階Cで合成後を測る。**両者を混ぜない** | **段階を問わず`ADC-5V`／`ADC-3V3`のdivider（10 kΩ／10 kΩ）の実装と検証が要る。**rippleはDMMでは捉えられず、この文書が定める測定手段はADC loggingだけである。**抵抗は入手済みであり**（`hardware-bom.md`の`MEAS-01`）、**残るのは実装と検証である。**段階Cはこれに加えて段階Cのgateが要る | **Blocked。**許容電圧範囲の下限が決まらないと不等式を評価できない（(a)(b)に従属） |
-| (d) 最大transient droopと継続時間 | **段階C**（servo起動過渡を含む）。段階A／B-1では出ない | **必要。**段階Cのgateに加えて、(c)と同じく`ADC-5V`／`ADC-3V3`のdividerの実装と検証が要る（抵抗は入手済み） | **Blocked。**継続時間0は確定しているが、**深さの判定に使う下限が未確定**（(a)(b)に従属） |
+| (b) ESP32入力／3.3 Vの最低電圧 | 5 V入力側は**段階B-1**。3.3 V rail側は周辺moduleを足す**段階B-2** | 段階B-1は**不要**。段階B-2は**必要** | **Blocked。**5 V入力側の4.6 Vは**2026-08-15に現物の`U2`のdatasheetによる値になった**ため、部品未確認を理由とするBlockedは解消した（閾値として確定させるかは`HW-TBD-028`で扱う）。3.3 V rail側は閾値そのものが未確定であり、**この項目全体としては引き続きBlockedである**（`HW-TBD-004`と`3.3 V railの許容電圧範囲`の3経路）。**加えて、測定系がESP32自身であることによる未観測区間がある**（`HW-TBD-034`） |
+| (c) 最大定常ripple | 段階A／B-1で各railを単独で、段階Cで合成後を測る。**両者を混ぜない** | **段階を問わず`ADC-5V`／`ADC-3V3`のdivider（10 kΩ／10 kΩ）の実装と検証が要る。**rippleはDMMでは捉えられず、この文書が定める測定手段はADC loggingだけである。**抵抗は入手済みであり**（`hardware-bom.md`の`MEAS-01`）、**残るのは実装と検証である。**段階Cはこれに加えて段階Cのgateが要る | **Blocked。**許容電圧範囲の下限が決まらないと不等式を評価できない（(a)(b)に従属）。**下限が決まっても、未観測区間があるため測定値から合格を導けない**（`HW-TBD-034`） |
+| (d) 最大transient droopと継続時間 | **段階C**（servo起動過渡を含む）。段階A／B-1では出ない | **必要。**段階Cのgateに加えて、(c)と同じく`ADC-5V`／`ADC-3V3`のdividerの実装と検証が要る（抵抗は入手済み） | **Blocked。**継続時間0は確定しているが、**深さの判定に使う下限が未確定**（(a)(b)に従属）。**さらに、sample間・reset中・capture window外の未観測区間があるため、「継続時間0」規則をsampleした測定値から合格にできない**（`(c)(d)の導出規則`、`ESP32自身のADCは測定対象から独立していない`、`HW-TBD-034`） |
 | (e) connector／wireの最大温度上昇 | **段階C**。`HW-TBD-021`／`HW-TBD-022`の部品が揃ってから | **必要** | **Blocked。**経路部品が未選定で、比較対象となるメーカー定義の温度上昇条件が存在しない |
 
 **段階AとB-1の探索的な起動そのものにgateも追加購入も要らない。**DMMで読める直流値は、閾値が
@@ -1183,3 +1440,6 @@ rippleはDMMで代替できない。
 | 2026-08-15 | 43 | [PR #122](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/122)のレビュー指摘を反映。**電源rail構成案の図がADXL345を3.3V railの下に置いたままで、`HW-TBD-004`のclose前に接続を承認したように読めた。**ADXL345の枝を`（接続不可）`とし、**`HW-TBD-004`がcloseするまでこの経路へ接続してはならない**ことを明記した。あわせて本文の「周辺moduleはすべて3.3Vで給電し」という表現を改めた。**未確定のmoduleを含む「すべて」は、接続を承認済みに見せる** | [PR #122レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/122) |
 | 2026-08-15 | 44 | Revision 43の残存を修正。**図でADXL345を`（接続不可）`とした一方、本文と測定checklistが接続を前提にしたままだった。**(a)「3V3 railに接続する3module」→「接続する予定の3module」とし、**ADXL345分は`HW-TBD-004`がcloseした場合の見積である**ことを明記した。(b) 段階Cの`測定5`と3V3 pin定格確認の項目に、**ADXL345を繋ぐのは`HW-TBD-004`のclose後である**ことを追記した。**見積りの数値も測定手順も変えていない** | [PR #122レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/122) |
 | 2026-08-15 | 45 | [#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)。**現物の`U2`のメーカーを特定し、`AMS1117`由来の導出を現物のdatasheetへ差し替えた。**`U2`は**UMW（UTD Semiconductor Co., Limited）の`LD1117-3.3`（SOT-223）**である。根拠は刻印`LD1117AG` / `33AQVCUV`と、UMW datasheetが図示するSOT-223 template（1行目`LD1117AG`、2行目`xxAQwwT S`。`xx`はVoltage）の一致である。**UTC（Unisonic Technologies）も候補に挙げたが外した**（UTCのtemplateは社名行を含み`AQ`を生まない）。(a) `暫定値の下限は、そのままでは成立しない`節の出力電圧行を**3.201–3.399 V（`AMS1117`）から3.234–3.366 V（現物）へ差し替えた。下限が3.3 Vを割るという結論は変わらない。**(b) `(b)のESP32 board 5 V入力の導出`節を書き換えた。**4.6 Vという数値は変わらないが、根拠が別部品の`IOUT ≤ 0.8 A`条件付きの値から、現物の部品の`IOUT = 1 A`でのdropout最大1.30 Vへ変わった。**(c) **regulatorの種別がLDOと確定したため、5 V側への換算`Iin ≒ Iout + Iq`を使ってよいことにした**（`Iq` typ 5 mA／max 10 mA）。(d) **保護の内容を記録した。**電流制限`Ilimit` min 1.25 A／max 1.6 Aと熱shutdown`TSD` typ 150 ℃までは確定したが、**短絡保護と折り返し特性はdatasheetに記載が無い。記載の不在を保護の不在と読み替えないため、B-2aの`実施条件（保護）`は満たされていないままとした**（[AGENTS.md](../../AGENTS.md) 推測禁止）。**確定したのは、trip点1.25 Aが1 Aの定格より上にあり、`IOUT` 1.0–1.25 Aの区間が電流制限の動作しない範囲だということである。**この事実をB-2aの`実施条件（保護）`と逆極性保護のdesign reviewへ反映した。**どのgateも開いていない。**B-2aの`実施条件（定格）`は**Espressifがboard levelで公開しておらず、ICのdatasheetでも埋まらないことが確定した**ため、`HW-TBD-023`(a)は未解決のまま残る | [UMW LD1117 datasheet](https://www.umw-ic.com/static/pdf/a5e0c99cefdefaf03cfa7777b369e45b.pdf) Mar.2025（sha256 `5dec5c09027316c375c27108cbac9d088ba94060bebacd614a04a3b8bb18a3d3`、2026-08-15取得）。詳細は[tbd-register.md](tbd-register.md)の`HW-TBD-023` |
+| 2026-08-16 | 46 | [#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)の2026-08-16の追記を反映。**電源過渡の測定主張が3つの正本で食い違っている**という指摘に対し、**この文書を測定主張の正とし、材料を揃えて人間の決定を待つ形にした。方式は決めていない。どのgateも開いていない。**(a) **`ESP32自身のADCは測定対象から独立していない`節を新設した。**`ADC-5V`／`ADC-3V3`はESP32自身が給電されているrailであり、**測りたい区間と測定器が止まる区間が同じである。**独立性が要る量と、ESP32自身のADCで測ってよい量を表で分けた。**未観測区間を3種**（sample間、brownout／reset中から再起動完了まで、burst captureのwindowの外）**に整理し、何を保証しないかを明記した。**3つ目はこれまでどの文書にも無かった。`reset reason`は**resetが起きた事実**であって、その区間のrail波形ではない。**`Pi Zero Wには低電圧検出が無い`とは別の問題である**（あちらは検出回路の有無、こちらは測定系の独立性）。(b) **`電源過渡の測定方式のdesign review`節を新設した。**方式1（独立した外部観測）と方式2（ADC loggingへ限定し合格主張を狭める）の材料を並べた。**必要帯域も品番も`TBD`のまま置き、値を推測で埋めていない。**購入待ちリストへは何も足していない（方式が未決定のため）。方式2については**改訂が要る箇所の全数**と、**適用していない改訂案**を表で示した。走査patternも残した。**手持ちのArduino Unoを方式1の候補として記載した。**[hardware-bom.md](hardware-bom.md)の`Not used`は**controllerとしての判断**であって所持や他用途を否定していない（同文書 Revision 47で役割の限定を明記した）。**同日に現物の刻印で`BOARD MODEL UNO R3`／`ATMEGA328P-PU`／`MEGA16U2`を確定し、Arduino公式のUser Manualとschematicで裏付けた**（`手持ち候補の現物識別`。**通電はしていない**）。**USB給電の経路が監視対象のrailを通らないことは、公式のPower Treeで裏付けが取れた。****同日に`DS40002061B`（現物のSPDIPを対象に含む版）でADCの分解能・sample rate・入力範囲・基準電圧を確定した**（sha256付きで記録）。**必須要件の1 kSample/s以上は満たす見込みである。****入力範囲は0〜V<sub>CC</sub>だが、直結の可否は別条件であり、`5 V railをADCへ直結する条件`節を新設してdividerを既定として残した。**Arduino側のAV<sub>CC</sub>と監視対象の5 V railは独立した電源であり、**対象側の過渡がAV<sub>CC</sub>を超えうる。****それでも採否は決めない。**基準電圧が未解決であり（AV<sub>CC</sub>は精密基準ではなく、内蔵1.1 Vは個体差min 1.0／max 1.2 V）、**校正か外部基準が要る。**USB給電での動作とGND topologyへの影響も未確認である。****あわせてSRAM 2 KBの制約を記録した。**`Sample rateとlog形式`のburst capture（200 ms分）は15 kSPSで6 KBを要し2 KBに収まらないが、**ArduinoのUSBはProtocolと共有していないため連続streamingを選べる。**成立すれば`capture window外`の未観測区間が消える。**実現rateは未測定であり値を置いていない。**先に見つけたautomotive版datasheet（`7810D–AVR–01/15`）は、package（TQFP／VQFN）もchannel数（8）もgradeも現物と一致しないため根拠に採らなかった。**(c) **同日、人間が方式1（独立した外部観測）を採ると決定した。**oscilloscopeは購入せず、手持ちのArduino Uno R3を候補とする。**これにより[技術ガイド](../DeskCat_Microcontroller_Development_Guide.md)のゲートAの改訂は不要になり、同文書は変更していない。****方式2の節は`採らない`へ改め、未適用の改訂案の全数表は削除した。**適用先が無い案を正本へ残すと後から誤って適用されうるためである。**方式2の内容と却下の理由は同節に残した。**(c-2) **`HW-TBD-034`はcloseしない。**決まったのは方式であり、**測定器の採否も実装も未了である**（基準電圧の校正、SRAM 2 KBに対する取得方式、GND topologyへの影響の3点。`方式1で残っている未解決3点`）。したがって追記の受け入れ観点のうち**「4文書の合格主張が一致した」は依然として未達である。**(d) `測定計画`、`Sample rateとlog形式`、`Pi Zero Wには低電圧検出が無い`、`サーボ接続前`、`サーボ試験`、`(c)(d)の導出規則`、`定義した値をどの段階で照合するか`から新設節を参照させた。**規則も数値も再掲していない。**(e) **`定義した値をどの段階で照合するか`の(b)(c)(d)の合否判定へ`HW-TBD-034`を追加した。Blockedを解除していない。**(f) **記録として残す。**`a11d32d`（2026-08-16）はこの文書の本文を変えたが**Revision行を追加していない。**その結果、**Revision 45のitem (c)「`Iin ≒ Iout + Iq`を使ってよいことにした」が、同commitによる撤回と食い違ったまま残っている。**Revision 45の行は過去時点の記録として書き換えず、ここに記録する。**本文側の撤回内容は正しいため変更していない**(g) **[PR #138](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/138)のCodeRabbitの指摘3件を反映した。**(g-1) 方式決定後も「どちらの測定方式を採るかは決まっていない」という旧文言が残っていた。(g-2) **独立給電を「独立した観測」の成立と書いていた。**独立給電は必要条件の1つにすぎず、GND topology・PC groundの影響・入力headroom・実機動作は別に検証が要る。`hardware-bom.md`の`MEAS-02`も揃えた。(g-3) **`5 V railをADCへ直結する条件`節を新設した。****3件とも主張を弱める方向であり、gateは開いていない** | [#3の2026-08-16の追記](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)、`a11d32d`。追跡は[tbd-register.md](tbd-register.md)の`HW-TBD-034` |
+| 2026-08-18 | 47 | [PR #146](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/146)のreview指摘。**`HW-TBD-034`のclose契約が2文書で一致していなかった。**本文の未解決一覧は「測定器の採否、実装、基準電圧の校正、取得方式、GND topology」の5点を挙げるのに対し、[tbd-register.md](tbd-register.md)の`HW-TBD-034`のclose条件は「実装と4文書の主張整合」の2点しか挙げておらず、**校正・取得方式・GND topologyが解けないままcloseしうる書き方だった。**本文側へ`必要帯域の一次資料`を足して台帳と同じ集合にし、close条件の全数は台帳側へ置いた（**値と規則の正は本文であり、台帳へ再掲していない**）。**未解決を増やす方向であり、gateは開いていない。**測定値も規則も変えていない | [PR #146のreview指摘](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/146)、[#147](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/147)。close条件の全数は[tbd-register.md](tbd-register.md)の`HW-TBD-034` |
+| 2026-08-18 | 48 | [PR #146](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/146)のreview指摘。**(a) `HW-TBD-034`のclose条件を1つの正本へ寄せた。**本文の未解決参照が「3点」と読める書き方で、台帳のclose条件7項目と件数が併存していた。**方式1の技術的な3点は本文の`方式1で残っている未解決3点`が正、close条件の全数は台帳が正**と役割を分けた。(b) **Power Treeの記述をblock図の粒度と明示した。**`USBVCC → OPAMP → +5V`の`OPAMP`が電源電流経路に直列かMOSFETを制御する側かは**この出典からは決まらない。**`F1`／`T1`／GND／backfeed経路のschematic粒度の一致は未確認であり、**独立給電はそれまで候補条件として扱う**と明記した。**同じ主張が`AV_CC`の行（`USBから`OPAMP`と`T1`（`FDN340P`）を経て作られる`）にもあったため、そちらも同じ扱いへ揃えた。**片方だけ直すと、粒度の違う2つの記述が残る。**あわせて`HW-TBD-034`のclose条件へ`(6b) Power Treeのschematic粒度の確認`を足した。**未確認をここへ送っただけでは、close条件に無いまま解決済みとして閉じうる。**測定値も閾値も変えていない。未確認を増やす方向である** | [PR #146のreview指摘](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/146)、[#149](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/149)。close条件の全数は[tbd-register.md](tbd-register.md)の`HW-TBD-034` |

@@ -50,7 +50,8 @@ Protocol channelから送信するすべてのbyteは、有効にframe化され�
 - `ts_ms`はwall-clock timeではなく、device間で直接比較できない。
 - 送信側が再起動したとき、`sid`を新しい値へ変更し、`id`を初期値へ戻す。
 - **processが再起動したときは、必ず新しい`sid`を選ぶ。**再起動しても同じ`sid`を名乗ると、受信側は遷移を検知できず、旧sessionのduplicate履歴が新しい`id`空間へそのまま適用される。生成方法と衝突確率の許容値は`PROTO-TBD-011`とする。**衝突を完全には排除できないため、衝突を検知したあとの再生成を§3.1で規定する。**
-- **`sid`が変わるのは、processの再起動と、衝突検知による選び直し（§3.1）のときだけである。**選び直しにprocessの再起動は要らない。serial linkの切断と再接続だけでは`sid`を変えない。link断は相手processの終了を意味せず、duplicate履歴を捨てる理由にならない。
+- **`sid`が変わるのは、processの再起動、衝突検知による選び直し（§3.1）、運用者の明示的なsession reset（§3.1）の3つだけである。****3つ目は`id`の枯渇や停止状態からの復帰に使う外部からの操作であり、processを動かしたまま新しい`sid`を選ぶ**（§3.1が(1)(2)として定める）。§3.1が禁じているのは**枯渇を理由にした自動の切り替え**であって、この外部操作の経路ではない。選び直しにprocessの再起動は要らない。serial linkの切断と再接続だけでは`sid`を変えない。link断は相手processの終了を意味せず、duplicate履歴を捨てる理由にならない。
+- **`id`はwrapさせない。**上限に達した送信側は新しい`(sid, id)`を要する送出を止めて`protocol_fault`で報告し、`sid`を選び直さない。上限到達は`sid`変更の契機ではない（下記の`PROTO-TBD-003`の確定内容）。
 - Message同一性は`id`単独ではなく`(sid, id)`の組で判定する。
 - `boot` messageによって、新しいESP32 sessionを開始する。
 - `hello` messageによって、新しいPi sessionを開始する。
@@ -74,7 +75,16 @@ Integer widthは、共有test fixture（§12.1）とあわせて次のとおり�
 | `id` | `u32` | 同一session内のmessage ID |
 | `ts_ms` | `u64` | uptime ms。`u32`は約49.7日でwrapし、長時間動作で`ts_ms`の単調性が崩れる |
 
-**送信側が`id`の上限に達したときの動作は未確定である**（`PROTO-TBD-003`）。受信側の判定ではなく送信側の運用であり、session確立とduplicate履歴の扱いに関わるため、host serial session（#11）とACK／reconnect実装（#12）で決める。
+**送信側が`id`の上限に達したときの動作を次のとおり確定する**（`PROTO-TBD-003`）。受信側の判定ではなく送信側の運用である。
+
+- **`id`をwrapさせない。**wrapは`(sid, id)`の一意性そのものを壊す。§9は「Duplicate判定は必ず`(sid, id)`の組で行う」と定めており、同じ組が同一session内で二度現れると、受信側は二度目を新しいcommandとして判定できない。§9末尾が挙げる失敗（**新しいcommandを実行せず`ok`を返す**）を、送信側の側から作り込むことになる。
+- **次に割り当てる新規`id`が`u32`の上限値そのものになった時点で、その上限値を終端報告のために予約する。**予約した`id`は`protocol_fault`ちょうど1件にだけ使う。それ以外の新しい`(sid, id)`を要する送出は、command、event、`status`、完了event、fault eventのいずれであっても、この時点からすべて止める。この停止状態は、§3.1の`sid`選び直しが上限に達した状態と同じものとして扱う。
+- **予約と払い出しは不可分に行う。**`id`の採番点が複数ある実装では、境界で別の送出元が先に上限値を取り、終端報告を送れないまま停止しうる。**採番は単一の点で直列化し、上限値に達した採番要求は「予約済み」として拒否する。**「上限を超えたら止める」という書き方にしないのは、超えた時点では上限値が既に通常のmessageへ払い出されており、`protocol_fault`に使う`id`が残らないためである。
+- **上限値そのものは正当な`id`のままとする。**予約は送信側の内部規則であって、受信側に「この値だけ特別」という判定を足さない。§12.1の作成済みfixtureが上限値のenvelopeを有効な行として固定している。
+- **既に送出したmessageの再送は、同じ`(sid, id)`で行うため新しい`id`を消費しない**（§4.1、§9）。上限に達した後も、各節の有限budgetが残る範囲では再送してよい。**止まるのは新しい`(sid, id)`を要する送出だけである。**
+- **`id`の枯渇を`sid`変更の契機にしない。**上の規則が定める2つの契機（processの再起動と、衝突検知による選び直し）を増やさない。新しいsessionが必要なら、§3.1のとおりprocessを再起動するか、運用者が明示的にsession resetを指示する。**再起動していないprocessが新しい`sid`を名乗る経路を作らないのは、受信側がduplicate履歴を破棄する経路を1つ余分に得るためである**（§3.1、§4.1）。**protocolはその再起動の自動化を禁じない。**再起動していれば`sid`の変更はその2つの契機に合致し、`hello`の`reason: startup`（§5.1）も事実と一致する。
+
+到達時間は`2^32 ÷ 持続送出レート`である。**持続レートの確定値は`PROTO-TBD-001`のbaudと`PROTO-TBD-012`の送出上限を待つ**ため、ここでは条件付きの評価だけを示す。§2のbaud候補115200 bps・8N1（11,520 byte/s）でlinkを飽和させた場合、§6の`ack`例と同じ行長（改行込み115 byte）なら毎秒約100件で**約496日**、§2の最大line 1024 byteなら毎秒約11件で**約12年**である。baudを上げれば反比例で縮み、毎秒1000件なら**49.7日**と、§3が`ts_ms`に`u32`を採らなかった理由と同じ桁になる。**連続運転する機器では到達しうる。到達しない前提で実装しない。**なお**ここで定める動作は、この数値のいずれにも依存しない。**
 
 ### 3.1 Session IDが必要な理由
 
@@ -153,10 +163,29 @@ session churnのfixtureを§12へ追加する。
 - 選び直しの回数には上限を設ける。上限に達したら`protocol_fault`で報告し、
   session確立messageの自動送出を停止する。運用者の明示的なsession resetまたはprocess再起動まで
   再開せず、motion commandを送らない。上限後も自動試行を続けると、上限が実質的に無くなる。
+- **停止状態からの復帰に使う「運用者の明示的なsession reset」とは、次のいずれかを指す。**
+  (1) processを再起動する。(2) processを動かしたまま、`id`を初期値へ戻し、
+  新しい`sid`を選び、`hello`（Pi）／`boot`（ESP32）で§5.1の遷移確定まで完了させる。
+  **送信側は受信側のretired集合を知らないため、衝突しない`sid`を事前には選べない。**
+  衝突した場合は上の`stale_session`による選び直しに従い、その回数上限も同じく適用する。
+  **どちらも外部からの操作であり、protocol内の自動遷移ではない。**
+  **(2)で`reason: startup`を使ってよいのは、これが外部からの操作だからである。**
+  processは起動していないが、運用者の指示というprotocolの外側の事象が`sid`の変更を正当化する。
+  **同じ扱いをprotocol内の自動的な契機へ広げない。(2)を自動化してはならない。**
+  budget満了やlink断を契機に自動で行うと、`sid`の変更が送信側の判断だけで
+  起こせるようになり、上で塞いだ経路が戻る。
+  **受信側の扱いは(1)(2)で変わらない。**`sid`の変化を見ただけでは遷移せず、
+  `hello`／`boot`による遷移確定を要する（§5.1）。運用者のresetのために受信側へ
+  新しい判定を足さない。
 - **この規則は`hello`／`boot`自身が拒否された場合にだけ適用する。**通常commandが
   `stale_session`で拒否されたのは、そのsessionがまだ確立されていないという意味であり、
   衝突ではない。この場合は現在の`sid`のまま`hello`から再開する（§10.2）。
   区別せずに選び直すと、正常な`sid`を捨てて確立をやり直し続ける。
+- **`id`が上限に達して停止した場合も、上の停止状態と同じ復帰経路による**（§3）。
+  **`id`の枯渇を理由に`reason`を`startup`へ切り替えて新しい`sid`を名乗ってはならない。**
+  processが動き続けたまま新しい`sid`を名乗る点で、上で塞いだ経路と同じである。
+  加えて`startup`の意味は「Piのprocessを起動した」（§5.1）であり、起動していないのに送ると
+  必須fieldが事実と異なる値を運ぶ。§11は必須fieldの意味の変更に新しいmajor versionを要求している。
 - **retired sessionの保持期間は、遅延messageの最大生存時間と再送windowの合計を
   下回ってはならない。**短すぎると、retiredから外れた旧sessionのmessageが
   現在のsessionとして受理される。
@@ -307,6 +336,17 @@ Piは何度受けても相関ACKを構成できない。通常再送とrecovery�
 **新しいESP32 sessionが必要な場合は、processを再起動するか§3.1の衝突回復に従う。**
 どちらの経路でも、新しい`sid`の`boot`がACKされるまでmotion commandを受理しない。
 
+**`id`の上限到達も`sid`変更の契機にしない**（§3）。ESP32が`id`の上限に達した場合、再起動せずに
+新しい`sid`の`boot`を送ってはならない。`boot`は「ESP32が起動した」ことを表し、`reset_reason`は
+実際のreset reasonを運ぶ。再起動していないのに送ると、必須fieldが事実と異なる値を運び、
+§10.1の再起動手順に該当しないまま同じ手順を相手に起こさせる。**`boot`には`hello`の`reason`に
+当たるfieldが無いため、契機の違いを受信側へ伝える手段もない。**停止時の動作は上表の
+「ACKが無いままrecovery budgetを使い切った」と同じとし、**送出を止め、実行中のrelative motionを
+安全に停止し、サーボ出力を有効にせず**`protocol_fault`で報告する。**ただし復帰は同じではない。**
+同表の再開はrecovery budgetを作り直すものであって、`id`空間は戻らない。`boot`の再送は同じ
+`(sid, id)`を使うため続けられるが、ACKされた後に新しい`(sid, id)`を要するevent、`status`、
+完了eventは送れないままである。**復帰にはprocessの再起動または運用者の明示的なsession resetが要る**（§3、§3.1）。
+
 無限に再送すると、直らない障害のために送出帯域を占有し続ける。
 budget値は`PROTO-TBD-017`に含める。
 
@@ -372,7 +412,7 @@ budget値は`PROTO-TBD-017`に含める。
     "display":{"state":"ready","expression":"neutral"},
     "servo":{"state":"disabled"},
     "sensors":{"touch":"unknown","acceleration":"unknown","environment":"unknown"},
-    "protocol":{"parse_errors":0,"invalid_payloads":0,"unsupported_versions":0,"oversize_lines":0,"unknown_types":0,"rate_limited":0,"busy":0,"out_of_range":0,"stale_sessions":0,"session_switches":0,"suppressed_responses":0}
+    "protocol":{"parse_errors":0,"invalid_payloads":0,"unsupported_versions":0,"oversize_lines":0,"unknown_types":0,"rate_limited":0,"busy":0,"out_of_range":0,"stale_sessions":0,"hardware_unavailable":0,"duplicate_expired":0,"session_switches":0,"suppressed_responses":0}
   }
 }
 ```
@@ -390,8 +430,15 @@ budget値は`PROTO-TBD-017`に含める。
 | `busy` | `busy`で拒否した件数。resourceの一時的な占有による拒否 |
 | `out_of_range` | `out_of_range`で拒否した件数 |
 | `stale_sessions` | §5.1の`stale_session`拒否 |
+| `hardware_unavailable` | `hardware_unavailable`で拒否した件数。§7のとおり、対象hardwareの初期化が完了していない状態で受けたdisplay／motion commandに返す。**`busy`と合算しない。**`busy`は待てば受け付けられる状態であり、区別できなければ「待てば直る」と「待っても直らない」を外から見分けられない |
+| `duplicate_expired` | `duplicate_expired`で拒否した件数。codeの意味は§7が定める（保持履歴から失われたduplicateを安全に再実行できない）。**発火条件そのものは未確定である。**§9の`TBD`「Duplicateが保持履歴より古い場合の動作」と、履歴の保持期間・件数・evict後の扱い（`PROTO-TBD-005`）で決まる。**このcounterはそれらの値を先取りしない** |
 | `session_switches` | §5.1の実際に発生したsession遷移 |
 | `suppressed_responses` | **ESP32が受信機会に即時送出しなかった応答の総数。**§8.2で集約・抑制した拒否応答、正規retry quotaを超えた保持ACK、duplicateへの**非ACKの**保持結果、ESP32所有のPi→ESP32保留tableで送出待ちの間に重ねて受信した同一identity、およびtable上限で受け付けなかった新規identityを含む。保留後に送出できても、以前の受信機会で即時送出しなかった計数は戻さない。Piが抑制または保留した`boot`への応答はPi側の同名local counterへ記録し、このfieldへ合算しない。内訳が必要になった時点でfieldを分割する（`PROTO-TBD-006`） |
+
+**§7の全error codeが、この表のいずれかのcounterへ対応する。**`rate_limited`だけが複数の規則を
+合算し、残るcodeは1対1で対応する。`session_switches`と`suppressed_responses`はerror code由来
+ではなく、拒否せずに観測する事象である。この対応が全codeについて成立していることは、
+§12.1のfixtureと同じ場所にあるhost workspaceのRust実装が検査する。
 
 `rate_limited`はreceiver層とservo層の拒否を合算する。層ごとの内訳が必要になった時点で
 fieldを分割する。合算のままにするか分割するかは`PROTO-TBD-006`（最終status field）で決める。
@@ -992,6 +1039,9 @@ Draft 2のpolicy:
   ものとして扱う。同じ`(sid, id)`をretryせず、cooldown後に改めて要求する場合は
   新しい`id`を割り当てる。ACKが無い場合の1回retryとは区別する。
 - 同じ`(sid, id)`を再利用する。
+- `id`が上限に達した送信側は、新しい`(sid, id)`を作らない（§3）。**未ACK messageの再送は同じ
+  `(sid, id)`で行うため、上限到達後もこのretryは実行できる。**止まるのは新しい`(sid, id)`を要する送出だけである。
+  停止時に未ACKで残るcommandの扱いは`PROTO-TBD-013`に従う。
 - ESP32は直近に処理した`(sid, id)`とresultを保持する。
 - Duplicateには、要求の`(sid, id)`を`(reply_sid, reply_to)`に保持したresultのreplay経路を使い、
   非idempotentな動作を再実行しない。実際の送出には§8.2の上限を適用する。
@@ -1006,7 +1056,7 @@ Draft 2のpolicy:
 
 - ACK timeout
 - 保持件数と期間
-- Integer wrapの処理
+- ~~Integer wrapの処理~~（envelopeの`id`は§3で確定した。wrapさせず、上限で新しい`(sid, id)`を要する送出を止める。**残るのは`status.payload.protocol`のcounterの幅と飽和時の扱いである。**§3の型表はenvelope fieldだけを対象とし、§4.6もcounterの幅とoverflow時の動作を規定していない。連続運転では`id`と同じ桁で到達するため、「最終status field」を扱う`PROTO-TBD-006`の範囲とする）
 - Duplicateが保持履歴より古い場合の動作
 - ACKを必要とするmessage
 - `sid`の生成方法と衝突許容確率
@@ -1117,6 +1167,8 @@ Session境界のfixtureは、遷移の有無で期待結果が逆になる。set
 | `hello`への`stale_session`が送出上限で抑制されるか喪失する | 送信側は同じ`(sid, id)`で再送し、受信側は保存された`stale_session`を保留tableから返す。**明示的に`stale_session`を受信してから**`sid`を選び直す。無応答のままなら選び直さず、budget満了で停止する |
 | 処理済みの`reason: startup`の`hello`のACKだけが失われ、送信側が現在の`sid`と同一`(sid, id)`で正規retry | `reason`／`sid`の不整合判定より先にduplicateを照会し、残るquota内で保持ACKを§8.2の予約容量から返す。2回目の遷移、duplicate履歴の再破棄、motion停止は起きない |
 | `sid`選び直しが上限に達した状態 | `protocol_fault`で報告し、session確立messageの自動送出を停止する。運用者の明示的なsession resetまたはprocess再起動まで再開せず、motion commandを送らない |
+| 送信側の`id`が上限に達した状態 | 新しい`(sid, id)`を要する送出を止め、**予約しておいた上限値の`id`で`protocol_fault`をちょうど1件**報告する。**wrapさせず、`sid`も選び直さない。**未ACK messageの再送は同じ`(sid, id)`で継続してよい。復帰はprocess再起動または運用者の明示的なsession resetによる（§3、§3.1） |
+| 上限値の`id`が通常のmessageへ払い出された状態 | 送信側の採番が直列化されていない実装の誤りである。終端報告に使う`id`が残らない。§3の予約規則で防ぐ |
 | 保持件数の上限に達するまでsession遷移を繰り返した状態での、保持期間内の旧`sid`からの遅延message | `stale_session`で拒否する。保持期間の満了前に追い出さない |
 | 保持期間内に上限を超える速度でsession遷移を要求 | `rate_limited`で拒否する。retired sessionを追い出して枠を空けない |
 | retired保持期間**内**に届いた旧sessionからの遅延message | `stale_session`で拒否する。保持期間は遅延messageの最大生存時間＋再送windowを下回らないため、この期間を過ぎた遅延messageは前提上存在しない |
@@ -1200,7 +1252,7 @@ Framing／parse層について、**host workspaceのRust実装**がfixtureに合
 |---|---|---|
 | PROTO-TBD-001 | 最終baud | Pi／ESP32のthroughput・安定性test。[HW-TBD-014](../hardware/tbd-register.md)と対で確定する。値はProtocol側、実機transport testの実施責任はhardware台帳 |
 | PROTO-TBD-002 | 最終最大line byte数、および**overflow時にidentity復元のため保持するprefixのbyte数**（`v`、`type`、`sid`、`id`を含みうる大きさ。行長上限より十分小さいこと） | Worst-caseの上限付きpayloadとmemory test。[HW-TBD-014](../hardware/tbd-register.md)と対で確定する。値はProtocol側、実機transport testの実施責任はhardware台帳 |
-| PROTO-TBD-003 | ~~Integer width~~（§3で確定。`v`=`u16`、`sid`／`id`=`u32`、`ts_ms`=`u64`）と、**送信側が`id`の上限に達したときの動作** | 残るのはwrap時の運用だけである。session確立とduplicate履歴の扱いに関わるため、host serial session（[#11](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11)）とACK／reconnect実装（[#12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)）で決める |
+| PROTO-TBD-003 | ~~Integer width~~（§3で確定。`v`=`u16`、`sid`／`id`=`u32`、`ts_ms`=`u64`）と、~~送信側が`id`の上限に達したときの動作~~（§3で確定。wrapさせず、上限で新しい`(sid, id)`を要する送出を止め`protocol_fault`で報告する。復帰は§3.1の停止状態と同じ経路、すなわちprocessの再起動または運用者の明示的なsession resetに限り、`sid`変更の契機を増やさない） | **解決済み。**受信側の判定規則、`hello`の`reason`の値集合、error code、counterのいずれも増やしておらず、§12の未作成fixture群も増やさない。到達時間の見積りは`PROTO-TBD-001`と`PROTO-TBD-012`に依存するが、**動作の定義はそれらの数値に依存しない。**`status`のcounterの幅と飽和時の扱いは`PROTO-TBD-006`が引き取る |
 | PROTO-TBD-004 | ACK timeout | 測定latencyとrecovery test |
 | PROTO-TBD-005 | **現在のsession**のduplicate履歴の保持期間とretry window、および**保持件数の上限と超過時の動作**。期間の下限は遅延messageの最大生存時間＋再送windowを下回らない。件数上限は受理budget（§8.2）と保持する結果の最大sizeから導出する。上限超過時は最も古いentryをevictしてよいが、evictしたentryへの再送は新規commandとして実行しない（`duplicate_expired`で拒否する。§9参照）。`PROTO-TBD-011`のretired session保持期間から導出しない（目的の異なる別モデル。§5.1） | Memory予算とretry window。[HW-TBD-020](../hardware/tbd-register.md)と対で確定する。サーボ出力の有効化条件に含まれる |
 | PROTO-TBD-006 | 最終status field | 診断要件とencode size test |
@@ -1215,6 +1267,7 @@ Framing／parse層について、**host workspaceのRust実装**がfixtureに合
 | PROTO-TBD-015 | Draft schema revisionの表明方法（envelope fieldかout-of-band照合か） | Draft間の相互接続が必要になった時点。fixture一致で足りるなら追加しない |
 | PROTO-TBD-016 | §12のconformance fixtureの実体作成と配置。**schema群とframing／parse群は`crates/deskcat-protocol/tests/fixtures/`へ配置済み**（schema群と行長境界・CRLF・invalid JSONは[#9](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/9)、byte単位の分割受信とinvalid UTF-8は[#10](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/10)）。残るのはsession判定、duplicate replay、budgetと応答の3群と、実機上でのfirmware側の合格確認 | 残る3群は受信側のstateを必要とするため[#12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)。firmware側はhost workspaceのRust実装をpath dependencyで再利用しており（[ADR-0008](../decisions/0008-firmware-protocol-crate-reuse.md)）、cross compileまでは確認済みで実機実行は[#6](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/6)を待つ。budget群は`PROTO-TBD-011`／`012`／`017`の確定を待つ |
 | PROTO-TBD-017 | `boot`再送契約のparameter（初期間隔、backoff係数、通常再送の回数、recovery間隔、**無応答時に送出を止めるまでの有限recovery budget**、**同一`(sid, id)`の最大再送回数**、**`rate_limited`で拒否されたときのcooldown後再送を含む上限**）。recovery budgetの総待ち時間は`PROTO-TBD-012`の拒否ACK最悪送出待ち時間以上とする。終了条件そのものは§4.1で確定済み | 起動時のlink確立latency測定とreconnect試験 |
+| PROTO-TBD-018 | **`protocol_fault`のwire表現**（message type名とpayload schema）。本文は終端報告を`protocol_fault`で行うと複数箇所で定めているが、**`crates/deskcat-protocol`の`Message`にそれを表す variant が無く、現状の実装では符号化できない。**`PROTO-TBD-014`は実行時安全制限のfault eventであり、**これとは別物である**（畳まないこと） | 終端報告を実装する時点で確定する。**§3の`id`枯渇の終端報告は、予約した上限値の`id`でちょうど1件送ると定めているため、payloadに`id`と枯渇の区別を持たせるかを併せて決める。**wire formatの追加になるため、§11のversion規則に従う |
 
 ## Revision履歴
 
@@ -1226,6 +1279,10 @@ Framing／parse層について、**host workspaceのRust実装**がfixtureに合
 | 2026-08-10 | Draft 2 fixture | §3のinteger widthを確定し、§7へ単一lineの検証で決まるcodeの対応付けを追加（分類と送出の判断を分ける）。§12.1をschema群のfixture作成済みの状態へ更新。wire formatは変更していない |
 | 2026-08-15 | Draft 2 sync | [PR #122](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/122)。`PROTO-TBD-009`の解決方法が`正確なtouch controllerと実験`のままだったため、**touch controllerが`XPT2046`と確定した**ことを反映した（[HW-TBD-003](../hardware/tbd-register.md)はclose）。**protocolの仕様は変えていない。**残る作業は同ICのdatasheetでのtouch strengthの意味づけと実験である |
 | 2026-08-15 | Draft 2 framing | [Issue #10](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/10)。§12.1のFraming／parse群を**作成済み**へ更新した。byte単位の分割受信とinvalid UTF-8のfixtureが揃い、host workspaceのRust実装が合格する。firmwareは同じ実装をpath dependencyで使う（[ADR-0008](../decisions/0008-firmware-protocol-crate-reuse.md)）が、**実機上でのfixture実行は未実施**である。**wire formatは変更していない。** |
+| 2026-08-16 | Draft 2 counters | [Issue #132](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/132)。§4.6の`protocol` counterへ`hardware_unavailable`と`duplicate_expired`を追加し、§7の全error codeがcounterへ対応する状態にした。**これは`status`のwire format変更である。**過去のentryと違い「変更していない」ではない。`status.payload.protocol`に必須fieldが2本増え、旧schemaの`status`は新schemaで`invalid_payload`になる。**Draft schemaは互換性の対象外であり**（下の「Draft schemaの互換性」）、互換の根拠はconformance fixtureの一致であるため`v`は上げない。**`status`を送出する実装はまだ存在しない**（firmwareはcross compileまでで、`src/main.rs`はprotocol crateを呼び出していない）。counterの発火条件と保持parameterは`PROTO-TBD-005`／`PROTO-TBD-006`のままであり、確定させていない |
+| 2026-08-17 | Draft 2 id exhaustion | [Issue #141](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/141)。`PROTO-TBD-003`の残り（送信側が`id`の上限に達したときの動作）を確定した。**wrapさせず、上限で新しい`(sid, id)`を要する送出を止め`protocol_fault`で報告する。**復帰は§3.1が既に定めた停止状態の経路（processの再起動、運用者の明示的なsession reset）に限り、**`sid`変更の契機を増やさない。**wrapを退けたのは、`(sid, id)`の一意性が失われ、§9が挙げる「`id`だけで判定する実装」と同型の失敗を送信側から作り込むためである。`id`枯渇でsessionを張り直す案は退けた。新しい`sid`の`hello`には`reason: startup`が要り（§5.1）、その意味は「Piのprocessを起動した」であって、再起動していないprocessが名乗ると§11の「必須fieldの意味の変更」に当たる。`boot`には`reason`に当たるfieldが無く、同じ問題を`reset_reason`で抱える。**wire formatは変更していない。**envelope field、`hello`の`reason`の値集合、error code、counterのいずれも増やしていない。§5.1のsession遷移契機も増やしていない。`status`のcounterの幅と飽和時の扱いは`PROTO-TBD-006`へ移した。あわせて[PR #142](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/142)のreview指摘により、終端報告用の`id`の予約を採番の直列化として明示し、既存語だった「運用者の明示的なsession reset」の定義を§3.1へ置いた。**どちらも受信側の判定規則を増やしていない** |
+| 2026-08-18 | Draft 2 recovery sync | [PR #146](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/146)のreview指摘。**§4.1の`boot`再送が枯渇した場合の復帰を「processの再起動が要る」としており、§3.1と§12のfixture表の「process再起動または運用者の明示的なsession reset」と食い違っていた。**狭い側だけが§4.1にあり、hostとfirmwareが違う復帰条件を実装しうる。**§3.1とfixture表へ揃えた。**`sid`選び直し上限の行も同じ文言であり、id枯渇だけを狭くする根拠は無い。**あわせて`PROTO-TBD-018`を新設し、`protocol_fault`のwire表現が未定義であることを登録した。**本文は終端報告を`protocol_fault`で行うと定めるが、`Message`に対応するvariantが無く符号化できない。**`PROTO-TBD-014`は実行時安全制限のfault eventであって別物であり、そこへ畳んでいない。****wire formatは変更していない。規則の追加も数値の変更もしていない** |
+| 2026-08-18 | Draft 2 sid paths | [PR #146](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/146)のreview指摘。**§3が「`sid`が変わるのはprocessの再起動と衝突検知による選び直しのときだけである」と言い切っていたが、§3.1が定める`運用者の明示的なsession reset`の(2)は、processを動かしたまま新しい`sid`を選ぶ。**言い切りに当てはまらない経路が存在し、hostとfirmwareが違う実装をしうる。§3を3経路（process再起動／衝突検知による選び直し／運用者の明示的なsession reset）へ揃え、**§3.1が禁じているのは枯渇を理由にした自動の切り替えであって外部操作の経路ではない**ことを明記した。**wire formatは変更していない。規則を増やしてもいない**（既に§3.1にある経路を§3の一覧へ入れただけである） |
 
 ### Draft schemaの互換性
 
