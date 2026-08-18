@@ -35,7 +35,7 @@
 #define LOGGER_NCH 2
 #endif
 
-// 1 blockで送るsample数。header 21 B に対する payload の割合を決める。
+// 1 blockで送るsample数。header 22 B に対する payload の割合を決める。
 #ifndef LOGGER_BLOCK
 #define LOGGER_BLOCK 128
 #endif
@@ -169,8 +169,8 @@ static inline void put_u32(uint8_t *buf, uint8_t &i, uint32_t v) {
   buf[i++] = (uint8_t)((v >> 24) & 0xFF);
 }
 
-// header は 21 B 固定である。PC側の parser と同じ並びを保つこと。
-#define HEADER_LEN 21
+// header は 22 B 固定である。PC側の parser と同じ並びを保つこと。
+#define HEADER_LEN 22
 
 static void send_block(void) {
   // ring から LOGGER_BLOCK 件そろうまで待つ。
@@ -189,8 +189,11 @@ static void send_block(void) {
   }
 
   // counter類は32 bitなのでISRに割り込まれないよう一括で取る。
+  // pending（ring に滞留していて未送信のsample数）も同じ critical section で採る。
+  // これが無いと PC 側の収支が閉じない。`taken` は ring 滞留分を含むためである。
   uint32_t taken, mark_us, mark_taken;
   uint16_t dropped;
+  uint8_t pending;
   {
     const uint8_t sreg = SREG;
     cli();
@@ -198,6 +201,7 @@ static void send_block(void) {
     dropped = g_dropped;
     mark_us = g_mark_us;
     mark_taken = g_mark_taken;
+    pending = (uint8_t)(g_head - g_tail);
     SREG = sreg;
   }
 
@@ -211,6 +215,8 @@ static void send_block(void) {
   put_u32(header, i, mark_us);
   put_u32(header, i, mark_taken);
   put_u8(header, i, (uint8_t)LOGGER_BLOCK);
+  // pending は ring 滞留数。0〜255 に収まる（ring は 256 で、snapshot 時は LOGGER_BLOCK 以上）。
+  put_u8(header, i, pending);
   // cfg: bit0-2 = ADPS、bit3 = (channel数 == 2)、bit4-7 は 0 で予約する。
   put_u8(header, i, (uint8_t)((LOGGER_ADPS & 0x07) | ((LOGGER_NCH == 2) ? 0x08 : 0x00)));
 

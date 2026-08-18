@@ -21,7 +21,7 @@ import termios
 import time
 
 MAGIC = b"\xa5\x5a"
-HEADER_LEN = 21
+HEADER_LEN = 22
 
 # micros() は uint32 で約71.6分で wrap する。
 US_MODULO = 1 << 32
@@ -37,21 +37,28 @@ class Block:
         "mark_us",
         "mark_taken",
         "nsamples",
+        "pending",
         "adps",
         "nch",
         "raw",
+        "t_recv",
     )
 
-    def __init__(self, seq, taken, dropped, mark_us, mark_taken, nsamples, adps, nch, raw):
+    def __init__(self, seq, taken, dropped, mark_us, mark_taken, nsamples, pending,
+                 adps, nch, raw):
         self.seq = seq
         self.taken = taken
         self.dropped = dropped
         self.mark_us = mark_us
         self.mark_taken = mark_taken
         self.nsamples = nsamples
+        # pending は snapshot 時に ring に滞留していた（未送信の）sample数。
+        # `taken` はこれを含むため、収支を閉じるには差し引く必要がある。
+        self.pending = pending
         self.adps = adps
         self.nch = nch
         self.raw = raw  # tuple[int]。bit 0-9 が値、bit 10 が channel
+        self.t_recv = None  # PC側で受け取った時刻（time.monotonic）。measure() が入れる
 
     def values(self):
         """(channel, value) を順に返す。"""
@@ -60,6 +67,8 @@ class Block:
 
 
 class ParseStats:
+    """parser が読み捨てた量と framing の破れの件数。"""
+
     def __init__(self):
         self.resync_bytes = 0
         self.header_xor_errors = 0
@@ -75,10 +84,12 @@ class BlockParser:
         self.stats = ParseStats()
 
     def feed(self, chunk: bytes):
+        """byte列を追加し、その時点で完成した Block の list を返す。"""
         self._buf.extend(chunk)
         return self._drain()
 
     def _drain(self):
+        """buffer から取り出せる Block をすべて取り出す。"""
         out = []
         buf = self._buf
         while True:
@@ -108,9 +119,8 @@ class BlockParser:
                 del buf[:1]
                 continue
 
-            (seq, taken, dropped, mark_us, mark_taken, nsamples, cfg) = struct.unpack_from(
-                "<HIHIIBB", header, 2
-            )
+            (seq, taken, dropped, mark_us, mark_taken, nsamples, pending,
+             cfg) = struct.unpack_from("<HIHIIBBB", header, 2)
             if nsamples == 0:
                 self.stats.header_xor_errors += 1
                 del buf[:1]
@@ -137,6 +147,7 @@ class BlockParser:
                     mark_us=mark_us,
                     mark_taken=mark_taken,
                     nsamples=nsamples,
+                    pending=pending,
                     adps=cfg & 0x07,
                     nch=2 if (cfg & 0x08) else 1,
                     raw=raw,
@@ -176,6 +187,7 @@ def us_delta(later: int, earlier: int) -> int:
 
 
 def measure(fd: int, seconds: float, settle: float, quiet_banner: bool):
+    """指定秒数ぶん streaming を受け、Block の list と受信時刻を返す。"""
     parser = BlockParser()
 
     # port を開くと DTR が立って Uno が reset する。bootloader が抜けるまで待ち、
@@ -212,12 +224,20 @@ def measure(fd: int, seconds: float, settle: float, quiet_banner: bool):
             if t_start is None:
                 t_start = now
             t_end = now
+            for b in got:
+                # 同じ read で複数 block が来た場合も同じ時刻を入れる。
+                # rate は block 間の差分で出すため、この粒度で足りる。
+                b.t_recv = now
             blocks.extend(got)
 
     return blocks, parser.stats, t_start, t_end
 
 
 def summarize(blocks, stats, t_start, t_end, discard_blocks: int):
+    """rate・取りこぼし・channel別統計を集計する。
+
+    差分で出す量（rate、収支）は、分子と分母を同じ区間へ揃える。
+    """
     if len(blocks) <= discard_blocks + 1:
         raise SystemExit(
             "block が足りない（%d 件）。配線・baud・sketchの動作を確認する。" % len(blocks)
@@ -231,15 +251,17 @@ def summarize(blocks, stats, t_start, t_end, discard_blocks: int):
     taken_delta = (last.taken - first.taken) % (1 << 32)
     dropped_delta = (last.dropped - first.dropped) % (1 << 16)
 
-    # taken / dropped は「差」なので、比べる相手も同じ区間に揃える。
-    # first block 自身の sample は first.taken の時点で既に数え終わっているため、
-    # 区間内に届いたのは先頭 block を除いたぶんである。ここを揃えないと
-    # 先頭 block ぶんだけずれた比較になる。
-    delivered_in_interval = delivered - first.nsamples
+    # taken / dropped / pending は「差」なので、比べる相手も同じ区間に揃える。
+    # 各 block の header は「自分の sample を ring から取り出す前」に採られている。
+    # したがって snapshot first と snapshot last の間に取り出されたのは
+    # first, ..., last-1 の block であり、last block のぶんは含まれない。
+    delivered_in_interval = delivered - last.nsamples
 
-    # 区間内の収支。ISRが取得した数は、届いた数 + ISRが捨てた数 + 回線上で失った数。
-    # 差が残るなら block が回線上で失われている（block欠番と符合するはず）。
-    unaccounted = taken_delta - delivered_in_interval - dropped_delta
+    # 区間内の収支。`taken` は ring に滞留していて未送信の sample も含むため、
+    # pending の増減を差し引かないと収支が閉じない。
+    #   taken の増分 = 届いた数 + ISRが捨てた数 + ring滞留の増減 + 回線上で失った数
+    pending_delta = last.pending - first.pending
+    unaccounted = taken_delta - delivered_in_interval - dropped_delta - pending_delta
 
     # block seq の欠番。
     seq_gaps = 0
@@ -252,7 +274,12 @@ def summarize(blocks, stats, t_start, t_end, discard_blocks: int):
             lost_blocks += max(0, step - 1)
         prev = b.seq
 
-    wall_s = (t_end - t_start) if (t_start is not None and t_end is not None) else 0.0
+    # 壁時計の区間も、分子と同じ区間に揃える。捨てた block の時間を分母へ入れると
+    # rate が blocks_discarded / blocks_total のぶん低く出る。
+    if first.t_recv is not None and last.t_recv is not None:
+        wall_s = last.t_recv - first.t_recv
+    else:
+        wall_s = (t_end - t_start) if (t_start is not None and t_end is not None) else 0.0
 
     # Arduino自身の時計による rate。mark は「取得したsample数」に対して打たれている。
     ard_rate = None
@@ -286,12 +313,14 @@ def summarize(blocks, stats, t_start, t_end, discard_blocks: int):
         "delivered_in_interval": delivered_in_interval,
         "taken_delta": taken_delta,
         "dropped_delta": dropped_delta,
+        "pending_delta": pending_delta,
         "unaccounted": unaccounted,
         "dropped_total_since_boot": last.dropped,
         "seq_gaps": seq_gaps,
         "lost_blocks": lost_blocks,
         "wall_s": wall_s,
-        "wall_rate_total": (delivered / wall_s) if wall_s > 0 else None,
+        # 分子は delivered_in_interval。分母の wall_s と同じ区間である。
+        "wall_rate_total": (delivered_in_interval / wall_s) if wall_s > 0 else None,
         "arduino_rate_taken": ard_rate,
         "per_ch": per_ch,
         "stats": stats,
@@ -300,6 +329,7 @@ def summarize(blocks, stats, t_start, t_end, discard_blocks: int):
 
 
 def print_report(r, baud: int):
+    """summarize() の結果を人が読む形で出す。"""
     adc_clock = 16_000_000 / (1 << r["adps"]) if r["adps"] else None
     print("")
     print("=== 設定 ===")
@@ -335,9 +365,9 @@ def print_report(r, baud: int):
           % (r["seq_gaps"], r["lost_blocks"]))
     # 収支は同じ区間どうしで比べる。先頭 block の sample は first.taken の時点で
     # 既に数え終わっているため、届いた数から先頭 block ぶんを除く。
-    print("  区間収支            : 取得 %d = 届いた %d + 捨てた %d + 未説明 %d"
+    print("  区間収支            : 取得 %d = 届いた %d + 捨てた %d + ring滞留増減 %d + 未説明 %d"
           % (r["taken_delta"], r["delivered_in_interval"], r["dropped_delta"],
-             r["unaccounted"]))
+             r["pending_delta"], r["unaccounted"]))
     expected_lost = r["lost_blocks"] * r["nsamples_per_block"]
     if r["unaccounted"] == expected_lost:
         print("                        未説明ぶんは block欠番 %d 件と符合する（整合）"
@@ -374,11 +404,13 @@ def write_csv(path: str, r, allow_drops: bool):
     時刻は block header の micros() mark を anchor に、sample index から線形に復元する。
     """
     used = r["used"]
-    if r["dropped_delta"] and not allow_drops:
+    # 回線上で block を失った場合も index と時刻の対応が崩れるため、両方を見る。
+    if (r["dropped_delta"] or r["lost_blocks"]) and not allow_drops:
         raise SystemExit(
-            "取りこぼしが %d 件ある。時刻の復元が曖昧になるため CSV を書かない。\n"
+            "取りこぼしが %d 件、回線上で失った block が %d 件ある。\n"
+            "時刻の復元が曖昧になるため CSV を書かない。\n"
             "承知のうえで書くなら --allow-drops を付ける（時刻は近似になる）。"
-            % r["dropped_delta"]
+            % (r["dropped_delta"], r["lost_blocks"])
         )
 
     first, last = used[0], used[-1]
@@ -390,10 +422,15 @@ def write_csv(path: str, r, allow_drops: bool):
     if period_us <= 0:
         raise SystemExit("micros() mark から周期を出せない。測定時間を延ばす。")
 
+    if first.mark_taken == 0:
+        # mark がまだ打たれていない block を anchor にすると時刻の原点がずれる。
+        raise SystemExit(
+            "先頭 block に micros() mark が無い。--discard-blocks を増やす。"
+        )
+
     nch = first.nch
     base_us = first.mark_us
     base_idx = first.mark_taken
-    idx = first.taken - first.nsamples  # この block の先頭sampleの取得index（近似）
 
     with open(path, "w", encoding="utf-8", newline="\n") as fh:
         if nch > 1:
@@ -401,6 +438,11 @@ def write_csv(path: str, r, allow_drops: bool):
         else:
             fh.write("時刻[us],生ADC値\n")
         for b in used:
+            # index は block ごとに header から引き直す。単調加算だけにすると、
+            # 回線上で block を失ったときに以降のすべての sample へずれが残り、累積する。
+            # header の pending は「この block の sample を取り出す前の ring 滞留数」なので、
+            # 先頭 sample の取得 index は taken - pending になる。
+            idx = b.taken - b.pending
             for ch, v in b.values():
                 t = base_us + (idx - base_idx) * period_us
                 if nch > 1:
@@ -416,6 +458,7 @@ def write_csv(path: str, r, allow_drops: bool):
 
 
 def main(argv=None):
+    """command line entry point。"""
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--port", default="/dev/ttyACM0", help="既定 /dev/ttyACM0")

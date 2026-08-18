@@ -7,7 +7,7 @@
 // この sketch が出すのは **AV_CC を基準にしたときの各入力の生ADC値**だけである。
 // 絶対電圧へ変換するには、AV_CC 自身をデジタルテスター（MAS830L）で測った値が要る。
 //
-//     V_INT_actual = (VBG の生ADC値 / 1023) * AV_CC の実測値
+//     V_INT_actual = (VBG の生ADC値 / 1024) * AV_CC の実測値
 //
 // **テスターの確度が校正の精度の上限になる。**それを超える主張をしない。
 //
@@ -16,6 +16,9 @@
 //   Table 24-3 `Voltage Reference Selections for ADC`: REFS1:0 = 01 は
 //     `AVCC with external capacitor at AREF pin`
 //   Table 24-4 `Input Channel Selections`: MUX3:0 = 1110 は `1.1V (VBG)`、1111 は `0V (GND)`
+//   §24.7 `ADC Conversion Result`: 単端変換の結果は `ADC = (V_IN * 1024) / V_REF` である。
+//     したがって電圧へ戻すときの分母は **1024** であって 1023 ではない。
+//     `0x3FF represents the selected reference voltage minus one LSB` もこれと整合する。
 //   §24.5.2: `The first ADC conversion result after switching reference voltage source may be
 //     inaccurate, and the user is advised to discard this result.`
 //   §24.4: `When the bandgap reference voltage is used as input to the ADC, it will take a
@@ -116,7 +119,7 @@ static void measure(const char *label, uint8_t mux) {
   Serial.print(F(" mean="));
   Serial.print(mean, 3);
   Serial.print(F(" ratio="));
-  Serial.println(mean / 1023.0, 6);
+  Serial.println(mean / 1024.0, 6);
 }
 
 void setup(void) {

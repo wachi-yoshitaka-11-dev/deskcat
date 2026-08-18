@@ -21,6 +21,7 @@
 | file | 役割 |
 |---|---|
 | `arduino-transient-logger/arduino-transient-logger.ino` | Arduino Uno R3 側。ADC を free running で回し、連続 streaming で PC へ流す |
+| `arduino-vref-calibrate/arduino-vref-calibrate.ino` | Arduino Uno R3 側。基準電圧の校正用。AV<sub>CC</sub> 基準で内蔵 1.1 V を読む |
 | `adc_stream_rate.py` | PC 側。実効 sample rate、取りこぼし、channel別の生値を集計する |
 | `test_adc_stream_rate.py` | 合成した byte 列に対する parser の検証。**board を占有せずに回せる** |
 
@@ -84,7 +85,7 @@ arduino-cli compile --fqbn arduino:avr:uno --build-property compiler.cpp.extra_f
 | `LOGGER_BAUD` | UART の baud。**PC 側の `--baud` と一致させる** |
 | `LOGGER_ADPS` | ADPS2:0。ADC clock = F_CPU / 2^ADPS。`DS40002061B` §24.4 は最大分解能に 50〜200 kHz を要求する |
 | `LOGGER_NCH` | 1 または 2。2 のとき `A0` と `A1` を交互に読む |
-| `LOGGER_BLOCK` | 1 block の sample 数。header 21 B に対する payload の割合を決める |
+| `LOGGER_BLOCK` | 1 block の sample 数。header 22 B に対する payload の割合を決める |
 
 ## 入力の配線（作業1）
 
@@ -96,19 +97,25 @@ arduino-cli compile --fqbn arduino:avr:uno --build-property compiler.cpp.extra_f
 
 ## block 形式
 
-little endian。header は 21 B 固定。
+little endian。header は 22 B 固定。
 
 | offset | size | field |
 |---|---|---|
 | 0 | 2 | magic `0xA5 0x5A` |
 | 2 | 2 | block sequence（wrap する） |
-| 4 | 4 | `taken`。ISR が取得した sample 数の累計（**捨てたぶんを含む**） |
+| 4 | 4 | `taken`。ISR が取得した sample 数の累計（**捨てたぶんと、ring に滞留中のぶんを含む**） |
 | 8 | 2 | `dropped`。ring が満杯で捨てた sample 数の累計 |
 | 10 | 4 | `mark_us`。`mark_taken` の時点の `micros()` |
 | 14 | 4 | `mark_taken` |
 | 18 | 1 | この block の sample 数 |
-| 19 | 1 | cfg。bit0-2 = ADPS、bit3 = (channel 数 == 2)、bit4-7 は 0 で予約 |
-| 20 | 1 | header 全 byte の XOR |
+| 19 | 1 | `pending`。**この block の sample を取り出す前の ring 滞留数** |
+| 20 | 1 | cfg。bit0-2 = ADPS、bit3 = (channel 数 == 2)、bit4-7 は 0 で予約 |
+| 21 | 1 | header 全 byte の XOR |
+
+`pending` が要るのは、`taken` が ring 滞留分を含むためである。これが無いと
+PC 側の収支（`taken の増分 = 届いた + 捨てた + ring滞留の増減 + 回線上の欠落`）が閉じず、
+正常な測定に対して「不整合」を誤報しうる。CSV の時刻復元でも、
+各 block の先頭 sample の取得 index を `taken - pending` として引き直すために使う。
 
 payload は sample 数 × 2 B。各 sample は bit 0-9 が生 ADC 値、bit 10 が channel、
 **bit 11-15 は 0 で予約**する。PC 側はこの予約 bit で framing の健全性を確認する。
@@ -135,8 +142,13 @@ ISR で書く値はそのさらに次の変換に効く、として扱う。
   magic と予約 bit の検査を併用して補っているが、通信路の誤り検出を目的とした設計ではない
 - **CSV の時刻は復元値である。**block header の `micros()` mark を anchor に、
   sample index から線形に補間している。**sample 毎の実測時刻ではない。**
-  取りこぼしがあると index と時刻の対応が曖昧になるため、既定では CSV を書かない
+  index は block ごとに `taken - pending` から引き直すため、回線上で block を失っても
+  次の block で自己修復する。**ただし ISR が sample を捨てた場合は、
+  取得 index と届いた sample の対応そのものが崩れる。**
+  取りこぼしと回線上の block 欠落のどちらかがあれば、既定では CSV を書かない
 - **基準電圧の校正は別作業である。**ADC は基準電圧に対する割合を返すので、
-  生値のままでは絶対電圧の閾値と照合できない（正本は `基準電圧が未解決である（設計上の論点）`）
+  生値のままでは絶対電圧の閾値と照合できない（正本は `基準電圧が未解決である（設計上の論点）`）。
+  **電圧へ戻すときの分母は 1024 である。**§24.7 が `ADC = (V_IN * 1024) / V_REF` と定めている。
+  慣習的に使われる 1023 ではない
 - **DeskCat 側へ接続する場合は GND topology の確定が先である。**star point 構成を崩すと
   全 ADC 値がずれる。PC の GND が経路へ入る影響も別に評価する

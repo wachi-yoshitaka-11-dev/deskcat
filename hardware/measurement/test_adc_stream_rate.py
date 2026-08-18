@@ -11,9 +11,11 @@ Python 3 の標準ライブラリだけを使う（ADR-0006）。
 
 from __future__ import annotations
 
+import io
 import os
 import struct
 import sys
+import tempfile
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -21,12 +23,18 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import adc_stream_rate as asr  # noqa: E402
 
 
-def build_block(seq, taken, dropped, mark_us, mark_taken, values, nch=2, adps=7):
-    """sketch と同じ並びで1 block を組む。値は (ch, adc) の列で渡す。"""
+def build_block(seq, taken, dropped, mark_us, mark_taken, values, nch=2, adps=7,
+                pending=None):
+    """sketch と同じ並びで1 block を組む。値は (ch, adc) の列で渡す。
+
+    pending を省略した場合は「ring 滞留がこの block ぶんだけ」という素直な状態にする。
+    """
+    if pending is None:
+        pending = len(values)
     cfg = (adps & 0x07) | (0x08 if nch == 2 else 0x00)
     header = bytearray(asr.MAGIC)
     header += struct.pack(
-        "<HIHIIBB", seq, taken, dropped, mark_us, mark_taken, len(values), cfg
+        "<HIHIIBBB", seq, taken, dropped, mark_us, mark_taken, len(values), pending, cfg
     )
     x = 0
     for b in header:
@@ -49,7 +57,10 @@ def alt_values(n, v0=675, v1=0):
 
 
 class TestParser(unittest.TestCase):
+    """block の切り出しと framing の破れの扱い。"""
+
     def test_parses_single_block(self):
+        """header の全 field と payload を正しく取り出せること。"""
         blk = build_block(7, 1000, 0, 123456, 768, alt_values(8))
         p = asr.BlockParser()
         got = p.feed(blk)
@@ -61,6 +72,7 @@ class TestParser(unittest.TestCase):
         self.assertEqual(b.mark_us, 123456)
         self.assertEqual(b.mark_taken, 768)
         self.assertEqual(b.nsamples, 8)
+        self.assertEqual(b.pending, 8)
         self.assertEqual(b.nch, 2)
         self.assertEqual(b.adps, 7)
         self.assertEqual(list(b.values()), alt_values(8))
@@ -78,6 +90,7 @@ class TestParser(unittest.TestCase):
         self.assertEqual(p.stats.resync_bytes, len(junk))
 
     def test_header_xor_error_is_counted_and_recovered(self):
+        """header の XOR が壊れた block を落とし、後続は拾えること。"""
         good = build_block(2, 256, 0, 20, 256, alt_values(4))
         bad = bytearray(build_block(3, 384, 0, 30, 384, alt_values(4)))
         bad[asr.HEADER_LEN - 1] ^= 0xFF  # header 末尾のXOR byteを壊す
@@ -88,6 +101,7 @@ class TestParser(unittest.TestCase):
         self.assertGreaterEqual(p.stats.header_xor_errors, 1)
 
     def test_reserved_bit_error_detected(self):
+        """sample の予約bitの破れを framing のずれとして検出すること。"""
         blk = bytearray(build_block(4, 512, 0, 40, 512, alt_values(4)))
         # payload 先頭 sample の bit 11 を立てる（予約bitの破れ）。
         off = asr.HEADER_LEN
@@ -99,6 +113,7 @@ class TestParser(unittest.TestCase):
         self.assertEqual(p.stats.reserved_bit_errors, 1)
 
     def test_split_across_chunks_byte_by_byte(self):
+        """1 byte ずつ届いても block を組み立てられること。"""
         blk = build_block(5, 640, 0, 50, 640, alt_values(6))
         p = asr.BlockParser()
         got = []
@@ -118,7 +133,10 @@ class TestParser(unittest.TestCase):
 
 
 class TestSummary(unittest.TestCase):
+    """rate・取りこぼし・欠番の集計。"""
+
     def _two_blocks(self, dropped_second=0, seq_second=1):
+        """1 sample = 100 us になる 2 block を作る。"""
         n = 128
         b0 = build_block(0, n, 0, 1_000_000, n, alt_values(n))
         # 2 block目: 取得は 2n、mark は n 進んで 1 sample 100 us の想定にする。
@@ -135,11 +153,13 @@ class TestSummary(unittest.TestCase):
 
     def test_rate_from_arduino_clock(self):
         blocks, stats = self._two_blocks()
+        blocks[0].t_recv, blocks[1].t_recv = 0.0, 2.0
         r = asr.summarize(blocks, stats, t_start=0.0, t_end=2.0, discard_blocks=0)
         # mark 間 128 sample を 12800 us で進んだので 1 sample = 100 us -> 10000 Sample/s
         self.assertAlmostEqual(r["arduino_rate_taken"], 10000.0, places=3)
-        # 壁時計は 256 sample / 2.0 s = 128 Sample/s
-        self.assertAlmostEqual(r["wall_rate_total"], 128.0, places=6)
+        # 壁時計も同じ区間で出す。2 block の受信間隔 2.0 s に届いたのは
+        # 後続 block の 128 sample だけなので 64 Sample/s になる。
+        self.assertAlmostEqual(r["wall_rate_total"], 64.0, places=6)
         self.assertEqual(r["nch"], 2)
         self.assertEqual(r["delivered"], 256)
         self.assertEqual(r["dropped_delta"], 0)
@@ -147,6 +167,7 @@ class TestSummary(unittest.TestCase):
         self.assertEqual(r["lost_blocks"], 0)
 
     def test_drop_accounting(self):
+        """ISR が捨てた数を区間収支へ正しく載せること。"""
         blocks, stats = self._two_blocks(dropped_second=5)
         r = asr.summarize(blocks, stats, t_start=0.0, t_end=1.0, discard_blocks=0)
         self.assertEqual(r["dropped_delta"], 5)
@@ -172,12 +193,14 @@ class TestSummary(unittest.TestCase):
         self.assertEqual(r["unaccounted"], n)
 
     def test_block_seq_gap_detected(self):
+        """block sequence の欠番と失った件数を数えること。"""
         blocks, stats = self._two_blocks(seq_second=3)
         r = asr.summarize(blocks, stats, t_start=0.0, t_end=1.0, discard_blocks=0)
         self.assertEqual(r["seq_gaps"], 1)
         self.assertEqual(r["lost_blocks"], 2)
 
     def test_per_channel_split(self):
+        """channel ごとに生値を分けて集計すること。"""
         blocks, stats = self._two_blocks()
         r = asr.summarize(blocks, stats, t_start=0.0, t_end=1.0, discard_blocks=0)
         self.assertEqual(set(r["per_ch"]), {0, 1})
@@ -187,8 +210,90 @@ class TestSummary(unittest.TestCase):
         self.assertEqual(r["per_ch"][1]["max"], 0)
 
 
+class TestIntervalConsistency(unittest.TestCase):
+    """壁時計 rate の分子と分母が同じ区間であることを確かめる。"""
+
+    @staticmethod
+    def _uniform(n_blocks, n=128, period_us=100, dt=0.1):
+        """等間隔に受信した n_blocks 件の block を作る。"""
+        blocks = []
+        p = asr.BlockParser()
+        raw = b""
+        for k in range(n_blocks):
+            taken = (k + 1) * n
+            raw += build_block(k, taken, 0, 1_000_000 + k * n * period_us, taken,
+                               alt_values(n))
+        blocks = p.feed(raw)
+        for k, b in enumerate(blocks):
+            b.t_recv = k * dt
+        return blocks, p.stats
+
+    def test_discarding_blocks_does_not_change_rate(self):
+        """捨てた block の時間が分母へ残っていれば rate が下がってしまう。"""
+        blocks, stats = self._uniform(20)
+        r0 = asr.summarize(blocks, stats, 0.0, 1.9, discard_blocks=0)
+        blocks2, stats2 = self._uniform(20)
+        r4 = asr.summarize(blocks2, stats2, 0.0, 1.9, discard_blocks=4)
+        self.assertAlmostEqual(r0["wall_rate_total"], r4["wall_rate_total"], places=6)
+        # 128 sample / 0.1 s = 1280 Sample/s
+        self.assertAlmostEqual(r0["wall_rate_total"], 1280.0, places=6)
+
+    def test_unaccounted_ignores_ring_residue(self):
+        """ring 滞留が増減しても収支は閉じる（pending を差し引くため）。"""
+        n = 128
+        b0 = build_block(0, n, 0, 1_000_000, n, alt_values(n), pending=n)
+        # 2 block目は ring に 10 sample 余分に溜まった状態。taken もそのぶん増える。
+        b1 = build_block(1, 2 * n + 10, 0, 1_000_000 + n * 100, 2 * n,
+                         alt_values(n), pending=n + 10)
+        p = asr.BlockParser()
+        blocks = p.feed(b0 + b1)
+        r = asr.summarize(blocks, p.stats, 0.0, 1.0, discard_blocks=0)
+        self.assertEqual(r["pending_delta"], 10)
+        self.assertEqual(r["unaccounted"], 0)
+
+
+class TestCsv(unittest.TestCase):
+    """CSV 出力の時刻復元。"""
+
+    def test_index_recovers_after_wire_loss(self):
+        """回線上で block を失っても、時刻のずれが以降へ累積しないこと。"""
+        n, period = 128, 100
+        specs = [(0, 1 * n), (1, 2 * n), (3, 4 * n)]  # seq 2 は回線上で失われた
+        raw = b""
+        for seq, taken in specs:
+            raw += build_block(seq, taken, 0, 1_000_000 + (taken - n) * period, taken,
+                               alt_values(n), pending=n)
+        p = asr.BlockParser()
+        blocks = p.feed(raw)
+        for k, b in enumerate(blocks):
+            b.t_recv = k * 0.1
+        r = asr.summarize(blocks, p.stats, 0.0, 0.2, discard_blocks=0)
+        self.assertEqual(r["lost_blocks"], 1)
+
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "out.csv")
+            # 欠落があるので既定では書かない。
+            with self.assertRaises(SystemExit):
+                asr.write_csv(path, r, allow_drops=False)
+            asr.write_csv(path, r, allow_drops=True)
+            rows = [l.strip().split(",") for l in
+                    io.open(path, encoding="utf-8").read().splitlines()[1:]]
+
+        self.assertEqual(len(rows), 3 * n)
+        base_us, base_idx = blocks[0].mark_us, blocks[0].mark_taken
+        # 3番目の block（seq=3）の先頭 sample。取得 index は 3n であり、
+        # 届いた順の index（2n）ではない。単調加算だけだと n*period だけ早くなる。
+        expect = base_us + (3 * n - base_idx) * period
+        self.assertAlmostEqual(float(rows[2 * n][0]), expect, places=1)
+        wrong = base_us + (2 * n - base_idx) * period
+        self.assertNotAlmostEqual(float(rows[2 * n][0]), wrong, places=1)
+
+
 class TestUsDelta(unittest.TestCase):
+    """micros() の差の取り方。"""
+
     def test_wrap(self):
+        """uint32 の wrap を跨いでも正の差になること。"""
         self.assertEqual(asr.us_delta(5, 1), 4)
         # micros() の uint32 wrap を跨いでも正の差になる。
         self.assertEqual(asr.us_delta(3, (1 << 32) - 2), 5)
