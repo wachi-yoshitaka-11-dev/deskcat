@@ -147,6 +147,11 @@ pub struct Session {
     /// あってlinkの切断ではなく、両者を1つのfieldに畳むと、停止後に終端報告を
     /// 書き切れなくなる。
     link_connected: bool,
+    /// 書き切ったmessageの`flush`が未完了か。
+    /// **`WouldBlock`や`TimedOut`は再試行できるerrorであり、1回失敗しただけでは
+    /// bufferの中身は消えない。**flagを残さないと、outboxが空になった後は
+    /// `flush`を呼ぶ契機が無くなり、byteがbufferに残ったままになる。
+    flush_pending: bool,
     /// 停止した理由。停止していなければ`None`。
     stopped: Option<StopReason>,
     counters: SessionCounters,
@@ -185,6 +190,7 @@ impl Session {
             receiver: LineReceiver::with_protocol_limit(),
             outbox,
             link_connected: false,
+            flush_pending: false,
             stopped: None,
             counters: SessionCounters::default(),
             reconnect_attempts: 0,
@@ -257,6 +263,9 @@ impl Session {
         }
         self.link_connected = false;
         self.receiver.reset();
+        // 切断したlinkへはflushできない。保留を持ち越すと再接続後に
+        // 別のlinkへ対して意味のないflushを1回呼ぶことになる。
+        self.flush_pending = false;
         self.counters.discarded_on_disconnect += self.outbox.clear();
     }
 
@@ -431,6 +440,15 @@ impl Session {
         if !self.can_pump() {
             return Pump::Idle;
         }
+        // 前回の書き切りで`flush`が終わっていなければ、先に片付ける。
+        // **outboxが空になると書き込み経路を通らなくなる。**ここで再試行しないと
+        // 再試行できるerrorで落ちたflushが永久に取り残される。
+        if self.flush_pending {
+            match transport.flush() {
+                Ok(()) => self.flush_pending = false,
+                Err(err) => return self.handle_io_error(&err),
+            }
+        }
         // 書き出しの結果だけを取り出し、`outbox`のborrowをここで終える。
         // **copyしない。**1回に1byteしか書けない相手では`pump_write`が
         // byte数だけ呼ばれるため、毎回のcopyは行長に対して二乗の仕事になる。
@@ -454,12 +472,16 @@ impl Session {
                 // では、`write`が受け取っただけでbyteはbufferに残る。**flushしないと
                 // `bytes_out`が増えて`pending_out`が0になり、呼び出し側からは
                 // 送り切ったように見える。
-                if self.outbox.len() < pending_before
-                    && let Err(err) = transport.flush()
-                {
-                    // **byteは既に`write`が受け取っており、取り消せない。**
-                    // 進捗の記録は残したまま、失敗の分類だけを返す。
-                    return self.handle_io_error(&err);
+                if self.outbox.len() < pending_before {
+                    self.flush_pending = true;
+                }
+                if self.flush_pending {
+                    match transport.flush() {
+                        Ok(()) => self.flush_pending = false,
+                        // **byteは既に`write`が受け取っており、取り消せない。**
+                        // 進捗の記録とflag は残したまま、失敗の分類だけを返す。
+                        Err(err) => return self.handle_io_error(&err),
+                    }
                 }
                 Pump::Progress(n)
             }

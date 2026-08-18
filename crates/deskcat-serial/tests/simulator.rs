@@ -636,3 +636,51 @@ fn an_unencodable_message_is_counted() {
     assert_eq!(session.pending_out(), 0, "queueへは入っていない");
     assert_eq!(session.counters().dropped_out, 0, "輻輳とは別に数える");
 }
+
+/// 再試行できるerrorで落ちた`flush`を取り残さない。outboxが空になった後も片付ける。
+#[test]
+fn a_retryable_flush_failure_is_retried_until_it_succeeds() {
+    let mut session = connected_session();
+    let _ = session.send(hello(), 40).expect("queueへ入る");
+    let mut sim = Sim {
+        // 書き切った直後のflushだけWouldBlockで落ちる。
+        flush_errors: VecDeque::from(vec![io::Error::from(io::ErrorKind::WouldBlock)]),
+        ..Sim::default()
+    };
+
+    // 書き切りはするが、flushは落ちるため再試行扱いになる。
+    while matches!(session.pump_write(&mut sim), Pump::Progress(_)) {}
+    assert_eq!(session.pending_out(), 0, "byteはtransportへ渡っている");
+    assert_eq!(sim.flushes, 1, "1回目のflushは失敗している");
+    assert_eq!(session.counters().retries, 1, "再試行として分類される");
+
+    // **outboxは空である。**ここで再試行できなければbufferの中身は取り残される。
+    assert_eq!(session.pump_write(&mut sim), Pump::Idle);
+    assert_eq!(sim.flushes, 2, "outboxが空でもflushを片付ける");
+    assert_eq!(session.state(), ConnectionState::Connected);
+}
+
+/// 切断したlinkへflushを持ち越さない。
+#[test]
+fn a_disconnect_clears_the_pending_flush() {
+    let mut session = connected_session();
+    let _ = session.send(hello(), 40).expect("queueへ入る");
+    let mut sim = Sim {
+        flush_errors: VecDeque::from(vec![io::Error::from(io::ErrorKind::WouldBlock)]),
+        ..Sim::default()
+    };
+    while matches!(session.pump_write(&mut sim), Pump::Progress(_)) {}
+    assert_eq!(sim.flushes, 1, "flushは保留になっている");
+
+    // EOFで切断させる。`Ok(0)`は「dataが無い」ではなく切断である。
+    sim.reads.push_back(Ok(Vec::new()));
+    let _ = session.pump_read(&mut sim, |_| {});
+    assert_eq!(session.state(), ConnectionState::Disconnected);
+
+    let flushes_at_disconnect = sim.flushes;
+    assert_eq!(session.pump_write(&mut sim), Pump::Idle, "切断中は送らない");
+    assert_eq!(
+        sim.flushes, flushes_at_disconnect,
+        "切断したlinkへflushを持ち越さない"
+    );
+}
