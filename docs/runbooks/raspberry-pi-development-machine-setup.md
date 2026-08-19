@@ -1,7 +1,8 @@
 # Raspberry Pi開発端末Setup
 
-> 状態: Draft。対象のRaspberry Pi Zero Wでは未実行
-> 更新: 2026-08-15 1節へfloat ABIの判定手順を追加（[#62](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/62)）。**手順が実機で判別できることは未確認**
+> 状態: 1節から4節を対象のRaspberry Pi Zero Wで実行済み（2節のGitは#8の範囲外として未導入）
+> 更新: 2026-08-15 1節へfloat ABIの判定手順を追加（[#62](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/62)）
+> 更新: 2026-08-17 [#8](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/8) の実機作業で1節から4節を実行した。**float ABIの判定手順は実機で判別できた**（手段6つが一致）。記録は [Version Record](../toolchains/version-records/2026-08-17-pi-direct-build-native.md)。**5節（cross compilation）は保留のまま、依存を持つbuildは未測定である**
 > 適用範囲: Raspberry Pi RuntimeとRaspberry Pi Direct Build profile
 
 ## 目的
@@ -114,7 +115,9 @@ Flags:                             0x5000200, Version5 EABI, soft-float ABI
 >
 > このとき `Tag_CPU_arch` は、同じ armhf でも Raspbian の検体が `v6`、Debian の検体が `v7` であった。**hard-float であることは Armv6 であることを意味しない。**この値は各 distribution が想定する baseline であり、**動かす CPU の値ではない。**
 >
-> **実機で同じ出力が得られることは未確認である。**手順が実際に判別できるかの確認は [#8](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/8) の実機作業で行う。
+> **2026-08-17 に実機で確認した。**[#8](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/8) の作業で対象の Raspberry Pi Zero W 上で手段 A・B・C をすべて実行し、**6 つの手段が hard-float で一致した。**`Tag_ABI_VFP_args` は判定表が hard と定める `VFP registers` そのもので、「判定不能」に当たる値ではなかった。`Tag_CPU_arch` は `v6` で、上の Raspbian 検体と同じである。実出力は [Version Record](../toolchains/version-records/2026-08-17-pi-direct-build-native.md) にある。**この手順が実機で判別できることを確認したのは、この 1 機体の 1 回である。**
+>
+> **実機で現れた読み違えの罠。**この機体の `/proc/cpuinfo` は `CPU architecture: 7` と表示する。**これを Armv7 と読んではならない。**同 file の `CPU part: 0xb76` は ARM1176JZF-S であり Armv6 である。**この行は上の判定表にも `Tag_CPU_arch` にも関係しない。**物理 CPU の根拠は board model と SoC の公式情報に置く（[Raspberry Pi Rust Toolchain](../toolchains/raspberry-pi-rust-toolchain.md#arm-unknown-linux-gnueabihf-を適用してよい条件) の条件 4）。
 
 ### ABIを判別できなかったとき
 
@@ -131,7 +134,7 @@ Flags:                             0x5000200, Version5 EABI, soft-float ABI
 - 候補 target を適用せず、先へ進まない（3節の停止規則と同じ扱いとする）。
 - 得た出力を、匿名化したうえで [#62](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/62) と [#8](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/8) へ記録する。判別できなかったこと自体を、手段と出力つきで残す。
 - **確定させる所有者は [#8](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/8) である。**記録だけして2節以降へ進まない。
-- [Raspberry Pi Rust Toolchain](../toolchains/raspberry-pi-rust-toolchain.md#候補-toolchain) の「候補 toolchain」表にある状態は `ABI 確認待ち` のまま据え置き、確定として書き換えない。
+- [Raspberry Pi Rust Toolchain](../toolchains/raspberry-pi-rust-toolchain.md#候補-toolchain) の「候補 toolchain」表を書き換えない。**同表の `確定` は 2026-08-17 に検証した 1 機体についての記録であり、判別できなかった機体へ引き継げない。**その機体では候補 target を適用せず、判別できなかったことを手段と出力つきで記録する。
 
 ## 2. Native build事前要件
 

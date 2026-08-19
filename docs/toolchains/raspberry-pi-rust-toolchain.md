@@ -1,15 +1,16 @@
 # Raspberry Pi Rust Toolchain
 
-> 状態: 調査済み。Raspberry Pi実機は未検証
+> 状態: 実機検証済み。native host/target を確定
 > 調査日: 2026-07-27
-> 更新: 2026-08-15 float ABIの判定基準と`arm-unknown-linux-gnueabihf`の適用条件を追加（[#62](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/62)）。**実機確認は未実施**
+> 更新: 2026-08-15 float ABIの判定基準と`arm-unknown-linux-gnueabihf`の適用条件を追加（[#62](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/62)）
+> 更新: 2026-08-17 Raspberry Pi Zero W 実機で 8 条件すべてを確認し、`arm-unknown-linux-gnueabihf`を確定（[#8](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/8)）。根拠は [Version Record](version-records/2026-08-17-pi-direct-build-native.md)。**依存を持つbuildとworkspace buildは未測定である**
 > 対象board: Raspberry Pi Zero W（V1.1。ヘッダなし版にpin headerをハンダ付けした個体）
 
 ## 結論
 
 Raspberry Pi Zero W は Zero 2 W とは異なる。公式 product information では BCM2835、single-core Arm11 / Armv6、512 MB の機種である。したがって、64-bit Arm や Armv7 を前提にしない。
 
-32-bit Raspberry Pi OS と hard-float ABI を実機で確認できた場合、Rust の candidate target は次である。
+32-bit Raspberry Pi OS と hard-float ABI を実機で確認できた場合、Rust の candidate target は次である。**2026-08-17 に実機で確認し、これを確定した。**
 
 ```text
 arm-unknown-linux-gnueabihf
@@ -38,7 +39,13 @@ Rust 公式の platform support では、この target は Armv6 Linux hard-floa
 
 **条件 4 と条件 5 も別物である。**`Tag_CPU_arch` は ELF の build attribute であり、その binary が要求する architecture を示す。**CPU を測定した値ではないため、物理 CPU の証拠に使わない。**同様に `uname -m` は kernel 側の値であり、64-bit kernel と 32-bit userspace の組合せでは userspace の architecture を示さない。物理 CPU の根拠は board model と SoC の公式情報に置く。
 
-**これは適用してよいかを判断する gate であり、target の確定ではない。**確定は [#8](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/8) の範囲である。条件を満たせない場合、または ABI を判別できない場合の扱いは [runbook](../runbooks/raspberry-pi-development-machine-setup.md#abiを判別できなかったとき)に従い、[「候補 toolchain」表](#候補-toolchain)の状態欄を `ABI 確認待ち` のまま据え置く。
+**この表は適用してよいかを判断する gate であり、それ自体は target の確定ではない。**確定は [#8](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/8) の範囲であった。
+
+**2026-08-17 に #8 の実機作業で 8 条件すべてを確認し、target を確定した。**実出力は [Version Record](version-records/2026-08-17-pi-direct-build-native.md) にある。float ABI は判定手段 6 つすべてが hard-float で一致し、`Tag_ABI_VFP_args` は判定表が hard と定める `VFP registers` そのものであった。**この機体では「判定不能」に落ちなかった。**
+
+**確定したのは検証した 1 機体についてである。**別の機体、別の OS image、再 install 後の環境では、この 8 条件を改めて確認する。条件を満たせない場合、または ABI を判別できない場合の扱いは [runbook](../runbooks/raspberry-pi-development-machine-setup.md#abiを判別できなかったとき)に従い、その機体について候補 target を適用しない。[「候補 toolchain」表](#候補-toolchain)の確定は検証済みの機体に対する記録であって、未検証の機体へ引き継げるものではない（[Machine Profiles](machine-profiles.md) の「検証の移送」と同じ扱いである）。
+
+**実機で現れた読み違えの罠を 1 つ記録する。**この機体の `/proc/cpuinfo` は `CPU architecture: 7` と表示する。**これを Armv7 と読んではならない。**同 file の `CPU part: 0xb76` は ARM1176JZF-S であり Armv6 である。条件 4 の根拠は board model と SoC の公式情報に置き、`/proc/cpuinfo` の `CPU architecture` 行を物理 CPU の architecture の根拠に使わない。`uname -m`（この機体では `armv6l`）を根拠にしないのと同じ理由である。
 
 ## 初期方針
 
@@ -73,16 +80,20 @@ Pi Zero W は CPU と RAM が限られるため、build 時間と storage 使用
 
 ## 候補 toolchain
 
+状態欄は 2026-08-17 の実機検証（[Version Record](version-records/2026-08-17-pi-direct-build-native.md)）で更新した。
+
 | 項目 | 候補 | 状態 |
 |---|---|---|
-| OS | Raspberry Pi OS 32-bit | 実機確認待ち |
-| Rust channel | stable | 採用候補 |
-| Native host/target | `arm-unknown-linux-gnueabihf` | ABI 確認待ち |
-| Linker | OS の native GNU linker | version 確認待ち |
-| Build method | Pi 上の direct build | #8 で検証 |
-| Cross compilation | 保留 | direct build の計測後に判断 |
+| OS | Raspberry Pi OS 32-bit | 確定。Raspbian GNU/Linux 13 (trixie)、userspace 32-bit |
+| Rust channel | stable | 確定。rustup 経由の stable（rustc 1.97.1） |
+| Native host/target | `arm-unknown-linux-gnueabihf` | **確定**（8 条件を実機で確認） |
+| Linker | OS の native GNU linker | 確定。`cc` 14.2.0、GNU ld 2.44 |
+| Build method | Pi 上の direct build | 最小 program で検証済み。**依存を持つ build は未測定** |
+| Cross compilation | 保留 | **保留を維持**（移行条件のいずれにも当たらない） |
 
 ESP32 用の `esp` toolchain を Pi service の build に使わない。
+
+**distribution package の `rustc` は使わない。**2026-08-17 時点の apt の候補版は `1.85.0+dfsg3-1+rpi1` であり、root `Cargo.toml` の `rust-version = "1.97"` を満たさない。rustup の stable は 1.97.1 でこれを満たす。
 
 ## Cross compilationへ移る条件
 
@@ -93,22 +104,35 @@ ESP32 用の `esp` toolchain を Pi service の build に使わない。
 - storage 消費や書込み負荷が大きい
 - 複数 Pi への配布を自動化する必要が生じた
 
+2026-08-17 の実機計測では、**4 条件のうち評価できた 3 つが当たらず、残る 1 つは未評価であるため、移行する根拠が無いと判断して保留を維持する。****4 条件すべてを否定したのではない。**根拠は [Version Record](version-records/2026-08-17-pi-direct-build-native.md) にある。
+
+| 条件 | 実測 | 判断 |
+|---|---|---|
+| clean build が許容できない | 最小 program の clean build は debug 4〜5 秒台、release 3.5 秒台 | 評価した。当たらない |
+| dependency build の memory 不足 | **未評価。**計測した program の依存は 0 件である | **判断できない。**「当たらない」とは言えない |
+| storage 消費や書込み負荷 | toolchain 約 820 MiB、`target/` 4.6 MiB、空き 24.8 GiB | 評価した。当たらない |
+| 複数 Pi への配布の自動化 | 対象は 1 台 | 評価した。当たらない |
+
+**「dependency build が memory 不足で安定しない」は未評価のまま残る。**依存 0 件の program しか測っていないため、426 MiB の機体で依存を伴う build が通るかはこの計測から言えない。cross compilation の判断を確定させるには、依存を持つ crate の build 計測が別途必要である。
+
 cross compilation では Rust target の追加だけでなく、Armv6 hard-float に対応する linker と target libc が必要になる。build host の library へ誤って link しないことを、`file`、ELF metadata、実機実行で確認する。生成物の float ABI と `Tag_CPU_arch` は、[runbook](../runbooks/raspberry-pi-development-machine-setup.md#float-abiの判定)と同じ手段で読む。
 
 ## 確定条件
 
-- [ ] 物理 board model と revision を記録した
-- [ ] OS、kernel、userspace bitness、libc を記録した
-- [ ] float ABI を、判定に使った command と実出力つきで記録した
-- [ ] `Tag_CPU_arch` を記録し、ELF が Armv6 を超える命令セットを要求しないことを float ABI とは別に確認した
-- [ ] 物理 CPU が Armv6 であることを board model と SoC の公式情報で確認した（`Tag_CPU_arch` と `uname -m` を物理 CPU の根拠にしない）
-- [ ] kernel version と glibc version が Rust 公式の下限（kernel 3.2、glibc 2.17）を満たすことを記録した
-- [ ] Rust stable の host triple を記録した
-- [ ] 最小 Rust program が Pi 上で build できた
-- [ ] 生成物が同じ Pi 上で実行できた
-- [ ] clean build 時間、peak memory、storage 使用量を記録した
-- [ ] project の test command を記録した
-- [ ] direct build を継続するか cross compilation へ移るか決定した
+記録は [Version Record](version-records/2026-08-17-pi-direct-build-native.md) にある。
+
+- [x] 物理 board model と revision を記録した
+- [x] OS、kernel、userspace bitness、libc を記録した
+- [x] float ABI を、判定に使った command と実出力つきで記録した
+- [x] `Tag_CPU_arch` を記録し、ELF が Armv6 を超える命令セットを要求しないことを float ABI とは別に確認した
+- [x] 物理 CPU が Armv6 であることを board model と SoC の公式情報で確認した（`Tag_CPU_arch` と `uname -m` を物理 CPU の根拠にしない）
+- [x] kernel version と glibc version が Rust 公式の下限（kernel 3.2、glibc 2.17）を満たすことを記録した
+- [x] Rust stable の host triple を記録した
+- [x] 最小 Rust program が Pi 上で build できた
+- [x] 生成物が同じ Pi 上で実行できた（reboot 後も実行できた）
+- [x] clean build 時間、peak memory、storage 使用量を記録した
+- [ ] project の test command を記録した — **未実施。**#8 の範囲は最小 Rust program であり、このrepositoryのcrateとworkspaceを Pi 上で build していない。host workspace の検証済み command が Pi で通るかは不明である
+- [ ] direct build を継続するか cross compilation へ移るか決定した — **暫定で direct build を継続。**移行条件のうち「dependency build が memory 不足で安定しない」が未評価であり、確定していない
 
 ## 公式資料
 
