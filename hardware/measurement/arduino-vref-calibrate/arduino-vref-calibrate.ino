@@ -34,10 +34,18 @@
 #include <Arduino.h>
 
 #ifndef CAL_ADPS
-// ADC clock = F_CPU / 2^CAL_ADPS。16 MHz で 7 なら 125 kHz。
+// ADPS2:0。16 MHz で 7 なら ADC clock 125 kHz であり、
 // `DS40002061B` §24.4 が最大分解能に要求する 50〜200 kHz の規定内である。
 // 校正では速度より確度を採る。
 #define CAL_ADPS 7
+#endif
+
+// **`ADPS2:0 = 0` は分周比1ではなく2である**（`DS40002061B` Table 24-5。
+// 000 と 001 がどちらも分周比2）。したがって 0 を許すと 16 MHz で 8 MHz の
+// ADC clock になり、50〜200 kHz を大きく外れる。1..7 に限る。
+// transient-logger 側の `LOGGER_ADPS` と同じ扱いにする。
+#if (CAL_ADPS < 1) || (CAL_ADPS > 7)
+#error "CAL_ADPS must be 1..7 (ADPS=0 selects division by 2, not 1)"
 #endif
 
 #ifndef CAL_SAMPLES
