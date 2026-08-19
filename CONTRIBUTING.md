@@ -261,6 +261,11 @@ Issue itemでは両fieldが予定であり未定なら空欄でよいが、Pull 
 日付を書き換えないため、実績値への更新は手作業で行う。mergeせずcloseした場合の実績日は
 close日である。
 
+**Issue itemでも、完了時には空欄を残さない。**上の「未定なら空欄でよい」は**未定である間の
+扱い**である。`Status`が`Done`になった時点で開始日と終了日は確定しているため、空欄でよい
+根拠が消える。close後に`Start date`へ着手日、`Target date`へclose日（実績）を入れる。
+**Pull Request itemだけが実績を持つと読まない。**
+
 日付はJST（UTC+9）で判断する。GitHubのAPIが返す時刻はUTCであり、JSTの`00:00`から`08:59`に
 作成したPull RequestはUTCでは前日の日付になるため、そのまま転記しない。
 

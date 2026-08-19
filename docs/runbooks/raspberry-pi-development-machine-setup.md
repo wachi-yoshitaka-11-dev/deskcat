@@ -2,7 +2,7 @@
 
 > 状態: 1節から4節を対象のRaspberry Pi Zero Wで実行済み（2節のGitは#8の範囲外として未導入）
 > 更新: 2026-08-15 1節へfloat ABIの判定手順を追加（[#62](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/62)）
-> 更新: 2026-08-17 [#8](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/8) の実機作業で1節から4節を実行した。**float ABIの判定手順は実機で判別できた**（手段6つが一致）。記録は [Version Record](../toolchains/version-records/2026-08-17-pi-direct-build-native.md)。**5節（cross compilation）は保留のまま、依存を持つbuildは未測定である**
+> 更新: 2026-08-17 [#8](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/8) の実機作業で1節から4節を実行した。**float ABIの判定手順は実機で判別できた**（手段6つが一致）。記録は [Version Record](../toolchains/version-records/2026-08-17-pi-direct-build-native.md)。**5節（cross compilation）は保留のまま、依存を持つbuildは未測定である**。この更新は[PR #144](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/144)として2026-08-19に`develop`へmergeした
 > 適用範囲: Raspberry Pi RuntimeとRaspberry Pi Direct Build profile
 
 ## 目的

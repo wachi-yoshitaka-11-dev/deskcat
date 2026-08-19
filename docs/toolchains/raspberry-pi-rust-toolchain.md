@@ -3,7 +3,7 @@
 > 状態: 実機検証済み。native host/target を確定
 > 調査日: 2026-07-27
 > 更新: 2026-08-15 float ABIの判定基準と`arm-unknown-linux-gnueabihf`の適用条件を追加（[#62](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/62)）
-> 更新: 2026-08-17 Raspberry Pi Zero W 実機で 8 条件すべてを確認し、`arm-unknown-linux-gnueabihf`を確定（[#8](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/8)）。根拠は [Version Record](version-records/2026-08-17-pi-direct-build-native.md)。**依存を持つbuildとworkspace buildは未測定である**
+> 更新: 2026-08-17 Raspberry Pi Zero W 実機で 8 条件すべてを確認し、`arm-unknown-linux-gnueabihf`を確定（[#8](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/8)）。根拠は [Version Record](version-records/2026-08-17-pi-direct-build-native.md)。**依存を持つbuildとworkspace buildは未測定である**。この更新は[PR #144](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/144)として2026-08-19に`develop`へmergeした
 > 対象board: Raspberry Pi Zero W（V1.1。ヘッダなし版にpin headerをハンダ付けした個体）
 
 ## 結論
