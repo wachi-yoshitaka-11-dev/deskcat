@@ -300,8 +300,9 @@ class TestCsv(unittest.TestCase):
             with self.assertRaises(SystemExit):
                 asr.write_csv(path, r, allow_drops=False)
             asr.write_csv(path, r, allow_drops=True)
-            rows = [l.strip().split(",") for l in
-                    io.open(path, encoding="utf-8").read().splitlines()[1:]]
+            with io.open(path, encoding="utf-8") as fh:
+                lines = fh.read().splitlines()
+            rows = [line.strip().split(",") for line in lines[1:]]
 
         self.assertEqual(len(rows), 3 * n)
         base_us, base_idx = blocks[0].mark_us, blocks[0].mark_taken
@@ -332,10 +333,11 @@ class TestWireFormat(unittest.TestCase):
     def test_header_len_matches_sketch(self):
         """parser の HEADER_LEN が sketch の #define と一致すること。"""
         import re
-        ino = io.open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                   "arduino-transient-logger",
-                                   "arduino-transient-logger.ino"),
-                      encoding="utf-8").read()
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                            "arduino-transient-logger",
+                            "arduino-transient-logger.ino")
+        with io.open(path, encoding="utf-8") as fh:
+            ino = fh.read()
         m = re.search(r"#define HEADER_LEN (\d+)", ino)
         self.assertIsNotNone(m)
         self.assertEqual(int(m.group(1)), asr.HEADER_LEN)

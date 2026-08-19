@@ -242,6 +242,11 @@ def summarize(blocks, stats, t_start, t_end, discard_blocks: int):
 
     差分で出す量（rate、収支）は、分子と分母を同じ区間へ揃える。
     """
+    # 負値を渡すと blocks[discard_blocks:] が末尾だけを採用区間にしてしまい、
+    # rate と収支が意図と違う区間の値になる。下限判定も通ってしまうため入口で弾く。
+    if discard_blocks < 0:
+        raise SystemExit("discard_blocks に負値は使えない（%d）。" % discard_blocks)
+
     if len(blocks) <= discard_blocks + 1:
         raise SystemExit(
             "block が足りない（%d 件）。配線・baud・sketchの動作を確認する。" % len(blocks)
@@ -519,6 +524,8 @@ def main(argv=None):
                    help="取りこぼしがあっても CSV を書く（時刻は近似になる）")
     p.add_argument("--quiet-banner", action="store_true")
     args = p.parse_args(argv)
+    if args.discard_blocks < 0:
+        p.error("--discard-blocks に負値は使えない。採用区間が末尾だけに変わってしまう。")
     if args.seconds >= MAX_CAPTURE_SECONDS:
         p.error(
             "--seconds は %.0f 未満にする。micros() は約 %.0f s で wrap し、"
