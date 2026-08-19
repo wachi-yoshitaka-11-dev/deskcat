@@ -95,8 +95,13 @@ Commands run:
   # toolchain 導入
   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o /tmp/rustup-init.sh
   sh /tmp/rustup-init.sh -y --no-modify-path --profile minimal --default-toolchain stable
+  # **`--no-modify-path` で導入したため、PATH を通さないと以降の rustup と cargo は動かない。**
+  # shell の起動 file を書き換えていないので、以降の各 session と各 script の先頭で
+  # 都度これを実行した（下の `rustup component add` 以降のすべての command が対象）。
+  export PATH="$HOME/.cargo/bin:$PATH"
   rustup component add rustfmt clippy
   # 最小 program（このrepositoryのcrateは使わない）
+  export PATH="$HOME/.cargo/bin:$PATH"   # 別 session のため再度実行した
   WORK="$HOME/deskcat-issue8"
   cargo new "$WORK/hello" --name hello
   cd "$WORK/hello"
