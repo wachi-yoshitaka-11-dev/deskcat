@@ -138,7 +138,9 @@ Linux x86_64、Rust stable 1.97.1 で検証した。検証日は 2026-08-10 で�
 
 firmware は `crates/deskcat-protocol` を path dependency で使う（[ADR-0008](docs/decisions/0008-firmware-protocol-crate-reuse.md)）。**同 crate の `rust-version` は host と ESP toolchain の両方を満たす下限にしてある。**上げると firmware の build が compile 前に停止する。`crates/deskcat-protocol/` を変更したら、host だけでなく ESP32 build も回す。
 
-Raspberry Pi、HIL、ESP32 の flash と serial monitor には、まだ正式なコマンドが無い。[ツールチェーン一覧](docs/toolchains/README.md) と未検証の runbook 手順を、検証済みコマンドとして扱わない。clean build の成功ごとにこの節を更新する。
+**ESP32 の flash と serial monitor は 2026-08-20 に検証した**（[#6](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/6)。`espflash` 4.5.0）。artifact の path を渡し、`--port` と `--chip esp32` を明示する。**非対話 shell では monitor が落ちるため pty を割り当てる。****chip 識別は `esptool` で行い、`espflash` では代替できない**（family 名しか返さない）。実行した command と版は [Version Record](docs/toolchains/version-records/2026-08-20-esp32-flash-boot-native.md) にある。**主張するのは flash と起動記録までであり、周辺回路と servo は含まない。****USB 抜き差しによる電源再投入後の起動出力は未検証である**（host 側の serial port が USB enumerate 後にしか存在しないため。再現は `espflash` の reset による）。
+
+**Raspberry Pi と HIL の実機試験には、まだ正式なコマンドが無い。**[ツールチェーン一覧](docs/toolchains/README.md) と未検証の runbook 手順を、検証済みコマンドとして扱わない。clean build の成功ごとにこの節を更新する。
 
 実機試験が必要な変更を、PC テストだけで完了扱いにしない。
 

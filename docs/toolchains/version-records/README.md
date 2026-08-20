@@ -15,6 +15,7 @@ file 名と Record ID は初回検証日で固定し、以後の再検証でも�
 | [ESP32 Build (実機 Linux x86_64)](2026-08-15-esp32-build-native-linux.md) | ESP32 Build | `Partial` | 2026-08-15 | 2026-08-15 |
 | [host workspace format／lint／test (CI)](2026-08-15-host-rust-ci.md) | CI | `Verified` | 2026-08-15 | 2026-08-16 |
 | [Raspberry Pi Direct Build (実機 Raspberry Pi Zero W)](2026-08-17-pi-direct-build-native.md) | Raspberry Pi Direct Build | `Partial` | 2026-08-17 | 2026-08-17 |
+| [ESP32 Flash / HIL (実機 Linux x86_64)](2026-08-20-esp32-flash-boot-native.md) | ESP32 Flash / HIL | `Verified` | 2026-08-20 | 2026-08-20 |
 
 **同じ profile の記録が複数あるのは、端末が違うためである。**`2026-08-06`と`2026-08-10`は VM 上、
 `2026-08-15`の2件は実機で取得した。`Container / VM / native:`が異なるため、

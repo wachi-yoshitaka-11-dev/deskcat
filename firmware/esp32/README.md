@@ -71,8 +71,8 @@ deskcat-protocol = { path = "../../crates/deskcat-protocol" }
 
 機種と搭載moduleは確定している（ESP-WROOM-32D開発ボード／秋月電子 M-13628。基板にrevision表示は無い）。根拠は[hardware-bom.md](../../docs/hardware/hardware-bom.md)のMCU-01である。
 
-**公式pin表と現物pin表記の照合は2026-08-15に完了し、[HW-TBD-001](../../docs/hardware/tbd-register.md)はcloseした**（38pinヘッダ両側のsilkが公式`J2`／`J3`と19pin×2列すべてで一致した）。照合先は[ESP32-DevKitC V4公式回路図](https://dl.espressif.com/dl/schematics/esp32_devkitc_v4-sch.pdf)と公式guideのpin description表である（秋月商品ページの添付はモジュールとチップのdatasheetのみで、boardのpin配列表を含まない）。**ただしGPIO割り当てを伴う変更は、まだ入れない。**[gpio-assignment.md](../../docs/hardware/gpio-assignment.md)は実機での電源off導通check、MSP2807のlogic IO levelの現物確認、servo起動時状態の安全review待ちで`Blocked`のままである。**中核chipの識別（`HW-TBD-031`）も未了である。**中核chipは半田付けされた金属シールドの内側にあり刻印を読めないため、要件は2026-08-15にesptoolの報告で満たす形へ再定義された（[esp32-rust-toolchain.md](../../docs/toolchains/esp32-rust-toolchain.md)の`chip識別の満たし方`）。確定はflashとbootを行う#6を待つ。
+**公式pin表と現物pin表記の照合は2026-08-15に完了し、[HW-TBD-001](../../docs/hardware/tbd-register.md)はcloseした**（38pinヘッダ両側のsilkが公式`J2`／`J3`と19pin×2列すべてで一致した）。照合先は[ESP32-DevKitC V4公式回路図](https://dl.espressif.com/dl/schematics/esp32_devkitc_v4-sch.pdf)と公式guideのpin description表である（秋月商品ページの添付はモジュールとチップのdatasheetのみで、boardのpin配列表を含まない）。**ただしGPIO割り当てを伴う変更は、まだ入れない。**[gpio-assignment.md](../../docs/hardware/gpio-assignment.md)は実機での電源off導通check、MSP2807のlogic IO levelの現物確認、servo起動時状態の安全review待ちで`Blocked`のままである。**中核chipの識別（`HW-TBD-031`）は2026-08-20に満たした。**中核chipは半田付けされた金属シールドの内側にあり刻印を読めないため、要件は2026-08-15にesptoolの報告で満たす形へ再定義され（[esp32-rust-toolchain.md](../../docs/toolchains/esp32-rust-toolchain.md)の`chip識別の満たし方`）、#6のflash時に`esptool`が`ESP32-D0WD`を報告した。**値と未加工の出力はそちらとVersion Recordが持ち、ここへ再掲しない。**
 
 ESP-WROOM-32D datasheet v2.7にはPSRAM内蔵variantの記載が無いため、PSRAMを前提とする設定は不要である。
 
-flash、serial monitor、実機起動は#6の範囲である。
+**flash、serial monitor、実機起動は2026-08-20に#6で実施した**（記録は[Version Record](../../docs/toolchains/version-records/2026-08-20-esp32-flash-boot-native.md)）。**確認したのは起動出力とchip名までであり、周辺回路とservoには触れていない。****USB抜き差しによる電源再投入後の起動出力は未検証である**（host側のserial portがUSB enumerate後にしか存在せず、その時点で起動出力が終わっているため。再現は`espflash`のresetによる4回で示した）。
