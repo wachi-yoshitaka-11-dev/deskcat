@@ -1238,6 +1238,30 @@ profileの新設は要さない。**デジタルテスターと同じ扱いで�
 この構成が取れない場合（star pointを作れない、shuntを迂回する戻り経路が残る等）は、
 **測定を実施しない**。誤ったtopologyでの実測値は、電源承認の根拠にしない。
 
+#### 方式1の記録係をこのtopologyへ足すとき（`HW-TBD-034` 作業3）
+
+**上図のstar pointは`5V ingress GND`を含む。**その5 V ingressは変換基板`PSU-INGRESS-01`で
+M-12001を受けて作るものであり、**同品は未購入である**（[hardware-bom.md](hardware-bom.md)の購入待ちリスト）。
+**したがって上図の完全な構成は、現時点では組めない。**
+
+**組める範囲は段階B-1に限られる。**同節（`5 V ingress`）は段階B-1を
+「ESP32を単体でPCのUSBから給電し、flashingとADC loggingを行う」と定め、
+**gateも追加購入も要らない**としている。段階Cが変換基板を要するのに対し、B-1は要さない。
+
+**段階B-1で作業3のうち確認できること**を次に限定する。**これ以上を主張しない。**
+
+| 確認できる | 確認できない |
+|---|---|
+| **PCのGNDが経路へ入る影響。**記録係（Arduino）はPCのUSB給電であり、そのGNDはPC側へ繋がる。ESP32もPCのUSB給電なので、**両者のGNDがPC内部で共通化される**。この経路が測定へ与える影響は段階B-1で評価できる | **servo戻りとshuntを含むstar point。**shuntはservo戻り専用で、servoも`PROT-OC-01`も未購入である |
+| **記録係のGNDをESP32 GNDへ落としたときのADC値の妥当性**（既知電圧を入れた状態での照合） | **`5V ingress GND`とstar pointの同一node性。**変換基板が無いため ingress そのものが無い |
+| **入力headroom**（`5 V railをADCへ直結する条件`。dividerは既定で残す） | **`ADC-SHUNT`の基準電位**。shuntが無い |
+
+**段階B-1で得た結果を、段階Cのtopologyの検証として扱わない。**`HW-TBD-034`の未解決3点のうち
+(3)は、**star point構成そのものの確認を含むため、変換基板が揃うまで完了しない。**
+
+**PCのGNDが経路へ入る影響は、上表のとおり段階B-1で先に評価できる。**
+これは(3)の全部ではなく一部である。
+
 ### Sample rateとlog形式
 
 `115200 8N1`のUSB serialは実効約11.5 kB/sであり、16 bit sampleを連続で流すと
@@ -1578,3 +1602,4 @@ rippleはDMMで代替できない。
 | 2026-08-18 | 47 | [PR #146](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/146)のreview指摘。**`HW-TBD-034`のclose契約が2文書で一致していなかった。**本文の未解決一覧は「測定器の採否、実装、基準電圧の校正、取得方式、GND topology」の5点を挙げるのに対し、[tbd-register.md](tbd-register.md)の`HW-TBD-034`のclose条件は「実装と4文書の主張整合」の2点しか挙げておらず、**校正・取得方式・GND topologyが解けないままcloseしうる書き方だった。**本文側へ`必要帯域の一次資料`を足して台帳と同じ集合にし、close条件の全数は台帳側へ置いた（**値と規則の正は本文であり、台帳へ再掲していない**）。**未解決を増やす方向であり、gateは開いていない。**測定値も規則も変えていない | [PR #146のreview指摘](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/146)、[#147](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/147)。close条件の全数は[tbd-register.md](tbd-register.md)の`HW-TBD-034` |
 | 2026-08-18 | 48 | [PR #146](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/146)のreview指摘。**(a) `HW-TBD-034`のclose条件を1つの正本へ寄せた。**本文の未解決参照が「3点」と読める書き方で、台帳のclose条件7項目と件数が併存していた。**方式1の技術的な3点は本文の`方式1で残っている未解決3点`が正、close条件の全数は台帳が正**と役割を分けた。(b) **Power Treeの記述をblock図の粒度と明示した。**`USBVCC → OPAMP → +5V`の`OPAMP`が電源電流経路に直列かMOSFETを制御する側かは**この出典からは決まらない。**`F1`／`T1`／GND／backfeed経路のschematic粒度の一致は未確認であり、**独立給電はそれまで候補条件として扱う**と明記した。**同じ主張が`AV_CC`の行（`USBから`OPAMP`と`T1`（`FDN340P`）を経て作られる`）にもあったため、そちらも同じ扱いへ揃えた。**片方だけ直すと、粒度の違う2つの記述が残る。**あわせて`HW-TBD-034`のclose条件へ`(6b) Power Treeのschematic粒度の確認`を足した。**未確認をここへ送っただけでは、close条件に無いまま解決済みとして閉じうる。**測定値も閾値も変えていない。未確認を増やす方向である** | [PR #146のreview指摘](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/146)、[#149](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/149)。close条件の全数は[tbd-register.md](tbd-register.md)の`HW-TBD-034` |
 | 2026-08-18 | 49 | **`HW-TBD-034`方式1の作業1を実施し、作業2の測定側を採った**（実測は2026-08-17。未加工の観測と手順は[experiment-log.md](experiment-log.md)の`EXP-001`。**この文書には要件と照合する値だけを置いた**）。(a) **`手持ち候補に固有の制約: SRAMと取得方式`の「実現できるsample rateは未測定である」を実測値へ置き換えた。**連続streamingは**必須要件を2 channel同時で満たした**ため、**SRAM 2 KBは取得方式の障害にならない。****既定のADC clockは125 kHz（§24.4の50〜200 kHzの規定内）とし、250 kHzの実測値も規定外である旨を併記して残した。**具体的な値はこのRevision行へ書かず、同節の表に置く**（再測定のたびにRevision行が古くなるのを避けるためである。実際に一度古くしている）。**目標帯へ届かせるには250 kHzが要るが、**目標帯そのものの根拠が`TBD`である**ため、**根拠が未確定の目標のために一次資料が保証する分解能を手放さない**という判断である（2026-08-18、人間の判断）。baud 115200では取りこぼしが出ることも実測した（transportが律速）。(b) **`手持ち候補の現物識別`の「channel切り替えの扱いは§24.5にあり、未確認である」を確定させた。**§24.5.1により**free running modeでは結果のchannel帰属が1変換ぶん遅れる。**現在の`ADMUX`でtagを付けるとlabelが入れ替わり、**値は正常に見えたままlabelだけが誤るため、同一電圧を2 channelへ入れる確認では検出できない。**1 channelあたりのrateが合計をchannel数で割った値になることも実測で確認した。(c) **`基準電圧が未解決である（設計上の論点）`へ、採る校正方法と採れた値を追記した。****比率法**（AV<sub>CC</sub>基準で内蔵1.1 Vを読む）を採る。**AREF pinをテスターで直接測る代替には依らない**（§24.5.2は`VREF`を`high impedance source`と述べ`high impedance voltmeter`を要求するが、**MAS830Lの入力インピーダンスは未取得で判定できない。**満たさないと断定せず、依存しないことを選んだ。比率法はAREFへ何も接続しない）。内蔵1.1 VのAV<sub>CC</sub>に対する比を実測し、**ADC offsetが現分解能では検出されない**ことも記録した。**§24.4の「bandgapは安定するまで最初の値が誤りうる」が実測で見えた**（切替直後の1変換のみ外れる）。**それでも基準電圧は未解決である。**得られたのは比だけで、**AV<sub>CC</sub>自身の実測と、MAS830L自身のrange別確度・基準温度が未取得である。**確度はrepository内のどこにも記録が無く、**テスターの確度を超える主張をしない。**(d) **`方式1で残っている未解決3点`の表へ状態列を追加した。**(2)は解け、(1)は一部進み、**(3) GND topologyは未着手である。**(e) **`HW-TBD-034`はcloseしない。`MEAS-02`の採否も未確定である。**どのgateも開いていない。**未観測区間について新たな主張をしていない。**連続streamingで`capture window外`は消えるが**`sample間`は残り、「電源過渡をすべて実測済み」とは扱わない。**(f) **`手持ち候補の現物識別`の「目標帯（5〜10 kSample/s）にも入る」を訂正した。**この見込みは**ADC clock 200 kHz相当の15 kSPSを前提にしていたが、prescalerの分周比は2の冪しか選べず**（Table 24-5）、16 MHzからは125 kHzの次が250 kHzである。**50〜200 kHzの規定内に収まるのは125 kHzだけであり、規定内で目標帯へ届く設定は存在しない。****したがって(a)の2択に中間は無い。**この訂正は実測で判明した。**主張を弱める方向であり、gateは開いていない。**(g) **[PR #145](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/145)の自動reviewの指摘で、2026-08-17の初回測定値に集計起因の誤りが2件あったことが判明し、2026-08-18に取り直した。**壁時計rateの分子と分母が同じ区間でなく**実効rateが約0.5 %低く出ていた**こと、および**ADC変換式の分母に1023を使っていた**ことである。後者は§24.7 が `ADC = (V_IN × 1024) / V_REF` と定めており、**1024が正しい。**(a)の表と校正の比を取り直した値へ差し替えた。**結論は変わっていない**（1 channelあたりは依然として目標帯へ届かない）。経緯は[experiment-log.md](experiment-log.md)の`訂正`にある。(h) **自動reviewの2巡目で4件の指摘を受け、うち2件は測定系のwire formatの誤りだった。**`dropped`が16 bitでbaud 115200では約16秒でwrapし、境界で差が0に見えて時刻復元のguardを誤って通す状態だった。32 bitへ広げ、`micros()`のwrapを跨ぐ取得も弾くようにした。**wire formatが変わったため全条件を再測定し、(a)の表を差し替えた。**あわせて**transportの上限の導出を実baudで直した**（`DS40002061B` Table 20-7 の16 MHz・U2X=1・115.2 kbpsは`UBRRn` 16、誤差+2.1 %。公称baudで計算すると実測より低く出る）。**結論は変わっていない。**(i) **測定値を`HW-TBD-028`(b)(c)(d)の合否判定へ使っていない**（判定は`Blocked`のままである） | [#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)、[experiment-log.md](experiment-log.md)の`EXP-001`、`DS40002061B` §24.4／§24.5／§24.5.1／§24.5.2／Table 24-1／Table 24-3／Table 24-4（sha256は[hardware-bom.md](hardware-bom.md)の`MEAS-02`行。取得物のsha256一致を2026-08-17に確認した） |
+| 2026-08-20 | 50 | **`GND topology（測定前に必ず確定させる）`へ、方式1の記録係を足すときの実施可能範囲を追記した**（`HW-TBD-034`作業3の準備）。**上図のstar pointは`5V ingress GND`を含み、それは変換基板`PSU-INGRESS-01`で作るものだが同品は未購入である。したがって完全な構成は現時点で組めない。****組める範囲は段階B-1に限られる**（同段階はgateも追加購入も要さないと`5 V ingress`が定めている）。段階B-1で確認できるもの（**PCのGNDが経路へ入る影響**、記録係のGNDをESP32 GNDへ落としたときのADC値の妥当性、入力headroom）と、確認できないもの（**servo戻りとshuntを含むstar point**、`5V ingress GND`とstar pointの同一node性、`ADC-SHUNT`の基準電位）を表で分けた。**段階B-1で得た結果を段階Cのtopologyの検証として扱わない。**したがって未解決3点の(3)は、**star point構成そのものの確認を含むため変換基板が揃うまで完了しない。****gateは開いていない。数値も規則も再掲していない** | [#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)、[hardware-bom.md](hardware-bom.md)の購入待ちリスト |
