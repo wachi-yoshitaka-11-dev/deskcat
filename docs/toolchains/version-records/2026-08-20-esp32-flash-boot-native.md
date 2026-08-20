@@ -56,8 +56,10 @@ Commands run:
   cargo build --locked
   cargo build --locked --release
   cargo install espflash --version 4.5.0 --locked
-  <esp-idf python> <esp-idf esptool.py> --port <port> chip_id
-  <esp-idf python> <esp-idf esptool.py> --chip esp32 elf2image --output <out> <elf>
+  ESPTOOL=firmware/esp32/.embuild/espressif/python_env/idf5.5_py3.12_env/bin/esptool.py
+  IDFPY=firmware/esp32/.embuild/espressif/python_env/idf5.5_py3.12_env/bin/python
+  "$IDFPY" "$ESPTOOL" --port <port> chip_id
+  "$IDFPY" "$ESPTOOL" --chip esp32 elf2image --output <out> <elf>
   espflash flash --monitor --port <port> --chip esp32 target/xtensa-esp32-espidf/release/deskcat-esp32
 
 Expected result:
@@ -98,6 +100,13 @@ Crystal is 40MHz
 
 **chip 名は `ESP32-D0WD` であり、期待値に一致する。**
 `esptool` の版は **4.12.0**（pin 済み ESP-IDF v5.5.3 の tool set に含まれる。追加導入はしていない）。
+
+**`esptool.py` は PATH では解決できない。**`. "$HOME/export-esp.sh"` を読んでも
+`command -v esptool.py` は何も返さない（同 script が設定するのは `LIBCLANG_PATH` と
+Xtensa compiler の `PATH` である）。`python3` も system の `/usr/bin/python3` が選ばれる。
+**したがって ESP-IDF の Python と `esptool.py` を path で明示して起動する。**
+上の `Commands run` はその形で記録した。`ESP_IDF_TOOLS_INSTALL_DIR=workspace` のため、
+両者は `firmware/esp32/.embuild/` 配下にある。
 
 **MAC address は記録しない**（template の「記録してはいけないもの」に該当する）。
 
@@ -165,4 +174,5 @@ I (364) main_task: Returned from app_main()
   `HW-TBD-028` の (b)(c)(d) は合否判定が `Blocked` である
 - **周辺回路を何も確認していない。**LCD、touch、sensor、servo には触れていない
 - **`HW-TBD-034` の未解決項目は動いていない**（基準電圧の校正、GND topology）
-- 本物の電源再投入の起動出力は採れていない（上記のとおり）
+- 本物の電源再投入の起動出力は採れていない（上記のとおり）。**したがって「電源再投入後の
+  起動を再現できる」は、`espflash` の reset による 4 回で示したにとどまる。USB 抜き差しでの再現は未検証である**

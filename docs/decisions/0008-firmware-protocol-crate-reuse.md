@@ -149,10 +149,14 @@ root workspaceの`exclude`は維持し、lockfileは2つに分かれたままに
       `Boot` messageを送っていない。**この項目は残る。**
 
 最後の項目が満たされるまで、「両側が共有fixtureに合格した」とは言わない。
-現時点の根拠はcross compileが通ることまでである。
+**現時点の根拠は、cross compileが通ることと、2026-08-20の実機起動記録までである**
+（[Version Record](../toolchains/version-records/2026-08-20-esp32-flash-boot-native.md)）。
+**起動は確認したが、`Boot` messageの送出とfixture照合は行っていない。**
 
-flash sizeが#6の実測で問題になった場合、または`deskcat-protocol`がhost専用の依存を必要と
-した場合に、この決定を見直す。
+**flash sizeは2026-08-20の#6の実測で問題にならなかった。**release imageは381,344 bytesで、
+partitionの4,128,768 bytesに対し9.24 %である（`espflash`の`App/part. size`の表示）。
+**したがってこの理由での見直しは要らない。**`deskcat-protocol`がhost専用の依存を必要と
+した場合は、この決定を見直す。
 
 ## 置き換える決定
 

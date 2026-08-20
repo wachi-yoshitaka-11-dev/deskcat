@@ -75,4 +75,4 @@ deskcat-protocol = { path = "../../crates/deskcat-protocol" }
 
 ESP-WROOM-32D datasheet v2.7にはPSRAM内蔵variantの記載が無いため、PSRAMを前提とする設定は不要である。
 
-**flash、serial monitor、実機起動は2026-08-20に#6で実施した**（記録は[Version Record](../../docs/toolchains/version-records/2026-08-20-esp32-flash-boot-native.md)）。**確認したのは起動出力とchip名までであり、周辺回路とservoには触れていない。**
+**flash、serial monitor、実機起動は2026-08-20に#6で実施した**（記録は[Version Record](../../docs/toolchains/version-records/2026-08-20-esp32-flash-boot-native.md)）。**確認したのは起動出力とchip名までであり、周辺回路とservoには触れていない。****USB抜き差しによる電源再投入後の起動出力は未検証である**（host側のserial portがUSB enumerate後にしか存在せず、その時点で起動出力が終わっているため。再現は`espflash`のresetによる4回で示した）。

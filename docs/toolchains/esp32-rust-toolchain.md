@@ -191,9 +191,9 @@ build はそのまま成功する。この取り違えは runbook の版上げ�
 - [x] 正式な format、lint、build command を `AGENTS.md` と root README へ反映した
 - [x] 別の開発端末または clean environment で再現した（CI の `ubuntu-24.04` runner。[#42](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/42)、[Version Record](version-records/2026-08-10-esp32-build-ci.md)）
 
-**未達は 1 項目になった。**この文書の状態は `検証済み`（`Verified`）ではなく **`build検証済み`** にとどめる。語の定義は [状態ラベル](README.md#状態ラベル) を参照する。
+**2026-08-20 に最後の 1 項目（chip の識別）を満たし、確定条件はすべて達成した。**この文書の状態を **`検証済み`（`Verified`）** へ上げる。語の定義は [状態ラベル](README.md#状態ラベル) にある。**ただし `Verified` が指すのはこの文書の確定条件であり、周辺回路・servo・Protocol は含まない**（下記「この状態が主張しないこと」）。
 
-- **chip の識別**: **非破壊では刻印を読めないことが 2026-08-15 に確定した**（シールド内側）。**したがって「撮り直せば満たせる項目」ではない。**module 刻印は読了しており、搭載 module は module 自身の刻印で確定した。その datasheet が中核 chip を示すため、build への影響は無い。**満たし方は 2026-08-15 に再定義した**（[chip 識別の満たし方](#chip-識別の満たし方)、[HW-TBD-031](../hardware/tbd-register.md)）。
+- **chip の識別**: **非破壊では刻印を読めないことが 2026-08-15 に確定した**（シールド内側）。そのため満たし方を同日に再定義し、**2026-08-20 に #6 で満たした**（`esptool` 4.12.0 が `ESP32-D0WD` を報告した。[chip 識別の満たし方](#chip-識別の満たし方)）。**この項目は未達ではなくなった。**記録は [Version Record](version-records/2026-08-20-esp32-flash-boot-native.md)
 - **公式 pin 表と現物 pin 表記の照合**: **2026-08-13 に完了し、一致した**（[HW-TBD-001](../hardware/tbd-register.md) は close）。**この項目は未達ではなくなった。**#6 の flash 前提条件も、この照合については満たされる。
 
 **別端末での再現は満たした。**根拠と、そう判断してよい理由を次に示す。
@@ -215,13 +215,20 @@ lockfile、clean build）をすべて記録している。
 標準OSは [ADR-0005](../decisions/0005-standard-development-os.md) により実機 Linux であり、
 Windows は対象外のため再現対象に含めない。**CI は Windows ではなく Linux であり、この除外に当たらない。**
 
-**それでも状態は `Verified` へ上げない。**残る 1 項目（chip の識別）は CI では代替できない。**「CI が通ったから昇格できる」とは結論しない。**
+**CI だけでは `Verified` へ上げられなかった。**残っていた chip の識別は CI では代替できず、**実機での flash を要した。**2026-08-20 に実機 Linux で実施して満たしたため昇格した。**「CI が通ったから昇格できる」ではない。**
 
 **うち chip の識別は、満たし方を 2026-08-15 に再定義した。**旧条件は非破壊で成立せず、
 満たし方が未定のままだった。**再定義したのは満たし方であって、項目が満たされたわけではない。**
 **2026-08-20 に #6 で実施し、この項目を満たした**（`esptool` 4.12.0 が `ESP32-D0WD` を報告した。[chip 識別の満たし方](#chip-識別の満たし方)）。記録は [Version Record](version-records/2026-08-20-esp32-flash-boot-native.md)。
 
-flash、serial monitor、実機起動は #6 の範囲であり、この文書の build-only 確定条件には含めない。
+## この状態が主張しないこと
+
+**flash、serial monitor、実機起動は 2026-08-20 に #6 で実施した**（記録は [Version Record](version-records/2026-08-20-esp32-flash-boot-native.md)）。**それでも `Verified` が主張するのはこの文書の確定条件までである。**次は含まない。
+
+- **周辺回路と servo。**LCD、touch、sensor、servo には触れていない。[gpio-assignment.md](../hardware/gpio-assignment.md) は `Blocked` のままである
+- **Protocol。**#6 の最小 firmware は Protocol session を確立せず、共有 fixture へ合格していない
+- **電源品質。**`HW-TBD-028` の合否判定は `Blocked` のままである
+- **USB 抜き差しによる電源再投入後の起動出力。**抜き差しは行ったが、**host 側の serial port は USB enumerate 後にしか存在せず、その時点で起動出力は終わっている。****未検証のまま残る**（詳細は [Version Record](version-records/2026-08-20-esp32-flash-boot-native.md)）
 
 ### chip 識別の満たし方
 
