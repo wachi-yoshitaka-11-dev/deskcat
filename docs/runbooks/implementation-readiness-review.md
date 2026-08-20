@@ -50,7 +50,7 @@ Peripheral driverまたはservo出力は、いずれもこのgateを通過して
 | ESP32 workspaceを分離する | ArchitectureとしてPass | ADR-0001 |
 | 公式情報による互換性調査 | Pass | `docs/toolchains/esp32-rust-toolchain.md` |
 | 互換性のあるRust／ESP-IDF version | build検証済み | 追加作業なし。#5（PR #40）で確定し、#86でCIの`ubuntu-24.04`から再現した。証拠は[開発端末の記録](../toolchains/version-records/2026-08-06-esp32-build-linux.md)と[CIの記録](../toolchains/version-records/2026-08-10-esp32-build-ci.md)の2件 |
-| 再現可能なbuild／flash／monitor command | Partial | **buildは検証済み。**確定commandは`AGENTS.md`の「検証」節とroot READMEにある。**未確定はflashとserial monitorで、#6の範囲** |
+| 再現可能なbuild／flash／monitor command | Partial | **buildは検証済み。**確定commandは`AGENTS.md`の「検証」節とroot READMEにある。**flashとserial monitorは2026-08-20に#6で検証した**（`espflash flash --monitor`。記録は[Version Record](../toolchains/version-records/2026-08-20-esp32-flash-boot-native.md)）。**残るのはPi側とHILであり、`AGENTS.md`の検証済みcommandへは未反映** |
 | Draft protocolが存在する | Review用としてPass | #4 |
 | 承認済みprotocol制限とfixture | Partial | #9でschema群のfixtureとhost実装の合格を確認済み。session判定・duplicate replay・budgetの3群は#12、firmware側の合格は#10 |
 | Host／firmware workspaceが存在する | Pass | firmware workspaceは#5／#40、host workspaceは#9で作成した |

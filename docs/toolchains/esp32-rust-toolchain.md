@@ -65,7 +65,7 @@ ESP-WROOM-32D の datasheet v2.7 には **PSRAM を内蔵する variant の記�
 | `esp-idf-svc` | `0.52.1` | `0.52.1` |
 | `embuild` | `0.33` | `0.33.3` |
 | linker | `ldproxy` | `ldproxy` 0.3.5 → `xtensa-esp-elf-gcc` 15.2.0 |
-| runner | `espflash flash --monitor` | 未検証。flash Issue（#6）で確認する |
+| runner | `espflash flash --monitor` | **2026-08-20 に検証した**（`espflash` 4.5.0）。`--port` と `--chip esp32` を明示し、artifact の path を渡して実行した。**非対話 shell では monitor が `Failed to initialize input reader` で落ちるため pty を割り当てる。**記録は [Version Record](version-records/2026-08-20-esp32-flash-boot-native.md) |
 | ESP-IDF tools location | workspace | workspace（`firmware/esp32/.embuild`） |
 
 `esp-idf-hal` 0.46.2、`esp-idf-sys` 0.37.2、`embassy-time` 0.5.1 を含む **184 個の依存**の確定版は `firmware/esp32/Cargo.lock` にあり、主要なものは [Version Record](version-records/2026-08-06-esp32-build-linux.md) にも記載している。`Cargo.lock` の `[[package]]` は、root crate `deskcat-esp32` 自身を含むため 185 entry になる。
@@ -113,7 +113,7 @@ ESP-WROOM-32D の datasheet v2.7 には **PSRAM を内蔵する variant の記�
 - `espup`
 - `ldproxy`
 - `espflash` は flash、monitor を行う端末だけで必須
-- `esptool` は flash を行う端末だけで必須。**chip 識別の確認に要る**（[chip 識別の満たし方](#chip-識別の満たし方)）。**`espflash` では代替できない。**ESP-IDF の tool 一式に含まれるかは未検証であり、#6 で確認する
+- `esptool` は flash を行う端末だけで必須。**chip 識別の確認に要る**（[chip 識別の満たし方](#chip-識別の満たし方)）。**`espflash` では代替できない。****2026-08-20 に、pin 済み ESP-IDF v5.5.3 の tool 一式へ含まれることを確認した**（`esptool` 4.12.0。追加導入は不要）。記録は [Version Record](version-records/2026-08-20-esp32-flash-boot-native.md)
 - `cargo-espflash` は任意。初期手順では command surface を増やさない
 
 host は [ADR-0005](../decisions/0005-standard-development-os.md) の標準OS である実機 Linux を対象とする。ESP-IDF が公式に列挙する OS package と、`espup` が出力する environment export が必要になる。
@@ -180,7 +180,7 @@ build はそのまま成功する。この取り違えは runbook の版上げ�
 
 - [x] 物理基板の機種と搭載 module を確認した（ESP-WROOM-32D 開発ボード／秋月電子 M-13628。基板に revision 表示は無い）
 - [x] **module 刻印を読み取った**（`ESPRESSIF` / `ESP32-WROOM-32D`。2026-08-13、斜光＋接写）
-- [ ] **chip の識別を確認した。****旧項目「chip 刻印を読み取った」は非破壊で満たせないため 2026-08-15 に書き換え、同日に満たし方を再定義した**（chip はシールド内側にある）。**満たし方は [chip 識別の満たし方](#chip-識別の満たし方) に定める。**実施は [#6](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/6)（[HW-TBD-031](../hardware/tbd-register.md)）
+- [x] **chip の識別を確認した**（2026-08-20。`esptool` 4.12.0 が `ESP32-D0WD` を報告した）。**旧項目「chip 刻印を読み取った」は非破壊で満たせないため 2026-08-15 に書き換え、同日に満たし方を再定義した**（chip はシールド内側にある）。**満たし方は [chip 識別の満たし方](#chip-識別の満たし方) に定める。**未加工の出力と実行した command は [Version Record](version-records/2026-08-20-esp32-flash-boot-native.md) にある
 - [x] **公式 pin 表と現物 pin 表記を照合した**（2026-08-13、19pin×2 列すべて一致。[HW-TBD-001](../hardware/tbd-register.md) は close 済み）
 - [x] 開発端末の profile と version record を作成した
 - [x] レビュー済み template commit から最小 project を生成した
@@ -219,7 +219,7 @@ Windows は対象外のため再現対象に含めない。**CI は Windows で�
 
 **うち chip の識別は、満たし方を 2026-08-15 に再定義した。**旧条件は非破壊で成立せず、
 満たし方が未定のままだった。**再定義したのは満たし方であって、項目が満たされたわけではない。**
-実施は #6 であり、**この項目は未達のままである**（[chip 識別の満たし方](#chip-識別の満たし方)）。
+**2026-08-20 に #6 で実施し、この項目を満たした**（`esptool` 4.12.0 が `ESP32-D0WD` を報告した。[chip 識別の満たし方](#chip-識別の満たし方)）。記録は [Version Record](version-records/2026-08-20-esp32-flash-boot-native.md)。
 
 flash、serial monitor、実機起動は #6 の範囲であり、この文書の build-only 確定条件には含めない。
 
@@ -234,7 +234,7 @@ flash、serial monitor、実機起動は #6 の範囲であり、この文書の
 | 満たし方 | **実機へ接続したときに `esptool` が報告する chip 名**を記録し、`ESP32-D0WD` または `ESP32-D0WD-V3` であることを確認する |
 | 期待値が 2 つある理由 | `esptool` は major revision 3 の個体へ `-V3` を付ける。**どちらであるかは現物を読むまで決まらない**ため、両方を満たしたものとして扱う |
 | **`espflash` では満たせない** | `espflash` が印字するのは family 名 `esp32` であり、品番を含まない（根拠は下表）。**本文書は runner を `espflash flash --monitor` と記録しているため、その出力を見ただけではこの項目を満たさない** |
-| 使う command | **#6 で確定する。**下表の一次資料が示す例は **flash 時の出力**であり、**他の command でも同じ行が出るかは確認していない。**実行した command と `esptool` の版を [Version Record](version-record-template.md) へ記録する |
+| 使う command | **2026-08-20 に確定した。**`esptool.py --port <port> chip_id` を使う。**この command の出力の label は `Chip is` であり、`Chip type:` ではない**（`Chip type:` を出すのは `espflash` だが、そちらは family 名しか含まない）。**照合するのは chip 名だけ**であるため判定は成立する。実行した command と `esptool` の版は [Version Record](version-records/2026-08-20-esp32-flash-boot-native.md) にある |
 | datasheet の扱い | 中核 chip を `ESP32-D0WD` とする [ESP-WROOM-32D datasheet v2.7](https://documentation.espressif.com/esp32-wroom-32d_esp32-wroom-32u_datasheet_en.pdf) の記載は根拠として維持する。**ただし datasheet の記載だけではこの項目を満たさない** |
 | 期待値と食い違った場合 | `ESP32-D0WD` 系以外が返ったら、datasheet 由来の記載が現物と食い違う。**その訂正**（[hardware-bom.md](../hardware/hardware-bom.md) の `MCU-01` と本文書の [board から target を決めた根拠](#board-から-target-を決めた根拠)）**は別 Issue で行う。**この決定はその訂正を含まない |
 | 実施時期 | [#6](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/6)。**この項目のチェックが埋まるのは #6 のあとである** |
@@ -260,8 +260,10 @@ flash、serial monitor、実機起動は #6 の範囲であり、この文書の
 **版へ固定したのは実装の引用だけである。**上表 2 行目の `esptool` は v5.3.1、3 行目の `espflash` は
 v4.5.0 であり、既定 branch は変わるため tag へ固定した path で確認した。**documentation の link は
 固定していない。**上表 1 行目は `latest` を指しており、**内容が変わりうる**ため取得日を併記した。
-**いずれも採用版として確定したわけではない。**使用する版は Issue
-[#6](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/6) で決め、[Version Record](version-record-template.md) へ記録する。
+**引用時点では採用版として確定していなかった。****2026-08-20 に [#6](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/6) で決めた。**
+`espflash` は **4.5.0** を採用し、導入 command は [ESP32 開発端末セットアップ](../runbooks/esp32-development-machine-setup.md) が持つ。
+`esptool` は **pin 済み ESP-IDF v5.5.3 の tool set に含まれる 4.12.0** を使い、追加導入しない。
+**実際に使った版と command は [Version Record](version-records/2026-08-20-esp32-flash-boot-native.md) にある**（引用に使った版とは別である。上表 2 行目の `esptool` v5.3.1 は実装の引用であり、**実行した版は 4.12.0 である**）。
 
 **この再定義とあわせて日付を 1 件訂正した。**上の確定条件は旧記載で「非破壊で満たせないため
 **2026-08-13 に**書き換えた」としていたが、書き換えたのは **2026-08-15** である。08-13 は

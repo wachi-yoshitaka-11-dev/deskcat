@@ -143,8 +143,10 @@ root workspaceの`exclude`は維持し、lockfileは2つに分かれたままに
 - [x] `firmware/esp32`で`cargo build --locked`が通る。root workspaceの`exclude`を外さずに
       path dependencyを張れること、lockfileが2つに分かれたままで矛盾しないことを含む。
       別端末での再現は`.github/workflows/firmware.yml`が`ubuntu-24.04`で行う。
-- [ ] 実機でfirmwareが起動し、共有fixtureに合格する。**未実施。**flashと実機試験は
-      [ADR-0005](0005-standard-development-os.md)により実機Linuxに限られ、#6を待つ。
+- [ ] 実機でfirmwareが起動し、共有fixtureに合格する。**起動は2026-08-20に#6で確認した**
+      （[Version Record](../toolchains/version-records/2026-08-20-esp32-flash-boot-native.md)）。
+      **共有fixtureへの合格は未実施である。**#6の最小firmwareはProtocol sessionを確立せず、
+      `Boot` messageを送っていない。**この項目は残る。**
 
 最後の項目が満たされるまで、「両側が共有fixtureに合格した」とは言わない。
 現時点の根拠はcross compileが通ることまでである。
