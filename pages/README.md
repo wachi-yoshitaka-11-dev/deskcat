@@ -72,7 +72,7 @@ pageが`post`へ落ちることはなく、postが`page`へ落ちることもな
 
 **`page.html`があるおかげで、`docs/`配下のfileを1行も変更せずに文書用layoutが当たる。**`default.html`を欠かすと、`page.html`も消したときにlayoutなしのHTMLが生成される。
 
-`pages/_config.yml`の`theme: jekyll-theme-cayman`は**削除しない。**`github-pages` gemの`Configuration::DEFAULTS`が`theme => jekyll-theme-primer`を持つため、keyを消すとreviewしていないprimerが暗黙に有効化される。review済みのCaymanをinertなbaseとして残す方が安全である。`{% seo %}`（jekyll-seo-tag）が使えるのも、このgemの依存だからである。
+`pages/_config.yml`の`theme: jekyll-theme-cayman`は**削除しない。**`github-pages` gemの`Configuration::DEFAULTS`が`theme => jekyll-theme-primer`を持つため、keyを消すとreviewしていないprimerが暗黙に有効化される。review済みのCaymanをinertなbaseとして残す方が安全である。`{% seo %}`（jekyll-seo-tag）が使えるのも、Cayman gemの依存として読み込まれるからである。
 
 `pages/assets/css/style.scss`はthemeのSCSSを読み込まない。配色、typography、chrome、card、table、blockquote、code block、responsive layout、a11yを自前で持つ。文字色と背景色の組は、明暗いずれのmodeでもWCAG AAのcontrast比（4.5:1、24 px以上または18.66 px以上のboldは3:1）を満たす。Sassのcompileはこの端末では実行できず、GitHub ActionsのPR buildが唯一の検証経路である。
 

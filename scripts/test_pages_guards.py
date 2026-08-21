@@ -103,6 +103,44 @@ def _resolve_git_index_path():
     return guards.full_path(index_path)
 
 
+def decode_ico(data):
+    """`build_favicon`とは独立にICOを復号し、寸法ごとのASCII artへ戻す。
+
+    復号はencoderのhelperを使わずに書く。共有すると両方が同じ間違いをする。
+
+    **これが捕まえるのはencoder側の誤りだけである。**channel順（BGRA）を
+    取り違えれば落ちる（実際にRGBAへ変えて落ちることを確認した）。一方、
+    ASCII art自体を書き換えた場合は、比較の両辺が同時に変わるため落ちない。
+    artは正本であり、その内容はdiff reviewで読む前提である（公開asset register
+    にも同じ根拠を記載している）。testで代替できる性質ではない。
+    """
+    reserved, kind, count = struct.unpack_from("<HHH", data, 0)
+    if reserved != 0 or kind != 1:
+        raise AssertionError("not an ICO file")
+    characters = {
+        value: key for key, value in prepare_pages.FAVICON_PALETTE.items()
+    }
+    images = {}
+    for index in range(count):
+        entry = struct.unpack_from("<BBBBHHII", data, 6 + 16 * index)
+        offset = entry[7]
+        header = struct.unpack_from("<IiiHHIIiiII", data, offset)
+        width = header[1]
+        height = header[2] // 2
+        pixel_start = offset + 40
+        rows = []
+        for y in range(height):
+            row = []
+            for x in range(width):
+                base = pixel_start + (y * width + x) * 4
+                blue, green, red, alpha = data[base:base + 4]
+                row.append(characters.get((red, green, blue, alpha), "?"))
+            rows.append("".join(row))
+        # ICO内のBMPはbottom-upである。
+        images[width] = tuple(reversed(rows))
+    return images
+
+
 class PrepareRun:
     def __init__(self, exit_code, output):
         self.exit_code = exit_code
@@ -877,11 +915,33 @@ class FaviconStagingTests(PublishGuardTestCase):
     """
 
     def test_staged_favicon_matches_the_generated_bytes(self):
+        """stagingが、別の定数ではなく`build_favicon()`の出力を書くこと。
+
+        artの中身は検証できない（両辺が同じ関数由来）。ここで見るのは配線であり、
+        以前の`FAVICON_BYTES`のような別の定数を書いていないことである。
+        """
         staged_root, _ = self.assert_staging_succeeds()
         staged = os.path.join(staged_root, "favicon.ico")
         self.assertTrue(os.path.isfile(staged), "favicon.ico was not staged")
         with open(staged, "rb") as handle:
             self.assertEqual(handle.read(), prepare_pages.build_favicon())
+
+    def test_staged_favicon_decodes_back_to_the_source_art(self):
+        """公開されるICOが、sourceのASCII artへ1 pixel単位で戻ること。
+
+        独立に書いた復号で戻すため、channel順や行順、offsetを取り違えていれば
+        落ちる。**art自体の書き換えは検出しない**（`decode_ico`のdocstring）。
+        """
+        staged_root, _ = self.assert_staging_succeeds()
+        with open(os.path.join(staged_root, "favicon.ico"), "rb") as handle:
+            images = decode_ico(handle.read())
+        self.assertEqual(
+            images,
+            {
+                32: prepare_pages.FAVICON_ART_32,
+                16: prepare_pages.FAVICON_ART_16,
+            },
+        )
 
 
 if __name__ == "__main__":

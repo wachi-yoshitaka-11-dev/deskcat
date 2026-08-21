@@ -26,7 +26,9 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;800&display=swap">
     <link rel="stylesheet" href="{{ '/assets/css/style.css' | relative_url }}">
   </head>
-  <body class="dc-body{% if page.layout == 'home' %} dc-body-home{% endif %}">
+  <!-- 入口pageだけ肉球の透かしを強く出すため、そのpageにだけclassを付ける。
+       他のpageではclass属性そのものを出さない。 -->
+  <body{% if page.layout == 'home' %} class="dc-body-home"{% endif %}>
     <a class="dc-skip" href="#content">本文へ移動する</a>
 
     {% if page.layout != 'home' %}
