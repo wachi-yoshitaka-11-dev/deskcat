@@ -365,6 +365,29 @@ Pull Requestに限定している。**それ以外のPull Requestでは、この
 [#82](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/82)（存在しない照合先を参照していた）、
 [#61](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/61)（本文が「4 Pull Request、14 file」のまま、実際は9 commitへ増えていた）である。
 
+#### 2つのPass
+
+回数とは別に、**最終diffに対して次の2つを別々に実施する。**同じ読み方を2回繰り返しても、
+拾えるものは増えない。
+
+**要件照合Pass。**受け入れ条件、Issueの対象範囲、上のchecklistの観点を、差分と1つずつ
+突き合わせる。「だいたい満たしている」で通さない。**満たしていない項目は、満たしていないと
+書く。**このPassは、何を作るはずだったかを手元に置いて読む。
+
+**fresh-context Pass。****何を作るつもりだったかを一旦忘れて、差分だけを読む。**
+作成者は意図を頭に持っているため、書いていないことを読み取って補完してしまう。
+初めてこのrepositoryを見た人が、その差分だけで同じ結論に辿り着くかを見る。
+このPassで拾えるのは、意図を知らないと意味が通らない記述、宣言だけで根拠が無い主張、
+前提の書き漏れである。
+
+**2つのPassは同じ最終diffに対して行う。**どちらかの後に差分が変わったら、
+**両方が無効**になる。差分を変えたら2つとも実施し直す。
+
+宣言はcommit trailerで行う。**書式の例は[Merge方式](#merge方式)にあり、値の正本は
+`scripts/review_gate.py`である。**trailerはcommitへ結び付くため、差分を変えると宣言が
+自動的に無効になる。**収束の宣言も同じtrailerで行う。**回数と2つのPassは別の軸であり、
+1つの値にまとめるとどちらをやっていないのかが分からなくなる。
+
 ### Merge前の確認
 
 **未解決のreview threadが0件であることを確認するまでmergeしない。**
@@ -625,6 +648,8 @@ gh pr merge <N> --squash --subject "<Pull Requestの題名>" --body-file <path>
 
 ```text
 Change-Class: review-required
+Self-Review: requirements-pass
+Self-Review: fresh-context-pass
 Self-Review: converged
 Instruction-Change: reviewed-as-data
 ```

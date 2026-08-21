@@ -44,6 +44,13 @@ def _git(root, *arguments, stdin_text=None):
     return result.stdout
 
 
+def _review_trailers():
+    """`Self-Review`の宣言をすべて並べた行を返す。値の正本はscript側にある。"""
+    return "".join(
+        f"{gate.TRAILER_REVIEW}: {value}\n" for value in gate.REVIEW_DECLARATIONS
+    )
+
+
 def _run(arguments, cwd=None):
     return subprocess.run(
         [sys.executable, SCRIPT, *arguments],
@@ -209,7 +216,7 @@ class ReviewGateTests(unittest.TestCase):
             root,
             "AGENTS.mdを直す\n\n"
             f"{gate.TRAILER_CLASS}: {gate.CLASS_MINOR}\n"
-            f"{gate.TRAILER_REVIEW}: {gate.REVIEW_CONVERGED}\n",
+            + _review_trailers(),
         )
         result = _run(["receipt", "--repository-root", root, "--base", "HEAD~1"])
         self.assertEqual(result.returncode, 1, result.stdout)
@@ -222,10 +229,66 @@ class ReviewGateTests(unittest.TestCase):
             root,
             "追記する\n\n"
             f"{gate.TRAILER_CLASS}: {gate.CLASS_REVIEW}\n"
-            f"{gate.TRAILER_REVIEW}: {gate.REVIEW_CONVERGED}\n",
+            + _review_trailers(),
         )
         result = _run(["receipt", "--repository-root", root, "--base", "HEAD~1"])
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_receipt_requires_every_review_declaration(self):
+        """`Self-Review`は3つとも要る。1つ欠けたら通さない。
+
+        収束と2つのPassは別の軸である。1つでも欠けたときに、どれが欠けたかを
+        診断へ出すことも確認する。
+        """
+        for missing in gate.REVIEW_DECLARATIONS:
+            with self.subTest(missing=missing):
+                root = self._repository()
+                declared = "".join(
+                    f"{gate.TRAILER_REVIEW}: {value}\n"
+                    for value in gate.REVIEW_DECLARATIONS
+                    if value != missing
+                )
+                self._write(root, PLAIN_DOC, BASE_TEXT + "ここに追記する。\n")
+                self._commit(
+                    root,
+                    "追記する\n\n"
+                    f"{gate.TRAILER_CLASS}: {gate.CLASS_REVIEW}\n" + declared,
+                )
+                result = _run(
+                    ["receipt", "--repository-root", root, "--base", "HEAD~1"]
+                )
+                self.assertEqual(result.returncode, 1, result.stdout)
+                self.assertIn(missing, result.stderr)
+
+    def test_receipt_rejects_an_unknown_review_declaration(self):
+        """知らない値を足しても通さない。3つ揃っていても余りを許さない。"""
+        root = self._repository()
+        self._write(root, PLAIN_DOC, BASE_TEXT + "ここに追記する。\n")
+        self._commit(
+            root,
+            "追記する\n\n"
+            f"{gate.TRAILER_CLASS}: {gate.CLASS_REVIEW}\n"
+            + _review_trailers()
+            + f"{gate.TRAILER_REVIEW}: looks-fine\n",
+        )
+        result = _run(["receipt", "--repository-root", root, "--base", "HEAD~1"])
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("looks-fine", result.stderr)
+
+    def test_receipt_rejects_a_duplicated_review_declaration(self):
+        """同じ宣言を2回書いても通さない。実施した回数の証拠にはならない。"""
+        root = self._repository()
+        self._write(root, PLAIN_DOC, BASE_TEXT + "ここに追記する。\n")
+        self._commit(
+            root,
+            "追記する\n\n"
+            f"{gate.TRAILER_CLASS}: {gate.CLASS_REVIEW}\n"
+            + _review_trailers()
+            + f"{gate.TRAILER_REVIEW}: {gate.REVIEW_DECLARATIONS[0]}\n",
+        )
+        result = _run(["receipt", "--repository-root", root, "--base", "HEAD~1"])
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn(f"duplicated=['{gate.REVIEW_DECLARATIONS[0]}']", result.stderr)
 
     def test_a_later_commit_without_trailers_invalidates_the_receipt(self):
         """reviewの後にdiffが変わったら宣言が無効になること。
@@ -238,7 +301,7 @@ class ReviewGateTests(unittest.TestCase):
             root,
             "追記する\n\n"
             f"{gate.TRAILER_CLASS}: {gate.CLASS_REVIEW}\n"
-            f"{gate.TRAILER_REVIEW}: {gate.REVIEW_CONVERGED}\n",
+            + _review_trailers(),
         )
         self._write(root, PLAIN_DOC, BASE_TEXT + "ここに別の追記をする。\n")
         self._commit(root, "review後に書き換える")
@@ -273,19 +336,20 @@ class ReviewGateTests(unittest.TestCase):
             root,
             "AGENTS.mdを直す\n\n"
             f"{gate.TRAILER_CLASS}: {gate.CLASS_REVIEW}\n"
-            f"{gate.TRAILER_REVIEW}: {gate.REVIEW_CONVERGED}\n"
-            f"{gate.TRAILER_INSTRUCTION}: {gate.INSTRUCTION_ACK}\n",
+            + _review_trailers()
+            + f"{gate.TRAILER_INSTRUCTION}: {gate.INSTRUCTION_ACK}\n",
         )
         result = _run(["gate", "--repository-root", root, "--base", "HEAD~1"])
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
-        # 宣言を1つ落とすと落ちること。3つが揃っていることを見ているのを確認する。
+        # trailerの種類を1つ落とすと落ちること。`Instruction-Change`まで見ているのを
+        # 確認する。`Self-Review`の値の欠落は別のtestが見る。
         self._write(root, "AGENTS.md", "# Rules\n\nさらになおす。\n")
         self._commit(
             root,
             "AGENTS.mdをさらに直す\n\n"
             f"{gate.TRAILER_CLASS}: {gate.CLASS_REVIEW}\n"
-            f"{gate.TRAILER_REVIEW}: {gate.REVIEW_CONVERGED}\n",
+            + _review_trailers(),
         )
         result = _run(["gate", "--repository-root", root, "--base", "HEAD~1"])
         self.assertEqual(result.returncode, 1, result.stdout)
