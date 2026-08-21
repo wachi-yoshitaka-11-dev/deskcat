@@ -6,8 +6,13 @@
 //
 // この sketch が出すのは **AV_CC を基準にしたときの各入力の生ADC値**だけである。
 // 絶対電圧へ変換するには、AV_CC 自身をデジタルテスター（DT830B）で測った値が要る。
+// **現状は `5V` pin を代理値として測っており、AV_CC 自身は測れていない。**
 //
-//     V_INT_actual = (VBG の生ADC値 / 1024) * AV_CC の実測値
+//     V_INT_estimate = (VBG の生ADC値 / 1024) * AV_CC の代理値
+//
+// **`5V` pin は `AVCC` pin ではない。**Uno R3 では `AVCC` は `+5V` からフィルタを経る。
+// **その差は測っていないし上限も与えていないため、得られるのは絶対値ではなく代理値ベースの推定である。**
+// 差を測るか上限を与えるまで、絶対電圧としての合否判定に使わない。
 //
 // **テスターの確度が校正の精度の上限になる。**それを超える主張をしない。
 //
@@ -162,8 +167,10 @@ void loop(void) {
   measure("A1 ", MUX_A1);
 
   // serial 出力は ASCII だけにする。flash を節約し、端末側の encoding に依存しない。
-  Serial.println(F("# V_INT_actual = ratio(VBG) * AVCC_measured"));
-  Serial.println(F("# AVCC_measured: measure the 5V pin with the DMM (DT830B), 20V range."));
+  Serial.println(F("# V_INT_estimate = ratio(VBG) * AVCC_proxy"));
+  Serial.println(F("# AVCC_proxy: 5V header pin measured with the DMM (DT830B), 20V range."));
+  Serial.println(F("# The 5V pin is NOT the AVCC pin. The difference is not bounded."));
+  Serial.println(F("# Therefore this is a proxy-based estimate, not an absolute value."));
   Serial.println(F("# 20V range resolution is 10mV: uncertainty is AT LEAST +/-10mV."));
   Serial.println(F("# Accuracy is not stated by the vendor. Do not claim better."));
   delay(2000);
