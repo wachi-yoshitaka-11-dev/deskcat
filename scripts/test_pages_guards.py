@@ -709,6 +709,7 @@ class LayoutBoundaryTests(PublishGuardTestCase):
     """
 
     def test_declared_layouts_are_staged(self):
+        """列挙した3枚だけが`.pages-src/_layouts/`へ入ること。"""
         staged_root, _ = self.assert_staging_succeeds()
         staged_layouts = os.path.join(staged_root, "_layouts")
         for name in prepare_pages.PORTAL_LAYOUTS:
@@ -723,11 +724,13 @@ class LayoutBoundaryTests(PublishGuardTestCase):
         )
 
     def test_undeclared_layout_on_disk_fails(self):
+        """列挙外のlayoutを置いたら、公開せずbuildを止めること。"""
         path = self.track(os.path.join(LAYOUTS_ROOT, "__guardtest-extra.html"))
         _write(path, "<p>undeclared layout</p>")
         self.assert_staging_fails("Layout is not declared in PORTAL_LAYOUTS")
 
     def test_declared_layout_missing_on_disk_fails(self):
+        """列挙したlayoutが無いなら、layoutなしのHTMLを作らず止めること。"""
         path = os.path.join(LAYOUTS_ROOT, "page.html")
         backup = _read(path)
         self.addCleanup(_write, path, backup)
@@ -735,6 +738,7 @@ class LayoutBoundaryTests(PublishGuardTestCase):
         self.assert_staging_fails("Declared layout is missing: pages/_layouts/page.html")
 
     def test_declared_layout_not_tracked_by_git_fails(self):
+        """追跡外のlayoutを公開しないこと。localの下書きを混ぜない。"""
         self.detached_index_without("pages/_layouts/page.html")
         self.assert_staging_fails(
             "Declared layout is not tracked by Git: pages/_layouts/page.html"
@@ -785,6 +789,7 @@ class FaviconTests(unittest.TestCase):
     """
 
     def test_art_is_square_and_uses_the_declared_palette(self):
+        """sourceのASCII artが正方形で、palette外の文字を含まないこと。"""
         for art, expected in (
             (prepare_pages.FAVICON_ART_32, 32),
             (prepare_pages.FAVICON_ART_16, 16),
@@ -796,18 +801,22 @@ class FaviconTests(unittest.TestCase):
                     self.assertIn(character, prepare_pages.FAVICON_PALETTE)
 
     def test_ragged_art_is_rejected(self):
+        """行幅が揃わないartは、ずれたpixelを書き出す前に止めること。"""
         with self.assertRaises(guards.ValidationError):
             prepare_pages._favicon_image(("..", "."))
 
     def test_non_square_art_is_rejected(self):
+        """非正方形のartを、寸法を偽ったICOにせず止めること。"""
         with self.assertRaises(guards.ValidationError):
             prepare_pages._favicon_image(("..", "..", ".."))
 
     def test_undeclared_character_is_rejected(self):
+        """palette外の文字を、透過として黙って流さず止めること。"""
         with self.assertRaises(guards.ValidationError):
             prepare_pages._favicon_image(("X.", ".."))
 
     def test_empty_art_is_rejected(self):
+        """空のartを、0 x 0のICOとして書き出さず止めること。"""
         with self.assertRaises(guards.ValidationError):
             prepare_pages._favicon_image(())
 
@@ -821,6 +830,7 @@ class FaviconTests(unittest.TestCase):
             prepare_pages._favicon_image(oversized)
 
     def test_icon_declares_two_square_images_with_consistent_sizes(self):
+        """ICOのdirectoryとBMP headerが、実byte数と整合すること。"""
         data = prepare_pages.build_favicon()
         reserved, kind, count = struct.unpack_from("<HHH", data, 0)
         self.assertEqual(reserved, 0)
@@ -857,10 +867,19 @@ class FaviconTests(unittest.TestCase):
 
         self.assertEqual(sorted(seen), [16, 32])
 
+
+class FaviconStagingTests(PublishGuardTestCase):
+    """stagingが実際にpixel artから組んだfaviconを書き出すこと。
+
+    以前はこのcaseを既存の`.pages-src/`に依存して書いていた。clean checkoutでは
+    directoryが無いためskipされ、生成物が壊れていても検出できなかった。
+    自分でstagingを走らせて、その結果と突き合わせる。
+    """
+
     def test_staged_favicon_matches_the_generated_bytes(self):
-        staged = os.path.join(STAGING_ROOT, "favicon.ico")
-        if not os.path.isfile(staged):
-            self.skipTest("staging has not run yet")
+        staged_root, _ = self.assert_staging_succeeds()
+        staged = os.path.join(staged_root, "favicon.ico")
+        self.assertTrue(os.path.isfile(staged), "favicon.ico was not staged")
         with open(staged, "rb") as handle:
             self.assertEqual(handle.read(), prepare_pages.build_favicon())
 

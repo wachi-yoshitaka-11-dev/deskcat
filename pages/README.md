@@ -59,7 +59,18 @@ Hardware写真や技術図のような文書向けimageはここへ置かない�
 | `home.html` | `pages/index.md` | front matterの`layout: home` |
 | `page.html` | `docs/`配下の約40 pageとroot直下の公開文書 | GitHub Pages既定pluginの`jekyll-default-layout`が注入する |
 
-front matterを持たないMarkdownへlayoutを割り当てるのは`jekyll-default-layout`である。選択順は`home`（`url == "/"`）→ `page`（`Jekyll::Page`）→ `post` → collection名 → `default`である。**`page.html`があるおかげで、`docs/`配下のfileを1行も変更せずに文書用layoutが当たる。**`default.html`を欠かすと、`page`も無い場合にlayoutなしのHTMLが生成される。
+front matterを持たないMarkdownへlayoutを割り当てるのは`jekyll-default-layout`である。**fallbackは横並びの1本ではなく、文書の種別ごとに決まる。**
+
+| 文書の種別 | 探す順 |
+|---|---|
+| 入口page（`url == "/"`） | `home` → `page` → `default` |
+| page（`Jekyll::Page`） | `page` → `default` |
+| post | `post` → `default` |
+| collection document | collection名 → `default` |
+
+pageが`post`へ落ちることはなく、postが`page`へ落ちることもない。どれも存在しなければlayoutは付かない。
+
+**`page.html`があるおかげで、`docs/`配下のfileを1行も変更せずに文書用layoutが当たる。**`default.html`を欠かすと、`page.html`も消したときにlayoutなしのHTMLが生成される。
 
 `pages/_config.yml`の`theme: jekyll-theme-cayman`は**削除しない。**`github-pages` gemの`Configuration::DEFAULTS`が`theme => jekyll-theme-primer`を持つため、keyを消すとreviewしていないprimerが暗黙に有効化される。review済みのCaymanをinertなbaseとして残す方が安全である。`{% seo %}`（jekyll-seo-tag）が使えるのも、このgemの依存だからである。
 
