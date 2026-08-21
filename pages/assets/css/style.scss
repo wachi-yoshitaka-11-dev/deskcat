@@ -308,8 +308,10 @@ a {
 
 // ---------------------------------------------------------------- hero
 
-.dc-main {
-  display: block;
+// skip linkのためにfocusを受け取れるようにしてあるが、focus ringは本文全体を
+// 囲うだけで情報にならない。keyboardの位置は本文の先頭要素で分かる。
+.dc-main:focus {
+  outline: none;
 }
 
 .dc-hero {

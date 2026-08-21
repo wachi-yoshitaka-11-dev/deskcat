@@ -55,7 +55,13 @@
     </header>
     {% endif %}
 
-    <main id="content" class="dc-main">
+    <!--
+      `tabindex="-1"`が無いと、skip linkを押しても`<main>`はfocusを受け取れず、
+      URLのfragmentだけが変わってkeyboardの位置が先頭に残るbrowserがある。
+      本文のprose styleは`page.html`の`.dc-doc`が持つ。`default`を直接使うpageは
+      現在404だけであり、prose中心のpageを増やすなら`page`側を使う。
+    -->
+    <main id="content" class="dc-main" tabindex="-1">
       {{ content }}
     </main>
 
