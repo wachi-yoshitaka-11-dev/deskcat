@@ -731,6 +731,80 @@ a {
       color: #f0e2d8;
       font-size: inherit;
     }
+
+    // rougeが出すtokenの色。Cayman由来のrouge stylesheetを読み込まなくなった
+    // ため、ここが唯一の定義になる。`docs/protocol/esp32-pi-protocol.md`の
+    // JSON blockでは実際に548個のspanが出る（2026-08-21に公開siteで実測）。
+    //
+    // **網羅ではない。**このrepositoryのcode blockが出すclass（`nl`、`mi`、
+    // `mf`、`p`、`w`）と、一般的なgroupだけを塗る。列挙外のtokenは基準色を
+    // 継ぐため、色が付かないだけで読めなくなることはない。
+    //
+    // code blockの地は明暗どちらのmodeでも暗色に固定してあるので、1組で足りる。
+    // いずれも`#2b211e`に対して6:1以上ある。
+    .c,
+    .c1,
+    .cd,
+    .cm,
+    .cp,
+    .cs {
+      color: #b9a8a0;
+    }
+
+    .k,
+    .kc,
+    .kd,
+    .kn,
+    .kp,
+    .kr,
+    .kt {
+      color: #f4b7c5;
+    }
+
+    .dl,
+    .s,
+    .s1,
+    .s2,
+    .sb,
+    .sd,
+    .se,
+    .sh,
+    .si,
+    .sr,
+    .ss,
+    .sx {
+      color: #a8d5c2;
+    }
+
+    .il,
+    .m,
+    .mf,
+    .mh,
+    .mi,
+    .mo {
+      color: #e8c184;
+    }
+
+    .na,
+    .nb,
+    .nc,
+    .nf,
+    .ni,
+    .nl,
+    .nn,
+    .no,
+    .nt,
+    .nv,
+    .py {
+      color: #f0aab9;
+    }
+
+    .o,
+    .ow,
+    .p,
+    .pi {
+      color: #d9c9c0;
+    }
   }
 
   // `border-collapse: collapse`ではtableのborder-radiusが無視され、角が直角の
