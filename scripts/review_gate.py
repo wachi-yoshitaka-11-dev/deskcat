@@ -54,8 +54,18 @@ TRAILER_INSTRUCTION = "Instruction-Change"
 
 CLASS_MINOR = "minor"
 CLASS_REVIEW = "review-required"
-REVIEW_CONVERGED = "converged"
 INSTRUCTION_ACK = "reviewed-as-data"
+
+# `Self-Review`で宣言する内容。**3つとも要る。**
+#
+# 収束（新規指摘0件が2 round）と、2つのPassは別の軸である。1つの値にまとめると、
+# どれをやっていないのかが分からなくなる。要件照合Passとfresh-context Passは
+# 同じ最終diffに対して行い、差分が変わったら両方が無効になる。定義は
+# `CONTRIBUTING.md`の「自己レビュー」にある。
+#
+# **これは宣言であって証拠ではない。**scriptが確かめられるのは、3つが揃っていることと、
+# その宣言がこのcommitに結び付いていることだけである。
+REVIEW_DECLARATIONS = ("requirements-pass", "fresh-context-pass", "converged")
 
 MARKDOWN_SUFFIXES = (".md", ".markdown")
 
@@ -239,10 +249,16 @@ def _check_receipt(root, head, computed):
             f" {computed}. A declaration cannot widen the minor path."
         )
     review = found.get(TRAILER_REVIEW, [])
-    if review != [REVIEW_CONVERGED]:
+    missing = [value for value in REVIEW_DECLARATIONS if value not in review]
+    unknown = [value for value in review if value not in REVIEW_DECLARATIONS]
+    # 重複も落とす。同じ宣言を2回書いても、実施した回数の証拠にはならない。
+    duplicated = sorted({value for value in review if review.count(value) > 1})
+    if missing or unknown or duplicated:
         problems.append(
-            f"head commit must carry {TRAILER_REVIEW}: {REVIEW_CONVERGED},"
-            f" found {review}"
+            f"head commit must carry exactly one {TRAILER_REVIEW} trailer for each of"
+            f" {list(REVIEW_DECLARATIONS)}."
+            f" missing={missing} unknown={unknown} duplicated={duplicated}"
+            f" found={review}"
         )
     return problems
 
