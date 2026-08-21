@@ -72,7 +72,8 @@ dependencyの増減はゼロである。あわせてCayman由来のOpen Sans外�
 - `pages/assets/css/style.scss`はthemeのSCSSを読み込まない。配色、typography、chrome、
   card、table、code block、responsive layout、a11yを自前で持つ。
 - `pages/_config.yml`の`theme: jekyll-theme-cayman`は削除しない。削除するとprimerが
-  暗黙に当たる。`{% seo %}`（jekyll-seo-tag）が使えるのも、このgemの依存だからである。
+  暗黙に当たる。`{% seo %}`（jekyll-seo-tag）が使えるのも、Cayman gemの依存として
+  読み込まれるからである。
 - `pages/_layouts/`の公開は`prepare_pages.py`の`PORTAL_LAYOUTS`が列挙したexact pathに
   限る。列挙外のfileがdirectoryにあればbuildを失敗させる。存在、Gitの追跡、symlinkと
   reparse point、拡張子の確認は`pages/assets/`と同じ規則を課す。
@@ -104,13 +105,17 @@ dependencyの増減はゼロである。あわせてCayman由来のOpen Sans外�
 | 自前layoutの初回buildが失敗する | この端末で静的mockupを作りDOMとCSSを確認したうえで、Pull RequestのCIで数往復する前提を置く |
 | 外部fontの読み込みが増える | 追加はM PLUS Rounded 1c（SIL OFL 1.1）1書体のみ。Cayman由来のOpen Sans依存が消えるため、通信先hostは増えない |
 | a11yが退行する | contrast比4.5:1（大きい文字3:1）、`:focus-visible`、`prefers-reduced-motion`、44 pxのhit targetを実測で確認する |
+| 生成したfaviconが再び誰からも参照されなくなる | `validate_pages_output.py`が全pageの`<link rel="icon">`を要求する |
+| CSSの`url(...)`のpath誤りが静かに404になる | `validate_pages_output.py`がHTMLの`href`／`src`と同じ規則で解決する |
+| theme SCSSのimportが戻る | `validate_pages_output.py`が生成CSSからCayman固有の識別子を検出する |
 
 ## 検証
 
 この決定は、次を満たすことで検証する。**確認できる時期が項目ごとに違う。**
 `Upload Pages artifact`は`main`へのpushだけを対象にしているため、
-**Pull Requestのrunからは生成物（`_site/`）を取り出せない。**生成HTMLとCSSの
-中身に関する項目は、`develop`→`main`昇格後のread-backでしか確認できない。
+**Pull Requestのrunから生成物（`_site/`）を取り出して人が見ることはできない。**
+そのため、生成HTMLとCSSの中身に関する項目は`validate_pages_output.py`の検査へ
+落として、CIの中で判定させている。
 
 Pull RequestのCIが毎回自動で見るもの:
 
@@ -122,15 +127,28 @@ Pull RequestのCIが毎回自動で見るもの:
 | 生成siteのlinkが解決する | `BROKEN_LINKS=0` |
 | `favicon.ico`が32 x 32と16 x 16の2枚を含み、ASCII artと1 pixel単位で一致する | `test_pages_guards.py`（encoderとは独立に復号して突き合わせる） |
 | `pages/_layouts/`の公開境界がfail-closedである | `test_pages_guards.py` |
+| 生成HTMLが`<link rel="icon">`を持つ | `validate_pages_output.py`（全pageを検査する） |
+| 生成CSSにthemeの痕跡が無い | `validate_pages_output.py`（Cayman固有の識別子を検出する） |
+| 肉球SVGの`mask-image`が404にならない | `validate_pages_output.py`（CSSの`url(...)`をHTMLと同じ規則で解決する） |
+
+当初はこれらを「deploy後のread-backで見るもの」としていた。`Upload Pages artifact`は
+`main`へのpush限定であり、Pull Requestのrunから生成物を取り出せないためである。
+しかし「生成したfaviconが誰からも参照されていない」状態が長く気付かれなかった経緯から、
+**目で見る運用ではなく`validate_pages_output.py`の検査項目へ移した。**
+CSSの`url(...)`はHTMLの`href`／`src`と同じ規則で解決させ、`data:`と`javascript:`も
+同様に拒否する。
+
+themeの痕跡の検出は、Cayman固有の識別子（`#157878`、`page-header`、`project-name`、
+`project-tagline`、`main-content`、`site-footer-owner`）を生成**CSS**に限って探す。
+配色やfontを一般に禁止するものではない。HTMLとMarkdownを対象にしないのは、本ADRと
+runbookがこれらの語を引用しており、自分の文書で落ちるためである。
 
 deploy後のread-backで見るもの（**CIでは代替できない**）:
 
 | 項目 | 確認方法 |
 |---|---|
-| 生成HTMLが`<link rel="icon">`を持つ | 公開pageのHTMLを取得して確認する |
-| `<meta name="theme-color">`が新paletteの値である | 同上 |
-| 生成CSSにCayman由来の規則とOpen Sansの`@import url(...)`が含まれない | 公開`assets/css/style.css`を取得して確認する |
-| 肉球SVGの`mask-image`が404にならない | CSSの`url()`は`validate_pages_output.py`のlink検査対象外である |
+| `<meta name="theme-color">`が新paletteの値である | 公開pageのHTMLを取得して確認する。値の一致をCIで固定すると、palette変更のたびに検査を書き換えることになるため入れない |
+| 実際の見た目（書体、hero、cardの色調、tabのicon） | 公開siteを開いて確認する |
 
 この端末で実測したもの（生成siteそのものではない）:
 

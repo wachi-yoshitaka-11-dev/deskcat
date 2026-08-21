@@ -109,7 +109,14 @@ Asset追加前に[公開asset register](../governance/published-asset-register.m
 
 `pages/assets/css/style.scss`はthemeのSCSSを読み込まず、配色、typography、chrome、card、table、blockquote、code block、responsive layout、a11yを自前で持つ（[ADR-0009](../decisions/0009-pages-own-layout.md)）。Sassのcompileはこの端末では実行できず、GitHub ActionsのPR buildが唯一の検証経路である。**layoutを変更したときは、CIで数往復する前提を置く。**この端末でできるのは、layoutのliquidを展開した静的mockupをbrowserで確認することまでである。
 
-`favicon.ico`は`prepare_pages.py`が32 x 32と16 x 16のpixel artから組み立て、`_layouts/default.html`が`<link rel="icon">`で参照する。以前はCaymanのlayoutがこのlinkをコメントアウトしたまま配信していたため、生成したfaviconはどのpageからも参照されていなかった。
+`favicon.ico`は`prepare_pages.py`が32 x 32と16 x 16のpixel artから組み立て、`_layouts/default.html`が`<link rel="icon">`で参照する。以前はCaymanのlayoutがこのlinkをコメントアウトしたまま配信していたため、生成したfaviconはどのpageからも参照されていなかった。**同じ状態を繰り返さないため、`validate_pages_output.py`は生成HTMLがfaviconを参照していることを要求する。**
+
+`validate_pages_output.py`は生成CSSについても次を検査する（[ADR-0009](../decisions/0009-pages-own-layout.md)）。
+
+- Cayman固有の識別子が含まれない（theme SCSSを再びimportしたことの目印）
+- `url(...)`のtargetが、HTMLの`href`／`src`と同じ規則で解決する。`data:`と`javascript:`は拒否する
+
+`url(...)`の検査が要るのは、`mask-image`でassetを参照する構成ではpath誤りが静かに404になるためである。
 
 次は公開しない。
 
