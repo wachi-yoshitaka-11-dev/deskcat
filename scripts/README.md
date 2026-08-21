@@ -10,7 +10,7 @@
 | `prepare_pages.py` | 公開対象を`.pages-src/`へ複製し、公開禁止情報を検査する。診断のfile pathはstaging-root相対で出力する | Pages workflowとlocal |
 | `validate_pages_output.py` | 生成済み`_site/`のlinkと公開禁止情報を検査する。拡張子allowlistとsize上限は`.pages-src/`側と同じ値を使う。診断のfile pathはsite-root相対で出力し、`EXTENSIONS=`／`UNSCANNED=`／`LARGEST=`で公開物の内訳を残す | Pages workflowとlocal |
 | `test_link_validators.py` | source／生成siteのanchor、Pages baseurl（引用、YAML comment、末尾slashを含む）、時間制限付きHTML解析、local URL解決（encoding、unsafe scheme、directory、曖昧候補、case、reparse point、非HTML assetを含む）、公開禁止pattern・local path・値の非露出、Markdown link抽出、追跡file／symlink helperの0・1・複数件、PathSpec、Git quoting前提、非ASCII path、**symlinkを途中に挟むpathとsymlink自身へのlinkが未公開として報告されること**、**閉じていないcode fenceが、その後ろの壊れたlinkを隠す前に失敗すること**を検証する。link作成不可の環境では対象caseを成功件数と分けてskipする | Pages workflowとlocal |
-| `test_pages_guards.py` | 公開境界の回帰test（未宣言asset、追跡外file、hash不一致、size超過、公開禁止patternとlocal staging pathの非露出、**Gitのmode 120000によるsymlink除外**、**file属性のreparse point除外**、拡張子）を検証する。symlinkの2 caseは、どちらのguardが働いたかをskip理由で確認する | Pages workflowとlocal |
+| `test_pages_guards.py` | 公開境界の回帰test（未宣言asset、追跡外file、hash不一致、size超過、公開禁止patternとlocal staging pathの非露出、**Gitのmode 120000によるsymlink除外**、**file属性のreparse point除外**、拡張子）を検証する。あわせて`pages/_layouts/`の境界（`PORTAL_LAYOUTS`の列挙外、欠落、追跡外、symlink）と、faviconを検証する。**faviconは、encoderとは独立に書いた復号でICOをASCII artへ戻して突き合わせる**（生成bytesを`build_favicon()`と比べても両辺が同じ関数由来で常に一致し、channel順や行順の誤りを検出できない）。symlinkのcaseは、どちらのguardが働いたかをskip理由で確認する | Pages workflowとlocal |
 | `lib/publish_guards.py` | secret／個人path pattern、path containmentとroot相対表記、追跡file列挙（`core.quotePath=false`で非ASCII pathをescapeさせない）、Gitのmodeによるsymlink判定、見出しanchor生成、fence外行の抽出と閉じ忘れfenceの検出、Markdown link抽出、null安全な読み出し、reparse pointを跨がないtree走査。`validate_doc_links.py`、`prepare_pages.py`、`validate_pages_output.py`、`test_link_validators.py`、`test_pages_guards.py`の5本すべてがimportする。`test_link_validators.py`と`test_pages_guards.py`は、importとは別に対象scriptを子processとして起動し、exit codeと診断出力まで検査する | import専用 |
 
 `lib/publish_guards.py`は単体で実行しない。secretや個人pathのpatternはこのfileだけで定義し、各scriptへ複製しない。
@@ -63,9 +63,10 @@ CIで初めて検出される。
 `validate_pages_output.py`のsummaryが、その内訳を毎回logへ残す。
 
 ```text
-EXTENSIONS=(none)=1,.css=1,.html=44,.ico=1,.jpg=1,.md=44
+FILES=121 HTML=58 BROKEN_LINKS=0
+EXTENSIONS=(none)=1,.css=1,.html=58,.ico=1,.jpg=1,.md=58,.svg=1
 UNSCANNED=.ico=1,.jpg=1
-LARGEST=205894 docs/protocol/esp32-pi-protocol.html
+LARGEST=343587 docs/hardware/power-budget.html
 ```
 
 `UNSCANNED=`はsecret／個人pathの内容scanが効かない拡張子である。**binaryは内容scanに
@@ -75,10 +76,9 @@ sourceのASCII art（`FAVICON_ART_32`／`FAVICON_ART_16`）から組み立てる
 別の手段で押さえている。
 
 `_site/`にも`.pages-src/`と同じ拡張子allowlistとsize上限を課す。上のsummaryは
-2026-08-08時点の記録である。以降、自前layoutの導入（[ADR-0009](../docs/decisions/0009-pages-own-layout.md)）で
-`.svg`が1件加わり、`.html`と`.md`の件数も増えている。いずれも許可済み・上限内であり、
-どちらの判定も現状no-opである。Jekyllやpluginが将来別の拡張子を生成したときに、
-気付かないまま公開せず止めるために置いている。
+2026-08-21時点の実測である（自前layout導入後。[ADR-0009](../docs/decisions/0009-pages-own-layout.md)）。
+7種類すべてが許可済み・上限内であり、どちらの判定も現状no-opである。Jekyllやpluginが
+将来別の拡張子を生成したときに、気付かないまま公開せず止めるために置いている。
 
 `_layouts/`は`.pages-src/`にはあるが、Jekyllがunderscore始まりのdirectoryを出力へ
 複製しないため`_site/`には現れない。`EXTENSIONS=`の`.html`件数にも入らない。

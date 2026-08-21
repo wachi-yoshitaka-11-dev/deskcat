@@ -107,7 +107,7 @@ Asset追加前に[公開asset register](../governance/published-asset-register.m
 - 列挙したfileがsymlinkまたはreparse pointである
 - 拡張子が`.html`でない
 
-`pages/assets/css/style.scss`はthemeのSCSSを読み込まず、配色、typography、chrome、card、table、blockquote、code block、responsive layout、a11yを自前で持つ（[ADR-0009](../decisions/0009-pages-own-layout.md)）。Sassのcompileはこの端末では実行できず、GitHub ActionsのPR buildが唯一の検証経路である。**自前layoutの初回は、CIで数往復する前提を置く。**この端末でできるのは、layoutのliquidを展開した静的mockupをbrowserで確認することまでである。
+`pages/assets/css/style.scss`はthemeのSCSSを読み込まず、配色、typography、chrome、card、table、blockquote、code block、responsive layout、a11yを自前で持つ（[ADR-0009](../decisions/0009-pages-own-layout.md)）。Sassのcompileはこの端末では実行できず、GitHub ActionsのPR buildが唯一の検証経路である。**layoutを変更したときは、CIで数往復する前提を置く。**この端末でできるのは、layoutのliquidを展開した静的mockupをbrowserで確認することまでである。
 
 `favicon.ico`は`prepare_pages.py`が32 x 32と16 x 16のpixel artから組み立て、`_layouts/default.html`が`<link rel="icon">`で参照する。以前はCaymanのlayoutがこのlinkをコメントアウトしたまま配信していたため、生成したfaviconはどのpageからも参照されていなかった。
 
