@@ -63,8 +63,12 @@ Closes #
 ## 自己レビュー
 
 - [ ] [自己レビュー](../CONTRIBUTING.md#自己レビュー)の観点で見直し、新規指摘0件が2 round続いた
+- [ ] **要件照合Pass**と**fresh-context Pass**を、同じ最終diffに対して別々に実施した（[2つのPass](../CONTRIBUTING.md#2つのpass)）
 
 自動reviewを行わないPull Requestでは、これが唯一のreviewである。
+
+宣言はhead commitのtrailerで行う。**checkboxとtrailerの両方が要る。**checkboxは本文の記述であり、
+差分が変わっても残る。trailerはcommitへ結び付くため、差分を変えると無効になる。
 
 ## Review thread
 
