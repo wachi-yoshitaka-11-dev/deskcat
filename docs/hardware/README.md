@@ -11,6 +11,7 @@
 - `sensor-datasheet-notes.md`
 - `sd-health-check.md`
 - `experiment-log.md`（実験記録）
+- `tbd-register.md`（未確定項目と解決状況の正本）
 
 正確な部品型番、公式資料、記録済み実測値だけを使用する。不明値は`TBD`とする。
 

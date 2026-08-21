@@ -21,7 +21,7 @@ DeskCatは、ESP32とRaspberry Pi Zero Wで構成する、机上で静かに振�
 ## はじめに
 
 - [Project概要（repository README）](https://github.com/wachi-yoshitaka-11-dev/deskcat#readme)
-- [Architecture](docs/architecture/README.md)
+- [Architecture（予定文書の一覧）](docs/architecture/README.md)
 - [開発基盤計画](docs/planning/development-foundation-plan.md)
 - [GitHub repository](https://github.com/wachi-yoshitaka-11-dev/deskcat)
 - [GitHub Issues](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues)
