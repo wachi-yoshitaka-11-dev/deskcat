@@ -35,27 +35,42 @@ Issueには次を含める。
 実際、[#84](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/84)は規約の言い回しを直すために
 起票し、直後にcloseした。
 
-| 対象 | 扱い |
-|---|---|
-| typo、リンク修正、表記ゆれ、boardのmetadata記入漏れ | **Issue不要。**変更内容の承認を得たうえで`develop`へ直接反映してよい |
-| 規約、仕様、安全、電気、protocol、GPIO、電源、toolchain、CI、依存の変更 | **Issue必須** |
-| 複数のPull Requestに跨る、または他の作業をblockするもの | **Issue必須** |
+**Issueが要るかどうかと、Pull Requestが要るかどうかは別の問いである。**この2つを1つの段に
+まとめていたため、規約文書のtypoを直すのにIssueまで要る状態になっていた
+（[ADR-0011](docs/decisions/0011-issue-optional-pull-request-required.md)）。列を分ける。
+
+| 対象 | Issue | Pull Request |
+|---|---|---|
+| boardのmetadata記入漏れ。repositoryの変更ではない | 不要 | 不要 |
+| `review_gate.py`が`CLASS=minor`と判定した変更 | 不要 | 不要。承認を得たうえで`develop`へ直接反映してよい |
+| typo、リンク修正、表記ゆれ、言い回しの修正で、**意味を変えないもの** | 不要 | **必要** |
+| 規約、仕様、安全、電気、protocol、GPIO、電源、toolchain、CI、依存の**意味**を変えるもの | **必須** | **必要** |
+| 複数のPull Requestに跨る、または他の作業をblockするもの | **必須** | **必要** |
 
 Issue不要の側でも、**変更内容の承認は必ず得る。**「Issueを立てない」は「勝手に変えてよい」ではない。
 判断に迷うものはIssue必須の側として扱う。安全に関わる範囲は緩めない。
 
-**「規約の言い回し」はこの表から外した**（[ADR-0010](docs/decisions/0010-change-class-and-review-declaration.md)）。
-規則を持つfileの散文では、言い回しの修正と意味の変更を機械的に区別できない。
+**3行目と4行目の境界は機械的に判定できない。**「言い回しの修正」と「意味の変更」を区別するcodeは
+無い（[ADR-0010](docs/decisions/0010-change-class-and-review-declaration.md)）。迷ったら4行目にする。
+**ただし3行目はPull Requestを通る。**判断を誤っても、Review gateと自己レビューがその差分を見る。
+黙って`develop`へ入ることはない。**repositoryへの変更でPull Requestを省けるのは2行目だけであり、
+そこはscriptが判定する。**1行目はrepositoryの変更ではないため、Pull Requestという単位が無い。
 
-**どちら側かは`scripts/review_gate.py`が判定する。**この表は判断の背景であり、正本はscriptである。
+**scriptが決めるのは`CLASS`だけである。**Issueが要るかどうかはscriptの判定ではない。
 
 ```bash
 python3 scripts/review_gate.py classify --base origin/develop --head HEAD
 ```
 
-`CLASS=minor`のときだけIssue不要側として扱う。**`CLASS=review-required`を人の判断で覆さない。**
-scriptは軽微と証明できるものだけを`minor`にするため、本当は軽微な変更もreview必須側へ落ちる。
-それは意図した失敗方向であり、Pull Requestを1本作れば済む。
+`CLASS=minor`のときだけ、Pull Requestなしで`develop`へ直接反映してよい。
+**`CLASS=review-required`を人の判断で覆さない。**scriptは軽微と証明できるものだけを`minor`に
+するため、本当は軽微な変更も`review-required`へ落ちる。それは意図した失敗方向であり、
+Pull Requestを1本作れば済む。
+
+**この表を強制する仕組みは無い。**Review gateはPull Requestで起動するため、直接pushした変更は
+見ない。`develop`のbranch protectionにも必須reviewと必須status checkを設定していない
+（[ADR-0007](docs/decisions/0007-review-scope-and-self-review.md)の決定4）。
+`classify`を実行する場面は、`develop`へ直接反映すると決めた場面と同じである。
 
 ## Issueの命名
 

@@ -135,3 +135,10 @@ Markdownの差分を解析し、typoの修正か意味の変更かを判定す�
 なし。**[ADR-0007](0007-review-scope-and-self-review.md)を置き換えない。**
 自動reviewの範囲、自己レビューの回数、branch protectionの扱いはADR-0007のままである。
 本ADRはその決定3（Issueを立てずに直接反映してよい範囲）を狭め、判定と宣言を機械化する。
+
+## 後継の決定
+
+[ADR-0011](0011-issue-optional-pull-request-required.md)が、本ADRの決定3による副作用を扱った。
+**本ADRの決定3は変わらない。**「規約の言い回し」は軽微経路（Issue不要かつPull Request不要）へ
+戻っていない。ADR-0011が動かしたのはIssueの要否だけであり、意味を変えない記述修正は
+Issue不要でPull Requestは必要になった。
