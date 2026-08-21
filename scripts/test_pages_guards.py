@@ -181,6 +181,115 @@ def output_exposes_staging_root(output):
     return normalized_staging_root in normalized_output
 
 
+_module_state = {}
+
+# 各caseがin-placeで書き換え、`setUp`が読んだbackupから戻す追跡file。
+# 実行の前後で内容を突き合わせ、残骸が次の実行のbackupへ化けるのを防ぐ。
+RESTORED_IN_PLACE = (MANIFEST_PATH, PORTAL_PAGE_PATH)
+
+
+def _manifest_precondition_problem(content):
+    """manifest改変caseの前提を満たさない理由を返す。満たすなら`None`。
+
+    前提は「JSONとして読めて、`assets`にbinary assetのhashが1つ以上ある」ことである。
+    改変caseはこのhashを書き換えたり外したりして、prepare側の判定を試す。
+    """
+    try:
+        manifest = json.loads(content)
+    except ValueError as error:
+        return f"it is not valid JSON ({error.__class__.__name__})"
+    assets = manifest.get("assets")
+    if not isinstance(assets, list):
+        return "it has no `assets` list"
+    if not any(isinstance(entry, dict) and "sha256" in entry for entry in assets):
+        return "no entry under `assets` declares `sha256`"
+    return None
+
+
+def setUpModule():
+    """前提を1回だけ確認し、in-placeで書き換えるfileの内容を記録する。
+
+    確認するのは2つである。**`RESTORED_IN_PLACE`のどれもstagingのsize上限を超えて
+    いないこと**と、**manifestが改変caseの必要な形をしていること**である。どちらも
+    本番のstagingが成立するために元から必要な条件であり、正当な編集を残骸と
+    誤判定しない。記録した内容は`tearDownModule`が突き合わせる。
+
+    このharnessは`pages/assets-manifest.json`をin-placeで書き換え、`setUp`が読んだ
+    backupから戻す。**backupはworking treeから読む。**そのため、前回の実行が途中で
+    落ちて改変が残っていると、**その改変済みの内容がbackupになり、以後の実行でも
+    元へ戻らない。**残骸は静かに固定され、無関係なcaseが誤解を招くmessageで落ちる。
+    実際に、`sha256`が失われた状態から12件が失敗し2件がerrorになった。原因として
+    報告されたのはmanifestの残骸ではなく、hash不一致やsecret検出といった別の判定だった。
+
+    ここで前提を1回だけ検査し、満たさなければ1件の診断で止める。cascadeさせない。
+
+    **HEADとは比較しない。**manifestやportal pageを正当に編集しているbranchで、その
+    編集を残骸と誤判定して検査を止めないためである。見るのは「本番のstagingと改変case
+    が成立する形をしているか」だけであり、内容がcommit済みの版と同じかどうかは見ない。
+    """
+    problems = []
+    for path in RESTORED_IN_PLACE:
+        relative = guards.path_relative_to_root(path, REPOSITORY_ROOT)
+        # size上限を超えたfileは、そもそも本番のstagingが拒否する。ここに現れるのは
+        # 中断した実行がsize超過のfixtureを残した場合だけである。
+        if os.path.getsize(path) > guards.FILE_SIZE_LIMIT:
+            problems.append(
+                f"{relative} exceeds the staging size limit, which the real staging"
+                " would reject"
+            )
+    manifest_problem = _manifest_precondition_problem(_read(MANIFEST_PATH))
+    if manifest_problem is not None:
+        manifest_relative = guards.path_relative_to_root(
+            MANIFEST_PATH, REPOSITORY_ROOT
+        )
+        problems.append(
+            f"{manifest_relative} does not satisfy the precondition for the manifest"
+            f" tampering cases: {manifest_problem}"
+        )
+    if problems:
+        listed = " ".join(
+            guards.path_relative_to_root(path, REPOSITORY_ROOT)
+            for path in RESTORED_IN_PLACE
+        )
+        raise RuntimeError(
+            "The working tree does not satisfy this harness's preconditions: "
+            + "; ".join(problems)
+            + ". If these copies are residue from an interrupted run, restore them"
+            f" with `git checkout -- {listed}` and run the harness again."
+            " If the manifest layout changed on purpose, update the tampering cases."
+        )
+    _module_state["baselines"] = {
+        path: _read(path) for path in RESTORED_IN_PLACE
+    }
+
+
+def tearDownModule():
+    """実行後に、in-placeで書き換えたfileが元へ戻っていることを確認する。
+
+    戻っていなければ、この実行が残骸を残したということである。次の実行では
+    その内容がbackupになり、静かに固定される。**気付ける位置で失敗させる。**
+
+    manifestだけでなくportal pageも見る。**同じ仕組みで書き換えて同じ仕組みで戻す**
+    ため、残骸の残り方も同じである。
+    """
+    baselines = _module_state.pop("baselines", None)
+    if not baselines:
+        return
+    left_modified = [
+        guards.path_relative_to_root(path, REPOSITORY_ROOT)
+        for path, baseline in baselines.items()
+        if _read(path) != baseline
+    ]
+    if left_modified:
+        listed = " ".join(left_modified)
+        raise RuntimeError(
+            "A cleanup did not restore every file this run modified in place."
+            f" Still modified: {listed}."
+            f" Restore with `git checkout -- {listed}` before running again,"
+            " otherwise the modified copy becomes the backup for the next run."
+        )
+
+
 class PublishGuardTestCase(unittest.TestCase):
     """各caseの後始末を共通化する。
 
@@ -193,16 +302,20 @@ class PublishGuardTestCase(unittest.TestCase):
         cls.git_index_path = _resolve_git_index_path()
 
     def setUp(self):
-        self.manifest_backup = _read(MANIFEST_PATH)
-        self.portal_page_backup = _read(PORTAL_PAGE_PATH)
+        # backupを取る対象は`RESTORED_IN_PLACE`が持つ。ここで個別に列挙すると、
+        # in-placeで書き換えるfileを増やしたときに`tearDownModule`の監視対象と
+        # 食い違い、片方だけが黙って外れる。
+        self.backups = {path: _read(path) for path in RESTORED_IN_PLACE}
+        self.manifest_backup = self.backups[MANIFEST_PATH]
+        self.portal_page_backup = self.backups[PORTAL_PAGE_PATH]
         self.temporary_paths = []
-        # 復元をstepごとに登録する。1つの関数へまとめると、前半の`_write`が
+        # 復元をfileごとに登録する。1つの関数へまとめると、前半の`_write`が
         # 失敗した時点で残りが実行されず、実repositoryのfileが書き換わったまま
         # 残ってcommitへ入りうる。`unittest`は登録した全cleanupを、失敗しても
         # 最後まで実行する。実行はLIFOのため、登録は「最後に戻したいもの」から行う。
         self.addCleanup(self._remove_temporary_paths)
-        self.addCleanup(_write, PORTAL_PAGE_PATH, self.portal_page_backup)
-        self.addCleanup(_write, MANIFEST_PATH, self.manifest_backup)
+        for path in reversed(RESTORED_IN_PLACE):
+            self.addCleanup(_write, path, self.backups[path])
         self.addCleanup(os.environ.pop, "GIT_INDEX_FILE", None)
 
     def _remove_temporary_paths(self):
@@ -371,6 +484,41 @@ class HarnessSelfTests(PublishGuardTestCase):
         self.assertTrue(output_exposes_staging_root(f"synthetic: {probe}"))
         self.assertFalse(output_exposes_staging_root("synthetic: .pages-src"))
 
+    def test_manifest_precondition_detects_the_residue_shapes(self):
+        """前提検査が、実際に踏んだ残骸の形を検出すること。
+
+        `setUpModule`はこの判定に依存している。判定がno-opでも、cleanなtreeでは
+        全caseが成功するため、検出力を先に確認する。
+        """
+        intact = self.manifest_backup
+        self.assertIsNone(_manifest_precondition_problem(intact))
+
+        stripped = json.loads(intact)
+        for entry in stripped["assets"]:
+            entry.pop("sha256", None)
+        cases = (
+            {
+                "name": "sha256 removed",
+                "content": json.dumps(stripped, ensure_ascii=False),
+                "expected": "declares `sha256`",
+            },
+            {
+                "name": "truncated JSON",
+                "content": '{ "assets": [ ',
+                "expected": "not valid JSON",
+            },
+            {
+                "name": "no assets list",
+                "content": '{"documentation": []}',
+                "expected": "`assets` list",
+            },
+        )
+        for case in cases:
+            with self.subTest(case=case["name"]):
+                problem = _manifest_precondition_problem(case["content"])
+                self.assertIsNotNone(problem)
+                self.assertIn(case["expected"], problem)
+
 
 class BaselineTests(PublishGuardTestCase):
     """改変なしのstagingが成功すること。
@@ -422,7 +570,12 @@ class AssetManifestGuardTests(PublishGuardTestCase):
                     replaced = True
             if not replaced:
                 raise RuntimeError(
-                    "Unable to tamper with the recorded SHA-256. The manifest layout changed."
+                    "No entry under `assets` declares `sha256`, so there is"
+                    " nothing to tamper with. Either the manifest layout"
+                    " changed, or this working tree copy is residue from an"
+                    " interrupted run. `setUpModule` checks this precondition"
+                    " first, so reaching here means the manifest changed"
+                    " during the run."
                 )
 
         self.edit_manifest(tamper)
@@ -436,7 +589,11 @@ class AssetManifestGuardTests(PublishGuardTestCase):
                     removed = True
             if not removed:
                 raise RuntimeError(
-                    "Unable to remove the recorded SHA-256. The manifest layout changed."
+                    "No entry under `assets` declares `sha256`, so there is"
+                    " nothing to remove. Either the manifest layout changed,"
+                    " or this working tree copy is residue from an interrupted"
+                    " run. `setUpModule` checks this precondition first, so"
+                    " reaching here means the manifest changed during the run."
                 )
 
         self.edit_manifest(remove_hashes)
