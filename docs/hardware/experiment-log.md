@@ -1,5 +1,9 @@
 # 実験記録
 
+**この文書の日付はすべてJST（UTC+9）である。**[CONTRIBUTING.md](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/CONTRIBUTING.md)が`日付はJST（UTC+9）で判断する`と定めている。
+**JSTの`00:00`から`08:59`に行った作業は、UTCでは前日の日付になる。**GitHubのAPIやreview toolがUTCで日付を判定すると、**実施済みの記録が未来日に見える。**
+実際に[PR #160](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/160)と[PR #163](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/163)でこの食い違いが指摘されている。**日付をUTCへ読み替えない。**
+
 [README](README.md)が正式文書として挙げる`実験記録`の実体である。書式は
 [技術ガイド](../DeskCat_Microcontroller_Development_Guide.md)の`28.2 実験ログ`に従う。
 
@@ -356,7 +360,7 @@ V_INT_actual      = 0.220668 x 5.04 V = 1.1122 V
 **確認できる範囲と、確認できない範囲は事前に確定させてある**
 （正は[power-budget.md](power-budget.md)の`方式1の記録係をこのtopologyへ足すとき（HW-TBD-034 作業3）`。**ここへ再掲しない**）。
 
-**実施日**: 2026-08-22。実機Linux。**人間が基板のそばで観察している状態で行った。**
+**実施日**: 2026-08-22（**JST**。[CONTRIBUTING.md](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/CONTRIBUTING.md)が`日付はJST（UTC+9）で判断する`と定めている。**UTCでは前日になる**）。実機Linux。**人間が基板のそばで観察している状態で行った。**
 
 ### 構成
 
@@ -465,7 +469,7 @@ DT830Bによる実測（条件Bの状態）。
 **目的**: `EXP-003`が単端ADCでは片側しか縛れなかったGNDの電位差を、極性を読める手段で測る。
 `HW-TBD-034`作業3の(3)の残作業である。
 
-**実施日**: 2026-08-22。実機Linux。**人間が基板のそばで観察している状態で行った。**
+**実施日**: 2026-08-22（**JST**。[CONTRIBUTING.md](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/CONTRIBUTING.md)が`日付はJST（UTC+9）で判断する`と定めている。**UTCでは前日になる**）。実機Linux。**人間が基板のそばで観察している状態で行った。**
 **構成は`EXP-003`と同じ**（Arduino Uno R3とESP32 DevKitCをともにPCのUSBで給電。servoも外部電源も接続していない）。
 
 ### 測定手段
@@ -539,3 +543,4 @@ DT830Bによる実測（条件Bの状態）。
 | 2026-08-22 | 5 | **`EXP-003`（段階B-1でのGND topologyと入力headroom）を追加した。**`HW-TBD-034`作業3の実施記録である。**Arduino Uno R3とESP32 DevKitCをともにPCのUSBで給電し、servoも外部電源も接続していない。**ESP32のfirmwareはperipheralを初期化しない最小firmwareである。GNDの直結の有無で2条件を取り、`A0`／`A1`／`VBG`の統計とDT830Bによる3点の実測を未加工で残した。**`A1`が浮いていたときの数百LSBの暴れも記録した**（測定系が未接続を検出できることの確認になる）。**抜き差しで条件が壊れていないことの確認**（`A0`の復帰）も残した。**主張しないことを節にまとめた。**段階Cのtopologyの検証ではないこと、star pointとshuntと`ADC-SHUNT`は確認していないこと、GNDの直結が何を変えたかの原因を特定していないこと、`HW-TBD-028`の判定に使っていないこと、**過渡を測っていないこと**である | [#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3) |
 | 2026-08-22 | 6 | [PR #160](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/160)の自動reviewの指摘3件を`EXP-003`へ反映した。**raw dataと値は変えていない。主張の強さだけを下げた。**(a) **観測結果4を片側限定へ改めた。**`A1`の`0`から「GNDの電位差は検出されない」と書いていたが、**単端ADCは負電圧を測れないため、`0`は正方向しか縛らない。****ESP32の`GND`が低い側にずれている場合は測定範囲の外で同じく`0`と観測されうる。****結論として(3)は「段階B-1の範囲では解けた」から「未解決」へ下げた。**(b) **「測定系が未接続を検出できる」を取り下げた。****しきい値も誤判定の試験も無い。**確認できたのは「浮いた入力では値が不安定になる」ことである。各系列へ試行番号とsample数を付けた。(c) **「ADCの入力は電流を流さない」を取り下げた。**入力電流は測定していない。確認できたのは**この条件でジャンパを抜き差ししてもrailの変化を観測しなかった**ことである | [PR #160](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/160) |
 | 2026-08-22 | 7 | **`EXP-004`（GND offsetを両極性で測る）を追加した。**`EXP-003`が単端ADCでは片側しか縛れなかったGNDの電位差を、DT830Bの`200m`レンジで測った。**このレンジを選んだのは、極性を読めることと、最小単位がADCの1 LSBより約49倍細かいことの2点による。****ESP32の`GND`はArduinoの`GND`より低く、ADCの1 LSBより大きいoffsetがADCの死角にあった。****`GND`の直結はoffsetを縮めるが消さない。****`EXP-003`の`A0`の差の原因も説明できた。**GND offsetの変化とADCが見た差が、`EXP-003`の条件内のばらつき以内で整合する。**2つの独立した測定手段が一致した。****GND offsetを入れるとADC値の妥当性の一致も1桁良くなった。**`EXP-003`の観測2と観測4へ後日の追記を入れた（**記録そのものは書き換えていない**）。**offsetの原因は特定していない。**確度は未取得のままで、値そのものの不確かさは`TBD`である。**静的な測定であり、過渡中のoffsetの振る舞いは測っていない。****`HW-TBD-028`の判定には使っていない** | [#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3) |
+| 2026-08-22 | 8 | **この文書の日付がJSTであることを明記した。**[CONTRIBUTING.md](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/CONTRIBUTING.md)は`日付はJST（UTC+9）で判断する`と定めており、**JSTの`00:00`から`08:59`に行った作業はUTCでは前日になる。****この食い違いが[PR #160](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/160)と[PR #163](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/163)で2回続けて指摘された。**どちらも「実施済みの記録が未来日になっている」という内容だったが、**規約どおりJSTで読めば未来日ではない。**文書の冒頭と`EXP-003`／`EXP-004`の`実施日`欄へ明記し、**次回から同じ指摘が出ないようにした。****測定値も結論も変えていない** | [#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3) |
