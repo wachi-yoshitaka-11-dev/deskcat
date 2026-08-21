@@ -107,16 +107,37 @@ dependencyの増減はゼロである。あわせてCayman由来のOpen Sans外�
 
 ## 検証
 
-この決定は、次を満たすことで検証する。
+この決定は、次を満たすことで検証する。**確認できる時期が項目ごとに違う。**
+`Upload Pages artifact`は`main`へのpushだけを対象にしているため、
+**Pull Requestのrunからは生成物（`_site/`）を取り出せない。**生成HTMLとCSSの
+中身に関する項目は、`develop`→`main`昇格後のread-backでしか確認できない。
 
-- Pages workflowのbuildと`validate_pages_output.py`が成功する。
-- `_site/`に`_layouts/`が出力されない（`EXTENSIONS=`で確認する）。
-- 生成HTMLが`<link rel="icon">`を持ち、`favicon.ico`が32 x 32と16 x 16の2枚を含む。
-- `<meta name="theme-color">`が新paletteの値である。
-- 生成CSSにCayman由来の規則とOpen Sansの`@import url(...)`が含まれない。
-- `docs/`配下のpageが`page` layoutで生成され、`docs/`のfileを変更していない。
-- `REQUIRED_FILES`と`MINIMUM_PUBLISHED_COUNT`を割っていない。
-- 文字色と背景色の全組が、明暗いずれのmodeでもcontrast比の下限を満たす。
+Pull RequestのCIが毎回自動で見るもの:
+
+| 項目 | 見ているもの |
+|---|---|
+| Pages workflowのbuildと`validate_pages_output.py`が成功する | job の結果 |
+| `_site/`に`_layouts/`が出力されない | `EXTENSIONS=`の`.html`件数がpage数と一致すること |
+| `REQUIRED_FILES`と`MINIMUM_PUBLISHED_COUNT`を割っていない | `validate_pages_output.py` |
+| 生成siteのlinkが解決する | `BROKEN_LINKS=0` |
+| `favicon.ico`が32 x 32と16 x 16の2枚を含み、ASCII artと1 pixel単位で一致する | `test_pages_guards.py`（encoderとは独立に復号して突き合わせる） |
+| `pages/_layouts/`の公開境界がfail-closedである | `test_pages_guards.py` |
+
+deploy後のread-backで見るもの（**CIでは代替できない**）:
+
+| 項目 | 確認方法 |
+|---|---|
+| 生成HTMLが`<link rel="icon">`を持つ | 公開pageのHTMLを取得して確認する |
+| `<meta name="theme-color">`が新paletteの値である | 同上 |
+| 生成CSSにCayman由来の規則とOpen Sansの`@import url(...)`が含まれない | 公開`assets/css/style.css`を取得して確認する |
+| 肉球SVGの`mask-image`が404にならない | CSSの`url()`は`validate_pages_output.py`のlink検査対象外である |
+
+この端末で実測したもの（生成siteそのものではない）:
+
+| 項目 | 方法 |
+|---|---|
+| 文字色と背景色の全組が、明暗いずれのmodeでもcontrast比の下限を満たす | layoutのliquidを展開した静的mockupを、desktop / mobile × light / dark で計測した |
+| `docs/`配下のpageが`page` layoutで生成される | 現行公開siteのkramdown出力を`page.html`へ流して確認した。`docs/`のfileは変更していない（diffで確認できる） |
 
 ## 置き換える決定
 
