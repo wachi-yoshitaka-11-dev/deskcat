@@ -11,7 +11,9 @@
 | `validate_pages_output.py` | 生成済み`_site/`のlinkと公開禁止情報を検査する。拡張子allowlistとsize上限は`.pages-src/`側と同じ値を使う。診断のfile pathはsite-root相対で出力し、`EXTENSIONS=`／`UNSCANNED=`／`LARGEST=`で公開物の内訳を残す | Pages workflowとlocal |
 | `test_link_validators.py` | source／生成siteのanchor、Pages baseurl（引用、YAML comment、末尾slashを含む）、時間制限付きHTML解析、local URL解決（encoding、unsafe scheme、directory、曖昧候補、case、reparse point、非HTML assetを含む）、公開禁止pattern・local path・値の非露出、Markdown link抽出、追跡file／symlink helperの0・1・複数件、PathSpec、Git quoting前提、非ASCII path、**symlinkを途中に挟むpathとsymlink自身へのlinkが未公開として報告されること**、**閉じていないcode fenceが、その後ろの壊れたlinkを隠す前に失敗すること**を検証する。link作成不可の環境では対象caseを成功件数と分けてskipする | Pages workflowとlocal |
 | `test_pages_guards.py` | 公開境界の回帰test（未宣言asset、追跡外file、hash不一致、size超過、公開禁止patternとlocal staging pathの非露出、**Gitのmode 120000によるsymlink除外**、**file属性のreparse point除外**、拡張子）を検証する。あわせて`pages/_layouts/`の境界（`PORTAL_LAYOUTS`の列挙外、欠落、追跡外、symlink）と、faviconを検証する。**faviconは、encoderとは独立に書いた復号でICOをASCII artへ戻して突き合わせる**（生成bytesを`build_favicon()`と比べても両辺が同じ関数由来で常に一致し、channel順や行順の誤りを検出できない）。symlinkのcaseは、どちらのguardが働いたかをskip理由で確認する | Pages workflowとlocal |
-| `lib/publish_guards.py` | secret／個人path pattern、path containmentとroot相対表記、追跡file列挙（`core.quotePath=false`で非ASCII pathをescapeさせない）、Gitのmodeによるsymlink判定、見出しanchor生成、fence外行の抽出と閉じ忘れfenceの検出、Markdown link抽出、null安全な読み出し、reparse pointを跨がないtree走査。`validate_doc_links.py`、`prepare_pages.py`、`validate_pages_output.py`、`test_link_validators.py`、`test_pages_guards.py`の5本すべてがimportする。`test_link_validators.py`と`test_pages_guards.py`は、importとは別に対象scriptを子processとして起動し、exit codeと診断出力まで検査する | import専用 |
+| `validate_instruction_entrypoint.py` | `CLAUDE.md`がGit index上でmode 100644であり、内容が`@AGENTS.md`のimport stubと1 byteも違わないことを検査する。**working treeではなくindexを読む。**working treeの実体はcheckout環境で変わるため、mode 120000が記録されたままでもsymlinkを解決する環境では成功してしまう | Pages workflowとlocal |
+| `test_instruction_entrypoint.py` | このrepository自身のindexが契約を満たすことと、mode 120000のentry、link先のpath文字列だけの内容、CRLF、未追跡のそれぞれで上のscriptが失敗することを検証する。fixtureはmode 120000をGit indexへ直接登録するため、OSのsymlink作成権限に依存しない。**modeと内容は独立に検査する**（片方だけを直して通らないことを確認する） | Pages workflowとlocal |
+| `lib/publish_guards.py` | secret／個人path pattern、path containmentとroot相対表記、追跡file列挙（`core.quotePath=false`で非ASCII pathをescapeさせない）、Gitのmodeによるsymlink判定、見出しanchor生成、fence外行の抽出と閉じ忘れfenceの検出、Markdown link抽出、null安全な読み出し、reparse pointを跨がないtree走査。`validate_doc_links.py`、`prepare_pages.py`、`validate_pages_output.py`、`test_link_validators.py`、`test_pages_guards.py`、`test_instruction_entrypoint.py`がimportする。`validate_instruction_entrypoint.py`はimportしない。`test_link_validators.py`、`test_pages_guards.py`、`test_instruction_entrypoint.py`は、importとは別に対象scriptを子processとして起動し、exit codeと診断出力まで検査する | import専用 |
 
 `lib/publish_guards.py`は単体で実行しない。secretや個人pathのpatternはこのfileだけで定義し、各scriptへ複製しない。
 
@@ -25,6 +27,8 @@ Localでのbuild前検査:
 ```bash
 python3 scripts/validate_doc_links.py
 python3 scripts/test_link_validators.py
+python3 scripts/validate_instruction_entrypoint.py
+python3 scripts/test_instruction_entrypoint.py
 python3 scripts/prepare_pages.py
 python3 scripts/test_pages_guards.py
 ```
@@ -35,9 +39,11 @@ test harnessは`unittest`であり、`unittest`のrunnerからも実行できる
 python3 -m unittest discover --start-directory scripts --pattern "test_*.py" --verbose
 ```
 
-Pages CIは`test_link_validators.py`と`test_pages_guards.py`をrunnerの一時directoryから
-絶対pathで起動する。両harnessはrepository root以外のcurrent directoryでも成功し、
-`PAGES_SOURCE=.pages-src`をrepository root基準で解決しなければならない。
+Pages CIは`test_link_validators.py`、`test_pages_guards.py`、
+`test_instruction_entrypoint.py`をrunnerの一時directoryから絶対pathで起動する。
+いずれもrepository root以外のcurrent directoryで成功しなければならない。
+`test_link_validators.py`と`test_pages_guards.py`は、あわせて`PAGES_SOURCE=.pages-src`を
+repository root基準で解決しなければならない。
 
 `validate_pages_output.py`は生成済みの`_site/`を対象とするため、上記の検査だけでは実行できない。
 localで実行するにはJekyll build（Ruby、Jekyll、GitHub Pages gem）が必要である。

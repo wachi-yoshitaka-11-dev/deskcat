@@ -1734,14 +1734,15 @@ class SharedHelperTests(unittest.TestCase):
             str(context.exception), "Cannot format a path outside the publication root."
         )
 
-    def test_tracked_symlink_helper_uses_the_git_index_mode(self):
-        """file属性ではcheckout環境で結果が変わり、走査対象と公開物が環境ごとに変わる。
+    def test_tracked_symlink_helper_excludes_regular_files(self):
+        """通常fileをsymlinkとして報告しないこと。
 
-        `CLAUDE.md`はindex上mode 120000である。
+        mode 120000を登録した場合の戻り値は
+        `test_tracked_symlink_helper_returns_only_the_symlink`が見る。
         """
         symlinks = guards.get_tracked_symlinks(REPOSITORY_ROOT)
         self.assertIsInstance(symlinks, set)
-        self.assertIn("CLAUDE.md", symlinks)
+        self.assertNotIn("CLAUDE.md", symlinks)
         self.assertNotIn("AGENTS.md", symlinks)
 
     def test_tracked_file_helper_returns_expected_sets(self):
