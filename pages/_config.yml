@@ -4,6 +4,13 @@ lang: ja
 url: https://wachi-yoshitaka-11-dev.github.io
 baseurl: /deskcat
 repository: wachi-yoshitaka-11-dev/deskcat
+# layoutとstylesheetは`pages/_layouts/`と`pages/assets/css/style.scss`が正本で
+# あり、この themeの出力は生成siteへ届かない（ADR-0009）。
+#
+# それでも宣言を残すのは、`theme`keyを削除すると`github-pages` gemの
+# `Configuration::DEFAULTS`が`jekyll-theme-primer`を当てるためである。review済みの
+# Caymanをinertなbaseとして固定する方が、未reviewのthemeが暗黙に有効化されるより
+# 安全である。`{% seo %}`が使えるのも、jekyll-seo-tagがこのgemの依存だからである。
 theme: jekyll-theme-cayman
 show_downloads: false
 markdown: kramdown

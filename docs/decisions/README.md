@@ -14,6 +14,7 @@
 | [ADR-0006](0006-validation-script-language.md) | Accepted | 検証scriptの実装言語をPythonとする |
 | [ADR-0007](0007-review-scope-and-self-review.md) | Accepted | 自動reviewを高リスク変更へ限定し、自己レビューを主軸とする |
 | [ADR-0008](0008-firmware-protocol-crate-reuse.md) | Accepted | Firmwareから`deskcat-protocol`をpath dependencyで再利用する |
+| [ADR-0009](0009-pages-own-layout.md) | Accepted | Pagesのlayoutとstylesheetを自前で保持する |
 
 ## 新規作成
 

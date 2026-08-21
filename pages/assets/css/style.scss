@@ -1,58 +1,79 @@
 ---
 ---
 
-@import "{{ site.theme }}";
-
-// Cayman themeへのtheme override stylesheet。
-// 上書き対象は配色、typography、table、blockquote、code block、responsive
-// layoutであり、配色とtypographyはconcept資料（DeskCat_Modern_Public_10slides）
-// へ合わせる。Themeは差し替えず、公式のstylesheet override機構だけを使う。
+// Pages siteのstylesheet。ADR-0009に従い、themeのSCSSは読み込まない。
 //
-// 下の`@import`はCaymanのSCSSを読み込む。CaymanのSCSSはGoogle Fontsへの
-// `@import url(...)`を含み、Caymanのlayoutも同じfontを`<link>`で読み込む。
-// よってPagesは外部fontとしてOpen Sansを取得する。これは意図した依存であり、
-// 本stylesheetもLatinへOpen Sansを当てて実際に使用する。読み込むが使わない
-// 状態を避けるため、`--dc-font-body`の先頭へ置いている。
-// 読み込み自体を止める場合はtheme SCSSとlayoutの自前保守が必要になる。
+// 以前はここで`@import "{{ site.theme }}"`によりCaymanのSCSSを取り込み、その上へ
+// 配色とtypographyを被せていた。Caymanのlayoutに縛られるとhero、nav card、favicon、
+// theme-colorのいずれも作れないため、layoutとstylesheetの両方を自前に切り替えた。
+// `pages/_config.yml`の`theme`宣言はreview済みのinertなbaseとして残してあるが、
+// その出力はここへ届かない。
 //
-// 資料の実測値をそのまま使う。ただし次の2色は、cream背景に対してWCAG AAの
-// contrast比4.5:1を満たさないため、同系統で暗い値へ寄せる。
+// 配色はconcept画像（`pages/assets/deskcat-concept.jpg`）とconcept資料
+// （DeskCat_Modern_Public_10slides）の値を土台にし、そこから派生させたtintと
+// shadeだけを足す。**文字を載せる組み合わせはすべてWCAG AAのcontrast比
+// 4.5:1（24px以上、または18.66px以上のboldは3:1）を満たす。**実測して落ちた値は
+// 個別にcommentで理由を残す。
 //
-// - 見出しとlink: 資料の`#c96c83`は3.17:1。`#af4f69`へ寄せて4.55:1。
-// - Captionとfooter: 資料の`#8a7a74`は3.69:1。`#756661`へ寄せて4.93:1。
-//
-// 文字を載せない装飾（marker、blockquoteの罫、button）には、資料の
-// `#e08ba0`と`#c96c83`をそのまま使う。
+// 外部fontはGoogle FontsのM PLUS Rounded 1c（SIL OFL 1.1）を`_layouts/default.html`
+// の`<link>`で読み込む。Cayman由来のOpen Sans依存はlayoutの自前化で消えている。
 
 :root {
-  --dc-bg: #fbf1ea;
+  --dc-bg: #fdf5ef;
   --dc-surface: #ffffff;
-  --dc-surface-alt: #f3e3da;
+  --dc-surface-alt: #f5e7de;
   --dc-text: #3a2e2a;
   --dc-text-2: #5c4f4a;
-  --dc-muted: #756661;
-  --dc-accent: #af4f69;
-  --dc-accent-strong: #8e3d54;
-  --dc-accent-soft: #e08ba0;
-  --dc-border: #d9c9c0;
-  --dc-header-bg: #2b211e;
-  --dc-header-text: #ffffff;
-  --dc-shadow: 0 1px 2px rgba(58, 46, 42, 0.06), 0 10px 28px rgba(58, 46, 42, 0.1);
 
-  // 資料のCalibriとBookman Old StyleはOffice同梱fontであり、macOSやLinux
-  // には存在しない。またBookman Old Styleに日本語glyphがないため、
-  // 「Hardware TBD一覧」のような混在見出しでLatinだけserifになり、
-  // 一つの見出しの中で書体が割れる。資料の見出しはほぼ日本語のみで
-  // この問題が出ないが、この siteの見出しは混在が常態のため採用しない。
-  //
-  // 代わりに、Caymanが既に読み込むOpen SansをLatinへ当て、日本語はOSの
-  // UI fontへ落とす。Open Sansは上の`@import`で必ず読み込まれるため、
-  // stackの先頭へ置くことで追加requestなしに適用できる。
-  // 日本語glyphを持たない点はBookman Old Styleと同じだが、fallback先も
-  // sansであり、一つの見出しの中でserifとsansが混ざる問題は起きない。
-  --dc-font-body: "Open Sans", system-ui, -apple-system, "Segoe UI", Roboto,
-    "Helvetica Neue", Arial, "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI",
-    Meiryo, sans-serif;
+  // 資料の`#8a7a74`はcream地で3.69:1、実装中に試した`#8b7c76`も白地で4.01:1しか
+  // 出ない。同系で暗い`#6b5c56`へ寄せると白地6.38:1、`#f5e7de`地5.2:1になる。
+  --dc-muted: #6b5c56;
+
+  // 資料の`#c96c83`はcream地で3.17:1。`#af4f69`へ寄せて4.55:1。
+  --dc-accent: #af4f69;
+  // tintを敷いた面の上ではaccentが4.5:1を割る（`#f7ece5`地で4.36:1）。
+  // callout内のlinkはこちらを使う。
+  --dc-accent-strong: #8e3d54;
+  // 文字を載せない装飾には資料の`#e08ba0`をそのまま使う。
+  --dc-accent-soft: #e08ba0;
+  // accentを塗った面に載せる文字色。明面ではaccentが暗いので白、暗面では
+  // accentが明るいので暗色になる。白で固定すると暗面で1.88:1まで落ちる。
+  --dc-on-accent: #ffffff;
+
+  --dc-border: #e7d3c8;
+  --dc-header-bg: #2b211e;
+  --dc-header-text: #f6e7dc;
+
+  // 見出しの下に敷く帯。文字の背後にあるだけで、文字色ではない。
+  --dc-swash: #f4b7c5;
+  // 肉球の透かし。`mask-image`で敷くため、色はここが単独の正本になる。
+  --dc-paw: #d9a9b6;
+  --dc-paw-opacity: 0.13;
+
+  --dc-shadow: 0 2px 4px rgba(58, 46, 42, 0.06), 0 14px 34px rgba(58, 46, 42, 0.1);
+  // Mofu Maxの2 pxずれた実体shadow。blurを持たせずcardの厚みだけを出す。
+  --dc-edge: #e7d3c8;
+
+  --dc-radius-pill: 999px;
+  --dc-radius-card: 22px;
+  --dc-radius-panel: 30px;
+
+  // 群ごとの色調。pinkはconcept資料、sageとgoldはconcept画像の観葉植物と鈴から
+  // 採った。白地で4.5:1を満たすまで暗くしてある（`#5f8c7a`は3.81:1、
+  // `#a8762a`は3.97:1で不足）。
+  --dc-tone-1: #af4f69;
+  --dc-tone-1-edge: #f7d9e1;
+  --dc-tone-2: #8e3d54;
+  --dc-tone-2-edge: #f2d5da;
+  --dc-tone-3: #4a7563;
+  --dc-tone-3-edge: #d8e9e2;
+  --dc-tone-4: #8a5f18;
+  --dc-tone-4-edge: #f4e3c4;
+
+  // M PLUS Rounded 1cは日本語glyphを持つ丸ゴシックであり、和文と欧文の両方を
+  // 1書体で通せる。混在見出しで書体が割れないことを条件に選んでいる。
+  --dc-font-body: "M PLUS Rounded 1c", "Hiragino Maru Gothic ProN",
+    "Hiragino Sans", "Yu Gothic UI", Meiryo, system-ui, sans-serif;
   --dc-font-heading: var(--dc-font-body);
   --dc-font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
     "Liberation Mono", "Courier New", monospace;
@@ -66,61 +87,534 @@
     --dc-text: #f3e3da;
     --dc-text-2: #d9c9c0;
     --dc-muted: #b3a099;
-    --dc-accent: #e08ba0;
-    --dc-accent-strong: #f0aab9;
+    --dc-accent: #f0aab9;
+    --dc-accent-strong: #f7c6d0;
     --dc-accent-soft: #e08ba0;
+    --dc-on-accent: #2b211e;
     --dc-border: #43342f;
     --dc-header-bg: #191311;
-    --dc-shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 10px 28px rgba(0, 0, 0, 0.4);
+    --dc-swash: #5a3340;
+    --dc-paw: #7a545e;
+    --dc-paw-opacity: 0.3;
+    --dc-shadow: 0 2px 4px rgba(0, 0, 0, 0.35), 0 14px 34px rgba(0, 0, 0, 0.4);
+    --dc-edge: #43342f;
+
+    // 暗面では明度を反転させる。edgeは面の色、toneは文字の色である。
+    --dc-tone-1: #f0aab9;
+    --dc-tone-1-edge: #4a2b34;
+    --dc-tone-2: #f7c6d0;
+    --dc-tone-2-edge: #4a2f38;
+    --dc-tone-3: #9fd3bf;
+    --dc-tone-3-edge: #24413a;
+    --dc-tone-4: #e8c184;
+    --dc-tone-4-edge: #43331a;
   }
+}
+
+// ---------------------------------------------------------------- base
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  background-color: var(--dc-bg);
+  // iOSで横向きにしたときに本文が拡大されるのを止める。
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
-  background-color: var(--dc-bg);
+  margin: 0;
   color: var(--dc-text);
-  font-family: var(--dc-font-body);
-}
-
-// 資料の表紙と同じdark面にする。
-.page-header {
-  background-color: var(--dc-header-bg);
-  background-image: none;
-  color: var(--dc-header-text);
-}
-
-.project-name {
-  color: var(--dc-header-text);
-  font-family: var(--dc-font-heading);
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  line-height: 1.2;
-}
-
-.project-tagline {
-  color: var(--dc-accent-soft);
-  line-height: 1.5;
-  opacity: 1;
-}
-
-.btn {
-  border: 1px solid var(--dc-accent-soft);
-  border-radius: 999px;
   background-color: transparent;
-  color: var(--dc-accent-soft);
-  transition: background-color 0.2s ease, color 0.2s ease;
+  font-family: var(--dc-font-body);
+  font-size: 17px;
+  // 和文主体の本文では1.5は詰まって見える。
+  line-height: 1.9;
+}
+
+// 肉球の透かし。`background-image`だと色がSVG側に焼き付き暗色modeへ追従できない
+// ため、`mask-image`で敷いて色はtokenから与える。2枚重ねて寸法と位置をずらし、
+// 同じ1 fileだけで散らした見た目にする。
+body::before {
+  content: "";
+  position: fixed;
+  z-index: -1;
+  inset: 0;
+  background-color: var(--dc-paw);
+  opacity: var(--dc-paw-opacity);
+  pointer-events: none;
+  -webkit-mask-image: url("../deskcat-paw.svg"), url("../deskcat-paw.svg");
+  mask-image: url("../deskcat-paw.svg"), url("../deskcat-paw.svg");
+  -webkit-mask-size: 190px 190px, 108px 108px;
+  mask-size: 190px 190px, 108px 108px;
+  -webkit-mask-position: 8px 30px, 122px 96px;
+  mask-position: 8px 30px, 122px 96px;
+  -webkit-mask-repeat: repeat, repeat;
+  mask-repeat: repeat, repeat;
+}
+
+// 入口pageだけ透かしを強く出す。`docs/`は40 page・約2700行のproseがあり、
+// 同じ濃さだと本文の可読性を削る。
+.dc-body-home::before {
+  opacity: calc(var(--dc-paw-opacity) + 0.05);
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+a {
+  color: var(--dc-accent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
 
   &:hover,
   &:focus-visible {
-    border-color: var(--dc-accent-soft);
-    background-color: var(--dc-accent-soft);
-    color: var(--dc-header-bg);
+    color: var(--dc-accent-strong);
   }
 }
 
-.main-content {
+:focus-visible {
+  outline: 3px solid var(--dc-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.dc-skip {
+  position: absolute;
+  left: 12px;
+  top: -60px;
+  z-index: 10;
+  padding: 10px 18px;
+  border-radius: var(--dc-radius-pill);
+  background-color: var(--dc-accent);
+  color: var(--dc-on-accent);
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: top 0.15s ease;
+
+  &:focus {
+    top: 12px;
+    color: var(--dc-on-accent);
+  }
+}
+
+// ---------------------------------------------------------------- slim bar
+
+.dc-bar {
+  display: flex;
+  position: sticky;
+  z-index: 5;
+  top: 0;
+  gap: 14px;
+  align-items: center;
+  padding: 11px clamp(20px, 5vw, 56px);
+  border-bottom: 1px solid var(--dc-border);
+  background-color: var(--dc-surface);
+}
+
+.dc-bar-brand {
+  display: flex;
+  flex: 1;
+  gap: 9px;
+  align-items: center;
+  // touchのhit target。文中のlinkではなくnavigationである。
+  min-height: 44px;
   color: var(--dc-text);
-  // Cayman既定の1.5は、和文が主体の本文では詰まって見える。
-  line-height: 1.8;
+  text-decoration: none;
+
+  &:hover,
+  &:focus-visible {
+    color: var(--dc-text);
+  }
+}
+
+// mascotの頭部はcreamであり、暗面ではそのまま浮く。明面では輪郭を足して
+// 白いbarから切り離す。
+.dc-bar-mark {
+  display: inline-flex;
+  flex: none;
+  line-height: 0;
+  filter: drop-shadow(0 0 1px rgba(138, 106, 92, 0.55));
+}
+
+.dc-bar-name {
+  font-family: var(--dc-font-heading);
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+// ---------------------------------------------------------------- buttons
+
+.dc-btn {
+  display: inline-flex;
+  align-items: center;
+  // touchのhit targetを44 px以上に保つ。`.dc-btn-small`はpaddingが小さいため、
+  // 高さの下限をここで持たせる。
+  min-height: 44px;
+  padding: 13px 26px;
+  border: 0;
+  border-radius: var(--dc-radius-pill);
+  font-family: var(--dc-font-heading);
+  font-size: 15px;
+  font-weight: 800;
+  text-decoration: none;
+  transition: transform 0.16s ease;
+
+  &:hover,
+  &:focus-visible {
+    transform: translateY(-2px);
+  }
+}
+
+.dc-btn-solid {
+  background-color: var(--dc-accent);
+  // 明面は白文字がaccent（`#af4f69`）に対して5.07:1。暗面はaccentが明るい
+  // pinkになるため`--dc-on-accent`が暗色へ切り替わる。
+  color: var(--dc-on-accent);
+  box-shadow: 0 4px 0 var(--dc-accent-strong);
+
+  &:hover,
+  &:focus-visible {
+    color: var(--dc-on-accent);
+  }
+}
+
+.dc-btn-ghost {
+  border: 2px solid var(--dc-edge);
+  background-color: var(--dc-surface);
+  color: var(--dc-accent);
+  box-shadow: 0 4px 0 var(--dc-edge);
+}
+
+.dc-btn-small {
+  padding: 7px 16px;
+  font-size: 13px;
+  box-shadow: none;
+}
+
+.dc-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 22px 0 0;
+}
+
+// ---------------------------------------------------------------- hero
+
+.dc-main {
+  display: block;
+}
+
+.dc-hero {
+  display: flex;
+  gap: 22px;
+  align-items: flex-end;
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: clamp(28px, 5vw, 52px) clamp(20px, 5vw, 72px) 0;
+}
+
+.dc-hero-mark {
+  flex: none;
+  margin-bottom: -6px;
+  line-height: 0;
+}
+
+.dc-hero-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.dc-eyebrow {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  padding: 7px 16px 7px 12px;
+  border-radius: var(--dc-radius-pill);
+  background-color: var(--dc-header-bg);
+  color: #f7d9e1;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.dc-eyebrow-paw {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  background-color: #f7d9e1;
+  -webkit-mask-image: url("../deskcat-paw.svg");
+  mask-image: url("../deskcat-paw.svg");
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+}
+
+.dc-hero-title {
+  margin: 6px 0 0;
+  font-family: var(--dc-font-heading);
+  // 98pxを上限に、狭い幅では縮める。固定値だとmobileで折り返しが崩れる。
+  font-size: clamp(2.75rem, 9.2vw, 6.125rem);
+  font-weight: 800;
+  letter-spacing: -0.045em;
+  line-height: 1;
+  // `--dc-header-bg`だと暗面で地の色と同じになり読めない（1.07:1）。
+  // 明暗で反転するtokenを使う。
+  color: var(--dc-text);
+}
+
+// 帯は`background-image`で文字の背後へ敷く。絶対配置とz-indexで重ねると、
+// 折り返したときに帯だけ取り残される。
+.dc-hero-title-inner {
+  background-image: linear-gradient(
+    transparent 66%,
+    var(--dc-swash) 66%,
+    var(--dc-swash) 86%,
+    transparent 86%
+  );
+}
+
+.dc-hero-tagline {
+  max-width: 40em;
+  margin: 14px 0 0;
+  color: var(--dc-text-2);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+// ---------------------------------------------------------------- home body
+
+.dc-home-body {
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: clamp(24px, 4vw, 40px) clamp(20px, 5vw, 72px) clamp(32px, 5vw, 56px);
+}
+
+.dc-home-body {
+  h2 {
+    // 円は`radial-gradient`、肉球は`mask`で描く。1つの疑似要素で両方は塗れない
+    // ため、面をh2自身の背景に持たせている。
+    position: relative;
+    margin: 44px 0 16px;
+    padding-left: 46px;
+    background-image: radial-gradient(
+      circle 17px at 17px 0.62em,
+      var(--dc-tone-1-edge) 99%,
+      transparent 100%
+    );
+    background-repeat: no-repeat;
+    color: var(--dc-tone-1);
+    font-family: var(--dc-font-heading);
+    font-size: clamp(1.35rem, 3.4vw, 1.7rem);
+    font-weight: 800;
+    line-height: 1.45;
+
+    &::before {
+      content: "";
+      position: absolute;
+      left: 8px;
+      top: 0.32em;
+      width: 19px;
+      height: 19px;
+      background-color: var(--dc-tone-1);
+      -webkit-mask-image: url("../deskcat-paw.svg");
+      mask-image: url("../deskcat-paw.svg");
+      -webkit-mask-size: contain;
+      mask-size: contain;
+      -webkit-mask-repeat: no-repeat;
+      mask-repeat: no-repeat;
+    }
+  }
+
+  // 行長は`.dc-lead`と`.dc-note`が各々持つ。ここで`max-width`を指定すると
+  // selectorが1つ強く、`.dc-lead`の34emに勝ってしまう。
+  > p {
+    margin: 0 0 16px;
+  }
+}
+
+.dc-lead {
+  max-width: 34em;
+  font-size: clamp(1.05rem, 2.6vw, 1.3rem);
+  font-weight: 700;
+  line-height: 1.65;
+}
+
+// 実機駆動を行わない旨の断り。装飾ではなく読ませる必要があるため、暗面に
+// 反転させて本文から浮かせる。
+.dc-notice {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  max-width: 44em;
+  margin: 0 0 16px;
+  padding: 15px 20px;
+  border: 0;
+  border-radius: var(--dc-radius-card);
+  background-color: var(--dc-header-bg);
+  color: var(--dc-header-text);
+  font-size: 15px;
+
+  &::before {
+    content: "!";
+    display: inline-flex;
+    flex: none;
+    width: 26px;
+    height: 26px;
+    align-items: center;
+    justify-content: center;
+    margin-top: 3px;
+    border-radius: 50%;
+    background-color: var(--dc-accent-soft);
+    color: var(--dc-header-bg);
+    font-size: 15px;
+    font-weight: 800;
+  }
+
+  p {
+    margin: 0;
+  }
+
+  a {
+    color: #f7c6d0;
+
+    &:hover,
+    &:focus-visible {
+      color: #ffffff;
+    }
+  }
+}
+
+.dc-note {
+  max-width: 44em;
+  color: var(--dc-muted);
+  font-size: 14px;
+}
+
+// concept画像。傾けたcardとして置く。回転は狭い幅で外へはみ出すため、
+// 下のresponsive節で戻す。
+.dc-figure {
+  float: right;
+  width: 246px;
+  margin: 0 0 20px 28px;
+  padding: 12px 12px 10px;
+  border-radius: 26px;
+  background-color: var(--dc-surface);
+  box-shadow: var(--dc-shadow);
+  transform: rotate(-3deg);
+
+  img {
+    display: block;
+    width: 100%;
+    border-radius: 18px;
+  }
+
+  figcaption {
+    padding-top: 8px;
+    color: var(--dc-muted);
+    font-size: 11px;
+    line-height: 1.6;
+  }
+}
+
+// ---------------------------------------------------------------- nav cards
+
+// 入口pageの導線。**`.dc-cards`を付けたlistだけに効かせる。**素の`ul`へ当てると
+// `docs/`のprose箇条書きまでcardになる。
+.dc-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 13px;
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+  clear: both;
+
+  li {
+    display: flex;
+    border: 2px solid var(--dc-tone-1-edge);
+    border-radius: var(--dc-radius-pill);
+    background-color: var(--dc-surface);
+    box-shadow: 0 3px 0 var(--dc-tone-1-edge);
+    transition: transform 0.16s ease;
+
+    &:hover {
+      transform: translateY(-3px);
+    }
+  }
+
+  a {
+    display: flex;
+    flex: 1;
+    gap: 12px;
+    align-items: center;
+    min-width: 0;
+    padding: 12px 22px;
+    color: var(--dc-text);
+    font-size: 15px;
+    font-weight: 700;
+    text-decoration: none;
+
+    &::before {
+      content: "";
+      flex: none;
+      width: 16px;
+      height: 16px;
+      background-color: var(--dc-tone-1);
+      -webkit-mask-image: url("../deskcat-paw.svg");
+      mask-image: url("../deskcat-paw.svg");
+      -webkit-mask-size: contain;
+      mask-size: contain;
+      -webkit-mask-repeat: no-repeat;
+      mask-repeat: no-repeat;
+    }
+
+    &::after {
+      content: "\203A";
+      margin-left: auto;
+      color: var(--dc-tone-1);
+      font-size: 18px;
+      font-weight: 800;
+    }
+
+    &:hover,
+    &:focus-visible {
+      color: var(--dc-text);
+    }
+  }
+}
+
+// 群ごとの色調。`nth-of-type`ではなく明示のclassで指定する。proseのlistが
+// 混ざったときに番号がずれない。
+.dc-tone-2 {
+  --dc-tone-1: var(--dc-tone-2);
+  --dc-tone-1-edge: var(--dc-tone-2-edge);
+}
+
+.dc-tone-3 {
+  --dc-tone-1: var(--dc-tone-3);
+  --dc-tone-1-edge: var(--dc-tone-3-edge);
+}
+
+.dc-tone-4 {
+  --dc-tone-1: var(--dc-tone-4);
+  --dc-tone-1-edge: var(--dc-tone-4-edge);
+}
+
+// ---------------------------------------------------------------- documents
+
+.dc-doc {
+  max-width: 920px;
+  margin: 0 auto;
+  padding: clamp(24px, 4vw, 44px) clamp(20px, 5vw, 56px) clamp(32px, 5vw, 56px);
 
   h1,
   h2,
@@ -130,77 +624,128 @@ body {
   h6 {
     color: var(--dc-accent);
     font-family: var(--dc-font-heading);
-    // CaymanはOpen Sansを400と700だけ読み込む。600を指定すると700へ
-    // 解決されるため、実際に読み込むweightを直接指定する。
-    font-weight: 700;
-    letter-spacing: -0.01em;
+    font-weight: 800;
+    letter-spacing: -0.015em;
     line-height: 1.4;
   }
 
+  h1 {
+    margin: 0 0 22px;
+    font-size: clamp(1.9rem, 5vw, 2.5rem);
+    line-height: 1.3;
+  }
+
   h2 {
-    margin-top: 3rem;
+    margin: 46px 0 14px;
+    font-size: clamp(1.4rem, 3.6vw, 1.65rem);
   }
 
-  a {
-    color: var(--dc-accent);
-    text-decoration-thickness: 1px;
-    text-underline-offset: 0.18em;
-
-    &:hover,
-    &:focus-visible {
-      color: var(--dc-accent-strong);
-    }
+  h3 {
+    margin: 32px 0 12px;
+    color: var(--dc-text);
+    font-size: clamp(1.15rem, 3vw, 1.3rem);
   }
 
-  // 箇条書きはPages全ページで使うため、markerの色だけを資料へ合わせる。
-  // Card化すると、40ページ2700行のprose箇条書きまでcardになってしまう。
+  h4,
+  h5,
+  h6 {
+    margin: 26px 0 10px;
+    color: var(--dc-text);
+    font-size: 1.05rem;
+  }
+
+  p {
+    margin: 0 0 16px;
+  }
+
+  ul,
+  ol {
+    margin: 0 0 16px;
+    padding-left: 1.5em;
+  }
+
+  li {
+    margin-bottom: 4px;
+  }
+
   ul li::marker {
     color: var(--dc-accent-soft);
   }
 
   blockquote {
-    padding: 0.75rem 1.25rem;
+    margin: 0 0 18px;
+    padding: 14px 20px;
     border-left: 4px solid var(--dc-accent-soft);
-    border-radius: 0 12px 12px 0;
+    border-radius: 0 var(--dc-radius-card) var(--dc-radius-card) 0;
     background-color: var(--dc-surface-alt);
     color: var(--dc-text-2);
+
+    p:last-child {
+      margin-bottom: 0;
+    }
+
+    // tintを敷いた面ではaccentが4.5:1を割るため、強い側を使う。
+    a {
+      color: var(--dc-accent-strong);
+    }
   }
 
-  code,
-  pre {
+  code {
+    padding: 2px 6px;
+    border-radius: 7px;
     background-color: var(--dc-surface-alt);
     color: var(--dc-text);
     font-family: var(--dc-font-mono);
+    font-size: 0.88em;
   }
 
   pre {
-    border: 1px solid var(--dc-border);
-    border-radius: 12px;
+    margin: 0 0 18px;
+    padding: 18px 20px;
+    border: 0;
+    border-radius: var(--dc-radius-card);
+    background-color: var(--dc-header-bg);
+    color: #f0e2d8;
+    font-family: var(--dc-font-mono);
+    font-size: 13.5px;
+    line-height: 1.8;
+    overflow-x: auto;
+
+    code {
+      padding: 0;
+      border-radius: 0;
+      background-color: transparent;
+      // 明面でも暗面でもcode blockの地は暗色に固定する。ここで
+      // `--dc-text`を使うと暗面で文字が地に沈む。
+      color: #f0e2d8;
+      font-size: inherit;
+    }
   }
 
-  // Caymanの`.main-content pre > code`はselectorが1つ強く、上の`code`規則に
-  // 勝つ。結果、code block内の文字だけがCaymanの`#567482`のまま残り、
-  // `--dc-surface-alt`に対して明3.99:1、暗2.90:1でAAを満たさない。
-  pre > code {
-    color: var(--dc-text);
-  }
-
-  // `border-collapse: collapse`ではtableのborder-radiusが無視され、角が
-  // 直角のままになる。`separate`にしてcellの外周角だけを丸める。
-  // Border二重線を避けるため、cellはtopとleftだけに罫を持つ。
+  // `border-collapse: collapse`ではtableのborder-radiusが無視され、角が直角の
+  // ままになる。`separate`にしてcellの外周角だけを丸める。Border二重線を避ける
+  // ため、cellはtopとleftだけに罫を持つ。
+  //
+  // kramdownはtableをdivで包まないため、scroll用の外枠を足せない。角丸とshadowは
+  // table自身が持ち、狭い幅ではtableをblockにして横scrollさせる（下のresponsive節）。
   table {
     display: table;
     width: 100%;
+    margin: 0 0 20px;
     border: 1px solid var(--dc-border);
     border-collapse: separate;
     border-spacing: 0;
-    border-radius: 16px;
+    border-radius: var(--dc-radius-card);
     box-shadow: var(--dc-shadow);
+    font-size: 15px;
 
     th,
     td {
+      padding: 11px 16px;
       border-top: 1px solid var(--dc-border);
       border-left: 1px solid var(--dc-border);
+      text-align: left;
+      vertical-align: top;
 
       &:first-child {
         border-left: 0;
@@ -214,28 +759,28 @@ body {
       }
 
       th:first-child {
-        border-top-left-radius: 15px;
+        border-top-left-radius: calc(var(--dc-radius-card) - 1px);
       }
 
       th:last-child {
-        border-top-right-radius: 15px;
+        border-top-right-radius: calc(var(--dc-radius-card) - 1px);
       }
     }
 
     tbody tr:last-child {
       td:first-child {
-        border-bottom-left-radius: 15px;
+        border-bottom-left-radius: calc(var(--dc-radius-card) - 1px);
       }
 
       td:last-child {
-        border-bottom-right-radius: 15px;
+        border-bottom-right-radius: calc(var(--dc-radius-card) - 1px);
       }
     }
 
     th {
       background-color: var(--dc-surface-alt);
       color: var(--dc-text);
-      font-weight: 600;
+      font-weight: 700;
     }
 
     td {
@@ -244,43 +789,183 @@ body {
   }
 
   hr {
+    height: 1px;
+    margin: 34px 0;
+    border: 0;
     background-color: var(--dc-border);
   }
 }
 
+// ---------------------------------------------------------------- 404
+
+.dc-lost {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: center;
+  max-width: 640px;
+  margin: 0 auto;
+  padding: clamp(36px, 7vw, 72px) clamp(20px, 5vw, 56px) clamp(40px, 7vw, 72px);
+  text-align: center;
+
+  h1 {
+    margin: 0;
+    color: var(--dc-accent);
+    font-family: var(--dc-font-heading);
+    font-size: clamp(1.7rem, 5vw, 2.35rem);
+    font-weight: 800;
+    line-height: 1.35;
+  }
+
+  p {
+    margin: 0;
+    color: var(--dc-text-2);
+  }
+}
+
+.dc-lost-mark {
+  line-height: 0;
+}
+
+.dc-lost-code {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 14px;
+  border-radius: var(--dc-radius-pill);
+  background-color: var(--dc-surface-alt);
+  color: var(--dc-muted);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+}
+
+.dc-actions-center {
+  justify-content: center;
+}
+
+// ---------------------------------------------------------------- footer
+
+.dc-footer {
+  margin-top: clamp(28px, 5vw, 52px);
+  padding: clamp(26px, 4vw, 36px) clamp(20px, 5vw, 72px) clamp(30px, 4vw, 42px);
+  border-radius: var(--dc-radius-panel) var(--dc-radius-panel) 0 0;
+  background-color: var(--dc-header-bg);
+  color: #c9b8b0;
+}
+
+.dc-footer-note {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  max-width: 62em;
+  margin: 0;
+  font-size: 13.5px;
+
+  &::before {
+    content: "";
+    flex: none;
+    width: 22px;
+    height: 22px;
+    margin-top: 2px;
+    background-color: var(--dc-accent-soft);
+    -webkit-mask-image: url("../deskcat-paw.svg");
+    mask-image: url("../deskcat-paw.svg");
+    -webkit-mask-size: contain;
+    mask-size: contain;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+  }
+
+  a {
+    color: #f7c6d0;
+
+    &:hover,
+    &:focus-visible {
+      color: #ffffff;
+    }
+  }
+}
+
+.dc-footer-links {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin: 10px 0 0;
+  font-size: 13.5px;
+  font-weight: 700;
+
+  a {
+    // 文中のlinkではなくnavigationなので、touchのhit targetを44 px確保する。
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    color: #f7c6d0;
+
+    &:hover,
+    &:focus-visible {
+      color: #ffffff;
+    }
+  }
+}
+
+// ---------------------------------------------------------------- responsive
+
 // 表はscreenが狭い場合だけ横scrollさせ、行の折り返しを防ぐ。
 @media screen and (max-width: 42em) {
-  .main-content table {
+  .dc-doc table {
     display: block;
     overflow-x: auto;
   }
 }
 
-.hero {
-  margin: 0 0 2.5rem;
-  text-align: center;
-
-  img {
-    width: 360px;
-    max-width: 100%;
-    height: auto;
-    border-radius: 24px;
-    box-shadow: var(--dc-shadow);
+// 傾けたcardと回り込みは、本文幅が狭いと画像が本文へ食い込む。
+@media screen and (max-width: 52em) {
+  .dc-figure {
+    float: none;
+    width: min(246px, 100%);
+    margin: 0 0 20px;
+    transform: none;
   }
 
-  figcaption {
-    margin-top: 0.75rem;
-    color: var(--dc-muted);
-    font-size: 0.85rem;
+  .dc-hero {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .dc-hero-mark {
+    margin-bottom: 0;
+
+    svg {
+      width: 116px;
+      height: 116px;
+    }
   }
 }
 
-.site-footer {
-  border-top: 1px solid var(--dc-border);
-  color: var(--dc-muted);
+@media screen and (max-width: 30em) {
+  body {
+    font-size: 16px;
+  }
+
+  .dc-btn {
+    padding: 12px 20px;
+    font-size: 14px;
+  }
 }
 
-.site-footer-owner,
-.site-footer-credits {
-  color: var(--dc-muted);
+// ---------------------------------------------------------------- motion
+
+@media (prefers-reduced-motion: reduce) {
+  .dc-btn,
+  .dc-cards li,
+  .dc-skip {
+    transition: none;
+  }
+
+  .dc-btn:hover,
+  .dc-btn:focus-visible,
+  .dc-cards li:hover {
+    transform: none;
+  }
 }

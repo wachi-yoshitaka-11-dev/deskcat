@@ -19,6 +19,7 @@ import json
 import os
 import re
 import shutil
+import struct
 import subprocess
 import sys
 import tempfile
@@ -40,6 +41,7 @@ PREPARE_SCRIPT = str(SCRIPT_DIRECTORY / "prepare_pages.py")
 STAGING_ROOT = os.path.join(REPOSITORY_ROOT, ".pages-src")
 MANIFEST_PATH = os.path.join(REPOSITORY_ROOT, "pages", "assets-manifest.json")
 ASSETS_ROOT = os.path.join(REPOSITORY_ROOT, "pages", "assets")
+LAYOUTS_ROOT = os.path.join(REPOSITORY_ROOT, "pages", "_layouts")
 DOCS_ROOT = os.path.join(REPOSITORY_ROOT, "docs")
 PORTAL_PAGE_PATH = os.path.join(REPOSITORY_ROOT, "pages", "404.md")
 
@@ -697,6 +699,157 @@ class SymlinkBoundaryTests(PublishGuardTestCase):
             rf"{re.escape(self.LINK_NAME)} \(reparse point\)",
             f"Expected the reparse point guard to skip it. Output: {output}",
         )
+
+
+class LayoutBoundaryTests(PublishGuardTestCase):
+    """`pages/_layouts/`の公開境界（ADR-0009）。
+
+    layoutは全pageのHTMLを決めるため、assetより影響が大きい。`pages/assets/`と
+    同じく、列挙したexact pathだけを公開し、列挙外は失敗させる。
+    """
+
+    def test_declared_layouts_are_staged(self):
+        staged_root, _ = self.assert_staging_succeeds()
+        staged_layouts = os.path.join(staged_root, "_layouts")
+        for name in prepare_pages.PORTAL_LAYOUTS:
+            self.assertTrue(
+                os.path.isfile(os.path.join(staged_layouts, name)),
+                f"declared layout was not staged: {name}",
+            )
+        self.assertEqual(
+            sorted(os.listdir(staged_layouts)),
+            sorted(prepare_pages.PORTAL_LAYOUTS),
+            "staged layouts do not match PORTAL_LAYOUTS",
+        )
+
+    def test_undeclared_layout_on_disk_fails(self):
+        path = self.track(os.path.join(LAYOUTS_ROOT, "__guardtest-extra.html"))
+        _write(path, "<p>undeclared layout</p>")
+        self.assert_staging_fails("Layout is not declared in PORTAL_LAYOUTS")
+
+    def test_declared_layout_missing_on_disk_fails(self):
+        path = os.path.join(LAYOUTS_ROOT, "page.html")
+        backup = _read(path)
+        self.addCleanup(_write, path, backup)
+        os.remove(path)
+        self.assert_staging_fails("Declared layout is missing: pages/_layouts/page.html")
+
+    def test_declared_layout_not_tracked_by_git_fails(self):
+        self.detached_index_without("pages/_layouts/page.html")
+        self.assert_staging_fails(
+            "Declared layout is not tracked by Git: pages/_layouts/page.html"
+        )
+
+    def test_symlinked_layout_does_not_publish_outside_content(self):
+        """layoutがsymlinkならrepository外の内容を公開しない。
+
+        `os.path.isfile`はlinkを辿り、copyはtarget側の内容を書き出す。staged側は
+        通常fileになるため、stagingの最後にあるreparse point検査では捕まえられない。
+        """
+        outside = self.track(
+            os.path.join(
+                tempfile.gettempdir(), f"deskcat-outside-{uuid.uuid4().hex}.html"
+            )
+        )
+        secret = "OUTSIDE-LAYOUT-THAT-MUST-NOT-BE-PUBLISHED"
+        _write(outside, secret)
+
+        layout = os.path.join(LAYOUTS_ROOT, "page.html")
+        backup = _read(layout)
+        # 復元はLIFOで最後に走らせる。symlinkを消す前に書き戻すと、link越しに
+        # 一時fileを書き換えてしまい、repositoryにはsymlinkが残る。
+        self.addCleanup(_write, layout, backup)
+        os.remove(layout)
+        try:
+            os.symlink(outside, layout)
+        except (OSError, NotImplementedError):
+            self.skipTest("symlink creation unavailable")
+        self.addCleanup(_remove_fixture, layout)
+
+        # 追跡checkで弾かれると、どのguardが働いたのか区別できない。追跡済みにする。
+        self.detached_index_with("pages/_layouts/page.html")
+        run = self.assert_staging_fails(
+            "Declared layout is a symlink in Git: pages/_layouts/page.html",
+            forbidden_messages=(secret,),
+        )
+        staged = os.path.join(STAGING_ROOT, "_layouts", "page.html")
+        self.assertFalse(os.path.exists(staged), "symlink layoutが公開された")
+        self.assertNotIn(secret, run.output)
+
+
+class FaviconTests(unittest.TestCase):
+    """faviconをASCII artから組み立てる処理を、子processを介さず直接検査する。
+
+    以前のfaviconは1 x 1の単色placeholderで、内容を見るtestが無かった。
+    自前layoutが`<link rel="icon">`を持つため、生成物がそのままtabへ出る。
+    """
+
+    def test_art_is_square_and_uses_the_declared_palette(self):
+        for art, expected in (
+            (prepare_pages.FAVICON_ART_32, 32),
+            (prepare_pages.FAVICON_ART_16, 16),
+        ):
+            self.assertEqual(len(art), expected)
+            for row in art:
+                self.assertEqual(len(row), expected)
+                for character in row:
+                    self.assertIn(character, prepare_pages.FAVICON_PALETTE)
+
+    def test_ragged_art_is_rejected(self):
+        with self.assertRaises(guards.ValidationError):
+            prepare_pages._favicon_image(("..", "."))
+
+    def test_non_square_art_is_rejected(self):
+        with self.assertRaises(guards.ValidationError):
+            prepare_pages._favicon_image(("..", "..", ".."))
+
+    def test_undeclared_character_is_rejected(self):
+        with self.assertRaises(guards.ValidationError):
+            prepare_pages._favicon_image(("X.", ".."))
+
+    def test_icon_declares_two_square_images_with_consistent_sizes(self):
+        data = prepare_pages.build_favicon()
+        reserved, kind, count = struct.unpack_from("<HHH", data, 0)
+        self.assertEqual(reserved, 0)
+        self.assertEqual(kind, 1, "ICO type must be 1 (icon)")
+        self.assertEqual(count, 2, "expected a 32x32 and a 16x16 image")
+
+        seen = []
+        for index in range(count):
+            entry = struct.unpack_from("<BBBBHHII", data, 6 + 16 * index)
+            width, height, colors, entry_reserved = entry[0:4]
+            planes, bits, byte_count, offset = entry[4:8]
+            self.assertEqual(width, height, "favicon images must be square")
+            self.assertEqual(colors, 0)
+            self.assertEqual(entry_reserved, 0)
+            self.assertEqual(planes, 1)
+            self.assertEqual(bits, 32)
+            seen.append(width)
+
+            # 宣言したbyte数が、header + XOR + AND maskの実寸と一致すること。
+            mask_row_bytes = ((width + 31) // 32) * 4
+            expected = 40 + width * width * 4 + mask_row_bytes * width
+            self.assertEqual(byte_count, expected)
+            self.assertLessEqual(
+                offset + byte_count, len(data), "image extends past the file"
+            )
+
+            header = struct.unpack_from("<IiiHHIIiiII", data, offset)
+            self.assertEqual(header[0], 40, "BITMAPINFOHEADER size")
+            self.assertEqual(header[1], width)
+            # `biHeight`はXOR maskとAND maskの合計を表すため実寸の2倍になる。
+            self.assertEqual(header[2], width * 2)
+            self.assertEqual(header[4], 32, "biBitCount")
+            self.assertEqual(header[6], expected - 40, "biSizeImage")
+
+        self.assertEqual(sorted(seen), [16, 32])
+
+    def test_staged_favicon_matches_the_generated_bytes(self):
+        staged = os.path.join(STAGING_ROOT, "favicon.ico")
+        if not os.path.isfile(staged):
+            self.skipTest("staging has not run yet")
+        with open(staged, "rb") as handle:
+            self.assertEqual(handle.read(), prepare_pages.build_favicon())
 
 
 if __name__ == "__main__":

@@ -31,7 +31,17 @@ GitHub公式のJekyll Pages Actionを使用する。
 | `actions/upload-pages-artifact` | `v4` | `7b1f4a764d45c48632c6b24a0339c27f5614fb0b` | MIT | Pages artifact upload |
 | `actions/deploy-pages` | `v4` | `d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e` | MIT | Pages deploy |
 
-いずれのAction repositoryもarchivedではない。`actions/jekyll-build-pages`が使用するGitHub Pages Jekyll runtimeはMIT License、採用した公式対応Cayman themeはCC0-1.0で、いずれのrepositoryもarchivedではない。
+いずれのAction repositoryもarchivedではない。`actions/jekyll-build-pages`が使用するGitHub Pages Jekyll runtimeはMIT License、`pages/_config.yml`が宣言するCayman themeはCC0-1.0で、いずれのrepositoryもarchivedではない。
+
+[ADR-0009](../decisions/0009-pages-own-layout.md)以降、layoutとstylesheetの正本は`pages/_layouts/`と`pages/assets/css/style.scss`であり、**Cayman themeの出力は生成siteへ届かない。**それでも`theme`宣言を残すのは、keyを削除すると`github-pages` gemの`Configuration::DEFAULTS`が`jekyll-theme-primer`を当て、reviewしていないthemeが暗黙に有効化されるためである。review済みのCaymanをinertなbaseとして固定する。
+
+自前layoutが読み込む外部fontは次の1件である。
+
+| Font | 取得元 | License | 用途 |
+|---|---|---|---|
+| M PLUS Rounded 1c | Google Fonts（`fonts.googleapis.com`／`fonts.gstatic.com`） | SIL OFL 1.1 | 和文・欧文の本文と見出し |
+
+repositoryへfont fileを同梱せず、`<link>`で取得する。Cayman由来のOpen Sansを同じ経路で取得していたため、**通信先hostは増えない。**代替は、外部fontを使わずOSのUI fontへ落とすことである。日本語の丸ゴシックはOSによって存在しないため、見た目が端末ごとに変わることを受け入れる場合に選ぶ。
 
 ### 検討した代替
 
@@ -47,6 +57,7 @@ GitHub公式のJekyll Pages Actionを使用する。
 - `pages/_config.yml`
 - `pages/index.md`
 - `pages/404.md`
+- `scripts/prepare_pages.py`の`PORTAL_LAYOUTS`が列挙した`pages/_layouts/`配下のlayout
 - `pages/assets-manifest.json`が列挙した`pages/assets/`配下のasset
 - Rootの`README.md`、`AGENTS.md`、`CONTRIBUTING.md`、`SECURITY.md`、`LICENSE`
 - `docs/`配下の文書
@@ -89,7 +100,16 @@ python3 scripts/test_pages_guards.py
 
 Asset追加前に[公開asset register](../governance/published-asset-register.md)へ出所と再配布許諾を登録し、実機写真ではないimageにはその旨をpage上へ明記する。
 
-`pages/assets/css/style.scss`はCayman themeへのtheme override stylesheetである。上書き対象は配色、typography、table、blockquote、code block、responsive layoutである。Jekyll公式のstylesheet override機構を使い、theme自体は差し替えないため新規dependencyは発生しない。Sassのcompileはこの端末では実行できず、GitHub ActionsのPR buildが唯一の検証経路である。
+`pages/_layouts/`のlayoutは、`prepare_pages.py`の`PORTAL_LAYOUTS`が列挙したexact pathだけを公開する。`prepare_pages.py`は次を失敗として扱う。
+
+- 列挙外のfileが`pages/_layouts/`にある
+- 列挙したfileがdisk上に無い、またはGitの追跡対象でない
+- 列挙したfileがsymlinkまたはreparse pointである
+- 拡張子が`.html`でない
+
+`pages/assets/css/style.scss`はthemeのSCSSを読み込まず、配色、typography、chrome、card、table、blockquote、code block、responsive layout、a11yを自前で持つ（[ADR-0009](../decisions/0009-pages-own-layout.md)）。Sassのcompileはこの端末では実行できず、GitHub ActionsのPR buildが唯一の検証経路である。**自前layoutの初回は、CIで数往復する前提を置く。**この端末でできるのは、layoutのliquidを展開した静的mockupをbrowserで確認することまでである。
+
+`favicon.ico`は`prepare_pages.py`が32 x 32と16 x 16のpixel artから組み立て、`_layouts/default.html`が`<link rel="icon">`で参照する。以前はCaymanのlayoutがこのlinkをコメントアウトしたまま配信していたため、生成したfaviconはどのpageからも参照されていなかった。
 
 次は公開しない。
 

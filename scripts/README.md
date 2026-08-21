@@ -69,12 +69,19 @@ LARGEST=205894 docs/protocol/esp32-pi-protocol.html
 ```
 
 `UNSCANNED=`はsecret／個人pathの内容scanが効かない拡張子である。**binaryは内容scanに
-意味が無いため、意図して対象外にしている。** `favicon.ico`はscriptが固定byteから生成し、
-`.jpg`はmanifestがSHA-256で固定するため、内容は別の手段で押さえている。
+意味が無いため、意図して対象外にしている。** `favicon.ico`は`prepare_pages.py`が
+sourceのASCII art（`FAVICON_ART_32`／`FAVICON_ART_16`）から組み立てるため、
+内容はdiff reviewで読める。`.jpg`はmanifestがSHA-256で固定する。いずれも内容を
+別の手段で押さえている。
 
-`_site/`にも`.pages-src/`と同じ拡張子allowlistとsize上限を課す。2026-08-08時点の
-`_site`は上記の6種類だけで、いずれも許可済み・上限内であり、どちらの判定も現状no-opである。
-Jekyllやpluginが将来別の拡張子を生成したときに、気付かないまま公開せず止めるために置いている。
+`_site/`にも`.pages-src/`と同じ拡張子allowlistとsize上限を課す。上のsummaryは
+2026-08-08時点の記録である。以降、自前layoutの導入（[ADR-0009](../docs/decisions/0009-pages-own-layout.md)）で
+`.svg`が1件加わり、`.html`と`.md`の件数も増えている。いずれも許可済み・上限内であり、
+どちらの判定も現状no-opである。Jekyllやpluginが将来別の拡張子を生成したときに、
+気付かないまま公開せず止めるために置いている。
+
+`_layouts/`は`.pages-src/`にはあるが、Jekyllがunderscore始まりのdirectoryを出力へ
+複製しないため`_site/`には現れない。`EXTENSIONS=`の`.html`件数にも入らない。
 
 `TEXT_EXTENSIONS`へ`.xml`や`.json`を加えることは**しない**。`_site`にそれらは存在せず、
 存在しない拡張子へ備えるのは推測になる。`EXTENSIONS=`が変化したら、その時点で判断する。
