@@ -5,7 +5,7 @@
 // 正本は docs/hardware/power-budget.md の `基準電圧が未解決である（設計上の論点）` である。
 //
 // この sketch が出すのは **AV_CC を基準にしたときの各入力の生ADC値**だけである。
-// 絶対電圧へ変換するには、AV_CC 自身をデジタルテスター（MAS830L）で測った値が要る。
+// 絶対電圧へ変換するには、AV_CC 自身をデジタルテスター（DT830B）で測った値が要る。
 //
 //     V_INT_actual = (VBG の生ADC値 / 1024) * AV_CC の実測値
 //
@@ -27,7 +27,8 @@
 //
 // **AREF pin をテスターで直接測る方法には依らない。**§24.5.2 は VREF を
 // `high impedance source` と述べ、`high impedance voltmeter` を要求している。
-// MAS830L の入力インピーダンスは未取得であり、この要求を満たすか判定できない。
+// DT830B の入力インピーダンスは未取得であり、この要求を満たすか判定できない。
+// **付属の取扱説明書にも記載が無いことを 2026-08-21 に確認した。**
 // 比率法は AREF へ何も接続しないため、この条件を回避できる。
 // （満たさないと断定しているのではなく、判定材料が無いため依存しないという選択である）
 
@@ -162,7 +163,8 @@ void loop(void) {
 
   // serial 出力は ASCII だけにする。flash を節約し、端末側の encoding に依存しない。
   Serial.println(F("# V_INT_actual = ratio(VBG) * AVCC_measured"));
-  Serial.println(F("# AVCC_measured: measure the 5V pin with the DMM (MAS830L)."));
-  Serial.println(F("# Do not claim precision beyond the DMM accuracy."));
+  Serial.println(F("# AVCC_measured: measure the 5V pin with the DMM (DT830B), 20V range."));
+  Serial.println(F("# 20V range resolution is 10mV: uncertainty is AT LEAST +/-10mV."));
+  Serial.println(F("# Accuracy is not stated by the vendor. Do not claim better."));
   delay(2000);
 }
