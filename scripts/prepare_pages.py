@@ -186,11 +186,17 @@ def _favicon_image(art):
     maskも正しく書く。
     """
     height = len(art)
-    width = len(art[0]) if height else 0
-    if not height or any(len(row) != width for row in art):
+    if not height:
+        raise guards.ValidationError("Favicon art has no rows.")
+    width = len(art[0])
+    if any(len(row) != width for row in art):
         raise guards.ValidationError("Favicon art rows have inconsistent width.")
     if width != height:
         raise guards.ValidationError("Favicon art must be square.")
+    # ICOのdirectoryは寸法を1 byteで持ち、256だけを0で表す。257以上は表現できず、
+    # 黙って0（=256）として書き出すと寸法の宣言が実体と食い違う。
+    if width > 256:
+        raise guards.ValidationError("Favicon art must not exceed 256 pixels.")
 
     pixels = bytearray()
     mask = bytearray()
@@ -239,8 +245,8 @@ def build_favicon(arts=(FAVICON_ART_32, FAVICON_ART_16)):
     directory = bytearray(struct.pack("<HHH", 0, 1, len(images)))
     for art, image in zip(arts, images):
         size = len(art)
-        # ICOのdirectoryは寸法を1 byteで持ち、256は0で表す。
-        stored = 0 if size >= 256 else size
+        # 256だけを0で表す。257以上は`_favicon_image`が拒否している。
+        stored = 0 if size == 256 else size
         directory += struct.pack(
             "<BBBBHHII", stored, stored, 0, 0, 1, 32, len(image), offset
         )

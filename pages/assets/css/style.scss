@@ -39,6 +39,9 @@
   // accentを塗った面に載せる文字色。明面ではaccentが暗いので白、暗面では
   // accentが明るいので暗色になる。白で固定すると暗面で1.88:1まで落ちる。
   --dc-on-accent: #ffffff;
+  // solid buttonの下辺に置く厚み。accentより暗い側でなければ厚みに見えない。
+  // `--dc-accent-strong`を流用すると、暗面ではaccentより明るくなって発光に見える。
+  --dc-solid-shade: #8e3d54;
 
   --dc-border: #e7d3c8;
   --dc-header-bg: #2b211e;
@@ -91,6 +94,7 @@
     --dc-accent-strong: #f7c6d0;
     --dc-accent-soft: #e08ba0;
     --dc-on-accent: #2b211e;
+    --dc-solid-shade: #b06e7f;
     --dc-border: #43342f;
     --dc-header-bg: #191311;
     --dc-swash: #5a3340;
@@ -179,9 +183,10 @@ a {
 }
 
 :focus-visible {
+  // outlineは要素自身のborder-radiusに従う。ここで`border-radius`を足すと、
+  // focusした瞬間だけ要素の形が変わる。
   outline: 3px solid var(--dc-accent);
   outline-offset: 2px;
-  border-radius: 4px;
 }
 
 .dc-skip {
@@ -278,7 +283,7 @@ a {
   // 明面は白文字がaccent（`#af4f69`）に対して5.07:1。暗面はaccentが明るい
   // pinkになるため`--dc-on-accent`が暗色へ切り替わる。
   color: var(--dc-on-accent);
-  box-shadow: 0 4px 0 var(--dc-accent-strong);
+  box-shadow: 0 4px 0 var(--dc-solid-shade);
 
   &:hover,
   &:focus-visible {
@@ -522,7 +527,9 @@ a {
   figcaption {
     padding-top: 8px;
     color: var(--dc-muted);
-    font-size: 11px;
+    // 実機写真ではない旨の断りであり、読ませる必要がある。装飾のcaptionとして
+    // 小さくしない。
+    font-size: 12.5px;
     line-height: 1.6;
   }
 }
@@ -560,6 +567,8 @@ a {
     align-items: center;
     min-width: 0;
     padding: 12px 22px;
+    // focus ringをliのpill形へ合わせる。
+    border-radius: inherit;
     color: var(--dc-text);
     font-size: 15px;
     font-weight: 700;

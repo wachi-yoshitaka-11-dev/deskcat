@@ -807,6 +807,19 @@ class FaviconTests(unittest.TestCase):
         with self.assertRaises(guards.ValidationError):
             prepare_pages._favicon_image(("X.", ".."))
 
+    def test_empty_art_is_rejected(self):
+        with self.assertRaises(guards.ValidationError):
+            prepare_pages._favicon_image(())
+
+    def test_art_larger_than_256_is_rejected(self):
+        """ICOのdirectoryは寸法を1 byteで持ち、256だけを0で表す。
+
+        257以上を黙って0（=256）として書き出すと、宣言した寸法が実体と食い違う。
+        """
+        oversized = tuple("." * 257 for _ in range(257))
+        with self.assertRaises(guards.ValidationError):
+            prepare_pages._favicon_image(oversized)
+
     def test_icon_declares_two_square_images_with_consistent_sizes(self):
         data = prepare_pages.build_favicon()
         reserved, kind, count = struct.unpack_from("<HHH", data, 0)
