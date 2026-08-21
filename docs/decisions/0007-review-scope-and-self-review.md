@@ -149,3 +149,8 @@ Pull Request templateの「検証」表と「安全とsecurity」は、何を確
 ## 置き換える決定
 
 なし。
+
+## 後継の決定
+
+[ADR-0010](0010-change-class-and-review-declaration.md)が、本ADRの決定3（Issueを立てずに直接反映してよい範囲）を狭めた。**「規約の言い回し」は軽微経路から外れている。**
+本ADRを置き換えるものではない。自動reviewの範囲、自己レビューの回数、branch protectionの扱いは本ADRのままである。

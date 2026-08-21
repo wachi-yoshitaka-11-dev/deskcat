@@ -26,6 +26,17 @@ buildを実行するworkflowは、そのbuild commandが確定してから追加
 top-level directoryを列挙すると検査対象と起動条件がずれる。実際に`apps/`、`crates/`、
 `firmware/`等の14 fileが対象外で、component READMEだけの変更は検査を素通りしていた。
 
+### `review-gate.yml` — 分類と自己レビューの宣言確認
+
+- base が`develop`と`main`のPull Requestで起動する。
+- 含まれる変更の分類と、Pull Request head commitのtrailer（分類、自己レビュー、指示source変更の
+  宣言）を`scripts/review_gate.py`で検証する（[ADR-0010](../../docs/decisions/0010-change-class-and-review-declaration.md)）。
+- **`develop`側でも掛ける。**宣言が無効になる仕組みは、Pull Requestのhead commitを見て初めて
+  働く。`main`側だけに掛けると、宣言はsquash commitにしか現れない。
+- **未解決threadと必要CIは検証しない。**branch protectionが強制しており、同じ条件を2箇所で持たない。
+- commit messageのtrailerを読むため`fetch-depth: 0`でcheckoutする。
+- 権限はread-onlyとし、tokenをscriptから読めないよう`persist-credentials: false`を指定する。
+
 ### `host.yml` — host workspace
 
 - **実機、firmware、ESP-IDF、ESP32 toolchainを触らない。**`firmware/esp32`はroot workspaceから

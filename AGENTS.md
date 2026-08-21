@@ -150,6 +150,7 @@ firmware は `crates/deskcat-protocol` を path dependency で使う（[ADR-0008
 
 - `git reset --hard`、強制 checkout、履歴書き換え、force push を行わない。
 - ユーザーから依頼されない限り commit、push、tag、release を行わない。
+- commit する前に、変更範囲の分類を `scripts/review_gate.py` で確認する。**`CLASS=minor` と判定されない変更を、Issue と Pull Request なしで `develop` へ入れない。**
 - `.env`、資格情報、秘密鍵、ローカル設定をコミットしない。
 - ユーザーの既存変更を破棄、整形、移動しない。
 

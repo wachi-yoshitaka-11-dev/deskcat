@@ -15,6 +15,7 @@
 | [ADR-0007](0007-review-scope-and-self-review.md) | Accepted | 自動reviewを高リスク変更へ限定し、自己レビューを主軸とする |
 | [ADR-0008](0008-firmware-protocol-crate-reuse.md) | Accepted | Firmwareから`deskcat-protocol`をpath dependencyで再利用する |
 | [ADR-0009](0009-pages-own-layout.md) | Accepted | Pagesのlayoutとstylesheetを自前で保持する |
+| [ADR-0010](0010-change-class-and-review-declaration.md) | Accepted | 変更の分類を機械化し、自己レビューをcommit trailerで宣言する |
 
 ## 新規作成
 

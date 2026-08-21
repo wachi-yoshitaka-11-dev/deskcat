@@ -37,12 +37,25 @@ Issueには次を含める。
 
 | 対象 | 扱い |
 |---|---|
-| typo、リンク修正、表記ゆれ、規約の言い回し、boardのmetadata記入漏れ | **Issue不要。**変更内容の承認を得たうえで`develop`へ直接反映してよい |
-| 仕様、安全、電気、protocol、GPIO、電源、toolchain、CI、依存の変更 | **Issue必須** |
+| typo、リンク修正、表記ゆれ、boardのmetadata記入漏れ | **Issue不要。**変更内容の承認を得たうえで`develop`へ直接反映してよい |
+| 規約、仕様、安全、電気、protocol、GPIO、電源、toolchain、CI、依存の変更 | **Issue必須** |
 | 複数のPull Requestに跨る、または他の作業をblockするもの | **Issue必須** |
 
 Issue不要の側でも、**変更内容の承認は必ず得る。**「Issueを立てない」は「勝手に変えてよい」ではない。
 判断に迷うものはIssue必須の側として扱う。安全に関わる範囲は緩めない。
+
+**「規約の言い回し」はこの表から外した**（[ADR-0010](docs/decisions/0010-change-class-and-review-declaration.md)）。
+規則を持つfileの散文では、言い回しの修正と意味の変更を機械的に区別できない。
+
+**どちら側かは`scripts/review_gate.py`が判定する。**この表は判断の背景であり、正本はscriptである。
+
+```bash
+python3 scripts/review_gate.py classify --base origin/develop --head HEAD
+```
+
+`CLASS=minor`のときだけIssue不要側として扱う。**`CLASS=review-required`を人の判断で覆さない。**
+scriptは軽微と証明できるものだけを`minor`にするため、本当は軽微な変更もreview必須側へ落ちる。
+それは意図した失敗方向であり、Pull Requestを1本作れば済む。
 
 ## Issueの命名
 
@@ -583,6 +596,40 @@ baseで決まる。
 |---|---|---|
 | `develop` | **squash merge** | Issue branchの試行錯誤を1 commitにまとめ、`develop`の履歴を「1 Issue = 1 commit」に保つ |
 | `main` | **squashしない。merge commitにする** | 昇格をsquashすると`develop`側の個々のcommitが`main`の履歴から消え、両branchが別系列になる |
+
+**squash merge時に、分類と自己レビューをtrailerで宣言する。**trailerはcommitへ結び付くため、
+review後にcommitが増えると宣言が自動的に無効になる（[ADR-0010](docs/decisions/0010-change-class-and-review-declaration.md)）。
+`main`昇格workflowが、`develop`のtip commitにこの宣言があることを要求する。
+
+```bash
+gh pr merge <N> --squash --subject "<Pull Requestの題名>" --body-file <path>
+```
+
+`--body-file`の内容には、末尾へ次のtrailerを置く。**指示sourceを変更していない場合、
+3行目は書かない。**
+
+```text
+Change-Class: review-required
+Self-Review: converged
+Instruction-Change: reviewed-as-data
+```
+
+**trailerの名前と値の正本は`scripts/review_gate.py`である。**
+
+**Pull Requestのhead commitにも同じtrailerを置く。**Review gate workflowがそれを見る。
+head commitへ置いておけば、review後にcommitを足したときにworkflowが落ちる。
+**squash commitのtrailerは、mergeするまで存在しないためmerge前に検査できない。**
+merge前にlocalで確認できるのは、自分のbranchのhead commitに対する次である。
+
+```bash
+python3 scripts/review_gate.py gate --base origin/develop --head HEAD
+```
+
+merge後に`develop`のtipへ宣言が入ったことは、次で確認する。ここが`main`昇格の前提になる。
+
+```bash
+python3 scripts/review_gate.py receipt --base origin/develop~1 --head origin/develop
+```
 
 squash mergeしたbranchはcommit hashが変わるため、`git branch -d`が「未merge」と判定する。
 削除前に`git diff <branch> origin/develop`が空であることを確認してから`-D`する。
