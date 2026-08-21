@@ -1,0 +1,56 @@
+---
+layout: default
+---
+<!--
+  入口pageのhero。`jekyll-default-layout`はfront matterに`layout`を持つpageへは
+  介入しないため、このlayoutは`pages/index.md`の`layout: home`で明示的に選ぶ。
+
+  heroはsite全体の第一印象だけを持ち、導線の本文は`index.md`側に置く。
+  mascotはfaviconと同じ意匠のinline SVGである。装飾のみのため`aria-hidden`とし、
+  代替textを持たせない。
+-->
+<div class="dc-hero">
+  <span class="dc-hero-mark" aria-hidden="true">
+    <svg viewBox="0 0 200 200" width="184" height="184" focusable="false">
+      <g fill="#faf0e8" stroke="#faf0e8" stroke-width="16" stroke-linejoin="round">
+        <path d="M50 76 66 30 106 60Z"/><path d="M150 76 134 30 94 60Z"/>
+      </g>
+      <g fill="#f4b7c5" stroke="#f4b7c5" stroke-width="9" stroke-linejoin="round">
+        <path d="M64 68 72 44 92 62Z"/><path d="M136 68 128 44 108 62Z"/>
+      </g>
+      <rect x="22" y="52" width="156" height="122" rx="52" fill="#faf0e8"/>
+      <path d="M40 150h120a52 52 0 0 1-52 24H92a52 52 0 0 1-52-24Z" fill="#f0dfd4"/>
+      <rect x="44" y="70" width="112" height="80" rx="34" fill="#2b211e"/>
+      <g fill="#ffffff">
+        <path d="M72 91c0-2 1.5-3.4 3.5-3.4 1.6 0 3 1 3.7 2.3.7-1.3 2.1-2.3 3.7-2.3 2 0 3.5 1.4 3.5 3.4 0 4.2-7.2 9.5-7.2 9.5S72 95.2 72 91Z"/>
+        <path d="M117 91c0-2 1.5-3.4 3.5-3.4 1.6 0 3 1 3.7 2.3.7-1.3 2.1-2.3 3.7-2.3 2 0 3.5 1.4 3.5 3.4 0 4.2-7.2 9.5-7.2 9.5S117 95.2 117 91Z"/>
+      </g>
+      <path d="M96 118h8l-4 5Z" fill="#e08ba0" stroke="#e08ba0" stroke-width="2.4" stroke-linejoin="round"/>
+      <path d="M96 128 Q100 133 104 128" fill="none" stroke="#e08ba0" stroke-width="3.5" stroke-linecap="round"/>
+      <ellipse cx="36" cy="122" rx="9" ry="6" fill="#f4b7c5" opacity="0.75"/>
+      <ellipse cx="164" cy="122" rx="9" ry="6" fill="#f4b7c5" opacity="0.75"/>
+      <rect x="56" y="163" width="88" height="13" rx="6.5" fill="#e08ba0"/>
+      <circle cx="100" cy="182" r="11" fill="#e9b445"/>
+      <path d="M92 180h16" stroke="#c9922c" stroke-width="2.4" stroke-linecap="round"/>
+      <circle cx="100" cy="186" r="2.2" fill="#c9922c"/>
+    </svg>
+  </span>
+
+  <div class="dc-hero-text">
+    <span class="dc-eyebrow">
+      <span class="dc-eyebrow-paw" aria-hidden="true"></span>PUBLIC DOCUMENTATION
+    </span>
+    <h1 class="dc-hero-title">
+      <span class="dc-hero-title-inner">{{ site.title }}</span>
+    </h1>
+    <p class="dc-hero-tagline">{{ site.description }}</p>
+    <p class="dc-actions">
+      <a class="dc-btn dc-btn-solid" href="https://github.com/{{ site.repository }}">View on GitHub</a>
+      <a class="dc-btn dc-btn-ghost" href="https://github.com/{{ site.repository }}/issues">Issues</a>
+    </p>
+  </div>
+</div>
+
+<div class="dc-home-body">
+  {{ content }}
+</div>

@@ -19,6 +19,7 @@ import json
 import os
 import re
 import shutil
+import struct
 import subprocess
 import sys
 import tempfile
@@ -40,6 +41,7 @@ PREPARE_SCRIPT = str(SCRIPT_DIRECTORY / "prepare_pages.py")
 STAGING_ROOT = os.path.join(REPOSITORY_ROOT, ".pages-src")
 MANIFEST_PATH = os.path.join(REPOSITORY_ROOT, "pages", "assets-manifest.json")
 ASSETS_ROOT = os.path.join(REPOSITORY_ROOT, "pages", "assets")
+LAYOUTS_ROOT = os.path.join(REPOSITORY_ROOT, "pages", "_layouts")
 DOCS_ROOT = os.path.join(REPOSITORY_ROOT, "docs")
 PORTAL_PAGE_PATH = os.path.join(REPOSITORY_ROOT, "pages", "404.md")
 
@@ -99,6 +101,44 @@ def _resolve_git_index_path():
     if not os.path.isabs(index_path):
         index_path = os.path.join(REPOSITORY_ROOT, index_path)
     return guards.full_path(index_path)
+
+
+def decode_ico(data):
+    """`build_favicon`とは独立にICOを復号し、寸法ごとのASCII artへ戻す。
+
+    復号はencoderのhelperを使わずに書く。共有すると両方が同じ間違いをする。
+
+    **これが捕まえるのはencoder側の誤りだけである。**channel順（BGRA）を
+    取り違えれば落ちる（実際にRGBAへ変えて落ちることを確認した）。一方、
+    ASCII art自体を書き換えた場合は、比較の両辺が同時に変わるため落ちない。
+    artは正本であり、その内容はdiff reviewで読む前提である（公開asset register
+    にも同じ根拠を記載している）。testで代替できる性質ではない。
+    """
+    reserved, kind, count = struct.unpack_from("<HHH", data, 0)
+    if reserved != 0 or kind != 1:
+        raise AssertionError("not an ICO file")
+    characters = {
+        value: key for key, value in prepare_pages.FAVICON_PALETTE.items()
+    }
+    images = {}
+    for index in range(count):
+        entry = struct.unpack_from("<BBBBHHII", data, 6 + 16 * index)
+        offset = entry[7]
+        header = struct.unpack_from("<IiiHHIIiiII", data, offset)
+        width = header[1]
+        height = header[2] // 2
+        pixel_start = offset + 40
+        rows = []
+        for y in range(height):
+            row = []
+            for x in range(width):
+                base = pixel_start + (y * width + x) * 4
+                blue, green, red, alpha = data[base:base + 4]
+                row.append(characters.get((red, green, blue, alpha), "?"))
+            rows.append("".join(row))
+        # ICO内のBMPはbottom-upである。
+        images[width] = tuple(reversed(rows))
+    return images
 
 
 class PrepareRun:
@@ -696,6 +736,211 @@ class SymlinkBoundaryTests(PublishGuardTestCase):
             output,
             rf"{re.escape(self.LINK_NAME)} \(reparse point\)",
             f"Expected the reparse point guard to skip it. Output: {output}",
+        )
+
+
+class LayoutBoundaryTests(PublishGuardTestCase):
+    """`pages/_layouts/`の公開境界（ADR-0009）。
+
+    layoutは全pageのHTMLを決めるため、assetより影響が大きい。`pages/assets/`と
+    同じく、列挙したexact pathだけを公開し、列挙外は失敗させる。
+    """
+
+    def test_declared_layouts_are_staged(self):
+        """列挙した3枚だけが`.pages-src/_layouts/`へ入ること。"""
+        staged_root, _ = self.assert_staging_succeeds()
+        staged_layouts = os.path.join(staged_root, "_layouts")
+        for name in prepare_pages.PORTAL_LAYOUTS:
+            self.assertTrue(
+                os.path.isfile(os.path.join(staged_layouts, name)),
+                f"declared layout was not staged: {name}",
+            )
+        self.assertEqual(
+            sorted(os.listdir(staged_layouts)),
+            sorted(prepare_pages.PORTAL_LAYOUTS),
+            "staged layouts do not match PORTAL_LAYOUTS",
+        )
+
+    def test_undeclared_layout_on_disk_fails(self):
+        """列挙外のlayoutを置いたら、公開せずbuildを止めること。"""
+        path = self.track(os.path.join(LAYOUTS_ROOT, "__guardtest-extra.html"))
+        _write(path, "<p>undeclared layout</p>")
+        self.assert_staging_fails("Layout is not declared in PORTAL_LAYOUTS")
+
+    def test_declared_layout_missing_on_disk_fails(self):
+        """列挙したlayoutが無いなら、layoutなしのHTMLを作らず止めること。"""
+        path = os.path.join(LAYOUTS_ROOT, "page.html")
+        backup = _read(path)
+        self.addCleanup(_write, path, backup)
+        os.remove(path)
+        self.assert_staging_fails("Declared layout is missing: pages/_layouts/page.html")
+
+    def test_declared_layout_not_tracked_by_git_fails(self):
+        """追跡外のlayoutを公開しないこと。localの下書きを混ぜない。"""
+        self.detached_index_without("pages/_layouts/page.html")
+        self.assert_staging_fails(
+            "Declared layout is not tracked by Git: pages/_layouts/page.html"
+        )
+
+    def test_symlinked_layout_does_not_publish_outside_content(self):
+        """layoutがsymlinkならrepository外の内容を公開しない。
+
+        `os.path.isfile`はlinkを辿り、copyはtarget側の内容を書き出す。staged側は
+        通常fileになるため、stagingの最後にあるreparse point検査では捕まえられない。
+        """
+        outside = self.track(
+            os.path.join(
+                tempfile.gettempdir(), f"deskcat-outside-{uuid.uuid4().hex}.html"
+            )
+        )
+        secret = "OUTSIDE-LAYOUT-THAT-MUST-NOT-BE-PUBLISHED"
+        _write(outside, secret)
+
+        layout = os.path.join(LAYOUTS_ROOT, "page.html")
+        backup = _read(layout)
+        # 復元はLIFOで最後に走らせる。symlinkを消す前に書き戻すと、link越しに
+        # 一時fileを書き換えてしまい、repositoryにはsymlinkが残る。
+        self.addCleanup(_write, layout, backup)
+        os.remove(layout)
+        try:
+            os.symlink(outside, layout)
+        except (OSError, NotImplementedError):
+            self.skipTest("symlink creation unavailable")
+        self.addCleanup(_remove_fixture, layout)
+
+        # 追跡checkで弾かれると、どのguardが働いたのか区別できない。追跡済みにする。
+        self.detached_index_with("pages/_layouts/page.html")
+        run = self.assert_staging_fails(
+            "Declared layout is a symlink in Git: pages/_layouts/page.html",
+            forbidden_messages=(secret,),
+        )
+        staged = os.path.join(STAGING_ROOT, "_layouts", "page.html")
+        self.assertFalse(os.path.exists(staged), "symlink layoutが公開された")
+        self.assertNotIn(secret, run.output)
+
+
+class FaviconTests(unittest.TestCase):
+    """faviconをASCII artから組み立てる処理を、子processを介さず直接検査する。
+
+    以前のfaviconは1 x 1の単色placeholderで、内容を見るtestが無かった。
+    自前layoutが`<link rel="icon">`を持つため、生成物がそのままtabへ出る。
+    """
+
+    def test_art_is_square_and_uses_the_declared_palette(self):
+        """sourceのASCII artが正方形で、palette外の文字を含まないこと。"""
+        for art, expected in (
+            (prepare_pages.FAVICON_ART_32, 32),
+            (prepare_pages.FAVICON_ART_16, 16),
+        ):
+            self.assertEqual(len(art), expected)
+            for row in art:
+                self.assertEqual(len(row), expected)
+                for character in row:
+                    self.assertIn(character, prepare_pages.FAVICON_PALETTE)
+
+    def test_ragged_art_is_rejected(self):
+        """行幅が揃わないartは、ずれたpixelを書き出す前に止めること。"""
+        with self.assertRaises(guards.ValidationError):
+            prepare_pages._favicon_image(("..", "."))
+
+    def test_non_square_art_is_rejected(self):
+        """非正方形のartを、寸法を偽ったICOにせず止めること。"""
+        with self.assertRaises(guards.ValidationError):
+            prepare_pages._favicon_image(("..", "..", ".."))
+
+    def test_undeclared_character_is_rejected(self):
+        """palette外の文字を、透過として黙って流さず止めること。"""
+        with self.assertRaises(guards.ValidationError):
+            prepare_pages._favicon_image(("X.", ".."))
+
+    def test_empty_art_is_rejected(self):
+        """空のartを、0 x 0のICOとして書き出さず止めること。"""
+        with self.assertRaises(guards.ValidationError):
+            prepare_pages._favicon_image(())
+
+    def test_art_larger_than_256_is_rejected(self):
+        """ICOのdirectoryは寸法を1 byteで持ち、256だけを0で表す。
+
+        257以上を黙って0（=256）として書き出すと、宣言した寸法が実体と食い違う。
+        """
+        oversized = tuple("." * 257 for _ in range(257))
+        with self.assertRaises(guards.ValidationError):
+            prepare_pages._favicon_image(oversized)
+
+    def test_icon_declares_two_square_images_with_consistent_sizes(self):
+        """ICOのdirectoryとBMP headerが、実byte数と整合すること。"""
+        data = prepare_pages.build_favicon()
+        reserved, kind, count = struct.unpack_from("<HHH", data, 0)
+        self.assertEqual(reserved, 0)
+        self.assertEqual(kind, 1, "ICO type must be 1 (icon)")
+        self.assertEqual(count, 2, "expected a 32x32 and a 16x16 image")
+
+        seen = []
+        for index in range(count):
+            entry = struct.unpack_from("<BBBBHHII", data, 6 + 16 * index)
+            width, height, colors, entry_reserved = entry[0:4]
+            planes, bits, byte_count, offset = entry[4:8]
+            self.assertEqual(width, height, "favicon images must be square")
+            self.assertEqual(colors, 0)
+            self.assertEqual(entry_reserved, 0)
+            self.assertEqual(planes, 1)
+            self.assertEqual(bits, 32)
+            seen.append(width)
+
+            # 宣言したbyte数が、header + XOR + AND maskの実寸と一致すること。
+            mask_row_bytes = ((width + 31) // 32) * 4
+            expected = 40 + width * width * 4 + mask_row_bytes * width
+            self.assertEqual(byte_count, expected)
+            self.assertLessEqual(
+                offset + byte_count, len(data), "image extends past the file"
+            )
+
+            header = struct.unpack_from("<IiiHHIIiiII", data, offset)
+            self.assertEqual(header[0], 40, "BITMAPINFOHEADER size")
+            self.assertEqual(header[1], width)
+            # `biHeight`はXOR maskとAND maskの合計を表すため実寸の2倍になる。
+            self.assertEqual(header[2], width * 2)
+            self.assertEqual(header[4], 32, "biBitCount")
+            self.assertEqual(header[6], expected - 40, "biSizeImage")
+
+        self.assertEqual(sorted(seen), [16, 32])
+
+
+class FaviconStagingTests(PublishGuardTestCase):
+    """stagingが実際にpixel artから組んだfaviconを書き出すこと。
+
+    以前はこのcaseを既存の`.pages-src/`に依存して書いていた。clean checkoutでは
+    directoryが無いためskipされ、生成物が壊れていても検出できなかった。
+    自分でstagingを走らせて、その結果と突き合わせる。
+    """
+
+    def test_staged_favicon_matches_the_generated_bytes(self):
+        """stagingが、別の定数ではなく`build_favicon()`の出力を書くこと。
+
+        artの中身は検証できない（両辺が同じ関数由来）。ここで見るのは配線であり、
+        以前の`FAVICON_BYTES`のような別の定数を書いていないことである。
+        """
+        staged_root, _ = self.assert_staging_succeeds()
+        staged = os.path.join(staged_root, "favicon.ico")
+        self.assertTrue(os.path.isfile(staged), "favicon.ico was not staged")
+        with open(staged, "rb") as handle:
+            self.assertEqual(handle.read(), prepare_pages.build_favicon())
+
+    def test_staged_favicon_decodes_back_to_the_source_art(self):
+        """公開されるICOが、sourceのASCII artへ1 pixel単位で戻ること。
+
+        独立に書いた復号で戻すため、channel順や行順、offsetを取り違えていれば
+        落ちる。**art自体の書き換えは検出しない**（`decode_ico`のdocstring）。
+        """
+        staged_root, _ = self.assert_staging_succeeds()
+        with open(os.path.join(staged_root, "favicon.ico"), "rb") as handle:
+            images = decode_ico(handle.read())
+        self.assertEqual(
+            images,
+            {
+                32: prepare_pages.FAVICON_ART_32,
+                16: prepare_pages.FAVICON_ART_16,
+            },
         )
 
 

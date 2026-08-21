@@ -1,0 +1,81 @@
+<!doctype html>
+<!--
+  Pages siteのbase layout。ADR-0009に従い、themeのlayoutではなくこのfileを正本とする。
+  `pages/_config.yml`の`theme`宣言はreview済みのinertなbaseとして残してあり、
+  Caymanのlayoutとstylesheetはここへ届かない。
+
+  liquidで`site.github`を参照しない。`jekyll-github-metadata`の内容は実行環境で
+  変わるため、`site.title`／`site.description`／`site.repository`だけを使う。
+
+  `page.layout`での分岐は1箇所だけに留める。入口pageはheroがsite名を大きく出すため、
+  上部のslim barを重ねない。
+-->
+<html lang="{{ site.lang | default: 'ja' }}">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- 配色に合わせる。Caymanのlayoutが残していた`#157878`はこのsiteの色ではない。 -->
+    <meta name="theme-color" content="#fdf5ef" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#211a17" media="(prefers-color-scheme: dark)">
+    {% seo %}
+    <!-- Caymanのlayoutはこのlinkをコメントアウトしたまま配信しており、生成した
+         favicon.icoはどのpageからも参照されていなかった。 -->
+    <link rel="icon" href="{{ '/favicon.ico' | relative_url }}" sizes="16x16 32x32">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;800&display=swap">
+    <link rel="stylesheet" href="{{ '/assets/css/style.css' | relative_url }}">
+  </head>
+  <!-- 入口pageだけ肉球の透かしを強く出すため、そのpageにだけclassを付ける。
+       他のpageではclass属性そのものを出さない。 -->
+  <body{% if page.layout == 'home' %} class="dc-body-home"{% endif %}>
+    <a class="dc-skip" href="#content">本文へ移動する</a>
+
+    {% if page.layout != 'home' %}
+    <header class="dc-bar">
+      <a class="dc-bar-brand" href="{{ '/' | relative_url }}">
+        <span class="dc-bar-mark" aria-hidden="true">
+          <svg viewBox="0 0 200 200" width="30" height="30" focusable="false">
+            <g fill="#faf0e8" stroke="#faf0e8" stroke-width="16" stroke-linejoin="round">
+              <path d="M50 76 66 30 106 60Z"/><path d="M150 76 134 30 94 60Z"/>
+            </g>
+            <g fill="#f4b7c5" stroke="#f4b7c5" stroke-width="9" stroke-linejoin="round">
+              <path d="M64 68 72 44 92 62Z"/><path d="M136 68 128 44 108 62Z"/>
+            </g>
+            <rect x="22" y="52" width="156" height="122" rx="52" fill="#faf0e8"/>
+            <rect x="44" y="70" width="112" height="80" rx="34" fill="#2b211e"/>
+            <g fill="#ffffff">
+              <path d="M72 91c0-2 1.5-3.4 3.5-3.4 1.6 0 3 1 3.7 2.3.7-1.3 2.1-2.3 3.7-2.3 2 0 3.5 1.4 3.5 3.4 0 4.2-7.2 9.5-7.2 9.5S72 95.2 72 91Z"/>
+              <path d="M117 91c0-2 1.5-3.4 3.5-3.4 1.6 0 3 1 3.7 2.3.7-1.3 2.1-2.3 3.7-2.3 2 0 3.5 1.4 3.5 3.4 0 4.2-7.2 9.5-7.2 9.5S117 95.2 117 91Z"/>
+            </g>
+            <path d="M96 118h8l-4 5Z" fill="#e08ba0" stroke="#e08ba0" stroke-width="2.4" stroke-linejoin="round"/>
+          </svg>
+        </span>
+        <span class="dc-bar-name">{{ site.title }}</span>
+      </a>
+      <a class="dc-btn dc-btn-ghost dc-btn-small" href="https://github.com/{{ site.repository }}">View on GitHub</a>
+    </header>
+    {% endif %}
+
+    <!--
+      `tabindex="-1"`が無いと、skip linkを押しても`<main>`はfocusを受け取れず、
+      URLのfragmentだけが変わってkeyboardの位置が先頭に残るbrowserがある。
+      本文のprose styleは`page.html`の`.dc-doc`が持つ。`default`を直接使うpageは
+      現在404だけであり、prose中心のpageを増やすなら`page`側を使う。
+    -->
+    <main id="content" class="dc-main" tabindex="-1">
+      {{ content }}
+    </main>
+
+    <footer class="dc-footer">
+      <p class="dc-footer-note">
+        このsiteは、<a href="{{ '/docs/decisions/0003-public-documentation-publishing.html' | relative_url }}">ADR-0003</a>に従ってrepository内のMarkdownから生成されます。技術情報の正本はrepositoryであり、PagesやWiki上で独立した仕様を管理しません。
+      </p>
+      <p class="dc-footer-links">
+        <a href="https://github.com/{{ site.repository }}">Repository</a>
+        <a href="https://github.com/{{ site.repository }}/issues">Issues</a>
+        <a href="{{ '/SECURITY.html' | relative_url }}">Security</a>
+      </p>
+    </footer>
+  </body>
+</html>

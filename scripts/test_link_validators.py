@@ -39,7 +39,35 @@ VALIDATE_OUTPUT = str(SCRIPT_DIRECTORY / "validate_pages_output.py")
 # 個別caseではなくharness側で列挙し、新しい診断を追加した際の漏れを防ぐ。
 PRIVATE_PATH_OPTIONS = ("--repository-root", "--site-root", "--pages-config-path")
 
-VALID_PAGE = '<html><body><h1 id="existing">Existing</h1></body></html>'
+# faviconのlinkを持たせる。`validate_pages_output.py`は生成HTMLがfaviconを
+# 参照していることを要求する（layoutがlinkを出さないまま`favicon.ico`だけを
+# 生成していた回帰の再発防止）。
+#
+# `href`を`#`にしてあるのは、この検査が`rel`だけを見るためである。実pathを
+# 書くとfixtureが`baseurl`に依存し、baseurlを差し替えるcaseで意味の無い失敗を
+# 出す。`href`の解決は専用のlink検査caseが受け持つ。
+FAVICON_LINK = '<link rel="icon" href="#">'
+
+
+def with_favicon(html):
+    """faviconのlinkを持たないfixture HTMLへ、それを補う。
+
+    既存caseの関心はlinkとanchorの解決であり、faviconの有無ではない。caseごとの
+    HTMLへ書き足すと、検査の対象が増えるたびにfixtureを全部触ることになる。
+    既に宣言しているHTMLはそのまま返す。faviconそのものを試すcaseは、この
+    helperを通さず直接書き出す。
+    """
+    if 'rel="icon"' in html or "rel='icon'" in html or "shortcut icon" in html:
+        return html
+    if "<head>" in html:
+        return html.replace("<head>", "<head>" + FAVICON_LINK, 1)
+    if "<body" in html:
+        return html.replace("<body", "<head>" + FAVICON_LINK + "</head><body", 1)
+    return FAVICON_LINK + html
+VALID_PAGE = (
+    "<html><head>" + FAVICON_LINK + "</head>"
+    '<body><h1 id="existing">Existing</h1></body></html>'
+)
 
 # NBSP。URL parserもYAMLもASCII空白としては扱わないが、Unicode whitespace判定では
 # 空白になる。両者を取り違えていないことを確かめるfixtureで使う。
@@ -62,6 +90,9 @@ REQUIRED_HTML = (
 )
 
 REQUIRED_ASSETS = ("favicon.ico", "assets/css/style.css", "assets/deskcat-concept.jpg")
+
+# REQUIRED_ASSETSへ書き込む内容。stylesheetを書き換えるcaseがここへ戻す。
+ASSET_FIXTURE = "fixture"
 
 _state = {}
 
@@ -213,7 +244,7 @@ def _build_fixtures(temporary_root):
     for relative_path in REQUIRED_HTML:
         _write(os.path.join(site_root, *relative_path.split("/")), VALID_PAGE)
     for relative_path in REQUIRED_ASSETS:
-        _write(os.path.join(site_root, *relative_path.split("/")), "fixture")
+        _write(os.path.join(site_root, *relative_path.split("/")), ASSET_FIXTURE)
 
     extra_root = os.path.join(site_root, "extra")
     os.makedirs(extra_root)
@@ -520,7 +551,7 @@ class OutputValidatorTestCase(ValidatorAssertions):
         )
 
     def check_index(self, html, should_succeed, expected_message="", forbidden=""):
-        _write(_state["output_index"], html)
+        _write(_state["output_index"], with_favicon(html))
         self.assert_outcome(
             self.run_site(), should_succeed, expected_message, forbidden
         )
@@ -1213,7 +1244,7 @@ class OutputValidatorBaseUrlTests(OutputValidatorTestCase):
 
     def check_config(self, config, html, should_succeed, expected, forbidden=""):
         _write(self.config_path, config)
-        _write(_state["output_index"], html)
+        _write(_state["output_index"], with_favicon(html))
         run = run_validator(
             VALIDATE_OUTPUT,
             [
@@ -1325,6 +1356,148 @@ class OutputValidatorBaseUrlTests(OutputValidatorTestCase):
             False,
             "contains an unsafe baseurl",
             forbidden=secret,
+        )
+
+
+class OutputValidatorFaviconTests(OutputValidatorTestCase):
+    """生成HTMLがfaviconを参照していることを要求する。
+
+    `favicon.ico`を生成していても、layoutが`<link rel="icon">`を出さなければ
+    どのpageからも参照されない。実際にその状態で長く配信されていた。
+    """
+
+    def test_page_without_a_favicon_link_fails(self):
+        _write(
+            _state["output_index"],
+            '<html><body><h1 id="existing">Existing</h1></body></html>',
+        )
+        self.assert_outcome(
+            self.run_site(),
+            False,
+            expected_message="Generated page does not reference a favicon: index.html",
+        )
+
+    def test_shortcut_icon_rel_is_accepted(self):
+        _write(
+            _state["output_index"],
+            '<html><head><link rel="shortcut icon" href="#"></head>'
+            '<body><h1 id="existing">Existing</h1></body></html>',
+        )
+        self.assert_outcome(self.run_site(), True, expected_message="BROKEN_LINKS=0")
+
+    def test_unrelated_rel_does_not_satisfy_the_check(self):
+        """`rel="stylesheet"`をfaviconと数えないこと。"""
+        _write(
+            _state["output_index"],
+            '<html><head><link rel="stylesheet" href="#"></head>'
+            '<body><h1 id="existing">Existing</h1></body></html>',
+        )
+        self.assert_outcome(
+            self.run_site(),
+            False,
+            expected_message="Generated page does not reference a favicon",
+        )
+
+
+class OutputValidatorStylesheetTests(OutputValidatorTestCase):
+    """生成CSSのthemeの痕跡と`url(...)`の解決を検査する。
+
+    HTMLの`href`／`src`しか見ていなかったため、CSSの`url(...)`のpath誤りは
+    静かに404になっていた。`mask-image`でassetを参照する構成では見逃せない。
+    """
+
+    STYLESHEET = ("assets", "css", "style.css")
+
+    def setUp(self):
+        super().setUp()
+        self.stylesheet_path = os.path.join(_state["site_root"], *self.STYLESHEET)
+        self.addCleanup(_write, self.stylesheet_path, ASSET_FIXTURE)
+
+    def check_css(self, css, should_succeed, expected_message="", forbidden=""):
+        _write(self.stylesheet_path, css)
+        self.assert_outcome(
+            self.run_site(), should_succeed, expected_message, forbidden
+        )
+
+    def test_theme_selector_in_the_stylesheet_fails(self):
+        self.check_css(
+            ".page-header{background:#eee}",
+            False,
+            expected_message=(
+                "Theme output leaked into the stylesheet assets/css/style.css:"
+                " page-header"
+            ),
+        )
+
+    def test_theme_color_value_in_the_stylesheet_fails(self):
+        self.check_css(
+            "a{color:#157878}",
+            False,
+            expected_message="Theme output leaked into the stylesheet",
+        )
+
+    def test_resolvable_url_is_accepted(self):
+        """`assets/css/`から見た`../deskcat-concept.jpg`が解決すること。"""
+        self.check_css(
+            'body{mask-image:url("../deskcat-concept.jpg")}',
+            True,
+            expected_message="BROKEN_LINKS=0",
+        )
+
+    def test_url_forms_and_fragments_are_accepted(self):
+        """quoteの3形とfragment付きを、同じtargetとして解決すること。"""
+        self.check_css(
+            "body{mask-image:url(../deskcat-concept.jpg)}"
+            "p{mask-image:url('../deskcat-concept.jpg#icon')}"
+            'i{mask-image:url( "../deskcat-concept.jpg?v=2" )}',
+            True,
+            expected_message="BROKEN_LINKS=0",
+        )
+
+    def test_broken_url_fails(self):
+        self.check_css(
+            'body{mask-image:url("../deskcat-paw.svg")}',
+            False,
+            expected_message=(
+                "Broken stylesheet url() in assets/css/style.css:"
+                " ../deskcat-paw.svg"
+            ),
+        )
+
+    def test_external_url_is_accepted(self):
+        self.check_css(
+            '@import url("https://fonts.googleapis.com/css2?family=Test");',
+            True,
+            expected_message="BROKEN_LINKS=0",
+        )
+
+    def test_data_uri_in_the_stylesheet_fails(self):
+        """data URIはasset manifestとsize guardを迂回する。HTML側と同じ扱いにする。"""
+        self.check_css(
+            'body{mask-image:url("data:image/svg+xml,%3Csvg%3E%3C/svg%3E")}',
+            False,
+            expected_message="Unsafe URL scheme in assets/css/style.css",
+        )
+
+    def test_root_absolute_url_outside_base_path_fails(self):
+        self.check_css(
+            'body{mask-image:url("/assets/deskcat-concept.jpg")}',
+            False,
+            expected_message=(
+                "Root-absolute stylesheet url() is outside Pages base path"
+            ),
+        )
+
+    def test_url_escaping_the_site_fails(self):
+        """site rootの外へ出るurlは、broken扱いではなくescapeとして報告すること。
+
+        `assets/css/`からは3段上がって初めてsite rootの外へ出る。2段では
+        site root直下の存在しないfileを指すだけで、broken linkになる。
+        """
+        self.check_css(
+            'body{mask-image:url("../../../outside.svg")}',
+            False,
+            expected_message="Stylesheet url() escapes Pages output",
         )
 
 
