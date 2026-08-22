@@ -1,6 +1,6 @@
 # Repository設定計画
 
-> 最終remote確認: 2026-07-28
+> 最終remote確認: 2026-08-22（[全面照合](#2026-08-22のdesired-stateとの全面照合)）
 
 ## 確認済み
 
@@ -21,7 +21,7 @@
 - [x] `.github/MILESTONES.md`のM0–M6 title／descriptionを同期
 - [x] `main`へのforce pushを禁止
 - [x] `main`の削除を禁止
-- [x] `main`の`enforce_admins`を有効化し、管理者にも上記2つを適用
+- [ ] `main`の`enforce_admins`を有効化し、管理者にも上記2つを適用。**2026-07-28に有効化しread-backで確認したが、2026-08-22の照合では`false`だった。**現在は適用されていないため未チェックへ戻した（下記「[2026-08-22のdesired stateとの全面照合](#2026-08-22のdesired-stateとの全面照合)」）
 - [x] Repository description、homepage、topicsを設定
 - [x] `delete_branch_on_merge`を有効化（2026-07-31に無効化のdriftを検出し、再適用してread-back済み）
 - [x] `develop`: Branch protectionで`Require conversation resolution before merging`**だけ**を有効化（2026-08-10。下記「2026-08-10のdevelop branch protection」を参照）。**必須reviewと必須status checkは設定しない**
@@ -78,7 +78,7 @@ CI導入前:
 - [ ] 外部contributionにreviewを必須化
 - 必須承認review数: 外部contribution受付時は`1`
 - [ ] signed commitとlinear historyを別途評価
-- [ ] `Require conversation resolution before merging`を評価する。現状は[CONTRIBUTING.md](../CONTRIBUTING.md#merge前の確認)の手作業gateだけであり、[PR #40](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/40)で未解決thread 1件を残したmergeが起きている
+- [x] `Require conversation resolution before merging`を評価し、有効化した。`develop`は2026-08-10である（下記「2026-08-10のdevelop branch protection」）。`main`も有効であることを2026-08-22の照合で確認したが、**`main`で有効化した時期は本文書に記録が無い。**導入の契機は[PR #40](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/40)で未解決thread 1件を残したmergeが起きたことである
 
 ## Actions権限
 
@@ -450,6 +450,103 @@ GitHubはProjects（classic）のREST APIを2025-04-01にsunsetしており（�
 方針: `has_projects`は`true`のまま変更しない。classic projectとしては使っていないが、
 このflag自体がGitHub側で実質的な意味を失っているため、無効化のための追加操作は行わない。
 実際のIssue進行管理は上記Projects v2のboardで行う。
+
+## 2026-08-22のdesired stateとの全面照合
+
+[Issue #154](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/154)の「branch protection／ruleset／Actions／Pages設定をdesired stateと一致させ、API read-backを記録する」に対する照合である。**設定は変更していない。読み出しだけを行った。**
+
+読み出した値である。**本文書がdesired stateとして記録している項目は、下の1件を除いて
+すべて一致した。**記録が無い項目（`has_wiki`、merge方式の設定等）は、一致・不一致を
+言えないため観測値として並べる。
+
+```text
+visibility:                            public
+default_branch:                        main
+has_issues:                            true
+has_discussions:                       false
+has_wiki:                              true
+delete_branch_on_merge:                true
+secret_scanning:                       enabled
+secret_scanning_push_protection:       enabled
+dependabot_security_updates:           enabled
+private_vulnerability_reporting:       true
+vulnerability-alerts:                  HTTP 204 (有効)
+
+main   allow_force_pushes:             false
+main   allow_deletions:                false
+main   required_approving_review_count: 0
+main   require_code_owner_reviews:     false
+main   required_status_checks:         null
+main   required_conversation_resolution: true
+
+develop allow_force_pushes:            false
+develop allow_deletions:               false
+develop required_pull_request_reviews: null
+develop required_status_checks:        null
+develop required_conversation_resolution: true
+
+ruleset "Protect develop from deletion"
+  target:      branch
+  enforcement: active
+  include:     refs/heads/develop
+  rules:       deletion
+  bypass_actors: []
+
+actions enabled:                       true
+actions allowed_actions:               selected
+actions github_owned_allowed:          true
+actions verified_allowed:              false
+actions patterns_allowed:              esp-rs/xtensa-toolchain@*
+actions sha_pinning_required:          true
+default_workflow_permissions:          read
+can_approve_pull_request_reviews:      false
+
+github-pages can_admins_bypass:        false
+github-pages protection_rules:         branch_policy
+github-pages 許可branch:               main (1件)
+pages source:                          main /
+pages build_type:                      workflow
+pages https_enforced:                  true
+```
+
+**一致していなかった項目が1件ある。**
+
+```text
+main enforce_admins:                   false   ← 本文書は「有効化し read-back true」と記録
+```
+
+本文書の「管理者除外の解消」は、2026-07-28に`enforce_admins`を有効化し、read-backで
+`enabled = true`を確認したと記録している。**2026-08-22の読み出しでは`false`である。**
+その間に無効化されたことになるが、**経緯は特定できていない。**
+`delete_branch_on_merge`が2026-07-31に同種のdriftを起こしたときと同じく、変化の理由を
+遡って確定する手段が無い。
+
+影響は次に限られる。`main`の`allow_force_pushes: false`と`allow_deletions: false`は
+設定として残っているが、**管理者はこの2つに拘束されない。**「管理者除外の解消」が述べた
+「[AGENTS.md](../AGENTS.md)の force pushを行わない が`main`に限ってGitHub側でも実効化され、
+AIエージェントの誤操作に対する防壁になる」という状態は、**現在は成立していない。**
+
+**この照合では設定を戻していない。**再適用はrepository所有者の判断であり、
+判断と適用後のread-backをここへ追記する。
+
+意図して無効化していた場合は、その理由を本文書へ記録する。checklistとremoteが
+食い違ったまま放置しない。
+
+## merge方式の設定と規約のずれ（2026-08-22）
+
+```text
+allow_squash_merge:  true
+allow_merge_commit:  true
+allow_rebase_merge:  true
+allow_auto_merge:    false
+```
+
+[CONTRIBUTING.md](../CONTRIBUTING.md#merge方式)が認めるのは、base `develop`のsquash mergeと
+base `main`のmerge commitだけである。**rebase mergeは規約に無いが、設定では選べる。**
+
+これはdriftではない。本文書はこれまでmerge方式の設定についてdesired stateを記録していない。
+**規約と設定を一致させるなら`allow_rebase_merge`を無効化する**という選択肢があることを、
+照合の結果として記録する。適用はrepository所有者の判断とする。
 
 ## 保留
 
