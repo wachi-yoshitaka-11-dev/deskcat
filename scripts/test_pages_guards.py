@@ -206,13 +206,43 @@ def _manifest_precondition_problem(content):
     return None
 
 
+def _manifest_missing_assets(content, assets_root):
+    """manifestが宣言していて実体が無いassetの相対pathを返す。
+
+    改変caseはmanifestへ一時entryを足し、cleanupで元へ戻す。戻らなかった場合、
+    残るのは**実体の無いfileを指すentry**である。本番のstagingはこれを
+    `Declared asset is missing`で拒否するため、**残骸があると無関係なcaseが
+    まとめて失敗する。**
+
+    prefixでは判定しない。fixtureの命名規約に依存すると、規約を変えたときに
+    guardだけが古い名前を見続ける。**「本番のstagingが受け付ける形か」だけを見る。**
+    """
+    try:
+        manifest = json.loads(content)
+    except ValueError:
+        return []
+    assets = manifest.get("assets")
+    if not isinstance(assets, list):
+        return []
+    missing = []
+    for entry in assets:
+        if not isinstance(entry, dict):
+            continue
+        relative = entry.get("path")
+        if not isinstance(relative, str) or not relative:
+            continue
+        if not os.path.isfile(os.path.join(assets_root, relative)):
+            missing.append(relative)
+    return missing
+
+
 def setUpModule():
     """前提を1回だけ確認し、in-placeで書き換えるfileの内容を記録する。
 
-    確認するのは2つである。**`RESTORED_IN_PLACE`のどれもstagingのsize上限を超えて
-    いないこと**と、**manifestが改変caseの必要な形をしていること**である。どちらも
-    本番のstagingが成立するために元から必要な条件であり、正当な編集を残骸と
-    誤判定しない。記録した内容は`tearDownModule`が突き合わせる。
+    確認するのは、**`RESTORED_IN_PLACE`のどれもstagingのsize上限を超えていないこと**、
+    **manifestが改変caseの必要な形をしていること**、**manifestが宣言したassetの実体が
+    あること**である。いずれも本番のstagingが成立するために元から必要な条件であり、
+    正当な編集を残骸と誤判定しない。記録した内容は`tearDownModule`が突き合わせる。
 
     このharnessは`pages/assets-manifest.json`をin-placeで書き換え、`setUp`が読んだ
     backupから戻す。**backupはworking treeから読む。**そのため、前回の実行が途中で
@@ -220,6 +250,12 @@ def setUpModule():
     元へ戻らない。**残骸は静かに固定され、無関係なcaseが誤解を招くmessageで落ちる。
     実際に、`sha256`が失われた状態から12件が失敗し2件がerrorになった。原因として
     報告されたのはmanifestの残骸ではなく、hash不一致やsecret検出といった別の判定だった。
+
+    **残骸が生じる引き金は特定できていない。**2026-08-22に、同一shell呼び出しでこの
+    harnessを連続実行した2回目が失敗し、manifestへ実体の無いentryが残る事象を観測した。
+    失敗した回は所要時間が短く、stagingが早期に失敗して連鎖する形だった。**同日に同じ
+    手順を6回試して再現しなかった。**単発実行とfull suiteの単発実行はいずれも成功する。
+    ここで行うのは引き金の除去ではなく、**残骸から始まった実行を起点で止めること**である。
 
     ここで前提を1回だけ検査し、満たさなければ1件の診断で止める。cascadeさせない。
 
@@ -237,14 +273,20 @@ def setUpModule():
                 f"{relative} exceeds the staging size limit, which the real staging"
                 " would reject"
             )
-    manifest_problem = _manifest_precondition_problem(_read(MANIFEST_PATH))
+    manifest_content = _read(MANIFEST_PATH)
+    manifest_relative = guards.path_relative_to_root(MANIFEST_PATH, REPOSITORY_ROOT)
+    manifest_problem = _manifest_precondition_problem(manifest_content)
     if manifest_problem is not None:
-        manifest_relative = guards.path_relative_to_root(
-            MANIFEST_PATH, REPOSITORY_ROOT
-        )
         problems.append(
             f"{manifest_relative} does not satisfy the precondition for the manifest"
             f" tampering cases: {manifest_problem}"
+        )
+    missing = _manifest_missing_assets(manifest_content, ASSETS_ROOT)
+    if missing:
+        problems.append(
+            f"{manifest_relative} declares asset(s) that do not exist on disk:"
+            f" {' '.join(missing)}. The real staging rejects this, so every"
+            " staging case would fail for an unrelated reason"
         )
     if problems:
         listed = " ".join(
@@ -518,6 +560,29 @@ class HarnessSelfTests(PublishGuardTestCase):
                 problem = _manifest_precondition_problem(case["content"])
                 self.assertIsNotNone(problem)
                 self.assertIn(case["expected"], problem)
+
+    def test_missing_asset_detector_finds_residue_entries(self):
+        """宣言済みで実体の無いassetを検出すること。
+
+        改変caseのcleanupが戻らなかったとき、manifestに残るのはこの形である。
+        検出できないと、次の実行で無関係なcaseがまとめて失敗する。
+        `setUpModule`はこの判定に依存しているため、検出力を先に確認する。
+        """
+        intact = self.manifest_backup
+        self.assertEqual(_manifest_missing_assets(intact, ASSETS_ROOT), [])
+
+        residue = json.loads(intact)
+        residue["assets"].append({"path": "__guardtest-absent-probe.pdf"})
+        self.assertEqual(
+            _manifest_missing_assets(json.dumps(residue), ASSETS_ROOT),
+            ["__guardtest-absent-probe.pdf"],
+        )
+
+        # 壊れたJSONや`assets`が無い形は、別の判定が扱う。ここでは空を返す。
+        self.assertEqual(_manifest_missing_assets('{ "assets": [ ', ASSETS_ROOT), [])
+        self.assertEqual(
+            _manifest_missing_assets('{"documentation": []}', ASSETS_ROOT), []
+        )
 
 
 class BaselineTests(PublishGuardTestCase):
