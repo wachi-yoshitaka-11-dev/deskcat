@@ -47,6 +47,27 @@ NAVIGATION_ATTRIBUTES = frozenset({"href", "src", "xlink:href"})
 # `Trim()`へ渡すURL前後の文字。ASCII制御文字と空白だけを対象にする。
 URL_TRIM_CHARACTERS = "".join(chr(code) for code in range(0x00, 0x21))
 
+# ADR-0009: layoutとstylesheetは自前で持ち、themeの出力は生成siteへ届かない。
+# 再びtheme SCSSをimportすると、これらの識別子が生成CSSへ現れる。
+#
+# **配色やfontを一般に禁止するものではない。**themeが戻ってきたことの目印だけを見る。
+# 検査対象をCSSに限るのは、`docs/`の文書がADR-0009やrunbookの中でこれらの語を
+# 引用しており、HTMLやMarkdownまで対象にすると自分の文書で落ちるためである。
+THEME_LEAK_MARKERS = (
+    "#157878",  # Caymanのteal。`.page-header`のgradientと`theme-color`に出る
+    "page-header",
+    "project-name",
+    "project-tagline",
+    "main-content",
+    "site-footer-owner",
+)
+
+# 生成CSSから`url(...)`のtargetを取り出す。`@import url(...)`も同じ形で拾う。
+CSS_URL_RE = re.compile(r"url\(\s*(?P<quote>['\"]?)(?P<target>[^'\")]*)(?P=quote)\s*\)")
+
+# faviconを参照するlinkのrel。`icon`と`shortcut icon`の両方を受ける。
+FAVICON_RELS = frozenset({"icon", "shortcut icon"})
+
 BASEURL_LINE_RE = re.compile(r"^baseurl[ \t]*:(?P<after>.*)$")
 UNSAFE_BASEURL_RE = re.compile(r"[\x00-\x1f\x7f?#\\]")
 BASEURL_DOT_SEGMENT_RE = re.compile(r"(?:^|/)\.\.?(?:/|$)")
@@ -572,6 +593,116 @@ def _check_links(
                 )
 
 
+def _check_favicon_links(
+    html_files, attributes_by_file, sensitive_text_files, site_root_path, problems
+):
+    """生成HTMLがfaviconを参照していることを確認する。
+
+    `favicon.ico`を生成していても、layoutが`<link rel="icon">`を出していなければ
+    どのpageからも参照されない。実際にtheme由来のlayoutがこのlinkをコメント
+    アウトしたまま配信しており、その状態が長く気付かれなかった。存在するだけの
+    fileを「公開されている」と数えないため、参照側を検査する。
+
+    `href`が実在するかどうかは既存のlink検査が見る。ここでは`rel`の有無だけを見る。
+    """
+    for html_path in html_files:
+        # secret検出済みのfileへ追加の診断を出さない。link検査と同じ扱い。
+        if html_path in sensitive_text_files:
+            continue
+        has_favicon = any(
+            name.lower() == "rel"
+            and " ".join(guards.html_decode(value).lower().split()) in FAVICON_RELS
+            for name, value in attributes_by_file[html_path]
+        )
+        if not has_favicon:
+            problems.append(
+                "Generated page does not reference a favicon: "
+                + guards.path_relative_to_root(html_path, site_root_path)
+            )
+
+
+def _check_stylesheets(files, published_file_paths, site_root_path, base_path, problems):
+    """生成CSSのthemeの痕跡と、`url(...)`の解決を確認する。
+
+    `validate_pages_output.py`のlink検査はHTMLの`href`／`src`だけを見る。CSSの
+    `url(...)`は対象外であり、`mask-image`やbackgroundのpath誤りは静かに404に
+    なる。同じ規則で解決させる。
+    """
+    for path in files:
+        if guards.get_extension(path).lower() != ".css":
+            continue
+        relative_css = guards.path_relative_to_root(path, site_root_path)
+        try:
+            content = guards.get_file_text(path)
+        except OSError:
+            # 読めなかった事実は内容scan側が診断へ出している。
+            continue
+
+        for marker in THEME_LEAK_MARKERS:
+            if marker in content:
+                problems.append(
+                    f"Theme output leaked into the stylesheet {relative_css}:"
+                    f" {marker}"
+                )
+
+        for match in CSS_URL_RE.finditer(content):
+            raw = match.group("target").strip(URL_TRIM_CHARACTERS)
+            if not raw.strip():
+                problems.append(f"Stylesheet url() has no target in {relative_css}")
+                continue
+            value = guards.html_decode(raw)
+            diagnostic_value = guards.diagnostic_text(value)
+            scheme_probe = CONTROL_RUN_RE.sub("", value)
+            lowered = scheme_probe.lower()
+            # HTML側と同じ規則。data URIはasset manifestとsize guardを迂回する。
+            if lowered.startswith("data:") or lowered.startswith("javascript:"):
+                problems.append(
+                    f"Unsafe URL scheme in {relative_css}: {diagnostic_value}"
+                )
+                continue
+            if scheme_probe.startswith("//") or lowered.startswith(
+                ("http:", "https:", "mailto:", "tel:")
+            ):
+                continue
+            if SCHEME_RE.match(scheme_probe):
+                problems.append(
+                    f"Unsafe URL scheme in {relative_css}: {diagnostic_value}"
+                )
+                continue
+
+            link_path = value.split("#", 1)[0].split("?", 1)[0]
+            if not link_path.strip():
+                continue
+            link_path = guards.unescape_data_string(link_path).replace("\\", "/")
+
+            if link_path == base_path or link_path == f"{base_path}/":
+                candidate = site_root_path
+            elif link_path.startswith(f"{base_path}/"):
+                candidate = os.path.join(
+                    site_root_path, link_path[len(base_path) + 1 :]
+                )
+            elif link_path.startswith("/"):
+                problems.append(
+                    "Root-absolute stylesheet url() is outside Pages base path in "
+                    f"{relative_css}: {diagnostic_value}"
+                )
+                continue
+            else:
+                candidate = os.path.join(os.path.dirname(path), link_path)
+
+            candidate = guards.full_path(candidate)
+            if not guards.path_within_root(candidate, site_root_path):
+                problems.append(
+                    f"Stylesheet url() escapes Pages output in {relative_css}:"
+                    f" {diagnostic_value}"
+                )
+                continue
+            if candidate not in published_file_paths or not os.path.isfile(candidate):
+                problems.append(
+                    f"Broken stylesheet url() in {relative_css}: {diagnostic_value}"
+                )
+
+
 def _is_license(path):
     """`LICENSE`はMarkdownではないため拡張子を持たない。file名で判定する。
 
@@ -807,6 +938,18 @@ def main(argv=None):
         site_root_path,
         base_path,
         problems,
+    )
+
+    _check_favicon_links(
+        html_files,
+        attributes_by_file,
+        sensitive_text_files,
+        site_root_path,
+        problems,
+    )
+
+    _check_stylesheets(
+        files, published_file_paths, site_root_path, base_path, problems
     )
 
     if problems:

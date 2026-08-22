@@ -19,6 +19,7 @@ import json
 import os
 import re
 import shutil
+import struct
 import subprocess
 import sys
 import tempfile
@@ -40,6 +41,7 @@ PREPARE_SCRIPT = str(SCRIPT_DIRECTORY / "prepare_pages.py")
 STAGING_ROOT = os.path.join(REPOSITORY_ROOT, ".pages-src")
 MANIFEST_PATH = os.path.join(REPOSITORY_ROOT, "pages", "assets-manifest.json")
 ASSETS_ROOT = os.path.join(REPOSITORY_ROOT, "pages", "assets")
+LAYOUTS_ROOT = os.path.join(REPOSITORY_ROOT, "pages", "_layouts")
 DOCS_ROOT = os.path.join(REPOSITORY_ROOT, "docs")
 PORTAL_PAGE_PATH = os.path.join(REPOSITORY_ROOT, "pages", "404.md")
 
@@ -101,6 +103,44 @@ def _resolve_git_index_path():
     return guards.full_path(index_path)
 
 
+def decode_ico(data):
+    """`build_favicon`とは独立にICOを復号し、寸法ごとのASCII artへ戻す。
+
+    復号はencoderのhelperを使わずに書く。共有すると両方が同じ間違いをする。
+
+    **これが捕まえるのはencoder側の誤りだけである。**channel順（BGRA）を
+    取り違えれば落ちる（実際にRGBAへ変えて落ちることを確認した）。一方、
+    ASCII art自体を書き換えた場合は、比較の両辺が同時に変わるため落ちない。
+    artは正本であり、その内容はdiff reviewで読む前提である（公開asset register
+    にも同じ根拠を記載している）。testで代替できる性質ではない。
+    """
+    reserved, kind, count = struct.unpack_from("<HHH", data, 0)
+    if reserved != 0 or kind != 1:
+        raise AssertionError("not an ICO file")
+    characters = {
+        value: key for key, value in prepare_pages.FAVICON_PALETTE.items()
+    }
+    images = {}
+    for index in range(count):
+        entry = struct.unpack_from("<BBBBHHII", data, 6 + 16 * index)
+        offset = entry[7]
+        header = struct.unpack_from("<IiiHHIIiiII", data, offset)
+        width = header[1]
+        height = header[2] // 2
+        pixel_start = offset + 40
+        rows = []
+        for y in range(height):
+            row = []
+            for x in range(width):
+                base = pixel_start + (y * width + x) * 4
+                blue, green, red, alpha = data[base:base + 4]
+                row.append(characters.get((red, green, blue, alpha), "?"))
+            rows.append("".join(row))
+        # ICO内のBMPはbottom-upである。
+        images[width] = tuple(reversed(rows))
+    return images
+
+
 class PrepareRun:
     def __init__(self, exit_code, output):
         self.exit_code = exit_code
@@ -141,6 +181,157 @@ def output_exposes_staging_root(output):
     return normalized_staging_root in normalized_output
 
 
+_module_state = {}
+
+# 各caseがin-placeで書き換え、`setUp`が読んだbackupから戻す追跡file。
+# 実行の前後で内容を突き合わせ、残骸が次の実行のbackupへ化けるのを防ぐ。
+RESTORED_IN_PLACE = (MANIFEST_PATH, PORTAL_PAGE_PATH)
+
+
+def _manifest_precondition_problem(content):
+    """manifest改変caseの前提を満たさない理由を返す。満たすなら`None`。
+
+    前提は「JSONとして読めて、`assets`にbinary assetのhashが1つ以上ある」ことである。
+    改変caseはこのhashを書き換えたり外したりして、prepare側の判定を試す。
+    """
+    try:
+        manifest = json.loads(content)
+    except ValueError as error:
+        return f"it is not valid JSON ({error.__class__.__name__})"
+    assets = manifest.get("assets")
+    if not isinstance(assets, list):
+        return "it has no `assets` list"
+    if not any(isinstance(entry, dict) and "sha256" in entry for entry in assets):
+        return "no entry under `assets` declares `sha256`"
+    return None
+
+
+def _manifest_missing_assets(content, assets_root):
+    """manifestが宣言していて実体が無いassetの相対pathを返す。
+
+    改変caseはmanifestへ一時entryを足し、cleanupで元へ戻す。戻らなかった場合、
+    残るのは**実体の無いfileを指すentry**である。本番のstagingはこれを
+    `Declared asset is missing`で拒否するため、**残骸があると無関係なcaseが
+    まとめて失敗する。**
+
+    prefixでは判定しない。fixtureの命名規約に依存すると、規約を変えたときに
+    guardだけが古い名前を見続ける。**「本番のstagingが受け付ける形か」だけを見る。**
+    """
+    try:
+        manifest = json.loads(content)
+    except ValueError:
+        return []
+    assets = manifest.get("assets")
+    if not isinstance(assets, list):
+        return []
+    missing = []
+    for entry in assets:
+        if not isinstance(entry, dict):
+            continue
+        relative = entry.get("path")
+        if not isinstance(relative, str) or not relative:
+            continue
+        if not os.path.isfile(os.path.join(assets_root, relative)):
+            missing.append(relative)
+    return missing
+
+
+def setUpModule():
+    """前提を1回だけ確認し、in-placeで書き換えるfileの内容を記録する。
+
+    確認するのは、**`RESTORED_IN_PLACE`のどれもstagingのsize上限を超えていないこと**、
+    **manifestが改変caseの必要な形をしていること**、**manifestが宣言したassetの実体が
+    あること**である。いずれも本番のstagingが成立するために元から必要な条件であり、
+    正当な編集を残骸と誤判定しない。記録した内容は`tearDownModule`が突き合わせる。
+
+    このharnessは`pages/assets-manifest.json`をin-placeで書き換え、`setUp`が読んだ
+    backupから戻す。**backupはworking treeから読む。**そのため、前回の実行が途中で
+    落ちて改変が残っていると、**その改変済みの内容がbackupになり、以後の実行でも
+    元へ戻らない。**残骸は静かに固定され、無関係なcaseが誤解を招くmessageで落ちる。
+    実際に、`sha256`が失われた状態から12件が失敗し2件がerrorになった。原因として
+    報告されたのはmanifestの残骸ではなく、hash不一致やsecret検出といった別の判定だった。
+
+    **残骸が生じる引き金は特定できていない。**2026-08-22に、同一shell呼び出しでこの
+    harnessを連続実行した2回目が失敗し、manifestへ実体の無いentryが残る事象を観測した。
+    失敗した回は所要時間が短く、stagingが早期に失敗して連鎖する形だった。**同日に同じ
+    手順を6回試して再現しなかった。**単発実行とfull suiteの単発実行はいずれも成功する。
+    ここで行うのは引き金の除去ではなく、**残骸から始まった実行を起点で止めること**である。
+
+    ここで前提を1回だけ検査し、満たさなければ1件の診断で止める。cascadeさせない。
+
+    **HEADとは比較しない。**manifestやportal pageを正当に編集しているbranchで、その
+    編集を残骸と誤判定して検査を止めないためである。見るのは「本番のstagingと改変case
+    が成立する形をしているか」だけであり、内容がcommit済みの版と同じかどうかは見ない。
+    """
+    problems = []
+    for path in RESTORED_IN_PLACE:
+        relative = guards.path_relative_to_root(path, REPOSITORY_ROOT)
+        # size上限を超えたfileは、そもそも本番のstagingが拒否する。ここに現れるのは
+        # 中断した実行がsize超過のfixtureを残した場合だけである。
+        if os.path.getsize(path) > guards.FILE_SIZE_LIMIT:
+            problems.append(
+                f"{relative} exceeds the staging size limit, which the real staging"
+                " would reject"
+            )
+    manifest_content = _read(MANIFEST_PATH)
+    manifest_relative = guards.path_relative_to_root(MANIFEST_PATH, REPOSITORY_ROOT)
+    manifest_problem = _manifest_precondition_problem(manifest_content)
+    if manifest_problem is not None:
+        problems.append(
+            f"{manifest_relative} does not satisfy the precondition for the manifest"
+            f" tampering cases: {manifest_problem}"
+        )
+    missing = _manifest_missing_assets(manifest_content, ASSETS_ROOT)
+    if missing:
+        problems.append(
+            f"{manifest_relative} declares asset(s) that do not exist on disk:"
+            f" {' '.join(missing)}. The real staging rejects this, so every"
+            " staging case would fail for an unrelated reason"
+        )
+    if problems:
+        listed = " ".join(
+            guards.path_relative_to_root(path, REPOSITORY_ROOT)
+            for path in RESTORED_IN_PLACE
+        )
+        raise RuntimeError(
+            "The working tree does not satisfy this harness's preconditions: "
+            + "; ".join(problems)
+            + ". If these copies are residue from an interrupted run, restore them"
+            f" with `git checkout -- {listed}` and run the harness again."
+            " If the manifest layout changed on purpose, update the tampering cases."
+        )
+    _module_state["baselines"] = {
+        path: _read(path) for path in RESTORED_IN_PLACE
+    }
+
+
+def tearDownModule():
+    """実行後に、in-placeで書き換えたfileが元へ戻っていることを確認する。
+
+    戻っていなければ、この実行が残骸を残したということである。次の実行では
+    その内容がbackupになり、静かに固定される。**気付ける位置で失敗させる。**
+
+    manifestだけでなくportal pageも見る。**同じ仕組みで書き換えて同じ仕組みで戻す**
+    ため、残骸の残り方も同じである。
+    """
+    baselines = _module_state.pop("baselines", None)
+    if not baselines:
+        return
+    left_modified = [
+        guards.path_relative_to_root(path, REPOSITORY_ROOT)
+        for path, baseline in baselines.items()
+        if _read(path) != baseline
+    ]
+    if left_modified:
+        listed = " ".join(left_modified)
+        raise RuntimeError(
+            "A cleanup did not restore every file this run modified in place."
+            f" Still modified: {listed}."
+            f" Restore with `git checkout -- {listed}` before running again,"
+            " otherwise the modified copy becomes the backup for the next run."
+        )
+
+
 class PublishGuardTestCase(unittest.TestCase):
     """各caseの後始末を共通化する。
 
@@ -153,16 +344,20 @@ class PublishGuardTestCase(unittest.TestCase):
         cls.git_index_path = _resolve_git_index_path()
 
     def setUp(self):
-        self.manifest_backup = _read(MANIFEST_PATH)
-        self.portal_page_backup = _read(PORTAL_PAGE_PATH)
+        # backupを取る対象は`RESTORED_IN_PLACE`が持つ。ここで個別に列挙すると、
+        # in-placeで書き換えるfileを増やしたときに`tearDownModule`の監視対象と
+        # 食い違い、片方だけが黙って外れる。
+        self.backups = {path: _read(path) for path in RESTORED_IN_PLACE}
+        self.manifest_backup = self.backups[MANIFEST_PATH]
+        self.portal_page_backup = self.backups[PORTAL_PAGE_PATH]
         self.temporary_paths = []
-        # 復元をstepごとに登録する。1つの関数へまとめると、前半の`_write`が
+        # 復元をfileごとに登録する。1つの関数へまとめると、前半の`_write`が
         # 失敗した時点で残りが実行されず、実repositoryのfileが書き換わったまま
         # 残ってcommitへ入りうる。`unittest`は登録した全cleanupを、失敗しても
         # 最後まで実行する。実行はLIFOのため、登録は「最後に戻したいもの」から行う。
         self.addCleanup(self._remove_temporary_paths)
-        self.addCleanup(_write, PORTAL_PAGE_PATH, self.portal_page_backup)
-        self.addCleanup(_write, MANIFEST_PATH, self.manifest_backup)
+        for path in reversed(RESTORED_IN_PLACE):
+            self.addCleanup(_write, path, self.backups[path])
         self.addCleanup(os.environ.pop, "GIT_INDEX_FILE", None)
 
     def _remove_temporary_paths(self):
@@ -331,6 +526,64 @@ class HarnessSelfTests(PublishGuardTestCase):
         self.assertTrue(output_exposes_staging_root(f"synthetic: {probe}"))
         self.assertFalse(output_exposes_staging_root("synthetic: .pages-src"))
 
+    def test_manifest_precondition_detects_the_residue_shapes(self):
+        """前提検査が、実際に踏んだ残骸の形を検出すること。
+
+        `setUpModule`はこの判定に依存している。判定がno-opでも、cleanなtreeでは
+        全caseが成功するため、検出力を先に確認する。
+        """
+        intact = self.manifest_backup
+        self.assertIsNone(_manifest_precondition_problem(intact))
+
+        stripped = json.loads(intact)
+        for entry in stripped["assets"]:
+            entry.pop("sha256", None)
+        cases = (
+            {
+                "name": "sha256 removed",
+                "content": json.dumps(stripped, ensure_ascii=False),
+                "expected": "declares `sha256`",
+            },
+            {
+                "name": "truncated JSON",
+                "content": '{ "assets": [ ',
+                "expected": "not valid JSON",
+            },
+            {
+                "name": "no assets list",
+                "content": '{"documentation": []}',
+                "expected": "`assets` list",
+            },
+        )
+        for case in cases:
+            with self.subTest(case=case["name"]):
+                problem = _manifest_precondition_problem(case["content"])
+                self.assertIsNotNone(problem)
+                self.assertIn(case["expected"], problem)
+
+    def test_missing_asset_detector_finds_residue_entries(self):
+        """宣言済みで実体の無いassetを検出すること。
+
+        改変caseのcleanupが戻らなかったとき、manifestに残るのはこの形である。
+        検出できないと、次の実行で無関係なcaseがまとめて失敗する。
+        `setUpModule`はこの判定に依存しているため、検出力を先に確認する。
+        """
+        intact = self.manifest_backup
+        self.assertEqual(_manifest_missing_assets(intact, ASSETS_ROOT), [])
+
+        residue = json.loads(intact)
+        residue["assets"].append({"path": "__guardtest-absent-probe.pdf"})
+        self.assertEqual(
+            _manifest_missing_assets(json.dumps(residue), ASSETS_ROOT),
+            ["__guardtest-absent-probe.pdf"],
+        )
+
+        # 壊れたJSONや`assets`が無い形は、別の判定が扱う。ここでは空を返す。
+        self.assertEqual(_manifest_missing_assets('{ "assets": [ ', ASSETS_ROOT), [])
+        self.assertEqual(
+            _manifest_missing_assets('{"documentation": []}', ASSETS_ROOT), []
+        )
+
 
 class BaselineTests(PublishGuardTestCase):
     """改変なしのstagingが成功すること。
@@ -382,7 +635,12 @@ class AssetManifestGuardTests(PublishGuardTestCase):
                     replaced = True
             if not replaced:
                 raise RuntimeError(
-                    "Unable to tamper with the recorded SHA-256. The manifest layout changed."
+                    "No entry under `assets` declares `sha256`, so there is"
+                    " nothing to tamper with. Either the manifest layout"
+                    " changed, or this working tree copy is residue from an"
+                    " interrupted run. `setUpModule` checks this precondition"
+                    " first, so reaching here means the manifest changed"
+                    " during the run."
                 )
 
         self.edit_manifest(tamper)
@@ -396,7 +654,11 @@ class AssetManifestGuardTests(PublishGuardTestCase):
                     removed = True
             if not removed:
                 raise RuntimeError(
-                    "Unable to remove the recorded SHA-256. The manifest layout changed."
+                    "No entry under `assets` declares `sha256`, so there is"
+                    " nothing to remove. Either the manifest layout changed,"
+                    " or this working tree copy is residue from an interrupted"
+                    " run. `setUpModule` checks this precondition first, so"
+                    " reaching here means the manifest changed during the run."
                 )
 
         self.edit_manifest(remove_hashes)
@@ -696,6 +958,211 @@ class SymlinkBoundaryTests(PublishGuardTestCase):
             output,
             rf"{re.escape(self.LINK_NAME)} \(reparse point\)",
             f"Expected the reparse point guard to skip it. Output: {output}",
+        )
+
+
+class LayoutBoundaryTests(PublishGuardTestCase):
+    """`pages/_layouts/`の公開境界（ADR-0009）。
+
+    layoutは全pageのHTMLを決めるため、assetより影響が大きい。`pages/assets/`と
+    同じく、列挙したexact pathだけを公開し、列挙外は失敗させる。
+    """
+
+    def test_declared_layouts_are_staged(self):
+        """列挙した3枚だけが`.pages-src/_layouts/`へ入ること。"""
+        staged_root, _ = self.assert_staging_succeeds()
+        staged_layouts = os.path.join(staged_root, "_layouts")
+        for name in prepare_pages.PORTAL_LAYOUTS:
+            self.assertTrue(
+                os.path.isfile(os.path.join(staged_layouts, name)),
+                f"declared layout was not staged: {name}",
+            )
+        self.assertEqual(
+            sorted(os.listdir(staged_layouts)),
+            sorted(prepare_pages.PORTAL_LAYOUTS),
+            "staged layouts do not match PORTAL_LAYOUTS",
+        )
+
+    def test_undeclared_layout_on_disk_fails(self):
+        """列挙外のlayoutを置いたら、公開せずbuildを止めること。"""
+        path = self.track(os.path.join(LAYOUTS_ROOT, "__guardtest-extra.html"))
+        _write(path, "<p>undeclared layout</p>")
+        self.assert_staging_fails("Layout is not declared in PORTAL_LAYOUTS")
+
+    def test_declared_layout_missing_on_disk_fails(self):
+        """列挙したlayoutが無いなら、layoutなしのHTMLを作らず止めること。"""
+        path = os.path.join(LAYOUTS_ROOT, "page.html")
+        backup = _read(path)
+        self.addCleanup(_write, path, backup)
+        os.remove(path)
+        self.assert_staging_fails("Declared layout is missing: pages/_layouts/page.html")
+
+    def test_declared_layout_not_tracked_by_git_fails(self):
+        """追跡外のlayoutを公開しないこと。localの下書きを混ぜない。"""
+        self.detached_index_without("pages/_layouts/page.html")
+        self.assert_staging_fails(
+            "Declared layout is not tracked by Git: pages/_layouts/page.html"
+        )
+
+    def test_symlinked_layout_does_not_publish_outside_content(self):
+        """layoutがsymlinkならrepository外の内容を公開しない。
+
+        `os.path.isfile`はlinkを辿り、copyはtarget側の内容を書き出す。staged側は
+        通常fileになるため、stagingの最後にあるreparse point検査では捕まえられない。
+        """
+        outside = self.track(
+            os.path.join(
+                tempfile.gettempdir(), f"deskcat-outside-{uuid.uuid4().hex}.html"
+            )
+        )
+        secret = "OUTSIDE-LAYOUT-THAT-MUST-NOT-BE-PUBLISHED"
+        _write(outside, secret)
+
+        layout = os.path.join(LAYOUTS_ROOT, "page.html")
+        backup = _read(layout)
+        # 復元はLIFOで最後に走らせる。symlinkを消す前に書き戻すと、link越しに
+        # 一時fileを書き換えてしまい、repositoryにはsymlinkが残る。
+        self.addCleanup(_write, layout, backup)
+        os.remove(layout)
+        try:
+            os.symlink(outside, layout)
+        except (OSError, NotImplementedError):
+            self.skipTest("symlink creation unavailable")
+        self.addCleanup(_remove_fixture, layout)
+
+        # 追跡checkで弾かれると、どのguardが働いたのか区別できない。追跡済みにする。
+        self.detached_index_with("pages/_layouts/page.html")
+        run = self.assert_staging_fails(
+            "Declared layout is a symlink in Git: pages/_layouts/page.html",
+            forbidden_messages=(secret,),
+        )
+        staged = os.path.join(STAGING_ROOT, "_layouts", "page.html")
+        self.assertFalse(os.path.exists(staged), "symlink layoutが公開された")
+        self.assertNotIn(secret, run.output)
+
+
+class FaviconTests(unittest.TestCase):
+    """faviconをASCII artから組み立てる処理を、子processを介さず直接検査する。
+
+    以前のfaviconは1 x 1の単色placeholderで、内容を見るtestが無かった。
+    自前layoutが`<link rel="icon">`を持つため、生成物がそのままtabへ出る。
+    """
+
+    def test_art_is_square_and_uses_the_declared_palette(self):
+        """sourceのASCII artが正方形で、palette外の文字を含まないこと。"""
+        for art, expected in (
+            (prepare_pages.FAVICON_ART_32, 32),
+            (prepare_pages.FAVICON_ART_16, 16),
+        ):
+            self.assertEqual(len(art), expected)
+            for row in art:
+                self.assertEqual(len(row), expected)
+                for character in row:
+                    self.assertIn(character, prepare_pages.FAVICON_PALETTE)
+
+    def test_ragged_art_is_rejected(self):
+        """行幅が揃わないartは、ずれたpixelを書き出す前に止めること。"""
+        with self.assertRaises(guards.ValidationError):
+            prepare_pages._favicon_image(("..", "."))
+
+    def test_non_square_art_is_rejected(self):
+        """非正方形のartを、寸法を偽ったICOにせず止めること。"""
+        with self.assertRaises(guards.ValidationError):
+            prepare_pages._favicon_image(("..", "..", ".."))
+
+    def test_undeclared_character_is_rejected(self):
+        """palette外の文字を、透過として黙って流さず止めること。"""
+        with self.assertRaises(guards.ValidationError):
+            prepare_pages._favicon_image(("X.", ".."))
+
+    def test_empty_art_is_rejected(self):
+        """空のartを、0 x 0のICOとして書き出さず止めること。"""
+        with self.assertRaises(guards.ValidationError):
+            prepare_pages._favicon_image(())
+
+    def test_art_larger_than_256_is_rejected(self):
+        """ICOのdirectoryは寸法を1 byteで持ち、256だけを0で表す。
+
+        257以上を黙って0（=256）として書き出すと、宣言した寸法が実体と食い違う。
+        """
+        oversized = tuple("." * 257 for _ in range(257))
+        with self.assertRaises(guards.ValidationError):
+            prepare_pages._favicon_image(oversized)
+
+    def test_icon_declares_two_square_images_with_consistent_sizes(self):
+        """ICOのdirectoryとBMP headerが、実byte数と整合すること。"""
+        data = prepare_pages.build_favicon()
+        reserved, kind, count = struct.unpack_from("<HHH", data, 0)
+        self.assertEqual(reserved, 0)
+        self.assertEqual(kind, 1, "ICO type must be 1 (icon)")
+        self.assertEqual(count, 2, "expected a 32x32 and a 16x16 image")
+
+        seen = []
+        for index in range(count):
+            entry = struct.unpack_from("<BBBBHHII", data, 6 + 16 * index)
+            width, height, colors, entry_reserved = entry[0:4]
+            planes, bits, byte_count, offset = entry[4:8]
+            self.assertEqual(width, height, "favicon images must be square")
+            self.assertEqual(colors, 0)
+            self.assertEqual(entry_reserved, 0)
+            self.assertEqual(planes, 1)
+            self.assertEqual(bits, 32)
+            seen.append(width)
+
+            # 宣言したbyte数が、header + XOR + AND maskの実寸と一致すること。
+            mask_row_bytes = ((width + 31) // 32) * 4
+            expected = 40 + width * width * 4 + mask_row_bytes * width
+            self.assertEqual(byte_count, expected)
+            self.assertLessEqual(
+                offset + byte_count, len(data), "image extends past the file"
+            )
+
+            header = struct.unpack_from("<IiiHHIIiiII", data, offset)
+            self.assertEqual(header[0], 40, "BITMAPINFOHEADER size")
+            self.assertEqual(header[1], width)
+            # `biHeight`はXOR maskとAND maskの合計を表すため実寸の2倍になる。
+            self.assertEqual(header[2], width * 2)
+            self.assertEqual(header[4], 32, "biBitCount")
+            self.assertEqual(header[6], expected - 40, "biSizeImage")
+
+        self.assertEqual(sorted(seen), [16, 32])
+
+
+class FaviconStagingTests(PublishGuardTestCase):
+    """stagingが実際にpixel artから組んだfaviconを書き出すこと。
+
+    以前はこのcaseを既存の`.pages-src/`に依存して書いていた。clean checkoutでは
+    directoryが無いためskipされ、生成物が壊れていても検出できなかった。
+    自分でstagingを走らせて、その結果と突き合わせる。
+    """
+
+    def test_staged_favicon_matches_the_generated_bytes(self):
+        """stagingが、別の定数ではなく`build_favicon()`の出力を書くこと。
+
+        artの中身は検証できない（両辺が同じ関数由来）。ここで見るのは配線であり、
+        以前の`FAVICON_BYTES`のような別の定数を書いていないことである。
+        """
+        staged_root, _ = self.assert_staging_succeeds()
+        staged = os.path.join(staged_root, "favicon.ico")
+        self.assertTrue(os.path.isfile(staged), "favicon.ico was not staged")
+        with open(staged, "rb") as handle:
+            self.assertEqual(handle.read(), prepare_pages.build_favicon())
+
+    def test_staged_favicon_decodes_back_to_the_source_art(self):
+        """公開されるICOが、sourceのASCII artへ1 pixel単位で戻ること。
+
+        独立に書いた復号で戻すため、channel順や行順、offsetを取り違えていれば
+        落ちる。**art自体の書き換えは検出しない**（`decode_ico`のdocstring）。
+        """
+        staged_root, _ = self.assert_staging_succeeds()
+        with open(os.path.join(staged_root, "favicon.ico"), "rb") as handle:
+            images = decode_ico(handle.read())
+        self.assertEqual(
+            images,
+            {
+                32: prepare_pages.FAVICON_ART_32,
+                16: prepare_pages.FAVICON_ART_16,
+            },
         )
 
 

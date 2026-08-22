@@ -1,6 +1,6 @@
 # GitHub Pages source
 
-このdirectoryには、GitHub Pages固有の入口、Jekyll設定、404 page、page表示用assetだけを置く。
+このdirectoryには、GitHub Pages固有の入口、Jekyll設定、404 page、layout、page表示用assetだけを置く。
 
 技術文書の正本はrootのMarkdownと`docs/`である。Pages用に技術仕様、ADR、runbook、hardware値、live statusを複製しない。
 
@@ -25,6 +25,7 @@ Concept素材を許すのは、[ADR-0003](../docs/decisions/0003-public-document
 - `pages/_config.yml`
 - `pages/index.md`
 - `pages/404.md`
+- `scripts/prepare_pages.py`の`PORTAL_LAYOUTS`が列挙した`pages/_layouts/`配下のlayout
 - `pages/assets-manifest.json`が列挙した`pages/assets/`配下のasset
 - Rootの公開文書（`README.md`、`AGENTS.md`、`CONTRIBUTING.md`、`SECURITY.md`、`LICENSE`）。`LICENSE`はMarkdownではないため、`prepare_pages.py`が個別に扱う
 - `docs/`配下の**Markdownだけ**
@@ -46,11 +47,38 @@ Concept素材を許すのは、[ADR-0003](../docs/decisions/0003-public-document
 
 Hardware写真や技術図のような文書向けimageはここへ置かない。境界の回帰testは`scripts/test_pages_guards.py`にある。
 
-`pages/assets/css/style.scss`は、Cayman themeを差し替えずに上書きするtheme override stylesheetである。対象は配色、typography、table、blockquote、code block、responsive layoutである。Themeの差し替えはdependency reviewが必要なため、[ADR-0003](../docs/decisions/0003-public-documentation-publishing.md)に従って独立した変更として扱う。
+## Layoutとstylesheet
 
-このstylesheetは`@import "{{ site.theme }}"`でCaymanのSCSSを読み込む。CaymanのSCSSはGoogle Fontsへの`@import url(...)`を含み、Caymanのlayoutも同じfontを`<link>`で読み込む。よってPagesは外部fontとしてOpen Sansを取得する。これは意図した依存であり、stylesheet側もLatinへOpen Sansを当てて実際に使用する。読み込むが使わない状態を避けるためである。日本語はOSのUI fontへ落ちる。
+[ADR-0009](../docs/decisions/0009-pages-own-layout.md)に従い、**layoutとstylesheetの正本はこのdirectoryにある。**themeのlayoutもSCSSも生成siteへ届かない。
 
-外部fontの読み込み自体を止める場合は、`font-family`の上書きでは足りず、theme SCSSとlayoutを自前で持つ必要がある。theme更新の恩恵を失うため、独立した変更として判断する。
+`pages/_layouts/`には次の3枚だけを置く。公開対象は`scripts/prepare_pages.py`の`PORTAL_LAYOUTS`が列挙したexact pathに限られ、列挙外のfileを置くとbuildが失敗する。
+
+| layout | 当たるpage | 機構 |
+|---|---|---|
+| `default.html` | `pages/404.md`とfallback | front matterの`layout: default` |
+| `home.html` | `pages/index.md` | front matterの`layout: home` |
+| `page.html` | `docs/`配下の約40 pageとroot直下の公開文書 | GitHub Pages既定pluginの`jekyll-default-layout`が注入する |
+
+front matterを持たないMarkdownへlayoutを割り当てるのは`jekyll-default-layout`である。**fallbackは横並びの1本ではなく、文書の種別ごとに決まる。**
+
+| 文書の種別 | 探す順 |
+|---|---|
+| 入口page（`url == "/"`） | `home` → `page` → `default` |
+| page（`Jekyll::Page`） | `page` → `default` |
+| post | `post` → `default` |
+| collection document | collection名 → `default` |
+
+pageが`post`へ落ちることはなく、postが`page`へ落ちることもない。どれも存在しなければlayoutは付かない。
+
+**`page.html`があるおかげで、`docs/`配下のfileを1行も変更せずに文書用layoutが当たる。**`default.html`を欠かすと、`page.html`も消したときにlayoutなしのHTMLが生成される。
+
+`pages/_config.yml`の`theme: jekyll-theme-cayman`は**削除しない。**`github-pages` gemの`Configuration::DEFAULTS`が`theme => jekyll-theme-primer`を持つため、keyを消すとreviewしていないprimerが暗黙に有効化される。review済みのCaymanをinertなbaseとして残す方が安全である。`{% seo %}`（jekyll-seo-tag）が使えるのも、Cayman gemの依存として読み込まれるからである。
+
+`pages/assets/css/style.scss`はthemeのSCSSを読み込まない。配色、typography、chrome、card、table、blockquote、code block、responsive layout、a11yを自前で持つ。文字色と背景色の組は、明暗いずれのmodeでもWCAG AAのcontrast比（4.5:1、24 px以上または18.66 px以上のboldは3:1）を満たす。Sassのcompileはこの端末では実行できず、GitHub ActionsのPR buildが唯一の検証経路である。
+
+外部fontはGoogle FontsのM PLUS Rounded 1c（SIL OFL 1.1）を`_layouts/default.html`の`<link>`で読み込む。日本語glyphを持つ丸ゴシックであり、和文と欧文を1書体で通せるため、混在見出しで書体が割れない。Cayman由来のOpen Sans依存はlayoutの自前化で消えている。
+
+`favicon.ico`は`prepare_pages.py`がpixel artから生成し、`default.html`が`<link rel="icon">`で参照する。Caymanのlayoutはこのlinkをコメントアウトしたまま配信していたため、以前のfaviconはどのpageからも参照されていなかった。
 
 `.pages-src/`と`_site/`は生成物であり、commitしない。
 

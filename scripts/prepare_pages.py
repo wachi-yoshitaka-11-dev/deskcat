@@ -8,6 +8,7 @@ import json
 import os
 import re
 import shutil
+import struct
 import sys
 from pathlib import Path
 
@@ -22,23 +23,89 @@ STAGING_DIRECTORY_NAME = ".pages-src"
 # Windowsのdrive指定。manifestの`path`判定で使う。
 DRIVE_LETTER_RE = re.compile(r"^[A-Za-z]:")
 
-# GitHub Pagesのthemeが各pageから参照するfaviconを、依存toolなしで生成する。
-# 1 x 1 pixel、32-bit BGRAの最小ICOであり、公開文書のbuild成否だけに影響する。
-FAVICON_BYTES = bytes(
-    [
-        0x00, 0x00, 0x01, 0x00, 0x01, 0x00,
-        0x01, 0x01, 0x00, 0x00, 0x01, 0x00, 0x20, 0x00,
-        0x30, 0x00, 0x00, 0x00, 0x16, 0x00, 0x00, 0x00,
-        0x28, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
-        0x02, 0x00, 0x00, 0x00, 0x01, 0x00, 0x20, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x66, 0x99, 0xCC, 0xFF, 0x00, 0x00, 0x00, 0x00,
-    ]
+PORTAL_FILES = ("_config.yml", "index.md", "404.md")
+
+# 自前layoutは`pages/_layouts/`へ置き、ここに列挙したexact pathだけを公開する
+# （ADR-0009）。`pages/assets/`と同じ考え方であり、列挙外のfileがdirectoryに
+# あればbuildを失敗させる。「置いたのに公開されない」も「置いたら黙って公開
+# される」も作らない。
+#
+# `default.html`は必須である。`jekyll-default-layout`はfront matterを持たない
+# Markdownへ`page`が無ければ`default`を割り当てるため、これが欠けると`docs/`
+# 配下の約40 pageがlayoutなしで生成される。
+LAYOUT_DIRECTORY = "_layouts"
+PORTAL_LAYOUTS = ("default.html", "home.html", "page.html")
+
+# faviconの意匠。concept画像（pages/assets/deskcat-concept.jpg）の猫顔を
+# pixel artへ落としたものであり、1文字が1 pixelである。巨大なbyte列を貼ると
+# diffでreviewできないため、この形のままsourceへ置いて組み立てる。
+#
+# browserの縮小は汚いため、32 x 32と16 x 16を別々に描いて1つのICOへ入れる。
+# 16 x 16は頭の輪郭、内耳、目だけへ簡略化している。
+FAVICON_PALETTE = {
+    ".": (0x00, 0x00, 0x00, 0x00),  # 透過
+    "o": (0x8A, 0x6A, 0x5C, 0xFF),  # 輪郭。cream地を明るいtabから切り離す
+    "C": (0xFA, 0xF0, 0xE8, 0xFF),  # 頭部のcream
+    "c": (0xEC, 0xD9, 0xCD, 0xFF),  # 顎の陰
+    "P": (0xF0, 0xA6, 0xB8, 0xFF),  # 内耳
+    "D": (0x2B, 0x21, 0x1E, 0xFF),  # face panel
+    "W": (0xFF, 0xFF, 0xFF, 0xFF),  # ハート型の目
+    "p": (0xE0, 0x8B, 0xA0, 0xFF),  # 鼻
+}
+
+FAVICON_ART_32 = (
+    "................................",
+    ".........o............o.........",
+    "........oCo..........oCo........",
+    ".......oCCCo........oCCCo.......",
+    ".......oCCCo........oCCCo.......",
+    "......oCCPCCo......oCCPCCo......",
+    "......oCPPPCo......oCPPPCo......",
+    ".....oCCPPPCCooooooCCPPPCCo.....",
+    "....oCCPCCCCCCCCCCCCCCCCPCCo....",
+    "....oCCCCCCCCCCCCCCCCCCCCCCo....",
+    "...oCCCCCCCCCCCCCCCCCCCCCCCCo...",
+    "...oCCCCCCCCCCCCCCCCCCCCCCCCo...",
+    "..oCCCCCCCCCCCCCCCCCCCCCCCCCCo..",
+    "..oCCCCCCCCCCCCCCCCCCCCCCCCCCo..",
+    ".oCCCCCCCCCDDDDDDDDDDCCCCCCCCCo.",
+    ".oCCCCCCCDDDDDDDDDDDDDDCCCCCCCo.",
+    ".oCCCCCCDDDDDDDDDDDDDDDDCCCCCCo.",
+    ".oCCCCCCDDDWDWDDDDWDWDDDCCCCCCo.",
+    ".oCCCCCDDDWWWWWDDWWWWWDDDCCCCCo.",
+    ".oCCCCCDDDWWWWWDDWWWWWDDDCCCCCo.",
+    ".oCCCCCDDDDWWWDDDDWWWDDDDCCCCCo.",
+    ".oCCCCCDDDDDWDDDDDDWDDDDDCCCCCo.",
+    ".oCCCCCCDDDDDDDDDDDDDDDDCCCCCCo.",
+    ".oCCCCCCDDDDDDDppDDDDDDDCCCCCCo.",
+    "..oCCCCCCDDDDDDDDDDDDDDCCCCCCo..",
+    "..oCCCCCCCCDDDDDDDDDDCCCCCCCCo..",
+    "...oCCCCCCCCCCCCCCCCCCCCCCCCo...",
+    "....oCCCCCccccccccccccCCCCCo....",
+    ".....oCCCccccccccccccccCCCo.....",
+    "......ooCCccccccccccccCCoo......",
+    "........oooooooooooooooo........",
+    "................................",
 )
 
-PORTAL_FILES = ("_config.yml", "index.md", "404.md")
+FAVICON_ART_16 = (
+    "...oCo....oCo...",
+    "...oCo....oCo...",
+    "..oCPCo..oCPCo..",
+    ".oCCPCCooCCPCCo.",
+    ".oCPPPCooCPPPCo.",
+    ".oCCCCCCCCCCCCo.",
+    "oCCCCCCCCCCCCCCo",
+    "oCCCDDDDDDDDCCCo",
+    "oCCDDDDDDDDDDCCo",
+    "oCCDWDWDDWDWDCCo",
+    "oCCDWWWDDWWWDCCo",
+    "oCCDDWDDDDWDDCCo",
+    "oCCCDDDDDDDDCCCo",
+    ".oCCCCCCCCCCCCo.",
+    "..oCCCCCCCCCCo..",
+    "...oooooooooo...",
+)
 
 # hashで固定しないtext asset。diff reviewと内容scanの対象であり、
 # 編集ごとにhashが変わるだけなのでmanifestへ記録しない。
@@ -108,6 +175,145 @@ def _remove_staging(path, repository_root):
         raise guards.ValidationError("Unexpected Pages staging path.")
     if not guards.remove_tree(path):
         raise guards.ValidationError("Unable to clear the Pages staging directory.")
+
+
+def _favicon_image(art):
+    """1枚のASCII artを、32-bit BGRAのBMP-in-ICO imageへ変換する。
+
+    ICO内のBMPは行がbottom-upで、`biHeight`はXOR maskとAND maskの合計を表すため
+    実寸の2倍になる。AND maskは1 bit per pixelで、行を4 byte境界へ揃える。
+    32-bit BGRAではalpha channelが効くが、alphaを見ない古いrendererのために
+    maskも正しく書く。
+    """
+    height = len(art)
+    if not height:
+        raise guards.ValidationError("Favicon art has no rows.")
+    width = len(art[0])
+    if any(len(row) != width for row in art):
+        raise guards.ValidationError("Favicon art rows have inconsistent width.")
+    if width != height:
+        raise guards.ValidationError("Favicon art must be square.")
+    # ICOのdirectoryは寸法を1 byteで持ち、256だけを0で表す。257以上は表現できず、
+    # 黙って0（=256）として書き出すと寸法の宣言が実体と食い違う。
+    if width > 256:
+        raise guards.ValidationError("Favicon art must not exceed 256 pixels.")
+
+    pixels = bytearray()
+    mask = bytearray()
+    mask_row_bytes = ((width + 31) // 32) * 4
+    for row in reversed(art):
+        for character in row:
+            if character not in FAVICON_PALETTE:
+                raise guards.ValidationError(
+                    "Favicon art uses a character that is not in the palette."
+                )
+            red, green, blue, alpha = FAVICON_PALETTE[character]
+            pixels += bytes((blue, green, red, alpha))
+        bits = bytearray(mask_row_bytes)
+        for index, character in enumerate(row):
+            # AND maskは1が透過、0が不透過である。
+            if FAVICON_PALETTE[character][3] == 0:
+                bits[index // 8] |= 0x80 >> (index % 8)
+        mask += bits
+
+    header = struct.pack(
+        "<IiiHHIIiiII",
+        40,  # biSize
+        width,
+        height * 2,  # biHeight。XORとANDの合計
+        1,  # biPlanes
+        32,  # biBitCount
+        0,  # biCompression
+        len(pixels) + len(mask),  # biSizeImage
+        0,  # biXPelsPerMeter
+        0,  # biYPelsPerMeter
+        0,  # biClrUsed
+        0,  # biClrImportant
+    )
+    return header + bytes(pixels) + bytes(mask)
+
+
+def build_favicon(arts=(FAVICON_ART_32, FAVICON_ART_16)):
+    """複数寸法のpixel artを1つのICOへまとめる。
+
+    以前のfaviconは1 x 1の単色placeholderで、themeのlayoutが`<link rel="icon">`を
+    コメントアウトしていたため実際には使われていなかった。自前layoutがlinkを持つ
+    ため、ここで生成する内容がそのままtabへ出る。
+    """
+    images = [_favicon_image(art) for art in arts]
+    offset = 6 + 16 * len(images)
+    directory = bytearray(struct.pack("<HHH", 0, 1, len(images)))
+    for art, image in zip(arts, images):
+        size = len(art)
+        # 256だけを0で表す。257以上は`_favicon_image`が拒否している。
+        stored = 0 if size == 256 else size
+        directory += struct.pack(
+            "<BBBBHHII", stored, stored, 0, 0, 1, 32, len(image), offset
+        )
+        offset += len(image)
+    return bytes(directory) + b"".join(images)
+
+
+def _stage_layouts(repository_root, portal_root, output_root, tracked_symlinks):
+    """自前layoutを、`PORTAL_LAYOUTS`が列挙したexact pathだけ公開する。
+
+    `pages/assets/`と同じ規則を課す。存在、Gitの追跡、symlink／reparse point、
+    拡張子を確認し、列挙外のfileがdirectoryにあれば失敗させる。再帰copyにすると、
+    reviewを経ていないlayoutが公開経路へ入る。layoutは全pageのHTMLを決めるため、
+    assetよりも影響が大きい。
+    """
+    layouts_source = os.path.join(portal_root, LAYOUT_DIRECTORY)
+    layouts_destination = os.path.join(output_root, LAYOUT_DIRECTORY)
+
+    if not os.path.isdir(layouts_source):
+        raise guards.ValidationError(
+            f"Required Pages layouts directory is missing: pages/{LAYOUT_DIRECTORY}"
+        )
+
+    tracked_layouts = guards.get_tracked_files(
+        repository_root, f"pages/{LAYOUT_DIRECTORY}"
+    )
+
+    problems = []
+    os.makedirs(layouts_destination, exist_ok=True)
+    for name in PORTAL_LAYOUTS:
+        repository_relative = f"pages/{LAYOUT_DIRECTORY}/{name}"
+        source = os.path.join(layouts_source, name)
+
+        if guards.get_extension(name).lower() != ".html":
+            problems.append(f"Declared layout must be HTML: {repository_relative}")
+            continue
+        if not os.path.isfile(source):
+            problems.append(f"Declared layout is missing: {repository_relative}")
+            continue
+        if repository_relative not in tracked_layouts:
+            problems.append(
+                f"Declared layout is not tracked by Git: {repository_relative}"
+            )
+            continue
+        rejection = link_rejection(repository_relative, source, tracked_symlinks)
+        if rejection:
+            problems.append(f"Declared layout {rejection}: {repository_relative}")
+            continue
+
+        _copy(source, os.path.join(layouts_destination, name))
+
+    # 列挙外のfileを検知する。追跡状態にかかわらず失敗させ、localとCIで同じ結果に
+    # する。`pages/_layouts/`は少数のreview済みlayoutだけを置く場所である。
+    for path in guards.iter_files(layouts_source):
+        on_disk = guards.path_relative_to_root(path, layouts_source)
+        if on_disk not in PORTAL_LAYOUTS:
+            problems.append(
+                "Layout is not declared in PORTAL_LAYOUTS:"
+                f" pages/{LAYOUT_DIRECTORY}/{on_disk}"
+            )
+
+    if problems:
+        for problem in problems:
+            print(problem, file=sys.stderr)
+        raise guards.ValidationError(
+            f"Pages layout validation failed with {len(problems)} problem(s)."
+        )
 
 
 def _stage_assets(repository_root, portal_root, output_root, tracked_symlinks):
@@ -326,10 +532,11 @@ def main(argv=None):
             )
         _copy(source, os.path.join(output_root, name))
 
+    _stage_layouts(repository_root, portal_root, output_root, tracked_symlinks)
     _stage_assets(repository_root, portal_root, output_root, tracked_symlinks)
 
     with open(os.path.join(output_root, "favicon.ico"), "wb") as handle:
-        handle.write(FAVICON_BYTES)
+        handle.write(build_favicon())
 
     for name in guards.ROOT_DOCUMENTS:
         source = os.path.join(repository_root, name)

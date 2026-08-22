@@ -1,0 +1,15 @@
+---
+layout: default
+---
+<!--
+  `docs/`配下の約40 pageと、root直下の公開文書が使うlayout。
+  これらのMarkdownはfront matterを持たないため、GitHub Pages既定pluginの
+  `jekyll-default-layout`が`page`を注入する。**docs側のfileは変更しない。**
+
+  見出しは本文Markdownの先頭にあるため、ここで`page.title`を再掲しない。
+  二重見出しになるうえ、`jekyll-titles-from-headings`が入れる値と本文が食い違う
+  余地を作らない。
+-->
+<article class="dc-doc">
+  {{ content }}
+</article>

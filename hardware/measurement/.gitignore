@@ -1,0 +1,10 @@
+# arduino-cli の出力を tree へ置いた場合に取り込まない。
+# 既定では arduino-cli は一時directoryへ出すため、通常この行は効かない。
+build/
+*.hex
+*.elf
+
+# 測定で採った生data。size が大きく、保存場所は未決定である
+# （docs/planning/development-foundation-plan.md の「実験ログと大容量計測データの
+# 正式な保存場所」が未確定）。確定するまで tree へ入れない。
+*.csv
