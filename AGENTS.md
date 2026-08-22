@@ -134,7 +134,7 @@ cargo test --workspace --locked
 
 lint の水準は root `Cargo.toml` の `[workspace.lints]` が持つため、`-D warnings` は付けない。`unsafe_code = "forbid"` もそこで強制している。
 
-Linux x86_64、Rust stable 1.97.1 で検証した。検証日は 2026-08-10 である（[Version Record](docs/toolchains/version-records/2026-08-10-host-rust-linux.md)）。別端末での再現は CI の `ubuntu-24.04` runner で満たした（#129。[Version Record](docs/toolchains/version-records/2026-08-15-host-rust-ci.md)）。**CI が実行するのは host workspace だけであり、Raspberry Pi 上での build と実行は主張しない。**
+Linux x86_64、Rust stable 1.97.1 で検証した。初回は 2026-08-10 で、これは VM 上の記録である（[Version Record](docs/toolchains/version-records/2026-08-10-host-rust-linux.md)）。実機 Linux での検証は 2026-08-15 であり、上の block の command がすべて成功している（[Version Record](docs/toolchains/version-records/2026-08-15-host-rust-native-linux.md)）。別端末での再現は CI の `ubuntu-24.04` runner で満たした（#129。[Version Record](docs/toolchains/version-records/2026-08-15-host-rust-ci.md)）。**CI が実行するのは host workspace だけであり、Raspberry Pi 上での build と実行は主張しない。**
 
 `firmware/esp32` は root workspace から `exclude` している。firmware の manifest は `[workspace]` 節を持たないため、exclude を外すと firmware の build が壊れる。
 

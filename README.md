@@ -49,7 +49,7 @@ firmware/esp32/            独立したESP-IDF Rust workspace
 simulator/deskcat-sim/     host simulator
 configs/                   秘密情報を含まない設定例
 deploy/                    Raspberry Pi deployment artifact
-docs/architecture/         現在のアーキテクチャ
+docs/architecture/         アーキテクチャ（予定文書の一覧）
 docs/backlog/              初期Issue定義
 docs/decisions/            ADR
 docs/governance/           AI、workflow、安全方針

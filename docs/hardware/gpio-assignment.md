@@ -81,7 +81,7 @@
 | 物理接続 | Pi（USB host）のUSB OTG port ⇔ ESP32 boardのMicro USB port を**USB cable 1本**で接続する | ESP32のGPIO1／GPIO3とPiのGPIO14／GPIO15をjumperで直接配線する |
 | ESP32側の経路 | board上のUSB-UARTブリッジICが内部でUART0（GPIO1／GPIO3）へ接続する。GPIO headerには何も配線しない | GPIO1／GPIO3をheaderから引き出す |
 | Pi側のdevice | USB CDC serial（`/dev/ttyUSB*`。実際の名称は#8で確認） | `/dev/serial0`（Pi内蔵UART） |
-| 追加部品 | Pi側がMicro-B（OTG）のため、**USB OTG変換（Micro-B → Type-A）またはMicro-B ⇔ Micro-B OTG cable**が必要。未購入 | jumper wireのみ |
+| 追加部品 | Pi側がMicro-B（OTG）のため、**USB OTG変換（Micro-B → Type-A）またはMicro-B ⇔ Micro-B OTG cable**が必要。**2026-08-22に手持ちで充当と確定した**（`hardware-bom.md`の`CABLE-PI-LINK-01`。購入待ちリストから外した） | jumper wireのみ |
 
 この結果、GPIO1／GPIO3は**board上のブリッジが占有する予約pin**であり、外部配線用に空いていない。
 PCからflashingするときは同じUSB portを使うため、Piとの同時接続は想定しない。
@@ -90,7 +90,7 @@ PCからflashingするときは同じUSB portを使うため、Piとの同時接
 
 | Bus | 候補device | 状態 | 不足している根拠 |
 |---|---|---|---|
-| USB serial（Pi link） | Raspberry Pi | **USB connector経由に確定**（GPIO配線なし）。GPIO1／GPIO3はboard上ブリッジの予約pin | Pi上のdevice名（`/dev/ttyUSB*`等）は#8で確認。USB OTG変換cableが未購入 |
+| USB serial（Pi link） | Raspberry Pi | **USB connector経由に確定**（GPIO配線なし）。GPIO1／GPIO3はboard上ブリッジの予約pin | Pi上のdevice名（`/dev/ttyUSB*`等）は#8で確認。USB OTG変換cableが**手持ちで充当**（2026-08-22） |
 | ADC測定（`power-budget.md`） | Shunt、5 V rail、3.3 V rail | GPIO32／33／36に確定（すべてADC1） | 分圧器の実装と実測値。ADC2はWi-Fi有効時に使用不可のため割り当てない |
 | SPI display bus | LCD（MSP2807／ILI9341）、touch（同module） | GPIO18／23／19（SCLK／MOSI／MISO）＋CS個別（LCD: GPIO22、Touch: GPIO21）に確定 | Touch controller型番の現物確認、実際のSPI mode／速度の実測 |
 | I2C sensor bus | Accelerometer（ADXL345）、environment sensor（BME280） | GPIO25（SDA）／GPIO26（SCL）に確定 | **BME280側のjumperは2026-08-22に実測で確定した**（`J1`／`J2`／`J3`はすべて開放）。**残るのはADXL345側のpin接続の確認と、実効pull-up抵抗の計算である** **2026-08-22にBME280側のjumperを実測した。`J1`／`J2`はどちらも開放であり、module搭載の4.7 kΩプルアップはbusへ繋がっていない**（正は[sensor-datasheet-notes.md](sensor-datasheet-notes.md)の`現物の実装状態を実測で確定させた（2026-08-22）`。**ここへ再掲しない**）。**したがって実効pull-upの計算にBME280側の4.7 kΩを入れない。**`J1`／`J2`をはんだ付けするかは、この計算の結果で決める。**まだ決めていない。****あわせて`J3`が開放であるため、I2Cで使うには`J3`のはんだ付けが要る。** |
@@ -144,3 +144,4 @@ PCからflashingするときは同じUSB portを使うため、Piとの同時接
 | 2026-08-15 | 13 | [PR #122](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/122)のレビュー指摘を反映。文書冒頭の状態行が`touch controller型番`を現物確認待ちに挙げたままだったため、**`XPT2046`確定と`HW-TBD-003`のcloseを反映した** | [PR #122レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/122) |
 | 2026-08-22 | 14 | **`I2C sensor bus`行へ、BME280側のjumperの実測結果を反映した。**`J1`／`J2`はどちらも開放であり、**module搭載の4.7 kΩプルアップはbusへ繋がっていない**（正は[sensor-datasheet-notes.md](sensor-datasheet-notes.md)の`現物の実装状態を実測で確定させた（2026-08-22）`。**ここへ再掲しない**）。**したがって実効pull-upの計算にBME280側の4.7 kΩを入れない。**同じbusのADXL345モジュールは`01C`（10 kΩ）を搭載しており、計算はそちら側だけを数える形になる。**`J1`／`J2`をはんだ付けするかは計算の結果で決める。まだ決めていない。****あわせて`J3`が開放であるため、I2Cで使うには`J3`のはんだ付けが要る** | [#1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1) |
 | 2026-08-22 | 15 | [PR #173](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/173)の自動reviewの指摘を反映した。**BME280の実測結果を記録したのに、同じ文書に古い記述が残っていた。**`ENV-SDA`行の`選択jumperの現物確認が必要`、`I2C sensor bus`行の`両moduleのinterface選択jumperの現物確認`、受け入れchecklistの`半田の有無が光学的に判別できず未確定`である。**いずれも実測結果へ更新した。**未解決として残す対象を**ADXL345側のpin接続の確認と実効pull-up計算に限定**し、**BME280の`J3`は実装作業、`J1`／`J2`は計算後の判断**として記録した | [#1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1) |
+| 2026-08-22 | 16 | [PR #174](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/174)の自動reviewの指摘を反映した。**USB OTG cableを`未購入`としていた記述が2箇所残っていた**（`追加部品`行と`USB serial（Pi link）`行）。**`CABLE-PI-LINK-01`は2026-08-22に手持ちで充当と確定し購入待ちリストから外している**（正は[hardware-bom.md](hardware-bom.md)の`CABLE-PI-LINK-01`）。両方を更新した | [#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3) |
