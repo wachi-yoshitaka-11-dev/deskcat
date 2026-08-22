@@ -17,6 +17,7 @@
 | [ADR-0009](0009-pages-own-layout.md) | Accepted | Pagesのlayoutとstylesheetを自前で保持する |
 | [ADR-0010](0010-change-class-and-review-declaration.md) | Accepted | 変更の分類を機械化し、自己レビューをcommit trailerで宣言する |
 | [ADR-0011](0011-issue-optional-pull-request-required.md) | Accepted | Issueの要否とPull Requestの要否を分ける |
+| [ADR-0012](0012-milestones-count-issues-only.md) | Accepted | milestoneはIssueだけに設定する |
 
 ## 新規作成
 

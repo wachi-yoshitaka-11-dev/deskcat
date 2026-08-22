@@ -98,6 +98,11 @@ GitHubのIssue一覧はlabelを常にtitleの横に表示するため、titleに
 作成日という実績、`Target date`はmerge見込み日という予定を表す。`Target date`はmergeまたは
 closeの**完了後**に実績値へ更新する。[Pull request](#pull-request)節を参照する。
 
+**milestoneはIssueだけに設定する。Pull Requestには設定しない**
+（[ADR-0012](docs/decisions/0012-milestones-count-issues-only.md)）。milestoneは節目までに
+出すものを数える道具であり、Pull Requestはその手段である。両方に付けると、1つのIssueを
+何本のPull Requestに割ったかでmilestoneの件数が動く。
+
 boardの`Item closed` workflowは`Status`を`Done`にするが、**日付fieldは更新しない。**
 そのためIssueのclose後は、close実施者が手作業で`Target date`を実績日へ設定する。
 
@@ -211,7 +216,7 @@ Pull requestには次を含める。
 ```bash
 gh pr create --base develop --title "<title>" --body-file <path> \
   --label "<area:*>" --label "<type:*>" --label "<priority:*>" \
-  --assignee "<login>" --milestone "<milestone>"
+  --assignee "<login>"
 ```
 
 **CodeRabbitは対象判定をPull Requestの作成直後に行い、後からのlabel追加では再判定しない。**
@@ -237,9 +242,9 @@ Issue `#89` を「後付けが原因」の証拠として使わない。
 **それでも作成時に付ける。**CodeRabbitの回答に沿う運用であり、費用は`--label`を足すだけで、
 取り落としの可能性を消せる。**切り分けられない以上、確実な側に倒す。**
 
-**この規則が要るのはlabelだけである。**assignee・milestoneも同じcommandで指定するが、
-自動reviewの判定に関わらないため、後から設定しても失うものは無い。boardへのitem追加は
-Pull Requestが存在しないと行えないため、上記のとおり作成直後に行う。
+**この規則が要るのはlabelだけである。**assigneeも同じcommandで指定するが、自動reviewの
+判定に関わらないため、後から設定しても失うものは無い。boardへのitem追加はPull Requestが
+存在しないと行えないため、上記のとおり作成直後に行う。
 
 ### 関連Issueの書き方
 
@@ -263,10 +268,11 @@ boardでは6つのworkflowが有効である。全一覧はRepository設定に�
 merge後に、対応するIssue itemの`Status`を`Done`にする。これにより`Auto-close issue`が
 Issueをcloseする。
 
-作成時に、対応するIssueと同じassignee・label・milestoneを設定し、Projects v2 board
+作成時に、対応するIssueと同じassignee・labelを設定し、Projects v2 board
 （`deskcat`、`https://github.com/users/wachi-yoshitaka-11-dev/projects/5`）へitemとして
 追加して`Status`を設定する。boardが進行管理の正本であり、boardに無いPull Requestは
 `Pull request merged` workflowの対象にならず、merge済みかどうかがboard上で追えない。
+**milestoneは設定しない**（[ADR-0012](docs/decisions/0012-milestones-count-issues-only.md)）。
 
 **このうちlabelだけは作成後では間に合わないおそれがある。**自動reviewの対象判定が
 作成直後に終わるためである。[labelは作成時に付ける](#labelは作成時に付ける)に従い、
