@@ -235,7 +235,7 @@ class ReviewGateTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_receipt_requires_every_review_declaration(self):
-        """`Self-Review`は3つとも要る。1つ欠けたら通さない。
+        """`Self-Review`は`REVIEW_DECLARATIONS`のすべてが要る。1つ欠けたら通さない。
 
         収束と2つのPassは別の軸である。1つでも欠けたときに、どれが欠けたかを
         診断へ出すことも確認する。
@@ -261,7 +261,7 @@ class ReviewGateTests(unittest.TestCase):
                 self.assertIn(missing, result.stderr)
 
     def test_receipt_rejects_an_unknown_review_declaration(self):
-        """知らない値を足しても通さない。3つ揃っていても余りを許さない。"""
+        """知らない値を足しても通さない。すべて揃っていても余りを許さない。"""
         root = self._repository()
         self._write(root, PLAIN_DOC, BASE_TEXT + "ここに追記する。\n")
         self._commit(
@@ -370,6 +370,134 @@ class ReviewGateTests(unittest.TestCase):
         for path, expected in cases:
             with self.subTest(path=path):
                 self.assertEqual(gate._is_instruction_source(path), expected)
+
+    # -- history ---------------------------------------------------------
+
+    def _history_fixture(self, steps):
+        """起点commitを持つfixtureを作り、`(root, cutover)`を返す。
+
+        `steps`は`(相対path, 本文, message)`の並びで、起点の後にこの順でcommitする。
+        """
+        root = self._repository()
+        self._write(root, PLAIN_DOC, BASE_TEXT + "起点である。\n")
+        self._commit(root, "cutover")
+        cutover = _git(root, "rev-parse", "HEAD").strip()
+        for relative, text, message in steps:
+            self._write(root, relative, text)
+            self._commit(root, message)
+        return root, cutover
+
+    def _history(self, root, cutover):
+        return _run(
+            [
+                "history",
+                "--repository-root",
+                root,
+                "--base",
+                f"{cutover}~1",
+                "--head",
+                "HEAD",
+                "--since",
+                cutover,
+            ]
+        )
+
+    def _declared(self, message, klass=None, review=True, instruction=False):
+        lines = [message, ""]
+        if klass:
+            lines.append(f"{gate.TRAILER_CLASS}: {klass}")
+        if review:
+            lines.append(f"{gate.TRAILER_REVIEW}: {gate.REVIEW_DECLARATIONS[0]}")
+        if instruction:
+            lines.append(f"{gate.TRAILER_INSTRUCTION}: {gate.INSTRUCTION_ACK}")
+        return "\n".join(lines) + "\n"
+
+    def test_history_is_not_checked_when_the_cutover_is_absent(self):
+        """起点がこのhistoryに無ければ検査しない。**その事実を出力へ書く。**"""
+        root, _ = self._history_fixture(
+            [(PLAIN_DOC, BASE_TEXT + "追記する。\n", "追記する")]
+        )
+        result = _run(["history", "--repository-root", root, "--base", "HEAD~1"])
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("HISTORY=not-checked", result.stdout)
+
+    def test_history_passes_when_every_commit_declares(self):
+        root, cutover = self._history_fixture(
+            [
+                (PLAIN_DOC, BASE_TEXT + "一つ目。\n", self._declared("一つ目", gate.CLASS_MINOR)),
+                (PLAIN_DOC, BASE_TEXT + "二つ目。\n", self._declared("二つ目", gate.CLASS_REVIEW)),
+            ]
+        )
+        result = self._history(root, cutover)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("HISTORY_CHECKED=2", result.stdout)
+
+    def test_history_requires_declarations_on_every_commit(self):
+        """途中の1 commitが宣言を持たないだけで落ちること。"""
+        root, cutover = self._history_fixture(
+            [
+                (PLAIN_DOC, BASE_TEXT + "一つ目。\n", self._declared("一つ目", gate.CLASS_MINOR)),
+                (PLAIN_DOC, BASE_TEXT + "二つ目。\n", "宣言を書き忘れる"),
+            ]
+        )
+        result = self._history(root, cutover)
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn(gate.TRAILER_CLASS, result.stderr)
+        self.assertIn(gate.TRAILER_REVIEW, result.stderr)
+
+    def test_history_rejects_a_minor_declaration_on_a_review_required_commit(self):
+        root, cutover = self._history_fixture(
+            [
+                (
+                    "AGENTS.md",
+                    "# Rules\n\n本文をなおす。\n",
+                    self._declared("AGENTS.mdを直す", gate.CLASS_MINOR, instruction=True),
+                )
+            ]
+        )
+        result = self._history(root, cutover)
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("declares minor but classifies as", result.stderr)
+
+    def test_history_requires_an_instruction_acknowledgement_per_commit(self):
+        root, cutover = self._history_fixture(
+            [
+                (
+                    "AGENTS.md",
+                    "# Rules\n\n本文をなおす。\n",
+                    self._declared("AGENTS.mdを直す", gate.CLASS_REVIEW),
+                )
+            ]
+        )
+        result = self._history(root, cutover)
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn(gate.TRAILER_INSTRUCTION, result.stderr)
+
+    def test_history_ignores_commits_before_the_cutover(self):
+        """起点より前の宣言なしcommitを蒸し返さないこと。"""
+        root = self._repository()
+        self._write(root, PLAIN_DOC, BASE_TEXT + "起点より前。\n")
+        self._commit(root, "宣言なし。起点より前である")
+        self._write(root, PLAIN_DOC, BASE_TEXT + "起点。\n")
+        self._commit(root, "cutover")
+        cutover = _git(root, "rev-parse", "HEAD").strip()
+        self._write(root, PLAIN_DOC, BASE_TEXT + "起点より後。\n")
+        self._commit(root, self._declared("起点より後", gate.CLASS_MINOR))
+        result = _run(
+            [
+                "history",
+                "--repository-root",
+                root,
+                "--base",
+                f"{cutover}~2",
+                "--head",
+                "HEAD",
+                "--since",
+                cutover,
+            ]
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("HISTORY_CHECKED=1", result.stdout)
 
     def test_runs_against_this_repository(self):
         """実repositoryでもerrorなく分類できること。結果の値は主張しない。"""
