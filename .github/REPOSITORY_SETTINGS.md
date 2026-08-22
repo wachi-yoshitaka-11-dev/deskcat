@@ -566,6 +566,52 @@ base `main`のmerge commitだけである。**rebase mergeは規約に無いが�
 rebase mergeを選んだ場合、それは規約違反であって設定の不備ではない。
 **設定が選択肢を残していることと、規約が1つに定めていることは両立する。**
 
+## 追跡file全体のsecret走査（2026-08-22）
+
+[Issue #154](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/154)の受け入れ条件
+「credential、個人情報、local secretがcommit／Issue／logへ含まれない」に対する確認である。
+
+`scripts/lib/publish_guards.py`の`secret_like`と`personal_path`を、**追跡下の全fileへ**
+当てた。公開対象だけを見る`prepare_pages.py`とは範囲が違う。
+
+結果は次のとおりで、**実在するcredentialと個人pathは検出されなかった。**
+一致した箇所はすべて、検出器自身のpattern定義か、その検出力を確かめるfixtureである。
+
+```text
+tracked files:          161（追跡下のsymlinkは0件）
+scan対象外:             1（pages/assets/deskcat-concept.jpg。binary）
+secret_like 一致:       3   すべて test_pages_guards.py のfixture
+                            （変数名が secret、値はOUTSIDE-...-MUST-NOT-BE-PUBLISHED）
+personal_path 一致:     6   3件は publish_guards.py のpattern定義そのもの
+                            3件は test_*.py のfixture（架空のuser名を使う）
+実在するsecret:         0
+実在する個人path:       0
+```
+
+### 自前の全体走査scriptは追加しない
+
+**GitHubのsecret scanningとpush protectionが同じ範囲を既に見ている。**2026-08-22の
+read-backで両方`enabled`である（上記「2026-08-22のdesired stateとの全面照合」）。
+GitHub側は履歴も含めて走査し、patternの維持もGitHubが行う。**これはGitHubの仕様であり、
+こちらの実測ではない。**確認したのは両設定が有効であることだけである。
+
+自前で全体走査を持つと、上の一致9件を通すための除外一覧が必要になる。除外は
+**検出器自身のfileとそのfixture**、つまり最も編集されるfileを対象にすることになり、
+**除外を保ちながら検出力を保つことができない。**同じ条件を2箇所で持つ弊害でもある。
+
+`publish_guards.py`のpatternが担うのは**公開境界**である。`prepare_pages.py`と
+`validate_pages_output.py`が公開対象に対して適用し、GitHub Pagesへ出る内容を止める。
+この役割は変えない。
+
+### 残る隙間
+
+**個人pathは、公開対象でないfileについては機械的に見ていない。**GitHubのsecret scanningは
+credentialを対象とし、Linuxのhome配下やWindowsのUsers配下を指す絶対pathは検出しない。
+**この節に例を書かないのは、書けばそれ自身がpatternに一致するためである。**patternの正本は
+`scripts/lib/publish_guards.py`にある。
+`AGENTS.md`が「永続文書に個人のlocal pathを記載しない」と定めており、**この範囲は規約と
+reviewが担保する。**上の走査で現状0件であることは確認したが、継続的な機械検査は無い。
+
 ## 保留
 
 - CODEOWNERS: 安定したreviewer／owner対応が複数になった時点で追加
