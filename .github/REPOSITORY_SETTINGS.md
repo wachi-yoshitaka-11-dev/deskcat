@@ -262,7 +262,12 @@ PR mergeのたびにhead branchを削除する。`develop`のような恒久的�
 これにより`CONTRIBUTING.md`の「Merge前の確認」が要求していた手作業のGraphQL確認は不要になり、同節を縮小した。
 ただし**`Review rate limited`はcheckが`pass`と表示されGitHubは止めない**ため、その確認だけは手作業として残している。
 
-### CodeRabbitのauto review設定（2026-08-10）
+### CodeRabbitのauto review設定（2026-08-10。2026-08-22に廃止）
+
+**この設定は2026-08-22に廃止した。**`.coderabbit.yaml`は`reviews.auto_review.enabled: false`
+だけを持ち、`labels`と`base_branches`は外した。reviewは意味上criticalな変更に対して
+自己レビューの後で手動依頼する（[ADR-0013](../docs/decisions/0013-manual-only-coderabbit-review.md)）。
+**以下は廃止前の記録である。**
 
 [`.coderabbit.yaml`](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/.coderabbit.yaml)を新設し、auto reviewを高リスク変更へ限定した
 （[PR #88](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/88)、[#87](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/87)）。

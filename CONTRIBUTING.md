@@ -209,9 +209,9 @@ Pull requestには次を含める。
 - [ ] `Start date`（作成日。JSTで判断する）
 - [ ] `Target date`（mergeを見込む日。**merge完了後またはclose完了後**に実績値へ更新する）
 
-### labelは作成時に付ける
+### labelは必ず付ける
 
-**labelは`gh pr create --label`で作成時に指定する。作成後に付け足さない。**
+**labelは`gh pr create --label`で指定する。**`area:*`／`type:*`／`priority:*`を付ける。
 
 ```bash
 gh pr create --base develop --title "<title>" --body-file <path> \
@@ -219,32 +219,12 @@ gh pr create --base develop --title "<title>" --body-file <path> \
   --assignee "<login>"
 ```
 
-**CodeRabbitは対象判定をPull Requestの作成直後に行い、後からのlabel追加では再判定しない。**
-[#94](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/94#issuecomment-5242077436)での
-CodeRabbit自身の回答である。**こちらの実測ではない。**
+**「作成時でなければならない」という縛りは廃止した**（[ADR-0013](docs/decisions/0013-manual-only-coderabbit-review.md)）。
+理由はCodeRabbitが対象判定をPull Requestの作成直後に行うことだけであり、
+**自動reviewを廃止したため判定そのものが無い。**当時の実測はADR-0013へ移した。
 
-実測で確かめたのは次の2点である。いずれも
-[`.coderabbit.yaml`](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/.coderabbit.yaml)が
-`develop`にある状態で作成したPull Requestである。
-
-| 作成時のlabel | Pull Request | 結果 |
-|---|---|---|
-| allowlistに一致する（当時は`type:decision`） | [#90](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/90)・[#91](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/91) | **対象判定を通過した。**#91 は作成の4分47秒後に自動reviewが提出され、完走した（手動依頼より前） |
-| labelはあるがallowlistに一致しない | [#95](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/95)・[#96](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/96) | `Review skipped: excluded by label configuration` |
-
-**「後から付けたので発火しなかった」ことを実測した記録は無い。**
-[#89](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/89)は作成の24秒後にlabel無しで
-`Review skipped`となり、labelは33分後に付いた。しかし**その判定の5秒後に`.coderabbit.yaml`が
-`develop`へmergeされている**（判定 `12:22:00Z`、merge `12:22:05Z`）。
-**判定の時点でこの設定はbase branchに無く、labelの未付与と設定の未反映が切り分けられない。**
-Issue `#89` を「後付けが原因」の証拠として使わない。
-
-**それでも作成時に付ける。**CodeRabbitの回答に沿う運用であり、費用は`--label`を足すだけで、
-取り落としの可能性を消せる。**切り分けられない以上、確実な側に倒す。**
-
-**この規則が要るのはlabelだけである。**assigneeも同じcommandで指定するが、自動reviewの
-判定に関わらないため、後から設定しても失うものは無い。boardへのitem追加はPull Requestが
-存在しないと行えないため、上記のとおり作成直後に行う。
+labelは引き続き必須である。仕分けと`review_gate.py`の分類に要る。
+boardへのitem追加はPull Requestが存在しないと行えないため、作成直後に行う。
 
 ### 関連Issueの書き方
 
@@ -274,9 +254,8 @@ Issueをcloseする。
 `Pull request merged` workflowの対象にならず、merge済みかどうかがboard上で追えない。
 **milestoneは設定しない**（[ADR-0012](docs/decisions/0012-milestones-count-issues-only.md)）。
 
-**このうちlabelだけは作成後では間に合わないおそれがある。**自動reviewの対象判定が
-作成直後に終わるためである。[labelは作成時に付ける](#labelは作成時に付ける)に従い、
-`gh pr create --label`で指定する。
+labelは[labelは必ず付ける](#labelは必ず付ける)に従い、`gh pr create --label`で指定する。
+**時期の縛りは無い**（[ADR-0013](docs/decisions/0013-manual-only-coderabbit-review.md)）。
 
 board上のworkflow構成は[Repository設定](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/.github/REPOSITORY_SETTINGS.md)に記録する。
 
@@ -337,16 +316,13 @@ close日である。
 
 pushする前に、作成者自身が差分を見直す。**新規指摘が0件の状態が2 round続くまで繰り返す。**
 
-[`.coderabbit.yaml`](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/.coderabbit.yaml)により、
-自動reviewは高リスク変更（firmware、protocol、Raspberry Pi、hardware）を示すlabelを持つ
-Pull Requestに限定している。**それ以外のPull Requestでは、この自己レビューが唯一のreviewである。**
-**対象labelを持つPull Requestでも、labelを作成後に付けた場合は自動reviewを
-受けられないおそれがある**（[labelは作成時に付ける](#labelは作成時に付ける)）。
-その場合もこの自己レビューが唯一のreviewになる。
+**自動reviewは行わない**（[ADR-0013](docs/decisions/0013-manual-only-coderabbit-review.md)）。
+[`.coderabbit.yaml`](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/.coderabbit.yaml)は
+`enabled: false`だけを持つ。**したがって、この自己レビューが既定で唯一のreviewである。**
 
-**対象labelの正本は`.coderabbit.yaml`であり、ここでは再掲しない。**値を2箇所に書くと
-片方だけを見た判断が起きる。実際、[#91](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/91)で
-`type:decision`をallowlistから外した後も、この節には5つ目として残っていた。
+**意味上criticalな変更では、自己レビューの後で手動でreviewを依頼する。最大1回。**
+判断は人が行い、機械的な判定は置かない。安全・電気・protocol・firmwareに関わる変更を
+自己レビューで代替しない。手順は[手動で依頼する前に状態を確認する](#手動で依頼する前に状態を確認する)にある。
 
 回数だけを守っても、同じ観点を繰り返しなぞるだけになる。次の観点で見る。
 
@@ -418,13 +394,18 @@ GitHubの強制が意味を失う。
 
 #### GitHubが強制しないもの
 
+**自動reviewは行わない**（[ADR-0013](docs/decisions/0013-manual-only-coderabbit-review.md)）。
+そのため`Review skipped`は**既定の状態であり、異常ではない。**以下は**手動で依頼した
+reviewの結果を読むため**、および過去の観測を履歴として残すためにある。
+allowlistに言及する記述は、廃止前の設定に対する観測である。
+
 **「checkが緑」は「reviewが行われた」を意味しない。**次の3つはcheck状態から見分けられない。
 
 | CodeRabbitの状態 | checkの表示 | reviewの実行 | 原因 |
 |---|---|---|---|
 | `Review in progress` | `pending` | 未完了 | — |
 | **`Review rate limited`** | **`pass`** | **実行されていない** | 毎時の枠切れ。**対象判定は通っている** |
-| **`Review skipped`** | **`pass`** | **実行されていない** | 対象判定で外れた。allowlistのlabelが**作成時に**無かった場合を含む |
+| **`Review skipped`** | **`pass`** | **実行されていない** | 自動reviewを行わない設定である（ADR-0013）。**自動review側では既定の状態であり、異常ではない。**手動依頼が空振りした場合もこの表示になる |
 
 `pending`のままmergeしないのは当然として、**`pass`でも中身が`Review rate limited`または
 `Review skipped`ならreviewは走っていない。**merge前にCodeRabbitのcheckの説明文を読む。
@@ -491,18 +472,20 @@ gh api --paginate "repos/<owner>/<repo>/commits/<sha>/statuses?per_page=100" \
 reviewが届き、actionable comment 2件がmerge済みPull Requestへ付いた。
 GitHubはthreadが存在しないものをblockできない。**reviewの到着を待たずに0件を「解決済み」と読まない。**
 
-自動reviewの対象は[`.coderabbit.yaml`](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/.coderabbit.yaml)
-で高リスク変更へ限定している。対象外のPull Requestでは[自己レビュー](#自己レビュー)が唯一のreviewである。
+**自動reviewは行わない**（[ADR-0013](docs/decisions/0013-manual-only-coderabbit-review.md)）。
+既定では[自己レビュー](#自己レビュー)が唯一のreviewである。
 
-**指摘に対応したcommitは、自己レビューで見る。**`auto_incremental_review`を`false`にしているため、
-pushしても再reviewは走らない。**ここで`@coderabbitai review`を投げ直さない。**
-投げ直すと1つのPull Requestでreviewを何度も消費し、`false`にした意味が無くなる。
+**手動で依頼するのは、意味上criticalな変更に対してだけ、自己レビューの後で、最大1回である。**
+判断は人が行う。
+
+**依頼したreviewの指摘に対応したcommitは、自己レビューで見る。ここで投げ直さない。**
+投げ直すと1つのPull Requestでreviewを何度も消費する。
 [#91](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/91)で実際にそうなり、2回目はrate limitで終わった。
 
-**自動reviewが一度も走らなかった場合だけ、手動で依頼する。**該当するのは
-`Review rate limited`または`Review skipped`で初回のreviewが得られなかったときである。
+依頼したreviewが得られなかったときは、次の表に従う。**依頼しなかった場合も、
+安全・電気・protocol・firmwareに関わる変更では同じ扱いとする。**
 
-| 変更の種類 | 初回reviewが得られなかったとき |
+| 変更の種類 | reviewが得られなかったとき |
 |---|---|
 | 安全、電気、protocol、firmware | **rate limitが解けるまで待つ。**自己レビューで代替しない |
 | 上記以外 | **自己レビューで通してよい。**Pull Request本文へ機械reviewを通していない旨と、その判断の根拠を書く |
@@ -599,8 +582,8 @@ commit日時`2026-08-16T00:12:31Z`のcommitに対する`00:13:58Z`の判定で�
 | 確認結果 | 行動 |
 |---|---|
 | 残数が0 | **投げない。**返ってきた時刻まで待つ |
-| 残数があり、**初回reviewがskipされた** | **`@coderabbitai full review` を使う。**`review`はincrementalであり、skip後は空振りしうる |
-| 残数があり、初回reviewは走ったが対応commitが未review | `@coderabbitai review` |
+| 残数があり、**まだ一度もreviewが走っていない** | **`@coderabbitai full review` を使う。**自動reviewを行わないため、依頼はいつもこの状態から始まる。`review`はincrementalであり、skip後は空振りしうる |
+| 残数があり、依頼したreviewは走ったが対応commitが未review | `@coderabbitai review`。**ただし対応commitは自己レビューで見るのが既定であり、投げ直さない**（[Merge前の確認](#merge前の確認)） |
 
 `review`と`full review`は別物である。`review`は**新しい変更のみ**、`full review`は**全fileを最初から**
 review する。**どちらも同じ毎時上限を消費する。**`full review`は枠を回避する手段ではない。
