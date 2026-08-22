@@ -130,11 +130,27 @@ CodeRabbit自身の回答。実測ではない）。
 
 ## 検証
 
-- `.coderabbit.yaml`が`develop`へ入った後のPull Requestで、CodeRabbitのcheckが
-  `Review skipped`のままであること。**本ADRを入れるPull Request自身が最初の観測になる。**
-  ただし変更前も`area:docs`のPull Requestは同じ表示だったため、**表示だけでは
-  「設定が効いた」ことの証拠にならない。**証拠になるのは、allowlistに一致するlabelを持つ
-  Pull Request（`area:firmware`等）でも同じ表示になることである
+- **本ADRを入れるPull Request（#176）で、説明文の変化を実測した。**同じ`area:docs`の
+  Pull Requestに対する表示が次のとおり変わった。
+
+  ```text
+  廃止前: Review skipped: excluded by label configuration
+  廃止後: Review skipped: automatic reviews are disabled
+  ```
+
+  **`excluded by label configuration`はlabel判定で外れたことを意味し、
+  `automatic reviews are disabled`は自動review自体が無効であることを意味する。**
+  文言が入れ替わったこと自体が、`labels`の削除が読まれた証拠である。
+  **`Review skipped`という表示だけでは区別できない。**説明文を読む。
+
+  **この観測はもう1つのことを示す。**判定の時点で新しい設定はhead branchにしかなく、
+  base branchの`develop`には旧設定があった。それでも新しい文言が出た。
+  **したがってCodeRabbitはこのPull Requestでhead側の設定を読んでいる。**
+  ADR-0007がPR #89 を切り分けられないとした根拠は「判定の時点で設定がbase branchに
+  無かった」ことだったが、**その前提は本観測と整合しない。**ただし観測は本Pull Request
+  1件であり、**一般規則として「常にhead側を読む」と主張しない。**
+- allowlistに一致していたlabel（`area:firmware`等）を持つPull Requestでも同じ説明文に
+  なること。**未検証である。**該当するPull Requestが次の観測になる
 - 手動依頼の手順が変わっていないこと。`CONTRIBUTING.md`の該当節を変更しない
 - 見直し条件: 高リスク変更でreviewが1件も無いままmergeされた事例が出た場合は、
   **自動reviewを戻すのではなく、依頼を必須にする位置**（Pull Request templateの
