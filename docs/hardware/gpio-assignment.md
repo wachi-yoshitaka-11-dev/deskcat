@@ -81,7 +81,7 @@
 | 物理接続 | Pi（USB host）のUSB OTG port ⇔ ESP32 boardのMicro USB port を**USB cable 1本**で接続する | ESP32のGPIO1／GPIO3とPiのGPIO14／GPIO15をjumperで直接配線する |
 | ESP32側の経路 | board上のUSB-UARTブリッジICが内部でUART0（GPIO1／GPIO3）へ接続する。GPIO headerには何も配線しない | GPIO1／GPIO3をheaderから引き出す |
 | Pi側のdevice | USB CDC serial（`/dev/ttyUSB*`。実際の名称は#8で確認） | `/dev/serial0`（Pi内蔵UART） |
-| 追加部品 | Pi側がMicro-B（OTG）のため、**USB OTG変換（Micro-B → Type-A）またはMicro-B ⇔ Micro-B OTG cable**が必要。未購入 | jumper wireのみ |
+| 追加部品 | Pi側がMicro-B（OTG）のため、**USB OTG変換（Micro-B → Type-A）またはMicro-B ⇔ Micro-B OTG cable**が必要。**2026-08-22に手持ちで充当と確定した**（`hardware-bom.md`の`CABLE-PI-LINK-01`。購入待ちリストから外した） | jumper wireのみ |
 
 この結果、GPIO1／GPIO3は**board上のブリッジが占有する予約pin**であり、外部配線用に空いていない。
 PCからflashingするときは同じUSB portを使うため、Piとの同時接続は想定しない。
@@ -90,7 +90,7 @@ PCからflashingするときは同じUSB portを使うため、Piとの同時接
 
 | Bus | 候補device | 状態 | 不足している根拠 |
 |---|---|---|---|
-| USB serial（Pi link） | Raspberry Pi | **USB connector経由に確定**（GPIO配線なし）。GPIO1／GPIO3はboard上ブリッジの予約pin | Pi上のdevice名（`/dev/ttyUSB*`等）は#8で確認。USB OTG変換cableが未購入 |
+| USB serial（Pi link） | Raspberry Pi | **USB connector経由に確定**（GPIO配線なし）。GPIO1／GPIO3はboard上ブリッジの予約pin | Pi上のdevice名（`/dev/ttyUSB*`等）は#8で確認。USB OTG変換cableが**手持ちで充当**（2026-08-22） |
 | ADC測定（`power-budget.md`） | Shunt、5 V rail、3.3 V rail | GPIO32／33／36に確定（すべてADC1） | 分圧器の実装と実測値。ADC2はWi-Fi有効時に使用不可のため割り当てない |
 | SPI display bus | LCD（MSP2807／ILI9341）、touch（同module） | GPIO18／23／19（SCLK／MOSI／MISO）＋CS個別（LCD: GPIO22、Touch: GPIO21）に確定 | Touch controller型番の現物確認、実際のSPI mode／速度の実測 |
 | I2C sensor bus | Accelerometer（ADXL345）、environment sensor（BME280） | GPIO25（SDA）／GPIO26（SCL）に確定 | 両moduleのinterface選択jumper（I2C側になっているか）の現物確認、実効pull-up抵抗の計算 |
@@ -142,3 +142,4 @@ PCからflashingするときは同じUSB portを使うため、Piとの同時接
 | 2026-08-12 | 11 | [PR #116](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/116)のreview指摘。`SERVO-PWM`行が`RES-PULL-01`を「**未購入**・抵抗値未選定」としていたが、**10 kΩと4.7 kΩが各1袋入手済みである**（[hardware-bom.md](hardware-bom.md) Revision 37）。二重発注を招くため「一部の抵抗値は入手済み。ただし必要な本数と抵抗値が未選定であり、手元の2種で足りるとは限らない」へ改めた。**外部pull-downを必須とする規則も`HW-TBD-027`のgateも変えていない** | [PR #116のreview](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/116)、[hardware-bom.md](hardware-bom.md) Revision 37 |
 | 2026-08-15 | 12 | [#1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1)。**現物写真の読み取り結果を反映した。**(a) **`HW-TBD-001`のpin照合が完了し、一致した。**38pinヘッダ両側のsilkが公式`J2`／`J3`と19pin×2列すべてで一致した（GNDの位置を含む）。`Board識別情報`の`公式回路図revision`欄へ読み取った並びを記録した。(b) 基板裏面silkscreenの大文字小文字を**`ESP32_DevKitc_V4`**へ訂正した（旧記載`ESP32_DevkitC_V4`。現物と公式回路図のtitle blockが一致する）。(c) Touch controllerを**`XPT2046`と確定**し、`LCD-MISO`と`TOUCH-CS`の「想定」「現物確認待ち」を確定表現へ改めた。(d) `ACCEL-SDA`と競合checklistへ、**ADXL345が`01C`＝10 kΩのpull-upを4個搭載している**ことを記録した。**ただしどのpinへ付くかはパターンを追っておらず、BME280側は半田の有無が光学判別できないため、実効抵抗は両方が確定するまで計算しない** | 現物写真（斜光＋接写）。詳細は[tbd-register.md](tbd-register.md)の`HW-TBD-001`／`003`／`004`／`005` |
 | 2026-08-15 | 13 | [PR #122](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/122)のレビュー指摘を反映。文書冒頭の状態行が`touch controller型番`を現物確認待ちに挙げたままだったため、**`XPT2046`確定と`HW-TBD-003`のcloseを反映した** | [PR #122レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/122) |
+| 2026-08-22 | 16 | [PR #174](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/174)の自動reviewの指摘を反映した。**USB OTG cableを`未購入`としていた記述が2箇所残っていた**（`追加部品`行と`USB serial（Pi link）`行）。**`CABLE-PI-LINK-01`は2026-08-22に手持ちで充当と確定し購入待ちリストから外している**（正は[hardware-bom.md](hardware-bom.md)の`CABLE-PI-LINK-01`）。両方を更新した | [#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3) |
