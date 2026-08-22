@@ -1,6 +1,6 @@
 # Repository設定計画
 
-> 最終remote確認: 2026-07-28
+> 最終remote確認: 2026-08-22（[全面照合](#2026-08-22のdesired-stateとの全面照合)）
 
 ## 確認済み
 
@@ -21,7 +21,7 @@
 - [x] `.github/MILESTONES.md`のM0–M6 title／descriptionを同期
 - [x] `main`へのforce pushを禁止
 - [x] `main`の削除を禁止
-- [x] `main`の`enforce_admins`を有効化し、管理者にも上記2つを適用
+- `main`の`enforce_admins`は**有効化しない**。2026-07-28に一度有効化してread-backで確認したが、2026-08-22の照合では`false`であり、**同日にrepository所有者が「不要」と判断した。**checkboxを外したのは、これが未完了のtaskではなく決定だからである（下記「[2026-08-22のdesired stateとの全面照合](#2026-08-22のdesired-stateとの全面照合)」）
 - [x] Repository description、homepage、topicsを設定
 - [x] `delete_branch_on_merge`を有効化（2026-07-31に無効化のdriftを検出し、再適用してread-back済み）
 - [x] `develop`: Branch protectionで`Require conversation resolution before merging`**だけ**を有効化（2026-08-10。下記「2026-08-10のdevelop branch protection」を参照）。**必須reviewと必須status checkは設定しない**
@@ -45,6 +45,11 @@ read-back結果: `enforce_admins.enabled = true`
 
 これにより[AGENTS.md](../AGENTS.md)の「force pushを行わない」は、**`main`に限って**
 GitHub側でも実効化され、AIエージェントの誤操作に対する防壁になる。
+
+**この段落は2026-08-22時点では成立しない。**同日の照合で`enforce_admins`は`false`であり、
+repository所有者は有効化を「不要」と判断した。**管理者はforce pushとbranch削除の禁止に
+拘束されない。**この2つを止めているのはGovernanceの規約とユーザー承認だけである
+（下記「[2026-08-22のdesired stateとの全面照合](#2026-08-22のdesired-stateとの全面照合)」）。
 
 **この記述は2026-08-10に更新した。**`develop`にもbranch protectionを設定したため、
 force pushとbranch削除はGitHub側で禁止されている（下記「2026-08-10のdevelop branch protection」）。
@@ -78,7 +83,7 @@ CI導入前:
 - [ ] 外部contributionにreviewを必須化
 - 必須承認review数: 外部contribution受付時は`1`
 - [ ] signed commitとlinear historyを別途評価
-- [ ] `Require conversation resolution before merging`を評価する。現状は[CONTRIBUTING.md](../CONTRIBUTING.md#merge前の確認)の手作業gateだけであり、[PR #40](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/40)で未解決thread 1件を残したmergeが起きている
+- [x] `Require conversation resolution before merging`を評価し、有効化した。`develop`は2026-08-10である（下記「2026-08-10のdevelop branch protection」）。`main`も有効であることを2026-08-22の照合で確認したが、**`main`で有効化した時期は本文書に記録が無い。**導入の契機は[PR #40](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/40)で未解決thread 1件を残したmergeが起きたことである
 
 ## Actions権限
 
@@ -450,6 +455,116 @@ GitHubはProjects（classic）のREST APIを2025-04-01にsunsetしており（�
 方針: `has_projects`は`true`のまま変更しない。classic projectとしては使っていないが、
 このflag自体がGitHub側で実質的な意味を失っているため、無効化のための追加操作は行わない。
 実際のIssue進行管理は上記Projects v2のboardで行う。
+
+## 2026-08-22のdesired stateとの全面照合
+
+[Issue #154](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/154)の「branch protection／ruleset／Actions／Pages設定をdesired stateと一致させ、API read-backを記録する」に対する照合である。**設定は変更していない。読み出しだけを行った。**
+
+読み出した値である。**本文書がdesired stateとして記録している項目は、下の1件を除いて
+すべて一致した。**記録が無い項目（`has_wiki`、merge方式の設定等）は、一致・不一致を
+言えないため観測値として並べる。
+
+```text
+visibility:                            public
+default_branch:                        main
+has_issues:                            true
+has_discussions:                       false
+has_wiki:                              true
+delete_branch_on_merge:                true
+secret_scanning:                       enabled
+secret_scanning_push_protection:       enabled
+dependabot_security_updates:           enabled
+private_vulnerability_reporting:       true
+vulnerability-alerts:                  HTTP 204 (有効)
+
+main   allow_force_pushes:             false
+main   allow_deletions:                false
+main   required_approving_review_count: 0
+main   require_code_owner_reviews:     false
+main   required_status_checks:         null
+main   required_conversation_resolution: true
+
+develop allow_force_pushes:            false
+develop allow_deletions:               false
+develop required_pull_request_reviews: null
+develop required_status_checks:        null
+develop required_conversation_resolution: true
+
+ruleset "Protect develop from deletion"
+  target:      branch
+  enforcement: active
+  include:     refs/heads/develop
+  rules:       deletion
+  bypass_actors: []
+
+actions enabled:                       true
+actions allowed_actions:               selected
+actions github_owned_allowed:          true
+actions verified_allowed:              false
+actions patterns_allowed:              esp-rs/xtensa-toolchain@*
+actions sha_pinning_required:          true
+default_workflow_permissions:          read
+can_approve_pull_request_reviews:      false
+
+github-pages can_admins_bypass:        false
+github-pages protection_rules:         branch_policy
+github-pages 許可branch:               main (1件)
+pages source:                          main /
+pages build_type:                      workflow
+pages https_enforced:                  true
+```
+
+**本文書の記録と食い違っていた項目が1件ある。**照合後の判断を受けて、記録側を現状へ
+合わせた。
+
+```text
+main enforce_admins:                   false   ← 2026-07-28の記録はtrue。同項目は2026-08-22に不要と判断
+```
+
+本文書の「管理者除外の解消」は、2026-07-28に`enforce_admins`を有効化し、read-backで
+`enabled = true`を確認したと記録している。**2026-08-22の読み出しでは`false`である。**
+その間に無効化されたことになるが、**経緯は特定できていない。**
+`delete_branch_on_merge`が2026-07-31に同種のdriftを起こしたときと同じく、変化の理由を
+遡って確定する手段が無い。
+
+影響は次に限られる。`main`の`allow_force_pushes: false`と`allow_deletions: false`は
+設定として残っているが、**管理者はこの2つに拘束されない。**「管理者除外の解消」が述べた
+「[AGENTS.md](../AGENTS.md)の force pushを行わない が`main`に限ってGitHub側でも実効化され、
+AIエージェントの誤操作に対する防壁になる」という状態は、**現在は成立していない。**
+
+**この照合では設定を戻していない。**そして2026-08-22に、repository所有者が
+**再適用は不要と判断した。**したがって`enforce_admins: false`は**driftではなく
+意図した状態である。**次の照合でこれを未解決として再度上げない。
+
+判断の意味は限定して読む。**`main`のforce pushとbranch削除を止めているのは、
+GitHubの設定ではなくGovernanceの規約とユーザー承認だけになる。**
+[AGENTS.md](../AGENTS.md)は「`git reset --hard`、強制checkout、履歴書き換え、force pushを
+行わない」と定めており、AIエージェントに対してはこの規約が唯一の歯止めである。
+**設定で強制されていると読まない。**
+
+`## 確認済み`のcheckboxは外した。**未完了のtaskではなく決定である。**
+
+## merge方式の設定とdesired state（2026-08-22）
+
+```text
+allow_squash_merge:  true
+allow_merge_commit:  true
+allow_rebase_merge:  true
+allow_auto_merge:    false
+```
+
+[CONTRIBUTING.md](../CONTRIBUTING.md#merge方式)が認めるのは、base `develop`のsquash mergeと
+base `main`のmerge commitだけである。**rebase mergeは規約に無いが、設定では選べる。**
+
+これはdriftではない。本文書はこれまでmerge方式の設定についてdesired stateを記録していない。
+
+**2026-08-22に、repository所有者が`allow_rebase_merge`を無効化しないと判断した。**
+これをdesired stateとして記録する。**merge方式は設定では絞らず、
+[CONTRIBUTING.md](../CONTRIBUTING.md#merge方式)の規約とreviewで守る。**
+次の照合で「規約と設定が食い違っている」として再度上げない。
+
+rebase mergeを選んだ場合、それは規約違反であって設定の不備ではない。
+**設定が選択肢を残していることと、規約が1つに定めていることは両立する。**
 
 ## 保留
 
