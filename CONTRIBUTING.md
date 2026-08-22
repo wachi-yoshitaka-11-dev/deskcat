@@ -662,6 +662,8 @@ Instruction-Change: reviewed-as-data
 
 **trailerの名前と値の正本は`scripts/review_gate.py`である。**
 
+**`main`昇格では、範囲の各commitの宣言も検証される。**squash commitへtrailerを書き忘れると、その回のmergeは通っても次の昇格で落ちる。
+
 **Pull Requestのhead commitにも同じtrailerを置く。**Review gate workflowがそれを見る。
 head commitへ置いておけば、review後にcommitを足したときにworkflowが落ちる。
 **squash commitのtrailerは、mergeするまで存在しないためmerge前に検査できない。**
