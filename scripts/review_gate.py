@@ -1,14 +1,19 @@
 #!/usr/bin/env python3
 """変更の分類と、自己レビューを宣言するcommit trailerを検査する。
 
-このscriptが答えるのは次の3つだけである。
+このscriptが答えるのは次の問いだけである。
 
 1. `classify`     この変更範囲は軽微（`minor`）と機械的に**証明できる**か
 2. `receipt`      範囲のhead commitが、分類と自己レビューをtrailerで宣言しているか
 3. `instructions` 指示sourceが変わったなら、dataとしてreviewした宣言があるか
+4. `history`      範囲の**各commit**が分類を宣言しているか
 
-`gate`は上の3つをまとめて実行する。分類と指示sourceの
-検査は範囲全体を見て、trailerの検査はhead commitだけを見る。
+`gate`は1から3をまとめて実行する。分類と指示sourceの検査は範囲全体を見て、trailerの
+検査はhead commitだけを見る。
+
+**`history`は`gate`に含めない。**feature branchの中間commitにまで宣言を要求すると、
+最後にまとめて宣言する運用が成立しない。`main`昇格では範囲に複数のsquash commitが
+入るため、そこでだけ各commitを見る。
 
 **意味は判定しない。**「言い回しの修正」と「意味の反転」を区別するcodeは書かない。
 `〜しない`を`〜する`へ変える差分は、数値もcommandもlinkも含まない純粋な文字列変更であり、
@@ -56,18 +61,36 @@ CLASS_MINOR = "minor"
 CLASS_REVIEW = "review-required"
 INSTRUCTION_ACK = "reviewed-as-data"
 
-# `Self-Review`で宣言する内容。**3つとも要る。**
+# `Self-Review`で宣言する内容。**下の値がすべて要る。**
 #
 # 収束（新規指摘0件が2 round）と、2つのPassは別の軸である。1つの値にまとめると、
 # どれをやっていないのかが分からなくなる。要件照合Passとfresh-context Passは
 # 同じ最終diffに対して行い、差分が変わったら両方が無効になる。定義は
 # `CONTRIBUTING.md`の「自己レビュー」にある。
 #
-# **これは宣言であって証拠ではない。**scriptが確かめられるのは、3つが揃っていることと、
+# **これは宣言であって証拠ではない。**scriptが確かめられるのは、下の値が揃っていることと、
 # その宣言がこのcommitに結び付いていることだけである。
 REVIEW_DECLARATIONS = ("requirements-pass", "fresh-context-pass", "converged")
 
 MARKDOWN_SUFFIXES = (".md", ".markdown")
+
+# 理由を並べる上限。`main`昇格の範囲では数百行になり、宣言の問題が埋もれる。
+# 打ち切った件数は必ず出す。silent capを作らない。
+REASON_PREVIEW_LIMIT = 20
+
+# 宣言を求める範囲の起点。trailer運用を導入したcommitである（PR #161のsquash）。
+# これより前のcommitは検査しない。宣言を求める規則が存在しなかった。
+DECLARATION_CUTOVER = "57734371384d18f31de7557a7a60fd1aa856edff"
+
+# 起点より後だが、宣言を持たないことを許すcommit。
+#
+# 対象はPR #160のsquashである。**Gateがrequired status checkでなかった期間に
+# mergeされた。**
+# `AGENTS.md`が履歴書き換えを禁じているため、後からtrailerを付けられない。
+#
+# **この列挙を増やさない。**増やす変更は`scripts/`の変更であり、reviewと
+# `Instruction-Change`の宣言を通る。通したうえで増やすなら、それは判断である。
+DECLARATION_EXEMPT = ("9c91f913696033ca3da9b26d10ac793ee2c2291e",)
 
 # 変更行がこれらのいずれかに当たると軽微にしない。数値、command、link、表、見出し、
 # checkbox、HTML commentは、typoの修正に見えても意味を持つ。
@@ -276,9 +299,9 @@ def _check_instructions(root, base, head):
     if found.get(TRAILER_INSTRUCTION) != [INSTRUCTION_ACK]:
         return (
             [
-                f"the range changes {len(touched)} instruction source path(s) but the"
-                f" head commit does not carry {TRAILER_INSTRUCTION}:"
-                f" {INSTRUCTION_ACK}. Instruction files in a diff are review targets,"
+                f"the range changes {len(touched)} instruction source path(s) but"
+                f" {head} does not carry {TRAILER_INSTRUCTION}: {INSTRUCTION_ACK}."
+                " Instruction files in a diff are review targets,"
                 " not instructions."
             ],
             touched,
@@ -286,15 +309,77 @@ def _check_instructions(root, base, head):
     return [], touched
 
 
+def _rev_exists(root, revision):
+    result = subprocess.run(
+        ["git", "-C", root, "rev-parse", "--verify", "--quiet",
+         f"{revision}^{{commit}}"],
+        capture_output=True,
+    )
+    return result.returncode == 0
+
+
+def _check_history(root, base, head, cutover):
+    """範囲の各commitが分類を宣言しているかを検査する。
+
+    head commitだけを見ると、**宣言を持たないcommitが範囲の中に混ざっていても通る。**
+    `main`昇格では範囲に複数のsquash commitが入るため、1つずつ見る。
+
+    要求はhead commitより軽い。**`Change-Class`が計算結果より緩くないこと**と、
+    `Self-Review`が1つ以上あることだけを見る。`Self-Review`の値の集合は時期によって
+    変わっており、過去のcommitを現在の集合で測ると、当時は正しかった宣言が落ちる。
+    現在の集合はhead commitに対してだけ適用する（`_check_receipt`）。
+
+    起点より前のcommitは検査しない。宣言を求める規則が存在しなかった。
+    """
+    if not _rev_exists(root, cutover):
+        # 起点がこのrepositoryに無い。fixtureや別historyでは検査しない。
+        return [], None
+    listed = _git(
+        root, ["rev-list", "--no-merges", f"{base}..{head}", "--not", cutover]
+    ).split()
+    with_merges = _git(
+        root, ["rev-list", f"{base}..{head}", "--not", cutover]
+    ).split()
+
+    problems = []
+    exempt = 0
+    for commit in listed:
+        if commit in DECLARATION_EXEMPT:
+            exempt += 1
+            continue
+        short = commit[:7]
+        computed, _ = classify(root, f"{commit}^", commit)
+        found = trailers(root, commit)
+        declared = found.get(TRAILER_CLASS, [])
+        if len(declared) != 1 or declared[0] not in (CLASS_MINOR, CLASS_REVIEW):
+            problems.append(
+                f"{short} must carry exactly one valid {TRAILER_CLASS} trailer,"
+                f" found {declared}"
+            )
+        elif declared[0] == CLASS_MINOR and computed != CLASS_MINOR:
+            problems.append(
+                f"{short} declares {CLASS_MINOR} but classifies as {computed}"
+            )
+        if not found.get(TRAILER_REVIEW):
+            problems.append(f"{short} carries no {TRAILER_REVIEW} trailer")
+        instruction_problems, _ = _check_instructions(root, f"{commit}^", commit)
+        problems.extend(instruction_problems)
+    # 数えたものと数えなかったものを必ず出す。silent capを作らない。
+    summary = (len(listed) - exempt, len(with_merges) - len(listed), exempt)
+    return problems, summary
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "command", choices=("classify", "receipt", "instructions", "gate")
+        "command", choices=("classify", "receipt", "instructions", "history", "gate")
     )
     parser.add_argument("--repository-root", default="")
     parser.add_argument("--base", default="origin/develop")
     parser.add_argument("--head", default="HEAD")
     parser.add_argument("--expect", default="")
+    # 起点の既定は`DECLARATION_CUTOVER`である。上書きはtestとdry runのためにある。
+    parser.add_argument("--since", default="")
     options = parser.parse_args(argv)
     root = options.repository_root.strip() or str(
         Path(__file__).resolve().parent.parent
@@ -304,20 +389,36 @@ def main(argv=None):
     computed, reasons = classify(root, base, head)
     problems = []
     touched = None
+    history = None
 
     if options.command in ("receipt", "gate"):
         problems.extend(_check_receipt(root, head, computed))
     if options.command in ("instructions", "gate"):
         instruction_problems, touched = _check_instructions(root, base, head)
         problems.extend(instruction_problems)
+    if options.command == "history":
+        history_problems, history = _check_history(
+            root, base, head, options.since.strip() or DECLARATION_CUTOVER
+        )
+        problems.extend(history_problems)
     if options.expect and options.expect != computed:
         problems.append(f"expected CLASS={options.expect} but computed {computed}")
 
     print(f"CLASS={computed} RANGE={base}..{head}")
     if touched is not None:
         print(f"INSTRUCTION_SOURCES_TOUCHED={len(touched)}")
-    for reason in reasons:
+    if history is None and options.command == "history":
+        print("HISTORY=not-checked (declaration cutover is not in this history)")
+    elif history is not None:
+        print(
+            f"HISTORY_CHECKED={history[0]} MERGES_SKIPPED={history[1]}"
+            f" EXEMPT={history[2]}"
+        )
+    for reason in reasons[:REASON_PREVIEW_LIMIT]:
         print(f"  reason: {reason}")
+    hidden = len(reasons) - REASON_PREVIEW_LIMIT
+    if hidden > 0:
+        print(f"  ({hidden} more reason(s) not listed)")
     for problem in problems:
         print(problem, file=sys.stderr)
     return 1 if problems else 0
