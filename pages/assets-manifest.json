@@ -12,7 +12,11 @@
   "assets": [
     {
       "path": "css/style.scss",
-      "note": "Cayman themeのtheme override stylesheet。配色、typography、table、blockquote、code block、responsive layoutを上書きする"
+      "note": "Pages siteのstylesheet。themeのSCSSは読み込まず、配色、typography、chrome、card、table、code block、responsive layout、a11yを自前で持つ（ADR-0009）"
+    },
+    {
+      "path": "deskcat-paw.svg",
+      "note": "肉球のmotif。背景の透かし、見出しとcardのmarker、footerで`mask-image`として使う。色はCSS側のtokenが決めるため単色で持つ"
     },
     {
       "path": "deskcat-concept.jpg",

@@ -18,7 +18,11 @@ Assetを追加する前に、次をすべて満たす。
 2. 作成または取得の方法を記録する。
 3. 再配布許諾の根拠を記録する。
 4. 確認日を記録する。
-5. SHA-256を記録する。差し替え時は必ず更新する。
+5. SHA-256を記録する。差し替え時は必ず更新する。**この要件はbinary assetに適用する。**
+   Text asset（`.svg`、`.css`、`.scss`、`.txt`）と、scriptがsourceから生成するbinaryは
+   内容がdiff reviewと内容scanの対象であり、hashは編集ごとに変わるだけで古くなる。
+   `pages/assets-manifest.json`はtext assetの`sha256`を**誤りとして拒否する**ため、
+   両者の要件を一致させる。該当欄には固定していない理由を書く。
 6. 実機写真ではないimageは、その旨をpage上へ明記する。
 
 許諾の根拠は、assetの由来で書き分ける。
@@ -45,8 +49,39 @@ Assetを追加する前に、次をすべて満たす。
 
 検証に使うSHA-256の正本は`pages/assets-manifest.json`である。`prepare_pages.py`はそのhashと実fileを照合し、不一致でbuildを失敗させる。Assetを差し替える場合は、manifestと本文書の両方を更新する。
 
+### `pages/assets/deskcat-paw.svg`
+
+| 項目 | 内容 |
+|---|---|
+| 用途 | 肉球のmotif。背景の透かし、見出しとcardのmarker、footerで`mask-image`として使う |
+| 作成者・権利者 | wachi-yoshitaka-11-dev（repository所有者） |
+| 作成方法 | repository所有者がconcept image（mugとnotebookに描かれた肉球）を基に、幾何形状だけで作図 |
+| 再配布許諾の根拠 | 権利者本人による許諾。本repositoryの[MIT License](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/c69f9a7d7767a6b4572e9f6920939529765316fc/LICENSE)（commit `c69f9a7d`時点）に従って公開・再配布する |
+| 確認日 | 2026-08-21 |
+| SHA-256 | 記録しない。text assetであり内容はdiff reviewとscanの対象。manifestは`sha256`を誤りとして拒否する |
+| 寸法・size | viewBox 24 x 24、1 KiB未満 |
+| 実機写真か | いいえ。写真ではなく単色の図形である |
+
+`mask-image`として使うため色はCSS側のtokenが決める。SVG自身は単色で持ち、暗色modeへ追従させるために色を焼き付けない。
+
+### `favicon.ico`
+
+| 項目 | 内容 |
+|---|---|
+| 用途 | 全pageの`<link rel="icon">`が参照するfavicon |
+| 作成者・権利者 | wachi-yoshitaka-11-dev（repository所有者） |
+| 作成方法 | repository所有者が`pages/assets/deskcat-concept.jpg`の猫顔を32 x 32と16 x 16のpixel artへ落とし、`scripts/prepare_pages.py`が`FAVICON_ART_32`／`FAVICON_ART_16`からICOを組み立てる |
+| 再配布許諾の根拠 | 権利者本人による許諾。concept image由来の派生であり、本repositoryの[MIT License](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/c69f9a7d7767a6b4572e9f6920939529765316fc/LICENSE)（commit `c69f9a7d`時点）に従って公開・再配布する |
+| 確認日 | 2026-08-21 |
+| SHA-256 | 記録しない。正本はsourceのASCII artであり、内容はdiff reviewで読める。形式と寸法は`scripts/test_pages_guards.py`が検証する |
+| 寸法・size | 32 x 32と16 x 16の2枚、5,430 bytes |
+| 実機写真か | いいえ。concept imageから作図したpixel artである |
+
+`pages/assets/`には置かない。`prepare_pages.py`がstaging時に生成するため、manifestの対象外である。
+
 ## 履歴
 
 | 日付 | 内容 |
 |---|---|
 | 2026-07-29 | `pages/assets/deskcat-concept.jpg`を登録。1254 x 1254から720 x 720へ縮小した版のSHA-256を記録 |
+| 2026-08-21 | `pages/assets/deskcat-paw.svg`と`favicon.ico`を登録。登録要件5のSHA-256をbinary assetへ限定し、text assetと生成binaryはdiff reviewで担保する旨を明記（[ADR-0009](../decisions/0009-pages-own-layout.md)） |

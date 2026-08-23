@@ -149,3 +149,15 @@ Pull Request templateの「検証」表と「安全とsecurity」は、何を確
 ## 置き換える決定
 
 なし。
+
+## 後継の決定
+
+[ADR-0010](0010-change-class-and-review-declaration.md)が、本ADRの決定3（Issueを立てずに直接反映してよい範囲）を狭めた。**「規約の言い回し」は軽微経路から外れている。**
+自己レビューの回数とbranch protectionの扱いは本ADRのままである。
+
+[ADR-0013](0013-manual-only-coderabbit-review.md)が、**本ADRの決定1を置き換えた。**
+label allowlistによる自動reviewの発火制御は廃止され、reviewは手動依頼だけになった。
+
+**置き換えられたのは決定1だけである。**決定2（自己レビューのchecklistと回数）、
+決定4（branch protection）、決定5（templateを変更しない）は本ADRのままである。
+決定3（直接反映の範囲）は上記のとおりADR-0010とADR-0011が狭めた。

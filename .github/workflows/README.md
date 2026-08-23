@@ -17,7 +17,7 @@ buildを実行するworkflowは、そのbuild commandが確定してから追加
 ### `pages.yml` — 公開文書
 
 - Rust、ESP-IDF、firmware、実機をbuildしない。
-- Pull Requestでは、link検査（`validate_doc_links.py`）、validator自身のtest（`test_link_validators.py`）、Pages sourceの生成、Jekyll build、生成物の検査（`validate_pages_output.py`）、公開境界の回帰test（`test_pages_guards.py`）を行う。**deployはしない。**
+- Pull Requestでは、指示entrypointの検査（`validate_instruction_entrypoint.py`）とそのtest（`test_instruction_entrypoint.py`）、link検査（`validate_doc_links.py`）、validator自身のtest（`test_link_validators.py`）、Pages sourceの生成、Jekyll build、生成物の検査（`validate_pages_output.py`）、公開境界の回帰test（`test_pages_guards.py`）を行う。**deployはしない。**
 - `main`で同じcheckに成功した場合だけPages artifactをdeployする。
 - 通常権限はread-onlyとし、deploy jobだけに`pages: write`と`id-token: write`を付与する。
 - Actionはreview済みのcommit SHAへ固定する。
@@ -25,6 +25,20 @@ buildを実行するworkflowは、そのbuild commandが確定してから追加
 `paths`は`**/*.md`を含む。`validate_doc_links.py`が追跡下の**全**Markdownを検査するため、
 top-level directoryを列挙すると検査対象と起動条件がずれる。実際に`apps/`、`crates/`、
 `firmware/`等の14 fileが対象外で、component READMEだけの変更は検査を素通りしていた。
+
+### `review-gate.yml` — 分類と自己レビューの宣言確認
+
+- base が`develop`と`main`のPull Requestで起動する。
+- 含まれる変更の分類と、Pull Request head commitのtrailer（分類、自己レビュー、指示source変更の
+  宣言）を`scripts/review_gate.py`で検証する（[ADR-0010](../../docs/decisions/0010-change-class-and-review-declaration.md)）。
+- **`develop`側でも掛ける。**宣言が無効になる仕組みは、Pull Requestのhead commitを見て初めて
+  働く。`main`側だけに掛けると、宣言はsquash commitにしか現れない。
+- **base が`main`のPull Requestでは、範囲の各commitの宣言も検証する**（`history`）。
+  範囲に複数のsquash commitが入るため、head commitだけでは宣言を持たないcommitが混ざっても
+  通る。**`develop`側では実行しない。**feature branchの中間commitへ宣言を要求しない。
+- **未解決threadと必要CIは検証しない。**branch protectionが強制しており、同じ条件を2箇所で持たない。
+- commit messageのtrailerを読むため`fetch-depth: 0`でcheckoutする。
+- 権限はread-onlyとし、tokenをscriptから読めないよう`persist-credentials: false`を指定する。
 
 ### `host.yml` — host workspace
 
