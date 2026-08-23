@@ -80,6 +80,50 @@ Conclusion: Verified（flash と起動記録について）
 Next action: 下記「この記録が主張しないこと」に挙げた項目
 ```
 
+## `Commands run` の作業directoryについて（2026-08-23 追記）
+
+**上の `Commands run` は、そのままの順で実行しても再現しない。**起点の異なる path が
+混在しているためである。
+
+- `cargo fmt` ／ `cargo clippy` ／ `cargo build` は `firmware/esp32` でしか動かない。
+  root workspace が `firmware/esp32` を `exclude` しているためである（[ADR-0008](../../decisions/0008-firmware-protocol-crate-reuse.md)）
+- `espflash` へ渡している `target/xtensa-esp32-espidf/release/deskcat-esp32` も
+  `firmware/esp32` 起点である
+- 一方 `ESPTOOL` と `IDFPY` は `firmware/esp32/.embuild/...` と **repository root 起点**で書かれている
+
+**当時どの directory で実行したかは記録していない。**上の行は観測の記録であり、
+**推測で書き換えない。**再現する場合は、次のとおり `firmware/esp32` を作業directory
+として読み替える。
+
+**この手順を実行してよいのは ESP32 Flash / HIL profile の端末だけである**
+（この記録の `Machine profile`。役割の正本は
+[Machine Profiles](../machine-profiles.md)）。**Docs / Review 端末と ESP32 Build
+profile 端末では実行しない。**`cargo install espflash` と USB serial の操作を含むためである。
+
+**`espflash flash --monitor` は実機を駆動する。**実行前に
+[Hardware Safety Policy](../../governance/hardware-safety-policy.md) と
+[AGENTS.md](../../../AGENTS.md) の「ハードウェア安全」が定める条件を満たすこと。
+**条件と停止判断の正本はそちらであり、ここへ再掲しない。**この記録が対象とした構成は
+`この記録が主張しないこと`のとおり **ESP32 単体（周辺回路・servo なし）**である。
+
+```text
+cd firmware/esp32
+. "$HOME/export-esp.sh"
+cargo fmt --all -- --check
+cargo clippy --all-targets --locked -- -D warnings
+cargo build --locked
+cargo build --locked --release
+cargo install espflash --version 4.5.0 --locked
+ESPTOOL=.embuild/espressif/python_env/idf5.5_py3.12_env/bin/esptool.py
+IDFPY=.embuild/espressif/python_env/idf5.5_py3.12_env/bin/python
+"$IDFPY" "$ESPTOOL" --port <port> chip_id
+"$IDFPY" "$ESPTOOL" --chip esp32 elf2image --output <out> <elf>
+espflash flash --monitor --port <port> --chip esp32 target/xtensa-esp32-espidf/release/deskcat-esp32
+```
+
+**この節は再現手順であって、追加の実行記録ではない。**上の形で再実行して確かめてはいない。
+**記録済みの観測値（chip 名、版、size、起動出力）は1つも変更していない。**
+
 ## chip 識別（`HW-TBD-031`）
 
 **満たし方の正本は [ESP32 Rust Toolchain](../esp32-rust-toolchain.md) の `chip 識別の満たし方` である。

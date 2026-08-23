@@ -155,8 +155,48 @@ def _fenced_line_numbers(content):
     return fenced
 
 
+def _merge_base(root, base, head):
+    """diffの起点をmerge baseへ解決する。
+
+    **`git diff A..B`は端点間の差分であり、merge baseを起点にしない**（3点diffは
+    `A...B`である）。`.github/workflows/review-gate.yml`が渡すのは
+    `github.event.pull_request.base.sha`＝**base branchのtip**であって、merge base
+    ではない。したがってbranch点より後にbase branchへ入ったcommitが、逆向きの変更として
+    範囲へ混ざる。影響は2方向ある。
+
+    - 偽陽性: base側だけが指示sourceを触っていると、Pull Requestが触っていないfileに対して
+      `Instruction-Change`を要求し、gateが落ちる
+    - 偽陰性: base側の変更が指示sourceをhead側と同じ内容にすると、端点diffに現れず、
+      宣言の要求そのものが消える
+
+    **3点diffへ書き換えるだけでは足りない。**`_inspect_side`がbase側の行番号を
+    `git show {revision}:{path}`で読むため、diffの起点と`git show`の起点が食い違うと
+    行番号がずれる。**commitを1回解決し、diffと`git show`の両方で同じものを使う。**
+
+    `_check_history`の`git rev-list base..head`は「headから辿れてbaseから辿れない
+    commit」であり、既にmerge base相当の意味を持つ。**そちらは変換しない。**
+
+    共通の祖先が無い場合は`base`をそのまま返す。無関係なhistory同士では`merge-base`が
+    失敗するため、そこで検査を止めない。
+    """
+    result = subprocess.run(
+        ["git", "-C", root, "merge-base", base, head],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    if result.returncode != 0:
+        return base
+    return result.stdout.strip() or base
+
+
 def _changed_line_numbers(root, base, head, path):
-    """変更のあった行番号を、base側とhead側に分けて返す。"""
+    """変更のあった行番号を、base側とhead側に分けて返す。
+
+    `base`は`_merge_base`で解決済みのcommitを受け取る。呼び出し側で解決するのは、
+    `_inspect_side`の`git show`と同じ起点を使うためである。
+    """
     diff = _git(
         root,
         ["diff", "--unified=0", "--no-color", f"{base}..{head}", "--", path],
@@ -205,6 +245,9 @@ def _inspect_side(root, revision, path, numbers, cache, label):
 
 def classify(root, base, head):
     """範囲を分類し、`(class, reasons)`を返す。軽微と証明できなければ`review-required`。"""
+    # 起点をここで1回だけ解決する。以降の`git diff`と`_inspect_side`の`git show`が
+    # 同じcommitを見る（理由は`_merge_base`）。
+    base = _merge_base(root, base, head)
     status = _git(root, ["diff", "--name-status", "--no-color", f"{base}..{head}"])
     reasons = []
     paths = []
@@ -287,6 +330,9 @@ def _check_receipt(root, head, computed):
 
 
 def _check_instructions(root, base, head):
+    # `classify`と同じ理由で起点を解決する。ここを端点diffのままにすると、base側だけの
+    # 指示source変更に対して宣言を要求し、逆にbase側と内容が一致した変更を見落とす。
+    base = _merge_base(root, base, head)
     status = _git(root, ["diff", "--name-only", "--no-color", f"{base}..{head}"])
     touched = [
         path
