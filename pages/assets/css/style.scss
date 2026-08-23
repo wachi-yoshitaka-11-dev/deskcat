@@ -51,7 +51,8 @@
   --dc-swash: #f4b7c5;
   // 肉球の透かし。`mask-image`で敷くため、色はここが単独の正本になる。
   --dc-paw: #d9a9b6;
-  --dc-paw-opacity: 0.13;
+  // 透かしの濃さ。**上げると重なりが模様として見え始める**（下の`body::before`）。
+  --dc-paw-opacity: 0.07;
 
   --dc-shadow: 0 2px 4px rgba(58, 46, 42, 0.06), 0 14px 34px rgba(58, 46, 42, 0.1);
   // Mofu Maxの2 pxずれた実体shadow。blurを持たせずcardの厚みだけを出す。
@@ -99,7 +100,7 @@
     --dc-header-bg: #191311;
     --dc-swash: #5a3340;
     --dc-paw: #7a545e;
-    --dc-paw-opacity: 0.3;
+    --dc-paw-opacity: 0.16;
     --dc-shadow: 0 2px 4px rgba(0, 0, 0, 0.35), 0 14px 34px rgba(0, 0, 0, 0.4);
     --dc-edge: #43342f;
 
@@ -142,6 +143,13 @@ body {
 // 肉球の透かし。`background-image`だと色がSVG側に焼き付き暗色modeへ追従できない
 // ため、`mask-image`で敷いて色はtokenから与える。2枚重ねて寸法と位置をずらし、
 // 同じ1 fileだけで散らした見た目にする。
+//
+// **tileは大きく、opacityは低く保つ。**2枚は寸法が違うぶん格子が一致せず、
+// ずれ続けて重なる。tileが小さいと重なりが密になり、透かしではなく模様として
+// 目に入る。**190px／108pxで公開したときに実際にそうなった**（重なった肉球が
+// 塊に見え、背景が乱れて見える）。tileを広げて1画面あたりの数を減らし、
+// 濃さも下げて、重なりが目立たない密度にしてある。**この2つは対で効く。
+// 片方だけ戻さない。**
 body::before {
   content: "";
   position: fixed;
@@ -152,18 +160,19 @@ body::before {
   pointer-events: none;
   -webkit-mask-image: url("../deskcat-paw.svg"), url("../deskcat-paw.svg");
   mask-image: url("../deskcat-paw.svg"), url("../deskcat-paw.svg");
-  -webkit-mask-size: 190px 190px, 108px 108px;
-  mask-size: 190px 190px, 108px 108px;
-  -webkit-mask-position: 8px 30px, 122px 96px;
-  mask-position: 8px 30px, 122px 96px;
+  -webkit-mask-size: 300px 300px, 180px 180px;
+  mask-size: 300px 300px, 180px 180px;
+  -webkit-mask-position: 12px 46px, 176px 132px;
+  mask-position: 12px 46px, 176px 132px;
   -webkit-mask-repeat: repeat, repeat;
   mask-repeat: repeat, repeat;
 }
 
 // 入口pageだけ透かしを強く出す。`docs/`は40 page・約2700行のproseがあり、
-// 同じ濃さだと本文の可読性を削る。
+// 同じ濃さだと本文の可読性を削る。**加算は小さく保つ。**入口pageは本文が短いぶん
+// 透かしの面積が広く、重なりが最も見えやすい。
 .dc-body-home::before {
-  opacity: calc(var(--dc-paw-opacity) + 0.05);
+  opacity: calc(var(--dc-paw-opacity) + 0.03);
 }
 
 img {
@@ -938,20 +947,29 @@ a {
   color: #c9b8b0;
 }
 
+// 肉球アイコンは左の余白へ絶対配置し、本文はinline flowのまま流す。
+//
+// **`display: flex`にしてはならない。**この`<p>`の中身はテキストと`<a>`が混在した
+// inline内容であり、flexにすると匿名のテキスト塊と`<a>`がそれぞれ別のflex itemに
+// なる。**段落が「このsiteは、」「ADR-0003」「に従って…」の3カラムへ割れる。**
+// **公開時に実際にそうなった**（`ADR-`と`0003`がカラム幅に収まらず2行に割れた）。
+// `::before`を横に置く目的でflexを使うと、この形の段落では必ず壊れる。
+// `padding-left`と絶対配置なら、字下げの見た目を保ったままinline flowを壊さない。
 .dc-footer-note {
-  display: flex;
-  gap: 14px;
-  align-items: flex-start;
+  position: relative;
   max-width: 62em;
   margin: 0;
+  // 22pxのiconと14pxの間隔。上の絶対配置と対で効く。
+  padding-left: 36px;
   font-size: 13.5px;
 
   &::before {
     content: "";
-    flex: none;
+    position: absolute;
+    top: 2px;
+    left: 0;
     width: 22px;
     height: 22px;
-    margin-top: 2px;
     background-color: var(--dc-accent-soft);
     -webkit-mask-image: url("../deskcat-paw.svg");
     mask-image: url("../deskcat-paw.svg");
