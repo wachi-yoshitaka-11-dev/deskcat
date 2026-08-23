@@ -51,8 +51,8 @@
   --dc-swash: #f4b7c5;
   // 肉球の透かし。`mask-image`で敷くため、色はここが単独の正本になる。
   --dc-paw: #d9a9b6;
-  // 透かしの濃さ。**上げると重なりが模様として見え始める**（下の`body::before`）。
-  --dc-paw-opacity: 0.07;
+  // 透かしの濃さ。肉球が融合しなくなったため、以前より上げてよい。
+  --dc-paw-opacity: 0.09;
 
   --dc-shadow: 0 2px 4px rgba(58, 46, 42, 0.06), 0 14px 34px rgba(58, 46, 42, 0.1);
   // Mofu Maxの2 pxずれた実体shadow。blurを持たせずcardの厚みだけを出す。
@@ -100,7 +100,7 @@
     --dc-header-bg: #191311;
     --dc-swash: #5a3340;
     --dc-paw: #7a545e;
-    --dc-paw-opacity: 0.16;
+    --dc-paw-opacity: 0.20;
     --dc-shadow: 0 2px 4px rgba(0, 0, 0, 0.35), 0 14px 34px rgba(0, 0, 0, 0.4);
     --dc-edge: #43342f;
 
@@ -141,15 +141,20 @@ body {
 }
 
 // 肉球の透かし。`background-image`だと色がSVG側に焼き付き暗色modeへ追従できない
-// ため、`mask-image`で敷いて色はtokenから与える。2枚重ねて寸法と位置をずらし、
-// 同じ1 fileだけで散らした見た目にする。
+// ため、`mask-image`で敷いて色はtokenから与える。
 //
-// **tileは大きく、opacityは低く保つ。**2枚は寸法が違うぶん格子が一致せず、
-// ずれ続けて重なる。tileが小さいと重なりが密になり、透かしではなく模様として
-// 目に入る。**190px／108pxで公開したときに実際にそうなった**（重なった肉球が
-// 塊に見え、背景が乱れて見える）。tileを広げて1画面あたりの数を減らし、
-// 濃さも下げて、重なりが目立たない密度にしてある。**この2つは対で効く。
-// 片方だけ戻さない。**
+// **散らした見た目はtileの中で作る。CSS側でlayerを重ねて作らない。**
+// `deskcat-paw-tile.svg`が240 x 240の中へ肉球を10個、位置・角度・大きさを変えて
+// 持っている。端を跨ぐものは反対側へ複製してあり、`repeat`しても継ぎ目が出ない。
+// 同一tile内で肉球の外接矩形は1組も重ならない。
+//
+// **以前は肉球1個のSVGを、寸法の違う2枚のmask layerで重ねていた。**
+// `mask-image`の複数レイヤーは1本のアルファチャンネルへ合成されるため、
+// **重なった肉球は単一の均一な色になり、シルエットが融合して塊になる。**
+// `deskcat-paw.svg`はviewBoxに肉球が枠いっぱいで入っており、正方形の`mask-size`と
+// `repeat`では平面を隙間なく埋めるため、2枚重ねればあらゆる場所で融合した。
+// **公開して初めて分かった。tileを広げてopacityを下げても、塊が大きく薄くなる
+// だけで直らない。**1枚にすれば構造的に起きない。**layerを増やさない。**
 body::before {
   content: "";
   position: fixed;
@@ -158,21 +163,19 @@ body::before {
   background-color: var(--dc-paw);
   opacity: var(--dc-paw-opacity);
   pointer-events: none;
-  -webkit-mask-image: url("../deskcat-paw.svg"), url("../deskcat-paw.svg");
-  mask-image: url("../deskcat-paw.svg"), url("../deskcat-paw.svg");
-  -webkit-mask-size: 300px 300px, 180px 180px;
-  mask-size: 300px 300px, 180px 180px;
-  -webkit-mask-position: 12px 46px, 176px 132px;
-  mask-position: 12px 46px, 176px 132px;
-  -webkit-mask-repeat: repeat, repeat;
-  mask-repeat: repeat, repeat;
+  -webkit-mask-image: url("../deskcat-paw-tile.svg");
+  mask-image: url("../deskcat-paw-tile.svg");
+  // tileは240 x 240。640pxで敷くと肉球1つは約50〜74pxになる。
+  -webkit-mask-size: 640px 640px;
+  mask-size: 640px 640px;
+  -webkit-mask-repeat: repeat;
+  mask-repeat: repeat;
 }
 
 // 入口pageだけ透かしを強く出す。`docs/`は40 page・約2700行のproseがあり、
-// 同じ濃さだと本文の可読性を削る。**加算は小さく保つ。**入口pageは本文が短いぶん
-// 透かしの面積が広く、重なりが最も見えやすい。
+// 同じ濃さだと本文の可読性を削る。
 .dc-body-home::before {
-  opacity: calc(var(--dc-paw-opacity) + 0.03);
+  opacity: calc(var(--dc-paw-opacity) + 0.04);
 }
 
 img {

@@ -19,6 +19,10 @@
       "note": "肉球のmotif。背景の透かし、見出しとcardのmarker、footerで`mask-image`として使う。色はCSS側のtokenが決めるため単色で持つ"
     },
     {
+      "path": "deskcat-paw-tile.svg",
+      "note": "背景の透かし専用のtile。240 x 240の中へ肉球を10個、位置・角度・大きさを変えて持つ。端を跨ぐ肉球は反対側へ複製してあり`repeat`で継ぎ目が出ない。散らした見た目をtile内で作ることで、mask layerを重ねずに済む（重ねるとアルファが合成されて肉球が融合する）"
+    },
+    {
       "path": "deskcat-concept.jpg",
       "sha256": "615063ED60596F55066D602E1C44ACFB46D6D3103B9D234AEB8170E864FBB5B2",
       "note": "入口pageのconcept image。720 x 720。出所と許諾は公開asset registerを参照"
