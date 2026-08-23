@@ -647,6 +647,12 @@ Instruction-Change: reviewed-as-data
 
 **`main`昇格では、範囲の各commitの宣言も検証される。**squash commitへtrailerを書き忘れると、その回のmergeは通っても次の昇格で落ちる。
 
+**ただし検査に起点がある。**trailer運用を導入したcommit（[#161](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/161)のsquash）より前は検査しない。**宣言を求める規則が存在しなかったためである。**起点より後にも、宣言を持たないことを許しているcommitがある。`AGENTS.md`が履歴書き換えを禁じているため、後からtrailerを付けられない。**起点と免除の正本は`scripts/review_gate.py`の`DECLARATION_CUTOVER`と`DECLARATION_EXEMPT`であり、免除の理由は同fileが持つ。**
+
+そのため**`HISTORY_CHECKED`は昇格範囲のcommit数より少なくなりうる。取りこぼしではない。**検査した件数、skipしたmerge commitの件数、免除した件数を必ず出すため、差はその内訳で説明できる。**この数を期待値として引用しない。**範囲は昇格ごとに変わる。
+
+**過去のcommitへの要求は、head commitより軽い。**`Change-Class`が計算結果より緩くないことと、`Self-Review`が1つ以上あることだけを見る。`Self-Review`の値の集合は時期によって変わっており、**過去のcommitを現在の集合で測ると、当時は正しかった宣言が落ちる。**
+
 **Pull Requestのhead commitにも同じtrailerを置く。**Review gate workflowがそれを見る。
 head commitへ置いておけば、review後にcommitを足したときにworkflowが落ちる。
 **squash commitのtrailerは、mergeするまで存在しないためmerge前に検査できない。**
