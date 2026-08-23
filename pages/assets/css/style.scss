@@ -51,8 +51,8 @@
   --dc-swash: #f4b7c5;
   // 肉球の透かし。`mask-image`で敷くため、色はここが単独の正本になる。
   --dc-paw: #d9a9b6;
-  // 透かしの濃さ。肉球が融合しなくなったため、以前より上げてよい。
-  --dc-paw-opacity: 0.09;
+  // 透かしの濃さ。肉球が融合しなくなったため、layerを重ねていた頃の値へ戻せる。
+  --dc-paw-opacity: 0.13;
 
   --dc-shadow: 0 2px 4px rgba(58, 46, 42, 0.06), 0 14px 34px rgba(58, 46, 42, 0.1);
   // Mofu Maxの2 pxずれた実体shadow。blurを持たせずcardの厚みだけを出す。
@@ -100,7 +100,7 @@
     --dc-header-bg: #191311;
     --dc-swash: #5a3340;
     --dc-paw: #7a545e;
-    --dc-paw-opacity: 0.20;
+    --dc-paw-opacity: 0.29;
     --dc-shadow: 0 2px 4px rgba(0, 0, 0, 0.35), 0 14px 34px rgba(0, 0, 0, 0.4);
     --dc-edge: #43342f;
 
@@ -144,9 +144,15 @@ body {
 // ため、`mask-image`で敷いて色はtokenから与える。
 //
 // **散らした見た目はtileの中で作る。CSS側でlayerを重ねて作らない。**
-// `deskcat-paw-tile.svg`が240 x 240の中へ肉球を10個、位置・角度・大きさを変えて
+// `deskcat-paw-tile.svg`が720 x 720の中へ肉球を90個、位置・角度・大きさを変えて
 // 持っている。端を跨ぐものは反対側へ複製してあり、`repeat`しても継ぎ目が出ない。
-// 同一tile内で肉球の外接矩形は1組も重ならない。
+// **重なりの検査はトーラス（上下左右がつながった面）で行っており、複製も含めて
+// 外接矩形は1組も重ならない。**
+//
+// **tileを広くしてあるのは、繰り返しの周期を伸ばすためである。**同じ配置が現れる
+// 間隔は`mask-size`そのものになる。SVGなので拡大しても劣化しない。**周期だけを
+// 伸ばしたいときは、`mask-size`だけを上げてはならない。**肉球も一緒に拡大される。
+// tileのviewBoxと肉球の数を同じ比で増やす。
 //
 // **以前は肉球1個のSVGを、寸法の違う2枚のmask layerで重ねていた。**
 // `mask-image`の複数レイヤーは1本のアルファチャンネルへ合成されるため、
@@ -165,9 +171,10 @@ body::before {
   pointer-events: none;
   -webkit-mask-image: url("../deskcat-paw-tile.svg");
   mask-image: url("../deskcat-paw-tile.svg");
-  // tileは240 x 240。640pxで敷くと肉球1つは約50〜74pxになる。
-  -webkit-mask-size: 640px 640px;
-  mask-size: 640px 640px;
+  // tileは720 x 720。1920pxで敷くと肉球1つは約46〜73pxになり、同じ配置が
+  // 現れる間隔は1920pxになる。
+  -webkit-mask-size: 1920px 1920px;
+  mask-size: 1920px 1920px;
   -webkit-mask-repeat: repeat;
   mask-repeat: repeat;
 }
@@ -175,7 +182,7 @@ body::before {
 // 入口pageだけ透かしを強く出す。`docs/`は40 page・約2700行のproseがあり、
 // 同じ濃さだと本文の可読性を削る。
 .dc-body-home::before {
-  opacity: calc(var(--dc-paw-opacity) + 0.04);
+  opacity: calc(var(--dc-paw-opacity) + 0.05);
 }
 
 img {

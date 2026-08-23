@@ -70,11 +70,11 @@ Assetを追加する前に、次をすべて満たす。
 |---|---|
 | 用途 | 背景の透かし専用のtile。`body::before`が`mask-image`として`repeat`する |
 | 作成者・権利者 | wachi-yoshitaka-11-dev（repository所有者） |
-| 作成方法 | repository所有者が[`deskcat-paw.svg`](#pagesassetsdeskcat-pawsvg)の肉球を、240 x 240のtileの中へ10個、位置・角度・大きさを変えて配置した。**新しい図形は描いていない。**端を跨ぐ肉球は反対側へ複製し、`repeat`で継ぎ目が出ないようにしてある |
+| 作成方法 | repository所有者が[`deskcat-paw.svg`](#pagesassetsdeskcat-pawsvg)の肉球を、720 x 720のtileの中へ90個、位置・角度・大きさを変えて配置した。**新しい図形は描いていない。**肉球は`<defs>`に1つだけ持ち、各配置は`<use>`で参照する。配置はseed `20260823`の擬似乱数で決め、外接矩形がトーラス（上下左右がつながった面）で重ならず、すき間が6単位以上空くまで棄却法で採り直した（scale 0.72〜1.15、rotate -40°〜+40°）。端を跨ぐ肉球は反対側へ複製し、`repeat`で継ぎ目が出ないようにしてある |
 | 再配布許諾の根拠 | 権利者本人による許諾。`deskcat-paw.svg`の派生であり、本repositoryの[MIT License](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/c69f9a7d7767a6b4572e9f6920939529765316fc/LICENSE)（commit `c69f9a7d`時点）に従って公開・再配布する |
 | 確認日 | 2026-08-23 |
 | SHA-256 | 記録しない。text assetであり内容はdiff reviewとscanの対象。manifestは`sha256`を誤りとして拒否する |
-| 寸法・size | viewBox 240 x 240、描画要素14（うち継ぎ目用の複製4）、約6 KiB |
+| 寸法・size | viewBox 720 x 720、描画要素94（うち継ぎ目用の複製4）、約8 KiB |
 | 実機写真か | いいえ。写真ではなく単色の図形である |
 
 **散らした見た目をtileの中で作るためのfileである。**以前は`deskcat-paw.svg`を寸法の違う2枚のmask layerで重ねて散らそうとしていたが、`mask-image`の複数レイヤーは1本のアルファチャンネルへ合成されるため、**重なった肉球が融合して塊になった。**1枚のtileにすれば構造的に起きない。
