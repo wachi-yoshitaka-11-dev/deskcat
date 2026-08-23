@@ -57,7 +57,8 @@ Peripheral driverまたはservo出力は、いずれもこのgateを通過して
 
 **`build検証済み`という状態語の正本は[ESP32 Rust Toolchain](../toolchains/esp32-rust-toolchain.md)である。**
 同文書は**2026-08-20に確定条件をすべて達成し、状態を`Verified`へ上げた**（最後の1項目だったchipの識別を#6のflash時に満たした）
-**build以外を検証済みとして扱わない。**
+**buildに加えて、flashと実機起動を2026-08-20に#6で検証した**（[Version Record](../toolchains/version-records/2026-08-20-esp32-flash-boot-native.md)）。
+**検証済みとして扱えるのはそこまでである。**周辺回路、servo、Protocol session、共有fixtureへの合格は含まない。
 
 Toolchainのbuild-only spikeはperipheral pinの選定なしで進められる。Docs / Review端末にtoolchainを導入する必要はない。
 

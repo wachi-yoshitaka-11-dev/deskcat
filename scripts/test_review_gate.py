@@ -27,6 +27,12 @@ SCRIPT = str(SCRIPTS_ROOT / "review_gate.py")
 PLAIN_DOC = "docs/runbooks/plain-note.md"
 BASE_TEXT = "見出しのない散文である。\nここに説明を書く。\n"
 
+# base branch側だけで入れる`AGENTS.md`の内容。
+# **偽陰性の回帰testはhead側でも同じ内容へ変える。**端点diffで差が消える条件を作るため、
+# 両者は一致していなければならない。別々の文字列literalにすると、片方を直したときに
+# testが「差が出ない」条件を検査しなくなる。
+BASE_ONLY_AGENTS = "# Rules\n\nbase側だけで足した本文である。\n"
+
 
 def _git(root, *arguments, stdin_text=None):
     result = subprocess.run(
@@ -498,6 +504,83 @@ class ReviewGateTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("HISTORY_CHECKED=1", result.stdout)
+
+    def _diverged(self, root):
+        """base branchがbranch点より後に進んだ状態を作り、base branchのtipを返す。
+
+        `review-gate.yml`が渡す`--base`はbase branchのtipであり、merge baseではない。
+        Pull Requestのbranch点より後にbase branchが進むと、この形になる。
+        base branch側では`AGENTS.md`を`BASE_ONLY_AGENTS`の内容へ変える。
+        """
+        _git(root, "branch", "--quiet", "topic")
+        # base branch側だけを進める。
+        self._write(root, "AGENTS.md", BASE_ONLY_AGENTS)
+        self._commit(root, "base branch側でAGENTS.mdを直す")
+        base_tip = _git(root, "rev-parse", "HEAD").strip()
+        _git(root, "checkout", "--quiet", "topic")
+        return base_tip
+
+    def test_base_only_instruction_change_is_out_of_range(self):
+        """base側だけの指示source変更を、範囲へ取り込まない（偽陽性の回帰）。
+
+        `git diff base..head`は端点間の差分であり、base branch側だけにある
+        `AGENTS.md`の変更を逆向きの変更として範囲へ入れる。Pull Requestが
+        `AGENTS.md`を触っていないのに`Instruction-Change`を要求して落ちる。
+        """
+        root = self._repository()
+        base_tip = self._diverged(root)
+        # head側は散文だけを直す。指示sourceには触れない。
+        self._write(root, PLAIN_DOC, BASE_TEXT.replace("である", "です"))
+        self._commit(root, "散文の言い回しを直す")
+
+        result = _run(
+            ["instructions", "--repository-root", root, "--base", base_tip]
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("INSTRUCTION_SOURCES_TOUCHED=0", result.stdout)
+
+        classified = _run(
+            ["classify", "--repository-root", root, "--base", base_tip]
+        )
+        self.assertEqual(classified.returncode, 0, classified.stdout)
+        self.assertIn(f"CLASS={gate.CLASS_MINOR}", classified.stdout)
+        self.assertNotIn("AGENTS.md", classified.stdout)
+
+    def test_instruction_change_matching_the_base_still_needs_the_trailer(self):
+        """head側の指示source変更を、base側と同内容でも見落とさない（偽陰性の回帰）。
+
+        base branchが同じ変更を先に入れていると、端点diffには何も現れない。
+        Pull Request自体は`AGENTS.md`を変えているため、宣言の要求は消えてはならない。
+        """
+        root = self._repository()
+        base_tip = self._diverged(root)
+        # head側でも**base側と同じ内容**へ変える。端点diffでは差が出ない。
+        self._write(root, "AGENTS.md", BASE_ONLY_AGENTS)
+        self._commit(root, "AGENTS.mdを直す")
+
+        result = _run(
+            ["instructions", "--repository-root", root, "--base", base_tip]
+        )
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn(gate.TRAILER_INSTRUCTION, result.stderr)
+        self.assertIn("INSTRUCTION_SOURCES_TOUCHED=1", result.stdout)
+
+    def test_unrelated_history_falls_back_to_the_given_base(self):
+        """共通の祖先が無い場合は`--base`をそのまま使い、検査を止めない。"""
+        root = self._repository()
+        # 既定branch名は`init.defaultBranch`次第で`master`にも`main`にもなる。
+        # 決め打ちすると、その設定が違う端末とCIで落ちる。
+        original = _git(root, "rev-parse", "--abbrev-ref", "HEAD").strip()
+        _git(root, "checkout", "--quiet", "--orphan", "detached")
+        self._write(root, PLAIN_DOC, "無関係なhistoryの本文である。\n")
+        self._commit(root, "無関係なhistoryを作る")
+        result = _run(
+            ["classify", "--repository-root", root, "--base", original]
+        )
+        # merge-baseが無いため`--base`をそのまま起点にする。
+        # 落ちずに分類できることだけを見る。
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("CLASS=", result.stdout)
 
     def test_runs_against_this_repository(self):
         """実repositoryでもerrorなく分類できること。結果の値は主張しない。"""
