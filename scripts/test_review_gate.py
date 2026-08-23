@@ -574,11 +574,24 @@ class ReviewGateTests(unittest.TestCase):
         _git(root, "checkout", "--quiet", "--orphan", "detached")
         self._write(root, PLAIN_DOC, "無関係なhistoryの本文である。\n")
         self._commit(root, "無関係なhistoryを作る")
+
+        # `git merge-base`が非0で戻ることを先に確かめる。この前提が崩れたら、
+        # 下の`_merge_base`の戻り値はfallbackの証明にならない。
+        probe = subprocess.run(
+            ["git", "-C", root, "merge-base", original, "HEAD"],
+            capture_output=True,
+        )
+        self.assertNotEqual(probe.returncode, 0, "fixtureに共通の祖先が残っている")
+
+        # **fallbackした値そのものを見る。**`git diff original..HEAD`は共通の祖先が
+        # 無くても成功するため、exit codeと`CLASS=`の有無だけでは、`_merge_base`が
+        # `original`を返したことを証明できない。
+        self.assertEqual(gate._merge_base(root, original, "HEAD"), original)
+
         result = _run(
             ["classify", "--repository-root", root, "--base", original]
         )
-        # merge-baseが無いため`--base`をそのまま起点にする。
-        # 落ちずに分類できることだけを見る。
+        # そのうえで、検査が止まらないことを見る。
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("CLASS=", result.stdout)
 
