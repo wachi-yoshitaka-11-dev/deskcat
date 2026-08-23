@@ -64,6 +64,21 @@ Assetを追加する前に、次をすべて満たす。
 
 `mask-image`として使うため色はCSS側のtokenが決める。SVG自身は単色で持ち、暗色modeへ追従させるために色を焼き付けない。
 
+### `pages/assets/deskcat-paw-tile.svg`
+
+| 項目 | 内容 |
+|---|---|
+| 用途 | 背景の透かし専用のtile。`body::before`が`mask-image`として`repeat`する |
+| 作成者・権利者 | wachi-yoshitaka-11-dev（repository所有者） |
+| 作成方法 | repository所有者が[`deskcat-paw.svg`](#pagesassetsdeskcat-pawsvg)の肉球を、720 x 720のtileの中へ90個、位置・角度・大きさを変えて配置した。**新しい図形は描いていない。**肉球は`<defs>`に1つだけ持ち、各配置は`<use>`で参照する。配置はseed `20260823`の擬似乱数で決め、外接矩形がトーラス（上下左右がつながった面）で重ならず、すき間が6単位以上空くまで棄却法で採り直した（scale 0.72〜1.15、rotate -40°〜+40°）。端を跨ぐ肉球は反対側へ複製し、`repeat`で継ぎ目が出ないようにしてある |
+| 再配布許諾の根拠 | 権利者本人による許諾。`deskcat-paw.svg`の派生であり、本repositoryの[MIT License](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/c69f9a7d7767a6b4572e9f6920939529765316fc/LICENSE)（commit `c69f9a7d`時点）に従って公開・再配布する |
+| 確認日 | 2026-08-23 |
+| SHA-256 | 記録しない。text assetであり内容はdiff reviewとscanの対象。manifestは`sha256`を誤りとして拒否する |
+| 寸法・size | viewBox 720 x 720、描画要素94（うち継ぎ目用の複製4）、約8 KiB |
+| 実機写真か | いいえ。写真ではなく単色の図形である |
+
+**散らした見た目をtileの中で作るためのfileである。**以前は`deskcat-paw.svg`を寸法の違う2枚のmask layerで重ねて散らそうとしていたが、`mask-image`の複数レイヤーは1本のアルファチャンネルへ合成されるため、**重なった肉球が融合して塊になった。**1枚のtileにすれば構造的に起きない。
+
 ### `favicon.ico`
 
 | 項目 | 内容 |
@@ -85,3 +100,4 @@ Assetを追加する前に、次をすべて満たす。
 |---|---|
 | 2026-07-29 | `pages/assets/deskcat-concept.jpg`を登録。1254 x 1254から720 x 720へ縮小した版のSHA-256を記録 |
 | 2026-08-21 | `pages/assets/deskcat-paw.svg`と`favicon.ico`を登録。登録要件5のSHA-256をbinary assetへ限定し、text assetと生成binaryはdiff reviewで担保する旨を明記（[ADR-0009](../decisions/0009-pages-own-layout.md)） |
+| 2026-08-23 | `pages/assets/deskcat-paw-tile.svg`を登録。背景の透かしを2枚のmask layerから1枚のtileへ変更した（[#185](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/185)） |
