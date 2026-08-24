@@ -13,12 +13,14 @@
 //! - 送信側の`id`採番（[`IdAllocator`]）。仕様§3の`PROTO-TBD-003`をそのまま実装する
 //! - 接続stateとcounter（[`Session`]）。partial I/O、切断の観測、
 //!   再接続の上限とrate limitを含む
+//! - 実serial portの上で[`Transport`]を満たす型（[`SerialDevice`]）。
+//!   `serial2`を使ってportを開き、切断のerrnoと読みのtimeoutを契約どおりに正規化する
 //!
 //! 含まないもの:
 //!
-//! - **実serial deviceのopen。**VM上では実portを検証できず、device名も未確認である。
-//!   `serialport`のようなcrateの選定は依存追加の規則に従って別途行う。
-//!   **検証できない依存を先に足さない。**[`Transport`]を実装する形で後から載せる
+//! - **実portを開いての確認。**このcrateの検証はhost（VM）上であり、擬似端末
+//!   （`SerialPort::pair`）までである。`/dev/ttyUSB*`のdevice名の確定と、実機での
+//!   read／write、切断、再接続、partial I/Oの確認は[Issue #11]の後半に残る
 //! - **domain動作。**感情、性格、行動判断、独り言はこのcrateに入らない
 //! - **session遷移の確定、duplicate履歴、受理budget、遷移cooldown。**
 //!   受信側のstateを要するため[Issue #12]の範囲である
@@ -52,15 +54,18 @@
 //! assert_eq!(id, 1);
 //! ```
 //!
+//! [Issue #11]: https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11
 //! [Issue #12]: https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12
 
 pub mod config;
+pub mod device;
 pub mod ids;
 pub mod outbox;
 pub mod session;
 pub mod transport;
 
 pub use config::{ConfigError, ReconnectPolicy, SerialConfig};
+pub use device::SerialDevice;
 pub use ids::{IdAllocator, IdSpaceExhausted};
 pub use outbox::{Enqueued, Outbox};
 pub use session::{ConnectionState, Pump, SendError, Session, SessionCounters, StopReason};

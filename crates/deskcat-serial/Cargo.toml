@@ -20,6 +20,46 @@ deskcat-protocol = { path = "../deskcat-protocol" }
 # `tracing-log`で`log`のrecordを吸えるため選択を潰さない。
 log = "0.4"
 
+# 実serial deviceのbackend（`device.rs`）に要る。`unsafe_code = "forbid"`のため
+# termiosを自前で叩けず、standard libraryだけでは実現できない。
+#
+# - 必要性: `std::fs::File`はbaud、character size、parity、raw modeを設定できない。
+#   設定しないまま開くと、直前に誰が使ったかで振る舞いが変わる
+# - 公式性: https://github.com/de-vri-es/serial2-rs / https://crates.io/crates/serial2
+# - 保守状況: 0.2.38は2026-07-31 release。直近90日のdownloadは約520万
+# - target と toolchain: `libc`経由でunixを広く覆う。Pi側の候補target
+#   `arm-unknown-linux-gnueabihf`もその範囲にある（未検証。#11後半で確かめる）
+# - license: `BSD-2-Clause OR Apache-2.0`。repositoryのMITとどちらも permissive で衝突しない
+# - security: buildscriptを持たない。`unsafe`はcrate内部のsyscall呼び出しにあり、
+#   workspaceの`unsafe_code = "forbid"`はこちらのcodeにのみ効く（依存の内部には及ばない）
+# - build負荷: **これが選定の決め手である。**Linuxでの推移依存は`cfg-if`と`libc`の2つだけ。
+#   host の`Cargo.lock`は現在FFI crateを1つも持たない純Rustの木であり、
+#   Pi Zero W（使用可能memory 426 MiB、依存付きbuildは未評価）へ持ち込む量を最小にする
+# - 代替: `serialport` 4.9.0を検討して**採らなかった**。MPL-2.0（file単位のweak copyleft）で、
+#   `bitflags`＋`nix 0.26`＋`scopeguard`＋`unescaper`を引き、default featureではCの`libudev`が要る。
+#   port列挙は本projectに不要であり、その重さを負う理由が無い。
+#   `nix`／`rustix`を直接使う案も検討したが、termios設定を自前で組むことになり、
+#   `serial2`が既に持つ設定の読み戻し検証を再実装することになる
+#
+# `unix` featureを有効にする。**追加のcrateは引かない**（`unix = []`）。
+# `SerialPort::pair()`（PTYを使ったtest）と`Settings::as_termios_mut()`（`CLOCAL`）に要る。
+serial2 = { version = "0.2.38", features = ["unix"] }
+
+# errno定数を数値で埋め込まないためだけに使う。`serial2`が既に引いているため
+# **build graphは増えない**が、直接使う以上は明示する。
+#
+# - 必要性: 切断時のerrno（`EIO`／`ENXIO`／`ENODEV`）を名前で書く。`5`／`6`／`19`と
+#   書くと、どのheaderの値なのかがcodeから消える
+# - 公式性: https://github.com/rust-lang/libc / https://crates.io/crates/libc。rust-lang organization
+# - 保守状況: rust-lang本体が維持している
+# - target と toolchain: 対象とするunix系を覆う
+# - license: `MIT OR Apache-2.0`
+# - security: 定数の参照だけに使う。`unsafe`な関数は呼ばない
+# - build負荷: 増分なし（`serial2`経由で既に木にある）
+# - 代替: 定数を自前で`const`にする案。値自体はLinuxのABIで安定だが、
+#   名前と出典がcodeから失われるため採らない
+libc = "0.2"
+
 
 # workspaceのlintはmemberへ自動継承されない。これを書き忘れると
 # `unsafe_code = "forbid"`、`missing_docs = "warn"`、`clippy::all = deny`が
