@@ -33,8 +33,10 @@ message型、検証、上限付きline受信は[`deskcat-protocol`](../deskcat-p
 依存追加の手順に従い、`Cargo.toml`のcommentへ8項目（必要性・公式性・保守状況・target・
 license・security・build負荷・代替）を記録した。**`serialport`は採らなかった。**
 MPL-2.0であり、`nix`／`bitflags`／`unescaper`とCの`libudev`を引く。
-Pi Zero W（512 MB機。**依存を伴うbuildがmemory不足で不安定にならないかは未評価**である。
-[Raspberry Pi Rust toolchain](../../docs/toolchains/raspberry-pi-rust-toolchain.md)）へ
+Pi Zero W（公称512 MB、実測の使用可能memoryは**426 MiB**。**依存を伴うbuildがmemory不足で
+安定しないかは未評価のまま残っている**——
+[Raspberry Pi Rust toolchain](../../docs/toolchains/raspberry-pi-rust-toolchain.md)、
+[Version Record](../../docs/toolchains/version-records/2026-08-17-pi-direct-build-native.md)）へ
 持ち込む量を最小にするため、Linuxでの推移依存が`cfg-if`と`libc`の2つだけである
 `serial2`を採った。
 
@@ -70,9 +72,10 @@ linkの上で起きたerrorである。openの`ENOENT`／`EACCES`／`EBUSY`はUS
 - `/dev/ttyUSB*`のdevice名の確定
 - 実portでのread／write、切断、reconnect、partial I/Oの確認
 - `CLOCAL`をdriverが受け付けること（受け付けなければopenが失敗する）
-- **`HUPCL`の判断。**既定ではcloseでDTRが落ちる。ESP32の開発boardはDTR／RTSに自動reset
-  回路を持つものが多く、その場合**再接続のたびにESP32が再起動する。**`boot`／`hello`の
-  handshakeに効くprotocol側の判断であり、**このcrateでは触っていない**
+- **`HUPCL`の判断。**既定ではcloseでDTRが落ちる。**本projectのESP32 boardでDTR／RTSが
+  自動resetへ繋がっているかは確認していない。**繋がっていれば再接続のたびにESP32が
+  再起動することになり、`boot`／`hello`のhandshakeに効く。現物の確認と判断はprotocol側の
+  話であり、**このcrateでは触っていない**
 - Pi上でこのcrateをbuildできるか（memory）
 
 ## 既定値は暫定である

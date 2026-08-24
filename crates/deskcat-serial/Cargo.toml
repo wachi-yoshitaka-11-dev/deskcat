@@ -39,8 +39,11 @@ log = "0.4"
 # - build負荷（上の項目とは別に記録する。**これが選定の決め手である**）:
 #   Linuxでの推移依存は`cfg-if`と`libc`の2つだけ。
 #   host の`Cargo.lock`は現在FFI crateを1つも持たない純Rustの木であり、
-#   Pi Zero W（512 MB機。**依存を伴うbuildがmemory不足で不安定にならないかは未評価**である。
-#   `docs/toolchains/raspberry-pi-rust-toolchain.md`）へ持ち込む量を最小にする
+#   Pi Zero W（公称512 MB、実測の使用可能memoryは**426 MiB**。**依存を伴うbuildが
+#   memory不足で安定しないかは未評価のまま残っている。**
+#   `docs/toolchains/raspberry-pi-rust-toolchain.md`と
+#   `docs/toolchains/version-records/2026-08-17-pi-direct-build-native.md`）へ
+#   持ち込む量を最小にする
 # - 代替: `serialport` 4.9.0を検討して**採らなかった**。MPL-2.0（file単位のweak copyleft）で、
 #   `bitflags`＋`nix 0.26`＋`scopeguard`＋`unescaper`を引き、default featureではCの`libudev`が要る。
 #   port列挙は本projectに不要であり、その重さを負う理由が無い。

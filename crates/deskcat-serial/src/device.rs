@@ -52,10 +52,14 @@
 //!
 //! # 決めていないこと（`HUPCL`）
 //!
-//! 既定ではportをcloseするときにDTRが落ちる。ESP32の開発boardはDTR／RTSに自動reset回路を
-//! 持つものが多く、その場合**再接続のたびにESP32が再起動する。**これは`boot`／`hello`の
-//! handshake（[Issue #12]）に直接効くprotocol側の判断であり、backendが黙って決めてよい
-//! ことではない。**したがってここでは触らない**（＝既定のまま）。`TBD`として残す。
+//! 既定では、portをcloseするときに DTR が落ちる。**本projectの ESP32 board で
+//! DTR ／ RTS が自動resetへ繋がっているかは確認していない。**繋がっていれば、
+//! 再接続のたびに ESP32 が再起動することになり、`boot`／`hello`のhandshake
+//! （[Issue #12]）に直接効く。
+//!
+//! **確認していない以上、ここでは決めない。**現物の確認と、再起動させるか否かの判断は
+//! protocol側の話であり、backendが黙って選ぶことではない。**触らない**（＝既定のまま）。
+//! `TBD`として残す。
 //!
 //! [Issue #12]: https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12
 //! [`Pump::TimedOut`]: crate::Pump::TimedOut
