@@ -396,7 +396,19 @@ mod tests {
 
         assert_eq!(session.send(Message::Ping, 100).expect("queueへ入る"), 1);
 
+        // read側と同じく上限を置く。`pump_write`はretryableなerrorでも`Pump::Idle`を
+        // 返すため、**上限が無いとqueueが減らないまま回り続け、診断の無いhangになる。**
+        //
+        // 進捗のある周は最大でも行長分（1周1 byteでも行を書き切る）である。
+        // **ただし進捗の無い周もある**（flushの再試行、retryableなerror）ため、
+        // その分を予備として足す。実測では1周で終わる。
+        let mut rounds = 0;
         while session.pending_out() > 0 {
+            rounds += 1;
+            assert!(
+                rounds <= expected.len() + 16,
+                "書き出しが進まないまま回り続けている"
+            );
             match session.pump_write(&mut device) {
                 Pump::Progress(_) | Pump::Idle => {}
                 other => panic!("書き出しが進まない: {other:?}"),
