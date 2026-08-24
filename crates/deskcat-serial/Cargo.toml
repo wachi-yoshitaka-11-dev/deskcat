@@ -32,7 +32,12 @@ log = "0.4"
 # - license: `BSD-2-Clause OR Apache-2.0`。repositoryのMITとどちらも permissive で衝突しない
 # - security: buildscriptを持たない。`unsafe`はcrate内部のsyscall呼び出しにあり、
 #   workspaceの`unsafe_code = "forbid"`はこちらのcodeにのみ効く（依存の内部には及ばない）
-# - build負荷: **これが選定の決め手である。**Linuxでの推移依存は`cfg-if`と`libc`の2つだけ。
+# - binary sizeとruntimeへの影響: **どちらも測っていない。**このworkspaceにbinary target が
+#   無く（`apps/deskcatd`は未作成）、測る対象がまだない。runtimeについて言えるのは、
+#   sourceを読んだ範囲で`read`／`write`が`poll`1回とsyscall 1回であり、
+#   呼び出しごとのallocationを持たないことである。実測は`deskcatd`ができてから行う
+# - build負荷（上の項目とは別に記録する。**これが選定の決め手である**）:
+#   Linuxでの推移依存は`cfg-if`と`libc`の2つだけ。
 #   host の`Cargo.lock`は現在FFI crateを1つも持たない純Rustの木であり、
 #   Pi Zero W（512 MB機。**依存を伴うbuildがmemory不足で不安定にならないかは未評価**である。
 #   `docs/toolchains/raspberry-pi-rust-toolchain.md`）へ持ち込む量を最小にする
@@ -56,6 +61,8 @@ serial2 = { version = "0.2.38", features = ["unix"] }
 # - target と toolchain: 対象とするunix系を覆う
 # - license: `MIT OR Apache-2.0`
 # - security: 定数の参照だけに使う。`unsafe`な関数は呼ばない
+# - binary sizeとruntimeへの影響: 増分なし。定数への参照はcompile時に解決され、
+#   codeも呼び出しも生まない
 # - build負荷: 増分なし（`serial2`経由で既に木にある）
 # - 代替: 定数を自前で`const`にする案。値自体はLinuxのABIで安定だが、
 #   名前と出典がcodeから失われるため採らない
