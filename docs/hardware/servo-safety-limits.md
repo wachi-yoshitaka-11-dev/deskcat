@@ -21,20 +21,25 @@
 |---|---|---|
 | メーカー | TowerPro | 現物ラベル（`TOWER PRO Micro servo 9g SG90`）。[HW-TBD-006](tbd-register.md)で解決済み |
 | 正確なmodel／suffix | SG90 | 同上 |
-| データシートrevision | [TowerPro公式](https://towerpro.com.tw/product/sg90-7/)、[datasheet](https://www.mouser.com/catalog/specsheets/Soldered_101246.pdf)。revision表記なし | メーカー文書 |
-| 定格電圧範囲 | 4.8–6 V | データシート |
-| 無負荷電流 | **TBD** | データシート／測定 |
-| 動作電流 | **TBD**（データシート値は0.5–2 Aと負荷依存で幅が広い） | データシート／測定 |
-| Stall／peak電流 | **TBD**（実測必須。[HW-TBD-010／011](tbd-register.md)、`power-budget.md`測定計画） | データシート／測定 |
-| 制御logic要件 | **TBD**（ESP32のGPIOは3.3 V。SG90のlogic閾値を現物確認するまで確定しない） | データシート |
-| PWM周期／rate | **TBD**（50 Hzが一般値だが、この表の確定値として採らない） | データシート |
-| 許容最小pulse | **TBD** | データシートと無負荷試験 |
+| データシートrevision | **公式のdatasheet PDFは無い。**一次資料は公式製品ページの仕様表だけである（[SG90 Digital](https://towerpro.com.tw/product/sg90-7/)、[SG90 Analog](https://towerpro.com.tw/product/sg90-analog/)。revision表記なし）。従来引いていた[Soldered_101246.pdf](https://www.mouser.com/catalog/specsheets/Soldered_101246.pdf)は**TowerPro発行と確認できず、取得もできない**（2026-08-24。正はBOM） | メーカーの製品ページ |
+| 定格電圧範囲 | 4.8–6 V | **公式製品ページのレビュー欄。**仕様表の記載は`Operating voltage: 4.8v`だけである（2026-08-24。正はBOM） |
+| 無負荷電流 | **TBD** | 測定（**一次資料に記載が無い**。正はBOM） |
+| 動作電流 | **TBD**（0.5–2 Aと負荷依存で幅が広い。**`データシート値`という表記を2026-08-24に外した。**この値もTowerPro公式製品ページのレビュー欄に由来する。**値は変えていない。**確定は`HW-TBD-010`／`011`の範囲である） | 測定（**一次資料に記載が無い**。正はBOM） |
+| Stall／peak電流 | **TBD**（実測必須。[HW-TBD-010／011](tbd-register.md)、`power-budget.md`測定計画） | 測定（**一次資料に記載が無い**。正はBOM） |
+| 制御logic要件 | **TBD**（ESP32のGPIOは3.3 V。SG90のlogic閾値を現物確認するまで確定しない）。**2026-08-24に、一次資料にlogic閾値の記載が無いことを確認した**（Digital／Analog両ページ）。**したがって3.3 V driveの可否をこの資料では判定できない。**level shifterの要否も決まらない | **一次資料に記載が無い**（[tbd-register HW-TBD-026](tbd-register.md)） |
+| PWM周期／rate | **TBD**（50 Hzが一般値だが、この表の確定値として採らない）。**2026-08-24に、一次資料に記載が無いことを確認した。**50 Hzは出所を持たない | **一次資料に記載が無い**（[tbd-register HW-TBD-026](tbd-register.md)） |
+| 許容最小pulse | **TBD**。**2026-08-24に、一次資料に記載が無いことを確認した** | **一次資料に記載が無い。**残るのは無負荷試験（[tbd-register HW-TBD-026](tbd-register.md)） |
 | Neutral pulse | **TBD** | Calibration |
-| 許容最大pulse | **TBD** | データシートと無負荷試験 |
+| 許容最大pulse | **TBD**。**2026-08-24に、一次資料に記載が無いことを確認した** | **一次資料に記載が無い。**残るのは無負荷試験（[tbd-register HW-TBD-026](tbd-register.md)） |
+| Dead band width | **1 us**（Digital／Analog両ページ共通）。**確定した運用値ではない。**一次資料が示す制御信号の電気仕様であり、**許容pulse幅範囲の代わりにならない**（範囲の内側の分解能に当たる量である）。**この値だけでpulse幅範囲を導かない** | 公式製品ページの仕様表（[SG90 Digital](https://towerpro.com.tw/product/sg90-7/)、[SG90 Analog](https://towerpro.com.tw/product/sg90-analog/)。2026-08-24取得）。**正は[tbd-register HW-TBD-026](tbd-register.md)である**（`SERVO-01`にはこの項目を載せる列が無い） |
 
 **modelは確定したが、駆動条件はまだ確定していない。**上表で`TBD`が残る項目は、
 一般的なhobby servoの値やdatasheetの代表値を確定値として使用しない。
 とくにpulse幅とstall電流は、実機のcalibrationと測定で決める。
+
+**一次資料に記載が無いことが確認できた項目は、記載が無いという結論として記録する。**
+無い記載を一般値で埋めない。一次資料から得られた値を記録する場合も、
+**それが電気的な仕様であって確定した運用値ではないことを、値のそばに明記する。**
 
 ## 機械組み立て
 
@@ -355,3 +360,4 @@ recovery／reconnect動作は`HW-TBD-018`の範囲に含める。fail-safe seque
 | 2026-08-16 | 11 | [#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)の2026-08-16の追記を反映。**受け入れchecklistの`（Blocked）`項目（ESP32入力と3.3 V railの電圧）を3点直した。****Blockedは解除していない。**(a) **`HW-TBD-034`への参照を足した。**この項目は`HW-TBD-028`(b)(c)(d)を根拠にBlockedとしていたが、**閾値が確定しても合格にできない**理由がもう一つある。測定系がESP32自身のADCであり、**brownout／reset中・sample間・burst captureのwindow外が未観測である**（[power-budget.md](power-budget.md#測定計画)の`ESP32自身のADCは測定対象から独立していない`。**規則も数値も再掲していない**）。(b) **同項目が「(b)の5 V入力側は参照設計由来の4.6 Vで現物の`U2`が未確認」と述べていたが、これは古い。**`U2`は2026-08-15にUMW `LD1117-3.3`と特定され、[power-budget.md](power-budget.md#受け入れ条件) Revision 45が**部品未確認を理由とするBlockedの解消**を記録している。正本に合わせて訂正した。**この項目自体は3.3 V rail側と`HW-TBD-034`によりBlockedのままである。**(c) **記録として残す。**この項目は`a11d32d`（2026-08-16）で新設されたが、**対応するRevision行が無く、この文書には2026-08-16の記録が1つも無かった。**過去行は書き換えず、ここに記録する |
 | 2026-08-18 | 12 | [PR #146](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/146)のreview指摘。**受け入れchecklistの`（Blocked）`項目が、ESP32自身のADCという現状の測定系を最終の受け入れ条件として固定して読めた。**2026-08-16に方式1（独立した外部観測）を採用しており、実装されれば未観測区間は観測対象にできる。**「現状の」測定系であることを明示し、合否は`HW-TBD-034`のclose条件で決まるとした**（条件の全数は台帳が正。再掲しない）。**Blockedは解除していない。サーボの動作制限も出力有効化のgateも変えていない** |
 | 2026-08-18 | 13 | [PR #146](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/146)のreview指摘。**Revision 12で「方式1が実装されれば未観測区間は観測対象にできる」と書いたが、これは正本より広い主張だった。**[power-budget.md](power-budget.md#測定計画)の`ESP32自身のADCは測定対象から独立していない`は未観測区間を3種に分け、**独立した記録係で塞げるのは`brownout／reset中`と`capture window外`だけで、`sample間`は残ると定めている。**3区間すべてを覆う読みになっており、**この`（Blocked）`項目の根拠を実際より弱めていた。**塞げる区間と残る区間を書き分け、方式1の実装だけでは合格にできないことを明記した。**Blockedは解除していない。サーボの動作制限も出力有効化のgateも変えていない** |
+| 2026-08-24 | 14 | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。`HW-TBD-026`（SG90の電気的駆動条件）のうち一次資料で確定できる部分を確認し、`サーボ識別情報`表へ反映した。**駆動条件は未確定のまま残す。Revision 2の方針を変えていない。****動作制限表、サーボ出力を有効化してよい条件、受け入れchecklistは変えていない。**この文書の状態`Blocked`も変えていない。(a) **`制御logic要件`・`PWM周期／rate`・`許容最小／最大pulse`は、いずれも一次資料に記載が無いことを確認した。**`TBD`は維持したまま、**「記載が無い」ことを結論として記録した。**とくに`制御logic要件`は、3.3 V driveの可否がこの資料では判定できないことを明示した。**「3.3 Vで動く」とは書いていない。**(b) **`Dead band width`行を新設した（`1 us`）。**一次資料の仕様表から得られた制御信号の電気仕様はこの1点だけである。**この行の正は[tbd-register.md](tbd-register.md)の`HW-TBD-026`である。**[hardware-bom.md](hardware-bom.md)の`SERVO-01`にはこの項目を載せる列が無いため、この1行だけ`根拠`欄がBOMを指していない。**確定した運用値ではなく、許容pulse幅範囲の代わりにもならない旨を同じセルに書いた。**(c) `データシートrevision`行を訂正した。**公式サイトにSG90のdatasheet PDFは無く、従来引いていた`Soldered_101246.pdf`はTowerPro発行と確認できず取得もできない。**あわせて公式サイトに同名2品（`SG90 Digital`／`SG90 Analog`）があることを反映した。(d) `定格電圧範囲`の根拠を`データシート`から訂正した。**仕様表の記載は`Operating voltage: 4.8v`だけで、`4.8–6 V`はレビュー欄に由来する。値は変えていない。****この表はBOMからの再掲であり、値をこの文書で確定させていない。**(e) `動作電流`行の`データシート値は0.5–2 A`も同じ誤帰属であったため、同様に外した。**値は変えていない。**確定は`HW-TBD-010`／`011`の範囲であり、この改訂では判断していない。(f) **電流3行（`無負荷電流`・`動作電流`・`Stall／peak電流`）と`データシートrevision`行の`根拠`欄が、存在しない文書を指していた。**公式のdatasheet PDFが無いことが確定したため、前者3行を`データシート／測定`から`測定`へ、後者を`メーカー文書`から`メーカーの製品ページ`へ改めた。**`TBD`は3行とも維持しており、確定先（`HW-TBD-010`／`011`）も変えていない。**1行だけ直すと同じ誤りが同じ表の中に併存するため、`根拠`欄は全数を見た。正は[hardware-bom.md](hardware-bom.md) Revision 49と[tbd-register.md](tbd-register.md)の`HW-TBD-026`である |
