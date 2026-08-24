@@ -24,6 +24,9 @@ opt-level = "z"
 # lockfileは`firmware/esp32/Cargo.lock`とroot `Cargo.lock`の2つに分かれたままでよい。
 deskcat-protocol = { path = "../../crates/deskcat-protocol" }
 log = "0.4"
+# health snapshotを`deskcat-protocol`の`Status`と同じ形へserializeするために使う。
+# 同crateが既に依存しており、`firmware/esp32/Cargo.lock`にも推移的に入っている。
+serde_json = "1"
 esp-idf-svc = { version = "0.52.1", features = ["critical-section", "embassy-time-driver", "embassy-sync"] }
 # Remove `generic-queue-8` if you plan to use `embassy-time` WITH `embassy-executor`
 embassy-time = { version = "0.5", features = ["generic-queue-8"] }

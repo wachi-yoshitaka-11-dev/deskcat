@@ -358,6 +358,7 @@ dependencies = [
  "embuild",
  "esp-idf-svc",
  "log",
+ "serde_json",
 ]
 
 [[package]]
