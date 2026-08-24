@@ -35,8 +35,8 @@ license・security・build負荷・代替）を記録した。**`serialport`は�
 MPL-2.0であり、`nix`／`bitflags`／`unescaper`とCの`libudev`を引く。
 Pi Zero W（512 MB機。**依存を伴うbuildがmemory不足で不安定にならないかは未評価**である。
 [Raspberry Pi Rust toolchain](../../docs/toolchains/raspberry-pi-rust-toolchain.md)）へ
-持ち込む量を最小にするため、
-Linuxでの推移依存が`cfg-if`と`libc`の2つだけである`serial2`を採った。
+持ち込む量を最小にするため、Linuxでの推移依存が`cfg-if`と`libc`の2つだけである
+`serial2`を採った。
 
 `serial2::SerialPort`は`Read + Write`を実装するため、`transport.rs`のblanket implで
 **そのままでも既に`Transport`である。**それでもnewtypeを置くのは、**下層のerrorを
@@ -60,6 +60,10 @@ linkの上で起きたerrorである。openの`ENOENT`／`EACCES`／`EBUSY`はUS
 実のfile descriptor越しに行の復元、切断（`EIO`）、idle、送出を確認している。
 **`SerialDevice::open()`はtestで呼んでいない。**openこそがhardware無しに検証できない
 部分であり、通したことにしない。
+
+**ESP32とはまだ繋げない。**`CABLE-PI-LINK-01`（Pi ↔ ESP32のUSB OTG変換／cable）は
+[Hardware BOM](../../docs/hardware/hardware-bom.md)で**未購入**である。後半に着手する前に
+この状態を確認する。
 
 [Issue #11](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11)の後半に残るもの:
 

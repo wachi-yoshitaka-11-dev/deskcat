@@ -159,7 +159,6 @@ impl SerialDevice {
     /// }
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    ///
     pub fn open(config: &SerialConfig) -> io::Result<Self> {
         Self::open_with_timeouts(
             config,
