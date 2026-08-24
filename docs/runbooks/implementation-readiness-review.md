@@ -1,7 +1,7 @@
 # Implementation Readiness Review
 
 > Review日: 2026-07-27
-> 最終更新: 2026-08-15（`HW-TBD-001`のcloseと、chip識別が非破壊で満たせないことを反映）
+> 最終更新: 2026-08-20（[#6](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/6)のflashと起動記録、chip識別の達成を反映）
 > 結果: Hardware driver実装のgateは未通過
 
 ## 結論
@@ -50,15 +50,15 @@ Peripheral driverまたはservo出力は、いずれもこのgateを通過して
 | ESP32 workspaceを分離する | ArchitectureとしてPass | ADR-0001 |
 | 公式情報による互換性調査 | Pass | `docs/toolchains/esp32-rust-toolchain.md` |
 | 互換性のあるRust／ESP-IDF version | build検証済み | 追加作業なし。#5（PR #40）で確定し、#86でCIの`ubuntu-24.04`から再現した。証拠は[開発端末の記録](../toolchains/version-records/2026-08-06-esp32-build-linux.md)と[CIの記録](../toolchains/version-records/2026-08-10-esp32-build-ci.md)の2件 |
-| 再現可能なbuild／flash／monitor command | Partial | **buildは検証済み。**確定commandは`AGENTS.md`の「検証」節とroot READMEにある。**未確定はflashとserial monitorで、#6の範囲** |
+| 再現可能なbuild／flash／monitor command | Partial | **buildは検証済み。**確定commandは`AGENTS.md`の「検証」節とroot READMEにある。**flashとserial monitorは2026-08-20に#6で検証した**（`espflash flash --monitor`。記録は[Version Record](../toolchains/version-records/2026-08-20-esp32-flash-boot-native.md)）。**残るのはPi側とHILであり、`AGENTS.md`の検証済みcommandへは未反映** |
 | Draft protocolが存在する | Review用としてPass | #4 |
 | 承認済みprotocol制限とfixture | Partial | #9でschema群のfixtureとhost実装の合格を確認済み。session判定・duplicate replay・budgetの3群は#12、firmware側の合格は#10 |
 | Host／firmware workspaceが存在する | Pass | firmware workspaceは#5／#40、host workspaceは#9で作成した |
 
 **`build検証済み`という状態語の正本は[ESP32 Rust Toolchain](../toolchains/esp32-rust-toolchain.md)である。**
-同文書は確定条件のうち**chipの識別1項目が未達である**ため、
-状態を`Verified`ではなく`build検証済み`にとどめている（**公式pin表と現物pin表記の照合は2026-08-15に達成した**）。このgateも同じ語を使い、
-**build以外を検証済みとして扱わない。**
+同文書は**2026-08-20に確定条件をすべて達成し、状態を`Verified`へ上げた**（最後の1項目だったchipの識別を#6のflash時に満たした）
+**buildに加えて、flashと実機起動を2026-08-20に#6で検証した**（[Version Record](../toolchains/version-records/2026-08-20-esp32-flash-boot-native.md)）。
+**検証済みとして扱えるのはそこまでである。**周辺回路、servo、Protocol session、共有fixtureへの合格は含まない。
 
 Toolchainのbuild-only spikeはperipheral pinの選定なしで進められる。Docs / Review端末にtoolchainを導入する必要はない。
 
@@ -117,8 +117,7 @@ checkboxをここで二重管理しない。**同文書で未達なのは次の1
 - **chipの識別**: **非破壊では刻印を読めないことが2026-08-15に確定した**（シールド内側）。**撮り直しても解決しない。**
   module刻印は読了し、搭載moduleはmodule自身の刻印で確定した。そのdatasheetが中核chipを示すため、
   **buildへの影響は無い**。**要件は2026-08-15に再定義した**（`esptool`が報告するchip名で確認する。正本は
-  [ESP32 Rust Toolchain](../toolchains/esp32-rust-toolchain.md#chip-識別の満たし方)）。**実施は#6のflash時であり、
-  この項目は未達のままである**（`HW-TBD-031`）
+  [ESP32 Rust Toolchain](../toolchains/esp32-rust-toolchain.md#chip-識別の満たし方)）。**2026-08-20に#6のflash時に実施し、この項目を満たした**（`esptool` 4.12.0が`ESP32-D0WD`を報告した。記録は [Version Record](../toolchains/version-records/2026-08-20-esp32-flash-boot-native.md)）。**`HW-TBD-031`の行は、close手順を通すまで台帳に残る**
 - **公式pin表と現物pin表記の照合**: **2026-08-13に照合が完了して一致し、2026-08-15にcloseした**（`HW-TBD-001`）
 
 許可した範囲:
@@ -161,9 +160,10 @@ GitHub Issue migration: PENDING foundation document publication
 「互換性のあるRust／ESP-IDF version」は`build検証済み`である。公式pin表と現物pin表記の照合は`HW-TBD-001`（#1）が担い、**2026-08-15にcloseした。**
 flashとserial monitorは#6が担う。
 
-`#6`（flashとserial monitor）を落とさない。Software gateの「再現可能なbuild／flash／monitor
-command」が`Partial`にとどまる唯一の理由であり、揃わないまま再実行しても同じ`Partial`を
-繰り返すだけになる。
+`#6`（flashとserial monitor）は**2026-08-20に実施した**（記録は [Version Record](../toolchains/version-records/2026-08-20-esp32-flash-boot-native.md)）。
+Software gateの「再現可能なbuild／flash／monitor command」が`Partial`にとどまる理由は
+**Pi側とHILへ移った。**あわせて**USB抜き差しによる電源再投入後の起動出力は未検証で残る**
+（host側のserial portがUSB enumerate後にしか存在しないため。詳細は同記録）。
 
 「承認済みprotocol制限とfixture」は#9で`Partial`まで進んだ。**残りをblockerとして扱うのは
 Issue #9ではなく#10と#12である。**#9はschema群のfixtureとhost実装の合格までを担当し、

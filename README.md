@@ -42,13 +42,14 @@ Piから不正なcommandを受け取った場合も、ESP32が物理安全制限
 ## Repository構成
 
 ```text
+.github/                   workflow、Issue／PR template、repository設定の記録
 apps/deskcatd/             Raspberry Pi service
 crates/                    host側Rust library
 firmware/esp32/            独立したESP-IDF Rust workspace
 simulator/deskcat-sim/     host simulator
 configs/                   秘密情報を含まない設定例
 deploy/                    Raspberry Pi deployment artifact
-docs/architecture/         現在のアーキテクチャ
+docs/architecture/         アーキテクチャ（予定文書の一覧）
 docs/backlog/              初期Issue定義
 docs/decisions/            ADR
 docs/governance/           AI、workflow、安全方針
@@ -77,16 +78,9 @@ workspaceの判断は[ADR-0001](docs/decisions/0001-monorepo-layout.md)を参照
 
 ## 現在のblocker
 
-次の物理情報は未確定である。
+**未確定の物理情報は[TBD一覧](docs/hardware/tbd-register.md)が正本である。**この節では列挙しない。複製すると、解決済みの項目が未確定として残り続ける（[Single Source of Truth](docs/governance/README.md#single-source-of-truth)）。
 
-- LCDとtouch controller／moduleの正確な型番
-- 加速度sensorと環境sensorの正確な型番
-- サーボの正確な型番とpeak電流
-- ESP32 board revisionと最終GPIO map
-- 電源とbackfeed対策
-- サーボの機械可動域と動作制限
-
-例の候補値をfirmwareへ転記しない。[Hardware BOM](docs/hardware/hardware-bom.md)と[TBD一覧](docs/hardware/tbd-register.md)を使って解決する。
+確定した部品識別情報は[Hardware BOM](docs/hardware/hardware-bom.md)にある。**例の候補値をfirmwareへ転記しない。**
 
 ## Buildとtest
 

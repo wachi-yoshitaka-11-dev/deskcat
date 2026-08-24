@@ -184,10 +184,11 @@ def main(argv=None):
     if not tracked:
         raise guards.ValidationError(_zero_tracked_diagnostics(root))
 
-    # symlinkは走査しない。`CLAUDE.md`は`AGENTS.md`へのsymlinkであり、
-    # symlinkを解決する環境では同じ内容を2回走査して件数が二重になる。
-    # 実際にWindows（`core.symlinks=false`）で229件、Linux CIで243件と食い違い、
-    # 差の14件はすべて`CLAUDE.md`だった。
+    # symlinkは走査しない。symlinkを解決する環境では、実体とlinkで同じ内容を2回
+    # 走査して件数が二重になる。実際にWindows（`core.symlinks=false`）で229件、
+    # Linux CIで243件と食い違ったことがある。当時の差は`AGENTS.md`へのsymlinkだった
+    # `CLAUDE.md`である。`CLAUDE.md`は現在は通常fileであり
+    # （`validate_instruction_entrypoint.py`が検査する）、この判定は残す。
     #
     # 判定はfile属性ではなくGitのmode（120000）で行う。作業ツリー上の実体は
     # checkout環境で変わるため、属性で判定すると走査対象そのものが環境ごとに変わる。
@@ -297,8 +298,8 @@ def main(argv=None):
             # fragmentが見出しに対応するか。
             #
             # `anchors_by_file`は追跡下でsymlinkでないMarkdownだけを持つ。targetがそこに
-            # 無いままskipすると、`CLAUDE.md`のようなsymlinkや追跡外のMarkdownへの
-            # fragmentが無検査で通る。このscriptの他の判定はfail-closedであり、
+            # 無いままskipすると、symlinkや追跡外のMarkdownへのfragmentが無検査で通る。
+            # このscriptの他の判定はfail-closedであり、
             # ここだけfail-openにしない。検査できない事実を報告する。
             if fragment.strip():
                 candidate_full = guards.full_path(candidate)

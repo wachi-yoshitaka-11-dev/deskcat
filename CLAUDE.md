@@ -1,1 +1,3 @@
-AGENTS.md
+# DeskCat Claude Code Instructions
+
+@AGENTS.md

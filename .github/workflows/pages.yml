@@ -55,6 +55,21 @@ jobs:
           # runner上のfileとして読める点は同じであり、この指定は引き続き要る。
           persist-credentials: false
 
+      - name: Check instruction entrypoint
+        # `CLAUDE.md`のGit index上のmodeと内容を検査する。mode 120000で記録すると、
+        # `core.symlinks=false`のcheckoutではlink先のpath文字列だけのfileになり、
+        # import行が消える。`ubuntu-24.04`のcheckoutには症状が出ないため、
+        # 実体ではなく記録そのものを見る。
+        run: python3 scripts/validate_instruction_entrypoint.py
+
+      - name: Test instruction entrypoint validator
+        working-directory: ${{ runner.temp }}
+        run: python3 "$GITHUB_WORKSPACE/scripts/test_instruction_entrypoint.py"
+
+      - name: Test review gate
+        working-directory: ${{ runner.temp }}
+        run: python3 "$GITHUB_WORKSPACE/scripts/test_review_gate.py"
+
       - name: Check documentation links
         run: python3 scripts/validate_doc_links.py
 

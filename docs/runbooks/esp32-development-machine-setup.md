@@ -16,9 +16,9 @@
 |---|---|
 | Linux x86_64 の build-only 経路（1、3〜8節） | 検証済み。[Version Record](../toolchains/version-records/2026-08-06-esp32-build-linux.md) |
 | 2節の `rustup component add` | 未実行。検証時は installer の `--profile default` で `rustfmt` と Clippy を導入したため、この command 自体は通していない |
-| 3節の `cargo install espflash` | 未実行。Flash / HIL profile 専用であり、ESP32 Build profile では導入しない |
+| 3節の `cargo install espflash` | **2026-08-20 に実行した**（`espflash` 4.5.0）。Flash / HIL profile 専用であり、**ESP32 Build profile では導入しない。**記録は [Version Record](../toolchains/version-records/2026-08-20-esp32-flash-boot-native.md) |
 | Windows | 対象外。[ADR-0005](../decisions/0005-standard-development-os.md) により support しない |
-| 9節（Flash への移行） | 未検証。#6 の範囲 |
+| 9節（Flash への移行） | **2026-08-20 に実施した**（[#6](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/6)）。flash と起動記録、chip 識別まで。記録は [Version Record](../toolchains/version-records/2026-08-20-esp32-flash-boot-native.md)。**周辺回路と servo には触れていない** |
 
 code block はすべて Linux で実行する形式で記載している。
 
@@ -108,7 +108,7 @@ cargo install espup --version 0.17.1 --locked
 Flash / HIL profile の端末だけ追加する。
 
 ```bash
-cargo install espflash
+cargo install espflash --version 4.5.0 --locked
 ```
 
 `cargo-espflash` は初期必須ツールに含めない。必要性が生じた時点で `espflash` との差を review する。
@@ -319,7 +319,7 @@ Clippy は ESP-IDF target でも動作することを確認済みである。実
 
 ## 9. Flashへの移行
 
-flash と serial monitor は #6 で行う。次を満たすまで実行しない。
+**flash と serial monitor は 2026-08-20 に #6 で実施した**（記録は [Version Record](../toolchains/version-records/2026-08-20-esp32-flash-boot-native.md)）。**次の前提は、以降の flash でも満たすまで実行しない。**
 
 - 実機 Linux 端末である。VM と container 上での flash は [ADR-0005](../decisions/0005-standard-development-os.md) で対象外とした
 - exact board と USB-UART を確認済み

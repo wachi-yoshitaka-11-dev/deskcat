@@ -1,0 +1,63 @@
+name: Review gate
+
+# base が`develop`と`main`のPull Requestを対象にする。
+#
+# `develop`側で掛けないと、宣言はsquash commitにしか現れず、review後にcommitを足しても
+# 何も落ちない。**宣言が無効になる仕組みは、Pull Requestのhead commitを見て初めて働く。**
+#
+# 検証するのは分類と自己レビューの宣言だけである。**未解決threadと必要CIは検証しない。**
+# どちらもbranch protectionが強制しており、同じ条件を2箇所で持つと、片方だけを見た判断が
+# 起きる（ADR-0007の「GitHubまたは設定で強制できるものはそちらへ寄せる」）。
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+
+permissions:
+  contents: read
+
+concurrency:
+  group: review-gate-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    name: Verify change class and self-review
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # commit messageのtrailerを読むため、履歴を切り詰めない。
+          fetch-depth: 0
+          # このstepの後にPR側のscriptを実行する。checkoutが残すtokenを
+          # そのscriptから読めないようにする。
+          persist-credentials: false
+
+      - name: Verify change class and self-review declarations
+        # 値は環境変数で渡す。`run`へ直接展開すると、branch名やshaがshellの構文として
+        # 解釈される余地が残る。
+        env:
+          # base は remote-tracking ref ではなくshaで渡す。`origin/main`が
+          # checkout後に存在するとは限らない。
+          GATE_BASE: ${{ github.event.pull_request.base.sha }}
+          GATE_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python3 scripts/review_gate.py gate \
+            --base "$GATE_BASE" --head "$GATE_HEAD"
+
+      - name: Verify every commit in the promotion range
+        # base が`main`のPull Requestだけで実行する。範囲に複数のsquash commitが入るため、
+        # head commitだけでは宣言を持たないcommitが混ざっても通る。
+        #
+        # **`develop`側では実行しない。**feature branchの中間commitにまで宣言を要求すると、
+        # 最後にまとめて宣言する運用が成立しない。
+        if: ${{ github.base_ref == 'main' }}
+        env:
+          GATE_BASE: ${{ github.event.pull_request.base.sha }}
+          GATE_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python3 scripts/review_gate.py history \
+            --base "$GATE_BASE" --head "$GATE_HEAD"

@@ -12,7 +12,15 @@
   "assets": [
     {
       "path": "css/style.scss",
-      "note": "Cayman themeのtheme override stylesheet。配色、typography、table、blockquote、code block、responsive layoutを上書きする"
+      "note": "Pages siteのstylesheet。themeのSCSSは読み込まず、配色、typography、chrome、card、table、code block、responsive layout、a11yを自前で持つ（ADR-0009）"
+    },
+    {
+      "path": "deskcat-paw.svg",
+      "note": "肉球のmotif。背景の透かし、見出しとcardのmarker、footerで`mask-image`として使う。色はCSS側のtokenが決めるため単色で持つ"
+    },
+    {
+      "path": "deskcat-paw-tile.svg",
+      "note": "背景の透かし専用のtile。720 x 720の中へ肉球を90個、位置・角度・大きさを変えて持つ（肉球は`defs`に1つだけ置き、各配置は`use`で参照する）。端を跨ぐ肉球は反対側へ複製してあり`repeat`で継ぎ目が出ない。散らした見た目をtile内で作ることで、mask layerを重ねずに済む（重ねるとアルファが合成されて肉球が融合する）"
     },
     {
       "path": "deskcat-concept.jpg",

@@ -14,6 +14,11 @@
 | [ADR-0006](0006-validation-script-language.md) | Accepted | 検証scriptの実装言語をPythonとする |
 | [ADR-0007](0007-review-scope-and-self-review.md) | Accepted | 自動reviewを高リスク変更へ限定し、自己レビューを主軸とする |
 | [ADR-0008](0008-firmware-protocol-crate-reuse.md) | Accepted | Firmwareから`deskcat-protocol`をpath dependencyで再利用する |
+| [ADR-0009](0009-pages-own-layout.md) | Accepted | Pagesのlayoutとstylesheetを自前で保持する |
+| [ADR-0010](0010-change-class-and-review-declaration.md) | Accepted | 変更の分類を機械化し、自己レビューをcommit trailerで宣言する |
+| [ADR-0011](0011-issue-optional-pull-request-required.md) | Accepted | Issueの要否とPull Requestの要否を分ける |
+| [ADR-0012](0012-milestones-count-issues-only.md) | Accepted | milestoneはIssueだけに設定する |
+| [ADR-0013](0013-manual-only-coderabbit-review.md) | Accepted | CodeRabbitの自動reviewを廃止し、手動依頼だけにする |
 
 ## 新規作成
 
