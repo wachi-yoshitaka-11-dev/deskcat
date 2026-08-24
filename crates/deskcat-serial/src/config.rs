@@ -50,12 +50,13 @@ impl core::error::Error for ConfigError {}
 /// **既定値を持たない。**`Default`を実装していないのは意図的である。
 /// device名（`/dev/ttyUSB*`など）を「たぶんこれ」で埋めると、確認していない値が
 /// 設定の既定として固定される。実機のdevice名はまだ確認されていない
-/// （USB OTG の変換 cable が未入手であり、[Issue #8]の受け入れ条件にも含まれない）。
+/// （[Issue #8]の受け入れ条件に含まれず、確定は[Issue #11]の後半に残る）。
 ///
 /// baudも同様に呼び出し側が渡す。仕様§2の`115200`は`Candidate`であり、
 /// 確定値は`PROTO-TBD-001`である。
 ///
 /// [Issue #8]: https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/8
+/// [Issue #11]: https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SerialConfig {
     /// Serial deviceのpath。**このcrateはopenしない。**値を保持するだけである。

@@ -100,10 +100,6 @@ baudの正本は`PROTO-TBD-001`でいずれも`Candidate`である。渡した�
 **`SerialDevice::open()`はtestで呼んでいない。**openこそがhardware無しに検証できない
 部分であり、通したことにしない。
 
-**ESP32とはまだ繋げない。**`CABLE-PI-LINK-01`（Pi ↔ ESP32のUSB OTG変換／cable）は
-[Hardware BOM](../../docs/hardware/hardware-bom.md)で**未購入**である。後半に着手する前に
-この状態を確認する。
-
 [Issue #11](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11)の後半に残るもの:
 
 - `/dev/ttyUSB*`のdevice名の確定
