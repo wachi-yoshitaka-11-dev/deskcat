@@ -52,9 +52,9 @@
 //!
 //! # 決めていないこと（`HUPCL`）
 //!
-//! 既定では、portをcloseするときに DTR が落ちる。**本projectの ESP32 board で
-//! DTR ／ RTS が自動resetへ繋がっているかは確認していない。**繋がっていれば、
-//! 再接続のたびに ESP32 が再起動することになり、`boot`／`hello`のhandshake
+//! 既定では、portをcloseするときに`DTR`が落ちる。**本projectの`ESP32` boardで
+//! `DTR`／`RTS`が自動resetへ繋がっているかは確認していない。**繋がっていれば、
+//! 再接続のたびに`ESP32`が再起動することになり、`boot`／`hello`のhandshake
 //! （[Issue #12]）に直接効く。
 //!
 //! **確認していない以上、ここでは決めない。**現物の確認と、再起動させるか否かの判断は
@@ -258,7 +258,9 @@ impl Transport for SerialDevice {
     fn flush(&mut self) -> io::Result<()> {
         // `serial2`の`flush`は`tcdrain`であり、byteが物理的に出るまで待つ。
         // `set_raw`がRTS/CTSとXON/XOFFの両方を切っているため、待ち時間は
-        // 行長（`MAX_LINE_BYTES` = 1024 byte）÷ baudで抑えられる。
+        // 行長の上限（`deskcat_protocol::limits::MAX_LINE_BYTES`）÷ baudで抑えられる。
+        // **値をここへ複製しない。**同定数は`PROTO-TBD-002`待ちのCandidateであり、
+        // 書き写すと片方だけが古くなる。
         // **flow controlを有効にすると、この上限が無くなる。**
         self.port.flush().map_err(normalize_disconnect)
     }
