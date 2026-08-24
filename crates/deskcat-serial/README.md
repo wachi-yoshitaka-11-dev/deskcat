@@ -56,6 +56,43 @@ linkの上で起きたerrorである。openの`ENOENT`／`EACCES`／`EBUSY`はUS
 一時的なものだが、`classify`はこれらを`Fatal`にする。再接続のloopは、openの失敗を
 `Session::begin_reconnect()`が`None`を返すまで単純に再試行する。
 
+## 動かす（`serial_link` example）
+
+`SerialDevice`を呼ぶ実行体を1つ持つ。**このcrateはloopを持たない**（`Session`は
+transportを所有せず、pumpの引数で受け取る）ため、呼び出し側の形をここに置く。
+
+```bash
+cargo run --example serial_link -- --port <path> --baud <rate> [--seconds <n>] [--verbose]
+```
+
+`--port`と`--baud`は**どちらも必須である。既定値を持たせない。**device名は未確認であり
+（確定は[Issue #11](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11)の後半）、
+baudの正本は`PROTO-TBD-001`でいずれも`Candidate`である。渡した値は記録にそのまま残る。
+
+**出力にdevice名を書かない。**`Version Record Template`の禁止項目であり、出力を
+そのまま記録へ貼れるようにしてある。
+
+`--verbose`を付けない限り`Info`までを出す。`Debug`にするとread timeoutごとに1行出て
+（既定50 msなので毎秒20行）、長時間の観察では本当のeventが埋まる。
+
+**確かめられるのは「行が通ること」までである。**`protocol`が成立したことは確かめられない。
+`boot`／`ping`／`status`／ACK／reconnect同期の実装は
+[Issue #12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)であり、
+**ESP32側がprotocolを話すとは限らない。**起動時に`hello`を1件送るのは書き出し経路を
+通すためであって、handshakeではない。記録では**「行が通った」と「protocolが成立した」を
+書き分ける。**
+
+### host（VM）で確認済みの挙動
+
+**擬似端末を相手に実走させた。実serial portではない。**
+
+| 確認 | 結果 |
+|---|---|
+| 存在しないportを指定 | openの失敗が`Fatal`にならず、backoffが100→200→400→800→1600 msと伸びて上限5回で`Stopped(ReconnectExhausted)` |
+| 行の往復 | `hello`を123 byte書き出して相手が受信。相手の`ping`行を受信して`sid`／`id`／型まで復元 |
+| idle | 4秒で`retries=80`、**`timeouts=0`**。「dataが無いだけ」をtimeoutとして数えていない |
+| 相手を落とす | 切断を観測（`disconnects=1`）し、再接続へ入って上限で停止 |
+
 ## 実機に残っていること
 
 **このcrateの検証はhost（VM）上である。**testは`SerialPort::pair()`の擬似端末を使い、
