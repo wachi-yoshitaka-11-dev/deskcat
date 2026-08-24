@@ -12,8 +12,8 @@
 //!
 //! # 正規化1: 切断を表すerrno
 //!
-//! [`IoDisposition::classify`]は[`std::io::ErrorKind`]だけで判定し、
-//! **知らないkindは意図的に[`IoDisposition::Fatal`]へ落とす。**`Fatal`は再接続せずに
+//! [`IoDisposition::classify`](crate::IoDisposition::classify)は[`std::io::ErrorKind`]だけで判定し、
+//! **知らないkindは意図的に[`Fatal`](crate::IoDisposition::Fatal)へ落とす。**`Fatal`は再接続せずに
 //! sessionを止める。
 //!
 //! ところが、USB serialのadapterをLinux上で抜くと、下層は`EIO`／`ENXIO`／`ENODEV`を返す。
@@ -21,14 +21,14 @@
 //! **そのままでは切断が`Fatal`になり、再接続の経路へ入らない。**
 //!
 //! この3つを[`std::io::ErrorKind::BrokenPipe`]へ包み直し、`classify`が
-//! [`IoDisposition::Disconnected`]と読めるようにする。`read`／`write`／`flush`の
+//! [`Disconnected`](crate::IoDisposition::Disconnected)と読めるようにする。`read`／`write`／`flush`の
 //! **3つすべてに掛ける**。hangup中の`tcdrain`も`EIO`を返すため、`flush`を外すと
 //! 「flush中に抜かれた」だけが`Fatal`になる。
 //!
 //! `EBADF`と`ENOTTY`は**写さない。**前者はこちらのfd管理の誤り、後者はtty以外のpathを
 //! 設定した誤りであり、いずれも再接続では直らない。`Fatal`が正しい。
 //!
-//! 正規化を[`IoDisposition::classify`]側へ入れない理由は2つある。errnoの意味はdeviceの
+//! 正規化を[`classify`](crate::IoDisposition::classify)側へ入れない理由は2つある。errnoの意味はdeviceの
 //! 種別に依存する（regular fileの`EIO`は切断ではない）こと、そして`classify`はtestの
 //! fakeも通る共通の関数であり、そこへ`libc`を持ち込むと分類の中心が特定OSへ寄ることである。
 //!
@@ -104,17 +104,17 @@ impl SerialDevice {
     ///
     /// 下層のopenと設定適用の失敗をそのまま返す。
     ///
-    /// **この errorを[`IoDisposition::classify`]へ渡さない。**同関数が分類するのは
+    /// **この errorを[`IoDisposition::classify`](crate::IoDisposition::classify)へ渡さない。**同関数が分類するのは
     /// 確立済みのlinkの上で起きたI/O errorである。openの失敗のうち`ENOENT`（device nodeが
     /// まだ無い）、`EACCES`（`udev`のruleが当たる前）、`EBUSY`はいずれもUSBの再列挙中に
-    /// 起きる一時的なものだが、`classify`はこれらを[`IoDisposition::Fatal`]にする。
+    /// 起きる一時的なものだが、`classify`はこれらを[`IoDisposition::Fatal`](crate::IoDisposition::Fatal)にする。
     /// **復帰しようとしているまさにその場面でsessionを永久に止めることになる。**
-    /// 再接続のloopは、openの失敗を[`Session::begin_reconnect`]が`None`を返すまで
+    /// 再接続のloopは、openの失敗を[`Session::begin_reconnect`](crate::Session::begin_reconnect)が`None`を返すまで
     /// 単純に再試行する。下の例がその形である。
     ///
     /// # 例
     ///
-    /// 呼び出し側のloop。**このcrateはloopを持たない**（[`Session`]はtransportを
+    /// 呼び出し側のloop。**このcrateはloopを持たない**（[`Session`](crate::Session)はtransportを
     /// 所有せず、pumpの引数で受け取る）。実portを開くため`no_run`である。
     ///
     /// ```no_run
@@ -122,7 +122,9 @@ impl SerialDevice {
     ///
     /// use deskcat_serial::{Pump, SerialConfig, SerialDevice, Session};
     ///
-    /// let config = SerialConfig::new("/dev/ttyUSB0", 115_200)?;
+    /// // device名は呼び出し側が設定として渡す。**ここに実機の名前を書かない。**
+    /// // `/dev/ttyUSB*`の実際の名前は未確認であり、確定はIssue #11の後半である。
+    /// let config = SerialConfig::new("/dev/example", 115_200)?;
     /// let mut session = Session::new(config.clone(), 90_312);
     ///
     /// loop {
@@ -158,10 +160,6 @@ impl SerialDevice {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     ///
-    /// [`IoDisposition::classify`]: crate::IoDisposition::classify
-    /// [`IoDisposition::Fatal`]: crate::IoDisposition::Fatal
-    /// [`Session`]: crate::Session
-    /// [`Session::begin_reconnect`]: crate::Session::begin_reconnect
     pub fn open(config: &SerialConfig) -> io::Result<Self> {
         Self::open_with_timeouts(
             config,

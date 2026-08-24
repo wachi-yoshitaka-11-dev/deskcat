@@ -26,7 +26,7 @@ log = "0.4"
 # - 必要性: `std::fs::File`はbaud、character size、parity、raw modeを設定できない。
 #   設定しないまま開くと、直前に誰が使ったかで振る舞いが変わる
 # - 公式性: https://github.com/de-vri-es/serial2-rs / https://crates.io/crates/serial2
-# - 保守状況: 0.2.38は2026-07-31 release。直近90日のdownloadは約520万
+# - 保守状況: 0.2.38は2026-07-31 release。直近90日のdownloadは約520万（2026-08-24時点のcrates.io）
 # - target と toolchain: `libc`経由でunixを広く覆う。Pi側の候補target
 #   `arm-unknown-linux-gnueabihf`もその範囲にある（未検証。#11後半で確かめる）
 # - license: `BSD-2-Clause OR Apache-2.0`。repositoryのMITとどちらも permissive で衝突しない
@@ -34,7 +34,8 @@ log = "0.4"
 #   workspaceの`unsafe_code = "forbid"`はこちらのcodeにのみ効く（依存の内部には及ばない）
 # - build負荷: **これが選定の決め手である。**Linuxでの推移依存は`cfg-if`と`libc`の2つだけ。
 #   host の`Cargo.lock`は現在FFI crateを1つも持たない純Rustの木であり、
-#   Pi Zero W（使用可能memory 426 MiB、依存付きbuildは未評価）へ持ち込む量を最小にする
+#   Pi Zero W（512 MB機。**依存を伴うbuildがmemory不足で不安定にならないかは未評価**である。
+#   `docs/toolchains/raspberry-pi-rust-toolchain.md`）へ持ち込む量を最小にする
 # - 代替: `serialport` 4.9.0を検討して**採らなかった**。MPL-2.0（file単位のweak copyleft）で、
 #   `bitflags`＋`nix 0.26`＋`scopeguard`＋`unescaper`を引き、default featureではCの`libudev`が要る。
 #   port列挙は本projectに不要であり、その重さを負う理由が無い。

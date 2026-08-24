@@ -250,7 +250,7 @@ impl Session {
     /// 生きている証拠にならない。device nodeは列挙されるが応答しないという状態は
     /// 実際に起きる（USB adapterの半挿し、相手の電源断）。ここでresetすると、
     /// 「open成功 → 予算が戻る → すぐ切断 → 再試行」が延々と回り、
-    /// **[`ReconnectPolicy::max_attempts`]に永久に到達せず、backoffも初期値から
+    /// **[`ReconnectPolicy::max_attempts`](crate::ReconnectPolicy::max_attempts)に永久に到達せず、backoffも初期値から
     /// 伸びない。**予算が戻るのは[`Self::pump_read`]が実際にbyteを読めたときである。
     pub fn note_connected(&mut self) {
         if self.stopped.is_some() {

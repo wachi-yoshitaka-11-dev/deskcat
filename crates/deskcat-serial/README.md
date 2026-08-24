@@ -33,7 +33,9 @@ message型、検証、上限付きline受信は[`deskcat-protocol`](../deskcat-p
 依存追加の手順に従い、`Cargo.toml`のcommentへ8項目（必要性・公式性・保守状況・target・
 license・security・build負荷・代替）を記録した。**`serialport`は採らなかった。**
 MPL-2.0であり、`nix`／`bitflags`／`unescaper`とCの`libudev`を引く。
-Pi Zero W（使用可能memory 426 MiB、依存付きbuildは未評価）へ持ち込む量を最小にするため、
+Pi Zero W（512 MB機。**依存を伴うbuildがmemory不足で不安定にならないかは未評価**である。
+[Raspberry Pi Rust toolchain](../../docs/toolchains/raspberry-pi-rust-toolchain.md)）へ
+持ち込む量を最小にするため、
 Linuxでの推移依存が`cfg-if`と`libc`の2つだけである`serial2`を採った。
 
 `serial2::SerialPort`は`Read + Write`を実装するため、`transport.rs`のblanket implで
