@@ -315,11 +315,14 @@ mod tests {
         (SerialDevice::from_port(near), far)
     }
 
+    /// このsessionのsid。
+    const SID: u32 = 90_312;
+
     fn session() -> Session {
         // device名は台本の中だけの値である。この対は擬似端末であり、
         // ここに書いた名前でopenするわけではない。
         let config = SerialConfig::new("/dev/simulated", 115_200).expect("設定は妥当である");
-        let mut session = Session::new(config, 90_312);
+        let mut session = Session::new(config, SID);
         session.note_connected();
         session
     }
@@ -368,14 +371,25 @@ mod tests {
         assert_eq!(session.state(), ConnectionState::Connected);
     }
 
-    /// 送った行が実のfile descriptorへ出る。
+    /// 送った行が、そのまま実のfile descriptorの向こう側へ出る。
     #[test]
     fn a_queued_message_reaches_the_other_end_of_a_real_fd() {
         let (mut device, far) = pty_pair();
         let mut session = session();
-        let line = ping_line(3);
 
-        session.send(Message::Ping, 100).expect("queueへ入る");
+        // sessionが実際に採番するのは`id = 1`である（このsessionの最初の送出）。
+        let expected = encode_line(&Frame::new(
+            Envelope {
+                v: limits::PROTOCOL_VERSION,
+                sid: SID,
+                id: 1,
+                ts_ms: 100,
+            },
+            Message::Ping,
+        ))
+        .expect("encodeできる");
+
+        assert_eq!(session.send(Message::Ping, 100).expect("queueへ入る"), 1);
 
         while session.pending_out() > 0 {
             match session.pump_write(&mut device) {
@@ -384,10 +398,21 @@ mod tests {
             }
         }
 
-        let mut received = vec![0_u8; line.len() * 2];
-        let read = far.read(&mut received).expect("対の片側から読める");
-        assert!(read > 0, "実fdへ出ている");
-        assert_eq!(session.counters().bytes_out, read as u64);
+        // 1回のreadで全部届くとは限らない。出したbyte数だけ集める。
+        let mut received = Vec::new();
+        let mut chunk = [0_u8; 256];
+        while (received.len() as u64) < session.counters().bytes_out {
+            let read = far.read(&mut chunk).expect("対の片側から読める");
+            assert!(read > 0, "書き出したbyteが届く");
+            received.extend_from_slice(&chunk[..read]);
+        }
+
+        assert_eq!(
+            String::from_utf8(received).expect("行はUTF-8である"),
+            expected,
+            "encodeした行がそのまま実fdへ出る"
+        );
+        assert_eq!(session.counters().bytes_out, expected.len() as u64);
     }
 
     /// **この test が正規化1の回帰guardである。**
@@ -446,7 +471,11 @@ mod tests {
     }
 
     /// 空bufferを渡す経路が無いことを、契約として固定する。
+    ///
+    /// `debug_assert!`はrelease buildで消えるため、このtestもdebugのときだけ意味を持つ。
+    /// gateを付けないと`cargo test --release`が「panicしなかった」で落ちる。
     #[test]
+    #[cfg(debug_assertions)]
     #[should_panic(expected = "空のbuffer")]
     fn reading_into_an_empty_buffer_is_a_contract_violation() {
         let (mut device, _far) = pty_pair();
