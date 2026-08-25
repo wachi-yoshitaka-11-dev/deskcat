@@ -82,7 +82,7 @@ Generated artifact identity:
   release ELF    654,944 bytes / flash image 381,344 bytes
 Log or evidence path: 本文書に未加工の出力を転記した。log file は repository へ入れていない
 Known differences from documented profile: 下記「文書との差」を参照
-Conclusion: Verified（flash と起動記録について）
+Conclusion: Partial（flash と起動記録について。USB 抜き差しによる電源再投入後の起動出力が未検証。詳細は下記「この記録が主張しないこと」）
 Next action: 下記「この記録が主張しないこと」に挙げた項目
 ```
 
