@@ -16,8 +16,17 @@
 | `review_gate.py` | 変更範囲を`minor`／`review-required`へ分類し、head commitのtrailer（分類、自己レビュー、指示source変更の宣言）を照合する。`gate`は`classify`・`receipt`・`instructions`をまとめて実行する。`history`は範囲の**各commit**の宣言を見る（起点は`DECLARATION_CUTOVER`。**`gate`には含めない。**feature branchの中間commitへ宣言を要求しないため）。**意味は判定しない。**規則を持つfileの列挙と、変更行の字句的なdeny規則だけで判定し、軽微と証明できないものはすべて`review-required`にする（[ADR-0010](../docs/decisions/0010-change-class-and-review-declaration.md)）。**未解決threadと必要CIは検証しない。**未解決threadは`required_conversation_resolution`が強制するため、同じ条件を2箇所で持たない。**必要CIを強制しているものは無い**（`main`の`required_status_checks`は`null`。判断は[Repository設定](../.github/REPOSITORY_SETTINGS.md)が持つ） | Review gate workflowとlocal |
 | `test_review_gate.py` | 各deny規則（数値、inline code、link、表、見出し、checkbox、HTML comment、fence内）と、instruction source、非Markdown、追加file、空範囲が`minor`にならないことを検証する。あわせてtrailerの欠落、`minor`と宣言して範囲がreview必須の場合、review後のcommit追加で宣言が無効になること、path境界の前方一致を検証する。`history`については、起点が無いhistoryで検査しないこと、起点より前のcommitを蒸し返さないこと、各commitの分類・自己レビュー・指示source宣言の欠落を検出することを検証する。**fixtureはfileを実際にcommitして分類させる** | Pages workflowとlocal |
 | `lib/publish_guards.py` | secret／個人path pattern、path containmentとroot相対表記、追跡file列挙（`core.quotePath=false`で非ASCII pathをescapeさせない）、Gitのmodeによるsymlink判定、見出しanchor生成、fence外行の抽出と閉じ忘れfenceの検出、Markdown link抽出、null安全な読み出し、reparse pointを跨がないtree走査。`validate_doc_links.py`、`prepare_pages.py`、`validate_pages_output.py`、`test_link_validators.py`、`test_pages_guards.py`、`test_instruction_entrypoint.py`、`test_review_gate.py`がimportする。`validate_instruction_entrypoint.py`と`review_gate.py`はimportしない。test harnessはいずれも、importとは別に対象scriptを子processとして起動し、exit codeと診断出力まで検査する | import専用 |
+| `hooks/gh_metadata_guard.py` | Claude CodeのPreToolUse hook。`gh issue create`／`gh pr create`に`--project`（短縮形`-p`）が無い場合と、`gh pr merge`のsquash messageが`Change-Class`／`Self-Review`を持たない場合に**拒否**する。**判定は字句だけで行い、意味は判定しない。**stdin（`-F -`）で渡された本文は読めないため、読めないことを理由に止める。`DESKCAT_SKIP_GH_GUARD=1`で無効化できる | Claude Codeのhook |
+| `hooks/branch_base_guard.py` | Claude CodeのPreToolUse hook。`git checkout -b`／`git switch -c`の基点が最新の`origin/develop`から遅れている場合に**拒否**する。**`git fetch`を伴う**（fetchしないとlocalの`origin/develop`自体が古いままで一致し、本当の失敗を検出できない）。基点を明示した場合と`hotfix/`で始まるbranchは対象外。`DESKCAT_SKIP_BASE_GUARD=1`で無効化できる | Claude Codeのhook |
+| `hooks/merge_trailer_report.py` | Claude CodeのPostToolUse hook。`gh pr merge`の後にmerge commitのtrailerを実測して報告する。**判定を止めない。****確認できなかった場合は「入っている」と書かない。**事後の検査であり、入っていなければ履歴書き換えなしには直せないが、免除へ回す判断を次の昇格まで先延ばしにしないために報告する | Claude Codeのhook |
+| `hooks/command_line.py` | hookが受け取ったcommand文字列から、目的のprogramの呼び出しを取り出す。**語がcommand位置にあるかを見る**（単に語を探すと`echo gh pr merge`を呼び出しと読む。実際にそれで誤報告した）。区切り、絶対path、`sudo`／`env`等の前置語、`VAR=value`の代入を扱う。**shellの意味論は再現しない。**alias、function、変数展開経由の呼び出しは取れない。`hooks/gh_metadata_guard.py`と`hooks/branch_base_guard.py`と`hooks/merge_trailer_report.py`がimportする | import専用 |
+| `test_hooks.py` | `hooks/`配下の回帰test。hookを子processとして起動し、stdinへ入力JSONを渡して**拒否したか通したか**と診断文を検査する。基点の検査はfixture repositoryを作り、自分自身をoriginにして実際に`git fetch`させる（networkへ出ない）。`gh`と実際のPull Requestを要する経路は検査しない（落ちた理由がhookの誤りか環境かを区別できなくなるため） | Pages workflowとlocal |
 
 `lib/publish_guards.py`は単体で実行しない。secretや個人pathのpatternはこのfileだけで定義し、各scriptへ複製しない。
+
+`hooks/command_line.py`も単体で実行しない。commandの語がcommand位置にあるかの判定はこのfileだけで持ち、各hookへ複製しない。**`hooks/gh_metadata_guard.py`と`hooks/merge_trailer_report.py`は`review_gate.py`もimportする。**trailerの名前をhook側へ複製せず、正本から取るためである。名前がずれると、gateが要求するものとhookが見るものが食い違い、hookが素通りする。
+
+`hooks/`配下は Claude Code の hook として自動で起動される。**`.claude/settings.json`が起動元であり、hookの一覧と回避手順の正本は[CONTRIBUTINGの「hookが止めたとき」](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/CONTRIBUTING.md#hookが止めたとき)である。**stdinからhookの入力JSONを読み、`tool_input.command`だけを見る。**対象commandを実行しない。**
 
 ## 実行環境の前提
 
@@ -33,6 +42,7 @@ python3 scripts/validate_instruction_entrypoint.py
 python3 scripts/test_instruction_entrypoint.py
 python3 scripts/review_gate.py classify --base origin/develop --head HEAD
 python3 scripts/test_review_gate.py
+python3 scripts/test_hooks.py
 python3 scripts/prepare_pages.py
 python3 scripts/test_pages_guards.py
 ```
@@ -44,7 +54,7 @@ python3 -m unittest discover --start-directory scripts --pattern "test_*.py" --v
 ```
 
 Pages CIは`test_link_validators.py`、`test_pages_guards.py`、
-`test_instruction_entrypoint.py`、`test_review_gate.py`をrunnerの一時directoryから
+`test_instruction_entrypoint.py`、`test_review_gate.py`、`test_hooks.py`をrunnerの一時directoryから
 絶対pathで起動する。
 いずれもrepository root以外のcurrent directoryで成功しなければならない。
 `test_link_validators.py`と`test_pages_guards.py`は、あわせて`PAGES_SOURCE=.pages-src`を
