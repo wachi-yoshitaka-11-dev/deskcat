@@ -31,6 +31,6 @@ host workspace 側も同じ位置づけで、`2026-08-15-host-rust-ci` が開発
 ## 規則
 
 - 一つの記録は、一台の端末と一つの profile に対応させる。ある端末の成功記録を、別端末や別 profile の根拠にしない。
-- 判定は `Verified`、`Partial`、`Failed`、`Incompatible` のいずれかで結論づける。未実行の項目が残る場合は `Partial` とし、何が未達かを記録内に明記する。
+- **判定語とその選び方は [Version Record Template](../version-record-template.md) の「判定」節が正本である。**値も規則もここへ再掲しない。
 - 秘密情報、個人名、端末名、個人の絶対 path、USB serial を記録しない。build log を載せる場合は、home directory の path を `<home>` のような表記へ置換する。
 - Markdown 以外の拡張子で証拠 file を置かない。`docs/` 配下は Markdown だけが公開対象であり、それ以外は未公開として報告される。log は記録本文へ埋め込む。

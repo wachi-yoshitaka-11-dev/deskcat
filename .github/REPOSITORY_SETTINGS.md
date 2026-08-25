@@ -543,8 +543,8 @@ AIエージェントの誤操作に対する防壁になる」という状態は
 
 判断の意味は限定して読む。**`main`のforce pushとbranch削除を止めているのは、
 GitHubの設定ではなくGovernanceの規約とユーザー承認だけになる。**
-[AGENTS.md](../AGENTS.md)は「`git reset --hard`、強制checkout、履歴書き換え、force pushを
-行わない」と定めており、AIエージェントに対してはこの規約が唯一の歯止めである。
+[AGENTS.md](../AGENTS.md)は「共有branch（`main`／`develop`）の履歴を書き換えない。
+force pushもしない」と定めており、AIエージェントに対してはこの規約が唯一の歯止めである。
 **設定で強制されていると読まない。**
 
 `## 確認済み`のcheckboxは外した。**未完了のtaskではなく決定である。**

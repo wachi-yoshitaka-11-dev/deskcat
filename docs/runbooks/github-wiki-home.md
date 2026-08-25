@@ -620,7 +620,7 @@ allowlist、最終fragment／anchor検査を実施していない。現行gate�
 
 > **この履歴書き換えは、通常の保守手順ではない。**
 > [AGENTS.md](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/AGENTS.md)は
-> 履歴書き換えとforce pushを禁止している。今回は、既に公開されたcommitへ意図しない
+> 共有履歴の書き換えとforce pushを禁止している。今回は、既に公開されたcommitへ意図しない
 > addressが記録されていたことへの一回限りの是正として、ユーザーの明示的な指示のもとで実施した。
 >
 > 今後Wikiの内容や記録を訂正する場合は、**履歴を書き換えず新しいcommitで修正する**。

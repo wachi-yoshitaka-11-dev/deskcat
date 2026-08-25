@@ -10,6 +10,7 @@
 - [Raspberry Pi開発端末セットアップ](raspberry-pi-development-machine-setup.md)
 - [GitHub Pages公開](github-pages-publishing.md)
 - [GitHub Wiki入口の保守](github-wiki-home.md)
+- [CodeRabbitのreview状態の観測記録](coderabbit-review-observations.md)
 
 予定runbook:
 
