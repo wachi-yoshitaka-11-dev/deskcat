@@ -684,7 +684,7 @@ Instruction-Change: reviewed-as-data
 
 **`main`昇格では、範囲の各commitの宣言も検証される。**squash commitへtrailerを書き忘れると、その回のmergeは通っても次の昇格で落ちる。
 
-**ただし検査に起点がある。**trailer運用を導入したcommit（[#161](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/161)のsquash）より前は検査しない。**宣言を求める規則が存在しなかったためである。**起点より後にも、宣言を持たないことを許しているcommitがある。`AGENTS.md`が履歴書き換えを禁じているため、後からtrailerを付けられない。**起点と免除の正本は`scripts/review_gate.py`の`DECLARATION_CUTOVER`と`DECLARATION_EXEMPT`であり、免除の理由は同fileが持つ。**
+**ただし検査に起点がある。**trailer運用を導入したcommit（[#161](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/161)のsquash）より前は検査しない。**宣言を求める規則が存在しなかったためである。**起点より後にも、宣言を持たないことを許しているcommitがある。`AGENTS.md`が共有branchの履歴書き換えを禁じているため、後からtrailerを付けられない。**起点と免除の正本は`scripts/review_gate.py`の`DECLARATION_CUTOVER`と`DECLARATION_EXEMPT`であり、免除の理由は同fileが持つ。**
 
 そのため**`HISTORY_CHECKED`は昇格範囲のcommit数より少なくなりうる。取りこぼしではない。**検査した件数、skipしたmerge commitの件数、免除した件数を必ず出すため、差はその内訳で説明できる。**この数を期待値として引用しない。**範囲は昇格ごとに変わる。
 
@@ -705,7 +705,7 @@ merge後に`develop`のtipへ宣言が入ったことは、次で確認する。
 python3 scripts/review_gate.py receipt --base origin/develop~1 --head origin/develop
 ```
 
-**この確認をskipすると取り返しがつかない。**`AGENTS.md`が履歴書き換えを禁じているため、
+**この確認をskipすると取り返しがつかない。**`AGENTS.md`が共有branchの履歴書き換えを禁じているため、
 mergeしたsquash commitへ後からtrailerを付ける手段は無い。残るのは`DECLARATION_EXEMPT`へ
 登録する判断だけであり、それはIssueとPull Requestを1本ずつ要する。
 [#197](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/197)で実際に2 commit分を払っている。
@@ -777,7 +777,7 @@ DESKCAT_SKIP_BASE_GUARD=1 git checkout -b experiment/scratch
 - `.env`、資格情報、token、秘密鍵をcommitしない。
 - commit前にstage対象pathとdiffを確認する。
 - build生成物をcommitしない。
-- 通常作業でforce pushしない。
+- **共有branch（`main`／`develop`）へforce pushしない。**自分の未push・未mergeのbranchでは使ってよい（[Development Workflow](docs/governance/development-workflow.md)）。
 - 許可なく第三者参考資料を公開しない。
 
 ## Security上の報告

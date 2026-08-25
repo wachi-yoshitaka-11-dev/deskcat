@@ -122,7 +122,8 @@ Raspberry Piは動作を要求できるが、その実行が妥当かつ安全�
 - GitHubのvisibility変更
 - push、release、deploy、外部公開
 - 外部serviceへの書き込み
-- 既に依頼されていない破壊的な削除または履歴書き換え
+- 既に依頼されていない破壊的な削除
+- 共有branch（`main`／`develop`）の履歴書き換え。**自分の未push・未mergeのbranchでのrebaseは含まない**（[Development Workflow](development-workflow.md)）
 - `unsafe`の導入
 - 安全境界またはsecurity境界の縮小
 
