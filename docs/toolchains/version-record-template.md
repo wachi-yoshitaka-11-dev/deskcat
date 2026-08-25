@@ -81,11 +81,27 @@ Next action:
 
 ## 判定
 
-結果は次のいずれかで結論づける。
+**この節が判定語の正本である。**値も、値の意味も、選び方も、ここだけで定義する。
+[Version Records](version-records/README.md) はここを参照する。
+
+結果は次のいずれかで結論づける。**この4つ以外を使わない。**
 
 - `Verified`: 記録した profile の必須 command が成功した
 - `Partial`: 一部だけ成功し、未実行項目がある
 - `Failed`: 再現可能な失敗証拠がある
 - `Incompatible`: support 条件または target が一致しない
+
+**未実行の項目が一つでも残る場合は `Partial` とし、何が未達かを記録内に明記する。**
+「必須 command はすべて成功した」だけでは `Verified` にならない。
+
+**範囲を括弧で添えることで、上の4つから外れた判定にしない。**
+範囲そのものは `Conclusion` へ書いてよいが、**判定語は4つのいずれかである。**
+
+実例がある。ESP32 Flash / HIL の記録は `Conclusion: Verified（flash と起動記録について）`
+だったが、同じ記録が「USB 抜き差しでの再現は未検証である」とも書いていた。
+**未実行の項目が残っているため `Verified` にはならない。**
+[PR #208](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/208) が
+`Partial（… USB 抜き差しによる電源再投入後の起動出力が未検証。…）` へ改めた。
+**括弧の中身は残し、判定語だけを規則へ合わせている。**
 
 失敗を手動 workaround で通した場合、元の失敗と workaround の両方を記録する。
