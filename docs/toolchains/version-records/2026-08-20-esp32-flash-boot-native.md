@@ -384,7 +384,10 @@ release  5 m 59 s
 
 ### Conclusion（2026-08-25 時点）
 
-`Verified`。**profile の必須 command はすべて成功した**（`fmt`／`clippy`／`build`／
-`build --release`／`chip_id`／`elf2image`／`flash --monitor`）。判定は template の定義どおり
-**環境と profile の command に対するもの**であり、firmware の機能が完全であることを意味しない。
-未達の項目は上の「この再検証が主張しないこと」に挙げてある。
+`Partial`。profile の必須 command はすべて成功した（`fmt`／`clippy`／`build`／
+`build --release`／`chip_id`／`elf2image`／`flash --monitor`）が、**未実行の項目が残る。**
+一覧は上の「この再検証が主張しないこと」にある。
+
+**判定はこの記録に対して1つである。**[記録一覧](README.md)の規則が「未実行の項目が残る場合は
+`Partial`とし、何が未達かを記録内に明記する」と定めているため、先頭の `Conclusion:` 欄と
+この節を食い違わせない。
