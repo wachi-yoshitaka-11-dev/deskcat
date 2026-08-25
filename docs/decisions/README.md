@@ -19,6 +19,7 @@
 | [ADR-0011](0011-issue-optional-pull-request-required.md) | Accepted | Issueの要否とPull Requestの要否を分ける |
 | [ADR-0012](0012-milestones-count-issues-only.md) | Accepted | milestoneはIssueだけに設定する |
 | [ADR-0013](0013-manual-only-coderabbit-review.md) | Accepted | CodeRabbitの自動reviewを廃止し、手動依頼だけにする |
+| [ADR-0014](0014-safety-requirements-and-general-values.md) | Proposed | 安全要件を5項目に固定し、それ以外は一般値で開始してよいものとする |
 
 ## 新規作成
 
