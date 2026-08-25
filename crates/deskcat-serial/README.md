@@ -16,25 +16,101 @@ message型、検証、上限付きline受信は[`deskcat-protocol`](../deskcat-p
 - 上限のある送信queue（`Outbox`）
 - 送信側の`id`採番（`IdAllocator`）
 - 接続stateとcounter（`Session`）
+- 実serial portの上で`Transport`を満たす型（`SerialDevice`）。`serial2`でportを開き、
+  切断のerrnoと読みのtimeoutを契約どおりに正規化する（下記）
 
 含まないもの:
 
-- **実serial deviceのopen**（下記）
+- **実portを開いての確認**（下記）
 - **domain動作。**感情、性格、行動判断、独り言は入らない。公開するのは
   connection stateとcounterだけである
 - **session遷移の確定、duplicate履歴、受理budget、遷移cooldown。**受信側のstateを
   要するため[Issue #12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)の範囲である
 
-## 実deviceのbackendを含めない理由
+## 実deviceのbackend（`SerialDevice`）
 
-**VM上では実portを検証できない。**`/dev/ttyUSB*`のdevice名も未確認であり、
-USB OTG の変換 cable が未入手のため ESP32 と接続できない。
+`serial2`でportを開く。crateの選定は[Development Workflow](../../docs/governance/development-workflow.md)の
+依存追加の手順に従い、`Cargo.toml`のcommentへ8項目（必要性・公式性・保守状況・target・
+license・security・build負荷・代替）を記録した。**`serialport`は採らなかった。**
+MPL-2.0であり、`nix`／`bitflags`／`unescaper`とCの`libudev`を引く。
+Pi Zero W（公称512 MB、実測の使用可能memoryは**426 MiB**。**依存を伴うbuildがmemory不足で
+安定しないかは未評価のまま残っている**——
+[Raspberry Pi Rust toolchain](../../docs/toolchains/raspberry-pi-rust-toolchain.md)、
+[Version Record](../../docs/toolchains/version-records/2026-08-17-pi-direct-build-native.md)）へ
+持ち込む量を最小にするため、Linuxでの推移依存が`cfg-if`と`libc`の2つだけである
+`serial2`を採った。
 
-`serialport`のようなcrateの選定は、[Development Workflow](../../docs/governance/development-workflow.md)の
-依存追加の手順（必要性・公式性・保守状況・license・代替）に従って別途行う。
-**検証できない依存を先に足さない。**「あとで実機で確かめる」前提の依存追加をしない。
+`serial2::SerialPort`は`Read + Write`を実装するため、`transport.rs`のblanket implで
+**そのままでも既に`Transport`である。**それでもnewtypeを置くのは、**下層のerrorを
+2点だけ正規化するため**である。
 
-実backendは`Transport`を実装する形で後から載せられる。testはfakeを注入して行う。
+| 正規化 | なぜ要るか |
+|---|---|
+| `EIO`／`ENXIO`／`ENODEV` → `BrokenPipe` | LinuxでUSB serialを抜くとこのerrnoが出るが、standard libraryは対応する`ErrorKind`を持たない。`IoDisposition::classify`は知らないkindを`Fatal`にするため、**正規化しないと切断が再接続の経路へ入らない** |
+| `read`の`TimedOut` → `WouldBlock` | `serial2`は`poll`満了を`TimedOut`で表すが、`Transport`の契約は「今はdataが無い」を`WouldBlock`と定めている。移さないとidleのあいだ`counters.timeouts`が増え続ける。**`write`側は移さない**（送信bufferが詰まったままなのは実際に異常である） |
+
+`EBADF`と`ENOTTY`は**写さない。**再接続では直らないため`Fatal`が正しい。
+
+**`open()`のerrorを`IoDisposition::classify`へ渡さない。**同関数が分類するのは確立済みの
+linkの上で起きたerrorである。openの`ENOENT`／`EACCES`／`EBUSY`はUSBの再列挙中に起きる
+一時的なものだが、`classify`はこれらを`Fatal`にする。再接続のloopは、openの失敗を
+`Session::begin_reconnect()`が`None`を返すまで単純に再試行する。
+
+## 動かす（`serial_link` example）
+
+`SerialDevice`を呼ぶ実行体を1つ持つ。**このcrateはloopを持たない**（`Session`は
+transportを所有せず、pumpの引数で受け取る）ため、呼び出し側の形をここに置く。
+
+```bash
+cargo run --example serial_link -- --port <path> --baud <rate> [--seconds <n>] [--verbose]
+```
+
+`--port`と`--baud`は**どちらも必須である。既定値を持たせない。**device名は未確認であり
+（確定は[Issue #11](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11)の後半）、
+baudの正本は`PROTO-TBD-001`でいずれも`Candidate`である。渡した値は記録にそのまま残る。
+
+**出力にdevice名を書かない。**`Version Record Template`の禁止項目であり、出力を
+そのまま記録へ貼れるようにしてある。
+
+`--verbose`を付けない限り`Info`までを出す。`Debug`にするとread timeoutごとに1行出て
+（既定50 msなので毎秒20行）、長時間の観察では本当のeventが埋まる。
+
+**確かめられるのは「行が通ること」までである。**`protocol`が成立したことは確かめられない。
+`boot`／`ping`／`status`／ACK／reconnect同期の実装は
+[Issue #12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)であり、
+**ESP32側がprotocolを話すとは限らない。**接続のたびに`hello`を1件送るのは書き出し経路を
+通すためであって、handshakeではない（`reason`は初回が`Startup`、再接続が`PortReopen`。
+仕様§5.1）。記録では**「行が通った」と「protocolが成立した」を
+書き分ける。**
+
+### host（VM）で確認済みの挙動
+
+**擬似端末を相手に実走させた。実serial portではない。**
+
+| 確認 | 結果 |
+|---|---|
+| 存在しないportを指定 | openの失敗が`Fatal`にならず、backoffが100→200→400→800→1600 msと伸びて上限5回で`Stopped(ReconnectExhausted)` |
+| 行の往復 | `hello`を123 byte書き出して相手が受信。相手の`ping`行を受信して`sid`／`id`／型まで復元 |
+| idle | 4秒で`retries=80`、**`timeouts=0`**。「dataが無いだけ」をtimeoutとして数えていない |
+| 相手を落とす | 切断を観測（`disconnects=1`）し、再接続へ入って上限で停止 |
+
+## 実機に残っていること
+
+**このcrateの検証はhost（VM）上である。**testは`SerialPort::pair()`の擬似端末を使い、
+実のfile descriptor越しに行の復元、切断（`EIO`）、idle、送出を確認している。
+**`SerialDevice::open()`はtestで呼んでいない。**openこそがhardware無しに検証できない
+部分であり、通したことにしない。
+
+[Issue #11](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11)の後半に残るもの:
+
+- `/dev/ttyUSB*`のdevice名の確定
+- 実portでのread／write、切断、reconnect、partial I/Oの確認
+- `CLOCAL`をdriverが受け付けること（受け付けなければopenが失敗する）
+- **`HUPCL`の判断。**既定ではcloseでDTRが落ちる。**本projectのESP32 boardでDTR／RTSが
+  自動resetへ繋がっているかは確認していない。**繋がっていれば再接続のたびにESP32が
+  再起動することになり、`boot`／`hello`のhandshakeに効く。現物の確認と判断はprotocol側の
+  話であり、**このcrateでは触っていない**
+- Pi上でこのcrateをbuildできるか（memory）
 
 ## 既定値は暫定である
 

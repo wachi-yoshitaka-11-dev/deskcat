@@ -785,3 +785,97 @@ mod logging {
         assert!(hit.contains("Retry"), "分類が残る: {hit}");
     }
 }
+
+/// **openは成功するがlinkが死んでいる場合でも、再接続の上限は効く。**
+///
+/// device nodeは列挙されるが応答しない、という状態は実際に起きる（USB adapterの
+/// 半挿し、相手の電源断）。予算のresetを`note_connected`（＝openが成功しただけ）で
+/// 行うと、「open成功 → 予算が戻る → すぐ切断 → 再試行」が延々と回り、
+/// 受け入れ条件「Reconnectに上限とrate limitがある」が実質的に無効になる。
+///
+/// 既存の`reconnect_stops_at_the_attempt_limit`はこの経路を踏まない。
+/// あちらはfakeに再openが無く、`note_connected`を1度しか呼ばないためである。
+#[test]
+fn a_link_that_opens_but_never_carries_bytes_still_exhausts_the_reconnect_budget() {
+    let policy = ReconnectPolicy::new(3, Duration::from_millis(10), Duration::from_millis(40))
+        .expect("方針は妥当である");
+    let config = SerialConfig::new("/dev/simulated", 115_200)
+        .expect("設定は妥当である")
+        .with_reconnect(policy);
+    let mut session = Session::new(config, 90_312);
+
+    let mut backoffs = Vec::new();
+    for round in 0..16 {
+        assert!(round < 15, "上限に達せず再接続が止まらない");
+
+        // 「openは成功した」。だがlinkは死んでおり、すぐEOFになる。
+        session.note_connected();
+        let mut dead = Sim::with_reads(vec![Ok(Vec::new())]);
+        assert_eq!(session.pump_read(&mut dead, |_| {}), Pump::Disconnected);
+
+        match session.begin_reconnect() {
+            Some(backoff) => backoffs.push(backoff),
+            None => break,
+        }
+    }
+
+    assert_eq!(backoffs.len(), 3, "上限は3回である");
+    assert_eq!(
+        backoffs,
+        vec![
+            Duration::from_millis(10),
+            Duration::from_millis(20),
+            Duration::from_millis(40),
+        ],
+        "予算が戻っているとbackoffが初期値のまま伸びない"
+    );
+    assert_eq!(
+        session.state(),
+        ConnectionState::Stopped(StopReason::ReconnectExhausted)
+    );
+}
+
+/// 予算が戻るのは、実際にbyteが流れたときである。
+///
+/// 上のtestの裏側。**正当な復帰まで塞いでいないこと**を固定する。
+#[test]
+fn the_reconnect_budget_is_restored_by_bytes_not_by_opening() {
+    let policy = ReconnectPolicy::new(3, Duration::from_millis(10), Duration::from_millis(40))
+        .expect("方針は妥当である");
+    let config = SerialConfig::new("/dev/simulated", 115_200)
+        .expect("設定は妥当である")
+        .with_reconnect(policy);
+    let mut session = Session::new(config, 90_312);
+
+    session.note_connected();
+    let mut dead = Sim::with_reads(vec![Ok(Vec::new())]);
+    assert_eq!(session.pump_read(&mut dead, |_| {}), Pump::Disconnected);
+    assert!(session.begin_reconnect().is_some());
+    assert_eq!(session.reconnect_attempts(), 1);
+
+    // 再open。openしただけでは戻らない。
+    session.note_connected();
+    assert_eq!(
+        session.reconnect_attempts(),
+        1,
+        "openが成功しただけでは予算は戻らない"
+    );
+
+    // byteが流れたら戻る。
+    let incoming = ping_line(1);
+    let mut healthy = Sim::with_reads(vec![Ok(incoming.as_bytes().to_vec())]);
+    assert!(matches!(
+        session.pump_read(&mut healthy, |_| {}),
+        Pump::Progress(_)
+    ));
+    assert_eq!(
+        session.reconnect_attempts(),
+        0,
+        "実際にbyteが読めたら予算は戻る"
+    );
+    assert_eq!(
+        session.counters().reconnect_attempts,
+        1,
+        "累計のcounterはresetしない"
+    );
+}

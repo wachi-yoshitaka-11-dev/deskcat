@@ -1,12 +1,12 @@
 //! byte列を運ぶ層の境界。
 //!
-//! **実deviceのopenはこのcrateに含めない。**VM 上では実 port を検証できず、
-//! device名も未確認である（Issue #8の範囲外として保留されている）。
-//! `serialport`のようなcrateの選定は、依存追加の規則（必要性・公式性・保守状況・
-//! license・代替）に従って別途行う。**検証できない依存を先に足さない。**
+//! ここにあるのは境界だけである。testはfakeを注入し、実deviceは
+//! [`crate::device::SerialDevice`]がこのtraitを実装する。**このmoduleは
+//! deviceを開かないし、特定のOSを知らない。**
 //!
-//! ここではtraitだけを置き、testからfakeを注入できるようにする。実deviceの
-//! backendは、このtraitを実装する形で後から足せる。
+//! [`IoDisposition::classify`]が[`io::ErrorKind`]だけで判定するのはそのためである。
+//! errnoの意味はdeviceの種別で変わる（regular fileの`EIO`は切断ではない）。
+//! **device固有の正規化はbackend側の責務であり、ここへ足さない。**
 
 use std::fmt;
 use std::io;
@@ -19,27 +19,41 @@ use std::io;
 /// - `read`が`Ok(0)`を返すのは**EOFのときだけ**である。「今はdataが無い」は
 ///   `Ok(0)`ではなく[`io::ErrorKind::WouldBlock`]で表す。この区別を崩すと、
 ///   切断を「dataが無いだけ」と読み違える（受け入れ条件「Disconnectを観測できる」）。
+///   `poll`で待つbackendは満了を[`io::ErrorKind::TimedOut`]で表しがちだが、
+///   **それは「dataが無い」であって異常ではない。実装側で`WouldBlock`へ移す**
+///   （[`crate::device::SerialDevice`]がそうしている）。
+/// - 切断を[`IoDisposition::classify`]が`Disconnected`と読めるkindで返す。
+///   下層のerrnoが`ErrorKind`へ写らない場合（Linuxの`EIO`等）、**実装側で移す。**
+///   移さないと`classify`の既定に従って`Fatal`になり、再接続の経路へ入らない。
 /// - `write`は要求より少ないbyte数を返してよい。呼び出し側が進捗を管理する。
 pub trait Transport {
     /// `buf`へ読み込む。`Ok(0)`はEOF（切断）を表す。
     ///
     /// # Errors
     ///
-    /// 下層のI/O errorをそのまま返す。分類は呼び出し側が行う。
+    /// 上の契約に合う`ErrorKind`で返す。**それ以外は下層のI/O errorをそのまま返し、
+    /// 分類は呼び出し側（[`IoDisposition::classify`]）が行う。**
+    ///
+    /// 契約に合わせるための書き換えは2つだけである。「dataが無い」を表す満了を
+    /// [`io::ErrorKind::WouldBlock`]へ、`ErrorKind`へ写らない切断のerrnoを
+    /// `classify`が`Disconnected`と読むkindへ移す。**それ以外のerrorを作り替えない。**
+    /// 握りつぶしと区別が付かなくなる。
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize>;
 
     /// `buf`から書き出す。要求より少ないbyte数を返してよい。
     ///
     /// # Errors
     ///
-    /// 下層のI/O errorをそのまま返す。分類は呼び出し側が行う。
+    /// [`Self::read`]と同じ。ただし**満了の書き換えは`read`側だけである。**
+    /// 書き出しの満了は「送信bufferが窓のあいだ詰まったまま」であり、実際に異常である。
     fn write(&mut self, buf: &[u8]) -> io::Result<usize>;
 
     /// 書き出しをflushする。
     ///
     /// # Errors
     ///
-    /// 下層のI/O errorをそのまま返す。
+    /// [`Self::write`]と同じ。切断のerrnoの書き換えは**flushにも掛ける。**
+    /// hangup中のflushも切断であり、ここだけ`Fatal`にすると再接続の経路へ入らない。
     fn flush(&mut self) -> io::Result<()>;
 }
 
@@ -112,7 +126,10 @@ impl fmt::Display for IoOp {
 
 /// `Read + Write`を実装する型を、そのまま[`Transport`]として使えるようにする。
 ///
-/// testのfakeも、将来の実device backendも、この経路で載せられる。
+/// **この impl があるため、`Read + Write`を実装する型に対して個別の
+/// `impl Transport`を書くとcompileが通らない**（重複する。E0119）。
+/// 上の契約に足りない型を載せるときは、`Read`／`Write`を実装しないnewtypeで包む。
+/// [`crate::device::SerialDevice`]がその例である。
 impl<T> Transport for T
 where
     T: io::Read + io::Write,
