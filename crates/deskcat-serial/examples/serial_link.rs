@@ -11,7 +11,9 @@
 //!
 //! **`protocol`が成立したことは確かめられない。**`boot`／`ping`／`status`／ACK／reconnect
 //! 同期の実装は[Issue #12]であり、**`ESP32`側がprotocolを話すとは限らない。**
-//! 起動時に`hello`を1件送るのは書き出し経路を通すためであって、handshakeではない。
+//! 接続のたびに`hello`を1件送るのは書き出し経路を通すためであって、handshakeではない。
+//! `reason`は初回が`Startup`、再接続が`PortReopen`である（仕様§5.1）。
+//! **相手がこれに応答するとは限らない。**
 //! 記録するときは「行が通った」と「protocolが成立した」を書き分ける。
 //!
 //! # 使い方
@@ -110,6 +112,17 @@ fn parse_args() -> Result<Parsed, String> {
     })))
 }
 
+/// backoffを`--seconds`の残りで頭打ちにする。
+///
+/// 頭打ちにしないと、期限が切れているのにbackoffを寝過ごしてから終了する。
+/// `--seconds`を省いた場合（`deadline`が`None`）はbackoffをそのまま使う。
+fn capped_backoff(backoff: Duration, deadline: Option<Instant>) -> Duration {
+    match deadline {
+        Some(d) => backoff.min(d.saturating_duration_since(Instant::now())),
+        None => backoff,
+    }
+}
+
 /// 起動からの経過（milliseconds）。仕様§3の`ts_ms`はwall-clock timeではない。
 ///
 /// `u128`から`u64`へは飽和させる。切り捨てると値が巻き戻り、**単調増加という
@@ -118,12 +131,18 @@ fn uptime_ms(started: Instant) -> u64 {
     u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX)
 }
 
-/// 起動時に1件だけ送るmessage。**handshakeではない**（module docを読む）。
-fn hello() -> Message {
+/// 接続ごとに1件送る`hello`。**handshakeではない**（module docを読む）。
+///
+/// `reason`は初回だけ[`HelloReason::Startup`]で、**再接続では
+/// [`HelloReason::PortReopen`]である。**仕様§5.1が両者を別の値として定義しており
+/// （`Startup`は「新しい`sid`を使う」、`PortReopen`は「現在の`sid`を維持する」）、
+/// この実行体は`sid`をprocessごとに1つしか持たない。**再接続で`Startup`を送ると
+/// 「新しいsidを使う」と宣言しながら同じsidを送り続けることになる。**
+fn hello(reason: HelloReason) -> Message {
     Message::Hello(Hello {
         host: "serial_link".to_owned(),
         version: env!("CARGO_PKG_VERSION").to_owned(),
-        reason: HelloReason::Startup,
+        reason,
     })
 }
 
@@ -194,6 +213,9 @@ fn main() -> ExitCode {
 
     log::info!("sid={sid} で開始する");
 
+    // 初回接続かどうか。`hello`の`reason`を分けるために持つ。
+    let mut first_connect = true;
+
     loop {
         if deadline.is_some_and(|d| Instant::now() >= d) {
             log::info!("--seconds に達した");
@@ -210,8 +232,9 @@ fn main() -> ExitCode {
                     log::error!("再接続の上限に達した");
                     break;
                 };
-                log::info!("{backoff:?} 待って再試行する");
-                sleep(backoff);
+                let wait = capped_backoff(backoff, deadline);
+                log::info!("{wait:?} 待って再試行する");
+                sleep(wait);
                 continue;
             }
         };
@@ -219,9 +242,15 @@ fn main() -> ExitCode {
         log::info!("portを開いた");
         session.note_connected();
 
-        // 書き出し経路を通すために1件だけ送る。**handshakeではない。**
-        match session.send(hello(), uptime_ms(started)) {
-            Ok(id) => log::info!("hello を queue へ入れた（id={id}）"),
+        // 書き出し経路を通すために1件送る。**handshakeではない。**
+        let reason = if first_connect {
+            HelloReason::Startup
+        } else {
+            HelloReason::PortReopen
+        };
+        first_connect = false;
+        match session.send(hello(reason), uptime_ms(started)) {
+            Ok(id) => log::info!("hello を queue へ入れた（id={id}, reason={reason:?}）"),
             Err(error) => log::warn!("hello を送れない: {error}"),
         }
 
@@ -239,8 +268,9 @@ fn main() -> ExitCode {
             log::error!("再接続の上限に達した。停止する");
             break;
         };
-        log::info!("切断した。{backoff:?} 待って再接続する");
-        sleep(backoff);
+        let wait = capped_backoff(backoff, deadline);
+        log::info!("切断した。{wait:?} 待って再接続する");
+        sleep(wait);
     }
 
     report(session.counters(), session.state());

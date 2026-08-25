@@ -31,21 +31,29 @@ pub trait Transport {
     ///
     /// # Errors
     ///
-    /// 下層のI/O errorをそのまま返す。分類は呼び出し側が行う。
+    /// 上の契約に合う`ErrorKind`で返す。**それ以外は下層のI/O errorをそのまま返し、
+    /// 分類は呼び出し側（[`IoDisposition::classify`]）が行う。**
+    ///
+    /// 契約に合わせるための書き換えは2つだけである。「dataが無い」を表す満了を
+    /// [`io::ErrorKind::WouldBlock`]へ、`ErrorKind`へ写らない切断のerrnoを
+    /// `classify`が`Disconnected`と読むkindへ移す。**それ以外のerrorを作り替えない。**
+    /// 握りつぶしと区別が付かなくなる。
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize>;
 
     /// `buf`から書き出す。要求より少ないbyte数を返してよい。
     ///
     /// # Errors
     ///
-    /// 下層のI/O errorをそのまま返す。分類は呼び出し側が行う。
+    /// [`Self::read`]と同じ。ただし**満了の書き換えは`read`側だけである。**
+    /// 書き出しの満了は「送信bufferが窓のあいだ詰まったまま」であり、実際に異常である。
     fn write(&mut self, buf: &[u8]) -> io::Result<usize>;
 
     /// 書き出しをflushする。
     ///
     /// # Errors
     ///
-    /// 下層のI/O errorをそのまま返す。
+    /// [`Self::write`]と同じ。切断のerrnoの書き換えは**flushにも掛ける。**
+    /// hangup中のflushも切断であり、ここだけ`Fatal`にすると再接続の経路へ入らない。
     fn flush(&mut self) -> io::Result<()>;
 }
 

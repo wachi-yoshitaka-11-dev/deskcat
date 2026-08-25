@@ -59,7 +59,10 @@ impl core::error::Error for ConfigError {}
 /// [Issue #11]: https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SerialConfig {
-    /// Serial deviceのpath。**このcrateはopenしない。**値を保持するだけである。
+    /// Serial deviceのpath。
+    ///
+    /// **この型は値を保持するだけである。**openするのは
+    /// [`SerialDevice::open`](crate::SerialDevice::open)であり、そちらがこのpathを使う。
     port: String,
     /// Baud rate。確定値は`PROTO-TBD-001`。
     baud: u32,

@@ -78,8 +78,9 @@ baudの正本は`PROTO-TBD-001`でいずれも`Candidate`である。渡した�
 **確かめられるのは「行が通ること」までである。**`protocol`が成立したことは確かめられない。
 `boot`／`ping`／`status`／ACK／reconnect同期の実装は
 [Issue #12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)であり、
-**ESP32側がprotocolを話すとは限らない。**起動時に`hello`を1件送るのは書き出し経路を
-通すためであって、handshakeではない。記録では**「行が通った」と「protocolが成立した」を
+**ESP32側がprotocolを話すとは限らない。**接続のたびに`hello`を1件送るのは書き出し経路を
+通すためであって、handshakeではない（`reason`は初回が`Startup`、再接続が`PortReopen`。
+仕様§5.1）。記録では**「行が通った」と「protocolが成立した」を
 書き分ける。**
 
 ### host（VM）で確認済みの挙動

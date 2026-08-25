@@ -241,11 +241,15 @@ impl fmt::Debug for SerialDevice {
 impl Transport for SerialDevice {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         // 空bufferを渡すと`read(2)`が`Ok(0)`を返し、呼び出し側がEOFと読む。
-        // `Session`は固定長のbufferを丸ごと渡すため到達しないが、契約として残す。
-        debug_assert!(
-            !buf.is_empty(),
-            "空のbufferを渡すとOk(0)がEOFと区別できない"
-        );
+        // **`debug_assert!`にしない。**release buildで消えるため、
+        // 「releaseのときだけ偽の切断になる」という最悪の形になる。
+        // `Transport`は公開traitであり、`Session`以外の呼び出し側も通る。
+        if buf.is_empty() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "空のbufferを渡すとOk(0)がEOFと区別できない",
+            ));
+        }
         self.port
             .read(buf)
             .map_err(|error| normalize_read_idle(normalize_disconnect(error)))
@@ -294,6 +298,7 @@ fn normalize_read_idle(error: io::Error) -> io::Error {
 
 #[cfg(all(unix, test))]
 mod tests {
+    use std::io;
     use std::time::Duration;
 
     use deskcat_protocol::{Envelope, Frame, Message, Outcome, encode_line, limits};
@@ -487,16 +492,21 @@ mod tests {
         assert_eq!(session.state(), ConnectionState::Connected);
     }
 
-    /// 空bufferを渡す経路が無いことを、契約として固定する。
+    /// 空bufferは、**buildの種類によらず**errorで弾く。
     ///
-    /// `debug_assert!`はrelease buildで消えるため、このtestもdebugのときだけ意味を持つ。
-    /// gateを付けないと`cargo test --release`が「panicしなかった」で落ちる。
+    /// `debug_assert!`だとrelease buildで消え、`Ok(0)`＝EOFとして返ってしまう。
+    /// 「releaseのときだけ偽の切断になる」形を避けるため、このtestにgateを付けない。
     #[test]
-    #[cfg(debug_assertions)]
-    #[should_panic(expected = "空のbuffer")]
-    fn reading_into_an_empty_buffer_is_a_contract_violation() {
+    fn reading_into_an_empty_buffer_is_rejected_in_every_build() {
         let (mut device, _far) = pty_pair();
-        let _ = device.read(&mut []);
+        let error = device.read(&mut []).expect_err("空bufferは弾く");
+
+        assert_eq!(error.kind(), io::ErrorKind::InvalidInput);
+        // 切断とも再試行とも読ませない。設定の誤りである。
+        assert_eq!(
+            crate::IoDisposition::classify(&error),
+            crate::IoDisposition::Fatal
+        );
     }
 }
 
