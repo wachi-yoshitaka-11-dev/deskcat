@@ -17,12 +17,12 @@ allowlistで自動reviewを高リスク変更（firmware、protocol、Raspberry 
 **現行設定はこれを満たさない。**allowlistのlabelを持つPull Requestは自動起動する設計である。
 
 あわせて、allowlistが実際には機能していないことが分かっている。`CONTRIBUTING.md`の
-「GitHubが強制しないもの」に記録した観測のうち、**allowlistのlabelを持つPull Requestが
+観測記録のうち、**allowlistのlabelを持つPull Requestが
 `Review skipped`になった事象**（[#123](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/123)・
 [#125](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/125)）がそれである。
 **設定は「走る」と宣言し、実際には走らない状態が続いている。**
-**その原因は未特定である**（`CONTRIBUTING.md`の「5行目の観測」が「未特定のまま残る」と
-記録している）。**本ADRは原因を特定していない。**特定できないまま「走る」と宣言する設定を
+**その原因は未特定である**（[CodeRabbitのreview状態の観測記録](../runbooks/coderabbit-review-observations.md)の
+「5行目の観測」が「未特定のまま残る」と記録している）。**本ADRは原因を特定していない。**特定できないまま「走る」と宣言する設定を
 残さない、という判断である。
 
 ## 判断要因
