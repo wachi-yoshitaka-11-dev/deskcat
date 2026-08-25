@@ -13,6 +13,7 @@
 | [Development Workflow](development-workflow.md) | Issue、実装、検証、文書化、Gitの作業手順 |
 | [Hardware Safety Policy](hardware-safety-policy.md) | 電気、機構、ベンチ試験に関する必須安全規則 |
 | [公開asset register](published-asset-register.md) | 公開するbinary assetの出所と再配布許諾 |
+| [作業指示書テンプレート](work-instruction-template.md) | 人間がAIエージェントへ1つの作業を渡すときの様式 |
 
 ルートの[AGENTS.md](../../AGENTS.md)は、AIエージェントが実行時に参照する簡潔な指示である。背景情報を重複させず、このディレクトリのポリシーを参照する。
 
