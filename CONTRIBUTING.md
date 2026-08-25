@@ -632,8 +632,12 @@ review後にcommitが増えると宣言が自動的に無効になる（[ADR-001
 gh pr merge <N> --squash --subject "<Pull Requestの題名>" --body-file <path>
 ```
 
+**`--subject`と`--body-file`を省略しない。**引数なしの`gh pr merge --squash`はGitHubが合成した
+messageでmergeし、**Pull Requestのhead commitが持っていたtrailerは引き継がれない。**
+mergeは成功し、警告も出ない。
+
 `--body-file`の内容には、末尾へ次のtrailerを置く。**指示sourceを変更していない場合、
-3行目は書かない。**
+`Instruction-Change`の行は書かない。**残る`Change-Class` 1行と`Self-Review` 3行はすべて要る。
 
 ```text
 Change-Class: review-required
@@ -644,6 +648,13 @@ Instruction-Change: reviewed-as-data
 ```
 
 **trailerの名前と値の正本は`scripts/review_gate.py`である。**
+
+**この節は、省略する行を「3行目」と行番号で指定していた。**
+[#161](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/161)でこの節を書いたとき上のblockは3行で、3行目は`Instruction-Change`だった。
+[#164](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/164)が`Self-Review`を3値へ分けてblockが5行になった際、
+**古い記述だけが取り残された。**指す先は`Self-Review: fresh-context-pass`へずれており、
+**従うと`receipt`が落ちる**（3値すべてを要求するため）。
+**行番号で指定しない。**値が増減するとずれる。
 
 **`main`昇格では、範囲の各commitの宣言も検証される。**squash commitへtrailerを書き忘れると、その回のmergeは通っても次の昇格で落ちる。
 
@@ -667,6 +678,11 @@ merge後に`develop`のtipへ宣言が入ったことは、次で確認する。
 ```bash
 python3 scripts/review_gate.py receipt --base origin/develop~1 --head origin/develop
 ```
+
+**この確認をskipすると取り返しがつかない。**`AGENTS.md`が履歴書き換えを禁じているため、
+mergeしたsquash commitへ後からtrailerを付ける手段は無い。残るのは`DECLARATION_EXEMPT`へ
+登録する判断だけであり、それはIssueとPull Requestを1本ずつ要する。
+[#197](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/197)で実際に2 commit分を払っている。
 
 squash mergeしたbranchはcommit hashが変わるため、`git branch -d`が「未merge」と判定する。
 削除前に`git diff <branch> origin/develop`が空であることを確認してから`-D`する。

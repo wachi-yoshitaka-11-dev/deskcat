@@ -14,7 +14,9 @@
 
 ## 現在の状態
 
-Issue #5 でtoolchainを固定し、最小projectのclean buildを確認した。実装済みなのは`link_patches()`、logger初期化、起動logの出力だけであり、hardware driverは未実装である。
+Issue #5 でtoolchainを固定し、最小projectのclean buildを確認した。実装済みなのは`link_patches()`、logger初期化、起動logの出力、および Issue #7 の heartbeat と health snapshot だけであり、**hardware driverは未実装である。**
+
+heartbeat と health snapshot は ESP logger の log にのみ出す。**「log へ出す」は「serial へ出ない」ではない。**logger の出力は UART を通って serial monitor に現れる。送らないのは、protocol の message として application の serial link（#11）へ流すことである。周期は `src/config.rs` が持ち、**いずれも暫定値である**（Protocol §5.7 が heartbeat の interval を `TBD` としているため、一次資料の根拠が無い）。health snapshot は `crates/deskcat-protocol` の `Status` を組み立てて JSON 1 行として出す。**`ProtocolCounters` はすべて 0 のままである。**serial link（#11）も session（#12）も無く、計上すべき事象が発生しないためである。
 
 | 項目 | 確定版 |
 |---|---|
@@ -62,10 +64,18 @@ deskcat-protocol = { path = "../../crates/deskcat-protocol" }
 - `crates/deskcat-protocol/**`の変更でも`.github/workflows/firmware.yml`が発火する。
   host側だけの変更でfirmware buildが壊れるのを検知するためである。
 
-**`src/main.rs`はまだこのcrateを呼び出していない。**serial taskの配線は
+`src/health.rs`がこのcrateの`Status`と`ProtocolCounters`を組み立てる。ただし**送信はしない。**
+serial deviceは[#11](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11)、
+session stateとserial taskの配線は
 [#12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)の担当である。
-現時点で示せているのは、固定toolchainで`xtensa-esp32-espidf`向けにcross compileできることまでで、
-**実機上での動作とfixture合格は主張しない。**
+現時点で示せているのは、固定toolchainで`xtensa-esp32-espidf`向けにcross compileできること、
+および同crateの`status` payloadを実機上でserializeできることまでで、
+**共有fixtureへの合格は主張しない。**
+
+実機でのserializeの証拠は
+[Version Recordの「2026-08-25 再検証」](../../docs/toolchains/version-records/2026-08-20-esp32-flash-boot-native.md)
+にある（`status` payloadのJSON 1行と`serialize失敗 0`）。**同記録の2026-08-20の確認とは別である。**
+そちらが示したのは#6の起動出力とchip名までであり、`deskcat-protocol`を呼んでいなかった。
 
 ## 未確定の前提
 

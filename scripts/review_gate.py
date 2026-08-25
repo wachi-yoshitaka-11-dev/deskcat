@@ -84,13 +84,35 @@ DECLARATION_CUTOVER = "57734371384d18f31de7557a7a60fd1aa856edff"
 
 # 起点より後だが、宣言を持たないことを許すcommit。
 #
-# 対象はPR #160のsquashである。**Gateがrequired status checkでなかった期間に
-# mergeされた。**
 # `AGENTS.md`が履歴書き換えを禁じているため、後からtrailerを付けられない。
+# 中身はいずれもPull Requestのreviewを通っており、失われるのは宣言の記録である。
+#
+# **ただし免除は`Change-Class`と`Self-Review`だけを飛ばすのではない。**`history`は
+# 免除commitで`continue`するため、`_check_instructions`も掛からない。**指示source変更の
+# 宣言（`Instruction-Change`）の検査まで抑止する。**
+# 実際に効いているのは`9c91f913`だけである（`docs/hardware/`を触りながら
+# `Instruction-Change`を持たない）。`18298ae`と`619c843`は`INSTRUCTION_SOURCES`のpathを
+# 1つも触らないため、この抑止は掛かっていない。
+#
+# **理由は1つではない。原因ごとに書き分ける。**同じ「後から付けられない」で
+# まとめると、再発を止める手がかりが消える。
+#
+# - `9c91f913`（PR #160）。**Gateがrequired status checkでなかった期間にmergeされた。**
+#   規則を強制する仕組みが無かった。
+# - `18298ae`（PR #191）、`619c843`（PR #196）。**規則も強制も揃っていた。**
+#   head commit（`57c099b`、`e1553a1`）は`Change-Class`と3値の`Self-Review`を持ち、
+#   Gateの`Verify change class and self-review`はどちらも`success`だった。
+#   `gh pr merge --squash`をmessage指定なしで実行したため、GitHubが合成したmessageへ
+#   trailerが入らず、squash commitへ引き継がれなかった。**書き忘れである。**
+#   確認手順はCONTRIBUTINGの「Merge方式」にある。
 #
 # **この列挙を増やさない。**増やす変更は`scripts/`の変更であり、reviewと
 # `Instruction-Change`の宣言を通る。通したうえで増やすなら、それは判断である。
-DECLARATION_EXEMPT = ("9c91f913696033ca3da9b26d10ac793ee2c2291e",)
+DECLARATION_EXEMPT = (
+    "9c91f913696033ca3da9b26d10ac793ee2c2291e",
+    "18298ae3127f31a81411a6c723122dad17a91299",
+    "619c8439be8489451ec9f6a9b79613bc01c1605d",
+)
 
 # 変更行がこれらのいずれかに当たると軽微にしない。数値、command、link、表、見出し、
 # checkbox、HTML commentは、typoの修正に見えても意味を持つ。

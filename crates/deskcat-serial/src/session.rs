@@ -244,13 +244,19 @@ impl Session {
     /// transportが確立したことを通知する。
     ///
     /// **実deviceのopenはこのcrateが行わない。**呼び出し側がtransportを用意し、
-    /// ここでstateを揃える。再接続の試行回数はここでresetする。
+    /// ここでstateを揃える。
+    ///
+    /// **再接続の予算はここでresetしない。**openが成功しただけでは、linkが
+    /// 生きている証拠にならない。device nodeは列挙されるが応答しないという状態は
+    /// 実際に起きる（USB adapterの半挿し、相手の電源断）。ここでresetすると、
+    /// 「open成功 → 予算が戻る → すぐ切断 → 再試行」が延々と回り、
+    /// **[`ReconnectPolicy::max_attempts`](crate::ReconnectPolicy::max_attempts)に永久に到達せず、backoffも初期値から
+    /// 伸びない。**予算が戻るのは[`Self::pump_read`]が実際にbyteを読めたときである。
     pub fn note_connected(&mut self) {
         if self.stopped.is_some() {
             return;
         }
         self.link_connected = true;
-        self.reconnect_attempts = 0;
         // port再openとreconnectでは受信中の断片を捨てる（§10）。
         // 途中まで読んだlineの続きが、新しい接続の先頭と繋がってはならない。
         self.receiver.reset();
@@ -287,6 +293,9 @@ impl Session {
     ///
     /// `None`を返したときsessionは[`StopReason::ReconnectExhausted`]で停止する。
     /// **上限後も自動試行を続けると、上限が実質的に無くなる。**
+    ///
+    /// 予算は[`Self::pump_read`]が実際にbyteを読めた時点で戻る。
+    /// [`Self::note_connected`]では戻らない（理由は同methodのdocにある）。
     pub fn begin_reconnect(&mut self) -> Option<Duration> {
         if self.stopped.is_some() {
             return None;
@@ -415,6 +424,10 @@ impl Session {
             }
             Ok(n) => {
                 self.counters.bytes_in += n as u64;
+                // **linkが生きている唯一の証拠である。**ここで再接続の予算を戻す。
+                // `note_connected`（＝openが成功しただけ）では戻さない。
+                // 累計の`counters.reconnect_attempts`はresetしない。
+                self.reconnect_attempts = 0;
                 let mut frames = 0_u64;
                 let mut rejected = 0_u64;
                 self.receiver.drain(&self.read_buf[..n], |outcome| {
