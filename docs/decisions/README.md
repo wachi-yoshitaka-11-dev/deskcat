@@ -19,6 +19,7 @@
 | [ADR-0011](0011-issue-optional-pull-request-required.md) | Accepted | Issueの要否とPull Requestの要否を分ける |
 | [ADR-0012](0012-milestones-count-issues-only.md) | Accepted | milestoneはIssueだけに設定する |
 | [ADR-0013](0013-manual-only-coderabbit-review.md) | Accepted | CodeRabbitの自動reviewを廃止し、手動依頼だけにする |
+| [ADR-0015](0015-fixup-class-and-direct-commit-scope.md) | Proposed | 後始末を宣言専用の区分として足し、直接commitの基準を到達できる形へ変える |
 
 ## 新規作成
 

@@ -150,7 +150,8 @@ firmware は `crates/deskcat-protocol` を path dependency で使う（[ADR-0008
 
 - `git reset --hard`、強制 checkout、履歴書き換え、force push を行わない。
 - ユーザーから依頼されない限り commit、push、tag、release を行わない。
-- commit する前に、変更範囲の分類を `scripts/review_gate.py` で確認する。**`CLASS=minor` と判定されない変更を、Issue と Pull Request なしで `develop` へ入れない。**
+- commit する前に、変更範囲の分類を `scripts/review_gate.py` で確認する。
+- **`develop` へ Issue と Pull Request なしで入れてよいのは次の2つだけである。**`CLASS=minor` と判定された変更、または `Change-Class: fixup` と `Refs: #<番号>` を宣言する**既に merge され review を通った作業の後始末**。範囲の上限は CONTRIBUTING の「後始末（`fixup`）の範囲」が正本である。どちらも承認は要る。
 - `.env`、資格情報、秘密鍵、ローカル設定をコミットしない。
 - ユーザーの既存変更を破棄、整形、移動しない。
 
