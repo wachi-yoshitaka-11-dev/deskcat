@@ -148,11 +148,13 @@ firmware は `crates/deskcat-protocol` を path dependency で使う（[ADR-0008
 
 ## Git と公開
 
-- `git reset --hard`、強制 checkout、履歴書き換え、force push を行わない。
-- ユーザーから依頼されない限り commit、push、tag、release を行わない。
+- ユーザーから依頼されない限り commit、push、force push、tag、release を行わない。
+- **共有 branch（`main`／`develop`）の履歴を書き換えない。**依頼があっても force push しない。
+- **他者が pull した可能性のある branch は共有として扱う。**判断に迷うものは共有として扱う。
+- 自分の未 push・未 merge branch では rebase と force push を使ってよい。**許すのは操作の種類であって、push の依頼を省いてよいという意味ではない。**
 - commit する前に、変更範囲の分類を `scripts/review_gate.py` で確認する。**`CLASS=minor` と判定されない変更を、Issue と Pull Request なしで `develop` へ入れない。**
 - `.env`、資格情報、秘密鍵、ローカル設定をコミットしない。
-- ユーザーの既存変更を破棄、整形、移動しない。
+- ユーザーの既存変更を破棄、整形、移動しない。**`git reset --hard` と強制 checkout はこの規則で扱う**（履歴書き換えではなく、未 commit の変更を失う操作である）。実行前に working tree を確認する。
 
 ## 外部操作
 

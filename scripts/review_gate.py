@@ -84,7 +84,8 @@ DECLARATION_CUTOVER = "57734371384d18f31de7557a7a60fd1aa856edff"
 
 # 起点より後だが、宣言を持たないことを許すcommit。
 #
-# `AGENTS.md`が履歴書き換えを禁じているため、後からtrailerを付けられない。
+# `AGENTS.md`が共有branchの履歴書き換えを禁じているため、後からtrailerを付けられない。
+# **いずれも`develop`へmerge済みであり、共有履歴である。**
 # 中身はいずれもPull Requestのreviewを通っており、失われるのは宣言の記録である。
 #
 # **ただし免除は`Change-Class`と`Self-Review`だけを飛ばすのではない。**`history`は
