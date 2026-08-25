@@ -637,7 +637,7 @@ messageでmergeし、**Pull Requestのhead commitが持っていたtrailerは引
 mergeは成功し、警告も出ない。
 
 `--body-file`の内容には、末尾へ次のtrailerを置く。**指示sourceを変更していない場合、
-3行目は書かない。**
+`Instruction-Change`の行は書かない。**残る`Change-Class` 1行と`Self-Review` 3行はすべて要る。
 
 ```text
 Change-Class: review-required
@@ -648,6 +648,12 @@ Instruction-Change: reviewed-as-data
 ```
 
 **trailerの名前と値の正本は`scripts/review_gate.py`である。**
+
+**省略する行を行番号で指定しない。**値が増減するとずれる。
+[#161](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/161)でこの節を書いたとき上のblockは3行で、3行目は`Instruction-Change`だった。
+[#164](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/164)が`Self-Review`を3値へ分けてblockが5行になった際、
+**`3行目は書かない`という古い記述だけが取り残された。**その3行目は`Self-Review: fresh-context-pass`であり、
+**従うと`receipt`が落ちる**（3値すべてを要求するため）。
 
 **`main`昇格では、範囲の各commitの宣言も検証される。**squash commitへtrailerを書き忘れると、その回のmergeは通っても次の昇格で落ちる。
 
