@@ -69,6 +69,7 @@ Issueには次を含める。
 |---|---|---|
 | boardのmetadata記入漏れ。repositoryの変更ではない | 不要 | 不要 |
 | `review_gate.py`が`CLASS=minor`と判定した変更 | 不要 | 不要。承認を得たうえで`develop`へ直接反映してよい |
+| **既にmergeされreviewを通った作業の後始末。**`Change-Class: fixup`と`Refs: #<番号>`を宣言する | 不要 | 不要。承認を得たうえで`develop`へ直接反映してよい |
 | typo、リンク修正、表記ゆれ、言い回しの修正で、**意味を変えないもの** | 不要 | **必要** |
 | 規約、仕様、安全、電気、protocol、GPIO、電源、toolchain、CI、依存の**意味**を変えるもの | **必須** | **必要** |
 | 複数のPull Requestに跨る、または他の作業をblockするもの | **必須** | **必要** |
@@ -76,11 +77,15 @@ Issueには次を含める。
 Issue不要の側でも、**変更内容の承認は必ず得る。**「Issueを立てない」は「勝手に変えてよい」ではない。
 判断に迷うものはIssue必須の側として扱う。安全に関わる範囲は緩めない。
 
-**3行目と4行目の境界は機械的に判定できない。**「言い回しの修正」と「意味の変更」を区別するcodeは
-無い（[ADR-0010](docs/decisions/0010-change-class-and-review-declaration.md)）。迷ったら4行目にする。
-**ただし3行目はPull Requestを通る。**判断を誤っても、Review gateと自己レビューがその差分を見る。
-黙って`develop`へ入ることはない。**repositoryへの変更でPull Requestを省けるのは2行目だけであり、
-そこはscriptが判定する。**1行目はrepositoryの変更ではないため、Pull Requestという単位が無い。
+**「言い回しの修正」と「意味の変更」の境界は機械的に判定できない。**両者を区別するcodeは
+無い（[ADR-0010](docs/decisions/0010-change-class-and-review-declaration.md)）。
+**迷ったら「意味を変えるもの」として扱う。**
+**ただし「言い回しの修正」もPull Requestを通る。**判断を誤っても、Review gateと自己レビューが
+その差分を見る。黙って`develop`へ入ることはない。
+
+**repositoryへの変更でPull Requestを省けるのは、`CLASS=minor`と後始末（`fixup`）の2つだけである。**
+前者はscriptが判定し、後者は宣言する側が申告する（下の「後始末（`fixup`）の範囲」）。
+boardのmetadata記入漏れはrepositoryの変更ではないため、Pull Requestという単位が無い。
 
 **scriptが決めるのは`CLASS`だけである。**Issueが要るかどうかはscriptの判定ではない。
 
@@ -88,8 +93,10 @@ Issue不要の側でも、**変更内容の承認は必ず得る。**「Issueを
 python3 scripts/review_gate.py classify --base origin/develop --head HEAD
 ```
 
-`CLASS=minor`のときだけ、Pull Requestなしで`develop`へ直接反映してよい。
-**`CLASS=review-required`を人の判断で覆さない。**scriptは軽微と証明できるものだけを`minor`に
+`CLASS=minor`のときは、Pull Requestなしで`develop`へ直接反映してよい。
+**`CLASS=review-required`でも、後始末として申告する経路がある**（下の
+「[後始末（`fixup`）の範囲](#後始末fixupの範囲)」）。**それ以外で
+`CLASS=review-required`を人の判断で覆さない。**scriptは軽微と証明できるものだけを`minor`に
 するため、本当は軽微な変更も`review-required`へ落ちる。それは意図した失敗方向であり、
 Pull Requestを1本作れば済む。
 
@@ -97,6 +104,32 @@ Pull Requestを1本作れば済む。
 見ない。`develop`のbranch protectionにも必須reviewと必須status checkを設定していない
 （[ADR-0007](docs/decisions/0007-review-scope-and-self-review.md)の決定4）。
 `classify`を実行する場面は、`develop`へ直接反映すると決めた場面と同じである。
+
+### 後始末（`fixup`）の範囲
+
+**`CLASS=minor`は構造的に出ない。**`INSTRUCTION_SOURCES`にpathが該当した時点で
+`review-required`が決まり、行の中身の判定へ届かない。**この repository の文書作業は
+ほぼ全部が該当する。**そのため上の表の`CLASS=minor`の行は、実際には空である。
+
+そこで**申告による軽い経路**を置いた。`Change-Class: fixup`と`Refs: #<番号>`を宣言する。
+
+対象:
+
+- 既にmergeされreviewを通った作業の**後始末**。typo、リンク切れ、指摘対応の漏れ、記録の整理
+- `Refs`でその Issue または Pull Request を指す。**後始末である以上、対象が存在する**
+
+**絶対に対象外:**
+
+- **安全値、protocol、GPIO、電源値、firmware、`crates/`。**新しい判断
+- `docs/hardware/`の**値**の変更。**節の整理は可**
+
+**この経路には強制点がある。**直接commitは`gate`を通らない（`gate`はPull Requestで起動する）。
+しかし`history`が`develop`から`main`への昇格時に**範囲の各commitを検査する**ため、
+宣言が壊れていれば次の昇格で落ちる。**`minor`経路が完全に無検証であるのより強い。**
+
+**`fixup`は「軽微である」と主張しない。**`classify`の出力は変わらず、`review-required`の
+まま出る。主張しているのは「後始末である」だけである。**そのため`minor`の判定も
+`review-required`の判定も緩んでいない**（[ADR-0015](docs/decisions/0015-fixup-class-and-direct-commit-scope.md)）。
 
 ## Issueの命名
 
@@ -536,6 +569,36 @@ Self-Review: fresh-context-pass
 Self-Review: converged
 Instruction-Change: reviewed-as-data
 ```
+
+**`Change-Class: fixup`を宣言する場合は、`Refs`で後始末の対象を示す。**
+番号を含まない`Refs`は通らない。
+
+```text
+Change-Class: fixup
+Self-Review: requirements-pass
+Self-Review: fresh-context-pass
+Self-Review: converged
+Refs: #206
+```
+
+**`Refs`にはコロンが要る。**`git interpret-trailers`はコロンの無い行をtrailerとして
+読まない。この repository のcommit messageは`Refs #204`（コロンなし）を本文の段落として
+書いてきたが、**それはtrailerではない。**
+
+**そしてコロンの無い行をtrailer blockと同じ段落へ置くと、blockごと無効になる。**
+`Change-Class`も`Self-Review`も消え、gateは「trailerが無い」と報告する。実測した。
+
+```text
+本文
+
+Refs #200
+Change-Class: review-required
+Self-Review: converged
+```
+
+上のmessageから`git interpret-trailers --parse`が返すのは**空である。**
+本文の段落として`Refs #204`を書く場合は、**trailer blockと空行で分ける。**
+`fixup`の宣言に使う場合は、**block の中へ`Refs: #204`と書く。**
 
 **trailerの名前と値の正本は`scripts/review_gate.py`である。**
 

@@ -157,7 +157,8 @@ firmware は `crates/deskcat-protocol` を path dependency で使う（[ADR-0008
 - **共有 branch（`main`／`develop`）の履歴を書き換えない。**依頼があっても force push しない。
 - **他者が pull した可能性のある branch は共有として扱う。**判断に迷うものは共有として扱う。
 - 自分の未 push・未 merge branch では rebase と force push を使ってよい。**許すのは操作の種類であって、push の依頼を省いてよいという意味ではない。**
-- commit する前に、変更範囲の分類を `scripts/review_gate.py` で確認する。**`CLASS=minor` と判定されない変更を、Issue と Pull Request なしで `develop` へ入れない。**
+- commit する前に、変更範囲の分類を `scripts/review_gate.py` で確認する。
+- **`develop` へ Issue と Pull Request なしで入れてよいのは次の2つだけである。**`CLASS=minor` と判定された変更、または `Change-Class: fixup` と `Refs: #<番号>` を宣言する**既に merge され review を通った作業の後始末**。範囲の上限は CONTRIBUTING の「後始末（`fixup`）の範囲」が正本である。どちらも承認は要る。
 - `.env`、資格情報、秘密鍵、ローカル設定をコミットしない。
 - ユーザーの既存変更を破棄、整形、移動しない。**`git reset --hard` と強制 checkout はこの規則で扱う**（履歴書き換えではなく、未 commit の変更を失う操作である）。実行前に working tree を確認する。
 
