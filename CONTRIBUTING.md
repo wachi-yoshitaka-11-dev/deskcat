@@ -632,6 +632,10 @@ review後にcommitが増えると宣言が自動的に無効になる（[ADR-001
 gh pr merge <N> --squash --subject "<Pull Requestの題名>" --body-file <path>
 ```
 
+**`--subject`と`--body-file`を省略しない。**引数なしの`gh pr merge --squash`はGitHubが合成した
+messageでmergeし、**Pull Requestのhead commitが持っていたtrailerは引き継がれない。**
+mergeは成功し、警告も出ない。
+
 `--body-file`の内容には、末尾へ次のtrailerを置く。**指示sourceを変更していない場合、
 3行目は書かない。**
 
@@ -667,6 +671,11 @@ merge後に`develop`のtipへ宣言が入ったことは、次で確認する。
 ```bash
 python3 scripts/review_gate.py receipt --base origin/develop~1 --head origin/develop
 ```
+
+**この確認をskipすると取り返しがつかない。**`AGENTS.md`が履歴書き換えを禁じているため、
+mergeしたsquash commitへ後からtrailerを付ける手段は無い。残るのは`DECLARATION_EXEMPT`へ
+登録する判断だけであり、それはIssueとPull Requestを1本ずつ要する。
+[#197](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/197)で実際に2 commit分を払っている。
 
 squash mergeしたbranchはcommit hashが変わるため、`git branch -d`が「未merge」と判定する。
 削除前に`git diff <branch> origin/develop`が空であることを確認してから`-D`する。
