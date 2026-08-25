@@ -186,11 +186,16 @@ fn main() -> ExitCode {
     // **既定はInfoである。**`Debug`にすると、dataが来ていないだけの状態でも
     // read timeoutごとに1行出る（既定50 msなので毎秒20行）。長時間の実機観察では
     // それが本当のeventを埋めてしまう。切り分けが要るときだけ`--verbose`で上げる。
-    logger::install(if args.verbose {
+    let level = if args.verbose {
         log::LevelFilter::Debug
     } else {
         log::LevelFilter::Info
-    });
+    };
+    if let Err(error) = logger::install(level) {
+        // logが使えないのでstderrへ直接出す。ここだけは例外である。
+        eprintln!("loggerを入れられない: {error}");
+        return ExitCode::FAILURE;
+    }
 
     // **device名を出力しない。**開いた事実と設定値だけを出す。
     log::info!("baud={} で serial portを開く", args.baud);
@@ -209,7 +214,17 @@ fn main() -> ExitCode {
     let sid = std::process::id();
     let mut session = Session::new(config.clone(), sid);
     let started = Instant::now();
-    let deadline = args.seconds.map(|s| started + Duration::from_secs(s));
+    // **`started + Duration`にしない。**`--seconds`は任意の`u64`を受け取るため、
+    // 表現できないdeadlineでpanicする（実測: `u64::MAX`で
+    // `overflow when adding duration to instant`）。引数の誤りをpanicで返さない。
+    let mut deadline = None;
+    if let Some(s) = args.seconds {
+        let Some(d) = started.checked_add(Duration::from_secs(s)) else {
+            log::error!("--seconds が大きすぎる: {s}");
+            return ExitCode::FAILURE;
+        };
+        deadline = Some(d);
+    }
 
     log::info!("sid={sid} で開始する");
 
@@ -276,6 +291,14 @@ fn main() -> ExitCode {
     report(session.counters(), session.state());
     log::info!("経過 {:?}", started.elapsed());
 
+    // **握りつぶしていないことをここで示す。**0件でも出す。
+    let failures = logger::write_failures();
+    if failures > 0 {
+        eprintln!("log出力の失敗: {failures} 件");
+    } else {
+        log::info!("log出力の失敗: 0 件");
+    }
+
     if matches!(session.state(), ConnectionState::Stopped(_)) {
         ExitCode::FAILURE
     } else {
@@ -341,6 +364,18 @@ fn pump_until_break(
 /// `Cargo.toml`の方針に従い、ここで選ぶ。依存を増やさないため自前で書く。
 mod logger {
     use std::io::Write as _;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    /// 出力に失敗した件数。
+    ///
+    /// **loggerの失敗をlogへ書けない。**書けばそれ自体が失敗しうる経路へ再入する。
+    /// counterへ落として、終了時に1度だけ読む。**握りつぶしとの違いはここである。**
+    static WRITE_FAILURES: AtomicU64 = AtomicU64::new(0);
+
+    /// 出力に失敗した件数を読む。
+    pub fn write_failures() -> u64 {
+        WRITE_FAILURES.load(Ordering::Relaxed)
+    }
 
     struct Stderr;
 
@@ -351,11 +386,15 @@ mod logger {
 
         fn log(&self, record: &log::Record<'_>) {
             let mut err = std::io::stderr().lock();
-            let _ = writeln!(err, "[{:5}] {}", record.level(), record.args());
+            if writeln!(err, "[{:5}] {}", record.level(), record.args()).is_err() {
+                WRITE_FAILURES.fetch_add(1, Ordering::Relaxed);
+            }
         }
 
         fn flush(&self) {
-            let _ = std::io::stderr().lock().flush();
+            if std::io::stderr().lock().flush().is_err() {
+                WRITE_FAILURES.fetch_add(1, Ordering::Relaxed);
+            }
         }
     }
 
@@ -367,8 +406,14 @@ mod logger {
     /// 要求しないためである（`tests/simulator.rs`と同じ理由）。
     ///
     /// `level`より下は`log`側で捨てられる。
-    pub fn install(level: log::LevelFilter) {
-        let _ = log::set_logger(&LOGGER);
+    ///
+    /// # Errors
+    ///
+    /// 既にloggerが入っている場合に[`log::SetLoggerError`]を返す。**捨てない。**
+    /// 捨てると、logが1行も出ない状態のまま走り続ける。
+    pub fn install(level: log::LevelFilter) -> Result<(), log::SetLoggerError> {
+        log::set_logger(&LOGGER)?;
         log::set_max_level(level);
+        Ok(())
     }
 }
