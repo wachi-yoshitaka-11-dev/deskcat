@@ -2,14 +2,40 @@
 
 DeskCatはfirmware、Linux software、電子回路、可動機構を組み合わせる。変更はreview可能で、証拠に基づく必要がある。
 
+## 全体の流れ
+
+**各段で1つだけ落としやすいものを並べる。**規則は再掲しない。詳細は各節を参照する。
+
+```text
+着手前:  git fetch origin && git rev-parse --short origin/develop
+merge前: 人間の承認を得る
+merge時: squash messageへChange-ClassとSelf-Review 3値を入れる
+merge後: 入ったことをmerge commitで確認する
+review:  full reviewを使う
+```
+
+| 段 | 落としたときに起きること | 正本 |
+|---|---|---|
+| 着手前 | 古い基点で判断する。**後から入った文書を「存在しない」と読み、そこから誤った断定へ進む** | 下の[作業開始前](#作業開始前) |
+| merge前 | **CIが緑でも機械reviewが完走しても承認ではない** | [Merge前の確認](#merge前の確認) |
+| merge時 | trailerがsquash commitへ引き継がれない | [Merge方式](#merge方式) |
+| merge後 | 引き継がれなかったことに次の昇格まで気付かない | [Merge方式](#merge方式) |
+| review | `review`はincrementalで空振りし、枠だけ消費する | [手動で依頼する前に状態を確認する](#手動で依頼する前に状態を確認する) |
+
+**この表は覚えるためのものではない。**`.claude/settings.json`のhookが、着手前・merge時・
+merge後を機械で止める。**merge前の承認とreviewの投げ方は止められない**（人の判断であり、
+`review`と`full review`はどちらも同じ枠を消費するため機械で選べない）。
+hookの一覧と回避手順は[hookが止めたとき](#hookが止めたとき)にある。
+
 ## 作業開始前
 
-1. [AGENTS.md](AGENTS.md)を読む。
-2. [Governance](docs/governance/README.md)を読む。
-3. 一つの目的に絞ったIssueを探すか作成する。
-4. 依存関係と受け入れ条件を確認する。
-5. [ハードウェアTBD](docs/hardware/tbd-register.md)を確認する。
-6. 編集前にworking treeを確認する。
+1. `git fetch origin`し、`origin/develop`を基点にする。
+2. [AGENTS.md](AGENTS.md)を読む。
+3. [Governance](docs/governance/README.md)を読む。
+4. 一つの目的に絞ったIssueを探すか作成する。
+5. 依存関係と受け入れ条件を確認する。
+6. [ハードウェアTBD](docs/hardware/tbd-register.md)を確認する。
+7. 編集前にworking treeを確認する。
 
 正確な部品、関連GPIO、電源、安全値が`TBD`のときはhardware driverへ着手しない。
 
@@ -690,6 +716,61 @@ squash mergeしたbranchはcommit hashが変わるため、`git branch -d`が「
 昇格Pull Requestのmerge後は`origin/develop`が消えていないことを確認する。
 [#33](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/33)で`delete_branch_on_merge`が
 `develop`自体を削除する事故が起きている。Repository Rulesetで禁止済みだが確認はする。
+
+## hookが止めたとき
+
+`.claude/settings.json`が3つのscriptをhookとして起動する。**検査は4つである。**
+
+**文書に書いても実行されないことが実測で分かっている。**
+[#204](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/204)、
+[#205](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/205)、
+[#206](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/206)は
+**3件とも作成時にboardへ入っておらず、5分55秒〜18分29秒後に追加されている**
+（`added_to_project_v2`のevent時刻と作成時刻の差）。規約は当時も同じだった。
+そこで[全体の流れ](#全体の流れ)のうち機械で判定できる段をhookで止めている。
+
+| いつ | 何を見る | 実体 |
+|---|---|---|
+| `gh issue create`／`gh pr create`の前 | `--project`（短縮形`-p`）があるか | `scripts/hooks/gh_metadata_guard.py` |
+| `gh pr merge`の前 | squash messageが`Change-Class`と`Self-Review`を持つか | 同上 |
+| `git checkout -b`／`git switch -c`の前 | 基点が最新の`origin/develop`か | `scripts/hooks/branch_base_guard.py` |
+| `gh pr merge`の後 | squash commitに実際に入ったか | `scripts/hooks/merge_trailer_report.py` |
+
+**判定は字句だけで行う。**意味は判定しない（`scripts/review_gate.py`と同じ方針）。
+
+### 止まったときにどうするか
+
+**まず、指摘が当たっているかを見る。**当たっていれば、足りないものを足して再実行する。
+
+誤検知のときは環境変数で無効化できる。**逃げ道であって常用するものではない。**
+使ったらPull Request本文へ理由を書く。
+
+```bash
+DESKCAT_SKIP_GH_GUARD=1 gh pr create --title "..." --body-file body.md
+DESKCAT_SKIP_BASE_GUARD=1 git checkout -b experiment/scratch
+```
+
+`branch_base_guard.py`は、基点を明示した場合（`git checkout -b <name> <start>`）と
+`hotfix/`で始まるbranchを対象外にする。`hotfix/`は`main`から作るのが正しい
+（[ADR-0004](docs/decisions/0004-main-develop-branch-strategy.md)）。
+
+### 取り切れていないもの
+
+**hookを「通った」ことを「正しい」と読まない。**次は検査できていない。
+
+- **squash messageをstdin（`-F -`）で渡す経路。**hookからは読めないため、
+  読めないことを理由に止める。`--body-file`を使う。
+- **`gh`や`git`を、alias、shell function、`xargs`、`sh -c`の内側から起動した場合。**
+  hookはcommandの字句だけを見るため、呼び出しとして拾えない。
+  **推測で拾わないのは、誤検知がhookごと無効化される側の失敗だからである。**
+- **branchをhook以外の経路で作った場合。**worktreeを外部の道具が作ると
+  `git checkout -b`を通らないため、基点は検査されない。
+- **`git fetch`ができない環境。**基点の検査は行わず、黙って通る。
+- **merge後の確認は事後である。**入っていなければ履歴書き換えなしには直せない。
+  それでも報告するのは、免除へ回す判断を次の昇格まで先延ばしにしないためである。
+
+**hookで安全要件を代替しない。**hookが直すのは「忘れる」であって、
+[Hardware Safety Policy](docs/governance/hardware-safety-policy.md)が要求する根拠ではない。
 
 ## Gitと秘密情報
 
