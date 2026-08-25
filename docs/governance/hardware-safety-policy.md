@@ -25,7 +25,7 @@
 
 | 項目 | 外したときに起きること | 値と状態の正本 |
 |---|---|---|
-| **短絡** | M-12001は5 V／3 Aを供給でき、経路上で**定格が判明している部品の最小は1.5 A**である。**過電流保護部品（`PROT-OC-01`）が入るまで、故障電流を制限するものが経路に無い。**connectorと線材の発熱は秒から分のorderで進む | [過電流保護（段階Cのgate）](../hardware/power-budget.md#過電流保護段階cのgate)、[power-budget](../hardware/power-budget.md)の`配線・保護表`。`HW-TBD-021`／`HW-TBD-022` |
+| **短絡** | **電源の供給能力が、経路の最弱部品の定格を上回る。****過電流保護部品（`PROT-OC-01`）が入るまで、故障電流を制限するものが経路に無い。**connectorと線材の発熱は秒から分のorderで進むため、人が読み取って電源を落とすのでは止まらない | [過電流保護（段階Cのgate）](../hardware/power-budget.md#過電流保護段階cのgate)、[power-budget](../hardware/power-budget.md)の`配線・保護表`。`HW-TBD-021`／`HW-TBD-022` |
 | **逆極性** | 5 Vを逆に入れると、Pi・ESP32・moduleが同時に死ぬ | [逆極性保護のdesign review](../hardware/power-budget.md#逆極性保護のdesign-review)。`HW-TBD-030` |
 | **給電経路の重複** | 電源系統は排他であり、2つ以上から同時に給電するとboardまたは電源が破損する | [ESP32の給電経路](../hardware/power-budget.md#esp32の給電経路案aで確定実測待ち)。[§3 電源](#3-電源)のbackfeed確認と合わせて読む |
 | **電圧違いのpinへ挿す** | 3.3 Vのpinへ5 Vを入れると、その部品が死ぬ | [§4 Logic信号とGPIO](#4-logic信号とgpio)。[GPIO割り当て](../hardware/gpio-assignment.md)。servoへ入れてよい電圧は`HW-TBD-035` |
