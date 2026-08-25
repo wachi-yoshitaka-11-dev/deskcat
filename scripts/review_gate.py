@@ -85,7 +85,14 @@ DECLARATION_CUTOVER = "57734371384d18f31de7557a7a60fd1aa856edff"
 # 起点より後だが、宣言を持たないことを許すcommit。
 #
 # `AGENTS.md`が履歴書き換えを禁じているため、後からtrailerを付けられない。
-# **免除するのは宣言の記録だけである。**中身はいずれもPull Requestのreviewを通っている。
+# 中身はいずれもPull Requestのreviewを通っており、失われるのは宣言の記録である。
+#
+# **ただし免除は`Change-Class`と`Self-Review`だけを飛ばすのではない。**`history`は
+# 免除commitで`continue`するため、`_check_instructions`も掛からない。**指示source変更の
+# 宣言（`Instruction-Change`）の検査まで抑止する。**
+# 実際に効いているのは`9c91f913`だけである（`docs/hardware/`を触りながら
+# `Instruction-Change`を持たない）。`18298ae`と`619c843`は`INSTRUCTION_SOURCES`のpathを
+# 1つも触らないため、この抑止は掛かっていない。
 #
 # **理由は1つではない。原因ごとに書き分ける。**同じ「後から付けられない」で
 # まとめると、再発を止める手がかりが消える。
