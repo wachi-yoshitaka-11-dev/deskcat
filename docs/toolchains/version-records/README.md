@@ -15,7 +15,7 @@ file 名と Record ID は初回検証日で固定し、以後の再検証でも�
 | [ESP32 Build (実機 Linux x86_64)](2026-08-15-esp32-build-native-linux.md) | ESP32 Build | `Partial` | 2026-08-15 | 2026-08-15 |
 | [host workspace format／lint／test (CI)](2026-08-15-host-rust-ci.md) | CI | `Verified` | 2026-08-15 | 2026-08-16 |
 | [Raspberry Pi Direct Build (実機 Raspberry Pi Zero W)](2026-08-17-pi-direct-build-native.md) | Raspberry Pi Direct Build | `Partial` | 2026-08-17 | 2026-08-17 |
-| [ESP32 Flash / HIL (実機 Linux x86_64)](2026-08-20-esp32-flash-boot-native.md) | ESP32 Flash / HIL | `Verified` | 2026-08-20 | 2026-08-25 |
+| [ESP32 Flash / HIL (実機 Linux x86_64)](2026-08-20-esp32-flash-boot-native.md) | ESP32 Flash / HIL | `Partial` | 2026-08-20 | 2026-08-25 |
 
 **同じ profile の記録が複数あるのは、端末が違うためである。**`2026-08-06`と`2026-08-10`は VM 上、
 `2026-08-15`の2件は実機で取得した。`Container / VM / native:`が異なるため、
@@ -31,6 +31,6 @@ host workspace 側も同じ位置づけで、`2026-08-15-host-rust-ci` が開発
 ## 規則
 
 - 一つの記録は、一台の端末と一つの profile に対応させる。ある端末の成功記録を、別端末や別 profile の根拠にしない。
-- 判定は `Verified`、`Partial`、`Failed`、`Incompatible` のいずれかで結論づける。未実行の項目が残る場合は `Partial` とし、何が未達かを記録内に明記する。
+- **判定語とその選び方は [Version Record Template](../version-record-template.md) の「判定」節が正本である。**値も規則もここへ再掲しない。
 - 秘密情報、個人名、端末名、個人の絶対 path、USB serial を記録しない。build log を載せる場合は、home directory の path を `<home>` のような表記へ置換する。
 - Markdown 以外の拡張子で証拠 file を置かない。`docs/` 配下は Markdown だけが公開対象であり、それ以外は未公開として報告される。log は記録本文へ埋め込む。

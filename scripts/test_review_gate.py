@@ -7,6 +7,7 @@ fixture repositoryを作り、validatorを子processとして起動して、分�
 """
 
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -32,6 +33,25 @@ BASE_TEXT = "見出しのない散文である。\nここに説明を書く。\n
 # 両者は一致していなければならない。別々の文字列literalにすると、片方を直したときに
 # testが「差が出ない」条件を検査しなくなる。
 BASE_ONLY_AGENTS = "# Rules\n\nbase側だけで足した本文である。\n"
+
+# `LINE_DENY`の各規則を1つずつ踏む行。**`(規則のlabel, 足す行)`である。**
+#
+# `_deny_reason`は先頭から最初に当たった規則を返すため、**各行は狙った規則より前の規則に
+# 当たってはならない。**たとえばautolinkの行に数字を入れると`digit`が先に当たり、
+# autolinkの規則を踏まないまま「軽微でない」だけが確認される。
+#
+# **この並びと`LINE_DENY`の対応は`test_every_lexical_deny_rule_has_a_case`が突き合わせる。**
+# 規則を足してここへcaseを足し忘れると落ちる。
+LEXICAL_DENY_CASES = (
+    ("digit", "ここに3件と書く。\n"),
+    ("inline code", "ここに `cargo build` と書く。\n"),
+    ("link", "ここに [doc](../index.md) と書く。\n"),
+    ("autolink", "ここに <https://example.com> と書く。\n"),
+    ("table", "| a | b |\n"),
+    ("heading", "## 見出しを足す\n"),
+    ("checkbox", "- [ ] 項目を足す\n"),
+    ("html comment", "<!-- 注記 -->\n"),
+)
 
 
 def _git(root, *arguments, stdin_text=None):
@@ -118,18 +138,42 @@ class ReviewGateTests(unittest.TestCase):
         self._commit(root, "散文の言い回しを直す")
         self.assertIn(f"CLASS={gate.CLASS_MINOR}", self._classify(root))
 
-    def test_lexical_deny_rules_block_minor(self):
-        """数値・inline code・link・表・見出し・checkboxに触れたら軽微にしない。"""
-        cases = (
-            ("digit", "ここに3件と書く。\n"),
-            ("inline code", "ここに `cargo build` と書く。\n"),
-            ("link", "ここに [doc](../index.md) と書く。\n"),
-            ("table", "| a | b |\n"),
-            ("heading", "## 見出しを足す\n"),
-            ("checkbox", "- [ ] 項目を足す\n"),
-            ("html comment", "<!-- 注記 -->\n"),
+    def test_every_lexical_deny_rule_has_a_case(self):
+        """`LINE_DENY`の各規則に、それを踏むcaseがあること。
+
+        **規則を足してcaseを足し忘れても、他のtestは成功する。**
+        [ADR-0010](../docs/decisions/0010-change-class-and-review-declaration.md)の
+        検証節は「各deny規則について回帰testを持つ」と定めているが、
+        **`autolink`だけがcase無しで残っていた**
+        （[#214](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/214)）。
+        他の7規則は揃っており、**目視では欠けている1つに気付けなかった。**
+        機械で突き合わせる。
+        """
+        declared = [label for _, label in gate.LINE_DENY]
+        covered = [label for label, _ in LEXICAL_DENY_CASES]
+        self.assertEqual(
+            sorted(declared),
+            sorted(covered),
+            "LINE_DENYの規則とLEXICAL_DENY_CASESが一致しない。"
+            " 規則を足したらcaseも足す。",
         )
-        for expected, addition in cases:
+        # 同じlabelを2つ書いて件数だけ合わせる、という抜けを塞ぐ。
+        self.assertEqual(len(set(covered)), len(covered), "caseのlabelが重複している")
+
+    def test_each_lexical_deny_case_hits_its_own_rule(self):
+        """各caseが、狙った規則に当たること。
+
+        `_deny_reason`は先頭から最初に当たった規則を返す。**行の書き方次第で、
+        狙いより前の規則に当たる。**その場合、狙った規則は踏まれないまま
+        「軽微でない」だけが確認され、testが規則を守っていることにならない。
+        """
+        for expected, addition in LEXICAL_DENY_CASES:
+            with self.subTest(rule=expected):
+                self.assertEqual(gate._deny_reason(addition.rstrip("\n")), expected)
+
+    def test_lexical_deny_rules_block_minor(self):
+        """各deny規則に触れた行があれば軽微にしない。"""
+        for expected, addition in LEXICAL_DENY_CASES:
             with self.subTest(rule=expected):
                 root = self._repository()
                 self._write(root, PLAIN_DOC, BASE_TEXT + addition)
@@ -239,6 +283,121 @@ class ReviewGateTests(unittest.TestCase):
         )
         result = _run(["receipt", "--repository-root", root, "--base", "HEAD~1"])
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_receipt_accepts_a_fixup_declaration_with_a_reference(self):
+        """`fixup`は`Refs`で後始末の対象を示していれば通る。
+
+        **`fixup`は宣言専用の区分であり、`classify`は返さない。**そのため範囲が
+        `review-required`のままでも、`fixup`の宣言は「軽微である」と主張していない。
+        """
+        root = self._repository()
+        self._write(root, PLAIN_DOC, BASE_TEXT + "typoを直す。\n")
+        self._commit(
+            root,
+            "typoを直す\n\n"
+            f"{gate.TRAILER_CLASS}: {gate.CLASS_FIXUP}\n"
+            + _review_trailers()
+            + f"{gate.TRAILER_REFS}: #206\n",
+        )
+        result = _run(["receipt", "--repository-root", root, "--base", "HEAD~1"])
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_receipt_rejects_a_fixup_declaration_without_a_reference(self):
+        """後始末の対象を示さない`fixup`を通さない。
+
+        **後始末である以上、後始末の対象が存在する。**示せないものは後始末ではない。
+        機械で確かめられるのはこの整合だけであり、差分が本当に後始末かは判定しない。
+        """
+        root = self._repository()
+        self._write(root, PLAIN_DOC, BASE_TEXT + "typoを直す。\n")
+        self._commit(
+            root,
+            "typoを直す\n\n"
+            f"{gate.TRAILER_CLASS}: {gate.CLASS_FIXUP}\n" + _review_trailers(),
+        )
+        result = _run(["receipt", "--repository-root", root, "--base", "HEAD~1"])
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn(gate.TRAILER_REFS, result.stderr)
+
+    def test_receipt_rejects_a_reference_without_a_number(self):
+        """`Refs`があっても番号を含まなければ通さない。"""
+        root = self._repository()
+        self._write(root, PLAIN_DOC, BASE_TEXT + "typoを直す。\n")
+        self._commit(
+            root,
+            "typoを直す\n\n"
+            f"{gate.TRAILER_CLASS}: {gate.CLASS_FIXUP}\n"
+            + _review_trailers()
+            + f"{gate.TRAILER_REFS}: 前のPull Request\n",
+        )
+        result = _run(["receipt", "--repository-root", root, "--base", "HEAD~1"])
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn(gate.TRAILER_REFS, result.stderr)
+
+    def test_receipt_rejects_an_unknown_change_class(self):
+        """`CLASS_VALUES`に無い値を通さない。**診断へ有効値を並べる。**"""
+        root = self._repository()
+        self._write(root, PLAIN_DOC, BASE_TEXT + "ここに追記する。\n")
+        self._commit(
+            root,
+            "追記する\n\n"
+            f"{gate.TRAILER_CLASS}: trivial\n" + _review_trailers(),
+        )
+        result = _run(["receipt", "--repository-root", root, "--base", "HEAD~1"])
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("trivial", result.stderr)
+        for value in gate.CLASS_VALUES:
+            self.assertIn(value, result.stderr)
+
+    def test_fixup_does_not_widen_the_minor_path(self):
+        """`fixup`は`minor`の判定を緩めない。
+
+        同じ範囲（指示sourceを触るためreview必須）に対して、`minor`の宣言は落ち、
+        `fixup`の宣言は通る。**`fixup`が主張しているのは「軽微である」ではなく
+        「後始末である」だからである。**`review-required`の判定も変わっていない。
+        """
+        for klass, expected in ((gate.CLASS_MINOR, 1), (gate.CLASS_FIXUP, 0)):
+            with self.subTest(klass=klass):
+                root = self._repository()
+                self._write(root, "AGENTS.md", "# Rules\n\n本文をなおす。\n")
+                self._commit(
+                    root,
+                    "AGENTS.mdを直す\n\n"
+                    f"{gate.TRAILER_CLASS}: {klass}\n"
+                    + _review_trailers()
+                    + f"{gate.TRAILER_REFS}: #206\n",
+                )
+                result = _run(
+                    ["receipt", "--repository-root", root, "--base", "HEAD~1"]
+                )
+                self.assertEqual(
+                    result.returncode, expected, result.stdout + result.stderr
+                )
+        # `classify`の出力そのものが変わっていないことも見る。
+        root = self._repository()
+        self._write(root, "AGENTS.md", "# Rules\n\n本文をなおす。\n")
+        self._commit(root, "AGENTS.mdを直す")
+        classified = _run(["classify", "--repository-root", root, "--base", "HEAD~1"])
+        self.assertIn(f"CLASS={gate.CLASS_REVIEW}", classified.stdout)
+        self.assertNotIn(gate.CLASS_FIXUP, classified.stdout)
+
+    def test_fixup_still_needs_the_instruction_acknowledgement(self):
+        """`fixup`でも指示sourceを触れば`Instruction-Change`が要る。
+
+        後始末であることは、指示sourceをdataとしてreviewしたことの代わりにならない。
+        """
+        root = self._repository()
+        self._write(root, "AGENTS.md", "# Rules\n\n本文をなおす。\n")
+        self._commit(
+            root,
+            "AGENTS.mdのtypoを直す\n\n"
+            f"{gate.TRAILER_CLASS}: {gate.CLASS_FIXUP}\n"
+            + _review_trailers()
+            + f"{gate.TRAILER_REFS}: #206\n",
+        )
+        result = _run(["gate", "--repository-root", root, "--base", "HEAD~1"])
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn(gate.TRAILER_INSTRUCTION, result.stderr)
 
     def test_receipt_requires_every_review_declaration(self):
         """`Self-Review`は`REVIEW_DECLARATIONS`のすべてが要る。1つ欠けたら通さない。
@@ -408,7 +567,9 @@ class ReviewGateTests(unittest.TestCase):
             ]
         )
 
-    def _declared(self, message, klass=None, review=True, instruction=False):
+    def _declared(
+        self, message, klass=None, review=True, instruction=False, refs=None
+    ):
         lines = [message, ""]
         if klass:
             lines.append(f"{gate.TRAILER_CLASS}: {klass}")
@@ -416,6 +577,8 @@ class ReviewGateTests(unittest.TestCase):
             lines.append(f"{gate.TRAILER_REVIEW}: {gate.REVIEW_DECLARATIONS[0]}")
         if instruction:
             lines.append(f"{gate.TRAILER_INSTRUCTION}: {gate.INSTRUCTION_ACK}")
+        if refs:
+            lines.append(f"{gate.TRAILER_REFS}: {refs}")
         return "\n".join(lines) + "\n"
 
     def test_history_is_not_checked_when_the_cutover_is_absent(self):
@@ -464,6 +627,32 @@ class ReviewGateTests(unittest.TestCase):
         result = self._history(root, cutover)
         self.assertEqual(result.returncode, 1, result.stdout)
         self.assertIn("declares minor but classifies as", result.stderr)
+
+    def test_history_checks_the_fixup_reference(self):
+        """`fixup`の整合を各commitでも見る。
+
+        **直接commitは`gate`を通らない**（`gate`はPull Requestで起動する）。
+        `history`が`develop`から`main`への昇格時に見るのが、唯一の強制点である。
+        """
+        for refs, expected in (("#206", 0), (None, 1)):
+            with self.subTest(refs=refs):
+                root, cutover = self._history_fixture(
+                    [
+                        (
+                            PLAIN_DOC,
+                            BASE_TEXT + "後始末である。\n",
+                            self._declared(
+                                "後始末する", gate.CLASS_FIXUP, refs=refs
+                            ),
+                        )
+                    ]
+                )
+                result = self._history(root, cutover)
+                self.assertEqual(
+                    result.returncode, expected, result.stdout + result.stderr
+                )
+                if expected:
+                    self.assertIn(gate.TRAILER_REFS, result.stderr)
 
     def test_history_requires_an_instruction_acknowledgement_per_commit(self):
         root, cutover = self._history_fixture(
@@ -602,6 +791,43 @@ class ReviewGateTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("CLASS=", result.stdout)
+
+
+class DeclarationExemptTests(unittest.TestCase):
+    """免除リストそのもののtest。
+
+    **typoしたSHAは黙って免除しなくなる。**`_check_history`は文字列の一致で見るため、
+    1文字違えば免除は効かず、しかも何も報告されない。**気付けるのは次の昇格である。**
+    """
+
+    def test_entries_are_full_length_hexadecimal(self):
+        """短縮SHAを書かない。`rev-list`が返すのは40桁であり、短縮では一致しない。"""
+        for value in gate.DECLARATION_EXEMPT:
+            self.assertRegex(value, r"^[0-9a-f]{40}$", value)
+
+    def test_entries_are_unique(self):
+        """同じcommitを2度書かない。数え間違いのもとになる。"""
+        self.assertEqual(
+            len(set(gate.DECLARATION_EXEMPT)), len(gate.DECLARATION_EXEMPT)
+        )
+
+    def test_each_entry_is_explained_in_the_comment(self):
+        """免除ごとに理由が書かれている。**原因ごとに書き分ける規則の機械側である。**
+
+        理由が無い免除は、再発を止める手がかりを残さない。
+
+        **照合は短縮形のprefix一致で行う。**commentの短縮形は7桁と8桁が混在しており、
+        桁数を固定すると、書いてあるのに「無い」と読む。
+        """
+        source = Path(gate.__file__).read_text(encoding="utf-8")
+        header = source.split("DECLARATION_EXEMPT = (")[0]
+        quoted = set(re.findall(r"`([0-9a-f]{7,40})`", header))
+        for value in gate.DECLARATION_EXEMPT:
+            self.assertTrue(
+                any(value.startswith(short) for short in quoted),
+                f"{value[:8]}の免除理由がcommentに無い",
+            )
+
 
 
 if __name__ == "__main__":

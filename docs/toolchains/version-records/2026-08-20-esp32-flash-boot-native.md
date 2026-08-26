@@ -82,7 +82,7 @@ Generated artifact identity:
   release ELF    654,944 bytes / flash image 381,344 bytes
 Log or evidence path: 本文書に未加工の出力を転記した。log file は repository へ入れていない
 Known differences from documented profile: 下記「文書との差」を参照
-Conclusion: Verified（flash と起動記録について）
+Conclusion: Partial（flash と起動記録について。USB 抜き差しによる電源再投入後の起動出力が未検証。詳細は下記「この記録が主張しないこと」）
 Next action: 下記「この記録が主張しないこと」に挙げた項目
 ```
 
@@ -384,7 +384,10 @@ release  5 m 59 s
 
 ### Conclusion（2026-08-25 時点）
 
-`Verified`。**profile の必須 command はすべて成功した**（`fmt`／`clippy`／`build`／
-`build --release`／`chip_id`／`elf2image`／`flash --monitor`）。判定は template の定義どおり
-**環境と profile の command に対するもの**であり、firmware の機能が完全であることを意味しない。
-未達の項目は上の「この再検証が主張しないこと」に挙げてある。
+`Partial`。profile の必須 command はすべて成功した（`fmt`／`clippy`／`build`／
+`build --release`／`chip_id`／`elf2image`／`flash --monitor`）が、**未実行の項目が残る。**
+一覧は上の「この再検証が主張しないこと」にある。
+
+**判定はこの記録に対して1つである。**[記録一覧](README.md)の規則が「未実行の項目が残る場合は
+`Partial`とし、何が未達かを記録内に明記する」と定めているため、先頭の `Conclusion:` 欄と
+この節を食い違わせない。

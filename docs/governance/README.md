@@ -13,6 +13,7 @@
 | [Development Workflow](development-workflow.md) | Issue、実装、検証、文書化、Gitの作業手順 |
 | [Hardware Safety Policy](hardware-safety-policy.md) | 電気、機構、ベンチ試験に関する必須安全規則 |
 | [公開asset register](published-asset-register.md) | 公開するbinary assetの出所と再配布許諾 |
+| [作業指示書テンプレート](work-instruction-template.md) | 人間がAIエージェントへ1つの作業を渡すときの様式 |
 
 ルートの[AGENTS.md](../../AGENTS.md)は、AIエージェントが実行時に参照する簡潔な指示である。背景情報を重複させず、このディレクトリのポリシーを参照する。
 
@@ -39,6 +40,8 @@
 5. [DeskCat マイコン開発技術ガイド](../DeskCat_Microcontroller_Development_Guide.md)
 6. Issue、Pull Request、コードコメント
 7. 一般知識またはAIによる推論
+
+**3が指すのは甲（メーカーの仕様書）である。**メーカー自身による仕様書以外の記述（公式siteのQ&A回答、現物同梱の説明書など。乙）は条件付きで根拠になるが、**3ではなく、4（再現可能な測定結果）より下に置く。****現物を測った値のほうが強い。**段の定義と条件は[Hardware Safety Policy](hardware-safety-policy.md#一次資料に当たるもの)が正本である（[ADR-0017](../decisions/0017-what-counts-as-a-primary-source.md)）。**この表は矛盾したときの優先順位であって、何を根拠として認めるかの定義ではない。ここへ再掲しない。**
 
 現在の指示であっても、電気的または機械的な安全制限を暗黙に上書きしない。指示が危険と思われる場合は、影響する操作を停止し、その根拠とリスクを提示する。
 

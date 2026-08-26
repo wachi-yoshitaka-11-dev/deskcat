@@ -2,14 +2,41 @@
 
 DeskCatはfirmware、Linux software、電子回路、可動機構を組み合わせる。変更はreview可能で、証拠に基づく必要がある。
 
+## 全体の流れ
+
+**各段で1つだけ落としやすいものを並べる。**規則は再掲しない。詳細は各節を参照する。
+
+```text
+着手前:  git fetch origin && git rev-parse --short origin/develop
+merge前: 人間の承認を得る
+merge時: squash messageへChange-ClassとSelf-Review 3値を入れる
+merge後: 入ったことをmerge commitで確認する
+review:  full reviewを使う
+```
+
+| 段 | 落としたときに起きること | 正本 |
+|---|---|---|
+| 着手前 | 古い基点で判断する。**後から入った文書を「存在しない」と読み、そこから誤った断定へ進む** | 下の[作業開始前](#作業開始前) |
+| merge前 | **CIが緑でも機械reviewが完走しても承認ではない** | [Merge前の確認](#merge前の確認) |
+| merge時 | trailerがsquash commitへ引き継がれない | [Merge方式](#merge方式) |
+| merge後 | 引き継がれなかったことに次の昇格まで気付かない | [Merge方式](#merge方式) |
+| review | `review`はincrementalで空振りし、枠だけ消費する | [手動で依頼する前に状態を確認する](#手動で依頼する前に状態を確認する) |
+
+**この表は覚えるためのものではない。**`.claude/settings.json`のhookが、着手前・merge時・
+merge後を機械で止める。**hookが止めない段の実行手順は`.claude/skills/deskcat-preflight`が持つ**
+（規則ではなく実行だけを持ち、規則はこの文書を参照する）。**merge前の承認とreviewの投げ方は止められない**（人の判断であり、
+`review`と`full review`はどちらも同じ枠を消費するため機械で選べない）。
+hookの一覧と回避手順は[hookが止めたとき](#hookが止めたとき)にある。
+
 ## 作業開始前
 
-1. [AGENTS.md](AGENTS.md)を読む。
-2. [Governance](docs/governance/README.md)を読む。
-3. 一つの目的に絞ったIssueを探すか作成する。
-4. 依存関係と受け入れ条件を確認する。
-5. [ハードウェアTBD](docs/hardware/tbd-register.md)を確認する。
-6. 編集前にworking treeを確認する。
+1. `git fetch origin`し、`origin/develop`を基点にする。
+2. [AGENTS.md](AGENTS.md)を読む。
+3. [Governance](docs/governance/README.md)を読む。
+4. 一つの目的に絞ったIssueを探すか作成する。
+5. 依存関係と受け入れ条件を確認する。
+6. [ハードウェアTBD](docs/hardware/tbd-register.md)を確認する。
+7. 編集前にworking treeを確認する。
 
 正確な部品、関連GPIO、電源、安全値が`TBD`のときはhardware driverへ着手しない。
 
@@ -43,6 +70,7 @@ Issueには次を含める。
 |---|---|---|
 | boardのmetadata記入漏れ。repositoryの変更ではない | 不要 | 不要 |
 | `review_gate.py`が`CLASS=minor`と判定した変更 | 不要 | 不要。承認を得たうえで`develop`へ直接反映してよい |
+| **既にmergeされreviewを通った作業の後始末。**`Change-Class: fixup`と`Refs: #<番号>`を宣言する | 不要 | 不要。承認を得たうえで`develop`へ直接反映してよい |
 | typo、リンク修正、表記ゆれ、言い回しの修正で、**意味を変えないもの** | 不要 | **必要** |
 | 規約、仕様、安全、電気、protocol、GPIO、電源、toolchain、CI、依存の**意味**を変えるもの | **必須** | **必要** |
 | 複数のPull Requestに跨る、または他の作業をblockするもの | **必須** | **必要** |
@@ -50,11 +78,15 @@ Issueには次を含める。
 Issue不要の側でも、**変更内容の承認は必ず得る。**「Issueを立てない」は「勝手に変えてよい」ではない。
 判断に迷うものはIssue必須の側として扱う。安全に関わる範囲は緩めない。
 
-**3行目と4行目の境界は機械的に判定できない。**「言い回しの修正」と「意味の変更」を区別するcodeは
-無い（[ADR-0010](docs/decisions/0010-change-class-and-review-declaration.md)）。迷ったら4行目にする。
-**ただし3行目はPull Requestを通る。**判断を誤っても、Review gateと自己レビューがその差分を見る。
-黙って`develop`へ入ることはない。**repositoryへの変更でPull Requestを省けるのは2行目だけであり、
-そこはscriptが判定する。**1行目はrepositoryの変更ではないため、Pull Requestという単位が無い。
+**「言い回しの修正」と「意味の変更」の境界は機械的に判定できない。**両者を区別するcodeは
+無い（[ADR-0010](docs/decisions/0010-change-class-and-review-declaration.md)）。
+**迷ったら「意味を変えるもの」として扱う。**
+**ただし「言い回しの修正」もPull Requestを通る。**判断を誤っても、Review gateと自己レビューが
+その差分を見る。黙って`develop`へ入ることはない。
+
+**repositoryへの変更でPull Requestを省けるのは、`CLASS=minor`と後始末（`fixup`）の2つだけである。**
+前者はscriptが判定し、後者は宣言する側が申告する（下の「後始末（`fixup`）の範囲」）。
+boardのmetadata記入漏れはrepositoryの変更ではないため、Pull Requestという単位が無い。
 
 **scriptが決めるのは`CLASS`だけである。**Issueが要るかどうかはscriptの判定ではない。
 
@@ -62,8 +94,10 @@ Issue不要の側でも、**変更内容の承認は必ず得る。**「Issueを
 python3 scripts/review_gate.py classify --base origin/develop --head HEAD
 ```
 
-`CLASS=minor`のときだけ、Pull Requestなしで`develop`へ直接反映してよい。
-**`CLASS=review-required`を人の判断で覆さない。**scriptは軽微と証明できるものだけを`minor`に
+`CLASS=minor`のときは、Pull Requestなしで`develop`へ直接反映してよい。
+**`CLASS=review-required`でも、後始末として申告する経路がある**（下の
+「[後始末（`fixup`）の範囲](#後始末fixupの範囲)」）。**それ以外で
+`CLASS=review-required`を人の判断で覆さない。**scriptは軽微と証明できるものだけを`minor`に
 するため、本当は軽微な変更も`review-required`へ落ちる。それは意図した失敗方向であり、
 Pull Requestを1本作れば済む。
 
@@ -71,6 +105,32 @@ Pull Requestを1本作れば済む。
 見ない。`develop`のbranch protectionにも必須reviewと必須status checkを設定していない
 （[ADR-0007](docs/decisions/0007-review-scope-and-self-review.md)の決定4）。
 `classify`を実行する場面は、`develop`へ直接反映すると決めた場面と同じである。
+
+### 後始末（`fixup`）の範囲
+
+**`CLASS=minor`は構造的に出ない。**`INSTRUCTION_SOURCES`にpathが該当した時点で
+`review-required`が決まり、行の中身の判定へ届かない。**この repository の文書作業は
+ほぼ全部が該当する。**そのため上の表の`CLASS=minor`の行は、実際には空である。
+
+そこで**申告による軽い経路**を置いた。`Change-Class: fixup`と`Refs: #<番号>`を宣言する。
+
+対象:
+
+- 既にmergeされreviewを通った作業の**後始末**。typo、リンク切れ、指摘対応の漏れ、記録の整理
+- `Refs`でその Issue または Pull Request を指す。**後始末である以上、対象が存在する**
+
+**絶対に対象外:**
+
+- **安全値、protocol、GPIO、電源値、firmware、`crates/`。**新しい判断
+- `docs/hardware/`の**値**の変更。**節の整理は可**
+
+**この経路には強制点がある。**直接commitは`gate`を通らない（`gate`はPull Requestで起動する）。
+しかし`history`が`develop`から`main`への昇格時に**範囲の各commitを検査する**ため、
+宣言が壊れていれば次の昇格で落ちる。**`minor`経路が完全に無検証であるのより強い。**
+
+**`fixup`は「軽微である」と主張しない。**`classify`の出力は変わらず、`review-required`の
+まま出る。主張しているのは「後始末である」だけである。**そのため`minor`の判定も
+`review-required`の判定も緩んでいない**（[ADR-0015](docs/decisions/0015-fixup-class-and-direct-commit-scope.md)）。
 
 ## Issueの命名
 
@@ -426,150 +486,14 @@ allowlistに言及する記述は、廃止前の設定に対する観測であ�
 上の3つと違い表示で気付ける。ただし**reviewは完走していない。**
 [手動で依頼する](#手動で依頼する前に状態を確認する)。#125では`full review`で`Review completed`へ到達した。
 
-**`Review skipped`の説明文で、skipの原因を切り分けられる。**これまでに観測した文言は次のとおりである。
-**文言はCodeRabbit側のものであり、将来変わりうる。**一致しない文言を見たら、推測せず実際の表示を記録する。
+**`Review skipped`の説明文で、skipの原因を切り分けられる。**
+観測した文言と、それぞれの読み方・対応は
+[CodeRabbitのreview状態の観測記録](docs/runbooks/coderabbit-review-observations.md)にある。
+**文言はCodeRabbit側のものであり、将来変わりうる。**一致しない文言を見たら、
+推測せず実際の表示を記録し、同記録へ追記する。
 
-**説明文の出どころは2つあり、同じ事象でも文言が違う。**commit statusの`description`と、
-CodeRabbitがPull Requestへ投稿するcommentの本文である。たとえば前者は
-`Review skipped: automatic reviews are disabled`、後者は`Auto reviews are disabled on this repository.`と表示される。
-**記録するときはどちらで見たかを併記する。**commentの本文はCodeRabbitが後から書き換えるため、
-review完走後には最初の文言が残らない。**後から検証できるのはcommit statusの履歴だけである。**
-GitHubのcheck欄は文脈ごとの最新1件しか表示しないため、履歴は次で読む。
-
-```bash
-gh api --paginate "repos/<owner>/<repo>/commits/<sha>/statuses?per_page=100" \
-  --jq '.[] | select(.context=="CodeRabbit") | [.created_at,.state,.description] | @tsv'
-```
-
-| 説明文 | 読み方 | 観測した Pull Request |
-|---|---|---|
-| `excluded by label configuration` | **設定は効いている。**labelは付いていたが、allowlistに一致しなかった。**対象外として正しくskipされた** | [#95](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/95)・[#96](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/96)（`area:docs`＋`type:maintenance`） |
-| comment: `Auto reviews are disabled on this repository.`<br>status: `Review skipped: automatic reviews are disabled` | **設定が定着する前の観測である。**[#89](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/89)の判定時点では`.coderabbit.yaml`がまだ`develop`に無かった。**同じ文言を設定の定着後に見たら5行目である** | #89（判定の5秒後に設定がmergeされた） |
-| `reviews are disabled for this base branch` | baseが対象外と判定された | [#88](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/88)（`.coderabbit.yaml`を`develop`へmergeする前） |
-| `manual review required for this OSS repository` | **labelの判定では説明できない。**allowlistのlabelが作成時から付いており、1行目には当たらない。#127では`@coderabbitai rate limit`が`Reviews are available now`を返したためrate limitでもなかった。**`@coderabbitai full review`を投げると実際にreviewが走った。****2026-08-16に原因が判明した。**[#135](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/135)でCodeRabbitが投稿したcommentが`Reviews should be triggered manually for repositories with fewer than 10 stars.`と述べている。**star数による条件であり、設定の誤りではない。**この文言を見たら設定を疑わず、手動で`full review`を投げる | [#127](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/127)（`area:firmware`＋`area:protocol`）・[#123](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/123)・[#125](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/125)（後の2件は5行目と同時に観測） |
-| **2行目と同じ文言を、設定の定着後に観測した**<br>status: `Review skipped: automatic reviews are disabled` | **設定は読まれている。**2行目の読み方（設定が未反映）を当てはめない。**原因は未特定。**対応は4行目と同じで、`@coderabbitai full review`でreviewが走った。**なお4行目の原因（star数）が2026-08-16に判明したが、この文言との関係は確かめていない。**同一Pull Requestに両方出るため（#123・#125・#135）同じ原因である可能性はあるが、CodeRabbitはこの文言について何も述べていない。**推測で4行目へ畳まない** | [#123](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/123)・[#125](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/125)（いずれも2026-08-15、作成直後）・[#124](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/124)（push後。後述） |
-
-**行ごとに意味が違う。**同じ`Review skipped`でも取るべき対応が違う。
-
-- 1行目: `.coderabbit.yaml`の意図どおりのskipである。[自己レビュー](#自己レビュー)で通す。
-  ただし**変更の内容に対してlabelの付け方が誤っていないかは確認する。**安全・電気・protocol・
-  firmwareに関わる変更が`area:docs`だけになっていれば、labelが誤っており1行目に該当しない
-- 2行目・3行目: **allowlistの判定まで届いていない。**設定が`develop`にあるか、baseが
-  `base_branches`に含まれるかを確認する。対象範囲の変更なら
-  [手動で依頼する](#手動で依頼する前に状態を確認する)。安全に関わる変更では自己レビューで代替しない
-- 4行目・5行目: **labelもrate limitも原因ではない。**
-  [手動で依頼する](#手動で依頼する前に状態を確認する)と得られる。`review`ではなく
-  **`full review`**を使う。自己レビューで代替しない。
-  ただし**「自動reviewは二度と起動しない」と決めつけない。**#125ではこの2文言の約2分後に
-  自動で`Review in progress`へ移っている（その回はrate limitで止まった）
-
-**2行目・3行目は、いずれも`.coderabbit.yaml`が`develop`に無かった時期の観測である。**4行目・5行目は設定が定着した後の観測であり、原因が別である。
-設定が定着した後にこの文言を見たら、**それは新しい事象である。**推測で1行目と同じ扱いにしない。
-5行目はその事象であり、確認できた事実を[5行目の観測](#5行目の観測)にまとめてある。
-
-**thread 0件は、reviewが終わったことを意味しない。**
-[#76](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/76)では0件を確認した**28秒後**に
-reviewが届き、actionable comment 2件がmerge済みPull Requestへ付いた。
-GitHubはthreadが存在しないものをblockできない。**reviewの到着を待たずに0件を「解決済み」と読まない。**
-
-**自動reviewは行わない**（[ADR-0013](docs/decisions/0013-manual-only-coderabbit-review.md)）。
-既定では[自己レビュー](#自己レビュー)が唯一のreviewである。
-
-**手動で依頼するのは、意味上criticalな変更に対してだけ、自己レビューの後で、最大1回である。**
-判断は人が行う。
-
-**依頼したreviewの指摘に対応したcommitは、自己レビューで見る。ここで投げ直さない。**
-投げ直すと1つのPull Requestでreviewを何度も消費する。
-[#91](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/91)で実際にそうなり、2回目はrate limitで終わった。
-
-依頼したreviewが得られなかったときは、次の表に従う。**依頼しなかった場合も、
-安全・電気・protocol・firmwareに関わる変更では同じ扱いとする。**
-
-| 変更の種類 | reviewが得られなかったとき |
-|---|---|
-| 安全、電気、protocol、firmware | **rate limitが解けるまで待つ。**自己レビューで代替しない |
-| 上記以外 | **自己レビューで通してよい。**Pull Request本文へ機械reviewを通していない旨と、その判断の根拠を書く |
-
-**`Review stopped after lock loss`もこの表の対象である。**`state`が`failure`でcheckは赤くなるため`Review rate limited`／`Review skipped`とは表示で見分けられるが、**reviewが完走していない点は同じ**である。したがって初回reviewが得られなかった場合として扱い、上の表に従う。**安全・電気・protocol・firmwareに関わる変更では、`Review completed`へ到達するか手動の`full review`が完走するまでmergeしない。**赤いcheckを「reviewは走ったが失敗しただけ」と読み替えない。観測例は[GitHubが強制しないもの](#githubが強制しないもの)にある。
-
-##### 5行目の観測
-
-上の「設定が定着した後に2行目の文言を見たら新しい事象である」に**実際に当たった**。
-**1件限りではない。**同日の[#123](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/123)と
-[#125](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/125)で、いずれも作成直後に同じ並びが出ている。
-まず#123について、確認できた事実だけを次に記録する。
-
-| 確認したこと | 根拠 |
-|---|---|
-| **設定は読まれている** | reviewの`Run configuration`が`Configuration used: Path: .coderabbit.yaml`（`Review profile: CHILL`、`Plan: Pro Plus`）を示す |
-| 設定は`main`・`develop`の両方にあり、内容も同一 | 両branchでblob sha `816e60d` |
-| baseは`develop`で、`base_branches`に含まれる | Pull Requestのbase |
-| allowlistのlabelが**作成時**に付いている | `13:19:16Z`に`area:firmware`・`area:hardware`（作成は`13:19:15Z`。`gh pr create --label`で指定） |
-| それでもskipされた | commit statusの履歴（下記） |
-
-commit statusは`Review queued`が6件出たあと、**4行目の文言が5件と5行目の文言が1件**という内訳になった。
-
-| 時刻（UTC） | `description` |
-|---|---|
-| `13:19:23Z`〜`13:19:33Z` | `Review skipped: manual review required for this OSS repository`（5件） |
-| `13:19:35Z` | `Review skipped: automatic reviews are disabled`（1件） |
-
-**この2文言は排他ではない。**同じPull Requestの同じ時刻帯に両方出る。
-**どちらか一方だけを見て切り分けたと判断しない。**
-
-解決は4行目と同じく`@coderabbitai full review`だが、**1回目は空振りした。**
-
-| 時刻（UTC） | 出来事 |
-|---|---|
-| `13:21:20Z` | `@coderabbitai rate limit` → `More reviews will be available in 26 minutes.` |
-| `13:50:36Z` | `@coderabbitai full review` → `13:50:41Z`のreplyが`Review rate limited.`（`next included review will be available in 59 minutes`）。commit statusも`13:50:45Z`に`Review rate limited` |
-| `14:53:54Z` | `@coderabbitai rate limit` → `Reviews are available now.` |
-| `14:54:26Z` | `@coderabbitai full review` → `14:54:43Z`のreplyが`Full review finished.`、`14:58:39Z`にcommit statusが`Review completed`。review本文は`Actionable comments posted: 3` |
-
-**`full review`自体もrate limitで空振りする。**空振りしても同じCodeRabbit checkが
-`Review rate limited`という**別の説明文**で`pass`になるため、投げっぱなしにすると走ったように見える。
-[手動で依頼する前に状態を確認する](#手動で依頼する前に状態を確認する)の手順を省かない。
-`26 minutes`の案内どおりに待っても枠が空いていなかった点にも注意する。**案内の時刻は保証ではない。**
-
-**#125（作成`13:41:11Z`、allowlistのlabel`area:hardware`を`13:41:13Z`に付与）でも同じ並びが再現した。**
-`13:41:17Z`〜`13:41:19Z`に`Review queued`が5件、`13:41:19Z`〜`13:41:27Z`に4行目の文言が4件、
-`13:41:30Z`に5行目の文言が1件である。**#123と同じ形であり、単発の事故ではない。**
-
-**ただし#125では、その後に自動reviewが自力で起動している。**同じcommit（`be52d9b`）に対し、
-手動依頼も新しいpushも無いまま`13:43:30Z`に`Review in progress`へ移り、`13:43:33Z`に
-`Review rate limited`で止まった。**同じことが`13:50:15Z`と`15:08:54Z`にも起きている。**
-最終的に`Review completed`へ至ったのは手動の`full review`（`17:26:49Z`）である。
-
-**したがって「5行目＝自動reviewは二度と動かない」ではない。**skipの後に自動で再試行されることがあり、
-そのときrate limitに当たると`Review rate limited`へ変わる。**表示が変わったことを「解決した」と読まない。**
-
-**#124でも5行目の文言を観測しているが、条件が違う。**作成直後ではなく、
-commit日時`2026-08-16T00:12:31Z`のcommitに対する`00:13:58Z`の判定である。
-**#124に現存するcommitはすべてPull Request作成より後のものであり、作成時点のcommitに
-付いたstatusはもう辿れない。**作成直後の観測として数えられるのは#123と#125の2件である。
-
-##### `enabled: false`と`labels`の関係（公式文書の確認）
-
-**5行目を「設定の誤りだ」と読まないため、CodeRabbitの公式文書を確認した。**
-設定schema（[`schema.v2.json`](https://coderabbit.ai/integrations/schema.v2.json)。
-`.coderabbit.yaml`冒頭の`$schema`が指すもの）の`reviews.auto_review.labels`の説明は次を含む。
-
-> When `enabled` is false, a positive label match (for example ['review-ready']) triggers a review;
-> negative-only labels such as ['!wip'] remain exclusion filters and do not opt PRs in by themselves.
-
-**`enabled: false`＋`labels`によるopt-inは、文書どおりの使い方である。**
-`.coderabbit.yaml`は誤設定ではなく、**5行目を設定変更で解消する根拠は無い。**
-
-実測もこれと矛盾しない。[#90](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/90)・
-[#91](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/91)は
-`area:docs`＋`type:decision`＋`priority:*`で作成され、**当時のallowlistには`type:decision`が入っていた**
-（`.coderabbit.yaml`から外したのは[#95](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/95)）。
-一致するlabelがあり、`enabled: false`のまま自動reviewが走っている。
-**「#90・#91はallowlistに一致していないのに通った」ではない。**現在のlabel一覧だけを見て
-過去の観測を読み替えない。
-
-**したがって5行目の原因は未特定のまま残る。**CodeRabbit側の挙動か、設定以外の要因である。
-**推測を書き足さない。**次に同じ文言を見たら、上と同じ形で観測を追記する。
+**同記録は履歴である。**読むのは、見た文言が既知かどうかを調べるときだけでよい。
+**merge前に必要なのは上の3つの区別だけである。**
 
 #### 手動で依頼する前に状態を確認する
 
@@ -647,6 +571,36 @@ Self-Review: converged
 Instruction-Change: reviewed-as-data
 ```
 
+**`Change-Class: fixup`を宣言する場合は、`Refs`で後始末の対象を示す。**
+番号を含まない`Refs`は通らない。
+
+```text
+Change-Class: fixup
+Self-Review: requirements-pass
+Self-Review: fresh-context-pass
+Self-Review: converged
+Refs: #206
+```
+
+**`Refs`にはコロンが要る。**`git interpret-trailers`はコロンの無い行をtrailerとして
+読まない。この repository のcommit messageは`Refs #204`（コロンなし）を本文の段落として
+書いてきたが、**それはtrailerではない。**
+
+**そしてコロンの無い行をtrailer blockと同じ段落へ置くと、blockごと無効になる。**
+`Change-Class`も`Self-Review`も消え、gateは「trailerが無い」と報告する。実測した。
+
+```text
+本文
+
+Refs #200
+Change-Class: review-required
+Self-Review: converged
+```
+
+上のmessageから`git interpret-trailers --parse`が返すのは**空である。**
+本文の段落として`Refs #204`を書く場合は、**trailer blockと空行で分ける。**
+`fixup`の宣言に使う場合は、**block の中へ`Refs: #204`と書く。**
+
 **trailerの名前と値の正本は`scripts/review_gate.py`である。**
 
 **この節は、省略する行を「3行目」と行番号で指定していた。**
@@ -658,7 +612,7 @@ Instruction-Change: reviewed-as-data
 
 **`main`昇格では、範囲の各commitの宣言も検証される。**squash commitへtrailerを書き忘れると、その回のmergeは通っても次の昇格で落ちる。
 
-**ただし検査に起点がある。**trailer運用を導入したcommit（[#161](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/161)のsquash）より前は検査しない。**宣言を求める規則が存在しなかったためである。**起点より後にも、宣言を持たないことを許しているcommitがある。`AGENTS.md`が履歴書き換えを禁じているため、後からtrailerを付けられない。**起点と免除の正本は`scripts/review_gate.py`の`DECLARATION_CUTOVER`と`DECLARATION_EXEMPT`であり、免除の理由は同fileが持つ。**
+**ただし検査に起点がある。**trailer運用を導入したcommit（[#161](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/161)のsquash）より前は検査しない。**宣言を求める規則が存在しなかったためである。**起点より後にも、宣言を持たないことを許しているcommitがある。`AGENTS.md`が共有branchの履歴書き換えを禁じているため、後からtrailerを付けられない。**起点と免除の正本は`scripts/review_gate.py`の`DECLARATION_CUTOVER`と`DECLARATION_EXEMPT`であり、免除の理由は同fileが持つ。**
 
 そのため**`HISTORY_CHECKED`は昇格範囲のcommit数より少なくなりうる。取りこぼしではない。**検査した件数、skipしたmerge commitの件数、免除した件数を必ず出すため、差はその内訳で説明できる。**この数を期待値として引用しない。**範囲は昇格ごとに変わる。
 
@@ -679,7 +633,7 @@ merge後に`develop`のtipへ宣言が入ったことは、次で確認する。
 python3 scripts/review_gate.py receipt --base origin/develop~1 --head origin/develop
 ```
 
-**この確認をskipすると取り返しがつかない。**`AGENTS.md`が履歴書き換えを禁じているため、
+**この確認をskipすると取り返しがつかない。**`AGENTS.md`が共有branchの履歴書き換えを禁じているため、
 mergeしたsquash commitへ後からtrailerを付ける手段は無い。残るのは`DECLARATION_EXEMPT`へ
 登録する判断だけであり、それはIssueとPull Requestを1本ずつ要する。
 [#197](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/197)で実際に2 commit分を払っている。
@@ -691,12 +645,85 @@ squash mergeしたbranchはcommit hashが変わるため、`git branch -d`が「
 [#33](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/33)で`delete_branch_on_merge`が
 `develop`自体を削除する事故が起きている。Repository Rulesetで禁止済みだが確認はする。
 
+## hookが止めたとき
+
+`.claude/settings.json`が4つのscriptをhookとして起動する。**検査は5つである。**
+
+**文書に書いても実行されないことが実測で分かっている。**
+[#204](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/204)、
+[#205](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/205)、
+[#206](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/206)は
+**3件とも作成時にboardへ入っておらず、5分55秒〜18分29秒後に追加されている**
+（`added_to_project_v2`のevent時刻と作成時刻の差）。規約は当時も同じだった。
+そこで[全体の流れ](#全体の流れ)のうち機械で判定できる段をhookで止めている。
+
+| いつ | 何を見る | 実体 |
+|---|---|---|
+| `gh issue create`／`gh pr create`の前 | `--project`（短縮形`-p`）があるか | `scripts/hooks/gh_metadata_guard.py` |
+| `gh pr merge`の前 | squash messageが`Change-Class`と`Self-Review`を持つか | 同上 |
+| `git checkout -b`／`git switch -c`の前 | 基点が最新の`origin/develop`か | `scripts/hooks/branch_base_guard.py` |
+| `gh pr merge`の後 | squash commitに実際に入ったか | `scripts/hooks/merge_trailer_report.py` |
+| `develop`へ直接pushする前 | 押す範囲が`review_gate.py gate`を通るか | `scripts/hooks/push_gate.py` |
+
+**判定は字句だけで行う。**意味は判定しない（`scripts/review_gate.py`と同じ方針）。
+
+### 止まったときにどうするか
+
+**まず、指摘が当たっているかを見る。**当たっていれば、足りないものを足して再実行する。
+
+誤検知のときは環境変数で無効化できる。**逃げ道であって常用するものではない。**
+使ったらPull Request本文へ理由を書く。
+
+```bash
+DESKCAT_SKIP_GH_GUARD=1 gh pr create --title "..." --body-file body.md
+DESKCAT_SKIP_BASE_GUARD=1 git checkout -b experiment/scratch
+DESKCAT_SKIP_PUSH_GATE=1 git push origin HEAD:develop
+```
+
+`branch_base_guard.py`は、基点を明示した場合（`git checkout -b <name> <start>`）と
+`hotfix/`で始まるbranchを対象外にする。`hotfix/`は`main`から作るのが正しい
+（[ADR-0004](docs/decisions/0004-main-develop-branch-strategy.md)）。
+
+`push_gate.py`は`develop`を更新するpushだけを見る。**他のbranchへのpushは見ない。**
+Pull Requestを通る変更は`review-gate.yml`が`gate`を実行するためである。
+**直接pushはCIを通らないため、そこだけが検査の無い経路だった。**
+
+**このhookは`gate`を実行するだけで、直接commitしてよい基準そのものは検査しない。**
+検査すると、trailerを落としたsquash commitをamendして直す手順
+（[Merge方式](#merge方式)）を誤って止める。その手順の対象は
+`Change-Class: review-required`を持つため、基準で測ると拒否になる。
+**字句で区別する手立てが無い。**
+
+### 取り切れていないもの
+
+**hookを「通った」ことを「正しい」と読まない。**次は検査できていない。
+
+- **squash messageをstdin（`-F -`）で渡す経路。**hookからは読めないため、
+  読めないことを理由に止める。`--body-file`を使う。
+- **`gh`や`git`を、alias、shell function、`xargs`、`sh -c`の内側から起動した場合。**
+  hookはcommandの字句だけを見るため、呼び出しとして拾えない。
+  **推測で拾わないのは、誤検知がhookごと無効化される側の失敗だからである。**
+- **branchをhook以外の経路で作った場合。**worktreeを外部の道具が作ると
+  `git checkout -b`を通らないため、基点は検査されない。
+- **`git fetch`ができない環境。**基点の検査は行わず、黙って通る。
+- **merge後の確認は事後である。**入っていなければ履歴書き換えなしには直せない。
+  それでも報告するのは、免除へ回す判断を次の昇格まで先延ばしにしないためである。
+- **`develop`へ入る経路のうち、`gh pr merge`によるものは`push_gate.py`を通らない。**
+  そちらはPull RequestのCIで`gate`が済んでいる。
+- **`push_gate.py`が見る`develop`の書き方は`develop`と`refs/heads/develop`だけである。**
+  `--mirror`と`--all`のように、refspecを書かずに複数branchを更新する形は拾えない。
+- **`gate`が時間内に終わらない場合は通す。**止めないのは、遅い環境で作業を止めないためである。
+  **通ったことを、検査したことと読まない。**
+
+**hookで安全要件を代替しない。**hookが直すのは「忘れる」であって、
+[Hardware Safety Policy](docs/governance/hardware-safety-policy.md)が要求する根拠ではない。
+
 ## Gitと秘密情報
 
 - `.env`、資格情報、token、秘密鍵をcommitしない。
 - commit前にstage対象pathとdiffを確認する。
 - build生成物をcommitしない。
-- 通常作業でforce pushしない。
+- **共有branch（`main`／`develop`）へforce pushしない。**自分の未push・未mergeのbranchでは使ってよい（[Development Workflow](docs/governance/development-workflow.md)）。
 - 許可なく第三者参考資料を公開しない。
 
 ## Security上の報告

@@ -70,6 +70,11 @@ jobs:
         working-directory: ${{ runner.temp }}
         run: python3 "$GITHUB_WORKSPACE/scripts/test_review_gate.py"
 
+      - name: Test hooks
+        # hookは失敗しても静かなため、壊れたことに気付けない。CIで回帰させる。
+        working-directory: ${{ runner.temp }}
+        run: python3 "$GITHUB_WORKSPACE/scripts/test_hooks.py"
+
       - name: Check documentation links
         run: python3 scripts/validate_doc_links.py
 

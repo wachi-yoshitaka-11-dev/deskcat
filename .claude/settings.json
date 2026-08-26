@@ -1,0 +1,42 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "R=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}\"; [ -n \"$R\" ] && [ -f \"$R/scripts/hooks/gh_metadata_guard.py\" ] && exec python3 \"$R/scripts/hooks/gh_metadata_guard.py\" || exit 0",
+            "timeout": 30,
+            "statusMessage": "gh の必須 metadata を確認"
+          },
+          {
+            "type": "command",
+            "command": "R=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}\"; [ -n \"$R\" ] && [ -f \"$R/scripts/hooks/branch_base_guard.py\" ] && exec python3 \"$R/scripts/hooks/branch_base_guard.py\" || exit 0",
+            "timeout": 90,
+            "statusMessage": "branch の基点を確認"
+          },
+          {
+            "type": "command",
+            "command": "R=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}\"; [ -n \"$R\" ] && [ -f \"$R/scripts/hooks/push_gate.py\" ] && exec python3 \"$R/scripts/hooks/push_gate.py\" || exit 0",
+            "timeout": 150,
+            "statusMessage": "develop への直接 push を gate で確認"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "R=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}\"; [ -n \"$R\" ] && [ -f \"$R/scripts/hooks/merge_trailer_report.py\" ] && exec python3 \"$R/scripts/hooks/merge_trailer_report.py\" || exit 0",
+            "timeout": 60,
+            "statusMessage": "merge 後の trailer を確認"
+          }
+        ]
+      }
+    ]
+  }
+}

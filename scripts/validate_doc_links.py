@@ -116,11 +116,17 @@ def _collect_anchors(markdown_files, file_texts):
     fileが存在するだけでは検出できないため、link先の存在確認とは別に突き合わせる。
     過去に見出しの改名で2度壊している。
 
+    **anchorを計算できたと主張できない見出しは、別に返す。**kramdownがその文字を
+    落とすかを確認していない場合、source側と生成site側の判定がずれる。**どちらへ外しても
+    落ちるのはJekyll buildの後であり、localでは分からない。**そのためlinkを拒否する。
+
     本文は`file_texts`から取り、ここでfileを読み直さない。読み直すと、走査中に
     fileが変わったときにanchor収集とlink収集が別の内容を見る。片方にしか無い
     見出しが「Broken anchor」として報告され、原因が実在しないlink切れに見える。
     """
     anchors_by_file = {}
+    # 扱いが未確認の文字を含む見出しのanchor。`{path: {anchor: 文字}}`。
+    unverified_by_file = {}
     for path in markdown_files:
         anchors = set()
         # GitHubは同一textの見出しが繰り返されると`-1`、`-2`と採番する。
@@ -133,12 +139,18 @@ def _collect_anchors(markdown_files, file_texts):
             match = HEADING_RE.match(line)
             if not match:
                 continue
-            base = guards.heading_anchor(match.group("heading"))
+            heading = match.group("heading")
+            base = guards.heading_anchor(heading)
             count = seen.get(base, 0)
-            anchors.add(base if count == 0 else f"{base}-{count}")
+            anchor = base if count == 0 else f"{base}-{count}"
+            anchors.add(anchor)
+            unverified = guards.anchor_unverified_characters(heading)
+            if unverified:
+                # **anchorを計算できたと主張しない。**この見出しへのlinkは拒否する。
+                unverified_by_file.setdefault(path, {})[anchor] = unverified
             seen[base] = count + 1
         anchors_by_file[path] = anchors
-    return anchors_by_file
+    return anchors_by_file, unverified_by_file
 
 
 def main(argv=None):
@@ -230,7 +242,9 @@ def main(argv=None):
             )
     _fail_if_any(problems)
 
-    anchors_by_file = _collect_anchors(markdown_files, file_texts)
+    anchors_by_file, unverified_by_file = _collect_anchors(
+        markdown_files, file_texts
+    )
 
     for path in markdown_files:
         scanned += 1
@@ -309,6 +323,18 @@ def main(argv=None):
                         problems.append(
                             f"Broken anchor in {relative_file}: {target}"
                             " (no matching heading)"
+                        )
+                        continue
+                    unverified = unverified_by_file.get(candidate_full, {}).get(wanted)
+                    if unverified:
+                        # anchorが一致していても通さない。**一致しているのはこちらの
+                        # 計算どうしであって、生成site側と一致する保証が無い。**
+                        problems.append(
+                            f"Unverified anchor in {relative_file}: {target}"
+                            f" (the heading contains {''.join(unverified)};"
+                            " kramdown's handling is not confirmed."
+                            " Link to the document without a fragment,"
+                            " or confirm with a Jekyll build first)"
                         )
                         continue
                 elif (
