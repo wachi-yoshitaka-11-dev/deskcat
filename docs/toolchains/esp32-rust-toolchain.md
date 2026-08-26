@@ -41,7 +41,7 @@ ESP-WROOM-32D の datasheet v2.7 には **PSRAM を内蔵する variant の記�
 
 **module の刻印は 2026-08-13 に読了した**（斜光＋接写）。シールド上面に `ESPRESSIF` と `ESP32-WROOM-32D` が刻印されており、**module 種別の根拠が購入履歴と silkscreen に加えて module 自身の刻印になった。**ただし**これは module の品番であって chip の品番ではない。**中核 chip が `ESP32-D0WD` であるという記載の出典は、上表のとおり ESP-WROOM-32D datasheet v2.7 のままである。
 
-追跡は [`HW-TBD-031`](../hardware/tbd-register.md)（2026-08-11 の全数照合で登録し、2026-08-15 に要件を書き換えた）。**本文書の状態を `Verified` にする条件のうち chip 刻印の項は、非破壊で満たせないため 2026-08-15 に満たし方を再定義した。****`esptool` が報告する chip 名で満たす。**一次資料で、`esptool` が品番相当の文字列を返すことを確認した。**`espflash` の出力では満たせない**（family 名しか返さない）。実施は実機 Linux 限定の flash（[#6](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/6)）を要した。**2026-08-20 にその flash を実施し、この項目を満たした**（`esptool` 4.12.0 が `ESP32-D0WD` を報告した。[chip 識別の満たし方](#chip-識別の満たし方)、記録は [Version Record](version-records/2026-08-20-esp32-flash-boot-native.md)）。**`HW-TBD-031` の行は、台帳の解決手順を通した時点で close する。**
+追跡は [`HW-TBD-031`](../hardware/tbd-register.md)（2026-08-11 の全数照合で登録し、2026-08-15 に要件を書き換えた）。**本文書の状態を `Verified` にする条件のうち chip 刻印の項は、非破壊で満たせないため 2026-08-15 に満たし方を再定義した。****`esptool` が報告する chip 名で満たす。**一次資料で、`esptool` が品番相当の文字列を返すことを確認した。**`espflash` の出力では満たせない**（family 名しか返さない）。実施は実機 Linux 限定の flash（[#6](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/6)）を要した。**2026-08-20 にその flash を実施し、この項目を満たした**（`esptool` 4.12.0 が `ESP32-D0WD` を報告した。[chip 識別の満たし方](#chip-識別の満たし方)、記録は [Version Record](version-records/2026-08-20-esp32-flash-boot-native.md)）。**`HW-TBD-031` の行は、台帳の解決手順を通して close した**（close 日と解決 reference は [`tbd-register.md`](../hardware/tbd-register.md) の `解決済み項目` が持つ。**ここへ再掲しない**）。
 
 いずれも build には影響しないが、flash 後の実機動作には影響する。
 
