@@ -90,7 +90,7 @@ VDD = 3.3 Vである（`電圧domain`節）。受け側の`VIH`は0.7×3.3 = **2
 
 | 信号 | 向き | 値 | 本数 | 決め手 |
 |---|---|---|---|---|
-| **`SERVO-PWM`** | **pull-down（必須）** | **未確定**（4.7 kΩを推奨） | 1 | 下記「`SERVO-PWM`の値を確定させない理由」。**振り分けがPMで決まるまで確定しない** |
+| **`SERVO-PWM`** | **pull-down（必須）** | **4.7 kΩ** | **1** | 下記「`SERVO-PWM`を4.7 kΩにした理由」。**2026-08-26に一般値側と決まったため確定した** |
 | `LCD-CS` | pull-up | **10 kΩ** | 1 | `Rmax` 943 kΩに対して94倍の余裕。駆動負荷は`IOL`の1.1 % |
 | `LCD-RST` | pull-up | **10 kΩ** | 1 | 同上。**あわせて下記「`LCD-RST`の2つの注意」** |
 | `TOUCH-CS` | pull-up | **10 kΩ** | 1 | `Rmax` 196 kΩに対して20倍の余裕 |
@@ -98,11 +98,11 @@ VDD = 3.3 Vである（`電圧domain`節）。受け側の`VIH`は0.7×3.3 = **2
 | `TOUCH-IRQ` | **外部pullを付けない** | — | **0** | 下記「`TOUCH-IRQ`へ外部pull-upを付けてはならない」 |
 
 **手元の2種で足りる。**10 kΩ（秋月 125103）と4.7 kΩ（秋月 125472）がどちらも1袋100本入で2026-08-08に着荷している
-（[hardware-bom.md](hardware-bom.md) `RES-PULL-01`）。**確定したのは 10 kΩ×3 の3本である。**`SERVO-PWM` の 4.7 kΩ×1 は推奨にとどまる。**いずれにしても手元の2種で足り、追加の発注は要らない。**
+（[hardware-bom.md](hardware-bom.md) `RES-PULL-01`）。**確定した4本は 4.7 kΩ×1 と 10 kΩ×3 であり、追加の発注は要らない。**
 **ただし現物の表示・値の確認はしていない**（同BOMの`着荷済み`と`受け入れ済み`の区別）。
 消費電力はどちらも問題にならない（3.3 Vで4.7 kΩが2.32 mW、10 kΩが1.09 mW。**1/4 W = 250 mWの1 %未満**）。
 
-#### `SERVO-PWM`の値を確定させない理由と、揃えた材料
+#### `SERVO-PWM`を4.7 kΩにした理由
 
 **この信号だけ、上限を一次資料から計算できない。**SG90の`logic閾値`と入力インピーダンスは
 **どの一次資料にも記載が無い**（2026-08-24に確定。[`HW-TBD-026`](tbd-register.md)(a)）。
@@ -120,11 +120,22 @@ VDD = 3.3 Vである（`電圧domain`節）。受け側の`VIH`は0.7×3.3 = **2
 **未知に対して強い側が安全側である。**上限が計算できない状況では、**下限側に余裕がある範囲で値を下げるほうが安全である。**
 4.7 kΩは駆動負荷が`IOH`の1.8 %にとどまり、手元にもある。**したがって4.7 kΩ×1本を推奨とする。確定はしない。**
 
-**確定しない理由は規則側にある。**[hardware-safety-policy.md](../governance/hardware-safety-policy.md)の対応表は
+**振り分けは2026-08-26に決着した。**経緯を残す。[hardware-safety-policy.md](../governance/hardware-safety-policy.md)の対応表は
 「pull-upとdecouplingの値」を**一般値で開始してよい側**、「サーボPWM、可動域、速度、加速度」を**一次資料を要する側**に置く。
-**`SERVO-PWM`のpull-down抵抗値は両方に読める。**pull抵抗の値であるから前者に読め、
+**`SERVO-PWM`のpull-down抵抗値は両方に読めた。**pull抵抗の値であるから前者に読め、
 外すとreset時のhigh-Z区間でservoが不定pulseを受け、機構へ押し付けられれば安全5項目の
-「servoの持続的拘束」に至りうるから後者にも読める。**この振り分けはこの節では決めない。**
+「servoの持続的拘束」に至りうるから後者にも読める。
+
+**2026-08-26に人間が一般値側と決めた。**判断の材料は3つである。
+
+- **持続的拘束に至る経路が成立しにくい。**servoが動くには有効なPWM pulse列が要る。
+  high-Zで浮いた線が出すのは静的なレベルかノイズであり、pulse列ではない。
+- **一次資料側に振ると無期限に止まる。**SG90の`logic閾値`とPWM受理条件は公式datasheetが存在せず、
+  仕様表にも記載が無い（2026-08-24に全数確認）。一次資料を要求すると存在しない文書を待つことになる。
+- **値の妥当性は文書ではなく実測で決まる。**`HW-TBD-027`の証拠契約は項目4でreset中の実測を求めており、
+  格を上げてもこの実測は要る。
+
+**この決定が変えたのは値の根拠の水準だけである。pull-down自体が必須であることは変わらない。**
 
 **揃えた材料は3つである。**(1) reset時のpin状態（`oe=0, ie=0`＝内部pull無しの真のhigh-Z）、
 (2) 内部pullの強さ（`RPU`／`RPD` typ 45 kΩ、駆動能力約75 µA。**ただしGPIO27にはそれが無い**）、
@@ -315,7 +326,7 @@ UM10204 Table 10の注記も、400 kHzでfull bus loadを駆動するには`VOL`
 | ACCEL-IRQ | ACCEL-01 | Interrupt（tap／free-fall検出） | Input | GPIO35 | 入力専用 | **外部pull要確認**（`HW-TBD-004`）。**ICの事実:**ADXL345のINT1/INT2は**push-pull固定**であり、設定で切り替えられない（`Both interrupt pins are push-pull, low impedance pins`。Rev. G page 19）。polarityは`DATA_FORMAT` register（`0x31`）の`INT_INVERT` bitで選び、**同registerのreset値が`00000000`であるためICの既定はactive-highである**（Rev. G Table 19 page 23、page 27）。**旧記載の「push-pull／open-drainを設定可能」はICの事実として誤りであり、2026-08-12に訂正した**（Revision 9）。**module levelは別である。**M-06724のboard上でINT pinがheaderへ直結しているか（直列抵抗、level shift、引き出しの有無）を示す資料が無いため、**外部pullの要否とheaderで観測されるpolarityは現物確認まで確定しない。ICがpush-pullであることからmoduleの配線条件を導かない**（[tbd-register HW-TBD-004](tbd-register.md)） | Edge想定 | なし | ADXL345のtap／free-fall検出hardwareを軽打／持ち上げ判定に使う場合に使用（`hardware-bom.md` ACCEL-01の採用理由） |
 | ENV-SDA | ENV-01 | I2C SDA | Bidirectional | GPIO25（ACCEL-01と共有） | 同上 | 同上 | 同上 | ACCEL-01と共有 | BME280はI2C／SPI選択式。**2026-08-22に選択jumperを実測し、`J1`／`J2`／`J3`は3つとも開放であると確定した**（正は[sensor-datasheet-notes.md](sensor-datasheet-notes.md)の`現物の実装状態を実測で確定させた（2026-08-22）`）。**したがってI2Cで使うには`J3`のはんだ付けが要る**（実装作業）。**module搭載の4.7 kΩプルアップも繋がっていない** |
 | ENV-SCL | ENV-01 | I2C SCL | Bidirectional | GPIO26（ACCEL-01と共有） | 同上 | 同上 | 同上 | ACCEL-01と共有 | 同上 |
-| SERVO-PWM | SERVO-01 | PWM control | Output | GPIO27 | **不定**。ESP32のGPIO27はreset時にhigh-Z（output disable、input disable）であり、Lowにdriveされる保証はない。**Lowと仮定しない。**外部pull-downが確定させるまで、servoは不定pulseを受けうる | **外部pull-down必須**（推奨ではない）。high-Z期間中もLowを保証する唯一の手段であり、これがないとPWM driver初期化前にservoが動きうる。詳細は`servo-safety-limits.md`。**値は未確定である。**`4.7 kΩ`×`1本`を**推奨として**置くところまでで、確定はしていない（材料と導出は[起動時状態を確定させる外部pull](#起動時状態を確定させる外部pull)節。**ここへ再掲しない**）。**2026-08-26時点で、この抵抗値を一般値で開始してよい側と一次資料を要する側のどちらに置くかが決まっていない**（[hardware-safety-policy.md](../governance/hardware-safety-policy.md)の対応表は「pull-upとdecouplingの値」を一般値側、「サーボPWM、可動域、速度、加速度」を一次資料側に置いており、**この項目は両方に読める**）。**振り分けが決まるまで値を確定させない。****上限はSG90の`logic閾値`が一次資料に無いため計算できない**（[`HW-TBD-026`](tbd-register.md)(a)）。**そのうえで、駆動側の下限に余裕がある範囲で未知に強い側（低い値）を採った。**部品は`hardware-bom.md`の`RES-PULL-01`（10 kΩと4.7 kΩが各1袋100本入、2026-08-08着荷。**追加の発注は要らない**）。**選定は実装ではない。未実装である** | 50Hz、pulse幅は`servo-safety-limits.md`で規定する制限に従う | なし | Strapping pinでもflash pinでもない。起動時とdriver故障時の状態は`tbd-register.md` HW-TBD-019で引き続き検討する |
+| SERVO-PWM | SERVO-01 | PWM control | Output | GPIO27 | **不定**。ESP32のGPIO27はreset時にhigh-Z（output disable、input disable）であり、Lowにdriveされる保証はない。**Lowと仮定しない。**外部pull-downが確定させるまで、servoは不定pulseを受けうる | **外部pull-down必須**（推奨ではない）。high-Z期間中もLowを保証する唯一の手段であり、これがないとPWM driver初期化前にservoが動きうる。詳細は`servo-safety-limits.md`。**`4.7 kΩ`×`1本`で確定した。**導出は[起動時状態を確定させる外部pull](#起動時状態を確定させる外部pull)節。**ここへ再掲しない。****この抵抗値を一般値で開始してよい側に置くことを2026-08-26に人間が決めた**（[hardware-safety-policy.md](../governance/hardware-safety-policy.md)の対応表は「pull-upとdecouplingの値」を一般値側、「サーボPWM、可動域、速度、加速度」を一次資料側に置き、**この項目は両方に読めた**）。**pull-down自体が必須であることは変わらない。**一般値側になったのは値の根拠の水準だけである。**上限はSG90の`logic閾値`が一次資料に無いため計算できない**（[`HW-TBD-026`](tbd-register.md)(a)）。**そのうえで、駆動側の下限に余裕がある範囲で未知に強い側（低い値）を採った。**部品は`hardware-bom.md`の`RES-PULL-01`（10 kΩと4.7 kΩが各1袋100本入、2026-08-08着荷。**追加の発注は要らない**）。**選定は実装ではない。未実装である** | 50Hz、pulse幅は`servo-safety-limits.md`で規定する制限に従う | なし | Strapping pinでもflash pinでもない。起動時とdriver故障時の状態は`tbd-register.md` HW-TBD-019で引き続き検討する |
 | ADC-SHUNT | MEAS-01 | Servo rail低側shuntの電圧 | Input（ADC1_CH4） | GPIO32 | 入力専用扱い、high-Z | 外部pull不要（shunt両端が電位を決める） | ADC1、減衰0 dB（0–1.1 V）。0.1Ω×最大2 A＝0.2 Vがfull scale内 | なし | ADC1のためWi-Fi動作中も使用可。ADC2は**Wi-Fi有効時に使用不可**のため測定へ割り当てない。低電流側の精度限界（実用域は約1 A以上）は`power-budget.md`の測定計画を参照 |
 | ADC-5V | MEAS-01 | 5 V railの電圧 | Input（ADC1_CH5） | GPIO33 | 入力専用扱い、high-Z | 分圧器10 kΩ／10 kΩ（比1/2）。分圧後の最大は約2.5 V | ADC1、減衰11 dB（約0–3.1 V）。分圧なしでは5 VがADC定格3.3 Vを超え破損する | なし | 分圧比は10 kΩ抵抗で構成する（`hardware-bom.md` MEAS-01）。**`ADC-5V`と`ADC-3V3`で計4本を使う。抵抗は入手済みであり**（2026-08-08着荷、1袋100本入。2026-08-12に購入履歴と照合して訂正した）、**残るのは実装と検証である** |
 | ADC-3V3 | MEAS-01 | ESP32 3.3 V railの電圧 | Input（ADC1_CH0） | GPIO36（VP） | 入力専用、high-Z | 分圧器10 kΩ／10 kΩ（比1/2）。分圧後の最大は約1.65 V | ADC1、減衰11 dB | なし | 3.3 Vは減衰11 dBのfull scale（約3.1 V）を超えるため直結しない。Input-only pinのためoutputへ転用不可 |
@@ -365,7 +376,7 @@ PCからflashingするときは同じUSB portを使うため、Piとの同時接
 - [ ] MSP2807のlogic IOが3.3Vで動作することを現物で確認した（VCC 3.3–5V対応だがlogic IOは3.3V TTL。`power-budget.md`参照）
 - [ ] ESP32の電源投入前に外部moduleがESP32 pinをdriveしない（未検証、実機電源offでの導通checkが必要）
 - [ ] Resetとbacklight lineが安全な状態で起動する（LCD-RST/LCD-CSへの外部pull-up実装が前提。**2026-08-25に値と本数を選定した**（`LCD-RST`／`LCD-CS`とも10 kΩ×1本。導出は[起動時状態を確定させる外部pull](#起動時状態を確定させる外部pull)節）**が、実装は未了であり、`LCD-BL`の値は未選定のままである。**したがってこの項目は満たしていない。[`HW-TBD-032`](tbd-register.md)で追跡する）
-- [ ] Servo PWMがdisabledまたは承認済みの安全状態で起動する（GPIO27はreset時high-Zであり、外部pull-downを**必須**とした。**reset時状態が`oe=0, ie=0`＝内部pull無しであることをESP32 Datasheet v5.3の`IO_MUX`で2026-08-25に確認した。**同日に**4.7 kΩ×1本を推奨として置いた**（導出は[起動時状態を確定させる外部pull](#起動時状態を確定させる外部pull)節）。**値は確定していない**（一般値側か一次資料側かの振り分けが未了）。**実装・検証とも未了である。****判定閾値はSG90の`logic閾値`が未確定のため確定していない**（[`HW-TBD-026`](tbd-register.md)(a)）。`tbd-register.md` HW-TBD-019と連動、未解決）
+- [ ] Servo PWMがdisabledまたは承認済みの安全状態で起動する（GPIO27はreset時high-Zであり、外部pull-downを**必須**とした。**reset時状態が`oe=0, ie=0`＝内部pull無しであることをESP32 Datasheet v5.3の`IO_MUX`で2026-08-25に確認した。**同日に**4.7 kΩ×1本を選定し、2026-08-26に一般値側と決まって確定した**（導出は[起動時状態を確定させる外部pull](#起動時状態を確定させる外部pull)節）。**実装・検証とも未了である。****判定閾値はSG90の`logic閾値`が未確定のため確定していない**（[`HW-TBD-026`](tbd-register.md)(a)）。`tbd-register.md` HW-TBD-019と連動、未解決）
 
 ## Firmwareとの同期
 
@@ -400,4 +411,4 @@ PCからflashingするときは同じUSB portを使うため、Piとの同時接
 | 2026-08-22 | 15 | [PR #173](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/173)の自動reviewの指摘を反映した。**BME280の実測結果を記録したのに、同じ文書に古い記述が残っていた。**`ENV-SDA`行の`選択jumperの現物確認が必要`、`I2C sensor bus`行の`両moduleのinterface選択jumperの現物確認`、受け入れchecklistの`半田の有無が光学的に判別できず未確定`である。**いずれも実測結果へ更新した。**未解決として残す対象を**ADXL345側のpin接続の確認と実効pull-up計算に限定**し、**BME280の`J3`は実装作業、`J1`／`J2`は計算後の判断**として記録した | [#1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1) |
 | 2026-08-22 | 16 | [PR #174](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/174)の自動reviewの指摘を反映した。**USB OTG cableを`未購入`としていた記述が2箇所残っていた**（`追加部品`行と`USB serial（Pi link）`行）。**`CABLE-PI-LINK-01`は2026-08-22に手持ちで充当と確定し購入待ちリストから外している**（正は[hardware-bom.md](hardware-bom.md)の`CABLE-PI-LINK-01`）。両方を更新した | [#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3) |
 | 2026-08-25 | 17 | [#1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1)。**`I2C busの実効pull-up`節と`I2C addressの選択`節を新設した。**`I2C sensor bus`行と受け入れchecklistが「実効pull-upの計算はまだできない」と書きながら、**式も規定値も前提もどこにも無かった。**そのため何が足りないのかを行の記述から読み取れなかった。一次資料（**I2C-bus specification and user manual UM10204 Rev. 7.0、NXP、2021-10-01**）の§7.1から`Rp(max) = tr / (0.8473 × Cb)`と`Rp(min) = (VDD(max) - VOL(max)) / IOL`、およびTable 10／Table 11の規定値（`tr` max、`Cb` max、`IOL`）を取り、**VDD = 3.3 Vでの`Rp(min)`（約967 Ω）と、`Rp`候補ごとに許される`Cb`の上限を算出した。****値そのものは確定させていない。**確定できない入力を3つ明示した（ADXL345側の`01C`がどのpinへ付くか、bus容量`Cb`、採るmode）。**あわせて、Fast-modeで`Cb`が規定上限の400 pFに達すると`Rp(max)`が`Rp(min)`を下回り、3.3 Vの受動pull-upでは成立しないことを示した。**addressについては、ADXL345の候補（`0x1D`／`0x53`）とBME280の候補（`0x76`／`0x77`）が**全4通りで衝突しない**ことを確認し、**選択が衝突回避では決まらない**ことを判断材料として記録した。**決定は行っていない。**`J1`／`J2`のはんだ付けもaddressの配線も未実施である | [UM10204 Rev. 7.0 §7.1、Table 10、Table 11](https://web.archive.org/web/2023/https://www.nxp.com/docs/en/user-guide/UM10204.pdf)（**NXPの直リンクは404を返すため同一pathのarchive snapshotを参照先にした。**2026-08-25確認）、[sensor-datasheet-notes.md](sensor-datasheet-notes.md)、[tbd-register.md](tbd-register.md) `HW-TBD-004`／`HW-TBD-005` |
-| 2026-08-25 | 18 | [#2](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/2)。**`起動時状態を確定させる外部pull`節を新設し、`信号inventory`の`Pull`列へ選定した値と本数を入れた。****確定した内訳**: `LCD-CS`／`LCD-RST`／`TOUCH-CS`のpull-upが**各10 kΩ×1本**（一般値で開始してよい側）。**`SERVO-PWM`のpull-downは4.7 kΩ×1本を推奨として置いたが確定していない**（一般値側か一次資料側かの振り分けが未了）。**`LCD-BL`は未選定のまま**（極性とbacklight回路の入力条件が未確定で上限を出せない）。**`TOUCH-IRQ`は外部pullを付けない（0本）へ改めた。**根拠は一次資料である（**ESP32 Series Datasheet v5.3** の Table 5-3 と Appendix `IO_MUX` と §3.2、**ILI9341 Datasheet V1.11** の §18.2.1 と §12.1／§12.2、**XPT2046 Datasheet**（2007.5）の`DIGITAL INPUT/OUTPUT`と`PENIRQ Output`）。**一次資料で分かった重要な点が4つある。**(a) **`SERVO-PWM`（GPIO27）のreset時状態は`oe=0, ie=0`で内部pullが無く、真のhigh-Zである。**外部pull-downが必須である理由が`IO_MUX`の値として裏付いた。(b) **`LCD-CS`／`LCD-RST`／`TOUCH-CS`のpolarityは現物確認を要しない。**ILI9341が`CSX`と`RESX`をactive low、XPT2046が`CS`をactive lowと明記している。**旧記載の`要現物のpolarity確認`を削除した。**(c) **`TOUCH-IRQ`へ外部pull-upを付けると有害である。**XPT2046の`PENIRQ`は内部pull-up付きの出力（公称50 kΩ）であり、外部10 kΩを並列に足すと実効8.33 kΩになり、datasheetが`logic low 0.35×(+VCC)`を保証する条件（X+とY−間21 kΩ未満）に対してlowが**0.716×VCC**まで上がる。**touchがLowとして読めなくなる。**旧記載の`外部pull-up推奨`はcontroller未確定時のものであった。(d) **`LCD-RST`（GPIO16）は`VDD_SDIO` domainにある。**3.3 Vへのpull-upが定格内である前提は同domainが3.3 Vであることに依り、それは`MTDI`（GPIO12）のreset時の内部weak pull-downと、module内flashが動作している事実から成り立つ。**`SERVO-PWM`だけは上限を計算できない**（SG90の`logic閾値`が一次資料に無い。`HW-TBD-026`(a)）。**駆動側の下限に余裕がある範囲で未知に強い側を採り、4.7 kΩを推奨とした。確定はしていない。****この変更は値と本数の選定であって実装ではない。5本とも未実装である。****この文書の状態`Blocked`は解除していない。checkboxも1つも開いていない** | [ESP32 Series Datasheet v5.3](https://www.espressif.com/sites/default/files/documentation/esp32_datasheet_en.pdf)、[ILI9341 Datasheet V1.11](https://cdn-shop.adafruit.com/datasheets/ILI9341.pdf)、[XPT2046 Datasheet](https://grobotronics.com/images/datasheets/xpt2046-datasheet.pdf)、[tbd-register.md](tbd-register.md) `HW-TBD-026`／`HW-TBD-027`／`HW-TBD-032`、[hardware-bom.md](hardware-bom.md) `RES-PULL-01` |
+| 2026-08-25 | 18 | [#2](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/2)。**`起動時状態を確定させる外部pull`節を新設し、`信号inventory`の`Pull`列へ選定した値と本数を入れた。****確定した内訳**: `SERVO-PWM`のpull-downが**4.7 kΩ×1本**、`LCD-CS`／`LCD-RST`／`TOUCH-CS`のpull-upが**各10 kΩ×1本**。**`SERVO-PWM`の振り分け（一般値側か一次資料側か）は2026-08-26に人間が一般値側と決めた。****`LCD-BL`は未選定のまま**（極性とbacklight回路の入力条件が未確定で上限を出せない）。**`TOUCH-IRQ`は外部pullを付けない（0本）へ改めた。**根拠は一次資料である（**ESP32 Series Datasheet v5.3** の Table 5-3 と Appendix `IO_MUX` と §3.2、**ILI9341 Datasheet V1.11** の §18.2.1 と §12.1／§12.2、**XPT2046 Datasheet**（2007.5）の`DIGITAL INPUT/OUTPUT`と`PENIRQ Output`）。**一次資料で分かった重要な点が4つある。**(a) **`SERVO-PWM`（GPIO27）のreset時状態は`oe=0, ie=0`で内部pullが無く、真のhigh-Zである。**外部pull-downが必須である理由が`IO_MUX`の値として裏付いた。(b) **`LCD-CS`／`LCD-RST`／`TOUCH-CS`のpolarityは現物確認を要しない。**ILI9341が`CSX`と`RESX`をactive low、XPT2046が`CS`をactive lowと明記している。**旧記載の`要現物のpolarity確認`を削除した。**(c) **`TOUCH-IRQ`へ外部pull-upを付けると有害である。**XPT2046の`PENIRQ`は内部pull-up付きの出力（公称50 kΩ）であり、外部10 kΩを並列に足すと実効8.33 kΩになり、datasheetが`logic low 0.35×(+VCC)`を保証する条件（X+とY−間21 kΩ未満）に対してlowが**0.716×VCC**まで上がる。**touchがLowとして読めなくなる。**旧記載の`外部pull-up推奨`はcontroller未確定時のものであった。(d) **`LCD-RST`（GPIO16）は`VDD_SDIO` domainにある。**3.3 Vへのpull-upが定格内である前提は同domainが3.3 Vであることに依り、それは`MTDI`（GPIO12）のreset時の内部weak pull-downと、module内flashが動作している事実から成り立つ。**`SERVO-PWM`だけは上限を計算できない**（SG90の`logic閾値`が一次資料に無い。`HW-TBD-026`(a)）。**駆動側の下限に余裕がある範囲で未知に強い側を採り、4.7 kΩ×1本を選定した。****この変更は値と本数の選定であって実装ではない。5本とも未実装である。****この文書の状態`Blocked`は解除していない。checkboxも1つも開いていない** | [ESP32 Series Datasheet v5.3](https://www.espressif.com/sites/default/files/documentation/esp32_datasheet_en.pdf)、[ILI9341 Datasheet V1.11](https://cdn-shop.adafruit.com/datasheets/ILI9341.pdf)、[XPT2046 Datasheet](https://grobotronics.com/images/datasheets/xpt2046-datasheet.pdf)、[tbd-register.md](tbd-register.md) `HW-TBD-026`／`HW-TBD-027`／`HW-TBD-032`、[hardware-bom.md](hardware-bom.md) `RES-PULL-01` |
