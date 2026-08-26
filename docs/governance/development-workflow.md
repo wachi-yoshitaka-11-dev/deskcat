@@ -239,8 +239,40 @@ Pull Request作成時は、通常のbaseが`develop`であることを確認す�
 ### Gitの外部操作
 
 - 明示的な指示なしにpush、force-push、tag、release、visibility変更を行わない。
-- 通常のworkflowでforce-pushを使用しない。
+- **共有branch（`main`／`develop`）へは、指示があってもforce-pushしない。**履歴を書き換えない。
+- **他者がpullした可能性のあるbranchは共有として扱う。**
 - 外部へ書き込む前に正確なremoteとbranchを確認する。
+
+#### 未mergeのbranchでのrebaseとforce-push
+
+**自分の未push・未mergeのbranchでは、rebaseとforce-pushを使ってよい。**
+ここで許すのは操作の種類であって、**指示なしにpushしてよいという意味ではない。**
+上の「明示的な指示なしにpush、force-pushを行わない」はそのまま適用される。
+
+以前は一律で禁止していた。守るべきものは共有履歴であって、自分のbranchの整理ではない。
+
+**一律の禁止は、既に守られていなかった。**feature branchを`develop`へ追随させるrebaseは、
+記録として残っている。
+
+| 記録 | 内容 |
+|---|---|
+| [ESP32 Build (Linux x86_64)](../toolchains/version-records/2026-08-06-esp32-build-linux.md) | `develop`（#44／#45／#46反映後）へrebaseし、「rebase後のフル再検証log」を残している |
+| [host workspace (CI)](../toolchains/version-records/2026-08-15-host-rust-ci.md) | Pull Request #130を`origin/develop`へrebaseし、SHAが振り直されたことを記録している |
+| [SDのhealth check](../hardware/sd-health-check.md) | #113のmerge後の`develop`へrebaseしたことを記録している |
+| [Raspberry Pi Direct Build](../toolchains/version-records/2026-08-17-pi-direct-build-native.md) | `develop`の更新へ追従してrebaseしたことを記録している |
+
+**いずれも未mergeのfeature branchであり、共有履歴は書き換えていない。害も出ていない。**
+規則が禁じ、運用が行い、記録がそれを残している状態は、**厳格に守るより悪い。**
+守っている側だけが、基点をそろえる正しい対処を躊躇する。基点をそろえずに進めると、
+後から入った文書を「存在しない」と読み、そこから誤った断定へ進む。
+
+**線引きの基準は「他の誰かがその履歴を持っているか」である。**push済みで他者が
+pullした可能性があるbranchは、未mergeでも共有として扱う。判断に迷うものは共有として扱う。
+
+`git reset --hard`と強制checkoutは、**履歴書き換えではなく未commitの変更を失う操作である。**
+別枠では禁止しない。[Working tree](#working-tree)の「関係のない未commitのユーザー変更を
+維持する」と「可能な限り復元可能な操作を使用する」が守る対象と同じものを守っている。
+**実行前にstatusを確認する。**
 
 ## 11. Review
 

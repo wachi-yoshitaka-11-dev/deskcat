@@ -26,6 +26,11 @@
 作れば済む。偽陽性だけが危険なので、そちら側に倒さない。
 
 **下の規則表は意図して粗い。**edge caseを追って条件を足すと、上の「近似の穴」に戻る。
+
+**`fixup`は宣言専用の区分であり、`classify`は返さない。**「既にmergeされreviewを通った
+作業の後始末である」は申告であって、差分からは読めない。機械が確かめるのは整合だけで、
+`Refs`で後始末の対象を示していることを要求する。**`minor`と`review-required`の判定は
+どちらも変えていない**（[ADR-0015](../docs/decisions/0015-fixup-class-and-direct-commit-scope.md)）。
 """
 
 import argparse
@@ -56,10 +61,44 @@ INSTRUCTION_SOURCES = (
 TRAILER_CLASS = "Change-Class"
 TRAILER_REVIEW = "Self-Review"
 TRAILER_INSTRUCTION = "Instruction-Change"
+TRAILER_REFS = "Refs"
 
 CLASS_MINOR = "minor"
 CLASS_REVIEW = "review-required"
+CLASS_FIXUP = "fixup"
 INSTRUCTION_ACK = "reviewed-as-data"
+
+# `Change-Class`が取りうる値。**宣言の検査はこの集合だけを見る。**
+#
+# 以前は`(CLASS_MINOR, CLASS_REVIEW)`というtupleを`_check_receipt`と`_check_history`へ
+# 別々に埋め込んでいた。値を足すときに片方だけを直す事故が起きる形だったため集約した。
+CLASS_VALUES = (CLASS_MINOR, CLASS_REVIEW, CLASS_FIXUP)
+
+# `CLASS_FIXUP`は**宣言専用の区分である。`classify`は返さない。**
+#
+# `classify`が返すのは`minor`と`review-required`だけである。`fixup`が意味するのは
+# 「既にmergeされreviewを通った作業の後始末である」という**申告**であり、
+# 差分からは読めない。人間の意図（新しい判断か、前の判断の後始末か）は字句に現れない。
+#
+# 機械で確かめられるのは整合だけである。**`fixup`を宣言したら`Refs`で対象を示すことを
+# 要求する。**後始末である以上、後始末の対象が存在する。示せないものは後始末ではない。
+#
+# **`minor`の判定を緩めない。**`fixup`はminor経路を主張しないため、
+# 「宣言が計算結果より緩くない」検査（`minor`に対するもの）の外側に置く。
+# **`review-required`の判定も緩めない。**`fixup`は`classify`の出力を変えない。
+#
+# 判定を機械化せず申告に寄せた理由は
+# [ADR-0015](../docs/decisions/0015-fixup-class-and-direct-commit-scope.md)にある。
+
+# `Refs`が対象を示しているかの判定。**番号を含むことだけを見る。**
+# その番号が実在するか、正しい対象かは判定しない。**示していないことだけを落とす。**
+#
+# **`Refs`はtrailerの形（`Refs: #204`）で書く必要がある。**`git interpret-trailers`は
+# コロンの無い行をtrailerとして読まない。この repositoryのcommit messageは本文の段落として
+# `Refs #204`と書いてきたが、それはtrailerではない。**さらにコロンの無い行をtrailer blockと
+# 同じ段落へ置くと、blockごと無効になり`Change-Class`も`Self-Review`も消える。**
+# 落とし穴はCONTRIBUTINGの「Merge方式」に書いた。
+FIXUP_REFERENCE_RE = re.compile(r"#\d+")
 
 # `Self-Review`で宣言する内容。**下の値がすべて要る。**
 #
@@ -84,7 +123,8 @@ DECLARATION_CUTOVER = "57734371384d18f31de7557a7a60fd1aa856edff"
 
 # 起点より後だが、宣言を持たないことを許すcommit。
 #
-# `AGENTS.md`が履歴書き換えを禁じているため、後からtrailerを付けられない。
+# `AGENTS.md`が共有branchの履歴書き換えを禁じているため、後からtrailerを付けられない。
+# **いずれも`develop`へmerge済みであり、共有履歴である。**
 # 中身はいずれもPull Requestのreviewを通っており、失われるのは宣言の記録である。
 #
 # **ただし免除は`Change-Class`と`Self-Review`だけを飛ばすのではない。**`history`は
@@ -266,7 +306,11 @@ def _inspect_side(root, revision, path, numbers, cache, label):
 
 
 def classify(root, base, head):
-    """範囲を分類し、`(class, reasons)`を返す。軽微と証明できなければ`review-required`。"""
+    """範囲を分類し、`(class, reasons)`を返す。軽微と証明できなければ`review-required`。
+
+    **返すのは`CLASS_MINOR`と`CLASS_REVIEW`だけである。`CLASS_FIXUP`は返さない。**
+    後始末かどうかは差分から読めないため、計算結果には現れない。宣言だけが持つ。
+    """
     # 起点をここで1回だけ解決する。以降の`git diff`と`_inspect_side`の`git show`が
     # 同じcommitを見る（理由は`_merge_base`）。
     base = _merge_base(root, base, head)
@@ -317,6 +361,23 @@ def trailers(root, revision):
     return found
 
 
+def _check_fixup_reference(found, subject):
+    """`fixup`の宣言が、後始末の対象を`Refs`で示しているかを検査する。
+
+    **機械で確かめられるのはここだけである。**その差分が本当に後始末かは判定しない。
+    示された対象が正しいかも判定しない。**示していないことだけを落とす。**
+    """
+    references = found.get(TRAILER_REFS, [])
+    if not any(FIXUP_REFERENCE_RE.search(value) for value in references):
+        return [
+            f"{subject} declares {TRAILER_CLASS}: {CLASS_FIXUP} but carries no"
+            f" {TRAILER_REFS} trailer naming the Issue or Pull Request being"
+            f" cleaned up. found {TRAILER_REFS}={references}."
+            " A fixup without a target is not a fixup."
+        ]
+    return []
+
+
 def _check_receipt(root, head, computed):
     found = trailers(root, head)
     problems = []
@@ -326,9 +387,9 @@ def _check_receipt(root, head, computed):
             f"head commit must carry exactly one {TRAILER_CLASS} trailer,"
             f" found {declared}"
         )
-    elif declared[0] not in (CLASS_MINOR, CLASS_REVIEW):
+    elif declared[0] not in CLASS_VALUES:
         problems.append(
-            f"{TRAILER_CLASS} must be {CLASS_MINOR} or {CLASS_REVIEW},"
+            f"{TRAILER_CLASS} must be one of {list(CLASS_VALUES)},"
             f" found {declared[0]}"
         )
     elif declared[0] == CLASS_MINOR and computed != CLASS_MINOR:
@@ -336,6 +397,8 @@ def _check_receipt(root, head, computed):
             f"{TRAILER_CLASS} declares {CLASS_MINOR} but the range classifies as"
             f" {computed}. A declaration cannot widen the minor path."
         )
+    elif declared[0] == CLASS_FIXUP:
+        problems.extend(_check_fixup_reference(found, "head commit"))
     review = found.get(TRAILER_REVIEW, [])
     missing = [value for value in REVIEW_DECLARATIONS if value not in review]
     unknown = [value for value in review if value not in REVIEW_DECLARATIONS]
@@ -419,7 +482,7 @@ def _check_history(root, base, head, cutover):
         computed, _ = classify(root, f"{commit}^", commit)
         found = trailers(root, commit)
         declared = found.get(TRAILER_CLASS, [])
-        if len(declared) != 1 or declared[0] not in (CLASS_MINOR, CLASS_REVIEW):
+        if len(declared) != 1 or declared[0] not in CLASS_VALUES:
             problems.append(
                 f"{short} must carry exactly one valid {TRAILER_CLASS} trailer,"
                 f" found {declared}"
@@ -428,6 +491,9 @@ def _check_history(root, base, head, cutover):
             problems.append(
                 f"{short} declares {CLASS_MINOR} but classifies as {computed}"
             )
+        elif declared[0] == CLASS_FIXUP:
+            # 直接commitは`gate`を通らないため、`fixup`の整合はここで初めて検査される。
+            problems.extend(_check_fixup_reference(found, short))
         if not found.get(TRAILER_REVIEW):
             problems.append(f"{short} carries no {TRAILER_REVIEW} trailer")
         instruction_problems, _ = _check_instructions(root, f"{commit}^", commit)

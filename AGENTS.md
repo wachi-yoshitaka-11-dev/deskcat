@@ -69,6 +69,9 @@
 
 根拠がない場合は `TBD` とし、必要な公式資料または実測を示す。
 
+**この一覧のうち、どれが一次資料または実測を要し、どれを一般値で開始してよいかは、[Hardware Safety Policy](docs/governance/hardware-safety-policy.md) の対応表が正本である。**分かれ目は安全要件5項目に効くかどうかであり、分類名ではない。ここへ対応表を再掲しない。
+一般値で開始する場合も、採った値と、それが暫定であることと、確定させる手段を記録する。
+
 ## ハードウェア安全
 
 - サーボを ESP32 から給電しない。
@@ -77,6 +80,8 @@
 - 初回通電、初回サーボ動作、回路変更後の試験は人間の監視を必要とする。
 - ロジック電圧、電源経路、起動時 GPIO が未確認なら実機駆動しない。
 - 危険、異音、発熱、拘束、電圧降下を認めたら試験を停止する。
+
+**一次資料または実測を要求し続ける安全要件は、[Hardware Safety Policy](docs/governance/hardware-safety-policy.md) の「安全要件の5項目」が正本である。**項目も、値も、状態もここへ再掲しない。ハードウェアに触る作業では、上の一覧だけで判断せず policy を開く。
 
 ## 変更規則
 
@@ -148,11 +153,14 @@ firmware は `crates/deskcat-protocol` を path dependency で使う（[ADR-0008
 
 ## Git と公開
 
-- `git reset --hard`、強制 checkout、履歴書き換え、force push を行わない。
-- ユーザーから依頼されない限り commit、push、tag、release を行わない。
-- commit する前に、変更範囲の分類を `scripts/review_gate.py` で確認する。**`CLASS=minor` と判定されない変更を、Issue と Pull Request なしで `develop` へ入れない。**
+- ユーザーから依頼されない限り commit、push、force push、tag、release を行わない。
+- **共有 branch（`main`／`develop`）の履歴を書き換えない。**依頼があっても force push しない。
+- **他者が pull した可能性のある branch は共有として扱う。**判断に迷うものは共有として扱う。
+- 自分の未 push・未 merge branch では rebase と force push を使ってよい。**許すのは操作の種類であって、push の依頼を省いてよいという意味ではない。**
+- commit する前に、変更範囲の分類を `scripts/review_gate.py` で確認する。
+- **`develop` へ Issue と Pull Request なしで入れてよいのは次の2つだけである。**`CLASS=minor` と判定された変更、または `Change-Class: fixup` と `Refs: #<番号>` を宣言する**既に merge され review を通った作業の後始末**。範囲の上限は CONTRIBUTING の「後始末（`fixup`）の範囲」が正本である。どちらも承認は要る。
 - `.env`、資格情報、秘密鍵、ローカル設定をコミットしない。
-- ユーザーの既存変更を破棄、整形、移動しない。
+- ユーザーの既存変更を破棄、整形、移動しない。**`git reset --hard` と強制 checkout はこの規則で扱う**（履歴書き換えではなく、未 commit の変更を失う操作である）。実行前に working tree を確認する。
 
 ## 外部操作
 
