@@ -41,6 +41,8 @@
 6. Issue、Pull Request、コードコメント
 7. 一般知識またはAIによる推論
 
+**3が指すメーカー資料の範囲は、[Hardware Safety Policy](hardware-safety-policy.md#一次資料に当たるもの)の「一次資料に当たるもの」が正本である**（[ADR-0017](../decisions/0017-what-counts-as-a-primary-source.md)）。**この表は矛盾したときの優先順位であって、何を根拠として認めるかの定義ではない。ここへ再掲しない。**
+
 現在の指示であっても、電気的または機械的な安全制限を暗黙に上書きしない。指示が危険と思われる場合は、影響する操作を停止し、その根拠とリスクを提示する。
 
 ## Single Source of Truth
