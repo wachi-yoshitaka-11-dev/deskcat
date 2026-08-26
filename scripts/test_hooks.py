@@ -29,6 +29,11 @@ import review_gate as gate  # noqa: E402
 GH_GUARD = str(SCRIPTS_ROOT / "hooks" / "gh_metadata_guard.py")
 BASE_GUARD = str(SCRIPTS_ROOT / "hooks" / "branch_base_guard.py")
 MERGE_REPORT = str(SCRIPTS_ROOT / "hooks" / "merge_trailer_report.py")
+PUSH_GATE = str(SCRIPTS_ROOT / "hooks" / "push_gate.py")
+
+sys.path.insert(0, str(SCRIPTS_ROOT / "hooks"))
+
+import push_gate  # noqa: E402
 
 # fixtureのcommitに使うidentity。実行者の設定に依存させない。
 GIT_IDENTITY = (
@@ -60,6 +65,7 @@ def _invoke(script, command, cwd=None, environment=None):
     # 呼び出し側の環境に無効化用の変数が残っていても、testの前提を壊さない。
     env.pop("DESKCAT_SKIP_GH_GUARD", None)
     env.pop("DESKCAT_SKIP_BASE_GUARD", None)
+    env.pop("DESKCAT_SKIP_PUSH_GATE", None)
     if environment:
         env.update(environment)
     result = subprocess.run(
@@ -334,6 +340,243 @@ class MergeTrailerReportTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0)
         self.assertEqual(result.stdout.strip(), "")
+
+
+class PushGateTests(unittest.TestCase):
+    """`develop`への直接pushを`gate`で見るhookのtest。
+
+    **fixture repositoryへ`review_gate.py`を複製して実際に実行させる。**
+    hookが呼ぶのはsubprocessであり、呼べているかどうかを模擬では確かめられない。
+    """
+
+    # `docs/decisions/`は`INSTRUCTION_SOURCES`に入る。`Instruction-Change`が要る。
+    INSTRUCTION_FILE = "docs/decisions/0001-x.md"
+
+    def setUp(self):
+        self.directory = tempfile.mkdtemp()
+        self.addCleanup(guards.remove_tree, Path(self.directory))
+        root = Path(self.directory)
+        self.root = root
+        _git(str(root), "init", "--quiet", ".")
+        (root / "scripts").mkdir()
+        (root / "scripts" / "review_gate.py").write_text(
+            (SCRIPTS_ROOT / "review_gate.py").read_text(encoding="utf-8"),
+            encoding="utf-8",
+        )
+        (root / "note.md").write_text("最初\n", encoding="utf-8")
+        _git(str(root), "add", "-A")
+        _git(str(root), "commit", "--quiet", "-m", "first")
+        # 自分自身をoriginにする。networkへ出ずに`origin/develop`を成立させる。
+        _git(str(root), "branch", "--force", "trunk", "HEAD")
+        _git(str(root), "remote", "add", "origin", str(root))
+        _git(
+            str(root), "config", "remote.origin.fetch",
+            "+refs/heads/trunk:refs/remotes/origin/develop",
+        )
+        _git(str(root), "fetch", "--quiet", "origin")
+
+    def _instruction_commit(self, declared):
+        """指示sourceを触るcommitを1つ積む。`declared`で宣言の有無を切り替える。"""
+        target = self.root / self.INSTRUCTION_FILE
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("# 決定\n\n本文\n", encoding="utf-8")
+        trailers = [
+            f"{gate.TRAILER_CLASS}: {gate.CLASS_FIXUP}",
+            *(
+                f"{gate.TRAILER_REVIEW}: {value}"
+                for value in gate.REVIEW_DECLARATIONS
+            ),
+            f"{gate.TRAILER_REFS}: #1",
+        ]
+        if declared:
+            trailers.append(
+                f"{gate.TRAILER_INSTRUCTION}: {gate.INSTRUCTION_ACK}"
+            )
+        _git(str(self.root), "add", "-A")
+        _git(
+            str(self.root), "commit", "--quiet",
+            "-m", "決定を足す\n\n" + "\n".join(trailers) + "\n",
+        )
+
+    def _review_gate(self, command):
+        return subprocess.run(
+            [
+                sys.executable, str(self.root / "scripts" / "review_gate.py"),
+                command, "--repository-root", str(self.root),
+                "--base", "origin/develop", "--head", "HEAD",
+            ],
+            capture_output=True, text=True, encoding="utf-8", cwd=str(self.root),
+        ).returncode
+
+    def assertDenied(self, command, cwd=None):
+        code, output = _invoke(PUSH_GATE, command, cwd=cwd or str(self.root))
+        self.assertEqual(code, 0, command)
+        self.assertIsNotNone(output, f"通してしまった: {command}")
+        return _reason(output)
+
+    def assertAllowed(self, command, cwd=None):
+        code, output = _invoke(PUSH_GATE, command, cwd=cwd or str(self.root))
+        self.assertEqual(code, 0, command)
+        self.assertIsNone(output, f"止めてしまった: {command}")
+
+    def test_undeclared_instruction_change_is_denied(self):
+        """`Instruction-Change`を持たないまま`develop`へ押すのを止める。
+
+        **`b93b309`で実際に起きた形である。**
+        """
+        self._instruction_commit(declared=False)
+        reason = self.assertDenied("git push origin HEAD:develop")
+        self.assertIn(gate.TRAILER_INSTRUCTION, reason)
+
+    def test_receipt_alone_would_have_passed(self):
+        """同じcommitが`receipt`だけなら通る。**この差がhookの存在理由である。**"""
+        self._instruction_commit(declared=False)
+        self.assertEqual(self._review_gate("receipt"), 0)
+        self.assertEqual(self._review_gate("gate"), 1)
+
+    def test_declared_instruction_change_is_allowed(self):
+        """宣言が揃っていれば通す。"""
+        self._instruction_commit(declared=True)
+        self.assertAllowed("git push origin HEAD:develop")
+
+    def test_refspec_forms_that_update_develop_are_inspected(self):
+        """`develop`を更新する書き方をひととおり拾う。"""
+        self._instruction_commit(declared=False)
+        _git(str(self.root), "branch", "--force", "develop", "HEAD")
+        for command in (
+            "git push origin HEAD:develop",
+            "git push origin develop",
+            "git push origin HEAD:refs/heads/develop",
+            "git push origin +HEAD:develop",
+            "git push --force-with-lease origin HEAD:develop",
+            "cd . && git push origin HEAD:develop",
+            "/usr/bin/git push origin HEAD:develop",
+            "git -c core.pager=cat push origin HEAD:develop",
+            "git --no-pager push origin HEAD:develop",
+        ):
+            self.assertDenied(command)
+
+    def test_deleting_develop_is_not_read_as_pushing_head(self):
+        """`git push origin :develop`はbranchの削除であり、押すcommitが無い。
+
+        `HEAD`を押すものとして扱うと、**無関係な範囲を検査する。**
+        """
+        self._instruction_commit(declared=False)
+        self.assertIsNone(push_gate.pushed_source("git push origin :develop"))
+        self.assertAllowed("git push origin :develop")
+
+    def test_tag_option_does_not_hide_an_explicit_refspec(self):
+        """`--tags`を併記しても、`develop`を指すrefspecは見る。
+
+        **`--tags`をskip対象に置くと、この形を取り落とす。**
+        """
+        self._instruction_commit(declared=False)
+        self.assertDenied("git push --tags origin HEAD:develop")
+
+    def test_forms_without_a_refspec_are_not_inspected(self):
+        """refspecを書かない形は対象にならない。**gapとして文書に書いてある。**"""
+        self._instruction_commit(declared=False)
+        for command in (
+            "git push --mirror origin",
+            "git push --all origin",
+            "git push --tags origin",
+        ):
+            self.assertIsNone(push_gate.pushed_source(command), command)
+
+    def test_prefix_of_develop_is_not_matched(self):
+        """`develop`で始まるだけのbranchを取り違えない。"""
+        self._instruction_commit(declared=False)
+        for command in (
+            "git push origin HEAD:developer",
+            "git push origin HEAD:develop-2",
+            "git push origin HEAD:feature/develop",
+        ):
+            self.assertAllowed(command)
+
+    def test_directory_option_selects_the_repository(self):
+        """`git -C <dir> push`は、そのdirectoryのrepositoryを検査する。
+
+        **cwdの側を検査すると、別treeの結果で判断することになる。**
+        """
+        self._instruction_commit(declared=False)
+        other = tempfile.mkdtemp()
+        self.addCleanup(guards.remove_tree, Path(other))
+        source, directory = push_gate.pushed_source(
+            f"git -C {self.root} push origin HEAD:develop"
+        )
+        self.assertEqual((source, directory), ("HEAD", str(self.root)))
+        # cwdをrepositoryの外に置いても、`-C`の先を見て拒否する。
+        reason = self.assertDenied(
+            f"git -C {self.root} push origin HEAD:develop", cwd=other
+        )
+        self.assertIn(gate.TRAILER_INSTRUCTION, reason)
+
+    def test_directory_option_outside_a_repository_is_not_inspected(self):
+        """`-C`の先がrepositoryでなければ見ない。どこを検査すべきか決まらない。"""
+        self._instruction_commit(declared=False)
+        other = tempfile.mkdtemp()
+        self.addCleanup(guards.remove_tree, Path(other))
+        self.assertAllowed(f"git -C {other} push origin HEAD:develop")
+
+    def test_other_destinations_are_out_of_scope(self):
+        """`develop`以外へのpushは見ない。Pull Requestが`gate`を通す。"""
+        self._instruction_commit(declared=False)
+        for command in (
+            "git push origin HEAD:feature/x",
+            "git push origin HEAD:main",
+            "git push fork HEAD:develop",
+            "git push --dry-run origin HEAD:develop",
+            "git push --delete origin develop",
+            "git push --tags origin",
+            "git status",
+        ):
+            self.assertAllowed(command)
+
+    def test_the_word_push_in_an_argument_is_not_an_invocation(self):
+        """`echo git push origin HEAD:develop`を呼び出しと読まない。"""
+        self._instruction_commit(declared=False)
+        self.assertAllowed("echo git push origin HEAD:develop")
+
+    def test_nothing_to_push_is_allowed(self):
+        """押すcommitが無ければ検査しない。範囲が空でheadのtrailerを問わない。"""
+        _git(str(self.root), "checkout", "--quiet", "-B", "work", "origin/develop")
+        self.assertAllowed("git push origin HEAD:develop")
+
+    def test_bare_push_follows_the_upstream(self):
+        """`git push`だけの形は、upstreamが`origin/develop`のときだけ対象になる。"""
+        self._instruction_commit(declared=False)
+        _git(str(self.root), "branch", "--set-upstream-to", "origin/develop")
+        self.assertDenied("git push")
+
+    def test_bare_push_to_another_upstream_is_out_of_scope(self):
+        """upstreamが`origin/develop`でなければ見ない。"""
+        self._instruction_commit(declared=False)
+        branch = _git(str(self.root), "rev-parse", "--abbrev-ref", "HEAD").strip()
+        # `--set-upstream-to`はremote-tracking refの実在を要求するため、configで置く。
+        _git(str(self.root), "config", f"branch.{branch}.remote", "origin")
+        _git(str(self.root), "config", f"branch.{branch}.merge", "refs/heads/other")
+        self.assertAllowed("git push")
+
+    def test_skip_environment_disables_the_guard(self):
+        """逃げ道が効く。**使ったら理由を残すのは人間の側の規則である。**"""
+        self._instruction_commit(declared=False)
+        code, output = _invoke(
+            PUSH_GATE, "git push origin HEAD:develop", cwd=str(self.root),
+            environment={"DESKCAT_SKIP_PUSH_GATE": "1"},
+        )
+        self.assertEqual(code, 0)
+        self.assertIsNone(output)
+
+    def test_broken_input_does_not_block(self):
+        """壊れた入力で作業を止めない。"""
+        result = subprocess.run(
+            [sys.executable, PUSH_GATE], input="{壊れている",
+            capture_output=True, text=True, encoding="utf-8",
+            timeout=60, cwd=str(self.root),
+        )
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.stdout.strip(), "")
+
 
 
 if __name__ == "__main__":

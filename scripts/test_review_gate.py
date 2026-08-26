@@ -7,6 +7,7 @@ fixture repositoryを作り、validatorを子processとして起動して、分�
 """
 
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -790,6 +791,43 @@ class ReviewGateTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("CLASS=", result.stdout)
+
+
+class DeclarationExemptTests(unittest.TestCase):
+    """免除リストそのもののtest。
+
+    **typoしたSHAは黙って免除しなくなる。**`_check_history`は文字列の一致で見るため、
+    1文字違えば免除は効かず、しかも何も報告されない。**気付けるのは次の昇格である。**
+    """
+
+    def test_entries_are_full_length_hexadecimal(self):
+        """短縮SHAを書かない。`rev-list`が返すのは40桁であり、短縮では一致しない。"""
+        for value in gate.DECLARATION_EXEMPT:
+            self.assertRegex(value, r"^[0-9a-f]{40}$", value)
+
+    def test_entries_are_unique(self):
+        """同じcommitを2度書かない。数え間違いのもとになる。"""
+        self.assertEqual(
+            len(set(gate.DECLARATION_EXEMPT)), len(gate.DECLARATION_EXEMPT)
+        )
+
+    def test_each_entry_is_explained_in_the_comment(self):
+        """免除ごとに理由が書かれている。**原因ごとに書き分ける規則の機械側である。**
+
+        理由が無い免除は、再発を止める手がかりを残さない。
+
+        **照合は短縮形のprefix一致で行う。**commentの短縮形は7桁と8桁が混在しており、
+        桁数を固定すると、書いてあるのに「無い」と読む。
+        """
+        source = Path(gate.__file__).read_text(encoding="utf-8")
+        header = source.split("DECLARATION_EXEMPT = (")[0]
+        quoted = set(re.findall(r"`([0-9a-f]{7,40})`", header))
+        for value in gate.DECLARATION_EXEMPT:
+            self.assertTrue(
+                any(value.startswith(short) for short in quoted),
+                f"{value[:8]}の免除理由がcommentに無い",
+            )
+
 
 
 if __name__ == "__main__":

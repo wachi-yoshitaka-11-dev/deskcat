@@ -37,7 +37,7 @@ gh issue view <番号> --json body --jq .body | grep -n "^\s*- \[[ x]\]"
 ## push前
 
 ```bash
-python3 scripts/review_gate.py classify --base origin/develop --head HEAD
+python3 scripts/review_gate.py gate --base origin/develop --head HEAD
 python3 scripts/test_review_gate.py && python3 scripts/test_hooks.py
 python3 scripts/test_link_validators.py && python3 scripts/test_pages_guards.py
 python3 scripts/test_instruction_entrypoint.py

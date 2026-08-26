@@ -145,6 +145,14 @@ DECLARATION_CUTOVER = "57734371384d18f31de7557a7a60fd1aa856edff"
 #   `gh pr merge --squash`をmessage指定なしで実行したため、GitHubが合成したmessageへ
 #   trailerが入らず、squash commitへ引き継がれなかった。**書き忘れである。**
 #   確認手順はCONTRIBUTINGの「Merge方式」にある。
+# - `b93b309`（#227）。既存の2種類と別の原因である。
+#   **規則も強制も揃っていたが、強制が掛かる経路を通らないcommitだった。**
+#   `Change-Class: fixup`による`develop`への直接pushであり、Pull Requestを通らないため
+#   `review-gate.yml`の`gate`が走らない。push前に実行したのが`receipt`だけで、
+#   `receipt`はhead commitのtrailerの整合しか見ず`_check_instructions`を呼ばない。
+#   `gate`なら落ちていた（`receipt` exit 0／`gate` exit 1）。**subcommandの選び間違いである。**
+#   **これは`fixup`区分そのものの欠陥ではない。**直接commit経路に、押す瞬間の検査が
+#   無かったことによる。同じ形を止めるため`scripts/hooks/push_gate.py`を入れた。
 #
 # **この列挙を増やさない。**増やす変更は`scripts/`の変更であり、reviewと
 # `Instruction-Change`の宣言を通る。通したうえで増やすなら、それは判断である。
@@ -152,6 +160,7 @@ DECLARATION_EXEMPT = (
     "9c91f913696033ca3da9b26d10ac793ee2c2291e",
     "18298ae3127f31a81411a6c723122dad17a91299",
     "619c8439be8489451ec9f6a9b79613bc01c1605d",
+    "b93b309c7f6a39967d2eb3ba62807bc4bb1a5dfe",
 )
 
 # 変更行がこれらのいずれかに当たると軽微にしない。数値、command、link、表、見出し、
