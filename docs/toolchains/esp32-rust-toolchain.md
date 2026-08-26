@@ -1,9 +1,10 @@
 # ESP32 Rust Toolchain
 
-> 状態: build検証済み（Linux x86_64 の ESP32 Build profile 端末、および CI の `ubuntu-24.04`）。**実機確認は未実施**
+> 状態: 検証済み（Linux x86_64 の ESP32 Build profile 端末、および CI の `ubuntu-24.04`）。**2026-08-20 に最後の確定条件（chip の識別）を満たしたため、`build検証済み` から昇格した**（[確定条件](#確定条件)）。**flash と実機起動は 2026-08-20 に実施した。**ただし `検証済み` が指すのはこの文書の確定条件までであり、周辺回路・servo・Protocol・電源品質は含まない（[この状態が主張しないこと](#この状態が主張しないこと)）
 > 調査日: 2026-07-27
-> build 検証日: 2026-08-06（初回）／2026-08-10（現行 tree に対する最新の検証、および CI での再現）
-> 証拠: [開発端末](version-records/2026-08-06-esp32-build-linux.md)／[CI](version-records/2026-08-10-esp32-build-ci.md)
+> build 検証日: 2026-08-06（初回、VM）／2026-08-10（CI での再現）／2026-08-15（実機 Linux、現行 tree に対する最新の build 検証）
+> flash・実機起動・chip 識別の実施日: 2026-08-20（実機 Linux。[#6](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/6)）
+> 証拠: [開発端末（VM）](version-records/2026-08-06-esp32-build-linux.md)／[CI](version-records/2026-08-10-esp32-build-ci.md)／[実機 Linux（build）](version-records/2026-08-15-esp32-build-native-linux.md)／[実機 Linux（flash・起動・chip 識別）](version-records/2026-08-20-esp32-flash-boot-native.md)
 > 対象family: classic ESP32／Xtensa
 
 ## 結論
@@ -40,7 +41,7 @@ ESP-WROOM-32D の datasheet v2.7 には **PSRAM を内蔵する variant の記�
 
 **module の刻印は 2026-08-13 に読了した**（斜光＋接写）。シールド上面に `ESPRESSIF` と `ESP32-WROOM-32D` が刻印されており、**module 種別の根拠が購入履歴と silkscreen に加えて module 自身の刻印になった。**ただし**これは module の品番であって chip の品番ではない。**中核 chip が `ESP32-D0WD` であるという記載の出典は、上表のとおり ESP-WROOM-32D datasheet v2.7 のままである。
 
-追跡は [`HW-TBD-031`](../hardware/tbd-register.md)（2026-08-11 の全数照合で登録し、2026-08-15 に要件を書き換えた）。**本文書の状態を `Verified` にする条件のうち chip 刻印の項は、非破壊で満たせないため 2026-08-15 に満たし方を再定義した。****`esptool` が報告する chip 名で満たす。**一次資料で、`esptool` が品番相当の文字列を返すことを確認した。**`espflash` の出力では満たせない**（family 名しか返さない）。実施は実機 Linux 限定の flash（[#6](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/6)）まで進まないため、**この項目は未達のままである**（[chip 識別の満たし方](#chip-識別の満たし方)）。
+追跡は [`HW-TBD-031`](../hardware/tbd-register.md)（2026-08-11 の全数照合で登録し、2026-08-15 に要件を書き換えた）。**本文書の状態を `Verified` にする条件のうち chip 刻印の項は、非破壊で満たせないため 2026-08-15 に満たし方を再定義した。****`esptool` が報告する chip 名で満たす。**一次資料で、`esptool` が品番相当の文字列を返すことを確認した。**`espflash` の出力では満たせない**（family 名しか返さない）。実施は実機 Linux 限定の flash（[#6](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/6)）を要した。**2026-08-20 にその flash を実施し、この項目を満たした**（`esptool` 4.12.0 が `ESP32-D0WD` を報告した。[chip 識別の満たし方](#chip-識別の満たし方)、記録は [Version Record](version-records/2026-08-20-esp32-flash-boot-native.md)）。**`HW-TBD-031` の行は、台帳の解決手順を通した時点で close する。**
 
 いずれも build には影響しないが、flash 後の実機動作には影響する。
 
