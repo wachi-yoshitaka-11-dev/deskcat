@@ -727,6 +727,19 @@ class CodeRabbitGateTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0)
         self.assertEqual(result.stdout.strip(), "")
+        # **握りつぶさない。**素通りの動作は変えずに、理由をstderrへ残す
+        # （PR #241のreview指摘）。
+        self.assertIn("coderabbit_gate:", result.stderr)
+
+    def test_invalid_utf8_input_is_recorded(self):
+        """不正なUTF-8の入力も分類して記録する。**素通りの動作は変えない。**"""
+        result = subprocess.run(
+            [sys.executable, CODERABBIT_GATE],
+            input=b"\xff\xfe not utf-8", capture_output=True, timeout=60,
+        )
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.stdout.decode("utf-8", "replace").strip(), "")
+        self.assertIn("coderabbit_gate:", result.stderr.decode("utf-8", "replace"))
 
     def test_non_mapping_input_does_not_raise(self):
         """妥当なJSONでもmappingでない入力で落ちない。

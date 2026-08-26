@@ -191,8 +191,12 @@ def _check(subcommand, args):
 def main():
     try:
         payload = json.load(sys.stdin)
-    except (json.JSONDecodeError, UnicodeDecodeError):
+    except (json.JSONDecodeError, UnicodeDecodeError) as error:
         # hookの入力を読めないことを、対象commandの問題として扱わない。
+        # **素通りさせるが、握りつぶさない。**既存hookはここを黙って返すが、
+        # `_note()`を用意した以上この経路だけ黙るのは筋が通らない
+        # （PR #241のreview指摘）。**return codeとstdoutは変えない。**
+        _note(f"hookの入力を読めなかったため判定できない: {error}")
         return 0
     if not isinstance(payload, dict):
         # 妥当なJSONでもmappingでないことがある（`[]`など）。
