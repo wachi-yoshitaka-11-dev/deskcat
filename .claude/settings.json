@@ -12,6 +12,12 @@
           },
           {
             "type": "command",
+            "command": "R=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}\"; [ -n \"$R\" ] && [ -f \"$R/scripts/hooks/coderabbit_gate.py\" ] && exec python3 \"$R/scripts/hooks/coderabbit_gate.py\" || exit 0",
+            "timeout": 30,
+            "statusMessage": "CodeRabbit への review 依頼を確認"
+          },
+          {
+            "type": "command",
             "command": "R=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}\"; [ -n \"$R\" ] && [ -f \"$R/scripts/hooks/branch_base_guard.py\" ] && exec python3 \"$R/scripts/hooks/branch_base_guard.py\" || exit 0",
             "timeout": 90,
             "statusMessage": "branch の基点を確認"
