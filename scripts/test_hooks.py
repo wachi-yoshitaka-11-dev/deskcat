@@ -26,11 +26,16 @@ sys.path.insert(0, str(SCRIPTS_ROOT))
 
 import review_gate as gate  # noqa: E402
 
+sys.path.insert(0, str(SCRIPTS_ROOT / "hooks"))
+
+import command_line  # noqa: E402
+
 GH_GUARD = str(SCRIPTS_ROOT / "hooks" / "gh_metadata_guard.py")
 BASE_GUARD = str(SCRIPTS_ROOT / "hooks" / "branch_base_guard.py")
 MERGE_REPORT = str(SCRIPTS_ROOT / "hooks" / "merge_trailer_report.py")
 PUSH_GATE = str(SCRIPTS_ROOT / "hooks" / "push_gate.py")
 CODERABBIT_GATE = str(SCRIPTS_ROOT / "hooks" / "coderabbit_gate.py")
+MERGE_REPORT = str(SCRIPTS_ROOT / "hooks" / "merge_trailer_report.py")
 
 sys.path.insert(0, str(SCRIPTS_ROOT / "hooks"))
 
@@ -821,6 +826,82 @@ class CodeRabbitGateTests(unittest.TestCase):
                 self.assertEqual(
                     output["hookSpecificOutput"]["permissionDecision"], "ask"
                 )
+
+
+class CommandFromTests(unittest.TestCase):
+    """`command_line.command_from`のtest。**5本のhookが共有する入口である。**
+
+    妥当なJSONでもmappingでない入力で`AttributeError`を出していた（#242）。
+    **hookが例外で落ちると、止めているはずの判定が走らない。**
+    """
+
+    def test_valid_payload_returns_command(self):
+        self.assertEqual(
+            command_line.command_from({"tool_input": {"command": "gh pr create"}}),
+            "gh pr create",
+        )
+
+    def test_non_mapping_payload_returns_none(self):
+        """mappingでないpayloadで例外を出さない。"""
+        for payload in ([], "text", None, 0, 1.5, True, ("a",)):
+            with self.subTest(payload=payload):
+                self.assertIsNone(command_line.command_from(payload))
+
+    def test_non_mapping_tool_input_returns_none(self):
+        """`tool_input`がmappingでない入力で例外を出さない。"""
+        for value in (["x"], "x", 0, True):
+            with self.subTest(value=value):
+                self.assertIsNone(command_line.command_from({"tool_input": value}))
+
+    def test_missing_pieces_return_none(self):
+        for payload in ({}, {"tool_input": None}, {"tool_input": {}},
+                        {"tool_input": {"command": None}},
+                        {"tool_input": {"command": 1}},
+                        {"tool_input": {"command": ["gh"]}}):
+            with self.subTest(payload=payload):
+                self.assertIsNone(command_line.command_from(payload))
+
+
+class HookPayloadShapeTests(unittest.TestCase):
+    """**5本のhookが、mappingでない入力で落ちないことを確かめる**（#242）。
+
+    [PR #241](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/241)のreview指摘は`coderabbit_gate.py`に対するものだったが、
+    **型で全数走査したら5本すべてに同じ形が残っていた。**指摘は代表例であって全数ではない。
+    """
+
+    HOOKS = (GH_GUARD, BASE_GUARD, PUSH_GATE, MERGE_REPORT, CODERABBIT_GATE)
+
+    MALFORMED = (
+        "[]",
+        '"text"',
+        "null",
+        "0",
+        '{"tool_input": ["x"]}',
+        '{"tool_input": "x"}',
+        '{"tool_input": {"command": 1}}',
+        "{}",
+    )
+
+    def test_no_hook_raises_on_malformed_payload(self):
+        """例外を出さず、素通りする。**return code 0かつstdoutが空である。**"""
+        for script in self.HOOKS:
+            for payload in self.MALFORMED:
+                with self.subTest(script=Path(script).name, payload=payload):
+                    result = subprocess.run(
+                        [sys.executable, script],
+                        input=payload, capture_output=True, text=True,
+                        encoding="utf-8", errors="replace", timeout=120,
+                        env={**os.environ,
+                             "DESKCAT_SKIP_GH_GUARD": "",
+                             "DESKCAT_SKIP_BASE_GUARD": "",
+                             "DESKCAT_SKIP_PUSH_GATE": ""},
+                    )
+                    self.assertEqual(result.returncode, 0,
+                                     f"{Path(script).name} が落ちた: {result.stderr[:300]}")
+                    self.assertNotIn("Traceback", result.stderr,
+                                     f"{Path(script).name} が例外を出した")
+                    self.assertEqual(result.stdout.strip(), "",
+                                     f"{Path(script).name} が止めてしまった")
 
 
 if __name__ == "__main__":
