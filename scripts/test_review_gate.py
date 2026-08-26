@@ -33,6 +33,25 @@ BASE_TEXT = "見出しのない散文である。\nここに説明を書く。\n
 # testが「差が出ない」条件を検査しなくなる。
 BASE_ONLY_AGENTS = "# Rules\n\nbase側だけで足した本文である。\n"
 
+# `LINE_DENY`の各規則を1つずつ踏む行。**`(規則のlabel, 足す行)`である。**
+#
+# `_deny_reason`は先頭から最初に当たった規則を返すため、**各行は狙った規則より前の規則に
+# 当たってはならない。**たとえばautolinkの行に数字を入れると`digit`が先に当たり、
+# autolinkの規則を踏まないまま「軽微でない」だけが確認される。
+#
+# **この並びと`LINE_DENY`の対応は`test_every_lexical_deny_rule_has_a_case`が突き合わせる。**
+# 規則を足してここへcaseを足し忘れると落ちる。
+LEXICAL_DENY_CASES = (
+    ("digit", "ここに3件と書く。\n"),
+    ("inline code", "ここに `cargo build` と書く。\n"),
+    ("link", "ここに [doc](../index.md) と書く。\n"),
+    ("autolink", "ここに <https://example.com> と書く。\n"),
+    ("table", "| a | b |\n"),
+    ("heading", "## 見出しを足す\n"),
+    ("checkbox", "- [ ] 項目を足す\n"),
+    ("html comment", "<!-- 注記 -->\n"),
+)
+
 
 def _git(root, *arguments, stdin_text=None):
     result = subprocess.run(
@@ -118,18 +137,42 @@ class ReviewGateTests(unittest.TestCase):
         self._commit(root, "散文の言い回しを直す")
         self.assertIn(f"CLASS={gate.CLASS_MINOR}", self._classify(root))
 
-    def test_lexical_deny_rules_block_minor(self):
-        """数値・inline code・link・表・見出し・checkboxに触れたら軽微にしない。"""
-        cases = (
-            ("digit", "ここに3件と書く。\n"),
-            ("inline code", "ここに `cargo build` と書く。\n"),
-            ("link", "ここに [doc](../index.md) と書く。\n"),
-            ("table", "| a | b |\n"),
-            ("heading", "## 見出しを足す\n"),
-            ("checkbox", "- [ ] 項目を足す\n"),
-            ("html comment", "<!-- 注記 -->\n"),
+    def test_every_lexical_deny_rule_has_a_case(self):
+        """`LINE_DENY`の各規則に、それを踏むcaseがあること。
+
+        **規則を足してcaseを足し忘れても、他のtestは成功する。**
+        [ADR-0010](../docs/decisions/0010-change-class-and-review-declaration.md)の
+        検証節は「各deny規則について回帰testを持つ」と定めているが、
+        **`autolink`だけがcase無しで残っていた**
+        （[#214](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/214)）。
+        他の7規則は揃っており、**目視では欠けている1つに気付けなかった。**
+        機械で突き合わせる。
+        """
+        declared = [label for _, label in gate.LINE_DENY]
+        covered = [label for label, _ in LEXICAL_DENY_CASES]
+        self.assertEqual(
+            sorted(declared),
+            sorted(covered),
+            "LINE_DENYの規則とLEXICAL_DENY_CASESが一致しない。"
+            " 規則を足したらcaseも足す。",
         )
-        for expected, addition in cases:
+        # 同じlabelを2つ書いて件数だけ合わせる、という抜けを塞ぐ。
+        self.assertEqual(len(set(covered)), len(covered), "caseのlabelが重複している")
+
+    def test_each_lexical_deny_case_hits_its_own_rule(self):
+        """各caseが、狙った規則に当たること。
+
+        `_deny_reason`は先頭から最初に当たった規則を返す。**行の書き方次第で、
+        狙いより前の規則に当たる。**その場合、狙った規則は踏まれないまま
+        「軽微でない」だけが確認され、testが規則を守っていることにならない。
+        """
+        for expected, addition in LEXICAL_DENY_CASES:
+            with self.subTest(rule=expected):
+                self.assertEqual(gate._deny_reason(addition.rstrip("\n")), expected)
+
+    def test_lexical_deny_rules_block_minor(self):
+        """各deny規則に触れた行があれば軽微にしない。"""
+        for expected, addition in LEXICAL_DENY_CASES:
             with self.subTest(rule=expected):
                 root = self._repository()
                 self._write(root, PLAIN_DOC, BASE_TEXT + addition)
