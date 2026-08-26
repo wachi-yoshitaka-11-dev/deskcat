@@ -3,6 +3,8 @@
 > 対象: [#129](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/129)
 > 位置づけ: 開発端末での記録を、**別環境で再現したかどうか**の記録
 
+判定語は [Version Record Template](../version-record-template.md) の「判定」節が正本である。
+
 host workspace の検証は、これまで開発端末でしか行っていなかった。
 [2026-08-10 の記録](2026-08-10-host-rust-linux.md)と[2026-08-15 の実機記録](2026-08-15-host-rust-native-linux.md)は
 いずれも 1 台ずつの端末であり、`AGENTS.md` も「別端末での再現は未検証である」と書いていた。
