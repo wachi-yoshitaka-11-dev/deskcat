@@ -331,7 +331,30 @@ def unclosed_fence(content):
 
 # GitHubはunderscoreをslugへ残す。除去すると`#some_heading`が解決しない。
 _ANCHOR_STRIP_RE = re.compile(r"[`*\[\]()!\"'.,:;/|<>?~^{}+=&%$#@]")
-_ANCHOR_FULLWIDTH = ("／", "、", "。", "（", "）")
+# 見出しanchorの生成でkramdownが落とす文字。**生成siteで実証したものだけを置く。**
+#
+# `（`／`）`と`.`が落ちることは、CIの`Validate output`が返した実物のidで確認した
+# （`## 5 V ingress（物理的な引き込み経路）` -> `5-v-ingress物理的な引き込み経路`）。
+# **`・`は[PR #212](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/212)のCIが落ちて分かった。**
+# `## 配線・保護表`へのanchorが、source側では`配線・保護表`、生成site側では`配線保護表`だった。
+_ANCHOR_FULLWIDTH = ("／", "、", "。", "（", "）", "・")
+
+# **kramdownの扱いを確認していない文字。**推測でstripしない。
+#
+# stripするかしないかを外すと、source側と生成site側の判定がずれる。**どちらへ外しても、
+# 落ちるのはJekyll buildを通した後のCIであり、localでは分からない。**そのため、
+# これらを含む見出しへのlinkは`validate_doc_links.py`が拒否する。
+#
+# **確かめ方はJekyll buildである。**`.pages-src`をbuildして生成HTMLのidを読み、
+# 落ちる文字が分かったら上の`_ANCHOR_FULLWIDTH`へ移す。
+# 現在このrepositoryの見出しに現れるのは`「`／`」`が7件、`–`が3件、`—`が2件である
+# （[#213](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/213)）。
+_ANCHOR_UNVERIFIED = ("「", "」", "–", "—")
+
+
+def anchor_unverified_characters(heading):
+    """見出しに含まれる、anchor生成の扱いが未確認の文字を返す。"""
+    return tuple(c for c in _ANCHOR_UNVERIFIED if c in heading)
 _ANCHOR_SPACE_RE = re.compile(r"\s+")
 
 

@@ -395,6 +395,55 @@ class SourceValidatorTests(ValidatorAssertions):
         )
         self.assert_outcome(run, True, expected_message="BROKEN=0")
 
+    def test_middle_dot_heading_anchor_matches_the_generated_site(self):
+        """中黒を含む見出しへのanchorが、生成siteと同じ形で解決すること。
+
+        kramdownは`・`を落とす。source側が落とさないと、link検査を通ったlinkが
+        生成siteで404になる。**[PR #212]で実際にCIの`Validate output`が落ちた。**
+        """
+        self.assertEqual(guards.heading_anchor("配線・保護表"), "配線保護表")
+        _write(
+            _state["source_page"],
+            "# Existing\n\n## 配線・保護表\n\n[ok](#配線保護表)",
+        )
+        run = run_validator(
+            VALIDATE_DOCS, ["--repository-root", _state["source_root"]]
+        )
+        self.assert_outcome(run, True, expected_message="BROKEN=0")
+
+    def test_unverified_character_in_a_heading_blocks_the_link(self):
+        """扱いが未確認の文字を含む見出しへのlinkを拒否すること。
+
+        **anchorが一致していても通さない。**一致しているのはこちらの計算どうしで
+        あって、生成site側と一致する保証が無い。**外した場合に落ちるのはJekyll build
+        の後であり、localでは分からない。**そのため計算できたと主張しない。
+        """
+        for character in guards._ANCHOR_UNVERIFIED:
+            with self.subTest(character=character):
+                heading = f"見出し{character}である"
+                anchor = guards.heading_anchor(heading)
+                _write(
+                    _state["source_page"],
+                    f"# Existing\n\n## {heading}\n\n[x](#{anchor})",
+                )
+                run = run_validator(
+                    VALIDATE_DOCS, ["--repository-root", _state["source_root"]]
+                )
+                self.assert_outcome(
+                    run, False, expected_message="Unverified anchor"
+                )
+
+    def test_a_heading_without_unverified_characters_is_linkable(self):
+        """未確認文字を含まない見出しは、これまでどおりlinkできること。"""
+        _write(
+            _state["source_page"],
+            "# Existing\n\n## 普通の見出し\n\n[ok](#普通の見出し)",
+        )
+        run = run_validator(
+            VALIDATE_DOCS, ["--repository-root", _state["source_root"]]
+        )
+        self.assert_outcome(run, True, expected_message="BROKEN=0")
+
     def test_unclosed_code_fence_is_rejected(self):
         _write(
             _state["source_page"],
