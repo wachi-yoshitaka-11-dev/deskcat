@@ -23,7 +23,8 @@ review:  full reviewを使う
 | review | `review`はincrementalで空振りし、枠だけ消費する | [手動で依頼する前に状態を確認する](#手動で依頼する前に状態を確認する) |
 
 **この表は覚えるためのものではない。**`.claude/settings.json`のhookが、着手前・merge時・
-merge後を機械で止める。**merge前の承認とreviewの投げ方は止められない**（人の判断であり、
+merge後を機械で止める。**hookが止めない段の実行手順は`.claude/skills/deskcat-preflight`が持つ**
+（規則ではなく実行だけを持ち、規則はこの文書を参照する）。**merge前の承認とreviewの投げ方は止められない**（人の判断であり、
 `review`と`full review`はどちらも同じ枠を消費するため機械で選べない）。
 hookの一覧と回避手順は[hookが止めたとき](#hookが止めたとき)にある。
 

@@ -42,6 +42,10 @@ git に入らない。**渡した作業が終わったら削除してよい。
 
 **定型を足したくなったら、それはCONTRIBUTINGへ足す。**指示書へ写さない。
 
+**実行できるものは`.claude/skills/deskcat-preflight`が持つ。**着手前・push前・merge前・
+merge後に機械で確かめられることをまとめてある。**同skillも規則を持たず、CONTRIBUTINGを
+参照する。**指示書からはskillの名前を挙げるだけでよい。
+
 ## 様式
 
 ```text
