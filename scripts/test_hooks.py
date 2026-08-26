@@ -728,6 +728,67 @@ class CodeRabbitGateTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0)
         self.assertEqual(result.stdout.strip(), "")
 
+    def test_non_mapping_input_does_not_raise(self):
+        """妥当なJSONでもmappingでない入力で落ちない。
+
+        `payload.get`／`tool_input.get`は`AttributeError`を出す。
+        **hookが例外で落ちると、止めているはずの判定が走らない。**
+        PR #241のreview指摘で見つけた。
+        """
+        for payload in ("[]", '"text"', "null", '{"tool_input": ["x"]}',
+                        '{"tool_input": "x"}'):
+            with self.subTest(payload=payload):
+                result = subprocess.run(
+                    [sys.executable, CODERABBIT_GATE],
+                    input=payload, capture_output=True, text=True,
+                    encoding="utf-8", errors="replace", timeout=60,
+                )
+                self.assertEqual(result.returncode, 0, payload)
+                self.assertEqual(result.stdout.strip(), "", payload)
+
+    def test_read_only_api_method_is_allowed(self):
+        """読み取りと明示した`gh api`は見ない。**commentを投げられない。**
+
+        `-f`を付けると`gh`は既定でPOSTになるが、`-X GET`を明示すると読み取りである。
+        PR #241のreview指摘で見つけた。
+        """
+        for command in (
+            'gh api -X GET repos/o/r/issues -f body="@coderabbitai full review"',
+            'gh api --method HEAD repos/o/r -f body="@coderabbitai review"',
+        ):
+            with self.subTest(command=command):
+                self.assertAllowed(command)
+
+    def test_write_api_method_is_still_inspected(self):
+        """書き込みのmethodと、method未指定は引き続き見る。"""
+        for command in (
+            'gh api -X POST repos/o/r/issues/1/comments -f body="@coderabbitai full review"',
+            'gh api repos/o/r/issues/1/comments -f body="@coderabbitai full review"',
+            'gh api graphql -f query="mutation { x(body: \\"@coderabbitai review\\") }"',
+        ):
+            with self.subTest(command=command):
+                self.assertAsked(command)
+
+    def test_unreadable_body_file_is_recorded_on_stderr(self):
+        """読めない`--body-file`を素通りさせるが、**握りつぶさない。**
+
+        AGENTS.mdの「エラーを握りつぶさず、分類、ログ、カウンタを用意する」に従う。
+        判定は変えない（素通り）が、理由をstderrへ残す。
+        """
+        payload = json.dumps({
+            "tool_name": "Bash",
+            "tool_input": {"command": "gh pr comment 1 --body-file /nonexistent/x.md"},
+        })
+        result = subprocess.run(
+            [sys.executable, CODERABBIT_GATE],
+            input=payload, capture_output=True, text=True,
+            encoding="utf-8", errors="replace", timeout=60,
+        )
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.stdout.strip(), "", "止めてしまった")
+        self.assertIn("coderabbit_gate:", result.stderr)
+        self.assertIn("--body-file", result.stderr)
+
     def test_no_bypass_environment_variable(self):
         """**環境変数で無効化できないことを確認する。**
 

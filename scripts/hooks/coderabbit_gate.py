@@ -43,6 +43,13 @@ import command_line
 COMMENT_SUBCOMMANDS = (("pr", "comment"), ("issue", "comment"), ("pr", "review"))
 API_SUBCOMMAND = ("api",)
 
+# `gh api`で読み取りと明示されたmethod。**この場合はcommentを投げられない。**
+# `-f`を付けると`gh`は既定でPOSTになるが、`-X GET`を明示すると読み取りのままである。
+# **endpointのwhitelistは作らない。**`gh api graphql`のmutationでもcommentは投げられ、
+# **endpoint名からは判別できない。**methodだけで絞る。
+READ_ONLY_METHODS = ("get", "head")
+METHOD_OPTIONS = ("-X", "--method")
+
 # 止める対象。**`review`という語が現れたら止める。**
 # `full review`は完全なreview、`review`はincrementalで、**どちらも枠を1件消費する。**
 # incrementalはADR-0013で自動reviewを無効にしているこのrepositoryでは必ず空振りするが、
@@ -59,6 +66,16 @@ REVIEW_WORD = re.compile(r"\breview\b")
 NOT_A_REVIEW = ("rate limit", "resolve", "help", "configuration", "status")
 
 MENTION = "@coderabbitai"
+
+
+def _note(message):
+    """素通りさせた理由をstderrへ1行で残す。**判定は変えない。**
+
+    hookのstdoutは`permissionDecision`のJSONに使うため、**診断はstderrへ出す。**
+    素通りはこのhookの設計であって異常ではないが、**黙って通ると
+    「止めているはず」と食い違ったことに気付けない。**
+    """
+    sys.stderr.write(f"coderabbit_gate: {message}\n")
 
 
 def _ask(reason):
@@ -140,12 +157,17 @@ def _texts(args):
     found = _option_values(args, BODY_OPTIONS)
     for path in _option_values(args, BODY_FILE_OPTIONS):
         if path == "-":
+            _note(f"本文がstdin（`-`）から渡されており、hookからは読めない: {path}")
             continue
         try:
             with open(path, encoding="utf-8") as handle:
                 found.append(handle.read())
-        except OSError:
-            continue
+        except OSError as error:
+            # **握りつぶさない。**素通りさせる判断は変えないが、分類して記録する
+            # （AGENTS.mdの「エラーを握りつぶさず、分類、ログ、カウンタを用意する」）。
+            # `gh_metadata_guard.py`は同じ失敗を診断文へ載せているが、**こちらは
+            # 素通りするため診断文が無い。**代わりにstderrへ出す。
+            _note(f"`--body-file`の読み出しに失敗したため判定できない: {error}")
     return found
 
 
@@ -172,7 +194,16 @@ def main():
     except (json.JSONDecodeError, UnicodeDecodeError):
         # hookの入力を読めないことを、対象commandの問題として扱わない。
         return 0
-    command = (payload.get("tool_input") or {}).get("command")
+    if not isinstance(payload, dict):
+        # 妥当なJSONでもmappingでないことがある（`[]`など）。
+        # **`payload.get`でAttributeErrorを出さない。**
+        _note("hookの入力がmappingではない")
+        return 0
+    tool_input = payload.get("tool_input")
+    if tool_input is not None and not isinstance(tool_input, dict):
+        _note("`tool_input`がmappingではない")
+        return 0
+    command = (tool_input or {}).get("command")
     if not isinstance(command, str) or "gh" not in command:
         # 全Bash呼び出しでこのhookが走る。`if`条件でBash(gh *)へ絞ると
         # `cd x && gh pr comment`が素通りするため、絞らずここで安く抜ける。
@@ -182,7 +213,12 @@ def main():
         if head in COMMENT_SUBCOMMANDS:
             _check(head, args[2:])
         elif tuple(args[:1]) == API_SUBCOMMAND:
-            _check(API_SUBCOMMAND, args[1:])
+            rest = args[1:]
+            methods = [m.lower() for m in _option_values(rest, METHOD_OPTIONS)]
+            if any(m in READ_ONLY_METHODS for m in methods):
+                # 読み取りと明示されている。**commentは投げられない。**
+                continue
+            _check(API_SUBCOMMAND, rest)
     return 0
 
 
