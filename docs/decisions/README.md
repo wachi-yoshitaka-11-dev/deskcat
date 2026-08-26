@@ -22,6 +22,7 @@
 | [ADR-0014](0014-safety-requirements-and-general-values.md) | Accepted | 安全要件を5項目に固定し、それ以外は一般値で開始してよいものとする |
 | [ADR-0015](0015-fixup-class-and-direct-commit-scope.md) | Accepted | 後始末を宣言専用の区分として足し、直接commitの基準を到達できる形へ変える |
 | [ADR-0016](0016-evidence-bar-inside-the-safety-requirements.md) | Accepted | 安全要件の中で、判定に効く数と資格として求める数を分ける |
+| [ADR-0017](0017-what-counts-as-a-primary-source.md) | Accepted | 「一次資料」に当たるものを、出した主体と載り方で定める |
 
 ## 新規作成
 
