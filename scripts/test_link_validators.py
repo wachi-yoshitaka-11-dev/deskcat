@@ -433,6 +433,30 @@ class SourceValidatorTests(ValidatorAssertions):
                     run, False, expected_message="Unverified anchor"
                 )
 
+    def test_unverified_character_blocks_a_cross_file_link(self):
+        """別fileの見出しへのlinkでも拒否すること。
+
+        同一page内のfragmentと別fileへのfragmentは、`validate_doc_links.py`で
+        `candidate`の決め方が違う。**片方だけ塞いでも罠は残る。**
+        """
+        root = _state["source_root"]
+        other = os.path.join(_state["source_docs"], "other-heading.md")
+        _write(other, "# Other\n\n## 見出し「かぎ」である\n")
+        # **追跡下に置く。**未追跡のMarkdownは`anchors_by_file`へ入らず、
+        # `Unverifiable anchor`という別の判定へ落ちる。それでは、この検査が
+        # 効いていることの証明にならない。
+        _git(root, "add", "--", "docs/other-heading.md")
+        _write(
+            _state["source_page"],
+            "# Existing\n\n[x](other-heading.md#見出し「かぎ」である)",
+        )
+        try:
+            run = run_validator(VALIDATE_DOCS, ["--repository-root", root])
+            self.assert_outcome(run, False, expected_message="Unverified anchor")
+        finally:
+            _git(root, "update-index", "--force-remove", "docs/other-heading.md")
+            os.remove(other)
+
     def test_a_heading_without_unverified_characters_is_linkable(self):
         """未確認文字を含まない見出しは、これまでどおりlinkできること。"""
         _write(
