@@ -647,7 +647,7 @@ squash mergeしたbranchはcommit hashが変わるため、`git branch -d`が「
 
 ## hookが止めたとき
 
-`.claude/settings.json`が3つのscriptをhookとして起動する。**検査は4つである。**
+`.claude/settings.json`が4つのscriptをhookとして起動する。**検査は5つである。**
 
 **文書に書いても実行されないことが実測で分かっている。**
 [#204](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/204)、
@@ -663,6 +663,7 @@ squash mergeしたbranchはcommit hashが変わるため、`git branch -d`が「
 | `gh pr merge`の前 | squash messageが`Change-Class`と`Self-Review`を持つか | 同上 |
 | `git checkout -b`／`git switch -c`の前 | 基点が最新の`origin/develop`か | `scripts/hooks/branch_base_guard.py` |
 | `gh pr merge`の後 | squash commitに実際に入ったか | `scripts/hooks/merge_trailer_report.py` |
+| `develop`へ直接pushする前 | 押す範囲が`review_gate.py gate`を通るか | `scripts/hooks/push_gate.py` |
 
 **判定は字句だけで行う。**意味は判定しない（`scripts/review_gate.py`と同じ方針）。
 
@@ -676,11 +677,22 @@ squash mergeしたbranchはcommit hashが変わるため、`git branch -d`が「
 ```bash
 DESKCAT_SKIP_GH_GUARD=1 gh pr create --title "..." --body-file body.md
 DESKCAT_SKIP_BASE_GUARD=1 git checkout -b experiment/scratch
+DESKCAT_SKIP_PUSH_GATE=1 git push origin HEAD:develop
 ```
 
 `branch_base_guard.py`は、基点を明示した場合（`git checkout -b <name> <start>`）と
 `hotfix/`で始まるbranchを対象外にする。`hotfix/`は`main`から作るのが正しい
 （[ADR-0004](docs/decisions/0004-main-develop-branch-strategy.md)）。
+
+`push_gate.py`は`develop`を更新するpushだけを見る。**他のbranchへのpushは見ない。**
+Pull Requestを通る変更は`review-gate.yml`が`gate`を実行するためである。
+**直接pushはCIを通らないため、そこだけが検査の無い経路だった。**
+
+**このhookは`gate`を実行するだけで、直接commitしてよい基準そのものは検査しない。**
+検査すると、trailerを落としたsquash commitをamendして直す手順
+（[Merge方式](#merge方式)）を誤って止める。その手順の対象は
+`Change-Class: review-required`を持つため、基準で測ると拒否になる。
+**字句で区別する手立てが無い。**
 
 ### 取り切れていないもの
 
@@ -696,6 +708,12 @@ DESKCAT_SKIP_BASE_GUARD=1 git checkout -b experiment/scratch
 - **`git fetch`ができない環境。**基点の検査は行わず、黙って通る。
 - **merge後の確認は事後である。**入っていなければ履歴書き換えなしには直せない。
   それでも報告するのは、免除へ回す判断を次の昇格まで先延ばしにしないためである。
+- **`develop`へ入る経路のうち、`gh pr merge`によるものは`push_gate.py`を通らない。**
+  そちらはPull RequestのCIで`gate`が済んでいる。
+- **`push_gate.py`が見る`develop`の書き方は`develop`と`refs/heads/develop`だけである。**
+  `--mirror`と`--all`のように、refspecを書かずに複数branchを更新する形は拾えない。
+- **`gate`が時間内に終わらない場合は通す。**止めないのは、遅い環境で作業を止めないためである。
+  **通ったことを、検査したことと読まない。**
 
 **hookで安全要件を代替しない。**hookが直すのは「忘れる」であって、
 [Hardware Safety Policy](docs/governance/hardware-safety-policy.md)が要求する根拠ではない。
