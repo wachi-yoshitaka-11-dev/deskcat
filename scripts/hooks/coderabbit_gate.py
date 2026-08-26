@@ -198,17 +198,13 @@ def main():
         # （PR #241のreview指摘）。**return codeとstdoutは変えない。**
         _note(f"hookの入力を読めなかったため判定できない: {error}")
         return 0
-    if not isinstance(payload, dict):
-        # 妥当なJSONでもmappingでないことがある（`[]`など）。
-        # **`payload.get`でAttributeErrorを出さない。**
-        _note("hookの入力がmappingではない")
+    command = command_line.command_from(payload)
+    if command is None:
+        # 妥当なJSONでもmappingでないことがある（`[]`／`{"tool_input": ["x"]}`）。
+        # **判定は`command_line.command_from`が持つ。**5本のhookへ複製しない（#242）。
+        _note("hookの入力からcommandを取り出せなかったため判定できない")
         return 0
-    tool_input = payload.get("tool_input")
-    if tool_input is not None and not isinstance(tool_input, dict):
-        _note("`tool_input`がmappingではない")
-        return 0
-    command = (tool_input or {}).get("command")
-    if not isinstance(command, str) or "gh" not in command:
+    if "gh" not in command:
         # 全Bash呼び出しでこのhookが走る。`if`条件でBash(gh *)へ絞ると
         # `cd x && gh pr comment`が素通りするため、絞らずここで安く抜ける。
         return 0

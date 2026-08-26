@@ -86,8 +86,8 @@ def main():
         payload = json.load(sys.stdin)
     except (json.JSONDecodeError, UnicodeDecodeError):
         return 0
-    command = (payload.get("tool_input") or {}).get("command")
-    if not isinstance(command, str) or "gh" not in command:
+    command = command_line.command_from(payload)
+    if command is None or "gh" not in command:
         return 0
     found, number = _pr_merge(command)
     if not found:

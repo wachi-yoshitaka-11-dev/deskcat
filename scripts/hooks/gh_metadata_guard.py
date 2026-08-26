@@ -166,8 +166,8 @@ def main():
     except (json.JSONDecodeError, UnicodeDecodeError):
         # hookの入力を読めないことを、対象commandの問題として扱わない。
         return 0
-    command = (payload.get("tool_input") or {}).get("command")
-    if not isinstance(command, str) or "gh" not in command:
+    command = command_line.command_from(payload)
+    if command is None or "gh" not in command:
         # 全Bash呼び出しでこのhookが走る。`if`条件でBash(gh *)へ絞ると
         # `cd x && gh pr create`が素通りするため、絞らずここで安く抜ける。
         return 0
