@@ -540,10 +540,14 @@ Conclusion: Partial。**この節の対象は、この 1 台・Raspberry Pi Dire
   - **`project の test command を記録した` は埋めた。**`cargo test --locked -p <crate>` が
     Pi 上で通る。138 tests passed、0 failed。所要は deskcat-serial 190 秒、
     deskcat-protocol 339 秒。**ただし `--workspace` は実行していない。**
-  - **`direct build を継続するか cross compilation へ移るか決定した` は埋まっていない。**
-    移行条件のうち memory は評価した（peak 単一 process RSS 247364 kB＝MemTotal の 56.6%、
-    OOM なし）。**したがって「dependency build が memory 不足で安定しない」は当たらない。**
-    **残る `clean build が許容できない` は数値を出しただけであり、可否の判断は human に属する。**
+  - **`direct build を継続するか cross compilation へ移るか決定した` は、この測定の時点では
+    埋まっていない。**移行条件のうち memory は評価した（peak 単一 process RSS 247364 kB＝
+    MemTotal の 56.6%、OOM なし）。**したがって「dependency build が memory 不足で安定しない」は
+    当たらない。**残る `clean build が許容できない` は、この時点では数値を出しただけである。
+    **（2026-08-27 追記: この実測値をもとに direct build の継続を決定し、同項目は埋まった。
+    判断と、それを覆す条件は
+    [Raspberry Pi Rust Toolchain](../raspberry-pi-rust-toolchain.md#cross-compilationへ移る条件)
+    にある。**この記録の測定値は変更していない。**）
 
   **`Verified` にしないのは、次が未実行のためである。**
   - **`cargo test --workspace` と `cargo clippy --workspace` を実行していない。**
@@ -568,8 +572,10 @@ Next action:
 - **実 serial port について何も主張しない。**port を開いていない。device 名も確定していない。
 - **ESP32 との通信について何も主張しない。**`serial_link` は build しただけである。
 - **電源経路について何も主張しない。**測定中に 1 度 Pi の電源が落ちたが、原因を切り分けていない。
-- **cross compilation へ移るか否かを決めていない。**移行条件のうち memory の 1 つが
-  「当たらない」と言えるようになっただけである。**4 条件すべてを否定していない。**
+- **この測定は cross compilation へ移るか否かを決めていない。**移行条件のうち memory の 1 つが
+  「当たらない」と言えるようになっただけである。**判断そのものは 2026-08-27 に別途行った**
+  （[Raspberry Pi Rust Toolchain](../raspberry-pi-rust-toolchain.md#cross-compilationへ移る条件)）。
+  **この記録は測定の記録であり、判断の記録ではない。**
 - **release profile と reboot 後の再実行を主張しない。**どちらも今回は行っていない。
 
 

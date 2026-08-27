@@ -3,6 +3,7 @@
 > 状態: 1節から4節を対象のRaspberry Pi Zero Wで実行済み（2節のGitは#8の範囲外として未導入）
 > 更新: 2026-08-15 1節へfloat ABIの判定手順を追加（[#62](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/62)）
 > 更新: 2026-08-17 [#8](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/8) の実機作業で1節から4節を実行した。**float ABIの判定手順は実機で判別できた**（手段6つが一致）。記録は [Version Record](../toolchains/version-records/2026-08-17-pi-direct-build-native.md)。**5節（cross compilation）は保留のまま、依存を持つbuildは未測定である**。この更新は[PR #144](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/144)として2026-08-19に`develop`へmergeした
+> 更新: 2026-08-27 依存を持つcrateのbuild、lint、testを2026-08-26に実測し、**5節の保留を解いた。cross compilationは採らない**（[#11](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11)）。正本は [Raspberry Pi Rust Toolchain](../toolchains/raspberry-pi-rust-toolchain.md#cross-compilationへ移る条件) であり、判断を覆す条件も同節にある
 > 適用範囲: Raspberry Pi RuntimeとRaspberry Pi Direct Build profile
 
 ## 目的
@@ -186,6 +187,11 @@ root workspace が未生成の間は、対象 Issue 専用の最小 binary crate
 project workspace 生成後は、root で合意した format、lint、unit test、build command に置き換える。
 
 ## 5. Cross compilationの判断
+
+**2026-08-27 に cross compilation を採らないと決定した。**移行条件 4 つを実測し、いずれも当たらない。
+判断と、それを覆す条件は [Raspberry Pi Rust Toolchain](../toolchains/raspberry-pi-rust-toolchain.md#cross-compilationへ移る条件) が正本である。**ここへ再掲しない。**
+
+下の一覧は、**覆す条件に当たって導入することになった場合**に確定すべき項目である。
 
 native build の計測前に cross compilation を導入しない。導入する場合は別 Issue で次を確定する。
 

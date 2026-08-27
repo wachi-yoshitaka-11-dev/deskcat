@@ -16,7 +16,7 @@
 - **別環境での再現は実施済み。**GitHub Actionsの`ubuntu-24.04` runnerがclean環境でbuildを再現した（[CIのVersion Record](version-records/2026-08-10-esp32-build-ci.md)、#42／PR #86）。**開発端末以外の実機での再現は未実施である**
 - **ESP32の実機確認（物理基板・module・revision）は未実施。**CIでの再現はこれを代替しない
 - Windowsは[ADR-0005](../decisions/0005-standard-development-os.md)により対象外。support対象ではないため「未検証」ではない
-- **Raspberry Pi Zero W実機での最小Rust programのdirect buildは成功した**（[Version Record](version-records/2026-08-17-pi-direct-build-native.md)。判定は`Partial`）。候補target`arm-unknown-linux-gnueabihf`はこのとき確定した。**ただし成功したのは依存0件の最小programだけである。****このrepositoryのcrateとworkspaceのbuild、および依存を持つbuildはPi上で未測定**であり、host workspaceの検証済みcommandがPiで通るかは不明である。cross compilationは保留を維持している
+- **Raspberry Pi Zero W実機でのdirect buildは成功した**（[Version Record](version-records/2026-08-17-pi-direct-build-native.md)。判定は`Partial`）。候補target`arm-unknown-linux-gnueabihf`は2026-08-17に確定した。**依存を持つcrateのbuild、lint、testも2026-08-26に実測した**（`deskcat-serial`と`deskcat-protocol`）。**cross compilationは採らないと2026-08-27に決定した。**実測値、判断の理由、判断を覆す条件は[Raspberry Pi Rust Toolchain](raspberry-pi-rust-toolchain.md#cross-compilationへ移る条件)が正本である。**ここへ再掲しない。****ただし`--workspace`は未実行であり、workspace全体をPiで一度に回して通るかは未確認である。**実serial portも開いていない
 - 実行結果が得られるまで、記載したversionを「検証済み」または「確定」と扱わない
 
 ## 文書
