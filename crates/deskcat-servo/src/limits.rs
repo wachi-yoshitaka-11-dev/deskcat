@@ -373,13 +373,29 @@ impl ControlPeriod {
     ///
     /// # Errors
     ///
-    /// 有限でない、`nominal_s`が正でない、`tolerance_s`が負、または
-    /// `tolerance_s >= nominal_s`の場合に失敗する。
+    /// 有限でない、`nominal_s`が正でない、`tolerance_s`が負、
+    /// `tolerance_s >= nominal_s`、または`nominal_s + tolerance_s`が有限でない場合に
+    /// 失敗する。
+    ///
+    /// **入力2つの有限性だけでは足りない。**和は上へ溢れうる。
+    /// `new(f32::MAX, f32::MAX / 2.0)`は入力の検査を通るが、[`Self::longest_s`]が
+    /// `+∞`を返す。[`Self::accepts`]は有限でない値を受理しないため、
+    /// **有限の上限を持たない契約ができてしまう。**
+    ///
+    /// **上限の定数は決めていない。**「和が有限であること」だけを要求する。
+    /// 何秒までを許すかは[`ControlPeriod`]の値の話であり、この型は決めない
+    /// （[#19](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/19)は
+    /// 境界値を決めずに実装している）。
     pub fn new(nominal_s: f32, tolerance_s: f32) -> Result<Self, LimitsError> {
         if !nominal_s.is_finite() || !tolerance_s.is_finite() {
             return Err(LimitsError::InvalidControlPeriod);
         }
         if nominal_s <= 0.0 || tolerance_s < 0.0 || tolerance_s >= nominal_s {
+            return Err(LimitsError::InvalidControlPeriod);
+        }
+        // 差（`shortest_s`）は`0 <= tolerance_s < nominal_s`から常に有限であり、
+        // 溢れるのは和（`longest_s`）だけである。
+        if !(nominal_s + tolerance_s).is_finite() {
             return Err(LimitsError::InvalidControlPeriod);
         }
         Ok(Self {
