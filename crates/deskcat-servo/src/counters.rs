@@ -56,13 +56,30 @@ pub struct ClampReport {
     pub braking: bool,
     /// 加速度を`最大加速度`へ収めた。
     pub acceleration: bool,
+    /// `最大加速度`を守れず、位置の bound を優先した。
+    ///
+    /// **clampではなく、譲ったことの記録である。**`Limiter::step`の`dt_s`の項が
+    /// 発生条件を書いている。`dt_s`が一定であれば立たない。
+    ///
+    /// **位置の bound はこの場合も破っていない。**破ったのは加速度の側だけである。
+    pub acceleration_bound_conceded: bool,
 }
 
 impl ClampReport {
-    /// 1つでもclampが作用したか。
+    /// このstepで制限が何か作用したか。
+    ///
+    /// **[`Self::acceleration_bound_conceded`]も含める。**clampではないが、
+    /// 「制限が関与した step」として報告する対象は同じだからである。
+    /// clampの累計だけが要る場合は[`LimiterCounters::total_clamps`]を使う
+    /// （そちらは譲りを含めない）。
     #[must_use]
     pub const fn any(self) -> bool {
-        self.position || self.step || self.velocity || self.braking || self.acceleration
+        self.position
+            || self.step
+            || self.velocity
+            || self.braking
+            || self.acceleration
+            || self.acceleration_bound_conceded
     }
 }
 
@@ -81,6 +98,10 @@ pub struct LimiterCounters {
     pub clamped_braking: u32,
     /// `最大加速度`へclampした回数。
     pub clamped_acceleration: u32,
+    /// `最大加速度`を守れず位置の bound を優先した回数。
+    ///
+    /// **clamp counterではない。**[`Self::total_clamps`]に含めない。
+    pub acceleration_bound_conceded: u32,
     /// `invalid_payload`でrejectした回数。
     pub rejected_invalid_payload: u32,
     /// `out_of_range`でrejectした回数。
@@ -104,6 +125,9 @@ impl LimiterCounters {
         }
         if report.acceleration {
             self.clamped_acceleration = self.clamped_acceleration.saturating_add(1);
+        }
+        if report.acceleration_bound_conceded {
+            self.acceleration_bound_conceded = self.acceleration_bound_conceded.saturating_add(1);
         }
     }
 

@@ -12,6 +12,13 @@
 //! [`LimiterCounters`]の`Default`は数値を選んでいない（前者は「何も受理しない」、
 //! 後者は全counterが0）。
 //!
+//! # 呼び出し側の前提
+//!
+//! **[`Limiter::step`]へ渡す`dt_s`は制御周期であり、安定していることを前提とする。**
+//! step ごとに大きく変えると`最大加速度`を守れない場合がある。そのとき**位置の bound を
+//! 優先し**、譲ったことを[`ClampReport::acceleration_bound_conceded`]で報告する。
+//! **位置の bound は`dt_s`をどう変えても破らない。**条件は[`Limiter::step`]の doc にある。
+//!
 //! # 範囲
 //!
 //! 含むもの（`servo-safety-limits.md`の`Command処理`の中央3段）:

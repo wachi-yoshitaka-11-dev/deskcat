@@ -53,6 +53,15 @@ const TEST_MOTION: &str = "test-motion";
 /// f32比較の許容誤差。**制限値ではない。**
 const EPSILON: f32 = 1e-4;
 
+/// 加速度を比較するときの上限。**制限値ではない。**
+///
+/// 加速度は `Δv / dt` で求めるため、`dt` が小さいと f32 の丸め誤差が `1/dt` 倍に拡大する。
+/// `dt = 0.005` で実測 40.000153（上限 40）が出た。**その誤差を許すためだけの余裕であり、
+/// 実際の超過は桁が違う**（`dt`を変える場合で 15000 に達する）。
+fn acceleration_ceiling(dt: f32) -> f32 {
+    TEST_MAX_ACCELERATION + EPSILON / dt
+}
+
 /// 2値の中点。**制限値ではない。**testの範囲を作るためだけに使う。
 fn midpoint(a: f32, b: f32) -> f32 {
     a + (b - a) / 2.0
@@ -79,6 +88,42 @@ fn test_limits() -> ServoLimits {
         Cap::new(TEST_MAX_STEP, TEST_MAX_STEP_HARD, "max_step").expect("test step cap"),
     )
     .expect("test limits are consistent")
+}
+
+/// sweepで使うtarget。hard範囲の外・境界・内側・反転を含む。**test用の値である。**
+const SWEEP_TARGETS: [f32; 7] = [
+    TEST_APPROVED_MAX,
+    TEST_APPROVED_MIN,
+    TEST_NEUTRAL,
+    TEST_HARD_MAX,
+    TEST_HARD_MIN,
+    12.5,
+    -7.0,
+];
+
+/// `単一commandの最大変化量`だけ差し替えたlimiter。**値はtest用である。**
+fn limiter_with_max_step(max_step: f32) -> Limiter {
+    let limits = ServoLimits::new(
+        PositionRange::new(
+            TEST_HARD_MIN,
+            TEST_APPROVED_MIN,
+            TEST_APPROVED_MAX,
+            TEST_HARD_MAX,
+        )
+        .expect("test range is ordered"),
+        TEST_NEUTRAL,
+        Cap::new(TEST_MAX_VELOCITY, TEST_MAX_VELOCITY_HARD, "max_velocity").expect("cap"),
+        Cap::new(
+            TEST_MAX_ACCELERATION,
+            TEST_MAX_ACCELERATION_HARD,
+            "max_acceleration",
+        )
+        .expect("cap"),
+        Cap::new(max_step, max_step + 10.0, "max_step").expect("cap"),
+    )
+    .expect("test limits are consistent");
+    Limiter::new(limits, MotionCatalog::new([TEST_MOTION]), TEST_NEUTRAL)
+        .expect("start is inside the approved range")
 }
 
 fn limiter_at(position: f32) -> Limiter {
@@ -404,6 +449,122 @@ fn a_long_interval_is_bounded_by_velocity_not_by_the_interval() {
     );
 }
 
+/// 制御周期が一定なら、`最大加速度`を1度も超えず、譲りもしない。
+///
+/// `dt`・target・`単一commandの最大変化量`を変えた組み合わせを総当たりし、
+/// 境界への突入と反転を含む長い列を回す。
+#[test]
+fn a_constant_interval_never_exceeds_the_acceleration_bound() {
+    let mut worst = 0.0f32;
+    for max_step in [TEST_MAX_STEP, 80.0, 0.5] {
+        for dt in [10.0f32, 1.0, 0.25, 0.05, TEST_DT_S, 0.005, 0.001] {
+            let mut limiter = limiter_with_max_step(max_step);
+            let mut previous_velocity = 0.0f32;
+            for k in 0..120 {
+                let target = SWEEP_TARGETS[(k / 11) % SWEEP_TARGETS.len()];
+                let Ok(admitted) = limiter.admit(&request(target, CommandSource::Pi)) else {
+                    continue;
+                };
+                let setpoint = limiter.step(admitted, dt).expect("dt is positive");
+                let acceleration = (setpoint.velocity() - previous_velocity).abs() / dt;
+                if acceleration > worst {
+                    worst = acceleration;
+                }
+                assert!(
+                    acceleration <= acceleration_ceiling(dt),
+                    "max_step {max_step}, dt {dt}, step {k}: acceleration {acceleration} exceeded"
+                );
+                assert!(
+                    !setpoint.clamps().acceleration_bound_conceded,
+                    "max_step {max_step}, dt {dt}, step {k}: conceded under a constant interval"
+                );
+                previous_velocity = setpoint.velocity();
+            }
+            assert_eq!(limiter.counters().acceleration_bound_conceded, 0);
+        }
+    }
+    assert!(worst > 0.0, "sweepが実際に加速度を動かしていること");
+}
+
+/// 制御周期を変えると`最大加速度`を譲ることがある。**そのとき位置の bound は破らず、
+/// 譲ったことを必ず報告する**（PR #251 の review で見つかった。修正前は無報告だった）。
+///
+/// `dt`を**大きくする**方向が危険である。位置境界へ向けた減速の上限が縮み、前の step から
+/// 持ち越した速度がその上限を超えるためである。
+#[test]
+fn a_varying_interval_may_concede_acceleration_but_never_position() {
+    let intervals = [10.0f32, 1.0, 0.25, 0.05, TEST_DT_S, 0.005, 0.001];
+    let mut conceded_any = false;
+    for max_step in [TEST_MAX_STEP, 80.0] {
+        for first in intervals {
+            for second in intervals {
+                let mut limiter = limiter_with_max_step(max_step);
+                let mut previous_velocity = 0.0f32;
+                for k in 0..120 {
+                    let dt = if (k / 7) % 2 == 0 { first } else { second };
+                    let target = SWEEP_TARGETS[(k / 11) % SWEEP_TARGETS.len()];
+                    let Ok(admitted) = limiter.admit(&request(target, CommandSource::Pi)) else {
+                        continue;
+                    };
+                    let setpoint = limiter.step(admitted, dt).expect("dt is positive");
+
+                    // 位置の bound は`dt`をどう変えても破らない。
+                    assert!(
+                        (TEST_HARD_MIN - EPSILON..=TEST_HARD_MAX + EPSILON)
+                            .contains(&setpoint.position()),
+                        "dt {first}/{second}, step {k}: position left the hard range"
+                    );
+
+                    // 加速度を超えたなら、必ず報告されている。握りつぶさない。
+                    let acceleration = (setpoint.velocity() - previous_velocity).abs() / dt;
+                    if acceleration > acceleration_ceiling(dt) {
+                        assert!(
+                            setpoint.clamps().acceleration_bound_conceded,
+                            "dt {first}/{second}, step {k}: acceleration {acceleration} \
+                             exceeded without being reported"
+                        );
+                        assert!(setpoint.clamps().any());
+                        conceded_any = true;
+                    }
+                    previous_velocity = setpoint.velocity();
+                }
+            }
+        }
+    }
+    assert!(
+        conceded_any,
+        "この組み合わせでは実際に譲る場面が起きること。起きないならtestが弱い"
+    );
+}
+
+/// review が挙げた具体例。長い`dt`の直後に短い`dt`を与える。
+#[test]
+fn the_reported_long_then_short_interval_case_keeps_the_position_bound() {
+    let mut limiter = limiter_with_max_step(80.0);
+    let admitted = limiter
+        .admit(&request(TEST_APPROVED_MAX, CommandSource::Pi))
+        .expect("valid target");
+    let arrival = limiter.step(admitted, 10.0).expect("dt is positive");
+    assert_eq!(arrival.position(), TEST_APPROVED_MAX, "1 stepで境界へ着く");
+
+    let mut previous_velocity = arrival.velocity();
+    for dt in [TEST_DT_S, 0.005, 0.001, TEST_DT_S] {
+        let admitted = limiter
+            .admit(&request(TEST_APPROVED_MAX, CommandSource::Pi))
+            .expect("valid target");
+        let setpoint = limiter.step(admitted, dt).expect("dt is positive");
+        assert!(
+            (TEST_HARD_MIN - EPSILON..=TEST_HARD_MAX + EPSILON).contains(&setpoint.position()),
+            "dt {dt}: position left the hard range"
+        );
+        let acceleration = (setpoint.velocity() - previous_velocity).abs() / dt;
+        if acceleration > acceleration_ceiling(dt) {
+            assert!(setpoint.clamps().acceleration_bound_conceded);
+        }
+        previous_velocity = setpoint.velocity();
+    }
+}
+
 // ---------------------------------------------------------------------------
 // 受け入れ条件3: Debug command が同じ limiter を使用する
 // ---------------------------------------------------------------------------
@@ -557,6 +718,7 @@ fn counters_saturate_instead_of_wrapping() {
         clamped_velocity: u32::MAX,
         clamped_braking: u32::MAX,
         clamped_acceleration: u32::MAX,
+        acceleration_bound_conceded: u32::MAX,
         rejected_invalid_payload: u32::MAX,
         rejected_out_of_range: u32::MAX,
     };

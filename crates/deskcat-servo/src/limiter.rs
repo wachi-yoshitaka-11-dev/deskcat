@@ -387,6 +387,22 @@ impl Limiter {
     /// 一気に落とし`最大加速度`を超えるのを防ぐためである。最後の位置範囲は安全網であり、
     /// 減速が効いている限り作用しない。
     ///
+    /// # `dt_s`は制御周期であり、安定していることを前提とする
+    ///
+    /// **`dt_s`を step ごとに大きく変えると、`最大加速度`を守れない場合がある。**
+    /// 位置境界へ向けた減速の上限は`dt_s`に依存する。`dt_s`を**小さくする方向は安全**で、
+    /// 上限が緩むだけである。**大きくする方向が危険**で、上限が縮むため、前の step から
+    /// 持ち越した速度がその上限を超えうる。超えた分は減速しきれず境界に達し、
+    /// 最後の位置clampが速度を切り落とす。その切り落としは`最大加速度`を超える。
+    ///
+    /// **そのとき位置の bound を優先する。**境界を越えて機構へ押し付けることは
+    /// 安全要件5項目の「servoの持続的拘束」に直接効くのに対し、加速度の超過は
+    /// **一度きりの減速**だからである。**位置の bound は、`dt_s`をどう変えても破らない。**
+    ///
+    /// 譲ったことは[`ClampReport::acceleration_bound_conceded`]と
+    /// [`LimiterCounters::acceleration_bound_conceded`]で観測できる。**握りつぶさない。**
+    /// `dt_s`が一定であれば、この flag は立たない。
+    ///
     /// # Errors
     ///
     /// `dt_s`が有限でない、または正でない場合にrejectする。
@@ -397,6 +413,7 @@ impl Limiter {
 
         let mut clamps = ClampReport::default();
         let start = self.position;
+        let range = self.limits.position();
 
         // `単一commandの最大変化量`。
         let max_step = self.limits.max_step().approved();
@@ -438,7 +455,6 @@ impl Limiter {
         }
 
         // `承認値`の位置範囲。ここを最後に当てる。
-        let range = self.limits.position();
         let unclamped_position = start + velocity * dt_s;
         let position = range.clamp_to_approved(unclamped_position);
         // 上と同じ理由で厳密比較を使う。
@@ -446,9 +462,17 @@ impl Limiter {
         let position_clamped = position != unclamped_position;
         if position_clamped {
             clamps.position = true;
-            // 位置をclampしたら速度も実際の移動量と整合させる。大きさは必ず
-            // clamp前以下になるため、`最大速度`と`最大加速度`の制限は保たれる。
+            // 位置をclampしたら速度も実際の移動量と整合させる。
             velocity = (position - start) / dt_s;
+
+            // **ここだけが`最大加速度`を破りうる経路である。**上の加速度clampを通った速度を
+            // 位置clampが切り落とすため、切り落とし分が`最大加速度`を超えることがある。
+            // 境界ではこれ以上位置を進められないので、**位置の bound を優先する以外に無い。**
+            // **握りつぶさず、譲ったことを数える**（`dt_s`の項に発生条件がある）。
+            let realized = (velocity - self.velocity).abs();
+            if realized > max_delta_v {
+                clamps.acceleration_bound_conceded = true;
+            }
         }
 
         self.position = position;
