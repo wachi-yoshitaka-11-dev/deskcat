@@ -7,7 +7,7 @@
 > 調査日: 2026-07-27
 > 標準OS判断: 2026-08-06（[ADR-0005](../decisions/0005-standard-development-os.md)）
 > ESP32 build検証日: 2026-08-06（初回）／2026-08-11（現行treeに対する最新の検証。開発端末は`2026-08-11T11:13:22Z`、CIは`2026-08-10T06:26:26Z`）
-> Raspberry Pi direct build検証日: 2026-08-17（実機のRaspberry Pi Zero W。最小Rust programのみ。判定は`Partial`。[Version Record](version-records/2026-08-17-pi-direct-build-native.md)）
+> Raspberry Pi direct build検証日: 2026-08-17（初回。実機のRaspberry Pi Zero W。最小Rust programのみ）／2026-08-26（現行の範囲。依存を持つcrateのbuild、lint、test。`deskcat-serial`と`deskcat-protocol`）。判定は`Partial`。[Version Record](version-records/2026-08-17-pi-direct-build-native.md)
 
 - 開発環境の標準OSは実機のLinuxで、Windowsは対象外。distributionとarchitectureは未固定
 - USBを必要としない作業ではDocker上のLinuxも使う。flashと実機試験は実機Linuxに限る
