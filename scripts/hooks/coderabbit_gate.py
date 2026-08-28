@@ -14,6 +14,9 @@ Claude CodeのPreToolUse hookとして、Bash tool呼び出しの前に走る。
 「reviewを投げて」と指示した通常の流れも通らなくなる。**止めたいのはAIの独断であって、
 人間の依頼ではない。**
 
+**2026-08-28に、承認を経ずに通る経路を3つ塞いだ**（PR #254のreviewで出た）。
+`-X GET -X POST`の後勝ち、`--input <file>`、`-F key=@<path>`。**3つとも実測で再現した。**
+
 **環境変数によるバイパスを設けていない。**他のhookの`SKIP_ENV`に当たるものが無いのは
 意図である。**AIが自分で外せる抑制は抑制ではない。**この判断は#240で人間が決めた。
 
@@ -122,6 +125,17 @@ def _mentions_review(text):
 BODY_OPTIONS = ("--body", "-b", "-f", "--field", "--raw-field", "-F")
 BODY_FILE_OPTIONS = ("--body-file",)
 
+# `gh api`はbody全体をfileから読める（`-`はstdin）。**`BODY_OPTIONS`では拾えない。**
+# 値がpathであって本文ではないためである。**塞ぐまでは`--input`に本文を置けば
+# 素通りした**（2026-08-28に実測）。
+INPUT_OPTIONS = ("--input",)
+
+# `-F`／`--field`は値の`@<path>`をfileとして読む（`@-`はstdin）。
+# **`-f`／`--raw-field`は展開せず、文字列のまま送る**（`gh api --help`で確認した）。
+# そのため`@`の展開はこの2つの綴りにだけ当てる。**`-f body=@x`をfileとして読むと、
+# 実際には送られない内容でaskを出すことになる。**
+FIELD_FILE_OPTIONS = ("-F", "--field")
+
 
 def _option_values(args, names):
     """`--name value`と`--name=value`の値を**全件**返す。
@@ -146,28 +160,49 @@ def _option_values(args, names):
     return found
 
 
+def _read_body(path, source):
+    """fileから本文を読む。読めなければ空を返す。**判定は変えない。**
+
+    `-`（stdin）と読み出し失敗は、どちらも**素通りさせる。**理由は`_texts`のdocstringにある。
+    **握りつぶさない。**分類してstderrへ残す
+    （AGENTS.mdの「エラーを握りつぶさず、分類、ログ、カウンタを用意する」）。
+
+    **`source`にどのoptionから来たかを渡す。**読める経路が3つ（`--body-file`／
+    `--input`／`-F key=@path`）あるため、**どれが読めなかったかを書かないと
+    記録から経路を辿れない。**
+    """
+    if path == "-":
+        _note(f"本文が`{source}`のstdin（`-`）から渡されており、hookからは読めない")
+        return []
+    try:
+        with open(path, encoding="utf-8") as handle:
+            return [handle.read()]
+    except OSError as error:
+        # `gh_metadata_guard.py`は同じ失敗を診断文へ載せているが、**こちらは
+        # 素通りするため診断文が無い。**代わりにstderrへ出す。
+        _note(f"`{source}`の読み出しに失敗したため判定できない: {error}")
+        return []
+
+
 def _texts(args):
     """引数として渡された本文の候補を返す。
 
-    **`--body-file`は読む。**`gh_metadata_guard.py`の`_merge_message`と違い、
-    読めなかったことを理由に止めない。**本文が読めなければ`@coderabbitai`が
+    **fileから読む経路は3つある**（`--body-file`／`--input`／`-F key=@path`）。
+    `gh_metadata_guard.py`の`_merge_message`と違い、読めなかったことを理由に
+    止めない。**本文が読めなければ`@coderabbitai`が
     含まれるかを判定できないため素通りさせる。**hookが読めないことを、
     AIの独断の証拠として扱わない。**この方向の取りこぼしは意図である。**
     """
     found = _option_values(args, BODY_OPTIONS)
-    for path in _option_values(args, BODY_FILE_OPTIONS):
-        if path == "-":
-            _note(f"本文がstdin（`-`）から渡されており、hookからは読めない: {path}")
-            continue
-        try:
-            with open(path, encoding="utf-8") as handle:
-                found.append(handle.read())
-        except OSError as error:
-            # **握りつぶさない。**素通りさせる判断は変えないが、分類して記録する
-            # （AGENTS.mdの「エラーを握りつぶさず、分類、ログ、カウンタを用意する」）。
-            # `gh_metadata_guard.py`は同じ失敗を診断文へ載せているが、**こちらは
-            # 素通りするため診断文が無い。**代わりにstderrへ出す。
-            _note(f"`--body-file`の読み出しに失敗したため判定できない: {error}")
+    for option in (BODY_FILE_OPTIONS, INPUT_OPTIONS):
+        for path in _option_values(args, option):
+            found.extend(_read_body(path, option[0]))
+    # `-F key=@path`は値をfileから読む。**`key=@path`という文字列のままでは
+    # `@coderabbitai`を含まないため、読まないと素通りする**（2026-08-28に実測）。
+    for value in _option_values(args, FIELD_FILE_OPTIONS):
+        _, separator, right = value.partition("=")
+        if separator and right.startswith("@"):
+            found.extend(_read_body(right[1:], FIELD_FILE_OPTIONS[0]))
     return found
 
 
@@ -215,7 +250,11 @@ def main():
         elif tuple(args[:1]) == API_SUBCOMMAND:
             rest = args[1:]
             methods = [m.lower() for m in _option_values(rest, METHOD_OPTIONS)]
-            if any(m in READ_ONLY_METHODS for m in methods):
+            # **最後の`-X`が効く。**`gh`のmethodは単一の文字列option
+            # （`gh api --help`の`-X, --method string`）であり、複数回渡すと後勝ちになる。
+            # **`any()`で見ると`-X GET -X POST`が読み取り扱いになって素通りする**
+            # （2026-08-28に実測）。**渡されていなければ見る側へ倒す。**
+            if methods and methods[-1] in READ_ONLY_METHODS:
                 # 読み取りと明示されている。**commentは投げられない。**
                 continue
             _check(API_SUBCOMMAND, rest)

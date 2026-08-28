@@ -647,7 +647,7 @@ squash mergeしたbranchはcommit hashが変わるため、`git branch -d`が「
 
 ## hookが止めたとき
 
-`.claude/settings.json`が4つのscriptをhookとして起動する。**検査は6つである。**
+`.claude/settings.json`が5つのscriptをhookとして起動する。**検査は7つである。**
 
 **文書に書いても実行されないことが実測で分かっている。**
 [#204](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/204)、
@@ -661,6 +661,7 @@ squash mergeしたbranchはcommit hashが変わるため、`git branch -d`が「
 |---|---|---|
 | `gh issue create`／`gh pr create`の前 | `--project`（短縮形`-p`）があるか | `scripts/hooks/gh_metadata_guard.py` |
 | `gh pr create`の前 | `--base`（短縮形`-B`）があるか | 同上 |
+| `@coderabbitai`へreviewを投げる前 | 同じ行に`review`の語があるか | `scripts/hooks/coderabbit_gate.py` |
 | `gh pr merge`の前 | squash messageが`Change-Class`と`Self-Review`を持つか | 同上 |
 | `git checkout -b`／`git switch -c`の前 | 基点が最新の`origin/develop`か | `scripts/hooks/branch_base_guard.py` |
 | `gh pr merge`の後 | squash commitに実際に入ったか | `scripts/hooks/merge_trailer_report.py` |
