@@ -1,0 +1,320 @@
+//! Limiterへ渡す動作制限の入力。
+//!
+//! # この moduleは境界値を1つも持たない
+//!
+//! 正本は[`docs/hardware/servo-safety-limits.md`]の`動作制限`表であり、同表は
+//! 12行のうち`最大連続電流`を除く全行が`承認値 TBD`／`設定可能なhard bound TBD`である
+//! （その`最大連続電流`も「**firmwareへ直接は設定しない**」と同表が定めている）。
+//! [Hardware Safety Policy]の対応表は`サーボPWM、可動域、速度、加速度`を
+//! 「一次資料または実測」の側に置いており、**一般値で開始してよい側ではない。**
+//!
+//! したがってこの moduleが持つのは**型と検査だけ**である。値は呼び出し側が渡す。
+//! **[`Default`]を実装しない。**実装すると数値を選ぶことになる。
+//!
+//! # `承認値`と`設定可能なhard bound`を別に持つ理由
+//!
+//! `動作制限`表が2列を別に持っているためである。[`Limiter`]はこの2列を
+//! [`servo-safety-limits.md`の`Command処理`]が定める
+//! 「構造的に不正または明らかに危険なcommandは、clampよりrejectを優先する」の
+//! 分かれ目に使う。**hard boundの外はreject、`承認値`とhard boundの間はclampして報告**である。
+//! **この対応付けは同文書が明示していない読みである。**文書が定めているのは優先順位と
+//! 報告義務だけであり、境目の定義は書かれていない。変える場合はこの doc commentも変える。
+//!
+//! # 単位
+//!
+//! **この moduleは単位を決めない。**位置は「command単位」、速度は「command単位毎秒」、
+//! 加速度は「command単位毎秒毎秒」として扱い、**degreeともpulse widthとも解釈しない。**
+//! `calibrated pulse conversion`（`Command処理`の後段）はこのcrateの範囲外であり、
+//! calibration値（`HW-TBD-010`）が未確定なため単位を確定できない。
+//!
+//! [`Limiter`]: crate::Limiter
+//! [`docs/hardware/servo-safety-limits.md`]: https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/docs/hardware/servo-safety-limits.md
+//! [Hardware Safety Policy]: https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/docs/governance/hardware-safety-policy.md
+//! [`servo-safety-limits.md`の`Command処理`]: https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/docs/hardware/servo-safety-limits.md#command処理
+
+use core::fmt;
+
+/// 制限の組み立てに失敗した理由。
+///
+/// **値の妥当性そのものは判定しない。**判定できるのは、渡された値どうしの整合
+/// （有限であること、大小関係、符号）だけである。「その値が安全か」は実測
+/// （`HW-TBD-010`／`011`／`020`）が決めることであり、この型は答えを持たない。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum LimitsError {
+    /// 有限でない値（NaN、±∞）を渡された。
+    NotFinite {
+        /// 対象のfield名。
+        field: &'static str,
+    },
+    /// 負の値を渡された。上限は大きさであり、負にならない。
+    Negative {
+        /// 対象のfield名。
+        field: &'static str,
+    },
+    /// `承認値`が`設定可能なhard bound`を超えている。
+    ///
+    /// `承認値`はhard boundの内側にある保守的な運用値であり、外側に置けない。
+    ApprovedExceedsHard {
+        /// 対象のfield名。
+        field: &'static str,
+    },
+    /// 位置範囲の大小関係が
+    /// `hard_min <= approved_min <= approved_max <= hard_max`を満たさない。
+    RangeOutOfOrder,
+    /// `Neutral位置`が`承認値`の位置範囲の外にある。
+    NeutralOutsideApprovedRange,
+    /// 開始位置が`承認値`の位置範囲の外にある。
+    ///
+    /// [`NeutralOutsideApprovedRange`]と分けている。呼び出し側が直せるのは
+    /// 別々の入力であり、同じcodeで返すとどちらを直せばよいか分からない。
+    ///
+    /// [`NeutralOutsideApprovedRange`]: Self::NeutralOutsideApprovedRange
+    StartOutsideApprovedRange,
+}
+
+impl fmt::Display for LimitsError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::NotFinite { field } => write!(f, "`{field}` must be finite"),
+            Self::Negative { field } => write!(f, "`{field}` must not be negative"),
+            Self::ApprovedExceedsHard { field } => {
+                write!(f, "`{field}` approved value exceeds its hard bound")
+            }
+            Self::RangeOutOfOrder => f.write_str(
+                "position range must satisfy hard_min <= approved_min <= approved_max <= hard_max",
+            ),
+            Self::NeutralOutsideApprovedRange => {
+                f.write_str("neutral position lies outside the approved position range")
+            }
+            Self::StartOutsideApprovedRange => {
+                f.write_str("start position lies outside the approved position range")
+            }
+        }
+    }
+}
+
+impl std::error::Error for LimitsError {}
+
+/// 上限1つ分の、`承認値`と`設定可能なhard bound`。
+///
+/// 大きさの上限（最大速度、最大加速度、単一commandの最大変化量など）に使う。
+/// 符号を持たないため、`0 <= approved <= hard`を要求する。
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Cap {
+    approved: f32,
+    hard: f32,
+}
+
+impl Cap {
+    /// `承認値`と`設定可能なhard bound`から作る。
+    ///
+    /// `field`は失敗したときに[`LimitsError`]へ載せる名前である。どの入力を直せばよいかを
+    /// 呼び出し側へ返すためだけに使い、検査そのものには影響しない。
+    ///
+    /// # Errors
+    ///
+    /// 有限でない、負である、または`承認値`がhard boundを超える場合に失敗する。
+    pub fn new(approved: f32, hard: f32, field: &'static str) -> Result<Self, LimitsError> {
+        if !approved.is_finite() || !hard.is_finite() {
+            return Err(LimitsError::NotFinite { field });
+        }
+        if approved < 0.0 || hard < 0.0 {
+            return Err(LimitsError::Negative { field });
+        }
+        if approved > hard {
+            return Err(LimitsError::ApprovedExceedsHard { field });
+        }
+        Ok(Self { approved, hard })
+    }
+
+    /// 保守的な運用値。clampの行き先である。
+    #[must_use]
+    pub const fn approved(self) -> f32 {
+        self.approved
+    }
+
+    /// 設定可能なhard bound。これを超える要求はrejectする。
+    #[must_use]
+    pub const fn hard(self) -> f32 {
+        self.hard
+    }
+}
+
+/// 位置の範囲。`承認値`側とhard bound側の2組を持つ。
+///
+/// `動作制限`表の`最小位置`／`最大位置`／`最大command範囲`に対応する。
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PositionRange {
+    hard_min: f32,
+    approved_min: f32,
+    approved_max: f32,
+    hard_max: f32,
+}
+
+impl PositionRange {
+    /// 4つの境界から作る。
+    ///
+    /// 引数は数直線上の並び順、すなわち
+    /// `hard_min` → `approved_min` → `approved_max` → `hard_max` で渡す。
+    /// **「外側2つ、内側2つ」の順ではない。**`承認値`の範囲がhard boundの範囲に
+    /// 内包されることが不変条件である。
+    ///
+    /// # Errors
+    ///
+    /// 有限でない値がある場合、または
+    /// `hard_min <= approved_min <= approved_max <= hard_max`を満たさない場合に失敗する。
+    pub fn new(
+        hard_min: f32,
+        approved_min: f32,
+        approved_max: f32,
+        hard_max: f32,
+    ) -> Result<Self, LimitsError> {
+        for (value, field) in [
+            (hard_min, "position.hard_min"),
+            (approved_min, "position.approved_min"),
+            (approved_max, "position.approved_max"),
+            (hard_max, "position.hard_max"),
+        ] {
+            if !value.is_finite() {
+                return Err(LimitsError::NotFinite { field });
+            }
+        }
+        if !(hard_min <= approved_min && approved_min <= approved_max && approved_max <= hard_max) {
+            return Err(LimitsError::RangeOutOfOrder);
+        }
+        Ok(Self {
+            hard_min,
+            approved_min,
+            approved_max,
+            hard_max,
+        })
+    }
+
+    /// hard boundの下限。
+    #[must_use]
+    pub const fn hard_min(self) -> f32 {
+        self.hard_min
+    }
+
+    /// hard boundの上限。
+    #[must_use]
+    pub const fn hard_max(self) -> f32 {
+        self.hard_max
+    }
+
+    /// `承認値`側の下限。clampの行き先である。
+    #[must_use]
+    pub const fn approved_min(self) -> f32 {
+        self.approved_min
+    }
+
+    /// `承認値`側の上限。clampの行き先である。
+    #[must_use]
+    pub const fn approved_max(self) -> f32 {
+        self.approved_max
+    }
+
+    /// hard boundの内側にあるか。境界上は内側として扱う。
+    #[must_use]
+    pub fn within_hard(self, value: f32) -> bool {
+        value >= self.hard_min && value <= self.hard_max
+    }
+
+    /// `承認値`の範囲へ収める。
+    ///
+    /// [`f32::clamp`]は`min > max`と非有限のboundでpanicするが、
+    /// [`PositionRange::new`]が有限性と`approved_min <= approved_max`を保証するため、
+    /// この呼び出しはpanicしない。
+    #[must_use]
+    pub fn clamp_to_approved(self, value: f32) -> f32 {
+        value.clamp(self.approved_min, self.approved_max)
+    }
+}
+
+/// [`Limiter`]が強制する制限一式。
+///
+/// `動作制限`表の行との対応は次のとおりである。**値はここに無い。**
+///
+/// - `position` — `最小位置`／`最大位置`／`最大command範囲`（同表は「最小位置と最大位置で決まる」としている）
+/// - `neutral` — `Neutral位置`
+/// - `max_velocity` — `最大速度`
+/// - `max_acceleration` — `最大加速度`
+/// - `max_step` — `単一commandの最大変化量`
+///
+/// 同表の残りの行（`最大連続電流`、`最大連続動作時間`、`最大duty cycle`、
+/// `秒あたり受理motion command数`、`Command timeout`）は**この型が持たない。**
+/// 時間と電流に関わる強制はこのcrateの範囲外である。
+///
+/// [`Limiter`]: crate::Limiter
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ServoLimits {
+    position: PositionRange,
+    neutral: f32,
+    max_velocity: Cap,
+    max_acceleration: Cap,
+    max_step: Cap,
+}
+
+impl ServoLimits {
+    /// 制限一式を組み立てる。
+    ///
+    /// `neutral`は`Neutral位置`（`HW-TBD-010`）である。`承認値`の位置範囲の内側を要求する。
+    /// hard boundの内側で足りるとはしない。neutralはfail-safeの行き先の候補であり、
+    /// 保守的な運用範囲の外に置くと、安全側へ倒す動作が運用範囲を出る。
+    ///
+    /// # Errors
+    ///
+    /// `neutral`が有限でない場合、または`承認値`の位置範囲の外にある場合に失敗する。
+    pub fn new(
+        position: PositionRange,
+        neutral: f32,
+        max_velocity: Cap,
+        max_acceleration: Cap,
+        max_step: Cap,
+    ) -> Result<Self, LimitsError> {
+        if !neutral.is_finite() {
+            return Err(LimitsError::NotFinite { field: "neutral" });
+        }
+        if neutral < position.approved_min() || neutral > position.approved_max() {
+            return Err(LimitsError::NeutralOutsideApprovedRange);
+        }
+        Ok(Self {
+            position,
+            neutral,
+            max_velocity,
+            max_acceleration,
+            max_step,
+        })
+    }
+
+    /// 位置の範囲。
+    #[must_use]
+    pub const fn position(self) -> PositionRange {
+        self.position
+    }
+
+    /// `Neutral位置`。
+    #[must_use]
+    pub const fn neutral(self) -> f32 {
+        self.neutral
+    }
+
+    /// `最大速度`。
+    #[must_use]
+    pub const fn max_velocity(self) -> Cap {
+        self.max_velocity
+    }
+
+    /// `最大加速度`。
+    #[must_use]
+    pub const fn max_acceleration(self) -> Cap {
+        self.max_acceleration
+    }
+
+    /// `単一commandの最大変化量`。
+    #[must_use]
+    pub const fn max_step(self) -> Cap {
+        self.max_step
+    }
+}

@@ -1,0 +1,20 @@
+[package]
+name = "deskcat-servo"
+version = "0.1.0"
+description = "Servoのhard limit強制とtrajectory limiting（値を持たない純粋なlogic）"
+edition.workspace = true
+# workspaceの`rust-version`（1.97）を継承する。**このcrateはhostでしか検証していない。**
+# `firmware/esp32`から使うには`deskcat-protocol`と同じくESP toolchainの下限（1.95）を
+# 満たす必要があるが、その版でのbuildとtestをまだ通していないため宣言しない。
+# firmware側から使う変更を出すときに、検証記録と一緒に下げる。
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+# reject理由をwire error codeへ対応づけるためだけに使う（Protocol §5.3・§7）。
+# **このcrateはwire messageのencode／decodeを行わない。**
+deskcat-protocol = { path = "../deskcat-protocol" }
+
+[lints]
+workspace = true
