@@ -373,8 +373,9 @@ OS、kernel、board、libc、rustup、rustc、cargo、rustfmt、clippy、linker 
 ### 測定をやり直したことの記録
 
 **1 回目の測定は完走していない。**外部 crate 14 件を通過し、`deskcat-protocol` を compile 中に、
-**Pi の電源が落ちて中断した。**原因はこの profile の測定ではなく、同じ作業の別手順で
-ESP32 を Pi の USB OTG port へ接続したことである。**接続した瞬間に Pi が network から消えた。**
+**Pi の電源が落ちて中断した。****直前に、同じ作業の別手順で ESP32 を Pi の USB OTG port へ
+接続している。接続した瞬間に Pi が network から消えた。****これは先行して起きた事象であり、
+原因として確かめたものではない。**原因は `TBD` である（下の「電源が落ちた原因は…」の段落）。
 
 **中断した測定の値は採らない。**`target/` を削除したうえで測定をやり直した。
 **この節に載せる値は、すべてやり直した側の 1 回の連続実行から採っている。**
@@ -471,10 +472,14 @@ Actual result: **全 phase が rc=0 で成功した。OOM は発生していな�
                      tests/limits.rs            9 passed
                      Doc-tests                  3 passed
 
-  **警告は 0 件である。**root Cargo.toml の [workspace.lints] が
-  `clippy::all = deny` と `unsafe_code = "forbid"` を課すため、
-  警告が出ていれば P4 は rc!=0 で失敗する。**`-D warnings` を付けていないのは
-  この理由による**（AGENTS.md の host workspace の検証 command と同じ扱い）。
+  **警告は 0 件を観測した。**root Cargo.toml の [workspace.lints] は
+  `clippy::all = deny` と `unsafe_code = "forbid"` を課す一方、
+  `missing_docs` と `clippy::pedantic` は `warn` に留めている。
+  **したがって P4 が rc!=0 で失敗するのは deny 水準の違反だけであり、
+  警告が出ても失敗しない。**`-D warnings` を付けていないのは
+  `clippy::all` が既に deny であるためで、**全警告を落とす設定ではない**
+  （AGENTS.md の host workspace の検証 command と同じ扱い）。
+  **ここで言えるのは「この実行では警告が 0 件だった」までである。**
 
 Build duration: 上表のとおり。**clean build 1344 秒、cache 有り 3 秒。**
   **上の 2026-08-17 の記録（依存 0 件の最小 program で clean 4〜5 秒台）とは
@@ -558,9 +563,12 @@ Conclusion: Partial。**この節の対象は、この 1 台・Raspberry Pi Dire
   - **release profile を測っていない。**
 
 Next action:
-  - **clean build 1344 秒を「開発サイクルとして許容できるか」の判断は human に残る。**
-    移行条件の 1 つ「clean build が許容できない」は、依存 0 件のときの 4〜5 秒台と
-    22 分 24 秒とで見え方が変わる。**この記録は数値を出すところまでとし、可否を決めない。**
+  - ~~**clean build 1344 秒を「開発サイクルとして許容できるか」の判断は human に残る。**~~
+    **2026-08-27 に決着した。**direct build の継続を決定し、22 分 24 秒は許容すると判断した
+    （cache 有り 3 秒で反復でき、clean build の頻度が低く、cross toolchain の保守コストの方が重い）。
+    **判断とそれを覆す条件は
+    [Raspberry Pi Rust Toolchain](../raspberry-pi-rust-toolchain.md#cross-compilationへ移る条件)が
+    正本である。****この記録は数値を出すところまでであり、可否は決めていない。**
   - 実 serial port の確認（Issue #11 の後半）は、ESP32 との接続経路が
     段階 C の gate の内側にあるため、この記録の範囲外である。
   - Raspberry Pi Runtime profile（`deskcatd` の実行）の記録は別途必要である。
