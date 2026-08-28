@@ -647,7 +647,7 @@ squash mergeしたbranchはcommit hashが変わるため、`git branch -d`が「
 
 ## hookが止めたとき
 
-`.claude/settings.json`が4つのscriptをhookとして起動する。**検査は5つである。**
+`.claude/settings.json`が4つのscriptをhookとして起動する。**検査は6つである。**
 
 **文書に書いても実行されないことが実測で分かっている。**
 [#204](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/204)、
@@ -660,6 +660,7 @@ squash mergeしたbranchはcommit hashが変わるため、`git branch -d`が「
 | いつ | 何を見る | 実体 |
 |---|---|---|
 | `gh issue create`／`gh pr create`の前 | `--project`（短縮形`-p`）があるか | `scripts/hooks/gh_metadata_guard.py` |
+| `gh pr create`の前 | `--base`（短縮形`-B`）があるか | 同上 |
 | `gh pr merge`の前 | squash messageが`Change-Class`と`Self-Review`を持つか | 同上 |
 | `git checkout -b`／`git switch -c`の前 | 基点が最新の`origin/develop`か | `scripts/hooks/branch_base_guard.py` |
 | `gh pr merge`の後 | squash commitに実際に入ったか | `scripts/hooks/merge_trailer_report.py` |
@@ -680,6 +681,17 @@ DESKCAT_SKIP_BASE_GUARD=1 git checkout -b experiment/scratch
 DESKCAT_SKIP_PUSH_GATE=1 git push origin HEAD:develop
 ```
 
+> **上の1行目の形は効かない。**2026-08-28に
+> `DESKCAT_SKIP_GH_GUARD=1 gh issue create --help`を実行し、**拒否された。**
+> hookは対象commandとは別のprocessとして起動されるため、command行頭の環境変数代入は
+> hookのenvironmentへ届かない。**例はこれまでの記述のまま残してある。**
+>
+> **`DESKCAT_SKIP_BASE_GUARD`と`DESKCAT_SKIP_PUSH_GATE`は実測していない。**
+> hookの起動のされ方が同じであるため同じ見込みだが、**同じであると断定しない。**
+>
+> **効く形は未確定である。**hookのprocessが継ぐenvironmentへ入れる必要がある、
+> というところまでしか分かっていない。**機構の扱いは別に判断する。**
+
 `branch_base_guard.py`は、基点を明示した場合（`git checkout -b <name> <start>`）と
 `hotfix/`で始まるbranchを対象外にする。`hotfix/`は`main`から作るのが正しい
 （[ADR-0004](docs/decisions/0004-main-develop-branch-strategy.md)）。
@@ -698,6 +710,19 @@ Pull Requestを通る変更は`review-gate.yml`が`gate`を実行するためで
 
 **hookを「通った」ことを「正しい」と読まない。**次は検査できていない。
 
+- **`--base`の値そのもの。**存在するかだけを見る。`develop`と書くべきか`main`と
+  書くべきかはそのPull Requestの目的で決まり、字句からは読めない。
+  **`--base main`は昇格では正しく、日常のPull Requestでは誤りである。**
+  hookが直すのは「省略して既定の`main`になる」であって、選び間違いではない
+  （2026-08-28に[PR #250](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/250)が
+  base `main`で作られ、変更まで1時間17分かかった）。
+- **`gh issue create`には`--base`を要求しない。**option自体が存在しない。
+- **`--help`／`-h`が付いた呼び出しは、`gh_metadata_guard.py`の3つの検査すべてを抜ける。**helpの表示は何も作らず、
+  mergeもしないため、誤検知しか生まない。**2026-08-28に`gh issue create --help`、
+  `gh pr create --help`、`gh pr merge --help`の3つとも拒否されることを実測した。
+  hookが要求するoption名を`--help`で調べる手段そのものが塞がっていた。**
+  判定は完全一致であり、`--title -h`のように値として`-h`を渡した呼び出しも
+  検査を抜ける。**字句だけで区別する手立てが無い。**
 - **squash messageをstdin（`-F -`）で渡す経路。**hookからは読めないため、
   読めないことを理由に止める。`--body-file`を使う。
 - **`gh`や`git`を、alias、shell function、`xargs`、`sh -c`の内側から起動した場合。**

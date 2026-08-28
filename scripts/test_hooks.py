@@ -115,10 +115,14 @@ class GhMetadataGuardTests(unittest.TestCase):
                 self.assertDenied(command, contains="--project")
 
     def test_create_with_project_is_allowed(self):
-        """`--project value`と`--project=value`のどちらも通す。"""
+        """`--project value`と`--project=value`のどちらも通す。
+
+        `gh pr create`側の`--base`は、この検査の前提を満たすために足しているだけである。
+        **見ている対象は`--project`のままである。**
+        """
         for command in (
-            "gh pr create --title t --project deskcat",
-            "gh pr create --title t --project=deskcat",
+            "gh pr create --title t --project deskcat --base develop",
+            "gh pr create --title t --project=deskcat --base develop",
             "gh issue create --title t --project deskcat",
         ):
             with self.subTest(command=command):
@@ -132,10 +136,10 @@ class GhMetadataGuardTests(unittest.TestCase):
         無効化される側の失敗である。
         """
         for command in (
-            "gh pr create --title t -p deskcat",
+            "gh pr create --title t -p deskcat --base develop",
             "gh issue create --title t -p deskcat",
-            "gh pr create --title t -pdeskcat",
-            "gh pr create --title t -p=deskcat",
+            "gh pr create --title t -pdeskcat --base develop",
+            "gh pr create --title t -p=deskcat --base develop",
         ):
             with self.subTest(command=command):
                 self.assertAllowed(command)
@@ -148,6 +152,116 @@ class GhMetadataGuardTests(unittest.TestCase):
         ):
             with self.subTest(command=command):
                 self.assertDenied(command)
+
+    def test_pr_create_without_base_is_denied(self):
+        """`--base`が無いPull Request作成を止める。
+
+        **`gh`は省略時にrepositoryのdefault branchを使い、このrepositoryのdefaultは
+        `main`である。**2026-08-28にPR #250がbase `main`で作られ、baseの変更まで
+        1時間17分かかった。**機構は何も止めなかった。**
+        """
+        for command in (
+            "gh pr create --title t --project deskcat",
+            "gh pr create --title t -p deskcat --draft",
+        ):
+            with self.subTest(command=command):
+                self.assertDenied(command, contains="--base")
+
+    def test_pr_create_with_base_is_allowed(self):
+        """`--base value`／`--base=value`／短縮形`-B`のいずれも通す。
+
+        **短縮形は大文字の`-B`である**（`gh help pr create`で確認した）。
+        """
+        for command in (
+            "gh pr create --title t -p deskcat --base develop",
+            "gh pr create --title t -p deskcat --base=develop",
+            "gh pr create --title t -p deskcat -B develop",
+            "gh pr create --title t -p deskcat -Bdevelop",
+        ):
+            with self.subTest(command=command):
+                self.assertAllowed(command)
+
+    def test_issue_create_does_not_require_base(self):
+        """`gh issue create`へ`--base`を要求しない。
+
+        **`gh issue create`の option 一覧に`--base`は存在しない**
+        （`gh help issue create`で確認した。出現0件）。要求すると、満たしようのない
+        条件で起票が止まる。
+        """
+        self.assertAllowed("gh issue create --title t --project deskcat")
+
+    def test_base_short_form_is_case_sensitive(self):
+        """`-b`（`--body`）を`-B`（`--base`）と読まない。
+
+        `gh pr create`は両方を持ち、意味が違う。**大小を区別しないと、本文を渡した
+        だけのcommandがbase指定として通る。**
+        """
+        for command in (
+            "gh pr create --title t -p deskcat -b 本文",
+            "gh pr create --title t -p deskcat --body 本文",
+        ):
+            with self.subTest(command=command):
+                self.assertDenied(command, contains="--base")
+
+    def test_base_value_is_not_judged(self):
+        """**`--base`の値の正しさを見ない。**存在するかだけを見る。
+
+        `develop`と書くべきか`main`と書くべきかは、そのPull Requestの目的で決まり、
+        字句からは読めない。昇格Pull Requestのbaseは`main`が正しい。
+        """
+        for command in (
+            "gh pr create --title t -p deskcat --base main",
+            "gh pr create --title t -p deskcat --base 実在しないbranch",
+        ):
+            with self.subTest(command=command):
+                self.assertAllowed(command)
+
+    def test_help_requires_no_metadata(self):
+        """helpの表示だけを求める呼び出しへ、`--project`も`--base`も要求しない。
+
+        **何も作らない呼び出しである。**boardへのitem追加漏れは起きようがない。
+        **ここを拒否すると、hookが要求しているoption名を`--help`で調べる手段そのものが
+        塞がる。**2026-08-28に`gh issue create --help`が実際に拒否され、
+        `gh help issue create`へ回避してoption一覧を確認した。
+        **規則を守るために要る情報を、規則が隠している状態だった。**
+        """
+        for command in (
+            "gh pr create --help",
+            "gh issue create --help",
+            "gh pr create -h",
+            "gh issue create -h",
+            "gh pr create -p deskcat --help",
+        ):
+            with self.subTest(command=command):
+                self.assertAllowed(command)
+
+    def test_help_needs_no_merge_message(self):
+        """`gh pr merge --help`へsquash messageを要求しない。
+
+        **helpの表示はmergeしない。**この検査でとりわけ効く。`--subject`と
+        `--body-file`の明示をCONTRIBUTINGが要求しているのに、**そのoption名を
+        `--help`で確認できなかった**（2026-08-28に実測。拒否された）。
+        """
+        for command in (
+            "gh pr merge --help",
+            "gh pr merge -h",
+        ):
+            with self.subTest(command=command):
+                self.assertAllowed(command)
+
+    def test_help_is_matched_only_as_a_whole_word(self):
+        """`-h`の連結判定をしない。`-help`や`-hello`をhelpと読まない。
+
+        `_has_option`の連結判定を当てると、`-h`で始まる語がすべてhelpになる。
+        **boolean flagに連結形は無い。**
+        """
+        for command in (
+            "gh pr create --title t -hello",
+            "gh issue create --title t -help",
+        ):
+            with self.subTest(command=command):
+                self.assertDenied(command, contains="--project")
+        self.assertDenied("gh pr merge 1 --squash -hello", contains="本文")
 
     def test_compound_command_is_inspected(self):
         """`cd x && gh pr create`を見落とさない。
