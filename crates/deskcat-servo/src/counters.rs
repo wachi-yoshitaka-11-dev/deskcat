@@ -56,12 +56,23 @@ pub struct ClampReport {
     pub braking: bool,
     /// 加速度を`最大加速度`へ収めた。
     pub acceleration: bool,
-    /// `最大加速度`を守れず、位置の bound を優先した。
+    /// **立ったら実装の前提が破れている。**
     ///
-    /// **clampではなく、譲ったことの記録である。**`Limiter::step`の`dt_s`の項が
-    /// 発生条件を書いている。`dt_s`が一定であれば立たない。
+    /// `Limiter::step`は減速の上限を、契約が許す**最短**の間隔（1 stepで確実に使える
+    /// 減速量）と**最長**の間隔（1 stepで進みうる距離）で見積もる。実際の間隔が
+    /// [`ControlPeriod`]の許容幅のどこに来ても見積もりより楽になるため、
+    /// **境界へ速度を持ち越さず、位置clampが発火せず、`最大加速度`も破れない。**
+    /// 許容幅11通り×49,440 stepの総当たりで、**この flag は1度も立たなかった。**
     ///
-    /// **位置の bound はこの場合も破っていない。**破ったのは加速度の側だけである。
+    /// **したがって、これは「起きないはずのこと」の検出器である。**立った場合は
+    /// 見積もりの前提が成り立っていない。counterを消さずに残してあるのはそのためで、
+    /// 通常の運用で数えるためではない。
+    ///
+    /// **なお、立った場合でも位置の bound は破っていない。**位置と加速度が両立しない
+    /// ときに譲るのは加速度の側だけである（機構への押し付けは安全要件5項目の
+    /// 「servoの持続的拘束」に直接効く）。
+    ///
+    /// [`ControlPeriod`]: crate::ControlPeriod
     pub acceleration_bound_conceded: bool,
 }
 
@@ -100,6 +111,7 @@ pub struct LimiterCounters {
     pub clamped_acceleration: u32,
     /// `最大加速度`を守れず位置の bound を優先した回数。
     ///
+    /// **0 以外になったら実装の前提が破れている**（[`ClampReport::acceleration_bound_conceded`]）。
     /// **clamp counterではない。**[`Self::total_clamps`]に含めない。
     pub acceleration_bound_conceded: u32,
     /// `invalid_payload`でrejectした回数。

@@ -350,12 +350,15 @@ impl ServoLimits {
 /// **0にできるが、実際の制御loopにはjitterがある。**厳密一致でrejectすると正常な系で
 /// servoが止まるため、呼び出し側が実測に基づく幅を渡せるようにしてある。
 ///
-/// **幅を広げるほど、`最大加速度`を譲る余地が広がる。**幅が0のときだけ譲りは起きない。
-/// **広い幅では譲りは小さくない。**周期の9割の幅を与えたtestでは、上限40に対して
-/// 実測で最大387だった（`tests/trajectory.rs`のtest値である。**正本の値ではない**）。
-/// **実測のjitterに見合う最小の幅を渡すこと。**
-/// 譲りは[`ClampReport::acceleration_bound_conceded`]で観測でき、
-/// **位置の bound は幅をどれだけ広げても破らない。**
+/// **幅を広げても`最大加速度`は破れない。**[`Limiter::step`]は減速の上限を、
+/// 幅が許す**最短**の間隔（1 stepで確実に使える減速量）と**最長**の間隔
+/// （1 stepで進みうる距離）で見積もる。実際の間隔が幅のどこに来ても見積もりより楽になる。
+/// 幅11通り×49,440 stepの総当たりで、譲りは1度も起きなかった。
+///
+/// **代償は速さである。**幅を広げるほど見積もりが保守的になり、境界への接近が遅くなる。
+/// 幅を周期の9割にしたtestでは、到達に模擬5.0秒かかった（`tests/trajectory.rs`のtest値。
+/// **正本の値ではない**）。**違反ではなく遅さとして現れるので、実測のjitterに見合う
+/// 最小の幅を渡すこと。**
 ///
 /// [`Limiter::step`]: crate::Limiter::step
 /// [`ClampReport::acceleration_bound_conceded`]: crate::ClampReport::acceleration_bound_conceded
@@ -395,6 +398,18 @@ impl ControlPeriod {
     #[must_use]
     pub const fn tolerance_s(self) -> f32 {
         self.tolerance_s
+    }
+
+    /// 契約が許す最短の間隔（秒）。減速で確実に使える`最大加速度 × 間隔`を決める。
+    #[must_use]
+    pub fn shortest_s(self) -> f32 {
+        self.nominal_s - self.tolerance_s
+    }
+
+    /// 契約が許す最長の間隔（秒）。1 stepで進みうる距離を決める。
+    #[must_use]
+    pub fn longest_s(self) -> f32 {
+        self.nominal_s + self.tolerance_s
     }
 
     /// この間隔を受理するか。境界上は受理する。

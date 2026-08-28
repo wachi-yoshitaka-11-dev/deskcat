@@ -613,14 +613,16 @@ fn jitter_inside_the_tolerance_is_accepted() {
     );
 }
 
-/// 許容変動幅を広く取ると、幅の内側の jitter でも`最大加速度`を譲りうる。
+/// 許容変動幅を広く取っても、**受理したすべての step で3つの bound を保ち、譲らない。**
 ///
-/// **譲ること自体は避けられない。**検査するのは、**譲ったら必ず報告されること**と、
-/// **位置の bound は破らないこと**である。幅を0にすれば譲りは起きない
-/// （`a_constant_interval_never_exceeds_the_acceleration_bound`）。
+/// 減速の見積もりに、契約が許す**最短**の間隔（1 stepで確実に使える減速量）と
+/// **最長**の間隔（1 stepで進みうる距離）を使っているためである。実際の間隔が幅の
+/// どこに来ても、見積もりより楽になる。
+///
+/// **代償は、幅を広く取るほど境界への接近が保守的になること**である。
+/// 違反ではなく遅さとして現れる。
 #[test]
-fn a_wide_tolerance_can_concede_but_always_reports_and_keeps_position() {
-    let mut saw_concession = false;
+fn a_wide_tolerance_stays_within_every_bound_and_never_concedes() {
     // **test用の組。**実機の周期でもjitter幅でもない。幅を周期の9割まで広げてある。
     for (nominal, tolerance) in [(1.0f32, 0.9f32), (0.1, 0.09), (TEST_DT_S, 0.018)] {
         let period = ControlPeriod::new(nominal, tolerance).expect("valid period");
@@ -633,37 +635,81 @@ fn a_wide_tolerance_can_concede_but_always_reports_and_keeps_position() {
         .expect("start is inside the approved range");
 
         let mut previous_velocity = 0.0f32;
-        for k in 0..200 {
+        for k in 0..250 {
+            // 幅の端から端まで揺らす。
             let dt = if k % 2 == 0 {
                 nominal + tolerance * 0.99
             } else {
                 nominal - tolerance * 0.99
             };
-            let admitted = limiter
-                .admit(&request(TEST_APPROVED_MAX, CommandSource::Pi))
-                .expect("valid target");
+            let target = SWEEP_TARGETS[(k / 11) % SWEEP_TARGETS.len()];
+            let Ok(admitted) = limiter.admit(&request(target, CommandSource::Pi)) else {
+                continue;
+            };
             let setpoint = limiter.step(admitted, dt).expect("inside the tolerance");
 
-            // 位置の bound は、幅をどれだけ広げても破らない。
             assert!(
                 (TEST_HARD_MIN - EPSILON..=TEST_HARD_MAX + EPSILON).contains(&setpoint.position()),
-                "nominal {nominal}: position left the hard range"
+                "nominal {nominal}, step {k}: position left the hard range"
             );
-            // 超えたなら必ず報告されている。
+            assert!(
+                setpoint.velocity().abs() <= TEST_MAX_VELOCITY_HARD + EPSILON,
+                "nominal {nominal}, step {k}: velocity left the hard bound"
+            );
             let acceleration = (setpoint.velocity() - previous_velocity).abs() / dt;
-            if acceleration > acceleration_ceiling(dt) {
-                assert!(
-                    setpoint.clamps().acceleration_bound_conceded,
-                    "nominal {nominal}: acceleration {acceleration} exceeded without a report"
-                );
-                saw_concession = true;
-            }
+            assert!(
+                acceleration <= acceleration_ceiling(dt),
+                "nominal {nominal}, step {k}: acceleration {acceleration} exceeded"
+            );
+            assert!(
+                !setpoint.clamps().acceleration_bound_conceded,
+                "nominal {nominal}, step {k}: conceded despite the conservative estimate"
+            );
             previous_velocity = setpoint.velocity();
         }
+        assert_eq!(
+            limiter.counters().acceleration_bound_conceded,
+            0,
+            "nominal {nominal}: 譲りは起きないはずである"
+        );
     }
-    assert!(
-        saw_concession,
-        "広い許容幅では実際に譲りが起きること。起きないならtestが弱い"
+}
+
+/// 広い許容幅でも境界へ到達し、速度が0まで落ちきる。**保守的にしすぎて手前で止まらない。**
+#[test]
+fn a_wide_tolerance_still_reaches_the_bound_and_stops() {
+    // 幅を周期の9割にした極端な設定。到達は遅くなるが、止まる。
+    let (nominal, tolerance) = (0.001_f32, 0.0009_f32);
+    let period = ControlPeriod::new(nominal, tolerance).expect("valid period");
+    let mut limiter = Limiter::new(
+        wide_step_limits(),
+        period,
+        MotionCatalog::new([TEST_MOTION]),
+        TEST_NEUTRAL,
+    )
+    .expect("start is inside the approved range");
+
+    for k in 0..20_000 {
+        let dt = if k % 2 == 0 {
+            nominal + tolerance * 0.99
+        } else {
+            nominal - tolerance * 0.99
+        };
+        let admitted = limiter
+            .admit(&request(TEST_APPROVED_MAX, CommandSource::Pi))
+            .expect("valid target");
+        limiter.step(admitted, dt).expect("inside the tolerance");
+        if (limiter.position() - TEST_APPROVED_MAX).abs() < EPSILON
+            && limiter.velocity().abs() < EPSILON
+        {
+            assert_eq!(limiter.counters().acceleration_bound_conceded, 0);
+            return;
+        }
+    }
+    panic!(
+        "境界へ到達しなかった: pos={} vel={}",
+        limiter.position(),
+        limiter.velocity()
     );
 }
 
