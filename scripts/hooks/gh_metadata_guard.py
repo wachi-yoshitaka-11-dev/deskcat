@@ -4,20 +4,32 @@
 Claude CodeのPreToolUse hookとして、Bash tool呼び出しの前に走る。stdinからhookの
 入力JSONを読み、`tool_input.command`だけを見る。実行はしない。
 
-止める対象は2つである。
+止める対象は3つである。
 
 1. `gh issue create`／`gh pr create`に`--project`が無い。Projects v2 boardへの
    item追加は`CONTRIBUTING.md`の起票規約で必須だが、**#204／#205／#206は3件とも
    作成時に入っておらず、5分55秒〜18分29秒後に追加されている**（`added_to_project_v2`の
    event時刻と作成時刻の差）。文書に書いても実行されないため、作成の一部にする。
-2. `gh pr merge`のsquash messageに`Change-Class`と`Self-Review`が無い。
+2. `gh pr create`に`--base`が無い。**`gh`は省略時にrepositoryのdefault branchを
+   使い、このrepositoryのdefaultは`main`である。**2026-08-28に
+   [PR #250](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/250)がbase `main`で
+   作られ、baseの変更まで1時間17分かかった（timelineの`base_ref_changed`で実測）。
+   **`gh issue create`に`--base`は存在しないため、そちらへは要求しない。**
+3. `gh pr merge`のsquash messageに`Change-Class`と`Self-Review`が無い。
    PR側のgateがSUCCESSでも、squash commitへtrailerが引き継がれないと次の昇格で
    落ちる（`18298ae`／`619c843`。どちらも`DECLARATION_EXEMPT`へ登録済み）。
+
+**3つとも`--help`／`-h`が付いた呼び出しを対象外にする。**helpの表示は何も作らず、
+mergeもしない。metadataを要求しても誤検知しか生まない。**2026-08-28に
+`gh issue create --help`／`gh pr create --help`／`gh pr merge --help`の3つとも
+拒否されることを実測した。**`gh pr merge`はとりわけ効く。`--subject`と`--body-file`の
+明示をCONTRIBUTINGが要求しているのに、**そのoption名を`--help`で確認できなかった。**
 
 **判定は字句だけで行う。**意味は判定しない。`review_gate.py`と同じ方針である。
 
 `DESKCAT_SKIP_GH_GUARD=1`で丸ごと無効化できる。**誤検知で作業が止まったときの
 逃げ道であり、常用するものではない。**使ったら理由をPull Request本文へ書く。
+**ただしcommand行頭へ置く形では効かない**（`SKIP_ENV`の隣に実測を書いてある）。
 """
 
 import json
@@ -35,13 +47,20 @@ import review_gate  # noqa: E402
 
 # 検査する`gh`のsubcommand。`gh`の呼び出しに続く2語がこの組のときだけ見る。
 # 呼び出しの切り出しは`command_line.invocations`が行う。
-CREATE_SUBCOMMANDS = (("issue", "create"), ("pr", "create"))
+PR_CREATE_SUBCOMMAND = ("pr", "create")
+CREATE_SUBCOMMANDS = (("issue", "create"), PR_CREATE_SUBCOMMAND)
 MERGE_SUBCOMMAND = ("pr", "merge")
 
 # squash messageが持たなければならないtrailerの名前。**値は見ない。**
 REQUIRED_MERGE_TRAILERS = (review_gate.TRAILER_CLASS, review_gate.TRAILER_REVIEW)
 
 SKIP_ENV = "DESKCAT_SKIP_GH_GUARD"
+
+# **この逃げ道は`DESKCAT_SKIP_GH_GUARD=1 gh ...`という形では効かない。**hookは対象
+# commandとは別のprocessとして起動されるため、command行頭の代入はhookのenvironmentへ
+# 届かない（2026-08-28に`gh issue create --help`で実測。拒否された）。効かせるには
+# hookのprocessが継ぐenvironmentへ入れる必要がある。**診断文はCONTRIBUTINGの記述に
+# 合わせてあり、記述側の扱いは別途判断する。**
 
 
 def _deny(reason):
@@ -65,6 +84,25 @@ def _deny(reason):
 # 誤って拒否する。**誤検知はhookごと無効化される側の失敗である。
 PROJECT_OPTIONS = ("--project", "-p")
 
+# `--base`の短縮形。**`gh pr create`は`-B, --base`を持ち、大文字である**
+# （`gh help pr create`で確認した。小文字の`-h`はhelp、`-H`は`--head`）。
+# `gh issue create`の option 一覧に`--base`は無い（同じく確認した。出現0件）。
+BASE_OPTIONS = ("--base", "-B")
+
+# helpの表示だけを求める呼び出し。**何も作らないため、metadataを要求しない。**
+# **3つの検査すべてに効かせる**（`_check_create`と`_check_merge`の先頭）。
+#
+# `gh <sub> <cmd> --help`は option 一覧の確認に使う。**ここを拒否すると、hookが
+# 要求しているoption名を調べる手段そのものが塞がる。**2026-08-28に
+# `gh issue create --help`が拒否され、`gh help issue create`へ回避した。
+# **規則を守るために要る情報を、規則が隠している状態だった。**
+# `gh pr merge`では`--subject`と`--body-file`の名前がそこにある。
+#
+# **完全一致だけを見る。**`_has_option`の連結判定を当てると`-hello`がhelpになる。
+# 代わりに`--title -h`のように値としての`-h`を拾い、**その呼び出しは検査を抜ける。**
+# 字句だけで区別する手立てが無い。CONTRIBUTINGの「取り切れていないもの」に載せる。
+HELP_OPTIONS = ("--help", "-h")
+
 
 def _has_option(args, *names):
     """`--name value`／`--name=value`／短縮形の連結（`-pvalue`）を拾う。"""
@@ -81,6 +119,11 @@ def _has_option(args, *names):
             ):
                 return True
     return False
+
+
+def _is_help(args):
+    """helpの表示だけを求める呼び出しかを返す。**完全一致だけを見る。**"""
+    return any(arg in HELP_OPTIONS for arg in args)
 
 
 def _option_value(args, *names):
@@ -117,17 +160,17 @@ def _merge_message(args):
     return None, "本文が渡されていない"
 
 
-def _option_names():
+def _option_names(names):
     """診断文に出す option 名の並び。定数から作り、文面へ値を複製しない。"""
-    return "／".join(f"`{name}`" for name in PROJECT_OPTIONS)
+    return "／".join(f"`{name}`" for name in names)
 
 
-def _check_create(subcommand, args):
+def _check_project(subcommand, args):
     if _has_option(args, *PROJECT_OPTIONS):
         return
     _deny(
         f"`gh {' '.join(subcommand)}`にprojectの指定が無い"
-        f"（{_option_names()}のいずれかが要る）。"
+        f"（{_option_names(PROJECT_OPTIONS)}のいずれかが要る）。"
         " Projects v2 boardへのitem追加は起票・作成時に必要である"
         "（CONTRIBUTINGの「起票時に設定する項目」）。"
         " #204／#205／#206は3件とも作成時に入っておらず後から追加している。"
@@ -136,7 +179,41 @@ def _check_create(subcommand, args):
     )
 
 
+def _check_base(args):
+    """`gh pr create`にbaseの指定があるかを見る。**値の正しさは見ない。**
+
+    存在するかだけを見る。`develop`と書くべきか`main`と書くべきかは、その
+    Pull Requestの目的で決まり、字句からは読めない。**明示させることだけを強制する。**
+    """
+    if _has_option(args, *BASE_OPTIONS):
+        return
+    _deny(
+        "`gh pr create`にbaseの指定が無い"
+        f"（{_option_names(BASE_OPTIONS)}のいずれかが要る）。"
+        " 省略すると`gh`はrepositoryのdefault branchを使い、"
+        "このrepositoryのdefaultは`main`である。"
+        " 2026-08-28にPR #250がbase `main`で作られ、baseの変更まで1時間17分かかった。"
+        " 日常のPull Requestのbaseは`develop`であり、`main`は昇格でだけ使う"
+        "（CONTRIBUTINGの「全体の流れ」）。"
+        " **どちらが正しいかはhookは判定しない。明示することだけを求めている。**"
+        f" 意図して既定へ委ねる場合は{SKIP_ENV}=1を付けて実行し、理由を残す。"
+    )
+
+
+def _check_create(subcommand, args):
+    if _is_help(args):
+        # helpの表示だけを求める呼び出しは何も作らない。**metadataを要求しない。**
+        return
+    _check_project(subcommand, args)
+    # `--base`は`gh pr create`だけが持つ。`gh issue create`へ要求しない。
+    if subcommand == PR_CREATE_SUBCOMMAND:
+        _check_base(args)
+
+
 def _check_merge(args):
+    if _is_help(args):
+        # helpの表示だけを求める呼び出しはmergeしない。**messageを要求しない。**
+        return
     text, source = _merge_message(args)
     if text is None:
         _deny(
