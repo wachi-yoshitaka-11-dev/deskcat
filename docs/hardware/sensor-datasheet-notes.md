@@ -183,7 +183,7 @@ module boardの値は、これとは別に現物でしか決まらない（[AGEN
 | 実装済みI2C address | TBD。**`SDO`はheaderへ出ており、基板上で固定されていない。**したがってaddressは配線時に決まる |
 | board上のregulatorの有無 | **非搭載（確定）。**2026-08-13の現物確認で、IC＋`C1`×2＋抵抗のみであり3端子部品が無いことを確認した。**旧記載は根拠資料（秋月 商品ページ。現在404）を失ってTBDへ戻していたが、現物で確定した** |
 | moduleへ入れてよい電圧 | TBD。**ICの動作上限3.6 Vも絶対最大定格3.9 Vも、boardの許容値と同一視しない**（regulatorやlevel shiftの有無で変わる）。**[power-budget.md](power-budget.md)と[hardware-bom.md](hardware-bom.md)が置く「3.3 Vで給電する」は、この行が埋まるまで確定しない。****5 V直結の禁止と、この行は別の主張である。**5 V禁止は「moduleがregulatorを持たなければ5 VがICへ直接掛かる」ことを否定できないための**確認前の安全規則**であって、IC定格からmoduleの許容入力電圧を導いたものではない。3.3 Vをmoduleが受け入れる根拠も同様に別に要る（[tbd-register HW-TBD-004](tbd-register.md)） |
-| Module搭載pull-up | **`01C`（EIA-96で10 kΩ、1%）が4個**（2026-08-13確認）。ほかに`R2`＝`0`（0 Ωジャンパ）が1個。**どのpinへ付くかはパターンを追っていないため未確定であり、I2Cの実効pull-upを計算する前に配線を確認する**（[gpio-assignment.md](gpio-assignment.md)の競合checklist） |
+| Module搭載pull-up | **`01C`（EIA-96で10 kΩ、1%）が4個**（2026-08-13確認）。ほかに`R2`＝`0`（0 Ωジャンパ）が1個。**どのpinへ付くかは2026-08-27に現物写真でパターンを追って確定した。SDAへ2本、SCLへ2本であり、各lineの並列合成値は5.00 kΩである**（[gpio-assignment.md](gpio-assignment.md)の`I2C busの実効pull-up`節） |
 
 必要なベンチ試験の根拠:
 
