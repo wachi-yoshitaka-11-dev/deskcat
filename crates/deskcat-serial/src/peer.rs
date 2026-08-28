@@ -21,9 +21,21 @@ use deskcat_protocol::{Ack, AckStatus, Boot, ErrorCode, Frame, Message, Status};
 
 /// retired session集合の上限。**暫定値であり、確定値ではない。**
 ///
-/// 正本は`PROTO-TBD-011`（保持件数は「保持期間内に起こりうる最大の session 遷移回数」
-/// から導出する、と仕様§3.1が定める）。この値は一次資料を持たず、実装を進めるための
-/// 仮の上限である。確定したら置き換える。
+/// 正本は`PROTO-TBD-011`。保持件数の下限は
+/// `N_transition × ceil(T_retention / T_window)`件であり、`N_transition`と`T_window`は
+/// `PROTO-TBD-012`、`T_retention`は`PROTO-TBD-011`で、**どれも未確定である。**
+/// **したがってこの値は式の解ではない。**一次資料を持たない仮の上限である。
+///
+/// **上限に達しても、retired sessionを追い出さない。**仕様§3.1が定める。
+///
+/// > **保持件数の上限によって、保持期間の満了前にretired sessionを追い出してはならない。**
+/// > 追い出すと、その`sid`は「未知」に戻る。遅れて届いた`hello`／`boot`が遷移候補として
+/// > 受理され、現在のduplicate履歴を破棄して実行中motionを停止する。
+/// > `stale_session`で拒否されるはずの経路が、逆に副作用を起こす経路になる。
+///
+/// **代わりに、追い出しを要する遷移そのものを拒否する**（[`PeerRejection::RetentionFull`]）。
+/// 値が仮であることと、追い出さないことは別の話である。**仮の値のまま追い出すと、
+/// 上の副作用が仮の件数で起きる。**確定したら値だけを置き換える。
 const RETIRED_CAPACITY: usize = 4;
 
 /// `boot`のduplicate履歴の上限。**暫定値であり、確定値ではない。**
@@ -62,6 +74,17 @@ pub enum PeerRejection {
     /// Piが送っていない要求への相関ACK、または`reply_sid`／envelopeの`sid`が
     /// 現在のsessionと一致しないACK（§6）。
     UnmatchedAck,
+    /// retired session保持が満杯で、遷移すると保持期間の満了前に追い出すことになる
+    /// （§3.1、`PROTO-TBD-011`）。
+    ///
+    /// **既存の4つに収まらないため足した。**`StaleSession`は現在承認していない`sid`から
+    /// のmessage、`DuplicateExpired`は履歴から失われたduplicate、`InvalidPayload`と
+    /// `UnmatchedAck`は形の話であり、**いずれも「遷移そのものを受けられない」ではない。**
+    ///
+    /// codeは`rate_limited`である。仕様§3.1が「遷移速度の上限も併せて定め、上限を
+    /// 超える遷移は`rate_limited`で拒否する」と定めており、**保持が満杯になるのは
+    /// 保持期間内の遷移が想定を超えたときである。**
+    RetentionFull,
 }
 
 impl PeerRejection {
@@ -72,6 +95,7 @@ impl PeerRejection {
             Self::StaleSession => ErrorCode::StaleSession,
             Self::DuplicateExpired => ErrorCode::DuplicateExpired,
             Self::InvalidPayload | Self::UnmatchedAck => ErrorCode::InvalidPayload,
+            Self::RetentionFull => ErrorCode::RateLimited,
         }
     }
 }
@@ -218,14 +242,29 @@ impl PeerSession {
         self.retired.contains(&sid)
     }
 
+    /// 現在sessionをretireすると、保持期間の満了前に追い出すことになるかを返す。
+    ///
+    /// **既にretiredにある`sid`は件数を増やさない**ため、追い出しは起きない。
+    fn retiring_would_evict(&self) -> bool {
+        match self.esp32_sid {
+            Some(old) if !self.retired.contains(&old) => self.retired.len() >= RETIRED_CAPACITY,
+            _ => false,
+        }
+    }
+
+    /// 現在sessionをretiredへ移す。
+    ///
+    /// **追い出さない**（§3.1）。追い出しを要する場合は、呼び出す前に
+    /// [`Self::retiring_would_evict`]で遷移そのものを拒否している。
     fn retire_current(&mut self) {
         if let Some(old) = self.esp32_sid
             && !self.retired.contains(&old)
         {
+            debug_assert!(
+                self.retired.len() < RETIRED_CAPACITY,
+                "retiring would evict; the transition must be rejected first"
+            );
             self.retired.push_back(old);
-            while self.retired.len() > RETIRED_CAPACITY {
-                self.retired.pop_front();
-            }
         }
     }
 
@@ -276,6 +315,18 @@ impl PeerSession {
         }
 
         // 未知のsid: hello／bootだけが遷移候補になれる（§5.1優先順位3）。
+
+        // **保持が満杯なら、遷移そのものを拒否する。**旧sidを追い出すと「未知」に戻り、
+        // 遅れて届いたhello／bootが遷移候補として受理されて実行中motionを停止する
+        // （§3.1）。**session状態は変えない。**
+        if self.retiring_would_evict() {
+            let rejection = PeerRejection::RetentionFull;
+            return BootHandled {
+                reply: Self::rejection_ack(sid, id, rejection),
+                outcome: BootOutcome::Rejected(rejection),
+            };
+        }
+
         self.retire_current();
         self.boot_history.clear();
         self.esp32_sid = Some(sid);
@@ -364,7 +415,7 @@ mod tests {
 
     use super::{
         Ack, AckStatus, BOOT_HISTORY_CAPACITY, Boot, BootHistory, BootOutcome, ErrorCode,
-        OutstandingKind, PeerRejection, PeerSession, Status,
+        OutstandingKind, PeerRejection, PeerSession, RETIRED_CAPACITY, Status,
     };
 
     fn boot() -> Boot {
@@ -448,6 +499,56 @@ mod tests {
 
         assert_eq!(retry.outcome, BootOutcome::Replayed);
         assert_eq!(retry.reply, first.reply, "同じACKを再送する");
+    }
+
+    /// [`RETIRED_CAPACITY`]を`sid`の型で扱う。**`as`で切り捨てない。**
+    fn retired_capacity() -> u32 {
+        u32::try_from(RETIRED_CAPACITY).expect("RETIRED_CAPACITY fits in u32")
+    }
+
+    #[test]
+    fn a_transition_that_would_evict_a_retired_sid_is_rejected() {
+        // 保持が満杯になるまで遷移させる。**追い出しは起きない。**
+        let mut peer = PeerSession::new();
+        let _ = peer.handle_boot(1, 1, boot());
+        for sid in 2..=(retired_capacity() + 1) {
+            let _ = peer.handle_boot(sid, 1, boot());
+        }
+        // ここで retired は満杯であり、次の遷移は最古を追い出すことになる。
+        let rejected = peer.handle_boot(9_000, 1, boot());
+        assert_eq!(
+            rejected.outcome,
+            BootOutcome::Rejected(PeerRejection::RetentionFull)
+        );
+        match rejected.reply {
+            super::Message::Ack(ack) => {
+                assert_eq!(ack.status, AckStatus::Rejected);
+                assert_eq!(ack.code, Some(ErrorCode::RateLimited));
+            }
+            other => panic!("Ackを期待した: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_rejected_transition_does_not_change_session_state() {
+        // **拒否は副作用を持たない。**最古のsidは「未知」へ戻らない。
+        let mut peer = PeerSession::new();
+        let _ = peer.handle_boot(1, 1, boot());
+        for sid in 2..=(retired_capacity() + 1) {
+            let _ = peer.handle_boot(sid, 1, boot());
+        }
+        let current = retired_capacity() + 1;
+        let _ = peer.handle_boot(9_000, 1, boot());
+
+        // 現在sessionは変わっていない。
+        assert_eq!(peer.esp32_sid, Some(current));
+        // 最古のsidはretiredのままであり、stale_sessionで拒否される。
+        // **追い出していれば、ここは遷移候補として受理されてしまう。**
+        let stale = peer.handle_boot(1, 2, boot());
+        assert_eq!(
+            stale.outcome,
+            BootOutcome::Rejected(PeerRejection::StaleSession)
+        );
     }
 
     #[test]

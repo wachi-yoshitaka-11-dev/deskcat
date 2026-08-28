@@ -741,6 +741,31 @@ fn an_inconsistent_control_period_is_refused() {
     assert!(!ok.accepts(f32::NAN));
 }
 
+/// 和が有限でない契約を作らせない。
+///
+/// **入力2つの有限性だけでは足りない。**`(f32::MAX, f32::MAX / 2.0)`は
+/// `nominal_s > 0`・`0 <= tolerance_s < nominal_s`・両方有限をすべて満たすが、
+/// `longest_s()`が`+∞`を返す。`accepts()`は有限でない値を受理しないため、
+/// **有限の上限を持たない契約ができてしまう。**
+#[test]
+fn a_control_period_whose_upper_bound_overflows_is_refused() {
+    assert!(
+        matches!(
+            ControlPeriod::new(f32::MAX, f32::MAX / 2.0),
+            Err(deskcat_servo::LimitsError::InvalidControlPeriod)
+        ),
+        "a period whose nominal + tolerance is not finite must be refused"
+    );
+
+    // **上限の定数は決めていない。**和が有限であれば、大きい値でも通す。
+    let wide = ControlPeriod::new(f32::MAX / 4.0, f32::MAX / 8.0)
+        .expect("a finite sum is allowed regardless of magnitude");
+    assert!(wide.longest_s().is_finite());
+    assert!(wide.shortest_s().is_finite());
+    assert!(wide.accepts(wide.longest_s()));
+    assert!(wide.accepts(wide.shortest_s()));
+}
+
 // ---------------------------------------------------------------------------
 // 受け入れ条件3: Debug command が同じ limiter を使用する
 // ---------------------------------------------------------------------------
