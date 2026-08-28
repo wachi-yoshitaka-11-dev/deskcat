@@ -14,9 +14,11 @@
 
 ## 現在の状態
 
-Issue #5 でtoolchainを固定し、最小projectのclean buildを確認した。実装済みなのは`link_patches()`、logger初期化、起動logの出力、および Issue #7 の heartbeat と health snapshot だけであり、**hardware driverは未実装である。**
+Issue #5 でtoolchainを固定し、最小projectのclean buildを確認した。実装済みなのは`link_patches()`、logger初期化、起動logの出力、Issue #7 の heartbeat と health snapshot、および Issue #12 の`crate::protocol::PiSession`（`hello`／`ping`／`get_status`の受信側logic）だけであり、**hardware driverは未実装である。**
 
-heartbeat と health snapshot は ESP logger の log にのみ出す。**「log へ出す」は「serial へ出ない」ではない。**logger の出力は UART を通って serial monitor に現れる。送らないのは、protocol の message として application の serial link（#11）へ流すことである。周期は `src/config.rs` が持ち、**いずれも暫定値である**（Protocol §5.7 が heartbeat の interval を `TBD` としているため、一次資料の根拠が無い）。health snapshot は `crates/deskcat-protocol` の `Status` を組み立てて JSON 1 行として出す。**`ProtocolCounters` はすべて 0 のままである。**serial link（#11）も session（#12）も無く、計上すべき事象が発生しないためである。
+heartbeat と health snapshot は ESP logger の log にのみ出す。**「log へ出す」は「serial へ出ない」ではない。**logger の出力は UART を通って serial monitor に現れる。送らないのは、protocol の message として application の serial link（#11）へ流すことである。周期は `src/config.rs` が持ち、**いずれも暫定値である**（Protocol §5.7 が heartbeat の interval を `TBD` としているため、一次資料の根拠が無い）。health snapshot は `crates/deskcat-protocol` の `Status` を組み立てて JSON 1 行として出す。**`ProtocolCounters` はすべて 0 のままである。**実serial linkが無く、計上すべき事象が発生しないためである。
+
+`src/protocol.rs`の`PiSession`は`hello`のsession遷移、`ping`／`get_status`への応答、`stale_session`の判定を実装し、`crates/deskcat-serial/src/peer.rs`（Pi側、Issue #12）と対になる。**実serial linkへは配線していない。**`main()`はこの型を自己完結した例（`demonstrate_pi_session`）で1回動かしてlogへ出すだけであり、実際のUART受信loopではない。**配線を止めているのはGPIO割り当てではない。**[gpio-assignment.md](../../docs/hardware/gpio-assignment.md)の`Pi–ESP32間のtransport`節がPi linkをUSB serialに確定させており、board上のUSB-UARTブリッジICが内部でUART0（GPIO1／GPIO3）へ接続するためGPIO headerへの配線は無い。**同文書のpin表はこのUART0を`firmware flashingとdebug log専用`と定めており**、ESP loggerの出力とprotocolのJSON Lines streamが同じUART0を奪い合う。**この分離方法が未決であることが配線していない理由である。**ESP32自身が送る`boot`も同じ理由でwireへは出さず、`log_boot_message`がpayloadの組み立てだけをlogへ示す。`sid`の生成方法は`PROTO-TBD-011`が未確定であり、この型は決めない。
 
 | 項目 | 確定版 |
 |---|---|

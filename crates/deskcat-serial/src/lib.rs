@@ -15,6 +15,9 @@
 //!   再接続の上限とrate limitを含む
 //! - 実serial portの上で[`Transport`]を満たす型（[`SerialDevice`]）。
 //!   `serial2`を使ってportを開き、切断のerrnoと読みのtimeoutを契約どおりに正規化する
+//! - ESP32 peer sessionの状態（[`PeerSession`]）。`boot`のsession遷移、duplicate履歴、
+//!   `hello`／`boot`以外の`stale_session`判定、Piが送った要求への応答の相関
+//!   （[Issue #12]、`crates/deskcat-serial/src/peer.rs`）
 //!
 //! 含まないもの:
 //!
@@ -22,8 +25,9 @@
 //!   （`SerialPort::pair`）までである。`/dev/ttyUSB*`のdevice名の確定と、実機での
 //!   read／write、切断、再接続、partial I/Oの確認は[Issue #11]の後半に残る
 //! - **domain動作。**感情、性格、行動判断、独り言はこのcrateに入らない
-//! - **session遷移の確定、duplicate履歴、受理budget、遷移cooldown。**
-//!   受信側のstateを要するため[Issue #12]の範囲である
+//! - **単位時間あたりの受理上限、session遷移budget、cooldown。**`PROTO-TBD-012`が
+//!   未確定であり、値を推測しない。[`PeerSession`]はこれらのbudgetに依存しない
+//!   部分だけを扱う（`peer`モジュールのdoc参照）
 //!
 //! # 暫定値について
 //!
@@ -61,6 +65,7 @@ pub mod config;
 pub mod device;
 pub mod ids;
 pub mod outbox;
+pub mod peer;
 pub mod session;
 pub mod transport;
 
@@ -68,5 +73,8 @@ pub use config::{ConfigError, ReconnectPolicy, SerialConfig};
 pub use device::SerialDevice;
 pub use ids::{IdAllocator, IdSpaceExhausted};
 pub use outbox::{Enqueued, Outbox};
+pub use peer::{
+    BootHandled, BootOutcome, CorrelatedAck, OutstandingKind, PeerRejection, PeerSession,
+};
 pub use session::{ConnectionState, Pump, SendError, Session, SessionCounters, StopReason};
 pub use transport::{IoDisposition, Transport};

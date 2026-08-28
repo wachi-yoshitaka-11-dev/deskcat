@@ -17,7 +17,9 @@ use std::collections::VecDeque;
 use std::io;
 
 use deskcat_protocol::{
-    Cause, Envelope, Frame, Hello, HelloReason, Message, Outcome, encode_line, limits,
+    Ack, AckStatus, Boot, Cause, DisplayStatus, Envelope, ErrorCode, Frame, Hello, HelloReason,
+    Message, Outcome, ProtocolCounters, SensorStatus, ServoStatus, Status, decode_line,
+    encode_line, limits,
 };
 use deskcat_serial::{
     ConfigError, ConnectionState, Enqueued, Outbox, Pump, ReconnectPolicy, SendError, SerialConfig,
@@ -878,4 +880,316 @@ fn the_reconnect_budget_is_restored_by_bytes_not_by_opening() {
         1,
         "累計のcounterはresetしない"
     );
+}
+
+/// [`PeerSession`]の受け入れ条件（Issue #12）: `boot`のsession遷移、`ping`／
+/// `get_status`への応答の相関、`duplicate_expired`、`stale_session`の遮蔽。
+///
+/// `Session`はbyte<->frameの往復だけを持つ（`peer.rs`のmodule doc参照）。ここでは
+/// `Session::pump_read`で復元した[`Frame`]を[`PeerSession`]へ渡し、返ってきた
+/// 応答を別の`Session::send`／`pump_write`で実際にwireへ乗せるところまで確認する。
+mod peer_protocol {
+    use super::{
+        Ack, AckStatus, Boot, DisplayStatus, Envelope, ErrorCode, Frame, Message, Outcome,
+        ProtocolCounters, SensorStatus, ServoStatus, Sim, Status, config, connected_session,
+        decode_line, encode_line, limits,
+    };
+    use deskcat_serial::{BootOutcome, OutstandingKind, PeerRejection, PeerSession, Session};
+
+    const ESP32_SID: u32 = 41_207;
+    const PI_SID: u32 = 90_312;
+
+    fn boot_payload() -> Boot {
+        Boot {
+            firmware: "0.1.0".to_owned(),
+            board: "esp32".to_owned(),
+            reset_reason: "power_on".to_owned(),
+        }
+    }
+
+    fn boot_line(sid: u32, id: u32) -> String {
+        let frame = Frame::new(
+            Envelope {
+                v: limits::PROTOCOL_VERSION,
+                sid,
+                id,
+                ts_ms: 100,
+            },
+            Message::Boot(boot_payload()),
+        );
+        encode_line(&frame).expect("encodeできる")
+    }
+
+    fn ack_line(sender_sid: u32, id: u32, ack: Ack) -> String {
+        let frame = Frame::new(
+            Envelope {
+                v: limits::PROTOCOL_VERSION,
+                sid: sender_sid,
+                id,
+                ts_ms: 200,
+            },
+            Message::Ack(ack),
+        );
+        encode_line(&frame).expect("encodeできる")
+    }
+
+    fn status_line(sender_sid: u32, id: u32) -> String {
+        let status = Status {
+            firmware: "0.1.0".to_owned(),
+            reset_reason: "power_on".to_owned(),
+            display: DisplayStatus {
+                state: "ready".to_owned(),
+                expression: "neutral".to_owned(),
+            },
+            servo: ServoStatus {
+                state: "disabled".to_owned(),
+            },
+            sensors: SensorStatus {
+                touch: "unknown".to_owned(),
+                acceleration: "unknown".to_owned(),
+                environment: "unknown".to_owned(),
+            },
+            protocol: ProtocolCounters::default(),
+        };
+        let frame = Frame::new(
+            Envelope {
+                v: limits::PROTOCOL_VERSION,
+                sid: sender_sid,
+                id,
+                ts_ms: 300,
+            },
+            Message::Status(Box::new(status)),
+        );
+        encode_line(&frame).expect("encodeできる")
+    }
+
+    /// 受信したlineから、`PeerSession`へ渡す1件のframeを取り出す。
+    /// 1件のframeが復元できるまで`pump_read`を回す。
+    ///
+    /// `status`のような長いlineは`Session::READ_CHUNK`（512 byte）を超えることがあり、
+    /// 1回の`pump_read`では改行まで届かない。複数回のreadにまたがっても
+    /// 復元されることは他のtest（`a_line_delivered_one_byte_at_a_time_is_reassembled`）
+    /// と同じ性質である。**`line_len`はこれから読むlineのbyte長を渡す。**1回の
+    /// `pump_read`で最低1byteは進むため、`line_len`回あれば必ず読み切れる
+    /// （`an_oversize_line_is_rejected_and_the_next_line_still_decodes`と同じ導出）。
+    fn recv_one_frame(session: &mut Session, sim: &mut Sim, line_len: usize) -> Frame {
+        let mut frames = Vec::new();
+        for _ in 0..=line_len {
+            let _ = session.pump_read(sim, |outcome| {
+                if let Outcome::Frame(frame) = outcome {
+                    frames.push(frame);
+                }
+            });
+            if !frames.is_empty() {
+                break;
+            }
+        }
+        assert_eq!(frames.len(), 1, "1件のframeを期待した");
+        frames.into_iter().next().expect("1件ある")
+    }
+
+    /// 実際にPi自身の`Session`で応答を送り、書き出されたbyte列をACKとして復元する。
+    fn send_and_capture_ack(reply: Message) -> Ack {
+        let mut pi = connected_session();
+        let _ = pi.send(reply, 400).expect("queueへ入る");
+        let mut sim = Sim::default();
+        while matches!(pi.pump_write(&mut sim), super::Pump::Progress(_)) {}
+        let written = String::from_utf8(sim.written).expect("UTF-8である");
+        let line = written.lines().next().expect("1行ある");
+        match decode_line(line).expect("復元できる").message {
+            Message::Ack(ack) => ack,
+            other => panic!("Ackを期待した: {other:?}"),
+        }
+    }
+
+    fn connected_session_with_sid(sid: u32) -> Session {
+        let mut session = Session::new(config(), sid);
+        session.note_connected();
+        session
+    }
+
+    /// 受け入れ条件: `boot`を受信するとsessionを確立し、ACKを返せる。
+    #[test]
+    fn a_boot_over_the_wire_establishes_a_session_and_its_ack_reaches_the_wire() {
+        let mut esp32_in = connected_session_with_sid(ESP32_SID);
+        let line = boot_line(ESP32_SID, 1);
+        let line_len = line.len();
+        let mut sim = Sim::with_reads(vec![Ok(line.into_bytes())]);
+        let frame = recv_one_frame(&mut esp32_in, &mut sim, line_len);
+
+        let mut peer = PeerSession::new();
+        let Message::Boot(boot) = frame.message else {
+            panic!("Bootを期待した");
+        };
+        let handled = peer.handle_boot(frame.envelope.sid, frame.envelope.id, boot);
+        assert!(matches!(
+            handled.outcome,
+            BootOutcome::Established { sid: ESP32_SID, .. }
+        ));
+        assert_eq!(peer.esp32_sid(), Some(ESP32_SID));
+
+        let ack = send_and_capture_ack(handled.reply);
+        assert_eq!(ack.reply_sid, ESP32_SID);
+        assert_eq!(ack.reply_to, 1);
+        assert_eq!(ack.status, AckStatus::Ok);
+    }
+
+    /// 受け入れ条件: `boot`の再送（duplicate）は同じACKのreplayになる。
+    #[test]
+    fn a_retried_boot_line_replays_the_same_ack_over_the_wire() {
+        let mut peer = PeerSession::new();
+        let line = boot_line(ESP32_SID, 1);
+        let line_len = line.len();
+        let mut sim = Sim::with_reads(vec![Ok(line.clone().into_bytes()), Ok(line.into_bytes())]);
+        let mut esp32_in = connected_session_with_sid(ESP32_SID);
+
+        let first_frame = recv_one_frame(&mut esp32_in, &mut sim, line_len);
+        let Message::Boot(boot) = first_frame.message.clone() else {
+            panic!("Bootを期待した");
+        };
+        let first = peer.handle_boot(first_frame.envelope.sid, first_frame.envelope.id, boot);
+
+        let retry_frame = recv_one_frame(&mut esp32_in, &mut sim, line_len);
+        let Message::Boot(boot) = retry_frame.message else {
+            panic!("Bootを期待した");
+        };
+        let retry = peer.handle_boot(retry_frame.envelope.sid, retry_frame.envelope.id, boot);
+
+        assert_eq!(retry.outcome, BootOutcome::Replayed);
+        assert_eq!(
+            send_and_capture_ack(retry.reply),
+            send_and_capture_ack(first.reply)
+        );
+    }
+
+    /// 受け入れ条件: `ping`への応答（ACK）を、Piが送った要求と相関できる。
+    #[test]
+    fn pings_ack_is_correlated_with_the_outstanding_request() {
+        let mut peer = PeerSession::new();
+        let _ = peer.handle_boot(ESP32_SID, 1, boot_payload());
+
+        let mut pi = connected_session_with_sid(PI_SID);
+        let id = pi.send(Message::Ping, 500).expect("queueへ入る");
+        peer.note_sent(id, OutstandingKind::Ping);
+
+        let ack = Ack {
+            reply_sid: PI_SID,
+            reply_to: id,
+            status: AckStatus::Ok,
+            code: None,
+            detail: None,
+        };
+        let line = ack_line(ESP32_SID, 2, ack);
+        let line_len = line.len();
+        let mut sim = Sim::with_reads(vec![Ok(line.into_bytes())]);
+        let mut esp32_in = connected_session_with_sid(ESP32_SID);
+        let frame = recv_one_frame(&mut esp32_in, &mut sim, line_len);
+
+        let Message::Ack(ack) = frame.message else {
+            panic!("Ackを期待した");
+        };
+        let correlated = peer
+            .correlate_ack(frame.envelope.sid, PI_SID, ack)
+            .expect("相関が取れる");
+        assert_eq!(correlated.request, OutstandingKind::Ping);
+    }
+
+    /// 受け入れ条件: `get_status`への応答（ACK＋`status`）を相関し、`status`を受理できる。
+    #[test]
+    fn get_status_ack_and_status_are_accepted_for_the_current_session() {
+        let mut peer = PeerSession::new();
+        let _ = peer.handle_boot(ESP32_SID, 1, boot_payload());
+
+        let mut pi = connected_session_with_sid(PI_SID);
+        let id = pi.send(Message::GetStatus, 500).expect("queueへ入る");
+        peer.note_sent(id, OutstandingKind::GetStatus);
+
+        let ack = Ack {
+            reply_sid: PI_SID,
+            reply_to: id,
+            status: AckStatus::Ok,
+            code: None,
+            detail: None,
+        };
+        let ack_line_text = ack_line(ESP32_SID, 2, ack);
+        let ack_line_len = ack_line_text.len();
+        let status_line_text = status_line(ESP32_SID, 3);
+        let status_line_len = status_line_text.len();
+        let mut sim = Sim::with_reads(vec![
+            Ok(ack_line_text.into_bytes()),
+            Ok(status_line_text.into_bytes()),
+        ]);
+        let mut esp32_in = connected_session_with_sid(ESP32_SID);
+
+        let ack_frame = recv_one_frame(&mut esp32_in, &mut sim, ack_line_len);
+        let Message::Ack(ack) = ack_frame.message else {
+            panic!("Ackを期待した");
+        };
+        assert_eq!(
+            peer.correlate_ack(ack_frame.envelope.sid, PI_SID, ack)
+                .expect("相関が取れる")
+                .request,
+            OutstandingKind::GetStatus
+        );
+
+        let status_frame = recv_one_frame(&mut esp32_in, &mut sim, status_line_len);
+        let Message::Status(status) = status_frame.message else {
+            panic!("Statusを期待した");
+        };
+        assert!(
+            peer.accept_status(status_frame.envelope.sid, *status)
+                .is_ok(),
+            "現在sessionからのstatusは受理する"
+        );
+    }
+
+    // 受け入れ条件の`duplicate_expired`: `boot`単独では、正規のtrafficで容量超過は
+    // 起きない（1 sessionにつき1つの`id`しか処理しないため）。境界そのものは
+    // `crates/deskcat-serial/src/peer.rs`の
+    // `boot_history_reports_duplicate_expired_for_evicted_entries`が検査する。
+
+    /// 受け入れ条件: retired sessionからの`boot`は`stale_session`として遮蔽する。
+    #[test]
+    fn a_boot_from_a_retired_esp32_sid_is_screened_as_stale_session() {
+        let mut peer = PeerSession::new();
+        let _ = peer.handle_boot(ESP32_SID, 1, boot_payload());
+        // 別のsidへ遷移させ、ESP32_SIDをretiredへ移す。
+        let _ = peer.handle_boot(ESP32_SID + 1, 1, boot_payload());
+
+        let mut esp32_in = connected_session_with_sid(ESP32_SID);
+        let line = boot_line(ESP32_SID, 2);
+        let line_len = line.len();
+        let mut sim = Sim::with_reads(vec![Ok(line.into_bytes())]);
+        let frame = recv_one_frame(&mut esp32_in, &mut sim, line_len);
+        let Message::Boot(boot) = frame.message else {
+            panic!("Bootを期待した");
+        };
+
+        let rejected = peer.handle_boot(frame.envelope.sid, frame.envelope.id, boot);
+        assert_eq!(
+            rejected.outcome,
+            BootOutcome::Rejected(PeerRejection::StaleSession)
+        );
+        let ack = send_and_capture_ack(rejected.reply);
+        assert_eq!(ack.status, AckStatus::Rejected);
+        assert_eq!(ack.code, Some(ErrorCode::StaleSession));
+    }
+
+    /// 受け入れ条件: 現在のESP32 sessionを確立していないうちに届いたACKは、
+    /// Piの要求と相関しないため遮蔽する（`stale_session`の遮蔽と同じ考え方）。
+    #[test]
+    fn an_ack_before_any_session_is_established_is_screened_out() {
+        let mut peer = PeerSession::new();
+        let ack = Ack {
+            reply_sid: PI_SID,
+            reply_to: 1,
+            status: AckStatus::Ok,
+            code: None,
+            detail: None,
+        };
+        assert_eq!(
+            peer.correlate_ack(ESP32_SID, PI_SID, ack),
+            Err(PeerRejection::UnmatchedAck)
+        );
+    }
 }

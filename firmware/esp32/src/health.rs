@@ -40,6 +40,10 @@ pub struct Health {
     overrun_ticks: u32,
     /// Snapshot の serialize に失敗した回数。**Protocol counter ではない。**
     snapshot_errors: u32,
+    /// 起動時の`boot` message（`crate::protocol`）のserializeに失敗した回数。
+    /// **Protocol counterではない。**[`Self::snapshot_errors`]と原因が違うため
+    /// 混ぜずに分けて数える。
+    boot_serialize_errors: u32,
     /// Protocol counter。**すべて 0 のままである**（module doc 参照）。
     counters: ProtocolCounters,
     /// Machine-readable な reset reason。
@@ -54,6 +58,7 @@ impl Health {
             heartbeat_seq: 0,
             overrun_ticks: 0,
             snapshot_errors: 0,
+            boot_serialize_errors: 0,
             counters: ProtocolCounters::default(),
             reset_reason,
         }
@@ -90,6 +95,11 @@ impl Health {
         self.snapshot_errors = self.snapshot_errors.saturating_add(1);
     }
 
+    /// `boot` messageのserialize失敗を計上する。
+    pub fn record_boot_serialize_error(&mut self) {
+        self.boot_serialize_errors = self.boot_serialize_errors.saturating_add(1);
+    }
+
     /// 期限超過の回数。
     pub fn overrun_ticks(&self) -> u32 {
         self.overrun_ticks
@@ -98,6 +108,11 @@ impl Health {
     /// Snapshot の serialize 失敗の回数。
     pub fn snapshot_errors(&self) -> u32 {
         self.snapshot_errors
+    }
+
+    /// `boot` messageのserialize失敗の回数。
+    pub fn boot_serialize_errors(&self) -> u32 {
+        self.boot_serialize_errors
     }
 
     /// Protocol の [`Status`] を組み立てる。
