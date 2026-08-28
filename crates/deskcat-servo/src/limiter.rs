@@ -71,7 +71,7 @@ use core::fmt;
 use deskcat_protocol::ErrorCode;
 
 use crate::counters::{ClampReport, LimiterCounters};
-use crate::limits::{LimitsError, ServoLimits};
+use crate::limits::{ControlPeriod, LimitsError, ServoLimits};
 
 /// Commandの出所。
 ///
@@ -145,6 +145,13 @@ pub enum Rejection {
     NonFiniteTarget,
     /// 経過時間が有限でない、または正でない。構造的に不正である。
     NonPositiveInterval,
+    /// 呼び出し間隔が[`ControlPeriod`]の許容範囲の外にある。
+    ///
+    /// §5.3 が「値そのものが許容範囲外」を`out_of_range`としており、§7 が
+    /// `invalid_payload`（型と必須fieldの問題）と`out_of_range`（型は正しいが値が
+    /// 範囲外）を分けている。**間隔は型としては正しい正の秒数であり、範囲の側で外れる。**
+    /// したがって`out_of_range`である。**新しいcodeは作っていない。**
+    IntervalOutsideControlPeriod,
     /// targetが`設定可能なhard bound`の外にある。
     ///
     /// §5.3 が「値そのものが許容範囲外」を`out_of_range`としている。
@@ -159,7 +166,9 @@ impl Rejection {
             Self::UnknownMotion | Self::NonFiniteTarget | Self::NonPositiveInterval => {
                 ErrorCode::InvalidPayload
             }
-            Self::TargetOutOfHardRange => ErrorCode::OutOfRange,
+            Self::TargetOutOfHardRange | Self::IntervalOutsideControlPeriod => {
+                ErrorCode::OutOfRange
+            }
         }
     }
 }
@@ -171,6 +180,9 @@ impl fmt::Display for Rejection {
             Self::NonFiniteTarget => "target is not finite",
             Self::NonPositiveInterval => "interval is not a positive, finite number of seconds",
             Self::TargetOutOfHardRange => "target lies outside the configurable hard bound",
+            Self::IntervalOutsideControlPeriod => {
+                "interval lies outside the configured control period"
+            }
         };
         write!(f, "{reason} ({})", self.code().as_str())
     }
@@ -275,6 +287,7 @@ impl Setpoint {
 #[derive(Debug, Clone)]
 pub struct Limiter {
     limits: ServoLimits,
+    period: ControlPeriod,
     catalog: MotionCatalog,
     position: f32,
     velocity: f32,
@@ -295,6 +308,7 @@ impl Limiter {
     /// `initial_position`が有限でない場合、または`承認値`の位置範囲の外にある場合に失敗する。
     pub fn new(
         limits: ServoLimits,
+        period: ControlPeriod,
         catalog: MotionCatalog,
         initial_position: f32,
     ) -> Result<Self, LimitsError> {
@@ -309,6 +323,7 @@ impl Limiter {
         }
         Ok(Self {
             limits,
+            period,
             catalog,
             position: initial_position,
             velocity: 0.0,
@@ -338,6 +353,12 @@ impl Limiter {
     #[must_use]
     pub const fn limits(&self) -> ServoLimits {
         self.limits
+    }
+
+    /// 適用中の制御周期。
+    #[must_use]
+    pub const fn period(&self) -> ControlPeriod {
+        self.period
     }
 
     /// `motion-name/target validation`と`hard range clamp or rejection`。
@@ -387,28 +408,37 @@ impl Limiter {
     /// 一気に落とし`最大加速度`を超えるのを防ぐためである。最後の位置範囲は安全網であり、
     /// 減速が効いている限り作用しない。
     ///
-    /// # `dt_s`は制御周期であり、安定していることを前提とする
+    /// # `dt_s`は[`ControlPeriod`]の範囲内でなければならない
     ///
-    /// **`dt_s`を step ごとに大きく変えると、`最大加速度`を守れない場合がある。**
-    /// 位置境界へ向けた減速の上限は`dt_s`に依存する。`dt_s`を**小さくする方向は安全**で、
-    /// 上限が緩むだけである。**大きくする方向が危険**で、上限が縮むため、前の step から
-    /// 持ち越した速度がその上限を超えうる。超えた分は減速しきれず境界に達し、
-    /// 最後の位置clampが速度を切り落とす。その切り落としは`最大加速度`を超える。
+    /// **範囲外の間隔はrejectする。**doc で「安定させること」と頼むのではなく、型と検査で
+    /// 強制する（`AGENTS.md`「サーボ安全制限をデバッグ経路からも迂回させない」）。
     ///
-    /// **そのとき位置の bound を優先する。**境界を越えて機構へ押し付けることは
+    /// 理由である。境界に速度を持って着いた状態では、**必要な減速量は持っている速度で
+    /// 固定される**一方、1 stepで使える減速量は`最大加速度 × dt_s`である。
+    /// **`dt_s`が縮むと後者だけが縮むため、`最大加速度`を守れなくなる。**
+    ///
+    /// **危険なのは`dt_s`を小さくする方向である。**`10.0`の次に`0.02`で加速度125、
+    /// `0.001`で2500だった。逆に`0.02`の次に`10.0`と大きくした場合は40のままである
+    /// （`tests/trajectory.rs`のtest値で、上限は40。**正本の値ではない**）。
+    ///
+    /// **`ControlPeriod`の許容変動幅が0であれば、`最大加速度`を譲ることは無い**
+    /// （総当たりで確認した）。幅を広げるほど譲る余地が広がる。譲った場合は
+    /// [`ClampReport::acceleration_bound_conceded`]で観測できる。
+    ///
+    /// 譲る場合でも**位置の bound は破らない。**境界を越えて機構へ押し付けることは
     /// 安全要件5項目の「servoの持続的拘束」に直接効くのに対し、加速度の超過は
-    /// **一度きりの減速**だからである。**位置の bound は、`dt_s`をどう変えても破らない。**
-    ///
-    /// 譲ったことは[`ClampReport::acceleration_bound_conceded`]と
-    /// [`LimiterCounters::acceleration_bound_conceded`]で観測できる。**握りつぶさない。**
-    /// `dt_s`が一定であれば、この flag は立たない。
+    /// 一度きりの減速だからである。
     ///
     /// # Errors
     ///
-    /// `dt_s`が有限でない、または正でない場合にrejectする。
+    /// `dt_s`が有限でない、正でない、または[`ControlPeriod`]の許容範囲の外にある場合に
+    /// rejectする。
     pub fn step(&mut self, admitted: AdmittedTarget, dt_s: f32) -> Result<Setpoint, Rejection> {
         if !dt_s.is_finite() || dt_s <= 0.0 {
             return Err(self.reject(Rejection::NonPositiveInterval));
+        }
+        if !self.period.accepts(dt_s) {
+            return Err(self.reject(Rejection::IntervalOutsideControlPeriod));
         }
 
         let mut clamps = ClampReport::default();

@@ -19,8 +19,8 @@
 #![allow(clippy::float_cmp)]
 
 use deskcat_servo::{
-    Cap, CommandSource, Limiter, LimiterCounters, MotionCatalog, MotionRequest, PositionRange,
-    Rejection, ServoLimits,
+    Cap, CommandSource, ControlPeriod, Limiter, LimiterCounters, MotionCatalog, MotionRequest,
+    PositionRange, Rejection, ServoLimits,
 };
 
 /// **test用の値。**`最小位置`のhard bound側ではない。
@@ -102,7 +102,36 @@ const SWEEP_TARGETS: [f32; 7] = [
 ];
 
 /// `単一commandの最大変化量`だけ差し替えたlimiter。**値はtest用である。**
-fn limiter_with_max_step(max_step: f32) -> Limiter {
+/// `単一commandの最大変化量`を大きくした制限。**test用の値である。**
+/// 1 stepで境界へ届かせ、境界での挙動を試すために使う。
+fn wide_step_limits() -> ServoLimits {
+    ServoLimits::new(
+        PositionRange::new(
+            TEST_HARD_MIN,
+            TEST_APPROVED_MIN,
+            TEST_APPROVED_MAX,
+            TEST_HARD_MAX,
+        )
+        .expect("ordered"),
+        TEST_NEUTRAL,
+        Cap::new(TEST_MAX_VELOCITY, TEST_MAX_VELOCITY_HARD, "max_velocity").expect("cap"),
+        Cap::new(
+            TEST_MAX_ACCELERATION,
+            TEST_MAX_ACCELERATION_HARD,
+            "max_acceleration",
+        )
+        .expect("cap"),
+        Cap::new(80.0, 90.0, "max_step").expect("cap"),
+    )
+    .expect("consistent")
+}
+
+/// 許容変動幅を0にした制御周期。**test用であり、実機の周期でもjitter幅でもない。**
+fn exact_period(nominal_s: f32) -> ControlPeriod {
+    ControlPeriod::new(nominal_s, 0.0).expect("test period is positive and finite")
+}
+
+fn limiter_with_max_step(max_step: f32, period_s: f32) -> Limiter {
     let limits = ServoLimits::new(
         PositionRange::new(
             TEST_HARD_MIN,
@@ -122,13 +151,23 @@ fn limiter_with_max_step(max_step: f32) -> Limiter {
         Cap::new(max_step, max_step + 10.0, "max_step").expect("cap"),
     )
     .expect("test limits are consistent");
-    Limiter::new(limits, MotionCatalog::new([TEST_MOTION]), TEST_NEUTRAL)
-        .expect("start is inside the approved range")
+    Limiter::new(
+        limits,
+        exact_period(period_s),
+        MotionCatalog::new([TEST_MOTION]),
+        TEST_NEUTRAL,
+    )
+    .expect("start is inside the approved range")
 }
 
 fn limiter_at(position: f32) -> Limiter {
-    Limiter::new(test_limits(), MotionCatalog::new([TEST_MOTION]), position)
-        .expect("test start position is inside the approved range")
+    Limiter::new(
+        test_limits(),
+        exact_period(TEST_DT_S),
+        MotionCatalog::new([TEST_MOTION]),
+        position,
+    )
+    .expect("test start position is inside the approved range")
 }
 
 fn limiter() -> Limiter {
@@ -217,8 +256,13 @@ fn rejects_a_motion_name_that_is_not_in_the_catalog() {
 fn an_empty_catalog_rejects_every_name() {
     // motion名がTBDである間の安全側の状態。Protocol §5.3 は受理するmotion名を
     // 「calibrationが完了するまでTBD」としている。
-    let mut limiter = Limiter::new(test_limits(), MotionCatalog::empty(), TEST_NEUTRAL)
-        .expect("start position is inside the approved range");
+    let mut limiter = Limiter::new(
+        test_limits(),
+        exact_period(TEST_DT_S),
+        MotionCatalog::empty(),
+        TEST_NEUTRAL,
+    )
+    .expect("start position is inside the approved range");
 
     assert!(MotionCatalog::empty().is_empty());
     for name in [TEST_MOTION, "", "nod", "neutral"] {
@@ -432,14 +476,16 @@ fn a_single_step_never_moves_further_than_the_max_step() {
 
 #[test]
 fn a_long_interval_is_bounded_by_velocity_not_by_the_interval() {
-    // dtを大きくしても、1 stepの移動量は`最大速度`×dtと`単一commandの最大変化量`の
-    // 小さい方を超えない。
-    let mut limiter = limiter();
+    // 制御周期そのものが長い場合。1 stepの移動量は`最大速度`×周期と
+    // `単一commandの最大変化量`の小さい方を超えない。
+    let long_dt = 10.0;
+    let mut limiter = limiter_with_max_step(TEST_MAX_STEP, long_dt);
     let admitted = limiter
         .admit(&request(TEST_APPROVED_MAX, CommandSource::Pi))
         .expect("valid target");
-    let long_dt = 10.0;
-    let setpoint = limiter.step(admitted, long_dt).expect("dt is positive");
+    let setpoint = limiter
+        .step(admitted, long_dt)
+        .expect("dt is the control period");
 
     assert!(setpoint.position() <= TEST_APPROVED_MAX + EPSILON);
     assert!(setpoint.velocity().abs() <= TEST_MAX_VELOCITY + EPSILON);
@@ -458,14 +504,16 @@ fn a_constant_interval_never_exceeds_the_acceleration_bound() {
     let mut worst = 0.0f32;
     for max_step in [TEST_MAX_STEP, 80.0, 0.5] {
         for dt in [10.0f32, 1.0, 0.25, 0.05, TEST_DT_S, 0.005, 0.001] {
-            let mut limiter = limiter_with_max_step(max_step);
+            let mut limiter = limiter_with_max_step(max_step, dt);
             let mut previous_velocity = 0.0f32;
             for k in 0..120 {
                 let target = SWEEP_TARGETS[(k / 11) % SWEEP_TARGETS.len()];
                 let Ok(admitted) = limiter.admit(&request(target, CommandSource::Pi)) else {
                     continue;
                 };
-                let setpoint = limiter.step(admitted, dt).expect("dt is positive");
+                let setpoint = limiter
+                    .step(admitted, dt)
+                    .expect("dt is the control period");
                 let acceleration = (setpoint.velocity() - previous_velocity).abs() / dt;
                 if acceleration > worst {
                     worst = acceleration;
@@ -486,83 +534,165 @@ fn a_constant_interval_never_exceeds_the_acceleration_bound() {
     assert!(worst > 0.0, "sweepが実際に加速度を動かしていること");
 }
 
-/// 制御周期を変えると`最大加速度`を譲ることがある。**そのとき位置の bound は破らず、
-/// 譲ったことを必ず報告する**（PR #251 の review で見つかった。修正前は無報告だった）。
+/// 制御周期の外にある間隔は reject する。**doc の依頼ではなく検査で強制する。**
 ///
-/// `dt`を**大きくする**方向が危険である。位置境界へ向けた減速の上限が縮み、前の step から
-/// 持ち越した速度がその上限を超えるためである。
+/// review が挙げた再現手順（長い間隔の直後に短い間隔）が、ここで止まる。
 #[test]
-fn a_varying_interval_may_concede_acceleration_but_never_position() {
-    let intervals = [10.0f32, 1.0, 0.25, 0.05, TEST_DT_S, 0.005, 0.001];
-    let mut conceded_any = false;
-    for max_step in [TEST_MAX_STEP, 80.0] {
-        for first in intervals {
-            for second in intervals {
-                let mut limiter = limiter_with_max_step(max_step);
-                let mut previous_velocity = 0.0f32;
-                for k in 0..120 {
-                    let dt = if (k / 7) % 2 == 0 { first } else { second };
-                    let target = SWEEP_TARGETS[(k / 11) % SWEEP_TARGETS.len()];
-                    let Ok(admitted) = limiter.admit(&request(target, CommandSource::Pi)) else {
-                        continue;
-                    };
-                    let setpoint = limiter.step(admitted, dt).expect("dt is positive");
-
-                    // 位置の bound は`dt`をどう変えても破らない。
-                    assert!(
-                        (TEST_HARD_MIN - EPSILON..=TEST_HARD_MAX + EPSILON)
-                            .contains(&setpoint.position()),
-                        "dt {first}/{second}, step {k}: position left the hard range"
-                    );
-
-                    // 加速度を超えたなら、必ず報告されている。握りつぶさない。
-                    let acceleration = (setpoint.velocity() - previous_velocity).abs() / dt;
-                    if acceleration > acceleration_ceiling(dt) {
-                        assert!(
-                            setpoint.clamps().acceleration_bound_conceded,
-                            "dt {first}/{second}, step {k}: acceleration {acceleration} \
-                             exceeded without being reported"
-                        );
-                        assert!(setpoint.clamps().any());
-                        conceded_any = true;
-                    }
-                    previous_velocity = setpoint.velocity();
-                }
-            }
-        }
-    }
-    assert!(
-        conceded_any,
-        "この組み合わせでは実際に譲る場面が起きること。起きないならtestが弱い"
-    );
-}
-
-/// review が挙げた具体例。長い`dt`の直後に短い`dt`を与える。
-#[test]
-fn the_reported_long_then_short_interval_case_keeps_the_position_bound() {
-    let mut limiter = limiter_with_max_step(80.0);
+fn an_interval_outside_the_control_period_is_rejected() {
+    let mut limiter = limiter_with_max_step(80.0, TEST_DT_S);
     let admitted = limiter
         .admit(&request(TEST_APPROVED_MAX, CommandSource::Pi))
         .expect("valid target");
-    let arrival = limiter.step(admitted, 10.0).expect("dt is positive");
-    assert_eq!(arrival.position(), TEST_APPROVED_MAX, "1 stepで境界へ着く");
 
-    let mut previous_velocity = arrival.velocity();
-    for dt in [TEST_DT_S, 0.005, 0.001, TEST_DT_S] {
+    // review の再現手順の1歩目そのもの。
+    let rejection = limiter
+        .step(admitted, 10.0)
+        .expect_err("10.0 is not the control period");
+    assert_eq!(rejection, Rejection::IntervalOutsideControlPeriod);
+    assert_eq!(
+        rejection.code(),
+        deskcat_protocol::ErrorCode::OutOfRange,
+        "§5.3は「値そのものが許容範囲外」をout_of_rangeとしている"
+    );
+    assert_eq!(limiter.counters().rejected_out_of_range, 1);
+    assert_eq!(limiter.position(), TEST_NEUTRAL, "rejectで状態を動かさない");
+
+    // 小さすぎる方向も同じ。**危険なのはこちらの方向である。**
+    for dt in [0.001f32, 0.005, 0.019, 0.021, 1.0] {
+        let mut limiter = limiter_with_max_step(80.0, TEST_DT_S);
         let admitted = limiter
             .admit(&request(TEST_APPROVED_MAX, CommandSource::Pi))
             .expect("valid target");
-        let setpoint = limiter.step(admitted, dt).expect("dt is positive");
+        assert_eq!(
+            limiter.step(admitted, dt),
+            Err(Rejection::IntervalOutsideControlPeriod),
+            "dt {dt} は許容幅0の制御周期の外である"
+        );
+    }
+}
+
+/// 許容変動幅の内側の jitter は受理する。**厳密一致にすると正常な系が止まる。**
+#[test]
+fn jitter_inside_the_tolerance_is_accepted() {
+    let nominal = TEST_DT_S;
+    // **test用の幅。**実機のjitter実測値ではない。
+    let tolerance = 0.002_f32;
+    let period = ControlPeriod::new(nominal, tolerance).expect("valid period");
+    let mut limiter = Limiter::new(
+        test_limits(),
+        period,
+        MotionCatalog::new([TEST_MOTION]),
+        TEST_NEUTRAL,
+    )
+    .expect("start is inside the approved range");
+
+    // **境界ちょうどは検査しない。**`|dt - nominal|`を f32 で求めるため、境界上の値は
+    // どちらに転ぶか決まらない。内側と、明確に外側だけを検査する。
+    for dt in [
+        nominal,
+        nominal - tolerance * 0.5,
+        nominal + tolerance * 0.5,
+    ] {
+        let admitted = limiter
+            .admit(&request(TEST_APPROVED_MAX, CommandSource::Pi))
+            .expect("valid target");
+        let setpoint = limiter.step(admitted, dt).expect("inside the tolerance");
         assert!(
             (TEST_HARD_MIN - EPSILON..=TEST_HARD_MAX + EPSILON).contains(&setpoint.position()),
             "dt {dt}: position left the hard range"
         );
-        let acceleration = (setpoint.velocity() - previous_velocity).abs() / dt;
-        if acceleration > acceleration_ceiling(dt) {
-            assert!(setpoint.clamps().acceleration_bound_conceded);
-        }
-        previous_velocity = setpoint.velocity();
     }
+
+    // 幅のすぐ外は reject する。
+    let admitted = limiter
+        .admit(&request(TEST_APPROVED_MAX, CommandSource::Pi))
+        .expect("valid target");
+    assert_eq!(
+        limiter.step(admitted, nominal + tolerance * 2.0),
+        Err(Rejection::IntervalOutsideControlPeriod)
+    );
+}
+
+/// 許容変動幅を広く取ると、幅の内側の jitter でも`最大加速度`を譲りうる。
+///
+/// **譲ること自体は避けられない。**検査するのは、**譲ったら必ず報告されること**と、
+/// **位置の bound は破らないこと**である。幅を0にすれば譲りは起きない
+/// （`a_constant_interval_never_exceeds_the_acceleration_bound`）。
+#[test]
+fn a_wide_tolerance_can_concede_but_always_reports_and_keeps_position() {
+    let mut saw_concession = false;
+    // **test用の組。**実機の周期でもjitter幅でもない。幅を周期の9割まで広げてある。
+    for (nominal, tolerance) in [(1.0f32, 0.9f32), (0.1, 0.09), (TEST_DT_S, 0.018)] {
+        let period = ControlPeriod::new(nominal, tolerance).expect("valid period");
+        let mut limiter = Limiter::new(
+            wide_step_limits(),
+            period,
+            MotionCatalog::new([TEST_MOTION]),
+            TEST_NEUTRAL,
+        )
+        .expect("start is inside the approved range");
+
+        let mut previous_velocity = 0.0f32;
+        for k in 0..200 {
+            let dt = if k % 2 == 0 {
+                nominal + tolerance * 0.99
+            } else {
+                nominal - tolerance * 0.99
+            };
+            let admitted = limiter
+                .admit(&request(TEST_APPROVED_MAX, CommandSource::Pi))
+                .expect("valid target");
+            let setpoint = limiter.step(admitted, dt).expect("inside the tolerance");
+
+            // 位置の bound は、幅をどれだけ広げても破らない。
+            assert!(
+                (TEST_HARD_MIN - EPSILON..=TEST_HARD_MAX + EPSILON).contains(&setpoint.position()),
+                "nominal {nominal}: position left the hard range"
+            );
+            // 超えたなら必ず報告されている。
+            let acceleration = (setpoint.velocity() - previous_velocity).abs() / dt;
+            if acceleration > acceleration_ceiling(dt) {
+                assert!(
+                    setpoint.clamps().acceleration_bound_conceded,
+                    "nominal {nominal}: acceleration {acceleration} exceeded without a report"
+                );
+                saw_concession = true;
+            }
+            previous_velocity = setpoint.velocity();
+        }
+    }
+    assert!(
+        saw_concession,
+        "広い許容幅では実際に譲りが起きること。起きないならtestが弱い"
+    );
+}
+
+/// 制御周期そのものの整合検査。
+#[test]
+fn an_inconsistent_control_period_is_refused() {
+    for (nominal, tolerance) in [
+        (0.0_f32, 0.0_f32),
+        (-TEST_DT_S, 0.0),
+        (TEST_DT_S, -0.001),
+        (TEST_DT_S, TEST_DT_S),
+        (TEST_DT_S, TEST_DT_S * 2.0),
+        (f32::NAN, 0.0),
+        (TEST_DT_S, f32::INFINITY),
+    ] {
+        assert!(
+            matches!(
+                ControlPeriod::new(nominal, tolerance),
+                Err(deskcat_servo::LimitsError::InvalidControlPeriod)
+            ),
+            "period ({nominal}, {tolerance}) must be refused"
+        );
+    }
+    let ok = ControlPeriod::new(TEST_DT_S, 0.0).expect("zero tolerance is allowed");
+    assert_eq!(ok.nominal_s(), TEST_DT_S);
+    assert_eq!(ok.tolerance_s(), 0.0);
+    assert!(ok.accepts(TEST_DT_S));
+    assert!(!ok.accepts(TEST_DT_S * 2.0));
+    assert!(!ok.accepts(f32::NAN));
 }
 
 // ---------------------------------------------------------------------------
@@ -811,12 +941,21 @@ fn a_start_position_outside_the_approved_range_is_refused() {
     assert!(
         Limiter::new(
             test_limits(),
+            exact_period(TEST_DT_S),
             MotionCatalog::new([TEST_MOTION]),
             TEST_HARD_MAX
         )
         .is_err()
     );
-    assert!(Limiter::new(test_limits(), MotionCatalog::new([TEST_MOTION]), f32::NAN).is_err());
+    assert!(
+        Limiter::new(
+            test_limits(),
+            exact_period(TEST_DT_S),
+            MotionCatalog::new([TEST_MOTION]),
+            f32::NAN
+        )
+        .is_err()
+    );
 }
 
 /// testの読みやすさのためだけの補助。名前を差し替えた要求を作る。

@@ -64,6 +64,11 @@ pub enum LimitsError {
     RangeOutOfOrder,
     /// `Neutral位置`が`承認値`の位置範囲の外にある。
     NeutralOutsideApprovedRange,
+    /// 制御周期または許容変動幅が、正の有限な秒数として成り立たない。
+    ///
+    /// 許容変動幅は0以上で、制御周期より小さくなければならない。等しいか大きいと
+    /// 受理する間隔の下限が0以下になり、間隔の検査が意味を失う。
+    InvalidControlPeriod,
     /// 開始位置が`承認値`の位置範囲の外にある。
     ///
     /// [`NeutralOutsideApprovedRange`]と分けている。呼び出し側が直せるのは
@@ -90,6 +95,9 @@ impl fmt::Display for LimitsError {
             Self::StartOutsideApprovedRange => {
                 f.write_str("start position lies outside the approved position range")
             }
+            Self::InvalidControlPeriod => f.write_str(
+                "control period must be positive and finite, with a tolerance in [0, period)",
+            ),
         }
     }
 }
@@ -316,5 +324,82 @@ impl ServoLimits {
     #[must_use]
     pub const fn max_step(self) -> Cap {
         self.max_step
+    }
+}
+
+/// 制御周期と、その許容変動幅。
+///
+/// # なぜ型で持つのか
+///
+/// [`Limiter::step`]が守れる保証は、**呼び出される間隔が安定していることに依存する。**
+/// 境界に速度を持って着いた状態では、必要な減速量は持っている速度で固定される一方、
+/// 1 stepで使える減速量は`最大加速度 × 間隔`である。**間隔が縮むと後者だけが縮み、
+/// `最大加速度`を守れなくなる。**
+///
+/// doc へ「安定させること」と書くだけでは、呼び出し側が守らなければ破れる。
+/// `AGENTS.md`は「サーボ安全制限をデバッグ経路からも迂回させない」と定めており、
+/// **迂回できる強制を残さないために型で受け取り、範囲外の間隔をrejectする。**
+///
+/// # 値はここで決めない
+///
+/// `docs/hardware/servo-safety-limits.md`の`動作制限`表に制御周期の行は無い。
+/// **既定値を持たず、[`Default`]も実装しない。**周期も許容幅も呼び出し側が渡す。
+///
+/// # 許容変動幅について
+///
+/// **0にできるが、実際の制御loopにはjitterがある。**厳密一致でrejectすると正常な系で
+/// servoが止まるため、呼び出し側が実測に基づく幅を渡せるようにしてある。
+///
+/// **幅を広げるほど、`最大加速度`を譲る余地が広がる。**幅が0のときだけ譲りは起きない。
+/// **広い幅では譲りは小さくない。**周期の9割の幅を与えたtestでは、上限40に対して
+/// 実測で最大387だった（`tests/trajectory.rs`のtest値である。**正本の値ではない**）。
+/// **実測のjitterに見合う最小の幅を渡すこと。**
+/// 譲りは[`ClampReport::acceleration_bound_conceded`]で観測でき、
+/// **位置の bound は幅をどれだけ広げても破らない。**
+///
+/// [`Limiter::step`]: crate::Limiter::step
+/// [`ClampReport::acceleration_bound_conceded`]: crate::ClampReport::acceleration_bound_conceded
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ControlPeriod {
+    nominal_s: f32,
+    tolerance_s: f32,
+}
+
+impl ControlPeriod {
+    /// 公称の制御周期（秒）と許容変動幅（秒）から作る。
+    ///
+    /// # Errors
+    ///
+    /// 有限でない、`nominal_s`が正でない、`tolerance_s`が負、または
+    /// `tolerance_s >= nominal_s`の場合に失敗する。
+    pub fn new(nominal_s: f32, tolerance_s: f32) -> Result<Self, LimitsError> {
+        if !nominal_s.is_finite() || !tolerance_s.is_finite() {
+            return Err(LimitsError::InvalidControlPeriod);
+        }
+        if nominal_s <= 0.0 || tolerance_s < 0.0 || tolerance_s >= nominal_s {
+            return Err(LimitsError::InvalidControlPeriod);
+        }
+        Ok(Self {
+            nominal_s,
+            tolerance_s,
+        })
+    }
+
+    /// 公称の制御周期（秒）。
+    #[must_use]
+    pub const fn nominal_s(self) -> f32 {
+        self.nominal_s
+    }
+
+    /// 許容変動幅（秒）。
+    #[must_use]
+    pub const fn tolerance_s(self) -> f32 {
+        self.tolerance_s
+    }
+
+    /// この間隔を受理するか。境界上は受理する。
+    #[must_use]
+    pub fn accepts(self, dt_s: f32) -> bool {
+        dt_s.is_finite() && (dt_s - self.nominal_s).abs() <= self.tolerance_s
     }
 }

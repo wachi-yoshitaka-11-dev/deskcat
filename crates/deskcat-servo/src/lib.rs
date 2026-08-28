@@ -14,10 +14,15 @@
 //!
 //! # 呼び出し側の前提
 //!
-//! **[`Limiter::step`]へ渡す`dt_s`は制御周期であり、安定していることを前提とする。**
-//! step ごとに大きく変えると`最大加速度`を守れない場合がある。そのとき**位置の bound を
-//! 優先し**、譲ったことを[`ClampReport::acceleration_bound_conceded`]で報告する。
-//! **位置の bound は`dt_s`をどう変えても破らない。**条件は[`Limiter::step`]の doc にある。
+//! **[`Limiter::step`]を呼ぶ間隔は[`ControlPeriod`]で受け取り、範囲外はrejectする。**
+//! doc で頼むのではなく検査で強制する。境界に速度を持って着いた状態では、必要な減速量が
+//! 固定される一方で1 stepの減速量は`最大加速度 × 間隔`なので、**間隔が縮むと
+//! `最大加速度`を守れなくなる**（危険なのは**小さくする**方向である）。
+//!
+//! 周期も許容変動幅も**呼び出し側から受け取る。**`動作制限`表に制御周期の行は無く、
+//! ここで値を決めない。**許容幅が0なら`最大加速度`を譲ることは無い。**幅を広げた場合の
+//! 譲りは[`ClampReport::acceleration_bound_conceded`]で観測できる。
+//! **位置の bound は、どの場合も破らない。**
 //!
 //! # 範囲
 //!
@@ -47,7 +52,8 @@
 //!
 //! ```
 //! use deskcat_servo::{
-//!     Cap, CommandSource, Limiter, MotionCatalog, MotionRequest, PositionRange, ServoLimits,
+//!     Cap, CommandSource, ControlPeriod, Limiter, MotionCatalog, MotionRequest, PositionRange,
+//!     ServoLimits,
 //! };
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -59,7 +65,9 @@
 //!     Cap::new(40.0, 50.0, "max_acceleration")?,
 //!     Cap::new(10.0, 12.0, "max_step")?,
 //! )?;
-//! let mut limiter = Limiter::new(limits, MotionCatalog::new(["doc-test-motion"]), 0.0)?;
+//! // 制御周期と許容幅も呼び出し側が渡す。**この数値もdoc test用である。**
+//! let period = ControlPeriod::new(0.02, 0.002)?;
+//! let mut limiter = Limiter::new(limits, period, MotionCatalog::new(["doc-test-motion"]), 0.0)?;
 //!
 //! // hard boundの外はreject。
 //! let refused = limiter.admit(&MotionRequest {
@@ -90,4 +98,4 @@ pub use counters::{ClampReport, LimiterCounters};
 pub use limiter::{
     AdmittedTarget, CommandSource, Limiter, MotionCatalog, MotionRequest, Rejection, Setpoint,
 };
-pub use limits::{Cap, LimitsError, PositionRange, ServoLimits};
+pub use limits::{Cap, ControlPeriod, LimitsError, PositionRange, ServoLimits};
