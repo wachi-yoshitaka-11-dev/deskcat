@@ -901,6 +901,125 @@ class CodeRabbitGateTests(unittest.TestCase):
             with self.subTest(command=command):
                 self.assertAsked(command)
 
+    def test_later_write_method_is_not_masked_by_an_earlier_read(self):
+        """`-X GET -X POST`を読み取り扱いにしない。**`gh`は最後の`-X`を使う。**
+
+        `any()`で見ると先頭の`get`が後ろの`post`を隠し、**承認を経ずに素通りした**
+        （2026-08-28に実測。PR #254のreviewで出た）。
+        """
+        self.assertAsked(
+            "gh api -X GET -X POST repos/o/r/issues/1/comments"
+            ' -f body="@coderabbitai full review"'
+        )
+
+    def test_read_method_declared_last_is_still_allowed(self):
+        """**後勝ちは両方向へ効く。**最後が読み取りなら素通りさせる。
+
+        `-X POST -X GET`で`gh`が投げるのはGETである。ここを止めると誤検知になる。
+        """
+        self.assertAllowed(
+            "gh api -X POST -X GET repos/o/r/issues/1/comments"
+            ' -f body="@coderabbitai full review"'
+        )
+
+    def test_input_file_is_read(self):
+        """`gh api --input <file>`の本文を読む。
+
+        **値がpathであって本文ではないため、`BODY_OPTIONS`では拾えない。**
+        塞ぐまでは`--input`へ本文を置けば素通りした（2026-08-28に実測）。
+        """
+        with tempfile.TemporaryDirectory() as directory:
+            body = Path(directory) / "body.json"
+            body.write_text(
+                '{"body": "@coderabbitai full review"}', encoding="utf-8"
+            )
+            self.assertAsked(
+                f"gh api repos/o/r/issues/1/comments --input {body}"
+            )
+            harmless = Path(directory) / "ok.json"
+            harmless.write_text(
+                '{"body": "@coderabbitai rate limit"}', encoding="utf-8"
+            )
+            self.assertAllowed(
+                f"gh api repos/o/r/issues/1/comments --input {harmless}"
+            )
+
+    def test_field_value_from_a_file_is_read(self):
+        """`-F key=@<path>`の値をfileから読む。
+
+        **`key=@path`という文字列のままでは`@coderabbitai`を含まないため素通りする**
+        （2026-08-28に実測）。
+        """
+        with tempfile.TemporaryDirectory() as directory:
+            body = Path(directory) / "body.txt"
+            body.write_text("@coderabbitai full review", encoding="utf-8")
+            for option in ("-F", "--field"):
+                with self.subTest(option=option):
+                    self.assertAsked(
+                        f"gh api -X POST repos/o/r/issues/1/comments"
+                        f" {option} body=@{body}"
+                    )
+
+    def test_raw_field_does_not_expand_at_sign(self):
+        """`-f`／`--raw-field`の`@`をfileとして読まない。
+
+        **`gh`は`-f`の値を文字列のまま送る**（`gh api --help`で確認した）。
+        fileとして読むと、**実際には送られない内容でaskを出す**ことになる。
+        """
+        with tempfile.TemporaryDirectory() as directory:
+            body = Path(directory) / "body.txt"
+            body.write_text("@coderabbitai full review", encoding="utf-8")
+            for option in ("-f", "--raw-field"):
+                with self.subTest(option=option):
+                    self.assertAllowed(
+                        f"gh api -X POST repos/o/r/issues/1/comments"
+                        f" {option} body=@{body}"
+                    )
+
+    def test_unreadable_input_file_is_allowed(self):
+        """読めない`--input`を素通りさせる。**判定の方針は変えていない。**
+
+        読めないことをAIの独断の証拠として扱わない、という既存の判断
+        （`_texts`のdocstring）を、増えた経路にも同じく当てる。
+        """
+        self.assertAllowed(
+            "gh api repos/o/r/issues/1/comments --input /nonexistent/body.json"
+        )
+        self.assertAllowed(
+            "gh api -X POST repos/o/r/issues/1/comments"
+            " -F body=@/nonexistent/b.txt"
+        )
+
+    def test_body_source_is_named_on_stderr(self):
+        """読めなかった経路の名前を記録へ残す。
+
+        **読める経路は3つある。**どれが読めなかったかを書かないと、記録から
+        経路を辿れない。
+        """
+        for command, name in (
+            (
+                "gh api repos/o/r/issues/1/comments"
+                " --input /nonexistent/b.json",
+                "--input",
+            ),
+            (
+                "gh api -X POST repos/o/r/issues/1/comments"
+                " -F body=@/nonexistent/b.txt",
+                "-F",
+            ),
+        ):
+            with self.subTest(name=name):
+                payload = json.dumps(
+                    {"tool_name": "Bash", "tool_input": {"command": command}}
+                )
+                result = subprocess.run(
+                    [sys.executable, CODERABBIT_GATE], input=payload,
+                    capture_output=True, text=True,
+                    encoding="utf-8", timeout=60,
+                )
+                self.assertEqual(result.stdout.strip(), "")
+                self.assertIn(name, result.stderr)
+
     def test_unreadable_body_file_is_recorded_on_stderr(self):
         """読めない`--body-file`を素通りさせるが、**握りつぶさない。**
 
