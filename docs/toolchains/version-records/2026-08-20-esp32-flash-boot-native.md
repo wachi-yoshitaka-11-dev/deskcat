@@ -438,13 +438,16 @@ USB-UART: Silicon Labs CP210x（10c4:ea60、/dev/ttyUSB0）
 | 3 |  5.30 s | 0.110 s | power_on（+10.059 s） | 1006（+1.008 s） |
 
 **3 回とも `reset_reason=power_on`、`uptime_ms=1006`（heartbeat 1 本目の値）で一致した。**
+heartbeat の周期は約 994 ms（「2026-08-25 再検証」節の周期実測を参照）であり、3 回とも
+最初に検出できた行が 1 本目の heartbeat（`hb seq=1`）だったため、同じ値になっている。
+**使い回しではなく、毎回起動直後の最初の行を捕まえたことの結果である。**
 `uptime_ms` は port を開いてから 1 秒程度で検出できており、「十分小さい」と言える値である。
 `reset_reason` は heartbeat には含まれず、10 秒周期の health snapshot（JSON）まで待って初めて
 検出できたため、検出までの経過時間は 10 秒前後になっている。**この経過時間の長さは
 `reset_reason` の値そのものの信頼性を下げるものではない**（health snapshot の JSON にある
 `"reset_reason":"power_on"` を読んだだけであり、10 秒待ったこと自体が異常を示すものではない）。
 
-これとは別に、上と同じ抜き差しの試行のうち 3 回は、device node 再作成の直後に port を開いた
+これとは別に、上と同じ抜き差しの試行のうち 4 回は、device node 再作成の直後に port を開いた
 際に `SerialException`（device disconnected or multiple access on port?）が発生し、
 `reset_reason`／`uptime_ms` を得られなかった。**再現するたびに device node は正しく消失・
 再作成しており、電源が実際に切れて入り直したこと自体は確認できている。**エラーは port を
@@ -464,14 +467,16 @@ USB-UART: Silicon Labs CP210x（10c4:ea60、/dev/ttyUSB0）
   （`rst:0x...`）と firmware 起動直後（`uptime_ms` が heartbeat 1 本目である 1006 ms より前）
   の出力は、今回も取得していない。取りに行っていない
 - **主張しないこと（今回追加）**: `uptime_ms=1006` より前、すなわち boot から heartbeat
-  1 本目までの区間（記録済みの起動出力によれば app_main 開始が uptime 354 ms 付近）で
-  何が起きたかは、今回の方法では確認できない
+  1 本目までの区間で何が起きたかは、今回の方法では確認できない（記録済みの起動出力に
+  よれば ESP-IDF の log timestamp で `app_main` 呼び出しは `I (354)` 付近だが、これは
+  firmware 自身の `uptime_ms` とは別の clock であり、上記「2026-08-25 再検証」節が示す
+  約 380 ms のオフセットを直接足し引きできる値ではない）
 - 周辺回路、servo、電圧については本節でも何も追加確認していない（既存の「この記録が
   主張しないこと」と同じ）
 
 ### `AGENTS.md` との食い違い（記録のみ。書き換えは PM へ引き継ぐ）
 
-**`AGENTS.md` の「ハードウェア安全」節にある「USB 抜き差しによる電源再投入後の起動出力は
+**`AGENTS.md` の「検証」節にある「USB 抜き差しによる電源再投入後の起動出力は
 未検証である」という一文は、この追記の時点で未更新であり、この記録と食い違っている。**
 
 具体的には、`AGENTS.md` の当該文は「起動出力（起動直後の出力全般）が未検証」とだけ書いており、
