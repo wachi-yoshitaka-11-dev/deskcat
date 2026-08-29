@@ -130,7 +130,7 @@ DECLARATION_CUTOVER = "57734371384d18f31de7557a7a60fd1aa856edff"
 # **ただし免除は`Change-Class`と`Self-Review`だけを飛ばすのではない。**`history`は
 # 免除commitで`continue`するため、`_check_instructions`も掛からない。**指示source変更の
 # 宣言（`Instruction-Change`）の検査まで抑止する。**
-# 実際に効いているのは`9c91f913`だけである（`docs/hardware/`を触りながら
+# 実際に効いているのは`9c91f913`と`b71c7ef`である（どちらも`docs/hardware/`を触りながら
 # `Instruction-Change`を持たない）。`18298ae`と`619c843`は`INSTRUCTION_SOURCES`のpathを
 # 1つも触らないため、この抑止は掛かっていない。
 #
@@ -154,6 +154,23 @@ DECLARATION_CUTOVER = "57734371384d18f31de7557a7a60fd1aa856edff"
 #   **これは`fixup`区分そのものの欠陥ではない。**直接commit経路に、押す瞬間の検査が
 #   無かったことによる。同じ形を止めるため`scripts/hooks/push_gate.py`を入れた。
 #
+# - `b71c7ef`（PR #258）。**`18298ae`／`619c843`と同じ原因である。**
+#   head commit（`63fe1b3`）は`Change-Class`、3値の`Self-Review`、`Instruction-Change`、
+#   `Refs: #257`をすべて持ち、Gateの`Verify change class and self-review`は`success`だった。
+#   squash merge時にmessageへtrailerが載らず、squash commitへ引き継がれなかった。
+#   **中身のreviewは通っており、失われたのは宣言の記録だけである。**
+#
+#   **前2件と違う点が2つある。**
+#
+#   1. **`docs/hardware/`を3 file触る。**そのため免除は`Instruction-Change`の検査まで
+#      抑止する（`9c91f913`と同じ側になる）。**head commitはその宣言を持っていた**ため、
+#      抑止されるのは記録であって判断ではない。
+#   2. **`gh_metadata_guard.py`が`gh pr merge`のsquash messageを検査する状態で起きた。**
+#      同hookは`Change-Class`と`Self-Review`を持たないmessageを`deny`する。
+#      **それでも止まらなかった。**hookはBash tool経由の`gh pr merge`だけを見るため、
+#      別の経路を通ったと考えられるが、**経路は特定していない。推測で書かない。**
+#      **「hookを入れたから同じ型は起きない」とは言えない、という記録である。**
+#
 # **この列挙を増やさない。**増やす変更は`scripts/`の変更であり、reviewと
 # `Instruction-Change`の宣言を通る。通したうえで増やすなら、それは判断である。
 DECLARATION_EXEMPT = (
@@ -161,6 +178,7 @@ DECLARATION_EXEMPT = (
     "18298ae3127f31a81411a6c723122dad17a91299",
     "619c8439be8489451ec9f6a9b79613bc01c1605d",
     "b93b309c7f6a39967d2eb3ba62807bc4bb1a5dfe",
+    "b71c7ef9e58240d71667c95b551b113288ee450f",
 )
 
 # 変更行がこれらのいずれかに当たると軽微にしない。数値、command、link、表、見出し、
