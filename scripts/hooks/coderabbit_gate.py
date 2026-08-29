@@ -17,6 +17,12 @@ Claude CodeのPreToolUse hookとして、Bash tool呼び出しの前に走る。
 **2026-08-28に、承認を経ずに通る経路を3つ塞いだ**（PR #254のreviewで出た）。
 `-X GET -X POST`の後勝ち、`--input <file>`、`-F key=@<path>`。**3つとも実測で再現した。**
 
+**2026-08-29に、本文を読めない場合の扱いを素通りからaskへ変えた。**
+以前は「読めなければ判定できないため素通りさせる。この方向の取りこぼしは意図である」と
+していたが、**`-F body=@-`は意図して選べる経路であり、外したい側が自分で選べる穴だった。**
+**判定は`deny`ではなく`ask`である。**誤検知の代償は人への確認1回で、
+見逃しの代償はこのhookが在る理由そのものである。**釣り合っていなかった。**
+
 **環境変数によるバイパスを設けていない。**他のhookの`SKIP_ENV`に当たるものが無いのは
 意図である。**AIが自分で外せる抑制は抑制ではない。**この判断は#240で人間が決めた。
 
@@ -161,9 +167,12 @@ def _option_values(args, names):
 
 
 def _read_body(path, source):
-    """fileから本文を読む。読めなければ空を返す。**判定は変えない。**
+    """fileから本文を読む。戻りは`(本文のlist, 読めなかった理由のlist)`。
 
-    `-`（stdin）と読み出し失敗は、どちらも**素通りさせる。**理由は`_texts`のdocstringにある。
+    **読めなかったことを呼び出し側へ返す。**以前は空を返して素通りさせていたが、
+    **それは外したい側が自分で選べる穴だった**（`-F body=@-`と書けば検査を抜けられる）。
+    扱いは`_check`が決める。
+
     **握りつぶさない。**分類してstderrへ残す
     （AGENTS.mdの「エラーを握りつぶさず、分類、ログ、カウンタを用意する」）。
 
@@ -172,42 +181,61 @@ def _read_body(path, source):
     記録から経路を辿れない。**
     """
     if path == "-":
-        _note(f"本文が`{source}`のstdin（`-`）から渡されており、hookからは読めない")
-        return []
+        reason = f"`{source}`のstdin（`-`）から渡されており、hookからは読めない"
+        _note(f"本文が{reason}")
+        return [], [reason]
     try:
         with open(path, encoding="utf-8") as handle:
-            return [handle.read()]
+            return [handle.read()], []
     except OSError as error:
-        # `gh_metadata_guard.py`は同じ失敗を診断文へ載せているが、**こちらは
-        # 素通りするため診断文が無い。**代わりにstderrへ出す。
-        _note(f"`{source}`の読み出しに失敗したため判定できない: {error}")
-        return []
+        reason = f"`{source}`の読み出しに失敗した: {error}"
+        _note(f"{reason}ため判定できない")
+        return [], [reason]
 
 
 def _texts(args):
     """引数として渡された本文の候補を返す。
 
+    戻りは`(本文のlist, 読めなかった理由のlist)`。
+
     **fileから読む経路は3つある**（`--body-file`／`--input`／`-F key=@path`）。
-    `gh_metadata_guard.py`の`_merge_message`と違い、読めなかったことを理由に
-    止めない。**本文が読めなければ`@coderabbitai`が
-    含まれるかを判定できないため素通りさせる。**hookが読めないことを、
-    AIの独断の証拠として扱わない。**この方向の取りこぼしは意図である。**
+    **読めなかった経路を、読んで何も見つからなかったのと同じに扱わない。**
+    以前は同じに扱っており、**`-F body=@-`と書けば検査を抜けられた。**
     """
     found = _option_values(args, BODY_OPTIONS)
+    unreadable = []
     for option in (BODY_FILE_OPTIONS, INPUT_OPTIONS):
         for path in _option_values(args, option):
-            found.extend(_read_body(path, option[0]))
+            texts, reasons = _read_body(path, option[0])
+            found.extend(texts)
+            unreadable.extend(reasons)
     # `-F key=@path`は値をfileから読む。**`key=@path`という文字列のままでは
     # `@coderabbitai`を含まないため、読まないと素通りする**（2026-08-28に実測）。
     for value in _option_values(args, FIELD_FILE_OPTIONS):
         _, separator, right = value.partition("=")
         if separator and right.startswith("@"):
-            found.extend(_read_body(right[1:], FIELD_FILE_OPTIONS[0]))
-    return found
+            texts, reasons = _read_body(right[1:], FIELD_FILE_OPTIONS[0])
+            found.extend(texts)
+            unreadable.extend(reasons)
+    return found, unreadable
 
 
 def _check(subcommand, args):
-    for text in _texts(args):
+    texts, unreadable = _texts(args)
+    if unreadable:
+        # **読めない本文を「reviewではない」と扱わない。**判定はaskであり、人が通せる。
+        # **誤検知の代償は確認1回、見逃しの代償はこのgateが在る理由そのものである。**
+        # `-F body=@-`は意図して選べる経路であり、**外したい側が自分で選べる穴だった。**
+        _ask(
+            f"`{' '.join(subcommand)}`の本文をhookから読めない"
+            f"（{'／'.join(unreadable)}）。"
+            f" **`{MENTION}`へreviewを投げようとしているかを判定できない。**"
+            " CodeRabbitのreview枠は共有資源であり、AIの判断で消費してよいものではない。"
+            " 読めない経路を「reviewではない」と扱うと、その経路が抑制を外す手段になる。"
+            " 投げてよいか人間へ確認する。"
+            " **reviewを含まない操作なら、本文をfileへ書いて`--body-file`で渡すと判定できる。**"
+        )
+    for text in texts:
         if not _mentions_review(text):
             continue
         _ask(

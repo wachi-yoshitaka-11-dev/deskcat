@@ -817,14 +817,33 @@ class CodeRabbitGateTests(unittest.TestCase):
             path.write_text("@coderabbitai full review\n", encoding="utf-8")
             self.assertAsked(f'gh pr comment 239 --body-file {path}')
 
-    def test_unreadable_body_file_is_allowed(self):
-        """読めない`--body-file`で止めない。
+    def test_an_unreadable_body_is_asked_not_allowed(self):
+        """本文を読めない呼び出しを素通りさせない。**askする。**
 
-        **hookが読めないことを、AIの独断の証拠として扱わない。**
-        この方向の取りこぼしは意図である。
+        以前は素通りさせ、docstringも「この方向の取りこぼしは意図である」としていた。
+        **しかし`-F body=@-`は意図して選べる経路であり、外したい側が自分で選べる穴だった。**
+        **判定は`deny`ではなく`ask`である。**誤検知の代償は人への確認1回で、
+        見逃しの代償はこのhookが在る理由そのものである。
         """
-        self.assertAllowed("gh pr comment 239 --body-file /nonexistent/body.md")
-        self.assertAllowed("gh pr comment 239 --body-file -")
+        for command in (
+            "gh pr comment 1 --body-file /nonexistent/body.md",
+            "gh api repos/o/r/issues/1/comments --input /nonexistent/body.json",
+            "gh api -X POST repos/o/r/issues/1/comments -F body=@/nonexistent/b.txt",
+            "gh pr comment 1 --body-file -",
+            "gh api -X POST repos/o/r/issues/1/comments -F body=@-",
+        ):
+            with self.subTest(command=command):
+                self.assertAsked(command, contains="読めない")
+
+    def test_a_readable_body_without_review_is_still_allowed(self):
+        """**読めた本文にreviewが無ければ素通りする。**askを一律にはしない。"""
+        with tempfile.TemporaryDirectory() as directory:
+            body = Path(directory) / "b.md"
+            body.write_text("@coderabbitai rate limit", encoding="utf-8")
+            self.assertAllowed(f"gh pr comment 1 --body-file {body}")
+            self.assertAllowed(
+                f"gh api repos/o/r/issues/1/comments --input {body}"
+            )
 
     def test_unrelated_commands_are_allowed(self):
         """CodeRabbitに関係しない`gh`と読み取りを通す。"""
@@ -976,20 +995,6 @@ class CodeRabbitGateTests(unittest.TestCase):
                         f" {option} body=@{body}"
                     )
 
-    def test_unreadable_input_file_is_allowed(self):
-        """読めない`--input`を素通りさせる。**判定の方針は変えていない。**
-
-        読めないことをAIの独断の証拠として扱わない、という既存の判断
-        （`_texts`のdocstring）を、増えた経路にも同じく当てる。
-        """
-        self.assertAllowed(
-            "gh api repos/o/r/issues/1/comments --input /nonexistent/body.json"
-        )
-        self.assertAllowed(
-            "gh api -X POST repos/o/r/issues/1/comments"
-            " -F body=@/nonexistent/b.txt"
-        )
-
     def test_body_source_is_named_on_stderr(self):
         """読めなかった経路の名前を記録へ残す。
 
@@ -1017,14 +1022,18 @@ class CodeRabbitGateTests(unittest.TestCase):
                     capture_output=True, text=True,
                     encoding="utf-8", timeout=60,
                 )
-                self.assertEqual(result.stdout.strip(), "")
+                # **askで止めたうえで**、経路の名前を記録へ残す。
+                decision = json.loads(result.stdout.strip())
+                self.assertEqual(
+                    decision["hookSpecificOutput"]["permissionDecision"], "ask"
+                )
                 self.assertIn(name, result.stderr)
 
-    def test_unreadable_body_file_is_recorded_on_stderr(self):
-        """読めない`--body-file`を素通りさせるが、**握りつぶさない。**
+    def test_an_unreadable_body_is_recorded_on_stderr(self):
+        """読めない`--body-file`をaskで止めつつ、**理由をstderrへも残す。**
 
         AGENTS.mdの「エラーを握りつぶさず、分類、ログ、カウンタを用意する」に従う。
-        判定は変えない（素通り）が、理由をstderrへ残す。
+        **askの診断文と、stderrの記録の両方に残す。**前者は人が読み、後者は後から辿る。
         """
         payload = json.dumps({
             "tool_name": "Bash",
@@ -1036,7 +1045,11 @@ class CodeRabbitGateTests(unittest.TestCase):
             encoding="utf-8", errors="replace", timeout=60,
         )
         self.assertEqual(result.returncode, 0)
-        self.assertEqual(result.stdout.strip(), "", "止めてしまった")
+        decision = json.loads(result.stdout.strip())
+        self.assertEqual(
+            decision["hookSpecificOutput"]["permissionDecision"], "ask"
+        )
+        self.assertIn("--body-file", _reason(decision))
         self.assertIn("coderabbit_gate:", result.stderr)
         self.assertIn("--body-file", result.stderr)
 
