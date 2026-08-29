@@ -6,7 +6,7 @@
 # 分離自体はADR-0001（docs/decisions/0001-monorepo-layout.md）の決定である。
 [workspace]
 resolver = "3"
-members = ["crates/deskcat-protocol", "crates/deskcat-serial"]
+members = ["crates/deskcat-protocol", "crates/deskcat-serial", "crates/deskcat-servo"]
 exclude = ["firmware/esp32"]
 
 # `rust-version`は、実際にbuildとtestを通した版だけを宣言する。

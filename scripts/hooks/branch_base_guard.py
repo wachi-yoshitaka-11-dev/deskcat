@@ -95,8 +95,8 @@ def main():
         payload = json.load(sys.stdin)
     except (json.JSONDecodeError, UnicodeDecodeError):
         return 0
-    command = (payload.get("tool_input") or {}).get("command")
-    if not isinstance(command, str):
+    command = command_line.command_from(payload)
+    if command is None:
         return 0
     creation = _branch_creation(command)
     if creation is None:

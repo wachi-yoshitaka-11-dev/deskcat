@@ -18,14 +18,18 @@ message型、検証、上限付きline受信は[`deskcat-protocol`](../deskcat-p
 - 接続stateとcounter（`Session`）
 - 実serial portの上で`Transport`を満たす型（`SerialDevice`）。`serial2`でportを開き、
   切断のerrnoと読みのtimeoutを契約どおりに正規化する（下記）
+- ESP32 peer sessionの状態（`PeerSession`、`src/peer.rs`）。`boot`のsession遷移、
+  duplicate履歴、`hello`／`boot`以外の`stale_session`判定、Piが送った`ping`／
+  `get_status`への応答の相関（[Issue #12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)）
 
 含まないもの:
 
 - **実portを開いての確認**（下記）
 - **domain動作。**感情、性格、行動判断、独り言は入らない。公開するのは
   connection stateとcounterだけである
-- **session遷移の確定、duplicate履歴、受理budget、遷移cooldown。**受信側のstateを
-  要するため[Issue #12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)の範囲である
+- **単位時間あたりの受理上限、session遷移budget、cooldown。**`PROTO-TBD-012`が
+  未確定であり、値を推測しない。`PeerSession`はこれらのbudgetに依存しない部分だけを
+  扱う（`src/peer.rs`のmodule doc参照）
 
 ## 実deviceのbackend（`SerialDevice`）
 
@@ -76,12 +80,12 @@ baudの正本は`PROTO-TBD-001`でいずれも`Candidate`である。渡した�
 （既定50 msなので毎秒20行）、長時間の観察では本当のeventが埋まる。
 
 **確かめられるのは「行が通ること」までである。**`protocol`が成立したことは確かめられない。
-`boot`／`ping`／`status`／ACK／reconnect同期の実装は
-[Issue #12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)であり、
-**ESP32側がprotocolを話すとは限らない。**接続のたびに`hello`を1件送るのは書き出し経路を
-通すためであって、handshakeではない（`reason`は初回が`Startup`、再接続が`PortReopen`。
-仕様§5.1）。記録では**「行が通った」と「protocolが成立した」を
-書き分ける。**
+この実行体は`PeerSession`（[Issue #12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)）を
+呼んでおらず、**ESP32側がprotocolを話すとは限らない。**接続のたびに`hello`を1件送るのは
+書き出し経路を通すためであって、handshakeではない（`reason`は初回が`Startup`、再接続が
+`PortReopen`。仕様§5.1）。記録では**「行が通った」と「protocolが成立した」を
+書き分ける。**`boot`／`ping`／`get_status`のsession logicそのものは`PeerSession`が持つが、
+simulator test（`tests/simulator.rs`）までの検証であり、実機での成立は確認していない。
 
 ### host（VM）で確認済みの挙動
 

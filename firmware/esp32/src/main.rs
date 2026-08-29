@@ -36,10 +36,13 @@
 
 mod config;
 mod health;
+mod protocol;
 
+use deskcat_protocol::{Boot, Hello, HelloReason};
 use esp_idf_svc::hal::delay::FreeRtos;
 
 use crate::health::Health;
+use crate::protocol::PiSession;
 
 /// `ResetReason` を Protocol の語彙（snake_case）へ写す。
 ///
@@ -158,6 +161,18 @@ fn main() {
     let mut next_heartbeat = u64::from(config::HEARTBEAT_PERIOD_MS);
     let mut next_snapshot = u64::from(config::HEALTH_SNAPSHOT_PERIOD_MS);
 
+    // **`boot`はまだwireへ送らない。**GPIO割り当ての承認待ちではない
+    // （`docs/hardware/gpio-assignment.md`の`Pi–ESP32間のtransport`節はUSB serialへ
+    // 確定済みで、GPIO headerへの配線は無い）。止めているのは、そのUSB link上の
+    // UART0が同文書のpin表で`firmware flashingとdebug log専用`と定められており、
+    // ESP loggerの出力と、これから送るprotocolのJSON Lines streamが同じUART0を
+    // 奪い合う点が未決なことである（`crate::protocol`のmodule doc参照）。ここで示すのは、
+    // `crates/deskcat-protocol`の`Boot`をこのfirmwareが正しく組み立てられることと、
+    // `crate::protocol::PiSession`が`hello`／`ping`／`get_status`を仕様どおり処理できる
+    // ことであり、`health.rs`が`status`について既に示しているのと同じ範囲の主張である。
+    log_boot_message(&mut health, reset_reason);
+    demonstrate_pi_session(&mut health);
+
     // **`main()` から戻らない。**#6 の firmware は戻っていたため、task が進み続けて
     // いるかを外から確認できなかった。
     loop {
@@ -201,6 +216,61 @@ fn main() {
         let until = next_heartbeat.min(next_snapshot);
         sleep_ms_until(until, health.uptime_ms());
     }
+}
+
+/// 起動時に送るはずの`boot`を組み立て、1行のJSONとしてlogへ出す（wireへは送らない）。
+///
+/// `firmware`／`board`は§4.1が要求するfieldであり、`reset_reason`は実際の
+/// `ResetReason`から得た値である。**捏造しない。**envelopeを付けないのは、`sid`を
+/// 選ぶ根拠（`PROTO-TBD-011`）も、選んだ`sid`を運ぶ相手も、まだ無いためである。
+fn log_boot_message(health: &mut Health, reset_reason: &str) {
+    let boot = Boot {
+        firmware: env!("CARGO_PKG_VERSION").to_owned(),
+        board: config::BOARD.to_owned(),
+        reset_reason: reset_reason.to_owned(),
+    };
+    match serde_json::to_string(&boot) {
+        Ok(payload) => log::info!("boot={payload}"),
+        Err(err) => {
+            health.record_boot_serialize_error();
+            log::warn!(
+                "boot_serialize_failed error={err} boot_serialize_errors={}",
+                health.boot_serialize_errors()
+            );
+        }
+    }
+}
+
+/// `crate::protocol::PiSession`が`hello`／`ping`／`get_status`を仕様どおり処理できることを、
+/// 自己完結した例で示す（実serial linkは無いため、入力もこの関数が作る）。
+///
+/// **これはprotocolの成立を主張しない。**`crates/deskcat-serial`の`tests/simulator.rs`が
+/// 持つ受け入れ条件のtestとは違い、これはbuildできることと、log出力を目視できることの
+/// 実物である。UART0のlogとprotocol streamの分離が決まり実serial linkが入ったら、
+/// この呼び出し元を受信loopへ置き換える。
+fn demonstrate_pi_session(health: &mut Health) {
+    let mut session = PiSession::new();
+    // 例として使うだけのPi `sid`／`id`である。実際の値は相手が選ぶ。
+    let pi_sid = 90_312;
+    let hello = Hello {
+        host: "deskcatd".to_owned(),
+        version: "0.1.0".to_owned(),
+        reason: HelloReason::Startup,
+    };
+    log::info!("protocol_demo pi_sid_before={:?}", session.pi_sid());
+    let established = session.handle_hello(pi_sid, 1, &hello);
+    log::info!(
+        "protocol_demo hello_outcome={:?} pi_sid_after={:?}",
+        established.outcome,
+        session.pi_sid()
+    );
+
+    let ping_reply = session.handle_ping(pi_sid, 2);
+    log::info!("protocol_demo ping_reply={ping_reply:?}");
+
+    let status = health.to_status();
+    let (get_status_ack, get_status_reply) = session.handle_get_status(pi_sid, 3, status);
+    log::info!("protocol_demo get_status_ack={get_status_ack:?} status={get_status_reply:?}");
 }
 
 /// Health snapshot を 1 行の JSON として log へ出す。

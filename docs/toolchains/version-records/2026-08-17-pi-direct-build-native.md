@@ -5,7 +5,8 @@
 - Record ID: `2026-08-17-pi-direct-build-native`
 - 判定: `Partial`
 - 初回検証日: 2026-08-17
-- 最終有効な検証日時: 2026-08-17
+- 最終有効な検証日時: 2026-08-26（[Issue #11](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11)
+  の前半。依存を持つ crate の build、lint、test。下の[2026-08-26 再検証](#2026-08-26-再検証issue-11-の前半依存を持つ-crate-の-build-と-test)）
 
 **Raspberry Pi profile の version record は、これが初めてである。**既存 6 記録はいずれも
 x86_64 の開発端末または CI の記録であり、Raspberry Pi 実機の記録は存在しなかった。
@@ -353,6 +354,238 @@ Next action:
   - PATH 設定を恒久化するか（`. "$HOME/.cargo/env"` の .bashrc 追記など）は human の判断。
   - /dev/ttyUSB* の device 名の確認は USB OTG 変換 cable の入手後に行う。
 ```
+
+## 2026-08-26 再検証（Issue #11 の前半。依存を持つ crate の build と test）
+
+同じ端末、同じ profile である。**環境の値は上の記録から変わっていない。**
+OS、kernel、board、libc、rustup、rustc、cargo、rustfmt、clippy、linker のいずれも同一である。
+**上の記録が「未実行」として残した項目のうち 2 つに答えるために行った測定だけを書く。**
+
+上の `Conclusion` が `Verified` にしない理由として挙げていたもののうち、この節が扱うのは次の 2 つである。
+
+- **このrepositoryのcrateとworkspaceを Pi 上で build していない**
+  → **crate は build した。workspace は build していない。**したがって**この項目は半分しか埋まっていない。**
+- **依存を持つ build を測っていない**（測定した最小 program の依存は 0 件だった）
+  → **埋めた。**
+
+**残りは埋まっていない。**何が残るかは末尾の[この再検証が主張しないこと](#この再検証が主張しないこと)に書く。
+
+### 測定をやり直したことの記録
+
+**1 回目の測定は完走していない。**外部 crate 14 件を通過し、`deskcat-protocol` を compile 中に、
+**Pi の電源が落ちて中断した。****直前に、同じ作業の別手順で ESP32 を Pi の USB OTG port へ
+接続している。接続した瞬間に Pi が network から消えた。****これは先行して起きた事象であり、
+原因として確かめたものではない。**原因は `TBD` である（下の「電源が落ちた原因は…」の段落）。
+
+**中断した測定の値は採らない。**`target/` を削除したうえで測定をやり直した。
+**この節に載せる値は、すべてやり直した側の 1 回の連続実行から採っている。**
+
+file system は再起動時の journal 復旧（`EXT4-fs: orphan cleanup`）だけで済み、
+**破損は無かった**（`EXT4-fs error` と `I/O error` はいずれも 0 件、書き込み test も成功）。
+再起動後の連続稼働で異常は出ていない。
+
+**電源が落ちた原因はこの記録では切り分けていない。**低電圧 flag（`vcgencmd get_throttled`）は
+再起動で消えるため事後に確認できず、電圧も測っていない。**この記録は電源経路について何も主張しない。**
+扱いは [Issue #11](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11) と
+[power-budget.md](../../hardware/power-budget.md) の側に残す。
+
+### 記録
+
+```text
+Record ID: 2026-08-17-pi-direct-build-native（2026-08-26 再検証）
+Date: 2026-08-26（JST。測定は 23:03–23:43）
+Machine profile: Raspberry Pi Direct Build（上の記録と同一）
+Operator role: 開発者（human）の監督下でのAI agent作業。SSH経由で実行した
+Repository commit: 4a91ee18fa41ce0398ca0e710fb586cfde0c590c
+  （**測定を行った時点の commit である。**本記録を載せた branch はその後 develop の
+  更新へ追従したが、**測定はやり直していない。**追従で入った差分は文書と script であり、
+  測定対象の `crates/deskcat-serial` と `crates/deskcat-protocol` と `Cargo.lock` を
+  変更していない。上の 2026-08-17 の記録と同じ扱いである）
+Working tree clean: yes（Pi 側は git checkout ではない。開発端末から
+  `git archive` で同 commit の tree を転送した。**Pi へ git を導入していない**）
+
+環境: 上の記録から変更なし。再確認した値だけを挙げる。
+  rustc 1.97.1 (8bab26f4f 2026-07-14) / cargo 1.97.1 (c980f4866 2026-06-30)
+  rustfmt 1.9.0-stable (8bab26f4f6 2026-07-14) / clippy 0.1.97 (8bab26f4f6 2026-07-14)
+  nproc: 1
+  MemTotal: 437156 kB（約 426.9 MiB）
+  swap: zram（/dev/zram0）。**この作業で swap 設定を変更していない**
+
+Available memory before build: MemTotal 437156 kB のうち MemAvailable 約 321888 kB
+  （約 314 MiB）。sampler の baseline（MemTotal-MemAvailable）は 115268 kB、swap used 0
+Available storage before build: /dev/mmcblk0p2 の used 3028124 kB、available 25916636 kB
+  （約 24.7 GiB）。~/.cargo は 56340 kB
+
+Commands run:
+  . "$HOME/.cargo/env"
+  cd "$HOME/deskcat"
+  rm -rf target                                              # clean 状態を作る
+  cargo build  --locked -p deskcat-serial                    # P1 clean build
+  cargo build  --locked -p deskcat-serial                    # P2 cache 有り（no-op）
+  cargo fmt --all -- --check                                 # P3
+  cargo clippy --locked -p deskcat-serial --all-targets      # P4
+  cargo test   --locked -p deskcat-serial                    # P5
+  cargo test   --locked -p deskcat-protocol                  # P6
+  cargo build  --locked -p deskcat-serial --example serial_link   # P7（buildのみ。実行しない）
+
+  **`cargo test --workspace` を実行していない。**426 MiB の機体で workspace 全体を
+  一度に回す前に 1 crate ずつ確認する方針を採り、`-p` で絞った。
+  **registry cache は測定開始前から埋まっている。**1 回目（中断した回）の
+  `cargo fetch --locked` が 20 秒で 17 crate を download 済みであり、
+  ~/.cargo は 15816 kB から 56340 kB へ増えていた（+40524 kB、約 39.6 MiB）。
+  **したがって下の P1 は compile だけの時間であり、download を含まない。**
+
+Expected result: 依存を持つこのrepositoryの crate が Pi 上で build でき、
+  lint と test が通り、426 MiB の機体で OOM せずに完走する。
+
+Actual result: **全 phase が rc=0 で成功した。OOM は発生していない。**
+
+  ┌─────┬──────────────────────────────────────────────┬──────┬───────────┐
+  │ 相  │ 内容                                         │ rc   │ 所要      │
+  ├─────┼──────────────────────────────────────────────┼──────┼───────────┤
+  │ P1  │ clean build（-p deskcat-serial）             │ 0    │ 1344 秒   │
+  │ P2  │ cache 有り再build（no-op）                   │ 0    │    3 秒   │
+  │ P3  │ cargo fmt --all -- --check                   │ 0    │    5 秒   │
+  │ P4  │ clippy（-p、--all-targets）                  │ 0    │  569 秒   │
+  │ P5  │ test -p deskcat-serial                       │ 0    │  190 秒   │
+  │ P6  │ test -p deskcat-protocol                     │ 0    │  339 秒   │
+  │ P7  │ example serial_link の build                 │ 0    │    3 秒   │
+  └─────┴──────────────────────────────────────────────┴──────┴───────────┘
+
+  P1 の 1344 秒は 22 分 24 秒である。**`deskcat-serial` 自身を含めて 17 unit を compile した。**
+  内訳は依存 16 件と対象 crate 1 件である。**依存 16 件のうち 15 件が crates.io の外部 crate**
+  （proc-macro2、unicode-ident、quote、serde_core、zmij、syn、serde_json、libc、serde、
+  serde_derive、itoa、memchr、cfg-if、serial2、log）**であり、残る 1 件は path dependency の
+  `deskcat-protocol` である。**
+  **download した 17 crate のうち 2 件（windows-link、windows-sys）は compile されていない。**
+  Windows 専用であり、Linux では `cfg` で外れる。**`cargo fetch` の件数と compile 件数を
+  同じ数として扱わない。**
+
+  test の内訳（合計 138 tests passed、0 failed、0 ignored）
+    deskcat-serial   unittests src/lib.rs      24 passed
+                     tests/simulator.rs        29 passed
+                     Doc-tests                  2 passed
+    deskcat-protocol unittests src/lib.rs      52 passed
+                     tests/conformance.rs      11 passed
+                     tests/error_codes.rs       3 passed
+                     tests/framing.rs           5 passed
+                     tests/limits.rs            9 passed
+                     Doc-tests                  3 passed
+
+  **警告は 0 件を観測した。**root Cargo.toml の [workspace.lints] は
+  `clippy::all = deny` と `unsafe_code = "forbid"` を課す一方、
+  `missing_docs` と `clippy::pedantic` は `warn` に留めている。
+  **したがって P4 が rc!=0 で失敗するのは deny 水準の違反だけであり、
+  警告が出ても失敗しない。**`-D warnings` を付けていないのは
+  `clippy::all` が既に deny であるためで、**全警告を落とす設定ではない**
+  （AGENTS.md の host workspace の検証 command と同じ扱い）。
+  **ここで言えるのは「この実行では警告が 0 件だった」までである。**
+
+Build duration: 上表のとおり。**clean build 1344 秒、cache 有り 3 秒。**
+  **上の 2026-08-17 の記録（依存 0 件の最小 program で clean 4〜5 秒台）とは
+  比較の対象が違う。**同じ「clean build」の語で並べない。
+
+Peak memory if measured: 測定した。**sampling による近似値である。**
+  GNU time（/usr/bin/time）はこの機体に無く、この作業で package を増やさない判断をしたため、
+  /proc を 1 秒間隔で読む sampler を全 phase と並走させた（686 sample）。
+  ┌────────────────────────────────────┬───────────────┐
+  │ 指標                               │ 値            │
+  ├────────────────────────────────────┼───────────────┤
+  │ sample 数（1 秒間隔）              │ 686           │
+  │ baseline（MemTotal-MemAvailable）  │ 115268 kB     │
+  │ peak（MemTotal-MemAvailable）      │ 216332 kB     │
+  │ build 起因の増分                   │ 101064 kB     │
+  │ peak 単一 process RSS（rustc）     │ 247364 kB     │
+  │ baseline swap used                 │      0 kB     │
+  │ peak swap used                     │  53680 kB     │
+  └────────────────────────────────────┴───────────────┘
+  **peak 単一 process RSS 247364 kB は MemTotal 437156 kB の 56.6% である。**
+  **これは「単一 process の最大 RSS」であり、process の合計ではない。**
+  上の 2026-08-17 の記録が採った `Σ RSS（cargo + rustc）` とは指標が違うため、
+  両者を直接比べない。
+  **MemTotal-MemAvailable が単一 process の RSS より小さいのは二重計上ではなく、
+  MemAvailable が回収可能な page cache を含むためである。**rustc の RSS には
+  共有 file-backed page が含まれる。**両者を足したり引いたりしない。**
+  **1 秒間隔の sampling であり、これより短い spike は取り落としうる。**
+  **swap は baseline 0 kB から peak 53680 kB へ増えた。**上の 2026-08-17 の測定
+  （build 起因の増加が観測されなかった）とは異なり、**今回は build 起因の swap 使用がある。**
+  ただし zram（圧縮 RAM）であり、disk swap ではない。
+
+Storage delta if measured:
+  測定前  used 3028124 kB / available 25916636 kB。~/.cargo 56340 kB
+  測定後  used 3265516 kB / available 25679244 kB。~/.cargo 56340 kB、target/ 237344 kB
+  差分    used +237392 kB（約 232 MiB）。**ほぼ全量が target/ である**
+  registry cache は測定中に増えていない（56340 kB で不変）。
+  **1 回目の fetch による +40524 kB（約 39.6 MiB）は測定前に発生している。**
+  空き容量は約 24.5 GiB。**問題は無い。**
+
+Generated artifact identity: **この再検証では生成物の hash を採っていない。**
+  上の 2026-08-17 の記録と違い、再現性の確認ではなく資源の測定を目的としたためである。
+  library crate と test binary であり、実行して同一性を確認した binary は無い。
+
+Log or evidence path: この記録本文
+
+Known differences from documented profile:
+  - **Pi 側は git checkout ではない。**開発端末から `git archive` で同 commit の tree を
+    転送した。**Pi へ git を導入していない**（上の記録の「git は導入していない」を維持した）。
+  - **`libudev` を導入していない。**`serial2` は `unix` feature で libc 経由の
+    termios だけを使い、C の `libudev` を要求しない（`serialport` crate を採らなかった
+    理由の 1 つである。`crates/deskcat-serial/Cargo.toml` の依存選定を参照）。
+    **Pi 上で `pkg-config --modversion libudev` は「見つからない」を返すが、build は通る。**
+  - **package を 1 つも新規導入していない。**測定に使った sampler は shell と
+    /proc だけで書いた。
+  - **release profile を測っていない。**debug のみである。
+
+Conclusion: Partial。**この節の対象は、この 1 台・Raspberry Pi Direct Build profile に限る。**
+  その範囲で、**依存を持つこのrepositoryの crate の build、format 検査、lint、test が
+  すべて Pi 上で成功した。**
+
+  **[Raspberry Pi Rust Toolchain](../raspberry-pi-rust-toolchain.md) の `確定条件` に
+  未達で残っていた 2 項目のうち、埋まったのは 1 つと半分である。**
+  - **`project の test command を記録した` は埋めた。**`cargo test --locked -p <crate>` が
+    Pi 上で通る。138 tests passed、0 failed。所要は deskcat-serial 190 秒、
+    deskcat-protocol 339 秒。**ただし `--workspace` は実行していない。**
+  - **`direct build を継続するか cross compilation へ移るか決定した` は、この測定の時点では
+    埋まっていない。**移行条件のうち memory は評価した（peak 単一 process RSS 247364 kB＝
+    MemTotal の 56.6%、OOM なし）。**したがって「dependency build が memory 不足で安定しない」は
+    当たらない。**残る `clean build が許容できない` は、この時点では数値を出しただけである。
+    **（2026-08-27 追記: この実測値をもとに direct build の継続を決定し、同項目は埋まった。
+    判断と、それを覆す条件は
+    [Raspberry Pi Rust Toolchain](../raspberry-pi-rust-toolchain.md#cross-compilationへ移る条件)
+    にある。**この記録の測定値は変更していない。**）
+
+  **`Verified` にしないのは、次が未実行のためである。**
+  - **`cargo test --workspace` と `cargo clippy --workspace` を実行していない。**
+    1 crate ずつに絞った。**workspace 全体を一度に回したときに通るかは、この記録では言えない。**
+  - **`serial_link` example を build しただけで、実行していない。**
+  - **実 serial port を開いていない。`/dev/ttyUSB*` の device 名も確定していない。**
+  - **reboot 後の再実行を今回は行っていない。**
+  - **release profile を測っていない。**
+
+Next action:
+  - ~~**clean build 1344 秒を「開発サイクルとして許容できるか」の判断は human に残る。**~~
+    **2026-08-27 に決着した。**direct build の継続を決定し、22 分 24 秒は許容すると判断した
+    （cache 有り 3 秒で反復でき、clean build の頻度が低く、cross toolchain の保守コストの方が重い）。
+    **判断とそれを覆す条件は
+    [Raspberry Pi Rust Toolchain](../raspberry-pi-rust-toolchain.md#cross-compilationへ移る条件)が
+    正本である。****この記録は数値を出すところまでであり、可否は決めていない。**
+  - 実 serial port の確認（Issue #11 の後半）は、ESP32 との接続経路が
+    段階 C の gate の内側にあるため、この記録の範囲外である。
+  - Raspberry Pi Runtime profile（`deskcatd` の実行）の記録は別途必要である。
+```
+
+### この再検証が主張しないこと
+
+- **workspace 全体の検証 command が Pi で通ることを主張しない。**`-p` で 1 crate ずつ回した。
+- **実 serial port について何も主張しない。**port を開いていない。device 名も確定していない。
+- **ESP32 との通信について何も主張しない。**`serial_link` は build しただけである。
+- **電源経路について何も主張しない。**測定中に 1 度 Pi の電源が落ちたが、原因を切り分けていない。
+- **この測定は cross compilation へ移るか否かを決めていない。**移行条件のうち memory の 1 つが
+  「当たらない」と言えるようになっただけである。**判断そのものは 2026-08-27 に別途行った**
+  （[Raspberry Pi Rust Toolchain](../raspberry-pi-rust-toolchain.md#cross-compilationへ移る条件)）。
+  **この記録は測定の記録であり、判断の記録ではない。**
+- **release profile と reboot 後の再実行を主張しない。**どちらも今回は行っていない。
+
 
 ## 補足
 

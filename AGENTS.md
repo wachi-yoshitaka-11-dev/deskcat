@@ -147,7 +147,20 @@ firmware は `crates/deskcat-protocol` を path dependency で使う（[ADR-0008
 
 **ESP32 の flash と serial monitor は 2026-08-20 に検証した**（[#6](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/6)。`espflash` 4.5.0）。artifact の path を渡し、`--port` と `--chip esp32` を明示する。**非対話 shell では monitor が落ちるため pty を割り当てる。****chip 識別は `esptool` で行い、`espflash` では代替できない**（family 名しか返さない）。実行した command と版は [Version Record](docs/toolchains/version-records/2026-08-20-esp32-flash-boot-native.md) にある。**主張するのは flash と起動記録までであり、周辺回路と servo は含まない。****USB 抜き差しによる電源再投入後の起動出力は未検証である**（host 側の serial port が USB enumerate 後にしか存在しないため。再現は `espflash` の reset による）。
 
-**Raspberry Pi と HIL の実機試験には、まだ正式なコマンドが無い。**[ツールチェーン一覧](docs/toolchains/README.md) と未検証の runbook 手順を、検証済みコマンドとして扱わない。clean build の成功ごとにこの節を更新する。
+**Raspberry Pi 上の build、lint、test は 2026-08-26 に検証した**（[#11](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11) の前半）。Raspberry Pi Direct Build profile の端末で、source tree の root にて実行する。ESP32 toolchain は要らない。
+
+```bash
+cargo build --locked -p deskcat-serial
+cargo fmt --all -- --check
+cargo clippy --locked -p deskcat-serial --all-targets
+cargo test --locked -p deskcat-serial
+cargo test --locked -p deskcat-protocol
+```
+
+**検証したのはこの 2 crate である。**他の crate で通ることは主張しない。
+**`-p` で 1 crate ずつ絞る。**Pi Zero W の使用可能 memory は実測 426 MiB であり、**`--workspace` を一度に回した場合は未検証である。**実行した版と実測値（依存 16 crate を含む clean build 22 分 24 秒、peak 単一 process RSS 247364 kB、OOM なし、138 tests passed）は [Version Record](docs/toolchains/version-records/2026-08-17-pi-direct-build-native.md) の 2026-08-26 再検証節にある。**主張するのは build と lint と test までであり、実 serial port と ESP32 との通信は含まない。**
+
+**Raspberry Pi の実機試験（実 serial port、ESP32 との通信）と HIL には、まだ正式なコマンドが無い。**[ツールチェーン一覧](docs/toolchains/README.md) と未検証の runbook 手順を、検証済みコマンドとして扱わない。clean build の成功ごとにこの節を更新する。
 
 実機試験が必要な変更を、PC テストだけで完了扱いにしない。
 

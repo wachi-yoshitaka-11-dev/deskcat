@@ -112,7 +112,8 @@ Toolchainのbuild-only spikeはperipheral pinの選定なしで進められる�
 - Clean buildとdependency lockfileを記録した
 
 **確定条件の正本は[ESP32 Rust Toolchain](../toolchains/esp32-rust-toolchain.md)であり、
-checkboxをここで二重管理しない。**同文書で未達なのは次の1項目である。**あわせて、2026-08-15に達成した項目も記す。**
+checkboxをここで二重管理しない。****2026-08-20に最後の1項目（chipの識別）を満たし、同文書の確定条件はすべて達成した。**
+そのため同文書の状態は`検証済み`へ昇格した。**未達の項目は無い。**次に記すのは、直近に達成した2項目の経緯である。
 
 - **chipの識別**: **非破壊では刻印を読めないことが2026-08-15に確定した**（シールド内側）。**撮り直しても解決しない。**
   module刻印は読了し、搭載moduleはmodule自身の刻印で確定した。そのdatasheetが中核chipを示すため、

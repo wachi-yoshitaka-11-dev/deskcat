@@ -26,10 +26,16 @@ sys.path.insert(0, str(SCRIPTS_ROOT))
 
 import review_gate as gate  # noqa: E402
 
+sys.path.insert(0, str(SCRIPTS_ROOT / "hooks"))
+
+import command_line  # noqa: E402
+
 GH_GUARD = str(SCRIPTS_ROOT / "hooks" / "gh_metadata_guard.py")
 BASE_GUARD = str(SCRIPTS_ROOT / "hooks" / "branch_base_guard.py")
 MERGE_REPORT = str(SCRIPTS_ROOT / "hooks" / "merge_trailer_report.py")
 PUSH_GATE = str(SCRIPTS_ROOT / "hooks" / "push_gate.py")
+CODERABBIT_GATE = str(SCRIPTS_ROOT / "hooks" / "coderabbit_gate.py")
+MERGE_REPORT = str(SCRIPTS_ROOT / "hooks" / "merge_trailer_report.py")
 
 sys.path.insert(0, str(SCRIPTS_ROOT / "hooks"))
 
@@ -109,10 +115,14 @@ class GhMetadataGuardTests(unittest.TestCase):
                 self.assertDenied(command, contains="--project")
 
     def test_create_with_project_is_allowed(self):
-        """`--project value`と`--project=value`のどちらも通す。"""
+        """`--project value`と`--project=value`のどちらも通す。
+
+        `gh pr create`側の`--base`は、この検査の前提を満たすために足しているだけである。
+        **見ている対象は`--project`のままである。**
+        """
         for command in (
-            "gh pr create --title t --project deskcat",
-            "gh pr create --title t --project=deskcat",
+            "gh pr create --title t --project deskcat --base develop",
+            "gh pr create --title t --project=deskcat --base develop",
             "gh issue create --title t --project deskcat",
         ):
             with self.subTest(command=command):
@@ -126,10 +136,10 @@ class GhMetadataGuardTests(unittest.TestCase):
         無効化される側の失敗である。
         """
         for command in (
-            "gh pr create --title t -p deskcat",
+            "gh pr create --title t -p deskcat --base develop",
             "gh issue create --title t -p deskcat",
-            "gh pr create --title t -pdeskcat",
-            "gh pr create --title t -p=deskcat",
+            "gh pr create --title t -pdeskcat --base develop",
+            "gh pr create --title t -p=deskcat --base develop",
         ):
             with self.subTest(command=command):
                 self.assertAllowed(command)
@@ -142,6 +152,116 @@ class GhMetadataGuardTests(unittest.TestCase):
         ):
             with self.subTest(command=command):
                 self.assertDenied(command)
+
+    def test_pr_create_without_base_is_denied(self):
+        """`--base`が無いPull Request作成を止める。
+
+        **`gh`は省略時にrepositoryのdefault branchを使い、このrepositoryのdefaultは
+        `main`である。**2026-08-28にPR #250がbase `main`で作られ、baseの変更まで
+        1時間17分かかった。**機構は何も止めなかった。**
+        """
+        for command in (
+            "gh pr create --title t --project deskcat",
+            "gh pr create --title t -p deskcat --draft",
+        ):
+            with self.subTest(command=command):
+                self.assertDenied(command, contains="--base")
+
+    def test_pr_create_with_base_is_allowed(self):
+        """`--base value`／`--base=value`／短縮形`-B`のいずれも通す。
+
+        **短縮形は大文字の`-B`である**（`gh help pr create`で確認した）。
+        """
+        for command in (
+            "gh pr create --title t -p deskcat --base develop",
+            "gh pr create --title t -p deskcat --base=develop",
+            "gh pr create --title t -p deskcat -B develop",
+            "gh pr create --title t -p deskcat -Bdevelop",
+        ):
+            with self.subTest(command=command):
+                self.assertAllowed(command)
+
+    def test_issue_create_does_not_require_base(self):
+        """`gh issue create`へ`--base`を要求しない。
+
+        **`gh issue create`の option 一覧に`--base`は存在しない**
+        （`gh help issue create`で確認した。出現0件）。要求すると、満たしようのない
+        条件で起票が止まる。
+        """
+        self.assertAllowed("gh issue create --title t --project deskcat")
+
+    def test_base_short_form_is_case_sensitive(self):
+        """`-b`（`--body`）を`-B`（`--base`）と読まない。
+
+        `gh pr create`は両方を持ち、意味が違う。**大小を区別しないと、本文を渡した
+        だけのcommandがbase指定として通る。**
+        """
+        for command in (
+            "gh pr create --title t -p deskcat -b 本文",
+            "gh pr create --title t -p deskcat --body 本文",
+        ):
+            with self.subTest(command=command):
+                self.assertDenied(command, contains="--base")
+
+    def test_base_value_is_not_judged(self):
+        """**`--base`の値の正しさを見ない。**存在するかだけを見る。
+
+        `develop`と書くべきか`main`と書くべきかは、そのPull Requestの目的で決まり、
+        字句からは読めない。昇格Pull Requestのbaseは`main`が正しい。
+        """
+        for command in (
+            "gh pr create --title t -p deskcat --base main",
+            "gh pr create --title t -p deskcat --base 実在しないbranch",
+        ):
+            with self.subTest(command=command):
+                self.assertAllowed(command)
+
+    def test_help_requires_no_metadata(self):
+        """helpの表示だけを求める呼び出しへ、`--project`も`--base`も要求しない。
+
+        **何も作らない呼び出しである。**boardへのitem追加漏れは起きようがない。
+        **ここを拒否すると、hookが要求しているoption名を`--help`で調べる手段そのものが
+        塞がる。**2026-08-28に`gh issue create --help`が実際に拒否され、
+        `gh help issue create`へ回避してoption一覧を確認した。
+        **規則を守るために要る情報を、規則が隠している状態だった。**
+        """
+        for command in (
+            "gh pr create --help",
+            "gh issue create --help",
+            "gh pr create -h",
+            "gh issue create -h",
+            "gh pr create -p deskcat --help",
+        ):
+            with self.subTest(command=command):
+                self.assertAllowed(command)
+
+    def test_help_needs_no_merge_message(self):
+        """`gh pr merge --help`へsquash messageを要求しない。
+
+        **helpの表示はmergeしない。**この検査でとりわけ効く。`--subject`と
+        `--body-file`の明示をCONTRIBUTINGが要求しているのに、**そのoption名を
+        `--help`で確認できなかった**（2026-08-28に実測。拒否された）。
+        """
+        for command in (
+            "gh pr merge --help",
+            "gh pr merge -h",
+        ):
+            with self.subTest(command=command):
+                self.assertAllowed(command)
+
+    def test_help_is_matched_only_as_a_whole_word(self):
+        """`-h`の連結判定をしない。`-help`や`-hello`をhelpと読まない。
+
+        `_has_option`の連結判定を当てると、`-h`で始まる語がすべてhelpになる。
+        **boolean flagに連結形は無い。**
+        """
+        for command in (
+            "gh pr create --title t -hello",
+            "gh issue create --title t -help",
+        ):
+            with self.subTest(command=command):
+                self.assertDenied(command, contains="--project")
+        self.assertDenied("gh pr merge 1 --squash -hello", contains="本文")
 
     def test_compound_command_is_inspected(self):
         """`cd x && gh pr create`を見落とさない。
@@ -577,6 +697,457 @@ class PushGateTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0)
         self.assertEqual(result.stdout.strip(), "")
 
+
+
+class CodeRabbitGateTests(unittest.TestCase):
+    """CodeRabbitのreviewを起動するcommandを見るhookのtest。
+
+    **このhookだけ`deny`ではなく`ask`を返す。**他のhookのtestは`deny`を期待するため、
+    検査する経路を別に持つ。**止めたいのはAIの独断であって、人間の依頼ではない。**
+    """
+
+    def assertAsked(self, command, *, contains=None):
+        code, output = _invoke(CODERABBIT_GATE, command)
+        self.assertEqual(code, 0, command)
+        self.assertIsNotNone(output, f"通してしまった: {command}")
+        self.assertEqual(
+            output["hookSpecificOutput"]["permissionDecision"], "ask", command
+        )
+        if contains:
+            self.assertIn(contains, _reason(output))
+
+    def assertAllowed(self, command):
+        code, output = _invoke(CODERABBIT_GATE, command)
+        self.assertEqual(code, 0, command)
+        self.assertIsNone(output, f"止めてしまった: {command}")
+
+    def test_review_triggers_are_asked(self):
+        """reviewを起動する語を止める。**枠を消費するのはこの2つだけである。**"""
+        for command in (
+            'gh pr comment 239 --body "@coderabbitai full review"',
+            'gh pr comment 239 --body "@coderabbitai review"',
+            'gh issue comment 240 --body "@coderabbitai full review"',
+            'gh pr comment 239 -b "@coderabbitai full review"',
+            'gh pr comment 239 --body="@coderabbitai full review"',
+        ):
+            with self.subTest(command=command):
+                self.assertAsked(command)
+
+    def test_passthrough_words_are_allowed(self):
+        """枠を消費しない語は通す。**残数確認とthreadの後始末を塞がない。**"""
+        for command in (
+            'gh pr comment 239 --body "@coderabbitai rate limit"',
+            'gh pr comment 239 --body "@coderabbitai resolve"',
+            'gh pr comment 239 --body "@coderabbitai help"',
+            'gh pr comment 239 --body "@coderabbitai configuration"',
+        ):
+            with self.subTest(command=command):
+                self.assertAllowed(command)
+
+    def test_spelling_variants_are_asked(self):
+        """表記の揺れで抜けない。**語の並びを列挙していた版は`full-review`を通した。**"""
+        for command in (
+            'gh pr comment 239 --body "@coderabbitai full-review"',
+            'gh pr comment 239 --body "@CodeRabbitAI FULL REVIEW"',
+            'gh pr comment 239 --body "  @coderabbitai   full review  "',
+        ):
+            with self.subTest(command=command):
+                self.assertAsked(command)
+
+    def test_passthrough_word_does_not_grant_immunity(self):
+        """`rate limit`で始めて後ろに`review`を置く形を止める。
+
+        **免除listを先に見る版はこれを通した。**実測して直した。
+        """
+        self.assertAsked(
+            'gh pr comment 239 --body "@coderabbitai rate limit and then full review"'
+        )
+
+    def test_review_on_another_line_is_allowed(self):
+        """mentionと同じ行に`review`が無ければ通す。
+
+        指摘への返信は別の行で`review`に触れる。**行単位で見る理由である。**
+        """
+        self.assertAllowed(
+            'gh pr comment 239 --body "確認しました\nreviewで出た指摘を反映\n@coderabbitai resolve"'
+        )
+
+    def test_mention_without_command_is_allowed(self):
+        """`@coderabbitai`だけではreviewが始まらない。止めない。"""
+        self.assertAllowed('gh pr comment 239 --body "@coderabbitai"')
+
+    def test_mention_elsewhere_in_body_is_allowed(self):
+        """`@coderabbitai`の直後以外にある`review`で止めない。
+
+        指摘への返信は「reviewで出た指摘を反映した」のような文を含む。
+        **返信を塞ぐと、threadの後始末ができなくなる。**
+        """
+        for command in (
+            'gh pr comment 239 --body "reviewで出た指摘を反映しました"',
+            'gh pr comment 239 --body "full review の結果を記録します"',
+        ):
+            with self.subTest(command=command):
+                self.assertAllowed(command)
+
+    def test_compound_command_is_inspected(self):
+        """`cd x && gh pr comment ...`の形を素通りさせない。
+
+        `if`条件で`Bash(gh *)`へ絞るとこの形が抜ける。絞らない理由である。
+        """
+        self.assertAsked(
+            'cd /tmp && gh pr comment 239 --body "@coderabbitai full review"'
+        )
+
+    def test_quoted_command_is_not_inspected(self):
+        """`echo`の引数として書かれた形は実行ではない。止めない。"""
+        self.assertAllowed(
+            'echo gh pr comment 239 --body "@coderabbitai full review"'
+        )
+
+    def test_api_field_is_inspected(self):
+        """`gh api`の`-f body=...`でも止める。**commentはこの経路でも投げられる。**"""
+        self.assertAsked(
+            'gh api repos/o/r/issues/1/comments -f body="@coderabbitai full review"'
+        )
+
+    def test_body_file_is_read(self):
+        """`--body-file`の中身を読んで判定する。"""
+        with tempfile.TemporaryDirectory() as work:
+            path = Path(work) / "body.md"
+            path.write_text("@coderabbitai full review\n", encoding="utf-8")
+            self.assertAsked(f'gh pr comment 239 --body-file {path}')
+
+    def test_an_unreadable_body_is_asked_not_allowed(self):
+        """本文を読めない呼び出しを素通りさせない。**askする。**
+
+        以前は素通りさせ、docstringも「この方向の取りこぼしは意図である」としていた。
+        **しかし`-F body=@-`は意図して選べる経路であり、外したい側が自分で選べる穴だった。**
+        **判定は`deny`ではなく`ask`である。**誤検知の代償は人への確認1回で、
+        見逃しの代償はこのhookが在る理由そのものである。
+        """
+        for command in (
+            "gh pr comment 1 --body-file /nonexistent/body.md",
+            "gh api repos/o/r/issues/1/comments --input /nonexistent/body.json",
+            "gh api -X POST repos/o/r/issues/1/comments -F body=@/nonexistent/b.txt",
+            "gh pr comment 1 --body-file -",
+            "gh api -X POST repos/o/r/issues/1/comments -F body=@-",
+        ):
+            with self.subTest(command=command):
+                self.assertAsked(command, contains="読めない")
+
+    def test_a_readable_body_without_review_is_still_allowed(self):
+        """**読めた本文にreviewが無ければ素通りする。**askを一律にはしない。"""
+        with tempfile.TemporaryDirectory() as directory:
+            body = Path(directory) / "b.md"
+            body.write_text("@coderabbitai rate limit", encoding="utf-8")
+            self.assertAllowed(f"gh pr comment 1 --body-file {body}")
+            self.assertAllowed(
+                f"gh api repos/o/r/issues/1/comments --input {body}"
+            )
+
+    def test_unrelated_commands_are_allowed(self):
+        """CodeRabbitに関係しない`gh`と読み取りを通す。"""
+        for command in (
+            "gh pr view 239 --json body",
+            'gh pr comment 239 --body "通常のコメント"',
+            "gh pr merge 239 --squash --subject s --body-file /tmp/x",
+            "git status",
+        ):
+            with self.subTest(command=command):
+                self.assertAllowed(command)
+
+    def test_broken_input_does_not_block(self):
+        """hookの入力が壊れていても止めない。**既存hookと同じ扱いである。**"""
+        result = subprocess.run(
+            [sys.executable, CODERABBIT_GATE],
+            input="{ not json", capture_output=True, text=True,
+            encoding="utf-8", errors="replace", timeout=60,
+        )
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.stdout.strip(), "")
+        # **握りつぶさない。**素通りの動作は変えずに、理由をstderrへ残す
+        # （PR #241のreview指摘）。
+        self.assertIn("coderabbit_gate:", result.stderr)
+
+    def test_invalid_utf8_input_is_recorded(self):
+        """不正なUTF-8の入力も分類して記録する。**素通りの動作は変えない。**"""
+        result = subprocess.run(
+            [sys.executable, CODERABBIT_GATE],
+            input=b"\xff\xfe not utf-8", capture_output=True, timeout=60,
+        )
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.stdout.decode("utf-8", "replace").strip(), "")
+        self.assertIn("coderabbit_gate:", result.stderr.decode("utf-8", "replace"))
+
+    def test_non_mapping_input_does_not_raise(self):
+        """妥当なJSONでもmappingでない入力で落ちない。
+
+        `payload.get`／`tool_input.get`は`AttributeError`を出す。
+        **hookが例外で落ちると、止めているはずの判定が走らない。**
+        PR #241のreview指摘で見つけた。
+        """
+        for payload in ("[]", '"text"', "null", '{"tool_input": ["x"]}',
+                        '{"tool_input": "x"}'):
+            with self.subTest(payload=payload):
+                result = subprocess.run(
+                    [sys.executable, CODERABBIT_GATE],
+                    input=payload, capture_output=True, text=True,
+                    encoding="utf-8", errors="replace", timeout=60,
+                )
+                self.assertEqual(result.returncode, 0, payload)
+                self.assertEqual(result.stdout.strip(), "", payload)
+
+    def test_read_only_api_method_is_allowed(self):
+        """読み取りと明示した`gh api`は見ない。**commentを投げられない。**
+
+        `-f`を付けると`gh`は既定でPOSTになるが、`-X GET`を明示すると読み取りである。
+        PR #241のreview指摘で見つけた。
+        """
+        for command in (
+            'gh api -X GET repos/o/r/issues -f body="@coderabbitai full review"',
+            'gh api --method HEAD repos/o/r -f body="@coderabbitai review"',
+        ):
+            with self.subTest(command=command):
+                self.assertAllowed(command)
+
+    def test_write_api_method_is_still_inspected(self):
+        """書き込みのmethodと、method未指定は引き続き見る。"""
+        for command in (
+            'gh api -X POST repos/o/r/issues/1/comments -f body="@coderabbitai full review"',
+            'gh api repos/o/r/issues/1/comments -f body="@coderabbitai full review"',
+            'gh api graphql -f query="mutation { x(body: \\"@coderabbitai review\\") }"',
+        ):
+            with self.subTest(command=command):
+                self.assertAsked(command)
+
+    def test_later_write_method_is_not_masked_by_an_earlier_read(self):
+        """`-X GET -X POST`を読み取り扱いにしない。**`gh`は最後の`-X`を使う。**
+
+        `any()`で見ると先頭の`get`が後ろの`post`を隠し、**承認を経ずに素通りした**
+        （2026-08-28に実測。PR #254のreviewで出た）。
+        """
+        self.assertAsked(
+            "gh api -X GET -X POST repos/o/r/issues/1/comments"
+            ' -f body="@coderabbitai full review"'
+        )
+
+    def test_read_method_declared_last_is_still_allowed(self):
+        """**後勝ちは両方向へ効く。**最後が読み取りなら素通りさせる。
+
+        `-X POST -X GET`で`gh`が投げるのはGETである。ここを止めると誤検知になる。
+        """
+        self.assertAllowed(
+            "gh api -X POST -X GET repos/o/r/issues/1/comments"
+            ' -f body="@coderabbitai full review"'
+        )
+
+    def test_input_file_is_read(self):
+        """`gh api --input <file>`の本文を読む。
+
+        **値がpathであって本文ではないため、`BODY_OPTIONS`では拾えない。**
+        塞ぐまでは`--input`へ本文を置けば素通りした（2026-08-28に実測）。
+        """
+        with tempfile.TemporaryDirectory() as directory:
+            body = Path(directory) / "body.json"
+            body.write_text(
+                '{"body": "@coderabbitai full review"}', encoding="utf-8"
+            )
+            self.assertAsked(
+                f"gh api repos/o/r/issues/1/comments --input {body}"
+            )
+            harmless = Path(directory) / "ok.json"
+            harmless.write_text(
+                '{"body": "@coderabbitai rate limit"}', encoding="utf-8"
+            )
+            self.assertAllowed(
+                f"gh api repos/o/r/issues/1/comments --input {harmless}"
+            )
+
+    def test_field_value_from_a_file_is_read(self):
+        """`-F key=@<path>`の値をfileから読む。
+
+        **`key=@path`という文字列のままでは`@coderabbitai`を含まないため素通りする**
+        （2026-08-28に実測）。
+        """
+        with tempfile.TemporaryDirectory() as directory:
+            body = Path(directory) / "body.txt"
+            body.write_text("@coderabbitai full review", encoding="utf-8")
+            for option in ("-F", "--field"):
+                with self.subTest(option=option):
+                    self.assertAsked(
+                        f"gh api -X POST repos/o/r/issues/1/comments"
+                        f" {option} body=@{body}"
+                    )
+
+    def test_raw_field_does_not_expand_at_sign(self):
+        """`-f`／`--raw-field`の`@`をfileとして読まない。
+
+        **`gh`は`-f`の値を文字列のまま送る**（`gh api --help`で確認した）。
+        fileとして読むと、**実際には送られない内容でaskを出す**ことになる。
+        """
+        with tempfile.TemporaryDirectory() as directory:
+            body = Path(directory) / "body.txt"
+            body.write_text("@coderabbitai full review", encoding="utf-8")
+            for option in ("-f", "--raw-field"):
+                with self.subTest(option=option):
+                    self.assertAllowed(
+                        f"gh api -X POST repos/o/r/issues/1/comments"
+                        f" {option} body=@{body}"
+                    )
+
+    def test_body_source_is_named_on_stderr(self):
+        """読めなかった経路の名前を記録へ残す。
+
+        **読める経路は3つある。**どれが読めなかったかを書かないと、記録から
+        経路を辿れない。
+        """
+        for command, name in (
+            (
+                "gh api repos/o/r/issues/1/comments"
+                " --input /nonexistent/b.json",
+                "--input",
+            ),
+            (
+                "gh api -X POST repos/o/r/issues/1/comments"
+                " -F body=@/nonexistent/b.txt",
+                "-F",
+            ),
+        ):
+            with self.subTest(name=name):
+                payload = json.dumps(
+                    {"tool_name": "Bash", "tool_input": {"command": command}}
+                )
+                result = subprocess.run(
+                    [sys.executable, CODERABBIT_GATE], input=payload,
+                    capture_output=True, text=True,
+                    encoding="utf-8", timeout=60,
+                )
+                # **askで止めたうえで**、経路の名前を記録へ残す。
+                decision = json.loads(result.stdout.strip())
+                self.assertEqual(
+                    decision["hookSpecificOutput"]["permissionDecision"], "ask"
+                )
+                self.assertIn(name, result.stderr)
+
+    def test_an_unreadable_body_is_recorded_on_stderr(self):
+        """読めない`--body-file`をaskで止めつつ、**理由をstderrへも残す。**
+
+        AGENTS.mdの「エラーを握りつぶさず、分類、ログ、カウンタを用意する」に従う。
+        **askの診断文と、stderrの記録の両方に残す。**前者は人が読み、後者は後から辿る。
+        """
+        payload = json.dumps({
+            "tool_name": "Bash",
+            "tool_input": {"command": "gh pr comment 1 --body-file /nonexistent/x.md"},
+        })
+        result = subprocess.run(
+            [sys.executable, CODERABBIT_GATE],
+            input=payload, capture_output=True, text=True,
+            encoding="utf-8", errors="replace", timeout=60,
+        )
+        self.assertEqual(result.returncode, 0)
+        decision = json.loads(result.stdout.strip())
+        self.assertEqual(
+            decision["hookSpecificOutput"]["permissionDecision"], "ask"
+        )
+        self.assertIn("--body-file", _reason(decision))
+        self.assertIn("coderabbit_gate:", result.stderr)
+        self.assertIn("--body-file", result.stderr)
+
+    def test_no_bypass_environment_variable(self):
+        """**環境変数で無効化できないことを確認する。**
+
+        他のhookは`DESKCAT_SKIP_*`を持つが、このhookは意図して持たない。
+        **AIが自分で外せる抑制は抑制ではない。**#240で人間が決めた。
+        """
+        command = 'gh pr comment 239 --body "@coderabbitai full review"'
+        for name in (
+            "DESKCAT_SKIP_GH_GUARD",
+            "DESKCAT_SKIP_CODERABBIT_GATE",
+            "DESKCAT_SKIP_PUSH_GATE",
+        ):
+            with self.subTest(name=name):
+                code, output = _invoke(CODERABBIT_GATE, command, environment={name: "1"})
+                self.assertEqual(code, 0)
+                self.assertIsNotNone(output, f"{name}で素通りした")
+                self.assertEqual(
+                    output["hookSpecificOutput"]["permissionDecision"], "ask"
+                )
+
+
+class CommandFromTests(unittest.TestCase):
+    """`command_line.command_from`のtest。**5本のhookが共有する入口である。**
+
+    妥当なJSONでもmappingでない入力で`AttributeError`を出していた（#242）。
+    **hookが例外で落ちると、止めているはずの判定が走らない。**
+    """
+
+    def test_valid_payload_returns_command(self):
+        self.assertEqual(
+            command_line.command_from({"tool_input": {"command": "gh pr create"}}),
+            "gh pr create",
+        )
+
+    def test_non_mapping_payload_returns_none(self):
+        """mappingでないpayloadで例外を出さない。"""
+        for payload in ([], "text", None, 0, 1.5, True, ("a",)):
+            with self.subTest(payload=payload):
+                self.assertIsNone(command_line.command_from(payload))
+
+    def test_non_mapping_tool_input_returns_none(self):
+        """`tool_input`がmappingでない入力で例外を出さない。"""
+        for value in (["x"], "x", 0, True):
+            with self.subTest(value=value):
+                self.assertIsNone(command_line.command_from({"tool_input": value}))
+
+    def test_missing_pieces_return_none(self):
+        for payload in ({}, {"tool_input": None}, {"tool_input": {}},
+                        {"tool_input": {"command": None}},
+                        {"tool_input": {"command": 1}},
+                        {"tool_input": {"command": ["gh"]}}):
+            with self.subTest(payload=payload):
+                self.assertIsNone(command_line.command_from(payload))
+
+
+class HookPayloadShapeTests(unittest.TestCase):
+    """**5本のhookが、mappingでない入力で落ちないことを確かめる**（#242）。
+
+    [PR #241](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/241)のreview指摘は`coderabbit_gate.py`に対するものだったが、
+    **型で全数走査したら5本すべてに同じ形が残っていた。**指摘は代表例であって全数ではない。
+    """
+
+    HOOKS = (GH_GUARD, BASE_GUARD, PUSH_GATE, MERGE_REPORT, CODERABBIT_GATE)
+
+    MALFORMED = (
+        "[]",
+        '"text"',
+        "null",
+        "0",
+        '{"tool_input": ["x"]}',
+        '{"tool_input": "x"}',
+        '{"tool_input": {"command": 1}}',
+        "{}",
+    )
+
+    def test_no_hook_raises_on_malformed_payload(self):
+        """例外を出さず、素通りする。**return code 0かつstdoutが空である。**"""
+        for script in self.HOOKS:
+            for payload in self.MALFORMED:
+                with self.subTest(script=Path(script).name, payload=payload):
+                    result = subprocess.run(
+                        [sys.executable, script],
+                        input=payload, capture_output=True, text=True,
+                        encoding="utf-8", errors="replace", timeout=120,
+                        env={**os.environ,
+                             "DESKCAT_SKIP_GH_GUARD": "",
+                             "DESKCAT_SKIP_BASE_GUARD": "",
+                             "DESKCAT_SKIP_PUSH_GATE": ""},
+                    )
+                    self.assertEqual(result.returncode, 0,
+                                     f"{Path(script).name} が落ちた: {result.stderr[:300]}")
+                    self.assertNotIn("Traceback", result.stderr,
+                                     f"{Path(script).name} が例外を出した")
+                    self.assertEqual(result.stdout.strip(), "",
+                                     f"{Path(script).name} が止めてしまった")
 
 
 if __name__ == "__main__":

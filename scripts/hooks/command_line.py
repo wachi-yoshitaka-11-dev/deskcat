@@ -3,6 +3,9 @@
 
 `gh_metadata_guard.py`と`branch_base_guard.py`が使う。**同じ判定を各hookへ複製しない。**
 
+**hookの入力からcommandを取り出す`command_from`も持つ。**payloadの形の検査を
+各hookへ複製しないためである（#242）。
+
 **語がcommand位置にあるかを見る。**単に`gh`という語を探すと、`echo gh pr merge`のような
 引数を呼び出しと読んでしまう。実際にそれで`merge_trailer_report.py`が誤報告し、
 `gh_metadata_guard.py`なら誤って拒否する（偽陽性でhookごと無効化される側の失敗である）。
@@ -75,3 +78,30 @@ def invocations(command, program):
     if current is not None:
         found.append(current)
     return found
+
+
+def command_from(payload):
+    """hookの入力から`tool_input.command`を返す。取り出せなければ`None`。
+
+    **payloadがmappingであることを先に確かめる。**妥当なJSONでもmappingでないことがある
+    （`[]`／`"text"`／`null`）。**`payload.get`は`AttributeError`を出す。**
+    hookが例外で落ちると、止めているはずの判定が走らない。**そしてhookは失敗しても
+    静かなため、壊れたことに気付けない。**
+
+    `tool_input`も同じ理由で検査する（`{"tool_input": ["x"]}`という入力がありうる）。
+
+    **戻りが`None`のとき、hookは素通りさせる。**入力を解釈できないことを、
+    対象commandの問題として扱わない。**この判断は各hookが変えない。**
+
+    2026-08-26に#242で追加した。**それまで5本のhookが同じ形を各自で書いており、
+    どれも型検査を持っていなかった**（[PR #241](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/241)のreview指摘を型で全数走査して見つけた）。
+    """
+    if not isinstance(payload, dict):
+        return None
+    tool_input = payload.get("tool_input")
+    if tool_input is None:
+        return None
+    if not isinstance(tool_input, dict):
+        return None
+    command = tool_input.get("command")
+    return command if isinstance(command, str) else None

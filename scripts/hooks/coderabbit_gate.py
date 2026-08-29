@@ -1,0 +1,293 @@
+#!/usr/bin/env python3
+"""CodeRabbitのreviewを起動するcommandを、人間の許可を求める形で止める。
+
+Claude CodeのPreToolUse hookとして、Bash tool呼び出しの前に走る。stdinからhookの
+入力JSONを読み、`tool_input.command`だけを見る。実行はしない。
+
+**止めるのはreviewを起動するものだけである。**判定は「`@coderabbitai`と同じ行に
+`review`という語があるか」の1点で行う。**枠を消費する操作の名前はどれも`review`を含む。**
+`rate limit`、`resolve`、`help`は素通りする。**免除listを持たせると、`rate limit`で
+始めて後ろに`full review`を置く形で抜ける**（実測した）。
+
+**返すのは`deny`ではなく`ask`である。**AIの判断を経由せずに人間へ許可を求める形にする
+（`permissionDecision`の許容値は`allow`／`deny`／`ask`）。`deny`にすると、人間が
+「reviewを投げて」と指示した通常の流れも通らなくなる。**止めたいのはAIの独断であって、
+人間の依頼ではない。**
+
+**2026-08-28に、承認を経ずに通る経路を3つ塞いだ**（PR #254のreviewで出た）。
+`-X GET -X POST`の後勝ち、`--input <file>`、`-F key=@<path>`。**3つとも実測で再現した。**
+
+**2026-08-29に、本文を読めない場合の扱いを素通りからaskへ変えた。**
+以前は「読めなければ判定できないため素通りさせる。この方向の取りこぼしは意図である」と
+していたが、**`-F body=@-`は意図して選べる経路であり、外したい側が自分で選べる穴だった。**
+**判定は`deny`ではなく`ask`である。**誤検知の代償は人への確認1回で、
+見逃しの代償はこのhookが在る理由そのものである。**釣り合っていなかった。**
+
+**環境変数によるバイパスを設けていない。**他のhookの`SKIP_ENV`に当たるものが無いのは
+意図である。**AIが自分で外せる抑制は抑制ではない。**この判断は#240で人間が決めた。
+
+なぜ必要か。**AIはこの型の失敗を3回繰り返した。**
+
+1. #153（1 file、+2 −1）に対し、誰も頼んでいないreviewを取りに行き`rate limit`を投げた
+2. PR #146／#148／#150。待ち時間を告げられているのに`rate limit`を約60秒ごとに
+   投げ続け、**34件**のゴミコメントを積んだ
+3. PR #238／#239。承認なしに`full review`を連投し、2本目が`Review rate limited`で
+   空振りして安全に関わる変更のreviewが59分止まった
+
+**AI側の記憶には3件の禁止規則が既にあり、3件とも破った。**記憶は参照するかどうかが
+AIの判断に依存する。**同じ型を記憶では止められていない。**`push_gate.py`が
+`develop`への直接pushを門で止めているのと同じ扱いにする。
+
+**判定は字句だけで行う。**意味は判定しない。`review_gate.py`と同じ方針である。
+"""
+
+import json
+import re
+import sys
+
+import command_line
+
+# `@coderabbitai`を呼ぶ本文が渡されうるsubcommand。`gh`の呼び出しに続く2語で見る。
+# `gh api`は1語だが、`gh api ... -f body=@coderabbitai ...`の形で投げられるため含める。
+COMMENT_SUBCOMMANDS = (("pr", "comment"), ("issue", "comment"), ("pr", "review"))
+API_SUBCOMMAND = ("api",)
+
+# `gh api`で読み取りと明示されたmethod。**この場合はcommentを投げられない。**
+# `-f`を付けると`gh`は既定でPOSTになるが、`-X GET`を明示すると読み取りのままである。
+# **endpointのwhitelistは作らない。**`gh api graphql`のmutationでもcommentは投げられ、
+# **endpoint名からは判別できない。**methodだけで絞る。
+READ_ONLY_METHODS = ("get", "head")
+METHOD_OPTIONS = ("-X", "--method")
+
+# 止める対象。**`review`という語が現れたら止める。**
+# `full review`は完全なreview、`review`はincrementalで、**どちらも枠を1件消費する。**
+# incrementalはADR-0013で自動reviewを無効にしているこのrepositoryでは必ず空振りするが、
+# **空振りでも枠は消える**（2026-08-24、PR #191で実際に焼いた）。
+#
+# **語の並びを列挙するのではなく、`review`の1語だけを見る。**列挙すると
+# `full-review`のような表記の揺れで抜ける。**枠を消費する操作の名前は
+# どれも`review`を含む**ため、これで足りる。
+REVIEW_WORD = re.compile(r"\breview\b")
+
+# 枠を消費しない操作。**別扱いにしていない。**いずれも`review`という語を含まないため、
+# 上の判定で自動的に素通りする。**免除listを持たせると、`rate limit`で始めて
+# 後ろに`full review`を置く形で抜けてしまう**（実測した）。
+NOT_A_REVIEW = ("rate limit", "resolve", "help", "configuration", "status")
+
+MENTION = "@coderabbitai"
+
+
+def _note(message):
+    """素通りさせた理由をstderrへ1行で残す。**判定は変えない。**
+
+    hookのstdoutは`permissionDecision`のJSONに使うため、**診断はstderrへ出す。**
+    素通りはこのhookの設計であって異常ではないが、**黙って通ると
+    「止めているはず」と食い違ったことに気付けない。**
+    """
+    sys.stderr.write(f"coderabbit_gate: {message}\n")
+
+
+def _ask(reason):
+    """PreToolUse hookとして、人間へ許可を求めて終了する。
+
+    **`deny`ではない。**AIの独断を止めるのが目的であり、人間の依頼を塞ぐのではない。
+    """
+    json.dump(
+        {
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "permissionDecision": "ask",
+                "permissionDecisionReason": reason,
+            }
+        },
+        sys.stdout,
+    )
+    sys.stdout.write("\n")
+    raise SystemExit(0)
+
+
+def _mentions_review(text):
+    """`@coderabbitai`と同じ行に`review`があるなら`True`。
+
+    **行単位で見る。**CodeRabbitへのcommandは`@coderabbitai <command>`の形で書き、
+    1つのcommentに複数書ける。**本文全体で見ると、mentionと無関係な行の`review`まで
+    拾う**（「reviewで出た指摘を反映した」という返信を止めてしまう）。
+    **mentionの直後の1語だけで見ると、`rate limit`で始めて後ろに`review`を置く形で抜ける。**
+    同じ行という範囲がその中間である。
+
+    **取りこぼす側と止めすぎる側では、止めすぎる側へ倒す。**返すのは`deny`ではなく
+    `ask`であり、人間が通せる。
+    """
+    for line in text.lower().splitlines():
+        if MENTION not in line:
+            continue
+        if REVIEW_WORD.search(line.split(MENTION, 1)[1]):
+            return True
+    return False
+
+
+# 本文が載りうるoption。`gh api`は`-f body=...`を複数持てるため、**全件を見る。**
+# `gh_metadata_guard.py`の`_option_value`は最初の1件だけを返すので使えない。
+BODY_OPTIONS = ("--body", "-b", "-f", "--field", "--raw-field", "-F")
+BODY_FILE_OPTIONS = ("--body-file",)
+
+# `gh api`はbody全体をfileから読める（`-`はstdin）。**`BODY_OPTIONS`では拾えない。**
+# 値がpathであって本文ではないためである。**塞ぐまでは`--input`に本文を置けば
+# 素通りした**（2026-08-28に実測）。
+INPUT_OPTIONS = ("--input",)
+
+# `-F`／`--field`は値の`@<path>`をfileとして読む（`@-`はstdin）。
+# **`-f`／`--raw-field`は展開せず、文字列のまま送る**（`gh api --help`で確認した）。
+# そのため`@`の展開はこの2つの綴りにだけ当てる。**`-f body=@x`をfileとして読むと、
+# 実際には送られない内容でaskを出すことになる。**
+FIELD_FILE_OPTIONS = ("-F", "--field")
+
+
+def _option_values(args, names):
+    """`--name value`と`--name=value`の値を**全件**返す。
+
+    短縮形の連結（`-fbody=...`）は拾わない。`gh`はこの形を受けるが、
+    **拾おうとすると`-F`のような別optionの値まで巻き込む。**取りこぼす側へ倒す。
+    """
+    found = []
+    index = 0
+    while index < len(args):
+        arg = args[index]
+        for name in names:
+            if arg == name:
+                if index + 1 < len(args):
+                    found.append(args[index + 1])
+                index += 1
+                break
+            if arg.startswith(name + "="):
+                found.append(arg[len(name) + 1:])
+                break
+        index += 1
+    return found
+
+
+def _read_body(path, source):
+    """fileから本文を読む。戻りは`(本文のlist, 読めなかった理由のlist)`。
+
+    **読めなかったことを呼び出し側へ返す。**以前は空を返して素通りさせていたが、
+    **それは外したい側が自分で選べる穴だった**（`-F body=@-`と書けば検査を抜けられる）。
+    扱いは`_check`が決める。
+
+    **握りつぶさない。**分類してstderrへ残す
+    （AGENTS.mdの「エラーを握りつぶさず、分類、ログ、カウンタを用意する」）。
+
+    **`source`にどのoptionから来たかを渡す。**読める経路が3つ（`--body-file`／
+    `--input`／`-F key=@path`）あるため、**どれが読めなかったかを書かないと
+    記録から経路を辿れない。**
+    """
+    if path == "-":
+        reason = f"`{source}`のstdin（`-`）から渡されており、hookからは読めない"
+        _note(f"本文が{reason}")
+        return [], [reason]
+    try:
+        with open(path, encoding="utf-8") as handle:
+            return [handle.read()], []
+    except OSError as error:
+        reason = f"`{source}`の読み出しに失敗した: {error}"
+        _note(f"{reason}ため判定できない")
+        return [], [reason]
+
+
+def _texts(args):
+    """引数として渡された本文の候補を返す。
+
+    戻りは`(本文のlist, 読めなかった理由のlist)`。
+
+    **fileから読む経路は3つある**（`--body-file`／`--input`／`-F key=@path`）。
+    **読めなかった経路を、読んで何も見つからなかったのと同じに扱わない。**
+    以前は同じに扱っており、**`-F body=@-`と書けば検査を抜けられた。**
+    """
+    found = _option_values(args, BODY_OPTIONS)
+    unreadable = []
+    for option in (BODY_FILE_OPTIONS, INPUT_OPTIONS):
+        for path in _option_values(args, option):
+            texts, reasons = _read_body(path, option[0])
+            found.extend(texts)
+            unreadable.extend(reasons)
+    # `-F key=@path`は値をfileから読む。**`key=@path`という文字列のままでは
+    # `@coderabbitai`を含まないため、読まないと素通りする**（2026-08-28に実測）。
+    for value in _option_values(args, FIELD_FILE_OPTIONS):
+        _, separator, right = value.partition("=")
+        if separator and right.startswith("@"):
+            texts, reasons = _read_body(right[1:], FIELD_FILE_OPTIONS[0])
+            found.extend(texts)
+            unreadable.extend(reasons)
+    return found, unreadable
+
+
+def _check(subcommand, args):
+    texts, unreadable = _texts(args)
+    if unreadable:
+        # **読めない本文を「reviewではない」と扱わない。**判定はaskであり、人が通せる。
+        # **誤検知の代償は確認1回、見逃しの代償はこのgateが在る理由そのものである。**
+        # `-F body=@-`は意図して選べる経路であり、**外したい側が自分で選べる穴だった。**
+        _ask(
+            f"`{' '.join(subcommand)}`の本文をhookから読めない"
+            f"（{'／'.join(unreadable)}）。"
+            f" **`{MENTION}`へreviewを投げようとしているかを判定できない。**"
+            " CodeRabbitのreview枠は共有資源であり、AIの判断で消費してよいものではない。"
+            " 読めない経路を「reviewではない」と扱うと、その経路が抑制を外す手段になる。"
+            " 投げてよいか人間へ確認する。"
+            " **reviewを含まない操作なら、本文をfileへ書いて`--body-file`で渡すと判定できる。**"
+        )
+    for text in texts:
+        if not _mentions_review(text):
+            continue
+        _ask(
+            f"`{' '.join(subcommand)}`で`{MENTION}`へreviewを投げようとしている。"
+            " **CodeRabbitのreview枠は共有資源であり、AIの判断で消費してよいものではない。**"
+            " 投げてよいか人間へ確認する。"
+            " このrepositoryは同じ型の失敗を3回している"
+            "（#153の無断依頼、PR #146／#148／#150の34件のゴミコメント、"
+            " PR #238／#239の連投で安全に関わる変更のreviewが59分止まった）。"
+            " 判断材料: 誰が求めたか／対象は新しい内容か／直前に同じ資源を使ったか／"
+            " 対象が複数なら重要度の高いものを1本ずつか。"
+            f" 枠を消費しない{'／'.join(f'`{w}`' for w in NOT_A_REVIEW)}は素通りする。"
+        )
+
+
+def main():
+    try:
+        payload = json.load(sys.stdin)
+    except (json.JSONDecodeError, UnicodeDecodeError) as error:
+        # hookの入力を読めないことを、対象commandの問題として扱わない。
+        # **素通りさせるが、握りつぶさない。**既存hookはここを黙って返すが、
+        # `_note()`を用意した以上この経路だけ黙るのは筋が通らない
+        # （PR #241のreview指摘）。**return codeとstdoutは変えない。**
+        _note(f"hookの入力を読めなかったため判定できない: {error}")
+        return 0
+    command = command_line.command_from(payload)
+    if command is None:
+        # 妥当なJSONでもmappingでないことがある（`[]`／`{"tool_input": ["x"]}`）。
+        # **判定は`command_line.command_from`が持つ。**5本のhookへ複製しない（#242）。
+        _note("hookの入力からcommandを取り出せなかったため判定できない")
+        return 0
+    if "gh" not in command:
+        # 全Bash呼び出しでこのhookが走る。`if`条件でBash(gh *)へ絞ると
+        # `cd x && gh pr comment`が素通りするため、絞らずここで安く抜ける。
+        return 0
+    for args in command_line.invocations(command, "gh"):
+        head = tuple(args[:2])
+        if head in COMMENT_SUBCOMMANDS:
+            _check(head, args[2:])
+        elif tuple(args[:1]) == API_SUBCOMMAND:
+            rest = args[1:]
+            methods = [m.lower() for m in _option_values(rest, METHOD_OPTIONS)]
+            # **最後の`-X`が効く。**`gh`のmethodは単一の文字列option
+            # （`gh api --help`の`-X, --method string`）であり、複数回渡すと後勝ちになる。
+            # **`any()`で見ると`-X GET -X POST`が読み取り扱いになって素通りする**
+            # （2026-08-28に実測）。**渡されていなければ見る側へ倒す。**
+            if methods and methods[-1] in READ_ONLY_METHODS:
+                # 読み取りと明示されている。**commentは投げられない。**
+                continue
+            _check(API_SUBCOMMAND, rest)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

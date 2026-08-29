@@ -4,6 +4,8 @@
 > 調査日: 2026-07-27
 > 更新: 2026-08-15 float ABIの判定基準と`arm-unknown-linux-gnueabihf`の適用条件を追加（[#62](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/62)）
 > 更新: 2026-08-17 Raspberry Pi Zero W 実機で 8 条件すべてを確認し、`arm-unknown-linux-gnueabihf`を確定（[#8](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/8)）。根拠は [Version Record](version-records/2026-08-17-pi-direct-build-native.md)。**依存を持つbuildとworkspace buildは未測定である**。この更新は[PR #144](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/144)として2026-08-19に`develop`へmergeした
+> 更新: 2026-08-26 依存を持つ crate の build、lint、test を Pi 上で実測した（[#11](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11) の前半）。**`Build method` の「依存を持つ build は未測定」と、`Cross compilationへ移る条件` の memory 条件の「未評価」を解消した。**根拠は [Version Record](version-records/2026-08-17-pi-direct-build-native.md) の 2026-08-26 再検証節。**実 serial port は開いていない**
+> 更新: 2026-08-27 **direct build の継続を決定し、`Cross compilation` の保留を解いた**（[#11](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11)）。移行条件 4 つを実測し、いずれも当たらない。**新しい測定は行っていない。**2026-08-26 の実測値から判断を確定させただけである
 > 対象board: Raspberry Pi Zero W（V1.1。ヘッダなし版にpin headerをハンダ付けした個体）
 
 ## 結論
@@ -88,8 +90,8 @@ Pi Zero W は CPU と RAM が限られるため、build 時間と storage 使用
 | Rust channel | stable | 確定。rustup 経由の stable（rustc 1.97.1） |
 | Native host/target | `arm-unknown-linux-gnueabihf` | **確定**（8 条件を実機で確認） |
 | Linker | OS の native GNU linker | 確定。`cc` 14.2.0、GNU ld 2.44 |
-| Build method | Pi 上の direct build | 最小 program で検証済み。**依存を持つ build は未測定** |
-| Cross compilation | 保留 | **保留を維持**（移行条件のいずれにも当たらない） |
+| Build method | Pi 上の direct build | 確定。**依存を持つ crate の build、lint、test も 2026-08-26 に実測した**（clean build 22 分 24 秒、peak 単一 process RSS 247364 kB＝MemTotal の 56.6%、OOM なし）。**`--workspace` は未実行** |
+| Cross compilation | 採らない | **確定**（2026-08-27）。移行条件 4 つを実測し、いずれも当たらない。判断を覆す条件は下記 |
 
 ESP32 用の `esp` toolchain を Pi service の build に使わない。
 
@@ -104,16 +106,48 @@ ESP32 用の `esp` toolchain を Pi service の build に使わない。
 - storage 消費や書込み負荷が大きい
 - 複数 Pi への配布を自動化する必要が生じた
 
-2026-08-17 の実機計測では、**4 条件のうち評価できた 3 つが当たらず、残る 1 つは未評価であるため、移行する根拠が無いと判断して保留を維持する。****4 条件すべてを否定したのではない。**根拠は [Version Record](version-records/2026-08-17-pi-direct-build-native.md) にある。
+2026-08-17 の計測では 4 条件のうち 3 つを評価し、残る 1 つ（memory）は未評価だった。
+**2026-08-26 に依存を持つ crate を実測し、memory 条件を評価した。**根拠はいずれも
+[Version Record](version-records/2026-08-17-pi-direct-build-native.md)（初回と 2026-08-26 再検証節）にある。
+
+**4 条件すべてを実測し、いずれも当たらないため、direct build の継続を決定した**（2026-08-27）。
+`Cross compilation` の保留は解けた。**新しい測定はしていない。**2026-08-26 の実測値から
+判断を確定させただけである。
+
+**唯一争点だったのは `clean build が許容できない` である。**依存 0 件のとき 4〜5 秒台だったものが、
+実 crate では 22 分 24 秒になった。**それでも許容すると判断した理由を 3 つ書く。**
+
+1. **開発サイクルの律速がここではない。**cache 有りの再 build は 3 秒である。22 分を払うのは
+   `target/` を捨てたときと依存を変えたときだけであり、日常の反復には現れない。
+2. **Pi 上の build の目的が配布物の生成ではない。**同じ target・同じ libc・同じ linker で
+   通ることを確かめるための検証 build であり、実行頻度が低い。配布の自動化も対象 1 台では要らない。
+3. **cross compilation の保守コストが 22 分より重い。**Armv6 hard-float の linker と target libc を
+   別途用意し、build host の library へ誤 link していないことを `file`、ELF metadata、
+   実機実行で毎回確かめることになる（下記）。**この文書自身が「実用上困難と確認できた場合だけ」
+   導入すると定めており、困難は確認できていない。**
+
+**この決定を覆す条件を先に書いておく。**次のいずれかを実測したら、`Cross compilationへ移る条件`
+の判定をやり直す。
+
+- **依存または crate が増えて clean build がさらに伸びる。**目安は現在の 22 分 24 秒の倍。
+- **`--workspace` を回す必要が生じ、それが memory で通らない。**現在 `-p` で 1 crate ずつに絞っており、
+  **workspace 全体は未測定である。**
+- **配布対象の Pi が 2 台以上になる。**
 
 | 条件 | 実測 | 判断 |
 |---|---|---|
-| clean build が許容できない | 最小 program の clean build は debug 4〜5 秒台、release 3.5 秒台 | 評価した。当たらない |
-| dependency build の memory 不足 | **未評価。**計測した program の依存は 0 件である | **判断できない。**「当たらない」とは言えない |
-| storage 消費や書込み負荷 | toolchain 約 820 MiB、`target/` 4.6 MiB、空き 24.8 GiB | 評価した。当たらない |
+| clean build が許容できない | 依存 0 件の最小 program は debug 4〜5 秒台、release 3.5 秒台（2026-08-17）。**依存 16 crate を含む `deskcat-serial` は 22 分 24 秒**（2026-08-26。cache 有りの再 build は 3 秒） | **当たらない**（2026-08-27 に判断）。cache 有り 3 秒で反復でき、clean build の頻度が低い |
+| dependency build の memory 不足 | **評価した**（2026-08-26）。peak 単一 process RSS 247364 kB、MemTotal 437156 kB の 56.6%。**OOM なし。**swap は zram で peak 53680 kB | **当たらない** |
+| storage 消費や書込み負荷 | toolchain 約 820 MiB、依存を含む `target/` 232 MiB、registry cache 約 55 MiB、空き約 24.5 GiB | 評価した。当たらない |
 | 複数 Pi への配布の自動化 | 対象は 1 台 | 評価した。当たらない |
 
-**「dependency build が memory 不足で安定しない」は未評価のまま残る。**依存 0 件の program しか測っていないため、426 MiB の機体で依存を伴う build が通るかはこの計測から言えない。cross compilation の判断を確定させるには、依存を持つ crate の build 計測が別途必要である。
+**「dependency build が memory 不足で安定しない」は 2026-08-26 に解消した。**426 MiB の機体で、
+依存 16 crate を含む `deskcat-serial` の clean build、clippy、test が OOM せずに完走した。
+
+**この計測が主張しないことを 3 点書く。**(1) `cargo test --workspace` と
+`cargo clippy --workspace` は実行していない。**1 crate ずつ `-p` で絞った。**
+(2) **release profile を測っていない。**debug のみである。
+(3) **実 serial port を開いていない。**`serial_link` example は build しただけである。
 
 cross compilation では Rust target の追加だけでなく、Armv6 hard-float に対応する linker と target libc が必要になる。build host の library へ誤って link しないことを、`file`、ELF metadata、実機実行で確認する。生成物の float ABI と `Tag_CPU_arch` は、[runbook](../runbooks/raspberry-pi-development-machine-setup.md#float-abiの判定)と同じ手段で読む。
 
@@ -131,8 +165,8 @@ cross compilation では Rust target の追加だけでなく、Armv6 hard-float
 - [x] 最小 Rust program が Pi 上で build できた
 - [x] 生成物が同じ Pi 上で実行できた（reboot 後も実行できた）
 - [x] clean build 時間、peak memory、storage 使用量を記録した
-- [ ] project の test command を記録した — **未実施。**#8 の範囲は最小 Rust program であり、このrepositoryのcrateとworkspaceを Pi 上で build していない。host workspace の検証済み command が Pi で通るかは不明である
-- [ ] direct build を継続するか cross compilation へ移るか決定した — **暫定で direct build を継続。**移行条件のうち「dependency build が memory 不足で安定しない」が未評価であり、確定していない
+- [x] project の test command を記録した — **2026-08-26 に記録した。**`cargo build --locked -p <crate>`、`cargo fmt --all -- --check`、`cargo clippy --locked -p <crate> --all-targets`、`cargo test --locked -p <crate>` がいずれも Pi 上で成功した（138 tests passed、0 failed、警告 0 件）。**ただし `--workspace` は実行していない。**426 MiB の機体で 1 crate ずつに絞った判断であり、**workspace 全体を一度に回して通るかは未確認である**
+- [x] direct build を継続するか cross compilation へ移るか決定した — **2026-08-27 に direct build の継続を決定した。**移行条件 4 つを実測し、いずれも当たらない。`clean build が許容できない` は 22 分 24 秒を許容すると判断した（cache 有り 3 秒で反復でき、clean build の頻度が低く、cross toolchain の保守コストの方が重い）。**判断を覆す条件は[Cross compilationへ移る条件](#cross-compilationへ移る条件)に明記した**
 
 ## 公式資料
 
