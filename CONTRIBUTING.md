@@ -324,7 +324,7 @@ board上のworkflow構成は[Repository設定](https://github.com/wachi-yoshitak
 ### Pull Request itemの開始日／終了日
 
 Pull Request itemの`Start date`／`Target date`は必須とし、次の値を設定する。
-Issue itemでは両fieldが予定であり未定なら空欄でよいが、Pull Request itemの`Start date`は
+Issue itemでは両fieldが予定であるのに対し、Pull Request itemの`Start date`は
 作成時点で確定した実績であり、空欄にする理由がない。
 
 | field | 値 | 設定時期 |
@@ -336,9 +336,9 @@ Issue itemでは両fieldが予定であり未定なら空欄でよいが、Pull 
 日付を書き換えないため、実績値への更新は手作業で行う。mergeせずcloseした場合の実績日は
 close日である。
 
-**Issue itemでも、完了時には空欄を残さない。**上の「未定なら空欄でよい」は**未定である間の
-扱い**である。`Status`が`Done`になった時点で開始日と終了日は確定しているため、空欄でよい
-根拠が消える。close後に`Start date`へ着手日、`Target date`へclose日（実績）を入れる。
+**Issue itemでも、完了時には空欄を残さない。**起票時に設定した値は予定であり、
+`Status`が`Done`になった時点で開始日と終了日は確定するため、close後に`Start date`へ
+着手日、`Target date`へclose日（実績）を入れる。
 **Pull Request itemだけが実績を持つと読まない。**
 
 日付はJST（UTC+9）で判断する。GitHubのAPIが返す時刻はUTCであり、JSTの`00:00`から`08:59`に
