@@ -13,6 +13,13 @@
 | 実験 | 対象 | 値の正 |
 |---|---|---|
 | [EXP-001](#exp-001-連続streamingの実効sample-rate) | `HW-TBD-034` 作業1・作業2 | [power-budget.md](power-budget.md)の`手持ち候補に固有の制約: SRAMと取得方式`、`基準電圧が未解決である（設計上の論点）` |
+| [EXP-002](#exp-002-内蔵基準電圧の校正比率法) | `HW-TBD-034` 作業2 | [power-budget.md](power-budget.md)の`基準電圧が未解決である（設計上の論点）` |
+| [EXP-003](#exp-003-段階b-1でのgnd-topologyと入力headroom) | `HW-TBD-034` 作業3 | [power-budget.md](power-budget.md)の`GND topology（測定前に必ず確定させる）` |
+| [EXP-004](#exp-004-gnd-offsetを両極性で測る) | `HW-TBD-034` 作業3 | [power-budget.md](power-budget.md)の`GND topology（測定前に必ず確定させる）` |
+| [EXP-005](#exp-005-5v-pinとavcc-pinの差の上限) | `HW-TBD-034` 作業2 | [power-budget.md](power-budget.md)の`基準電圧が未解決である（設計上の論点）` |
+| [EXP-006](#exp-006-ポーリングログの試運転) | [#247](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/247)測定計画3節 | 値の正なし（手順が機能することの検証記録） |
+| [EXP-007](#exp-007-journal永続化と直後のpi再起動) | [Hardware Safety Policy](../governance/hardware-safety-policy.md) §11、[#247](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/247) | 値の正なし（事象記録） |
+| [EXP-008](#exp-008-段階b-1でのpi単体build負荷比較とesp32側基準値) | `HW-TBD-023`（この記録は判定に使っていない） | 値の正なし（`HW-TBD-023`が未確定であり、正本側に置ける確定値がまだ無い） |
 
 **大容量の生dataはこのrepositoryへ入れていない。**保存場所は
 [development-foundation-plan.md](../planning/development-foundation-plan.md)の
@@ -633,6 +640,145 @@ DT830Bの`V⎓`の`200m`レンジ（最小単位0.1 mV）。赤プローブは`5
 **それでも`HW-TBD-034`はcloseしない。**(3)のstar point構成の確認が残り、
 close条件は3点だけではない。
 
+## EXP-006: ポーリングログの試運転
+
+**目的**: [#247](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/247)（2026-08-25、案AでESP32へ通電した際にPiが落ちた事象）が記録した「低電圧flagが再起動で消えて事後に確認できなかった」を防ぐため、`vcgencmd get_throttled`／`measure_volts`を1秒間隔でpollingし、reboot跨ぎでもファイルへ残る仕組み（`rail_logger.py`）を作り、実機で動くことを確かめる。
+
+**実施日**: 2026-08-28（JST）。Raspberry Pi Runtime実機（`deskcat-pi`）。
+
+### 構成
+
+- 対象コマンド: `vcgencmd get_throttled`、`vcgencmd measure_volts core`（`sdram_c`／`measure_temp`も同時取得）
+- 各書き込みごとに`flush()`と`os.fsync()`を行う。新規file作成時はdirectory entryも`fsync`する
+- 絶対時刻でscheduleする（`sleep(interval)`の単純な積み上げは標本間隔を単調に伸ばすため）
+- ESP32は接続していない。案Aの再試験は行っていない
+
+### 結果
+
+| 3節が要求した性質 | 結果 |
+|---|---|
+| `get_throttled`と`measure_volts core`を一定間隔で取得 | OK。`sudo`不要（実行userが`video` group所属） |
+| タイムスタンプ付きでローカルfileへ追記 | OK。CSV。ISO8601（`+0900`）、monotonic経過秒、`boot_id`、`/proc/uptime`、`MemAvailable`を併記 |
+| 毎行flush／sync | OK。実機で再起動をまたいで確認した。**再起動前に存在した18行について**、再起動後も同一の`sha256`であり`cmp`も一致した（その後に5 sampleが追記されている。file全体のhashではなく、再起動前の18行分を対象にした） |
+| flagだけでなく実測値も残す | OK。`get_throttled`のraw文字列と16進値の両方を残す。bitを解釈して合否を出さない（`HW-TBD-023`が未確定であるため） |
+| bootをまたいだ推移が追える | OK。同一fileへappendし、`boot_id`列と`# session start/end`行で境界が読める |
+
+標本間隔の実測（初版の誤りを1件直した）:
+
+| | 修正前 | 修正後 |
+|---|---|---|
+| 指定 | 1 s | 1 s |
+| 実測min/max/平均 | — | 0.9980 / 1.0020 / 1.0002 s |
+| 15 sampleの総経過 | — | 14.003 s |
+
+初版は`sleep(interval)`を作業時間に上乗せしていたため、標本間隔が1.075 sへ伸びていた（`vcgencmd`4回と`fsync`の所要が毎周期積み上がる）。絶対時刻でscheduleするよう直した。
+
+参考値（判定には使わない）: アイドル時の`measure_volts core`は1.2000Vで安定し、logger起動直後の1 sampleだけ1.3500Vを示した。CPUの周波数・電圧scalingによる差と解されるが、確認していない。**`measure_volts core`はSoC内部のcore railであり、`PWR IN`の入力電圧ではない。**この値をPi入力電圧の代用にしない。
+
+### この記録が主張しないこと
+
+- **案Aについて何も主張しない。**ESP32を接続していない
+- **`PWR IN`の入力電圧を測っていない。**取れたのはSoC内部railの値だけである
+- **落ちた瞬間を捉えたわけではない。**捉える仕組みが動くことを確認しただけである
+- **完全な電源断では末尾（ポーリング間隔未満）が失われうる。**Piが応答停止した後の状態は捉えられない
+- **SDへの書き込みが毎行発生する。**測定窓の外で回し続けるものではない
+
+### 結論
+
+reboot跨ぎで値を失わない仕組みが機能することを実機で確認した。**この仕組みは`EXP-007`で（意図しない形で）実地検証された。**
+
+## EXP-007: journal永続化と直後のPi再起動
+
+**目的**: [#247](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/247)のPM決定（2026-08-29）に従い、`journalctl`の`Storage`を`persistent`化し（`SystemMaxUse=32M`上限付き）、kernelログが再起動をまたいで残る状態にする。その直後にPiが実際に再起動した事象を記録する。
+
+**実施日**: 2026-08-29（JST）。Raspberry Pi Runtime実機（`deskcat-pi`）とDocs/Review端末（ssh経由）。sudo操作はユーザーの承認を得て実施した。
+
+### journal永続化の実施
+
+- `/etc/systemd/journald.conf.d/50-persistent-storage.conf`に`Storage=persistent`／`SystemMaxUse=32M`を追加し、`systemd-journald`を再起動
+- `/var/log/journal/`に実file（`system.journal`／`user-1000.journal`）ができたことを確認した
+
+### 再起動事象
+
+**何をしていたか**: 測定計画6節の残り2項目のうち「Pi単体でのbuild負荷比較」を実施しようとしていた。検証済みでない条件（`cargo build --release`）で建て直し、さらにその完了確認中に**別の検証済みコマンドのbuildをもう一度重ねて起動してしまい、空きメモリ68MiBの状態で2つのcargo buildが同時に動く状態を作った（AI側の判断ミス）。**二重buildを解消しようとssh経由で`kill`コマンドを送った直後、Piがネットワークから応答しなくなった。
+
+タイムライン（`journalctl`と`boot_id`による再構成、時刻はJST）:
+
+| 時刻 | 内容 |
+|---|---|
+| 02:47頃 | `--release`buildが依然として稼働中（見落とし）に、debug buildをさらに起動。空きメモリ68MiB |
+| 02:48:29–02:48:35 | 二重build解消のための`kill`コマンドがssh接続。正常に切断（`disconnected by user`） |
+| 02:48:35 | rail loggerのCSVの最後の行。以降、記録が途切れる（`# session end`行が無い＝正常終了ではない） |
+| 02:48:41 | 新しい`boot_id`（`85d4479e…`）でkernelログが開始。旧bootとの間はわずか6秒 |
+| 02:48:41 | journal再起動時、旧journalファイルが「corrupted or uncleanly shut down」として作り直された（正常なshutdownでは起きない） |
+| 02:59頃 | ping応答が復帰。人間が物理的に立ち会っており、その時点でLEDは点灯、DT830B読みは5.30V（プローブを固定した状態） |
+
+### 追加の観測
+
+- **`throttled`の低電圧sticky bitは、新bootで`0x0`**（このboot中は低電圧未検出）。旧boot終了直前の最後のポーリング行（02:48:35時点）も`throttled=0x0`だった
+- **新bootのfilesystemは`orphan cleanup`のみでEXT4エラー無し**
+
+### この記録が主張しないこと
+
+- **原因を確定していない。**証拠は「AI側の二重build（メモリ逼迫）が引き金」という仮説を、タイミングの近さから支持するが、旧bootのkernelログにOOM killerの記録が一つも無いため断定できない
+- **物理的な短絡が引き金だった可能性を完全には排除できない。**ただしタイムラインは、後で報告された「プローブを外したらLEDが消え、その後点滅した」という観察より前に再起動が始まっていたことを示しており、それが新たな短絡ではなく既に始まっていた同じ再起動の起動シーケンス（SDカードアクセスによる点滅）だった可能性を示唆する
+- **1秒間隔のポーリングでは、間隔未満の瞬間的な電圧降下は検出できない。**`throttled=0x0`の記録は、この限界の範囲内でのものである
+- `docs/hardware/`の値は変更していない。案Aの再試験は行っていない
+
+### 是正
+
+- 今後、Pi上のcargo buildはAGENTS.md検証済みコマンドのみを使い、同時に2つ以上走らせない。`--release`など未検証条件は使わない
+- DT830Bのプローブは、GPIO pinへ手持ちで当てず、線を延長して固定する（本事象後に対応済み）
+
+### 結論
+
+**Piは実際に再起動した（`boot_id`変化で確定）。**原因は特定できていない。journal永続化は意図通り機能し、この事象が期せずして`journalctl -b -1`が使えることの実地確認になった（`EXP-006`参照）。
+
+## EXP-008: 段階B-1でのPi単体build負荷比較とESP32側基準値
+
+**目的**: 測定計画6節「待たない」項目のうち残る2件（Pi単体でのbuild負荷比較、ESP32側の基準値〈段階B-1〉）を実測する。`EXP-007`の事象を踏まえ、検証済みコマンド1つだけを同時実行なしで使い、DT830Bのプローブは線を延長して固定してから測定した。
+
+**実施日**: 2026-08-30（JST）。Raspberry Pi Runtime実機（`deskcat-pi`）とDocs/Review端末（ssh経由、およびPC USB直結）。人間が物理的に立ち会い、DT830Bのプローブ当てと読み取りを行った。
+
+### 測定点の限界
+
+- Pi側: `PWR IN`ポート直前は、M-12001のcableがreceptacleへ直挿しの構成（`PSU-INGRESS-01`未着荷）のため物理的に触れられない。**代わりにGPIO 40pinヘッダ pin2(5V)/pin6(GND)で近似した。**Pi公式資料によれば、GPIO 5V pinはUSB入力と同一railだが、USB側にあるfuse／TVS／filterの保護回路を経由しない。Zero W自体の回路図は非公開のため、この保護回路による電圧降下の有無・大きさは確認できていない
+- ESP32側: `5V`ピン（Micro USBコネクタ直近）で近似した。この秋月基板の`5V`ピンがVBUSへ保護diodeを介するか直結かは未確認（[power-budget.md](power-budget.md)既知のTBD）
+- DT830Bの確度そのものは一次資料に無く取得できない。`±10 mV`はDT830Bの最小表示単位から出る不確かさの下限であり、確度そのものではない。真の確度は不明でこの下限より悪い可能性がある
+- `HW-TBD-023`の暫定値を合否の基準に使っていない。以下は記録のみで、合否判定はしていない
+
+### 項目2: Pi単体build負荷比較
+
+ESP32は接続せず、Piの`PWR IN`をGPIO pin2/pin6で近似測定した。ポーリングログ（`EXP-006`と同じ仕組み）も並行して動かした。
+
+| 条件 | 実測(V) | 備考 |
+|---|---|---|
+| アイドル | 5.29〜5.30 | 安定 |
+| build中（`cargo build --locked -p deskcat-serial`、13.35秒、16:41:08〜16:41:22 JST） | 5.27〜5.28 | ロガーの`volts_core`（SoC内部rail、参考値）も同時刻に`1.2000V`→`1.3500V`、温度も40℃→42℃台へ上昇。時間的に一致 |
+| build後 | 5.28〜5.30 | アイドルへ復帰 |
+
+`throttled`は測定を通して`0x0`。約10〜20 mVの低下が見えるが、有意な低下として扱わない（DT830Bの確度が不明であるため）。ロガーのCSVは今回`# session end`行で正常終了した（`EXP-007`の事象では同じ行が欠けており、それが異常終了の根拠の1つだった。今回はその対比になる）。
+
+### 項目3: ESP32側の基準値（段階B-1、PC給電）
+
+PCのUSBからESP32を給電した状態（cargo buildは実行していない）で測定。
+
+| 条件 | 実測(V) |
+|---|---|
+| アイドル（PC給電、`5V`ピン） | 4.82〜4.83、安定 |
+
+**Pi側の実測（5.29V付近）と単純比較しない。**給電元（M-12001経由 対 PCのUSBポート）が異なり、経由する保護回路・降下要因も異なるため、この2値の差から何かを結論しない。
+
+### この記録が主張しないこと
+
+- **`PWR IN`・Micro USBコネクタそのものの電圧ではない。**いずれもGPIO/5Vピンでの近似であり、途中の保護回路による降下は未確認
+- **合否を判定していない。**`HW-TBD-023`は依然TBDのまま
+- **案Aの再試験は行っていない。**OTG供給能力の実測も行っていない（段階Cまで待つ）
+
+### 結論
+
+測定計画6節「待たない」3項目（`EXP-006`〜本記録）は、いずれも着手し、いま取れる範囲の値を取った。**ただし項目2は、測定計画5節が定める測定点（`PWR IN`直前）では測れていない。**5節は「経路の途中で測ると、降下を含めた実際の入力電圧が分からない」と理由を明記しており、今回のGPIO pin代用はこの条件を満たさない。**`PSU-INGRESS-01`が着荷してcableの受けがbreakoutになれば、その点で測り直せる。それまで、この値を「Piの`PWR IN`入力電圧」として扱わない。**同じ理由で、ESP32側の`5V`ピンもMicro USBコネクタそのものの代用ではない。
+
 ## Revision履歴
 
 | 日付 | Revision | 変更 | 根拠 |
@@ -648,3 +794,4 @@ close条件は3点だけではない。
 | 2026-08-22 | 8 | **この文書の日付がJSTであることを明記した。**[CONTRIBUTING.md](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/CONTRIBUTING.md)は`日付はJST（UTC+9）で判断する`と定めており、**JSTの`00:00`から`08:59`に行った作業はUTCでは前日になる。****この食い違いが[PR #160](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/160)と[PR #163](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/163)で2回続けて指摘された。**どちらも「実施済みの記録が未来日になっている」という内容だったが、**規約どおりJSTで読めば未来日ではない。**文書の冒頭と`EXP-003`／`EXP-004`の`実施日`欄へ明記し、**次回から同じ指摘が出ないようにした。****測定値も結論も変えていない** | [#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3) |
 | 2026-08-22 | 9 | **`EXP-005`（`5V` pinと`AVCC` pinの差の上限）を追加した。これで`HW-TBD-034`の(1)が解けた。**`L2`は`0805`でプローブが当てられなかったため、**ATmega328Pのpin 20を直接測った。**位置はArduino公式のboard reference design（`UNO-TH_Rev3e.brd`。sha256を記録した）から算出した。**差はテスターのゼロ点と区別できず、上限はそのゼロ点である。生の読みを差の値として採らない。****この上限は`EXP-002`が記録している不確かさに埋もれる。**したがって`EXP-002`の`V_INT`を、その不確かさの範囲で絶対値として扱える。**`L2`のDCRは依然として未取得だが、差を上限で縛れたため算出が要らなくなった。****同じゼロ点オフセットが`EXP-004`のGND offsetの絶対値にも乗っていることを記録した。****2条件の差は定数オフセットの影響を受けないため、ADCと整合するという結論は変わらない。**`EXP-002`と`EXP-004`へ後日の追記を入れた（**記録そのものは書き換えていない**）。**確度は未取得のままで、上限は最小単位とゼロ点からの値である。****`HW-TBD-028`の判定には使っていない** | [#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3) |
 | 2026-08-22 | 10 | **`EXP-005`のraw dataが誤っていた。訂正した。**pin 20の読みを`0.02`と記録していたが、**実際の表示は`00.2`である。****`0.02`はこのレンジの最小単位（0.1 mV）では表示できない値であり、記録する前に読み直しを頼むべきだった。**表示できない値に気づきながら、確認せず`桁形式の食い違い`という節を書いて残していた。**その節は削除した。2つの表示は同一であり、食い違いは存在しない。****訂正により結論が変わった。**測定値とゼロ点が同じ表示であるため、これは**ゼロ法（null測定）**である。**差は表示を1 count動かすに足りず、上限は0.1 mV**（従来は0.2 mVとしていた）。`V_INT`へ与える影響は約0.02 mVで、記録済みの不確かさ ±0.003 V の130分の1以下である。**差の値そのものは依然として得られていない。上限だけである。**あわせて[PR #166](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/166)の自動reviewの指摘に従い、**解決済みの記述の後に残っていた過去の記述へ、当時のものである旨を明示した**（観測結果1と`EXP-002`の結論）。**Revision 9は書き換えず、この行で訂正する** | [PR #166](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/166) |
+| 2026-08-30 | 11 | **`EXP-006`〜`EXP-008`を追加した。**[#247](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/247)（案AでESP32へ通電した際にPiが落ちた事象）の測定計画6節「待たない」3項目の実施記録である。**`EXP-006`**（2026-08-28、ポーリングログの試運転）、**`EXP-007`**（2026-08-29、journal永続化とその直後のPi再起動。原因未確定。二重cargo buildというAI側の判断ミスがタイミング的に近いことを記録した）、**`EXP-008`**（2026-08-30、Pi単体build負荷比較とESP32側基準値〈段階B-1〉。GPIO pin代用のため測定計画5節が定める`PWR IN`直前では測れていないことを明記した）。**いずれも値の正をこの文書へ置かず、`HW-TBD-023`の判定にも使っていない。**CSVは`hardware/measurement/.gitignore`により追跡対象外のまま。**案Aの再試験は行っていない。`docs/hardware/`の既存の値は変更していない。**あわせて、索引表に`EXP-001`しか無く`EXP-002`〜`EXP-005`が抜けていたため、006〜008を足す機会に**`EXP-002`〜`EXP-005`の索引行も追加し、表を揃えた**（既存の抜けであり、この行の追加が原因ではない） | [#247](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/247) |
