@@ -417,9 +417,13 @@ USB-UART: Silicon Labs CP210x（10c4:ea60、/dev/ttyUSB0）
   給電は PC の USB のみ。Raspberry Pi へは未接続（人間が着手前に確認）
 立ち会い: 有（人間が USB の抜き差しを物理的に実施。エージェントは device node の
   消失／再作成を監視し、再作成直後に port を開いて出力を記録した）
-再 flash: 行っていない。flash 済み firmware は health snapshot の firmware=0.1.0 と
-  protocol counters の形が 2026-08-25 節の記録と一致しており、Issue #7 の firmware と同一と判断した
-  （commit hash を含む boot 行は、着手時点で既に流れ去っており未確認）
+再 flash: 行っていない。**board 上の binary の同一性は `TBD` である。**health snapshot の
+  firmware=0.1.0 と protocol counters の形は 2026-08-25 節の記録と一致するが、**いずれも
+  binary や commit を一意に識別しない**（`firmware` はバージョン文字列であり、counters は
+  形の一致にすぎない）。2026-08-29 は再 flash しておらず、boot identity も binary hash も
+  記録していない（commit hash を含む boot 行は、着手時点で既に流れ去っており未確認）。
+  **したがって「Issue #7 の firmware と同一である」とは結論しない。**同定するには boot 行の
+  取得か、binary hash の照合が要る
 ```
 
 ### 手法
@@ -474,16 +478,18 @@ heartbeat の周期は約 994 ms（「2026-08-25 再検証」節の周期実測�
 - 周辺回路、servo、電圧については本節でも何も追加確認していない（既存の「この記録が
   主張しないこと」と同じ）
 
-### `AGENTS.md` との食い違い（記録のみ。書き換えは PM へ引き継ぐ）
+### `AGENTS.md` との食い違い（2026-08-31 に解消済み）
 
-**`AGENTS.md` の「検証」節にある「USB 抜き差しによる電源再投入後の起動出力は
-未検証である」という一文は、この追記の時点で未更新であり、この記録と食い違っている。**
+**この追記の時点では、`AGENTS.md` の「検証」節が「USB 抜き差しによる電源再投入後の
+起動出力は未検証である」とだけ書いており、この記録と食い違っていた。**当該文は「起動出力
+（起動直後の出力全般）が未検証」とだけ述べ、本節が示した「定常状態への到達（`reset_reason`／
+`uptime_ms` による確認）は実測済みであり、未検証なのは boot banner と firmware 最初の出力に
+限られる」という区別を反映していなかった。
 
-具体的には、`AGENTS.md` の当該文は「起動出力（起動直後の出力全般）が未検証」とだけ書いており、
-本節が新たに示した「定常状態への到達（`reset_reason`／`uptime_ms` による確認）は実測済みで
-あり、未検証なのは boot banner と firmware 最初の出力に限られる」という区別を反映していない。
-**この一文の書き換えは PM が引き取り、次に Issue を立てる機会へまとめる。このセッションでは
-`AGENTS.md` を書き換えていない。**
+**この食い違いは `7ff4e54`（[PR #277](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/277)）で解消した。**
+`AGENTS.md` は現在、電源再投入のあと firmware が定常状態へ到達したことまでを主張し、
+起動出力そのものは今も取得していないことと、その理由が構造的で再試行では解決しないことを
+書き分けている。**本節の実測内容は変更していない。**
 
 ### Conclusion（2026-08-29 時点）
 
