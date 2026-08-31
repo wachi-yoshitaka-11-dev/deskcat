@@ -131,8 +131,8 @@ DECLARATION_CUTOVER = "57734371384d18f31de7557a7a60fd1aa856edff"
 # 免除commitで`continue`するため、`_check_instructions`も掛からない。**指示source変更の
 # 宣言（`Instruction-Change`）の検査まで抑止する。**
 # 実際に効いているのは`9c91f913`と`b71c7ef`である（どちらも`docs/hardware/`を触りながら
-# `Instruction-Change`を持たない）。`18298ae`と`619c843`は`INSTRUCTION_SOURCES`のpathを
-# 1つも触らないため、この抑止は掛かっていない。
+# `Instruction-Change`を持たない）。`18298ae`と`619c843`と`1a5dda8`は`INSTRUCTION_SOURCES`
+# のpathを1つも触らないため、この抑止は掛かっていない。
 #
 # **理由は1つではない。原因ごとに書き分ける。**同じ「後から付けられない」で
 # まとめると、再発を止める手がかりが消える。
@@ -171,6 +171,22 @@ DECLARATION_CUTOVER = "57734371384d18f31de7557a7a60fd1aa856edff"
 #      別の経路を通ったと考えられるが、**経路は特定していない。推測で書かない。**
 #      **「hookを入れたから同じ型は起きない」とは言えない、という記録である。**
 #
+# - `1a5dda8`（Refs #6）。**既存5件のどれとも原因が違う。**
+#   `Change-Class: fixup`による`develop`への直接pushで、**push前に`gate`を実行し
+#   exit 0を確認していた。**しかし`Refs: #6`と`Co-Authored-By`の行の間に空行を
+#   入れてしまい、trailerの段落が2つに割れた。`git interpret-trailers --parse`は
+#   最後の段落しかtrailerと見なさないため、`Change-Class`と`Refs`を含む先頭の
+#   段落がまるごと無効になった（`Self-Review`はこのcommitではまだ書いておらず、
+#   元から無い）。続くcommitで`Self-Review`を足した際に空行の問題へ気づき、
+#   **その後続commitだけ**`git commit --amend`で直した（rebase後`fb60e31`。
+#   trailerは正しく認識される）。**`1a5dda8`自身は直っていない。**
+#   **`gate`は間違っていない。**Pull RequestのRequired status checkとしてhead
+#   commit 1本を見る設計であり、それは正しい。**欠けていたのは、複数commitを
+#   まとめて`fixup`で直接pushする場面で`history`も合わせて確認するという
+#   運用手順だった。**`docs/toolchains/version-records/`のみを変更しており
+#   `INSTRUCTION_SOURCES`を触っていないため、`Instruction-Change`の抑止は
+#   このentryでは掛からない（`18298ae`／`619c843`と同じ側）。
+#
 # **この列挙を増やさない。**増やす変更は`scripts/`の変更であり、reviewと
 # `Instruction-Change`の宣言を通る。通したうえで増やすなら、それは判断である。
 DECLARATION_EXEMPT = (
@@ -179,6 +195,7 @@ DECLARATION_EXEMPT = (
     "619c8439be8489451ec9f6a9b79613bc01c1605d",
     "b93b309c7f6a39967d2eb3ba62807bc4bb1a5dfe",
     "b71c7ef9e58240d71667c95b551b113288ee450f",
+    "1a5dda877e4994309cd35dd033d66881ea431a2f",
 )
 
 # 変更行がこれらのいずれかに当たると軽微にしない。数値、command、link、表、見出し、

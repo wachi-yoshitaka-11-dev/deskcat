@@ -6,8 +6,9 @@
 **この記録は flash と実機起動を主張する。**build-only の記録
 （[2026-08-15](2026-08-15-esp32-build-native-linux.md)）とは別である。
 
-- 最終有効な検証日時: 2026-08-25（[Issue #7](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/7)
-  の firmware を同じ端末・同じ profile で flash した。「[2026-08-25 再検証](#2026-08-25-再検証issue-7-の-heartbeat-と-health-snapshot)」節を参照する）
+- 最終有効な検証日時: 2026-08-29（USB の抜き差しによる電源再投入を、同じ端末・同じ profile で実測した。
+  「[2026-08-29 追加検証](#2026-08-29-追加検証usb-の抜き差しによる電源再投入)」節を参照する。
+  2026-08-25 の firmware 差し替え記録は「[2026-08-25 再検証](#2026-08-25-再検証issue-7-の-heartbeat-と-health-snapshot)」節に残る）
 
 **Record ID と file 名は初回検証日の 2026-08-20 で固定する。**同じ端末の同じ profile であるため、
 別記録を起こさずこの記録を更新する（[記録一覧](README.md)の規則）。
@@ -391,3 +392,106 @@ release  5 m 59 s
 **判定はこの記録に対して1つである。**[記録一覧](README.md)の規則が「未実行の項目が残る場合は
 `Partial`とし、何が未達かを記録内に明記する」と定めているため、先頭の `Conclusion:` 欄と
 この節を食い違わせない。
+
+## 2026-08-29 追加検証（USB の抜き差しによる電源再投入）
+
+[Issue #6](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/6) の実施記録として、
+`WORK-INSTRUCTIONS-POWER-CYCLE-BOOT.md`（PM 作成。人間の review は経ていない。
+Issue は立てず、この節の反映は `Change-Class: fixup` と `Refs: #6` を宣言する）に基づき実施した。
+
+**この節が閉じるのは「本物の電源再投入の起動出力は採れていない」（上記「この記録が主張しないこと」）
+のうち、`reset_reason` と `uptime_ms` による定常状態到達の確認だけである。banner
+（`rst:0x...`）と firmware 最初の出力は、今回も取得していない。**理由は同じで、host 側の
+serial port が USB enumerate 後にしか存在せず、その時点で当該出力は既に流れ終わっているためである
+（独立給電の serial adapter が無い。この作業の範囲外。導入の要否は方式ごと PM へ上げる）。
+
+```text
+Date: 2026-08-29 (JST)
+Machine profile: ESP32 Flash / HIL
+Repository commit: 6190f616b028063c09a653fa46c4e47bbeaf4a94
+Working tree clean: yes
+Container / VM / native: native（実機）。systemd-detect-virt: none
+OS: Ubuntu 24.04.4 LTS / x86_64
+USB-UART: Silicon Labs CP210x（10c4:ea60、/dev/ttyUSB0）
+現物構成: ESP32 単体（ブレッドボード・pull 抵抗・LCD・servo・sensor 未接続）。
+  給電は PC の USB のみ。Raspberry Pi へは未接続（人間が着手前に確認）
+立ち会い: 有（人間が USB の抜き差しを物理的に実施。エージェントは device node の
+  消失／再作成を監視し、再作成直後に port を開いて出力を記録した）
+再 flash: 行っていない。**board 上の binary の同一性は `TBD` である。**health snapshot の
+  firmware=0.1.0 と protocol counters の形は 2026-08-25 節の記録と一致するが、**いずれも
+  binary や commit を一意に識別しない**（`firmware` はバージョン文字列であり、counters は
+  形の一致にすぎない）。2026-08-29 は再 flash しておらず、boot identity も binary hash も
+  記録していない（commit hash を含む boot 行は、着手時点で既に流れ去っており未確認）。
+  **したがって「Issue #7 の firmware と同一である」とは結論しない。**同定するには boot 行の
+  取得か、binary hash の照合が要る
+```
+
+### 手法
+
+事前に用意した監視 script（repository 外。`docs/` へは入れていない）が、`/dev/ttyUSB0` の
+存在を高頻度で poll し、消失→再作成の遷移を検知した。再作成を検知した時刻を起点とし、
+可能な限り速やかに port を開いて出力を読み、最初に検出できた `reset_reason` と `uptime_ms`
+（および検出までの経過時間）を記録した。
+
+### 実測（3 回）
+
+| 回 | 消失→再作成 | 再作成→port open | reset_reason（検出まで） | uptime_ms（検出まで） |
+|---|---|---|---|---|
+| 1 | 10.59 s | 0.118 s | power_on（+9.903 s） | 1006（+0.854 s） |
+| 2 |  7.72 s | 0.120 s | power_on（+10.042 s） | 1006（+0.993 s） |
+| 3 |  5.30 s | 0.110 s | power_on（+10.059 s） | 1006（+1.008 s） |
+
+**3 回とも `reset_reason=power_on`、`uptime_ms=1006`（heartbeat 1 本目の値）で一致した。**
+heartbeat の周期は約 994 ms（「2026-08-25 再検証」節の周期実測を参照）であり、3 回とも
+最初に検出できた行が 1 本目の heartbeat（`hb seq=1`）だったため、同じ値になっている。
+**使い回しではなく、毎回起動直後の最初の行を捕まえたことの結果である。**
+`uptime_ms` は port を開いてから 1 秒程度で検出できており、「十分小さい」と言える値である。
+`reset_reason` は heartbeat には含まれず、10 秒周期の health snapshot（JSON）まで待って初めて
+検出できたため、検出までの経過時間は 10 秒前後になっている。**この経過時間の長さは
+`reset_reason` の値そのものの信頼性を下げるものではない**（health snapshot の JSON にある
+`"reset_reason":"power_on"` を読んだだけであり、10 秒待ったこと自体が異常を示すものではない）。
+
+これとは別に、上と同じ抜き差しの試行のうち 4 回は、device node 再作成の直後に port を開いた
+際に `SerialException`（device disconnected or multiple access on port?）が発生し、
+`reset_reason`／`uptime_ms` を得られなかった。**再現するたびに device node は正しく消失・
+再作成しており、電源が実際に切れて入り直したこと自体は確認できている。**エラーは port を
+開くタイミングが udev のデバイス確定に対して早すぎたことによる読み取り側の一時的な失敗と見られ、
+`reset_reason` が `power_on` 以外だった、または `uptime_ms` が続きに見えた、という
+停止条件には該当しなかった。これらの試行は破棄し、実測には含めていない。
+
+### 主張の更新
+
+**上記「この記録が主張しないこと」の関連行は、消さずにそのまま残す。**そのうえで、今回の
+実測で新たに言えることを次のとおり区別する。
+
+- **主張してよいこと（今回追加）**: USB の抜き差しによる電源再投入のあと、`reset_reason=power_on`
+  かつ `uptime_ms` が小さい値（1006 ms）であることを 3 回とも確認した。**したがって
+  「USB の抜き差しによる電源再投入のあと、firmware が定常状態へ到達した」と言える**
+- **主張しないこと（変わらず）**: 「起動出力を記録した」とは書かない。ROM の boot banner
+  （`rst:0x...`）と firmware 起動直後（`uptime_ms` が heartbeat 1 本目である 1006 ms より前）
+  の出力は、今回も取得していない。取りに行っていない
+- **主張しないこと（今回追加）**: `uptime_ms=1006` より前、すなわち boot から heartbeat
+  1 本目までの区間で何が起きたかは、今回の方法では確認できない（記録済みの起動出力に
+  よれば ESP-IDF の log timestamp で `app_main` 呼び出しは `I (354)` 付近だが、これは
+  firmware 自身の `uptime_ms` とは別の clock であり、上記「2026-08-25 再検証」節が示す
+  約 380 ms のオフセットを直接足し引きできる値ではない）
+- 周辺回路、servo、電圧については本節でも何も追加確認していない（既存の「この記録が
+  主張しないこと」と同じ）
+
+### `AGENTS.md` との食い違い（2026-08-31 に解消済み）
+
+**この追記の時点では、`AGENTS.md` の「検証」節が「USB 抜き差しによる電源再投入後の
+起動出力は未検証である」とだけ書いており、この記録と食い違っていた。**当該文は「起動出力
+（起動直後の出力全般）が未検証」とだけ述べ、本節が示した「定常状態への到達（`reset_reason`／
+`uptime_ms` による確認）は実測済みであり、未検証なのは boot banner と firmware 最初の出力に
+限られる」という区別を反映していなかった。
+
+**この食い違いは `7ff4e54`（[PR #277](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/277)）で解消した。**
+`AGENTS.md` は現在、電源再投入のあと firmware が定常状態へ到達したことまでを主張し、
+起動出力そのものは今も取得していないことと、その理由が構造的で再試行では解決しないことを
+書き分けている。**本節の実測内容は変更していない。**
+
+### Conclusion（2026-08-29 時点）
+
+`Partial`。電源再投入後の定常状態到達（`reset_reason`／`uptime_ms`）は 3 回とも実測できた。
+banner と firmware 最初の出力は、構造的理由により今回も未達である。一覧は上の「主張の更新」を参照する。
