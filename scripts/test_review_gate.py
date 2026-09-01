@@ -136,7 +136,39 @@ class ReviewGateTests(unittest.TestCase):
         root = self._repository()
         self._write(root, PLAIN_DOC, "見出しのない散文である。\nここに解説を書く。\n")
         self._commit(root, "散文の言い回しを直す")
-        self.assertIn(f"CLASS={gate.CLASS_MINOR}", self._classify(root))
+        output = self._classify(root)
+        self.assertIn(f"CLASS={gate.CLASS_MINOR}", output)
+        # `minor`はCodeRabbitの要否と紛れる文言ではないため、説明行を出さない。
+        self.assertNotIn("meaning:", output)
+
+    def test_review_required_explains_it_is_not_a_coderabbit_review(self):
+        """`CLASS=review-required`は`minor`経路を採れないという意味であり、
+        CodeRabbit reviewの要否ではない。**出力のどこにもその区別が無いと、
+        `review-required`という名前だけで読み違えられる。**
+
+        **`Change-Class`／`Self-Review`のtrailerは、値と無関係に無条件で
+        要求される**（`_check_receipt`）。この説明行がtrailerの要求を
+        `review-required`固有のものとして書くと、`minor`ならtrailerが
+        要らないと読める別の誤りを生む。そのため`minor`の経路の話としてだけ書く。
+
+        **Issue／Pull Requestが要るとも書かない。**`fixup`＋`Refs`の宣言は
+        `computed`に関係なく受理される（`_check_receipt`の`CLASS_FIXUP`分岐に
+        `computed`条件が無い）ため、`review-required`と判定された範囲でも
+        Issue・Pull Request無しで`develop`へ入れる経路が残っている
+        （`CONTRIBUTING.md`）。出力へ経路の一覧を再掲すると、表が変わったときに
+        追随できない。
+        """
+        root = self._repository()
+        self._write(root, "AGENTS.md", "# Rules\n\n本文をなおす。\n")
+        self._commit(root, "AGENTS.mdの言い回しを直す")
+        output = self._classify(root)
+        self.assertIn(f"CLASS={gate.CLASS_REVIEW}", output)
+        self.assertIn(gate.CLASS_MINOR, output)
+        self.assertIn("not that a CodeRabbit review is required", output)
+        self.assertNotIn(gate.TRAILER_CLASS, output)
+        self.assertNotIn(gate.TRAILER_REVIEW, output)
+        self.assertNotIn("Issue", output)
+        self.assertNotIn("Pull Request", output)
 
     def test_every_lexical_deny_rule_has_a_case(self):
         """`LINE_DENY`の各規則に、それを踏むcaseがあること。

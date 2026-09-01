@@ -583,6 +583,11 @@ def main(argv=None):
         problems.append(f"expected CLASS={options.expect} but computed {computed}")
 
     print(f"CLASS={computed} RANGE={base}..{head}")
+    if computed == CLASS_REVIEW:
+        print(
+            f"  meaning: {CLASS_REVIEW} means the {CLASS_MINOR} path is unavailable,"
+            " not that a CodeRabbit review is required"
+        )
     if touched is not None:
         print(f"INSTRUCTION_SOURCES_TOUCHED={len(touched)}")
     if history is None and options.command == "history":
