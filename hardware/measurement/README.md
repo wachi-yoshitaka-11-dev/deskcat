@@ -24,6 +24,7 @@
 | `arduino-vref-calibrate/arduino-vref-calibrate.ino` | Arduino Uno R3 側。基準電圧の校正用。AV<sub>CC</sub> 基準で内蔵 1.1 V を読む |
 | `adc_stream_rate.py` | PC 側。実効 sample rate、取りこぼし、channel別の生値を集計する |
 | `test_adc_stream_rate.py` | 合成した byte 列に対する parser の検証。**board を占有せずに回せる** |
+| `rail_logger.py` | **Raspberry Pi 側。**`vcgencmd` を一定間隔で polling し、再起動をまたいで残る CSV へ追記する |
 
 `adc_stream_rate.py` は **Python 3 の標準ライブラリだけ**を使う
 （[ADR-0006](../../docs/decisions/0006-validation-script-language.md)）。`pyserial` は導入しない。
@@ -80,8 +81,38 @@ sg dialout -c 'python3 hardware/measurement/adc_stream_rate.py --port /dev/ttyAC
 sg dialout -c 'python3 hardware/measurement/adc_stream_rate.py --port /dev/ttyACM0 --baud 1000000 --seconds 10 --csv out.csv'
 ```
 
+CSV の先頭には、**壁時計の anchor が `#` 行として入る。**別系統の log（Pi 上の polling log は
+ISO8601、こちらは `micros()` 由来の相対時刻）と突き合わせるための対応点である。
+**anchor は block を PC が受け取った時刻であり、sample した時刻ではない。**間には USB の遅延と
+block 1 個ぶんの取得時間が入る。差の向きと大きさも同じ `#` 行に書く。
+
 CSV は `.gitignore` で追跡対象から外している。保存場所が未確定のためである
 （[development-foundation-plan.md](../../docs/planning/development-foundation-plan.md)）。
+
+## `rail_logger.py`（Pi 側）
+
+Pi の software が動いていた区間の `get_throttled` と `measure_volts` を残す。
+**Arduino 側の測定とは別系統であり、Pi の上で動かす。**
+
+**Pi の上で、script を置いた場所から実行する**（`EXP-006` の時点では `/home/deskcat/`）。
+repository の checkout から実行したことは確認していないため、以下は script 名のみで示す。
+
+```bash
+python3 rail_logger.py <出力file> --interval 1
+```
+
+- 各行ごとに `flush` と `os.fsync` を行う。**再起動をまたいでも直前の行が残る**
+- `# session start` 行と `boot_id` 列で、boot の境界が読める。
+  **正常終了なら `# session end` 行が付く。**この行の欠落は異常終了の印になる
+- `get_throttled` の bit を解釈して合否を出さない。raw 値のまま残す
+- **毎行 SD へ書く。測定窓の外で回し続けない**
+- **この script は Pi から回収した実体をそのまま置いたものであり、引数の検証を持たない。**
+  再利用するときは値（特に `--interval`）を確かめること
+
+**この logger が答えられないこと**は Pi が完全に応答停止した後の状態と、
+polling 間隔より短い過渡である。**`SBC-01`（Pi Zero W）には低電圧検出回路が無い**ため、
+`under-voltage` 系の bit がこの品で立つことは期待できない
+（正本は [power-budget.md](../../docs/hardware/power-budget.md) の `Pi Zero Wには低電圧検出が無い`）。
 
 ### parameter を振る
 

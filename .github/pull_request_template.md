@@ -60,6 +60,15 @@ Closes #
 - [ ] 不正入力・最大長超過を有界に処理する
 - [ ] `unsafe`を追加していない、または別のreviewをlinkした
 
+## 作成時の設定
+
+- [ ] 対応するIssueと同じassigneeを設定した
+- [ ] 対応するIssueと同じlabel（`area:*`／`type:*`／`priority:*`）を設定した
+- [ ] Projects v2の`deskcat` boardへitemとして追加した
+- [ ] `Status`を設定した
+- [ ] `Start date`（作成日）を設定した
+- [ ] `Target date`（mergeを見込む日）を設定した
+
 ## 自己レビュー
 
 - [ ] [自己レビュー](../CONTRIBUTING.md#自己レビュー)の観点で見直し、新規指摘0件が2 round続いた
