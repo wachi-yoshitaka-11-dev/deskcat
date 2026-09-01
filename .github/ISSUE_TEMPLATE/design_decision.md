@@ -55,3 +55,7 @@ cost／risk:
 - [ ] `priority:*` labelを1つ設定した
 - [ ] assigneeを設定した
 - [ ] Projects v2の`deskcat` boardへ追加し、`Status`を設定した
+- [ ] `Start date`（着手予定日）を設定した
+- [ ] `Target date`（完了目標）を設定した
+
+<!-- どちらの日付も予定でよい。確定していないことを理由に空欄にしない。 -->
