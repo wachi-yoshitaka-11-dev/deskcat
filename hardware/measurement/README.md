@@ -94,6 +94,9 @@ CSV は `.gitignore` で追跡対象から外している。保存場所が未�
 Pi の software が動いていた区間の `get_throttled` と `measure_volts` を残す。
 **Arduino 側の測定とは別系統であり、Pi の上で動かす。**
 
+**Pi の上で、script を置いた場所から実行する**（`EXP-006` の時点では `/home/deskcat/`）。
+repository の checkout から実行したことは確認していないため、以下は script 名のみで示す。
+
 ```bash
 python3 rail_logger.py <出力file> --interval 1
 ```
@@ -103,6 +106,8 @@ python3 rail_logger.py <出力file> --interval 1
   **正常終了なら `# session end` 行が付く。**この行の欠落は異常終了の印になる
 - `get_throttled` の bit を解釈して合否を出さない。raw 値のまま残す
 - **毎行 SD へ書く。測定窓の外で回し続けない**
+- **この script は Pi から回収した実体をそのまま置いたものであり、引数の検証を持たない。**
+  再利用するときは値（特に `--interval`）を確かめること
 
 **この logger が答えられないこと**は Pi が完全に応答停止した後の状態と、
 polling 間隔より短い過渡である。**`SBC-01`（Pi Zero W）には低電圧検出回路が無い**ため、
