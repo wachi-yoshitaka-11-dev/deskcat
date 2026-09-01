@@ -521,8 +521,8 @@ review する。**どちらも同じ毎時上限を消費する。**`full review
 [#91](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/91)で計4回投げ、3回がrate limitに当たり、
 [#89](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/89)のreviewを遅らせた。
 
-上限は開発者identity単位のrolling windowである（Pro 5件／時、Pro+ 10件／時）。
-一定時刻にまとめて戻るのではなく、古いreviewが枠から抜けるたびに1件ずつ空く。
+上限は開発者identity単位のrolling windowである。一定時刻にまとめて戻るのではなく、
+古いreviewが枠から抜けるたびに1件ずつ空く。
 
 **「reviewを依頼した」を「reviewを受けた」と書かない。**`Review rate limited`は`pass`と表示されるため、
 依頼の事実だけで完了扱いにすると検出が抜ける。
