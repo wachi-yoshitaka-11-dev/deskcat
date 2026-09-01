@@ -11,6 +11,7 @@ Python 3 の標準ライブラリだけを使う（ADR-0006）。
 
 from __future__ import annotations
 
+import datetime
 import io
 import os
 import struct
@@ -312,6 +313,61 @@ class TestCsv(unittest.TestCase):
         self.assertAlmostEqual(float(rows[2 * n][0]), expect, places=1)
         wrong = base_us + (2 * n - base_idx) * period
         self.assertNotAlmostEqual(float(rows[2 * n][0]), wrong, places=1)
+
+    def test_csv_wall_clock_anchor(self):
+        """壁時計の anchor 行が、先頭 block の受信時刻と一致すること。
+
+        Pi 側の polling log（ISO8601）と Arduino 側の CSV（micros() 由来の相対時刻）は
+        時間軸が別である。突き合わせるには片方に対応点が要る。
+        """
+        n, period = 128, 100
+        raw = b""
+        for k, (seq, taken) in enumerate([(0, 1 * n), (1, 2 * n)]):
+            raw += build_block(seq, taken, 0, 1_000_000 + (taken - n) * period, taken,
+                               alt_values(n), pending=n)
+        p = asr.BlockParser()
+        blocks = p.feed(raw)
+        for k, b in enumerate(blocks):
+            b.t_recv = 100.0 + k * 0.1
+        r = asr.summarize(blocks, p.stats, 100.0, 100.1, discard_blocks=0)
+
+        # monotonic 100.0 が壁時計 t_wall に対応する組を渡す。
+        t_wall = 1_800_000_000.0
+        clock_ref = (100.0, t_wall)
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "out.csv")
+            asr.write_csv(path, r, False, clock_ref)
+            with io.open(path, encoding="utf-8") as fh:
+                lines = fh.read().splitlines()
+
+        comments = [line for line in lines if line.startswith("#")]
+        self.assertTrue(comments, "anchor 行が書かれていない")
+        expect = datetime.datetime.fromtimestamp(t_wall).astimezone().isoformat(
+            timespec="milliseconds")
+        self.assertIn(expect, comments[0])
+        # header と data は `#` の後ろに残る。
+        body = [line for line in lines if not line.startswith("#")]
+        self.assertTrue(body[0].startswith("時刻[us]"))
+        self.assertEqual(len(body) - 1, 2 * n)
+
+    def test_csv_without_clock_ref_has_no_comment(self):
+        """clock_ref を渡さない既存の使い方では `#` 行を足さないこと。"""
+        n, period = 128, 100
+        raw = b""
+        for seq, taken in [(0, 1 * n), (1, 2 * n)]:
+            raw += build_block(seq, taken, 0, 1_000_000 + (taken - n) * period, taken,
+                               alt_values(n), pending=n)
+        p = asr.BlockParser()
+        blocks = p.feed(raw)
+        for k, b in enumerate(blocks):
+            b.t_recv = 1.0 + k * 0.1
+        r = asr.summarize(blocks, p.stats, 1.0, 1.1, discard_blocks=0)
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "out.csv")
+            asr.write_csv(path, r, True)
+            with io.open(path, encoding="utf-8") as fh:
+                head = fh.readline()
+        self.assertTrue(head.startswith("時刻[us]"))
 
 
 class TestWireFormat(unittest.TestCase):

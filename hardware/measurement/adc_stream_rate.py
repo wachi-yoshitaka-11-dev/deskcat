@@ -13,6 +13,7 @@ Python 3 の標準ライブラリだけを使う（ADR-0006）。pyserial は導
 from __future__ import annotations
 
 import argparse
+import datetime
 import os
 import select
 import struct
@@ -434,11 +435,45 @@ def print_report(r, baud: int):
     print("")
 
 
-def write_csv(path: str, r, allow_drops: bool):
+def wall_anchor_line(first, t_first: float, period_us: float, clock_ref):
+    """CSV 先頭へ置く `#` 行を作る。突き合わせ用の壁時計 anchor である。
+
+    `clock_ref` が無いとき、または受信時刻が無いときは空の list を返す。
+    **この壁時計は block を PC が受け取った時刻であり、sample した時刻ではない。**
+    間には USB の遅延と、block 1 個ぶんの取得時間が入る。どちらも 1 s 間隔の
+    polling log と突き合わせる用途では効かないが、値を書く以上は差の向きと
+    大きさを CSV 自身に残す。
+    """
+    if clock_ref is None or first.t_recv is None:
+        return []
+    mono0, wall0 = clock_ref
+    recv_wall = wall0 + (first.t_recv - mono0)
+    iso = datetime.datetime.fromtimestamp(recv_wall).astimezone().isoformat(
+        timespec="milliseconds")
+    block_ms = first.nsamples * period_us / 1000.0
+    return [
+        "# 時刻の対応 anchor: 時刻[us]=%.1f の sample を含む block を PC が受け取った"
+        "壁時計 = %s" % (t_first, iso),
+        "# **block の受信時刻であり sample した時刻ではない。**"
+        "block 1 個ぶん（%d sample、約 %.1f ms）と USB の遅延だけ後ろにある。"
+        % (first.nsamples, block_ms),
+        "# 壁時計は PC の system clock である。取得中に時刻が飛べばこの anchor もずれる。",
+    ]
+
+
+def write_csv(path: str, r, allow_drops: bool, clock_ref=None):
     """log形式は power-budget.md の `Sample rateとlog形式` に合わせる。
 
     同節は `時刻[us],生ADC値` を定める。2 channelのときだけ ch 列を足す。
     時刻は block header の micros() mark を anchor に、sample index から線形に復元する。
+
+    `clock_ref` は `(time.monotonic(), time.time())` の組である。渡すと、先頭 sample に
+    対応する PC 側の壁時計を `#` 行として CSV の先頭へ書く。**別系統の log（Pi 上の
+    polling log など）と突き合わせるための anchor であり、無くても CSV は成立する。**
+
+    **`#` 行は、同節が定める列そのものへの追加ではなく、その手前に置く注記である。**
+    `rail_logger.py` が `# session start` を置いているのと同じ形にしてある。
+    **正本の列の定義は変えていない。**
     """
     used = r["used"]
     # 回線上で block を失った場合も index と時刻の対応が崩れるため、両方を見る。
@@ -480,7 +515,13 @@ def write_csv(path: str, r, allow_drops: bool):
     base_us = first.mark_us
     base_idx = first.mark_taken
 
+    idx_first = first.taken - first.pending
+    t_first = base_us + (idx_first - base_idx) * period_us
+    anchor_line = wall_anchor_line(first, t_first, period_us, clock_ref)
+
     with open(path, "w", encoding="utf-8", newline="\n") as fh:
+        for line in anchor_line:
+            fh.write(line + "\n")
         if nch > 1:
             fh.write("時刻[us],ch,生ADC値\n")
         else:
@@ -533,6 +574,9 @@ def main(argv=None):
             % (MAX_CAPTURE_SECONDS, US_WRAP_SECONDS)
         )
 
+    # 壁時計と monotonic の対応を取得の前に取る。CSV の anchor に使う。
+    clock_ref = (time.monotonic(), time.time())
+
     fd = open_serial(args.port, args.baud)
     try:
         blocks, stats, t0, t1 = measure(fd, args.seconds, args.settle, args.quiet_banner)
@@ -542,7 +586,7 @@ def main(argv=None):
     r = summarize(blocks, stats, t0, t1, args.discard_blocks)
     print_report(r, args.baud)
     if args.csv:
-        write_csv(args.csv, r, args.allow_drops)
+        write_csv(args.csv, r, args.allow_drops, clock_ref)
     return 0
 
 
