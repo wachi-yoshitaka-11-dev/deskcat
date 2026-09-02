@@ -343,6 +343,17 @@ grep -rnE "未購入|購入|発注|未選定|未確定|Required|Blocked|手配|�
   --include="*.md" --exclude-dir=version-records --exclude=tbd-register.md
 ```
 
+**このcommandはtracked Markdownしか見ない。**GitHubのIssue本文・Pull Request本文・
+commentはどの引数にも入らず、台帳への登録漏れを生む経路になっていた
+（[#289](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/289)）。群A（調達状態）だけを
+GitHub側へ広げる報告専用の補助scriptが`scripts/scan_procurement_mentions.py`にある。
+**このcommandを代替しない。**群Bを含まず、判定も止めず、tracked Markdown側は
+引き続きこのcommandで走査する。
+
+```bash
+python3 scripts/scan_procurement_mentions.py --owner wachi-yoshitaka-11-dev --repo deskcat
+```
+
 **発注前の走査とこの command 3) は出力先が違う。**あちらは`購入待ちリスト`への計上漏れを探し、
 こちらは台帳への**登録**漏れを探す。群Aが重なっていても判定は別であるため、
 一方を実施したことをもって他方を済ませたとしない。
