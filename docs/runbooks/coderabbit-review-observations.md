@@ -76,6 +76,17 @@ GitHubはthreadが存在しないものをblockできない。**reviewの到着�
 | 安全、電気、protocol、firmware | **rate limitが解けるまで待つ。**自己レビューで代替しない |
 | 上記以外 | **自己レビューで通してよい。**Pull Request本文へ機械reviewを通していない旨と、その判断の根拠を書く |
 
+##### `rate limit`への返答時間に上限が無い
+
+**`@coderabbitai rate limit`自体への返答時間は一定ではない。**2026-09-01までに、
+6秒で返った例と22分35秒かかった例の両方が観測されている（[#289](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/289)）。
+**この節の他の記録が扱う「残数が空くまでの案内時間」（`26 minutes`等）とは別軸である。**
+こちらは「rate limitの確認command自体に、いつ返答が来るか」の話である。
+
+**無応答と遅延は表示だけでは区別できない。**上限が無いため、「まだ返ってこない」を
+「無応答である」と判断する基準を正本は持たない。[手動で依頼する前に状態を確認する](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/CONTRIBUTING.md#手動で依頼する前に状態を確認する)の
+「投げる直前に確認する」運用を、待機時間の長さによらず続ける。
+
 **`Review stopped after lock loss`もこの表の対象である。**`state`が`failure`でcheckは赤くなるため`Review rate limited`／`Review skipped`とは表示で見分けられるが、**reviewが完走していない点は同じ**である。したがって初回reviewが得られなかった場合として扱い、上の表に従う。**安全・電気・protocol・firmwareに関わる変更では、`Review completed`へ到達するか手動の`full review`が完走するまでmergeしない。**赤いcheckを「reviewは走ったが失敗しただけ」と読み替えない。観測例は[GitHubが強制しないもの](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/CONTRIBUTING.md#githubが強制しないもの)にある。
 
 ##### 5行目の観測

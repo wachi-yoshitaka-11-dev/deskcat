@@ -49,10 +49,8 @@ python3 scripts/prepare_pages.py && git status --short
 
 自己レビューの収束条件は
 [CONTRIBUTINGの「自己レビュー」](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/CONTRIBUTING.md#自己レビュー)が持つ。
-**回した round 数と各 round で出た件数を commit message へ書く。**
-書けない round は回していないということである。
 
-**追加commitをしたら回し直す。**merge commitも追加commitである。
+**追加commitをしたら[2つのPass](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/CONTRIBUTING.md#2つのpass)をやり直す**（差分が変わると両方無効になる）。**merge commitも追加commitである。**
 
 ## merge前
 
