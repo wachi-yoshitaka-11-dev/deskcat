@@ -14,3 +14,41 @@
 reviews:
   auto_review:
     enabled: false
+
+  # docstring coverageのpre-merge checkを止める。
+  #
+  # **pre-merge checksはauto reviewとは別の機構であり、`enabled: false`でも走る**
+  # （[#313](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/313)で実際に走り、
+  # 4 passed／1 warningを返した）。上のblockの「効かない設定を残さない」も、ADR-0013の決定1の
+  # 「`.coderabbit.yaml`は`reviews.auto_review.enabled: false`だけを持つ」も、
+  # **auto reviewの発火条件についての判断である**（同ADRの選択肢Aが「`labels`と
+  # `base_branches`を外し」と書いている）。**pre-merge checksはそこに当たらない。**
+  #
+  # **閾値80%はCodeRabbitの既定値であり、このrepositoryは採用していない。**
+  # `CONTRIBUTING.md`／`AGENTS.md`／`docs/governance/`にdocstringの規約は無い。そして
+  # `scripts/`はこの線を元から満たしていない。**2026-09-02に`origin/develop`（`7066456`）を
+  # 全数走査して58.40%である**（512関数中213件が欠落。23 file中18 fileが80%未満）。
+  # 測り方は#313の本文にある（`ast.get_docstring()`が`None`でない関数を数える）。
+  #
+  # **止める理由はcoverageが低いからではない。対応しない警告を1件常設すると、
+  # pre-merge checksの表そのものを読み飛ばす習慣ができる。**#313では、「表を開き
+  # `passed`以外の行を読む」を運用へ足した直後に、**`No actionable comments were
+  # generated`の行だけを見て「指摘0件」「全部通った」と報告された**（担当と進捗管理の
+  # 双方。#313の作業経過としての報告であり、この差分で測ったものではない）。
+  # **開かせる表に、対応しない行を常設しない。**
+  #
+  # **`threshold`を実態へ下げる案は採らない。**coverageはdiffが触った関数で測るため
+  # （#313の警告文が`Docstring coverage is scoped to functions touched by this diff.`と
+  # 書いている）、下げても触る関数次第で当たる。そしてrepositoryが決めていない数字を
+  # 入れることになる。
+  #
+  # **`scripts/`へdocstringを書くかどうかは別の判断であり、ここでは決めていない。**
+  # 規約を置くなら`CONTRIBUTING.md`側の判断であり、そのときこの設定を見直す。
+  # **他のcheckは触らない。**#313では`Title`／`Description`／`Linked Issues`／
+  # `Out of Scope Changes`の4件が`Passed`であり、既定のままで機能している。
+  #
+  # **`off`は引用符で囲む。**schemaが要求するのは`off`／`warning`／`error`のstring enumであり、
+  # YAML 1.1として読む実装ではquoteしない`off`がbooleanの`false`になる。
+  pre_merge_checks:
+    docstrings:
+      mode: "off"
