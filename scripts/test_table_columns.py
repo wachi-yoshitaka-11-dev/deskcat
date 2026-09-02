@@ -79,6 +79,21 @@ class SplitCellsTests(unittest.TestCase):
         self.assertEqual(without_trailing, ["x", "y", "z"])
         self.assertEqual(len(without_trailing), len(with_trailing))
 
+    def test_even_backslash_run_leaves_pipe_as_delimiter(self):
+        r"""`\\|`（backslash 2個）はエスケープされたbackslashに続く実区切り。
+
+        2個目のbackslashだけを見て判定すると、直前の連続数を無視して常に
+        エスケープと扱ってしまう（full reviewの指摘）。ここでは2個の行で
+        パイプが区切りとして働き、3個の行では区切りにならないことを確認する。
+        """
+        two_backslashes = [c.strip() for c in check.split_cells(r"a\\|b")]
+        self.assertEqual(two_backslashes, ["a\\", "b"])
+
+    def test_odd_backslash_run_still_escapes_the_pipe(self):
+        r"""`\\\|`（backslash 3個）はエスケープされたbackslashとエスケープされたパイプ。"""
+        three_backslashes = check.split_cells(r"a\\\|b")
+        self.assertEqual(three_backslashes, ["a\\|b"])
+
     def test_leading_and_trailing_empty_cells_are_dropped_once(self):
         """行頭・行末のパイプが作る空セルは、無ければ落とさない。"""
         self.assertEqual(check.split_cells("|a|b|"), ["a", "b"])

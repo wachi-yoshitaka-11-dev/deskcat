@@ -22,6 +22,23 @@
 壊れているかは、報告された行を開いて読む必要がある。列がずれているだけで数が
 合っている行、HTMLの`<table>`、header行そのものの誤り（列名の妥当性）は
 この検査の対象外である。
+
+full reviewで指摘された、意図して直さない2点（[PR #307](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/307)）:
+
+- **fenceの判定は開始文字種・長さを見ない。**4個以上のbacktick fenceの内側に
+  3個のbacktick行があると、そこで閉じたと誤認する。GFMの厳密な規則ではない。
+  `validate_doc_links.py`の`markdown_outside_fences`と同じ`_FENCE_RE`を意図して
+  共有しており（このscriptだけを直すと、2つのscriptが別の行をfenceと見なし
+  片方だけがfence内の表を走査する不整合を生む）、現在の追跡下Markdownに
+  該当する書き方は無い。
+- **パイプを含まない行は、直前まで表であっても表の終わりとして扱う。**GFMの
+  厳密な規則では、空行または別のblock構造の開始までは1セルの行として
+  表が続く。この単純化により、パイプの無い継続行を見逃す可能性がある。
+  ただし2026-09-02の実測で、追跡下362表すべてが空行区切りを持ち、
+  該当する行は0件だった。正しく実装するにはblock構造の開始判定
+  （見出し・list・blockquote等）が要り、誤判定すると見出しや通常の段落を
+  誤って1セルの表行として報告しうる。実例が無い状態でこの複雑さを追加する
+  リスクを取らない。
 """
 
 import argparse
@@ -44,6 +61,13 @@ _FENCE_RE = re.compile(r"^\s*(?:```|~~~)")
 def split_cells(line):
     r"""1行をセルへ割る。`\|`は文字として扱い、区切りにしない。
 
+    連続するbackslashは、直前の連続数が奇数のときだけ次のパイプをエスケープする
+    （GFM）。`\\|`（backslash 2個）はエスケープされたbackslashに続く実区切りであり、
+    `\\\|`（3個）はエスケープされたbackslashとエスケープされたパイプになる。
+    2個目のbackslashだけを見て判定すると、この2つを取り違える
+    （full reviewの指摘。この repositoryの現行文書に該当行は無いが、将来の
+    書き方を制限しないため正しく扱う）。
+
     行頭・行末のパイプが作る空セルは、あれば落とす。末尾パイプは省略できるため
     「あれば落とす」であって「必ず1引く」ではない。
     """
@@ -53,9 +77,19 @@ def split_cells(line):
     length = len(line)
     while index < length:
         char = line[index]
-        if char == "\\" and index + 1 < length and line[index + 1] == "|":
-            current.append("|")
-            index += 2
+        if char == "\\":
+            run_start = index
+            while index < length and line[index] == "\\":
+                index += 1
+            run_length = index - run_start
+            # 2個で1つの literal backslash。奇数分の最後の1個は次のパイプへ回す。
+            current.append("\\" * (run_length // 2))
+            if run_length % 2 == 1:
+                if index < length and line[index] == "|":
+                    current.append("|")
+                    index += 1
+                else:
+                    current.append("\\")
             continue
         if char == "|":
             out.append("".join(current))
