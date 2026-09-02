@@ -266,6 +266,19 @@ def _merge_trailers(text, source):
 
 
 def _check_merge(args):
+    """`gh pr merge`のsquash messageが宣言trailerを持つかを見る。
+
+    **この関数は判定を持たない。**trailerの名前も、messageからtrailerを読む判定も
+    `scripts/review_gate.py`が正本である（名前は`REQUIRED_MERGE_TRAILERS`経由で、
+    判定は`trailers_from_message`で受け取る）。ここがするのは、その2つを突き合わせて
+    欠けている名前を診断文にすることだけである。
+    **hook側へ複製しない。**名前だけを共有して存在の判定を部分一致で別実装して
+    いたことが`c171c52`の穴だった（module docstringの3を参照）。
+
+    見る順は3つである。**helpの表示は何もmergeしないため対象外**、
+    **messageを特定できない場合は`deny`**（`_merge_message`）、
+    そのうえで`git`がtrailerとして読むかを見る。
+    """
     if _is_help(args):
         # helpの表示だけを求める呼び出しはmergeしない。**messageを要求しない。**
         return
