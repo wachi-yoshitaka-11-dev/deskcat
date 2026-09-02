@@ -742,9 +742,85 @@ Pull Requestを通る変更は`review-gate.yml`が`gate`を実行するためで
   `--mirror`と`--all`のように、refspecを書かずに複数branchを更新する形は拾えない。
 - **`gate`が時間内に終わらない場合は通す。**止めないのは、遅い環境で作業を止めないためである。
   **通ったことを、検査したことと読まない。**
+- **`gh_metadata_guard.py`の`gh pr merge`検査は、trailerの名前を文字列の部分一致で確認する。**
+  `git interpret-trailers`がそのblockを実際にtrailerとして解釈するかは見ていない。
+  2026-09-02に、squash messageのtrailer blockの直前へ空行無しでコロン無しの行
+  （`Closes #304`）を置いたcommitで、`Change-Class:`／`Self-Review:`という文字列は
+  存在したためhookは通したが、`git interpret-trailers --parse`は空を返した。
+  **文字列としてある**ことと**trailerとして解釈される**ことは別であり、hookは
+  前者しか見ていない。
 
 **hookで安全要件を代替しない。**hookが直すのは「忘れる」であって、
 [Hardware Safety Policy](docs/governance/hardware-safety-policy.md)が要求する根拠ではない。
+
+## 報告と成果物
+
+**checklistの項目は増やさない。**下の2つは、既存のchecklistが見ない観点を補う手順である
+（[#289](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/289)）。
+
+### 外向き操作の報告を受けたら結果を確認する
+
+「push した」「commit した」「merge した」という報告を受けたら、**その場で結果を見る。**
+報告の内容が正確であることと、その操作が引き起こした結果（CIの状態等）が問題無いことは別である。
+
+2026-09-01の実例。担当が「push済み」と報告し、内容は正確だった。だがそのpushでCIが
+赤くなっており、報告した側も受け取った側も、その時点では見ていない。気付いたのは
+次の照合のときだった。**これは宣言の真偽を検査する話ではない。**受け取る側の手順である。
+
+### 説明は成果物へ書く
+
+PMやreviewerへ説明した内容のうち、成果物（Pull Request本文、commit message、
+Issue本文）に残るべきものは、成果物へ書く。**報告と成果物は別のfileであり、
+片方に書いたことがもう片方に自動で反映されない。**
+
+2026-08-31の実例。昇格Pull Requestのcheckが`Review skipped`へ戻った経緯を、
+担当は報告には正確に書いたが、`main`の履歴に残るPull Request本文には書いていなかった。
+説明は正確に行われていた。**宛先が違った。**
+
+## 道具の効かない条件
+
+**道具そのものは正しく動いていても、効かない条件が書かれていなければ誤読する。**
+2026-09-01と2026-09-02に、7件の道具でこれが起きた（[#289](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/289)）。
+`scripts/review_gate.py`固有の2件は同fileのdocstringにある。残りをここへ記載する。
+
+- **`git cherry`は、squash mergeされたbranchに対して逆の答えを返しうる。**
+  1 commitのbranchでは`-`（取り込み済み）を返すが、複数commitを1つへ畳んだbranchでは
+  patch-idが一致せず`+`（未取り込み）を返す。額面どおり読むと「作業が`develop`に
+  入っていない」となるが、実際にはblob hashが完全一致していることがある。
+  **`git diff`では判定できない場面で`git cherry`へ切り替えても、この条件は消えない。**
+  疑わしい場合はblob hashまたは実際のfile内容を突き合わせる。
+- **`@coderabbitai rate limit`への返答時間に上限が無い。**6秒で返った例と22分35秒
+  かかった例の両方が観測されている（[CodeRabbitのreview状態の観測記録](docs/runbooks/coderabbit-review-observations.md)）。
+  **無応答と遅延は区別できない。**待つ上限を決めずに「投げる直前に1回確認する」
+  運用を続ける。
+- **quoteしていないheredoc（`<<EOF`）は、`\|`とbacktickを含む文書を壊す。**
+  このrepositoryの文書はどちらも高頻度で使う。**heredocは`<<'EOF'`で書く。**
+- **走査結果を数として報告するときは、patternが何を含み何を落とすかを一緒に書く。**
+  「0件」も「N件」も、pattern外側については何も言っていない。2026-09-01に3件の
+  実例が出た。
+
+  | 主張したもの | 実際に測ったもの |
+  |---|---|
+  | 昇格範囲15 fileのbyte合計 | 既存14 fileだけ（新規fileを`NEW`として別行に出し`continue`し、合計から抜けた） |
+  | 表のGFMセル数 | パイプ数−1（末尾パイプの無い行で1ずれた） |
+  | `members`が増えた時期 | servoが入った時期だけ（patternに`servo`を含めたため、`serial`の日が出なかった） |
+
+- **`gh api /markdown`は、相対linkを書き換えずに返す。**入力に含まれる相対pathの
+  文字列がそのまま出力に残るため、GitHub上でrenderされたときに解決できるかは
+  この呼び出しだけでは分からない。**ブラウザ側の解決は別に確認する。**
+- **`origin/*`を検査するscriptを、自分のworktreeの版で実行すると、遅れた判定になる。**
+  `origin/develop`や`origin/main`は`git fetch`しないと更新されない。fetchせずに
+  過去の版へ対して`history`等を走らせると、既に解決済みの問題を「まだ落ちている」
+  と読みうる。**実行前に`git fetch origin`する。**
+- **`git log -S<文字列>`は、既存の定数へ1行足しただけのcommitを検出しない。**
+  `-S`は指定した文字列の**出現数の変化**を見る。定数名（例:
+  `DECLARATION_EXEMPT`）そのものへ1行足しても、定数名の出現数は変わらないため
+  hitしない。**個々の値（SHAや識別子）で検索し直す必要がある。**
+- **`closingIssuesReferences`は、Pull Request作成直後や本文編集直後には
+  反映されていないことがある。**2026-09-02に、本文へ`Closes #N`を含むPull Requestを
+  作成した直後に1回目を測ると0件で、時間を置いて測り直すと1件（正しい番号）に
+  変わった実測がある。**0件という結果を「本文にclosing keywordが無い」と即断せず、
+  時間を置いて測り直す。**
 
 ## Gitと秘密情報
 

@@ -31,6 +31,17 @@
 作業の後始末である」は申告であって、差分からは読めない。機械が確かめるのは整合だけで、
 `Refs`で後始末の対象を示していることを要求する。**`minor`と`review-required`の判定は
 どちらも変えていない**（[ADR-0015](../docs/decisions/0015-fixup-class-and-direct-commit-scope.md)）。
+
+出力の読み方について2点、誤読の実例が出ている（[#289](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/289)）。
+
+- **`INSTRUCTION_SOURCES_TOUCHED=0`は「そのpathが対象外」と「diffが空」を区別しない。**
+  0件という値だけでは、指示sourceに触れていないのか、範囲そのものに変更が無いのかが
+  分からない。区別が要る場合は`--base`と`--head`の間に実際の差分があるかを別途確認する。
+- **`CLASS=review-required`は、CodeRabbitのreviewが必要という意味ではない。**
+  意味しているのは`minor`（機械的に軽微と証明できる）経路が使えないというだけである。
+  CodeRabbit reviewの要否は別軸であり、`CONTRIBUTING.md`が「判断は人が行い、機械的な
+  判定は置かない」と定めている（[#297](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/297)で
+  出力へ説明行を足して解消済み。`main()`の出力を参照）。
 """
 
 import argparse
