@@ -61,3 +61,16 @@ jobs:
         run: |
           python3 scripts/review_gate.py history \
             --base "$GATE_BASE" --head "$GATE_HEAD"
+
+      - name: Report closing keywords in the promotion range
+        # base が`main`のPull Requestだけで実行する。範囲内commitの`Closes #N`等は
+        # Pull Request本文（`closingIssuesReferences`）からは検出できず、merge時に
+        # 発火する（#289）。**報告のみで、mergeを止めない。**`--check-issue-state`は
+        # 付けない（`persist-credentials: false`によりこのjobは`gh`の認証を持たない）。
+        if: ${{ github.base_ref == 'main' }}
+        env:
+          GATE_BASE: ${{ github.event.pull_request.base.sha }}
+          GATE_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python3 scripts/report_promotion_closing_keywords.py \
+            --base "$GATE_BASE" --head "$GATE_HEAD"
