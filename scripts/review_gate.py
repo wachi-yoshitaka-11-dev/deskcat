@@ -187,6 +187,23 @@ DECLARATION_CUTOVER = "57734371384d18f31de7557a7a60fd1aa856edff"
 #   `INSTRUCTION_SOURCES`を触っていないため、`Instruction-Change`の抑止は
 #   このentryでは掛からない（`18298ae`／`619c843`と同じ側）。
 #
+# - `c171c52`（[PR #307](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/307)、[#304](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/304)）。
+#   **前6件と違う原因である。**squash mergeのcommit messageで、trailer blockの直前に
+#   空行を入れずに`Closes #304`（コロン無し）を置いた。`git interpret-trailers`は
+#   最後の段落しかtrailerと見なさないため、同じ段落にある`Change-Class`・`Self-Review`・
+#   `Instruction-Change`・`Refs`がまるごと無効になった（`1a5dda8`と同型の踏み方だが、
+#   原因は空行の欠落ではなくcolon無し行の混入）。
+#
+#   **`scripts/hooks/gh_metadata_guard.py`はこの形を止められなかった。**同hookは
+#   `Change-Class:`／`Self-Review:`という**文字列の部分一致**で存在を確認しており、
+#   `git interpret-trailers`がblockとして解釈するかは見ていない。文字列としては
+#   3つとも存在したため、hookは「ある」と判定した。**hookの判定粒度の不足であり、
+#   別途扱う。**
+#
+#   full reviewは完走し指摘3件を検証済みで（1件反映・2件は[#308](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/308)で追跡）、
+#   PR側のhead commitは`Change-Class`・3値の`Self-Review`・`Instruction-Change`を
+#   すべて正しく持っていた。**失われたのはsquash時の記録だけである。**
+#
 # **この列挙を増やさない。**増やす変更は`scripts/`の変更であり、reviewと
 # `Instruction-Change`の宣言を通る。通したうえで増やすなら、それは判断である。
 DECLARATION_EXEMPT = (
@@ -196,6 +213,7 @@ DECLARATION_EXEMPT = (
     "b93b309c7f6a39967d2eb3ba62807bc4bb1a5dfe",
     "b71c7ef9e58240d71667c95b551b113288ee450f",
     "1a5dda877e4994309cd35dd033d66881ea431a2f",
+    "c171c5212bc27bd6337bd1e89b8ad7f40fd359ba",
 )
 
 # 変更行がこれらのいずれかに当たると軽微にしない。数値、command、link、表、見出し、
