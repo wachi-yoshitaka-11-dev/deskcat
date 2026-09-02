@@ -62,12 +62,31 @@ jobs:
           python3 scripts/review_gate.py history \
             --base "$GATE_BASE" --head "$GATE_HEAD"
 
-      - name: Report closing keywords in the promotion range
-        # base が`main`のPull Requestだけで実行する。範囲内commitの`Closes #N`等は
-        # Pull Request本文（`closingIssuesReferences`）からは検出できず、merge時に
-        # 発火する（#289）。**報告のみで、mergeを止めない。**`--check-issue-state`は
-        # 付けない（`persist-credentials: false`によりこのjobは`gh`の認証を持たない）。
-        if: ${{ github.base_ref == 'main' }}
+  report-closing-keywords:
+    name: Report closing keywords in the promotion range
+    # 別jobにする。`report_promotion_closing_keywords.py`はgit操作が失敗した場合に
+    # exit 1になりうる（`guards.ValidationError`）。`gate` jobの1 stepとして
+    # 組み込むと、報告scriptの失敗が`Verify change class and self-review`という
+    # 名前のcheckを赤くし、宣言の失敗と見分けが付かなくなる。**「報告のみで
+    # mergeを止めない」という設計を、job名の分離によりCI側でも成立させる**（#305）。
+    #
+    # base が`main`のPull Requestだけで実行する。範囲内commitの`Closes #N`等は
+    # Pull Request本文（`closingIssuesReferences`）からは検出できず、merge時に発火する
+    # （#289）。**このjob自体が赤くなっても、mergeを止める強制力は無い**
+    # （`required_status_checks`は`null`。[Repository設定](../REPOSITORY_SETTINGS.md)）。
+    if: ${{ github.base_ref == 'main' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Report closing keywords
+        # `--check-issue-state`は付けない（`persist-credentials: false`により
+        # このjobは`gh`の認証を持たない）。
         env:
           GATE_BASE: ${{ github.event.pull_request.base.sha }}
           GATE_HEAD: ${{ github.event.pull_request.head.sha }}
