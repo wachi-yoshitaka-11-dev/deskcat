@@ -552,7 +552,11 @@ baseで決まる。
 
 **squash merge時に、分類と自己レビューをtrailerで宣言する。**trailerはcommitへ結び付くため、
 review後にcommitが増えると宣言が自動的に無効になる（[ADR-0010](docs/decisions/0010-change-class-and-review-declaration.md)）。
-`main`昇格workflowが、`develop`のtip commitにこの宣言があることを要求する。
+base が`develop`のPull Requestでは、Review gate workflowがhead commitにこの宣言があることを要求する。
+**`main`昇格では要求しない。**`develop`のtip commitは範囲の1本にすぎず、自分の変更しか宣言していない。
+head commit 1本の宣言を範囲全体のdiffへ当てると、**指示sourceを0 path触りながら`Instruction-Change`を
+持つcommitで通り、正しく付けなかったcommitで落ちる。**偽陽性と偽陰性の両方を出すため、保証を持たない。
+`main`昇格で見るのは`history`であり、**範囲の各commitを1本ずつ検査する**（次節）。
 
 ```bash
 gh pr merge <N> --squash --subject "<Pull Requestの題名>" --body-file <path>
@@ -612,9 +616,14 @@ Self-Review: converged
 **従うと`receipt`が落ちる**（3値すべてを要求するため）。
 **行番号で指定しない。**値が増減するとずれる。
 
-**`main`昇格では、範囲の各commitの宣言も検証される。**squash commitへtrailerを書き忘れると、その回のmergeは通っても次の昇格で落ちる。
+**`main`昇格で検証されるのは、範囲の各commitの宣言である。**squash commitへtrailerを書き忘れると、その回のmergeは通っても次の昇格で落ちる。
+**head commit 1本を見る検査は`main`昇格では走らない**（上の「Merge方式」を参照）。
 
-**ただし検査に起点がある。**trailer運用を導入したcommit（[#161](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/161)のsquash）より前は検査しない。**宣言を求める規則が存在しなかったためである。**起点より後にも、宣言を持たないことを許しているcommitがある。`AGENTS.md`が共有branchの履歴書き換えを禁じているため、後からtrailerを付けられない。**起点と免除の正本は`scripts/review_gate.py`の`DECLARATION_CUTOVER`と`DECLARATION_EXEMPT`であり、免除の理由は同fileが持つ。**
+**ただし検査に起点がある。**trailer運用を導入したcommit（[#161](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/161)のsquash）より前は検査しない。**宣言を求める規則が存在しなかったためである。**起点より後にも、宣言を持たないことを許しているcommitがある。`AGENTS.md`が共有branchの履歴書き換えを禁じているため、後からtrailerを付けられない。**起点と免除の正本は`scripts/review_gate.py`の`DECLARATION_CUTOVER`と`DECLARATION_EXEMPT`であり、免除の理由も同fileが持つ**（登録と同じ場所に置いてある。commentだけに書いていた間、どの免除が指示sourceを触るかの列挙が2回遅れた）。
+
+**免除が飛ばすのは`Change-Class`と`Self-Review`だけである。**指示source変更の宣言（`Instruction-Change`）は飛ばさない。
+免除commitが指示sourceを触る場合、`DECLARATION_EXEMPT`の記録が**その差分をdataとしてreviewしたと言えること**を示していなければ`history`が落ちる。
+**免除はreviewを飛ばすためにあるのではなく、後から付けられない宣言の記録を飛ばすためにある。**
 
 そのため**`HISTORY_CHECKED`は昇格範囲のcommit数より少なくなりうる。取りこぼしではない。**検査した件数、skipしたmerge commitの件数、免除した件数を必ず出すため、差はその内訳で説明できる。**この数を期待値として引用しない。**範囲は昇格ごとに変わる。
 

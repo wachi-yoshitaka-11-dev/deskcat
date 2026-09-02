@@ -5,6 +5,16 @@ name: Review gate
 # `develop`側で掛けないと、宣言はsquash commitにしか現れず、review後にcommitを足しても
 # 何も落ちない。**宣言が無効になる仕組みは、Pull Requestのhead commitを見て初めて働く。**
 #
+# **`gate`はbase が`develop`のPull Requestだけで走らせる。**base が`main`では
+# `history`だけを走らせる。`gate`はhead commit 1本の宣言を範囲全体のdiffへ当てるため、
+# **満たされ方が2通りあってどちらも保証になっていない。**`d9d9711`は指示sourceを
+# 0 path触りながら`Instruction-Change`を持っており（儀式として付いていた）、
+# `59a77df`は正しく付けなかったために落ちた
+# （[#316](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/316)）。
+# **偽陽性と偽陰性の両方を出すcheckは保証を持たない。**保証はcommit単位に置く。
+# それが`history`である。**`history`が範囲の各commitを見るようになったのが理由であり、
+# 偽陽性が煩わしいからではない。**
+#
 # 検証するのは分類と自己レビューの宣言だけである。**未解決threadと必要CIは検証しない。**
 # どちらもbranch protectionが強制しており、同じ条件を2箇所で持つと、片方だけを見た判断が
 # 起きる（ADR-0007の「GitHubまたは設定で強制できるものはそちらへ寄せる」）。
@@ -37,6 +47,13 @@ jobs:
           persist-credentials: false
 
       - name: Verify change class and self-review declarations
+        # base が`develop`のPull Requestだけで実行する。**base が`main`では
+        # `history`が範囲の各commitを見る**（免除commitの指示source変更も含む。
+        # `review_gate.py`の`_check_exempt_instructions`）。head commit 1本へ
+        # 範囲全体を当てる検査は、そこでは保証を足さず偽陽性と偽陰性だけを足す。
+        # **順序が意味を持つ。**`history`が免除commitを覆う前にこのstepを外すと、
+        # その間の昇格が無検査で通る。
+        if: ${{ github.base_ref != 'main' }}
         # 値は環境変数で渡す。`run`へ直接展開すると、branch名やshaがshellの構文として
         # 解釈される余地が残る。
         env:
