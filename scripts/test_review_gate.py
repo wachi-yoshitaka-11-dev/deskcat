@@ -803,7 +803,9 @@ class ReviewGateTests(unittest.TestCase):
         """免除commit自身が`Instruction-Change`を持つなら、登録の記録は要らない。
 
         免除されているのは`Change-Class`と`Self-Review`であり、**3つすべてを
-        失っているとは限らない。**`b93b309`は`Instruction-Change`だけを失った例である。
+        失っているとは限らない。**`b93b309`が逆側の実例である（`Change-Class`と
+        `Self-Review`を持ち、`Instruction-Change`だけを失った）。**この検査が見るのは
+        その鏡像である。**登録の記録は、commit自身が宣言を持たない場合にだけ問われる。
         """
         problems, _ = self._exempt_history(
             "AGENTS.md",

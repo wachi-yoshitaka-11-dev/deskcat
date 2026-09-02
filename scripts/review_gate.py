@@ -306,10 +306,11 @@ DECLARATION_EXEMPT_ENTRIES = (
     ExemptEntry(
         "c171c5212bc27bd6337bd1e89b8ad7f40fd359ba",
         True,
-        "PR #307でfull reviewが完走し、指摘3件を検証したうえで#309で人間のreviewを"
-        "経て登録した。head commitは`Instruction-Change: reviewed-as-data`を持って"
-        "いた。**squash messageで同じ段落へコロン無しの行が混じり、block ごと"
-        "無効になっただけである。**",
+        "PR #307でfull reviewが完走し、指摘3件を検証した（CodeRabbitのreview eventが"
+        "実在する）。head commitは`Instruction-Change: reviewed-as-data`を持っていた。"
+        "**squash messageで同じ段落へコロン無しの行が混じり、blockごと無効になった"
+        "だけである。**登録は#309で行った。**#309自体にreview eventは無く、"
+        "人間が出しているのはmerge承認である。**内容のreviewは#307側にある。",
     ),
 )
 
