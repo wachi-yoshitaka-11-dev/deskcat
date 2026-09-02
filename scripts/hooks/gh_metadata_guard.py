@@ -15,9 +15,14 @@ Claude CodeのPreToolUse hookとして、Bash tool呼び出しの前に走る。
    [PR #250](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/250)がbase `main`で
    作られ、baseの変更まで1時間17分かかった（timelineの`base_ref_changed`で実測）。
    **`gh issue create`に`--base`は存在しないため、そちらへは要求しない。**
-3. `gh pr merge`のsquash messageに`Change-Class`と`Self-Review`が無い。
-   PR側のgateがSUCCESSでも、squash commitへtrailerが引き継がれないと次の昇格で
-   落ちる（`18298ae`／`619c843`。どちらも`DECLARATION_EXEMPT`へ登録済み）。
+3. `gh pr merge`のsquash messageから、`git`が`Change-Class`と`Self-Review`を
+   trailerとして読めない。PR側のgateがSUCCESSでも、squash commitへtrailerが
+   引き継がれないと次の昇格で落ちる（`18298ae`／`619c843`。どちらも
+   `DECLARATION_EXEMPT`へ登録済み）。**「文字列としてあるか」では足りない。**
+   `c171c52`は`Change-Class`・`Self-Review`・`Instruction-Change`を文字列として
+   持っていたが、最後の段落にコロン無しの`Closes #304`が混じっていたため、
+   `git interpret-trailers`は段落ごとtrailerと認めなかった。部分一致で見ていた
+   当時のこの検査は素通りさせ、CIの`history`だけが検出した。
 
 **3つとも`--help`／`-h`が付いた呼び出しを対象外にする。**helpの表示は何も作らず、
 mergeもしない。metadataを要求しても誤検知しか生まない。**2026-08-28に
@@ -26,6 +31,8 @@ mergeもしない。metadataを要求しても誤検知しか生まない。**20
 明示をCONTRIBUTINGが要求しているのに、**そのoption名を`--help`で確認できなかった。**
 
 **判定は字句だけで行う。**意味は判定しない。`review_gate.py`と同じ方針である。
+**`git interpret-trailers --parse`に読ませることは字句の判定である。**見ているのは
+trailerとして解釈できる形かどうかだけで、値の正しさは見に行かない。
 
 `DESKCAT_SKIP_GH_GUARD=1`で丸ごと無効化できる。**誤検知で作業が止まったときの
 逃げ道であり、常用するものではない。**使ったら理由をPull Request本文へ書く。
@@ -34,13 +41,16 @@ mergeもしない。metadataを要求しても誤検知しか生まない。**20
 
 import json
 import os
+import subprocess
 import sys
 from pathlib import Path
 
 import command_line
 
-# trailerの名前は`scripts/review_gate.py`が正本である。**hook側へ複製しない。**
-# 名前がずれると、gateが要求するものとhookが見るものが食い違い、hookが素通りする。
+# trailerの名前と、messageからtrailerを読む判定は`scripts/review_gate.py`が正本で
+# ある。**hook側へ複製しない。**名前がずれると、gateが要求するものとhookが見るものが
+# 食い違い、hookが素通りする。**判定も同じである。**名前だけを共有して存在の判定を
+# 部分一致で別実装していたことが`c171c52`の穴だった。
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import review_gate  # noqa: E402
@@ -53,6 +63,24 @@ MERGE_SUBCOMMAND = ("pr", "merge")
 
 # squash messageが持たなければならないtrailerの名前。**値は見ない。**
 REQUIRED_MERGE_TRAILERS = (review_gate.TRAILER_CLASS, review_gate.TRAILER_REVIEW)
+
+# gitへ渡す作業ディレクトリ。**`interpret-trailers --parse`はrepositoryの外でも
+# 動く**（2026-09-02に`/tmp`で実測。EXIT=0）。見ているのはstdinのmessageだけで、
+# repositoryの状態もrevisionも読まない。hookの起動位置に依存させない。
+GIT_ROOT = "."
+
+# gitを待つ上限（秒）。**hookはtool呼び出しの前に走るため、返らないと作業が止まる。**
+# 超えたら「確認できなかった」として扱う（`_merge_trailers`）。
+GIT_TIMEOUT_SECONDS = 10
+
+# 本文の前に置く1行。`gh pr merge`が作るcommit messageは`--subject`と本文を空行で
+# 連結した形になるため、**本文だけをgitへ渡すと本文の先頭行がsubjectとして扱われる。**
+# 本文がtrailerだけで構成されている場合、実際のcommitでは有効なtrailer blockなのに、
+# 本文単体では段落が1つしか無い形になりtrailer 0件と読まれる（2026-09-02に実測）。
+# **subjectの中身は解釈に効かない**（効くのは「空行の前に1行あること」だけ）ため、
+# `--subject`の値は読まずにこの1行を前へ付ける。**値を読むと、渡されなかった場合に
+# GitHubがPull Request titleで補う分を推測することになる。**
+SUBJECT_PLACEHOLDER = "subject"
 
 SKIP_ENV = "DESKCAT_SKIP_GH_GUARD"
 
@@ -210,6 +238,33 @@ def _check_create(subcommand, args):
         _check_base(args)
 
 
+def _merge_trailers(text, source):
+    """squash messageから、`git`がtrailerとして読む組を返す。
+
+    **読めなかった場合は`deny`する。**gitを実行できない、返らない、想定外の入力で
+    落ちる、のいずれでも「trailerがある」とは言えない。この検査が守っているのは
+    「宣言がsquash commitへ入るか」であり、**入らなかったときの手当ては
+    `DECLARATION_EXEMPT`への登録＝Pull Request 1本である**（`c171c52`が実例）。
+    確認できないまま通すほうが高くつく。**止まったときの逃げ道は`DESKCAT_SKIP_GH_GUARD`
+    であり、診断文にも書く。**
+    """
+    message = f"{SUBJECT_PLACEHOLDER}\n\n{text}"
+    try:
+        return review_gate.trailers_from_message(
+            GIT_ROOT, message, timeout=GIT_TIMEOUT_SECONDS
+        )
+    except (SystemExit, OSError, subprocess.SubprocessError) as error:
+        _deny(
+            f"`gh pr merge`のsquash message（{source}）を`git`で解釈できなかった"
+            f"（{type(error).__name__}: {error}）。"
+            " **確認できないまま通さない。**trailerがsquash commitへ入らなかった"
+            "場合の手当ては`DECLARATION_EXEMPT`への登録＝Pull Request 1本であり"
+            "（`c171c52`が実例）、通すほうが高くつく。"
+            f" gitを実行できない環境で作業する場合は{SKIP_ENV}=1で無効化し、"
+            " 理由をPull Request本文へ書く。"
+        )
+
+
 def _check_merge(args):
     if _is_help(args):
         # helpの表示だけを求める呼び出しはmergeしない。**messageを要求しない。**
@@ -224,14 +279,22 @@ def _check_merge(args):
             "（`18298ae`／`619c843`で実際に起きた）。"
             " `--subject`と`--body-file`を明示する（CONTRIBUTINGの「Merge方式」）。"
         )
-    missing = [name for name in REQUIRED_MERGE_TRAILERS if f"{name}:" not in text]
+    found = _merge_trailers(text, source)
+    missing = [name for name in REQUIRED_MERGE_TRAILERS if name not in found]
     if missing:
         _deny(
-            f"`gh pr merge`のsquash message（{source}）に"
-            f" {', '.join(missing)} が無い。"
+            f"`gh pr merge`のsquash message（{source}）から"
+            f" {', '.join(missing)} を`git`がtrailerとして読めない。"
+            " **文字列として書いてあるかではなく、`git interpret-trailers --parse`が"
+            "trailerとして返すかを見ている。**messageの最後の段落にコロンの無い行が"
+            "1行でも混じると、その段落はまるごとtrailerでなくなる"
+            "（`c171c52`は`Closes #304`をtrailerと同じ段落へ置き、`Change-Class`・"
+            "`Self-Review`・`Instruction-Change`・`Refs`をすべて失った）。"
+            " 宣言はmessage末尾の段落へまとめ、その段落へ他の行を混ぜない。"
             " 引き継がれないと、そのmergeは通っても次の`main`昇格で"
             " `review_gate.py history`が落ちる。"
             " 値の正本は`scripts/review_gate.py`である。"
+            f" 誤検知で止まった場合は{SKIP_ENV}=1で無効化し、理由を残す。"
         )
 
 

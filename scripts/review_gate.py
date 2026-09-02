@@ -244,7 +244,13 @@ FENCE_RE = re.compile(r"^\s{0,3}(?:```|~~~)")
 HUNK_RE = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")
 
 
-def _git(root, arguments, stdin_text=None):
+def _git(root, arguments, stdin_text=None, timeout=None):
+    """`git`を実行して標準出力を返す。**失敗は`SystemExit`にする。**
+
+    `timeout`の既定は`None`（無制限）であり、CLIとしての振る舞いは変えていない。
+    値を渡すのは`scripts/hooks/gh_metadata_guard.py`だけである。**hookはtool
+    呼び出しの前に走るため、gitが返らないと作業そのものが止まる。**
+    """
     result = subprocess.run(
         ["git", "-C", root, *arguments],
         capture_output=True,
@@ -252,6 +258,7 @@ def _git(root, arguments, stdin_text=None):
         encoding="utf-8",
         errors="replace",
         input=stdin_text,
+        timeout=timeout,
     )
     if result.returncode != 0:
         raise SystemExit(
@@ -417,14 +424,21 @@ def classify(root, base, head):
     return (CLASS_REVIEW if reasons else CLASS_MINOR), reasons
 
 
-def trailers(root, revision):
-    """commit messageのtrailerを`{key: [values]}`で返す。
+def trailers_from_message(root, message, timeout=None):
+    """message文字列のtrailerを`{key: [values]}`で返す。
 
     解釈はgit自身の`interpret-trailers --parse`に任せる。trailerの書式規則を
     こちらで再実装すると、gitの解釈とずれた判定になる。
+
+    **commitになる前のmessageを見る経路のために、revisionから切り離してある。**
+    `scripts/hooks/gh_metadata_guard.py`が、`gh pr merge`へ渡されたsquash message
+    に対して同じ判定をする。**判定をhook側へ複製しない。**trailerの名前だけを
+    共有し、存在の判定を部分一致で別実装していたために、`c171c52`は素通りした
+    （`DECLARATION_EXEMPT`の同commitの記録を参照）。
     """
-    message = _git(root, ["log", "-1", "--format=%B", revision])
-    parsed = _git(root, ["interpret-trailers", "--parse"], stdin_text=message)
+    parsed = _git(
+        root, ["interpret-trailers", "--parse"], stdin_text=message, timeout=timeout
+    )
     found = {}
     for line in parsed.splitlines():
         if ":" not in line:
@@ -432,6 +446,12 @@ def trailers(root, revision):
         key, _, value = line.partition(":")
         found.setdefault(key.strip(), []).append(value.strip())
     return found
+
+
+def trailers(root, revision):
+    """commit messageのtrailerを`{key: [values]}`で返す。"""
+    message = _git(root, ["log", "-1", "--format=%B", revision])
+    return trailers_from_message(root, message)
 
 
 def _check_fixup_reference(found, subject):

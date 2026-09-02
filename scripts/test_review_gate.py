@@ -281,6 +281,34 @@ class ReviewGateTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1, result.stdout)
         self.assertIn("expected CLASS=", result.stderr)
 
+    def test_trailers_from_message_reads_the_same_message(self):
+        """**commit前のmessageも、commit済みと同じ判定で読める。**
+
+        `scripts/hooks/gh_metadata_guard.py`は、`gh pr merge`へ渡された
+        squash message（まだcommitではない）に対してこの関数を使う。
+        **hook側へ判定を複製しないための切り出しである。**名前だけを共有して
+        判定を部分一致で別実装していたことが`c171c52`の穴だった。
+
+        同じ文字列に対して`trailers`と一致すること、そして**最後の段落に
+        コロンの無い行が混じると0件になること**を、両方この1本で押さえる。
+        """
+        root = self._repository()
+        message = (
+            "件名である。\n\n本文である。\n\n"
+            f"{gate.TRAILER_CLASS}: {gate.CLASS_REVIEW}\n" + _review_trailers()
+        )
+        self._write(root, PLAIN_DOC, BASE_TEXT + "ここに追記する。\n")
+        self._commit(root, message)
+        from_message = gate.trailers_from_message(root, message)
+        self.assertEqual(from_message, gate.trailers(root, "HEAD"))
+        self.assertEqual(from_message[gate.TRAILER_CLASS], [gate.CLASS_REVIEW])
+
+        broken = message.replace(
+            f"\n\n{gate.TRAILER_CLASS}:", f"\n\nCloses #304\n{gate.TRAILER_CLASS}:"
+        )
+        self.assertIn(f"{gate.TRAILER_CLASS}:", broken, "前提が崩れている")
+        self.assertEqual(gate.trailers_from_message(root, broken), {})
+
     def test_receipt_requires_both_trailers(self):
         root = self._repository()
         self._write(root, PLAIN_DOC, BASE_TEXT + "ここに追記する。\n")
