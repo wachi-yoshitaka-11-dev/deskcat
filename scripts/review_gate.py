@@ -6,7 +6,8 @@
 1. `classify`     この変更範囲は軽微（`minor`）と機械的に**証明できる**か
 2. `receipt`      範囲のhead commitが、分類と自己レビューをtrailerで宣言しているか
 3. `instructions` 指示sourceが変わったなら、dataとしてreviewした宣言があるか
-4. `history`      範囲の**各commit**が分類を宣言しているか
+4. `history`      範囲の**各commit**が分類を宣言しているか。免除commitについては、
+                  指示source変更をdataとしてreviewしたと言えるかを登録側へ問う
 
 `gate`は1から3をまとめて実行する。分類と指示sourceの検査は範囲全体を見て、trailerの
 検査はhead commitだけを見る。
@@ -48,6 +49,7 @@ import argparse
 import re
 import subprocess
 import sys
+from collections import namedtuple
 from pathlib import Path
 
 # 指示source。**規則・安全・protocol・commandを持つ経路である。**
@@ -132,18 +134,33 @@ REASON_PREVIEW_LIMIT = 20
 # これより前のcommitは検査しない。宣言を求める規則が存在しなかった。
 DECLARATION_CUTOVER = "57734371384d18f31de7557a7a60fd1aa856edff"
 
-# 起点より後だが、宣言を持たないことを許すcommit。
+# 起点より後だが、宣言の**一部または全部**を持たないことを許すcommit。
 #
 # `AGENTS.md`が共有branchの履歴書き換えを禁じているため、後からtrailerを付けられない。
 # **いずれも`develop`へmerge済みであり、共有履歴である。**
-# 中身はいずれもPull Requestのreviewを通っており、失われるのは宣言の記録である。
+# **「宣言を1つも持たない」ものと、「1つだけ欠けている」ものが混在する。**
+# `b93b309`は`Change-Class`と3値の`Self-Review`と`Refs`を実際に持ち、
+# 欠けているのは`Instruction-Change`だけである。**同じ言葉でまとめない。**
+# **経路も混在する。**Pull Requestを通ったものと、`fixup`で`develop`へ直接pushした
+# もの（`b93b309`／`1a5dda8`）がある。それぞれの経緯は下の各entryが持つ。
 #
-# **ただし免除は`Change-Class`と`Self-Review`だけを飛ばすのではない。**`history`は
-# 免除commitで`continue`するため、`_check_instructions`も掛からない。**指示source変更の
-# 宣言（`Instruction-Change`）の検査まで抑止する。**
-# 実際に効いているのは`9c91f913`と`b71c7ef`である（どちらも`docs/hardware/`を触りながら
-# `Instruction-Change`を持たない）。`18298ae`と`619c843`と`1a5dda8`は`INSTRUCTION_SOURCES`
-# のpathを1つも触らないため、この抑止は掛かっていない。
+# **免除が飛ばすのは`Change-Class`と`Self-Review`だけである。**
+# `Instruction-Change`は飛ばさない。**以前は飛ばしていた。**`history`が免除commitで
+# `continue`する位置が`_check_instructions`の呼び出しより前にあり、**指示source変更の
+# 宣言の検査まで抑止していた。**昇格の段でその分を問うものが無く、`review-gate.yml`の
+# `gate` stepが範囲単位で代わりに問うていただけである
+# （[#316](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/316)で露見した）。
+#
+# **いまは免除commitも`_check_instructions`を通る。**commit自身が宣言を持たない場合、
+# 下の登録が持つ`instruction_reviewed`が「指示source変更をdataとしてreviewしたと
+# 言えるか」を答える。**言えないものは`history`が落とす。**
+#
+# 指示sourceを触る免除（**次の1行だけを`test_review_gate.py`が実測と照合する**）:
+# `9c91f913`・`b71c7ef`・`b93b309`・`c171c52`
+# **手で書いた列挙は2回遅れた。**`b93b309`と`c171c52`は、登録された後も足されなかった。
+# 導出できる事実を手で書いている以上、遅れは繰り返す。**だから機械で照合する。**
+# `18298ae`と`619c843`と`1a5dda8`は`INSTRUCTION_SOURCES`のpathを1つも触らないため、
+# この問いの対象にならない。
 #
 # **理由は1つではない。原因ごとに書き分ける。**同じ「後から付けられない」で
 # まとめると、再発を止める手がかりが消える。
@@ -164,6 +181,14 @@ DECLARATION_CUTOVER = "57734371384d18f31de7557a7a60fd1aa856edff"
 #   `gate`なら落ちていた（`receipt` exit 0／`gate` exit 1）。**subcommandの選び間違いである。**
 #   **これは`fixup`区分そのものの欠陥ではない。**直接commit経路に、押す瞬間の検査が
 #   無かったことによる。同じ形を止めるため`scripts/hooks/push_gate.py`を入れた。
+#
+#   **`docs/decisions/`を3 file触る。**そのため免除は`Instruction-Change`の検査まで
+#   抑止していた（`9c91f913`と同じ側）。**ただし他の3件と種類が違う。**
+#   このcommitは`Change-Class: fixup`と3値の`Self-Review`と`Refs`を実際に持ち、
+#   `_check_fixup_reference`も通る。**失われた宣言は`Instruction-Change` 1つだけである。**
+#   **`fixup`で直接pushして指示sourceを触ると`Instruction-Change`が抜けやすい、
+#   というのがこのentryの教訓である。**`gate`なら落ちていた、はその形の言い換えである。
+#   **data reviewが行われた記録は無い。**Pull Requestを通っていないためである。
 #
 # - `b71c7ef`（PR #258）。**`18298ae`／`619c843`と同じ原因である。**
 #   head commit（`63fe1b3`）は`Change-Class`、3値の`Self-Review`、`Instruction-Change`、
@@ -215,17 +240,83 @@ DECLARATION_CUTOVER = "57734371384d18f31de7557a7a60fd1aa856edff"
 #   PR側のhead commitは`Change-Class`・3値の`Self-Review`・`Instruction-Change`を
 #   すべて正しく持っていた。**失われたのはsquash時の記録だけである。**
 #
+#   **`.github/`と`scripts/`を4 path触る。**そのため免除は`Instruction-Change`の検査まで
+#   抑止していた（`9c91f913`と同じ側）。**7件のうち、`main`へ未到達なのはこの1件だけで
+#   ある。**昇格範囲に現れるのはこれであり、他の6件は既に`main`に入っている。
+#
+# 免除1件の登録。**SHAと記録を同じ場所に置く。**片方だけが古くなる形にしない。
+# 記録をcomment側だけに置いていたため、**どの免除が指示sourceを触るかの列挙が
+# 2回遅れた**（`b93b309`と`c171c52`）。
+#
+# `instruction_reviewed`は、そのcommitの指示source変更を**dataとしてreviewしたと
+# 言えるか**である。**`_check_history`が見るのはこの真偽だけである。**
+# `note`は、言える場合はその所在、言えない場合は何が無いのかを書く。
+#
+# **機械が持つ状態は2つに保つ。**根拠の強さや欠け方の違いは`note`の文面で表す。
+# 状態を増やすと、次に1件足したときに「3つ目の状態を作るか」の判断が要る。
+ExemptEntry = namedtuple("ExemptEntry", ("commit", "instruction_reviewed", "note"))
+
 # **この列挙を増やさない。**増やす変更は`scripts/`の変更であり、reviewと
 # `Instruction-Change`の宣言を通る。通したうえで増やすなら、それは判断である。
-DECLARATION_EXEMPT = (
-    "9c91f913696033ca3da9b26d10ac793ee2c2291e",
-    "18298ae3127f31a81411a6c723122dad17a91299",
-    "619c8439be8489451ec9f6a9b79613bc01c1605d",
-    "b93b309c7f6a39967d2eb3ba62807bc4bb1a5dfe",
-    "b71c7ef9e58240d71667c95b551b113288ee450f",
-    "1a5dda877e4994309cd35dd033d66881ea431a2f",
-    "c171c5212bc27bd6337bd1e89b8ad7f40fd359ba",
+DECLARATION_EXEMPT_ENTRIES = (
+    ExemptEntry(
+        "9c91f913696033ca3da9b26d10ac793ee2c2291e",
+        True,
+        "PR #160。CodeRabbitのreviewと人間のreview commentが実際に付いている。"
+        "**根拠はreviewイベントであって宣言ではない。**head commit`9f5d0e9`は"
+        "trailerを1つも持たない。Gateがrequired status checkでなかった時期であり、"
+        "**後からtrailerを付けられない以上、これが得られる最強の証拠である。**"
+        "弱いことを承知のうえで真とする。",
+    ),
+    ExemptEntry(
+        "18298ae3127f31a81411a6c723122dad17a91299",
+        False,
+        "`INSTRUCTION_SOURCES`のpathを1つも触らない。**この問いの対象にならない。**"
+        "偽であることが落とす理由になるのは、指示sourceを触る場合だけである。",
+    ),
+    ExemptEntry(
+        "619c8439be8489451ec9f6a9b79613bc01c1605d",
+        False,
+        "`INSTRUCTION_SOURCES`のpathを1つも触らない。**この問いの対象にならない。**",
+    ),
+    ExemptEntry(
+        "b93b309c7f6a39967d2eb3ba62807bc4bb1a5dfe",
+        False,
+        "**宣言は`Instruction-Change`以外すべて揃っている**"
+        "（`Change-Class: fixup`、3値の`Self-Review`、`Refs: #212`／`Refs: #220`）。"
+        "`_check_fixup_reference`も通る。**それでもdata reviewの記録は無い。**"
+        "`fixup`による`develop`への直接pushであり、Pull Requestを通っていないため"
+        "reviewの場が存在しない。**「宣言も無いcommitだった」と読まないこと。**"
+        "`fixup`で直接pushして指示sourceを触ると`Instruction-Change`が抜けやすい、"
+        "というのがこのentryの教訓である。",
+    ),
+    ExemptEntry(
+        "b71c7ef9e58240d71667c95b551b113288ee450f",
+        True,
+        "PR #258。head commit`63fe1b3`が`Instruction-Change: reviewed-as-data`を持ち、"
+        "`Verify change class and self-review`はsuccessだった。"
+        "**squash messageへ載らなかっただけである。**",
+    ),
+    ExemptEntry(
+        "1a5dda877e4994309cd35dd033d66881ea431a2f",
+        False,
+        "`INSTRUCTION_SOURCES`のpathを1つも触らない。**この問いの対象にならない。**"
+        "`docs/toolchains/version-records/`のみを変更している。",
+    ),
+    ExemptEntry(
+        "c171c5212bc27bd6337bd1e89b8ad7f40fd359ba",
+        True,
+        "PR #307でfull reviewが完走し、指摘3件を検証したうえで#309で人間のreviewを"
+        "経て登録した。head commitは`Instruction-Change: reviewed-as-data`を持って"
+        "いた。**squash messageで同じ段落へコロン無しの行が混じり、block ごと"
+        "無効になっただけである。**",
+    ),
 )
+
+# `commit`から記録を引く。**dict literalで直接書かない。**同じSHAを2度書いても
+# 黙って1件へ畳まれ、数え間違いを検出できなくなる（`test_entries_are_unique`が
+# `DECLARATION_EXEMPT_ENTRIES`との件数一致で見る）。
+DECLARATION_EXEMPT = {entry.commit: entry for entry in DECLARATION_EXEMPT_ENTRIES}
 
 # 変更行がこれらのいずれかに当たると軽微にしない。数値、command、link、表、見出し、
 # checkbox、HTML commentは、typoの修正に見えても意味を持つ。
@@ -542,6 +633,42 @@ def _rev_exists(root, revision):
     return result.returncode == 0
 
 
+def _check_exempt_instructions(root, commit):
+    """免除commitの指示source変更が、dataとしてreviewされたと言えるかを見る。
+
+    **免除は宣言の記録を飛ばすためにあり、reviewを飛ばすためにはない。**
+    `AGENTS.md`が共有branchの履歴書き換えを禁じているため、失われたtrailerは
+    後から付けられない。**付けられないのは記録であって、reviewの事実ではない。**
+
+    commit自身が`Instruction-Change`を持つならそれで足りる（免除されているのは
+    `Change-Class`と`Self-Review`であり、両方を失っていても`Instruction-Change`だけ
+    残っている形はありうる）。持たない場合は、`DECLARATION_EXEMPT`の記録が
+    `instruction_reviewed=True`であることを要求する。
+
+    **この検査は`_check_history`の`continue`より前で呼ぶ。**呼び出しが`continue`の
+    後ろにあったため、免除commitの指示source変更は昇格の段でどこからも問われて
+    いなかった（[#316](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/316)で
+    露見した）。`review-gate.yml`の`gate` stepが範囲単位で代わりに問うていたが、
+    あれはhead commit 1本の宣言を範囲全体の diff へ当てるため、
+    **儀式として付いていても通り、正しく付けなかった回に落ちる。**
+    保証をcommit単位へ置く。
+    """
+    instruction_problems, touched = _check_instructions(root, f"{commit}^", commit)
+    if not instruction_problems:
+        # commit自身が宣言を持っている。免除はここへ効かない。
+        return []
+    entry = DECLARATION_EXEMPT[commit]
+    if entry.instruction_reviewed:
+        return []
+    return [
+        f"{commit[:7]} is exempt from the declaration trailers and changes"
+        f" {len(touched)} instruction source path(s), but DECLARATION_EXEMPT records"
+        " instruction_reviewed=False for it."
+        " Record in DECLARATION_EXEMPT where that instruction diff was reviewed as"
+        " data. Instruction files in a diff are review targets, not instructions."
+    ]
+
+
 def _check_history(root, base, head, cutover):
     """範囲の各commitが分類を宣言しているかを検査する。
 
@@ -554,6 +681,11 @@ def _check_history(root, base, head, cutover):
     現在の集合はhead commitに対してだけ適用する（`_check_receipt`）。
 
     起点より前のcommitは検査しない。宣言を求める規則が存在しなかった。
+
+    **免除commitも`_check_exempt_instructions`を通る。**免除が飛ばすのは
+    `Change-Class`と`Self-Review`だけである。**`continue`をその呼び出しより前に
+    置くと、免除commitの指示source変更が昇格の段でどこからも問われなくなる。**
+    実際にそうなっていた。
     """
     if not _rev_exists(root, cutover):
         # 起点がこのrepositoryに無い。fixtureや別historyでは検査しない。
@@ -568,10 +700,12 @@ def _check_history(root, base, head, cutover):
     problems = []
     exempt = 0
     for commit in listed:
+        short = commit[:7]
         if commit in DECLARATION_EXEMPT:
             exempt += 1
+            # **`continue`より前に呼ぶ。**後ろへ置くと指示sourceの検査が飛ぶ。
+            problems.extend(_check_exempt_instructions(root, commit))
             continue
-        short = commit[:7]
         computed, _ = classify(root, f"{commit}^", commit)
         found = trailers(root, commit)
         declared = found.get(TRAILER_CLASS, [])

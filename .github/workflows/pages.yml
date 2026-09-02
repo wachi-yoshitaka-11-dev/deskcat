@@ -48,6 +48,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          # **`test_review_gate.py`が`DECLARATION_EXEMPT`の各commitを実測するため、
+          # 履歴を切り詰めない。**既定のshallow checkoutではそれらのcommitが存在せず、
+          # 「どの免除が指示sourceを触るか」の照合が**空振りする**（落ちるのではなく、
+          # 対象0件で通ってしまう）。免除の列挙は手で書いた分が2回遅れており、
+          # その照合をCIで走らせることがこの指定の目的である。
+          fetch-depth: 0
           # Pull Requestでは、この後のstepがPR側の検証scriptを実行する。
           # checkoutが残すtokenを、そのscriptから読めないようにする。
           # v6.0.0以降、tokenは`.git/config`ではなく`$RUNNER_TEMP`配下の別fileへ
