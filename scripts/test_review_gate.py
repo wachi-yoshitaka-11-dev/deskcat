@@ -13,6 +13,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import Mock, patch
 
 SCRIPTS_ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPTS_ROOT / "lib"))
@@ -280,6 +281,34 @@ class ReviewGateTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 1, result.stdout)
         self.assertIn("expected CLASS=", result.stderr)
+
+    def test_trailers_from_message_reads_the_same_message(self):
+        """**commit前のmessageも、commit済みと同じ判定で読める。**
+
+        `scripts/hooks/gh_metadata_guard.py`は、`gh pr merge`へ渡された
+        squash message（まだcommitではない）に対してこの関数を使う。
+        **hook側へ判定を複製しないための切り出しである。**名前だけを共有して
+        判定を部分一致で別実装していたことが`c171c52`の穴だった。
+
+        同じ文字列に対して`trailers`と一致すること、そして**最後の段落に
+        コロンの無い行が混じると0件になること**を、両方この1本で押さえる。
+        """
+        root = self._repository()
+        message = (
+            "件名である。\n\n本文である。\n\n"
+            f"{gate.TRAILER_CLASS}: {gate.CLASS_REVIEW}\n" + _review_trailers()
+        )
+        self._write(root, PLAIN_DOC, BASE_TEXT + "ここに追記する。\n")
+        self._commit(root, message)
+        from_message = gate.trailers_from_message(root, message)
+        self.assertEqual(from_message, gate.trailers(root, "HEAD"))
+        self.assertEqual(from_message[gate.TRAILER_CLASS], [gate.CLASS_REVIEW])
+
+        broken = message.replace(
+            f"\n\n{gate.TRAILER_CLASS}:", f"\n\nCloses #304\n{gate.TRAILER_CLASS}:"
+        )
+        self.assertIn(f"{gate.TRAILER_CLASS}:", broken, "前提が崩れている")
+        self.assertEqual(gate.trailers_from_message(root, broken), {})
 
     def test_receipt_requires_both_trailers(self):
         root = self._repository()
@@ -700,6 +729,135 @@ class ReviewGateTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1, result.stdout)
         self.assertIn(gate.TRAILER_INSTRUCTION, result.stderr)
 
+    # -- 免除commit -------------------------------------------------------
+    #
+    # **免除は`DECLARATION_EXEMPT`のSHAで決まる。**fixtureのSHAはcommitするまで
+    # 分からないため、実行時にそのSHAで登録を差し替える。**差し替えは子processへ
+    # 伝わらない**ため、この群だけ`_check_history`を直接呼ぶ。
+
+    def _exempt_history(self, relative, text, message, reviewed):
+        """最後のcommitを免除へ登録した状態の`_check_history`の結果を返す。"""
+        root, cutover = self._history_fixture([(relative, text, message)])
+        head = _git(root, "rev-parse", "HEAD").strip()
+        entry = gate.ExemptEntry(head, reviewed, "fixtureのための記録である。")
+        with patch.dict(gate.DECLARATION_EXEMPT, {head: entry}):
+            return gate._check_history(root, f"{cutover}~1", head, cutover)
+
+    def test_history_requires_a_record_when_an_exempt_commit_touches_instructions(self):
+        """免除commitが指示sourceを触り、記録が無ければ落ちる。
+
+        **免除は宣言の記録を飛ばすためにあり、reviewを飛ばすためにはない。**
+        `continue`が`_check_instructions`の呼び出しより前にあった間、この経路は
+        昇格の段でどこからも問われていなかった。**`gate` stepが範囲単位で代わりに
+        問うていただけである。**
+        """
+        problems, summary = self._exempt_history(
+            "AGENTS.md", "# Rules\n\n本文をなおす。\n", "AGENTS.mdを直す", False
+        )
+        self.assertEqual(len(problems), 1, problems)
+        self.assertIn("instruction_reviewed=False", problems[0])
+        self.assertEqual(summary, (0, 0, 1))
+
+    def test_history_accepts_an_exempt_commit_with_a_recorded_instruction_review(self):
+        """記録があれば通る。`c171c52`がこの側である。"""
+        problems, summary = self._exempt_history(
+            "AGENTS.md", "# Rules\n\n本文をなおす。\n", "AGENTS.mdを直す", True
+        )
+        self.assertEqual(problems, [])
+        self.assertEqual(summary, (0, 0, 1))
+
+    def test_history_does_not_require_a_record_without_instruction_sources(self):
+        """指示sourceを触らない免除commitは、記録の真偽に関係なく通る。
+
+        `18298ae`／`619c843`／`1a5dda8`がこの側である。**偽が落とす理由になるのは、
+        指示sourceを触る場合だけである。**
+        """
+        for reviewed in (False, True):
+            with self.subTest(instruction_reviewed=reviewed):
+                problems, summary = self._exempt_history(
+                    PLAIN_DOC, BASE_TEXT + "追記する。\n", "追記する", reviewed
+                )
+                self.assertEqual(problems, [])
+                self.assertEqual(summary, (0, 0, 1))
+
+    def test_exemption_still_covers_the_class_and_review_declarations(self):
+        """免除は`Change-Class`と`Self-Review`を従来どおり飛ばす。
+
+        **同じcommitを免除しなければ落ちること**まで見る。免除した側だけを見ると、
+        「もともと落ちない差分だった」と区別が付かない。
+        """
+        root, cutover = self._history_fixture(
+            [(PLAIN_DOC, BASE_TEXT + "追記する。\n", "宣言を1つも持たない")]
+        )
+        head = _git(root, "rev-parse", "HEAD").strip()
+        problems, _ = gate._check_history(root, f"{cutover}~1", head, cutover)
+        self.assertTrue(
+            problems, "免除しなければ落ちる差分でなければ、この検査は何も示さない"
+        )
+        entry = gate.ExemptEntry(head, False, "fixtureのための記録である。")
+        with patch.dict(gate.DECLARATION_EXEMPT, {head: entry}):
+            exempted, _ = gate._check_history(root, f"{cutover}~1", head, cutover)
+        self.assertEqual(exempted, [])
+
+    def test_an_exempt_commit_may_declare_the_instruction_change_itself(self):
+        """免除commit自身が`Instruction-Change`を持つなら、登録の記録は要らない。
+
+        免除されているのは`Change-Class`と`Self-Review`であり、**3つすべてを
+        失っているとは限らない。**`b93b309`が逆側の実例である（`Change-Class`と
+        `Self-Review`を持ち、`Instruction-Change`だけを失った）。**この検査が見るのは
+        その鏡像である。**登録の記録は、commit自身が宣言を持たない場合にだけ問われる。
+        """
+        problems, _ = self._exempt_history(
+            "AGENTS.md",
+            "# Rules\n\n本文をなおす。\n",
+            self._declared(
+                "AGENTS.mdを直す", klass=None, review=False, instruction=True
+            ),
+            False,
+        )
+        self.assertEqual(problems, [])
+
+    def test_history_prints_the_three_counts(self):
+        """**数えたものと数えなかったものを必ず出す。**silent capを作らない。"""
+        root, cutover = self._history_fixture(
+            [
+                (
+                    PLAIN_DOC,
+                    BASE_TEXT + "追記する。\n",
+                    self._declared("追記する", gate.CLASS_MINOR),
+                )
+            ]
+        )
+        result = self._history(root, cutover)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("HISTORY_CHECKED=1", result.stdout)
+        self.assertIn("MERGES_SKIPPED=0", result.stdout)
+        self.assertIn("EXEMPT=0", result.stdout)
+
+    def test_history_counts_the_merge_commits_it_skipped(self):
+        """merge commitは検査せず、**数えて出す。**差は内訳で説明できなければならない。"""
+        root, cutover = self._history_fixture(
+            [
+                (
+                    PLAIN_DOC,
+                    BASE_TEXT + "本線である。\n",
+                    self._declared("本線", gate.CLASS_MINOR),
+                )
+            ]
+        )
+        trunk = _git(root, "rev-parse", "--abbrev-ref", "HEAD").strip()
+        _git(root, "checkout", "--quiet", "-b", "topic", cutover)
+        self._write(root, "docs/runbooks/topic-note.md", BASE_TEXT + "枝である。\n")
+        # 新規fileの追加は`review-required`へ落ちる。**宣言は計算結果より緩くしない。**
+        self._commit(root, self._declared("枝", gate.CLASS_REVIEW))
+        _git(root, "checkout", "--quiet", trunk)
+        _git(root, "merge", "--quiet", "--no-ff", "-m", "枝をmergeする", "topic")
+        result = self._history(root, cutover)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("HISTORY_CHECKED=2", result.stdout)
+        self.assertIn("MERGES_SKIPPED=1", result.stdout)
+        self.assertIn("EXEMPT=0", result.stdout)
+
     def test_history_ignores_commits_before_the_cutover(self):
         """起点より前の宣言なしcommitを蒸し返さないこと。"""
         root = self._repository()
@@ -825,6 +983,34 @@ class ReviewGateTests(unittest.TestCase):
         self.assertIn("CLASS=", result.stdout)
 
 
+class GitFailureTests(unittest.TestCase):
+    """`_git`の失敗経路のtest。
+
+    **docstringが「失敗は`SystemExit`にする」と約束している。**以前は`OSError`と
+    `TimeoutExpired`がそのまま抜けており、約束を守っていなかった
+    （[#323](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/323)）。
+    **merge の門でtracebackが出ると、落ちたことと検査したことの区別が付かない。**
+    """
+
+    def test_start_failure_and_timeout_become_system_exit(self):
+        cases = (
+            subprocess.TimeoutExpired(cmd="git", timeout=1),
+            OSError("git not found"),
+        )
+        for error in cases:
+            with self.subTest(error=type(error).__name__):
+                with patch.object(gate.subprocess, "run", side_effect=error):
+                    with self.assertRaises(SystemExit):
+                        gate._git(".", ["status"])
+
+    def test_nonzero_exit_still_becomes_system_exit(self):
+        """**既存の経路を壊していないこと。**"""
+        with patch.object(gate.subprocess, "run") as run:
+            run.return_value = Mock(returncode=1, stdout="", stderr="boom")
+            with self.assertRaises(SystemExit):
+                gate._git(".", ["status"])
+
+
 class DeclarationExemptTests(unittest.TestCase):
     """免除リストそのもののtest。
 
@@ -834,14 +1020,31 @@ class DeclarationExemptTests(unittest.TestCase):
 
     def test_entries_are_full_length_hexadecimal(self):
         """短縮SHAを書かない。`rev-list`が返すのは40桁であり、短縮では一致しない。"""
-        for value in gate.DECLARATION_EXEMPT:
-            self.assertRegex(value, r"^[0-9a-f]{40}$", value)
+        for entry in gate.DECLARATION_EXEMPT_ENTRIES:
+            self.assertRegex(entry.commit, r"^[0-9a-f]{40}$", entry.commit)
 
     def test_entries_are_unique(self):
-        """同じcommitを2度書かない。数え間違いのもとになる。"""
-        self.assertEqual(
-            len(set(gate.DECLARATION_EXEMPT)), len(gate.DECLARATION_EXEMPT)
-        )
+        """同じcommitを2度書かない。数え間違いのもとになる。
+
+        **`DECLARATION_EXEMPT`はdictである。**dict literalへ直接書くと、同じSHAを
+        2度書いても黙って1件へ畳まれ、`set`との比較では気付けない。
+        **登録の並びとdictの件数が一致することで、畳まれたことを見る。**
+        """
+        commits = [entry.commit for entry in gate.DECLARATION_EXEMPT_ENTRIES]
+        self.assertEqual(len(set(commits)), len(commits))
+        self.assertEqual(len(gate.DECLARATION_EXEMPT), len(commits))
+
+    def test_each_entry_records_its_instruction_review(self):
+        """真偽と文面の両方を持つこと。
+
+        **真偽だけでは、次に読む人が判断できない。**根拠の強さや欠け方の違いは
+        文面が持つ（`9c91f913`はreviewイベント、`b93b309`は`Instruction-Change`
+        だけの欠落）。**空の文面を許すと、機械の状態だけが残る。**
+        """
+        for entry in gate.DECLARATION_EXEMPT_ENTRIES:
+            with self.subTest(commit=entry.commit[:8]):
+                self.assertIsInstance(entry.instruction_reviewed, bool)
+                self.assertTrue(entry.note.strip(), entry.commit)
 
     def test_each_entry_is_explained_in_the_comment(self):
         """免除ごとに理由が書かれている。**原因ごとに書き分ける規則の機械側である。**
@@ -852,12 +1055,66 @@ class DeclarationExemptTests(unittest.TestCase):
         桁数を固定すると、書いてあるのに「無い」と読む。
         """
         source = Path(gate.__file__).read_text(encoding="utf-8")
-        header = source.split("DECLARATION_EXEMPT = (")[0]
+        anchor = "DECLARATION_EXEMPT_ENTRIES = ("
+        # **anchorが消えると`split`は全文を返し、testは通るが何も検査しなくなる。**
+        # 定数名を変えたときに、静かに空振りへ落ちない。
+        self.assertIn(anchor, source)
+        header = source.split(anchor)[0]
         quoted = set(re.findall(r"`([0-9a-f]{7,40})`", header))
-        for value in gate.DECLARATION_EXEMPT:
+        for entry in gate.DECLARATION_EXEMPT_ENTRIES:
             self.assertTrue(
-                any(value.startswith(short) for short in quoted),
-                f"{value[:8]}の免除理由がcommentに無い",
+                any(entry.commit.startswith(short) for short in quoted),
+                f"{entry.commit[:8]}の免除理由がcommentに無い",
+            )
+
+    def test_the_comment_lists_every_exempt_commit_touching_instruction_sources(self):
+        """指示sourceを触る免除の列挙が、実測と一致していること。
+
+        **この列挙は導出できる事実を手で書いている。**2回遅れた（`b93b309`と
+        `c171c52`が、登録された後も足されなかった）。**手で直す約束では止まらない。**
+
+        照合するのはcommentの1行だけである。**この repository に無いcommitは
+        対象から外す**（浅いcloneやfixtureでは辿れない）。
+        """
+        source = Path(gate.__file__).read_text(encoding="utf-8")
+        marker = "# 指示sourceを触る免除（"
+        self.assertIn(marker, source)
+        lines = source[source.index(marker) :].splitlines()
+        listed = set(re.findall(r"`([0-9a-f]{7,40})`", lines[1]))
+        self.assertTrue(listed, f"列挙の行にSHAが無い: {lines[1]!r}")
+
+        present = [
+            entry
+            for entry in gate.DECLARATION_EXEMPT_ENTRIES
+            if gate._rev_exists(REPOSITORY_ROOT, entry.commit)
+        ]
+        if not present:
+            # **通さない。**shallow checkoutでは免除commitが1件も存在せず、
+            # 対象0件のまま通ると照合したことにならない。CIは`fetch-depth: 0`で
+            # 履歴を持つ（`.github/workflows/pages.yml`）。
+            self.skipTest(
+                "免除commitがこのcheckoutに1件も無い。"
+                "履歴を切り詰めた環境では照合できない（fetch-depth: 0が要る）"
+            )
+
+        affected = set()
+        for entry in present:
+            _, touched = gate._check_instructions(
+                REPOSITORY_ROOT, f"{entry.commit}^", entry.commit
+            )
+            if touched:
+                affected.add(entry.commit)
+        self.assertTrue(affected, "実測で1件も出ないなら、この検査は何も示さない")
+
+        for commit in sorted(affected):
+            self.assertTrue(
+                any(commit.startswith(short) for short in listed),
+                f"{commit[:8]}は指示sourceを触るが、commentの列挙に無い",
+            )
+        for short in sorted(listed):
+            self.assertTrue(
+                any(commit.startswith(short) for commit in affected),
+                f"{short}はcommentの列挙にあるが、指示sourceを触っていない",
             )
 
 

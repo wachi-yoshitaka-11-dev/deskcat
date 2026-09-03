@@ -552,7 +552,11 @@ baseで決まる。
 
 **squash merge時に、分類と自己レビューをtrailerで宣言する。**trailerはcommitへ結び付くため、
 review後にcommitが増えると宣言が自動的に無効になる（[ADR-0010](docs/decisions/0010-change-class-and-review-declaration.md)）。
-`main`昇格workflowが、`develop`のtip commitにこの宣言があることを要求する。
+base が`develop`のPull Requestでは、Review gate workflowがhead commitにこの宣言があることを要求する。
+**`main`昇格では要求しない。**`develop`のtip commitは範囲の1本にすぎず、自分の変更しか宣言していない。
+head commit 1本の宣言を範囲全体のdiffへ当てると、**指示sourceを0 path触りながら`Instruction-Change`を
+持つcommitで通り、正しく付けなかったcommitで落ちる。**偽陽性と偽陰性の両方を出すため、保証を持たない。
+`main`昇格で見るのは`history`であり、**範囲の各commitを1本ずつ検査する**（次節）。
 
 ```bash
 gh pr merge <N> --squash --subject "<Pull Requestの題名>" --body-file <path>
@@ -612,9 +616,14 @@ Self-Review: converged
 **従うと`receipt`が落ちる**（3値すべてを要求するため）。
 **行番号で指定しない。**値が増減するとずれる。
 
-**`main`昇格では、範囲の各commitの宣言も検証される。**squash commitへtrailerを書き忘れると、その回のmergeは通っても次の昇格で落ちる。
+**`main`昇格で検証されるのは、範囲の各commitの宣言である。**squash commitへtrailerを書き忘れると、その回のmergeは通っても次の昇格で落ちる。
+**head commit 1本を見る検査は`main`昇格では走らない**（上の「Merge方式」を参照）。
 
-**ただし検査に起点がある。**trailer運用を導入したcommit（[#161](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/161)のsquash）より前は検査しない。**宣言を求める規則が存在しなかったためである。**起点より後にも、宣言を持たないことを許しているcommitがある。`AGENTS.md`が共有branchの履歴書き換えを禁じているため、後からtrailerを付けられない。**起点と免除の正本は`scripts/review_gate.py`の`DECLARATION_CUTOVER`と`DECLARATION_EXEMPT`であり、免除の理由は同fileが持つ。**
+**ただし検査に起点がある。**trailer運用を導入したcommit（[#161](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/161)のsquash）より前は検査しない。**宣言を求める規則が存在しなかったためである。**起点より後にも、宣言を持たないことを許しているcommitがある。`AGENTS.md`が共有branchの履歴書き換えを禁じているため、後からtrailerを付けられない。**起点と免除の正本は`scripts/review_gate.py`の`DECLARATION_CUTOVER`と`DECLARATION_EXEMPT`であり、免除の理由も同fileが持つ**（登録と同じ場所に置いてある。commentだけに書いていた間、どの免除が指示sourceを触るかの列挙が2回遅れた）。
+
+**免除が飛ばすのは`Change-Class`と`Self-Review`だけである。**指示source変更の宣言（`Instruction-Change`）は飛ばさない。
+免除commitが指示sourceを触る場合、`DECLARATION_EXEMPT`の記録が**その差分をdataとしてreviewしたと言えること**を示していなければ`history`が落ちる。
+**免除はreviewを飛ばすためにあるのではなく、後から付けられない宣言の記録を飛ばすためにある。**
 
 そのため**`HISTORY_CHECKED`は昇格範囲のcommit数より少なくなりうる。取りこぼしではない。**検査した件数、skipしたmerge commitの件数、免除した件数を必ず出すため、差はその内訳で説明できる。**この数を期待値として引用しない。**範囲は昇格ごとに変わる。
 
@@ -664,12 +673,23 @@ squash mergeしたbranchはcommit hashが変わるため、`git branch -d`が「
 | `gh issue create`／`gh pr create`の前 | `--project`（短縮形`-p`）があるか | `scripts/hooks/gh_metadata_guard.py` |
 | `gh pr create`の前 | `--base`（短縮形`-B`）があるか | 同上 |
 | `@coderabbitai`へreviewを投げる前 | 同じ行に`review`の語があるか | `scripts/hooks/coderabbit_gate.py` |
-| `gh pr merge`の前 | squash messageが`Change-Class`と`Self-Review`を持つか | 同上 |
+| `gh pr merge`の前 | squash messageから`git`が`Change-Class`と`Self-Review`をtrailerとして読むか | 同上 |
 | `git checkout -b`／`git switch -c`の前 | 基点が最新の`origin/develop`か | `scripts/hooks/branch_base_guard.py` |
 | `gh pr merge`の後 | squash commitに実際に入ったか | `scripts/hooks/merge_trailer_report.py` |
 | `develop`へ直接pushする前 | 押す範囲が`review_gate.py gate`を通るか | `scripts/hooks/push_gate.py` |
 
 **判定は字句だけで行う。**意味は判定しない（`scripts/review_gate.py`と同じ方針）。
+**`git interpret-trailers --parse`へ読ませることも字句の判定である**
+（理由は`scripts/hooks/gh_metadata_guard.py`のdocstringが持つ。**ここへ複製しない**）。
+
+> **`gh pr merge`の検査は、以前は文字列の部分一致だった。**2026-09-02に、squash message
+> のtrailer blockと同じ段落へコロン無しの行（`Closes` と `#304`）を置いたcommitで、
+> `Change-Class:`／`Self-Review:`という文字列は存在したためhookは通したが、
+> `git interpret-trailers --parse`は空を返した。**文字列としてある**ことと
+> **trailerとして解釈される**ことは別である。
+> [#312](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/312)／[#313](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/313)で
+> 判定を`review_gate.trailers_from_message`へ寄せ、**この形は止まるようになった。**
+> 回帰testは`scripts/test_hooks.py`が持つ。
 
 ### 止まったときにどうするか
 
@@ -745,6 +765,76 @@ Pull Requestを通る変更は`review-gate.yml`が`gate`を実行するためで
 
 **hookで安全要件を代替しない。**hookが直すのは「忘れる」であって、
 [Hardware Safety Policy](docs/governance/hardware-safety-policy.md)が要求する根拠ではない。
+
+## 報告と成果物
+
+**checklistの項目は増やさない。**下の2つは、既存のchecklistが見ない観点を補う手順である
+（[#289](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/289)）。
+
+### 外向き操作の報告を受けたら結果を確認する
+
+「push した」「commit した」「merge した」という報告を受けたら、**その場で結果を見る。**
+報告の内容が正確であることと、その操作が引き起こした結果（CIの状態等）が問題無いことは別である。
+
+2026-09-01の実例。担当が「push済み」と報告し、内容は正確だった。だがそのpushでCIが
+赤くなっており、報告した側も受け取った側も、その時点では見ていない。気付いたのは
+次の照合のときだった。**これは宣言の真偽を検査する話ではない。**受け取る側の手順である。
+
+### 説明は成果物へ書く
+
+PMやreviewerへ説明した内容のうち、成果物（Pull Request本文、commit message、
+Issue本文）に残るべきものは、成果物へ書く。**報告と成果物は別のfileであり、
+片方に書いたことがもう片方に自動で反映されない。**
+
+2026-08-31の実例。昇格Pull Requestのcheckが`Review skipped`へ戻った経緯を、
+担当は報告には正確に書いたが、`main`の履歴に残るPull Request本文には書いていなかった。
+説明は正確に行われていた。**宛先が違った。**
+
+## 道具の効かない条件
+
+**道具そのものは正しく動いていても、効かない条件が書かれていなければ誤読する。**
+2026-09-01と2026-09-02に、10件の道具でこれが起きた（[#289](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/289)）。
+`scripts/review_gate.py`固有の2件は同fileのdocstringにある。**残りの8件をここへ記載する。**
+**数と箇条書きの件数が食い違っていた**（7件と書いて8件並べていた）。数を書くなら数える。
+
+- **`git cherry`は、squash mergeされたbranchに対して逆の答えを返しうる。**
+  1 commitのbranchでは`-`（取り込み済み）を返すが、複数commitを1つへ畳んだbranchでは
+  patch-idが一致せず`+`（未取り込み）を返す。額面どおり読むと「作業が`develop`に
+  入っていない」となるが、実際にはblob hashが完全一致していることがある。
+  **`git diff`では判定できない場面で`git cherry`へ切り替えても、この条件は消えない。**
+  疑わしい場合はblob hashまたは実際のfile内容を突き合わせる。
+- **`@coderabbitai rate limit`への返答時間に上限が無い。**6秒で返った例と22分35秒
+  かかった例の両方が観測されている（[CodeRabbitのreview状態の観測記録](docs/runbooks/coderabbit-review-observations.md)）。
+  **無応答と遅延は区別できない。**待つ上限を決めずに「投げる直前に1回確認する」
+  運用を続ける。
+- **quoteしていないheredoc（`<<EOF`）は、`\|`とbacktickを含む文書を壊す。**
+  このrepositoryの文書はどちらも高頻度で使う。**heredocは`<<'EOF'`で書く。**
+- **走査結果を数として報告するときは、patternが何を含み何を落とすかを一緒に書く。**
+  「0件」も「N件」も、pattern外側については何も言っていない。2026-09-01に3件の
+  実例が出た。
+
+  | 主張したもの | 実際に測ったもの |
+  |---|---|
+  | 昇格範囲15 fileのbyte合計 | 既存14 fileだけ（新規fileを`NEW`として別行に出し`continue`し、合計から抜けた） |
+  | 表のGFMセル数 | パイプ数−1（末尾パイプの無い行で1ずれた） |
+  | `members`が増えた時期 | servoが入った時期だけ（patternに`servo`を含めたため、`serial`の日が出なかった） |
+
+- **`gh api /markdown`は、相対linkを書き換えずに返す。**入力に含まれる相対pathの
+  文字列がそのまま出力に残るため、GitHub上でrenderされたときに解決できるかは
+  この呼び出しだけでは分からない。**ブラウザ側の解決は別に確認する。**
+- **`origin/*`を検査するscriptを、自分のworktreeの版で実行すると、遅れた判定になる。**
+  `origin/develop`や`origin/main`は`git fetch`しないと更新されない。fetchせずに
+  過去の版へ対して`history`等を走らせると、既に解決済みの問題を「まだ落ちている」
+  と読みうる。**実行前に`git fetch origin`する。**
+- **`git log -S<文字列>`は、既存の定数へ1行足しただけのcommitを検出しない。**
+  `-S`は指定した文字列の**出現数の変化**を見る。定数名（例:
+  `DECLARATION_EXEMPT`）そのものへ1行足しても、定数名の出現数は変わらないため
+  hitしない。**個々の値（SHAや識別子）で検索し直す必要がある。**
+- **`closingIssuesReferences`は、Pull Request作成直後や本文編集直後には
+  反映されていないことがある。**2026-09-02に、本文へ`Closes #N`を含むPull Requestを
+  作成した直後に1回目を測ると0件で、時間を置いて測り直すと1件（正しい番号）に
+  変わった実測がある。**0件という結果を「本文にclosing keywordが無い」と即断せず、
+  時間を置いて測り直す。**
 
 ## Gitと秘密情報
 

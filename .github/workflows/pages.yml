@@ -48,6 +48,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          # **`test_review_gate.py`が`DECLARATION_EXEMPT`の各commitを実測するため、
+          # 履歴を切り詰めない。**既定のshallow checkoutではそれらのcommitが存在せず、
+          # 「どの免除が指示sourceを触るか」の照合が**空振りする**（落ちるのではなく、
+          # 対象0件で通ってしまう）。免除の列挙は手で書いた分が2回遅れており、
+          # その照合をCIで走らせることがこの指定の目的である。
+          fetch-depth: 0
           # Pull Requestでは、この後のstepがPR側の検証scriptを実行する。
           # checkoutが残すtokenを、そのscriptから読めないようにする。
           # v6.0.0以降、tokenは`.git/config`ではなく`$RUNNER_TEMP`配下の別fileへ
@@ -70,6 +76,16 @@ jobs:
         working-directory: ${{ runner.temp }}
         run: python3 "$GITHUB_WORKSPACE/scripts/test_review_gate.py"
 
+      - name: Test promotion closing keyword report
+        working-directory: ${{ runner.temp }}
+        run: python3 "$GITHUB_WORKSPACE/scripts/test_promotion_closing_keywords.py"
+
+      - name: Test procurement mention scanner
+        # `gh`はmockする。networkへは出ない。**READMEが「Pages workflowとlocal」と
+        # 書いているのに、この workflowが呼んでいなかった**（#320）。
+        working-directory: ${{ runner.temp }}
+        run: python3 "$GITHUB_WORKSPACE/scripts/test_procurement_mentions.py"
+
       - name: Test hooks
         # hookは失敗しても静かなため、壊れたことに気付けない。CIで回帰させる。
         working-directory: ${{ runner.temp }}
@@ -83,6 +99,16 @@ jobs:
         # CIで回帰させる。script自体はcheckoutの絶対pathから起動する。
         working-directory: ${{ runner.temp }}
         run: python3 "$GITHUB_WORKSPACE/scripts/test_link_validators.py"
+
+      # GFM表のheader行とセル数が食い違う行を検出する。不足セルは空で埋まり、
+      # 超過セルは捨てられるため、review・自己レビュー・昇格の照合のいずれも
+      # 気付かないまま`main`へ入りうる（#289）。
+      - name: Check table columns
+        run: python3 scripts/validate_table_columns.py
+
+      - name: Test table column validator
+        working-directory: ${{ runner.temp }}
+        run: python3 "$GITHUB_WORKSPACE/scripts/test_table_columns.py"
 
       - name: Prepare public source
         run: python3 scripts/prepare_pages.py
@@ -129,4 +155,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0

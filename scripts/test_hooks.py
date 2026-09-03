@@ -313,6 +313,95 @@ class GhMetadataGuardTests(unittest.TestCase):
         )
         self.assertDenied('gh pr merge 1 --squash --body "本文だけ"')
 
+    def test_merge_message_must_parse_as_trailers(self):
+        """**`git`がtrailerとして読める形かを見る。文字列の一致では足りない。**
+
+        `c171c52`（[PR #307](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/307)）は、
+        trailer blockの直前へ空行なしでコロンの無い`Closes #304`を置いた。
+        `git interpret-trailers`は最後の段落がすべてtrailerでないとその段落を
+        認めないため、`Change-Class`・`Self-Review`・`Instruction-Change`・`Refs`が
+        まるごと無効になり、`develop`のsquash commitは宣言を1つも持たなかった。
+
+        **このhookは通していた。**当時の判定が`f"{name}:" not in text`という
+        部分一致で、**文字列としては存在した**ためである（`c171c52`では3種類とも）。
+        下のfixtureも同じ性質を持たせてあり、`assertIn`が固定しているのはそこである。
+        **部分一致へ戻すとこのtestは落ちる。**
+        """
+        with tempfile.TemporaryDirectory() as directory:
+            broken = Path(directory) / "broken.txt"
+            broken.write_text(
+                "本文である。\n\n"
+                f"Closes #304\n{gate.TRAILER_CLASS}: c\n{gate.TRAILER_REVIEW}: s\n",
+                encoding="utf-8",
+            )
+            separated = Path(directory) / "separated.txt"
+            separated.write_text(
+                "本文である。\n\nCloses #304\n\n"
+                f"{gate.TRAILER_CLASS}: c\n{gate.TRAILER_REVIEW}: s\n",
+                encoding="utf-8",
+            )
+            text = broken.read_text(encoding="utf-8")
+            for name in (gate.TRAILER_CLASS, gate.TRAILER_REVIEW):
+                self.assertIn(f"{name}:", text, "回帰testの前提が崩れている")
+            self.assertDenied(
+                f"gh pr merge 1 --squash --subject s --body-file {broken}",
+                contains=gate.TRAILER_CLASS,
+            )
+            # 同じ宣言を空行で区切っただけのmessageは通る。**直し方が示されている。**
+            self.assertAllowed(
+                f"gh pr merge 1 --squash --subject s --body-file {separated}"
+            )
+
+    def test_merge_message_of_only_trailers_is_allowed(self):
+        """**本文がtrailerだけの形を誤検知しない。**
+
+        `gh pr merge`が作るcommit messageは`--subject`と本文を空行で連結した形に
+        なる。**本文だけを`git`へ渡すと本文の先頭行がsubjectとして扱われ**、段落が
+        1つしか無い形になってtrailerが0件と読まれる（2026-09-02に実測）。
+        実際のcommitでは有効なtrailer blockであり、**止めれば正しいmergeが
+        通らなくなる。**hookはsubjectの行を補ってから`git`へ渡す。
+        """
+        with tempfile.TemporaryDirectory() as directory:
+            only = Path(directory) / "only.txt"
+            only.write_text(
+                f"{gate.TRAILER_CLASS}: c\n{gate.TRAILER_REVIEW}: s\n",
+                encoding="utf-8",
+            )
+            self.assertAllowed(
+                f"gh pr merge 1 --squash --subject s --body-file {only}"
+            )
+
+    def test_merge_is_denied_when_git_cannot_be_run(self):
+        """**`git`を実行できない場合は通さない。**
+
+        この検査が守っているのは「宣言がsquash commitへ入るか」であり、
+        **入らなかったときの手当ては`DECLARATION_EXEMPT`への登録＝Pull Request
+        1本である**（`c171c52`が実例）。確認できないまま通すほうが高くつく。
+        **止まったときの逃げ道は`DESKCAT_SKIP_GH_GUARD`であり、診断文に書いてある。**
+        それを検査しているのが最後の`assertIn`である。
+        """
+        with tempfile.TemporaryDirectory() as directory:
+            body = Path(directory) / "body.txt"
+            body.write_text(
+                "本文である。\n\n"
+                f"{gate.TRAILER_CLASS}: c\n{gate.TRAILER_REVIEW}: s\n",
+                encoding="utf-8",
+            )
+            command = f"gh pr merge 1 --squash --subject s --body-file {body}"
+            # 同じmessageが、gitを引ける状態では通ることを先に確かめる。
+            self.assertAllowed(command)
+            # `git`の無いPATHで起動する。hook自身は絶対pathのpythonで動くため、
+            # PATHを空にしてもhookの起動そのものは妨げない。
+            empty = Path(directory) / "bin"
+            empty.mkdir()
+            code, output = _invoke(GH_GUARD, command, environment={"PATH": str(empty)})
+            self.assertEqual(code, 0)
+            self.assertIsNotNone(output, "gitを実行できないまま通してしまった")
+            self.assertEqual(
+                output["hookSpecificOutput"]["permissionDecision"], "deny"
+            )
+            self.assertIn("DESKCAT_SKIP_GH_GUARD", _reason(output))
+
     def test_unrelated_commands_are_allowed(self):
         """`gh`以外と、`gh`の他のsubcommandは通す。"""
         for command in ("git status", "ls -la", "gh pr view 1 --json state"):
