@@ -63,15 +63,22 @@ def build_pattern(words):
 
 
 def _run_gh(arguments, input_text=None):
-    result = subprocess.run(
-        ["gh", *arguments],
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        input=input_text,
-        timeout=TIMEOUT,
-    )
+    try:
+        result = subprocess.run(
+            ["gh", *arguments],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            input=input_text,
+            timeout=TIMEOUT,
+        )
+    except (subprocess.TimeoutExpired, OSError) as error:
+        # **返らない・起動できないも`ValidationError`にする。**捕まえないと
+        # `main()`のhandlerへ届かず、定義した診断の代わりにtracebackが出る。
+        raise guards.ValidationError(
+            f"gh {' '.join(arguments)} failed: {type(error).__name__}: {error}"
+        ) from error
     if result.returncode != 0:
         raise guards.ValidationError(
             f"gh {' '.join(arguments)} failed: {result.stdout}{result.stderr}"

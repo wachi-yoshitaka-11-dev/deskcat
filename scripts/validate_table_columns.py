@@ -118,6 +118,12 @@ def find_mismatches(text):
     表の開始は「直前の非空行」+「区切り行」の対で検出する。ここでの列数は
     header行のセル数であり、以降の行はそれと比較する。fence内は表として
     読まない（fence内の`|`はcode例示であり表ではない）。
+
+    **header行と区切り行のセル数が一致しない対は、表として開かない。**GFMは
+    その block を表として扱わない。以前は区切り行のセル数を見ずに開いていたため、
+    `| h |`と`| --- | --- |`の対で表を開き、続く`| 1 | 2 |`を不一致として
+    **報告していた**（偽陽性。実測）。body行が無い場合も`tables`だけ増えていた。
+    偽陽性はCIを落とすため、偽陰性より高くつく。
     """
     mismatches = []
     tables = 0
@@ -140,8 +146,13 @@ def find_mismatches(text):
             previous_line = None
             continue
         if column_count == 0:
-            if previous_line is not None and is_delimiter_row(stripped):
-                column_count = len(split_cells(previous_line))
+            # **区切り行のセル数もheader行と一致していなければ表ではない。**
+            # 一致しない場合はこの行をheader候補として持ち越す（GFMはこのblockを
+            # 段落として扱うため、ここで表を開かなければ以降も開かない）。
+            paired = previous_line is not None and is_delimiter_row(stripped)
+            header_cells = len(split_cells(previous_line)) if paired else 0
+            if paired and header_cells == len(split_cells(stripped)):
+                column_count = header_cells
                 header_line_number = number - 1
                 tables += 1
             else:

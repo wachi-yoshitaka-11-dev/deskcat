@@ -129,6 +129,27 @@ class IssueStateRepositoryTests(unittest.TestCase):
         self.assertEqual(state, "CLOSED")
         self.assertEqual(run.call_args.kwargs["cwd"], "/somewhere/else")
 
+    def test_issue_state_returns_none_when_gh_does_not_return(self):
+        """`gh`が返らない・起動できない場合は`未確認`へ落ちる。
+
+        **捕まえないと、`None`を返す設計へ入らずtracebackになる。**
+        「確認できなければCLOSEDと決め付けない」という既定は、
+        失敗経路でも守られていなければ意味がない。
+        """
+        cases = (
+            subprocess.TimeoutExpired(cmd="gh", timeout=30),
+            OSError("gh not found"),
+        )
+        for error in cases:
+            with self.subTest(error=type(error).__name__):
+                with mock.patch.object(
+                    report.shutil, "which", return_value="/usr/bin/gh"
+                ):
+                    with mock.patch.object(
+                        report.subprocess, "run", side_effect=error
+                    ):
+                        self.assertIsNone(report._issue_state("304", "."))
+
     def test_main_passes_the_repository_root_to_the_state_lookup(self):
         """**`main`の配線を固定する。**
 

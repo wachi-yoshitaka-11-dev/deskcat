@@ -171,6 +171,64 @@ class FindMismatchesTests(unittest.TestCase):
         self.assertEqual(mismatches, [])
 
 
+class HeaderDelimiterMatchTests(unittest.TestCase):
+    """header行と区切り行のセル数が一致しない対のtest。
+
+    **GFMはこのblockを表として扱わない。**以前は区切り行のセル数を見ずに表を開き、
+    続く行を不一致として報告していた（偽陽性。
+    [#323](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/323)）。
+    **偽陽性はCIを落とすため、偽陰性より高くつく。**
+    """
+
+    def test_mismatched_pair_with_a_body_row_is_not_a_table(self):
+        """`| h |`＋`| --- | --- |`＋`| 1 | 2 |`は表ではない。
+
+        以前はここで表を開き、3行目を「header 1列／この行 2列」として報告していた。
+        """
+        text = "| h |\n| --- | --- |\n| 1 | 2 |\n"
+        self.assertEqual(check.find_mismatches(text), ([], 0, 0))
+
+    def test_mismatched_pair_without_a_body_row_is_not_a_table(self):
+        """body行が無い場合も表として数えない。
+
+        以前は`tables`だけ増えて通っていた。**通る側の誤りは気付きにくい。**
+        """
+        text = "| h |\n| --- | --- |\n"
+        self.assertEqual(check.find_mismatches(text), ([], 0, 0))
+
+    def test_a_real_table_after_a_mismatched_pair_is_still_detected(self):
+        """不一致の対の後に来る本物の表を、取りこぼさない。
+
+        **表を開かない判断が、以降の行を全部捨てる形になっていないこと**を見る。
+        """
+        text = (
+            "| a |\n| --- | --- |\n"
+            "| b | c |\n| --- | --- |\n| 1 | 2 |\n"
+        )
+        mismatches, tables, rows = check.find_mismatches(text)
+        self.assertEqual(mismatches, [])
+        self.assertEqual((tables, rows), (1, 1))
+
+    def test_a_genuine_mismatch_is_still_reported(self):
+        """**偽陰性を作っていないこと。**header と区切り行が一致する表では、
+        列数の違う body行を引き続き報告する。
+        """
+        text = "| a | b |\n| --- | --- |\n| 1 |\n"
+        mismatches, tables, rows = check.find_mismatches(text)
+        self.assertEqual(len(mismatches), 1, mismatches)
+        self.assertEqual(mismatches[0][2:4], (2, 1))
+        self.assertEqual((tables, rows), (1, 1))
+
+    def test_delimiter_with_more_cells_than_header_is_not_a_table(self):
+        """逆向き（区切り行のほうが多い／少ない）も同じ扱いにする。"""
+        for text in (
+            "| a | b |\n| --- |\n| 1 | 2 |\n",
+            "| a |\n| --- | --- | --- |\n| 1 |\n",
+        ):
+            with self.subTest(text=text.replace("\n", "/")):
+                self.assertEqual(check.find_mismatches(text), ([], 0, 0))
+
+
 class CommandLineTests(unittest.TestCase):
     """script全体を子processとして起動し、exit codeと出力を検査する。"""
 
