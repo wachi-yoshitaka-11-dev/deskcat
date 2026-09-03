@@ -342,16 +342,27 @@ def _git(root, arguments, stdin_text=None, timeout=None):
     `timeout`の既定は`None`（無制限）であり、CLIとしての振る舞いは変えていない。
     値を渡すのは`scripts/hooks/gh_metadata_guard.py`だけである。**hookはtool
     呼び出しの前に走るため、gitが返らないと作業そのものが止まる。**
+
+    **`git`を起動できない場合と返らない場合も`SystemExit`にする。**以前は
+    `OSError`と`TimeoutExpired`がそのまま抜けており、**この docstring が約束する
+    「失敗は`SystemExit`にする」を守っていなかった**（merge の門でtracebackが出る形
+    であり、落ちたことと検査したことの区別が付かない）。
     """
-    result = subprocess.run(
-        ["git", "-C", root, *arguments],
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        input=stdin_text,
-        timeout=timeout,
-    )
+    try:
+        result = subprocess.run(
+            ["git", "-C", root, *arguments],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            input=stdin_text,
+            timeout=timeout,
+        )
+    except (subprocess.TimeoutExpired, OSError) as error:
+        raise SystemExit(
+            f"git {' '.join(arguments)} failed:"
+            f" {type(error).__name__}: {error}"
+        ) from error
     if result.returncode != 0:
         raise SystemExit(
             f"git {' '.join(arguments)} failed:"

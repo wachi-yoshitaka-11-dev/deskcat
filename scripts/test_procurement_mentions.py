@@ -8,6 +8,7 @@ tracked fileの内容と乖離しないことを確認する。
 """
 
 import json
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -302,6 +303,35 @@ class ScanKindTests(unittest.TestCase):
                 "o", "r", "Issue", "issues", "issue", "IssueState", ["OPEN"], pattern
             )
         self.assertEqual(findings, [])
+
+
+class RunGhFailureTests(unittest.TestCase):
+    """`gh`の起動失敗とtimeoutのtest。
+
+    **`main()`は`ValidationError`だけをhandlerで受ける。**捕まえないと、定義した
+    診断の代わりにtracebackが出る
+    （[#323](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/323)）。
+    """
+
+    def test_timeout_and_start_failure_become_validation_errors(self):
+        cases = (
+            subprocess.TimeoutExpired(cmd="gh", timeout=1),
+            OSError("gh not found"),
+        )
+        for error in cases:
+            with self.subTest(error=type(error).__name__):
+                with mock.patch.object(
+                    scan.subprocess, "run", side_effect=error
+                ):
+                    with self.assertRaises(guards.ValidationError):
+                        scan._run_gh(["api", "graphql"])
+
+    def test_nonzero_exit_still_becomes_a_validation_error(self):
+        """**既存の経路を壊していないこと。**"""
+        with mock.patch.object(scan.subprocess, "run") as run:
+            run.return_value = mock.Mock(returncode=1, stdout="", stderr="boom")
+            with self.assertRaises(guards.ValidationError):
+                scan._run_gh(["api", "graphql"])
 
 
 class CursorJudgementTests(unittest.TestCase):

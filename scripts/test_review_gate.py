@@ -13,7 +13,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 SCRIPTS_ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPTS_ROOT / "lib"))
@@ -981,6 +981,34 @@ class ReviewGateTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("CLASS=", result.stdout)
+
+
+class GitFailureTests(unittest.TestCase):
+    """`_git`の失敗経路のtest。
+
+    **docstringが「失敗は`SystemExit`にする」と約束している。**以前は`OSError`と
+    `TimeoutExpired`がそのまま抜けており、約束を守っていなかった
+    （[#323](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/323)）。
+    **merge の門でtracebackが出ると、落ちたことと検査したことの区別が付かない。**
+    """
+
+    def test_start_failure_and_timeout_become_system_exit(self):
+        cases = (
+            subprocess.TimeoutExpired(cmd="git", timeout=1),
+            OSError("git not found"),
+        )
+        for error in cases:
+            with self.subTest(error=type(error).__name__):
+                with patch.object(gate.subprocess, "run", side_effect=error):
+                    with self.assertRaises(SystemExit):
+                        gate._git(".", ["status"])
+
+    def test_nonzero_exit_still_becomes_system_exit(self):
+        """**既存の経路を壊していないこと。**"""
+        with patch.object(gate.subprocess, "run") as run:
+            run.return_value = Mock(returncode=1, stdout="", stderr="boom")
+            with self.assertRaises(SystemExit):
+                gate._git(".", ["status"])
 
 
 class DeclarationExemptTests(unittest.TestCase):

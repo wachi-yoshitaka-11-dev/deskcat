@@ -87,15 +87,21 @@ def _issue_state(number, root):
     """
     if shutil.which("gh") is None:
         return None
-    result = subprocess.run(
-        ["gh", "issue", "view", number, "--json", "state", "-q", ".state"],
-        cwd=root,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        timeout=30,
-    )
+    try:
+        result = subprocess.run(
+            ["gh", "issue", "view", number, "--json", "state", "-q", ".state"],
+            cwd=root,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=30,
+        )
+    except (subprocess.TimeoutExpired, OSError):
+        # **返らない・起動できないは「確認できなかった」である。**`None`へ落とす。
+        # 捕まえないと、`未確認`を返す設計へ入らずtracebackになる。
+        # **CLOSEDと決め付けないという既定を、失敗経路でも守る。**
+        return None
     if result.returncode != 0:
         return None
     state = result.stdout.strip()
