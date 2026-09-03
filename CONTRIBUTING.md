@@ -541,6 +541,36 @@ branch protectionの`enforce_admins`は無効であり、管理者は強制merge
 mergeされ、追跡も無かった。後から[#74](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/74)として
 起票し直している。
 
+#### 昇格Pull Requestでの手動reviewと未解決thread
+
+**base が`main`のPull Request（`develop`からの昇格）について定める。**
+定めが無かったため、[#316](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/316)で
+手動reviewを2回投げる違反と、未解決を残してmergeしかける判断が起きた（追跡は[#327](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/327)）。
+
+**1. 昇格は手動reviewの対象である。**`main`に載るためである。
+**回数は[自己レビュー](#自己レビュー)のとおり最大1回で、昇格も例外ではない。**
+
+**2. 未解決threadを残してmergeしない。**[未解決を残してmergeする場合](#未解決を残してmergeする場合)は
+**昇格では使わない。**`main`をbaseとするmerge済みPull Request 18本を全数走査した結果、
+`Require conversation resolution before merging`の強制後（2026-08-10）の13本は
+**すべて未解決0件**である（#316自身を含む。2026-09-03時点の実測）。未解決を残した2本（#32／#52）は強制より前であり、
+[Repository設定](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/.github/REPOSITORY_SETTINGS.md)が「導入の契機は#40で未解決thread 1件を
+残したmergeが起きたこと」と記録している。**例外の2本は前例ではなく、規則が作られた原因である。**
+
+**3. 内容への指摘は`develop`側で直す。**昇格Pull Requestのheadは`develop`であり、
+応じると共有branchへの直接pushになる。**Issueを立てて`develop`側のPull Requestで直す。**
+本文への指摘は昇格Pull Requestで直す。
+
+**4. 範囲が変わったら、昇格Pull Requestを作り直す。**同じPull Requestで`full review`を
+投げ直さない（[手動で依頼する前に状態を確認する](#手動で依頼する前に状態を確認する)）。
+**昇格の差分は1回のreviewで閉じない。**各部分は自分のPull Requestでreviewを通っており、
+昇格では全fileを最初から読み直すため、個別のreviewが出さなかったものが出る。#316では
+1回目に6件、直した後の2回目に3件出た。**直せば範囲が変わる。**作り直した新しい
+Pull Requestが、確定した範囲に対する1回を持つ。
+
+**5. 昇格Pull Requestを作るのは、範囲が確定してからである。**上の3で立てたIssueが
+すべて`develop`へ入った後に作る。
+
 ### Merge方式
 
 baseで決まる。
@@ -830,11 +860,16 @@ Issue本文）に残るべきものは、成果物へ書く。**報告と成果�
   `-S`は指定した文字列の**出現数の変化**を見る。定数名（例:
   `DECLARATION_EXEMPT`）そのものへ1行足しても、定数名の出現数は変わらないため
   hitしない。**個々の値（SHAや識別子）で検索し直す必要がある。**
-- **`closingIssuesReferences`は、Pull Request作成直後や本文編集直後には
-  反映されていないことがある。**2026-09-02に、本文へ`Closes #N`を含むPull Requestを
-  作成した直後に1回目を測ると0件で、時間を置いて測り直すと1件（正しい番号）に
-  変わった実測がある。**0件という結果を「本文にclosing keywordが無い」と即断せず、
-  時間を置いて測り直す。**
+- **`closingIssuesReferences`は、本文にclosing keywordがあっても0件のままのことがある。**
+  **「時間を置けば反映される」では説明が付かない。**2026-09-02の実測では、作成直後は
+  0件で時間を置くと1件（正しい番号）に変わった。しかし2026-09-03に、`Closes`と番号を
+  本文へ持つPull Request 3本（[#321](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/321)・[#322](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/322)・[#326](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/326)）が
+  **作成直後・merge直前・merge後のいずれでも0件だった。**本文の形は登録された例
+  （#313・#318）とbyte単位で同じである（5行目、独立した段落、前後に空行、ASCIIのみ）。
+  **原因は特定できていない。推測を書かない。**
+  **0件を「本文にclosing keywordが無い」と読まない。**本文を直接見て判定する。
+  この repository はcloseをProjects v2 boardで管理しており、`closingIssuesReferences`に
+  依存していない。**0件でも失われる機能は無い**（追跡は[#328](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/328)）。
 
 ## Gitと秘密情報
 
