@@ -591,6 +591,12 @@ gh pr view <N> --json headRefOid --jq .headRefOid
 **食い違ったらmergeしない。**範囲が変わっているため、走査からやり直して規則4のとおり
 Pull Requestを作り直す。
 
+**照合は2回行う。作成直後と、merge を実行する直前である。**昇格Pull Requestのheadは
+branch（`develop`）であり、**作成後に`develop`へcommitが入るとPull Requestのheadも動く。**
+作成直後の照合だけでは範囲を固定できない。**入ったcommitは未走査かつ未reviewであり、
+closing keywordの発火に加えて規則1と規則2の保証も外れる。**下のIssue itemの手当てを
+終えたあと、`gh pr merge`を実行する直前にもう一度照合する。
+
 **baseが`main`では、範囲内commit messageのclosing keywordがmerge時に発火する。**
 `closingIssuesReferences`とPull Request本文の確認では**この経路を検出できない**
 （本文からしか計算されないため。[#289](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/289)）。
