@@ -571,6 +571,26 @@ Pull Requestが、確定した範囲に対する1回を持つ。
 **5. 昇格Pull Requestを作るのは、範囲が確定してからである。**上の3で立てたIssueが
 すべて`develop`へ入った後に作る。
 
+**6. 範囲が確定したら、範囲内commitのclosing keywordを走査する。**
+
+```bash
+python3 scripts/report_promotion_closing_keywords.py --base origin/main --head origin/develop
+```
+
+**baseが`main`では、範囲内commit messageのclosing keywordがmerge時に発火する。**
+`closingIssuesReferences`とPull Request本文の確認では**この経路を検出できない**
+（本文からしか計算されないため。[#289](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/289)）。
+**履歴は書き換えないため、検出しても消せない。**できるのは、発火を知ってboard側を
+先に手当てすることだけである。
+
+**検出したら、参照先Issueと対応するIssue itemの状態を確認する。**boardの
+`Auto-close issue`はIssue itemの`Status`が`Done`になったときにcloseする。
+**GitHubの自動closeが先に走ると、IssueはCLOSEDだがIssue itemは`Done`にならず、
+boardとIssueの状態が食い違う。**参照先が既にCLOSEDなら空振りであり、手当ては要らない。
+
+**走査は昇格Pull Requestを作る前に行う。**CIの`Report closing keywords in the
+promotion range` jobも同じ走査を行うが（base=`main`のときだけ）、**作成後にしか出ない。**
+
 ### Merge方式
 
 baseで決まる。
