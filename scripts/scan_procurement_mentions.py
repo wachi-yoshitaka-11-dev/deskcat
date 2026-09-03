@@ -88,7 +88,10 @@ query($owner: String!, $repo: String!, $states: [{state_enum}!], $cursor: String
         number
         url
         body
-        comments(first: 100) {{ nodes {{ url body }} }}
+        comments(first: 100) {{
+          pageInfo {{ hasNextPage endCursor }}
+          nodes {{ url body }}
+        }}
       }}
     }}
   }}
@@ -96,8 +99,77 @@ query($owner: String!, $repo: String!, $states: [{state_enum}!], $cursor: String
 """
 
 
-def _fetch_kind(owner, repo, field, state_enum, states):
-    """`issues`または`pullRequests`connectionを全ページ取得する。"""
+# 1件のIssue／Pull Requestのcommentの続きを取るquery。**`_QUERY`のcomments connection
+# は1ページしか返さない。**comment数が`first`を超えるnodeでは、超過分の調達状態の記述を
+# 見落とす。**この scriptは「台帳への登録漏れを探す」ための道具であり、取りこぼすと
+# 「無い」と読むことになる。**報告のみで止めない設計とは別の問題である。
+#
+# `{field}`は単数形（`issue`／`pullRequest`）で埋める。**複数形から文字列操作で導かない。**
+# 導くと、connection名の変更で静かにずれる。
+_COMMENTS_QUERY = """
+query($owner: String!, $repo: String!, $number: Int!, $cursor: String) {{
+  repository(owner: $owner, name: $repo) {{
+    {field}(number: $number) {{
+      comments(first: 100, after: $cursor) {{
+        pageInfo {{ hasNextPage endCursor }}
+        nodes {{ url body }}
+      }}
+    }}
+  }}
+}}
+"""
+
+
+def _fetch_remaining_comments(owner, repo, singular, number, cursor):
+    """`cursor`より後のcommentを全ページ取得して返す。"""
+    query = _COMMENTS_QUERY.format(field=singular)
+    nodes = []
+    while cursor:
+        arguments = [
+            "api", "graphql",
+            "-f", f"query={query}",
+            "-f", f"owner={owner}",
+            "-f", f"repo={repo}",
+            # `number`はInt!である。`-f`は文字列として渡すため型が合わない。
+            "-F", f"number={number}",
+            "-f", f"cursor={cursor}",
+        ]
+        output = _run_gh(arguments)
+        data = json.loads(output)["data"]["repository"][singular]["comments"]
+        nodes.extend(data["nodes"])
+        page = data["pageInfo"]
+        cursor = page["endCursor"] if page["hasNextPage"] else None
+    return nodes
+
+
+def _complete_comments(owner, repo, singular, node):
+    """nodeのcommentが途中で切れていれば、続きを足して完全にする。
+
+    **`pageInfo`が無い形は1ページで収まった応答として扱う。**`_QUERY`が`pageInfo`を
+    要求しているため実際の応答には必ず含まれるが、mockした単一ページのfixtureを
+    壊さないために欠落を許す。**続きがある形の検査はtestが持つ。**
+    """
+    comments = node.get("comments") or {}
+    page = comments.get("pageInfo") or {}
+    if not page.get("hasNextPage"):
+        return
+    cursor = page.get("endCursor")
+    if not cursor:
+        # **続きがあると言いながらcursorが無い応答は、黙って捨てない。**
+        # 捨てるとこのscriptが直そうとしている取りこぼしそのものになる。
+        raise guards.ValidationError(
+            f"{singular} #{node['number']}: comments has hasNextPage but no endCursor"
+        )
+    comments["nodes"] = (comments.get("nodes") or []) + _fetch_remaining_comments(
+        owner, repo, singular, node["number"], cursor
+    )
+
+
+def _fetch_kind(owner, repo, field, singular, state_enum, states):
+    """`issues`または`pullRequests`connectionを全ページ取得する。
+
+    **commentも全ページ取る**（`_complete_comments`）。
+    """
     query = _QUERY.format(field=field, state_enum=state_enum)
     cursor = None
     nodes = []
@@ -114,6 +186,8 @@ def _fetch_kind(owner, repo, field, state_enum, states):
             arguments += ["-f", f"cursor={cursor}"]
         output = _run_gh(arguments)
         data = json.loads(output)["data"]["repository"][field]
+        for node in data["nodes"]:
+            _complete_comments(owner, repo, singular, node)
         nodes.extend(data["nodes"])
         if not data["pageInfo"]["hasNextPage"]:
             break
@@ -121,10 +195,10 @@ def _fetch_kind(owner, repo, field, state_enum, states):
     return nodes
 
 
-def scan_kind(owner, repo, kind, field, state_enum, states, pattern):
+def scan_kind(owner, repo, kind, field, singular, state_enum, states, pattern):
     """1種類（Issue／Pull Request）分の`[(kind, number, location, url, matched_words)]`を返す。"""
     findings = []
-    for node in _fetch_kind(owner, repo, field, state_enum, states):
+    for node in _fetch_kind(owner, repo, field, singular, state_enum, states):
         body = node.get("body") or ""
         matches = sorted(set(pattern.findall(body)))
         if matches:
@@ -172,12 +246,15 @@ def main(argv=None):
     )
 
     findings = []
-    for kind, field, state_enum, states in (
-        ("Issue", "issues", "IssueState", issue_states),
-        ("Pull Request", "pullRequests", "PullRequestState", pr_states),
+    for kind, field, singular, state_enum, states in (
+        ("Issue", "issues", "issue", "IssueState", issue_states),
+        ("Pull Request", "pullRequests", "pullRequest", "PullRequestState", pr_states),
     ):
         findings.extend(
-            scan_kind(arguments.owner, arguments.repo, kind, field, state_enum, states, pattern)
+            scan_kind(
+                arguments.owner, arguments.repo, kind, field, singular,
+                state_enum, states, pattern,
+            )
         )
 
     if not findings:
