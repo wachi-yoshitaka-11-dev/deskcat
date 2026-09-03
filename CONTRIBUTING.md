@@ -574,8 +574,22 @@ Pull Requestが、確定した範囲に対する1回を持つ。
 **6. 範囲が確定したら、範囲内commitのclosing keywordを走査する。**
 
 ```bash
-python3 scripts/report_promotion_closing_keywords.py --base origin/main --head origin/develop
+git fetch origin
+promotion_head="$(git rev-parse origin/develop)"
+python3 scripts/report_promotion_closing_keywords.py --base origin/main --head "$promotion_head"
 ```
+
+**`origin/develop`をそのまま渡さない。移動するrefである。**走査してから昇格Pull Requestを
+作るまでの間に`develop`へcommitが入ると、**走査していないcommitが範囲へ足される。**
+そのcommitのclosing keywordはmerge時に発火する。**走査時のSHAを固定し、作った
+Pull Requestの`headRefOid`が同じSHAであることを確認する。**
+
+```bash
+gh pr view <N> --json headRefOid --jq .headRefOid
+```
+
+**食い違ったらmergeしない。**範囲が変わっているため、走査からやり直して規則4のとおり
+Pull Requestを作り直す。
 
 **baseが`main`では、範囲内commit messageのclosing keywordがmerge時に発火する。**
 `closingIssuesReferences`とPull Request本文の確認では**この経路を検出できない**
@@ -586,7 +600,14 @@ python3 scripts/report_promotion_closing_keywords.py --base origin/main --head o
 **検出したら、参照先Issueと対応するIssue itemの状態を確認する。**boardの
 `Auto-close issue`はIssue itemの`Status`が`Done`になったときにcloseする。
 **GitHubの自動closeが先に走ると、IssueはCLOSEDだがIssue itemは`Done`にならず、
-boardとIssueの状態が食い違う。**参照先が既にCLOSEDなら空振りであり、手当ては要らない。
+boardとIssueの状態が食い違う。**
+
+**判定するのはIssueの状態ではなくIssue itemの`Status`である。**参照先が`OPEN`なら、
+**mergeする前にIssue itemを`Done`にする。**更新できない場合はmergeしない。
+**参照先が既に`CLOSED`でも、Issue itemの`Status`を実測する。**`Done`でなければ手当てが
+要る。**`CLOSED`を見て「空振り」と判定しない。**boardには`Item closed` workflowも
+有効にしてあるが（[Repository設定](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/.github/REPOSITORY_SETTINGS.md)）、
+**それが`Status`をどの値にするかをここで前提にしない。**見るのは実測した`Status`である。
 
 **走査は昇格Pull Requestを作る前に行う。**CIの`Report closing keywords in the
 promotion range` jobも同じ走査を行うが（base=`main`のときだけ）、**作成後にしか出ない。**
