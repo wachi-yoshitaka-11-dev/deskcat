@@ -178,7 +178,9 @@ class ScanKindTests(unittest.TestCase):
             },
         }]
         pattern = scan.build_pattern(["未購入"])
-        with mock.patch.object(scan, "_run_gh", return_value=_page(nodes)) as run:
+        # **`side_effect`を1件だけにする。**`return_value`だと、余分に問い合わせる
+        # 壊れ方をしたときにloopが回り続け、testはfailせずhangしうる。
+        with mock.patch.object(scan, "_run_gh", side_effect=[_page(nodes)]) as run:
             findings = scan.scan_kind(
                 "o", "r", "Issue", "issues", "issue", "IssueState", ["OPEN"], pattern
             )
@@ -237,6 +239,61 @@ class ScanKindTests(unittest.TestCase):
                     ["OPEN"], pattern,
                 )
 
+    def test_missing_cursor_on_a_later_page_is_an_error(self):
+        """**2ページ目以降でも、cursorの欠落を黙って捨てない。**
+
+        1ページ目と2ページ目以降で判定を分けていたため、後者だけ素通りしていた
+        （loopが正常終了し、それより後のcommentを落とす）。
+        [#321](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/321)のfull review
+        で指摘された。**1ページ目のtestだけでは、この形は捕まらない。**
+        """
+        nodes = [{
+            "number": 11,
+            "url": "u11",
+            "body": "",
+            "comments": {
+                "pageInfo": {"hasNextPage": True, "endCursor": "C1"},
+                "nodes": [],
+            },
+        }]
+        pattern = scan.build_pattern(["未購入"])
+        pages = [
+            _page(nodes),
+            # 2ページ目が「続きがある」と言いながらcursorを返さない。
+            _comments_page(
+                [{"url": "u11#c2", "body": "関係ない"}],
+                has_next=True, end_cursor=None,
+            ),
+        ]
+        with mock.patch.object(scan, "_run_gh", side_effect=pages):
+            with self.assertRaises(guards.ValidationError):
+                scan.scan_kind(
+                    "o", "r", "Issue", "issues", "issue", "IssueState",
+                    ["OPEN"], pattern,
+                )
+
+    def test_missing_cursor_on_the_outer_connection_is_an_error(self):
+        """**外側のconnectionでも、cursorの欠落を黙って進めない。**
+
+        judgementを複製していたため、`hasNextPage`が真で`endCursor`が`null`の応答で
+        `cursor`が`None`に戻り、**同じ1ページ目を取り続ける無限loop**になっていた
+        （実測）。**commentの側だけ直しても、この形は残る。**
+        """
+        node = {"number": 1, "url": "u1", "body": "", "comments": {"nodes": []}}
+        pattern = scan.build_pattern(["未購入"])
+        bad = _page([node], has_next=True, end_cursor=None)
+        # **`side_effect`を1件だけにする。**`return_value`にすると、判定が壊れた
+        # ときにloopが回り続け、testはfailせずhangする。2回目の呼び出しで
+        # `StopIteration`になる形にして、壊れたことを即座に出す。
+        with mock.patch.object(scan, "_run_gh", side_effect=[bad]) as run:
+            with self.assertRaises(guards.ValidationError):
+                scan.scan_kind(
+                    "o", "r", "Issue", "issues", "issue", "IssueState",
+                    ["OPEN"], pattern,
+                )
+        # **loopへ入る前に止まる。**取り直しを繰り返さない。
+        self.assertEqual(run.call_count, 1)
+
     def test_no_hits_returns_empty(self):
         nodes = [{"number": 1, "url": "u1", "body": "関係ない", "comments": {"nodes": []}}]
         pattern = scan.build_pattern(["未購入"])
@@ -245,6 +302,44 @@ class ScanKindTests(unittest.TestCase):
                 "o", "r", "Issue", "issues", "issue", "IssueState", ["OPEN"], pattern
             )
         self.assertEqual(findings, [])
+
+
+class CursorJudgementTests(unittest.TestCase):
+    """cursorの判定が1箇所に留まっていることのtest。
+
+    **判定を`_next_cursor`へ寄せただけでは、次にconnectionを足す人が
+    呼ばない形を書ける。**現在の3つのcall siteはそれぞれ回帰testが固定しているが
+    （commentの1ページ目・2ページ目以降・外側）、**4つ目はどのtestも守らない。**
+
+    `endCursor`の読み出しがsourceの1箇所にしか無いことを、字句で固定する。
+    **queryの文字列にも`endCursor`は出る**ため、読み出しの形だけを見る。
+    """
+
+    # 読み出しの形。**quoteの種類を両方見る。**このrepositoryはdouble quoteで
+    # 書いているが、single quoteで書かれた読み出しをすり抜けさせない。
+    READS = (
+        'endCursor"]', 'endCursor")',
+        "endCursor']", "endCursor')",
+    )
+
+    def test_only_next_cursor_reads_the_end_cursor(self):
+        source = Path(scan.__file__).read_text(encoding="utf-8")
+        marker = "def _next_cursor("
+        # **markerが消えるとsplitが全文を返し、testは通るが何も検査しなくなる。**
+        self.assertIn(marker, source)
+        start = source.index(marker)
+        end = source.index("\ndef ", start + 1)
+        inside, outside = source[start:end], source[:start] + source[end:]
+        for read in self.READS:
+            with self.subTest(read=read):
+                self.assertNotIn(
+                    read, outside,
+                    f"{read} が`_next_cursor`の外で読まれている。判定を寄せた意味が消える",
+                )
+        self.assertTrue(
+            any(read in inside for read in self.READS),
+            "`_next_cursor`が`endCursor`を読んでいない。この検査が空振りしている",
+        )
 
 
 class MainWiringTests(unittest.TestCase):

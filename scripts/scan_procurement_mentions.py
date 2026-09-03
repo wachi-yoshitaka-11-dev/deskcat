@@ -120,6 +120,31 @@ query($owner: String!, $repo: String!, $number: Int!, $cursor: String) {{
 """
 
 
+def _next_cursor(page, label):
+    """`pageInfo`から次のcursorを返す。続きが無ければ`None`。
+
+    **続きがあると言いながらcursorが無い応答は、黙って捨てない。**捨てると、この
+    scriptが直そうとしている取りこぼしそのものになる。
+
+    **connectionごとに判定を分けない。**分けていたため、同じ形の応答で3通りの結果に
+    なっていた。commentの1ページ目は`ValidationError`、2ページ目以降は残りを黙って
+    落として正常終了、`issues`／`pullRequests`は同じ応答を取り続けて**無限loop**で
+    ある（3つとも実測）。2ページ目以降の分は
+    [#321](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/321)のfull reviewで
+    指摘された。**guardを各所へ書くのではなく、判定をここへ寄せる。**
+
+    `label`は診断のためにcaller側が渡す（どのconnectionのどのnodeか）。
+    """
+    if not page.get("hasNextPage"):
+        return None
+    cursor = page.get("endCursor")
+    if not cursor:
+        raise guards.ValidationError(
+            f"{label}: hasNextPage is set but endCursor is missing"
+        )
+    return cursor
+
+
 def _fetch_remaining_comments(owner, repo, singular, number, cursor):
     """`cursor`より後のcommentを全ページ取得して返す。"""
     query = _COMMENTS_QUERY.format(field=singular)
@@ -137,8 +162,7 @@ def _fetch_remaining_comments(owner, repo, singular, number, cursor):
         output = _run_gh(arguments)
         data = json.loads(output)["data"]["repository"][singular]["comments"]
         nodes.extend(data["nodes"])
-        page = data["pageInfo"]
-        cursor = page["endCursor"] if page["hasNextPage"] else None
+        cursor = _next_cursor(data["pageInfo"], f"{singular} #{number} comments")
     return nodes
 
 
@@ -151,15 +175,9 @@ def _complete_comments(owner, repo, singular, node):
     """
     comments = node.get("comments") or {}
     page = comments.get("pageInfo") or {}
-    if not page.get("hasNextPage"):
-        return
-    cursor = page.get("endCursor")
+    cursor = _next_cursor(page, f"{singular} #{node['number']} comments")
     if not cursor:
-        # **続きがあると言いながらcursorが無い応答は、黙って捨てない。**
-        # 捨てるとこのscriptが直そうとしている取りこぼしそのものになる。
-        raise guards.ValidationError(
-            f"{singular} #{node['number']}: comments has hasNextPage but no endCursor"
-        )
+        return
     comments["nodes"] = (comments.get("nodes") or []) + _fetch_remaining_comments(
         owner, repo, singular, node["number"], cursor
     )
@@ -169,6 +187,9 @@ def _fetch_kind(owner, repo, field, singular, state_enum, states):
     """`issues`または`pullRequests`connectionを全ページ取得する。
 
     **commentも全ページ取る**（`_complete_comments`）。
+    **cursorの判定は`_next_cursor`が持つ。**ここへ複製しない。複製していたため、
+    `hasNextPage`が真で`endCursor`が`null`の応答で**無限loop**になっていた
+    （`cursor`が`None`に戻り、同じ1ページ目を取り続ける。実測）。
     """
     query = _QUERY.format(field=field, state_enum=state_enum)
     cursor = None
@@ -189,9 +210,9 @@ def _fetch_kind(owner, repo, field, singular, state_enum, states):
         for node in data["nodes"]:
             _complete_comments(owner, repo, singular, node)
         nodes.extend(data["nodes"])
-        if not data["pageInfo"]["hasNextPage"]:
+        cursor = _next_cursor(data["pageInfo"], field)
+        if not cursor:
             break
-        cursor = data["pageInfo"]["endCursor"]
     return nodes
 
 
