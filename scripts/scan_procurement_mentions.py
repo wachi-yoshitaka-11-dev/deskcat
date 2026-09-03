@@ -88,7 +88,10 @@ query($owner: String!, $repo: String!, $states: [{state_enum}!], $cursor: String
         number
         url
         body
-        comments(first: 100) {{ nodes {{ url body }} }}
+        comments(first: 100) {{
+          pageInfo {{ hasNextPage endCursor }}
+          nodes {{ url body }}
+        }}
       }}
     }}
   }}
@@ -96,8 +99,98 @@ query($owner: String!, $repo: String!, $states: [{state_enum}!], $cursor: String
 """
 
 
-def _fetch_kind(owner, repo, field, state_enum, states):
-    """`issues`または`pullRequests`connectionを全ページ取得する。"""
+# 1件のIssue／Pull Requestのcommentの続きを取るquery。**`_QUERY`のcomments connection
+# は1ページしか返さない。**comment数が`first`を超えるnodeでは、超過分の調達状態の記述を
+# 見落とす。**この scriptは「台帳への登録漏れを探す」ための道具であり、取りこぼすと
+# 「無い」と読むことになる。**報告のみで止めない設計とは別の問題である。
+#
+# `{field}`は単数形（`issue`／`pullRequest`）で埋める。**複数形から文字列操作で導かない。**
+# 導くと、connection名の変更で静かにずれる。
+_COMMENTS_QUERY = """
+query($owner: String!, $repo: String!, $number: Int!, $cursor: String) {{
+  repository(owner: $owner, name: $repo) {{
+    {field}(number: $number) {{
+      comments(first: 100, after: $cursor) {{
+        pageInfo {{ hasNextPage endCursor }}
+        nodes {{ url body }}
+      }}
+    }}
+  }}
+}}
+"""
+
+
+def _next_cursor(page, label):
+    """`pageInfo`から次のcursorを返す。続きが無ければ`None`。
+
+    **続きがあると言いながらcursorが無い応答は、黙って捨てない。**捨てると、この
+    scriptが直そうとしている取りこぼしそのものになる。
+
+    **connectionごとに判定を分けない。**分けていたため、同じ形の応答で3通りの結果に
+    なっていた。commentの1ページ目は`ValidationError`、2ページ目以降は残りを黙って
+    落として正常終了、`issues`／`pullRequests`は同じ応答を取り続けて**無限loop**で
+    ある（3つとも実測）。2ページ目以降の分は
+    [#321](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/321)のfull reviewで
+    指摘された。**guardを各所へ書くのではなく、判定をここへ寄せる。**
+
+    `label`は診断のためにcaller側が渡す（どのconnectionのどのnodeか）。
+    """
+    if not page.get("hasNextPage"):
+        return None
+    cursor = page.get("endCursor")
+    if not cursor:
+        raise guards.ValidationError(
+            f"{label}: hasNextPage is set but endCursor is missing"
+        )
+    return cursor
+
+
+def _fetch_remaining_comments(owner, repo, singular, number, cursor):
+    """`cursor`より後のcommentを全ページ取得して返す。"""
+    query = _COMMENTS_QUERY.format(field=singular)
+    nodes = []
+    while cursor:
+        arguments = [
+            "api", "graphql",
+            "-f", f"query={query}",
+            "-f", f"owner={owner}",
+            "-f", f"repo={repo}",
+            # `number`はInt!である。`-f`は文字列として渡すため型が合わない。
+            "-F", f"number={number}",
+            "-f", f"cursor={cursor}",
+        ]
+        output = _run_gh(arguments)
+        data = json.loads(output)["data"]["repository"][singular]["comments"]
+        nodes.extend(data["nodes"])
+        cursor = _next_cursor(data["pageInfo"], f"{singular} #{number} comments")
+    return nodes
+
+
+def _complete_comments(owner, repo, singular, node):
+    """nodeのcommentが途中で切れていれば、続きを足して完全にする。
+
+    **`pageInfo`が無い形は1ページで収まった応答として扱う。**`_QUERY`が`pageInfo`を
+    要求しているため実際の応答には必ず含まれるが、mockした単一ページのfixtureを
+    壊さないために欠落を許す。**続きがある形の検査はtestが持つ。**
+    """
+    comments = node.get("comments") or {}
+    page = comments.get("pageInfo") or {}
+    cursor = _next_cursor(page, f"{singular} #{node['number']} comments")
+    if not cursor:
+        return
+    comments["nodes"] = (comments.get("nodes") or []) + _fetch_remaining_comments(
+        owner, repo, singular, node["number"], cursor
+    )
+
+
+def _fetch_kind(owner, repo, field, singular, state_enum, states):
+    """`issues`または`pullRequests`connectionを全ページ取得する。
+
+    **commentも全ページ取る**（`_complete_comments`）。
+    **cursorの判定は`_next_cursor`が持つ。**ここへ複製しない。複製していたため、
+    `hasNextPage`が真で`endCursor`が`null`の応答で**無限loop**になっていた
+    （`cursor`が`None`に戻り、同じ1ページ目を取り続ける。実測）。
+    """
     query = _QUERY.format(field=field, state_enum=state_enum)
     cursor = None
     nodes = []
@@ -114,17 +207,19 @@ def _fetch_kind(owner, repo, field, state_enum, states):
             arguments += ["-f", f"cursor={cursor}"]
         output = _run_gh(arguments)
         data = json.loads(output)["data"]["repository"][field]
+        for node in data["nodes"]:
+            _complete_comments(owner, repo, singular, node)
         nodes.extend(data["nodes"])
-        if not data["pageInfo"]["hasNextPage"]:
+        cursor = _next_cursor(data["pageInfo"], field)
+        if not cursor:
             break
-        cursor = data["pageInfo"]["endCursor"]
     return nodes
 
 
-def scan_kind(owner, repo, kind, field, state_enum, states, pattern):
+def scan_kind(owner, repo, kind, field, singular, state_enum, states, pattern):
     """1種類（Issue／Pull Request）分の`[(kind, number, location, url, matched_words)]`を返す。"""
     findings = []
-    for node in _fetch_kind(owner, repo, field, state_enum, states):
+    for node in _fetch_kind(owner, repo, field, singular, state_enum, states):
         body = node.get("body") or ""
         matches = sorted(set(pattern.findall(body)))
         if matches:
@@ -172,12 +267,15 @@ def main(argv=None):
     )
 
     findings = []
-    for kind, field, state_enum, states in (
-        ("Issue", "issues", "IssueState", issue_states),
-        ("Pull Request", "pullRequests", "PullRequestState", pr_states),
+    for kind, field, singular, state_enum, states in (
+        ("Issue", "issues", "issue", "IssueState", issue_states),
+        ("Pull Request", "pullRequests", "pullRequest", "PullRequestState", pr_states),
     ):
         findings.extend(
-            scan_kind(arguments.owner, arguments.repo, kind, field, state_enum, states, pattern)
+            scan_kind(
+                arguments.owner, arguments.repo, kind, field, singular,
+                state_enum, states, pattern,
+            )
         )
 
     if not findings:

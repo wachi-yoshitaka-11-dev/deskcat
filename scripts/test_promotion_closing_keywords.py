@@ -11,6 +11,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 SCRIPTS_ROOT = Path(__file__).resolve().parent
@@ -111,6 +112,42 @@ class CommandLineTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("state=未確認", result.stdout)
         self.assertIn("UNKNOWN=1", result.stdout)
+
+
+class IssueStateRepositoryTests(unittest.TestCase):
+    """`_issue_state`が問い合わせるrepositoryのtest。
+
+    **`gh`は対象repositoryをcwdのgit remoteから推定する。**`--repository-root`へ別の
+    pathを渡すと、commitを読むrepositoryとIssueを問い合わせるrepositoryが食い違う。
+    """
+
+    def test_issue_state_runs_gh_in_the_given_root(self):
+        with mock.patch.object(report.shutil, "which", return_value="/usr/bin/gh"):
+            with mock.patch.object(report.subprocess, "run") as run:
+                run.return_value = mock.Mock(returncode=0, stdout="CLOSED\n")
+                state = report._issue_state("304", "/somewhere/else")
+        self.assertEqual(state, "CLOSED")
+        self.assertEqual(run.call_args.kwargs["cwd"], "/somewhere/else")
+
+    def test_main_passes_the_repository_root_to_the_state_lookup(self):
+        """**`main`の配線を固定する。**
+
+        `_issue_state`側のtestだけでは、`main`が`root`を渡し忘れても落ちない。
+        """
+        given = str(SCRIPTS_ROOT.parent)
+        commits = ["a" * 40]
+        with mock.patch.object(report, "_issue_state", return_value="CLOSED") as lookup:
+            with mock.patch.object(report, "_commits_in_range", return_value=commits):
+                with mock.patch.object(
+                    report, "_commit_message", return_value="本文\n\nCloses #1\n"
+                ):
+                    code = report.main([
+                        "--base", "B", "--head", "H",
+                        "--repository-root", given,
+                        "--check-issue-state",
+                    ])
+        self.assertEqual(code, 0)
+        self.assertEqual(lookup.call_args.args[1], guards.full_path(given))
 
 
 if __name__ == "__main__":

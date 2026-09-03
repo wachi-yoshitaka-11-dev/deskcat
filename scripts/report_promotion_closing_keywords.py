@@ -76,12 +76,20 @@ def _commit_message(root, commit):
     return result.stdout
 
 
-def _issue_state(number):
-    """Issue番号の状態を調べる。確認できなければNoneを返す（「CLOSEDである」と決め付けない）。"""
+def _issue_state(number, root):
+    """Issue番号の状態を調べる。確認できなければNoneを返す（「CLOSEDである」と決め付けない）。
+
+    **`root`を作業ディレクトリとして渡す。**`gh`は対象repositoryをcwdのgit remoteから
+    推定するため、渡さないとlauncherのcwdの側を見る。`--repository-root`へ別のpathを
+    渡す運用は実在し（`git archive`で展開したscriptsから実repositoryを測る形。
+    `AGENTS.md`の検証手順にある）、**commitを読むrepositoryとIssueを問い合わせる
+    repositoryが食い違う。**別repositoryの同番号を返すか、`未確認`になる。
+    """
     if shutil.which("gh") is None:
         return None
     result = subprocess.run(
         ["gh", "issue", "view", number, "--json", "state", "-q", ".state"],
+        cwd=root,
         capture_output=True,
         text=True,
         encoding="utf-8",
@@ -120,7 +128,9 @@ def main(argv=None):
     for commit in commits:
         message = _commit_message(root, commit)
         for keyword, number in find_closing_keywords(message):
-            state = _issue_state(number) if arguments.check_issue_state else None
+            state = (
+                _issue_state(number, root) if arguments.check_issue_state else None
+            )
             findings.append((commit[:7], keyword, number, state))
 
     print(
