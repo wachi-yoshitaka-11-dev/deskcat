@@ -673,12 +673,23 @@ squash mergeしたbranchはcommit hashが変わるため、`git branch -d`が「
 | `gh issue create`／`gh pr create`の前 | `--project`（短縮形`-p`）があるか | `scripts/hooks/gh_metadata_guard.py` |
 | `gh pr create`の前 | `--base`（短縮形`-B`）があるか | 同上 |
 | `@coderabbitai`へreviewを投げる前 | 同じ行に`review`の語があるか | `scripts/hooks/coderabbit_gate.py` |
-| `gh pr merge`の前 | squash messageが`Change-Class`と`Self-Review`を持つか | 同上 |
+| `gh pr merge`の前 | squash messageから`git`が`Change-Class`と`Self-Review`をtrailerとして読むか | 同上 |
 | `git checkout -b`／`git switch -c`の前 | 基点が最新の`origin/develop`か | `scripts/hooks/branch_base_guard.py` |
 | `gh pr merge`の後 | squash commitに実際に入ったか | `scripts/hooks/merge_trailer_report.py` |
 | `develop`へ直接pushする前 | 押す範囲が`review_gate.py gate`を通るか | `scripts/hooks/push_gate.py` |
 
 **判定は字句だけで行う。**意味は判定しない（`scripts/review_gate.py`と同じ方針）。
+**`git interpret-trailers --parse`へ読ませることも字句の判定である**
+（理由は`scripts/hooks/gh_metadata_guard.py`のdocstringが持つ。**ここへ複製しない**）。
+
+> **`gh pr merge`の検査は、以前は文字列の部分一致だった。**2026-09-02に、squash message
+> のtrailer blockと同じ段落へコロン無しの行（`Closes` と `#304`）を置いたcommitで、
+> `Change-Class:`／`Self-Review:`という文字列は存在したためhookは通したが、
+> `git interpret-trailers --parse`は空を返した。**文字列としてある**ことと
+> **trailerとして解釈される**ことは別である。
+> [#312](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/312)／[#313](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/313)で
+> 判定を`review_gate.trailers_from_message`へ寄せ、**この形は止まるようになった。**
+> 回帰testは`scripts/test_hooks.py`が持つ。
 
 ### 止まったときにどうするか
 
@@ -751,13 +762,6 @@ Pull Requestを通る変更は`review-gate.yml`が`gate`を実行するためで
   `--mirror`と`--all`のように、refspecを書かずに複数branchを更新する形は拾えない。
 - **`gate`が時間内に終わらない場合は通す。**止めないのは、遅い環境で作業を止めないためである。
   **通ったことを、検査したことと読まない。**
-- **`gh_metadata_guard.py`の`gh pr merge`検査は、trailerの名前を文字列の部分一致で確認する。**
-  `git interpret-trailers`がそのblockを実際にtrailerとして解釈するかは見ていない。
-  2026-09-02に、squash messageのtrailer blockの直前へ空行無しでコロン無しの行
-  （`Closes #304`）を置いたcommitで、`Change-Class:`／`Self-Review:`という文字列は
-  存在したためhookは通したが、`git interpret-trailers --parse`は空を返した。
-  **文字列としてある**ことと**trailerとして解釈される**ことは別であり、hookは
-  前者しか見ていない。
 
 **hookで安全要件を代替しない。**hookが直すのは「忘れる」であって、
 [Hardware Safety Policy](docs/governance/hardware-safety-policy.md)が要求する根拠ではない。
@@ -789,8 +793,9 @@ Issue本文）に残るべきものは、成果物へ書く。**報告と成果�
 ## 道具の効かない条件
 
 **道具そのものは正しく動いていても、効かない条件が書かれていなければ誤読する。**
-2026-09-01と2026-09-02に、7件の道具でこれが起きた（[#289](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/289)）。
-`scripts/review_gate.py`固有の2件は同fileのdocstringにある。残りをここへ記載する。
+2026-09-01と2026-09-02に、10件の道具でこれが起きた（[#289](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/289)）。
+`scripts/review_gate.py`固有の2件は同fileのdocstringにある。**残りの8件をここへ記載する。**
+**数と箇条書きの件数が食い違っていた**（7件と書いて8件並べていた）。数を書くなら数える。
 
 - **`git cherry`は、squash mergeされたbranchに対して逆の答えを返しうる。**
   1 commitのbranchでは`-`（取り込み済み）を返すが、複数commitを1つへ畳んだbranchでは

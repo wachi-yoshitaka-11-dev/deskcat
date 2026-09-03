@@ -80,6 +80,12 @@ jobs:
         working-directory: ${{ runner.temp }}
         run: python3 "$GITHUB_WORKSPACE/scripts/test_promotion_closing_keywords.py"
 
+      - name: Test procurement mention scanner
+        # `gh`はmockする。networkへは出ない。**READMEが「Pages workflowとlocal」と
+        # 書いているのに、この workflowが呼んでいなかった**（#320）。
+        working-directory: ${{ runner.temp }}
+        run: python3 "$GITHUB_WORKSPACE/scripts/test_procurement_mentions.py"
+
       - name: Test hooks
         # hookは失敗しても静かなため、壊れたことに気付けない。CIで回帰させる。
         working-directory: ${{ runner.temp }}
