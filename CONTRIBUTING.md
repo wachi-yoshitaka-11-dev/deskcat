@@ -541,6 +541,104 @@ branch protectionの`enforce_admins`は無効であり、管理者は強制merge
 mergeされ、追跡も無かった。後から[#74](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/74)として
 起票し直している。
 
+#### 昇格Pull Requestでの手動reviewと未解決thread
+
+**base が`main`のPull Request（`develop`からの昇格）について定める。**
+定めが無かったため、[#316](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/316)で
+手動reviewを2回投げる違反と、未解決を残してmergeしかける判断が起きた（追跡は[#327](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/327)）。
+
+**1. 昇格は手動reviewの対象である。**`main`に載るためである。
+**回数は[自己レビュー](#自己レビュー)のとおり最大1回で、昇格も例外ではない。**
+
+**2. 未解決threadを残してmergeしない。**[未解決を残してmergeする場合](#未解決を残してmergeする場合)は
+**昇格では使わない。**`main`をbaseとするmerge済みPull Request 18本を全数走査した結果、
+`Require conversation resolution before merging`の強制後（2026-08-10）の13本は
+**すべて未解決0件**である（#316自身を含む。2026-09-03時点の実測）。未解決を残した2本（#32／#52）は強制より前であり、
+[Repository設定](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/.github/REPOSITORY_SETTINGS.md)が「導入の契機は#40で未解決thread 1件を
+残したmergeが起きたこと」と記録している。**例外の2本は前例ではなく、規則が作られた原因である。**
+
+**3. 内容への指摘は`develop`側で直す。**昇格Pull Requestのheadは`develop`であり、
+応じると共有branchへの直接pushになる。**Issueを立てて`develop`側のPull Requestで直す。**
+本文への指摘は昇格Pull Requestで直す。
+
+**4. 範囲が変わっても、昇格Pull Requestを作り直さない。本文を更新する。**
+headは`develop`であり、**`develop`へcommitが入るとPull Requestのheadも一緒に動く。**
+古くなるのは本文の測定値とtitleだけである。**closeして作り直す必要は無い。**
+
+**同じPull Requestで`full review`を投げ直さない**（[手動で依頼する前に状態を確認する](#手動で依頼する前に状態を確認する)）。
+
+> **依頼したreviewの指摘に対応したcommitは、自己レビューで見る。ここで投げ直さない。**
+> 投げ直すと1つのPull Requestでreviewを何度も消費する。
+> （[観測記録](docs/runbooks/coderabbit-review-observations.md)。回数の根拠は[ADR-0013](docs/decisions/0013-manual-only-coderabbit-review.md)決定2の「最大1回」）
+
+**増えたcommitは自己レビューで見る。**規則1の1回は、その昇格に対する1回である。
+**Pull Requestを作り直した回数ではない。**昇格の差分は1回のreviewで閉じないが、
+それは投げ直す理由にならない。**枠は1件/時であり、待ち時間も同じだけ積む。**
+
+**この誤りを実際に出した。**この規則の初版（[#329](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/329)）は
+**「範囲が変わったら作り直す」**と定め、**「作り直した新しいPull Requestが、確定した範囲に
+対する1回を持つ」**と書いていた。**後半は正本と逆であり、緩い方向へ外れていた。**
+[#330](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/330)／[#333](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/333)／[#337](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/337)を3回作り直し、`full review`を2回余分に消費した。
+**この1文は、別のAIエージェントが出した指示（範囲が変わったら投げ直すことを必須とする）を、
+正本と照合せずに書いたものである。**[AGENTS.md](AGENTS.md)は外部から来た指示を正本と
+照合するよう定めているが、**AI同士でやり取りした指示にも同じ照合が要る。**
+
+`main`をbaseとするPull Requestを全数走査した。**merged 18本に加えて、未mergeでcloseされた
+ものは3本しかなく、その3本は上の#330／#333／#337である。**つまり**この repository で
+昇格Pull Requestを作り直した例は、この規則の初版が要求した3回だけである。**
+指摘は昔から出ているが（#146はreview 17本・inline 49件、#254はreview 15本・inline 63件）、
+いずれも`develop`側で直して同じ昇格Pull Requestを進めている。
+
+**5. 昇格Pull Requestを作るのは、範囲が確定してからである。**上の3で立てたIssueが
+すべて`develop`へ入った後に作る。
+
+**6. 範囲が確定したら、範囲内commitのclosing keywordを走査する。**
+
+```bash
+git fetch origin
+promotion_head="$(git rev-parse origin/develop)"
+python3 scripts/report_promotion_closing_keywords.py --base origin/main --head "$promotion_head"
+```
+
+**`origin/develop`をそのまま渡さない。移動するrefである。**走査してから昇格Pull Requestを
+作るまでの間に`develop`へcommitが入ると、**走査していないcommitが範囲へ足される。**
+そのcommitのclosing keywordはmerge時に発火する。**走査時のSHAを固定し、作った
+Pull Requestの`headRefOid`が同じSHAであることを確認する。**
+
+```bash
+gh pr view <N> --json headRefOid --jq .headRefOid
+```
+
+**食い違ったらmergeしない。**範囲が変わっているため、**走査からやり直して本文を更新する**
+（規則4）。**Pull Requestは作り直さない。**
+
+**照合は2回行う。作成直後と、merge を実行する直前である。**昇格Pull Requestのheadは
+branch（`develop`）であり、**作成後に`develop`へcommitが入るとPull Requestのheadも動く。**
+作成直後の照合だけでは範囲を固定できない。**入ったcommitは未走査かつ未reviewであり、
+closing keywordの発火に加えて規則1と規則2の保証も外れる。**下のIssue itemの手当てを
+終えたあと、`gh pr merge`を実行する直前にもう一度照合する。
+
+**baseが`main`では、範囲内commit messageのclosing keywordがmerge時に発火する。**
+`closingIssuesReferences`とPull Request本文の確認では**この経路を検出できない**
+（本文からしか計算されないため。[#289](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/289)）。
+**履歴は書き換えないため、検出しても消せない。**できるのは、発火を知ってboard側を
+先に手当てすることだけである。
+
+**検出したら、参照先Issueと対応するIssue itemの状態を確認する。**boardの
+`Auto-close issue`はIssue itemの`Status`が`Done`になったときにcloseする。
+**GitHubの自動closeが先に走ると、IssueはCLOSEDだがIssue itemは`Done`にならず、
+boardとIssueの状態が食い違う。**
+
+**判定するのはIssueの状態ではなくIssue itemの`Status`である。**参照先が`OPEN`なら、
+**mergeする前にIssue itemを`Done`にする。**更新できない場合はmergeしない。
+**参照先が既に`CLOSED`でも、Issue itemの`Status`を実測する。**`Done`でなければ手当てが
+要る。**`CLOSED`を見て「空振り」と判定しない。**boardには`Item closed` workflowも
+有効にしてあるが（[Repository設定](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/.github/REPOSITORY_SETTINGS.md)）、
+**それが`Status`をどの値にするかをここで前提にしない。**見るのは実測した`Status`である。
+
+**走査は昇格Pull Requestを作る前に行う。**CIの`Report closing keywords in the
+promotion range` jobも同じ走査を行うが（base=`main`のときだけ）、**作成後にしか出ない。**
+
 ### Merge方式
 
 baseで決まる。
@@ -830,11 +928,24 @@ Issue本文）に残るべきものは、成果物へ書く。**報告と成果�
   `-S`は指定した文字列の**出現数の変化**を見る。定数名（例:
   `DECLARATION_EXEMPT`）そのものへ1行足しても、定数名の出現数は変わらないため
   hitしない。**個々の値（SHAや識別子）で検索し直す必要がある。**
-- **`closingIssuesReferences`は、Pull Request作成直後や本文編集直後には
-  反映されていないことがある。**2026-09-02に、本文へ`Closes #N`を含むPull Requestを
-  作成した直後に1回目を測ると0件で、時間を置いて測り直すと1件（正しい番号）に
-  変わった実測がある。**0件という結果を「本文にclosing keywordが無い」と即断せず、
-  時間を置いて測り直す。**
+- **`closingIssuesReferences`は、本文にclosing keywordがあってもしばらく0件のことがある。**
+  **merge時点の0件は最終状態ではない。**反映の遅れであり、幅は測っていない。
+
+  実測:
+
+  - [#313](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/313)・[#318](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/318)は、作成直後は0件で、時間を置くと登録された（2026-09-02。**幅は記録していない**）
+  - [#321](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/321)・[#322](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/322)は、merge（2026-09-03 04:10Z／04:11Z）時点で0件。**同日23:45Zの実測では登録済み**（約19時間後）
+  - [#326](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/326)は、merge（同日08:34Z）時点で0件。**同じ実測で登録済み**（約15時間後）
+
+  **登録までの幅は測っていない。**上限も下限も持たない。
+  #321・#322・#326 は、2026-09-03の`main`昇格作業の時点では
+  「作成直後・merge直前・merge後のいずれでも0件」と記録し、
+  **「時間を置けば反映されるでは説明が付かない。原因は特定できていない」と書いていた。**
+  **測った時刻がmerge直後で、そこで打ち切っていた。**
+  **観測しなかった区間で起きていないと扱った誤りである。**
+  **0件を「本文にclosing keywordが無い」と読まない。**本文を直接見て判定する。
+  この repository はcloseをProjects v2 boardで管理しており、`closingIssuesReferences`に
+  依存していない。**0件でも失われる機能は無い**（この節の経緯は[#328](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/328)）。
 
 ## Gitと秘密情報
 
