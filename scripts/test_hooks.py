@@ -11,6 +11,7 @@ hookを子processとして起動し、stdinへhookの入力JSONを渡して、**
 
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -36,6 +37,9 @@ MERGE_REPORT = str(SCRIPTS_ROOT / "hooks" / "merge_trailer_report.py")
 PUSH_GATE = str(SCRIPTS_ROOT / "hooks" / "push_gate.py")
 CODERABBIT_GATE = str(SCRIPTS_ROOT / "hooks" / "coderabbit_gate.py")
 MERGE_REPORT = str(SCRIPTS_ROOT / "hooks" / "merge_trailer_report.py")
+REPO_ROOT_FOR_TEMPLATES = SCRIPTS_ROOT.parent
+ISSUE_TEMPLATE_DIR = REPO_ROOT_FOR_TEMPLATES / ".github" / "ISSUE_TEMPLATE"
+PR_TEMPLATE_PATH = REPO_ROOT_FOR_TEMPLATES / ".github" / "pull_request_template.md"
 
 sys.path.insert(0, str(SCRIPTS_ROOT / "hooks"))
 
@@ -47,6 +51,22 @@ GIT_IDENTITY = (
     "-c", "user.email=test@example.invalid",
     "-c", "commit.gpgsign=false",
 )
+
+
+def _template_sections(path):
+    """正本templateから`## `見出しの並びを読む。hook側の抽出方法を複製しない。
+
+    見出し名はhookの実装（`_section_headings`）と同じ正規表現で取る。
+    testがhookのロジックと違う方法で見出しを数えると、hookが見ていないずれを
+    testが見落とす。
+    """
+    text = Path(path).read_text(encoding="utf-8")
+    return [heading.strip() for heading in re.findall(r"(?m)^## (.+)$", text)]
+
+
+def _body_with_sections(headings):
+    """指定した見出しだけを持つ本文を作る。中身は節が空でなければ何でもよい。"""
+    return "\n".join(f"## {heading}\nx\n" for heading in headings)
 
 
 def _git(root, *arguments):
@@ -417,6 +437,22 @@ class GhMetadataGuardTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIsNone(output)
 
+    def test_skip_environment_disables_the_body_section_check(self):
+        """決定3の節検査も`DESKCAT_SKIP_GH_GUARD`で無効化される。
+
+        `main()`の先頭で全検査を一括して止める既存の仕組みに乗っているだけだが、
+        新設した検査が実際にその経路を通ることは別途確認する必要がある。
+        （通常なら節が欠けてdenyされる本文で確認する。）
+        """
+        code, output = _invoke(
+            GH_GUARD,
+            'gh issue create --title t --project deskcat '
+            '--label type:maintenance --body "## 背景\nx\n"',
+            environment={"DESKCAT_SKIP_GH_GUARD": "1"},
+        )
+        self.assertEqual(code, 0)
+        self.assertIsNone(output)
+
     def test_broken_input_does_not_block(self):
         """hookの入力やcommandが壊れていることを、対象commandの問題として扱わない。"""
         result = subprocess.run(
@@ -427,6 +463,112 @@ class GhMetadataGuardTests(unittest.TestCase):
         self.assertEqual(result.stdout.strip(), "")
         # 引用符が閉じていないcommandは、shell自身が落とす。ここで二重に報告しない。
         self.assertAllowed('gh pr create --title "閉じていない')
+
+    # --- 決定3（#348）: `--body`系の本文がtemplateの節を欠いていないかの検査 ---
+
+    def test_body_option_absent_is_not_checked(self):
+        """`--body`系が無い呼び出しは節検査の対象外である。
+
+        対話prompt（またはeditor）経由はtemplateを経由しており、迂回にならない。
+        `--template`も`type:*` labelも無いのに通ることが、検査が本文の有無で
+        分岐していることを示す。
+        """
+        self.assertAllowed("gh issue create --title t --project deskcat")
+
+    def test_issue_body_with_all_sections_is_allowed_via_template_name(self):
+        """`--template`（表示名）で指定したtemplateの全節が揃った本文を通す。"""
+        sections = _template_sections(ISSUE_TEMPLATE_DIR / "maintenance_task.md")
+        body = _body_with_sections(sections)
+        self.assertAllowed(
+            "gh issue create --title t --project deskcat "
+            f'--template 保守作業 --body "{body}"'
+        )
+
+    def test_issue_body_with_all_sections_is_allowed_via_type_label(self):
+        """`--template`が無くても、`type:*` labelから一意にtemplateを決めて通す。"""
+        sections = _template_sections(ISSUE_TEMPLATE_DIR / "maintenance_task.md")
+        body = _body_with_sections(sections)
+        self.assertAllowed(
+            "gh issue create --title t --project deskcat "
+            f'--label type:maintenance --body "{body}"'
+        )
+
+    def test_issue_body_missing_sections_is_denied(self):
+        """節が欠けたIssue本文を止め、欠けている節名を名指しする。"""
+        sections = _template_sections(ISSUE_TEMPLATE_DIR / "maintenance_task.md")
+        body = _body_with_sections(sections[:2])  # 先頭2節だけにする
+        self.assertDenied(
+            "gh issue create --title t --project deskcat "
+            f'--label type:maintenance --body "{body}"',
+            contains=sections[-1],
+        )
+
+    def test_pr_body_with_all_sections_is_allowed(self):
+        """`gh pr create`はtemplateが1つだけなので、`--template`無しでも判定できる。"""
+        sections = _template_sections(PR_TEMPLATE_PATH)
+        body = _body_with_sections(sections)
+        self.assertAllowed(
+            "gh pr create --title t --project deskcat --base develop "
+            f'--body "{body}"'
+        )
+
+    def test_pr_body_missing_sections_is_denied(self):
+        """節が欠けたPull Request本文を止める。"""
+        sections = _template_sections(PR_TEMPLATE_PATH)
+        body = _body_with_sections(sections[:1])
+        self.assertDenied(
+            "gh pr create --title t --project deskcat --base develop "
+            f'--body "{body}"',
+            contains=sections[-1],
+        )
+
+    def test_undeterminable_template_is_denied(self):
+        """`--template`も対応する`type:*` labelも無いIssue本文は、素通りさせない。
+
+        **fail-openを選ばない。**存在検査ではなく内容検査へ変えた理由そのものが、
+        「決められないなら安全側で止める」である。素通りは選択肢に無い。
+        """
+        self.assertDenied(
+            'gh issue create --title t --project deskcat --body "## 背景\nx\n"',
+            contains="決められない",
+        )
+
+    def test_ambiguous_type_labels_are_denied(self):
+        """複数の`type:*` labelが異なるtemplateへ一致する場合も決められないとする。"""
+        self.assertDenied(
+            "gh issue create --title t --project deskcat "
+            '--label type:bug --label type:maintenance --body "## 背景\nx\n"',
+            contains="決められない",
+        )
+
+    def test_unknown_template_name_is_denied(self):
+        """`--template`の値がどのtemplateの`name:`とも一致しない場合を通さない。"""
+        self.assertDenied(
+            "gh issue create --title t --project deskcat "
+            '--template 存在しない名前 --body "## 背景\nx\n"',
+            contains="--template",
+        )
+
+    def test_unreadable_create_body_is_denied(self):
+        """`gh issue create`／`gh pr create`でも、本文を読めない経路を素通りさせない。
+
+        [#267](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/267)で
+        `coderabbit_gate.py`が同じ理由でfail-openをやめた前例と同じ扱いにする。
+        """
+        self.assertDenied(
+            "gh issue create --title t --project deskcat -F -", contains="stdin"
+        )
+        self.assertDenied(
+            "gh pr create --title t --project deskcat --base develop "
+            "--body-file /nonexistent/body.txt",
+            contains="読み出しに失敗",
+        )
+
+    def test_help_skips_body_check(self):
+        """`--help`は`--body`が付いていても節検査をしない。何も作らないためである。"""
+        self.assertAllowed(
+            'gh issue create --title t --body "## 背景\nx\n" --help'
+        )
 
 
 class BranchBaseGuardTests(unittest.TestCase):
