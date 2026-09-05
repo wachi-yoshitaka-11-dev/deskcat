@@ -92,6 +92,7 @@ def _invoke(script, command, cwd=None, environment=None):
     env.pop("DESKCAT_SKIP_GH_GUARD", None)
     env.pop("DESKCAT_SKIP_BASE_GUARD", None)
     env.pop("DESKCAT_SKIP_PUSH_GATE", None)
+    env.pop("DESKCAT_SKIP_TRUNCATION_GUARD", None)
     if environment:
         env.update(environment)
     result = subprocess.run(
@@ -662,6 +663,217 @@ class BranchBaseGuardTests(unittest.TestCase):
         )
         self.assertEqual(code, 0)
         self.assertIsNone(output)
+
+
+TRUNCATION_GUARD = str(SCRIPTS_ROOT / "hooks" / "truncation_guard.py")
+
+
+class TruncationGuardTests(unittest.TestCase):
+    """列挙commandの明示的な切り詰めを見るhookのtest（決定2、#349）。"""
+
+    def assertAsked(self, command, *, contains=None):
+        code, output = _invoke(TRUNCATION_GUARD, command)
+        self.assertEqual(code, 0, command)
+        self.assertIsNotNone(output, f"通してしまった: {command}")
+        self.assertEqual(
+            output["hookSpecificOutput"]["permissionDecision"], "ask", command
+        )
+        if contains:
+            self.assertIn(contains, _reason(output))
+
+    def assertAllowed(self, command):
+        code, output = _invoke(TRUNCATION_GUARD, command)
+        self.assertEqual(code, 0, command)
+        self.assertIsNone(output, f"止めてしまった: {command}")
+
+    def test_piped_head_after_target_command_is_asked(self):
+        """対象commandの出力を`head -N`／`tail -N`へ渡す形をaskする。"""
+        for command in (
+            "gh pr list | head -8",
+            "gh issue list | tail -3",
+            "git log | head -5",
+            "git rev-list HEAD | head -1",
+            "git branch | head -5",
+            "gh api repos/x/y/issues | head -20",
+        ):
+            with self.subTest(command=command):
+                self.assertAsked(command)
+
+    def test_reason_names_the_detected_limit(self):
+        """診断文が、検出した数値そのものを名指しする。"""
+        self.assertAsked("gh pr list | head -8", contains="8")
+
+    def test_head_tail_forms_are_all_detected(self):
+        """`-N`／`-n N`／`-nN`／`--lines=N`のいずれの書き方も拾う。"""
+        for command in (
+            "gh pr list | head -8",
+            "gh pr list | head -n 8",
+            "gh pr list | head -n8",
+            "gh pr list | head --lines=8",
+        ):
+            with self.subTest(command=command):
+                self.assertAsked(command)
+
+    def test_bare_head_without_a_number_is_allowed(self):
+        """数の無い`head`／`tail`（既定10行）は対象外にする。
+
+        **数が一切commandに現れない呼び出しまで拾うと、閲覧全般を止めることになる。**
+        """
+        self.assertAllowed("gh pr list | head")
+        self.assertAllowed("gh issue list | tail")
+
+    def test_head_tail_on_unrelated_command_is_allowed(self):
+        """対象commandではない出力を`head`へ渡す形は見ない。"""
+        self.assertAllowed("gh pr view 1 | head -8")
+        self.assertAllowed("head -20 file.txt")
+        self.assertAllowed("cat file.txt | head -8")
+
+    def test_max_count_on_git_log_and_rev_list_is_asked(self):
+        """`git log`／`git rev-list`の`-n`／`--max-count`をaskする。"""
+        for command in (
+            "git log -n 20",
+            "git log -n20",
+            "git rev-list --max-count=5 HEAD",
+        ):
+            with self.subTest(command=command):
+                self.assertAsked(command)
+
+    def test_git_log_without_max_count_is_allowed(self):
+        """`-n`／`--max-count`が無い`git log`は対象外にする。"""
+        self.assertAllowed("git log --oneline")
+        self.assertAllowed("git log")
+
+    def test_limit_on_gh_list_commands_is_asked(self):
+        """`gh pr list`／`gh issue list`の`--limit`／`-L`をaskする。"""
+        for command in (
+            "gh pr list --limit 50",
+            "gh issue list --limit=50",
+            "gh pr list -L 50",
+            "gh pr list -L50",
+        ):
+            with self.subTest(command=command):
+                self.assertAsked(command)
+
+    def test_gh_list_without_limit_is_allowed(self):
+        """`--limit`を指定しない呼び出し（既定30件）は、`--json`が無ければ対象外にする。
+
+        **これらのcommandを閲覧のためだけに使う頻度は非常に高く、`--limit`省略は
+        そのほとんどを占める。**明示的な数が無い呼び出しまで対象にすると、通常の
+        閲覧が毎回止まる。
+        """
+        self.assertAllowed("gh pr list")
+        self.assertAllowed("gh issue list")
+
+    def test_json_without_limit_is_asked(self):
+        """`--json`が付いているが`--limit`が無い場合はaskする。
+
+        **PM（`deskcat-66`）が2026-09-05に実測で見つけた反転を塞ぐ。**`--limit`を
+        明示する正しい書き方はaskで止まり、省略して既定30件で黙って切れる書き方が
+        素通りしていた。`--json`（機械可読）が付いている場合に限り、`--limit`省略も
+        対象へ入れる。
+        """
+        for command in (
+            "gh issue list --json number,title",
+            "gh pr list --json number",
+            "gh issue list --json=number",
+        ):
+            with self.subTest(command=command):
+                self.assertAsked(command, contains="--json")
+
+    def test_json_with_small_limit_is_asked_for_the_limit_reason(self):
+        """`--json`と、閾値未満の`--limit`が両方あるときは、`--limit`側の理由でaskする。
+
+        **4は3の穴埋めであり、3が既にaskする場合に重ねて別のaskを出さない。**
+        """
+        self.assertAsked(
+            "gh issue list --json number,title --limit 50", contains="--limit 50"
+        )
+
+    def test_json_with_large_limit_is_allowed(self):
+        """`--json`が付いていても、`--limit`が閾値以上なら通す。
+
+        **PM（`deskcat-66`）の決定4件のうちの1つ（2026-09-05）。**`--limit`を
+        実際の総数以上に明示した書き方まで止めると、規則を守った側が損をする。
+        """
+        self.assertAllowed("gh issue list --state open --limit 1000 --json number")
+
+    def test_json_on_unrelated_command_is_allowed(self):
+        """対象commandではない`--json`は見ない。"""
+        self.assertAllowed("gh api repos/x/y/issues --jq .[].number")
+
+    def test_gh_api_limit_is_not_judged(self):
+        """`gh api`の`--paginate`要否は対象外にする。
+
+        エンドポイントによってpaginationの要否が変わり、字句だけでは判定できない。
+        推測で拾うと誤検知になる。`gh api`はpipeで`head`／`tail`へ渡す形だけを見る。
+        """
+        self.assertAllowed("gh api repos/x/y/issues")
+        self.assertAllowed("gh api repos/x/y/issues --paginate")
+
+    def test_limit_below_threshold_is_asked(self):
+        """閾値未満の`--limit`はaskする。"""
+        for command in ("gh pr list --limit 50", "gh pr list --limit 999"):
+            with self.subTest(command=command):
+                self.assertAsked(command)
+
+    def test_limit_at_or_above_threshold_is_allowed(self):
+        """閾値以上の`--limit`は通す。
+
+        **PMが実測で見つけた反転の本体（2026-09-05）。**規則どおり大きく明示した
+        書き方が毎回止まると、規則を破って省略する側が静かに通ることになり、
+        この検査が守りたい向きと逆になる。閾値の根拠はhookのdocstringにある実測
+        （Issue 135件／Pull Request 217件／board item 352件、いずれも全state、
+        2026-09-05時点）であり、この3つの3倍前後に設定した。
+        """
+        for command in ("gh pr list --limit 1000", "gh pr list --limit 1500"):
+            with self.subTest(command=command):
+                self.assertAllowed(command)
+
+    def test_limit_non_numeric_value_is_not_judged_as_large(self):
+        """`--limit`の値が数値でなければ「大きい」とみなさず、askする。
+
+        判定できない値を安全側（大きいと仮定して通す）へ倒さない。
+        """
+        self.assertAsked("gh pr list --limit abc")
+
+    def test_compound_command_is_inspected(self):
+        """`cd x && gh pr list | head -8`を見落とさない。"""
+        self.assertAsked("cd /tmp && gh pr list | head -8")
+
+    def test_unrelated_commands_are_allowed(self):
+        """対象command以外は見ない。"""
+        for command in ("git status", "ls -la", "gh pr view 1 --json state"):
+            with self.subTest(command=command):
+                self.assertAllowed(command)
+
+    def test_help_is_not_judged(self):
+        """helpの表示だけを求める呼び出しは何も列挙しないため対象外にする。"""
+        for command in (
+            "gh pr list --help",
+            "gh pr list --limit 50 --help",
+            "git log --help -n 5",
+        ):
+            with self.subTest(command=command):
+                self.assertAllowed(command)
+
+    def test_skip_environment_disables_the_guard(self):
+        """逃げ道が効く。"""
+        code, output = _invoke(
+            TRUNCATION_GUARD, "gh pr list | head -8",
+            environment={"DESKCAT_SKIP_TRUNCATION_GUARD": "1"},
+        )
+        self.assertEqual(code, 0)
+        self.assertIsNone(output)
+
+    def test_broken_input_does_not_block(self):
+        """hookの入力やcommandが壊れていることを、対象commandの問題として扱わない。"""
+        result = subprocess.run(
+            [sys.executable, TRUNCATION_GUARD], input="{ではないJSON",
+            capture_output=True, text=True, encoding="utf-8", timeout=60,
+        )
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.stdout.strip(), "")
+        self.assertAllowed('gh pr list --limit "閉じていない')
 
 
 class MergeTrailerReportTests(unittest.TestCase):

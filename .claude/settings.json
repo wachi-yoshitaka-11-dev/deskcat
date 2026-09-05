@@ -27,6 +27,12 @@
             "command": "R=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}\"; [ -n \"$R\" ] && [ -f \"$R/scripts/hooks/push_gate.py\" ] && exec python3 \"$R/scripts/hooks/push_gate.py\" || exit 0",
             "timeout": 150,
             "statusMessage": "develop への直接 push を gate で確認"
+          },
+          {
+            "type": "command",
+            "command": "R=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}\"; [ -n \"$R\" ] && [ -f \"$R/scripts/hooks/truncation_guard.py\" ] && exec python3 \"$R/scripts/hooks/truncation_guard.py\" || exit 0",
+            "timeout": 30,
+            "statusMessage": "列挙 command の切り詰めを確認"
           }
         ]
       }
