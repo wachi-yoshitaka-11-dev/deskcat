@@ -17,23 +17,36 @@ commandの構造（`--project`の有無等）だけを見ており、出力の�
 
 1. 対象commandの出力を`| head -N`／`| tail -N`へ渡している（pipelineの隣接で見る）
 2. `git log`／`git rev-list`に`-n N`／`-nN`／`--max-count=N`が付いている
-3. `gh pr list`／`gh issue list`に`--limit N`／`-L N`が付いている
+3. `gh pr list`／`gh issue list`に`--limit N`／`-L N`が付いている。**ただしNが
+   `LARGE_LIMIT_THRESHOLD`（実測に基づく定数）以上なら通す**
 4. `gh pr list`／`gh issue list`に`--json`が付いているが`--limit`が無い
 
 1〜3は「明示的な数がcommandに現れている」場合だけを見る。**`--limit`を指定しない
-呼び出し（既定30件）は、単独では対象外にする。**理由は誤検知である。これらの
-commandをlogを眺めるためだけに使う頻度は非常に高く、`--limit`省略はそのほとんどを
-占める。明示的な数が全く無い呼び出しまで対象にすると、通常の閲覧が毎回止まり、
-hookそのものが無視される側の失敗になる（指示書「迷ったら対象を狭める」）。
+呼び出し（既定30件）は、`--json`を伴わない限り対象外にする。**理由は誤検知である。
+これらのcommandをlogを眺めるためだけに使う頻度は非常に高く、`--limit`省略は
+そのほとんどを占める。明示的な数が全く無い呼び出しまで対象にすると、通常の閲覧が
+毎回止まり、hookそのものが無視される側の失敗になる（指示書「迷ったら対象を狭める」）。
 
-**ただし4は例外である。**PM（`deskcat-66`）が初版（1〜3のみ）を実測し、門の向きが
-逆になっていることを2026-09-05に見つけた。`--limit`を明示する正しい書き方（`--limit
-1000`）はaskで止まり、省略して既定30件で黙って切れる書き方（`gh issue list
---json number,title`）はそのまま通っていた。**「promptを避けたい側は`--limit`を
-落とす方向へ動く」**という指摘であり、この検査が塞ぐはずだった失敗の型と逆方向の
-穴だった。`--json`（機械可読の出力であり、件数を数える意図が濃い）が付いている
-場合に限り、`--limit`省略も対象へ入れて塞いだ。`--json`の無い素の`gh issue list`は
-引き続き対象外である。
+**3と4はPM（`deskcat-66`）による2回の訂正を経ている（いずれも2026-09-05）。**
+
+初版（1〜3のみ、3に閾値なし）を実測したところ、門の向きが逆になっていた。
+`--limit`を明示する正しい書き方（`--limit 1000`）はaskで止まり、省略して既定
+30件で黙って切れる書き方（`gh issue list --json number,title`）はそのまま
+通っていた。**「promptを避けたい側は`--limit`を落とす方向へ動く」**という
+指摘であり、この検査が塞ぐはずだった失敗の型と逆方向の穴だった。1回目の訂正で
+4を足し、`--json`（機械可読の出力であり、件数を数える意図が濃い）が付いている
+場合に限り`--limit`省略も対象へ入れた。
+
+**しかしこれでもまだ、規則を守ると止まり破ると静かに通る非対称が3に残っていた。**
+`--limit 1000`のように実際の総数を上回る値を明示しても、常にaskになっていた。
+2回目の訂正で3へ閾値を足し、`LARGE_LIMIT_THRESHOLD`以上の`--limit`は通す。
+値は実測である（2026-09-05、担当セッションが`gh issue list --state all
+--limit 1000`／`gh pr list --state all --limit 1000`／`gh project item-list 5`
+で取得）: Issue 135件（全state）、Pull Request 217件（全state）、Projects v2
+boardのitem 352件。1000はいずれの3倍前後ある。**この閾値を超える規模になったら
+見直しが要る。**固定した数を将来の総数の保証として扱わない。**1・2（`head -N`／
+`tail -N`／`-n N`）には閾値を適用しない。**「PMが決定を戻したい」と指摘したのは
+3（`--limit`）だけであり、1・2は値の大小を問わず引き続きaskする。
 
 **返すのは`deny`ではなく`ask`である。**`head -8`や`--limit 50`は、件数の根拠として
 使うことも、単に一部だけを見る正当な閲覧であることもあり、**commandの字句だけからは
@@ -225,6 +238,24 @@ def _has_json_option(args):
     return any(arg == "--json" or arg.startswith("--json=") for arg in args)
 
 
+# `--limit`の値がこれ以上なら、明示された値を「全数を意図した指定」として通す。
+# **PM（`deskcat-66`）の決定（2026-09-05）。**根拠は実測である
+# （2026-09-05、担当セッションが`gh issue list --state all --limit 1000`／
+# `gh pr list --state all --limit 1000`／`gh project item-list 5`で実測）:
+# Issue 135件（全state）、Pull Request 217件（全state）、Projects v2 boardの
+# item 352件。1000はいずれの3倍前後ある。**この閾値を超える規模になったら
+# 見直しが要る。**固定した数を将来の総数の保証として扱わない。
+LARGE_LIMIT_THRESHOLD = 1000
+
+
+def _is_large_enough(limit):
+    """`limit`（文字列）が`LARGE_LIMIT_THRESHOLD`以上の数値かを見る。
+
+    数値でない場合は`False`を返す。**判定できない値を「大きい」とみなさない。**
+    """
+    return limit.isdigit() and int(limit) >= LARGE_LIMIT_THRESHOLD
+
+
 def _check_pipeline(pipeline):
     for index, stage in enumerate(pipeline):
         target = _match_target(stage)
@@ -258,10 +289,12 @@ def _check_pipeline(pipeline):
                     " 単に一部を見るだけの用途であればこのまま進めてよい。"
                     f" 誤検知で頻発する場合は{SKIP_ENV}=1で無効化し、理由を残す。"
                 )
-        # 3. `gh pr list`／`gh issue list`の`--limit`。
+        # 3. `gh pr list`／`gh issue list`の`--limit`。**値が`LARGE_LIMIT_THRESHOLD`
+        # 以上なら通す。**規則どおり大きく明示した書き方が毎回止まると、規則を破って
+        # 省略する側が静かに通ることになり、この検査が守りたい向きと逆になる。
         if target in LIMIT_COMMANDS:
             limit = _limit_value(args)
-            if limit is not None:
+            if limit is not None and not _is_large_enough(limit):
                 _ask(
                     f"`{command_text}`に`--limit {limit}`が付いている。"
                     f" 表示されるのは最大{limit}件だけであり、"
@@ -270,7 +303,7 @@ def _check_pipeline(pipeline):
                     " このまま進めてよい。"
                     f" 誤検知で頻発する場合は{SKIP_ENV}=1で無効化し、理由を残す。"
                 )
-            elif _has_json_option(args):
+            elif limit is None and _has_json_option(args):
                 # 4. `--limit`省略でも`--json`付きは対象にする。**PM実測（2026-09-05）
                 # で見つかった反転を塞ぐ。**`--limit`を明示する正しい書き方だけがask
                 # で止まり、省略して既定30件で黙って切れる書き方が素通りしていた。

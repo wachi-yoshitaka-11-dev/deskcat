@@ -780,16 +780,22 @@ class TruncationGuardTests(unittest.TestCase):
             with self.subTest(command=command):
                 self.assertAsked(command, contains="--json")
 
-    def test_json_with_limit_is_asked_for_the_limit_reason(self):
-        """`--json`と`--limit`が両方あるときは、`--limit`側の理由でaskする。
+    def test_json_with_small_limit_is_asked_for_the_limit_reason(self):
+        """`--json`と、閾値未満の`--limit`が両方あるときは、`--limit`側の理由でaskする。
 
-        **`--limit`が明示されていれば、それが指すのが実際の総数以上かどうかは
-        別問題であり、既存の3の検査がそのまま扱う。**4は3の穴埋めであり、
-        3が既にaskする場合に重ねて別のaskを出さない。
+        **4は3の穴埋めであり、3が既にaskする場合に重ねて別のaskを出さない。**
         """
         self.assertAsked(
-            "gh issue list --json number,title --limit 1000", contains="--limit 1000"
+            "gh issue list --json number,title --limit 50", contains="--limit 50"
         )
+
+    def test_json_with_large_limit_is_allowed(self):
+        """`--json`が付いていても、`--limit`が閾値以上なら通す。
+
+        **PM（`deskcat-66`）の決定4件のうちの1つ（2026-09-05）。**`--limit`を
+        実際の総数以上に明示した書き方まで止めると、規則を守った側が損をする。
+        """
+        self.assertAllowed("gh issue list --state open --limit 1000 --json number")
 
     def test_json_on_unrelated_command_is_allowed(self):
         """対象commandではない`--json`は見ない。"""
@@ -804,12 +810,31 @@ class TruncationGuardTests(unittest.TestCase):
         self.assertAllowed("gh api repos/x/y/issues")
         self.assertAllowed("gh api repos/x/y/issues --paginate")
 
-    def test_limit_with_generous_value_is_still_asked(self):
-        """`--limit`の値の大小は判定しない。**明示された値そのものが対象である。**
+    def test_limit_below_threshold_is_asked(self):
+        """閾値未満の`--limit`はaskする。"""
+        for command in ("gh pr list --limit 50", "gh pr list --limit 999"):
+            with self.subTest(command=command):
+                self.assertAsked(command)
 
-        大きい値でも、実際の総数がそれを超えていれば同じ取りこぼしが起きる。
+    def test_limit_at_or_above_threshold_is_allowed(self):
+        """閾値以上の`--limit`は通す。
+
+        **PMが実測で見つけた反転の本体（2026-09-05）。**規則どおり大きく明示した
+        書き方が毎回止まると、規則を破って省略する側が静かに通ることになり、
+        この検査が守りたい向きと逆になる。閾値の根拠はhookのdocstringにある実測
+        （Issue 135件／Pull Request 217件／board item 352件、いずれも全state、
+        2026-09-05時点）であり、この3つの3倍前後に設定した。
         """
-        self.assertAsked("gh pr list --limit 1000")
+        for command in ("gh pr list --limit 1000", "gh pr list --limit 1500"):
+            with self.subTest(command=command):
+                self.assertAllowed(command)
+
+    def test_limit_non_numeric_value_is_not_judged_as_large(self):
+        """`--limit`の値が数値でなければ「大きい」とみなさず、askする。
+
+        判定できない値を安全側（大きいと仮定して通す）へ倒さない。
+        """
+        self.assertAsked("gh pr list --limit abc")
 
     def test_compound_command_is_inspected(self):
         """`cd x && gh pr list | head -8`を見落とさない。"""
