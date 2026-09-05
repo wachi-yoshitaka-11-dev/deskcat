@@ -755,7 +755,7 @@ class TruncationGuardTests(unittest.TestCase):
                 self.assertAsked(command)
 
     def test_gh_list_without_limit_is_allowed(self):
-        """`--limit`を指定しない呼び出し（既定30件）は対象外にする。
+        """`--limit`を指定しない呼び出し（既定30件）は、`--json`が無ければ対象外にする。
 
         **これらのcommandを閲覧のためだけに使う頻度は非常に高く、`--limit`省略は
         そのほとんどを占める。**明示的な数が無い呼び出しまで対象にすると、通常の
@@ -763,6 +763,37 @@ class TruncationGuardTests(unittest.TestCase):
         """
         self.assertAllowed("gh pr list")
         self.assertAllowed("gh issue list")
+
+    def test_json_without_limit_is_asked(self):
+        """`--json`が付いているが`--limit`が無い場合はaskする。
+
+        **PM（`deskcat-66`）が2026-09-05に実測で見つけた反転を塞ぐ。**`--limit`を
+        明示する正しい書き方はaskで止まり、省略して既定30件で黙って切れる書き方が
+        素通りしていた。`--json`（機械可読）が付いている場合に限り、`--limit`省略も
+        対象へ入れる。
+        """
+        for command in (
+            "gh issue list --json number,title",
+            "gh pr list --json number",
+            "gh issue list --json=number",
+        ):
+            with self.subTest(command=command):
+                self.assertAsked(command, contains="--json")
+
+    def test_json_with_limit_is_asked_for_the_limit_reason(self):
+        """`--json`と`--limit`が両方あるときは、`--limit`側の理由でaskする。
+
+        **`--limit`が明示されていれば、それが指すのが実際の総数以上かどうかは
+        別問題であり、既存の3の検査がそのまま扱う。**4は3の穴埋めであり、
+        3が既にaskする場合に重ねて別のaskを出さない。
+        """
+        self.assertAsked(
+            "gh issue list --json number,title --limit 1000", contains="--limit 1000"
+        )
+
+    def test_json_on_unrelated_command_is_allowed(self):
+        """対象commandではない`--json`は見ない。"""
+        self.assertAllowed("gh api repos/x/y/issues --jq .[].number")
 
     def test_gh_api_limit_is_not_judged(self):
         """`gh api`の`--paginate`要否は対象外にする。
