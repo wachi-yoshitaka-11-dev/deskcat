@@ -163,8 +163,32 @@ def _skip_prefixes(stage):
     return tokens
 
 
+# `git`／`gh`は、subcommandの前にrepositoryを指定するglobal optionを取れる
+# （`git -C <path> log`／`gh --repo <owner/repo> pr list`）。値を伴うoptionだけを
+# 対象にする。値の有無を取り違えると、値をsubcommandの語として誤読する。
+GLOBAL_VALUE_OPTIONS = {
+    "git": ("-C",),
+    "gh": ("--repo", "-R"),
+}
+
+
+def _skip_global_options(tokens, program):
+    """`program`直後、subcommandより前に来るglobal optionを読み飛ばす。"""
+    value_options = GLOBAL_VALUE_OPTIONS.get(program, ())
+    if not value_options:
+        return tokens
+    result = list(tokens)
+    while len(result) >= 2 and result[0] in value_options:
+        result = result[2:]
+    return result
+
+
 def _match_target(stage):
-    """stageが対象commandの呼び出しなら、一致した`TARGET_COMMANDS`の組を返す。"""
+    """stageが対象commandの呼び出しなら`(pattern, args)`を返す。一致しなければ`None`。
+
+    `args`はsubcommandより後ろの語である。global optionを挟んだ分だけ位置が
+    動くため、呼び出し側が`len(pattern)`だけ引いて求めることはできない。
+    """
     tokens = _skip_prefixes(stage)
     if len(tokens) < 2:
         return None
@@ -173,8 +197,9 @@ def _match_target(stage):
         if not command_line.is_program(program, pattern[0]):
             continue
         rest = pattern[1:]
-        if tuple(tokens[1:1 + len(rest)]) == rest:
-            return pattern
+        remaining = _skip_global_options(tokens[1:], pattern[0])
+        if tuple(remaining[:len(rest)]) == rest:
+            return pattern, remaining[len(rest):]
     return None
 
 
@@ -219,15 +244,22 @@ def _max_count_value(args):
 
 
 def _limit_value(args):
-    """`gh pr list`／`gh issue list`の`--limit`／`-L`の値を返す。無ければ`None`。"""
+    """`gh pr list`／`gh issue list`の`--limit`／`-L`の値を返す。無ければ`None`。
+
+    **重複指定時は最後の値を返す。**GitHub CLIのscalar型optionは、繰り返し
+    指定すると最後の値が有効になる（`gh pr list --limit 1000 --limit 50`の
+    実効値は`50`）。先に見つかったものを返すと、大きい値を後から実効値として
+    上書きする書き方を見逃す。
+    """
+    value = None
     for index, arg in enumerate(args):
         if arg in ("--limit", "-L") and index + 1 < len(args):
-            return args[index + 1]
-        if arg.startswith("--limit="):
-            return arg[len("--limit="):]
-        if arg.startswith("-L") and len(arg) > 2:
-            return arg[2:]
-    return None
+            value = args[index + 1]
+        elif arg.startswith("--limit="):
+            value = arg[len("--limit="):]
+        elif arg.startswith("-L") and len(arg) > 2:
+            value = arg[2:]
+    return value
 
 
 def _has_json_option(args):
@@ -258,9 +290,10 @@ def _is_large_enough(limit):
 
 def _check_pipeline(pipeline):
     for index, stage in enumerate(pipeline):
-        target = _match_target(stage)
-        if target is None:
+        matched = _match_target(stage)
+        if matched is None:
             continue
+        target, args = matched
         if any(arg in HELP_OPTIONS for arg in _skip_prefixes(stage)):
             # helpの表示だけを求める呼び出しは何も列挙しない。**判定を要求しない。**
             continue
@@ -277,7 +310,6 @@ def _check_pipeline(pipeline):
                     " 単に一部を見るだけの用途であればこのまま進めてよい。"
                     f" 誤検知で頻発する場合は{SKIP_ENV}=1で無効化し、理由を残す。"
                 )
-        args = _skip_prefixes(stage)[len(target):]
         # 2. `git log`／`git rev-list`の`-n`／`--max-count`。
         if target in MAX_COUNT_COMMANDS:
             count = _max_count_value(args)
