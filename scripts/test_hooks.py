@@ -11,6 +11,7 @@ hookを子processとして起動し、stdinへhookの入力JSONを渡して、**
 
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -36,6 +37,9 @@ MERGE_REPORT = str(SCRIPTS_ROOT / "hooks" / "merge_trailer_report.py")
 PUSH_GATE = str(SCRIPTS_ROOT / "hooks" / "push_gate.py")
 CODERABBIT_GATE = str(SCRIPTS_ROOT / "hooks" / "coderabbit_gate.py")
 MERGE_REPORT = str(SCRIPTS_ROOT / "hooks" / "merge_trailer_report.py")
+REPO_ROOT_FOR_TEMPLATES = SCRIPTS_ROOT.parent
+ISSUE_TEMPLATE_DIR = REPO_ROOT_FOR_TEMPLATES / ".github" / "ISSUE_TEMPLATE"
+PR_TEMPLATE_PATH = REPO_ROOT_FOR_TEMPLATES / ".github" / "pull_request_template.md"
 
 sys.path.insert(0, str(SCRIPTS_ROOT / "hooks"))
 
@@ -47,6 +51,22 @@ GIT_IDENTITY = (
     "-c", "user.email=test@example.invalid",
     "-c", "commit.gpgsign=false",
 )
+
+
+def _template_sections(path):
+    """正本templateから`## `見出しの並びを読む。hook側の抽出方法を複製しない。
+
+    見出し名はhookの実装（`_section_headings`）と同じ正規表現で取る。
+    testがhookのロジックと違う方法で見出しを数えると、hookが見ていないずれを
+    testが見落とす。
+    """
+    text = Path(path).read_text(encoding="utf-8")
+    return [heading.strip() for heading in re.findall(r"(?m)^## (.+)$", text)]
+
+
+def _body_with_sections(headings):
+    """指定した見出しだけを持つ本文を作る。中身は節が空でなければ何でもよい。"""
+    return "\n".join(f"## {heading}\nx\n" for heading in headings)
 
 
 def _git(root, *arguments):
@@ -72,6 +92,7 @@ def _invoke(script, command, cwd=None, environment=None):
     env.pop("DESKCAT_SKIP_GH_GUARD", None)
     env.pop("DESKCAT_SKIP_BASE_GUARD", None)
     env.pop("DESKCAT_SKIP_PUSH_GATE", None)
+    env.pop("DESKCAT_SKIP_TRUNCATION_GUARD", None)
     if environment:
         env.update(environment)
     result = subprocess.run(
@@ -417,6 +438,22 @@ class GhMetadataGuardTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIsNone(output)
 
+    def test_skip_environment_disables_the_body_section_check(self):
+        """決定3の節検査も`DESKCAT_SKIP_GH_GUARD`で無効化される。
+
+        `main()`の先頭で全検査を一括して止める既存の仕組みに乗っているだけだが、
+        新設した検査が実際にその経路を通ることは別途確認する必要がある。
+        （通常なら節が欠けてdenyされる本文で確認する。）
+        """
+        code, output = _invoke(
+            GH_GUARD,
+            'gh issue create --title t --project deskcat '
+            '--label type:maintenance --body "## 背景\nx\n"',
+            environment={"DESKCAT_SKIP_GH_GUARD": "1"},
+        )
+        self.assertEqual(code, 0)
+        self.assertIsNone(output)
+
     def test_broken_input_does_not_block(self):
         """hookの入力やcommandが壊れていることを、対象commandの問題として扱わない。"""
         result = subprocess.run(
@@ -427,6 +464,112 @@ class GhMetadataGuardTests(unittest.TestCase):
         self.assertEqual(result.stdout.strip(), "")
         # 引用符が閉じていないcommandは、shell自身が落とす。ここで二重に報告しない。
         self.assertAllowed('gh pr create --title "閉じていない')
+
+    # --- 決定3（#348）: `--body`系の本文がtemplateの節を欠いていないかの検査 ---
+
+    def test_body_option_absent_is_not_checked(self):
+        """`--body`系が無い呼び出しは節検査の対象外である。
+
+        対話prompt（またはeditor）経由はtemplateを経由しており、迂回にならない。
+        `--template`も`type:*` labelも無いのに通ることが、検査が本文の有無で
+        分岐していることを示す。
+        """
+        self.assertAllowed("gh issue create --title t --project deskcat")
+
+    def test_issue_body_with_all_sections_is_allowed_via_template_name(self):
+        """`--template`（表示名）で指定したtemplateの全節が揃った本文を通す。"""
+        sections = _template_sections(ISSUE_TEMPLATE_DIR / "maintenance_task.md")
+        body = _body_with_sections(sections)
+        self.assertAllowed(
+            "gh issue create --title t --project deskcat "
+            f'--template 保守作業 --body "{body}"'
+        )
+
+    def test_issue_body_with_all_sections_is_allowed_via_type_label(self):
+        """`--template`が無くても、`type:*` labelから一意にtemplateを決めて通す。"""
+        sections = _template_sections(ISSUE_TEMPLATE_DIR / "maintenance_task.md")
+        body = _body_with_sections(sections)
+        self.assertAllowed(
+            "gh issue create --title t --project deskcat "
+            f'--label type:maintenance --body "{body}"'
+        )
+
+    def test_issue_body_missing_sections_is_denied(self):
+        """節が欠けたIssue本文を止め、欠けている節名を名指しする。"""
+        sections = _template_sections(ISSUE_TEMPLATE_DIR / "maintenance_task.md")
+        body = _body_with_sections(sections[:2])  # 先頭2節だけにする
+        self.assertDenied(
+            "gh issue create --title t --project deskcat "
+            f'--label type:maintenance --body "{body}"',
+            contains=sections[-1],
+        )
+
+    def test_pr_body_with_all_sections_is_allowed(self):
+        """`gh pr create`はtemplateが1つだけなので、`--template`無しでも判定できる。"""
+        sections = _template_sections(PR_TEMPLATE_PATH)
+        body = _body_with_sections(sections)
+        self.assertAllowed(
+            "gh pr create --title t --project deskcat --base develop "
+            f'--body "{body}"'
+        )
+
+    def test_pr_body_missing_sections_is_denied(self):
+        """節が欠けたPull Request本文を止める。"""
+        sections = _template_sections(PR_TEMPLATE_PATH)
+        body = _body_with_sections(sections[:1])
+        self.assertDenied(
+            "gh pr create --title t --project deskcat --base develop "
+            f'--body "{body}"',
+            contains=sections[-1],
+        )
+
+    def test_undeterminable_template_is_denied(self):
+        """`--template`も対応する`type:*` labelも無いIssue本文は、素通りさせない。
+
+        **fail-openを選ばない。**存在検査ではなく内容検査へ変えた理由そのものが、
+        「決められないなら安全側で止める」である。素通りは選択肢に無い。
+        """
+        self.assertDenied(
+            'gh issue create --title t --project deskcat --body "## 背景\nx\n"',
+            contains="決められない",
+        )
+
+    def test_ambiguous_type_labels_are_denied(self):
+        """複数の`type:*` labelが異なるtemplateへ一致する場合も決められないとする。"""
+        self.assertDenied(
+            "gh issue create --title t --project deskcat "
+            '--label type:bug --label type:maintenance --body "## 背景\nx\n"',
+            contains="決められない",
+        )
+
+    def test_unknown_template_name_is_denied(self):
+        """`--template`の値がどのtemplateの`name:`とも一致しない場合を通さない。"""
+        self.assertDenied(
+            "gh issue create --title t --project deskcat "
+            '--template 存在しない名前 --body "## 背景\nx\n"',
+            contains="--template",
+        )
+
+    def test_unreadable_create_body_is_denied(self):
+        """`gh issue create`／`gh pr create`でも、本文を読めない経路を素通りさせない。
+
+        [#267](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/267)で
+        `coderabbit_gate.py`が同じ理由でfail-openをやめた前例と同じ扱いにする。
+        """
+        self.assertDenied(
+            "gh issue create --title t --project deskcat -F -", contains="stdin"
+        )
+        self.assertDenied(
+            "gh pr create --title t --project deskcat --base develop "
+            "--body-file /nonexistent/body.txt",
+            contains="読み出しに失敗",
+        )
+
+    def test_help_skips_body_check(self):
+        """`--help`は`--body`が付いていても節検査をしない。何も作らないためである。"""
+        self.assertAllowed(
+            'gh issue create --title t --body "## 背景\nx\n" --help'
+        )
 
 
 class BranchBaseGuardTests(unittest.TestCase):
@@ -520,6 +663,545 @@ class BranchBaseGuardTests(unittest.TestCase):
         )
         self.assertEqual(code, 0)
         self.assertIsNone(output)
+
+
+TRUNCATION_GUARD = str(SCRIPTS_ROOT / "hooks" / "truncation_guard.py")
+
+
+class TruncationGuardTests(unittest.TestCase):
+    """列挙commandの明示的な切り詰めを見るhookのtest（決定2、#349）。"""
+
+    def assertAsked(self, command, *, contains=None):
+        code, output = _invoke(TRUNCATION_GUARD, command)
+        self.assertEqual(code, 0, command)
+        self.assertIsNotNone(output, f"通してしまった: {command}")
+        self.assertEqual(
+            output["hookSpecificOutput"]["permissionDecision"], "ask", command
+        )
+        if contains:
+            self.assertIn(contains, _reason(output))
+
+    def assertAllowed(self, command):
+        code, output = _invoke(TRUNCATION_GUARD, command)
+        self.assertEqual(code, 0, command)
+        self.assertIsNone(output, f"止めてしまった: {command}")
+
+    def test_piped_head_after_target_command_is_asked(self):
+        """対象commandの出力を`head -N`／`tail -N`へ渡す形をaskする。"""
+        for command in (
+            "gh pr list | head -8",
+            "gh issue list | tail -3",
+            "git log | head -5",
+            "git rev-list HEAD | head -1",
+            "git branch | head -5",
+            "gh api repos/x/y/issues | head -20",
+        ):
+            with self.subTest(command=command):
+                self.assertAsked(command)
+
+    def test_reason_names_the_detected_limit(self):
+        """診断文が、検出した数値そのものを名指しする。"""
+        self.assertAsked("gh pr list | head -8", contains="8")
+
+    def test_head_tail_forms_are_all_detected(self):
+        """`-N`／`-n N`／`-nN`／`--lines=N`のいずれの書き方も拾う。"""
+        for command in (
+            "gh pr list | head -8",
+            "gh pr list | head -n 8",
+            "gh pr list | head -n8",
+            "gh pr list | head --lines=8",
+        ):
+            with self.subTest(command=command):
+                self.assertAsked(command)
+
+    def test_bare_head_without_a_number_is_allowed(self):
+        """数の無い`head`／`tail`（既定10行）は対象外にする。
+
+        **数が一切commandに現れない呼び出しまで拾うと、閲覧全般を止めることになる。**
+        """
+        self.assertAllowed("gh pr list | head")
+        self.assertAllowed("gh issue list | tail")
+
+    def test_head_tail_on_unrelated_command_is_allowed(self):
+        """対象commandではない出力を`head`へ渡す形は見ない。"""
+        self.assertAllowed("gh pr view 1 | head -8")
+        self.assertAllowed("head -20 file.txt")
+        self.assertAllowed("cat file.txt | head -8")
+
+    def test_max_count_on_git_log_and_rev_list_is_asked(self):
+        """`git log`／`git rev-list`の`-n`／`--max-count`をaskする。"""
+        for command in (
+            "git log -n 20",
+            "git log -n20",
+            "git rev-list --max-count=5 HEAD",
+        ):
+            with self.subTest(command=command):
+                self.assertAsked(command)
+
+    def test_git_log_without_max_count_is_allowed(self):
+        """`-n`／`--max-count`が無い`git log`は対象外にする。"""
+        self.assertAllowed("git log --oneline")
+        self.assertAllowed("git log")
+
+    def test_limit_on_gh_list_commands_is_asked(self):
+        """`gh pr list`／`gh issue list`の`--limit`／`-L`をaskする。"""
+        for command in (
+            "gh pr list --limit 50",
+            "gh issue list --limit=50",
+            "gh pr list -L 50",
+            "gh pr list -L50",
+        ):
+            with self.subTest(command=command):
+                self.assertAsked(command)
+
+    def test_gh_list_without_limit_is_allowed(self):
+        """`--limit`を指定しない呼び出し（既定30件）は、`--json`が無ければ対象外にする。
+
+        **これらのcommandを閲覧のためだけに使う頻度は非常に高く、`--limit`省略は
+        そのほとんどを占める。**明示的な数が無い呼び出しまで対象にすると、通常の
+        閲覧が毎回止まる。
+        """
+        self.assertAllowed("gh pr list")
+        self.assertAllowed("gh issue list")
+
+    def test_json_without_limit_is_asked(self):
+        """`--json`が付いているが`--limit`が無い場合はaskする。
+
+        **PM（`deskcat-66`）が2026-09-05に実測で見つけた反転を塞ぐ。**`--limit`を
+        明示する正しい書き方はaskで止まり、省略して既定30件で黙って切れる書き方が
+        素通りしていた。`--json`（機械可読）が付いている場合に限り、`--limit`省略も
+        対象へ入れる。
+        """
+        for command in (
+            "gh issue list --json number,title",
+            "gh pr list --json number",
+            "gh issue list --json=number",
+        ):
+            with self.subTest(command=command):
+                self.assertAsked(command, contains="--json")
+
+    def test_json_with_small_limit_is_asked_for_the_limit_reason(self):
+        """`--json`と、閾値未満の`--limit`が両方あるときは、`--limit`側の理由でaskする。
+
+        **4は3の穴埋めであり、3が既にaskする場合に重ねて別のaskを出さない。**
+        """
+        self.assertAsked(
+            "gh issue list --json number,title --limit 50", contains="--limit 50"
+        )
+
+    def test_json_with_large_limit_is_allowed(self):
+        """`--json`が付いていても、`--limit`が閾値以上なら通す。
+
+        **PM（`deskcat-66`）の決定4件のうちの1つ（2026-09-05）。**`--limit`を
+        実際の総数以上に明示した書き方まで止めると、規則を守った側が損をする。
+        """
+        self.assertAllowed("gh issue list --state open --limit 1000 --json number")
+
+    def test_json_on_unrelated_command_is_allowed(self):
+        """対象commandではない`--json`は見ない。"""
+        self.assertAllowed("gh api repos/x/y/issues --jq .[].number")
+
+    def test_gh_api_limit_is_not_judged(self):
+        """`gh api`の`--paginate`要否は対象外にする。
+
+        エンドポイントによってpaginationの要否が変わり、字句だけでは判定できない。
+        推測で拾うと誤検知になる。`gh api`はpipeで`head`／`tail`へ渡す形だけを見る。
+        """
+        self.assertAllowed("gh api repos/x/y/issues")
+        self.assertAllowed("gh api repos/x/y/issues --paginate")
+
+    def test_limit_below_threshold_is_asked(self):
+        """閾値未満の`--limit`はaskする。"""
+        for command in ("gh pr list --limit 50", "gh pr list --limit 999"):
+            with self.subTest(command=command):
+                self.assertAsked(command)
+
+    def test_limit_at_or_above_threshold_is_allowed(self):
+        """閾値以上の`--limit`は通す。
+
+        **PMが実測で見つけた反転の本体（2026-09-05）。**規則どおり大きく明示した
+        書き方が毎回止まると、規則を破って省略する側が静かに通ることになり、
+        この検査が守りたい向きと逆になる。閾値の根拠はhookのdocstringにある実測
+        （Issue 135件／Pull Request 217件／board item 352件、いずれも全state、
+        2026-09-05時点）であり、この3つの3倍前後に設定した。
+        """
+        for command in ("gh pr list --limit 1000", "gh pr list --limit 1500"):
+            with self.subTest(command=command):
+                self.assertAllowed(command)
+
+    def test_limit_non_numeric_value_is_not_judged_as_large(self):
+        """`--limit`の値が数値でなければ「大きい」とみなさず、askする。
+
+        判定できない値を安全側（大きいと仮定して通す）へ倒さない。
+        """
+        self.assertAsked("gh pr list --limit abc")
+
+    def test_duplicate_limit_uses_the_last_value(self):
+        """`--limit`の重複指定は最後の値で判定する（`#355`のreview指摘）。
+
+        GitHub CLIのscalar型`--limit`は、重複指定時に最後の値が有効になる。
+        `--limit 1000 --limit 50`の実効値は`50`であり、最初の値（1000、閾値以上）
+        で「大きい」と誤判定してはならない。
+        """
+        self.assertAsked(
+            "gh pr list --limit 1000 --limit 50 --json number", contains="--limit 50"
+        )
+
+    def test_global_option_before_subcommand_is_detected(self):
+        """subcommandの前のglobal optionを見落とさない（`#355`のreview指摘）。
+
+        `git -C <path> log`／`gh --repo <owner/repo> pr list`は、subcommandの
+        前にrepositoryを指定するglobal optionを置く。`_match_target`が
+        executableの直後だけを見ると、これらを対象外と誤判定して切り詰めを
+        見逃す。
+        """
+        for command in (
+            "git -C /tmp/repo log -n 1",
+            "gh --repo owner/repo pr list --limit 1",
+            "gh -R owner/repo issue list --limit 1",
+        ):
+            with self.subTest(command=command):
+                self.assertAsked(command)
+
+    def test_compound_command_is_inspected(self):
+        """`cd x && gh pr list | head -8`を見落とさない。"""
+        self.assertAsked("cd /tmp && gh pr list | head -8")
+
+    def test_unrelated_commands_are_allowed(self):
+        """対象command以外は見ない。"""
+        for command in ("git status", "ls -la", "gh pr view 1 --json state"):
+            with self.subTest(command=command):
+                self.assertAllowed(command)
+
+    def test_help_is_not_judged(self):
+        """helpの表示だけを求める呼び出しは何も列挙しないため対象外にする。"""
+        for command in (
+            "gh pr list --help",
+            "gh pr list --limit 50 --help",
+            "git log --help -n 5",
+        ):
+            with self.subTest(command=command):
+                self.assertAllowed(command)
+
+    def test_skip_environment_disables_the_guard(self):
+        """逃げ道が効く。"""
+        code, output = _invoke(
+            TRUNCATION_GUARD, "gh pr list | head -8",
+            environment={"DESKCAT_SKIP_TRUNCATION_GUARD": "1"},
+        )
+        self.assertEqual(code, 0)
+        self.assertIsNone(output)
+
+    def test_broken_input_does_not_block(self):
+        """hookの入力やcommandが壊れていることを、対象commandの問題として扱わない。"""
+        result = subprocess.run(
+            [sys.executable, TRUNCATION_GUARD], input="{ではないJSON",
+            capture_output=True, text=True, encoding="utf-8", timeout=60,
+        )
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.stdout.strip(), "")
+        self.assertAllowed('gh pr list --limit "閉じていない')
+
+
+STOP_CLAIM_GUARD = str(SCRIPTS_ROOT / "hooks" / "stop_claim_guard.py")
+
+# transcript行の最小形。**PMの決定5により、判定の対象となる形をfixtureとして
+# 固定する。**Claude Codeのtranscript形式が変わればこのtestが落ちる。
+TRANSCRIPT_HUMAN_STRING = {"type": "user", "message": {"role": "user", "content": "何か送って"}}
+TRANSCRIPT_TOOL_RESULT_ONLY = {
+    "type": "user",
+    "message": {"role": "user", "content": [{"type": "tool_result", "content": "ok"}]},
+}
+TRANSCRIPT_HUMAN_WITH_TEXT_BLOCK = {
+    "type": "user",
+    "message": {"role": "user", "content": [{"type": "text", "text": "続けて"}]},
+}
+
+
+def _assistant_text(text):
+    return {"type": "assistant", "message": {"role": "assistant", "content": [{"type": "text", "text": text}]}}
+
+
+def _assistant_tool_use(name, command=None):
+    tool_input = {"command": command} if command is not None else {}
+    return {
+        "type": "assistant",
+        "message": {"role": "assistant", "content": [{"type": "tool_use", "name": name, "input": tool_input}]},
+    }
+
+
+class StopClaimGuardTests(unittest.TestCase):
+    """完了の主張とtool呼び出しを突き合わせるhookのtest（決定1、#350）。"""
+
+    def setUp(self):
+        self._tmpdir = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmpdir.cleanup)
+
+    def _write_transcript(self, entries):
+        path = Path(self._tmpdir.name) / "transcript.jsonl"
+        with open(path, "w", encoding="utf-8") as handle:
+            for entry in entries:
+                handle.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        return str(path)
+
+    def _scratchpad(self, name="scratchpad"):
+        path = Path(self._tmpdir.name) / name
+        path.mkdir(exist_ok=True)
+        return str(path)
+
+    def _invoke(self, message, transcript_entries, *, scratchpad=None):
+        payload = {
+            "last_assistant_message": message,
+            "transcript_path": self._write_transcript(transcript_entries),
+            "scratchpad_dir": scratchpad or self._scratchpad(),
+        }
+        result = subprocess.run(
+            [sys.executable, STOP_CLAIM_GUARD],
+            input=json.dumps(payload, ensure_ascii=False),
+            capture_output=True, text=True, encoding="utf-8", timeout=60,
+        )
+        text = result.stdout.strip()
+        return result.returncode, (json.loads(text) if text else None)
+
+    def assertBlocked(self, message, transcript_entries, *, contains=None, scratchpad=None):
+        code, output = self._invoke(message, transcript_entries, scratchpad=scratchpad)
+        self.assertEqual(code, 0, message)
+        self.assertIsNotNone(output, f"通してしまった: {message}")
+        self.assertEqual(output["decision"], "block", message)
+        if contains:
+            self.assertIn(contains, output["reason"])
+
+    def assertAllowed(self, message, transcript_entries, *, scratchpad=None):
+        code, output = self._invoke(message, transcript_entries, scratchpad=scratchpad)
+        self.assertEqual(code, 0, message)
+        self.assertIsNone(output, f"止めてしまった: {message}")
+
+    def test_send_claim_without_evidence_is_blocked(self):
+        """証拠の無い送信主張をblockし、主張した語を名指しする。"""
+        self.assertBlocked(
+            "送りました", [TRANSCRIPT_HUMAN_STRING], contains="送りました"
+        )
+
+    def test_send_claim_with_evidence_is_allowed(self):
+        """`mcp__ccd_session_mgmt__send_message`の呼び出しがあれば通す。"""
+        self.assertAllowed(
+            "送りました",
+            [
+                TRANSCRIPT_HUMAN_STRING,
+                _assistant_tool_use("mcp__ccd_session_mgmt__send_message"),
+                TRANSCRIPT_TOOL_RESULT_ONLY,
+            ],
+        )
+
+    def test_evidence_across_multiple_assistant_blocks_is_found(self):
+        """複数回のtool往復（複数の`requestId`相当）を跨いでも証拠を見つける。
+
+        1つの人間turnの中で、thinking→tool_use→tool_result→…→最後はtextだけ、
+        という繰り返しが実際に起きる（担当セッションが自身のtranscriptで観測）。
+        直前の1回分だけを見ると、途中のtool呼び出しを見落とす。
+        """
+        self.assertAllowed(
+            "起票しました",
+            [
+                TRANSCRIPT_HUMAN_STRING,
+                {"type": "assistant", "message": {"role": "assistant", "content": [{"type": "thinking", "text": "..."}]}},
+                _assistant_tool_use("Bash", "gh issue create --title t --body-file f"),
+                TRANSCRIPT_TOOL_RESULT_ONLY,
+                _assistant_text("起票しました"),
+            ],
+        )
+
+    def test_issue_create_evidence_for_filing_claim(self):
+        """`起票しました`は`gh issue create`のBash呼び出しで満たす。"""
+        self.assertAllowed(
+            "起票しました",
+            [TRANSCRIPT_HUMAN_STRING, _assistant_tool_use("Bash", "gh issue create --title t")],
+        )
+
+    def test_merge_evidence_for_merge_claim(self):
+        """`mergeしました`は`gh pr merge`のBash呼び出しで満たす。"""
+        self.assertAllowed(
+            "mergeしました",
+            [TRANSCRIPT_HUMAN_STRING, _assistant_tool_use("Bash", "gh pr merge 1 --squash")],
+        )
+
+    def test_push_evidence_for_push_claim(self):
+        """`pushしました`は`git push`のBash呼び出しで満たす。"""
+        self.assertAllowed(
+            "pushしました",
+            [TRANSCRIPT_HUMAN_STRING, _assistant_tool_use("Bash", "git push origin main")],
+        )
+
+    def test_unrelated_bash_command_is_not_evidence(self):
+        """関係ないBash呼び出しは証拠にならない。"""
+        self.assertBlocked(
+            "pushしました",
+            [TRANSCRIPT_HUMAN_STRING, _assistant_tool_use("Bash", "git status")],
+        )
+
+    def test_dry_run_push_is_not_evidence(self):
+        """`git push --dry-run`は完了の証拠にならない（`#355`のreview指摘）。
+
+        `--dry-run`は実際には何も送信しない。subcommandが一致するだけで
+        証拠として数えると、送信していないことを「pushしました」と主張できてしまう。
+        """
+        self.assertBlocked(
+            "pushしました",
+            [TRANSCRIPT_HUMAN_STRING, _assistant_tool_use("Bash", "git push --dry-run origin main")],
+        )
+
+    def test_auto_merge_is_not_evidence(self):
+        """`gh pr merge --auto`は完了の証拠にならない（`#355`のreview指摘）。
+
+        `--auto`は要件が揃うまでの予約であり、その場でmergeするわけではない。
+        """
+        self.assertBlocked(
+            "mergeしました",
+            [TRANSCRIPT_HUMAN_STRING, _assistant_tool_use("Bash", "gh pr merge 1 --auto")],
+        )
+
+    def test_actual_push_is_still_evidence(self):
+        """`--dry-run`を伴わない`git push`は引き続き証拠になる。"""
+        self.assertAllowed(
+            "pushしました",
+            [TRANSCRIPT_HUMAN_STRING, _assistant_tool_use("Bash", "git push origin main")],
+        )
+
+    def test_actual_merge_is_still_evidence(self):
+        """`--auto`を伴わない`gh pr merge`は引き続き証拠になる。"""
+        self.assertAllowed(
+            "mergeしました",
+            [TRANSCRIPT_HUMAN_STRING, _assistant_tool_use("Bash", "gh pr merge 1 --squash")],
+        )
+
+    def test_quoted_claim_is_not_counted(self):
+        """引用（`「」`）の中の語は主張として数えない。"""
+        self.assertAllowed("彼は「送りました」と言っていた", [TRANSCRIPT_HUMAN_STRING])
+
+    def test_negated_claim_is_not_counted(self):
+        """否定形は主張として数えない。"""
+        for message in ("まだ送っていません", "送りませんでした"):
+            with self.subTest(message=message):
+                self.assertAllowed(message, [TRANSCRIPT_HUMAN_STRING])
+
+    def test_future_claim_is_not_counted(self):
+        """未来形・意志形は主張として数えない。"""
+        for message in ("これから送ります", "送信します"):
+            with self.subTest(message=message):
+                self.assertAllowed(message, [TRANSCRIPT_HUMAN_STRING])
+
+    def test_no_claim_is_allowed(self):
+        """完了を主張する語が無い応答は何も見ない。"""
+        self.assertAllowed("承知しました。作業を進めます。", [TRANSCRIPT_HUMAN_STRING])
+
+    def test_same_category_is_blocked_once_then_allowed(self):
+        """同じ主張分類に対してblockするのは1回だけとし、2回目は通す。
+
+        **`stop_hook_active`には依存しない**（担当セッションの実測で、
+        block後の再実行でもfalseのままだったため）。状態は`scratchpad_dir`
+        （セッション内で完結する場所）に持つ。
+        """
+        scratchpad = self._scratchpad()
+        self.assertBlocked("送りました", [TRANSCRIPT_HUMAN_STRING], scratchpad=scratchpad)
+        self.assertAllowed("送りました", [TRANSCRIPT_HUMAN_STRING], scratchpad=scratchpad)
+
+    def test_different_session_state_does_not_leak(self):
+        """`scratchpad_dir`が違えば、blockの記録は引き継がれない。
+
+        **セッションをまたいで残る場所へ書くと、前のセッションのblockが
+        次のセッションを素通りさせる。**`scratchpad_dir`はsession_idを含む
+        pathであり、別sessionなら別の場所になる。
+        """
+        self.assertBlocked(
+            "送りました", [TRANSCRIPT_HUMAN_STRING], scratchpad=self._scratchpad("session_a")
+        )
+        self.assertBlocked(
+            "送りました", [TRANSCRIPT_HUMAN_STRING], scratchpad=self._scratchpad("session_b")
+        )
+
+    def test_human_turn_boundary_uses_tool_result_only_rule(self):
+        """境界判定は「文字列か」ではなく「tool_resultだけで構成されていないか」で行う。
+
+        **PMの決定1（2026-09-06）。**画像添付等、人間の入力でも`content`が
+        listになる形（`tool_result`以外のblockを含むlist）を、境界として正しく
+        扱えることを確かめる。
+        """
+        self.assertAllowed(
+            "送りました",
+            [
+                TRANSCRIPT_TOOL_RESULT_ONLY,  # これより前の(無い)tool_useは境界外
+                TRANSCRIPT_HUMAN_WITH_TEXT_BLOCK,  # tool_result以外を含むlist→人間の入力
+                _assistant_tool_use("mcp__ccd_session_mgmt__send_message"),
+            ],
+        )
+
+    def test_boundary_not_found_uses_whole_file(self):
+        """人間の入力entryが1つも無い場合は、file全体を対象にする。
+
+        **tool_useを多く集める方向であり、blockを減らす安全側である。**
+        """
+        self.assertAllowed(
+            "送りました",
+            [_assistant_tool_use("mcp__ccd_session_mgmt__send_message")],
+        )
+
+    def test_unreadable_transcript_is_allowed(self):
+        """transcriptを読めない場合はblockしない。判定できないことを理由にしない。"""
+        payload = {
+            "last_assistant_message": "送りました",
+            "transcript_path": "/nonexistent/path.jsonl",
+            "scratchpad_dir": self._scratchpad(),
+        }
+        result = subprocess.run(
+            [sys.executable, STOP_CLAIM_GUARD],
+            input=json.dumps(payload, ensure_ascii=False),
+            capture_output=True, text=True, encoding="utf-8", timeout=60,
+        )
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.stdout.strip(), "")
+
+    def test_non_string_transcript_path_is_allowed(self):
+        """`transcript_path`が文字列以外のtruthy値でも`TypeError`を出さず通す。
+
+        `#355`のreview指摘。非空listや数値は真偽値としてtruthyだが、`open()`へ
+        渡すと`TypeError`になる。
+        """
+        for transcript_path in ([1, 2], {"a": 1}, 123):
+            with self.subTest(transcript_path=transcript_path):
+                payload = {
+                    "last_assistant_message": "送りました",
+                    "transcript_path": transcript_path,
+                    "scratchpad_dir": self._scratchpad(),
+                }
+                result = subprocess.run(
+                    [sys.executable, STOP_CLAIM_GUARD],
+                    input=json.dumps(payload, ensure_ascii=False),
+                    capture_output=True, text=True, encoding="utf-8", timeout=60,
+                )
+                self.assertEqual(result.returncode, 0)
+                self.assertEqual(result.stderr, "")
+                self.assertEqual(result.stdout.strip(), "")
+
+    def test_broken_input_does_not_block(self):
+        """hookの入力が壊れていることを、対象応答の問題として扱わない。"""
+        result = subprocess.run(
+            [sys.executable, STOP_CLAIM_GUARD], input="{ではないJSON",
+            capture_output=True, text=True, encoding="utf-8", timeout=60,
+        )
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.stdout.strip(), "")
+
+    def test_no_last_assistant_message_is_allowed(self):
+        """`last_assistant_message`が無い（または空）payloadは何も見ない。"""
+        for payload in ({}, {"last_assistant_message": ""}, {"last_assistant_message": None}):
+            with self.subTest(payload=payload):
+                result = subprocess.run(
+                    [sys.executable, STOP_CLAIM_GUARD],
+                    input=json.dumps(payload), capture_output=True, text=True,
+                    encoding="utf-8", timeout=60,
+                )
+                self.assertEqual(result.returncode, 0)
+                self.assertEqual(result.stdout.strip(), "")
 
 
 class MergeTrailerReportTests(unittest.TestCase):

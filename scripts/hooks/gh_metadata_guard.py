@@ -4,7 +4,7 @@
 Claude CodeのPreToolUse hookとして、Bash tool呼び出しの前に走る。stdinからhookの
 入力JSONを読み、`tool_input.command`だけを見る。実行はしない。
 
-止める対象は3つである。
+止める対象は4つである。
 
 1. `gh issue create`／`gh pr create`に`--project`が無い。Projects v2 boardへの
    item追加は`CONTRIBUTING.md`の起票規約で必須だが、**#204／#205／#206は3件とも
@@ -23,8 +23,19 @@ Claude CodeのPreToolUse hookとして、Bash tool呼び出しの前に走る。
    持っていたが、最後の段落にコロン無しの`Closes #304`が混じっていたため、
    `git interpret-trailers`は段落ごとtrailerと認めなかった。部分一致で見ていた
    当時のこの検査は素通りさせ、CIの`history`だけが検出した。
+4. `gh issue create`／`gh pr create`に`--body`／`--body-file`が付いており、その
+   本文が対応するtemplate（`.github/ISSUE_TEMPLATE/*.md`／
+   `.github/pull_request_template.md`）の`## `節を欠いている。`--body`系は
+   templateを丸ごと迂回できる唯一の経路であり、既存Issueの記載漏れの根本原因だった
+   （[#348](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/348)）。
+   **`--body`系が付いていない呼び出し（対話prompt／`-e`）は対象外である。**
+   その経路は既にtemplateを経由するため、迂回にならない。
+   **本文を特定できない場合（stdin `-`、読めないfile）は素通りさせない。**
+   [#267](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/267)で
+   `coderabbit_gate.py`が同じ理由でfail-openを廃止した前例に倣い、`_body_text`の
+   「特定できない」は3の`_check_merge`と同じ扱い（`deny`）にする。
 
-**3つとも`--help`／`-h`が付いた呼び出しを対象外にする。**helpの表示は何も作らず、
+**4つとも`--help`／`-h`が付いた呼び出しを対象外にする。**helpの表示は何も作らず、
 mergeもしない。metadataを要求しても誤検知しか生まない。**2026-08-28に
 `gh issue create --help`／`gh pr create --help`／`gh pr merge --help`の3つとも
 拒否されることを実測した。**`gh pr merge`はとりわけ効く。`--subject`と`--body-file`の
@@ -41,6 +52,7 @@ trailerとして解釈できる形かどうかだけで、値の正しさは見�
 
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -63,6 +75,13 @@ MERGE_SUBCOMMAND = ("pr", "merge")
 
 # squash messageが持たなければならないtrailerの名前。**値は見ない。**
 REQUIRED_MERGE_TRAILERS = (review_gate.TRAILER_CLASS, review_gate.TRAILER_REVIEW)
+
+# repositoryの正本template。**hookの起動位置に依存させない。**`__file__`から
+# 辿るため、cwdがどこであっても同じfileを見る（`GIT_ROOT`とは別の理由で位置に
+# 依存させている。こちらはgitを呼ばない純粋なfile読み出しである）。
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+ISSUE_TEMPLATE_DIR = REPO_ROOT / ".github" / "ISSUE_TEMPLATE"
+PR_TEMPLATE_PATH = REPO_ROOT / ".github" / "pull_request_template.md"
 
 # gitへ渡す作業ディレクトリ。**`interpret-trailers --parse`はrepositoryの外でも
 # 動く**（2026-09-02に`/tmp`で実測。EXIT=0）。見ているのはstdinのmessageだけで、
@@ -117,6 +136,19 @@ PROJECT_OPTIONS = ("--project", "-p")
 # `gh issue create`の option 一覧に`--base`は無い（同じく確認した。出現0件）。
 BASE_OPTIONS = ("--base", "-B")
 
+# 本文を渡すoption。**存在するかどうかだけをまず見る。**この組が1つも無い呼び出しは
+# 対話prompt（またはeditor）経由であり、templateを迂回していない。対象外にする。
+BODY_OPTIONS = ("--body", "-b", "--body-file", "-F")
+
+# labelを渡すoption。**繰り返し指定でき、値はcomma区切りでも複数持てる**
+# （`gh label`系の一般的な仕様。`gh issue create --help`で確認した）。
+LABEL_OPTIONS = ("--label", "-l")
+
+# `gh issue create`のtemplate選択option。値はfile名ではなくtemplateの`name:`
+# frontmatter（表示名）である（`gh issue create --template "Bug Report"`の例が
+# `gh issue create --help`に載っている）。
+TEMPLATE_OPTIONS = ("--template", "-T")
+
 # helpの表示だけを求める呼び出し。**何も作らないため、metadataを要求しない。**
 # **3つの検査すべてに効かせる**（`_check_create`と`_check_merge`の先頭）。
 #
@@ -167,11 +199,37 @@ def _option_value(args, *names):
     return None
 
 
-def _merge_message(args):
-    """squash messageとして渡された本文を返す。
+def _option_values(args, *names):
+    """`--name value`／`--name=value`の値を、繰り返し分すべて返す。
+
+    `_option_value`は最初の1つしか返さない。`--label`のような繰り返し可能な
+    optionは、2回目以降を見落とすと存在するlabelを見落とす。
+    """
+    values = []
+    index = 0
+    while index < len(args):
+        arg = args[index]
+        for name in names:
+            if arg == name:
+                if index + 1 < len(args):
+                    values.append(args[index + 1])
+                index += 1
+                break
+            if arg.startswith(name + "="):
+                values.append(arg[len(name) + 1:])
+                break
+        index += 1
+    return values
+
+
+def _body_text(args):
+    """`--body`系optionで渡された本文を返す。
 
     戻りは`(text, source)`。`text`が`None`のときは本文を特定できなかったことを表し、
     `source`がその理由を持つ。**特定できないことを「入っている」と扱わない。**
+    `gh pr merge`のsquash messageと`gh issue create`／`gh pr create`の本文は、
+    同じoption（`--body`／`-b`／`--body-file`／`-F`）で渡される。判定を複製しない
+    ため、subcommandを問わずここで一本化する。
     """
     path = _option_value(args, "--body-file", "-F")
     if path is not None:
@@ -186,6 +244,138 @@ def _merge_message(args):
     if body is not None:
         return body, "--body"
     return None, "本文が渡されていない"
+
+
+def _section_headings(text):
+    """`## `見出しの並びを返す。字句だけで見る。Markdownの意味解釈はしない。"""
+    return [heading.strip() for heading in re.findall(r"(?m)^## (.+)$", text)]
+
+
+def _frontmatter_field(text, field):
+    """templateの frontmatter（先頭の`---`〜`---`）から`field:`の値を返す。"""
+    match = re.match(r"^---\n(.*?\n)---\n", text, re.DOTALL)
+    if not match:
+        return None
+    field_match = re.search(
+        rf"^{re.escape(field)}:\s*(.+)$", match.group(1), re.MULTILINE
+    )
+    if not field_match:
+        return None
+    return field_match.group(1).strip().strip('"')
+
+
+def _issue_template_catalog():
+    """`.github/ISSUE_TEMPLATE/*.md`から`{表示名: path}`と`{type:*label: path}`を作る。
+
+    値は起票時に実際に使われる2つの手がかり、`--template`の表示名（frontmatterの
+    `name:`）と`type:*` label（frontmatterの`labels:`）である。**filename には
+    紐付けない。**`gh issue create --template`が受け取るのは表示名であり、
+    filenameではない。
+    """
+    by_name = {}
+    by_label = {}
+    if not ISSUE_TEMPLATE_DIR.is_dir():
+        return by_name, by_label
+    for path in sorted(ISSUE_TEMPLATE_DIR.glob("*.md")):
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        name = _frontmatter_field(text, "name")
+        if name:
+            by_name[name] = path
+        labels = _frontmatter_field(text, "labels")
+        if labels:
+            for label in labels.split(","):
+                label = label.strip()
+                if label.startswith("type:"):
+                    by_label[label] = path
+    return by_name, by_label
+
+
+def _expected_template(subcommand, args):
+    """検査に使うtemplateの`(見出しの並び, path)`を返す。決められなければ`(None, 理由)`。
+
+    `gh pr create`は`.github/pull_request_template.md`の1つしか無く、曖昧さが無い。
+    `gh issue create`は5つある。**`--template`の指定があればそれを最優先する**
+    （明示された意図と食い違うfallbackをしない）。無ければ`--label`のうち
+    `type:*`のものを見る。**該当が0件でも複数件でも決められない。**PMの判断で、
+    決められない場合は実装者ではなくこの呼び出し自体を止める
+    （[#348](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/348)受け入れ条件）。
+    """
+    if subcommand == PR_CREATE_SUBCOMMAND:
+        try:
+            text = PR_TEMPLATE_PATH.read_text(encoding="utf-8")
+        except OSError as error:
+            return None, f"pull request templateを読めない（{error}）"
+        return _section_headings(text), None
+
+    by_name, by_label = _issue_template_catalog()
+    template_name = _option_value(args, *TEMPLATE_OPTIONS)
+    if template_name is not None:
+        path = by_name.get(template_name)
+        if path is None:
+            return None, (
+                f"`--template {template_name}`が`.github/ISSUE_TEMPLATE/`のどのtemplateの"
+                f"`name:`とも一致しない（候補: {'／'.join(sorted(by_name)) or 'なし'}）"
+            )
+        return _section_headings(path.read_text(encoding="utf-8")), None
+
+    type_labels = [
+        label.strip()
+        for value in _option_values(args, *LABEL_OPTIONS)
+        for label in value.split(",")
+        if label.strip().startswith("type:")
+    ]
+    matches = {label: by_label[label] for label in type_labels if label in by_label}
+    if len(matches) == 1:
+        path = next(iter(matches.values()))
+        return _section_headings(path.read_text(encoding="utf-8")), None
+    if not matches:
+        return None, (
+            "どのIssue templateと突き合わせるか決められない"
+            "（`--template`も、templateに対応する`type:*` labelも無い）。"
+            " `--template <name>`（`.github/ISSUE_TEMPLATE/*.md`の`name:`と一致する表示名）"
+            " か、`type:*` labelを1つ指定する。"
+        )
+    return None, (
+        f"どのIssue templateと突き合わせるか決められない"
+        f"（`type:*` labelが複数の候補に一致した: {'／'.join(sorted(matches))}）。"
+        " `--template <name>`で明示する。"
+    )
+
+
+def _check_body_sections(subcommand, args):
+    """`--body`系で渡された本文が、templateの`## `節を欠いていないかを見る。
+
+    **`--body`系が付いていない呼び出しは対象外である。**対話prompt／`-e`は
+    templateを経由しており、迂回にならない（module docstringの4を参照）。
+    """
+    if not _has_option(args, *BODY_OPTIONS):
+        return
+    text, source = _body_text(args)
+    if text is None:
+        _deny(
+            f"`gh {' '.join(subcommand)}`の本文（{source}）を確認できない。"
+            " templateの節が揃っているか判定できないため、確認できる形で本文を渡す。"
+            " `--body-file`にfileのpathを渡すと判定できる。"
+            f" 意図して確認させない場合は{SKIP_ENV}=1を付けて実行し、理由を残す。"
+        )
+    expected, error = _expected_template(subcommand, args)
+    if expected is None:
+        _deny(error)
+        return
+    present = set(_section_headings(text))
+    missing = [heading for heading in expected if heading not in present]
+    if missing:
+        _deny(
+            f"`gh {' '.join(subcommand)}`の本文（{source}）が、templateの節を"
+            f"{len(missing)}個欠いている: {'／'.join(missing)}。"
+            " `--body`はtemplateを丸ごと迂回できる経路であり、欠けた節は記載漏れとして"
+            " 残る。欠けている節を本文へ足すか、templateを埋めたfileを用意して"
+            " `--body-file`で渡す。"
+            f" 意図して外す場合は{SKIP_ENV}=1を付けて実行し、理由を残す。"
+        )
 
 
 def _option_names(names):
@@ -236,6 +426,7 @@ def _check_create(subcommand, args):
     # `--base`は`gh pr create`だけが持つ。`gh issue create`へ要求しない。
     if subcommand == PR_CREATE_SUBCOMMAND:
         _check_base(args)
+    _check_body_sections(subcommand, args)
 
 
 def _merge_trailers(text, source):
@@ -276,13 +467,13 @@ def _check_merge(args):
     いたことが`c171c52`の穴だった（module docstringの3を参照）。
 
     見る順は3つである。**helpの表示は何もmergeしないため対象外**、
-    **messageを特定できない場合は`deny`**（`_merge_message`）、
+    **messageを特定できない場合は`deny`**（`_body_text`）、
     そのうえで`git`がtrailerとして読むかを見る。
     """
     if _is_help(args):
         # helpの表示だけを求める呼び出しはmergeしない。**messageを要求しない。**
         return
-    text, source = _merge_message(args)
+    text, source = _body_text(args)
     if text is None:
         _deny(
             f"`gh pr merge`のsquash messageを確認できない（{source}）。"

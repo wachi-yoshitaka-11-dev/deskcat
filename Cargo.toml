@@ -6,7 +6,12 @@
 # 分離自体はADR-0001（docs/decisions/0001-monorepo-layout.md）の決定である。
 [workspace]
 resolver = "3"
-members = ["crates/deskcat-protocol", "crates/deskcat-serial", "crates/deskcat-servo"]
+members = [
+    "crates/deskcat-config",
+    "crates/deskcat-protocol",
+    "crates/deskcat-serial",
+    "crates/deskcat-servo",
+]
 exclude = ["firmware/esp32"]
 
 # `rust-version`は、実際にbuildとtestを通した版だけを宣言する。
@@ -20,6 +25,9 @@ publish = false
 [workspace.dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["raw_value"] }
+# `deskcat-config`のTOML parse専用。「display」(serializer)は責務(parseと検証)に
+# 無いため落とし、build footprintを絞る。
+toml = { version = "1", default-features = false, features = ["parse", "serde"] }
 
 # lint levelをmanifestで持つ。`unsafe_code = "forbid"`は、AGENTS.mdの
 # 「`unsafe`は原則禁止する」を、command optionの付け忘れに関係なくbuildで強制する。
