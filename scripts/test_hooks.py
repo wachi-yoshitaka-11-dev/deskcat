@@ -876,6 +876,250 @@ class TruncationGuardTests(unittest.TestCase):
         self.assertAllowed('gh pr list --limit "閉じていない')
 
 
+STOP_CLAIM_GUARD = str(SCRIPTS_ROOT / "hooks" / "stop_claim_guard.py")
+
+# transcript行の最小形。**PMの決定5により、判定の対象となる形をfixtureとして
+# 固定する。**Claude Codeのtranscript形式が変わればこのtestが落ちる。
+TRANSCRIPT_HUMAN_STRING = {"type": "user", "message": {"role": "user", "content": "何か送って"}}
+TRANSCRIPT_TOOL_RESULT_ONLY = {
+    "type": "user",
+    "message": {"role": "user", "content": [{"type": "tool_result", "content": "ok"}]},
+}
+TRANSCRIPT_HUMAN_WITH_TEXT_BLOCK = {
+    "type": "user",
+    "message": {"role": "user", "content": [{"type": "text", "text": "続けて"}]},
+}
+
+
+def _assistant_text(text):
+    return {"type": "assistant", "message": {"role": "assistant", "content": [{"type": "text", "text": text}]}}
+
+
+def _assistant_tool_use(name, command=None):
+    tool_input = {"command": command} if command is not None else {}
+    return {
+        "type": "assistant",
+        "message": {"role": "assistant", "content": [{"type": "tool_use", "name": name, "input": tool_input}]},
+    }
+
+
+class StopClaimGuardTests(unittest.TestCase):
+    """完了の主張とtool呼び出しを突き合わせるhookのtest（決定1、#350）。"""
+
+    def setUp(self):
+        self._tmpdir = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmpdir.cleanup)
+
+    def _write_transcript(self, entries):
+        path = Path(self._tmpdir.name) / "transcript.jsonl"
+        with open(path, "w", encoding="utf-8") as handle:
+            for entry in entries:
+                handle.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        return str(path)
+
+    def _scratchpad(self, name="scratchpad"):
+        path = Path(self._tmpdir.name) / name
+        path.mkdir(exist_ok=True)
+        return str(path)
+
+    def _invoke(self, message, transcript_entries, *, scratchpad=None):
+        payload = {
+            "last_assistant_message": message,
+            "transcript_path": self._write_transcript(transcript_entries),
+            "scratchpad_dir": scratchpad or self._scratchpad(),
+        }
+        result = subprocess.run(
+            [sys.executable, STOP_CLAIM_GUARD],
+            input=json.dumps(payload, ensure_ascii=False),
+            capture_output=True, text=True, encoding="utf-8", timeout=60,
+        )
+        text = result.stdout.strip()
+        return result.returncode, (json.loads(text) if text else None)
+
+    def assertBlocked(self, message, transcript_entries, *, contains=None, scratchpad=None):
+        code, output = self._invoke(message, transcript_entries, scratchpad=scratchpad)
+        self.assertEqual(code, 0, message)
+        self.assertIsNotNone(output, f"通してしまった: {message}")
+        self.assertEqual(output["decision"], "block", message)
+        if contains:
+            self.assertIn(contains, output["reason"])
+
+    def assertAllowed(self, message, transcript_entries, *, scratchpad=None):
+        code, output = self._invoke(message, transcript_entries, scratchpad=scratchpad)
+        self.assertEqual(code, 0, message)
+        self.assertIsNone(output, f"止めてしまった: {message}")
+
+    def test_send_claim_without_evidence_is_blocked(self):
+        """証拠の無い送信主張をblockし、主張した語を名指しする。"""
+        self.assertBlocked(
+            "送りました", [TRANSCRIPT_HUMAN_STRING], contains="送りました"
+        )
+
+    def test_send_claim_with_evidence_is_allowed(self):
+        """`mcp__ccd_session_mgmt__send_message`の呼び出しがあれば通す。"""
+        self.assertAllowed(
+            "送りました",
+            [
+                TRANSCRIPT_HUMAN_STRING,
+                _assistant_tool_use("mcp__ccd_session_mgmt__send_message"),
+                TRANSCRIPT_TOOL_RESULT_ONLY,
+            ],
+        )
+
+    def test_evidence_across_multiple_assistant_blocks_is_found(self):
+        """複数回のtool往復（複数の`requestId`相当）を跨いでも証拠を見つける。
+
+        1つの人間turnの中で、thinking→tool_use→tool_result→…→最後はtextだけ、
+        という繰り返しが実際に起きる（担当セッションが自身のtranscriptで観測）。
+        直前の1回分だけを見ると、途中のtool呼び出しを見落とす。
+        """
+        self.assertAllowed(
+            "起票しました",
+            [
+                TRANSCRIPT_HUMAN_STRING,
+                {"type": "assistant", "message": {"role": "assistant", "content": [{"type": "thinking", "text": "..."}]}},
+                _assistant_tool_use("Bash", "gh issue create --title t --body-file f"),
+                TRANSCRIPT_TOOL_RESULT_ONLY,
+                _assistant_text("起票しました"),
+            ],
+        )
+
+    def test_issue_create_evidence_for_filing_claim(self):
+        """`起票しました`は`gh issue create`のBash呼び出しで満たす。"""
+        self.assertAllowed(
+            "起票しました",
+            [TRANSCRIPT_HUMAN_STRING, _assistant_tool_use("Bash", "gh issue create --title t")],
+        )
+
+    def test_merge_evidence_for_merge_claim(self):
+        """`mergeしました`は`gh pr merge`のBash呼び出しで満たす。"""
+        self.assertAllowed(
+            "mergeしました",
+            [TRANSCRIPT_HUMAN_STRING, _assistant_tool_use("Bash", "gh pr merge 1 --squash")],
+        )
+
+    def test_push_evidence_for_push_claim(self):
+        """`pushしました`は`git push`のBash呼び出しで満たす。"""
+        self.assertAllowed(
+            "pushしました",
+            [TRANSCRIPT_HUMAN_STRING, _assistant_tool_use("Bash", "git push origin main")],
+        )
+
+    def test_unrelated_bash_command_is_not_evidence(self):
+        """関係ないBash呼び出しは証拠にならない。"""
+        self.assertBlocked(
+            "pushしました",
+            [TRANSCRIPT_HUMAN_STRING, _assistant_tool_use("Bash", "git status")],
+        )
+
+    def test_quoted_claim_is_not_counted(self):
+        """引用（`「」`）の中の語は主張として数えない。"""
+        self.assertAllowed("彼は「送りました」と言っていた", [TRANSCRIPT_HUMAN_STRING])
+
+    def test_negated_claim_is_not_counted(self):
+        """否定形は主張として数えない。"""
+        for message in ("まだ送っていません", "送りませんでした"):
+            with self.subTest(message=message):
+                self.assertAllowed(message, [TRANSCRIPT_HUMAN_STRING])
+
+    def test_future_claim_is_not_counted(self):
+        """未来形・意志形は主張として数えない。"""
+        for message in ("これから送ります", "送信します"):
+            with self.subTest(message=message):
+                self.assertAllowed(message, [TRANSCRIPT_HUMAN_STRING])
+
+    def test_no_claim_is_allowed(self):
+        """完了を主張する語が無い応答は何も見ない。"""
+        self.assertAllowed("承知しました。作業を進めます。", [TRANSCRIPT_HUMAN_STRING])
+
+    def test_same_category_is_blocked_once_then_allowed(self):
+        """同じ主張分類に対してblockするのは1回だけとし、2回目は通す。
+
+        **`stop_hook_active`には依存しない**（担当セッションの実測で、
+        block後の再実行でもfalseのままだったため）。状態は`scratchpad_dir`
+        （セッション内で完結する場所）に持つ。
+        """
+        scratchpad = self._scratchpad()
+        self.assertBlocked("送りました", [TRANSCRIPT_HUMAN_STRING], scratchpad=scratchpad)
+        self.assertAllowed("送りました", [TRANSCRIPT_HUMAN_STRING], scratchpad=scratchpad)
+
+    def test_different_session_state_does_not_leak(self):
+        """`scratchpad_dir`が違えば、blockの記録は引き継がれない。
+
+        **セッションをまたいで残る場所へ書くと、前のセッションのblockが
+        次のセッションを素通りさせる。**`scratchpad_dir`はsession_idを含む
+        pathであり、別sessionなら別の場所になる。
+        """
+        self.assertBlocked(
+            "送りました", [TRANSCRIPT_HUMAN_STRING], scratchpad=self._scratchpad("session_a")
+        )
+        self.assertBlocked(
+            "送りました", [TRANSCRIPT_HUMAN_STRING], scratchpad=self._scratchpad("session_b")
+        )
+
+    def test_human_turn_boundary_uses_tool_result_only_rule(self):
+        """境界判定は「文字列か」ではなく「tool_resultだけで構成されていないか」で行う。
+
+        **PMの決定1（2026-09-06）。**画像添付等、人間の入力でも`content`が
+        listになる形（`tool_result`以外のblockを含むlist）を、境界として正しく
+        扱えることを確かめる。
+        """
+        self.assertAllowed(
+            "送りました",
+            [
+                TRANSCRIPT_TOOL_RESULT_ONLY,  # これより前の(無い)tool_useは境界外
+                TRANSCRIPT_HUMAN_WITH_TEXT_BLOCK,  # tool_result以外を含むlist→人間の入力
+                _assistant_tool_use("mcp__ccd_session_mgmt__send_message"),
+            ],
+        )
+
+    def test_boundary_not_found_uses_whole_file(self):
+        """人間の入力entryが1つも無い場合は、file全体を対象にする。
+
+        **tool_useを多く集める方向であり、blockを減らす安全側である。**
+        """
+        self.assertAllowed(
+            "送りました",
+            [_assistant_tool_use("mcp__ccd_session_mgmt__send_message")],
+        )
+
+    def test_unreadable_transcript_is_allowed(self):
+        """transcriptを読めない場合はblockしない。判定できないことを理由にしない。"""
+        payload = {
+            "last_assistant_message": "送りました",
+            "transcript_path": "/nonexistent/path.jsonl",
+            "scratchpad_dir": self._scratchpad(),
+        }
+        result = subprocess.run(
+            [sys.executable, STOP_CLAIM_GUARD],
+            input=json.dumps(payload, ensure_ascii=False),
+            capture_output=True, text=True, encoding="utf-8", timeout=60,
+        )
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.stdout.strip(), "")
+
+    def test_broken_input_does_not_block(self):
+        """hookの入力が壊れていることを、対象応答の問題として扱わない。"""
+        result = subprocess.run(
+            [sys.executable, STOP_CLAIM_GUARD], input="{ではないJSON",
+            capture_output=True, text=True, encoding="utf-8", timeout=60,
+        )
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.stdout.strip(), "")
+
+    def test_no_last_assistant_message_is_allowed(self):
+        """`last_assistant_message`が無い（または空）payloadは何も見ない。"""
+        for payload in ({}, {"last_assistant_message": ""}, {"last_assistant_message": None}):
+            with self.subTest(payload=payload):
+                result = subprocess.run(
+                    [sys.executable, STOP_CLAIM_GUARD],
+                    input=json.dumps(payload), capture_output=True, text=True,
+                    encoding="utf-8", timeout=60,
+                )
+                self.assertEqual(result.returncode, 0)
+                self.assertEqual(result.stdout.strip(), "")
+
+
 class MergeTrailerReportTests(unittest.TestCase):
     """merge後の確認hookのtest。
 

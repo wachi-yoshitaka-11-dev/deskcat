@@ -37,6 +37,18 @@
         ]
       }
     ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "R=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}\"; [ -n \"$R\" ] && [ -f \"$R/scripts/hooks/stop_claim_guard.py\" ] && exec python3 \"$R/scripts/hooks/stop_claim_guard.py\" || exit 0",
+            "timeout": 30,
+            "statusMessage": "完了の主張とtool呼び出しを確認"
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": "Bash",
