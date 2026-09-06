@@ -156,7 +156,7 @@ gateも経路ごとに違う。
 | 項目 | 内容 |
 |---|---|
 | 測る量 | **定常電流**（MSP2807のbacklight点灯とLCD描画、I2C通信を継続した状態） |
-| 許容電圧範囲 | 周辺module3点が**moduleとして受け入れてよい電圧**の**積集合**（各下限の最大値〜各上限の最小値）と、ESP32のlogic levelから決める。**積集合を取る対象はIC単体の動作範囲ではない。****この行がこの値の正である**（`3.3 V railの許容電圧範囲`節に導出を置く）。**2026-08-12時点の暫定値は3.3–3.6 Vだが、確定値ではない。****`ACCEL-01`分は未確定である**（`moduleへ入れてよい電圧`は`HW-TBD-004`。ADXL345 ICの2.0–3.6 Vからmodule boardの許容入力電圧は決まらない）。**さらに暫定値の下限3.3 Vはrailの公称値と同一であり、下振れの余裕が原理的に無い**（`暫定値の下限は、そのままでは成立しない`節。追跡は同じ`HW-TBD-025`(a)）。**確認できるまでB-2を実施しない** |
+| 許容電圧範囲 | 周辺module3点が**moduleとして受け入れてよい電圧**の**積集合**（各下限の最大値〜各上限の最小値）と、ESP32のlogic levelから決める。**積集合を取る対象はIC単体の動作範囲ではない。****この行がこの値の正である**（`3.3 V railの許容電圧範囲`節に導出を置く）。**2026-08-12時点の暫定値は3.3–3.6 Vだが、確定値ではない。****`ACCEL-01`のmodule一般としての受け入れ電圧範囲は依然TBDである**（`moduleへ入れてよい電圧`は`HW-TBD-004`。ADXL345 ICの2.0–3.6 Vからmodule boardの許容入力電圧は決まらない。`HW-TBD-004`はcloseしていない）。**下限3.3 Vがrailの公称値と同一で下振れの余裕が原理的に無い件は、2026-09-06に`3.3 V rail下限の設計判断`節で解決した。**下限は3.234 V（`U2`の保証最小出力）を受け入れる形で確定した。**あわせて同日、この具体的なrail値（3.234–3.366 V）について`ACCEL-01`が安全に受け入れることも個別に確認した**（`ACCEL-01`行の注記。ICの`VS`動作範囲2.0–3.6 Vに両端とも余裕を持って入り、直列抵抗の有無によらず結論は変わらない）。**したがってこのrail値に関する`許容電圧範囲`の確定は完了した。****ただしB-2は`全moduleの安全な電流上限`が別途未解決のため、確認できるまで実施しない** |
 | **全moduleの安全な電流上限** | 周辺module3点それぞれについて、耐えられる電流の上限を持つこと。**経路によらず必要である。**B-2bでは電源に設定する電流制限値の上限を決めるために、B-2aでは**board上regulatorの保護のtrip点がmoduleにとって安全かを判定する**ために要る。**1点でも上限が無ければB-2を実施しない**（全体の追跡は`HW-TBD-025`、MSP2807分は`HW-TBD-024`）。**2026-08-12にADXL345とBME280のdatasheetを確認した結果、両者とも絶対最大定格に電流の上限は記載が無い**（ADXL345 Rev. G Table 2 page 5、BME280 Revision 1.24 Table 5 page 13）。**したがって3点すべてについて、公開値からは上限を得られない。**現物回路の確認が要る。**この条件は満たされていないため、B-2は実施できない** |
 | 5 V railとPi | 使わない。合成給電ではないため段階Cのgateの対象外である |
 | 停止手順 | 給電元を切る（B-2aはUSB cableをhost側から抜く、B-2bは電源出力を切る）。これは**停止手順であって保護機構ではない。**人が手を掛けられる状態で行い、無人で継続しない |
@@ -177,7 +177,9 @@ gateも経路ごとに違う。
 |---|---|---|---|
 | `DISP-01`（MSP2807） | VCC **3.3–5 V**。logic IOは3.3 V TTL | [msp2807.pdf](https://akizukidenshi.com/goodsaffix/msp2807.pdf)の`Product Parameters`（`VCC power voltage`／`Logic IO port voltage`）。**module levelの資料である** | **使える** |
 | `ENV-01`（AE-BME280） | VDD **1.71–3.6 V**。module上でVDDとVDDIOは結線済みのため実効も同じ | [AE-BME280説明書](https://akizukidenshi.com/goodsaffix/AE-BME280_manu_v1.1.pdf) v1.1の`主な仕様`（電源電圧DC1.71V〜3.6V）。**module levelの資料である** | **使える** |
-| `ACCEL-01`（秋月 M-06724） | **TBD** | **module boardの資料が無い**（秋月 商品ページは404） | **使えない**（[HW-TBD-004](tbd-register.md)） |
+| `ACCEL-01`（秋月 M-06724） | **module一般としての受け入れ電圧範囲はTBDのまま**（module boardの資料が無い。秋月 商品ページは404） | — | **一般には使えない**（[HW-TBD-004](tbd-register.md)。**closeしない**） |
+
+**ただし、2026-09-06に確定した`3.3 V rail下限の設計判断`のrail値（3.234–3.366 V）に対しては、`ACCEL-01`が安全に受け入れることを個別に確認した。**根拠はICの`VS`動作範囲2.0–3.6 V（typ 2.5 V。sensor-datasheet-notes.mdの`供給電圧（動作範囲）`行に既に記録済みのため値を再掲しない）とADXL345のsupply current 140 µA typ（同`Supply Current`行）である。3.234–3.366 Vは`VS` 2.0–3.6 Vの内側に両端とも余裕を持って入る（下側余裕約1.234 V、上側余裕約0.234 V）。headerとIC足の間の直列抵抗は現物未確認のままだが、下側余裕を使い切る抵抗値は`1.234 V ÷ 140 µA ≈ 8.8 kΩ`であり、供給pinに現実的に入りうる値（decoupling／EMI対策でせいぜい数十Ω）と3桁近く離れているため、**直列抵抗の値によらずこの結論は変わらない**。**これは`HW-TBD-025`(a)（このrail値に対する安全性）の判断であり、`HW-TBD-004`（module一般としての受け入れ電圧範囲の確定。I2Cアドレス等も含む）をcloseするものではない。**
 
 **この積集合はservoを含まない。**`SERVO-01`は3.3 V railではなく5 Vのservo railから給電するため、
 この表の対象外である。**ただし対象外であることは、確認しなくてよいことを意味しない。**
@@ -203,7 +205,7 @@ bindingになっていないだけであり、「ESP32は積集合に関与し�
 
 したがって2026-08-12時点で置けるのは`DISP-01` ∩ `ENV-01` ∩ ESP-WROOM-32D moduleの積集合であり、
 **その値を上の`許容電圧範囲`行へ暫定値として置いた。****確定値ではない。**
-`ACCEL-01`分が入ると下限が上がりうるため、確定形で書かない。
+`ACCEL-01`分の一般的な受け入れ電圧範囲が入ると下限が上がりうるため、確定形で書かない。**ただし2026-09-06に、この積集合から出た具体的なrail値（3.234–3.366 V）について`ACCEL-01`が安全に受け入れることは個別に確認済みである**（上表`ACCEL-01`行の注記）。したがってこのrail値に関する限り、`HW-TBD-025`(a)の`ACCEL-01`側の未確定は解消している。
 
 ###### 暫定値の下限は、そのままでは成立しない
 
@@ -239,8 +241,31 @@ bindingになっていないだけであり、「ESP32は積集合に関与し�
 | 経路 | 状況 |
 |---|---|
 | (1) MSP2807のmodule level資料に下限の性質（公称か絶対最小か）を求める | **不可。**2026-08-12に確認した。`msp2807.pdf`に該当する記載が無い |
-| (2) MSP2807のVCCを5 V railへ移す（module specは3.3–5 Vを許す） | **`DISP-01`の現物確認待ち**（`HW-TBD-002`）。logic IOが3.3 V TTLであり、5 V給電時に出力が5 VになればESP32のGPIOを壊す。level shiftの有無が未確認である（`電源rail構成案`が3.3 V給電を選んだ理由そのものである）。**さらに、`module VCC 3.3–5 V`の範囲を確認しただけでこの経路を採れると判断しない。**この経路は**段階B-2の前提そのものを引き直す。**この文書はB-2を`周辺module3点を3.3 Vで測る`測定と定義しており、MSP2807だけ5 V railへ移すと**測定するrail、電流予算の割り付け、許容電圧範囲の積集合、logic levelの保護、decouplingの要否、B-2a／B-2bの依存関係のすべてが変わる。**採用の条件にはこれらの更新を含める |
-| (3) 周辺module用に別途3.3 V regulatorを置き、設定点とtoleranceで下限を成立させる | **設計判断。**採る場合は`hardware-bom.md`の購入待ちリストへ部品が増える |
+| (2) MSP2807のVCCを5 V railへ移す（module specは3.3–5 Vを許す） | **引き続きBlocked。**`HW-TBD-002`は2026-09-06にcloseしたが、close内容はpin配列・電源pin照合（`VCC`→`U1`入力側、`GND`→`U1`のGND側）・decoupling実装の3点のみであり、この経路が要求する「logic IOのlevel shiftの有無」（`VCC`を5 Vへ上げたときILI9341の出力が5 Vになりうるか）は確認項目に含まれていない。`sensor-datasheet-notes.md`のLogic電圧欄も「5 V給電時の出力levelがメーカー資料で不明なため3.3 V給電とする」のまま、close後も未更新である。**したがってこの経路は採らない** |
+| (3) 周辺module用に別途3.3 V regulatorを置き、設定点とtoleranceで下限を成立させる | **採らない。**下の`3.3 V rail下限の設計判断`のとおり、部品追加なしで下限を成立させる経路(4)を採ったため不要になった |
+
+###### 3.3 V rail下限の設計判断（2026-09-06）
+
+**採る経路: (1)〜(3)のいずれでもない第4の経路。**暫定下限3.3 V（`DISP-01`のVCC下限、一次資料の範囲の下端）を**下回って運用することを受け入れる**形で下限を確定する。3.3 Vが「公称値」だったという読み替えではない。一次資料（`hardware-bom.md`／`sensor-datasheet-notes.md`）が示す`VCC 3.3–5 V`はそのまま範囲であり、3.3 Vはその最小値である。
+
+**下限値: 3.234 V**（`U2 = UMW LD1117-3.3`の保証最小出力。上表`現物のU2=UMW LD1117-3.3の出力電圧`の値、**直接のdatasheet値**）。`ACCEL-01`のmodule許容電圧（`HW-TBD-004`）が確定し、その下限がこの値を上回る場合は置き換える。
+
+**分類と根拠水準**（[hardware-safety-policy.md](../governance/hardware-safety-policy.md)の対応表）: この下限は「供給電圧の動作の下限」に当たり、安全要件5項目のいずれにも該当しない。下回っても絶対最大定格を超えず、部品は壊れない（起動しないかhangするか、書き込み中の記録が壊れうるだけ）。「ロジック電圧の下限は一次資料側に置く」という同policyの例外は、異なる電圧domain間のlevel mismatch（貫通電流のリスク）を指す。本rail上の`DISP-01`／`ENV-01`／ESP32は同一railを共有しており、rail全体が一様に振れても跨domainの閾値ずれは生じないため、この例外には当たらない。**先例: `HW-TBD-028`(a)**（Pi入力の最低許容電圧）。同policyはこの項目を、一次資料が存在せず確定のためだけに機材購入が必要になる同じ構造の例として挙げ、「一般値で開始してよい」分類に位置づけている（同policy「5項目以外の扱い」節）。**ここで先例として指すのは分類の適用であり、`HW-TBD-028`(a)自体の値がtbd-register.mdで確定した、という意味ではない**（同行は本稿執筆時点でも数値未確定のまま残っている）。
+
+**`DISP-01`内部のLDO(`U1`)を通した場合の追加の裏付け。**`DISP-01`のboard上には`U1`（UMW `XC6206P332MR`、3.3 V固定LDO、`VCC`入力）が実装されている（`hardware-bom.md` DISP-01、2026-08-13現物確認／2026-08-15品番特定）。[UMW XC6206 datasheet](https://www.umw-ic.com/static/pdf/e442437afc9daa185da86486e2bfe8c5.pdf) Mar.2025 `8.Electrical characteristics`は、出力3.3 V品のVdropを`2.6V≤Vout(T)≤3.3V`区分でtyp 160 mV／max 240 mV（`Iout`=50 mA）と規定する。**したがって`U1`が3.3 Vを完全に規制するために必要な`Vin`は3.46〜3.54 Vであり、`VCC`=3.3 V（rail上限側の値）でも既に`U1`はdropout領域にある。**これは3.234 Vを受け入れて新たに生じる状態ではなく、rail電圧が3.3〜3.6 Vのどこにあってもこの構成（3.3 V rail上に3.3 V品のLDOを直列に置く構成）では常に生じている状態である。
+
+**ILI9341への実際の供給電圧は、経路を問わず次の2通りいずれでも成立する**（ILI9341の`VDDI`／`VCI`が`U1`出力経由か`VCC`直結かのパターン追跡は未了。`HW-TBD-002`はpin配列・電源pin・decouplingの3点のみを確認範囲としており、`HW-TBD-024`もbacklightのLED電流経路（`R5`／`R6`／`Q1`／`J1`）を対象とするだけで、いずれもこのcontroller自身の給電経路を確認範囲に含んでいない。**したがってこの点は現状どのTBD行にも明示的には属していない**）。
+
+| 経路 | ILI9341供給の見積り | `VCI`下限2.5 Vに対する余裕 |
+|---|---|---|
+| `VCC`直結（`U1`を経由しない） | 3.234 V（`U2`の直接値） | 約0.73 V |
+| `U1`出力経由 | 約2.99 V（**導出値。**`Vin` 3.234 V − `Vdrop` max 240 mV@50 mA。`U1`のdropout curveは非公開のため近似であり、実測値ではない） | 約0.49 V |
+
+いずれの経路でも、ILI9341自身の最小動作電圧（[ILI9341 Datasheet V1.11](https://cdn-shop.adafruit.com/datasheets/ILI9341.pdf) §18.2.1 `General DC Characteristics` p.236。`VCI`（analog operating voltage）Min 2.5 V／Typ 2.8 V／Max 3.3 V。`VDDI`（logic）の値は[gpio-assignment.md](gpio-assignment.md#電圧domainすべての外部pull-upに適用)が既に記録済みのため、ここへ値を再掲しない）を満たす。
+
+**受容の条件（caveat。本文としてここに置き、脚注にしない）。**上記の余裕計算は、ILI9341ロジック単体（`Iout`=50 mA相当の最悪ケース）の負荷条件で成立する。backlightのLED電流が`U1`を経由するかは`HW-TBD-024`で未解決であり、経由すると判明した場合は実効負荷電流が50 mAを大きく超えうるため`Vdrop`が増え、この余裕計算は崩れる。**`HW-TBD-024`がbacklight電流の`U1`経由を確定させた場合、この下限は再導出を要する。**
+
+**`#13`（LCD bring-up）への記録。**表示不良に遭遇した場合、driverや結線を疑う前に、`DISP-01`の`VCC`rail電圧と`U1`出力電圧を先に実測する。rail電圧の低下と`U1`のdropoutは、ここまでの記述のとおり既知の受け入れ済みリスクである。
 
 ##### 通常動作の上限は保護ではない
 
@@ -3049,3 +3074,5 @@ rippleはDMMで代替できない。
 | 2026-09-03 | 84 | [#205](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/205)。**`PROT-RP-01`の実装方法（向き、ゲート抵抗の値、基板上の配置）を決定した。**`VGSが未確定である（2026-08-27）`が未決定のまま残していた3点である。**`実装方法を決定した（2026-09-03）`を新設した。**(a) 向きはdatasheet 1ページ目のpin配列図（`1.ゲート 2.ドレイン 3.ソース`）に従い、Sourceを`PROT-OC-01`側（入力側）、Drainを分岐点側（出力側）とし、Gateは共通GND戻りへ抵抗を介してつなぐ。(b) ゲート抵抗は`RES-PULL-01`の手持ち10 kΩとし、根拠は`Ciss` 3300 pF（typ）によるRC時定数約33 µsと、`IGSS`最大±10 µAによる基準電位のずれ最大100 mV、および絶対最大定格表が`VDGR`の測定条件として`RGS = 20 kΩ`を明記していることの3点（いずれもdatasheetの実在値）。(c) この向きにより、正しい極性で`VGS`≒−5 V（ON）、逆接時は`VGS`≒+5 V（channel OFF）になることを示した。**あわせて、channelがOFFでも内蔵diode（`VDSF`最大1.7 V、`VDS`が正の値として記載される唯一の項目）がDrain側の電位次第で導通しうることを明記し、完全遮断は主張しないとした。**(d) 基板上の配置は、`PROT-OC-01`と`PROT-RP-01`を`PROTO-02`の入力パッド側（分岐点より手前）に直列配置する方針までを決め、現物合わせの座標は着荷後に決めるとした。**`配線・保護表`の`逆極性保護`行と`hardware-bom.md`の`PROT-RP-01`行、[tbd-register.md](tbd-register.md)の`HW-TBD-030`(ii)も揃えた。**決定しただけであり実装は済んでいない。`HW-TBD-030`はcloseしていない** | [2SJ334 datasheet](https://akizukidenshi.com/goodsaffix/2sj334.pdf)（東芝、2006-11-14、sha256 `c01da93643cb1cb11075d9137897655c556989de647c38368d5c487274d5da46`。2026-09-03に1・2ページ目を再確認） |
 | 2026-09-03 | 86 | [#205](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/205)。**手動review（CodeRabbit、`full review`）の指摘4件を反映した。Revision 84は書き換えない。**(1) `hardware-bom.md`の`PROT-RP-01`セルが「ゲート抵抗の役割・最終値は未決定」という旧い状態のまま残っていたため、現行状態（10 kΩ・向き・配置は決定済み）へ書き換え、旧い状態は日付付きの記述として残した。(2) `実装方法を決定した（2026-09-03）`の`VGS`の説明が、`Vth`を超えることを`RDS(on)`（`VGS`=−4 V規定）採用の根拠として使っていたが、**`Vth`は導通の開始点であって完全導通の保証ではない。**実装とGND戻りの電圧降下を含む実回路の最悪条件で`VGS` ≤ −4 Vが成り立つ根拠が無いことを明記し、`VGS`≒−5 Vと`RDS(on)`適用は条件付きの見積りに戻した。(3) 同節がゲート抵抗10 kΩの根拠として`VDGR`測定条件の`RGS = 20 kΩ`を挙げていたが、**これは測定条件であって許容範囲の保証ではなく、この回路のGate-GND間抵抗とは電圧の掛かり方も異なる。**Revision 84が挙げていた3点のうち、この1点を取り下げ、根拠を`Ciss`によるRC時定数と`IGSS`による基準電位のずれの2点へ改めた。(4) 同節が`PROT-OC-01`の`Ihold` 1.35 Aを逆電流の「頭打ち値」と書いていたが、**`Ihold`はトリップしない電流の値であって上限を保証する値ではない。**逆電流はPTCの抵抗・電源・負荷・時間・温度に依存し、トリップまで`Ihold`を超えうることを明記し、安全性は未確定のままとした | CodeRabbit `full review`（PR #338、2026-09-04） |
 | 2026-09-04 | 87 | [PR #342](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/342)（`develop`→`main`昇格）の`full review`でCodeRabbitが🟠Majorを1件出した。**`PROT-RP-01`の向き（Revision 84・86）をSource/Drainで入れ替える。**Revision 84・86は書き換えない。**(1) 向きの訂正。**2SJ334の内蔵diodeはDrain-Source間に構造として存在し、channelと並列である。Revision 84・86は「channelがOFFになるか」だけを基準に向きを選んでいたが、**channelがOFFでもdiodeが順バイアスなら電流はdiodeを通り、channelの状態はそれを止めない。**従来の向き（Source=`PROT-OC-01`側／入力側、Drain=分岐点側）では、逆接シナリオでchannelは確実にOFFになる（Revision 84の記述どおり）が、**下流の分岐点（Drain側）が引き上げられうるため内蔵diodeは順バイアスのまま導通し、channelのOFFは電流を止めていなかった。**向きをDrain=`PROT-OC-01`側（入力側）、Source=分岐点側（出力側）へ入れ替えることで、同じ逆接シナリオにおいてDrain（入力側、常に真のGND）がSourceより高くなることがなくなり（Sourceを引き上げる経路はGateと同じstar pointを経由し、star point自身の電位を超えて引き上げることができないため）、**内蔵diodeは逆バイアスで導通せず、`VGS`も0以上でchannel側もOFFに留まる。**両方が阻止側になる点が、従来の向きに対する実質的な変更点である。**正しい極性でのVGSの見積り（≒−5 V、条件付き）は変えていない**（channelが主経路を取れば分岐点はDrain電位にほぼ等しくなるため）。起動直後の短い区間はdiode経由の充電に依存する（起動シーケンス依存が新たに生じる。この区間でdiodeを通る電流は`PROT-OC-01`（PTC）・配線抵抗・分岐先bulk capacitor・電源側供給能力で決まる突入電流であり測っていないため、datasheetの`IDR`と比較できる実在値を持たず「定格に余裕がある」とは主張しない）。**(2) 🟡 Minorの反映。**`33 µs`（RC時定数）は`Ciss`のtyp値に基づく条件付きの見積りであり、datasheetにmax規定は無いことを明記した。`100 mV`（leakageによる基準電位のずれ）は`IGSS`のmax欄の値だが測定条件（`VGS`=±16 V）が実回路（±5 V付近）と異なる条件付きの上限であることを明記した。**いずれもworst-caseや安全上限としては扱わない。**(3) **`hardware-bom.md`の`PROT-RP-01`行と`tbd-register.md`の`HW-TBD-030`を同期した。**`HW-TBD-030`はcloseしていない。**「向きを直したから安全になった」とは書いていない**（他の故障モード・下流耐量・PTC過渡特性は未評価のまま）。**通電は行っていない。**この判定は一次資料（datasheet）とこの文書が既に置いている配線トポロジーの記述だけから導いた | [PR #342](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/342)のCodeRabbit `full review`、[2SJ334 datasheet](https://akizukidenshi.com/goodsaffix/2sj334.pdf)（東芝、2006-11-14、sha256 `c01da93643cb1cb11075d9137897655c556989de647c38368d5c487274d5da46`。2026-09-04に1・2ページ目を再確認） |
+| 2026-09-06 | 88 | [#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)。**`3.3 V rail下限の設計判断`節を新設し、`HW-TBD-025`(a)の暫定下限3.3 Vが成立しない件を解決した。**経路(1)〜(3)のいずれでもなく、下限をDISP-01の最小VCC（3.3 V。一次資料の範囲の下端）より下（3.234 V、`U2`の保証最小出力）で運用することを受け入れる形で確定した。分類は`hardware-safety-policy.md`の「供給電圧の動作の下限」（一般値で開始してよい。安全要件5項目に該当しない）。先例は`HW-TBD-028`(a)。あわせて`DISP-01`のboard上LDO（`U1`＝UMW `XC6206P332MR`）のdropout仕様（[UMW XC6206 datasheet](https://www.umw-ic.com/static/pdf/e442437afc9daa185da86486e2bfe8c5.pdf)）から、`VCC`=3.3 Vでも`U1`は既にdropout領域にあることを示し、ILI9341自身の最小動作電圧（[ILI9341 Datasheet V1.11](https://cdn-shop.adafruit.com/datasheets/ILI9341.pdf) §18.2.1 p.236、`VCI` Min 2.5 V）に対し、`VCC`直結・`U1`出力経由のいずれの給電経路でも余裕があることを確認した。**backlight電流が`U1`を経由するかは`HW-TBD-024`で未解決であり、経由すると判明した場合はこの下限の再導出を要するとcaveatを本文に明記した。**`#13`（LCD bring-up）向けに、表示不良時は先にrail電圧と`U1`出力を実測する運用も記録した。`許容電圧範囲`行と`解決経路は3つあり`の表も同期した。**`HW-TBD-002`（2026-09-06close）は経路(2)（MSP2807のVCCを5 V railへ移す）を解かないことも確認し、経路(2)は引き続きBlockedと明記した** | [UMW XC6206 datasheet](https://www.umw-ic.com/static/pdf/e442437afc9daa185da86486e2bfe8c5.pdf) Mar.2025、[ILI9341 Datasheet V1.11](https://cdn-shop.adafruit.com/datasheets/ILI9341.pdf) §18.2.1（2026-09-06取得）、[hardware-safety-policy.md](../governance/hardware-safety-policy.md)「5項目以外の扱い」節 |
+| 2026-09-06 | 89 | [#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)。**`3.3 V railの許容電圧範囲`の`ACCEL-01`行へ、Revision 88で確定したrail値（3.234–3.366 V）に対する個別の安全性確認を追加した。**`ACCEL-01`のmodule一般としての受け入れ電圧範囲は`HW-TBD-004`が未解決のままTBDだが、**このrail値についてはICの`VS`動作範囲2.0–3.6 V（typ 2.5 V。sensor-datasheet-notes.mdに既存記録、値は再掲していない）とADXL345のsupply current 140 µA typ（同）から、両端とも余裕を持って入ることを確認した。**headerとIC足の間の直列抵抗は現物未確認のままだが、下側余裕（約1.234 V）を使い切る抵抗値は`1.234 V ÷ 140 µA ≈ 8.8 kΩ`であり、供給pinに現実的な値と3桁近く離れているため、**直列抵抗の値によらず結論は変わらない**。**これは`HW-TBD-025`(a)（このrail値に対する安全性）の判断であり、`HW-TBD-004`（module一般としての受け入れ電圧範囲。I2Cアドレス等も含む）はcloseしていない。**`sensor-datasheet-notes.md`と`HW-TBD-004`行自体は、`#1`／`#2`との近接を避けるため触っていない | sensor-datasheet-notes.mdの`供給電圧（動作範囲）`行・`Supply Current`行（ADXL345 Rev. G。既存記録） |
