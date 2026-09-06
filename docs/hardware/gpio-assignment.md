@@ -1,15 +1,16 @@
 # GPIO Assignment
 
-> 状態: Blocked — 競合checklist（下記）の未達6件が理由である。1行ずつ書く。
+> 状態: Blocked — 競合checklist（下記）の未達7件が理由である。1行ずつ書く。
 > (1) `ADC-5V`／`ADC-3V3`分圧器（`MEAS-01`の10 kΩ×4）が未実装。
 > (2) `ACCEL-SDA`／`ACCEL-SCL`の外部4.7 kΩ pull-upと`LCD-BL`の外部4.7 kΩ pull-down（値・極性は2026-09-06に確定済み）がいずれも未実装（`LCD-CS`／`LCD-RST`／`TOUCH-CS`の3本は実装済み・3.3V接続確認済み）。
-> (3) MSP2807のlogic IO levelが非通電の現物確認待ち。
-> (4) ESP32電源投入前の外部moduleによるpin駆動有無が非通電の導通check待ち。
-> (5) `LCD-RST`／`LCD-CS`が`EN`でresetに保持した状態での再測定待ち（`LCD-BL`は実装と起動時確認も未実施）。
-> (6) `TOUCH-CS`が同じく`EN`保持での再測定待ち。
-> **servo起動時状態（`SERVO-PWM`のGPIO27起動時state）の安全reviewは2026-09-06に机上で完了し、この6件には含まれない。**サーボ出力を有効化してよいかの判断も別であり、[servo-safety-limits.md](servo-safety-limits.md#サーボ出力を有効化してよい条件)のgateが未解決のまま`Blocked`である。
-> **I2C実効pull-upの有効範囲（旧(3)）も2026-09-06に、初回bring-upのmodeをStandard-modeと決定して達成へ改めた。**根拠は[初回bring-upのmode決定](#初回bring-upのmode決定)節。
-> **(5)(6)は`#247`が止めている案A（Pi→ESP32のUSB OTG給電）を待たない。**`EN`保持測定はESP32単体・PC USB給電（段階B-1）で足り、`power-budget.md`は段階Aと段階B-1をgate不要・追加購入不要と定めている
+> (3) I2C実効pull-upが有効範囲内であることの確認待ち（`Cb`未測定。詳細は下記）。
+> (4) MSP2807のlogic IO levelが非通電の現物確認待ち。
+> (5) ESP32電源投入前の外部moduleによるpin駆動有無が非通電の導通check待ち。
+> (6) `LCD-RST`／`LCD-CS`が`EN`でresetに保持した状態での再測定待ち（`LCD-BL`は実装と起動時確認も未実施）。
+> (7) `TOUCH-CS`が同じく`EN`保持での再測定待ち。
+> **servo起動時状態（`SERVO-PWM`のGPIO27起動時state）の安全reviewは2026-09-06に机上で完了し、この7件には含まれない。**サーボ出力を有効化してよいかの判断も別であり、[servo-safety-limits.md](servo-safety-limits.md#サーボ出力を有効化してよい条件)のgateが未解決のまま`Blocked`である。
+> **I2C実効pull-upの有効範囲（(3)）は、2026-09-06に初回bring-upのmodeをStandard-modeと決定したことで一旦「達成」へ改めたが、同日PR #358のCodeRabbit手動reviewの指摘を受けて未達へ戻した。**mode決定（Standard-mode）自体は取り消していない。rise timeの制約（`Rp(max)`）には実配線の`Cb`が400 pFを超えても488 pFまで余裕があるが、**Standard-modeの規定`Cb`上限400 pFがrise time以外の制約（fall time等）にも由来する可能性を、この文書が引用した一次資料の範囲では排除できないため、`Cb`の実測または設計上の根拠を得るまで達成にしない。**根拠は[初回bring-upのmode決定](#初回bring-upのmode決定)節と競合checklistの当該項目。
+> **(6)(7)は`#247`が止めている案A（Pi→ESP32のUSB OTG給電）を待たない。**`EN`保持測定はESP32単体・PC USB給電（段階B-1）で足り、`power-budget.md`は段階Aと段階B-1をgate不要・追加購入不要と定めている
 > （**touch controller型番は2026-08-13に`XPT2046`と確定し、`HW-TBD-003`は2026-08-15にcloseした**）
 > 正本とする情報: ESP32 boardのpin割り当て
 
@@ -320,13 +321,17 @@ UM10204 Table 10の注記も、400 kHzでfull bus loadを駆動するには`VOL`
 ### 初回bring-upのmode決定
 
 **2026-09-06に、初回bring-upで採るmodeをStandard-mode（100 kHz）と決定した。**
-[#2](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/2)の受け入れchecklist
-「Moduleのpull-upを並列合成した実効抵抗が有効範囲内である」を、この決定で閉じる。
+**この決定自体は取り消していない。**ただし[#2](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/2)の受け入れchecklist
+「Moduleのpull-upを並列合成した実効抵抗が有効範囲内である」は、この決定だけでは閉じない
+（2026-09-06、PR #358のCodeRabbit手動reviewでの指摘を受けて訂正した。詳細は競合checklistの
+当該項目を参照。**ここへ再掲しない**）。
 
-**根拠。**上の`判断に使える境界`節のとおり、実構成（`Rp`約2.42 kΩ）はStandard-modeの
-規定`Cb`上限（400 pF）でも`Rp(max)`約2.945 kΩを下回り、**実配線の`Cb`を測らなくても
-有効範囲内と言える。**Fast-modeは規定`Cb`上限で`Rp(max)`約885 Ωとなり実構成を大きく
-下回るため成立しない（現在のpull-up構成のままではFast-modeを採れない）。
+**mode決定の根拠。**上の`判断に使える境界`節のとおり、実構成（`Rp`約2.42 kΩ）はStandard-modeの
+規定`Cb`上限（400 pF）でも`Rp(max)`約2.945 kΩを下回り、**rise timeの制約だけを見れば実配線の
+`Cb`を測らなくても余裕がある。**Fast-modeは規定`Cb`上限で`Rp(max)`約885 Ωとなり実構成を大きく
+下回るため成立しない（現在のpull-up構成のままではFast-modeを採れない）。**ただし「rise timeの
+制約に余裕がある」ことと「実効抵抗がStandard-modeの規定範囲内にあることの確認」は同じではない**
+（理由は競合checklistの当該項目に記載）。
 
 **用途側の要求を確認した。**現時点でこのbusを使う受け入れ条件（[#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)
 のaccelerometer bring-up、[#22](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/22)の軽打→驚く反応統合）は、
@@ -400,7 +405,7 @@ I2C busの速度と無関係である。加速度の軽打検出は`ACCEL-IRQ`�
 | LCD-BL | DISP-01 | Backlight | Output（PWM調光は将来検討） | GPIO4 | **不定**。ESP32のGPIO4はreset時にinput（内部weak pull-downあり）で、driveされた状態にはならない。ただし内部weak pullは外部回路に対して弱く、backlight回路の入力仕様によっては点灯しうる。firmwareまたは外部pullが確定させるまでOffを保証しない | **外部pull-down（確定）**（backlightをfirmware初期化前もOffに確定させるため）。**`4.7 kΩ`×`1本`を2026-09-06に確定した。**極性は2026-09-05に一次資料（MSP2807公式User Manual、`LED` pin「high level lighting」）で`active-high`と確定済みであり、現物確認は要しない（正は[sensor-datasheet-notes.md](sensor-datasheet-notes.md)の`Backlight回路／電流／polarity`行）。値は`SERVO-PWM`と同じ理由（未知の競合電流に対しては値を下げるほうが安全側）で選定した。**backlight点灯時の耐性電流上限（`HW-TBD-024`）はこの値の決定条件ではない**（消灯を維持するpull-downの仕事に点灯時の電流上限は関係しない。導出は[`LCD-BLを4.7 kΩにした理由`](#lcd-blを47-kωにした理由)節。**ここへ再掲しない**）。**本数は1本。実装と起動時の状態確認は未実施である** | 現状はdigital on/off。将来PWM調光も可能なpinを選定 | なし | 回路上のLED電流経路はmodule内蔵に依存。直接大電流をdriveしない（module側で電流制限されている前提、現物確認要） |
 | TOUCH-CS | TOUCH-01 | Chip select（touch controller用、LCD-SPIバスを共有） | Output | GPIO21 | 起動時floating→不定 | **外部`10 kΩ`×`1本`を選定した**（2026-08-25。LCD-CSと同じ理由）（導出は[起動時状態を確定させる外部pull](#起動時状態を確定させる外部pull)節。**ここへ再掲しない**）。**根拠は別である**（受け側がXPT2046であり、漏れ電流が\|`IIH`\| ≤ 5 µAでILI9341の1 µAより大きい。`Rmax`は196 kΩ）。**2026-08-27にブレッドボード上へ実装した。****2026-08-29に通電しての実測を行い、3.30 Vを得た。****ただしこの値は、pull-upが効いている場合と、firmwareがGPIO21をHighへ駆動している場合を区別しない。**測定時にboard上で走っていたfirmwareを同定していないため、**pull-upが正常であることの根拠にはならない**（受け入れchecklist参照） | **Active-low（一次資料で確定）。**XPT2046 datasheetのpin表が`CS`にoverlineを付けている。**現物のpolarity確認は要しない** | DISP-01とSCLK／MOSI／MISOを共有 | **Touch controllerは2026-08-13に`XPT2046`と確定した**（現物chip刻印。`hardware-bom.md` TOUCH-01）。polarityは`XPT2046`のdatasheetで確認する |
 | TOUCH-IRQ | TOUCH-01 | Interrupt（touch検出） | Input | GPIO34 | 入力専用、floating | **外部pullを付けない（本数0本）。**2026-08-25に一次資料から判定した。**XPT2046の`PENIRQ`は内部pull-up付きの出力**（公称50 kΩ）であり、外部pull-upは不要かつ**有害である**（並列に足すとlow levelが`0.35×VCC`の保証を超える）（導出は[起動時状態を確定させる外部pull](#起動時状態を確定させる外部pull)節。**ここへ再掲しない**）。**旧記載「外部pull-up推奨（一般的なtouch controllerはactive-low IRQ。要現物確認）」はcontroller未確定時の記述であり、2026-08-13の`XPT2046`確定で前提が変わっていた** | Edge／level要確認 | なし | Input-only pin。Output不可のため他用途に転用できない |
-| ACCEL-SDA | ACCEL-01 | I2C SDA | Bidirectional | GPIO25 | floating（open-drain想定） | 外部4.7kΩ pull-up（**一般値での開始値である。**I2Cのpull-up値は[hardware-safety-policy.md](../governance/hardware-safety-policy.md)の対応表で一般値で開始してよい側に置かれている（2026-08-26。ADR-0014／0016）。**導出された確定値ではない。**実効pull-upの式は[I2C busの実効pull-up](#i2c-busの実効pull-up)節にある。**ADXL345モジュールは`01C`＝10 kΩのpull-upを4個搭載しており、2026-08-27に現物写真でパターンを確認したところSDA・SCLへ各2本ずつ付いている**（各line並列合成で5.00 kΩ）） | 400kHz(Fast-mode)を想定、要実測 | ENV-01と共有 | ADXL345はI2C／SPI選択式。Interface選択jumperの現物確認が必要（`hardware-bom.md` ACCEL-01） |
+| ACCEL-SDA | ACCEL-01 | I2C SDA | Bidirectional | GPIO25 | floating（open-drain想定） | 外部4.7kΩ pull-up（**一般値での開始値である。**I2Cのpull-up値は[hardware-safety-policy.md](../governance/hardware-safety-policy.md)の対応表で一般値で開始してよい側に置かれている（2026-08-26。ADR-0014／0016）。**導出された確定値ではない。**実効pull-upの式は[I2C busの実効pull-up](#i2c-busの実効pull-up)節にある。**ADXL345モジュールは`01C`＝10 kΩのpull-upを4個搭載しており、2026-08-27に現物写真でパターンを確認したところSDA・SCLへ各2本ずつ付いている**（各line並列合成で5.00 kΩ）） | **100 kHz(Standard-mode)を初回bring-upとして採用した**（2026-09-06。導出は[初回bring-upのmode決定](#初回bring-upのmode決定)節。**ここへ再掲しない**）。**Fast-modeへの変更にはpull-up値の再設計が要る**（現構成はFast-modeの`Rp(max)`を満たさない）。旧記載「400kHz(Fast-mode)を想定、要実測」はmode決定前の記述であり訂正した | ENV-01と共有 | ADXL345はI2C／SPI選択式。Interface選択jumperの現物確認が必要（`hardware-bom.md` ACCEL-01） |
 | ACCEL-SCL | ACCEL-01 | I2C SCL | Bidirectional | GPIO26 | 同上 | 同上 | 同上 | ENV-01と共有 | 同上 |
 | ACCEL-IRQ | ACCEL-01 | Interrupt（tap／free-fall検出） | Input | GPIO35 | 入力専用 | **外部pull要確認**（`HW-TBD-004`）。**ICの事実:**ADXL345のINT1/INT2は**push-pull固定**であり、設定で切り替えられない（`Both interrupt pins are push-pull, low impedance pins`。Rev. G page 19）。polarityは`DATA_FORMAT` register（`0x31`）の`INT_INVERT` bitで選び、**同registerのreset値が`00000000`であるためICの既定はactive-highである**（Rev. G Table 19 page 23、page 27）。**旧記載の「push-pull／open-drainを設定可能」はICの事実として誤りであり、2026-08-12に訂正した**（Revision 9）。**module levelは別である。**M-06724のboard上でINT pinがheaderへ直結しているか（直列抵抗、level shift、引き出しの有無）を示す資料が無いため、**外部pullの要否とheaderで観測されるpolarityは現物確認まで確定しない。ICがpush-pullであることからmoduleの配線条件を導かない**（[tbd-register HW-TBD-004](tbd-register.md)） | Edge想定 | なし | ADXL345のtap／free-fall検出hardwareを軽打／持ち上げ判定に使う場合に使用（`hardware-bom.md` ACCEL-01の採用理由） |
 | ENV-SDA | ENV-01 | I2C SDA | Bidirectional | GPIO25（ACCEL-01と共有） | 同上 | 同上 | 同上 | ACCEL-01と共有 | BME280はI2C／SPI選択式。**2026-08-22に選択jumperを実測し、`J1`／`J2`／`J3`は3つとも開放であると確定した**（正は[sensor-datasheet-notes.md](sensor-datasheet-notes.md)の`現物の実装状態を実測で確定させた（2026-08-22）`）。**したがってI2Cで使うには`J3`のはんだ付けが要る**（実装作業）。**module搭載の4.7 kΩプルアップも繋がっていない** |
@@ -451,14 +456,26 @@ PCからflashingするときは同じUSB portを使うため、Piとの同時接
 - [x] 共有SPI上の各deviceに個別CSがある（LCD: GPIO22、Touch: GPIO21）
 - [x] I2C deviceのaddressが一意、または明示的な対策がある（**候補の全組み合わせで衝突しない。**ADXL345は`0x1D`（`SDO/ALT ADDRESS`をhigh）／`0x53`（同pinをGNDへ）、BME280は`0x76`（`SDO`→GND）／`0x77`（`SDO`→VDD）であり、**2×2の4通りすべてで重複が無い**（2026-08-25に確認）。**したがってaddressの選択は衝突回避を理由に決まらない。**候補の出所は[sensor-datasheet-notes.md](sensor-datasheet-notes.md)であり、**ここへ再掲しない。****両moduleとも`SDO`が基板上で固定されていないことを実測で確定しており**（2026-08-22）、**どちらのaddressも配線しなければ定まらない。**未接続のまま通電しない。選択の判断材料は[I2C addressの選択](#i2c-addressの選択)節にある）
 - [ ] すべての外部pull-upが3.3Vへ接続され、5Vへ接続されていない（`電圧domain`節で規定済み。**内訳を明確にする。**`LCD-CS`／`LCD-RST`／`TOUCH-CS`の3本（10 kΩ pull-up）はRevision 20でブレッドボードへ実装済みであり、Revision 21の配線色確認（黄／紫／茶がいずれも`3V3`帯）で**3.3Vへの接続そのものは確認済みである**（5Vへの誤接続はない）。**未検証のまま残るのは他2本であり、いずれも値・極性は選定済みで実配線だけが未実施である。**`ACCEL-SDA`／`ACCEL-SCL`の外部4.7 kΩ pull-upは値を選定済みだが実配線がまだ存在しない。`LCD-BL`のpull-down（`4.7 kΩ`×1本）も2026-09-06に値と極性を確定したが、実配線はまだ存在しない（導出は[`LCD-BLを4.7 kΩにした理由`](#lcd-blを47-kωにした理由)節）。項目全体としては後者2本の配線が残るため`[ ]`のまま）
-- [x] Moduleのpull-upを並列合成した実効抵抗が有効範囲内である（**式と前提の正本は[I2C busの実効pull-up](#i2c-busの実効pull-up)節である。****ADXL345は`01C`＝10 kΩ×4を搭載しており、2026-08-27に現物写真でパターンを確認した結果、SDA・SCLへ各2本ずつ付き、各lineの合成値は5.00 kΩである。**BME280は`J1`／`J2`のはんだジャンパで4.7 kΩの接続を選ぶ設計で、**2026-08-22の導通確認で両方とも開放と確定した。したがって実効pull-upの計算にBME280側の4.7 kΩを入れない。****`J1`／`J2`をはんだ付けするかはこの計算の結果で決める。まだ決めていない（残る未確定入力は`bus容量Cb`のみ。採るmodeは下記のとおり2026-09-06に決定済み）。**
+- [ ] Moduleのpull-upを並列合成した実効抵抗が有効範囲内である（**式と前提の正本は[I2C busの実効pull-up](#i2c-busの実効pull-up)節である。****ADXL345は`01C`＝10 kΩ×4を搭載しており、2026-08-27に現物写真でパターンを確認した結果、SDA・SCLへ各2本ずつ付き、各lineの合成値は5.00 kΩである。**BME280は`J1`／`J2`のはんだジャンパで4.7 kΩの接続を選ぶ設計で、**2026-08-22の導通確認で両方とも開放と確定した。したがって実効pull-upの計算にBME280側の4.7 kΩを入れない。****`J1`／`J2`をはんだ付けするかはこの計算の結果で決める。まだ決めていない（残る未確定入力は`bus容量Cb`のみ。採るmodeは下記のとおり2026-09-06に決定済み）。**
   **2026-09-06に、`SERVO-PWM`項目と同じ「値によらず判定できるか」を検討したが、この項目は同じ形では閉じられない。**`Rp(min)`側（約967 Ω、`VDD(max)`と`IOL`だけで決まる）は実構成の`Rp`約2.42 kΩが常に上回り、`Cb`／modeの値によらず成立する。**しかし`Rp(max)`側は`Cb`とmodeに依存し、両方の値によっては不成立になる組み合わせが実在する。**Fast-modeで`Cb`が規定上限の400 pFに達した場合、`Rp(max)`は約885 Ωとなり実構成の約2.42 kΩを下回る（`判断に使える境界`節に既出）。**したがって「`Cb`とmodeが何であっても有効範囲内」とは言えない。**servoの場合と違うのは、servoは「どんな閾値でもPWMとして復号されない」という**否定形**を示せたのに対し、こちらは「ある組み合わせ（Fast-mode かつ 高`Cb`）では実際に成立しない」ことがすでに分かっている点である。**閉じるには、少なくとも採るmodeを決める必要がある。**Standard-modeを採る場合に限定すれば、同modeの規定`Cb`上限（400 pF）における`Rp(max)`は約2.945 kΩであり、実構成の約2.42 kΩはこの上限を下回るため、**実配線の`Cb`を測らなくても「Standard-modeなら有効範囲内」と言える。**この条件付きの結論はmode選定の判断材料になった。**2026-09-06に、初回bring-upで採るmodeを
   Standard-modeへ決定した（人間の判断。根拠は[初回bring-upのmode決定](#初回bring-upのmode決定)節）。
   **Standard-modeが決まったことで、規定`Cb`上限（400 pF）における`Rp(max)`約2.945 kΩを実構成の
-  約2.42 kΩが下回ることが確定し、実配線の`Cb`を測らなくても有効範囲内と言える。**したがって
-  この項目を達成とする。**Fast-modeへの見直しが必要になった場合は、まずpull-up値の再設計から
-  着手する（現構成はFast-modeの`Rp(max)`約885 Ωを満たさない）。`J1`／`J2`をはんだ付けするかの
-  判断はこのmode決定の対象外であり、`bus容量Cb`が未確定のまま別途残る
+  約2.42 kΩが下回ることが確定した。**
+  **2026-09-06に、CodeRabbitの手動review（PR #358）で、この結論だけでは項目を達成にできないという指摘を受け、検討のうえ採用した。**
+  `Rp(max)`約2.945 kΩという数字は**rise time（`tr`）の制約からRpの側で導いた上限であり、
+  「実配線のCbがStandard-modeの規定上限400 pFを超えていないこと」を示すものではない。**
+  実構成`Rp`（約2.42 kΩ）を使えば、rise timeの制約だけを見るなら実際には`Cb`が約488 pFまで
+  許容される（`Rp(max) = tr/(0.8473×Cb)`を`Cb`について解いた値）。**しかしStandard-modeの
+  `Cb`上限400 pFは、この文書が引用した一次資料の範囲では、rise time以外の制約（fall time等、
+  driveする素子の出力impedanceに依存し`Rp`の選定では動かせない可能性がある制約）から来ている
+  可能性があり、この文書は`tr`／`Cb`／`IOL`の列しか引用していないため、その制約の有無を
+  確認できていない。**したがって、実配線の`Cb`が400 pFを超えて488 pF以下に収まる場合、
+  rise timeの計算だけは通っても、Standard-modeとして規定範囲内と言い切れない可能性が残る。
+  **実配線の`Cb`が存在しない現状では、これを判定できない。****mode決定（Standard-mode採用）は
+  取り消さない。**初回bring-upの選択としては変わらず有効である。**ただしこの項目（実効抵抗が
+  有効範囲内である）は、実配線の`Cb`を測定するか、`Cb`≤400 pFを裏付ける設計上の根拠を得るまで、
+  未達のまま残す。**`J1`／`J2`をはんだ付けするかの判断もこのmode決定の対象外であり、
+  `bus容量Cb`が未確定のまま別途残る
 - [ ] MSP2807のlogic IOが3.3Vで動作することを現物で確認した（VCC 3.3–5V対応だがlogic IOは3.3V TTL。`power-budget.md`参照）
 - [ ] ESP32の電源投入前に外部moduleがESP32 pinをdriveしない（未検証、実機電源offでの導通checkが必要）
 - [ ] Resetとbacklight lineが安全な状態で起動する（LCD-RST/LCD-CSへの外部pull-up実装が前提。**2026-08-25に値と本数を選定した**（`LCD-RST`／`LCD-CS`とも10 kΩ×1本。導出は[起動時状態を確定させる外部pull](#起動時状態を確定させる外部pull)節）。**2026-08-27にブレッドボード上へ実装した。****2026-08-29に通電しての実測を行い、`LCD-CS`(GPIO22)＝3.30 V、`LCD-RST`(GPIO16)＝3.30 Vを得た**（USB抜き差しによる再現性も確認した）。**ただしこの値は、pull-upが効いている場合と、firmwareが当該pinをHighへ駆動している場合を区別しない。**測定時にboard上で走っていたfirmwareを同定していないため、**pull-upが正常であることの根拠にはならない**（`TOUCH-CS`と同じ制約である。同項目に詳しい）。**満たすには`EN`でresetに保持した状態での測定が要る。****`LCD-BL`は2026-09-06に値・極性（`4.7 kΩ`×1本、`active-high`）を確定したが、実装と起動時の状態確認（backlight Offを維持しているか）はまだ行っていない。**この項目自体は`LCD-RST`／`LCD-CS`の再測定と`LCD-BL`の実装・確認がいずれも未完了のため満たしていない。**[`HW-TBD-032`](tbd-register.md)で追跡する）
@@ -534,3 +551,4 @@ environment sensor、servo、ADC測定、UART）にGPIO番号が入っており�
 | 2026-09-06 | 27 | [#2](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/2)。PMの決定と質問を反映した。**(a) 初回bring-upで採るI2C modeをStandard-mode（100 kHz）と決定した（人間の判断）。**`I2C busの実効pull-up`節に`初回bring-upのmode決定`小節を新設し、根拠（実構成`Rp`約2.42 kΩはStandard-modeの規定`Cb`上限400 pFでも`Rp(max)`約2.945 kΩを下回り成立、Fast-modeは`Rp(max)`約885 Ωで不成立）、下流要件の確認結果（`#12`／`#15`／`#22`の受け入れ条件に具体的な下限bus速度の要求は無く、`ACCEL-IRQ`によるhardware割り込み設計とBME280の秒order pollingであればStandard-modeで足りる）、見直し条件（Fast-modeが要るならpull-up値の再設計から。`sensor-datasheet-notes.md`の`検証済み最大bus速度`は変更しない）を記録した。checklist「Moduleのpull-upを並列合成した実効抵抗が有効範囲内である」を`[x]`へ改めた。**`J1`／`J2`をはんだ付けするかの判断はこの決定の対象外のまま残した（`bus容量Cb`が未確定）。**(b) `LCD-BL`のpull-down値が`HW-TBD-024`待ちだとしていた記載を訂正した。**`HW-TBD-024`（MSP2807が耐えられる電流の上限）は backlightを点灯させるときの電流制限設定に要る値であり、firmware初期化前にGPIO4をLowへ保って消灯を維持するpull-downの仕事とは無関係である。**`LCD-BL`が決まらない実際の理由は極性の現物未確認（`HW-TBD-032`）1点であると判定した。`LCD-BLを決められない理由`節、`信号inventory`の`LCD-BL`行、checklist L391の該当箇所を訂正した。**値の選定自体（`4.7 kΩ`か`10 kΩ`か）は極性確定後に`SERVO-PWM`と同じ一般値の方法で決められる見込みであることも記録したが、極性の現物確認はこの作業指示書の範囲（机上）では行っていないため、値そのものは選定していない。**(c) 文書冒頭`状態`行を、(a)(b)の変更を反映して未達6件へ更新した | PM（deskcat-f2）の決定・質問、[#12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)／[#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)／[#22](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/22)の受け入れ条件、[tbd-register.md](tbd-register.md) `HW-TBD-024`／`HW-TBD-032` |
 | 2026-09-06 | 28 | [#2](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/2)。**Revision 27の判定は、それ自体が古い前提に基づいていた。**PMから`HW-TBD-032`（owner `#2`）のstale記述（後述）を指摘された過程で判明した。**`LCD-BL`の極性は2026-09-05にすでに一次資料で確定していた**（MSP2807公式User Manual、LCDWIKI、Interface Description表が`LED` pinを「high level lighting」と定める。正は[sensor-datasheet-notes.md](sensor-datasheet-notes.md)の`Backlight回路／電流／polarity`行、Revision 12）。**Revision 27はこの確定を見落とし、「極性の現物未確認が残る」と誤って報告した。**`gpio-assignment.md`側（この文書）が2026-09-05の確定を反映していなかったため、`tbd-register.md`・`sensor-datasheet-notes.md`を照合せずに判定した結果である。**訂正する。**極性が確定済みである以上、Revision 27で示した「極性確定後に`SERVO-PWM`と同じ一般値の方法で決められる」という条件は満たされたため、**`LCD-BL`のpull-downを`4.7 kΩ`×1本に確定した。**`選定した値と本数`表、`LCD-BLを4.7 kΩにした理由`節（旧`LCD-BLを決められない理由`。見出しも実体に合わせて改めた）、`信号inventory`の`LCD-BL`行、checklist L391／L395、文書冒頭`状態`行を更新した。**あわせて`tbd-register.md`の`HW-TBD-032`（owner `#2`）を、実装状況（`LCD-CS`／`LCD-RST`は実装済み、未実装は`LCD-BL`のみ）と極性確定の反映が遅れていた点を含めて訂正した（別途同file側のRevisionで記録）。**このRevisionは、今日指摘・修正してきた「実体が進んだのに参照側が取り残される」型の不整合を、自分自身の直前の判定でも起こしていたことの記録である | PM（deskcat-f2）指摘、[sensor-datasheet-notes.md](sensor-datasheet-notes.md) Revision 12、[tbd-register.md](tbd-register.md) `HW-TBD-032` |
 | 2026-09-06 | 29 | [#2](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/2)。**commit前の自己レビュー（要件照合Passとfresh-context Pass）で検出した3件を反映した。**(a) `LCD-BLを4.7 kΩにした理由`節末尾の結論文が、直前の箇条書き（極性確定・値確定）と矛盾していた。「`LCD-BL`の値と向きは`HW-TBD-032`（極性の現物確認）の後に決める」「極性の現物確認は…この作業指示書の範囲では行っていない」という、Revision 28以前の未確定を前提にした文をRevision 28後も直しておらず、同じ節の中で「確定した」と「未確定」が両方書かれていた。**値・向き・本数が確定済みであることを述べる形へ書き直した。**(b) checklist L392（I2C実効pull-upの有効範囲）の本文中に、mode決定（Revision 27で`[x]`化した同じ文の中）より後ろの文で「残る未確定入力は`bus容量Cb`と`採るmode`の2つである」という、mode決定前の文言が残っていた。**採るmodeは決定済みである旨へ訂正した。**(c) 受け入れ条件7件目「最初のbring-up範囲について未解決GPIOがない」の範囲定義を、これまでPMへの報告（chat）でのみ述べており、**正本である本文書には一度も書いていなかった。**新設した`初回bring-upの範囲`節（`競合check`の直後）に、含める範囲（ESP32単体・PC USB給電・`信号inventory`の全信号へのGPIO割り当てと起動時state確定）と含めない範囲（`#247`のPi給電、servoの実actuator動作）を明記し、この定義の下で未解決GPIOが無いことを示した。**要件照合Passはこの3件で1 round目に0件へ収束していない。****fresh-context Passで(a)(b)を、要件照合Passで(c)を検出した。**この訂正後に改めて両Passを実施し、新規指摘0件を確認した（2 round目） | 自己レビュー（`CONTRIBUTING.md`「自己レビュー」の2つのPass） |
+| 2026-09-06 | 30 | [#2](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/2)。**PR #358へ手動で依頼したCodeRabbit reviewの指摘2件を反映した。**(a) `信号inventory`の`ACCEL-SDA`行が、初回bring-upのmode決定（Standard-mode、Revision 27）の後も「400kHz(Fast-mode)を想定、要実測」というmode決定前の記述のままだった。**Standard-mode採用と、Fast-modeへ変更する場合はpull-up再設計が要る旨へ訂正した。**(b) checklist「Moduleのpull-upを並列合成した実効抵抗が有効範囲内である」を、Revision 27で「Standard-mode採用により実配線の`Cb`を測らなくても有効範囲内」として`[x]`にしていたが、**この判定は不十分だった。**`Rp(max)`約2.945 kΩ（Standard-modeの規定`Cb`上限400 pFから導いた値）は**rise timeの制約から`Rp`側で導いた上限であり、実配線の`Cb`が規定上限400 pFの範囲内であることを示すものではない。**実構成`Rp`（約2.42 kΩ）を使えばrise timeの制約だけなら`Cb`は約488 pFまで許容されるが、**Standard-modeの`Cb`上限400 pFがrise time以外の制約（fall time等、`Rp`の選定では動かせない可能性がある制約）にも由来するかどうかを、この文書が引用した一次資料（`tr`／`Cb`／`IOL`の列のみ）の範囲では確認できていない。**したがって、実配線の`Cb`が400〜488 pFの間にある場合、rise timeの計算は通ってもStandard-modeとして規定範囲内と言い切れない可能性が残る。**mode決定（Standard-mode採用）自体は取り消さない**（初回bring-upの選択としては変わらず有効）が、**この checklist項目は`Cb`の実測または設計上の根拠を得るまで未達へ戻した。**文書冒頭`状態`行も未達7件へ戻した。**受け入れ条件5件目（I2C addressとpull-upに互換性がある）の判定は変えていない。**同判定は`Rp(min)`（`Cb`／modeによらず常に成立し、素子の破損に至らないことの根拠）に基づくものであり、今回reopenしたのは`Rp(max)`側（通信の正しさに関わるが、外れても安全要件5項目には該当しない一般値tierの論点）である | PR #358のCodeRabbit手動review（2026-09-06、`@coderabbitai full review`） |
