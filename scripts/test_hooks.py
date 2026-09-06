@@ -836,6 +836,33 @@ class TruncationGuardTests(unittest.TestCase):
         """
         self.assertAsked("gh pr list --limit abc")
 
+    def test_duplicate_limit_uses_the_last_value(self):
+        """`--limit`の重複指定は最後の値で判定する（`#355`のreview指摘）。
+
+        GitHub CLIのscalar型`--limit`は、重複指定時に最後の値が有効になる。
+        `--limit 1000 --limit 50`の実効値は`50`であり、最初の値（1000、閾値以上）
+        で「大きい」と誤判定してはならない。
+        """
+        self.assertAsked(
+            "gh pr list --limit 1000 --limit 50 --json number", contains="--limit 50"
+        )
+
+    def test_global_option_before_subcommand_is_detected(self):
+        """subcommandの前のglobal optionを見落とさない（`#355`のreview指摘）。
+
+        `git -C <path> log`／`gh --repo <owner/repo> pr list`は、subcommandの
+        前にrepositoryを指定するglobal optionを置く。`_match_target`が
+        executableの直後だけを見ると、これらを対象外と誤判定して切り詰めを
+        見逃す。
+        """
+        for command in (
+            "git -C /tmp/repo log -n 1",
+            "gh --repo owner/repo pr list --limit 1",
+            "gh -R owner/repo issue list --limit 1",
+        ):
+            with self.subTest(command=command):
+                self.assertAsked(command)
+
     def test_compound_command_is_inspected(self):
         """`cd x && gh pr list | head -8`を見落とさない。"""
         self.assertAsked("cd /tmp && gh pr list | head -8")
@@ -1012,6 +1039,41 @@ class StopClaimGuardTests(unittest.TestCase):
             [TRANSCRIPT_HUMAN_STRING, _assistant_tool_use("Bash", "git status")],
         )
 
+    def test_dry_run_push_is_not_evidence(self):
+        """`git push --dry-run`は完了の証拠にならない（`#355`のreview指摘）。
+
+        `--dry-run`は実際には何も送信しない。subcommandが一致するだけで
+        証拠として数えると、送信していないことを「pushしました」と主張できてしまう。
+        """
+        self.assertBlocked(
+            "pushしました",
+            [TRANSCRIPT_HUMAN_STRING, _assistant_tool_use("Bash", "git push --dry-run origin main")],
+        )
+
+    def test_auto_merge_is_not_evidence(self):
+        """`gh pr merge --auto`は完了の証拠にならない（`#355`のreview指摘）。
+
+        `--auto`は要件が揃うまでの予約であり、その場でmergeするわけではない。
+        """
+        self.assertBlocked(
+            "mergeしました",
+            [TRANSCRIPT_HUMAN_STRING, _assistant_tool_use("Bash", "gh pr merge 1 --auto")],
+        )
+
+    def test_actual_push_is_still_evidence(self):
+        """`--dry-run`を伴わない`git push`は引き続き証拠になる。"""
+        self.assertAllowed(
+            "pushしました",
+            [TRANSCRIPT_HUMAN_STRING, _assistant_tool_use("Bash", "git push origin main")],
+        )
+
+    def test_actual_merge_is_still_evidence(self):
+        """`--auto`を伴わない`gh pr merge`は引き続き証拠になる。"""
+        self.assertAllowed(
+            "mergeしました",
+            [TRANSCRIPT_HUMAN_STRING, _assistant_tool_use("Bash", "gh pr merge 1 --squash")],
+        )
+
     def test_quoted_claim_is_not_counted(self):
         """引用（`「」`）の中の語は主張として数えない。"""
         self.assertAllowed("彼は「送りました」と言っていた", [TRANSCRIPT_HUMAN_STRING])
@@ -1097,6 +1159,28 @@ class StopClaimGuardTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0)
         self.assertEqual(result.stdout.strip(), "")
+
+    def test_non_string_transcript_path_is_allowed(self):
+        """`transcript_path`が文字列以外のtruthy値でも`TypeError`を出さず通す。
+
+        `#355`のreview指摘。非空listや数値は真偽値としてtruthyだが、`open()`へ
+        渡すと`TypeError`になる。
+        """
+        for transcript_path in ([1, 2], {"a": 1}, 123):
+            with self.subTest(transcript_path=transcript_path):
+                payload = {
+                    "last_assistant_message": "送りました",
+                    "transcript_path": transcript_path,
+                    "scratchpad_dir": self._scratchpad(),
+                }
+                result = subprocess.run(
+                    [sys.executable, STOP_CLAIM_GUARD],
+                    input=json.dumps(payload, ensure_ascii=False),
+                    capture_output=True, text=True, encoding="utf-8", timeout=60,
+                )
+                self.assertEqual(result.returncode, 0)
+                self.assertEqual(result.stderr, "")
+                self.assertEqual(result.stdout.strip(), "")
 
     def test_broken_input_does_not_block(self):
         """hookの入力が壊れていることを、対象応答の問題として扱わない。"""

@@ -24,7 +24,9 @@ where
     /// `value`が`min`未満または`max`超過なら[`ConfigError::OutOfRange`]を返す。
     /// **panicしない。**呼び出し側から渡る値をprocessの終了で扱わない。
     pub fn new(value: T, min: T, max: T) -> Result<Self, ConfigError> {
-        if value < min || value > max {
+        // `value < min || value > max`だと、`NaN`はどちらの比較も`false`になり
+        // 範囲外として拒否できない。両側の包含比較が成立する条件で判定する。
+        if !(min <= value && value <= max) {
             return Err(ConfigError::OutOfRange {
                 value: format!("{value:?}"),
                 min: format!("{min:?}"),

@@ -22,3 +22,10 @@ fn value_below_min_is_rejected() {
 
     assert!(matches!(result, Err(ConfigError::OutOfRange { .. })));
 }
+
+#[test]
+fn nan_is_rejected() {
+    let result = Bounded::new(f64::NAN, 0.0, 10.0);
+
+    assert!(matches!(result, Err(ConfigError::OutOfRange { .. })));
+}

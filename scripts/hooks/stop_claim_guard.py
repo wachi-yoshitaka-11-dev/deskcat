@@ -55,6 +55,13 @@ https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/348)）とは逆の
 あり、素通りさせても失うのは1回の検出機会だけで取り返しがつく。誤検知で
 作業が止まる代償のほうが大きい（指示書「誤検知は門を殺す」）。
 
+## 完了していない操作を証拠として扱わない
+
+`git push --dry-run`（何も送信しない）と`gh pr merge --auto`（要件が揃うまでの
+予約）は、subcommandだけを見ると証拠に見えるが完了ではない。`CLAIM_CATEGORIES`
+の`disqualifying_flags`に列挙し、これらのflagを伴う呼び出しは証拠として数えない
+（[#355](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/355)の`full review`で見つかった）。
+
 ## 無限loop防止
 
 **同じ主張分類に対してblockするのは1回だけとし、2回目は通す**（PMの訂正3、
@@ -88,10 +95,14 @@ CLAIM_CATEGORIES = {
     "merge": {
         "phrases": ("mergeしました", "mergeした"),
         "gh_subcommand": ("pr", "merge"),
+        # `--auto`は要件が揃うまでの予約であり、mergeそのものではない。
+        "disqualifying_flags": ("--auto",),
     },
     "push": {
         "phrases": ("pushしました", "pushした"),
         "git_subcommand": "push",
+        # `--dry-run`／`-n`は実際には送信しない。
+        "disqualifying_flags": ("--dry-run", "-n"),
     },
 }
 
@@ -210,16 +221,31 @@ def _tool_uses_since_last_human_turn(entries):
     return tool_uses
 
 
-def _gh_invocation_matches(command, subcommand):
+def _gh_invocation_matches(command, subcommand, disqualifying_flags=()):
+    """`command`が`gh <subcommand>`の呼び出しかを見る。
+
+    `disqualifying_flags`のいずれかを伴う呼び出しは、subcommandが一致しても
+    証拠として数えない（`gh pr merge --auto`は要件が揃うまでの予約であり、
+    mergeの完了ではない）。
+    """
     for args in command_line.invocations(command, "gh"):
-        if tuple(args[:2]) == subcommand:
+        if tuple(args[:2]) == subcommand and not any(
+            flag in args for flag in disqualifying_flags
+        ):
             return True
     return False
 
 
-def _git_invocation_matches(command, subcommand):
+def _git_invocation_matches(command, subcommand, disqualifying_flags=()):
+    """`command`が`git <subcommand>`の呼び出しかを見る。
+
+    `disqualifying_flags`のいずれかを伴う呼び出しは証拠として数えない
+    （`git push --dry-run`は実際には何も送信しない）。
+    """
     for args in command_line.invocations(command, "git"):
-        if args[:1] == [subcommand]:
+        if args[:1] == [subcommand] and not any(
+            flag in args for flag in disqualifying_flags
+        ):
             return True
     return False
 
@@ -228,6 +254,7 @@ def _category_has_evidence(category, tool_uses):
     """`category`に対応するtool呼び出しが`tool_uses`にあるかを見る。"""
     spec = CLAIM_CATEGORIES[category]
     tool_name = spec.get("tool")
+    disqualifying_flags = spec.get("disqualifying_flags", ())
     for block in tool_uses:
         name = block.get("name")
         if tool_name is not None:
@@ -241,10 +268,14 @@ def _category_has_evidence(category, tool_uses):
         if not isinstance(command, str):
             continue
         gh_subcommand = spec.get("gh_subcommand")
-        if gh_subcommand is not None and _gh_invocation_matches(command, gh_subcommand):
+        if gh_subcommand is not None and _gh_invocation_matches(
+            command, gh_subcommand, disqualifying_flags
+        ):
             return True
         git_subcommand = spec.get("git_subcommand")
-        if git_subcommand is not None and _git_invocation_matches(command, git_subcommand):
+        if git_subcommand is not None and _git_invocation_matches(
+            command, git_subcommand, disqualifying_flags
+        ):
             return True
     return False
 
@@ -303,7 +334,11 @@ def main():
         return 0
 
     transcript_path = payload.get("transcript_path")
-    entries = _read_transcript_entries(transcript_path) if transcript_path else None
+    # 文字列以外のtruthy値（非空list、object、非zero数値等）が渡ると、
+    # `_read_transcript_entries`の`open()`が`TypeError`を投げる。
+    # 文字列であることを先に確かめ、そうでなければ「読めない」として通す。
+    has_transcript_path = isinstance(transcript_path, str) and transcript_path
+    entries = _read_transcript_entries(transcript_path) if has_transcript_path else None
     if entries is None:
         # transcriptを読めない。**判定できないため通す。**素通りの帰結は
         # 検出機会を1回失うだけであり、外部へ何かが残るわけではない。
