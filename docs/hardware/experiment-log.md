@@ -22,6 +22,7 @@
 | [EXP-008](#exp-008-段階b-1でのpi単体build負荷比較とesp32側基準値) | `HW-TBD-023`（この記録は判定に使っていない） | 値の正なし（`HW-TBD-023`が未確定であり、正本側に置ける確定値がまだ無い） |
 | [EXP-009](#exp-009-案aの再現3回と停止時刻の記録) | [#247](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/247) | 値の正なし（事象記録。原因は未確定） |
 | [EXP-010](#exp-010-pi入力の独立観測系の構築と初回測定) | `HW-TBD-034` 方式1のPi入力への拡張 | [power-budget.md](power-budget.md)の`5 V railをADCへ直結する条件`、`GND topology（測定前に必ず確定させる）` |
+| [EXP-011](#exp-011-en保持での起動時状態の再測定lcd-cslcd-rsttouch-cslcd-bl) | `#2`受け入れchecklist項目6・7 | [gpio-assignment.md](gpio-assignment.md)の`競合check` |
 
 **大容量の生dataはこのrepositoryへ入れていない。**保存場所は
 [development-foundation-plan.md](../planning/development-foundation-plan.md)の
@@ -1036,6 +1037,46 @@ cable別の回数（**作業者の申告**。journalからは導けない）。
 - **対照chにより、AV<sub>CC</sub>の変動ではないことを分離できた。**`3V3`を同時に読む構成がこの分離を可能にした。**ただし`3V3`の生成経路をschematic粒度で確認していないため、これをAV<sub>CC</sub>の補正には使っていない。**
 - **`HW-TBD-034`はcloseしない。**(3) GND topologyは`PSU-INGRESS-01`の着荷まで完了しない。**この測定で得た値を受け入れ判定に使わない。**
 
+## EXP-011: `EN`保持での起動時状態の再測定（`LCD-CS`／`LCD-RST`／`TOUCH-CS`／`LCD-BL`）
+
+**目的**: `#2`受け入れchecklist項目6（Reset／backlight lineが安全な状態で起動）と項目7（Touch CS lineが安全な状態で起動）を判定する。**2026-08-29の実測（`LCD-CS`＝3.30 V、`LCD-RST`＝3.30 V、`GPIO21`＝3.30 V）は`EN`保持なしで行われており、「pull-upが効いている」場合と「firmwareがpinをHighへ駆動している」場合を区別できなかった。**`EN`を押し続けてESP32をresetに保持すれば、firmwareが動かない状態でpull-up単体の効果だけを測れる（`fc42332`の`SERVO-PWM`測定と同じ方法）。あわせて、本日（`#2`の段1）新規実装した`LCD-BL`のpull-down（`4.7 kΩ`、GPIO4）についても、起動時にLowへ確定していることをこの機会に測る。
+
+**実施日**: 2026-09-07（JST）。人間が物理的に立ち会い、DT830Bのプローブ当てと読み取りを行った。
+
+### 構成
+
+| 項目 | 内容 |
+|---|---|
+| 給電 | ESP32単体、PCのUSBから（段階B-1）。**Piは接続していない。servoは未接続・servo電源未投入** |
+| `EN`保持 | `EN`ピンを指で押し込み、テープで基板へ貼り付けて固定した |
+| プローブ固定 | 黒プローブ（GND側）をクリップでブレッドボードのGND帯へ固定し、赤プローブを片手で各測定点へ当てた |
+| 計器 | DT830B、DC電圧`20V`レンジ |
+| 測定対象 | `LCD-CS`(GPIO22)、`LCD-RST`(GPIO16)、`TOUCH-CS`(GPIO21)、`LCD-BL`(GPIO4)。いずれも対GND |
+
+### 結果
+
+| 信号 | GPIO | 実測 | 期待値 | 判定 |
+|---|---|---|---|---|
+| `LCD-CS` | 22 | **3.31 V** | High（外部pull-up`10 kΩ`が効く） | 一致 |
+| `LCD-RST` | 16 | **3.31 V** | High（外部pull-up`10 kΩ`が効く） | 一致 |
+| `TOUCH-CS` | 21 | **3.31 V** | High（外部pull-up`10 kΩ`が効く） | 一致 |
+| `LCD-BL` | 4 | **0.00 V** | Low（reset中にLowへ確定） | 一致 |
+
+**4点とも、`EN`を押した状態と離した状態とで値に変化が無いことを、作業者が申告した。**中止条件（異音・異臭・発熱・煙・変色・想定と桁が違う電圧・`DT830B`の表示が不安定）はいずれも認めなかった。
+
+### この記録が主張しないこと
+
+- **確度は主張しない。**`DT830B`の確度そのものは未取得であり、`±10 mV`程度は最小単位からの不確かさの下限にすぎない
+- **`LCD-BL`の極性（`active-high`）はここでは検証していない。**確認したのは「firmware初期化前にLowへ確定していること」だけである
+- **`LCD-BL`（GPIO4）の0.00 Vは、外部pull-downの存在を証明しない。**`reset時のpin状態`表（`IO_MUX`）のとおり、GPIO4は`LCD-CS`／`LCD-RST`／`TOUCH-CS`（いずれも`oe=0, ie=0`＝内部pull無し）と異なり、`oe=0, ie=1, wpd`＝**内部weak pull-down（typ 45 kΩ）が有効**である。したがって外部`4.7 kΩ`が未接続でも`EN`保持下では0.00 Vを示しうる。**この測定では外部pull-downの実装有無を切り分けられない。**外部pull-downの存在自体は本日の配線作業（段1）で確認済みだが、この電圧測定はその証拠ではない
+- **実機のLCD／touch panelは接続していない。**SPI通信が実際に成立するかはここでは判定しない（`#13`の範囲）
+- **`EN`解放直後・firmware起動直後の過渡は測っていない。**`EN`保持中の定常値のみである
+- **`ACCEL-SDA`／`ACCEL-SCL`（本日新規実装したpull-up）はここでは測っていない。**I2C bus側の確認は別項目（`#2`のclose条件から外れた項目3）が扱う
+
+### 結論
+
+**`LCD-CS`／`LCD-RST`／`TOUCH-CS`は、`EN`保持下（firmware非動作）でも3.31 Vを維持した。**この3信号は内部pullが無いため、この結果は外部pull-upの効果をfirmwareのHigh駆動と切り分けて確認したことを意味する。**`LCD-BL`も同条件で0.00 Vを維持し、reset中にbacklightがOffへ確定していることを確認した。**ただしGPIO4は内部weak pull-downが有効なため、この0.00 Vだけでは外部pull-downが効いているとは言えない（上記「主張しないこと」参照）。**いずれにせよ、項目6が要求する「reset中に安全な状態（backlight Off）にあること」自体は満たしている。****`#2`受け入れchecklist項目6・7を達成とする。**
+
 ## Revision履歴
 
 | 日付 | Revision | 変更 | 根拠 |
@@ -1053,3 +1094,5 @@ cable別の回数（**作業者の申告**。journalからは導けない）。
 | 2026-08-22 | 10 | **`EXP-005`のraw dataが誤っていた。訂正した。**pin 20の読みを`0.02`と記録していたが、**実際の表示は`00.2`である。****`0.02`はこのレンジの最小単位（0.1 mV）では表示できない値であり、記録する前に読み直しを頼むべきだった。**表示できない値に気づきながら、確認せず`桁形式の食い違い`という節を書いて残していた。**その節は削除した。2つの表示は同一であり、食い違いは存在しない。****訂正により結論が変わった。**測定値とゼロ点が同じ表示であるため、これは**ゼロ法（null測定）**である。**差は表示を1 count動かすに足りず、上限は0.1 mV**（従来は0.2 mVとしていた）。`V_INT`へ与える影響は約0.02 mVで、記録済みの不確かさ ±0.003 V の130分の1以下である。**差の値そのものは依然として得られていない。上限だけである。**あわせて[PR #166](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/166)の自動reviewの指摘に従い、**解決済みの記述の後に残っていた過去の記述へ、当時のものである旨を明示した**（観測結果1と`EXP-002`の結論）。**Revision 9は書き換えず、この行で訂正する** | [PR #166](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/166) |
 | 2026-08-30 | 11 | **`EXP-006`〜`EXP-008`を追加した。**[#247](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/247)（案AでESP32へ通電した際にPiが落ちた事象）の測定計画6節「待たない」3項目の実施記録である。**`EXP-006`**（2026-08-28、ポーリングログの試運転）、**`EXP-007`**（2026-08-29、journal永続化とその直後のPi再起動。原因未確定。二重cargo buildというAI側の判断ミスがタイミング的に近いことを記録した）、**`EXP-008`**（2026-08-30、Pi単体build負荷比較とESP32側基準値〈段階B-1〉。GPIO pin代用のため測定計画5節が定める`PWR IN`直前では測れていないことを明記した）。**いずれも値の正をこの文書へ置かず、`HW-TBD-023`の判定にも使っていない。**CSVは`hardware/measurement/.gitignore`により追跡対象外のまま。**案Aの再試験は行っていない。`docs/hardware/`の既存の値は変更していない。**あわせて、索引表に`EXP-001`しか無く`EXP-002`〜`EXP-005`が抜けていたため、006〜008を足す機会に**`EXP-002`〜`EXP-005`の索引行も追加し、表を揃えた**（既存の抜けであり、この行の追加が原因ではない） | [#247](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/247) |
 | 2026-09-01 | 12 | **`EXP-009`と`EXP-010`を追加した。**[#247](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/247)。**`EXP-009`**（2026-08-31、案Aが3回再現し3回とも電源断相当で停止した事象。**測定計画が予定した作業ではなく作業者が実施した。**3回目は`rail_logger.py`が稼働しており停止時刻を1秒精度で記録できた。**原因は未確定で電圧を測っていない。**cable別の回数は作業者の申告として記録し、確定していない。**`throttled=0x0`はPi Zero Wに低電圧検出回路が無いため電圧の証拠にならないことを明記した**）。**`EXP-010`**（2026-09-01、`HW-TBD-034`方式1のPi入力への拡張。GND電位差を両極性で測ってから接続し、分圧比0.7501・rail換算6.56 mV/LSBで観測系を組んだ。`cargo build`で14.8 mVの低下を捉え、対照chによりAV<sub>CC</sub>変動でないことを分離した）。**いずれも値の正をこの文書へ置かず、`HW-TBD-023`／`HW-TBD-028`の判定にも使っていない。****どのgateも開いていない。`HW-TBD-034`はcloseしない。**CSVは`hardware/measurement/.gitignore`により追跡対象外のまま | [#247](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/247) |
+| 2026-09-07 | 13 | **`EXP-011`を追加した。**[#2](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/2)。`EN`を押し続けてESP32をresetに保持した状態で`LCD-CS`(GPIO22)／`LCD-RST`(GPIO16)／`TOUCH-CS`(GPIO21)／`LCD-BL`(GPIO4)の対GND電圧を実測した（`LCD-CS`／`LCD-RST`／`TOUCH-CS`＝3.31 V、`LCD-BL`＝0.00 V。いずれも期待どおり）。**2026-08-29の実測は`EN`保持なしであり、pull-upの効果とfirmwareのHigh駆動を区別できなかった。**今回`EN`保持により両者を切り分けた。`#2`受け入れchecklist項目6・7の判定に使う | [#2](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/2) |
+| 2026-09-07 | 14 | PM（deskcat-f2）の指摘を受け、`EXP-011`の`LCD-BL`に関する記述を訂正した。**`LCD-CS`／`LCD-RST`／`TOUCH-CS`はreset時`oe=0, ie=0`（内部pull無し）のため、`EN`保持下の3.31 Vは外部pull-upの存在を証明するが、`LCD-BL`（GPIO4）はreset時`oe=0, ie=1, wpd`（内部weak pull-down有効）であり、外部`4.7 kΩ`が未接続でも0.00 Vを示しうる。**したがって`LCD-BL`の0.00 Vを「外部pull-downが効く」証拠として書いていた箇所（結果表の期待値欄、結論）を「reset中にLowへ確定（内部weak pull-downと外部pull-downを切り分けられない）」へ訂正した。**測定値・判定・項目6・7の達成という結論は変わらない**（項目6が要求するのは外部pull-downの実証ではなく、reset中の安全な状態そのものであるため） | PM（deskcat-f2）の指摘（2026-09-07） |
