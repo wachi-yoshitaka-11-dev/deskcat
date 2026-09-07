@@ -476,13 +476,133 @@ PCからflashingするときは同じUSB portを使うため、Piとの同時接
   有効範囲内である）は、実配線の`Cb`を測定するか、`Cb`≤400 pFを裏付ける設計上の根拠を得るまで、
   未達のまま残す。**`J1`／`J2`をはんだ付けするかの判断もこのmode決定の対象外であり、
   `bus容量Cb`が未確定のまま別途残る
-- [ ] MSP2807のlogic IOが3.3Vで動作することを現物で確認した（VCC 3.3–5V対応だがlogic IOは3.3V TTL。`power-budget.md`参照）
-- [ ] ESP32の電源投入前に外部moduleがESP32 pinをdriveしない（未検証、実機電源offでの導通checkが必要）
+- [ ] MSP2807のlogic IOが3.3Vで動作することを現物で確認した（VCC 3.3–5V対応だがlogic IOは3.3V TTL。`power-budget.md`参照。**確認方法は[実機check（電源off）の確認方法](#実機check電源offの確認方法)節を参照。記載だけでは足りないと判定した**）
+- [ ] ESP32の電源投入前に外部moduleがESP32 pinをdriveしない（未検証、実機電源offでの導通checkが必要。**確認方法は[実機check（電源off）の確認方法](#実機check電源offの確認方法)節を参照**）
 - [ ] Resetとbacklight lineが安全な状態で起動する（LCD-RST/LCD-CSへの外部pull-up実装が前提。**2026-08-25に値と本数を選定した**（`LCD-RST`／`LCD-CS`とも10 kΩ×1本。導出は[起動時状態を確定させる外部pull](#起動時状態を確定させる外部pull)節）。**2026-08-27にブレッドボード上へ実装した。****2026-08-29に通電しての実測を行い、`LCD-CS`(GPIO22)＝3.30 V、`LCD-RST`(GPIO16)＝3.30 Vを得た**（USB抜き差しによる再現性も確認した）。**ただしこの値は、pull-upが効いている場合と、firmwareが当該pinをHighへ駆動している場合を区別しない。**測定時にboard上で走っていたfirmwareを同定していないため、**pull-upが正常であることの根拠にはならない**（`TOUCH-CS`と同じ制約である。同項目に詳しい）。**満たすには`EN`でresetに保持した状態での測定が要る。****`LCD-BL`は2026-09-06に値・極性（`4.7 kΩ`×1本、`active-high`）を確定したが、実装と起動時の状態確認（backlight Offを維持しているか）はまだ行っていない。**この項目自体は`LCD-RST`／`LCD-CS`の再測定と`LCD-BL`の実装・確認がいずれも未完了のため満たしていない。**[`HW-TBD-032`](tbd-register.md)で追跡する）
 - [x] Servo PWMがdisabledまたは承認済みの安全状態で起動する（GPIO27はreset時high-Zであり、外部pull-downを**必須**とした。**reset時状態が`oe=0, ie=0`＝内部pull無しであることをESP32 Datasheet v5.3の`IO_MUX`で2026-08-25に確認した。**同日に**4.7 kΩ×1本を選定し、2026-08-26に一般値側と決まって確定した**（導出は[起動時状態を確定させる外部pull](#起動時状態を確定させる外部pull)節）。**2026-08-27にブレッドボード上へ実装した。****2026-08-29に通電しての実測を行い、GPIO27＝0 Vを確認した（期待どおり、pull-down正常。USB抜き差しによる再現性も確認した）。****この実測はservo・LCD本体を接続していない状態（Revision 23参照）で行った。**
   **2026-09-06に机上reviewを行い、下記の論はservoの接続有無に依存しないことを確認したうえで、この項目を達成と判定した。**`HW-TBD-026`（SG90の`logic閾値`が一次資料に無い）は、この項目を止めない。**理由**: RC servoのPWM制御信号は、周期的な立ち上がり・立ち下がりedgeとpulse幅で位置commandを符号化する方式であり、**受信側は一定のDC levelからpulse幅を測れない。**GPIO27の起動時state（内部pullの無い真のhigh-Zを、外部4.7 kΩ pull-downで確定させた定常0 V）は、SG90側の`VIH`／`VIL`が具体的にいくつであっても——0 Vはどのような正の閾値よりも低く、high側に誤読される余地が無い——edgeを持たないDC levelとしてしか受信されず、**有効なPWM pulseとして復号されない。**したがって「起動時に安全な（動きえない）状態で止まっているか」は`HW-TBD-026`の数値によらず判定できる。**この論はservoの接続有無にも依存しない。**2026-08-29の実測はservo・LCD本体を接続していない状態（Revision 23）で行ったが、edgeが無いという性質は信号線の電圧レベルそのものに依るのではなく波形の形（DC定常か周期パルスか）に依るため、servoを接続してGPIO27側から見た電位が仮に変化したとしても——たとえばservo内部のpull-up等でlevelが持ち上がったとしても——**edgeを持たないDC levelである限り復号されないことに変わりはない。**したがって接続後の再測定を待たずにこの結論を採用してよい。**`HW-TBD-026`が実際に要るのは別の判定である**（firmware初期化後、3.3 V driveのactiveなPWM pulseがSG90側に正しく`HIGH`として認識されるかという実運用側の判定であり、この項目＝起動時のdisabled stateとは別の問いである）。
   **この判定が閉じるのはこの項目（gpio-assignment.md側のGPIO27起動時state review）だけである。**servoの出力を実際に有効化してよいかの判断（[servo-safety-limits.md](servo-safety-limits.md#サーボ出力を有効化してよい条件)のgate）は、`HW-TBD-007`／`009`／`010`／`011`／`019`／`020`／`026`／`035`ほか多数のTBDとProtocol側TBDが未解決のままであり、依然`Blocked`である。**`HW-TBD-019`（起動時とdriver故障時の動作の全6サブ項目）もこの1点の解決だけでは閉じない**（「PWM driver初期化前のGPIO state」というサブ項目1つが埋まっただけであり、開始mode・enableまでのdelay・Pi未接続時の動作・reset／panic後の動作・driver故障検知時の動作の5項目は未解決のまま`tbd-register.md`で追跡する）。`tbd-register.md` HW-TBD-019と連動、当該サブ項目のみ解決）
 - [ ] Touch CS lineが安全な状態（inactive＝High）で起動する（`TOUCH-CS`(GPIO21)への外部pull-up実装が前提。**2026-08-25に値と本数を選定した**（10 kΩ×1本、`LCD-CS`と同じ理由。導出は[起動時状態を確定させる外部pull](#起動時状態を確定させる外部pull)節）。**2026-08-27にブレッドボード上へ実装した。**2026-08-29に通電しての実測を行い、GPIO21＝3.30 Vを得た（USB抜き差しによる再現性は他3信号で確認済みのため同一配線構成として省略した）。**この項目はこれまで`HW-TBD-032`にも他のどのTBDにも含まれておらず、追跡漏れだった**（`HW-TBD-032`は明示的に`LCD-RST`／`LCD-CS`／`LCD-BL`の3信号だけを対象とし、`TOUCH-CS`を含まないと定めている）。**2026-08-29に本項目を新設し、同日中に満たしたと判断した。****2026-08-31にその判断を取り消した。****`3.30 V`は、pull-upが効いている場合と、firmwareがGPIO21をHighへ駆動している場合を区別しない。**repositoryのfirmwareは`Peripherals::take()`を呼ばずGPIOを一切駆動しない（`firmware/esp32/src/main.rs`）が、**それは「測定時にboard上でそのfirmwareが走っていた」ことを示さない。**同じ通電での`HW-TBD-027`について、`1d957dc`が「boardにfirmwareが書き込まれているかを確認していない」と記録している。**満たすには`EN`でresetに保持した状態での測定が要る**（`SERVO-PWM`は`fc42332`でその測定を行っている）。**この再測定は通電と人間の立ち会いを要するため未実施である**）
+
+## 実機check（電源off）の確認方法
+
+**[#2](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/2)本文は実機checkの範囲を
+「電源offでの導通とpin header対応だけを確認する。Actuatorは動作させない」と定めている。**
+競合checklistの2項目（MSP2807のlogic IO、外部moduleがESP32 pinをdriveしないこと）は、
+この範囲でどう確認するかを定義していなかった。2026-09-06に定義する。
+
+### ESP32の電源投入前に外部moduleがESP32 pinをdriveしない
+
+**結論: この項目は非通電の導通checkだけで判定できる。module側の出力段の性質は効かない。**
+
+**前提。**この設計では、周辺module3点（`DISP-01`／`ACCEL-01`／`ENV-01`）はいずれも
+ESP32 boardの`3V3` pinから給電される（[power-budget.md](power-budget.md#測定計画)の
+測定点定義「ESP32 boardの`3V3` pinと周辺module3点のrailの間」）。**独立した電源を持つ
+moduleは無い。**したがってESP32が電源offのとき（USB非接続。`3V3` pinはESP32board上の
+regulatorが作るrailであり、ESP32自体が無給電ならこのrailも無給電である）、周辺module側も
+無給電である。
+
+**判定に効かない理由。**無給電のIC出力段は、内部topology（`Rp`直列抵抗の値、
+`MSP2807`の`U1`経由かVCC直結か等）によらず、能動的にlogic levelを駆動できない。
+駆動には電源が要るためである。無給電状態で存在しうるのは、内部ESD／clamp diode経由の
+微小な漏れ電流だけであり、これは「drive」ではない。**したがって`HW-TBD-004`の直列抵抗
+未追跡やMSP2807の`U1`経路未追跡は、この項目の判定に影響しない。**（比較として、通電後の
+微小漏れ電流はすでに`起動時状態を確定させる外部pull`節のpull-up `Rmax`計算で余裕を
+確認済みであり、別の話である。）
+
+**したがって、確認すべきは「module側が本当に独立電源を持たないこと」と「配線が
+意図した1対1対応どおりであること」の2点であり、いずれも非通電の導通checkで判定できる。**
+
+| 測定項目 | 測定点 | 計器・レンジ | 判定基準 |
+|---|---|---|---|
+| module電源pinの独立性 | 各moduleの電源pin（`DISP-01`の`VCC`、`ACCEL-01`の`Vs`／`VDD`、`ENV-01`の`VDD`）⇔ ESP32の`3V3` pin | DT830B、導通（buzzer）または抵抗レンジ（2000 Ωレンジ、`HW-TBD-002`の先例に合わせる） | 導通していること（＝`3V3`と同一net）。**5V rail・他の独立電源への導通が無いこと** |
+| pin header対応 | `信号inventory`の各signalについて、moduleの header pin ⇔ 対応するESP32 GPIO pin | 同上 | 導通していること（＝documented通りのnet）。**他のGPIO・5V rail・GNDへの誤配線（意図しない導通）が無いこと** |
+
+**判定基準を両方満たせば、この項目は達成とする。**電源pinの独立性が確認できれば
+「moduleが独立電源でESP32 pinを駆動する経路自体が存在しない」ことが示され、
+pin header対応が確認できれば「配線ミスによる意図しない接続」も排除される。
+**この2点は、`ACCEL-01`についてはすでに`HW-TBD-004`で個別に着手されている**
+（`Vs`／`VDD`間の導通は2026-09-05に確認済み）。`DISP-01`／`ENV-01`は未実施である。
+
+**この項目が見ていないもの。**module側のpull-upがESP32の起動時levelへ与える影響は、
+この項目の対象外である。`ACCEL-01`は`01C`（10 kΩ）を4個搭載しており（`信号inventory`の
+`ACCEL-SDA`行）、ESP32が電源offの間もmodule側にこの抵抗経由の経路が物理的に存在する。
+**ただし、この経路がESP32の起動時levelに与える影響（内部weak pullとの兼ね合い等）は、
+`起動時状態を確定させる外部pull`節とbootstrap pinのreview（`ESP32の使用制限pin`節）が
+扱う範囲であり、この項目（moduleが能動的にdriveしないこと）が扱う範囲ではない。**この項目が
+確認するのは「無給電のmoduleが能動的にlogic levelを出力しないこと」だけであり、
+「受動的な抵抗経路が起動時levelへ与える影響が無いこと」までは確認しない。混同しないこと。
+
+### MSP2807のlogic IOが3.3Vで動作することを現物で確認した
+
+**結論: メーカー資料の記載（Logic IO port voltage: 3.3 V TTL）だけでは足りないと判定する。
+非通電で追加確認できる項目を1つ定義するが、それでも解決しない可能性が残る。**
+
+**なぜ記載だけでは足りないか。**この設計は`DISP-01`のVCCをESP32の`3V3` rail
+（3.234–3.366 V）から給電し、5 Vを給電しない。**これは「5V給電時の出力levelが不明」
+という既知のriskを避けるためであり、記載どおりの動作を保証する行為ではない。**
+`DISP-01`のboard上には`U1`（`UMW XC6206P332MR`、3.3 V固定LDO）があり、
+[power-budget.md](power-budget.md#33-v-rail下限の設計判断2026-09-06)が2026-09-06に確認したとおり、
+**このrail電圧（3.234–3.366 V）では`U1`は常時dropout領域にあり、出力は入力からVdrop
+（typ 160 mV／max 240 mV）だけ下がった値になる（regulatorとして完全に3.3 Vへ収束しない）。**
+**controller IC（ILI9341・XPT2046）が`U1`の出力（dropoutにより約3.0–3.2 V）から
+給電されているのか、`VCC`（rail電圧そのもの、3.234–3.366 V）から直接給電されているのかは、
+現時点でどちらの一次資料にも記録が無い。**したがって、メーカー資料の「3.3 V TTL」という
+記載は、**このboardの実際のlogic供給nodeの電圧を保証しない。**
+
+**非通電で追加確認できること。**`U1`の出力側の脚は`HW-TBD-024`の測定（2026-09-05）で
+すでに識別済みである。**この脚とcontroller ICの電源pinの間の導通を追跡すれば、
+logic供給nodeが`U1`出力側か`VCC`側かを非通電で判別できる可能性がある。**
+
+| 測定項目 | 測定点 | 計器・レンジ | 判定基準 |
+|---|---|---|---|
+| logic供給nodeの特定 | `U1`の出力側の脚 ⇔ controller IC（ILI9341／XPT2046）の電源pin | DT830B、導通（buzzer）または抵抗レンジ | 導通していれば`U1`出力側から給電（dropoutにより約3.0–3.2 V）。非導通なら`VCC`直結の可能性を検討する |
+
+**ただしこの追跡が成功する保証は無い。**`backlight`回路のLED給電経路特定
+（`R5`・`Q1`を用いた同種の追跡）は、**部品が小さくプローブを確実に当てられないため
+非通電の導通測定では決められないとすでに結論している**（[sensor-datasheet-notes.md](sensor-datasheet-notes.md)
+の`Backlight回路／電流／polarity`行）。controller ICのpinも同程度に微小である可能性が高く、
+**同じ理由で追跡できない場合、この項目は`TBD`のまま残る。**
+
+**計算で閉じられないかを試した。**ILI9341とXPT2046のdatasheetがVOHを与えているかを
+一次資料で確認した。**両方とも与えている。**
+
+- **ILI9341 Datasheet V1.11 §18.2.1（p.236）**: `VOH` Min `0.8×VDDI`、条件`IOL=-1.0mA`
+  （2026-09-06にPDFを取得し直接確認した。この文書がこれまで引用してきた§18.2.1の抜粋
+  （`VIH`／`VIL`／`IIH`／`IIL`／`ILEA`）は`VOH`を含んでいなかったため、新たに読み取った）
+- **XPT2046 Datasheet（2007.5）`DIGITAL INPUT/OUTPUT`**: `VOH` Min `IOVDD×0.8`、条件`IOH=-250µA`
+  （同様に新たに読み取った）
+
+**ESP32側の`VIH`（受信側のしきい値）と突き合わせる。**ESP32の`VIH` ≥ 0.75×VDDであり
+（`起動時状態を確定させる外部pull`節の一次資料）、rail上限3.366 Vのとき`VIH`min = **2.5245 V**、
+rail下限3.234 Vのとき`VIH`min = **2.4255 V**である（ESP32とDISP-01は同一rail上にあるため、
+実際にはこの2値の間でrail電圧に応じて連動して動く）。
+
+**2通りのlogic供給nodeで場合分けする。**
+
+| logic供給node | `VDDI`（module側供給電圧） | `VOH`min（`0.8×VDDI`） | ESP32`VIH`minとの余裕 |
+|---|---|---|---|
+| `VCC`直結（rail電圧そのまま） | 3.234–3.366 V | 2.587–2.693 V | **約160–170 mVの余裕がある**（railの両端で確認。ESP32の`VIH`もrailに連動するため） |
+| `U1`出力経由（dropout、約2.99 V） | 約2.99 V（`power-budget.md`導出値、実測値ではない） | **約2.392 V** | **不足する**（ESP32`VIH`min 2.4255–2.5245 Vに対し約34–133 mV不足。ESP32が`VOH`をLowと誤読しうる） |
+
+**したがって、計算だけではこの項目を閉じられない。**`VCC`直結なら余裕があるが、`U1`出力経由なら
+datasheetの保証値どうしを突き合わせただけで不足が出る。**答えはlogic供給nodeがどちらであるかに
+懸かっており、それこそが上表の非通電追跡（`U1`出力側の脚とcontroller IC電源pinの導通）が
+判定しようとしているものである。**この追跡が成功すれば、上の表のどちらの行を採るかが決まり、
+`VCC`直結ならこの項目は計算で達成にできる。**追跡が失敗する場合（部品サイズの理由で）、
+この項目は`TBD`のまま残り、通電を伴う実測（`U1`出力またはcontroller IC`VDDI`pinの電圧測定）が
+必要になる。**なお、ESP32からmoduleへの向き（`SCLK`／`MOSI`／`CS`／`DC`／`RST`）は、
+`VDDI`がどちらの値でもESP32の`VOH`（0.8×VDD以上）がmodule側`VIH`（0.7×`VDDI`以下）を
+十分に上回るため問題にならない（`起動時状態を確定させる外部pull`節の`Rmax`計算とは別に、
+この方向の余裕はどちらのnode想定でも成立する）。**余裕が不足しうるのはmoduleからESP32への
+向き（touch controllerの`DOUT`／`PENIRQ`等）だけである。**
+
+**この場合に要ること。**非通電の追跡で解決しない場合、残る手段は通電を伴う実測
+（controller ICのVDD pinの電圧を実際に測る）であり、これは`#2`本文の範囲（非通電）を超える。
+**通電を伴う実際のlogic動作確認（SPI通信が実際に成立するか）は、そもそもこの項目の範囲外であり、
+LCD bring-up（[#13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)）で行う**
+（[sensor-datasheet-notes.md](sensor-datasheet-notes.md)の`Data／command動作`行にも同じ切り分けが
+すでに書かれている）。
 
 ## 初回bring-upの範囲
 
@@ -552,3 +672,4 @@ environment sensor、servo、ADC測定、UART）にGPIO番号が入っており�
 | 2026-09-06 | 28 | [#2](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/2)。**Revision 27の判定は、それ自体が古い前提に基づいていた。**PMから`HW-TBD-032`（owner `#2`）のstale記述（後述）を指摘された過程で判明した。**`LCD-BL`の極性は2026-09-05にすでに一次資料で確定していた**（MSP2807公式User Manual、LCDWIKI、Interface Description表が`LED` pinを「high level lighting」と定める。正は[sensor-datasheet-notes.md](sensor-datasheet-notes.md)の`Backlight回路／電流／polarity`行、Revision 12）。**Revision 27はこの確定を見落とし、「極性の現物未確認が残る」と誤って報告した。**`gpio-assignment.md`側（この文書）が2026-09-05の確定を反映していなかったため、`tbd-register.md`・`sensor-datasheet-notes.md`を照合せずに判定した結果である。**訂正する。**極性が確定済みである以上、Revision 27で示した「極性確定後に`SERVO-PWM`と同じ一般値の方法で決められる」という条件は満たされたため、**`LCD-BL`のpull-downを`4.7 kΩ`×1本に確定した。**`選定した値と本数`表、`LCD-BLを4.7 kΩにした理由`節（旧`LCD-BLを決められない理由`。見出しも実体に合わせて改めた）、`信号inventory`の`LCD-BL`行、checklist L391／L395、文書冒頭`状態`行を更新した。**あわせて`tbd-register.md`の`HW-TBD-032`（owner `#2`）を、実装状況（`LCD-CS`／`LCD-RST`は実装済み、未実装は`LCD-BL`のみ）と極性確定の反映が遅れていた点を含めて訂正した（別途同file側のRevisionで記録）。**このRevisionは、今日指摘・修正してきた「実体が進んだのに参照側が取り残される」型の不整合を、自分自身の直前の判定でも起こしていたことの記録である | PM（deskcat-f2）指摘、[sensor-datasheet-notes.md](sensor-datasheet-notes.md) Revision 12、[tbd-register.md](tbd-register.md) `HW-TBD-032` |
 | 2026-09-06 | 29 | [#2](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/2)。**commit前の自己レビュー（要件照合Passとfresh-context Pass）で検出した3件を反映した。**(a) `LCD-BLを4.7 kΩにした理由`節末尾の結論文が、直前の箇条書き（極性確定・値確定）と矛盾していた。「`LCD-BL`の値と向きは`HW-TBD-032`（極性の現物確認）の後に決める」「極性の現物確認は…この作業指示書の範囲では行っていない」という、Revision 28以前の未確定を前提にした文をRevision 28後も直しておらず、同じ節の中で「確定した」と「未確定」が両方書かれていた。**値・向き・本数が確定済みであることを述べる形へ書き直した。**(b) checklist L392（I2C実効pull-upの有効範囲）の本文中に、mode決定（Revision 27で`[x]`化した同じ文の中）より後ろの文で「残る未確定入力は`bus容量Cb`と`採るmode`の2つである」という、mode決定前の文言が残っていた。**採るmodeは決定済みである旨へ訂正した。**(c) 受け入れ条件7件目「最初のbring-up範囲について未解決GPIOがない」の範囲定義を、これまでPMへの報告（chat）でのみ述べており、**正本である本文書には一度も書いていなかった。**新設した`初回bring-upの範囲`節（`競合check`の直後）に、含める範囲（ESP32単体・PC USB給電・`信号inventory`の全信号へのGPIO割り当てと起動時state確定）と含めない範囲（`#247`のPi給電、servoの実actuator動作）を明記し、この定義の下で未解決GPIOが無いことを示した。**要件照合Passはこの3件で1 round目に0件へ収束していない。****fresh-context Passで(a)(b)を、要件照合Passで(c)を検出した。**この訂正後に改めて両Passを実施し、新規指摘0件を確認した（2 round目） | 自己レビュー（`CONTRIBUTING.md`「自己レビュー」の2つのPass） |
 | 2026-09-06 | 30 | [#2](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/2)。**PR #358へ手動で依頼したCodeRabbit reviewの指摘2件を反映した。**(a) `信号inventory`の`ACCEL-SDA`行が、初回bring-upのmode決定（Standard-mode、Revision 27）の後も「400kHz(Fast-mode)を想定、要実測」というmode決定前の記述のままだった。**Standard-mode採用と、Fast-modeへ変更する場合はpull-up再設計が要る旨へ訂正した。**(b) checklist「Moduleのpull-upを並列合成した実効抵抗が有効範囲内である」を、Revision 27で「Standard-mode採用により実配線の`Cb`を測らなくても有効範囲内」として`[x]`にしていたが、**この判定は不十分だった。**`Rp(max)`約2.945 kΩ（Standard-modeの規定`Cb`上限400 pFから導いた値）は**rise timeの制約から`Rp`側で導いた上限であり、実配線の`Cb`が規定上限400 pFの範囲内であることを示すものではない。**実構成`Rp`（約2.42 kΩ）を使えばrise timeの制約だけなら`Cb`は約488 pFまで許容されるが、**Standard-modeの`Cb`上限400 pFがrise time以外の制約（fall time等、`Rp`の選定では動かせない可能性がある制約）にも由来するかどうかを、この文書が引用した一次資料（`tr`／`Cb`／`IOL`の列のみ）の範囲では確認できていない。**したがって、実配線の`Cb`が400〜488 pFの間にある場合、rise timeの計算は通ってもStandard-modeとして規定範囲内と言い切れない可能性が残る。**mode決定（Standard-mode採用）自体は取り消さない**（初回bring-upの選択としては変わらず有効）が、**この checklist項目は`Cb`の実測または設計上の根拠を得るまで未達へ戻した。**文書冒頭`状態`行も未達7件へ戻した。**受け入れ条件5件目（I2C addressとpull-upに互換性がある）の判定は変えていない。**同判定は`Rp(min)`（`Cb`／modeによらず常に成立し、素子の破損に至らないことの根拠）に基づくものであり、今回reopenしたのは`Rp(max)`側（通信の正しさに関わるが、外れても安全要件5項目には該当しない一般値tierの論点）である | PR #358のCodeRabbit手動review（2026-09-06、`@coderabbitai full review`） |
+| 2026-09-06 | 31 | [#2](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/2)。**競合checklistの2項目（MSP2807のlogic IO確認、ESP32電源投入前に外部moduleがpinをdriveしないこと）が確認方法を持っていなかったため、`実機check（電源off）の確認方法`節を新設して定義した。**`#2`本文の範囲（電源offでの導通とpin header対応だけ）を超えないこと、推測禁止（一般値や記憶で判定基準を作らない）を守った。**(1) driveしないことの確認は、非通電の導通checkだけで判定できると判定した。**周辺module3点はいずれもESP32の`3V3` pinから給電され独立電源を持たない（[power-budget.md](power-budget.md)の測定点定義）ため、ESP32電源offの状態では周辺moduleも無給電であり、無給電のICは内部topology（`HW-TBD-004`の直列抵抗未追跡、MSP2807の`U1`経路未追跡）によらず能動的にdriveできない。**したがってmodule側の出力段の性質はこの判定に効かない。**確認すべきは(a)module電源pinがESP32の`3V3`と同一netであること（独立電源が無いこと）、(b)pin header対応（配線ミスが無いこと）の2点であり、測定点・計器・判定基準を表にまとめた。**(2) MSP2807のlogic IO確認は、メーカー記載（3.3 V TTL）だけでは足りないと判定した。**`DISP-01`のVCCはESP32の3.3 V rail（3.234–3.366 V）から給電されるが、[power-budget.md](power-budget.md)が2026-09-06に確認したとおり同rail電圧では`DISP-01`board上の`U1`（3.3 V LDO）は常時dropout領域にあり、出力は3.3 Vへ完全収束しない。**controller IC（ILI9341／XPT2046）が`U1`出力側から給電されているかVCC直結かは、どちらの一次資料にも記録が無い。**したがってメーカー記載はこのboardの実際のlogic供給node電圧を保証しない。**非通電で追加確認できる方法（`U1`出力側の脚とcontroller IC電源pinの導通追跡）を1つ定義したが、backlight LED給電経路の追跡（`R5`／`Q1`）がすでに部品サイズを理由に非通電では決められないと結論しており、同程度のIC pinで同じ制約に当たる可能性が高いことも明記した。**解決しない場合、残る手段は通電を伴う実測であり`#2`の範囲を超え、実際の動作確認はLCD bring-up（`#13`）で行うと整理した。**PMの検査を受け、2点を追記した。**(a) (1)の項目へ「見ていないもの」を明記した。**`ACCEL-01`の`01C`（10 kΩ×4）のような module側pull-upがESP32起動時levelへ与える影響は、この項目（moduleが能動的にdriveしないこと）の対象外であり、`起動時状態を確定させる外部pull`節とbootstrap pinのreviewが扱う範囲であると書き分けた。**(b) (2)へ、ILI9341とXPT2046のdatasheetを2026-09-06に新たに取得し`VOH`（それぞれ`0.8×VDDI`、`IOVDD×0.8`）を確認したうえでの計算を追記した。**ESP32の`VIH`（rail 3.234–3.366 Vで2.4255–2.5245 V）と突き合わせると、logic供給nodeが`VCC`直結なら約160–170 mVの余裕があるが、`U1`出力経由（dropout、約2.99 V）なら`VOH`min約2.392 Vとなり約34–133 mV不足する。**計算だけではこの項目を閉じられず、答えは非通電追跡（logic供給nodeの特定）に懸かっていることを示した。**あわせて、ESP32からmoduleへの向き（`SCLK`等）はどちらのnode想定でも余裕があり、不足しうるのはmoduleからESP32への向き（`DOUT`／`PENIRQ`等）だけであることも明記した。**GPIO割り当てそのものは変えていない | PM（deskcat-f2）の追加依頼・検査、`WORK-INSTRUCTIONS-BENCH-2026-09-06.md`（PM作成、gitignore対象）、[power-budget.md](power-budget.md)、[sensor-datasheet-notes.md](sensor-datasheet-notes.md)、[ILI9341 Datasheet V1.11](https://cdn-shop.adafruit.com/datasheets/ILI9341.pdf) §18.2.1（2026-09-06取得）、[XPT2046 Datasheet](https://grobotronics.com/images/datasheets/xpt2046-datasheet.pdf)（2026-09-06取得） |
