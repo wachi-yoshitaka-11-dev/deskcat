@@ -348,10 +348,18 @@ a {
   padding: clamp(28px, 5vw, 52px) clamp(20px, 5vw, 72px) 0;
 }
 
+// mascotの頭部はcreamであり、明面では`--dc-bg`とほぼ同色で輪郭が消える。
+// `.dc-bar-mark`と同じ手法で輪郭を足す。ただし`drop-shadow`のぼかし半径は
+// CSS pxの絶対値で要素の大きさに追従しないため、値はそのまま流用しない。
+// `.dc-bar-mark`の`1px`は30px幅に対して3.33%。同じ比率をhero(184px、狭幅
+// breakpointで116px)へ当てるなら約6pxだが、過剰なhaloを避けるため3pxに
+// 留める（184pxに対して1.63%、116pxに対して2.59%）。screenshotで輪郭が
+// 視認できないと判定した場合は6px側へ上げる（#362）。
 .dc-hero-mark {
   flex: none;
   margin-bottom: -6px;
   line-height: 0;
+  filter: drop-shadow(0 0 3px rgba(138, 106, 92, 0.55));
 }
 
 .dc-hero-text {
