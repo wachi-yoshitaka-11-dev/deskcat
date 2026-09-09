@@ -117,13 +117,7 @@ integer widthは`PROTO-TBD-003`として保留されていたものを確定し�
 
 ## 検証
 
-repository rootで実行する。
-
-```bash
-cargo fmt --all -- --check
-cargo clippy --workspace --all-targets --locked
-cargo test --workspace --locked
-```
+**commandの正本は[検証済みコマンド](../../docs/toolchains/verified-commands.md)である。**
+repository rootで実行する。**ここへcommandを写さない**（[ADR-0018](../../docs/decisions/0018-instruction-file-structure.md)）。
 
 lint levelはroot `Cargo.toml`の`[workspace.lints]`が持つため、`-D warnings`は要らない。
-`cargo fmt`は`--locked`を受け付けない。

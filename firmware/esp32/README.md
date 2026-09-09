@@ -32,16 +32,8 @@ heartbeat と health snapshot は ESP logger の log にのみ出す。**「log 
 
 ## Build
 
-ESP32 Build profileの端末で、このディレクトリにて実行する。
-
-```bash
-. "$HOME/export-esp.sh"
-cargo fmt --all -- --check
-cargo clippy --all-targets --locked -- -D warnings
-cargo build --locked
-```
-
-`--locked`は、追跡している`Cargo.lock`から解決結果が逸脱した場合に失敗させる。`cargo fmt`はこのoptionを受け付けない。
+**commandの正本は[検証済みコマンド](../../docs/toolchains/verified-commands.md)である。**
+ESP32 Build profileの端末で、このディレクトリにて実行する。**ここへcommandを写さない**（[ADR-0018](../../docs/decisions/0018-instruction-file-structure.md)）。
 
 `export-esp.sh`を読み込まないと失敗する。`ESP_IDF_TOOLS_INSTALL_DIR=workspace`のため、ESP-IDF本体とmanaged toolは`.embuild/`（約4.4 GB）へ展開される。`.embuild/`と`target/`は`.gitignore`で除外し、applicationの`Cargo.lock`は追跡する。
 

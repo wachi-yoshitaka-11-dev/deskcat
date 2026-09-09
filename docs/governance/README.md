@@ -58,6 +58,7 @@
 | サーボ制限とfail-safe動作 | `docs/hardware/servo-safety-limits.md` |
 | ESP32–Pi間のwire protocol | `docs/protocol/esp32-pi-protocol.md` |
 | 開発端末の役割とtoolchain選定 | `docs/toolchains/` |
+| 検証済みのbuild／lint／test／flashコマンドと来歴 | `docs/toolchains/verified-commands.md` |
 | 開発・運用手順 | `docs/runbooks/` |
 | 公開文書のsource | RootのMarkdownと`docs/` |
 | 公開binary assetの出所と許諾 | [公開asset register](published-asset-register.md) |

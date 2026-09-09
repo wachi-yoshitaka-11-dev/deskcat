@@ -205,7 +205,7 @@ hotfix/<issue>-<short-name>
 
 root READMEとcomponent READMEに記載された、関連するcommandをすべて実行する。
 
-host workspaceはrepository rootで、ESP32 firmwareは`firmware/esp32`で検証する。確定したcommandは[root README](README.md#buildとtest)と`AGENTS.md`の「検証」節にある。Raspberry Pi、HIL、ESP32のflashとserial monitorには、まだ正式なcommandがない。
+host workspaceはrepository rootで、ESP32 firmwareは`firmware/esp32`で検証する。**確定したcommandの正本は[検証済みコマンド](docs/toolchains/verified-commands.md)である**（[ADR-0018](docs/decisions/0018-instruction-file-structure.md)で`AGENTS.md`とroot READMEから移した）。**まだ正式なcommandが無いのは、Raspberry Piの実機試験（実serial port、ESP32との通信）とHILである。**同文書の「まだコマンドが無いもの」が正本であり、ここでは列挙しない。
 
 今後の変更では次を報告する。
 
