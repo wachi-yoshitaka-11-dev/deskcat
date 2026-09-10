@@ -37,3 +37,21 @@ hooks:
 
 - 各指摘に **file と行**、**その diff だけからは何が読み取れないか** を書く。
 - **指摘が0件なら0件と書く。**求められているから挙げる、をしない。
+
+## Bash の制約
+
+**`Bash` は read-only の allowlist を通る**（`scripts/hooks/inspector_readonly_guard.py`。
+[ADR-0020](../../docs/decisions/0020-inspector-readonly-by-hook.md)）。次を守る。
+
+- **`git diff`／`git show`／`git log`／`git blame` は `--no-ext-diff --no-textconv` を必ず付ける。**
+  付けないと拒否される。**この 4 つは option 無しでも git config の外部 helper
+  （`diff.external`／`textconv`）を実行するためである。**helper は任意の command であり file を書ける。
+- **`git status` は `git --no-optional-locks status` の形で使う。**`status` は既定で
+  index を refresh し `.git/index` を書く。`--no-optional-locks` は **global option** であり、
+  `git status --no-optional-locks` の位置では効かない。
+- **program を path 付きで書かない。**`./git` や `/usr/bin/git` は拒否される。
+- **`rg --pre` と `rg --hostname-bin` は使えない。**前者は検索対象ごとに、後者は hostname を
+  得るために任意の command を起動するため拒否される。
+- redirect（`>`）、pipe（`|`）、`;`、`$(...)` を含む command は拒否される。**検索は `Grep` tool を使う。**
+
+**拒否は正しい動作である。**回避策を探さず、許された形へ書き換える。

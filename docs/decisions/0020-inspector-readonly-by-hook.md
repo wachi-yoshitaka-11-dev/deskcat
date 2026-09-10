@@ -91,10 +91,18 @@ platform 依存もある（native Windows 非対応）。**採れない。**
 2. **`scripts/hooks/inspector_readonly_guard.py`を新設する。**agent frontmatter の
    `hooks.PreToolUse`（`matcher: Bash`）から呼ぶ。**`.claude/settings.json`へは置かない。**
 3. **判定は allowlist とする。**
-   - command位置の program は`ALLOWED_PROGRAMS`のみ。**単体で file を書けるものを入れない**
-     （`sort -o`、`uniq out`、`sed -i`、`tee`、interpreter を除外した）
-   - `git`の subcommand は`GIT_READONLY_SUBCOMMANDS`のみ。**flag に関係なく書かないものだけ**
-     （`branch`／`tag`／`config`は flag 次第で壊せるため入れない）
+   - command位置の program は`ALLOWED_PROGRAMS`のみ。**option を含めても外部 command を
+     起動せず file を書かないものだけを入れる**（`sort -o`、`uniq out`、`sed -i`、`tee`、
+     interpreter を除外した）。**当初は「単体で file を書けない」を基準にしていたが、
+     それでは足りなかった**（[#384](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/384)。下の`欠点`）
+   - **program は名前で照合する。**`/`を含む語を拒否する（`./git`、`/tmp/cat`）
+   - `git`の subcommand は`GIT_READONLY_SUBCOMMANDS`のみ
+     （`branch`／`tag`／`config`は flag 次第で壊せるため入れない）。
+     **ただし「flag に関係なく安全」ではない。**`diff`／`show`／`log`／`blame`は
+     `--no-ext-diff --no-textconv`の両方を、`status`は global の`--no-optional-locks`を要求する
+   - **許可した program 自身の危険な option を個別に拒否する。**
+     git の`-c`／`--config-env`／`--exec-path`／`-O`／`--output`／`--ext-diff`／
+     `--textconv`／`--filters`、`rg`の`--pre`／`--hostname-bin`
    - **shell metacharacter（`>|;&()`` ` ``$<{}`）を含む語を拒否する。**
      `shlex`は空白でしか語を切らないため、`cat a>b`も`cat a;rm -rf /`も1語になり、
      redirect も次の command も command 位置として見えない
@@ -145,8 +153,26 @@ platform 依存もある（native Windows 非対応）。**採れない。**
   （`check()`への 55 例、wrapper の 4 条件、hook として起動したときの`deny` payload）。
 - **誤検知がある。**`grep "=>"`のように、metacharacter を含む正当な引数を拒否する。
   **代替がある**（両 agent は`Grep` tool を持つ）ため引き受けた。
-- **`ALLOWED_PROGRAMS`は「単体で書けない」という判断に依存する。**判断が誤っていれば穴になる。
-  `sort -o`と`uniq out`は実際に見落としやすく、**除外した理由を script の comment へ書いた。**
+- **`ALLOWED_PROGRAMS`は、載せた program が option を含めても安全だという判断に依存する。**
+  判断が誤っていれば穴になる。`sort -o`と`uniq out`は実際に見落としやすく、
+  **除外した理由を script の comment へ書いた。**
+- **当初の基準「単体では file を書けない」は誤りだった。**[#384](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/384)で
+  **5 箇所の穴**が見つかった（[PR #383](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/383)の手動 review）。
+  いずれも「program 名は allowlist にあるが、option または path が実体を変える」形である。
+  **基準を「option を含めても外部 command を起動せず file を書かない」へ引き上げ、
+  option 側の拒否と対で使う形にした。**穴の内訳は次のとおりである。
+
+  | 穴 | 実体 |
+  |---|---|
+  | `git diff --ext-diff`／`show --textconv`／`grep --textconv`／`cat-file --filters` | git config の外部 helper を起動する |
+  | **`git diff`／`show`／`log`／`blame` は flag 無しでも helper が走る** | `--no-ext-diff --no-textconv` の両方を要求する。**`--no-ext-diff` は textconv を止めない**（実測） |
+  | `rg --pre COMMAND`／`rg --hostname-bin COMMAND` | `--pre`は検索対象ごとに、`--hostname-bin`は hostname を得るために `COMMAND` を起動する |
+  | `git status` | 既定で index を refresh し `.git/index` を書く |
+  | `./git`／`/tmp/cat` | **basename で照合していた。**名前が一致するだけの別の実行 file が通った |
+
+- **program 名の allowlist だけでは read-only を保証できない。**上の 5 件はすべて
+  「名前は allowlist にある」ものだった。**allowlist へ program を足すときは、
+  その program の option を全数見る必要がある。**この作業は機械化していない。
 - **入力が JSON でない場合は素通りする。**`command_from`が`None`を返す場合と同じ扱いである。
   **境界としては弱い。**hook 側の事故を対象 command の問題として扱わないほうを優先した。
 - **参照した公式文書の版を固定していない。**ADR-0018 と同じ欠点である。
@@ -162,18 +188,27 @@ platform 依存もある（native Windows 非対応）。**採れない。**
 | hook が掛からない version で、read-only が指示だけに戻る | **agent 本文の指示を残した**（決定5）。**掛かっていないことを検出する手段は無い。引き受ける** |
 | allowlist が狭すぎて検査が止まる | 拒否理由に「許可しているのは何か」と「広げるなら ADR-0020 を更新する」を書いた。**黙って諦めさせない** |
 | allowlist を後から安易に広げる | `test_hooks.py`が、書き込めるprogramと状態を変えるgit subcommandが入っていないことを固定する。**広げる変更はtestを落とす** |
-| 字句判定を抜ける形が見つかる | **allowlistであり、抜けるには許可した program 自身の書き込み経路を使うことになる。**見つかったら`ALLOWED_PROGRAMS`から外す |
+| 字句判定を抜ける形が見つかる | **allowlistであり、抜けるには許可した program 自身の書き込み経路を使うことになる。**見つかったら`ALLOWED_PROGRAMS`から外すか、option 側で拒否する。**[#384](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/384)で 5 件見つかり、いずれも後者で塞いだ** |
+| 許可 program の危険な option を見落とす | **`DENIED_GIT_GLOBAL_OPTIONS`／`DENIED_GIT_SUBCOMMAND_OPTIONS`／`DENIED_RG_OPTIONS`／`REQUIRED_GIT_HELPER_OPTIONS`が持つ。****網羅は保証していない。**program を足すときに option を全数見る手順は機械化していない |
+| 要求 option（`--no-ext-diff --no-textconv`等）を agent が知らず、検査が止まる | **両 agent 本文へ`Bash の制約`節を足した。**拒否理由にも正しい形を書いてある |
 | `.claude/settings.json`へ間違って置かれる | `test_the_guard_is_not_wired_globally`が固定する |
 | 片方の agent にだけ書き忘れる | `test_both_inspector_agents_wire_the_guard`が固定する |
 
 ## 検証
 
-- `python3 scripts/test_hooks.py` — **158件 OK**（`InspectorReadonlyGuardTests` 17件を含む）
-- allowlist 側 16 例が通り、拒否側 39 例が落ちることを`check()`で確認した
+- `python3 scripts/test_hooks.py` — **162件 OK**（`InspectorReadonlyGuardTests` 21件を含む）
+- allowlist 側 19 例が通り、拒否側 59 例が落ちることを`check()`で確認した
+- **[#384](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/384)の 5 件を、使い捨て repository で実測してから塞いだ。**
+  helper script に `echo ... > PWNED` を書かせ、**file が実際に作られたことで判定した。**
+  `diff.external` は `git diff` だけが flag 無しで起動し、textconv は
+  `diff`／`show`／`log`／`blame` の 4 つが flag 無しで起動する。
+  4 つとも `--no-ext-diff --no-textconv` を受け付けることも確認した
 - **wrapper を 4 条件で実測した。**guard が無い／`python3`が無い → **exit 2**、
   読み取り command → exit 0 かつ stdout 空、書き込み command → exit 0 かつ`deny` payload
 - hook として起動し、`rm -rf /`に対し`permissionDecision: deny`が出ることを確認した
-- `git show HEAD`に対し stdout が空（素通り）であることを確認した
+- **`git show --no-ext-diff --no-textconv HEAD`に対し stdout が空（素通り）であることを確認した。**
+  **flag を欠いた`git show HEAD`は拒否される**（[#384](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/384)の対処後）。
+  **この行は当初「`git show HEAD`が素通りする」と書いていた。対処後は誤りである。**
 - 見直し条件: **subagent を実際に起動して書き込みが拒否されることを測れたとき**、
   この ADR の「実測していない」を実測結果へ差し替える。
   **測れないまま allowlist を広げる変更を重ねる場合は、選択肢A（sandbox）を再検討する。**
