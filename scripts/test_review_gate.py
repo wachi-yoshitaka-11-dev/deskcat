@@ -646,6 +646,71 @@ class ReviewGateTests(unittest.TestCase):
             lines.append(f"{gate.TRAILER_REFS}: {refs}")
         return "\n".join(lines) + "\n"
 
+    def _orphan_fixture(self, messages):
+        """`main`と共通祖先を持たないbranchを作り、`(root, cutover, head)`を返す。
+
+        `declaration-audit.yml`が`--from-root`を使う実際の形である
+        （branch作成やforce pushで`origin/main`と繋がらない履歴が入る）。
+        """
+        root = self._repository()
+        self._write(root, PLAIN_DOC, BASE_TEXT + "起点である。\n")
+        self._commit(root, "cutover")
+        cutover = _git(root, "rev-parse", "HEAD").strip()
+        _git(root, "checkout", "--quiet", "--orphan", "orphan")
+        _git(root, "rm", "--quiet", "-rf", ".")
+        for index, message in enumerate(messages):
+            self._write(root, f"orphan{index}.md", f"散文である。{index}\n")
+            self._commit(root, message)
+        return root, cutover, _git(root, "rev-parse", "HEAD").strip()
+
+    def test_from_root_checks_every_commit_including_the_parentless_one(self):
+        """**基点を置けない範囲を、直前の1 commitへ縮めない。**
+
+        `origin/main`と共通祖先が無いpushでは`base..head`で範囲を表せない。
+        **`${PUSH_AFTER}^`で代用すると中間commitを1つも見ない**
+        （[#385](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/385)で実測）。
+
+        **履歴の最初のcommitは親を持たない。**`<commit>^`が解決できないため、
+        `--from-root`はそこで落ちうる。空treeと比べて検査を続けることを固定する。
+        """
+        root, cutover, head = self._orphan_fixture(
+            ["一つ目\n", "二つ目\n", "三つ目\n"]
+        )
+        first = _git(root, "rev-list", "--max-parents=0", head).strip()
+        common = [
+            "history", "--repository-root", root,
+            "--head", head, "--since", cutover,
+        ]
+
+        # 縮めた形は1 commitしか見ない。**これが#385の欠陥である。**
+        narrow = _run(common + ["--base", _git(root, "rev-parse", f"{head}^").strip()])
+        self.assertIn("HISTORY_CHECKED=1", narrow.stdout)
+
+        result = _run(common + ["--base", first, "--from-root"])
+        self.assertIn("RANGE=(root)..", result.stdout)
+        self.assertIn("HISTORY_CHECKED=3", result.stdout)
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        # **親を持たないcommitで落ちていないこと。**gitのerrorではなく宣言の問題が出る。
+        self.assertNotIn("ambiguous argument", result.stderr)
+        self.assertIn(first[:7], result.stderr)
+
+    def test_from_root_still_honours_the_cutover(self):
+        """`--from-root`でも起点より前は検査しない。**規則を弱めない。**"""
+        root, cutover = self._history_fixture(
+            [(PLAIN_DOC, BASE_TEXT + "一つ目。\n", self._declared("一つ目", gate.CLASS_MINOR))]
+        )
+        first = _git(root, "rev-list", "--max-parents=0", "HEAD").strip()
+        result = _run(
+            [
+                "history", "--repository-root", root,
+                "--base", first, "--head", "HEAD", "--since", cutover,
+                "--from-root",
+            ]
+        )
+        # 起点そのものと、その前のcommitは数に入らない。
+        self.assertIn("HISTORY_CHECKED=1", result.stdout)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def test_history_is_not_checked_when_the_cutover_is_absent(self):
         """起点がこのhistoryに無ければ検査しない。**その事実を出力へ書く。**"""
         root, _ = self._history_fixture(

@@ -56,10 +56,20 @@ top-level directoryを列挙すると検査対象と起動条件がずれる。�
 - **阻止ではなく事後検出である。**pushは既に完了している。
   **`main`昇格の直前ではなく、原因を作ったmergeの直後に気付けるようにする**のが目的である
   （[ADR-0021](../../docs/decisions/0021-declaration-audit-on-push.md)）。
-- `before`が解決できない場合（branch作成、force push後）は、**`main`へ入っていない範囲を
-  すべて見る。****直前の1 commitへ縮めない。**縮めると、force pushが複数のcommitを
+- `before`が解決できない場合（branch作成、force push後）は、**3つの状況を分ける。**
+  **どの経路でも直前の1 commitへ縮めない。**縮めると、force pushが複数のcommitを
   持ち込んだときに中間のcommitを1つも見ない（[ADR-0021](../../docs/decisions/0021-declaration-audit-on-push.md)の`検証`で実測）。
-  `main`自身へのpushでは merge-base が head と一致するため、そこだけ直前の1 commitを見る。
+
+  | `git merge-base <after> origin/main` | 意味 | 見る範囲 |
+  |---|---|---|
+  | head と一致する | **`main`自身への push** | 直前の1 commit。**範囲は昇格 Pull Request で検査済みである** |
+  | 空を返す | **`origin/main`と共通祖先が無い** | `review_gate.py history --from-root`。**head から辿れるcommitをすべて見る** |
+  | それ以外 | 通常の branch 作成・force push | `main`へ入っていない範囲をすべて見る |
+
+  **2つに畳まない。**共通祖先が無い場合を「`main`への push」と同じ扱いにすると、
+  中間のcommitを1つも見ない（[#385](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/385)で実測）。
+  `--from-root`では`--base`は`CLASS`の計算にだけ使う。**`--not <起点>`は変わらず効くため、
+  起点より前を検査しない規則は弱まらない。**
 - `fetch-depth: 0`、`persist-credentials: false`は`review-gate.yml`と同じ理由である。
 - **`cancel-in-progress`を有効にしない。**pushごとに範囲が違うため、後のpushで
   前の範囲の検査を打ち切ると、その範囲を誰も見なくなる。

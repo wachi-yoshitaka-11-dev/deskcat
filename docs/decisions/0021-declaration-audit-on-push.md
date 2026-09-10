@@ -116,8 +116,13 @@ squash commit が`Change-Class`・`Self-Review`・`Instruction-Change`を失う�
   失われた宣言は後から付けられないため、**手当ては`DECLARATION_EXEMPT`への登録のままである。**
 - **`DECLARATION_EXEMPT`へ登録した commit は、その後の push でも素通りする。**
   免除は`history`の仕様であり、この workflow はそれを変えない。
-- **範囲の解決を shell で書いている。**`review_gate.py`のような unit test を持たない。
-  **手で実測して確かめた**（下の`検証`）。
+- **範囲の解決を shell で書いている。**workflow 側の分岐そのものは unit test を持たない。
+  **同じ見落としが 2 回続いた**（[#385](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/385)）。
+  1 回目は`${PUSH_AFTER}^`への縮退、2 回目は`merge-base`が**空を返す場合**を
+  「`main`への push」と同じ分岐へ畳んでいたことである。**どちらも手の実測でしか
+  見つかっていない。**2 回目の対処で、範囲の表し方（`--from-root`）は
+  `review_gate.py`側へ移し、`test_review_gate.py`で固定した。
+  **残る shell の分岐は 3 つで、test を持たない。**
 - **hook を通らない経路そのものは塞いでいない。**多層の下側を足しただけである。
 - **参照した公式文書の版を固定していない。**ADR-0018・ADR-0020 と同じ欠点である。
 
@@ -126,7 +131,8 @@ squash commit が`Change-Class`・`Self-Review`・`Instruction-Change`を失う�
 | リスク | 対策 |
 |---|---|
 | workflow が赤いまま放置され、慣れる | **`main`昇格で必ず落ちる。**放置しても最後に止まる。この workflow はその時点を早めるだけである |
-| 範囲の解決が誤り、検査対象が空になる | `before`が解決できないときは`main`へ入っていない範囲へ落とす。**素通りさせない。**4 通り（正常・zero・複数 commit・親なし）を実測した |
+| 範囲の解決が誤り、検査対象が空になる | `before`が解決できないときは`main`へ入っていない範囲へ落とす。**素通りさせない。**5 通り（正常・zero・複数 commit・親なし・**共通祖先なし**）を実測した |
+| 分岐を畳んで別の状況を同じ扱いにする | **[#385](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/385)で実際に起きた。**`merge-base`の結果は「head と一致」「空」「それ以外」の 3 つであり、**2 つに畳まない。**`--from-root`の側は`test_review_gate.py`が固定する |
 | force push で範囲が飛ぶ | `before`は force push 前の head を指す。履歴に無ければ fallback が効く。**共有 branch への force push は`AGENTS.md`が禁じている** |
 | 判定が workflow 側へ漏れ出す | workflow は範囲を解決して`review_gate.py`を呼ぶだけである。**trailer の名前も読み方も持たない** |
 | MCP 経路が塞がれないままである | **引き受ける。**選択肢Bの 3 つの理由による。構文は記録した |
@@ -169,6 +175,21 @@ squash commit が`Change-Class`・`Self-Review`・`Instruction-Change`を失う�
   **`main`昇格の merge commit が宣言を持たないのは設計どおりである**（[ADR-0010](0010-change-class-and-review-declaration.md)）。
   宣言は squash commit が持ち、`history`はそれを見る。**merge commit を検査対象にすると、
   昇格そのものが落ちる。**
+- **`origin/main`と共通祖先を持たない push で、中間 commit を取りこぼすことを実測した**
+  （[#385](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/385)）。
+  `git checkout --orphan`で宣言を持たない 3 commit を積み、workflow と同じ分岐を回した。
+
+  | 範囲の解決 | 結果 |
+  |---|---|
+  | `${PUSH_AFTER}^`（`merge-base`が空のとき当時こうなった） | **`HISTORY_CHECKED=1`。中間 2 commit を見逃す** |
+  | `--from-root`（採用） | **`HISTORY_CHECKED=3`、exit 1。3 件すべてを検出** |
+
+  **履歴の最初の commit は親を持たない。**`<commit>^`が解決できず`git diff`が
+  `ambiguous argument`で落ちていた。**空 tree（`4b825dc…`）と比べる形にして、
+  全 file が追加として出るようにした。**`git diff`は tree を引数に取れるが
+  `A..B`の形は取れないため、`classify`と`_check_instructions`の`git diff`を
+  2 引数へ変えた。`test_review_gate.py`が orphan branch の fixture で固定する。
+
 - 見直し条件: **この workflow が検出した事故が、それでも`main`昇格まで放置された場合。**
   そのときは検出ではなく阻止が要る。選択肢Bと、branch protection 側の手段を再検討する。
 
