@@ -158,7 +158,7 @@ DECLARATION_CUTOVER = "57734371384d18f31de7557a7a60fd1aa856edff"
 # 言えるか」を答える。**言えないものは`history`が落とす。**
 #
 # 指示sourceを触る免除（**次の1行だけを`test_review_gate.py`が実測と照合する**）:
-# `9c91f913`・`b71c7ef`・`b93b309`・`c171c52`
+# `9c91f913`・`b71c7ef`・`b93b309`・`c171c52`・`6bcd7b9`
 # **手で書いた列挙は2回遅れた。**`b93b309`と`c171c52`は、登録された後も足されなかった。
 # 導出できる事実を手で書いている以上、遅れは繰り返す。**だから機械で照合する。**
 # `18298ae`と`619c843`と`1a5dda8`は`INSTRUCTION_SOURCES`のpathを1つも触らないため、
@@ -243,8 +243,34 @@ DECLARATION_CUTOVER = "57734371384d18f31de7557a7a60fd1aa856edff"
 #   すべて正しく持っていた。**失われたのはsquash時の記録だけである。**
 #
 #   **`.github/`と`scripts/`を4 path触る。**そのため免除は`Instruction-Change`の検査まで
-#   抑止していた（`9c91f913`と同じ側）。**7件のうち、`main`へ未到達なのはこの1件だけで
-#   ある。**昇格範囲に現れるのはこれであり、他の6件は既に`main`に入っている。
+#   抑止していた（`9c91f913`と同じ側）。**この記述は「7件のうち`main`へ未到達なのは
+#   この1件だけである」と書いていたが、`c171c52`はその後`main`へ入り、記述だけが
+#   残っていた。**2026-09-10 (JST) に`git merge-base --is-ancestor`で8件すべてを
+#   測り直した。未到達は`1a5dda8`と`6bcd7b9`の2件であり、`c171c52`は到達済みである。
+#   **昇格の到達状況は機械で照合していない。書いた時点で古くなる。**
+#
+# - `6bcd7b9`（[PR #373](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/373)、[#372](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/372)）。
+#   **踏み方は`1a5dda8`と同型である。**squash mergeのcommit messageで、`Refs: #376`と
+#   `Co-Authored-By:`の間に空行を入れた。`git interpret-trailers`は最後の段落しか
+#   trailerと見なさないため、先頭の段落にある`Change-Class`・3値の`Self-Review`・
+#   `Instruction-Change`・`Closes`・`Refs`がまるごと無効になった。
+#   **文字列としては8行すべてmessage中に存在する。**
+#
+#   **既存7件と違うのは経路である。**`scripts/hooks/gh_metadata_guard.py`は
+#   Bash tool経由の`gh pr merge`のmessageを見る。**このmergeはGitHub MCPの
+#   `merge_pull_request` toolで実行しており、hookの経路を1度も通っていない。**
+#   `b71c7ef`の記録が「別の経路を通ったと考えられるが経路は特定していない。
+#   推測で書かない」と書いた形の、**経路が特定できた事例である。**
+#   hookの判定粒度（`c171c52`）とは別の穴であり、**hookをどれだけ賢くしても、
+#   hookを通らない経路は塞げない。**別途扱う。
+#
+#   full reviewは完走し指摘5件を全件検証済みで（4件resolved・1件を#376で追跡）、
+#   PR側のhead commit`9d8932c`は`Change-Class`・3値の`Self-Review`・
+#   `Instruction-Change`をすべて正しく持ち、`Verify change class and self-review`は
+#   `success`だった。**失われたのはsquash時の記録だけである。**
+#
+#   **`INSTRUCTION_SOURCES`を15 path触る。**そのため免除は`Instruction-Change`の
+#   検査まで抑止する（`9c91f913`と同じ側）。
 #
 # 免除1件の登録。**SHAと記録を同じ場所に置く。**片方だけが古くなる形にしない。
 # 記録をcomment側だけに置いていたため、**どの免除が指示sourceを触るかの列挙が
@@ -313,6 +339,17 @@ DECLARATION_EXEMPT_ENTRIES = (
         "**squash messageで同じ段落へコロン無しの行が混じり、blockごと無効になった"
         "だけである。**登録は#309で行った。**#309自体にreview eventは無く、"
         "人間が出しているのはmerge承認である。**内容のreviewは#307側にある。",
+    ),
+    ExemptEntry(
+        "6bcd7b9091f5d0131d467d13f84ed25735bce194",
+        True,
+        "PR #373でfull reviewが完走し、指摘5件を全件検証した（CodeRabbitのreview event"
+        "が実在する）。head commit`9d8932c`は`Instruction-Change: reviewed-as-data`を"
+        "持ち、`Verify change class and self-review`はsuccessだった。"
+        "**squash messageで`Refs: #376`と`Co-Authored-By:`の間へ空行を入れ、"
+        "trailerの段落が割れただけである**（`1a5dda8`と同型）。"
+        "登録は#377で行った。**#377自体のreviewは登録の妥当性に対するものであり、"
+        "内容のreviewは#373側にある。**",
     ),
 )
 
