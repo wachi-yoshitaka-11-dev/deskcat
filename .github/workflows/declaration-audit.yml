@@ -66,15 +66,27 @@ jobs:
           # 代わりに**`main`へ入っていない範囲をすべて見る。**`main`到達済みのcommitは
           # 昇格時に検査済みであり、そこから先を全部見れば取りこぼしが無い。
           # 既に通っているcommitを再検査するだけなので、余分に落ちることもない。
+          # **3つの状況を分ける。**2つに畳むと、共通祖先が無い push が
+          # 「main への push」と同じ扱いになり、中間commitを1つも見ない
+          # （[#385](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/385)で実測）。
+          FROM_ROOT=""
           BASE="$PUSH_BEFORE"
           if [ -z "$BASE" ] \
             || [ "$BASE" = "0000000000000000000000000000000000000000" ] \
             || ! git cat-file -e "${BASE}^{commit}" 2>/dev/null; then
-            BASE="$(git merge-base "$PUSH_AFTER" origin/main 2>/dev/null || true)"
-            if [ -n "$BASE" ] && [ "$BASE" != "$PUSH_AFTER" ]; then
+            MERGE_BASE="$(git merge-base "$PUSH_AFTER" origin/main 2>/dev/null || true)"
+            if [ -z "$MERGE_BASE" ]; then
+              # **`origin/main`と共通祖先が無い。**基点を置けないため`base..head`で
+              # 範囲を表せない。**`head`から辿れるcommitをすべて見る。**
+              # `--base`は`CLASS`の計算にだけ使う（履歴の最初のcommitを渡す）。
+              BASE="$(git rev-list --max-parents=0 "$PUSH_AFTER" | tail -n 1)"
+              FROM_ROOT="--from-root"
+              echo "origin/main と共通祖先が無い。head から辿れる範囲をすべて見る。"
+            elif [ "$MERGE_BASE" != "$PUSH_AFTER" ]; then
+              BASE="$MERGE_BASE"
               echo "before を解決できないため、main へ入っていない範囲をすべて見る: ${BASE}"
             elif BASE="$(git rev-parse --verify "${PUSH_AFTER}^" 2>/dev/null)"; then
-              # `main`自身へのpushでは merge-base が head と一致する。**そこは1 commitでよい。**
+              # **merge-base が head と一致するのは`main`自身へのpushである。**
               # `main`へ入る経路は昇格 Pull Request であり、範囲は既に検査されている。
               echo "main への push とみなし、直前の1 commit を見る: ${BASE}"
             else
@@ -87,4 +99,6 @@ jobs:
           # **判定は`review_gate.py`が持つ。**ここへ複製しない。
           # 同scriptは`git interpret-trailers --parse`でtrailerを読む。
           # **文字列としてmessageにあるかではない。**
-          python3 scripts/review_gate.py history --base "$BASE" --head "$PUSH_AFTER"
+          # shellcheck disable=SC2086 # FROM_ROOT は空か単一の option である
+          python3 scripts/review_gate.py history \
+            --base "$BASE" --head "$PUSH_AFTER" $FROM_ROOT

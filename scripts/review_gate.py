@@ -282,6 +282,21 @@ DECLARATION_CUTOVER = "57734371384d18f31de7557a7a60fd1aa856edff"
 #
 # **機械が持つ状態は2つに保つ。**根拠の強さや欠け方の違いは`note`の文面で表す。
 # 状態を増やすと、次に1件足したときに「3つ目の状態を作るか」の判断が要る。
+# gitが定義する空treeのobject id。**履歴の最初のcommitには親が無い。**
+# `<commit>^`が解決できないため、そのcommitはこれと比べる（全fileが追加として出る）。
+EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+
+
+def _parent_of(root, commit):
+    """`commit`の親を返す。**親が無ければ`EMPTY_TREE`を返す。**
+
+    `--from-root`は履歴の最初のcommitも検査対象へ入れるため、`<commit>^`が
+    解決できない場合がある。**空treeと比べると、全fileが追加として出る。**
+    `git diff`はtreeを引数に取れるが、`A..B`の形は取れない。呼び出し側は
+    2引数で渡す（`classify`と`_check_instructions`）。
+    """
+    return f"{commit}^" if _rev_exists(root, f"{commit}^") else EMPTY_TREE
+
 ExemptEntry = namedtuple("ExemptEntry", ("commit", "instruction_reviewed", "note"))
 
 # **この列挙を増やさない。**増やす変更は`scripts/`の変更であり、reviewと
@@ -536,7 +551,10 @@ def classify(root, base, head):
     # 起点をここで1回だけ解決する。以降の`git diff`と`_inspect_side`の`git show`が
     # 同じcommitを見る（理由は`_merge_base`）。
     base = _merge_base(root, base, head)
-    status = _git(root, ["diff", "--name-status", "--no-color", f"{base}..{head}"])
+    # **`A..B`ではなく2引数で渡す。**`git diff A..B`と`git diff A B`は同じだが、
+    # 2引数の形は**treeも受け付ける。**履歴の最初のcommit（親を持たない）を
+    # `EMPTY_TREE`と比べるために要る（`_check_history`の`--from-root`）。
+    status = _git(root, ["diff", "--name-status", "--no-color", base, head])
     reasons = []
     paths = []
     for line in status.splitlines():
@@ -653,7 +671,8 @@ def _check_instructions(root, base, head):
     # `classify`と同じ理由で起点を解決する。ここを端点diffのままにすると、base側だけの
     # 指示source変更に対して宣言を要求し、逆にbase側と内容が一致した変更を見落とす。
     base = _merge_base(root, base, head)
-    status = _git(root, ["diff", "--name-only", "--no-color", f"{base}..{head}"])
+    # **2引数で渡す。**理由は`classify`と同じ（`EMPTY_TREE`を受け付けるため）。
+    status = _git(root, ["diff", "--name-only", "--no-color", base, head])
     touched = [
         path
         for path in status.splitlines()
@@ -704,7 +723,7 @@ def _check_exempt_instructions(root, commit):
     **儀式として付いていても通り、正しく付けなかった回に落ちる。**
     保証をcommit単位へ置く。
     """
-    instruction_problems, touched = _check_instructions(root, f"{commit}^", commit)
+    instruction_problems, touched = _check_instructions(root, _parent_of(root, commit), commit)
     if not instruction_problems:
         # commit自身が宣言を持っている。免除はここへ効かない。
         return []
@@ -720,7 +739,7 @@ def _check_exempt_instructions(root, commit):
     ]
 
 
-def _check_history(root, base, head, cutover):
+def _check_history(root, base, head, cutover, from_root=False):
     """範囲の各commitが分類を宣言しているかを検査する。
 
     head commitだけを見ると、**宣言を持たないcommitが範囲の中に混ざっていても通る。**
@@ -737,16 +756,21 @@ def _check_history(root, base, head, cutover):
     `Change-Class`と`Self-Review`だけである。**`continue`をその呼び出しより前に
     置くと、免除commitの指示source変更が昇格の段でどこからも問われなくなる。**
     実際にそうなっていた。
+
+    `from_root`は**`base`を使わず、`head`から辿れるcommitをすべて見る。**
+    `origin/main`と共通祖先を持たないbranchへのpushで使う。**基点を置けないため
+    範囲を`base..head`で表せない。**`base`で代用すると、`base`自身と、`base`より
+    前のcommitが検査から外れる（[#385](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/385)）。
+    **`--not cutover`は変わらず効く。**起点より前は検査しない規則を弱めない。
     """
     if not _rev_exists(root, cutover):
         # 起点がこのrepositoryに無い。fixtureや別historyでは検査しない。
         return [], None
+    span = [head] if from_root else [f"{base}..{head}"]
     listed = _git(
-        root, ["rev-list", "--no-merges", f"{base}..{head}", "--not", cutover]
+        root, ["rev-list", "--no-merges", *span, "--not", cutover]
     ).split()
-    with_merges = _git(
-        root, ["rev-list", f"{base}..{head}", "--not", cutover]
-    ).split()
+    with_merges = _git(root, ["rev-list", *span, "--not", cutover]).split()
 
     problems = []
     exempt = 0
@@ -757,7 +781,9 @@ def _check_history(root, base, head, cutover):
             # **`continue`より前に呼ぶ。**後ろへ置くと指示sourceの検査が飛ぶ。
             problems.extend(_check_exempt_instructions(root, commit))
             continue
-        computed, _ = classify(root, f"{commit}^", commit)
+        # **親を持たないcommitがある。**`--from-root`は履歴の最初のcommitも
+        # 検査対象へ入れるため、`<commit>^`が解決できない場合がある。
+        computed, _ = classify(root, _parent_of(root, commit), commit)
         found = trailers(root, commit)
         declared = found.get(TRAILER_CLASS, [])
         if len(declared) != 1 or declared[0] not in CLASS_VALUES:
@@ -774,7 +800,7 @@ def _check_history(root, base, head, cutover):
             problems.extend(_check_fixup_reference(found, short))
         if not found.get(TRAILER_REVIEW):
             problems.append(f"{short} carries no {TRAILER_REVIEW} trailer")
-        instruction_problems, _ = _check_instructions(root, f"{commit}^", commit)
+        instruction_problems, _ = _check_instructions(root, _parent_of(root, commit), commit)
         problems.extend(instruction_problems)
     # 数えたものと数えなかったものを必ず出す。silent capを作らない。
     summary = (len(listed) - exempt, len(with_merges) - len(listed), exempt)
@@ -792,6 +818,10 @@ def main(argv=None):
     parser.add_argument("--expect", default="")
     # 起点の既定は`DECLARATION_CUTOVER`である。上書きはtestとdry runのためにある。
     parser.add_argument("--since", default="")
+    # **`history`専用。**`--base`を使わず`--head`から辿れるcommitをすべて検査する。
+    # `origin/main`と共通祖先を持たないbranchへのpushで使う（`declaration-audit.yml`）。
+    # **`--base`は`CLASS`の計算にだけ使われる。**
+    parser.add_argument("--from-root", action="store_true")
     options = parser.parse_args(argv)
     root = options.repository_root.strip() or str(
         Path(__file__).resolve().parent.parent
@@ -810,13 +840,18 @@ def main(argv=None):
         problems.extend(instruction_problems)
     if options.command == "history":
         history_problems, history = _check_history(
-            root, base, head, options.since.strip() or DECLARATION_CUTOVER
+            root,
+            base,
+            head,
+            options.since.strip() or DECLARATION_CUTOVER,
+            from_root=options.from_root,
         )
         problems.extend(history_problems)
     if options.expect and options.expect != computed:
         problems.append(f"expected CLASS={options.expect} but computed {computed}")
 
-    print(f"CLASS={computed} RANGE={base}..{head}")
+    span = f"(root)..{head}" if options.from_root else f"{base}..{head}"
+    print(f"CLASS={computed} RANGE={span}")
     if computed == CLASS_REVIEW:
         print(
             f"  meaning: {CLASS_REVIEW} means the {CLASS_MINOR} path is unavailable,"
