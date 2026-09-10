@@ -8,7 +8,7 @@ hooks:
     - matcher: "Bash"
       hooks:
         - type: command
-          command: "R=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}\"; [ -n \"$R\" ] && [ -f \"$R/scripts/hooks/inspector_readonly_guard.py\" ] && exec python3 \"$R/scripts/hooks/inspector_readonly_guard.py\" || exit 0"
+          command: "R=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}\"; G=\"$R/scripts/hooks/inspector_readonly_guard.py\"; if [ -z \"$R\" ] || [ ! -f \"$G\" ] || ! command -v python3 >/dev/null 2>&1; then echo \"検査 subagent の read-only guard を起動できない: $G。Bash を拒否する。\" >&2; exit 2; fi; python3 \"$G\" || { echo \"検査 subagent の read-only guard が異常終了した。Bash を拒否する。\" >&2; exit 2; }"
           timeout: 30
           statusMessage: "検査 subagent の Bash が読み取りだけか確認"
 ---

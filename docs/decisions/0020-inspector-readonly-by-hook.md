@@ -108,10 +108,23 @@ platform 依存もある（native Windows 非対応）。**採れない。**
      `--output`（**`git diff --output=<file>` は file を書く**）。
      **subcommand の後ろの `-c` は merge の combined diff であり、拒否しない**
    - **command 位置の環境変数代入を拒否する。**`command_line` は後続 command へ透過させるが、
-     `GIT_EXTERNAL_DIFF=rm git show` のように**環境変数だけで任意 command を起動できる**
+     `GIT_EXTERNAL_DIFF=rm git show` のように**環境変数だけで任意 command を起動できる。**
+     **判定は command 位置の語だけに当てる。**全語へ当てると `grep FOO=bar file` や
+     `git diff -- file=1` まで落ちる
+   - **command 位置の前置語を拒否する。**`command_line.TRANSPARENT_PREFIXES`
+     （`env`／`sudo`／`nohup`／`time`／`command`／`exec`）は後続 command へ透過するため、
+     **`sudo cat /etc/shadow` は `cat` だけを見れば allowlist を通る。**
+     `sudo` は実行の権限を変え、他も allowlist の外を呼ぶ足場になりうる。**1 つも許さない。**
+     `env` も許さない（代入自体を拒否しているため使い道が無い）
 4. **`tools`から`Bash`を外さない。`model: opus`も変えない。**ADR-0018 の決定4のままとする。
 5. **agent 本文の「read-only である」は残す。**機構と指示の両方を置く。
    **hook が掛からない環境（対応していない version）では、指示だけが残る。**
+6. **hook の wrapper を fail closed にする。**repository root、guard file、`python3` の
+   いずれかが無い場合と、guard が異常終了した場合は **`exit 2` で `Bash` を拒否する。**
+   **`exit 2` だけが tool 呼び出しを止める**（[公式文書](https://code.claude.com/docs/en/hooks)。
+   他の非 0 は「block しない error」として扱われ、動作は続行する）。
+   `.claude/settings.json` の既存 hook 5 本は `|| exit 0` で fail open だが、
+   **あちらは「書き忘れを指摘する」層であり、素通りは指摘漏れで済む。こちらは境界である。**
 
 ## 影響
 
@@ -129,7 +142,7 @@ platform 依存もある（native Windows 非対応）。**採れない。**
 - **hook が実際に掛かることを、この決定では実測していない。**agent frontmatter の`hooks`は
   [公式文書](https://code.claude.com/docs/en/sub-agents)に記載があるが、**subagent を起動して
   書き込みが実際に拒否されるところまでは測っていない。**測ったのは hook script 単体の判定である
-  （`check()`への 46 例と、hook として起動したときの`deny` payload）。
+  （`check()`への 55 例、wrapper の 4 条件、hook として起動したときの`deny` payload）。
 - **誤検知がある。**`grep "=>"`のように、metacharacter を含む正当な引数を拒否する。
   **代替がある**（両 agent は`Grep` tool を持つ）ため引き受けた。
 - **`ALLOWED_PROGRAMS`は「単体で書けない」という判断に依存する。**判断が誤っていれば穴になる。
@@ -137,6 +150,10 @@ platform 依存もある（native Windows 非対応）。**採れない。**
 - **入力が JSON でない場合は素通りする。**`command_from`が`None`を返す場合と同じ扱いである。
   **境界としては弱い。**hook 側の事故を対象 command の問題として扱わないほうを優先した。
 - **参照した公式文書の版を固定していない。**ADR-0018 と同じ欠点である。
+- **allowlist の設計は、`command_line` が透過させるものを打ち消す形になっている。**
+  同 module が`TRANSPARENT_PREFIXES`を増やすと、この guard は自動では追随しない。
+  `test_transparent_prefixes_do_not_smuggle_an_allowed_program`が全件を走査して固定するが、
+  **「増やしたときに落ちる」形であって、「増やしたら正しくなる」形ではない。**
 
 ### リスクと対策
 
@@ -151,8 +168,10 @@ platform 依存もある（native Windows 非対応）。**採れない。**
 
 ## 検証
 
-- `python3 scripts/test_hooks.py` — **151件 OK**（`InspectorReadonlyGuardTests` 10件を含む）
-- allowlist 側 14 例が通り、拒否側 32 例が落ちることを`check()`で確認した
+- `python3 scripts/test_hooks.py` — **158件 OK**（`InspectorReadonlyGuardTests` 17件を含む）
+- allowlist 側 16 例が通り、拒否側 39 例が落ちることを`check()`で確認した
+- **wrapper を 4 条件で実測した。**guard が無い／`python3`が無い → **exit 2**、
+  読み取り command → exit 0 かつ stdout 空、書き込み command → exit 0 かつ`deny` payload
 - hook として起動し、`rm -rf /`に対し`permissionDecision: deny`が出ることを確認した
 - `git show HEAD`に対し stdout が空（素通り）であることを確認した
 - 見直し条件: **subagent を実際に起動して書き込みが拒否されることを測れたとき**、

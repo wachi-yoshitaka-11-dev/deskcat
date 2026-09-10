@@ -12,6 +12,7 @@ hookを子processとして起動し、stdinへhookの入力JSONを渡して、**
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -1947,6 +1948,9 @@ class InspectorReadonlyGuardTests(unittest.TestCase):
         # `--output`への前方一致で誤爆させない
         "git log --output-indicator-new=X --oneline",
         "git grep -n pattern",
+        # **引数の中の`FOO=bar`は代入ではない。**command位置だけを見る
+        "grep FOO=bar AGENTS.md",
+        "git diff -- file=1",
         "cat AGENTS.md",
         "wc -l AGENTS.md",
         "head -40 AGENTS.md",
@@ -1997,6 +2001,14 @@ class InspectorReadonlyGuardTests(unittest.TestCase):
         "git diff --output=/tmp/x",
         # 環境変数の代入だけで任意commandを起動できる
         "GIT_EXTERNAL_DIFF=rm git show HEAD",
+        "env GIT_EXTERNAL_DIFF=rm git show HEAD",
+        # **前置語は allowlist の外側から実行の権限や解決先を変える**
+        "sudo cat /etc/shadow",
+        "env cat AGENTS.md",
+        "exec cat AGENTS.md",
+        "command cat AGENTS.md",
+        "nohup cat AGENTS.md",
+        "time cat AGENTS.md",
     )
 
     def test_allowed_commands_pass(self):
@@ -2085,6 +2097,127 @@ class InspectorReadonlyGuardTests(unittest.TestCase):
                 self.assertIn("inspector_readonly_guard.py", text,
                               f"{name}がguardを呼んでいない")
                 self.assertIn("PreToolUse", text, f"{name}のhookがPreToolUseでない")
+
+    def test_transparent_prefixes_do_not_smuggle_an_allowed_program(self):
+        """**`command_line`が透過させる前置語を、この guard は透過させない。**
+
+        `sudo cat /etc/shadow`は`cat`だけを見れば allowlist を通る。
+        `TRANSPARENT_PREFIXES`のすべてについて、command位置に現れたら落ちることを固定する。
+        """
+        for prefix in command_line.TRANSPARENT_PREFIXES:
+            with self.subTest(prefix=prefix):
+                self.assertIsNotNone(
+                    inspector_readonly_guard.check(f"{prefix} cat AGENTS.md"),
+                    f"{prefix}付きの呼び出しが通ってしまう",
+                )
+
+    def test_assignment_like_arguments_are_not_rejected(self):
+        """**代入の判定はcommand位置だけに当てる。**
+
+        全語へ当てると`grep FOO=bar file`のような読み取り専用commandまで落ちる。
+        **誤検知はhookごと無効化される側の失敗である。**
+        """
+        self.assertIsNone(inspector_readonly_guard.check("grep FOO=bar AGENTS.md"))
+        self.assertIsNone(inspector_readonly_guard.check("git diff -- file=1"))
+        self.assertIsNotNone(inspector_readonly_guard.check("FOO=bar cat AGENTS.md"))
+
+    def test_command_starts_keeps_the_prefixes_programs_drops(self):
+        """`command_starts`が前置語を残し、`programs`がそれを落とすこと。
+
+        **2つの関数が同じ走査から出ていることを固定する。**別実装にすると、
+        片方だけが前置語を数え落とす。
+        """
+        starts = command_line.command_starts("sudo FOO=1 cat x && git show HEAD")
+        self.assertEqual(starts, [(("sudo", "FOO=1"), "cat"), ((), "git")])
+        self.assertEqual(
+            command_line.programs("sudo FOO=1 cat x && git show HEAD"), ["cat", "git"])
+
+    def test_command_starts_keeps_a_prefix_with_no_program(self):
+        """program語が続かない前置語も落とさない。**捨てると呼び出し側が見逃す。**"""
+        self.assertEqual(command_line.command_starts("sudo && ls"),
+                         [(("sudo",), None), ((), "ls")])
+
+    def _wrapper_command(self, agent):
+        """agent frontmatterから`command:`のscalarを読む。
+
+        **PyYAMLを使わない。**このリポジトリはYAML parserを依存に持たず、
+        `validate_pages_output.py`も同じ理由でscalarを手で読んでいる。
+        **testのためだけに依存を増やさない。**
+
+        対象は`command: "..."`という1行のdouble-quoted scalarに限る。
+        **形が変わったらこのtestは落ちる。**黙って読み飛ばさないよう、
+        見つからなければ`fail`する。
+        """
+        text = (REPO_ROOT_FOR_TEMPLATES / ".claude" / "agents" / agent).read_text(
+            encoding="utf-8")
+        front = text[4:text.index("\n---\n", 4) + 1]
+        for line in front.splitlines():
+            stripped = line.strip()
+            if not stripped.startswith('command: "'):
+                continue
+            scalar = stripped[len('command: "'):]
+            self.assertTrue(scalar.endswith('"'), f"{agent}のcommandが1行で閉じていない")
+            # double-quoted scalarのescapeを戻す。`\"`と`\\`だけを扱う。
+            return scalar[:-1].replace('\\"', '"').replace("\\\\", "\\")
+        self.fail(f"{agent}に`command: \"...\"`の行が無い")
+
+    def _run_wrapper(self, agent, env_extra, payload):
+        shell = shutil.which("sh") or "/bin/sh"
+        return subprocess.run(
+            [shell, "-c", self._wrapper_command(agent)],
+            input=payload, capture_output=True, text=True,
+            encoding="utf-8", errors="replace", timeout=120,
+            env={**os.environ, **env_extra},
+        )
+
+    def test_wrapper_blocks_when_the_guard_cannot_start(self):
+        """**起動できないときは fail closed である。**
+
+        hookのwrapperが`exit 0`で終わると、guardが無い環境で`Bash`が素通りする。
+        **`exit 2`だけがtool呼び出しを止める**（[公式文書](https://code.claude.com/docs/en/hooks)。
+        他の非0は「blockしないerror」として扱われ、動作は続行する）。
+
+        guardが無い場合とpython3が無い場合の両方を測る。
+        """
+        write = json.dumps({"tool_input": {"command": "rm -rf /"}})
+        for agent in ("consistency-inspector.md", "fresh-context-reviewer.md"):
+            with tempfile.TemporaryDirectory() as empty:
+                with self.subTest(agent=agent, case="guard missing"):
+                    result = self._run_wrapper(agent, {"CLAUDE_PROJECT_DIR": empty}, write)
+                    self.assertEqual(result.returncode, 2, result.stderr[:300])
+            with self.subTest(agent=agent, case="python3 missing"):
+                result = self._run_wrapper(
+                    agent,
+                    {"CLAUDE_PROJECT_DIR": str(REPO_ROOT_FOR_TEMPLATES),
+                     "PATH": "/nonexistent"},
+                    write,
+                )
+                self.assertEqual(result.returncode, 2, result.stderr[:300])
+
+    def test_wrapper_passes_through_a_working_guard(self):
+        """**fail closedにしたことで、正常系まで落としていないことを測る。**"""
+        env = {"CLAUDE_PROJECT_DIR": str(REPO_ROOT_FOR_TEMPLATES)}
+        for agent in ("consistency-inspector.md", "fresh-context-reviewer.md"):
+            with self.subTest(agent=agent, case="read-only"):
+                result = self._run_wrapper(
+                    agent, env, json.dumps({"tool_input": {"command": "git show HEAD"}}))
+                self.assertEqual(result.returncode, 0, result.stderr[:300])
+                self.assertEqual(result.stdout.strip(), "")
+            with self.subTest(agent=agent, case="write"):
+                result = self._run_wrapper(
+                    agent, env, json.dumps({"tool_input": {"command": "rm -rf /"}}))
+                self.assertEqual(result.returncode, 0, result.stderr[:300])
+                emitted = json.loads(result.stdout)
+                self.assertEqual(
+                    emitted["hookSpecificOutput"]["permissionDecision"], "deny")
+
+    def test_the_wrapper_does_not_fail_open(self):
+        """`|| exit 0`という形が戻っていないことを、文字列でも固定する。"""
+        for agent in ("consistency-inspector.md", "fresh-context-reviewer.md"):
+            with self.subTest(agent=agent):
+                command = self._wrapper_command(agent)
+                self.assertNotIn("|| exit 0", command)
+                self.assertIn("exit 2", command)
 
     def test_the_guard_is_not_wired_globally(self):
         """**`.claude/settings.json`へは置かない。**置くと通常の作業 session が止まる。"""

@@ -132,6 +132,10 @@ DENIED_GIT_SUBCOMMAND_OPTIONS = ("-O", "--open-files-in-pager", "--output")
 # command位置に現れる環境変数の代入。`command_line`は後続commandへ透過させるが、
 # **`GIT_EXTERNAL_DIFF=rm git show`のように、環境変数だけで任意commandを起動できる。**
 # ここでは透過させず拒否する。
+#
+# **command位置の語だけに当てる。**全語へ当てると`grep FOO=bar file`や
+# `git diff -- file=1`のような読み取り専用commandまで落ちる。
+# 判定には`command_line.command_starts`が返す「読み飛ばした前置語」を使う。
 ASSIGNMENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 
 # 語の中に現れたら拒否するshell metacharacter。
@@ -220,15 +224,30 @@ def _check_line(line):
                 " 検索なら `Grep` tool を使う。"
             )
 
-    for token in tokens:
-        if ASSIGNMENT_RE.match(token):
+    for skipped, program in command_line.command_starts(line):
+        # **前置語は`command_line`が透過させるが、ここでは透過させない。**
+        # `sudo cat /etc/shadow`は`cat`だけを見ると allowlist を通ってしまう。
+        # `sudo`は実行の権限を変え、`exec`／`command`／`nohup`／`time`も
+        # 「allowlist に無い program を呼ぶための足場」になりうる。
+        # **1 つも許さない。**`env`も含めて拒否する（下記）。
+        for token in skipped:
+            if ASSIGNMENT_RE.match(token):
+                return (
+                    f"{PREFIX}"
+                    f" command 位置の環境変数代入のため拒否した: {token!r}。"
+                    "**`GIT_EXTERNAL_DIFF=rm git show` のように、"
+                    "環境変数だけで任意 command を起動できる。**"
+                    " 引数の中の `FOO=bar` は対象ではない。"
+                )
             return (
                 f"{PREFIX}"
-                f" 環境変数の代入を含むため拒否した: {token!r}。"
-                "**`GIT_EXTERNAL_DIFF=rm git show` のように、環境変数だけで任意 command を起動できる。**"
+                f" command 位置の前置語のため拒否した: {token!r}。"
+                "**`sudo cat x` のように、allowlist にある program でも"
+                "前置語が実行の権限や解決先を変える。**"
+                " `env` も許さない。環境変数の代入自体を拒否しているため、使い道が無い。"
             )
-
-    for program in command_line.programs(line):
+        if program is None:
+            continue
         name = program.rsplit("/", 1)[-1]
         if name not in ALLOWED_PROGRAMS:
             return (
