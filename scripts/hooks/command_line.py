@@ -80,6 +80,37 @@ def invocations(command, program):
     return found
 
 
+def programs(command):
+    """command位置に現れたprogram語を、現れた順に返す。
+
+    `invocations`が「特定のprogramを探す」のに対し、こちらは**何が呼ばれているかを
+    列挙する。**allowlistで判定するhook（`inspector_readonly_guard.py`）が使う。
+    列挙する側を各hookへ複製せず、command位置の判定をこの module へ寄せる。
+
+    `cat x && git show HEAD`は`["cat", "git"]`を返す。`echo git`は`["echo"]`だけを返す。
+
+    **`tokenize`が空を返した場合と、実際にcommandが空の場合を区別しない。**
+    呼び出し側が「空なら安全」と読まないよう、この関数は判定をしない。
+    `inspector_readonly_guard.py`は tokenize の失敗を別途 fail closed で扱う。
+    """
+    found = []
+    at_command_position = True
+    for token in tokenize(command):
+        if token in SEPARATORS:
+            at_command_position = True
+            continue
+        if not at_command_position:
+            continue
+        if token in TRANSPARENT_PREFIXES:
+            continue
+        if "=" in token and not token.startswith("-"):
+            # `VAR=value`の代入は、後ろのcommandへ透過する。
+            continue
+        found.append(token)
+        at_command_position = False
+    return found
+
+
 def command_from(payload):
     """hookの入力から`tool_input.command`を返す。取り出せなければ`None`。
 
