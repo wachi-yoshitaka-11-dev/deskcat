@@ -12,6 +12,7 @@ hookを子processとして起動し、stdinへhookの入力JSONを渡して、**
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -36,6 +37,7 @@ BASE_GUARD = str(SCRIPTS_ROOT / "hooks" / "branch_base_guard.py")
 MERGE_REPORT = str(SCRIPTS_ROOT / "hooks" / "merge_trailer_report.py")
 PUSH_GATE = str(SCRIPTS_ROOT / "hooks" / "push_gate.py")
 CODERABBIT_GATE = str(SCRIPTS_ROOT / "hooks" / "coderabbit_gate.py")
+INSPECTOR_GUARD = str(SCRIPTS_ROOT / "hooks" / "inspector_readonly_guard.py")
 MERGE_REPORT = str(SCRIPTS_ROOT / "hooks" / "merge_trailer_report.py")
 REPO_ROOT_FOR_TEMPLATES = SCRIPTS_ROOT.parent
 ISSUE_TEMPLATE_DIR = REPO_ROOT_FOR_TEMPLATES / ".github" / "ISSUE_TEMPLATE"
@@ -44,6 +46,8 @@ PR_TEMPLATE_PATH = REPO_ROOT_FOR_TEMPLATES / ".github" / "pull_request_template.
 sys.path.insert(0, str(SCRIPTS_ROOT / "hooks"))
 
 import push_gate  # noqa: E402
+
+import inspector_readonly_guard  # noqa: E402
 
 # fixtureのcommitに使うidentity。実行者の設定に依存させない。
 GIT_IDENTITY = (
@@ -1880,13 +1884,16 @@ class CommandFromTests(unittest.TestCase):
 
 
 class HookPayloadShapeTests(unittest.TestCase):
-    """**5本のhookが、mappingでない入力で落ちないことを確かめる**（#242）。
+    """**hookが、mappingでない入力で落ちないことを確かめる**（#242）。
 
     [PR #241](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/241)のreview指摘は`coderabbit_gate.py`に対するものだったが、
-    **型で全数走査したら5本すべてに同じ形が残っていた。**指摘は代表例であって全数ではない。
+    **型で全数走査したら当時の5本すべてに同じ形が残っていた。**指摘は代表例であって全数ではない。
+
+    **後から足したhookもこの一覧へ入れる。**`inspector_readonly_guard.py`は#376で足した。
     """
 
-    HOOKS = (GH_GUARD, BASE_GUARD, PUSH_GATE, MERGE_REPORT, CODERABBIT_GATE)
+    HOOKS = (GH_GUARD, BASE_GUARD, PUSH_GATE, MERGE_REPORT, CODERABBIT_GATE,
+             INSPECTOR_GUARD)
 
     MALFORMED = (
         "[]",
@@ -1919,6 +1926,303 @@ class HookPayloadShapeTests(unittest.TestCase):
                                      f"{Path(script).name} が例外を出した")
                     self.assertEqual(result.stdout.strip(), "",
                                      f"{Path(script).name} が止めてしまった")
+
+
+class InspectorReadonlyGuardTests(unittest.TestCase):
+    """検査 subagent の`Bash`を読み取りだけに絞るhook（#376）。
+
+    **allowlistである。**「通ってはいけないもの」を数え上げるのではなく、
+    通ってよいものだけを列挙し、それ以外が落ちることを確かめる。
+    """
+
+    ALLOWED = (
+        "git show HEAD",
+        "git -C /tmp/wt --no-pager diff origin/main..HEAD",
+        "git log --oneline -20",
+        "git diff HEAD~1 HEAD",
+        "git rev-parse HEAD",
+        "git merge-base --is-ancestor a b",
+        "git show HEAD:AGENTS.md",
+        # subcommandの後ろの`-c`はmergeのcombined diffであり読み取り専用である
+        "git log -c HEAD",
+        # `--output`への前方一致で誤爆させない
+        "git log --output-indicator-new=X --oneline",
+        "git grep -n pattern",
+        # **引数の中の`FOO=bar`は代入ではない。**command位置だけを見る
+        "grep FOO=bar AGENTS.md",
+        "git diff -- file=1",
+        "cat AGENTS.md",
+        "wc -l AGENTS.md",
+        "head -40 AGENTS.md",
+        "/usr/bin/git status",
+    )
+
+    DENIED = (
+        # 書き込みcommandそのもの
+        "rm -rf /",
+        "sed -i s/a/b/ AGENTS.md",
+        "cp a b",
+        "tee out",
+        # 書ける経路を持つ「読み取りに見える」command
+        "sort -o out in",
+        "uniq in out",
+        # 任意codeを実行できるもの
+        "python3 -c 'print(1)'",
+        "sh -c 'rm x'",
+        "bash -lc 'rm x'",
+        "xargs rm",
+        # 状態を変えるgit subcommand
+        "git checkout -- .",
+        "git commit -m x",
+        "git branch -D develop",
+        "git config --global user.name x",
+        "git push origin develop",
+        # subcommandが無い
+        "git",
+        # `shlex`が空白でしか切らないために潰れる形
+        "cat a>b",
+        "cat a;rm -rf /",
+        "git show HEAD > /tmp/x",
+        "git show HEAD | tee f",
+        "echo $(rm -rf /)",
+        "echo `rm -rf /`",
+        # 改行で並べた2つ目のcommand
+        "git show HEAD\nrm -rf /",
+        # 語へ分けられない
+        "cat 'unclosed",
+        # **subcommandが読み取り専用でも、gitのoptionが任意commandを実行する**
+        "git -c core.pager=rm log",
+        "git -ccore.pager=rm log",
+        "git --config-env=core.pager=P log",
+        "git --exec-path=/tmp show",
+        "git grep -Oless pattern",
+        "git grep --open-files-in-pager=rm x",
+        # **subcommandが読み取り専用でも、fileを書くoption**
+        "git diff --output=/tmp/x",
+        # 環境変数の代入だけで任意commandを起動できる
+        "GIT_EXTERNAL_DIFF=rm git show HEAD",
+        "env GIT_EXTERNAL_DIFF=rm git show HEAD",
+        # **前置語は allowlist の外側から実行の権限や解決先を変える**
+        "sudo cat /etc/shadow",
+        "env cat AGENTS.md",
+        "exec cat AGENTS.md",
+        "command cat AGENTS.md",
+        "nohup cat AGENTS.md",
+        "time cat AGENTS.md",
+    )
+
+    def test_allowed_commands_pass(self):
+        for command in self.ALLOWED:
+            with self.subTest(command=command):
+                self.assertIsNone(inspector_readonly_guard.check(command))
+
+    def test_denied_commands_are_refused(self):
+        for command in self.DENIED:
+            with self.subTest(command=command):
+                self.assertIsNotNone(
+                    inspector_readonly_guard.check(command),
+                    f"{command!r}が通ってしまう",
+                )
+
+    def test_empty_command_passes(self):
+        """空は拒否理由にしない。**hookは空commandを止める役ではない。**"""
+        for command in ("", "   ", "\n"):
+            with self.subTest(command=command):
+                self.assertIsNone(inspector_readonly_guard.check(command))
+
+    def test_newline_is_split_before_tokenizing(self):
+        """**`shlex`は改行を空白として扱う。**行で分けないと2行目が見えない。
+
+        分けずに`tokenize`へ渡すと`git show rm -rf /`という1つの語列になり、
+        `rm`がcommand位置に来ない。**この形が実際に素通りすることを固定する。**
+        """
+        collapsed = command_line.programs("git show HEAD\nrm -rf /")
+        self.assertEqual(collapsed, ["git"])
+        self.assertIsNotNone(inspector_readonly_guard.check("git show HEAD\nrm -rf /"))
+
+    def test_allowlist_holds_no_program_that_writes_on_its_own(self):
+        """allowlistへ書き込めるcommandが紛れ込まないよう固定する。
+
+        **将来`sort`や`tee`を足したくなったときに落ちる。**足すなら、その理由を
+        ADR-0020へ書いたうえでこのtestも変える。
+        """
+        writable = {"sort", "uniq", "sed", "tee", "dd", "cp", "mv", "install",
+                    "python3", "python", "sh", "bash", "zsh", "xargs", "awk",
+                    "perl", "ruby", "node", "tar", "touch", "mkdir", "rm"}
+        overlap = writable.intersection(inspector_readonly_guard.ALLOWED_PROGRAMS)
+        self.assertEqual(overlap, set(), f"書き込める program が allowlist にある: {overlap}")
+
+    def test_git_subcommands_hold_no_mutating_verb(self):
+        mutating = {"add", "commit", "push", "fetch", "pull", "checkout", "switch",
+                    "restore", "reset", "clean", "branch", "tag", "config",
+                    "worktree", "stash", "gc", "am", "apply", "rebase", "merge",
+                    "cherry-pick", "revert", "mv", "rm", "init", "clone"}
+        overlap = mutating.intersection(inspector_readonly_guard.GIT_READONLY_SUBCOMMANDS)
+        self.assertEqual(overlap, set(), f"状態を変える subcommand が allowlist にある: {overlap}")
+
+    def test_deny_payload_is_emitted_for_a_write(self):
+        """hookとして起動したとき、`permissionDecision: deny`を出す。"""
+        payload = json.dumps({"tool_input": {"command": "rm -rf /"}})
+        result = subprocess.run(
+            [sys.executable, INSPECTOR_GUARD],
+            input=payload, capture_output=True, text=True,
+            encoding="utf-8", errors="replace", timeout=120,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr[:300])
+        emitted = json.loads(result.stdout)
+        self.assertEqual(
+            emitted["hookSpecificOutput"]["permissionDecision"], "deny")
+        self.assertIn("rm", emitted["hookSpecificOutput"]["permissionDecisionReason"])
+
+    def test_read_only_payload_passes_through(self):
+        payload = json.dumps({"tool_input": {"command": "git show HEAD"}})
+        result = subprocess.run(
+            [sys.executable, INSPECTOR_GUARD],
+            input=payload, capture_output=True, text=True,
+            encoding="utf-8", errors="replace", timeout=120,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr[:300])
+        self.assertEqual(result.stdout.strip(), "")
+
+    def test_both_inspector_agents_wire_the_guard(self):
+        """**2つの agent 定義が実際にこのhookを呼んでいることを固定する。**
+
+        hookを置いただけでは何も起きない。`.claude/agents/`のfrontmatterへ
+        書かれていて初めて掛かる。**片方だけ書き忘れる形を止める。**
+        """
+        agents = REPO_ROOT_FOR_TEMPLATES / ".claude" / "agents"
+        for name in ("consistency-inspector.md", "fresh-context-reviewer.md"):
+            with self.subTest(agent=name):
+                text = (agents / name).read_text(encoding="utf-8")
+                self.assertIn("inspector_readonly_guard.py", text,
+                              f"{name}がguardを呼んでいない")
+                self.assertIn("PreToolUse", text, f"{name}のhookがPreToolUseでない")
+
+    def test_transparent_prefixes_do_not_smuggle_an_allowed_program(self):
+        """**`command_line`が透過させる前置語を、この guard は透過させない。**
+
+        `sudo cat /etc/shadow`は`cat`だけを見れば allowlist を通る。
+        `TRANSPARENT_PREFIXES`のすべてについて、command位置に現れたら落ちることを固定する。
+        """
+        for prefix in command_line.TRANSPARENT_PREFIXES:
+            with self.subTest(prefix=prefix):
+                self.assertIsNotNone(
+                    inspector_readonly_guard.check(f"{prefix} cat AGENTS.md"),
+                    f"{prefix}付きの呼び出しが通ってしまう",
+                )
+
+    def test_assignment_like_arguments_are_not_rejected(self):
+        """**代入の判定はcommand位置だけに当てる。**
+
+        全語へ当てると`grep FOO=bar file`のような読み取り専用commandまで落ちる。
+        **誤検知はhookごと無効化される側の失敗である。**
+        """
+        self.assertIsNone(inspector_readonly_guard.check("grep FOO=bar AGENTS.md"))
+        self.assertIsNone(inspector_readonly_guard.check("git diff -- file=1"))
+        self.assertIsNotNone(inspector_readonly_guard.check("FOO=bar cat AGENTS.md"))
+
+    def test_command_starts_keeps_the_prefixes_programs_drops(self):
+        """`command_starts`が前置語を残し、`programs`がそれを落とすこと。
+
+        **2つの関数が同じ走査から出ていることを固定する。**別実装にすると、
+        片方だけが前置語を数え落とす。
+        """
+        starts = command_line.command_starts("sudo FOO=1 cat x && git show HEAD")
+        self.assertEqual(starts, [(("sudo", "FOO=1"), "cat"), ((), "git")])
+        self.assertEqual(
+            command_line.programs("sudo FOO=1 cat x && git show HEAD"), ["cat", "git"])
+
+    def test_command_starts_keeps_a_prefix_with_no_program(self):
+        """program語が続かない前置語も落とさない。**捨てると呼び出し側が見逃す。**"""
+        self.assertEqual(command_line.command_starts("sudo && ls"),
+                         [(("sudo",), None), ((), "ls")])
+
+    def _wrapper_command(self, agent):
+        """agent frontmatterから`command:`のscalarを読む。
+
+        **PyYAMLを使わない。**このリポジトリはYAML parserを依存に持たず、
+        `validate_pages_output.py`も同じ理由でscalarを手で読んでいる。
+        **testのためだけに依存を増やさない。**
+
+        対象は`command: "..."`という1行のdouble-quoted scalarに限る。
+        **形が変わったらこのtestは落ちる。**黙って読み飛ばさないよう、
+        見つからなければ`fail`する。
+        """
+        text = (REPO_ROOT_FOR_TEMPLATES / ".claude" / "agents" / agent).read_text(
+            encoding="utf-8")
+        front = text[4:text.index("\n---\n", 4) + 1]
+        for line in front.splitlines():
+            stripped = line.strip()
+            if not stripped.startswith('command: "'):
+                continue
+            scalar = stripped[len('command: "'):]
+            self.assertTrue(scalar.endswith('"'), f"{agent}のcommandが1行で閉じていない")
+            # double-quoted scalarのescapeを戻す。`\"`と`\\`だけを扱う。
+            return scalar[:-1].replace('\\"', '"').replace("\\\\", "\\")
+        self.fail(f"{agent}に`command: \"...\"`の行が無い")
+
+    def _run_wrapper(self, agent, env_extra, payload):
+        shell = shutil.which("sh") or "/bin/sh"
+        return subprocess.run(
+            [shell, "-c", self._wrapper_command(agent)],
+            input=payload, capture_output=True, text=True,
+            encoding="utf-8", errors="replace", timeout=120,
+            env={**os.environ, **env_extra},
+        )
+
+    def test_wrapper_blocks_when_the_guard_cannot_start(self):
+        """**起動できないときは fail closed である。**
+
+        hookのwrapperが`exit 0`で終わると、guardが無い環境で`Bash`が素通りする。
+        **`exit 2`だけがtool呼び出しを止める**（[公式文書](https://code.claude.com/docs/en/hooks)。
+        他の非0は「blockしないerror」として扱われ、動作は続行する）。
+
+        guardが無い場合とpython3が無い場合の両方を測る。
+        """
+        write = json.dumps({"tool_input": {"command": "rm -rf /"}})
+        for agent in ("consistency-inspector.md", "fresh-context-reviewer.md"):
+            with tempfile.TemporaryDirectory() as empty:
+                with self.subTest(agent=agent, case="guard missing"):
+                    result = self._run_wrapper(agent, {"CLAUDE_PROJECT_DIR": empty}, write)
+                    self.assertEqual(result.returncode, 2, result.stderr[:300])
+            with self.subTest(agent=agent, case="python3 missing"):
+                result = self._run_wrapper(
+                    agent,
+                    {"CLAUDE_PROJECT_DIR": str(REPO_ROOT_FOR_TEMPLATES),
+                     "PATH": "/nonexistent"},
+                    write,
+                )
+                self.assertEqual(result.returncode, 2, result.stderr[:300])
+
+    def test_wrapper_passes_through_a_working_guard(self):
+        """**fail closedにしたことで、正常系まで落としていないことを測る。**"""
+        env = {"CLAUDE_PROJECT_DIR": str(REPO_ROOT_FOR_TEMPLATES)}
+        for agent in ("consistency-inspector.md", "fresh-context-reviewer.md"):
+            with self.subTest(agent=agent, case="read-only"):
+                result = self._run_wrapper(
+                    agent, env, json.dumps({"tool_input": {"command": "git show HEAD"}}))
+                self.assertEqual(result.returncode, 0, result.stderr[:300])
+                self.assertEqual(result.stdout.strip(), "")
+            with self.subTest(agent=agent, case="write"):
+                result = self._run_wrapper(
+                    agent, env, json.dumps({"tool_input": {"command": "rm -rf /"}}))
+                self.assertEqual(result.returncode, 0, result.stderr[:300])
+                emitted = json.loads(result.stdout)
+                self.assertEqual(
+                    emitted["hookSpecificOutput"]["permissionDecision"], "deny")
+
+    def test_the_wrapper_does_not_fail_open(self):
+        """`|| exit 0`という形が戻っていないことを、文字列でも固定する。"""
+        for agent in ("consistency-inspector.md", "fresh-context-reviewer.md"):
+            with self.subTest(agent=agent):
+                command = self._wrapper_command(agent)
+                self.assertNotIn("|| exit 0", command)
+                self.assertIn("exit 2", command)
+
+    def test_the_guard_is_not_wired_globally(self):
+        """**`.claude/settings.json`へは置かない。**置くと通常の作業 session が止まる。"""
+        settings = REPO_ROOT_FOR_TEMPLATES / ".claude" / "settings.json"
+        self.assertNotIn("inspector_readonly_guard", settings.read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":
