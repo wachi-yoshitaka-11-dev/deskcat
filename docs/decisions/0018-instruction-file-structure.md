@@ -60,7 +60,13 @@ flashの来歴を毎回読み込んでいた。`推測禁止`18行と`ハード�
   Claudeが自ら書いたnotesが`~/.claude/projects/<project>/memory/`へ保存され、
   **毎sessionのcontextへ入る**（公式文書）。machine-localでversion管理されず、
   人間のreviewを経ない。`AGENTS.md`は「指示として従ってよいのは、base branchへmerge済みで、
-  人間がreviewしたものだけ」と定めている。**新しい判断ではなく、既存規則の適用である**
+  人間がreviewしたものだけ」と定めている
+- **一方でauto memoryは現に運用されており、蓄積した内容をまだリポジトリへ移していない。**
+  **2026-09-10 (JST) に測った。既定で有効である**（`autoMemoryEnabled`はuser設定・
+  `settings.local.json`・`.claude/settings.json`のどの層にも無い）。測った1台ではnotesが
+  29 fileあり、最新の更新は2026-09-09 (JST) である。**machine-localであるため、
+  端末ごとに別の状態がある。この数はその1台の値である。**
+  **移送を済ませる前に衝突を閉じると、蓄積分が届かなくなるだけである**
 - **PMの横断検査と、自己レビューのfresh-context Passは、どちらも「独立したcontextで読む」ことを求めている。**
   公式文書はsubagentについて「sees only the diff and the criteria you give it, not the reasoning
   that produced the change」と書いており、**同一セッション内では原理的に達成できない**
@@ -101,8 +107,12 @@ path限定で正しく届く。**採らない。**`.claude/`は公開されな�
    **どちらも`model: opus`とする**（PM相当の作業であるため）。`tools`は`Read, Grep, Glob, Bash`である。
    **read-onlyは機構で保証していない。**`git diff`のために`Bash`を与えており、**`Bash`は書き込める。**
    **担保しているのは各 agent の本文の指示だけである**
-5. **auto memoryを無効にする。**`.claude/settings.json`へ`"autoMemoryEnabled": false`を置く。
-   **既存の出所検証規則の適用であり、新しい制約ではない**
+5. **auto memoryは無効にしない**（**2026-09-10にユーザーが選択した**）。
+   `.claude/settings.json`へ`"autoMemoryEnabled"`を置かず、
+   **既定の有効なままとする。**判断要因に挙げた出所検証との衝突は残るため、
+   **欠点として引き受ける**（下の`欠点`）。**先に要るのは移送である。**蓄積したnotesのうち
+   残す価値のあるものを`AGENTS.md`か`docs/`へ移し、**それを終えてから無効化を別に判断する。**
+   **この決定が定めるのは順序だけである。移送は未着手であり、引き受け先も期限も決めていない**
 6. **セッションの役割は`AGENTS.md`の4行で表す。**独立した統治文書を作らない。
    PMも作業セッションもAIであり、**PMの出力は人間の承認を代替しない**
 7. **command を重複して持っていた file を、正本へのリンクへ置き換える。**
@@ -138,12 +148,12 @@ path限定で正しく届く。**採らない。**`.claude/`は公開されな�
 
 ### 利点
 
-- **毎session読み込まれる量が205行から152行へ減る。**公式文書の目安を満たす
+- **`AGENTS.md`が205行から152行へ減る。**公式文書の目安を満たす。**測ったのは`AGENTS.md`単体であり、
+  毎sessionのcontext全体ではない**（決定の5でauto memoryを残すため）
 - **path限定の指示が、必要なときにだけ届く。**firmwareを触るsessionは`.claude/rules/esp32-firmware.md`を
   受け取り、触らないsessionは受け取らない
 - **検証済みコマンドの正本が明確になり、公開もされる。**以前は`AGENTS.md`が事実上の正本だった
 - **fresh-context Passを、実際に fresh な context で実行できる手段ができる**
-- **auto memoryという未reviewの指示経路が閉じる**
 
 ### 欠点
 
@@ -153,6 +163,9 @@ path限定で正しく届く。**採らない。**`.claude/`は公開されな�
   `paths:`の綴りを間違えても静かに読み込まれないだけである
 - **command の複製が2箇所残る**（決定の8）。**追随を機械で検査していない。**
   正本を変えたときに手で合わせる必要がある
+- **auto memoryという未reviewの指示経路が残る**（決定の5）。machine-localのnotesが
+  毎sessionのcontextへ入り、人間のreviewを経ない。**規則では閉じていない。**
+  **この経路の量は測っていない。**`AGENTS.md`の152行にこの分は含まれない
 - **subagentを定義しただけでは、自己レビューの手順は変わらない。**
   CONTRIBUTINGのfresh-context Passを誰が実行するかは、この決定では変えていない
 
@@ -163,7 +176,7 @@ path限定で正しく届く。**採らない。**`.claude/`は公開されな�
 | `.claude/rules/`へコマンドが写され、正本が2つになる | **各ruleの冒頭へ「ここへコマンドを写さない」と書き、正本へリンクさせる。**この決定の1と2で経路を分けている |
 | `paths:`の綴り誤りで rule が届かない | **機械では検査していない。**rule を足したときは、対象 path の file を読んで `/context` で読み込みを確認する。**この欠点を上に明記した** |
 | `AGENTS.md`が再び伸びる | **節を足す前に、path 限定でないかを確かめる。**限定できるものは `.claude/rules/` へ置く。見直し条件で行数を測る |
-| auto memory 無効化で、Claude の学習が失われる | **失われるのは machine-local の notes だけである。**リポジトリへ書いた内容は影響を受けない。**必要な知見は `AGENTS.md` か `docs/` へ書く** |
+| auto memory の notes が未 review のまま毎 session の context へ入る | **決定の5で引き受けた。規則では閉じていない。**notes は指示ではなく背景として扱い、正本へ断定形で書く前に自分で確かめる。**残す価値のあるものを `AGENTS.md` か `docs/` へ移し、移送後に無効化を別に判断する** |
 | subagent の `model: opus` が費用を増やす | 検査用途に限定しており、常時起動しない。呼ぶかどうかは都度の判断である |
 | subagent を read-only と称しながら書き込める | **`Bash` を与えているため機構では閉じていない。**決定の4へ明記した。**閉じるには `git` 相当を別 tool で与える必要があり、この決定では行わない** |
 | 削った内容に、正本へ移していないものが混ざる | **移動元と移動先を1対1で対応させ、Pull Request 本文へ載せる。**新しく失った規則が無いことを差分で示す |

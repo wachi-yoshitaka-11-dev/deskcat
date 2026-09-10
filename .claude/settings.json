@@ -1,5 +1,4 @@
 {
-  "autoMemoryEnabled": false,
   "hooks": {
     "PreToolUse": [
       {
