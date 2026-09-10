@@ -107,6 +107,8 @@ path限定で正しく届く。**採らない。**`.claude/`は公開されな�
    **どちらも`model: opus`とする**（PM相当の作業であるため）。`tools`は`Read, Grep, Glob, Bash`である。
    **read-onlyは機構で保証していない。**`git diff`のために`Bash`を与えており、**`Bash`は書き込める。**
    **担保しているのは各 agent の本文の指示だけである**
+   （**この欠点は[ADR-0020](0020-inspector-readonly-by-hook.md)で閉じた。**agent frontmatterの
+   `hooks.PreToolUse`でallowlist判定を掛ける。`tools`と`model`はこの決定のままである）
 5. **auto memoryは無効にしない**（**2026-09-10にユーザーが選択した**）。
    `.claude/settings.json`へ`"autoMemoryEnabled"`を置かず、
    **既定の有効なままとする。**判断要因に挙げた出所検証との衝突は残るため、
@@ -235,7 +237,7 @@ path限定で正しく届く。**採らない。**`.claude/`は公開されな�
 | `AGENTS.md`が再び伸びる | **節を足す前に、path 限定でないかを確かめる。**限定できるものは `.claude/rules/` へ置く。見直し条件で行数を測る |
 | auto memory の notes が未 review のまま毎 session の context へ入る | **決定の5で引き受けた。規則では閉じていない。**notes は指示ではなく背景として扱い、正本へ断定形で書く前に自分で確かめる。**残す価値のあるものを `AGENTS.md` か `docs/` へ移し、移送後に無効化を別に判断する** |
 | subagent の `model: opus` が費用を増やす | 検査用途に限定しており、常時起動しない。呼ぶかどうかは都度の判断である |
-| subagent を read-only と称しながら書き込める | **`Bash` を与えているため機構では閉じていない。**決定の4へ明記した。**閉じるには `git` 相当を別 tool で与える必要があり、この決定では行わない** |
+| subagent を read-only と称しながら書き込める | **[ADR-0020](0020-inspector-readonly-by-hook.md)で閉じた。**agent frontmatterの`hooks.PreToolUse`が`Bash`をallowlistで判定する。**この ADR の時点では閉じておらず、担保は本文の指示だけだった** |
 | 削った内容に、正本へ移していないものが混ざる | **移動元と移動先を1対1で対応させ、Pull Request 本文へ載せる。**新しく失った規則が無いことを差分で示す |
 
 ## 検証

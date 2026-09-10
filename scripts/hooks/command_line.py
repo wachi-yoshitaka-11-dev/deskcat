@@ -80,6 +80,64 @@ def invocations(command, program):
     return found
 
 
+def command_starts(command):
+    """command位置ごとに`(読み飛ばした前置語の並び, program語)`を返す。
+
+    `invocations`と`programs`が捨てている**前置語そのもの**を残す。
+    allowlistで判定するhook（`inspector_readonly_guard.py`）は、
+    **`sudo cat x`の`sudo`と`FOO=bar cat x`の`FOO=bar`を見る必要がある。**
+    透過させたまま`cat`だけを見ると、`sudo`付きの呼び出しが素通りする。
+
+    `sudo cat x && git show HEAD`は
+    `[(("sudo",), "cat"), ((), "git")]`を返す。
+
+    program語が無いまま区切りへ達した場合（`sudo && ls`の`sudo`）は
+    `(前置語, None)`を返す。**捨てない。**捨てると、呼び出し側が
+    「前置語だけの command は無かった」と読む。
+    """
+    found = []
+    skipped = []
+    at_command_position = True
+    for token in tokenize(command):
+        if token in SEPARATORS:
+            if skipped:
+                found.append((tuple(skipped), None))
+                skipped = []
+            at_command_position = True
+            continue
+        if not at_command_position:
+            continue
+        if token in TRANSPARENT_PREFIXES:
+            skipped.append(token)
+            continue
+        if "=" in token and not token.startswith("-"):
+            # `VAR=value`の代入は、後ろのcommandへ透過する。
+            skipped.append(token)
+            continue
+        found.append((tuple(skipped), token))
+        skipped = []
+        at_command_position = False
+    if skipped:
+        found.append((tuple(skipped), None))
+    return found
+
+
+def programs(command):
+    """command位置に現れたprogram語を、現れた順に返す。
+
+    `invocations`が「特定のprogramを探す」のに対し、こちらは**何が呼ばれているかを
+    列挙する。**列挙する側を各hookへ複製せず、command位置の判定をこの module へ寄せる。
+
+    `cat x && git show HEAD`は`["cat", "git"]`を返す。`echo git`は`["echo"]`だけを返す。
+    **前置語は落ちる。**前置語まで要る呼び出し側は`command_starts`を使う。
+
+    **`tokenize`が空を返した場合と、実際にcommandが空の場合を区別しない。**
+    呼び出し側が「空なら安全」と読まないよう、この関数は判定をしない。
+    `inspector_readonly_guard.py`は tokenize の失敗を別途 fail closed で扱う。
+    """
+    return [program for _, program in command_starts(command) if program is not None]
+
+
 def command_from(payload):
     """hookの入力から`tool_input.command`を返す。取り出せなければ`None`。
 

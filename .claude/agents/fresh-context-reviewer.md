@@ -3,6 +3,14 @@ name: fresh-context-reviewer
 description: 最終 diff だけを読み、それを書いた意図を知らない読み手として問題を報告する。CONTRIBUTING の fresh-context Pass を、diff を書いたセッションの外で実行するための subagent。修正は行わない。
 tools: Read, Grep, Glob, Bash
 model: opus
+hooks:
+  PreToolUse:
+    - matcher: "Bash"
+      hooks:
+        - type: command
+          command: "R=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}\"; G=\"$R/scripts/hooks/inspector_readonly_guard.py\"; if [ -z \"$R\" ] || [ ! -f \"$G\" ] || ! command -v python3 >/dev/null 2>&1; then echo \"検査 subagent の read-only guard を起動できない: $G。Bash を拒否する。\" >&2; exit 2; fi; python3 \"$G\" || { echo \"検査 subagent の read-only guard が異常終了した。Bash を拒否する。\" >&2; exit 2; }"
+          timeout: 30
+          statusMessage: "検査 subagent の Bash が読み取りだけか確認"
 ---
 
 あなたはこの変更を**初めて見る。**何を作るつもりだったかを知らないし、聞かない。
