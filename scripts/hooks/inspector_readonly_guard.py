@@ -41,8 +41,15 @@ frontmatterへ`hooks.PreToolUse`として書き、**その subagent の`Bash`呼
 alias、shell function、変数展開、`xargs`経由、`sh -c`の内側。
 **ただし`sh`・`bash`・`xargs`は`ALLOWED_PROGRAMS`に無いため、command位置に現れれば拒否される。**
 残るのは、許可した program 自身が持つ書き込み経路である。
-そのため`ALLOWED_PROGRAMS`には**単体では file を書けないものだけ**を入れる
-（`sort -o`、`uniq out`、`sed -i`、`tee`のような書き込み経路を持つものを入れない）。
+
+**`ALLOWED_PROGRAMS`へ入れてよいのは、option を含めても外部 command を起動せず
+file を書かないものだけである。**「単体では file を書けない」では足りない
+（`sort -o`、`uniq out`、`sed -i`、`tee`は書き込み経路を持つので入れない。
+`rg --pre`と`git`の外部 helper は**program 名だけを見ても分からない**ので、
+option 側でも拒否する）。**program 名の allowlist は、option の検査と対で使う。**
+
+**program は名前で照合する。**`/`を含む語は拒否する（`./git`、`/tmp/cat`）。
+basename だけで照合すると、名前が一致する任意の実行 file を起動できる。
 """
 
 import json
@@ -51,7 +58,9 @@ import sys
 
 import command_line
 
-# command位置に現れてよいprogram。**単体でfileを書けないものだけを入れる。**
+# command位置に現れてよいprogram。
+# **option を含めても外部 command を起動せず file を書かないものだけを入れる。**
+# 入れた後も、その program が持つ危険な option は下の `DENIED_*` で個別に拒否する。
 #
 # 入れなかったものと理由:
 # - `sort` — `-o FILE`で書ける
@@ -127,7 +136,44 @@ DENIED_GIT_GLOBAL_OPTIONS = ("-c", "--config-env", "--exec-path")
 #
 # **`-c`をここへ入れない。**subcommandの後ろの`-c`は`git log -c`（merge の combined diff）であり、
 # 読み取り専用である。**危険なのはglobal位置の`-c`だけである。**
-DENIED_GIT_SUBCOMMAND_OPTIONS = ("-O", "--open-files-in-pager", "--output")
+DENIED_GIT_SUBCOMMAND_OPTIONS = (
+    "-O",
+    "--open-files-in-pager",
+    "--output",
+    # **外部 helper を明示的に起動する option。**helper の command は git config
+    # （`diff.external`、`diff.<drv>.textconv`、`filter.<drv>.smudge`）にあり、
+    # **任意の command である。file を書ける。**
+    "--ext-diff",
+    "--textconv",
+    "--filters",
+)
+
+# **外部 helper は option 無しでも走る。**上の拒否だけでは閉じない。実測した。
+#
+# | 経路 | `diff.external` | `diff.<drv>.textconv` |
+# |---|---|---|
+# | `git diff` | **走る** | **走る** |
+# | `git show`／`git log -p`／`git blame` | 走らない | **走る** |
+# | 他の許可 subcommand | 走らない | 走らない |
+#
+# **`--no-ext-diff`は textconv を止めない。**両方を要求する。
+# 4 subcommand すべてが両 option を受け付けることも実測で確かめた。
+GIT_HELPER_SUBCOMMANDS = frozenset({"diff", "show", "log", "blame"})
+REQUIRED_GIT_HELPER_OPTIONS = ("--no-ext-diff", "--no-textconv")
+
+# `git status`は既定でindexをrefreshし、**更新したindexをdiskへ書く**
+# （https://git-scm.com/docs/git-status）。読み取り専用にするには
+# **global option**の`--no-optional-locks`が要る。`git status --no-optional-locks`
+# （subcommandの後ろ）はgitが受け付ける位置ではないため、globals側で見る。
+GIT_STATUS_REQUIRED_GLOBAL = "--no-optional-locks"
+
+# **`rg`が持つ、任意commandを起動するoption。**
+#
+# - `--pre COMMAND` — 検索対象ごとに`COMMAND`を実行する。`--pre=COMMAND`の形もある
+# - `--hostname-bin COMMAND` — hostnameを得るために`COMMAND`を実行する
+#
+# **`--pre-glob`は当たらない。**`_matches_option`は完全一致と`=`付きしか見ない。
+DENIED_RG_OPTIONS = ("--pre", "--hostname-bin")
 
 # command位置に現れる環境変数の代入。`command_line`は後続commandへ透過させるが、
 # **`GIT_EXTERNAL_DIFF=rm git show`のように、環境変数だけで任意commandを起動できる。**
@@ -248,7 +294,17 @@ def _check_line(line):
             )
         if program is None:
             continue
-        name = program.rsplit("/", 1)[-1]
+        if "/" in program:
+            # **basename で照合しない。**`./git`や`/tmp/cat`は名前が一致するだけの
+            # 別の実行 file であり、allowlist の前提（名前が実体を決める）が崩れる。
+            # **絶対 path を許す必要は無い。**`PATH`上の program だけで検査は足りる。
+            return (
+                f"{PREFIX}"
+                f" path を含む program のため拒否した: {program!r}。"
+                "**`./git`や`/tmp/cat`は、名前が allowlist と一致するだけの"
+                "別の実行 file である。**program 名だけを書く。"
+            )
+        name = program
         if name not in ALLOWED_PROGRAMS:
             return (
                 f"{PREFIX}"
@@ -256,6 +312,16 @@ def _check_line(line):
                 f" 許可しているのは {', '.join(sorted(ALLOWED_PROGRAMS))} だけである。"
                 " 検査に本当に必要なら、ADR-0020 を更新して allowlist を広げる。"
             )
+
+    for args in command_line.invocations(line, "rg"):
+        for token in args:
+            for option in DENIED_RG_OPTIONS:
+                if _matches_option(token, option):
+                    return (
+                        f"{PREFIX}"
+                        f" rg の option {token!r} は任意の command を実行するため拒否した。"
+                        "**`rg --pre` は検索対象ごとにその command を起動する。**"
+                    )
 
     for args in command_line.invocations(line, "git"):
         globals_, subcommand, rest = _split_git_args(args)
@@ -283,6 +349,25 @@ def _check_line(line):
                 f" 読み取り専用でない git subcommand のため拒否した: {subcommand!r}。"
                 f" 許可しているのは {', '.join(sorted(GIT_READONLY_SUBCOMMANDS))} だけである。"
             )
+        if subcommand == "status" and GIT_STATUS_REQUIRED_GLOBAL not in globals_:
+            return (
+                f"{PREFIX}"
+                f" `git status` は既定で index を refresh し `.git/index` を書くため、"
+                f" `git {GIT_STATUS_REQUIRED_GLOBAL} status` の形でだけ許す。"
+                "**global option であり、subcommand の後ろでは効かない。**"
+            )
+        if subcommand in GIT_HELPER_SUBCOMMANDS:
+            missing = [
+                option for option in REQUIRED_GIT_HELPER_OPTIONS if option not in rest
+            ]
+            if missing:
+                return (
+                    f"{PREFIX}"
+                    f" `git {subcommand}` は option 無しでも git config の外部 helper"
+                    f"（`diff.external`／`textconv`）を実行するため、"
+                    f" {' と '.join(repr(option) for option in missing)} の明示を要求する。"
+                    "**`--no-ext-diff` だけでは textconv を止められない。**"
+                )
 
     return None
 
