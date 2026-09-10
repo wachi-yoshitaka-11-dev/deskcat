@@ -67,6 +67,8 @@ INSTRUCTION_SOURCES = (
     "docs/decisions/",
     "docs/hardware/",
     "docs/protocol/",
+    "docs/toolchains/verified-commands.md",
+    "docs/toolchains/machine-profiles.md",
     "docs/DeskCat_Microcontroller_Development_Guide.md",
     "scripts/",
 )

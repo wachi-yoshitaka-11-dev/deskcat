@@ -592,6 +592,10 @@ class ReviewGateTests(unittest.TestCase):
             ("docs/governance/README.md", True),
             ("docs/governance-notes/README.md", False),
             ("docs/runbooks/note.md", False),
+            ("docs/toolchains/verified-commands.md", True),
+            ("docs/toolchains/machine-profiles.md", True),
+            ("docs/toolchains/README.md", False),
+            ("docs/toolchains/version-records/README.md", False),
         )
         for path, expected in cases:
             with self.subTest(path=path):

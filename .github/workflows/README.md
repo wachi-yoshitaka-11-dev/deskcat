@@ -3,6 +3,10 @@
 buildを実行するworkflowは、そのbuild commandが確定してから追加する。
 再現できないbuildを、検証したとworkflowで主張しない。
 
+**この文書が並べる command は、workflow が実際に実行するものの記述である。**
+**開発者が実行する command の正本は[検証済みコマンド](../../docs/toolchains/verified-commands.md)であり、
+正本が変わったら workflow とこの記述を合わせる**（[ADR-0018](../../docs/decisions/0018-instruction-file-structure.md)）。
+
 追加する順序は次のとおりである。**`#1`から`#4`まですべて実施済みである。**
 
 | # | 対象 | 状態 |

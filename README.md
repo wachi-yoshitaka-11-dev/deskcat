@@ -86,57 +86,25 @@ workspaceの判断は[ADR-0001](docs/decisions/0001-monorepo-layout.md)を参照
 
 文書作成・review専用端末にはRust、ESP-IDF、USB toolを導入しない。[ESP32セットアップrunbook](docs/runbooks/esp32-development-machine-setup.md)または[Raspberry Piセットアップrunbook](docs/runbooks/raspberry-pi-development-machine-setup.md)は、対応profileを割り当てた端末だけで使用し、[version記録template](docs/toolchains/version-record-template.md)で環境を記録する。
 
-### host workspace（検証済みcommand）
+### 検証済みcommand
 
-Host Rust Development profileの端末で、repository rootにて実行する。ESP32 toolchainは要らない。
+**コマンドと来歴の正本は[検証済みコマンド](docs/toolchains/verified-commands.md)である。**
+host workspace、ESP32 firmware、Raspberry Pi の実行手順と、それぞれが何を主張し何を主張しないかを持つ。
+**この README へコマンドを写さない**（[ADR-0018](docs/decisions/0018-instruction-file-structure.md)）。
 
-```bash
-cargo fmt --all -- --check
-cargo clippy --workspace --all-targets --locked
-cargo test --workspace --locked
-```
+**以前はこの節が command と来歴を重複して持っており、実際に古くなっていた。**
+2026-09-09 の時点で、ESP32 の「現行 tree に対する最新の検証」を 2026-08-10 と書いていたが、
+2026-08-15 の[Version Record](docs/toolchains/version-records/2026-08-15-esp32-build-native-linux.md)が存在していた。
+「未確定の command」として ESP32 の flash・serial monitor と Raspberry Pi の build を挙げていたが、
+どちらも[2026-08-20](docs/toolchains/version-records/2026-08-20-esp32-flash-boot-native.md)と
+[2026-08-26](docs/toolchains/version-records/2026-08-17-pi-direct-build-native.md)に検証済みだった。
 
-lintの水準はroot `Cargo.toml`の`[workspace.lints]`が持つため、`-D warnings`は付けない。`cargo fmt`は`--locked`を受け付けない。
+ESP32 の toolchain 確定版（target、channel、ESP-IDF、linker）は
+[ESP32 Rust Toolchain](docs/toolchains/esp32-rust-toolchain.md)が正本である。
 
-Linux x86_64、Rust stable 1.97.1で検証した。検証日は2026-08-10である。証拠は[Version Record](docs/toolchains/version-records/2026-08-10-host-rust-linux.md)にある。別端末での再現はCIの`ubuntu-24.04` runnerで満たした（#129。[Version Record](docs/toolchains/version-records/2026-08-15-host-rust-ci.md)）。**CIが実行するのはhost workspaceだけであり、Raspberry Pi上でのbuildと実行は主張しない。**
-
-`firmware/esp32`はroot workspaceから`exclude`している。firmwareのmanifestは`[workspace]`節を持たないため、excludeを外すとfirmwareのbuildが壊れる。分離自体は[ADR-0001](docs/decisions/0001-monorepo-layout.md)の決定である。
-
-### ESP32 firmware（検証済みcommand）
-
-ESP32 Build profileの端末で、`firmware/esp32`にて実行する。事前に[ESP32セットアップrunbook](docs/runbooks/esp32-development-machine-setup.md)のtoolchain導入を済ませる。
-
-```bash
-. "$HOME/export-esp.sh"
-cargo fmt --all -- --check
-cargo clippy --all-targets --locked -- -D warnings
-cargo build --locked
-```
-
-`--locked`は、追跡している`Cargo.lock`から解決結果が逸脱した場合に、lockfileを更新せず失敗させる。`cargo fmt`はこのoptionを受け付けない。
-
-Linux x86_64で検証した。初回は2026-08-06、現行treeに対する最新の検証は2026-08-10である。証拠は[Version Record](docs/toolchains/version-records/2026-08-06-esp32-build-linux.md)にある。確定版は次である。
-
-| 項目 | 確定版 |
-|---|---|
-| Rust target | `xtensa-esp32-espidf` |
-| Rust channel | `esp-1.95.0.0`（Xtensa Rust 1.95.0.0） |
-| ESP-IDF | `v5.5.3` |
-| linker | `ldproxy` |
-
-初回buildはESP-IDF本体を取得するため時間と容量を要する（検証時は4分33秒、`.embuild`は4.4 GB）。`export-esp.sh`を読み込まずに実行すると失敗する。
-
-別端末での再現はCIの`ubuntu-24.04` runnerで満たした（#42。[Version Record](docs/toolchains/version-records/2026-08-10-esp32-build-ci.md)）。**build-onlyであり、flashと実機起動は主張しない。**標準OSは[ADR-0005](docs/decisions/0005-standard-development-os.md)により実機のLinuxで、Windowsは対象外である。flashとserial monitorは#6の範囲であり、実機の確認が済むまで実行しない。
-
-### 未確定のcommand
-
-次はまだ検証済みcommandが無い。対象開発端末でclean buildに成功した後にこの節へ記載する。
-
-- ESP32のflash、serial monitor
-- Raspberry Piのbuildと実行
-- HIL test
-
-このplaceholderからcommandを推測しない。
+**まだ検証済み command が無いのは、Raspberry Pi の実機試験（実 serial port、ESP32 との通信）と HIL である。**
+[検証済みコマンド](docs/toolchains/verified-commands.md)の「まだコマンドが無いもの」が正本であり、
+**この README では列挙しない。**複製すると、解決済みの項目が未確定として残り続ける（上と同じ失敗）。
 
 ## 参考資料と生成data
 
