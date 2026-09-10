@@ -50,7 +50,8 @@ hooks:
   index を refresh し `.git/index` を書く。`--no-optional-locks` は **global option** であり、
   `git status --no-optional-locks` の位置では効かない。
 - **program を path 付きで書かない。**`./git` や `/usr/bin/git` は拒否される。
-- **`rg --pre` は使えない。**検索対象ごとに任意の command を起動するため拒否される。
+- **`rg --pre` と `rg --hostname-bin` は使えない。**前者は検索対象ごとに、後者は hostname を
+  得るために任意の command を起動するため拒否される。
 - redirect（`>`）、pipe（`|`）、`;`、`$(...)` を含む command は拒否される。**検索は `Grep` tool を使う。**
 
 **拒否は正しい動作である。**回避策を探さず、許された形へ書き換える。

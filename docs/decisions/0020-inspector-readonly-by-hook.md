@@ -91,10 +91,18 @@ platform 依存もある（native Windows 非対応）。**採れない。**
 2. **`scripts/hooks/inspector_readonly_guard.py`を新設する。**agent frontmatter の
    `hooks.PreToolUse`（`matcher: Bash`）から呼ぶ。**`.claude/settings.json`へは置かない。**
 3. **判定は allowlist とする。**
-   - command位置の program は`ALLOWED_PROGRAMS`のみ。**単体で file を書けるものを入れない**
-     （`sort -o`、`uniq out`、`sed -i`、`tee`、interpreter を除外した）
-   - `git`の subcommand は`GIT_READONLY_SUBCOMMANDS`のみ。**flag に関係なく書かないものだけ**
-     （`branch`／`tag`／`config`は flag 次第で壊せるため入れない）
+   - command位置の program は`ALLOWED_PROGRAMS`のみ。**option を含めても外部 command を
+     起動せず file を書かないものだけを入れる**（`sort -o`、`uniq out`、`sed -i`、`tee`、
+     interpreter を除外した）。**当初は「単体で file を書けない」を基準にしていたが、
+     それでは足りなかった**（[#384](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/384)。下の`欠点`）
+   - **program は名前で照合する。**`/`を含む語を拒否する（`./git`、`/tmp/cat`）
+   - `git`の subcommand は`GIT_READONLY_SUBCOMMANDS`のみ
+     （`branch`／`tag`／`config`は flag 次第で壊せるため入れない）。
+     **ただし「flag に関係なく安全」ではない。**`diff`／`show`／`log`／`blame`は
+     `--no-ext-diff --no-textconv`の両方を、`status`は global の`--no-optional-locks`を要求する
+   - **許可した program 自身の危険な option を個別に拒否する。**
+     git の`-c`／`--config-env`／`--exec-path`／`-O`／`--output`／`--ext-diff`／
+     `--textconv`／`--filters`、`rg`の`--pre`／`--hostname-bin`
    - **shell metacharacter（`>|;&()`` ` ``$<{}`）を含む語を拒否する。**
      `shlex`は空白でしか語を切らないため、`cat a>b`も`cat a;rm -rf /`も1語になり、
      redirect も次の command も command 位置として見えない
@@ -158,7 +166,7 @@ platform 依存もある（native Windows 非対応）。**採れない。**
   |---|---|
   | `git diff --ext-diff`／`show --textconv`／`grep --textconv`／`cat-file --filters` | git config の外部 helper を起動する |
   | **`git diff`／`show`／`log`／`blame` は flag 無しでも helper が走る** | `--no-ext-diff --no-textconv` の両方を要求する。**`--no-ext-diff` は textconv を止めない**（実測） |
-  | `rg --pre COMMAND` | 検索対象ごとに `COMMAND` を起動する |
+  | `rg --pre COMMAND`／`rg --hostname-bin COMMAND` | `--pre`は検索対象ごとに、`--hostname-bin`は hostname を得るために `COMMAND` を起動する |
   | `git status` | 既定で index を refresh し `.git/index` を書く |
   | `./git`／`/tmp/cat` | **basename で照合していた。**名前が一致するだけの別の実行 file が通った |
 
@@ -198,7 +206,9 @@ platform 依存もある（native Windows 非対応）。**採れない。**
 - **wrapper を 4 条件で実測した。**guard が無い／`python3`が無い → **exit 2**、
   読み取り command → exit 0 かつ stdout 空、書き込み command → exit 0 かつ`deny` payload
 - hook として起動し、`rm -rf /`に対し`permissionDecision: deny`が出ることを確認した
-- `git show HEAD`に対し stdout が空（素通り）であることを確認した
+- **`git show --no-ext-diff --no-textconv HEAD`に対し stdout が空（素通り）であることを確認した。**
+  **flag を欠いた`git show HEAD`は拒否される**（[#384](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/384)の対処後）。
+  **この行は当初「`git show HEAD`が素通りする」と書いていた。対処後は誤りである。**
 - 見直し条件: **subagent を実際に起動して書き込みが拒否されることを測れたとき**、
   この ADR の「実測していない」を実測結果へ差し替える。
   **測れないまま allowlist を広げる変更を重ねる場合は、選択肢A（sandbox）を再検討する。**
