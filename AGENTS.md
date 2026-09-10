@@ -21,9 +21,11 @@
 8. メーカー公式資料と実験結果
 9. [DeskCat マイコン開発技術ガイド](docs/DeskCat_Microcontroller_Development_Guide.md)
 
-**この一覧は網羅ではない。**この file の各節が「作業開始時に確認する」または「正本である」と名指しする文書も、
-同じ扱いとする。現時点では [Machine Profiles](docs/toolchains/machine-profiles.md)（`開発端末の役割`）と
-[検証済みコマンド](docs/toolchains/verified-commands.md)（`検証`）が該当する。
+**この一覧は網羅ではない。**判定は「**作業開始時に読み、かつ行動の根拠になるか**」で行う。
+**「正本である」だけでは足りない。**現時点で一覧の外から当たるのは 2 file である。
+[Machine Profiles](docs/toolchains/machine-profiles.md) は `開発端末の役割` が作業開始時に読むよう定め、
+実機試験の可否を決める。[検証済みコマンド](docs/toolchains/verified-commands.md) は `検証` が正本と定め、
+**着手時に何を実行するかと、何を実行済みと言えるかを決める。**
 
 ## 下位ディレクトリの追加指示
 

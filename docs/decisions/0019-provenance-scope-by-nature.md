@@ -80,8 +80,11 @@ Development Workflow、Hardware Safety Policy、ADR、`docs/hardware/`、`docs/p
 2. **基準の正本は[AI Agent Policy](../governance/ai-agent-policy.md)の
    「「承認済みのリポジトリポリシー」の範囲」に置く。**`AGENTS.md`は基準を1行で示し、正本へリンクする。
 3. **`AGENTS.md`の「作業開始時に読むもの」の番号付き一覧は網羅ではないと明記する。**
-   同 file の各節が「作業開始時に確認する」「正本である」と名指しする文書も含める。
-   現時点の該当は`machine-profiles.md`と`verified-commands.md`である。
+   **一覧の外にある文書も、決定1の基準1つで判定する。**「作業開始時に読む」と
+   「行動の根拠になる」の**両方**を満たすものだけを含める。
+   **「正本である」とだけ書かれていることは、それ自体では条件を満たさない。**
+   現時点の該当は`machine-profiles.md`と`verified-commands.md`であり、
+   **どちらも両方を満たす**（根拠は AI Agent Policy の表）。
 4. **`docs/toolchains/`の各 file が対象かどうかを、AI Agent Policyへ表で書く。**
    `machine-profiles.md`と`verified-commands.md`は対象、`version-records/`と調査記録・templateは対象外とする。
 5. **出所検証の範囲と`INSTRUCTION_SOURCES`を一致させない。**別の問いに答えるものであることと、
