@@ -56,8 +56,10 @@ top-level directoryを列挙すると検査対象と起動条件がずれる。�
 - **阻止ではなく事後検出である。**pushは既に完了している。
   **`main`昇格の直前ではなく、原因を作ったmergeの直後に気付けるようにする**のが目的である
   （[ADR-0021](../../docs/decisions/0021-declaration-audit-on-push.md)）。
-- `before`が解決できない場合（branch作成、force push後）は**直前の1 commitだけを見る。**
-  範囲を諦めて素通りさせない。
+- `before`が解決できない場合（branch作成、force push後）は、**`main`へ入っていない範囲を
+  すべて見る。****直前の1 commitへ縮めない。**縮めると、force pushが複数のcommitを
+  持ち込んだときに中間のcommitを1つも見ない（[ADR-0021](../../docs/decisions/0021-declaration-audit-on-push.md)の`検証`で実測）。
+  `main`自身へのpushでは merge-base が head と一致するため、そこだけ直前の1 commitを見る。
 - `fetch-depth: 0`、`persist-credentials: false`は`review-gate.yml`と同じ理由である。
 - **`cancel-in-progress`を有効にしない。**pushごとに範囲が違うため、後のpushで
   前の範囲の検査を打ち切ると、その範囲を誰も見なくなる。

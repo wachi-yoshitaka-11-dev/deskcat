@@ -58,13 +58,25 @@ jobs:
           set -eu
 
           # branch作成時と、`before`が履歴に無い場合（force push後など）に備える。
-          # **範囲を諦めない。**直前の1 commitだけでも見る。
+          #
+          # **直前の1 commitへ縮めない。**force pushが複数のcommitを持ち込んだとき、
+          # `${PUSH_AFTER}^`を基点にすると**中間のcommitを1つも見ない。**
+          # 宣言を持たない中間commitが素通りすることを実測した（ADR-0021の`検証`）。
+          #
+          # 代わりに**`main`へ入っていない範囲をすべて見る。**`main`到達済みのcommitは
+          # 昇格時に検査済みであり、そこから先を全部見れば取りこぼしが無い。
+          # 既に通っているcommitを再検査するだけなので、余分に落ちることもない。
           BASE="$PUSH_BEFORE"
           if [ -z "$BASE" ] \
             || [ "$BASE" = "0000000000000000000000000000000000000000" ] \
             || ! git cat-file -e "${BASE}^{commit}" 2>/dev/null; then
-            if BASE="$(git rev-parse --verify "${PUSH_AFTER}^" 2>/dev/null)"; then
-              echo "before を解決できないため、直前の1 commitだけを見る: ${BASE}"
+            BASE="$(git merge-base "$PUSH_AFTER" origin/main 2>/dev/null || true)"
+            if [ -n "$BASE" ] && [ "$BASE" != "$PUSH_AFTER" ]; then
+              echo "before を解決できないため、main へ入っていない範囲をすべて見る: ${BASE}"
+            elif BASE="$(git rev-parse --verify "${PUSH_AFTER}^" 2>/dev/null)"; then
+              # `main`自身へのpushでは merge-base が head と一致する。**そこは1 commitでよい。**
+              # `main`へ入る経路は昇格 Pull Request であり、範囲は既に検査されている。
+              echo "main への push とみなし、直前の1 commit を見る: ${BASE}"
             else
               # 親を持たないcommit（履歴の最初）。**検査対象が無い。**
               echo "before も親も解決できない。検査対象が無いため終了する。"

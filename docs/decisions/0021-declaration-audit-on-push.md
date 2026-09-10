@@ -87,8 +87,13 @@ squash commit が`Change-Class`・`Self-Review`・`Instruction-Change`を失う�
    `before..after`の各 commit を`scripts/review_gate.py history`で検証する。
 2. **判定を workflow へ複製しない。**`review_gate.py`を呼ぶだけとする。
    **`git interpret-trailers --parse`で読むことは、同 script が保証する。**
-3. **`before`が解決できない場合（branch 作成、force push 後）は、直前の 1 commit だけを見る。**
-   **範囲を諦めて素通りさせない。**親を持たない commit のときだけ、対象無しとして終了する。
+3. **`before`が解決できない場合（branch 作成、force push 後）は、`main`へ入っていない範囲を
+   すべて見る。****直前の 1 commit へ縮めない。**縮めると、force push が複数の commit を
+   持ち込んだときに**中間の commit を 1 つも見ない**（下の`検証`で実測した）。
+   `main`到達済みの commit は昇格時に検査済みであり、そこから先を全部見れば取りこぼしが無い。
+   既に通っている commit を再検査するだけなので、余分に落ちることもない。
+   `main`自身への push では merge-base が head と一致するため、**そこだけ直前の 1 commit を見る。**
+   親を持たない commit のときだけ、対象無しとして終了する。
 4. **`cancel-in-progress`を有効にしない。**push ごとに範囲が違うため、
    後の push で前の範囲の検査を打ち切ると、**その範囲を誰も見なくなる。**
 5. **`permissions.deny`による MCP tool の遮断は採らない。**理由は選択肢Bに書いた。
@@ -121,7 +126,7 @@ squash commit が`Change-Class`・`Self-Review`・`Instruction-Change`を失う�
 | リスク | 対策 |
 |---|---|
 | workflow が赤いまま放置され、慣れる | **`main`昇格で必ず落ちる。**放置しても最後に止まる。この workflow はその時点を早めるだけである |
-| 範囲の解決が誤り、検査対象が空になる | `before`が解決できないときは直前の 1 commit へ落とす。**素通りさせない。**3 通り（正常・zero・親なし）を実測した |
+| 範囲の解決が誤り、検査対象が空になる | `before`が解決できないときは`main`へ入っていない範囲へ落とす。**素通りさせない。**4 通り（正常・zero・複数 commit・親なし）を実測した |
 | force push で範囲が飛ぶ | `before`は force push 前の head を指す。履歴に無ければ fallback が効く。**共有 branch への force push は`AGENTS.md`が禁じている** |
 | 判定が workflow 側へ漏れ出す | workflow は範囲を解決して`review_gate.py`を呼ぶだけである。**trailer の名前も読み方も持たない** |
 | MCP 経路が塞がれないままである | **引き受ける。**選択肢Bの 3 つの理由による。構文は記録した |
@@ -134,16 +139,36 @@ squash commit が`Change-Class`・`Self-Review`・`Instruction-Change`を失う�
   `interpret-trailers --parse`は`Co-Authored-By`だけを返し、
   workflow と同じ手順で`history`を回すと**exit 1** で 3 件の problem を出した。
 
-  ```
+  ```text
   30fc04e must carry exactly one valid Change-Class trailer, found []
   30fc04e carries no Self-Review trailer
   the range changes 1 instruction source path(s) but 30fc04e... does not carry
   Instruction-Change: reviewed-as-data.
   ```
 
-- **範囲の解決を 3 通り実測した。**正常な`before`で exit 1、
-  `before`が all-zero のとき fallback が効いて exit 1、
-  宣言が揃っている範囲では exit 0。
+- **範囲の解決を実測した。**正常な`before`で exit 1、`before`が all-zero のとき
+  fallback が効いて exit 1、宣言が揃っている範囲では exit 0。
+
+- **fallback を「直前の 1 commit」にしていた形が、実際に取りこぼすことを実測した。**
+  worktree で 2 commit を作り、**中間は宣言なし・head は宣言あり**とした。
+
+  | fallback | 結果 |
+  |---|---|
+  | `${PUSH_AFTER}^`（当初） | **exit 0。中間 commit を見逃す** |
+  | `merge-base` with `origin/main`（採用） | **exit 1。中間 commit を検出** |
+
+- **merge commit が抜け道にならないことを実測した。**`history`は`rev-list --no-merges`を
+  使うため merge commit 自体は検査しない。**しかし merge commit が持ち込む commit は検査する。**
+  宣言を持たない commit を feature branch へ置き、`--no-ff`で merge して測った。
+
+  ```text
+  HISTORY_CHECKED=1 MERGES_SKIPPED=1 EXEMPT=0
+  6267c31 must carry exactly one valid Change-Class trailer, found []
+  ```
+
+  **`main`昇格の merge commit が宣言を持たないのは設計どおりである**（[ADR-0010](0010-change-class-and-review-declaration.md)）。
+  宣言は squash commit が持ち、`history`はそれを見る。**merge commit を検査対象にすると、
+  昇格そのものが落ちる。**
 - 見直し条件: **この workflow が検出した事故が、それでも`main`昇格まで放置された場合。**
   そのときは検出ではなく阻止が要る。選択肢Bと、branch protection 側の手段を再検討する。
 
