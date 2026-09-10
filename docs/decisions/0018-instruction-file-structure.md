@@ -123,15 +123,18 @@ path限定で正しく届く。**採らない。**`.claude/`は公開されな�
    `.github/workflows/README.md`は**workflowが実際に実行するものの記述**であり、
    `docs/runbooks/esp32-development-machine-setup.md`は**toolchain導入後の動作確認**である。
    **どちらも正本ではない。**各箇所へ「正本が変わったらここを合わせる」と書く
-9. **`docs/toolchains/verified-commands.md`を`review_gate.py`の`INSTRUCTION_SOURCES`へ足す。**
+9. **`docs/toolchains/verified-commands.md`と`docs/toolchains/machine-profiles.md`を
+   `review_gate.py`の`INSTRUCTION_SOURCES`へ足す。**
    移送先が分類の対象外だったため、**この決定は review 経路を弱めていた**（下の`移送が分類を弱めていた`）。
    **足すのはこの1 fileであり、`docs/toolchains/`全体ではない。**
    理由は2つある。**(a) この決定が正本と定めたのはこの1 fileである。**
    **(b) ディレクトリ単位で足すと、過去の免除commitが遡って落ちる**（下の節で実測した）。
    **「同ディレクトリの他のfileは規則を持たないから」ではない。**
-   `machine-profiles.md`は`状態: Accepted policy`であり、`AGENTS.md`が作業開始時に
-   読むよう指示している。**同 file は`INSTRUCTION_SOURCES`に入っていないが、
-   この決定では扱わない**（下の`欠点`）。
+   `machine-profiles.md`も`状態: Accepted policy`であり、`AGENTS.md`の`開発端末の役割`節が
+   作業開始時に読むよう指示している。**同 file が入っていなかったのはこの決定が作った穴ではないが、
+   同じ性質であるため合わせて足した。**残る4 file（`README.md`、`esp32-rust-toolchain.md`、
+   `raspberry-pi-rust-toolchain.md`、`version-record-template.md`）と`version-records/`は
+   **調査記録・検証記録・templateであり、この決定では足さない。**
    **列挙の拡大であり、縮小ではない。**[ADR-0010](0010-change-class-and-review-declaration.md)の
    見直し条件が禁じているのは縮小であり、同ADRは「`INSTRUCTION_SOURCES`に載っていないfileが
    将来規則を持ち始めた場合、列挙の更新が要る」と既に書いている。**その更新に当たる**
@@ -220,10 +223,6 @@ path限定で正しく届く。**採らない。**`.claude/`は公開されな�
   **ただし`AGENTS.md`は`開発端末の役割`節で`machine-profiles.md`を作業開始時に読むよう
   指示しており、`検証`節で`verified-commands.md`を正本と定めている。**
   「`docs/toolchains/`は対象外」と一般化しない。**どこまでが範囲かは決まっていない**
-- **`docs/toolchains/machine-profiles.md`が`INSTRUCTION_SOURCES`に入っていない。**
-  同 file は`状態: Accepted policy`であり、「flash・serial monitor・実機試験は実機 Linux に限る」
-  「container で得た結果を実機の根拠として扱わない」といった規範を持つ。
-  **この決定が作った穴ではなく、以前からある。****この決定では閉じていない**
 - **subagentを定義しただけでは、自己レビューの手順は変わらない。**
   CONTRIBUTINGのfresh-context Passを誰が実行するかは、この決定では変えていない
 
@@ -250,8 +249,9 @@ path限定で正しく届く。**採らない。**`.claude/`は公開されな�
   推測禁止とハードウェア安全は`AGENTS.md`が持ち、rule は写さない
 - **決定の8で残した2箇所以外に command の複製が無いこと**（Version Record と実験記録は記録であり対象外）
 - **`verified-commands.md`の散文1行だけを変えたcommitが`review-required`になること。**
-  `scripts/test_review_gate.py`のpath境界caseで`docs/toolchains/verified-commands.md`が`True`、
-  `docs/toolchains/README.md`と`docs/toolchains/version-records/README.md`が`False`であることを固定した
+  `scripts/test_review_gate.py`のpath境界caseで`docs/toolchains/verified-commands.md`と
+  `docs/toolchains/machine-profiles.md`が`True`、`docs/toolchains/README.md`と
+  `docs/toolchains/version-records/README.md`が`False`であることを固定した
 - **免除commitの列挙と実測が一致すること**（`test_the_comment_lists_every_exempt_commit_touching_instruction_sources`）。
   **ディレクトリ単位で足すとここが落ちる**
 - 見直し条件: **`AGENTS.md`が再び200行を超えた場合は、この決定を改訂するのではなく、
