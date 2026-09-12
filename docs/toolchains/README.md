@@ -23,6 +23,7 @@
 
 | 文書 | 役割 |
 |---|---|
+| [検証済みコマンド](verified-commands.md) | build／lint／test／flash の実行コマンドと来歴の正本 |
 | [Machine Profiles](machine-profiles.md) | 複数端末の役割と、役割ごとの最小要件 |
 | [ESP32 Rust Toolchain](esp32-rust-toolchain.md) | ESP32 向けの公式情報、採用候補、確定条件 |
 | [Raspberry Pi Rust Toolchain](raspberry-pi-rust-toolchain.md) | Pi Zero W 向けの候補 target と検証方針 |

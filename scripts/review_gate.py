@@ -67,6 +67,8 @@ INSTRUCTION_SOURCES = (
     "docs/decisions/",
     "docs/hardware/",
     "docs/protocol/",
+    "docs/toolchains/verified-commands.md",
+    "docs/toolchains/machine-profiles.md",
     "docs/DeskCat_Microcontroller_Development_Guide.md",
     "scripts/",
 )
@@ -156,7 +158,7 @@ DECLARATION_CUTOVER = "57734371384d18f31de7557a7a60fd1aa856edff"
 # 言えるか」を答える。**言えないものは`history`が落とす。**
 #
 # 指示sourceを触る免除（**次の1行だけを`test_review_gate.py`が実測と照合する**）:
-# `9c91f913`・`b71c7ef`・`b93b309`・`c171c52`
+# `9c91f913`・`b71c7ef`・`b93b309`・`c171c52`・`6bcd7b9`
 # **手で書いた列挙は2回遅れた。**`b93b309`と`c171c52`は、登録された後も足されなかった。
 # 導出できる事実を手で書いている以上、遅れは繰り返す。**だから機械で照合する。**
 # `18298ae`と`619c843`と`1a5dda8`は`INSTRUCTION_SOURCES`のpathを1つも触らないため、
@@ -241,8 +243,34 @@ DECLARATION_CUTOVER = "57734371384d18f31de7557a7a60fd1aa856edff"
 #   すべて正しく持っていた。**失われたのはsquash時の記録だけである。**
 #
 #   **`.github/`と`scripts/`を4 path触る。**そのため免除は`Instruction-Change`の検査まで
-#   抑止していた（`9c91f913`と同じ側）。**7件のうち、`main`へ未到達なのはこの1件だけで
-#   ある。**昇格範囲に現れるのはこれであり、他の6件は既に`main`に入っている。
+#   抑止していた（`9c91f913`と同じ側）。**この記述は「7件のうち`main`へ未到達なのは
+#   この1件だけである」と書いていたが、`c171c52`はその後`main`へ入り、記述だけが
+#   残っていた。**2026-09-10 (JST) に`git merge-base --is-ancestor`で8件すべてを
+#   測り直した。未到達は`1a5dda8`と`6bcd7b9`の2件であり、`c171c52`は到達済みである。
+#   **昇格の到達状況は機械で照合していない。書いた時点で古くなる。**
+#
+# - `6bcd7b9`（[PR #373](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/373)、[#372](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/372)）。
+#   **踏み方は`1a5dda8`と同型である。**squash mergeのcommit messageで、`Refs: #376`と
+#   `Co-Authored-By:`の間に空行を入れた。`git interpret-trailers`は最後の段落しか
+#   trailerと見なさないため、先頭の段落にある`Change-Class`・3値の`Self-Review`・
+#   `Instruction-Change`・`Closes`・`Refs`がまるごと無効になった。
+#   **文字列としては8行すべてmessage中に存在する。**
+#
+#   **既存7件と違うのは経路である。**`scripts/hooks/gh_metadata_guard.py`は
+#   Bash tool経由の`gh pr merge`のmessageを見る。**このmergeはGitHub MCPの
+#   `merge_pull_request` toolで実行しており、hookの経路を1度も通っていない。**
+#   `b71c7ef`の記録が「別の経路を通ったと考えられるが経路は特定していない。
+#   推測で書かない」と書いた形の、**経路が特定できた事例である。**
+#   hookの判定粒度（`c171c52`）とは別の穴であり、**hookをどれだけ賢くしても、
+#   hookを通らない経路は塞げない。**別途扱う。
+#
+#   full reviewは完走し指摘5件を全件検証済みで（4件resolved・1件を#376で追跡）、
+#   PR側のhead commit`9d8932c`は`Change-Class`・3値の`Self-Review`・
+#   `Instruction-Change`をすべて正しく持ち、`Verify change class and self-review`は
+#   `success`だった。**失われたのはsquash時の記録だけである。**
+#
+#   **`INSTRUCTION_SOURCES`を15 path触る。**そのため免除は`Instruction-Change`の
+#   検査まで抑止する（`9c91f913`と同じ側）。
 #
 # 免除1件の登録。**SHAと記録を同じ場所に置く。**片方だけが古くなる形にしない。
 # 記録をcomment側だけに置いていたため、**どの免除が指示sourceを触るかの列挙が
@@ -254,6 +282,21 @@ DECLARATION_CUTOVER = "57734371384d18f31de7557a7a60fd1aa856edff"
 #
 # **機械が持つ状態は2つに保つ。**根拠の強さや欠け方の違いは`note`の文面で表す。
 # 状態を増やすと、次に1件足したときに「3つ目の状態を作るか」の判断が要る。
+# gitが定義する空treeのobject id。**履歴の最初のcommitには親が無い。**
+# `<commit>^`が解決できないため、そのcommitはこれと比べる（全fileが追加として出る）。
+EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+
+
+def _parent_of(root, commit):
+    """`commit`の親を返す。**親が無ければ`EMPTY_TREE`を返す。**
+
+    `--from-root`は履歴の最初のcommitも検査対象へ入れるため、`<commit>^`が
+    解決できない場合がある。**空treeと比べると、全fileが追加として出る。**
+    `git diff`はtreeを引数に取れるが、`A..B`の形は取れない。呼び出し側は
+    2引数で渡す（`classify`と`_check_instructions`）。
+    """
+    return f"{commit}^" if _rev_exists(root, f"{commit}^") else EMPTY_TREE
+
 ExemptEntry = namedtuple("ExemptEntry", ("commit", "instruction_reviewed", "note"))
 
 # **この列挙を増やさない。**増やす変更は`scripts/`の変更であり、reviewと
@@ -311,6 +354,17 @@ DECLARATION_EXEMPT_ENTRIES = (
         "**squash messageで同じ段落へコロン無しの行が混じり、blockごと無効になった"
         "だけである。**登録は#309で行った。**#309自体にreview eventは無く、"
         "人間が出しているのはmerge承認である。**内容のreviewは#307側にある。",
+    ),
+    ExemptEntry(
+        "6bcd7b9091f5d0131d467d13f84ed25735bce194",
+        True,
+        "PR #373でfull reviewが完走し、指摘5件を全件検証した（CodeRabbitのreview event"
+        "が実在する）。head commit`9d8932c`は`Instruction-Change: reviewed-as-data`を"
+        "持ち、`Verify change class and self-review`はsuccessだった。"
+        "**squash messageで`Refs: #376`と`Co-Authored-By:`の間へ空行を入れ、"
+        "trailerの段落が割れただけである**（`1a5dda8`と同型）。"
+        "登録は#377で行った。**#377自体のreviewは登録の妥当性に対するものであり、"
+        "内容のreviewは#373側にある。**",
     ),
 )
 
@@ -497,7 +551,10 @@ def classify(root, base, head):
     # 起点をここで1回だけ解決する。以降の`git diff`と`_inspect_side`の`git show`が
     # 同じcommitを見る（理由は`_merge_base`）。
     base = _merge_base(root, base, head)
-    status = _git(root, ["diff", "--name-status", "--no-color", f"{base}..{head}"])
+    # **`A..B`ではなく2引数で渡す。**`git diff A..B`と`git diff A B`は同じだが、
+    # 2引数の形は**treeも受け付ける。**履歴の最初のcommit（親を持たない）を
+    # `EMPTY_TREE`と比べるために要る（`_check_history`の`--from-root`）。
+    status = _git(root, ["diff", "--name-status", "--no-color", base, head])
     reasons = []
     paths = []
     for line in status.splitlines():
@@ -614,7 +671,8 @@ def _check_instructions(root, base, head):
     # `classify`と同じ理由で起点を解決する。ここを端点diffのままにすると、base側だけの
     # 指示source変更に対して宣言を要求し、逆にbase側と内容が一致した変更を見落とす。
     base = _merge_base(root, base, head)
-    status = _git(root, ["diff", "--name-only", "--no-color", f"{base}..{head}"])
+    # **2引数で渡す。**理由は`classify`と同じ（`EMPTY_TREE`を受け付けるため）。
+    status = _git(root, ["diff", "--name-only", "--no-color", base, head])
     touched = [
         path
         for path in status.splitlines()
@@ -665,7 +723,7 @@ def _check_exempt_instructions(root, commit):
     **儀式として付いていても通り、正しく付けなかった回に落ちる。**
     保証をcommit単位へ置く。
     """
-    instruction_problems, touched = _check_instructions(root, f"{commit}^", commit)
+    instruction_problems, touched = _check_instructions(root, _parent_of(root, commit), commit)
     if not instruction_problems:
         # commit自身が宣言を持っている。免除はここへ効かない。
         return []
@@ -681,7 +739,7 @@ def _check_exempt_instructions(root, commit):
     ]
 
 
-def _check_history(root, base, head, cutover):
+def _check_history(root, base, head, cutover, from_root=False):
     """範囲の各commitが分類を宣言しているかを検査する。
 
     head commitだけを見ると、**宣言を持たないcommitが範囲の中に混ざっていても通る。**
@@ -698,16 +756,21 @@ def _check_history(root, base, head, cutover):
     `Change-Class`と`Self-Review`だけである。**`continue`をその呼び出しより前に
     置くと、免除commitの指示source変更が昇格の段でどこからも問われなくなる。**
     実際にそうなっていた。
+
+    `from_root`は**`base`を使わず、`head`から辿れるcommitをすべて見る。**
+    `origin/main`と共通祖先を持たないbranchへのpushで使う。**基点を置けないため
+    範囲を`base..head`で表せない。**`base`で代用すると、`base`自身と、`base`より
+    前のcommitが検査から外れる（[#385](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/385)）。
+    **`--not cutover`は変わらず効く。**起点より前は検査しない規則を弱めない。
     """
     if not _rev_exists(root, cutover):
         # 起点がこのrepositoryに無い。fixtureや別historyでは検査しない。
         return [], None
+    span = [head] if from_root else [f"{base}..{head}"]
     listed = _git(
-        root, ["rev-list", "--no-merges", f"{base}..{head}", "--not", cutover]
+        root, ["rev-list", "--no-merges", *span, "--not", cutover]
     ).split()
-    with_merges = _git(
-        root, ["rev-list", f"{base}..{head}", "--not", cutover]
-    ).split()
+    with_merges = _git(root, ["rev-list", *span, "--not", cutover]).split()
 
     problems = []
     exempt = 0
@@ -718,7 +781,9 @@ def _check_history(root, base, head, cutover):
             # **`continue`より前に呼ぶ。**後ろへ置くと指示sourceの検査が飛ぶ。
             problems.extend(_check_exempt_instructions(root, commit))
             continue
-        computed, _ = classify(root, f"{commit}^", commit)
+        # **親を持たないcommitがある。**`--from-root`は履歴の最初のcommitも
+        # 検査対象へ入れるため、`<commit>^`が解決できない場合がある。
+        computed, _ = classify(root, _parent_of(root, commit), commit)
         found = trailers(root, commit)
         declared = found.get(TRAILER_CLASS, [])
         if len(declared) != 1 or declared[0] not in CLASS_VALUES:
@@ -735,7 +800,7 @@ def _check_history(root, base, head, cutover):
             problems.extend(_check_fixup_reference(found, short))
         if not found.get(TRAILER_REVIEW):
             problems.append(f"{short} carries no {TRAILER_REVIEW} trailer")
-        instruction_problems, _ = _check_instructions(root, f"{commit}^", commit)
+        instruction_problems, _ = _check_instructions(root, _parent_of(root, commit), commit)
         problems.extend(instruction_problems)
     # 数えたものと数えなかったものを必ず出す。silent capを作らない。
     summary = (len(listed) - exempt, len(with_merges) - len(listed), exempt)
@@ -753,6 +818,10 @@ def main(argv=None):
     parser.add_argument("--expect", default="")
     # 起点の既定は`DECLARATION_CUTOVER`である。上書きはtestとdry runのためにある。
     parser.add_argument("--since", default="")
+    # **`history`専用。**`--base`を使わず`--head`から辿れるcommitをすべて検査する。
+    # `origin/main`と共通祖先を持たないbranchへのpushで使う（`declaration-audit.yml`）。
+    # **`--base`は`CLASS`の計算にだけ使われる。**
+    parser.add_argument("--from-root", action="store_true")
     options = parser.parse_args(argv)
     root = options.repository_root.strip() or str(
         Path(__file__).resolve().parent.parent
@@ -771,13 +840,18 @@ def main(argv=None):
         problems.extend(instruction_problems)
     if options.command == "history":
         history_problems, history = _check_history(
-            root, base, head, options.since.strip() or DECLARATION_CUTOVER
+            root,
+            base,
+            head,
+            options.since.strip() or DECLARATION_CUTOVER,
+            from_root=options.from_root,
         )
         problems.extend(history_problems)
     if options.expect and options.expect != computed:
         problems.append(f"expected CLASS={options.expect} but computed {computed}")
 
-    print(f"CLASS={computed} RANGE={base}..{head}")
+    span = f"(root)..{head}" if options.from_root else f"{base}..{head}"
+    print(f"CLASS={computed} RANGE={span}")
     if computed == CLASS_REVIEW:
         print(
             f"  meaning: {CLASS_REVIEW} means the {CLASS_MINOR} path is unavailable,"

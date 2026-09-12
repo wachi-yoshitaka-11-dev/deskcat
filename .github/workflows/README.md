@@ -3,6 +3,10 @@
 buildを実行するworkflowは、そのbuild commandが確定してから追加する。
 再現できないbuildを、検証したとworkflowで主張しない。
 
+**この文書が並べる command は、workflow が実際に実行するものの記述である。**
+**開発者が実行する command の正本は[検証済みコマンド](../../docs/toolchains/verified-commands.md)であり、
+正本が変わったら workflow とこの記述を合わせる**（[ADR-0018](../../docs/decisions/0018-instruction-file-structure.md)）。
+
 追加する順序は次のとおりである。**`#1`から`#4`まですべて実施済みである。**
 
 | # | 対象 | 状態 |
@@ -39,6 +43,36 @@ top-level directoryを列挙すると検査対象と起動条件がずれる。�
 - **未解決threadと必要CIは検証しない。**branch protectionが強制しており、同じ条件を2箇所で持たない。
 - commit messageのtrailerを読むため`fetch-depth: 0`でcheckoutする。
 - 権限はread-onlyとし、tokenをscriptから読めないよう`persist-credentials: false`を指定する。
+
+### `declaration-audit.yml` — 共有branchへ入った後の宣言確認
+
+- `main`と`develop`への**push**で起動する。**Pull Requestでは起動しない。**
+- pushされた範囲（`before..after`）の各commitを`scripts/review_gate.py history`で検証する。
+- **`review-gate.yml`との違いは見る位置である。**あちらはPull Requestを見るが、
+  **squash commitへtrailerが載るかは merge を実行する経路が決める。**
+  `gh_metadata_guard.py`はBash tool経由の`gh pr merge`しか見ないため、
+  GitHub MCPの`merge_pull_request`やweb UIからのmergeは素通りする
+  （[#373](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/373)で実際に起きた）。
+- **阻止ではなく事後検出である。**pushは既に完了している。
+  **`main`昇格の直前ではなく、原因を作ったmergeの直後に気付けるようにする**のが目的である
+  （[ADR-0021](../../docs/decisions/0021-declaration-audit-on-push.md)）。
+- `before`が解決できない場合（branch作成、force push後）は、**3つの状況を分ける。**
+  **どの経路でも直前の1 commitへ縮めない。**縮めると、force pushが複数のcommitを
+  持ち込んだときに中間のcommitを1つも見ない（[ADR-0021](../../docs/decisions/0021-declaration-audit-on-push.md)の`検証`で実測）。
+
+  | `git merge-base <after> origin/main` | 意味 | 見る範囲 |
+  |---|---|---|
+  | head と一致する | **`main`自身への push** | 直前の1 commit。**範囲は昇格 Pull Request で検査済みである** |
+  | 空を返す | **`origin/main`と共通祖先が無い** | `review_gate.py history --from-root`。**head から辿れるcommitをすべて見る** |
+  | それ以外 | 通常の branch 作成・force push | `main`へ入っていない範囲をすべて見る |
+
+  **2つに畳まない。**共通祖先が無い場合を「`main`への push」と同じ扱いにすると、
+  中間のcommitを1つも見ない（[#385](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/385)で実測）。
+  `--from-root`では`--base`は`CLASS`の計算にだけ使う。**`--not <起点>`は変わらず効くため、
+  起点より前を検査しない規則は弱まらない。**
+- `fetch-depth: 0`、`persist-credentials: false`は`review-gate.yml`と同じ理由である。
+- **`cancel-in-progress`を有効にしない。**pushごとに範囲が違うため、後のpushで
+  前の範囲の検査を打ち切ると、その範囲を誰も見なくなる。
 
 ### `host.yml` — host workspace
 

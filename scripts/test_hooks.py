@@ -12,6 +12,7 @@ hookを子processとして起動し、stdinへhookの入力JSONを渡して、**
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -36,6 +37,7 @@ BASE_GUARD = str(SCRIPTS_ROOT / "hooks" / "branch_base_guard.py")
 MERGE_REPORT = str(SCRIPTS_ROOT / "hooks" / "merge_trailer_report.py")
 PUSH_GATE = str(SCRIPTS_ROOT / "hooks" / "push_gate.py")
 CODERABBIT_GATE = str(SCRIPTS_ROOT / "hooks" / "coderabbit_gate.py")
+INSPECTOR_GUARD = str(SCRIPTS_ROOT / "hooks" / "inspector_readonly_guard.py")
 MERGE_REPORT = str(SCRIPTS_ROOT / "hooks" / "merge_trailer_report.py")
 REPO_ROOT_FOR_TEMPLATES = SCRIPTS_ROOT.parent
 ISSUE_TEMPLATE_DIR = REPO_ROOT_FOR_TEMPLATES / ".github" / "ISSUE_TEMPLATE"
@@ -44,6 +46,8 @@ PR_TEMPLATE_PATH = REPO_ROOT_FOR_TEMPLATES / ".github" / "pull_request_template.
 sys.path.insert(0, str(SCRIPTS_ROOT / "hooks"))
 
 import push_gate  # noqa: E402
+
+import inspector_readonly_guard  # noqa: E402
 
 # fixtureのcommitに使うidentity。実行者の設定に依存させない。
 GIT_IDENTITY = (
@@ -1880,13 +1884,16 @@ class CommandFromTests(unittest.TestCase):
 
 
 class HookPayloadShapeTests(unittest.TestCase):
-    """**5本のhookが、mappingでない入力で落ちないことを確かめる**（#242）。
+    """**hookが、mappingでない入力で落ちないことを確かめる**（#242）。
 
     [PR #241](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/241)のreview指摘は`coderabbit_gate.py`に対するものだったが、
-    **型で全数走査したら5本すべてに同じ形が残っていた。**指摘は代表例であって全数ではない。
+    **型で全数走査したら当時の5本すべてに同じ形が残っていた。**指摘は代表例であって全数ではない。
+
+    **後から足したhookもこの一覧へ入れる。**`inspector_readonly_guard.py`は#376で足した。
     """
 
-    HOOKS = (GH_GUARD, BASE_GUARD, PUSH_GATE, MERGE_REPORT, CODERABBIT_GATE)
+    HOOKS = (GH_GUARD, BASE_GUARD, PUSH_GATE, MERGE_REPORT, CODERABBIT_GATE,
+             INSPECTOR_GUARD)
 
     MALFORMED = (
         "[]",
@@ -1919,6 +1926,670 @@ class HookPayloadShapeTests(unittest.TestCase):
                                      f"{Path(script).name} が例外を出した")
                     self.assertEqual(result.stdout.strip(), "",
                                      f"{Path(script).name} が止めてしまった")
+
+
+class InspectorReadonlyGuardTests(unittest.TestCase):
+    """検査 subagent の`Bash`を読み取りだけに絞るhook（#376）。
+
+    **allowlistである。**「通ってはいけないもの」を数え上げるのではなく、
+    通ってよいものだけを列挙し、それ以外が落ちることを確かめる。
+    """
+
+    # **`diff`／`show`／`log`／`blame`は`--no-ext-diff --no-textconv`が要る。**
+    # option 無しでも git config の外部 helper が走るため（`GIT_HELPER_SUBCOMMANDS`）。
+    HELPER = "--no-ext-diff --no-textconv"
+
+    ALLOWED = (
+        f"git show {HELPER} HEAD",
+        f"git -C /tmp/wt --no-pager diff {HELPER} origin/main..HEAD",
+        f"git log {HELPER} --oneline -20",
+        f"git diff {HELPER} HEAD~1 HEAD",
+        f"git blame {HELPER} AGENTS.md",
+        "git rev-parse HEAD",
+        "git merge-base --is-ancestor a b",
+        f"git show {HELPER} HEAD:AGENTS.md",
+        # subcommandの後ろの`-c`はmergeのcombined diffであり読み取り専用である
+        f"git log {HELPER} -c HEAD",
+        # `--output`への前方一致で誤爆させない
+        f"git log {HELPER} --output-indicator-new=X --oneline",
+        "git grep -n pattern",
+        # **引数の中の`FOO=bar`は代入ではない。**command位置だけを見る
+        "grep FOO=bar AGENTS.md",
+        f"git diff {HELPER} -- file=1",
+        "cat AGENTS.md",
+        "wc -l AGENTS.md",
+        "head -40 AGENTS.md",
+        # **`--no-optional-locks`はglobal位置に要る**
+        "git --no-optional-locks status",
+        # `rg`の`--pre`と前方一致で誤爆させない
+        "rg --pre-glob *.md pattern",
+        "rg -n pattern AGENTS.md",
+    )
+
+    DENIED = (
+        # 書き込みcommandそのもの
+        "rm -rf /",
+        "sed -i s/a/b/ AGENTS.md",
+        "cp a b",
+        "tee out",
+        # 書ける経路を持つ「読み取りに見える」command
+        "sort -o out in",
+        "uniq in out",
+        # 任意codeを実行できるもの
+        "python3 -c 'print(1)'",
+        "sh -c 'rm x'",
+        "bash -lc 'rm x'",
+        "xargs rm",
+        # 状態を変えるgit subcommand
+        "git checkout -- .",
+        "git commit -m x",
+        "git branch -D develop",
+        "git config --global user.name x",
+        "git push origin develop",
+        # subcommandが無い
+        "git",
+        # `shlex`が空白でしか切らないために潰れる形
+        "cat a>b",
+        "cat a;rm -rf /",
+        "git show HEAD > /tmp/x",
+        "git show HEAD | tee f",
+        "echo $(rm -rf /)",
+        "echo `rm -rf /`",
+        # 改行で並べた2つ目のcommand
+        "git show HEAD\nrm -rf /",
+        # 語へ分けられない
+        "cat 'unclosed",
+        # **subcommandが読み取り専用でも、gitのoptionが任意commandを実行する**
+        "git -c core.pager=rm log",
+        "git -ccore.pager=rm log",
+        "git --config-env=core.pager=P log",
+        "git --exec-path=/tmp show",
+        "git grep -Oless pattern",
+        "git grep --open-files-in-pager=rm x",
+        # **subcommandが読み取り専用でも、fileを書くoption**
+        "git diff --output=/tmp/x",
+        # 環境変数の代入だけで任意commandを起動できる
+        "GIT_EXTERNAL_DIFF=rm git show HEAD",
+        "env GIT_EXTERNAL_DIFF=rm git show HEAD",
+        # **前置語は allowlist の外側から実行の権限や解決先を変える**
+        "sudo cat /etc/shadow",
+        "env cat AGENTS.md",
+        "exec cat AGENTS.md",
+        "command cat AGENTS.md",
+        "nohup cat AGENTS.md",
+        "time cat AGENTS.md",
+        # **program をbasenameで認可しない。**名前が一致するだけの別の実行fileである
+        "./git show HEAD",
+        "../git log",
+        "/tmp/cat file",
+        "/usr/bin/git status",
+        "/usr/bin/git --no-optional-locks status",
+        # **`rg`のoptionが任意commandを起動する**
+        "rg --pre /tmp/evil.sh pattern",
+        "rg --pre=/tmp/evil.sh pattern",
+        "rg --hostname-bin /tmp/evil.sh pattern",
+        # **`git status`は既定で`.git/index`を書く。**global位置の指定でなければ通さない
+        "git status",
+        "git status --no-optional-locks",
+        # **外部 helper を明示的に起動するoption**
+        "git diff --ext-diff HEAD~1 HEAD",
+        "git show --textconv HEAD:AGENTS.md",
+        "git grep --textconv pattern",
+        "git cat-file --filters HEAD:AGENTS.md",
+        # **option 無しでも helper は走る。**両方の明示が無ければ通さない
+        "git diff HEAD~1 HEAD",
+        "git show HEAD",
+        "git log -p",
+        "git blame AGENTS.md",
+        "git diff --no-ext-diff HEAD~1 HEAD",
+        "git show --no-textconv HEAD",
+    )
+
+    def test_help_option_is_refused_because_it_hijacks_the_subcommand(self):
+        """**`git <cmd> --help`は`git help <cmd>`へ書き換わる**（実測）。
+
+        `git version --help`と`git --no-optional-locks status --help`で man が出力された。
+        **guardは`version`／`status`を見ているのに、gitが実行するのは`help`である。**
+        `man`は`ALLOWED_PROGRAMS`に無いが、git 経由で起動する。
+
+        **3例目の`git rev-parse HEAD --help`は書き換わらない形である。**
+        書き換わるのは global option を剥いだ後の先頭に`--help`が来たときだけである。
+        **意図した過剰拒否として固定する。**位置の判定を増やすより単純である。
+        """
+        for command in ("git version --help",
+                        "git --no-optional-locks status --help",
+                        "git rev-parse HEAD --help"):
+            with self.subTest(command=command):
+                self.assertIsNotNone(inspector_readonly_guard.check(command))
+
+    def test_grep_pager_option_is_refused_when_abbreviated(self):
+        """**短縮拒否を`cat-file`へ限定しない。**
+
+        限定していたとき、`git grep --open-files-in-pag=sha1sum` で
+        **`ALLOWED_PROGRAMS`に無い`sha1sum`が実際に実行された**（実測）。
+        `git grep --textc` も通っていた。**subcommandを数え上げると数え漏れが穴になる。**
+        """
+        # **`--ext-di`は穴ではない。**diff 系の parser は短縮を受け付けず、git 自身が落とす。
+        # **予防として同じ扱いにしている**ことを固定する。
+        # **必須flagを先に置く。**置かないと位置判定で落ち、短縮判定が壊れても通ってしまう。
+        for command in ("git grep --open-files-in-pag=sha1sum AGENTS -- AGENTS.md",
+                        "git grep --textc zzz -- AGENTS.md",
+                        "git diff --no-ext-diff --no-textconv --ext-di HEAD"):
+            with self.subTest(command=command):
+                self.assertIsNotNone(inspector_readonly_guard.check(command))
+
+    def test_separator_looking_arguments_are_refused(self):
+        """**単独の区切り語も拒否する**（実測で迂回できた）。
+
+        `shlex`は引用符を剥いだ後の語を返すため、**bashが literal な引数として渡す語と
+        区別が付かない。**`rg <pattern> { cat --pre <command> <file>`では、
+        `command_line.invocations`が`{`で invocation を切り、**その先が無検査になった。**
+        検査 subagent の中で実行したところ、**`ALLOWED_PROGRAMS`に無い`/usr/bin/uname`が
+        実際に起動した。**
+
+        **pipe も使えなくなる。**判定が`command_line`の語り分けに依存しなくなることを採った。
+        """
+        # **`command_line.SEPARATORS`の全件が拒否されること。**
+        # `!`は`SHELL_METACHARACTERS`の文字を1つも含まないため、metacharacter検査だけでは
+        # 素通りし、**`rg <pattern> ! cat --pre sha1sum <file>`で`sha1sum`が実際に起動した。**
+        # **この形にしておけば、共有moduleへ区切りが増えても穴にならない。**
+        for separator in sorted(command_line.SEPARATORS):
+            with self.subTest(separator=separator):
+                self.assertIsNotNone(
+                    inspector_readonly_guard.check(
+                        f"rg pattern {separator} cat --pre sha1sum AGENTS.md"),
+                    f"区切り語 {separator!r} が素通りする")
+        for command in ("rg Linux ! cat --pre sha1sum AGENTS.md",
+                        "git grep Linux ! cat -O sha1sum",
+                        "rg Linux { cat --pre /usr/bin/uname AGENTS.md",
+                        "git diff --no-ext-diff --no-textconv { cat --output=/tmp/x HEAD",
+                        "git grep Linux { cat -O/bin/date AGENTS.md",
+                        "git log --no-ext-diff --no-textconv --oneline -20 | head -5"):
+            with self.subTest(command=command):
+                self.assertIsNotNone(inspector_readonly_guard.check(command))
+
+    def test_signature_verification_is_refused(self):
+        """**署名検証は`gpg.program`（既定`gpg`）を起動する**（実測）。
+
+        検査 subagent の中で`git log --show-signature`を実行したところ、
+        **`gpg`が`~/.gnupg`に directory と keybox file を作った。**
+        `ALLOWED_PROGRAMS`に無い program が、guard を通って file を書いた。
+
+        **`--show-signature`を拒否するだけでは閉じない。**`--format=%GK`でも走る。
+        `%G?`／`%GS`／`%GK`は同じ経路であるため、**`%G`を含む語を拒否する。**
+        """
+        for command in ("git log --no-ext-diff --no-textconv --show-signature -1",
+                        "git log --no-ext-diff --no-textconv --show-sig -1",
+                        "git log --no-ext-diff --no-textconv -1 --format=%GK",
+                        "git log --no-ext-diff --no-textconv -1 --pretty=format:%G?",
+                        "git show --no-ext-diff --no-textconv --show-signature HEAD"):
+            with self.subTest(command=command):
+                self.assertIsNotNone(inspector_readonly_guard.check(command))
+        # `%G`を含まない format は通る
+        self.assertIsNone(
+            inspector_readonly_guard.check(
+                "git log --no-ext-diff --no-textconv -1 --format=%H"))
+
+    def test_verbose_status_is_refused(self):
+        """**`git status -vv`はtextconvを走らせる**（実測）。
+
+        `-v`は走らせないが、`-vv`はworking treeのpatchを出す過程でtextconvを呼ぶ。
+        **`status`は`--no-ext-diff --no-textconv`を受理しない**ため、打ち消す形が無い。
+        **verboseそのものを拒否する。**`diff.external`は`-vv`でも走らなかった。
+        """
+        for command in ("git --no-optional-locks status -vv",
+                        "git --no-optional-locks status -v",
+                        "git --no-optional-locks status --verbose",
+                        "git --no-optional-locks status --verb",
+                        "git --no-optional-locks status -sv"):
+            with self.subTest(command=command):
+                self.assertIsNotNone(inspector_readonly_guard.check(command))
+        for command in ("git --no-optional-locks status",
+                        "git --no-optional-locks status --short",
+                        # **他の subcommand の `-v` は巻き込まない。**
+                        "git grep -v pattern",
+                        "git log --no-ext-diff --no-textconv -v"):
+            with self.subTest(command=command):
+                self.assertIsNone(inspector_readonly_guard.check(command))
+
+    def test_rg_search_zip_is_refused(self):
+        """**`rg -z`は外部decompressorを起動する。**
+
+        対象fileの拡張子に応じて`gzip`／`xz`／`zstd`等を呼ぶ。**どれも`ALLOWED_PROGRAMS`に無い。**
+
+        **根拠の水準は`--pre`と違う。**`rg --help`で確認できるのはoptionの存在だけであり、
+        **外部processの起動は測っていない。**ripgrepの文書化された挙動に依る拒否である。
+        """
+        for command in ("rg -z pattern", "rg --search-zip pattern", "rg -nz pattern"):
+            with self.subTest(command=command):
+                self.assertIsNotNone(inspector_readonly_guard.check(command))
+        self.assertIsNone(inspector_readonly_guard.check("rg -n pattern"))
+
+    def test_bundled_short_options_are_refused(self):
+        """**short optionは束ねられる**（実測）。
+
+        `git grep -nOzzz`は`-n -O zzz`であり、`token.startswith("-O")`では見えない。
+        **素通りしたとき、gitがpagerとして`zzz`をexecしようとした。**
+        """
+        for command in ("git grep -nOzzz AGENTS -- AGENTS.md",
+                        "git grep -Ozzz x",
+                        "git grep -nO less x"):
+            with self.subTest(command=command):
+                self.assertIsNotNone(inspector_readonly_guard.check(command))
+        for command in ("git grep -n pattern", "git grep -i -n x"):
+            with self.subTest(command=command):
+                self.assertIsNone(inspector_readonly_guard.check(command))
+
+    def test_git_version_is_allowed_for_recording_the_environment(self):
+        """**判定は git の version 依存である。**検査 session 側で記録できるようにする。
+
+        `git --version` は**許可していない global option として**拒否される。`git version` と書く。
+        """
+        self.assertIsNone(inspector_readonly_guard.check("git version"))
+        self.assertIsNotNone(inspector_readonly_guard.check("git --version"))
+
+    def test_unlisted_global_option_names_itself_in_the_reason(self):
+        """**拒否理由が原因を名指しする。**
+
+        以前は「`git` に subcommand が無い」としか出ず、どの option が原因か分からなかった。
+        """
+        reason = inspector_readonly_guard.check("git -p log --no-ext-diff --no-textconv")
+        self.assertIsNotNone(reason)
+        self.assertIn("global option", reason)
+        self.assertIn("-p", reason)
+
+    def test_cat_file_denied_options_are_refused_when_abbreviated(self):
+        """**`git cat-file`は短縮綴りを受理する**（実測）。
+
+        `--textcon`／`--textc`／`--te`はすべて`--textconv`として実行された
+        （textconv driver に `echo TEXTCONV_RAN` する script を設定し、
+        **3形とも出力が `TEXTCONV_RAN`、対照の `-p` は file の中身**になった）。
+        **完全一致だけを見ると抜けられる。**
+        """
+        for command in ("git cat-file --textcon HEAD:AGENTS.md",
+                        "git cat-file --te HEAD:AGENTS.md",
+                        "git cat-file --filt HEAD:AGENTS.md"):
+            with self.subTest(command=command):
+                self.assertIsNotNone(inspector_readonly_guard.check(command))
+        self.assertIsNone(inspector_readonly_guard.check("git cat-file -p HEAD:AGENTS.md"))
+
+    def test_abbreviation_denial_does_not_reach_other_subcommands(self):
+        """**短縮拒否を`diff`系へ広げない。**
+
+        `--filter`は`rev-list`の正当な読み取り専用 option であり、`--filters`の短縮ではない。
+        **巻き添えで落とすと検査が止まる。**
+        （`git log --filter=...`は git 2.34.1 では`unrecognized argument`になる。
+        限定の根拠は`rev-list`である。）
+        """
+        self.assertIsNone(
+            inspector_readonly_guard.check("git rev-list --objects --filter=blob:none HEAD"))
+
+    def test_unlisted_global_options_are_refused(self):
+        """**許可していない global option は、値を取るかが分からない**（実測）。
+
+        `git --super-prefix rev-parse submodule--helper x`では、guardが`rev-parse`を、
+        gitが`submodule--helper`を subcommand として読む。
+        **subcommand allowlist も必須 flag も、この読みの上に乗っている。**
+        """
+        for command in ("git --super-prefix rev-parse submodule--helper x",
+                        "git -p log --no-ext-diff --no-textconv",
+                        "git --paginate diff --no-ext-diff --no-textconv"):
+            with self.subTest(command=command):
+                self.assertIsNotNone(inspector_readonly_guard.check(command))
+        for command in ("git -C /tmp/wt --no-pager rev-parse HEAD",
+                        "git --git-dir=/tmp/x rev-parse HEAD"):
+            with self.subTest(command=command):
+                self.assertIsNone(inspector_readonly_guard.check(command))
+
+    def test_required_global_option_is_not_satisfied_by_a_value(self):
+        """**値として消費される位置では、必須 option は git へ届かない。**
+
+        `git --namespace --no-optional-locks status`では`--no-optional-locks`が
+        namespace の値になる。**集合検査のままでは「在る」と誤判定する。**
+        """
+        self.assertIsNotNone(
+            inspector_readonly_guard.check("git --namespace --no-optional-locks status"))
+        self.assertIsNone(
+            inspector_readonly_guard.check("git --no-optional-locks status"))
+
+    def test_required_helper_options_must_sit_right_after_the_subcommand(self):
+        """**必須flagはsubcommandの直後2語でなければ、gitへ届かない**（実測）。
+
+        - `git diff -- f --no-ext-diff` — `--`より後ろはpathspecである
+        - `git log -S --no-ext-diff -p` — `-S`が次の語を検索文字列として飲む
+
+        **値を取るoptionを数え上げる形にしない。**位置で決めれば前に何も置けない。
+        """
+        for command in ("git diff -- f --no-ext-diff --no-textconv",
+                        "git log -S --no-ext-diff --no-textconv -p",
+                        "git log --oneline --no-ext-diff --no-textconv"):
+            with self.subTest(command=command):
+                self.assertIsNotNone(inspector_readonly_guard.check(command))
+        # 順序は問わない。**位置だけを見る。**
+        self.assertIsNone(
+            inspector_readonly_guard.check("git diff --no-ext-diff --no-textconv -- f"))
+        self.assertIsNone(
+            inspector_readonly_guard.check("git diff --no-textconv --no-ext-diff HEAD"))
+
+    def test_allowed_commands_pass(self):
+        for command in self.ALLOWED:
+            with self.subTest(command=command):
+                self.assertIsNone(inspector_readonly_guard.check(command))
+
+    def test_denied_commands_are_refused(self):
+        for command in self.DENIED:
+            with self.subTest(command=command):
+                self.assertIsNotNone(
+                    inspector_readonly_guard.check(command),
+                    f"{command!r}が通ってしまう",
+                )
+
+    def test_empty_command_passes(self):
+        """空は拒否理由にしない。**hookは空commandを止める役ではない。**"""
+        for command in ("", "   ", "\n"):
+            with self.subTest(command=command):
+                self.assertIsNone(inspector_readonly_guard.check(command))
+
+    def test_newline_is_split_before_tokenizing(self):
+        """**`shlex`は改行を空白として扱う。**行で分けないと2行目が見えない。
+
+        分けずに`tokenize`へ渡すと`git show rm -rf /`という1つの語列になり、
+        `rm`がcommand位置に来ない。**この形が実際に素通りすることを固定する。**
+        """
+        collapsed = command_line.programs("git show HEAD\nrm -rf /")
+        self.assertEqual(collapsed, ["git"])
+        self.assertIsNotNone(inspector_readonly_guard.check("git show HEAD\nrm -rf /"))
+
+    def test_carriage_return_is_refused_before_tokenizing(self):
+        """**CRは行の区切りにしない。**`\\r`で割ると、bashの読みと食い違う。
+
+        **bashはCRをcommandの終端として扱わず、語の中のただの文字にする。**
+        一方`shlex.whitespace`は`' \\t\\r\\n'`であり、CRを空白として切る。
+        そのため`command_line`にはCRの後ろがcommand位置に見えず、
+        **`programs`は前のcommandしか返さない。**metacharacter検査でも捕まらない。
+        `LINE_SPLIT_RE`で割るのではなく、**tokenize前に拒否することを固定する。**
+
+        **この形は実測していない。**`Bash` toolへ生のCRを送るとtransportがLFへ正規化する
+        （ADR-0020の`検証`）。**固定するのは`check()`の判定である。**
+        """
+        smuggled = f"git show {self.HELPER} HEAD\rrm -rf /"
+        # **`rm`はcommand位置に見えない。**だから語ごとの検査では捕まらない
+        self.assertEqual(command_line.programs(smuggled), ["git"])
+        # **`LINE_SPLIT_RE`はCRで割らない。**割ると2行目としてbashの読みと食い違う
+        self.assertEqual(
+            len(inspector_readonly_guard.LINE_SPLIT_RE.split(smuggled)), 1)
+        reason = inspector_readonly_guard.check(smuggled)
+        self.assertIsNotNone(reason, "CRを含むcommandが通ってしまう")
+        self.assertIn("復帰文字", reason)
+        # **許可programだけで書いた形でも、CRを含めば拒否する**
+        self.assertIsNotNone(
+            inspector_readonly_guard.check("rg x f\rcat --pre sha1sum f"))
+
+    def test_allowlist_holds_no_program_that_writes_on_its_own(self):
+        """allowlistへ書き込めるcommandが紛れ込まないよう固定する。
+
+        **将来`sort`や`tee`を足したくなったときに落ちる。**足すなら、その理由を
+        ADR-0020へ書いたうえでこのtestも変える。
+        """
+        writable = {"sort", "uniq", "sed", "tee", "dd", "cp", "mv", "install",
+                    "python3", "python", "sh", "bash", "zsh", "xargs", "awk",
+                    "perl", "ruby", "node", "tar", "touch", "mkdir", "rm"}
+        overlap = writable.intersection(inspector_readonly_guard.ALLOWED_PROGRAMS)
+        self.assertEqual(overlap, set(), f"書き込める program が allowlist にある: {overlap}")
+
+    def test_git_subcommands_hold_no_mutating_verb(self):
+        mutating = {"add", "commit", "push", "fetch", "pull", "checkout", "switch",
+                    "restore", "reset", "clean", "branch", "tag", "config",
+                    "worktree", "stash", "gc", "am", "apply", "rebase", "merge",
+                    "cherry-pick", "revert", "mv", "rm", "init", "clone"}
+        overlap = mutating.intersection(inspector_readonly_guard.GIT_READONLY_SUBCOMMANDS)
+        self.assertEqual(overlap, set(), f"状態を変える subcommand が allowlist にある: {overlap}")
+
+    def test_deny_payload_is_emitted_for_a_write(self):
+        """hookとして起動したとき、`permissionDecision: deny`を出す。"""
+        payload = json.dumps({"tool_input": {"command": "rm -rf /"}})
+        result = subprocess.run(
+            [sys.executable, INSPECTOR_GUARD],
+            input=payload, capture_output=True, text=True,
+            encoding="utf-8", errors="replace", timeout=120,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr[:300])
+        emitted = json.loads(result.stdout)
+        self.assertEqual(
+            emitted["hookSpecificOutput"]["permissionDecision"], "deny")
+        self.assertIn("rm", emitted["hookSpecificOutput"]["permissionDecisionReason"])
+
+    def test_read_only_payload_passes_through(self):
+        payload = json.dumps({"tool_input": {"command": "git show --no-ext-diff --no-textconv HEAD"}})
+        result = subprocess.run(
+            [sys.executable, INSPECTOR_GUARD],
+            input=payload, capture_output=True, text=True,
+            encoding="utf-8", errors="replace", timeout=120,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr[:300])
+        self.assertEqual(result.stdout.strip(), "")
+
+    def test_both_inspector_agents_wire_the_guard(self):
+        """**2つの agent 定義が実際にこのhookを呼んでいることを固定する。**
+
+        hookを置いただけでは何も起きない。`.claude/agents/`のfrontmatterへ
+        書かれていて初めて掛かる。**片方だけ書き忘れる形を止める。**
+        """
+        agents = REPO_ROOT_FOR_TEMPLATES / ".claude" / "agents"
+        for name in ("consistency-inspector.md", "fresh-context-reviewer.md"):
+            with self.subTest(agent=name):
+                text = (agents / name).read_text(encoding="utf-8")
+                self.assertIn("inspector_readonly_guard.py", text,
+                              f"{name}がguardを呼んでいない")
+                self.assertIn("PreToolUse", text, f"{name}のhookがPreToolUseでない")
+
+    def test_transparent_prefixes_do_not_smuggle_an_allowed_program(self):
+        """**`command_line`が透過させる前置語を、この guard は透過させない。**
+
+        `sudo cat /etc/shadow`は`cat`だけを見れば allowlist を通る。
+        `TRANSPARENT_PREFIXES`のすべてについて、command位置に現れたら落ちることを固定する。
+        """
+        for prefix in command_line.TRANSPARENT_PREFIXES:
+            with self.subTest(prefix=prefix):
+                self.assertIsNotNone(
+                    inspector_readonly_guard.check(f"{prefix} cat AGENTS.md"),
+                    f"{prefix}付きの呼び出しが通ってしまう",
+                )
+
+    def test_a_program_with_a_path_is_rejected(self):
+        """**basenameで認可しない。**名前が一致するだけの別の実行fileである。
+
+        `./git`は`git`という名前だが、`PATH`上のgitではない。**allowlistの前提
+        （名前が実体を決める）が崩れる。**絶対pathも許さない。検査に要らない。
+        """
+        for command in ("./git show HEAD", "../git log", "/tmp/cat f", "/usr/bin/git status"):
+            with self.subTest(command=command):
+                reason = inspector_readonly_guard.check(command)
+                self.assertIsNotNone(reason, f"{command!r}が通ってしまう")
+                self.assertIn("path を含む program", reason)
+
+    def test_rg_options_that_execute_a_command_are_rejected(self):
+        """`rg --pre`は検索対象ごとにその command を起動する。`=`付きも同じ。
+
+        **program名のallowlistだけでは足りないことを固定する。**
+        """
+        for command in (
+            "rg --pre /tmp/evil.sh pattern",
+            "rg --pre=/tmp/evil.sh pattern",
+            "rg --hostname-bin /tmp/evil.sh pattern",
+        ):
+            with self.subTest(command=command):
+                self.assertIsNotNone(inspector_readonly_guard.check(command))
+        # **前方一致で誤爆させない。**`--pre-glob`はglobであってcommandではない
+        self.assertIsNone(inspector_readonly_guard.check("rg --pre-glob *.md pattern"))
+
+    def test_git_status_requires_the_global_no_optional_locks(self):
+        """`git status`は既定でindexをrefreshし`.git/index`を書く。
+
+        **`--no-optional-locks`はglobal optionである。**subcommandの後ろでは
+        gitが受け付けないため、その形を「安全な形」として通さない。
+        """
+        self.assertIsNotNone(inspector_readonly_guard.check("git status"))
+        self.assertIsNotNone(
+            inspector_readonly_guard.check("git status --no-optional-locks")
+        )
+        self.assertIsNone(
+            inspector_readonly_guard.check("git --no-optional-locks status")
+        )
+
+    def test_git_external_helpers_are_rejected_with_and_without_flags(self):
+        """外部 helper は明示のoptionでも、option無しでも走る。
+
+        **`--ext-diff`／`--textconv`／`--filters`を拒否するだけでは閉じない。**
+        `git diff`は`diff.external`を、`diff`／`show`／`log`／`blame`はtextconvを
+        **flag無しで走らせる**（実測）。両方の明示を要求する。
+        **`--no-ext-diff`だけではtextconvを止められない。**
+        """
+        for command in (
+            "git diff --ext-diff HEAD~1 HEAD",
+            "git show --textconv HEAD:AGENTS.md",
+            "git grep --textconv pattern",
+            "git cat-file --filters HEAD:AGENTS.md",
+        ):
+            with self.subTest(explicit=command):
+                self.assertIsNotNone(inspector_readonly_guard.check(command))
+        for command in (
+            "git diff HEAD~1 HEAD",
+            "git show HEAD",
+            "git log -p",
+            "git blame AGENTS.md",
+            "git diff --no-ext-diff HEAD~1 HEAD",
+            "git show --no-textconv HEAD",
+        ):
+            with self.subTest(implicit=command):
+                self.assertIsNotNone(
+                    inspector_readonly_guard.check(command),
+                    f"{command!r}が通ってしまう",
+                )
+        for subcommand in ("diff", "show", "log", "blame"):
+            with self.subTest(allowed=subcommand):
+                self.assertIsNone(
+                    inspector_readonly_guard.check(
+                        f"git {subcommand} --no-ext-diff --no-textconv"
+                    )
+                )
+
+    def test_assignment_like_arguments_are_not_rejected(self):
+        """**代入の判定はcommand位置だけに当てる。**
+
+        全語へ当てると`grep FOO=bar file`のような読み取り専用commandまで落ちる。
+        **誤検知はhookごと無効化される側の失敗である。**
+        """
+        self.assertIsNone(inspector_readonly_guard.check("grep FOO=bar AGENTS.md"))
+        self.assertIsNone(
+            inspector_readonly_guard.check(
+                "git diff --no-ext-diff --no-textconv -- file=1"
+            )
+        )
+        self.assertIsNotNone(inspector_readonly_guard.check("FOO=bar cat AGENTS.md"))
+
+    def test_command_starts_keeps_the_prefixes_programs_drops(self):
+        """`command_starts`が前置語を残し、`programs`がそれを落とすこと。
+
+        **2つの関数が同じ走査から出ていることを固定する。**別実装にすると、
+        片方だけが前置語を数え落とす。
+        """
+        starts = command_line.command_starts("sudo FOO=1 cat x && git show HEAD")
+        self.assertEqual(starts, [(("sudo", "FOO=1"), "cat"), ((), "git")])
+        self.assertEqual(
+            command_line.programs("sudo FOO=1 cat x && git show HEAD"), ["cat", "git"])
+
+    def test_command_starts_keeps_a_prefix_with_no_program(self):
+        """program語が続かない前置語も落とさない。**捨てると呼び出し側が見逃す。**"""
+        self.assertEqual(command_line.command_starts("sudo && ls"),
+                         [(("sudo",), None), ((), "ls")])
+
+    def _wrapper_command(self, agent):
+        """agent frontmatterから`command:`のscalarを読む。
+
+        **PyYAMLを使わない。**このリポジトリはYAML parserを依存に持たず、
+        `validate_pages_output.py`も同じ理由でscalarを手で読んでいる。
+        **testのためだけに依存を増やさない。**
+
+        対象は`command: "..."`という1行のdouble-quoted scalarに限る。
+        **形が変わったらこのtestは落ちる。**黙って読み飛ばさないよう、
+        見つからなければ`fail`する。
+        """
+        text = (REPO_ROOT_FOR_TEMPLATES / ".claude" / "agents" / agent).read_text(
+            encoding="utf-8")
+        front = text[4:text.index("\n---\n", 4) + 1]
+        for line in front.splitlines():
+            stripped = line.strip()
+            if not stripped.startswith('command: "'):
+                continue
+            scalar = stripped[len('command: "'):]
+            self.assertTrue(scalar.endswith('"'), f"{agent}のcommandが1行で閉じていない")
+            # double-quoted scalarのescapeを戻す。`\"`と`\\`だけを扱う。
+            return scalar[:-1].replace('\\"', '"').replace("\\\\", "\\")
+        self.fail(f"{agent}に`command: \"...\"`の行が無い")
+
+    def _run_wrapper(self, agent, env_extra, payload):
+        shell = shutil.which("sh") or "/bin/sh"
+        return subprocess.run(
+            [shell, "-c", self._wrapper_command(agent)],
+            input=payload, capture_output=True, text=True,
+            encoding="utf-8", errors="replace", timeout=120,
+            env={**os.environ, **env_extra},
+        )
+
+    def test_wrapper_blocks_when_the_guard_cannot_start(self):
+        """**起動できないときは fail closed である。**
+
+        hookのwrapperが`exit 0`で終わると、guardが無い環境で`Bash`が素通りする。
+        **`exit 2`だけがtool呼び出しを止める**（[公式文書](https://code.claude.com/docs/en/hooks)。
+        他の非0は「blockしないerror」として扱われ、動作は続行する）。
+
+        guardが無い場合とpython3が無い場合の両方を測る。
+        """
+        write = json.dumps({"tool_input": {"command": "rm -rf /"}})
+        for agent in ("consistency-inspector.md", "fresh-context-reviewer.md"):
+            with tempfile.TemporaryDirectory() as empty:
+                with self.subTest(agent=agent, case="guard missing"):
+                    result = self._run_wrapper(agent, {"CLAUDE_PROJECT_DIR": empty}, write)
+                    self.assertEqual(result.returncode, 2, result.stderr[:300])
+            with self.subTest(agent=agent, case="python3 missing"):
+                result = self._run_wrapper(
+                    agent,
+                    {"CLAUDE_PROJECT_DIR": str(REPO_ROOT_FOR_TEMPLATES),
+                     "PATH": "/nonexistent"},
+                    write,
+                )
+                self.assertEqual(result.returncode, 2, result.stderr[:300])
+
+    def test_wrapper_passes_through_a_working_guard(self):
+        """**fail closedにしたことで、正常系まで落としていないことを測る。**"""
+        env = {"CLAUDE_PROJECT_DIR": str(REPO_ROOT_FOR_TEMPLATES)}
+        for agent in ("consistency-inspector.md", "fresh-context-reviewer.md"):
+            with self.subTest(agent=agent, case="read-only"):
+                result = self._run_wrapper(
+                    agent, env, json.dumps({"tool_input": {"command": "git show --no-ext-diff --no-textconv HEAD"}}))
+                self.assertEqual(result.returncode, 0, result.stderr[:300])
+                self.assertEqual(result.stdout.strip(), "")
+            with self.subTest(agent=agent, case="write"):
+                result = self._run_wrapper(
+                    agent, env, json.dumps({"tool_input": {"command": "rm -rf /"}}))
+                self.assertEqual(result.returncode, 0, result.stderr[:300])
+                emitted = json.loads(result.stdout)
+                self.assertEqual(
+                    emitted["hookSpecificOutput"]["permissionDecision"], "deny")
+
+    def test_the_wrapper_does_not_fail_open(self):
+        """`|| exit 0`という形が戻っていないことを、文字列でも固定する。"""
+        for agent in ("consistency-inspector.md", "fresh-context-reviewer.md"):
+            with self.subTest(agent=agent):
+                command = self._wrapper_command(agent)
+                self.assertNotIn("|| exit 0", command)
+                self.assertIn("exit 2", command)
+
+    def test_the_guard_is_not_wired_globally(self):
+        """**`.claude/settings.json`へは置かない。**置くと通常の作業 session が止まる。"""
+        settings = REPO_ROOT_FOR_TEMPLATES / ".claude" / "settings.json"
+        self.assertNotIn("inspector_readonly_guard", settings.read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":
