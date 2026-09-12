@@ -2071,9 +2071,10 @@ class InspectorReadonlyGuardTests(unittest.TestCase):
         """
         # **`--ext-di`は穴ではない。**diff 系の parser は短縮を受け付けず、git 自身が落とす。
         # **予防として同じ扱いにしている**ことを固定する。
+        # **必須flagを先に置く。**置かないと位置判定で落ち、短縮判定が壊れても通ってしまう。
         for command in ("git grep --open-files-in-pag=sha1sum AGENTS -- AGENTS.md",
                         "git grep --textc zzz -- AGENTS.md",
-                        "git diff --ext-di HEAD"):
+                        "git diff --no-ext-diff --no-textconv --ext-di HEAD"):
             with self.subTest(command=command):
                 self.assertIsNotNone(inspector_readonly_guard.check(command))
 
@@ -2182,7 +2183,7 @@ class InspectorReadonlyGuardTests(unittest.TestCase):
     def test_git_version_is_allowed_for_recording_the_environment(self):
         """**判定は git の version 依存である。**検査 session 側で記録できるようにする。
 
-        `git --version` は subcommand が無い形になるため拒否される。`git version` と書く。
+        `git --version` は**許可していない global option として**拒否される。`git version` と書く。
         """
         self.assertIsNone(inspector_readonly_guard.check("git version"))
         self.assertIsNotNone(inspector_readonly_guard.check("git --version"))

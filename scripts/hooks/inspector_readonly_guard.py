@@ -38,12 +38,12 @@ frontmatterへ`hooks.PreToolUse`として書き、**その subagent の`Bash`呼
    **short optionの束ね（`-nz`）も見る**）
 8. `git`のoptionが拒否一覧に当たる（完全一致・`=`付き・**short optionの束ね**）
 9. `git`の`--help`がある（位置に依らない）
-10. `git`のoptionが拒否一覧の**短縮綴り**に当たる
-11. `git`に許可していないglobal optionがある（**allowlistである**）
-12. `git`の subcommand が`GIT_READONLY_SUBCOMMANDS`に無い
-13. `git`の語が pretty format の`%G*`を含む（**署名検証が`gpg`を起動する**）
-14. `git status`に`--no-optional-locks`が**optionとして解釈される位置に**無い、
-    または`-v`／`--verbose`がある（**`-vv`はtextconvを走らせる**）
+10. `git`の語が pretty format の`%G*`を含む（**署名検証が`gpg`を起動する**）
+11. `git`のoptionが拒否一覧の**短縮綴り**に当たる
+12. `git`に許可していないglobal optionがある（**allowlistである**）
+13. `git`の subcommand が`GIT_READONLY_SUBCOMMANDS`に無い
+14. `git status`に`--no-optional-locks`が**optionとして解釈される位置に**無い
+    （`status`の`-v`／`--verbose`は項目11で拒否する）
 15. `git diff`／`log`／`show`／`blame`の**subcommandの直後2語**が
     `--no-ext-diff --no-textconv`でない（順序は問わない）
 
@@ -60,7 +60,7 @@ frontmatterへ`hooks.PreToolUse`として書き、**その subagent の`Bash`呼
 `command_line`の module docstring が挙げるものは、ここでも取れない。
 alias、shell function、変数展開、`xargs`経由、`sh -c`の内側。
 **config 由来の option も取れない。**guardが見るのは argv だけである。
-`log.showSignature`（git config）が真なら`git log`／`git show`は option 無しで署名検証を走らせ、
+`log.showSignature`（git config）が真なら、**guardが許可する形でも**署名検証が走り、
 `gpg.program`が起動する。`rg`は`RIPGREP_CONFIG_PATH`が指すfileから option を読むため、
 そこに`--pre=<command>`があれば`rg <pattern> <file>`だけで前処理commandが走る。
 **どちらも argv に現れないため、この guard では原理的に見えない**（#384 の22巡目で判明。
@@ -271,6 +271,10 @@ DENIED_GIT_OPTIONS_WITH_ABBREVIATION = (
 # **pretty formatの`%G*`も署名検証を走らせる。**`--show-signature`を拒否するだけでは閉じない。
 # `git log --format=%GK`で`gpg`が起動することを実測した。`%G?`／`%GS`／`%GK`は同じ経路である。
 # **`%G`を含む語を拒否する。**`--format=`／`--pretty=`の綴りを数え上げない。
+#
+# **巻き添えがある。**pretty formatでない使い方も落ちる。
+# `git grep -n %G -- docs`や`git log ... -G %G`のような、`%G`を検索語やpathspecに含む形である（実測）。
+# **引き受ける。**綴りを数え上げる形に戻るより単純であり、検索は`Grep` toolで足りる。
 GIT_SIGNATURE_FORMAT_MARKER = "%G"
 # **`git status -vv`はtextconvを走らせる**（実測）。`-v`は走らせない。
 # **`status`は`--no-ext-diff --no-textconv`を受理しない**（実測）ため、打ち消す形が無い。

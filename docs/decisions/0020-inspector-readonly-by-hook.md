@@ -1,8 +1,8 @@
 # ADR-0020: 検査 subagent の read-only を、sandbox ではなく agent 単位の hook で絞る
 
 > 状態: Accepted
-> 日付: 2026-09-10（**2026-09-11 に改訂。**題、決定3、選択肢A の再検討、選択肢E・F の追加、
-> 利点・欠点・リスク表・検証、置き換える決定。`検証`を参照）
+> 日付: 2026-09-10（**2026-09-11 に改訂。**題を含め全体に及ぶ。**主張を「保証する」から
+> 「best effort で絞る」へ下げた。**範囲と理由は `検証` と `欠点` を参照）
 
 ## 背景
 
@@ -137,10 +137,12 @@ subagent を使い捨ての git worktree で動かす `isolation` field があ�
   **読み取りのつもりの command が書き込む**形が実際にあった（`検証`）。
   **ただし、この型のすべてを防げるわけではない。**
   **同じ書き込みは `log.showSignature`（git config）でも起きる。**真なら
-  **option を1つも付けない `git log` が `gpg` を起動し、`~/.gnupg` を作る。**
-  **argv に現れないため、この guard は止めない。**
+  **guard が許可する形（`git log --no-ext-diff --no-textconv -1`）でも `gpg` が起動する。**
+  **実測した**（`gpg.program` を script に差し替え、`log.showSignature=true` の有無で比べた。
+  署名のある commit に対して、有りでは走り、無しでは走らない）。
+  **config は argv に現れないため、この guard は止めない。**
   **誤操作の側に立っていて、かつ防げない例である。**
-  `git status` の index 書き戻しも、測ったのは `status` だけで、他の subcommand は測っていない。
+  `git status` の index 書き戻しも、**書き戻しが起きたのを観測できたのは `status` だけである。**
 - **防がない**: subagent が意図して境界を越えようとする場合。
   **ただし「意図せず踏むが防げていない」ものもある。**pathname expansion（`git grep -n -[N-P]sha1sum`）は、
   cwd の file 名次第で展開される。**file 名は検査対象 branch が持つもので、subagent の統制下に無い。**
@@ -157,7 +159,8 @@ subagent を使い捨ての git worktree で動かす `isolation` field があ�
 
 ## 保証が要るときにどうするか
 
-**いま利用できる機構は無い。**選択肢を探した結果である。
+**評価した範囲では、利用できる機構は無い。**下の3つを評価した結果である。
+**`permissionMode` は評価していない**（この節の末尾）。**「機構が無い」とは書かない。**
 
 - **sandbox（`sandbox.filesystem.denyWrite`）は subagent 単位に絞れない。**
   設定先は `settings.json`（user／project／managed）だけで、subagent の frontmatter に
@@ -168,7 +171,8 @@ subagent を使い捨ての git worktree で動かす `isolation` field があ�
   （[#373](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/373)で確認）。
   外して差分を file で渡す形（`選択肢E`）も検討したが、**検査 agent が `git` を失うため
   review の品質が落ちる**（性質からの判断である。試行も行ったが却下の根拠にしていない。`選択肢E`）
-- **`isolation: worktree` は未 commit の変更を含まない**（実測）。自己レビューは
+- **`isolation: worktree` は未 commit の変更を含まない**（**`git worktree add` の挙動を実測した。
+  subagent を `isolation: worktree` で起動して確かめてはいない。`選択肢F`**）。自己レビューは
   未 commit の最終 diff に対して行うため成立しない
 
 **ただし `permissionMode` は評価していない。**`plan` が書き込みをどこまで止めるかを確かめていない
@@ -201,7 +205,7 @@ subagent を使い捨ての git worktree で動かす `isolation` field があ�
      `--no-ext-diff --no-textconv`の両方を、`status`は global の`--no-optional-locks`を要求する
    - **許可した program 自身の危険な option を個別に拒否する。**
      git の`-c`／`--config-env`／`--exec-path`／`-O`／`--output`／`--ext-diff`／
-     `--textconv`／`--filters`、`rg`の`--pre`／`--hostname-bin`／`-z`／`--search-zip`
+     `--textconv`／`--filters`、`rg`の`--pre`／`--hostname-bin`、および`-z`／`--search-zip`（2026-09-11 に追加）
    - **shell metacharacter（`>|;&()`` ` ``$<{}`）を含む語を拒否する。**
      `shlex`は空白でしか語を切らないため、`cat a>b`も`cat a;rm -rf /`も1語になり、
      redirect も次の command も command 位置として見えない
@@ -351,12 +355,13 @@ subagent を使い捨ての git worktree で動かす `isolation` field があ�
   `-C`／`--git-dir`／`--work-tree`／`--namespace`は別 repository を指させ、**その config も差し替わる。**
   **別 repository を指した場合の挙動は測っていない。**
 - **誤検知がある。**`grep "=>"`のように、metacharacter を含む正当な引数を拒否する。
-  **2026-09-11 に2種類増えた。**(1) `--text`は`--textconv`の前方一致で落ちる
+  **2026-09-11 に3種類増えた。**(1) `--text`は`--textconv`の前方一致で落ちる
   （`git diff`／`grep`／`log` のいずれでも）。(2) **short option の束ね判定**により、
-  `git log -GFOO`のように値へ`O`が入る pickaxe 検索が落ちる。
-  **どちらも代替がある**ため引き受けた。(1) は binary を text として見る必要が無い。
+  `git log -GFOO`のように値へ`O`が入る pickaxe 検索が落ちる。(3) **`%G`を含む語**は、
+  pretty format でなくても落ちる（`git grep -n %G -- docs` など。実測）。
+  **3つとも代替がある**ため引き受けた。(1) は binary を text として見る必要が無い。
   (2) は**値を別の語にすれば通る**（`git log -GFOO` は落ちるが `git log ... -G FOO` は通る。実測）。
-  `rg` 側は `Grep` tool を使う。
+  (3) は `Grep` tool を使う（`%G` を検索語にする用途）。`rg` 側も同じである。
   **代替がある**（両 agent は`Grep` tool を持つ）ため引き受けた。
 - **`ALLOWED_PROGRAMS`は、載せた program が option を含めても安全だという判断に依存する。**
   判断が誤っていれば穴になる。`sort -o`と`uniq out`は実際に見落としやすく、
@@ -393,7 +398,7 @@ subagent を使い捨ての git worktree で動かす `isolation` field があ�
 | hook が掛からない version で、read-only が指示だけに戻る | **agent 本文の指示を残した**（決定5）。**掛かっていないことを検出する手段は無い。引き受ける** |
 | allowlist が狭すぎて検査が止まる | 拒否理由に「許可しているのは何か」と「広げるなら ADR-0020 を更新する」を書いた。**黙って諦めさせない** |
 | allowlist を後から安易に広げる | `test_hooks.py`が、書き込めるprogramと状態を変えるgit subcommandが入っていないことを固定する。**広げる変更はtestを落とす** |
-| 字句判定を抜ける形が見つかる | **初版は「allowlist であり、抜けるには許可した program 自身の書き込み経路を使うことになる」と書いていた。2026-09-11 にこの説明が実例と合わなくなった。**同日に塞いだ 14 件のうち **11 件は program の書き込み経路ではなく、guard の parse と git の parse がずれる形**である（**内訳は`検証`が持つ。ここへ写さない**）。**残る 3 件（`status -vv`の textconv、`--show-signature`、pretty format の`%G*`）は読みのずれではない。**guard も git も subcommand を同じに読んでおり、**その option が helper を起動することを拒否一覧へ入れていなかった**という、旧来の型である。**`%G*`は option ですらなく、format 文字列の中身である。****手順は3つに分かれる。**program 自身の書き込み経路なら`ALLOWED_PROGRAMS`から外す。**parse のずれなら、ずれる読み方そのものを直す。**helper を起動する option の見落としなら、拒否一覧へ足す（`status -vv`がこれ）。[#384](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/384)起票分の 5 件は option 側の拒否で塞ぎ、**`rg`は allowlist に残したまま`DENIED_RG_OPTIONS`で扱っている**（外していない）。**`rg --help` の option 一覧を見て拾った**（`--pre`／`--hostname-bin`／`-z`／`--search-zip`）。**`--pre`／`--hostname-bin` は help の表記（`=COMMAND`）が command 実行を含意する。`-z`／`--search-zip` は含意しない。外部 process の起動は測っておらず、ripgrep の文書化された挙動に依る。****`--pre-glob` は `--pre` が無ければ効かない。**全数を目で見ただけであり、機械で照合していない |
+| 字句判定を抜ける形が見つかる | **初版は「allowlist であり、抜けるには許可した program 自身の書き込み経路を使うことになる」と書いていた。2026-09-11 にこの説明が実例と合わなくなった。**同日に塞いだ 14 件のうち **11 件は program の書き込み経路ではなく、guard の読みと、実際に実行する側（git／bash）の読みがずれる形**である（**内訳は`検証`が持つ。ここへ写さない**）。**残る 3 件（`status -vv`の textconv、`--show-signature`、pretty format の`%G*`）は読みのずれではない。**guard も git も subcommand を同じに読んでおり、**その option が helper を起動することを拒否一覧へ入れていなかった**という、旧来の型である。**`%G*`は option ですらなく、format 文字列の中身である。****手順は3つに分かれる。**program 自身の書き込み経路なら`ALLOWED_PROGRAMS`から外す。**parse のずれなら、ずれる読み方そのものを直す。**helper を起動する option の見落としなら、拒否一覧へ足す（`status -vv`がこれ）。[#384](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/384)起票分の 5 件は option 側の拒否で塞ぎ、**`rg`は allowlist に残したまま`DENIED_RG_OPTIONS`で扱っている**（外していない）。**`rg --help` の option 一覧を見て拾った**（`--pre`／`--hostname-bin` は #384 起票分、**`-z`／`--search-zip` は 2026-09-11 に追加した**）。**`--pre`／`--hostname-bin` は help の表記（`=COMMAND`）が command 実行を含意する。`-z`／`--search-zip` は含意しない。外部 process の起動は測っておらず、ripgrep の文書化された挙動に依る。****`--pre-glob` は `--pre` が無ければ効かない。**全数を目で見ただけであり、機械で照合していない |
 | 許可 program の危険な option を見落とす | **`DENIED_GIT_GLOBAL_OPTIONS`／`DENIED_GIT_SUBCOMMAND_OPTIONS`／`DENIED_GIT_OPTIONS_WITH_ABBREVIATION`／`DENIED_GIT_OPTIONS_BY_SUBCOMMAND`／`DENIED_GIT_HELP_OPTIONS`／`DENIED_RG_OPTIONS`／`REQUIRED_GIT_HELPER_OPTIONS`／`GIT_ALLOWED_GLOBAL_OPTIONS_WITHOUT_VALUE`／`GIT_GLOBAL_OPTIONS_WITH_VALUE`が持つ。**当たり方は`_matches_option`（完全一致・`=`付き・short optionの束ね）、`_matches_option_or_abbreviation`（前方一致）、`_global_option_names`（値消費）が決める。****網羅は保証していない。**program を足すときに option を全数見る手順は機械化していない |
 | 要求 option（`--no-ext-diff --no-textconv`等）を agent が知らず、検査が止まる | **両 agent 本文へ`Bash の制約`節を足した。**拒否理由にも正しい形を書いてある |
 | `.claude/settings.json`へ間違って置かれる | `test_the_guard_is_not_wired_globally`が固定する |
@@ -415,7 +420,11 @@ subagent を使い捨ての git worktree で動かす `isolation` field があ�
   **flag を欠いた`git show HEAD`は拒否される**（[#384](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/384)の対処後）。
   **この行は当初「`git show HEAD`が素通りする」と書いていた。対処後は誤りである。**
 - **2026-09-11 の測定**（git `2.34.1`、ripgrep `14.1.1`。使い捨て repository は `mktemp -d` + `git init`）。
-  **大半は通常の作業 session で実行した。****ただし表中で「検査 subagent の中で実行した」と書いた 2 行**（`rg <pattern> { cat --pre /usr/bin/uname`／`git log --show-signature`）**だけは、guard が掛かった検査 subagent の中で起きたものである。****guard を通ったうえで起動した**という意味で、条件が違う。
+  **実行した場所は行によって違う。判定列に書く。**
+  使い捨て repository での測定は通常の作業 session で行った。
+  **`sha1sum` の起動、`!`／`{` の迂回、`--show-signature`、`--super-prefix` は、
+  guard が掛かった検査 subagent の中で起きたものである。****guard を通ったうえで起動した**
+  という意味で条件が違い、そちらのほうが重い。
   **判定方法は形ごとに違う。表の「判定」列に書く。**
 
   | 形 | 結果 | 判定 |
@@ -424,13 +433,13 @@ subagent を使い捨ての git worktree で動かす `isolation` field があ�
   | `git cat-file --te`／`--textc`／`--textcon` | **`--textconv` として実行された** | textconv driver に `echo TEXTCONV_RAN` する script を設定し、**3形とも出力が `TEXTCONV_RAN`、対照の `-p` は file の中身（`secret`）になったこと** |
   | `git cat-file --filt` | **`--filters` として実行された** | filter driver（小文字を大文字にする script）を設定し、**`--filt` の出力が `--filters` と同じ `A`、`-p` は `a` になったこと** |
   | `git grep --textc` | **`--textconv` として実行された** | 同じ textconv driver で、**`--textc` が `--textconv` と同じく `f:TEXTCONV_RAN` を出し、flag 無しでは出力が無かったこと** |
-  | `git grep --open-files-in-pag=sha1sum` | **`sha1sum` が実行された**（`ALLOWED_PROGRAMS` に無い） | 出力が `sha1sum` の出力（hash 値＋file 名）になったこと |
+  | `git grep --open-files-in-pag=sha1sum` | **`sha1sum` が実行された**（`ALLOWED_PROGRAMS` に無い） | 出力が `sha1sum` の出力（hash 値＋file 名）になったこと 。**検査 subagent の中で実行した**|
   | `git --namespace --no-optional-locks status` | `--no-optional-locks` が namespace の値になり、status へ届かない | **`git --namespace --no-optional-locks status` が正常終了し、値を欠いた `git --namespace status` はエラーになったこと**（＝次の語を値として飲んでいる）。**git 側の index 書き戻しは測っていない** |
   | `git log -S --no-ext-diff --no-textconv -p` | `-S` が `--no-ext-diff` を検索文字列として飲む | 出力が 0 行になったこと（同じ範囲で flag を先頭へ置くと commit が出る） |
   | `git diff -- f --no-ext-diff --no-textconv` | `--` より後ろは pathspec | **helper script が `PWNED` file を実際に作ったこと** |
-  | `git --super-prefix rev-parse submodule--helper x` | guard は `rev-parse`、git は `submodule--helper` を読む | git のエラー文が `'x' is not a valid submodule--helper subcommand` になったこと |
+  | `git --super-prefix rev-parse submodule--helper x` | guard は `rev-parse`、git は `submodule--helper` を読む | git のエラー文が `'x' is not a valid submodule--helper subcommand` になったこと 。**検査 subagent の中で実行した**|
   | `git diff --ext-dif`／`--ext`／`--e` | **git 自身が拒否した**（diff 系 parser は短縮を受けない） | git が `unknown option` を返したこと |
-  | `rg <pattern> ! cat --pre sha1sum <file>` | **`sha1sum` が起動した** | 出力が README の本文ではなく `sha1sum` の hash 値になったこと。**`!` は metacharacter を1つも含まないため、`{` を塞いだ後も残っていた** |
+  | `rg <pattern> ! cat --pre sha1sum <file>` | **`sha1sum` が起動した** | 出力が README の本文ではなく `sha1sum` の hash 値になったこと。**`!` は metacharacter を1つも含まないため、`{` を塞いだ後も残っていた** 。**検査 subagent の中で実行した**|
   | `rg <pattern> { cat --pre /usr/bin/uname <file>` | **`/usr/bin/uname` が起動した**（`ALLOWED_PROGRAMS` に無い） | ripgrep が `preprocessor command failed: '"/usr/bin/uname" ...'` を出したこと。**検査 subagent の中で実行した** |
   | `git log --show-signature` | **`gpg` が起動し、`~/.gnupg` に directory と keybox file を作った** | `gpg: directory '<HOME>/.gnupg' created` の出力と、**検査 subagent の中で実行したこと** |
   | `git log -1 --format=%GK` | **署名検証が走った** | 鍵 ID（`B5690EEE…`）が出力されたこと。**`--show-signature` を拒否するだけでは閉じない** |
@@ -438,10 +447,12 @@ subagent を使い捨ての git worktree で動かす `isolation` field があ�
   | `git --no-optional-locks status -v --no-ext-diff --no-textconv` | **git が拒否した** | `status` が両 flag を受理しないこと |
 
   **`--no-optional-locks` を `status` にだけ要求している理由を書いておく。**
-  `.git/index` の書き戻しを測ったのは `status` だけである。
+  **`.git/index` の書き戻しが起きたのを観測できたのは `status` だけである。**
   `diff`／`log`／`grep`／`ls-files`／`blame`／`show`／`rev-parse`／`merge-base`／`ls-tree` でも
   mtime が変わらないことは [#384](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/384) の
-  時点で測ったが、**stat-dirty な状態を作って測り直してはいない。**
+  時点で確認したが、**stat-dirty な状態を作って測り直してはいない。**
+  **したがって「書き戻さない」とは言えない。**下の「測った 10 個」は、
+  **`status` の1個と、mtime が変わらないことを確認した9個の合計である。**
   **測っていない subcommand が他にもある**（`cat-file`／`rev-list`／`describe`／`shortlog`／
   `show-ref`／`name-rev`／`version` の 7 個。許可している 17 個のうち測ったのは 10 個である）。
   **「status 以外は書かない」と言い切れる根拠は持っていない。**
@@ -455,6 +466,7 @@ subagent を使い捨ての git worktree で動かす `isolation` field があ�
   それぞれ短縮が効かないこと・`status` が flag を受理しないことの確認である**
   （16 行 − 2 行の束ね − 2 行の確認 = 12 件）。
   **この表の後に、13 件目として short option の束ね（`git grep -nOzzz`）を見つけて塞いだ。**
+  **これも検査 subagent の中で起きた。**表に行が無いのは、表を作った後に見つけたためである。
   `-O`を`token.startswith("-O")`だけで見ていたため、`-nOzzz`が素通りし、
   **git が pager として `zzz` を exec しようとした**（`error: cannot run zzz...` で判定）。
   **14 件目は `\r` である。**`LINE_SPLIT_RE` を `[\r\n]+` から `\n+` へ変え、
@@ -478,7 +490,8 @@ subagent を使い捨ての git worktree で動かす `isolation` field があ�
     **未 commit の変更が見えるかを実際に測る**（この ADR では行っていない）
   - 検査 agent が `git` を必要としなくなったとき
 
-  **どれも外部の変化であり、自分の commit からは観測できない。**
+  **上2つは外部の変化であり、自分の commit からは観測できない。**
+  **3つ目はこちら側の設計判断であり、自分の commit で起こる。**
   **契機を1つ決めておく。**この guard を触る変更（`ALLOWED_PROGRAMS`／`GIT_READONLY_SUBCOMMANDS`／
   拒否 option の一覧を変える変更）を行うとき、**上の3条件を1つずつ確認してから着手する。**
   確認した結果はこの ADR の`検証`へ追記する。

@@ -73,11 +73,12 @@ hooks:
   （`cat-file --textc` と `grep --open-files-in-pag=` で実測）。
   `--filters` は**短縮だけ `cat-file` 限定**である（完全一致はどの subcommand でも拒否される）。
   **`--open-files-in-pager` は short form の `-O` でも拒否される。**
-  **巻き添えが2種類ある。**(1) `--text`（binary を text として扱う）は `--textconv` の前方一致に
+  **巻き添えが3種類ある。**(1) `--text`（binary を text として扱う）は `--textconv` の前方一致に
   当たるため、`git diff --text`／`git grep --text`／`git log --text` が落ちる。
   (2) **short option の束ねは、cluster のどこかに禁止文字があれば落ちる。**
   `git log -GFOO`（`O` を含む）や `rg -ezebra`（`z` を含む）が落ちる。
   **値を別の語にすれば通る**（`git log ... -G FOO`）。
+  (3) **`%G` を含む語**は、pretty format でなくても落ちる（`git grep -n %G -- docs` など）。
   **git 側の拒否文面は、当たった option 名を必ず出す。**巻き添えの説明が付くのは `-O` の束ねと
   `--textconv` の前方一致の文面である（`git status -v` の拒否文面は前方一致として説明する）。
   **rg 側の文面は束ねに触れない。**`rg -ezebra` が落ちたら (2) を疑うこと。
