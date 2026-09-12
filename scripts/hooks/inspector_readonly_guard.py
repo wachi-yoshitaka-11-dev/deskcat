@@ -63,8 +63,9 @@ alias、shell function、変数展開、`xargs`経由、`sh -c`の内側。
 `log.showSignature`（git config）が真なら、**guardが許可する形でも**署名検証が走り、
 `gpg.program`が起動する。`rg`は`RIPGREP_CONFIG_PATH`が指すfileから option を読むため、
 そこに`--pre=<command>`があれば`rg <pattern> <file>`だけで前処理commandが走る。
-**どちらも argv に現れないため、この guard では原理的に見えない**（#384 の22巡目で判明。
-**config を設定して実際に起動させるところは測っていない。**read-onlyのため）。
+**どちらも argv に現れないため、この guard では原理的に見えない**（#384 の22巡目で判明）。
+**`log.showSignature`の側は実測した。**`gpg.program`をscriptへ差し替え、有無で比べた。
+**`RIPGREP_CONFIG_PATH`の側は測っていない。**
 
 **pathname expansion（`*`／`?`／`[...]`）と tilde expansion（`~`）も取れない。**
 guardが検査するのは**展開前の語**であり、programが受け取る語ではない。

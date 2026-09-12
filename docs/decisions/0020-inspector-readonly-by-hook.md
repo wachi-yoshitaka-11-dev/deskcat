@@ -346,8 +346,8 @@ subagent を使い捨ての git worktree で動かす `isolation` field があ�
   index の refresh 時に外部 program を起動しうる config 項目は見ていない。**
   **`gpg.program`は 2026-09-11 に、option と format の側だけ塞いだ**（`--show-signature`と`%G*`）。
   **config で暗黙に走る側は塞いでいない。**`log.showSignature`が真なら、
-  `git log`は option 無しで署名検証を走らせる（git 2.34.1 の binary に key の文字列が実在することを確認。
-  **config を設定して起動させるところは測っていない**）。
+  `git log`は option 無しで署名検証を走らせる（**実測した。**`gpg.program`を script へ差し替え、
+  `log.showSignature`の有無で比べた。**guard が許可する形でも走ることは`脅威モデル`に書いた**）。
   **`rg`も同じである。**`RIPGREP_CONFIG_PATH`が指す file に`--pre=<command>`があれば、
   `rg <pattern> <file>`だけで前処理 command が走る。
   **どちらも argv に現れないため、この guard では原理的に見えない。**
@@ -361,7 +361,9 @@ subagent を使い捨ての git worktree で動かす `isolation` field があ�
   pretty format でなくても落ちる（`git grep -n %G -- docs` など。実測）。
   **3つとも代替がある**ため引き受けた。(1) は binary を text として見る必要が無い。
   (2) は**値を別の語にすれば通る**（`git log -GFOO` は落ちるが `git log ... -G FOO` は通る。実測）。
-  (3) は `Grep` tool を使う（`%G` を検索語にする用途）。`rg` 側も同じである。
+  (3) は `Grep` tool を使う（`%G` を検索語にする用途）。
+  **(3) の巻き添えは `git` だけである。**`%G` の判定は git の invocation にしか掛からず、
+  `rg -n %G` は通る（実測）。**`rg` に掛かるのは (2) の束ねである**（`rg -ezebra` が `-z` で落ちる）。
   **代替がある**（両 agent は`Grep` tool を持つ）ため引き受けた。
 - **`ALLOWED_PROGRAMS`は、載せた program が option を含めても安全だという判断に依存する。**
   判断が誤っていれば穴になる。`sort -o`と`uniq out`は実際に見落としやすく、
@@ -406,7 +408,7 @@ subagent を使い捨ての git worktree で動かす `isolation` field があ�
 
 ## 検証
 
-- `python3 scripts/test_hooks.py` — **176件 OK**（`InspectorReadonlyGuardTests` 35件を含む）。**#384 の merge 後（`50671d9`）は 162件・21件だった**
+- `python3 scripts/test_hooks.py` — **177件 OK**（`InspectorReadonlyGuardTests` 36件を含む）。**#384 の merge 後（`50671d9`）は 162件・21件だった**
 - allowlist 側 19 例が通り、拒否側 59 例が落ちることを`check()`で確認した
 - **[#384](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/384)の 5 件を、使い捨て repository で実測してから塞いだ。**
   helper script に `echo ... > PWNED` を書かせ、**file が実際に作られたことで判定した。**
@@ -471,6 +473,8 @@ subagent を使い捨ての git worktree で動かす `isolation` field があ�
   **git が pager として `zzz` を exec しようとした**（`error: cannot run zzz...` で判定）。
   **14 件目は `\r` である。**`LINE_SPLIT_RE` を `[\r\n]+` から `\n+` へ変え、
   tokenize 前に CR を拒否するようにした。**表に行が無いのは、実測していないためである**（`Bash` tool へ生の CR を送ると transport が LF へ正規化する）。
+  **ただし `check()` の判定は test で固定した**（`test_carriage_return_is_refused_before_tokenizing`。
+  CR で割らないこと・CR を含む行を拒否することの両方を見る）。
 - 見直し条件: **subagent を実際に起動して書き込みが拒否されることを測れたとき**、
   この ADR の「実測していない」を実測結果へ差し替える。
 - **sandbox の再検討条件を書き換えた**（2026-09-11）。**上の bullet の「実測できたら差し替える」は有効である。

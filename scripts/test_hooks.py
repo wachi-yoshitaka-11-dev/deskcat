@@ -2300,6 +2300,31 @@ class InspectorReadonlyGuardTests(unittest.TestCase):
         self.assertEqual(collapsed, ["git"])
         self.assertIsNotNone(inspector_readonly_guard.check("git show HEAD\nrm -rf /"))
 
+    def test_carriage_return_is_refused_before_tokenizing(self):
+        """**CRは行の区切りにしない。**`\\r`で割ると、bashの読みと食い違う。
+
+        **bashはCRをcommandの終端として扱わず、語の中のただの文字にする。**
+        一方`shlex.whitespace`は`' \\t\\r\\n'`であり、CRを空白として切る。
+        そのため`command_line`にはCRの後ろがcommand位置に見えず、
+        **`programs`は前のcommandしか返さない。**metacharacter検査でも捕まらない。
+        `LINE_SPLIT_RE`で割るのではなく、**tokenize前に拒否することを固定する。**
+
+        **この形は実測していない。**`Bash` toolへ生のCRを送るとtransportがLFへ正規化する
+        （ADR-0020の`検証`）。**固定するのは`check()`の判定である。**
+        """
+        smuggled = f"git show {self.HELPER} HEAD\rrm -rf /"
+        # **`rm`はcommand位置に見えない。**だから語ごとの検査では捕まらない
+        self.assertEqual(command_line.programs(smuggled), ["git"])
+        # **`LINE_SPLIT_RE`はCRで割らない。**割ると2行目としてbashの読みと食い違う
+        self.assertEqual(
+            len(inspector_readonly_guard.LINE_SPLIT_RE.split(smuggled)), 1)
+        reason = inspector_readonly_guard.check(smuggled)
+        self.assertIsNotNone(reason, "CRを含むcommandが通ってしまう")
+        self.assertIn("復帰文字", reason)
+        # **許可programだけで書いた形でも、CRを含めば拒否する**
+        self.assertIsNotNone(
+            inspector_readonly_guard.check("rg x f\rcat --pre sha1sum f"))
+
     def test_allowlist_holds_no_program_that_writes_on_its_own(self):
         """allowlistへ書き込めるcommandが紛れ込まないよう固定する。
 
