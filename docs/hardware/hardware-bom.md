@@ -99,9 +99,11 @@ repositoryのどこにも無く、下記patternの走査で**追跡file全体で
 買えばIssueはcloseし、記録は残らない。**この文書に残すのは、買った後も残るものだけである。**
 
 **発注時に見る先は、その時点でopenな発注Issueである。**複数あるなら全部を見る。
-**この文書の部品表を発注リストの代わりに使わない。**部品表の`残作業`列には`未購入`が
-残っているが、**それは網羅を保証しない**（更新の契機が調達ではなく設計判断であるため、
-買った後も残ることがある）。**何を買うかは発注Issueが持つ。**
+**この文書の部品表を発注リストの代わりに使わない。この文書は調達の状態を持たない。**
+部品表の`残作業`列が持つのは設計の状態だけであり、**`未購入`／`購入待ち`／`発注済み`と
+いった調達の状態は置かない。**調達へ言及する必要がある行は、状態そのものを書かずに
+発注Issueを指す（`PSU-INGRESS-01`／`CABLE-PI-PWR-01`／`PROTO-02`／`PROT-OC-01`／
+`PROT-RP-01`／`WIRE-PWR-01`の6行が[#205](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/205)を指している）。**何を買うかは発注Issueが持つ。**
 
 | この文書に残す | Issueが持つ |
 |---|---|
@@ -278,3 +280,4 @@ repositoryのどこにも無く、下記patternの走査で**追跡file全体で
 | 2026-09-09 | 91 | [#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)（`WORK-INSTRUCTIONS-INGRESS-PLAN-B.md`）。**2026-09-09に人間が、5 V ingressの受け方をMicro-B変換基板（`PSU-INGRESS-01`）から端子台（`114217`）への直接ネジ止めへ変える決定をした（案B）。**理由は`power-budget.md`の`経路部品と定格`の2行（Micro-Bオスplugとreceptacleの嵌合接点1.5A、Micro-Bメスreceptacle変換基板1.5A）が、M-12001の3Aに対して遅いtripの帯を作っていたためであり（`HW-TBD-021`）、2026-09-08の現物確認で`VBUS`の複数pin化では実効定格が上がらないと判明したことを受けた。**`PSU-INGRESS-01`行の状態を`Selected`から`Not used`へ変更する提案をここに記録した（PM確認待ち）。**組立済みの現物は手元に残り、破棄していない。**この反映は机上のみであり、M-12001のcableはまだ切っていない。**最小定格は自分で確かめた（`power-budget.md`の`経路部品と定格`を参照。PTCの`Ihold` 1.35Aが引き続き経路の最小値であり、変わらない） | `power-budget.md`の`経路部品と定格`、人間の決定（2026-09-09） |
 | 2026-09-09 | 92 | [#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)。**Revision 91は書き換えない。**同Revisionが提案した`PSU-INGRESS-01`行の状態変更（`Selected`→`Not used`）を、PM（`deskcat-f2`）が確認した。**状態ラベル`Not used`＝「初期製作の対象外と明示済み」が正確であり、`Deferred`（初期MVPには含めない、将来の採用を含意）よりこちらが適切と判断した。**行の`（AI提案、PM確認待ち）`を`（2026-09-09、PM確認済み）`へ改めた | PM（`deskcat-f2`）の確認（2026-09-09） |
 | 2026-09-09 | 93 | [#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)。**ユーザーがM-12001のcable印字を撮影し、`PSU-SERVO-01`行へ反映した。**印字は`E520447`（UL file number）／`AWM STYLE 2464`（UL flexible cordの型式）／`20AWG`／`80℃`／`300V`／`VW-1`／`CU AWM I A`／`FTI`（難燃性の試験規格）／製造元名（`Xiamen Seebest-B...`、末尾は写真で切れており未確認）。**`20AWG`はRevision 61（2026-08-22）が既に記録していた値と一致し、今回の写真がその裏付けとなった。**他の印字は今回新たに得た一次資料である。**いずれも定格の主張には使わない**（換算方法が未確定。`HW-TBD-022`。既存規則を維持する）。この確認により[power-budget.md](power-budget.md)の`M-12001のcableを受ける端子台`行の終端方法（端子台へ直接ネジ止めか、はんだで線先を太らせるか）を「端子台へ直接ネジ止め」で確定できた（`20AWG`が端子台`114217`の適合電線範囲`AWG18〜26`の内側であるため）。**芯数は印字に無く不明のまま**（切った断面で数える） | ユーザー提供のcable印字写真（2026-09-09）、[power-budget.md](power-budget.md)のRevision 101 |
+| 2026-09-12 | 94 | [#392](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/392)。**`購入待ちリスト`節の自己説明を部品表の現物へ合わせた。**旧文は「部品表の`残作業`列には`未購入`が残っているが、それは網羅を保証しない」だったが、**残っていない**（`develop` `2ba07ab`に対する全数走査で、`未購入`21件・`購入待ち`40件・`発注済み`0件のうち、**`残作業`列の生きた札は0件**）。同列に出る5件は`購入待ちリスト`という節名への参照4件（`CABLE-PI-LINK-01`／`MEAS-03`／`MEAS-04`／`TOOL-02`）と、過去の誤記録の引用1件（`MEAS-01`）である。**分離は既に済んでいた。**6行（`PSU-INGRESS-01`／`CABLE-PI-PWR-01`／`PROTO-02`／`PROT-OC-01`／`PROT-RP-01`／`WIRE-PWR-01`）が`#205`を指している。新文はこの6行を根拠として示す。**部品表のセルは変更していない**（消す対象が0件のため）。**`発注漏れを防ぐ方法`節の「悪い運用例」の引用と、走査語の一覧は変更していない。**`未購入`は群A（調達状態）の走査語として現役である**（[tbd-register.md](tbd-register.md)の`command 3)`の表が9語を列挙し、この文書のRevision 19がその9語による走査で5件の漏れを検出したことを記録している）。**外すと走査が狭まる** | 全数走査。判定の内訳は[#392](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/392)のPull Request本文 |
