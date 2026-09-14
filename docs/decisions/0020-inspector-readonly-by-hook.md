@@ -213,6 +213,16 @@ subagent を使い捨ての git worktree で動かす `isolation` field があ�
      `git show HEAD`と`rm -rf /`を改行で並べると1つの語列に潰れる
    - **語へ分けられない command は拒否する（fail closed）。**他の hook は素通りさせるが、
      **こちらは境界であり、解釈できない入力を通すことは境界を開けることと同じである**
+   - **語頭の`#`から行末までは、判定の前に落ちる**（[#389](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/389)
+     で`command_line.segments`へ入った。**この guard 自体は変えていない**）。
+     **bash も実行しないため、allowlist の外へ出る経路は増えない。**
+     一方で**コメントの中に書いた option は、上の拒否一覧に当たっても見ない**
+     （`git version # --help`、`rg -n pattern f # --pre sha1sum`。2026-09-14 に実測）。
+     **落ちるのは判定の全段ではない。**CR の検査、`shlex`の失敗、
+     **区切り語と metacharacter を含む語の拒否**は、`tokenize`をコメントを落とす前の行へ
+     掛けているため、**コメントの中に書いても効く**（`git show … HEAD # don't`と
+     `git show … HEAD # ; rm -rf /`は今も拒否する）。
+     **緩むのは、`command_starts`／`invocations`を通る段（program allowlist と option 検査）だけである**
    - **subcommand が読み取り専用でも、`git` の option が抜け道になる。**次を拒否する。
      global 位置の `-c`／`--config-env`（`git -c core.pager='rm -rf /' log`で任意 command を実行できる）、
      `--exec-path`、`git grep` の `-O`／`--open-files-in-pager`（pager として任意 command を起動する）、
@@ -408,7 +418,7 @@ subagent を使い捨ての git worktree で動かす `isolation` field があ�
 
 ## 検証
 
-- `python3 scripts/test_hooks.py` — **177件 OK**（`InspectorReadonlyGuardTests` 36件を含む）。**#384 の merge 後（`50671d9`）は 162件・21件だった**
+- `python3 scripts/test_hooks.py` — **232件 OK**（`InspectorReadonlyGuardTests` 41件を含む）。**#384 の merge 後（`50671d9`）は 162件・21件、#389 の前は 177件・36件だった**
 - allowlist 側 19 例が通り、拒否側 59 例が落ちることを`check()`で確認した
 - **[#384](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/384)の 5 件を、使い捨て repository で実測してから塞いだ。**
   helper script に `echo ... > PWNED` を書かせ、**file が実際に作られたことで判定した。**

@@ -50,6 +50,14 @@ frontmatterへ`hooks.PreToolUse`として書き、**その subagent の`Bash`呼
 **判定は行ごとに行う。**`shlex`は改行を空白として扱うため、
 `git show`と`rm -rf /`を改行で並べると1つの語列に潰れ、`rm`がcommand位置として見えない。
 
+**上の一覧のうち4以降は、語頭の`#`から行末までを見ない。**`command_line.segments`が
+bashと同じくコメントとして落とすためである（#389。[ADR-0020](../../docs/decisions/0020-inspector-readonly-by-hook.md)
+の決定3）。**bashも実行しないため、allowlistの外へ出る経路は増えない。**
+**1〜3は生の行へ当たる。**`tokenize`はコメントを落とす前の行へ掛けており、
+CRの検査、語へ分けられない場合、区切り語とmetacharacterを含む語の拒否は、
+**コメントの中に書いても効く**（`… HEAD # ; rm -rf /`は今も拒否する）。
+**境界は4以降でだけ緩む。**
+
 **この hook は tokenize 失敗を素通りさせない。**他の hook（`gh_metadata_guard.py`等）は
 素通りさせる。**目的が違う。**あちらは「書き忘れを指摘する」ものであり、素通りは
 指摘漏れで済む。こちらは**書き込みを止める境界**であり、解釈できない入力を通すことは
