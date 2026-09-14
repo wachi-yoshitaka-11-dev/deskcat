@@ -780,6 +780,30 @@ squash mergeしたbranchはcommit hashが変わるため、`git branch -d`が「
 **`git interpret-trailers --parse`へ読ませることも字句の判定である**
 （理由は`scripts/hooks/gh_metadata_guard.py`のdocstringが持つ。**ここへ複製しない**）。
 
+**改行もcommandの区切りとして見る。**`git fetch origin`改行`git push origin develop`の
+`push`も検査の対象である。**以前はこの形が素通りしていた**（[#389](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/389)。
+**迂回を試みた形ではなく、通常の書き方で門が反応しなかった**）。
+**当たるのは`command_line.invocations`を使うhookである**（`inspector_readonly_guard.py`は使うが、
+自分で行分割しているため改行については変わらない。**ただし後述のコメント除去では、
+通す側へ動く**）。**向きは hook によって逆になる。**
+止める側（`push_gate.py`等）は止める形が増え、**やった証拠として読む側（`stop_claim_guard.py`）は、
+2行目のpushを証拠として数えるようになる**（止めなくなる側である）。
+
+**同じ走査で、bashが実行しない範囲も落とす。**heredocのbody、語頭の`#`以降である。
+**こちらは向きが逆になる。**止める側では止める形が減り、**証拠として読む側では、
+bodyに書いたpushを証拠として数えなくなる**（`stop_claim_guard.py`が止める側へ動く）。
+**「在るか」を見る検査ではさらに逆になる。**`gh_metadata_guard.py`は`--project`や`--base`が
+引数に在るかを見るため、**コメントの中に書いた`--project`は充足として数えなくなり、拒否が増える**
+（`gh pr create --title t --base develop # --project deskcat`。bashは渡さない）。
+**hookの種別だけで向きを決められない。**増える側と減る側が同じ変更に入っている。
+
+**command位置の判定では、引用の外で開いたheredocのbodyを見ない。****終端行を書いてある限りは、
+である。**終端行の無いheredocでは残りの行をcommandとして検査する（**bashは実行しない。
+検査しすぎる側の乖離であり、理由はdocstringが持つ**）。**引用の中へ入ったbodyは引数の文字列として読む**
+（`gh pr comment --body "$(cat <<'EOF' … EOF)"`の本文は`coderabbit_gate.py`が照合する）。
+**条件分岐の中の行は、独立した行にあれば検査の対象になる。実行されるかは判定しない。**
+**理由と、判定の細かい境界は`scripts/hooks/command_line.py`のdocstringが持つ。ここへ複製しない。**
+
 > **`gh pr merge`の検査は、以前は文字列の部分一致だった。**2026-09-02に、squash message
 > のtrailer blockと同じ段落へコロン無しの行（`Closes` と `#304`）を置いたcommitで、
 > `Change-Class:`／`Self-Review:`という文字列は存在したためhookは通したが、
@@ -849,6 +873,25 @@ Pull Requestを通る変更は`review-gate.yml`が`gate`を実行するためで
 - **`gh`や`git`を、alias、shell function、`xargs`、`sh -c`の内側から起動した場合。**
   hookはcommandの字句だけを見るため、呼び出しとして拾えない。
   **推測で拾わないのは、誤検知がhookごと無効化される側の失敗だからである。**
+- **1行に収めた`$(...)`と、引用の中の`$(...)`、および`eval`の内側。**実行されるのに
+  呼び出しとして拾えない。**引用の外で改行を挟む`$( )`の中の行は、行として拾う。**
+- **引用の中の`\`改行。**bashは消して1行に繋ぐが、hookは繋がない。
+  `--body "@coderabbitai \`改行`full review"`は、bashでは依頼として投稿されるが
+  `coderabbit_gate.py`が拾わない（実測）。**#389より前から同じである。**
+- **`;`／`&&`の直前に空白が無い形。**`cat x; git push origin develop`は`x;`が1語になり、
+  `git`がcommand位置から外れる。**bashは両方を実行する。**`shlex`が空白でしか語を切らない
+  ためであり、**改行の対応（[#389](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/389)）では直していない。****#389と同じ失敗型である。**
+  `inspector_readonly_guard.py`は別の形で塞いでいる（metacharacterを含む語をすべて拒否する。
+  [ADR-0020](docs/decisions/0020-inspector-readonly-by-hook.md)）。
+- **heredocのbodyを、bodyをcommandとして実行する側へ流した場合。**`bash <<'EOF' … EOF`／
+  `sh <<EOF`／`ssh host <<EOF`のbodyはbashが実行するが、hookはbodyを落とすため見ない。
+  **`cat > file <<EOF`のためにbodyを落としており、受け取る側の綴りで絞っていない。**
+  綴りで絞ると、別名や絶対pathで書いた形を落とし損ねる。
+- **`<<`をheredocと読み違え、その語と同じ行が後に現れた場合。**
+  `echo $((1 << 2))`改行`git push origin develop`改行`2`は、delimiterを`2`と読み、
+  3行目を終端行と見て**間のpushを落とす。bashは実行する**（実測）。
+  **終端行が現れない場合は1文字も落とさない**（`scripts/hooks/command_line.py`の
+  `_skip_heredoc_bodies`）。
 - **branchをhook以外の経路で作った場合。**worktreeを外部の道具が作ると
   `git checkout -b`を通らないため、基点は検査されない。
 - **`git fetch`ができない環境。**基点の検査は行わず、黙って通る。
