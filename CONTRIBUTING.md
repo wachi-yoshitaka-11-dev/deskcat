@@ -881,8 +881,8 @@ Pull Requestを通る変更は`review-gate.yml`が`gate`を実行するためで
 - **`;`／`&&`の直前に空白が無い形。**`cat x; git push origin develop`は`x;`が1語になり、
   `git`がcommand位置から外れる。**bashは両方を実行する。**`shlex`が空白でしか語を切らない
   ためであり、**改行の対応（[#389](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/389)）では直していない。****#389と同じ失敗型である。**
-  `inspector_readonly_guard.py`は別の形で塞いでいる（metacharacterを含む語をすべて拒否する。
-  [ADR-0020](docs/decisions/0020-inspector-readonly-by-hook.md)）。
+  `inspector_readonly_guard.py`は別の形で塞いでいる（**引用の外のmetacharacterと、
+  区切り語そのものを拒否する。**[ADR-0020](docs/decisions/0020-inspector-readonly-by-hook.md)）。
 - **heredocのbodyを、bodyをcommandとして実行する側へ流した場合。**`bash <<'EOF' … EOF`／
   `sh <<EOF`／`ssh host <<EOF`のbodyはbashが実行するが、hookはbodyを落とすため見ない。
   **`cat > file <<EOF`のためにbodyを落としており、受け取る側の綴りで絞っていない。**
