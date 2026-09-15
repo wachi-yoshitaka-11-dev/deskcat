@@ -206,9 +206,28 @@ subagent を使い捨ての git worktree で動かす `isolation` field があ�
    - **許可した program 自身の危険な option を個別に拒否する。**
      git の`-c`／`--config-env`／`--exec-path`／`-O`／`--output`／`--ext-diff`／
      `--textconv`／`--filters`、`rg`の`--pre`／`--hostname-bin`、および`-z`／`--search-zip`（2026-09-11 に追加）
-   - **shell metacharacter（`>|;&()`` ` ``$<{}`）を含む語を拒否する。**
+   - **引用の外の shell metacharacter（`>;&()`` ` ``$<{}!`）を拒否する**（2026-09-14 に
+     [#396](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/396) で改訂）。
      `shlex`は空白でしか語を切らないため、`cat a>b`も`cat a;rm -rf /`も1語になり、
-     redirect も次の command も command 位置として見えない
+     redirect も次の command も command 位置として見えない。
+     **判定は語ではなく生の行の文字へ当てる。**`shlex`は引用符を剥いだ後の語を返すため、
+     **語を見ても引用されていたかが分からない。**改訂前は語の中に1文字でもあれば拒否しており、
+     **クォートした pattern まで落としていた**（`rg -n 'a|b' <file>`）
+   - **ダブルクォートの中の展開構文（`$`／`` ` ``）を拒否する**（2026-09-14 に #396 で追加）。
+     **「クォートされているか」では足りない。**`"$(id)"`はクォートされているが実行される
+     （bash 5.1.16(1)-release で実測。`'$(id -u)'`は文字列のまま、`"$(id -u)"`は`1000`、
+     `"${HOME}"`はhome directoryのpathへ置き換わる）。**シングルクォートの中は展開されないため通す**
+   - **pipe（`|`）は区間へ割り、区間ごとに判定する**（2026-09-14 に #396 で改訂）。
+     **read-only は各区間で保たれる。**`cat f | tee out.txt`は2つ目の区間で落ちる。
+     **`||` は pipe ではないため拒否する**（前が失敗したときに後ろが走る）。
+     改訂前は`|`を含む語をそれ自体で拒否していた。**効いたのは2つの側である**（2026-09-14 に旧版で実測）。
+     **1つは pattern である。**`rg -c '^\|' <file>`も`grep -c '^|' <file>`も拒否されていた。
+     **この repository の正本は Markdown の表であり、区切り文字が`|`である。**
+     `docs/hardware/tbd-register.md`は519行で最長行が6778字あり、
+     **表の構造について pattern を書けなかった。**
+     **もう1つは行の窓である。**`head -n 752`も`tail -n +735`も単体では通るが、
+     **繋いで範囲を取り出す手段が無かった**（`sed`は allowlist に無い）。
+     **桁方向は`cut -c`で取れていた。取れなかったのは行方向である**
    - **判定は行ごとに行う。**`shlex`は改行を空白として扱うため、
      `git show HEAD`と`rm -rf /`を改行で並べると1つの語列に潰れる
    - **語へ分けられない command は拒否する（fail closed）。**他の hook は素通りさせるが、
@@ -218,9 +237,13 @@ subagent を使い捨ての git worktree で動かす `isolation` field があ�
      **bash も実行しないため、allowlist の外へ出る経路は増えない。**
      一方で**コメントの中に書いた option は、上の拒否一覧に当たっても見ない**
      （`git version # --help`、`rg -n pattern f # --pre sha1sum`。2026-09-14 に実測）。
+     **pipe もコメントの中では割らない**（bash も割らない。#396 で実測した）。
+     割ると、**bash が実行しないコメントの後半が独立した command として
+     program allowlist と option 検査へ入る。****ただしコメントの中の `|` は拒否する。**
+     コメントの中身は 1〜6 の対象であり、`;` と同じ扱いにする（過検出の側である）。
      **落ちるのは判定の全段ではない。**CR の検査、`shlex`の失敗、
-     **区切り語と metacharacter を含む語の拒否**は、`tokenize`をコメントを落とす前の行へ
-     掛けているため、**コメントの中に書いても効く**（`git show … HEAD # don't`と
+     **引用の外の metacharacter とダブルクォートの中の展開の拒否**は、生の行へ当てているため、
+     **コメントの中に書いても効く**（`git show … HEAD # don't`と
      `git show … HEAD # ; rm -rf /`は今も拒否する）。
      **緩むのは、`command_starts`／`invocations`を通る段（program allowlist と option 検査）だけである**
    - **subcommand が読み取り専用でも、`git` の option が抜け道になる。**次を拒否する。
@@ -273,10 +296,14 @@ subagent を使い捨ての git worktree で動かす `isolation` field があ�
      `rg <pattern> { cat --pre <任意の command> <file>`では、`command_line.invocations`が`{`で
      invocation を切り、**その先が無検査になった。実測で`/usr/bin/uname`が起動した。**
      **metacharacter 検査だけでは足りなかった。**`!`は`SEPARATORS`にあるが
-     `SHELL_METACHARACTERS`の文字を1つも含まず、`rg <pattern> ! cat --pre sha1sum <file>`で
+     当時の metacharacter 集合の文字を1つも含まず、`rg <pattern> ! cat --pre sha1sum <file>`で
      **`sha1sum`が実際に起動した**（実測）。**`command_line.SEPARATORS`の語を直接拒否する形にした。**
      共有 module へ区切りが増えても穴にならない。
-     **pipe が使えなくなる。**判定が`command_line`の語り分けに依存しなくなることを採った
+     **この段は#396でも残した。**判定を引用の外の文字へ移しただけでは、
+     `rg <pattern> '{' cat --pre sha1sum <file>`のように**区切り語をクォートした形で破れる**
+     （2026-09-14に実測。bashは`{`をliteralな引数としてrgへ渡すのに、`invocations`は
+     そこでinvocationを切り、`--pre`がoption検査へ届かない）。
+     **引用の有無では判定できない。**切る位置を決めるのは`command_line`の側だからである
    - **署名検証を拒否する**（2026-09-11 に追加）。`--show-signature`（短縮綴りを含む）と、
      **pretty format の `%G*` を含む語**を拒否する。どちらも `gpg.program`（既定 `gpg`）を起動する。
      **実測では、検査 subagent の中で `gpg` が `~/.gnupg` に directory と keybox file を作った。**
@@ -320,12 +347,16 @@ subagent を使い捨ての git worktree で動かす `isolation` field があ�
 - **閉じたと言えるのは1つの型だけである。**
   [#384](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/384)の自己レビュー 17〜20巡で出た
   **「guard が command を切る位置と、bash が切る位置がずれる」型**は、根元で閉じた
-  （**区切り語**と **metacharacter を含む語**を拒否し、**CR を tokenize 前に拒否**して、
-  **1 行 1 command に固定した**）。
+  （**区切り語**と **metacharacter** を拒否し、**CR を tokenize 前に拒否**して、
+  **1 行 1 command に固定した**）。**#396 でこのうち2つが変わった。**metacharacter は
+  **語ではなく引用の外の文字**へ当てるようになり、**1 行 1 command は pipe の区間へ緩んだ**
+  （`cat f | wc -l`は2 command として通る）。
   **`command_line` への依存が消えたわけではない。**program allowlist は `command_starts`、
   git と `rg` の option 検査は `invocations` を通る。
   **それらが呼び出しを拾い損ねれば、option 検査は一度も走らない。**
   閉じたのは「**区切りが増えても穴にならない**」という範囲だけである。
+  **#396でpipeを区間へ割り、metacharacterの判定を引用の外へ限ったが、区切り語の拒否は残した。**
+  残さないと、クォートした区切り語で同じ型が再発する（同節に実測がある）。
   **他の型が無いことは示していない。**穴が出なくなったことを根拠にしていない。
 - **この guard は保証ではない。best effort である**（2026-09-11 に位置づけを改めた。
   **題も「保証する」から「絞る」へ改めた**）。
@@ -350,7 +381,7 @@ subagent を使い捨ての git worktree で動かす `isolation` field があ�
 - **hook が実際に掛かることを、この決定では実測していない。**agent frontmatter の`hooks`は
   [公式文書](https://code.claude.com/docs/en/sub-agents)に記載があるが、**subagent を起動して
   書き込みが実際に拒否されるところまでは測っていない。**測ったのは hook script 単体の判定である
-  （`check()`への 78 例（`ALLOWED` 19 と `DENIED` 59）に加え、個別 test の例、wrapper の 4 条件、hook として起動したときの`deny` payload）。
+  （`check()`への 80 例（`ALLOWED` 19 と `DENIED` 61）に加え、個別 test の例、wrapper の 4 条件、hook として起動したときの`deny` payload）。
 - **config 経由の経路を全数は見ていない。**塞いだのは`-c`／`--config-env`／`--exec-path`と、
   `diff.external`／textconv／filter driver である。**`core.fsmonitor`のように、
   index の refresh 時に外部 program を起動しうる config 項目は見ていない。**
@@ -364,7 +395,9 @@ subagent を使い捨ての git worktree で動かす `isolation` field があ�
   **暗黙に走るものと、option／format で明示的に起動するものの両方がある。**
   `-C`／`--git-dir`／`--work-tree`／`--namespace`は別 repository を指させ、**その config も差し替わる。**
   **別 repository を指した場合の挙動は測っていない。**
-- **誤検知がある。**`grep "=>"`のように、metacharacter を含む正当な引数を拒否する。
+- **誤検知がある。****2026-09-14 に1つ減った。**`grep "=>"`のように metacharacter を
+  引用の中へ入れた形は、#396 で通るようになった（実測）。
+  **引用の外に置いた形と、区切り語そのものは拒否したままである。**
   **2026-09-11 に3種類増えた。**(1) `--text`は`--textconv`の前方一致で落ちる
   （`git diff`／`grep`／`log` のいずれでも）。(2) **short option の束ね判定**により、
   `git log -GFOO`のように値へ`O`が入る pickaxe 検索が落ちる。(3) **`%G`を含む語**は、
@@ -418,8 +451,34 @@ subagent を使い捨ての git worktree で動かす `isolation` field があ�
 
 ## 検証
 
-- `python3 scripts/test_hooks.py` — **232件 OK**（`InspectorReadonlyGuardTests` 41件を含む）。**#384 の merge 後（`50671d9`）は 162件・21件、#389 の前は 177件・36件だった**
-- allowlist 側 19 例が通り、拒否側 59 例が落ちることを`check()`で確認した
+### 改訂の途中で出た2つの乖離（#396）
+
+**2形が、改訂の途中の版で bash と食い違った。****向きは逆である。**どちらも自己レビューの巡が
+検出して戻した。**改訂前（`origin/develop`）も改訂後も拒否する。**
+
+| 形 | 改訂前 | 途中の版 | 改訂後 | 乖離の向き |
+|---|---|---|---|---|
+| `rg <pattern> '{' cat --pre sha1sum <file>` | 拒否（区切り語） | **通した** | 拒否（区切り語） | **穴**（bash は `--pre` を rg へ渡す） |
+| `cat <file> # note a \| b` | 拒否（区切り語） | 拒否（`b` が allowlist 外） | 拒否（コメントの中の `\|`） | **過検出**（bash は何も実行しない） |
+
+**途中の版の挙動は 2026-09-14 に、改訂前と改訂後は 2026-09-15 に実測した。**
+
+**1つ目は穴である。**`|` を metacharacter の集合から外したとき、区切り語そのものの拒否も
+落としたために開いた。**`shlex` は引用符を剥いだ後の語を返すので、クォートしても
+`command_line` は区切りとして扱う。**bash は引数として渡すため、その先の option 検査が届かない。
+**#384 が塞いだ型の再発である。**
+
+**2つ目は過検出である。穴ではない。**pipe の区間分割をコメントの除去より先に走らせたため、
+**bash が実行しないコメントの後半が独立した command として検査され、`b` が allowlist 外で落ちた。**
+**境界は開いていない。**開くのは逆側——**コメントの中の `|` の拒否を落とした場合**である。
+**この2つは別の判断であり、片方だけ戻すと素通しになる。**
+
+**どちらも既存の 59 例では落ちなかった。**「既存 test が通る」ことは、再発しないことを意味しない。
+**2形を `DENIED` へ足した**（59 → 61）。
+
+- `python3 scripts/test_hooks.py` — **242件 OK**（`InspectorReadonlyGuardTests` 51件を含む）。**#384 の merge 後（`50671d9`）は 162件・21件、#389 の前は 177件・36件、#396 の前は 232件・41件だった**
+- allowlist 側 19 例が通り、拒否側 61 例が落ちることを`check()`で確認した
+  （**#396 で 2 例増やした。**上の「改訂の途中で出た2つの乖離」にある2形である）
 - **[#384](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/384)の 5 件を、使い捨て repository で実測してから塞いだ。**
   helper script に `echo ... > PWNED` を書かせ、**file が実際に作られたことで判定した。**
   `diff.external` は `git diff` だけが flag 無しで起動し、textconv は
@@ -451,7 +510,7 @@ subagent を使い捨ての git worktree で動かす `isolation` field があ�
   | `git diff -- f --no-ext-diff --no-textconv` | `--` より後ろは pathspec | **helper script が `PWNED` file を実際に作ったこと** |
   | `git --super-prefix rev-parse submodule--helper x` | guard は `rev-parse`、git は `submodule--helper` を読む | git のエラー文が `'x' is not a valid submodule--helper subcommand` になったこと 。**検査 subagent の中で実行した**|
   | `git diff --ext-dif`／`--ext`／`--e` | **git 自身が拒否した**（diff 系 parser は短縮を受けない） | git が `unknown option` を返したこと |
-  | `rg <pattern> ! cat --pre sha1sum <file>` | **`sha1sum` が起動した** | 出力が README の本文ではなく `sha1sum` の hash 値になったこと。**`!` は metacharacter を1つも含まないため、`{` を塞いだ後も残っていた** 。**検査 subagent の中で実行した**|
+  | `rg <pattern> ! cat --pre sha1sum <file>` | **`sha1sum` が起動した** | 出力が README の本文ではなく `sha1sum` の hash 値になったこと。**`!` は当時の metacharacter 集合の文字を1つも含まなかったため、`{` を塞いだ後も残っていた**（**#396 で `!` を集合へ入れた**）。**検査 subagent の中で実行した**|
   | `rg <pattern> { cat --pre /usr/bin/uname <file>` | **`/usr/bin/uname` が起動した**（`ALLOWED_PROGRAMS` に無い） | ripgrep が `preprocessor command failed: '"/usr/bin/uname" ...'` を出したこと。**検査 subagent の中で実行した** |
   | `git log --show-signature` | **`gpg` が起動し、`~/.gnupg` に directory と keybox file を作った** | `gpg: directory '<HOME>/.gnupg' created` の出力と、**検査 subagent の中で実行したこと** |
   | `git log -1 --format=%GK` | **署名検証が走った** | 鍵 ID（`B5690EEE…`）が出力されたこと。**`--show-signature` を拒否するだけでは閉じない** |

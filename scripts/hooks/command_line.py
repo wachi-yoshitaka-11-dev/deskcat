@@ -284,11 +284,11 @@ def segments(command):
     **以前は拒否され、今は通る。bashはどれも渡さない。**コメントの外へ同じoptionを出せば今も拒否する。
     **拒否が増える形は無く、allowlistの外へ出る経路も増えない。**落とすのはbashも
     実行しない範囲だからである。
-    **語の単位の拒否は、コメントを落とす前に決まる。**同hookは#384で、`&&`／`;`という語と、
-    metacharacterを含む語をそれ自体で拒否するようになった
+    **引用の外のmetacharacterと区切り語の拒否は、コメントを落とす前に決まる。**同hookは#384で
+    区切り語を、#396で引用の外のmetacharacterを、生の行に対して拒否する
     （[ADR-0020](../../docs/decisions/0020-inspector-readonly-by-hook.md)）。
-    `cat x && # メモ`は`&&`で、`git show … HEAD # ; rm -rf /`は`;`を含む語で拒否され、
-    **前後で変わらない。**
+    `cat x && # メモ`は`&&`という区切り語で、`git show … HEAD # ; rm -rf /`は
+    引用の外の`;`で拒否され、**前後で変わらない。**
     **必須option側の抜け道も、ここでは閉じていない。**`git diff`／`show`／`log`／`blame`が要求する
     2 optionは#384から**subcommandの直後2語**に無ければならず、
     `git diff HEAD # --no-ext-diff --no-textconv`は**#389より前から拒否されている。**

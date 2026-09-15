@@ -2305,7 +2305,7 @@ class CommandLineSegmentsTests(unittest.TestCase):
 
         `shlex`は空白でしか語を切らないため、`x;`が1語になり`git`がcommand位置から
         外れる。**bashは両方を実行する。**`inspector_readonly_guard.py`は
-        metacharacterを含む語を拒否する形で別に塞いでいる（ADR-0020）。
+        **引用の外のmetacharacterを生の行へ当てる形**で別に塞いでいる（ADR-0020）。
         **直したらこのtestが落ちる。**そのときはCONTRIBUTINGの「取り切れていないもの」も直す。
         """
         for command in (
@@ -2842,7 +2842,16 @@ class InspectorReadonlyGuardTests(unittest.TestCase):
         "cat a>b",
         "cat a;rm -rf /",
         "git show HEAD > /tmp/x",
-        "git show HEAD | tee f",
+        "git show --no-ext-diff --no-textconv HEAD | tee f",
+        # **#396の改訂の途中でbashと食い違い、実測して戻した2形。**
+        # **向きは逆である。**1つ目は穴（途中の版が通していた）、
+        # 2つ目は過検出（途中の版は`b`をallowlist外として拒否していた。bashは何も実行しない）。
+        # 改訂前（`origin/develop`）も改訂後も拒否する。詳細はADR-0020が持つ。
+        # 個別のtestは`test_quoted_separator_word_is_still_refused`と
+        # `test_pipe_inside_a_comment_is_not_a_stage`が持つ。
+        # **ここへも置くのは、allowlist／denylistの一括走査から外れないようにするためである。**
+        "rg pattern '{' cat --pre sha1sum AGENTS.md",
+        "cat AGENTS.md # note a | b",
         "echo $(rm -rf /)",
         "echo `rm -rf /`",
         # 改行で並べた2つ目のcommand
@@ -2937,13 +2946,15 @@ class InspectorReadonlyGuardTests(unittest.TestCase):
         検査 subagent の中で実行したところ、**`ALLOWED_PROGRAMS`に無い`/usr/bin/uname`が
         実際に起動した。**
 
-        **pipe も使えなくなる。**判定が`command_line`の語り分けに依存しなくなることを採った。
+        **`|`だけは#396で外した。**pipeは区間へ割って区間ごとに検査する。
+        **残りの区切り語は、クォートしていても拒否する。**引用の外かどうかでは判定できない。
+        切る位置を決めるのは`command_line`の側であり、**引用符を剥いだ後の語しか見ないためである。**
         """
-        # **`command_line.SEPARATORS`の全件が拒否されること。**
-        # `!`は`SHELL_METACHARACTERS`の文字を1つも含まないため、metacharacter検査だけでは
+        # **`command_line.SEPARATORS`のうち`|`以外の全件が拒否されること。**
+        # `!`は`FORBIDDEN_OUTSIDE_QUOTES`に入れてある。入れないと、metacharacter検査だけでは
         # 素通りし、**`rg <pattern> ! cat --pre sha1sum <file>`で`sha1sum`が実際に起動した。**
         # **この形にしておけば、共有moduleへ区切りが増えても穴にならない。**
-        for separator in sorted(command_line.SEPARATORS):
+        for separator in sorted(command_line.SEPARATORS - {"|"}):
             with self.subTest(separator=separator):
                 self.assertIsNotNone(
                     inspector_readonly_guard.check(
@@ -2953,8 +2964,7 @@ class InspectorReadonlyGuardTests(unittest.TestCase):
                         "git grep Linux ! cat -O sha1sum",
                         "rg Linux { cat --pre /usr/bin/uname AGENTS.md",
                         "git diff --no-ext-diff --no-textconv { cat --output=/tmp/x HEAD",
-                        "git grep Linux { cat -O/bin/date AGENTS.md",
-                        "git log --no-ext-diff --no-textconv --oneline -20 | head -5"):
+                        "git grep Linux { cat -O/bin/date AGENTS.md"):
             with self.subTest(command=command):
                 self.assertIsNotNone(inspector_readonly_guard.check(command))
 
@@ -3210,8 +3220,8 @@ class InspectorReadonlyGuardTests(unittest.TestCase):
     def test_comment_after_a_separator_stays_refused(self):
         """区切りの後ろのコメントは、**コメントを落としても通らない**（#389）。
 
-        同hookは#384で、`&&`／`;`という語と、metacharacterを含む語をそれ自体で拒否する
-        （[ADR-0020](../docs/decisions/0020-inspector-readonly-by-hook.md)）。
+        同hookは#384で`&&`／`;`という区切り語を、#396で**引用の外のmetacharacterを生の行へ**
+        当てて拒否する（[ADR-0020](../docs/decisions/0020-inspector-readonly-by-hook.md)）。
         **拒否はコメントを落とす前に決まる。**#389の前後で判定は変わらない。
         **「コメントを通す」を、区切りを含む行まで広げて読まないために固定する。**
         """
@@ -3286,6 +3296,173 @@ class InspectorReadonlyGuardTests(unittest.TestCase):
             inspector_readonly_guard.check(
                 "git diff --no-ext-diff --no-textconv HEAD")
         )
+
+    def test_quoted_separator_word_is_still_refused(self):
+        """**区切り語は、クォートしていても拒否する**（#384の型。#396でも残した）。
+
+        `_quoting_reason`は引用の中を見ないため、これだけでは破れる。
+        `rg <pattern> '{' cat --pre sha1sum <file>`は、**bashが`{`をliteralな引数として
+        rgへ渡すのに、`invocations`はそこでinvocationを切る。**その結果
+        **`--pre sha1sum`がoption検査へ一度も届かない**（2026-09-14に実測）。
+        **guardがcommandを切る位置と、bashが切る位置がずれる型そのものである。**
+
+        後半が固定するのは、**`invocations`の読み方**である。`--pre`まで届かないことを見る。
+        **bash側の読みは固定していない**（`{`を引数としてrgへ渡すことは2026-09-14に実測したが、
+        この test は bash を起動しない）。
+        """
+        for separator in sorted(command_line.SEPARATORS):
+            with self.subTest(separator=separator):
+                self.assertIsNotNone(
+                    inspector_readonly_guard.check(
+                        f"rg pattern '{separator}' cat --pre sha1sum AGENTS.md"),
+                    f"クォートした区切り語 {separator!r} が素通りする",
+                )
+        # **`invocations`はクォートを見ないため、`--pre`まで届かない。**
+        # これが拒否を残す理由である。
+        self.assertEqual(
+            command_line.invocations(
+                "rg pattern '{' cat --pre sha1sum AGENTS.md", "rg"),
+            [["pattern"]],
+        )
+
+    def test_pipe_is_allowed_when_every_stage_is_allowlisted(self):
+        """pipeを区間へ割り、**区間ごとに先頭programを検査する**（#396）。
+
+        **read-onlyは各区間で保たれる。**以前は`|`を含む語をそれ自体で拒否していたため、
+        **patternに`|`を1文字も書けず**（`rg -c '^\|' <file>`は拒否されていた。2026-09-14に旧版で実測）、
+        **`head`と`tail`を繋いで行の窓を取ることもできなかった**（`sed`はallowlistに無い）。
+        `docs/hardware/tbd-register.md`は519行で最長行が6778字あり、
+        **この repository の正本はMarkdownの表で区切り文字が`|`である。**
+        """
+        for command in (
+            "cat AGENTS.md | wc -l",
+            "head -n 752 AGENTS.md | tail -n +735",
+            "rg -n Linux AGENTS.md | head -5",
+            "git log --no-ext-diff --no-textconv --oneline -20 | head -5",
+            "cat AGENTS.md | grep -n Linux | head -3",
+        ):
+            with self.subTest(command=command):
+                self.assertIsNone(inspector_readonly_guard.check(command))
+
+    def test_pipe_stage_outside_the_allowlist_is_refused(self):
+        """**区間のどれか1つでも先頭が allowlist の外なら拒否する**（#396）。
+
+        **pipe を許したことで書き込み経路が開いていないことを固定する。**
+        `tee`／`sh`／`python3`はいずれも`ALLOWED_PROGRAMS`に無い。
+        """
+        for command in (
+            "cat AGENTS.md | tee out.txt",
+            "cat AGENTS.md | sh",
+            "cat AGENTS.md | python3 -c 'open(\"x\",\"w\")'",
+            "cat AGENTS.md | wc -l | tee out.txt",
+            "tee out.txt | cat AGENTS.md",
+        ):
+            with self.subTest(command=command):
+                self.assertIsNotNone(
+                    inspector_readonly_guard.check(command),
+                    f"allowlist 外の区間が通ってしまう: {command}",
+                )
+
+    def test_pipe_inside_a_comment_is_not_a_stage(self):
+        """コメントの中の`|`では区間へ割らない（#396）。**bashも割らない。**
+
+        割ると、**bashが実行しないコメントの後半が独立したcommandとして
+        program allowlistとoption検査へ入る**（`cat f # note a | b`で`b`が
+        許可していないprogramとして落ちた。2026-09-14に実測）。
+
+        **通しはしない。**コメントの中身は一覧の1〜6の対象であり、`;`と同じ扱いにする。
+        `# ; rm -rf /`が拒否されるのと同じ側である。
+        """
+        for command in (
+            "cat AGENTS.md # note a | b",
+            "rg -n Linux AGENTS.md # x | rg --pre /bin/echo y",
+        ):
+            with self.subTest(command=command):
+                reason = inspector_readonly_guard.check(command)
+                self.assertIsNotNone(reason)
+                self.assertIn("コメントの中の", reason)
+        # **`|`を含まないコメントは、7以降の検査を素通りする。**
+        self.assertIsNone(inspector_readonly_guard.check("git version # --help"))
+
+    def test_logical_or_is_not_a_pipe(self):
+        """`||`はpipeではない（#396）。**前が失敗したときに後ろが走る。**
+
+        `_pipe_stages`は`||`で割らないため、`|`が引用の外に残って拒否される。
+        """
+        for command in ("cat AGENTS.md || rm -rf /", "rg pattern || cat --pre sha1sum AGENTS.md"):
+            with self.subTest(command=command):
+                reason = inspector_readonly_guard.check(command)
+                self.assertIsNotNone(reason, f"`||`が通ってしまう: {command}")
+                self.assertIn("`||`", reason)
+
+    def test_empty_pipe_stage_is_refused(self):
+        """pipeの区間が空なら拒否する（#396）。**bashはsyntax errorにする。**"""
+        for command in ("cat AGENTS.md | | wc -l", "| wc -l", "cat AGENTS.md |"):
+            with self.subTest(command=command):
+                self.assertIsNotNone(inspector_readonly_guard.check(command))
+
+    def test_quoted_metacharacters_are_allowed(self):
+        """**クォートの中のmetacharacterでは拒否しない**（#396）。
+
+        **bashは展開しない。**以前は`shlex`が引用符を剥いだ後の語を見ていたため、
+        `rg -n 'a|b' <file>`のようなpatternが書けなかった。**この repository の正本は
+        Markdownの表であり、区切り文字が`|`である。**
+        """
+        for command in (
+            "rg -n 'a|b' AGENTS.md",
+            "rg -oP '(?<!\\\\)\|' AGENTS.md",
+            "rg -n 'foo(bar)' AGENTS.md",
+            "rg -n 'a>b' AGENTS.md",
+            "grep -n 'a;b' AGENTS.md",
+            "rg -n '$(id)' AGENTS.md",
+            "rg -n '`id`' AGENTS.md",
+        ):
+            with self.subTest(command=command):
+                self.assertIsNone(
+                    inspector_readonly_guard.check(command),
+                    f"クォート済みのpatternが拒否される: {command}",
+                )
+
+    def test_expansion_inside_double_quotes_is_refused(self):
+        """**ダブルクォートの中の展開は拒否する**（#396）。
+
+        **「クォートされているか」では足りない。**`"$(id)"`はクォートされているが実行される
+        （2026-09-14にbash 5.1.16(1)-releaseで実測。`'$(id -u)'`は文字列のまま、
+        `"$(id -u)"`は`1000`、`"${HOME}"`はhome directoryのpathへ置き換わる）。
+        """
+        for command in (
+            'cat "$(id)"',
+            'echo "${HOME}"',
+            'cat "`id`"',
+            'rg -n "$USER" AGENTS.md',
+        ):
+            with self.subTest(command=command):
+                reason = inspector_readonly_guard.check(command)
+                self.assertIsNotNone(reason, f"展開される形が通ってしまう: {command}")
+                self.assertIn("ダブルクォート", reason)
+
+    def test_unquoted_metacharacters_are_still_refused(self):
+        """引用の外のmetacharacterは拒否したままである（#396）。"""
+        for command in (
+            "cat a>b",
+            "cat a;rm -rf /",
+            "echo $(id)",
+            "echo `id`",
+            "cat AGENTS.md > out.txt",
+            "cat AGENTS.md >> out.txt",
+            "cat ${HOME}/x",
+        ):
+            with self.subTest(command=command):
+                self.assertIsNotNone(
+                    inspector_readonly_guard.check(command),
+                    f"引用の外のmetacharacterが通ってしまう: {command}",
+                )
+
+    def test_unterminated_quote_is_refused(self):
+        """閉じない引用符は拒否する（#396）。**`shlex`も同じ入力で失敗する。**"""
+        for command in ("rg -n 'abc AGENTS.md", 'cat "abc'):
+            with self.subTest(command=command):
+                self.assertIsNotNone(inspector_readonly_guard.check(command))
 
     def test_allowlist_holds_no_program_that_writes_on_its_own(self):
         """allowlistへ書き込めるcommandが紛れ込まないよう固定する。

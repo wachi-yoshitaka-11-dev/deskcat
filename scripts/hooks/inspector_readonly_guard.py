@@ -29,34 +29,51 @@ frontmatterへ`hooks.PreToolUse`として書き、**その subagent の`Bash`呼
 次のいずれかに当たれば拒否する。**おおむね`_check_line`が判定する順である。**
 
 1. 行が復帰文字（CR）を含む（**tokenize前に見る。**`shlex`はCRを空白として切るため語に残らない）
-2. `shlex`がcommandを語へ分けられない（**fail closed**。下記）
-3. shell metacharacter（`>|;&()`` ` ``$<{}`）を含む語がある。**単独の区切り語も拒否する**
-4. command位置の前置語（`sudo`／`env`／`exec`など）か、環境変数代入がある
-5. command位置のprogram語に`/`が含まれる
-6. command位置のprogramが`ALLOWED_PROGRAMS`に無い
-7. `rg`のoptionが`DENIED_RG_OPTIONS`に当たる（`--pre`／`--hostname-bin`／`-z`／`--search-zip`。
+2. 引用符が閉じていない、または`shlex`がcommandを語へ分けられない（**fail closed**。下記）
+3. **引用の外に** shell metacharacter（`>;&()`` ` ``$<{}!`）がある
+   （**語ではなく生の行の文字へ当てる。**#396）
+4. **ダブルクォートの中に展開構文（`$`／`` ` ``）がある。**`"$(id)"`はクォートされていても実行される
+5. `||`がある（**pipeではない。**前が失敗したときに後ろが走る）
+6. `command_line.SEPARATORS`に一致する語がある（**クォートしていても拒否する。**#384）
+7. command位置の前置語（`sudo`／`env`／`exec`など）か、環境変数代入がある
+8. command位置のprogram語に`/`が含まれる
+9. command位置のprogramが`ALLOWED_PROGRAMS`に無い
+10. `rg`のoptionが`DENIED_RG_OPTIONS`に当たる（`--pre`／`--hostname-bin`／`-z`／`--search-zip`。
    **short optionの束ね（`-nz`）も見る**）
-8. `git`のoptionが拒否一覧に当たる（完全一致・`=`付き・**short optionの束ね**）
-9. `git`の`--help`がある（位置に依らない）
-10. `git`の語が pretty format の`%G*`を含む（**署名検証が`gpg`を起動する**）
-11. `git`のoptionが拒否一覧の**短縮綴り**に当たる
-12. `git`に許可していないglobal optionがある（**allowlistである**）
-13. `git`の subcommand が`GIT_READONLY_SUBCOMMANDS`に無い
-14. `git status`に`--no-optional-locks`が**optionとして解釈される位置に**無い
-    （`status`の`-v`／`--verbose`は項目11で拒否する）
-15. `git diff`／`log`／`show`／`blame`の**subcommandの直後2語**が
+11. `git`のoptionが拒否一覧に当たる（完全一致・`=`付き・**short optionの束ね**）
+12. `git`の`--help`がある（位置に依らない）
+13. `git`の語が pretty format の`%G*`を含む（**署名検証が`gpg`を起動する**）
+14. `git`のoptionが拒否一覧の**短縮綴り**に当たる
+15. `git`に許可していないglobal optionがある（**allowlistである**）
+16. `git`の subcommand が`GIT_READONLY_SUBCOMMANDS`に無い
+17. `git status`に`--no-optional-locks`が**optionとして解釈される位置に**無い
+    （`status`の`-v`／`--verbose`は項目14で拒否する）
+18. `git diff`／`log`／`show`／`blame`の**subcommandの直後2語**が
     `--no-ext-diff --no-textconv`でない（順序は問わない）
 
 **判定は行ごとに行う。**`shlex`は改行を空白として扱うため、
 `git show`と`rm -rf /`を改行で並べると1つの語列に潰れ、`rm`がcommand位置として見えない。
 
-**上の一覧のうち4以降は、語頭の`#`から行末までを見ない。**`command_line.segments`が
+**行はさらに pipe で区間へ割り、区間ごとに判定する**（#396）。`cat f | wc -l`は2つのcommandであり、
+**read-onlyはそれぞれの区間で決まる。**`cat f | tee out.txt`は2つ目の区間で落ちる。
+**以前は`|`を含む語をそれ自体で拒否していた。**効いたのは2つの側である（2026-09-14に旧版で実測）。
+**1つはpatternである。**`rg -c '^\|' <file>`も`grep -c '^|' <file>`も拒否されていた。
+**この repository の正本はMarkdownの表であり、区切り文字が`|`である。**
+`docs/hardware/tbd-register.md`は519行で最長行が6778字あり、
+**表の構造についてpatternを書けなかった。**
+**もう1つは行の窓である。**`head -n 752 <file>`も`tail -n +735 <file>`も単体では通るが、
+**その2つを繋いで範囲を取り出す手段が無かった**（`sed`はallowlistに無い）。
+**桁方向は`cut -c`で取れていた。**取れなかったのは行方向である。
+
+**上の一覧のうち7以降は、語頭の`#`から行末までを見ない。**
+**pipeもコメントの中では割らない**（bashも割らない。#396で実測した）。
+**ただしコメントの中の`|`は、1〜6の側で拒否する**（`;`と同じ扱いである）。`command_line.segments`が
 bashと同じくコメントとして落とすためである（#389。[ADR-0020](../../docs/decisions/0020-inspector-readonly-by-hook.md)
 の決定3）。**bashも実行しないため、allowlistの外へ出る経路は増えない。**
-**1〜3は生の行へ当たる。**`tokenize`はコメントを落とす前の行へ掛けており、
-CRの検査、語へ分けられない場合、区切り語とmetacharacterを含む語の拒否は、
-**コメントの中に書いても効く**（`… HEAD # ; rm -rf /`は今も拒否する）。
-**境界は4以降でだけ緩む。**
+**1〜6は生の行と、その語へ当たる。**`tokenize`はコメントを落とす前の行へ掛けており、
+CRの検査、語へ分けられない場合、引用の外のmetacharacterと
+ダブルクォートの中の展開、区切り語の拒否は、**コメントの中に書いても効く**（`… HEAD # ; rm -rf /`は今も拒否する）。
+**境界は7以降でだけ緩む。**
 
 **この hook は tokenize 失敗を素通りさせない。**他の hook（`gh_metadata_guard.py`等）は
 素通りさせる。**目的が違う。**あちらは「書き忘れを指摘する」ものであり、素通りは
@@ -303,23 +320,34 @@ DENIED_GIT_OPTIONS_BY_SUBCOMMAND = {
 # 判定には`command_line.command_starts`が返す「読み飛ばした前置語」を使う。
 ASSIGNMENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 
-# 語の中に現れたら拒否するshell metacharacter。
+# 引用の外に置けない文字。**bashがcommandの構造として読む。**
 #
-# **`shlex.split`は空白でしか語を切らない。**`cat a>b`も`cat a;rm -rf /`も1語
-# （`a>b`／`a;rm`）になり、**`>`や`rm`がcommand位置として見えない。**
-# そのため、これらを含む語をすべて拒否する。
+# **判定は語ではなく、生の行の文字へ当てる**（#396）。`shlex`は引用符を剥いだ後の語を
+# 返すため、**語を見ても引用されていたかが分からない。**以前はそのため語の中に1文字でも
+# あれば拒否しており、**クォートしたpatternまで落としていた**（`rg -n 'a|b' f`）。
+# `_quoting_reason`が引用の内外を追い、**引用の外にあるものだけを拒否する。**
 #
-# **単独の区切り語も拒否する**（2026-09-11）。以前は`SEPARATORS`として単独で現れた語を
-# 除外していたが、**`shlex`は引用符を剥いだ後の語を返すため、bashが literal な引数として
-# 渡す語と区別が付かない。**`rg <pattern> { cat --pre <任意のcommand> <file>`では、
-# `command_line.invocations`が`{`で invocation を切り、**その先が無検査になった。**
-# **`ALLOWED_PROGRAMS`に無い program が実際に起動することを実測した。**
-# pipe が使えなくなるが、**判定が`command_line`の語り分けに依存しなくなる。**
+# **`|`は入れない。**pipeとして`_pipe_stages`が区間へ割り、各区間の先頭programを
+# allowlistで検査する（#396。[ADR-0020](../../docs/decisions/0020-inspector-readonly-by-hook.md)
+# の決定3）。**read-onlyは各区間で保たれる。**
 #
-# **`grep "=>"`のような正当な使い方も拒否する。**誤検知を承知で採る。
-# 両 agent は`Grep` toolを持っており、検索はそちらで足りる。
-# 境界を緩めるより、代替がある側を止める。
-SHELL_METACHARACTERS = frozenset(">|;&()`$<{}")
+# **`!`を入れている。**`>`や`;`のようにbashのcommand構造を作る文字ではないが、
+# `SEPARATORS`にあるため`command_line`が区切りとして扱う。
+# `rg <pattern> ! cat --pre sha1sum <file>`で invocation が切れて
+# **その先のoption検査が届かなかった**（2026-09-11に実測）。
+# **引用の中の`!`は、区切り語そのものの拒否（`_check_stage`）が受け持つ。**
+FORBIDDEN_OUTSIDE_QUOTES = frozenset(">;&()`$<{}!")
+
+# ダブルクォートの中でも展開される文字。**「クォートされているか」では足りない。**
+# `"$(id)"`はクォートされているが実行される（2026-09-14に実測。
+# `'$(id -u)'`は文字列のまま、`"$(id -u)"`は`1000`、`"${HOME}"`はhome directoryのpathへ置き換わる）。
+# **シングルクォートの中は展開されないため、ここは見ない。**
+EXPANDS_INSIDE_DOUBLE_QUOTES = frozenset("$`")
+
+# 引用の状態。`_scan`が文字ごとに返す。
+OUTSIDE_QUOTES = 0
+SINGLE_QUOTED = 1
+DOUBLE_QUOTED = 2
 
 # `shlex`は改行も空白として扱うため、改行で区切られたcommandが1つの語列に潰れる。
 # **`git show\nrm -rf /`が`git show rm -rf /`に見える。**行ごとに分けて判定する。
@@ -433,8 +461,178 @@ def _matches_option_or_abbreviation(token, option):
 PREFIX = "検査 subagent の Bash は読み取り専用である。"
 
 
+def _scan(text):
+    """文字ごとに`(文字, 引用の状態, escapeされたか, 元のindex)`を返す。**閉じない引用符では`None`。**
+
+    **引用符そのものは返さない。**返すのは引用の中身と、引用の外の文字である。
+
+    escapeの扱いはbashに合わせる。**引用の外の`\\`は次の1文字をliteralにする。**
+    **ダブルクォートの中では`$`／`` ` ``／`"`／`\\`／改行だけがescapeできる**
+    （`"\\d"`は2文字のまま残る）。**シングルクォートの中にescapeは無い。**
+
+    **閉じない引用符を`None`で返すのは、この先の判定を止めるためである。**
+    `shlex`も同じ入力で失敗するため、`_check_stage`がfail closedで拒否する。
+    """
+    scanned = []
+    state = OUTSIDE_QUOTES
+    index = 0
+    length = len(text)
+    while index < length:
+        char = text[index]
+        if state == OUTSIDE_QUOTES:
+            if char == "\\" and index + 1 < length:
+                scanned.append((text[index + 1], state, True, index))
+                index += 2
+                continue
+            if char == "'":
+                state = SINGLE_QUOTED
+                index += 1
+                continue
+            if char == '"':
+                state = DOUBLE_QUOTED
+                index += 1
+                continue
+        elif state == SINGLE_QUOTED:
+            if char == "'":
+                state = OUTSIDE_QUOTES
+                index += 1
+                continue
+        else:
+            if char == "\\" and index + 1 < length and text[index + 1] in '$`"\\\n':
+                scanned.append((text[index + 1], state, True, index))
+                index += 2
+                continue
+            if char == '"':
+                state = OUTSIDE_QUOTES
+                index += 1
+                continue
+        scanned.append((char, state, False, index))
+        index += 1
+    if state != OUTSIDE_QUOTES:
+        return None
+    return scanned
+
+
+def _comment_start(scanned):
+    """語頭の`#`が現れた位置（scanのindex）を返す。無ければ末尾の位置。
+
+    **bashと同じ扱いである。**`cat f # note a | b`の`|`はコメントの中であり、
+    **bashはpipeとして読まない。**`_pipe_stages`がここで区間へ割ると、
+    コメントの後半が独立したcommandとして program allowlist と option 検査へ入り、
+    **bashが実行しない語で拒否することになる**（2026-09-14に実測）。
+
+    **コメントの中身を見なくなるわけではない。**引用の外のmetacharacterと区切り語の拒否
+    （一覧の1〜6）は、`tokenize`が生の行へ掛かるため今も効く。
+    緩むのは`command_starts`／`invocations`を通る段だけである。
+    """
+    breaks = " \t;&|"
+    for index, entry in enumerate(scanned):
+        char, state, escaped, _position = entry
+        if char != "#" or state != OUTSIDE_QUOTES or escaped:
+            continue
+        if index == 0:
+            return index
+        previous, previous_state, previous_escaped, _ = scanned[index - 1]
+        if (previous_state == OUTSIDE_QUOTES and not previous_escaped
+                and previous in breaks):
+            return index
+    return len(scanned)
+
+
+def _pipe_stages(line, scanned):
+    """引用の外の`|`で区間へ割り、`(生の部分文字列, その走査結果)`の list を返す。
+
+    **`||`では割らない。**論理ORであり、pipeとは別の構造である。この変更の範囲外として
+    `_quoting_reason`が拒否する（`|`が引用の外に残るため）。
+
+    **区間は生の部分文字列で返す。**引用符を落とした文字列を渡すと、
+    `shlex`がそこを別の語へ割る（`rg 'a b' f`が3語ではなく4語になる）。
+    """
+    boundaries = []
+    index = 0
+    # **コメントの中の`|`では割らない。**bashはpipeとして読まない。
+    comment = _comment_start(scanned)
+    while index < comment:
+        char, state, escaped, position = scanned[index]
+        if char == "|" and state == OUTSIDE_QUOTES and not escaped:
+            following = scanned[index + 1] if index + 1 < len(scanned) else None
+            if following and following[0] == "|" and following[1] == OUTSIDE_QUOTES:
+                index += 2
+                continue
+            boundaries.append((index, position))
+        index += 1
+    if not boundaries:
+        return [(line, scanned)]
+    stages = []
+    scan_start = 0
+    text_start = 0
+    for scan_end, position in boundaries + [(len(scanned), len(line))]:
+        stages.append((line[text_start:position], scanned[scan_start:scan_end]))
+        scan_start = scan_end + 1
+        text_start = position + 1
+    return stages
+
+
+def _quoting_reason(stage):
+    """引用の外のmetacharacterと、ダブルクォートの中の展開を拒否する。**理由か`None`。**
+
+    **判定は生の文字へ当てる。**`shlex`が引用符を剥いだ後の語では、
+    `rg -n 'a|b' f`の`a|b`と`rg -n a|b f`の`a|b`が区別できない。**bashは別のものとして扱う。**
+    """
+    comment = _comment_start(stage)
+    for index, (char, state, escaped, _position) in enumerate(stage):
+        if char == "|" and state == OUTSIDE_QUOTES and not escaped and index >= comment:
+            # **コメントの中の`|`。**`_pipe_stages`はここで割らない（bashも割らない）。
+            # **通しもしない。**コメントの中身は一覧の1〜6の対象であり、`;`と同じ扱いにする。
+            # **過検出の側であり、bashが実行しない範囲である。**
+            return (
+                f"{PREFIX}"
+                " コメントの中の `|` のため拒否した。"
+                "**bash は pipe として読まないが、この guard はコメントの中も"
+                "引用の外の文字として見る**（`# ; rm -rf /` と同じ扱いである）。"
+                " **検査 subagent にコメントは要らない。**外して書く。"
+            )
+        if state == SINGLE_QUOTED:
+            continue
+        if state == DOUBLE_QUOTED:
+            if char in EXPANDS_INSIDE_DOUBLE_QUOTES and not escaped:
+                return (
+                    f"{PREFIX}"
+                    f" ダブルクォートの中で展開される文字のため拒否した: {char!r}。"
+                    "**クォートしても実行される。**`\"$(id)\"`は`id`を起動し、"
+                    "`\"${HOME}\"`は値へ置き換わる。"
+                    " **展開させたくないならシングルクォートで囲む。**"
+                )
+            continue
+        if char == "|" and not escaped:
+            # **単独の`|`は`_pipe_stages`が区間の境として取り除いている。**
+            # ここへ残るのは`||`だけである。**論理ORはpipeではない。**
+            # `cat f || rm -rf /`の`rm`は、1つ目が失敗したときに走る。
+            return (
+                f"{PREFIX}"
+                " `||` のため拒否した。**pipe ではない。**"
+                "前の command が失敗したときに後ろが走る。"
+                " **pipe（`|`）は区間ごとに検査して通している。**"
+            )
+        if char in FORBIDDEN_OUTSIDE_QUOTES:
+            return (
+                f"{PREFIX}"
+                f" 引用の外のshell metacharacterのため拒否した: {char!r}。"
+                "**bashがcommandの構造として読む。**`cat a>b`はfileへ書き、"
+                "`cat a;rm -rf /`は次のcommandを実行する。"
+                " **引数として渡したいならクォートする**"
+                "（`rg -n 'a|b' <file>`は通る）。"
+            )
+    return None
+
+
 def _check_line(line):
-    """1行分の拒否理由を返す。問題が無ければ`None`。"""
+    """1行分の拒否理由を返す。問題が無ければ`None`。
+
+    **pipeで区間へ割り、区間ごとに検査する**（#396）。`cat f | wc -l`は
+    2つのcommandであり、**read-onlyはそれぞれの区間で決まる。**
+    `cat f | sh`は2つ目の区間で落ちる。
+    """
     # **CRはtokenize前に見る。**`shlex`はCRを空白として切るため語の中に残らないが、
     # **bashはCRを終端として扱わず、語の中のただの文字にする。**
     # `rg x f<CR>cat --pre sha1sum f`は、guardには2 command、bashには1 commandに見え、
@@ -446,42 +644,65 @@ def _check_line(line):
             "**bash は CR を command の終端として扱わないが、`shlex` は空白として切る。**"
             " 通すと、CR の後ろの語列が前の command の引数として実行される。"
         )
+    if not line.strip():
+        return None
+    scanned = _scan(line)
+    if scanned is None:
+        # **閉じない引用符。**`shlex`も同じ入力で失敗する。fail closedで拒否する。
+        return (
+            f"{PREFIX}"
+            f" 引用符が閉じていないため拒否した: {line!r}。"
+            "**解釈できない入力を通すことは、境界を開けることと同じである。**"
+        )
+    for stage, stage_scan in _pipe_stages(line, scanned):
+        reason = _quoting_reason(stage_scan)
+        if reason is not None:
+            return reason
+        reason = _check_stage(stage)
+        if reason is not None:
+            return reason
+    return None
+
+
+def _check_stage(line):
+    """pipeで割った1区間の拒否理由を返す。問題が無ければ`None`。
+
+    **引用の外のmetacharacterは`_quoting_reason`が先に見ている。**ここが見るのは
+    program allowlistとoption検査であり、どちらも`command_line`の語り分けを通る。
+    """
     tokens = command_line.tokenize(line)
+    for token in tokens:
+        # **区切り語は、クォートされていても拒否する**（#384。#396でも残した）。
+        # **`shlex`は引用符を剥いだ後の語を返すため、`command_line`は引用の有無を見ない。**
+        # `rg <pattern> '{' cat --pre sha1sum <file>`では、bashは`{`をliteralな引数として
+        # rgへ渡すのに、`invocations`は`{`でinvocationを切り、
+        # **その先の`--pre`がoption検査へ一度も届かない**（2026-09-14に実測）。
+        # **guardがcommandを切る位置と、bashが切る位置がずれる型そのものである。**
+        # **引用の外かどうかでは判定できない。**判定するのは`command_line`の側だからである。
+        if token in command_line.SEPARATORS:
+            return (
+                f"{PREFIX}"
+                f" 区切りとして扱われる語のため拒否した: {token!r}。"
+                "**クォートしても拒否する。**`shlex`は引用符を剥いだ後の語を返すため、"
+                "`command_line`は bash が引数として渡す語と区別が付かない。"
+                "**通すと、その先の option 検査が届かなくなる。**"
+                " pattern の一部として使うなら、`rg -n 'a|b' <file>` のように"
+                "**語全体を区切り語にしない形で書く。**"
+            )
     if not tokens:
         if not line.strip():
-            return None
+            # **pipeの区間が空。**`cat f | | wc -l`のような形である。
+            # **bashはsyntax errorにする。**こちらは拒否する側へ倒す。
+            return (
+                f"{PREFIX}"
+                " pipe の区間が空のため拒否した。"
+                "**`|` の前後には command が要る。**"
+            )
         return (
             f"{PREFIX}"
             f" command を語へ分けられなかったため拒否した: {line!r}。"
             "**解釈できない入力を通すことは、境界を開けることと同じである。**"
         )
-
-    for token in tokens:
-        # **`command_line`が区切りとして扱う語は、metacharacterを含まなくても拒否する。**
-        # `!`は`SEPARATORS`にあるが`SHELL_METACHARACTERS`の文字を1つも含まない。
-        # そのため`rg <pattern> ! cat --pre sha1sum <file>`で invocation が切れ、
-        # **その先の option 検査が届かず、`sha1sum`が実際に起動した**（実測）。
-        # **この形で書けば、`command_line`へ区切りが増えても穴にならない。**
-        # **ただし`command_line`への依存が消えたわけではない。**program allowlistは
-        # `command_starts`、gitとrgのoption検査は`invocations`を通る。
-        # **それらが呼び出しを拾い損ねれば、option検査は一度も走らない。**
-        if token in command_line.SEPARATORS:
-            return (
-                f"{PREFIX}"
-                f" 区切りとして扱われる語のため拒否した: {token!r}。"
-                "**`shlex`は引用符を剥いだ後の語を返すため、bash が引数として渡す語と"
-                "区別が付かない。**通すと、その先の option 検査が届かなくなる。"
-                " **1 行に 1 command を書く。**"
-            )
-        found = sorted(SHELL_METACHARACTERS.intersection(token))
-        if found:
-            return (
-                f"{PREFIX}"
-                f" shell metacharacter（{''.join(found)}）を含む語のため拒否した: {token!r}。"
-                "**`shlex`は空白でしか語を切らないため、`cat a>b`や`cat a;rm -rf /`は"
-                "1語になり、redirect や次の command が command 位置として見えない。**"
-                " 検索なら `Grep` tool を使う。"
-            )
 
     for skipped, program in command_line.command_starts(line):
         # **前置語は`command_line`が透過させるが、ここでは透過させない。**
