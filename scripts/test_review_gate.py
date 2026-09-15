@@ -516,6 +516,86 @@ class ReviewGateTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1, result.stdout)
         self.assertIn(f"duplicated=['{gate.REVIEW_DECLARATIONS[0]}']", result.stderr)
 
+    def test_receipt_accepts_a_capped_declaration(self):
+        """`capped`は`converged`と同じ扱いで通る。**打ち切りを真として申告できる。**
+
+        [#398](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/398)が扱う欠陥は、
+        収束条件に届く前に打ち切ったとき、`converged`を書けば事実と食い違い、
+        書かなければ`receipt`が落ちて`push`できないことだった。`capped`はどちらでもない
+        第三の値として、`REVIEW_TERMINAL`のもう一方に置く。
+        """
+        root = self._repository()
+        self._write(root, PLAIN_DOC, BASE_TEXT + "ここに追記する。\n")
+        self._commit(
+            root,
+            "追記する\n\n"
+            f"{gate.TRAILER_CLASS}: {gate.CLASS_REVIEW}\n"
+            f"{gate.TRAILER_REVIEW}: requirements-pass\n"
+            f"{gate.TRAILER_REVIEW}: fresh-context-pass\n"
+            f"{gate.TRAILER_REVIEW}: capped\n",
+        )
+        result = _run(["receipt", "--repository-root", root, "--base", "HEAD~1"])
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_receipt_rejects_both_terminal_values_together(self):
+        """`converged`と`capped`を同時に書いても通さない。
+
+        収束したのか打ち切ったのかを区別する値であり、両方を宣言すると
+        どちらが事実か読み取れない。
+        """
+        root = self._repository()
+        self._write(root, PLAIN_DOC, BASE_TEXT + "ここに追記する。\n")
+        self._commit(
+            root,
+            "追記する\n\n"
+            f"{gate.TRAILER_CLASS}: {gate.CLASS_REVIEW}\n"
+            f"{gate.TRAILER_REVIEW}: requirements-pass\n"
+            f"{gate.TRAILER_REVIEW}: fresh-context-pass\n"
+            f"{gate.TRAILER_REVIEW}: converged\n"
+            f"{gate.TRAILER_REVIEW}: capped\n",
+        )
+        result = _run(["receipt", "--repository-root", root, "--base", "HEAD~1"])
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("terminal=['converged', 'capped']", result.stderr)
+
+    def test_receipt_rejects_neither_terminal_value(self):
+        """`converged`も`capped`も無いと通さない。両方のPassだけでは足りない。"""
+        root = self._repository()
+        self._write(root, PLAIN_DOC, BASE_TEXT + "ここに追記する。\n")
+        self._commit(
+            root,
+            "追記する\n\n"
+            f"{gate.TRAILER_CLASS}: {gate.CLASS_REVIEW}\n"
+            f"{gate.TRAILER_REVIEW}: requirements-pass\n"
+            f"{gate.TRAILER_REVIEW}: fresh-context-pass\n",
+        )
+        result = _run(["receipt", "--repository-root", root, "--base", "HEAD~1"])
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("terminal=[]", result.stderr)
+
+    def test_history_accepts_a_capped_declaration(self):
+        """`main`昇格の`history`検査も`capped`を宣言したcommitを通す。
+
+        `history`は`Self-Review`が1つ以上あることしか見ない（値の集合は検査しない）。
+        `capped`が新しい値であっても、この緩さのために別途の対応は要らない。
+        """
+        root, cutover = self._history_fixture(
+            [
+                (
+                    PLAIN_DOC,
+                    BASE_TEXT + "打ち切って進める。\n",
+                    "打ち切って進める\n\n"
+                    f"{gate.TRAILER_CLASS}: {gate.CLASS_REVIEW}\n"
+                    f"{gate.TRAILER_REVIEW}: requirements-pass\n"
+                    f"{gate.TRAILER_REVIEW}: fresh-context-pass\n"
+                    f"{gate.TRAILER_REVIEW}: capped\n",
+                ),
+            ]
+        )
+        result = self._history(root, cutover)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("HISTORY_CHECKED=1", result.stdout)
+
     def test_a_later_commit_without_trailers_invalidates_the_receipt(self):
         """reviewの後にdiffが変わったら宣言が無効になること。
 
