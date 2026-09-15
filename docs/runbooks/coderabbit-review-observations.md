@@ -35,6 +35,8 @@ gh api --paginate "repos/<owner>/<repo>/commits/<sha>/statuses?per_page=100" \
 | `manual review required for this OSS repository` | **labelの判定では説明できない。**allowlistのlabelが作成時から付いており、1行目には当たらない。#127では`@coderabbitai rate limit`が`Reviews are available now`を返したためrate limitでもなかった。**`@coderabbitai full review`を投げると実際にreviewが走った。****2026-08-16に原因が判明した。**[#135](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/135)でCodeRabbitが投稿したcommentが`Reviews should be triggered manually for repositories with fewer than 10 stars.`と述べている。**star数による条件であり、設定の誤りではない。**この文言を見たら設定を疑わず、手動で`full review`を投げる | [#127](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/127)（`area:firmware`＋`area:protocol`）・[#123](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/123)・[#125](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/125)（後の2件は5行目と同時に観測） |
 | **2行目と同じ文言を、設定の定着後に観測した**<br>status: `Review skipped: automatic reviews are disabled` | **設定は読まれている。**2行目の読み方（設定が未反映）を当てはめない。**原因は未特定。**対応は4行目と同じで、`@coderabbitai full review`でreviewが走った。**なお4行目の原因（star数）が2026-08-16に判明したが、この文言との関係は確かめていない。**同一Pull Requestに両方出るため（#123・#125・#135）同じ原因である可能性はあるが、CodeRabbitはこの文言について何も述べていない。**推測で4行目へ畳まない** | [#123](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/123)・[#125](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/125)（いずれも2026-08-15、作成直後）・[#124](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/124)（push後。後述） |
 
+| **comment: `Review skipped`／status: `Review completed`**<br>comment: `Review was skipped as selected files did not have any reviewable changes`（`💤 Files selected but had no reviewable changes`に file 名が並ぶ）<br>comment（`full review`への応答）: `⚠️ Action not completed` / `No files to review.`<br>status: `Review in progress` → `Review completed` | **reviewは走っている。**依頼した`full review`が起動し、**解析対象が無いと判定して0件で完了した。**`.md`だけの差分で観測した。**commentの本文とcommit statusが同じ事象について逆のことを言う。**前者は`skipped`、後者は`completed`である。**commentだけを読んで「reviewが走らなかった」と判断しない。**枠は1回消費されている。**0件は「問題なし」ではない。**CodeRabbitがその差分を解析対象にしなかったという意味であり、安全・電気に関わる変更では[自己レビューで代替しない](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/CONTRIBUTING.md#merge前の確認)規則が別に効く | [#397](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/397)（2026-09-15。`docs/hardware/tbd-register.md` 1 file・3行の表セルへの純追記）。**同日に同じ`docs/hardware/`を触る**[#399](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/399)**（4 file）はreviewされ指摘1件が出ている。差分の性質で分かれた** |
+
 **行ごとに意味が違う。**同じ`Review skipped`でも取るべき対応が違う。
 
 - 1行目: `.coderabbit.yaml`の意図どおりのskipである。[自己レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/CONTRIBUTING.md#自己レビュー)で通す。
@@ -48,6 +50,8 @@ gh api --paginate "repos/<owner>/<repo>/commits/<sha>/statuses?per_page=100" \
   **`full review`**を使う。自己レビューで代替しない。
   ただし**「自動reviewは二度と起動しない」と決めつけない。**#125ではこの2文言の約2分後に
   自動で`Review in progress`へ移っている（その回はrate limitで止まった）
+
+- 6行目: **skipではない。reviewは完走している。**commentだけで判断すると、**依頼が空振りしたと誤読して投げ直し、枠を二重に焼く。**判定は必ず commit status の履歴で行う（上の`gh api .../statuses`）。**0件で完了したことと、差分がreviewを受けたことは別である。**
 
 **2行目・3行目は、いずれも`.coderabbit.yaml`が`develop`に無かった時期の観測である。**4行目・5行目は設定が定着した後の観測であり、原因が別である。
 設定が定着した後にこの文言を見たら、**それは新しい事象である。**推測で1行目と同じ扱いにしない。
