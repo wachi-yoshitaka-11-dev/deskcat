@@ -377,6 +377,7 @@ close日である。
 ### 自己レビュー
 
 pushする前に、作成者自身が差分を見直す。**新規指摘が0件の状態が2 round続くまで繰り返す。**
+続けても実りが無いと判断する場合は[打ち切り](#打ち切り)に従う。
 
 **自動reviewは行わない**（[ADR-0013](docs/decisions/0013-manual-only-coderabbit-review.md)）。
 [`.coderabbit.yaml`](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/.coderabbit.yaml)は
@@ -426,6 +427,59 @@ pushする前に、作成者自身が差分を見直す。**新規指摘が0件�
 
 **2つのPassは同じ最終diffに対して行う。**どちらかの後に差分が変わったら、
 **両方が無効**になる。差分を変えたら2つとも実施し直す。
+
+#### 打ち切り
+
+「新規指摘が0件の状態が2 round続く」（収束）に、上限は無い。**巡数の上限を固定では
+置かない。**過去の実績で、回した巡数と指摘の中身は対応しなかった。
+
+| 作業 | 巡 | 内容 |
+|---|---|---|
+| [#384](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/384) | 22巡以上 | 17〜20巡で「guardの判定位置がbashとずれる」型の実体ある欠陥が出た（[ADR-0020](docs/decisions/0020-inspector-readonly-by-hook.md)）。別の実体ある欠陥が22巡目にも出た（`scripts/hooks/inspector_readonly_guard.py`のコメント） |
+| [#396](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/396) | 9巡 | 9巡すべてが実体のある欠陥だった（[PR #400](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/400)） |
+| [#397](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/397) | 7巡 | 要件照合Passは7巡中5巡が0件で、早期に収束していた。残りはcommit messageの書き方と指示語の先行詞（[#398](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/398)） |
+| #389（[PR #395](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/395)） | 11巡 | 実装への指摘は2巡で尽き、残り9巡は前の巡で自分が書き足した説明文が次の巡の指摘源になったものだった |
+| `#3` B1・B2（[PR #399](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/399)） | 3巡 | 3巡目に出た実質4件のうち3件は、前の巡で自分が入れた文から出ていた |
+
+**巡数だけでは、まだ実りがあるかを判定できない。**判定するのは指摘の出所である。
+
+**AIが打ち切りを判定してよい条件。**直近2 roundで採った指摘が、すべて直前の巡で
+自分が書き足した記述（説明文、注記、訂正）を発生源としている場合。**この場合、
+差分そのものが持つ欠陥はもう出ていない**と見なす。前提として、対象（最終diff）を
+凍結してから回していること、機械で検出できるもの（リンク切れ、表の列ずれ、数の
+不一致など）は巡に含めず最初に0件にしてあることが要る。
+
+**人間の承認が要る関門。**通算5 roundを超えて続ける場合は、巡ごとの指摘件数と
+出所（差分由来か、自分の前巡の記述由来か）を示し、続けてよいかの承認を得る。
+5 round目の終わりに1回。以後は指摘の出所の性質が変わったとき（例: 自分の記述由来
+だけだった状態から、差分由来の指摘が再び出た）に再度求める。**5という数は、
+上の実績から導いた閾値ではない。**`#396`は9巡すべてが実体のある欠陥で、`#384`は
+17〜20巡目でも実体のある欠陥が出ている。**正当な発見は何巡目にでも出うる。**
+5に置いたのは、続けてよいかを人へ1回尋ねる費用が低いためであり、**それを超えて
+続けるコストを人へ可視化する点である。**巡数そのものを止める基準にはしない。
+
+**打ち切ったときに記録する。**Pull Request本文の自己レビュー欄へ次を書く。
+
+- 巡ごとの指摘件数（要件照合Pass／fresh-context Pass）と、採用／不採用の内訳
+- 採らなかった理由（型ごとでよい。1件ずつ書く必要はない）
+- 凍結した最終diffのhash（`git diff <base>..HEAD`のsha256などで固定した値）
+- 最後の版に、2つのPassの両方を実施したかどうか
+
+**打ち切りは`converged`と別の値で申告する。**commit trailerへ`Self-Review: capped`を
+書く（[Merge方式](#merge方式)）。**収束したのか打ち切ったのかを、trailerの値から
+区別できるようにする。**どちらを選んでも、`requirements-pass`と`fresh-context-pass`は
+別途要る——打ち切りは2つのPassの実施を免除しない。
+
+**`main`昇格時の`history`検査でも区別できる。**値はcommitのtrailerに残り続けるため、
+`git log`から常に読める。`history`が値の組み合わせを検証しないのは、過去のcommitへの
+要求をhead commitより軽くする既存の設計（`Self-Review`が1つ以上あることだけを見る。
+下の「Merge方式」）と一貫させたためであり、区別できないからではない。
+
+**[#397](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/397)はこの規則で説明できる。**
+7巡目で人間が打ち切りを決定した時点は、上の表のとおり「要件照合Passは7巡中5巡が0件」
+という状態であり、この規則があれば`Self-Review: capped`を宣言し、巡ごとの件数と
+採否の内訳をPull Request本文へ書けば足りた。**過去のcommitを遡って書き換える必要は
+無い。**次に同じ状況（収束条件に届く前に打ち切る）が起きたら、この節に従う。
 
 宣言はcommit trailerで行う。**書式の例は[Merge方式](#merge方式)にあり、値の正本は
 `scripts/review_gate.py`である。**trailerはcommitへ結び付くため、差分を変えると宣言が
@@ -665,13 +719,26 @@ messageでmergeし、**Pull Requestのhead commitが持っていたtrailerは引
 mergeは成功し、警告も出ない。
 
 `--body-file`の内容には、末尾へ次のtrailerを置く。**指示sourceを変更していない場合、
-`Instruction-Change`の行は書かない。**残る`Change-Class` 1行と`Self-Review` 3行はすべて要る。
+`Instruction-Change`の行は書かない。**残る`Change-Class` 1行と`Self-Review` 3行
+（`requirements-pass`・`fresh-context-pass`・`converged`または`capped`のどちらか1つ）は
+すべて要る。**打ち切ったか収束したかで最後の1行が変わる**（下の「打ち切り」を参照）。
 
 ```text
 Change-Class: review-required
 Self-Review: requirements-pass
 Self-Review: fresh-context-pass
 Self-Review: converged
+Instruction-Change: reviewed-as-data
+```
+
+**[打ち切り](#打ち切り)の条件で終える場合は、最後の1行を`capped`にする。**
+`converged`と`capped`は同時に書けない（どちらか一方だけを要求する）。
+
+```text
+Change-Class: review-required
+Self-Review: requirements-pass
+Self-Review: fresh-context-pass
+Self-Review: capped
 Instruction-Change: reviewed-as-data
 ```
 
@@ -711,7 +778,8 @@ Self-Review: converged
 [#161](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/161)でこの節を書いたとき上のblockは3行で、3行目は`Instruction-Change`だった。
 [#164](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/164)が`Self-Review`を3値へ分けてblockが5行になった際、
 **古い記述だけが取り残された。**指す先は`Self-Review: fresh-context-pass`へずれており、
-**従うと`receipt`が落ちる**（3値すべてを要求するため）。
+**従うと`receipt`が落ちる**（`requirements-pass`・`fresh-context-pass`の両方と、
+`converged`／`capped`のどちらか1つを要求するため）。
 **行番号で指定しない。**値が増減するとずれる。
 
 **`main`昇格で検証されるのは、範囲の各commitの宣言である。**squash commitへtrailerを書き忘れると、その回のmergeは通っても次の昇格で落ちる。

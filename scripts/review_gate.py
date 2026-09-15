@@ -115,16 +115,33 @@ CLASS_VALUES = (CLASS_MINOR, CLASS_REVIEW, CLASS_FIXUP)
 # 落とし穴はCONTRIBUTINGの「Merge方式」に書いた。
 FIXUP_REFERENCE_RE = re.compile(r"#\d+")
 
-# `Self-Review`で宣言する内容。**下の値がすべて要る。**
+# `Self-Review`で宣言する内容。**`REVIEW_REQUIRED`の全部と、`REVIEW_TERMINAL`の
+# ちょうど1つが要る。**
 #
-# 収束（新規指摘0件が2 round）と、2つのPassは別の軸である。1つの値にまとめると、
+# 2つのPassは、回した巡が収束したか打ち切ったかとは別の軸である。1つの値にまとめると、
 # どれをやっていないのかが分からなくなる。要件照合Passとfresh-context Passは
 # 同じ最終diffに対して行い、差分が変わったら両方が無効になる。定義は
 # `CONTRIBUTING.md`の「自己レビュー」にある。
 #
+# **`converged`と`capped`は同じ軸の2値である。**「新規指摘0件が2 round続いた」上での
+# 収束と、それに届く前に人間が打ち切った場合を区別する。どちらも2つのPassを免除しない。
+#
+# **`main`昇格時の`history`検査でも区別できる。**値はcommitのtrailerへ直接書き込まれ、
+# 履歴を書き換えない限り消えない。`git log`／`git interpret-trailers`でどの範囲からでも
+# 常に読める。`history`自身がこの値を検証しないのは、`Self-Review`が1つ以上あることだけを
+# 見るという既存の設計と一貫させたためであり（過去のcommitへの要求はhead commitより軽い。
+# `CONTRIBUTING.md`の「Merge方式」）、区別できないからではない。値の組み合わせが正しいこと
+# （ちょうど1つの終端値を持つこと）の強制は`receipt`（head commitの宣言）が持つ。
+#
 # **これは宣言であって証拠ではない。**scriptが確かめられるのは、下の値が揃っていることと、
 # その宣言がこのcommitに結び付いていることだけである。
-REVIEW_DECLARATIONS = ("requirements-pass", "fresh-context-pass", "converged")
+REVIEW_REQUIRED = ("requirements-pass", "fresh-context-pass")
+REVIEW_TERMINAL = ("converged", "capped")
+
+# 後方互換の別名。既定で有効な宣言一式（収束を選んだ場合）を並べたもので、
+# testのfixtureが「まるごと有効なSelf-Review」を組み立てるのに使う。
+# 値の正本は`REVIEW_REQUIRED`と`REVIEW_TERMINAL`であり、ここは組み合わせにすぎない。
+REVIEW_DECLARATIONS = REVIEW_REQUIRED + (REVIEW_TERMINAL[0],)
 
 MARKDOWN_SUFFIXES = (".md", ".markdown")
 
@@ -653,16 +670,18 @@ def _check_receipt(root, head, computed):
     elif declared[0] == CLASS_FIXUP:
         problems.extend(_check_fixup_reference(found, "head commit"))
     review = found.get(TRAILER_REVIEW, [])
-    missing = [value for value in REVIEW_DECLARATIONS if value not in review]
-    unknown = [value for value in review if value not in REVIEW_DECLARATIONS]
+    missing = [value for value in REVIEW_REQUIRED if value not in review]
+    known = set(REVIEW_REQUIRED) | set(REVIEW_TERMINAL)
+    unknown = [value for value in review if value not in known]
     # 重複も落とす。同じ宣言を2回書いても、実施した回数の証拠にはならない。
     duplicated = sorted({value for value in review if review.count(value) > 1})
-    if missing or unknown or duplicated:
+    terminal = [value for value in review if value in REVIEW_TERMINAL]
+    if missing or unknown or duplicated or len(terminal) != 1:
         problems.append(
             f"head commit must carry exactly one {TRAILER_REVIEW} trailer for each of"
-            f" {list(REVIEW_DECLARATIONS)}."
+            f" {list(REVIEW_REQUIRED)} and exactly one of {list(REVIEW_TERMINAL)}."
             f" missing={missing} unknown={unknown} duplicated={duplicated}"
-            f" found={review}"
+            f" terminal={terminal} found={review}"
         )
     return problems
 
