@@ -12,6 +12,7 @@ hookを子processとして起動し、stdinへhookの入力JSONを渡して、**
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -36,6 +37,7 @@ BASE_GUARD = str(SCRIPTS_ROOT / "hooks" / "branch_base_guard.py")
 MERGE_REPORT = str(SCRIPTS_ROOT / "hooks" / "merge_trailer_report.py")
 PUSH_GATE = str(SCRIPTS_ROOT / "hooks" / "push_gate.py")
 CODERABBIT_GATE = str(SCRIPTS_ROOT / "hooks" / "coderabbit_gate.py")
+INSPECTOR_GUARD = str(SCRIPTS_ROOT / "hooks" / "inspector_readonly_guard.py")
 MERGE_REPORT = str(SCRIPTS_ROOT / "hooks" / "merge_trailer_report.py")
 REPO_ROOT_FOR_TEMPLATES = SCRIPTS_ROOT.parent
 ISSUE_TEMPLATE_DIR = REPO_ROOT_FOR_TEMPLATES / ".github" / "ISSUE_TEMPLATE"
@@ -44,6 +46,10 @@ PR_TEMPLATE_PATH = REPO_ROOT_FOR_TEMPLATES / ".github" / "pull_request_template.
 sys.path.insert(0, str(SCRIPTS_ROOT / "hooks"))
 
 import push_gate  # noqa: E402
+
+import inspector_readonly_guard  # noqa: E402
+
+import merge_trailer_report  # noqa: E402
 
 # fixtureのcommitに使うidentity。実行者の設定に依存させない。
 GIT_IDENTITY = (
@@ -134,6 +140,23 @@ class GhMetadataGuardTests(unittest.TestCase):
         ):
             with self.subTest(command=command):
                 self.assertDenied(command, contains="--project")
+
+    def test_calls_on_a_later_line_are_denied(self):
+        """複数行commandの2行目以降の`gh`を見る（#389）。"""
+        for command in (
+            "cat x\ngh pr merge 1 --squash",
+            "git status\ngh pr create --title t --body b",
+            "cd /tmp\n\n  gh issue create --title t",
+        ):
+            with self.subTest(command=command):
+                self.assertDenied(command)
+
+    def test_calls_written_in_a_heredoc_body_are_allowed(self):
+        """heredocのbodyの`gh`呼び出しでは止めない（#389）。**bashは実行しない。**
+
+        本文へ`gh pr merge`と書く操作は、このリポジトリでは日常である。
+        """
+        self.assertAllowed("cat > body.md <<'EOF'\ngh pr merge 1 --squash\nEOF\n")
 
     def test_create_with_project_is_allowed(self):
         """`--project value`と`--project=value`のどちらも通す。
@@ -632,6 +655,24 @@ class BranchBaseGuardTests(unittest.TestCase):
         self._at_old_base()
         self.assertDenied("git checkout -b chore/1-x && echo done")
 
+    def test_creation_on_a_later_line_is_denied(self):
+        """複数行commandの2行目のbranch作成を止める（#389）。"""
+        self._at_old_base()
+        for command in (
+            "git fetch origin\ngit checkout -b chore/1-x",
+            "git status\ngit switch -c chore/1-x",
+            "cat note.md\n\n  git checkout -b chore/1-x",
+        ):
+            with self.subTest(command=command):
+                self.assertDenied(command)
+
+    def test_creation_written_in_a_heredoc_body_is_allowed(self):
+        """heredocのbodyの`git checkout -b`では止めない（#389）。**実行されない。**"""
+        self._at_old_base()
+        self.assertAllowed(
+            "cat > note.md <<'EOF'\ngit checkout -b chore/1-x\nEOF\n"
+        )
+
     def test_current_base_is_allowed(self):
         """基点が`origin/develop`と一致していれば通す。"""
         self._at_trunk()
@@ -685,6 +726,16 @@ class TruncationGuardTests(unittest.TestCase):
         code, output = _invoke(TRUNCATION_GUARD, command)
         self.assertEqual(code, 0, command)
         self.assertIsNone(output, f"止めてしまった: {command}")
+
+    def test_newline_is_not_a_separator_for_this_hook(self):
+        """**このhookの範囲は#389で変えていない。**
+
+        理由は`ask`か`deny`かではない（`coderabbit_gate.py`は`ask`だが範囲は広がった）。
+        **このhookだけが`invocations`も`command_starts`も使わず、`tokenize`を直接呼ぶ**
+        （`_pipelines`）。改行の区切りは`segments`側にあるため通らない。
+        2行目の`git log -n 5`は今も見ない。**見ていないことを、通したことと読まない。**
+        """
+        self.assertAllowed("cat x\ngit log -n 5")
 
     def test_piped_head_after_target_command_is_asked(self):
         """対象commandの出力を`head -N`／`tail -N`へ渡す形をaskする。"""
@@ -1060,6 +1111,55 @@ class StopClaimGuardTests(unittest.TestCase):
             [TRANSCRIPT_HUMAN_STRING, _assistant_tool_use("Bash", "gh pr merge 1 --auto")],
         )
 
+    def test_push_on_a_later_line_is_evidence(self):
+        """複数行commandの2行目の`git push`も証拠として数える（#389）。
+
+        **`command_line.invocations`を共有しているため、範囲がここへも及ぶ。**
+        こちら側で変わるのは、**実際に押しているのにblockしていた形**（偽陽性）が
+        通るようになる向きである。
+        """
+        self.assertAllowed(
+            "pushしました",
+            [
+                TRANSCRIPT_HUMAN_STRING,
+                _assistant_tool_use("Bash", "git status\ngit push origin main"),
+            ],
+        )
+
+    def test_push_in_a_branch_that_did_not_run_is_counted_as_evidence(self):
+        """**走らなかった`git push`も証拠として数える**（#389）。
+
+        `command_line.invocations`は字句だけで見るため、条件が偽でも呼び出しとして返す。
+        **止める門では安全側だが、この hook では逆である。**押していないのに
+        「pushしました」を通す。**過検出の向きは呼び出し側で変わる。**
+        取り落としではなく、**#389で増えた側の乖離である。**ここへ書いて残す。
+        """
+        self.assertAllowed(
+            "pushしました",
+            [
+                TRANSCRIPT_HUMAN_STRING,
+                _assistant_tool_use(
+                    "Bash", "if false; then\ngit push origin main\nfi"
+                ),
+            ],
+        )
+
+    def test_push_written_in_a_heredoc_body_is_not_evidence(self):
+        """heredocのbodyに書いた`git push`は証拠にならない（#389）。
+
+        **bashは実行していない。**数えると、押していないことを「pushしました」と
+        主張できてしまう。
+        """
+        self.assertBlocked(
+            "pushしました",
+            [
+                TRANSCRIPT_HUMAN_STRING,
+                _assistant_tool_use(
+                    "Bash", "cat > note.md <<'EOF'\ngit push origin main\nEOF\n"
+                ),
+            ],
+        )
+
     def test_actual_push_is_still_evidence(self):
         """`--dry-run`を伴わない`git push`は引き続き証拠になる。"""
         self.assertAllowed(
@@ -1224,6 +1324,25 @@ class MergeTrailerReportTests(unittest.TestCase):
                 self.assertEqual(code, 0, command)
                 self.assertIsNone(output, f"報告してしまった: {command}")
 
+    def test_merge_on_a_later_line_is_found(self):
+        """複数行commandの2行目の`gh pr merge`を見つける（#389）。
+
+        **`gh`を呼ぶ経路は通さない。**判定だけを`_pr_merge`で直接見る。
+        """
+        self.assertEqual(
+            merge_trailer_report._pr_merge("git status\ngh pr merge 12 --squash"),
+            (True, "12"),
+        )
+
+    def test_merge_written_in_a_heredoc_body_is_not_found(self):
+        """heredocのbodyの`gh pr merge`は見つけない（#389）。**mergeしていない。**"""
+        self.assertEqual(
+            merge_trailer_report._pr_merge(
+                "cat > note.md <<'EOF'\ngh pr merge 12 --squash\nEOF\n"
+            ),
+            (False, None),
+        )
+
     def test_broken_input_is_ignored(self):
         result = subprocess.run(
             [sys.executable, MERGE_REPORT], input="{ではないJSON",
@@ -1318,6 +1437,73 @@ class PushGateTests(unittest.TestCase):
         self._instruction_commit(declared=False)
         reason = self.assertDenied("git push origin HEAD:develop")
         self.assertIn(gate.TRAILER_INSTRUCTION, reason)
+
+    def test_push_on_a_later_line_is_denied(self):
+        """複数行commandの2行目以降のpushを止める（#389）。
+
+        **迂回を試みた形ではない。**`git fetch`や`git status`を先に書く、
+        `add`／`commit`／`push`を並べる、空行と字下げを挟む、`\`で行を継ぐ——
+        いずれも通常の書き方であり、**5つとも素通りしていた。**
+        **旧挙動は、`origin/develop`の`command_line.py`だけを別directoryへ取り出し、
+        `sys.path`の先頭に置いた状態で`push_gate.pushed_source`を呼んで測った**
+        （2026-09-14。5形すべてが`None`だった。この門は`pushed_source`が`None`なら
+        何も検査せずに通す）。**この形のtestは置いていない。**`pushed_source`は
+        `command_line.invocations`を呼ぶだけなので、旧走査（`_invocations_in`）を差し込めば
+        再現はできる。**差し込みを前提にしたtestを置かないのは、旧走査を残す約束になるためである。**
+        `invocations`の層での旧挙動は`CommandLineSegmentsTests`が形ごとに固定する
+        （改行を挟む4形は`test_the_walk_without_segments_missed_the_second_line`、
+        `\`で継ぐ形は`test_the_walk_without_segments_broke_the_line_continuation`）。
+        """
+        self._instruction_commit(declared=False)
+        # `git push origin develop`は押す側のrefを`develop`として解決する。
+        # **局所に`develop`が無いと検査対象を決められない**（既存の refspec test と同じ前提）。
+        _git(str(self.root), "branch", "--force", "develop", "HEAD")
+        for command in (
+            "git fetch origin\ngit push origin develop",
+            "git status\ngit push origin HEAD:develop",
+            "git add -A\ngit commit -m x\ngit push origin develop",
+            "cat note.md\n\n  git push origin develop",
+            "git push \\\n  origin develop",
+        ):
+            with self.subTest(command=command):
+                reason = self.assertDenied(command)
+                self.assertIn(gate.TRAILER_INSTRUCTION, reason)
+
+    def test_push_written_in_a_heredoc_body_is_allowed(self):
+        """heredocのbodyに書いた`git push origin develop`では止めない（#389）。
+
+        **bashはbodyを実行しない。**手順を文書へ書く操作はこのリポジトリでは日常であり、
+        **そこで止める門は誤検知としてhookごと無効化される。**
+        """
+        self._instruction_commit(declared=False)
+        # **`develop`を張らないと、refが解けずどのみち素通りする。**
+        # 張らないままでは、通った理由がbodyを落としたからなのか区別できない。
+        _git(str(self.root), "branch", "--force", "develop", "HEAD")
+        self.assertAllowed("cat > note.md <<'EOF'\ngit push origin develop\nEOF\n")
+
+    def test_comment_after_a_push_is_not_read_as_a_refspec(self):
+        """`git push origin main # develop`を`develop`へのpushとして読まない。
+
+        **bashは語頭の`#`から行末までをコメントとして落とす。**残すと`develop`が
+        refspecの位置に現れ、`main`へのpushをこの門が拒否する。**#389より前からの
+        誤検知であり、同じ走査で直した。**
+        """
+        self._instruction_commit(declared=False)
+        _git(str(self.root), "branch", "--force", "develop", "HEAD")
+        self.assertAllowed("git push origin main # develop")
+
+    def test_push_after_a_heredoc_body_is_denied(self):
+        """bodyの後ろのpushは止める。**bodyの引用符で検査が止まらない。**
+
+        bodyを落とさずに`tokenize`へ渡すと、body の`'`1つで`shlex`が失敗し、
+        **同じcommandのpushまで検査できない。**
+        """
+        self._instruction_commit(declared=False)
+        _git(str(self.root), "branch", "--force", "develop", "HEAD")
+        self.assertDenied(
+            "cat > note.md <<'EOF'\nそれはできない。don't\nEOF\n"
+            "git push origin develop"
+        )
 
     def test_receipt_alone_would_have_passed(self):
         """同じcommitが`receipt`だけなら通る。**この差がhookの存在理由である。**"""
@@ -1503,6 +1689,65 @@ class CodeRabbitGateTests(unittest.TestCase):
         ):
             with self.subTest(command=command):
                 self.assertAsked(command)
+
+    def test_trigger_on_a_later_line_is_asked(self):
+        """複数行commandの2行目のreview依頼も止める（#389）。
+
+        **`command_line.invocations`を`push_gate`と共有している。**改行対応で
+        このhookの範囲も広がる。**広がる向きは、これまで素通りしていた形を
+        `ask`へ入れる側である。**
+        """
+        self.assertAsked('cat x\ngh pr comment 239 --body "@coderabbitai full review"')
+
+    def test_trigger_written_in_a_heredoc_body_is_allowed(self):
+        """heredocのbodyに書いた依頼文では止めない（#389）。**bashは投稿しない。**"""
+        self.assertAllowed(
+            "cat > note.md <<'EOF'\n"
+            'gh pr comment 239 --body "@coderabbitai full review"\n'
+            "EOF\n"
+        )
+
+    def test_trigger_inside_a_quoted_heredoc_substitution_is_asked(self):
+        """`--body "$(cat <<'EOF' … EOF)"`の本文も見る（#389）。
+
+        **引用の中へ入ったheredocのbodyは落とさない。**引用ごと1語として残るため、
+        本文の語を見るこの判定はそこでも効く。**この形はこのリポジトリの常用形であり、
+        落とすと外向きの操作を止める門が抜ける。**
+        """
+        self.assertAsked(
+            'gh pr comment 239 --body "$(cat <<\'EOF\'\n'
+            '@coderabbitai full review\n'
+            'EOF\n'
+            ')"'
+        )
+
+    def test_line_continuation_inside_the_body_is_still_missed(self):
+        """**引用の中の`\\`改行は今も素通りする。**#389では直していない。
+
+        bashは`\\`と改行を消して1行へ繋ぐため、**この形は依頼として投稿される。**
+        `segments`は引用の中を素通しし、`_mentions_review`は行ごとに見るため、
+        `@coderabbitai`と`review`が別の行になる。
+        **#389より前から同じである**（2026-09-14に実測）。
+        CONTRIBUTINGの「取り切れていないもの」に書いた形であり、
+        **直したらこのtestが落ちる。**そのときはCONTRIBUTINGも直す。
+        """
+        self.assertAllowed('gh pr comment 239 --body "@coderabbitai \\\nfull review"')
+
+    def test_body_piped_from_a_heredoc_is_still_asked(self):
+        """`--body-file -`へheredocで流す形でも止める（#389）。
+
+        **bodyを落とすとhookから本文が読めなくなるが、素通りはしない。**
+        `--body-file -`はstdinであり、このhookは読めない本文をaskへ倒す
+        （`_read_body`／`_check`の`unreadable`）。**#389の前後で判定は変わらない**
+        （2026-09-14に実測）。
+        **「bashが実行しないから落としてよい」は、本文を読む判定には直接効かない。**
+        ここが素通りに変わらないことを固定する。
+        """
+        self.assertAsked(
+            "gh pr comment 239 --body-file - <<'EOF'\n"
+            "@coderabbitai full review\n"
+            "EOF\n"
+        )
 
     def test_passthrough_words_are_allowed(self):
         """枠を消費しない語は通す。**残数確認とthreadの後始末を塞がない。**"""
@@ -1879,14 +2124,626 @@ class CommandFromTests(unittest.TestCase):
                 self.assertIsNone(command_line.command_from(payload))
 
 
-class HookPayloadShapeTests(unittest.TestCase):
-    """**5本のhookが、mappingでない入力で落ちないことを確かめる**（#242）。
+class CommandLineSegmentsTests(unittest.TestCase):
+    """`command_line.segments`のtest（#389）。**改行もcommandの区切りである。**
 
-    [PR #241](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/241)のreview指摘は`coderabbit_gate.py`に対するものだったが、
-    **型で全数走査したら5本すべてに同じ形が残っていた。**指摘は代表例であって全数ではない。
+    #389が挙げた3つのhook（`push_gate`／`branch_base_guard`／`gh_metadata_guard`）は
+    `invocations`で呼び出しを探す。**2行目が見えないと、止める門が通常の書き方で
+    反応しない。**（`deny`を出すhookはこの3つに限らない。`inspector_readonly_guard.py`も
+    出す。**あちらは自分で行分割しているため、改行については変わらない。**
+    ただし**コメントの除去では判定が動く**。動く向きと、動かない形は
+    `InspectorReadonlyGuardTests`の`test_comment_only_line_is_allowed`／
+    `test_denied_option_inside_a_comment_is_no_longer_refused`／
+    `test_comment_after_a_separator_stays_refused`／
+    `test_comment_cannot_satisfy_a_required_option`が固定する。）
+
+    **実測の条件（bash／python3／gitの版）は`hooks/command_line.py`のdocstringが持つ。**
     """
 
-    HOOKS = (GH_GUARD, BASE_GUARD, PUSH_GATE, MERGE_REPORT, CODERABBIT_GATE)
+    def test_the_walk_without_segments_missed_the_second_line(self):
+        """**直す前の挙動を固定する。**`segments`を通さない走査では2行目が消える。
+
+        `_invocations_in`は改行を含まない1 commandを歩く内部関数であり、
+        **#389より前の`invocations`と同じ走査である。**この差が#389の中身である。
+
+        **固定するのは、下の7形で`push`から始まる並びが返らないことだけである。**
+        **「空が返る」ではない。**1行目が`git`なら1件返り、2行目以降はその引数として
+        飲み込まれる（`git fetch origin`改行`git push origin develop`は
+        `[['fetch', 'origin', 'git', 'push', 'origin', 'develop']]`になる）。
+
+        **複数行commandが必ずこうなる、という主張ではない。**行末へ区切り語を置いた
+        `cat x &&`改行`git push origin develop`は、**旧走査でも拾えていた**
+        （2026-09-14に実測）。#389が挙げたのは区切り語を置かない形である。
+
+        **`push`から始まるかどうかが門の反応と一致するのも、この7形に限る。**
+        `push_gate.pushed_source`はglobal optionを外した後の先頭語を見るため、
+        `git -C sub push origin develop`では割れる（`invocations`の戻りは`-C`から始まるが、
+        門は検出する。`test_directory_option_selects_the_repository`が固定している形である）。
+        """
+        for command in (
+            "cat x\ngit push origin develop",
+            "cat x\r\ngit push origin develop",
+            "cat x\n\n  git push origin develop",
+            "git fetch origin\ngit push origin develop",
+            "git add -A\ngit commit -m x\ngit push origin develop",
+            "git status\ngit push origin HEAD:develop",
+            "git status\ngit add -A\ngit commit -m x\ngit push origin develop",
+        ):
+            with self.subTest(command=command):
+                def pushes(calls):
+                    return [call for call in calls if call and call[0] == "push"]
+
+                self.assertEqual(
+                    pushes(command_line._invocations_in(command, "git")), [],
+                    "旧走査がpushを拾ってしまう",
+                )
+                self.assertNotEqual(
+                    pushes(command_line.invocations(command, "git")), [],
+                    "新走査がpushを拾えていない",
+                )
+
+    def test_the_walk_without_segments_broke_the_line_continuation(self):
+        r"""行継続では、旧走査は改行1文字を語として返していた。
+
+        `git push \`改行`origin develop`の第1引数が改行1文字になるため、
+        **`push_gate`は`origin`を読めず、`develop`へのpushとして扱えなかった。**
+        """
+        command = "git push \\\n  origin develop"
+        self.assertEqual(
+            command_line._invocations_in(command, "git"),
+            [["push", "\n", "origin", "develop"]],
+        )
+        self.assertEqual(
+            command_line.invocations(command, "git"), [["push", "origin", "develop"]]
+        )
+
+    def test_the_walk_without_segments_counted_a_comment_as_a_refspec(self):
+        """コメントを落とさない走査では、`# develop`の`develop`が引数に残っていた。
+
+        **`push_gate`はこれを`develop`へのrefspecとして数える。**#389より前からの
+        誤検知であり、同じ走査で直した。
+        """
+        command = "git push origin main # develop"
+        self.assertEqual(
+            command_line._invocations_in(command, "git"),
+            [["push", "origin", "main", "#", "develop"]],
+        )
+        self.assertEqual(
+            command_line.invocations(command, "git"), [["push", "origin", "main"]]
+        )
+
+    def test_heredoc_delimiter_of_an_arithmetic_shift(self):
+        """算術の`<<`から読むdelimiterが何になるかを固定する。
+
+        **機構まで固定する。**結果だけを見るtestは、delimiterが`2`でも`2))`でも通る。
+        `)`は`DELIMITER_END`に入っているため`2`で切れる。
+        """
+        self.assertEqual(
+            command_line._heredoc_delimiter("echo $((1 << 2))", len("echo $((1 <<")),
+            ("2", len("echo $((1 << 2")),
+        )
+        self.assertEqual(
+            command_line._heredoc_delimiter("(( i <<= 1 ))", len("(( i <<")),
+            ("=", len("(( i <<=")),
+        )
+
+    def test_hash_after_a_brace_or_an_escaped_space_is_not_a_comment(self):
+        r"""`${#x}`と`a\ #b`と`$(date)#x`の`#`をコメントと読まない。**bashも読まない。**
+
+        `{`／`}`／`!`／`)`は語の区切りとして数えない。**数えると行末までを捨て、
+        `git push`を取り落とす**（門が黙る側である）。`)`だけは形で意味が変わり
+        （`(echo hi)#x`ではコメントになる）、**字句では区別できないため入れていない。**
+        """
+        for command in (
+            "test ${#x} -gt 0 && git push origin develop",
+            "echo ${x}#1 && git push origin develop",
+            "echo a\\ #b && git push origin develop",
+            "echo $(date)#x ; git push origin develop",
+        ):
+            with self.subTest(command=command):
+                self.assertEqual(
+                    command_line.invocations(command, "git"),
+                    [["push", "origin", "develop"]],
+                )
+
+    def test_empty_heredoc_delimiter_is_not_treated_as_a_heredoc(self):
+        """`<<''`はheredocとして扱わない。**bashは空行またはEOFまでをbodyとして読む。**
+
+        この形には空行が無いため、bashはendまでbodyとして読み、`git`を実行しない
+        （2026-09-14に実測。`here-document delimited by end-of-file`の警告が出る）。
+        こちらはbodyを落とさず検査するため、**過検出の側である。**
+        乖離そのものは`DIVERGENT_CASES`が持つ。
+        """
+        self.assertEqual(
+            command_line.invocations("cat <<''\ngit push origin develop", "git"),
+            [["push", "origin", "develop"]],
+        )
+
+    def test_partially_terminated_heredocs_keep_everything(self):
+        """`cat <<A <<B`でAだけ終端している場合、Aのbodyごと検査する。
+
+        **途中まで捨てると、どこまで捨てたかで判定が変わる。**
+        1つでも終端行が無ければ1文字も捨てない（`_skip_heredoc_bodies`）。
+        """
+        self.assertEqual(
+            command_line.invocations("cat <<A <<B\nx\nA\ngit push origin develop", "git"),
+            [["push", "origin", "develop"]],
+        )
+
+    def test_control_flow_body_is_detected_even_if_bash_would_skip_it(self):
+        """条件分岐の中の行も呼び出しとして返す。**実行されるかは判定しない。**
+
+        `cat x && git push`の短絡と同じ扱いであり、**過検出の側である。**
+        止める門としては安全側に出るため、合わせない。
+        """
+        for command in (
+            "if false; then\ngit push origin develop\nfi",
+            "for i in 1 2; do\ngit push origin develop\ndone",
+        ):
+            with self.subTest(command=command):
+                self.assertEqual(
+                    command_line.invocations(command, "git"),
+                    [["push", "origin", "develop"]],
+                )
+
+    def test_control_flow_written_on_one_line_is_not_detected(self):
+        """**1行で書いた場合は逆になる。**command位置が`git`まで戻らない。
+
+        落ちる語は書き方で変わる。`false;`と続けると区切り語が現れず`if`で落ち、
+        `false ; then`と空けると`;`で戻ってから`then`で落ちる。
+        **どちらも取り落としであり、#389では直していない。**
+        """
+        for command in (
+            "if false; then git push origin develop; fi",
+            "if false ; then git push origin develop ; fi",
+        ):
+            with self.subTest(command=command):
+                self.assertEqual(command_line.invocations(command, "git"), [])
+
+    def test_separator_without_a_leading_space_is_still_missed(self):
+        """**`;`／`&&`の直前に空白が無い形は今も素通りする。**#389では直していない。
+
+        `shlex`は空白でしか語を切らないため、`x;`が1語になり`git`がcommand位置から
+        外れる。**bashは両方を実行する。**`inspector_readonly_guard.py`は
+        **引用の外のmetacharacterを生の行へ当てる形**で別に塞いでいる（ADR-0020）。
+        **直したらこのtestが落ちる。**そのときはCONTRIBUTINGの「取り切れていないもの」も直す。
+        """
+        for command in (
+            "cat x; git push origin develop",
+            "cat x;git push origin develop",
+            "cat x&&git push origin develop",
+        ):
+            with self.subTest(command=command):
+                self.assertEqual(command_line.invocations(command, "git"), [])
+
+    def test_command_substitution_on_one_line_is_still_missed(self):
+        """**1行に収めた`$(...)`と`eval`の内側は今も素通りする。**#389では直していない。
+
+        CONTRIBUTINGの「取り切れていないもの」に書いた形である。
+        **改行を挟んだ`$( )`の中の行は、行として拾う。**その差を並べて固定する。
+        **直したらこのtestが落ちる。**そのときはCONTRIBUTINGも直す。
+        """
+        for command in (
+            "echo $(git push origin develop)",
+            "eval 'git push origin develop'",
+        ):
+            with self.subTest(command=command):
+                self.assertEqual(command_line.invocations(command, "git"), [])
+        self.assertEqual(
+            command_line.invocations("MSG=$(\ngit push origin develop\n)", "git"),
+            [["push", "origin", "develop"]],
+        )
+
+    def test_word_initial_comment_is_dropped(self):
+        """語頭の`#`から行末までを落とす。**bashと同じ扱いである。**"""
+        self.assertEqual(
+            command_line.invocations("git push origin main # develop", "git"),
+            [["push", "origin", "main"]],
+        )
+        self.assertEqual(
+            command_line.invocations("# git push origin develop\ngit status", "git"),
+            [["status"]],
+        )
+
+    def test_hash_inside_a_word_or_quotes_is_kept(self):
+        """語の中と引用の中の`#`は落とさない。**bashも落とさない。**"""
+        self.assertEqual(
+            command_line.invocations("git log --format=%h#x", "git"),
+            [["log", "--format=%h#x"]],
+        )
+        self.assertEqual(
+            command_line.invocations("git commit -m 'fix #389'", "git"),
+            [["commit", "-m", "fix #389"]],
+        )
+
+    def test_arithmetic_shift_is_not_read_as_a_heredoc_that_eats_the_rest(self):
+        """`$((1 << 2))`の`<<`でheredocと読み違えても、残りの行を捨てない。
+
+        delimiterは`2`になり（`)`は`DELIMITER_END`にある）、終端行は現れない。
+        **捨てると後続の`git push`が門から消える。**`_skip_heredoc_bodies`は
+        終端行が無ければ1文字も捨てない。**delimiterの値そのものは
+        `test_heredoc_delimiter_of_an_arithmetic_shift`が固定する。**
+        """
+        for command in (
+            "echo $((1 << 2))\ngit push origin develop",
+            "(( i <<= 1 ))\ngit push origin develop",
+        ):
+            with self.subTest(command=command):
+                self.assertEqual(
+                    command_line.invocations(command, "git"),
+                    [["push", "origin", "develop"]],
+                )
+
+    def test_heredoc_without_a_terminator_does_not_hide_the_rest(self):
+        """終端行の無いheredocでは、残りを検査する側へ倒す。
+
+        **bashはEOFまでbodyとして読むため、bashは`git push`を実行しない。**
+        それでも検査するのは、`<<`を読み違えた場合に門が黙るのを避けるためである
+        （`_skip_heredoc_bodies`のdocstring）。**bashと一致しない側の判断であり、
+        `BASH_CASES`へは入れていない。**
+        """
+        self.assertEqual(
+            command_line.invocations("cat <<EOF\ngit push origin develop", "git"),
+            [["push", "origin", "develop"]],
+        )
+
+    def test_newline_separates_commands(self):
+        """改行、CRLF、空行＋字下げのいずれでも2行目を呼び出しとして見る。
+
+        **4形とも#389より前は素通りしていた。**旧走査（`_invocations_in`）が
+        `push`から始まる並びを返さないことを
+        `test_the_walk_without_segments_missed_the_second_line`が固定しており、
+        **この差が#389の中身である。**
+        """
+        for command in (
+            "cat x\ngit push origin develop",
+            "cat x\r\ngit push origin develop",
+            "cat x\n\n  git push origin develop",
+            "git status\ngit add -A\ngit commit -m x\ngit push origin develop",
+        ):
+            with self.subTest(command=command):
+                self.assertEqual(
+                    command_line.invocations(command, "git")[-1],
+                    ["push", "origin", "develop"],
+                )
+
+    def test_existing_separators_still_split(self):
+        """`;`／`&&`／`&`／`|`／`!`／`{`で検出できていた形を落とさない。"""
+        for separator in (";", "&&", "&", "|", "!", "{"):
+            command = f"cat x {separator} git push origin develop"
+            with self.subTest(separator=separator):
+                self.assertEqual(
+                    command_line.invocations(command, "git"),
+                    [["push", "origin", "develop"]],
+                )
+
+    def test_quoted_newline_does_not_split(self):
+        """引用の中の改行では切らない。**素朴に改行で切ると引用符が途中で切れる。**
+
+        切れた側は`tokenize`が失敗して空になり、**同じcommandのpushを取り落とす。**
+        """
+        command = 'git commit -m "題\n\n本文" && git push origin develop'
+        self.assertEqual(
+            command_line.invocations(command, "git"),
+            [["commit", "-m", "題\n\n本文"], ["push", "origin", "develop"]],
+        )
+
+    def test_heredoc_body_is_not_a_command(self):
+        """heredocのbodyを呼び出しとして数えない。**bashは実行しない。**
+
+        `<<EOF`／`<<'EOF'`／`<<"EOF"`／`<< EOF`／`<<-EOF`のいずれの書き方でも落とす。
+        """
+        for command in (
+            "cat > doc.md <<'EOF'\ngit push origin develop\nEOF\n",
+            'cat > doc.md <<"EOF"\ngit push origin develop\nEOF\n',
+            "cat > doc.md <<EOF\ngit push origin develop\nEOF\n",
+            "cat > doc.md << 'EOF'\ngit push origin develop\nEOF\n",
+            "cat > doc.md <<-EOF\n\tgit push origin develop\n\tEOF\n",
+        ):
+            with self.subTest(command=command):
+                self.assertEqual(command_line.invocations(command, "git"), [])
+
+    def test_command_after_a_heredoc_body_is_inspected(self):
+        """bodyの後ろのcommandは見る。**bodyの引用符で検査が止まらない。**
+
+        bodyを落とさずに`tokenize`へ渡すと、body の`'`1つで`shlex`が失敗し、
+        **後ろの`git push`まで検査できない。**
+        """
+        command = (
+            "cat > doc.md <<'EOF'\n"
+            "それはできない。don't\n"
+            "EOF\n"
+            "git push origin develop"
+        )
+        self.assertEqual(
+            command_line.invocations(command, "git"),
+            [["push", "origin", "develop"]],
+        )
+
+    def test_two_heredocs_on_one_line_are_both_skipped(self):
+        """1行に2つ開いたheredocのbodyを、開いた順に読み飛ばす。"""
+        command = (
+            "cat <<A <<B\n"
+            "git push origin develop\n"
+            "A\n"
+            "gh pr merge 1\n"
+            "B\n"
+            "git push origin develop"
+        )
+        self.assertEqual(
+            command_line.invocations(command, "git"),
+            [["push", "origin", "develop"]],
+        )
+        self.assertEqual(command_line.invocations(command, "gh"), [])
+
+    def test_carriage_return_is_not_a_separator(self):
+        r"""`\r`は区切りにしない。**bashも語の一部として扱う。**
+
+        `shlex`が`\r`を空白として落とすため、`develop\r`は`develop`として読む。
+        bashへ渡せば`fatal: invalid refspec`で落ちる形であり（2026-09-12に実測）、
+        **こちらはbashより厳しい側へ出る。**取り落としではないため合わせない。
+        """
+        self.assertEqual(
+            command_line.segments("git push origin develop\r"),
+            ["git push origin develop\r"],
+        )
+        self.assertEqual(
+            command_line.invocations("git push origin develop\r", "git"),
+            [["push", "origin", "develop"]],
+        )
+
+    def test_crlf_heredoc_body_is_skipped(self):
+        r"""CRLFのfileでも、delimiterと終端行がどちらも`EOF\r`になり body を落とす。
+
+        **走るcommandの並びはbashと同じである。**bashもbodyの`git push`を実行せず、
+        `git tag`だけを実行する。**これは`DIVERGENT_CASES`の同じ形が、
+        bashを起動して毎回測っている**（`test_known_divergences_from_bash_are_measured`）。
+        **引数は一致しない。**bashは`v1\r`を渡すが、`shlex`が`\r`を落とすため`v1`として読む。
+        **そのため`BASH_CASES`へは入れていない。**
+        """
+        command = "cat > d.md <<EOF\r\ngit push origin develop\r\nEOF\r\ngit tag v1\r\n"
+        self.assertEqual(command_line.invocations(command, "git"), [["tag", "v1"]])
+
+    def test_herestring_has_no_body(self):
+        """`<<<`はherestringであり、bodyを持たない。次の行は普通のcommandである。"""
+        self.assertEqual(
+            command_line.invocations("grep x <<<'text'\ngit push origin develop", "git"),
+            [["push", "origin", "develop"]],
+        )
+
+    def test_line_continuation_joins_the_command(self):
+        r"""`\`改行はbashと同じく消す。**残すと引数の位置がずれる。**
+
+        `shlex`は`\`改行を改行1文字の語として返すため、`git push \`改行`origin develop`の
+        `origin`が第1引数でなくなる（2026-09-12に実測）。
+        """
+        for command in (
+            "git push \\\n  origin develop",
+            "git \\\n  push origin develop",
+        ):
+            with self.subTest(command=command):
+                self.assertEqual(
+                    command_line.invocations(command, "git"),
+                    [["push", "origin", "develop"]],
+                )
+
+    def test_unterminated_quote_is_still_not_inspected(self):
+        """引用符が閉じていないcommandは検査しない。**今と同じ扱いである。**
+
+        引用の中で切らないため、後ろの行も引用の中として読む。`tokenize`が失敗し、
+        `invocations`は空を返す。**取り落としであって誤検知ではない。**
+        """
+        self.assertEqual(
+            command_line.invocations("echo 'x\ngit push origin develop", "git"), []
+        )
+
+    def test_tokenize_still_treats_newline_as_whitespace(self):
+        """**`tokenize`は変えていない。**語の切り方を`truncation_guard.py`と
+        `inspector_readonly_guard.py`が共有している。
+
+        改行を語として返すようにすると、それらの判定まで動く。
+        **区切りの追加は`segments`側で持つ。**
+        """
+        self.assertEqual(
+            command_line.tokenize("cat x\ngit push"), ["cat", "x", "git", "push"]
+        )
+
+    def test_command_starts_splits_on_newline_too(self):
+        """`command_starts`も`segments`で分ける。**片方だけだと定義がずれる。**"""
+        self.assertEqual(
+            command_line.command_starts("sudo cat x\nFOO=1 git show HEAD"),
+            [(("sudo",), "cat"), (("FOO=1",), "git")],
+        )
+
+    # `git`の呼び出しを記録するだけのshim。**PATHの先頭へ置いて本物を隠す。**
+    # shebangは`sys.executable`で書く。**`python3`がPATHに無い環境でも記録が空にならない。**
+    GIT_SHIM = (
+        f"#!{sys.executable}\n"
+        "import json, os, sys\n"
+        "open(os.environ['GIT_SHIM_LOG'], 'a', encoding='utf-8')"
+        ".write(json.dumps(sys.argv[1:]) + '\\n')\n"
+    )
+
+    # bashが実際に起動する`git`と突き合わせる形。改行（LF／CRLF／空行と字下げ）、
+    # 既存の区切り、heredoc（`<<`／`<<-`／終端後の続き／2つ同時）、行継続、
+    # コメント、算術の`<<`を含む。**この表は等値で突き合わせるため、
+    # bashと一致しない形は入れない。**それらは`DIVERGENT_CASES`が持つ
+    # （**数はそちらが正本である。ここへ書き写さない。**理由は各testが持つ）。
+    BASH_CASES = (
+        "cat x\ngit push origin develop",
+        "cat x\r\ngit push origin develop",
+        "cat x\n\n  git push origin develop",
+        "git status\ngit add -A\ngit commit -m x\ngit push origin develop",
+        "cat x ; git push origin develop",
+        "cat x && git push origin develop",
+        "cat x | git push origin develop",
+        "git push \\\n  origin develop",
+        "git \\\n  push origin develop",
+        'git commit -m "題\n\n本文" && git push origin develop',
+        "cat > doc.md <<'EOF'\ngit push origin develop\nEOF\ngit status",
+        "cat > doc.md <<-EOF\n\tgit push origin develop\n\tEOF\ngit status",
+        "echo $((1 << 2))\ngit push origin develop",
+        "git push origin main # develop",
+        # **`gh`は使わない。**本物の`gh`は内部で`git`を起動するため、shimがそれを拾う。
+        "echo x # git push origin develop",
+        # 変数を空にすると`&&`が短絡し、bashは`git`を起動しない。**値を入れて測る。**
+        "x=abc\ntest ${#x} -gt 0 && git push origin develop",
+        "echo ${x}#1\ngit status",
+        "echo a\\ #b && git push origin develop",
+        "echo $(date)#x ; git push origin develop",
+        "if false; then git push origin develop; fi",
+        "MSG=$(\ngit push origin develop\n)",
+        "cat > doc.md <<'EOF'\nそれはできない。don't\nEOF\ngit push origin develop",
+        "cat <<A <<B\ngit push origin develop\nA\ngit tag v1\nB\ngit push origin develop",
+        "grep x <<<'text'\ngit push origin develop",
+        "# git push origin develop\ngit status",
+        "echo 'git push origin develop'\ngit status",
+        "env FOO=1 git push origin develop\ngit status",
+        "cd .\ngit push origin develop",
+        "{ git push origin develop ; }\ngit status",
+    )
+
+    def test_invocations_match_what_bash_executes(self):
+        """**bashが実際に起動した`git`と、`invocations`が返す並びを突き合わせる。**
+
+        #389でずれていたのは、guardとbashでcommandの区切りが違ったためである。
+        **ずれを直接測る。**`git`を記録するだけのshimでPATHの先頭を差し替え、
+        `bash -c`で実行して、記録された引数の並びと比較する。
+
+        **本物の`git`は走らない。**shimが同じ名前で先に見つかる。実行するdirectoryも
+        tempdirであり、`cat > doc.md`はそこへ書く。
+        """
+        bash = shutil.which("bash")
+        if bash is None:
+            self.skipTest("bashが無い")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            shim = root / "git"
+            shim.write_text(self.GIT_SHIM, encoding="utf-8")
+            shim.chmod(0o755)
+            (root / "x").write_text("x\n", encoding="utf-8")
+            log = root / "log.jsonl"
+            environment = dict(os.environ)
+            environment["PATH"] = f"{root}{os.pathsep}{environment['PATH']}"
+            environment["GIT_SHIM_LOG"] = str(log)
+            for command in self.BASH_CASES:
+                with self.subTest(command=command):
+                    log.write_text("", encoding="utf-8")
+                    subprocess.run(
+                        [bash, "-c", command], cwd=str(root), env=environment,
+                        capture_output=True, text=True, encoding="utf-8", timeout=60,
+                    )
+                    executed = [
+                        json.loads(line)
+                        for line in log.read_text(encoding="utf-8").splitlines()
+                        if line.strip()
+                    ]
+                    self.assertEqual(
+                        command_line.invocations(command, "git"), executed,
+                        f"bashが実行したものと一致しない: {command!r}",
+                    )
+
+    # bashと一致しない形。**ずれていることを測る。**`BASH_CASES`の等値検査へは入れられない。
+    DIVERGENT_CASES = (
+        # `shlex`が`\r`を空白として落とすため、引数末尾の`\r`が消える。
+        ("git push origin develop\r",
+         [["push", "origin", "develop\r"]], [["push", "origin", "develop"]]),
+        # 同じ理由。bodyの読み飛ばし自体はbashと同じ結果になる。
+        ("cat > d.md <<EOF\r\ngit push origin develop\r\nEOF\r\ngit tag v1\r\n",
+         [["tag", "v1\r"]], [["tag", "v1"]]),
+        # 終端行の無いheredoc。bashはEOFまでbodyとして読み、`git`を実行しない。
+        ("cat <<EOF\ngit push origin develop",
+         [], [["push", "origin", "develop"]]),
+        # `)`を語の区切りに数えないため、`#`をコメントと読まない。bashは読む。
+        # **`)`は形で意味が変わり、字句では区別できない**（`WORD_BREAKS`のコメント）。
+        ("(echo hi)#x ; git push origin develop",
+         [], [["push", "origin", "develop"]]),
+        # 多重度の乖離。**bashは2回起動するが、返すのは1件である。**
+        ("for i in 1 2; do\ngit push origin develop\ndone",
+         [["push", "origin", "develop"], ["push", "origin", "develop"]],
+         [["push", "origin", "develop"]]),
+        # 空delimiter。bashは空行かEOFまでbodyとして読み、`git`を実行しない。
+        ("cat <<''\ngit push origin develop",
+         [], [["push", "origin", "develop"]]),
+        # 部分終端。Bのbodyがそのままendまで伸び、bashは`git`を実行しない。
+        ("cat <<A <<B\nx\nA\ngit push origin develop",
+         [], [["push", "origin", "develop"]]),
+        # **門が黙る側。**算術の`<<`をheredocと読み違え、後から現れた`2`を終端行と見て
+        # bodyごと落とす。**bashはpushを実行する。**
+        ("echo $((1 << 2))\ngit push origin develop\n2\n",
+         [["push", "origin", "develop"]], []),
+        # **門が黙る側。**bodyを実行する側へ流す形。落としてよいのは、受け取る側が
+        # bodyをcommandとして実行しない場合だけである。
+        ("bash <<'EOF'\ncd . ; git push origin develop\nEOF\n",
+         [["push", "origin", "develop"]], []),
+        # 条件分岐。bashは走らせないが、字句だけで見るこちらは1件返す。
+        ("if false; then\ngit push origin develop\nfi",
+         [], [["push", "origin", "develop"]]),
+    )
+
+    def test_known_divergences_from_bash_are_measured(self):
+        """**bashと一致しない形を、ずれたまま固定する。**
+
+        `BASH_CASES`は等値で突き合わせるため、これらは入れられない。
+        **入れずに黙っていると、ずれが記録から消える。**各形の判断の理由は
+        `hooks/command_line.py`のdocstringと、対応する個別のtestが持つ。
+
+        **`BASH_CASES`と同じ仕組みで、一致しないことの方を測る。**引数の中身だけがずれる形も、
+        起動の有無や回数がずれる形も入れてある。
+
+        **ここに在るのは乖離の全件ではない。**`;`の直前に空白が無い形は
+        `test_separator_without_a_leading_space_is_still_missed`が、引用の中の`\`改行は
+        `CodeRabbitGateTests.test_line_continuation_inside_the_body_is_still_missed`が固定しており、
+        **bashと突き合わせる形では測っていない。**
+        """
+        bash = shutil.which("bash")
+        if bash is None:
+            self.skipTest("bashが無い")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            shim = root / "git"
+            shim.write_text(self.GIT_SHIM, encoding="utf-8")
+            shim.chmod(0o755)
+            log = root / "log.jsonl"
+            environment = dict(os.environ)
+            environment["PATH"] = f"{root}{os.pathsep}{environment['PATH']}"
+            environment["GIT_SHIM_LOG"] = str(log)
+            for command, by_bash, by_parse in self.DIVERGENT_CASES:
+                with self.subTest(command=command):
+                    log.write_text("", encoding="utf-8")
+                    subprocess.run(
+                        [bash, "-c", command], cwd=str(root), env=environment,
+                        capture_output=True, text=True, encoding="utf-8", timeout=60,
+                    )
+                    executed = [
+                        json.loads(line)
+                        for line in log.read_text(encoding="utf-8").splitlines()
+                        if line.strip()
+                    ]
+                    self.assertEqual(executed, by_bash, "bash側の観測が変わった")
+                    self.assertEqual(
+                        command_line.invocations(command, "git"), by_parse,
+                        "こちら側の読みが変わった",
+                    )
+
+    def test_blank_and_empty_commands_have_no_segments(self):
+        """空と空白だけのcommandは区切りを持たない。**空を1つのcommandと数えない。**"""
+        for command in ("", "   ", "\n", "\n\n  \n"):
+            with self.subTest(command=command):
+                self.assertEqual(command_line.segments(command), [])
+
+
+class HookPayloadShapeTests(unittest.TestCase):
+    """**hookが、mappingでない入力で落ちないことを確かめる**（#242）。
+
+    [PR #241](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/241)のreview指摘は`coderabbit_gate.py`に対するものだったが、
+    **型で全数走査したら当時の5本すべてに同じ形が残っていた。**指摘は代表例であって全数ではない。
+
+    **後から足したhookもこの一覧へ入れる。**`inspector_readonly_guard.py`は#376で足した。
+    """
+
+    HOOKS = (GH_GUARD, BASE_GUARD, PUSH_GATE, MERGE_REPORT, CODERABBIT_GATE,
+             INSPECTOR_GUARD)
 
     MALFORMED = (
         "[]",
@@ -1919,6 +2776,959 @@ class HookPayloadShapeTests(unittest.TestCase):
                                      f"{Path(script).name} が例外を出した")
                     self.assertEqual(result.stdout.strip(), "",
                                      f"{Path(script).name} が止めてしまった")
+
+
+class InspectorReadonlyGuardTests(unittest.TestCase):
+    """検査 subagent の`Bash`を読み取りだけに絞るhook（#376）。
+
+    **allowlistである。**「通ってはいけないもの」を数え上げるのではなく、
+    通ってよいものだけを列挙し、それ以外が落ちることを確かめる。
+    """
+
+    # **`diff`／`show`／`log`／`blame`は`--no-ext-diff --no-textconv`が要る。**
+    # option 無しでも git config の外部 helper が走るため（`GIT_HELPER_SUBCOMMANDS`）。
+    HELPER = "--no-ext-diff --no-textconv"
+
+    ALLOWED = (
+        f"git show {HELPER} HEAD",
+        f"git -C /tmp/wt --no-pager diff {HELPER} origin/main..HEAD",
+        f"git log {HELPER} --oneline -20",
+        f"git diff {HELPER} HEAD~1 HEAD",
+        f"git blame {HELPER} AGENTS.md",
+        "git rev-parse HEAD",
+        "git merge-base --is-ancestor a b",
+        f"git show {HELPER} HEAD:AGENTS.md",
+        # subcommandの後ろの`-c`はmergeのcombined diffであり読み取り専用である
+        f"git log {HELPER} -c HEAD",
+        # `--output`への前方一致で誤爆させない
+        f"git log {HELPER} --output-indicator-new=X --oneline",
+        "git grep -n pattern",
+        # **引数の中の`FOO=bar`は代入ではない。**command位置だけを見る
+        "grep FOO=bar AGENTS.md",
+        f"git diff {HELPER} -- file=1",
+        "cat AGENTS.md",
+        "wc -l AGENTS.md",
+        "head -40 AGENTS.md",
+        # **`--no-optional-locks`はglobal位置に要る**
+        "git --no-optional-locks status",
+        # `rg`の`--pre`と前方一致で誤爆させない
+        "rg --pre-glob *.md pattern",
+        "rg -n pattern AGENTS.md",
+    )
+
+    DENIED = (
+        # 書き込みcommandそのもの
+        "rm -rf /",
+        "sed -i s/a/b/ AGENTS.md",
+        "cp a b",
+        "tee out",
+        # 書ける経路を持つ「読み取りに見える」command
+        "sort -o out in",
+        "uniq in out",
+        # 任意codeを実行できるもの
+        "python3 -c 'print(1)'",
+        "sh -c 'rm x'",
+        "bash -lc 'rm x'",
+        "xargs rm",
+        # 状態を変えるgit subcommand
+        "git checkout -- .",
+        "git commit -m x",
+        "git branch -D develop",
+        "git config --global user.name x",
+        "git push origin develop",
+        # subcommandが無い
+        "git",
+        # `shlex`が空白でしか切らないために潰れる形
+        "cat a>b",
+        "cat a;rm -rf /",
+        "git show HEAD > /tmp/x",
+        "git show --no-ext-diff --no-textconv HEAD | tee f",
+        # **#396の改訂の途中でbashと食い違い、実測して戻した2形。**
+        # **向きは逆である。**1つ目は穴（途中の版が通していた）、
+        # 2つ目は過検出（途中の版は`b`をallowlist外として拒否していた。bashは何も実行しない）。
+        # 改訂前（`origin/develop`）も改訂後も拒否する。詳細はADR-0020が持つ。
+        # 個別のtestは`test_quoted_separator_word_is_still_refused`と
+        # `test_pipe_inside_a_comment_is_not_a_stage`が持つ。
+        # **ここへも置くのは、allowlist／denylistの一括走査から外れないようにするためである。**
+        "rg pattern '{' cat --pre sha1sum AGENTS.md",
+        "cat AGENTS.md # note a | b",
+        "echo $(rm -rf /)",
+        "echo `rm -rf /`",
+        # 改行で並べた2つ目のcommand
+        "git show HEAD\nrm -rf /",
+        # 語へ分けられない
+        "cat 'unclosed",
+        # **subcommandが読み取り専用でも、gitのoptionが任意commandを実行する**
+        "git -c core.pager=rm log",
+        "git -ccore.pager=rm log",
+        "git --config-env=core.pager=P log",
+        "git --exec-path=/tmp show",
+        "git grep -Oless pattern",
+        "git grep --open-files-in-pager=rm x",
+        # **subcommandが読み取り専用でも、fileを書くoption**
+        "git diff --output=/tmp/x",
+        # 環境変数の代入だけで任意commandを起動できる
+        "GIT_EXTERNAL_DIFF=rm git show HEAD",
+        "env GIT_EXTERNAL_DIFF=rm git show HEAD",
+        # **前置語は allowlist の外側から実行の権限や解決先を変える**
+        "sudo cat /etc/shadow",
+        "env cat AGENTS.md",
+        "exec cat AGENTS.md",
+        "command cat AGENTS.md",
+        "nohup cat AGENTS.md",
+        "time cat AGENTS.md",
+        # **program をbasenameで認可しない。**名前が一致するだけの別の実行fileである
+        "./git show HEAD",
+        "../git log",
+        "/tmp/cat file",
+        "/usr/bin/git status",
+        "/usr/bin/git --no-optional-locks status",
+        # **`rg`のoptionが任意commandを起動する**
+        "rg --pre /tmp/evil.sh pattern",
+        "rg --pre=/tmp/evil.sh pattern",
+        "rg --hostname-bin /tmp/evil.sh pattern",
+        # **`git status`は既定で`.git/index`を書く。**global位置の指定でなければ通さない
+        "git status",
+        "git status --no-optional-locks",
+        # **外部 helper を明示的に起動するoption**
+        "git diff --ext-diff HEAD~1 HEAD",
+        "git show --textconv HEAD:AGENTS.md",
+        "git grep --textconv pattern",
+        "git cat-file --filters HEAD:AGENTS.md",
+        # **option 無しでも helper は走る。**両方の明示が無ければ通さない
+        "git diff HEAD~1 HEAD",
+        "git show HEAD",
+        "git log -p",
+        "git blame AGENTS.md",
+        "git diff --no-ext-diff HEAD~1 HEAD",
+        "git show --no-textconv HEAD",
+    )
+
+    def test_help_option_is_refused_because_it_hijacks_the_subcommand(self):
+        """**`git <cmd> --help`は`git help <cmd>`へ書き換わる**（実測）。
+
+        `git version --help`と`git --no-optional-locks status --help`で man が出力された。
+        **guardは`version`／`status`を見ているのに、gitが実行するのは`help`である。**
+        `man`は`ALLOWED_PROGRAMS`に無いが、git 経由で起動する。
+
+        **3例目の`git rev-parse HEAD --help`は書き換わらない形である。**
+        書き換わるのは global option を剥いだ後の先頭に`--help`が来たときだけである。
+        **意図した過剰拒否として固定する。**位置の判定を増やすより単純である。
+        """
+        for command in ("git version --help",
+                        "git --no-optional-locks status --help",
+                        "git rev-parse HEAD --help"):
+            with self.subTest(command=command):
+                self.assertIsNotNone(inspector_readonly_guard.check(command))
+
+    def test_grep_pager_option_is_refused_when_abbreviated(self):
+        """**短縮拒否を`cat-file`へ限定しない。**
+
+        限定していたとき、`git grep --open-files-in-pag=sha1sum` で
+        **`ALLOWED_PROGRAMS`に無い`sha1sum`が実際に実行された**（実測）。
+        `git grep --textc` も通っていた。**subcommandを数え上げると数え漏れが穴になる。**
+        """
+        # **`--ext-di`は穴ではない。**diff 系の parser は短縮を受け付けず、git 自身が落とす。
+        # **予防として同じ扱いにしている**ことを固定する。
+        # **必須flagを先に置く。**置かないと位置判定で落ち、短縮判定が壊れても通ってしまう。
+        for command in ("git grep --open-files-in-pag=sha1sum AGENTS -- AGENTS.md",
+                        "git grep --textc zzz -- AGENTS.md",
+                        "git diff --no-ext-diff --no-textconv --ext-di HEAD"):
+            with self.subTest(command=command):
+                self.assertIsNotNone(inspector_readonly_guard.check(command))
+
+    def test_separator_looking_arguments_are_refused(self):
+        """**単独の区切り語も拒否する**（実測で迂回できた）。
+
+        `shlex`は引用符を剥いだ後の語を返すため、**bashが literal な引数として渡す語と
+        区別が付かない。**`rg <pattern> { cat --pre <command> <file>`では、
+        `command_line.invocations`が`{`で invocation を切り、**その先が無検査になった。**
+        検査 subagent の中で実行したところ、**`ALLOWED_PROGRAMS`に無い`/usr/bin/uname`が
+        実際に起動した。**
+
+        **`|`だけは#396で外した。**pipeは区間へ割って区間ごとに検査する。
+        **残りの区切り語は、クォートしていても拒否する。**引用の外かどうかでは判定できない。
+        切る位置を決めるのは`command_line`の側であり、**引用符を剥いだ後の語しか見ないためである。**
+        """
+        # **`command_line.SEPARATORS`のうち`|`以外の全件が拒否されること。**
+        # `!`は`FORBIDDEN_OUTSIDE_QUOTES`に入れてある。入れないと、metacharacter検査だけでは
+        # 素通りし、**`rg <pattern> ! cat --pre sha1sum <file>`で`sha1sum`が実際に起動した。**
+        # **この形にしておけば、共有moduleへ区切りが増えても穴にならない。**
+        for separator in sorted(command_line.SEPARATORS - {"|"}):
+            with self.subTest(separator=separator):
+                self.assertIsNotNone(
+                    inspector_readonly_guard.check(
+                        f"rg pattern {separator} cat --pre sha1sum AGENTS.md"),
+                    f"区切り語 {separator!r} が素通りする")
+        for command in ("rg Linux ! cat --pre sha1sum AGENTS.md",
+                        "git grep Linux ! cat -O sha1sum",
+                        "rg Linux { cat --pre /usr/bin/uname AGENTS.md",
+                        "git diff --no-ext-diff --no-textconv { cat --output=/tmp/x HEAD",
+                        "git grep Linux { cat -O/bin/date AGENTS.md"):
+            with self.subTest(command=command):
+                self.assertIsNotNone(inspector_readonly_guard.check(command))
+
+    def test_signature_verification_is_refused(self):
+        """**署名検証は`gpg.program`（既定`gpg`）を起動する**（実測）。
+
+        検査 subagent の中で`git log --show-signature`を実行したところ、
+        **`gpg`が`~/.gnupg`に directory と keybox file を作った。**
+        `ALLOWED_PROGRAMS`に無い program が、guard を通って file を書いた。
+
+        **`--show-signature`を拒否するだけでは閉じない。**`--format=%GK`でも走る。
+        `%G?`／`%GS`／`%GK`は同じ経路であるため、**`%G`を含む語を拒否する。**
+        """
+        for command in ("git log --no-ext-diff --no-textconv --show-signature -1",
+                        "git log --no-ext-diff --no-textconv --show-sig -1",
+                        "git log --no-ext-diff --no-textconv -1 --format=%GK",
+                        "git log --no-ext-diff --no-textconv -1 --pretty=format:%G?",
+                        "git show --no-ext-diff --no-textconv --show-signature HEAD"):
+            with self.subTest(command=command):
+                self.assertIsNotNone(inspector_readonly_guard.check(command))
+        # `%G`を含まない format は通る
+        self.assertIsNone(
+            inspector_readonly_guard.check(
+                "git log --no-ext-diff --no-textconv -1 --format=%H"))
+
+    def test_verbose_status_is_refused(self):
+        """**`git status -vv`はtextconvを走らせる**（実測）。
+
+        `-v`は走らせないが、`-vv`はworking treeのpatchを出す過程でtextconvを呼ぶ。
+        **`status`は`--no-ext-diff --no-textconv`を受理しない**ため、打ち消す形が無い。
+        **verboseそのものを拒否する。**`diff.external`は`-vv`でも走らなかった。
+        """
+        for command in ("git --no-optional-locks status -vv",
+                        "git --no-optional-locks status -v",
+                        "git --no-optional-locks status --verbose",
+                        "git --no-optional-locks status --verb",
+                        "git --no-optional-locks status -sv"):
+            with self.subTest(command=command):
+                self.assertIsNotNone(inspector_readonly_guard.check(command))
+        for command in ("git --no-optional-locks status",
+                        "git --no-optional-locks status --short",
+                        # **他の subcommand の `-v` は巻き込まない。**
+                        "git grep -v pattern",
+                        "git log --no-ext-diff --no-textconv -v"):
+            with self.subTest(command=command):
+                self.assertIsNone(inspector_readonly_guard.check(command))
+
+    def test_rg_search_zip_is_refused(self):
+        """**`rg -z`は外部decompressorを起動する。**
+
+        対象fileの拡張子に応じて`gzip`／`xz`／`zstd`等を呼ぶ。**どれも`ALLOWED_PROGRAMS`に無い。**
+
+        **根拠の水準は`--pre`と違う。**`rg --help`で確認できるのはoptionの存在だけであり、
+        **外部processの起動は測っていない。**ripgrepの文書化された挙動に依る拒否である。
+        """
+        for command in ("rg -z pattern", "rg --search-zip pattern", "rg -nz pattern"):
+            with self.subTest(command=command):
+                self.assertIsNotNone(inspector_readonly_guard.check(command))
+        self.assertIsNone(inspector_readonly_guard.check("rg -n pattern"))
+
+    def test_bundled_short_options_are_refused(self):
+        """**short optionは束ねられる**（実測）。
+
+        `git grep -nOzzz`は`-n -O zzz`であり、`token.startswith("-O")`では見えない。
+        **素通りしたとき、gitがpagerとして`zzz`をexecしようとした。**
+        """
+        for command in ("git grep -nOzzz AGENTS -- AGENTS.md",
+                        "git grep -Ozzz x",
+                        "git grep -nO less x"):
+            with self.subTest(command=command):
+                self.assertIsNotNone(inspector_readonly_guard.check(command))
+        for command in ("git grep -n pattern", "git grep -i -n x"):
+            with self.subTest(command=command):
+                self.assertIsNone(inspector_readonly_guard.check(command))
+
+    def test_git_version_is_allowed_for_recording_the_environment(self):
+        """**判定は git の version 依存である。**検査 session 側で記録できるようにする。
+
+        `git --version` は**許可していない global option として**拒否される。`git version` と書く。
+        """
+        self.assertIsNone(inspector_readonly_guard.check("git version"))
+        self.assertIsNotNone(inspector_readonly_guard.check("git --version"))
+
+    def test_unlisted_global_option_names_itself_in_the_reason(self):
+        """**拒否理由が原因を名指しする。**
+
+        以前は「`git` に subcommand が無い」としか出ず、どの option が原因か分からなかった。
+        """
+        reason = inspector_readonly_guard.check("git -p log --no-ext-diff --no-textconv")
+        self.assertIsNotNone(reason)
+        self.assertIn("global option", reason)
+        self.assertIn("-p", reason)
+
+    def test_cat_file_denied_options_are_refused_when_abbreviated(self):
+        """**`git cat-file`は短縮綴りを受理する**（実測）。
+
+        `--textcon`／`--textc`／`--te`はすべて`--textconv`として実行された
+        （textconv driver に `echo TEXTCONV_RAN` する script を設定し、
+        **3形とも出力が `TEXTCONV_RAN`、対照の `-p` は file の中身**になった）。
+        **完全一致だけを見ると抜けられる。**
+        """
+        for command in ("git cat-file --textcon HEAD:AGENTS.md",
+                        "git cat-file --te HEAD:AGENTS.md",
+                        "git cat-file --filt HEAD:AGENTS.md"):
+            with self.subTest(command=command):
+                self.assertIsNotNone(inspector_readonly_guard.check(command))
+        self.assertIsNone(inspector_readonly_guard.check("git cat-file -p HEAD:AGENTS.md"))
+
+    def test_abbreviation_denial_does_not_reach_other_subcommands(self):
+        """**短縮拒否を`diff`系へ広げない。**
+
+        `--filter`は`rev-list`の正当な読み取り専用 option であり、`--filters`の短縮ではない。
+        **巻き添えで落とすと検査が止まる。**
+        （`git log --filter=...`は git 2.34.1 では`unrecognized argument`になる。
+        限定の根拠は`rev-list`である。）
+        """
+        self.assertIsNone(
+            inspector_readonly_guard.check("git rev-list --objects --filter=blob:none HEAD"))
+
+    def test_unlisted_global_options_are_refused(self):
+        """**許可していない global option は、値を取るかが分からない**（実測）。
+
+        `git --super-prefix rev-parse submodule--helper x`では、guardが`rev-parse`を、
+        gitが`submodule--helper`を subcommand として読む。
+        **subcommand allowlist も必須 flag も、この読みの上に乗っている。**
+        """
+        for command in ("git --super-prefix rev-parse submodule--helper x",
+                        "git -p log --no-ext-diff --no-textconv",
+                        "git --paginate diff --no-ext-diff --no-textconv"):
+            with self.subTest(command=command):
+                self.assertIsNotNone(inspector_readonly_guard.check(command))
+        for command in ("git -C /tmp/wt --no-pager rev-parse HEAD",
+                        "git --git-dir=/tmp/x rev-parse HEAD"):
+            with self.subTest(command=command):
+                self.assertIsNone(inspector_readonly_guard.check(command))
+
+    def test_required_global_option_is_not_satisfied_by_a_value(self):
+        """**値として消費される位置では、必須 option は git へ届かない。**
+
+        `git --namespace --no-optional-locks status`では`--no-optional-locks`が
+        namespace の値になる。**集合検査のままでは「在る」と誤判定する。**
+        """
+        self.assertIsNotNone(
+            inspector_readonly_guard.check("git --namespace --no-optional-locks status"))
+        self.assertIsNone(
+            inspector_readonly_guard.check("git --no-optional-locks status"))
+
+    def test_required_helper_options_must_sit_right_after_the_subcommand(self):
+        """**必須flagはsubcommandの直後2語でなければ、gitへ届かない**（実測）。
+
+        - `git diff -- f --no-ext-diff` — `--`より後ろはpathspecである
+        - `git log -S --no-ext-diff -p` — `-S`が次の語を検索文字列として飲む
+
+        **値を取るoptionを数え上げる形にしない。**位置で決めれば前に何も置けない。
+        """
+        for command in ("git diff -- f --no-ext-diff --no-textconv",
+                        "git log -S --no-ext-diff --no-textconv -p",
+                        "git log --oneline --no-ext-diff --no-textconv"):
+            with self.subTest(command=command):
+                self.assertIsNotNone(inspector_readonly_guard.check(command))
+        # 順序は問わない。**位置だけを見る。**
+        self.assertIsNone(
+            inspector_readonly_guard.check("git diff --no-ext-diff --no-textconv -- f"))
+        self.assertIsNone(
+            inspector_readonly_guard.check("git diff --no-textconv --no-ext-diff HEAD"))
+
+    def test_allowed_commands_pass(self):
+        for command in self.ALLOWED:
+            with self.subTest(command=command):
+                self.assertIsNone(inspector_readonly_guard.check(command))
+
+    def test_denied_commands_are_refused(self):
+        for command in self.DENIED:
+            with self.subTest(command=command):
+                self.assertIsNotNone(
+                    inspector_readonly_guard.check(command),
+                    f"{command!r}が通ってしまう",
+                )
+
+    def test_empty_command_passes(self):
+        """空は拒否理由にしない。**hookは空commandを止める役ではない。**"""
+        for command in ("", "   ", "\n"):
+            with self.subTest(command=command):
+                self.assertIsNone(inspector_readonly_guard.check(command))
+
+    def test_newline_is_split_before_tokenizing(self):
+        """**改行で区切った2行目もcommand位置として見る**（#389）。
+
+        `shlex`は改行を空白として扱うため、まとめて`tokenize`へ渡すと
+        `git show rm -rf /`という1つの語列になり、`rm`がcommand位置に来ない。
+
+        **2つを別々に固定する。**`command_line.programs`は`segments`が改行で区切るように
+        なって`rm`を返す。**この hookは自分で行へ割ってから判定するため、hookの経路では
+        `segments`へ改行が渡らない**（`LINE_SPLIT_RE`）。**順序は起こり得ないので主張しない。**
+
+        **1行目は必須optionを満たしておく。**満たさないと`check()`が1行目の理由で返り、
+        **`rm`の行まで届かない**（`git show`は`--no-ext-diff --no-textconv`を要求される。
+        別の検査である）。**allowlistで落ちたことまで、理由の文面で見る。**
+        """
+        self.assertEqual(
+            command_line.programs("git show HEAD\nrm -rf /"), ["git", "rm"]
+        )
+        reason = inspector_readonly_guard.check(
+            f"git show {self.HELPER} HEAD\nrm -rf /")
+        self.assertIsNotNone(reason)
+        self.assertIn("許可していない program のため拒否した: 'rm'", reason)
+
+    def test_carriage_return_is_refused_before_tokenizing(self):
+        """**CRは行の区切りにしない。**`\\r`で割ると、bashの読みと食い違う。
+
+        **bashはCRをcommandの終端として扱わず、語の中のただの文字にする。**
+        一方`shlex.whitespace`は`' \\t\\r\\n'`であり、CRを空白として切る。
+        そのため`command_line`にはCRの後ろがcommand位置に見えず、
+        **`programs`は前のcommandしか返さない。**metacharacter検査でも捕まらない。
+        `LINE_SPLIT_RE`で割るのではなく、**tokenize前に拒否することを固定する。**
+
+        **この形は実測していない。**`Bash` toolへ生のCRを送るとtransportがLFへ正規化する
+        （ADR-0020の`検証`）。**固定するのは`check()`の判定である。**
+        """
+        smuggled = f"git show {self.HELPER} HEAD\rrm -rf /"
+        # **`rm`はcommand位置に見えない。**だから語ごとの検査では捕まらない
+        self.assertEqual(command_line.programs(smuggled), ["git"])
+        # **`LINE_SPLIT_RE`はCRで割らない。**割ると2行目としてbashの読みと食い違う
+        self.assertEqual(
+            len(inspector_readonly_guard.LINE_SPLIT_RE.split(smuggled)), 1)
+        reason = inspector_readonly_guard.check(smuggled)
+        self.assertIsNotNone(reason, "CRを含むcommandが通ってしまう")
+        self.assertIn("復帰文字", reason)
+        # **許可programだけで書いた形でも、CRを含めば拒否する**
+        self.assertIsNotNone(
+            inspector_readonly_guard.check("rg x f\rcat --pre sha1sum f"))
+
+    def test_comment_only_line_is_allowed(self):
+        """コメントだけの行を通す（#389）。**bashは何も実行しない。**
+
+        **以前は`#`という語が`ALLOWED_PROGRAMS`に無いprogramとして拒否されていた。**
+        **語の後ろへ置いた形（`… HEAD # メモ`）は以前から通っている。**command位置ではない。
+        **`#`が引数の位置にある場合も判定は動く。**そちらは
+        `test_denied_option_inside_a_comment_is_no_longer_refused`が固定する。
+        """
+        # `git show`は`--no-ext-diff`と`--no-textconv`を要求される。**別の検査である。**
+        # ここで見たいのはコメントの扱いなので、その要求は満たしておく。
+        read_only = "git show --no-ext-diff --no-textconv HEAD"
+        for command in (
+            "# メモ",
+            f"# メモ\n{read_only}",
+            f"{read_only}\n# メモ",
+            f"{read_only} # メモ",
+        ):
+            with self.subTest(command=command):
+                self.assertIsNone(inspector_readonly_guard.check(command))
+
+    def test_comment_after_a_separator_stays_refused(self):
+        """区切りの後ろのコメントは、**コメントを落としても通らない**（#389）。
+
+        同hookは#384で`&&`／`;`という区切り語を、#396で**引用の外のmetacharacterを生の行へ**
+        当てて拒否する（[ADR-0020](../docs/decisions/0020-inspector-readonly-by-hook.md)）。
+        **拒否はコメントを落とす前に決まる。**#389の前後で判定は変わらない。
+        **「コメントを通す」を、区切りを含む行まで広げて読まないために固定する。**
+        """
+        read_only = "git show --no-ext-diff --no-textconv HEAD"
+        for command in (f"{read_only} && # メモ", f"{read_only} # ; rm -rf /"):
+            with self.subTest(command=command):
+                self.assertIsNotNone(inspector_readonly_guard.check(command))
+
+    def test_denied_option_inside_a_comment_is_no_longer_refused(self):
+        """コメントの中に書いた、拒否される側のoptionは見ない（#389）。
+
+        **bashはどれも渡さない。**同hookのoption検査は`command_line.invocations`越しに
+        引数を読むため、コメントごと落ちる。**#389より前は拒否していた形である**
+        （2026-09-14に実測）。`#`はcommand位置に無く、
+        `test_comment_only_line_is_allowed`の範囲には入らない。
+
+        **穴は開いていない。**コメントの外へ同じoptionを出せば今も拒否する。
+        後半がそれを固定する。
+        """
+        for command in (
+            "git show --no-ext-diff --no-textconv HEAD # --ext-diff",
+            "git version # --help",
+            "git log --no-ext-diff --no-textconv -1 # %GK",
+            "rg -n pattern AGENTS.md # --pre sha1sum",
+        ):
+            with self.subTest(command=command):
+                self.assertIsNone(inspector_readonly_guard.check(command))
+        for command in (
+            "git show --no-ext-diff --no-textconv HEAD --ext-diff",
+            "git version --help",
+            "git log --no-ext-diff --no-textconv -1 %GK",
+            "rg -n pattern AGENTS.md --pre sha1sum",
+        ):
+            with self.subTest(command=command):
+                self.assertIsNotNone(
+                    inspector_readonly_guard.check(command),
+                    f"コメントの外でも通ってしまう: {command}",
+                )
+
+    def test_unbalanced_quote_inside_a_comment_is_still_refused(self):
+        """コメントの中に閉じない引用符があれば、行ごと拒否する（#389）。
+
+        **同hookはコメントを落とす前に、生の行を`tokenize`する**（`_check_line`）。
+        そのため「コメントだけの行は通る」は、**行が語へ分けられる場合の話である。**
+        **#389の前後で変わらない**（2026-09-14に実測）。
+        `test_comment_only_line_is_allowed`を、引用符を含むコメントまで広げて
+        読まないために固定する。
+        """
+        self.assertIsNotNone(
+            inspector_readonly_guard.check(
+                "git show --no-ext-diff --no-textconv HEAD # それはできない。don't")
+        )
+
+    def test_comment_cannot_satisfy_a_required_option(self):
+        """コメントに書いたoptionを、要求の充足として数えない（#389）。
+
+        `git diff`／`show`／`log`／`blame`は`--no-ext-diff`と`--no-textconv`の
+        両方を要求する（[ADR-0020](../docs/decisions/0020-inspector-readonly-by-hook.md)）。
+        **この形は#389より前から拒否されている。**#384が2 optionの位置を
+        **subcommandの直後2語**に限ったため、末尾のコメントでは届かない。
+        **コメントを落としても結論は変わらないことを固定する。**
+        """
+        self.assertIsNotNone(
+            inspector_readonly_guard.check(
+                "git diff HEAD # --no-ext-diff --no-textconv")
+        )
+        self.assertIsNotNone(
+            inspector_readonly_guard.check(
+                "git diff # --no-ext-diff --no-textconv HEAD")
+        )
+        self.assertIsNone(
+            inspector_readonly_guard.check(
+                "git diff --no-ext-diff --no-textconv HEAD")
+        )
+
+    def test_quoted_separator_word_is_still_refused(self):
+        """**区切り語は、クォートしていても拒否する**（#384の型。#396でも残した）。
+
+        `_quoting_reason`は引用の中を見ないため、これだけでは破れる。
+        `rg <pattern> '{' cat --pre sha1sum <file>`は、**bashが`{`をliteralな引数として
+        rgへ渡すのに、`invocations`はそこでinvocationを切る。**その結果
+        **`--pre sha1sum`がoption検査へ一度も届かない**（2026-09-14に実測）。
+        **guardがcommandを切る位置と、bashが切る位置がずれる型そのものである。**
+
+        後半が固定するのは、**`invocations`の読み方**である。`--pre`まで届かないことを見る。
+        **bash側の読みは固定していない**（`{`を引数としてrgへ渡すことは2026-09-14に実測したが、
+        この test は bash を起動しない）。
+        """
+        for separator in sorted(command_line.SEPARATORS):
+            with self.subTest(separator=separator):
+                self.assertIsNotNone(
+                    inspector_readonly_guard.check(
+                        f"rg pattern '{separator}' cat --pre sha1sum AGENTS.md"),
+                    f"クォートした区切り語 {separator!r} が素通りする",
+                )
+        # **`invocations`はクォートを見ないため、`--pre`まで届かない。**
+        # これが拒否を残す理由である。
+        self.assertEqual(
+            command_line.invocations(
+                "rg pattern '{' cat --pre sha1sum AGENTS.md", "rg"),
+            [["pattern"]],
+        )
+
+    def test_pipe_is_allowed_when_every_stage_is_allowlisted(self):
+        """pipeを区間へ割り、**区間ごとに先頭programを検査する**（#396）。
+
+        **read-onlyは各区間で保たれる。**以前は`|`を含む語をそれ自体で拒否していたため、
+        **patternに`|`を1文字も書けず**（`rg -c '^\|' <file>`は拒否されていた。2026-09-14に旧版で実測）、
+        **`head`と`tail`を繋いで行の窓を取ることもできなかった**（`sed`はallowlistに無い）。
+        `docs/hardware/tbd-register.md`は519行で最長行が6778字あり、
+        **この repository の正本はMarkdownの表で区切り文字が`|`である。**
+        """
+        for command in (
+            "cat AGENTS.md | wc -l",
+            "head -n 752 AGENTS.md | tail -n +735",
+            "rg -n Linux AGENTS.md | head -5",
+            "git log --no-ext-diff --no-textconv --oneline -20 | head -5",
+            "cat AGENTS.md | grep -n Linux | head -3",
+        ):
+            with self.subTest(command=command):
+                self.assertIsNone(inspector_readonly_guard.check(command))
+
+    def test_pipe_stage_outside_the_allowlist_is_refused(self):
+        """**区間のどれか1つでも先頭が allowlist の外なら拒否する**（#396）。
+
+        **pipe を許したことで書き込み経路が開いていないことを固定する。**
+        `tee`／`sh`／`python3`はいずれも`ALLOWED_PROGRAMS`に無い。
+        """
+        for command in (
+            "cat AGENTS.md | tee out.txt",
+            "cat AGENTS.md | sh",
+            "cat AGENTS.md | python3 -c 'open(\"x\",\"w\")'",
+            "cat AGENTS.md | wc -l | tee out.txt",
+            "tee out.txt | cat AGENTS.md",
+        ):
+            with self.subTest(command=command):
+                self.assertIsNotNone(
+                    inspector_readonly_guard.check(command),
+                    f"allowlist 外の区間が通ってしまう: {command}",
+                )
+
+    def test_pipe_inside_a_comment_is_not_a_stage(self):
+        """コメントの中の`|`では区間へ割らない（#396）。**bashも割らない。**
+
+        割ると、**bashが実行しないコメントの後半が独立したcommandとして
+        program allowlistとoption検査へ入る**（`cat f # note a | b`で`b`が
+        許可していないprogramとして落ちた。2026-09-14に実測）。
+
+        **通しはしない。**コメントの中身は一覧の1〜6の対象であり、`;`と同じ扱いにする。
+        `# ; rm -rf /`が拒否されるのと同じ側である。
+        """
+        for command in (
+            "cat AGENTS.md # note a | b",
+            "rg -n Linux AGENTS.md # x | rg --pre /bin/echo y",
+        ):
+            with self.subTest(command=command):
+                reason = inspector_readonly_guard.check(command)
+                self.assertIsNotNone(reason)
+                self.assertIn("コメントの中の", reason)
+        # **`|`を含まないコメントは、7以降の検査を素通りする。**
+        self.assertIsNone(inspector_readonly_guard.check("git version # --help"))
+
+    def test_logical_or_is_not_a_pipe(self):
+        """`||`はpipeではない（#396）。**前が失敗したときに後ろが走る。**
+
+        `_pipe_stages`は`||`で割らないため、`|`が引用の外に残って拒否される。
+        """
+        for command in ("cat AGENTS.md || rm -rf /", "rg pattern || cat --pre sha1sum AGENTS.md"):
+            with self.subTest(command=command):
+                reason = inspector_readonly_guard.check(command)
+                self.assertIsNotNone(reason, f"`||`が通ってしまう: {command}")
+                self.assertIn("`||`", reason)
+
+    def test_empty_pipe_stage_is_refused(self):
+        """pipeの区間が空なら拒否する（#396）。**bashはsyntax errorにする。**"""
+        for command in ("cat AGENTS.md | | wc -l", "| wc -l", "cat AGENTS.md |"):
+            with self.subTest(command=command):
+                self.assertIsNotNone(inspector_readonly_guard.check(command))
+
+    def test_quoted_metacharacters_are_allowed(self):
+        """**クォートの中のmetacharacterでは拒否しない**（#396）。
+
+        **bashは展開しない。**以前は`shlex`が引用符を剥いだ後の語を見ていたため、
+        `rg -n 'a|b' <file>`のようなpatternが書けなかった。**この repository の正本は
+        Markdownの表であり、区切り文字が`|`である。**
+        """
+        for command in (
+            "rg -n 'a|b' AGENTS.md",
+            "rg -oP '(?<!\\\\)\|' AGENTS.md",
+            "rg -n 'foo(bar)' AGENTS.md",
+            "rg -n 'a>b' AGENTS.md",
+            "grep -n 'a;b' AGENTS.md",
+            "rg -n '$(id)' AGENTS.md",
+            "rg -n '`id`' AGENTS.md",
+        ):
+            with self.subTest(command=command):
+                self.assertIsNone(
+                    inspector_readonly_guard.check(command),
+                    f"クォート済みのpatternが拒否される: {command}",
+                )
+
+    def test_expansion_inside_double_quotes_is_refused(self):
+        """**ダブルクォートの中の展開は拒否する**（#396）。
+
+        **「クォートされているか」では足りない。**`"$(id)"`はクォートされているが実行される
+        （2026-09-14にbash 5.1.16(1)-releaseで実測。`'$(id -u)'`は文字列のまま、
+        `"$(id -u)"`は`1000`、`"${HOME}"`はhome directoryのpathへ置き換わる）。
+        """
+        for command in (
+            'cat "$(id)"',
+            'echo "${HOME}"',
+            'cat "`id`"',
+            'rg -n "$USER" AGENTS.md',
+        ):
+            with self.subTest(command=command):
+                reason = inspector_readonly_guard.check(command)
+                self.assertIsNotNone(reason, f"展開される形が通ってしまう: {command}")
+                self.assertIn("ダブルクォート", reason)
+
+    def test_unquoted_metacharacters_are_still_refused(self):
+        """引用の外のmetacharacterは拒否したままである（#396）。"""
+        for command in (
+            "cat a>b",
+            "cat a;rm -rf /",
+            "echo $(id)",
+            "echo `id`",
+            "cat AGENTS.md > out.txt",
+            "cat AGENTS.md >> out.txt",
+            "cat ${HOME}/x",
+        ):
+            with self.subTest(command=command):
+                self.assertIsNotNone(
+                    inspector_readonly_guard.check(command),
+                    f"引用の外のmetacharacterが通ってしまう: {command}",
+                )
+
+    def test_unterminated_quote_is_refused(self):
+        """閉じない引用符は拒否する（#396）。**`shlex`も同じ入力で失敗する。**"""
+        for command in ("rg -n 'abc AGENTS.md", 'cat "abc'):
+            with self.subTest(command=command):
+                self.assertIsNotNone(inspector_readonly_guard.check(command))
+
+    def test_allowlist_holds_no_program_that_writes_on_its_own(self):
+        """allowlistへ書き込めるcommandが紛れ込まないよう固定する。
+
+        **将来`sort`や`tee`を足したくなったときに落ちる。**足すなら、その理由を
+        ADR-0020へ書いたうえでこのtestも変える。
+        """
+        writable = {"sort", "uniq", "sed", "tee", "dd", "cp", "mv", "install",
+                    "python3", "python", "sh", "bash", "zsh", "xargs", "awk",
+                    "perl", "ruby", "node", "tar", "touch", "mkdir", "rm"}
+        overlap = writable.intersection(inspector_readonly_guard.ALLOWED_PROGRAMS)
+        self.assertEqual(overlap, set(), f"書き込める program が allowlist にある: {overlap}")
+
+    def test_git_subcommands_hold_no_mutating_verb(self):
+        mutating = {"add", "commit", "push", "fetch", "pull", "checkout", "switch",
+                    "restore", "reset", "clean", "branch", "tag", "config",
+                    "worktree", "stash", "gc", "am", "apply", "rebase", "merge",
+                    "cherry-pick", "revert", "mv", "rm", "init", "clone"}
+        overlap = mutating.intersection(inspector_readonly_guard.GIT_READONLY_SUBCOMMANDS)
+        self.assertEqual(overlap, set(), f"状態を変える subcommand が allowlist にある: {overlap}")
+
+    def test_deny_payload_is_emitted_for_a_write(self):
+        """hookとして起動したとき、`permissionDecision: deny`を出す。"""
+        payload = json.dumps({"tool_input": {"command": "rm -rf /"}})
+        result = subprocess.run(
+            [sys.executable, INSPECTOR_GUARD],
+            input=payload, capture_output=True, text=True,
+            encoding="utf-8", errors="replace", timeout=120,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr[:300])
+        emitted = json.loads(result.stdout)
+        self.assertEqual(
+            emitted["hookSpecificOutput"]["permissionDecision"], "deny")
+        self.assertIn("rm", emitted["hookSpecificOutput"]["permissionDecisionReason"])
+
+    def test_read_only_payload_passes_through(self):
+        payload = json.dumps({"tool_input": {"command": "git show --no-ext-diff --no-textconv HEAD"}})
+        result = subprocess.run(
+            [sys.executable, INSPECTOR_GUARD],
+            input=payload, capture_output=True, text=True,
+            encoding="utf-8", errors="replace", timeout=120,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr[:300])
+        self.assertEqual(result.stdout.strip(), "")
+
+    def test_both_inspector_agents_wire_the_guard(self):
+        """**2つの agent 定義が実際にこのhookを呼んでいることを固定する。**
+
+        hookを置いただけでは何も起きない。`.claude/agents/`のfrontmatterへ
+        書かれていて初めて掛かる。**片方だけ書き忘れる形を止める。**
+        """
+        agents = REPO_ROOT_FOR_TEMPLATES / ".claude" / "agents"
+        for name in ("consistency-inspector.md", "fresh-context-reviewer.md"):
+            with self.subTest(agent=name):
+                text = (agents / name).read_text(encoding="utf-8")
+                self.assertIn("inspector_readonly_guard.py", text,
+                              f"{name}がguardを呼んでいない")
+                self.assertIn("PreToolUse", text, f"{name}のhookがPreToolUseでない")
+
+    def test_transparent_prefixes_do_not_smuggle_an_allowed_program(self):
+        """**`command_line`が透過させる前置語を、この guard は透過させない。**
+
+        `sudo cat /etc/shadow`は`cat`だけを見れば allowlist を通る。
+        `TRANSPARENT_PREFIXES`のすべてについて、command位置に現れたら落ちることを固定する。
+        """
+        for prefix in command_line.TRANSPARENT_PREFIXES:
+            with self.subTest(prefix=prefix):
+                self.assertIsNotNone(
+                    inspector_readonly_guard.check(f"{prefix} cat AGENTS.md"),
+                    f"{prefix}付きの呼び出しが通ってしまう",
+                )
+
+    def test_a_program_with_a_path_is_rejected(self):
+        """**basenameで認可しない。**名前が一致するだけの別の実行fileである。
+
+        `./git`は`git`という名前だが、`PATH`上のgitではない。**allowlistの前提
+        （名前が実体を決める）が崩れる。**絶対pathも許さない。検査に要らない。
+        """
+        for command in ("./git show HEAD", "../git log", "/tmp/cat f", "/usr/bin/git status"):
+            with self.subTest(command=command):
+                reason = inspector_readonly_guard.check(command)
+                self.assertIsNotNone(reason, f"{command!r}が通ってしまう")
+                self.assertIn("path を含む program", reason)
+
+    def test_rg_options_that_execute_a_command_are_rejected(self):
+        """`rg --pre`は検索対象ごとにその command を起動する。`=`付きも同じ。
+
+        **program名のallowlistだけでは足りないことを固定する。**
+        """
+        for command in (
+            "rg --pre /tmp/evil.sh pattern",
+            "rg --pre=/tmp/evil.sh pattern",
+            "rg --hostname-bin /tmp/evil.sh pattern",
+        ):
+            with self.subTest(command=command):
+                self.assertIsNotNone(inspector_readonly_guard.check(command))
+        # **前方一致で誤爆させない。**`--pre-glob`はglobであってcommandではない
+        self.assertIsNone(inspector_readonly_guard.check("rg --pre-glob *.md pattern"))
+
+    def test_git_status_requires_the_global_no_optional_locks(self):
+        """`git status`は既定でindexをrefreshし`.git/index`を書く。
+
+        **`--no-optional-locks`はglobal optionである。**subcommandの後ろでは
+        gitが受け付けないため、その形を「安全な形」として通さない。
+        """
+        self.assertIsNotNone(inspector_readonly_guard.check("git status"))
+        self.assertIsNotNone(
+            inspector_readonly_guard.check("git status --no-optional-locks")
+        )
+        self.assertIsNone(
+            inspector_readonly_guard.check("git --no-optional-locks status")
+        )
+
+    def test_git_external_helpers_are_rejected_with_and_without_flags(self):
+        """外部 helper は明示のoptionでも、option無しでも走る。
+
+        **`--ext-diff`／`--textconv`／`--filters`を拒否するだけでは閉じない。**
+        `git diff`は`diff.external`を、`diff`／`show`／`log`／`blame`はtextconvを
+        **flag無しで走らせる**（実測）。両方の明示を要求する。
+        **`--no-ext-diff`だけではtextconvを止められない。**
+        """
+        for command in (
+            "git diff --ext-diff HEAD~1 HEAD",
+            "git show --textconv HEAD:AGENTS.md",
+            "git grep --textconv pattern",
+            "git cat-file --filters HEAD:AGENTS.md",
+        ):
+            with self.subTest(explicit=command):
+                self.assertIsNotNone(inspector_readonly_guard.check(command))
+        for command in (
+            "git diff HEAD~1 HEAD",
+            "git show HEAD",
+            "git log -p",
+            "git blame AGENTS.md",
+            "git diff --no-ext-diff HEAD~1 HEAD",
+            "git show --no-textconv HEAD",
+        ):
+            with self.subTest(implicit=command):
+                self.assertIsNotNone(
+                    inspector_readonly_guard.check(command),
+                    f"{command!r}が通ってしまう",
+                )
+        for subcommand in ("diff", "show", "log", "blame"):
+            with self.subTest(allowed=subcommand):
+                self.assertIsNone(
+                    inspector_readonly_guard.check(
+                        f"git {subcommand} --no-ext-diff --no-textconv"
+                    )
+                )
+
+    def test_assignment_like_arguments_are_not_rejected(self):
+        """**代入の判定はcommand位置だけに当てる。**
+
+        全語へ当てると`grep FOO=bar file`のような読み取り専用commandまで落ちる。
+        **誤検知はhookごと無効化される側の失敗である。**
+        """
+        self.assertIsNone(inspector_readonly_guard.check("grep FOO=bar AGENTS.md"))
+        self.assertIsNone(
+            inspector_readonly_guard.check(
+                "git diff --no-ext-diff --no-textconv -- file=1"
+            )
+        )
+        self.assertIsNotNone(inspector_readonly_guard.check("FOO=bar cat AGENTS.md"))
+
+    def test_command_starts_keeps_the_prefixes_programs_drops(self):
+        """`command_starts`が前置語を残し、`programs`がそれを落とすこと。
+
+        **2つの関数が同じ走査から出ていることを固定する。**別実装にすると、
+        片方だけが前置語を数え落とす。
+        """
+        starts = command_line.command_starts("sudo FOO=1 cat x && git show HEAD")
+        self.assertEqual(starts, [(("sudo", "FOO=1"), "cat"), ((), "git")])
+        self.assertEqual(
+            command_line.programs("sudo FOO=1 cat x && git show HEAD"), ["cat", "git"])
+
+    def test_command_starts_keeps_a_prefix_with_no_program(self):
+        """program語が続かない前置語も落とさない。**捨てると呼び出し側が見逃す。**"""
+        self.assertEqual(command_line.command_starts("sudo && ls"),
+                         [(("sudo",), None), ((), "ls")])
+
+    def _wrapper_command(self, agent):
+        """agent frontmatterから`command:`のscalarを読む。
+
+        **PyYAMLを使わない。**このリポジトリはYAML parserを依存に持たず、
+        `validate_pages_output.py`も同じ理由でscalarを手で読んでいる。
+        **testのためだけに依存を増やさない。**
+
+        対象は`command: "..."`という1行のdouble-quoted scalarに限る。
+        **形が変わったらこのtestは落ちる。**黙って読み飛ばさないよう、
+        見つからなければ`fail`する。
+        """
+        text = (REPO_ROOT_FOR_TEMPLATES / ".claude" / "agents" / agent).read_text(
+            encoding="utf-8")
+        front = text[4:text.index("\n---\n", 4) + 1]
+        for line in front.splitlines():
+            stripped = line.strip()
+            if not stripped.startswith('command: "'):
+                continue
+            scalar = stripped[len('command: "'):]
+            self.assertTrue(scalar.endswith('"'), f"{agent}のcommandが1行で閉じていない")
+            # double-quoted scalarのescapeを戻す。`\"`と`\\`だけを扱う。
+            return scalar[:-1].replace('\\"', '"').replace("\\\\", "\\")
+        self.fail(f"{agent}に`command: \"...\"`の行が無い")
+
+    def _run_wrapper(self, agent, env_extra, payload):
+        shell = shutil.which("sh") or "/bin/sh"
+        return subprocess.run(
+            [shell, "-c", self._wrapper_command(agent)],
+            input=payload, capture_output=True, text=True,
+            encoding="utf-8", errors="replace", timeout=120,
+            env={**os.environ, **env_extra},
+        )
+
+    def test_wrapper_blocks_when_the_guard_cannot_start(self):
+        """**起動できないときは fail closed である。**
+
+        hookのwrapperが`exit 0`で終わると、guardが無い環境で`Bash`が素通りする。
+        **`exit 2`だけがtool呼び出しを止める**（[公式文書](https://code.claude.com/docs/en/hooks)。
+        他の非0は「blockしないerror」として扱われ、動作は続行する）。
+
+        guardが無い場合とpython3が無い場合の両方を測る。
+        """
+        write = json.dumps({"tool_input": {"command": "rm -rf /"}})
+        for agent in ("consistency-inspector.md", "fresh-context-reviewer.md"):
+            with tempfile.TemporaryDirectory() as empty:
+                with self.subTest(agent=agent, case="guard missing"):
+                    result = self._run_wrapper(agent, {"CLAUDE_PROJECT_DIR": empty}, write)
+                    self.assertEqual(result.returncode, 2, result.stderr[:300])
+            with self.subTest(agent=agent, case="python3 missing"):
+                result = self._run_wrapper(
+                    agent,
+                    {"CLAUDE_PROJECT_DIR": str(REPO_ROOT_FOR_TEMPLATES),
+                     "PATH": "/nonexistent"},
+                    write,
+                )
+                self.assertEqual(result.returncode, 2, result.stderr[:300])
+
+    def test_wrapper_passes_through_a_working_guard(self):
+        """**fail closedにしたことで、正常系まで落としていないことを測る。**"""
+        env = {"CLAUDE_PROJECT_DIR": str(REPO_ROOT_FOR_TEMPLATES)}
+        for agent in ("consistency-inspector.md", "fresh-context-reviewer.md"):
+            with self.subTest(agent=agent, case="read-only"):
+                result = self._run_wrapper(
+                    agent, env, json.dumps({"tool_input": {"command": "git show --no-ext-diff --no-textconv HEAD"}}))
+                self.assertEqual(result.returncode, 0, result.stderr[:300])
+                self.assertEqual(result.stdout.strip(), "")
+            with self.subTest(agent=agent, case="write"):
+                result = self._run_wrapper(
+                    agent, env, json.dumps({"tool_input": {"command": "rm -rf /"}}))
+                self.assertEqual(result.returncode, 0, result.stderr[:300])
+                emitted = json.loads(result.stdout)
+                self.assertEqual(
+                    emitted["hookSpecificOutput"]["permissionDecision"], "deny")
+
+    def test_the_wrapper_does_not_fail_open(self):
+        """`|| exit 0`という形が戻っていないことを、文字列でも固定する。"""
+        for agent in ("consistency-inspector.md", "fresh-context-reviewer.md"):
+            with self.subTest(agent=agent):
+                command = self._wrapper_command(agent)
+                self.assertNotIn("|| exit 0", command)
+                self.assertIn("exit 2", command)
+
+    def test_the_guard_is_not_wired_globally(self):
+        """**`.claude/settings.json`へは置かない。**置くと通常の作業 session が止まる。"""
+        settings = REPO_ROOT_FOR_TEMPLATES / ".claude" / "settings.json"
+        self.assertNotIn("inspector_readonly_guard", settings.read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

@@ -50,6 +50,7 @@ DeskCatは、ESP32とRaspberry Pi Zero Wで構成する、机上で静かに振�
 {: .dc-tone-4}
 
 - [Toolchainと端末profile](docs/toolchains/README.md)
+- [検証済みコマンド](docs/toolchains/verified-commands.md)
 - [Runbook](docs/runbooks/README.md)
 - [Contribution方法](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/CONTRIBUTING.md)
 - [Security](SECURITY.md)

@@ -284,6 +284,8 @@ application の `Cargo.lock` を追跡する。template 由来の `.gitignore` �
 
 最小 source が未確認 GPIO、LCD、sensor、servo を初期化しないことを確認してから実行する。`firmware/esp32` で実行する。
 
+**ここは toolchain 導入後の動作確認としての再掲である。****command の正本は[検証済みコマンド](../toolchains/verified-commands.md)であり、正本が変わったらここを合わせる**（[ADR-0018](../decisions/0018-instruction-file-structure.md)）。
+
 ```bash
 . "$HOME/export-esp.sh"
 cargo fmt --all -- --check

@@ -1,0 +1,104 @@
+name: Declaration audit
+
+# **共有branchへ入った時点で、宣言trailerを失ったcommitを検出する。**
+#
+# `review-gate.yml`はPull Requestを見る。**mergeそのものは見ていない。**
+# squash commitへtrailerが載るかは、merge を実行する経路が決める。
+# `scripts/hooks/gh_metadata_guard.py`はBash toolのPreToolUse hookとして
+# `gh pr merge`のmessageを検査するが、**hookを通らない経路がある。**
+# [#373](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/373)はGitHub MCPの
+# `merge_pull_request` toolでmergeされ、hookは1度も呼ばれず、
+# squash commit `6bcd7b9`が宣言をすべて失った（[#377](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/377)で`DECLARATION_EXEMPT`へ登録）。
+# **GitHubのweb UIからのmergeも同じである。**
+#
+# **hookをどれだけ賢くしても、hookを通らない経路は塞げない。**
+# 経路に依らない位置は、commitが共有branchへ入った後である。
+# 詳細と、採らなかった案は[ADR-0021](../../docs/decisions/0021-declaration-audit-on-push.md)にある。
+#
+# **これは阻止ではなく事後検出である。**pushは既に完了している。
+# 検出した時点で`main`昇格の`history`が落ちることが確定しており、
+# **昇格の直前ではなく、原因を作ったmergeの直後に気付けるようにする**のが目的である。
+on:
+  push:
+    branches:
+      - main
+      - develop
+
+permissions:
+  contents: read
+
+concurrency:
+  # **cancel-in-progressにしない。**pushごとに範囲が違うため、
+  # 後のpushで前のpushの範囲の検査を打ち切ると、その範囲を誰も見なくなる。
+  group: declaration-audit-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    name: Audit declaration trailers of pushed commits
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # commit messageのtrailerと、範囲の解決に履歴が要る。
+          fetch-depth: 0
+          # このstepの後にrepository側のscriptを実行する。
+          # checkoutが残すtokenをそのscriptから読めないようにする。
+          persist-credentials: false
+
+      - name: Audit pushed commits
+        # 値は環境変数で渡す。`run`へ直接展開すると、shaがshellの構文として
+        # 解釈される余地が残る。
+        env:
+          PUSH_BEFORE: ${{ github.event.before }}
+          PUSH_AFTER: ${{ github.event.after }}
+        run: |
+          set -eu
+
+          # branch作成時と、`before`が履歴に無い場合（force push後など）に備える。
+          #
+          # **直前の1 commitへ縮めない。**force pushが複数のcommitを持ち込んだとき、
+          # `${PUSH_AFTER}^`を基点にすると**中間のcommitを1つも見ない。**
+          # 宣言を持たない中間commitが素通りすることを実測した（ADR-0021の`検証`）。
+          #
+          # 代わりに**`main`へ入っていない範囲をすべて見る。**`main`到達済みのcommitは
+          # 昇格時に検査済みであり、そこから先を全部見れば取りこぼしが無い。
+          # 既に通っているcommitを再検査するだけなので、余分に落ちることもない。
+          # **3つの状況を分ける。**2つに畳むと、共通祖先が無い push が
+          # 「main への push」と同じ扱いになり、中間commitを1つも見ない
+          # （[#385](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/385)で実測）。
+          FROM_ROOT=""
+          BASE="$PUSH_BEFORE"
+          if [ -z "$BASE" ] \
+            || [ "$BASE" = "0000000000000000000000000000000000000000" ] \
+            || ! git cat-file -e "${BASE}^{commit}" 2>/dev/null; then
+            MERGE_BASE="$(git merge-base "$PUSH_AFTER" origin/main 2>/dev/null || true)"
+            if [ -z "$MERGE_BASE" ]; then
+              # **`origin/main`と共通祖先が無い。**基点を置けないため`base..head`で
+              # 範囲を表せない。**`head`から辿れるcommitをすべて見る。**
+              # `--base`は`CLASS`の計算にだけ使う（履歴の最初のcommitを渡す）。
+              BASE="$(git rev-list --max-parents=0 "$PUSH_AFTER" | tail -n 1)"
+              FROM_ROOT="--from-root"
+              echo "origin/main と共通祖先が無い。head から辿れる範囲をすべて見る。"
+            elif [ "$MERGE_BASE" != "$PUSH_AFTER" ]; then
+              BASE="$MERGE_BASE"
+              echo "before を解決できないため、main へ入っていない範囲をすべて見る: ${BASE}"
+            elif BASE="$(git rev-parse --verify "${PUSH_AFTER}^" 2>/dev/null)"; then
+              # **merge-base が head と一致するのは`main`自身へのpushである。**
+              # `main`へ入る経路は昇格 Pull Request であり、範囲は既に検査されている。
+              echo "main への push とみなし、直前の1 commit を見る: ${BASE}"
+            else
+              # 親を持たないcommit（履歴の最初）。**検査対象が無い。**
+              echo "before も親も解決できない。検査対象が無いため終了する。"
+              exit 0
+            fi
+          fi
+
+          # **判定は`review_gate.py`が持つ。**ここへ複製しない。
+          # 同scriptは`git interpret-trailers --parse`でtrailerを読む。
+          # **文字列としてmessageにあるかではない。**
+          # shellcheck disable=SC2086 # FROM_ROOT は空か単一の option である
+          python3 scripts/review_gate.py history \
+            --base "$BASE" --head "$PUSH_AFTER" $FROM_ROOT

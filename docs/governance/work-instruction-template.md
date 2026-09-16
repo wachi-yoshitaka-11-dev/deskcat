@@ -75,8 +75,8 @@ merge後に機械で確かめられることをまとめてある。**同skill�
 ```
 
 **`## 検証`を書かない。**検証コマンドの正本は
-[AGENTS.md](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/AGENTS.md)の「検証」節と
-`scripts/README.md`である。**その作業だけに必要な追加の検証があるときだけ、
+[検証済みコマンド](../toolchains/verified-commands.md)と`scripts/README.md`である
+（[ADR-0018](../decisions/0018-instruction-file-structure.md)で`AGENTS.md`から移した）。**その作業だけに必要な追加の検証があるときだけ、
 「この作業に固有のこと」へ1行で書く。**
 
 **`## Pull Requestの規約`を書かない。**base、squash、label、milestone、trailer、
