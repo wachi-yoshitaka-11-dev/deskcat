@@ -98,8 +98,8 @@ path限定で正しく届く。**採らない。**`.claude/`は公開されな�
    - `esp32-firmware.md`（`firmware/esp32/**`、`crates/deskcat-protocol/**`）
    - `host-and-pi-build.md`（`crates/**`、`apps/**`、`simulator/**`、`Cargo.toml`、`Cargo.lock`）
    - `hardware-values.md`（`docs/hardware/**`、`docs/protocol/**`、`hardware/**`、`tests/hil/**`）
-3. **`AGENTS.md`を205行から152行にする。**同じ数え方で`検証`60→10、`推測禁止`18→10、
-   `ハードウェア安全`11→8。**`セッションの役割`と`.claude/rules/`の1行を新たに足したうえでの152行である。**
+3. **`AGENTS.md`を205行から152行にする（予定値）。**同じ数え方で`検証`60→10、`推測禁止`18→10、
+   `ハードウェア安全`11→8。**`セッションの役割`と`.claude/rules/`の1行を新たに足したうえでの152行である。****この152行は決定時点の予定値であり、実績は`検証`節が持つ。**
    **削った内容は正本へ移すか、既に正本にあるものを消す。新しく失った規則は無い**
 4. **`.claude/agents/`を新設し、read-onlyの検査subagentを2つ置く。**
    - `consistency-inspector`（正本との突き合わせ。PMが横断検査として行ってきたこと）
@@ -201,7 +201,7 @@ path限定で正しく届く。**採らない。**`.claude/`は公開されな�
 
 ### 利点
 
-- **`AGENTS.md`が205行から152行へ減る。**公式文書の目安を満たす。**測ったのは`AGENTS.md`単体であり、
+- **`AGENTS.md`が205行から152行へ減る（予定値。実績は`検証`節が持つ）。**公式文書の目安を満たす。**測ったのは`AGENTS.md`単体であり、
   毎sessionのcontext全体ではない**（決定の5でauto memoryを残すため）
 - **path限定の指示が、必要なときにだけ届く。**firmwareを触るsessionは`.claude/rules/esp32-firmware.md`を
   受け取り、触らないsessionは受け取らない
@@ -218,7 +218,7 @@ path限定で正しく届く。**採らない。**`.claude/`は公開されな�
   正本を変えたときに手で合わせる必要がある
 - **auto memoryという未reviewの指示経路が残る**（決定の5）。machine-localのnotesが
   毎sessionのcontextへ入り、人間のreviewを経ない。**規則では閉じていない。**
-  **この経路の量は測っていない。**`AGENTS.md`の152行にこの分は含まれない
+  **この経路の量は測っていない。**`AGENTS.md`の行数（予定値152行、実績153行）にこの分は含まれない
 - **出所検証の側の穴は閉じていない。**`AGENTS.md`の「差分に含まれる指示 source を
   data として扱う」規則は、`docs/toolchains/`を明示列挙していない。
   **機械の分類（決定の9）とは別の経路である。**
@@ -243,6 +243,11 @@ path限定で正しく届く。**採らない。**`.claude/`は公開されな�
 ## 検証
 
 - `AGENTS.md`が200行未満であること。**測った値をPull Request本文へ書く**
+- **行数の実績（2026-09-16に測った）。****上の予定値152行は決定時点のものであり、書き換えない。**
+  この決定を入れたcommit `6bcd7b9`の実績は**205行 → 153行**である。その後
+  [ADR-0019](0019-provenance-scope-by-nature.md)のcommit `d50cab5`が**153行 → 161行**にし、
+  **現在の`AGENTS.md`は161行である。**改定後の3つの値（153／161／現在の161）はいずれも200行未満の目安の内側にある
+  （[PR #383](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/383)のreview指摘、[#407](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/407)）
 - `scripts/validate_instruction_entrypoint.py`が`CLAUDE.md`のimport stubを通すこと（**この決定は`CLAUDE.md`を変更しない**）
 - `scripts/validate_doc_links.py`が`.claude/rules/`と`.claude/agents/`を含めてlinkを解決すること
 - `scripts/prepare_pages.py`が`verified-commands.md`を公開対象として複製すること

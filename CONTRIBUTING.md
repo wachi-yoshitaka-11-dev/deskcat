@@ -865,8 +865,8 @@ bodyに書いたpushを証拠として数えなくなる**（`stop_claim_guard.p
 （`gh pr create --title t --base develop # --project deskcat`。bashは渡さない）。
 **hookの種別だけで向きを決められない。**増える側と減る側が同じ変更に入っている。
 
-**command位置の判定では、引用の外で開いたheredocのbodyを見ない。****終端行を書いてある限りは、
-である。**終端行の無いheredocでは残りの行をcommandとして検査する（**bashは実行しない。
+**command位置の判定では、引用の外で開いたheredocのbodyを、開いているheredocのすべてに終端行があるときに限って見ない。**
+終端行の無いheredocでは残りの行をcommandとして検査する（**bashは実行しない。
 検査しすぎる側の乖離であり、理由はdocstringが持つ**）。**引用の中へ入ったbodyは引数の文字列として読む**
 （`gh pr comment --body "$(cat <<'EOF' … EOF)"`の本文は`coderabbit_gate.py`が照合する）。
 **条件分岐の中の行は、独立した行にあれば検査の対象になる。実行されるかは判定しない。**
