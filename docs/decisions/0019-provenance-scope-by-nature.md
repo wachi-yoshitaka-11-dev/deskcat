@@ -95,7 +95,7 @@ Development Workflow、Hardware Safety Policy、ADR、`docs/hardware/`、`docs/p
 ### 利点
 
 - **列挙に無い file でも判定できる。**次に`docs/`へ正本を足したとき、出所検証側は自動的に追随する。
-- **`AGENTS.md`の増加が6行で済んだ**（153行 → 159行）。200行未満の目安を保つ。
+- **`AGENTS.md`の増加が6行で済む見込みだった**（153行 → 159行。**予定値。実績は`検証`節が持つ**）。200行未満の目安を保つ。
 - **2つの範囲が独立に動ける。**`INSTRUCTION_SOURCES`へ`scripts/`を入れたことが、
   gate の実装 file を出所検証の枠へ引き込む理由にならなくなる。
 - **「片方に入っている」を根拠にする誤りを、明示的に禁じた。**
@@ -123,6 +123,10 @@ Development Workflow、Hardware Safety Policy、ADR、`docs/hardware/`、`docs/p
 - `python3 scripts/validate_table_columns.py`（`MISMATCHES=0`）
 - `python3 scripts/validate_instruction_entrypoint.py`（`CONTENT=MATCHED`）
 - `AGENTS.md`が200行未満であること
+- **行数の実績（2026-09-16に測った）。****上の予定値159行は決定時点のものであり、書き換えない。**
+  この決定を入れたcommit `d50cab5`の実績は**153行 → 161行**（増加8行）である。
+  **現在の`AGENTS.md`は161行であり、**200行未満の目安の内側にある
+  （[PR #383](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/383)のreview指摘、[#407](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/407)）
 - 見直し条件: **性質での判定が実際にぶれた場合**（同じ file について、別の session が別の結論を出した場合）。
   そのときは列挙へ戻すのではなく、**判定例を表へ足して基準を鋭くする。**
   それでも収束しないなら、選択肢Aを再検討する。
