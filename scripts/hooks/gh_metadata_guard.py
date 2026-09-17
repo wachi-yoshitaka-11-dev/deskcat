@@ -171,7 +171,8 @@ LABEL_OPTIONS = ("--label", "-l")
 TEMPLATE_OPTIONS = ("--template", "-T")
 
 # helpの表示だけを求める呼び出し。**何も作らないため、metadataを要求しない。**
-# **3つの検査すべてに効かせる**（`_check_create`と`_check_merge`の先頭）。
+# **4つの検査すべてに効かせる**（`_check_create`と`_check_merge`の先頭。前者は
+# `_check_body_sections`も呼ぶ）。**同 file の docstring が「4つとも」と書いている方が正しい。**
 #
 # `gh <sub> <cmd> --help`は option 一覧の確認に使う。**ここを拒否すると、hookが
 # 要求しているoption名を調べる手段そのものが塞がる。**2026-08-28に
@@ -624,6 +625,9 @@ def main():
         # `cd x && gh pr create`が素通りするため、絞らずここで安く抜ける。
         return 0
     for args in command_line.invocations(command, "gh"):
+        # **subcommandより前のglobal optionを外す。**外さないと`gh --repo o/r pr create`の
+        # ように1語足すだけで検査が抜ける（#325で実測）。
+        args = command_line.skip_global_options(args, "gh")
         head = tuple(args[:2])
         if head in CREATE_SUBCOMMANDS:
             _check_create(head, args[2:])

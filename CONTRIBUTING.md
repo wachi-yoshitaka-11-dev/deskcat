@@ -824,7 +824,14 @@ squash mergeしたbranchはcommit hashが変わるため、`git branch -d`が「
 
 ## hookが止めたとき
 
-`.claude/settings.json`が5つのscriptをhookとして起動する。**検査は7つである。**
+`.claude/settings.json`が8つのscriptをhookとして起動する。**検査は11である。**
+**この数は下の表と一致させる。**一致していない間、表に無いhookは「無い」ものとして
+読まれる（`truncation_guard.py`と`stop_claim_guard.py`は、追加した
+[#349](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/349)／[#350](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/350)から
+[#325](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/325)まで表に無く、
+`gh_metadata_guard.py`の本文節の検査も同じく無かった）。**数えるのは検査であって
+scriptではない。**`gh_metadata_guard.py`は1 scriptで4つを見る
+（同fileのdocstring「止める対象は4つである」）。
 
 **文書に書いても実行されないことが実測で分かっている。**
 [#204](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/204)、
@@ -838,13 +845,22 @@ squash mergeしたbranchはcommit hashが変わるため、`git branch -d`が「
 |---|---|---|
 | `gh issue create`／`gh pr create`の前 | `--project`（短縮形`-p`）があるか | `scripts/hooks/gh_metadata_guard.py` |
 | `gh pr create`の前 | `--base`（短縮形`-B`）があるか | 同上 |
+| `gh issue create`／`gh pr create`の前 | 本文がtemplateの`## `節を持つか | 同上 |
 | `@coderabbitai`へreviewを投げる前 | 同じ行に`review`の語があるか | `scripts/hooks/coderabbit_gate.py` |
-| `gh pr merge`の前 | squash messageから`git`が`Change-Class`と`Self-Review`をtrailerとして読むか | 同上 |
+| `gh pr merge`の前 | squash messageから`git`が`Change-Class`と`Self-Review`をtrailerとして読むか | `scripts/hooks/gh_metadata_guard.py` |
 | `git checkout -b`／`git switch -c`の前 | 基点が最新の`origin/develop`か | `scripts/hooks/branch_base_guard.py` |
 | `gh pr merge`の後 | squash commitに実際に入ったか | `scripts/hooks/merge_trailer_report.py` |
 | `develop`へ直接pushする前 | 押す範囲が`review_gate.py gate`を通るか | `scripts/hooks/push_gate.py` |
+| 件数・不在の根拠になりうる列挙commandの前 | 明示的な切り詰め（`head -N`／`-n N`／`--limit N`）があるか | `scripts/hooks/truncation_guard.py` |
+| `git reset --hard`／`git clean`／checkout・switch・restoreによる破棄の前 | 捨てる範囲に未commitの変更があるか | `scripts/hooks/worktree_guard.py` |
+| 応答を終える前 | 完了の主張に、対応するtool呼び出しがあるか | `scripts/hooks/stop_claim_guard.py` |
 
 **判定は字句だけで行う。**意味は判定しない（`scripts/review_gate.py`と同じ方針）。
+**字句だけでは決まらない検査は、repositoryの状態も見る。**`branch_base_guard.py`は
+基点を、`worktree_guard.py`は捨てる対象が在るかを、`push_gate.py`は`gate`の結果を、
+`merge_trailer_report.py`はsquash commitを、それぞれ子processのgitで読む。
+**`git reset --hard`は、汚れたtreeでは破壊的で、汚れていないtreeでは何も失わない。
+同じcommandである。**
 **`git interpret-trailers --parse`へ読ませることも字句の判定である**
 （理由は`scripts/hooks/gh_metadata_guard.py`のdocstringが持つ。**ここへ複製しない**）。
 
@@ -892,6 +908,8 @@ bodyに書いたpushを証拠として数えなくなる**（`stop_claim_guard.p
 DESKCAT_SKIP_GH_GUARD=1 gh pr create --title "..." --body-file body.md
 DESKCAT_SKIP_BASE_GUARD=1 git checkout -b experiment/scratch
 DESKCAT_SKIP_PUSH_GATE=1 git push origin HEAD:develop
+DESKCAT_SKIP_TRUNCATION_GUARD=1 gh pr list --limit 50
+DESKCAT_SKIP_WORKTREE_GUARD=1 git reset --hard origin/develop
 ```
 
 > **上の1行目の形は効かない。**2026-08-28に
@@ -899,8 +917,11 @@ DESKCAT_SKIP_PUSH_GATE=1 git push origin HEAD:develop
 > hookは対象commandとは別のprocessとして起動されるため、command行頭の環境変数代入は
 > hookのenvironmentへ届かない。**例はこれまでの記述のまま残してある。**
 >
-> **`DESKCAT_SKIP_BASE_GUARD`と`DESKCAT_SKIP_PUSH_GATE`は実測していない。**
+> **`DESKCAT_SKIP_BASE_GUARD`、`DESKCAT_SKIP_PUSH_GATE`、
+> `DESKCAT_SKIP_TRUNCATION_GUARD`、`DESKCAT_SKIP_WORKTREE_GUARD`は実測していない。**
 > hookの起動のされ方が同じであるため同じ見込みだが、**同じであると断定しない。**
+> **上の例はすべてcommand行頭の代入である。**効く形が未確定である以上、
+> 4行目と5行目についても「この形で効く」とは読まない。
 >
 > **効く形は未確定である。**hookのprocessが継ぐenvironmentへ入れる必要がある、
 > というところまでしか分かっていない。**機構の扱いは別に判断する。**
@@ -930,7 +951,7 @@ Pull Requestを通る変更は`review-gate.yml`が`gate`を実行するためで
   （2026-08-28に[PR #250](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/250)が
   base `main`で作られ、変更まで1時間17分かかった）。
 - **`gh issue create`には`--base`を要求しない。**option自体が存在しない。
-- **`--help`／`-h`が付いた呼び出しは、`gh_metadata_guard.py`の3つの検査すべてを抜ける。**helpの表示は何も作らず、
+- **`--help`／`-h`が付いた呼び出しは、`gh_metadata_guard.py`の4つの検査すべてを抜ける。**helpの表示は何も作らず、
   mergeもしないため、誤検知しか生まない。**2026-08-28に`gh issue create --help`、
   `gh pr create --help`、`gh pr merge --help`の3つとも拒否されることを実測した。
   hookが要求するoption名を`--help`で調べる手段そのものが塞がっていた。**
@@ -949,6 +970,11 @@ Pull Requestを通る変更は`review-gate.yml`が`gate`を実行するためで
 - **`;`／`&&`の直前に空白が無い形。**`cat x; git push origin develop`は`x;`が1語になり、
   `git`がcommand位置から外れる。**bashは両方を実行する。**`shlex`が空白でしか語を切らない
   ためであり、**改行の対応（[#389](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/389)）では直していない。****#389と同じ失敗型である。**
+  **同じ形で`worktree_guard.py`も丸ごと抜ける。**`cd sub; git reset --hard`、
+  `(git reset --hard)`、`git reset --hard|cat`はいずれも素通りする（2026-09-17実測）。
+  **この穴で失うものは、hookによって違う。**申告の監査漏れで済む側と、
+  **戻らない未commitの変更**が消える側がある。`SEPARATORS`に`|`／`(`／`)`は入っているが、
+  **空白で囲まれていない限り`shlex`が語を切らないため届かない。**
   `inspector_readonly_guard.py`は別の形で塞いでいる（**引用の外のmetacharacterと、
   区切り語そのものを拒否する。**[ADR-0020](docs/decisions/0020-inspector-readonly-by-hook.md)）。
 - **heredocのbodyを、bodyをcommandとして実行する側へ流した場合。**`bash <<'EOF' … EOF`／
@@ -971,6 +997,28 @@ Pull Requestを通る変更は`review-gate.yml`が`gate`を実行するためで
   `--mirror`と`--all`のように、refspecを書かずに複数branchを更新する形は拾えない。
 - **`gate`が時間内に終わらない場合は通す。**止めないのは、遅い環境で作業を止めないためである。
   **通ったことを、検査したことと読まない。**
+- **`git stash drop`／`git stash clear`／`git rm -f`／`git worktree remove --force`／
+  `git checkout-index -f`。**いずれも未commitの変更を失いうるが、
+  `worktree_guard.py`の対象は[#325](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/325)の候補1が挙げた3系統
+  （`git reset --hard`／checkout系による破棄／`git clean`）だけである。
+  **広げるかどうかは判断であり、この変更では判断していない。**
+- **汚れていない範囲への破棄は通す**（`worktree_guard.py`）。**cleanなtreeでの
+  `git reset --hard <ref>`が落とす未pushのcommitも通る。**この検査が守るのは
+  未commitの変更である。
+- **`git clean`は、逆に作業treeの状態を見ない**（`-n`／`--dry-run`を除きaskする）。
+  **消える対象を`git status`では数え切れないためである。**
+- **`cd other && git restore x`のように、commandの中で移動した先のpath。**
+  自分のcwdで`git status`を実行する（`git -C <path>`は引き継ぐが、`cd`は字句であって
+  実行ではない）。**別のtreeを見て「汚れていない」と読む。**
+- **pathspecとして名指しした`pages/assets-manifest.json`だけは通す。**
+  [preflight skill](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/.claude/skills/deskcat-preflight/SKILL.md)がpush前に`git restore`するよう指示している経路である。
+  **`git reset --hard`のようにpathを取らない形では効かない**（範囲全体を見るため、
+  このfileだけが汚れていてもaskになる）。
+- **staged済みで作業treeがindexと一致する変更も数える。**`git checkout -- <path>`は
+  indexから戻すため実際には失われないが、**askする側へ倒している。**
+- **`worktree_guard.py`に関する上の各項目について、そう決めた理由は同fileのdocstringが
+  持つ。ここへ複製しない。**同じ規則を2箇所で持つと、片方だけが実装とずれる。
+  **数で参照しない。**項目が増えたときに数だけが古くなる。
 
 **hookで安全要件を代替しない。**hookが直すのは「忘れる」であって、
 [Hardware Safety Policy](docs/governance/hardware-safety-policy.md)が要求する根拠ではない。

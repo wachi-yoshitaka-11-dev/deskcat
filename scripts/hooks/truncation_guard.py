@@ -163,26 +163,6 @@ def _skip_prefixes(stage):
     return tokens
 
 
-# `git`／`gh`は、subcommandの前にrepositoryを指定するglobal optionを取れる
-# （`git -C <path> log`／`gh --repo <owner/repo> pr list`）。値を伴うoptionだけを
-# 対象にする。値の有無を取り違えると、値をsubcommandの語として誤読する。
-GLOBAL_VALUE_OPTIONS = {
-    "git": ("-C",),
-    "gh": ("--repo", "-R"),
-}
-
-
-def _skip_global_options(tokens, program):
-    """`program`直後、subcommandより前に来るglobal optionを読み飛ばす。"""
-    value_options = GLOBAL_VALUE_OPTIONS.get(program, ())
-    if not value_options:
-        return tokens
-    result = list(tokens)
-    while len(result) >= 2 and result[0] in value_options:
-        result = result[2:]
-    return result
-
-
 def _match_target(stage):
     """stageが対象commandの呼び出しなら`(pattern, args)`を返す。一致しなければ`None`。
 
@@ -197,7 +177,7 @@ def _match_target(stage):
         if not command_line.is_program(program, pattern[0]):
             continue
         rest = pattern[1:]
-        remaining = _skip_global_options(tokens[1:], pattern[0])
+        remaining = command_line.skip_global_options(tokens[1:], pattern[0])
         if tuple(remaining[:len(rest)]) == rest:
             return pattern, remaining[len(rest):]
     return None
