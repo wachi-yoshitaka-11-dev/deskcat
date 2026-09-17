@@ -358,7 +358,12 @@ class GhMetadataGuardTests(unittest.TestCase):
         )
 
     def test_merge_message_trailers_are_checked(self):
-        """squash messageのtrailerを、fileとinlineの両方で見る。"""
+        """squash messageのtrailerを、fileとinlineの両方で見る。
+
+        **すべての呼び出しに`--subject`を付ける。**`--subject`が無ければ
+        strategyを問わず先にdenyされるため（`#423`）、trailerの検査そのものを
+        見るにはここで`--subject`を満たしておく必要がある。
+        """
         with tempfile.TemporaryDirectory() as directory:
             complete = Path(directory) / "complete.txt"
             complete.write_text(
@@ -369,16 +374,21 @@ class GhMetadataGuardTests(unittest.TestCase):
             partial.write_text(
                 f"body\n\n{gate.TRAILER_REVIEW}: y\n", encoding="utf-8"
             )
-            self.assertAllowed(f"gh pr merge 1 --squash --body-file {complete}")
+            self.assertAllowed(
+                f"gh pr merge 1 --squash --subject s --body-file {complete}"
+            )
             self.assertDenied(
-                f"gh pr merge 1 --squash --body-file {partial}",
+                f"gh pr merge 1 --squash --subject s --body-file {partial}",
                 contains=gate.TRAILER_CLASS,
             )
         self.assertAllowed(
-            "gh pr merge 1 --squash --body "
+            'gh pr merge 1 --squash --subject s --body '
             f'"x\n\n{gate.TRAILER_CLASS}: c\n{gate.TRAILER_REVIEW}: s"'
         )
-        self.assertDenied('gh pr merge 1 --squash --body "本文だけ"')
+        self.assertDenied(
+            'gh pr merge 1 --squash --subject s --body "本文だけ"',
+            contains=gate.TRAILER_CLASS,
+        )
 
     def test_merge_message_must_parse_as_trailers(self):
         """**`git`がtrailerとして読める形かを見る。文字列の一致では足りない。**
@@ -538,6 +548,53 @@ class GhMetadataGuardTests(unittest.TestCase):
             'gh pr merge 1 --squash --subject "s" --body "trailerなし"',
             contains=gate.TRAILER_CLASS,
         )
+
+    def test_squash_strategy_requires_subject_too(self):
+        """**`--squash`も`--subject`が無ければ拒否する（`#423`）。**
+
+        `#417`／`#418`では`--merge`（main昇格）側にだけ`--subject`の有無を
+        見る検査を足し、`--squash`側は既存test`test_merge_message_trailers_are_checked`
+        の前提（`--subject`無しのsquash呼び出しを許可する）を理由に対象外と
+        していた。この穴が`#423`として報告され、strategyを問わず`--subject`
+        を見るよう修正した。
+        """
+        self.assertDenied(
+            'gh pr merge 1 --squash --body '
+            f'"x\n\n{gate.TRAILER_CLASS}: c\n{gate.TRAILER_REVIEW}: s"',
+            contains="`--subject`が無い",
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            body = Path(directory) / "body.txt"
+            body.write_text(
+                f"x\n\n{gate.TRAILER_CLASS}: c\n{gate.TRAILER_REVIEW}: s",
+                encoding="utf-8",
+            )
+            # 短縮形（`-s`／`-t`）でも同じ判定になることを確かめる。
+            self.assertDenied(
+                f"gh pr merge 1 -s --body-file {body}",
+                contains="`--subject`が無い",
+            )
+            self.assertAllowed(f"gh pr merge 1 -s -t s --body-file {body}")
+
+    def test_subject_short_form_with_attached_value_is_accepted(self):
+        """**`-ts`（`-t`＋値の結合形）でも`--subject`ありと判定する。**
+
+        `gh`の`-t`はpflagの短縮string flagであり、`-ts`は`-t s`と同じ意味に
+        なる。`_option_value`はこの結合形を読まず、`-ts`を指定していても
+        `--subject`が無いと誤判定していた（2026-09-17のCodeRabbit reviewが
+        `#425`で指摘）。**値は使わず有無だけを見るため、`_option_value`ではなく
+        `_has_option`で判定する。**
+        """
+        with tempfile.TemporaryDirectory() as directory:
+            body = Path(directory) / "body.txt"
+            body.write_text(
+                f"x\n\n{gate.TRAILER_CLASS}: c\n{gate.TRAILER_REVIEW}: s",
+                encoding="utf-8",
+            )
+            self.assertAllowed(f"gh pr merge 1 --squash -ts --body-file {body}")
+            self.assertAllowed(
+                f"gh pr merge 1 --merge -ts --body-file {body}"
+            )
 
     def test_rebase_strategy_still_requires_trailers(self):
         """**`--rebase`は`CONTRIBUTING.md`に定義が無く、要求を外さない。**

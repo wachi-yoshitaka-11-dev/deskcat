@@ -531,13 +531,14 @@ def _check_merge(args):
 
     見る順は5つである。**helpの表示は何もmergeしないため対象外**、
     **messageを特定できない場合は`deny`**（`_body_text`。strategyを問わない）、
-    **`--merge`（`main`昇格）の場合は`--subject`の有無も見て、無ければ`deny`**
-    （`_body_text`は`--body`／`--body-file`の有無しか見ておらず、
-    `--subject`無しの`--merge`呼び出しがここまで素通りしていたことを
-    2026-09-17にCodeRabbitのreviewが指摘した。`CONTRIBUTING.md`の`Merge方式`は
-    `--subject`と`--body-file`の両方を明示すると定めている。squash側の
-    同じ穴（`--subject`無しのsquash呼び出しを許可している）はこのPRの
-    範囲外とし、直していない）、
+    **`--subject`の有無も見て、無ければ`deny`**（strategyを問わない。
+    `_body_text`は`--body`／`--body-file`の有無しか見ておらず、`--subject`は
+    見ていない。2026-09-17にCodeRabbitのreviewが`--merge`側の欠如を指摘し
+    （`#417`）、その時点では`--squash`側の同じ穴を既存test
+    `test_merge_message_trailers_are_checked`の前提を理由に対象外としたが、
+    その穴は`#423`として別途報告され、この修正でstrategyを問わず塞いだ。
+    `CONTRIBUTING.md`の`Merge方式`は`--subject`と`--body-file`の両方を
+    明示すると定めている）、
     **`--merge`（`main`昇格）はここでtrailerを要求せず終える**
     （`_is_main_promotion_merge`。`CONTRIBUTING.md`の`Merge方式`が`main`昇格へ
     これらのtrailerを要求しないと明記しており、`scripts/review_gate.py`の
@@ -568,29 +569,30 @@ def _check_merge(args):
             "`18298ae`／`619c843`でtrailerが入らなかった）。"
             " `--subject`と`--body-file`を明示する（CONTRIBUTINGの「Merge方式」）。"
         )
-    if _is_main_promotion_merge(args):
-        # `main`昇格のmerge commitである。**`--subject`の指定も見る。**
+    if not _has_option(args, "--subject", "-t"):
         # `_body_text`は`--body`／`--body-file`の有無しか見ておらず、
-        # `gh pr merge --merge --body "本文"`（`--subject`無し）が
-        # ここまで素通りしていた（2026-09-17のCodeRabbit reviewが指摘）。
-        # `CONTRIBUTING.md`の`Merge方式`は`--subject`と`--body-file`の
-        # **両方**を明示すると定めている。**squash側の同じ穴はこのPRの
-        # 範囲外とする**（既存の挙動であり、`#417`の対象ではない。
-        # `test_merge_message_trailers_are_checked`が`--subject`無しの
-        # squash呼び出しを許可する前提を持っており、ここで変えると
-        # 無関係な回帰を起こす）。
-        if _option_value(args, "--subject", "-t") is None:
-            _deny(
-                "`gh pr merge --merge`（main昇格）に`--subject`が無い。"
-                " `CONTRIBUTING.md`の`Merge方式`は`--subject`と`--body-file`の"
-                "両方を明示すると定めており、`--body`／`--body-file`の"
-                "有無だけでは足りない。"
-                " `--subject`を省略すると、GitHubがPull Request titleを"
-                "推測で補う可能性があり、messageの内容を呼び出し側が"
-                "制御できなくなる。"
-            )
-        # messageの指定は上で確認済みであり、**squash向けのtrailer要求だけを
-        # ここで掛けない。**
+        # `--subject`無しの呼び出しがここまで素通りしていた。`--merge`側は
+        # 2026-09-17にCodeRabbitのreviewが指摘し（`#417`）、`--squash`側の
+        # 同じ穴は`#423`として別途報告された。**strategyを問わず見る**ため、
+        # 診断文もstrategy名を決め打ちしない（`--rebase`／flag無しでも
+        # 同じ理由でdenyされる）。
+        # **値は使わず、有無だけを見るため`_option_value`ではなく`_has_option`
+        # を使う。**`gh`の`-t`はpflagの短縮string flagであり、`-ts`（`-t s`の
+        # 結合形）でも値を渡せる。`_option_value`はこの結合形を読まず、
+        # `-ts`を指定していても`--subject`が無いと誤判定していた
+        # （2026-09-17のCodeRabbit reviewが指摘）。
+        _deny(
+            "`gh pr merge`に`--subject`が無い。"
+            " `CONTRIBUTING.md`の`Merge方式`は`--subject`と`--body-file`の"
+            "両方を明示すると定めており、`--body`／`--body-file`の"
+            "有無だけでは足りない。"
+            " `--subject`を省略すると、GitHubがPull Request titleを"
+            "推測で補う可能性があり、messageの内容を呼び出し側が"
+            "制御できなくなる。"
+        )
+    if _is_main_promotion_merge(args):
+        # `main`昇格のmerge commitである。messageの指定（`--subject`を含む）は
+        # 上で確認済みであり、**squash向けのtrailer要求だけをここで掛けない。**
         return
     found = _merge_trailers(text, source)
     missing = [name for name in REQUIRED_MERGE_TRAILERS if name not in found]
