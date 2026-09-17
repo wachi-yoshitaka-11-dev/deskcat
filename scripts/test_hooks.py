@@ -99,6 +99,7 @@ def _invoke(script, command, cwd=None, environment=None):
     env.pop("DESKCAT_SKIP_BASE_GUARD", None)
     env.pop("DESKCAT_SKIP_PUSH_GATE", None)
     env.pop("DESKCAT_SKIP_TRUNCATION_GUARD", None)
+    env.pop("DESKCAT_SKIP_WORKTREE_GUARD", None)
     if environment:
         env.update(environment)
     result = subprocess.run(
@@ -952,6 +953,336 @@ class TruncationGuardTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0)
         self.assertEqual(result.stdout.strip(), "")
         self.assertAllowed('gh pr list --limit "閉じていない')
+
+
+WORKTREE_GUARD = str(SCRIPTS_ROOT / "hooks" / "worktree_guard.py")
+
+
+class WorktreeGuardTests(unittest.TestCase):
+    """未commitの変更を失うgit操作を見るhookのtest（#325の候補1）。
+
+    **fixture repositoryを実際に汚してから判定させる。**このhookは字句だけでは
+    決まらず、`git status`の結果で向きが変わる。**汚れていないtreeで止めないことも、
+    汚れたtreeで止めることと同じだけ見る必要がある**（止めすぎるhookは無効化される）。
+    """
+
+    def setUp(self):
+        self.directory = tempfile.mkdtemp()
+        self.addCleanup(guards.remove_tree, Path(self.directory))
+        root = Path(self.directory)
+        _git(self.directory, "init", "--quiet", ".")
+        (root / "note.md").write_text("最初\n", encoding="utf-8")
+        (root / "pages").mkdir()
+        (root / "pages" / "assets-manifest.json").write_text("{}\n", encoding="utf-8")
+        _git(self.directory, "add", "note.md", "pages/assets-manifest.json")
+        _git(self.directory, "commit", "--quiet", "-m", "first")
+        _git(self.directory, "branch", "pages")
+
+    def _dirty_note(self):
+        (Path(self.directory) / "note.md").write_text("書き換えた\n", encoding="utf-8")
+
+    def _dirty_manifest(self):
+        (Path(self.directory) / "pages" / "assets-manifest.json").write_text(
+            '{"Assets": []}\n', encoding="utf-8"
+        )
+
+    def assertAsked(self, command, *, cwd=None, contains=None):
+        code, output = _invoke(WORKTREE_GUARD, command, cwd=cwd or self.directory)
+        self.assertEqual(code, 0, command)
+        self.assertIsNotNone(output, f"通してしまった: {command}")
+        self.assertEqual(
+            output["hookSpecificOutput"]["permissionDecision"], "ask", command
+        )
+        if contains:
+            self.assertIn(contains, _reason(output))
+
+    def assertAllowed(self, command, *, cwd=None):
+        code, output = _invoke(WORKTREE_GUARD, command, cwd=cwd or self.directory)
+        self.assertEqual(code, 0, command)
+        self.assertIsNone(output, f"止めてしまった: {command}")
+
+    def test_reset_hard_with_a_dirty_tree_is_asked(self):
+        """`git reset --hard`は作業tree全体を捨てる。"""
+        self._dirty_note()
+        for command in (
+            "git reset --hard",
+            "git reset --hard HEAD",
+            "/usr/bin/git reset --hard",
+            "git -C . reset --hard",
+        ):
+            with self.subTest(command=command):
+                self.assertAsked(command)
+
+    def test_global_options_do_not_hide_the_subcommand(self):
+        """**subcommandの前のglobal optionで素通りしない**（#325で実際に開いていた穴）。
+
+        `command_line.skip_global_options`が`-C`しか知らなかった版では、
+        `git --no-pager reset --hard`と`git -c key=value reset --hard`は
+        `remaining[0]`がoptionになり、**検査ごと素通りしていた**
+        （2026-09-16実測）。`push_gate.py`は同じ形を前から外していた。
+        """
+        self._dirty_note()
+        for command in (
+            "git --no-pager reset --hard",
+            "git -c user.name=x reset --hard",
+            "git -c user.name=x -c user.email=y@z reset --hard",
+            "git --literal-pathspecs clean -fd",
+            "git --no-pager checkout -- note.md",
+        ):
+            with self.subTest(command=command):
+                self.assertAsked(command)
+
+    def test_a_dirty_tree_in_another_repository_is_seen(self):
+        """**`-C`で指した先のtreeを見る。**hookのcwdではない。
+
+        `prefix`を`git status`へ引き継がない実装に戻ると、cwd側のcleanなtreeを
+        見て通してしまう。**`git -C .`だけのcaseではその退行を検出できない。**
+        """
+        other = tempfile.mkdtemp()
+        self.addCleanup(guards.remove_tree, Path(other))
+        _git(other, "init", "--quiet", ".")
+        (Path(other) / "other.md").write_text("最初\n", encoding="utf-8")
+        _git(other, "add", "other.md")
+        _git(other, "commit", "--quiet", "-m", "first")
+        (Path(other) / "other.md").write_text("汚した\n", encoding="utf-8")
+        # 自分のtreeはcleanのまま。汚れているのは`-C`の先だけである。
+        self.assertAsked(f"git -C {other} reset --hard")
+
+    def test_reset_hard_with_a_clean_tree_is_allowed(self):
+        """**汚れていなければ失うものが無い。**
+
+        **このtestが確かめているのは「cleanなtreeなら通す」だけである。**
+        refを引数に取る形も同じに通ることは見ているが、hookはrefを一切見ないため、
+        **未pushのcommitの扱いを検証してはいない**（対象にしていないという決定は
+        hookのdocstringが持つ）。
+        """
+        self.assertAllowed("git reset --hard")
+        self.assertAllowed("git reset --hard HEAD~1")
+
+    def test_other_reset_modes_are_allowed(self):
+        """`--soft`／`--mixed`／`--keep`は作業treeのfileを捨てない。"""
+        self._dirty_note()
+        for command in (
+            "git reset --soft HEAD~1",
+            "git reset --mixed HEAD~1",
+            "git reset --keep HEAD~1",
+            "git reset note.md",
+        ):
+            with self.subTest(command=command):
+                self.assertAllowed(command)
+
+    def test_forced_checkout_and_switch_are_asked(self):
+        """強制optionは作業tree全体を上書きする。"""
+        self._dirty_note()
+        for command in (
+            "git checkout -f main",
+            "git checkout --force main",
+            "git switch -f main",
+            "git switch --discard-changes main",
+        ):
+            with self.subTest(command=command):
+                self.assertAsked(command)
+
+    def test_checkout_of_a_dirty_path_is_asked(self):
+        """pathを指したcheckout／restoreは、そのpathの変更を捨てる。"""
+        self._dirty_note()
+        for command in (
+            "git checkout -- note.md",
+            "git checkout note.md",
+            "git checkout HEAD -- note.md",
+            "git checkout .",
+            "git restore note.md",
+            "git restore --source=HEAD note.md",
+            "git restore --staged --worktree note.md",
+        ):
+            with self.subTest(command=command):
+                self.assertAsked(command)
+
+    def test_checkout_of_a_clean_path_is_allowed(self):
+        """同じ形でも、そのpathが汚れていなければ失うものが無い。"""
+        self._dirty_note()
+        self.assertAllowed("git restore pages")
+        self.assertAllowed("git checkout -- pages")
+
+    def test_switching_branches_is_allowed(self):
+        """branchの移動はこのhookの対象ではない。
+
+        **gitは未commitの変更を捨てない。**持ち越せるなら持ち越し、衝突するなら
+        拒否する。**どちらでも失われない**ため、強制optionの無い移動は見ない。
+        """
+        self._dirty_note()
+        for command in (
+            "git checkout main",
+            "git switch main",
+            "git checkout -b chore/325-x",
+            "git switch -c chore/325-x",
+        ):
+            with self.subTest(command=command):
+                self.assertAllowed(command)
+
+    def test_a_branch_named_like_a_dirty_directory_is_allowed(self):
+        """**`git checkout -b pages`の`pages`をpathspecと読まない。**
+
+        読むと、`pages/`が汚れている限りbranch作成が毎回askになる。
+        `git checkout`では`VALUE_OPTIONS`がoptionの値を落とすことで避けている。
+        `git switch`はそもそもpathspecを取らないため、強制optionが無ければ見ない。
+        """
+        self._dirty_manifest()
+        for command in (
+            "git checkout -b pages",
+            "git checkout -B pages",
+            "git switch -c pages",
+        ):
+            with self.subTest(command=command):
+                self.assertAllowed(command)
+
+    def test_staged_only_restore_is_allowed(self):
+        """`git restore --staged`はindexだけを戻す。**作業treeのfileは残る。**"""
+        self._dirty_note()
+        _git(self.directory, "add", "note.md")
+        self.assertAllowed("git restore --staged note.md")
+
+    def test_staged_change_matching_the_worktree_is_still_asked(self):
+        """**過剰に止める側の挙動を、そうと分かる形で固定する。**
+
+        staged済みで作業treeがindexと一致する変更は、`git checkout -- <path>`では
+        失われない（indexから戻るため。2026-09-16実測）。**それでもaskする。**
+        `git status --porcelain -uno`の出力側で分けると、同じ変更を実際に失う
+        `git reset --hard`を取り落とす。理由はhookのdocstringが持つ。
+        """
+        self._dirty_note()
+        _git(self.directory, "add", "note.md")
+        self.assertAsked("git checkout -- note.md")
+
+    def test_patch_mode_is_asked(self):
+        """hunk単位で捨てる形も対象である。pathが無ければ作業tree全体が対象になる。"""
+        self._dirty_note()
+        self.assertAsked("git checkout -p")
+        self.assertAsked("git restore -p")
+
+    def test_generated_manifest_restore_is_allowed(self):
+        """**`prepare_pages.py`の後の`git restore`を止めない。**
+
+        `deskcat-preflight` skillがpush前の手順として指示している経路である。
+        """
+        self._dirty_manifest()
+        for command in (
+            "git restore pages/assets-manifest.json",
+            "git restore ./pages/assets-manifest.json",
+            "git checkout -- pages/assets-manifest.json",
+        ):
+            with self.subTest(command=command):
+                self.assertAllowed(command)
+
+    def test_generated_manifest_does_not_cover_other_paths(self):
+        """除外は指定したpathだけである。**同じ呼び出しの他のpathは見る。**"""
+        self._dirty_note()
+        self._dirty_manifest()
+        self.assertAsked("git restore pages/assets-manifest.json note.md")
+
+    def test_clean_is_asked_even_with_a_clean_tree(self):
+        """**`git clean`だけは作業treeの状態を見ずにaskする。**
+
+        `-x`が消す無視fileは`git status --porcelain`に出ない。
+        **確かめられない対象で、確かめた顔をしない。**
+        """
+        for command in ("git clean -fd", "git clean -f", "git clean -fdx", "git clean"):
+            with self.subTest(command=command):
+                self.assertAsked(command)
+
+    def test_clean_dry_run_is_allowed(self):
+        """`-n`／`--dry-run`は何も消さない。**確認そのものを止めない。**"""
+        for command in ("git clean -n", "git clean -nd", "git clean --dry-run"):
+            with self.subTest(command=command):
+                self.assertAllowed(command)
+
+    def test_unrelated_git_commands_are_allowed(self):
+        """捨てない操作は見ない。"""
+        self._dirty_note()
+        for command in (
+            "git status",
+            "git add note.md",
+            "git commit -m x",
+            "git stash",
+            "git diff -- note.md",
+            "git log --oneline",
+        ):
+            with self.subTest(command=command):
+                self.assertAllowed(command)
+
+    def test_help_is_out_of_scope(self):
+        """helpの表示は何も捨てない。既存hookと同じ扱いにする。"""
+        self._dirty_note()
+        self.assertAllowed("git clean --help")
+        self.assertAllowed("git reset -h")
+
+    def test_discard_on_a_later_line_is_asked(self):
+        """複数行commandの2行目も検査する（#389と同じ範囲）。"""
+        self._dirty_note()
+        self.assertAsked("git fetch origin\ngit reset --hard origin/develop")
+
+    def test_discard_written_in_a_heredoc_body_is_allowed(self):
+        """heredocのbodyは実行されない。**検査しない。**
+
+        **treeを先に汚す。**汚していないと、bodyの`git reset --hard`を拾って
+        しまってもcleanなtreeとして通り、**検出が壊れてもこのtestは通る。**
+        """
+        self._dirty_note()
+        self.assertAllowed(
+            "cat > note.md <<'EOF'\ngit reset --hard\nEOF\n"
+        )
+
+    def test_discard_as_an_argument_is_allowed(self):
+        """command位置にない語は呼び出しではない。
+
+        **これもtreeを汚してから見る。**理由は上と同じである。
+        """
+        self._dirty_note()
+        self.assertAllowed("echo git reset --hard")
+
+    def test_unknown_tree_state_is_asked(self):
+        """**状態を確認できないときは通さない。**
+
+        repositoryの外で`git status`は失敗する（2026-09-16実測、exit 128）。
+        **確認できなかったことを、汚れていないことと読まない。**
+        """
+        outside = tempfile.mkdtemp()
+        self.addCleanup(guards.remove_tree, Path(outside))
+        # **temp領域がrepositoryの内側にある環境でも前提を保つ。**
+        # ceilingを置かないと、上位のrepositoryが見つかってcleanと読まれ、
+        # このtestは黙って逆の意味になる。
+        code, output = _invoke(
+            WORKTREE_GUARD, "git reset --hard", cwd=outside,
+            environment={"GIT_CEILING_DIRECTORIES": str(Path(outside).parent)},
+        )
+        self.assertEqual(code, 0)
+        self.assertIsNotNone(output, "通してしまった")
+        self.assertIn("確認できなかった", _reason(output))
+
+    def test_reason_names_the_count(self):
+        """診断文が、数えた件数をそのまま書く。"""
+        self._dirty_note()
+        self.assertAsked("git reset --hard", contains="1件")
+
+    def test_skip_environment_disables_the_guard(self):
+        """逃げ道が効く。"""
+        self._dirty_note()
+        code, output = _invoke(
+            WORKTREE_GUARD, "git reset --hard", cwd=self.directory,
+            environment={"DESKCAT_SKIP_WORKTREE_GUARD": "1"},
+        )
+        self.assertEqual(code, 0)
+        self.assertIsNone(output)
+
+    def test_broken_input_does_not_block(self):
+        """hookの入力が壊れていることを、対象commandの問題として扱わない。"""
+        result = subprocess.run(
+            [sys.executable, WORKTREE_GUARD], input="{ではないJSON",
+            capture_output=True, text=True, encoding="utf-8", timeout=60,
+            cwd=self.directory,
+        )
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.stdout.strip(), "")
 
 
 STOP_CLAIM_GUARD = str(SCRIPTS_ROOT / "hooks" / "stop_claim_guard.py")
@@ -2740,10 +3071,12 @@ class HookPayloadShapeTests(unittest.TestCase):
     **型で全数走査したら当時の5本すべてに同じ形が残っていた。**指摘は代表例であって全数ではない。
 
     **後から足したhookもこの一覧へ入れる。**`inspector_readonly_guard.py`は#376で足した。
+    `truncation_guard.py`と`worktree_guard.py`は#325で足した（**前者は#349で入っていた
+    のに、この一覧へ入れ忘れていた。**一覧に無いhookは、壊れても静かに素通りする）。
     """
 
     HOOKS = (GH_GUARD, BASE_GUARD, PUSH_GATE, MERGE_REPORT, CODERABBIT_GATE,
-             INSPECTOR_GUARD)
+             INSPECTOR_GUARD, TRUNCATION_GUARD, WORKTREE_GUARD)
 
     MALFORMED = (
         "[]",
@@ -2768,7 +3101,9 @@ class HookPayloadShapeTests(unittest.TestCase):
                         env={**os.environ,
                              "DESKCAT_SKIP_GH_GUARD": "",
                              "DESKCAT_SKIP_BASE_GUARD": "",
-                             "DESKCAT_SKIP_PUSH_GATE": ""},
+                             "DESKCAT_SKIP_PUSH_GATE": "",
+                             "DESKCAT_SKIP_TRUNCATION_GUARD": "",
+                             "DESKCAT_SKIP_WORKTREE_GUARD": ""},
                     )
                     self.assertEqual(result.returncode, 0,
                                      f"{Path(script).name} が落ちた: {result.stderr[:300]}")

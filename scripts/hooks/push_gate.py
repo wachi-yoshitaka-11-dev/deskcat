@@ -63,12 +63,6 @@ SKIP_OPTIONS = frozenset({"--dry-run", "-n", "--delete", "-d"})
 # `develop`を指す書き方。これ以外は取れない。
 GUARDED_DESTINATIONS = frozenset({GUARDED, f"refs/heads/{GUARDED}"})
 
-# `git`の大域option。`push`より前に置かれ、値を1つ取る。
-GLOBAL_OPTIONS_WITH_VALUE = frozenset({"-C", "-c"})
-
-# 値を取らない大域option。
-GLOBAL_FLAGS = frozenset({"-p", "-P", "--paginate", "--no-pager", "--bare"})
-
 
 def _deny(reason):
     json.dump(
@@ -122,22 +116,16 @@ def _strip_global_options(args):
 
     `git -C dir push ...`と`git -c key=value push ...`を拾うために要る。
     **外さないと`args[0]`が`push`にならず、素通りする。**
+
+    **判定は`command_line`が持つ。**2026-09-16に[#325](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/325)で移した。
+    このfileが持っていた規則をそのまま共有側へ置き、ここは呼ぶだけにした。
+    **同じ読み飛ばしを要るhookが3本になったためである**（`truncation_guard.py`は
+    狭い版を私有しており、`git --no-pager`／`git -c`を取り落としていた）。
     """
-    directory = None
-    index = 0
-    while index < len(args):
-        token = args[index]
-        if token in GLOBAL_OPTIONS_WITH_VALUE:
-            value = args[index + 1] if index + 1 < len(args) else None
-            if token == "-C" and value is not None:
-                directory = value
-            index += 2
-            continue
-        if token.startswith("--") or token in GLOBAL_FLAGS:
-            index += 1
-            continue
-        break
-    return args[index:], directory
+    return (
+        command_line.skip_global_options(args, "git"),
+        command_line.global_option_value(args, "git", "-C"),
+    )
 
 
 def pushed_source(command):
