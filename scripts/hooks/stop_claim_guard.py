@@ -247,6 +247,10 @@ def _git_invocation_matches(command, subcommand, disqualifying_flags=()):
     （`git push --dry-run`は実際には何も送信しない）。
     """
     for args in command_line.invocations(command, "git"):
+        # global optionを外す。**`gh`側と同じ理由である**（#325）。
+        # `git -C <path> push`は実際にpushしている。**外さないと、実際に押した後の
+        # 「pushしました」を証拠なしとして止める側へ倒れる。**
+        args = command_line.skip_global_options(args, "git")
         if args[:1] == [subcommand] and not any(
             flag in args for flag in disqualifying_flags
         ):

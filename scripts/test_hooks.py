@@ -1396,6 +1396,54 @@ class StopClaimGuardTests(unittest.TestCase):
         self._tmpdir = tempfile.TemporaryDirectory()
         self.addCleanup(self._tmpdir.cleanup)
 
+    def test_global_options_do_not_hide_the_evidence(self):
+        """**global optionで「やった証拠」を見失わない**（#325）。
+
+        **このhookだけは向きが逆である。**他のhookは止める側なので、外さないと
+        止め損なう。こちらは証拠として読む側であり、**外さないと実際に実行した
+        pushやmergeを数えず、本当にやった後の主張を止める側へ倒れる。**
+
+        `--dry-run`のような失格flagの判定は、global optionを外しても変わらない。
+        """
+        sys.path.insert(0, str(SCRIPTS_ROOT / "hooks"))
+        import stop_claim_guard
+
+        for command in (
+            "git push origin HEAD",
+            "git -C /tmp/repo push origin HEAD",
+            "git --no-pager push origin HEAD",
+            "git -c user.name=x push origin HEAD",
+        ):
+            with self.subTest(command=command):
+                self.assertTrue(
+                    stop_claim_guard._git_invocation_matches(
+                        command, "push", ("--dry-run", "-n")
+                    ),
+                    f"証拠として数えなかった: {command}",
+                )
+        for command in (
+            "git push --dry-run origin HEAD",
+            "git -C /tmp/repo push --dry-run origin HEAD",
+        ):
+            with self.subTest(command=command):
+                self.assertFalse(
+                    stop_claim_guard._git_invocation_matches(
+                        command, "push", ("--dry-run", "-n")
+                    ),
+                    f"実際には送信しない呼び出しを証拠にした: {command}",
+                )
+        for command in (
+            "gh pr merge 413 --squash",
+            "gh --repo owner/repo pr merge 413 --squash",
+        ):
+            with self.subTest(command=command):
+                self.assertTrue(
+                    stop_claim_guard._gh_invocation_matches(
+                        command, ("pr", "merge"), ("--auto",)
+                    ),
+                    f"証拠として数えなかった: {command}",
+                )
+
     def _write_transcript(self, entries):
         path = Path(self._tmpdir.name) / "transcript.jsonl"
         with open(path, "w", encoding="utf-8") as handle:
@@ -1719,6 +1767,24 @@ class MergeTrailerReportTests(unittest.TestCase):
     状態に依存すると、落ちた理由がhookの誤りか環境かを区別できなくなる。
     ここで見るのは、対象外のcommandで`gh`を呼ばずに抜けることである。
     """
+
+    def test_global_options_do_not_hide_the_merge(self):
+        """**global optionで`gh pr merge`を見失わない**（#325）。
+
+        `args[:2]`で位置から読んでいた版では、`gh --repo o/r pr merge`を
+        対象外として黙って抜けていた。**このhookは事後の報告であり、
+        見失うと「trailerが入ったか」を誰も確かめないまま終わる。**
+        """
+        for command, expected in (
+            ("gh pr merge 413 --squash", "413"),
+            ("gh --repo owner/repo pr merge 413 --squash", "413"),
+            ("gh -R owner/repo pr merge 413 --squash", "413"),
+            ("gh --repo owner/repo pr merge --squash", None),
+        ):
+            with self.subTest(command=command):
+                found, number = merge_trailer_report._pr_merge(command)
+                self.assertTrue(found, command)
+                self.assertEqual(number, expected, command)
 
     def test_non_merge_commands_are_ignored(self):
         for command in (
