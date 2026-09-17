@@ -311,9 +311,13 @@ fn demonstrate_pi_session(health: &mut Health) {
 /// idle taskのwatchdogに機会を与える。
 fn service_bringup_step(health: &mut Health, step: &str) {
     FreeRtos::delay_ms(1);
+    // **`bringup_hb`と`hb`は別の名前にする。**main loopの`hb seq=`（`config::HEARTBEAT_PERIOD_MS`
+    // 周期の本来のheartbeat）とlog上の接頭辞を分け、読み手が混同しないようにする。
+    // seqの連番自体は`Health`の同じcounterを共有するため単調増加のままである
+    // （bring-up段階の分だけ、main loop側の最初のheartbeatのseqが0からは始まらない）。
     let seq = health.next_heartbeat_seq();
     log::info!(
-        "hb seq={seq} uptime_ms={} bringup_step={step}",
+        "bringup_hb seq={seq} uptime_ms={} bringup_step={step}",
         health.uptime_ms()
     );
 }
