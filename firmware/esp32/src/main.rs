@@ -1,18 +1,23 @@
 //! DeskCat ESP32 の最小firmware。
 //!
-//! [Issue #6](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/6) と
-//! [Issue #7](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/7) の受け入れ条件に
-//! 対応し、**未検証のperipheralを初期化しない。**
+//! [Issue #6](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/6)、
+//! [Issue #7](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/7)、
+//! [Issue #13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)
+//! の受け入れ条件に対応する。
 //!
 //! - firmware build identity を出す
 //! - board-configuration ID を出す
 //! - reset reason を出す
 //! - **rate limit 付きの heartbeat と health snapshot を出し続ける**（#7）
-//! - **servoも未知のoutputもdriveしない**
+//! - `DISP-01`（LCD）を初期化し、識別・単色fill・四隅patternを描画する（#13）
+//! - **servoも、それ以外の未検証GPIOもdriveしない**
 //!
-//! **`Peripherals::take()` を呼ばない。**これがGPIOを一切駆動しない根拠である。
-//! GPIO割り当ては `docs/hardware/gpio-assignment.md` が導通checkなどを待って
-//! `Blocked` であり、この firmware は pin へ触れない。
+//! **`Peripherals::take()` を呼ぶのはLCD関連の6+1本（`crate::display`のmodule doc参照）
+//! に限る。**`docs/hardware/gpio-assignment.md`の`信号inventory`のうち、
+//! `SERVO-PWM`・`ACCEL-*`・`ENV-*`・`ADC-*`・`TOUCH-*`はこの版でも一切触れない
+//! （同文書の`Blocked`状態は、servo出力gateなどLCD以外の項目が理由であり解除していない。
+//! [#13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)本文が
+//! `HW-TBD-023`のcloseを待たずに着手してよいとした根拠は、この範囲（LCDのみ）を前提にする）。
 //!
 //! **Protocol sessionは確立しない。**`crates/deskcat-protocol` の `Boot` message を
 //! 送るのは別の作業であり、ここでは log へ出すだけである。ただし `reset_reason` の
@@ -35,12 +40,17 @@
 //! （[`sleep_ms_until`] 参照）。
 
 mod config;
+mod display;
 mod health;
 mod protocol;
 
+use std::time::Instant;
+
 use deskcat_protocol::{Boot, Hello, HelloReason};
 use esp_idf_svc::hal::delay::FreeRtos;
+use esp_idf_svc::hal::peripherals::Peripherals;
 
+use crate::display::Ili9341;
 use crate::health::Health;
 use crate::protocol::PiSession;
 
@@ -146,8 +156,12 @@ fn main() {
     let reset_reason = reset_reason_str(reason);
     log::info!("reset_reason={reset_reason} raw={reason:?}");
 
-    // **peripheralを取らない。**GPIOもservoも触らない。
-    log::info!("peripherals=untouched servo=not_driven");
+    // **`Peripherals::take()`はLCD配線の分だけ。**servoやI2C sensorは触らない
+    // （module doc参照）。1度しか成功しないため`expect`で即座に気付く。
+    let peripherals = Peripherals::take().expect("Peripherals::take must succeed exactly once");
+    log::info!("peripherals=display_only servo=not_driven i2c=not_driven adc=not_driven");
+
+    run_display_bringup(peripherals);
 
     // 周期は `config` が持つ。**ここへ数値を直接書かない。**暫定値である根拠は
     // `config` の doc comment にある。
@@ -271,6 +285,139 @@ fn demonstrate_pi_session(health: &mut Health) {
     let status = health.to_status();
     let (get_status_ack, get_status_reply) = session.handle_get_status(pi_sid, 3, status);
     log::info!("protocol_demo get_status_ack={get_status_ack:?} status={get_status_reply:?}");
+}
+
+/// `DISP-01`を初期化し、識別・単色fill・四隅patternを実行する。
+///
+/// **どの段階で失敗しても、この関数はpanicしない。**heartbeat／health snapshot
+/// （§13の受け入れ条件「更新中も通信とwatchdogがactiveである」）は、LCDの成否に
+/// 関わらず`main`のloopで動き続ける必要があるためであり、この関数はエラーを
+/// `log::error!`へ分類して返すだけで、呼び出し元の`main`を止めない。
+fn run_display_bringup(peripherals: Peripherals) {
+    // pinは`docs/hardware/gpio-assignment.md`の`信号inventory`に従う
+    // （`LCD-SCLK`=18, `LCD-MOSI`=23, `LCD-MISO`=19, `LCD-CS`=22, `LCD-DC`=17,
+    // `LCD-RST`=16, `LCD-BL`=4）。`TOUCH-CS`(21)はbusを共有するが、このfirmwareは
+    // touchへは触れない（`crate::display`のmodule doc参照）。
+    let mut lcd = match Ili9341::new(
+        peripherals.spi3,
+        peripherals.pins.gpio18,
+        peripherals.pins.gpio23,
+        peripherals.pins.gpio19,
+        peripherals.pins.gpio22,
+        peripherals.pins.gpio17,
+        peripherals.pins.gpio16,
+        peripherals.pins.gpio4,
+    ) {
+        Ok(lcd) => lcd,
+        Err(err) => {
+            log::error!("display_driver_new_failed error={err}");
+            return;
+        }
+    };
+
+    let id = match lcd.init() {
+        Ok(id) => id,
+        Err(err) => {
+            log::error!("display_init_failed error={err}");
+            return;
+        }
+    };
+
+    // **識別結果を捏造しない。**読めた生byteと判定を両方logへ残す
+    // （受け入れ条件「Controller識別情報と初期化の根拠を記録した」）。
+    log::info!(
+        "display_id raw={:02x?} matches_ili9341={}",
+        id.raw,
+        id.matches_ili9341()
+    );
+    if !id.matches_ili9341() {
+        log::error!(
+            "display_id_mismatch expected_id_hi=0x93 expected_id_lo=0x41 got_hi=0x{:02x} got_lo=0x{:02x}",
+            id.raw[2],
+            id.raw[3]
+        );
+    }
+
+    if let Err(err) = lcd.backlight_on() {
+        log::error!("display_backlight_on_failed error={err}");
+    }
+
+    run_fill_tests(&mut lcd);
+    run_corner_pattern(&mut lcd);
+}
+
+/// 単色fillを既知のRGB565値で順に実行し、所要時間を計測してlogへ出す。
+///
+/// 受け入れ条件「単色fillが正しい」「Color orderが正しい」「更新timingを測定した」に
+/// 対応する。**正しいかどうかの判定はこの関数では行わない。**実機のLCDを目視して
+/// 判定するのは人間であり（`AGENTS.md`ハードウェア安全、初回通電は人間監視下）、
+/// この関数は色と所要時間を機械可読な形でlogへ残すだけである。
+fn run_fill_tests(lcd: &mut Ili9341<'_>) {
+    let fills: [(&str, u16); 5] = [
+        ("black", display::color::BLACK),
+        ("red", display::color::RED),
+        ("green", display::color::GREEN),
+        ("blue", display::color::BLUE),
+        ("white", display::color::WHITE),
+    ];
+
+    for (name, color) in fills {
+        let start = Instant::now();
+        match lcd.fill_screen(color) {
+            Ok(()) => {
+                let elapsed_us = start.elapsed().as_micros();
+                log::info!("display_fill name={name} color=0x{color:04x} elapsed_us={elapsed_us}");
+            }
+            Err(err) => {
+                log::error!("display_fill_failed name={name} error={err}");
+            }
+        }
+    }
+}
+
+/// 四隅へ異なる色の正方形を描き、orientationとcolor orderを実機で確認できるようにする。
+///
+/// 受け入れ条件「四隅とorientationが正しい」に対応する。**MADCTLはreset時default
+/// （`00h`）のままである**（`crate::display`のmodule doc参照）。この patternを見て
+/// 向きと色順が期待どおりでなければ、`docs/hardware/gpio-assignment.md`の`MADCTL`欄と
+/// `crate::display`のMADCTL定数を実測結果で更新する必要がある。
+fn run_corner_pattern(lcd: &mut Ili9341<'_>) {
+    if let Err(err) = lcd.fill_screen(display::color::BLACK) {
+        log::error!("display_corner_background_failed error={err}");
+        return;
+    }
+
+    const SQUARE: u16 = 24;
+    let corners: [(&str, u16, u16, u16); 4] = [
+        ("top_left", 0, 0, display::color::RED),
+        (
+            "top_right",
+            display::WIDTH - SQUARE,
+            0,
+            display::color::GREEN,
+        ),
+        (
+            "bottom_left",
+            0,
+            display::HEIGHT - SQUARE,
+            display::color::BLUE,
+        ),
+        (
+            "bottom_right",
+            display::WIDTH - SQUARE,
+            display::HEIGHT - SQUARE,
+            display::color::WHITE,
+        ),
+    ];
+
+    let start = Instant::now();
+    for (name, x, y, color) in corners {
+        if let Err(err) = lcd.fill_rect(x, y, x + SQUARE - 1, y + SQUARE - 1, color) {
+            log::error!("display_corner_failed corner={name} error={err}");
+        }
+    }
+    let elapsed_us = start.elapsed().as_micros();
+    log::info!("display_corner_pattern elapsed_us={elapsed_us}");
 }
 
 /// Health snapshot を 1 行の JSON として log へ出す。
