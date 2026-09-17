@@ -553,6 +553,26 @@ class GhMetadataGuardTests(unittest.TestCase):
             )
             self.assertAllowed(f"gh pr merge 1 -s -t s --body-file {body}")
 
+    def test_subject_short_form_with_attached_value_is_accepted(self):
+        """**`-ts`（`-t`＋値の結合形）でも`--subject`ありと判定する。**
+
+        `gh`の`-t`はpflagの短縮string flagであり、`-ts`は`-t s`と同じ意味に
+        なる。`_option_value`はこの結合形を読まず、`-ts`を指定していても
+        `--subject`が無いと誤判定していた（2026-09-17のCodeRabbit reviewが
+        `#425`で指摘）。**値は使わず有無だけを見るため、`_option_value`ではなく
+        `_has_option`で判定する。**
+        """
+        with tempfile.TemporaryDirectory() as directory:
+            body = Path(directory) / "body.txt"
+            body.write_text(
+                f"x\n\n{gate.TRAILER_CLASS}: c\n{gate.TRAILER_REVIEW}: s",
+                encoding="utf-8",
+            )
+            self.assertAllowed(f"gh pr merge 1 --squash -ts --body-file {body}")
+            self.assertAllowed(
+                f"gh pr merge 1 --merge -ts --body-file {body}"
+            )
+
     def test_rebase_strategy_still_requires_trailers(self):
         """**`--rebase`は`CONTRIBUTING.md`に定義が無く、要求を外さない。**
 

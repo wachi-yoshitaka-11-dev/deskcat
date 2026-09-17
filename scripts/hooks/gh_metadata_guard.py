@@ -568,13 +568,18 @@ def _check_merge(args):
             "`18298ae`／`619c843`でtrailerが入らなかった）。"
             " `--subject`と`--body-file`を明示する（CONTRIBUTINGの「Merge方式」）。"
         )
-    if _option_value(args, "--subject", "-t") is None:
+    if not _has_option(args, "--subject", "-t"):
         # `_body_text`は`--body`／`--body-file`の有無しか見ておらず、
         # `--subject`無しの呼び出しがここまで素通りしていた。`--merge`側は
         # 2026-09-17にCodeRabbitのreviewが指摘し（`#417`）、`--squash`側の
         # 同じ穴は`#423`として別途報告された。**strategyを問わず見る**ため、
         # 診断文もstrategy名を決め打ちしない（`--rebase`／flag無しでも
         # 同じ理由でdenyされる）。
+        # **値は使わず、有無だけを見るため`_option_value`ではなく`_has_option`
+        # を使う。**`gh`の`-t`はpflagの短縮string flagであり、`-ts`（`-t s`の
+        # 結合形）でも値を渡せる。`_option_value`はこの結合形を読まず、
+        # `-ts`を指定していても`--subject`が無いと誤判定していた
+        # （2026-09-17のCodeRabbit reviewが指摘）。
         _deny(
             "`gh pr merge`に`--subject`が無い。"
             " `CONTRIBUTING.md`の`Merge方式`は`--subject`と`--body-file`の"
