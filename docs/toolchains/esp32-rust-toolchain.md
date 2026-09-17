@@ -95,6 +95,9 @@ ESP-WROOM-32D の datasheet v2.7 には **PSRAM を内蔵する variant の記�
 - 最初の Issue では変数を減らし、公式 release の crate を使う。
 - SDK を workspace 管理にして、端末全体の外部 `IDF_PATH` 依存を減らす。
 - simulator、container、CI は最小 build の成立後に独立して判断する。
+  **このうち simulator（Wokwi）は判断済みである。**`Wokwi` は `false` のまま据え置く
+  （[ADR-0022](../decisions/0022-wokwi-not-a-ci-simulation-gate.md)）。
+  **判断の範囲と理由は同 ADR が持つ。ここへ複製しない。**
 - `master` の ESP-IDF は再現性と公式サポートの観点から選ばない。
 
 なお、この表の値は上記 template commit における各項目の default と一致する。2026-08-06 時点の [ESP-IDF stable ドキュメント](https://docs.espressif.com/projects/esp-idf/en/stable/esp32/get-started/index.html)は v6.0.2 を指していたが、review 済み commit が提示する `v5.5.3` を採用した。最新版を自動的に採用しない方針（[更新規則](README.md#更新規則)）に従う。この stable の値は時間とともに変わるため、比較する場合は再取得して日付とともに記録する。
