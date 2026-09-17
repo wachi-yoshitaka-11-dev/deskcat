@@ -37,7 +37,8 @@
 //! watchdog could trigger. **This delayer avoids that by yielding to the OS during the
 //! delay.**」と doc に明記しており、これが「logging が watchdog の進行を block しない」
 //! 根拠である。busy wait をしないため、待ち時間は必ず 1 ms 以上へ丸める
-//! （[`sleep_ms_until`] 参照）。
+//! （[`sleep_ms_until`] 参照）。`run_display_bringup`（#13の LCD bring-up）も同じ
+//! [`FreeRtos::delay_ms`] を段階ごとに挟む（[`service_bringup_step`] 参照）。
 
 mod config;
 mod display;
