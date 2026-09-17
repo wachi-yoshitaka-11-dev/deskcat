@@ -446,6 +446,111 @@ class GhMetadataGuardTests(unittest.TestCase):
             )
             self.assertIn("DESKCAT_SKIP_GH_GUARD", _reason(output))
 
+    def test_merge_strategy_allows_main_promotion_without_trailers(self):
+        """**`--merge`（`main`昇格）はtrailerが無くても通す。**
+
+        `CONTRIBUTING.md`の`Merge方式`は`main`昇格のmerge commitへ`Change-Class`／
+        `Self-Review`のtrailerを要求しない。`review_gate.py`の`_check_history`も
+        `git rev-list --no-merges`でmerge commitを検査対象から外している。
+        以前はこのhookが`--squash`と区別せず一律に要求しており、`#383`の
+        main昇格で`gh pr merge --merge`が2回denyされ、ブラウザでのmergeを
+        強いた結果、merge commit `afc86cf`のmessageがGitHub既定のまま入り、
+        直前の昇格が持っていた検証経緯が失われた（`#417`）。
+        """
+        self.assertAllowed(
+            'gh pr merge 383 --merge --subject "s" --body "develop を main へ昇格する"'
+        )
+        self.assertAllowed('gh pr merge 383 -m --subject s --body "本文"')
+
+    def test_merge_strategy_still_requires_a_message(self):
+        """**`--merge`でも、messageの指定そのものは省略できない。**
+
+        2026-09-17に、`_is_main_promotion_merge`がtrueのとき`_body_text`より
+        前でreturnする版が入りかけた。**`gh pr merge N --merge`をmessageの
+        指定なしで実行できてしまい、GitHubが既定messageを合成する経路が
+        開いていた。**それは`afc86cf`（`#383`）で実際に起きた損失そのものであり、
+        `#417`が防ごうとした事象を修正自体が再び開けるところだった。
+        trailerの要求（`--squash`のみ）と、messageの要求（両strategy共通）は
+        別であり、混ぜてはいけない。
+        """
+        self.assertDenied(
+            "gh pr merge 383 --merge", contains="messageを確認できない"
+        )
+        self.assertDenied(
+            "gh pr merge 383 -m --subject s", contains="messageを確認できない"
+        )
+
+    def test_merge_strategy_requires_subject_not_just_body(self):
+        """**`--merge`は`--body`だけでは足りない。`--subject`も要る。**
+
+        `_body_text`は`--body`／`--body-file`の有無しか見ておらず、
+        `gh pr merge N --merge --body "本文"`（`--subject`無し）が
+        main昇格の早期returnまで素通りしていた。`CONTRIBUTING.md`の
+        `Merge方式`は`--subject`と`--body-file`の両方を明示すると定めている。
+        2026-09-17にCodeRabbitのreviewが指摘し、push前に直した。
+
+        **本文自体は読める形にする。**bodyが特定できない場合のdeny理由にも
+        たまたま`--subject`という文字列が含まれるため、それだけでは
+        「`--subject`欠如を専用に検出しているか」を確かめたことにならない。
+        """
+        with tempfile.TemporaryDirectory() as directory:
+            body = Path(directory) / "body.txt"
+            body.write_text("develop を main へ昇格する", encoding="utf-8")
+            self.assertDenied(
+                f"gh pr merge 383 --merge --body-file {body}",
+                contains="`--subject`が無い",
+            )
+            self.assertDenied(
+                f"gh pr merge 383 -m --body-file {body}",
+                contains="`--subject`が無い",
+            )
+            self.assertAllowed(
+                f'gh pr merge 383 --merge --subject "s" --body-file {body}'
+            )
+            self.assertAllowed(f"gh pr merge 383 -m -t s -F {body}")
+
+    def test_squash_strategy_still_requires_trailers(self):
+        """**`--squash`は引き続きtrailerを要求する。**既存の動作を変えない。"""
+        self.assertDenied(
+            'gh pr merge 1 --squash --subject "s" --body "trailerなし"',
+            contains=gate.TRAILER_CLASS,
+        )
+
+    def test_rebase_strategy_still_requires_trailers(self):
+        """**`--rebase`は`CONTRIBUTING.md`に定義が無く、要求を外さない。**
+
+        `Merge方式`が定めるのは`develop`（squash）と`main`（merge commit）だけで
+        あり、`--rebase`の扱いは決まっていない。分からないものは、従来どおり
+        trailerを要求する側へ倒す。
+        """
+        self.assertDenied(
+            'gh pr merge 1 --rebase --subject "s" --body "trailerなし"',
+            contains=gate.TRAILER_CLASS,
+        )
+
+    def test_no_strategy_flag_still_requires_trailers(self):
+        """**戦略flagが無い呼び出しは、`main`昇格として扱わない。**
+
+        `gh`はflag省略時にrepositoryの既定戦略を使うが、hookはcommand文字列
+        しか見ないため既定が何かを知りようが無い。`_body_text`が特定できない
+        messageを`deny`するのと同じ理由で、分からないものは要求を掛けたままにする。
+        """
+        self.assertDenied(
+            'gh pr merge 1 --subject "s" --body "trailerなし"',
+            contains=gate.TRAILER_CLASS,
+        )
+
+    def test_merge_and_squash_together_still_requires_trailers(self):
+        """**`--merge`と`--squash`が同時に指定された場合は主昇格として扱わない。**
+
+        `gh`自身がこの組み合わせを拒否するため通常は起きないが、字句だけで
+        見ている以上、単独で`--merge`が立っている場合だけに限定する。
+        """
+        self.assertDenied(
+            'gh pr merge 1 --merge --squash --subject "s" --body "trailerなし"',
+            contains=gate.TRAILER_CLASS,
+        )
+
     def test_unrelated_commands_are_allowed(self):
         """`gh`以外と、`gh`の他のsubcommandは通す。"""
         for command in ("git status", "ls -la", "gh pr view 1 --json state"):

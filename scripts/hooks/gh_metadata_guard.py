@@ -23,6 +23,20 @@ Claude CodeのPreToolUse hookとして、Bash tool呼び出しの前に走る。
    持っていたが、最後の段落にコロン無しの`Closes #304`が混じっていたため、
    `git interpret-trailers`は段落ごとtrailerと認めなかった。部分一致で見ていた
    当時のこの検査は素通りさせ、CIの`history`だけが検出した。
+   **`--merge`（`main`昇格のmerge commit）にはこの要求を掛けない**
+   （`_is_main_promotion_merge`）。`CONTRIBUTING.md`の`Merge方式`が`main`昇格へ
+   これらのtrailerを要求しないと定めており、`_check_history`（`review_gate.py`）も
+   `git rev-list --no-merges`でmerge commitを検査対象から外している。
+   2026-09-16まで`--squash`と区別せず一律に要求しており（`#417`）、`#383`の
+   main昇格でこの誤検知が`gh pr merge --merge`を2回denyし、ブラウザでの
+   mergeを強いた結果、merge commit `afc86cf`のmessageがGitHub既定のまま入り、
+   直前の昇格が持っていた検証経緯・実測値が失われた（main の履歴は書き換えない
+   ため戻せない）。**この判定はPRのbaseを見ていない。**`--merge`の指定と
+   `CONTRIBUTING.md`の規約（`develop`はsquash、`main`はmerge commit）に頼る
+   heuristicであり、規約に反して`develop`へ`--merge`でmergeされた場合は
+   誤って通す。`--rebase`は同節に定義が無く、trailerの扱いを定めていないため
+   要求を掛けたままにする。戦略flagが1つも無い呼び出しも、`gh`がrepositoryの
+   既定を使い hookからは何になるか分からないため、要求を掛けたままにする。
 4. `gh issue create`／`gh pr create`に`--body`／`--body-file`が付いており、その
    本文が対応するtemplate（`.github/ISSUE_TEMPLATE/*.md`／
    `.github/pull_request_template.md`）の`## `節を欠いている。`--body`系は
@@ -75,6 +89,13 @@ MERGE_SUBCOMMAND = ("pr", "merge")
 
 # squash messageが持たなければならないtrailerの名前。**値は見ない。**
 REQUIRED_MERGE_TRAILERS = (review_gate.TRAILER_CLASS, review_gate.TRAILER_REVIEW)
+
+# `gh pr merge`の戦略flag。**`CONTRIBUTING.md`の`Merge方式`が定義するのは
+# squash（`develop`向け）とmerge commit（`main`昇格）の2つだけである。**
+# `--rebase`は同節に定義が無く、trailerの扱いも定めていない。
+MERGE_STRATEGY_FLAGS = ("--merge", "-m")
+SQUASH_STRATEGY_FLAGS = ("--squash", "-s")
+REBASE_STRATEGY_FLAGS = ("--rebase", "-r")
 
 # repositoryの正本template。**hookの起動位置に依存させない。**`__file__`から
 # 辿るため、cwdがどこであっても同じfileを見る（`GIT_ROOT`とは別の理由で位置に
@@ -456,8 +477,36 @@ def _merge_trailers(text, source):
         )
 
 
+def _is_main_promotion_merge(args):
+    """`--merge`（merge commit戦略）が指定されているかを返す。
+
+    **これはPRのbaseを見ていない。**`CONTRIBUTING.md`の`Merge方式`が
+    `develop`はsquash、`main`はmerge commitと定めていることに基づく
+    heuristicであり、**その規約が守られている前提のもとでのみ正しい。**
+    baseを実際に問い合わせて判定する形はここでは採らない
+    （`gh pr view --json baseRefName`が必要になり、hookからの追加のnetwork
+    呼び出しを増やす。字句だけで判定する既存方針（module docstring）に合わせ、
+    flagの有無だけで判定する）。
+
+    **`--squash`／`--rebase`が同時に指定されている場合は主昇格として扱わない。**
+    `gh`自身が複数戦略の同時指定を拒否するため通常は起きないが、字句だけで
+    見ている以上、単独で`--merge`が立っている場合だけに限定する。
+    **`--rebase`単独の場合は、この関数はFalseを返す**（`CONTRIBUTING.md`が
+    `--rebase`の扱いを定めていないため、trailerを要求する既存の扱いのままにする）。
+    **戦略flagが1つも無い場合もFalseを返す。**`gh`はrepositoryの既定を使うが、
+    hookはcommand文字列しか見ないため既定が何かを知りようが無い。
+    `_body_text`が「特定できない場合はdeny」としているのと同じ理由で、
+    分からないものは従来どおりtrailerを要求する側へ倒す。
+    """
+    if any(flag in SQUASH_STRATEGY_FLAGS for flag in args):
+        return False
+    if any(flag in REBASE_STRATEGY_FLAGS for flag in args):
+        return False
+    return any(flag in MERGE_STRATEGY_FLAGS for flag in args)
+
+
 def _check_merge(args):
-    """`gh pr merge`のsquash messageが宣言trailerを持つかを見る。
+    """`gh pr merge`のmessageが指定されているか、squash messageなら宣言trailerも見る。
 
     **この関数は判定を持たない。**trailerの名前も、messageからtrailerを読む判定も
     `scripts/review_gate.py`が正本である（名前は`REQUIRED_MERGE_TRAILERS`経由で、
@@ -466,23 +515,82 @@ def _check_merge(args):
     **hook側へ複製しない。**名前だけを共有して存在の判定を部分一致で別実装して
     いたことが`c171c52`の穴だった（module docstringの3を参照）。
 
-    見る順は3つである。**helpの表示は何もmergeしないため対象外**、
-    **messageを特定できない場合は`deny`**（`_body_text`）、
-    そのうえで`git`がtrailerとして読むかを見る。
+    **messageの有無と、trailerの有無は別の要求であり、分けて見る。**
+    `CONTRIBUTING.md`の`Merge方式`は「`--subject`と`--body-file`を省略しない」と
+    定めており、これは`--squash`／`--merge`のどちらにも掛かる。**trailer
+    （`Change-Class`／`Self-Review`）を要求しないのは`--merge`（`main`昇格）だけ**
+    である。
+
+    **2026-09-17に、この2つを分けずに書いた版が入りかけた。**`_is_main_promotion_merge`
+    がtrueのとき`_body_text`より前でreturnしており、**`gh pr merge N --merge`を
+    messageの指定なしで実行できた。**message省略はGitHubが既定messageを合成する
+    経路であり、これは`afc86cf`（`#383`）で実際に起きた損失そのものである。
+    **`#417`が防ごうとした事象を、この修正自体が再び開けるところだった。**
+    push前のreviewで実行順の問題として発見し、通す前に直した。
+
+    見る順は5つである。**helpの表示は何もmergeしないため対象外**、
+    **messageを特定できない場合は`deny`**（`_body_text`。strategyを問わない）、
+    **`--merge`（`main`昇格）の場合は`--subject`の有無も見て、無ければ`deny`**
+    （`_body_text`は`--body`／`--body-file`の有無しか見ておらず、
+    `--subject`無しの`--merge`呼び出しがここまで素通りしていたことを
+    2026-09-17にCodeRabbitのreviewが指摘した。`CONTRIBUTING.md`の`Merge方式`は
+    `--subject`と`--body-file`の両方を明示すると定めている。squash側の
+    同じ穴（`--subject`無しのsquash呼び出しを許可している）はこのPRの
+    範囲外とし、直していない）、
+    **`--merge`（`main`昇格）はここでtrailerを要求せず終える**
+    （`_is_main_promotion_merge`。`CONTRIBUTING.md`の`Merge方式`が`main`昇格へ
+    これらのtrailerを要求しないと明記しており、`scripts/review_gate.py`の
+    `_check_history`も`git rev-list --no-merges`でmerge commitを検査対象から
+    外している。このhookが`--squash`と区別せず一律に要求していたことが
+    2026-09-16に`#417`として報告された。実際に`#383`のmain昇格でこの誤検知により
+    `gh pr merge --merge`が2回denyされ、ブラウザでのmergeを強いた結果、
+    merge commit `afc86cf`のmessageがGitHub既定のまま入り、直前の昇格が
+    持っていた検証経緯・実測値が失われた。この記録は戻せない）、
+    そのうえで（`--merge`でない場合）`git`がtrailerとして読むかを見る。
     """
     if _is_help(args):
         # helpの表示だけを求める呼び出しはmergeしない。**messageを要求しない。**
         return
     text, source = _body_text(args)
     if text is None:
+        strategy_note = (
+            "main昇格（`--merge`）でもmessageの指定を省略しない。"
+            if _is_main_promotion_merge(args)
+            else "trailerがsquash commitへ引き継がれたかを後から辿れない。"
+        )
         _deny(
-            f"`gh pr merge`のsquash messageを確認できない（{source}）。"
-            " 確認できないmessageでmergeすると、trailerがsquash commitへ"
-            " 引き継がれたかを後から辿れない。messageを渡さない場合はGitHubが"
-            " 合成したmessageになり、trailerは入らない"
-            "（`18298ae`／`619c843`で実際に起きた）。"
+            f"`gh pr merge`のmessageを確認できない（{source}）。"
+            f" 確認できないmessageでmergeすると、{strategy_note}"
+            " messageを渡さない場合はGitHubが合成したmessageになり、"
+            " 検証経緯や測定値が失われる"
+            "（main昇格の`#383`／`afc86cf`で実際に起きた。squashでは"
+            "`18298ae`／`619c843`でtrailerが入らなかった）。"
             " `--subject`と`--body-file`を明示する（CONTRIBUTINGの「Merge方式」）。"
         )
+    if _is_main_promotion_merge(args):
+        # `main`昇格のmerge commitである。**`--subject`の指定も見る。**
+        # `_body_text`は`--body`／`--body-file`の有無しか見ておらず、
+        # `gh pr merge --merge --body "本文"`（`--subject`無し）が
+        # ここまで素通りしていた（2026-09-17のCodeRabbit reviewが指摘）。
+        # `CONTRIBUTING.md`の`Merge方式`は`--subject`と`--body-file`の
+        # **両方**を明示すると定めている。**squash側の同じ穴はこのPRの
+        # 範囲外とする**（既存の挙動であり、`#417`の対象ではない。
+        # `test_merge_message_trailers_are_checked`が`--subject`無しの
+        # squash呼び出しを許可する前提を持っており、ここで変えると
+        # 無関係な回帰を起こす）。
+        if _option_value(args, "--subject", "-t") is None:
+            _deny(
+                "`gh pr merge --merge`（main昇格）に`--subject`が無い。"
+                " `CONTRIBUTING.md`の`Merge方式`は`--subject`と`--body-file`の"
+                "両方を明示すると定めており、`--body`／`--body-file`の"
+                "有無だけでは足りない。"
+                " `--subject`を省略すると、GitHubがPull Request titleを"
+                "推測で補う可能性があり、messageの内容を呼び出し側が"
+                "制御できなくなる。"
+            )
+        # messageの指定は上で確認済みであり、**squash向けのtrailer要求だけを
+        # ここで掛けない。**
+        return
     found = _merge_trailers(text, source)
     missing = [name for name in REQUIRED_MERGE_TRAILERS if name not in found]
     if missing:
