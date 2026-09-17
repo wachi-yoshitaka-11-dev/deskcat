@@ -528,8 +528,15 @@ def _check_merge(args):
     **`#417`が防ごうとした事象を、この修正自体が再び開けるところだった。**
     push前のreviewで実行順の問題として発見し、通す前に直した。
 
-    見る順は4つである。**helpの表示は何もmergeしないため対象外**、
+    見る順は5つである。**helpの表示は何もmergeしないため対象外**、
     **messageを特定できない場合は`deny`**（`_body_text`。strategyを問わない）、
+    **`--merge`（`main`昇格）の場合は`--subject`の有無も見て、無ければ`deny`**
+    （`_body_text`は`--body`／`--body-file`の有無しか見ておらず、
+    `--subject`無しの`--merge`呼び出しがここまで素通りしていたことを
+    2026-09-17にCodeRabbitのreviewが指摘した。`CONTRIBUTING.md`の`Merge方式`は
+    `--subject`と`--body-file`の両方を明示すると定めている。squash側の
+    同じ穴（`--subject`無しのsquash呼び出しを許可している）はこのPRの
+    範囲外とし、直していない）、
     **`--merge`（`main`昇格）はここでtrailerを要求せず終える**
     （`_is_main_promotion_merge`。`CONTRIBUTING.md`の`Merge方式`が`main`昇格へ
     これらのtrailerを要求しないと明記しており、`scripts/review_gate.py`の
@@ -561,8 +568,28 @@ def _check_merge(args):
             " `--subject`と`--body-file`を明示する（CONTRIBUTINGの「Merge方式」）。"
         )
     if _is_main_promotion_merge(args):
-        # `main`昇格のmerge commitである。messageの指定は上で確認済みであり、
-        # **squash向けのtrailer要求だけをここで掛けない。**
+        # `main`昇格のmerge commitである。**`--subject`の指定も見る。**
+        # `_body_text`は`--body`／`--body-file`の有無しか見ておらず、
+        # `gh pr merge --merge --body "本文"`（`--subject`無し）が
+        # ここまで素通りしていた（2026-09-17のCodeRabbit reviewが指摘）。
+        # `CONTRIBUTING.md`の`Merge方式`は`--subject`と`--body-file`の
+        # **両方**を明示すると定めている。**squash側の同じ穴はこのPRの
+        # 範囲外とする**（既存の挙動であり、`#417`の対象ではない。
+        # `test_merge_message_trailers_are_checked`が`--subject`無しの
+        # squash呼び出しを許可する前提を持っており、ここで変えると
+        # 無関係な回帰を起こす）。
+        if _option_value(args, "--subject", "-t") is None:
+            _deny(
+                "`gh pr merge --merge`（main昇格）に`--subject`が無い。"
+                " `CONTRIBUTING.md`の`Merge方式`は`--subject`と`--body-file`の"
+                "両方を明示すると定めており、`--body`／`--body-file`の"
+                "有無だけでは足りない。"
+                " `--subject`を省略すると、GitHubがPull Request titleを"
+                "推測で補う可能性があり、messageの内容を呼び出し側が"
+                "制御できなくなる。"
+            )
+        # messageの指定は上で確認済みであり、**squash向けのtrailer要求だけを
+        # ここで掛けない。**
         return
     found = _merge_trailers(text, source)
     missing = [name for name in REQUIRED_MERGE_TRAILERS if name not in found]

@@ -480,6 +480,35 @@ class GhMetadataGuardTests(unittest.TestCase):
             "gh pr merge 383 -m --subject s", contains="messageを確認できない"
         )
 
+    def test_merge_strategy_requires_subject_not_just_body(self):
+        """**`--merge`は`--body`だけでは足りない。`--subject`も要る。**
+
+        `_body_text`は`--body`／`--body-file`の有無しか見ておらず、
+        `gh pr merge N --merge --body "本文"`（`--subject`無し）が
+        main昇格の早期returnまで素通りしていた。`CONTRIBUTING.md`の
+        `Merge方式`は`--subject`と`--body-file`の両方を明示すると定めている。
+        2026-09-17にCodeRabbitのreviewが指摘し、push前に直した。
+
+        **本文自体は読める形にする。**bodyが特定できない場合のdeny理由にも
+        たまたま`--subject`という文字列が含まれるため、それだけでは
+        「`--subject`欠如を専用に検出しているか」を確かめたことにならない。
+        """
+        with tempfile.TemporaryDirectory() as directory:
+            body = Path(directory) / "body.txt"
+            body.write_text("develop を main へ昇格する", encoding="utf-8")
+            self.assertDenied(
+                f"gh pr merge 383 --merge --body-file {body}",
+                contains="`--subject`が無い",
+            )
+            self.assertDenied(
+                f"gh pr merge 383 -m --body-file {body}",
+                contains="`--subject`が無い",
+            )
+            self.assertAllowed(
+                f'gh pr merge 383 --merge --subject "s" --body-file {body}'
+            )
+            self.assertAllowed(f"gh pr merge 383 -m -t s -F {body}")
+
     def test_squash_strategy_still_requires_trailers(self):
         """**`--squash`は引き続きtrailerを要求する。**既存の動作を変えない。"""
         self.assertDenied(
