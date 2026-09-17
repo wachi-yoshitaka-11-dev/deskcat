@@ -159,7 +159,9 @@ fn main() {
     // **`Peripherals::take()`はLCD配線の分だけ。**servoやI2C sensorは触らない
     // （module doc参照）。1度しか成功しないため`expect`で即座に気付く。
     let peripherals = Peripherals::take().expect("Peripherals::take must succeed exactly once");
-    log::info!("peripherals=display_only servo=not_driven i2c=not_driven adc=not_driven");
+    log::info!(
+        "peripherals=display_only servo=not_driven i2c=not_driven adc=not_driven touch=not_driven"
+    );
 
     run_display_bringup(peripherals);
 

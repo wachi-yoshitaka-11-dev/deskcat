@@ -259,6 +259,14 @@ impl<'d> Ili9341<'d> {
 
     /// 矩形を単色で塗る。**RAMWRの間はCSXを一度も上げない**（1回の描画を1つの
     /// SPI transactionとして扱う。datasheetのcommand図と同じ形）。
+    ///
+    /// # Panics
+    ///
+    /// debug buildでは`x1 < x0`または`y1 < y0`のとき`debug_assert!`でpanicする。
+    /// release buildではこの前提を検査しない（`overflow-checks`既定offのため、
+    /// 満たさない場合`x1 - x0 + 1`等が無音でwrapし、無関係なpixel数とCASET/PASET値を
+    /// 送りかねない。呼び出し側はCASET/PASETの一次資料の制約
+    /// 「SC[15:0] always must be equal to or less than EC[15:0]」と同じ前提を守ること）。
     pub fn fill_rect(
         &mut self,
         x0: u16,
@@ -267,6 +275,10 @@ impl<'d> Ili9341<'d> {
         y1: u16,
         color: u16,
     ) -> Result<(), EspError> {
+        debug_assert!(
+            x1 >= x0 && y1 >= y0,
+            "fill_rect requires x1 >= x0 and y1 >= y0"
+        );
         self.set_window(x0, y0, x1, y1)?;
 
         let pixel_count = u32::from(x1 - x0 + 1) * u32::from(y1 - y0 + 1);
