@@ -122,17 +122,34 @@ Wokwi board を `board-esp32-devkit-c-v4` と定義しており、対象 board �
 
 | 妨げているもの | 確かめ方と結果 |
 |---|---|
-| ESP-IDF toolchain が無い | 作業端末に `espup`／`idf.py`／`espflash` のいずれも無い（`which` で確認） |
-| toolchain を入れられない | `dl.espressif.com` へ到達できない（`curl: (56) CONNECT tunnel failed, response 403`。作業環境の egress policy が proxy の CONNECT を拒否する） |
+| ESP-IDF toolchain が無い | 起案した作業端末に `espup`／`idf.py`／`espflash` のいずれも無い（`which` で確認） |
+| toolchain を入れられない | `dl.espressif.com` へ到達できない（`curl: (56) CONNECT tunnel failed, response 403`） |
 | Wokwi を呼べない | `wokwi.com` へ到達できない（同じ 403）。**token も持っていない** |
+
+**この 403 を「端末の性質」や「profile の性質」として読まない。**
+**同じ project directory を見る別 session が、3 host とも `200` で到達したと報告している**
+（2026-09-17。[PR #414](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/414) の review）。
+**起案 session からは再測しても 403 のままである。**したがって遮断しているのは
+**session ごとの egress 経路**であり、端末でも profile でもない。
 
 **「成立しない」ではない。「確かめていない」である。**この区別を崩さない。
 
 ### 6. 無償ライセンスの範囲で足りるかは確認できていない
 
 #325 の候補2は「無償ライセンスの範囲で足りるかを公式資料で確認する」も求めている。
-**`docs.wokwi.com` と `wokwi.com` がどちらも作業環境の egress policy で遮断されており、公式の利用条件を読めなかった**
+**起案 session からは `docs.wokwi.com` と `wokwi.com` のどちらも読めなかった**
 （2026-09-17実測。いずれも `curl: (56) CONNECT tunnel failed, response 403`）。`wokwi-cli` の README には CI 利用の条件が書かれていない（MIT と書かれているのは CLI 自身の license である）。
+
+**別 session が、到達して plan ごとの simulation 時間と `Community` plan の表示を引用している**
+（[PR #414](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/414) の review、2026-09-17）。
+**その内容をここへ確定として写さない。**起案 session からは再測しても読めず、
+**`AGENTS.md`「セッションの役割」が、別 session から受け取ったものをそれ自体では
+根拠にしないと定めている。**同 review 自身も、`Community` plan の適用条件は読んでいないと
+断っている。
+
+**したがってこの項目は開いたままである。**ただし**埋めるのに Wokwi の account も
+別 profile の端末も要らない。**必要なのは、当該 host へ到達できる session が公式の
+利用条件を読み、取得日とともに記録することだけである（「検証」節の見直し条件2）。
 
 **`AGENTS.md`の推測禁止に従い、「無償で足りる」とも「足りない」とも書かない。**
 
@@ -163,9 +180,10 @@ push または Pull Request のたびに Wokwi で firmware を起動し、boot 
 
 **利点。**根拠が揃ってから決められる。
 
-**コスト。**#325 の候補2が開いたまま残る。**そして埋める条件は、この作業の側では作れない**
-（別 profile の端末、Wokwi の account、egress policy の変更のいずれかが要る）。
+**コスト。**#325 の候補2が開いたまま残る。**そして判断要因5を埋める条件は、
+起案 session の側では作れない**（別 profile の端末と Wokwi の account が要る）。
 **「誰かが条件を揃えるまで待つ」は、待つ主体が居ないと止まったままになる。**
+**判断要因6の方は別である。**到達できる session なら読めるため、保留の理由にはならない。
 
 ## 決定
 
@@ -226,12 +244,17 @@ repository 内に無い。**この ADR の判断要因3が、その判断その�
    Issue または実験記録に待ちが現れたときである
 2. **CI へ credential を置く方針が変わったとき。**[Machine Profiles](../toolchains/machine-profiles.md)の
    CI 必須要件が変われば、判断要因 2 は消える
-3. **判断要因 5・6 が埋まったとき。**次の2つを満たした記録が出た場合である
-   - ESP32 Build profile の端末で `wokwi=true` 相当の `wokwi.toml`／`diagram.json` を用意し、
-     **実際に Wokwi で起動して結果を記録した**（成立しない結論も記録に当たる）
-   - **Wokwi の公式の利用条件を読み、CI と個人利用それぞれで無償の範囲に収まるかを記録した**
+3. **判断要因 5 が埋まったとき。**ESP32 Build profile の端末で `wokwi=true` 相当の
+   `wokwi.toml`／`diagram.json` を用意し、**実際に Wokwi で起動して結果を記録した場合である**
+   （成立しない結論も記録に当たる）。**これには別 profile の端末と Wokwi の account が要る。**
+4. **判断要因 6 が埋まったとき。**Wokwi の公式の利用条件を読み、CI と個人利用それぞれで
+   無償の範囲に収まるかを、取得日とともに記録した場合である。
+   **こちらは account も別 profile の端末も要らない。**必要なのは当該 host へ到達できる
+   session だけである（判断要因6）。**3 と 4 を同じ条件にしない。**要るものが違う。
 
-**3 を満たす作業は、この端末では行えない**（判断要因 5 の表）。**別 profile の端末と、Wokwi の account が要る。**
+**どちらが埋まっても、それだけで決定が変わるわけではない。**決定は判断要因 1・2・3 に
+依っており、**5・6 はその根拠に含まれていない。**埋まったときに見直すのは、
+**判断要因 5・6 を理由に選択肢Aを避けた部分だけである**（選択肢Aのコスト欄）。
 
 ## 置き換える決定
 
