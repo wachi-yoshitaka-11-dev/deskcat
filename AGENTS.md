@@ -94,6 +94,9 @@
 - **初回通電、初回サーボ動作、回路変更後の試験は人間の監視を必要とする。**
 - **ロジック電圧、電源経路、起動時 GPIO が未確認なら実機駆動しない。**
 - 危険、異音、発熱、拘束、電圧降下を認めたら試験を停止する。
+- **メーカーが想定していない内部構造・情報を、不可逆な手段で取得しない。**詳細は
+  [Hardware Safety Policy](docs/governance/hardware-safety-policy.md)の
+  「測定は現物を改変しない」節が正本である。
 - **上の一覧だけで判断しない。**安全要件の5項目と要求する根拠の水準は [Hardware Safety Policy](docs/governance/hardware-safety-policy.md) が正本である。
 
 ## 変更規則
