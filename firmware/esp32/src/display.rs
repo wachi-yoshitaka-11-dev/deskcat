@@ -56,7 +56,7 @@ use esp_idf_svc::hal::gpio::{InputPin, Level, Output, OutputPin, PinDriver};
 use esp_idf_svc::hal::spi::config::{Config as SpiConfig, DriverConfig, MODE_0};
 use esp_idf_svc::hal::spi::{SpiAnyPins, SpiBusDriver, SpiDriver};
 use esp_idf_svc::hal::units::Hertz;
-use esp_idf_svc::sys::EspError;
+use esp_idf_svc::sys::{EspError, ESP_ERR_INVALID_ARG};
 
 /// SPI clockの上限。read timing（`trc`最小150ns→最大約6.67 MHz）を基準に、
 /// write（`twc`最小100ns→最大10 MHz）にも共通で使えるよう余裕を持たせた値。
@@ -185,35 +185,57 @@ impl<'d> Ili9341<'d> {
         Ok(())
     }
 
-    fn begin_write(&mut self, cmd: u8) -> Result<(), EspError> {
+    /// commandを送り、CSXをlowにする。`body`をその中で実行し、`body`の成否に
+    /// 関わらずCSXを解放する。
+    ///
+    /// CodeRabbit review（[#415](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/415)）
+    /// の指摘: 以前は`command()`／`read_id()`／`fill_rect()`がそれぞれ独立に
+    /// `?`でSPIエラーを伝播しており、途中の`self.bus.write`／`self.bus.read`が
+    /// 失敗するとCSXがLow（assert状態）のまま関数を抜けていた。次のcommandは
+    /// `cs.set_low()`を呼ぶが既にLowであり、controllerからは前のtransactionの
+    /// 続きに見えかねない。**この関数はCSXの解放をbodyの結果と切り離して保証する。**
+    /// `body`が失敗した場合はそのerrorを返す（CSX解放自体が別途失敗しても、
+    /// 根本原因である`body`側のerrorを優先し、解放側のerrorは`let _`で無視する）。
+    /// `body`が成功した場合に限り、CSX解放（`cs.set_high()`）の結果をそのまま返す。
+    fn with_transaction(
+        &mut self,
+        cmd: u8,
+        body: impl FnOnce(&mut Self) -> Result<(), EspError>,
+    ) -> Result<(), EspError> {
         self.cs.set_low()?;
-        self.dc.set_low()?;
-        self.bus.write(&[cmd])?;
-        self.dc.set_high()?;
-        Ok(())
+        let result = self.write_command_byte(cmd).and_then(|()| body(self));
+        match result {
+            Ok(()) => self.cs.set_high(),
+            Err(err) => {
+                let _ = self.cs.set_high();
+                Err(err)
+            }
+        }
     }
 
-    fn end_transaction(&mut self) -> Result<(), EspError> {
-        self.cs.set_high()?;
-        Ok(())
+    /// command byteを送り、D/CXをHighへ戻す。`with_transaction`の内側専用。
+    fn write_command_byte(&mut self, cmd: u8) -> Result<(), EspError> {
+        self.dc.set_low()?;
+        self.bus.write(&[cmd])?;
+        self.dc.set_high()
     }
 
     /// commandを送り、parameterを続けて書く。**1回のCSX assertion内で完結する。**
     fn command(&mut self, cmd: u8, params: &[u8]) -> Result<(), EspError> {
-        self.begin_write(cmd)?;
-        if !params.is_empty() {
-            self.bus.write(params)?;
-        }
-        self.end_transaction()
+        self.with_transaction(cmd, |this| {
+            if params.is_empty() {
+                Ok(())
+            } else {
+                this.bus.write(params)
+            }
+        })
     }
 
     /// Read ID4 (D3h)。command byteの直後（D/CXをHighへ切り替えた後）に4byteを読む。
     /// **1byte目は一次資料が明記する`dummy read period`であり、判定に使わない。**
     pub fn read_id(&mut self) -> Result<DisplayId, EspError> {
         let mut raw = [0u8; 4];
-        self.begin_write(CMD_RDID4)?;
-        self.bus.read(&mut raw)?;
-        self.end_transaction()?;
+        self.with_transaction(CMD_RDID4, |this| this.bus.read(&mut raw))?;
         Ok(DisplayId { raw })
     }
 
@@ -260,13 +282,16 @@ impl<'d> Ili9341<'d> {
     /// 矩形を単色で塗る。**RAMWRの間はCSXを一度も上げない**（1回の描画を1つの
     /// SPI transactionとして扱う。datasheetのcommand図と同じ形）。
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// debug buildでは`x1 < x0`または`y1 < y0`のとき`debug_assert!`でpanicする。
-    /// release buildではこの前提を検査しない（`overflow-checks`既定offのため、
-    /// 満たさない場合`x1 - x0 + 1`等が無音でwrapし、無関係なpixel数とCASET/PASET値を
-    /// 送りかねない。呼び出し側はCASET/PASETの一次資料の制約
-    /// 「SC[15:0] always must be equal to or less than EC[15:0]」と同じ前提を守ること）。
+    /// `x1 < x0`、`y1 < y0`、`x1 >= WIDTH`、`y1 >= HEIGHT`のいずれかを満たす場合、
+    /// SPIへは何も送らず`ESP_ERR_INVALID_ARG`を返す。CodeRabbit review
+    /// （[#415](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/415)）の指摘:
+    /// 以前は`debug_assert!`のみで、release buildでは前提を検査しなかった
+    /// （`overflow-checks`既定offのため、満たさない場合`x1 - x0 + 1`等が無音でwrapし、
+    /// 無関係なpixel数とCASET/PASET値を送りかねなかった）。CASET/PASETの一次資料の
+    /// 制約「SC[15:0] always must be equal to or less than EC[15:0]」と同じ前提を、
+    /// ここで実行時に検証する。
     pub fn fill_rect(
         &mut self,
         x0: u16,
@@ -275,10 +300,9 @@ impl<'d> Ili9341<'d> {
         y1: u16,
         color: u16,
     ) -> Result<(), EspError> {
-        debug_assert!(
-            x1 >= x0 && y1 >= y0,
-            "fill_rect requires x1 >= x0 and y1 >= y0"
-        );
+        if x1 < x0 || y1 < y0 || x1 >= WIDTH || y1 >= HEIGHT {
+            return Err(EspError::from_infallible::<{ ESP_ERR_INVALID_ARG }>());
+        }
         self.set_window(x0, y0, x1, y1)?;
 
         let pixel_count = u32::from(x1 - x0 + 1) * u32::from(y1 - y0 + 1);
@@ -294,14 +318,15 @@ impl<'d> Ili9341<'d> {
             pair[1] = lo;
         }
 
-        self.begin_write(CMD_RAMWR)?;
-        let mut remaining = pixel_count;
-        while remaining > 0 {
-            let this_chunk = remaining.min(CHUNK_PIXELS as u32) as usize;
-            self.bus.write(&chunk[..this_chunk * 2])?;
-            remaining -= this_chunk as u32;
-        }
-        self.end_transaction()
+        self.with_transaction(CMD_RAMWR, |this| {
+            let mut remaining = pixel_count;
+            while remaining > 0 {
+                let this_chunk = remaining.min(CHUNK_PIXELS as u32) as usize;
+                this.bus.write(&chunk[..this_chunk * 2])?;
+                remaining -= this_chunk as u32;
+            }
+            Ok(())
+        })
     }
 
     /// 画面全体を単色で塗る。

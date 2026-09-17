@@ -156,6 +156,11 @@ fn main() {
     let reset_reason = reset_reason_str(reason);
     log::info!("reset_reason={reset_reason} raw={reason:?}");
 
+    // **`Health`はdisplay bring-upより前に作る。**bring-up中もheartbeatを刻めるように
+    // するためであり（下記`run_display_bringup`参照）、heartbeatのdeadline計算
+    // （`next_heartbeat`／`next_snapshot`）は従来どおりbring-upの後で初期化する。
+    let mut health = Health::new(reset_reason);
+
     // **`Peripherals::take()`はLCD配線の分だけ。**servoやI2C sensorは触らない
     // （module doc参照）。1度しか成功しないため`expect`で即座に気付く。
     let peripherals = Peripherals::take().expect("Peripherals::take must succeed exactly once");
@@ -163,7 +168,7 @@ fn main() {
         "peripherals=display_only servo=not_driven i2c=not_driven adc=not_driven touch=not_driven"
     );
 
-    run_display_bringup(peripherals);
+    run_display_bringup(peripherals, &mut health);
 
     // 周期は `config` が持つ。**ここへ数値を直接書かない。**暫定値である根拠は
     // `config` の doc comment にある。
@@ -173,9 +178,13 @@ fn main() {
         config::HEALTH_SNAPSHOT_PERIOD_MS
     );
 
-    let mut health = Health::new(reset_reason);
-    let mut next_heartbeat = u64::from(config::HEARTBEAT_PERIOD_MS);
-    let mut next_snapshot = u64::from(config::HEALTH_SNAPSHOT_PERIOD_MS);
+    // **`health.uptime_ms()`起点で最初の締切を積む。**`0`起点で固定すると、
+    // bring-upの所要時間（複数のSPI fillで実測1秒前後かかりうる）だけで最初の
+    // loop周回が即座に`overrun`と判定されてしまう。bring-up自体の遅延であって
+    // main loopの遅延ではないため、混同しない。
+    let bringup_done_ms = health.uptime_ms();
+    let mut next_heartbeat = bringup_done_ms + u64::from(config::HEARTBEAT_PERIOD_MS);
+    let mut next_snapshot = bringup_done_ms + u64::from(config::HEALTH_SNAPSHOT_PERIOD_MS);
 
     // **`boot`はまだwireへ送らない。**GPIO割り当ての承認待ちではない
     // （`docs/hardware/gpio-assignment.md`の`Pi–ESP32間のtransport`節はUSB serialへ
@@ -289,13 +298,31 @@ fn demonstrate_pi_session(health: &mut Health) {
     log::info!("protocol_demo get_status_ack={get_status_ack:?} status={get_status_reply:?}");
 }
 
+/// bring-up中の各段階の境界で1回、heartbeatを刻みOSへyieldする。
+///
+/// 受け入れ条件「更新中も通信とwatchdogがactiveである」に対応する。CodeRabbitの
+/// review（[#415](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/415)）が、
+/// `run_display_bringup`が`Health::new`とmain loopの開始より前に複数のSPI転送
+/// （単色fill×5、四隅pattern）を連続実行しており、その間heartbeatが一度も
+/// 出ないことを指摘した。`main`のloopが使う`next_heartbeat`によるdeadline
+/// schedulingとは別の、bring-up専用の簡易版である。[`FreeRtos::delay_ms`]は
+/// module doc冒頭が引用するとおりOSへyieldするため、SPI転送が連続する区間でも
+/// idle taskのwatchdogに機会を与える。
+fn service_bringup_step(health: &mut Health, step: &str) {
+    FreeRtos::delay_ms(1);
+    let seq = health.next_heartbeat_seq();
+    log::info!(
+        "hb seq={seq} uptime_ms={} bringup_step={step}",
+        health.uptime_ms()
+    );
+}
+
 /// `DISP-01`を初期化し、識別・単色fill・四隅patternを実行する。
 ///
-/// **どの段階で失敗しても、この関数はpanicしない。**heartbeat／health snapshot
-/// （§13の受け入れ条件「更新中も通信とwatchdogがactiveである」）は、LCDの成否に
-/// 関わらず`main`のloopで動き続ける必要があるためであり、この関数はエラーを
+/// **どの段階で失敗しても、この関数はpanicしない。**この関数はエラーを
 /// `log::error!`へ分類して返すだけで、呼び出し元の`main`を止めない。
-fn run_display_bringup(peripherals: Peripherals) {
+/// heartbeatは[`service_bringup_step`]で段階ごとに刻む（同関数のdoc参照）。
+fn run_display_bringup(peripherals: Peripherals, health: &mut Health) {
     // pinは`docs/hardware/gpio-assignment.md`の`信号inventory`に従う
     // （`LCD-SCLK`=18, `LCD-MOSI`=23, `LCD-MISO`=19, `LCD-CS`=22, `LCD-DC`=17,
     // `LCD-RST`=16, `LCD-BL`=4）。`TOUCH-CS`(21)はbusを共有するが、このfirmwareは
@@ -324,6 +351,7 @@ fn run_display_bringup(peripherals: Peripherals) {
             return;
         }
     };
+    service_bringup_step(health, "init");
 
     // **識別結果を捏造しない。**読めた生byteと判定を両方logへ残す
     // （受け入れ条件「Controller識別情報と初期化の根拠を記録した」）。
@@ -344,8 +372,8 @@ fn run_display_bringup(peripherals: Peripherals) {
         log::error!("display_backlight_on_failed error={err}");
     }
 
-    run_fill_tests(&mut lcd);
-    run_corner_pattern(&mut lcd);
+    run_fill_tests(&mut lcd, health);
+    run_corner_pattern(&mut lcd, health);
 }
 
 /// 単色fillを既知のRGB565値で順に実行し、所要時間を計測してlogへ出す。
@@ -354,7 +382,7 @@ fn run_display_bringup(peripherals: Peripherals) {
 /// 対応する。**正しいかどうかの判定はこの関数では行わない。**実機のLCDを目視して
 /// 判定するのは人間であり（`AGENTS.md`ハードウェア安全、初回通電は人間監視下）、
 /// この関数は色と所要時間を機械可読な形でlogへ残すだけである。
-fn run_fill_tests(lcd: &mut Ili9341<'_>) {
+fn run_fill_tests(lcd: &mut Ili9341<'_>, health: &mut Health) {
     let fills: [(&str, u16); 5] = [
         ("black", display::color::BLACK),
         ("red", display::color::RED),
@@ -374,6 +402,7 @@ fn run_fill_tests(lcd: &mut Ili9341<'_>) {
                 log::error!("display_fill_failed name={name} error={err}");
             }
         }
+        service_bringup_step(health, "fill");
     }
 }
 
@@ -383,11 +412,12 @@ fn run_fill_tests(lcd: &mut Ili9341<'_>) {
 /// （`00h`）のままである**（`crate::display`のmodule doc参照）。この patternを見て
 /// 向きと色順が期待どおりでなければ、`docs/hardware/gpio-assignment.md`の`MADCTL`欄と
 /// `crate::display`のMADCTL定数を実測結果で更新する必要がある。
-fn run_corner_pattern(lcd: &mut Ili9341<'_>) {
+fn run_corner_pattern(lcd: &mut Ili9341<'_>, health: &mut Health) {
     if let Err(err) = lcd.fill_screen(display::color::BLACK) {
         log::error!("display_corner_background_failed error={err}");
         return;
     }
+    service_bringup_step(health, "corner_background");
 
     const SQUARE: u16 = 24;
     let corners: [(&str, u16, u16, u16); 4] = [
@@ -417,6 +447,7 @@ fn run_corner_pattern(lcd: &mut Ili9341<'_>) {
         if let Err(err) = lcd.fill_rect(x, y, x + SQUARE - 1, y + SQUARE - 1, color) {
             log::error!("display_corner_failed corner={name} error={err}");
         }
+        service_bringup_step(health, "corner");
     }
     let elapsed_us = start.elapsed().as_micros();
     log::info!("display_corner_pattern elapsed_us={elapsed_us}");
