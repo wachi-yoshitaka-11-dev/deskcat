@@ -951,7 +951,7 @@ Pull Requestを通る変更は`review-gate.yml`が`gate`を実行するためで
   （2026-08-28に[PR #250](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/250)が
   base `main`で作られ、変更まで1時間17分かかった）。
 - **`gh issue create`には`--base`を要求しない。**option自体が存在しない。
-- **`--help`／`-h`が付いた呼び出しは、`gh_metadata_guard.py`の3つの検査すべてを抜ける。**helpの表示は何も作らず、
+- **`--help`／`-h`が付いた呼び出しは、`gh_metadata_guard.py`の4つの検査すべてを抜ける。**helpの表示は何も作らず、
   mergeもしないため、誤検知しか生まない。**2026-08-28に`gh issue create --help`、
   `gh pr create --help`、`gh pr merge --help`の3つとも拒否されることを実測した。
   hookが要求するoption名を`--help`で調べる手段そのものが塞がっていた。**
@@ -970,6 +970,11 @@ Pull Requestを通る変更は`review-gate.yml`が`gate`を実行するためで
 - **`;`／`&&`の直前に空白が無い形。**`cat x; git push origin develop`は`x;`が1語になり、
   `git`がcommand位置から外れる。**bashは両方を実行する。**`shlex`が空白でしか語を切らない
   ためであり、**改行の対応（[#389](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/389)）では直していない。****#389と同じ失敗型である。**
+  **同じ形で`worktree_guard.py`も丸ごと抜ける。**`cd sub; git reset --hard`、
+  `(git reset --hard)`、`git reset --hard|cat`はいずれも素通りする（2026-09-17実測）。
+  **この穴で失うものは、hookによって違う。**申告の監査漏れで済む側と、
+  **戻らない未commitの変更**が消える側がある。`SEPARATORS`に`|`／`(`／`)`は入っているが、
+  **空白で囲まれていない限り`shlex`が語を切らないため届かない。**
   `inspector_readonly_guard.py`は別の形で塞いでいる（**引用の外のmetacharacterと、
   区切り語そのものを拒否する。**[ADR-0020](docs/decisions/0020-inspector-readonly-by-hook.md)）。
 - **heredocのbodyを、bodyをcommandとして実行する側へ流した場合。**`bash <<'EOF' … EOF`／

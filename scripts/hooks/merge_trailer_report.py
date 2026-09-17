@@ -69,6 +69,8 @@ def _pr_merge(command):
     `gh pr view`も同じ既定に従うため、番号は`None`のままでよい。
     """
     for args in command_line.invocations(command, "gh"):
+        # global optionを外す。理由は`gh_metadata_guard.py`と同じである（#325）。
+        args = command_line.skip_global_options(args, "gh")
         if args[:2] != ["pr", "merge"]:
             continue
         for candidate in args[2:]:

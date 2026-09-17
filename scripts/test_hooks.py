@@ -16,6 +16,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -132,6 +133,27 @@ class GhMetadataGuardTests(unittest.TestCase):
         code, output = _invoke(GH_GUARD, command)
         self.assertEqual(code, 0, command)
         self.assertIsNone(output, f"止めてしまった: {command}")
+
+    def test_global_options_do_not_hide_the_subcommand(self):
+        """**subcommandより前のglobal optionで検査が抜けない**（#325で実測した穴）。
+
+        `args[:2]`で位置から読んでいた版では、`gh --repo o/r pr create`と
+        `gh -R o/r pr merge`が**denyを素通りしていた。**`--project`の要求も
+        squash messageのtrailerの要求も、**global optionを1語足すだけで抜けた。**
+        """
+        for command in (
+            "gh --repo owner/repo pr create --title x --body y",
+            "gh -R owner/repo pr create --title x --body y",
+            "gh --repo owner/repo issue create --title x --body y",
+        ):
+            with self.subTest(command=command):
+                self.assertDenied(command)
+
+    def test_global_options_do_not_hide_the_merge_subcommand(self):
+        """merge側も同じである。trailerの検査が素通りしていた。"""
+        self.assertDenied(
+            'gh -R owner/repo pr merge 1 --squash --subject "x" --body "y"'
+        )
 
     def test_create_without_project_is_denied(self):
         """`--project`が無いIssue／Pull Request作成を止める。"""
@@ -674,6 +696,21 @@ class BranchBaseGuardTests(unittest.TestCase):
             "cat > note.md <<'EOF'\ngit checkout -b chore/1-x\nEOF\n"
         )
 
+    def test_global_options_do_not_hide_the_creation(self):
+        """**global optionでbranch作成の検査が抜けない**（#325）。
+
+        `args[:2]`で位置から読んでいた版では、`git -C . checkout -b`と
+        `git --no-pager checkout -b`が検査を素通りしていた。
+        """
+        self._at_old_base()
+        for command in (
+            "git -C . checkout -b chore/1-x",
+            "git --no-pager checkout -b chore/1-x",
+            "git -c user.name=x switch -c chore/1-x",
+        ):
+            with self.subTest(command=command):
+                self.assertDenied(command)
+
     def test_current_base_is_allowed(self):
         """基点が`origin/develop`と一致していれば通す。"""
         self._at_trunk()
@@ -1137,10 +1174,50 @@ class WorktreeGuardTests(unittest.TestCase):
                 self.assertAllowed(command)
 
     def test_staged_only_restore_is_allowed(self):
-        """`git restore --staged`はindexだけを戻す。**作業treeのfileは残る。**"""
+        """`git restore --staged`はindexだけを戻す。**作業treeのfileは残る。**
+
+        **短縮形`-S`も同じに扱う。**長い形だけを見ていた版では、同じ意味の
+        `git restore -S <path>`がaskになっていた（2026-09-17実測）。
+        """
         self._dirty_note()
         _git(self.directory, "add", "note.md")
         self.assertAllowed("git restore --staged note.md")
+        self.assertAllowed("git restore -S note.md")
+
+    def test_worktree_restore_is_asked_even_with_staged(self):
+        """`--worktree`／`-W`が付けば作業treeを書き換える。**短縮形も見る。**
+
+        `-s`（`--source`。値を取る）は`-S`とは別のoptionである。**取り違えない。**
+        """
+        self._dirty_note()
+        _git(self.directory, "add", "note.md")
+        for command in (
+            "git restore --staged --worktree note.md",
+            "git restore -W note.md",
+            "git restore -SW note.md",
+            "git restore -s HEAD note.md",
+        ):
+            with self.subTest(command=command):
+                self.assertAsked(command)
+
+    def test_exhausted_budget_is_not_read_as_clean(self):
+        """**1呼び出し全体の予算を使い切ったら、通さない。**
+
+        1行に対象commandが複数あると`git status`もその数だけ走る。予算を使い切った
+        状態で`_git`が成功を返すと、**確認していないtreeを「汚れていない」と読む。**
+        """
+        sys.path.insert(0, str(SCRIPTS_ROOT / "hooks"))
+        import worktree_guard
+
+        original = worktree_guard._started
+        worktree_guard._started = time.monotonic() - worktree_guard.TOTAL_BUDGET - 1
+        try:
+            self.assertLessEqual(worktree_guard._remaining_budget(), 0)
+            ok, output = worktree_guard._git(["status", "--porcelain"])
+            self.assertFalse(ok, "予算切れで成功を返した")
+            self.assertEqual(output, "")
+        finally:
+            worktree_guard._started = original
 
     def test_staged_change_matching_the_worktree_is_still_asked(self):
         """**過剰に止める側の挙動を、そうと分かる形で固定する。**
@@ -2017,6 +2094,16 @@ class CodeRabbitGateTests(unittest.TestCase):
             'gh issue comment 240 --body "@coderabbitai full review"',
             'gh pr comment 239 -b "@coderabbitai full review"',
             'gh pr comment 239 --body="@coderabbitai full review"',
+        ):
+            with self.subTest(command=command):
+                self.assertAsked(command)
+
+    def test_global_options_do_not_hide_the_subcommand(self):
+        """**global optionで検査が抜けない**（#325）。`args[:2]`で位置から読んでいた
+        版では、`gh --repo o/r pr comment`が素通りしていた。"""
+        for command in (
+            'gh --repo owner/repo pr comment 239 --body "@coderabbitai full review"',
+            'gh -R owner/repo issue comment 240 --body "@coderabbitai review"',
         ):
             with self.subTest(command=command):
                 self.assertAsked(command)

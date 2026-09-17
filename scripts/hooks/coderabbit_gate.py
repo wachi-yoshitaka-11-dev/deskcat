@@ -272,6 +272,8 @@ def main():
         # `cd x && gh pr comment`が素通りするため、絞らずここで安く抜ける。
         return 0
     for args in command_line.invocations(command, "gh"):
+        # global optionを外す。理由は`gh_metadata_guard.py`と同じである（#325）。
+        args = command_line.skip_global_options(args, "gh")
         head = tuple(args[:2])
         if head in COMMENT_SUBCOMMANDS:
             _check(head, args[2:])

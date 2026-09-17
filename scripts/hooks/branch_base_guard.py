@@ -76,6 +76,8 @@ def _branch_creation(command):
     明示されている場合、作成者は基点を選んでいる。**選んだ基点は尊重する。**
     """
     for args in command_line.invocations(command, "git"):
+        # global optionを外す。理由は`gh_metadata_guard.py`と同じである（#325）。
+        args = command_line.skip_global_options(args, "git")
         for verb, flag in CREATE_FORMS:
             if args[:2] != [verb, flag]:
                 continue

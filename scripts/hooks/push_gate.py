@@ -119,8 +119,10 @@ def _strip_global_options(args):
 
     **判定は`command_line`が持つ。**2026-09-16に[#325](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/325)で移した。
     このfileが持っていた規則をそのまま共有側へ置き、ここは呼ぶだけにした。
-    **同じ読み飛ばしを要るhookが3本になったためである**（`truncation_guard.py`は
+    **同じ読み飛ばしを要るhookが複数になったためである**（`truncation_guard.py`は
     狭い版を私有しており、`git --no-pager`／`git -c`を取り落としていた）。
+    **その後、subcommandを位置で読んでいた5 hookも同じ関数を呼ぶようにした**
+    （review指摘。`gh --repo o/r pr create`でdenyが抜けることを実測した）。
     """
     return (
         command_line.skip_global_options(args, "git"),

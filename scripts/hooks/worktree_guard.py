@@ -69,6 +69,7 @@ import os
 import posixpath
 import subprocess
 import sys
+import time
 
 import command_line
 
@@ -77,8 +78,16 @@ SKIP_ENV = "DESKCAT_SKIP_WORKTREE_GUARD"
 # `git status`1回あたりの制限。**`.claude/settings.json`のhook timeout（30秒）より
 # 十分小さく取る**（`push_gate.py`と同じ作法。同値だと、遅い環境でhook自体が先に
 # 殺され、`_check`のfail-closedなaskへ到達しないまま素通りする）。
-# **1回の呼び出しで複数のgit操作を検査することがあり、その分だけ積み上がる。**
 TIMEOUT = 10
+
+# 1回のhook呼び出し全体で`git`へ使ってよい合計時間。**1行に対象commandが複数あると
+# `git status`もその数だけ走るため、1回あたりの制限だけでは足りない。**予算を使い切ったら
+# 以降の`_git`は失敗として返り、`_check`のfail-closedなaskへ倒れる。
+# **hook自体が殺されると、決定をstdoutへ書く前に消える。**そちらは通す側の失敗である。
+TOTAL_BUDGET = 20.0
+
+# 予算の起点。`main`が設定する。
+_started = None
 
 # 破棄しても失うものが無いpath。**生成物だけを入れる。**
 # `pages/assets-manifest.json`は`scripts/prepare_pages.py`が書き換える生成物であり、
@@ -141,12 +150,27 @@ def _ask(reason):
     raise SystemExit(0)
 
 
+def _remaining_budget():
+    """`TOTAL_BUDGET`の残りを返す。起点が無い場合は1回分の制限を返す。"""
+    if _started is None:
+        return TIMEOUT
+    return TOTAL_BUDGET - (time.monotonic() - _started)
+
+
 def _git(args):
-    """gitを実行し`(成否, 出力)`を返す。失敗と例外を区別せず`False`にまとめる。"""
+    """gitを実行し`(成否, 出力)`を返す。失敗と例外を区別せず`False`にまとめる。
+
+    **1回あたりの制限と、呼び出し全体の予算の小さい方を使う。**予算が尽きていれば
+    実行せずに失敗を返す。**呼び出し側はそれを「確認できなかった」askにする。**
+    """
+    remaining = _remaining_budget()
+    if remaining <= 0:
+        return False, ""
     try:
         result = subprocess.run(
             ["git"] + list(args), capture_output=True, text=True,
-            encoding="utf-8", errors="replace", timeout=TIMEOUT, check=False,
+            encoding="utf-8", errors="replace",
+            timeout=min(TIMEOUT, remaining), check=False,
         )
     except (OSError, subprocess.TimeoutExpired):
         return False, ""
@@ -235,6 +259,25 @@ def _is_generated(path):
     return normalized in GENERATED_PATHS
 
 
+def _is_staged_only(args):
+    """`git restore`がindexだけを戻す形かを見る。
+
+    **短縮形も同じに扱う。**`-S`は`--staged`、`-W`は`--worktree`の短縮形である。
+    長い形だけを見ていた版では、`git restore --staged <path>`は通るのに
+    `git restore -S <path>`がaskになっていた（2026-09-17実測）。
+    **安全側へ倒れる誤りだったが、同じ意味の2つの書き方で向きが違うのは、
+    docstringが扱った顔をしている範囲の中の食い違いである。**
+
+    **大文字と小文字を取り違えない。**`-s`は`--source`（値を取る）であり、
+    `-S`とは別のoptionである。`_has_short_letter`は文字をそのまま見るため区別できる。
+    """
+    staged = _has_long_option(args, ("--staged",)) or _has_short_letter(args, "S")
+    worktree = (
+        _has_long_option(args, ("--worktree",)) or _has_short_letter(args, "W")
+    )
+    return staged and not worktree
+
+
 def _plan(subcommand, args):
     """この呼び出しが失いうる範囲を返す。失うものが無ければ`None`。
 
@@ -257,8 +300,7 @@ def _plan(subcommand, args):
             return "git switch --discard-changes", WHOLE_TREE
         return None
     if subcommand in ("checkout", "restore"):
-        if subcommand == "restore" and _has_long_option(args, ("--staged",)) \
-                and not _has_long_option(args, ("--worktree",)):
+        if subcommand == "restore" and _is_staged_only(args):
             # index だけを戻す。**作業treeのfileは書き換わらない。**
             return None
         if _is_forced(args) \
@@ -364,6 +406,8 @@ def _check(prefix, subcommand, args):
 
 
 def main():
+    global _started
+    _started = time.monotonic()
     if os.environ.get(SKIP_ENV) == "1":
         return 0
     try:

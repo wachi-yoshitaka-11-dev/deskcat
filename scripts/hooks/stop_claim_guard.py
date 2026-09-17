@@ -229,6 +229,10 @@ def _gh_invocation_matches(command, subcommand, disqualifying_flags=()):
     mergeの完了ではない）。
     """
     for args in command_line.invocations(command, "gh"):
+        # global optionを外す。理由は`gh_metadata_guard.py`と同じである（#325）。
+        # **このhookは「やった証拠」として読む側である。**外さないと、実際に
+        # 実行したmergeを証拠として数えない側へ倒れる。
+        args = command_line.skip_global_options(args, "gh")
         if tuple(args[:2]) == subcommand and not any(
             flag in args for flag in disqualifying_flags
         ):

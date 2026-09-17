@@ -10,7 +10,9 @@
 各hookへ複製しないためである（#242）。
 
 **global optionの読み飛ばし（`skip_global_options`／`global_option_value`）も持つ。**
-`truncation_guard.py`・`worktree_guard.py`・`push_gate.py`の3 hookが使う。
+**`inspector_readonly_guard.py`を除く8 hookが使う。**subcommandを位置で読む hook は、
+`gh --repo o/r pr create`のように**global optionを1語足すだけで検査が抜ける**
+（2026-09-17に`gh_metadata_guard.py`で実測。#325）。
 **`truncation_guard.py`はこれと`tokenize`系だけを使い、`invocations`は使わない。**
 
 **語がcommand位置にあるかを見る。**単に`gh`という語を探すと、`echo gh pr merge`のような
@@ -471,8 +473,13 @@ def skip_global_options(tokens, program):
     **移したのは`truncation_guard.py`の版だが、規則は`push_gate.py`の版に揃えた。**
     前者は`-C`しか知らず、**`git --no-pager reset --hard`と`git -c key=value reset --hard`が
     subcommandを取り落として素通りしていた**（2026-09-16実測。git 2.43.0／
-    python3 3.11.15／Linux x86_64）。**3本目を残さないため、`push_gate.py`も
+    python3 3.11.15／Linux x86_64）。**私有の版を残さないため、`push_gate.py`も
     この関数を呼ぶ。**
+
+    **subcommandを位置で読んでいた5 hookも、後からここへ寄せた**
+    （`gh_metadata_guard.py`／`coderabbit_gate.py`／`merge_trailer_report.py`／
+    `stop_claim_guard.py`／`branch_base_guard.py`）。**`gh --repo o/r pr create`で
+    `deny`が素通りすることを実測している**（2026-09-17）。
     """
     index, _ = _global_prefix(tokens, program)
     return list(tokens[index:])
