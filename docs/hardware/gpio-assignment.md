@@ -402,7 +402,7 @@ I2C busの速度と無関係である。加速度の軽打検出は`ACCEL-IRQ`�
 
 | Signal ID | Device | 信号 | ESP32側の方向 | GPIO | Boot state | Pull | Bus設定 | 共有先 | 制約／根拠 |
 |---|---|---|---|---|---|---|---|---|---|
-| LCD-SCLK | DISP-01 | SCLK | Output | GPIO18 | 起動時floating（input）。CSがinactiveの間はbus上で無害 | 外部pull不要 | VSPI、SPI mode要確認（ILI9341は一般にMode0）。速度は実測で確認 | TOUCH-01と共有 | ESP32 VSPIの既定CLK pin。Flash／strapping pinではない |
+| LCD-SCLK | DISP-01 | SCLK | Output | GPIO18 | 起動時floating（input）。CSがinactiveの間はbus上で無害 | 外部pull不要 | VSPI、**SPI Mode 0（CPOL=0, CPHA=0）で確定した**（2026-09-17。ILI9341 Datasheet V1.11 §4 Pin Descriptions「Interface Logic Signals」表、p.10。`SDA`/`SDI`はSCL立ち上がりでlatch、`SDO`はSCL立ち下がりで出力される旨の記載から導いた。`firmware/esp32/src/display.rs`のmodule docに同じ引用がある）。**clockは6 MHzに固定した**（同datasheet §18.3.4 4-line SPI system timing、p.242。write `twc`最小100ns→最大10 MHz、read `trc`最小150ns→最大約6.67 MHzの両方を満たす値として選定。実測ではなく一次資料の上限から導いた値である。`#13`の受け入れ条件「更新timingを測定した」はまだ満たしていない。実機試験で測る際は、この固定clockでの所要時間になる） | TOUCH-01と共有 | ESP32 VSPIの既定CLK pin。Flash／strapping pinではない |
 | LCD-MOSI | DISP-01 | MOSI | Output | GPIO23 | 同上 | 外部pull不要 | 同上 | TOUCH-01と共有 | ESP32 VSPIの既定MOSI pin |
 | LCD-MISO | DISP-01 | MISO | Input | GPIO19 | 同上 | 外部pull不要 | 同上 | TOUCH-01と共有 | ILI9341自体はMISO未使用の可能性が高い（要現物確認）。Touch controller（**`XPT2046`。2026-08-13に現物刻印で確定**）の読み取りに使用 |
 | LCD-CS | DISP-01 | Chip select | Output | GPIO22 | 起動時floating→firmware初期化前は不定 | **外部`10 kΩ`×`1本`を選定した**（2026-08-25。active-low CSをfirmware初期化前もinactive＝Highに保つため）（導出は[起動時状態を確定させる外部pull](#起動時状態を確定させる外部pull)節。**ここへ再掲しない**）。**2026-08-27にブレッドボード上へ実装した。通電・検証は未了である** | **Active-low（一次資料で確定）。**ILI9341 datasheet V1.11が`CSX`をactive lowと明記している。**現物のpolarity確認は要しない** | なし | Output設定前にinactiveにする。Pull-up未実装の場合、起動直後の数十ms間bus contentionのriskがある |

@@ -14,7 +14,9 @@
 
 ## 現在の状態
 
-Issue #5 でtoolchainを固定し、最小projectのclean buildを確認した。実装済みなのは`link_patches()`、logger初期化、起動logの出力、Issue #7 の heartbeat と health snapshot、および Issue #12 の`crate::protocol::PiSession`（`hello`／`ping`／`get_status`の受信側logic）だけであり、**hardware driverは未実装である。**
+Issue #5 でtoolchainを固定し、最小projectのclean buildを確認した。実装済みなのは`link_patches()`、logger初期化、起動logの出力、Issue #7 の heartbeat と health snapshot、Issue #12 の`crate::protocol::PiSession`（`hello`／`ping`／`get_status`の受信側logic）、および Issue #13 の`crate::display::Ili9341`（`DISP-01`／ILI9341のSPI driver）である。
+
+`crate::display`は`docs/hardware/gpio-assignment.md`の`信号inventory`のうち`LCD-SCLK`／`LCD-MOSI`／`LCD-MISO`／`LCD-CS`／`LCD-DC`／`LCD-RST`／`LCD-BL`の7本だけを配線する。**`main()`は起動直後にcontroller識別（Read ID4）、単色fill、四隅test patternを実行し、結果をlogへ出す。**一次資料の引用はmodule docにある。**この版で確認できているのはESP32 Build profile端末でのbuild成功までである。**flash・実機通電・LCD panelの目視確認は未実施であり、実機のtouch／accelerometer／environment sensor／servoは引き続き未実装のままである（`SERVO-PWM`・`ACCEL-*`・`ENV-*`・`ADC-*`・`TOUCH-*`はこの版でも一切GPIOへ触れない）。
 
 heartbeat と health snapshot は ESP logger の log にのみ出す。**「log へ出す」は「serial へ出ない」ではない。**logger の出力は UART を通って serial monitor に現れる。送らないのは、protocol の message として application の serial link（#11）へ流すことである。周期は `src/config.rs` が持ち、**いずれも暫定値である**（Protocol §5.7 が heartbeat の interval を `TBD` としているため、一次資料の根拠が無い）。health snapshot は `crates/deskcat-protocol` の `Status` を組み立てて JSON 1 行として出す。**`ProtocolCounters` はすべて 0 のままである。**実serial linkが無く、計上すべき事象が発生しないためである。
 
@@ -80,3 +82,5 @@ session stateとserial taskの配線は
 ESP-WROOM-32D datasheet v2.7にはPSRAM内蔵variantの記載が無いため、PSRAMを前提とする設定は不要である。
 
 **flash、serial monitor、実機起動は2026-08-20に#6で実施した**（記録は[Version Record](../../docs/toolchains/version-records/2026-08-20-esp32-flash-boot-native.md)）。**確認したのは起動出力とchip名までであり、周辺回路とservoには触れていない。****USB抜き差しによる電源再投入後の起動出力は未検証である**（host側のserial portがUSB enumerate後にしか存在せず、その時点で起動出力が終わっているため。再現は`espflash`のresetによる4回で示した）。
+
+**Issue #13の`DISP-01`driverはこの版ではESP32 Build profile端末でのbuild確認までである。**flash・実機通電はESP32 Flash / HIL profile端末と人間の監視を要する（[Hardware Safety Policy](../../docs/governance/hardware-safety-policy.md)、初回通電）。実機での識別結果（Read ID4の一致）、単色fillの色、四隅patternの向きとcolor order、更新timingの実測値は、実機試験後に`docs/hardware/experiment-log.md`へ記録する（**この版ではまだ記録していない**）。
