@@ -28,6 +28,7 @@
 | [ADR-0020](0020-inspector-readonly-by-hook.md) | Accepted | 検査 subagent の read-only を、sandbox ではなく agent 単位の hook で絞る |
 | [ADR-0021](0021-declaration-audit-on-push.md) | Accepted | 宣言 trailer の検出を、hook ではなく共有 branch への push に置く |
 | [ADR-0022](0022-wokwi-not-a-ci-simulation-gate.md) | Accepted | Wokwi を CI の simulation gate として採らない |
+| [ADR-0023](0023-no-model-checking-for-now.md) | Accepted | サーボ安全制限と通信断の状態機械へ、いまモデル検査を導入しない |
 
 ## 新規作成
 
