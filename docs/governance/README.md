@@ -63,8 +63,16 @@
 | 公開文書のsource | RootのMarkdownと`docs/` |
 | 公開binary assetの出所と許諾 | [公開asset register](published-asset-register.md) |
 | Pages／Wikiの公開方針 | [ADR-0003](../decisions/0003-public-documentation-publishing.md) |
+| 安全要件5項目とその根拠の水準 | [Hardware Safety Policy](hardware-safety-policy.md#安全要件の5項目) |
+| 一次資料に当たるもの | [Hardware Safety Policy](hardware-safety-policy.md#一次資料に当たるもの) |
+| 「承認済みのリポジトリポリシー」の範囲 | [AI Agent Policy](ai-agent-policy.md)の「「承認済みのリポジトリポリシー」の範囲」節 |
+| ハードウェアTBDの状態と解決手順 | [Hardware TBD Register](../hardware/tbd-register.md) |
+| Issueを立てずに直接反映してよい範囲（後始末／`fixup`を含む） | [CONTRIBUTING](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/CONTRIBUTING.md#後始末fixupの範囲)の「後始末（`fixup`）の範囲」節 |
 
 同じ値を複数の文書で再定義しない。他の文書からは正本の定義へリンクする。
+**この表に足す用語は、3箇所以上の file で説明なしに使われ、かつADR番号に紐づかないものに限る**
+（ADR単位の概念は[docs/decisions/README.md](../decisions/README.md)が既に索引している。
+[ADR-0024](../decisions/0024-terminology-index-in-single-source-of-truth.md)）。
 
 ## ポリシー変更
 
