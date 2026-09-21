@@ -15,9 +15,12 @@
 //! [`crate::session::Session::pump_read`]で復元した[`Frame`]をここへ渡し、
 //! 返ってきた返信を[`crate::session::Session::send`]で送る。
 
+use core::time::Duration;
 use std::collections::{HashMap, VecDeque};
 
 use deskcat_protocol::{Ack, AckStatus, Boot, ErrorCode, Frame, Message, Status};
+
+use crate::config::RetryPolicy;
 
 /// retired session集合の上限。**暫定値であり、確定値ではない。**
 ///
@@ -52,6 +55,56 @@ pub enum OutstandingKind {
     Ping,
     /// `get_status`（§5.6）。
     GetStatus,
+}
+
+impl OutstandingKind {
+    /// `message`が追跡対象なら、その種別を返す。
+    ///
+    /// **呼び出し側が`kind`を別途指定する経路を作らない。**`kind`と`message`を
+    /// 別々の引数で受け取ると、両者が食い違う値を渡せてしまう
+    /// （例えば`kind: Ping`なのに`message: Message::Hello(..)`）。この場合
+    /// [`CorrelatedAck::request`]や[`OutstandingAction::Retry`]の種別が、
+    /// 実際にwireへ送った`message`と食い違ったまま報告される。`message`から
+    /// `kind`を導くことで、この食い違いをそもそも作れないようにする。
+    fn classify(message: &Message) -> Option<Self> {
+        match message {
+            Message::Ping => Some(Self::Ping),
+            Message::GetStatus => Some(Self::GetStatus),
+            _ => None,
+        }
+    }
+}
+
+/// [`PeerSession::poll_outstanding`]が応答待ちの要求へ下す判断。
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum OutstandingAction {
+    /// ACK timeoutを超えたが、再送予算がまだ残っている。同じ`id`で再送してよい。
+    /// [`Message`]は送信時にそのまま保持しておいたものであり、**種別から
+    /// 組み直したものではない。**
+    Retry(OutstandingKind, Message),
+    /// 再送予算を使い切った。要求を取り下げた。
+    GaveUp(OutstandingKind),
+}
+
+/// Piが送った、応答待ちの要求。送信したmessage自体、送信時刻、これまでの
+/// 再送回数を持つ。
+///
+/// **種別（[`OutstandingKind`]）だけでなく、送信した[`Message`]そのものを保持する。**
+/// `ping`／`get_status`はpayloadを持たないため、種別だけからでも`Message::Ping`
+/// ／`Message::GetStatus`を組み直せてしまう。だが将来`OutstandingKind`へ
+/// payloadを持つ種別（例えばmotion command）が加わったとき、種別からの復元は
+/// 「元と違うpayloadで静かに再送する」という、気づきにくい壊れ方をする。
+/// 実際に送ったmessageを保持しておけば、この種のkindが増えても再送は
+/// 常に元のmessageのままである。
+#[derive(Debug, Clone)]
+struct OutstandingEntry {
+    kind: OutstandingKind,
+    message: Message,
+    /// 最後に送信した（または再送した）時刻。
+    sent_at_ms: u64,
+    /// これまでの再送回数。最初の送信では0。
+    retries: u32,
 }
 
 /// `boot`を拒否した、またはPiの要求と相関しないmessageを受けた理由。
@@ -185,7 +238,23 @@ pub struct PeerSession {
     retired: VecDeque<u32>,
     boot_history: BootHistory,
     /// Piが送った、応答待ちの要求。`session.send`で割り当てた`id`をkeyにする。
-    outstanding: HashMap<u32, OutstandingKind>,
+    ///
+    /// **`retired`／`boot_history`と違い、容量の上限を持たない。**ACKが返る、
+    /// [`Self::poll_outstanding`]が取り下げる、[`Self::forget_sent`]を呼ぶ、
+    /// [`Self::handle_boot`]がsession遷移を確定して丸ごと`clear`する、の
+    /// いずれかで抜けるまで残る。上限が無い代わり、呼び出し側が
+    /// [`Self::poll_outstanding`]を一定間隔で呼び続けることに頼っている。
+    outstanding: HashMap<u32, OutstandingEntry>,
+    /// `boot`確立後の`get_status`（§10.1 step4）を、まだenqueueできていないか。
+    ///
+    /// `Established`直後の送信が失敗した場合（outbox満杯など）にtrueになる。
+    /// この時点では`note_sent`が呼ばれていないため`outstanding`には何も残らず、
+    /// [`Self::poll_outstanding`]の対象にもならない——このflagが唯一の記録である。
+    /// `note_sent`が`get_status`をenqueueした時点で自動的に落ちる
+    /// （[`Self::note_sent`]のdoc参照）。以後のACK到達までの再送は
+    /// `outstanding`／[`Self::poll_outstanding`]が引き継ぐ。このflagは
+    /// enqueueできたかどうかだけを表し、ACKが来たかどうかは表さない。
+    status_sync_pending: bool,
 }
 
 impl Default for PeerSession {
@@ -203,6 +272,7 @@ impl PeerSession {
             retired: VecDeque::with_capacity(RETIRED_CAPACITY),
             boot_history: BootHistory::default(),
             outstanding: HashMap::new(),
+            status_sync_pending: false,
         }
     }
 
@@ -212,22 +282,112 @@ impl PeerSession {
         self.esp32_sid
     }
 
-    /// Piが送った要求を記録する。`session.send`が返した`id`をそのまま渡す。
+    /// Piが送った要求を記録する。`session.send`が返した`id`と、実際に送った
+    /// `message`をそのまま渡す。記録していない`id`へのACKは
+    /// [`PeerRejection::UnmatchedAck`]になる。
     ///
-    /// 呼び出し側が`session.send(Message::Ping, ts)`などで送信した直後に呼ぶ。
-    /// 記録していない`id`へのACKは[`PeerRejection::UnmatchedAck`]になる。
-    pub fn note_sent(&mut self, id: u32, kind: OutstandingKind) {
-        self.outstanding.insert(id, kind);
+    /// **`kind`は`message`から導く**（呼び出し側が別々に指定する経路は無い。
+    /// `OutstandingKind::classify`参照）。`message`が`ping`／`get_status`の
+    /// どちらでもない場合は追跡せず`None`を返す。
+    ///
+    /// **`message`が`get_status`なら、[`Self::status_sync_pending`]も
+    /// 合わせて`false`にする。**呼び出し側へ2手を強いると対が崩れうるため、
+    /// 1手にまとめている。
+    #[must_use = "Noneは追跡されなかったことを意味する。無視すると、応答が来ても相関しない"]
+    pub fn note_sent(
+        &mut self,
+        id: u32,
+        message: Message,
+        sent_at_ms: u64,
+    ) -> Option<OutstandingKind> {
+        let kind = OutstandingKind::classify(&message)?;
+        self.outstanding.insert(
+            id,
+            OutstandingEntry {
+                kind,
+                message,
+                sent_at_ms,
+                retries: 0,
+            },
+        );
+        if matches!(kind, OutstandingKind::GetStatus) {
+            self.status_sync_pending = false;
+        }
+        Some(kind)
     }
 
-    /// 応答待ちの要求を1件取り下げる。
+    /// `boot`確立後の`get_status`（§10.1 step4）を、まだ送れていないと記録する。
     ///
-    /// ACKが返らないまま放置すると`outstanding`が際限なく増える。**timeoutの判定
-    /// そのものはこの型が持たない**（間隔は`PROTO-TBD-017`等が未確定であり、
-    /// この型は値を推測しない）。呼び出し側がtimeoutを判定した`id`をここへ渡して
-    /// 取り下げる。記録していない`id`なら`None`を返す。
+    /// 呼び出し側が送信を試みて失敗した直後に呼ぶ。[`Self::status_sync_pending`]が
+    /// `true`を返すようになり、次に送信を試みる契機になる。
+    pub fn mark_status_sync_pending(&mut self) {
+        self.status_sync_pending = true;
+    }
+
+    /// `boot`確立後の`get_status`を、まだ送れていないか。
+    ///
+    /// `true`なら、呼び出し側は`get_status`を送り直し、成功したら
+    /// [`Self::note_sent`]を呼ぶ。`note_sent`が`message`を`get_status`として
+    /// 分類した時点でこのflagを自動的に落とすため、呼び出し側が別途
+    /// 落とす必要はない。
+    #[must_use]
+    pub const fn status_sync_pending(&self) -> bool {
+        self.status_sync_pending
+    }
+
+    /// 応答待ちの要求を1件取り下げる。記録していない`id`なら`None`を返す。
+    ///
+    /// **ACK timeoutに基づく自動的な取り下げは[`Self::poll_outstanding`]が行う。**
+    /// こちらは呼び出し側が別の理由で明示的に取り下げるためにある。
+    /// session切り替えの取り下げはこれを使わない（[`Self::handle_boot`]が
+    /// 遷移確定時に`outstanding`を丸ごと`clear`する）。
     pub fn forget_sent(&mut self, id: u32) -> Option<OutstandingKind> {
-        self.outstanding.remove(&id)
+        self.outstanding.remove(&id).map(|entry| entry.kind)
+    }
+
+    /// ACK timeoutを超えた応答待ちの要求を判定する。
+    ///
+    /// timeoutに達していない要求は対象にしない。timeoutに達した要求のうち、
+    /// 再送予算（[`RetryPolicy::max_retries`]）がまだ残っているものは`retries`を
+    /// 1増やし送信時刻を`now_ms`へ更新したうえで保持し、
+    /// [`OutstandingAction::Retry`]として返す。予算を使い切ったものは取り下げ、
+    /// [`OutstandingAction::GaveUp`]として返す。**再送そのものは行わない**
+    /// （送信はtransportを持つ[`crate::Session`]の役割。module doc参照）。
+    ///
+    /// `now_ms`は[`Self::note_sent`]へ渡した`sent_at_ms`と同じ時計（送信側の
+    /// uptime。§3）で、単調に増加する値を渡す（巻き戻るとそのentryがtimeoutを
+    /// 検出できなくなる）。
+    ///
+    /// `policy`を`Self`が保持せず引数で受け取るのは、この型が`SerialConfig`を
+    /// 持たないためである（`PeerSession`はbyte列やtransportを持たない。
+    /// module doc参照）。呼び出しをまたいだ一貫性は呼び出し側の責務であり、
+    /// [`crate::retry_due_requests`]が毎回`session.config().retry()`から
+    /// 読むことでそれを保っている。
+    pub fn poll_outstanding(
+        &mut self,
+        now_ms: u64,
+        policy: &RetryPolicy,
+    ) -> Vec<(u32, OutstandingAction)> {
+        let mut due = Vec::new();
+        self.outstanding.retain(|&id, entry| {
+            let elapsed = Duration::from_millis(now_ms.saturating_sub(entry.sent_at_ms));
+            if elapsed < policy.ack_timeout() {
+                return true;
+            }
+            if entry.retries >= policy.max_retries() {
+                due.push((id, OutstandingAction::GaveUp(entry.kind)));
+                false
+            } else {
+                entry.retries += 1;
+                entry.sent_at_ms = now_ms;
+                due.push((
+                    id,
+                    OutstandingAction::Retry(entry.kind, entry.message.clone()),
+                ));
+                true
+            }
+        });
+        due
     }
 
     /// 応答待ちの要求の件数。**個々の`id`は特定しない。**呼び出し側が、放置された
@@ -374,10 +534,13 @@ impl PeerSession {
         if ack.reply_sid != our_sid {
             return Err(PeerRejection::UnmatchedAck);
         }
-        let Some(request) = self.outstanding.remove(&ack.reply_to) else {
+        let Some(entry) = self.outstanding.remove(&ack.reply_to) else {
             return Err(PeerRejection::UnmatchedAck);
         };
-        Ok(CorrelatedAck { request, ack })
+        Ok(CorrelatedAck {
+            request: entry.kind,
+            ack,
+        })
     }
 
     /// `status`を検査する（§5.1優先順位・§8）。ESP32からのeventであり、
@@ -413,9 +576,12 @@ impl PeerSession {
 mod tests {
     use deskcat_protocol::{DisplayStatus, ProtocolCounters, SensorStatus, ServoStatus};
 
+    use core::time::Duration;
+
     use super::{
         Ack, AckStatus, BOOT_HISTORY_CAPACITY, Boot, BootHistory, BootOutcome, ErrorCode,
-        OutstandingKind, PeerRejection, PeerSession, RETIRED_CAPACITY, Status,
+        OutstandingAction, OutstandingKind, PeerRejection, PeerSession, RETIRED_CAPACITY,
+        RetryPolicy, Status,
     };
 
     fn boot() -> Boot {
@@ -593,7 +759,7 @@ mod tests {
     fn correlate_ack_matches_a_pending_request() {
         let mut peer = PeerSession::new();
         let _ = peer.handle_boot(41_207, 1, boot());
-        peer.note_sent(7, OutstandingKind::Ping);
+        let _ = peer.note_sent(7, super::Message::Ping, 100);
 
         let ack = Ack {
             reply_sid: 90_312,
@@ -625,7 +791,7 @@ mod tests {
     fn correlate_ack_rejects_a_sid_that_is_not_the_current_esp32_session() {
         let mut peer = PeerSession::new();
         let _ = peer.handle_boot(41_207, 1, boot());
-        peer.note_sent(7, OutstandingKind::GetStatus);
+        let _ = peer.note_sent(7, super::Message::GetStatus, 100);
 
         let ack = Ack {
             reply_sid: 90_312,
@@ -645,7 +811,7 @@ mod tests {
     fn correlate_ack_rejects_a_mismatched_reply_sid() {
         let mut peer = PeerSession::new();
         let _ = peer.handle_boot(41_207, 1, boot());
-        peer.note_sent(7, OutstandingKind::Ping);
+        let _ = peer.note_sent(7, super::Message::Ping, 100);
 
         let ack = Ack {
             reply_sid: 12_345, // Piの現在のsidと一致しない
@@ -691,5 +857,153 @@ mod tests {
             },
             protocol: ProtocolCounters::default(),
         }
+    }
+
+    fn retry_policy(ack_timeout_ms: u64, max_retries: u32) -> RetryPolicy {
+        RetryPolicy::new(Duration::from_millis(ack_timeout_ms), max_retries)
+            .expect("ack_timeoutは0ではない")
+    }
+
+    /// timeoutに達していない要求は対象にしない。
+    #[test]
+    fn poll_outstanding_ignores_requests_that_have_not_timed_out_yet() {
+        let mut peer = PeerSession::new();
+        let _ = peer.note_sent(1, super::Message::Ping, 1_000);
+
+        let due = peer.poll_outstanding(1_100, &retry_policy(500, 3));
+        assert!(due.is_empty(), "500ms timeoutに対し100msしか経っていない");
+        assert_eq!(peer.outstanding_len(), 1, "取り下げていない");
+    }
+
+    /// timeoutを超え、再送予算が残っていれば`Retry`を返し、送信時刻を更新する。
+    #[test]
+    fn poll_outstanding_retries_a_timed_out_request_while_budget_remains() {
+        let mut peer = PeerSession::new();
+        let _ = peer.note_sent(1, super::Message::Ping, 1_000);
+
+        let due = peer.poll_outstanding(1_600, &retry_policy(500, 3));
+        assert_eq!(
+            due,
+            vec![(
+                1,
+                OutstandingAction::Retry(OutstandingKind::Ping, super::Message::Ping)
+            )]
+        );
+        assert_eq!(peer.outstanding_len(), 1, "予算が残る限り保持する");
+
+        // 送信時刻が更新されているため、直後にもう一度呼んでもすぐには再度timeoutしない。
+        let immediate = peer.poll_outstanding(1_650, &retry_policy(500, 3));
+        assert!(immediate.is_empty(), "送信時刻を更新したはずである");
+    }
+
+    /// 再送予算を使い切ったら`GaveUp`を返し、要求を取り下げる。
+    #[test]
+    fn poll_outstanding_gives_up_after_exhausting_the_retry_budget() {
+        let mut peer = PeerSession::new();
+        let _ = peer.note_sent(1, super::Message::GetStatus, 0);
+        let policy = retry_policy(100, 2);
+
+        // 1回目・2回目はretry予算が残っている。
+        for round in 1_u64..=2 {
+            let now = round * 100;
+            let due = peer.poll_outstanding(now, &policy);
+            assert_eq!(
+                due,
+                vec![(
+                    1,
+                    OutstandingAction::Retry(OutstandingKind::GetStatus, super::Message::GetStatus)
+                )],
+                "round {round}"
+            );
+        }
+
+        // 3回目でmax_retries(2)を使い切り、取り下げる。
+        let due = peer.poll_outstanding(300, &policy);
+        assert_eq!(
+            due,
+            vec![(1, OutstandingAction::GaveUp(OutstandingKind::GetStatus))]
+        );
+        assert_eq!(peer.outstanding_len(), 0, "取り下げ後は残らない");
+    }
+
+    /// `note_sent`は`kind`を`message`から導く。呼び出し側が`kind`を別途渡す
+    /// 経路が無いため、`message`とは食い違う`kind`を記録させられない。
+    #[test]
+    fn note_sent_classifies_the_kind_from_the_message() {
+        let mut peer = PeerSession::new();
+        assert_eq!(
+            peer.note_sent(1, super::Message::Ping, 0),
+            Some(OutstandingKind::Ping)
+        );
+        assert_eq!(
+            peer.note_sent(2, super::Message::GetStatus, 0),
+            Some(OutstandingKind::GetStatus)
+        );
+        assert_eq!(peer.outstanding_len(), 2);
+    }
+
+    /// `note_sent`が`get_status`を追跡したら、`status_sync_pending`が
+    /// 呼び出し側の追加操作なしに自動的に落ちる。
+    ///
+    /// `status_sync_pending`（flagが立っているか）と`outstanding`（実際に
+    /// 追跡中の`get_status`があるか）は、同じ「まだ送れていない」という事実を
+    /// 別々の場所に持つ。呼び出し側に「`note_sent`を呼んだら
+    /// `clear_status_sync_pending`も呼ぶ」という2手を強いると、その対が崩れる
+    /// 呼び出し経路（`note_sent`だけ呼んでflagを消し忘れる）を作れてしまう。
+    /// `note_sent`自身が両方を1手で更新することで、この食い違いを構造的に
+    /// 無くす。
+    #[test]
+    fn note_sent_clears_status_sync_pending_when_it_tracks_a_get_status() {
+        let mut peer = PeerSession::new();
+        peer.mark_status_sync_pending();
+        assert!(peer.status_sync_pending(), "前提: flagが立っている");
+
+        // try_send_get_statusを経由せず、note_sentを直接呼ぶ
+        // （将来別の呼び出し経路が増えても、この不変条件が保たれることを確認する）。
+        assert_eq!(
+            peer.note_sent(1, super::Message::GetStatus, 0),
+            Some(OutstandingKind::GetStatus)
+        );
+
+        assert!(
+            !peer.status_sync_pending(),
+            "note_sentがget_statusを追跡した時点でflagは落ちる"
+        );
+    }
+
+    /// 追跡対象外の`message`（`ping`／`get_status`以外）は記録しない。
+    ///
+    /// `kind`を`message`から導くようにしたのは、呼び出し側が`kind`と`message`を
+    /// 食い違う組み合わせで渡せてしまう経路を無くすためである
+    /// （[`OutstandingKind::classify`]のdoc参照）。分類できない`message`を
+    /// 黙って追跡してしまうと、同じ食い違いが別の形で戻ってくる。
+    #[test]
+    fn note_sent_does_not_track_a_message_it_cannot_classify() {
+        let mut peer = PeerSession::new();
+        let hello = super::Message::Hello(deskcat_protocol::Hello {
+            host: "deskcatd".to_owned(),
+            version: "0.1.0".to_owned(),
+            reason: deskcat_protocol::HelloReason::Resync,
+        });
+
+        assert_eq!(peer.note_sent(1, hello, 0), None);
+        assert_eq!(peer.outstanding_len(), 0, "追跡していない");
+    }
+
+    /// `poll_outstanding`が再送用に返すのは`note_sent`へ渡した[`super::Message`]
+    /// そのものであって、種別から組み直したものではない。
+    #[test]
+    fn poll_outstanding_retries_the_exact_message_that_was_sent() {
+        let mut peer = PeerSession::new();
+        let _ = peer.note_sent(1, super::Message::GetStatus, 0);
+
+        let due = peer.poll_outstanding(1_000, &retry_policy(500, 1));
+        assert_eq!(
+            due,
+            vec![(
+                1,
+                OutstandingAction::Retry(OutstandingKind::GetStatus, super::Message::GetStatus)
+            )]
+        );
     }
 }

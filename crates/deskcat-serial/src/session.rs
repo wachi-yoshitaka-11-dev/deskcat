@@ -346,6 +346,31 @@ impl Session {
         Ok(id)
     }
 
+    /// 既存の`id`のまま、同じ`message`を送信queueへ入れ直す。
+    ///
+    /// **`id`空間を消費しない。**仕様が求める「既に送出したmessageの再送は同じ
+    /// `(sid, id)`で行う」（§9）に従って、ACK timeoutしたPi発の要求（`ping`や
+    /// `get_status`）を送り直すためにある。新しい送出には[`Self::send`]を使う。
+    ///
+    /// どの`id`を使うかは呼び出し側が決める。典型的には
+    /// [`crate::PeerSession::poll_outstanding`]が返した`id`をそのまま渡す。
+    ///
+    /// **`self.stopped`を見ない。**[`ids`](crate::ids)モジュールdocが定めるとおり、
+    /// `id`空間の枯渇で停止した後も「止まるのは新しい`(sid, id)`を要する送出だけ」
+    /// であり、既存`id`での再送はできなければならない。ここで`Stopped`を返すと、
+    /// 停止後にretryだけを止めてしまい、その規則に反する。[`Self::send_terminal`]が
+    /// 同じ理由で`stopped`を見ないのと同じ形である。
+    ///
+    /// # Errors
+    ///
+    /// queueが満杯なら[`SendError::Dropped`]、encodeに失敗すれば
+    /// [`SendError::Encode`]、encode結果が空になれば[`SendError::EmptyPayload`]
+    /// （内部経路では起こらない。`encode_and_enqueue`のdoc参照）を返す。
+    /// **`id`空間の枯渇では失敗しない**（新しい`id`を必要としないため）。
+    pub fn resend(&mut self, id: u32, message: Message, ts_ms: u64) -> Result<(), SendError> {
+        self.encode_and_enqueue(id, ts_ms, message)
+    }
+
     /// 終端報告を、予約しておいた上限値の`id`で1件だけ送る。
     ///
     /// 仕様§3の「終端報告のために最後の1件を残す」に対応する。呼び出し側は
