@@ -475,12 +475,8 @@ fn a_session_stopped_by_id_exhaustion_still_flushes_what_it_already_queued() {
     );
 }
 
-/// `id`空間の枯渇で停止した後も、既存`id`での再送はできる。
-///
-/// `crates/deskcat-serial/src/ids.rs`のmodule docが「上限に達した後もretryは
-/// 実行でき、止まるのは新しい`(sid, id)`を要する送出だけである」と定める。
-/// `resend`が`send`と同じく`self.stopped`を見て早期returnしていたら、
-/// この規則に反してretryそのものを止めてしまう。
+/// `id`空間の枯渇で停止した後も、linkが繋がっていれば既存`id`での再送はできる。
+/// 設計の理由はPull Request本文を参照。
 #[test]
 fn resend_still_works_after_the_session_stops_from_id_exhaustion() {
     let mut session = Session::with_first_id(config(), 90_312, u32::MAX);
@@ -494,6 +490,7 @@ fn resend_still_works_after_the_session_stops_from_id_exhaustion() {
         session.state(),
         ConnectionState::Stopped(StopReason::IdSpaceExhausted)
     );
+    assert!(session.link_connected(), "id枯渇はlinkを切断しない");
 
     // 停止前に払い出した既存のidでの再送は、新しいidを要さないため通る。
     assert_eq!(
@@ -502,6 +499,39 @@ fn resend_still_works_after_the_session_stops_from_id_exhaustion() {
         "既存idでの再送は新しい(sid, id)を要さないため止まらない"
     );
     assert_eq!(session.pending_out(), 1);
+}
+
+/// `id`空間の枯渇で停止し、かつlinkが切れていれば、`resend`は積まない。
+/// 上のtestとの対比。設計の理由はPull Request本文を参照。
+#[test]
+fn resend_does_not_enqueue_after_id_exhaustion_while_disconnected() {
+    let mut session = Session::with_first_id(config(), 90_312, u32::MAX);
+    session.note_connected();
+
+    assert_eq!(
+        session.send(Message::Ping, 10),
+        Err(SendError::IdSpaceExhausted)
+    );
+    assert_eq!(
+        session.state(),
+        ConnectionState::Stopped(StopReason::IdSpaceExhausted)
+    );
+
+    let mut sim = Sim::with_reads(vec![Ok(Vec::new())]);
+    assert_eq!(session.pump_read(&mut sim, |_| {}), Pump::Disconnected);
+    assert!(!session.link_connected(), "EOFで切断済み");
+    assert_eq!(
+        session.state(),
+        ConnectionState::Stopped(StopReason::IdSpaceExhausted),
+        "切断してもstopした理由は変わらない"
+    );
+
+    assert_eq!(
+        session.resend(7, Message::Ping, 20),
+        Err(SendError::Stopped(StopReason::IdSpaceExhausted)),
+        "id空間の規則は新しいidを要さないだけであり、切れたlinkへは出せない"
+    );
+    assert_eq!(session.pending_out(), 0);
 }
 
 /// 再接続で直らないerrorはlinkも落とす。停止後に書き続けない。
@@ -516,14 +546,7 @@ fn a_fatal_error_drops_the_link_as_well_as_stopping_the_session() {
 }
 
 /// `Fatal`で停止した後は、`resend`がqueueへ積まない。
-///
-/// `Fatal`の発生源は[`Session::handle_io_error`]の1箇所だけであり、
-/// 必ず切断処理（`link_connected`を`false`にする）の後に停止するため、
-/// この停止理由からlinkの死を判定してよい（`ReconnectExhausted`とは違う。
-/// `resend`のdoc参照）。`link_connected`が`false`のまま積んでも`pump_write`が
-/// 一生送り出さないため、「積んでも出ない」ではなく「そもそも積まない」ことを
-/// 確認する（手動reviewの指摘。`resend`が`Ok(())`を返すと、二度とwireへ出ない
-/// messageを「送れた」と報告することになる）。
+/// 設計の理由はPull Request本文を参照。
 #[test]
 fn resend_does_not_enqueue_after_a_fatal_stop() {
     let mut sim = Sim::with_reads(vec![Err(io::Error::from(io::ErrorKind::PermissionDenied))]);
@@ -547,13 +570,9 @@ fn resend_does_not_enqueue_after_a_fatal_stop() {
 }
 
 /// `ReconnectExhausted`で停止した後も、実際に切断していれば`resend`がqueueへ積まない。
-///
-/// `begin_reconnect`自身は`link_connected`を変更しない（下のtestが示すとおり）。
-/// ここでは実際の呼び出し（[`crate::device`]の参照loop）の慣行どおり、
-/// `pump_read`が`Disconnected`を処理してから`begin_reconnect`を呼ぶ順序で
-/// 構成する。**この順序はAPIが強制するものではなく、呼び出し側の慣行である。**
-/// `resend`が見るのは`link_connected`であって停止理由そのものではないため、
-/// この順序を守っている限り正しく積まない。
+/// `deskcat_serial::device`（`SerialDevice::open`のdoc example）が示す参照loopの
+/// 慣行どおり、`pump_read`が`Disconnected`を処理してから`begin_reconnect`を
+/// 呼ぶ順序で構成する。設計の理由はPull Request本文を参照。
 #[test]
 fn resend_does_not_enqueue_after_reconnect_exhausted_while_disconnected() {
     let config = config().with_reconnect(
@@ -582,10 +601,9 @@ fn resend_does_not_enqueue_after_reconnect_exhausted_while_disconnected() {
 
 /// `begin_reconnect`自身は`link_connected`を変更しない。`ReconnectExhausted`で
 /// 停止した時点でlinkが実際にはまだ繋がっているなら、`resend`は積む。
-///
-/// **停止理由だけで「linkは死んでいる」と決めつけない。**手動reviewの指摘
-/// （`resend`は停止理由ではなく`link_connected`を直接見て判断するべき、という
-/// 修正のregression test）。
+/// 上のtestが前提とする呼び出し順序（切断処理の後に`begin_reconnect`を呼ぶ）を
+/// 踏まずに状態を作っている（`begin_reconnect`はその順序を強制しない）。
+/// 設計の理由はPull Request本文を参照。
 #[test]
 fn resend_still_enqueues_when_reconnect_exhausted_but_the_link_is_still_connected() {
     let config = config().with_reconnect(
