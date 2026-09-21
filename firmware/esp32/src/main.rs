@@ -42,6 +42,7 @@
 
 mod config;
 mod display;
+mod env;
 mod health;
 mod protocol;
 
