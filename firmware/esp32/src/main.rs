@@ -10,14 +10,27 @@
 //! - reset reason を出す
 //! - **rate limit 付きの heartbeat と health snapshot を出し続ける**（#7）
 //! - `DISP-01`（LCD）を初期化し、識別・単色fill・四隅patternを描画する（#13）
-//! - **servoも、それ以外の未検証GPIOもdriveしない**
+//! - `ACCEL-01`（ADXL345）／`ENV-01`（BME280）のDevice ID／Chip IDを読み、生byteを
+//!   logへ出す（[#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)／
+//!   [#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16)）。
+//!   **一致判定はここでは行わない。**生byteをlogへ残すだけで、識別の断定は
+//!   log を読む人間の責務とする（[`run_i2c_bringup`]参照）。
+//! - **servoも、それ以外の未検証GPIOもdriveしない**（`SERVO-PWM`・`ADC-*`・`TOUCH-*`）
 //!
-//! **`Peripherals::take()` を呼ぶのはLCD関連の6+1本（`crate::display`のmodule doc参照）
-//! に限る。**`docs/hardware/gpio-assignment.md`の`信号inventory`のうち、
-//! `SERVO-PWM`・`ACCEL-*`・`ENV-*`・`ADC-*`・`TOUCH-*`はこの版でも一切触れない
-//! （同文書の`Blocked`状態は、servo出力gateなどLCD以外の項目が理由であり解除していない。
+//! **`Peripherals::take()` を呼ぶのはLCD関連の6+1本（`crate::display`のmodule doc参照）と、
+//! I2C関連の2本（`ACCEL-SDA`／`ACCEL-SCL`、`ENV-01`と共有。`crate::accel`・`crate::env`の
+//! module doc参照）だけである。**`docs/hardware/gpio-assignment.md`の`信号inventory`の
+//! うち、`SERVO-PWM`・`ADC-*`・`TOUCH-*`はこの版でも一切触れない
+//! （同文書の`Blocked`状態はservo出力gateだけが理由であり、I2Cとは別のgateである。
 //! [#13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)本文が
-//! `HW-TBD-023`のcloseを待たずに着手してよいとした根拠は、この範囲（LCDのみ）を前提にする）。
+//! `HW-TBD-023`のcloseを待たずに着手してよいとした根拠は、この範囲（LCDのみ）を前提にする。
+//! **I2Cの追加はservo gateの解除を主張しない。**servo gateが対象とする
+//! `SERVO-PWM`にはこの版でも一切触れておらず、servo側の判定に影響しない）。
+//!
+//! **I2Cはこの版でも実機通電していない。**この版の検証は`cargo build`でのcross-compile
+//! 確認までであり、実機へflashして確認するのは別工程である（[Hardware Safety
+//! Policy](../../../docs/governance/hardware-safety-policy.md)「人間の監視が必要な
+//! 操作」。初回配線revisionでの初回通電は人間監視下で行う）。
 //!
 //! **Protocol sessionは確立しない。**`crates/deskcat-protocol` の `Boot` message を
 //! 送るのは別の作業であり、ここでは log へ出すだけである。ただし `reset_reason` の
@@ -51,11 +64,54 @@ use std::time::Instant;
 
 use deskcat_protocol::{Boot, Hello, HelloReason};
 use esp_idf_svc::hal::delay::FreeRtos;
+use esp_idf_svc::hal::gpio::{InputPin, OutputPin};
+use esp_idf_svc::hal::i2c::{I2cConfig, I2cDriver, I2C0};
 use esp_idf_svc::hal::peripherals::Peripherals;
+use esp_idf_svc::hal::spi::SpiAnyPins;
+use esp_idf_svc::hal::units::Hertz;
 
+use crate::accel::Adxl345;
 use crate::display::Ili9341;
+use crate::env::Bme280;
 use crate::health::Health;
 use crate::protocol::PiSession;
+
+/// `ACCEL-01`（ADXL345）のI2C address。**`SDO`を`GND`へ配線する前提の値である。**
+///
+/// `SDO`／`ALT ADDRESS`をGNDへ配線すると`0x53`になる
+/// （[`docs/hardware/sensor-datasheet-notes.md`](../../../docs/hardware/sensor-datasheet-notes.md)
+/// 170行目。**ただしどちらになるかはmodule board上の実装で決まり、現物確認まで確定しない**
+/// （[`HW-TBD-004`](../../../docs/hardware/tbd-register.md)）。この定数は`SDO`→GND前提の値である）。
+/// addressは一般値で開始してよい側であり
+/// （[`docs/hardware/gpio-assignment.md`](../../../docs/hardware/gpio-assignment.md)
+/// 372行目「addressは一般値で開始してよい側である」（hardware-safety-policy.mdの
+/// 対応表に基づく分類）、388行目「上の材料には電気的な優劣が無く、実装コストの差だけ
+/// である」）、`SDO`配線を決める側（現物作業）がこの値と異なる配線を選ぶ場合は、この
+/// 定数を実際の配線へ合わせて直す。`ENV-01`側も`GND`側を前提にした
+/// （[`ENV_I2C_ADDRESS`]参照）。
+const ACCEL_I2C_ADDRESS: u8 = 0x53;
+
+/// `ENV-01`（BME280）のI2C address。**`SDO`を`GND`へ配線する前提の値である。**
+///
+/// `SDO`をGNDへ配線すると`0x76`になる
+/// （[`docs/hardware/sensor-datasheet-notes.md`](../../../docs/hardware/sensor-datasheet-notes.md)
+/// 211行目）。module資料の既定でもある
+/// （[`docs/hardware/gpio-assignment.md`](../../../docs/hardware/gpio-assignment.md)
+/// 382行目「`0x76`はmodule資料が「既定」と記す側である」）。[`ACCEL_I2C_ADDRESS`]と
+/// 同じ根拠（一般値で開始してよい側、`gpio-assignment.md`372行目）で、GND側を
+/// 前提にした。**現物確認まで確定しない点も`ACCEL_I2C_ADDRESS`と同じである。**
+const ENV_I2C_ADDRESS: u8 = 0x76;
+
+/// I2C busのbaudrate。Standard-mode（100 kHz）。
+///
+/// [`docs/hardware/gpio-assignment.md`](../../../docs/hardware/gpio-assignment.md)
+/// 329行目「2026-09-06に、初回bring-upで採るmodeをStandard-mode（100 kHz）と決定した」。
+/// `初回bring-upのmode決定`節が根拠（実効pull-up 約2.42 kΩは規定`Cb`上限でもStandard-modeの
+/// rise time制約を満たす。Fast-modeは成立しない）。**ただし同節が明記するとおり、
+/// 「rise timeの制約に余裕がある」ことと「実効抵抗がStandard-modeの規定範囲内にあることの
+/// 確認」は別であり、後者はこの変更の時点でも未達のまま残る**（[#2](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/2)
+/// の受け入れchecklist項目。この変更はその項目を閉じない）。
+const I2C_BAUDRATE_HZ: u32 = 100_000;
 
 /// `ResetReason` を Protocol の語彙（snake_case）へ写す。
 ///
@@ -164,14 +220,34 @@ fn main() {
     // （`next_heartbeat`／`next_snapshot`）は従来どおりbring-upの後で初期化する。
     let mut health = Health::new(reset_reason);
 
-    // **`Peripherals::take()`はLCD配線の分だけ。**servoやI2C sensorは触らない
+    // **`Peripherals::take()`はLCD配線とI2Cの分だけ。**servoやADC・touchは触らない
     // （module doc参照）。1度しか成功しないため`expect`で即座に気付く。
     let peripherals = Peripherals::take().expect("Peripherals::take must succeed exactly once");
     log::info!(
-        "peripherals=display_only servo=not_driven i2c=not_driven adc=not_driven touch=not_driven"
+        "peripherals=display_and_i2c servo=not_driven i2c=id_read_attempt adc=not_driven touch=not_driven"
+    );
+    log::info!(
+        "i2c_addresses accel=0x{ACCEL_I2C_ADDRESS:02x} env=0x{ENV_I2C_ADDRESS:02x} baudrate_hz={I2C_BAUDRATE_HZ}"
     );
 
-    run_display_bringup(peripherals, &mut health);
+    run_display_bringup(
+        peripherals.spi3,
+        peripherals.pins.gpio18,
+        peripherals.pins.gpio23,
+        peripherals.pins.gpio19,
+        peripherals.pins.gpio22,
+        peripherals.pins.gpio17,
+        peripherals.pins.gpio16,
+        peripherals.pins.gpio4,
+        &mut health,
+    );
+
+    run_i2c_bringup(
+        peripherals.i2c0,
+        peripherals.pins.gpio25,
+        peripherals.pins.gpio26,
+        &mut health,
+    );
 
     // 周期は `config` が持つ。**ここへ数値を直接書かない。**暫定値である根拠は
     // `config` の doc comment にある。
@@ -329,21 +405,26 @@ fn service_bringup_step(health: &mut Health, step: &str) {
 /// **どの段階で失敗しても、この関数はpanicしない。**この関数はエラーを
 /// `log::error!`へ分類して返すだけで、呼び出し元の`main`を止めない。
 /// heartbeatは[`service_bringup_step`]で段階ごとに刻む（同関数のdoc参照）。
-fn run_display_bringup(peripherals: Peripherals, health: &mut Health) {
+#[allow(clippy::too_many_arguments)]
+fn run_display_bringup<SPI: SpiAnyPins + 'static>(
+    spi3: SPI,
+    sclk: impl OutputPin + 'static,
+    mosi: impl OutputPin + 'static,
+    miso: impl InputPin + 'static,
+    cs: impl OutputPin + 'static,
+    dc: impl OutputPin + 'static,
+    rst: impl OutputPin + 'static,
+    bl: impl OutputPin + 'static,
+    health: &mut Health,
+) {
     // pinは`docs/hardware/gpio-assignment.md`の`信号inventory`に従う
     // （`LCD-SCLK`=18, `LCD-MOSI`=23, `LCD-MISO`=19, `LCD-CS`=22, `LCD-DC`=17,
     // `LCD-RST`=16, `LCD-BL`=4）。`TOUCH-CS`(21)はbusを共有するが、このfirmwareは
     // touchへは触れない（`crate::display`のmodule doc参照）。
-    let mut lcd = match Ili9341::new(
-        peripherals.spi3,
-        peripherals.pins.gpio18,
-        peripherals.pins.gpio23,
-        peripherals.pins.gpio19,
-        peripherals.pins.gpio22,
-        peripherals.pins.gpio17,
-        peripherals.pins.gpio16,
-        peripherals.pins.gpio4,
-    ) {
+    // **`Peripherals`全体ではなく個々のfieldを受け取る。**`main()`がI2C用の
+    // fieldも同じ`Peripherals`から取り出す必要があるため（`run_i2c_bringup`参照）、
+    // 呼び出し元でfieldを分けてから渡す。
+    let mut lcd = match Ili9341::new(spi3, sclk, mosi, miso, cs, dc, rst, bl) {
         Ok(lcd) => lcd,
         Err(err) => {
             log::error!("display_driver_new_failed error={err}");
@@ -381,6 +462,91 @@ fn run_display_bringup(peripherals: Peripherals, health: &mut Health) {
 
     run_fill_tests(&mut lcd, health);
     run_corner_pattern(&mut lcd, health);
+}
+
+/// `ACCEL-01`（ADXL345）と`ENV-01`（BME280）のDevice ID／Chip IDを読み、生byteをlogへ出す。
+///
+/// [Issue #15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)／
+/// [Issue #16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16)の
+/// bring-up手順の1工程である。**一致判定はここでは行わない。**`crate::accel::Adxl345`・
+/// `crate::env::Bme280`が返す生byteをそのままlogへ出すだけであり、期待値
+/// （`0xE5`／`0x60`）との一致は、logを読む人間の判断とする（`display_id`の
+/// `matches_ili9341()`とは異なる扱いである。**この関数へ判定を持ち込まない。**）。
+///
+/// 2つのsensorは同じI2C bus（`GPIO25`＝SDA、`GPIO26`＝SCL）を共有するため
+/// （`docs/hardware/gpio-assignment.md`414・415・417・418行目）、`I2cDriver`は
+/// この関数の中で1つだけ作り、両方のdriverへ順に貸す（`crate::accel`・`crate::env`
+/// のmodule docが定める設計）。**どの段階で失敗しても、この関数はpanicしない。**
+///
+/// **両deviceがI2Cモードでbusに応答する前提は、まだ現物で確定していない。**
+/// ADXL345は`CS` pinを`VDD I/O`へ配線する必要がある（Analog Devices ADXL345 Data
+/// Sheet **Rev. 0**（SparkFunがhostする版、`docs/hardware/sensor-datasheet-notes.md`
+/// 134行目が「Revision 4までの出典」と記録する版と同一）「I2C mode is enabled if
+/// the CS pin is tied high to VDD I/O... there is no default mode if the CS pin
+/// is left unconnected」page 8・10。**この版とRev. G（同文書が正とする版）の既知の
+/// 差異一覧（同文書140行目「Rev. 0とRev. Gには差がある」以下のtable）にSerial Communications／I2Cの記載は含まれない
+/// が、CLIからRev. Gを取得できないため、Rev. G側でこの記述が同一であることは
+/// 独立に確認していない**）。
+/// 裏面はんだジャンパ2箇所は開放だが何を選ぶ設定かboard資料が無く不明
+/// （[`docs/hardware/sensor-datasheet-notes.md`](../../../docs/hardware/sensor-datasheet-notes.md)
+/// 182行目「実装されているinterface（jumper設定）| TBD」）。BME280側は`J3`のはんだ付けが
+/// 要る（`docs/hardware/gpio-assignment.md`417行目）。**したがってこの関数の読み出しが
+/// 失敗（`Err`）しても、driverやbus配線ではなく、これらの未配線が原因でありうる。**
+///
+/// **bus自体の配線も、まだ完了していない。**`ACCEL-SDA`／`ACCEL-SCL`の外部pull-upは
+/// breadboardへ実装済みだが（`docs/hardware/gpio-assignment.md`710行目、2026-09-07）、
+/// I2C実効pull-upが有効範囲内であることの確認（`Cb`未測定）と、ESP32電源投入前に
+/// 外部moduleがpinを駆動していないことの非通電導通checkは、**moduleがESP32へ配線
+/// されるまで検証対象が存在しない**として`#15`／`#16`側へ送られている
+/// （同文書冒頭の`#2`のclose条件ではない項目一覧、(3)・(5)）。**したがってこの関数を
+/// 実機で動かす前に、これらの現物確認が要る。**
+///
+/// **通信timeoutには`esp_idf_svc::hal::delay::BLOCK`（無期限）を使う**（`crate::accel`・
+/// `crate::env`と同じ値。一次資料に無い値を推測しない）。**busが低のまま固着する
+/// 状態（jumper未設定など）で、この呼び出しがどのくらいの時間で`Err`を返すか、
+/// あるいは返さないままになりうるかは、このPRでは検証していない。**esp-idf-hal・
+/// esp-idfのI2C driver実装には複数の内部timeout機構（`i2c_master_cmd_begin`の
+/// alive-check polling、I2Cハードウェアのbus timeoutレジスタ）があるが、
+/// `esp_idf_svc::hal::i2c::config::Config`の`timeout`フィールドを設定していない
+/// 場合の既定挙動と、実際に`Err(ESP_ERR_TIMEOUT)`が返るまでの時間は未確認である。
+/// **したがってこの呼び出しが返る時間の上限は、このPRの時点で未確定として残す。**
+///
+/// 生byteの解釈は、この前提込みでlogを読む人間の判断とする。
+fn run_i2c_bringup(
+    i2c0: I2C0<'static>,
+    sda: impl InputPin + OutputPin + 'static,
+    scl: impl InputPin + OutputPin + 'static,
+    health: &mut Health,
+) {
+    // ESP32内蔵のweak pull-upは有効にしない。`gpio-assignment.md`の実効pull-up計算が
+    // 外部pull-upだけを前提にしているため（`crate::env`のmodule doc「bus speedは
+    // Standard-mode」節と同じ根拠。**ここへ再掲しない**）。
+    let config = I2cConfig::new()
+        .baudrate(Hertz(I2C_BAUDRATE_HZ))
+        .sda_enable_pullup(false)
+        .scl_enable_pullup(false);
+
+    let mut i2c = match I2cDriver::new(i2c0, sda, scl, &config) {
+        Ok(i2c) => i2c,
+        Err(err) => {
+            log::error!("i2c_driver_new_failed error={err}");
+            return;
+        }
+    };
+
+    let accel = Adxl345::new(ACCEL_I2C_ADDRESS);
+    match accel.read_device_id(&mut i2c) {
+        Ok(raw) => log::info!("accel_device_id raw=0x{raw:02x}"),
+        Err(err) => log::error!("accel_device_id_read_failed error={err}"),
+    }
+    service_bringup_step(health, "accel_device_id");
+
+    let env = Bme280::new(ENV_I2C_ADDRESS);
+    match env.read_chip_id(&mut i2c) {
+        Ok(raw) => log::info!("env_chip_id raw=0x{raw:02x}"),
+        Err(err) => log::error!("env_chip_id_read_failed error={err}"),
+    }
+    service_bringup_step(health, "env_chip_id");
 }
 
 /// 単色fillを既知のRGB565値で順に実行し、所要時間を計測してlogへ出す。
