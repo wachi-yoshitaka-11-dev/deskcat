@@ -515,6 +515,104 @@ fn a_fatal_error_drops_the_link_as_well_as_stopping_the_session() {
     assert_eq!(session.pump_write(&mut sim), Pump::Idle);
 }
 
+/// `Fatal`で停止した後は、`resend`がqueueへ積まない。
+///
+/// `Fatal`の発生源は[`Session::handle_io_error`]の1箇所だけであり、
+/// 必ず切断処理（`link_connected`を`false`にする）の後に停止するため、
+/// この停止理由からlinkの死を判定してよい（`ReconnectExhausted`とは違う。
+/// `resend`のdoc参照）。`link_connected`が`false`のまま積んでも`pump_write`が
+/// 一生送り出さないため、「積んでも出ない」ではなく「そもそも積まない」ことを
+/// 確認する（手動reviewの指摘。`resend`が`Ok(())`を返すと、二度とwireへ出ない
+/// messageを「送れた」と報告することになる）。
+#[test]
+fn resend_does_not_enqueue_after_a_fatal_stop() {
+    let mut sim = Sim::with_reads(vec![Err(io::Error::from(io::ErrorKind::PermissionDenied))]);
+    let mut session = connected_session();
+    assert_eq!(session.pump_read(&mut sim, |_| {}), Pump::Fatal);
+    assert_eq!(session.state(), ConnectionState::Stopped(StopReason::Fatal));
+    assert!(
+        !session.link_connected(),
+        "Fatalは必ず切断処理を経て停止する"
+    );
+
+    assert_eq!(
+        session.resend(1, Message::Ping, 100),
+        Err(SendError::Stopped(StopReason::Fatal))
+    );
+    assert_eq!(
+        session.pending_out(),
+        0,
+        "linkが死んでいるのでqueueへ積まない"
+    );
+}
+
+/// `ReconnectExhausted`で停止した後も、実際に切断していれば`resend`がqueueへ積まない。
+///
+/// `begin_reconnect`自身は`link_connected`を変更しない（下のtestが示すとおり）。
+/// ここでは実際の呼び出し（[`crate::device`]の参照loop）の慣行どおり、
+/// `pump_read`が`Disconnected`を処理してから`begin_reconnect`を呼ぶ順序で
+/// 構成する。**この順序はAPIが強制するものではなく、呼び出し側の慣行である。**
+/// `resend`が見るのは`link_connected`であって停止理由そのものではないため、
+/// この順序を守っている限り正しく積まない。
+#[test]
+fn resend_does_not_enqueue_after_reconnect_exhausted_while_disconnected() {
+    let config = config().with_reconnect(
+        ReconnectPolicy::new(0, Duration::from_millis(1), Duration::from_millis(1))
+            .expect("妥当な設定"),
+    );
+    let mut session = Session::new(config, 90_312);
+    session.note_connected();
+
+    let mut sim = Sim::with_reads(vec![Ok(Vec::new())]);
+    assert_eq!(session.pump_read(&mut sim, |_| {}), Pump::Disconnected);
+    assert!(!session.link_connected(), "EOFで切断済み");
+
+    assert_eq!(session.begin_reconnect(), None, "上限0なので即座に尽きる");
+    assert_eq!(
+        session.state(),
+        ConnectionState::Stopped(StopReason::ReconnectExhausted)
+    );
+
+    assert_eq!(
+        session.resend(1, Message::Ping, 100),
+        Err(SendError::Stopped(StopReason::ReconnectExhausted))
+    );
+    assert_eq!(session.pending_out(), 0);
+}
+
+/// `begin_reconnect`自身は`link_connected`を変更しない。`ReconnectExhausted`で
+/// 停止した時点でlinkが実際にはまだ繋がっているなら、`resend`は積む。
+///
+/// **停止理由だけで「linkは死んでいる」と決めつけない。**手動reviewの指摘
+/// （`resend`は停止理由ではなく`link_connected`を直接見て判断するべき、という
+/// 修正のregression test）。
+#[test]
+fn resend_still_enqueues_when_reconnect_exhausted_but_the_link_is_still_connected() {
+    let config = config().with_reconnect(
+        ReconnectPolicy::new(0, Duration::from_millis(1), Duration::from_millis(1))
+            .expect("妥当な設定"),
+    );
+    let mut session = Session::new(config, 90_312);
+    session.note_connected();
+
+    assert_eq!(session.begin_reconnect(), None, "上限0なので即座に尽きる");
+    assert_eq!(
+        session.state(),
+        ConnectionState::Stopped(StopReason::ReconnectExhausted)
+    );
+    assert!(
+        session.link_connected(),
+        "begin_reconnectはlink_connectedへ触れない"
+    );
+
+    assert_eq!(
+        session.resend(1, Message::Ping, 100),
+        Ok(()),
+        "linkが繋がっている限り、停止理由だけでは積むのを止めない"
+    );
+    assert_eq!(session.pending_out(), 1);
+}
+
 /// 終端報告は、queueが満杯でも**予約を失わない**。
 ///
 /// 先に予約を消費してからqueueへ入れる実装では、満杯だったときに予約だけが

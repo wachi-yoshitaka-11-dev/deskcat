@@ -82,9 +82,10 @@ fn try_send_get_status(session: &mut Session, peer: &mut PeerSession, now_ms: u6
 pub enum RetryOutcome {
     /// 同じ`id`で再送した。
     Resent(u32, OutstandingKind),
-    /// 再送しようとしたが、送信自体が失敗した。[`Session::resend`]は`stopped`を
-    /// 見ないため（`session.rs`のdoc参照）、この失敗に`SendError::Stopped`は
-    /// 含まれない。
+    /// 再送しようとしたが、送信自体が失敗した。どの`SendError`になりうるかは
+    /// [`Session::resend`]のdocが持つ（`stopped`と`link_connected`の両方を
+    /// 満たしたときだけ`SendError::Stopped`を返す。それ以外の失敗要因は
+    /// `resend`の`# Errors`節を参照）。
     ResendFailed(u32, OutstandingKind, SendError),
     /// 再送予算を使い切り、要求を取り下げた。
     ///

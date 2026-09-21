@@ -355,19 +355,51 @@ impl Session {
     /// どの`id`を使うかは呼び出し側が決める。典型的には
     /// [`crate::PeerSession::poll_outstanding`]が返した`id`をそのまま渡す。
     ///
-    /// **`self.stopped`を見ない。**[`ids`](crate::ids)モジュールdocが定めるとおり、
-    /// `id`空間の枯渇で停止した後も「止まるのは新しい`(sid, id)`を要する送出だけ」
-    /// であり、既存`id`での再送はできなければならない。ここで`Stopped`を返すと、
-    /// 停止後にretryだけを止めてしまい、その規則に反する。[`Self::send_terminal`]が
-    /// 同じ理由で`stopped`を見ないのと同じ形である。
+    /// **`stopped`していても、linkが繋がっている間は積む。**[`ids`](crate::ids)
+    /// モジュールdocが定めるのは「止まるのは新しい`(sid, id)`を要する送出だけ」
+    /// （`id`空間の枯渇後もretryは実行できる）という点であり、`id`空間の枯渇
+    /// そのものはlinkの生死と無関係に起こる（`id`が尽きても接続は切れていない
+    /// ことがある）。この場合にまで再送を止める理由は無い。
+    ///
+    /// **`stopped`していて、かつlinkが繋がっていなければ積まない。**積んでも
+    /// [`Self::pump_write`]は`link_connected`が`false`である限り一生送り出さない。
+    /// ここで`Ok(())`を返すと、二度とwireへ出ないmessageを「送れた」と
+    /// 報告することになる。
+    ///
+    /// **判定は停止理由（`Fatal`／`ReconnectExhausted`）では場合分けしない。
+    /// `link_connected`を直接見る。**`Fatal`は唯一の発生源（`Self::handle_io_error`）が
+    /// 必ず`link_connected`を`false`にしてから停止するため、停止理由から
+    /// linkの死を推測しても現状は成立する。しかし`ReconnectExhausted`は
+    /// `Self::begin_reconnect`が`link_connected`を変更しないため、その推測は
+    /// 呼び出し順序（切断処理の後に呼ぶという規約）に依存しており、型では
+    /// 強制されていない。**推測に頼ると、頼っている前提が崩れたときに気づけない。**
+    /// `link_connected`を直接見れば、この前提を要らなくできる：linkが実際に
+    /// 繋がっているなら送信を拒む理由は無く、繋がっていないなら（停止理由に
+    /// 関わらず）積んでも出せない。どちらの場合も判定を誤らない。
+    ///
+    /// **`stopped`していない間は、linkが繋がっていなくても積む。**[`Self::send`]と
+    /// 同じ挙動である。切断から再接続するまでの間も送信を受け付けるという、
+    /// 既存の（この変更で触れていない）挙動を変えない。
+    ///
+    /// **[`Self::send_terminal`]はこの原則に従わない。**`stopped`も
+    /// `link_connected`も見ず、`id`空間の予約が残っていれば積む。終端報告は
+    /// `id`空間を使い切った後に送る最後の1件であり、`resend`とは呼ばれる文脈が
+    /// 異なる。この差は既存の挙動であり、このPRの変更対象ではない。
     ///
     /// # Errors
     ///
-    /// queueが満杯なら[`SendError::Dropped`]、encodeに失敗すれば
-    /// [`SendError::Encode`]、encode結果が空になれば[`SendError::EmptyPayload`]
-    /// （内部経路では起こらない。`encode_and_enqueue`のdoc参照）を返す。
-    /// **`id`空間の枯渇では失敗しない**（新しい`id`を必要としないため）。
+    /// `stopped`していて、かつlinkが繋がっていなければ[`SendError::Stopped`]を
+    /// 返す。それ以外では、queueが満杯なら[`SendError::Dropped`]、encodeに
+    /// 失敗すれば[`SendError::Encode`]、encode結果が空になれば
+    /// [`SendError::EmptyPayload`]（内部経路では起こらない。
+    /// `encode_and_enqueue`のdoc参照）を返す。**`id`空間の枯渇単体では
+    /// （linkが繋がっている限り）失敗しない**（新しい`id`を必要としないため）。
     pub fn resend(&mut self, id: u32, message: Message, ts_ms: u64) -> Result<(), SendError> {
+        if let Some(reason) = self.stopped
+            && !self.can_pump()
+        {
+            return Err(SendError::Stopped(reason));
+        }
         self.encode_and_enqueue(id, ts_ms, message)
     }
 
