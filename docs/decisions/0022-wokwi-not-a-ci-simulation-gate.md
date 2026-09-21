@@ -9,8 +9,17 @@
 >
 > **`Accepted`は、根拠が揃ったという意味ではない。**#325の候補2が挙げた6項目のうち、
 > **「実際に試して記録する」と「無償ライセンスを公式資料で確認する」の2つは、
-> この作業では実行できていない**（判断要因5・6）。**決定はその2つに依存しない根拠
-> （判断要因1・2・3）で立てている。**埋め方は「検証」節が持つ。
+> 起票時点（2026-09-17）の作業では実行できていなかった**（判断要因5・6）。**決定はその2つに
+> 依存しない根拠（判断要因1・2・3）で立てている。**
+> **判断要因6は「足りるか」という問いには依然として答えていない。**2026-09-21に、
+> 無償（`Free`／`Community`）plan のCI simulation時間の数値上限（月50分）と、
+> Terms of Service本文（`the Service`の無償利用は`personal non-commercial purposes`限定。
+> `the Extension`はopen source projectであれば別途無償）を確認した。
+> **`Free`＝`Community`の対応付けは読みであり、公式資料に明示の一文は無い。**
+> **DeskCatでのCI自動実行がこの条件に当たるかは、Terms本文だけでは判定できず、
+> Wokwiへの問い合わせが要る**（判断要因6参照）。
+> **判断要因5（実際に動かして成立するかの確認）は、依然として未実行のままである**
+> （ESP-IDF toolchainとWokwi accountを要するため）。
 
 ## 背景
 
@@ -134,25 +143,99 @@ Wokwi board を `board-esp32-devkit-c-v4` と定義しており、対象 board �
 
 **「成立しない」ではない。「確かめていない」である。**この区別を崩さない。
 
-### 6. 無償ライセンスの範囲で足りるかは確認できていない
+### 6. 無償ライセンスの範囲は、CI simulation時間とTerms本文について確認できた（2026-09-21追記）
 
 #325 の候補2は「無償ライセンスの範囲で足りるかを公式資料で確認する」も求めている。
-**起案 session からは `docs.wokwi.com` と `wokwi.com` のどちらも読めなかった**
-（2026-09-17実測。いずれも `curl: (56) CONNECT tunnel failed, response 403`）。`wokwi-cli` の README には CI 利用の条件が書かれていない（MIT と書かれているのは CLI 自身の license である）。
+**起案 session（2026-09-17）からは `docs.wokwi.com` と `wokwi.com` のどちらも読めなかった**
+（`curl: (56) CONNECT tunnel failed, response 403`）。当時は「別 session が到達して引用した
+内容を、確定として写さない」という立場を採り、この項目を開いたままにしていた。
 
-**別 session が、到達して plan ごとの simulation 時間と `Community` plan の表示を引用している**
-（[PR #414](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/414) の review、2026-09-17）。
-**その内容をここへ確定として写さない。**起案 session からは再測しても読めず、
-**`AGENTS.md`「セッションの役割」が、別 session から受け取ったものをそれ自体では
-根拠にしないと定めている。**同 review 自身も、`Community` plan の適用条件は読んでいないと
-断っている。
+**2026-09-21に、この後始末を行うsession自身が`docs.wokwi.com/wokwi-ci/getting-started`
+と`wokwi.com/pricing`へ実際に到達し、読んだ。**「別sessionが到達して引用した内容を
+確定として写さない」という制約（`AGENTS.md`「セッションの役割」）は、この節が対象と
+していない。**同制約が対象とするのは、他sessionからの伝聞をそのまま断定として書くことである。
+ここでは、この節を書いているsession自身がfetchして原文を得ている。**原文（英語）は
+次のとおりである。
 
-**したがってこの項目は開いたままである。**ただし**埋めるのに Wokwi の account も
-別 profile の端末も要らない。**必要なのは、当該 host へ到達できる session が公式の
-利用条件を読み、取得日とともに記録することだけである（「検証」節の、判断要因6についての見直し条件）。
-**番号で参照しない。**条件を増やすたびに番号だけが古くなる。
+> Each user has a limit of simulation time per month, according to their Wokwi plan:
+>
+> - Free users: 50 minutes
+> - Hobby and Hobby+ users: 200 minutes
+> - Pro users: 2000 minutes
 
-**`AGENTS.md`の推測禁止に従い、「無償で足りる」とも「足りない」とも書かない。**
+（`docs.wokwi.com/wokwi-ci/getting-started`、2026-09-21取得。**この link は revision を
+固定していない。**既定 branch の doc であり、内容は変わりうる）
+
+`wokwi.com/pricing`（同日取得）は表形式で、**行を一行ずつに整理した（原文の逐語引用では
+ない）**。plan名と月額は次のとおりである。
+
+- Community: €0 /mo
+- Hobby: €5.6 /mo
+- Hobby+: €8.1 /mo
+- Wokwi Pro: €20 /seat/mo
+
+同ページには、上位planへの案内として「contact us to discuss options for a custom plan」
+という文もある。**この一文がsimulation時間の超過時を指すのか、より一般的な上位plan案内かは、
+表からは判別できなかった。**
+
+**プラン名の対応付けは推測である。**`wokwi-ci/getting-started`側の`Free`／`Hobby`／
+`Hobby+`／`Pro`という表記と、`pricing`側の`Community`／`Hobby`／`Hobby+`／`Wokwi Pro`
+という表記は、料金体系（`Hobby`と`Hobby+`が両ページに共通、無料側だけ名称が異なる）から
+**同一のplan区分を指すと読める。**ただし両ページに「`Free`＝`Community`」と明示する一文は
+無い。**したがって、Wokwi CI は無料（`Free`／`Community`）plan でも使用でき、
+月50分のsimulation時間が上限である、という結論は、この対応付けの読みに依存する。**
+
+**`AGENTS.md`の推測禁止に従い、この50分が DeskCat の実際の CI 利用に「足りる」とも
+「足りない」とも書かない。**理由は、実際の1回あたりのsimulation所要時間もCI起動頻度も
+測っていないためである（この repository は `wokwi=false` を維持しており、`wokwi.toml`を
+使ったCI実行を1度も行っていない）。**判明したのは、無償枠に具体的な数値上限（50分/月）が
+存在し、ゼロではないという事実だけである。**
+
+**個人利用・商用利用の条件も、同日に追加で確認できた。**`wokwi.com/legal/terms`
+（2026-09-21取得。この link も revision を固定していない）の`REGISTRATION, USER ACCOUNT,
+EXTENSION`節が持つ利用許諾の原文は次のとおりである（`...`は取得した引用の途中省略を示し、
+何が省かれたかは判別できていない。取得手段の制約による）。
+
+> ...we hereby grant you a worldwide, limited, revocable, non-exclusive, non-sub-licensable,
+> non-transferable and non-assignable right and license... to use the Service in
+> accordance with these Terms, for your personal and non-commercial purposes only,
+> and to use the Extension for open source projects, following the open source
+> licenses terms, without charge.
+
+**この一文は`the Service`と`the Extension`を分けて許諾している。**「personal and
+non-commercial purposes only」が掛かるのは`the Service`であり、「open source projects
+であれば無償」という条件が明記されているのは`the Extension`（VS Code拡張）側だけである。
+`the Service`は同 Terms 内で「a web simulator for embedded & IoT Systems...which is
+also available as an extension」と定義されており、**Wokwi CI（Web simulatorをCIから
+呼ぶ機能）は`the Extension`ではなく`the Service`に当たると読める。**この読みが正しければ、
+「open source projectだから無償」という理屈はWokwi CIには及ばず、掛かるのは
+「personal and non-commercial purposes only」の方である。
+
+`ACCEPTABLE USE`節は、禁止行為の1つとして次を挙げている。
+
+> Using the Service at no cost for commercial purposes without receiving our explicit
+> consent and agreement
+
+同Terms内の別の条項は、商用利用の相談先として次のように案内している。
+
+> For more details on the available options for commercial use to the Extension and
+> Service, please contact us at: [連絡先。fetch結果ではmailアドレスが難読化され、
+> 正確な文字列は確認できなかった]
+
+**Wokwi CI固有の利用（GitHub Actions等での自動テスト）を名指しする記述は、この Terms
+内に見当たらなかった。**Wokwi自身のdocs（`docs.wokwi.com/wokwi-ci/getting-started`）は
+「robust simulation solution for automated testing...on CI systems like GitHub Actions,
+GitLab CI」とCI利用を促す記述を持つ一方、Terms側の無償利用条件は`the Service`について
+「personal and non-commercial purposes only」に限定されている。**DeskCatは公開
+repositoryで非商用のhobby projectだが、「personal」（個人）と言えるかは別の軸である。**
+CIでの自動実行が「personal」な利用に当たるかどうかは、この Terms の文面だけからは
+判定できない。**`AGENTS.md`の推測禁止に従い、DeskCatでのCI利用が無償条件に
+当たるとも当たらないとも書かない。**この判定には、Wokwiへの問い合わせ（Terms内で
+商用利用の相談先として案内されている連絡先）が要る。
+
+**この決定（選択肢B、Wokwi をgateにしない）は判断要因1・2・3に依っており、
+判断要因6でCI simulation時間の数値上限・Terms本文が判明したことによっては変わらない**
+（下の「検証」節が既にそう定めている）。
 
 ## 検討した選択肢
 
@@ -163,7 +246,11 @@ push または Pull Request のたびに Wokwi で firmware を起動し、boot 
 **利点。**flash する前に、boot loop や panic を機械が見つける。実機を触れる人と時間に依存しない。
 
 **コスト。**判断要因 1・2 のとおり、CI へ token を置くことになり、Machine Profiles の CI 要件と衝突する。
-さらに判断要因 5・6 が未確認のまま残っており、**採用を決めても、動くかも、使ってよいかも確かめていない状態で入ることになる。**
+さらに判断要因 5 が未確認のまま残っており、**採用を決めても、動くかを確かめていない状態で入ることになる。**
+判断要因 6 は CI simulation 時間の上限（無償`Free`／`Community` plan で月50分。plan名の
+対応付けは読み）と、Terms of Service本文（`the Service`の無償利用は`personal
+non-commercial purposes`限定）が判明しているが、**DeskCatでのCI自動実行がその条件に
+当たるかは、Wokwiへの問い合わせを経ないと確定しない**（判断要因6を参照）。
 
 ### 選択肢B: gate にしない。local の任意利用は禁じない
 
@@ -235,7 +322,7 @@ repository 内に無い。**この ADR の判断要因3が、その判断その�
 |---|---|
 | 実機試験が増えて開発が詰まる | 見直し条件の1つ目に置く。**観測してから動く。**現時点で詰まっているという記録は無い |
 | 「Wokwiは使えない」と誤って引用される | 決定節に**「動かないという判断ではない」**を明記した。判断要因 4 と 5 を分けてある |
-| 判断要因 5・6 が埋まらないまま忘れられる | 見直し条件に埋め方を書く。**埋めた人が ADR を更新する** |
+| 判断要因 5 が埋まらないまま忘れられる（6は2026-09-21にCI simulation時間の数値上限とTerms本文が判明した。CI自動実行が無償条件に当たるかは未送信のまま。Wokwiへの問い合わせ自体がまだ行われていない） | 見直し条件に埋め方を書く。**埋めた人が ADR を更新する** |
 
 ## 検証
 
@@ -248,14 +335,31 @@ repository 内に無い。**この ADR の判断要因3が、その判断その�
 3. **判断要因 5 が埋まったとき。**ESP32 Build profile の端末で `wokwi=true` 相当の
    `wokwi.toml`／`diagram.json` を用意し、**実際に Wokwi で起動して結果を記録した場合である**
    （成立しない結論も記録に当たる）。**これには別 profile の端末と Wokwi の account が要る。**
-4. **判断要因 6 が埋まったとき。**Wokwi の公式の利用条件を読み、CI と個人利用それぞれで
-   無償の範囲に収まるかを、取得日とともに記録した場合である。
-   **こちらは account も別 profile の端末も要らない。**必要なのは当該 host へ到達できる
-   session だけである（判断要因6）。**3 と 4 を同じ条件にしない。**要るものが違う。
+4. **Wokwiへ問い合わせ、DeskCatでのCI自動実行が`personal non-commercial purposes`に
+   当たるかの回答を得て記録したとき。**2026-09-21に、CI simulation時間の数値上限
+   （無償`Free`／`Community` planで月50分。plan名の対応付けは読み）と、`wokwi.com/legal/terms`
+   の原文（`personal non-commercial purposes only`／商用利用には`explicit consent`が要る）
+   の両方を確認した。**ただしTerms本文には、CIでの自動実行を名指しする記述が無く、
+   それが`personal non-commercial`に当たるかは文面だけでは判定できない。**この判定を
+   得るには、`wokwi.com/legal/terms`が案内する連絡先へ問い合わせる必要がある。
+   **この節を書いたsessionは、fetch結果でmailアドレスが難読化され、連絡先の文字列を
+   正確に取得できなかった。**次に埋める session は、`wokwi.com/legal/terms`を
+   ブラウザ等で直接開いて連絡先を確認するところから始める（accountもESP-IDF環境も
+   不要）。**3と4を同じ条件にしない。**
+   3は実際にWokwiを起動する検証で別profileの端末とWokwi accountが要るが、4は
+   問い合わせと文書化だけであり、そのどちらも要らない。
 
-**どちらが埋まっても、それだけで決定が変わるわけではない。**決定は判断要因 1・2・3 に
-依っており、**5・6 はその根拠に含まれていない。**埋まったときに見直すのは、
-**判断要因 5・6 を理由に選択肢Aを避けた部分だけである**（選択肢Aのコスト欄）。
+**判断要因6でCI simulation時間の数値上限とTerms本文が判明しても、それだけで決定が
+変わるわけではない。**決定は判断要因 1・2・3 に依っており、**5・6 はその根拠に
+含まれていない。**判断要因5・6は、選択肢Aのコスト欄が挙げる**追加のコスト**
+（判断要因1・2による確定的な衝突とは別の、「動くか」「使ってよいか」を確かめていない
+という不確実性）の裏付けである。**選択肢Aのコスト欄は2026-09-21にあわせて更新した。**
+判明した内容（無償`Free`／`Community` planは月50分、DeskCatでのCI自動実行が無償利用
+条件に当たるかは未確定）は、この不確実性コストを部分的に減らした（simulation時間の
+上限という数値は得た）が、**完全には解消していない**（無償条件に当たるかがまだ
+確定しない）。**主たる決定根拠（判断要因1・2・3、CIへのcredential持ち込みと
+Machine Profiles要件の衝突）には、この判明内容は触れていない。**
+**判断要因6は数値上限とTerms本文まで判明したが、この決定を見直す事由には当たらなかった。**
 
 ## 置き換える決定
 
