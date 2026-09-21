@@ -40,6 +40,7 @@
 //! （[`sleep_ms_until`] 参照）。`run_display_bringup`（#13の LCD bring-up）も同じ
 //! [`FreeRtos::delay_ms`] を段階ごとに挟む（[`service_bringup_step`] 参照）。
 
+mod accel;
 mod config;
 mod display;
 mod env;
