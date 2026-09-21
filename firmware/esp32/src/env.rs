@@ -5,6 +5,12 @@
 //! **Chip ID (register `0xD0`) の読み出しだけを扱う**（[AGENTS.md](../../../AGENTS.md)
 //! 「最終形を一度に作らず、単体から統合へ進める」）。calibration・測定値の読み出しは別途進める。
 //!
+//! `main()`は`crate::run_i2c_bringup`からこのdriverを呼び、生byteをlogへ出す
+//! （一致判定はしない。`main.rs`のmodule doc参照）。**実機通電はまだ行っていない。**bus共有pull-up(`ACCEL-SDA`/`ACCEL-SCL`の外部4.7 kΩ)はbreadboardへ実装済みだが(`docs/hardware/gpio-assignment.md`710行目、2026-09-07)、sensor module自体の接続(address/mode選択の配線)はまだ行っていない。
+//! この呼び出しはcross-compileの確認までであり、実機での動作確認は別工程である
+//! （[Hardware Safety Policy](../../../docs/governance/hardware-safety-policy.md)
+//! 「人間の監視が必要な操作」）。
+//!
 //! # 配線の根拠
 //!
 //! pin割り当ては
@@ -14,8 +20,9 @@
 //! と共有するbusである（同文書418行目「ENV-SCL | ENV-01 | I2C SCL | Bidirectional |
 //! GPIO26（ACCEL-01と共有）」、415行目「ACCEL-SCL | ACCEL-01 | ... | GPIO26」と一致）。
 //! **このmoduleはbus(`I2cDriver`)を所有しない。**呼び出し側（`main.rs`）が1つのbusを
-//! 作り、`Adxl345`（`#15`側のdriver、未実装）と共有する設計であるため、[`Bme280`]は
-//! 自分のI2C addressだけを持ち、各methodは呼び出し側が渡す`&mut I2cDriver`を借りる。
+//! 作り、`Adxl345`（`#15`側のdriver、`crate::accel`）と共有する設計であるため、
+//! [`Bme280`]は自分のI2C addressだけを持ち、各methodは呼び出し側が渡す
+//! `&mut I2cDriver`を借りる。
 //!
 //! bus speedはStandard-mode（100 kHz）を使う（同文書「初回bring-upのmode決定」節、
 //! 2026-09-06決定）。ESP32内蔵のweak pull-upは有効にしない。同文書の`I2C busの実効
@@ -39,12 +46,6 @@
 //!   既に記録済み。**ここへ再掲しない**）。identify判定（`0x60`との一致）は呼び出し側の
 //!   責務とする（`display.rs`の[`DisplayId`](crate::display::DisplayId)と同じ「捏造しない」
 //!   形。このmoduleは生byteを返すだけで、BME280であると断定しない）。
-
-// このmoduleは`main.rs`から呼ばれていない（module doc冒頭を参照。`main.rs`は
-// 「ACCEL-*・ENV-*…はこの版でも一切触れない」「i2c=not_driven」を維持する）。
-// そのため`cargo clippy -- -D warnings`は`dead_code`をerrorとして落とす。
-// build-onlyの検証対象であることが目的であり、呼び出しを足して黙らせない。
-#![allow(dead_code)]
 
 use esp_idf_svc::hal::delay::BLOCK;
 use esp_idf_svc::hal::i2c::I2cDriver;
