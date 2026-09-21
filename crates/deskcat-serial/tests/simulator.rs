@@ -475,6 +475,65 @@ fn a_session_stopped_by_id_exhaustion_still_flushes_what_it_already_queued() {
     );
 }
 
+/// `id`空間の枯渇で停止した後も、linkが繋がっていれば既存`id`での再送はできる。
+/// 設計の理由はPull Request本文を参照。
+#[test]
+fn resend_still_works_after_the_session_stops_from_id_exhaustion() {
+    let mut session = Session::with_first_id(config(), 90_312, u32::MAX);
+    session.note_connected();
+
+    assert_eq!(
+        session.send(Message::Ping, 10),
+        Err(SendError::IdSpaceExhausted)
+    );
+    assert_eq!(
+        session.state(),
+        ConnectionState::Stopped(StopReason::IdSpaceExhausted)
+    );
+    assert!(session.link_connected(), "id枯渇はlinkを切断しない");
+
+    // 停止前に払い出した既存のidでの再送は、新しいidを要さないため通る。
+    assert_eq!(
+        session.resend(7, Message::Ping, 20),
+        Ok(()),
+        "既存idでの再送は新しい(sid, id)を要さないため止まらない"
+    );
+    assert_eq!(session.pending_out(), 1);
+}
+
+/// `id`空間の枯渇で停止し、かつlinkが切れていれば、`resend`は積まない。
+/// 上のtestとの対比。設計の理由はPull Request本文を参照。
+#[test]
+fn resend_does_not_enqueue_after_id_exhaustion_while_disconnected() {
+    let mut session = Session::with_first_id(config(), 90_312, u32::MAX);
+    session.note_connected();
+
+    assert_eq!(
+        session.send(Message::Ping, 10),
+        Err(SendError::IdSpaceExhausted)
+    );
+    assert_eq!(
+        session.state(),
+        ConnectionState::Stopped(StopReason::IdSpaceExhausted)
+    );
+
+    let mut sim = Sim::with_reads(vec![Ok(Vec::new())]);
+    assert_eq!(session.pump_read(&mut sim, |_| {}), Pump::Disconnected);
+    assert!(!session.link_connected(), "EOFで切断済み");
+    assert_eq!(
+        session.state(),
+        ConnectionState::Stopped(StopReason::IdSpaceExhausted),
+        "切断してもstopした理由は変わらない"
+    );
+
+    assert_eq!(
+        session.resend(7, Message::Ping, 20),
+        Err(SendError::Stopped(StopReason::IdSpaceExhausted)),
+        "id空間の規則は新しいidを要さないだけであり、切れたlinkへは出せない"
+    );
+    assert_eq!(session.pending_out(), 0);
+}
+
 /// 再接続で直らないerrorはlinkも落とす。停止後に書き続けない。
 #[test]
 fn a_fatal_error_drops_the_link_as_well_as_stopping_the_session() {
@@ -484,6 +543,92 @@ fn a_fatal_error_drops_the_link_as_well_as_stopping_the_session() {
     assert_eq!(session.pump_read(&mut sim, |_| {}), Pump::Fatal);
     assert!(!session.link_connected(), "linkは使えない");
     assert_eq!(session.pump_write(&mut sim), Pump::Idle);
+}
+
+/// `Fatal`で停止した後は、`resend`がqueueへ積まない。
+/// 設計の理由はPull Request本文を参照。
+#[test]
+fn resend_does_not_enqueue_after_a_fatal_stop() {
+    let mut sim = Sim::with_reads(vec![Err(io::Error::from(io::ErrorKind::PermissionDenied))]);
+    let mut session = connected_session();
+    assert_eq!(session.pump_read(&mut sim, |_| {}), Pump::Fatal);
+    assert_eq!(session.state(), ConnectionState::Stopped(StopReason::Fatal));
+    assert!(
+        !session.link_connected(),
+        "Fatalは必ず切断処理を経て停止する"
+    );
+
+    assert_eq!(
+        session.resend(1, Message::Ping, 100),
+        Err(SendError::Stopped(StopReason::Fatal))
+    );
+    assert_eq!(
+        session.pending_out(),
+        0,
+        "linkが死んでいるのでqueueへ積まない"
+    );
+}
+
+/// `ReconnectExhausted`で停止した後も、実際に切断していれば`resend`がqueueへ積まない。
+/// `deskcat_serial::device`（`SerialDevice::open`のdoc example）が示す参照loopの
+/// 慣行どおり、`pump_read`が`Disconnected`を処理してから`begin_reconnect`を
+/// 呼ぶ順序で構成する。設計の理由はPull Request本文を参照。
+#[test]
+fn resend_does_not_enqueue_after_reconnect_exhausted_while_disconnected() {
+    let config = config().with_reconnect(
+        ReconnectPolicy::new(0, Duration::from_millis(1), Duration::from_millis(1))
+            .expect("妥当な設定"),
+    );
+    let mut session = Session::new(config, 90_312);
+    session.note_connected();
+
+    let mut sim = Sim::with_reads(vec![Ok(Vec::new())]);
+    assert_eq!(session.pump_read(&mut sim, |_| {}), Pump::Disconnected);
+    assert!(!session.link_connected(), "EOFで切断済み");
+
+    assert_eq!(session.begin_reconnect(), None, "上限0なので即座に尽きる");
+    assert_eq!(
+        session.state(),
+        ConnectionState::Stopped(StopReason::ReconnectExhausted)
+    );
+
+    assert_eq!(
+        session.resend(1, Message::Ping, 100),
+        Err(SendError::Stopped(StopReason::ReconnectExhausted))
+    );
+    assert_eq!(session.pending_out(), 0);
+}
+
+/// `begin_reconnect`自身は`link_connected`を変更しない。`ReconnectExhausted`で
+/// 停止した時点でlinkが実際にはまだ繋がっているなら、`resend`は積む。
+/// 上のtestが前提とする呼び出し順序（切断処理の後に`begin_reconnect`を呼ぶ）を
+/// 踏まずに状態を作っている（`begin_reconnect`はその順序を強制しない）。
+/// 設計の理由はPull Request本文を参照。
+#[test]
+fn resend_still_enqueues_when_reconnect_exhausted_but_the_link_is_still_connected() {
+    let config = config().with_reconnect(
+        ReconnectPolicy::new(0, Duration::from_millis(1), Duration::from_millis(1))
+            .expect("妥当な設定"),
+    );
+    let mut session = Session::new(config, 90_312);
+    session.note_connected();
+
+    assert_eq!(session.begin_reconnect(), None, "上限0なので即座に尽きる");
+    assert_eq!(
+        session.state(),
+        ConnectionState::Stopped(StopReason::ReconnectExhausted)
+    );
+    assert!(
+        session.link_connected(),
+        "begin_reconnectはlink_connectedへ触れない"
+    );
+
+    assert_eq!(
+        session.resend(1, Message::Ping, 100),
+        Ok(()),
+        "linkが繋がっている限り、停止理由だけでは積むのを止めない"
+    );
+    assert_eq!(session.pending_out(), 1);
 }
 
 /// 終端報告は、queueが満杯でも**予約を失わない**。
@@ -889,12 +1034,17 @@ fn the_reconnect_budget_is_restored_by_bytes_not_by_opening() {
 /// `Session::pump_read`で復元した[`Frame`]を[`PeerSession`]へ渡し、返ってきた
 /// 応答を別の`Session::send`／`pump_write`で実際にwireへ乗せるところまで確認する。
 mod peer_protocol {
+    use core::time::Duration;
+
     use super::{
         Ack, AckStatus, Boot, DisplayStatus, Envelope, ErrorCode, Frame, Message, Outcome,
-        ProtocolCounters, SensorStatus, ServoStatus, Sim, Status, config, connected_session,
+        ProtocolCounters, Pump, SensorStatus, ServoStatus, Sim, Status, config, connected_session,
         decode_line, encode_line, limits,
     };
-    use deskcat_serial::{BootOutcome, OutstandingKind, PeerRejection, PeerSession, Session};
+    use deskcat_serial::{
+        BootOutcome, OutstandingKind, PeerRejection, PeerSession, RetryOutcome, RetryPolicy,
+        Session, handle_boot, retry_due_requests,
+    };
 
     const ESP32_SID: u32 = 41_207;
     const PI_SID: u32 = 90_312;
@@ -1070,7 +1220,7 @@ mod peer_protocol {
 
         let mut pi = connected_session_with_sid(PI_SID);
         let id = pi.send(Message::Ping, 500).expect("queueへ入る");
-        peer.note_sent(id, OutstandingKind::Ping);
+        let _ = peer.note_sent(id, Message::Ping, 500);
 
         let ack = Ack {
             reply_sid: PI_SID,
@@ -1102,7 +1252,7 @@ mod peer_protocol {
 
         let mut pi = connected_session_with_sid(PI_SID);
         let id = pi.send(Message::GetStatus, 500).expect("queueへ入る");
-        peer.note_sent(id, OutstandingKind::GetStatus);
+        let _ = peer.note_sent(id, Message::GetStatus, 500);
 
         let ack = Ack {
             reply_sid: PI_SID,
@@ -1190,6 +1340,262 @@ mod peer_protocol {
         assert_eq!(
             peer.correlate_ack(ESP32_SID, PI_SID, ack),
             Err(PeerRejection::UnmatchedAck)
+        );
+    }
+
+    /// 受け入れ条件（Issue #12）: reconnect時に現在状態を同期する。
+    ///
+    /// `boot`でESP32 sessionを確立したら、ACKに続けて`get_status`を自動で送信し、
+    /// 応答を追跡する（§10.1 step1〜4）。`crates/deskcat-serial/src/coordinator.rs`が
+    /// `Session`と`PeerSession`の両方へ実際に書き込む経路をここで確認する。
+    #[test]
+    fn establishing_an_esp32_session_sends_get_status_and_tracks_it() {
+        let mut peer = PeerSession::new();
+        let mut pi = connected_session_with_sid(PI_SID);
+
+        let handled = handle_boot(&mut pi, &mut peer, ESP32_SID, 1, boot_payload(), 500);
+        assert!(matches!(
+            handled.outcome,
+            BootOutcome::Established { sid: ESP32_SID, .. }
+        ));
+
+        let mut sim = Sim::default();
+        while pi.pending_out() > 0 {
+            match pi.pump_write(&mut sim) {
+                Pump::Progress(_) | Pump::Idle => {}
+                other => panic!("書き出しが進まない: {other:?}"),
+            }
+        }
+        let written = String::from_utf8(sim.written).expect("UTF-8である");
+        let mut lines = written.lines();
+
+        let ack = decode_line(lines.next().expect("ACKがある")).expect("復元できる");
+        assert!(
+            matches!(ack.message, Message::Ack(_)),
+            "1件目はbootへのACKである"
+        );
+
+        let get_status = decode_line(lines.next().expect("get_statusがある")).expect("復元できる");
+        assert_eq!(
+            get_status.message,
+            Message::GetStatus,
+            "ACKに続けてget_statusを送る（§10.1 step4）"
+        );
+        assert!(lines.next().is_none(), "この2件しか送っていない");
+
+        assert_eq!(
+            peer.outstanding_len(),
+            1,
+            "送ったget_statusをoutstandingとして追跡する"
+        );
+    }
+
+    /// `get_status`のqueueへの投入が失敗しても、session確立という事実は失われない。
+    ///
+    /// 以前の実装は`?`で早期returnしており、この場合に`Err`だけを返して
+    /// `BootOutcome::Established`を呼び出し側から隠していた。`PeerSession`の
+    /// session状態は`handle_boot`の時点で既に確定しているため、続く送信の
+    /// 失敗で見えなくしてはならない。
+    #[test]
+    fn establishing_a_session_is_still_visible_when_get_status_fails_to_enqueue() {
+        let mut peer = PeerSession::new();
+        let mut pi = Session::new(
+            config().with_outbox_capacity(1).expect("容量は1以上である"),
+            PI_SID,
+        );
+        pi.note_connected();
+        // outboxを埋めておく。ACKとget_statusのどちらも入らない。
+        let _ = pi.send(Message::Ping, 400).expect("1件目は入る");
+
+        let handled = handle_boot(&mut pi, &mut peer, ESP32_SID, 1, boot_payload(), 500);
+
+        assert!(
+            matches!(
+                handled.outcome,
+                BootOutcome::Established { sid: ESP32_SID, .. }
+            ),
+            "送信が失敗してもsession確立の事実は返り値に残る"
+        );
+        assert_eq!(
+            peer.esp32_sid(),
+            Some(ESP32_SID),
+            "PeerSessionの状態も巻き戻らない"
+        );
+        assert_eq!(
+            peer.outstanding_len(),
+            0,
+            "get_statusの送信自体が失敗したので追跡もしない"
+        );
+        assert!(
+            peer.status_sync_pending(),
+            "送れなかったことを覚えておき、次のtickで再試行する"
+        );
+    }
+
+    /// 受け入れ条件（Issue #12）: `boot`確立直後の`get_status`送信が失敗しても、
+    /// outboxが空けば次のtickで再試行して送り切る。
+    ///
+    /// §10.1は通信断からのrecovery手順である。その最初の一歩（step4）が
+    /// outbox輻輳で静かに失敗し、二度と送られないのでは「Reconnect時に現在状態を
+    /// 同期する」を満たさない。
+    #[test]
+    fn a_pending_status_sync_is_retried_and_sent_once_the_outbox_has_room() {
+        let mut peer = PeerSession::new();
+        // ACK timeoutにはまだ達していない前提のpolicyを、configとして持たせる
+        // （`retry_due_requests`は`session.config().retry()`から読む）。
+        let config = config()
+            .with_outbox_capacity(1)
+            .expect("容量は1以上である")
+            .with_retry(RetryPolicy::new(Duration::from_millis(500), 3).expect("妥当な設定"));
+        let mut pi = Session::new(config, PI_SID);
+        pi.note_connected();
+        let _ = pi.send(Message::Ping, 400).expect("1件目は入る");
+
+        let _ = handle_boot(&mut pi, &mut peer, ESP32_SID, 1, boot_payload(), 500);
+        assert!(peer.status_sync_pending(), "前提: 初回送信は失敗している");
+
+        // outboxを空ける（先に入れていたpingを書き出す）。
+        let mut sim = Sim::default();
+        while pi.pending_out() > 0 {
+            let _ = pi.pump_write(&mut sim);
+        }
+        assert_eq!(pi.pending_out(), 0);
+
+        // 次のtick。
+        let _ = retry_due_requests(&mut pi, &mut peer, 600);
+
+        assert!(!peer.status_sync_pending(), "送れたのでflagは落ちている");
+        assert_eq!(
+            peer.outstanding_len(),
+            1,
+            "送れたget_statusはpoll_outstandingの追跡へ引き継がれる"
+        );
+
+        sim.written.clear();
+        while pi.pending_out() > 0 {
+            let _ = pi.pump_write(&mut sim);
+        }
+        let written = String::from_utf8(sim.written).expect("UTF-8である");
+        let sent = decode_line(written.lines().next().expect("1行ある")).expect("復元できる");
+        assert_eq!(sent.message, Message::GetStatus, "get_statusが実際に出た");
+    }
+
+    /// `boot`の再送（duplicate）では`get_status`を送り直さない。
+    ///
+    /// session遷移が起きていないため（`BootOutcome::Replayed`）、§10.1 step1〜4は
+    /// 実行しない。二重にstate同期要求を送ると、無関係な`get_status`が積み上がる。
+    #[test]
+    fn a_replayed_boot_does_not_resend_get_status() {
+        let mut peer = PeerSession::new();
+        let mut pi = connected_session_with_sid(PI_SID);
+
+        let _ = handle_boot(&mut pi, &mut peer, ESP32_SID, 1, boot_payload(), 500);
+        let pending_after_first = pi.pending_out();
+
+        let handled = handle_boot(&mut pi, &mut peer, ESP32_SID, 1, boot_payload(), 600);
+        assert_eq!(handled.outcome, BootOutcome::Replayed);
+
+        // ACKのreplay 1件だけが増える。get_statusは増えない。
+        assert_eq!(pi.pending_out(), pending_after_first + 1);
+        assert_eq!(peer.outstanding_len(), 1, "追跡している要求は増えていない");
+    }
+
+    /// 受け入れ条件（Issue #12）: retryで同じidを使用する。
+    ///
+    /// ACK timeoutを超えた`ping`を、`crates/deskcat-serial/src/coordinator.rs`の
+    /// `retry_due_requests`が同じ`id`のままwireへ送り直す（§9）。
+    #[test]
+    fn retry_due_requests_resends_a_timed_out_ping_with_the_same_id() {
+        let mut peer = PeerSession::new();
+        let _ = peer.handle_boot(ESP32_SID, 1, boot_payload());
+
+        let config = config()
+            .with_retry(RetryPolicy::new(Duration::from_millis(500), 3).expect("妥当な設定"));
+        let mut pi = Session::new(config, PI_SID);
+        pi.note_connected();
+        let id = pi.send(Message::Ping, 100).expect("queueへ入る");
+        let _ = peer.note_sent(id, Message::Ping, 100);
+
+        // 最初の送出をwireから追い出しておく。以降で拾うのは再送分だけにする。
+        let mut sim = Sim::default();
+        while pi.pending_out() > 0 {
+            let _ = pi.pump_write(&mut sim);
+        }
+
+        let outcomes = retry_due_requests(&mut pi, &mut peer, 700);
+        assert_eq!(
+            outcomes,
+            vec![RetryOutcome::Resent(id, OutstandingKind::Ping)]
+        );
+
+        sim.written.clear();
+        while pi.pending_out() > 0 {
+            let _ = pi.pump_write(&mut sim);
+        }
+        let written = String::from_utf8(sim.written).expect("UTF-8である");
+        let resent =
+            decode_line(written.lines().next().expect("再送した1行がある")).expect("復元できる");
+        assert_eq!(resent.envelope.id, id, "同じidで再送している");
+        assert_eq!(resent.message, Message::Ping);
+    }
+
+    /// 受け入れ条件（Issue #12）: retry予算を使い切ったら取り下げる。
+    #[test]
+    fn retry_due_requests_gives_up_after_exhausting_the_budget() {
+        let mut peer = PeerSession::new();
+        let _ = peer.handle_boot(ESP32_SID, 1, boot_payload());
+
+        let config = config()
+            .with_retry(RetryPolicy::new(Duration::from_millis(100), 1).expect("妥当な設定"));
+        let mut pi = Session::new(config, PI_SID);
+        pi.note_connected();
+        let id = pi.send(Message::Ping, 0).expect("queueへ入る");
+        let _ = peer.note_sent(id, Message::Ping, 0);
+
+        let first = retry_due_requests(&mut pi, &mut peer, 100);
+        assert_eq!(first, vec![RetryOutcome::Resent(id, OutstandingKind::Ping)]);
+
+        let second = retry_due_requests(&mut pi, &mut peer, 200);
+        assert_eq!(
+            second,
+            vec![RetryOutcome::GaveUp(id, OutstandingKind::Ping)]
+        );
+        assert_eq!(peer.outstanding_len(), 0, "取り下げ後は追跡しない");
+    }
+
+    /// `retry_due_requests`は`session.config().retry()`が持つ方針を実際に読む。
+    ///
+    /// `SerialConfig`が`RetryPolicy`を保持するようになった後、`retry_due_requests`が
+    /// 別途受け取っていた`policy`引数と食い違いうる状態だった。関数からその引数を
+    /// 外し、`session.config()`から読むよう直した（[`Session::begin_reconnect`]が
+    /// `self.config.reconnect()`を読むのと同じ形）。ここでは、`with_retry`で
+    /// configへ持たせた短いACK timeoutが実際に効くことを確認する。
+    #[test]
+    fn retry_due_requests_reads_the_policy_from_session_config() {
+        let mut peer = PeerSession::new();
+        let _ = peer.handle_boot(ESP32_SID, 1, boot_payload());
+
+        // configへ持たせたのは50ms timeout。既定のprovisional値（500ms）のままなら、
+        // 30ms経過時点ではまだtimeoutしていないはずである。
+        let config = config()
+            .with_retry(RetryPolicy::new(Duration::from_millis(50), 1).expect("妥当な設定"));
+        let mut pi = Session::new(config, PI_SID);
+        pi.note_connected();
+        let id = pi.send(Message::Ping, 0).expect("queueへ入る");
+        let _ = peer.note_sent(id, Message::Ping, 0);
+
+        let outcomes = retry_due_requests(&mut pi, &mut peer, 30);
+        assert_eq!(
+            outcomes,
+            vec![],
+            "configの50ms timeoutにはまだ達していない（既定の500msを読んでいたら空でも意味が無い比較になる）"
+        );
+
+        let outcomes = retry_due_requests(&mut pi, &mut peer, 60);
+        assert_eq!(
+            outcomes,
+            vec![RetryOutcome::Resent(id, OutstandingKind::Ping)],
+            "configの50ms timeoutを超えたら再送する"
         );
     }
 }

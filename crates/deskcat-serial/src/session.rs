@@ -346,6 +346,41 @@ impl Session {
         Ok(id)
     }
 
+    /// 既存の`id`のまま、同じ`message`を送信queueへ入れ直す。
+    ///
+    /// **`id`空間を消費しない。**仕様が求める「既に送出したmessageの再送は同じ
+    /// `(sid, id)`で行う」（§9）に従って、ACK timeoutしたPi発の要求（`ping`や
+    /// `get_status`）を送り直すためにある。新しい送出には[`Self::send`]を使う。
+    ///
+    /// どの`id`を使うかは呼び出し側が決める。典型的には
+    /// [`crate::PeerSession::poll_outstanding`]が返した`id`をそのまま渡す。
+    ///
+    /// **判定は`stopped`と`link_connected`の両方を見る。`stopped`していない、
+    /// またはlinkが繋がっているなら積む。`stopped`していて、かつlinkが
+    /// 繋がっていなければ積まない。**設計の理由はPull Request本文を参照
+    /// （このdocが持つのは契約だけであり、理由はcodeの変更に追随する必要が
+    /// 無いため別に置く）。
+    ///
+    /// **[`Self::send_terminal`]はこの判定に従わない。**`stopped`も
+    /// `link_connected`も見ず、`id`空間の予約が残っていれば積む。
+    ///
+    /// # Errors
+    ///
+    /// `stopped`していて、かつlinkが繋がっていなければ[`SendError::Stopped`]を
+    /// 返す。それ以外では、queueが満杯なら[`SendError::Dropped`]、encodeに
+    /// 失敗すれば[`SendError::Encode`]、encode結果が空になれば
+    /// [`SendError::EmptyPayload`]（内部経路では起こらない。
+    /// `encode_and_enqueue`のdoc参照）を返す。**`id`空間の枯渇単体では
+    /// （linkが繋がっている限り）失敗しない**（新しい`id`を必要としないため）。
+    pub fn resend(&mut self, id: u32, message: Message, ts_ms: u64) -> Result<(), SendError> {
+        if let Some(reason) = self.stopped
+            && !self.can_pump()
+        {
+            return Err(SendError::Stopped(reason));
+        }
+        self.encode_and_enqueue(id, ts_ms, message)
+    }
+
     /// 終端報告を、予約しておいた上限値の`id`で1件だけ送る。
     ///
     /// 仕様§3の「終端報告のために最後の1件を残す」に対応する。呼び出し側は
