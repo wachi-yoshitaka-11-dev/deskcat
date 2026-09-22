@@ -31,6 +31,13 @@ esp-idf-svc = { version = "0.52.1", features = ["critical-section", "embassy-tim
 # Remove `generic-queue-8` if you plan to use `embassy-time` WITH `embassy-executor`
 embassy-time = { version = "0.5", features = ["generic-queue-8"] }
 
+[features]
+# Issue #17の単発servo bench試験だけを有効にする。既定ではoffであり、
+# 通常のbuildはこのfeatureを持たず`crate::servo`を呼ばない。承認の状態は
+# `docs/hardware/servo-safety-limits.md`の`承認の状態`節を参照する（ここへ再掲しない。
+# `main.rs`のmodule doc、`servo.rs`のmodule doc参照）。
+bench-servo-test-17 = []
+
 [lints.rust]
 unsafe_code = "forbid"
 
