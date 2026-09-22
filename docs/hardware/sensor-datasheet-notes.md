@@ -74,6 +74,37 @@ controllerの挙動は`ILI9341 Datasheet V1.13`（Ilitek、2011-08-05）によ�
 | 13 | `T_DO` | touch SPI output |
 | 14 | `T_IRQ` | touch割り込み（touch検出時low） |
 
+### pin定義（LCDWiki公式User Manual原文、9pin。touch用5pinを除く）
+
+**上のpin定義表はメーカーdatasheet（`msp2807.pdf`）を出典とする。**この節は同じ9pinについて、
+**別文書であるLCDWiki公式User Manual**（`2.8inch_SPI_Module_MSP2807_User_Manual_EN.pdf`、
+sha256 `0e0d3e57ca24213841907d845e509545819ec7303f0f43584c521a3f57a1d72c`。`Backlight回路／電流／polarity`行が
+2026-09-16取得として既に引用しているものと同一file。**2026-09-22に再取得し、sha256の一致で
+同一性を確認した**）の`Interface Description`表（3〜4ページ）を、原文のまま並べる。
+**記憶で埋めず、資料の記載だけを根拠にする（[#13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)）。**
+
+| No. | Module Pin | 原文（User Manual, Interface Description表） |
+|---|---|---|
+| 1 | `VCC` | LCD power supply is positive (3.3V~5V) |
+| 2 | `GND` | LCD Power ground |
+| 3 | `CS` | LCD selection control signal |
+| 4 | `RESET` | LCD reset control signal |
+| 5 | `DC/RS` | LCD register / data selection control signal |
+| 6 | `SDI(MOSI)` | LCD SPI bus write data signal |
+| 7 | `SCK` | LCD SPI bus clock signal |
+| 8 | `LED` | LCD backlight control signal (high level lighting, if you do not need control, please connect 3.3V) |
+| 9 | `SDO(MISO)` | LCD SPI bus read data signal (can not be connected if not needed) |
+
+**同User Manualはこの9pinについて、ESP32向けの推奨接続例を持たない**（掲載されている
+接続例はArduino UNO／MEGA2560、STC89C52RC／STC12C5A60S2、STM32F103の4種のみであり、
+ESP32は無い）。**したがってESP32側のGPIO割り当てはこの節では決めない。**正本は
+[gpio-assignment.md](gpio-assignment.md)の`信号inventory`である（`LCD-SCLK`=GPIO18、
+`LCD-MOSI`=GPIO23、`LCD-MISO`=GPIO19、`LCD-CS`=GPIO22、`LCD-DC`=GPIO17、
+`LCD-RST`=GPIO16、`LCD-BL`=GPIO4。**ここへ再掲しない**）。**`VCC`／`GND`は`信号inventory`に
+現れない**（ESP32の`3V3`／`GND` pinとの電源経路であり、信号pinではないため）。この経路の
+安全条件は[power-budget.md](power-budget.md)と[tbd-register.md](tbd-register.md)の
+`HW-TBD-024`が正本である。
+
 必要なベンチ試験の根拠:
 
 - 単色fill
@@ -385,3 +416,4 @@ M-06724に何が実装済みかが未確認である以上、外付けの要否�
 | 2026-09-05 | 12 | [#1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1)。**`HW-TBD-024`のbacklight回路を一部実測し、`LED` pinの機能を公式資料で確認した。**(a) LCDWIKI公式User Manual（`2.8inch_SPI_Module_MSP2807_User_Manual_EN.pdf`）のInterface Description表（Pin 8）が、`LED` pinを「backlight control signal（high level lighting、制御不要なら3.3Vへ直結可）」と定めていることを確認した。`akizukidenshi.com`の`msp2807.pdf`（`Power Consumption`欄`TBD`）とは別文書であり、これまで参照していなかった。(b) MSP2807を電源未接続の状態で、`LED` pin⇔`VCC` pin間（オーバーレンジ）、`U1`（3.3V LDO、刻印`662K`／`UMW S4T`）の3本足について`VCC`・`GND`との導通を測り、入力側・GND側・出力側（消去法）を識別した。**`GND`側の判定は当初5回中1回しか導通を示さず不安定だったが、後日の再測定で安定して導通を確認した。**`LED` pinは`U1`の3本の足いずれとも非導通（オーバーレンジ）であり、(a)の「制御信号線」という位置づけと整合する。**続けて、LEDへの給電ライン特定を`R5`と`Q1`で試みたが、いずれも非通電の導通測定では決められないと判断した。**`R5`（6.8Ω）は部品が小さくプローブを確実に当てられず、両脚とも`VCC`・`U1`出力側に非導通と読めたが信頼性が低い。`Q1`（SOT-23、刻印`J3Y`）は3本足とも`VCC`・`U1`出力側の両方に非導通だったが、**トランジスタの接合は単純な抵抗測定では極性次第で導通を示さないため、この結果から経路を判定しない。**`U1`の脚は油性ペンで印を付けて区別し、接写写真で位置を確認した。**LED個数と`R5`／`R6`／`Q1`／`J1`を経た正確な経路は、パネル端のカプトンテープに隠れており非分解では確認できないため、引き続き未確認のまま残す** |
 | 2026-09-05 | 13 | [#1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1)。**ADXL345の`Vs`ピンと`VDD`ピンの間が導通している（同一net）ことを、非通電導通測定で確認した。**2系統を独立に給電できる設計ではないと分かった。**ただし、この共通netがICの`VS`／`VDD I/O`それぞれへ直結しているかは、IC足が小さくプローブを直接当てられずパターンを追っていないため未解決のまま残る。**接写ではheader〜IC間に`C1`が`Vs`側・`VDD`側それぞれ1個見えるが、断定はしない |
 | 2026-09-07 | 14 | [#2](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/2)。**Revision 12にある「`U1`の脚は油性ペンで印を付けて区別し、接写写真で位置を確認した」という記述が事実に反すると判明した。**`#2`のclose作業中に人間へ現物を確認したところ、**そのような現物作業（油性ペンでの印付け）は行っていないと明確に否定された。**Revision 12の本文は書き換えず、この行で訂正する（過去のRevision履歴を書き換えない方針。同種の記録は[experiment-log.md](experiment-log.md)のRevision 10「Revision 9は書き換えず、この行で訂正する」を参照）。**`U1`の脚の識別（`VCC`と導通する脚＝入力側、`GND`と導通する脚＝GND側、どちらとも非導通の脚＝出力側）は、`VCC`／`GND`との導通測定だけを根拠としており、油性ペンの記述とは無関係である。**測り直せば同じ結果を再現できるため、この識別結果自体は無効化しない。**したがって`HW-TBD-024`が参照するこの識別結果は有効なまま残る**（PM `deskcat-f2`の判定、2026-09-07。根拠は人間への現物確認（2026-09-07）とPM（deskcat-f2）の判定） |
+| 2026-09-22 | 15 | [#13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)。**LCD moduleのpin定義表の直後に、同じ9pin（touch用5pinを除く）についてLCDWiki公式User Manualの原文だけを根拠にした表を追加した。**既存のpin定義表（`msp2807.pdf`が出典）とは別文書であることを明記し、`Backlight回路／電流／polarity`行が既に引用しているUser Manualと同一file（sha256一致）であることを2026-09-22に再取得して確認した。数値・GPIO割り当ての再計算はしていない（正本は[gpio-assignment.md](gpio-assignment.md)の`信号inventory`のまま） |
