@@ -26,6 +26,16 @@ pi-protocol-mode = []
 # `Peripherals::take()`を行わずservoのbench試験経路が呼ばれないため、
 # featureが黙って無効になることである。両方を同時に有効にするbuildは作らない。
 bench-servo-test-17 = []
+# Issue #13の`DISP-01`（MSP2807）bring-up（controller識別、backlight点灯、単色fill、
+# 四隅pattern）だけを有効にする。既定ではoffであり、通常のbuildは`run_display_bringup`を
+# 呼ばず、`LCD-BL`（GPIO4）を含むLCD関連pinへ一切触れない。既定offにした理由と、
+# 有効化してよい条件・手順は`main.rs`のmodule docの
+# 「`DISP-01`のbring-upを有効にする手順」節を参照する（ここへ再掲しない）。
+# **`pi-protocol-mode`と同時に有効にした構成は意図的にcompileできない。**
+# `main.rs`が`compile_error!`で拒否する。理由は`bench-servo-test-17`と同じで、
+# `pi-protocol-mode`が`Peripherals::take()`を行わずbring-up経路が呼ばれないため、
+# featureが黙って無効になることである。
+bringup-display-13 = []
 
 [profile.release]
 opt-level = "s"

@@ -31,6 +31,43 @@ pub const HEARTBEAT_PERIOD_MS: u32 = 1_000;
 /// している対応物であり、同じ頻度で出す必要が無い。
 pub const HEALTH_SNAPSHOT_PERIOD_MS: u32 = 10_000;
 
+/// I2Cの1 transactionのtimeout（milliseconds）。`crate::accel`・`crate::env`が
+/// tick数へ換算して`I2cDriver::write_read`へ渡す。
+///
+/// **一般値である。一次資料に基づく値ではない。**I2C読み出しのtimeout値は
+/// [Hardware Safety Policy](../../../docs/governance/hardware-safety-policy.md)の
+/// 安全要件5項目のいずれにも効かないため、同policyの`5項目以外の扱い`により一般値で
+/// 開始してよい（[AGENTS.md](../../../AGENTS.md)「推測禁止」の後段。**`TBD`にしない。**）。
+/// **どの値が5項目に効くかの判定は同policyが正本であり、ここへ5項目を再掲しない。**
+///
+/// # 導出
+///
+/// **「安全な秒数」ではなく「正常なら確実に終わっている時間」として決める。**
+///
+/// - 1 byte registerの読み出し（`write_read`）は`START`＋`addr+W`＋`reg`＋
+///   `repeated START`＋`addr+R`＋`data`＋`STOP`であり、ACK／NACKを含めて約36 bit時間
+///   である。bus speedは`main.rs`の`I2C_BAUDRATE_HZ`＝100 kHz（Standard-mode）なので
+///   1 bitは10 µs、合計は約0.36 msである。START／repeated START／STOPの分を足しても
+///   1 msに満たない。
+/// - FreeRTOSのtickは10 msである。`sdkconfig.defaults`が`CONFIG_FREERTOS_HZ`を
+///   設定しておらず、ESP-IDF v5.5.3の`components/freertos/Kconfig`の既定値100が効く
+///   （build生成物の`sdkconfig`で`CONFIG_FREERTOS_HZ=100`を確認した）。
+///   `write_read`のtimeoutはtick単位であるため、10 msが分解能の下限である。
+/// - この値は10 tickであり、上の所要時間のおよそ250倍の余裕がある。**正常な読み出しが
+///   この値で打ち切られることはない。**
+/// - 上限側は、人がlogを読んで状況を判断できる長さに収めるために置く。sensorは2つ
+///   （`ACCEL-01`／`ENV-01`）あるため、両方が固着した場合の「待ち」はこの値の2回分で
+///   ある。**bring-upからmain loopまでの実際の遅れはそれより長い。**timeout検出後の
+///   bus clear待ちが1回ごとに加わるためであり、その分は`main.rs`の`run_i2c_bringup`の
+///   doc commentが持つ。**ここへ再掲しない。**いずれにせよ秒のorderには達しない。
+///
+/// 上限が何によって効くか（ESP-IDFのどの機構が`Err`を返すか）と、
+/// `esp_idf_svc::hal::i2c::config::Config`の`timeout`フィールドを設定しない理由は、
+/// `main.rs`の`run_i2c_bringup`のdoc commentが持つ。**ここへ再掲しない。**
+// `pi-protocol-mode`では`crate::accel`／`crate::env`をcompileしないため未到達になる。
+#[allow(dead_code)]
+pub const I2C_TRANSACTION_TIMEOUT_MS: u64 = 100;
+
 /// `SERVO-PWM`（SG90への制御信号）のGPIO番号。出所は
 /// [gpio-assignment.md](../../../docs/hardware/gpio-assignment.md)の`信号inventory`。
 /// `esp-idf-hal`はpinをtype levelで選ぶためpin選択には使えず、確認用途のみ

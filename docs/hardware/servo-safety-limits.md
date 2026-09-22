@@ -496,10 +496,14 @@ firmware（`firmware/esp32/src/servo.rs`、
   場合はPi側への影響も上記のとおり否定できない。これ以上先は資料から判断できない。
   このriskを限定しているのは、人間がいつでも外部5 V電源を手動遮断できる状態を
   維持することだけである。
-- **このfirmwareは`DISP-01`のbacklightを無条件に点灯させる。**`run_display_bringup`は
-  既定buildでも常時実行され、`main.rs`が`lcd.backlight_on()`を呼ぶ。`DISP-01`の
-  許容電流上限は`HW-TBD-024`が未解決のまま。**`DISP-01`を接続しないことが唯一の
-  防御である。**
+- **`DISP-01`の許容電流上限は`HW-TBD-024`が未解決のままである。**
+  [#451](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/451)より前、
+  `run_display_bringup`は既定buildでも常時実行され`lcd.backlight_on()`を呼んでいた。
+  **`#451`で同関数は`bringup-display-13` feature（既定off）付きbuildだけの経路になり、
+  この試験のbuild（`--features bench-servo-test-17`）はそのfeatureを付けないため、
+  firmwareがbacklightを点ける経路は無い。**それでも`HW-TBD-024`は解けていない。
+  **`DISP-01`を接続しないことを引き続き求める。**確認は下の`通電前の現物確認`(d)で行う
+  （backlight以外に残る理由もそちらが持つ。**ここへ再掲しない**）。
 
 **対象部品の識別（Digital／Analog）は行わない**（2026-09-22、ユーザー決定。
 「識別できた」のではない。経緯は[tbd-register.md](tbd-register.md)の`HW-TBD-026`が正本）。
@@ -541,10 +545,16 @@ firmware（`firmware/esp32/src/servo.rs`、
    いるか。(b) `PROT-OC-01`（過電流保護PTC）がこの経路に物理的に入っているか。
    (c) `RES-PULL-01`（GPIO27の外部pull-down、4.7 kΩ）が現物に実装されているか。
    (d) `DISP-01`（MSP2807）がESP32の`3V3` pinへ接続されていないことを確認する。
-   **このfirmwareは起動時に`run_display_bringup`を実行し、`DISP-01`のbacklightを
-   無条件に点灯させる**（既定buildでもfeatureに関わらず実行される。`HW-TBD-024`
-   ＝module側の許容電流上限が未解決のまま）。接続されていると、ESP32へのUSB
-   接続と同時にbacklightへ給電される。
+   `HW-TBD-024`（module側の許容電流上限）が未解決であり、接続されていると
+   ESP32へのUSB接続と同時に`DISP-01`のlogic側へ給電される。
+   **backlightについては、この試験のbuildにfirmware側の点灯経路が無い**
+   （[#451](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/451)。
+   `run_display_bringup`は`bringup-display-13` feature付きbuildだけが呼び、
+   手順`build`はそのfeatureを付けない）。**ただし(d)の確認はそれでも省かない。**
+   `HW-TBD-024`が未解決であること自体は変わらず、GPIO4がreset中Lowへ確定することも
+   ESP32側の信号レベルまでしか確認できていない
+   （[gpio-assignment.md](gpio-assignment.md)の`信号inventory`の`LCD-BL`行、
+   [experiment-log.md](experiment-log.md)の`EXP-011`。**ここへ再掲しない**）。
    **(a)(b)(c)(d)の結果は残余riskの該当項目を変えるが、実行可否は変えない**
    （上記「決定事項」参照）。
 4. **`電源準備`（人間）** サーボの電源をまだ入れない。ESP32側だけ電源を入れられる
@@ -560,11 +570,17 @@ firmware（`firmware/esp32/src/servo.rs`、
    （それでも書き込み前にresetする経路は理論上残るため、`停止基準`の追加基準を守る）。
 6. **`起動とarm delay`（人間）** ESP32を起動する（flash直後）。`espflash`のmonitorで
    `servo_bench_test_arm_delay_start`のlogを待ち、出たら`config::SERVO_BENCH_TEST_ARM_DELAY_MS`
-   （既定10秒）の間にサーボの外部5 V電源を入れる。**このlogが出るまでの時間に
-   定義された上限は無い**（`run_i2c_bringup`のI2C呼び出しが無期限timeoutを使うため。
-   `main::run_i2c_bringup`のdoc参照）。**明らかに出ない（他のbring-up logより
-   大幅に遅い、または出ないまま止まって見える）場合は、異常（I2C bus固着の疑い）
-   として扱い、servoの電源を入れずに報告する。**
+   （既定10秒）の間にサーボの外部5 V電源を入れる。**このlogが出るまでの時間に、
+   実測に裏づけられた上限はまだ無い。**[#451](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/451)
+   で`run_i2c_bringup`のI2C読み出しは無期限timeoutをやめ、有限のtimeoutになった
+   （1回あたりの上限は`firmware/esp32/src/config.rs`の`I2C_TRANSACTION_TIMEOUT_MS`、
+   上限がどう効くかは`main::run_i2c_bringup`のdoc。**どちらもここへ再掲しない**）。
+   **したがってI2C固着でこのlogが永久に出ないことは無い**が、`Err`が返るまでの時間を
+   実機で測ってはいないため、待つべき秒数を数値では示さない。**明らかに出ない（他の
+   bring-up logより大幅に遅い、または出ないまま止まって見える）場合は、異常として扱い、
+   servoの電源を入れずに報告する。**I2C読み出しが失敗していれば
+   `accel_device_id_read_failed`／`env_chip_id_read_failed`がlogに出るため、
+   **bus固着とそれ以外は、まずこの行の有無で切り分ける。**
    **`arm delay`を過ぎたら、動かす意図で電源を入れない。**`arm delay`終了後も
    `Sg90::stop`までの短い間（既定300 ms）はduty出力が残っており、「`arm delay`を
    過ぎたら絶対に動かない」とは言えない（`停止基準`の「動かなかった場合」はこの
@@ -674,3 +690,4 @@ firmware（`firmware/esp32/src/servo.rs`、
 | 2026-09-22 | 23 | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。`SERVO-01`（TowerPro SG90）初回動作の準備として、`firmware/esp32/src/servo.rs`（`Sg90::move_to_angle_once`、1回だけ指定角度へ動かす）を追加し、`Calibration手順`の2〜7を人間とAIの作業順序へ具体化した`初回動作の実行手順（人間とAIの作業順序）`節と、承認状態を集約する`承認の状態`節を新設した。**別文書を作らず既存へ統合した**（PMの指摘。文書を増やすこと自体が食い違いの原因になるため）。新節は`サーボ出力を有効化してよい条件`の内容を再掲せず、同節へlinkするだけにしてある。この1つのcommit内で複数回の自己レビューを経ており、この行はその最終状態をまとめて記録する（途中経過を個別のRevisionへ分けない）。`HW-TBD-010`が要求する実測をこの手順が兼ねることを明記し、動かなかった場合やpulse幅を変えた再試行には改めて承認が要ることを記載した。信号停止（`Sg90::stop`）がservoの駆動停止を保証しない旨（Digital／Analogで挙動が異なりうるが識別しないため不明）と、拘束が続いた場合の最悪の事態（樹脂ギアの変形・溶融、煙が出る可能性を否定できない）を明記した。firmwareに`bench-servo-test-17` featureを追加し、このfeatureを付けたbuildだけが`main()`から`crate::servo`を呼ぶようにした（既定のbuildは変わらず呼ばない）。servoの突入電流やnoiseでESP32がbrownout resetした場合に承認の無いまま動作が繰り返される経路が見つかったため（PMの指摘）、NVSへ実行済みflagを実際に動かす前にcommitする一発limiterを追加し、resetのたびの再実行を防いだ。`停止基準`へ「指令していないのに2回目に動いたら直ちに遮断する」を追加した。Digital／Analog識別せず進めるユーザー決定（2026-09-22、[tbd-register.md](tbd-register.md)の`HW-TBD-026`）も新節へ反映した。**動作制限表・有効化gate表・受け入れchecklistは変えていない。**冒頭の`確定しているproject規則`のうち「AIが生成したcommandやdebug commandでもhard limitを迂回できない」の行へ、この試験がその迂回に該当する旨の一文を追記した（規則自体は変えていない）。承認の現在の状態は[承認の状態](#承認の状態)を参照する（このRevision行では再掲しない） |
 | 2026-09-22 | 24 | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。Revision 23が記録した3点の不備を補う再確認を行い、結果を`承認の状態`節へ追記した。同節の項目3・4がその内容と現在の状態を持つ（ここへ再掲しない）。動作制限表・有効化gate表・受け入れchecklistは変えていない。 |
 | 2026-09-22 | 25 | [#454](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/454)。[Hardware Safety Policy §6](../governance/hardware-safety-policy.md#6-サーボ)の「電流制限を設定でき、十分な定格を持つ電源を使用する」という要求が、「故障電流を制限する手段を明記する」という要求へ書き換わったことに追随し、この書き換えで記述が偽になった箇所（`初回動作の実行手順`の残余risk一覧と、その手前の参照文）を最小限に直した。**`承認の状態`節（2026-09-22に何を明示して承認を得たかの記録）は変更していない。**故障電流を制限しうる手段（`PROT-OC-01`の有無）と、手段が無い場合に代わりに守るもの（人間による手動遮断）についての記述内容は変えていない。冒頭の`確定しているproject規則`は変えていない |
+| 2026-09-23 | 26 | [#451](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/451)。**firmware側の2つの変更に追随した。**3箇所。(1) 残余riskの`DISP-01` backlight項は「firmwareが無条件に点灯させる」と書いていたが、`run_display_bringup`が`bringup-display-13` feature（既定off）付きbuildだけの経路になり、この試験のbuild（`--features bench-servo-test-17`）には点灯経路が無い。**`HW-TBD-024`は解けていないため、`DISP-01`を接続しない要求は維持する。**(2) `通電前の現物確認`(d)も同じ理由で書き換え、**(d)の確認自体は省かないことを明記した**（`HW-TBD-024`未解決、`EXP-011`はESP32側の信号レベルまで）。(3) `起動とarm delay`は「このlogが出るまでの時間に定義された上限は無い（I2Cが無期限timeoutのため）」と書いていたが、`#451`でI2C読み出しは有限timeoutになった。**永久に出ないことは無い**旨と、**`Err`までの実機実測はまだ無いため秒数を示さない**旨、切り分けはlog行の有無で行う旨へ書き換えた。**承認の状態、安全値、手順の順序、停止基準は1つも変えていない。** |
