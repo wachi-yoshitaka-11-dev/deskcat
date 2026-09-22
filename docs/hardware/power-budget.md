@@ -334,7 +334,12 @@ firmwareの`main.rs`はWi-Fi／Bluetooth APIを一切呼び出しておらず、
 無い。2026-09-22に走査して確認した）。
 
 **条件(4)の根拠。**計算はESP32＋`ACCEL-01`＋`ENV-01`の合計であり、`DISP-01`を含まない。
-`DISP-01`が同じ`3V3` railに同時接続されている場合、この計算は成立しない。
+`DISP-01`が同じ`3V3` railに同時接続されている場合、この計算は成立しない。**加えて、`main()`は
+起動のたびに`run_display_bringup`を無条件に呼び、その中で`lcd.backlight_on()`を実行する**
+（`main.rs`。`DISP-01`が接続されているかどうかをfirmware側が判定する分岐は無い）。したがって
+`DISP-01`が接続されていると、この手順の通電（手順8）と同時に`DISP-01`のbacklightへ給電される。
+`DISP-01`の電流経路は`HW-TBD-024`が未解決のまま止めている当のものであり、条件(4)で未接続を
+確認する理由はこれである。
 
 **条件(5)の根拠。**`main.rs`の`run_i2c_bringup`のdoc commentが「実機で動かす前に要る」と挙げる
 現物確認2件を指す。**(a) `module電源pinの独立性`／`pin header対応`（[gpio-assignment.md](gpio-assignment.md)
