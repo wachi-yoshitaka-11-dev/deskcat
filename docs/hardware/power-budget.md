@@ -291,6 +291,8 @@ HW-TBD-024行が持つ事実であり、ここへ再掲しない。**この節�
    - 火花・変色・異臭
    - 下記10の(c)（手順6で決めた待機時間の上限に達しても`run_i2c_bringup`側の出力が
      何も出ない）に至った場合
+   - 下記10の(b)のうち、`ENV-01`分のlogが成功・失敗のどちらも出ないまま止まる場合
+     （`J3`の選択によらず異常である。理由は同(b)）
 
    通電中のテスターによる`VCC`–`GND`間抵抗の監視は、この手順では設定していない（末尾
    `手順9の根拠`参照）。
@@ -301,13 +303,22 @@ HW-TBD-024行が持つ事実であり、ここへ再掲しない。**この節�
     [sensor-datasheet-notes.md](sensor-datasheet-notes.md)のDevice ID行が出典であり、一致するかは
     判定せず、値をそのまま記録する）がlogに出る。
     (b) `ENV-01`のDevice ID読み出しの結果（成功時は生byte、期待値`0x60`。**冒頭で`J3`を
-    はんだ付けせずに始めることを選んだ場合、ここが「失敗（error）」または「手順6の待機時間内は
-    出力が無いまま止まる」のいずれになっても異常ではない**（予期された結果。`J3`をはんだ付け
-    してから始めた場合は、`ACCEL-01`と同様に成功を期待する）。
+    はんだ付けせずに始めることを選んだ場合、`env_chip_id_read_failed`（失敗）が出るのは
+    異常ではない**（予期された結果。`J3`をはんだ付けしてから始めた場合は、`ACCEL-01`と
+    同様に成功を期待する）。**ただし、`ENV-01`分のlogが成功・失敗のどちらも出ないまま
+    止まるのは、`J3`の選択によらず異常である。**
+    [#451](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/451)でI2C読み出しは
+    有限timeoutになり、応答が無くても短い有界の待ちのあとに必ず`Err`としてlogへ出る
+    （1回あたりの上限は`firmware/esp32/src/config.rs`の`I2C_TRANSACTION_TIMEOUT_MS`、
+    上限がどう効くかは`main.rs`の`run_i2c_bringup`のdoc。**どちらもここへ再掲しない**）。
+    **したがって「出力が無いまま止まる」を`J3`未はんだの予期された結果として扱わない。**
+    扱うと、firmwareが本当に停止している状態をsensorの予期された結果として見逃す。
+    **この状態に至った場合は(c)と同じく手順9の停止条件として扱い、給電を止める。**
     (c) 手順6の待機時間内は`run_i2c_bringup`側の出力が何も（`ACCEL-01`分すら）出ないまま止まる
     （`ACCEL-01`の読み出し自体が止まっている状態であり、`J3`の選択によらず異常）。
     (a)(b)(c)いずれも確認し、待機時間・観測内容を記録する。**(a)(b)が確認でき次第（`J3`未はんだ
-    選択時は(a)のみでよい）、(c)は手順9の停止条件として、給電を止める（USB cableを抜く）。**
+    選択時は(a)のみでよい）、(c)と、(b)で`ENV-01`分のlogが成功・失敗のどちらも出ないまま
+    止まる場合は、手順9の停止条件として、給電を止める（USB cableを抜く）。**
 11. [人間] 給電を止めた後（手順9の停止、手順10の(a)(b)確認後の停止のいずれでも）、
     `VCC`–`GND`間抵抗を再測定する（末尾`手順11の根拠`参照）。通電後に「低いまま動かない」への
     変化を認めた場合は、短絡が新たに生じた可能性として再開しない。
@@ -3671,4 +3682,4 @@ rippleはDMMで代替できない。
 | 2026-09-22 | 116 | [#13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)。**`段階B-2の測定`節の末尾へ2つの小節を追加した。**(1) `B-2bの電流制限値の上限が決められない理由（要約）`は当初LED個数・`R5`/`Q1`経路・`U1`供給能力を再掲していたが、PM（`#0PM`）の指摘（「正本へ再掲しない」規則。実際に本文書L162が2026-08-12の古い記述のまま残り`#443`で直したばかりという実例あり）を受け、それらの事実は[tbd-register.md](tbd-register.md)のHW-TBD-024行のみに残し、ここには「B-2bの電流制限値の上限が決められない」という帰結の一文とlinkだけを残す形へ縮小した。(2) `DISP-01`初回通電の手順（給電構成の確定待ち）は、通電前チェック（[gpio-assignment.md](gpio-assignment.md)の新設小節）が完了した後の初回通電手順を、人間とAIの役割を分けた1本の順序として定義した。**給電構成（電源型番・電流制限値・表示方法）は空欄のままにし、`実施前に満たす条件`が揃っていないことを明記した。**通電はしていない | PM（`#0PM`）の指摘、新規追加（LCD bring-up作業） |
 | 2026-09-22 | 117 | [#445](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/445)。`B-2b を採る決定`（Revision 91、2026-09-07）は書き換えず維持したまま、ADXL345（`ACCEL-01`）とBME280（`ENV-01`）の2点に限り、ESP32自身の`3V3` pinから給電することをユーザーが2026-09-22に承認した旨を同節へ追記した。`DISP-01`（MSP2807）はこの承認の対象外であり、MSP2807を含む構成・将来の合成給電（段階B-2）には引き続き2026-09-07の決定が掛かる。`HW-TBD-023`(a)（`3V3` pinの外部供給可能電流のboard level定格）は解決していない。あわせて、この2点限定の給電について`U2`（UMW LD1117-3.3）の余裕を計算した。ESP32-WROOM-32D boardの電流は既存の負荷表（Wi-Fi idle、文献値約80〜100mA）を用いた。Espressif公式ESP32 Series Datasheet v5.3のTable 4-2（chip単体のModem-sleep上限68mA）はboard-levelの内訳（flash、USB-UARTブリッジ、電源LED分）を含まないため、100mAが十分保守的とは断定していない。合計約101.5mA（ADXL345 0.14mA＋BME280 1.4mA＋ESP32 100mA＝101.54mA。BME280はBoschの湿度340µA/気圧714µA/温度350µA各max値の単純合算約1.4mAを使用。`負荷表`の「<1mA」より保守的な値である）に対し電流の余裕は`U2`の連続定格1A比で約9.85倍。損失の計算には`U2`自身の`Iq`（quiescent current、UMW LD1117 datasheetの規格値でmax 10mA）も保守側として加えた。損失約222.6mW、温度上昇は約19.6℃（ambient 40℃、`TJ`約59.6℃）、`Rθja`がdatasheetの88℃/W（[tbd-register.md](tbd-register.md)の`HW-TBD-023`が持つ既存記録の値。table／page番号までは同行も記録していない）・`U2`の`TSD` typ 150℃（`TJ(max)`ではなく熱shutdown温度）より約5.62倍（`TSD`とambientの差110℃÷温度上昇19.590℃）悪化すると`TSD`に届く。ESP32の項を仮に2倍（約200mA）へ置いても、合計約201.5mA・電流の余裕約4.96倍・損失約392.6mW（`Iq`込み）・`TSD`までの悪化許容倍率約3.18倍（基準ケースと同じ丸め方）であり、board-levelの内訳を確認していない不確かさは結論に影響しないことを確認した。Espressifが電源側に要求する`I_VDD` min 0.5Aも上回ることを確認した。測定値ではなく計算による見積りであり、Wi-Fi/BT不使用・ambient 40℃（仮定）・Vin=5V（保守側）の前提でのみ成立する。`tbd-register.md`のHW-TBD-023行にも同日付で対応する追記を行った | [#445](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/445)、[ESP32 Series Datasheet v5.3](https://documentation.espressif.com/esp32_datasheet_en.pdf) Table 4-2、[ESP32-WROOM-32D & ESP32-WROOM-32U Datasheet v2.8](https://documentation.espressif.com/esp32-wroom-32d_esp32-wroom-32u_datasheet_en.pdf) Table 14、[UMW LD1117 datasheet](https://www.umw-ic.com/static/pdf/a5e0c99cefdefaf03cfa7777b369e45b.pdf) |
 | 2026-09-22 | 118 | [#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)／[#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16)。**`段階B-2の測定`節へ、`ACCEL-01`／`ENV-01`単体bring-upの手順（ESP32`3V3` pin給電、`#445`承認範囲）の節を新設した。**`DISP-01`初回通電の手順（Revision 116、[#447](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/447)）と対になる、`ACCEL-01`／`ENV-01`向けの手順である。給電経路が異なる（`DISP-01`はB-2b＝外部電源、この2点は`#445`承認によりESP32自身の`3V3` pin）ため、`DISP-01`の手順を流用せず並べて置いた。**手順はB-2のgateを開けない**（MSP2807分の`HW-TBD-024`が未解決のため、段階B-2＝3点合算測定は引き続き実施できない）。通電はしていない。**fresh-context自己レビュー（1〜13巡目）で多数の指摘を受け、都度本文を修正した。**指摘の種類は、引用先の誤り（doc commentの所在、見出し名の空白、pin名、実験記録の極性ラベル）、欠落していた実施前提（Wi-Fi/BT不使用、`DISP-01`未接続、`CS`／`CSB`／`SDO`の配線、既存2項目の未実施状態、人間の明示的な go-ahead）、手順内の相互参照のずれと循環（停止条件と観測結果が同じ事象を指す形になっていた）、手順の順序そのものの欠陥（firmwareの書き込みがUSB接続＝通電を伴うにもかかわらず、給電停止準備・待機時間決定より前に置かれていた）、余裕計算の丸め誤りと前提の書き漏れ、`main()`が`display bringup`を先に無条件実行する事実の欠落、`信号inventory`との不整合、boldマーカーの欠落など多岐にわたる。**個々の指摘内容と巡ごとの件数はこの行では再掲しない**（本文が正であり、数値・手順番号をここに書き写すと本文の版が変わるたびに乖離するため。乖離自体を複数巡のfresh-context自己レビューが指摘した）。収束（新規指摘0件が2巡連続）には至っていない時点でこのRevisionを記録しており、**引き続き自己レビューを継続する** | [#445](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/445)、[gpio-assignment.md](gpio-assignment.md) Revision 36、[#447](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/447)、fresh-context自己レビュー（1〜13巡目） |
-| 2026-09-23 | 120 | [#451](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/451)。**firmwareの`run_display_bringup`が`bringup-display-13` feature（既定off）付きbuildだけの経路になったことに追随した。**3箇所。(1) `実施前に満たす条件`の条件(2)へ「**既定build**（`bringup-display-13` featureを付けない構成）で」という限定を足した。featureを付けた構成は`DISP-01`のbring-upを実行するため、条件(4)と両立しない。**この限定はこのPRが作った必要であり、以前は書きようが無かった。**(2) `条件(4)の根拠`は、条件の主たる根拠を「`main()`が無条件に`run_display_bringup`を呼ぶ」に置いていた。その記述が偽になったため、変更の事実と、**それでも条件(4)を外さない理由3点**（電流の余裕計算が`DISP-01`を含まないこと、`EXP-011`で確認したのはESP32側の信号レベルまでであること、この手順が`#445`承認の範囲に閉じていること）へ書き換えた。(3) `手順10の根拠`は、display側のlogが`run_i2c_bringup`より先に出ることを「異常ではない」と説明していた。既定buildではもう出ないため、その旨と、**`#451`でI2C読み出しが有限timeoutになったこと**（値と上限の効き方はfirmware側が正本。ここへ再掲しない）へ書き換えた。**実機で`Err`が返るまでの実測時間は取っていないため、手順6の待機時間の上限はこの未実測を前提に置いたままにする。****値・gate・手順そのものは1つも変えていない。** | [#451](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/451)、`firmware/esp32/src/main.rs`、`firmware/esp32/src/config.rs` |
+| 2026-09-23 | 120 | [#451](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/451)。**firmwareの`run_display_bringup`が`bringup-display-13` feature（既定off）付きbuildだけの経路になったことに追随した。**4箇所。(1) `実施前に満たす条件`の条件(2)へ「**既定build**（`bringup-display-13` featureを付けない構成）で」という限定を足した。featureを付けた構成は`DISP-01`のbring-upを実行するため、条件(4)と両立しない。**この限定はこのPRが作った必要であり、以前は書きようが無かった。**(2) `条件(4)の根拠`は、条件の主たる根拠を「`main()`が無条件に`run_display_bringup`を呼ぶ」に置いていた。その記述が偽になったため、変更の事実と、**それでも条件(4)を外さない理由3点**（電流の余裕計算が`DISP-01`を含まないこと、`EXP-011`で確認したのはESP32側の信号レベルまでであること、この手順が`#445`承認の範囲に閉じていること）へ書き換えた。(3) `手順10の根拠`は、display側のlogが`run_i2c_bringup`より先に出ることを「異常ではない」と説明していた。既定buildではもう出ないため、その旨と、**`#451`でI2C読み出しが有限timeoutになったこと**（値と上限の効き方はfirmware側が正本。ここへ再掲しない）へ書き換えた。**実機で`Err`が返るまでの実測時間は取っていないため、手順6の待機時間の上限はこの未実測を前提に置いたままにする。**(4) `手順10`の(b)は、`J3`未はんだを選んだ場合の予期された結果として「失敗（error）」と「出力が無いまま止まる」の2つを挙げていた。**有限timeoutになった以上、後者はもう予期された結果ではない。**後者を削り、`env_chip_id_read_failed`が出ることを予期された結果とし、**`ENV-01`分のlogがどちらも出ないまま止まるのは`J3`の選択によらず異常である**と明記し、**その状態に至った場合の扱いを(c)と同じ（手順9の停止条件）に揃え、手順9の停止条件の一覧へも行を足した**（手動review（CodeRabbit、`full review`）の指摘。同(c)が既に「`ACCEL-01`分すら出ない」場合を異常としており、(b)の旧記述はそれと両立しなくなっていた）。**値・gate・手順の順序・既存の停止条件は1つも変えていない。**(4)で手順9の停止条件が1件増えるが、**これは停止する側へ倒す変更であり、既存の停止条件を緩めたものではない。**増やす必要が生じたのは、有限timeoutによって「出力が無いまま止まる」が予期された結果でなくなり、異常として扱う先が要るためである。 | [#451](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/451)、`firmware/esp32/src/main.rs`、`firmware/esp32/src/config.rs`、手動review（CodeRabbit、`full review`、[PR #459](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/459)） |
