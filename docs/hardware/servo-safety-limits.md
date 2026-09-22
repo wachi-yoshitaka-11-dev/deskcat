@@ -474,6 +474,10 @@ firmware（`firmware/esp32/src/servo.rs`、
   場合はPi側への影響も上記のとおり否定できない。これ以上先は資料から判断できない。
   このriskを限定しているのは、人間がいつでも外部5 V電源を手動遮断できる状態を
   維持することだけである。
+- **このfirmwareは`DISP-01`のbacklightを無条件に点灯させる。**`run_display_bringup`は
+  既定buildでも常時実行され、`main.rs`が`lcd.backlight_on()`を呼ぶ。`DISP-01`の
+  許容電流上限は`HW-TBD-024`が未解決のまま。**`DISP-01`を接続しないことが唯一の
+  防御である。**
 
 **対象部品の識別（Digital／Analog）は行わない**（2026-09-22、ユーザー決定。
 「識別できた」のではない。経緯は[tbd-register.md](tbd-register.md)の`HW-TBD-026`が正本）。
@@ -509,12 +513,17 @@ firmware（`firmware/esp32/src/servo.rs`、
    5 V系（`PSU-SERVO-01`）からサーボの電源線、ESP32とサーボ電源側のGNDを接続する
    （電源線は接続するが、電源自体はまだ入れない）。接続後、これらが共通化されて
    いること、ESP32の電源pinからサーボへ給電していないことを目視で確認する。
-   **加えて次の3点を確認し、結果をAIへ伝える（`記録`でAIが
+   **加えて次の4点を確認し、結果をAIへ伝える（`記録`でAIが
    [experiment-log.md](experiment-log.md)へまとめて記録する）。**
    (a) この試験でRaspberry Pi（`PSU-PI-01`）が`PSU-SERVO-01`と同じM-12001に接続されて
    いるか。(b) `PROT-OC-01`（過電流保護PTC）がこの経路に物理的に入っているか。
    (c) `RES-PULL-01`（GPIO27の外部pull-down、4.7 kΩ）が現物に実装されているか。
-   **(a)(b)(c)の結果は残余riskの該当項目を変えるが、実行可否は変えない**
+   (d) `DISP-01`（MSP2807）がESP32の`3V3` pinへ接続されていないことを確認する。
+   **このfirmwareは起動時に`run_display_bringup`を実行し、`DISP-01`のbacklightを
+   無条件に点灯させる**（既定buildでもfeatureに関わらず実行される。`HW-TBD-024`
+   ＝module側の許容電流上限が未解決のまま）。接続されていると、ESP32へのUSB
+   接続と同時にbacklightへ給電される。
+   **(a)(b)(c)(d)の結果は残余riskの該当項目を変えるが、実行可否は変えない**
    （上記「決定事項」参照）。
 4. **`電源準備`（人間）** サーボの電源をまだ入れない。ESP32側だけ電源を入れられる
    状態にする（ESP32はPCのUSBから給電する。servoの外部5 V系とは電源を分離する）。
