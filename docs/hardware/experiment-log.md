@@ -1566,7 +1566,7 @@ Bで10 kΩの両端に`4.85`が掛かっている。**この電圧が`PROT-RP-01
 | 項目 | 内容 |
 |---|---|
 | 給電 | ESP32単体、PCのUSBから（`ACCEL-01`／`ENV-01`は`3V3` pin経由で同時通電）。`DISP-01`は未配線（条件(4)） |
-| firmware commit | `35bcc36d74b7347201c0aade20a45715300b0475`。`run_i2c_bringup`実装（`4486de5`）、`SERVO-01` driver追加（`059743b`）、UART0 mode切替（`28bc38b`）のいずれの祖先であることを`git merge-base --is-ancestor`で確認済み（Linux実機セッションの申告） |
+| firmware commit | `35bcc36d74b7347201c0aade20a45715300b0475`。`run_i2c_bringup`実装（`4486de5`）、`SERVO-01` driver追加（`059743b`）、UART0 mode切替（`28bc38b`）のいずれも`35bcc36`の祖先である（＝`35bcc36`がこれら3つの変更をすべて含む）ことを`git merge-base --is-ancestor`で確認済み（Linux実機セッションの申告） |
 | build | `cargo build --locked`（debug、条件(2)用）と`cargo build --locked --release`（flash用）。featureフラグ指定なし（`default = []`のまま、`pi-protocol-mode`は無効）。boot logの`App version=35bcc36-dirty`と一致（`dirty`はbuild時の一時的な`[workspace]` shimによるものとLinux実機セッションが申告） |
 | 配線 | `ACCEL-01`: `Vs`/`VDD`→`3V3`、`GND`→`GND`、`SDA`→GPIO25、`SCL`→GPIO26、`CS`→同module上の`VDD`、`SDO`→`GND`。`ENV-01`: `VDD`→`3V3`、`GND`→`GND`、`SDI`→GPIO25（共有）、`SCK`→GPIO26（共有）、`SDO`→`GND`、`CSB`は外部配線せず`J3`はんだジャンパ経由（下記`この記録が主張しないこと`参照） |
 | 待機時間の上限 | 3分（180秒）。`run_i2c_bringup`のI2C通信timeoutは`esp_idf_svc::hal::delay::BLOCK`（無期限）であり、この上限に技術的根拠は無い（firmware側が保証する値ではなく、実施前に人間が承諾した運用上の値） |
@@ -1582,7 +1582,7 @@ Bで10 kΩの両端に`4.85`が掛かっている。**この電圧が`PROT-RP-01
 
 **条件(5)(a)（`module電源pinの独立性`／`pin header対応`、[gpio-assignment.md](gpio-assignment.md)の別の受け入れchecklist項目）は満たしていない。**`ACCEL-01`/`ENV-01`の`VDD`/`Vs`、`SDA`、`SCL`がいずれもESP32側の対応pin（`3V3`、GPIO25、GPIO26）と同一ブレッドボード行に直接刺さっており、「moduleの電源pin ⇔ ESP32のpin」という2点間の抵抗測定が物理的に成立しない（同一node）。**この状態のまま、人間の現場判断で通電へ進んだ。**配線を分離して測定し直すか、この制約のまま受け入れるかは持ち越し。
 
-`bus容量Cb`（受け入れchecklistの別項目、実効pull-up抵抗の並列合成が有効範囲内であること）も未測定のまま。PM（`#0PM`）が「rise timeに400 pFに対し488 pFまで余裕があり、100 kHz・4.7 kΩは標準的構成である」ことを根拠に「通電を止めない」と判定し、人間がこの判定を受けて条件(6)（通電してよい）を明示した。
+`bus容量Cb`（受け入れchecklistの別項目、実効pull-up抵抗の並列合成が有効範囲内であること）は未測定のまま通電した。PM（`#0PM`）が「通電を止めない」と判定し、人間がこの判定を受けて条件(6)（通電してよい）を明示した。**判定の技術的根拠（数値・導出）はこの記録では特定できないため書かない。**判定があった事実だけを記録する。
 
 ### 通電と結果（手順8〜10）
 
@@ -1614,7 +1614,7 @@ USB接続によりfirmware書き込み＝初回通電。約3分間、異音・�
 
 ### 結論
 
-`ACCEL-01`（ADXL345）・`ENV-01`（BME280）とも、ESP32`3V3` pin給電下でDevice ID読み出しに応答があった（生byte: `0xe5`、`0x60`）。通電中・通電後とも異常の兆候は認められなかった。**条件(5)(a)は未達のまま通電に至っており、この点は正本（`power-budget.md`）の手順の想定（条件を満たしてから通電）と食い違う。**`Issue #15`／`#16`の受け入れ条件はいずれも未達（配線・初回通電という現物作業は完了したが、calibration・sampling等のソフトウェア側の検証は残っている）。この判定は記録者からPM（`#0PM`）へ報告し、PMは異論無しと確認した（ただしこの確認は、`EXP-014`との相互参照linkを本文へ追加する前の内容に対するものである）。
+`ACCEL-01`（ADXL345）・`ENV-01`（BME280）とも、ESP32`3V3` pin給電下でDevice ID読み出しに応答があった（生byte: `0xe5`、`0x60`）。通電中・通電後とも異常の兆候は認められなかった。**条件(5)(a)は未達のまま通電に至っており、この点は正本（`power-budget.md`）の手順の想定（条件を満たしてから通電）と食い違う。**`Issue #15`／`#16`の受け入れ条件はいずれも未達（配線・初回通電という現物作業は完了したが、calibration・sampling等のソフトウェア側の検証は残っている）。この判定は記録者からPM（`#0PM`）へ報告し、PMは異論無しと確認した。その後、`EXP-014`との相互参照linkを追加した版の本文をPMが読み、祖先関係の記述の反転（`firmware commit`行）と`bus容量Cb`の判定根拠の帰属（数値の出所を特定できないため削除した）の2点を指摘した。いずれもこの記録の現在の本文へ反映済みである。
 
 ## Revision履歴
 
