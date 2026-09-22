@@ -77,9 +77,24 @@ closeした場合の見積である**）の合計消費電流は、ADXL345とBME
 接続前に、USBと外部電源間のbackfeed経路をreviewする。
 ```
 
-この図はarchitecture案であり、最終配線図ではない。単一のACアダプターを入力源とし、
-複数のACアダプターを並列に用意する構成は採用しない（Piの電圧低下riskを避けるための
-rail分離は、adapter本体を分けるのではなくbreadboard上のrail分岐とservo直近のbulk capacitorで行う）。
+この図はarchitecture案であり、最終配線図ではない。
+
+**単一ACアダプター構成への限定は削除した（2026-09-22）。**この節はかつて
+「単一のACアダプターを入力源とし、複数のACアダプターを並列に用意する構成は採用しない
+（Piの電圧低下riskを避けるためのrail分離は、adapter本体を分けるのではなくbreadboard上の
+rail分岐とservo直近のbulk capacitorで行う）」と書いていた。**この制約は2026-08-05に
+ユーザーが決定したものである**（[hardware-bom.md](hardware-bom.md) Revision 5。根拠欄
+「ユーザーからの指摘」。当初AIが提案していた「ACアダプター2個を別々に用意する」構成を、
+ユーザーが誤りとして訂正させた経緯である）。文言自体はcommit `3c53afe`
+（2026-08-08、[PR #55](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/55)）で
+この文書へ入ったが、決定そのものの記録は`hardware-bom.md`側にある。
+**2026-09-22、ユーザーが同じ制約を外すと判断した**（「そんな制約は求めていない」
+「とうに外した」）。**自分が過去に決めた制約を、自分で撤回したものである。**
+**複数ACアダプター構成を採用するとは決めていない。**削除したのは「採用しない」という
+禁止だけであり、現在の`電源rail構成案`（単一入力源、breadboard上のrail分岐とservo直近の
+bulk capacitorでrail分離する構成）はこの削除で変わらない。単一入力源にしている理由が
+「規則で禁じられているから」ではなくなっただけであり、複数アダプター構成の要否は未検討の
+まま残る。
 
 ## 5 V ingress（物理的な引き込み経路）
 
@@ -3512,6 +3527,7 @@ rippleはDMMで代替できない。
 
 | 日付 | Revision | 変更 | 根拠 |
 |---|---|---|---|
+| 2026-09-22 | 119 | [#454](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/454)。`5 V ingress`直前の文にあった「単一のACアダプターを入力源とし、複数のACアダプターを並列に用意する構成は採用しない」という制約を削除した。**過去のRevision行は書き換えない。**この制約は2026-08-05にユーザーが決定したもの（[hardware-bom.md](hardware-bom.md) Revision 5）だが、2026-09-22にユーザーが自分の過去の決定を撤回した。削除した原文と経緯はこのRevision行と本文の注記に残す。現在の単一入力源構成（breadboard上のrail分岐とservo直近のbulk capacitorでrail分離する構成）自体は変えていない | ユーザー指示（2026-09-22） |
 | 2026-09-08 | 93 | [#367](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/367)。[PR #366](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/366)（`develop`→`main`昇格）の`full review`でCodeRabbitが出した指摘のうち、この文書に関わる3件を直した。**過去のRevision行は書き換えない。**(1) **`3.234 V`を「保証最小出力」と呼ぶのをやめた。**datasheetがこの値に付けている条件（`IOUT = 10 mA`／`VIN = 5 V`／`TJ = 25 ℃`）は同文書の上表に自ら書いてあり、無条件の下限ではない。条件・確定させる手段（`#13`での実測）・`DISP-01`のmodule仕様下端を下回るため機能を保証しないことを明記した。**下限を3.234 Vとする設計判断そのものは維持する**（`hardware-safety-policy.md`の「供給電圧の動作の下限」に当たり安全要件5項目に該当しない。同policyが求める「値・暫定であること・確定させる手段」の記録を満たす形にした）。**この誤りはRevision 39が記録した型と同じである**（条件付きの値を無条件の判定基準として使う）。(2) **`ACCEL-01`の注記が、同節冒頭の「IC単体の動作範囲を代入しない」に反して読める点を直した。**規則が代入を禁じる理由はregulatorとlevel shiftであり、`ACCEL-01`はregulator非搭載が2026-08-13の現物確認で確定している（`HW-TBD-004`）。残る受動部品の電圧降下は下側余裕約1.234 Vが覆う。**規則の例外であって適用の省略ではないこと、この根拠を持たないmoduleへ広げないことを明記した。判断は撤回しない。**(3) **`HW-TBD-028`(a)の状態語を`対象外`へ統一した**（`恒久的にBlocked`が5箇所あった）。あわせて、Revision 88を反映していなかった古い記述を3箇所直した（`3.3 V railは確定しない`、`3.3 V rail側は閾値そのものが未確定`、`許容電圧範囲の下限が決まらないと不等式を評価できない`）。3箇所目は指摘の対象外だが、同じ型であり残すと不整合が戻るため直した | [PR #366](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/366)のCodeRabbit指摘、および引用先を開いたPMの検証 |
 | 2026-07-27 | 0 | 初期architectureと測定計画を作成。部品値は引き続きTBD | — |
 | 2026-08-05 | 1 | 単一入力源（秋月 M-12001、5V3A）＋breadboard上2rail分岐の構成に確定。負荷表にESP-WROOM-32D／Pi Zero W／ADXL345／BME280／SG90の文献値（実測前の参考値）を記載。Servo bulk capacitor候補（470μF50V×2〜3個）を記載。DISP-01(MSP2807)は未購入のため電流値Blockedのまま | `hardware-bom.md`のRevision履歴4〜6、ESP32／Raspberry Pi公式資料、各部品datasheet |
