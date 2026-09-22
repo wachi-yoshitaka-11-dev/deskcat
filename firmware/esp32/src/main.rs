@@ -575,9 +575,16 @@ fn run_display_bringup<SPI: SpiAnyPins + 'static>(
 /// 独立に確認していない**）。
 /// 裏面はんだジャンパ2箇所は開放だが何を選ぶ設定かboard資料が無く不明
 /// （[`docs/hardware/sensor-datasheet-notes.md`](../../../docs/hardware/sensor-datasheet-notes.md)
-/// 182行目「実装されているinterface（jumper設定）| TBD」）。BME280側は`J3`のはんだ付けが
-/// 要る（`docs/hardware/gpio-assignment.md`の`信号inventory`の`ENV-SDA`行）。**したがってこの関数の読み出しが
-/// 失敗（`Err`）しても、driverやbus配線ではなく、これらの未配線が原因でありうる。**
+/// 213行目「実装されているinterface（jumper設定）| TBD」）。BME280側の`J3`（`CSB`→`VDD`）は
+/// **はんだ付けされた**（実施日・状態・根拠の水準は
+/// [`docs/hardware/sensor-datasheet-notes.md`](../../../docs/hardware/sensor-datasheet-notes.md)の
+/// `jumper（AE-BME280）`節が正であり、ここへ再掲しない。実施の記録は同dir の
+/// `experiment-log.md`の`EXP-014`）。**ただしこの記述を書いたAIセッションは閉を確認しておらず、
+/// 測定値も無い。**
+/// **したがってこの関数の読み出しが失敗（`Err`）しても、原因をdriverやbus配線に限らない。**
+/// 上に挙げた`CS`の配線要求が満たされていない場合がありうる。`J3`についても、はんだ付け済みという記述は
+/// ユーザーの申告であって測定で確かめられておらず、**付いていない場合と、付いていても
+/// 品質に問題がある場合の両方が残る。**下記のbus配線側の未完了も併せて見る。
 ///
 /// **bus自体の配線も、まだ完了していない。**`ACCEL-SDA`／`ACCEL-SCL`の外部pull-upは
 /// breadboardへ実装済みだが（`docs/hardware/gpio-assignment.md`の`競合check`節の
