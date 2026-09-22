@@ -15,17 +15,15 @@
 //!   [#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16)）。
 //!   **一致判定はここでは行わない。**生byteをlogへ残すだけで、識別の断定は
 //!   log を読む人間の責務とする（[`run_i2c_bringup`]参照）。
-//! - **servoも、それ以外の未検証GPIOもdriveしない**（`SERVO-PWM`・`ADC-*`・`TOUCH-*`）
+//! - `SERVO-PWM`・`ADC-*`・`TOUCH-*`は既定のbuildではdriveしない。[`crate::servo`]は
+//!   cross-compile確認用に加えたのみ。`bench-servo-test-17` feature付きbuildだけが
+//!   [`run_servo_bench_test`]経由で呼ぶ（[Issue #17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。
+//!   詳細は[`crate::servo`]と[`run_servo_bench_test`]のdoc参照）。
 //!
-//! **`Peripherals::take()` を呼ぶのはLCD関連の6+1本（`crate::display`のmodule doc参照）と、
-//! I2C関連の2本（`ACCEL-SDA`／`ACCEL-SCL`、`ENV-01`と共有。`crate::accel`・`crate::env`の
-//! module doc参照）だけである。**`docs/hardware/gpio-assignment.md`の`信号inventory`の
-//! うち、`SERVO-PWM`・`ADC-*`・`TOUCH-*`はこの版でも一切触れない
-//! （同文書の`Blocked`状態はservo出力gateだけが理由であり、I2Cとは別のgateである。
-//! [#13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)本文が
-//! `HW-TBD-023`のcloseを待たずに着手してよいとした根拠は、この範囲（LCDのみ）を前提にする。
-//! **I2Cの追加はservo gateの解除を主張しない。**servo gateが対象とする
-//! `SERVO-PWM`にはこの版でも一切触れておらず、servo側の判定に影響しない）。
+//! 既定buildで`Peripherals::take()`が束縛するのはLCD関連6+1本と、I2C関連2本
+//! （`crate::display`・`crate::accel`・`crate::env`のmodule doc参照）だけである。
+//! `bench-servo-test-17` feature付きbuildだけは例外で`SERVO-PWM`（GPIO27）と
+//! `peripherals.ledc.timer0`／`channel0`も束縛する。
 //!
 //! **I2Cはこの版でも実機通電していない。**この版の検証は`cargo build`でのcross-compile
 //! 確認までであり、実機へflashして確認するのは別工程である（[Hardware Safety
@@ -59,6 +57,7 @@ mod display;
 mod env;
 mod health;
 mod protocol;
+mod servo;
 
 use std::time::Instant;
 
@@ -221,11 +220,15 @@ fn main() {
     // （`next_heartbeat`／`next_snapshot`）は従来どおりbring-upの後で初期化する。
     let mut health = Health::new(reset_reason);
 
-    // **`Peripherals::take()`はLCD配線とI2Cの分だけ。**servoやADC・touchは触らない
-    // （module doc参照）。1度しか成功しないため`expect`で即座に気付く。
+    // 束縛範囲はmodule doc参照。1度しか成功しないため`expect`で即座に気付く。
     let peripherals = Peripherals::take().expect("Peripherals::take must succeed exactly once");
+    #[cfg(not(feature = "bench-servo-test-17"))]
     log::info!(
         "peripherals=display_and_i2c servo=not_driven i2c=id_read_attempt adc=not_driven touch=not_driven"
+    );
+    #[cfg(feature = "bench-servo-test-17")]
+    log::info!(
+        "peripherals=display_and_i2c_and_servo_bench_test servo=bench_test_pending i2c=id_read_attempt adc=not_driven touch=not_driven"
     );
     log::info!(
         "i2c_addresses accel=0x{ACCEL_I2C_ADDRESS:02x} env=0x{ENV_I2C_ADDRESS:02x} baudrate_hz={I2C_BAUDRATE_HZ}"
@@ -248,6 +251,14 @@ fn main() {
         peripherals.pins.gpio25,
         peripherals.pins.gpio26,
         &mut health,
+    );
+
+    // featureが無ければこのblockはbuildへ含まれない（`run_servo_bench_test`のdoc参照）。
+    #[cfg(feature = "bench-servo-test-17")]
+    run_servo_bench_test(
+        peripherals.ledc.timer0,
+        peripherals.ledc.channel0,
+        peripherals.pins.gpio27,
     );
 
     // 周期は `config` が持つ。**ここへ数値を直接書かない。**暫定値である根拠は
@@ -550,6 +561,110 @@ fn run_i2c_bringup(
         Err(err) => log::error!("env_chip_id_read_failed error={err}"),
     }
     service_bringup_step(health, "env_chip_id");
+}
+
+/// `SERVO-01`（SG90）の単発bench試験（[Issue #17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)）。
+/// `bench-servo-test-17` feature付きbuildだけがこの関数を呼ぶ。承認の状態は
+/// [servo-safety-limits.md](../../../docs/hardware/servo-safety-limits.md)の
+/// `承認の状態`節が正本（ここへ再掲しない）。
+///
+/// # NVSによる単発latch
+///
+/// この関数はESP32起動のたびに呼ばれ、手動triggerは無い。brownout resetでの
+/// 意図しない再実行を防ぐため、**実際にPWMで動かす前に**NVSへ実行済みflagをcommitする
+/// （`EspNvs::set_u8`。`unsafe`は増やさない）。commit済みなら次回起動時にskipする。
+/// flagのcommit自体に失敗した場合はservoを動かさずに抜ける（誤判定を避けるため
+/// 動かさない側へ倒す）。再武装（NVS消去して再実行）には改めて承認が要る
+/// （[servo-safety-limits.md](../../../docs/hardware/servo-safety-limits.md)の
+/// `再武装`step参照）。
+///
+/// `config::SERVO_BENCH_TEST_ARM_DELAY_MS`の間、heartbeatは出ない。人間は
+/// `servo_bench_test_arm_delay_start`等のlogで状況を判断する
+/// （検討経緯・前提の検証状況はPR本文参照）。
+///
+/// 中央（`config::SERVO_ANGLE_CONVENTION_NEUTRAL_DEG`）から
+/// `config::SERVO_FIRST_MOTION_MAX_DEVIATION_DEG`だけ偏った角度へ1回動かし、
+/// `config::SERVO_BENCH_TEST_EXPOSURE_MS`を挟んでdutyを0へ戻す。
+#[cfg(feature = "bench-servo-test-17")]
+fn run_servo_bench_test(
+    timer0: esp_idf_svc::hal::ledc::TIMER0<'static>,
+    channel0: esp_idf_svc::hal::ledc::CHANNEL0<'static>,
+    pin: impl OutputPin + 'static,
+) {
+    use crate::servo::Sg90;
+    use esp_idf_svc::nvs::{EspDefaultNvsPartition, EspNvs};
+
+    const NVS_NAMESPACE: &str = "bench17";
+    const NVS_KEY_RAN: &str = "ran";
+
+    let nvs_partition = match EspDefaultNvsPartition::take() {
+        Ok(partition) => partition,
+        Err(err) => {
+            log::error!("servo_bench_test_nvs_partition_failed error={err}");
+            return;
+        }
+    };
+    let nvs = match EspNvs::new(nvs_partition, NVS_NAMESPACE, true) {
+        Ok(nvs) => nvs,
+        Err(err) => {
+            log::error!("servo_bench_test_nvs_open_failed error={err}");
+            return;
+        }
+    };
+
+    match nvs.get_u8(NVS_KEY_RAN) {
+        Ok(Some(1)) => {
+            log::warn!(
+                "servo_bench_test_skipped_already_ran reason=nvs_latch_set. \
+                 このESP32は既に本試験を1回実行済みである（reset後の再実行を防ぐ）。\
+                 改めて承認を得てNVSを消去するまで再実行しない"
+            );
+            return;
+        }
+        Ok(_) => {}
+        Err(err) => {
+            log::error!("servo_bench_test_nvs_get_failed error={err}");
+            return;
+        }
+    }
+
+    // **実際に動かす前にlatchをcommitする。**動作中・動作直後のbrownout resetでも
+    // 次回起動でこのflagが読め、再実行しない（module doc「NVSによる単発latch」参照）。
+    if let Err(err) = nvs.set_u8(NVS_KEY_RAN, 1) {
+        log::error!("servo_bench_test_nvs_set_failed error={err}");
+        return;
+    }
+    log::info!("servo_bench_test_nvs_latch_set");
+
+    log::info!(
+        "servo_bench_test_arm_delay_start ms={}",
+        config::SERVO_BENCH_TEST_ARM_DELAY_MS
+    );
+    FreeRtos::delay_ms(config::SERVO_BENCH_TEST_ARM_DELAY_MS);
+    log::info!("servo_bench_test_arm_delay_done");
+
+    let mut servo = match Sg90::new(timer0, channel0, pin) {
+        Ok(servo) => servo,
+        Err(err) => {
+            log::error!("servo_bench_test_new_failed error={err}");
+            return;
+        }
+    };
+
+    let target_deg =
+        config::SERVO_ANGLE_CONVENTION_NEUTRAL_DEG + config::SERVO_FIRST_MOTION_MAX_DEVIATION_DEG;
+    match servo.move_to_angle_once(target_deg) {
+        Ok(()) => log::info!("servo_bench_test_move target_deg={target_deg}"),
+        Err(err) => log::error!("servo_bench_test_move_failed error={err}"),
+    }
+
+    // 露出時間の技術的な最小化。「この秒数まで安全」の主張ではない（定数doc参照）。
+    FreeRtos::delay_ms(config::SERVO_BENCH_TEST_EXPOSURE_MS);
+
+    match servo.stop() {
+        Ok(()) => log::info!("servo_bench_test_stop"),
+        Err(err) => log::error!("servo_bench_test_stop_failed error={err}"),
+    }
 }
 
 /// 単色fillを既知のRGB565値で順に実行し、所要時間を計測してlogへ出す。
