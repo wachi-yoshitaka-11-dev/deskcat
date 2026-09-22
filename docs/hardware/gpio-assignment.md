@@ -568,17 +568,21 @@ pin header対応が確認できれば「配線ミスによる意図しない接�
 
 ### 電源pinの短絡・誤配線の確認（非通電）
 
-**上記2項目は信号pin（GPIOへ繋がるpin）の導通を扱う。**この項目は`VCC`／`GND`という
-**電源経路そのもの**の短絡・誤配線を扱い、対象が異なるため分ける。
+**上記2項目とは目的が異なるため分ける。**「module電源pinの独立性」は`VCC`が
+ESP32の`3V3`と同一netであること（2 kΩ未満）を確認するが、これは**独立電源の不在**を
+示すためであり、`VCC`と`GND`の間の**短絡**（数Ω以下）を検出するものではない
+（2 kΩ未満は`ACCEL-SDA`等のpull-up経由の経路も含む広い閾値であり、短絡検出には粗すぎる）。
+「pin header対応」も信号pin（GPIOへ繋がるpin）の対応を扱い、電源pinの逆極性や
+給電経路の重複は対象にしていない。この項目は
 [#13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)（LCD bring-up）が
 `DISP-01`の初回通電に先立って必要とする、非通電で今すぐ実施できる確認である。
 
 | # | 項目 | 手順 | 判定基準 |
 |---|---|---|---|
 | 1 | `VCC`–`GND`間の短絡検出 | 電源off状態（ESP32・moduleとも無給電）で、moduleの`VCC` pinと`GND` pin間の抵抗をテスターで測る | **短絡（数Ω以下）でないこと。**上記2項目が使う2 kΩ閾値（信号線の意図しない導通の検出）とは目的が異なり、**電源経路そのものの短絡故障を検出する**ための項目である |
-| 2 | 一覧との目視照合 | 実際の配線（breadboard／jumper）を、[sensor-datasheet-notes.md](sensor-datasheet-notes.md)の`pin定義（LCDWiki公式User Manual原文、9pin）`と本文書の`信号inventory`（`LCD-*`各行）へ1本ずつ照らす | `VCC`／`GND`／`LCD-CS`／`LCD-RST`／`LCD-DC`／`LCD-MOSI`／`LCD-SCLK`／`LCD-BL`／`LCD-MISO`の9本すべてが表と一致すること。touch用5本（`T_CLK`等）は未配線であること（[#14](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/14)の範囲であり、この段階では接続しない） |
+| 2 | 一覧との目視照合 | 実際の配線（breadboard／jumper）を、[sensor-datasheet-notes.md](sensor-datasheet-notes.md)の`pin定義（LCDWiki公式User Manual原文、9pin。touch用5pinを除く）`と本文書の`信号inventory`（`LCD-*`各行）へ1本ずつ照らす | `VCC`／`GND`／`LCD-CS`／`LCD-RST`／`LCD-DC`／`LCD-MOSI`／`LCD-SCLK`／`LCD-BL`／`LCD-MISO`の9本すべてが表と一致すること。touch用5本（`T_CLK`等）は未配線であること（[#14](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/14)の範囲であり、この段階では接続しない） |
 | 3 | 逆極性・電圧違いpinの確認 | `VCC`が3.3 V系統以外（5V rail等）へ繋がっていないこと、`GND`がGND以外へ繋がっていないこと、信号pin（`CS`／`RESET`／`DC/RS`等）へ電源ラインが誤配線されていないことを、上記1・2の結果と照らして確認する | すべて一致すること。1本でもずれがあれば通電しない |
-| 4 | 給電経路の重複確認 | `VCC`が単一の給電源（採用済みの経路はB-2b＝外部の3.3 V電源であり、`3V3` pinは使わない。[power-budget.md](power-budget.md)の`B-2bを採る決定とMSP2807の電流制限（2026-09-07）`節）だけから受電する構成になっており、複数の電源（USBの5V、`3V3` pin、外部3.3V電源の複数台）が同時にmoduleへ到達しないことを確認する | 単一経路であること |
+| 4 | 給電経路の重複確認 | `VCC`が単一の給電源（採用済みの経路はB-2b＝外部の3.3 V電源であり、`3V3` pinは使わない。[power-budget.md](power-budget.md)の`B-2b を採る決定と MSP2807 の電流制限（2026-09-07）`節）だけから受電する構成になっており、複数の電源（USBの5V、`3V3` pin、外部3.3V電源の複数台）が同時にmoduleへ到達しないことを確認する | 単一経路であること |
 
 **実施者はいずれも人間である。**AIはcommandとchecklistを準備するだけであり、物理的な
 結果の確認は人間が行う（[Hardware Safety Policy](../governance/hardware-safety-policy.md)
