@@ -46,7 +46,7 @@
 //!   生byteを返すだけで、ADXL345であると断定しない）。
 //!
 //! `main()`は`crate::run_i2c_bringup`からこのdriverを呼び、生byteをlogへ出す
-//! （一致判定はしない。`main.rs`のmodule doc参照）。**実機通電はまだ行っていない。**bus共有pull-up(`ACCEL-SDA`/`ACCEL-SCL`の外部4.7 kΩ)はbreadboardへ実装済みだが(`docs/hardware/gpio-assignment.md`710行目、2026-09-07)、sensor module自体の接続(address/mode選択の配線)はまだ行っていない。
+//! （一致判定はしない。`main.rs`のmodule doc参照）。**実機通電はまだ行っていない。**bus共有pull-up(`ACCEL-SDA`/`ACCEL-SCL`の外部4.7 kΩ)はbreadboardへ実装済みだが(`docs/hardware/gpio-assignment.md`の`競合check`節の受け入れchecklist「すべての外部pull-upが3.3Vへ接続され」の項目、2026-09-07)、sensor module自体の接続(address/mode選択の配線)はまだ行っていない。
 //! この呼び出しはcross-compileの確認までであり、実機での動作確認は別工程である
 //! （[Hardware Safety Policy](../../../docs/governance/hardware-safety-policy.md)
 //! 「人間の監視が必要な操作」）。

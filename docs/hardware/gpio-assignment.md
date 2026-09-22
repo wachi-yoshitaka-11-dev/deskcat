@@ -554,8 +554,13 @@ regulatorが作るrailであり、ESP32自体が無給電ならこのrailも無�
 「moduleが独立電源でESP32 pinを駆動する経路自体が存在しない」ことが示され、
 pin header対応が確認できれば「配線ミスによる意図しない接続」も排除される。
 **この項目が要求するのはこの2点であり、直結（1:1）の同一性の証明ではない。**
-**この2点は、`ACCEL-01`についてはすでに`HW-TBD-004`で個別に着手されている**
-（`Vs`／`VDD`間の導通は2026-09-05に確認済み）。`DISP-01`／`ENV-01`は未実施である。
+**この表が求める測定（各moduleの電源pin ⇔ ESP32の`3V3` pin）は、`ACCEL-01`／`ENV-01`について
+未実施である。**`ACCEL-01`について`HW-TBD-004`が記録する2026-09-05の`Vs`／`VDD`間導通確認は、
+header内部の別pin同士が同一netであることを見た**別の測定**であり、この表が求める「ESP32の
+`3V3` pinとの導通」の確認ではない（2026-09-22訂正。旧記載はこの2つの測定を同一視していた）。
+**`DISP-01`については、この行と採用済みの経路（B-2b＝外部の3.3 V電源、`3V3` pinは使わない）の
+関係をここでは判定しない**（`DISP-01`はこの節の対象外であり、`#15`／`#16`の範囲を超える）。
+`DISP-01`固有の非通電確認は下の`電源pinの短絡・誤配線の確認（非通電）`表の項目2〜4が別途扱う。
 
 **この項目が見ていないもの。**module側のpull-upがESP32の起動時levelへ与える影響は、
 この項目の対象外である。`ACCEL-01`は`01C`（10 kΩ）を4個搭載しており（`信号inventory`の
@@ -573,26 +578,48 @@ ESP32の`3V3`と同一netであること（2 kΩ未満）を確認するが、�
 示すためであり、`VCC`と`GND`の間の**短絡**（数Ω以下）を検出するものではない
 （2 kΩ未満は`ACCEL-SDA`等のpull-up経由の経路も含む広い閾値であり、短絡検出には粗すぎる）。
 「pin header対応」も信号pin（GPIOへ繋がるpin）の対応を扱い、電源pinの逆極性や
-給電経路の重複は対象にしていない。この項目は
+給電経路の重複は対象にしていない。この項目は当初
 [#13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)（LCD bring-up）が
-`DISP-01`の初回通電に先立って必要とする、非通電で今すぐ実施できる確認である。
+`DISP-01`の初回通電に先立って必要とし、非通電で今すぐ実施できる確認として追加した
+（Revision 33）。**その後、`ACCEL-01`／`ENV-01`向けの項目を追加し（Revision 36）、
+この節は`DISP-01`専用ではなく、周辺module3点に共通の項目（1）と、moduleごとに対象が
+分かれる項目（2〜7）を扱う節になっている。**各行の対象は下表の`対象`列が示す。
 
 **項目1（`VCC`–`GND`間短絡検出）は、固定した抵抗値のしきい値では判定しない。**
-`EXP-013`試験0（[experiment-log.md](experiment-log.md)）は、放電した状態の別対象へ
-プローブを当てた瞬間は0 Ω付近を示し、コンデンサの充電が進むにつれ値が上昇して
-安定する現象を記録しており、**その瞬時値を導通の判定に使うと正常品を短絡と
-誤判定しかけた**という教訓を残している。`DISP-01`（MSP2807）でも同じ挙動が
-起きることは確認されていないが、moduleにdecoupling capacitorが載っている
-可能性がある以上（[sensor-datasheet-notes.md](sensor-datasheet-notes.md)の
-`Local decoupling`節、MSP2807行は`TBD`）、**起きうるものとして扱う。**
-「何Ω以下なら短絡」という値は作らず、読みの挙動で判定する。
+`EXP-013`試験0（[experiment-log.md](experiment-log.md)）は、端子台の別対象への測定中に、
+放電した状態でプローブを当てた瞬間は0 Ω付近を示し、充電が進むにつれ値が上昇して安定する
+現象を観測したと記録している（`M-12001`の出力平滑コンデンサによるものと推定したが、
+**原因は確定していない。容量も時定数も測っていない**）。**同じ記録は、この現象を知らずに
+瞬時値だけを読み、赤と黒の間が2 Ωで短絡していると誤って判定しかけたことも明記している。**
+この記録自体は`VCC`–`GND`間の短絡検出を目的とした測定ではなく、対象も本項目のmoduleでは
+ないが、**瞬時値だけを導通の判定に使うと正常な経路を短絡と誤判定しかけた実例として参照する。**
+この項目は周辺module3点すべての`VCC`／`GND`pinに共通で適用する。**`DISP-01`（MSP2807）は
+decoupling capacitorの搭載有無自体が未確認であるが**（[sensor-datasheet-notes.md](sensor-datasheet-notes.md)の
+`Local decoupling`節、MSP2807行は`TBD`）、Revision 35のとおり**起きうるものとして扱う。**
+**`ACCEL-01`（ADXL345）は現物確認で`C1`が2個実装されていることを確認済みである**
+（容量表記は無く値は不明。[tbd-register.md](tbd-register.md)の`HW-TBD-004`(6)）。
+**`ENV-01`（BME280）はAE-BME280説明書の部品表により、`VDD`に0.1 µFが実装済みと
+確認済みである**（[sensor-datasheet-notes.md](sensor-datasheet-notes.md)の
+`Local decoupling`節、Revision 6の記録）。**したがって`ACCEL-01`／`ENV-01`は
+`DISP-01`より強い根拠（搭載の有無そのものが確認済み）で、同じ扱い（起きうるものとして扱う）が
+成り立つ。**`EXP-013`が観測した充電に伴う上昇という挙動そのものは、値不明の
+`ACCEL-01`側`C1`や`ENV-01`の0.1 µFで実際に観測されたわけではなく、**確認済みなのは
+decoupling capacitorが載っていることであって、充電で読みが上昇するという挙動が
+これらのmoduleで観測されたことではない。****それでも、項目1の判定基準（読みが上昇して
+安定する場合、または最初から高い値で安定している場合は正常、低いまま動かない場合は短絡）は
+これらのmoduleにもそのまま適用する。**固定した抵抗値のしきい値を作らない、という点も含め、
+`DISP-01`と同じ扱いである。いずれのmoduleについても「何Ω以下なら短絡」という値は作らず、
+読みの挙動で判定する。
 
-| # | 項目 | 手順 | 判定基準 |
-|---|---|---|---|
-| 1 | `VCC`–`GND`間の短絡検出 | 電源off状態（ESP32・moduleとも無給電）で、moduleの`VCC` pinと`GND` pin間の抵抗をテスターで測り、**プローブを当てた瞬間だけでなく、数秒間読みの変化を観察する** | **読みが低い値から始まり時間とともに上昇していく場合は正常（decoupling capacitorの充電と解釈する）。****低いまま動かない場合を短絡とする。**どちらを観察したかを記録する。上記2項目が使う2 kΩ閾値（`VCC`が独立電源でないことの確認、信号線の意図しない導通の検出）とは目的が異なり、**電源経路そのものの短絡故障を検出する**ための項目である |
-| 2 | 一覧との目視照合 | 実際の配線（breadboard／jumper）を、[sensor-datasheet-notes.md](sensor-datasheet-notes.md)の`pin定義（LCDWiki公式User Manual原文、9pin。touch用5pinを除く）`と本文書の`信号inventory`（`LCD-*`各行）へ1本ずつ照らす | `VCC`／`GND`／`LCD-CS`／`LCD-RST`／`LCD-DC`／`LCD-MOSI`／`LCD-SCLK`／`LCD-BL`／`LCD-MISO`の9本すべてが表と一致すること。touch用5本（`T_CLK`等）は未配線であること（[#14](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/14)の範囲であり、この段階では接続しない） |
-| 3 | 逆極性・電圧違いpinの確認 | `VCC`が3.3 V系統以外（5V rail等）へ繋がっていないこと、`GND`がGND以外へ繋がっていないこと、信号pin（`CS`／`RESET`／`DC/RS`等）へ電源ラインが誤配線されていないことを、上記1・2の結果と照らして確認する | すべて一致すること。1本でもずれがあれば通電しない |
-| 4 | 給電経路の重複確認（`DISP-01`限定） | `DISP-01`の`VCC`が単一の給電源（採用済みの経路はB-2b＝外部の3.3 V電源であり、`3V3` pinは使わない。[power-budget.md](power-budget.md)の`B-2b を採る決定と MSP2807 の電流制限（2026-09-07）`節）だけから受電する構成になっており、複数の電源（USBの5V、`3V3` pin、外部3.3V電源の複数台）が同時に`DISP-01`へ到達しないことを確認する。**この項目は`DISP-01`固有であり、`ACCEL-01`／`ENV-01`の給電経路には適用しない。**両moduleが`3V3` pinから給電する構成を採るかは[#445](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/445)で扱っており、この文書はその決定を先取りしない | 単一経路であること |
+| # | 対象 | 項目 | 手順 | 判定基準 |
+|---|---|---|---|---|
+| 1 | 共通（`DISP-01`／`ACCEL-01`／`ENV-01`） | `VCC`–`GND`間の短絡検出 | 電源off状態（ESP32・moduleとも無給電）で、moduleの`VCC`（`ACCEL-01`は`Vs`／`VDD`、`ENV-01`は`VDD`）pinと`GND` pin間の抵抗をテスターで測り、**プローブを当てた瞬間だけでなく、数秒間読みの変化を観察する** | **低いまま動かない場合を短絡とする。**それ以外（読みが低い値から始まり時間とともに上昇していく場合、または**最初から高い値で安定している場合**（decoupling capacitorの容量が小さく、充電がテスターの反応時間より速く完了した場合に起こりうる。特に`ENV-01`の0.1 µFのような小容量で典型的）を指す）はいずれも正常とする。**判定に効くのは「低いまま停滞するか否か」だけであり、上昇が観測できたかどうかそのものではない。**どの挙動を観察したかを記録する。上記2項目が使う2 kΩ閾値（`VCC`が独立電源でないことの確認、信号線の意図しない導通の検出）とは目的が異なり、**電源経路そのものの短絡故障を検出する**ための項目である |
+| 2 | `DISP-01`限定 | 一覧との目視照合 | 実際の配線（breadboard／jumper）を、[sensor-datasheet-notes.md](sensor-datasheet-notes.md)の`pin定義（LCDWiki公式User Manual原文、9pin。touch用5pinを除く）`と本文書の`信号inventory`（`LCD-*`各行）へ1本ずつ照らす | `VCC`／`GND`／`LCD-CS`／`LCD-RST`／`LCD-DC`／`LCD-MOSI`／`LCD-SCLK`／`LCD-BL`／`LCD-MISO`の9本すべてが表と一致すること。touch用5本（`T_CLK`等）は未配線であること（[#14](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/14)の範囲であり、この段階では接続しない） |
+| 3 | `DISP-01`限定 | 逆極性・電圧違いpinの確認 | `VCC`が3.3 V系統以外（5V rail等）へ繋がっていないこと、`GND`がGND以外へ繋がっていないこと、信号pin（`CS`／`RESET`／`DC/RS`等）へ電源ラインが誤配線されていないことを、上記1・2の結果と照らして確認する | すべて一致すること。1本でもずれがあれば通電しない |
+| 4 | `DISP-01`限定 | 給電経路の重複確認 | `DISP-01`の`VCC`が単一の給電源（採用済みの経路はB-2b＝外部の3.3 V電源であり、`3V3` pinは使わない。[power-budget.md](power-budget.md)の`B-2b を採る決定と MSP2807 の電流制限（2026-09-07）`節）だけから受電する構成になっており、複数の電源（USBの5V、`3V3` pin、外部3.3V電源の複数台）が同時に`DISP-01`へ到達しないことを確認する。**この項目は`DISP-01`固有であり、`ACCEL-01`／`ENV-01`の給電経路には適用しない**（項目7の対象） | 単一経路であること |
+| 5 | `ACCEL-01`／`ENV-01`限定 | 一覧との目視照合 | 実際の配線（breadboard／jumper）を、[sensor-datasheet-notes.md](sensor-datasheet-notes.md)の`module boardの値（秋月 M-06724）`の`pin列`（ADXL345、`CS`／`Vs`／`GND`／`VDD`／`INT1`／`INT2`／`SDO`／`SDA`／`SCL`）と`Environmental sensor`節のpin配列（BME280、`VDD`／`GND`／`CSB`／`SDI`／`SDO`／`SCK`。**同節冒頭は出典としてBosch BME280 Data SheetとAE-BME280製品説明書を挙げているが、pin配列行自体には行単位の出所（silkの現物観察か資料の転記か）が明記されていない。****`SDI`＝SDA相当、`SCK`＝SCL相当という対応は、同文書の`jumper（AE-BME280）`節（`J1`＝I2C時のSDA用プルアップ選択、その実装状態を`VDD`↔`SDI`間の導通で判定。`J2`＝I2C時のSCL用プルアップ選択、`VDD`↔`SCK`間で判定）が既に対応付けている**）へ1本ずつ照らす。**`SDA`／`SCL`（`ACCEL-*`／`ENV-*`）の4本は、GPIOへ接続する信号として本文書の`信号inventory`（`ACCEL-SDA`／`ACCEL-SCL`／`ENV-SDA`／`ENV-SCL`各行）とも照らす。**`CS`／`CSB`／`SDO`／`INT1`／`INT2`はGPIOへ接続せず固定railへ配線するか、この段階では未配線のいずれかであるため、`信号inventory`とは照合しない | 配線した各pinが表と一致すること。**`SDO`は「未配線」ではなく`GND`へ配線が必要である。**firmwareは`ACCEL-01`のI2C addressを`0x53`、`ENV-01`のI2C addressを`0x76`へhardcodeしており（`firmware/esp32/src/main.rs`。両addressとも`SDO`→`GND`を前提とする値）、`SDO`の配線先が異なれば期待するaddressで応答しない。**`ACCEL-IRQ`（[信号inventory](#信号inventory)、GPIO35。ADXL345の`INT1`／`INT2`のどちらか一方を将来使う計画）は、現行の`run_i2c_bringup`（Device ID読み出しのみ、割り込み処理を行わない）では使わないため、この段階のbring-upでは`INT1`／`INT2`とも未配線でよい**（どちらを`ACCEL-IRQ`に使うかは割り込みを使う段階で決める。この段階では両方未配線のため`信号inventory`との照合対象にならない）。**`CS`（ADXL345）／`CSB`（BME280）は「未配線」ではない。**`CS`はI2Cモード選択のため`VDD I/O`（IC pin名）へ配線が必要である（`firmware/esp32/src/main.rs`の`run_i2c_bringup`のdoc comment、Analog Devices ADXL345 Data Sheet Rev. 0「I2C mode is enabled if the CS pin is tied high to VDD I/O」）。**M-06724のheader silkに`VDD I/O`という表記のpinは無い。**headerには`VDD`のみがあり、`Vs`と`VDD`は2026-09-05の非通電導通測定で同一netと確認済みである（[tbd-register.md](tbd-register.md)の`HW-TBD-004`(5)。IC側の`VS`／`VDD I/O`それぞれへの直結か、直列抵抗が入るかは未確認のまま残る）。**したがって現物での配線先はheader上の`VDD`である。**`CSB`はI2Cモード選択のため`VDD`へ配線が必要であり、AE-BME280では`J3`のはんだジャンパで行う（[sensor-datasheet-notes.md](sensor-datasheet-notes.md)の`jumper（AE-BME280）`節）。**`J3`は2026-08-22の現物確認で開放のままである**（[tbd-register.md](tbd-register.md)の`HW-TBD-005`。**このjumperのはんだ付けはこの手順の対象外であり、別途実施が要る**） |
+| 6 | `ACCEL-01`／`ENV-01`限定 | 逆極性・電圧違いpinの確認 | `VDD`／`Vs`が3.3 V系統（ESP32の`3V3` pin。[#445](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/445)の2026-09-22承認）以外（5V rail等）へ繋がっていないこと、`GND`がGND以外へ繋がっていないこと、信号pin（`SDA`／`SCL`相当を含む）へ電源ラインが誤配線されていないことを、上記1・5の結果と照らして確認する | すべて一致すること。1本でもずれがあれば通電しない |
+| 7 | `ACCEL-01`／`ENV-01`限定 | 給電経路の重複確認 | 各moduleの`VDD`／`Vs`が単一の給電源（[#445](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/445)の2026-09-22承認により、この2点に限りESP32自身の`3V3` pinを使う。[power-budget.md](power-budget.md)の`B-2b を採る決定と MSP2807 の電流制限（2026-09-07）`節の2026-09-22追記）だけから受電する構成になっており、複数の電源（USBの5V、外部3.3V電源等）が同時に到達しないことを確認する。**この項目は`ACCEL-01`／`ENV-01`限定であり、`DISP-01`には適用しない**（項目4の対象） | 単一経路であること |
 
 **実施者はいずれも人間である。**AIはcommandとchecklistを準備するだけであり、物理的な
 結果の確認は人間が行う（[Hardware Safety Policy](../governance/hardware-safety-policy.md)
@@ -744,3 +771,4 @@ environment sensor、servo、ADC測定、UART）にGPIO番号が入っており�
 | 2026-09-22 | 33 | [#13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)。**`実機check（電源off）の確認方法`節へ、`電源pinの短絡・誤配線の確認（非通電）`小節を追加した。**既存2項目（driveしないこと、pin header対応）は信号pinの導通を扱うが、`DISP-01`初回通電に先立つ`VCC`–`GND`間短絡検出・一覧との目視照合・逆極性確認・給電経路の重複確認は電源経路そのものを扱うため対象が異なり、分けて追加した。新しい数値の正はここに置かず、[sensor-datasheet-notes.md](sensor-datasheet-notes.md)の`pin定義（LCDWiki公式User Manual原文）`と[power-budget.md](power-budget.md)のB-2b決定を参照するだけである | 新規追加（LCD bring-up作業） |
 | 2026-09-22 | 34 | [#13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)。**PM（`#0PM`）の指摘を受け、Revision 33の項目4（給電経路の重複確認）を`DISP-01`限定と明記した。**`ACCEL-01`／`ENV-01`が`3V3` pinから給電する構成を採るかは別途[#445](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/445)で扱われており、同じ節が異なる給電経路を一般則のように書いてしまうことを避けるため、項目名と本文へ`DISP-01`限定である旨を追記した。この文書は`#445`の決定を先取りしない | PM（`#0PM`）の指摘 |
 | 2026-09-22 | 35 | [#13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)。**`#15`／`#16`のsessionが見つけた事実（PM（`#0PM`）経由）を受け、Revision 33の項目1（`VCC`–`GND`間短絡検出）の判定基準を訂正した。**`EXP-013`試験0（[experiment-log.md](experiment-log.md)）を開いて確認したところ、放電した状態の別対象へプローブを当てた瞬間は0 Ω付近を示し、decoupling capacitorの充電が進むにつれ値が上昇して安定する現象と、瞬時値を導通の判定に使うと正常品を短絡と誤判定しかけたという教訓が記録されていた。**固定した抵抗値のしきい値（当初「数Ω以下」としていた）では、この現象を持つ正常なmoduleを短絡と誤判定しうる。**`DISP-01`（MSP2807）で同じ挙動が起きることは確認されていないが（[sensor-datasheet-notes.md](sensor-datasheet-notes.md)の`Local decoupling`節、MSP2807行は`TBD`）、起きうるものとして扱い、判定基準を「読みが低い値から始まり上昇していく＝正常」「低いまま動かない＝短絡」という挙動ベースへ変更した | `#15`／`#16`のsession、PM（`#0PM`）の指摘、[experiment-log.md](experiment-log.md)の`EXP-013`試験0 |
+| 2026-09-22 | 36 | [#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)／[#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16)。**`電源pinの短絡・誤配線の確認（非通電）`表へ、`ACCEL-01`／`ENV-01`向けの項目5〜7を追加し、節の前書きと項目1の説明段落を`DISP-01`限定の記述から周辺module3点を対象とする記述へ書き直した。**表へ`対象`列を追加し、各行が共通／`DISP-01`限定／`ACCEL-01`・`ENV-01`限定のいずれかを判別できるようにした。項目1（`VCC`–`GND`間短絡検出、Revision 35で挙動ベースへ訂正済み）の判定基準そのもの（2値：上昇して安定＝正常、低いまま動かない＝短絡）は作り直さず、`ACCEL-01`／`ENV-01`にもそのまま適用する形で参照した。ただしfresh-context自己レビューでの訂正を経て、判定基準に3つ目の帰結（最初から高い値で安定している場合も正常）を追加し、説明段落（`DISP-01`より`ACCEL-01`／`ENV-01`の方が根拠が強い点、`EXP-013`の引用範囲）も書き直している。項目5〜7の判定基準・照合先は、PM（`#0PM`）の指摘とfresh-context自己レビュー（1〜13巡目）を経て複数回訂正されている。**個々の指摘内容と巡ごとの件数はこの行では再掲しない**（本文が正であり、数値・pin名をここに書き写すと本文の版が変わるたびに乖離するため。実際にこの行の旧稿は、本文で訂正済みのpin名・現象の記述をそのまま複製しており、本文と食い違っていた）。収束（新規指摘0件が2巡連続）には至っていない時点でこのRevisionを記録しており、**引き続き自己レビューを継続する** | [#445](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/445)の2026-09-22承認、[sensor-datasheet-notes.md](sensor-datasheet-notes.md)、[tbd-register.md](tbd-register.md)の`HW-TBD-004`／`HW-TBD-005`、`firmware/esp32/src/main.rs`、PM（`#0PM`）の指摘、fresh-context自己レビュー（1〜13巡目） |
