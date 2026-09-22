@@ -197,8 +197,10 @@ HW-TBD-024行が持つ事実であり、ここへ再掲しない。**この節�
 | 設定する電流制限値 | TBD |
 | 制限動作時の表示方法 | TBD |
 
-1. [人間] [gpio-assignment.md](gpio-assignment.md)の`電源pinの短絡・誤配線の確認（非通電）`
-   4項目がすべて完了していることを確認する。
+1. [人間] [gpio-assignment.md](gpio-assignment.md)の`電源pinの短絡・誤配線の確認（非通電）`の
+   うち、`DISP-01`に適用される項目（項目1〜4）がすべて完了していることを確認する。**同表は
+   2026-09-22に`ACCEL-01`／`ENV-01`向けの項目5〜7が追加され、7項目になっている**
+   （[gpio-assignment.md](gpio-assignment.md) Revision 36）。
 2. [人間] 電源に手を掛けられる状態（コンセント／電源出力ボタンへすぐ手が届く）を確保する。
 3. [人間] 給電を開始する。**AIはこの操作を行わない。**
 4. [人間] 次のいずれかを認めた場合、直ちに給電を止める。
@@ -214,10 +216,185 @@ HW-TBD-024行が持つ事実であり、ここへ再掲しない。**この節�
 6. [AI] 結果（成功・停止のいずれも）を[experiment-log.md](experiment-log.md)へ
    `EXP-0xx`として記録する。
 
+#### `ACCEL-01`／`ENV-01`単体bring-upの手順（ESP32`3V3` pin給電、`#445`承認範囲）
+
+**AIは以下を準備するだけであり、実行と判定は人間が行う**（[Hardware Safety Policy](../governance/hardware-safety-policy.md)
+「7. 人間の監視が必要な操作」）。
+
+**この手順を始める前に、`ENV-01`（BME280）の`J3`について次のどちらかを決め、選んだ方を
+記録すること。**
+
+- **`J3`をはんだ付けしてから始める。**`ENV-01`をI2C modeにするために要る
+  （[tbd-register.md](tbd-register.md)の`HW-TBD-005`）。はんだ付け自体はこの手順の対象外で
+  あり、別途行う。この場合、条件(1)の項目5（`CSB`→`VDD`を含む）は`ACCEL-01`／`ENV-01`
+  両方について満たす。
+- **`J3`をはんだ付けせずに始める。**この場合、`ENV-01`は`CSB`が`VDD`に接続されないため
+  I2C modeで応答しない可能性が高い。条件(1)の項目5のうち`CSB`→`VDD`は`ENV-01`について
+  対象外として扱い、この手順は`ACCEL-01`だけを確認する手順として実施する。**手順10で
+  `ENV-01`のDevice IDが読めない、またはlogが途中で止まるのは異常ではなく、この選択の
+  予期された結果である。**
+
+**実施前に満たす条件(1)〜(6)。**すべて満たすまで通電（手順8以降）しない。手順1〜7で確認・
+充足する。根拠・出所は末尾の`条件と手順の根拠`にまとめてある。
+
+- [ ] (1) [gpio-assignment.md](gpio-assignment.md)の`電源pinの短絡・誤配線の確認（非通電）`の
+      項目1・5・6・7が完了している（`ENV-01`の項目5`CSB`→`VDD`は、上で`J3`未はんだを選んだ
+      場合は対象外）
+- [ ] (2) firmware（`main()`の`run_i2c_bringup`）がビルド済みである（書き込みは手順8で行う）
+- [ ] (3) 電流の余裕計算（`B-2b を採る決定と MSP2807 の電流制限（2026-09-07）`節の
+      2026-09-22追記、Revision 117）を確認した
+- [ ] (4) `DISP-01`が`3V3` pinへ接続されていない
+- [ ] (5) [gpio-assignment.md](gpio-assignment.md)の`module電源pinの独立性`／`pin header対応`と、
+      受け入れchecklistの`Moduleのpull-upを並列合成した実効抵抗が有効範囲内である`が完了している
+- [ ] (6) 人間が「通電してよい」と明示している
+
+**現時点で判明している未達（列挙。網羅ではない）:** `ENV-01`の`CSB`→`VDD`（`J3`未はんだ）、
+`ENV-01`／`ACCEL-01`の`SDO`→`GND`（未配線）、条件(5)（現物確認が未実施）。詳細は末尾を参照。
+
+1. [人間] `ACCEL-01`／`ENV-01`を配線する（`VDD`／`Vs`→ESP32の`3V3` pin、`GND`→`GND`、
+   `SDA`→GPIO25、`SCL`→GPIO26、`CS`→`VDD`（ADXL345）、`SDO`→`GND`（両module）。`DISP-01`は
+   配線しない）。`CSB`→`VDD`（BME280）は本節では配線しない（末尾`条件(1)の根拠`参照）。
+2. [人間] [gpio-assignment.md](gpio-assignment.md)の`電源pinの短絡・誤配線の確認（非通電）`
+   の該当項目（1・5・6・7）がすべて完了していることを確認する（末尾`手順2の根拠`参照）。
+3. [人間] [gpio-assignment.md](gpio-assignment.md)の`module電源pinの独立性`／`pin header対応`
+   と、受け入れchecklistの`Moduleのpull-upを並列合成した実効抵抗が有効範囲内である`を実施する
+   （末尾`手順3の根拠`参照）。
+4. [人間] `DISP-01`が`3V3` pinへ接続されていないことを確認する。
+5. [人間] 電源に手を掛けられる状態（USB cableをすぐ抜ける状態）を確保する。
+6. [人間] 通電開始前に、給電を止めるまでの待機時間の上限を決めておく（末尾`手順6の根拠`参照）。
+   **firmwareの書き込み自体がUSB接続＝通電を伴うため、この手順は書き込みより前に行う。**
+7. [人間] 条件(6)（人間が「通電してよい」と明示すること）を満たしていることを確認する。
+8. [人間] USB経由でESP32へ接続し、firmwareを書き込む。**この接続が最初の通電である。**
+   ESP32が有効化されると同時に、手順1で配線済みの`ACCEL-01`／`ENV-01`も`3V3` pinを
+   経由して同時に通電される（`DISP-01`は手順4で未接続を確認済みのため通電されない）。
+9. [人間] 書き込み中および書き込み後、次のいずれかを認めた場合、直ちに給電を止める
+   （USB cableを抜く）。
+   - 異音
+   - 発熱（module、ESP32 board、`U2`のいずれか）
+   - 火花・変色・異臭
+   - 下記10の(c)（手順6で決めた待機時間の上限に達しても`run_i2c_bringup`側の出力が
+     何も出ない）に至った場合
+
+   通電中のテスターによる`VCC`–`GND`間抵抗の監視は、この手順では設定していない（末尾
+   `手順9の根拠`参照）。
+10. [人間] シリアルログを確認する（末尾`手順10の根拠`参照）。`run_i2c_bringup`は`ACCEL-01`と
+    `ENV-01`を順に読み、それぞれ独立に成功／失敗をlogへ出す（片方の失敗がもう片方の読み出しを
+    止めない設計。`main.rs`の`run_i2c_bringup`実装）。
+    (a) `ACCEL-01`のDevice ID読み出しの結果（成功時は生byte。期待値`0xE5`は
+    [sensor-datasheet-notes.md](sensor-datasheet-notes.md)のDevice ID行が出典であり、一致するかは
+    判定せず、値をそのまま記録する）がlogに出る。
+    (b) `ENV-01`のDevice ID読み出しの結果（成功時は生byte、期待値`0x60`。**冒頭で`J3`を
+    はんだ付けせずに始めることを選んだ場合、ここが「失敗（error）」または「手順6の待機時間内は
+    出力が無いまま止まる」のいずれになっても異常ではない**（予期された結果。`J3`をはんだ付け
+    してから始めた場合は、`ACCEL-01`と同様に成功を期待する）。
+    (c) 手順6の待機時間内は`run_i2c_bringup`側の出力が何も（`ACCEL-01`分すら）出ないまま止まる
+    （`ACCEL-01`の読み出し自体が止まっている状態であり、`J3`の選択によらず異常）。
+    (a)(b)(c)いずれも確認し、待機時間・観測内容を記録する。**(a)(b)が確認でき次第（`J3`未はんだ
+    選択時は(a)のみでよい）、(c)は手順9の停止条件として、給電を止める（USB cableを抜く）。**
+11. [人間] 給電を止めた後（手順9の停止、手順10の(a)(b)確認後の停止のいずれでも）、
+    `VCC`–`GND`間抵抗を再測定する（末尾`手順11の根拠`参照）。通電後に「低いまま動かない」への
+    変化を認めた場合は、短絡が新たに生じた可能性として再開しない。
+12. [AI] 結果（成功・停止のいずれも）を[experiment-log.md](experiment-log.md)へ
+    `EXP-0xx`として記録する。
+
+##### `ACCEL-01`／`ENV-01`単体bring-upの手順：条件と手順の根拠
+
+**この節は`DISP-01`初回通電の手順とは別経路である。**`DISP-01`はB-2b（外部の3.3 V電源）だが、
+この節はADXL345（`ACCEL-01`）とBME280（`ENV-01`）の2点に限り、[#445](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/445)
+の2026-09-22承認によりESP32自身の`3V3` pinから給電する。**`DISP-01`はこの承認の対象外であり、
+`DISP-01`を含む構成・将来の合成給電（段階B-2）には引き続き`B-2b を採る決定と MSP2807 の電流制限
+（2026-09-07）`節が適用される。この手順はB-2のgateを開けない**（MSP2807分の`HW-TBD-024`が
+未解決のまま残るため、段階B-2は引き続き実施できない）。**共通条件表（`許容電圧範囲`／
+`全moduleの安全な電流上限`）の「1点でも上限が無ければB-2を実施しない」は、周辺module3点を
+合算する段階B-2そのものに掛かる規則であり、この単体bring-upを止めない。**根拠は共通条件表の
+`単体bring-upとB-2の区別（2026-09-21追記）`行（`許容電圧範囲`はADXL345`#436`／BME280`#433`で、
+`全moduleの安全な電流上限`が求める現物回路の確認は両module分とも`#430`で、それぞれ満たされたと
+判定済み。**厳密な電流上限の値そのものは依然として無い**）である。
+
+**条件(1)の根拠。**[gpio-assignment.md](gpio-assignment.md)の`電源pinの短絡・誤配線の確認
+（非通電）`のうち、`ACCEL-01`／`ENV-01`に適用される項目1・5・6・7を指す。**項目5の判定基準は
+`CS`→`VDD`（ADXL345、IC pin名`VDD I/O`。header silkには`VDD I/O`という表記は無く、`Vs`と同一net
+の`VDD`が配線先である。[tbd-register.md](tbd-register.md)の`HW-TBD-004`(5)）、`CSB`→`VDD`
+（BME280、`J3`はんだジャンパ経由。`J3`は2026-08-22時点で未はんだ（開放）であり、
+[tbd-register.md](tbd-register.md)の`HW-TBD-005`。はんだ付けされるまでこの項目は満たされない）を
+含む。****`SDO`→`GND`（両moduleとも）も項目5の判定基準に明記済みである。**firmwareは`ACCEL-01`の
+I2C addressを`0x53`、`ENV-01`のI2C addressを`0x76`へhardcodeしており（`main.rs`。`SDO`→GNDを
+前提とする値）、`SDO`の配線先が異なれば期待するaddressで応答しない。手順1が`CSB`→`VDD`（BME280）
+を配線しないのは、`J3`のはんだ付けが済んでいればboard上で既に接続されており、済んでいなければ
+条件(1)（項目5）が未達のままこの節に着手できないため（`J3`のはんだ付けはこの節の対象外）。
+
+**条件(2)の根拠。**実装commitは`4486de5`であり、`origin/develop`上に存在する。**書き込み自体は
+手順8で行う（書き込みはUSB接続＝通電を伴うため、この節の実行前提には含めない）。**firmwareの
+書き込みとUSBシリアルでのlog読み取りは人間が行う（[machine-profiles.md](../toolchains/machine-profiles.md)は
+`ESP32 Flash / HIL`profileの必須要件を「実機 Linux に限る」「人間の監視」と定めており、AI session
+はこの環境・監視のいずれも持たない。同文書自体は「AIがUSB busへアクセスできない」とは書いていない）。
+
+**条件(3)の根拠。**同計算はWi-Fi/BT不使用を前提とする。**この前提は満たされる**（現在の
+firmwareの`main.rs`はWi-Fi／Bluetooth APIを一切呼び出しておらず、`Cargo.toml`にも該当featureが
+無い。2026-09-22に走査して確認した）。
+
+**条件(4)の根拠。**計算はESP32＋`ACCEL-01`＋`ENV-01`の合計であり、`DISP-01`を含まない。
+`DISP-01`が同じ`3V3` railに同時接続されている場合、この計算は成立しない。
+
+**条件(5)の根拠。**`main.rs`の`run_i2c_bringup`のdoc commentが「実機で動かす前に要る」と挙げる
+現物確認2件を指す。**(a) `module電源pinの独立性`／`pin header対応`（[gpio-assignment.md](gpio-assignment.md)
+の`ESP32の電源投入前に外部moduleがESP32 pinをdriveしない`節にある測定項目表。moduleがESP32へ
+配線されるまで検証対象が存在しないため`#15`／`#16`側へ送られた確認）は、`ACCEL-01`／`ENV-01`と
+も未実施である。**`ACCEL-01`の`Vs`／`VDD`間導通
+（2026-09-05確認済み、[tbd-register.md](tbd-register.md)の`HW-TBD-004`(5)）は、header内部の
+別pin同士が同一netであることの確認であり、この表が求める`各moduleの電源pin ⇔ ESP32の3V3 pin`
+間の測定とは別の測定である。この表自体はACCEL-01についても未実施のまま残る。**(b) `Moduleの
+pull-upを並列合成した実効抵抗が有効範囲内である`（受け入れchecklist、`bus容量Cb`が未測定のため
+未達のまま）。**これら2件は条件(1)が引用する`電源pinの短絡・誤配線の確認（非通電）`表の対象外
+であり、別途満たす必要がある。
+
+**条件(6)の根拠。**`DISP-01`初回通電の手順の条件(2)と同じ扱い。[#445](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/445)
+の2026-09-22承認は給電経路の例外であり、個々の初回通電の実施可否を自動的に認めるものではない。
+
+**手順2の根拠。**手順1で配線済みのため、項目1の測定はESP32側の`3V3`／`GND`railを含む状態で
+行うことになる。module単体を切り離した測定ではないが、判定基準（低いまま動かない＝短絡）自体は
+railを含んでいても成立する（railを含む短絡もrailを含まない短絡も、同様に低いまま停滞する読みと
+して現れる）。
+
+**手順3の根拠。**`pin header対応`の対象は`信号inventory`の各signalだが、`ACCEL-IRQ`は手順1で
+意図的に未配線のため、この項目の対象から除く（項目5の判定基準と同じ扱い。`ACCEL-IRQ`の配線・
+確認は割り込みを使う段階で別途行う）。受け入れchecklistの`Moduleのpull-upを並列合成した実効抵抗
+が有効範囲内である`は、[gpio-assignment.md](gpio-assignment.md)が定める2通りのいずれかで満たす。
+**(a)** 実配線の`bus容量Cb`を実測する、または**(b)** `Cb`≤400 pFを裏付ける設計上の根拠を得る。
+**実測の結果が400 pFを超え488 pF以下の場合、同文書はrise timeの計算は通るが、Standard-mode
+として規定範囲内と言い切れない可能性が残ると明記している**（fall time等、rise time以外の
+制約を同文書が引用した一次資料の範囲では確認できていないため）。**この場合、この項目を達成済み
+とは扱わず、同文書のこの記述に従って判断する。**いずれの方法も採らない限り、この項目は未達の
+まま残る。
+
+**手順6の根拠。**firmware側はこの呼び出し（手順10）の応答時間を保証しないため、上限は実施者が
+事前に決める。
+
+**手順9の根拠。**項目1の抵抗測定は電源off状態で行う測定であり、通電中に別途計器を当てる手段は
+本節のどの手順にも無い。実施者が独自に安全に監視できる場合は追加の停止根拠として使ってよいが、
+この手順の必須条件ではない。
+
+**手順10の根拠。**`main()`は`run_display_bringup`（`#13`のLCD bring-up。SPI初期化、ID読み、
+backlight on、fill test、corner pattern test）を`run_i2c_bringup`より先に無条件で呼ぶため
+（`main.rs`）、`DISP-01`が未配線・無給電でも、これらの出力が先に現れる。手順の(a)(b)(c)は
+`run_i2c_bringup`側（`ACCEL-01`／`ENV-01`のDevice ID読み出し）のlogを指し、その手前にdisplay側
+のlogが出ることは異常ではない。**busが低のまま固着する状態で、この呼び出し（`run_i2c_bringup`
+内のDevice ID読み出し）が何秒で`Err`を返すか、あるいは返さないままになりうるかは、この機能の
+実装commit（`4486de5`。`origin/develop`上に存在する。PR番号はcommit message自体からは確認できない）
+の時点で検証していない**（`main.rs`の`run_i2c_bringup`のdoc comment）。
+
+**手順11の根拠。**[gpio-assignment.md](gpio-assignment.md)の項目1の判定基準により、条件(1)
+（項目1）を通過した個体は通電前の観測が「上昇して安定」または「最初から高い値で安定」の
+いずれかであったはずである（「低いまま動かない」は項目1で短絡と判定され、この節へ進まない）。
+
 ##### 3.3 V railの許容電圧範囲
 
 **この節は上の`許容電圧範囲`行の導出である。値の正はその行であり、この節ではない。**
-他の文書はその行を参照し、値を書き写さない。
+他の文書はその行を参照し、値を書き写さない。**見出し階層上は直前の`ACCEL-01`／`ENV-01`単体
+bring-upの手順・条件と手順の根拠の小節のように見えるが、この節が導出する`許容電圧範囲`行は
+`段階B-2の測定`節の共通条件表にあり、その節の続きである。**（`DISP-01`初回通電の手順を
+挟んだことで生じた見出し階層のずれは`#447`由来であり、本節の追加でさらに1段離れた。**見出し
+levelの再構成はこの差分の範囲外とする。**）
 
 積集合を取る対象は各moduleが**moduleとして受け入れてよい電圧**である。**IC単体の動作範囲を
 代入しない**（board上のregulatorやlevel shiftの有無で変わるため）。
@@ -444,6 +621,13 @@ ICの供給能力は上限を与えるだけであり、datasheetのNote 1は`R�
 
 **`HW-TBD-023`(a)はB-2bでは実施条件にならない。**ただし`HW-TBD-023`はcloseしない
 （`3V3` pin給電を将来採る場合に引き続き要る）。
+
+2026-09-22追記（[#445](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/445)）。この決定(B-2bを採る、`3V3` pinは使わない)は書き換えていない。ただし2026-09-22、ユーザーが範囲を限定した例外を承認した。対象は`ACCEL-01`(ADXL345)と`ENV-01`(BME280)の2点に限り、この2点だけをESP32自身の`3V3` pinから給電することを認める。`DISP-01`(MSP2807)はこの承認の対象外であり、MSP2807を含む構成、および将来の合成給電(段階B-2)には引き続きこの決定(B-2b)が掛かる。`HW-TBD-023`(a)は**解決していない**(値は今も公開されていない)。承認の前提として示した残余riskは、`U2`が`IOUT` 1.0–1.25 Aの区間で電流制限が働かないことであり、これは判断であり証拠ではない。**この帯は下記の想定合計電流（約101.5 mA、正常時）ではなく、短絡・配線ミス時に流れうる故障電流を指す**（`U2`の過電流保護のtrip特性がdatasheetから決まらないため、正常動作を超える電流が生じた場合に`U2`自身がどこで制限を掛けるかは未確認のまま残る）。詳細（`U2`のIlimit値、datasheetの記載範囲）は[tbd-register.md](tbd-register.md)のHW-TBD-023行を参照する。
+
+この2点限定の給電について、`U2`の余裕を確認した(MSP2807を含まない場合)。想定合計電流は、ESP32-WROOM-32D board(Wi-Fi/BT不使用時)+ ADXL345(140µA typ)+ BME280(測定mode時、後述)の合計として見積もる。ESP32-WROOM-32D boardの電流は、本file後半の`負荷表`節（Wi-Fi idle行）が挙げる文献値約80〜100mAを用いる。**`実施前に満たす条件`(3)がWi-Fi/BT不使用を前提とするのに対し、この値は`Wi-Fi idle`（Wi-Fi機能自体は初期化されているが通信していない状態）の文献値であり、Wi-Fi機能を一切初期化しない現在のfirmwareの状態とは厳密には異なる。Wi-Fi idleはWi-Fi不使用より消費電流が高い側（保守側）だと考えられるが、その関係を示す一次資料は確認していない。****この値を`U2`の出力側電流（`Iout`）として扱う**（`負荷表`の当該行は`ESP32 3V3出力`ではなく`Logic`railの board電流として記録されたものであり、`U2`出力側の負荷という位置づけは本行が置く解釈である）。参考として、Espressif公式[ESP32 Series Datasheet v5.3](https://documentation.espressif.com/esp32_datasheet_en.pdf) Table 4-2「Power Consumption by Power Modes」(4.3節、p.30)はchip単体のModem-sleep・240MHz dual-coreの電流を30〜68mAと記載している。**ただし100mAとの差(約32mA)がboard上の他の消費(WROOM内のflash、USB-UARTブリッジ、電源LED)を覆うかどうかは確認していない。**bridgeの品種も特定していないため、「100mAが保守的である」とは断定しない。BME280は`sensor-datasheet-notes.md`の`消費電流`行（Bosch datasheet由来）が湿度測定340µA(max)・気圧測定714µA(max)・温度測定350µA(max)を挙げており、単純合算では約1.4mAとなる（`負荷表`の「<1mA」は同時発生を想定しない書き方であり、単純合算の約1.4mAより保守的ではない。以下ではこの1.4mAを用いる）。以上より`Iout`の合計は約101.5 mAとなる（ADXL345 0.14mA＋BME280 1.4mA＋ESP32 100mA＝101.54mA、小数第2位を四捨五入）。`U2`の連続定格（`Iout`の定格）1Aに対する電流の余裕は1A÷101.5mAで約9.85倍。
+
+**損失の計算には`U2`自身の`Iq`（quiescent current）も要る。**`Iq`は`U2`（UMW LD1117-3.3）のdatasheetの規格値（実測値ではない）で確認済みであり（[UMW LD1117 datasheet](https://www.umw-ic.com/static/pdf/a5e0c99cefdefaf03cfa7777b369e45b.pdf)の`9.Electrical Characteristics`、`Quiescent Current`行。typ 5 mA／max 10 mA。本file`5 V側への換算には根拠が要る`の段落に既存記録がある。行番号は版により
+動くため節の見出しで参照する）、`Iq`は`U2`の`Iout`定格を消費しない（`Iout`に含めない）が、`Vin`側からそのまま流れて損失に加わる（`Iin ≒ Iout + Iq`）ため、**保守側として`Iq` max 10 mAを損失計算に加える。**損失(Vin=5V、Schottky降下を無視した保守値、`Vdrop`≈1.7V)は約222.6mW（`Vdrop`×`Iout`の172.6mW＋`Vin`×`Iq(max)`の50mW）、温度上昇は約19.6℃（222.6mW×88℃/W。`Rθja`＝88℃/Wの出所は[tbd-register.md](tbd-register.md)の`HW-TBD-023`行が既存記録として持つ値であり、**同行もdatasheetの具体的なtable／page番号までは記録していない**。この文書はその既存記録をそのまま用いる）、ambient 40℃(仮定)で`TJ`は約59.6℃。`U2`のdatasheetが持つ温度関連の値は**熱shutdown`TSD` typ 150℃**であり（[tbd-register.md](tbd-register.md)の`HW-TBD-023`。この値を記録したのは`power-budget.md`自身のRevision 45である）、この`power-budget.md`自身は`TJ(max)`（絶対最大接合温度）としての値を記録していない。**`tbd-register.md`の`HW-TBD-023`は「datasheetのNote 1が与えるPD(max)=(TJ(max)-Tamb)/Rθjaに`TJ(max)` 150℃と`Rθja` 88℃/Wを入れる」という形でこの2つを同じ150℃の数値として扱っているが、これは`TSD`とは別の観点（絶対最大定格）からの言及であり、同行自身も`TSD`と`TJ(max)`が同一の150℃であることを明示的に述べてはいない。****したがって以下の余裕は「`TSD`（熱shutdownが動作し始める温度のtyp値）までの余裕」であり、`TJ(max)`までの余裕ではない。**`TSD`とambientの差110℃÷温度上昇19.590…℃（四捨五入前）で、`Rθja`がdatasheetの88℃/Wより約5.62倍悪化すると`TSD`に届く計算になる。**board-levelの内訳を確認していない不確かさが結論に影響しないことを、ESP32の項を仮に2倍(約200mA)へ置いて確認した。**その場合`Iout`合計は約201.5mA、電流の余裕は`U2`の連続定格1A比で約4.96倍、損失は約392.6mW（`Vdrop`×`Iout`の342.6mW＋`Vin`×`Iq(max)`の50mW）、温度上昇は約34.550…℃(四捨五入前。ambient 40℃で`TJ`約74.55℃)、`TSD`までの悪化許容倍率は約3.18倍（110℃÷34.550…℃、四捨五入前の値から算出。基準ケースと同じ丸め方に揃えた）であり、結論(実装依存性は結論を変えない、`TSD`に対しても十分な余裕がある)は変わらない。`I_VDD`(min 0.5A。[ESP32-WROOM-32D & ESP32-WROOM-32U Datasheet v2.8](https://documentation.espressif.com/esp32-wroom-32d_esp32-wroom-32u_datasheet_en.pdf) Table 14「Recommended Operating Conditions」。**これはEspressifが電源側に要求する供給能力の下限（規格値）であり、実際の消費電流の見積りではない。**したがって熱側の感度確認（上記の2倍試算）とは別の軸であり、0.5Aを熱計算の入力に使わない。この確認は「`U2`が規格上要求される供給能力を満たせるか」だけを見る)の確認では、`U2`の連続定格から残る余力は1A−101.5mAで約898.5mAであり、0.5Aを上回る。この評価はWi-Fi/BT不使用、ambient 40℃(仮定)、Vin=5V(保守側の見積り)の前提でのみ成立する。
 
 **MSP2807の電流制限値。**初回設定値は**暫定の初期候補**であり、**単独で通電を許可する値ではない。**
 LCD Wikiのtypical消費「0.31 W」（≈94 mA）を上回るという以外の根拠を持たず、**その「0.31 W」自体が
@@ -3439,3 +3623,5 @@ rippleはDMMで代替できない。
 | 2026-09-21 | 114 | [#436](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/436)のCodeRabbit review 3件目の指摘（`tbd-register.md` L18への指摘）への対応。**PM（`#0PM`）が指摘を検証し、Revision 113の「経路の形は電圧の上限に効かない」を対GNDの絶対値に限る形へ狭めるよう判定した**（`許容電圧範囲`行、`3.3 V railの許容電圧範囲`節の訂正段落、`ACCEL-01`行の3箇所）。ADXL345のAbsolute Maximum Ratings表を確認し、`VDD I/O`を基準とする`Digital Pins`の相対定格が別に存在することを記録した（headerから`VDD I/O`への経路だけが断線し基板搭載pull-upがSDA/SCLを保持すればこの相対定格に触れうる）。**この懸念は購入品の製造欠陥を前提とする故障モードであり、判定の範囲外とした**（`#0PM`の判定。一次資料からの導出ではないことを明記。`#16`のstatus:blockedにも関わるため人間の最終承認を別途要する）。**headerからICへの経路の確認自体は、既存記録のとおり未確認のままTBDで残す。**BME280（`#16`）へも同型の懸念が及ぶが、同じ理由で`#16`の判定は見直さない（詳細は[tbd-register.md](tbd-register.md)の`HW-TBD-004`。**ここへ再掲しない**）。**あわせて同じ`ACCEL-01`行（3.3 V railの許容電圧範囲節の訂正段落）で、「能動部品が存在しないことを確定した」という記述に「推論であり、ユーザーの発言そのものではない」という留保を明記した**（CodeRabbit review 2件目の指摘、`power-budget.md` L161への指摘、の対応の一部として直した）。測定値は1つも変えていない | [tbd-register.md](tbd-register.md)の`HW-TBD-004`、[PR #436](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/436)のCodeRabbit review |
 | 2026-09-21 | 115 | [#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)。**`#422`が「本節では判定しない（未解決点として残す）」と留保していた問い（ADXL345／BME280に、MSP2807のbacklight回路と同型の懸念が及ぶか）へ結論を記録した。**及ばない（ADXL345は`#430`のHW-TBD-025(b)判定と`#436`のHW-TBD-004判定、BME280は`#430`のHW-TBD-025(b)判定。両moduleとも板上の部品を網羅的に確認済みで隠れた高電流経路が無い）。**MSP2807には引き続き及ぶ（backlight回路がカプトンテープに隠れ非分解では未確認。`HW-TBD-024`はcloseしていない）。**したがってADXL345／BME280の単体bring-upはこの懸念を理由に止めない。MSP2807の単体bring-upは引き続き止める。**段階B-2（3点合算測定）のgateは、MSP2807分が未解決のため引き続きBlockedのままである。**測定値は1つも変えていない。新しい調査ではなく、既存の`#430`／`#436`の判定を足し合わせた結論である | [#422](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/422)、[#430](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/430)、[#436](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/436) |
 | 2026-09-22 | 116 | [#13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)。**`段階B-2の測定`節の末尾へ2つの小節を追加した。**(1) `B-2bの電流制限値の上限が決められない理由（要約）`は当初LED個数・`R5`/`Q1`経路・`U1`供給能力を再掲していたが、PM（`#0PM`）の指摘（「正本へ再掲しない」規則。実際に本文書L162が2026-08-12の古い記述のまま残り`#443`で直したばかりという実例あり）を受け、それらの事実は[tbd-register.md](tbd-register.md)のHW-TBD-024行のみに残し、ここには「B-2bの電流制限値の上限が決められない」という帰結の一文とlinkだけを残す形へ縮小した。(2) `DISP-01`初回通電の手順（給電構成の確定待ち）は、通電前チェック（[gpio-assignment.md](gpio-assignment.md)の新設小節）が完了した後の初回通電手順を、人間とAIの役割を分けた1本の順序として定義した。**給電構成（電源型番・電流制限値・表示方法）は空欄のままにし、`実施前に満たす条件`が揃っていないことを明記した。**通電はしていない | PM（`#0PM`）の指摘、新規追加（LCD bring-up作業） |
+| 2026-09-22 | 117 | [#445](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/445)。`B-2b を採る決定`（Revision 91、2026-09-07）は書き換えず維持したまま、ADXL345（`ACCEL-01`）とBME280（`ENV-01`）の2点に限り、ESP32自身の`3V3` pinから給電することをユーザーが2026-09-22に承認した旨を同節へ追記した。`DISP-01`（MSP2807）はこの承認の対象外であり、MSP2807を含む構成・将来の合成給電（段階B-2）には引き続き2026-09-07の決定が掛かる。`HW-TBD-023`(a)（`3V3` pinの外部供給可能電流のboard level定格）は解決していない。あわせて、この2点限定の給電について`U2`（UMW LD1117-3.3）の余裕を計算した。ESP32-WROOM-32D boardの電流は既存の負荷表（Wi-Fi idle、文献値約80〜100mA）を用いた。Espressif公式ESP32 Series Datasheet v5.3のTable 4-2（chip単体のModem-sleep上限68mA）はboard-levelの内訳（flash、USB-UARTブリッジ、電源LED分）を含まないため、100mAが十分保守的とは断定していない。合計約101.5mA（ADXL345 0.14mA＋BME280 1.4mA＋ESP32 100mA＝101.54mA。BME280はBoschの湿度340µA/気圧714µA/温度350µA各max値の単純合算約1.4mAを使用。`負荷表`の「<1mA」より保守的な値である）に対し電流の余裕は`U2`の連続定格1A比で約9.85倍。損失の計算には`U2`自身の`Iq`（quiescent current、UMW LD1117 datasheetの規格値でmax 10mA）も保守側として加えた。損失約222.6mW、温度上昇は約19.6℃（ambient 40℃、`TJ`約59.6℃）、`Rθja`がdatasheetの88℃/W（[tbd-register.md](tbd-register.md)の`HW-TBD-023`が持つ既存記録の値。table／page番号までは同行も記録していない）・`U2`の`TSD` typ 150℃（`TJ(max)`ではなく熱shutdown温度）より約5.62倍（`TSD`とambientの差110℃÷温度上昇19.590℃）悪化すると`TSD`に届く。ESP32の項を仮に2倍（約200mA）へ置いても、合計約201.5mA・電流の余裕約4.96倍・損失約392.6mW（`Iq`込み）・`TSD`までの悪化許容倍率約3.18倍（基準ケースと同じ丸め方）であり、board-levelの内訳を確認していない不確かさは結論に影響しないことを確認した。Espressifが電源側に要求する`I_VDD` min 0.5Aも上回ることを確認した。測定値ではなく計算による見積りであり、Wi-Fi/BT不使用・ambient 40℃（仮定）・Vin=5V（保守側）の前提でのみ成立する。`tbd-register.md`のHW-TBD-023行にも同日付で対応する追記を行った | [#445](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/445)、[ESP32 Series Datasheet v5.3](https://documentation.espressif.com/esp32_datasheet_en.pdf) Table 4-2、[ESP32-WROOM-32D & ESP32-WROOM-32U Datasheet v2.8](https://documentation.espressif.com/esp32-wroom-32d_esp32-wroom-32u_datasheet_en.pdf) Table 14、[UMW LD1117 datasheet](https://www.umw-ic.com/static/pdf/a5e0c99cefdefaf03cfa7777b369e45b.pdf) |
+| 2026-09-22 | 118 | [#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)／[#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16)。**`段階B-2の測定`節へ、`ACCEL-01`／`ENV-01`単体bring-upの手順（ESP32`3V3` pin給電、`#445`承認範囲）の節を新設した。**`DISP-01`初回通電の手順（Revision 116、[#447](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/447)）と対になる、`ACCEL-01`／`ENV-01`向けの手順である。給電経路が異なる（`DISP-01`はB-2b＝外部電源、この2点は`#445`承認によりESP32自身の`3V3` pin）ため、`DISP-01`の手順を流用せず並べて置いた。**手順はB-2のgateを開けない**（MSP2807分の`HW-TBD-024`が未解決のため、段階B-2＝3点合算測定は引き続き実施できない）。通電はしていない。**fresh-context自己レビュー（1〜13巡目）で多数の指摘を受け、都度本文を修正した。**指摘の種類は、引用先の誤り（doc commentの所在、見出し名の空白、pin名、実験記録の極性ラベル）、欠落していた実施前提（Wi-Fi/BT不使用、`DISP-01`未接続、`CS`／`CSB`／`SDO`の配線、既存2項目の未実施状態、人間の明示的な go-ahead）、手順内の相互参照のずれと循環（停止条件と観測結果が同じ事象を指す形になっていた）、手順の順序そのものの欠陥（firmwareの書き込みがUSB接続＝通電を伴うにもかかわらず、給電停止準備・待機時間決定より前に置かれていた）、余裕計算の丸め誤りと前提の書き漏れ、`main()`が`display bringup`を先に無条件実行する事実の欠落、`信号inventory`との不整合、boldマーカーの欠落など多岐にわたる。**個々の指摘内容と巡ごとの件数はこの行では再掲しない**（本文が正であり、数値・手順番号をここに書き写すと本文の版が変わるたびに乖離するため。乖離自体を複数巡のfresh-context自己レビューが指摘した）。収束（新規指摘0件が2巡連続）には至っていない時点でこのRevisionを記録しており、**引き続き自己レビューを継続する** | [#445](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/445)、[gpio-assignment.md](gpio-assignment.md) Revision 36、[#447](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/447)、fresh-context自己レビュー（1〜13巡目） |

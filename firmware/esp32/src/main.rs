@@ -96,9 +96,10 @@ const ACCEL_I2C_ADDRESS: u8 = 0x53;
 /// `SDO`をGNDへ配線すると`0x76`になる
 /// （[`docs/hardware/sensor-datasheet-notes.md`](../../../docs/hardware/sensor-datasheet-notes.md)
 /// 211行目）。module資料の既定でもある
-/// （[`docs/hardware/gpio-assignment.md`](../../../docs/hardware/gpio-assignment.md)
-/// 382行目「`0x76`はmodule資料が「既定」と記す側である」）。[`ACCEL_I2C_ADDRESS`]と
-/// 同じ根拠（一般値で開始してよい側、`gpio-assignment.md`372行目）で、GND側を
+/// （[`docs/hardware/gpio-assignment.md`](../../../docs/hardware/gpio-assignment.md)の
+/// `I2C addressの選択`節「`0x76`はmodule資料が「既定」と記す側である」行）。
+/// [`ACCEL_I2C_ADDRESS`]と同じ根拠（一般値で開始してよい側、`gpio-assignment.md`の
+/// `I2C addressの選択`節「addressは一般値で開始してよい側である」行）で、GND側を
 /// 前提にした。**現物確認まで確定しない点も`ACCEL_I2C_ADDRESS`と同じである。**
 const ENV_I2C_ADDRESS: u8 = 0x76;
 
@@ -474,7 +475,8 @@ fn run_display_bringup<SPI: SpiAnyPins + 'static>(
 /// `matches_ili9341()`とは異なる扱いである。**この関数へ判定を持ち込まない。**）。
 ///
 /// 2つのsensorは同じI2C bus（`GPIO25`＝SDA、`GPIO26`＝SCL）を共有するため
-/// （`docs/hardware/gpio-assignment.md`414・415・417・418行目）、`I2cDriver`は
+/// （`docs/hardware/gpio-assignment.md`の`信号inventory`の`ACCEL-SDA`／`ACCEL-SCL`／
+/// `ENV-SDA`／`ENV-SCL`各行）、`I2cDriver`は
 /// この関数の中で1つだけ作り、両方のdriverへ順に貸す（`crate::accel`・`crate::env`
 /// のmodule docが定める設計）。**どの段階で失敗しても、この関数はpanicしない。**
 ///
@@ -490,11 +492,12 @@ fn run_display_bringup<SPI: SpiAnyPins + 'static>(
 /// 裏面はんだジャンパ2箇所は開放だが何を選ぶ設定かboard資料が無く不明
 /// （[`docs/hardware/sensor-datasheet-notes.md`](../../../docs/hardware/sensor-datasheet-notes.md)
 /// 182行目「実装されているinterface（jumper設定）| TBD」）。BME280側は`J3`のはんだ付けが
-/// 要る（`docs/hardware/gpio-assignment.md`417行目）。**したがってこの関数の読み出しが
+/// 要る（`docs/hardware/gpio-assignment.md`の`信号inventory`の`ENV-SDA`行）。**したがってこの関数の読み出しが
 /// 失敗（`Err`）しても、driverやbus配線ではなく、これらの未配線が原因でありうる。**
 ///
 /// **bus自体の配線も、まだ完了していない。**`ACCEL-SDA`／`ACCEL-SCL`の外部pull-upは
-/// breadboardへ実装済みだが（`docs/hardware/gpio-assignment.md`710行目、2026-09-07）、
+/// breadboardへ実装済みだが（`docs/hardware/gpio-assignment.md`の`競合check`節の
+/// 受け入れchecklist「すべての外部pull-upが3.3Vへ接続され」の項目、2026-09-07）、
 /// I2C実効pull-upが有効範囲内であることの確認（`Cb`未測定）と、ESP32電源投入前に
 /// 外部moduleがpinを駆動していないことの非通電導通checkは、**moduleがESP32へ配線
 /// されるまで検証対象が存在しない**として`#15`／`#16`側へ送られている
