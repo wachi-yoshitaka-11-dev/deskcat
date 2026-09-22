@@ -51,12 +51,27 @@
 //! （[Hardware Safety Policy](../../../docs/governance/hardware-safety-policy.md)
 //! 「人間の監視が必要な操作」）。
 
-use esp_idf_svc::hal::delay::BLOCK;
+use esp_idf_svc::hal::delay::{TickType, TickType_t};
 use esp_idf_svc::hal::i2c::I2cDriver;
 use esp_idf_svc::sys::EspError;
 
+use crate::config;
+
 /// Device ID register。Analog Devices ADXL345 Data Sheet Rev. G（module doc参照）。
 const REG_DEVID: u8 = 0x00;
+
+/// [`Adxl345::read_device_id`]の1 transactionのtimeout（tick）。
+///
+/// **`esp_idf_svc::hal::delay::BLOCK`（無期限）を使わない。**`SDA`がLowのまま固着した
+/// 場合（配線ミス、jumper未設定など）に呼び出しが返らず、`main()`がheartbeatのloopへ
+/// 到達しないため、人には「何も出ない」以外の情報が届かない。それでは「ハングした」
+/// 「起動していない」「センサが無い」を区別できない
+/// （[Issue #451](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/451)）。
+///
+/// 値と導出は[`crate::config::I2C_TRANSACTION_TIMEOUT_MS`]が正本である。
+/// **ここへ再掲しない。**[`crate::env`]も同じ定数から同じ換算で作る。
+const READ_TIMEOUT_TICKS: TickType_t =
+    TickType::new_millis(config::I2C_TRANSACTION_TIMEOUT_MS).ticks();
 
 /// `ACCEL-01`のI2C driver。
 ///
@@ -80,9 +95,13 @@ impl Adxl345 {
     ///
     /// **生byteをそのまま返す。**ADXL345のreset値`0xE5`との一致判定は呼び出し側の
     /// 責務とする（module doc参照）。
+    ///
+    /// **有限時間で返る。**timeoutは[`READ_TIMEOUT_TICKS`]であり、超えると
+    /// `Err(EspError)`（`ESP_ERR_TIMEOUT`）になる。応答しないsensorとbus固着を
+    /// この関数は区別しない。**区別するのはlogを読む人間である。**
     pub fn read_device_id(&self, i2c: &mut I2cDriver<'_>) -> Result<u8, EspError> {
         let mut buf = [0u8; 1];
-        i2c.write_read(self.address, &[REG_DEVID], &mut buf, BLOCK)?;
+        i2c.write_read(self.address, &[REG_DEVID], &mut buf, READ_TIMEOUT_TICKS)?;
         Ok(buf[0])
     }
 }

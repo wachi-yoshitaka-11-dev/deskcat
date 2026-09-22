@@ -9,29 +9,35 @@
 //! - board-configuration ID を出す
 //! - reset reason を出す
 //! - **rate limit 付きの heartbeat と health snapshot を出し続ける**（#7）
-//! - `DISP-01`（LCD）を初期化し、識別・単色fill・四隅patternを描画する（#13）
 //! - `ACCEL-01`（ADXL345）／`ENV-01`（BME280）のDevice ID／Chip IDを読み、生byteを
 //!   logへ出す（[#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)／
 //!   [#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16)）。
 //!   **一致判定はここでは行わない。**生byteをlogへ残すだけで、識別の断定は
 //!   log を読む人間の責務とする（[`run_i2c_bringup`]参照）。
-//! - `SERVO-PWM`・`ADC-*`・`TOUCH-*`は既定のbuildではdriveしない。[`crate::servo`]は
-//!   cross-compile確認用に加えたのみ。`bench-servo-test-17` feature付きbuildだけが
-//!   [`run_servo_bench_test`]経由で呼ぶ（[Issue #17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。
+//! - **`DISP-01`（LCD）・`SERVO-PWM`・`ADC-*`・`TOUCH-*`は既定のbuildではdriveしない。**
+//!   [`crate::display`]と[`crate::servo`]はcross-compile確認用にcompileするだけであり、
+//!   `main()`からは呼ばない。`bringup-display-13` feature付きbuildだけが
+//!   [`run_display_bringup`]経由でLCDを初期化し、識別・backlight点灯・単色fill・
+//!   四隅patternを行う（[Issue #13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)。
+//!   **既定offにした理由と有効化の手順は下の「`DISP-01`のbring-upを有効にする手順」節。**）。
+//!   `bench-servo-test-17` feature付きbuildだけが[`run_servo_bench_test`]経由でservoを
+//!   呼ぶ（[Issue #17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。
 //!   詳細は[`crate::servo`]と[`run_servo_bench_test`]のdoc参照）。
 //!
-//! **上の一覧は既定buildの動作を述べる。**`pi-protocol-mode`はLCD／I2Cの
-//! bring-upを行わない。build identity／board ID／reset reasonのlogと、
+//! **上の一覧は既定buildの動作を述べる。**`pi-protocol-mode`はI2Cの
+//! bring-upを行わず、`bringup-display-13`とは同時に有効にできない（下記
+//! `compile_error!`）。build identity／board ID／reset reasonのlogと、
 //! heartbeat／health snapshotのloopは`pi-protocol-mode`でも実行されるが、
 //! loggingを止めているため出力は既定buildにしか出ない（`crate::console`
 //! 参照）。`pi-protocol-mode`は代わりに`boot` frameの書き込みを1回だけ試みる
 //! （`send_boot_frame_once`参照。制約は`crate::console`のmodule docに
 //! まとめてある）。
 //!
-//! 既定buildで`Peripherals::take()`が束縛するのはLCD関連6+1本と、I2C関連2本
-//! （`crate::display`・`crate::accel`・`crate::env`のmodule doc参照）だけである。
-//! `bench-servo-test-17` feature付きbuildだけは例外で`SERVO-PWM`（GPIO27）と
-//! `peripherals.ledc.timer0`／`channel0`も束縛する。`pi-protocol-mode`は
+//! 既定buildで`Peripherals::take()`の戻り値から実際にdriverへ渡すのは、I2C関連2本
+//! （`crate::accel`・`crate::env`のmodule doc参照）だけである。
+//! `bringup-display-13` feature付きbuildはLCD関連6+1本（`crate::display`のmodule doc参照）を、
+//! `bench-servo-test-17` feature付きbuildは`SERVO-PWM`（GPIO27）と
+//! `peripherals.ledc.timer0`／`channel0`を、それぞれ追加で渡す。`pi-protocol-mode`は
 //! `Peripherals::take()`自体を呼ばない（`main()`参照）。
 //!
 //! **I2Cはこの版でも実機通電していない。**この版の検証は`cargo build`でのcross-compile
@@ -54,8 +60,38 @@
 //! watchdog could trigger. **This delayer avoids that by yielding to the OS during the
 //! delay.**」と doc に明記しており、これが「logging が watchdog の進行を block しない」
 //! 根拠である。busy wait をしないため、待ち時間は必ず 1 ms 以上へ丸める
-//! （[`sleep_ms_until`] 参照）。`run_display_bringup`（#13の LCD bring-up）も同じ
+//! （[`sleep_ms_until`] 参照）。`run_display_bringup`（#13の LCD bring-up。
+//! `bringup-display-13` feature付きbuildだけが呼ぶ）も同じ
 //! [`FreeRtos::delay_ms`] を段階ごとに挟む（`service_bringup_step` 参照）。
+//!
+//! # `DISP-01`のbring-upを有効にする手順
+//!
+//! **既定buildでLCDを動かさないのは、恒久的な無効化ではない。**`DISP-01`（MSP2807）の
+//! moduleが耐えられる電流の上限が`HW-TBD-024`として未解決であり
+//! （[tbd-register.md](../../../docs/hardware/tbd-register.md)）、B-2bの給電構成も
+//! 確定していない（[power-budget.md](../../../docs/hardware/power-budget.md)の
+//! `DISP-01`初回通電の手順（給電構成の確定待ち）が、実行の前提として2点を挙げている）。
+//! **[Issue #451](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/451)より前、
+//! `run_display_bringup`は既定buildでも無条件に呼ばれ、その中で`lcd.backlight_on()`を
+//! 実行していた。**そのため`DISP-01`が配線されているだけでbacklightへ給電された。
+//! **それを止めたのがこのfeatureである。**
+//!
+//! **上の2つが解けたら、人間が次の手順で有効にする。**
+//!
+//! 1. `power-budget.md`の`DISP-01`初回通電の手順（給電構成の確定待ち）が挙げる
+//!    前提2点を満たす。
+//! 2. `--features bringup-display-13`を付けてbuildする。**commandの正本は
+//!    [検証済みコマンド](../../../docs/toolchains/verified-commands.md)であり、
+//!    ここへ写さない。**
+//! 3. ESP32 Flash / HIL profileの端末で人間がflashし、人間の監視下で通電する
+//!    （[Machine Profiles](../../../docs/toolchains/machine-profiles.md)、
+//!    [Hardware Safety Policy](../../../docs/governance/hardware-safety-policy.md)
+//!    「人間の監視が必要な操作」）。
+//!
+//! **このfeatureは`HW-TBD-024`のgateを開けない。**開けてよいかの判定は上記の正本文書が
+//! 持つ。**このfeatureが変えるのは、既定buildが`DISP-01`へ触れるかどうかだけである**
+//! （上のLCD関連6+1本のGPIOを駆動するか、`lcd.backlight_on()`を呼ぶか、`display_*`の
+//! logを出すか）。回路側の制約も、`DISP-01`を接続してよいかの判定も、これで変わらない。
 
 // `pi-protocol-mode`ではLCD／I2Cのbring-upとdemo用moduleをcompileしない
 // （`crate::console`のmodule doc参照）。
@@ -83,7 +119,20 @@ compile_error!(
      呼ばれず、featureが黙って無効になる。どちらか一方だけを有効にすること。"
 );
 
-#[cfg(not(feature = "pi-protocol-mode"))]
+// `bringup-display-13`も同じ理由で`pi-protocol-mode`と排他にする。**servoと同じ形を
+// 採ったのは、失敗の仕方が同じだからである。**`pi-protocol-mode`は`Peripherals::take()`を
+// 呼ばず`crate::display`もcompileしないため、両方を有効にしてもLCDのbring-upは実行され
+// ない。「LCDを有効にしたつもりの構成が黙ってLCDを動かさない」状態を作らず、compile時に
+// 理由を示して止める（`#451`）。
+#[cfg(all(feature = "pi-protocol-mode", feature = "bringup-display-13"))]
+compile_error!(
+    "pi-protocol-modeとbringup-display-13は同時に有効にできない。\
+     pi-protocol-modeはPeripherals::take()を行わずcrate::displayもcompileしないため\
+     LCDのbring-up経路が呼ばれず、featureが黙って無効になる。\
+     どちらか一方だけを有効にすること。"
+);
+
+#[cfg(feature = "bringup-display-13")]
 use std::time::Instant;
 
 #[cfg(feature = "pi-protocol-mode")]
@@ -97,14 +146,14 @@ use esp_idf_svc::hal::gpio::{InputPin, OutputPin};
 use esp_idf_svc::hal::i2c::{I2cConfig, I2cDriver, I2C0};
 #[cfg(not(feature = "pi-protocol-mode"))]
 use esp_idf_svc::hal::peripherals::Peripherals;
-#[cfg(not(feature = "pi-protocol-mode"))]
+#[cfg(feature = "bringup-display-13")]
 use esp_idf_svc::hal::spi::SpiAnyPins;
 #[cfg(not(feature = "pi-protocol-mode"))]
 use esp_idf_svc::hal::units::Hertz;
 
 #[cfg(not(feature = "pi-protocol-mode"))]
 use crate::accel::Adxl345;
-#[cfg(not(feature = "pi-protocol-mode"))]
+#[cfg(feature = "bringup-display-13")]
 use crate::display::Ili9341;
 #[cfg(not(feature = "pi-protocol-mode"))]
 use crate::env::Bme280;
@@ -268,20 +317,30 @@ fn main() {
     // `bench-servo-test-17`を同時に有効にした場合も、servo benchは実行されない。
     #[cfg(not(feature = "pi-protocol-mode"))]
     {
-        // 束縛範囲はmodule doc参照。1度しか成功しないため`expect`で即座に気付く。
+        // 実際にdriverへ渡す範囲はmodule doc参照。1度しか成功しないため`expect`で即座に気付く。
         let peripherals = Peripherals::take().expect("Peripherals::take must succeed exactly once");
-        #[cfg(not(feature = "bench-servo-test-17"))]
+        // **bring-up経路ごとに1 fieldで出す。**featureが2つになったため、行ごと`#[cfg]`で
+        // 分けると組み合わせの数だけ同じ行を書くことになる。`cfg!`はcompile時に定数へ
+        // 畳まれるため、有効でない経路の文字列が実行時に選ばれることはない。
+        let display_state = if cfg!(feature = "bringup-display-13") {
+            "bringup_enabled"
+        } else {
+            "not_driven"
+        };
+        let servo_state = if cfg!(feature = "bench-servo-test-17") {
+            "bench_test_pending"
+        } else {
+            "not_driven"
+        };
         log::info!(
-            "peripherals=display_and_i2c servo=not_driven i2c=id_read_attempt adc=not_driven touch=not_driven"
-        );
-        #[cfg(feature = "bench-servo-test-17")]
-        log::info!(
-            "peripherals=display_and_i2c_and_servo_bench_test servo=bench_test_pending i2c=id_read_attempt adc=not_driven touch=not_driven"
+            "peripherals=taken display={display_state} servo={servo_state} i2c=id_read_attempt adc=not_driven touch=not_driven"
         );
         log::info!(
             "i2c_addresses accel=0x{ACCEL_I2C_ADDRESS:02x} env=0x{ENV_I2C_ADDRESS:02x} baudrate_hz={I2C_BAUDRATE_HZ}"
         );
 
+        // featureが無ければこのblockはbuildへ含まれない（`run_display_bringup`のdoc参照）。
+        #[cfg(feature = "bringup-display-13")]
         run_display_bringup(
             peripherals.spi3,
             peripherals.pins.gpio18,
@@ -489,7 +548,14 @@ fn service_bringup_step(health: &mut Health, step: &str) {
 /// **どの段階で失敗しても、この関数はpanicしない。**この関数はエラーを
 /// `log::error!`へ分類して返すだけで、呼び出し元の`main`を止めない。
 /// heartbeatは[`service_bringup_step`]で段階ごとに刻む（同関数のdoc参照）。
-#[cfg(not(feature = "pi-protocol-mode"))]
+///
+/// **`bringup-display-13` feature付きbuildだけがこの関数を持つ。**既定buildはこの関数を
+/// compileせず、`main()`から呼ばない。したがって既定buildは`LCD-BL`（GPIO4）を含む
+/// LCD関連pinへ一切触れず、`lcd.backlight_on()`も実行しない
+/// （[#451](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/451)。既定offにした
+/// 理由と有効化の手順はmodule docの「`DISP-01`のbring-upを有効にする手順」節が持つ。
+/// **ここへ再掲しない。**）。
+#[cfg(feature = "bringup-display-13")]
 #[allow(clippy::too_many_arguments)]
 fn run_display_bringup<SPI: SpiAnyPins + 'static>(
     spi3: SPI,
@@ -595,17 +661,40 @@ fn run_display_bringup<SPI: SpiAnyPins + 'static>(
 /// （同文書冒頭の`#2`のclose条件ではない項目一覧、(3)・(5)）。**したがってこの関数を
 /// 実機で動かす前に、これらの現物確認が要る。**
 ///
-/// **通信timeoutには`esp_idf_svc::hal::delay::BLOCK`（無期限）を使う**（`crate::accel`・
-/// `crate::env`と同じ値。一次資料に無い値を推測しない）。**busが低のまま固着する
-/// 状態（jumper未設定など）で、この呼び出しがどのくらいの時間で`Err`を返すか、
-/// あるいは返さないままになりうるかは、このPRでは検証していない。**esp-idf-hal・
-/// esp-idfのI2C driver実装には複数の内部timeout機構（`i2c_master_cmd_begin`の
-/// alive-check polling、I2Cハードウェアのbus timeoutレジスタ）があるが、
-/// `esp_idf_svc::hal::i2c::config::Config`の`timeout`フィールドを設定していない
-/// 場合の既定挙動と、実際に`Err(ESP_ERR_TIMEOUT)`が返るまでの時間は未確認である。
-/// **したがってこの呼び出しが返る時間の上限は、このPRの時点で未確定として残す。**
-///
 /// 生byteの解釈は、この前提込みでlogを読む人間の判断とする。
+///
+/// # 通信timeout
+///
+/// **無期限（`esp_idf_svc::hal::delay::BLOCK`）は使わない。**`crate::accel`・`crate::env`が
+/// [`crate::config::I2C_TRANSACTION_TIMEOUT_MS`]から換算したtick数を
+/// `I2cDriver::write_read`へ渡す（[#451](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/451)。
+/// 値と導出は同定数のdocが正本であり、**ここへ再掲しない**）。**これにより、busが低のまま
+/// 固着した状態（`SDA`の地絡、jumper未設定など）でもこの関数は`Err`を分類してlogへ出し、
+/// `main()`のheartbeat loopへ到達する。**「ハングした」と「センサが応答しない」を、人が
+/// logの有無から区別できる。
+///
+/// **上限が効くのはdriver呼び出し側のtick数である。**ESP-IDF v5.5.3の
+/// `i2c_master_cmd_begin`（`components/driver/i2c/i2c.c`）は、`ticks_to_wait`を
+/// `xSemaphoreTake`の待ち時間として使い、その後の完了待ちloopでも
+/// `elapsed >= ticks_to_wait`で打ち切って`ESP_ERR_TIMEOUT`を返す。`ticks_start`は
+/// semaphore取得より前に取るため、**この2区間を合わせた「待ち」の上限が渡したtick数**
+/// になる。
+///
+/// **関数が戻るまでの時間は、その待ちより少し長い。**timeoutを検出した側は
+/// `i2c_hw_fsm_reset`を呼び、同関数のbus clear待ちが最大`I2C_CLR_BUS_TIMEOUT_MS`
+/// （同版で50 ms）かかりうる（同file）。**有限であることは変わらないが、
+/// 「渡したtick数ちょうどで戻る」とは書かない。**
+///
+/// **`esp_idf_svc::hal::i2c::config::Config`の`timeout`フィールドは設定しない。**同
+/// フィールドが書き換えるのはI2C周辺回路側のbus timeoutレジスタ（`i2c_set_timeout`）で
+/// あり、ESP32ではこの値をbaudrateから導出して`i2c_param_config`の時点で既に設定して
+/// いる（同版`components/hal/esp32/include/hal/i2c_ll.h`の`i2c_ll_cal_bus_clk`。
+/// `clk_cal->tout = half_cycle * 20; //default we set the timeout value to 10 bus cycles.`）。
+/// **ここへ定数を与えると、baudrateへ連動している既定値を、根拠の無い固定値で置き換える
+/// ことになる。**上限の保証は上のtick数側で取るため、その必要が無い。
+///
+/// **実機で`Err`が返るまでの実測時間は、まだ取っていない。**上の上限はESP-IDF実装を
+/// 読んだ結果であって実機観測ではない（この変更の検証は`cargo build`までである）。
 #[cfg(not(feature = "pi-protocol-mode"))]
 fn run_i2c_bringup(
     i2c0: I2C0<'static>,
@@ -616,6 +705,8 @@ fn run_i2c_bringup(
     // ESP32内蔵のweak pull-upは有効にしない。`gpio-assignment.md`の実効pull-up計算が
     // 外部pull-upだけを前提にしているため（`crate::env`のmodule doc「bus speedは
     // Standard-mode」節と同じ根拠。**ここへ再掲しない**）。
+    // **`timeout`（hardware側のbus timeoutレジスタ）は設定しない。**理由はこの関数の
+    // doc comment「通信timeout」節。**ここへ再掲しない。**
     let config = I2cConfig::new()
         .baudrate(Hertz(I2C_BAUDRATE_HZ))
         .sda_enable_pullup(false)
@@ -754,7 +845,7 @@ fn run_servo_bench_test(
 /// 対応する。**正しいかどうかの判定はこの関数では行わない。**実機のLCDを目視して
 /// 判定するのは人間であり（`AGENTS.md`ハードウェア安全、初回通電は人間監視下）、
 /// この関数は色と所要時間を機械可読な形でlogへ残すだけである。
-#[cfg(not(feature = "pi-protocol-mode"))]
+#[cfg(feature = "bringup-display-13")]
 fn run_fill_tests(lcd: &mut Ili9341<'_>, health: &mut Health) {
     let fills: [(&str, u16); 5] = [
         ("black", display::color::BLACK),
@@ -785,7 +876,7 @@ fn run_fill_tests(lcd: &mut Ili9341<'_>, health: &mut Health) {
 /// （`00h`）のままである**（`crate::display`のmodule doc参照）。この patternを見て
 /// 向きと色順が期待どおりでなければ、`docs/hardware/gpio-assignment.md`の`MADCTL`欄と
 /// `crate::display`のMADCTL定数を実測結果で更新する必要がある。
-#[cfg(not(feature = "pi-protocol-mode"))]
+#[cfg(feature = "bringup-display-13")]
 fn run_corner_pattern(lcd: &mut Ili9341<'_>, health: &mut Health) {
     if let Err(err) = lcd.fill_screen(display::color::BLACK) {
         log::error!("display_corner_background_failed error={err}");

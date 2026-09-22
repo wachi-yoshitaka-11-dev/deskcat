@@ -47,12 +47,24 @@
 //!   責務とする（`display.rs`の[`DisplayId`](crate::display::DisplayId)と同じ「捏造しない」
 //!   形。このmoduleは生byteを返すだけで、BME280であると断定しない）。
 
-use esp_idf_svc::hal::delay::BLOCK;
+use esp_idf_svc::hal::delay::{TickType, TickType_t};
 use esp_idf_svc::hal::i2c::I2cDriver;
 use esp_idf_svc::sys::EspError;
 
+use crate::config;
+
 /// Chip ID register。Bosch BME280 Data Sheet Revision 1.24（module doc参照）。
 const REG_CHIP_ID: u8 = 0xD0;
+
+/// [`Bme280::read_chip_id`]の1 transactionのtimeout（tick）。
+///
+/// **`esp_idf_svc::hal::delay::BLOCK`（無期限）を使わない。**理由と値の正本は
+/// [`crate::accel`]側の同名定数と同じであり（`SDA`固着時に呼び出しが返らないと、
+/// 人には「何も出ない」以外の情報が届かない。
+/// [Issue #451](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/451)）、
+/// 値と導出は[`crate::config::I2C_TRANSACTION_TIMEOUT_MS`]が持つ。**ここへ再掲しない。**
+const READ_TIMEOUT_TICKS: TickType_t =
+    TickType::new_millis(config::I2C_TRANSACTION_TIMEOUT_MS).ticks();
 
 /// `ENV-01`（BME280）のI2C driver。
 ///
@@ -76,9 +88,13 @@ impl Bme280 {
     ///
     /// **生byteをそのまま返す。**BME280のreset値`0x60`との一致判定は呼び出し側の
     /// 責務とする（module doc参照）。
+    ///
+    /// **有限時間で返る。**timeoutは[`READ_TIMEOUT_TICKS`]であり、超えると
+    /// `Err(EspError)`（`ESP_ERR_TIMEOUT`）になる。応答しないsensorとbus固着を
+    /// この関数は区別しない。**区別するのはlogを読む人間である。**
     pub fn read_chip_id(&self, i2c: &mut I2cDriver<'_>) -> Result<u8, EspError> {
         let mut buf = [0u8; 1];
-        i2c.write_read(self.address, &[REG_CHIP_ID], &mut buf, BLOCK)?;
+        i2c.write_read(self.address, &[REG_CHIP_ID], &mut buf, READ_TIMEOUT_TICKS)?;
         Ok(buf[0])
     }
 }
