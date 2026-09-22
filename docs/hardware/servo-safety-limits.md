@@ -397,8 +397,7 @@ firmware（`firmware/esp32/src/servo.rs`、
 - `HW-TBD-009`（backfeed）はservoの内部回路図が非公開のため机上reviewで排除できない。
   **ESP32とservoの電源を分離した構成（下記`電源準備`）は、片方だけ電源が落ちる状況をむしろ生みうる。**
   この経路を遮断する対策（追加部品等）は無く、人間の監視だけに委ねている。
-- `HW-TBD-026`（logic閾値・PWM周期・pulse幅）は、[Hardware Safety
-  Policy](../governance/hardware-safety-policy.md)の`5項目以外の扱い`対応表で
+- `HW-TBD-026`（logic閾値・PWM周期・pulse幅）は、[Hardware Safety Policy](../governance/hardware-safety-policy.md)の`5項目以外の扱い`対応表で
   一次資料または実測を要する側に分類される。**「5項目に効かないので一般値でよい」
   という扱いはしていない。**一般的な慣行値を使うこと自体が、この承認が受容した
   未解決の、一次資料または実測を要する項目である。
@@ -527,8 +526,7 @@ firmware（`firmware/esp32/src/servo.rs`、
    （上記「決定事項」参照）。
 4. **`電源準備`（人間）** サーボの電源をまだ入れない。ESP32側だけ電源を入れられる
    状態にする（ESP32はPCのUSBから給電する。servoの外部5 V系とは電源を分離する）。
-   手やcableを、サーボが動きうる範囲の外へ置く（[Hardware Safety Policy
-   §6](../governance/hardware-safety-policy.md#6-サーボ)のPWM出力前7項目の1つ）。
+   手やcableを、サーボが動きうる範囲の外へ置く（[Hardware Safety Policy §6](../governance/hardware-safety-policy.md#6-サーボ)のPWM出力前7項目の1つ）。
 5. **`build`（AI、flashは人間）** `cargo build --locked --features bench-servo-test-17`で
    AIがfirmwareをbuildし、ESP32 Flash／HIL profileの端末で人間がflashする（`espflash`。
    AIがこの端末を持たない場合、この工程は人間が行う）。このfeatureを付けない通常buildでは
@@ -561,8 +559,7 @@ firmware（`firmware/esp32/src/servo.rs`、
    dutyを0へ戻す（連続で保持しない）。**信号を止めてもservoが駆動を止める保証は無い**
    （上記「残余risk」参照）。
 9. **`停止基準`（人間）** 人が試験を止める基準に該当する事象が無いかを確認する。
-   該当すれば直ちに外部5 V電源を遮断する。基準は[Hardware Safety Policy
-   §6](../governance/hardware-safety-policy.md#6-サーボ)が列挙する7項目
+   該当すれば直ちに外部5 V電源を遮断する。基準は[Hardware Safety Policy §6](../governance/hardware-safety-policy.md#6-サーボ)が列挙する7項目
    （予期しない方向への動作、衝突または拘束、異音、過熱、**resetまたはbrownoutの反復**、
    過電流、commandまたは緊急停止応答の喪失）**を基本とし**、本手順として次を加える
    （根拠はPR本文参照）。
