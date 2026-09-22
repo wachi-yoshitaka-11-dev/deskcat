@@ -26,6 +26,7 @@
 | [EXP-012](#exp-012-m-12001cableのplug側破片を使ったvbusgnd極性判定) | `HW-TBD-021`／`022`（案Bのingress実装） | [power-budget.md](power-budget.md)の`M-12001のcableを受ける端子台` |
 | [EXP-013](#exp-013-ブレッドボード上でのingress保護回路ptcmosfetの通電検証) | `HW-TBD-030`（`PROT-RP-01`の向き）、`HW-TBD-034`（`この試験から次へ渡すもの`の宛先） | 値の正なし（仮組みでの動作確認。定格表の検証ではない） |
 | [EXP-014](#exp-014-env-01bme280のj3はんだジャンパの実施記録) | `HW-TBD-005`（`J3`のはんだ付け。**closeしていない**） | 値の正なし（**測定値を1つも持たない。**状態の正は[sensor-datasheet-notes.md](sensor-datasheet-notes.md)の`jumper（AE-BME280）`節） |
+| [EXP-015](#exp-015-accel-01adxl345env-01bme280のesp323v3-pin給電による初回通電とdevice-id読み出し) | [#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)／[#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16)受け入れ条件 | [sensor-datasheet-notes.md](sensor-datasheet-notes.md)のDevice ID行、[gpio-assignment.md](gpio-assignment.md)の`電源pinの短絡・誤配線の確認（非通電）`表 |
 
 **大容量の生dataはこのrepositoryへ入れていない。**保存場所は
 [development-foundation-plan.md](../planning/development-foundation-plan.md)の
@@ -1552,6 +1553,69 @@ Bで10 kΩの両端に`4.85`が掛かっている。**この電圧が`PROT-RP-01
 **手順の実施時には、他の項目と同じように`J3`の閉を現物で確認する。**
 **この記録は測定値を持たないため、その確認の代わりにならない。**
 
+## EXP-015: `ACCEL-01`（ADXL345）／`ENV-01`（BME280）のESP32`3V3` pin給電による初回通電とDevice ID読み出し
+
+**目的**: [#445](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/445)の2026-09-22承認（周辺module3点のうち`ACCEL-01`／`ENV-01`の2点に限り、ESP32自身の`3V3` pinから給電する）に基づき、[power-budget.md](power-budget.md)の`ACCEL-01／ENV-01単体bring-upの手順`を実施し、両moduleのDevice ID読み出しを試みる。[#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)／[#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16)の受け入れ条件の判定材料とする。`ENV-01`の`J3`（`CSB`→`VDD`のはんだジャンパ）は事前にはんだ付け済みという前提で実施した（[EXP-014](#exp-014-env-01bme280のj3はんだジャンパの実施記録)参照。同記録は根拠をユーザーの申告のみに置き、測定値を持たない）。
+
+**実施日**: 2026-09-22（JST）。
+
+**実施者**: 配線、非通電確認（項目1・5・6・7）、通電中の監視、通電後の再測定はユーザーが物理的に行った。firmwareのbuildと書き込み、シリアルログの読み取り実行は別のClaude Codeセッション（実機Linux上、「Linux実機」）が行った。この記録の作成はDeskCat ACCEL-01/ENV-01 bring-up support（本セッション、VM上のworktree）が行った。**本セッションはUSB busへアクセスできず、配線・通電・実測のいずれも行っていない。**
+
+### 構成
+
+| 項目 | 内容 |
+|---|---|
+| 給電 | ESP32単体、PCのUSBから（`ACCEL-01`／`ENV-01`は`3V3` pin経由で同時通電）。`DISP-01`は未配線（条件(4)） |
+| firmware commit | `35bcc36d74b7347201c0aade20a45715300b0475`。`run_i2c_bringup`実装（`4486de5`）、`SERVO-01` driver追加（`059743b`）、UART0 mode切替（`28bc38b`）のいずれも`35bcc36`の祖先である（＝`35bcc36`がこれら3つの変更をすべて含む）ことを`git merge-base --is-ancestor`で確認済み（Linux実機セッションの申告） |
+| build | `cargo build --locked`（debug、条件(2)用）と`cargo build --locked --release`（flash用）。featureフラグ指定なし（`default = []`のまま、`pi-protocol-mode`は無効）。boot logの`App version=35bcc36-dirty`と一致（`dirty`はbuild時の一時的な`[workspace]` shimによるものとLinux実機セッションが申告） |
+| 配線 | `ACCEL-01`: `Vs`/`VDD`→`3V3`、`GND`→`GND`、`SDA`→GPIO25、`SCL`→GPIO26、`CS`→同module上の`VDD`、`SDO`→`GND`。`ENV-01`: `VDD`→`3V3`、`GND`→`GND`、`SDI`→GPIO25（共有）、`SCK`→GPIO26（共有）、`SDO`→`GND`、`CSB`は外部配線せず`J3`はんだジャンパ経由（下記`この記録が主張しないこと`参照） |
+| 待機時間の上限 | 3分（180秒）。`run_i2c_bringup`のI2C通信timeoutは`esp_idf_svc::hal::delay::BLOCK`（無期限）であり、この上限に技術的根拠は無い（firmware側が保証する値ではなく、実施前に人間が承諾した運用上の値） |
+
+### 通電前の非通電確認（条件(1)、[gpio-assignment.md](gpio-assignment.md)の`電源pinの短絡・誤配線の確認（非通電）`表）
+
+| # | 項目 | 結果 |
+|---|---|---|
+| 1 | `VCC`–`GND`間短絡検出 | `ACCEL-01`と`ENV-01`の`VDD`/`Vs`が同一ブレッドボード行に配線されているため、moduleごとの分離測定はできず、合算で1回測定した。プローブ接触時**1341 Ω**、数秒後**1210 Ωで安定**。「低いまま動かない」には該当せず、正常と判定した |
+| 5 | 一覧との目視照合 | ユーザーが実施し、一致・異常なしと申告 |
+| 6 | 逆極性・電圧違いpinの確認 | 同上 |
+| 7 | 給電経路の重複確認 | 同上 |
+
+**条件(5)(a)（`module電源pinの独立性`／`pin header対応`、[gpio-assignment.md](gpio-assignment.md)の別の受け入れchecklist項目）は満たしていない。**`ACCEL-01`/`ENV-01`の`VDD`/`Vs`、`SDA`、`SCL`がいずれもESP32側の対応pin（`3V3`、GPIO25、GPIO26）と同一ブレッドボード行に直接刺さっており、「moduleの電源pin ⇔ ESP32のpin」という2点間の抵抗測定が物理的に成立しない（同一node）。**この状態のまま、人間の現場判断で通電へ進んだ。**配線を分離して測定し直すか、この制約のまま受け入れるかは持ち越し。
+
+`bus容量Cb`（受け入れchecklistの別項目、実効pull-up抵抗の並列合成が有効範囲内であること）は未測定のまま通電した。PM（`#0PM`）が「通電を止めない」と判定し、人間がこの判定を受けて条件(6)（通電してよい）を明示した。**判定の技術的根拠（数値・導出）はこの記録では特定できないため書かない。**判定があった事実だけを記録する。
+
+### 通電と結果（手順8〜10）
+
+USB接続によりfirmware書き込み＝初回通電。約3分間、異音・発熱（module、ESP32 board、`U2`）・火花・変色・異臭はいずれも認めなかった（ユーザーの申告）。
+
+シリアルログ:
+
+| 対象 | 生byte | 期待値（出典） |
+|---|---|---|
+| `ACCEL-01`（`accel_device_id`） | `raw=0xe5` | `0xE5`（[sensor-datasheet-notes.md](sensor-datasheet-notes.md)のDevice ID行） |
+| `ENV-01`（`env_chip_id`） | `raw=0x60` | `0x60`（同上） |
+
+**一致・不一致の判定はこの記録では行わない**（[power-budget.md](power-budget.md)の手順10が「一致するかは判定せず、値をそのまま記録する」と定めているため）。両方とも応答が得られたため、手順10の運用（`(a)(b)`が確認でき次第、給電を止める）に従い、この時点で給電を停止した。手順9の停止条件（異音・発熱・火花・変色・異臭、または3分無出力）はいずれも発生しなかった。
+
+給電停止後、`VCC`–`GND`間抵抗を再測定した（`DT830B`、2000Ωレンジ）: **1218 Ω**（通電前の安定値1210 Ωに近い値。「低いまま動かない」への変化は認められなかった）。
+
+### この記録が主張しないこと
+
+- **Device ID読み出しの「一致」は判定していない。**生byteと期待値を併記しているだけであり、達成の主張ではない
+- **`ENV-01`の`J3`（はんだジャンパ）を、この記録の一部として現物確認していない。**「はんだ付け済み」は別セッション（DeskCat BME280 J3はんだ付け記録、実施日2026-09-07）の申告に基づく。今回`env_chip_id`が応答した事実は、`J3`が機能している（`CSB`が`VDD`へ接続されている）ことと整合するが、この記録単独でその状態を検証したものではない
+- **条件(5)(a)（`module電源pinの独立性`／`pin header対応`）は未達のまま進めた。**「配線方式のため測定不能」という制約を記録するだけで、代替手段で満たしたとは主張しない
+- **`bus容量Cb`（実効pull-up抵抗の並列合成が有効範囲内であること）は未測定のまま。**PM判定に基づき進めたが、この記録が同項目を満たしたとは主張しない
+- **3分という待機時間の上限に技術的根拠は無い。**firmware側のI2C通信timeoutは無期限（`BLOCK`）であり、この上限を超えなかったことは「異常が無かった」ことの傍証にはなるが、「何秒以内に応答する」という保証を示すものではない
+- **`ACCEL-IRQ`（割り込み）、`DISP-01`との同時動作、Pi側との通信は範囲外。**この記録では扱っていない
+- **通電後の抵抗再測定（1218 Ω）は短絡の有無の簡易確認であり、moduleの健全性を精密に証明するものではない**
+- **本セッション（記録者）は配線・通電・実測のいずれも物理的に行っていない。**実施はユーザーとLinux実機セッションによる
+- **計器（`DT830B`）自体の自己確認（短絡→導通表示、開放→開放表示）は記録していない。**`EXP-012`／`EXP-013`と同じ限定であり、この記録単独で測定系の信頼性を独立に保証できない
+- **この記録の生byte・抵抗値は、このセッションが直接見たシリアルログや写真ではなく、ユーザーとの会話での報告に基づく。**Linux実機セッションが読んだシリアルログの原文そのものは、このセッションには渡されていない
+
+### 結論
+
+`ACCEL-01`（ADXL345）・`ENV-01`（BME280）とも、ESP32`3V3` pin給電下でDevice ID読み出しに応答があった（生byte: `0xe5`、`0x60`）。通電中・通電後とも異常の兆候は認められなかった。**条件(5)(a)は未達のまま通電に至っており、この点は正本（`power-budget.md`）の手順の想定（条件を満たしてから通電）と食い違う。**`Issue #15`／`#16`の受け入れ条件はいずれも未達（配線・初回通電という現物作業は完了したが、calibration・sampling等のソフトウェア側の検証は残っている）。この判定は記録者からPM（`#0PM`）へ報告し、PMは異論無しと確認した。その後、`EXP-014`との相互参照linkを追加した版の本文をPMが読み、祖先関係の記述の反転（`firmware commit`行）と`bus容量Cb`の判定根拠の帰属（数値の出所を特定できないため削除した）の2点を指摘した。いずれもこの記録の現在の本文へ反映済みである。
+
 ## Revision履歴
 
 | 日付 | Revision | 変更 | 根拠 |
@@ -1577,3 +1641,4 @@ Bで10 kΩの両端に`4.85`が掛かっている。**この電圧が`PROT-RP-01
 | 2026-09-16 | 18 | [#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)。**`EXP-013`の事後確認の判定へ、2026-09-16の訂正を追記した。**[PR #404](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/404)の時点では、この判定は「AIセッション（PM）の提案であり、人間の承認を受けていないため発効していない」状態のまま`develop`へ入っていた。**2026-09-16にユーザーが承認し、発効した。****あわせてユーザーがESP32を無事と判断した。**ユーザーの言葉は「ESP32は無事です」、材料を問うたときの答えは「起動しているだけです」である（**後者はユーザー自身が付けた限定**）。**この記録に書かれている起動は作業ミスの間と試験3の2回であり、それ以外の点検を行った記録は無い**（ユーザーの言葉がこの2回を指していたかは述べない）。**この判断はESP32についてのみであり、`PROT-OC-01`／`PROT-RP-01`は未確認のままである。****`承認された場合に閉じる条件`は現に有効な残件になった**（この記録に書かれている2回の起動は同条件が言う「次にこのESP32を使うとき」より前であり、**同条件が満たされたという記録は無い。記録の不在であって事実の不在ではない**）。**承認と判断はセッション内の口頭であり、Issue・Pull Request・正本のいずれにも独立した記録は無い。この訂正がその記録である。****元の段落は書き換えず、直後へ日付つきの訂正として置いた。**発効していなかった期間が実在したことを残すためである（この文書の運用どおり）。**測定値は1つも変えていない。どのgateも開かない。`HW-TBD-007`／`021`／`022`／`030`／`034`のいずれもcloseしない。上限1.08 Aも動かさない。**[power-budget.md](power-budget.md)は1文字も変更していない | ユーザーの承認と判断（2026-09-16）、[CONTRIBUTING.md](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/CONTRIBUTING.md#後始末fixupの範囲)（`fixup`の対象外である「新しい判断」に当たるため、Pull Requestを立てた） |
 | 2026-09-16 | 19 | [#407](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/407)（昇格[PR #383](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/383)のCodeRabbit指摘、🟡Minor 1件・🟠Major 1件の余波）。2点。(a) `EXP-001`の`結論`にあった「**`MEAS-02`の採否は未確定である。****2026-09-14に採否を決定した。**」が、同じ対象を未決と既決の両方で述べていた。**記録時点の記述はそのまま残し、2026-09-14の決定を追記として分離した。****採否の決定（済）と、この品で足りるかの判定（未）は別のものである、と明示した。**(b) `EXP-013`の「**その判定はこの記録では行わない。****引き受け先は決めていない。**」の段落は書き換えず、**引き受け先が`#407`に決まったことを日付つきの訂正として直後へ置いた。**同Issueで[power-budget.md](power-budget.md)を全数走査して5箇所を訂正し、**(2)の実施と通電を反映したうえで、(3)の未決と`通電前の配線確認手順`の記録要件の未充足はどちらも残した。****測定値も結論も1つも変えていない。** | [PR #383](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/383)のCodeRabbit `full review` |
 | 2026-09-22 | 20 | [#453](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/453)（[#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16)の残件1件の記録。**`#16`自体はcloseしない**）。**`EXP-014`を追加した。**`ENV-01`（AE-BME280）の`J3`はんだジャンパ（`CSB`→`VDD`）の実施記録である。**実施は2026-09-07、記録は2026-09-22であり、15日遅れている。****2026-09-07の時点でAI側がこの作業を知らされていたかどうかは記録が無く、判定しない。**確かなのは、15日間どの正本にも記録が無かったことである。その間、正本のどこにも、はんだ付け済みであるという記録が無かった**（この文書は`J3`に関する記述を1件も持っておらず、[sensor-datasheet-notes.md](sensor-datasheet-notes.md)・[gpio-assignment.md](gpio-assignment.md)・[tbd-register.md](tbd-register.md)・Issue `#16`は`未実施`／`開放`と書いていた。**不在と誤記は別である**）。この記録は他の`EXP`と水準が違う。測定表（測定点・レンジ・読み・判定）を持たない。**根拠はユーザーの申告だけである（確認方法は写真とテスターだが、**測定点・レンジ・読みは覚えていないとの回答であり記録に残っていない**）。**2026-08-22の導通確認は測定表を持つため、同じ体裁で並べないよう水準の違いを冒頭に明示した。**`主張しないこと`として、この記録を書いたAIセッションが閉を確認していないこと、`VDD`↔`CSB`の導通を測定値として持たないこと、通電の有無を主張しないこと（Chip ID読み出しをAIが行っていないことだけは言える）、`J1`／`J2`を測り直していないこと、はんだ付けの品質を判定していないこと、`HW-TBD-005`をcloseしていないこと、[power-budget.md](power-budget.md)を1文字も変更していないことを挙げた。**`J1`／`J2`は2026-09-22時点でも開放のままである**（ユーザーの申告）。これにより[power-budget.md](power-budget.md)の`単体bring-upとB-2の区別`行が置いたfault電流上界の前提は崩れない。**ただし根拠は2026-09-22のユーザーの回答だけであり、再測定はしていない。「前提が確認された」とは書かない。****`#16`が2026-09-21に条件付きで引き受けていた再計算は、この申告のもとでは発生しない**（引き受けの記述は同Issueの本文にあり、`power-budget.md`のRevision 115は同じ件を`#15`へ帰属させている）。**あわせて`EXP-013`の`主張しないこと`が`PROTO-02`上の実装と配置の確定へ予約していた`EXP-014`という番号を、この記録が取った。**番号を先に予約しない、という`#0PM`の判定（2026-09-22）による。**この判定はPMセッションのものであり、正本文書に置かれた規則ではない。****該当箇所へ日付つきの追記を入れ、本文は書き換えていない。**`PROTO-02`側は記録を書く時点で空き番号を取る（Revision 17の本文も同じ予約を述べているが、過去のRevision行は書き換えないため、この行で訂正する） | ユーザーの言明（2026-09-22）、[sensor-datasheet-notes.md](sensor-datasheet-notes.md) Revision 16、[gpio-assignment.md](gpio-assignment.md) Revision 38、[tbd-register.md](tbd-register.md) `HW-TBD-005` |
+| 2026-09-22 | 21 | [#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)／[#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16)。**`EXP-015`を追加した。**[#445](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/445)承認範囲でのESP32`3V3` pin給電により、`ACCEL-01`（ADXL345）／`ENV-01`（BME280）へ初回通電し、Device ID読み出しに成功した（`accel_device_id raw=0xe5`、`env_chip_id raw=0x60`。一致・不一致の判定は行っていない）。通電中・通電後とも異常の兆候は無かった（通電後`VCC`–`GND`間抵抗1218 Ω、通電前1210 Ωと近い）。**条件(5)(a)（`module電源pinの独立性`／`pin header対応`）は未達のまま通電に至った。**ESP32側の対応pinとmoduleの電源・信号pinが同一ブレッドボード行に直接配線されており、2点間の抵抗測定が物理的に成立しないため。この状態のまま人間の現場判断で通電した。**`bus容量Cb`も未測定のまま、PM判定（通電を止めない）に基づき進めた。**`#0PM`の判定に従い、`EXP-014`（上記Revision 20）のmergeを待ってから本Revisionを起こし、`EXP-015`本文へ`EXP-014`への相互参照linkを追加した | ユーザーによる現物作業と監視、別のClaude Codeセッション（Linux実機）によるfirmware build・書き込み・ログ読み取り（いずれも2026-09-22）、`#0PM`の判定（merge順・相互参照） |
