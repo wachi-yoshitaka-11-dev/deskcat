@@ -7,10 +7,14 @@
 //! [`ProtocolCounters`] をそのまま使う。各 field の意味の正本は Protocol §4.6 の
 //! counter 対応表であり、ここへ再掲しない。
 //!
-//! **Protocol session は確立しない。**この firmware は serial link（#11）も
-//! session state（#12）も持たないため、[`ProtocolCounters`] は**すべて 0 のままである**。
-//! ここで示すのは「counter schema を `status` へ載せられる」ことであって、
-//! 「counter が動いている」ことではない。
+//! **Protocol session は確立しない。**この`Health`型はsession state（#12）を
+//! 持たない（既定buildが`crate::protocol::PiSession`で持つsession stateとは
+//! 別である）。`pi-protocol-mode`は`boot` frameのwire書き込みを1回試みるが
+//! （[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)、
+//! `crate::console`参照）、受理確認や応答の受信は無くsessionを確立しない。
+//! いずれの構成でも[`ProtocolCounters`]を増やす経路は無いため、**すべて 0 の
+//! ままである**。ここで示すのは「counter schema を `status` へ載せられる」
+//! ことであって、「counter が動いている」ことではない。
 
 use std::time::Instant;
 
@@ -40,10 +44,6 @@ pub struct Health {
     overrun_ticks: u32,
     /// Snapshot の serialize に失敗した回数。**Protocol counter ではない。**
     snapshot_errors: u32,
-    /// 起動時の`boot` message（`crate::protocol`）のserializeに失敗した回数。
-    /// **Protocol counterではない。**[`Self::snapshot_errors`]と原因が違うため
-    /// 混ぜずに分けて数える。
-    boot_serialize_errors: u32,
     /// Protocol counter。**すべて 0 のままである**（module doc 参照）。
     counters: ProtocolCounters,
     /// Machine-readable な reset reason。
@@ -58,7 +58,6 @@ impl Health {
             heartbeat_seq: 0,
             overrun_ticks: 0,
             snapshot_errors: 0,
-            boot_serialize_errors: 0,
             counters: ProtocolCounters::default(),
             reset_reason,
         }
@@ -68,8 +67,9 @@ impl Health {
     ///
     /// 型は `u64` である。Protocol §3 が `ts_ms` に `u64` を採ったのは
     /// 「`u32`は約49.7日でwrapし、長時間動作で`ts_ms`の単調性が崩れる」ためであり、
-    /// **`u32` で持たない。**`Envelope::ts_ms` へそのまま載せられる型に揃えてある
-    /// （載せるのは serial link と session が入ってからである。#11／#12）。
+    /// **`u32` で持たない。**`Envelope::ts_ms` へそのまま載せられる型に揃えてある。
+    /// `pi-protocol-mode`は`send_boot_frame_once`（`main.rs`）でこの値をすでに
+    /// `Envelope::ts_ms`へ載せている。session state（#12）が入るのは別工程である。
     ///
     /// [`Instant`] は単調性が型の契約であるため、この値も単調非減少である。
     /// `Duration::as_millis()` は `u128` を返すので飽和させるが、飽和しても
@@ -95,11 +95,6 @@ impl Health {
         self.snapshot_errors = self.snapshot_errors.saturating_add(1);
     }
 
-    /// `boot` messageのserialize失敗を計上する。
-    pub fn record_boot_serialize_error(&mut self) {
-        self.boot_serialize_errors = self.boot_serialize_errors.saturating_add(1);
-    }
-
     /// 期限超過の回数。
     pub fn overrun_ticks(&self) -> u32 {
         self.overrun_ticks
@@ -108,11 +103,6 @@ impl Health {
     /// Snapshot の serialize 失敗の回数。
     pub fn snapshot_errors(&self) -> u32 {
         self.snapshot_errors
-    }
-
-    /// `boot` messageのserialize失敗の回数。
-    pub fn boot_serialize_errors(&self) -> u32 {
-        self.boot_serialize_errors
     }
 
     /// Protocol の [`Status`] を組み立てる。

@@ -9,6 +9,7 @@
 //! - 行長上限を超えた行が流れてくる
 //! - 送信queue満杯時のdropとcounter増加
 //! - reconnect試行が上限に達して停止する
+//! - JSON化されていない行（debug logの見た目、invalid UTF-8）が混ざる
 //!
 //! 実deviceは開かない。[`Transport`]へfakeを注入する。
 
@@ -246,6 +247,156 @@ fn an_oversize_line_is_rejected_and_the_next_line_still_decodes() {
     assert_eq!(causes, vec![Cause::Oversize], "oversizeは1回だけ返る");
     assert_eq!(frames, 1, "oversizeの後続の行は通常どおり復元される");
     assert_eq!(session.counters().rejected_in, 1);
+}
+
+/// 非JSON行が1行混ざっても、続く正常なframeは拒否されずに復元される。
+///
+/// `ESP-IDF`のlog行の見た目（`I (356) tag: message`）を模した非JSON行を1本混ぜる。
+/// **これは受信byte streamの方向を模したものではない。**`Session::pump_read`の
+/// 行境界での再同期が、message種別や方向によらず機能することを確認する
+/// generic testであり、混ぜるprotocol行には`ping`（`Pi→ESP32`）を使うが、
+/// 実際にESP32のUART0出力へ`ping`が現れるわけではない。
+#[test]
+fn a_debug_log_line_interleaved_with_a_protocol_line_does_not_corrupt_the_next_frame() {
+    let log_line = b"I (356) deskcat_esp32: hb seq=1 uptime_ms=1006\n".to_vec();
+    let good = ping_line(9).into_bytes();
+
+    let mut batch = log_line;
+    batch.extend_from_slice(&good);
+    let mut sim = Sim::with_reads(vec![Ok(batch)]);
+    let mut session = connected_session();
+
+    let mut causes = Vec::new();
+    let mut frames = 0_usize;
+    let _ = session.pump_read(&mut sim, |outcome| match outcome {
+        Outcome::Rejected(rejection) => causes.push(rejection.cause()),
+        Outcome::Frame(_) => frames += 1,
+    });
+
+    assert_eq!(
+        causes,
+        vec![Cause::Decode],
+        "log行はJSONとして解釈できず拒否される"
+    );
+    assert_eq!(frames, 1, "直後のprotocol行は正常に復元される");
+    assert_eq!(session.counters().rejected_in, 1);
+}
+
+/// baud不一致等で生じる不正byte列（invalid UTF-8）が混ざっても、続く正常なframeは
+/// 拒否されずに復元される。**§2が明記する既知の例外（起動時出力、panic handler）の
+/// どちらでもない、一般的な通信noiseへの耐性を確認する。**確認したいのはbaudの
+/// 値ではなく、化けたbyte列の後に受信側が復帰できるかである。これは実機・
+/// 一次資料の両方に依存せず、host側のreceiverだけで確定できる。
+#[test]
+fn invalid_utf8_noise_interleaved_with_a_protocol_line_does_not_corrupt_the_next_frame() {
+    // 有効なUTF-8として続かない先頭byte（`0xFF`）を含む、改行終端の不正な行。
+    let mut noise = vec![0xFF_u8, 0x80, 0x80, 0x00, 0x01, 0x02];
+    noise.push(b'\n');
+    let good = ping_line(10).into_bytes();
+
+    let mut batch = noise;
+    batch.extend_from_slice(&good);
+    let mut sim = Sim::with_reads(vec![Ok(batch)]);
+    let mut session = connected_session();
+
+    let mut causes = Vec::new();
+    let mut frames = 0_usize;
+    let _ = session.pump_read(&mut sim, |outcome| match outcome {
+        Outcome::Rejected(rejection) => causes.push(rejection.cause()),
+        Outcome::Frame(_) => frames += 1,
+    });
+
+    assert_eq!(causes.len(), 1, "不正byte列は1回だけ拒否される");
+    assert!(
+        matches!(causes[0], Cause::InvalidUtf8 { .. }),
+        "invalid UTF-8として分類される: {:?}",
+        causes[0]
+    );
+    assert_eq!(frames, 1, "直後のprotocol行は正常に復元される");
+}
+
+/// debug logとprotocol行が複数回混ざっても、protocol行はすべて正しい順序で
+/// 復元される。
+///
+/// fixtureの1行目（`main_task: Started on CPU0`）は§2の既知の例外（ESP32→Pi方向の
+/// 起動時出力）の見た目を模した行であり、それ以降のASCII log行（`hb`／
+/// `heartbeat_overrun`）は例外の対象外の場面を模した仮想の行である。**混ぜる
+/// protocol行（`ping`）は実際にはPi→ESP32方向であり、この fixture は実際の
+/// wire上のbyte streamを再現したものではない**（上の単発testと同じ理由）。
+/// **このtestはinvalid UTF-8混入は扱わない**
+/// （別testが確認している）。この fixture は各行を別々の台本entry（＝別々の
+/// `read`）として作っている（`Sim`自体は1 entryに複数行を積むこともできる。
+/// 上の単発testが1 entryへ非JSON行とprotocol行を同居させている）。そのため
+/// このtestは、**複数の非JSON行が1回の`read`buffer内で連続するcaseは
+/// 検証していない**（そのcaseは上の単発testが単一行分だけ確認している）。
+/// このtestが一般化するのは、行数と出現順序が複数・固定の並びであっても
+/// 正しく復元されることである（順序を変えたfuzzingは行っていない）。
+#[test]
+fn multiple_interleaved_log_and_protocol_lines_all_resolve_correctly() {
+    let lines: Vec<Vec<u8>> = vec![
+        b"I (346) main_task: Started on CPU0\n".to_vec(),
+        ping_line(1).into_bytes(),
+        b"I (356) deskcat_esp32: hb seq=1 uptime_ms=1006\n".to_vec(),
+        b"I (2386) deskcat_esp32: hb seq=2 uptime_ms=2006\n".to_vec(),
+        ping_line(2).into_bytes(),
+        ping_line(3).into_bytes(),
+        b"W (9999) deskcat_esp32: heartbeat_overrun uptime_ms=9999\n".to_vec(),
+    ];
+    let reads = lines.iter().cloned().map(Ok).collect();
+    let mut sim = Sim::with_reads(reads);
+    let mut session = connected_session();
+
+    let mut ids = Vec::new();
+    let mut rejected = 0_usize;
+    for _ in 0..lines.len() {
+        let _ = session.pump_read(&mut sim, |outcome| match outcome {
+            Outcome::Rejected(_) => rejected += 1,
+            Outcome::Frame(frame) => ids.push(frame.envelope.id),
+        });
+    }
+
+    assert_eq!(
+        ids,
+        vec![1, 2, 3],
+        "protocol行は挟まれても順序どおり復元される"
+    );
+    assert_eq!(
+        rejected, 4,
+        "log行4本はいずれも拒否されるが停止も破損もしない"
+    );
+    assert_eq!(session.state(), ConnectionState::Connected);
+}
+
+/// `\r\n`終端の行も正しく復元される。
+///
+/// ESP-IDFのconsole出力は既定で`\n`を`\r\n`へ変換する（`CONFIG_LIBC_STDOUT_LINE_ENDING`
+/// 既定`CRLF`。`docs/protocol/esp32-pi-protocol.md`§2参照）。`pi-protocol-mode`の
+/// `write_line`が実際にUART0へ出すframeの行末は、この変換を経て`\r\n`になる。**この
+/// testは、その行末で受信側が実際に正しく復元できることを確認する**（`crates/deskcat-protocol`
+/// の`framing.rs`単体testが`\r`除去を確認しているが、`Session::pump_read`を通した
+/// 統合levelでは、それまで`\n`終端のfixtureしか使っていなかった）。
+#[test]
+fn a_crlf_terminated_line_decodes_the_same_as_lf_terminated() {
+    let mut line = ping_line(1).into_bytes();
+    assert_eq!(line.pop(), Some(b'\n'), "ping_lineの末尾は\\nである前提");
+    line.push(b'\r');
+    line.push(b'\n');
+
+    let mut sim = Sim::with_reads(vec![Ok(line)]);
+    let mut session = connected_session();
+
+    let mut frames = 0_usize;
+    let mut rejected = 0_usize;
+    let _ = session.pump_read(&mut sim, |outcome| match outcome {
+        Outcome::Rejected(_) => rejected += 1,
+        Outcome::Frame(frame) => {
+            frames += 1;
+            assert_eq!(frame.envelope.id, 1);
+        }
+    });
+
+    assert_eq!(frames, 1, "\\r\\n終端でもframeは復元される");
+    assert_eq!(rejected, 0, "\\rはparse errorにならない");
 }
 
 /// 送信queueが満杯なら捨ててcounterを増やす。握りつぶさない。

@@ -260,7 +260,7 @@ non-commercial purposes`限定）が判明しているが、**DeskCatでのCI自
 **利点。**CI 要件と衝突しない。未確認のまま何かを採用することにならない。保守 cost が増えない。
 
 **コスト。**flash 前に落とせたはずの失敗を、実機で踏む可能性が残る。
-**ただし現時点で、実機試験がボトルネックになっているという観測は無い。**`firmware/esp32/src` はまだ4 file である（`main.rs`／`config.rs`／`health.rs`／`protocol.rs`。2026-09-17に数えた）。
+**ただし現時点で、実機試験がボトルネックになっているという観測は無い。**`firmware/esp32/src` はまだ4 file である（`main.rs`／`config.rs`／`health.rs`／`protocol.rs`。2026-09-17に数えた）。**[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)により、この観測（2026-09-17時点の`firmware/esp32/src`は4 file）は現在の状態と一致しない。**この観測は2026-09-17時点の記録として保持し、書き換えない。「実機試験がボトルネックになっているという観測は無い」という結論自体の再評価は、このADRの対象外として扱う。
 
 ### 選択肢C: 判断を保留する
 

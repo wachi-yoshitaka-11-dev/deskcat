@@ -28,6 +28,35 @@
 
 Protocol channelから送信するすべてのbyteは、有効にframe化されたmessageの一部でなければならない。自由形式のfirmware logでJSON lineを分断してはならない。
 
+**次の2つを既知の例外として明記する**（[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)。ESP32のUART0がPi–ESP32 protocol channelとdebug logを兼ねるため）。どちらもESP32→Pi方向、かつこのUART0共有に固有の事情から生じる。Pi→ESP32方向や、将来UART0以外のtransportへ一般化してよいかはこの規則の対象外とする。**この2つ以外にも`esp_log`を経由しない出力経路（`ets_printf`等）が存在するかどうかは確認していない。**隠さず、受信側が対処できることを前提に許容する。
+
+- **firmwareがdebug logを止めるより前に生じる起動時出力。**この例外は、UART0をPi–ESP32 protocol channelへ使うbuild（`firmware/esp32`の`pi-protocol-mode` feature）にだけ関係する。既定buildはprotocolのmessageを一切送らないため、この規則自体の対象になるbyteが無い。ESP32のROM／2nd-stage bootloaderの出力、およびESP-IDF自身が`app_main`の前後で出す起動log（`main_task`等）を、個別のsubsystem名で列挙せず、**「firmwareがdebug logを止める処理を完了するまでに出たbyteは、frame化されていなくてもよい」という1つの規則に統一する。**受信側は化けたbyte列の後、改行境界で再同期できる（`crates/deskcat-serial/tests/simulator.rs`のtest群が手書きfixtureで確認している。実機の起動時出力そのものでは未検証であり、改行を含まない不正byte列が後続frameの先頭へ連結するcaseも未検証）。この例外byteをPi側でどう計数するか（§4.6のcounterへの計上要否）は、ここでは規定しない。
+- **Panic handlerの出力（未確認）。**ESP-IDFの既定panic handlerが`esp_log`の経路を通さず直接UARTへ書くかどうかは、一次資料で確認していない。確認しないまま、この例外の対象に含める。理由: panicが起きた時点でfirmwareは既に壊れており、この規則の遵守より原因が見えることを優先する。
+
+**上の2つとは別に、`pi-protocol-mode`（`firmware/esp32/src/console.rs`の`write_line`）が送る行のline endingが、本節の「送信時line ending | `\n`」行を満たさない既知の不一致がある。**これは自由形式logの混入ではなく、正しくframe化されたmessageの行末文字の話であるため、上の2つの例外（frame化されていないbyteの許容）とは性質が異なり、別項として扱う。
+
+1. 本節の規定（`\n`）と、実際にwireへ出るbyte（`\r\n`）が違う。
+2. 原因はESP-IDFのconsole出力の既定`CONFIG_LIBC_STDOUT_LINE_ENDING_CRLF`であり、
+   `firmware/esp32/sdkconfig.defaults`はこれを上書きしていない（vendored ESP-IDF
+   `components/newlib/Kconfig`で確認済み）。
+3. 解消する手段は2つある。`sdkconfig.defaults`で`LF`を指定するか、本節を`\r\n`許容へ
+   改めるか。**このPRではどちらも行わない**（`sdkconfig.defaults`はfirmware全体に効き、
+   他sessionのbring-up buildにも掛かるためこのPRの範囲を超える。本節の改定はprotocolの
+   正本を変える判断であり、別に立てるべきものである）。
+
+受信側は直前の`\r`を除去する（本節の受信可能なline ending。`crates/deskcat-protocol`の
+`framing.rs`が単体testを持ち、`crates/deskcat-serial/tests/simulator.rs`の
+`a_crlf_terminated_line_decodes_the_same_as_lf_terminated`が`Session::pump_read`を
+通した統合levelでも確認している）。**ただし受信bufferの容量判定
+（`limits::MAX_LINE_BODY_BYTES`）は`\r`を除去する前のbody長に対して行われるため、
+`\n`終端なら収まる行が`\r\n`終端では`Cause::Oversize`になりうる**
+（`crates/deskcat-protocol/src/limits.rs`の`MAX_LINE_BODY_BYTES`のdoc
+「CRLFの行は`\n`だけの行よりbody予算を1 byte多く使う」参照）。`boot`のpayload
+（firmware版・board名・reset reasonの短い文字列のみ）はこの上限に対して大きな余裕が
+あるため実際には起きないが、**一般に「`\r\n`は常に壊れずに復元される」とは言えない。**
+
+**この経路を恒久的な送信経路として扱うなら、この不一致を先に解消する必要がある。**
+
 ## 3. Envelope
 
 ```json
@@ -1283,6 +1312,7 @@ Framing／parse層について、**host workspaceのRust実装**がfixtureに合
 | 2026-08-17 | Draft 2 id exhaustion | [Issue #141](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/141)。`PROTO-TBD-003`の残り（送信側が`id`の上限に達したときの動作）を確定した。**wrapさせず、上限で新しい`(sid, id)`を要する送出を止め`protocol_fault`で報告する。**復帰は§3.1が既に定めた停止状態の経路（processの再起動、運用者の明示的なsession reset）に限り、**`sid`変更の契機を増やさない。**wrapを退けたのは、`(sid, id)`の一意性が失われ、§9が挙げる「`id`だけで判定する実装」と同型の失敗を送信側から作り込むためである。`id`枯渇でsessionを張り直す案は退けた。新しい`sid`の`hello`には`reason: startup`が要り（§5.1）、その意味は「Piのprocessを起動した」であって、再起動していないprocessが名乗ると§11の「必須fieldの意味の変更」に当たる。`boot`には`reason`に当たるfieldが無く、同じ問題を`reset_reason`で抱える。**wire formatは変更していない。**envelope field、`hello`の`reason`の値集合、error code、counterのいずれも増やしていない。§5.1のsession遷移契機も増やしていない。`status`のcounterの幅と飽和時の扱いは`PROTO-TBD-006`へ移した。あわせて[PR #142](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/142)のreview指摘により、終端報告用の`id`の予約を採番の直列化として明示し、既存語だった「運用者の明示的なsession reset」の定義を§3.1へ置いた。**どちらも受信側の判定規則を増やしていない** |
 | 2026-08-18 | Draft 2 recovery sync | [PR #146](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/146)のreview指摘。**§4.1の`boot`再送が枯渇した場合の復帰を「processの再起動が要る」としており、§3.1と§12のfixture表の「process再起動または運用者の明示的なsession reset」と食い違っていた。**狭い側だけが§4.1にあり、hostとfirmwareが違う復帰条件を実装しうる。**§3.1とfixture表へ揃えた。**`sid`選び直し上限の行も同じ文言であり、id枯渇だけを狭くする根拠は無い。**あわせて`PROTO-TBD-018`を新設し、`protocol_fault`のwire表現が未定義であることを登録した。**本文は終端報告を`protocol_fault`で行うと定めるが、`Message`に対応するvariantが無く符号化できない。**`PROTO-TBD-014`は実行時安全制限のfault eventであって別物であり、そこへ畳んでいない。****wire formatは変更していない。規則の追加も数値の変更もしていない** |
 | 2026-08-18 | Draft 2 sid paths | [PR #146](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/146)のreview指摘。**§3が「`sid`が変わるのはprocessの再起動と衝突検知による選び直しのときだけである」と言い切っていたが、§3.1が定める`運用者の明示的なsession reset`の(2)は、processを動かしたまま新しい`sid`を選ぶ。**言い切りに当てはまらない経路が存在し、hostとfirmwareが違う実装をしうる。§3を3経路（process再起動／衝突検知による選び直し／運用者の明示的なsession reset）へ揃え、**§3.1が禁じているのは枯渇を理由にした自動の切り替えであって外部操作の経路ではない**ことを明記した。**wire formatは変更していない。規則を増やしてもいない**（既に§3.1にある経路を§3の一覧へ入れただけである） |
+| 2026-09-22 | Draft 2 uart0 exception | [Issue #446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)。ESP32のUART0がdebug logとPi–ESP32 protocol channelを兼ねる（USB-UARTブリッジが両方を同じ物理lineへ内部接続する）ことに対応するため、§2へ2つの既知の例外を追記した。**`silence_logging`（`firmware/esp32/src/console.rs`）の呼び出しが完了するまでに生じる起動時出力**（ESP32のROM／2nd-stage bootloader出力、ESP-IDF自身の起動log）と、**panic handlerの出力（ESP-IDFの経路が`esp_log`を通すかどうか未確認）**の2つである。firmware側はbuild時のfeature（`pi-protocol-mode`）で、debug logとprotocol streamを同時に出さない設計にした（同fileのdoc参照）。**§2の主規則（自由形式logでJSON lineを分断してはならない）自体は変更していない。**wire formatも§3の数値・規則も変更していない |
 
 ### Draft schemaの互換性
 
