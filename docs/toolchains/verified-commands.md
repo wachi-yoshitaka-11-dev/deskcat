@@ -65,6 +65,8 @@ Linux x86_64 で検証した。初回は 2026-08-06 で、これは VM 上の初
 （#42。[Version Record](version-records/2026-08-10-esp32-build-ci.md)）。
 **build-only であり、flash と実機起動は主張しない。**
 
+**`pi-protocol-mode` feature（[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)）を有効にする場合は、既定構成に加えて`cargo clippy`と`cargo build`（`cargo fmt`は対象外）へ`--features pi-protocol-mode`を足したものも通す。**この構成のVersion Recordはまだ無い。**`flash と serial monitor`節（下記）がcommand blockを持たないのは「Version Recordが再現手順であって追加の実行記録ではないと自認しているため」であり、ここはそもそもVersion Record自体が無い、という別の理由である。**理由は違うが、結論（検証済みcommandへ格上げする形で書かない）は同じであるため、ここでもcommand blockを写さない。**上の「Linux x86_64 で検証した」以下の記録は既定構成についてのものであり、`pi-protocol-mode`構成を含まない。
+
 ### workspace との関係
 
 `firmware/esp32` は root workspace から `exclude` している。firmware の manifest は

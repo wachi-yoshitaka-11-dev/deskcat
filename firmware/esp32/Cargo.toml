@@ -11,6 +11,22 @@ publish = false
 name = "deskcat-esp32"
 harness = false # do not use the built-in cargo test harness -> resolve rust-analyzer errors
 
+[features]
+default = []
+# UART0をdebug log用ではなくPi-ESP32 protocol stream用に使うbuild。既定では無効
+# （debug logモード）。詳細は`docs/hardware/gpio-assignment.md`「信号inventory」の
+# `UART-TX`／`UART-RX`行、`#446`参照。
+pi-protocol-mode = []
+# Issue #17の単発servo bench試験だけを有効にする。既定ではoffであり、
+# 通常のbuildはこのfeatureを持たず`crate::servo`を呼ばない。承認の状態は
+# `docs/hardware/servo-safety-limits.md`の`承認の状態`節を参照する（ここへ再掲しない。
+# `main.rs`のmodule doc、`servo.rs`のmodule doc参照）。
+# **`pi-protocol-mode`と同時に有効にした構成は意図的にcompileできない。**
+# `main.rs`が`compile_error!`で拒否する。理由は、`pi-protocol-mode`が
+# `Peripherals::take()`を行わずservoのbench試験経路が呼ばれないため、
+# featureが黙って無効になることである。両方を同時に有効にするbuildは作らない。
+bench-servo-test-17 = []
+
 [profile.release]
 opt-level = "s"
 
@@ -30,13 +46,6 @@ serde_json = "1"
 esp-idf-svc = { version = "0.52.1", features = ["critical-section", "embassy-time-driver", "embassy-sync"] }
 # Remove `generic-queue-8` if you plan to use `embassy-time` WITH `embassy-executor`
 embassy-time = { version = "0.5", features = ["generic-queue-8"] }
-
-[features]
-# Issue #17の単発servo bench試験だけを有効にする。既定ではoffであり、
-# 通常のbuildはこのfeatureを持たず`crate::servo`を呼ばない。承認の状態は
-# `docs/hardware/servo-safety-limits.md`の`承認の状態`節を参照する（ここへ再掲しない。
-# `main.rs`のmodule doc、`servo.rs`のmodule doc参照）。
-bench-servo-test-17 = []
 
 [lints.rust]
 unsafe_code = "forbid"

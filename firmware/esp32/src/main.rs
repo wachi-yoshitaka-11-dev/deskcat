@@ -20,25 +20,31 @@
 //!   [`run_servo_bench_test`]経由で呼ぶ（[Issue #17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。
 //!   詳細は[`crate::servo`]と[`run_servo_bench_test`]のdoc参照）。
 //!
+//! **上の一覧は既定buildの動作を述べる。**`pi-protocol-mode`はLCD／I2Cの
+//! bring-upを行わない。build identity／board ID／reset reasonのlogと、
+//! heartbeat／health snapshotのloopは`pi-protocol-mode`でも実行されるが、
+//! loggingを止めているため出力は既定buildにしか出ない（`crate::console`
+//! 参照）。`pi-protocol-mode`は代わりに`boot` frameの書き込みを1回だけ試みる
+//! （`send_boot_frame_once`参照。制約は`crate::console`のmodule docに
+//! まとめてある）。
+//!
 //! 既定buildで`Peripherals::take()`が束縛するのはLCD関連6+1本と、I2C関連2本
 //! （`crate::display`・`crate::accel`・`crate::env`のmodule doc参照）だけである。
 //! `bench-servo-test-17` feature付きbuildだけは例外で`SERVO-PWM`（GPIO27）と
-//! `peripherals.ledc.timer0`／`channel0`も束縛する。
+//! `peripherals.ledc.timer0`／`channel0`も束縛する。`pi-protocol-mode`は
+//! `Peripherals::take()`自体を呼ばない（`main()`参照）。
 //!
 //! **I2Cはこの版でも実機通電していない。**この版の検証は`cargo build`でのcross-compile
 //! 確認までであり、実機へflashして確認するのは別工程である（[Hardware Safety
 //! Policy](../../../docs/governance/hardware-safety-policy.md)「人間の監視が必要な
 //! 操作」。初回配線revisionでの初回通電は人間監視下で行う）。
 //!
-//! **Protocol sessionは確立しない。**`crates/deskcat-protocol` の `Boot` message を
-//! 送るのは別の作業であり、ここでは log へ出すだけである。ただし `reset_reason` の
-//! 文字列は同 crate の fixture が使う snake_case へ揃えてある。health snapshot も
-//! 同 crate の `Status` を組み立てて log へ出すだけである。
-//!
-//! **「log へ出す」は「serial へ出ない」ではない。**ESP logger の出力は UART を通って
-//! serial monitor に現れる。送らないのは、protocol の message として
-//! application の serial link へ流すことである（serial device は #11、
-//! session state は #12）。
+//! **Protocol sessionは確立しない。**`pi-protocol-mode`は`Boot` frameの書き込みを
+//! 1回試みるだけで（[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)、
+//! `send_boot_frame_once`参照）、受理確認・再送・受信loopを持たない。
+//! **既定buildは`boot`を一切組み立てない。**`#446`より前は`boot=`というlog行を
+//! 出していたが、その行はこの変更で削除した。`boot=`行を目視で確認していた
+//! 作業（`#7`／`#13`等）があれば、この変更を踏まえて確認し直すこと。
 //!
 //! **Watchdog の設定を変えない。**Task Watchdog Timer は ESP-IDF の既定値のままである。
 //! `sdkconfig.defaults` に watchdog の項目を足していない。heartbeat loop は
@@ -49,30 +55,61 @@
 //! delay.**」と doc に明記しており、これが「logging が watchdog の進行を block しない」
 //! 根拠である。busy wait をしないため、待ち時間は必ず 1 ms 以上へ丸める
 //! （[`sleep_ms_until`] 参照）。`run_display_bringup`（#13の LCD bring-up）も同じ
-//! [`FreeRtos::delay_ms`] を段階ごとに挟む（[`service_bringup_step`] 参照）。
+//! [`FreeRtos::delay_ms`] を段階ごとに挟む（`service_bringup_step` 参照）。
 
+// `pi-protocol-mode`ではLCD／I2Cのbring-upとdemo用moduleをcompileしない
+// （`crate::console`のmodule doc参照）。
+#[cfg(not(feature = "pi-protocol-mode"))]
 mod accel;
 mod config;
+mod console;
+#[cfg(not(feature = "pi-protocol-mode"))]
 mod display;
+#[cfg(not(feature = "pi-protocol-mode"))]
 mod env;
 mod health;
+#[cfg(not(feature = "pi-protocol-mode"))]
 mod protocol;
 mod servo;
 
+// `pi-protocol-mode`は`Peripherals::take()`を行わないため、`bench-servo-test-17`の
+// servo bench試験経路（`run_servo_bench_test`）は呼ばれない。両方を有効にしても
+// buildは通るが、servoのfeatureが黙って無効になる。それより、compile時に理由を
+// 示して止めるほうがよいと判断した。
+#[cfg(all(feature = "pi-protocol-mode", feature = "bench-servo-test-17"))]
+compile_error!(
+    "pi-protocol-modeとbench-servo-test-17は同時に有効にできない。\
+     pi-protocol-modeはPeripherals::take()を行わないためservoのbench試験経路が\
+     呼ばれず、featureが黙って無効になる。どちらか一方だけを有効にすること。"
+);
+
+#[cfg(not(feature = "pi-protocol-mode"))]
 use std::time::Instant;
 
-use deskcat_protocol::{Boot, Hello, HelloReason};
+#[cfg(feature = "pi-protocol-mode")]
+use deskcat_protocol::{encode_line, limits, Boot, Envelope, Frame, Message};
+#[cfg(not(feature = "pi-protocol-mode"))]
+use deskcat_protocol::{Hello, HelloReason};
 use esp_idf_svc::hal::delay::FreeRtos;
+#[cfg(not(feature = "pi-protocol-mode"))]
 use esp_idf_svc::hal::gpio::{InputPin, OutputPin};
+#[cfg(not(feature = "pi-protocol-mode"))]
 use esp_idf_svc::hal::i2c::{I2cConfig, I2cDriver, I2C0};
+#[cfg(not(feature = "pi-protocol-mode"))]
 use esp_idf_svc::hal::peripherals::Peripherals;
+#[cfg(not(feature = "pi-protocol-mode"))]
 use esp_idf_svc::hal::spi::SpiAnyPins;
+#[cfg(not(feature = "pi-protocol-mode"))]
 use esp_idf_svc::hal::units::Hertz;
 
+#[cfg(not(feature = "pi-protocol-mode"))]
 use crate::accel::Adxl345;
+#[cfg(not(feature = "pi-protocol-mode"))]
 use crate::display::Ili9341;
+#[cfg(not(feature = "pi-protocol-mode"))]
 use crate::env::Bme280;
 use crate::health::Health;
+#[cfg(not(feature = "pi-protocol-mode"))]
 use crate::protocol::PiSession;
 
 /// `ACCEL-01`（ADXL345）のI2C address。**`SDO`を`GND`へ配線する前提の値である。**
@@ -88,6 +125,7 @@ use crate::protocol::PiSession;
 /// である」）、`SDO`配線を決める側（現物作業）がこの値と異なる配線を選ぶ場合は、この
 /// 定数を実際の配線へ合わせて直す。`ENV-01`側も`GND`側を前提にした
 /// （[`ENV_I2C_ADDRESS`]参照）。
+#[cfg(not(feature = "pi-protocol-mode"))]
 const ACCEL_I2C_ADDRESS: u8 = 0x53;
 
 /// `ENV-01`（BME280）のI2C address。**`SDO`を`GND`へ配線する前提の値である。**
@@ -100,6 +138,7 @@ const ACCEL_I2C_ADDRESS: u8 = 0x53;
 /// [`ACCEL_I2C_ADDRESS`]と同じ根拠（一般値で開始してよい側、`gpio-assignment.md`の
 /// `I2C addressの選択`節「addressは一般値で開始してよい側である」行）で、GND側を
 /// 前提にした。**現物確認まで確定しない点も`ACCEL_I2C_ADDRESS`と同じである。**
+#[cfg(not(feature = "pi-protocol-mode"))]
 const ENV_I2C_ADDRESS: u8 = 0x76;
 
 /// I2C busのbaudrate。Standard-mode（100 kHz）。
@@ -111,6 +150,7 @@ const ENV_I2C_ADDRESS: u8 = 0x76;
 /// 「rise timeの制約に余裕がある」ことと「実効抵抗がStandard-modeの規定範囲内にあることの
 /// 確認」は別であり、後者はこの変更の時点でも未達のまま残る**（[#2](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/2)
 /// の受け入れchecklist項目。この変更はその項目を閉じない）。
+#[cfg(not(feature = "pi-protocol-mode"))]
 const I2C_BAUDRATE_HZ: u32 = 100_000;
 
 /// `ResetReason` を Protocol の語彙（snake_case）へ写す。
@@ -189,8 +229,11 @@ fn main() {
     // implemented by esp-idf-sys might not link properly. See https://github.com/esp-rs/esp-idf-template/issues/71
     esp_idf_svc::sys::link_patches();
 
-    // Bind the log crate to the ESP Logging facilities
-    esp_idf_svc::log::EspLogger::initialize_default();
+    // `crate::console`のmodule doc参照。
+    #[cfg(feature = "pi-protocol-mode")]
+    console::silence_logging();
+    #[cfg(not(feature = "pi-protocol-mode"))]
+    console::init_log_mode();
 
     // build identity。profile は `Cargo.toml` の `[profile.dev]`／`[profile.release]` に対応する。
     // **`esp_app_desc!()` は使わない。**`#[no_mangle]`／`#[link_section]` を展開するため
@@ -220,46 +263,52 @@ fn main() {
     // （`next_heartbeat`／`next_snapshot`）は従来どおりbring-upの後で初期化する。
     let mut health = Health::new(reset_reason);
 
-    // 束縛範囲はmodule doc参照。1度しか成功しないため`expect`で即座に気付く。
-    let peripherals = Peripherals::take().expect("Peripherals::take must succeed exactly once");
-    #[cfg(not(feature = "bench-servo-test-17"))]
-    log::info!(
-        "peripherals=display_and_i2c servo=not_driven i2c=id_read_attempt adc=not_driven touch=not_driven"
-    );
-    #[cfg(feature = "bench-servo-test-17")]
-    log::info!(
-        "peripherals=display_and_i2c_and_servo_bench_test servo=bench_test_pending i2c=id_read_attempt adc=not_driven touch=not_driven"
-    );
-    log::info!(
-        "i2c_addresses accel=0x{ACCEL_I2C_ADDRESS:02x} env=0x{ENV_I2C_ADDRESS:02x} baudrate_hz={I2C_BAUDRATE_HZ}"
-    );
+    // `pi-protocol-mode`ではLCD／I2C／servo benchのbring-up（`Peripherals::take()`を
+    // 含む）を一切行わない（`crate::console`のmodule doc参照）。`pi-protocol-mode`と
+    // `bench-servo-test-17`を同時に有効にした場合も、servo benchは実行されない。
+    #[cfg(not(feature = "pi-protocol-mode"))]
+    {
+        // 束縛範囲はmodule doc参照。1度しか成功しないため`expect`で即座に気付く。
+        let peripherals = Peripherals::take().expect("Peripherals::take must succeed exactly once");
+        #[cfg(not(feature = "bench-servo-test-17"))]
+        log::info!(
+            "peripherals=display_and_i2c servo=not_driven i2c=id_read_attempt adc=not_driven touch=not_driven"
+        );
+        #[cfg(feature = "bench-servo-test-17")]
+        log::info!(
+            "peripherals=display_and_i2c_and_servo_bench_test servo=bench_test_pending i2c=id_read_attempt adc=not_driven touch=not_driven"
+        );
+        log::info!(
+            "i2c_addresses accel=0x{ACCEL_I2C_ADDRESS:02x} env=0x{ENV_I2C_ADDRESS:02x} baudrate_hz={I2C_BAUDRATE_HZ}"
+        );
 
-    run_display_bringup(
-        peripherals.spi3,
-        peripherals.pins.gpio18,
-        peripherals.pins.gpio23,
-        peripherals.pins.gpio19,
-        peripherals.pins.gpio22,
-        peripherals.pins.gpio17,
-        peripherals.pins.gpio16,
-        peripherals.pins.gpio4,
-        &mut health,
-    );
+        run_display_bringup(
+            peripherals.spi3,
+            peripherals.pins.gpio18,
+            peripherals.pins.gpio23,
+            peripherals.pins.gpio19,
+            peripherals.pins.gpio22,
+            peripherals.pins.gpio17,
+            peripherals.pins.gpio16,
+            peripherals.pins.gpio4,
+            &mut health,
+        );
 
-    run_i2c_bringup(
-        peripherals.i2c0,
-        peripherals.pins.gpio25,
-        peripherals.pins.gpio26,
-        &mut health,
-    );
+        run_i2c_bringup(
+            peripherals.i2c0,
+            peripherals.pins.gpio25,
+            peripherals.pins.gpio26,
+            &mut health,
+        );
 
-    // featureが無ければこのblockはbuildへ含まれない（`run_servo_bench_test`のdoc参照）。
-    #[cfg(feature = "bench-servo-test-17")]
-    run_servo_bench_test(
-        peripherals.ledc.timer0,
-        peripherals.ledc.channel0,
-        peripherals.pins.gpio27,
-    );
+        // featureが無ければこのblockはbuildへ含まれない（`run_servo_bench_test`のdoc参照）。
+        #[cfg(feature = "bench-servo-test-17")]
+        run_servo_bench_test(
+            peripherals.ledc.timer0,
+            peripherals.ledc.channel0,
+            peripherals.pins.gpio27,
+        );
+    }
 
     // 周期は `config` が持つ。**ここへ数値を直接書かない。**暫定値である根拠は
     // `config` の doc comment にある。
@@ -270,23 +319,19 @@ fn main() {
     );
 
     // **`health.uptime_ms()`起点で最初の締切を積む。**`0`起点で固定すると、
-    // bring-upの所要時間（複数のSPI fillで実測1秒前後かかりうる）だけで最初の
-    // loop周回が即座に`overrun`と判定されてしまう。bring-up自体の遅延であって
-    // main loopの遅延ではないため、混同しない。
+    // 既定build（LCD／I2C bring-upを行う）ではbring-upの所要時間（複数のSPI
+    // fillで実測1秒前後かかりうる）だけで最初のloop周回が即座に`overrun`と
+    // 判定されてしまう。bring-up自体の遅延であってmain loopの遅延ではないため、
+    // 混同しない。`pi-protocol-mode`はbring-upを行わないためこの遅延は生じないが、
+    // 締切の起点をuptimeにする扱い自体は両buildで共通にしている。
     let bringup_done_ms = health.uptime_ms();
     let mut next_heartbeat = bringup_done_ms + u64::from(config::HEARTBEAT_PERIOD_MS);
     let mut next_snapshot = bringup_done_ms + u64::from(config::HEALTH_SNAPSHOT_PERIOD_MS);
 
-    // **`boot`はまだwireへ送らない。**GPIO割り当ての承認待ちではない
-    // （`docs/hardware/gpio-assignment.md`の`Pi–ESP32間のtransport`節はUSB serialへ
-    // 確定済みで、GPIO headerへの配線は無い）。止めているのは、そのUSB link上の
-    // UART0が同文書のpin表で`firmware flashingとdebug log専用`と定められており、
-    // ESP loggerの出力と、これから送るprotocolのJSON Lines streamが同じUART0を
-    // 奪い合う点が未決なことである（`crate::protocol`のmodule doc参照）。ここで示すのは、
-    // `crates/deskcat-protocol`の`Boot`をこのfirmwareが正しく組み立てられることと、
-    // `crate::protocol::PiSession`が`hello`／`ping`／`get_status`を仕様どおり処理できる
-    // ことであり、`health.rs`が`status`について既に示しているのと同じ範囲の主張である。
-    log_boot_message(&mut health, reset_reason);
+    // `pi-protocol-mode`でだけ`boot`を1回試みる（`#446`。`send_boot_frame_once`参照）。
+    #[cfg(feature = "pi-protocol-mode")]
+    send_boot_frame_once(&health, reset_reason);
+    #[cfg(not(feature = "pi-protocol-mode"))]
     demonstrate_pi_session(&mut health);
 
     // **`main()` から戻らない。**#6 の firmware は戻っていたため、task が進み続けて
@@ -334,36 +379,62 @@ fn main() {
     }
 }
 
-/// 起動時に送るはずの`boot`を組み立て、1行のJSONとしてlogへ出す（wireへは送らない）。
+/// `boot` frameを1回だけ組み立て、`write_line`で直接UART0へ書き込みを試みる
+/// （`pi-protocol-mode`でだけ呼ぶ。制約は`crate::console`のmodule doc参照）。
 ///
-/// `firmware`／`board`は§4.1が要求するfieldであり、`reset_reason`は実際の
-/// `ResetReason`から得た値である。**捏造しない。**envelopeを付けないのは、`sid`を
-/// 選ぶ根拠（`PROTO-TBD-011`）も、選んだ`sid`を運ぶ相手も、まだ無いためである。
-fn log_boot_message(health: &mut Health, reset_reason: &str) {
+/// 受理確認・再送・recovery budget（§4.1）・受信loopを実装していないため
+/// sessionは確立しない（`#12`の受け入れ条件は満たさない。残りは`#12`本文が
+/// 引き続き追跡する）。
+///
+/// `sid`には`health.uptime_ms()`を使う。bring-upを行わないため起動ごとに
+/// ほぼ同じ小さい値になり、§3が求める再起動間の非衝突を満たさない
+/// （`PROTO-TBD-011`待ちの暫定値。`crate::console`の制約参照）。
+///
+/// `id`は1固定。`reset_reason`は実際の`ResetReason`から得た値である。
+#[cfg(feature = "pi-protocol-mode")]
+fn send_boot_frame_once(health: &Health, reset_reason: &str) {
     let boot = Boot {
         firmware: env!("CARGO_PKG_VERSION").to_owned(),
         board: config::BOARD.to_owned(),
         reset_reason: reset_reason.to_owned(),
     };
-    match serde_json::to_string(&boot) {
-        Ok(payload) => log::info!("boot={payload}"),
+    let ts_ms = health.uptime_ms();
+    let frame = Frame::new(
+        Envelope {
+            v: limits::PROTOCOL_VERSION,
+            sid: sid_from_uptime(ts_ms),
+            id: 1,
+            ts_ms,
+        },
+        Message::Boot(boot),
+    );
+    // encode失敗はlog::warn!で分類する（`AGENTS.md`「エラーを握りつぶさず、分類、
+    // ログ、カウンタを用意する」に沿った形）。ただし`pi-protocol-mode`では
+    // loggingを止めているため、この`log::warn!`自体は出力されない。counterは
+    // 持たない（同じ理由で増やしても観測できないため）。
+    match encode_line(&frame) {
+        Ok(line) => console::write_line(&line),
         Err(err) => {
-            health.record_boot_serialize_error();
-            log::warn!(
-                "boot_serialize_failed error={err} boot_serialize_errors={}",
-                health.boot_serialize_errors()
-            );
+            log::warn!("boot_encode_failed error={err}");
         }
     }
 }
 
+/// `send_boot_frame_once`のdoc参照。`ts_ms`（`u64`）を`sid`（`u32`）へ切り詰める（下位32 bit）。
+#[cfg(feature = "pi-protocol-mode")]
+const fn sid_from_uptime(ts_ms: u64) -> u32 {
+    ts_ms as u32
+}
+
 /// `crate::protocol::PiSession`が`hello`／`ping`／`get_status`を仕様どおり処理できることを、
 /// 自己完結した例で示す（実serial linkは無いため、入力もこの関数が作る）。
+/// **既定buildでだけ呼ぶ**（`pi-protocol-mode`ではlog出力を止めており、この関数の
+/// 目的である「log出力を目視できること」が成立しないため）。
 ///
 /// **これはprotocolの成立を主張しない。**`crates/deskcat-serial`の`tests/simulator.rs`が
 /// 持つ受け入れ条件のtestとは違い、これはbuildできることと、log出力を目視できることの
-/// 実物である。UART0のlogとprotocol streamの分離が決まり実serial linkが入ったら、
-/// この呼び出し元を受信loopへ置き換える。
+/// 実物である。実serial linkの受信loopが入ったら、この呼び出し元をそちらへ置き換える。
+#[cfg(not(feature = "pi-protocol-mode"))]
 fn demonstrate_pi_session(health: &mut Health) {
     let mut session = PiSession::new();
     // 例として使うだけのPi `sid`／`id`である。実際の値は相手が選ぶ。
@@ -399,6 +470,7 @@ fn demonstrate_pi_session(health: &mut Health) {
 /// schedulingとは別の、bring-up専用の簡易版である。[`FreeRtos::delay_ms`]は
 /// module doc冒頭が引用するとおりOSへyieldするため、SPI転送が連続する区間でも
 /// idle taskのwatchdogに機会を与える。
+#[cfg(not(feature = "pi-protocol-mode"))]
 fn service_bringup_step(health: &mut Health, step: &str) {
     FreeRtos::delay_ms(1);
     // **`bringup_hb`と`hb`は別の名前にする。**main loopの`hb seq=`（`config::HEARTBEAT_PERIOD_MS`
@@ -417,6 +489,7 @@ fn service_bringup_step(health: &mut Health, step: &str) {
 /// **どの段階で失敗しても、この関数はpanicしない。**この関数はエラーを
 /// `log::error!`へ分類して返すだけで、呼び出し元の`main`を止めない。
 /// heartbeatは[`service_bringup_step`]で段階ごとに刻む（同関数のdoc参照）。
+#[cfg(not(feature = "pi-protocol-mode"))]
 #[allow(clippy::too_many_arguments)]
 fn run_display_bringup<SPI: SpiAnyPins + 'static>(
     spi3: SPI,
@@ -526,6 +599,7 @@ fn run_display_bringup<SPI: SpiAnyPins + 'static>(
 /// **したがってこの呼び出しが返る時間の上限は、このPRの時点で未確定として残す。**
 ///
 /// 生byteの解釈は、この前提込みでlogを読む人間の判断とする。
+#[cfg(not(feature = "pi-protocol-mode"))]
 fn run_i2c_bringup(
     i2c0: I2C0<'static>,
     sda: impl InputPin + OutputPin + 'static,
@@ -673,6 +747,7 @@ fn run_servo_bench_test(
 /// 対応する。**正しいかどうかの判定はこの関数では行わない。**実機のLCDを目視して
 /// 判定するのは人間であり（`AGENTS.md`ハードウェア安全、初回通電は人間監視下）、
 /// この関数は色と所要時間を機械可読な形でlogへ残すだけである。
+#[cfg(not(feature = "pi-protocol-mode"))]
 fn run_fill_tests(lcd: &mut Ili9341<'_>, health: &mut Health) {
     let fills: [(&str, u16); 5] = [
         ("black", display::color::BLACK),
@@ -703,6 +778,7 @@ fn run_fill_tests(lcd: &mut Ili9341<'_>, health: &mut Health) {
 /// （`00h`）のままである**（`crate::display`のmodule doc参照）。この patternを見て
 /// 向きと色順が期待どおりでなければ、`docs/hardware/gpio-assignment.md`の`MADCTL`欄と
 /// `crate::display`のMADCTL定数を実測結果で更新する必要がある。
+#[cfg(not(feature = "pi-protocol-mode"))]
 fn run_corner_pattern(lcd: &mut Ili9341<'_>, health: &mut Health) {
     if let Err(err) = lcd.fill_screen(display::color::BLACK) {
         log::error!("display_corner_background_failed error={err}");
@@ -749,7 +825,8 @@ fn run_corner_pattern(lcd: &mut Ili9341<'_>, health: &mut Health) {
 /// `crates/deskcat-protocol` の `Status` をそのまま serialize する。
 /// **これが「counter schema を protocol status へ使用できる」ことの実物である。**
 /// 出力するのは `status` の payload であり、envelope を付けた wire line ではない
-/// （`sid` を選ぶには session が要る。#12）。
+/// （health snapshotをwireへ送るにはsessionが要る。#12。`pi-protocol-mode`が
+/// `boot`用に選ぶ`sid`は`send_boot_frame_once`参照。両者は別の判断である）。
 ///
 /// **error を握りつぶさない。**serialize は事実上失敗しないが、`expect()` で潰さず
 /// 分類して log し、counter を進める。

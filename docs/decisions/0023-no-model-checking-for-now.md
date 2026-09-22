@@ -199,6 +199,11 @@ ESP32以外のマイコンを扱うため念のため`grep -i`で当てたが、
 > 「**実serial linkからこの型へbyteを渡す配線は、GPIO割り当てではなく、UART0の出力先の未決で止まっている**」と書く。
 > **依存関係ではなくこの記述が根拠である**（firmware が `deskcat-serial` を引いていないことは、
 > 同 crate が host 側であるため link の有無とは独立である）。
+>
+> **[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)により、この引用は現在の`protocol.rs`と一致しない。**
+> この引用は2026-09-17時点の記録として保持し、書き換えない。この判断
+> （判断要因3）自体を再検討するかどうかは、このADRの対象外として扱う。
+>
 > host 側の `crates/deskcat-serial` には `serial2` を使う `SerialDevice` が在り、
 > `examples/serial_link.rs` も「実serial portへ繋いでlinkを確かめる実行体」として在る。
 > **ただし同 example の doc 自身が「`ESP32`側がprotocolを話すとは限らない」と書いている。**
@@ -225,6 +230,11 @@ ESP32以外のマイコンを扱うため念のため`grep -i`で当てたが、
 > `Peripherals::take()` を呼び、`display.rs` が在る。**
 > **この ADR は、どちらの doc comment でもなく現在の code から判断している。**
 > 訂正は `firmware/` の変更であり、**この ADR の範囲外として手を付けていない。**
+>
+> **[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)により、上で引用した`health.rs`の
+> module docは現在の記述と一致しない。**この ADR の結論（counterが0である
+> ことはcodeの事実だけで言える）は変わらない。この引用は2026-09-17時点の記録として
+> 保持し、書き換えない。
 
 ### 5. 「状態爆発せずに書ける規模か」は、いまは測れない
 

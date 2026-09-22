@@ -11,17 +11,18 @@
 //!
 //! **この型はbyte列やUART peripheralを持たない。**`Hello`／`Ping`／`GetStatus`を
 //! 受け取り、返すべき[`Message`]を返すだけである。実serial linkからこの型へ
-//! byteを渡す配線は、**GPIO割り当てではなく、UART0の出力先の未決で止まっている。**
-//! `docs/hardware/gpio-assignment.md`の`Pi–ESP32間のtransport`節が確定させているとおり、
-//! Pi linkはUSB serialであり、ESP32board上のUSB-UARTブリッジICが内部でUART0
-//! （GPIO1／GPIO3）へ接続する。GPIO headerへの配線は無く、GPIO割り当ての承認は要らない。
-//! **一方で同文書のpin表はUART0を`firmware flashingとdebug log専用`と定めている。**
-//! ESP loggerの出力は既にこのUART0（＝Pi linkと同じ物理line）へ出ており、そこへ
-//! protocolのJSON Lines streamを重ねるとlogとprotocol messageが同じbyte streamで
-//! 混ざる。**この分離方法（loggerの出力先を変えるか、protocol専用に道を分けるか）が
-//! 未決であり、それがこの型を実UARTへ配線していない理由である。**
-//! この点は`crates/deskcat-serial`側の`SerialDevice`の実機確認が[Issue #11]の後半に
-//! 残っているのと対になる。
+//! byteを渡す**受信loopは、まだ実装していない。**GPIO割り当ての承認待ちではない
+//! （`docs/hardware/gpio-assignment.md`の`Pi–ESP32間のtransport`節が確定させて
+//! いるとおり、Pi linkはUSB serialであり、GPIO headerへの配線は無い）。
+//!
+//! **このmoduleは既定build（debug logモード）でだけcompileする**
+//! （`#[cfg(not(feature = "pi-protocol-mode"))]`、`main.rs`参照）。UART0を
+//! Pi–ESP32 protocol streamへ使う`pi-protocol-mode`のbuildは、この型を使わず
+//! `boot` frameを1回だけ送る（`crate::console`、`main.rs`の
+//! `send_boot_frame_once`参照。[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)）。
+//! `Hello`／`Ping`／`GetStatus`を実UARTから読む受信loopはどちらのbuildにも無い。
+//! **この点は`crates/deskcat-serial`側の`SerialDevice`の実機確認が
+//! [Issue #11]の後半に残っているのと対になる。**
 //!
 //! ESP32自身の`sid`の生成方法は`PROTO-TBD-011`が未確定であり、この型は決めない
 //! （`crates/deskcat-serial`の`Session::new`が`sid`を呼び出し側から受け取るのと同じ
