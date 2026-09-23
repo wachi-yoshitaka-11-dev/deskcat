@@ -67,8 +67,8 @@
 //! # `DISP-01`のbring-upを有効にする手順
 //!
 //! **既定buildでLCDを動かさないのは、恒久的な無効化ではない。**このfeatureが有効にする
-//! `run_display_bringup`は、電流制限つき外部3.3 V電源（段階B-2b）を使った
-//! `DISP-01`（MSP2807）の初回通電手順に対応する。**この段階B-2bが要求する「設定する
+//! `run_display_bringup`は、二つの給電経路のいずれかで使う。**元々は**電流制限つき外部3.3 V
+//! 電源（段階B-2b）を使った`DISP-01`（MSP2807）の初回通電手順に対応していた。**この段階B-2bが要求する「設定する
 //! 電流制限値の上限を決めるためのmodule側の安全な上限」は引き続き未解決のままである**
 //! （[tbd-register.md](../../../docs/hardware/tbd-register.md)の`HW-TBD-024`行）。
 //! B-2bの給電構成も確定していない（[power-budget.md](../../../docs/hardware/power-budget.md)の
@@ -82,7 +82,7 @@
 //! `#445`が`ACCEL-01`／`ENV-01`に採った経路（B-2bではなく`3V3` pin）と同じであり、
 //! B-2bの前提2点は`3V3` pin経路には掛からない。**`3V3` pin経路での`DISP-01`
 //! bring-up手順は[power-budget.md](../../../docs/hardware/power-budget.md)の
-//! `DISP-01`単体bring-upの手順（ESP32`3V3` pin給電、`#461`承認範囲）節が持つ**（`#13`が
+//! `DISP-01`追加接続のbring-upの手順（ESP32`3V3` pin給電、`#461`承認範囲）節が持つ**（`#13`が
 //! 作成した。`ACCEL-01`／`ENV-01`が同じ`3V3` railへ既に接続済みの状態
 //! （[EXP-015](../../../docs/hardware/experiment-log.md)）へ`DISP-01`を追加する場合を扱い、
 //! `ACCEL-01`／`ENV-01`単体bring-upの手順とは別節である）。`#461`は接続そのものを
@@ -100,7 +100,7 @@
 //! 掛かっている**（§7は「新しい配線revisionの初回通電」、§10はbench試験記録の形式を、
 //! いずれも条件なしで定めている）。
 //!
-//! **B-2bの前提2つが解けたら、人間が次の手順でこのfeatureを有効にする。**
+//! **B-2b経由でこのfeatureを有効にする場合、B-2bの前提2つが解けたら、人間が次の手順で行う。**
 //!
 //! 1. `power-budget.md`の`DISP-01`初回通電の手順（給電構成の確定待ち）が挙げる
 //!    B-2bの前提2点を満たす。
@@ -111,6 +111,10 @@
 //!    （[Machine Profiles](../../../docs/toolchains/machine-profiles.md)、
 //!    [Hardware Safety Policy](../../../docs/governance/hardware-safety-policy.md)
 //!    「人間の監視が必要な操作」）。
+//!
+//! **`3V3` pin経路でこのfeatureを有効にする場合は、上記1〜3の代わりに`power-budget.md`の
+//! `DISP-01`追加接続のbring-upの手順（ESP32`3V3` pin給電、`#461`承認範囲）節が持つ実施前提条件と
+//! 手順に従う。**同節もこのfeatureを要求する（条件(2)）。
 //!
 //! **このfeatureはB-2bのgateを開けない。**開けてよいかの判定は上記の正本文書が
 //! 持つ。**このfeatureが変えるのは、既定buildが`DISP-01`へ触れるかどうかだけである**
