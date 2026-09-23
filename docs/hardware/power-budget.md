@@ -470,16 +470,27 @@ pinを給電元とし**（[#461](https://github.com/wachi-yoshitaka-11-dev/deskc
 承認）、B-2bの前提2点はこの手順には掛からない。**逆に、この手順が要求するACCEL-01／ENV-01先行接続
 という前提は、B-2b側の手順には掛からない。**2つの手順の条件を混用しない。
 
-**前提: `LED` pin配線とfirmwareのbacklight制御の関係。**`HW-TBD-024`行の2026-09-23追記が扱う
-「通常接続」はLCDWiki公式User Manualの原文（`LED` pinを3.3Vへ直結する構成）を指すが、
-`DISP-01`のfirmware側配線は`LCD-BL`（GPIO4、外部4.7 kΩ pull-down）経由でこの`LED` pinを能動的に
-Highへ駆動する（`gpio-assignment.md`の`信号inventory``LCD-BL`行）。**この違いは追記の範囲に収まる。**
+**前提: `LED` pin配線とfirmwareのbacklight制御の関係。**`HW-TBD-024`行の2026-09-17追記・
+2026-09-23追記が扱う「通常接続」はLCDWiki公式User Manualの原文（`LED` pinを3.3Vへ直結する構成）を
+含むが、それに限る書き方ではない（2026-09-17追記は「`LED` pinを能動制御せず3.3Vへ直結する構成を
+採っても…論点は消えない」と述べ、懸念自体を`LED` pinの配線方法に依存しないものとして立てている）。
+`DISP-01`のfirmware側配線は`LCD-BL`（GPIO4、外部4.7 kΩ pull-down。[gpio-assignment.md](gpio-assignment.md)の
+`信号inventory``LCD-BL`行、2026-09-06確定）経由でこの`LED` pinを能動的にHighへ駆動する。
 [sensor-datasheet-notes.md](sensor-datasheet-notes.md)の`Backlight回路／電流／polarity`行が
 明記するとおり、backlightの実電流は`LED` pin自体を流れず、`VCC`→`R5`→LED列という別経路を通るため、
-電流上界の計算は`LED` pinの配線方法（GPIO経由の能動制御か、3.3Vへの直結か）に依存しない。**この
-手順は`#461`が接続を許可した
-範囲の中で実施するが、`run_display_bringup`（LCDを実際に駆動する処理）を実行してよいかどうかの
-判断そのものは`#461`が下したものではなく、下記条件(7)（人間の明示的な「通電してよい」）が担う。**
+**電流上界の計算（`HW-TBD-024`行が持つ通常動作約245.4 mA・故障時約646.5 mA）は`LED` pinの配線
+方法（GPIO経由の能動制御か、3.3Vへの直結か）に依存しない。**`R5`先短絡の故障電流上界は`R5`の値と
+rail電圧だけで決まり、通常動作の値（LCD Wikiの0.31 W）もbacklightが点灯した状態の値であって
+駆動元（railかGPIOか）で変わらない。**ただしGPIO4自身が吐き出す電流（`LED` pinの入力電流）は
+正本のどこにも記録が無く、`#461`の余裕計算の対象外である。**この値を推定して足さない
+（`R6`（1 kΩ）がどこへ繋がるかも未確定であり、そこから電流を導出しない）。
+
+**ここまでは電流上界の計算が成立する根拠であり、`run_display_bringup`を実行してよいかの
+承認ではない。**`main.rs`のmodule docが明記するとおり、**`#461`は接続そのものを許可するだけで、
+`run_display_bringup`（識別・backlight点灯・fill・四隅patternを行う。GPIO4によるbacklight点灯を
+含む）を`3V3` pin経路で実行してよいかは決めていない。**この実行の承認は、下記条件(7)で人間から
+個別に得る（`#461`の残余risk受け入れを再審議するものではない。firmwareの経路を1つ実行してよいか
+という別の判断である）。
 
 **前提: 接続順序。**この手順は、`ACCEL-01`／`ENV-01`単体bring-upの手順（上記節、`#445`承認範囲）が
 既に実施され、両moduleがESP32`3V3` pinへ接続され通電済みの状態（[EXP-015](experiment-log.md#exp-015-accel-01adxl345env-01bme280のesp323v3-pin給電による初回通電とdevice-id読み出し)）へ、
@@ -529,7 +540,9 @@ ESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`の負荷合計（測定ではない。
       ことを実施者が把握している。**満たされているのは既知の経路（`R5`・`U1`）の電流上界計算だけ
       であり、隠れた経路の不在は確認できていない**（[tbd-register.md](tbd-register.md)の
       `HW-TBD-024`行）
-- [ ] (7) 人間が「通電してよい」と明示している
+- [ ] (7) 人間が、`run_display_bringup`（GPIO4による`DISP-01`のbacklight点灯を含む）を`3V3` pin
+      経路で実行することを明示的に承認しており、その記録（[Issue #13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)
+      のコメントまたは[experiment-log.md](experiment-log.md)の`EXP-0xx`）がある
 
 1. [人間] `DISP-01`を配線する（`VCC`→ESP32の`3V3` pin（`ACCEL-01`／`ENV-01`と共通のrail）、
    `GND`→`GND`、`LCD-CS`→GPIO22、`LCD-DC`→GPIO17、`LCD-RST`→GPIO16、`LCD-MOSI`→GPIO23、
@@ -548,7 +561,8 @@ ESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`の負荷合計（測定ではない。
    未達のまま人間の現場判断で先へ進む可能性がある**）。
 4. [人間] 電源に手を掛けられる状態（USB cableをすぐ抜ける状態）を確保する。
 5. [人間] 通電開始前に、給電を止めるまでの待機時間の上限を決めておく。
-6. [人間] 条件(7)（人間が「通電してよい」と明示すること）を満たしていることを確認する。
+6. [人間] 条件(7)（`run_display_bringup`を`3V3` pin経路で実行することの明示的な承認と、
+   その記録）を満たしていることを確認する。
 7. [人間] USB経由でESP32へ接続し、`--features bringup-display-13`でbuildしたfirmwareを書き込む。
    **この接続がこの配線revisionでの最初の通電である。**ESP32が有効化されると同時に、`ACCEL-01`／
    `ENV-01`（既存配線）と`DISP-01`（今回追加）が`3V3` pinを経由して同時に通電される。
@@ -645,6 +659,13 @@ Revision 39で、給電元（B-2bか`3V3` pinか）ごとに参照先の節が�
 とおり、`#461`の承認は接続を許可するだけであり、「MSP2807が耐えられる電流の上限」自体
 （`HW-TBD-024`が問う値）にも、`HW-TBD-025`(b)（現物回路の確認）にも答えていない。この手順は
 その残余riskをユーザーが受け入れた範囲の中で実施する。
+
+**条件(7)の根拠。**`main.rs`のmodule docが明記するとおり、`#461`は`DISP-01`の`3V3` pinへの
+接続そのものを許可するだけであり、`run_display_bringup`（GPIO4によるbacklight点灯を含む）を
+`3V3` pin経路で実行してよいかは決めていない。**この承認は`#461`の残余risk受け入れを再審議する
+ものではない。**`#461`が既に受け入れた残余risk（未知の経路の可能性、故障時の熱余裕の薄さ、`R5`の
+公差不明）は変わらない。ここで人間から個別に得るのは、firmwareの実行経路を1つ実行してよいかと
+いう別の判断であり、条件(1)〜(6)を満たした状態でのみ問う。
 
 ##### 3.3 V railの許容電圧範囲
 
