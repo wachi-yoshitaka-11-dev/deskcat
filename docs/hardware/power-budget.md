@@ -622,6 +622,15 @@ ESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`の負荷合計（測定ではない。
 7. [人間] USB経由でESP32へ接続し、`--features bringup-display-13`でbuildしたfirmwareを書き込む。
    **この接続がこの配線revisionでの最初の通電である。**ESP32が有効化されると同時に、`ACCEL-01`／
    `ENV-01`（既存配線）と`DISP-01`（今回追加）が`3V3` pinを経由して同時に通電される。
+   **書き込み前にESP32へ入っているfirmwareのimageは既定build（`run_display_bringup`を呼ばない）
+   とは限らない。**`EXP-015`が使ったimage（commit `35bcc36`）は既定buildだが、それより前に
+   焼かれたimageが残っている可能性を排除できない。USB接続からflash書き込み完了までの間、
+   古いimageが一時的に起動し`DISP-01`関連pinを駆動する可能性があるが、その電流は条件(3)の
+   計算（backlight点灯・ILI9341ロジック動作を含む想定）の範囲内であり、この点だけを理由に
+   手順を止めない。**ただし、この間に生じるlogやbacklightの状態は、条件(7)が管理する
+   `run_display_bringup`の実行（この手順が対象とする実行）とは無関係であり、手順9の判定材料
+   にしない。**手順9で確認するのは、書き込み完了後に実行される`--features bringup-display-13`
+   build由来のlogだけである。
 8. [人間] 書き込み中および書き込み後、次のいずれかを認めた場合、直ちに給電を止める
    （USB cableを抜く）。
    - 異音
@@ -632,6 +641,8 @@ ESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`の負荷合計（測定ではない。
      止まる場合（`run_display_bringup`・`run_i2c_bringup`とも出力が無い状態）
    - 手順9(a)は出た（成功または`display_driver_new_failed`／`display_init_failed`）のに、
      `i2c_driver_new_failed`も含め、`accel_device_id`・`env_chip_id`関連のlogが待機時間内に
+     一切出ない場合（下記`失敗時の扱い`参照）
+   - `accel_device_id`関連のlogは出たにもかかわらず、`env_chip_id`関連のlogだけが待機時間内に
      一切出ない場合（下記`失敗時の扱い`参照）
 
    **通電中のテスターによる`VCC`–`GND`間抵抗の監視は、この手順では設定していない**
@@ -703,7 +714,11 @@ ESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`の負荷合計（測定ではない。
     通電前の読みと比較する。通電後に「低いまま動かない」への変化を認めた場合は、短絡が
     新たに生じた可能性として再開しない。
 11. [AI] 結果（成功・停止のいずれも）を[experiment-log.md](experiment-log.md)へ`EXP-0xx`として
-    記録する。**受け入れ条件6件（[Issue #13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)）
+    記録する。**`main.rs`のmodule docが明記するとおり、記録は[Hardware Safety Policy](../governance/hardware-safety-policy.md)
+    「10. ベンチ試験記録」の形式（Test ID／Date／Operator／Hardware revision／Exact components／
+    Wiring revision／Power supply and current limit／Firmware commit/profile／Configuration／
+    Measurement equipment／Procedure／Expected result／Measured result／Faults／Conclusion／
+    Next safe step）に従う。**受け入れ条件6件（[Issue #13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)）
     のうち何が確認でき、何が未達のまま残るかを明記する。**「更新中も通信とwatchdogがactiveである」
     （条件6）は、`main.rs`のmodule docが記録するとおり、既定buildでも`bringup-display-13`
     buildでも実protocol sessionを確立せず（`pi-protocol-mode`は排他）、heartbeatは描画段階の
