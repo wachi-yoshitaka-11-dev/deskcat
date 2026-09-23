@@ -66,20 +66,35 @@
 //!
 //! # `DISP-01`のbring-upを有効にする手順
 //!
-//! **既定buildでLCDを動かさないのは、恒久的な無効化ではない。**`DISP-01`（MSP2807）の
-//! moduleが耐えられる電流の上限が`HW-TBD-024`として未解決であり
-//! （[tbd-register.md](../../../docs/hardware/tbd-register.md)）、B-2bの給電構成も
-//! 確定していない（[power-budget.md](../../../docs/hardware/power-budget.md)の
-//! `DISP-01`初回通電の手順（給電構成の確定待ち）が、実行の前提として2点を挙げている）。
-//! **[Issue #451](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/451)より前、
+//! **既定buildでLCDを動かさないのは、恒久的な無効化ではない。**このfeatureが有効にする
+//! `run_display_bringup`は、電流制限つき外部3.3 V電源（段階B-2b）を使った
+//! `DISP-01`（MSP2807）の初回通電手順に対応する。**この段階B-2bが要求する「設定する
+//! 電流制限値の上限を決めるためのmodule側の安全な上限」は引き続き未解決のままである**
+//! （[tbd-register.md](../../../docs/hardware/tbd-register.md)の`HW-TBD-024`行）。
+//! B-2bの給電構成も確定していない（[power-budget.md](../../../docs/hardware/power-budget.md)の
+//! `DISP-01`初回通電の手順（給電構成の確定待ち）が、B-2bを採る場合の実行前提として
+//! 2点を挙げている）。**[Issue #451](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/451)より前、
 //! `run_display_bringup`は既定buildでも無条件に呼ばれ、その中で`lcd.backlight_on()`を
 //! 実行していた。**そのため`DISP-01`が配線されているだけでbacklightへ給電された。
 //! **それを止めたのがこのfeatureである。**
 //!
-//! **上の2つが解けたら、人間が次の手順で有効にする。**
+//! **`#461`（2026-09-23）が認めたのは、B-2bではなくESP32`3V3` pinからの通常接続である。**
+//! `#445`が`ACCEL-01`／`ENV-01`に採った経路（B-2bではなく`3V3` pin）と同じであり、
+//! B-2bの前提2点は`3V3` pin経路には掛からない。**ただし`3V3` pin経路での`DISP-01`
+//! bring-up手順はまだ書かれていない**（`ACCEL-01`／`ENV-01`には
+//! `ACCEL-01`／`ENV-01`単体bring-upの手順（`power-budget.md`）があるが、`DISP-01`向けの
+//! 対応物は無い。作成は`#13`が引き受ける）。`#461`は接続そのものを許可するだけで、
+//! `run_display_bringup`（識別・backlight点灯・fill・四隅patternを行う）を`3V3` pin
+//! 経路で呼んでよいかは決めない。**`#461`の余裕解析はbacklightが点灯した状態を含む
+//! （通常動作の合計にbacklightのtypical値とILI9341ロジック50 mAが入っている）。
+//! `run_display_bringup`が追加で引く負荷は無い。**`#13`に残るのは`3V3` pin経路の
+//! bring-up手順を書くことであり、余裕の再判定ではない
+//! （[tbd-register.md](../../../docs/hardware/tbd-register.md)の`HW-TBD-024`行）。
+//!
+//! **B-2bの前提2つが解けたら、人間が次の手順でこのfeatureを有効にする。**
 //!
 //! 1. `power-budget.md`の`DISP-01`初回通電の手順（給電構成の確定待ち）が挙げる
-//!    前提2点を満たす。
+//!    B-2bの前提2点を満たす。
 //! 2. `--features bringup-display-13`を付けてbuildする。**commandの正本は
 //!    [検証済みコマンド](../../../docs/toolchains/verified-commands.md)であり、
 //!    ここへ写さない。**
@@ -88,7 +103,7 @@
 //!    [Hardware Safety Policy](../../../docs/governance/hardware-safety-policy.md)
 //!    「人間の監視が必要な操作」）。
 //!
-//! **このfeatureは`HW-TBD-024`のgateを開けない。**開けてよいかの判定は上記の正本文書が
+//! **このfeatureはB-2bのgateを開けない。**開けてよいかの判定は上記の正本文書が
 //! 持つ。**このfeatureが変えるのは、既定buildが`DISP-01`へ触れるかどうかだけである**
 //! （上のLCD関連6+1本のGPIOを駆動するか、`lcd.backlight_on()`を呼ぶか、`display_*`の
 //! logを出すか）。回路側の制約も、`DISP-01`を接続してよいかの判定も、これで変わらない。
