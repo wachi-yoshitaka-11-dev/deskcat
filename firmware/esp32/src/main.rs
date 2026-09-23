@@ -89,7 +89,11 @@
 //! （通常動作の合計にbacklightのtypical値とILI9341ロジック50 mAが入っている）。
 //! `run_display_bringup`が追加で引く負荷は無い。**`#13`に残るのは`3V3` pin経路の
 //! bring-up手順を書くことであり、余裕の再判定ではない
-//! （[tbd-register.md](../../../docs/hardware/tbd-register.md)の`HW-TBD-024`行）。
+//! （[tbd-register.md](../../../docs/hardware/tbd-register.md)の`HW-TBD-024`行）。**
+//! `3V3` pin経路の初回接続も、B-2bと同じく人間の監視下で行い、異音・発熱・変色・異臭を
+//! 認めたら直ちに停止する（[Hardware Safety Policy](../../../docs/governance/hardware-safety-policy.md)
+//! 「人間の監視が必要な操作」、[tbd-register.md](../../../docs/hardware/tbd-register.md)の
+//! `HW-TBD-024`行が持つ停止基準）。**`#13`が書く手順もこの基準を満たす。**
 //!
 //! **B-2bの前提2つが解けたら、人間が次の手順でこのfeatureを有効にする。**
 //!
