@@ -684,6 +684,11 @@ ESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`の負荷合計（測定ではない。
    - (a)自体（成功・失敗いずれのlogも）が待機時間内に一切出ない場合
    - (a)は出た（成功または失敗）にもかかわらず、`i2c_driver_new_failed`も含め
      `accel_device_id`・`env_chip_id`関連のlogが待機時間内に一切出ない場合
+   - `accel_device_id`関連のlog（成功または`accel_device_id_read_failed`）は出たにもかかわらず、
+     `env_chip_id`関連のlog（成功または`env_chip_id_read_failed`）だけが待機時間内に一切出ない場合
+     （`accel`読み出しと`env`読み出しは独立したmatch文であり、`accel`側が終われば`env`側は
+     必ず有限timeout内に何らかのlogを出す設計である。出ないのは異常であり、`J3`の状態にも
+     左右されない）
 
    これらは`ACCEL-01`／`ENV-01`単体bring-upの手順の手順10(b)(c)と同じ考え方（firmwareが実際に
    停止している可能性を、bring-up未実施の予期された結果と誤認しない）に基づく扱いであり、
