@@ -80,16 +80,18 @@
 //!
 //! **`#461`（2026-09-23）が認めたのは、B-2bではなくESP32`3V3` pinからの通常接続である。**
 //! `#445`が`ACCEL-01`／`ENV-01`に採った経路（B-2bではなく`3V3` pin）と同じであり、
-//! B-2bの前提2点は`3V3` pin経路には掛からない。**ただし`3V3` pin経路での`DISP-01`
-//! bring-up手順はまだ書かれていない**（`ACCEL-01`／`ENV-01`には
-//! `ACCEL-01`／`ENV-01`単体bring-upの手順（`power-budget.md`）があるが、`DISP-01`向けの
-//! 対応物は無い。作成は`#13`が引き受ける）。`#461`は接続そのものを許可するだけで、
-//! `run_display_bringup`（識別・backlight点灯・fill・四隅patternを行う）を`3V3` pin
-//! 経路で呼んでよいかは決めない。**`#461`の余裕解析はbacklightが点灯した状態を含む
+//! B-2bの前提2点は`3V3` pin経路には掛からない。**`3V3` pin経路での`DISP-01`
+//! bring-up手順は[power-budget.md](../../../docs/hardware/power-budget.md)の
+//! `DISP-01`単体bring-upの手順（ESP32`3V3` pin給電、`#461`承認範囲）節が持つ**（`#13`が
+//! 作成した。`ACCEL-01`／`ENV-01`が同じ`3V3` railへ既に接続済みの状態
+//! （[EXP-015](../../../docs/hardware/experiment-log.md)）へ`DISP-01`を追加する場合を扱い、
+//! `ACCEL-01`／`ENV-01`単体bring-upの手順とは別節である）。`#461`は接続そのものを
+//! 許可するだけで、`run_display_bringup`（識別・backlight点灯・fill・四隅patternを行う）を
+//! `3V3` pin経路で呼んでよいかは決めない。**`#461`の余裕解析はbacklightが点灯した状態を含む
 //! （通常動作の合計にbacklightのtypical値とILI9341ロジック50 mAが入っている）。
-//! `run_display_bringup`が追加で引く負荷は無い。**`#13`に残るのは`3V3` pin経路の
-//! bring-up手順を書くことであり、余裕の再判定ではない
-//! （[tbd-register.md](../../../docs/hardware/tbd-register.md)の`HW-TBD-024`行）。**
+//! `run_display_bringup`が追加で引く負荷は無い。**したがって上記の新設手順は、この余裕解析を
+//! そのまま前提とし（[tbd-register.md](../../../docs/hardware/tbd-register.md)の`HW-TBD-024`行、
+//! 2026-09-23追記）、余裕の再計算はしていない。**
 //! `3V3` pin経路の初回接続も、B-2bと同じく人間の監視下で行い、異音・発熱・変色・異臭を
 //! 認めたら直ちに停止する（[Hardware Safety Policy](../../../docs/governance/hardware-safety-policy.md)
 //! 「人間の監視が必要な操作」、[tbd-register.md](../../../docs/hardware/tbd-register.md)の
