@@ -264,8 +264,11 @@ HW-TBD-024行が持つ事実であり、ここへ再掲しない。**この節�
       bring-upを実行するため、条件(4)と両立しない。末尾`条件(4)の根拠`参照）
 - [ ] (3) 電流の余裕計算（`B-2b を採る決定と MSP2807 の電流制限（2026-09-07）`節の
       2026-09-22追記、Revision 117）を確認した
-- [ ] (4) `DISP-01`が`3V3` pinへ接続されていない（この節を単独実施する場合の前提。`DISP-01`
-      追加接続のbring-upの手順を見る場合は同節の条件(4)が代わりに適用される）
+- [ ] (4) `DISP-01`が`3V3` pinへ接続されていない（この節の条件(1)〜(7)はすべて、
+      `ACCEL-01`／`ENV-01`だけを`3V3` pinへ接続する場合の前提である。`DISP-01`を追加接続する
+      場合は、この節の条件ではなく`DISP-01`追加接続のbring-upの手順が持つ条件(1)〜(7)を
+      別途満たす。特に条件(2)（既定build限定）と条件(3)（101.5 mAの計算）は、同手順の
+      条件(2)（`bringup-display-13`必須）・条件(3)（4点合算の計算）と両立しない）
 - [ ] (5) [gpio-assignment.md](gpio-assignment.md)の`module電源pinの独立性`／`pin header対応`と、
       受け入れchecklistの`Moduleのpull-upを並列合成した実効抵抗が有効範囲内である`が完了している
 - [ ] (6) 人間が「通電してよい」と明示している
@@ -482,14 +485,15 @@ pinを給電元とし**（[#461](https://github.com/wachi-yoshitaka-11-dev/deskc
 `DISP-01`のfirmware側配線は`LCD-BL`（GPIO4、外部4.7 kΩ pull-down。[gpio-assignment.md](gpio-assignment.md)の
 `信号inventory``LCD-BL`行、2026-09-06確定）経由でこの`LED` pinを能動的にHighへ駆動する。
 [sensor-datasheet-notes.md](sensor-datasheet-notes.md)の`Backlight回路／電流／polarity`行が
-記録するとおり、`LED` pinは`VCC`および`U1`の3本の足のいずれとも非導通（オーバーレンジ）であり、
-これは`LED` pinが制御信号線であることと**整合する**（同行はこの非通電測定だけで断定はしていない。
-`Q1`側の経路は接合の性質上この方法では判定できないとも明記している）。**backlightの実電流が
-`R5`の先で`VCC`側と`U1`出力側のどちらを経由するかは同行も確定できていないが、いずれの経路でも
-`LED` pin自体を電流が流れる経路にはならない（`LED` pinが`VCC`／`U1`いずれとも非導通という
-上記の実測結果に基づく）。**したがって、**電流上界の計算（`HW-TBD-024`行が持つ通常動作
-約245.4 mA・故障時約646.5 mA）は`LED` pinの配線方法（GPIO経由の能動制御か、3.3Vへの直結か）に
-依存しない。**
+記録するとおり、`LED` pinは`VCC`および`U1`の3本の足のいずれとも非導通（オーバーレンジ）である。
+同行はこの非通電測定だけで断定しておらず、backlightの実電流が`R5`の先で`VCC`側と`U1`出力側の
+どちらを経由するかも、`Q1`側の経路（接合の性質上この方法では判定できない）も未確定のまま残して
+いる。**それでも、`HW-TBD-024`行の2026-09-17追記が示す枠組み（懸念は`LED` pinの配線方法に
+依存しないという整理。上記）に従えば、電流上界の計算（`HW-TBD-024`行が持つ通常動作約245.4 mA・
+故障時約646.5 mA）自体は`LED` pinの配線方法（GPIO経由の能動制御か、3.3Vへの直結か）に依存しない
+という結論は変わらない。**この結論の根拠は、`LED` pinの非導通という個別の実測結果ではなく、
+`HW-TBD-024`行がbacklight経路そのもの（`VCC`→`R5`→LED列。`LED` pinとは別）を対象に組んだ
+電流上界の計算が、`LED` pinの状態を入力に使っていないことにある。
 `R5`先短絡の故障電流上界は`R5`の値と
 rail電圧だけで決まり、通常動作の値（LCD Wikiの0.31 W）もbacklightが点灯した状態の値であって
 駆動元（railかGPIOか）で変わらない。**`main.rs`のmodule docは「`run_display_bringup`が追加で
@@ -506,17 +510,20 @@ rail電圧だけで決まり、通常動作の値（LCD Wikiの0.31 W）もbackl
 個別に得る（`#461`の残余risk受け入れを再審議するものではない。firmwareの経路を1つ実行してよいか
 という別の判断である）。
 
-**前提: `gpio-assignment.md`が`#13`（この手順）へ送った2件の確認。**この手順は次の2件に
+**前提: `gpio-assignment.md`が`#13`（この手順）へ送った2件の確認。**この手順はいずれにも
 新たに答えるものではなく、既存の記録どおり未解決のまま扱う。(1) MSP2807のlogic IOが3.3Vで
 動作することの現物確認（[gpio-assignment.md](gpio-assignment.md)の`実機check（電源off）の確認方法`
-節。`U1`出力経由なら`VOH`が約34–133 mV不足しうるという計算があり、同節が名指しで挙げる懸念対象は
-touchの`DOUT`／`PENIRQ`（module→ESP32方向の信号）である。**touchは本手順で配線しないため直接の
-対象外だが、同じdropout機構（`U1`出力側からの給電）はILI9341の`LCD-MISO`（module→ESP32方向の
-信号を含むSPI通信）にも技術的には及びうる。**この対応は同節では確認されておらず、この手順が
-新たに確認するものでもない。**手順9(a)の`display_id`読み出しはこのSPI通信を使うため、
-`display_id_mismatch`や読み出し失敗が生じた場合、この未解決事項が一因である可能性を考慮する）。
-(2) 実機`DISP-01`を接続した状態でbacklightが実際に消灯していることの物理確認（同節、`EXP-011`は
-LCD／touch未接続での測定に限る）。**この手順は(2)を確かめる手段を持たない**（`run_display_bringup`は
+節。`U1`出力経由なら`VOH`が約34–133 mV不足しうるという計算は、`ILI9341`と`XPT2046`の両方の
+`VOH`を確認したうえで行われており、**`ILI9341`（`DISP-01`のcontroller）自体がこの計算の対象に
+含まれている。**「moduleからESP32への向き（touchの`DOUT`／`PENIRQ`等）」という同節の例示は
+touch限定ではなく、module→ESP32方向の信号一般を指しており、`LCD-MISO`もこれに含まれると読める。
+**この対応は同節では確認されておらず、この手順が新たに確認するものでもない。**手順9(a)の
+`display_id`読み出しはこのSPI通信を使うため、`display_id_mismatch`や読み出し失敗が生じた場合、
+この未解決事項が一因である可能性を考慮する）。
+(2) 実機`DISP-01`を接続した状態でbacklightが実際に消灯していることの物理確認（[gpio-assignment.md](gpio-assignment.md)の
+`信号inventory`の`LCD-BL`行が持つ「Resetとbacklight lineが安全な状態で起動する」項目。同項目が
+「確認は`#13`（LCD bring-up）で行う」と定める。`EXP-011`はLCD／touch未接続での測定に限る）。
+**この手順は(2)を確かめる手段を持たない**（`run_display_bringup`は
 backlightを点灯させるため、消灯状態の確認自体が別途・別の機会に要る）。いずれも解決したと
 主張せず、実施時の記録（手順11）へ未解決事項として残す。
 
@@ -526,7 +533,9 @@ backlightを点灯させるため、消灯状態の確認自体が別途・別�
 先に同節を実施すること。**この手順の電流余裕計算（条件(3)）は、`HW-TBD-024`行が計算で出した
 ESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`の負荷合計（測定ではない。段階B-2＝周辺module3点合算の
 定常電流「測定」とは別物であり、混同しない）を前提としており、`DISP-01`単独接続
-（`ACCEL-01`／`ENV-01`なし）には使えない。**`ACCEL-01`／`ENV-01`単体bring-upの手順の
+（`ACCEL-01`／`ENV-01`なし）には使えない（`HW-TBD-024`行の計算自体がこの3点構成を前提として
+組まれており、異なる構成への適用は同行が明示的に検証した範囲を超える。負荷が減る分には
+数値上は保守側へ動く可能性が高いが、それを理由に前提を無断で広げない）。**`ACCEL-01`／`ENV-01`単体bring-upの手順の
 条件(4)（`DISP-01`が`3V3` pinへ接続されていないこと）は、同節を単独で実施する場合の前提であり、
 この手順（`DISP-01`を追加接続する場合）には適用しない。**この手順の条件(4)（下記）が代わりに適用
 される。配線の変更（`DISP-01`の追加）は、ESP32・周辺module3点とも無給電の状態で行う
@@ -546,7 +555,10 @@ ESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`の負荷合計（測定ではない。
       [検証済みコマンド](../toolchains/verified-commands.md)であり、ここへ写さない。**同feature
       は`pi-protocol-mode`と同時指定できない（`main.rs`の`compile_error!`）。既定buildのままでは
       `run_display_bringup`が呼ばれず、受け入れ条件（識別・fill・四隅・timing）を確認する材料が
-      得られない
+      得られない。**この構成のVersion Recordはまだ無い**（[検証済みコマンド](../toolchains/verified-commands.md)
+      が明記するとおり、`bringup-display-13`構成は正式なVersion Recordを持たない。`#13`の
+      本作業でbuild-onlyの検証（`cargo clippy`／`cargo build`）は実施済みだが、Version Record
+      としての記録は別途要る）
 - [ ] (3) 電流の余裕計算（[tbd-register.md](tbd-register.md)の`HW-TBD-024`行、2026-09-23追記）を
       確認した。**この計算はESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`（backlight点灯＋ILI9341ロジック
       50 mA）の負荷合計（計算であり、段階B-2の定常電流「測定」ではない）を前提とする。**次の4点が
@@ -563,14 +575,17 @@ ESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`の負荷合計（測定ではない。
 - [ ] (5) [gpio-assignment.md](gpio-assignment.md)の`module電源pinの独立性`／`pin header対応`と
       受け入れchecklistの`Moduleのpull-upを並列合成した実効抵抗が有効範囲内である`を確認した
       （末尾`条件(5)の根拠`参照。**`ACCEL-01`／`ENV-01`単体bring-upの手順と同じく、この条件は
-      `EXP-015`の時点でも未達のまま人間の現場判断で通電された先例がある**）
+      `EXP-015`の時点でも未達のまま通電された先例がある。**ただし未達の内訳は一様ではない。
+      `module電源pinの独立性`測定（配線構造上物理的に成立しない）は人間の現場判断、
+      `bus容量Cb`（未測定のまま進めた）はPMの判断に基づく、と`EXP-015`自身が別々に記録している）
 - [ ] (6) `HW-TBD-025`(b)（現物回路の確認という手続き）がMSP2807について引き続き満たされていない
       ことを実施者が把握している。**満たされているのは既知の経路（`R5`・`U1`）の電流上界計算だけ
       であり、隠れた経路の不在は確認できていない**（[tbd-register.md](tbd-register.md)の
       `HW-TBD-024`行）
 - [ ] (7) 人間が、`run_display_bringup`（GPIO4による`DISP-01`のbacklight点灯を含む）を`3V3` pin
       経路で実行することを明示的に承認しており、その記録（[Issue #13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)
-      のコメントまたは[experiment-log.md](experiment-log.md)の`EXP-0xx`）がある
+      のコメント等、通電前に確認できる記録）がある。**通電後に手順11で作る`EXP-0xx`は、この
+      条件の記録にはならない**（承認は通電前に済んでいる必要がある）
 
 1. [人間] `DISP-01`を配線する（`VCC`→ESP32の`3V3` pin（`ACCEL-01`／`ENV-01`と共通のrail）、
    `GND`→`GND`、`LCD-CS`→GPIO22、`LCD-DC`→GPIO17、`LCD-RST`→GPIO16、`LCD-MOSI`→GPIO23、
@@ -582,7 +597,8 @@ ESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`の負荷合計（測定ではない。
    ここへ個別の日付は再掲しない）。**
    配線はESP32・周辺module3点とも無給電の状態で行う。**この手順は`ACCEL-01`／`ENV-01`の既存配線
    （`EXP-015`時点のもの）が`DISP-01`を追加する間に変わっていないことを前提とする。**同moduleの
-   `信号inventory`項目5〜7（一覧照合・逆極性確認・給電経路重複確認）の再確認はこの手順の対象外
+   `電源pinの短絡・誤配線の確認（非通電）`表の項目5〜7（一覧照合・逆極性確認・給電経路重複確認）の
+   再確認はこの手順の対象外
    とし、疑わしい場合は`ACCEL-01`／`ENV-01`単体bring-upの手順の該当項目へ戻って確認する。
 2. [人間] 手順1の配線を終えた状態で、[gpio-assignment.md](gpio-assignment.md)の
    `電源pinの短絡・誤配線の確認（非通電）`の項目1・2・3・4を実施する。
@@ -650,7 +666,8 @@ ESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`の負荷合計（測定ではない。
    (d)（`accel_device_id`・`env_chip_id`）は(a)(b)(c)から独立している。**ただし(d)自身の内部は
    完全に独立ではない。**`run_i2c_bringup`は`I2cDriver::new`が失敗すると`i2c_driver_new_failed`
    を出してその場で`return`し、`accel_device_id`・`env_chip_id`のどちらのlogも一切出ない。
-   `I2cDriver::new`が成功した後は、`main.rs`の`run_i2c_bringup`のdocが明記するとおり、
+   `I2cDriver::new`が成功した後は、`main.rs`の`run_i2c_bringup`の実装（`accel`読み出しと`env`
+   読み出しが独立したmatch文であり、`accel`側の`Err`がreturnを伴わないこと）が示すとおり、
    `accel_device_id`の失敗が`env_chip_id`の読み出しを止めない（両方とも有限timeoutを持つ）。
 
    **したがって、失敗logが出た項目は未達として記録し、それが原因で実行されなかった後続項目
