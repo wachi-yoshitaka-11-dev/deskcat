@@ -632,7 +632,8 @@ ESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`の負荷合計（測定ではない。
    この点だけを理由に手順を止めない。**ただし、この間に生じるlogやbacklightの状態は、条件(7)が
    管理する`run_display_bringup`の実行（この手順が対象とする実行）とは無関係であり、手順9の
    判定材料にしない。**手順9で確認するのは、書き込み完了後に実行される
-   `--features bringup-display-13` build由来のlogだけである。
+   `--features bringup-display-13` build由来のlogだけである。**この間に旧imageが出したlogと
+   backlightの状態は、手順9の判定とは別に、手順11の`Measured result`／`Faults`へ記録する。
 8. [人間] USB接続（手順7）の直後から、書き込み中および書き込み後まで通して、次のいずれかを
    認めた場合、直ちに給電を止める
    （USB cableを抜く）。
@@ -661,7 +662,11 @@ ESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`の負荷合計（測定ではない。
    (a) `display_id`（controller識別。受け入れ条件「Controller識別情報と初期化の根拠」）、
    (b) `display_fill`×5色（受け入れ条件「単色fillが正しい」「Color orderが正しい」
    「更新timingを測定した」。`elapsed_us`を記録する）、
-   (c) `display_corner_pattern`（受け入れ条件「四隅とorientationが正しい」）、
+   (c) `display_corner_pattern`（受け入れ条件「四隅とorientationが正しい」）。**受け入れ条件
+   「単色fillが正しい」「Color orderが正しい」「四隅とorientationが正しい」は、logに加えて
+   人間がpanelを目視（写真記録）で確認し、その結果を手順11へ記録したときだけ達成とする。**
+   logだけでは描画処理の実行結果を示すにとどまり、実際の色順・四隅位置・orientationを
+   保証しない。
    (d) `accel_device_id`・`env_chip_id`（`ACCEL-01`／`ENV-01`の読み出し。期待値は
    [sensor-datasheet-notes.md](sensor-datasheet-notes.md)のDevice ID行。**`ENV-01`の`J3`
    （`CSB`→`VDD`）は`EXP-014`によれば2026-09-07にはんだ付けされたとユーザーが申告している。
