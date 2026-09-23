@@ -280,7 +280,9 @@ HW-TBD-024行が持つ事実であり、ここへ再掲しない。**この節�
 3. [人間] [gpio-assignment.md](gpio-assignment.md)の`module電源pinの独立性`／`pin header対応`
    と、受け入れchecklistの`Moduleのpull-upを並列合成した実効抵抗が有効範囲内である`を実施する
    （末尾`手順3の根拠`参照）。
-4. [人間] `DISP-01`が`3V3` pinへ接続されていないことを確認する。
+4. [人間] `DISP-01`が`3V3` pinへ接続されていないことを確認する。**この節を単独で実施する場合の
+   前提である。既に`DISP-01`が接続された状態へ本節を後から適用する意味ではない。**`DISP-01`を
+   このrailへ追加接続する場合の手順は`DISP-01`追加接続のbring-upの手順（本節の下に新設）を見る。
 5. [人間] 電源に手を掛けられる状態（USB cableをすぐ抜ける状態）を確保する。
 6. [人間] 通電開始前に、給電を止めるまでの待機時間の上限を決めておく（末尾`手順6の根拠`参照）。
    **firmwareの書き込み自体がUSB接続＝通電を伴うため、この手順は書き込みより前に行う。**
@@ -394,7 +396,7 @@ firmwareの`main.rs`はWi-Fi／Bluetooth APIを一切呼び出しておらず、
 `#445`承認の範囲（`ACCEL-01`／`ENV-01`のESP32`3V3` pin給電）に閉じている。**`DISP-01`を
 ESP32`3V3` pinへ通常接続すること自体は2026-09-23（`#461`）で別途認められたが、`#461`は
 この手順（`#445`の余裕計算）へ`DISP-01`を合流させることを意味しない。**`DISP-01`を含めて
-余裕を見積もり直す手順は、この節とは別になる（作成は`#13`が引き受ける）。**したがって「既定buildならLCDを繋いでよい」とは読まない。**
+余裕を見積もり直す手順は、この節とは別になる（作成は`#13`が引き受け、`DISP-01`追加接続のbring-upの手順として本節の下に新設済みである）。**したがって「既定buildならLCDを繋いでよい」とは読まない。**
 
 **条件(5)の根拠。**`main.rs`の`run_i2c_bringup`のdoc commentが「実機で動かす前に要る」と挙げる
 現物確認2件を指す。**(a) `module電源pinの独立性`／`pin header対応`（[gpio-assignment.md](gpio-assignment.md)
@@ -493,7 +495,10 @@ ESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`の負荷合計（測定ではない。
 新しい配線revisionの初回通電にあたる）。
 
 **実施前に満たす条件(1)〜(7)。**すべて満たすまで通電（手順7以降。firmwareの書き込み＝
-この配線revisionでの最初の通電にあたる）しない。
+この配線revisionでの最初の通電にあたる）しない。**ただし条件(5)は例外として扱いうる**
+（末尾`条件(5)の根拠`が示すとおり、`EXP-015`はこの条件が未達のまま人間の現場判断で通電した
+先例を持つ。この手順でも同じ判断がありうることを明記しているのは条件(5)だけであり、他の
+条件を人間の現場判断で省略してよいことにはならない）。
 
 - [ ] (1) [gpio-assignment.md](gpio-assignment.md)の`電源pinの短絡・誤配線の確認（非通電）`の
       項目1（共通）・2（一覧照合）・3（逆極性）・4（給電経路の重複。`3V3` pin経路の参照先は
@@ -510,7 +515,10 @@ ESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`の負荷合計（測定ではない。
       (a) `3V3` railに載る負荷はESP32本体・`ACCEL-01`・`ENV-01`・`DISP-01`だけである（servo・
       Pi・他のmoduleを同時に接続しない）。(b) ESP32はUSB経由でPCから給電する（[EXP-015](experiment-log.md#exp-015-accel-01adxl345env-01bme280のesp323v3-pin給電による初回通電とdevice-id読み出し)と
       同じ給電源。計算が`Vin=5V`前提の熱計算（`Vdrop`≈1.7 V）を使っているため、Piからの給電・
-      5 V rail経由など別経路へは変えない）。(c) 周囲温度はambient 40℃の仮定に収まる範囲である
+      5 V rail経由など別経路へは変えない）。(c) 周囲温度はambient 40℃の仮定に収まる範囲である。
+      (d) firmwareがWi-Fi／Bluetoothを使用しない（計算の基礎となる101.54 mA自体がこの前提に
+      立つ。確認結果は`ACCEL-01`／`ENV-01`単体bring-upの手順`条件(3)の根拠`が持ち、現在の
+      firmwareはWi-Fi／Bluetooth APIを呼び出していないことを確認済みである）
 - [ ] (4) `ACCEL-01`／`ENV-01`が`3V3` pinへ接続済み（[EXP-015](experiment-log.md#exp-015-accel-01adxl345env-01bme280のesp323v3-pin給電による初回通電とdevice-id読み出し)）であり、
       `DISP-01`が同じ`3V3` railへ追加接続されている
 - [ ] (5) [gpio-assignment.md](gpio-assignment.md)の`module電源pinの独立性`／`pin header対応`と
@@ -527,12 +535,17 @@ ESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`の負荷合計（測定ではない。
    `GND`→`GND`、`LCD-CS`→GPIO22、`LCD-DC`→GPIO17、`LCD-RST`→GPIO16、`LCD-MOSI`→GPIO23、
    `LCD-SCLK`→GPIO18、`LCD-BL`→GPIO4、`LCD-MISO`→GPIO19。touch用5pinは配線しない。
    pinの正は[gpio-assignment.md](gpio-assignment.md)の`信号inventory`であり、ここへ再掲しない）。
+   **`LCD-CS`／`LCD-RST`の外部10 kΩ pull-upと`LCD-BL`の外部4.7 kΩ pull-downは、この手順の対象
+   外である（2026-09-07に実装済み。[gpio-assignment.md](gpio-assignment.md)冒頭の実装状況参照）。**
    配線はESP32・周辺module3点とも無給電の状態で行う。
-2. [人間] [gpio-assignment.md](gpio-assignment.md)の`電源pinの短絡・誤配線の確認（非通電）`の
-   項目1・2・3・4がすべて完了していることを確認する。
+2. [人間] 手順1の配線を終えた状態で、[gpio-assignment.md](gpio-assignment.md)の
+   `電源pinの短絡・誤配線の確認（非通電）`の項目1・2・3・4を実施する。
 3. [人間] [gpio-assignment.md](gpio-assignment.md)の`module電源pinの独立性`／`pin header対応`
    と、受け入れchecklistの`Moduleのpull-upを並列合成した実効抵抗が有効範囲内である`を実施する
-   （末尾`条件(5)の根拠`参照）。
+   （末尾`条件(5)の根拠`参照。**`ACCEL-01`／`ENV-01`側の`module電源pinの独立性`測定は、`EXP-015`が
+   記録するとおりブレッドボード配線（ESP32側pinとmoduleの電源・信号pinが同一行にある）では
+   物理的に成立しない。この手順でも同じ配線を使う限り同様に成立しない見込みであり、条件(5)は
+   未達のまま人間の現場判断で先へ進む可能性がある**）。
 4. [人間] 電源に手を掛けられる状態（USB cableをすぐ抜ける状態）を確保する。
 5. [人間] 通電開始前に、給電を止めるまでの待機時間の上限を決めておく。
 6. [人間] 条件(7)（人間が「通電してよい」と明示すること）を満たしていることを確認する。
@@ -545,8 +558,8 @@ ESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`の負荷合計（測定ではない。
    - 発熱（`DISP-01`、`ACCEL-01`、`ENV-01`、ESP32 board（`U2`周辺を含む）のいずれか）
    - 火花・変色・異臭
    - 電圧降下（給電源側の出力電圧が測定できる場合、垂れがあれば停止）
-   - 手順5で決めた待機時間の上限に達しても、`run_display_bringup`側・`run_i2c_bringup`側の
-     いずれのlogも何も出ないまま止まる場合
+   - 手順5で決めた待機時間の上限に達しても、手順9の(a)〜(d)のいずれのlogも一切出ないまま
+     止まる場合（`run_display_bringup`・`run_i2c_bringup`とも出力が無い状態）
 
    **通電中のテスターによる`VCC`–`GND`間抵抗の監視は、この手順では設定していない**
    （`ACCEL-01`／`ENV-01`単体bring-upの手順`手順9の根拠`と同じ理由。通電中の回路の抵抗は
@@ -563,15 +576,30 @@ ESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`の負荷合計（測定ではない。
    (c) `display_corner_pattern`（受け入れ条件「四隅とorientationが正しい」）、
    (d) `accel_device_id`・`env_chip_id`（`ACCEL-01`／`ENV-01`の読み出し。期待値は
    [sensor-datasheet-notes.md](sensor-datasheet-notes.md)のDevice ID行。**`ENV-01`の`J3`
-   （`CSB`→`VDD`）は`EXP-014`で既にはんだ付け済みであり、`ACCEL-01`／`ENV-01`単体bring-upの
-   手順が持つ「`J3`をはんだ付けせずに始める」選択肢はこの手順では扱わない**（この手順は
-   `EXP-015`で両device IDの読み出しに成功した状態（`accel_device_id raw=0xe5`、
-   `env_chip_id raw=0x60`）からの追加接続であり、I2C modeの前提は`EXP-014`／`EXP-015`が満たした
-   状態のまま変えていない）。したがって、いずれかの読み出しが失敗した場合は今回の配線変更
-   （`DISP-01`追加）に起因する可能性を優先して調べる）。
-   いずれかのlogが手順5の待機時間内に一切出ない場合は手順8の停止条件として扱う。
-10. [人間] 給電を止めた後、`VCC`–`GND`間抵抗を再測定する。通電後に「低いまま動かない」への
-    変化を認めた場合は、短絡が新たに生じた可能性として再開しない。
+   （`CSB`→`VDD`）は`EXP-014`によれば2026-09-07にはんだ付けされたとユーザーが申告している。
+   ただし`EXP-014`自身が明記するとおり、この記録は測定値を持たずユーザーの申告のみを根拠とし、
+   閉（導通）は確認されていない。**`ACCEL-01`／`ENV-01`単体bring-upの手順が持つ「`J3`を
+   はんだ付けせずに始める」選択肢はこの手順では扱わない**（この手順は`EXP-015`で両device ID
+   の読み出しに成功した状態（`accel_device_id raw=0xe5`、`env_chip_id raw=0x60`）からの追加接続
+   であり、I2C modeの前提は`EXP-014`／`EXP-015`が満たした状態のまま変えていない）。
+
+   **失敗時の扱い。**(a)〜(d)いずれかについて、対応する失敗log（`display_driver_new_failed`、
+   `display_init_failed`、`display_id_mismatch`、`display_backlight_on_failed`、
+   `display_fill_failed`、`display_corner_background_failed`、`display_corner_failed`、
+   `accel_device_id_read_failed`、`env_chip_id_read_failed`。いずれも`main.rs`が出す）が出た場合、
+   その項目は未達として記録し、他の項目の確認は続けてよい（`main.rs`のdocが明記するとおり、
+   1つの失敗が他の読み出し・描画処理を止めない設計である）。**ただし(d)のうち`ACCEL-01`分
+   （`accel_device_id`）自体が出ない、または(a)〜(d)のいずれも一切出ないまま手順5の待機時間の
+   上限に達した場合は、手順8の停止条件として給電を止める**（`ACCEL-01`／`ENV-01`単体bring-upの
+   手順の手順9(c)と同じ扱い。firmwareが実際に停止している可能性を、bring-up未実施の予期された
+   結果と誤認しないため）。今回の配線変更（`DISP-01`追加）が原因である可能性を優先して調べる。
+
+   **(a)〜(d)の確認が終わったら（成功・失敗いずれの結果であっても）、給電を止める。**
+   継続して観察する必要が無い限り、通電を漫然と続けない。
+10. [人間] 給電を止めた後、`VCC`–`GND`間抵抗を再測定する。測定点は手順2の項目1（`DISP-01`の
+    `VCC`／`GND`。ESP32・`ACCEL-01`・`ENV-01`と共通のrailを含む）と同一とし、手順2で得た
+    通電前の読みと比較する。通電後に「低いまま動かない」への変化を認めた場合は、短絡が
+    新たに生じた可能性として再開しない。
 11. [AI] 結果（成功・停止のいずれも）を[experiment-log.md](experiment-log.md)へ`EXP-0xx`として
     記録する。**受け入れ条件6件（[Issue #13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)）
     のうち何が確認でき、何が未達のまま残るかを明記する。**「更新中も通信とwatchdogがactiveである」
@@ -583,14 +611,12 @@ ESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`の負荷合計（測定ではない。
 
 ##### `DISP-01`追加接続のbring-upの手順：条件の根拠
 
-**条件(1)の根拠。**[gpio-assignment.md](gpio-assignment.md)の項目2〜4は元々`DISP-01`が
-B-2b（外部電源）経由で接続される前提の記述を含む。この手順（`3V3` pin経路）でも、項目2
-（一覧との目視照合）・項目3（逆極性・電圧違いpinの確認）が求める確認内容自体は給電元によらず
-成立する。項目4（給電経路の重複確認）は「単一の給電源だけから受電する」ことを求める点で
-給電元によらず適用できる。**同項目は本commitの[gpio-assignment.md](gpio-assignment.md) Revision 39で、
-給電元（B-2bか`3V3` pinか）ごとに参照先の節が変わる形へ更新済みであり**、この手順を実施する際は
-「単一経路であること」（`3V3` pinの1系統だけから受電し、USBの5V・外部3.3V電源等が同時に到達
-しないこと）という判定基準をそのまま適用する。
+**条件(1)の根拠。**[gpio-assignment.md](gpio-assignment.md)の項目2（一覧との目視照合）・項目3
+（逆極性・電圧違いpinの確認）が求める確認内容は給電元によらず成立し、そのまま適用する。項目4
+（給電経路の重複確認）はB-2b経由の接続を前提に元々書かれていたが、[gpio-assignment.md](gpio-assignment.md)
+Revision 39で、給電元（B-2bか`3V3` pinか）ごとに参照先の節が変わる形へ更新済みである。この手順
+（`3V3` pin経路）を実施する際は、項目4が定める判定基準「単一経路であること」（`3V3` pinの1系統
+だけから受電し、USBの5V・外部3.3V電源等が同時に到達しないこと）を適用する。
 
 **条件(2)の根拠。**`main.rs`の`run_display_bringup`は`bringup-display-13` feature付きbuildだけが
 持つ関数であり、既定buildは`main()`から呼ばない（`#451`）。受け入れ条件のうち識別・fill・
@@ -599,7 +625,7 @@ B-2b（外部電源）経由で接続される前提の記述を含む。この�
 **条件(3)の根拠。**[tbd-register.md](tbd-register.md)の`HW-TBD-024`行、2026-09-23追記が持つ
 電流上界の計算（通常動作約245.4 mA、`R5`先短絡の故障時約646.5 mA）は、`ACCEL-01`／`ENV-01`が
 既に`3V3` pinへ接続されている状態（`#445`、`EXP-015`）へ`DISP-01`を足した合計として組まれている。
-**この手順はその前提（条件(3)(a)〜(c)、ESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`の負荷合計という
+**この手順はその前提（条件(3)(a)〜(d)、ESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`の負荷合計という
 計算上の前提。段階B-2の定常電流「測定」とは別物）を満たす場合にだけ、この計算をそのまま使える。**
 値の再掲はしない。
 
@@ -3861,4 +3887,4 @@ rippleはDMMで代替できない。
 | 2026-09-22 | 118 | [#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)／[#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16)。**`段階B-2の測定`節へ、`ACCEL-01`／`ENV-01`単体bring-upの手順（ESP32`3V3` pin給電、`#445`承認範囲）の節を新設した。**`DISP-01`初回通電の手順（Revision 116、[#447](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/447)）と対になる、`ACCEL-01`／`ENV-01`向けの手順である。給電経路が異なる（`DISP-01`はB-2b＝外部電源、この2点は`#445`承認によりESP32自身の`3V3` pin）ため、`DISP-01`の手順を流用せず並べて置いた。**手順はB-2のgateを開けない**（MSP2807分の`HW-TBD-024`が未解決のため、段階B-2＝3点合算測定は引き続き実施できない）。通電はしていない。**fresh-context自己レビュー（1〜13巡目）で多数の指摘を受け、都度本文を修正した。**指摘の種類は、引用先の誤り（doc commentの所在、見出し名の空白、pin名、実験記録の極性ラベル）、欠落していた実施前提（Wi-Fi/BT不使用、`DISP-01`未接続、`CS`／`CSB`／`SDO`の配線、既存2項目の未実施状態、人間の明示的な go-ahead）、手順内の相互参照のずれと循環（停止条件と観測結果が同じ事象を指す形になっていた）、手順の順序そのものの欠陥（firmwareの書き込みがUSB接続＝通電を伴うにもかかわらず、給電停止準備・待機時間決定より前に置かれていた）、余裕計算の丸め誤りと前提の書き漏れ、`main()`が`display bringup`を先に無条件実行する事実の欠落、`信号inventory`との不整合、boldマーカーの欠落など多岐にわたる。**個々の指摘内容と巡ごとの件数はこの行では再掲しない**（本文が正であり、数値・手順番号をここに書き写すと本文の版が変わるたびに乖離するため。乖離自体を複数巡のfresh-context自己レビューが指摘した）。収束（新規指摘0件が2巡連続）には至っていない時点でこのRevisionを記録しており、**引き続き自己レビューを継続する** | [#445](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/445)、[gpio-assignment.md](gpio-assignment.md) Revision 36、[#447](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/447)、fresh-context自己レビュー（1〜13巡目） |
 | 2026-09-23 | 120 | [#451](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/451)。**firmwareの`run_display_bringup`が`bringup-display-13` feature（既定off）付きbuildだけの経路になったことに追随した。**4箇所。(1) `実施前に満たす条件`の条件(2)へ「**既定build**（`bringup-display-13` featureを付けない構成）で」という限定を足した。featureを付けた構成は`DISP-01`のbring-upを実行するため、条件(4)と両立しない。**この限定はこのPRが作った必要であり、以前は書きようが無かった。**(2) `条件(4)の根拠`は、条件の主たる根拠を「`main()`が無条件に`run_display_bringup`を呼ぶ」に置いていた。その記述が偽になったため、変更の事実と、**それでも条件(4)を外さない理由3点**（電流の余裕計算が`DISP-01`を含まないこと、`EXP-011`で確認したのはESP32側の信号レベルまでであること、この手順が`#445`承認の範囲に閉じていること）へ書き換えた。(3) `手順10の根拠`は、display側のlogが`run_i2c_bringup`より先に出ることを「異常ではない」と説明していた。既定buildではもう出ないため、その旨と、**`#451`でI2C読み出しが有限timeoutになったこと**（値と上限の効き方はfirmware側が正本。ここへ再掲しない）へ書き換えた。**実機で`Err`が返るまでの実測時間は取っていないため、手順6の待機時間の上限はこの未実測を前提に置いたままにする。**(4) `手順10`の(b)は、`J3`未はんだを選んだ場合の予期された結果として「失敗（error）」と「出力が無いまま止まる」の2つを挙げていた。**有限timeoutになった以上、後者はもう予期された結果ではない。**後者を削り、`env_chip_id_read_failed`が出ることを予期された結果とし、**`ENV-01`分のlogがどちらも出ないまま止まるのは`J3`の選択によらず異常である**と明記し、**その状態に至った場合の扱いを(c)と同じ（手順9の停止条件）に揃え、手順9の停止条件の一覧へも行を足した**（手動review（CodeRabbit、`full review`）の指摘。同(c)が既に「`ACCEL-01`分すら出ない」場合を異常としており、(b)の旧記述はそれと両立しなくなっていた）。**値・gate・手順の順序・既存の停止条件は1つも変えていない。**(4)で手順9の停止条件が1件増えるが、**これは停止する側へ倒す変更であり、既存の停止条件を緩めたものではない。**増やす必要が生じたのは、有限timeoutによって「出力が無いまま止まる」が予期された結果でなくなり、異常として扱う先が要るためである。 | [#451](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/451)、`firmware/esp32/src/main.rs`、`firmware/esp32/src/config.rs`、手動review（CodeRabbit、`full review`、[PR #459](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/459)） |
 | 2026-09-23 | 121 | [#461](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/461)。**`HW-TBD-024`が「`DISP-01`を3.3 V系へ通常接続すること自体」を一律に妨げる扱いを終える（ユーザー承認）。**B-2b・段階B-2（3点合算測定）のgateは変えない。**`HW-TBD-025`(b)（現物回路の確認という手続き）はMSP2807について引き続き満たされない。**それでも、既知の部品（`R5`・`U1`）を通る経路の電流の上界（`R5`経由495.0 mA、`3.3 V rail下限の設計判断`節が持つILI9341ロジック50 mAと合わせ、通常動作は保守側で約245.4 mA＝101.54＋93.9＋50、`U2`連続定格1 A比で約4.1倍・`TSD`まで約68.9 ℃、`R5`先短絡の故障では約646.5 mA＝101.54＋495.0＋50.0、`U2`のIlimit min 1.25 Aは効かず`TSD`まで約9 ℃しか余裕が無い）を判断材料の1つとして、ユーザーが残余risk（未知の経路の可能性、故障時の熱余裕の薄さ、`R5`の公差不明、`U2`の`TJ(max)`未記録）を受け入れた。**これは`#445`と同じ性質の判断（判断であって証拠ではない）である。**値・導出・限定の正は[tbd-register.md](tbd-register.md)の`HW-TBD-024`行であり、ここへ再掲しない。5箇所。(1) `単体bring-upとB-2の区別`行の末尾へ追記。(2) 145行目付近の段落を書き換え。(3) `DISP-01`初回通電の手順（給電構成の確定待ち）の冒頭へ、この節が扱うB-2bの要求はそのまま残ることを明記。(4) `条件(4)の根拠`を書き換え。(5) `B-2bを採る決定とMSP2807の電流制限（2026-09-07）`節の`#445`追記の末尾へ追記（`#445`自体の範囲は変えていない）。**維持したもの:** B-2b・B-2の要求、`PROT-OC-01`未実装の記述、`HW-TBD-021`／`022`、過去のRevision履歴、既存の停止条件。**変えたもの:** `DISP-01`の`3V3`通常接続を一律に止める扱い。**自己レビューの経緯（複数巡にわたる根拠の訂正）はここへ書かない。**Issue本文とPR本文が持つ | [#461](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/461)、[tbd-register.md](tbd-register.md)の`HW-TBD-024`行、[#445](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/445)、[#409](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/409) |
-| 2026-09-23 | 122 | [#13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)。**`ACCEL-01`／`ENV-01`単体bring-upの手順の直後へ、`DISP-01`追加接続のbring-upの手順（ESP32`3V3` pin給電、`#461`承認範囲）を新設した。**`#461`（Revision 121）は`DISP-01`の`3V3` pin接続を許可するだけで、実行手順は新設しないと明記しており（`tbd-register.md`の`HW-TBD-024`行）、`main.rs`のmodule docも同じ理由でこの節の作成を`#13`へ送っていた。新設した手順は、`ACCEL-01`／`ENV-01`が`3V3` pinへ接続済みの状態（`#445`、`EXP-015`）へ`DISP-01`を追加する場合を扱い、B-2b手順（Revision 116）とは給電元・前提とも別であることを明記した（節名を「単体bring-up」ではなく「追加接続のbring-up」としたのも、`ACCEL-01`／`ENV-01`の接続を前提とする内容と一致させるためである）。電流余裕は`HW-TBD-024`行の2026-09-23追記（ESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`の負荷合計。計算であり段階B-2の定常電流測定ではない。通常動作約245.4 mA・故障時約646.5 mA）をそのまま参照し、この節では再計算しない。`ACCEL-01`／`ENV-01`単体bring-upの手順の条件(4)（`DISP-01`未接続）は、同節を単独実施する場合の前提であり、この新設手順（`DISP-01`追加）には適用しないことを両節に明記した。firmwareは`--features bringup-display-13`付きbuildを要求する（既定buildは`run_display_bringup`を呼ばず、受け入れ条件の確認材料が得られないため）。あわせて、[gpio-assignment.md](gpio-assignment.md)の`電源pinの短絡・誤配線の確認（非通電）`表の項目4（給電経路の重複確認）を、経路により参照先が変わる形へ同commit内で更新した（Revision 39）。**PM（`#0PM`）のレビューを経て、初回commit案から次の点を修正した。**(a) 「すべて満たすまで通電しない」対象の手順番号が、実際の最初の通電（手順7＝firmware書き込み）とずれていた（手順9→手順7）。(b) 待機時間を決める手順番号の参照が誤っていた（手順6→手順5、2箇所）。(c) LED pin配線とbacklight実電流経路の分離の根拠が、`#422`本文を引用しない`tbd-register.md`のHW-TBD-023行を誤って指していた。正しくは[sensor-datasheet-notes.md](sensor-datasheet-notes.md)の`Backlight回路／電流／polarity`行。(d) `条件(1)の根拠`が、同commit内で書き換えたはずのgpio-assignment.md項目4を「B-2bを採用済みの経路と記す（読み替えて適用する）」という書き換え前の記述のまま説明しており自己矛盾していた。(e) `条件(5)の根拠`の「実施者・PMが別途判断する」を「人間が判断する（条件(7)）」へ訂正（PMの判断は人間の承認の代替にならない）。(f) 停止条件に「テスターでの異常値（`VCC`–`GND`間抵抗が通電中に急変する等）」をB-2b節から誤って複製していた。通電中の回路の抵抗はテスターで意味のある値として測れないため削除し、`ACCEL-01`／`ENV-01`単体bring-upの手順が同じ理由で明示的にこの監視を設定していない旨を参照する形にした。(g) 節名を「単体bring-up」から「追加接続のbring-up」へ改め、参照4箇所（gpio-assignment.mdの項目4、main.rs、Revision履歴行）を揃えた。通電はしていない | [#461](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/461)、[tbd-register.md](tbd-register.md)の`HW-TBD-024`行、[#445](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/445)、`experiment-log.md`の`EXP-015`、`firmware/esp32/src/main.rs`のmodule doc、PM（`#0PM`）のレビュー |
+| 2026-09-23 | 122 | [#13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)。**`ACCEL-01`／`ENV-01`単体bring-upの手順の直後へ、`DISP-01`追加接続のbring-upの手順（ESP32`3V3` pin給電、`#461`承認範囲）を新設した。**`#461`（Revision 121）は`DISP-01`の`3V3` pin接続を許可するだけで、実行手順は新設しないと明記しており（`tbd-register.md`の`HW-TBD-024`行）、`main.rs`のmodule docも同じ理由でこの節の作成を`#13`へ送っていた。新設した手順は、`ACCEL-01`／`ENV-01`が`3V3` pinへ接続済みの状態（`#445`、`EXP-015`）へ`DISP-01`を追加する場合を扱い、B-2b手順（Revision 116）とは給電元・前提とも別であることを明記した（節名を「単体bring-up」ではなく「追加接続のbring-up」としたのも、`ACCEL-01`／`ENV-01`の接続を前提とする内容と一致させるためである）。電流余裕は`HW-TBD-024`行の2026-09-23追記（ESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`の負荷合計。計算であり段階B-2の定常電流測定ではない。通常動作約245.4 mA・故障時約646.5 mA）をそのまま参照し、この節では再計算しない。`ACCEL-01`／`ENV-01`単体bring-upの手順の条件(4)（`DISP-01`未接続）は、同節を単独実施する場合の前提であり、この新設手順（`DISP-01`追加）には適用しないことを新設手順側に明記した。あわせて`ACCEL-01`／`ENV-01`単体bring-upの手順の手順4へも、この前提が同節を単独実施する場合に限ることと新設手順への参照を追記した（両節を揃えた）。firmwareは`--features bringup-display-13`付きbuildを要求する（既定buildは`run_display_bringup`を呼ばず、受け入れ条件の確認材料が得られないため）。あわせて、[gpio-assignment.md](gpio-assignment.md)の`電源pinの短絡・誤配線の確認（非通電）`表の項目4（給電経路の重複確認）を、経路により参照先が変わる形へ同commit内で更新した（Revision 39）。**PM（`#0PM`）のレビューを経て、初回commit案から次の点を修正した。**(a) 「すべて満たすまで通電しない」対象の手順番号が、実際の最初の通電（手順7＝firmware書き込み）とずれていた（手順9→手順7）。(b) 待機時間を決める手順番号の参照が誤っていた（手順6→手順5、2箇所）。(c) LED pin配線とbacklight実電流経路の分離の根拠が、`#422`本文を引用しない`tbd-register.md`のHW-TBD-023行を誤って指していた。正しくは[sensor-datasheet-notes.md](sensor-datasheet-notes.md)の`Backlight回路／電流／polarity`行。(d) `条件(1)の根拠`が、同commit内で書き換えたはずのgpio-assignment.md項目4を「B-2bを採用済みの経路と記す（読み替えて適用する）」という書き換え前の記述のまま説明しており自己矛盾していた。(e) `条件(5)の根拠`の「実施者・PMが別途判断する」を「人間が判断する（条件(7)）」へ訂正（PMの判断は人間の承認の代替にならない）。(f) 停止条件に「テスターでの異常値（`VCC`–`GND`間抵抗が通電中に急変する等）」をB-2b節から誤って複製していた。通電中の回路の抵抗はテスターで意味のある値として測れないため削除し、`ACCEL-01`／`ENV-01`単体bring-upの手順が同じ理由で明示的にこの監視を設定していない旨を参照する形にした。(g) 節名を「単体bring-up」から「追加接続のbring-up」へ改め、参照箇所（power-budget.mdの見出しと小見出し、gpio-assignment.mdの項目4とRevision履歴行、main.rs）を揃えた。通電はしていない | [#461](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/461)、[tbd-register.md](tbd-register.md)の`HW-TBD-024`行、[#445](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/445)、`experiment-log.md`の`EXP-015`、`firmware/esp32/src/main.rs`のmodule doc、PM（`#0PM`）のレビュー |
