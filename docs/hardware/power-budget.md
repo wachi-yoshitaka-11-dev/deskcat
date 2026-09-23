@@ -529,10 +529,10 @@ touch限定ではなく、module→ESP32方向の信号一般を指しており�
 `LCD-BL`行はこの項目を参照するだけで、項目自体はここに無い。同項目が「確認は`#13`（LCD bring-up）
 で行う」と定める。`EXP-011`はLCD／touch未接続での測定に限る）。
 **この手順は(2)を確かめる確立した手段を持たない**（`run_display_bringup`が動き出すとbacklightを
-点灯させる。手順7のUSB接続からflash書き込み完了までの間、書き込み前の既定build（`DISP-01`の
-pinへ触れない）がまだ動作している可能性があるが、その時間・挙動は保証されておらず、これを
-確認方法として定めない。消灯状態の確立した確認は別途・別の機会に要る）。いずれも解決したと
-主張せず、実施時の記録（手順11）へ未解決事項として残す。
+点灯させる。手順7の根拠が示すとおり、書き込み前にESP32へ残っているimageが`run_display_bringup`を
+呼ばない構成とは限らず、`EXP-015`が使ったimage（`35bcc36`）はむしろ無条件に呼ぶ版であるため、
+USB接続からflash書き込み完了までの間も消灯していると仮定できない。消灯状態の確立した確認は
+別途・別の機会に要る）。いずれも解決したと主張せず、実施時の記録（手順11）へ未解決事項として残す。
 
 **前提: 接続順序。**この手順は、`ACCEL-01`／`ENV-01`単体bring-upの手順（上記節、`#445`承認範囲）が
 既に実施され、両moduleがESP32`3V3` pinへ接続され通電済みの状態（[EXP-015](experiment-log.md#exp-015-accel-01adxl345env-01bme280のesp323v3-pin給電による初回通電とdevice-id読み出し)）へ、
@@ -622,15 +622,17 @@ ESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`の負荷合計（測定ではない。
 7. [人間] USB経由でESP32へ接続し、`--features bringup-display-13`でbuildしたfirmwareを書き込む。
    **この接続がこの配線revisionでの最初の通電である。**ESP32が有効化されると同時に、`ACCEL-01`／
    `ENV-01`（既存配線）と`DISP-01`（今回追加）が`3V3` pinを経由して同時に通電される。
-   **書き込み前にESP32へ入っているfirmwareのimageは既定build（`run_display_bringup`を呼ばない）
-   とは限らない。**`EXP-015`が使ったimage（commit `35bcc36`）は既定buildだが、それより前に
-   焼かれたimageが残っている可能性を排除できない。USB接続からflash書き込み完了までの間、
-   古いimageが一時的に起動し`DISP-01`関連pinを駆動する可能性があるが、その電流は条件(3)の
-   計算（backlight点灯・ILI9341ロジック動作を含む想定）の範囲内であり、この点だけを理由に
-   手順を止めない。**ただし、この間に生じるlogやbacklightの状態は、条件(7)が管理する
-   `run_display_bringup`の実行（この手順が対象とする実行）とは無関係であり、手順9の判定材料
-   にしない。**手順9で確認するのは、書き込み完了後に実行される`--features bringup-display-13`
-   build由来のlogだけである。
+   **書き込み前にESP32へ入っているfirmwareのimageは、`run_display_bringup`を呼ばない構成とは
+   限らない。**`EXP-015`が使ったimage（commit `35bcc36`）は`#451`（`bringup-display-13`
+   feature gateの導入）より前の版であり、`run_display_bringup`を無条件に呼ぶ（feature gate
+   自体が存在しない。`main.rs`のmodule docが「`#451`より前、`run_display_bringup`は既定build
+   でも無条件に呼ばれ」と記録するとおり）。**このimageが残っていれば、USB接続の直後から
+   （flash書き込みが完了する前に）`DISP-01`が駆動され、backlightが点灯すると想定する。**
+   その電流は条件(3)の計算（backlight点灯・ILI9341ロジック動作を含む想定）の範囲内であり、
+   この点だけを理由に手順を止めない。**ただし、この間に生じるlogやbacklightの状態は、条件(7)が
+   管理する`run_display_bringup`の実行（この手順が対象とする実行）とは無関係であり、手順9の
+   判定材料にしない。**手順9で確認するのは、書き込み完了後に実行される
+   `--features bringup-display-13` build由来のlogだけである。
 8. [人間] 書き込み中および書き込み後、次のいずれかを認めた場合、直ちに給電を止める
    （USB cableを抜く）。
    - 異音
