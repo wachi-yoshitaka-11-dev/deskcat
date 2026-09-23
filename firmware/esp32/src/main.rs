@@ -93,7 +93,10 @@
 //! `3V3` pin経路の初回接続も、B-2bと同じく人間の監視下で行い、異音・発熱・変色・異臭を
 //! 認めたら直ちに停止する（[Hardware Safety Policy](../../../docs/governance/hardware-safety-policy.md)
 //! 「人間の監視が必要な操作」、[tbd-register.md](../../../docs/hardware/tbd-register.md)の
-//! `HW-TBD-024`行が持つ停止基準）。**`#13`が書く手順もこの基準を満たす。**
+//! `HW-TBD-024`行が持つ停止基準）。結果は[Hardware Safety Policy](../../../docs/governance/hardware-safety-policy.md)
+//! 「ベンチ試験記録」の形式で記録する。**`#13`が書く手順にも、これらは`#461`を待たずに
+//! 掛かっている**（§7は「新しい配線revisionの初回通電」、§10はbench試験記録の形式を、
+//! いずれも条件なしで定めている）。
 //!
 //! **B-2bの前提2つが解けたら、人間が次の手順でこのfeatureを有効にする。**
 //!
