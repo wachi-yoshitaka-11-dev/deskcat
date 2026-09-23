@@ -496,8 +496,8 @@ ESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`の負荷合計（測定ではない。
 この配線revisionでの最初の通電にあたる）しない。
 
 - [ ] (1) [gpio-assignment.md](gpio-assignment.md)の`電源pinの短絡・誤配線の確認（非通電）`の
-      項目1（共通）・2（一覧照合）・3（逆極性）・4（給電経路の重複。`3V3` pin経路向けの読み替えは
-      同表の項目4を参照）が、`DISP-01`について完了している
+      項目1（共通）・2（一覧照合）・3（逆極性）・4（給電経路の重複。`3V3` pin経路の参照先は
+      同表の項目4が持つ）が、`DISP-01`について完了している
 - [ ] (2) firmwareが`--features bringup-display-13`付きでbuild済みである。**commandの正本は
       [検証済みコマンド](../toolchains/verified-commands.md)であり、ここへ写さない。**同feature
       は`pi-protocol-mode`と同時指定できない（`main.rs`の`compile_error!`）。既定buildのままでは
