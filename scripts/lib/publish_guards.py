@@ -128,7 +128,30 @@ MARKDOWN_EXTENSIONS = (".md", ".markdown")
 # `.svg`はtext扱いだがimage同様に大きくなり得るため、除外すると検査から漏れる。
 # 上限を超えるfixtureを作るtestもこの値から大きさを決める。testが独自の定数を
 # 持つと、上限を上げたときにtestだけが古い値のまま失敗する。
-FILE_SIZE_LIMIT = 1024 * 1024
+#
+# 2026-09-24見直し（`#469`）。旧値`1024 * 1024`（1 MiB）は`b65265b`（`#50`）が
+# 「実測最大205,894 byteに対しno-opとして置いた」値であり、外部の制約から
+# 導いたものではなかった。`docs/hardware/power-budget.md`の伸びによりこの
+# 旧値を超えたため見直した。
+#
+# 実測（再現手順）: 公開中のPagesを直接取得し、対応するcommitのMarkdown source
+# と比較する。ワークフローの追加実行やlocalのJekyll環境を必要としない。
+#   curl -s https://wachi-yoshitaka-11-dev.github.io/deskcat/<path>.html \
+#     -o rendered.html && wc -c rendered.html
+#   git show <対応するcommit>:<path>.md | wc -c
+# 2026-09-24時点の実測: `docs/hardware/power-budget.md`（`main`、567,807 byte）
+# → render後878,587 byte。この1組（1file・1時点）からrender後/source比率
+# ≈1.547を得た。この比率はfile間で流用しない（表やlinkの密度がfileごとに
+# 違うため）。`develop`（`#468`（`#13`）のPR前、646,722 byte）は比率から
+# 約1.00 MB、`#468`（684,399 byte）は約1.06 MBという見積もりであり、実測
+# ではない。上下はPages CIのsuccess／failureの実績（`develop`はsuccessなので
+# 1,048,576 byte以下、`#468`はfailureなので1,048,576 byte超）で押さえた。
+#
+# 新しい上限は、実測済みの最大（878,587 byte）に対し約4.8倍、`#468`が見込む
+# 大きさ（約1.06 MB）に対し約4倍の余裕を持つ。旧上限が実測最大に対して
+# 持っていた余裕（約5.1倍）と近い比率であり、想定外の巨大fileを止める
+# という本来の検知目的を保ちながら、既知の文書の伸びを吸収する。
+FILE_SIZE_LIMIT = 4 * 1024 * 1024
 
 
 class ValidationError(Exception):
