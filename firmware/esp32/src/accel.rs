@@ -46,8 +46,11 @@
 //!   生byteを返すだけで、ADXL345であると断定しない）。
 //!
 //! `main()`は`crate::run_i2c_bringup`からこのdriverを呼び、生byteをlogへ出す
-//! （一致判定はしない。`main.rs`のmodule doc参照）。**実機通電はまだ行っていない。**bus共有pull-up(`ACCEL-SDA`/`ACCEL-SCL`の外部4.7 kΩ)はbreadboardへ実装済みだが(`docs/hardware/gpio-assignment.md`の`競合check`節の受け入れchecklist「すべての外部pull-upが3.3Vへ接続され」の項目、2026-09-07)、sensor module自体の接続(address/mode選択の配線)はまだ行っていない。
-//! この呼び出しはcross-compileの確認までであり、実機での動作確認は別工程である
+//! （一致判定はしない。`main.rs`のmodule doc参照）。**2026-09-22に、`35bcc36`のbuildをESP32へ書き込み、ESP32`3V3` pin給電で
+//! `ACCEL-01`／`ENV-01`へ初回通電して、この読み出しに応答を得た**（生byte `0xe5`。
+//! 一致判定はしていない。記録は[EXP-015](../../../docs/hardware/experiment-log.md)が正本であり、
+//! **ここへ再掲しない**）。**それより後の変更を含むbuildは、実機で動かした記録が無い。**
+//! 実機での動作確認は人間の監視下で行う別工程である
 //! （[Hardware Safety Policy](../../../docs/governance/hardware-safety-policy.md)
 //! 「人間の監視が必要な操作」）。
 

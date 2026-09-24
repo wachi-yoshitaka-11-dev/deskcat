@@ -65,6 +65,7 @@ Issueで書いたものを含み、日付の無いものが同じ日の測定だ
 `shlex`とbashの挙動はどちらも実装依存である。**版が変われば測り直す。**
 """
 
+import os
 import shlex
 
 # commandの区切り。ここより後ろは新しいcommandとして読む。
@@ -422,7 +423,10 @@ def _invocations_in(command, program):
 # `git -c key=value reset`／`gh --repo <owner/repo> pr list`）。**値を伴うものと
 # 伴わないものを分ける。**取り違えると、値の方をsubcommandの語として読む。
 GLOBAL_VALUE_OPTIONS = {
-    "git": ("-C", "-c"),
+    # `--git-dir`／`--work-tree`／`--namespace`／`--config-env`／`--super-prefix`は値を次の語で
+    # 取れる（`--git-dir=X`の形も取れる。git 2.34.1で確認）。**1語として飛ばすと値の方をsubcommandとして読み、
+    # `git --git-dir X push`を`push_gate.py`が検査しない**（#472。PR #471のreview指摘）。
+    "git": ("-C", "-c", "--git-dir", "--work-tree", "--namespace", "--config-env", "--super-prefix"),
     "gh": ("--repo", "-R"),
 }
 
@@ -437,8 +441,12 @@ GLOBAL_FLAGS = {
 def _global_prefix(tokens, program):
     """global optionの並びを読み、`(subcommandが始まるindex, 値の対応)`を返す。
 
-    **値の対応は、同じoptionが複数回現れたら最後の値を残す。**`git -C a -C b`は
-    bが有効である（gitは前の`-C`からの相対で解決するため、最後の指定が効く）。
+    **`-C`は重ねるとつなぐ。**gitは相対pathの`-C`を前の`-C`からの相対で解決するため、
+    `git -C a -C b`は`a/b`を指す（絶対pathならそこから始め直す。空の`-C ""`は何も変えない）。
+    **最後の値だけを残すと、別のtreeを検査する**（#472）。それ以外のoptionは、
+    複数回現れたら最後の値を残す。
+
+    `--git-dir=X`のように値を`=`でつないだ1語も、値として読む。
     """
     value_options = GLOBAL_VALUE_OPTIONS.get(program, ())
     flags = GLOBAL_FLAGS.get(program, ())
@@ -448,14 +456,30 @@ def _global_prefix(tokens, program):
         token = tokens[index]
         if token in value_options:
             if index + 1 < len(tokens):
-                values[token] = tokens[index + 1]
+                _record_value(values, token, tokens[index + 1])
             index += 2
+            continue
+        name, separator, value = token.partition("=")
+        if separator and name.startswith("--") and name in value_options:
+            _record_value(values, name, value)
+            index += 1
             continue
         if token.startswith("--") or token in flags:
             index += 1
             continue
         break
     return index, values
+
+
+def _record_value(values, option, value):
+    """global optionの値を`values`へ入れる。`-C`だけは前の値とつなぐ。"""
+    if option == "-C":
+        if value == "":
+            return
+        previous = values.get(option)
+        values[option] = os.path.join(previous, value) if previous else value
+        return
+    values[option] = value
 
 
 def skip_global_options(tokens, program):

@@ -995,6 +995,20 @@ Pull Requestを通る変更は`review-gate.yml`が`gate`を実行するためで
   そちらはPull RequestのCIで`gate`が済んでいる。
 - **`push_gate.py`が見る`develop`の書き方は`develop`と`refs/heads/develop`だけである。**
   `--mirror`と`--all`のように、refspecを書かずに複数branchを更新する形は拾えない。
+- **`push_gate.py`は、`git push`の字句を完全には解釈しない。下の各項目は2026-09-24に実測で確かめた例であり、網羅ではない。**
+  **通ったことを、検査したことと読まない。**
+- **`push_gate.py`は、環境変数を前に付けた形を見ない。**`GIT_DIR=/o/.git git push origin HEAD:develop`は
+  `VAR=value`を読み捨てるため、cwd側のrepositoryを検査する（2026-09-24実測）。**[#472](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/472)より前から同じである。**
+- **`push_gate.py`は、1つのcommandの中で最初に見つけた`develop`へのpushだけを見る。**
+  `git push origin HEAD:develop && git --git-dir=/o/.git push origin HEAD:develop`では2つ目を見ない（2026-09-24実測）。
+  **#472で足した判定（`--git-dir`／`--work-tree`／`--namespace`を付けた`develop`へのpushを止める）も、この形で外れる。**
+- **`push_gate.py`は、値を次の語で取るpushのoptionを読み違える。**`git push -o ci.skip origin HEAD:develop`は
+  `ci.skip`をremoteと読み、検査しない（`--push-option`も同じ。2026-09-24実測）。**#472より前から同じである。**
+- **`push_gate.py`は、refspecを書かない`git push origin`を見ない。**upstreamを引くのは`git push`だけの形である。**#472より前から同じである。**
+- **`push_gate.py`は、remoteを`origin`以外の綴りで書いた形を見ない。**`git push https://github.com/wachi-yoshitaka-11-dev/deskcat.git HEAD:develop`は検査しない。**#472より前から同じである。**
+- **`push_gate.py`は、dry-runの判定を値の位置でも一致させる。**`git push -o -n origin HEAD:develop`は`-n`を見て検査しない。**#472より前から同じである。**
+- **`push_gate.py`は、commandの中で`cd`した先を見ない。**`cd other && git push origin HEAD:develop`はhookのcwdのrepositoryを検査する。**#472より前から同じである。**
+- **`push_gate.py`は、`-C`の値にshellの展開が要る形を検査しない。**`git -C ~/x push origin HEAD:develop`は`~`を展開できずrepositoryを決められないため通す。**#472より前から同じである。**
 - **`gate`が時間内に終わらない場合は通す。**止めないのは、遅い環境で作業を止めないためである。
   **通ったことを、検査したことと読まない。**
 - **`git stash drop`／`git stash clear`／`git rm -f`／`git worktree remove --force`／
