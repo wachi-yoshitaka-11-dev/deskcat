@@ -242,7 +242,7 @@ VDD = 3.3 Vである（`電圧domain`節）。受け側の`VIH`は0.7×3.3 = **2
 値を詰める必要が出た時点で、下の式と境界表をそのまま使える。**甲乙丙の区分を通す必要も無い**
 （同policyが「5項目に効かない値は出所を問わない」と定める）。
 
-**値そのものはまだ確定していない。**下記「まだ確定できない2つの入力」が埋まるまで決まらない。（2026-09-24追記（[#472](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/472)）: 下の節の見出しと項目のとおり、まだ確定できない入力は`Cb`の1つである）
+**値そのものはまだ確定していない。**下記「まだ確定できない2つの入力」が埋まるまで決まらない。（2026-09-24追記（[#472](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/472)）: 下の節の見出しと項目のとおり、まだ確定できない入力は`Cb`の1つである。上の「2つの入力」はこの追記が置き換える）
 **ただし確定を待つ必要は無い。**上のとおり一般値で開始してよい。
 
 **起動時の状態を確定させるための外部pull（[`HW-TBD-027`](tbd-register.md)／[`HW-TBD-032`](tbd-register.md)、[#2](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/2)）とは別の計算である。**
@@ -295,7 +295,7 @@ VDD = 3.3 Vである（`電圧domain`節）。受け側の`VIH`は0.7×3.3 = **2
    理由と根拠は下記「初回bring-upのmode決定」節。[sensor-datasheet-notes.md](sensor-datasheet-notes.md)の
    `検証済み最大bus速度`は、実測して確認した値ではないため`TBD`のまま変更しない
    （**この決定は「採用するmode」であり「実測して確認した最大速度」ではない**）。
-3. **bus容量`Cb`を得ていない。**`Cb`は配線・接続・pinの合計容量であり、**実配線が存在しない。**（2026-09-24追記（[#472](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/472)）: [experiment-log.md](experiment-log.md)の`EXP-015`（2026-09-22）で両moduleをGPIO25／GPIO26へ配線した。`Cb`は同記録でも未測定である）
+3. **bus容量`Cb`を得ていない。**`Cb`は配線・接続・pinの合計容量であり、**実配線が存在しない。**（2026-09-24追記（[#472](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/472)）: [experiment-log.md](experiment-log.md)の`EXP-015`（2026-09-22）で両moduleをGPIO25／GPIO26へ配線した。`Cb`は同記録でも未測定である。上の「実配線が存在しない」はこの追記が置き換える）
    `J1`／`J2`をはんだ付けするかの判断にはこの入力が引き続き要る。
 
 ### 判断に使える境界
@@ -448,7 +448,7 @@ PCからflashingするときは同じUSB portを使うため、Piとの同時接
 | USB serial（Pi link） | Raspberry Pi | **USB connector経由に確定**（GPIO配線なし）。GPIO1／GPIO3はboard上ブリッジの予約pin | Pi上のdevice名（`/dev/ttyUSB*`等）は#8で確認。USB OTG変換cableが**手持ちで充当**（2026-08-22） |
 | ADC測定（`power-budget.md`） | Shunt、5 V rail、3.3 V rail | GPIO32／33／36に確定（すべてADC1） | 分圧器の実装と実測値。ADC2はWi-Fi有効時に使用不可のため割り当てない |
 | SPI display bus | LCD（MSP2807／ILI9341）、touch（同module） | GPIO18／23／19（SCLK／MOSI／MISO）＋CS個別（LCD: GPIO22、Touch: GPIO21）に確定 | Touch controller型番の現物確認、実際のSPI mode／速度の実測 |
-| I2C sensor bus | Accelerometer（ADXL345）、environment sensor（BME280） | GPIO25（SDA）／GPIO26（SCL）に確定 | **BME280側のjumperは2026-08-22に実測で確定した**（`J1`／`J2`／`J3`はすべて開放）。**残るのはADXL345側のpin接続の確認と、実効pull-up抵抗の計算である。****計算の式と前提は[I2C busの実効pull-up](#i2c-busの実効pull-up)節が正本であり、ここへ再掲しない。**同節は2026-08-25に一次資料（UM10204 Rev. 7.0 §7.1）から式と規定値を確定させた。**値が決まらない理由は3つある**（ADXL345側のpin接続、bus容量`Cb`、採るmode）。**いずれも同節に書いた。** **2026-08-22にBME280側のjumperを実測した。`J1`／`J2`はどちらも開放であり、module搭載の4.7 kΩプルアップはbusへ繋がっていない**（正は[sensor-datasheet-notes.md](sensor-datasheet-notes.md)の`現物の実装状態を実測で確定させた（2026-08-22）`。**ここへ再掲しない**）。**したがって実効pull-upの計算にBME280側の4.7 kΩを入れない。**`J1`／`J2`をはんだ付けするかは、この計算の結果で決める。**まだ決めていない。****計算前にはんだ付けしない。****あわせて`J3`が開放であるため、I2Cで使うには`J3`のはんだ付けが要る。****2026-09-22追記: 上の2026-08-22時点の記述は、`J3`について現在の状態と合わない。****状態・実施日・確認方法・根拠の水準は、すべて[sensor-datasheet-notes.md](sensor-datasheet-notes.md)の`jumper（AE-BME280）`節と`J3をはんだ付けした（2026-09-07）`節が持つ。ここへ再掲しない。**実施の記録は[experiment-log.md](experiment-log.md)の`EXP-014`。**上の2026-08-22時点の記述は書き換えていない。****実効pull-upの計算にBME280側の4.7 kΩを入れるかどうかは`J1`／`J2`で決まり、`J3`では変わらない。**`J1`／`J2`の現在の状態は上記の正本が持つ。**2026-09-24追記（[#472](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/472)）。**上の「残るのはADXL345側のpin接続の確認と、実効pull-up抵抗の計算である」と「値が決まらない理由は3つある（ADXL345側のpin接続、bus容量`Cb`、採るmode）」は、ADXL345側のpin接続（2026-08-27）とmode（2026-09-06、Standard-mode）の確定より前の記述である（`I2C busの実効pull-up`節の`確定した入力・まだ確定できない1つの入力`）。**残る入力は`Cb`の1つである。**上の記述は書き換えていない |
+| I2C sensor bus | Accelerometer（ADXL345）、environment sensor（BME280） | GPIO25（SDA）／GPIO26（SCL）に確定 | **BME280側のjumperは2026-08-22に実測で確定した**（`J1`／`J2`／`J3`はすべて開放）。**残るのはADXL345側のpin接続の確認と、実効pull-up抵抗の計算である。****計算の式と前提は[I2C busの実効pull-up](#i2c-busの実効pull-up)節が正本であり、ここへ再掲しない。**同節は2026-08-25に一次資料（UM10204 Rev. 7.0 §7.1）から式と規定値を確定させた。**値が決まらない理由は3つある**（ADXL345側のpin接続、bus容量`Cb`、採るmode）。**いずれも同節に書いた。** **2026-08-22にBME280側のjumperを実測した。`J1`／`J2`はどちらも開放であり、module搭載の4.7 kΩプルアップはbusへ繋がっていない**（正は[sensor-datasheet-notes.md](sensor-datasheet-notes.md)の`現物の実装状態を実測で確定させた（2026-08-22）`。**ここへ再掲しない**）。**したがって実効pull-upの計算にBME280側の4.7 kΩを入れない。**`J1`／`J2`をはんだ付けするかは、この計算の結果で決める。**まだ決めていない。****計算前にはんだ付けしない。****あわせて`J3`が開放であるため、I2Cで使うには`J3`のはんだ付けが要る。****2026-09-22追記: 上の2026-08-22時点の記述は、`J3`について現在の状態と合わない。****状態・実施日・確認方法・根拠の水準は、すべて[sensor-datasheet-notes.md](sensor-datasheet-notes.md)の`jumper（AE-BME280）`節と`J3をはんだ付けした（2026-09-07）`節が持つ。ここへ再掲しない。**実施の記録は[experiment-log.md](experiment-log.md)の`EXP-014`。**上の2026-08-22時点の記述は書き換えていない。****実効pull-upの計算にBME280側の4.7 kΩを入れるかどうかは`J1`／`J2`で決まり、`J3`では変わらない。**`J1`／`J2`の現在の状態は上記の正本が持つ。**2026-09-24追記（[#472](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/472)）。**上の「残るのはADXL345側のpin接続の確認と、実効pull-up抵抗の計算である」と「値が決まらない理由は3つある（ADXL345側のpin接続、bus容量`Cb`、採るmode）」は、ADXL345側のpin接続（2026-08-27）とmode（2026-09-06、Standard-mode）の確定より前の記述である（`I2C busの実効pull-up`節の`確定した入力・まだ確定できない1つの入力`）。**残る入力は`Cb`の1つである。**上の2文はこの追記が置き換える。上の記述は書き換えていない |
 | PWM／timer | Servo（SG90） | GPIO27に確定 | `servo-safety-limits.md`のpulse幅制限確定、起動時安全状態のreview |
 
 ## 競合check
@@ -479,7 +479,7 @@ PCからflashingするときは同じUSB portを使うため、Piとの同時接
   可能性があり、この文書は`tr`／`Cb`／`IOL`の列しか引用していないため、その制約の有無を
   確認できていない。**したがって、実配線の`Cb`が400 pFを超えて488 pF以下に収まる場合、
   rise timeの計算だけは通っても、Standard-modeとして規定範囲内と言い切れない可能性が残る。
-  **実配線の`Cb`が存在しない現状では、これを判定できない。**（2026-09-24追記（[#472](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/472)）: 配線は`EXP-015`で行われたが、`Cb`は未測定のままであり、判定できないことは変わらない）**mode決定（Standard-mode採用）は
+  **実配線の`Cb`が存在しない現状では、これを判定できない。**（2026-09-24追記（[#472](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/472)）: 配線は`EXP-015`で行われたが、`Cb`は未測定のままであり、判定できないことは変わらない。上の「実配線の`Cb`が存在しない」はこの追記が置き換える）**mode決定（Standard-mode採用）は
   取り消さない。**初回bring-upの選択としては変わらず有効である。**ただしこの項目（実効抵抗が
   有効範囲内である）は、実配線の`Cb`を測定するか、`Cb`≤400 pFを裏付ける設計上の根拠を得るまで、
   未達のまま残す。**`J1`／`J2`をはんだ付けするかの判断もこのmode決定の対象外であり、

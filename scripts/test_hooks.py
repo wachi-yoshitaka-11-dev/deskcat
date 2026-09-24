@@ -2349,6 +2349,26 @@ class PushGateTests(unittest.TestCase):
         _git(str(self.root), "branch", "--set-upstream-to", "origin/develop")
         self.assertDenied("git push")
 
+    def test_two_guarded_pushes_in_one_command_are_denied(self):
+        """1つのcommandの中に`develop`へのpushが2件あれば止める（#472。PR #473のreview指摘）。
+
+        **最初の1件で止めていた版では、1つ目が通れば2つ目の`--git-dir`を見ずに通していた。**
+        1件でも各段の上限を合わせるとhookの制限時間を超えうる（変更前から同じ）。件数が増えるとさらに延びるため、
+        2件以上ある形そのものを止める。1つ目は宣言の揃ったcommitで`gate`を通る形にしてある。
+        """
+        self._instruction_commit(declared=True)
+        other = tempfile.mkdtemp()
+        self.addCleanup(guards.remove_tree, Path(other))
+        command = (
+            f"git -C {self.root} push origin HEAD:develop"
+            f" && git --git-dir={self.root / '.git'} push origin HEAD:develop"
+        )
+        self.assertEqual(len(push_gate.pushed_sources(command)), 2)
+        reason = self.assertDenied(command, cwd=other)
+        self.assertIn("1件ずつpushし直す", reason)
+        # 1件だけなら、宣言の揃ったcommitは通る。
+        self.assertAllowed(f"git -C {self.root} push origin HEAD:develop", cwd=other)
+
     def test_bare_push_with_git_dir_follows_the_upstream_of_that_repository(self):
         """refspecを書かない`git --git-dir X push`は、`X`のupstreamを引いて止める（#472）。
 

@@ -999,9 +999,6 @@ Pull Requestを通る変更は`review-gate.yml`が`gate`を実行するためで
   **通ったことを、検査したことと読まない。**
 - **`push_gate.py`は、環境変数を前に付けた形を見ない。**`GIT_DIR=/o/.git git push origin HEAD:develop`は
   `VAR=value`を読み捨てるため、cwd側のrepositoryを検査する（2026-09-24実測）。**[#472](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/472)より前から同じである。**
-- **`push_gate.py`は、1つのcommandの中で最初に見つけた`develop`へのpushだけを見る。**
-  `git push origin HEAD:develop && git --git-dir=/o/.git push origin HEAD:develop`では2つ目を見ない（2026-09-24実測）。
-  **#472で足した判定（`--git-dir`／`--work-tree`／`--namespace`を付けた`develop`へのpushを止める）も、この形で外れる。**
 - **`push_gate.py`は、値を次の語で取るpushのoptionを読み違える。**`git push -o ci.skip origin HEAD:develop`は
   `ci.skip`をremoteと読み、検査しない（`--push-option`も同じ。2026-09-24実測）。**#472より前から同じである。**
 - **`push_gate.py`は、refspecを書かない`git push origin`を見ない。**upstreamを引くのは`git push`だけの形である。**#472より前から同じである。**

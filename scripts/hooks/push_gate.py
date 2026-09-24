@@ -112,16 +112,16 @@ def _repository_root(directory=None):
     return Path(__file__).resolve().parent.parent.parent
 
 
-# 値を次の語で取るglobal optionと、同じ意味を持つ環境変数。`pushed_source`がupstreamを
+# 値を次の語で取るglobal optionと、同じ意味を持つ環境変数。`pushed_sources`がupstreamを
 # 引くとき、pushするrepositoryと同じものを見るために使う（#472）。**検査そのものには渡さない。**
-# これらが付いたpushは`main`が止める（下の`UNRESOLVED_OPTIONS`）。
+# これらが付いたpushは`_inspect`が止める（下の`UNRESOLVED_OPTIONS`）。
 GLOBAL_OPTION_ENV = {
     "--git-dir": "GIT_DIR",
     "--work-tree": "GIT_WORK_TREE",
     "--namespace": "GIT_NAMESPACE",
 }
 
-# 指定されると、検査するrepository・tree・refを一意に決められないもの。`main`が止める。
+# 指定されると、検査するrepository・tree・refを一意に決められないもの。`_inspect`が止める。
 # **`--namespace`も含める。**refの探し方を変えるoptionであり、検査側で再現しない（#472）。
 UNRESOLVED_OPTIONS = ("--git-dir", "--work-tree", "--namespace")
 
@@ -131,7 +131,7 @@ def _strip_global_options(args):
 
     環境変数は`--git-dir`／`--work-tree`／`--namespace`を同じ意味の`GIT_*`へ移したもの。
     **相対pathは、gitと同じく`-C`の後のdirectoryから解決して絶対pathにする。**
-    空でなければ`main`はそのpushを止める（検査するrepositoryを一意に決められない）。
+    空でなければ`_inspect`がそのpushを止める（検査するrepositoryを一意に決められない）。
 
     `git -C dir push ...`と`git -c key=value push ...`を拾うために要る。
     **外さないと`args[0]`が`push`にならず、素通りする。**
@@ -161,15 +161,21 @@ def _strip_global_options(args):
     )
 
 
-def pushed_source(command):
-    """`develop`を更新するpushなら`(押す側のref, 実行するdirectory, 環境変数)`を返す。
+def pushed_sources(command):
+    """`develop`を更新するpushを、commandに現れる順にすべて`(押す側のref, 実行するdirectory, 環境変数)`の
+    listで返す。無ければ空のlistを返す。
+
+    **最初の1件で止めない。**止めると、`git push origin HEAD:develop && git --git-dir=X push ...`の
+    2つ目を見落とす（#472。PR #473のreview指摘）。2件以上あれば`main`が止める。
+    1回の`git push`の中では、最初に一致したrefspecを1件として数える。
 
     `git push origin HEAD:develop`は`HEAD`を、`git push origin develop`は`develop`を
-    返す。`git push`だけの形はupstreamを引いて判定する。該当しなければ`None`。
+    返す。`git push`だけの形はupstreamを引いて判定する。
 
     **`git push origin :develop`は返さない。**これはbranchの削除であり、
     押すcommitが無い。`HEAD`を押すものとして扱うと、無関係な範囲を検査する。
     """
+    found = []
     for raw in command_line.invocations(command, "git"):
         args, directory, env = _strip_global_options(raw)
         if not args or args[0] != "push":
@@ -184,7 +190,7 @@ def pushed_source(command):
                 cwd=directory, env=env,
             )
             if ok and upstream == f"{REMOTE}/{GUARDED}":
-                return "HEAD", directory, env
+                found.append(("HEAD", directory, env))
             continue
         if positional[0] != REMOTE:
             continue
@@ -196,8 +202,15 @@ def pushed_source(command):
                 continue
             destination = destination or source
             if destination in GUARDED_DESTINATIONS:
-                return source, directory, env
-    return None
+                found.append((source, directory, env))
+                break
+    return found
+
+
+def pushed_source(command):
+    """[`pushed_sources`]の最初の1件を返す。無ければ`None`。"""
+    found = pushed_sources(command)
+    return found[0] if found else None
 
 
 def main():
@@ -210,11 +223,23 @@ def main():
     command = command_line.command_from(payload)
     if command is None:
         return 0
-    target = pushed_source(command)
-    if target is None:
-        return 0
-    source, directory, env = target
+    targets = pushed_sources(command)
+    if len(targets) > 1:
+        # **1件でも、各段（rev-parse・fetch・rev-list・`gate`の4段×`TIMEOUT`50秒）の上限を合わせると
+        # hookの制限時間を超えうる（変更前から同じ）。件数が増えると、その分さらに延びる。**
+        # 時間切れに頼ると、どちらに倒れても検査漏れになりうる。**止めて1件にさせる**（#472）。
+        _deny(
+            f"1つのcommandの中に`develop`へのpushが{len(targets)}件ある。"
+            "検査が時間内に終わらない恐れがあるため止めた。1件ずつpushし直す。"
+            f" 意図して押す場合は{SKIP_ENV}=1を付け、理由を残す。"
+        )
+    for target in targets:
+        _inspect(*target)
+    return 0
 
+
+def _inspect(source, directory, env):
+    """1件のpushを検査する。止めるなら`_deny`で抜ける。通すなら何も返さない。"""
     unresolved = [option for option in UNRESOLVED_OPTIONS if GLOBAL_OPTION_ENV[option] in env]
     if unresolved:
         # **検査するrepository・tree・refを一意に決められない。**`--git-dir`だけならgitは
@@ -231,11 +256,11 @@ def main():
 
     root = _repository_root(directory)
     if root is None:
-        return 0
+        return
     gate = root / "scripts" / "review_gate.py"
     if not gate.is_file():
         # 検査する道具が無い環境で作業を止めない。**ただし検査していない。**
-        return 0
+        return
 
     # fetchしなければ、localの`origin/develop`が古いまま範囲に入る。
     # **他人のcommitを自分の宣言漏れとして数えることになる。**
@@ -243,15 +268,15 @@ def main():
     if not ok:
         # offline等。**古いbaseで測ると誤検知になるため、測らない。**
         # 通したことを、検査したことと読まない。
-        return 0
+        return
 
     base = f"{REMOTE}/{GUARDED}"
     ok, ahead = _git(["rev-list", "--count", f"{base}..{source}"], cwd=str(root))
     if not ok:
         # refを解決できない。**押す前の判定材料が無いので止めない。**
-        return 0
+        return
     if ahead == "0":
-        return 0
+        return
 
     code, output = _run(
         [
@@ -262,7 +287,7 @@ def main():
         cwd=str(root),
     )
     if code is None or code == 0:
-        return 0
+        return
     _deny(
         f"`{base}..{source}`（{ahead} commit）が`review_gate.py gate`で落ちた。"
         " 直接pushはCIを通らないため、ここが最後の検査である。\n\n"
