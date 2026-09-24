@@ -1247,6 +1247,28 @@ class WorktreeGuardTests(unittest.TestCase):
         # 自分のtreeはcleanのまま。汚れているのは`-C`の先だけである。
         self.assertAsked(f"git -C {other} reset --hard")
 
+    def test_value_options_select_the_tree_and_do_not_hide_the_subcommand(self):
+        """`--git-dir X --work-tree Y reset --hard`は`Y`のtreeを見る（#472）。
+
+        **`--git-dir`等を1語として飛ばしていた版では、値`X`を subcommand と読み、
+        検査ごと素通りしていた。**読んだ値は`git status`へ引き継ぐため、
+        `-C`と同じく指した先のtreeを見る。
+        """
+        other = tempfile.mkdtemp()
+        self.addCleanup(guards.remove_tree, Path(other))
+        _git(other, "init", "--quiet", ".")
+        (Path(other) / "other.md").write_text("最初\n", encoding="utf-8")
+        _git(other, "add", "other.md")
+        _git(other, "commit", "--quiet", "-m", "first")
+        (Path(other) / "other.md").write_text("汚した\n", encoding="utf-8")
+        # 自分のtreeはcleanのまま。汚れているのは指した先だけである。
+        for command in (
+            f"git --git-dir {other}/.git --work-tree {other} reset --hard",
+            f"git --git-dir={other}/.git --work-tree={other} reset --hard",
+        ):
+            with self.subTest(command=command):
+                self.assertAsked(command)
+
     def test_reset_hard_with_a_clean_tree_is_allowed(self):
         """**汚れていなければ失うものが無い。**
 
@@ -2214,10 +2236,10 @@ class PushGateTests(unittest.TestCase):
         self._instruction_commit(declared=False)
         other = tempfile.mkdtemp()
         self.addCleanup(guards.remove_tree, Path(other))
-        source, directory = push_gate.pushed_source(
+        source, directory, env = push_gate.pushed_source(
             f"git -C {self.root} push origin HEAD:develop"
         )
-        self.assertEqual((source, directory), ("HEAD", str(self.root)))
+        self.assertEqual((source, directory, env), ("HEAD", str(self.root), {}))
         # cwdをrepositoryの外に置いても、`-C`の先を見て拒否する。
         reason = self.assertDenied(
             f"git -C {self.root} push origin HEAD:develop", cwd=other
@@ -2230,6 +2252,72 @@ class PushGateTests(unittest.TestCase):
         other = tempfile.mkdtemp()
         self.addCleanup(guards.remove_tree, Path(other))
         self.assertAllowed(f"git -C {other} push origin HEAD:develop")
+
+    def test_repeated_directory_options_resolve_relative_to_the_previous_one(self):
+        """`git -C a -C b push`は`a/b`を検査する（#472）。
+
+        gitは相対pathの`-C`を前の`-C`からの相対で解決する。**最後の値だけを見ると、
+        `b`をcwdからの相対で探し、別のtreeを検査するか検査しない。**
+        """
+        self._instruction_commit(declared=False)
+        other = tempfile.mkdtemp()
+        self.addCleanup(guards.remove_tree, Path(other))
+        parent, name = str(self.root.parent), self.root.name
+        command = f"git -C {parent} -C {name} push origin HEAD:develop"
+        source, directory, _ = push_gate.pushed_source(command)
+        self.assertEqual((source, directory), ("HEAD", str(self.root)))
+        reason = self.assertDenied(command, cwd=other)
+        self.assertIn(gate.TRAILER_INSTRUCTION, reason)
+
+    def test_value_options_are_not_read_as_the_subcommand(self):
+        """`--git-dir X push`の`X`を subcommand と読まない（#472）。
+
+        **1語として飛ばしていた版では、`X`が先頭語になって`push`と一致せず、
+        検査せずに通していた。**`--git-dir=X`の1語の形も同じに扱う。
+        """
+        self._instruction_commit(declared=False)
+        git_dir = self.root / ".git"
+        for command in (
+            f"git --git-dir {git_dir} --work-tree {self.root} push origin HEAD:develop",
+            f"git --git-dir={git_dir} --work-tree={self.root} push origin HEAD:develop",
+            f"git --git-dir {git_dir} push origin HEAD:develop",
+            f"git --work-tree {self.root} push origin HEAD:develop",
+        ):
+            with self.subTest(command=command):
+                self.assertIsNotNone(push_gate.pushed_source(command), command)
+
+    def test_git_dir_and_work_tree_forms_are_denied(self):
+        """`--git-dir`／`--work-tree`／`--namespace`を付けた`develop`へのpushは止める（#472）。
+
+        **検査するrepository・tree・refを一意に決められない。**`--git-dir`だけならgitはcwdを
+        work treeとして扱い、`--work-tree`だけならrepositoryをcwdから探す。
+        `--namespace`はrefの探し方を変える（検査側で再現しない）。
+        **宣言の揃ったcommitでも止める**（gateの結果ではなく、形で止めている）。
+        """
+        self._instruction_commit(declared=True)
+        other = tempfile.mkdtemp()
+        self.addCleanup(guards.remove_tree, Path(other))
+        git_dir = self.root / ".git"
+        for command in (
+            f"git --git-dir {git_dir} --work-tree {self.root} push origin HEAD:develop",
+            f"git --git-dir {git_dir} push origin HEAD:develop",
+            f"git --work-tree {self.root} push origin HEAD:develop",
+            f"git --namespace n push origin HEAD:develop",
+            f"git --namespace=n push origin HEAD:develop",
+        ):
+            with self.subTest(command=command):
+                reason = self.assertDenied(command, cwd=other)
+                self.assertIn("`-C`とcwd", reason)
+
+
+    def test_relative_git_dir_is_resolved_from_the_directory_option(self):
+        """相対の`--git-dir`は`-C`の後のdirectoryから解決する。gitと同じである（#472）。"""
+        self._instruction_commit(declared=False)
+        _, directory, env = push_gate.pushed_source(
+            f"git -C {self.root} --git-dir .git push origin HEAD:develop"
+        )
+        self.assertEqual(directory, str(self.root))
+        self.assertEqual(env, {"GIT_DIR": str((self.root / ".git").resolve())})
 
     def test_other_destinations_are_out_of_scope(self):
         """`develop`以外へのpushは見ない。Pull Requestが`gate`を通す。"""
@@ -2260,6 +2348,40 @@ class PushGateTests(unittest.TestCase):
         self._instruction_commit(declared=False)
         _git(str(self.root), "branch", "--set-upstream-to", "origin/develop")
         self.assertDenied("git push")
+
+    def test_two_guarded_pushes_in_one_command_are_denied(self):
+        """1つのcommandの中に`develop`へのpushが2件あれば止める（#472。PR #473のreview指摘）。
+
+        **最初の1件で止めていた版では、1つ目が通れば2つ目の`--git-dir`を見ずに通していた。**
+        1件でも各段の上限を合わせるとhookの制限時間を超えうる（変更前から同じ）。件数が増えるとさらに延びるため、
+        2件以上ある形そのものを止める。1つ目は宣言の揃ったcommitで`gate`を通る形にしてある。
+        """
+        self._instruction_commit(declared=True)
+        other = tempfile.mkdtemp()
+        self.addCleanup(guards.remove_tree, Path(other))
+        command = (
+            f"git -C {self.root} push origin HEAD:develop"
+            f" && git --git-dir={self.root / '.git'} push origin HEAD:develop"
+        )
+        self.assertEqual(len(push_gate.pushed_sources(command)), 2)
+        reason = self.assertDenied(command, cwd=other)
+        self.assertIn("1件ずつpushし直す", reason)
+        # 1件だけなら、宣言の揃ったcommitは通る。
+        self.assertAllowed(f"git -C {self.root} push origin HEAD:develop", cwd=other)
+
+    def test_bare_push_with_git_dir_follows_the_upstream_of_that_repository(self):
+        """refspecを書かない`git --git-dir X push`は、`X`のupstreamを引いて止める（#472）。
+
+        **cwdのupstreamを引くと、cwdがrepositoryでなければ`None`になり、止める判定まで届かない。**
+        """
+        self._instruction_commit(declared=False)
+        _git(str(self.root), "branch", "--set-upstream-to", "origin/develop")
+        other = tempfile.mkdtemp()
+        self.addCleanup(guards.remove_tree, Path(other))
+        command = f"git --git-dir {self.root / '.git'} --work-tree {self.root} push"
+        self.assertIsNotNone(push_gate.pushed_source(command))
+        reason = self.assertDenied(command, cwd=other)
+        self.assertIn("`-C`とcwd", reason)
 
     def test_bare_push_to_another_upstream_is_out_of_scope(self):
         """upstreamが`origin/develop`でなければ見ない。"""
@@ -2734,6 +2856,44 @@ class CodeRabbitGateTests(unittest.TestCase):
                 self.assertEqual(
                     output["hookSpecificOutput"]["permissionDecision"], "ask"
                 )
+
+
+class GlobalOptionTests(unittest.TestCase):
+    """`command_line`のglobal optionの読み飛ばし（#472）。"""
+
+    def test_value_options_consume_their_value(self):
+        for option in ("--git-dir", "--work-tree", "--namespace", "--config-env", "--super-prefix"):
+            with self.subTest(option=option):
+                self.assertEqual(
+                    command_line.skip_global_options([option, "X", "push", "origin"], "git"),
+                    ["push", "origin"],
+                )
+                self.assertEqual(
+                    command_line.global_option_value([option, "X", "push"], "git", option),
+                    "X",
+                )
+                self.assertEqual(
+                    command_line.skip_global_options([f"{option}=X", "push"], "git"),
+                    ["push"],
+                )
+                self.assertEqual(
+                    command_line.global_option_value([f"{option}=X", "push"], "git", option),
+                    "X",
+                )
+
+    def test_repeated_directory_option_joins_paths(self):
+        """gitの`-C`は前の`-C`からの相対で解決する。絶対pathはそこから始め直す。"""
+        value = command_line.global_option_value
+        self.assertEqual(value(["-C", "a", "-C", "b", "push"], "git", "-C"), os.path.join("a", "b"))
+        self.assertEqual(value(["-C", "a", "-C", "/abs", "push"], "git", "-C"), "/abs")
+        self.assertEqual(value(["-C", "a", "-C", "", "push"], "git", "-C"), "a")
+        self.assertEqual(value(["-C", "a", "push"], "git", "-C"), "a")
+
+    def test_other_options_keep_the_last_value(self):
+        self.assertEqual(
+            command_line.global_option_value(["--repo", "a/x", "--repo", "b/y", "pr"], "gh", "--repo"),
+            "b/y",
+        )
 
 
 class CommandFromTests(unittest.TestCase):

@@ -1036,6 +1036,73 @@ mod logging {
         CAPTURE.with_borrow_mut(std::mem::take)
     }
 
+    /// 停止した`Session`へは`get_status`を送り直さず、logも出し続けない（#472）。
+    ///
+    /// **以前は予約がある限り毎tick`send`を呼び、`Stopped`の`log::warn!`を1行ずつ出していた。**
+    /// 予約そのものは残る（以前と同じ。reset後の扱いは変えていない）。
+    #[test]
+    fn a_stopped_session_does_not_repeat_the_status_sync_attempt() {
+        install();
+        let mut session = connected_session();
+        let mut sim = Sim::with_reads(vec![Err(io::Error::from(io::ErrorKind::PermissionDenied))]);
+        assert_eq!(
+            session.pump_read(&mut sim, |_| {}),
+            Pump::Fatal,
+            "前提: 停止する"
+        );
+        let mut peer = deskcat_serial::PeerSession::new();
+        peer.mark_status_sync_pending();
+        let _ = take();
+
+        for tick in 0..3 {
+            let _ = deskcat_serial::retry_due_requests(&mut session, &mut peer, 1_000 + tick);
+        }
+
+        let lines = take();
+        assert!(
+            !lines.iter().any(|l| l.contains("get_status")),
+            "停止したsessionへget_statusを送り直していない: {lines:?}"
+        );
+        assert!(peer.status_sync_pending(), "予約は残る（以前と同じ）");
+    }
+
+    /// `id`空間を使い切った`Session`へも、`get_status`を送り直さない（#472）。
+    ///
+    /// `IdSpaceExhausted`は`Session`を停止させる。**失敗した1回の後は、tickを重ねても
+    /// `get_status`のlogが増えない。**
+    #[test]
+    fn id_exhaustion_does_not_repeat_the_status_sync_attempt() {
+        install();
+        let mut session =
+            deskcat_serial::Session::with_first_id(super::config(), 90_312, u32::MAX - 1);
+        session.note_connected();
+        let _ = session
+            .send(hello(), 10)
+            .expect("上限の1つ手前までは送れる");
+        let mut peer = deskcat_serial::PeerSession::new();
+        peer.mark_status_sync_pending();
+        let _ = take();
+
+        let _ = deskcat_serial::retry_due_requests(&mut session, &mut peer, 1_000);
+        let first = take();
+        let tried: Vec<&String> = first.iter().filter(|l| l.contains("get_status")).collect();
+        assert_eq!(tried.len(), 1, "最初の1回は試して失敗を記録する: {first:?}");
+        assert!(
+            tried[0].starts_with("ERROR"),
+            "ERROR水準である: {}",
+            tried[0]
+        );
+        assert!(peer.status_sync_pending(), "予約は残る（以前と同じ）");
+        for tick in 1..3 {
+            let _ = deskcat_serial::retry_due_requests(&mut session, &mut peer, 1_000 + tick);
+        }
+        let later = take();
+        assert!(
+            !later.iter().any(|l| l.contains("get_status")),
+            "停止した後は送り直さない: {later:?}"
+        );
+    }
+
     /// 切断は`warn`で、操作の種別とerrorと分類が残る。
     #[test]
     fn a_disconnect_is_logged_with_the_operation_and_disposition() {

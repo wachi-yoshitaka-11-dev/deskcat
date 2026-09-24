@@ -247,7 +247,8 @@ pub struct PeerSession {
     outstanding: HashMap<u32, OutstandingEntry>,
     /// `boot`確立後の`get_status`（§10.1 step4）を、まだenqueueできていないか。
     ///
-    /// `Established`直後の送信が失敗した場合（outbox満杯など）にtrueになる。
+    /// `Established`直後の送信が失敗し、予約を残す`SendError`だった場合にtrueになる
+    /// （どれが当たるかは`coordinator.rs`の`keeps_status_sync`だけが決める。理由は`try_send_get_status`の表）。
     /// この時点では`note_sent`が呼ばれていないため`outstanding`には何も残らず、
     /// [`Self::poll_outstanding`]の対象にもならない——このflagが唯一の記録である。
     /// `note_sent`が`get_status`をenqueueした時点で自動的に落ちる
@@ -322,6 +323,16 @@ impl PeerSession {
     /// `true`を返すようになり、次に送信を試みる契機になる。
     pub fn mark_status_sync_pending(&mut self) {
         self.status_sync_pending = true;
+    }
+
+    /// `boot`確立後の`get_status`を、送り直しても送れないと確定したと記録する。
+    ///
+    /// 送り直しても、`Session`を替えても結果が変わらない失敗の直後に呼ぶ
+    /// （どの`SendError`が当たるかは`coordinator.rs`の`keeps_status_sync`だけが決める）。
+    /// [`Self::status_sync_pending`]が`false`へ戻り、再試行の契機が消える。
+    /// **送れた場合に落とすのは[`Self::note_sent`]であり、この関数ではない。**
+    pub fn clear_status_sync_pending(&mut self) {
+        self.status_sync_pending = false;
     }
 
     /// `boot`確立後の`get_status`を、まだ送れていないか。

@@ -44,6 +44,10 @@
 //! 確認までであり、実機へflashして確認するのは別工程である（[Hardware Safety
 //! Policy](../../../docs/governance/hardware-safety-policy.md)「人間の監視が必要な
 //! 操作」。初回配線revisionでの初回通電は人間監視下で行う）。
+//! **2026-09-24追記（#472）: 上の2文は`4486de5`の時点の記述である。**2026-09-22に`35bcc36`の
+//! buildで`ACCEL-01`／`ENV-01`へ初回通電し、Device ID読み出しに応答を得た記録が
+//! [EXP-015](../../../docs/hardware/experiment-log.md)にある。それより後の変更を含むbuildは、
+//! 実機で動かした記録が無い。
 //!
 //! **Protocol sessionは確立しない。**`pi-protocol-mode`は`Boot` frameの書き込みを
 //! 1回試みるだけで（[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)、
@@ -688,6 +692,11 @@ fn run_display_bringup<SPI: SpiAnyPins + 'static>(
 /// されるまで検証対象が存在しない**として`#15`／`#16`側へ送られている
 /// （同文書冒頭の`#2`のclose条件ではない項目一覧、(3)・(5)）。**したがってこの関数を
 /// 実機で動かす前に、これらの現物確認が要る。**
+/// **2026-09-24追記（#472）: この段落の配線についての記述は、2026-09-22の
+/// [EXP-015](../../../docs/hardware/experiment-log.md)の記録と合わない。**同記録は、両moduleを
+/// GPIO25／GPIO26・`3V3`・`GND`へ配線して通電したと書いている。同記録は、`module電源pinの独立性`／
+/// `pin header対応`の確認（`docs/hardware/power-budget.md`の`ACCEL-01／ENV-01単体bring-upの手順`の
+/// 条件(5)(a)）が未達のまま、`Cb`が未測定のまま通電したと書いている。
 ///
 /// 生byteの解釈は、この前提込みでlogを読む人間の判断とする。
 ///
