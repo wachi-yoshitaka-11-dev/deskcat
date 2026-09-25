@@ -22,7 +22,8 @@
 //!   **既定offにした理由と有効化の手順は下の「`DISP-01`のbring-upを有効にする手順」節。**）。
 //!   `bench-servo-test-17` feature付きbuildだけが[`run_servo_bench_test`]経由でservoを
 //!   呼ぶ（[Issue #17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。
-//!   詳細は[`crate::servo`]と[`run_servo_bench_test`]のdoc参照）。
+//!   詳細は[`crate::servo`]と[`run_servo_bench_test`]のdoc参照）。**#474で、このfeature付きbuildは
+//!   `compile_error!`でcompileが止まる（下記）。**
 //!
 //! **上の一覧は既定buildの動作を述べる。**`pi-protocol-mode`はI2Cの
 //! bring-upを行わず、`bringup-display-13`とは同時に有効にできない（下記
@@ -37,7 +38,8 @@
 //! （`crate::accel`・`crate::env`のmodule doc参照）だけである。
 //! `bringup-display-13` feature付きbuildはLCD関連6+1本（`crate::display`のmodule doc参照）を、
 //! `bench-servo-test-17` feature付きbuildは`SERVO-PWM`（GPIO27）と
-//! `peripherals.ledc.timer0`／`channel0`を、それぞれ追加で渡す。`pi-protocol-mode`は
+//! `peripherals.ledc.timer0`／`channel0`を、それぞれ追加で渡す（`bench-servo-test-17`付きbuildは
+//! #474でcompileが止まる。下記`compile_error!`）。`pi-protocol-mode`は
 //! `Peripherals::take()`自体を呼ばない（`main()`参照）。
 //!
 //! **I2Cはこの版でも実機通電していない。**この版の検証は`cargo build`でのcross-compile
@@ -143,12 +145,14 @@ mod servo;
 // `pi-protocol-mode`は`Peripherals::take()`を行わないため、`bench-servo-test-17`の
 // servo bench試験経路（`run_servo_bench_test`）は呼ばれない。両方を有効にしても
 // buildは通るが、servoのfeatureが黙って無効になる。それより、compile時に理由を
-// 示して止めるほうがよいと判断した。
+// 示して止めるほうがよいと判断した。**#474以降、`bench-servo-test-17`は単独でもcompileが
+// 止まる（下記）。**この排他は、#474の`compile_error!`を外したあとも効くよう残す。
 #[cfg(all(feature = "pi-protocol-mode", feature = "bench-servo-test-17"))]
 compile_error!(
     "pi-protocol-modeとbench-servo-test-17は同時に有効にできない。\
      pi-protocol-modeはPeripherals::take()を行わないためservoのbench試験経路が\
-     呼ばれず、featureが黙って無効になる。どちらか一方だけを有効にすること。"
+     呼ばれず、featureが黙って無効になる。どちらか一方だけを有効にすること\
+     （bench-servo-test-17は#474により単独でもcompileが止まる）。"
 );
 
 // `bringup-display-13`も同じ理由で`pi-protocol-mode`と排他にする。**servoと同じ形を
@@ -162,6 +166,16 @@ compile_error!(
      pi-protocol-modeはPeripherals::take()を行わずcrate::displayもcompileしないため\
      LCDのbring-up経路が呼ばれず、featureが黙って無効になる。\
      どちらか一方だけを有効にすること。"
+);
+
+// `bench-servo-test-17`付きbuildは、#474でcompileを止めた（理由と承認の状態は
+// `docs/hardware/servo-safety-limits.md`の`承認の状態`節が持つ。ここへ再掲しない）。
+// **docへ書くだけでは、featureを付ければbuildでき動いてしまう。**
+// codeとfeatureの定義は残す。
+#[cfg(feature = "bench-servo-test-17")]
+compile_error!(
+    "bench-servo-test-17付きbuildは#474でcompileを止めている。\
+     理由と承認の状態はdocs/hardware/servo-safety-limits.mdの承認の状態節を見ること。"
 );
 
 #[cfg(feature = "bringup-display-13")]
@@ -773,7 +787,8 @@ fn run_i2c_bringup(
 }
 
 /// `SERVO-01`（SG90）の単発bench試験（[Issue #17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)）。
-/// `bench-servo-test-17` feature付きbuildだけがこの関数を呼ぶ。承認の状態は
+/// `bench-servo-test-17` feature付きbuildだけがこの関数を呼ぶ（#474で、そのbuildは
+/// `compile_error!`でcompileが止まる）。承認の状態は
 /// [servo-safety-limits.md](../../../docs/hardware/servo-safety-limits.md)の
 /// `承認の状態`節が正本（ここへ再掲しない）。
 ///
