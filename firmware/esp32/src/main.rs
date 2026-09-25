@@ -434,8 +434,11 @@ fn main() {
     let mut next_snapshot = bringup_done_ms + u64::from(config::HEALTH_SNAPSHOT_PERIOD_MS);
 
     // `pi-protocol-mode`でだけ`boot`を1回試みる（`#446`。`send_boot_frame_once`参照）。
+    // `sid`は起動のたびに1回だけ選ぶ（§3「送信側が再起動したとき、`sid`を新しい値へ
+    // 変更する」）。再送（`PROTO-TBD-017`。#446 PR Bで実装）は同じ`sid`を使い続けるため、
+    // ここで選び直さない。
     #[cfg(feature = "pi-protocol-mode")]
-    send_boot_frame_once(&health, reset_reason);
+    send_boot_frame_once(&health, reset_reason, generate_sid(&health));
     #[cfg(not(feature = "pi-protocol-mode"))]
     demonstrate_pi_session(&mut health);
 
@@ -491,13 +494,11 @@ fn main() {
 /// sessionは確立しない（`#12`の受け入れ条件は満たさない。残りは`#12`本文が
 /// 引き続き追跡する）。
 ///
-/// `sid`には`health.uptime_ms()`を使う。bring-upを行わないため起動ごとに
-/// ほぼ同じ小さい値になり、§3が求める再起動間の非衝突を満たさない
-/// （`PROTO-TBD-011`待ちの暫定値。`crate::console`の制約参照）。
-///
-/// `id`は1固定。`reset_reason`は実際の`ResetReason`から得た値である。
+/// `sid`は呼び出し側が[`generate_sid`]で選ぶ（§3「processが再起動したときは、
+/// 必ず新しい`sid`を選ぶ」）。`id`は1固定。`reset_reason`は実際の`ResetReason`から
+/// 得た値である。
 #[cfg(feature = "pi-protocol-mode")]
-fn send_boot_frame_once(health: &Health, reset_reason: &str) {
+fn send_boot_frame_once(health: &Health, reset_reason: &str, sid: u32) {
     let boot = Boot {
         firmware: env!("CARGO_PKG_VERSION").to_owned(),
         board: config::BOARD.to_owned(),
@@ -507,7 +508,7 @@ fn send_boot_frame_once(health: &Health, reset_reason: &str) {
     let frame = Frame::new(
         Envelope {
             v: limits::PROTOCOL_VERSION,
-            sid: sid_from_uptime(ts_ms),
+            sid,
             id: 1,
             ts_ms,
         },
@@ -525,7 +526,119 @@ fn send_boot_frame_once(health: &Health, reset_reason: &str) {
     }
 }
 
-/// `send_boot_frame_once`のdoc参照。`ts_ms`（`u64`）を`sid`（`u32`）へ切り詰める（下位32 bit）。
+/// NVS namespace。`bench17`（`run_servo_bench_test`が使うnamespace）とは別の名前にする。
+/// 用途が異なるnamespaceを共有すると、片方のkey追加がもう片方の`erase_all`等を
+/// 誤って巻き込みうる。
+#[cfg(feature = "pi-protocol-mode")]
+const SID_NVS_NAMESPACE: &str = "pi_session";
+/// 次回起動が使う`sid`をこのkeyへ保存する。
+#[cfg(feature = "pi-protocol-mode")]
+const SID_NVS_KEY_NEXT: &str = "next_sid";
+
+/// 起動のたびに新しい`sid`を選ぶ（`PROTO-TBD-011`のうち`sid`の生成方法に
+/// 当たる部分。§3.1参照。生成方法は確定するが、衝突許容確率は未確定のまま
+/// 残る。下の「衝突許容確率」節参照）。
+///
+/// # 生成方法: NVSの不揮発counter
+///
+/// **乱数ではなく不揮発counterを使う。**§3.1は生成方法として「乱数、不揮発カウンタ、
+/// またはその併用」を挙げている。この crate は`Cargo.toml`で`unsafe_code = "forbid"`
+/// としており、`esp_random()`／`bootloader_random_enable()`（ESP-IDF v5.5.3
+/// `components/esp_hw_support/include/esp_random.h`・`bootloader_random.h`）は
+/// `unsafe extern "C"` fnであるため直接呼べない。加えて、ESP-IDF公式資料
+/// （`docs/en/api-reference/system/random.rst`）は、Wi-Fi／Bluetoothが有効か、
+/// `bootloader_random_enable()`を呼んでいるか、second-stage bootloader実行中の
+/// いずれかを満たさない限り、RNGの出力は「pseudo-random only」と明記する。
+/// このfirmwareは`pi-protocol-mode`でWi-Fi／Bluetoothを一切初期化せず
+/// （`Peripherals::take()`自体を呼ばない）、`bootloader_random_enable()`も
+/// 呼ばない（呼ぶには`unsafe`が要る）。**したがって乱数側を使っても、
+/// 上記の非衝突要件に対する根拠のある確率は示せない。**
+///
+/// 不揮発counterは`unsafe`もWi-Fi／Bluetoothの初期化も要らず、§3.1の要件
+/// （再起動のたびに新しい値を選ぶ）を確率ではなく構造で満たそうとする。
+/// [`EspNvs::get_u32`]で前回保存した値を読み、1加算し、**使う前に**
+/// [`EspNvs::set_u32`]で保存する（保存後に停電しても、次回起動は保存済みの
+/// 値から続くため、このboot分の値が失われるだけで、値の再利用は起きない）。
+///
+/// # 衝突許容確率
+///
+/// **0ではない。**`u32`一周（`u32::MAX`回のcommit）は実運用で起こらないが、
+/// counterが`0`へ戻る経路が一周以外にもある。
+///
+/// `EspDefaultNvsPartition::take()`は`take_with(true)`（`reinit=true`）を呼ぶ
+/// （esp-idf-svc 0.52.1 `src/nvs.rs`の`EspNvsPartition<NvsDefault>::take`）。
+/// `NvsDefault::init(reinit=true)`は、`nvs_flash_init()`が
+/// `ESP_ERR_NVS_NO_FREE_PAGES`または`ESP_ERR_NVS_NEW_VERSION_FOUND`を返すと、
+/// **`nvs_flash_erase()`でdefault partition全体を消去してから再初期化する**
+/// （同fileの`NvsDefault::init`）。この経路を通ると[`SID_NVS_KEY_NEXT`]も失われ、
+/// counterは`0`から数え直しになり、以前使った小さい`sid`を再び選びうる。
+/// 人がflash全体を消去した場合も同じ結果になる。**したがって「commitが
+/// 成功する限り再利用しない」だけでは正しくない。**
+///
+/// counterが`0`から数え直された後にESP32が送る小さい`sid`が、受信側のretired
+/// session集合に残っている値と一致すれば衝突する。この衝突は、protocol側の
+/// `stale_session`回復（§3.1「`sid`が衝突した場合」。ACKで`stale_session`を
+/// 受けたら新しい`sid`を選び直して再送する）で扱う対象である。**この回復経路は
+/// `#446` PR Bで実装する（未実装。本PRの時点ではACK受信も再送も無いため、衝突していても
+/// 検知できない）。**
+///
+/// # NVSが使えない場合
+///
+/// `EspDefaultNvsPartition::take()`／`EspNvs::new`／`get_u32`／`set_u32`の
+/// いずれかが失敗した場合、`health.uptime_ms()`の下位32 bitへ縮退する
+/// （旧`sid_from_uptime`と同じ値）。**この経路では非衝突を主張しない。**
+/// bring-upを行わないため起動ごとにほぼ同じ小さい値になり、§3の要件を
+/// 満たさないまま`boot`を送る。エラーは`log::error!`で分類するが、
+/// `pi-protocol-mode`はloggingを止めているため出力されない
+/// （`send_boot_frame_once`の`boot_encode_failed`と同じ理由。counterは持たない）。
+#[cfg(feature = "pi-protocol-mode")]
+fn generate_sid(health: &Health) -> u32 {
+    use esp_idf_svc::nvs::{EspDefaultNvsPartition, EspNvs};
+
+    let nvs_partition = match EspDefaultNvsPartition::take() {
+        Ok(partition) => partition,
+        Err(err) => {
+            log::error!("sid_nvs_partition_failed error={err}");
+            return sid_from_uptime(health.uptime_ms());
+        }
+    };
+    let nvs = match EspNvs::new(nvs_partition, SID_NVS_NAMESPACE, true) {
+        Ok(nvs) => nvs,
+        Err(err) => {
+            log::error!("sid_nvs_open_failed error={err}");
+            return sid_from_uptime(health.uptime_ms());
+        }
+    };
+
+    // `None`（keyが無い＝初回起動）は`0`とみなす。protocolはsid=0を特別扱いしない
+    // ため（Envelope §3、`u32`の正当な値）、「保存されていない」と「0が保存されている」を
+    // 区別する必要は無い。どちらでも次のsidは`1`加算した値になる（最初の起動なら`1`）。
+    let previous = match nvs.get_u32(SID_NVS_KEY_NEXT) {
+        Ok(value) => value.unwrap_or(0),
+        Err(err) => {
+            log::error!("sid_nvs_get_failed error={err}");
+            return sid_from_uptime(health.uptime_ms());
+        }
+    };
+    // **`wrapping_add`のままにする。**`u32`一周（`generate_sid`のdoc「衝突許容確率」
+    // 参照）は実運用では起こらないため、その先のsidが`0`や過去の小さい値と
+    // 見た目上一致しても、`max(1)`のような補正は入れない。補正を入れると、
+    // 一周した直後のsidが常に同じ値（`1`）へ寄せられ、実際に一周する状況では
+    // 逆に衝突を作り込む。
+    let sid = previous.wrapping_add(1);
+
+    // **実際に返す前にcommitする。**`run_servo_bench_test`の「実際に動かす前に
+    // latchをcommitする」と同じ順序（module doc参照）。
+    if let Err(err) = nvs.set_u32(SID_NVS_KEY_NEXT, sid) {
+        log::error!("sid_nvs_set_failed error={err}");
+        return sid_from_uptime(health.uptime_ms());
+    }
+
+    sid
+}
+
+/// [`generate_sid`]のNVS不使用時の縮退経路が使う。`ts_ms`（`u64`）を`sid`（`u32`）へ
+/// 切り詰める（下位32 bit）。**非衝突を主張しない**（[`generate_sid`]のdoc参照）。
 #[cfg(feature = "pi-protocol-mode")]
 const fn sid_from_uptime(ts_ms: u64) -> u32 {
     ts_ms as u32

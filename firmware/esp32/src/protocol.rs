@@ -24,9 +24,12 @@
 //! **この点は`crates/deskcat-serial`側の`SerialDevice`の実機確認が
 //! [Issue #11]の後半に残っているのと対になる。**
 //!
-//! ESP32自身の`sid`の生成方法は`PROTO-TBD-011`が未確定であり、この型は決めない
-//! （`crates/deskcat-serial`の`Session::new`が`sid`を呼び出し側から受け取るのと同じ
-//! 設計判断である）。呼び出し側が選んだ値を渡す。
+//! ESP32自身の`sid`の生成方法は`main.rs`の`generate_sid`が決める
+//! （`PROTO-TBD-011`のうち生成方法を部分解決。
+//! [#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446) PR A）。
+//! この型自体は生成方法を持たず、呼び出し側が選んだ値を受け取るだけである
+//! （`crates/deskcat-serial`の`Session::new`が`sid`を呼び出し側から受け取るのと
+//! 同じ設計判断である）。
 //!
 //! [Issue #11]: https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11
 
