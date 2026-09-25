@@ -10,6 +10,7 @@
 - ESP32はRaspberry Piから独立して、hard motion limitを強制する。
 - AIが生成したcommandやdebug commandでもhard limitを迂回できない。**`bench-servo-test-17`
   featureによる単発bench試験は、この規則が禁じる迂回に該当する（[承認の状態](#承認の状態)参照）。**
+  **2026-09-25追記（[#474](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/474)）: この試験の扱いは[承認の状態](#承認の状態)が持つ。`bench-servo-test-17` featureを有効にするとcompileが止まる（`firmware/esp32/src/main.rs`の`compile_error!`）。**
 - 初回動作では負荷を外すか、意図的に狭い安全範囲を使用する。
 
 ## サーボ識別情報
@@ -365,6 +366,18 @@ gate表のいずれの行も解決していない。動かなかった場合、�
 そこで止めて改めてこの節の状態を
 更新する。
 
+5. **2026-09-25、[#474](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/474)により、この節の状態を「進めてよい」から「実行しない」へ改めた。**PMと作業セッションの判断であり、ユーザーが承認した。承認はIssueやpull requestのcommentではなく、この変更（PR）を作成したAI sessionとユーザーとの対話の中で得た。承認を求めたときに示したのは、下の2つの理由（短絡、循環）と、`AGENTS.md`とHardware Safety Policyを変えずにfeatureを`compile_error!`で塞ぐことである。flash済みのESP32についての注意と再開の手順は、承認の後にこの変更のreviewで足した。記録は、この節、#474の本文、この変更を含むcommitとpull requestが持つ。**上の1〜4の記録は書き換えていない。**
+
+   この例外は規則と整合させられないと判断した。理由は2つある。
+   - **5項目の短絡と両立しない。**[Hardware Safety Policy](../governance/hardware-safety-policy.md)の`安全要件の5項目`の`短絡`の行は、`PROT-OC-01`が入るまで故障電流を制限するものが経路に無く、connectorと線材の発熱は秒から分のorderで進むため「人が読み取って電源を落とすのでは止まらない」と定める。この試験は、`PROT-OC-01`が経路に入っているかを`通電前の現物確認`で記録するだけで、結果にかかわらず進む（下の`決定事項`）。入っていなければ、故障電流への備えは人間の手動遮断だけになる（下の残余riskの「この試験には、故障電流を制限する手段が無い。」）。**1〜4の承認時に示した点に、この衝突は含まれていない**（項目2は§6の電流制限電源が無いことを、項目3は`PROT-OC-01`の実装状況が未確認であることを示したが、そのとき人の遮断では止まらないという`短絡`の行の定めは示していない）。`PROT-OC-01`が入っていることを条件に足すと、上の1〜4で承認された手順（結果にかかわらず進む）とは別の手順になり、その承認の範囲を超える。
+   - **例外を規則に書く道も取れない（前提が循環する）。**PR #471のreviewは、承認の記録だけでは迂回を禁じる規則が変わらないと指摘した。規則に例外として書くことを先に検討した（#474）。[サーボ出力を有効化してよい条件](#サーボ出力を有効化してよい条件)は、`HW-TBD-010`を含む全行が解決するまでservo出力を有効にしないと定める。この試験は`HW-TBD-010`の実測に着手する最初のstepである（下の`初回動作の実行手順`）。`010`は`026`を含む項目にBlockedされ、`026`に残るのは無負荷試験を要する範囲である（[TBD台帳](tbd-register.md)の各行）。そのため、gateを満たすまで待つ形に書くと例外は一度も使えず、使える形に書くとgateと5項目（上の短絡）を外す規則になる。**`PROT-OC-01`を条件に足しても、この循環は解けない。**
+
+   `bench-servo-test-17` featureは、有効にするとcompileが止まる形で塞いだ（`firmware/esp32/src/main.rs`の`compile_error!`）。**`compile_error!`が止めるのは、これからのbuildだけである。**`bench-servo-test-17`付きbuildを一度flashしたESP32は、NVSに実行済みflagが無ければ次の起動で試験を実行する（`run_servo_bench_test`のdoc）。[experiment-log.md](experiment-log.md)に、同featureを付けたbuildをflashした記録は無い。flashしたESP32があれば、servoの外部5 V電源を入れる前に既定buildを書き込む。同featureを付けて以前buildした成果物（ELF）が残っていても、書き込まない。
+
+   codeとfeatureの定義は、再開するときの出発点として残す。**ただし`#[cfg(feature = "bench-servo-test-17")]`の付いたcode（`run_servo_bench_test`等）は、この間どのbuildも成功せず、既定buildとCIの型検査・lint・buildはこのcodeに届かない（届くのは`cargo fmt`の構文検査だけである）。壊れても気づきにくい。**再開するときに確かめる。
+
+   **再開の条件は、この節では定めない。**[サーボ出力を有効化してよい条件](#サーボ出力を有効化してよい条件)は`HW-TBD-010`（監視下calibration）を含む全行の解決を求めるが、`010`の実測にはservo出力が要る。**gateと5項目の範囲で最初の駆動をどう行うかは未決であり、[#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)が扱う。**`PROT-OC-01`の実装（[#405](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/405)）は、その前提の1つである。再開するには、この節の状態を改め、`main.rs`の#474の`compile_error!`を外し、#474の`compile_error!`で止まることを述べた注記を外す変更が要る。**`pi-protocol-mode`との排他の`compile_error!`とその注記は残し、#474に触れた括弧書き・文だけを外す。**外す注記は、`firmware/esp32`の`Cargo.toml`・`README.md`・`src/main.rs`・`src/servo.rs`のものと、この文書の`確定しているproject規則`・`build`stepへの2026-09-25追記である。**この項目5、残余riskへの2026-09-25追記、Revision 28は記録として残す。**これらの注記は承認の状態ではなく、`compile_error!`があるというfirmwareの挙動を述べたものであり、`compile_error!`を外すと偽になるため外す。
+
 ## 初回動作の実行手順（人間とAIの作業順序）
 
 [Calibration手順](#calibration手順)の2〜7を、`SERVO-01`（TowerPro SG90）とこのリポジトリの
@@ -473,7 +486,7 @@ firmware（`firmware/esp32/src/servo.rs`、
   であり、この試験の未達は「制限付き電源そのものを使っていないこと」である。
   形は完全に同一ではないが、**どちらも故障電流を制限する手段を確立していないという点で
   共通する。**）**LCDはこの理由で段階B-2bを止めているのに
-  対し、この試験は止まらずに進む。**扱いが異なることを明示する。実際に電流を
+  対し、この試験は止まらずに進む。**扱いが異なることを明示する。**（2026-09-25追記: 「この試験は止まらずに進む」は#474より前の扱いである。この試験を行うかは[承認の状態](#承認の状態)が持つ。flash済みのESP32の扱いも同節にある。）**実際に電流を
   制限しうるのは、
   [hardware-bom.md](hardware-bom.md)の`PROT-OC-01`（PTC、Bourns `MF-R135`。
   `Ihold` 1.35 A／`Itrip` 2.70 A。値の正は同文書、ここへ再掲しない）が経路に
@@ -566,7 +579,7 @@ firmware（`firmware/esp32/src/servo.rs`、
 4. **`電源準備`（人間）** サーボの電源をまだ入れない。ESP32側だけ電源を入れられる
    状態にする（ESP32はPCのUSBから給電する。servoの外部5 V系とは電源を分離する）。
    手やcableを、サーボが動きうる範囲の外へ置く（[Hardware Safety Policy §6](../governance/hardware-safety-policy.md#6-サーボ)のPWM出力前7項目の1つ）。
-5. **`build`（AI、flashは人間）** `cargo build --locked --features bench-servo-test-17`で
+5. **`build`（AI、flashは人間）** **（2026-09-25追記: #474以降、次のcommandは`compile_error!`で止まる。[承認の状態](#承認の状態)参照。）**`cargo build --locked --features bench-servo-test-17`で
    AIがfirmwareをbuildし、ESP32 Flash／HIL profileの端末で人間がflashする（`espflash`。
    AIがこの端末を持たない場合、この工程は人間が行う）。このfeatureを付けない通常buildでは
    `crate::servo`は`main()`から呼ばれず、GPIO27は駆動されない。build検証の状況は
@@ -698,3 +711,4 @@ firmware（`firmware/esp32/src/servo.rs`、
 | 2026-09-22 | 25 | [#454](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/454)。[Hardware Safety Policy §6](../governance/hardware-safety-policy.md#6-サーボ)の「電流制限を設定でき、十分な定格を持つ電源を使用する」という要求が、「故障電流を制限する手段を明記する」という要求へ書き換わったことに追随し、この書き換えで記述が偽になった箇所（`初回動作の実行手順`の残余risk一覧と、その手前の参照文）を最小限に直した。**`承認の状態`節（2026-09-22に何を明示して承認を得たかの記録）は変更していない。**故障電流を制限しうる手段（`PROT-OC-01`の有無）と、手段が無い場合に代わりに守るもの（人間による手動遮断）についての記述内容は変えていない。冒頭の`確定しているproject規則`は変えていない |
 | 2026-09-23 | 26 | [#451](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/451)。**firmware側の2つの変更に追随した。**3箇所。(1) 残余riskの`DISP-01` backlight項は「firmwareが無条件に点灯させる」と書いていたが、`run_display_bringup`が`bringup-display-13` feature（既定off）付きbuildだけの経路になり、この試験のbuild（`--features bench-servo-test-17`）には点灯経路が無い。**`HW-TBD-024`は解けていないため、`DISP-01`を接続しない要求は維持する。**(2) `通電前の現物確認`(d)も同じ理由で書き換え、**(d)の確認自体は省かないことを明記した**（`HW-TBD-024`未解決、`EXP-011`はESP32側の信号レベルまで）。(3) `起動とarm delay`は「このlogが出るまでの時間に定義された上限は無い（I2Cが無期限timeoutのため）」と書いていたが、`#451`でI2C読み出しは有限timeoutになった。**永久に出ないことは無い**旨と、**`Err`までの実機実測はまだ無いため秒数を示さない**旨、切り分けはlog行の有無で行う旨へ書き換えた。**承認の状態、安全値、手順の順序、停止基準は1つも変えていない。** |
 | 2026-09-23 | 27 | [#461](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/461)。**`HW-TBD-024`が「`DISP-01`を3.3 V系へ通常接続すること自体」を一律に妨げる扱いではなくなったこと（ユーザー承認）に追随した。**2箇所。(1) 残余riskの`DISP-01`項を、「`HW-TBD-024`が未解決のため」という理由から「この試験がservoの拘束・過負荷を対象とし、`DISP-01`を試験変数に含めないため」という理由へ書き換えた。**`DISP-01`を接続しないという結論、確認先（`通電前の現物確認`(d)）は変えていない。**(2) `通電前の現物確認`(d)も同じ理由で書き換えた。**(d)の確認自体は省かない。**承認の状態、安全値、手順の順序、停止基準は1つも変えていない。 |
+| 2026-09-25 | 28 | [#474](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/474)（PR #471 のCodeRabbit review指摘）。`承認の状態`節に項目5を追記した（内容と現在の状態は同節が持つ。ここへ再掲しない）。`bench-servo-test-17` featureを`compile_error!`で塞いだことに合わせ、`確定しているproject規則`、残余riskの「この試験は止まらずに進む」の箇所（#474より前の扱いであることも書いた）、手順の`build`stepに、`承認の状態`への参照を足した。**`承認の状態`の1〜4の記録、安全値、手順の順序、停止基準は変えていない。** |

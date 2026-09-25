@@ -9,7 +9,8 @@
 //! [servo-safety-limits.md](../../../docs/hardware/servo-safety-limits.md)の
 //! `サーボ出力を有効化してよい条件`が正本）。`bench-servo-test-17` feature付きbuild
 //! だけが[`run_servo_bench_test`](../../../firmware/esp32/src/main.rs)経由で呼ぶ
-//! （承認の状態は同文書の`承認の状態`節が正本）。
+//! （承認の状態は同文書の`承認の状態`節が正本）。**#474で、このfeature付きbuildは
+//! `main.rs`の`compile_error!`でcompileが止まる。**
 //!
 //! pin割り当ては[gpio-assignment.md](../../../docs/hardware/gpio-assignment.md)の
 //! `信号inventory`が正本（`SERVO-PWM`＝GPIO27、[`crate::config::SERVO_PWM_GPIO`]）。
@@ -21,7 +22,7 @@
 //! [servo-safety-limits.md](../../../docs/hardware/servo-safety-limits.md)の残余riskを参照。
 
 // 既定buildは`main()`からこのmoduleを呼ばないためdead_codeになる（module doc参照）。
-// `bench-servo-test-17` feature付きbuildでは呼ばれるため無害。
+// `bench-servo-test-17` feature付きbuildでは呼ばれるため無害（#474で、そのbuildはcompileが止まる）。
 #![allow(dead_code)]
 
 use esp_idf_svc::hal::gpio::OutputPin;
