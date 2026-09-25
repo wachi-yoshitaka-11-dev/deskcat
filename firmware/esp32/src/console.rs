@@ -7,8 +7,11 @@
 //!   直接書く。LCD／I2Cのbring-upは行わない（`main.rs`参照）。
 //!
 //! **`pi-protocol-mode`を有効にしたbuildを、実際のPi hostへ接続しないこと**
-//! （`sid`が§3の再起動間の非衝突を満たさない。`main.rs`の
-//! `send_boot_frame_once`参照）。
+//! （`boot`は受理確認・再送・recovery budgetを実装しておらず1回書き込むだけで
+//! session確立を主張しない。§4.1、`main.rs`の`send_boot_frame_once`参照。
+//! `sid`の生成（`main.rs`の`generate_sid`）は衝突許容確率`0`を主張しない
+//! （`generate_sid`のdoc参照）。どちらの理由でも、受理確認が無い以上この
+//! 制約は変わらない）。
 //!
 //! §2との関係、既知の逸脱、行長・line endingの扱いは
 //! `docs/protocol/esp32-pi-protocol.md`§2が正本として持つ。
