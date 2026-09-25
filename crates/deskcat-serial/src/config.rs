@@ -28,6 +28,9 @@ pub enum ConfigError {
     ZeroInitialBackoff,
     /// backoffの初期値が上限を超えている。
     BackoffBoundsInverted,
+    /// ACK timeoutが0である。**0にすると、ACKを受け取る前に即timeoutし、
+    /// 送るそばから再送することになる。**
+    ZeroAckTimeout,
 }
 
 impl core::fmt::Display for ConfigError {
@@ -38,6 +41,7 @@ impl core::fmt::Display for ConfigError {
             Self::ZeroOutboxCapacity => "送信queueの容量が0である",
             Self::ZeroInitialBackoff => "backoffの初期値が0である",
             Self::BackoffBoundsInverted => "backoffの初期値が上限を超えている",
+            Self::ZeroAckTimeout => "ACK timeoutが0である",
         };
         f.write_str(text)
     }
@@ -70,6 +74,8 @@ pub struct SerialConfig {
     outbox_capacity: NonZeroUsize,
     /// 再接続の方針。
     reconnect: ReconnectPolicy,
+    /// ACK timeoutと再送の方針。
+    retry: RetryPolicy,
 }
 
 impl SerialConfig {
@@ -97,6 +103,7 @@ impl SerialConfig {
             baud,
             outbox_capacity: Self::DEFAULT_OUTBOX_CAPACITY,
             reconnect: ReconnectPolicy::provisional(),
+            retry: RetryPolicy::provisional(),
         })
     }
 
@@ -126,6 +133,13 @@ impl SerialConfig {
         self
     }
 
+    /// ACK timeoutと再送の方針を差し替える。
+    #[must_use]
+    pub fn with_retry(mut self, retry: RetryPolicy) -> Self {
+        self.retry = retry;
+        self
+    }
+
     /// Serial deviceのpath。
     #[must_use]
     pub fn port(&self) -> &str {
@@ -148,6 +162,12 @@ impl SerialConfig {
     #[must_use]
     pub const fn reconnect(&self) -> &ReconnectPolicy {
         &self.reconnect
+    }
+
+    /// ACK timeoutと再送の方針。
+    #[must_use]
+    pub const fn retry(&self) -> &RetryPolicy {
+        &self.retry
     }
 }
 
@@ -226,5 +246,90 @@ impl ReconnectPolicy {
         self.initial_backoff
             .saturating_mul(factor)
             .min(self.max_backoff)
+    }
+}
+
+/// ACK timeoutと、同じ`(sid, id)`での再送回数の上限。
+///
+/// **[`ReconnectPolicy`]とは別の量である。**引き金も単位も違う。前者はtransportの
+/// 再接続（portを開き直す回数と間隔）、こちらはmessageの再送（ACKが返らないことの
+/// 検知と、同じ`id`での送り直し）を扱う。1つの型に混ぜると、片方の暫定値を
+/// 動かしたときにもう片方が巻き添えになる。
+///
+/// **2つの値の確定状況は異なる。**ACK timeoutの数値は`PROTO-TBD-004`が未確定であり、
+/// [`Self::provisional`]の`ack_timeout`は暫定値である。一方、再送回数の上限は
+/// `docs/protocol/esp32-pi-protocol.md`§9のDraft 2 policyが「ACKが必要なcommandは
+/// timeout後に1回retryする」と既に確定している（`boot`は対象外。§4.1に従う）。
+/// `ping`／`get_status`はどちらもACKを要する通常commandであり、この1回制限の
+/// 対象である。`PROTO-TBD-011`の最大retry回数は`hello`専用であり、ここには
+/// 当たらない（同TBDの定義、および§3.1「`boot`の無応答時はこの`hello`規則ではなく
+/// §4.1に従う」の記述参照——この一文が、§3.1の規則自体は`hello`のものであり
+/// `boot`は対象外であることを裏づける）。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RetryPolicy {
+    ack_timeout: Duration,
+    max_retries: u32,
+}
+
+impl RetryPolicy {
+    /// ACK timeoutと再送回数の上限を指定して方針を作る。
+    ///
+    /// # Errors
+    ///
+    /// `ack_timeout`が0なら[`ConfigError::ZeroAckTimeout`]を返す。
+    pub fn new(ack_timeout: Duration, max_retries: u32) -> Result<Self, ConfigError> {
+        if ack_timeout.is_zero() {
+            return Err(ConfigError::ZeroAckTimeout);
+        }
+        Ok(Self {
+            ack_timeout,
+            max_retries,
+        })
+    }
+
+    /// 既定値を返す。
+    ///
+    /// **`ack_timeout`は暫定値であり、確定値ではない。**`PROTO-TBD-004`が
+    /// 決まるまでの仮置きであり、数値そのものに根拠は無い。
+    ///
+    /// **`max_retries`は確定値である。**`docs/protocol/esp32-pi-protocol.md`§9が
+    /// 定める「ACKが必要なcommandはtimeout後に1回retryする」に従う（`ping`／
+    /// `get_status`はどちらもこれに当たる）。
+    #[must_use]
+    pub const fn provisional() -> Self {
+        // [`ReconnectPolicy::provisional`]と同じ理由で、[`Self::new`]を通さず直接組む。
+        Self {
+            ack_timeout: Duration::from_millis(500),
+            max_retries: 1,
+        }
+    }
+
+    /// ACKを待つ時間。この時間を過ぎても届かなければ、同じ`id`で再送してよい。
+    #[must_use]
+    pub const fn ack_timeout(&self) -> Duration {
+        self.ack_timeout
+    }
+
+    /// 同じ`(sid, id)`での再送回数の上限。これを使い切ったら取り下げる。
+    #[must_use]
+    pub const fn max_retries(&self) -> u32 {
+        self.max_retries
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::RetryPolicy;
+
+    /// `max_retries`は§9のDraft 2 policy（「ACKが必要なcommandはtimeout後に
+    /// 1回retryする」）が確定した値であり、`PROTO-TBD-011`（`hello`専用）待ちの
+    /// 暫定値ではない。当初この値を誤って暫定扱い（5）にしていた回帰を防ぐ。
+    #[test]
+    fn provisional_max_retries_matches_the_confirmed_protocol_value() {
+        assert_eq!(
+            RetryPolicy::provisional().max_retries(),
+            1,
+            "§9のDraft 2 policyが確定した値"
+        );
     }
 }

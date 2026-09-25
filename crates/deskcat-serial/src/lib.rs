@@ -18,23 +18,34 @@
 //! - ESP32 peer sessionの状態（[`PeerSession`]）。`boot`のsession遷移、duplicate履歴、
 //!   `hello`／`boot`以外の`stale_session`判定、Piが送った要求への応答の相関
 //!   （[Issue #12]、`crates/deskcat-serial/src/peer.rs`）
+//! - [`Session`]と[`PeerSession`]をまたいだ送信の判断（[`handle_boot`]、
+//!   [`retry_due_requests`]）。`boot`確立後の`get_status`送出（§10.1 step1〜4）と、
+//!   ACK timeoutした要求の同一`id`再送（§9）に限る
+//!   （`crates/deskcat-serial/src/coordinator.rs`）
 //!
 //! 含まないもの:
 //!
 //! - **実portを開いての確認。**このcrateの検証はhost（VM）上であり、擬似端末
 //!   （`SerialPort::pair`）までである。`/dev/ttyUSB*`のdevice名の確定と、実機での
 //!   read／write、切断、再接続、partial I/Oの確認は[Issue #11]の後半に残る
-//! - **domain動作。**感情、性格、行動判断、独り言はこのcrateに入らない
+//! - **domain動作。**感情、性格、行動判断、独り言はこのcrateに入らない。
+//!   §10.1 step6（実際のstateとdesired stateの比較）とstep7（安全な状態設定command
+//!   の送出）も、「望ましい状態」がdomainの概念であるため同じ理由で含まない
 //! - **単位時間あたりの受理上限、session遷移budget、cooldown。**`PROTO-TBD-012`が
 //!   未確定であり、値を推測しない。[`PeerSession`]はこれらのbudgetに依存しない
 //!   部分だけを扱う（`peer`モジュールのdoc参照）
+//! - **serial portを開き直しただけの状態同期**（§10.2、`hello(reason: port_reopen)`
+//!   経由）。§10.1（ESP32再起動）とは別の経路であり、2026-09-21時点でこれを要求する
+//!   受け入れ条件はどのopen Issueにも無い（[Issue #12]の本文に観測として記録した）
 //!
 //! # 暫定値について
 //!
 //! 再接続の回数上限とbackoff、送信queueの容量は**設定parameterとして受け取る。**
 //! [`ReconnectPolicy::provisional`]と[`SerialConfig::DEFAULT_OUTBOX_CAPACITY`]が
 //! 返す値は**暫定であり、確定値ではない。**正本は`PROTO-TBD-012`と`PROTO-TBD-017`で、
-//! いずれも負荷試験・reconnect試験待ちである。
+//! いずれも負荷試験・reconnect試験待ちである。[`RetryPolicy::provisional`]の
+//! `ack_timeout`も同様に暫定であり、正本は`PROTO-TBD-004`である。**`max_retries`は
+//! 確定値であり暫定ではない**（`RetryPolicy`のdoc参照）。
 //!
 //! # 例
 //!
@@ -62,6 +73,7 @@
 //! [Issue #12]: https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12
 
 pub mod config;
+pub mod coordinator;
 pub mod device;
 pub mod ids;
 pub mod outbox;
@@ -69,12 +81,14 @@ pub mod peer;
 pub mod session;
 pub mod transport;
 
-pub use config::{ConfigError, ReconnectPolicy, SerialConfig};
+pub use config::{ConfigError, ReconnectPolicy, RetryPolicy, SerialConfig};
+pub use coordinator::{RetryOutcome, handle_boot, retry_due_requests};
 pub use device::SerialDevice;
 pub use ids::{IdAllocator, IdSpaceExhausted};
 pub use outbox::{Enqueued, Outbox};
 pub use peer::{
-    BootHandled, BootOutcome, CorrelatedAck, OutstandingKind, PeerRejection, PeerSession,
+    BootHandled, BootOutcome, CorrelatedAck, OutstandingAction, OutstandingKind, PeerRejection,
+    PeerSession,
 };
 pub use session::{ConnectionState, Pump, SendError, Session, SessionCounters, StopReason};
 pub use transport::{IoDisposition, Transport};

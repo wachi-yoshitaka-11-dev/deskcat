@@ -16,6 +16,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -99,6 +100,7 @@ def _invoke(script, command, cwd=None, environment=None):
     env.pop("DESKCAT_SKIP_BASE_GUARD", None)
     env.pop("DESKCAT_SKIP_PUSH_GATE", None)
     env.pop("DESKCAT_SKIP_TRUNCATION_GUARD", None)
+    env.pop("DESKCAT_SKIP_WORKTREE_GUARD", None)
     if environment:
         env.update(environment)
     result = subprocess.run(
@@ -131,6 +133,27 @@ class GhMetadataGuardTests(unittest.TestCase):
         code, output = _invoke(GH_GUARD, command)
         self.assertEqual(code, 0, command)
         self.assertIsNone(output, f"止めてしまった: {command}")
+
+    def test_global_options_do_not_hide_the_subcommand(self):
+        """**subcommandより前のglobal optionで検査が抜けない**（#325で実測した穴）。
+
+        `args[:2]`で位置から読んでいた版では、`gh --repo o/r pr create`と
+        `gh -R o/r pr merge`が**denyを素通りしていた。**`--project`の要求も
+        squash messageのtrailerの要求も、**global optionを1語足すだけで抜けた。**
+        """
+        for command in (
+            "gh --repo owner/repo pr create --title x --body y",
+            "gh -R owner/repo pr create --title x --body y",
+            "gh --repo owner/repo issue create --title x --body y",
+        ):
+            with self.subTest(command=command):
+                self.assertDenied(command)
+
+    def test_global_options_do_not_hide_the_merge_subcommand(self):
+        """merge側も同じである。trailerの検査が素通りしていた。"""
+        self.assertDenied(
+            'gh -R owner/repo pr merge 1 --squash --subject "x" --body "y"'
+        )
 
     def test_create_without_project_is_denied(self):
         """`--project`が無いIssue／Pull Request作成を止める。"""
@@ -335,7 +358,12 @@ class GhMetadataGuardTests(unittest.TestCase):
         )
 
     def test_merge_message_trailers_are_checked(self):
-        """squash messageのtrailerを、fileとinlineの両方で見る。"""
+        """squash messageのtrailerを、fileとinlineの両方で見る。
+
+        **すべての呼び出しに`--subject`を付ける。**`--subject`が無ければ
+        strategyを問わず先にdenyされるため（`#423`）、trailerの検査そのものを
+        見るにはここで`--subject`を満たしておく必要がある。
+        """
         with tempfile.TemporaryDirectory() as directory:
             complete = Path(directory) / "complete.txt"
             complete.write_text(
@@ -346,16 +374,21 @@ class GhMetadataGuardTests(unittest.TestCase):
             partial.write_text(
                 f"body\n\n{gate.TRAILER_REVIEW}: y\n", encoding="utf-8"
             )
-            self.assertAllowed(f"gh pr merge 1 --squash --body-file {complete}")
+            self.assertAllowed(
+                f"gh pr merge 1 --squash --subject s --body-file {complete}"
+            )
             self.assertDenied(
-                f"gh pr merge 1 --squash --body-file {partial}",
+                f"gh pr merge 1 --squash --subject s --body-file {partial}",
                 contains=gate.TRAILER_CLASS,
             )
         self.assertAllowed(
-            "gh pr merge 1 --squash --body "
+            'gh pr merge 1 --squash --subject s --body '
             f'"x\n\n{gate.TRAILER_CLASS}: c\n{gate.TRAILER_REVIEW}: s"'
         )
-        self.assertDenied('gh pr merge 1 --squash --body "本文だけ"')
+        self.assertDenied(
+            'gh pr merge 1 --squash --subject s --body "本文だけ"',
+            contains=gate.TRAILER_CLASS,
+        )
 
     def test_merge_message_must_parse_as_trailers(self):
         """**`git`がtrailerとして読める形かを見る。文字列の一致では足りない。**
@@ -445,6 +478,158 @@ class GhMetadataGuardTests(unittest.TestCase):
                 output["hookSpecificOutput"]["permissionDecision"], "deny"
             )
             self.assertIn("DESKCAT_SKIP_GH_GUARD", _reason(output))
+
+    def test_merge_strategy_allows_main_promotion_without_trailers(self):
+        """**`--merge`（`main`昇格）はtrailerが無くても通す。**
+
+        `CONTRIBUTING.md`の`Merge方式`は`main`昇格のmerge commitへ`Change-Class`／
+        `Self-Review`のtrailerを要求しない。`review_gate.py`の`_check_history`も
+        `git rev-list --no-merges`でmerge commitを検査対象から外している。
+        以前はこのhookが`--squash`と区別せず一律に要求しており、`#383`の
+        main昇格で`gh pr merge --merge`が2回denyされ、ブラウザでのmergeを
+        強いた結果、merge commit `afc86cf`のmessageがGitHub既定のまま入り、
+        直前の昇格が持っていた検証経緯が失われた（`#417`）。
+        """
+        self.assertAllowed(
+            'gh pr merge 383 --merge --subject "s" --body "develop を main へ昇格する"'
+        )
+        self.assertAllowed('gh pr merge 383 -m --subject s --body "本文"')
+
+    def test_merge_strategy_still_requires_a_message(self):
+        """**`--merge`でも、messageの指定そのものは省略できない。**
+
+        2026-09-17に、`_is_main_promotion_merge`がtrueのとき`_body_text`より
+        前でreturnする版が入りかけた。**`gh pr merge N --merge`をmessageの
+        指定なしで実行できてしまい、GitHubが既定messageを合成する経路が
+        開いていた。**それは`afc86cf`（`#383`）で実際に起きた損失そのものであり、
+        `#417`が防ごうとした事象を修正自体が再び開けるところだった。
+        trailerの要求（`--squash`のみ）と、messageの要求（両strategy共通）は
+        別であり、混ぜてはいけない。
+        """
+        self.assertDenied(
+            "gh pr merge 383 --merge", contains="messageを確認できない"
+        )
+        self.assertDenied(
+            "gh pr merge 383 -m --subject s", contains="messageを確認できない"
+        )
+
+    def test_merge_strategy_requires_subject_not_just_body(self):
+        """**`--merge`は`--body`だけでは足りない。`--subject`も要る。**
+
+        `_body_text`は`--body`／`--body-file`の有無しか見ておらず、
+        `gh pr merge N --merge --body "本文"`（`--subject`無し）が
+        main昇格の早期returnまで素通りしていた。`CONTRIBUTING.md`の
+        `Merge方式`は`--subject`と`--body-file`の両方を明示すると定めている。
+        2026-09-17にCodeRabbitのreviewが指摘し、push前に直した。
+
+        **本文自体は読める形にする。**bodyが特定できない場合のdeny理由にも
+        たまたま`--subject`という文字列が含まれるため、それだけでは
+        「`--subject`欠如を専用に検出しているか」を確かめたことにならない。
+        """
+        with tempfile.TemporaryDirectory() as directory:
+            body = Path(directory) / "body.txt"
+            body.write_text("develop を main へ昇格する", encoding="utf-8")
+            self.assertDenied(
+                f"gh pr merge 383 --merge --body-file {body}",
+                contains="`--subject`が無い",
+            )
+            self.assertDenied(
+                f"gh pr merge 383 -m --body-file {body}",
+                contains="`--subject`が無い",
+            )
+            self.assertAllowed(
+                f'gh pr merge 383 --merge --subject "s" --body-file {body}'
+            )
+            self.assertAllowed(f"gh pr merge 383 -m -t s -F {body}")
+
+    def test_squash_strategy_still_requires_trailers(self):
+        """**`--squash`は引き続きtrailerを要求する。**既存の動作を変えない。"""
+        self.assertDenied(
+            'gh pr merge 1 --squash --subject "s" --body "trailerなし"',
+            contains=gate.TRAILER_CLASS,
+        )
+
+    def test_squash_strategy_requires_subject_too(self):
+        """**`--squash`も`--subject`が無ければ拒否する（`#423`）。**
+
+        `#417`／`#418`では`--merge`（main昇格）側にだけ`--subject`の有無を
+        見る検査を足し、`--squash`側は既存test`test_merge_message_trailers_are_checked`
+        の前提（`--subject`無しのsquash呼び出しを許可する）を理由に対象外と
+        していた。この穴が`#423`として報告され、strategyを問わず`--subject`
+        を見るよう修正した。
+        """
+        self.assertDenied(
+            'gh pr merge 1 --squash --body '
+            f'"x\n\n{gate.TRAILER_CLASS}: c\n{gate.TRAILER_REVIEW}: s"',
+            contains="`--subject`が無い",
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            body = Path(directory) / "body.txt"
+            body.write_text(
+                f"x\n\n{gate.TRAILER_CLASS}: c\n{gate.TRAILER_REVIEW}: s",
+                encoding="utf-8",
+            )
+            # 短縮形（`-s`／`-t`）でも同じ判定になることを確かめる。
+            self.assertDenied(
+                f"gh pr merge 1 -s --body-file {body}",
+                contains="`--subject`が無い",
+            )
+            self.assertAllowed(f"gh pr merge 1 -s -t s --body-file {body}")
+
+    def test_subject_short_form_with_attached_value_is_accepted(self):
+        """**`-ts`（`-t`＋値の結合形）でも`--subject`ありと判定する。**
+
+        `gh`の`-t`はpflagの短縮string flagであり、`-ts`は`-t s`と同じ意味に
+        なる。`_option_value`はこの結合形を読まず、`-ts`を指定していても
+        `--subject`が無いと誤判定していた（2026-09-17のCodeRabbit reviewが
+        `#425`で指摘）。**値は使わず有無だけを見るため、`_option_value`ではなく
+        `_has_option`で判定する。**
+        """
+        with tempfile.TemporaryDirectory() as directory:
+            body = Path(directory) / "body.txt"
+            body.write_text(
+                f"x\n\n{gate.TRAILER_CLASS}: c\n{gate.TRAILER_REVIEW}: s",
+                encoding="utf-8",
+            )
+            self.assertAllowed(f"gh pr merge 1 --squash -ts --body-file {body}")
+            self.assertAllowed(
+                f"gh pr merge 1 --merge -ts --body-file {body}"
+            )
+
+    def test_rebase_strategy_still_requires_trailers(self):
+        """**`--rebase`は`CONTRIBUTING.md`に定義が無く、要求を外さない。**
+
+        `Merge方式`が定めるのは`develop`（squash）と`main`（merge commit）だけで
+        あり、`--rebase`の扱いは決まっていない。分からないものは、従来どおり
+        trailerを要求する側へ倒す。
+        """
+        self.assertDenied(
+            'gh pr merge 1 --rebase --subject "s" --body "trailerなし"',
+            contains=gate.TRAILER_CLASS,
+        )
+
+    def test_no_strategy_flag_still_requires_trailers(self):
+        """**戦略flagが無い呼び出しは、`main`昇格として扱わない。**
+
+        `gh`はflag省略時にrepositoryの既定戦略を使うが、hookはcommand文字列
+        しか見ないため既定が何かを知りようが無い。`_body_text`が特定できない
+        messageを`deny`するのと同じ理由で、分からないものは要求を掛けたままにする。
+        """
+        self.assertDenied(
+            'gh pr merge 1 --subject "s" --body "trailerなし"',
+            contains=gate.TRAILER_CLASS,
+        )
+
+    def test_merge_and_squash_together_still_requires_trailers(self):
+        """**`--merge`と`--squash`が同時に指定された場合は主昇格として扱わない。**
+
+        `gh`自身がこの組み合わせを拒否するため通常は起きないが、字句だけで
+        見ている以上、単独で`--merge`が立っている場合だけに限定する。
+        """
+        self.assertDenied(
+            'gh pr merge 1 --merge --squash --subject "s" --body "trailerなし"',
+            contains=gate.TRAILER_CLASS,
+        )
 
     def test_unrelated_commands_are_allowed(self):
         """`gh`以外と、`gh`の他のsubcommandは通す。"""
@@ -672,6 +857,21 @@ class BranchBaseGuardTests(unittest.TestCase):
         self.assertAllowed(
             "cat > note.md <<'EOF'\ngit checkout -b chore/1-x\nEOF\n"
         )
+
+    def test_global_options_do_not_hide_the_creation(self):
+        """**global optionでbranch作成の検査が抜けない**（#325）。
+
+        `args[:2]`で位置から読んでいた版では、`git -C . checkout -b`と
+        `git --no-pager checkout -b`が検査を素通りしていた。
+        """
+        self._at_old_base()
+        for command in (
+            "git -C . checkout -b chore/1-x",
+            "git --no-pager checkout -b chore/1-x",
+            "git -c user.name=x switch -c chore/1-x",
+        ):
+            with self.subTest(command=command):
+                self.assertDenied(command)
 
     def test_current_base_is_allowed(self):
         """基点が`origin/develop`と一致していれば通す。"""
@@ -954,6 +1154,398 @@ class TruncationGuardTests(unittest.TestCase):
         self.assertAllowed('gh pr list --limit "閉じていない')
 
 
+WORKTREE_GUARD = str(SCRIPTS_ROOT / "hooks" / "worktree_guard.py")
+
+
+class WorktreeGuardTests(unittest.TestCase):
+    """未commitの変更を失うgit操作を見るhookのtest（#325の候補1）。
+
+    **fixture repositoryを実際に汚してから判定させる。**このhookは字句だけでは
+    決まらず、`git status`の結果で向きが変わる。**汚れていないtreeで止めないことも、
+    汚れたtreeで止めることと同じだけ見る必要がある**（止めすぎるhookは無効化される）。
+    """
+
+    def setUp(self):
+        self.directory = tempfile.mkdtemp()
+        self.addCleanup(guards.remove_tree, Path(self.directory))
+        root = Path(self.directory)
+        _git(self.directory, "init", "--quiet", ".")
+        (root / "note.md").write_text("最初\n", encoding="utf-8")
+        (root / "pages").mkdir()
+        (root / "pages" / "assets-manifest.json").write_text("{}\n", encoding="utf-8")
+        _git(self.directory, "add", "note.md", "pages/assets-manifest.json")
+        _git(self.directory, "commit", "--quiet", "-m", "first")
+        _git(self.directory, "branch", "pages")
+
+    def _dirty_note(self):
+        (Path(self.directory) / "note.md").write_text("書き換えた\n", encoding="utf-8")
+
+    def _dirty_manifest(self):
+        (Path(self.directory) / "pages" / "assets-manifest.json").write_text(
+            '{"Assets": []}\n', encoding="utf-8"
+        )
+
+    def assertAsked(self, command, *, cwd=None, contains=None):
+        code, output = _invoke(WORKTREE_GUARD, command, cwd=cwd or self.directory)
+        self.assertEqual(code, 0, command)
+        self.assertIsNotNone(output, f"通してしまった: {command}")
+        self.assertEqual(
+            output["hookSpecificOutput"]["permissionDecision"], "ask", command
+        )
+        if contains:
+            self.assertIn(contains, _reason(output))
+
+    def assertAllowed(self, command, *, cwd=None):
+        code, output = _invoke(WORKTREE_GUARD, command, cwd=cwd or self.directory)
+        self.assertEqual(code, 0, command)
+        self.assertIsNone(output, f"止めてしまった: {command}")
+
+    def test_reset_hard_with_a_dirty_tree_is_asked(self):
+        """`git reset --hard`は作業tree全体を捨てる。"""
+        self._dirty_note()
+        for command in (
+            "git reset --hard",
+            "git reset --hard HEAD",
+            "/usr/bin/git reset --hard",
+            "git -C . reset --hard",
+        ):
+            with self.subTest(command=command):
+                self.assertAsked(command)
+
+    def test_global_options_do_not_hide_the_subcommand(self):
+        """**subcommandの前のglobal optionで素通りしない**（#325で実際に開いていた穴）。
+
+        `command_line.skip_global_options`が`-C`しか知らなかった版では、
+        `git --no-pager reset --hard`と`git -c key=value reset --hard`は
+        `remaining[0]`がoptionになり、**検査ごと素通りしていた**
+        （2026-09-16実測）。`push_gate.py`は同じ形を前から外していた。
+        """
+        self._dirty_note()
+        for command in (
+            "git --no-pager reset --hard",
+            "git -c user.name=x reset --hard",
+            "git -c user.name=x -c user.email=y@z reset --hard",
+            "git --literal-pathspecs clean -fd",
+            "git --no-pager checkout -- note.md",
+        ):
+            with self.subTest(command=command):
+                self.assertAsked(command)
+
+    def test_a_dirty_tree_in_another_repository_is_seen(self):
+        """**`-C`で指した先のtreeを見る。**hookのcwdではない。
+
+        `prefix`を`git status`へ引き継がない実装に戻ると、cwd側のcleanなtreeを
+        見て通してしまう。**`git -C .`だけのcaseではその退行を検出できない。**
+        """
+        other = tempfile.mkdtemp()
+        self.addCleanup(guards.remove_tree, Path(other))
+        _git(other, "init", "--quiet", ".")
+        (Path(other) / "other.md").write_text("最初\n", encoding="utf-8")
+        _git(other, "add", "other.md")
+        _git(other, "commit", "--quiet", "-m", "first")
+        (Path(other) / "other.md").write_text("汚した\n", encoding="utf-8")
+        # 自分のtreeはcleanのまま。汚れているのは`-C`の先だけである。
+        self.assertAsked(f"git -C {other} reset --hard")
+
+    def test_value_options_select_the_tree_and_do_not_hide_the_subcommand(self):
+        """`--git-dir X --work-tree Y reset --hard`は`Y`のtreeを見る（#472）。
+
+        **`--git-dir`等を1語として飛ばしていた版では、値`X`を subcommand と読み、
+        検査ごと素通りしていた。**読んだ値は`git status`へ引き継ぐため、
+        `-C`と同じく指した先のtreeを見る。
+        """
+        other = tempfile.mkdtemp()
+        self.addCleanup(guards.remove_tree, Path(other))
+        _git(other, "init", "--quiet", ".")
+        (Path(other) / "other.md").write_text("最初\n", encoding="utf-8")
+        _git(other, "add", "other.md")
+        _git(other, "commit", "--quiet", "-m", "first")
+        (Path(other) / "other.md").write_text("汚した\n", encoding="utf-8")
+        # 自分のtreeはcleanのまま。汚れているのは指した先だけである。
+        for command in (
+            f"git --git-dir {other}/.git --work-tree {other} reset --hard",
+            f"git --git-dir={other}/.git --work-tree={other} reset --hard",
+        ):
+            with self.subTest(command=command):
+                self.assertAsked(command)
+
+    def test_reset_hard_with_a_clean_tree_is_allowed(self):
+        """**汚れていなければ失うものが無い。**
+
+        **このtestが確かめているのは「cleanなtreeなら通す」だけである。**
+        refを引数に取る形も同じに通ることは見ているが、hookはrefを一切見ないため、
+        **未pushのcommitの扱いを検証してはいない**（対象にしていないという決定は
+        hookのdocstringが持つ）。
+        """
+        self.assertAllowed("git reset --hard")
+        self.assertAllowed("git reset --hard HEAD~1")
+
+    def test_other_reset_modes_are_allowed(self):
+        """`--soft`／`--mixed`／`--keep`は作業treeのfileを捨てない。"""
+        self._dirty_note()
+        for command in (
+            "git reset --soft HEAD~1",
+            "git reset --mixed HEAD~1",
+            "git reset --keep HEAD~1",
+            "git reset note.md",
+        ):
+            with self.subTest(command=command):
+                self.assertAllowed(command)
+
+    def test_forced_checkout_and_switch_are_asked(self):
+        """強制optionは作業tree全体を上書きする。"""
+        self._dirty_note()
+        for command in (
+            "git checkout -f main",
+            "git checkout --force main",
+            "git switch -f main",
+            "git switch --discard-changes main",
+        ):
+            with self.subTest(command=command):
+                self.assertAsked(command)
+
+    def test_checkout_of_a_dirty_path_is_asked(self):
+        """pathを指したcheckout／restoreは、そのpathの変更を捨てる。"""
+        self._dirty_note()
+        for command in (
+            "git checkout -- note.md",
+            "git checkout note.md",
+            "git checkout HEAD -- note.md",
+            "git checkout .",
+            "git restore note.md",
+            "git restore --source=HEAD note.md",
+            "git restore --staged --worktree note.md",
+        ):
+            with self.subTest(command=command):
+                self.assertAsked(command)
+
+    def test_checkout_of_a_clean_path_is_allowed(self):
+        """同じ形でも、そのpathが汚れていなければ失うものが無い。"""
+        self._dirty_note()
+        self.assertAllowed("git restore pages")
+        self.assertAllowed("git checkout -- pages")
+
+    def test_switching_branches_is_allowed(self):
+        """branchの移動はこのhookの対象ではない。
+
+        **gitは未commitの変更を捨てない。**持ち越せるなら持ち越し、衝突するなら
+        拒否する。**どちらでも失われない**ため、強制optionの無い移動は見ない。
+        """
+        self._dirty_note()
+        for command in (
+            "git checkout main",
+            "git switch main",
+            "git checkout -b chore/325-x",
+            "git switch -c chore/325-x",
+        ):
+            with self.subTest(command=command):
+                self.assertAllowed(command)
+
+    def test_a_branch_named_like_a_dirty_directory_is_allowed(self):
+        """**`git checkout -b pages`の`pages`をpathspecと読まない。**
+
+        読むと、`pages/`が汚れている限りbranch作成が毎回askになる。
+        `git checkout`では`VALUE_OPTIONS`がoptionの値を落とすことで避けている。
+        `git switch`はそもそもpathspecを取らないため、強制optionが無ければ見ない。
+        """
+        self._dirty_manifest()
+        for command in (
+            "git checkout -b pages",
+            "git checkout -B pages",
+            "git switch -c pages",
+        ):
+            with self.subTest(command=command):
+                self.assertAllowed(command)
+
+    def test_staged_only_restore_is_allowed(self):
+        """`git restore --staged`はindexだけを戻す。**作業treeのfileは残る。**
+
+        **短縮形`-S`も同じに扱う。**長い形だけを見ていた版では、同じ意味の
+        `git restore -S <path>`がaskになっていた（2026-09-17実測）。
+        """
+        self._dirty_note()
+        _git(self.directory, "add", "note.md")
+        self.assertAllowed("git restore --staged note.md")
+        self.assertAllowed("git restore -S note.md")
+
+    def test_worktree_restore_is_asked_even_with_staged(self):
+        """`--worktree`／`-W`が付けば作業treeを書き換える。**短縮形も見る。**
+
+        `-s`（`--source`。値を取る）は`-S`とは別のoptionである。**取り違えない。**
+        """
+        self._dirty_note()
+        _git(self.directory, "add", "note.md")
+        for command in (
+            "git restore --staged --worktree note.md",
+            "git restore -W note.md",
+            "git restore -SW note.md",
+            "git restore -s HEAD note.md",
+        ):
+            with self.subTest(command=command):
+                self.assertAsked(command)
+
+    def test_exhausted_budget_is_not_read_as_clean(self):
+        """**1呼び出し全体の予算を使い切ったら、通さない。**
+
+        1行に対象commandが複数あると`git status`もその数だけ走る。予算を使い切った
+        状態で`_git`が成功を返すと、**確認していないtreeを「汚れていない」と読む。**
+        """
+        sys.path.insert(0, str(SCRIPTS_ROOT / "hooks"))
+        import worktree_guard
+
+        original = worktree_guard._started
+        worktree_guard._started = time.monotonic() - worktree_guard.TOTAL_BUDGET - 1
+        try:
+            self.assertLessEqual(worktree_guard._remaining_budget(), 0)
+            ok, output = worktree_guard._git(["status", "--porcelain"])
+            self.assertFalse(ok, "予算切れで成功を返した")
+            self.assertEqual(output, "")
+        finally:
+            worktree_guard._started = original
+
+    def test_staged_change_matching_the_worktree_is_still_asked(self):
+        """**過剰に止める側の挙動を、そうと分かる形で固定する。**
+
+        staged済みで作業treeがindexと一致する変更は、`git checkout -- <path>`では
+        失われない（indexから戻るため。2026-09-16実測）。**それでもaskする。**
+        `git status --porcelain -uno`の出力側で分けると、同じ変更を実際に失う
+        `git reset --hard`を取り落とす。理由はhookのdocstringが持つ。
+        """
+        self._dirty_note()
+        _git(self.directory, "add", "note.md")
+        self.assertAsked("git checkout -- note.md")
+
+    def test_patch_mode_is_asked(self):
+        """hunk単位で捨てる形も対象である。pathが無ければ作業tree全体が対象になる。"""
+        self._dirty_note()
+        self.assertAsked("git checkout -p")
+        self.assertAsked("git restore -p")
+
+    def test_generated_manifest_restore_is_allowed(self):
+        """**`prepare_pages.py`の後の`git restore`を止めない。**
+
+        `deskcat-preflight` skillがpush前の手順として指示している経路である。
+        """
+        self._dirty_manifest()
+        for command in (
+            "git restore pages/assets-manifest.json",
+            "git restore ./pages/assets-manifest.json",
+            "git checkout -- pages/assets-manifest.json",
+        ):
+            with self.subTest(command=command):
+                self.assertAllowed(command)
+
+    def test_generated_manifest_does_not_cover_other_paths(self):
+        """除外は指定したpathだけである。**同じ呼び出しの他のpathは見る。**"""
+        self._dirty_note()
+        self._dirty_manifest()
+        self.assertAsked("git restore pages/assets-manifest.json note.md")
+
+    def test_clean_is_asked_even_with_a_clean_tree(self):
+        """**`git clean`だけは作業treeの状態を見ずにaskする。**
+
+        `-x`が消す無視fileは`git status --porcelain`に出ない。
+        **確かめられない対象で、確かめた顔をしない。**
+        """
+        for command in ("git clean -fd", "git clean -f", "git clean -fdx", "git clean"):
+            with self.subTest(command=command):
+                self.assertAsked(command)
+
+    def test_clean_dry_run_is_allowed(self):
+        """`-n`／`--dry-run`は何も消さない。**確認そのものを止めない。**"""
+        for command in ("git clean -n", "git clean -nd", "git clean --dry-run"):
+            with self.subTest(command=command):
+                self.assertAllowed(command)
+
+    def test_unrelated_git_commands_are_allowed(self):
+        """捨てない操作は見ない。"""
+        self._dirty_note()
+        for command in (
+            "git status",
+            "git add note.md",
+            "git commit -m x",
+            "git stash",
+            "git diff -- note.md",
+            "git log --oneline",
+        ):
+            with self.subTest(command=command):
+                self.assertAllowed(command)
+
+    def test_help_is_out_of_scope(self):
+        """helpの表示は何も捨てない。既存hookと同じ扱いにする。"""
+        self._dirty_note()
+        self.assertAllowed("git clean --help")
+        self.assertAllowed("git reset -h")
+
+    def test_discard_on_a_later_line_is_asked(self):
+        """複数行commandの2行目も検査する（#389と同じ範囲）。"""
+        self._dirty_note()
+        self.assertAsked("git fetch origin\ngit reset --hard origin/develop")
+
+    def test_discard_written_in_a_heredoc_body_is_allowed(self):
+        """heredocのbodyは実行されない。**検査しない。**
+
+        **treeを先に汚す。**汚していないと、bodyの`git reset --hard`を拾って
+        しまってもcleanなtreeとして通り、**検出が壊れてもこのtestは通る。**
+        """
+        self._dirty_note()
+        self.assertAllowed(
+            "cat > note.md <<'EOF'\ngit reset --hard\nEOF\n"
+        )
+
+    def test_discard_as_an_argument_is_allowed(self):
+        """command位置にない語は呼び出しではない。
+
+        **これもtreeを汚してから見る。**理由は上と同じである。
+        """
+        self._dirty_note()
+        self.assertAllowed("echo git reset --hard")
+
+    def test_unknown_tree_state_is_asked(self):
+        """**状態を確認できないときは通さない。**
+
+        repositoryの外で`git status`は失敗する（2026-09-16実測、exit 128）。
+        **確認できなかったことを、汚れていないことと読まない。**
+        """
+        outside = tempfile.mkdtemp()
+        self.addCleanup(guards.remove_tree, Path(outside))
+        # **temp領域がrepositoryの内側にある環境でも前提を保つ。**
+        # ceilingを置かないと、上位のrepositoryが見つかってcleanと読まれ、
+        # このtestは黙って逆の意味になる。
+        code, output = _invoke(
+            WORKTREE_GUARD, "git reset --hard", cwd=outside,
+            environment={"GIT_CEILING_DIRECTORIES": str(Path(outside).parent)},
+        )
+        self.assertEqual(code, 0)
+        self.assertIsNotNone(output, "通してしまった")
+        self.assertIn("確認できなかった", _reason(output))
+
+    def test_reason_names_the_count(self):
+        """診断文が、数えた件数をそのまま書く。"""
+        self._dirty_note()
+        self.assertAsked("git reset --hard", contains="1件")
+
+    def test_skip_environment_disables_the_guard(self):
+        """逃げ道が効く。"""
+        self._dirty_note()
+        code, output = _invoke(
+            WORKTREE_GUARD, "git reset --hard", cwd=self.directory,
+            environment={"DESKCAT_SKIP_WORKTREE_GUARD": "1"},
+        )
+        self.assertEqual(code, 0)
+        self.assertIsNone(output)
+
+    def test_broken_input_does_not_block(self):
+        """hookの入力が壊れていることを、対象commandの問題として扱わない。"""
+        result = subprocess.run(
+            [sys.executable, WORKTREE_GUARD], input="{ではないJSON",
+            capture_output=True, text=True, encoding="utf-8", timeout=60,
+            cwd=self.directory,
+        )
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.stdout.strip(), "")
+
+
 STOP_CLAIM_GUARD = str(SCRIPTS_ROOT / "hooks" / "stop_claim_guard.py")
 
 # transcript行の最小形。**PMの決定5により、判定の対象となる形をfixtureとして
@@ -987,6 +1579,54 @@ class StopClaimGuardTests(unittest.TestCase):
     def setUp(self):
         self._tmpdir = tempfile.TemporaryDirectory()
         self.addCleanup(self._tmpdir.cleanup)
+
+    def test_global_options_do_not_hide_the_evidence(self):
+        """**global optionで「やった証拠」を見失わない**（#325）。
+
+        **このhookだけは向きが逆である。**他のhookは止める側なので、外さないと
+        止め損なう。こちらは証拠として読む側であり、**外さないと実際に実行した
+        pushやmergeを数えず、本当にやった後の主張を止める側へ倒れる。**
+
+        `--dry-run`のような失格flagの判定は、global optionを外しても変わらない。
+        """
+        sys.path.insert(0, str(SCRIPTS_ROOT / "hooks"))
+        import stop_claim_guard
+
+        for command in (
+            "git push origin HEAD",
+            "git -C /tmp/repo push origin HEAD",
+            "git --no-pager push origin HEAD",
+            "git -c user.name=x push origin HEAD",
+        ):
+            with self.subTest(command=command):
+                self.assertTrue(
+                    stop_claim_guard._git_invocation_matches(
+                        command, "push", ("--dry-run", "-n")
+                    ),
+                    f"証拠として数えなかった: {command}",
+                )
+        for command in (
+            "git push --dry-run origin HEAD",
+            "git -C /tmp/repo push --dry-run origin HEAD",
+        ):
+            with self.subTest(command=command):
+                self.assertFalse(
+                    stop_claim_guard._git_invocation_matches(
+                        command, "push", ("--dry-run", "-n")
+                    ),
+                    f"実際には送信しない呼び出しを証拠にした: {command}",
+                )
+        for command in (
+            "gh pr merge 413 --squash",
+            "gh --repo owner/repo pr merge 413 --squash",
+        ):
+            with self.subTest(command=command):
+                self.assertTrue(
+                    stop_claim_guard._gh_invocation_matches(
+                        command, ("pr", "merge"), ("--auto",)
+                    ),
+                    f"証拠として数えなかった: {command}",
+                )
 
     def _write_transcript(self, entries):
         path = Path(self._tmpdir.name) / "transcript.jsonl"
@@ -1312,6 +1952,24 @@ class MergeTrailerReportTests(unittest.TestCase):
     ここで見るのは、対象外のcommandで`gh`を呼ばずに抜けることである。
     """
 
+    def test_global_options_do_not_hide_the_merge(self):
+        """**global optionで`gh pr merge`を見失わない**（#325）。
+
+        `args[:2]`で位置から読んでいた版では、`gh --repo o/r pr merge`を
+        対象外として黙って抜けていた。**このhookは事後の報告であり、
+        見失うと「trailerが入ったか」を誰も確かめないまま終わる。**
+        """
+        for command, expected in (
+            ("gh pr merge 413 --squash", "413"),
+            ("gh --repo owner/repo pr merge 413 --squash", "413"),
+            ("gh -R owner/repo pr merge 413 --squash", "413"),
+            ("gh --repo owner/repo pr merge --squash", None),
+        ):
+            with self.subTest(command=command):
+                found, number = merge_trailer_report._pr_merge(command)
+                self.assertTrue(found, command)
+                self.assertEqual(number, expected, command)
+
     def test_non_merge_commands_are_ignored(self):
         for command in (
             "git status",
@@ -1578,10 +2236,10 @@ class PushGateTests(unittest.TestCase):
         self._instruction_commit(declared=False)
         other = tempfile.mkdtemp()
         self.addCleanup(guards.remove_tree, Path(other))
-        source, directory = push_gate.pushed_source(
+        source, directory, env = push_gate.pushed_source(
             f"git -C {self.root} push origin HEAD:develop"
         )
-        self.assertEqual((source, directory), ("HEAD", str(self.root)))
+        self.assertEqual((source, directory, env), ("HEAD", str(self.root), {}))
         # cwdをrepositoryの外に置いても、`-C`の先を見て拒否する。
         reason = self.assertDenied(
             f"git -C {self.root} push origin HEAD:develop", cwd=other
@@ -1594,6 +2252,72 @@ class PushGateTests(unittest.TestCase):
         other = tempfile.mkdtemp()
         self.addCleanup(guards.remove_tree, Path(other))
         self.assertAllowed(f"git -C {other} push origin HEAD:develop")
+
+    def test_repeated_directory_options_resolve_relative_to_the_previous_one(self):
+        """`git -C a -C b push`は`a/b`を検査する（#472）。
+
+        gitは相対pathの`-C`を前の`-C`からの相対で解決する。**最後の値だけを見ると、
+        `b`をcwdからの相対で探し、別のtreeを検査するか検査しない。**
+        """
+        self._instruction_commit(declared=False)
+        other = tempfile.mkdtemp()
+        self.addCleanup(guards.remove_tree, Path(other))
+        parent, name = str(self.root.parent), self.root.name
+        command = f"git -C {parent} -C {name} push origin HEAD:develop"
+        source, directory, _ = push_gate.pushed_source(command)
+        self.assertEqual((source, directory), ("HEAD", str(self.root)))
+        reason = self.assertDenied(command, cwd=other)
+        self.assertIn(gate.TRAILER_INSTRUCTION, reason)
+
+    def test_value_options_are_not_read_as_the_subcommand(self):
+        """`--git-dir X push`の`X`を subcommand と読まない（#472）。
+
+        **1語として飛ばしていた版では、`X`が先頭語になって`push`と一致せず、
+        検査せずに通していた。**`--git-dir=X`の1語の形も同じに扱う。
+        """
+        self._instruction_commit(declared=False)
+        git_dir = self.root / ".git"
+        for command in (
+            f"git --git-dir {git_dir} --work-tree {self.root} push origin HEAD:develop",
+            f"git --git-dir={git_dir} --work-tree={self.root} push origin HEAD:develop",
+            f"git --git-dir {git_dir} push origin HEAD:develop",
+            f"git --work-tree {self.root} push origin HEAD:develop",
+        ):
+            with self.subTest(command=command):
+                self.assertIsNotNone(push_gate.pushed_source(command), command)
+
+    def test_git_dir_and_work_tree_forms_are_denied(self):
+        """`--git-dir`／`--work-tree`／`--namespace`を付けた`develop`へのpushは止める（#472）。
+
+        **検査するrepository・tree・refを一意に決められない。**`--git-dir`だけならgitはcwdを
+        work treeとして扱い、`--work-tree`だけならrepositoryをcwdから探す。
+        `--namespace`はrefの探し方を変える（検査側で再現しない）。
+        **宣言の揃ったcommitでも止める**（gateの結果ではなく、形で止めている）。
+        """
+        self._instruction_commit(declared=True)
+        other = tempfile.mkdtemp()
+        self.addCleanup(guards.remove_tree, Path(other))
+        git_dir = self.root / ".git"
+        for command in (
+            f"git --git-dir {git_dir} --work-tree {self.root} push origin HEAD:develop",
+            f"git --git-dir {git_dir} push origin HEAD:develop",
+            f"git --work-tree {self.root} push origin HEAD:develop",
+            f"git --namespace n push origin HEAD:develop",
+            f"git --namespace=n push origin HEAD:develop",
+        ):
+            with self.subTest(command=command):
+                reason = self.assertDenied(command, cwd=other)
+                self.assertIn("`-C`とcwd", reason)
+
+
+    def test_relative_git_dir_is_resolved_from_the_directory_option(self):
+        """相対の`--git-dir`は`-C`の後のdirectoryから解決する。gitと同じである（#472）。"""
+        self._instruction_commit(declared=False)
+        _, directory, env = push_gate.pushed_source(
+            f"git -C {self.root} --git-dir .git push origin HEAD:develop"
+        )
+        self.assertEqual(directory, str(self.root))
+        self.assertEqual(env, {"GIT_DIR": str((self.root / ".git").resolve())})
 
     def test_other_destinations_are_out_of_scope(self):
         """`develop`以外へのpushは見ない。Pull Requestが`gate`を通す。"""
@@ -1624,6 +2348,40 @@ class PushGateTests(unittest.TestCase):
         self._instruction_commit(declared=False)
         _git(str(self.root), "branch", "--set-upstream-to", "origin/develop")
         self.assertDenied("git push")
+
+    def test_two_guarded_pushes_in_one_command_are_denied(self):
+        """1つのcommandの中に`develop`へのpushが2件あれば止める（#472。PR #473のreview指摘）。
+
+        **最初の1件で止めていた版では、1つ目が通れば2つ目の`--git-dir`を見ずに通していた。**
+        1件でも各段の上限を合わせるとhookの制限時間を超えうる（変更前から同じ）。件数が増えるとさらに延びるため、
+        2件以上ある形そのものを止める。1つ目は宣言の揃ったcommitで`gate`を通る形にしてある。
+        """
+        self._instruction_commit(declared=True)
+        other = tempfile.mkdtemp()
+        self.addCleanup(guards.remove_tree, Path(other))
+        command = (
+            f"git -C {self.root} push origin HEAD:develop"
+            f" && git --git-dir={self.root / '.git'} push origin HEAD:develop"
+        )
+        self.assertEqual(len(push_gate.pushed_sources(command)), 2)
+        reason = self.assertDenied(command, cwd=other)
+        self.assertIn("1件ずつpushし直す", reason)
+        # 1件だけなら、宣言の揃ったcommitは通る。
+        self.assertAllowed(f"git -C {self.root} push origin HEAD:develop", cwd=other)
+
+    def test_bare_push_with_git_dir_follows_the_upstream_of_that_repository(self):
+        """refspecを書かない`git --git-dir X push`は、`X`のupstreamを引いて止める（#472）。
+
+        **cwdのupstreamを引くと、cwdがrepositoryでなければ`None`になり、止める判定まで届かない。**
+        """
+        self._instruction_commit(declared=False)
+        _git(str(self.root), "branch", "--set-upstream-to", "origin/develop")
+        other = tempfile.mkdtemp()
+        self.addCleanup(guards.remove_tree, Path(other))
+        command = f"git --git-dir {self.root / '.git'} --work-tree {self.root} push"
+        self.assertIsNotNone(push_gate.pushed_source(command))
+        reason = self.assertDenied(command, cwd=other)
+        self.assertIn("`-C`とcwd", reason)
 
     def test_bare_push_to_another_upstream_is_out_of_scope(self):
         """upstreamが`origin/develop`でなければ見ない。"""
@@ -1686,6 +2444,16 @@ class CodeRabbitGateTests(unittest.TestCase):
             'gh issue comment 240 --body "@coderabbitai full review"',
             'gh pr comment 239 -b "@coderabbitai full review"',
             'gh pr comment 239 --body="@coderabbitai full review"',
+        ):
+            with self.subTest(command=command):
+                self.assertAsked(command)
+
+    def test_global_options_do_not_hide_the_subcommand(self):
+        """**global optionで検査が抜けない**（#325）。`args[:2]`で位置から読んでいた
+        版では、`gh --repo o/r pr comment`が素通りしていた。"""
+        for command in (
+            'gh --repo owner/repo pr comment 239 --body "@coderabbitai full review"',
+            'gh -R owner/repo issue comment 240 --body "@coderabbitai review"',
         ):
             with self.subTest(command=command):
                 self.assertAsked(command)
@@ -2088,6 +2856,44 @@ class CodeRabbitGateTests(unittest.TestCase):
                 self.assertEqual(
                     output["hookSpecificOutput"]["permissionDecision"], "ask"
                 )
+
+
+class GlobalOptionTests(unittest.TestCase):
+    """`command_line`のglobal optionの読み飛ばし（#472）。"""
+
+    def test_value_options_consume_their_value(self):
+        for option in ("--git-dir", "--work-tree", "--namespace", "--config-env", "--super-prefix"):
+            with self.subTest(option=option):
+                self.assertEqual(
+                    command_line.skip_global_options([option, "X", "push", "origin"], "git"),
+                    ["push", "origin"],
+                )
+                self.assertEqual(
+                    command_line.global_option_value([option, "X", "push"], "git", option),
+                    "X",
+                )
+                self.assertEqual(
+                    command_line.skip_global_options([f"{option}=X", "push"], "git"),
+                    ["push"],
+                )
+                self.assertEqual(
+                    command_line.global_option_value([f"{option}=X", "push"], "git", option),
+                    "X",
+                )
+
+    def test_repeated_directory_option_joins_paths(self):
+        """gitの`-C`は前の`-C`からの相対で解決する。絶対pathはそこから始め直す。"""
+        value = command_line.global_option_value
+        self.assertEqual(value(["-C", "a", "-C", "b", "push"], "git", "-C"), os.path.join("a", "b"))
+        self.assertEqual(value(["-C", "a", "-C", "/abs", "push"], "git", "-C"), "/abs")
+        self.assertEqual(value(["-C", "a", "-C", "", "push"], "git", "-C"), "a")
+        self.assertEqual(value(["-C", "a", "push"], "git", "-C"), "a")
+
+    def test_other_options_keep_the_last_value(self):
+        self.assertEqual(
+            command_line.global_option_value(["--repo", "a/x", "--repo", "b/y", "pr"], "gh", "--repo"),
+            "b/y",
+        )
 
 
 class CommandFromTests(unittest.TestCase):
@@ -2740,10 +3546,12 @@ class HookPayloadShapeTests(unittest.TestCase):
     **型で全数走査したら当時の5本すべてに同じ形が残っていた。**指摘は代表例であって全数ではない。
 
     **後から足したhookもこの一覧へ入れる。**`inspector_readonly_guard.py`は#376で足した。
+    `truncation_guard.py`と`worktree_guard.py`は#325で足した（**前者は#349で入っていた
+    のに、この一覧へ入れ忘れていた。**一覧に無いhookは、壊れても静かに素通りする）。
     """
 
     HOOKS = (GH_GUARD, BASE_GUARD, PUSH_GATE, MERGE_REPORT, CODERABBIT_GATE,
-             INSPECTOR_GUARD)
+             INSPECTOR_GUARD, TRUNCATION_GUARD, WORKTREE_GUARD)
 
     MALFORMED = (
         "[]",
@@ -2768,7 +3576,9 @@ class HookPayloadShapeTests(unittest.TestCase):
                         env={**os.environ,
                              "DESKCAT_SKIP_GH_GUARD": "",
                              "DESKCAT_SKIP_BASE_GUARD": "",
-                             "DESKCAT_SKIP_PUSH_GATE": ""},
+                             "DESKCAT_SKIP_PUSH_GATE": "",
+                             "DESKCAT_SKIP_TRUNCATION_GUARD": "",
+                             "DESKCAT_SKIP_WORKTREE_GUARD": ""},
                     )
                     self.assertEqual(result.returncode, 0,
                                      f"{Path(script).name} が落ちた: {result.stderr[:300]}")

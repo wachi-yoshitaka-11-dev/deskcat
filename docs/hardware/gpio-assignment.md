@@ -242,7 +242,7 @@ VDD = 3.3 Vである（`電圧domain`節）。受け側の`VIH`は0.7×3.3 = **2
 値を詰める必要が出た時点で、下の式と境界表をそのまま使える。**甲乙丙の区分を通す必要も無い**
 （同policyが「5項目に効かない値は出所を問わない」と定める）。
 
-**値そのものはまだ確定していない。**下記「まだ確定できない2つの入力」が埋まるまで決まらない。
+**値そのものはまだ確定していない。**下記「まだ確定できない2つの入力」が埋まるまで決まらない。（2026-09-24追記（[#472](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/472)）: 下の節の見出しと項目のとおり、まだ確定できない入力は`Cb`の1つである。上の「2つの入力」はこの追記が置き換える）
 **ただし確定を待つ必要は無い。**上のとおり一般値で開始してよい。
 
 **起動時の状態を確定させるための外部pull（[`HW-TBD-027`](tbd-register.md)／[`HW-TBD-032`](tbd-register.md)、[#2](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/2)）とは別の計算である。**
@@ -295,7 +295,7 @@ VDD = 3.3 Vである（`電圧domain`節）。受け側の`VIH`は0.7×3.3 = **2
    理由と根拠は下記「初回bring-upのmode決定」節。[sensor-datasheet-notes.md](sensor-datasheet-notes.md)の
    `検証済み最大bus速度`は、実測して確認した値ではないため`TBD`のまま変更しない
    （**この決定は「採用するmode」であり「実測して確認した最大速度」ではない**）。
-3. **bus容量`Cb`を得ていない。**`Cb`は配線・接続・pinの合計容量であり、**実配線が存在しない。**
+3. **bus容量`Cb`を得ていない。**`Cb`は配線・接続・pinの合計容量であり、**実配線が存在しない。**（2026-09-24追記（[#472](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/472)）: [experiment-log.md](experiment-log.md)の`EXP-015`（2026-09-22）で両moduleをGPIO25／GPIO26へ配線した。`Cb`は同記録でも未測定である。上の「実配線が存在しない」はこの追記が置き換える）
    `J1`／`J2`をはんだ付けするかの判断にはこの入力が引き続き要る。
 
 ### 判断に使える境界
@@ -373,7 +373,7 @@ I2C busの速度と無関係である。加速度の軽打検出は`ACCEL-IRQ`�
 **外れても deviceが応答しないだけで壊れない。**したがって「決まらないから配線できない」ではない。
 **下の材料は、どちらを採るかを選ぶためのものであって、着手の前提条件ではない。**
 **候補値そのものの正本は[sensor-datasheet-notes.md](sensor-datasheet-notes.md)であり、ここへ再掲しない。**
-**実装は配線であり、`J3`のはんだ付けと同じ機会に行う作業である。**
+**実装は配線であり、`J3`のはんだ付けと同じ機会に行う作業である。****2026-09-22追記: `J3`のはんだ付けは完了した**（実施日・根拠の水準は[sensor-datasheet-notes.md](sensor-datasheet-notes.md)の`J3をはんだ付けした（2026-09-07）`節。**ここへ再掲しない**）。**アドレスの配線が行われた記録は無い。**（2026-09-22にユーザーへ訊いたのは`J3`の実施日・確認方法と`J1`／`J2`の状態の3点だけであり、**アドレス配線の現況は訊いていない。記録の不在であって、未実施の確認ではない。**）**したがって「同じ機会に行う」は、少なくとも記録上は成立していない。****いつ行うかの代わりの規定は、この変更では置いていない。****引き受け先も決めていない。**状態の正は[sensor-datasheet-notes.md](sensor-datasheet-notes.md)の`closeまでに要ること（実装と確認を含む）`表である。**ここへ再掲しない。**
 
 | 判断材料 | 内容 |
 |---|---|
@@ -394,7 +394,7 @@ I2C busの速度と無関係である。加速度の軽打検出は`ACCEL-IRQ`�
 |---|---|---|
 | Flash通信専用（**使用禁止**） | 6, 7, 8, 9, 10, 11（`CLK`／`D0`／`D1`／`D2`／`D3`／`CMD`） | 内蔵SPI Flashとの通信に使用。外部回路から絶対に使用しない |
 | Strapping pin（起動modeを決定。用途を厳選） | 0, 2, 5, 12, 15 | GPIO0: boot button。GPIO2: download mode判定。GPIO12(MTDI): flash電圧選択（Highだと起動しない可能性）。GPIO15(MTDO): boot logのsilence制御。今回の割り当てでは**いずれも使用しない**（安全側） |
-| UART0（Flashingとboard上USB-UARTブリッジ専用） | 1（TX）, 3（RX） | **firmware flashingとdebug log専用。**board上のUSB-UARTブリッジが占有するため、外部配線用のGPIOとして使わない。**Pi linkはUSB serialであり、この2本は使わない**（下記`Pi–ESP32間のtransport`） |
+| UART0（board上USB-UARTブリッジ専用。TXの用途はbuild時のfeatureで排他的に切り替える） | 1（TX）, 3（RX） | board上のUSB-UARTブリッジが占有するため、外部配線用のGPIOとして使わない（新たな配線を追加しない、という意味）。TX（GPIO1）はdebug logとPi–ESP32 protocol streamのどちらかへ排他的に使う（`pi-protocol-mode`。詳細は`docs/protocol/esp32-pi-protocol.md`§2、`firmware/esp32/src/console.rs`参照）。RX（GPIO3）はこのfirmwareが受信loopを実装していないため読まれない（`UART-RX`行参照） |
 | Input-only（出力不可） | 34, 35, 36（VP）, 39（VN） | 純粋なinput信号（interrupt、ADC）にのみ割り当て可 |
 | WROOM/SOLO-1専用（WROVERでは予約） | 16, 17 | 今回のmoduleはESP-WROOM-32Dのため使用可 |
 
@@ -402,7 +402,7 @@ I2C busの速度と無関係である。加速度の軽打検出は`ACCEL-IRQ`�
 
 | Signal ID | Device | 信号 | ESP32側の方向 | GPIO | Boot state | Pull | Bus設定 | 共有先 | 制約／根拠 |
 |---|---|---|---|---|---|---|---|---|---|
-| LCD-SCLK | DISP-01 | SCLK | Output | GPIO18 | 起動時floating（input）。CSがinactiveの間はbus上で無害 | 外部pull不要 | VSPI、SPI mode要確認（ILI9341は一般にMode0）。速度は実測で確認 | TOUCH-01と共有 | ESP32 VSPIの既定CLK pin。Flash／strapping pinではない |
+| LCD-SCLK | DISP-01 | SCLK | Output | GPIO18 | 起動時floating（input）。CSがinactiveの間はbus上で無害 | 外部pull不要 | VSPI、**SPI Mode 0（CPOL=0, CPHA=0）で確定した**（2026-09-17。ILI9341 Datasheet V1.11 §4 Pin Descriptions「Interface Logic Signals」表、p.10。`SDA`/`SDI`はSCL立ち上がりでlatch、`SDO`はSCL立ち下がりで出力される旨の記載から導いた。`firmware/esp32/src/display.rs`のmodule docに同じ引用がある）。**clockは6 MHzに固定した**（同datasheet §18.3.4 4-line SPI system timing、p.242。write `twc`最小100ns→最大10 MHz、read `trc`最小150ns→最大約6.67 MHzの両方を満たす値として選定。実測ではなく一次資料の上限から導いた値である。`#13`の受け入れ条件「更新timingを測定した」はまだ満たしていない。実機試験で測る際は、この固定clockでの所要時間になる） | TOUCH-01と共有 | ESP32 VSPIの既定CLK pin。Flash／strapping pinではない |
 | LCD-MOSI | DISP-01 | MOSI | Output | GPIO23 | 同上 | 外部pull不要 | 同上 | TOUCH-01と共有 | ESP32 VSPIの既定MOSI pin |
 | LCD-MISO | DISP-01 | MISO | Input | GPIO19 | 同上 | 外部pull不要 | 同上 | TOUCH-01と共有 | ILI9341自体はMISO未使用の可能性が高い（要現物確認）。Touch controller（**`XPT2046`。2026-08-13に現物刻印で確定**）の読み取りに使用 |
 | LCD-CS | DISP-01 | Chip select | Output | GPIO22 | 起動時floating→firmware初期化前は不定 | **外部`10 kΩ`×`1本`を選定した**（2026-08-25。active-low CSをfirmware初期化前もinactive＝Highに保つため）（導出は[起動時状態を確定させる外部pull](#起動時状態を確定させる外部pull)節。**ここへ再掲しない**）。**2026-08-27にブレッドボード上へ実装した。通電・検証は未了である** | **Active-low（一次資料で確定）。**ILI9341 datasheet V1.11が`CSX`をactive lowと明記している。**現物のpolarity確認は要しない** | なし | Output設定前にinactiveにする。Pull-up未実装の場合、起動直後の数十ms間bus contentionのriskがある |
@@ -414,14 +414,14 @@ I2C busの速度と無関係である。加速度の軽打検出は`ACCEL-IRQ`�
 | ACCEL-SDA | ACCEL-01 | I2C SDA | Bidirectional | GPIO25 | floating（open-drain想定） | 外部4.7kΩ pull-up（**一般値での開始値である。**I2Cのpull-up値は[hardware-safety-policy.md](../governance/hardware-safety-policy.md)の対応表で一般値で開始してよい側に置かれている（2026-08-26。ADR-0014／0016）。**導出された確定値ではない。**実効pull-upの式は[I2C busの実効pull-up](#i2c-busの実効pull-up)節にある。**ADXL345モジュールは`01C`＝10 kΩのpull-upを4個搭載しており、2026-08-27に現物写真でパターンを確認したところSDA・SCLへ各2本ずつ付いている**（各line並列合成で5.00 kΩ）） | **100 kHz(Standard-mode)を初回bring-upとして採用した**（2026-09-06。導出は[初回bring-upのmode決定](#初回bring-upのmode決定)節。**ここへ再掲しない**）。**Fast-modeへの変更にはpull-up値の再設計が要る**（現構成はFast-modeの`Rp(max)`を満たさない）。旧記載「400kHz(Fast-mode)を想定、要実測」はmode決定前の記述であり訂正した | ENV-01と共有 | ADXL345はI2C／SPI選択式。Interface選択jumperの現物確認が必要（`hardware-bom.md` ACCEL-01） |
 | ACCEL-SCL | ACCEL-01 | I2C SCL | Bidirectional | GPIO26 | 同上 | 同上 | 同上 | ENV-01と共有 | 同上 |
 | ACCEL-IRQ | ACCEL-01 | Interrupt（tap／free-fall検出） | Input | GPIO35 | 入力専用 | **外部pull要確認**（`HW-TBD-004`）。**ICの事実:**ADXL345のINT1/INT2は**push-pull固定**であり、設定で切り替えられない（`Both interrupt pins are push-pull, low impedance pins`。Rev. G page 19）。polarityは`DATA_FORMAT` register（`0x31`）の`INT_INVERT` bitで選び、**同registerのreset値が`00000000`であるためICの既定はactive-highである**（Rev. G Table 19 page 23、page 27）。**旧記載の「push-pull／open-drainを設定可能」はICの事実として誤りであり、2026-08-12に訂正した**（Revision 9）。**module levelは別である。**M-06724のboard上でINT pinがheaderへ直結しているか（直列抵抗、level shift、引き出しの有無）を示す資料が無いため、**外部pullの要否とheaderで観測されるpolarityは現物確認まで確定しない。ICがpush-pullであることからmoduleの配線条件を導かない**（[tbd-register HW-TBD-004](tbd-register.md)） | Edge想定 | なし | ADXL345のtap／free-fall検出hardwareを軽打／持ち上げ判定に使う場合に使用（`hardware-bom.md` ACCEL-01の採用理由） |
-| ENV-SDA | ENV-01 | I2C SDA | Bidirectional | GPIO25（ACCEL-01と共有） | 同上 | 同上 | 同上 | ACCEL-01と共有 | BME280はI2C／SPI選択式。**2026-08-22に選択jumperを実測し、`J1`／`J2`／`J3`は3つとも開放であると確定した**（正は[sensor-datasheet-notes.md](sensor-datasheet-notes.md)の`現物の実装状態を実測で確定させた（2026-08-22）`）。**したがってI2Cで使うには`J3`のはんだ付けが要る**（実装作業）。**module搭載の4.7 kΩプルアップも繋がっていない** |
+| ENV-SDA | ENV-01 | I2C SDA | Bidirectional | GPIO25（ACCEL-01と共有） | 同上 | 同上 | 同上 | ACCEL-01と共有 | BME280はI2C／SPI選択式。**2026-08-22に選択jumperを実測し、`J1`／`J2`／`J3`は3つとも開放であると確定した**（正は[sensor-datasheet-notes.md](sensor-datasheet-notes.md)の`現物の実装状態を実測で確定させた（2026-08-22）`）。**したがってI2Cで使うには`J3`のはんだ付けが要る**（実装作業）。**module搭載の4.7 kΩプルアップも繋がっていない**。**2026-09-22追記: 上の2026-08-22時点の記述は、`J3`について現在の状態と合わない。****状態・実施日・確認方法・根拠の水準は、すべて[sensor-datasheet-notes.md](sensor-datasheet-notes.md)の`jumper（AE-BME280）`節と`J3をはんだ付けした（2026-09-07）`節が持つ。ここへ再掲しない。**実施の記録は[experiment-log.md](experiment-log.md)の`EXP-014`。**上の2026-08-22時点の記述は書き換えていない。** |
 | ENV-SCL | ENV-01 | I2C SCL | Bidirectional | GPIO26（ACCEL-01と共有） | 同上 | 同上 | 同上 | ACCEL-01と共有 | 同上 |
 | SERVO-PWM | SERVO-01 | PWM control | Output | GPIO27 | **不定**。ESP32のGPIO27はreset時にhigh-Z（output disable、input disable）であり、Lowにdriveされる保証はない。**Lowと仮定しない。**外部pull-downが確定させるまで、servoは不定pulseを受けうる | **外部pull-down必須**（推奨ではない）。high-Z期間中もLowを保証する唯一の手段であり、これがないとPWM driver初期化前にservoが動きうる。詳細は`servo-safety-limits.md`。**`4.7 kΩ`×`1本`で確定した。**導出は[起動時状態を確定させる外部pull](#起動時状態を確定させる外部pull)節。**ここへ再掲しない。****この抵抗値を一般値で開始してよい側に置くことを2026-08-26に人間が決めた**（[hardware-safety-policy.md](../governance/hardware-safety-policy.md)の対応表は「pull-upとdecouplingの値」を一般値側、「サーボPWM、可動域、速度、加速度」を一次資料側に置き、**この項目は両方に読めた**）。**pull-down自体が必須であることは変わらない。**一般値側になったのは値の根拠の水準だけである。**上限はSG90の`logic閾値`が一次資料に無いため計算できない**（[`HW-TBD-026`](tbd-register.md)(a)）。**そのうえで、駆動側の下限に余裕がある範囲で未知に強い側（低い値）を採った。**部品は`hardware-bom.md`の`RES-PULL-01`（10 kΩと4.7 kΩが各1袋100本入、2026-08-08着荷。**追加の発注は要らない**）。**2026-08-27にブレッドボード上へ実装した。通電・検証は未了である** | 50Hz、pulse幅は`servo-safety-limits.md`で規定する制限に従う | なし | Strapping pinでもflash pinでもない。起動時とdriver故障時の状態は`tbd-register.md` HW-TBD-019で引き続き検討する |
 | ADC-SHUNT | MEAS-01 | Servo rail低側shuntの電圧 | Input（ADC1_CH4） | GPIO32 | 入力専用扱い、high-Z | 外部pull不要（shunt両端が電位を決める） | ADC1、減衰0 dB（0–1.1 V）。0.1Ω×最大2 A＝0.2 Vがfull scale内 | なし | ADC1のためWi-Fi動作中も使用可。ADC2は**Wi-Fi有効時に使用不可**のため測定へ割り当てない。低電流側の精度限界（実用域は約1 A以上）は`power-budget.md`の測定計画を参照 |
 | ADC-5V | MEAS-01 | 5 V railの電圧 | Input（ADC1_CH5） | GPIO33 | 入力専用扱い、high-Z | 分圧器10 kΩ／10 kΩ（比1/2）。分圧後の最大は約2.5 V | ADC1、減衰11 dB（約0–3.1 V）。分圧なしでは5 VがADC定格3.3 Vを超え破損する | なし | 分圧比は10 kΩ抵抗で構成する（`hardware-bom.md` MEAS-01）。**`ADC-5V`と`ADC-3V3`で計4本を使う。抵抗は入手済みであり**（2026-08-08着荷、1袋100本入。2026-08-12に購入履歴と照合して訂正した）、**残るのは実装と検証である** |
 | ADC-3V3 | MEAS-01 | ESP32 3.3 V railの電圧 | Input（ADC1_CH0） | GPIO36（VP） | 入力専用、high-Z | 分圧器10 kΩ／10 kΩ（比1/2）。分圧後の最大は約1.65 V | ADC1、減衰11 dB | なし | 3.3 Vは減衰11 dBのfull scale（約3.1 V）を超えるため直結しない。Input-only pinのためoutputへ転用不可 |
-| UART-TX | Firmware flashingとdebug log（**Pi linkではない**） | TX | Output | GPIO1（固定、board上USB-UARTブリッジへ内部接続） | SDK既定（起動logを出力） | 変更不可（chip内蔵UART0） | 115200 8N1（候補、`esp32-pi-protocol.md`で最終確定） | Boot log | board上のUSB-UARTブリッジが占有するため、**外部配線用のGPIOとして使用しない**。Pi linkは下記のとおりUSB connector経由であり、この2本をPiへ直接配線しない |
-| UART-RX | Firmware flashingとdebug log（**Pi linkではない**） | RX | Input | GPIO3（固定） | 同上 | 変更不可 | 同上 | Flashing | 同上 |
+| UART-TX | Firmware flashing（両build共通）。実行時はdebug log（既定build）、**または**Pi–ESP32 protocol stream（`pi-protocol-mode`のbuildだけ。[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)） | TX | Output | GPIO1（固定、board上USB-UARTブリッジへ内部接続） | SDK既定（起動logを出力） | 変更不可（chip内蔵UART0） | 115200 8N1（候補、`esp32-pi-protocol.md`で最終確定） | Pi link（USB-UARTブリッジ経由で同じ物理lineを共有。GPIO headerでの配線共有ではない） | board上のUSB-UARTブリッジが占有するため、**新たな外部配線用のGPIOとして使用しない**（GPIO headerからの直接配線は無い、という意味）。debug logとprotocol streamの排他はbuild時のfeatureで選ぶ。詳細（既知の例外を含む）は`docs/protocol/esp32-pi-protocol.md`§2、`firmware/esp32/src/console.rs`参照 |
+| UART-RX | Firmware flashing（両build共通）。**このfirmwareはRXを読む受信loopを実装していない**（既定build・`pi-protocol-mode`buildのどちらも。実装は`#11`／`#12`が追跡する） | RX | Input | GPIO3（固定） | 同上 | 変更不可 | 同上 | USB-UARTブリッジの物理line（同じchipのTXと対）。**このfirmwareはRXを読まない**（protocol用途があるのはTXだけ。Pi側からのtrafficの有無はこのfirmwareの実装範囲外） | 同上 |
 
 正確なmoduleが使用しない信号は削除し、不足しているreset、enable、address-select、interrupt、power-control信号はすべて追加する。
 
@@ -448,14 +448,14 @@ PCからflashingするときは同じUSB portを使うため、Piとの同時接
 | USB serial（Pi link） | Raspberry Pi | **USB connector経由に確定**（GPIO配線なし）。GPIO1／GPIO3はboard上ブリッジの予約pin | Pi上のdevice名（`/dev/ttyUSB*`等）は#8で確認。USB OTG変換cableが**手持ちで充当**（2026-08-22） |
 | ADC測定（`power-budget.md`） | Shunt、5 V rail、3.3 V rail | GPIO32／33／36に確定（すべてADC1） | 分圧器の実装と実測値。ADC2はWi-Fi有効時に使用不可のため割り当てない |
 | SPI display bus | LCD（MSP2807／ILI9341）、touch（同module） | GPIO18／23／19（SCLK／MOSI／MISO）＋CS個別（LCD: GPIO22、Touch: GPIO21）に確定 | Touch controller型番の現物確認、実際のSPI mode／速度の実測 |
-| I2C sensor bus | Accelerometer（ADXL345）、environment sensor（BME280） | GPIO25（SDA）／GPIO26（SCL）に確定 | **BME280側のjumperは2026-08-22に実測で確定した**（`J1`／`J2`／`J3`はすべて開放）。**残るのはADXL345側のpin接続の確認と、実効pull-up抵抗の計算である。****計算の式と前提は[I2C busの実効pull-up](#i2c-busの実効pull-up)節が正本であり、ここへ再掲しない。**同節は2026-08-25に一次資料（UM10204 Rev. 7.0 §7.1）から式と規定値を確定させた。**値が決まらない理由は3つある**（ADXL345側のpin接続、bus容量`Cb`、採るmode）。**いずれも同節に書いた。** **2026-08-22にBME280側のjumperを実測した。`J1`／`J2`はどちらも開放であり、module搭載の4.7 kΩプルアップはbusへ繋がっていない**（正は[sensor-datasheet-notes.md](sensor-datasheet-notes.md)の`現物の実装状態を実測で確定させた（2026-08-22）`。**ここへ再掲しない**）。**したがって実効pull-upの計算にBME280側の4.7 kΩを入れない。**`J1`／`J2`をはんだ付けするかは、この計算の結果で決める。**まだ決めていない。****計算前にはんだ付けしない。****あわせて`J3`が開放であるため、I2Cで使うには`J3`のはんだ付けが要る。** |
+| I2C sensor bus | Accelerometer（ADXL345）、environment sensor（BME280） | GPIO25（SDA）／GPIO26（SCL）に確定 | **BME280側のjumperは2026-08-22に実測で確定した**（`J1`／`J2`／`J3`はすべて開放）。**残るのはADXL345側のpin接続の確認と、実効pull-up抵抗の計算である。****計算の式と前提は[I2C busの実効pull-up](#i2c-busの実効pull-up)節が正本であり、ここへ再掲しない。**同節は2026-08-25に一次資料（UM10204 Rev. 7.0 §7.1）から式と規定値を確定させた。**値が決まらない理由は3つある**（ADXL345側のpin接続、bus容量`Cb`、採るmode）。**いずれも同節に書いた。** **2026-08-22にBME280側のjumperを実測した。`J1`／`J2`はどちらも開放であり、module搭載の4.7 kΩプルアップはbusへ繋がっていない**（正は[sensor-datasheet-notes.md](sensor-datasheet-notes.md)の`現物の実装状態を実測で確定させた（2026-08-22）`。**ここへ再掲しない**）。**したがって実効pull-upの計算にBME280側の4.7 kΩを入れない。**`J1`／`J2`をはんだ付けするかは、この計算の結果で決める。**まだ決めていない。****計算前にはんだ付けしない。****あわせて`J3`が開放であるため、I2Cで使うには`J3`のはんだ付けが要る。****2026-09-22追記: 上の2026-08-22時点の記述は、`J3`について現在の状態と合わない。****状態・実施日・確認方法・根拠の水準は、すべて[sensor-datasheet-notes.md](sensor-datasheet-notes.md)の`jumper（AE-BME280）`節と`J3をはんだ付けした（2026-09-07）`節が持つ。ここへ再掲しない。**実施の記録は[experiment-log.md](experiment-log.md)の`EXP-014`。**上の2026-08-22時点の記述は書き換えていない。****実効pull-upの計算にBME280側の4.7 kΩを入れるかどうかは`J1`／`J2`で決まり、`J3`では変わらない。**`J1`／`J2`の現在の状態は上記の正本が持つ。**2026-09-24追記（[#472](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/472)）。**上の「残るのはADXL345側のpin接続の確認と、実効pull-up抵抗の計算である」と「値が決まらない理由は3つある（ADXL345側のpin接続、bus容量`Cb`、採るmode）」は、ADXL345側のpin接続（2026-08-27）とmode（2026-09-06、Standard-mode）の確定より前の記述である（`I2C busの実効pull-up`節の`確定した入力・まだ確定できない1つの入力`）。**残る入力は`Cb`の1つである。**上の2文はこの追記が置き換える。上の記述は書き換えていない |
 | PWM／timer | Servo（SG90） | GPIO27に確定 | `servo-safety-limits.md`のpulse幅制限確定、起動時安全状態のreview |
 
 ## 競合check
 
 - [x] 割り当てたpinがmodule flash用に予約されていない（GPIO6-11を使用していないことを確認済み）
 - [x] Outputがbootstrap要件と競合しない（GPIO0/2/5/12/15を一切使用していない）
-- [x] UART flashingとboot logを引き続き利用できる（GPIO1/3を変更していない）
+- [x] UART flashingとboot logを引き続き利用できる（GPIO1/3を変更していない。既定buildのdebug logの仕組み自体は変えていないが、`boot=`というlog行はこの変更で削除した（`firmware/esp32/src/main.rs`参照）。`pi-protocol-mode`のbuildは`silence_logging`が止める範囲（`esp_log`経由の出力）のdebug logが出ない。詳細は`UART0`行、`docs/protocol/esp32-pi-protocol.md`§2参照）
 - [x] Input-only制約を守っている（GPIO34/35/36は入力専用として使用。GPIO36はADC-3V3、outputへ転用しない）
 - [x] ADC測定pinを予約済みで、ADC2をWi-Fi併用下で使っていない（GPIO32/33/36はすべてADC1）
 - [x] 5 Vと3.3 V railのADC入力に分圧器が実装され、ADC定格3.3 Vを超えない（分圧比1/2を規定済み。**2026-09-07にブレッドボード上へ実装した。**`ADC-5V`(GPIO33)側は`5V`ピン→10 kΩ→分圧点(青)→GPIO33、分圧点→10 kΩ→GND。`ADC-3V3`(GPIO36)側は3V3帯→10 kΩ→分圧点(白)→GPIO36、分圧点→10 kΩ→GND。**抵抗の個別実測（DT830B）は行っていない。**5 %許容差の着荷済み品であり`Rp`等の余裕は桁で足りるため、2026-09-07に人間と合意のうえ個別実測をしないと決めた。**通電しての起動時電圧の検証はこの項目の対象外**（ADCは受動素子でありreset時のGPIO駆動状態に関わらない）
@@ -479,7 +479,7 @@ PCからflashingするときは同じUSB portを使うため、Piとの同時接
   可能性があり、この文書は`tr`／`Cb`／`IOL`の列しか引用していないため、その制約の有無を
   確認できていない。**したがって、実配線の`Cb`が400 pFを超えて488 pF以下に収まる場合、
   rise timeの計算だけは通っても、Standard-modeとして規定範囲内と言い切れない可能性が残る。
-  **実配線の`Cb`が存在しない現状では、これを判定できない。****mode決定（Standard-mode採用）は
+  **実配線の`Cb`が存在しない現状では、これを判定できない。**（2026-09-24追記（[#472](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/472)）: 配線は`EXP-015`で行われたが、`Cb`は未測定のままであり、判定できないことは変わらない。上の「実配線の`Cb`が存在しない」はこの追記が置き換える）**mode決定（Standard-mode採用）は
   取り消さない。**初回bring-upの選択としては変わらず有効である。**ただしこの項目（実効抵抗が
   有効範囲内である）は、実配線の`Cb`を測定するか、`Cb`≤400 pFを裏付ける設計上の根拠を得るまで、
   未達のまま残す。**`J1`／`J2`をはんだ付けするかの判断もこのmode決定の対象外であり、
@@ -554,8 +554,17 @@ regulatorが作るrailであり、ESP32自体が無給電ならこのrailも無�
 「moduleが独立電源でESP32 pinを駆動する経路自体が存在しない」ことが示され、
 pin header対応が確認できれば「配線ミスによる意図しない接続」も排除される。
 **この項目が要求するのはこの2点であり、直結（1:1）の同一性の証明ではない。**
-**この2点は、`ACCEL-01`についてはすでに`HW-TBD-004`で個別に着手されている**
-（`Vs`／`VDD`間の導通は2026-09-05に確認済み）。`DISP-01`／`ENV-01`は未実施である。
+**この表が求める測定（各moduleの電源pin ⇔ ESP32の`3V3` pin）は、`ACCEL-01`／`ENV-01`について
+未実施である。**`ACCEL-01`について`HW-TBD-004`が記録する2026-09-05の`Vs`／`VDD`間導通確認は、
+header内部の別pin同士が同一netであることを見た**別の測定**であり、この表が求める「ESP32の
+`3V3` pinとの導通」の確認ではない（2026-09-22訂正。旧記載はこの2つの測定を同一視していた）。
+**`DISP-01`については、B-2b経由（外部の3.3 V電源、`3V3` pinは使わない）の場合、この表が求める
+測定（`DISP-01`の`VCC`⇔ESP32の`3V3` pin）自体が発生しない**（`DISP-01`はB-2b経由ではこの節の
+対象外であり、`#15`／`#16`の範囲を超える）。**`DISP-01`をESP32自身の`3V3` pinへ接続する場合
+（[#461](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/461)、2026-09-23承認）は、
+この表の`module電源pinの独立性`行が`DISP-01`の`VCC`も対象に含めており、`ACCEL-01`／`ENV-01`と
+同様に未実施のまま残る（測定は`power-budget.md`の`DISP-01`追加接続のbring-upの手順が扱う）。**
+`DISP-01`固有の非通電確認は下の`電源pinの短絡・誤配線の確認（非通電）`表の項目2〜4が別途扱う。
 
 **この項目が見ていないもの。**module側のpull-upがESP32の起動時levelへ与える影響は、
 この項目の対象外である。`ACCEL-01`は`01C`（10 kΩ）を4個搭載しており（`信号inventory`の
@@ -565,6 +574,61 @@ pin header対応が確認できれば「配線ミスによる意図しない接�
 扱う範囲であり、この項目（moduleが能動的にdriveしないこと）が扱う範囲ではない。**この項目が
 確認するのは「無給電のmoduleが能動的にlogic levelを出力しないこと」だけであり、
 「受動的な抵抗経路が起動時levelへ与える影響が無いこと」までは確認しない。混同しないこと。
+
+### 電源pinの短絡・誤配線の確認（非通電）
+
+**上記2項目とは目的が異なるため分ける。**「module電源pinの独立性」は`VCC`が
+ESP32の`3V3`と同一netであること（2 kΩ未満）を確認するが、これは**独立電源の不在**を
+示すためであり、`VCC`と`GND`の間の**短絡**（数Ω以下）を検出するものではない
+（2 kΩ未満は`ACCEL-SDA`等のpull-up経由の経路も含む広い閾値であり、短絡検出には粗すぎる）。
+「pin header対応」も信号pin（GPIOへ繋がるpin）の対応を扱い、電源pinの逆極性や
+給電経路の重複は対象にしていない。この項目は当初
+[#13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)（LCD bring-up）が
+`DISP-01`の初回通電に先立って必要とし、非通電で今すぐ実施できる確認として追加した
+（Revision 33）。**その後、`ACCEL-01`／`ENV-01`向けの項目を追加し（Revision 36）、
+この節は`DISP-01`専用ではなく、周辺module3点に共通の項目（1）と、moduleごとに対象が
+分かれる項目（2〜7）を扱う節になっている。**各行の対象は下表の`対象`列が示す。
+
+**項目1（`VCC`–`GND`間短絡検出）は、固定した抵抗値のしきい値では判定しない。**
+`EXP-013`試験0（[experiment-log.md](experiment-log.md)）は、端子台の別対象への測定中に、
+放電した状態でプローブを当てた瞬間は0 Ω付近を示し、充電が進むにつれ値が上昇して安定する
+現象を観測したと記録している（`M-12001`の出力平滑コンデンサによるものと推定したが、
+**原因は確定していない。容量も時定数も測っていない**）。**同じ記録は、この現象を知らずに
+瞬時値だけを読み、赤と黒の間が2 Ωで短絡していると誤って判定しかけたことも明記している。**
+この記録自体は`VCC`–`GND`間の短絡検出を目的とした測定ではなく、対象も本項目のmoduleでは
+ないが、**瞬時値だけを導通の判定に使うと正常な経路を短絡と誤判定しかけた実例として参照する。**
+この項目は周辺module3点すべての`VCC`／`GND`pinに共通で適用する。**`DISP-01`（MSP2807）は
+decoupling capacitorの搭載有無自体が未確認であるが**（[sensor-datasheet-notes.md](sensor-datasheet-notes.md)の
+`Local decoupling`節、MSP2807行は`TBD`）、Revision 35のとおり**起きうるものとして扱う。**
+**`ACCEL-01`（ADXL345）は現物確認で`C1`が2個実装されていることを確認済みである**
+（容量表記は無く値は不明。[tbd-register.md](tbd-register.md)の`HW-TBD-004`(6)）。
+**`ENV-01`（BME280）はAE-BME280説明書の部品表により、`VDD`に0.1 µFが実装済みと
+確認済みである**（[sensor-datasheet-notes.md](sensor-datasheet-notes.md)の
+`Local decoupling`節、Revision 6の記録）。**したがって`ACCEL-01`／`ENV-01`は
+`DISP-01`より強い根拠（搭載の有無そのものが確認済み）で、同じ扱い（起きうるものとして扱う）が
+成り立つ。**`EXP-013`が観測した充電に伴う上昇という挙動そのものは、値不明の
+`ACCEL-01`側`C1`や`ENV-01`の0.1 µFで実際に観測されたわけではなく、**確認済みなのは
+decoupling capacitorが載っていることであって、充電で読みが上昇するという挙動が
+これらのmoduleで観測されたことではない。****それでも、項目1の判定基準（読みが上昇して
+安定する場合、または最初から高い値で安定している場合は正常、低いまま動かない場合は短絡）は
+これらのmoduleにもそのまま適用する。**固定した抵抗値のしきい値を作らない、という点も含め、
+`DISP-01`と同じ扱いである。いずれのmoduleについても「何Ω以下なら短絡」という値は作らず、
+読みの挙動で判定する。
+
+| # | 対象 | 項目 | 手順 | 判定基準 |
+|---|---|---|---|---|
+| 1 | 共通（`DISP-01`／`ACCEL-01`／`ENV-01`） | `VCC`–`GND`間の短絡検出 | 電源off状態（ESP32・moduleとも無給電）で、moduleの`VCC`（`ACCEL-01`は`Vs`／`VDD`、`ENV-01`は`VDD`）pinと`GND` pin間の抵抗をテスターで測り、**プローブを当てた瞬間だけでなく、数秒間読みの変化を観察する** | **低いまま動かない場合を短絡とする。**それ以外（読みが低い値から始まり時間とともに上昇していく場合、または**最初から高い値で安定している場合**（decoupling capacitorの容量が小さく、充電がテスターの反応時間より速く完了した場合に起こりうる。特に`ENV-01`の0.1 µFのような小容量で典型的）を指す）はいずれも正常とする。**判定に効くのは「低いまま停滞するか否か」だけであり、上昇が観測できたかどうかそのものではない。**どの挙動を観察したかを記録する。上記2項目が使う2 kΩ閾値（`VCC`が独立電源でないことの確認、信号線の意図しない導通の検出）とは目的が異なり、**電源経路そのものの短絡故障を検出する**ための項目である |
+| 2 | `DISP-01`限定 | 一覧との目視照合 | 実際の配線（breadboard／jumper）を、[sensor-datasheet-notes.md](sensor-datasheet-notes.md)の`pin定義（LCDWiki公式User Manual原文、9pin。touch用5pinを除く）`と本文書の`信号inventory`（`LCD-*`各行）へ1本ずつ照らす | `VCC`／`GND`／`LCD-CS`／`LCD-RST`／`LCD-DC`／`LCD-MOSI`／`LCD-SCLK`／`LCD-BL`／`LCD-MISO`の9本すべてが表と一致すること。touch用5本（`T_CLK`等）は未配線であること（[#14](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/14)の範囲であり、この段階では接続しない） |
+| 3 | `DISP-01`限定 | 逆極性・電圧違いpinの確認 | `VCC`が3.3 V系統以外（5V rail等）へ繋がっていないこと、`GND`がGND以外へ繋がっていないこと、信号pin（`CS`／`RESET`／`DC/RS`等）へ電源ラインが誤配線されていないことを、上記1・2の結果と照らして確認する | すべて一致すること。1本でもずれがあれば通電しない |
+| 4 | `DISP-01`限定 | 給電経路の重複確認 | `DISP-01`の`VCC`が単一の給電源だけから受電する構成になっており、複数の電源（USBの5V、`3V3` pin、外部3.3V電源の複数台）が同時に`DISP-01`へ到達しないことを確認する。**給電元は経路によって異なる。**B-2b（外部の3.3 V電源。`3V3` pinは使わない）を採る場合は[power-budget.md](power-budget.md)の`B-2b を採る決定と MSP2807 の電流制限（2026-09-07）`節を、ESP32自身の`3V3` pinから給電する場合（[#461](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/461)、2026-09-23承認）は同文書の`DISP-01`追加接続のbring-upの手順（ESP32`3V3` pin給電、`#461`承認範囲）節を、それぞれ参照する。**どちらの経路を採るかで「単一」の基準となる給電源が変わるだけであり、判定基準（単一経路であること）自体は経路によらず同じである。**この項目は`DISP-01`固有であり、`ACCEL-01`／`ENV-01`の給電経路には適用しない**（項目7の対象） | 単一経路であること |
+| 5 | `ACCEL-01`／`ENV-01`限定 | 一覧との目視照合 | 実際の配線（breadboard／jumper）を、[sensor-datasheet-notes.md](sensor-datasheet-notes.md)の`module boardの値（秋月 M-06724）`の`pin列`（ADXL345、`CS`／`Vs`／`GND`／`VDD`／`INT1`／`INT2`／`SDO`／`SDA`／`SCL`）と`Environmental sensor`節のpin配列（BME280、`VDD`／`GND`／`CSB`／`SDI`／`SDO`／`SCK`。**同節冒頭は出典としてBosch BME280 Data SheetとAE-BME280製品説明書を挙げているが、pin配列行自体には行単位の出所（silkの現物観察か資料の転記か）が明記されていない。****`SDI`＝SDA相当、`SCK`＝SCL相当という対応は、同文書の`jumper（AE-BME280）`節（`J1`＝I2C時のSDA用プルアップ選択、その実装状態を`VDD`↔`SDI`間の導通で判定。`J2`＝I2C時のSCL用プルアップ選択、`VDD`↔`SCK`間で判定）が既に対応付けている**）へ1本ずつ照らす。**`SDA`／`SCL`（`ACCEL-*`／`ENV-*`）の4本は、GPIOへ接続する信号として本文書の`信号inventory`（`ACCEL-SDA`／`ACCEL-SCL`／`ENV-SDA`／`ENV-SCL`各行）とも照らす。**`CS`／`CSB`／`SDO`／`INT1`／`INT2`はGPIOへ接続せず固定railへ配線するか、この段階では未配線のいずれかであるため、`信号inventory`とは照合しない | 配線した各pinが表と一致すること。**`SDO`は「未配線」ではなく`GND`へ配線が必要である。**firmwareは`ACCEL-01`のI2C addressを`0x53`、`ENV-01`のI2C addressを`0x76`へhardcodeしており（`firmware/esp32/src/main.rs`。両addressとも`SDO`→`GND`を前提とする値）、`SDO`の配線先が異なれば期待するaddressで応答しない。**`ACCEL-IRQ`（[信号inventory](#信号inventory)、GPIO35。ADXL345の`INT1`／`INT2`のどちらか一方を将来使う計画）は、現行の`run_i2c_bringup`（Device ID読み出しのみ、割り込み処理を行わない）では使わないため、この段階のbring-upでは`INT1`／`INT2`とも未配線でよい**（どちらを`ACCEL-IRQ`に使うかは割り込みを使う段階で決める。この段階では両方未配線のため`信号inventory`との照合対象にならない）。**`CS`（ADXL345）／`CSB`（BME280）は「未配線」ではない。**`CS`はI2Cモード選択のため`VDD I/O`（IC pin名）へ配線が必要である（`firmware/esp32/src/main.rs`の`run_i2c_bringup`のdoc comment、Analog Devices ADXL345 Data Sheet Rev. 0「I2C mode is enabled if the CS pin is tied high to VDD I/O」）。**M-06724のheader silkに`VDD I/O`という表記のpinは無い。**headerには`VDD`のみがあり、`Vs`と`VDD`は2026-09-05の非通電導通測定で同一netと確認済みである（[tbd-register.md](tbd-register.md)の`HW-TBD-004`(5)。IC側の`VS`／`VDD I/O`それぞれへの直結か、直列抵抗が入るかは未確認のまま残る）。**したがって現物での配線先はheader上の`VDD`である。**`CSB`はI2Cモード選択のため`VDD`へ配線が必要であり、AE-BME280では`J3`のはんだジャンパで行う（[sensor-datasheet-notes.md](sensor-datasheet-notes.md)の`jumper（AE-BME280）`節）。**`J3`は2026-08-22の現物確認で開放のままである**（[tbd-register.md](tbd-register.md)の`HW-TBD-005`。**このjumperのはんだ付けはこの手順の対象外であり、別途実施が要る**）。**2026-09-22追記: この別途の実施は完了した。実施日・状態・根拠の水準は[sensor-datasheet-notes.md](sensor-datasheet-notes.md)の`J3をはんだ付けした（2026-09-07）`節が持つ。ここへ再掲しない。****したがって`ENV-01`の`CSB`→`VDD`は、`J3`未はんだを理由に対象外とする必要がなくなった。****ただし未接合の可能性を判定していないため、電気的に繋がっていることをこの追記は主張しない。****ただしこの項目5は非通電での現物確認を求めるものであり、その確認自体はこの手順の実施時に行う**（正本節が明記するとおり、この変更を書いたAIセッションは`J3`の閉を確認しておらず、測定点・レンジ・読みの記録も残っていない）。**はんだ付けの品質（ブリッジ・未接合・隣接pinへの流れ）も判定されていない。****`J3`のはんだパッドが基板上でどの銅箔と隣り合うかの記録はリポジトリに無いため、ブリッジがどこへ届きうるかをここで判定しない。****判定せずに、同じ表の項目1（`VCC`–`GND`間の短絡検出。`ENV-01`も対象）をこの手順の実施時に行う。**項目1は`共通（DISP-01／ACCEL-01／ENV-01）`の行であり、`ENV-01`については`VDD`pinと`GND`pin間を非通電で測って「低いまま動かない場合を短絡とする」と定めている（同行の判定基準）。**項目1はこの手順の実施時に行う項目であるため、2026-09-07のはんだ付けより後の現物を測ることになる。****ただし項目1が拾うのは`VDD`–`GND`間の短絡だけである。****未接合（導通していない）や`CSB`以外の隣接pinへの流れは、項目1の判定基準の対象ではない。****この変更ではそれらの判定基準を足していない。**残ることとして挙げる。 |
+| 6 | `ACCEL-01`／`ENV-01`限定 | 逆極性・電圧違いpinの確認 | `VDD`／`Vs`が3.3 V系統（ESP32の`3V3` pin。[#445](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/445)の2026-09-22承認）以外（5V rail等）へ繋がっていないこと、`GND`がGND以外へ繋がっていないこと、信号pin（`SDA`／`SCL`相当を含む）へ電源ラインが誤配線されていないことを、上記1・5の結果と照らして確認する | すべて一致すること。1本でもずれがあれば通電しない |
+| 7 | `ACCEL-01`／`ENV-01`限定 | 給電経路の重複確認 | 各moduleの`VDD`／`Vs`が単一の給電源（[#445](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/445)の2026-09-22承認により、この2点に限りESP32自身の`3V3` pinを使う。[power-budget.md](power-budget.md)の`B-2b を採る決定と MSP2807 の電流制限（2026-09-07）`節の2026-09-22追記）だけから受電する構成になっており、複数の電源（USBの5V、外部3.3V電源等）が同時に到達しないことを確認する。**この項目は`ACCEL-01`／`ENV-01`限定であり、`DISP-01`には適用しない**（項目4の対象） | 単一経路であること |
+
+**実施者はいずれも人間である。**AIはcommandとchecklistを準備するだけであり、物理的な
+結果の確認は人間が行う（[Hardware Safety Policy](../governance/hardware-safety-policy.md)
+「7. 人間の監視が必要な操作」）。結果は[experiment-log.md](experiment-log.md)へ
+`EXP-0xx`として記録する（この文書自身には実測値を書かない）。
 
 ### MSP2807のlogic IOが3.3Vで動作することを現物で確認した
 
@@ -708,3 +772,12 @@ environment sensor、servo、ADC測定、UART）にGPIO番号が入っており�
 | 2026-09-06 | 30 | [#2](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/2)。**PR #358へ手動で依頼したCodeRabbit reviewの指摘2件を反映した。**(a) `信号inventory`の`ACCEL-SDA`行が、初回bring-upのmode決定（Standard-mode、Revision 27）の後も「400kHz(Fast-mode)を想定、要実測」というmode決定前の記述のままだった。**Standard-mode採用と、Fast-modeへ変更する場合はpull-up再設計が要る旨へ訂正した。**(b) checklist「Moduleのpull-upを並列合成した実効抵抗が有効範囲内である」を、Revision 27で「Standard-mode採用により実配線の`Cb`を測らなくても有効範囲内」として`[x]`にしていたが、**この判定は不十分だった。**`Rp(max)`約2.945 kΩ（Standard-modeの規定`Cb`上限400 pFから導いた値）は**rise timeの制約から`Rp`側で導いた上限であり、実配線の`Cb`が規定上限400 pFの範囲内であることを示すものではない。**実構成`Rp`（約2.42 kΩ）を使えばrise timeの制約だけなら`Cb`は約488 pFまで許容されるが、**Standard-modeの`Cb`上限400 pFがrise time以外の制約（fall time等、`Rp`の選定では動かせない可能性がある制約）にも由来するかどうかを、この文書が引用した一次資料（`tr`／`Cb`／`IOL`の列のみ）の範囲では確認できていない。**したがって、実配線の`Cb`が400〜488 pFの間にある場合、rise timeの計算は通ってもStandard-modeとして規定範囲内と言い切れない可能性が残る。**mode決定（Standard-mode採用）自体は取り消さない**（初回bring-upの選択としては変わらず有効）が、**この checklist項目は`Cb`の実測または設計上の根拠を得るまで未達へ戻した。**文書冒頭`状態`行も未達7件へ戻した。**受け入れ条件5件目（I2C addressとpull-upに互換性がある）の判定は変えていない。**同判定は`Rp(min)`（`Cb`／modeによらず常に成立し、素子の破損に至らないことの根拠）に基づくものであり、今回reopenしたのは`Rp(max)`側（通信の正しさに関わるが、外れても安全要件5項目には該当しない一般値tierの論点）である | PR #358のCodeRabbit手動review（2026-09-06、`@coderabbitai full review`） |
 | 2026-09-06 | 31 | [#2](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/2)。**競合checklistの2項目（MSP2807のlogic IO確認、ESP32電源投入前に外部moduleがpinをdriveしないこと）が確認方法を持っていなかったため、`実機check（電源off）の確認方法`節を新設して定義した。**`#2`本文の範囲（電源offでの導通とpin header対応だけ）を超えないこと、推測禁止（一般値や記憶で判定基準を作らない）を守った。**(1) driveしないことの確認は、非通電の導通checkだけで判定できると判定した。**周辺module3点はいずれもESP32の`3V3` pinから給電され独立電源を持たない（[power-budget.md](power-budget.md)の測定点定義）ため、ESP32電源offの状態では周辺moduleも無給電であり、無給電のICは内部topology（`HW-TBD-004`の直列抵抗未追跡、MSP2807の`U1`経路未追跡）によらず能動的にdriveできない。**したがってmodule側の出力段の性質はこの判定に効かない。**確認すべきは(a)module電源pinがESP32の`3V3`と同一netであること（独立電源が無いこと）、(b)pin header対応（配線ミスが無いこと）の2点であり、測定点・計器・判定基準を表にまとめた。**(2) MSP2807のlogic IO確認は、メーカー記載（3.3 V TTL）だけでは足りないと判定した。**`DISP-01`のVCCはESP32の3.3 V rail（3.234–3.366 V）から給電されるが、[power-budget.md](power-budget.md)が2026-09-06に確認したとおり同rail電圧では`DISP-01`board上の`U1`（3.3 V LDO）は常時dropout領域にあり、出力は3.3 Vへ完全収束しない。**controller IC（ILI9341／XPT2046）が`U1`出力側から給電されているかVCC直結かは、どちらの一次資料にも記録が無い。**したがってメーカー記載はこのboardの実際のlogic供給node電圧を保証しない。**非通電で追加確認できる方法（`U1`出力側の脚とcontroller IC電源pinの導通追跡）を1つ定義したが、backlight LED給電経路の追跡（`R5`／`Q1`）がすでに部品サイズを理由に非通電では決められないと結論しており、同程度のIC pinで同じ制約に当たる可能性が高いことも明記した。**解決しない場合、残る手段は通電を伴う実測であり`#2`の範囲を超え、実際の動作確認はLCD bring-up（`#13`）で行うと整理した。**PMの検査を受け、2点を追記した。**(a) (1)の項目へ「見ていないもの」を明記した。**`ACCEL-01`の`01C`（10 kΩ×4）のような module側pull-upがESP32起動時levelへ与える影響は、この項目（moduleが能動的にdriveしないこと）の対象外であり、`起動時状態を確定させる外部pull`節とbootstrap pinのreviewが扱う範囲であると書き分けた。**(b) (2)へ、ILI9341とXPT2046のdatasheetを2026-09-06に新たに取得し`VOH`（それぞれ`0.8×VDDI`、`IOVDD×0.8`）を確認したうえでの計算を追記した。**ESP32の`VIH`（rail 3.234–3.366 Vで2.4255–2.5245 V）と突き合わせると、logic供給nodeが`VCC`直結なら約160–170 mVの余裕があるが、`U1`出力経由（dropout、約2.99 V）なら`VOH`min約2.392 Vとなり約34–133 mV不足する。**計算だけではこの項目を閉じられず、答えは非通電追跡（logic供給nodeの特定）に懸かっていることを示した。**あわせて、ESP32からmoduleへの向き（`SCLK`等）はどちらのnode想定でも余裕があり、不足しうるのはmoduleからESP32への向き（`DOUT`／`PENIRQ`等）だけであることも明記した。**GPIO割り当てそのものは変えていない | PM（deskcat-f2）の追加依頼・検査、`WORK-INSTRUCTIONS-BENCH-2026-09-06.md`（PM作成、gitignore対象）、[power-budget.md](power-budget.md)、[sensor-datasheet-notes.md](sensor-datasheet-notes.md)、[ILI9341 Datasheet V1.11](https://cdn-shop.adafruit.com/datasheets/ILI9341.pdf) §18.2.1（2026-09-06取得）、[XPT2046 Datasheet](https://grobotronics.com/images/datasheets/xpt2046-datasheet.pdf)（2026-09-06取得） |
 | 2026-09-07 | 32 | [#2](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/2)。**`#2`のclose作業。**(a) 残っていた7本の抵抗（ADC分圧器4本、外部pull3本。`ADC-5V`／`ADC-3V3`分圧器`10 kΩ`×4、`ACCEL-SDA`／`ACCEL-SCL`pull-up`4.7 kΩ`×2、`LCD-BL`pull-down`4.7 kΩ`×1）をブレッドボードへ実装した。配線色は`ADC-5V`＝青、`ADC-3V3`＝白、`ACCEL-SDA`＝青、`ACCEL-SCL`＝緑、`LCD-BL`＝紫（人間の申告）。**抵抗の個別実測（DT830B）は行わない。**5%許容差の着荷済み品であり`Rp`等の余裕は桁で足りるため、人間と合意のうえ個別実測をしないと決めた。**やっていないことをやったと書かないため、この決定自体を記録する。**(b) `EN`を押し続けてESP32をresetに保持した状態で、`LCD-CS`(GPIO22)＝3.31 V、`LCD-RST`(GPIO16)＝3.31 V、`TOUCH-CS`(GPIO21)＝3.31 V、`LCD-BL`(GPIO4)＝0.00 Vを実測した（いずれも`EN`押下の有無で値が変化しないことを確認。`fc42332`の`SERVO-PWM`測定と同じ方法）。**2026-08-29の実測はpull-upの効果とfirmwareのHigh駆動を区別できていなかったが、今回`EN`保持により切り分けた。**記録は[experiment-log.md](experiment-log.md)の`EXP-011`。(c) **PM（`deskcat-f2`）が2026-09-07に`#2`のclose条件を再スコープした。**checklist項目3（I2C実効pull-up有効範囲）と項目5（外部moduleがpinをdriveしないこと）は、いずれもmoduleをESP32へ配線することが検証の前提であり、`初回bring-upの範囲`節が定める`#2`の範囲に含まれないため、close条件から外した（満たすのはmoduleを配線した時点。`#13`／`#15`／`#16`側）。**項目4（MSP2807のlogic IO）も、`#360`自身が「`R5`／`Q1`と同じ理由で決まらない可能性が高い」としていることと、`#2`本文の受け入れ条件7件のどれにも対応せず安全要件5項目にも該当しないことから、追跡を試みず`#13`（LCD bring-up）の通電実測へ送った。**checklistからは削除せず、理由と送り先を項目の記述へ書き足した。**文書冒頭`状態`行を、`#2`のclose条件（達成した4件）と、close条件ではない3件（module配線時に満たす）とに分けた。**`#2`のclose条件（項目1・2・6・7）はすべて達成した。**(d) [sensor-datasheet-notes.md](sensor-datasheet-notes.md) Revision 12にあった誤りをRevision 14で訂正した（Revision 12の本文は書き換えていない。詳細は同文書のRevision履歴）。**`U1`の脚の識別結果（`VCC`／`GND`導通による入力／GND／出力の判定）は電気的関係に基づく再現可能な識別であり、有効なまま残す** | 人間の現物作業（配線、`EN`保持測定）、PM（deskcat-f2）の判定（2026-09-07）、[experiment-log.md](experiment-log.md) `EXP-011` |
+| 2026-09-22 | 33 | [#13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)。**`実機check（電源off）の確認方法`節へ、`電源pinの短絡・誤配線の確認（非通電）`小節を追加した。**既存2項目（driveしないこと、pin header対応）は信号pinの導通を扱うが、`DISP-01`初回通電に先立つ`VCC`–`GND`間短絡検出・一覧との目視照合・逆極性確認・給電経路の重複確認は電源経路そのものを扱うため対象が異なり、分けて追加した。新しい数値の正はここに置かず、[sensor-datasheet-notes.md](sensor-datasheet-notes.md)の`pin定義（LCDWiki公式User Manual原文）`と[power-budget.md](power-budget.md)のB-2b決定を参照するだけである | 新規追加（LCD bring-up作業） |
+| 2026-09-22 | 34 | [#13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)。**PM（`#0PM`）の指摘を受け、Revision 33の項目4（給電経路の重複確認）を`DISP-01`限定と明記した。**`ACCEL-01`／`ENV-01`が`3V3` pinから給電する構成を採るかは別途[#445](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/445)で扱われており、同じ節が異なる給電経路を一般則のように書いてしまうことを避けるため、項目名と本文へ`DISP-01`限定である旨を追記した。この文書は`#445`の決定を先取りしない | PM（`#0PM`）の指摘 |
+| 2026-09-22 | 35 | [#13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)。**`#15`／`#16`のsessionが見つけた事実（PM（`#0PM`）経由）を受け、Revision 33の項目1（`VCC`–`GND`間短絡検出）の判定基準を訂正した。**`EXP-013`試験0（[experiment-log.md](experiment-log.md)）を開いて確認したところ、放電した状態の別対象へプローブを当てた瞬間は0 Ω付近を示し、decoupling capacitorの充電が進むにつれ値が上昇して安定する現象と、瞬時値を導通の判定に使うと正常品を短絡と誤判定しかけたという教訓が記録されていた。**固定した抵抗値のしきい値（当初「数Ω以下」としていた）では、この現象を持つ正常なmoduleを短絡と誤判定しうる。**`DISP-01`（MSP2807）で同じ挙動が起きることは確認されていないが（[sensor-datasheet-notes.md](sensor-datasheet-notes.md)の`Local decoupling`節、MSP2807行は`TBD`）、起きうるものとして扱い、判定基準を「読みが低い値から始まり上昇していく＝正常」「低いまま動かない＝短絡」という挙動ベースへ変更した | `#15`／`#16`のsession、PM（`#0PM`）の指摘、[experiment-log.md](experiment-log.md)の`EXP-013`試験0 |
+| 2026-09-22 | 36 | [#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)／[#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16)。**`電源pinの短絡・誤配線の確認（非通電）`表へ、`ACCEL-01`／`ENV-01`向けの項目5〜7を追加し、節の前書きと項目1の説明段落を`DISP-01`限定の記述から周辺module3点を対象とする記述へ書き直した。**表へ`対象`列を追加し、各行が共通／`DISP-01`限定／`ACCEL-01`・`ENV-01`限定のいずれかを判別できるようにした。項目1（`VCC`–`GND`間短絡検出、Revision 35で挙動ベースへ訂正済み）の判定基準そのもの（2値：上昇して安定＝正常、低いまま動かない＝短絡）は作り直さず、`ACCEL-01`／`ENV-01`にもそのまま適用する形で参照した。ただしfresh-context自己レビューでの訂正を経て、判定基準に3つ目の帰結（最初から高い値で安定している場合も正常）を追加し、説明段落（`DISP-01`より`ACCEL-01`／`ENV-01`の方が根拠が強い点、`EXP-013`の引用範囲）も書き直している。項目5〜7の判定基準・照合先は、PM（`#0PM`）の指摘とfresh-context自己レビュー（1〜13巡目）を経て複数回訂正されている。**個々の指摘内容と巡ごとの件数はこの行では再掲しない**（本文が正であり、数値・pin名をここに書き写すと本文の版が変わるたびに乖離するため。実際にこの行の旧稿は、本文で訂正済みのpin名・現象の記述をそのまま複製しており、本文と食い違っていた）。収束（新規指摘0件が2巡連続）には至っていない時点でこのRevisionを記録しており、**引き続き自己レビューを継続する** | [#445](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/445)の2026-09-22承認、[sensor-datasheet-notes.md](sensor-datasheet-notes.md)、[tbd-register.md](tbd-register.md)の`HW-TBD-004`／`HW-TBD-005`、`firmware/esp32/src/main.rs`、PM（`#0PM`）の指摘、fresh-context自己レビュー（1〜13巡目） |
+| 2026-09-22 | 37 | [#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)。UART0関連の用途記述（`ESP32の使用制限pin`表の`UART0`行、`信号inventory`の`UART-TX`／`UART-RX`行とその`共有先`列、`競合check`の該当項目）を書き直した。**旧記述「firmware flashingとdebug log専用」「Pi linkはこの2本を使わない」は誤りだった。**USB-UARTブリッジがUART0（GPIO1／GPIO3）へ内部接続すること自体はRevision 4（2026-08-05）から記録済みだったが、**Pi linkがそのUSB serial経由で同じUART0を使うことをこの用途記述へ反映していなかった**（`#446`調査で判明）。**GPIO割り当てそのものは変えていない。**設計の詳細は`docs/protocol/esp32-pi-protocol.md`§2、`firmware/esp32/src/console.rs`参照。**実機へflashしての確認はしていない。**（本Revisionの番号は、rebase前に`#15`／`#16`が既に使っていた「36」との衝突を避けるため37とした。両者は互いに独立した変更である。） | [#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)、`firmware/esp32/src/console.rs` |
+| 2026-09-22 | 38 | [#453](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/453)（[#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16)の残件1件の記録。**`#16`自体はcloseしない**）。**`ENV-01`（AE-BME280）の`J3`が2026-09-07にはんだ付けされていたことが、2026-09-22にユーザーの言明で判明した。****実施から15日間、この文書は`J3`を`開放`・`はんだ付けが要る`と書き続けていた。****正本のどこにも、はんだ付け済みであるという記録が無かった**（この文書・[sensor-datasheet-notes.md](sensor-datasheet-notes.md)・[tbd-register.md](tbd-register.md)・Issue `#16`は`未実施`／`開放`と書き、[experiment-log.md](experiment-log.md)は`J3`に関する記述を1件も持っていなかった。**誤りではなく不在である**）。この文書はjumper実装状態の正本ではないため、**状態そのものと確認方法はここへ再掲せず、正本（[sensor-datasheet-notes.md](sensor-datasheet-notes.md)の`J3をはんだ付けした（2026-09-07）`節、Revision 16）を指す追記を4箇所へ入れた。**(a) `信号inventory`の`ENV-SDA`行（`ENV-SCL`は`同上`で追従する）。(b) `Bus計画`の`I2C sensor bus`行。**実効pull-upの計算にBME280側の4.7 kΩを入れるかどうかは`J1`／`J2`で決まり`J3`では変わらないこと、`J1`／`J2`の現在の状態は正本が持つことを明記した。**(c) `電源pinの短絡・誤配線の確認（非通電）`の項目5の判定基準。**`ENV-01`の`CSB`→`VDD`は`J3`未はんだを理由に対象外とする必要がなくなったが、未接合の可能性を判定していないため電気的な接続は主張しないこと、項目5が求める非通電での現物確認自体は手順の実施時に行うこと、はんだ付けの品質の判定基準はこの変更で足していないこと**を明記した（正本節が明記するとおり、この変更を書いたAIセッションは`J3`の閉を確認しておらず、測定点・レンジ・読みの記録も残っていない）。(d) `I2C addressの選択`節の「実装は配線であり、`J3`のはんだ付けと同じ機会に行う作業である」。**`J3`は済んだがアドレスの配線が行われた記録は無いため、この前提は少なくとも記録上は成立していない**（**現況をユーザーへ訊いてはいない。記録の不在であって未実施の確認ではない**）。**いつ行うかの代わりの規定は置いていない。****`J3`以外の項目の現在の状態は正本の`closeまでに要ること（実装と確認を含む）`表が持つ。ここへ再掲しない。****2026-08-22時点の記述は1箇所も書き換えていない。****GPIO割り当ては変えていない。****`J1`／`J2`をはんだ付けするかの判断（`bus容量Cb`待ち）も動かしていない** | ユーザーの言明（2026-09-22）、[sensor-datasheet-notes.md](sensor-datasheet-notes.md) Revision 16、[experiment-log.md](experiment-log.md) `EXP-014` |
+| 2026-09-23 | 39 | [#13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)。**`電源pinの短絡・誤配線の確認（非通電）`表の項目4（給電経路の重複確認）を更新した。**旧記述は「採用済みの経路はB-2b」と、`DISP-01`の給電経路をB-2b（外部の3.3 V電源）だけに固定して書いていたが、[#461](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/461)（2026-09-23）でESP32自身の`3V3` pinからの通常接続も認められたため、この記述は経路を1つに限定できなくなった。**判定基準（単一経路であること）自体は変えず**、給電元がB-2bか`3V3` pinかで参照先の節が変わることを明記し、[power-budget.md](power-budget.md)の新設節（`DISP-01`追加接続のbring-upの手順、`#461`承認範囲）へ相互参照を足した。**項目2・3（一覧照合、逆極性確認）はいずれの経路でも判定内容が変わらないため触っていない。****GPIO割り当て・他項目の判定基準は変えていない** | [#461](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/461)、[power-budget.md](power-budget.md)の`DISP-01`追加接続のbring-upの手順（ESP32`3V3` pin給電、`#461`承認範囲） |
+| 2026-09-23 | 40 | [#13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)。**`module電源pinの独立性`行の直後にある`DISP-01`の扱いを訂正した。**旧記述は「`DISP-01`はこの節の対象外」と一律に書いていたが、同じ行自体は`DISP-01`の`VCC`を測定対象に含めている。B-2b経由（`3V3` pinを使わない）では測定自体が発生しないため対象外という説明は成立するが、[#461](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/461)（2026-09-23）でESP32自身の`3V3` pinへの通常接続が認められたため、その経路では`ACCEL-01`／`ENV-01`と同様にこの測定が未実施のまま残ることを明記した。測定自体は`power-budget.md`の`DISP-01`追加接続のbring-upの手順が扱う。**表の判定基準・GPIO割り当ては変えていない** | [#461](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/461)、[power-budget.md](power-budget.md)の`DISP-01`追加接続のbring-upの手順 |
+| 2026-09-24 | 41 | [#472](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/472)（[PR #471](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/471)のCodeRabbit review指摘）。`I2C sensor bus`行が、実効pull-upの値が決まらない理由に「ADXL345側のpin接続」と「採るmode」を数え、残作業にも「ADXL345側のpin接続の確認」を挙げていた。前者は2026-08-27に、後者は2026-09-06に確定済みであり（`I2C busの実効pull-up`節の`確定した入力・まだ確定できない1つの入力`）、**残る入力は`Cb`の1つである**と同じセルの末尾へ日付つきで追記した。あわせて、同節の「まだ確定できない2つの入力」（残る入力の数）と「実配線が存在しない」（`EXP-015`で配線済み）、`競合check`節の「実配線の`Cb`が存在しない現状」の計3箇所へ、日付つきの追記を入れた。**既存の文言は書き換えていない。****値そのもの、判定基準、GPIO割り当ては変えていない** | PR #471のreview thread、同文書の`I2C busの実効pull-up`節 |

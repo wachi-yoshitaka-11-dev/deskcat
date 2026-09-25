@@ -1,13 +1,19 @@
 #!/usr/bin/env python3
 """hookが受け取ったcommand文字列から、目的のprogramの呼び出しを取り出す。
 
-`hooks/`配下の他の8 hookが使う。**同じ判定を各hookへ複製しない。**
-**`invocations`を使うのは7 hookである。`truncation_guard.py`だけが使わず、`tokenize`／
+`hooks/`配下の他の9 hookが使う。**同じ判定を各hookへ複製しない。**
+**`invocations`を使うのは8 hookである。`truncation_guard.py`だけが使わず、`tokenize`／
 `SEPARATORS`／`TRANSPARENT_PREFIXES`／`is_program`を直接使う。**`invocations`を変えると
-7 hook、語の切り方（`tokenize`）を変えると8 hook全部の判定が動く。
+8 hook、語の切り方（`tokenize`）を変えると9 hook全部の判定が動く。
 
 **hookの入力からcommandを取り出す`command_from`も持つ。**payloadの形の検査を
 各hookへ複製しないためである（#242）。
+
+**global optionの読み飛ばし（`skip_global_options`／`global_option_value`）も持つ。**
+**`inspector_readonly_guard.py`を除く8 hookが使う。**subcommandを位置で読む hook は、
+`gh --repo o/r pr create`のように**global optionを1語足すだけで検査が抜ける**
+（2026-09-17に`gh_metadata_guard.py`で実測。#325）。
+**`truncation_guard.py`はこれと`tokenize`系だけを使い、`invocations`は使わない。**
 
 **語がcommand位置にあるかを見る。**単に`gh`という語を探すと、`echo gh pr merge`のような
 引数を呼び出しと読んでしまう。実際にそれで`merge_trailer_report.py`が誤報告し、
@@ -59,6 +65,7 @@ Issueで書いたものを含み、日付の無いものが同じ日の測定だ
 `shlex`とbashの挙動はどちらも実装依存である。**版が変われば測り直す。**
 """
 
+import os
 import shlex
 
 # commandの区切り。ここより後ろは新しいcommandとして読む。
@@ -410,6 +417,106 @@ def _invocations_in(command, program):
     if current is not None:
         found.append(current)
     return found
+
+
+# `git`／`gh`は、subcommandの前にglobal optionを取れる（`git -C <path> log`／
+# `git -c key=value reset`／`gh --repo <owner/repo> pr list`）。**値を伴うものと
+# 伴わないものを分ける。**取り違えると、値の方をsubcommandの語として読む。
+GLOBAL_VALUE_OPTIONS = {
+    # `--git-dir`／`--work-tree`／`--namespace`／`--config-env`／`--super-prefix`は値を次の語で
+    # 取れる（`--git-dir=X`の形も取れる。git 2.34.1で確認）。**1語として飛ばすと値の方をsubcommandとして読み、
+    # `git --git-dir X push`を`push_gate.py`が検査しない**（#472。PR #471のreview指摘）。
+    "git": ("-C", "-c", "--git-dir", "--work-tree", "--namespace", "--config-env", "--super-prefix"),
+    "gh": ("--repo", "-R"),
+}
+
+# 値を取らないglobal option。**`-p`は`git`では`--paginate`である**（subcommandの
+# `-p`とは別物であり、subcommandより前に現れたものだけをここで読む）。
+GLOBAL_FLAGS = {
+    "git": ("-p", "-P", "--paginate", "--no-pager", "--bare"),
+    "gh": (),
+}
+
+
+def _global_prefix(tokens, program):
+    """global optionの並びを読み、`(subcommandが始まるindex, 値の対応)`を返す。
+
+    **`-C`は重ねるとつなぐ。**gitは相対pathの`-C`を前の`-C`からの相対で解決するため、
+    `git -C a -C b`は`a/b`を指す（絶対pathならそこから始め直す。空の`-C ""`は何も変えない）。
+    **最後の値だけを残すと、別のtreeを検査する**（#472）。それ以外のoptionは、
+    複数回現れたら最後の値を残す。
+
+    `--git-dir=X`のように値を`=`でつないだ1語も、値として読む。
+    """
+    value_options = GLOBAL_VALUE_OPTIONS.get(program, ())
+    flags = GLOBAL_FLAGS.get(program, ())
+    values = {}
+    index = 0
+    while index < len(tokens):
+        token = tokens[index]
+        if token in value_options:
+            if index + 1 < len(tokens):
+                _record_value(values, token, tokens[index + 1])
+            index += 2
+            continue
+        name, separator, value = token.partition("=")
+        if separator and name.startswith("--") and name in value_options:
+            _record_value(values, name, value)
+            index += 1
+            continue
+        if token.startswith("--") or token in flags:
+            index += 1
+            continue
+        break
+    return index, values
+
+
+def _record_value(values, option, value):
+    """global optionの値を`values`へ入れる。`-C`だけは前の値とつなぐ。"""
+    if option == "-C":
+        if value == "":
+            return
+        previous = values.get(option)
+        values[option] = os.path.join(previous, value) if previous else value
+        return
+    values[option] = value
+
+
+def skip_global_options(tokens, program):
+    """`program`の引数から、subcommandより前に来るglobal optionを読み飛ばす。
+
+    `invocations`が返す引数の並びは、subcommandから始まるとは限らない。
+    `git -C path reset --hard`は`["-C", "path", "reset", "--hard"]`であり、
+    **先頭の語だけを見るhookはこの形を取り落とす。**
+
+    **値を伴うoptionは2語、それ以外の`--`始まりと`GLOBAL_FLAGS`は1語として飛ばす。**
+    値を伴う側を先に見る。逆にすると`gh --repo x pr list`の`x`をsubcommandと読む。
+
+    2026-09-16に[#325](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/325)で`truncation_guard.py`から移した。**2つ目のhookが同じ読み飛ばしを
+    要った時点で、複製ではなくここへ置く**（このmoduleの「同じ判定を各hookへ複製しない」）。
+    **移したのは`truncation_guard.py`の版だが、規則は`push_gate.py`の版に揃えた。**
+    前者は`-C`しか知らず、**`git --no-pager reset --hard`と`git -c key=value reset --hard`が
+    subcommandを取り落として素通りしていた**（2026-09-16実測。git 2.43.0／
+    python3 3.11.15／Linux x86_64）。**私有の版を残さないため、`push_gate.py`も
+    この関数を呼ぶ。**
+
+    **subcommandを位置で読んでいた5 hookも、後からここへ寄せた**
+    （`gh_metadata_guard.py`／`coderabbit_gate.py`／`merge_trailer_report.py`／
+    `stop_claim_guard.py`／`branch_base_guard.py`）。**`gh --repo o/r pr create`で
+    `deny`が素通りすることを実測している**（2026-09-17）。
+    """
+    index, _ = _global_prefix(tokens, program)
+    return list(tokens[index:])
+
+
+def global_option_value(tokens, program, option):
+    """subcommandより前に指定されたglobal optionの値を返す。無ければ`None`。
+
+    `git -C <path> push`の`<path>`を取る。**`skip_global_options`と同じ走査を使う。**
+    別々に書くと、飛ばす語と値を取る語の定義が2つになる。
+    """
+    _, values = _global_prefix(tokens, program)
+    return values.get(option)
 
 
 def command_starts(command):

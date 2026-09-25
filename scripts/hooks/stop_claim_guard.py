@@ -229,6 +229,10 @@ def _gh_invocation_matches(command, subcommand, disqualifying_flags=()):
     mergeの完了ではない）。
     """
     for args in command_line.invocations(command, "gh"):
+        # global optionを外す。理由は`gh_metadata_guard.py`と同じである（#325）。
+        # **このhookは「やった証拠」として読む側である。**外さないと、実際に
+        # 実行したmergeを証拠として数えない側へ倒れる。
+        args = command_line.skip_global_options(args, "gh")
         if tuple(args[:2]) == subcommand and not any(
             flag in args for flag in disqualifying_flags
         ):
@@ -243,6 +247,10 @@ def _git_invocation_matches(command, subcommand, disqualifying_flags=()):
     （`git push --dry-run`は実際には何も送信しない）。
     """
     for args in command_line.invocations(command, "git"):
+        # global optionを外す。**`gh`側と同じ理由である**（#325）。
+        # `git -C <path> push`は実際にpushしている。**外さないと、実際に押した後の
+        # 「pushしました」を証拠なしとして止める側へ倒れる。**
+        args = command_line.skip_global_options(args, "git")
         if args[:1] == [subcommand] and not any(
             flag in args for flag in disqualifying_flags
         ):

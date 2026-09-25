@@ -2,6 +2,11 @@
 
 このディレクトリには、DeskCatの複数領域へ影響する判断、または後から戻すコストが高い判断を置く。
 
+**番号は「次の未使用ID」で採番するため（[新規作成](#新規作成)）、採番順とmerge順は一致しない。**
+一覧に欠番がある場合、多くは採番したPull Requestがまだmergeされていないことを意味するが、
+**採番だけしてmergeされずに終わったPull Requestがあれば、[命名](#命名)の「識別子を再利用しない」
+により番号は永続的に欠番のまま残る。**欠番の理由を機械では判定しない。
+
 ## 一覧
 
 | ADR | Status | 判断 |
@@ -27,6 +32,9 @@
 | [ADR-0019](0019-provenance-scope-by-nature.md) | Accepted | 出所検証の範囲を性質で定め、機械の分類とは一致させない |
 | [ADR-0020](0020-inspector-readonly-by-hook.md) | Accepted | 検査 subagent の read-only を、sandbox ではなく agent 単位の hook で絞る |
 | [ADR-0021](0021-declaration-audit-on-push.md) | Accepted | 宣言 trailer の検出を、hook ではなく共有 branch への push に置く |
+| [ADR-0022](0022-wokwi-not-a-ci-simulation-gate.md) | Accepted | Wokwi を CI の simulation gate として採らない |
+| [ADR-0023](0023-no-model-checking-for-now.md) | Accepted | サーボ安全制限と通信断の状態機械へ、いまモデル検査を導入しない |
+| [ADR-0024](0024-terminology-index-in-single-source-of-truth.md) | Accepted | 用語の索引を、既存の Single Source of Truth 表へ追加する形で置く |
 
 ## 新規作成
 
