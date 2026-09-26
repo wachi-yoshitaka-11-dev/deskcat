@@ -827,6 +827,10 @@ def _check_history(root, base, head, cutover, from_root=False):
 
 
 def main(argv=None):
+    arguments = list(sys.argv[1:] if argv is None else argv)
+    if arguments[:1] == ["session"]:
+        import review_session
+        return review_session.main(arguments[1:])
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "command", choices=("classify", "receipt", "instructions", "history", "gate")
@@ -835,6 +839,7 @@ def main(argv=None):
     parser.add_argument("--base", default="origin/develop")
     parser.add_argument("--head", default="HEAD")
     parser.add_argument("--expect", default="")
+    parser.add_argument("--review-work", help="local Issue-scoped execution record; CI receipts remain declarations")
     # 起点の既定は`DECLARATION_CUTOVER`である。上書きはtestとdry runのためにある。
     parser.add_argument("--since", default="")
     # **`history`専用。**`--base`を使わず`--head`から辿れるcommitをすべて検査する。
@@ -854,6 +859,18 @@ def main(argv=None):
 
     if options.command in ("receipt", "gate"):
         problems.extend(_check_receipt(root, head, computed))
+        if options.review_work:
+            import review_session
+            try:
+                if _git(root, ["rev-parse", head]).strip() != _git(root, ["rev-parse", "HEAD"]).strip():
+                    raise ValueError("--review-work supports the current checkout HEAD only")
+                state = review_session.validate(review_session.read_json(
+                    review_session.state_path(root, options.review_work)), options.review_work)
+                status = review_session.completed(state, review_session.fingerprint(root, base))
+                if status not in REVIEW_TERMINAL or status not in trailers(root, head).get(TRAILER_REVIEW, []):
+                    problems.append(f"review execution record is {status}; it does not support the terminal declaration")
+            except (OSError, ValueError, TypeError, KeyError) as exc:
+                problems.append(f"review execution record unavailable: {exc}")
     if options.command in ("instructions", "gate"):
         instruction_problems, touched = _check_instructions(root, base, head)
         problems.extend(instruction_problems)
