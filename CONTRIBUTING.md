@@ -166,7 +166,9 @@ GitHubのIssue一覧はlabelを常にtitleの横に表示するため、titleに
 何本のPull Requestに割ったかでmilestoneの件数が動く。
 
 boardの`Item closed` workflowは`Status`を`Done`にするが、**日付fieldは更新しない。**
-そのためIssueのclose後は、close実施者が手作業で`Target date`を実績日へ設定する。
+そのためIssueのclose後は、close実施者が`Target date`を実績日へ設定し、APIで読み戻す。
+作成・更新・close/reopen後は[metadata操作手順](docs/runbooks/github-metadata.md)の
+`check`または`apply`で保存された実値を照合する。checkboxだけを設定済みの証拠にしない。
 
 ## Branches
 
@@ -263,9 +265,9 @@ Pull requestには次を含める。
 - 残存riskと`TBD`
 - 無関係なformat変更やrefactorがないこと
 
-作成直後に、boardへitemを追加して次を設定する。**空欄を検出する自動化は無いため、
-ここが唯一のgateである**（詳細は[Pull Request itemの開始日／終了日](#pull-request-itemの開始日終了日)の
-[誰がいつ確認するか](#誰がいつ確認するか)）。
+作成直後に、boardへitemを追加して次を設定し、APIで読み戻す。
+更新や終了後も[metadata操作手順](docs/runbooks/github-metadata.md)の検査を行う
+（確認者は[誰がいつ確認するか](#誰がいつ確認するか)）。
 
 - [ ] `Status`
 - [ ] `Start date`（作成日。JSTで判断する）
@@ -333,7 +335,7 @@ Issue itemでは両fieldが予定であるのに対し、Pull Request itemの`St
 | `Target date` | 作成時はmergeを見込む日（予定）、mergeまたはclose後はその実績日 | 作成時に見込みを設定し、**merge完了後またはclose完了後**に実績値へ更新する |
 
 `Target date`だけが予定から実績へ変わる。merge時に`Status`を`Done`にするworkflowは
-日付を書き換えないため、実績値への更新は手作業で行う。mergeせずcloseした場合の実績日は
+日付を書き換えないため、実績値への更新は操作実施者が行う。mergeせずcloseした場合の実績日は
 close日である。
 
 **Issue itemでも、完了時には空欄を残さない。**起票時に設定した値は予定であり、
@@ -346,7 +348,8 @@ close日である。
 
 #### 誰がいつ確認するか
 
-この2 fieldを強制する自動化は無い。**空欄を検出する仕組みが無いため、次の手作業をgateとする。**
+次の担当者が更新後のAPI実値を検査する。ローカルcommandを通さない操作も`check`/全件`audit`で
+事後検出できるが、すべての経路を強制停止する仕組みではない。API失敗を合格にしない。
 
 | 時期 | 実施者 | 確認内容 |
 |---|---|---|
@@ -358,7 +361,7 @@ close日である。
 **更新は「後」であって「直前」ではない。**merge前に実績日を確定できないためである。JSTの日付を
 またいだ場合や、mergeを中止した場合に、誤った実績日が残る。
 
-**自動化しない。**理由は2段ある。
+**CIによる日付の自動更新は採らない。**理由は2段ある。
 
 1. Projects v2のboard workflowは日付fieldを更新できない。`Status`を`Done`にするworkflowでは書き換えられない
 2. GitHub Actionsから叩く案も採らない。**`GITHUB_TOKEN`はrepository scopeであり、Projects v2へ
@@ -366,13 +369,12 @@ close日である。
    `project` scopeを持つclassic personal access token、またはGitHub Appが必要になる。
    日付2 fieldのためにCIへ長期secretを持ち込む取引は成立しない
 
-したがって**手作業を正式な手順とする。**これは妥協ではなく判断である。
-以後「自動化できるはず」として再検討しない。前提が変わるのは、Projects v2のworkflowが
-日付fieldを扱えるようになったときだけである。
-
-**忘れることが唯一の失敗モードである。**実際に[#71](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/71)・
-[#72](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/72)・[#73](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/73)で
-3件続けて空のままcloseした。**空欄を検出する仕組みは無い。**closeの操作と同じ場面で設定する。
+操作端末の既存認証を使う明示的なcommandで更新・読み戻す方法を正式手順へ加える（#466）。
+従来の手作業限定という結論をこの範囲で改定し、CIへ長期secretを置かない判断は維持する。
+UI/APIで直接操作した場合も読み戻して検証する。空欄だけでなく不一致・取得失敗・部分成功を扱い、
+予定日・担当者・条件付きlabelを推測で埋めない。操作と再開の詳細は
+[metadata操作手順](docs/runbooks/github-metadata.md)へ集約する。
+CIのrepository内field検査はProject・日付の保証ではなく、保護設定の必須化もこの変更に含めない。
 
 ### 自己レビュー
 
