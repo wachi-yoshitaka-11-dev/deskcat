@@ -1,0 +1,37 @@
+name: Metadata audit
+
+# Read-only repository metadata. Projects require local authenticated check.
+# Run trusted base code, never the PR head (including fork PRs).
+on:
+  issues:
+    types: [opened, edited, labeled, unlabeled, assigned, unassigned, milestoned, demilestoned, closed, reopened]
+  pull_request_target:
+    branches: [main, develop]
+    types: [opened, edited, labeled, unlabeled, assigned, unassigned, milestoned, demilestoned, closed, reopened, synchronize, ready_for_review]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+
+jobs:
+  metadata:
+    name: Verify repository metadata (Projects excluded)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.sha }}
+          persist-credentials: false
+      - name: Read back current metadata
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OBJECT_NUMBER: ${{ github.event.issue.number || github.event.pull_request.number }}
+        run: |
+          if [ -n "$OBJECT_NUMBER" ]; then
+            python3 scripts/github_metadata.py check --repository-only --number "$OBJECT_NUMBER"
+          else
+            python3 scripts/github_metadata.py audit --repository-only --output "$RUNNER_TEMP/metadata-audit.json"
+          fi
