@@ -33,16 +33,11 @@ Protocol channelから送信するすべてのbyteは、有効にframe化され�
 - **firmwareがdebug logを止めるより前に生じる起動時出力。**この例外は、UART0をPi–ESP32 protocol channelへ使うbuild（`firmware/esp32`の`pi-protocol-mode` feature）にだけ関係する。既定buildはprotocolのmessageを一切送らないため、この規則自体の対象になるbyteが無い。ESP32のROM／2nd-stage bootloaderの出力、およびESP-IDF自身が`app_main`の前後で出す起動log（`main_task`等）を、個別のsubsystem名で列挙せず、**「firmwareがdebug logを止める処理を完了するまでに出たbyteは、frame化されていなくてもよい」という1つの規則に統一する。**受信側は化けたbyte列の後、改行境界で再同期できる（`crates/deskcat-serial/tests/simulator.rs`のtest群が手書きfixtureで確認している。実機の起動時出力そのものでは未検証であり、改行を含まない不正byte列が後続frameの先頭へ連結するcaseも未検証）。この例外byteをPi側でどう計数するか（§4.6のcounterへの計上要否）は、ここでは規定しない。
 - **Panic handlerの出力（未確認）。**ESP-IDFの既定panic handlerが`esp_log`の経路を通さず直接UARTへ書くかどうかは、一次資料で確認していない。確認しないまま、この例外の対象に含める。理由: panicが起きた時点でfirmwareは既に壊れており、この規則の遵守より原因が見えることを優先する。
 
-**上の2つとは別に、`pi-protocol-mode`（`firmware/esp32/src/console.rs`の`write_line`）が送る行のline endingが、本節の「送信時line ending | `\n`」行を満たさない既知の不一致がある。**これは自由形式logの混入ではなく、正しくframe化されたmessageの行末文字の話であるため、上の2つの例外（frame化されていないbyteの許容）とは性質が異なり、別項として扱う。
+**上の2つ（ROM／bootloader起動出力、panic handlerの出力）とは別に、`pi-protocol-mode`のfirmware application自身が送る行のline endingについて、過去の既知の不一致を記録していた（[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)のPR Aまで）。**PR B（`firmware/esp32/src/boot_session.rs`）は、この不一致をsource上は解消した（下記）。`pi-protocol-mode`がapplication levelで送る行は現状`boot`（`BootSession::send_boot`）のみであり（`console.rs`の`write_line`はPR Bで削除し、他に送信経路は無い）、それ以外の送信経路は無い。**ROM／bootloader起動出力とpanic出力（上の2項目）はfirmware applicationの制御外にあり、この解消の対象外のまま残る。**
 
-1. 本節の規定（`\n`）と、実際にwireへ出るbyte（`\r\n`）が違う。
-2. 原因はESP-IDFのconsole出力の既定`CONFIG_LIBC_STDOUT_LINE_ENDING_CRLF`であり、
-   `firmware/esp32/sdkconfig.defaults`はこれを上書きしていない（vendored ESP-IDF
-   `components/newlib/Kconfig`で確認済み）。
-3. 解消する手段は2つある。`sdkconfig.defaults`で`LF`を指定するか、本節を`\r\n`許容へ
-   改めるか。**このPRではどちらも行わない**（`sdkconfig.defaults`はfirmware全体に効き、
-   他sessionのbring-up buildにも掛かるためこのPRの範囲を超える。本節の改定はprotocolの
-   正本を変える判断であり、別に立てるべきものである）。
+1. 旧経路（`firmware/esp32/src/console.rs`の`write_line`、PR Aまで）は`std::io::stdout()`経由で書いており、本節の規定（`\n`）と実際にwireへ出るbyte（`\r\n`）が違っていた。原因はESP-IDFのconsole出力の既定`CONFIG_LIBC_STDOUT_LINE_ENDING_CRLF`（vendored ESP-IDF`components/newlib/Kconfig`で確認済み）である。
+2. PR Bは`pi-protocol-mode`のUART0を`UartDriver`（interrupt駆動）へ一本化し、送信も`UartDriver::write`（`uart_write_bytes`を直接呼ぶ。esp-idf-hal 0.46.2の`uart.rs`で確認）へ変えた。**`uart_write_bytes`はbyte列をそのまま書き、`CONFIG_LIBC_STDOUT_LINE_ENDING_CRLF`が効くlibc／newlibのstdio層を経由しない。**`encode_line`（`crates/deskcat-protocol/src/decode.rs`）が既に`\n`だけを付与している（206行、`pub fn encode_line`参照）ため、これらのcodeを読んで導いた結論としては、wireへ出るbyteは本節の規定どおり`\n`終端になるはずである。**この結論はsourceを読んで導いたものであり、実機でwireのbyteを測ったものではない**（実機確認はまだ無い。状態はIssue #446の追跡を見る）。
+3. **したがって、この不一致は`pi-protocol-mode`の`boot`送出経路については、source上は解消している。**旧経路（stdio）はPR Bでもう使っていない。実機での確認はまだ無い。
 
 受信側は直前の`\r`を除去する（本節の受信可能なline ending。`crates/deskcat-protocol`の
 `framing.rs`が単体testを持ち、`crates/deskcat-serial/tests/simulator.rs`の
@@ -55,7 +50,9 @@ Protocol channelから送信するすべてのbyteは、有効にframe化され�
 （firmware版・board名・reset reasonの短い文字列のみ）はこの上限に対して大きな余裕が
 あるため実際には起きないが、**一般に「`\r\n`は常に壊れずに復元される」とは言えない。**
 
-**この経路を恒久的な送信経路として扱うなら、この不一致を先に解消する必要がある。**
+上の不一致は`boot`送出経路に限り、source上はPR Bで解消している（本節の直前の3項目を参照。実機での確認はまだ無い）。
+
+**もう2つ、`pi-protocol-mode`（PR B）の既知の逸脱を記録する。**(i) `Ack`以外に届いたframeへ§8の相関ACKを返さない。(ii) §7のParser counterによる区別を、確立前に限り`log`でだけ分類する（`pi-protocol-mode`はloggingを止めているためそれも観測できない）。確立後に届いたbyteは種類を問わず未分類のまま読み捨てる。詳細は`firmware/esp32/src/boot_session.rs`の`BootSession::on_bytes`のdocを参照する。
 
 ## 3. Envelope
 
@@ -1314,6 +1311,7 @@ Framing／parse層について、**host workspaceのRust実装**がfixtureに合
 | 2026-08-18 | Draft 2 sid paths | [PR #146](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/146)のreview指摘。**§3が「`sid`が変わるのはprocessの再起動と衝突検知による選び直しのときだけである」と言い切っていたが、§3.1が定める`運用者の明示的なsession reset`の(2)は、processを動かしたまま新しい`sid`を選ぶ。**言い切りに当てはまらない経路が存在し、hostとfirmwareが違う実装をしうる。§3を3経路（process再起動／衝突検知による選び直し／運用者の明示的なsession reset）へ揃え、**§3.1が禁じているのは枯渇を理由にした自動の切り替えであって外部操作の経路ではない**ことを明記した。**wire formatは変更していない。規則を増やしてもいない**（既に§3.1にある経路を§3の一覧へ入れただけである） |
 | 2026-09-22 | Draft 2 uart0 exception | [Issue #446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)。ESP32のUART0がdebug logとPi–ESP32 protocol channelを兼ねる（USB-UARTブリッジが両方を同じ物理lineへ内部接続する）ことに対応するため、§2へ2つの既知の例外を追記した。**`silence_logging`（`firmware/esp32/src/console.rs`）の呼び出しが完了するまでに生じる起動時出力**（ESP32のROM／2nd-stage bootloader出力、ESP-IDF自身の起動log）と、**panic handlerの出力（ESP-IDFの経路が`esp_log`を通すかどうか未確認）**の2つである。firmware側はbuild時のfeature（`pi-protocol-mode`）で、debug logとprotocol streamを同時に出さない設計にした（同fileのdoc参照）。**§2の主規則（自由形式logでJSON lineを分断してはならない）自体は変更していない。**wire formatも§3の数値・規則も変更していない |
 | 2026-09-25 | Draft 2 esp32 sid | [Issue #446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)のPR A。`PROTO-TBD-011`のうち`sid`の生成方法をESP32側だけ確定した（§13参照。**Pi側は未確定のまま残る。衝突許容確率も未確定のまま残る**）。理由と制約は`firmware/esp32/src/main.rs`の`generate_sid`のdoc comment（**ここへ再掲しない**）。**wire formatは変更していない。**envelope field、integer width、error code、counterのいずれも増やしていない。`sid`の値の選び方という送信側の実装であり、受信側の判定規則（§3.1、§5.1）は変えていない |
+| 2026-09-25 | Draft 2 esp32 boot retry | [Issue #446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)のPR B。§4.1の`boot`受理確認・再送の終了条件の表をESP32側（`firmware/esp32/src/boot_session.rs`）へ実装した。`stale_session`受信時の`sid`選び直しも実装した（§3.1）。再送間隔・backoff係数・通常再送の回数・recovery間隔・recovery budget（`PROTO-TBD-017`）と、`sid`選び直し回数の上限（`PROTO-TBD-011`の残り）は暫定値のまま。`protocol_fault`はwireへ出さない（`PROTO-TBD-018`未確定。「送出を止める」という動作面だけ実装）。§2の`pi-protocol-mode`送信line ending不一致（PR Aまで既知の逸脱として記録していたもの）は、`boot`送出経路に限りsource上は解消した（実機でのbyte実測はまだ無い。同節参照）。**wire formatは変更していない。**envelope field、integer width、error codeのいずれも増やしていない。受信側（Pi）の判定規則は変えていない |
 
 ### Draft schemaの互換性
 

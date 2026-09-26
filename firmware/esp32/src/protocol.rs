@@ -18,9 +18,10 @@
 //! **このmoduleは既定build（debug logモード）でだけcompileする**
 //! （`#[cfg(not(feature = "pi-protocol-mode"))]`、`main.rs`参照）。UART0を
 //! Pi–ESP32 protocol streamへ使う`pi-protocol-mode`のbuildは、この型を使わず
-//! `boot` frameを1回だけ送る（`crate::console`、`main.rs`の
-//! `send_boot_frame_once`参照。[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)）。
-//! `Hello`／`Ping`／`GetStatus`を実UARTから読む受信loopはどちらのbuildにも無い。
+//! `boot`のACK待ち・再送・`sid`選び直しを行う
+//! （`crate::boot_session`参照。[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446) PR B）。
+//! `pi-protocol-mode`の受信loopは`ack`だけを扱い、`Hello`／`Ping`／`GetStatus`を
+//! 実UARTから読む受信loopはどちらのbuildにも無い。
 //! **この点は`crates/deskcat-serial`側の`SerialDevice`の実機確認が
 //! [Issue #11]の後半に残っているのと対になる。**
 //!

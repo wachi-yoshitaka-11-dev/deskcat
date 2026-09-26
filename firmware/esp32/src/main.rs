@@ -30,8 +30,8 @@
 //! `compile_error!`）。build identity／board ID／reset reasonのlogと、
 //! heartbeat／health snapshotのloopは`pi-protocol-mode`でも実行されるが、
 //! loggingを止めているため出力は既定buildにしか出ない（`crate::console`
-//! 参照）。`pi-protocol-mode`は代わりに`boot` frameの書き込みを1回だけ試みる
-//! （`send_boot_frame_once`参照。制約は`crate::console`のmodule docに
+//! 参照）。`pi-protocol-mode`は代わりに`boot`のACK待ち・再送・`sid`選び直しを行う
+//! （`crate::boot_session`参照。`#446` PR B。制約は`crate::console`のmodule docに
 //! まとめてある）。
 //!
 //! 既定buildで`Peripherals::take()`の戻り値から実際にdriverへ渡すのは、I2C関連2本
@@ -40,7 +40,9 @@
 //! `bench-servo-test-17` feature付きbuildは`SERVO-PWM`（GPIO27）と
 //! `peripherals.ledc.timer0`／`channel0`を、それぞれ追加で渡す（`bench-servo-test-17`付きbuildは
 //! #474でcompileが止まる。下記`compile_error!`）。`pi-protocol-mode`は
-//! `Peripherals::take()`自体を呼ばない（`main()`参照）。
+//! UART0関連（`peripherals.uart0`、GPIO1＝TX、GPIO3＝RX。`crate::boot_session`が
+//! 使う`UartDriver`）だけを渡す（`#446` PR B。それ以前は`Peripherals::take()`自体を
+//! 呼ばなかった）。
 //!
 //! **I2Cはこの版でも実機通電していない。**この版の検証は`cargo build`でのcross-compile
 //! 確認までであり、実機へflashして確認するのは別工程である（[Hardware Safety
@@ -51,12 +53,15 @@
 //! [EXP-015](../../../docs/hardware/experiment-log.md)にある。それより後の変更を含むbuildは、
 //! 実機で動かした記録が無い。
 //!
-//! **Protocol sessionは確立しない。**`pi-protocol-mode`は`Boot` frameの書き込みを
-//! 1回試みるだけで（[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)、
-//! `send_boot_frame_once`参照）、受理確認・再送・受信loopを持たない。
-//! **既定buildは`boot`を一切組み立てない。**`#446`より前は`boot=`というlog行を
-//! 出していたが、その行はこの変更で削除した。`boot=`行を目視で確認していた
-//! 作業（`#7`／`#13`等）があれば、この変更を踏まえて確認し直すこと。
+//! **Protocol sessionはまだ確立を主張しない。**`pi-protocol-mode`は`boot`のACK待ち・
+//! 再送・`stale_session`受信時の`sid`選び直しを実装した
+//! （[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446) PR B、
+//! `crate::boot_session`参照）が、実機での動作確認（受信経路がring buffer溢れなく
+//! 動くか、実際に`boot`→ACKが成立するか）はまだ無い。**既定buildは`boot`を一切
+//! 組み立てない。**
+//! `#446`より前は`boot=`というlog行を出していたが、その行は`#446`のPR Aで削除した。
+//! `boot=`行を目視で確認していた作業（`#7`／`#13`等）があれば、`boot=`行が
+//! 無くなったことを踏まえて確認し直すこと。
 //!
 //! **Watchdog の設定を変えない。**Task Watchdog Timer は ESP-IDF の既定値のままである。
 //! `sdkconfig.defaults` に watchdog の項目を足していない。heartbeat loop は
@@ -131,6 +136,8 @@
 // （`crate::console`のmodule doc参照）。
 #[cfg(not(feature = "pi-protocol-mode"))]
 mod accel;
+#[cfg(feature = "pi-protocol-mode")]
+mod boot_session;
 mod config;
 mod console;
 #[cfg(not(feature = "pi-protocol-mode"))]
@@ -142,28 +149,33 @@ mod health;
 mod protocol;
 mod servo;
 
-// `pi-protocol-mode`は`Peripherals::take()`を行わないため、`bench-servo-test-17`の
-// servo bench試験経路（`run_servo_bench_test`）は呼ばれない。両方を有効にしても
-// buildは通るが、servoのfeatureが黙って無効になる。それより、compile時に理由を
-// 示して止めるほうがよいと判断した。**#474以降、`bench-servo-test-17`は単独でもcompileが
-// 止まる（下記）。**この排他は、#474の`compile_error!`を外したあとも効くよう残す。
+// `pi-protocol-mode`はUART0向けに`Peripherals::take()`を呼ぶが（`#446` PR B）、
+// `run_servo_bench_test`の呼び出し自体が`#[cfg(not(feature = "pi-protocol-mode"))]`の
+// blockの中にあるため、servo bench試験経路（`run_servo_bench_test`）は呼ばれない。
+// 両方を有効にしてもbuildは通るが、servoのfeatureが黙って無効になる。それより、
+// compile時に理由を示して止めるほうがよいと判断した。**#474以降、`bench-servo-test-17`は
+// 単独でもcompileが止まる（下記）。**この排他は、#474の`compile_error!`を外したあとも
+// 効くよう残す。
 #[cfg(all(feature = "pi-protocol-mode", feature = "bench-servo-test-17"))]
 compile_error!(
     "pi-protocol-modeとbench-servo-test-17は同時に有効にできない。\
-     pi-protocol-modeはPeripherals::take()を行わないためservoのbench試験経路が\
-     呼ばれず、featureが黙って無効になる。どちらか一方だけを有効にすること\
+     run_servo_bench_testの呼び出しはpi-protocol-mode以外のbuildでだけ実行される\
+     blockの中にあり、servoのbench試験経路が呼ばれず、featureが黙って無効になる。\
+     どちらか一方だけを有効にすること\
      （bench-servo-test-17は#474により単独でもcompileが止まる）。"
 );
 
 // `bringup-display-13`も同じ理由で`pi-protocol-mode`と排他にする。**servoと同じ形を
-// 採ったのは、失敗の仕方が同じだからである。**`pi-protocol-mode`は`Peripherals::take()`を
-// 呼ばず`crate::display`もcompileしないため、両方を有効にしてもLCDのbring-upは実行され
-// ない。「LCDを有効にしたつもりの構成が黙ってLCDを動かさない」状態を作らず、compile時に
+// 採ったのは、失敗の仕方が同じだからである。**`pi-protocol-mode`は`crate::display`を
+// compileせず、`run_display_bringup`の呼び出しも`#[cfg(not(feature = "pi-protocol-mode"))]`の
+// blockの中にあるため、両方を有効にしてもLCDのbring-upは実行されない。
+// 「LCDを有効にしたつもりの構成が黙ってLCDを動かさない」状態を作らず、compile時に
 // 理由を示して止める（`#451`）。
 #[cfg(all(feature = "pi-protocol-mode", feature = "bringup-display-13"))]
 compile_error!(
     "pi-protocol-modeとbringup-display-13は同時に有効にできない。\
-     pi-protocol-modeはPeripherals::take()を行わずcrate::displayもcompileしないため\
+     pi-protocol-modeはcrate::displayをcompileせず、run_display_bringupの呼び出しも\
+     pi-protocol-mode以外のbuildでだけ実行されるblockの中にあるため、\
      LCDのbring-up経路が呼ばれず、featureが黙って無効になる。\
      どちらか一方だけを有効にすること。"
 );
@@ -181,24 +193,25 @@ compile_error!(
 #[cfg(feature = "bringup-display-13")]
 use std::time::Instant;
 
-#[cfg(feature = "pi-protocol-mode")]
-use deskcat_protocol::{encode_line, limits, Boot, Envelope, Frame, Message};
 #[cfg(not(feature = "pi-protocol-mode"))]
 use deskcat_protocol::{Hello, HelloReason};
+#[cfg(not(feature = "pi-protocol-mode"))]
 use esp_idf_svc::hal::delay::FreeRtos;
 #[cfg(not(feature = "pi-protocol-mode"))]
 use esp_idf_svc::hal::gpio::{InputPin, OutputPin};
 #[cfg(not(feature = "pi-protocol-mode"))]
 use esp_idf_svc::hal::i2c::{I2cConfig, I2cDriver, I2C0};
-#[cfg(not(feature = "pi-protocol-mode"))]
 use esp_idf_svc::hal::peripherals::Peripherals;
 #[cfg(feature = "bringup-display-13")]
 use esp_idf_svc::hal::spi::SpiAnyPins;
-#[cfg(not(feature = "pi-protocol-mode"))]
+#[cfg(feature = "pi-protocol-mode")]
+use esp_idf_svc::hal::uart::{config::Config as UartConfig, UartDriver};
 use esp_idf_svc::hal::units::Hertz;
 
 #[cfg(not(feature = "pi-protocol-mode"))]
 use crate::accel::Adxl345;
+#[cfg(feature = "pi-protocol-mode")]
+use crate::boot_session::{BootRetryPolicy, BootSession};
 #[cfg(feature = "bringup-display-13")]
 use crate::display::Ili9341;
 #[cfg(not(feature = "pi-protocol-mode"))]
@@ -313,6 +326,10 @@ fn next_deadline(deadline: u64, period_ms: u32, now: u64) -> (u64, bool) {
 ///
 /// 待ち時間が `u32` に収まらない場合は `u32::MAX` で頭打ちにする。頭打ちにしても
 /// 次の周回で残りを待ち直すだけであり、期限を飛ばさない。
+///
+/// `pi-protocol-mode`はこの関数の代わりに`UartDriver::read`のtimeoutで待つ
+/// （main loop参照。`#446` PR B）。
+#[cfg(not(feature = "pi-protocol-mode"))]
 fn sleep_ms_until(until: u64, now: u64) {
     let remaining = until.saturating_sub(now);
     let ms = u32::try_from(remaining).unwrap_or(u32::MAX).max(1);
@@ -358,13 +375,16 @@ fn main() {
     // （`next_heartbeat`／`next_snapshot`）は従来どおりbring-upの後で初期化する。
     let mut health = Health::new(reset_reason);
 
-    // `pi-protocol-mode`ではLCD／I2C／servo benchのbring-up（`Peripherals::take()`を
-    // 含む）を一切行わない（`crate::console`のmodule doc参照）。`pi-protocol-mode`と
-    // `bench-servo-test-17`を同時に有効にした場合も、servo benchは実行されない。
+    // **両buildで`Peripherals::take()`を呼ぶ**（`#446` PR B）。既定buildはLCD／I2C／
+    // servo benchのbring-upへ、`pi-protocol-mode`はUART0（`boot`のACK待ち・再送。
+    // `crate::boot_session`参照）へ使う。1度しか成功しないため`expect`で即座に気付く。
+    let peripherals = Peripherals::take().expect("Peripherals::take must succeed exactly once");
+
+    // `pi-protocol-mode`ではLCD／I2C／servo benchのbring-upを一切行わない
+    // （`crate::console`のmodule doc参照）。`pi-protocol-mode`と`bench-servo-test-17`を
+    // 同時に有効にした場合も、servo benchは実行されない（上の`compile_error!`参照）。
     #[cfg(not(feature = "pi-protocol-mode"))]
     {
-        // 実際にdriverへ渡す範囲はmodule doc参照。1度しか成功しないため`expect`で即座に気付く。
-        let peripherals = Peripherals::take().expect("Peripherals::take must succeed exactly once");
         // **bring-up経路ごとに1 fieldで出す。**featureが2つになったため、行ごと`#[cfg]`で
         // 分けると組み合わせの数だけ同じ行を書くことになる。`cfg!`はcompile時に定数へ
         // 畳まれるため、有効でない経路の文字列が実行時に選ばれることはない。
@@ -433,12 +453,44 @@ fn main() {
     let mut next_heartbeat = bringup_done_ms + u64::from(config::HEARTBEAT_PERIOD_MS);
     let mut next_snapshot = bringup_done_ms + u64::from(config::HEALTH_SNAPSHOT_PERIOD_MS);
 
-    // `pi-protocol-mode`でだけ`boot`を1回試みる（`#446`。`send_boot_frame_once`参照）。
-    // `sid`は起動のたびに1回だけ選ぶ（§3「送信側が再起動したとき、`sid`を新しい値へ
-    // 変更する」）。再送（`PROTO-TBD-017`。#446 PR Bで実装）は同じ`sid`を使い続けるため、
-    // ここで選び直さない。
+    // `pi-protocol-mode`では、**このfirmwareのcodeが行うUART0のI/Oを**
+    // protocol専用の`UartDriver`へ一本化する（`crate::console`のmodule doc参照）。
+    // 送信も受信もこのdriver経由に揃える。**ESP-IDFのROM／bootloader起動出力や
+    // panic出力は対象外である**（`UartDriver`をinstallする前、またはこのfirmware
+    // のcode外で書かれるため。§2の既知の逸脱として別途扱う）。
+    // TX=GPIO1、RX=GPIO3はUART0のROM固定pin（`docs/hardware/gpio-assignment.md`の
+    // `Pi–ESP32間のtransport`節。GPIO headerへの配線は無く内部USB-UARTブリッジへ
+    // 接続する）。baudは既定build側のconsoleと同じ115200
+    // （`CONFIG_ESP_CONSOLE_UART_BAUDRATE`）に揃える。ring buffer容量の根拠は
+    // `config::PI_PROTOCOL_UART_RX_BUFFER_BYTES`のdoc参照。
     #[cfg(feature = "pi-protocol-mode")]
-    send_boot_frame_once(&health, reset_reason, generate_sid(&health));
+    let mut uart = {
+        let uart_config = UartConfig::default()
+            .baudrate(Hertz(config::PI_PROTOCOL_UART_BAUDRATE_HZ))
+            .rx_fifo_size(config::PI_PROTOCOL_UART_RX_BUFFER_BYTES)
+            .tx_fifo_size(config::PI_PROTOCOL_UART_TX_BUFFER_BYTES);
+        UartDriver::new(
+            peripherals.uart0,
+            peripherals.pins.gpio1,
+            peripherals.pins.gpio3,
+            Option::<esp_idf_svc::hal::gpio::AnyIOPin>::None,
+            Option::<esp_idf_svc::hal::gpio::AnyIOPin>::None,
+            &uart_config,
+        )
+        .expect("UartDriver::new for UART0 must succeed exactly once")
+    };
+
+    // `pi-protocol-mode`でだけ`boot`のACK待ち・再送sessionを開始する（`#446` PR B、
+    // `crate::boot_session`参照）。`sid`は起動のたびに1回だけ選ぶ（§3）。`stale_session`を
+    // 受けたときの選び直しは`BootSession`内部が行うため、ここで選び直さない。
+    #[cfg(feature = "pi-protocol-mode")]
+    let mut boot_session = BootSession::start(
+        BootRetryPolicy::provisional(),
+        generate_sid(&health),
+        reset_reason,
+        &health,
+        &mut uart,
+    );
     #[cfg(not(feature = "pi-protocol-mode"))]
     demonstrate_pi_session(&mut health);
 
@@ -481,48 +533,50 @@ fn main() {
             }
         }
 
-        // 期限を積み直した後の時刻で残りを測る。log の所要時間を待ち時間から差し引く。
-        let until = next_heartbeat.min(next_snapshot);
-        sleep_ms_until(until, health.uptime_ms());
-    }
-}
+        #[cfg(feature = "pi-protocol-mode")]
+        boot_session.on_deadline(&health, &mut uart);
 
-/// `boot` frameを1回だけ組み立て、`write_line`で直接UART0へ書き込みを試みる
-/// （`pi-protocol-mode`でだけ呼ぶ。制約は`crate::console`のmodule doc参照）。
-///
-/// 受理確認・再送・recovery budget（§4.1）・受信loopを実装していないため
-/// sessionは確立しない（`#12`の受け入れ条件は満たさない。残りは`#12`本文が
-/// 引き続き追跡する）。
-///
-/// `sid`は呼び出し側が[`generate_sid`]で選ぶ（§3「processが再起動したときは、
-/// 必ず新しい`sid`を選ぶ」）。`id`は1固定。`reset_reason`は実際の`ResetReason`から
-/// 得た値である。
-#[cfg(feature = "pi-protocol-mode")]
-fn send_boot_frame_once(health: &Health, reset_reason: &str, sid: u32) {
-    let boot = Boot {
-        firmware: env!("CARGO_PKG_VERSION").to_owned(),
-        board: config::BOARD.to_owned(),
-        reset_reason: reset_reason.to_owned(),
-    };
-    let ts_ms = health.uptime_ms();
-    let frame = Frame::new(
-        Envelope {
-            v: limits::PROTOCOL_VERSION,
-            sid,
-            id: 1,
-            ts_ms,
-        },
-        Message::Boot(boot),
-    );
-    // encode失敗はlog::warn!で分類する（`AGENTS.md`「エラーを握りつぶさず、分類、
-    // ログ、カウンタを用意する」に沿った形）。ただし`pi-protocol-mode`では
-    // loggingを止めているため、この`log::warn!`自体は出力されない。counterは
-    // 持たない（同じ理由で増やしても観測できないため）。
-    match encode_line(&frame) {
-        Ok(line) => console::write_line(&line),
-        Err(err) => {
-            log::warn!("boot_encode_failed error={err}");
+        // 期限を積み直した後の時刻で残りを測る。log の所要時間を待ち時間から差し引く。
+        #[cfg_attr(not(feature = "pi-protocol-mode"), allow(unused_mut))]
+        let mut until = next_heartbeat.min(next_snapshot);
+        #[cfg(feature = "pi-protocol-mode")]
+        if let Some(retry_deadline) = boot_session.next_deadline_ms() {
+            until = until.min(retry_deadline);
         }
+
+        // `pi-protocol-mode`では、sleepの代わりに`UartDriver::read`へ残り時間を
+        // timeoutとして渡す。旧設計（`sleep_ms_until`）はUARTを一切読まなかった
+        // ため、`read`を導入すること自体が変更点である。data到着があれば
+        // timeoutいっぱいまで待たず即座に戻る（`config::PI_PROTOCOL_UART_RX_BUFFER_BYTES`
+        // のdoc「容量の根拠」参照）ため、busy-waitにならずACK受信への反応
+        // latencyも下がる。ring bufferの容量とdata到着時の早期returnの関係は
+        // 同定数のdocが持つ正本であり、ここでは繰り返さない。
+        #[cfg(feature = "pi-protocol-mode")]
+        {
+            let now2 = health.uptime_ms();
+            let remaining_ms = until.saturating_sub(now2);
+            let ticks = boot_session::ticks_until(std::time::Duration::from_millis(remaining_ms));
+            let mut buf = [0_u8; config::PI_PROTOCOL_UART_READ_CHUNK_BYTES];
+            // **`Err`を無視する。**esp-idf-hal 0.46.2の`UartRxDriver::read`
+            // （`uart.rs`1179〜1246行）は、timeout（data未到着、毎周回起こりうる
+            // 正常系）と`uart_read_bytes`自体の失敗（`-1`）を、どちらも同じ
+            // `Err(ESP_ERR_TIMEOUT)`に畳んでおり、この版のAPIでは型で区別できない
+            // （`len`が`-1`でも`0`でも同じ分岐、doc commentも「timeoutならErr」と
+            // 明記している）。両者を区別する手段（別のAPIや`unsafe`）は導入しない。
+            // `uart_read_bytes`の`ESP_RETURN_ON_FALSE`（不正な`uart_num`／
+            // null buffer／未installのdriver。`uart.c`1662〜1666行）は即時
+            // returnであり、繰り返し起きればbusy-waitになる。ここではinstall
+            // 済みの`uart`・固定長の`buf`しか渡さないためこの経路は実質
+            // 到達しないという前提に立つ。`rx_mux`取得待ち（同1670〜1671行）は
+            // `ticks`の間blockするため問題にならない。
+            if let Ok(n) = uart.read(&mut buf, ticks) {
+                if n > 0 {
+                    boot_session.on_bytes(&buf[..n], &health, &mut uart);
+                }
+            }
+        }
+        #[cfg(not(feature = "pi-protocol-mode"))]
+        sleep_ms_until(until, health.uptime_ms());
     }
 }
 
@@ -549,9 +603,10 @@ const SID_NVS_KEY_NEXT: &str = "next_sid";
 /// （`docs/en/api-reference/system/random.rst`）は、Wi-Fi／Bluetoothが有効か、
 /// `bootloader_random_enable()`を呼んでいるか、second-stage bootloader実行中の
 /// いずれかを満たさない限り、RNGの出力は「pseudo-random only」と明記する。
-/// このfirmwareは`pi-protocol-mode`でWi-Fi／Bluetoothを一切初期化せず
-/// （`Peripherals::take()`自体を呼ばない）、`bootloader_random_enable()`も
-/// 呼ばない（呼ぶには`unsafe`が要る）。**したがって乱数側を使っても、
+/// このfirmwareは`pi-protocol-mode`でWi-Fi／Bluetoothを一切初期化しない
+/// （`Peripherals::take()`はUART0向けに呼ぶが、Wi-Fi／Bluetoothの初期化は
+/// 別の話であり行わない。`#446` PR B）。`bootloader_random_enable()`も呼ばない
+/// （呼ぶには`unsafe`が要る）。**したがって乱数側を使っても、
 /// 上記の非衝突要件に対する根拠のある確率は示せない。**
 ///
 /// 不揮発counterは`unsafe`もWi-Fi／Bluetoothの初期化も要らず、§3.1の要件
@@ -579,8 +634,11 @@ const SID_NVS_KEY_NEXT: &str = "next_sid";
 /// session集合に残っている値と一致すれば衝突する。この衝突は、protocol側の
 /// `stale_session`回復（§3.1「`sid`が衝突した場合」。ACKで`stale_session`を
 /// 受けたら新しい`sid`を選び直して再送する）で扱う対象である。**この回復経路は
-/// `#446` PR Bで実装する（未実装。本PRの時点ではACK受信も再送も無いため、衝突していても
-/// 検知できない）。**
+/// `crate::boot_session::BootSession::reselect_sid`が実装している
+/// （`#446` PR B）。**選び直しの回数には上限がある（`BootRetryPolicy`の
+/// `sid_reselect_limit`）ため、counterが`0`から数え直された後に連続して選ぶ
+/// `sid`が、上限+1回分以上retired session集合に含まれていると衝突から
+/// 抜けられないまま終端しうる。
 ///
 /// # NVSが使えない場合
 ///
@@ -590,7 +648,7 @@ const SID_NVS_KEY_NEXT: &str = "next_sid";
 /// bring-upを行わないため起動ごとにほぼ同じ小さい値になり、§3の要件を
 /// 満たさないまま`boot`を送る。エラーは`log::error!`で分類するが、
 /// `pi-protocol-mode`はloggingを止めているため出力されない
-/// （`send_boot_frame_once`の`boot_encode_failed`と同じ理由。counterは持たない）。
+/// （観測経路が無い。counterは持たない。`boot_session`のmodule doc「停止理由の区別」参照）。
 #[cfg(feature = "pi-protocol-mode")]
 fn generate_sid(health: &Health) -> u32 {
     use esp_idf_svc::nvs::{EspDefaultNvsPartition, EspNvs};
@@ -1089,7 +1147,7 @@ fn run_corner_pattern(lcd: &mut Ili9341<'_>, health: &mut Health) {
 /// **これが「counter schema を protocol status へ使用できる」ことの実物である。**
 /// 出力するのは `status` の payload であり、envelope を付けた wire line ではない
 /// （health snapshotをwireへ送るにはsessionが要る。#12。`pi-protocol-mode`が
-/// `boot`用に選ぶ`sid`は`send_boot_frame_once`参照。両者は別の判断である）。
+/// `boot`用に選ぶ`sid`は`generate_sid`参照。両者は別の判断である）。
 ///
 /// **error を握りつぶさない。**serialize は事実上失敗しないが、`expect()` で潰さず
 /// 分類して log し、counter を進める。
