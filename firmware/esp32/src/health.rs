@@ -68,7 +68,7 @@ impl Health {
     /// 型は `u64` である。Protocol §3 が `ts_ms` に `u64` を採ったのは
     /// 「`u32`は約49.7日でwrapし、長時間動作で`ts_ms`の単調性が崩れる」ためであり、
     /// **`u32` で持たない。**`Envelope::ts_ms` へそのまま載せられる型に揃えてある。
-    /// `pi-protocol-mode`は`send_boot_frame_once`（`main.rs`）でこの値をすでに
+    /// `pi-protocol-mode`は`crate::boot_session`（`#446` PR B）でこの値をすでに
     /// `Envelope::ts_ms`へ載せている。session state（#12）が入るのは別工程である。
     ///
     /// [`Instant`] は単調性が型の契約であるため、この値も単調非減少である。

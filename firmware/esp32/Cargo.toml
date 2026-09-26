@@ -22,9 +22,10 @@ pi-protocol-mode = []
 # `docs/hardware/servo-safety-limits.md`の`承認の状態`節を参照する（ここへ再掲しない。
 # `main.rs`のmodule doc、`servo.rs`のmodule doc参照）。
 # **`pi-protocol-mode`と同時に有効にした構成は意図的にcompileできない。**
-# `main.rs`が`compile_error!`で拒否する。理由は、`pi-protocol-mode`が
-# `Peripherals::take()`を行わずservoのbench試験経路が呼ばれないため、
-# featureが黙って無効になることである。両方を同時に有効にするbuildは作らない。
+# `main.rs`が`compile_error!`で拒否する。理由は、servoのbench試験経路の呼び出しが
+# `#[cfg(not(feature = "pi-protocol-mode"))]`のblockの中にあり、`pi-protocol-mode`では
+# 呼ばれないため、featureが黙って無効になることである。両方を同時に有効にするbuildは
+# 作らない。
 # **#474で、このfeatureは単独で有効にしてもcompileが止まる**（`main.rs`の`compile_error!`）。
 bench-servo-test-17 = []
 # Issue #13の`DISP-01`（MSP2807）bring-up（controller識別、backlight点灯、単色fill、
@@ -34,8 +35,9 @@ bench-servo-test-17 = []
 # 「`DISP-01`のbring-upを有効にする手順」節を参照する（ここへ再掲しない）。
 # **`pi-protocol-mode`と同時に有効にした構成は意図的にcompileできない。**
 # `main.rs`が`compile_error!`で拒否する。理由は`bench-servo-test-17`と同じで、
-# `pi-protocol-mode`が`Peripherals::take()`を行わずbring-up経路が呼ばれないため、
-# featureが黙って無効になることである。
+# `run_display_bringup`の呼び出しが`#[cfg(not(feature = "pi-protocol-mode"))]`の
+# blockの中にあり、`pi-protocol-mode`では呼ばれないため、featureが黙って無効に
+# なることである。
 bringup-display-13 = []
 
 [profile.release]

@@ -121,3 +121,83 @@ pub const SERVO_BENCH_TEST_ARM_DELAY_MS: u32 = 10_000;
 /// （ミリ秒）。安全な保持時間の主張ではなく露出時間の最小化。
 #[allow(dead_code)]
 pub const SERVO_BENCH_TEST_EXPOSURE_MS: u32 = 300;
+
+/// `pi-protocol-mode`のUART0 baud（Hz）。**一般値ではなく既定buildのconsoleと
+/// 揃えた値である。**`CONFIG_ESP_CONSOLE_UART_BAUDRATE`は、既定buildで
+/// `cargo build`が生成する`target/xtensa-esp32-espidf/debug/build/esp-idf-sys-*/out/sdkconfig`
+/// （`#446` PR B時点、ESP-IDF v5.5.3）で`115200`と確認した。一致させないと、
+/// 既定buildと`pi-protocol-mode`で通信速度が変わってしまう。`PROTO-TBD-001`
+/// （最終baud）は未確定のままであり、この値もその暫定値の一つである。この定数は
+/// `sdkconfig`の値から自動で導出していない（手で揃え続ける前提であり、
+/// `sdkconfig`側が変わっても黙ってずれる）。
+#[cfg(feature = "pi-protocol-mode")]
+pub const PI_PROTOCOL_UART_BAUDRATE_HZ: u32 = 115_200;
+
+/// `pi-protocol-mode`のUART0受信ring buffer容量（byte）。`UartDriver`（interrupt駆動）が
+/// hardware FIFOから継続的に吸い上げる先であり、hardware FIFO自体
+/// （`SOC_UART_FIFO_LEN`＝128 byte、ESP32の`soc_caps.h`）より大きくなければ
+/// `uart_driver_install`が`ESP_FAIL`を返す（ESP-IDF v5.5.3の
+/// `esp_driver_uart/src/uart.c`の`rx_buffer_size > UART_HW_FIFO_LEN`検査）。
+///
+/// # 容量の根拠
+///
+/// `main()`のloopは、次の締切（heartbeat／health snapshot／`boot`再送）までの
+/// 残り時間を`UartDriver::read`のtimeoutへ渡す（`sleep_ms_until`の代わり）。
+/// interrupt駆動のring bufferはこの待ちの間もhardware FIFOから継続的に吸い上げる
+/// ため、**待ち時間の長さ（heartbeatの`1_000` msなど）そのものはring buffer容量に
+/// 効かない。**効くのは、1回の`read`呼び出しから次の呼び出しまでの間にどれだけ
+/// 溜まりうるかであり、`read`はdataが来ればtimeoutを待たずに戻る
+/// （esp-idf-hal 0.46.2の`UartRxDriver::read`（`uart.rs`1179〜1246行）が、
+/// まずnon-blockingで試し、無ければ**1 byteだけ**を実際のtimeoutでblocking
+/// 読みし、来たら残りをnon-blockingで拾う、という2段構えの実装になっている
+/// ため。「1 byteだけ」の要求に対して、ESP-IDF v5.5.3の`uart.c`の
+/// `uart_read_bytes`（1662〜1701行）内部の`xRingbufferReceiveUpTo`は、
+/// その1 byteが来た時点で満たされ即座に戻る。同じ`uart_read_bytes`を
+/// buffer全長で呼んだ場合は、要求量を満たすかtimeoutまで戻らない
+/// （hal側がこの2段構えを採る理由）ため、通常は小さい。**ただし`on_bytes`の
+/// 処理中（`reselect_sid`のNVS操作を含む）はこの`read`を呼ばないため、
+/// その間はring bufferが貯まり続ける。**このNVS操作の所要時間は未確認
+/// （下記）。
+///
+/// **この値は理論値ではなく安全側の見込みである。**`boot`のACK（§6の例で約115 byte）に
+/// 続けて`get_status`等の別messageが即座に届く場合（`coordinator::handle_boot`が
+/// ACK後に同期送信する。`crates/deskcat-serial/src/coordinator.rs`参照）を想定し、
+/// hardware FIFO（128 byte）の4倍を確保して複数行分の余裕を見た。**`BootSession`は
+/// `boot`のACK以外を読み捨てる（`Established`後は`on_bytes`の冒頭で即return する。
+/// `crate::boot_session::BootSession::on_bytes`参照）ため、Piが送るこれらの
+/// messageは処理されずに読み捨てられるだけであり、この余裕（4倍）は「処理する
+/// ために必要」ではなく「読み捨てる前に受信bufferだけで溢れないため」の
+/// 根拠である。
+/// **このring bufferが実機で溢れないことはbuildでは示せない。**実機確認の項目とする
+/// （`console.rs`のmodule doc参照）。**`generate_sid`が行うNVSへの書き込み・
+/// 消去（flash操作）の間、UART受信interruptが遅延・停止しうるかどうかは
+/// 確認していない。**`generate_sid`は起動直後の初回呼び出し（`main.rs`の
+/// `BootSession::start`の引数評価）でも、`reselect_sid`からの再呼び出しでも
+/// 同じ経路を通る。前者は`UartDriver`のinstall後に評価されるため、受信
+/// interruptが有効な状態で発生する。書き込みは通常`set_u32`1回分だが、
+/// `EspDefaultNvsPartition::take()`が`ESP_ERR_NVS_NO_FREE_PAGES`／
+/// `ESP_ERR_NVS_NEW_VERSION_FOUND`を検知した場合は`nvs_flash_erase()`で
+/// partition全体を消去する経路もある（`generate_sid`のdoc「衝突許容確率」
+/// 節参照。この経路の実在はesp-idf-svcのsourceで確認済み）。**この書き込み・
+/// 消去の間、UART受信interruptが遅延・停止しうるかどうかは一次資料で
+/// 確認しておらず、この版ではその影響を測っていない。**
+#[cfg(feature = "pi-protocol-mode")]
+pub const PI_PROTOCOL_UART_RX_BUFFER_BYTES: usize = 512;
+
+/// `pi-protocol-mode`のUART0送信ring buffer容量（byte）。受信側ほど余裕を必要と
+/// しない。`UartDriver::write`が呼ぶ`uart_write_bytes`→`uart_tx_all`は
+/// `portMAX_DELAY`でblockし、渡した全byteをtx ring bufferへ積み終えるまで
+/// 戻らない（wireへ送り終えるまでではない。`crate::boot_session`の`send_boot`の
+/// comment参照）ため、tx ring bufferが溢れて送信側がdataを失うことは無い。`uart_driver_install`は`tx_fifo_size`にも
+/// `> UART_HW_FIFO_LEN`（または`0`）を要求するため、受信側と同じ値にしておく。
+#[cfg(feature = "pi-protocol-mode")]
+pub const PI_PROTOCOL_UART_TX_BUFFER_BYTES: usize = 512;
+
+/// `main()`のloopで1回の`UartDriver::read`に渡すstack buffer長（byte）。
+/// Ring buffer容量（[`PI_PROTOCOL_UART_RX_BUFFER_BYTES`]）より小さくてよい
+/// （`read`は複数回に分けて呼ばれ、`crate::boot_session::BootSession`が
+/// 受信済みbyteを跨いで行を組み立てる）。stack上に置くため小さく抑えた
+/// （ring buffer容量の半分）。**`main()`の他のlocal変数と合わせた合計stack使用量は
+/// 測っていない。**task stack sizeを圧迫しないという主張はしない。
+#[cfg(feature = "pi-protocol-mode")]
+pub const PI_PROTOCOL_UART_READ_CHUNK_BYTES: usize = 256;
