@@ -2,6 +2,17 @@
   "hooks": {
     "PreToolUse": [
       {
+        "matcher": "Agent|Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "R=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}\"; G=\"$R/scripts/hooks/review_round_guard.py\"; if [ -z \"$R\" ] || [ ! -f \"$G\" ] || ! command -v python3 >/dev/null 2>&1; then echo 'Review admission guard unavailable; dispatch denied' >&2; exit 2; fi; python3 \"$G\" || exit 2",
+            "timeout": 30,
+            "statusMessage": "自己レビューの通算巡数と継続承認を確認"
+          }
+        ]
+      },
+      {
         "matcher": "Bash",
         "hooks": [
           {

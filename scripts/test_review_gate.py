@@ -21,6 +21,7 @@ sys.path.insert(0, str(SCRIPTS_ROOT))
 
 import publish_guards as guards  # noqa: E402
 import review_gate as gate  # noqa: E402
+from test_review_session import ReviewSessionTests  # noqa: E402,F401
 
 REPOSITORY_ROOT = str(SCRIPTS_ROOT.parent)
 SCRIPT = str(SCRIPTS_ROOT / "review_gate.py")
