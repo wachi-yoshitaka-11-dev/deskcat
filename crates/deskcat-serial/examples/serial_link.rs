@@ -6,11 +6,19 @@
 //!
 //! # これで確かめられること／確かめられないこと
 //!
-//! **確かめられるのは「行が通ること」までである。**open、byteのread／write、行の復元、
-//! 切断の観測、再接続の上限、partial I/Oはここで見える。
+//! **確かめられるのは「行が通ること」と、`boot`受信からsession確立までである。**
+//! open、byteのread／write、行の復元、切断の観測、再接続の上限、partial I/Oに加えて、
+//! 受信した`boot`は[`deskcat_serial::handle_boot`]（[Issue #12]、
+//! `crates/deskcat-serial/src/coordinator.rs`）へ渡し、ACKを返す。
 //!
-//! **`protocol`が成立したことは確かめられない。**`boot`／`ping`／`status`／ACK／reconnect
-//! 同期の実装は[Issue #12]であり、**`ESP32`側がprotocolを話すとは限らない。**
+//! **`boot`確立より先のprotocol往復は確かめられない。**`handle_boot`は確立時に
+//! 内部で`get_status`を1件送るが、この実行体は[`deskcat_serial::retry_due_requests`]を
+//! 呼ばない。そのACKの相関・ACK timeoutの再送は配線していない。**呼んでも実効が無い**
+//! ためである。`pi-protocol-mode`（`firmware/esp32/src/boot_session.rs`）は`Established`後に
+//! 届いたbyteを種類を問わず読み捨てるため（`docs/protocol/esp32-pi-protocol.md`§2の
+//! 既知の逸脱(i)(ii)）、確立後に送った`get_status`にESP32が応答することは無い。
+//! `ping`／`status`／reconnect同期の実装は引き続き[Issue #12]の範囲である。
+//! **`ESP32`側がprotocolを話すとは限らない**という留保も、`boot`確立以外では変わらない。
 //! 接続のたびに`hello`を1件送るのは書き出し経路を通すためであって、handshakeではない。
 //! `reason`は初回が`Startup`、再接続が`PortReopen`である（仕様§5.1）。
 //! **相手がこれに応答するとは限らない。**
@@ -44,8 +52,11 @@ use std::process::ExitCode;
 use std::thread::sleep;
 use std::time::{Duration, Instant};
 
-use deskcat_protocol::{Hello, HelloReason, Message, Outcome};
-use deskcat_serial::{ConnectionState, Pump, SerialConfig, SerialDevice, Session, SessionCounters};
+use deskcat_protocol::{Boot, Hello, HelloReason, Message, Outcome};
+use deskcat_serial::{
+    ConnectionState, PeerSession, Pump, SerialConfig, SerialDevice, Session, SessionCounters,
+    handle_boot,
+};
 
 /// 呼び出し側の引数。
 struct Args {
@@ -213,6 +224,10 @@ fn main() -> ExitCode {
     // ここではprocessのidを種にする。乱数を持ち込まない。
     let sid = std::process::id();
     let mut session = Session::new(config.clone(), sid);
+    // ESP32側のsession state。**再接続をまたいで1つだけ持つ。**Piの再接続
+    // （`PortReopen`）はESP32側のsessionを暗黙に変えない。ESP32が再起動すれば
+    // 新しい`sid`の`boot`として届き、`PeerSession`自身がsession遷移として扱う（§3.1）。
+    let mut peer = PeerSession::new();
     let started = Instant::now();
     // **`started + Duration`にしない。**`--seconds`は任意の`u64`を受け取るため、
     // 表現できないdeadlineでpanicする（実測: `u64::MAX`で
@@ -269,7 +284,8 @@ fn main() -> ExitCode {
             Err(error) => log::warn!("hello を送れない: {error}"),
         }
 
-        let disconnected = pump_until_break(&mut session, &mut device, deadline);
+        let disconnected =
+            pump_until_break(&mut session, &mut peer, &mut device, started, deadline);
 
         if !disconnected {
             break; // deadline到達、または停止済み。summaryはloopの外で1度だけ出す
@@ -309,7 +325,9 @@ fn main() -> ExitCode {
 /// linkが切れるか、期限に達するまでpumpを回す。切断で抜けたときだけ`true`。
 fn pump_until_break(
     session: &mut Session,
+    peer: &mut PeerSession,
     device: &mut SerialDevice,
+    started: Instant,
     deadline: Option<Instant>,
 ) -> bool {
     loop {
@@ -317,11 +335,19 @@ fn pump_until_break(
             return false;
         }
 
+        // `boot`だけを集めてから、`pump_read`（`session`を`&mut self`で借用中）を
+        // 抜けたあとに適用する。**その場で`handle_boot(session, ...)`は呼べない**
+        // （`session`の二重可変借用）。`firmware/esp32/src/boot_session.rs`の
+        // `on_bytes`が採る「集めてから適用する」パターンと同じ理由である。
+        let mut boots: Vec<(u32, u32, Boot)> = Vec::new();
         let read = session.pump_read(device, |outcome| match outcome {
             Outcome::Frame(frame) => {
                 let (sid, id) = frame.envelope.identity();
                 // **payloadを出さない。**上位（Issue #12）が扱う。ここはlinkの確認である。
                 log::info!("行を復元した: sid={sid} id={id} type={:?}", frame.message);
+                if let Message::Boot(boot) = frame.message {
+                    boots.push((sid, id, boot));
+                }
             }
             Outcome::Rejected(rejection) => {
                 log::warn!(
@@ -332,6 +358,13 @@ fn pump_until_break(
                 );
             }
         });
+        for (sid, id, boot) in boots {
+            let handled = handle_boot(session, peer, sid, id, boot, uptime_ms(started));
+            log::info!(
+                "bootを処理した: sid={sid} id={id} outcome={:?}",
+                handled.outcome
+            );
+        }
         let write = session.pump_write(device);
 
         for pump in [read, write] {
