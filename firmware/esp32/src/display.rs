@@ -26,11 +26,16 @@
 //! - Hardware reset（`RESX`）: パルス幅`tRW`最小10µs、reset cancel`tRT`最小5ms
 //!   （Sleep In状態からの解除。§15.4 Reset Timing、p.229）。
 //! - Memory Access Control (36h、MADCTL、§8.2.29 p.127)。Reset時default `00h`
-//!   （MY=MX=MV=ML=BGR=MH=0）。**このfirmwareはdefault値のまま初期化する。**
-//!   実際の物理orientationとcolor order（BGR/RGB filter）はmoduleの現物に依存し、
-//!   一次資料からは決まらない。四隅test patternで実機確認した結果を
-//!   `docs/hardware/experiment-log.md`へ記録し、必要ならこの値を差し替える
-//!   （[AGENTS.md](../../../AGENTS.md) 推測禁止）。
+//!   （MY=MX=MV=ML=BGR=MH=0）。bit配置はparameter byteの`D7..D0`が
+//!   `MY MX MV ML BGR MH 0 0`（同節のbit表）であり、`BGR`は`D3`。
+//!   [`EXP-016`](../../../docs/hardware/experiment-log.md#exp-016-disp-01msp2807esp323v3-pin追加接続のbring-upcontroller識別単色fill四隅pattern)
+//!   （2026-09-27）の実機確認で、`BGR=0`（reset時default）のとき赤と青が入れ替わって
+//!   表示されることが分かったため、**`BGR=1`（`D3`のみ立てる）で初期化する。**
+//!   orientation bit（MY/MX/MV/ML/MH）はdefaultの`0`のまま変更しない
+//!   （搭載時にどちらを上にするかはまだ決まっていない。`EXP-016`参照）。
+//!   **`BGR=1`で赤と青の入れ替わりが実際に解消するかは、この変更の時点では実機で
+//!   確認していない。**次回の実機試験で確認する。実際の物理orientationは
+//!   moduleの現物に依存し、一次資料からは決まらない（[AGENTS.md](../../../AGENTS.md) 推測禁止）。
 //! - Pixel Format Set (3Ah、COLMOD、§8.2.33 p.134)。`DPI`/`DBI` = `101`/`101`で16bit/pixel
 //!   （byte値`0x55`）。
 //! - Read ID4 (D3h、§8.3.23 p.186)。応答は4byte
@@ -82,7 +87,17 @@ const CMD_COLMOD: u8 = 0x3A;
 
 /// Reset時のMADCTL既定値（`00h`）。**一次資料の`Default Value`欄そのものであり、
 /// このfirmwareが独自に選んだ値ではない。**module doc参照。
+/// **このfirmwareは初期化時にこの値を書き込まない（下記`MADCTL_BGR_ENABLED`を書き込む）。**
+/// IC自体のreset時defaultを示す値として残す。
 const MADCTL_RESET_DEFAULT: u8 = 0x00;
+
+/// `BGR`bit（`D3`）だけを立てたMADCTL値。ILI9341 Datasheet V1.11 §8.2.29 p.127の
+/// bit表（parameter byte `D7..D0` = `MY MX MV ML BGR MH 0 0`）に基づく。
+/// [`EXP-016`](../../../docs/hardware/experiment-log.md#exp-016-disp-01msp2807esp323v3-pin追加接続のbring-upcontroller識別単色fill四隅pattern)
+/// （2026-09-27）が、reset時default（`BGR=0`）で赤と青が入れ替わって表示されることを
+/// 確認したため、`BGR=1`へ変更する。orientation bit（MY/MX/MV/ML/MH）は`0`のまま
+/// （module doc参照）。**`BGR=1`で入れ替わりが解消するかは実機で未確認。**
+const MADCTL_BGR_ENABLED: u8 = 0x08;
 
 /// 16 bit/pixel（RGB565相当）。`DPI[2:0]=101, DBI[2:0]=101`（module doc参照）。
 const COLMOD_16BPP: u8 = 0x55;
@@ -247,7 +262,7 @@ impl<'d> Ili9341<'d> {
     }
 
     /// 初期化sequence。**controller識別→reset解除待ち→sleep out→pixel
-    /// format→MADCTL既定値→display on、の順で一次資料の待ち時間を守る。**
+    /// format→MADCTL（`BGR=1`）→display on、の順で一次資料の待ち時間を守る。**
     ///
     /// 戻り値の[`DisplayId`]は呼び出し側が`matches_ili9341()`で判定し、ログへ残すこと
     /// （このmoduleでは判定結果を握りつぶさない。呼び出し側の責務とする）。
@@ -263,7 +278,7 @@ impl<'d> Ili9341<'d> {
         FreeRtos::delay_ms(120);
 
         self.command(CMD_COLMOD, &[COLMOD_16BPP])?;
-        self.command(CMD_MADCTL, &[MADCTL_RESET_DEFAULT])?;
+        self.command(CMD_MADCTL, &[MADCTL_BGR_ENABLED])?;
         self.command(CMD_DISPON, &[])?;
 
         Ok(id)
