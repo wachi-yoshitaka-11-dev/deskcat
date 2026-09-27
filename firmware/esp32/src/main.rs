@@ -1095,9 +1095,12 @@ fn run_fill_tests(lcd: &mut Ili9341<'_>, health: &mut Health) {
 
 /// 四隅へ異なる色の正方形を描き、orientationとcolor orderを実機で確認できるようにする。
 ///
-/// 受け入れ条件「四隅とorientationが正しい」に対応する。**MADCTLはreset時default
-/// （`00h`）のままである**（`crate::display`のmodule doc参照）。この patternを見て
-/// 向きと色順が期待どおりでなければ、`docs/hardware/gpio-assignment.md`の`MADCTL`欄と
+/// 受け入れ条件「四隅とorientationが正しい」に対応する。**MADCTLの`BGR`bitは
+/// `EXP-016`の実測結果に基づき変更済みである**（`crate::display`のmodule doc参照）。
+/// orientation bit（MY/MX/MV）は今もreset時defaultの`0`のままである。この patternを見て
+/// 向きと色順が期待どおりでなければ、`docs/hardware/sensor-datasheet-notes.md`の
+/// `Color format／order`行（色の並び〈RGB／BGR〉は未記載。byte orderはTBD）と
+/// `対応orientation command`行（TBD）へ、実機で確かめた後に記録し、
 /// `crate::display`のMADCTL定数を実測結果で更新する必要がある。
 #[cfg(feature = "bringup-display-13")]
 fn run_corner_pattern(lcd: &mut Ili9341<'_>, health: &mut Health) {
