@@ -15,7 +15,7 @@
 2. この `AGENTS.md`
 3. [AI Agent Policy](docs/governance/ai-agent-policy.md)
 4. [Development Workflow](docs/governance/development-workflow.md)
-5. [CONTRIBUTING の「自己レビュー」](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/CONTRIBUTING.md#自己レビュー)
+5. [CONTRIBUTING の「自己レビュー」（通常開発版）](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/CONTRIBUTING.md#自己レビュー)
 6. [Hardware Safety Policy](docs/governance/hardware-safety-policy.md)
 7. 承認済みの ADR、プロトコル、GPIO、電源、安全制限
 8. メーカー公式資料と実験結果
@@ -169,4 +169,4 @@
 
 受け入れ条件、必要な検証、安全制限を満たすまで完了扱いにしない。
 
-push する前に、[CONTRIBUTING の「自己レビュー」](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/CONTRIBUTING.md#自己レビュー)の収束条件と観点を満たす。**条件の正本は CONTRIBUTING であり、ここでは再掲しない。**
+push する前に、[CONTRIBUTING の「自己レビュー」（通常開発版）](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/CONTRIBUTING.md#自己レビュー)の収束条件と観点を満たす。**条件の正本は CONTRIBUTING であり、ここでは再掲しない。**
