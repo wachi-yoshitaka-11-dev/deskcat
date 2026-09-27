@@ -5,6 +5,13 @@
 
 このディレクトリには、DeskCatの開発時に人間とAIエージェントが使用する永続的なポリシーを置く。
 
+## 参照する版
+
+作業の基準は対象baseの承認済みcommitで揃える。通常開発は`develop`、安定版と公開Pagesは`main`。
+Pagesから公開対象外のCONTRIBUTING等へは絶対URLでリンクするため、`blob/main/`は安定版を示す。
+`develop`作業では、取得したbase SHAの同じpathを読む。判断に使ったSHA・節はIssue／PRへ残す。
+過去の証拠を読む固定commitリンクと、現在の規則を読むリンクを混同しない。
+
 ## 文書一覧
 
 | 文書 | 目的 |

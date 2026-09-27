@@ -31,12 +31,16 @@ hookの一覧と回避手順は[hookが止めたとき](#hookが止めたとき)
 ## 作業開始前
 
 1. `git fetch origin`し、`origin/develop`を基点にする。
-2. [AGENTS.md](AGENTS.md)を読む。
+2. 対象baseのcommit SHAを記録し、その版の[AGENTS.md](AGENTS.md)とリンク先の規則を読む。
 3. [Governance](docs/governance/README.md)を読む。
 4. 一つの目的に絞ったIssueを探すか作成する。
 5. 依存関係と受け入れ条件を確認する。
 6. [ハードウェアTBD](docs/hardware/tbd-register.md)を確認する。
 7. 編集前にworking treeを確認する。
+
+通常開発は`develop`、安定版・公開Pagesは`main`を参照する。公開文書の`blob/main/`リンクは
+安定版へのリンクであり、`develop`作業の規則を読むときは記録したbase SHAの同じpathを開く。
+相対リンクは同じcheckoutの版を辿る。未mergeの差分は規則として適用しない。
 
 正確な部品、関連GPIO、電源、安全値が`TBD`のときはhardware driverへ着手しない。
 
@@ -251,6 +255,9 @@ PC testはLCD、電気、timing、sensor、機構の検証を代替しない。
 - build、flash、test手順
 
 複数componentに影響する判断や、戻すコストが高い判断にはADRを使う。
+現在の状態は正本へ集約し、日付付きの根拠・実験・訂正は履歴として参照する。
+TBD変更では[状態変更時の参照確認](docs/hardware/tbd-register.md#状態変更時の参照確認)を行う。
+本書の[過去事例](docs/runbooks/contributing-history.md)は現在の手順と分けて読む。
 
 ## Pull request
 
@@ -409,12 +416,7 @@ pushする前に、作成者自身が差分を見直す。**開始前にIssue/PR
 - [ ] **Pull Request本文の記述が、実際の差分と一致している。**対象file数、含まれる変更、
       検証欄の「実行した／していない」が実態と合っている
 
-各項目は過去に実際に起きた失敗に対応する。順に
-[#72](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/72)（規則を守っているか一度も照合していなかった）、
-[hardware-bom.md Revision 20](docs/hardware/hardware-bom.md)（同じ条件を2文書に書き、式が食い違った）、
-[#63](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/63)・[#82](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/82)（未検証の動作を断定した）、
-[#82](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/82)（存在しない照合先を参照していた）、
-[#61](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/61)（本文が「4 Pull Request、14 file」のまま、実際は9 commitへ増えていた）である。
+各観点の由来は[過去事例](docs/runbooks/contributing-history.md#自己レビュー観点の由来)を参照する。
 
 #### 2つのPass
 
@@ -441,15 +443,7 @@ pushする前に、作成者自身が差分を見直す。**開始前にIssue/PR
 #### 打ち切り
 
 **無承認で継続できるのは通算5巡までである。**必要な欠陥を巡数で無視する規則ではない。
-過去の実績は、巡数と欠陥の有無だけでは収束を判断できないことを示す。
-
-| 作業 | 巡 | 内容 |
-|---|---|---|
-| [#384](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/384) | 22巡以上 | 17〜20巡で「guardの判定位置がbashとずれる」型の実体ある欠陥が出た（[ADR-0020](docs/decisions/0020-inspector-readonly-by-hook.md)）。別の実体ある欠陥が22巡目にも出た（`scripts/hooks/inspector_readonly_guard.py`のコメント） |
-| [#396](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/396) | 9巡 | 9巡すべてが実体のある欠陥だった（[PR #400](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/400)） |
-| [#397](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/397) | 7巡 | 要件照合Passは7巡中5巡が0件で、早期に収束していた。残りはcommit messageの書き方と指示語の先行詞（[#398](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/398)） |
-| #389（[PR #395](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/395)） | 11巡 | 実装への指摘は2巡で尽き、残り9巡は前の巡で自分が書き足した説明文が次の巡の指摘源になったものだった |
-| `#3` B1・B2（[PR #399](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/399)） | 3巡 | 3巡目に出た実質4件のうち3件は、前の巡で自分が入れた文から出ていた |
+過去の巡数・指摘内容は[記録](docs/runbooks/contributing-history.md#レビュー巡数の過去事例)に分離する。
 
 **指摘は重要度と出所を別々に記録する。**型ごとに根拠、採否、理由を短く残す。
 
@@ -492,11 +486,7 @@ pushする前に、作成者自身が差分を見直す。**開始前にIssue/PR
 要求をhead commitより軽くする既存の設計（`Self-Review`が1つ以上あることだけを見る。
 下の「Merge方式」）と一貫させたためであり、区別できないからではない。
 
-**[#397](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/397)はこの規則で説明できる。**
-7巡目で人間が打ち切りを決定した時点は、上の表のとおり「要件照合Passは7巡中5巡が0件」
-という状態であり、この規則があれば`Self-Review: capped`を宣言し、巡ごとの件数と
-採否の内訳をPull Request本文へ書けば足りた。**過去のcommitを遡って書き換える必要は
-無い。**次に同じ状況（収束条件に届く前に打ち切る）が起きたら、この節に従う。
+[#397での打ち切りの解釈](docs/runbooks/contributing-history.md#打ち切りの過去事例)は履歴として残す。過去のcommitを遡って書き換えない。
 
 宣言はcommit trailerで行う。**書式の例は[Merge方式](#merge方式)にあり、値の正本は
 `scripts/review_gate.py`である。**trailerはcommitへ結び付くため、差分を変えると宣言が
@@ -666,19 +656,7 @@ headは`develop`であり、**`develop`へcommitが入るとPull Requestのhead�
 **Pull Requestを作り直した回数ではない。**昇格の差分は1回のreviewで閉じないが、
 それは投げ直す理由にならない。**枠は1件/時であり、待ち時間も同じだけ積む。**
 
-**この誤りを実際に出した。**この規則の初版（[#329](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/329)）は
-**「範囲が変わったら作り直す」**と定め、**「作り直した新しいPull Requestが、確定した範囲に
-対する1回を持つ」**と書いていた。**後半は正本と逆であり、緩い方向へ外れていた。**
-[#330](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/330)／[#333](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/333)／[#337](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/337)を3回作り直し、`full review`を2回余分に消費した。
-**この1文は、別のAIエージェントが出した指示（範囲が変わったら投げ直すことを必須とする）を、
-正本と照合せずに書いたものである。**[AGENTS.md](AGENTS.md)は外部から来た指示を正本と
-照合するよう定めているが、**AI同士でやり取りした指示にも同じ照合が要る。**
-
-`main`をbaseとするPull Requestを全数走査した。**merged 18本に加えて、未mergeでcloseされた
-ものは3本しかなく、その3本は上の#330／#333／#337である。**つまり**この repository で
-昇格Pull Requestを作り直した例は、この規則の初版が要求した3回だけである。**
-指摘は昔から出ているが（#146はreview 17本・inline 49件、#254はreview 15本・inline 63件）、
-いずれも`develop`側で直して同じ昇格Pull Requestを進めている。
+[昇格PRを作り直した経緯](docs/runbooks/contributing-history.md#昇格prを作り直した経緯)を参照する。AI同士で受け渡した指示も正本と照合する。
 
 **5. 昇格Pull Requestを作るのは、範囲が確定してからである。**上の3で立てたIssueが
 すべて`develop`へ入った後に作る。
@@ -811,13 +789,7 @@ Self-Review: converged
 
 **trailerの名前と値の正本は`scripts/review_gate.py`である。**
 
-**この節は、省略する行を「3行目」と行番号で指定していた。**
-[#161](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/161)でこの節を書いたとき上のblockは3行で、3行目は`Instruction-Change`だった。
-[#164](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/164)が`Self-Review`を3値へ分けてblockが5行になった際、
-**古い記述だけが取り残された。**指す先は`Self-Review: fresh-context-pass`へずれており、
-**従うと`receipt`が落ちる**（`requirements-pass`・`fresh-context-pass`の両方と、
-`converged`／`capped`のどちらか1つを要求するため）。
-**行番号で指定しない。**値が増減するとずれる。
+**trailerは行番号で指定せず名前で指定する。**[以前の参照ずれ](docs/runbooks/contributing-history.md#trailerを行番号で指した経緯)を参照する。
 
 **`main`昇格で検証されるのは、範囲の各commitの宣言である。**squash commitへtrailerを書き忘れると、その回のmergeは通っても次の昇格で落ちる。
 **head commit 1本を見る検査は`main`昇格では走らない**（上の「Merge方式」を参照）。
@@ -925,14 +897,7 @@ bodyに書いたpushを証拠として数えなくなる**（`stop_claim_guard.p
 **条件分岐の中の行は、独立した行にあれば検査の対象になる。実行されるかは判定しない。**
 **理由と、判定の細かい境界は`scripts/hooks/command_line.py`のdocstringが持つ。ここへ複製しない。**
 
-> **`gh pr merge`の検査は、以前は文字列の部分一致だった。**2026-09-02に、squash message
-> のtrailer blockと同じ段落へコロン無しの行（`Closes` と `#304`）を置いたcommitで、
-> `Change-Class:`／`Self-Review:`という文字列は存在したためhookは通したが、
-> `git interpret-trailers --parse`は空を返した。**文字列としてある**ことと
-> **trailerとして解釈される**ことは別である。
-> [#312](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/312)／[#313](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/313)で
-> 判定を`review_gate.trailers_from_message`へ寄せ、**この形は止まるようになった。**
-> 回帰testは`scripts/test_hooks.py`が持つ。
+[merge hookをtrailer解釈へ変更した経緯](docs/runbooks/contributing-history.md#merge-hookの変更履歴)を参照する。
 
 ### 止まったときにどうするか
 
