@@ -474,8 +474,8 @@ Raspberry Pi公式文書「Configure UARTs」（上で引いた`interfaces.adoc`
   serialのlogin shellを`No`、serial port hardwareを`Yes`にして再起動する。
 - `Linux device names`: `/dev/serial0`はprimary UARTを指すsymbolic linkであり、`/dev/ttyAMA0`は
   最初のPL011である。上の設定でPL011がprimaryになるため、`/dev/serial0`は`/dev/ttyAMA0`を指す
-  （2つの記述を組み合わせて導いたもの）。hostの`serial_link` example（`crates/deskcat-serial/examples/serial_link.rs`）は
-  `--port /dev/serial0`で開く。deviceの名前は既定値にしない（`--port`は必須引数であり、crate本体の`SerialConfig`も
+  （2つの記述を組み合わせて導いたもの）。hostの`serial_link` example（`crates/deskcat-serial/examples/serial_link.rs`）は、
+  `--port /dev/serial0`を渡して起動する。deviceの名前は既定値にしない（`--port`は必須引数であり、crate本体の`SerialConfig`も
   `Default`を持たない）。
 
 ### 信号線をつないでよい条件
@@ -514,7 +514,7 @@ USB OTG変換cable（`hardware-bom.md`の`CABLE-PI-LINK-01`）はこの方式の
 
 | Bus | 候補device | 状態 | 不足している根拠 |
 |---|---|---|---|
-| UART（Pi link） | Raspberry Pi | **GPIO13（TX）／GPIO14（RX）に確定**（2026-09-28。`Pi–ESP32間のtransport`節）。GPIO1／GPIO3はboard上ブリッジの予約pinのまま、書き込みとdebug logに使う | 回り込み対策の保証値（`HW-TBD-036`。対策は直列4.7 kΩと接続の手順に決めた）。firmwareの移行（#487）。2026-09-28まではUSB connector経由だった |
+| UART（Pi link） | Raspberry Pi | **GPIO13（TX）／GPIO14（RX）に確定**（2026-09-28。`Pi–ESP32間のtransport`節）。GPIO1／GPIO3はboard上ブリッジの予約pinのまま、書き込みとdebug logに使う | 回り込み対策の保証値（`HW-TBD-036`。対策は直列4.7 kΩと接続の手順に決めた）。実機での通信（`boot`→ACK、[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)の受け入れ条件4）。firmwareは[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)で移行した。2026-09-28まではUSB connector経由だった |
 | ADC測定（`power-budget.md`） | Shunt、5 V rail、3.3 V rail | GPIO32／33／36に確定（すべてADC1） | 分圧器の実装と実測値。ADC2はWi-Fi有効時に使用不可のため割り当てない |
 | SPI display bus | LCD（MSP2807／ILI9341）、touch（同module） | GPIO18／23／19（SCLK／MOSI／MISO）＋CS個別（LCD: GPIO22、Touch: GPIO21）に確定 | Touch controller型番の現物確認、実際のSPI mode／速度の実測 |
 | I2C sensor bus | Accelerometer（ADXL345）、environment sensor（BME280） | GPIO25（SDA）／GPIO26（SCL）に確定 | **BME280側のjumperは2026-08-22に実測で確定した**（`J1`／`J2`／`J3`はすべて開放）。**残るのはADXL345側のpin接続の確認と、実効pull-up抵抗の計算である。****計算の式と前提は[I2C busの実効pull-up](#i2c-busの実効pull-up)節が正本であり、ここへ再掲しない。**同節は2026-08-25に一次資料（UM10204 Rev. 7.0 §7.1）から式と規定値を確定させた。**値が決まらない理由は3つある**（ADXL345側のpin接続、bus容量`Cb`、採るmode）。**いずれも同節に書いた。** **2026-08-22にBME280側のjumperを実測した。`J1`／`J2`はどちらも開放であり、module搭載の4.7 kΩプルアップはbusへ繋がっていない**（正は[sensor-datasheet-notes.md](sensor-datasheet-notes.md)の`現物の実装状態を実測で確定させた（2026-08-22）`。**ここへ再掲しない**）。**したがって実効pull-upの計算にBME280側の4.7 kΩを入れない。**`J1`／`J2`をはんだ付けするかは、この計算の結果で決める。**まだ決めていない。****計算前にはんだ付けしない。****あわせて`J3`が開放であるため、I2Cで使うには`J3`のはんだ付けが要る。****2026-09-22追記: 上の2026-08-22時点の記述は、`J3`について現在の状態と合わない。****状態・実施日・確認方法・根拠の水準は、すべて[sensor-datasheet-notes.md](sensor-datasheet-notes.md)の`jumper（AE-BME280）`節と`J3をはんだ付けした（2026-09-07）`節が持つ。ここへ再掲しない。**実施の記録は[experiment-log.md](experiment-log.md)の`EXP-014`。**上の2026-08-22時点の記述は書き換えていない。****実効pull-upの計算にBME280側の4.7 kΩを入れるかどうかは`J1`／`J2`で決まり、`J3`では変わらない。**`J1`／`J2`の現在の状態は上記の正本が持つ。**2026-09-24追記（[#472](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/472)）。**上の「残るのはADXL345側のpin接続の確認と、実効pull-up抵抗の計算である」と「値が決まらない理由は3つある（ADXL345側のpin接続、bus容量`Cb`、採るmode）」は、ADXL345側のpin接続（2026-08-27）とmode（2026-09-06、Standard-mode）の確定より前の記述である（`I2C busの実効pull-up`節の`確定した入力・まだ確定できない1つの入力`）。**残る入力は`Cb`の1つである。**上の2文はこの追記が置き換える。上の記述は書き換えていない |

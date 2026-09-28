@@ -185,8 +185,9 @@ pub const PI_PROTOCOL_UART_BAUDRATE_HZ: u32 = 115_200;
 /// loggingを止めなくなったためである（`crate::console`参照）。heartbeat、health snapshot
 /// （JSON 1行）、`boot_tx`等のlogを書いている間も、この`read`は呼ばれない。**log出力の
 /// 所要時間は測っていない。**consoleがbyteを送り終えるまで戻らない場合、所要時間は
-/// logのbyte数に比例し、UART0とPi linkがどちらも115200 bpsなら、その間にPi linkへ届き
-/// うるbyte数はlogのbyte数と同程度になる（計算であり、実測ではない）。health snapshotの
+/// logのbyte数に比例する。UART0のbaudは生成された`sdkconfig`の`CONFIG_ESP_CONSOLE_UART_BAUDRATE`
+/// で`115200`と確かめた（`#487`、ESP-IDF v5.5.3）。Pi linkも115200 bpsであるため、その間にPi linkへ
+/// 届きうるbyte数はlogのbyte数と同程度になる（計算であり、実測ではない）。health snapshotの
 /// 1行の長さも測っていない。**この見込みが512 byteに収まるかは、`#446`の受け入れ条件4の
 /// 試験で確かめる。**
 ///
