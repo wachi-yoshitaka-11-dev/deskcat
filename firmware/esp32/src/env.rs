@@ -47,8 +47,8 @@
 //!
 //! - Chip ID register（`0xD0`）。reset値は`0x60`（同文書`sensor-datasheet-notes.md`が
 //!   既に記録済み。**ここへ再掲しない**）。identify判定（`0x60`との一致）は呼び出し側の
-//!   責務とする（`display.rs`の[`DisplayId`](crate::display::DisplayId)と同じ「捏造しない」
-//!   形。このmoduleは生byteを返すだけで、BME280であると断定しない）。
+//!   責務とする（[`crate::accel::Adxl345`]と同じ「捏造しない」形。このmoduleは生byteを
+//!   返すだけで、BME280であると断定しない）。
 
 use esp_idf_svc::hal::delay::{TickType, TickType_t};
 use esp_idf_svc::hal::i2c::I2cDriver;

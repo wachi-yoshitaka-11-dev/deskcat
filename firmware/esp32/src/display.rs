@@ -2,6 +2,7 @@
 //!
 //! [Issue #13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13) の受け入れ条件
 //! （controller識別・単色fill・color order・四隅とorientation・更新timing）に対応する。
+//! 実機での結果は`docs/hardware/experiment-log.md`の`EXP-016`〜`EXP-018`にある。
 //!
 //! # 配線の根拠
 //!
@@ -29,30 +30,33 @@
 //!   （Sleep In状態からの解除。§15.4 Reset Timing、p.229）。
 //! - Memory Access Control (36h、MADCTL、§8.2.29 p.127)。Reset時default `00h`
 //!   （MY=MX=MV=ML=BGR=MH=0）。bit配置はparameter byteの`D7..D0`が
-//!   `MY MX MV ML BGR MH 0 0`（同節のbit表）であり、`BGR`は`D3`。
-//!   [`EXP-016`](../../../docs/hardware/experiment-log.md#exp-016-disp-01msp2807esp323v3-pin追加接続のbring-upcontroller識別単色fill四隅pattern)
-//!   （2026-09-27）の実機確認で、`BGR=0`（reset時default）のとき赤と青が入れ替わって
-//!   表示されることが分かったため、**`BGR=1`（`D3`のみ立てる）で初期化する。**
-//!   orientation bit（MY/MX/MV/ML/MH）はdefaultの`0`のまま変更しない
-//!   （搭載時にどちらを上にするかはまだ決まっていない。`EXP-016`参照）。
-//!   **`BGR=1`で赤と青の入れ替わりが実際に解消するかは、この変更の時点では実機で
-//!   確認していない。**次回の実機試験で確認する。実際の物理orientationは
-//!   moduleの現物に依存し、一次資料からは決まらない（[AGENTS.md](../../../AGENTS.md) 推測禁止）。
+//!   `MY MX MV ML BGR MH 0 0`（同節のbit表）である。**このfirmwareは`0x28`
+//!   （`MV`=`D5`と`BGR`=`D3`だけを立てる）で初期化する**（[`MADCTL_LANDSCAPE`]）。
+//!   - `BGR=1`: reset時default（`BGR=0`）では赤と青が入れ替わって表示された（`EXP-016`）。
+//!     `BGR=1`で入れ替わりが解消した（`EXP-017`の目視、`EXP-018`の写真）。
+//!   - `MV=1`、`MY=0`、`MX=0`: 横向き（320×240）で、論理座標の原点が左上、`x`が右、`y`が
+//!     下へ増える。§9.3 MCU to memory write/read direction（p.208）の表と、`EXP-018`の
+//!     写真（`MV=0`で描いた生の座標の向きから決め、`0x28`で四隅が一致した）による。
+//!     実際の物理orientationはmoduleの現物に依存し、一次資料だけからは決まらない
+//!     （[AGENTS.md](../../../AGENTS.md) 推測禁止）。
+//!   - **判定の向きは「横向き、14 pinの`J2`のheaderを右の辺にして見た向き」である**
+//!     （[#13の判断(2)](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13#issuecomment-5860773100)）。
+//!     [#34](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/34)の仮筐体で
+//!     頭へのLCDの載せ方が決まったら見直す。向きを変えるときは[`MADCTL_LANDSCAPE`]と
+//!     [`WIDTH`]／[`HEIGHT`]だけを変える。
 //! - Pixel Format Set (3Ah、COLMOD、§8.2.33 p.134)。`DPI`/`DBI` = `101`/`101`で16bit/pixel
 //!   （byte値`0x55`）。
-//! - Read ID4 (D3h、§8.3.23 p.186)。応答は4byte
-//!   （1st: dummy read period、2nd: IC version、3rd/4th: IC model name）。
-//!   Power On/SW Reset/HW Resetいずれのdefaultも`24'h009341h`であり、
-//!   3rd/4thが`0x93`/`0x41`であることが`ILI9341`の識別根拠になる。
-//!   **同節の`Restriction`は「EXTC should be high to enable this command」である。**
-//! - Read ID1／ID2／ID3 (DAh／DBh／DCh、§8.2.46〜§8.2.48 p.151〜153)。各節の表は
-//!   1st parameterをdummy、2nd parameterをID（ID1はmanufacturer ID、ID2はmodule/driver
-//!   version ID、ID3はmodule/driver ID）とする。**3節とも`Restriction`は空欄であり、
-//!   Sleep In状態でも`Availability`は`Yes`である。**ID2は「the ID parameter range is from
-//!   80h to FFh」とされる。一方、§7.1.10 Read Cycle Sequence（p.38）の4-wire serialの
-//!   8-bit read（RDID1/RDID2/RDID3）の図は、command byteの直後に8 bitを読む形であり、
-//!   dummyの期間を描いていない。**serialで読んだときに先頭にdummyが来るかは確かめていない。**
-//!   そのためこのdriverは2 byteを読み、両方をそのまま返す（[`Ili9341::read_id_register`]）。
+//! - **このdriverはcontrollerのID（Read ID4＝D3h、Read ID1〜3＝DAh〜DCh）を読まない。**
+//!   D3hは`EXP-016`〜`EXP-018`で、DAh〜DChは`EXP-018`で、期待する値を返さなかった
+//!   （`EXP-018`ではすべて`00`で、値の範囲が80h〜FFhと決まっているID2も範囲外）。読み出しのdataが
+//!   ESP32の`LCD-MISO`へ届いていない見込みがある。原因の候補は`EXP-018`にあり、特定していない。
+//!   その候補の一つとして、§7.1.10（p.38）の4-wire serialの図は、Interface Iでは
+//!   読み出しdataを`SDA`（この配線では`MOSI`の線）へ出すと描いており、その場合は読み出しの
+//!   たびにcontrollerとESP32が同じ線を駆動しうる。moduleをどちらに設定しているかは、
+//!   moduleを改変しない方法では確かめられない。**読んでも識別に使えず、線の衝突の
+//!   おそれだけが残るため、読み出しのcodeを削除した。**読み出しのcodeは commit `213a107`
+//!   に残る。controllerの識別は、moduleのsilkと資料、およびこの節が挙げるcommandが実機で
+//!   期待どおりに効いたこと（`EXP-018`）で記録する。
 //! - Display Serial Interface Timing（4-line SPI system、§18.3.4 p.242）。
 //!   `twc`（write clock cycle）min 100ns → 最大10 MHz、`trc`（read clock cycle）min 150ns
 //!   → 最大約6.67 MHz。**このfirmwareは読み書き共通で1本のSPI clockを使うため、
@@ -84,13 +88,10 @@ use esp_idf_svc::sys::{EspError, ESP_ERR_INVALID_ARG};
 /// SPI clockの上限。read timing（`trc`最小150ns→最大約6.67 MHz）を基準に、
 /// write（`twc`最小100ns→最大10 MHz）にも共通で使えるよう余裕を持たせた値。
 /// **測定や一般値ではなく、上記一次資料の上限から導いた値である。**
+/// 今は読み出しをしない（module doc）が、`LCD-MISO`はbusに残るため値は変えない。
 const SPI_CLOCK_HZ: u32 = 6_000_000;
 
 const CMD_SWRESET: u8 = 0x01;
-const CMD_RDID4: u8 = 0xD3;
-const CMD_RDID1: u8 = 0xDA;
-const CMD_RDID2: u8 = 0xDB;
-const CMD_RDID3: u8 = 0xDC;
 const CMD_SLPOUT: u8 = 0x11;
 const CMD_DISPON: u8 = 0x29;
 const CMD_CASET: u8 = 0x2A;
@@ -101,81 +102,29 @@ const CMD_COLMOD: u8 = 0x3A;
 
 /// Reset時のMADCTL既定値（`00h`）。**一次資料の`Default Value`欄そのものであり、
 /// このfirmwareが独自に選んだ値ではない。**module doc参照。
-/// **このfirmwareは初期化時にこの値を書き込まない（下記`MADCTL_BGR_ENABLED`を書き込む）。**
+/// **このfirmwareは初期化時にこの値を書き込まない（下記[`MADCTL_LANDSCAPE`]を書き込む）。**
 /// IC自体のreset時defaultを示す値として残す。
 const MADCTL_RESET_DEFAULT: u8 = 0x00;
 
-/// `BGR`bit（`D3`）だけを立てたMADCTL値。ILI9341 Datasheet V1.11 §8.2.29 p.127の
-/// bit表（parameter byte `D7..D0` = `MY MX MV ML BGR MH 0 0`）に基づく。
-/// [`EXP-016`](../../../docs/hardware/experiment-log.md#exp-016-disp-01msp2807esp323v3-pin追加接続のbring-upcontroller識別単色fill四隅pattern)
-/// （2026-09-27）が、reset時default（`BGR=0`）で赤と青が入れ替わって表示されることを
-/// 確認したため、`BGR=1`へ変更する。orientation bit（MY/MX/MV/ML/MH）は`0`のまま
-/// （module doc参照）。**`BGR=1`で入れ替わりが解消するかは実機で未確認。**
-const MADCTL_BGR_ENABLED: u8 = 0x08;
+/// 初期化で書き込むMADCTL値。`MY=0 MX=0 MV=1 ML=0 BGR=1 MH=0`（`0x28`）。
+///
+/// bitの意味はILI9341 Datasheet V1.11 §8.2.29 p.127のbit表、`MV`・`MY`・`MX`と
+/// CASET／PASETの行き先は§9.3 p.208の表による。値は`docs/hardware/experiment-log.md`の
+/// `EXP-018`の写真で決め、この値で横向き（`J2`を右）の四隅が一致することを確かめた。
+/// **向きの値はここと[`WIDTH`]／[`HEIGHT`]だけに置く**（開発ガイド§9.5「LCDの寸法と向き」）。
+pub const MADCTL_LANDSCAPE: u8 = 0x28;
 
 /// 16 bit/pixel（RGB565相当）。`DPI[2:0]=101, DBI[2:0]=101`（module doc参照）。
 const COLMOD_16BPP: u8 = 0x55;
 
-/// Panel解像度。`hardware-bom.md` DISP-01行。現物silk `2.8 TFT SPI 240X320 V1.2`に従い
-/// 240列×320行（reset時MADCTLでの列/行方向。回転はMADCTLで変わる）。
-pub const WIDTH: u16 = 240;
-pub const HEIGHT: u16 = 320;
-
-/// Read ID4 (D3h) の期待値（3rd/4th parameter）。一次資料の`Default Value`欄
-/// （`24'h009341h`）の下位2byte。
-const EXPECTED_ID4_HI: u8 = 0x93;
-const EXPECTED_ID4_LO: u8 = 0x41;
-
-/// ILI9341識別結果。**捏造しない。**読めた生byteをそのまま保持する。
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct DisplayId {
-    /// Read ID4 (D3h) の4byte応答（dummy, version, id_hi, id_lo）。
-    pub raw: [u8; 4],
-}
-
-impl DisplayId {
-    /// `id_hi`/`id_lo`が`ILI9341`のdefault（`0x93`/`0x41`）と一致するか。
-    #[must_use]
-    pub const fn matches_ili9341(&self) -> bool {
-        self.raw[2] == EXPECTED_ID4_HI && self.raw[3] == EXPECTED_ID4_LO
-    }
-}
-
-/// Read ID1／ID2／ID3で読むregister（module doc参照）。
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum IdRegister {
-    /// Read ID1（DAh）。manufacturer ID。
-    Id1,
-    /// Read ID2（DBh）。module/driver version ID。
-    Id2,
-    /// Read ID3（DCh）。module/driver ID。
-    Id3,
-}
-
-impl IdRegister {
-    /// 読む順。
-    pub const ALL: [Self; 3] = [Self::Id1, Self::Id2, Self::Id3];
-
-    /// command byte。
-    #[must_use]
-    pub const fn command(self) -> u8 {
-        match self {
-            Self::Id1 => CMD_RDID1,
-            Self::Id2 => CMD_RDID2,
-            Self::Id3 => CMD_RDID3,
-        }
-    }
-
-    /// logへ出す名前。
-    #[must_use]
-    pub const fn name(self) -> &'static str {
-        match self {
-            Self::Id1 => "id1",
-            Self::Id2 => "id2",
-            Self::Id3 => "id3",
-        }
-    }
-}
+/// 論理座標での画面の幅と高さ（[`MADCTL_LANDSCAPE`]の横向き）。
+///
+/// Panelは`hardware-bom.md` DISP-01行、現物silk `2.8 TFT SPI 240X320 V1.2`のとおり
+/// 物理的に240列×320行である。`MV=1`ではCASET（`x`）が物理の行（0〜319）へ、
+/// PASET（`y`）が物理の列（0〜239）へ向かう（§9.3 p.208）ため、幅320・高さ240になる。
+/// **[`MADCTL_LANDSCAPE`]の`MV`を変えるときは、ここも入れ替える。**
+pub const WIDTH: u16 = 320;
+pub const HEIGHT: u16 = 240;
 
 /// RGB565の代表色。**一般値ではなく、色空間の定義そのもの**
 /// （赤・緑・青・白の各chをfull scaleにしただけ）。
@@ -303,47 +252,23 @@ impl<'d> Ili9341<'d> {
         })
     }
 
-    /// Read ID4 (D3h)。command byteの直後（D/CXをHighへ切り替えた後）に4byteを読む。
-    /// **1byte目は一次資料が明記する`dummy read period`であり、判定に使わない。**
-    pub fn read_id(&mut self) -> Result<DisplayId, EspError> {
-        let mut raw = [0u8; 4];
-        self.with_transaction(CMD_RDID4, |this| this.bus.read(&mut raw))?;
-        Ok(DisplayId { raw })
-    }
-
-    /// Read ID1／ID2／ID3のいずれかを1回読み、command byteの後の2 byteをそのまま返す。
-    ///
-    /// **どちらのbyteがIDかを判定しない。**datasheetの表は1st parameterをdummyとし、
-    /// serialの8-bit readの図はdummyを描いていない（module doc参照）。判定はlogを読む人間が行う。
-    /// **呼び出し側は1回の起動で同じregisterを繰り返し読まない**（`main.rs`の
-    /// `run_id_register_reads`のdoc参照）。
-    pub fn read_id_register(&mut self, register: IdRegister) -> Result<[u8; 2], EspError> {
-        let mut raw = [0u8; 2];
-        self.with_transaction(register.command(), |this| this.bus.read(&mut raw))?;
-        Ok(raw)
-    }
-
-    /// 初期化sequence。**controller識別→reset解除待ち→sleep out→pixel
-    /// format→MADCTL（`BGR=1`）→display on、の順で一次資料の待ち時間を守る。**
-    ///
-    /// 戻り値の[`DisplayId`]は呼び出し側が`matches_ili9341()`で判定し、ログへ残すこと
-    /// （このmoduleでは判定結果を握りつぶさない。呼び出し側の責務とする）。
-    pub fn init(&mut self) -> Result<DisplayId, EspError> {
+    /// 初期化sequence。**hardware reset→software reset→sleep out→pixel
+    /// format→MADCTL（[`MADCTL_LANDSCAPE`]）→display on、の順で一次資料の待ち時間を守る。**
+    /// controllerのIDは読まない（module doc）。
+    pub fn init(&mut self) -> Result<(), EspError> {
         self.hardware_reset()?;
 
         self.command(CMD_SWRESET, &[])?;
         FreeRtos::delay_ms(5);
 
-        let id = self.read_id()?;
-
         self.command(CMD_SLPOUT, &[])?;
         FreeRtos::delay_ms(120);
 
         self.command(CMD_COLMOD, &[COLMOD_16BPP])?;
-        self.command(CMD_MADCTL, &[MADCTL_BGR_ENABLED])?;
+        self.command(CMD_MADCTL, &[MADCTL_LANDSCAPE])?;
         self.command(CMD_DISPON, &[])?;
 
-        Ok(id)
+        Ok(())
     }
 
     /// Backlightを点灯する。**controller初期化（`init`）が完了した後に呼ぶこと。**
