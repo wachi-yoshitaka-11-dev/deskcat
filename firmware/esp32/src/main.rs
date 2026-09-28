@@ -1067,14 +1067,16 @@ fn run_servo_bench_test(
 /// Read ID1／ID2／ID3（DAh／DBh／DCh）を1回ずつ読み、生byteをlogへ出す。
 ///
 /// [Issue #13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)の条件1の切り分けに使う。
-/// `display_id`（Read ID4、D3h）が`EXP-016`・`EXP-017`で毎回違う値だったため、`EXTC`を
-/// 要しないこの3つを足して読む（根拠は`crate::display`のmodule doc）。
+/// `display_id`（Read ID4、D3h）は`EXP-016`・`EXP-017`を通じて3種類の値を観測し、いずれも
+/// 期待値と一致しなかった（`docs/hardware/experiment-log.md`）。`EXTC`を要しないこの3つを
+/// 足して読む（根拠は`crate::display`のmodule doc）。
 /// **一致判定はここでは行わない。**`run_i2c_bringup`と同じく生byteを残すだけであり、
 /// どちらのbyteがIDか（先頭がdummyか）の判断もlogを読む人間が行う。
 ///
-/// **1回の起動で各registerを1回しか読まない。**読み出しの向きが`SDO`ではなく`SDA`
-/// （`MOSI`の線）になる構成だった場合、読み出しのたびにcontrollerとESP32が同じ線を
-/// 駆動しうる（未確認のriskとして#13の2026-09-28の調査が挙げている）。**起動をまたいで
+/// **1回の起動で各registerを1回しか読まない。**ILI9341 Datasheet V1.11 §7.1.10（p.38）の
+/// 4-wire serialの図は、Interface Iでは読み出しdataを`SDA`（この配線では`MOSI`の線）へ、
+/// Interface IIでは`SDO`へ出すと描いている。moduleがどちらに設定されているかは確かめて
+/// いない。Interface Iだった場合、読み出しのたびにcontrollerとESP32が同じ線を駆動しうる。**起動をまたいで
 /// `id2`の値が毎回違う場合に、以後のbuildで読み出しを続けるかは、PMとユーザーが判断する。**
 /// 読み出しの失敗は`display_rdid_failed`へ分類し、残りのregisterと後続の段階を止めない。
 #[cfg(feature = "bringup-display-13")]
@@ -1099,7 +1101,7 @@ fn run_id_register_reads(lcd: &mut Ili9341<'_>, health: &mut Health) {
 /// 判定するのは人間であり（`AGENTS.md`ハードウェア安全、初回通電は人間監視下）、
 /// この関数は色と所要時間を機械可読な形でlogへ残すだけである。
 ///
-/// 描けた色は[`config::DISPLAY_FILL_HOLD_MS`]だけ表示したまま保ち、人が色ごとに写真を
+/// 描けた色は[`config::DISPLAY_HOLD_MS`]だけ表示したまま保ち、人が色ごとに写真を
 /// 撮れるようにする。`display_fill`の行の`hold_ms`がその値であり、行が出てから次の色へ
 /// 移るまでの目安になる。`elapsed_us`は描画だけの所要時間であり、保つ時間を含まない。
 #[cfg(feature = "bringup-display-13")]
@@ -1117,7 +1119,7 @@ fn run_fill_tests(lcd: &mut Ili9341<'_>, health: &mut Health) {
         match lcd.fill_screen(color) {
             Ok(()) => {
                 let elapsed_us = start.elapsed().as_micros();
-                let hold_ms = config::DISPLAY_FILL_HOLD_MS;
+                let hold_ms = config::DISPLAY_HOLD_MS;
                 log::info!(
                     "display_fill name={name} color=0x{color:04x} elapsed_us={elapsed_us} hold_ms={hold_ms}"
                 );
@@ -1152,7 +1154,10 @@ fn run_fill_tests(lcd: &mut Ili9341<'_>, health: &mut Health) {
 /// | `x_axis` | `origin`から`x_end`へ、列の増える向き | 幅8 pxの**実線** | 白 |
 /// | `y_axis` | `origin`から`y_end`へ、行の増える向き | 幅8 pxの**破線** | 白 |
 ///
-/// 各要素の座標は`display_pattern_element`の行としてlogにも出す。
+/// 各要素の座標は`display_pattern_element`の行としてlogにも出す。描き終えたら
+/// [`config::DISPLAY_HOLD_MS`]だけ表示したまま保つ（`display_pattern_hold`の行）。
+/// **この関数が戻ると`run_display_bringup`も戻り、backlightが消える**（同定数のdoc）。
+/// 写真はこの間に撮る。
 ///
 /// # 写真から`MY`／`MX`／`MV`を決める手順
 ///
@@ -1255,6 +1260,10 @@ fn run_corner_pattern(lcd: &mut Ili9341<'_>, health: &mut Health) {
 
     let elapsed_us = start.elapsed().as_micros();
     log::info!("display_corner_pattern elapsed_us={elapsed_us}");
+
+    let hold_ms = config::DISPLAY_HOLD_MS;
+    log::info!("display_pattern_hold hold_ms={hold_ms}");
+    FreeRtos::delay_ms(hold_ms);
 }
 
 /// Health snapshot を 1 行の JSON として log へ出す。
