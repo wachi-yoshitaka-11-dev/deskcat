@@ -54,7 +54,7 @@ pub enum Received {
 /// | type | 扱い |
 /// |---|---|
 /// | `boot` | [`handle_boot`]へ渡す。ACKは拒否でも返す（§4.1） |
-/// | `ack` | [`PeerSession::correlate_ack`]でPiの要求と相関する。`reply_sid`はこの`Session`の`sid`と照合する。**Piの`hello`へのACKも、`hello`を追跡していないため`UnmatchedAck`の拒否になる**（下記） |
+/// | `ack` | [`PeerSession::correlate_ack`]でPiの要求と相関する。`reply_sid`はこの`Session`の`sid`と照合する。Piの`hello`へのACKも相関する（下記） |
 /// | `status` | [`PeerSession::accept_status`]で受理する。`get_status`への応答かどうかも返す |
 /// | それ以外 | ESP32→Piでは定義されていない。応答せず[`PeerSession::note_undefined_type`]で計上する |
 ///
@@ -63,9 +63,14 @@ pub enum Received {
 /// **`ping`／`get_status`が`stale_session`で拒否された場合の再開（§3.1「現在の`sid`のまま`hello`から
 /// 再開する」、§10.2）は、ここでは行わない。**`hello`の送出と再送はPi自身のsession
 /// 確立の経路であり、この関数は判断を[`Received::Ack`]として呼び出し側へ返すだけである。
-/// 同じ理由で、Piが送った`hello`へのACKはここで相関できない。[`PeerSession::note_sent`]は
-/// `ping`／`get_status`だけを追跡するため、そのACKは[`PeerRejection::UnmatchedAck`]として
-/// [`Received::Rejected`]になり、[`crate::PeerCounters::unmatched_acks`]にも数える。
+///
+/// **Piの`hello`へのACK**は、呼び出し側が[`PeerSession::note_hello_sent`]で`hello`の`id`を
+/// 記録していれば相関する。現在のESP32 sessionから届いたものは[`Received::Ack`]
+/// （[`OutstandingKind::Hello`]）になり、`rejected`ならそのcodeをlogへ出す。応答送信側の
+/// `sid`が未知のもの（Piの起動直後の`hello`は多くの場合こうなる）は、§6のとおり`hello`の
+/// 結果として受理せず、[`PeerRejection::UnapprovedHelloAck`]の[`Received::Rejected`]にする。
+/// **§6の本物の不一致（[`PeerRejection::UnmatchedAck`]）とはlogの文面もcounterも分ける。**
+/// `hello`の再送は行わない（[`OutstandingKind::Hello`]のdoc参照）。
 pub fn handle_frame(
     session: &mut Session,
     peer: &mut PeerSession,
@@ -115,7 +120,13 @@ pub fn handle_frame(
 
 /// 拒否をlogへ残し、[`Received::Rejected`]にする。計上は[`PeerSession`]が済ませている。
 fn reject(type_str: &'static str, sid: u32, id: u32, rejection: PeerRejection) -> Received {
-    log::warn!("{type_str}を拒否した: sid={sid} id={id} rejection={rejection:?}");
+    if rejection == PeerRejection::UnapprovedHelloAck {
+        log::warn!(
+            "helloへのACKを受けたが、応答送信側のsessionが未承認のため受理しない（§6）: sid={sid} id={id}"
+        );
+    } else {
+        log::warn!("{type_str}を拒否した: sid={sid} id={id} rejection={rejection:?}");
+    }
     Received::Rejected {
         type_str,
         rejection,
