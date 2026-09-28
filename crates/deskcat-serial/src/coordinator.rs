@@ -1,8 +1,11 @@
 //! [`Session`]（transportとPi自身の送信）と[`PeerSession`]（ESP32側の状態）を
 //! またいで、送信を伴う判断を行う。
 //!
-//! ここでやるのは2つだけである。
+//! ここでやるのは3つだけである。
 //!
+//! - 受信した[`Frame`]をtypeごとに振り分ける（[`handle_frame`]）。`boot`は次項へ、
+//!   `ack`はPiの要求（`ping`／`get_status`）との相関へ、`status`は受理へ回し、
+//!   ESP32→Piで定義されていないtypeは応答せず計上する（§3、§6、§8）
 //! - `boot`を1件処理してACKを送り返す（outcomeによらず常に。§4.1）。ACKの
 //!   送信自体が失敗しても、この関数は再試行しない（回復はESP32側の`boot`再送に
 //!   頼る）。確立した場合は続けて現在状態を要求し（§10.1 step1〜4）、
@@ -14,16 +17,117 @@
 //! ここに含まない。**「望ましい状態」はdomain層の概念であり、`lib.rs`の
 //! module docが定める「domain動作はこのcrateに入らない」という範囲の外にある。
 
-use deskcat_protocol::{Boot, Message};
+use deskcat_protocol::{AckStatus, Boot, Frame, Message};
 
-use crate::peer::{BootHandled, BootOutcome, OutstandingAction, OutstandingKind, PeerSession};
+use crate::peer::{
+    AcceptedStatus, BootHandled, BootOutcome, CorrelatedAck, OutstandingAction, OutstandingKind,
+    PeerRejection, PeerSession,
+};
 use crate::session::{ConnectionState, SendError, Session};
+
+/// [`handle_frame`]が受信frameへ下した判断。
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum Received {
+    /// `boot`を処理した。ACKの送信は[`handle_boot`]が済ませている。
+    Boot(BootHandled),
+    /// Piの要求への`ack`を相関した。`ok`か`rejected`かは[`CorrelatedAck::ack`]の`status`で見る。
+    Ack(CorrelatedAck),
+    /// 現在sessionの`status`を受理した。
+    Status(Box<AcceptedStatus>),
+    /// `ack`または`status`を拒否した。**応答は返さない**（ESP32→Piのeventと、Piの要求への
+    /// 応答は、返す先の要求が無い。§8）。
+    Rejected {
+        /// 受信したmessageのtype。
+        type_str: &'static str,
+        /// 拒否した理由。
+        rejection: PeerRejection,
+    },
+    /// ESP32→Piで定義されていないtype（`hello`・`ping`・`get_status`）を、応答せず無視した。
+    UndefinedType(&'static str),
+}
+
+/// 受信した[`Frame`]を1件処理する。
+///
+/// 呼び出し側は[`Session::pump_read`]で復元したframeをここへ渡す。typeごとの扱いは次のとおり。
+///
+/// | type | 扱い |
+/// |---|---|
+/// | `boot` | [`handle_boot`]へ渡す。ACKは拒否でも返す（§4.1） |
+/// | `ack` | [`PeerSession::correlate_ack`]でPiの要求と相関する。`reply_sid`はこの`Session`の`sid`と照合する。**Piの`hello`へのACKも、`hello`を追跡していないため`UnmatchedAck`の拒否になる**（下記） |
+/// | `status` | [`PeerSession::accept_status`]で受理する。`get_status`への応答かどうかも返す |
+/// | それ以外 | ESP32→Piでは定義されていない。応答せず[`PeerSession::note_undefined_type`]で計上する |
+///
+/// 拒否と無視は`log::warn!`へ残す。握りつぶさない。
+///
+/// **`ping`／`get_status`が`stale_session`で拒否された場合の再開（§3.1「現在の`sid`のまま`hello`から
+/// 再開する」、§10.2）は、ここでは行わない。**`hello`の送出と再送はPi自身のsession
+/// 確立の経路であり、この関数は判断を[`Received::Ack`]として呼び出し側へ返すだけである。
+/// 同じ理由で、Piが送った`hello`へのACKはここで相関できない。[`PeerSession::note_sent`]は
+/// `ping`／`get_status`だけを追跡するため、そのACKは[`PeerRejection::UnmatchedAck`]として
+/// [`Received::Rejected`]になり、[`crate::PeerCounters::unmatched_acks`]にも数える。
+pub fn handle_frame(
+    session: &mut Session,
+    peer: &mut PeerSession,
+    frame: Frame,
+    now_ms: u64,
+) -> Received {
+    let Frame { envelope, message } = frame;
+    let type_str = message.type_str();
+    match message {
+        Message::Boot(boot) => Received::Boot(handle_boot(
+            session,
+            peer,
+            envelope.sid,
+            envelope.id,
+            boot,
+            now_ms,
+        )),
+        Message::Ack(ack) => match peer.correlate_ack(envelope.sid, session.sid(), ack) {
+            Ok(correlated) => {
+                if correlated.ack.status == AckStatus::Rejected {
+                    log::warn!(
+                        "id {}の{:?}が拒否された: code={:?}",
+                        correlated.ack.reply_to,
+                        correlated.request,
+                        correlated.ack.code
+                    );
+                }
+                Received::Ack(correlated)
+            }
+            Err(rejection) => reject(type_str, envelope.sid, envelope.id, rejection),
+        },
+        Message::Status(status) => match peer.accept_status(envelope.sid, *status) {
+            Ok(accepted) => Received::Status(Box::new(accepted)),
+            Err(rejection) => reject(type_str, envelope.sid, envelope.id, rejection),
+        },
+        _ => {
+            peer.note_undefined_type();
+            log::warn!(
+                "ESP32→Piで定義されていないtype {type_str}を無視した: sid={} id={}",
+                envelope.sid,
+                envelope.id
+            );
+            Received::UndefinedType(type_str)
+        }
+    }
+}
+
+/// 拒否をlogへ残し、[`Received::Rejected`]にする。計上は[`PeerSession`]が済ませている。
+fn reject(type_str: &'static str, sid: u32, id: u32, rejection: PeerRejection) -> Received {
+    log::warn!("{type_str}を拒否した: sid={sid} id={id} rejection={rejection:?}");
+    Received::Rejected {
+        type_str,
+        rejection,
+    }
+}
 
 /// `boot`を1件処理し、ACKを送り返す。新しいESP32 sessionを確立した場合は、
 /// 続けて`get_status`を送って現在状態を要求する（§10.1 step1〜4）。
 ///
 /// `sid`／`id`／`boot`は、受信した`boot` frameからそのまま渡す。`now_ms`は
-/// 送信に使う時刻（送信側のuptime。wall-clock timeではない、§3）である。
+/// 送信に使う時刻（送信側のuptime。wall-clock timeではない、§3）であり、
+/// duplicate履歴の保持期間もこの時計で測る（[`PeerSession::handle_boot`]）。
 ///
 /// **常に`BootHandled`を返す。**[`PeerSession::handle_boot`]自体は失敗せず、
 /// session状態はその呼び出し時点で既に確定している。続くACK／`get_status`の
@@ -40,7 +144,7 @@ pub fn handle_boot(
     boot: Boot,
     now_ms: u64,
 ) -> BootHandled {
-    let handled = peer.handle_boot(sid, id, boot);
+    let handled = peer.handle_boot(sid, id, boot, now_ms);
 
     if let Err(err) = session.send(handled.reply.clone(), now_ms) {
         log::warn!("bootへのACK送信に失敗した: {err}");

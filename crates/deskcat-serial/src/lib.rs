@@ -18,8 +18,12 @@
 //! - ESP32 peer sessionの状態（[`PeerSession`]）。`boot`のsession遷移、duplicate履歴、
 //!   `hello`／`boot`以外の`stale_session`判定、Piが送った要求への応答の相関
 //!   （[Issue #12]、`crates/deskcat-serial/src/peer.rs`）
-//! - [`Session`]と[`PeerSession`]をまたいだ送信の判断（[`handle_boot`]、
-//!   [`retry_due_requests`]）。`boot`確立後の`get_status`送出（§10.1 step1〜4）と、
+//! - 現在sessionのduplicate履歴（[`DuplicateHistory`]）。保持件数と保持期間
+//!   （`PROTO-TBD-005`）は[`DuplicatePolicy`]として呼び出し側から受け取る
+//!   （`crates/deskcat-serial/src/duplicate.rs`）
+//! - [`Session`]と[`PeerSession`]をまたいだ受信と送信の判断（[`handle_frame`]、
+//!   [`handle_boot`]、[`retry_due_requests`]）。受信frameの振り分け（`ack`の相関、
+//!   `status`の受理）、`boot`確立後の`get_status`送出（§10.1 step1〜4）と、
 //!   ACK timeoutした要求の同一`id`再送（§9）に限る
 //!   （`crates/deskcat-serial/src/coordinator.rs`）
 //!
@@ -75,20 +79,22 @@
 pub mod config;
 pub mod coordinator;
 pub mod device;
+pub mod duplicate;
 pub mod ids;
 pub mod outbox;
 pub mod peer;
 pub mod session;
 pub mod transport;
 
-pub use config::{ConfigError, ReconnectPolicy, RetryPolicy, SerialConfig};
-pub use coordinator::{RetryOutcome, handle_boot, retry_due_requests};
+pub use config::{ConfigError, DuplicatePolicy, ReconnectPolicy, RetryPolicy, SerialConfig};
+pub use coordinator::{Received, RetryOutcome, handle_boot, handle_frame, retry_due_requests};
 pub use device::SerialDevice;
+pub use duplicate::{DuplicateHistory, Lookup};
 pub use ids::{IdAllocator, IdSpaceExhausted};
 pub use outbox::{Enqueued, Outbox};
 pub use peer::{
-    BootHandled, BootOutcome, CorrelatedAck, OutstandingAction, OutstandingKind, PeerRejection,
-    PeerSession,
+    AcceptedStatus, BootHandled, BootOutcome, CorrelatedAck, OutstandingAction, OutstandingKind,
+    PeerCounters, PeerRejection, PeerSession,
 };
 pub use session::{ConnectionState, Pump, SendError, Session, SessionCounters, StopReason};
 pub use transport::{IoDisposition, Transport};

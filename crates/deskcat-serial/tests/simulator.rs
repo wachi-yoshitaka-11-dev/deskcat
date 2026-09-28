@@ -104,6 +104,11 @@ fn config() -> SerialConfig {
     SerialConfig::new("/dev/simulated", 115_200).expect("設定は妥当である")
 }
 
+/// test用のduplicate履歴の方針。**値はtestの都合であり、`PROTO-TBD-005`の候補ではない。**
+fn duplicate_policy() -> deskcat_serial::DuplicatePolicy {
+    deskcat_serial::DuplicatePolicy::new(8, Duration::from_secs(1)).expect("0ではない")
+}
+
 fn connected_session() -> Session {
     let mut session = Session::new(config(), 90_312);
     session.note_connected();
@@ -1050,7 +1055,7 @@ mod logging {
             Pump::Fatal,
             "前提: 停止する"
         );
-        let mut peer = deskcat_serial::PeerSession::new();
+        let mut peer = deskcat_serial::PeerSession::new(super::duplicate_policy());
         peer.mark_status_sync_pending();
         let _ = take();
 
@@ -1079,7 +1084,7 @@ mod logging {
         let _ = session
             .send(hello(), 10)
             .expect("上限の1つ手前までは送れる");
-        let mut peer = deskcat_serial::PeerSession::new();
+        let mut peer = deskcat_serial::PeerSession::new(super::duplicate_policy());
         peer.mark_status_sync_pending();
         let _ = take();
 
@@ -1260,8 +1265,8 @@ mod peer_protocol {
         decode_line, encode_line, limits,
     };
     use deskcat_serial::{
-        BootOutcome, OutstandingKind, PeerRejection, PeerSession, RetryOutcome, RetryPolicy,
-        Session, handle_boot, retry_due_requests,
+        BootOutcome, OutstandingKind, PeerRejection, PeerSession, Received, RetryOutcome,
+        RetryPolicy, Session, handle_boot, handle_frame, retry_due_requests,
     };
 
     const ESP32_SID: u32 = 41_207;
@@ -1385,11 +1390,11 @@ mod peer_protocol {
         let mut sim = Sim::with_reads(vec![Ok(line.into_bytes())]);
         let frame = recv_one_frame(&mut esp32_in, &mut sim, line_len);
 
-        let mut peer = PeerSession::new();
+        let mut peer = PeerSession::new(super::duplicate_policy());
         let Message::Boot(boot) = frame.message else {
             panic!("Bootを期待した");
         };
-        let handled = peer.handle_boot(frame.envelope.sid, frame.envelope.id, boot);
+        let handled = peer.handle_boot(frame.envelope.sid, frame.envelope.id, boot, 0);
         assert!(matches!(
             handled.outcome,
             BootOutcome::Established { sid: ESP32_SID, .. }
@@ -1405,7 +1410,7 @@ mod peer_protocol {
     /// 受け入れ条件: `boot`の再送（duplicate）は同じACKのreplayになる。
     #[test]
     fn a_retried_boot_line_replays_the_same_ack_over_the_wire() {
-        let mut peer = PeerSession::new();
+        let mut peer = PeerSession::new(super::duplicate_policy());
         let line = boot_line(ESP32_SID, 1);
         let line_len = line.len();
         let mut sim = Sim::with_reads(vec![Ok(line.clone().into_bytes()), Ok(line.into_bytes())]);
@@ -1415,13 +1420,13 @@ mod peer_protocol {
         let Message::Boot(boot) = first_frame.message.clone() else {
             panic!("Bootを期待した");
         };
-        let first = peer.handle_boot(first_frame.envelope.sid, first_frame.envelope.id, boot);
+        let first = peer.handle_boot(first_frame.envelope.sid, first_frame.envelope.id, boot, 0);
 
         let retry_frame = recv_one_frame(&mut esp32_in, &mut sim, line_len);
         let Message::Boot(boot) = retry_frame.message else {
             panic!("Bootを期待した");
         };
-        let retry = peer.handle_boot(retry_frame.envelope.sid, retry_frame.envelope.id, boot);
+        let retry = peer.handle_boot(retry_frame.envelope.sid, retry_frame.envelope.id, boot, 0);
 
         assert_eq!(retry.outcome, BootOutcome::Replayed);
         assert_eq!(
@@ -1433,8 +1438,8 @@ mod peer_protocol {
     /// 受け入れ条件: `ping`への応答（ACK）を、Piが送った要求と相関できる。
     #[test]
     fn pings_ack_is_correlated_with_the_outstanding_request() {
-        let mut peer = PeerSession::new();
-        let _ = peer.handle_boot(ESP32_SID, 1, boot_payload());
+        let mut peer = PeerSession::new(super::duplicate_policy());
+        let _ = peer.handle_boot(ESP32_SID, 1, boot_payload(), 0);
 
         let mut pi = connected_session_with_sid(PI_SID);
         let id = pi.send(Message::Ping, 500).expect("queueへ入る");
@@ -1465,8 +1470,8 @@ mod peer_protocol {
     /// 受け入れ条件: `get_status`への応答（ACK＋`status`）を相関し、`status`を受理できる。
     #[test]
     fn get_status_ack_and_status_are_accepted_for_the_current_session() {
-        let mut peer = PeerSession::new();
-        let _ = peer.handle_boot(ESP32_SID, 1, boot_payload());
+        let mut peer = PeerSession::new(super::duplicate_policy());
+        let _ = peer.handle_boot(ESP32_SID, 1, boot_payload(), 0);
 
         let mut pi = connected_session_with_sid(PI_SID);
         let id = pi.send(Message::GetStatus, 500).expect("queueへ入る");
@@ -1512,17 +1517,18 @@ mod peer_protocol {
     }
 
     // 受け入れ条件の`duplicate_expired`: `boot`単独では、正規のtrafficで容量超過は
-    // 起きない（1 sessionにつき1つの`id`しか処理しないため）。境界そのものは
-    // `crates/deskcat-serial/src/peer.rs`の
-    // `boot_history_reports_duplicate_expired_for_evicted_entries`が検査する。
+    // 起きない（1 sessionにつき1つの`id`しか処理しないため）。容量の境界そのものは
+    // `crates/deskcat-serial/src/duplicate.rs`の
+    // `an_id_evicted_by_capacity_is_expired_not_new`が検査する。保持期間を過ぎた再送は
+    // `a_repeated_boot_is_not_executed_twice`が公開APIを通して検査する。
 
     /// 受け入れ条件: retired sessionからの`boot`は`stale_session`として遮蔽する。
     #[test]
     fn a_boot_from_a_retired_esp32_sid_is_screened_as_stale_session() {
-        let mut peer = PeerSession::new();
-        let _ = peer.handle_boot(ESP32_SID, 1, boot_payload());
+        let mut peer = PeerSession::new(super::duplicate_policy());
+        let _ = peer.handle_boot(ESP32_SID, 1, boot_payload(), 0);
         // 別のsidへ遷移させ、ESP32_SIDをretiredへ移す。
-        let _ = peer.handle_boot(ESP32_SID + 1, 1, boot_payload());
+        let _ = peer.handle_boot(ESP32_SID + 1, 1, boot_payload(), 0);
 
         let mut esp32_in = connected_session_with_sid(ESP32_SID);
         let line = boot_line(ESP32_SID, 2);
@@ -1533,7 +1539,7 @@ mod peer_protocol {
             panic!("Bootを期待した");
         };
 
-        let rejected = peer.handle_boot(frame.envelope.sid, frame.envelope.id, boot);
+        let rejected = peer.handle_boot(frame.envelope.sid, frame.envelope.id, boot, 0);
         assert_eq!(
             rejected.outcome,
             BootOutcome::Rejected(PeerRejection::StaleSession)
@@ -1547,7 +1553,7 @@ mod peer_protocol {
     /// Piの要求と相関しないため遮蔽する（`stale_session`の遮蔽と同じ考え方）。
     #[test]
     fn an_ack_before_any_session_is_established_is_screened_out() {
-        let mut peer = PeerSession::new();
+        let mut peer = PeerSession::new(super::duplicate_policy());
         let ack = Ack {
             reply_sid: PI_SID,
             reply_to: 1,
@@ -1568,7 +1574,7 @@ mod peer_protocol {
     /// `Session`と`PeerSession`の両方へ実際に書き込む経路をここで確認する。
     #[test]
     fn establishing_an_esp32_session_sends_get_status_and_tracks_it() {
-        let mut peer = PeerSession::new();
+        let mut peer = PeerSession::new(super::duplicate_policy());
         let mut pi = connected_session_with_sid(PI_SID);
 
         let handled = handle_boot(&mut pi, &mut peer, ESP32_SID, 1, boot_payload(), 500);
@@ -1616,7 +1622,7 @@ mod peer_protocol {
     /// 失敗で見えなくしてはならない。
     #[test]
     fn establishing_a_session_is_still_visible_when_get_status_fails_to_enqueue() {
-        let mut peer = PeerSession::new();
+        let mut peer = PeerSession::new(super::duplicate_policy());
         let mut pi = Session::new(
             config().with_outbox_capacity(1).expect("容量は1以上である"),
             PI_SID,
@@ -1658,7 +1664,7 @@ mod peer_protocol {
     /// 同期する」を満たさない。
     #[test]
     fn a_pending_status_sync_is_retried_and_sent_once_the_outbox_has_room() {
-        let mut peer = PeerSession::new();
+        let mut peer = PeerSession::new(super::duplicate_policy());
         // ACK timeoutにはまだ達していない前提のpolicyを、configとして持たせる
         // （`retry_due_requests`は`session.config().retry()`から読む）。
         let config = config()
@@ -1704,7 +1710,7 @@ mod peer_protocol {
     /// 実行しない。二重にstate同期要求を送ると、無関係な`get_status`が積み上がる。
     #[test]
     fn a_replayed_boot_does_not_resend_get_status() {
-        let mut peer = PeerSession::new();
+        let mut peer = PeerSession::new(super::duplicate_policy());
         let mut pi = connected_session_with_sid(PI_SID);
 
         let _ = handle_boot(&mut pi, &mut peer, ESP32_SID, 1, boot_payload(), 500);
@@ -1724,8 +1730,8 @@ mod peer_protocol {
     /// `retry_due_requests`が同じ`id`のままwireへ送り直す（§9）。
     #[test]
     fn retry_due_requests_resends_a_timed_out_ping_with_the_same_id() {
-        let mut peer = PeerSession::new();
-        let _ = peer.handle_boot(ESP32_SID, 1, boot_payload());
+        let mut peer = PeerSession::new(super::duplicate_policy());
+        let _ = peer.handle_boot(ESP32_SID, 1, boot_payload(), 0);
 
         let config = config()
             .with_retry(RetryPolicy::new(Duration::from_millis(500), 3).expect("妥当な設定"));
@@ -1760,8 +1766,8 @@ mod peer_protocol {
     /// 受け入れ条件（Issue #12）: retry予算を使い切ったら取り下げる。
     #[test]
     fn retry_due_requests_gives_up_after_exhausting_the_budget() {
-        let mut peer = PeerSession::new();
-        let _ = peer.handle_boot(ESP32_SID, 1, boot_payload());
+        let mut peer = PeerSession::new(super::duplicate_policy());
+        let _ = peer.handle_boot(ESP32_SID, 1, boot_payload(), 0);
 
         let config = config()
             .with_retry(RetryPolicy::new(Duration::from_millis(100), 1).expect("妥当な設定"));
@@ -1790,8 +1796,8 @@ mod peer_protocol {
     /// configへ持たせた短いACK timeoutが実際に効くことを確認する。
     #[test]
     fn retry_due_requests_reads_the_policy_from_session_config() {
-        let mut peer = PeerSession::new();
-        let _ = peer.handle_boot(ESP32_SID, 1, boot_payload());
+        let mut peer = PeerSession::new(super::duplicate_policy());
+        let _ = peer.handle_boot(ESP32_SID, 1, boot_payload(), 0);
 
         // configへ持たせたのは50ms timeout。既定のprovisional値（500ms）のままなら、
         // 30ms経過時点ではまだtimeoutしていないはずである。
@@ -1815,5 +1821,272 @@ mod peer_protocol {
             vec![RetryOutcome::Resent(id, OutstandingKind::Ping)],
             "configの50ms timeoutを超えたら再送する"
         );
+    }
+
+    /// `line`をPi自身の`Session`で受信し、[`handle_frame`]へ渡す。
+    fn receive(pi: &mut Session, peer: &mut PeerSession, line: &str, now_ms: u64) -> Received {
+        let mut sim = Sim::with_reads(vec![Ok(line.as_bytes().to_vec())]);
+        let frame = recv_one_frame(pi, &mut sim, line.len());
+        handle_frame(pi, peer, frame, now_ms)
+    }
+
+    /// Piの送信queueを書き出し、送ったframeを順に返す。
+    fn drain_sent(pi: &mut Session) -> Vec<Frame> {
+        let mut sim = Sim::default();
+        while pi.pending_out() > 0 {
+            match pi.pump_write(&mut sim) {
+                Pump::Progress(_) | Pump::Idle => {}
+                other => panic!("書き出しが進まない: {other:?}"),
+            }
+        }
+        let written = String::from_utf8(sim.written).expect("UTF-8である");
+        written
+            .lines()
+            .map(|line| decode_line(line).expect("復元できる"))
+            .collect()
+    }
+
+    fn ok_ack(reply_to: u32) -> Ack {
+        Ack {
+            reply_sid: PI_SID,
+            reply_to,
+            status: AckStatus::Ok,
+            code: None,
+            detail: None,
+        }
+    }
+
+    /// `boot`でESP32 sessionを確立し、`handle_boot`が送った`get_status`の`id`を返す。
+    fn establish(pi: &mut Session, peer: &mut PeerSession, esp32_sid: u32, now_ms: u64) -> u32 {
+        let received = receive(pi, peer, &boot_line(esp32_sid, 1), now_ms);
+        assert!(matches!(
+            received,
+            Received::Boot(ref handled) if matches!(handled.outcome, BootOutcome::Established { .. })
+        ));
+        let sent = drain_sent(pi);
+        assert_eq!(sent.len(), 2, "bootへのACKとget_status: {sent:?}");
+        assert_eq!(sent[1].message, Message::GetStatus);
+        sent[1].envelope.id
+    }
+
+    /// 受け入れ条件（Issue #12）: `ping`にACKが返る。
+    ///
+    /// wireから受けたACKを[`handle_frame`]が`ping`と相関し、要求を完了させる。
+    #[test]
+    fn a_ping_ack_received_over_the_wire_completes_the_ping() {
+        let mut peer = PeerSession::new(super::duplicate_policy());
+        let mut pi = connected_session_with_sid(PI_SID);
+        let _ = establish(&mut pi, &mut peer, ESP32_SID, 0);
+        let status_id_pending = peer.outstanding_len();
+
+        let ping_id = pi.send(Message::Ping, 10).expect("queueへ入る");
+        let _ = peer.note_sent(ping_id, Message::Ping, 10);
+
+        let received = receive(
+            &mut pi,
+            &mut peer,
+            &ack_line(ESP32_SID, 2, ok_ack(ping_id)),
+            20,
+        );
+        let Received::Ack(correlated) = received else {
+            panic!("Ackを期待した: {received:?}");
+        };
+        assert_eq!(correlated.request, OutstandingKind::Ping);
+        assert_eq!(correlated.ack.status, AckStatus::Ok);
+        assert_eq!(peer.outstanding_len(), status_id_pending, "pingは完了した");
+    }
+
+    /// 受け入れ条件（Issue #12）: `get_status`にACKと`status`が返る。
+    ///
+    /// ACKを相関した後に届いた`status`は応答（`solicited`）として受理し、
+    /// その次の`status`は定期のもの（§4.6）として区別する。
+    #[test]
+    fn a_get_status_ack_followed_by_status_is_accepted_as_the_reply() {
+        let mut peer = PeerSession::new(super::duplicate_policy());
+        let mut pi = connected_session_with_sid(PI_SID);
+        let status_id = establish(&mut pi, &mut peer, ESP32_SID, 0);
+
+        let received = receive(
+            &mut pi,
+            &mut peer,
+            &ack_line(ESP32_SID, 2, ok_ack(status_id)),
+            10,
+        );
+        assert!(
+            matches!(received, Received::Ack(ref c) if c.request == OutstandingKind::GetStatus),
+            "{received:?}"
+        );
+        assert!(peer.status_awaited());
+
+        let received = receive(&mut pi, &mut peer, &status_line(ESP32_SID, 3), 20);
+        let Received::Status(accepted) = received else {
+            panic!("Statusを期待した: {received:?}");
+        };
+        assert!(accepted.solicited, "get_statusへの応答である");
+        assert!(!peer.status_awaited());
+
+        let received = receive(&mut pi, &mut peer, &status_line(ESP32_SID, 4), 30);
+        let Received::Status(accepted) = received else {
+            panic!("Statusを期待した: {received:?}");
+        };
+        assert!(
+            !accepted.solicited,
+            "待っていないstatusは定期のものとして区別する"
+        );
+    }
+
+    /// `get_status`が拒否されたら、`status`を応答として待たない。
+    #[test]
+    fn a_rejected_get_status_does_not_wait_for_a_status() {
+        let mut peer = PeerSession::new(super::duplicate_policy());
+        let mut pi = connected_session_with_sid(PI_SID);
+        let status_id = establish(&mut pi, &mut peer, ESP32_SID, 0);
+
+        let rejected = Ack {
+            status: AckStatus::Rejected,
+            code: Some(ErrorCode::StaleSession),
+            ..ok_ack(status_id)
+        };
+        let received = receive(&mut pi, &mut peer, &ack_line(ESP32_SID, 2, rejected), 10);
+        assert!(
+            matches!(received, Received::Ack(ref c) if c.ack.status == AckStatus::Rejected),
+            "{received:?}"
+        );
+        assert!(!peer.status_awaited());
+        assert_eq!(peer.outstanding_len(), 0, "拒否は終端の応答である");
+    }
+
+    /// 受け入れ条件（Issue #12）: Piがsession追跡をresetする（§10.1 step2）。
+    ///
+    /// ESP32が再起動して新しい`sid`の`boot`を送ると、旧sessionの未完了要求、
+    /// `status`の待ち、duplicate履歴を破棄する。旧sessionから遅れて届いたACKは
+    /// `stale_session`、新sessionから届いた旧`id`へのACKは相関しない。
+    #[test]
+    fn a_new_esp32_boot_resets_the_tracking_of_the_old_session() {
+        let mut peer = PeerSession::new(super::duplicate_policy());
+        let mut pi = connected_session_with_sid(PI_SID);
+        let old_status_id = establish(&mut pi, &mut peer, ESP32_SID, 0);
+        let received = receive(
+            &mut pi,
+            &mut peer,
+            &ack_line(ESP32_SID, 2, ok_ack(old_status_id)),
+            10,
+        );
+        assert!(matches!(received, Received::Ack(_)));
+        assert!(peer.status_awaited(), "前提: 旧sessionのstatusを待っている");
+        let ping_id = pi.send(Message::Ping, 20).expect("queueへ入る");
+        let _ = peer.note_sent(ping_id, Message::Ping, 20);
+        let _ = drain_sent(&mut pi);
+
+        let new_sid = ESP32_SID + 1;
+        let _ = establish(&mut pi, &mut peer, new_sid, 30);
+        assert_eq!(peer.esp32_sid(), Some(new_sid));
+        assert!(!peer.status_awaited(), "旧sessionのstatusの待ちを解いた");
+        assert_eq!(
+            peer.outstanding_len(),
+            1,
+            "残るのは新sessionのget_statusだけ"
+        );
+        assert_eq!(peer.counters().session_switches, 2);
+
+        let late = receive(
+            &mut pi,
+            &mut peer,
+            &ack_line(ESP32_SID, 3, ok_ack(ping_id)),
+            40,
+        );
+        assert_eq!(
+            late,
+            Received::Rejected {
+                type_str: "ack",
+                rejection: PeerRejection::StaleSession
+            }
+        );
+        let unmatched = receive(
+            &mut pi,
+            &mut peer,
+            &ack_line(new_sid, 2, ok_ack(ping_id)),
+            50,
+        );
+        assert_eq!(
+            unmatched,
+            Received::Rejected {
+                type_str: "ack",
+                rejection: PeerRejection::UnmatchedAck
+            }
+        );
+        let status = receive(&mut pi, &mut peer, &status_line(new_sid, 3), 60);
+        assert!(
+            matches!(status, Received::Status(ref a) if !a.solicited),
+            "新sessionのget_statusはまだACKされていない: {status:?}"
+        );
+    }
+
+    /// 受け入れ条件（Issue #12）: duplicateが2回実行されない。
+    ///
+    /// 同じ`(sid, id)`の`boot`を何度受けても、session遷移と`get_status`の送出（§10.1の
+    /// step2〜4）は1回だけであり、再送には保持したACKをそのまま返す。保持期間を過ぎた
+    /// 再送は`duplicate_expired`で拒否し、遷移として受け直さない。
+    #[test]
+    fn a_repeated_boot_is_not_executed_twice() {
+        let mut peer = PeerSession::new(super::duplicate_policy());
+        let mut pi = connected_session_with_sid(PI_SID);
+        let _ = establish(&mut pi, &mut peer, ESP32_SID, 0);
+
+        let mut replies = Vec::new();
+        for now in [100, 200, 300] {
+            let received = receive(&mut pi, &mut peer, &boot_line(ESP32_SID, 1), now);
+            assert!(
+                matches!(received, Received::Boot(ref h) if h.outcome == BootOutcome::Replayed),
+                "{received:?}"
+            );
+            replies.extend(drain_sent(&mut pi));
+        }
+        assert_eq!(replies.len(), 3, "ACKのreplayだけを返す: {replies:?}");
+        assert!(
+            replies
+                .iter()
+                .all(|f| matches!(&f.message, Message::Ack(a) if a.status == AckStatus::Ok))
+        );
+        assert_eq!(peer.counters().session_switches, 1);
+        assert_eq!(peer.counters().duplicate_replays, 3);
+
+        // test用の保持期間（`duplicate_policy`）を過ぎた再送。
+        let received = receive(&mut pi, &mut peer, &boot_line(ESP32_SID, 1), 1_000);
+        assert!(
+            matches!(
+                received,
+                Received::Boot(ref h)
+                    if h.outcome == BootOutcome::Rejected(PeerRejection::DuplicateExpired)
+            ),
+            "{received:?}"
+        );
+        let sent = drain_sent(&mut pi);
+        assert_eq!(sent.len(), 1, "拒否ACKだけでget_statusは送らない: {sent:?}");
+        assert_eq!(peer.counters().session_switches, 1);
+    }
+
+    /// ESP32→Piで定義されていないtypeは、応答せず計上する（§3、§8）。
+    #[test]
+    fn a_hello_received_by_the_pi_is_ignored_and_counted() {
+        let mut peer = PeerSession::new(super::duplicate_policy());
+        let mut pi = connected_session_with_sid(PI_SID);
+        let _ = establish(&mut pi, &mut peer, ESP32_SID, 0);
+
+        let line = encode_line(&Frame::new(
+            Envelope {
+                v: limits::PROTOCOL_VERSION,
+                sid: ESP32_SID,
+                id: 2,
+                ts_ms: 10,
+            },
+            super::hello(),
+        ))
+        .expect("encodeできる");
+        let received = receive(&mut pi, &mut peer, &line, 10);
+        assert_eq!(received, Received::UndefinedType("hello"));
+        assert_eq!(peer.counters().unknown_types, 1);
+        assert_eq!(peer.counters().stale_sessions, 0, "sidの判定より先に扱う");
+        assert!(drain_sent(&mut pi).is_empty(), "応答しない");
     }
 }

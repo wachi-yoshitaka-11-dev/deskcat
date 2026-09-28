@@ -4,12 +4,14 @@
 //! **相手（ESP32）のsession遷移、duplicate履歴、`stale_session`判定は持たない**
 //! （`session.rs`のmodule doc参照）。この型がそれを持つ。
 //!
-//! 仕様の正本は`docs/protocol/esp32-pi-protocol.md`の§3.1・§4.1・§5.1・§6・§8。
+//! 仕様の正本は`docs/protocol/esp32-pi-protocol.md`の§3.1・§4.1・§4.6・§5.1・§5.6・§6・§8・§10.1。
 //! 単位時間あたりの受理上限、session遷移budget、cooldown（`PROTO-TBD-012`）、
 //! retired session保持件数と`hello`／`boot`の最大retry回数（`PROTO-TBD-011`、
 //! `PROTO-TBD-017`）は未確定であり、**ここでは実装しない。**この型が扱うのは、
 //! それらのbudgetに依存しない部分——現在session／retired sessionの判定、`boot`の
 //! duplicate履歴、Pi自身が送った要求への応答の相関——だけである。
+//! duplicate履歴の保持件数と保持期間（`PROTO-TBD-005`）も未確定であり、
+//! [`PeerSession::new`]が[`DuplicatePolicy`]として呼び出し側から受け取る。
 //!
 //! `PeerSession`はbyte列やtransportを持たない。呼び出し側が
 //! [`crate::session::Session::pump_read`]で復元した[`Frame`]をここへ渡し、
@@ -20,7 +22,8 @@ use std::collections::{HashMap, VecDeque};
 
 use deskcat_protocol::{Ack, AckStatus, Boot, ErrorCode, Frame, Message, Status};
 
-use crate::config::RetryPolicy;
+use crate::config::{DuplicatePolicy, RetryPolicy};
+use crate::duplicate::{DuplicateHistory, Lookup};
 
 /// retired session集合の上限。**暫定値であり、確定値ではない。**
 ///
@@ -40,12 +43,6 @@ use crate::config::RetryPolicy;
 /// 値が仮であることと、追い出さないことは別の話である。**仮の値のまま追い出すと、
 /// 上の副作用が仮の件数で起きる。**確定したら値だけを置き換える。
 const RETIRED_CAPACITY: usize = 4;
-
-/// `boot`のduplicate履歴の上限。**暫定値であり、確定値ではない。**
-///
-/// 正本は`PROTO-TBD-011`・`PROTO-TBD-017`。[`RETIRED_CAPACITY`]と同じく実装都合の
-/// 仮の値である。
-const BOOT_HISTORY_CAPACITY: usize = 8;
 
 /// Piが送った、応答待ちの要求。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -116,9 +113,9 @@ pub enum PeerRejection {
     /// 保持履歴から失われたduplicateを安全に再実行できない（§7、`PROTO-TBD-005`）。
     ///
     /// 判定は近似である。**`(sid, id)`が現在sessionに属し、これまで処理した最大`id`
-    /// 以下であるにもかかわらず履歴に残っていない場合**に、履歴からevictされたと
-    /// みなす。保持件数・保持期間そのものは`PROTO-TBD-011`が未確定であり、
-    /// この型は固定容量[`BOOT_HISTORY_CAPACITY`]で近似するだけである。
+    /// 以下であるにもかかわらず履歴に残っていない、または保持期間を過ぎている場合**に、
+    /// 履歴から失われたとみなす（`crate::duplicate`のmodule doc参照）。保持件数と保持期間は
+    /// `PROTO-TBD-005`が未確定であり、呼び出し側が渡した[`DuplicatePolicy`]に従う。
     DuplicateExpired,
     /// 現在の`sid`に、未処理の新しい`id`を付けた`boot`（§5.1「現在sessionで未処理の
     /// session確立message」）。ESP32 processの再起動には新しい`sid`が必須であり、
@@ -189,44 +186,47 @@ pub struct CorrelatedAck {
     pub ack: Ack,
 }
 
-/// `boot`のduplicate履歴。
-#[derive(Debug, Default)]
-struct BootHistory {
-    /// `id -> 返したACK`。挿入順を`order`で追い、境界を超えたら最古を捨てる。
-    entries: HashMap<u32, Ack>,
-    order: VecDeque<u32>,
-    /// これまでに処理した最大`id`。履歴から消えていても「処理済みだった」と
-    /// 判定するために使う（`duplicate_expired`の根拠）。
-    highest_processed: Option<u32>,
+/// [`PeerSession::accept_status`]が受理した`status`。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AcceptedStatus {
+    /// 受理した`status`。
+    pub status: Status,
+    /// Piが送った`get_status`への応答として待っていたものか（§5.6）。
+    ///
+    /// `false`は、`get_status`の`ok` ACKを受けていない時点で届いた`status`である。
+    /// §4.6は`status`を「必要に応じてrate limit付きの定期health messageとして」送ることも
+    /// 認めているため、**`false`を異常として拒否しない。**区別を呼び出し側へ渡すだけである。
+    pub solicited: bool,
 }
 
-impl BootHistory {
-    fn get(&self, id: u32) -> Option<&Ack> {
-        self.entries.get(&id)
-    }
-
-    fn was_processed_but_evicted(&self, id: u32) -> bool {
-        !self.entries.contains_key(&id) && self.highest_processed.is_some_and(|h| id <= h)
-    }
-
-    fn insert(&mut self, id: u32, ack: Ack) {
-        if !self.entries.contains_key(&id) {
-            self.order.push_back(id);
-            while self.order.len() > BOOT_HISTORY_CAPACITY {
-                if let Some(oldest) = self.order.pop_front() {
-                    self.entries.remove(&oldest);
-                }
-            }
-        }
-        self.entries.insert(id, ack);
-        self.highest_processed = Some(self.highest_processed.map_or(id, |h| h.max(id)));
-    }
-
-    fn clear(&mut self) {
-        self.entries.clear();
-        self.order.clear();
-        self.highest_processed = None;
-    }
+/// Pi側で観測するcounter（§8「Piも`parse_errors`、`unknown_types`、`suppressed_responses`を
+/// local metricとlogへ保持する」）。
+///
+/// `parse_errors`に当たるものは、lineを復元する層の[`crate::SessionCounters::rejected_in`]が
+/// 持つ。ここはframeを復元できた後の拒否と遷移だけを数える。`suppressed_responses`は、
+/// Piが`boot`への応答を抑制・保留する経路（`PROTO-TBD-012`のbudget）をまだ持たないため無い。
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct PeerCounters {
+    /// 確定したESP32 session遷移の回数（§4.6の`session_switches`に当たる）。
+    pub session_switches: u64,
+    /// 保持した`ack`をreplayした`boot`の件数。
+    pub duplicate_replays: u64,
+    /// `stale_session`で拒否・遮蔽した件数。
+    pub stale_sessions: u64,
+    /// `duplicate_expired`で拒否した件数。
+    pub duplicate_expired: u64,
+    /// `invalid_payload`で拒否した`boot`の件数（現在の`sid`で新しい`id`）。
+    pub invalid_payloads: u64,
+    /// retired session保持が満杯で遷移を拒否した件数（codeは`rate_limited`）。
+    pub rate_limited: u64,
+    /// Piの要求と相関しなかったACKの件数（§6）。
+    ///
+    /// **Piが送った`hello`へのACKもここに入る。**[`PeerSession::note_sent`]は`ping`／`get_status`
+    /// だけを追跡するためである（`crate::coordinator::handle_frame`のdoc参照）。
+    pub unmatched_acks: u64,
+    /// ESP32→Piで定義されていないtypeを無視した件数（§3、§8）。
+    pub unknown_types: u64,
 }
 
 /// ESP32 peer sessionの状態。
@@ -236,7 +236,8 @@ pub struct PeerSession {
     esp32_sid: Option<u32>,
     /// 直前まで有効だった`sid`の上限付き集合（§3.1、§5.1）。
     retired: VecDeque<u32>,
-    boot_history: BootHistory,
+    /// 現在sessionの`boot`のduplicate履歴（§9）。session遷移を確定したときだけ破棄する。
+    boot_history: DuplicateHistory<Ack>,
     /// Piが送った、応答待ちの要求。`session.send`で割り当てた`id`をkeyにする。
     ///
     /// **`retired`／`boot_history`と違い、容量の上限を持たない。**ACKが返る、
@@ -256,25 +257,62 @@ pub struct PeerSession {
     /// `outstanding`／[`Self::poll_outstanding`]が引き継ぐ。このflagは
     /// enqueueできたかどうかだけを表し、ACKが来たかどうかは表さない。
     status_sync_pending: bool,
-}
-
-impl Default for PeerSession {
-    fn default() -> Self {
-        Self::new()
-    }
+    /// `get_status`の`ok` ACKを受け、まだ`status`を受けていないか（§5.6）。
+    /// 次に届いた現在sessionの`status`を応答として扱うために使う（[`AcceptedStatus`]）。
+    status_awaited: bool,
+    counters: PeerCounters,
 }
 
 impl PeerSession {
     /// 未確立のsessionを作る。
+    ///
+    /// `duplicate_policy`は`boot`のduplicate履歴の保持件数と保持期間である。
+    /// **このcrateは値を持たない**（[`DuplicatePolicy`]のdoc参照）。
     #[must_use]
-    pub fn new() -> Self {
+    pub fn new(duplicate_policy: DuplicatePolicy) -> Self {
         Self {
             esp32_sid: None,
             retired: VecDeque::with_capacity(RETIRED_CAPACITY),
-            boot_history: BootHistory::default(),
+            boot_history: DuplicateHistory::new(duplicate_policy),
             outstanding: HashMap::new(),
             status_sync_pending: false,
+            status_awaited: false,
+            counters: PeerCounters::default(),
         }
+    }
+
+    /// これまでのcounter。
+    #[must_use]
+    pub const fn counters(&self) -> PeerCounters {
+        self.counters
+    }
+
+    /// `get_status`の`ok` ACKを受け、`status`をまだ受けていないか（§5.6）。
+    #[must_use]
+    pub const fn status_awaited(&self) -> bool {
+        self.status_awaited
+    }
+
+    /// 拒否を[`PeerCounters`]へ計上する。
+    fn count_rejection(&mut self, rejection: PeerRejection) {
+        let counter = match rejection {
+            PeerRejection::StaleSession => &mut self.counters.stale_sessions,
+            PeerRejection::DuplicateExpired => &mut self.counters.duplicate_expired,
+            PeerRejection::InvalidPayload => &mut self.counters.invalid_payloads,
+            PeerRejection::UnmatchedAck => &mut self.counters.unmatched_acks,
+            PeerRejection::RetentionFull => &mut self.counters.rate_limited,
+        };
+        *counter = counter.saturating_add(1);
+    }
+
+    /// ESP32→Piで定義されていないtypeを受けたと計上する（§3、§8）。
+    ///
+    /// `hello`・`ping`・`get_status`はPi→ESP32のmessageであり、Piが受ける方向では
+    /// 定義されていない。§8は、Piが受けた`hello`を`unknown_type`として扱い、応答せず、
+    /// duplicate照会もsession遷移も行わないと定める。**`sid`の判定より先に扱う**（§3）ため、
+    /// `stale_sessions`には数えない。
+    pub fn note_undefined_type(&mut self) {
+        self.counters.unknown_types = self.counters.unknown_types.saturating_add(1);
     }
 
     /// 現在承認しているESP32 `sid`。未確立なら`None`。
@@ -451,38 +489,45 @@ impl PeerSession {
         })
     }
 
+    /// `boot`を拒否し、計上する。**session状態は変えない。**
+    fn reject_boot(&mut self, sid: u32, id: u32, rejection: PeerRejection) -> BootHandled {
+        self.count_rejection(rejection);
+        BootHandled {
+            reply: Self::rejection_ack(sid, id, rejection),
+            outcome: BootOutcome::Rejected(rejection),
+        }
+    }
+
     /// `boot`を処理する（§4.1、§5.1、§8手順8〜10）。
     ///
     /// 遷移候補のsession遷移budget・cooldown（§5.1、`PROTO-TBD-012`）は判定しない。
     /// 呼び出し側がその上限を別途課す場合は、この呼び出し自体を抑制すること
     /// （session状態はこの呼び出しで変わるため、抑制せずに呼ぶと無条件で遷移する）。
-    pub fn handle_boot(&mut self, sid: u32, id: u32, boot: Boot) -> BootHandled {
+    ///
+    /// `now_ms`はduplicate履歴の保持期間を測る時計（Pi自身のuptime）の値である。
+    /// 単調に増加する値を渡す。
+    pub fn handle_boot(&mut self, sid: u32, id: u32, boot: Boot, now_ms: u64) -> BootHandled {
         if self.is_retired(sid) {
-            let rejection = PeerRejection::StaleSession;
-            return BootHandled {
-                reply: Self::rejection_ack(sid, id, rejection),
-                outcome: BootOutcome::Rejected(rejection),
-            };
+            return self.reject_boot(sid, id, PeerRejection::StaleSession);
         }
 
         if self.esp32_sid == Some(sid) {
-            if let Some(ack) = self.boot_history.get(id) {
-                return BootHandled {
-                    reply: Message::Ack(ack.clone()),
-                    outcome: BootOutcome::Replayed,
-                };
-            }
-            let rejection = if self.boot_history.was_processed_but_evicted(id) {
-                PeerRejection::DuplicateExpired
-            } else {
+            let rejection = match self.boot_history.lookup(id, now_ms) {
+                Lookup::Replay(ack) => {
+                    let reply = Message::Ack(ack.clone());
+                    self.counters.duplicate_replays =
+                        self.counters.duplicate_replays.saturating_add(1);
+                    return BootHandled {
+                        reply,
+                        outcome: BootOutcome::Replayed,
+                    };
+                }
+                Lookup::Expired => PeerRejection::DuplicateExpired,
                 // 現在のsidで未処理の新しいid。ESP32の再起動には新しいsidが必須であり、
                 // 同じsidのまま新しいidを名乗ることは想定されない（§5.1）。
-                PeerRejection::InvalidPayload
+                Lookup::New => PeerRejection::InvalidPayload,
             };
-            return BootHandled {
-                reply: Self::rejection_ack(sid, id, rejection),
-                outcome: BootOutcome::Rejected(rejection),
-            };
+            return self.reject_boot(sid, id, rejection);
         }
 
         // 未知のsid: hello／bootだけが遷移候補になれる（§5.1優先順位3）。
@@ -491,19 +536,20 @@ impl PeerSession {
         // 遅れて届いたhello／bootが遷移候補として受理されて実行中motionを停止する
         // （§3.1）。**session状態は変えない。**
         if self.retiring_would_evict() {
-            let rejection = PeerRejection::RetentionFull;
-            return BootHandled {
-                reply: Self::rejection_ack(sid, id, rejection),
-                outcome: BootOutcome::Rejected(rejection),
-            };
+            return self.reject_boot(sid, id, PeerRejection::RetentionFull);
         }
 
+        // **ここからが旧sessionの追跡のreset（§10.1 step2）である。**遷移を確定した
+        // ときだけ行い、拒否の経路（上）では何も変えない。
         self.retire_current();
         self.boot_history.clear();
         self.esp32_sid = Some(sid);
         // 新sessionでは、Piが持っていたESP32宛ての未完了要求はtimeout扱いにする
         // （§6「session切り替え後は旧sessionの未ACK commandをtimeout扱いにする」）。
         self.outstanding.clear();
+        // 旧sessionの`get_status`に対する`status`は、もう届いても応答として扱わない。
+        self.status_awaited = false;
+        self.counters.session_switches = self.counters.session_switches.saturating_add(1);
 
         let ack = Ack {
             reply_sid: sid,
@@ -512,7 +558,7 @@ impl PeerSession {
             code: None,
             detail: None,
         };
-        self.boot_history.insert(id, ack.clone());
+        self.boot_history.record(id, ack.clone(), now_ms);
         BootHandled {
             reply: Message::Ack(ack),
             outcome: BootOutcome::Established { sid, boot },
@@ -524,12 +570,32 @@ impl PeerSession {
     /// 検査する条件は§6のとおり: envelopeの`sid`が現在のESP32 session、
     /// `reply_sid`がPi自身の現在session、`reply_to`が未完了の要求である。
     ///
+    /// 相関が取れたACKは、`status`が`ok`でも`rejected`でも要求を完了させる
+    /// （`rejected`は終端の応答であり、再送の対象ではない）。`get_status`への`ok`なら、
+    /// 続けて届く`status`を応答として待つ（[`Self::status_awaited`]、§5.6）。
+    ///
+    /// 同じ`reply_to`への2件目のACK（Piが再送し、ESP32が保持ACKを返した場合など）は、
+    /// 1件目で要求が完了しているため[`PeerRejection::UnmatchedAck`]になる。
+    ///
     /// # Errors
     ///
     /// envelopeの`sid`が現在のESP32 sessionと異なる場合、`reply_sid`がPi自身の
     /// 現在sessionと異なる場合、または`reply_to`が記録した未完了の要求でない場合に
     /// [`PeerRejection`]を返す。
     pub fn correlate_ack(
+        &mut self,
+        envelope_sid: u32,
+        our_sid: u32,
+        ack: Ack,
+    ) -> Result<CorrelatedAck, PeerRejection> {
+        let result = self.correlate(envelope_sid, our_sid, ack);
+        if let Err(rejection) = result {
+            self.count_rejection(rejection);
+        }
+        result
+    }
+
+    fn correlate(
         &mut self,
         envelope_sid: u32,
         our_sid: u32,
@@ -548,6 +614,9 @@ impl PeerSession {
         let Some(entry) = self.outstanding.remove(&ack.reply_to) else {
             return Err(PeerRejection::UnmatchedAck);
         };
+        if matches!(entry.kind, OutstandingKind::GetStatus) && ack.status == AckStatus::Ok {
+            self.status_awaited = true;
+        }
         Ok(CorrelatedAck {
             request: entry.kind,
             ack,
@@ -557,17 +626,23 @@ impl PeerSession {
     /// `status`を検査する（§5.1優先順位・§8）。ESP32からのeventであり、
     /// Piは応答を返さない。
     ///
+    /// 受理した`status`が`get_status`への応答として待っていたものかを
+    /// [`AcceptedStatus::solicited`]で返し、待ちを解く（§5.6）。
+    ///
     /// # Errors
     ///
     /// envelopeの`sid`が現在のESP32 sessionと異なる場合は[`PeerRejection::StaleSession`]を返す。
+    /// この場合、`get_status`への応答の待ちは解かない。
     pub fn accept_status(
-        &self,
+        &mut self,
         envelope_sid: u32,
         status: Status,
-    ) -> Result<Status, PeerRejection> {
+    ) -> Result<AcceptedStatus, PeerRejection> {
         if self.esp32_sid == Some(envelope_sid) {
-            Ok(status)
+            let solicited = core::mem::take(&mut self.status_awaited);
+            Ok(AcceptedStatus { status, solicited })
         } else {
+            self.count_rejection(PeerRejection::StaleSession);
             Err(PeerRejection::StaleSession)
         }
     }
@@ -590,9 +665,8 @@ mod tests {
     use core::time::Duration;
 
     use super::{
-        Ack, AckStatus, BOOT_HISTORY_CAPACITY, Boot, BootHistory, BootOutcome, ErrorCode,
-        OutstandingAction, OutstandingKind, PeerRejection, PeerSession, RETIRED_CAPACITY,
-        RetryPolicy, Status,
+        Ack, AckStatus, Boot, BootOutcome, DuplicatePolicy, ErrorCode, OutstandingAction,
+        OutstandingKind, PeerRejection, PeerSession, RETIRED_CAPACITY, RetryPolicy, Status,
     };
 
     fn boot() -> Boot {
@@ -603,55 +677,41 @@ mod tests {
         }
     }
 
-    /// `BootHistory`単体: 容量を超えると最古のentryがevictされ、
-    /// evictされたidは「処理済みだが失われた」と判定される。
-    ///
-    /// `duplicate_expired`はprotocolが定める動作である。`docs/protocol/esp32-pi-protocol.md`は
-    /// duplicate履歴のoverflow時に最古のentryをevictし、evict済みへの再送を
-    /// `duplicate_expired`で拒否すると定めており、この型はその動作を実装する。
-    ///
-    /// **これは弱点として書いておく。**公開APIの`PeerSession::handle_boot`では、正規の
-    /// `boot`は1 sessionにつき1つの`id`しか処理しない（同じ`sid`で未処理の新しい`id`は
-    /// `invalid_payload`で拒否するため）。したがって**この容量超過は、正規のtrafficだけでは
-    /// `boot`単独では到達しない。**公開APIを通した`tests/simulator.rs`の受け入れ条件testでは
-    /// 検証できないため、ここで内部構造を直接叩いて境界そのものを検査する。
+    /// test用のduplicate履歴の方針。**値はtestの都合であり、`PROTO-TBD-005`の候補ではない。**
+    const TEST_RETENTION_MS: u64 = 1_000;
+
+    fn policy() -> DuplicatePolicy {
+        DuplicatePolicy::new(8, Duration::from_millis(TEST_RETENTION_MS)).expect("0ではない")
+    }
+
+    /// `boot`の保持ACKが保持期間を過ぎたら、再送は`duplicate_expired`で拒否する。
+    /// **session遷移として受け直さない**（`PROTO-TBD-005`「evictしたentryへの再送は
+    /// 新規commandとして実行しない」）。
     #[test]
-    fn boot_history_reports_duplicate_expired_for_evicted_entries() {
-        let mut history = BootHistory::default();
-        let ack_for = |id: u32| Ack {
-            reply_sid: 1,
-            reply_to: id,
-            status: AckStatus::Ok,
-            code: None,
-            detail: None,
-        };
+    fn a_boot_retried_after_the_retention_period_is_rejected_as_duplicate_expired() {
+        let mut peer = PeerSession::new(policy());
+        let _ = peer.handle_boot(41_207, 1, boot(), 0);
 
-        for id in 1..=u32::try_from(BOOT_HISTORY_CAPACITY).expect("小さい定数である") {
-            history.insert(id, ack_for(id));
+        let late = peer.handle_boot(41_207, 1, boot(), TEST_RETENTION_MS);
+        assert_eq!(
+            late.outcome,
+            BootOutcome::Rejected(PeerRejection::DuplicateExpired)
+        );
+        match late.reply {
+            super::Message::Ack(ack) => assert_eq!(ack.code, Some(ErrorCode::DuplicateExpired)),
+            other => panic!("Ackを期待した: {other:?}"),
         }
-        assert_eq!(history.get(1), Some(&ack_for(1)), "容量内はまだ残っている");
-
-        // 容量を1つ超えて挿入すると、最古（id=1）がevictされる。
-        let next = u32::try_from(BOOT_HISTORY_CAPACITY).expect("小さい定数である") + 1;
-        history.insert(next, ack_for(next));
-
-        assert_eq!(history.get(1), None, "最古のentryがevictされている");
-        assert!(
-            history.was_processed_but_evicted(1),
-            "処理済みだが履歴からは失われている"
-        );
-        assert!(
-            !history.was_processed_but_evicted(next + 1),
-            "一度も処理していないidはduplicate_expiredではない"
-        );
+        assert_eq!(peer.esp32_sid(), Some(41_207), "sessionは変わらない");
+        assert_eq!(peer.counters().session_switches, 1, "遷移は最初の1回だけ");
+        assert_eq!(peer.counters().duplicate_expired, 1);
     }
 
     #[test]
     fn an_unknown_sid_establishes_a_new_session_and_returns_an_ok_ack() {
-        let mut peer = PeerSession::new();
+        let mut peer = PeerSession::new(policy());
         assert_eq!(peer.esp32_sid(), None);
 
-        let handled = peer.handle_boot(41_207, 1, boot());
+        let handled = peer.handle_boot(41_207, 1, boot(), 0);
 
         assert!(matches!(
             handled.outcome,
@@ -670,9 +730,9 @@ mod tests {
 
     #[test]
     fn a_retried_boot_with_the_same_sid_and_id_replays_the_stored_ack() {
-        let mut peer = PeerSession::new();
-        let first = peer.handle_boot(41_207, 1, boot());
-        let retry = peer.handle_boot(41_207, 1, boot());
+        let mut peer = PeerSession::new(policy());
+        let first = peer.handle_boot(41_207, 1, boot(), 0);
+        let retry = peer.handle_boot(41_207, 1, boot(), 0);
 
         assert_eq!(retry.outcome, BootOutcome::Replayed);
         assert_eq!(retry.reply, first.reply, "同じACKを再送する");
@@ -686,13 +746,13 @@ mod tests {
     #[test]
     fn a_transition_that_would_evict_a_retired_sid_is_rejected() {
         // 保持が満杯になるまで遷移させる。**追い出しは起きない。**
-        let mut peer = PeerSession::new();
-        let _ = peer.handle_boot(1, 1, boot());
+        let mut peer = PeerSession::new(policy());
+        let _ = peer.handle_boot(1, 1, boot(), 0);
         for sid in 2..=(retired_capacity() + 1) {
-            let _ = peer.handle_boot(sid, 1, boot());
+            let _ = peer.handle_boot(sid, 1, boot(), 0);
         }
         // ここで retired は満杯であり、次の遷移は最古を追い出すことになる。
-        let rejected = peer.handle_boot(9_000, 1, boot());
+        let rejected = peer.handle_boot(9_000, 1, boot(), 0);
         assert_eq!(
             rejected.outcome,
             BootOutcome::Rejected(PeerRejection::RetentionFull)
@@ -709,19 +769,19 @@ mod tests {
     #[test]
     fn a_rejected_transition_does_not_change_session_state() {
         // **拒否は副作用を持たない。**最古のsidは「未知」へ戻らない。
-        let mut peer = PeerSession::new();
-        let _ = peer.handle_boot(1, 1, boot());
+        let mut peer = PeerSession::new(policy());
+        let _ = peer.handle_boot(1, 1, boot(), 0);
         for sid in 2..=(retired_capacity() + 1) {
-            let _ = peer.handle_boot(sid, 1, boot());
+            let _ = peer.handle_boot(sid, 1, boot(), 0);
         }
         let current = retired_capacity() + 1;
-        let _ = peer.handle_boot(9_000, 1, boot());
+        let _ = peer.handle_boot(9_000, 1, boot(), 0);
 
         // 現在sessionは変わっていない。
         assert_eq!(peer.esp32_sid, Some(current));
         // 最古のsidはretiredのままであり、stale_sessionで拒否される。
         // **追い出していれば、ここは遷移候補として受理されてしまう。**
-        let stale = peer.handle_boot(1, 2, boot());
+        let stale = peer.handle_boot(1, 2, boot(), 0);
         assert_eq!(
             stale.outcome,
             BootOutcome::Rejected(PeerRejection::StaleSession)
@@ -730,12 +790,12 @@ mod tests {
 
     #[test]
     fn a_boot_from_a_retired_sid_is_rejected_as_stale_session() {
-        let mut peer = PeerSession::new();
-        let _ = peer.handle_boot(41_207, 1, boot());
+        let mut peer = PeerSession::new(policy());
+        let _ = peer.handle_boot(41_207, 1, boot(), 0);
         // 別のsidへ遷移させ、41_207をretiredへ移す。
-        let _ = peer.handle_boot(90_000, 1, boot());
+        let _ = peer.handle_boot(90_000, 1, boot(), 0);
 
-        let rejected = peer.handle_boot(41_207, 2, boot());
+        let rejected = peer.handle_boot(41_207, 2, boot(), 0);
         assert_eq!(
             rejected.outcome,
             BootOutcome::Rejected(PeerRejection::StaleSession)
@@ -751,10 +811,10 @@ mod tests {
 
     #[test]
     fn a_new_id_under_the_current_sid_is_rejected_as_invalid_payload() {
-        let mut peer = PeerSession::new();
-        let _ = peer.handle_boot(41_207, 1, boot());
+        let mut peer = PeerSession::new(policy());
+        let _ = peer.handle_boot(41_207, 1, boot(), 0);
 
-        let rejected = peer.handle_boot(41_207, 2, boot());
+        let rejected = peer.handle_boot(41_207, 2, boot(), 0);
         assert_eq!(
             rejected.outcome,
             BootOutcome::Rejected(PeerRejection::InvalidPayload)
@@ -768,8 +828,8 @@ mod tests {
 
     #[test]
     fn correlate_ack_matches_a_pending_request() {
-        let mut peer = PeerSession::new();
-        let _ = peer.handle_boot(41_207, 1, boot());
+        let mut peer = PeerSession::new(policy());
+        let _ = peer.handle_boot(41_207, 1, boot(), 0);
         let _ = peer.note_sent(7, super::Message::Ping, 100);
 
         let ack = Ack {
@@ -800,8 +860,8 @@ mod tests {
 
     #[test]
     fn correlate_ack_rejects_a_sid_that_is_not_the_current_esp32_session() {
-        let mut peer = PeerSession::new();
-        let _ = peer.handle_boot(41_207, 1, boot());
+        let mut peer = PeerSession::new(policy());
+        let _ = peer.handle_boot(41_207, 1, boot(), 0);
         let _ = peer.note_sent(7, super::Message::GetStatus, 100);
 
         let ack = Ack {
@@ -820,8 +880,8 @@ mod tests {
 
     #[test]
     fn correlate_ack_rejects_a_mismatched_reply_sid() {
-        let mut peer = PeerSession::new();
-        let _ = peer.handle_boot(41_207, 1, boot());
+        let mut peer = PeerSession::new(policy());
+        let _ = peer.handle_boot(41_207, 1, boot(), 0);
         let _ = peer.note_sent(7, super::Message::Ping, 100);
 
         let ack = Ack {
@@ -839,8 +899,8 @@ mod tests {
 
     #[test]
     fn accept_status_requires_the_current_esp32_session() {
-        let mut peer = PeerSession::new();
-        let _ = peer.handle_boot(41_207, 1, boot());
+        let mut peer = PeerSession::new(policy());
+        let _ = peer.handle_boot(41_207, 1, boot(), 0);
 
         let status = sample_status();
         assert!(peer.accept_status(41_207, status.clone()).is_ok());
@@ -878,7 +938,7 @@ mod tests {
     /// timeoutに達していない要求は対象にしない。
     #[test]
     fn poll_outstanding_ignores_requests_that_have_not_timed_out_yet() {
-        let mut peer = PeerSession::new();
+        let mut peer = PeerSession::new(policy());
         let _ = peer.note_sent(1, super::Message::Ping, 1_000);
 
         let due = peer.poll_outstanding(1_100, &retry_policy(500, 3));
@@ -889,7 +949,7 @@ mod tests {
     /// timeoutを超え、再送予算が残っていれば`Retry`を返し、送信時刻を更新する。
     #[test]
     fn poll_outstanding_retries_a_timed_out_request_while_budget_remains() {
-        let mut peer = PeerSession::new();
+        let mut peer = PeerSession::new(policy());
         let _ = peer.note_sent(1, super::Message::Ping, 1_000);
 
         let due = peer.poll_outstanding(1_600, &retry_policy(500, 3));
@@ -910,7 +970,7 @@ mod tests {
     /// 再送予算を使い切ったら`GaveUp`を返し、要求を取り下げる。
     #[test]
     fn poll_outstanding_gives_up_after_exhausting_the_retry_budget() {
-        let mut peer = PeerSession::new();
+        let mut peer = PeerSession::new(policy());
         let _ = peer.note_sent(1, super::Message::GetStatus, 0);
         let policy = retry_policy(100, 2);
 
@@ -941,7 +1001,7 @@ mod tests {
     /// 経路が無いため、`message`とは食い違う`kind`を記録させられない。
     #[test]
     fn note_sent_classifies_the_kind_from_the_message() {
-        let mut peer = PeerSession::new();
+        let mut peer = PeerSession::new(policy());
         assert_eq!(
             peer.note_sent(1, super::Message::Ping, 0),
             Some(OutstandingKind::Ping)
@@ -965,7 +1025,7 @@ mod tests {
     /// 無くす。
     #[test]
     fn note_sent_clears_status_sync_pending_when_it_tracks_a_get_status() {
-        let mut peer = PeerSession::new();
+        let mut peer = PeerSession::new(policy());
         peer.mark_status_sync_pending();
         assert!(peer.status_sync_pending(), "前提: flagが立っている");
 
@@ -990,7 +1050,7 @@ mod tests {
     /// 黙って追跡してしまうと、同じ食い違いが別の形で戻ってくる。
     #[test]
     fn note_sent_does_not_track_a_message_it_cannot_classify() {
-        let mut peer = PeerSession::new();
+        let mut peer = PeerSession::new(policy());
         let hello = super::Message::Hello(deskcat_protocol::Hello {
             host: "deskcatd".to_owned(),
             version: "0.1.0".to_owned(),
@@ -1005,7 +1065,7 @@ mod tests {
     /// そのものであって、種別から組み直したものではない。
     #[test]
     fn poll_outstanding_retries_the_exact_message_that_was_sent() {
-        let mut peer = PeerSession::new();
+        let mut peer = PeerSession::new(policy());
         let _ = peer.note_sent(1, super::Message::GetStatus, 0);
 
         let due = peer.poll_outstanding(1_000, &retry_policy(500, 1));
