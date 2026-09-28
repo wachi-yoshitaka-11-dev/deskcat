@@ -175,7 +175,7 @@ DECLARATION_CUTOVER = "57734371384d18f31de7557a7a60fd1aa856edff"
 # 言えるか」を答える。**言えないものは`history`が落とす。**
 #
 # 指示sourceを触る免除（**次の1行だけを`test_review_gate.py`が実測と照合する**）:
-# `9c91f913`・`b71c7ef`・`b93b309`・`c171c52`・`6bcd7b9`
+# `9c91f913`・`b71c7ef`・`b93b309`・`c171c52`・`6bcd7b9`・`75eb3d7`・`43b1151`・`5c7fc95`・`09f6126`・`b4b41a5`・`eab62ee`
 # **手で書いた列挙は2回遅れた。**`b93b309`と`c171c52`は、登録された後も足されなかった。
 # 導出できる事実を手で書いている以上、遅れは繰り返す。**だから機械で照合する。**
 # `18298ae`と`619c843`と`1a5dda8`は`INSTRUCTION_SOURCES`のpathを1つも触らないため、
@@ -289,6 +289,27 @@ DECLARATION_CUTOVER = "57734371384d18f31de7557a7a60fd1aa856edff"
 #   **`INSTRUCTION_SOURCES`を15 path触る。**そのため免除は`Instruction-Change`の
 #   検査まで抑止する（`9c91f913`と同じ側）。
 #
+# - `75eb3d7`（PR #492）、`43b1151`（PR #493）、`5c7fc95`（PR #494）、`09f6126`（PR #495）、
+#   `b4b41a5`（PR #496）、`eab62ee`（[PR #497](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/497)）。
+#   登録は[#501](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/501)で行った。
+#   **6件とも`b71c7ef`と同じ原因である**（squash messageへtrailerが載らなかった）。
+#   6件のsquash messageは、trailerとして読まれる最後の段落が`Co-authored-by`の1行だけである。
+#   各PRの最終headは`Change-Class`・3値の`Self-Review`・`Instruction-Change`を持ち、
+#   `Verify change class and self-review`は`success`だった。**失われたのはsquash時の記録だけである。**
+#   **mergeされた変更がreviewしたheadと同じことは、1件ずつ確かめた**（各entryの`note`）。
+#
+#   **`eab62ee`の経路はGitHubのweb画面である。**AIセッションの`gh pr merge`（`--subject`／
+#   `--body-file`指定）が自動モードの権限判定で止められ、人間がweb画面でmergeした。
+#   GitHubが合成したmessageは、head commitのtrailerの段落の後に`---------`と
+#   `Co-authored-by`の段落を置くため、最後の段落には`Co-authored-by`しか無い。
+#   **web画面は`gh_metadata_guard.py`の経路を通らない**（`6bcd7b9`のMCPと同じく、
+#   hookを通らない経路である）。
+#
+#   他の5件の経路は特定していない。**推測で書かない**（`b71c7ef`と同じ扱い）。
+#
+#   6件とも`INSTRUCTION_SOURCES`を触る。そのため免除は`Instruction-Change`の検査まで
+#   抑止する（`9c91f913`と同じ側）。
+#
 # 免除1件の登録。**SHAと記録を同じ場所に置く。**片方だけが古くなる形にしない。
 # 記録をcomment側だけに置いていたため、**どの免除が指示sourceを触るかの列挙が
 # 2回遅れた**（`b93b309`と`c171c52`）。
@@ -382,6 +403,58 @@ DECLARATION_EXEMPT_ENTRIES = (
         "trailerの段落が割れただけである**（`1a5dda8`と同型）。"
         "登録は#377で行った。**#377自体のreviewは登録の妥当性に対するものであり、"
         "内容のreviewは#373側にある。**",
+    ),
+    ExemptEntry(
+        "eab62ee22e29f8ae2838679d8627b4a3576adb00",
+        True,
+        "PR #497。最終head`15d62db`が`Instruction-Change: reviewed-as-data`を持ち、"
+        "`Verify change class and self-review`はsuccessだった。`15d62db`と`eab62ee`の"
+        "treeは一致する。指示source 2 pathは#13の自己レビュー巡25〜30（converged）の"
+        "対象であり、CodeRabbitのfull review（`213a107`まで）は指摘0件だった。"
+        "**web画面のmergeでsquash messageへ載らなかっただけである。**登録は#501で行った。",
+    ),
+    ExemptEntry(
+        "75eb3d70145ea51077e518f4a4352f8c1a053522",
+        True,
+        "PR #492。最終head`0778560`が`Instruction-Change: reviewed-as-data`を持ち、"
+        "`Verify change class and self-review`はsuccessだった。"
+        "`0778560`と`75eb3d7`のtreeは一致する。"
+        "**squash messageへ載らなかっただけである。**登録は#501で行った。",
+    ),
+    ExemptEntry(
+        "43b1151af61a2d1cc7a074a4f69f2d30660cbca8",
+        True,
+        "PR #493。最終head`263b8c9`が`Instruction-Change: reviewed-as-data`を持ち、"
+        "`Verify change class and self-review`はsuccessだった。"
+        "treeは一致しない（mergeまでにbaseが進んだ）が、`git diff 43b1151^ 43b1151`と"
+        "`git diff <merge-base> 263b8c9`の`git patch-id --stable`は一致する。"
+        "**squash messageへ載らなかっただけである。**登録は#501で行った。",
+    ),
+    ExemptEntry(
+        "5c7fc95c43bfec8fc3af20e4a1108b1956a81ad9",
+        True,
+        "PR #494。最終head`3541b84`が`Instruction-Change: reviewed-as-data`を持ち、"
+        "`Verify change class and self-review`はsuccessだった。"
+        "`3541b84`と`5c7fc95`のtreeは一致する。"
+        "**squash messageへ載らなかっただけである。**登録は#501で行った。",
+    ),
+    ExemptEntry(
+        "09f612603b1840b8572d3ed4e0ac4f5da6948646",
+        True,
+        "PR #495。最終head`ef1bf47`が`Instruction-Change: reviewed-as-data`を持ち、"
+        "`Verify change class and self-review`はsuccessだった。"
+        "`ef1bf47`と`09f6126`のtreeは一致する。"
+        "**squash messageへ載らなかっただけである。**登録は#501で行った。",
+    ),
+    ExemptEntry(
+        "b4b41a55de0d3e23a653445872e558eaf720d8d5",
+        True,
+        "PR #496。最終head`b4f967f`が`Instruction-Change: reviewed-as-data`を持ち、"
+        "`Verify change class and self-review`はsuccessだった。"
+        "treeも`git patch-id --stable`も一致しないが、`-U0`の変更行（+／-）は完全に一致する。"
+        "違いは`docs/hardware/tbd-register.md`の文脈の行だけであり、その行は間にmergeされた"
+        "`09f6126`（#495）が変えたものである。**#496の変更ではない。**"
+        "**squash messageへ載らなかっただけである。**登録は#501で行った。",
     ),
 )
 
