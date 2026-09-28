@@ -332,7 +332,7 @@ UM10204 Table 10の注記も、400 kHzでfull bus loadを駆動するには`VOL`
 **用途側の要求を確認した。**現時点でこのbusを使う受け入れ条件（[#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)
 のaccelerometer bring-up、[#22](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/22)の軽打→驚く反応統合）は、
 tapしきい値・retrigger動作・end-to-end latencyを「測定する」と書くのみで、**具体的な数値要求（下限bus速度）を挙げていない。**
-[#12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)（boot/ping/status/ACK/reconnect）はUSB serial protocol側であり、
+[#12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)（boot/ping/status/ACK/reconnect）はPi–ESP32間のserial protocol側であり、
 I2C busの速度と無関係である。加速度の軽打検出は`ACCEL-IRQ`によるhardware割り込みで受ける設計（`信号inventory`）であり、
 割り込み後にレジスタを数byte読むだけであれば100 kHzでも遅延はサブミリ秒order、BME280のpollingは秒orderであるため、
 **bus速度がこれらの検出遅延を決めない。**したがってStandard-modeを妨げる下流要件は現時点で見つからない。
