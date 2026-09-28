@@ -52,6 +52,11 @@ pub enum OutstandingKind {
     Ping,
     /// `get_status`（§5.6）。
     GetStatus,
+    /// Pi自身の`hello`（§5.1）。**[`PeerSession::note_hello_sent`]だけが記録し、
+    /// [`PeerSession::poll_outstanding`]の対象にしない**（`hello`の最大retry回数は
+    /// `PROTO-TBD-011`が未確定であり、拒否code別の扱いも§5.1が`ping`／`get_status`と
+    /// 別に定めるため、ここでは自動再送しない）。[`CorrelatedAck::request`]にだけ現れる。
+    Hello,
 }
 
 impl OutstandingKind {
@@ -135,6 +140,16 @@ pub enum PeerRejection {
     /// 超える遷移は`rate_limited`で拒否する」と定めており、**保持が満杯になるのは
     /// 保持期間内の遷移が想定を超えたときである。**
     RetentionFull,
+    /// Piの`hello`への相関ACK（`reply_sid`がPi自身の現在session、`reply_to`が
+    /// [`PeerSession::note_hello_sent`]で記録した`id`）だが、envelopeの`sid`が
+    /// 現在承認しているESP32 sessionではない（未知である）もの。
+    ///
+    /// **§6のとおり、`hello`の結果としては受理しない。**ESP32の`sid`を承認する経路は
+    /// `boot`だけであり（§5.1、§8）、Piの起動直後の`hello`へのACKは多くの場合この形になる。
+    /// [`Self::UnmatchedAck`]と分けるのは、正常な`hello`のACKで`unmatched_acks`が増え、
+    /// §6の本物の不一致を見分けられなくなるのを避けるためである。**ESP32の`sid`は
+    /// 記録しない。**相手へは何も返さない（ACKへの応答は無い。§8）。
+    UnapprovedHelloAck,
 }
 
 impl PeerRejection {
@@ -142,7 +157,7 @@ impl PeerRejection {
     #[must_use]
     pub const fn code(self) -> ErrorCode {
         match self {
-            Self::StaleSession => ErrorCode::StaleSession,
+            Self::StaleSession | Self::UnapprovedHelloAck => ErrorCode::StaleSession,
             Self::DuplicateExpired => ErrorCode::DuplicateExpired,
             Self::InvalidPayload | Self::UnmatchedAck => ErrorCode::InvalidPayload,
             Self::RetentionFull => ErrorCode::RateLimited,
@@ -221,10 +236,10 @@ pub struct PeerCounters {
     /// retired session保持が満杯で遷移を拒否した件数（codeは`rate_limited`）。
     pub rate_limited: u64,
     /// Piの要求と相関しなかったACKの件数（§6）。
-    ///
-    /// **Piが送った`hello`へのACKもここに入る。**[`PeerSession::note_sent`]は`ping`／`get_status`
-    /// だけを追跡するためである（`crate::coordinator::handle_frame`のdoc参照）。
     pub unmatched_acks: u64,
+    /// Piの`hello`に相関したが、応答送信側のsessionが未承認のため受理しなかったACKの件数
+    /// （[`PeerRejection::UnapprovedHelloAck`]）。
+    pub unapproved_hello_acks: u64,
     /// ESP32→Piで定義されていないtypeを無視した件数（§3、§8）。
     pub unknown_types: u64,
 }
@@ -260,6 +275,13 @@ pub struct PeerSession {
     /// `get_status`の`ok` ACKを受け、まだ`status`を受けていないか（§5.6）。
     /// 次に届いた現在sessionの`status`を応答として扱うために使う（[`AcceptedStatus`]）。
     status_awaited: bool,
+    /// Piが最後に送った`hello`の`id`で、まだACKを受けていないもの（§5.1）。
+    ///
+    /// **最新の1件だけを持つ。**Piは起動時とportを開き直すたびに`hello`を送るため、
+    /// 古い`hello`へ遅れて届いたACKは[`PeerRejection::UnmatchedAck`]になる。
+    /// `outstanding`と分けるのは、[`Self::poll_outstanding`]の再送の対象にしないためである
+    /// （[`OutstandingKind::Hello`]のdoc参照）。
+    pending_hello: Option<u32>,
     counters: PeerCounters,
 }
 
@@ -277,6 +299,7 @@ impl PeerSession {
             outstanding: HashMap::new(),
             status_sync_pending: false,
             status_awaited: false,
+            pending_hello: None,
             counters: PeerCounters::default(),
         }
     }
@@ -301,6 +324,7 @@ impl PeerSession {
             PeerRejection::InvalidPayload => &mut self.counters.invalid_payloads,
             PeerRejection::UnmatchedAck => &mut self.counters.unmatched_acks,
             PeerRejection::RetentionFull => &mut self.counters.rate_limited,
+            PeerRejection::UnapprovedHelloAck => &mut self.counters.unapproved_hello_acks,
         };
         *counter = counter.saturating_add(1);
     }
@@ -353,6 +377,16 @@ impl PeerSession {
             self.status_sync_pending = false;
         }
         Some(kind)
+    }
+
+    /// Pi自身が送った`hello`の`id`を記録する。前に記録した`id`は置き換える
+    /// （`pending_hello`のdoc参照）。
+    ///
+    /// **再送の対象にしない。**`hello`のACK timeoutと再送、拒否code別の終端の扱い
+    /// （§5.1）は、`PROTO-TBD-011`が決まるまで実装しない。ここで扱うのは、届いたACKを
+    /// この`hello`と相関させることだけである（[`Self::correlate_ack`]）。
+    pub fn note_hello_sent(&mut self, id: u32) {
+        self.pending_hello = Some(id);
     }
 
     /// `boot`確立後の`get_status`（§10.1 step4）を、まだ送れていないと記録する。
@@ -549,6 +583,8 @@ impl PeerSession {
         self.outstanding.clear();
         // 旧sessionの`get_status`に対する`status`は、もう届いても応答として扱わない。
         self.status_awaited = false;
+        // 旧ESP32 sessionへ送った`hello`のACKも、新sessionからは届かない（§6）。
+        self.pending_hello = None;
         self.counters.session_switches = self.counters.session_switches.saturating_add(1);
 
         let ack = Ack {
@@ -577,6 +613,11 @@ impl PeerSession {
     /// 同じ`reply_to`への2件目のACK（Piが再送し、ESP32が保持ACKを返した場合など）は、
     /// 1件目で要求が完了しているため[`PeerRejection::UnmatchedAck`]になる。
     ///
+    /// **Piの`hello`へのACK**（[`Self::note_hello_sent`]）も同じ条件で相関する。現在の
+    /// ESP32 sessionから届けば[`OutstandingKind::Hello`]として返す。envelopeの`sid`が
+    /// 未知なら、`hello`の結果として受理せず[`PeerRejection::UnapprovedHelloAck`]にする。
+    /// どちらの場合も、その`hello`への応答は済んだものとして記録を消す。
+    ///
     /// # Errors
     ///
     /// envelopeの`sid`が現在のESP32 sessionと異なる場合、`reply_sid`がPi自身の
@@ -601,15 +642,26 @@ impl PeerSession {
         our_sid: u32,
         ack: Ack,
     ) -> Result<CorrelatedAck, PeerRejection> {
+        let answers_hello = ack.reply_sid == our_sid && self.pending_hello == Some(ack.reply_to);
         if self.esp32_sid != Some(envelope_sid) {
-            return Err(if self.is_retired(envelope_sid) {
-                PeerRejection::StaleSession
-            } else {
-                PeerRejection::UnmatchedAck
-            });
+            if self.is_retired(envelope_sid) {
+                return Err(PeerRejection::StaleSession);
+            }
+            if answers_hello {
+                self.pending_hello = None;
+                return Err(PeerRejection::UnapprovedHelloAck);
+            }
+            return Err(PeerRejection::UnmatchedAck);
         }
         if ack.reply_sid != our_sid {
             return Err(PeerRejection::UnmatchedAck);
+        }
+        if answers_hello {
+            self.pending_hello = None;
+            return Ok(CorrelatedAck {
+                request: OutstandingKind::Hello,
+                ack,
+            });
         }
         let Some(entry) = self.outstanding.remove(&ack.reply_to) else {
             return Err(PeerRejection::UnmatchedAck);
