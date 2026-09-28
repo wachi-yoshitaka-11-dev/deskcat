@@ -21,6 +21,10 @@ message型、検証、上限付きline受信は[`deskcat-protocol`](../deskcat-p
 - ESP32 peer sessionの状態（`PeerSession`、`src/peer.rs`）。`boot`のsession遷移、
   duplicate履歴、`hello`／`boot`以外の`stale_session`判定、Piが送った`ping`／
   `get_status`への応答の相関（[Issue #12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)）
+- 現在sessionのduplicate履歴（`DuplicateHistory`、`src/duplicate.rs`）。保持件数と保持期間
+  （`PROTO-TBD-005`）は`DuplicatePolicy`として呼び出し側から受け取り、値を持たない
+- 受信frameの振り分け（`handle_frame`、`src/coordinator.rs`）。`ack`の相関、`status`の受理、
+  ESP32→Piで定義されていないtypeの計上
 
 含まないもの:
 
@@ -66,12 +70,14 @@ linkの上で起きたerrorである。openの`ENOENT`／`EACCES`／`EBUSY`はUS
 transportを所有せず、pumpの引数で受け取る）ため、呼び出し側の形をここに置く。
 
 ```bash
-cargo run --example serial_link -- --port <path> --baud <rate> [--seconds <n>] [--verbose]
+cargo run --example serial_link -- --port <path> --baud <rate> --duplicate-capacity <n> --duplicate-retention-ms <ms> [--seconds <n>] [--verbose]
 ```
 
 `--port`と`--baud`は**どちらも必須である。既定値を持たせない。**device名は未確認であり
 （確定は[Issue #11](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11)の後半）、
 baudの正本は`PROTO-TBD-001`でいずれも`Candidate`である。渡した値は記録にそのまま残る。
+`--duplicate-capacity`と`--duplicate-retention-ms`（`boot`のduplicate履歴の保持件数と保持期間）も
+同じ理由で必須である。正本は`PROTO-TBD-005`で未確定である。
 
 **出力にdevice名を書かない。**`Version Record Template`の禁止項目であり、出力を
 そのまま記録へ貼れるようにしてある。
@@ -79,9 +85,11 @@ baudの正本は`PROTO-TBD-001`でいずれも`Candidate`である。渡した�
 `--verbose`を付けない限り`Info`までを出す。`Debug`にするとread timeoutごとに1行出て
 （既定50 msなので毎秒20行）、長時間の観察では本当のeventが埋まる。
 
-**確かめられるのは「行が通ること」までである。**`protocol`が成立したことは確かめられない。
-この実行体は`PeerSession`（[Issue #12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)）を
-呼んでおらず、**ESP32側がprotocolを話すとは限らない。**接続のたびに`hello`を1件送るのは
+**確かめられるのは「行が通ること」と、`boot`受信からsession確立までである。**それより先の
+protocol往復は確かめられない。この実行体は受信した`boot`だけを`handle_boot`経由で`PeerSession`
+（[Issue #12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)）へ渡し、`ack`／`status`を
+扱う`handle_frame`は呼ばない（理由は`examples/serial_link.rs`のmodule doc）。
+**ESP32側がprotocolを話すとは限らない。**接続のたびに`hello`を1件送るのは
 書き出し経路を通すためであって、handshakeではない（`reason`は初回が`Startup`、再接続が
 `PortReopen`。仕様§5.1）。記録では**「行が通った」と「protocolが成立した」を
 書き分ける。**`boot`／`ping`／`get_status`のsession logicそのものは`PeerSession`が持つが、

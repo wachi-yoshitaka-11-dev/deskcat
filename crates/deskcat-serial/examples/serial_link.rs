@@ -17,7 +17,8 @@
 //! ためである。`pi-protocol-mode`（`firmware/esp32/src/boot_session.rs`）は`Established`後に
 //! 届いたbyteを種類を問わず読み捨てるため（`docs/protocol/esp32-pi-protocol.md`§2の
 //! 既知の逸脱(i)(ii)）、確立後に送った`get_status`にESP32が応答することは無い。
-//! `ping`／`status`／reconnect同期の実装は引き続き[Issue #12]の範囲である。
+//! `ack`／`status`の受信処理は[`deskcat_serial::handle_frame`]にあるが、同じ理由でこの実行体は
+//! 呼ばない。
 //! **`ESP32`側がprotocolを話すとは限らない**という留保も、`boot`確立以外では変わらない。
 //! 接続のたびに`hello`を1件送るのは書き出し経路を通すためであって、handshakeではない。
 //! `reason`は初回が`Startup`、再接続が`PortReopen`である（仕様§5.1）。
@@ -27,12 +28,16 @@
 //! # 使い方
 //!
 //! ```text
-//! cargo run --example serial_link -- --port <path> --baud <rate> [--seconds <n>] [--verbose]
+//! cargo run --example serial_link -- --port <path> --baud <rate> \
+//!     --duplicate-capacity <n> --duplicate-retention-ms <ms> [--seconds <n>] [--verbose]
 //! ```
 //!
 //! `--port`と`--baud`は**どちらも必須である。**既定値を持たせない。device名は未確認で
 //! あり（確定はIssue #11の後半）、baudの正本は`PROTO-TBD-001`でいずれも`Candidate`である。
 //! **確認していない値を既定として固定しない。**渡した値は記録にそのまま残る。
+//!
+//! `--duplicate-capacity`と`--duplicate-retention-ms`（`boot`のduplicate履歴の保持件数と
+//! 保持期間）も同じ理由で必須である。正本は`PROTO-TBD-005`で未確定である。
 //!
 //! `--seconds`を省くと、再接続の上限に達してsessionが停止するまで走り続ける。
 //!
@@ -54,23 +59,26 @@ use std::time::{Duration, Instant};
 
 use deskcat_protocol::{Boot, Hello, HelloReason, Message, Outcome};
 use deskcat_serial::{
-    ConnectionState, PeerSession, Pump, SerialConfig, SerialDevice, Session, SessionCounters,
-    handle_boot,
+    ConnectionState, DuplicatePolicy, PeerSession, Pump, SerialConfig, SerialDevice, Session,
+    SessionCounters, handle_boot,
 };
 
 /// 呼び出し側の引数。
 struct Args {
     port: String,
     baud: u32,
+    /// `--duplicate-capacity`と`--duplicate-retention-ms`から作る。
+    duplicate_policy: DuplicatePolicy,
     seconds: Option<u64>,
     verbose: bool,
 }
 
 fn usage() -> &'static str {
-    "usage: serial_link --port <path> --baud <rate> [--seconds <n>] [--verbose]\n\
+    "usage: serial_link --port <path> --baud <rate> \
+     --duplicate-capacity <n> --duplicate-retention-ms <ms> [--seconds <n>] [--verbose]\n\
      \n\
-     --port と --baud は必須である。既定値を持たせない。\n\
-     device名は未確認であり、baudの正本は PROTO-TBD-001 である。"
+     --port、--baud、--duplicate-capacity、--duplicate-retention-ms は必須である。既定値を持たせない。\n\
+     device名は未確認であり、baudの正本は PROTO-TBD-001、duplicate履歴の正本は PROTO-TBD-005 である。"
 }
 
 /// 引数の解析結果。
@@ -87,6 +95,8 @@ enum Parsed {
 fn parse_args() -> Result<Parsed, String> {
     let mut port = None;
     let mut baud = None;
+    let mut duplicate_capacity = None;
+    let mut duplicate_retention_ms = None;
     let mut seconds = None;
     let mut verbose = false;
     let mut argv = std::env::args().skip(1);
@@ -100,6 +110,20 @@ fn parse_args() -> Result<Parsed, String> {
                     value()?
                         .parse::<u32>()
                         .map_err(|e| format!("--baudが数値でない: {e}"))?,
+                );
+            }
+            "--duplicate-capacity" => {
+                duplicate_capacity = Some(
+                    value()?
+                        .parse::<usize>()
+                        .map_err(|e| format!("--duplicate-capacityが数値でない: {e}"))?,
+                );
+            }
+            "--duplicate-retention-ms" => {
+                duplicate_retention_ms = Some(
+                    value()?
+                        .parse::<u64>()
+                        .map_err(|e| format!("--duplicate-retention-msが数値でない: {e}"))?,
                 );
             }
             "--seconds" => {
@@ -118,6 +142,16 @@ fn parse_args() -> Result<Parsed, String> {
     Ok(Parsed::Run(Box::new(Args {
         port: port.ok_or_else(|| format!("--portが必要である\n\n{}", usage()))?,
         baud: baud.ok_or_else(|| format!("--baudが必要である\n\n{}", usage()))?,
+        duplicate_policy: DuplicatePolicy::new(
+            duplicate_capacity
+                .ok_or_else(|| format!("--duplicate-capacityが必要である\n\n{}", usage()))?,
+            Duration::from_millis(
+                duplicate_retention_ms.ok_or_else(|| {
+                    format!("--duplicate-retention-msが必要である\n\n{}", usage())
+                })?,
+            ),
+        )
+        .map_err(|e| format!("duplicate履歴の設定が不正である: {e}"))?,
         seconds,
         verbose,
     })))
@@ -227,7 +261,7 @@ fn main() -> ExitCode {
     // ESP32側のsession state。**再接続をまたいで1つだけ持つ。**Piの再接続
     // （`PortReopen`）はESP32側のsessionを暗黙に変えない。ESP32が再起動すれば
     // 新しい`sid`の`boot`として届き、`PeerSession`自身がsession遷移として扱う（§3.1）。
-    let mut peer = PeerSession::new();
+    let mut peer = PeerSession::new(args.duplicate_policy.clone());
     let started = Instant::now();
     // **`started + Duration`にしない。**`--seconds`は任意の`u64`を受け取るため、
     // 表現できないdeadlineでpanicする（実測: `u64::MAX`で

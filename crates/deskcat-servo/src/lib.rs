@@ -47,7 +47,10 @@
 //!   「発火条件は未確定である。このcounterはそれらの値を先取りしない」と定めている。
 //!   **後続のIssueはまだ立っていない**（2026-08-28時点）。想定している形は、
 //!   `crates/deskcat-serial`の`BootHistory`と`firmware/esp32`の`processed_hello`から
-//!   共通の履歴型を抽出して共用することであり、**このcrateへ3つ目の実装を作らない**
+//!   共通の履歴型を抽出して共用することであり、**このcrateへ3つ目の実装を作らない**。
+//!   **2026-09-28追記（#12）:** `BootHistory`は`crates/deskcat-serial`の`DuplicateHistory`
+//!   （保持件数と保持期間を呼び出し側から受け取る）へ置き換わった。firmware側との共用は
+//!   まだ無い（`deskcat-serial`はhost専用であり、firmwareから参照しない）
 //! - servoの駆動、GPIO、通電に関わる一切
 //!
 //! # 例

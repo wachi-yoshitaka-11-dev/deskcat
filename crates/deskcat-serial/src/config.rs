@@ -31,6 +31,11 @@ pub enum ConfigError {
     /// ACK timeoutが0である。**0にすると、ACKを受け取る前に即timeoutし、
     /// 送るそばから再送することになる。**
     ZeroAckTimeout,
+    /// duplicate履歴の保持件数が0である。**0にすると、処理した直後の再送も
+    /// 履歴に無く、保持した結果をreplayできない。**
+    ZeroDuplicateCapacity,
+    /// duplicate履歴の保持期間が0である。0件と同じく、記録した結果が即座に失われる。
+    ZeroDuplicateRetention,
 }
 
 impl core::fmt::Display for ConfigError {
@@ -42,6 +47,8 @@ impl core::fmt::Display for ConfigError {
             Self::ZeroInitialBackoff => "backoffの初期値が0である",
             Self::BackoffBoundsInverted => "backoffの初期値が上限を超えている",
             Self::ZeroAckTimeout => "ACK timeoutが0である",
+            Self::ZeroDuplicateCapacity => "duplicate履歴の保持件数が0である",
+            Self::ZeroDuplicateRetention => "duplicate履歴の保持期間が0である",
         };
         f.write_str(text)
     }
@@ -317,9 +324,58 @@ impl RetryPolicy {
     }
 }
 
+/// 現在sessionのduplicate履歴の保持件数と保持期間（§9、`PROTO-TBD-005`）。
+///
+/// **既定値を持たない。**`provisional()`も用意しない。`PROTO-TBD-005`は保持期間、
+/// retry window、保持件数の上限のいずれも未確定であり、[`ReconnectPolicy::provisional`]や
+/// [`RetryPolicy::provisional`]のような仮の値もこのcrateでは決めない。呼び出し側が
+/// 値と、その値を選んだ根拠を持つ。
+///
+/// 期間は§13の`PROTO-TBD-005`行が定める下限（遅延messageの最大生存時間＋再送window）を
+/// 下回らないことが要求されているが、**この型はその下限を検査しない。**下限を構成する
+/// 2つの値自体が未確定だからである。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DuplicatePolicy {
+    capacity: NonZeroUsize,
+    retention: Duration,
+}
+
+impl DuplicatePolicy {
+    /// 保持件数と保持期間を指定して方針を作る。
+    ///
+    /// # Errors
+    ///
+    /// `capacity`が0なら[`ConfigError::ZeroDuplicateCapacity`]、`retention`が0なら
+    /// [`ConfigError::ZeroDuplicateRetention`]を返す。
+    pub fn new(capacity: usize, retention: Duration) -> Result<Self, ConfigError> {
+        let capacity = NonZeroUsize::new(capacity).ok_or(ConfigError::ZeroDuplicateCapacity)?;
+        if retention.is_zero() {
+            return Err(ConfigError::ZeroDuplicateRetention);
+        }
+        Ok(Self {
+            capacity,
+            retention,
+        })
+    }
+
+    /// 保持する件数の上限。超えたら最も古いentryを捨てる。
+    #[must_use]
+    pub const fn capacity(&self) -> NonZeroUsize {
+        self.capacity
+    }
+
+    /// 記録してから保持する期間。
+    #[must_use]
+    pub const fn retention(&self) -> Duration {
+        self.retention
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::RetryPolicy;
+    use core::time::Duration;
+
+    use super::{ConfigError, DuplicatePolicy, RetryPolicy};
 
     /// `max_retries`は§9のDraft 2 policy（「ACKが必要なcommandはtimeout後に
     /// 1回retryする」）が確定した値であり、`PROTO-TBD-011`（`hello`専用）待ちの
@@ -331,5 +387,19 @@ mod tests {
             1,
             "§9のDraft 2 policyが確定した値"
         );
+    }
+
+    /// 保持件数・保持期間の0は、どちらも記録した結果を即座に失う設定であり、受け付けない。
+    #[test]
+    fn a_duplicate_policy_rejects_zero_capacity_and_zero_retention() {
+        assert_eq!(
+            DuplicatePolicy::new(0, Duration::from_secs(1)),
+            Err(ConfigError::ZeroDuplicateCapacity)
+        );
+        assert_eq!(
+            DuplicatePolicy::new(1, Duration::ZERO),
+            Err(ConfigError::ZeroDuplicateRetention)
+        );
+        assert!(DuplicatePolicy::new(1, Duration::from_millis(1)).is_ok());
     }
 }
