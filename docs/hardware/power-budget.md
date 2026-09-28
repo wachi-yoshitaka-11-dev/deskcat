@@ -254,6 +254,9 @@ HW-TBD-024行が持つ事実であり、ここへ再掲しない。**この節�
    **firmwareの書き込み自体がUSB接続＝通電を伴うため、この手順は書き込みより前に行う。**
 7. [人間] 条件(6)（人間が「通電してよい」と明示すること）を満たしていることを確認する。
 8. [人間] USB経由でESP32へ接続し、firmwareを書き込む。**この接続が最初の通電である。**
+   **書き込みのcommand（`espflash`）は、人間が立ち会って監視している状態であれば、実機Linuxの
+   AIセッションが実行してよい**（[#489](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/489)）。
+   USBの接続（通電の開始）と、給電を止める判断は人間が行う。
    ESP32が有効化されると同時に、手順1で配線済みの`ACCEL-01`／`ENV-01`も`3V3` pinを
    経由して同時に通電される（`DISP-01`は手順4で未接続を確認済みのため通電されない）。
 9. [人間] 書き込み中および書き込み後、次のいずれかを認めた場合、直ちに給電を止める
@@ -582,7 +585,11 @@ ESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`の負荷合計（測定ではない。
 6. [人間] 条件(7)（`run_display_bringup`を`3V3` pin経路で実行することの明示的な承認と、
    その記録）を満たしていることを確認する。
 7. [人間] USB経由でESP32へ接続し、`--features bringup-display-13`でbuildしたfirmwareを書き込む。
-   **この接続がこの配線revisionでの最初の通電である。**ESP32が有効化されると同時に、`ACCEL-01`／
+   **この接続がこの配線revisionでの最初の通電である。**
+   **書き込みのcommand（`espflash`）は、人間が立ち会って監視している状態であれば、実機Linuxの
+   AIセッションが実行してよい**（[#489](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/489)）。
+   USBの接続（通電の開始）と、給電を止める判断は人間が行う。
+   ESP32が有効化されると同時に、`ACCEL-01`／
    `ENV-01`（既存配線）と`DISP-01`（今回追加）が`3V3` pinを経由して同時に通電される。
    **書き込み前にESP32へ入っているfirmwareのimageは、`run_display_bringup`を呼ばない構成とは
    限らない。**`EXP-015`が使ったimage（commit `35bcc36`）は`#451`（`bringup-display-13`
