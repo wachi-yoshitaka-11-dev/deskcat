@@ -34,7 +34,7 @@ Protocol channelから送信するすべてのbyteは、有効にframe化され�
 
 - **UART1のdriverの初期化時のglitchと、ROM／2nd-stage bootloader・panic handlerの出力（未確認）。**初期化時のglitchは、Pi側で不正なbyteとして受けうる。上の区間にROM／bootloaderがGPIO13へ出力を向けるか、panic handlerの出力がUART1（GPIO13）へ出るかは、確かめていない（firmware applicationの制御外である）。旧例外と同じく、確かめないまま例外に含める。
 
-受信側は化けたbyte列の後、改行境界で再同期できる（`crates/deskcat-serial/tests/simulator.rs`のtest群が手書きfixtureで確認している）。**実機では未検証であり、改行を含まない不正byte列が後続frameの先頭へ連結するcase（初期化時のglitchが最初の`boot`行の先頭へ付くcaseを含む）も未検証である。**連結した行は壊れた行として捨てられ、`boot`は§4.1の再送で送り直される見込みである（見込みであり、sourceでも実機でも確かめていない。#446の受け入れ条件4の試験で確かめる）。
+受信側は化けたbyte列の後、改行境界で再同期できる（`crates/deskcat-serial/tests/simulator.rs`のtest群が手書きfixtureで確認している）。**実機では未検証であり、改行を含まない不正byte列が後続frameの先頭へ連結するcase（初期化時のglitchが最初の`boot`行の先頭へ付くcaseを含む）も未検証である。**連結した行は壊れた行として捨てられ、`boot`は§4.1の再送で送り直される見込みである（見込みであり、sourceでも実機でも確かめていない）。
 
 **`pi-protocol-mode`のfirmware application自身が送る行のline endingについて、過去の既知の不一致を記録していた（[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)のPR Aまで）。**PR B（`firmware/esp32/src/boot_session.rs`）は、この不一致をsource上は解消した（下記）。`pi-protocol-mode`がapplication levelで送る行は現状`boot`（`BootSession::send_boot`）のみであり（`console.rs`の`write_line`はPR Bで削除し、他に送信経路は無い）、それ以外の送信経路は無い。（ROM／bootloader起動出力とpanic出力はfirmware applicationの制御外であり、この解消の対象外である。出力先は上の段落参照。）
 

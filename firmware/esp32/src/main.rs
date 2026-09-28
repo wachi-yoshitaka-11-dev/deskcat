@@ -134,7 +134,7 @@
 //! logを出すか）。回路側の制約も、`DISP-01`を接続してよいかの判定も、これで変わらない。
 
 // `pi-protocol-mode`ではLCD／I2Cのbring-upとdemo用moduleをcompileしない
-// （`crate::console`のmodule doc参照）。
+// （featureの排他は`#487`のPR Bで整理する。それまでは従来どおり）。
 #[cfg(not(feature = "pi-protocol-mode"))]
 mod accel;
 #[cfg(feature = "pi-protocol-mode")]
@@ -379,7 +379,7 @@ fn main() {
     let peripherals = Peripherals::take().expect("Peripherals::take must succeed exactly once");
 
     // `pi-protocol-mode`ではLCD／I2C／servo benchのbring-upを一切行わない
-    // （`crate::console`のmodule doc参照）。`pi-protocol-mode`と`bench-servo-test-17`を
+    // （featureの排他は`#487`のPR Bで整理する。それまでは従来どおり）。`pi-protocol-mode`と`bench-servo-test-17`を
     // 同時に有効にした場合も、servo benchは実行されない（上の`compile_error!`参照）。
     #[cfg(not(feature = "pi-protocol-mode"))]
     {

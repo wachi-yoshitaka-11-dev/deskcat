@@ -186,10 +186,10 @@ pub const PI_PROTOCOL_UART_BAUDRATE_HZ: u32 = 115_200;
 /// （JSON 1行）、`boot_tx`等のlogを書いている間も、この`read`は呼ばれない。**log出力の
 /// 所要時間は測っていない。**consoleがbyteを送り終えるまで戻らない場合、所要時間は
 /// logのbyte数に比例する。UART0のbaudは生成された`sdkconfig`の`CONFIG_ESP_CONSOLE_UART_BAUDRATE`
-/// で`115200`と確かめた（`#487`、ESP-IDF v5.5.3）。Pi linkも115200 bpsであるため、その間にPi linkへ
+/// で`115200`と確かめた（`#487`、ESP-IDF v5.5.3、debug profileのbuild出力）。Pi linkも115200 bpsであるため、その間にPi linkへ
 /// 届きうるbyte数はlogのbyte数と同程度になる（計算であり、実測ではない）。health snapshotの
-/// 1行の長さも測っていない。**この見込みが512 byteに収まるかは、`#446`の受け入れ条件4の
-/// 試験で確かめる。**
+/// 1行の長さも測っていない。**この見込みが512 byteに収まるかは確かめていない**（溢れを
+/// 数える経路もlogへ出す経路も無い。`console.rs`のmodule doc (2)）。
 ///
 /// **この値は理論値ではなく安全側の見込みである。**`boot`のACK（§6の例で約115 byte）に
 /// 続けて`get_status`等の別messageが即座に届く場合（`coordinator::handle_boot`が

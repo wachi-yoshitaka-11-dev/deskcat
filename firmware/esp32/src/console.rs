@@ -33,7 +33,8 @@
 //! (2) 受信経路がsoftware ring buffer（512 byte、
 //! `config::PI_PROTOCOL_UART_RX_BUFFER_BYTES`）を溢れさせずに動くかは、buildでは
 //! 示せず実機でしか確認できない（同定数のdoc「容量の根拠」参照）。**こちらは
-//! [#446]の受け入れ条件4の試験で確かめる項目である。**
+//! 未確認のまま残っている項目である。**溢れを数える経路もlogへ出す経路も無いため、
+//! 実機で`boot`→ACKが成立しても、溢れなかったことの根拠にはならない。
 //!
 //! (3) `pi-protocol-mode`はPi→ESP32方向のrequest（`hello`・`get_status`等）を
 //! 一切処理しない（`crate::protocol`の`PiSession`は既定buildだけでcompileされ、

@@ -15,7 +15,7 @@
 //! （Pi linkのpin（`PI-UART-TX`＝GPIO13、`PI-UART-RX`＝GPIO14）は
 //! `docs/hardware/gpio-assignment.md`の`Pi–ESP32間のtransport`節が決めている）。
 //!
-//! **このmoduleは既定build（debug logモード）でだけcompileする**
+//! **このmoduleは既定buildでだけcompileする**
 //! （`#[cfg(not(feature = "pi-protocol-mode"))]`、`main.rs`参照）。Pi linkのUARTを
 //! 使う`pi-protocol-mode`のbuildは、この型を使わず
 //! `boot`のACK待ち・再送・`sid`選び直しを行う
