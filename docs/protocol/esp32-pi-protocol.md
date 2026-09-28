@@ -1,7 +1,7 @@
 # ESP32–Raspberry Pi Protocol
 
 > 状態: Draft v2 — transport制限、session境界、流量制限の実装fixtureは引き続き検証が必要
-> 正本とする情報: USB serial／JSON Linesのwire上の動作
+> 正本とする情報: serial（UART）／JSON Linesのwire上の動作
 
 ## 1. 適用範囲
 
@@ -17,7 +17,7 @@
 
 | 特性 | 初期値 | 状態 |
 |---|---|---|
-| 物理／論理link | USB serial | Project decision |
+| 物理／論理link | UART（ESP32のGPIO13／GPIO14 ⇔ PiのGPIO15／GPIO14、3.3 V）。2026-09-28まではUSB serial | Project decision（2026-09-28、[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)。pinと接続の条件の正は[GPIO Assignment](../hardware/gpio-assignment.md)の`Pi–ESP32間のtransport`節） |
 | Encoding | UTF-8 | Project decision |
 | Framing | 1行に一つのJSON object | Project decision |
 | 送信時line ending | `\n` | Draft |
@@ -32,6 +32,8 @@ Protocol channelから送信するすべてのbyteは、有効にframe化され�
 
 - **firmwareがdebug logを止めるより前に生じる起動時出力。**この例外は、UART0をPi–ESP32 protocol channelへ使うbuild（`firmware/esp32`の`pi-protocol-mode` feature）にだけ関係する。既定buildはprotocolのmessageを一切送らないため、この規則自体の対象になるbyteが無い。ESP32のROM／2nd-stage bootloaderの出力、およびESP-IDF自身が`app_main`の前後で出す起動log（`main_task`等）を、個別のsubsystem名で列挙せず、**「firmwareがdebug logを止める処理を完了するまでに出たbyteは、frame化されていなくてもよい」という1つの規則に統一する。**受信側は化けたbyte列の後、改行境界で再同期できる（`crates/deskcat-serial/tests/simulator.rs`のtest群が手書きfixtureで確認している。実機の起動時出力そのものでは未検証であり、改行を含まない不正byte列が後続frameの先頭へ連結するcaseも未検証）。この例外byteをPi側でどう計数するか（§4.6のcounterへの計上要否）は、ここでは規定しない。
 - **Panic handlerの出力（未確認）。**ESP-IDFの既定panic handlerが`esp_log`の経路を通さず直接UARTへ書くかどうかは、一次資料で確認していない。確認しないまま、この例外の対象に含める。理由: panicが起きた時点でfirmwareは既に壊れており、この規則の遵守より原因が見えることを優先する。
+
+**2026-09-28の決定で、Pi linkはUART0から外れ、GPIO13／GPIO14のUARTへ移る。**firmwareが移行した後は、UART0はdebug logと書き込みだけに使い、上の2つの例外はPi linkには生じない。**firmwareの移行（[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)）は未実施であり、それまでは現在の`pi-protocol-mode`にこの節のとおり適用する。**
 
 **上の2つ（ROM／bootloader起動出力、panic handlerの出力）とは別に、`pi-protocol-mode`のfirmware application自身が送る行のline endingについて、過去の既知の不一致を記録していた（[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)のPR Aまで）。**PR B（`firmware/esp32/src/boot_session.rs`）は、この不一致をsource上は解消した（下記）。`pi-protocol-mode`がapplication levelで送る行は現状`boot`（`BootSession::send_boot`）のみであり（`console.rs`の`write_line`はPR Bで削除し、他に送信経路は無い）、それ以外の送信経路は無い。**ROM／bootloader起動出力とpanic出力（上の2項目）はfirmware applicationの制御外にあり、この解消の対象外のまま残る。**
 
@@ -960,7 +962,7 @@ Receiverは次の手順で動作する。
 
 ### 8.1 流量制限
 
-Protocolはline長とparse errorに上限を設けているが、それだけではmessage**数**を制限できない。誤動作したhost、あるいはUSB portへ物理accessした第三者が、有効なcommandを高頻度で送り続ける状況を想定する。
+Protocolはline長とparse errorに上限を設けているが、それだけではmessage**数**を制限できない。誤動作したhost、あるいはserial lineへ物理accessした第三者が、有効なcommandを高頻度で送り続ける状況を想定する。
 
 Receiverは次を満たす。
 
@@ -1050,7 +1052,7 @@ servoの秒あたり受理motion command数の値は[TBD台帳](../hardware/tbd-
 **正規retry quota内の保持ACK replay予約容量**、ACK・完了event・fault event・`status`へ
 確保する帯域の割合は`PROTO-TBD-012`で扱う。
 
-なおUSB serialには認証がない。物理accessを得た相手はPiと同等のcommandを送れる。**安全境界はprotocolではなくESP32側のhard limitで担保する**という前提を、実装で崩さない。
+なおserial linkには認証がない。物理accessを得た相手はPiと同等のcommandを送れる。**安全境界はprotocolではなくESP32側のhard limitで担保する**という前提を、実装で崩さない。
 
 ## 9. Retryとduplicate処理
 
@@ -1312,6 +1314,7 @@ Framing／parse層について、**host workspaceのRust実装**がfixtureに合
 | 2026-09-22 | Draft 2 uart0 exception | [Issue #446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)。ESP32のUART0がdebug logとPi–ESP32 protocol channelを兼ねる（USB-UARTブリッジが両方を同じ物理lineへ内部接続する）ことに対応するため、§2へ2つの既知の例外を追記した。**`silence_logging`（`firmware/esp32/src/console.rs`）の呼び出しが完了するまでに生じる起動時出力**（ESP32のROM／2nd-stage bootloader出力、ESP-IDF自身の起動log）と、**panic handlerの出力（ESP-IDFの経路が`esp_log`を通すかどうか未確認）**の2つである。firmware側はbuild時のfeature（`pi-protocol-mode`）で、debug logとprotocol streamを同時に出さない設計にした（同fileのdoc参照）。**§2の主規則（自由形式logでJSON lineを分断してはならない）自体は変更していない。**wire formatも§3の数値・規則も変更していない |
 | 2026-09-25 | Draft 2 esp32 sid | [Issue #446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)のPR A。`PROTO-TBD-011`のうち`sid`の生成方法をESP32側だけ確定した（§13参照。**Pi側は未確定のまま残る。衝突許容確率も未確定のまま残る**）。理由と制約は`firmware/esp32/src/main.rs`の`generate_sid`のdoc comment（**ここへ再掲しない**）。**wire formatは変更していない。**envelope field、integer width、error code、counterのいずれも増やしていない。`sid`の値の選び方という送信側の実装であり、受信側の判定規則（§3.1、§5.1）は変えていない |
 | 2026-09-25 | Draft 2 esp32 boot retry | [Issue #446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)のPR B。§4.1の`boot`受理確認・再送の終了条件の表をESP32側（`firmware/esp32/src/boot_session.rs`）へ実装した。`stale_session`受信時の`sid`選び直しも実装した（§3.1）。再送間隔・backoff係数・通常再送の回数・recovery間隔・recovery budget（`PROTO-TBD-017`）と、`sid`選び直し回数の上限（`PROTO-TBD-011`の残り）は暫定値のまま。`protocol_fault`はwireへ出さない（`PROTO-TBD-018`未確定。「送出を止める」という動作面だけ実装）。§2の`pi-protocol-mode`送信line ending不一致（PR Aまで既知の逸脱として記録していたもの）は、`boot`送出経路に限りsource上は解消した（実機でのbyte実測はまだ無い。同節参照）。**wire formatは変更していない。**envelope field、integer width、error codeのいずれも増やしていない。受信側（Pi）の判定規則は変えていない |
+| 2026-09-28 | Draft 2 uart transport | [Issue #446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)。ユーザーの決定により、§2の物理linkをUSB serialからUART（ESP32のGPIO13／GPIO14 ⇔ PiのGPIO15／GPIO14）へ変えた。最終構成でもUARTを使い、USBは書き込みとdebug専用にする。§2のUART0共有の例外は、firmwareの移行（#487）までの現状として残した。§8.1と§8.2の「USB」を「serial」へ直した。wire format（framing、baud候補、line長）は変えていない |
 
 ### Draft schemaの互換性
 

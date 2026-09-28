@@ -254,6 +254,9 @@ HW-TBD-024行が持つ事実であり、ここへ再掲しない。**この節�
    **firmwareの書き込み自体がUSB接続＝通電を伴うため、この手順は書き込みより前に行う。**
 7. [人間] 条件(6)（人間が「通電してよい」と明示すること）を満たしていることを確認する。
 8. [人間] USB経由でESP32へ接続し、firmwareを書き込む。**この接続が最初の通電である。**
+   **書き込みのcommand（`espflash`）は、人間が立ち会って監視している状態であれば、実機Linuxの
+   AIセッションが実行してよい**（[#489](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/489)）。
+   USBの接続（通電の開始）と、給電を止める判断は人間が行う。
    ESP32が有効化されると同時に、手順1で配線済みの`ACCEL-01`／`ENV-01`も`3V3` pinを
    経由して同時に通電される（`DISP-01`は手順4で未接続を確認済みのため通電されない）。
 9. [人間] 書き込み中および書き込み後、次のいずれかを認めた場合、直ちに給電を止める
@@ -584,7 +587,11 @@ ESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`の負荷合計（測定ではない。
 6. [人間] 条件(7)（`run_display_bringup`を`3V3` pin経路で実行することの明示的な承認と、
    その記録）を満たしていることを確認する。
 7. [人間] USB経由でESP32へ接続し、`--features bringup-display-13`でbuildしたfirmwareを書き込む。
-   **この接続がこの配線revisionでの最初の通電である。**ESP32が有効化されると同時に、`ACCEL-01`／
+   **この接続がこの配線revisionでの最初の通電である。**
+   **書き込みのcommand（`espflash`）は、人間が立ち会って監視している状態であれば、実機Linuxの
+   AIセッションが実行してよい**（[#489](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/489)）。
+   USBの接続（通電の開始）と、給電を止める判断は人間が行う。
+   ESP32が有効化されると同時に、`ACCEL-01`／
    `ENV-01`（既存配線）と`DISP-01`（今回追加）が`3V3` pinを経由して同時に通電される。
    **書き込み前にESP32へ入っているfirmwareのimageは、`run_display_bringup`を呼ばない構成とは
    限らない。**`EXP-015`が使ったimage（commit `35bcc36`）は`#451`（`bringup-display-13`
@@ -3303,6 +3310,9 @@ AREF pinでの測定に`high impedance voltmeter`を要求し、`only a capaciti
 - **段階B-2以降の電流gateは`Blocked`のままである。**この節はgateを開けない。
 - 代替として**特性の判っているshuntか、確度が公開されている測定器**を使う道がある。
   **どちらも未選定であり、購入待ちリストにも載せていない**（必要性が確定していないためである）。
+  **2026-09-28にshuntを選んだ（次の項目）。**確度が公開されている測定器は購入しない（同日のユーザー決定。次の項目）。
+- **2026-09-28、ユーザーが電流の測り方を決めた**（[#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)のコメントに記録）。段階B-2、servoの確認（[#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)）、段階Cの電流は、手持ちのshunt（[hardware-bom.md](hardware-bom.md)の`MEAS-01`、0.1 Ω）の両端電圧から求める。DT830Bの電流端子は使わない。
+  **同日、ユーザーは測定器を追加で購入しないと決め、段階B-2の電流を、今の接続（[#445](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/445)・[#461](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/461)で認めた構成）のまま、`MEAS-01`の両端電圧を手持ちの`DT830B`で読んで測ると決めた**（[#488](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/488)のコメントに記録）。`MEAS-01`はbreadboardに挿して使い、はんだ付けしないため、抵抗値は許容差±5 %、温度係数±300 ppm/℃で扱い、校正しない（値は[#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)の2026-09-28の調査コメントが、秋月の商品ページが示す資料`CementResistor.pdf`から読んだもの。同資料はメーカー名を本文に持たない）。**この扱いは、はんだ付けせずに使う場合に限る。**同資料ははんだ付け後の抵抗値の変化を±(2 %＋0.05 Ω)と規定しており、0.1 Ωに対して大きいため、段階C以降に`MEAS-01`をはんだ付けして使う場合は、この扱いを当てはめない。**`DT830B`は電圧rangeでも確度を取得できないため、測定値の確かさは評価できない。この制約は測定結果とあわせて記録する。**測った値を電流のgateの合否にどう使うかは、この節の上の規則（確度が未取得の読みを、しきい値との照合にそのまま使わない）に従う。段階B-2の実施条件（`段階B-2の測定`）の改訂は、別のPull Requestで行う。
 
 **この節は測定手順を確定していない。**確定していないことを明示するために置いた。
 **確定は`HW-TBD-028`および段階B-2のgateの側で行う。**
@@ -3626,6 +3636,8 @@ PC USBからのflashing、周辺module3点の3.3 V側定常電流の実測）だ
 - [ ] 外部電源とUSB間のbackfeed動作を確認する
 
 ### サーボ試験
+
+**2026-09-28追記（[#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)）。**ユーザーは、はんだ付け（[#405](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/405)）より前のservoの確認（#17〜#19）を、servo専用の別電源と故障電流の制限手段で行うと決めた。その条件と状態は[servo-safety-limits.md](servo-safety-limits.md)の`承認の状態`の項目6が持つ（ここへ再掲しない）。**次の段落の下段構成への移行は、はんだ付け後の最終構成でservoを試験する場合に適用する。**
 
 **この段階に入る前に、`5 V ingress`節の下段構成（端子台＋Piへの給電cable
 ＋過電流保護部品＋大電流経路の線材。**2026-09-09、案Bにより「Micro-Bメス変換基板」から差し替え**）へ移す。**Pi直挿しのままservoを繋ぐと、servo電流が

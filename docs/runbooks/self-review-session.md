@@ -81,14 +81,40 @@ python3 scripts/review_gate.py gate --base origin/develop --head HEAD --review-w
 
 `check`は現在のdiffに対して両Passと未解決欠陥を確認する。新規欠陥0件が2巡続けば
 `converged`、それより前の明示的な打ち切りは条件が揃った場合だけ`capped`、それ以外は
-`stopped`（exit 2）。5巡目の終わりに条件が揃っていれば完了判定はできるが、
-揃わない場合は未完了である。`begin` / `run` / hookは承認なしの6巡目を拒否する。
+`stopped`（exit 2）。無承認の上限（通常5巡、文書だけのdiffは3巡。範囲はCONTRIBUTINGの
+`打ち切り`）の巡の終わりに条件が揃っていれば完了判定はできるが、揃わない場合は未完了である。
+`begin` / `run` / hookは上限を超える承認なしの巡を拒否する。各巡の記録には、開始時に判定した
+上限を`free_limit`として残す。
 `--review-work`付きのgateは、実行記録の終端状態と既存trailerが一致しなければ失敗する。
 CIの通常のgateはローカル記録を持たず、形式検査のままである。
 
+## 人間の判断で終える
+
+最新の巡が両Passを終え、未解決の欠陥が無く、`converged`でない状態で人間が終了を判断したら、
+判断の出所を既存Issue/PRへ残し、次の形で記録する。**書式の例であり承認ではない。**
+`after_round`は記録時点の通算巡数と一致させる。
+
+```json
+{
+  "work": "465",
+  "actor_kind": "human",
+  "actor": "実際に判断した人間",
+  "source": "人間の終了判断を保存したIssue/PRコメントのURL",
+  "after_round": 3
+}
+```
+
+```bash
+python3 scripts/review_gate.py session end --work 465 --record ending.local.json
+python3 scripts/review_gate.py session check --work 465
+```
+
+記録した時点のdiffに限って`check`が`capped`を返す。diffが変われば無効になる。
+条件を満たさない終了（未解決の欠陥がある、最新の巡が未完了、AIによる記録）は拒否する。
+
 ## 人間の承認と引き継ぎ
 
-5巡後の続行は、判断の出所を既存Issue/PRへ残し、次の形で取り込む。
+上限の巡を超える続行は、判断の出所を既存Issue/PRへ残し、次の形で取り込む。
 これは**書式の例であり承認ではない**。`actor`と`source`は実在する判断者と判断元にする。
 
 ```json
