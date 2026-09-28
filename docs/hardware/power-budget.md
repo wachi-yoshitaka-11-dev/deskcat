@@ -425,7 +425,7 @@ railを含んでいても成立する（railを含む短絡もrailを含まな�
 この手順の必須条件ではない。
 
 **手順10の根拠。**手順の(a)(b)(c)は`run_i2c_bringup`側（`ACCEL-01`／`ENV-01`のDevice ID
-読み出し）のlogを指す。**既定buildでは、その手前にdisplay側のlog（`display_id`／`display_fill`／
+読み出し）のlogを指す。**既定buildでは、その手前にdisplay側のlog（`display_madctl`／`display_fill`／
 `display_corner_pattern`）は出ない。**[#451](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/451)
 で`run_display_bringup`が`bringup-display-13` feature（既定off）の付いたbuildだけの経路に
 なったためである（`main.rs`）。**`#451`より前の記述（display側のlogが先に現れるのは異常では
@@ -489,7 +489,7 @@ rail電圧だけで決まり、通常動作の値（LCD Wikiの0.31 W）もbackl
 
 **ここまでは電流上界の計算が成立する根拠であり、`run_display_bringup`を実行してよいかの
 承認ではない。**`main.rs`のmodule docが明記するとおり、**`#461`は接続そのものを許可するだけで、
-`run_display_bringup`（識別・backlight点灯・fill・四隅patternを行う。GPIO4によるbacklight点灯を
+`run_display_bringup`（初期化・backlight点灯・fill・四隅patternを行う。GPIO4によるbacklight点灯を
 含む）を`3V3` pin経路で実行してよいかは決めていない。**この実行の承認は、下記条件(7)で人間から
 個別に得る（`#461`の残余risk受け入れを再審議するものではない。firmwareの経路を1つ実行してよいか
 という別の判断である）。
@@ -501,9 +501,10 @@ rail電圧だけで決まり、通常動作の値（LCD Wikiの0.31 W）もbackl
 `VOH`を確認したうえで行われており、**`ILI9341`（`DISP-01`のcontroller）自体がこの計算の対象に
 含まれている。**「moduleからESP32への向き（touchの`DOUT`／`PENIRQ`等）」という同節の例示は
 touch限定ではなく、module→ESP32方向の信号一般を指しており、`LCD-MISO`もこれに含まれると読める。
-**この対応は同節では確認されておらず、この手順が新たに確認するものでもない。**手順9(a)の
-`display_id`読み出しはこのSPI通信を使うため、`display_id_mismatch`や読み出し失敗が生じた場合、
-この未解決事項が一因である可能性を考慮する）。
+**この対応は同節では確認されておらず、この手順が新たに確認するものでもない。**firmwareは
+`LCD-MISO`からcontrollerのIDを読まない（手順9(a)）ため、この未解決事項は今の手順の判定には
+効かない。`EXP-016`〜`EXP-018`でIDの読み出しが期待する値を返さなかった原因の候補の一つとして
+残る）。
 (2) 実機`DISP-01`を接続した状態でbacklightが実際に消灯していることの物理確認（[gpio-assignment.md](gpio-assignment.md)の
 `競合check`節の受け入れchecklist「Resetとbacklight lineが安全な状態で起動する」項目。`信号inventory`の
 `LCD-BL`行はこの項目を参照するだけで、項目自体はここに無い。同項目が「確認は`#13`（LCD bring-up）
@@ -542,8 +543,8 @@ ESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`の負荷合計（測定ではない。
 - [ ] (2) firmwareが`--features bringup-display-13`付きでbuild済みである。**commandの正本は
       [検証済みコマンド](../toolchains/verified-commands.md)であり、ここへ写さない。**同feature
       は`pi-protocol-mode`と同時指定できない（`main.rs`の`compile_error!`）。既定buildのままでは
-      `run_display_bringup`が呼ばれず、受け入れ条件（識別・fill・四隅・timing）を確認する材料が
-      得られない。**この構成のVersion Recordはまだ無い**（[検証済みコマンド](../toolchains/verified-commands.md)
+      `run_display_bringup`が呼ばれず、受け入れ条件（初期化・fill・四隅・timing）を確認する材料と、
+      controllerの識別に使うcommandの実機での効果が得られない。**この構成のVersion Recordはまだ無い**（[検証済みコマンド](../toolchains/verified-commands.md)
       が明記するとおり、`bringup-display-13`構成は正式なVersion Recordを持たない。build-onlyの
       検証を誰がいつどの端末で行ったかは、実施時にVersion Recordまたは相当の記録を別途作る）
 - [ ] (3) 電流の余裕計算（[HW-TBD-024の判断記録](tbd-register-history.md#hw-tbd-024)の2026-09-23追記）を
@@ -645,15 +646,17 @@ ESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`の負荷合計（測定ではない。
    ESP32 board（`U2`周辺）の両方で行う。
 9. [人間] シリアルログを確認する。`main()`は`run_display_bringup`を`run_i2c_bringup`より先に
    呼ぶ（`main.rs`）。
-   (a) `display_id`（controller識別。受け入れ条件「Controller識別情報と初期化の根拠」）と、
-   続く`display_rdid`×3（Read ID1〜3の生byte。読み出しの失敗は`display_rdid_failed`として出て、
-   後続を止めない）、
+   (a) `display_madctl`（初期化が済んだことと、書き込んだMADCTLの値・論理座標の幅と高さ。
+   受け入れ条件「Controller識別情報と初期化の根拠」の初期化の側）。**firmwareはcontrollerの
+   IDを読まない**（`firmware/esp32/src/display.rs`のmodule doc。`EXP-018`でどのregisterも期待する
+   値を返さなかったため。controllerの識別は、moduleのsilkと資料、およびcommandが実機で
+   期待どおりに効いたことで記録する）、
    (b) `display_fill`×5色（受け入れ条件「単色fillが正しい」「Color orderが正しい」
    「更新timingを測定した」。`elapsed_us`を記録する。各色は`hold_ms`だけ表示したまま保たれるので、
    その間に色ごとに写真を撮る）、
    (c) `display_pattern_element`と`display_corner_pattern`（受け入れ条件「四隅とorientationが正しい」。
    続く`display_pattern_hold`の`hold_ms`の間に、`J2`のheaderを入れて写真を撮る。patternの見方と
-   MADCTLの決め方は`main.rs`の`run_corner_pattern`のdoc commentが持つ。軸の線の描画失敗は
+   一致の判定のしかたは`main.rs`の`run_corner_pattern`のdoc commentが持つ。軸の線の描画失敗は
    `display_axis_failed`として出て、後続を止めない）。**受け入れ条件
    「単色fillが正しい」「Color orderが正しい」「四隅とorientationが正しい」は、logに加えて
    人間がpanelを目視（写真記録）で確認し、その結果を手順11へ記録したときだけ達成とする。**
@@ -672,12 +675,10 @@ ESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`の負荷合計（測定ではない。
    という記録の方が強い根拠である）。
 
    **失敗時の扱い。**(a)〜(d)は独立ではない。**`run_display_bringup`のcode（`main.rs`）は、
-   (a)（`display_id`）の段階で`display_driver_new_failed`または`display_init_failed`が出た場合、
+   (a)（`display_madctl`）の段階で`display_driver_new_failed`または`display_init_failed`が出た場合、
    その場で関数を`return`し、(b)（`display_fill`）・(c)（`display_corner_pattern`）は一切
    実行されない。**この場合、(b)(c)のlogが無いのは異常ではなく(a)の失敗の帰結であるため、
-   (b)(c)を個別の停止条件として扱わない。**`display_id_mismatch`（識別結果がILI9341と一致しない
-   ログ）は`display_driver_new_failed`／`display_init_failed`とは別であり、この場合は`return`
-   しないため(b)(c)は続けて実行される。**(a)が成功した場合、`display_backlight_on_failed`が
+   (b)(c)を個別の停止条件として扱わない。**(a)が成功した場合（`display_madctl`が出た場合）、`display_backlight_on_failed`が
    出ても(b)(c)は続けて実行される。(b)は色ごとに独立しており、ある色の`display_fill_failed`が
    他の色の実行を止めない。(c)は`display_corner_background_failed`が出た場合その場で`return`し
    四隅の描画自体を行わないが、四隅のうち1つの`display_corner_failed`は他の隅の描画を止めない。
@@ -736,8 +737,9 @@ Revision 39で、給電元（B-2bか`3V3` pinか）ごとに参照先の節が�
 だけから受電し、USBの5V・外部3.3V電源等が同時に到達しないこと）を適用する。
 
 **条件(2)の根拠。**`main.rs`の`run_display_bringup`は`bringup-display-13` feature付きbuildだけが
-持つ関数であり、既定buildは`main()`から呼ばない（`#451`）。受け入れ条件のうち識別・fill・
-四隅・timingはこの関数のlogでしか得られない。
+持つ関数であり、既定buildは`main()`から呼ばない（`#451`）。受け入れ条件のうちfill・四隅・timingと
+初期化の記録は、この関数のlogから得る。controllerの識別は、moduleのsilkと資料、およびこの関数が
+送るcommandの実機での効果から記録する（logだけの証拠にはしない）。
 
 **条件(3)の根拠。**[HW-TBD-024の判断記録](tbd-register-history.md#hw-tbd-024)の2026-09-23追記が持つ
 電流上界の計算（通常動作約245.4 mA、`R5`先短絡の故障時約646.5 mA）は、`ACCEL-01`／`ENV-01`が

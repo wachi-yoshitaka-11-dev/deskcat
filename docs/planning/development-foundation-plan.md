@@ -61,7 +61,7 @@ Issue本文・コメントは2026-09-27 JSTに再取得した。以後の実施�
   `EXP-015`でのPM判断を新しい配線への人間承認として流用しない。
 - 条件(7)の実行承認は[#13の2026-09-24記録](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13#issuecomment-5804046159)
   にある。対象構成と許可範囲を照合する。条件(1)〜(6)や当日の開始判断まで承認済みとはしない。
-- 完了証拠は`display_id`、5色の`display_fill`、`display_corner_pattern`、`elapsed_us`、
+- 完了証拠は`display_madctl`（firmwareはcontrollerのIDを読まない。`EXP-018`）、5色の`display_fill`、`display_corner_pattern`、`elapsed_us`、
   panel写真、既存sensorのID log、配線revision・firmware commit／feature・環境・停止の有無。
   [実験記録](../hardware/experiment-log.md)へ保存する。`elapsed_us`はSPI転送までの時間であり、
   panel応答時間ではない。起動直後の旧imageと書き込み後の結果を区別する。

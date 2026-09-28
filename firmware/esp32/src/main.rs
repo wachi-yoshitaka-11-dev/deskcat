@@ -17,7 +17,7 @@
 //! - **`DISP-01`（LCD）・`SERVO-PWM`・`ADC-*`・`TOUCH-*`は既定のbuildではdriveしない。**
 //!   [`crate::display`]と[`crate::servo`]はcross-compile確認用にcompileするだけであり、
 //!   `main()`からは呼ばない。`bringup-display-13` feature付きbuildだけが
-//!   [`run_display_bringup`]経由でLCDを初期化し、識別・backlight点灯・単色fill・
+//!   [`run_display_bringup`]経由でLCDを初期化し、backlight点灯・単色fill・
 //!   四隅patternを行う（[Issue #13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)。
 //!   **既定offにした理由と有効化の手順は下の「`DISP-01`のbring-upを有効にする手順」節。**）。
 //!   `bench-servo-test-17` feature付きbuildだけが[`run_servo_bench_test`]経由でservoを
@@ -97,7 +97,7 @@
 //! 作成した。`ACCEL-01`／`ENV-01`が同じ`3V3` railへ既に接続済みの状態
 //! （[EXP-015](../../../docs/hardware/experiment-log.md)）へ`DISP-01`を追加する場合を扱い、
 //! `ACCEL-01`／`ENV-01`単体bring-upの手順とは別節である）。`#461`は接続そのものを
-//! 許可するだけで、`run_display_bringup`（識別・backlight点灯・fill・四隅patternを行う）を
+//! 許可するだけで、`run_display_bringup`（初期化・backlight点灯・fill・四隅patternを行う）を
 //! `3V3` pin経路で呼んでよいかは決めない。**`#461`の余裕解析はbacklightが点灯した状態を含む
 //! （通常動作の合計にbacklightのtypical値とILI9341ロジック50 mAが入っている）。
 //! `run_display_bringup`が追加で引く負荷は無い。**したがって上記の新設手順は、この余裕解析を
@@ -213,7 +213,7 @@ use crate::accel::Adxl345;
 #[cfg(feature = "pi-protocol-mode")]
 use crate::boot_session::{BootRetryPolicy, BootSession};
 #[cfg(feature = "bringup-display-13")]
-use crate::display::{IdRegister, Ili9341};
+use crate::display::Ili9341;
 #[cfg(not(feature = "pi-protocol-mode"))]
 use crate::env::Bme280;
 use crate::health::Health;
@@ -760,7 +760,10 @@ fn service_bringup_step(health: &mut Health, step: &str) {
     );
 }
 
-/// `DISP-01`を初期化し、識別・単色fill・四隅patternを実行する。
+/// `DISP-01`を初期化し、単色fill・四隅patternを実行する。
+///
+/// controllerのIDは読まない（`crate::display`のmodule doc）。初期化の後に、書き込んだ
+/// MADCTLの値と論理座標の幅・高さを`display_madctl`の行としてlogへ出す。
 ///
 /// **どの段階で失敗しても、この関数はpanicしない。**この関数はエラーを
 /// `log::error!`へ分類して返すだけで、呼び出し元の`main`を止めない。
@@ -800,31 +803,20 @@ fn run_display_bringup<SPI: SpiAnyPins + 'static>(
         }
     };
 
-    let id = match lcd.init() {
-        Ok(id) => id,
-        Err(err) => {
-            log::error!("display_init_failed error={err}");
-            return;
-        }
-    };
+    if let Err(err) = lcd.init() {
+        log::error!("display_init_failed error={err}");
+        return;
+    }
     service_bringup_step(health, "init");
 
-    // **識別結果を捏造しない。**読めた生byteと判定を両方logへ残す
-    // （受け入れ条件「Controller識別情報と初期化の根拠を記録した」）。
+    // 初期化で書き込んだ向きの設定を残す（`docs/hardware/power-budget.md`の`DISP-01`
+    // 追加接続の手順9(a)）。
     log::info!(
-        "display_id raw={:02x?} matches_ili9341={}",
-        id.raw,
-        id.matches_ili9341()
+        "display_madctl value=0x{:02x} width={} height={}",
+        display::MADCTL_LANDSCAPE,
+        display::WIDTH,
+        display::HEIGHT
     );
-    if !id.matches_ili9341() {
-        log::error!(
-            "display_id_mismatch expected_id_hi=0x93 expected_id_lo=0x41 got_hi=0x{:02x} got_lo=0x{:02x}",
-            id.raw[2],
-            id.raw[3]
-        );
-    }
-
-    run_id_register_reads(&mut lcd, health);
 
     if let Err(err) = lcd.backlight_on() {
         log::error!("display_backlight_on_failed error={err}");
@@ -840,8 +832,7 @@ fn run_display_bringup<SPI: SpiAnyPins + 'static>(
 /// [Issue #16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16)の
 /// bring-up手順の1工程である。**一致判定はここでは行わない。**`crate::accel::Adxl345`・
 /// `crate::env::Bme280`が返す生byteをそのままlogへ出すだけであり、期待値
-/// （`0xE5`／`0x60`）との一致は、logを読む人間の判断とする（`display_id`の
-/// `matches_ili9341()`とは異なる扱いである。**この関数へ判定を持ち込まない。**）。
+/// （`0xE5`／`0x60`）との一致は、logを読む人間の判断とする。**この関数へ判定を持ち込まない。**
 ///
 /// 2つのsensorは同じI2C bus（`GPIO25`＝SDA、`GPIO26`＝SCL）を共有するため
 /// （`docs/hardware/gpio-assignment.md`の`信号inventory`の`ACCEL-SDA`／`ACCEL-SCL`／
@@ -1064,36 +1055,6 @@ fn run_servo_bench_test(
     }
 }
 
-/// Read ID1／ID2／ID3（DAh／DBh／DCh）を1回ずつ読み、生byteをlogへ出す。
-///
-/// [Issue #13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)の条件1の切り分けに使う。
-/// `display_id`（Read ID4、D3h）は`EXP-016`・`EXP-017`を通じて3種類の値を観測し、いずれも
-/// 期待値と一致しなかった（`docs/hardware/experiment-log.md`）。`EXTC`を要しないこの3つを
-/// 足して読む（根拠は`crate::display`のmodule doc）。
-/// **一致判定はここでは行わない。**`run_i2c_bringup`と同じく生byteを残すだけであり、
-/// どちらのbyteがIDか（先頭がdummyか）の判断もlogを読む人間が行う。
-///
-/// **1回の起動で各registerを1回しか読まない。**ILI9341 Datasheet V1.11 §7.1.10（p.38）の
-/// 4-wire serialの図は、Interface Iでは読み出しdataを`SDA`（この配線では`MOSI`の線）へ、
-/// Interface IIでは`SDO`へ出すと描いている。moduleがどちらに設定されているかは確かめて
-/// いない。Interface Iだった場合、読み出しのたびにcontrollerとESP32が同じ線を駆動しうる。**起動をまたいで
-/// `id2`の値が毎回違う場合に、以後のbuildで読み出しを続けるかは、PMとユーザーが判断する。**
-/// 読み出しの失敗は`display_rdid_failed`へ分類し、残りのregisterと後続の段階を止めない。
-#[cfg(feature = "bringup-display-13")]
-fn run_id_register_reads(lcd: &mut Ili9341<'_>, health: &mut Health) {
-    for register in IdRegister::ALL {
-        let name = register.name();
-        let cmd = register.command();
-        match lcd.read_id_register(register) {
-            Ok(raw) => log::info!("display_rdid register={name} cmd=0x{cmd:02x} raw={raw:02x?}"),
-            Err(err) => {
-                log::error!("display_rdid_failed register={name} cmd=0x{cmd:02x} error={err}");
-            }
-        }
-    }
-    service_bringup_step(health, "rdid");
-}
-
 /// 単色fillを既知のRGB565値で順に実行し、所要時間を計測してlogへ出す。
 ///
 /// 受け入れ条件「単色fillが正しい」「Color orderが正しい」「更新timingを測定した」に
@@ -1134,56 +1095,40 @@ fn run_fill_tests(lcd: &mut Ili9341<'_>, health: &mut Health) {
     }
 }
 
-/// 四隅と2本の軸を描き、MADCTLの`MY`／`MX`／`MV`を実機の写真から決められるようにする。
+/// 四隅と2本の軸を描き、論理座標の四隅と向きを実機の写真で確かめられるようにする。
 ///
 /// 受け入れ条件「四隅とorientationが正しい」に対応する（[Issue #13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)）。
-/// **MADCTLは`BGR`だけを立て、orientation bitは`0`のまま描く**（`crate::display`の
-/// module doc）。したがってpatternは**controllerの生の座標**で描かれ、写真には物理的な
-/// 走査方向がそのまま写る。
+/// 座標は**論理座標**（[`display::MADCTL_LANDSCAPE`]の向き、[`display::WIDTH`]×[`display::HEIGHT`]）
+/// である。
 ///
 /// # 描くもの
 ///
 /// 色が入れ替わって見えても判別できるよう、**色だけでなく大きさと線の形でも区別する。**
 ///
-/// | 要素 | 生の座標 | 大きさ | 色 |
+/// | 要素 | 論理座標 | 大きさ | 色 |
 /// |---|---|---|---|
-/// | `origin` | 列0・行0の隅 | 48 px角（最大） | 赤 |
-/// | `x_end` | 列の最大・行0の隅 | 32 px角 | 緑 |
-/// | `y_end` | 列0・行の最大の隅 | 24 px角 | 青 |
-/// | `far` | 列・行とも最大の隅 | 16 px角（最小） | 白 |
-/// | `x_axis` | `origin`から`x_end`へ、列の増える向き | 幅8 pxの**実線** | 白 |
-/// | `y_axis` | `origin`から`y_end`へ、行の増える向き | 幅8 pxの**破線** | 白 |
+/// | `origin` | `x`＝0・`y`＝0の隅 | 48 px角（最大） | 赤 |
+/// | `x_end` | `x`の最大・`y`＝0の隅 | 32 px角 | 緑 |
+/// | `y_end` | `x`＝0・`y`の最大の隅 | 24 px角 | 青 |
+/// | `far` | `x`・`y`とも最大の隅 | 16 px角（最小） | 白 |
+/// | `x_axis` | `origin`から`x_end`へ、`x`の増える向き | 幅8 pxの**実線** | 白 |
+/// | `y_axis` | `origin`から`y_end`へ、`y`の増える向き | 幅8 pxの**破線** | 白 |
 ///
 /// 各要素の座標は`display_pattern_element`の行としてlogにも出す。描き終えたら
 /// [`config::DISPLAY_HOLD_MS`]だけ表示したまま保つ（`display_pattern_hold`の行）。
 /// **この関数が戻ると`run_display_bringup`も戻り、backlightが消える**（同定数のdoc）。
 /// 写真はこの間に撮る。
 ///
-/// # 写真から`MY`／`MX`／`MV`を決める手順
+/// # 写真の見方
 ///
-/// 搭載時の向きは「横向き（320×240）、14 pinの`J2`のheaderを右の辺にして見た向き」である
-/// （#13の2026-09-28のコメント、ユーザー承認）。**この向きでpanelを撮り、`J2`のheaderを
-/// 写真に入れる。**写真から、`origin`（最大の正方形）がどの隅にあるか、実線（列の増える向き）と
-/// 破線（行の増える向き）がそれぞれどちらへ伸びるかを読む。
+/// 判定の向きは「横向き（320×240）、14 pinの`J2`のheaderを右の辺にして見た向き」である
+/// （[#13の判断(2)](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13#issuecomment-5860773100)）。
+/// **この向きでpanelを撮り、`J2`のheaderを写真に入れる。**`origin`が左上、`x_end`が右上、
+/// `y_end`が左下、`far`が右下にあり、実線が右へ、破線が下へ伸びていれば、論理の四隅が
+/// 物理の四隅と一致している（`docs/hardware/experiment-log.md`の`EXP-018`）。
 ///
-/// ILI9341 Datasheet V1.11 §9.3 MCU to memory write/read direction（p.208）の表は、
-/// `B5`（`MV`）・`B6`（`MX`）・`B7`（`MY`）ごとにCASET／PASETの行き先を次のように定める。
-/// `MV=1`ならCASETはPhysical Page Pointer、PASETはPhysical Column Pointerへ向かう。
-/// そのうえで`MY=1`ならPage側が`319-`、`MX=1`ならColumn側が`239-`になる。
-///
-/// 横向きの320 pxの辺は行（Page、0〜319）の軸である。論理座標の`x`（CASET）を横へ
-/// 伸ばすには`MV=1`が要る。そのとき、
-///
-/// - **破線（行の増える向き）が右へ伸びていれば`MY=0`、左へ伸びていれば`MY=1`**
-/// - **実線（列の増える向き）が下へ伸びていれば`MX=0`、上へ伸びていれば`MX=1`**
-///
-/// とすれば、論理座標の原点が左上に来て、`x`が右、`y`が下へ増える。**破線が縦に伸びて
-/// 写っている場合は、撮った向きが「横向き」ではない。**向きを確かめて撮り直す。
-///
-/// **この関数はMADCTLを変えない。**決めた値を`crate::display`の定数へ反映し、
-/// `WIDTH`／`HEIGHT`（現在は240×320）を合わせて直すのは、写真で確かめた後の別の変更である。
-/// 結果は`docs/hardware/sensor-datasheet-notes.md`の`対応orientation command`行（TBD）へ、
-/// 実機で確かめた後に記録する。
+/// 向きの値の決め方（MADCTLの`MV`を0にして生の座標を描き、線の伸びる向きから`MY`／`MX`を
+/// 読む。§9.3 p.208の表による）は`EXP-018`にある。
 #[cfg(feature = "bringup-display-13")]
 fn run_corner_pattern(lcd: &mut Ili9341<'_>, health: &mut Health) {
     if let Err(err) = lcd.fill_screen(display::color::BLACK) {
@@ -1202,7 +1147,7 @@ fn run_corner_pattern(lcd: &mut Ili9341<'_>, health: &mut Health) {
     const DASH: u16 = 16;
     let (w, h) = (display::WIDTH, display::HEIGHT);
 
-    // `(name, x, y, 一辺, color)`。座標はcontrollerの生の座標（CASET＝列、PASET＝行）。
+    // `(name, x, y, 一辺, color)`。座標は論理座標（`x`＝CASET、`y`＝PASET。向きは`MADCTL_LANDSCAPE`）。
     let corners: [(&str, u16, u16, u16, u16); 4] = [
         ("origin", 0, 0, ORIGIN, display::color::RED),
         ("x_end", w - X_END, 0, X_END, display::color::GREEN),
@@ -1221,7 +1166,7 @@ fn run_corner_pattern(lcd: &mut Ili9341<'_>, health: &mut Health) {
         service_bringup_step(health, "corner");
     }
 
-    // 実線: `origin`の右端から`x_end`の左端まで、列の増える向き。
+    // 実線: `origin`の右端から`x_end`の左端まで、`x`の増える向き。
     let x_len = w - X_END - ORIGIN;
     log::info!(
         "display_pattern_element name=x_axis x={ORIGIN} y={AXIS_OFFSET} width={x_len} height={AXIS} style=solid"
@@ -1236,7 +1181,7 @@ fn run_corner_pattern(lcd: &mut Ili9341<'_>, health: &mut Health) {
         log::error!("display_axis_failed axis=x_axis error={err}");
     }
 
-    // 破線: `origin`の下端から`y_end`の上端まで、行の増える向き。`DASH`ごとに描いて空ける。
+    // 破線: `origin`の下端から`y_end`の上端まで、`y`の増える向き。`DASH`ごとに描いて空ける。
     let y_len = h - Y_END - ORIGIN;
     log::info!(
         "display_pattern_element name=y_axis x={AXIS_OFFSET} y={ORIGIN} width={AXIS} height={y_len} style=dashed dash={DASH}"
