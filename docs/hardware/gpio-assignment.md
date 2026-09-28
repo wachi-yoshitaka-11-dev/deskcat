@@ -465,7 +465,7 @@ errataとPiの値は、[#446の調査コメント](https://github.com/wachi-yosh
 ### Pi側の設定
 
 Raspberry Pi公式文書「Configure UARTs」（上で引いた`interfaces.adoc`、commit `34dfb87`）の次の節による。
-**Piの現物ではまだ確かめていない**（初回の接続で確かめる）。
+**Piの現物ではまだ確かめていない。**設定と`/dev/serial0`の指す先は、信号線をつなぐ前にPiだけで確かめる。
 
 - `Disable Bluetooth and make UART0 primary`: `sudo systemctl disable hciuart`でBluetooth modemの
   初期化serviceを止め、`/boot/firmware/config.txt`へ`dtoverlay=disable-bt`を足して再起動する。
@@ -485,7 +485,7 @@ Raspberry Pi公式文書「Configure UARTs」（上で引いた`interfaces.adoc`
 1. **2本の信号線（`PI-UART-TX`、`PI-UART-RX`）に、それぞれ4.7 kΩを直列に入れる。**
 2. **UARTの信号線は、PiとESP32の両方に電源が入っている間だけつなぐ。**電源を入れるときは両方を
    入れてから信号線をつなぎ、どちらかの電源を切るとき（USBや電源cableを抜くときを含む）は、先に信号線を外す。
-3. firmwareとhostがこのUARTに対応している。firmwareは`pi-protocol-mode`のbuildが対応する（[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)）。hostは上の`Pi側の設定`を済ませたPiで`/dev/serial0`を開く。
+3. firmwareとhostがこのUARTに対応している。firmwareは`pi-protocol-mode`のbuildが対応する（[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)。対応するのは`boot`→ACKだけであり、このbuildをつなぐのは[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)の受け入れ条件4の試験に限る。理由は`firmware/esp32/src/console.rs`のmodule doc）。hostは上の`Pi側の設定`を済ませたPiで`/dev/serial0`を開く。
 4. 初回の接続と通電は、人間が監視する。baud 115200で直列抵抗を入れたまま通信できるかも、初回の接続で確かめる。
 
 **この対策は2026-09-28のユーザー決定であり、弱点を記録したうえで採った**（`HW-TBD-036`）。

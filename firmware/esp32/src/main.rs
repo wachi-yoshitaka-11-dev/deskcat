@@ -456,7 +456,10 @@ fn main() {
     // UART0以外のUARTをGPIO matrixで`PI-UART-TX`＝GPIO13、`PI-UART-RX`＝GPIO14へ
     // 割り当てる（`docs/hardware/gpio-assignment.md`の`Pi–ESP32間のtransport`節。
     // 同節は「UART0以外」とだけ定める。UART1とUART2のどちらでもよく、番号の小さい
-    // UART1を使う）。8N1でflow control（RTS／CTS）なし（`esp32-pi-protocol.md`§2の
+    // UART1を使う。`UartDriver::new`は渡したGPIO13／GPIO14だけを設定し、UART1の既定のpinには
+    // 触れない。esp-idf-hal 0.46.2 `uart.rs`2023行〜の`new_common`が`uart_set_pin`へ渡すのは
+    // この2本だけであり、ESP-IDF v5.5.3 `esp_driver_uart/src/uart.c`819行〜の`uart_set_pin`は
+    // 負の番号のpinを設定しない）。8N1でflow control（RTS／CTS）なし（`esp32-pi-protocol.md`§2の
     // `UART framing`、`Candidate`）は`UartConfig::default()`のまま得る（esp-idf-hal 0.46.2
     // `uart.rs`579〜596行の`Config::new`）。baudは`config::PI_PROTOCOL_UART_BAUDRATE_HZ`のdoc参照。
     // ring buffer容量の根拠は`config::PI_PROTOCOL_UART_RX_BUFFER_BYTES`のdoc参照。
