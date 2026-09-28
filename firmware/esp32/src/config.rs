@@ -181,6 +181,15 @@ pub const PI_PROTOCOL_UART_BAUDRATE_HZ: u32 = 115_200;
 /// その間はring bufferが貯まり続ける。**このNVS操作の所要時間は未確認
 /// （下記）。
 ///
+/// **`#487`から、`read`と`read`の間にUART0へのdebug log出力も入る。**`pi-protocol-mode`が
+/// loggingを止めなくなったためである（`crate::console`参照）。heartbeat、health snapshot
+/// （JSON 1行）、`boot_tx`等のlogを書いている間も、この`read`は呼ばれない。**log出力の
+/// 所要時間は測っていない。**consoleがbyteを送り終えるまで戻らない場合、所要時間は
+/// logのbyte数に比例し、UART0とPi linkがどちらも115200 bpsなら、その間にPi linkへ届き
+/// うるbyte数はlogのbyte数と同程度になる（計算であり、実測ではない）。health snapshotの
+/// 1行の長さも測っていない。**この見込みが512 byteに収まるかは、`#446`の受け入れ条件4の
+/// 試験で確かめる。**
+///
 /// **この値は理論値ではなく安全側の見込みである。**`boot`のACK（§6の例で約115 byte）に
 /// 続けて`get_status`等の別messageが即座に届く場合（`coordinator::handle_boot`が
 /// ACK後に同期送信する。`crates/deskcat-serial/src/coordinator.rs`参照）を想定し、

@@ -474,8 +474,9 @@ Raspberry Pi公式文書「Configure UARTs」（上で引いた`interfaces.adoc`
   serialのlogin shellを`No`、serial port hardwareを`Yes`にして再起動する。
 - `Linux device names`: `/dev/serial0`はprimary UARTを指すsymbolic linkであり、`/dev/ttyAMA0`は
   最初のPL011である。上の設定でPL011がprimaryになるため、`/dev/serial0`は`/dev/ttyAMA0`を指す
-  （2つの記述を組み合わせて導いたもの）。host（`crates/deskcat-serial`）は`--port /dev/serial0`で開く。
-  deviceの名前はhostの既定値にしない（`--port`は必須引数である）。
+  （2つの記述を組み合わせて導いたもの）。hostの`serial_link` example（`crates/deskcat-serial/examples/serial_link.rs`）は
+  `--port /dev/serial0`で開く。deviceの名前は既定値にしない（`--port`は必須引数であり、crate本体の`SerialConfig`も
+  `Default`を持たない）。
 
 ### 信号線をつないでよい条件
 
@@ -484,7 +485,7 @@ Raspberry Pi公式文書「Configure UARTs」（上で引いた`interfaces.adoc`
 1. **2本の信号線（`PI-UART-TX`、`PI-UART-RX`）に、それぞれ4.7 kΩを直列に入れる。**
 2. **UARTの信号線は、PiとESP32の両方に電源が入っている間だけつなぐ。**電源を入れるときは両方を
    入れてから信号線をつなぎ、どちらかの電源を切るとき（USBや電源cableを抜くときを含む）は、先に信号線を外す。
-3. firmwareとhostがこのUARTに対応している。firmwareは`pi-protocol-mode`のbuildが対応する（[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)）。hostは下の`Pi側の設定`を済ませたPiで`/dev/serial0`を開く。
+3. firmwareとhostがこのUARTに対応している。firmwareは`pi-protocol-mode`のbuildが対応する（[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)）。hostは上の`Pi側の設定`を済ませたPiで`/dev/serial0`を開く。
 4. 初回の接続と通電は、人間が監視する。baud 115200で直列抵抗を入れたまま通信できるかも、初回の接続で確かめる。
 
 **この対策は2026-09-28のユーザー決定であり、弱点を記録したうえで採った**（`HW-TBD-036`）。
