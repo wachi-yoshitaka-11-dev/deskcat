@@ -384,7 +384,7 @@ I2C busの速度と無関係である。加速度の軽打検出は`ACCEL-IRQ`�
 |---|---|---|
 | Flash通信専用（**使用禁止**） | 6, 7, 8, 9, 10, 11（`CLK`／`D0`／`D1`／`D2`／`D3`／`CMD`） | 内蔵SPI Flashとの通信に使用。外部回路から絶対に使用しない |
 | Strapping pin（起動modeを決定。用途を厳選） | 0, 2, 5, 12, 15 | GPIO0: boot button。GPIO2: download mode判定。GPIO12(MTDI): flash電圧選択（Highだと起動しない可能性）。GPIO15(MTDO): boot logのsilence制御。今回の割り当てでは**いずれも使用しない**（安全側） |
-| UART0（board上USB-UARTブリッジ専用。TXの用途はbuild時のfeatureで排他的に切り替える） | 1（TX）, 3（RX） | board上のUSB-UARTブリッジが占有するため、外部配線用のGPIOとして使わない（新たな配線を追加しない、という意味）。TX（GPIO1）はdebug logとPi–ESP32 protocol streamのどちらかへ排他的に使う（`pi-protocol-mode`。詳細は`docs/protocol/esp32-pi-protocol.md`§2、`firmware/esp32/src/console.rs`参照）。RX（GPIO3）は既定buildでは読まれないが、`pi-protocol-mode`は`boot`のACK受信に読む（[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446) PR B。`UART-RX`行参照） |
+| UART0（board上USB-UARTブリッジ専用。TXの用途はbuild時のfeatureで排他的に切り替える） | 1（TX）, 3（RX） | board上のUSB-UARTブリッジが占有するため、外部配線用のGPIOとして使わない（新たな配線を追加しない、という意味）。TX（GPIO1）はdebug logとPi–ESP32 protocol streamのどちらかへ排他的に使う（`pi-protocol-mode`。詳細は`docs/protocol/esp32-pi-protocol.md`§2、`firmware/esp32/src/console.rs`参照）。RX（GPIO3）は既定buildでは読まれないが、`pi-protocol-mode`は`boot`のACK受信に読む（[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446) PR B。`UART-RX`行参照）。**2026-09-28の決定で、Pi linkはUART0から外し、GPIO13／GPIO14のUARTへ移す**（下の`Pi–ESP32間のtransport`節）。**firmwareの移行は未実施である。**移行した後のUART0は、書き込みとdebug logだけに使う |
 | Input-only（出力不可） | 34, 35, 36（VP）, 39（VN） | 純粋なinput信号（interrupt、ADC）にのみ割り当て可 |
 | WROOM/SOLO-1専用（WROVERでは予約） | 16, 17 | 今回のmoduleはESP-WROOM-32Dのため使用可 |
 
@@ -410,32 +410,84 @@ I2C busの速度と無関係である。加速度の軽打検出は`ACCEL-IRQ`�
 | ADC-SHUNT | MEAS-01 | Servo rail低側shuntの電圧 | Input（ADC1_CH4） | GPIO32 | 入力専用扱い、high-Z | 外部pull不要（shunt両端が電位を決める） | ADC1、減衰0 dB（0–1.1 V）。0.1Ω×最大2 A＝0.2 Vがfull scale内 | なし | ADC1のためWi-Fi動作中も使用可。ADC2は**Wi-Fi有効時に使用不可**のため測定へ割り当てない。低電流側の精度限界（実用域は約1 A以上）は`power-budget.md`の測定計画を参照 |
 | ADC-5V | MEAS-01 | 5 V railの電圧 | Input（ADC1_CH5） | GPIO33 | 入力専用扱い、high-Z | 分圧器10 kΩ／10 kΩ（比1/2）。分圧後の最大は約2.5 V | ADC1、減衰11 dB（約0–3.1 V）。分圧なしでは5 VがADC定格3.3 Vを超え破損する | なし | 分圧比は10 kΩ抵抗で構成する（`hardware-bom.md` MEAS-01）。**`ADC-5V`と`ADC-3V3`で計4本を使う。抵抗は入手済みであり**（2026-08-08着荷、1袋100本入。2026-08-12に購入履歴と照合して訂正した）、**残るのは実装と検証である** |
 | ADC-3V3 | MEAS-01 | ESP32 3.3 V railの電圧 | Input（ADC1_CH0） | GPIO36（VP） | 入力専用、high-Z | 分圧器10 kΩ／10 kΩ（比1/2）。分圧後の最大は約1.65 V | ADC1、減衰11 dB | なし | 3.3 Vは減衰11 dBのfull scale（約3.1 V）を超えるため直結しない。Input-only pinのためoutputへ転用不可 |
-| UART-TX | Firmware flashing（両build共通）。実行時はdebug log（既定build）、**または**Pi–ESP32 protocol stream（`pi-protocol-mode`のbuildだけ。[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)） | TX | Output | GPIO1（固定、board上USB-UARTブリッジへ内部接続） | SDK既定（起動logを出力） | 変更不可（chip内蔵UART0） | 115200 8N1（候補、`esp32-pi-protocol.md`で最終確定） | Pi link（USB-UARTブリッジ経由で同じ物理lineを共有。GPIO headerでの配線共有ではない） | board上のUSB-UARTブリッジが占有するため、**新たな外部配線用のGPIOとして使用しない**（GPIO headerからの直接配線は無い、という意味）。debug logとprotocol streamの排他はbuild時のfeatureで選ぶ。詳細（既知の例外を含む）は`docs/protocol/esp32-pi-protocol.md`§2、`firmware/esp32/src/console.rs`参照 |
+| UART-TX | Firmware flashing（両build共通）。実行時はdebug log（既定build）、**または**Pi–ESP32 protocol stream（`pi-protocol-mode`のbuildだけ。[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)） | TX | Output | GPIO1（固定、board上USB-UARTブリッジへ内部接続） | SDK既定（起動logを出力） | 変更不可（chip内蔵UART0） | 115200 8N1（候補、`esp32-pi-protocol.md`で最終確定） | Pi link（USB-UARTブリッジ経由で同じ物理lineを共有。GPIO headerでの配線共有ではない） | board上のUSB-UARTブリッジが占有するため、**新たな外部配線用のGPIOとして使用しない**（GPIO headerからの直接配線は無い、という意味）。debug logとprotocol streamの排他はbuild時のfeatureで選ぶ。詳細（既知の例外を含む）は`docs/protocol/esp32-pi-protocol.md`§2、`firmware/esp32/src/console.rs`参照。**2026-09-28の決定で、Pi linkは`PI-UART-TX`／`PI-UART-RX`（GPIO13／GPIO14）へ移す。firmwareの移行は未実施であり、この行はそれまでの現状である** |
 | UART-RX | Firmware flashing（両build共通）。**既定buildはRXを読まない。**`pi-protocol-mode`は`boot`のACK受信にRXを読む（[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446) PR B、`crate::boot_session`）。実機での受信確認（software ring buffer溢れの有無、`boot`→ACK成立）はまだ無い | RX | Input | GPIO3（固定） | 同上 | 変更不可 | 同上 | USB-UARTブリッジの物理line（同じchipのTXと対）。**既定buildはRXを読まない**（protocol用途があるのはTXだけ）。`pi-protocol-mode`はTX／RXとも`UartDriver`（interrupt駆動）経由で読み書きする | 同上 |
+| PI-UART-TX | SBC-01（Raspberry Pi Zero W。受ける側はPiのGPIO15＝header pin 10、`RXD`） | UART TX（ESP32→Pi） | Output | GPIO13（`MTCK`） | reset中`oe=0, ie=0`、reset直後`oe=0, ie=1, wpd`（ESP32 Series Datasheet v5.3 Appendix `IO_MUX`）。UART driverの初期化まではHighにならない | 外部pullは付けない（安全要件の5項目に効かない。初期化前のLowやglitchはPi側で不正なbyteとして受け、改行境界で再同期する。`esp32-pi-protocol.md`§2） | UART（UART0以外。GPIO matrixで割り当てる）。115200 8N1（候補、`esp32-pi-protocol.md`§2） | なし | **2026-09-28に決定した**（[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)）。根拠は下の`Pi–ESP32間のtransport`節。GPIO13は`MTCK`（JTAG）を兼ねるため、この割り当てでJTAG debugは使えない。**Piとの信号線は`HW-TBD-036`が解決するまで接続しない** |
+| PI-UART-RX | SBC-01（送る側はPiのGPIO14＝header pin 8、`TXD`） | UART RX（Pi→ESP32） | Input | GPIO14（`MTMS`） | reset中`oe=0, ie=0`、reset直後`oe=0, ie=1, wpu`（同上） | 外部pullは付けない（同上） | 同上 | なし | 同上。GPIO14は`MTMS`（JTAG）を兼ねる。**ESP32の電源が切れているときにPiの送信線がHighだと、ESP32の入力の上限（VDD＋0.3 V）を超える。**対策は`HW-TBD-036` |
 
 正確なmoduleが使用しない信号は削除し、不足しているreset、enable、address-select、interrupt、power-control信号はすべて追加する。
 
-## Pi–ESP32間のtransport（USB serialに確定）
+## Pi–ESP32間のtransport（GPIO UART、2026-09-28に変更）
 
-[Protocol](../protocol/esp32-pi-protocol.md)が`物理／論理link`を**USB serial**とProject decisionで
-確定しているため、この文書もUSB serialだけを採る。**GPIO UARTによる直接配線は採用しない。**
-両者はconnector、配線、flashing手順が異なるため、片方に統一しないと配線が決まらない。
+**2026-09-28、ユーザーの決定で、PiとESP32の間をGPIO UARTで直接つなぐ方式へ変えた。**
+最終の製品構成でもUARTを使い、ESP32のUSB portは書き込みとdebug専用にする。
+検証の構成では、PiとESP32を別の電源から給電し（PiはM-12001、ESP32はPCのUSB）、GNDを共通にする。
+**最終構成でのESP32の給電経路は、この決定では決めていない**（[#405](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/405)の実装設計の見直しで決める）。
+決定の記録は[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)の次のコメントにある。
 
-| 項目 | 採用する方式 | 採用しない方式 |
+- 別電源とUARTの採用: https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446#issuecomment-5863027108
+- 最終構成でもUART、回り込み対策: https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446#issuecomment-5863142360
+- pinとPi側のUART: https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446#issuecomment-5864973568
+
+| 項目 | 採用する方式 |
+|---|---|
+| 物理接続 | ESP32のGPIO13（`PI-UART-TX`）→ PiのGPIO15（header pin 10、`RXD`）。PiのGPIO14（header pin 8、`TXD`）→ ESP32のGPIO14（`PI-UART-RX`）。GNDを共通にする |
+| ESP32側の経路 | UART0以外のUARTを、GPIO matrixでGPIO13／GPIO14へ割り当てる。UART0（GPIO1／GPIO3）はboard上のUSB-UARTブリッジ専用のまま、書き込みとdebug logに使う |
+| Pi側のdevice | PL011を`dtoverlay=disable-bt`でGPIO14／GPIO15へ出す（Bluetoothは止める。MVPで使わない）。login consoleはserialから外す |
+| 追加部品 | jumper wire。回り込み対策の部品は`HW-TBD-036`で決める |
+
+**pinの選び方。**ESP32で空いているpinは、flash用とstrapping pin（[使用制限pin](#esp32の使用制限pinespressif公式資料よりこの基板に適用)）を除くとGPIO13、GPIO14、GPIO39の3本だけである。
+GPIO39は入力専用で、ESP32 Series SoC Errata v3.0の`[GPIO-3.11]`（SAR ADCの電源投入時に
+GPIO36／GPIO39の入力が約80 ns Lowに引かれる）があり、ADC1を使うこの設計では受信に使えない。
+（errataの出典: https://docs.espressif.com/projects/esp-chip-errata/en/latest/esp32/esp-chip-errata-en-master-esp32.pdf 、
+2025-10-11版、sha256 `11994de91a76475513449027bff845310f2f2a5be7d0132dc6b09885ffb988a3`、2026-09-28取得）
+**GPIO13／GPIO14に基板上の部品がつながっていないことは、公式回路図（[Board識別情報](#board識別情報)の
+`公式回路図revision`）で確かめた**（次のコメント。現物の導通は測っていない）。
+
+- https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446#issuecomment-5865068972
+
+**ロジック電圧。**両者とも3.3 Vであり、level shifterは要らない（計算）。
+
+| 向き | 送る側の出力 | 受ける側の入力 |
 |---|---|---|
-| 物理接続 | Pi（USB host）のUSB OTG port ⇔ ESP32 boardのMicro USB port を**USB cable 1本**で接続する | ESP32のGPIO1／GPIO3とPiのGPIO14／GPIO15をjumperで直接配線する |
-| ESP32側の経路 | board上のUSB-UARTブリッジICが内部でUART0（GPIO1／GPIO3）へ接続する。GPIO headerには何も配線しない | GPIO1／GPIO3をheaderから引き出す |
-| Pi側のdevice | USB CDC serial（`/dev/ttyUSB*`。実際の名称は#8で確認） | `/dev/serial0`（Pi内蔵UART） |
-| 追加部品 | Pi側がMicro-B（OTG）のため、**USB OTG変換（Micro-B → Type-A）またはMicro-B ⇔ Micro-B OTG cable**が必要。**2026-08-22に手持ちで充当と確定した**（`hardware-bom.md`の`CABLE-PI-LINK-01`。購入待ちリストから外した） | jumper wireのみ |
+| Pi → ESP32 | Pi `VOH` ≥ 3.0 V（`IOH` 2 mA）、`VOL` ≤ 0.14 V（`IOL` −2 mA） | ESP32 `VIH` ≥ 0.75×VDD＝2.475 V、`VIL` ≤ 0.25×VDD＝0.825 V |
+| ESP32 → Pi | ESP32 `VOH` ≥ 0.8×VDD＝2.64 V、`VOL` ≤ 0.1×VDD＝0.33 V | Pi `VIH` ≥ 1.6 V、`VIL` ≤ 0.9 V |
 
-この結果、GPIO1／GPIO3は**board上のブリッジが占有する予約pin**であり、外部配線用に空いていない。
-PCからflashingするときは同じUSB portを使うため、Piとの同時接続は想定しない。
+ESP32の値は[一次資料と、そこから取った値](#一次資料とそこから取った値)のTable 5-3（VDD＝3.3 Vで計算）。
+Piの値はRaspberry Pi公式文書「GPIO」のVoltage specifications（原稿は`raspberrypi/documentation`
+commit `34dfb87`の`gpio-on-raspberry-pi.adoc`、sha256
+`6867ef1baafbb3be2c96b82266ba04c4344e09aad3c6276d588adeec24560b04`、2026-09-28取得）。
+UARTの設定は同文書「Configure UARTs」（同commitの`interfaces.adoc`、sha256
+`acc0b97d694ac130bfd816446e38c067616558624a8578ec71a12d7b81e68c09`）による。
+errataとPiの値は、[#446の調査コメント](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446#issuecomment-5864820541)が
+これらの資料から読んだものである。
+
+### 信号線をつないでよい条件
+
+次がそろうまで、PiとESP32の間のUARTの信号線をつながない。
+
+1. **`HW-TBD-036`（片方だけ電源が入っているときの回り込み対策と、電源を入れる順番・切る順番）が解決している。**
+   ESP32の入力の上限はVDD＋0.3 V（Table 5-3）であり、ESP32の電源が切れているときにPiの送信線が
+   High（UARTの待機状態）だと上限を超える。流れ込んでよい電流はESP32にもPiにも公開値が無く、
+   直列抵抗の値を公開値から導けない。GNDを共通にしたときのPC–Pi間の電流経路も、同じ行で扱う。
+2. firmwareとhostがこのUARTに対応している（firmwareの移行は[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)）。
+3. 初回の接続と通電は、人間が監視する。
+
+### 以前の方式（2026-09-28まで）
+
+2026-09-28まで、この節は「USB serialに確定。GPIO UARTによる直接配線は採用しない」としていた。
+PiのUSB OTG portとESP32 boardのMicro USB portをUSB cable 1本でつなぎ、ESP32側はboard上の
+USB-UARTブリッジ経由でUART0（GPIO1／GPIO3）を使う方式である（Pi側のdeviceは`/dev/ttyUSB*`）。
+USB OTG変換cable（`hardware-bom.md`の`CABLE-PI-LINK-01`）はこの方式のために手持ちで充当していた。
+**現在のfirmwareの`pi-protocol-mode`は、まだこの方式（UART0）を使っている。**
+**`power-budget.md`の`ESP32の給電経路（案Aで確定。実測待ち）`節（案A「USB VBUS単独給電」）は、この以前の方式を前提にしている。**
+同節の改訂は[#488](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/488)の一覧の`A4`で扱う（ESP32の最終の給電経路は[#405](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/405)の実装設計の見直しで決める）。
 
 ## Bus計画
 
 | Bus | 候補device | 状態 | 不足している根拠 |
 |---|---|---|---|
-| USB serial（Pi link） | Raspberry Pi | **USB connector経由に確定**（GPIO配線なし）。GPIO1／GPIO3はboard上ブリッジの予約pin | Pi上のdevice名（`/dev/ttyUSB*`等）は#8で確認。USB OTG変換cableが**手持ちで充当**（2026-08-22） |
+| UART（Pi link） | Raspberry Pi | **GPIO13（TX）／GPIO14（RX）に確定**（2026-09-28。`Pi–ESP32間のtransport`節）。GPIO1／GPIO3はboard上ブリッジの予約pinのまま、書き込みとdebug logに使う | 回り込み対策（`HW-TBD-036`）。firmwareの移行（#487）。2026-09-28まではUSB connector経由だった |
 | ADC測定（`power-budget.md`） | Shunt、5 V rail、3.3 V rail | GPIO32／33／36に確定（すべてADC1） | 分圧器の実装と実測値。ADC2はWi-Fi有効時に使用不可のため割り当てない |
 | SPI display bus | LCD（MSP2807／ILI9341）、touch（同module） | GPIO18／23／19（SCLK／MOSI／MISO）＋CS個別（LCD: GPIO22、Touch: GPIO21）に確定 | Touch controller型番の現物確認、実際のSPI mode／速度の実測 |
 | I2C sensor bus | Accelerometer（ADXL345）、environment sensor（BME280） | GPIO25（SDA）／GPIO26（SCL）に確定 | **BME280側のjumperは2026-08-22に実測で確定した**（`J1`／`J2`／`J3`はすべて開放）。**残るのはADXL345側のpin接続の確認と、実効pull-up抵抗の計算である。****計算の式と前提は[I2C busの実効pull-up](#i2c-busの実効pull-up)節が正本であり、ここへ再掲しない。**同節は2026-08-25に一次資料（UM10204 Rev. 7.0 §7.1）から式と規定値を確定させた。**値が決まらない理由は3つある**（ADXL345側のpin接続、bus容量`Cb`、採るmode）。**いずれも同節に書いた。** **2026-08-22にBME280側のjumperを実測した。`J1`／`J2`はどちらも開放であり、module搭載の4.7 kΩプルアップはbusへ繋がっていない**（正は[sensor-datasheet-notes.md](sensor-datasheet-notes.md)の`現物の実装状態を実測で確定させた（2026-08-22）`。**ここへ再掲しない**）。**したがって実効pull-upの計算にBME280側の4.7 kΩを入れない。**`J1`／`J2`をはんだ付けするかは、この計算の結果で決める。**まだ決めていない。****計算前にはんだ付けしない。****あわせて`J3`が開放であるため、I2Cで使うには`J3`のはんだ付けが要る。****2026-09-22追記: 上の2026-08-22時点の記述は、`J3`について現在の状態と合わない。****状態・実施日・確認方法・根拠の水準は、すべて[sensor-datasheet-notes.md](sensor-datasheet-notes.md)の`jumper（AE-BME280）`節と`J3をはんだ付けした（2026-09-07）`節が持つ。ここへ再掲しない。**実施の記録は[experiment-log.md](experiment-log.md)の`EXP-014`。**上の2026-08-22時点の記述は書き換えていない。****実効pull-upの計算にBME280側の4.7 kΩを入れるかどうかは`J1`／`J2`で決まり、`J3`では変わらない。**`J1`／`J2`の現在の状態は上記の正本が持つ。**2026-09-24追記（[#472](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/472)）。**上の「残るのはADXL345側のpin接続の確認と、実効pull-up抵抗の計算である」と「値が決まらない理由は3つある（ADXL345側のpin接続、bus容量`Cb`、採るmode）」は、ADXL345側のpin接続（2026-08-27）とmode（2026-09-06、Standard-mode）の確定より前の記述である（`I2C busの実効pull-up`節の`確定した入力・まだ確定できない1つの入力`）。**残る入力は`Cb`の1つである。**上の2文はこの追記が置き換える。上の記述は書き換えていない |
@@ -475,6 +527,7 @@ PCからflashingするときは同じUSB portを使うため、Piとの同時接
   未達のまま残す。**`J1`／`J2`をはんだ付けするかの判断もこのmode決定の対象外であり、
   `bus容量Cb`が未確定のまま別途残る
 - [ ] MSP2807のlogic IOが3.3Vで動作することを現物で確認した（VCC 3.3–5V対応だがlogic IOは3.3V TTL。`power-budget.md`参照。**確認方法は[実機check（電源off）の確認方法](#実機check電源offの確認方法)節を参照。記載だけでは足りないと判定した**。**2026-09-07、PM `deskcat-f2`判定によりこの項目は`#2`のclose条件ではない。**`#360`自身が「`U1`出力側の脚とcontroller IC電源pinの導通追跡は、`R5`／`Q1`と同じ理由（部品が小さくプローブを確実に当てられない）で決まらない可能性が高い」としており、追跡を試みず`#13`（LCD bring-up）の通電実測へ送る。判定材料の`VOH`／`VIH`計算は同節にある（`VCC`直結なら約160–170 mVの余裕、`U1`出力経由なら約34–133 mV不足）。`#13`が見るべきはmodule→ESP32の向き（touchの`DOUT`／`PENIRQ`等）のみで、ESP32→moduleの向きはどちらの想定でも問題ない）
+- [ ] PiとESP32の間のUARTで、片方だけ電源が入っているときに信号線から電流が回り込まない（`PI-UART-TX`／`PI-UART-RX`。対策は`HW-TBD-036`で決める。**決まるまで信号線をつながない**）
 - [ ] ESP32の電源投入前に外部moduleがESP32 pinをdriveしない（未検証、実機電源offでの導通checkが必要。**確認方法は[実機check（電源off）の確認方法](#実機check電源offの確認方法)節を参照**。**2026-09-07、PM `deskcat-f2`判定によりこの項目は`#2`のclose条件ではない。**moduleをESP32へ配線しないと検証対象（module電源pin⇔ESP32`3V3`pinの導通）が存在せず、`初回bring-upの範囲`節はmoduleの配線を`#2`に含めていない。満たすのはmoduleを配線した時点であり、`#13`／`#15`／`#16`側で扱う）
 - [x] Resetとbacklight lineが安全な状態で起動する（LCD-RST/LCD-CSへの外部pull-up実装が前提。**2026-08-25に値と本数を選定した**（`LCD-RST`／`LCD-CS`とも10 kΩ×1本。導出は[起動時状態を確定させる外部pull](#起動時状態を確定させる外部pull)節）。**2026-08-27にブレッドボード上へ実装した。**2026-08-29の通電実測（`LCD-CS`＝3.30 V、`LCD-RST`＝3.30 V）は`EN`保持なしであり、pull-upの効果とfirmwareのHigh駆動を区別できなかった。**2026-09-07に`EN`を押し続けてESP32をresetに保持した状態で再測定し、`LCD-CS`(GPIO22)＝3.31 V、`LCD-RST`(GPIO16)＝3.31 Vを得た（`EN`押下の有無で値は変化しない。`fc42332`の`SERVO-PWM`測定と同じ方法。記録は`experiment-log.md`の`EXP-011`）。**firmwareが動作しない状態でHighを維持しており、pull-upが正常であることを確認した。**`LCD-BL`も2026-09-07にpull-down（`4.7 kΩ`×1本、GPIO4）を実装し、同じ`EN`保持測定でGPIO4＝0.00 Vを得た（期待どおりLow）。**この項目が要求するのはbacklight lineが安全な状態（Low）にあることであり、それは実測（GPIO4＝0.00 V）と一次資料（MSP2807公式User Manual、`LED` pinは「high level lighting」＝active-high。正は[sensor-datasheet-notes.md](sensor-datasheet-notes.md)の`Backlight回路／電流／polarity`行）の組み合わせで満たしている。すべての構成要素（`LCD-CS`／`LCD-RST`／`LCD-BL`）が達成した。**あわせて次の2点はcaveatとして残す（達成の取り消しではない）。**(1) `EN`保持のGPIO4＝0.00 Vは、外部pull-downの存在を内部weak pull-down（`wpd`）から切り分けない**（`LCD-CS`／`LCD-RST`は内部pullが無いため区別できるが、`LCD-BL`は異なる。PM指摘、2026-09-07）。**(2) 実機LCDを接続した状態での物理的な消灯そのものは未確認である**（`EXP-011`はLCD／touch panelを接続せずに行った。確認は`#13`（LCD bring-up）で行う）。[`HW-TBD-032`](tbd-register.md)を参照）
 - [x] Servo PWMがdisabledまたは承認済みの安全状態で起動する（GPIO27はreset時high-Zであり、外部pull-downを**必須**とした。**reset時状態が`oe=0, ie=0`＝内部pull無しであることをESP32 Datasheet v5.3の`IO_MUX`で2026-08-25に確認した。**同日に**4.7 kΩ×1本を選定し、2026-08-26に一般値側と決まって確定した**（導出は[起動時状態を確定させる外部pull](#起動時状態を確定させる外部pull)節）。**2026-08-27にブレッドボード上へ実装した。****2026-08-29に通電しての実測を行い、GPIO27＝0 Vを確認した（期待どおり、pull-down正常。USB抜き差しによる再現性も確認した）。****この実測はservo・LCD本体を接続していない状態（Revision 23参照）で行った。**
