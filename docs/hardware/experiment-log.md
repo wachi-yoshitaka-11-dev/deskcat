@@ -1819,7 +1819,7 @@ firmwareが右上の座標に指定した色は、1行目ではGREEN、2行目�
 | Test ID | `EXP-018` |
 | Hardware revision／Exact components | `EXP-017`と同じ。`MCU-01`（[hardware-bom.md](hardware-bom.md)。書き込み時の表示はchip revision v1.0）、`ACCEL-01`、`ENV-01`、`DISP-01`（MSP2807、silk `2.8 TFT SPI 240X320 V1.2`、panel `HSD028309 A2`） |
 | Wiring revision | `EXP-017`から変更なし。**`EXP-017`の後に配線を変えた記録は無く、ユーザーからも変更の申告は無かった。**このため[power-budget.md](power-budget.md)の`DISP-01`追加接続の手順2（非通電確認の項目1〜4）はやり直していない（PMの判断） |
-| Power supply and current limit | ESP32はPCのUSBから給電。`3V3` railに載るのはESP32・`ACCEL-01`・`ENV-01`・`DISP-01`だけ。servoとPiは接続していない。port確認で`CP210x`（`/dev/ttyUSB0`）だけが見え、Arduino（`ttyACM*`）は接続されていなかった。電流制限は`#461`の範囲（`HW-TBD-024`の計算）のまま |
+| Power supply and current limit | ESP32はPCのUSBから給電。`3V3` railに載るのはESP32・`ACCEL-01`・`ENV-01`・`DISP-01`だけ。servoとPiは接続していない。port確認で`CP210x`（`/dev/ttyUSB0`）だけが見え、Arduino（`ttyACM*`）は接続されていなかった。電流制限は`#461`の範囲（`HW-TBD-024`の計算）のまま。**周囲温度は測っていない。**[power-budget.md](power-budget.md)の条件(3)(c)（ambient 40℃の仮定に収まる）の成立は、測定では確かめていない |
 | 条件(7) | [#13 comment（条件(7)の承認）](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13#issuecomment-5868974805)。通電の前に記録した。backlightの点灯が起動1回あたり約2秒から約20秒へ延びること、Read ID1〜3の読み出しを足すこと（Interface Iなら`MOSI`の線で出力がぶつかりうる）を示したうえでの承認である。B2の手順8・9の(a)の読み替えと、待ち時間の上限（60秒、ユーザーがAIに任せた）も同じcommentにある |
 | Measurement equipment | テスター（2000Ωレンジ。機種はこの試験では記録していない）。表示の記録はユーザーの動画 |
 | build | debug profile、`--features bringup-display-13`。repositoryの外に置いたdetachedのworktreeでbuildし、`.embuild`は共有した（**clean buildではない**）。`Cargo.lock`は変えていない |
@@ -1912,6 +1912,7 @@ USBを抜いた後、`DISP-01`の`VCC`–`GND`間、2000Ωレンジで**1210 Ω*
 
 ### Faults
 
+- 実施前の条件(3)(c)（周囲温度がambient 40℃の仮定に収まる）を、測定で確かめずに通電した。
 - 停止条件（手順8）にかかる事象は、どの起動でも無かった。異音・発熱・火花・変色・異臭について、ユーザーからの申告は無かった。logは、どの起動でも待ち時間の上限（60秒）より前に(a)〜(d)まで出そろった。
 - B1の写真を撮れなかった（上記）。そのため、起動が1回（B1'）増えた。B1'ではIDを読んでいない。
 - B2では、試験の時点でmerge済みだった手順9の(a)（`display_id`）の代わりに、`display_madctl`の行、または`display_driver_new_failed`／`display_init_failed`の行で(a)を判断した（条件(7)と同じcommentで、通電の前にユーザーが確認した）。

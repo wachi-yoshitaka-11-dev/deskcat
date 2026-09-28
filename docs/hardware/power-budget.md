@@ -543,8 +543,8 @@ ESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`の負荷合計（測定ではない。
 - [ ] (2) firmwareが`--features bringup-display-13`付きでbuild済みである。**commandの正本は
       [検証済みコマンド](../toolchains/verified-commands.md)であり、ここへ写さない。**同feature
       は`pi-protocol-mode`と同時指定できない（`main.rs`の`compile_error!`）。既定buildのままでは
-      `run_display_bringup`が呼ばれず、受け入れ条件（識別・fill・四隅・timing）を確認する材料が
-      得られない。**この構成のVersion Recordはまだ無い**（[検証済みコマンド](../toolchains/verified-commands.md)
+      `run_display_bringup`が呼ばれず、受け入れ条件（初期化・fill・四隅・timing）を確認する材料と、
+      controllerの識別に使うcommandの実機での効果が得られない。**この構成のVersion Recordはまだ無い**（[検証済みコマンド](../toolchains/verified-commands.md)
       が明記するとおり、`bringup-display-13`構成は正式なVersion Recordを持たない。build-onlyの
       検証を誰がいつどの端末で行ったかは、実施時にVersion Recordまたは相当の記録を別途作る）
 - [ ] (3) 電流の余裕計算（[HW-TBD-024の判断記録](tbd-register-history.md#hw-tbd-024)の2026-09-23追記）を
@@ -737,8 +737,9 @@ Revision 39で、給電元（B-2bか`3V3` pinか）ごとに参照先の節が�
 だけから受電し、USBの5V・外部3.3V電源等が同時に到達しないこと）を適用する。
 
 **条件(2)の根拠。**`main.rs`の`run_display_bringup`は`bringup-display-13` feature付きbuildだけが
-持つ関数であり、既定buildは`main()`から呼ばない（`#451`）。受け入れ条件のうち識別・fill・
-四隅・timingはこの関数のlogでしか得られない。
+持つ関数であり、既定buildは`main()`から呼ばない（`#451`）。受け入れ条件のうちfill・四隅・timingと
+初期化の記録は、この関数のlogから得る。controllerの識別は、moduleのsilkと資料、およびこの関数が
+送るcommandの実機での効果から記録する（logだけの証拠にはしない）。
 
 **条件(3)の根拠。**[HW-TBD-024の判断記録](tbd-register-history.md#hw-tbd-024)の2026-09-23追記が持つ
 電流上界の計算（通常動作約245.4 mA、`R5`先短絡の故障時約646.5 mA）は、`ACCEL-01`／`ENV-01`が
