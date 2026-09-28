@@ -2129,7 +2129,7 @@ mod peer_protocol {
         assert_eq!(peer.esp32_sid(), None, "ESP32のsidは記録しない");
         assert!(drain_sent(&mut pi).is_empty(), "ACKへは応答しない");
 
-        // 同じACKの2件目は、もう`hello`に相関しない。
+        // 受理しないACKでは記録を消さない。同じACKの2件目も同じ分類で数える。
         let again = receive(
             &mut pi,
             &mut peer,
@@ -2138,6 +2138,80 @@ mod peer_protocol {
         );
         assert_eq!(
             again,
+            Received::Rejected {
+                type_str: "ack",
+                rejection: PeerRejection::UnapprovedHelloAck
+            }
+        );
+        assert_eq!(peer.counters().unapproved_hello_acks, 2);
+        assert_eq!(peer.counters().unmatched_acks, 0);
+    }
+
+    /// 未承認のsessionからのACKを受けた後でも、承認済みのsessionからのACKが届けば相関する。
+    #[test]
+    fn an_unapproved_hello_ack_does_not_consume_the_pending_hello() {
+        let mut peer = PeerSession::new(super::duplicate_policy());
+        let mut pi = connected_session_with_sid(PI_SID);
+        let _ = establish(&mut pi, &mut peer, ESP32_SID, 0);
+        let hello_id = send_hello(&mut pi, &mut peer, 10);
+
+        let unapproved = receive(
+            &mut pi,
+            &mut peer,
+            &ack_line(ESP32_SID + 1, 1, ok_ack(hello_id)),
+            20,
+        );
+        assert_eq!(
+            unapproved,
+            Received::Rejected {
+                type_str: "ack",
+                rejection: PeerRejection::UnapprovedHelloAck
+            }
+        );
+
+        let approved = receive(
+            &mut pi,
+            &mut peer,
+            &ack_line(ESP32_SID, 2, ok_ack(hello_id)),
+            30,
+        );
+        assert!(
+            matches!(approved, Received::Ack(ref c) if c.request == OutstandingKind::Hello),
+            "{approved:?}"
+        );
+    }
+
+    /// 既知の制限: 未承認のACKを受け、同じESP32の`boot`でその`sid`を承認した後に届いた
+    /// 同じ`hello`へのACKは、遷移で記録を消しているため`UnmatchedAck`になる（§6）。
+    #[test]
+    fn a_hello_ack_resent_after_the_session_switch_is_unmatched() {
+        let mut peer = PeerSession::new(super::duplicate_policy());
+        let mut pi = connected_session_with_sid(PI_SID);
+        let hello_id = send_hello(&mut pi, &mut peer, 0);
+
+        let unapproved = receive(
+            &mut pi,
+            &mut peer,
+            &ack_line(ESP32_SID, 7, ok_ack(hello_id)),
+            10,
+        );
+        assert_eq!(
+            unapproved,
+            Received::Rejected {
+                type_str: "ack",
+                rejection: PeerRejection::UnapprovedHelloAck
+            }
+        );
+
+        let _ = establish(&mut pi, &mut peer, ESP32_SID, 20);
+        let resent = receive(
+            &mut pi,
+            &mut peer,
+            &ack_line(ESP32_SID, 8, ok_ack(hello_id)),
+            30,
+        );
+        assert_eq!(
+            resent,
             Received::Rejected {
                 type_str: "ack",
                 rejection: PeerRejection::UnmatchedAck

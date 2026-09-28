@@ -279,6 +279,10 @@ pub struct PeerSession {
     ///
     /// **最新の1件だけを持つ。**Piは起動時とportを開き直すたびに`hello`を送るため、
     /// 古い`hello`へ遅れて届いたACKは[`PeerRejection::UnmatchedAck`]になる。
+    /// 消すのは、現在のESP32 sessionから相関したACKを受けたときと、ESP32 sessionの遷移を
+    /// 確定したとき（[`Self::handle_boot`]）だけである。**遷移の後に届いた、遷移前の
+    /// `hello`へのACK（未承認のACKを受け、その`sid`の`boot`で承認した後の再送など）は
+    /// [`PeerRejection::UnmatchedAck`]になる。**新しいsessionへ古い要求の結果を持ち越さない（§6）。
     /// `outstanding`と分けるのは、[`Self::poll_outstanding`]の再送の対象にしないためである
     /// （[`OutstandingKind::Hello`]のdoc参照）。
     pending_hello: Option<u32>,
@@ -616,7 +620,8 @@ impl PeerSession {
     /// **Piの`hello`へのACK**（[`Self::note_hello_sent`]）も同じ条件で相関する。現在の
     /// ESP32 sessionから届けば[`OutstandingKind::Hello`]として返す。envelopeの`sid`が
     /// 未知なら、`hello`の結果として受理せず[`PeerRejection::UnapprovedHelloAck`]にする。
-    /// どちらの場合も、その`hello`への応答は済んだものとして記録を消す。
+    /// **記録を消すのは、現在のsessionで相関した前者だけである。**後者は受理しないため、
+    /// `hello`はまだ応答を得ていない（後から承認済みのsessionのACKが届けば相関する）。
     ///
     /// # Errors
     ///
@@ -648,7 +653,7 @@ impl PeerSession {
                 return Err(PeerRejection::StaleSession);
             }
             if answers_hello {
-                self.pending_hello = None;
+                // 受理しないため、`hello`はまだ応答を得ていない。記録は消さない。
                 return Err(PeerRejection::UnapprovedHelloAck);
             }
             return Err(PeerRejection::UnmatchedAck);
