@@ -21,6 +21,15 @@ class Stopped(ValueError):
     """Admission or completion requires human attention."""
 
 
+# Rounds that may start without a bounded human approval, counted per work (#490).
+# A diff made only of Markdown files outside every instruction source gets the
+# lower limit; anything else (code, scripts, safety/instruction documents,
+# or an empty diff) keeps the original limit. The limit only decides when a
+# human must be asked; it never lowers what convergence or capping requires.
+FREE_ROUNDS = 5
+FREE_ROUNDS_DOCS = 3
+
+
 def git(root, *args):
     return subprocess.check_output(["git", "-C", str(root), *args])
 
@@ -37,6 +46,25 @@ def fingerprint(root, base):
             path = Path(root) / os.fsdecode(name)
             digest.update(name + b"\0" + path.read_bytes() + b"\0")
     return digest.hexdigest()
+
+
+def changed_paths(root, base):
+    """Paths in the reviewed diff: tracked changes since merge-base plus new files."""
+    ancestor = git(root, "merge-base", base, "HEAD").decode().strip()
+    names = git(root, "diff", "--name-only", "-z", ancestor).split(b"\0")
+    names += git(root, "ls-files", "--others", "--exclude-standard", "-z").split(b"\0")
+    return sorted({os.fsdecode(name) for name in names if name})
+
+
+def free_limit(paths):
+    """Lower limit only for a non-empty diff of Markdown outside instruction sources."""
+    import review_gate  # Deferred: review_gate imports this module lazily as well.
+    if paths and all(path.endswith(".md")
+                     and not any(path == source or (source.endswith("/") and path.startswith(source))
+                                 for source in review_gate.INSTRUCTION_SOURCES)
+                     for path in paths):
+        return FREE_ROUNDS_DOCS
+    return FREE_ROUNDS
 
 
 def state_path(root, work):
@@ -60,10 +88,15 @@ def validate(state, work):
         raise Stopped("known prior round count and history source are required; unknown is not zero")
     if not isinstance(state.get("rounds"), list) or not isinstance(state.get("approvals"), list):
         raise Stopped("rounds and approvals must be lists")
+    if not isinstance(state.get("endings", []), list):
+        raise Stopped("endings must be a list")
     for number, entry in enumerate(state["rounds"], prior + 1):
         if entry.get("number") != number or not entry.get("diff"):
             raise Stopped("non-contiguous round history")
-        if number > 5:
+        limit = entry.get("free_limit", FREE_ROUNDS)
+        if limit not in (FREE_ROUNDS, FREE_ROUNDS_DOCS):
+            raise Stopped("round records an unknown free-round limit")
+        if number > limit:
             approval = approval_for(state, number, entry.get("scope"))
             if approval is None or entry.get("approval_source") != approval["source"]:
                 raise Stopped("round history exceeds its recorded human approval")
@@ -132,7 +165,20 @@ def completed(state, diff):
         return "converged"
     if result.get("disposition") == "capped":
         return "capped"
+    if human_ending(state, diff, len(rounds)) is not None:
+        return "capped"
     return "stopped"
+
+
+def human_ending(state, diff, after_round_index):
+    """A human decision to end review on this exact diff after the latest round."""
+    for ending in state.get("endings", []):
+        if (ending.get("actor_kind") == "human" and ending.get("work") == state["work"]
+                and ending.get("actor") and ending.get("source")
+                and ending.get("diff") == diff
+                and ending.get("after_round") == state["prior_rounds"] + after_round_index):
+            return ending
+    return None
 
 
 def begin(root, work, base, scope):
@@ -142,10 +188,12 @@ def begin(root, work, base, scope):
             raise Stopped("unfinished round: record its result/interruption before another review")
         number = total(state) + 1
         approval = approval_for(state, number, scope)
-        if number > 5 and approval is None:
-            raise Stopped(f"stopped: total={total(state)}; explicit bounded human approval required before round {number}")
+        limit = free_limit(changed_paths(root, base))
+        if number > limit and approval is None:
+            raise Stopped(f"stopped: total={total(state)} limit={limit}; explicit bounded human approval required before round {number}")
         entry = {"number": number, "diff": fingerprint(root, base), "scope": scope,
-                 "approval_source": approval["source"] if approval else None, "result": None}
+                 "approval_source": approval["source"] if approval else None,
+                 "free_limit": limit, "result": None}
         state["rounds"].append(entry)
         save(path, state)  # Reserve before launching: crashes also consume the round.
         return entry
@@ -187,14 +235,14 @@ def finish(root, work, base, result):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("init", "status", "begin", "finish", "approve", "run", "check"))
+    parser.add_argument("action", choices=("init", "status", "begin", "finish", "approve", "end", "run", "check"))
     parser.add_argument("--repository-root", default=".")
     parser.add_argument("--work", required=True)
     parser.add_argument("--base", default="origin/develop")
     parser.add_argument("--scope", default="Issue scope")
     parser.add_argument("--prior-rounds", type=int)
     parser.add_argument("--history-source")
-    parser.add_argument("--record", help="portable handoff JSON (init), result JSON (finish), or approval JSON (approve)")
+    parser.add_argument("--record", help="portable handoff JSON (init), result JSON (finish), approval JSON (approve), or human ending JSON (end)")
     args, command = parser.parse_known_args(argv)
     if command and (args.action != "run" or command[0] != "--"):
         parser.error("review command is allowed only after run options and --")
@@ -243,6 +291,26 @@ def main(argv=None):
                         or approval["through_round"] <= total(state)):
                     raise Stopped("human approval must name this work, current total, finite end round, scope, actor and source")
                 state["approvals"].append(approval)
+                save(path, state)
+        elif args.action == "end":
+            if not args.record:
+                raise Stopped("end requires --record with human decision provenance")
+            ending = read_json(args.record)
+            with locked(root, work) as path:
+                state = validate(read_json(path), work)
+                diff = fingerprint(root, args.base)
+                rounds = state["rounds"]
+                if (ending.get("actor_kind") != "human" or ending.get("work") != work
+                        or not ending.get("actor") or not ending.get("source")
+                        or ending.get("after_round") != total(state)):
+                    raise Stopped("human ending must name this work, the current total, actor and source")
+                if not rounds or rounds[-1].get("result") is None:
+                    raise Stopped("end requires the latest round to be finished")
+                ending = dict(ending, diff=diff)
+                trial = dict(state, endings=[*state.get("endings", []), ending])
+                if completed(trial, diff) != "capped" or completed(state, diff) == "converged":
+                    raise Stopped("end requires both passes on this diff, no unresolved defect, and no convergence yet")
+                state["endings"] = trial["endings"]
                 save(path, state)
         else:
             state = validate(read_json(state_path(root, work)), work)

@@ -140,12 +140,55 @@ class ReviewSessionTests(unittest.TestCase):
         self.run_review()
         self.run_review()
         self.assertIn("converged", self.cli("check").stdout)
-        (self.root / "new.md").write_text("pending\n", encoding="utf-8")
+        # A non-Markdown file keeps the default limit; the docs-only limit has its own test.
+        (self.root / "new.txt").write_text("pending\n", encoding="utf-8")
         self.cli("check", expected=2)
         self.run_review()
         self.cli("check", expected=2)
         self.run_review()
         self.assertIn("TOTAL_ROUNDS=4", self.cli("check").stdout)
+
+    def test_docs_only_diff_stops_after_three_rounds(self):
+        (self.root / "guide.md").write_text("docs only\n", encoding="utf-8")
+        for _ in range(3):
+            self.run_review()
+        blocked = self.run_review(expected=2)
+        self.assertIn("total=3 limit=3", blocked.stderr)
+        self.assertEqual(self.marker.read_text(), "xxx")
+
+    def test_instruction_source_markdown_keeps_default_limit(self):
+        (self.root / "docs" / "hardware").mkdir(parents=True)
+        (self.root / "docs" / "hardware" / "limits.md").write_text("safety\n", encoding="utf-8")
+        for _ in range(5):
+            self.run_review()
+        self.run_review(expected=2)
+        self.assertEqual(self.marker.read_text(), "xxxxx")
+
+    def ending(self, **changes):
+        record = {"work": "465", "actor_kind": "human", "actor": "fixture-human",
+                  "source": "https://github.com/example/repo/issues/465#issuecomment-456",
+                  "after_round": 1}
+        record.update(changes)
+        return record
+
+    def test_human_ending_caps_a_clean_final_diff(self):
+        self.run_review()
+        self.cli("check", expected=2)
+        self.cli("end", "--record", self.write(self.ending()))
+        self.assertIn("REVIEW_STATE=capped TOTAL_ROUNDS=1", self.cli("check").stdout)
+        (self.root / "note.md").write_text("changed after ending\n", encoding="utf-8")
+        self.cli("check", expected=2)
+
+    def test_human_ending_rejects_ai_stale_round_and_unresolved_defect(self):
+        self.run_review()
+        self.cli("end", "--record", self.write(self.ending(actor_kind="ai")), expected=2)
+        self.cli("end", "--record", self.write(self.ending(after_round=0)), expected=2)
+        self.cli("begin")
+        self.cli("end", "--record", self.write(self.ending(after_round=2)), expected=2)
+        self.finish(unresolved=["D1"], findings=[{"kind": "defect", "origin": "diff", "decision": "fix",
+                                                  "reason": "fixture", "evidence": "fixture"}])
+        self.cli("end", "--record", self.write(self.ending(after_round=2)), expected=2)
+        self.cli("check", expected=2)
 
     def test_unresolved_and_interrupted_never_converge_or_cap(self):
         self.run_review()
