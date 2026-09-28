@@ -213,7 +213,7 @@ use crate::accel::Adxl345;
 #[cfg(feature = "pi-protocol-mode")]
 use crate::boot_session::{BootRetryPolicy, BootSession};
 #[cfg(feature = "bringup-display-13")]
-use crate::display::Ili9341;
+use crate::display::{IdRegister, Ili9341};
 #[cfg(not(feature = "pi-protocol-mode"))]
 use crate::env::Bme280;
 use crate::health::Health;
@@ -824,6 +824,8 @@ fn run_display_bringup<SPI: SpiAnyPins + 'static>(
         );
     }
 
+    run_id_register_reads(&mut lcd, health);
+
     if let Err(err) = lcd.backlight_on() {
         log::error!("display_backlight_on_failed error={err}");
     }
@@ -1062,12 +1064,46 @@ fn run_servo_bench_test(
     }
 }
 
+/// Read ID1／ID2／ID3（DAh／DBh／DCh）を1回ずつ読み、生byteをlogへ出す。
+///
+/// [Issue #13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)の条件1の切り分けに使う。
+/// `display_id`（Read ID4、D3h）は`EXP-016`・`EXP-017`を通じて3種類の値を観測し、いずれも
+/// 期待値と一致しなかった（`docs/hardware/experiment-log.md`）。`EXTC`を要しないこの3つを
+/// 足して読む（根拠は`crate::display`のmodule doc）。
+/// **一致判定はここでは行わない。**`run_i2c_bringup`と同じく生byteを残すだけであり、
+/// どちらのbyteがIDか（先頭がdummyか）の判断もlogを読む人間が行う。
+///
+/// **1回の起動で各registerを1回しか読まない。**ILI9341 Datasheet V1.11 §7.1.10（p.38）の
+/// 4-wire serialの図は、Interface Iでは読み出しdataを`SDA`（この配線では`MOSI`の線）へ、
+/// Interface IIでは`SDO`へ出すと描いている。moduleがどちらに設定されているかは確かめて
+/// いない。Interface Iだった場合、読み出しのたびにcontrollerとESP32が同じ線を駆動しうる。**起動をまたいで
+/// `id2`の値が毎回違う場合に、以後のbuildで読み出しを続けるかは、PMとユーザーが判断する。**
+/// 読み出しの失敗は`display_rdid_failed`へ分類し、残りのregisterと後続の段階を止めない。
+#[cfg(feature = "bringup-display-13")]
+fn run_id_register_reads(lcd: &mut Ili9341<'_>, health: &mut Health) {
+    for register in IdRegister::ALL {
+        let name = register.name();
+        let cmd = register.command();
+        match lcd.read_id_register(register) {
+            Ok(raw) => log::info!("display_rdid register={name} cmd=0x{cmd:02x} raw={raw:02x?}"),
+            Err(err) => {
+                log::error!("display_rdid_failed register={name} cmd=0x{cmd:02x} error={err}");
+            }
+        }
+    }
+    service_bringup_step(health, "rdid");
+}
+
 /// 単色fillを既知のRGB565値で順に実行し、所要時間を計測してlogへ出す。
 ///
 /// 受け入れ条件「単色fillが正しい」「Color orderが正しい」「更新timingを測定した」に
 /// 対応する。**正しいかどうかの判定はこの関数では行わない。**実機のLCDを目視して
 /// 判定するのは人間であり（`AGENTS.md`ハードウェア安全、初回通電は人間監視下）、
 /// この関数は色と所要時間を機械可読な形でlogへ残すだけである。
+///
+/// 描けた色は[`config::DISPLAY_HOLD_MS`]だけ表示したまま保ち、人が色ごとに写真を
+/// 撮れるようにする。`display_fill`の行の`hold_ms`がその値であり、行が出てから次の色へ
+/// 移るまでの目安になる。`elapsed_us`は描画だけの所要時間であり、保つ時間を含まない。
 #[cfg(feature = "bringup-display-13")]
 fn run_fill_tests(lcd: &mut Ili9341<'_>, health: &mut Health) {
     let fills: [(&str, u16); 5] = [
@@ -1083,7 +1119,12 @@ fn run_fill_tests(lcd: &mut Ili9341<'_>, health: &mut Health) {
         match lcd.fill_screen(color) {
             Ok(()) => {
                 let elapsed_us = start.elapsed().as_micros();
-                log::info!("display_fill name={name} color=0x{color:04x} elapsed_us={elapsed_us}");
+                let hold_ms = config::DISPLAY_HOLD_MS;
+                log::info!(
+                    "display_fill name={name} color=0x{color:04x} elapsed_us={elapsed_us} hold_ms={hold_ms}"
+                );
+                // `FreeRtos::delay_ms`はOSへyieldする（module docの watchdog の節）。
+                FreeRtos::delay_ms(hold_ms);
             }
             Err(err) => {
                 log::error!("display_fill_failed name={name} error={err}");
@@ -1093,15 +1134,56 @@ fn run_fill_tests(lcd: &mut Ili9341<'_>, health: &mut Health) {
     }
 }
 
-/// 四隅へ異なる色の正方形を描き、orientationとcolor orderを実機で確認できるようにする。
+/// 四隅と2本の軸を描き、MADCTLの`MY`／`MX`／`MV`を実機の写真から決められるようにする。
 ///
-/// 受け入れ条件「四隅とorientationが正しい」に対応する。**MADCTLの`BGR`bitは
-/// `EXP-016`の実測結果に基づき変更済みである**（`crate::display`のmodule doc参照）。
-/// orientation bit（MY/MX/MV）は今もreset時defaultの`0`のままである。この patternを見て
-/// 向きと色順が期待どおりでなければ、`docs/hardware/sensor-datasheet-notes.md`の
-/// `Color format／order`行（色の並び〈RGB／BGR〉は未記載。byte orderはTBD）と
-/// `対応orientation command`行（TBD）へ、実機で確かめた後に記録し、
-/// `crate::display`のMADCTL定数を実測結果で更新する必要がある。
+/// 受け入れ条件「四隅とorientationが正しい」に対応する（[Issue #13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)）。
+/// **MADCTLは`BGR`だけを立て、orientation bitは`0`のまま描く**（`crate::display`の
+/// module doc）。したがってpatternは**controllerの生の座標**で描かれ、写真には物理的な
+/// 走査方向がそのまま写る。
+///
+/// # 描くもの
+///
+/// 色が入れ替わって見えても判別できるよう、**色だけでなく大きさと線の形でも区別する。**
+///
+/// | 要素 | 生の座標 | 大きさ | 色 |
+/// |---|---|---|---|
+/// | `origin` | 列0・行0の隅 | 48 px角（最大） | 赤 |
+/// | `x_end` | 列の最大・行0の隅 | 32 px角 | 緑 |
+/// | `y_end` | 列0・行の最大の隅 | 24 px角 | 青 |
+/// | `far` | 列・行とも最大の隅 | 16 px角（最小） | 白 |
+/// | `x_axis` | `origin`から`x_end`へ、列の増える向き | 幅8 pxの**実線** | 白 |
+/// | `y_axis` | `origin`から`y_end`へ、行の増える向き | 幅8 pxの**破線** | 白 |
+///
+/// 各要素の座標は`display_pattern_element`の行としてlogにも出す。描き終えたら
+/// [`config::DISPLAY_HOLD_MS`]だけ表示したまま保つ（`display_pattern_hold`の行）。
+/// **この関数が戻ると`run_display_bringup`も戻り、backlightが消える**（同定数のdoc）。
+/// 写真はこの間に撮る。
+///
+/// # 写真から`MY`／`MX`／`MV`を決める手順
+///
+/// 搭載時の向きは「横向き（320×240）、14 pinの`J2`のheaderを右の辺にして見た向き」である
+/// （#13の2026-09-28のコメント、ユーザー承認）。**この向きでpanelを撮り、`J2`のheaderを
+/// 写真に入れる。**写真から、`origin`（最大の正方形）がどの隅にあるか、実線（列の増える向き）と
+/// 破線（行の増える向き）がそれぞれどちらへ伸びるかを読む。
+///
+/// ILI9341 Datasheet V1.11 §9.3 MCU to memory write/read direction（p.208）の表は、
+/// `B5`（`MV`）・`B6`（`MX`）・`B7`（`MY`）ごとにCASET／PASETの行き先を次のように定める。
+/// `MV=1`ならCASETはPhysical Page Pointer、PASETはPhysical Column Pointerへ向かう。
+/// そのうえで`MY=1`ならPage側が`319-`、`MX=1`ならColumn側が`239-`になる。
+///
+/// 横向きの320 pxの辺は行（Page、0〜319）の軸である。論理座標の`x`（CASET）を横へ
+/// 伸ばすには`MV=1`が要る。そのとき、
+///
+/// - **破線（行の増える向き）が右へ伸びていれば`MY=0`、左へ伸びていれば`MY=1`**
+/// - **実線（列の増える向き）が下へ伸びていれば`MX=0`、上へ伸びていれば`MX=1`**
+///
+/// とすれば、論理座標の原点が左上に来て、`x`が右、`y`が下へ増える。**破線が縦に伸びて
+/// 写っている場合は、撮った向きが「横向き」ではない。**向きを確かめて撮り直す。
+///
+/// **この関数はMADCTLを変えない。**決めた値を`crate::display`の定数へ反映し、
+/// `WIDTH`／`HEIGHT`（現在は240×320）を合わせて直すのは、写真で確かめた後の別の変更である。
+/// 結果は`docs/hardware/sensor-datasheet-notes.md`の`対応orientation command`行（TBD）へ、
+/// 実機で確かめた後に記録する。
 #[cfg(feature = "bringup-display-13")]
 fn run_corner_pattern(lcd: &mut Ili9341<'_>, health: &mut Health) {
     if let Err(err) = lcd.fill_screen(display::color::BLACK) {
@@ -1110,38 +1192,78 @@ fn run_corner_pattern(lcd: &mut Ili9341<'_>, health: &mut Health) {
     }
     service_bringup_step(health, "corner_background");
 
-    const SQUARE: u16 = 24;
-    let corners: [(&str, u16, u16, u16); 4] = [
-        ("top_left", 0, 0, display::color::RED),
-        (
-            "top_right",
-            display::WIDTH - SQUARE,
-            0,
-            display::color::GREEN,
-        ),
-        (
-            "bottom_left",
-            0,
-            display::HEIGHT - SQUARE,
-            display::color::BLUE,
-        ),
-        (
-            "bottom_right",
-            display::WIDTH - SQUARE,
-            display::HEIGHT - SQUARE,
-            display::color::WHITE,
-        ),
+    const ORIGIN: u16 = 48;
+    const X_END: u16 = 32;
+    const Y_END: u16 = 24;
+    const FAR: u16 = 16;
+    const AXIS: u16 = 8;
+    /// 軸の線を、`origin`の正方形の中ほどから出す。panelの縁の直下を避けるためである。
+    const AXIS_OFFSET: u16 = 20;
+    const DASH: u16 = 16;
+    let (w, h) = (display::WIDTH, display::HEIGHT);
+
+    // `(name, x, y, 一辺, color)`。座標はcontrollerの生の座標（CASET＝列、PASET＝行）。
+    let corners: [(&str, u16, u16, u16, u16); 4] = [
+        ("origin", 0, 0, ORIGIN, display::color::RED),
+        ("x_end", w - X_END, 0, X_END, display::color::GREEN),
+        ("y_end", 0, h - Y_END, Y_END, display::color::BLUE),
+        ("far", w - FAR, h - FAR, FAR, display::color::WHITE),
     ];
 
     let start = Instant::now();
-    for (name, x, y, color) in corners {
-        if let Err(err) = lcd.fill_rect(x, y, x + SQUARE - 1, y + SQUARE - 1, color) {
+    for (name, x, y, size, color) in corners {
+        log::info!(
+            "display_pattern_element name={name} x={x} y={y} width={size} height={size} color=0x{color:04x}"
+        );
+        if let Err(err) = lcd.fill_rect(x, y, x + size - 1, y + size - 1, color) {
             log::error!("display_corner_failed corner={name} error={err}");
         }
         service_bringup_step(health, "corner");
     }
+
+    // 実線: `origin`の右端から`x_end`の左端まで、列の増える向き。
+    let x_len = w - X_END - ORIGIN;
+    log::info!(
+        "display_pattern_element name=x_axis x={ORIGIN} y={AXIS_OFFSET} width={x_len} height={AXIS} style=solid"
+    );
+    if let Err(err) = lcd.fill_rect(
+        ORIGIN,
+        AXIS_OFFSET,
+        ORIGIN + x_len - 1,
+        AXIS_OFFSET + AXIS - 1,
+        display::color::WHITE,
+    ) {
+        log::error!("display_axis_failed axis=x_axis error={err}");
+    }
+
+    // 破線: `origin`の下端から`y_end`の上端まで、行の増える向き。`DASH`ごとに描いて空ける。
+    let y_len = h - Y_END - ORIGIN;
+    log::info!(
+        "display_pattern_element name=y_axis x={AXIS_OFFSET} y={ORIGIN} width={AXIS} height={y_len} style=dashed dash={DASH}"
+    );
+    let mut offset = 0;
+    while offset < y_len {
+        let y0 = ORIGIN + offset;
+        let y1 = y0 + DASH.min(y_len - offset) - 1;
+        if let Err(err) = lcd.fill_rect(
+            AXIS_OFFSET,
+            y0,
+            AXIS_OFFSET + AXIS - 1,
+            y1,
+            display::color::WHITE,
+        ) {
+            log::error!("display_axis_failed axis=y_axis y={y0} error={err}");
+        }
+        offset += 2 * DASH;
+    }
+    service_bringup_step(health, "axis");
+
     let elapsed_us = start.elapsed().as_micros();
     log::info!("display_corner_pattern elapsed_us={elapsed_us}");
+
+    let hold_ms = config::DISPLAY_HOLD_MS;
+    log::info!("display_pattern_hold hold_ms={hold_ms}");
+    FreeRtos::delay_ms(hold_ms);
 }
 
 /// Health snapshot を 1 行の JSON として log へ出す。
