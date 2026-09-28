@@ -3626,6 +3626,8 @@ PC USBからのflashing、周辺module3点の3.3 V側定常電流の実測）だ
 
 ### サーボ試験
 
+**2026-09-28追記（[#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)）。**ユーザーは、はんだ付け（[#405](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/405)）より前のservoの確認（#17〜#19）を、servo専用の別電源と故障電流の制限手段で行うと決めた。その条件と状態は[servo-safety-limits.md](servo-safety-limits.md)の`承認の状態`の項目6が持つ（ここへ再掲しない）。**次の段落の下段構成への移行は、はんだ付け後の最終構成でservoを試験する場合に適用する。**
+
 **この段階に入る前に、`5 V ingress`節の下段構成（端子台＋Piへの給電cable
 ＋過電流保護部品＋大電流経路の線材。**2026-09-09、案Bにより「Micro-Bメス変換基板」から差し替え**）へ移す。**Pi直挿しのままservoを繋ぐと、servo電流が
 PiのconnectorとPCB traceを通る。
