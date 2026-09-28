@@ -68,6 +68,24 @@ pub const HEALTH_SNAPSHOT_PERIOD_MS: u32 = 10_000;
 #[allow(dead_code)]
 pub const I2C_TRANSACTION_TIMEOUT_MS: u64 = 100;
 
+/// `DISP-01`のbring-upで、単色fillの各色を表示したまま保つ時間（milliseconds）。
+///
+/// [Issue #13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)の条件2・3
+/// （単色fill、color order）を写真で残すための待ちである。以前は各色を描いた直後に
+/// 次の色を描いており、人が色ごとに撮る時間が無かった。
+///
+/// **一般値である。一次資料に基づく値ではない。**表示を保つ時間は
+/// [Hardware Safety Policy](../../../docs/governance/hardware-safety-policy.md)の安全要件5項目の
+/// いずれにも効かない（backlightはbring-up中も後も点灯したままであり、この待ちで負荷は
+/// 変わらない）。外した場合の帰結は「撮り直す」に留まる。**どの値が5項目に効くかの判定は
+/// 同policyが正本であり、ここへ5項目を再掲しない。**
+///
+/// 5色の合計でこの値の5倍だけ、`run_i2c_bringup`のlog（`accel_device_id`・`env_chip_id`）が
+/// 遅れて出る。`docs/hardware/power-budget.md`の`DISP-01`追加接続の手順で、人間が決める
+/// 待機時間の上限（手順5）はこの遅れを含めて決める。
+#[cfg(feature = "bringup-display-13")]
+pub const DISPLAY_FILL_HOLD_MS: u32 = 3_000;
+
 /// `SERVO-PWM`（SG90への制御信号）のGPIO番号。出所は
 /// [gpio-assignment.md](../../../docs/hardware/gpio-assignment.md)の`信号inventory`。
 /// `esp-idf-hal`はpinをtype levelで選ぶためpin選択には使えず、確認用途のみ

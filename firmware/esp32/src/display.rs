@@ -17,7 +17,9 @@
 //!
 //! 一次資料は**ILI9341 Datasheet V1.11**
 //! （<https://cdn-shop.adafruit.com/datasheets/ILI9341.pdf>、
-//! sha256 `a9bbfdf6d078f54a6aca7a56cba91246905358d3a4ed738817bfd3f582b5741`、2026-09-17取得。
+//! sha256 `a9bbfdf6d078f54a6aca7a56cba91246905358d3a4ed738817bfd3f582b5741c`、2026-09-17取得。
+//! 2026-09-28に取り直して同じsha256であることを確かめた。以前はここに末尾の`c`が抜けた
+//! 63文字を書いていた。
 //! `docs/hardware/gpio-assignment.md`が§18.2.1・§12.1／§12.2を既に引用しているものと同一文書）。
 //!
 //! - Software Reset (01h、§8.2.2 p.90)。**書込み後5msec待つ**（同節`Restriction`）。
@@ -42,6 +44,15 @@
 //!   （1st: dummy read period、2nd: IC version、3rd/4th: IC model name）。
 //!   Power On/SW Reset/HW Resetいずれのdefaultも`24'h009341h`であり、
 //!   3rd/4thが`0x93`/`0x41`であることが`ILI9341`の識別根拠になる。
+//!   **同節の`Restriction`は「EXTC should be high to enable this command」である。**
+//! - Read ID1／ID2／ID3 (DAh／DBh／DCh、§8.2.46〜§8.2.48 p.151〜153)。各節の表は
+//!   1st parameterをdummy、2nd parameterをID（ID1はmanufacturer ID、ID2はmodule/driver
+//!   version ID、ID3はmodule/driver ID）とする。**3節とも`Restriction`は空欄であり、
+//!   Sleep In状態でも`Availability`は`Yes`である。**ID2は「the ID parameter range is from
+//!   80h to FFh」とされる。一方、§7.1.10 Read Cycle Sequence（p.38）の4-wire serialの
+//!   8-bit read（RDID1/RDID2/RDID3）の図は、command byteの直後に8 bitを読む形であり、
+//!   dummyの期間を描いていない。**serialで読んだときに先頭にdummyが来るかは確かめていない。**
+//!   そのためこのdriverは2 byteを読み、両方をそのまま返す（[`Ili9341::read_id_register`]）。
 //! - Display Serial Interface Timing（4-line SPI system、§18.3.4 p.242）。
 //!   `twc`（write clock cycle）min 100ns → 最大10 MHz、`trc`（read clock cycle）min 150ns
 //!   → 最大約6.67 MHz。**このfirmwareは読み書き共通で1本のSPI clockを使うため、
@@ -77,6 +88,9 @@ const SPI_CLOCK_HZ: u32 = 6_000_000;
 
 const CMD_SWRESET: u8 = 0x01;
 const CMD_RDID4: u8 = 0xD3;
+const CMD_RDID1: u8 = 0xDA;
+const CMD_RDID2: u8 = 0xDB;
+const CMD_RDID3: u8 = 0xDC;
 const CMD_SLPOUT: u8 = 0x11;
 const CMD_DISPON: u8 = 0x29;
 const CMD_CASET: u8 = 0x2A;
@@ -124,6 +138,42 @@ impl DisplayId {
     #[must_use]
     pub const fn matches_ili9341(&self) -> bool {
         self.raw[2] == EXPECTED_ID4_HI && self.raw[3] == EXPECTED_ID4_LO
+    }
+}
+
+/// Read ID1／ID2／ID3で読むregister（module doc参照）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IdRegister {
+    /// Read ID1（DAh）。manufacturer ID。
+    Id1,
+    /// Read ID2（DBh）。module/driver version ID。
+    Id2,
+    /// Read ID3（DCh）。module/driver ID。
+    Id3,
+}
+
+impl IdRegister {
+    /// 読む順。
+    pub const ALL: [Self; 3] = [Self::Id1, Self::Id2, Self::Id3];
+
+    /// command byte。
+    #[must_use]
+    pub const fn command(self) -> u8 {
+        match self {
+            Self::Id1 => CMD_RDID1,
+            Self::Id2 => CMD_RDID2,
+            Self::Id3 => CMD_RDID3,
+        }
+    }
+
+    /// logへ出す名前。
+    #[must_use]
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::Id1 => "id1",
+            Self::Id2 => "id2",
+            Self::Id3 => "id3",
+        }
     }
 }
 
@@ -259,6 +309,18 @@ impl<'d> Ili9341<'d> {
         let mut raw = [0u8; 4];
         self.with_transaction(CMD_RDID4, |this| this.bus.read(&mut raw))?;
         Ok(DisplayId { raw })
+    }
+
+    /// Read ID1／ID2／ID3のいずれかを1回読み、command byteの後の2 byteをそのまま返す。
+    ///
+    /// **どちらのbyteがIDかを判定しない。**datasheetの表は1st parameterをdummyとし、
+    /// serialの8-bit readの図はdummyを描いていない（module doc参照）。判定はlogを読む人間が行う。
+    /// **呼び出し側は1回の起動で同じregisterを繰り返し読まない**（`main.rs`の
+    /// `run_id_register_reads`のdoc参照）。
+    pub fn read_id_register(&mut self, register: IdRegister) -> Result<[u8; 2], EspError> {
+        let mut raw = [0u8; 2];
+        self.with_transaction(register.command(), |this| this.bus.read(&mut raw))?;
+        Ok(raw)
     }
 
     /// 初期化sequence。**controller識別→reset解除待ち→sleep out→pixel

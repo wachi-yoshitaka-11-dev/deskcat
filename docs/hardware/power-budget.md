@@ -578,7 +578,9 @@ ESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`の負荷合計（測定ではない。
    物理的に成立しない。この手順でも同じ配線を使う限り同様に成立しない見込みであり、条件(5)は
    未達のまま人間の現場判断で先へ進む可能性がある**）。
 4. [人間] 電源に手を掛けられる状態（USB cableをすぐ抜ける状態）を確保する。
-5. [人間] 通電開始前に、給電を止めるまでの待機時間の上限を決めておく。
+5. [人間] 通電開始前に、給電を止めるまでの待機時間の上限を決めておく。**単色fillは各色を
+   表示したまま保つため（保つ時間は`firmware/esp32/src/config.rs`の`DISPLAY_FILL_HOLD_MS`。
+   ここへ値を再掲しない）、手順9(d)のlogはその5色分だけ遅れて出る。上限はこの遅れを含めて決める。**
 6. [人間] 条件(7)（`run_display_bringup`を`3V3` pin経路で実行することの明示的な承認と、
    その記録）を満たしていることを確認する。
 7. [人間] USB経由でESP32へ接続し、`--features bringup-display-13`でbuildしたfirmwareを書き込む。
@@ -621,10 +623,15 @@ ESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`の負荷合計（測定ではない。
    ESP32 board（`U2`周辺）の両方で行う。
 9. [人間] シリアルログを確認する。`main()`は`run_display_bringup`を`run_i2c_bringup`より先に
    呼ぶ（`main.rs`）。
-   (a) `display_id`（controller識別。受け入れ条件「Controller識別情報と初期化の根拠」）、
+   (a) `display_id`（controller識別。受け入れ条件「Controller識別情報と初期化の根拠」）と、
+   続く`display_rdid`×3（Read ID1〜3の生byte。読み出しの失敗は`display_rdid_failed`として出て、
+   後続を止めない）、
    (b) `display_fill`×5色（受け入れ条件「単色fillが正しい」「Color orderが正しい」
-   「更新timingを測定した」。`elapsed_us`を記録する）、
-   (c) `display_corner_pattern`（受け入れ条件「四隅とorientationが正しい」）。**受け入れ条件
+   「更新timingを測定した」。`elapsed_us`を記録する。各色は`hold_ms`だけ表示したまま保たれるので、
+   その間に色ごとに写真を撮る）、
+   (c) `display_pattern_element`と`display_corner_pattern`（受け入れ条件「四隅とorientationが正しい」。
+   `J2`のheaderを写真に入れる。patternの見方とMADCTLの決め方は`main.rs`の`run_corner_pattern`の
+   doc commentが持つ。軸の線の描画失敗は`display_axis_failed`として出て、後続を止めない）。**受け入れ条件
    「単色fillが正しい」「Color orderが正しい」「四隅とorientationが正しい」は、logに加えて
    人間がpanelを目視（写真記録）で確認し、その結果を手順11へ記録したときだけ達成とする。**
    logだけでは描画処理の実行結果を示すにとどまり、実際の色順・四隅位置・orientationを
