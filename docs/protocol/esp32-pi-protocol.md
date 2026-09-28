@@ -243,7 +243,7 @@ Protocol taskの準備完了後に一度送信する。
 
 Piは`boot`を受信したとき、`sid`が現在のESP32 sessionと**異なる場合にだけ**session遷移として扱い、旧sessionのID追跡を破棄する。
 
-`boot`も再送されうる（ESP32のretry、Pi側の取りこぼし後の再読み出し）。現在のsessionと同じ`sid`の`boot`でID追跡を破棄すると、`hello`と同じ理由で、直後のretryが「未処理」と判定され二重実行を招く。§5.1の`hello`と同じ規則を適用する。
+`boot`も再送されうる（ESP32のretry、Pi側の取りこぼし後の再読み出し、新しいPi `sid`の`hello`を受けた後の再送。下の表）。現在のsessionと同じ`sid`の`boot`でID追跡を破棄すると、`hello`と同じ理由で、直後のretryが「未処理」と判定され二重実行を招く。§5.1の`hello`と同じ規則を適用する。
 
 #### `boot`の受理確認と再送
 
@@ -260,11 +260,14 @@ Piは`boot`を受信したとき、`sid`が現在のESP32 sessionと**異なる�
 | ACKが返らない（通常再送の回数以内） | 初期間隔でbackoffしながら再送する |
 | 通常再送の回数を超えた | **直ちには止めない。**recovery間隔まで延ばし、有限のrecovery budget内で再送を続ける |
 | ACKが無いままrecovery budgetを使い切った | `boot`の送出を止め、サーボ出力を有効にせず`protocol_fault`で報告する。Piから有効な`hello`を受信したら、**同じ`(sid, id)`のまま**新しい有限budgetで`boot`の再送を再開してよい。ただし**再開は1つのPi sessionにつき1回まで**とする（下記）。**`sid`は選び直さない。** |
-| `status: ok`のACKを受信 | 再送を終了する |
+| `status: ok`のACKを受信 | 再送を終了する。ただし下の行の場合は再開する |
+| `status: ok`のACKを受けた後に、**現在と異なる（新しい）Pi `sid`の`hello`**を受理した（§5.1の手順1〜4を終えた） | **同じ`(sid, id)`のまま**、新しい有限budgetで`boot`の再送を再開する（§5.1の手順5）。**新しいPi `sid`の`hello`1件につき再開は1回まで**とする。**`sid`は選び直さない。**`reason`が`port_reopen`／`resync`の`hello`（Piの`sid`が同じ）では再開しない |
 | `status: rejected`かつ`code`が`stale_session`のACKを受信 | **終端ではない。**`sid`がretired sessionと衝突している。新しい`sid`を選び直し`id`を初期値へ戻して再送する（§3.1） |
 | `status: rejected`かつ`code`が`rate_limited`のACKを受信 | **終端ではない。**一時的な流量制限であり、再送で解消しうる。cooldown経過後に**同じ`(sid, id)`で**再送する。`PROTO-TBD-017`の有限budget内に収め、使い切ったら`protocol_fault`で報告して停止する |
 | `status: rejected`（`stale_session`／`rate_limited`以外）のACKを受信 | **終端応答として再送を終了する。**`code`を`protocol_fault`で報告し、Piの介入を待つ |
 | `sid`／`id`を復元できず、Piが相関ACKを構成できない | 有限budgetまで再送し、使い切ったら送出を止める。サーボ出力を有効にせず`protocol_fault`で報告する（下記） |
+
+**`status: ok`のACK済みの`boot`を、新しいPi `sid`の`hello`で再送する理由。**Piが再起動すると、新しいPi processはESP32の`sid`を知らない。PiがESP32の`sid`を承認する経路は`boot`だけであり（§5.1「Session切り替えは`hello`／`boot`だけが起こす」、§8の手順8）、Piは、envelopeの`sid`が現在承認している応答送信側のsessionでないACKを、`hello`の結果として受理しない（§6）。そのためESP32が`boot`を再送しない限り、Piは新しいsessionでESP32の`sid`を承認できず、§10.2の手順が成り立たない。再開の回数は、Pi session遷移（`hello`による）1回につき1回に限る。Pi session遷移そのものは§5.1の遷移上限（`PROTO-TBD-012`）で有界であり、`boot`の再送が際限なく続く経路は作らない。**この行は`firmware/esp32`にまだ実装していない**（[Issue #12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)の残作業）。
 
 通常再送の上限で**直ちに**止めないのは、Piが一時的に`boot`またはACKを取りこぼしただけでsessionを承認する経路が消えるためである。一方、無応答のまま無期限に送出するとlink帯域を占有する。有限のrecovery期間を確保し、満了後は物理出力を無効に保ったまま外部から観測可能な停止状態へ移る。
 
@@ -532,8 +535,9 @@ ESP32は`hello`を受信したとき、`sid`が現在のPi sessionと異なる�
 2. 旧sessionのcommand ID追跡とduplicate履歴を、**現行session分として**破棄する。旧`sid`はretired session集合へ移し、保持期間中は`stale_session`判定に使う（§5.1）。
 3. 実行中のrelative motionを安全に停止する。
 4. ACKを返す。
+5. §4.1の表が再送を定める場合（`status: ok`のACKを受けた後、またはACKが無いままrecovery budgetを使い切った後）は、自分の現在の`boot`を**同じ`(sid, id)`のまま**再送する。新しいPi sessionは、ESP32の`sid`を`boot`でしか承認できないためである。終端として拒否された`boot`（§4.1の表）は再送しない。
 
-`hello`はACKを必要とする。ACK後、Piは`get_status`で実stateを取得する。
+`hello`はACKを必要とする。ACK後、Piは`get_status`で実stateを取得する。ただし新しい`sid`の`hello`では、Piは手順4のACKを`hello`の結果として受理せず（ESP32の`sid`をまだ承認していない。§6）、手順5の`boot`でESP32 sessionを承認してから`get_status`を送る（§10.2）。
 
 #### 現在sessionで未処理のsession確立message
 
@@ -1113,9 +1117,9 @@ serial linkが切れて繋がり直しただけで、ESP32 processが再起動�
 1. Piがserial portを開き、新しい`sid`で`hello`を送信する（processの再起動なので`sid`を変える。link再接続だけの場合は`sid`を維持する。§3）。
 2. ESP32が旧Pi sessionのcommand ID追跡とduplicate履歴を破棄し、旧`sid`をretired session集合へ移す。retired分は保持期間中は捨てない（§5.1）。
 3. ESP32が実行中のrelative motionを安全に停止する。
-4. ESP32がACKを返す。
-5. Piが`get_status`を送信し、実stateを取得する。
-6. Piが安全な状態設定commandで desired state を再構成する。
+4. ESP32がACKを返す。**新しいPi processはESP32の`sid`をまだ承認していないため、このACKを`hello`の結果として受理しない（§6）。これは異常ではない。**
+5. ESP32が現在の`boot`を、同じ`(sid, id)`のまま再送する（§4.1の表、§5.1の手順5）。
+6. PiがそのbootでESP32 sessionを承認し（§10.1の手順2）、§10.1の手順3〜8（`boot`へのACK、`get_status`、実stateとdesired stateの比較、安全な状態設定command、古いrelative motionを再実行しないこと）へ進む。
 
 `hello`が失われた場合、ESP32は後続commandを`stale_session`で拒否する。Piは`stale_session`を受けたら`hello`から再開する。未知の`sid`を見ただけで切り替えてはならない（§5.1）。
 
@@ -1315,6 +1319,7 @@ Framing／parse層について、**host workspaceのRust実装**がfixtureに合
 | 2026-09-25 | Draft 2 esp32 sid | [Issue #446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)のPR A。`PROTO-TBD-011`のうち`sid`の生成方法をESP32側だけ確定した（§13参照。**Pi側は未確定のまま残る。衝突許容確率も未確定のまま残る**）。理由と制約は`firmware/esp32/src/main.rs`の`generate_sid`のdoc comment（**ここへ再掲しない**）。**wire formatは変更していない。**envelope field、integer width、error code、counterのいずれも増やしていない。`sid`の値の選び方という送信側の実装であり、受信側の判定規則（§3.1、§5.1）は変えていない |
 | 2026-09-25 | Draft 2 esp32 boot retry | [Issue #446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)のPR B。§4.1の`boot`受理確認・再送の終了条件の表をESP32側（`firmware/esp32/src/boot_session.rs`）へ実装した。`stale_session`受信時の`sid`選び直しも実装した（§3.1）。再送間隔・backoff係数・通常再送の回数・recovery間隔・recovery budget（`PROTO-TBD-017`）と、`sid`選び直し回数の上限（`PROTO-TBD-011`の残り）は暫定値のまま。`protocol_fault`はwireへ出さない（`PROTO-TBD-018`未確定。「送出を止める」という動作面だけ実装）。§2の`pi-protocol-mode`送信line ending不一致（PR Aまで既知の逸脱として記録していたもの）は、`boot`送出経路に限りsource上は解消した（実機でのbyte実測はまだ無い。同節参照）。**wire formatは変更していない。**envelope field、integer width、error codeのいずれも増やしていない。受信側（Pi）の判定規則は変えていない |
 | 2026-09-28 | Draft 2 uart transport | [Issue #446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)。ユーザーの決定により、§2の物理linkをUSB serialからUART（ESP32のGPIO13／GPIO14 ⇔ PiのGPIO15／GPIO14）へ変えた。最終構成でもUARTを使い、USBは書き込みとdebug専用にする。§2のUART0共有の例外は、firmwareの移行（#487）までの現状として残した。§8.1と§8.2の「USB」を「serial」へ直した。wire format（framing、baud候補、line長）は変えていない |
+| 2026-09-29 | Draft 2 boot resend on new pi session | [Issue #12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)。Piの再起動後、新しいPi processがESP32の`sid`を承認する手段が無く§10.2が成り立たない仕様の穴を塞いだ。§4.1の`boot`の再送の表へ、`status: ok`のACK済みでも新しいPi `sid`の`hello`を受理したら同じ`(sid, id)`で1回だけ再送を再開する行を足し、§5.1のESP32の手順へ手順5（`boot`の再送）を、§10.2へ「`hello`のACKは受理せず、再送された`boot`でESP32 sessionを承認してから§10.1の手順3〜8へ進む」手順を書いた。承認の経路は`boot`だけのままであり、§6と「Session切り替えは`hello`／`boot`だけが起こす」に例外は作らない。**wire formatは変更していない。**`firmware/esp32`の実装は未実施（#12の残作業） |
 
 ### Draft schemaの互換性
 
