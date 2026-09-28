@@ -456,7 +456,9 @@ fn main() {
     // UART0以外のUARTをGPIO matrixで`PI-UART-TX`＝GPIO13、`PI-UART-RX`＝GPIO14へ
     // 割り当てる（`docs/hardware/gpio-assignment.md`の`Pi–ESP32間のtransport`節。
     // 同節は「UART0以外」とだけ定める。UART1とUART2のどちらでもよく、番号の小さい
-    // UART1を使う。`UartDriver::new`は渡したGPIO13／GPIO14だけを設定し、UART1の既定のpinには
+    // UART1を使う。UART1の既定のpinはTX＝GPIO10、RX＝GPIO9で、どちらもflash用の使用禁止pin
+    // である（ESP-IDF v5.5.3 `soc/esp32/include/soc/uart_pins.h`20〜21行、gpio-assignment.mdの
+    // `ESP32の使用制限pin`節）。`UartDriver::new`は渡したGPIO13／GPIO14だけを設定し、既定のpinには
     // 触れない。esp-idf-hal 0.46.2 `uart.rs`2023行〜の`new_common`が`uart_set_pin`へ渡すのは
     // この2本だけであり、ESP-IDF v5.5.3 `esp_driver_uart/src/uart.c`819行〜の`uart_set_pin`は
     // 負の番号のpinを設定しない）。8N1でflow control（RTS／CTS）なし（`esp32-pi-protocol.md`§2の
