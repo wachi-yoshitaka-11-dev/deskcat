@@ -1,7 +1,7 @@
 //! `boot`の受理確認・再送（§4.1）と、`sid`選び直し（§3.1「`sid`が衝突した場合」）。
 //!
 //! `pi-protocol-mode`でだけ使う（`#446` PR B）。`main.rs`の`generate_sid`が選んだ`sid`で
-//! `boot`を送り、UART0から届く`ack`を待つ。§4.1の終了条件の表が定める**state遷移**
+//! `boot`を送り、Pi linkのUART（`PI-UART-RX`、`#487`）から届く`ack`を待つ。§4.1の終了条件の表が定める**state遷移**
 //! （いつ再送するか、いつ`sid`を選び直すか、いつ止めるか）を実装する狙いで
 //! 書いたものであり、**state遷移が§4.1の表どおりに正しいことをhost側の
 //! unit testでは確かめていない**（`firmware/esp32`はhostのworkspaceから
@@ -48,12 +48,23 @@
 //! # 停止理由の区別
 //!
 //! 停止理由は[`TerminalReason`]（[`Phase::Terminated`]が保持する）として内部stateに
-//! 持つ。`pi-protocol-mode`はloggingを止めているため出力されず、`Health`の
-//! `ProtocolCounters`もまだwireへ送る経路が無い（`#12`）。したがって`counter`は
-//! 増やさない——増やしても観測経路が無いcounterになる（`#448`で同じ理由から
+//! 持ち、終端したときにUART0（USB）のdebug logへ出す（`#487`。それより前の
+//! `pi-protocol-mode`はloggingを止めており、出力されなかった）。`Health`の
+//! `ProtocolCounters`はまだwireへ送る経路が無い（`#12`）。したがって`counter`は
+//! 増やさない——増やしても読む経路が無いcounterになる（`#448`で同じ理由から
 //! `boot_serialize_errors`を削除した判断に揃えた）。`TerminalReason`として
-//! 区別だけは保持し、将来`status`をwireへ送る段になったら`ProtocolCounters`へ写せる形に
+//! 区別を保持し、将来`status`をwireへ送る段になったら`ProtocolCounters`へ写せる形に
 //! しておく。
+//!
+//! # debug logへ出すもの
+//!
+//! `boot`の送出（`boot_tx`）、`status: ok`での確立（`boot_established`）、`sid`の
+//! 選び直し（`boot_sid_reselected`）、終端（`boot_terminated`）を`log`へ出す。
+//! [#446]の受け入れ条件4（実機での`boot`→ACK）の試験で、ESP32側で何が起きたかを
+//! Pi側のlogと突き合わせるためである。出力先はUART0（USB）であり、Pi linkの
+//! UARTには出ない（`crate::console`参照）。
+//!
+//! [#446]: https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446
 
 use std::time::Duration;
 
@@ -180,9 +191,9 @@ enum Phase {
     Terminated(TerminalReason),
 }
 
-/// 終端に至った理由。ログへは出ないが、区別だけ内部stateに残す（module doc参照）。
+/// 終端に至った理由。終端時にdebug logへ出し、区別を内部stateに残す（module doc参照）。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(dead_code)] // 現状は観測経路が無いため書き込まれるだけで読まれない。将来のstatus送出に備えて保持する。
+#[allow(dead_code)] // `Debug`での出力以外にはまだ読まれない。将来のstatus送出に備えて保持する。
 enum TerminalReason {
     /// Recovery budgetを使い切った。
     RecoveryBudgetExhausted,
@@ -244,7 +255,7 @@ impl BootSession {
         }
     }
 
-    /// UART0から読めた生byteを渡す。0 byteでもよい（timeoutで戻った場合）。
+    /// Pi linkのUARTから読めた生byteを渡す。0 byteでもよい（timeoutで戻った場合）。
     ///
     /// 自分宛でないframe（`(sid, id)`が一致しないACK等）と、壊れた行
     /// （`Outcome::Rejected`）は捨てる。**§4.1の終了条件はACKの到達・不到達で
@@ -262,7 +273,8 @@ impl BootSession {
     /// `#[cfg(not(feature = "pi-protocol-mode"))]`）、`pi-protocol-mode`の
     /// buildにはそもそも存在しない。この逸脱を解消するにはhello／get_status
     /// 処理自体を`pi-protocol-mode`へ実装する必要があり、このPRの範囲外である
-    /// （console.rsのmodule doc「実際のPi hostへ接続しないこと」の理由でもある）。
+    /// （console.rsのmodule doc「`pi-protocol-mode`のbuildを実際のPi hostへ接続する範囲」の
+    /// 理由でもある）。
     ///
     /// **§7「Parser counterでは…を区別する」の義務も満たしていない。**確立前
     /// （`Normal`／`Recovery`／`RateLimited`）に受けたbyteに限り、`Ack`以外の
@@ -273,8 +285,8 @@ impl BootSession {
     /// 同じ扱い）。**`Established`／`Terminated`へ移った後に届いたbyteは、
     /// `on_bytes`冒頭で`receiver.drain`へ通さずreturnするため、種類を問わず
     /// 未分類のまま読み捨てる**（確立後の受信を分類する処理は、hello処理と
-    /// 同じくこのPRの範囲外）。`pi-protocol-mode`はloggingを止めているため、
-    /// 分類したものも外部からは観測できない。
+    /// 同じくこのPRの範囲外）。分類したものはUART0（USB）のdebug logで見える
+    /// （`#487`。それより前はloggingを止めており、見えなかった）。
     ///
     /// # Envelopeの`sid`を検査しない理由
     ///
@@ -339,7 +351,7 @@ impl BootSession {
                 self.apply_ack(ack, health, uart);
             } else {
                 // §7「Parser counterでは…session不一致を区別する」の対象。
-                // 観測経路は無いが`generate_sid`等と同じ理由でlogだけ分類する。
+                // counterは持たず、`generate_sid`等と同じくlogだけ分類する。
                 log::error!(
                     "boot_rx_session_mismatch reply_sid={} reply_to={}",
                     ack.reply_sid,
@@ -414,6 +426,7 @@ impl BootSession {
         match ack.status {
             AckStatus::Ok => {
                 self.phase = Phase::Established;
+                log::info!("boot_established sid={} id={}", self.sid, self.id);
             }
             AckStatus::Rejected => {
                 let code = ack.code;
@@ -494,9 +507,15 @@ impl BootSession {
         // 呼び出しのたびに走り直す（同74〜86行）。条件次第で`nvs_flash_erase()`も
         // 起きる（`generate_sid`のdoc「衝突許容確率」節参照）。取れなければ
         // `sid_from_uptime`へ縮退する。
+        let previous_sid = self.sid;
         self.sid = crate::generate_sid(health);
         self.id = 1;
         self.phase = Phase::Normal { attempt: 0 };
+        log::info!(
+            "boot_sid_reselected previous_sid={previous_sid} sid={} count={}",
+            self.sid,
+            self.sid_reselect_count
+        );
         let now = health.uptime_ms();
         self.next_deadline_ms = now + duration_to_ms(self.policy.initial_interval);
         self.send_boot(health, uart);
@@ -504,6 +523,11 @@ impl BootSession {
 
     fn terminate(&mut self, reason: TerminalReason) {
         self.phase = Phase::Terminated(reason);
+        log::warn!(
+            "boot_terminated reason={reason:?} sid={} id={}",
+            self.sid,
+            self.id
+        );
     }
 
     fn send_boot(&self, health: &Health, uart: &mut UartDriver<'_>) {
@@ -551,10 +575,18 @@ impl BootSession {
                         }
                     }
                 }
+                if written == bytes.len() {
+                    log::info!(
+                        "boot_tx sid={} id={} ts_ms={ts_ms} phase={:?} bytes={written}",
+                        self.sid,
+                        self.id,
+                        self.phase
+                    );
+                }
             }
             Err(err) => {
-                // 観測経路が無いためcounterは持たない（module doc「停止理由の区別」参照）。
-                // `generate_sid`と同じ理由でlogだけは分類しておく。
+                // counterは持たない（module doc「停止理由の区別」参照）。
+                // `generate_sid`と同じくlogだけは分類しておく。
                 log::error!("boot_encode_failed error={err}");
             }
         }

@@ -28,17 +28,14 @@
 
 Protocol channelから送信するすべてのbyteは、有効にframe化されたmessageの一部でなければならない。自由形式のfirmware logでJSON lineを分断してはならない。
 
-**次の2つを既知の例外として明記する**（[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)。ESP32のUART0がPi–ESP32 protocol channelとdebug logを兼ねるため）。どちらもESP32→Pi方向、かつこのUART0共有に固有の事情から生じる。Pi→ESP32方向や、将来UART0以外のtransportへ一般化してよいかはこの規則の対象外とする。**この2つ以外にも`esp_log`を経由しない出力経路（`ets_printf`等）が存在するかどうかは確認していない。**隠さず、受信側が対処できることを前提に許容する。
+**Pi linkはUART0を使わない**（[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)）。firmwareの`pi-protocol-mode`は、UART0以外のUART（UART1）をGPIO13／GPIO14へ割り当ててPi linkに使い、UART0（board上のUSB-UARTブリッジ）はどのbuildでも書き込みとdebug logだけに使う。**firmware applicationがPi linkのUARTへ書くのは`boot`の送出（`BootSession::send_boot`）だけであり、debug log（`log`／`esp_log`）はESP-IDFのconsole（UART0）へ出る。**ROM／2nd-stage bootloaderの出力とpanic handlerの出力がUART1へ出ないことは、一次資料でも実機でも確かめていない（firmware applicationの制御外である）。GPIO13／GPIO14はreset直後に出力が無効であり（[GPIO Assignment](../hardware/gpio-assignment.md)の`PI-UART-TX`行）、UART driverの初期化時のglitchはPi側で不正なbyteとして受け、改行境界で再同期する（`crates/deskcat-serial/tests/simulator.rs`のtest群が手書きfixtureで確認している。実機では未検証）。
 
-- **firmwareがdebug logを止めるより前に生じる起動時出力。**この例外は、UART0をPi–ESP32 protocol channelへ使うbuild（`firmware/esp32`の`pi-protocol-mode` feature）にだけ関係する。既定buildはprotocolのmessageを一切送らないため、この規則自体の対象になるbyteが無い。ESP32のROM／2nd-stage bootloaderの出力、およびESP-IDF自身が`app_main`の前後で出す起動log（`main_task`等）を、個別のsubsystem名で列挙せず、**「firmwareがdebug logを止める処理を完了するまでに出たbyteは、frame化されていなくてもよい」という1つの規則に統一する。**受信側は化けたbyte列の後、改行境界で再同期できる（`crates/deskcat-serial/tests/simulator.rs`のtest群が手書きfixtureで確認している。実機の起動時出力そのものでは未検証であり、改行を含まない不正byte列が後続frameの先頭へ連結するcaseも未検証）。この例外byteをPi側でどう計数するか（§4.6のcounterへの計上要否）は、ここでは規定しない。
-- **Panic handlerの出力（未確認）。**ESP-IDFの既定panic handlerが`esp_log`の経路を通さず直接UARTへ書くかどうかは、一次資料で確認していない。確認しないまま、この例外の対象に含める。理由: panicが起きた時点でfirmwareは既に壊れており、この規則の遵守より原因が見えることを優先する。
+**#487より前は、UART0がPi–ESP32 protocol channelとdebug logを兼ねていたため、「firmwareがdebug logを止めるより前に生じる起動時出力」と「panic handlerの出力」の2つをこの規則の既知の例外としていた**（[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)。Revision履歴の`Draft 2 uart0 exception`）。Pi linkがUART0から外れたため、この2つの例外はPi linkについては置かない。上の未確認の点が実機で崩れた場合は、この節へ例外として戻す。
 
-**2026-09-28の決定で、Pi linkはUART0から外れ、GPIO13／GPIO14のUARTへ移る。**firmwareが移行した後は、UART0はdebug logと書き込みだけに使い、上の2つの例外はPi linkには生じない。**firmwareの移行（[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)）は未実施であり、それまでは現在の`pi-protocol-mode`にこの節のとおり適用する。**
-
-**上の2つ（ROM／bootloader起動出力、panic handlerの出力）とは別に、`pi-protocol-mode`のfirmware application自身が送る行のline endingについて、過去の既知の不一致を記録していた（[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)のPR Aまで）。**PR B（`firmware/esp32/src/boot_session.rs`）は、この不一致をsource上は解消した（下記）。`pi-protocol-mode`がapplication levelで送る行は現状`boot`（`BootSession::send_boot`）のみであり（`console.rs`の`write_line`はPR Bで削除し、他に送信経路は無い）、それ以外の送信経路は無い。**ROM／bootloader起動出力とpanic出力（上の2項目）はfirmware applicationの制御外にあり、この解消の対象外のまま残る。**
+**`pi-protocol-mode`のfirmware application自身が送る行のline endingについて、過去の既知の不一致を記録していた（[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)のPR Aまで）。**PR B（`firmware/esp32/src/boot_session.rs`）は、この不一致をsource上は解消した（下記）。`pi-protocol-mode`がapplication levelで送る行は現状`boot`（`BootSession::send_boot`）のみであり（`console.rs`の`write_line`はPR Bで削除し、他に送信経路は無い）、それ以外の送信経路は無い。（ROM／bootloader起動出力とpanic出力はfirmware applicationの制御外であり、この解消の対象外である。出力先は上の段落参照。）
 
 1. 旧経路（`firmware/esp32/src/console.rs`の`write_line`、PR Aまで）は`std::io::stdout()`経由で書いており、本節の規定（`\n`）と実際にwireへ出るbyte（`\r\n`）が違っていた。原因はESP-IDFのconsole出力の既定`CONFIG_LIBC_STDOUT_LINE_ENDING_CRLF`（vendored ESP-IDF`components/newlib/Kconfig`で確認済み）である。
-2. PR Bは`pi-protocol-mode`のUART0を`UartDriver`（interrupt駆動）へ一本化し、送信も`UartDriver::write`（`uart_write_bytes`を直接呼ぶ。esp-idf-hal 0.46.2の`uart.rs`で確認）へ変えた。**`uart_write_bytes`はbyte列をそのまま書き、`CONFIG_LIBC_STDOUT_LINE_ENDING_CRLF`が効くlibc／newlibのstdio層を経由しない。**`encode_line`（`crates/deskcat-protocol/src/decode.rs`）が既に`\n`だけを付与している（206行、`pub fn encode_line`参照）ため、これらのcodeを読んで導いた結論としては、wireへ出るbyteは本節の規定どおり`\n`終端になるはずである。**この結論はsourceを読んで導いたものであり、実機でwireのbyteを測ったものではない**（実機確認はまだ無い。状態はIssue #446の追跡を見る）。
+2. PR Bは`pi-protocol-mode`のPi link（当時はUART0、#487からはUART1）を`UartDriver`（interrupt駆動）へ一本化し、送信も`UartDriver::write`（`uart_write_bytes`を直接呼ぶ。esp-idf-hal 0.46.2の`uart.rs`で確認）へ変えた。**`uart_write_bytes`はbyte列をそのまま書き、`CONFIG_LIBC_STDOUT_LINE_ENDING_CRLF`が効くlibc／newlibのstdio層を経由しない。**`encode_line`（`crates/deskcat-protocol/src/decode.rs`）が既に`\n`だけを付与している（206行、`pub fn encode_line`参照）ため、これらのcodeを読んで導いた結論としては、wireへ出るbyteは本節の規定どおり`\n`終端になるはずである。**この結論はsourceを読んで導いたものであり、実機でwireのbyteを測ったものではない**（実機確認はまだ無い。状態はIssue #446の追跡を見る）。
 3. **したがって、この不一致は`pi-protocol-mode`の`boot`送出経路については、source上は解消している。**旧経路（stdio）はPR Bでもう使っていない。実機での確認はまだ無い。
 
 受信側は直前の`\r`を除去する（本節の受信可能なline ending。`crates/deskcat-protocol`の
@@ -54,7 +51,7 @@ Protocol channelから送信するすべてのbyteは、有効にframe化され�
 
 上の不一致は`boot`送出経路に限り、source上はPR Bで解消している（本節の直前の3項目を参照。実機での確認はまだ無い）。
 
-**もう2つ、`pi-protocol-mode`（PR B）の既知の逸脱を記録する。**(i) `Ack`以外に届いたframeへ§8の相関ACKを返さない。(ii) §7のParser counterによる区別を、確立前に限り`log`でだけ分類する（`pi-protocol-mode`はloggingを止めているためそれも観測できない）。確立後に届いたbyteは種類を問わず未分類のまま読み捨てる。詳細は`firmware/esp32/src/boot_session.rs`の`BootSession::on_bytes`のdocを参照する。
+**もう2つ、`pi-protocol-mode`（PR B）の既知の逸脱を記録する。**(i) `Ack`以外に届いたframeへ§8の相関ACKを返さない。(ii) §7のParser counterによる区別を、確立前に限り`log`でだけ分類する（分類はUART0のdebug logで見える。#487より前は`pi-protocol-mode`がloggingを止めており、見えなかった）。確立後に届いたbyteは種類を問わず未分類のまま読み捨てる。詳細は`firmware/esp32/src/boot_session.rs`の`BootSession::on_bytes`のdocを参照する。
 
 ## 3. Envelope
 
@@ -1332,6 +1329,7 @@ Framing／parse層について、**host workspaceのRust実装**がfixtureに合
 | 2026-09-28 | Draft 2 uart transport | [Issue #446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)。ユーザーの決定により、§2の物理linkをUSB serialからUART（ESP32のGPIO13／GPIO14 ⇔ PiのGPIO15／GPIO14）へ変えた。最終構成でもUARTを使い、USBは書き込みとdebug専用にする。§2のUART0共有の例外は、firmwareの移行（#487）までの現状として残した。§8.1と§8.2の「USB」を「serial」へ直した。wire format（framing、baud候補、line長）は変えていない |
 | 2026-09-29 | Draft 2 boot resend on new pi session | [Issue #12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)。Piの再起動後、新しいPi processがESP32の`sid`を承認する手段が無く§10.2が成り立たない仕様の穴を塞いだ。§4.1の`boot`の再送の表へ、`status: ok`のACK済みでも新しいPi `sid`の`hello`を受理したら同じ`(sid, id)`で1回だけ再送を再開する行を足し、§5.1のESP32の手順へ手順5（`boot`の再送）を、§10.2へ「`hello`のACKは受理せず、再送された`boot`でESP32 sessionを承認してから§10.1の手順3〜8へ進む」手順を書いた。承認の経路は`boot`だけのままであり、§6と「Session切り替えは`hello`／`boot`だけが起こす」に例外は作らない。**wire formatは変更していない。**`firmware/esp32`の実装は未実施（#12の残作業） |
 | 2026-09-29 | Draft 2 status reply order | [Issue #12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)。`status`が`get_status`への応答かどうかを、wire formatを変えずに送信の順序で決める規則を§5.6に書いた（送信側は`status: ok`のACKの直後に応答の`status`を送り、間に別の`status`を挟まない。受信側はそのACKの後に最初に届いた現在sessionの`status`を応答とみなす）。応答の`status`を得られないまま実stateが要る場合は、Piは新しい`id`で`get_status`を送る（同じ`(sid, id)`の再送は§9の保持したresultのreplayになる）。§4.6に、`status`が応答先のfieldを持たないことと§5.6への参照を足した。**wire formatは変更していない。**`firmware/esp32`はまだ`get_status`への応答をwireへ送っていない（`pi-protocol-mode`は確立後のbyteを読み捨てる）ため、送信側の規則はwireへの送出を実装する変更が守る |
+| 2026-09-29 | Draft 2 uart migration | [Issue #487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)。firmwareの`pi-protocol-mode`をUART0からUART1（GPIO13／GPIO14）へ移し、UART0をdebug log専用にしたことに合わせて、§2のUART0共有の既知の例外2つ（debug logを止めるより前の起動時出力、panic handlerの出力）を削除し、移行後の状態に書き換えた。Baud（115200、`Candidate`）とUART framing（8N1、`Candidate`）は変えていない |
 
 ### Draft schemaの互換性
 
