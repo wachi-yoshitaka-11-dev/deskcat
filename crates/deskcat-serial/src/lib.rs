@@ -30,7 +30,8 @@
 //! 含まないもの:
 //!
 //! - **実portを開いての確認。**このcrateの検証はhost（VM）上であり、擬似端末
-//!   （`SerialPort::pair`）までである。`/dev/ttyUSB*`のdevice名の確定と、実機での
+//!   （`SerialPort::pair`）までである。実機でのdevice名の確定（Pi側は`/dev/serial0`を使う。
+//!   現物では確かめていない。`docs/hardware/gpio-assignment.md`の`Pi側の設定`）と、実機での
 //!   read／write、切断、再接続、partial I/Oの確認は[Issue #11]の後半に残る
 //! - **domain動作。**感情、性格、行動判断、独り言はこのcrateに入らない。
 //!   §10.1 step6（実際のstateとdesired stateの比較）とstep7（安全な状態設定command

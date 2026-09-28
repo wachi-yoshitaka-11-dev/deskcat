@@ -127,7 +127,7 @@ impl SerialDevice {
     /// use deskcat_serial::{Pump, SerialConfig, SerialDevice, Session};
     ///
     /// // device名は呼び出し側が設定として渡す。**ここに実機の名前を書かない。**
-    /// // `/dev/ttyUSB*`の実際の名前は未確認であり、確定はIssue #11の後半である。
+    /// // 実機のdevice名は現物で確かめておらず、確定はIssue #11の後半である。
     /// let config = SerialConfig::new("/dev/example", 115_200)?;
     /// let mut session = Session::new(config.clone(), 90_312);
     ///

@@ -115,7 +115,7 @@ simulator test（`tests/simulator.rs`）までの検証であり、実機での�
 
 [Issue #11](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11)の後半に残るもの:
 
-- `/dev/ttyUSB*`のdevice名の確定
+- 実機でのdevice名の確定（Pi linkはGPIOのUARTであり、Pi側は`/dev/serial0`を使う。この名前はRaspberry Pi公式文書から導いたもので、現物では確かめていない。正は[gpio-assignment.md](../../docs/hardware/gpio-assignment.md)の`Pi側の設定`）
 - 実portでのread／write、切断、reconnect、partial I/Oの確認
 - `CLOCAL`をdriverが受け付けること（受け付けなければopenが失敗する）
 - **`HUPCL`の判断。**既定ではcloseでDTRが落ちる。**本projectのESP32 boardでDTR／RTSが
