@@ -68,7 +68,7 @@
 - ESP32 は LCD、入力センサ、環境センサ、サーボ、即時安全制御を担当する。
 - Raspberry Pi は感情、状態、自律行動、ログ、API を担当する。
 - 安全な角度、速度、加速度、通信断処理は ESP32 が強制する。
-- 初期通信は USB シリアル／JSON Lines を候補とする。
+- Pi–ESP32 間の通信は UART 上の JSON Lines とする。pin と接続の条件は [GPIO Assignment](docs/hardware/gpio-assignment.md) の `Pi–ESP32間のtransport` 節が正本である。
 - 初期 MVP にカメラ、マイク、音声、画像アセット、OTA は含めない。
 
 ## 推測禁止
