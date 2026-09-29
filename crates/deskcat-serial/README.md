@@ -121,7 +121,9 @@ simulator test（`tests/simulator.rs`）までの検証であり、実機での�
 - **`HUPCL`の判断。**既定ではcloseでDTRが落ちる。**本projectのESP32 boardでDTR／RTSが
   自動resetへ繋がっているかは確認していない。**繋がっていれば再接続のたびにESP32が
   再起動することになり、`boot`／`hello`のhandshakeに効く。現物の確認と判断はprotocol側の
-  話であり、**このcrateでは触っていない**
+  話であり、**このcrateでは触っていない**。**Pi linkはGPIOのUART（TX／RX／GNDだけ。[gpio-assignment.md](../../docs/hardware/gpio-assignment.md)の
+  `Pi–ESP32間のtransport`節）であり、PiのDTRはESP32へつながらないため、Pi linkではこの再起動は起きない。**
+  当てはまるのは、hostがESP32 board上のUSB-UARTブリッジ（USB）を開く場合だけである
 - Pi上でこのcrateをbuildできるか（memory）
 
 ## 既定値は暫定である
