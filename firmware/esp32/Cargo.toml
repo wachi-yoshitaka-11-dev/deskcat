@@ -53,7 +53,7 @@ opt-level = "z"
 # lockfileは`firmware/esp32/Cargo.lock`とroot `Cargo.lock`の2つに分かれたままでよい。
 deskcat-protocol = { path = "../../crates/deskcat-protocol" }
 # servoのhard limitとtrajectory limitingを、hostと同じ実装で強制する（ADR-0008の追記、#19）。
-# `crate::servo::Sg90`はこのcrateの`Setpoint`だけを出力として受け取る。
+# 角度を出せるのは、`Sg90`とこのcrateの`Limiter`を1つずつ所有する`crate::servo::LimitedServo`だけである。
 deskcat-servo = { path = "../../crates/deskcat-servo" }
 log = "0.4"
 # health snapshotを`deskcat-protocol`の`Status`と同じ形へserializeするために使う。

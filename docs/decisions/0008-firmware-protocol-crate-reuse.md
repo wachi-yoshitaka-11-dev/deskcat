@@ -174,8 +174,13 @@ partitionの4,128,768 bytesに対し9.24 %である（`espflash`の`App/part. si
   **両toolchainの下限（1.95）を明示した。**
 - `.github/workflows/firmware.yml`の`paths`へ`crates/deskcat-servo/**`を加えた（上の`リスクと対策`の2行目と同じ理由）。
 
-**根拠。**ESP toolchainのrustc（`esp-1.95.0.0`）で`deskcat-servo`と`deskcat-protocol`のbuild、lint、testを通し、
-`firmware/esp32`の既定構成・`pi-protocol-mode`・`bringup-display-13`の3構成でformat、lint、buildを通した。
+**根拠。**ESP toolchainのrustc（`esp-1.95.0.0`）で`deskcat-servo`と`deskcat-protocol`のbuild、lint、testを通し
+（testはhost target `x86_64-unknown-linux-gnu`で実行した。**その版のrustcで通るかの確認であり、
+xtensaの上でtestを走らせたのではない**）、`firmware/esp32`の既定構成・`pi-protocol-mode`・`bringup-display-13`の
+3構成でformat、lint、buildを通した。
 実行した版と結果は[Version Record](../toolchains/version-records/2026-09-29-esp32-build-servo-limiter-native-linux.md)にある。
-**build-onlyであり、flashと実機起動は含まない。**既定buildの`main()`はservoを駆動しないため、
-flash sizeへの影響もまだ測っていない。
+**build-onlyであり、flashと実機起動は含まない。**
+
+**flash sizeへの影響はまだ測っていない。**既定buildの`main()`は`deskcat-servo`を呼ばないため、
+link後の実行物に同crateのcodeが入っているかを確かめておらず、今の実行物の大きさを比べても
+影響の上限にならない。**servoを駆動する経路を`main()`へ足すときに測る。**

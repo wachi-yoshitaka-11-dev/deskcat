@@ -114,11 +114,14 @@ Known differences from documented profile:
     `git archive`でscratchpad（repo外）へ展開した独立コピーを使い、そこへ既存`.embuild`をsymlinkして実行した。
   - (1)は`--workspace`ではなく`-p`で2 crateに絞った。`deskcat-config`と`deskcat-serial`はworkspaceの
     `rust-version`（1.97）を継承しており、1.95のrustcではcompile前に止まるためである。
-    **firmwareが使うのはこの2 crateだけである**（`firmware/esp32/Cargo.toml`の`[dependencies]`）。
+    **root workspaceのcrateのうち、firmwareが使うのはこの2つだけである**（`firmware/esp32/Cargo.toml`の`[dependencies]`）。
+  - (1)のtestはhost target（`x86_64-unknown-linux-gnu`）で実行した。**ESP toolchainのrustcで
+    compileできることの確認であり、xtensaの上でtestを走らせたのではない。**
   - `bench-servo-test-17`構成は本記録の対象外（#474の`compile_error!`で意図的に止まる。
     扱いは[servo-safety-limits.md](../../hardware/servo-safety-limits.md)の`承認の状態`が持つ）。
     `pi-protocol-mode`との排他構成（`compile_error!`）も対象外である。
-  - 既定buildの`main()`はservoを駆動しない。**`deskcat-servo`のcodeはfirmwareへcompileされるが、
+  - 既定buildの`main()`はservoを駆動しない。**`deskcat-servo`はfirmwareのbuildでcrateとして
+    compileされるが、`main()`から呼ぶ経路が無いため、link後の実行物に入っているかは確かめていない。
     実機では一度も実行していない。**
 
 Conclusion: Partial。**build-onlyの範囲（(1)の2 crateのtestとlint、(2)の3構成のfmt/clippy/build）では
