@@ -17,12 +17,12 @@ Record ID: 2026-09-29-esp32-build-servo-limiter-native-linux
 Date: 2026-09-29
 Machine profile: ESP32 Build
 Operator role: AI agent作業（build-onlyのみ。flash・monitor・USBシリアルポートは開いていない）
-Repository commit: 0257b104a6e090da780bd0693496b16937f45b03（#19の作業branchのcommit。
+Repository commit: 8b8c15cdffef818368f3c974df08d036d51f7bdc（#19の作業branchのcommit。
   origin/develop 52a8142c793a54aa4627bca5c3a32f8debf951d8 を取り込み済み）。
   **このcommitより後に同branchへ入れるcommitは、この記録とVersion Recordsの一覧だけを変える。**
   code、manifest、lockfileは変えない。squash mergeの後はこのSHAがdevelopから辿れなくなるため、
   そのときはPull Requestのcommit一覧から辿る
-Working tree clean: yes（`git archive 0257b10`でscratchpadへ展開した未改変コピーを使用。
+Working tree clean: yes（`git archive 8b8c15c`でscratchpadへ展開した未改変コピーを使用。
   worktree・main checkoutいずれのgit stateも変更していない）
 
 OS name: Ubuntu
@@ -105,19 +105,19 @@ Actual result:
   (2) cargo build --locked --features bringup-display-13              成功
 
 Build duration:
-  (0) fmt 1秒未満、clippy 約14秒、test 約17秒
-  (1) test 約24秒、clippy 約10秒
-  cargo clippy（既定構成、ESP-IDF本体のcompileを含む）  約6分21秒
-  cargo build（既定構成、clippy後）                     約51秒
-  cargo clippy／build（+pi-protocol-mode、増分）        約3秒／約8秒
-  cargo clippy／build（+bringup-display-13、増分）      約2秒／約8秒
+  (0) fmt 1秒未満、clippy 約14秒、test 約16秒
+  (1) test 約25秒、clippy 約10秒
+  cargo clippy（既定構成、ESP-IDF本体のcompileを含む）  約6分28秒
+  cargo build（既定構成、clippy後）                     約50秒
+  cargo clippy／build（+pi-protocol-mode、増分）        約3秒／約9秒
+  cargo clippy／build（+bringup-display-13、増分）      約2秒／約7秒
 Peak memory if measured: 未測定
 Storage delta if measured:
   build前後の`df -h /` Used: 53G → 55G（scratchpad上のtarget。既存.embuildをsymlinkしたため.embuild分は増加なし）
 Generated artifact identity（いずれも target/xtensa-esp32-espidf/debug/deskcat-esp32。同じpathを構成ごとに上書きしたため、各build直後に取得した）:
-  既定構成            14,821,556 bytes  sha256 5cdc400aba852ab6dbc906ac08620e93230626b8095548cca5728a8398e369b6
-  pi-protocol-mode    16,774,760 bytes  sha256 41485b72bb595bf169b7038e145a2ae4ad7c488d3ee6bc77c742e50896280668
-  bringup-display-13  15,476,980 bytes  sha256 ec1ab9f37cc7be3dc64600d42fec591e66c6c75038f6374ed657cee12f090daa
+  既定構成            14,821,596 bytes  sha256 ea3b85bd8682f3240c458a83cb9159cf989ac68abb7bc20dd15637c2429f3855
+  pi-protocol-mode    16,774,872 bytes  sha256 d5488ebca23628e4eaac4e913f12ca1caf084f935b1b98dbd447653d0c50e0ab
+  bringup-display-13  15,477,060 bytes  sha256 c113fa6972c169fd9e50fc7fd14485e5d64e36758941809722b734f37a68588d
 Log or evidence path: この記録本文
 
 Known differences from documented profile:
