@@ -74,10 +74,12 @@ Linux x86_64 で検証した。初回は 2026-08-06 で、これは VM 上の初
 `firmware/esp32` は root workspace から `exclude` している。firmware の manifest は
 `[workspace]` 節を持たないため、**exclude を外すと firmware の build が壊れる。**
 
-firmware は `crates/deskcat-protocol` を path dependency で使う（[ADR-0008](../decisions/0008-firmware-protocol-crate-reuse.md)）。
-**同 crate の `rust-version` は host と ESP toolchain の両方を満たす下限にしてある。**
+firmware は `crates/deskcat-protocol` と `crates/deskcat-servo` を path dependency で使う
+（[ADR-0008](../decisions/0008-firmware-protocol-crate-reuse.md)。`deskcat-servo` は同 ADR の追記）。
+**両 crate の `rust-version` は host と ESP toolchain の両方を満たす下限にしてある。**
 上げると firmware の build が compile 前に停止する。
-**`crates/deskcat-protocol/` を変更したら、host だけでなく ESP32 build も回す。**
+**`crates/deskcat-protocol/` と `crates/deskcat-servo/` を変更したら、host だけでなく ESP32 build も回す。**
+`deskcat-servo` の下限の根拠は [Version Record](version-records/2026-09-29-esp32-build-servo-limiter-native-linux.md) にある。
 
 ### flash と serial monitor
 

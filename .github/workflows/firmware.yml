@@ -9,9 +9,10 @@ on:
       # 検証が要る。paths外にするとこのworkflowは起動せず、壊れたまま通る。
       - "Cargo.toml"
       - "Cargo.lock"
-      # firmwareがpath dependencyで使うcrate（ADR-0008）。ここを外すと、
+      # firmwareがpath dependencyで使うcrate（ADR-0008とその追記）。ここを外すと、
       # crates/だけの変更でfirmware buildが壊れても検知できない。
       - "crates/deskcat-protocol/**"
+      - "crates/deskcat-servo/**"
       - ".github/workflows/firmware.yml"
   push:
     branches:
@@ -22,6 +23,7 @@ on:
       - "Cargo.toml"
       - "Cargo.lock"
       - "crates/deskcat-protocol/**"
+      - "crates/deskcat-servo/**"
       - ".github/workflows/firmware.yml"
   workflow_dispatch:
 

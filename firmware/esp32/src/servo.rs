@@ -1,8 +1,28 @@
 //! `SERVO-01`（SG90首振りサーボ）のPWM driver。
 //!
-//! [Issue #17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。
-//! この段階では**「指定した角度へ1回動かす」だけを扱う**。首振り、fail-safe、
-//! 拘束検知は別途進める。
+//! [Issue #17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)、
+//! [Issue #19](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/19)。
+//! 首振り、fail-safe、拘束検知は別途進める。
+//!
+//! # 出力はlimiterを通ったものだけを受け取る
+//!
+//! **pulseを出す入口は[`Sg90::apply`]だけであり、`deskcat_servo::Setpoint`しか受け取らない。**
+//! `Setpoint`は`deskcat_servo::Limiter::step`だけが作れる（公開constructorが無い）。
+//! `step`は`Limiter::admit`を通った`AdmittedTarget`しか受け取らないため、Pi由来でも
+//! debug由来でも、**同じlimiterのadmitとstepを通らなければ角度を指定できない**
+//! （`AGENTS.md`「サーボ安全制限をデバッグ経路からも迂回させない」、#19の受け入れ条件3）。
+//! [`Sg90::stop`]（dutyを0へ戻す）は角度を指定しないため、この入口の外に置く。
+//!
+//! **例外は`bench-servo-test-17`の`Sg90::move_to_angle_once`である。**limiterを通らない。
+//! 同featureのbuildでだけcompileされ、そのbuildは#474の`compile_error!`で止まる
+//! （下記）。**compileできるbuildからは呼べない。**bench経路をlimiterへ通す書き換えは、
+//! 測定用のbuild（`servo-safety-limits.md`の`承認の状態`の項目6(b)）で行う。
+//!
+//! **`Setpoint`の位置の単位は、下の角度規約の度である**（`SERVO_ANGLE_CONVENTION_MIN_DEG`〜
+//! `_MAX_DEG`）。`Limiter`へ渡す可動域・速度・加速度もこの単位で与える。**値はこのmoduleが
+//! 持たない。**どれも`HW-TBD-010`／`011`／`020`で未確定であり、呼び出し側が渡す。
+//! 度からpulse幅への変換は、下の一般値による線形変換のままであり、**calibration済みの
+//! 変換ではない**（`HW-TBD-026`／`010`）。
 //!
 //! **既定build（`bench-servo-test-17` featureなし）は`main()`からこのmoduleを
 //! 呼ばない**（gate状態は[TBD台帳](../../../docs/hardware/tbd-register.md)、理由は
@@ -25,6 +45,7 @@
 // `bench-servo-test-17` feature付きbuildでは呼ばれるため無害（#474で、そのbuildはcompileが止まる）。
 #![allow(dead_code)]
 
+use deskcat_servo::Setpoint;
 use esp_idf_svc::hal::gpio::OutputPin;
 use esp_idf_svc::hal::ledc::config::TimerConfig;
 use esp_idf_svc::hal::ledc::{LedcChannel, LedcDriver, LedcTimer, LedcTimerDriver};
@@ -32,8 +53,9 @@ use esp_idf_svc::hal::units::FromValueType;
 use esp_idf_svc::sys::EspError;
 
 /// `SERVO-01`（SG90）のPWM driver。hardware LEDCでpulseを生成する（module doc参照）。
-/// `Sg90::new`でGPIO27の駆動が始まるが初期dutyは0%であり、`move_to_angle_once`を
-/// 呼ぶまで有効なservo pulseは出ない。
+/// `Sg90::new`でGPIO27の駆動が始まるが初期dutyは0%であり、[`Sg90::apply`]を
+/// 呼ぶまで有効なservo pulseは出ない（`bench-servo-test-17`付きbuildでは
+/// `move_to_angle_once`も同じ）。
 pub struct Sg90<'d> {
     driver: LedcDriver<'d>,
 }
@@ -67,10 +89,26 @@ impl<'d> Sg90<'d> {
         Ok(Self { driver })
     }
 
+    /// `deskcat_servo::Limiter::step`が作った1 step分の出力を出す。
+    ///
+    /// **角度を指定してpulseを出す入口はこれだけである**（module doc参照）。
+    /// `setpoint.position()`を角度規約の度として読み、一般値の線形変換でpulse幅にする。
+    /// 変換は角度規約の範囲（`SERVO_ANGLE_CONVENTION_MIN_DEG`〜`_MAX_DEG`）へ
+    /// clampするが、**これは安全制限ではない。**可動域を強制するのは`Limiter`である。
+    pub fn apply(&mut self, setpoint: Setpoint) -> Result<(), EspError> {
+        let pulse_width_us = pulse_width_us_for_angle(setpoint.position());
+        let duty = self.duty_for_pulse_width_us(pulse_width_us);
+        self.driver.set_duty(duty)
+    }
+
     /// 指定した角度（`SERVO_ANGLE_CONVENTION_MIN_DEG`〜`_MAX_DEG`）へ**1回だけ**動かす
     /// （連続動作は行わない）。中央からの偏角を
     /// [`crate::config::SERVO_FIRST_MOTION_MAX_DEVIATION_DEG`]でclampする
     /// （暫定値。同定数のdoc参照）。
+    ///
+    /// **limiterを通らない。**そのため`bench-servo-test-17`付きbuildでだけcompileする
+    /// （module doc参照）。
+    #[cfg(feature = "bench-servo-test-17")]
     pub fn move_to_angle_once(&mut self, angle_deg: f32) -> Result<(), EspError> {
         let neutral = crate::config::SERVO_ANGLE_CONVENTION_NEUTRAL_DEG;
         let max_deviation = crate::config::SERVO_FIRST_MOTION_MAX_DEVIATION_DEG;

@@ -52,6 +52,9 @@ opt-level = "z"
 # root workspaceの`exclude = ["firmware/esp32"]`は維持したまま、依存だけを張る。
 # lockfileは`firmware/esp32/Cargo.lock`とroot `Cargo.lock`の2つに分かれたままでよい。
 deskcat-protocol = { path = "../../crates/deskcat-protocol" }
+# servoのhard limitとtrajectory limitingを、hostと同じ実装で強制する（ADR-0008の追記、#19）。
+# `crate::servo::Sg90`はこのcrateの`Setpoint`だけを出力として受け取る。
+deskcat-servo = { path = "../../crates/deskcat-servo" }
 log = "0.4"
 # health snapshotを`deskcat-protocol`の`Status`と同じ形へserializeするために使う。
 # 同crateが既に依存しており、`firmware/esp32/Cargo.lock`にも推移的に入っている。

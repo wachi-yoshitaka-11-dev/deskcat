@@ -162,3 +162,20 @@ partitionの4,128,768 bytesに対し9.24 %である（`espflash`の`App/part. si
 
 なし。[ADR-0001](0001-monorepo-layout.md)の「保留した判断」のうち
 「Firmwareからの`deskcat-protocol`直接再利用」を解決するものであり、ADR-0001を置き換えない。
+
+## 追記（2026-09-29）: 2つ目の共有crate`deskcat-servo`
+
+[Issue #19](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/19)で、`firmware/esp32`が
+`crates/deskcat-servo`もpath dependencyで使うようにした。servoのhard limitとtrajectory limitingの
+実装を、hostのtestとfirmwareで1つに保つためである。**上の決定は変えていない。**
+
+- root `Cargo.toml`の`exclude = ["firmware/esp32"]`を維持し、lockfileは2つに分かれたままである。
+- `deskcat-servo`の`rust-version`は、workspaceからの継承をやめ、`deskcat-protocol`と同じく
+  **両toolchainの下限（1.95）を明示した。**
+- `.github/workflows/firmware.yml`の`paths`へ`crates/deskcat-servo/**`を加えた（上の`リスクと対策`の2行目と同じ理由）。
+
+**根拠。**ESP toolchainのrustc（`esp-1.95.0.0`）で`deskcat-servo`と`deskcat-protocol`のbuild、lint、testを通し、
+`firmware/esp32`の既定構成・`pi-protocol-mode`・`bringup-display-13`の3構成でformat、lint、buildを通した。
+実行した版と結果は[Version Record](../toolchains/version-records/2026-09-29-esp32-build-servo-limiter-native-linux.md)にある。
+**build-onlyであり、flashと実機起動は含まない。**既定buildの`main()`はservoを駆動しないため、
+flash sizeへの影響もまだ測っていない。

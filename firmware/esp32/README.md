@@ -45,20 +45,28 @@ ESP32 Build profileの端末で、このディレクトリにて実行する。*
 
 ## host crateの再利用
 
-`deskcat-protocol`をpath dependencyで使う。wire protocolの実装を両側で1つに保つためであり、
-判断の記録は[ADR-0008](../../docs/decisions/0008-firmware-protocol-crate-reuse.md)にある。
+`deskcat-protocol`と`deskcat-servo`をpath dependencyで使う。wire protocolの実装と、
+servoのhard limitとtrajectory limitingの実装を、それぞれ両側で1つに保つためである。
+判断の記録は[ADR-0008](../../docs/decisions/0008-firmware-protocol-crate-reuse.md)にある
+（`deskcat-servo`は同ADRの追記）。
 
 ```toml
 deskcat-protocol = { path = "../../crates/deskcat-protocol" }
+deskcat-servo = { path = "../../crates/deskcat-servo" }
 ```
 
 - root workspaceの`exclude = ["firmware/esp32"]`は**維持する。**lockfileはroot `Cargo.lock`と
   このディレクトリの`Cargo.lock`の2つに分かれたままでよい。
 - **共有crateの`rust-version`は、host（1.97.1）とESP toolchain（rustc 1.95.0-nightly）の
-  両方を満たす下限にしてある。**`crates/deskcat-protocol/Cargo.toml`が理由込みで宣言している。
+  両方を満たす下限にしてある。**`crates/deskcat-protocol/Cargo.toml`と
+  `crates/deskcat-servo/Cargo.toml`が理由込みで宣言している。
   ここを上げるとfirmwareのbuildが`rustc 1.95.0-nightly is not supported`でcompile前に止まる。
-- `crates/deskcat-protocol/**`の変更でも`.github/workflows/firmware.yml`が発火する。
+- `crates/deskcat-protocol/**`と`crates/deskcat-servo/**`の変更でも
+  `.github/workflows/firmware.yml`が発火する。
   host側だけの変更でfirmware buildが壊れるのを検知するためである。
+- `src/servo.rs`の`Sg90`は、`deskcat-servo`の`Limiter`が作った`Setpoint`だけを出力として
+  受け取る（同fileのmodule doc参照）。**既定buildの`main()`はservoを駆動しない。**
+  limiterへ渡す値（可動域、速度、加速度等）はどれも未確定であり、firmwareはまだ持たない。
 
 `src/health.rs`がこのcrateの`Status`と`ProtocolCounters`を組み立てる。ただし**送信はしない。**
 serial deviceは[#11](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11)、
