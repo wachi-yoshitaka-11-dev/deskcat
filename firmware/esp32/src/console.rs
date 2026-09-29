@@ -41,11 +41,16 @@
 //! `pi-protocol-mode`のbuildには存在しない）。§8はidentityを復元できる要求に
 //! 相関ACKを返すよう定めており、**これに反する既知の逸脱である**
 //! （`crate::boot_session::BootSession::on_bytes`のdoc参照）。**これは設計上の
-//! 性質であり、実機で確認して解消する類のものではない。**
+//! 性質であり、実機で確認して解消する類のものではない。**同じ理由で、§4.1の表と
+//! §5.1の手順5が定める、新しいPi `sid`の`hello`を受けたときの`boot`の再送
+//! （[#12]、Revision履歴の`Draft 2 boot resend on new pi session`）も満たさない。
+//! これらは`#487`の残りの作業（featureの排他をやめて1つのbuildへまとめ、`hello`の
+//! 処理を受信の経路へつなぐ変更）で満たす。
 //!
 //! §2との関係、既知の逸脱、行長・line endingの扱いは
 //! `docs/protocol/esp32-pi-protocol.md`§2が正本として持つ。
 //!
+//! [#12]: https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12
 //! [#446]: https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446
 //! [#487]: https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487
 
