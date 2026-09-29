@@ -64,7 +64,8 @@
 //! **Pi linkはGPIOのUART（TX／RX／GNDだけ。`docs/hardware/gpio-assignment.md`の
 //! `Pi–ESP32間のtransport`節）であり、Piの`DTR`は`ESP32`へつながらないため、Pi linkでは
 //! この再起動は起きない。**当てはまるのは、hostが`ESP32` board上のUSB-UARTブリッジ（USB）を
-//! 開く場合だけである。
+//! 開く場合だけである（Pi linkの試験中に、PCのserial monitorで`ESP32`のdebug logを読む場合も
+//! これに当たる。再起動が起きるかは確かめていない）。
 //!
 //! [Issue #12]: https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12
 //! [`Pump::TimedOut`]: crate::Pump::TimedOut

@@ -5,7 +5,9 @@
 //! `PI-UART-RX`（GPIO14）へ割り当てて使う（[#487]。pinと接続の条件の正は
 //! `docs/hardware/gpio-assignment.md`の`Pi–ESP32間のtransport`節）。そのため
 //! 既定buildでも`pi-protocol-mode`でも、`init_log_mode`が
-//! `esp_idf_svc::log::EspLogger`を初期化し、logはUART0へ出る。
+//! `esp_idf_svc::log::EspLogger`を初期化し、logはUART0へ出る（ESP-IDFのconsoleがUART0で
+//! あることは、debug profileで生成された`sdkconfig`で確かめた。範囲は
+//! `docs/protocol/esp32-pi-protocol.md`§2）。
 //!
 //! **[#487]より前、`pi-protocol-mode`はUART0をprotocol streamへ使い、loggingを
 //! 止めていた**（[#446]、`silence_logging`）。Pi linkがUART0から外れたため、

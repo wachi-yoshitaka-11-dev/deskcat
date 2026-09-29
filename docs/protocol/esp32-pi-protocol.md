@@ -268,7 +268,7 @@ Piは`boot`を受信したとき、`sid`が現在のESP32 sessionと**異なる�
 | `status: rejected`（`stale_session`／`rate_limited`以外）のACKを受信 | **終端応答として再送を終了する。**`code`を`protocol_fault`で報告し、Piの介入を待つ |
 | `sid`／`id`を復元できず、Piが相関ACKを構成できない | 有限budgetまで再送し、使い切ったら送出を止める。サーボ出力を有効にせず`protocol_fault`で報告する（下記） |
 
-**`status: ok`のACK済みの`boot`を、新しいPi `sid`の`hello`で再送する理由。**Piが再起動すると、新しいPi processはESP32の`sid`を知らない。PiがESP32の`sid`を承認する経路は`boot`だけであり（§5.1「Session切り替えは`hello`／`boot`だけが起こす」、§8の手順8）、Piは、envelopeの`sid`が現在承認している応答送信側のsessionでないACKを、`hello`の結果として受理しない（§6）。そのためESP32が`boot`を再送しない限り、Piは新しいsessionでESP32の`sid`を承認できず、§10.2の手順が成り立たない。再開の回数は、Pi session遷移（`hello`による）1回につき1回に限る。Pi session遷移そのものは§5.1の遷移上限（`PROTO-TBD-012`）で有界であり、`boot`の再送が際限なく続く経路は作らない。**この行は`firmware/esp32`にまだ実装していない**（[Issue #12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)の残作業）。
+**`status: ok`のACK済みの`boot`を、新しいPi `sid`の`hello`で再送する理由。**Piが再起動すると、新しいPi processはESP32の`sid`を知らない。PiがESP32の`sid`を承認する経路は`boot`だけであり（§5.1「Session切り替えは`hello`／`boot`だけが起こす」、§8の手順8）、Piは、envelopeの`sid`が現在承認している応答送信側のsessionでないACKを、`hello`の結果として受理しない（§6）。そのためESP32が`boot`を再送しない限り、Piは新しいsessionでESP32の`sid`を承認できず、§10.2の手順が成り立たない。再開の回数は、Pi session遷移（`hello`による）1回につき1回に限る。Pi session遷移そのものは§5.1の遷移上限（`PROTO-TBD-012`）で有界であり、`boot`の再送が際限なく続く経路は作らない。**この行は`firmware/esp32`にまだ実装していない**（firmwareへの実装は[Issue #487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)の残りの作業であり、`hello`の処理を受信の経路へつなぐ変更と一緒に行う）。
 
 通常再送の上限で**直ちに**止めないのは、Piが一時的に`boot`またはACKを取りこぼしただけでsessionを承認する経路が消えるためである。一方、無応答のまま無期限に送出するとlink帯域を占有する。有限のrecovery期間を確保し、満了後は物理出力を無効に保ったまま外部から観測可能な停止状態へ移る。
 

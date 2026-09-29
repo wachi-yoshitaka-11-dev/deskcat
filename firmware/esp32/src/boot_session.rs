@@ -58,7 +58,8 @@
 //!
 //! # debug logへ出すもの
 //!
-//! `boot`の送出（`boot_tx`）、`status: ok`での確立（`boot_established`）、`sid`の
+//! `boot`の送出（`boot_tx`。1行の全byteをtx ring bufferへ積み終えた時点であり、wireへ出た
+//! 時点ではない。`send_boot`のcomment参照）、`status: ok`での確立（`boot_established`）、`sid`の
 //! 選び直し（`boot_sid_reselected`）、終端（`boot_terminated`）を`log`へ出す。
 //! [#446]の受け入れ条件4（実機での`boot`→ACK）の試験で、ESP32側で何が起きたかを
 //! Pi側のlogと突き合わせるためである。出力先はUART0（USB）であり、Pi linkの

@@ -123,7 +123,8 @@ simulator test（`tests/simulator.rs`）までの検証であり、実機での�
   再起動することになり、`boot`／`hello`のhandshakeに効く。現物の確認と判断はprotocol側の
   話であり、**このcrateでは触っていない**。**Pi linkはGPIOのUART（TX／RX／GNDだけ。[gpio-assignment.md](../../docs/hardware/gpio-assignment.md)の
   `Pi–ESP32間のtransport`節）であり、PiのDTRはESP32へつながらないため、Pi linkではこの再起動は起きない。**
-  当てはまるのは、hostがESP32 board上のUSB-UARTブリッジ（USB）を開く場合だけである
+  当てはまるのは、hostがESP32 board上のUSB-UARTブリッジ（USB）を開く場合だけである（Pi linkの試験中に、
+  PCのserial monitorでESP32のdebug logを読む場合もこれに当たる。再起動が起きるかは確かめていない）
 - Pi上でこのcrateをbuildできるか（memory）
 
 ## 既定値は暫定である
