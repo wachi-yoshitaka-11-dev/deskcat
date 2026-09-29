@@ -428,6 +428,8 @@ budget値は`PROTO-TBD-017`に含める。
 
 `get_status`へのresponseとして送信し、必要に応じてrate limit付きの定期health messageとして送信する。
 
+**`status`は、どの`get_status`への応答かを示すfieldを持たない。**応答かどうかは送信の順序で決める（§5.6の2つの規則）。
+
 初期payload group:
 
 ```json
@@ -788,6 +790,15 @@ Choice count、ID、label、prompt length、timeoutに上限を設ける。正�
 ```
 
 ESP32はcommandへacknowledgeし、`status` snapshotを送信する。
+
+`status`（§4.6）は応答先を示すfieldを持たないため、応答の対応は次の2つの規則で決める。**wire formatにfieldを足さない。**
+
+1. **送信側（ESP32）:** `get_status`への応答の`status`は、その`get_status`への`status: ok`のACKの**直後**に送る。ACKと応答の`status`の間に、ほかの`status`（定期のhealth message）を挟まない。
+2. **受信側（Pi）:** 現在のESP32 sessionから`get_status`への`status: ok`のACKを受けた後に、同じsessionから最初に届いた`status`を、その`get_status`への応答とみなす。
+
+1が守られ、応答の`status`がlinkで失われなければ、2の判定はその応答を指す。応答の`status`の行が失われた場合（§8の手順5・6で破棄された場合など）は、次に届いた定期の`status`を応答とみなしうる。**`status: ok`のACKを受けていない間に届いた`status`は、応答とみなさない**（定期のhealth message、またはACKが失われた`get_status`への応答）。ACKを受けないまま`get_status`がtimeoutした場合は§9に従い同じ`(sid, id)`で再送する。**取り違えても、Piが受け取るのはESP32の実際の状態のsnapshotであり、安全の制限はESP32が強制する**ため、動作の安全には影響しない。
+
+**Piは、応答の`status`を待つtimeoutを持たない。**待ちは、次に届いた`status`か、ESP32 sessionの遷移で解ける。応答の`status`を得られないまま実stateが要る場合は、Piは**新しい`id`**で`get_status`を送る。`get_status`は状態を読むだけのcommandであり、新しい`id`で送り直しても二重実行の問題は起きない。**同じ`(sid, id)`の再送は、duplicateとして§9の保持したresultのreplayになる。**応答の`status`がreplayに含まれるかは、ESP32が何を保持しているかによる（保持件数と期間は未確定。`PROTO-TBD-005`）。応答の`status`を得るには、新しい`id`で`get_status`を送る。
 
 ### 5.7 `ping`
 
@@ -1320,6 +1331,7 @@ Framing／parse層について、**host workspaceのRust実装**がfixtureに合
 | 2026-09-25 | Draft 2 esp32 boot retry | [Issue #446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)のPR B。§4.1の`boot`受理確認・再送の終了条件の表をESP32側（`firmware/esp32/src/boot_session.rs`）へ実装した。`stale_session`受信時の`sid`選び直しも実装した（§3.1）。再送間隔・backoff係数・通常再送の回数・recovery間隔・recovery budget（`PROTO-TBD-017`）と、`sid`選び直し回数の上限（`PROTO-TBD-011`の残り）は暫定値のまま。`protocol_fault`はwireへ出さない（`PROTO-TBD-018`未確定。「送出を止める」という動作面だけ実装）。§2の`pi-protocol-mode`送信line ending不一致（PR Aまで既知の逸脱として記録していたもの）は、`boot`送出経路に限りsource上は解消した（実機でのbyte実測はまだ無い。同節参照）。**wire formatは変更していない。**envelope field、integer width、error codeのいずれも増やしていない。受信側（Pi）の判定規則は変えていない |
 | 2026-09-28 | Draft 2 uart transport | [Issue #446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)。ユーザーの決定により、§2の物理linkをUSB serialからUART（ESP32のGPIO13／GPIO14 ⇔ PiのGPIO15／GPIO14）へ変えた。最終構成でもUARTを使い、USBは書き込みとdebug専用にする。§2のUART0共有の例外は、firmwareの移行（#487）までの現状として残した。§8.1と§8.2の「USB」を「serial」へ直した。wire format（framing、baud候補、line長）は変えていない |
 | 2026-09-29 | Draft 2 boot resend on new pi session | [Issue #12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)。Piの再起動後、新しいPi processがESP32の`sid`を承認する手段が無く§10.2が成り立たない仕様の穴を塞いだ。§4.1の`boot`の再送の表へ、`status: ok`のACK済みでも新しいPi `sid`の`hello`を受理したら同じ`(sid, id)`で1回だけ再送を再開する行を足し、§5.1のESP32の手順へ手順5（`boot`の再送）を、§10.2へ「`hello`のACKは受理せず、再送された`boot`でESP32 sessionを承認してから§10.1の手順3〜8へ進む」手順を書いた。承認の経路は`boot`だけのままであり、§6と「Session切り替えは`hello`／`boot`だけが起こす」に例外は作らない。**wire formatは変更していない。**`firmware/esp32`の実装は未実施（#12の残作業） |
+| 2026-09-29 | Draft 2 status reply order | [Issue #12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)。`status`が`get_status`への応答かどうかを、wire formatを変えずに送信の順序で決める規則を§5.6に書いた（送信側は`status: ok`のACKの直後に応答の`status`を送り、間に別の`status`を挟まない。受信側はそのACKの後に最初に届いた現在sessionの`status`を応答とみなす）。応答の`status`を得られないまま実stateが要る場合は、Piは新しい`id`で`get_status`を送る（同じ`(sid, id)`の再送は§9の保持したresultのreplayになる）。§4.6に、`status`が応答先のfieldを持たないことと§5.6への参照を足した。**wire formatは変更していない。**`firmware/esp32`はまだ`get_status`への応答をwireへ送っていない（`pi-protocol-mode`は確立後のbyteを読み捨てる）ため、送信側の規則はwireへの送出を実装する変更が守る |
 
 ### Draft schemaの互換性
 
