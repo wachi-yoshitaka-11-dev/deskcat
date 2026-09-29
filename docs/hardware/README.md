@@ -10,6 +10,7 @@
 - `servo-safety-limits.md`
 - `sensor-datasheet-notes.md`
 - `sd-health-check.md`
+- `enclosure-and-neck.md`（#34 の設計案。現物適合と選定は未了）
 - `experiment-log.md`（実験記録）
 - `tbd-register.md`（未確定項目と解決状況の正本）
 
