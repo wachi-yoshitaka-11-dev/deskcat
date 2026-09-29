@@ -6,6 +6,12 @@
 //!
 //! # 角度を出せるのは、limiterを所有する[`LimitedServo`]だけである
 //!
+//! **この型が保証するのは、command の水準までである。**すなわち、compileできるbuildで、
+//! このmoduleを通ってLEDCへ設定する位置の列が、自分で測った間隔で`Limiter`の制限
+//! （位置、速度、加速度、`単一commandの最大変化量`）を満たすことまでである。**実機がその列を
+//! どう実現するか（PWMのframe、servo内部の追従、非常停止、resetの後）は保証しない。**
+//! それは下の「実機での実現は保証しない」に列挙し、段3の監視下の試験（#19の受け入れ条件7）で確かめる。
+//!
 //! **compileできるbuildで、このmoduleの外から角度を指定してpulseを出す入口は
 //! [`LimitedServo::tick`]だけである。**[`LimitedServo`]は[`Sg90`]と`deskcat_servo::Limiter`を
 //! **1つずつ所有**し、外へ出す操作は[`LimitedServo::new`]、[`LimitedServo::resume`]、
@@ -22,8 +28,8 @@
 //!   速度と加速度の制限を通らずに位置を跳ばせてしまうためである
 //! - **制御周期の間隔を呼び出し側から受け取らない。**`tick`は前回の`tick`からの経過時間を
 //!   単調時計（`std::time::Instant`）で**自分で測り**、それを`Limiter::step`へ渡す。
-//!   間隔を申告させると、公称値を申告したまま短い間隔で呼ぶだけで、実時間の速度と加速度が
-//!   `Limiter`の制限を超えるためである
+//!   間隔を申告させると、公称値を申告したまま短い間隔で呼ぶだけで、設定する位置の列が
+//!   実時間で`Limiter`の制限を満たさなくなるためである
 //! - **servo 1つにつき`Limiter`は1つである。**[`LimitedServo::new`]は[`Sg90`]を値で受け取り、
 //!   [`Sg90::new`]はLEDC timer・channel・pinを消費する。これらが`Peripherals`から1回だけ取れるのは、
 //!   `unsafe`の`steal`／`reborrow`を使わない場合であり、firmwareは`unsafe_code = "forbid"`で
@@ -42,93 +48,77 @@
 //! （下記）。**compileできるbuildからは呼べない。**bench経路をlimiterへ通す書き換えは、
 //! 測定用のbuild（`servo-safety-limits.md`の`承認の状態`の項目6(b)）で行う。
 //!
-//! # 出力が効く時点
-//!
-//! `tick`はLEDCのdutyを設定するが、**新しいdutyが効くのは次のPWM cycleからである**
-//! （ESP-IDF v5.5.3 の`components/esp_driver_ledc/include/driver/ledc.h`、`ledc_update_duty`のnote
-//! 「the new LEDC parameters don't take effect until the next PWM cycle」）。servoもframeごとにしか
-//! pulseを読まない。**`tick`の間隔がPWMの周期より短いと、1 frameの間に複数のstepがまとまり、
-//! 実機への速度が上限を超えうる。**そこで[`LimitedServo::new`]と[`LimitedServo::resume`]は、
-//! 制御周期の最短の間隔がPWMの周期（`1 / SERVO_PWM_FREQUENCY_HZ`）より短ければ拒否する
-//! （[`LimitedServoError::ControlPeriodShorterThanPwmPeriod`]）。
-//!
-//! **残る差がある。**出力は最大で1 frame遅れ、`tick`とPWM cycleの位相がずれると、1 frameで効く
-//! 変化は最大で「制御周期の最長の間隔 ÷ PWMの周期」倍の速度に当たりうる。**制御周期を決めるとき
-//! （#18の実測の後、段3）は、PWMの周期の整数倍にし、許容幅を小さくする前提で決める。**
-//! このmoduleは値を決めない。
-//!
 //! # 制御周期の外の間隔、出力の失敗ではlatchする
 //!
-//! 次のどちらかが起きたら、**以後の`tick`は出力も`Limiter`の更新もせず[`TickError::Faulted`]を
+//! 次のどちらかが起きたら、**以後の`tick`は何も設定せず、`Limiter`も進めず、[`TickError::Faulted`]を
 //! 返す。**解除の経路は、[`LimitedServo::stop`]の後に[`LimitedServo::resume`]で作り直すことだけである。
 //!
 //! - **測った間隔が制御周期（`ControlPeriod`）の外にある**（[`TickError::Rejected`]）。
-//!   長すぎる場合（遅れ）は、その間止まっていた実機へ、`Limiter`に残った速度を次の周期に
-//!   指令することになり、`最大加速度`を超えうる。短すぎる場合は、`Limiter`がその間隔では
+//!   長すぎる場合（遅れ）にそのまま続けると、`Limiter`に残った速度で次の位置を設定することになり、
+//!   その間の位置の列が`Limiter`の制限を満たさなくなる。短すぎる場合は、`Limiter`がその間隔では
 //!   `最大加速度`を保証できない（`deskcat_servo::Limiter::step`のdocの「`dt_s`は
-//!   `ControlPeriod`の範囲内でなければならない」）。**jitterが許容幅を超えると、servoはその位置で
-//!   止まる（最後のdutyを保つ）。**安全側に倒れる既知の性質である
+//!   `ControlPeriod`の範囲内でなければならない」）。**jitterが許容幅を超えると、そこで止まる。**
+//!   安全側に倒れる既知の性質である
 //! - **`Limiter::step`の後にPWMの出力が失敗した**（[`TickError::Output`]）。`Limiter`だけが1 step進み、
-//!   実際の出力は前の値のまま残るため、次の`tick`は1周期で2 step分の変化を指令し、
-//!   `最大速度`（最大で2倍）と`最大加速度`を超えうる
+//!   LEDCに設定した位置は前の値のまま残る（esp-idf-hal 0.46.2の`LedcDriver::set_duty`が呼ぶ
+//!   ESP-IDFの`ledc_set_duty_and_update`は、失敗をregisterへ書く前の検査で返す。source を読んだ結果）。
+//!   そのまま続けると、次の`tick`で2 step分の変化を設定することになる
 //!
 //! これは`servo-safety-limits.md`の`起動時とdriver故障時の動作`（`HW-TBD-019`、PWM driverの
 //! 実行中の故障を検知したときの動作は未確定）の中で、「未検証の動作出力を行わない」側の
 //! 既定として置いたものである。**値も復帰の条件も決めていない。**
 //!
-//! **latchは「それ以上動かさない」までであり、「出力を止める」ではない。**LEDCは、最後に
-//! 設定したdutyを出し続けうる。**[`TickError::Rejected`]、[`TickError::Output`]、
-//! [`TickError::Faulted`]を受けた呼び出し側は、[`LimitedServo::stop`]を呼ぶ。**
-//! その配線（`main.rs`）はまだ無い。
+//! **latchは「それ以上動かさない」までであり、「出力を止める」ではない。**LEDCは最後に設定した
+//! dutyを出し続けうる。**[`TickError::Rejected`]、[`TickError::Output`]、[`TickError::Faulted`]を
+//! 受けた呼び出し側は、[`LimitedServo::stop`]を呼ぶ。**その配線（`main.rs`）はまだ無い。
+//!
+//! # 間隔の基準と、tickを呼び続ける前提
+//!
+//! **間隔の基準を取るのは、[`LimitedServo::new`]または[`LimitedServo::resume`]の後で、targetが
+//! あるときの最初の`tick`だけである。**その`tick`は何も設定しない。2回目以降の`admit`では基準を
+//! 取り直さない。**したがって、一度動き始めたら、targetに着いた後も制御周期で`tick`を呼び続ける。**
+//! 呼ぶのを止めてから再開すると、測った間隔が制御周期の外になり、latchする。
 //!
 //! # 止めた後の再開
 //!
 //! [`LimitedServo::stop`]は自分を消費して[`Stopped`]を返す。[`Stopped`]は[`Sg90`]と**再開の位置**
-//! （最後に出力できた位置。一度も出力していなければ起動時の初期位置）をprivateに持つ。
+//! （最後にLEDCへ設定できた位置。一度も設定していなければ起動時の初期位置）をprivateに持つ。
 //! [`LimitedServo::resume`]は**位置を受け取らず**、その位置から速度0の`Limiter`を作る。
 //!
-//! - **止める直前の速度を持ち越さない。**持ち越すと、duty 0で止まっていたservoへ、再開の
-//!   最初の周期にその速度を指令することになり、`最大加速度`を超えうる
+//! - **止める直前の速度を持ち越さない。**持ち越すと、再開の最初の位置が、止まっていた間を
+//!   無視した速度で設定される
 //! - **呼び出し側が選んだ位置から再開させない。**選べると、その位置へ`Limiter`の速度・加速度の
-//!   制限を受けずに跳べてしまう
+//!   制限を受けずに設定できてしまう
 //!
-//! # 既知の制限: 起動時の初期位置は実際の位置と一致する保証が無い
+//! # 既知の制限: 起動時の初期位置
 //!
-//! [`LimitedServo::new`]の`initial_position`は、呼び出し側が渡す値である。
-//! **servoの実際の位置をfirmwareは測れない。**両者が食い違っていると、最初の`admit`の後の`tick`で、
-//! servoは実際の位置からその初期位置付近へ**`Limiter`の速度・加速度の制限を受けずに**動きうる
-//! （servo内部の制御が追従するため）。起動時の位置の扱いは`HW-TBD-019`／`HW-TBD-020`の範囲であり、
-//! **このmoduleは値も扱いも決めない。****呼び出し側が位置を選べる入口は、起動時のこの1つだけである。**
+//! [`LimitedServo::new`]の`initial_position`は、呼び出し側が渡す値である。**呼び出し側が位置を
+//! 選べる入口は、起動時のこの1つだけである。**`Limiter`の制限はこの位置から始まる列に効き、
+//! この位置と実機の位置の食い違いには効かない（起動時の位置の扱いは`HW-TBD-019`／`HW-TBD-020`）。
+//! **このmoduleは値も扱いも決めない。**
 //!
-//! 止めた後も、duty 0の間にservoが押されて動けば、再開の位置と実際の位置は食い違う。
-//! これは測れないことによる制限であり、呼び出し側が選べる経路ではない。
+//! # 実機での実現は保証しない
 //!
-//! # 出力を止めるものと、止めないもの
+//! 次は型でも、ESP-IDFのsourceを読むことでも確かめきれない。**量を主張しない。**
+//! 段3の監視下の試験（#19の受け入れ条件7）の項目として扱う（#19のコメントに記録する）。
 //!
-//! - **[`LimitedServo::stop`]:** dutyを0へ戻す（[`Sg90::stop`]）。**失敗したら、人が外部電源を切る。**
-//! - **drop（panicを除く）:** [`Sg90`]が持つ`esp_idf_svc::hal::ledc::LedcDriver`の`Drop`が
-//!   `ledc_stop`をidle level `0`で呼び、GPIO27をlowに固定する（`esp-idf-hal` 0.46.2の
-//!   `src/ledc.rs`）。**ただしその`Drop`は`ledc_stop`の失敗を`unwrap`するため、`ledc_stop`が
-//!   失敗した場合はpanicになり、下のpanicの経路に入る。**
-//! - **panicでは止まらない。**firmwareは`panic = "abort"`でbuildする（`firmware/esp32/.cargo/config.toml`の
-//!   `build-std`と、target `xtensa-esp32-espidf`の`panic-strategy`）ため`Drop`は走らない。ESP-IDF v5.5.3の
-//!   panic handlerは、buildが生成する`sdkconfig`の`CONFIG_ESP_SYSTEM_PANIC_PRINT_REBOOT=y`
-//!   （既定値。`sdkconfig.defaults`では設定していない）により、cache errorでなければ
-//!   `esp_restart_noos`を呼ぶ（`components/esp_system/port/panic_handler.c`の`panic_restart`）。
-//!   これがresetするperipheralにLEDCは含まれず（`components/esp_system/port/soc/esp32/system_internal.c`の
-//!   `esp_system_reset_modules_on_exit`。`esp_system.h`の`esp_restart`のdocも
-//!   「Peripherals (except for Wi-Fi, BT, UART0, SPI1, and legacy timers) are not reset」と書く）、
-//!   resetはCPUのsoftware resetである。reset理由がCPUのsoftware reset（またはMWDT0、RTC_WDTによる
-//!   CPU reset）のとき、起動処理はそれまで有効だったperipheralのclockを止めない
-//!   （`components/esp_system/port/soc/esp32/clk.c`）。**したがってLEDCは最後のdutyを出し続けうる。**
-//!   既定buildはGPIO27を初期化しないため、電源を切るまで続きうる
-//! - **system resetやRTC resetになる経路（interrupt watchdogのstage1、panic handlerが張るRTC WDT、
-//!   cache errorの`esp_restart_noos_dig`）では、LEDCが止まるかをこのPRでは確かめていない。**
-//!   止まるとも止まらないとも主張しない
-//! - **止めるのは、起動の早い段階で[`Sg90::new`]を作り直すこと**（`LedcDriver::new`がchannelを
-//!   duty 0で設定し直す）**と、人が外部電源を切ることである。**起動時の配線（`main.rs`）はまだ無い
-//!   （`HW-TBD-019`の`Watchdog、panic、brownout reset後の動作`）
-//! - **いずれも実機では確かめていない。**source を読んだ結果である
+//! - **PWMのframeで効くこと。**新しいdutyは次のPWM cycleから効く（ESP-IDF v5.5.3の
+//!   `components/esp_driver_ledc/include/driver/ledc.h`、`ledc_update_duty`のnote）。servoも
+//!   frameごとにしかpulseを読まない。制御周期とPWMの周期の関係によって、実機が受け取る位置の
+//!   列は、LEDCへ設定した列と時間の刻みが違う。**制御周期は段3で決める**（このmoduleは値を持たない）
+//! - **servoが受け取った位置へどう追従するか**（速さ、遅れ、行き過ぎ）は確かめていない
+//! - **[`LimitedServo::stop`]は、軌道の制限を受けない非常停止である。**dutyを0へ戻すだけで、
+//!   減速しない。**信号を止めてもservo側が駆動を止める保証は無い**（[`Sg90::stop`]のdoc）
+//! - **再開の位置は、最後にLEDCへ設定した値であり、実機に届いたとは限らない。**次のframeより前に
+//!   `stop`のduty 0が上書きした場合や、duty 0の間にservoが押されて動いた場合は、実機の位置と食い違う
+//! - **reset、panic、drop、`core::mem::forget`の後の出力は保証しない。**範囲外のpulseになりうる。
+//!   **止めるのは、人が外部電源を切ることである。**firmwareは`panic = "abort"`でbuildするため、
+//!   panicでは`Drop`が走らない。ESP-IDF v5.5.3のpanic handler（生成される`sdkconfig`の
+//!   `CONFIG_ESP_SYSTEM_PANIC_PRINT_REBOOT=y`）と`esp_restart`が通る`esp_restart_noos`は、
+//!   resetするperipheralにLEDCを含まず（`components/esp_system/port/soc/esp32/system_internal.c`、
+//!   `esp_system.h`の`esp_restart`のdoc）、reset前にCPUとAPBのclockを切り替える（同fileの
+//!   `rtc_clk_cpu_set_to_default_config`）。LEDCの`Drop`は`ledc_stop`を呼ぶが、その失敗を`unwrap`する。
+//!   **経路ごとの分析と、起動時にservoのLEDCを最初に止める要件は、#19のコメントに置く。**
 //!
 //! **`Setpoint`の位置の単位は、下の角度規約の度である**（`SERVO_ANGLE_CONVENTION_MIN_DEG`〜
 //! `_MAX_DEG`）。`Limiter`へ渡す可動域・速度・加速度もこの単位で与える。**値はこのmoduleが
@@ -270,7 +260,8 @@ pub struct LimitedServo<'d> {
     servo: Sg90<'d>,
     limiter: Limiter,
     target: Option<AdmittedTarget>,
-    /// 前回の`tick`の時刻。`admit`の後の最初の`tick`で基準として取る。
+    /// 前回の`tick`の時刻。`new`／`resume`の後で、targetがあるときの最初の`tick`で基準として取る
+    /// （module docの「間隔の基準と、tickを呼び続ける前提」）。
     last_tick: Option<Instant>,
     /// 再開の位置（角度規約の度）。最後に出力できた位置、一度も出力していなければ起動時の初期位置。
     resume_position: f32,
@@ -307,12 +298,6 @@ pub enum LimitedServoError {
     /// はみ出した分はpulse幅の変換で黙って飽和し、`Limiter`が認めた位置と
     /// 実際に出す位置が食い違う。**黙って受けずに構築を拒否する。**
     ApprovedRangeOutsideAngleConvention,
-    /// 制御周期の最短の間隔が、PWMの周期（`1 / SERVO_PWM_FREQUENCY_HZ`）より短い。
-    ///
-    /// LEDCの新しいdutyは次のPWM cycleまで効かず、servoもframeごとにしか読まないため、
-    /// 1 frameの間に複数のstepがまとまり、実機への速度が上限を超えうる
-    /// （module docの「出力が効く時点」）。
-    ControlPeriodShorterThanPwmPeriod,
 }
 
 impl fmt::Display for LimitedServoError {
@@ -321,9 +306,6 @@ impl fmt::Display for LimitedServoError {
             Self::Limits(err) => write!(f, "limiter rejected the configuration: {err}"),
             Self::ApprovedRangeOutsideAngleConvention => {
                 f.write_str("approved position range lies outside the servo angle convention")
-            }
-            Self::ControlPeriodShorterThanPwmPeriod => {
-                f.write_str("shortest control interval is shorter than the PWM period")
             }
         }
     }
@@ -355,7 +337,7 @@ impl fmt::Display for TickError {
     }
 }
 
-/// 制限と制御周期がservoの出力の前提に合うかを確かめ、速度0の`Limiter`を作る。
+/// 制限がservoの角度規約に収まるかを確かめ、速度0の`Limiter`を作る。
 fn build_limiter(
     limits: ServoLimits,
     period: ControlPeriod,
@@ -368,18 +350,13 @@ fn build_limiter(
     {
         return Err(LimitedServoError::ApprovedRangeOutsideAngleConvention);
     }
-    #[allow(clippy::cast_precision_loss)]
-    let pwm_period_s = 1.0 / crate::config::SERVO_PWM_FREQUENCY_HZ as f32;
-    if period.shortest_s() < pwm_period_s {
-        return Err(LimitedServoError::ControlPeriodShorterThanPwmPeriod);
-    }
     Limiter::new(limits, period, catalog, start_position).map_err(LimitedServoError::Limits)
 }
 
 impl<'d> LimitedServo<'d> {
     /// 起動時に[`Sg90`]を所有し、速度0の`Limiter`を作る。**この時点では何も出力しない。**
     ///
-    /// `initial_position`は実際の位置と一致する保証が無い（module docの「既知の制限」）。
+    /// `initial_position`は実機の位置と一致する保証が無い（module docの「既知の制限: 起動時の初期位置」）。
     ///
     /// # Errors
     ///
@@ -445,11 +422,12 @@ impl<'d> LimitedServo<'d> {
     }
 
     /// 前回の`tick`からの経過時間を自分で測り、内部のtargetへ向けて自分の`Limiter::step`を
-    /// その時間だけ進め、結果をLEDCへ設定する（効くのは次のPWM cycleから。module docの
-    /// 「出力が効く時点」）。
+    /// その時間だけ進め、結果をLEDCへ設定する（実機でいつ・どう効くかはmodule docの
+    /// 「実機での実現は保証しない」）。
     ///
-    /// **何も出力せず`Ok(None)`を返す場合が2つある。**targetが無い（まだ`admit`していない）とき、
-    /// と、`admit`の後の最初の`tick`（時刻の基準を取るだけ）である。起動時の出力は
+    /// **何も設定せず`Ok(None)`を返す場合が2つある。**targetが無い（まだ`admit`していない）とき、
+    /// と、`new`／`resume`の後でtargetがあるときの最初の`tick`（時刻の基準を取るだけ。
+    /// module docの「間隔の基準と、tickを呼び続ける前提」）である。起動時の出力は
     /// `HW-TBD-019`で未確定であり、`servo-safety-limits.md`の`起動時とdriver故障時の動作`が
     /// 「承認されるまで、安全状態は『未検証の動作出力を行わない』とする」としているためである。
     ///
@@ -457,7 +435,7 @@ impl<'d> LimitedServo<'d> {
     ///
     /// # Errors
     ///
-    /// 測った間隔を`Limiter::step`がrejectした場合は[`TickError::Rejected`]（何も出力しない）、
+    /// 測った間隔を`Limiter::step`がrejectした場合は[`TickError::Rejected`]（何も設定しない）、
     /// PWMの出力に失敗した場合は[`TickError::Output`]を返し、どちらもここでlatchする。
     /// latchの後は[`TickError::Faulted`]を返す。
     pub fn tick(&mut self) -> Result<Option<Setpoint>, TickError> {
@@ -492,10 +470,10 @@ impl<'d> LimitedServo<'d> {
     /// `Limiter`、target、counterはここで捨てる。再開は[`LimitedServo::resume`]だけである
     /// （module docの「止めた後の再開」）。
     ///
-    /// 返す`Result`は[`Sg90::stop`]の結果である。**失敗を握りつぶさない。**
-    /// **失敗したら、人が外部電源を切る。**[`Stopped`]をdropすると`LedcDriver`の`Drop`が
-    /// `ledc_stop`を呼ぶが、それも失敗した場合は、その`unwrap`がpanicになり、LEDCが止まらない
-    /// 経路に入る（module docの「出力を止めるものと、止めないもの」）。
+    /// **軌道の制限を受けない非常停止である**（減速しない。module docの「実機での実現は保証しない」）。
+    ///
+    /// 返す`Result`は[`Sg90::stop`]の結果である。**失敗を握りつぶさない。失敗したら、人が外部電源を
+    /// 切る。**dropやpanicの後の出力は保証しない（同じ節）。
     #[must_use = "dutyを0へ戻せたかをResultで確かめること"]
     pub fn stop(self) -> (Stopped<'d>, Result<(), EspError>) {
         let Self {
