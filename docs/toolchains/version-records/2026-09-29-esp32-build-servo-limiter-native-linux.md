@@ -2,6 +2,11 @@
 
 様式は [Version Record Template](../version-record-template.md) に従う。
 
+- Record ID: `2026-09-29-esp32-build-servo-limiter-native-linux`
+- 判定: `Partial`
+- 初回検証日: 2026-09-29
+- 最終有効な検証日時: 2026-09-30T00:01 JST（2026-09-29T23:53 JSTに開始した下の実行）
+
 **この記録は3つのことを示す。**(0) host workspaceの検証済みcommand（stable）が同じtreeで通ること、(1) ESP toolchainのrustc（`esp-1.95.0.0`）で`crates/deskcat-servo`と
 `crates/deskcat-protocol`のtestとlintが通ること（`deskcat-servo`の`rust-version = "1.95"`の根拠）、
 (2) `firmware/esp32`が`deskcat-servo`をpath dependencyで使う状態で、既定構成・`pi-protocol-mode`・
@@ -14,15 +19,15 @@
 
 ```text
 Record ID: 2026-09-29-esp32-build-servo-limiter-native-linux
-Date: 2026-09-29
+Date: 2026-09-29（初回）。下の値は最終有効な検証（2026-09-29T23:53〜2026-09-30T00:01 JST）のもの
 Machine profile: ESP32 Build
 Operator role: AI agent作業（build-onlyのみ。flash・monitor・USBシリアルポートは開いていない）
-Repository commit: 8b8c15cdffef818368f3c974df08d036d51f7bdc（#19の作業branchのcommit。
+Repository commit: df6878dcd523bcd521ac98c13a04aba2181ab4c3（#19の作業branchのcommit。
   origin/develop 52a8142c793a54aa4627bca5c3a32f8debf951d8 を取り込み済み）。
   **このcommitより後に同branchへ入れるcommitは、この記録とVersion Recordsの一覧だけを変える。**
   code、manifest、lockfileは変えない。squash mergeの後はこのSHAがdevelopから辿れなくなるため、
   そのときはPull Requestのcommit一覧から辿る
-Working tree clean: yes（`git archive 8b8c15c`でscratchpadへ展開した未改変コピーを使用。
+Working tree clean: yes（`git archive df6878d`でscratchpadへ展開した未改変コピーを使用。
   worktree・main checkoutいずれのgit stateも変更していない）
 
 OS name: Ubuntu
@@ -105,19 +110,19 @@ Actual result:
   (2) cargo build --locked --features bringup-display-13              成功
 
 Build duration:
-  (0) fmt 1秒未満、clippy 約14秒、test 約16秒
-  (1) test 約25秒、clippy 約10秒
-  cargo clippy（既定構成、ESP-IDF本体のcompileを含む）  約6分28秒
-  cargo build（既定構成、clippy後）                     約50秒
-  cargo clippy／build（+pi-protocol-mode、増分）        約3秒／約9秒
-  cargo clippy／build（+bringup-display-13、増分）      約2秒／約7秒
+  (0) fmt 約1秒、clippy 約14秒、test 約16秒
+  (1) test 約24秒、clippy 約10秒
+  cargo clippy（既定構成、ESP-IDF本体のcompileを含む）  約6分21秒
+  cargo build（既定構成、clippy後）                     約51秒
+  cargo clippy／build（+pi-protocol-mode、増分）        約3秒／約8秒
+  cargo clippy／build（+bringup-display-13、増分）      約2秒／約8秒
 Peak memory if measured: 未測定
 Storage delta if measured:
   build前後の`df -h /` Used: 53G → 55G（scratchpad上のtarget。既存.embuildをsymlinkしたため.embuild分は増加なし）
 Generated artifact identity（いずれも target/xtensa-esp32-espidf/debug/deskcat-esp32。同じpathを構成ごとに上書きしたため、各build直後に取得した）:
-  既定構成            14,821,596 bytes  sha256 ea3b85bd8682f3240c458a83cb9159cf989ac68abb7bc20dd15637c2429f3855
-  pi-protocol-mode    16,774,872 bytes  sha256 d5488ebca23628e4eaac4e913f12ca1caf084f935b1b98dbd447653d0c50e0ab
-  bringup-display-13  15,477,060 bytes  sha256 c113fa6972c169fd9e50fc7fd14485e5d64e36758941809722b734f37a68588d
+  既定構成            14,821,556 bytes  sha256 739b458b7a6b2b909c148dcd0fdf1d7d33905d03c73a6f2aa676febe35d2bfec
+  pi-protocol-mode    16,774,784 bytes  sha256 9fefc27c4beea5e0cedbf463ddd86de464c4a545446c8440871ea3cdb8a305e8
+  bringup-display-13  15,477,052 bytes  sha256 2b08799db07d39a6cc47ba32af97a3ac451f94893da7c1750d8e2e2dc4712cb4
 Log or evidence path: この記録本文
 
 Known differences from documented profile:
