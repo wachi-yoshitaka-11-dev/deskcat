@@ -2,7 +2,7 @@
 
 様式は [Version Record Template](../version-record-template.md) に従う。
 
-**この記録は2つのことを示す。**(1) ESP toolchainのrustc（`esp-1.95.0.0`）で`crates/deskcat-servo`と
+**この記録は3つのことを示す。**(0) host workspaceの検証済みcommand（stable）が同じtreeで通ること、(1) ESP toolchainのrustc（`esp-1.95.0.0`）で`crates/deskcat-servo`と
 `crates/deskcat-protocol`のtestとlintが通ること（`deskcat-servo`の`rust-version = "1.95"`の根拠）、
 (2) `firmware/esp32`が`deskcat-servo`をpath dependencyで使う状態で、既定構成・`pi-protocol-mode`・
 `bringup-display-13`の3構成のformat、lint、buildが通ること（[Issue #19](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/19)、
@@ -17,8 +17,12 @@ Record ID: 2026-09-29-esp32-build-servo-limiter-native-linux
 Date: 2026-09-29
 Machine profile: ESP32 Build
 Operator role: AI agent作業（build-onlyのみ。flash・monitor・USBシリアルポートは開いていない）
-Repository commit: e0b4b0a（#19の作業branchのcommit。base は origin/develop d88ec9480ca22d7a45a1ad356d32c4561de3d0db）
-Working tree clean: yes（`git archive e0b4b0a`でscratchpadへ展開した未改変コピーを使用。
+Repository commit: 95f33d5ac00eddad927b53186be6102f389343ba（#19の作業branchのcommit。
+  origin/develop 52a8142c793a54aa4627bca5c3a32f8debf951d8 を取り込み済み）。
+  **このcommitより後に同branchへ入れるcommitは、この記録とVersion Recordsの一覧だけを変える。**
+  code、manifest、lockfileは変えない。squash mergeの後はこのSHAがdevelopから辿れなくなるため、
+  そのときはPull Requestのcommit一覧から辿る
+Working tree clean: yes（`git archive 95f33d5`でscratchpadへ展開した未改変コピーを使用。
   worktree・main checkoutいずれのgit stateも変更していない）
 
 OS name: Ubuntu
@@ -62,6 +66,10 @@ ESP32 only:
   USB-UART identity: 未確認（board未接続）
 
 Commands run:
+  (0) 展開先のrootで（host workspace、stable rustc 1.97.1。CARGO_TARGET_DIRはscratchpad）
+  cargo fmt --all -- --check
+  cargo clippy --workspace --all-targets --locked
+  cargo test --workspace --locked
   (1) 展開先のrootで（host workspace。CARGO_TARGET_DIRはscratchpad）
   cargo +esp-1.95.0.0 test --locked -p deskcat-servo -p deskcat-protocol
   cargo +esp-1.95.0.0 clippy --locked -p deskcat-servo -p deskcat-protocol --all-targets
@@ -79,6 +87,7 @@ Expected result: すべて成功する。warningを出さない。(1)は`--ignor
   （`deskcat-servo`が`rust-version = "1.95"`を宣言しているため）。
 
 Actual result:
+  (0) cargo fmt／clippy／test（host workspace）                        成功。warning 0件。243 tests、失敗 0
   (1) cargo +esp-1.95.0.0 test（2 crate）                            成功。deskcat-protocol 80 tests
       （unit 52、conformance 11、error_codes 3、framing 5、limits 9）、deskcat-servo 32 tests
       （trajectory 32、unit 0）、doctest 4（deskcat-protocol 3、deskcat-servo 1）。失敗 0
@@ -92,18 +101,19 @@ Actual result:
   (2) cargo build --locked --features bringup-display-13              成功
 
 Build duration:
-  (1) test 約25秒、clippy 約11秒
-  cargo clippy（既定構成、ESP-IDF本体のcompileを含む）  約6分29秒
-  cargo build（既定構成、clippy後）                     約52秒
-  cargo clippy／build（+pi-protocol-mode、増分）        約3秒／約9秒
+  (0) fmt 約1秒、clippy 約13秒、test 約16秒
+  (1) test 約23秒、clippy 約10秒
+  cargo clippy（既定構成、ESP-IDF本体のcompileを含む）  約6分16秒
+  cargo build（既定構成、clippy後）                     約50秒
+  cargo clippy／build（+pi-protocol-mode、増分）        約2秒／約8秒
   cargo clippy／build（+bringup-display-13、増分）      約2秒／約8秒
 Peak memory if measured: 未測定
 Storage delta if measured:
-  build前後の`df -h /` Used: 51G → 53G（scratchpad上のtarget。既存.embuildをsymlinkしたため.embuild分は増加なし）
+  build前後の`df -h /` Used: 53G → 55G（scratchpad上のtarget。既存.embuildをsymlinkしたため.embuild分は増加なし）
 Generated artifact identity（いずれも target/xtensa-esp32-espidf/debug/deskcat-esp32。同じpathを構成ごとに上書きしたため、各build直後に取得した）:
-  既定構成            14,821,544 bytes  sha256 9a7f9c4ce2d84380c91d75edc171a4246083b322682cad1ecb32ceed70c3bf5e
-  pi-protocol-mode    16,774,592 bytes  sha256 d963e0d84fc2b0fed17035cb195b62c91033502806e13d11bd7bc5607cd1cc64
-  bringup-display-13  15,477,048 bytes  sha256 4bb96453045029b519ca598d83194ba4958c29c19129610f64be2eb347f59a7e
+  既定構成            14,821,588 bytes  sha256 5d6c633f0947ca409e1e1c6c5e89f60f8359b1bb52320fb5eff68828aec74c5c
+  pi-protocol-mode    16,774,868 bytes  sha256 3fc8c4fb6ecb364c5ecfa04b716f384bceac0ca47a7be81aeb949420da2ce15d
+  bringup-display-13  15,477,052 bytes  sha256 c40fba8d1abcc86ad8f980fb816a22f6d11048d2291cefa71659394c7c73dd9e
 Log or evidence path: この記録本文
 
 Known differences from documented profile:
@@ -124,7 +134,7 @@ Known differences from documented profile:
     compileされるが、`main()`から呼ぶ経路が無いため、link後の実行物に入っているかは確かめていない。
     実機では一度も実行していない。**
 
-Conclusion: Partial。**build-onlyの範囲（(1)の2 crateのtestとlint、(2)の3構成のfmt/clippy/build）では
+Conclusion: Partial。**build-onlyの範囲（(0)のhost workspace、(1)の2 crateのtestとlint、(2)の3構成のfmt/clippy/build）では
   未実行の項目が無く、すべて成功した。**
   **`Partial`とするのは、flashと実機起動を行っていないためである。**board未接続のため
   `Physical board`／`Module marking`／`Board revision`／`USB-UART identity`は
