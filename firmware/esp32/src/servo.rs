@@ -9,16 +9,21 @@
 //! **module の外から角度を指定してpulseを出す入口は[`LimitedServo::tick`]だけである。**
 //! [`LimitedServo`]は[`Sg90`]と`deskcat_servo::Limiter`を**1つずつ所有**し、外へ出す操作は
 //! [`LimitedServo::admit`]、[`LimitedServo::tick`]、[`LimitedServo::stop`]、
-//! [`LimitedServo::counters`]だけである（#19の受け入れ条件2・3、`AGENTS.md`
-//! 「サーボ安全制限をデバッグ経路からも迂回させない」）。
+//! [`LimitedServo::counters`]、再開の[`LimitedServo::resume`]だけである（#19の受け入れ条件2・3、
+//! `AGENTS.md`「サーボ安全制限をデバッグ経路からも迂回させない」）。
 //!
 //! - **`Setpoint`も`AdmittedTarget`も外から受け取らない。**`admit`は受理したtargetを内部に持ち、
 //!   `tick`はそのtargetへ向けて**自分の**`Limiter::step`を呼び、結果をその場で出力する。
 //!   別に作った`Limiter`の結果や、保存しておいた古い`Setpoint`を流し込む経路が無い。
 //!   `Setpoint`は`Copy`であり、出力を受け取る入口があると、古い値を後で出し直して
 //!   速度と加速度の制限を通らずに位置を跳ばせてしまうためである
+//! - **制御周期の間隔を呼び出し側から受け取らない。**`tick`は前回の`tick`からの経過時間を
+//!   単調時計（`std::time::Instant`）で**自分で測り**、それを`Limiter::step`へ渡す。
+//!   間隔を申告させると、公称値を申告したまま短い間隔で呼ぶだけで、実時間の速度と加速度が
+//!   `Limiter`の制限を超えるためである
 //! - **servo 1つにつき`Limiter`は1つである。**[`LimitedServo::new`]は[`Sg90`]を値で受け取り、
-//!   [`Sg90::new`]はLEDC timer・channel・pin（`Peripherals`から1回だけ取れる）を消費する
+//!   [`Sg90::new`]はLEDC timer・channel・pin（`Peripherals`から1回だけ取れる）を消費する。
+//!   止めた後は[`Stopped`]になり、[`Stopped`]から[`Sg90`]を取り出す手段は無い
 //! - [`Sg90`]が外へ出すのは[`Sg90::new`]と[`Sg90::stop`]（dutyを0へ戻す。角度を指定しない）
 //!   だけであり、角度を出す関数はこのmoduleのprivateである
 //! - Pi由来でもdebug由来でも、`MotionRequest::source`で判定を分けない（`Limiter::admit`のdoc）
@@ -32,50 +37,75 @@
 //! （下記）。**compileできるbuildからは呼べない。**bench経路をlimiterへ通す書き換えは、
 //! 測定用のbuild（`servo-safety-limits.md`の`承認の状態`の項目6(b)）で行う。
 //!
-//! # 既知の制限: 初期位置は実際の位置と一致する保証が無い
+//! # 間隔を測れなかったとき、出力に失敗したときはlatchする
 //!
-//! `Limiter`の初期位置は呼び出し側が渡す値である。**servoの実際の位置をfirmwareは測れない。**
-//! 両者が食い違っていると、最初の`admit`の後の`tick`で、servoは実際の位置から
-//! その初期位置付近へ**limiterの速度・加速度の制限を受けずに**動きうる（servo内部の制御が
-//! 追従するため）。起動時の位置の扱いは`HW-TBD-019`／`HW-TBD-020`の範囲であり、
-//! **このmoduleは値も扱いも決めない。**
+//! 次のどちらかが起きたら、**以後の`tick`は出力も`Limiter`の更新もせず[`TickError::Faulted`]を
+//! 返す。**解除の経路は、[`LimitedServo::stop`]の後に[`LimitedServo::resume`]で作り直すことだけである。
 //!
-//! **止めた後の再開も、この1か所に集める。**[`LimitedServo::stop`]は自分を消費して[`Sg90`]を返す。
-//! 再開するには、呼び出し側が新しい`Limiter`（速度0、初期位置は呼び出し側が渡す）で
-//! [`LimitedServo::new`]し直す。**止める直前の速度を持ち越す経路は無い。**持ち越すと、
-//! duty 0で止まっていたservoへ、再開の最初の周期にその速度を指令することになり、
-//! `最大加速度`を超えうるためである。
-//!
-//! # PWMの出力に失敗したらlatchする
-//!
-//! `tick`で`Limiter::step`が通った後に出力が失敗すると（[`TickError::Output`]）、`Limiter`だけが
-//! 1 step進み、実際の出力は前の値のまま残る。そのまま次の`tick`を出すと、**1周期で2 step分の
-//! 変化を指令し、`最大速度`（最大で2倍）と`最大加速度`を超えうる。**そこで出力の失敗を
-//! driverの故障として**latchし、以後の`tick`は出力も`Limiter`の更新もせず
-//! [`TickError::Faulted`]を返す。**解除の経路は、[`LimitedServo::stop`]の後に新しい`Limiter`で
-//! [`LimitedServo::new`]し直すことだけである（上の再開と同じ1つの経路）。
+//! - **測った間隔が`Limiter`の制御周期（`ControlPeriod`）の外にある**（[`TickError::Rejected`]）。
+//!   遅れの後にそのまま再開すると、その間止まっていた実機へ、`Limiter`に残った速度を
+//!   次の周期に指令することになり、`最大加速度`を超えうる。**jitterが許容幅を超えると、
+//!   servoはその位置で止まる（最後のdutyを保つ）。**安全側に倒れる既知の性質である
+//! - **`Limiter::step`の後にPWMの出力が失敗した**（[`TickError::Output`]）。`Limiter`だけが1 step進み、
+//!   実際の出力は前の値のまま残るため、次の`tick`は1周期で2 step分の変化を指令し、
+//!   `最大速度`（最大で2倍）と`最大加速度`を超えうる
 //!
 //! これは`servo-safety-limits.md`の`起動時とdriver故障時の動作`（`HW-TBD-019`、PWM driverの
 //! 実行中の故障を検知したときの動作は未確定）の中で、「未検証の動作出力を行わない」側の
 //! 既定として置いたものである。**値も復帰の条件も決めていない。**
 //!
-//! **latchは「それ以上動かさない」までであり、「出力を止める」ではない。**LEDCは、失敗する前に
-//! 設定したduty（1つ前の位置）を出し続けうる。**[`TickError::Faulted`]または
-//! [`TickError::Output`]を受けた呼び出し側は、[`LimitedServo::stop`]を呼ぶ。**
+//! **latchは「それ以上動かさない」までであり、「出力を止める」ではない。**LEDCは、最後に
+//! 設定したdutyを出し続けうる。**[`TickError::Rejected`]、[`TickError::Output`]、
+//! [`TickError::Faulted`]を受けた呼び出し側は、[`LimitedServo::stop`]を呼ぶ。**
 //! その配線（`main.rs`）はまだ無い。
 //!
-//! # `stop`を通らずに手放した場合
+//! # 止めた後の再開は、最後に出力した位置からだけ
 //!
+//! [`LimitedServo::stop`]は自分を消費して[`Stopped`]を返す。[`Stopped`]は[`Sg90`]と
+//! **最後に出力した位置**をprivateに持つ。再開の[`LimitedServo::resume`]は、渡された`Limiter`の
+//! 位置が最後に出力した位置と一致しなければ拒否する。呼び出し側は
+//! [`Stopped::last_output_position`]を初期位置として新しい`Limiter`（速度0）を作る。
+//!
+//! - **止める直前の速度を持ち越さない。**持ち越すと、duty 0で止まっていたservoへ、再開の
+//!   最初の周期にその速度を指令することになり、`最大加速度`を超えうる
+//! - **呼び出し側が選んだ位置から再開させない。**選べると、その位置へ`Limiter`の速度・加速度の
+//!   制限を受けずに跳べてしまう
+//! - 一度も出力していない（`last_output_position`が`None`）場合は、位置を問わない。
+//!   その場合は下の起動時と同じ扱いになる
+//!
+//! # 既知の制限: 起動時の初期位置は実際の位置と一致する保証が無い
+//!
+//! [`LimitedServo::new`]へ渡す`Limiter`の初期位置は、呼び出し側が渡す値である。
+//! **servoの実際の位置をfirmwareは測れない。**両者が食い違っていると、最初の`admit`の後の`tick`で、
+//! servoは実際の位置からその初期位置付近へ**`Limiter`の速度・加速度の制限を受けずに**動きうる
+//! （servo内部の制御が追従するため）。起動時の位置の扱いは`HW-TBD-019`／`HW-TBD-020`の範囲であり、
+//! **このmoduleは値も扱いも決めない。**
+//!
+//! 止めた後も、duty 0の間にservoが押されて動けば、最後に出力した位置と実際の位置は食い違う。
+//! これも測れないことによる制限であり、呼び出し側が選べる経路ではない。
+//!
+//! # 出力を止めるものと、止めないもの
+//!
+//! - **[`LimitedServo::stop`]:** dutyを0へ戻す（[`Sg90::stop`]）。**失敗したら、人が外部電源を切る。**
 //! - **drop（panicを除く）:** [`Sg90`]が持つ`esp_idf_svc::hal::ledc::LedcDriver`の`Drop`が
 //!   `ledc_stop`をidle level `0`で呼び、GPIO27をlowに固定する（`esp-idf-hal` 0.46.2の
-//!   `src/ledc.rs`で確認した）。**pulseは止まる側に倒れる。**
-//! - **panic:** firmwareは`panic = "abort"`でbuildする（`firmware/esp32/.cargo/config.toml`の
-//!   `build-std`と、target `xtensa-esp32-espidf`の`panic-strategy`）。**`Drop`は走らない。**
-//!   ESP-IDFのpanic handlerはbuildが生成する`sdkconfig`で`CONFIG_ESP_SYSTEM_PANIC_PRINT_REBOOT=y`
-//!   （既定値。`sdkconfig.defaults`では設定していない）であり、chipがresetする。
-//!   **reset後、GPIO27はdriverの初期化まで既定の状態（high-Z）に戻る。**pulseは止まるが、
-//!   信号線が浮いている間のservoの挙動と外部pull-down（`RES-PULL-01`）は
-//!   `HW-TBD-019`／`HW-TBD-027`の範囲であり、このmoduleは扱わない。
+//!   `src/ledc.rs`）。**ただしその`Drop`は`ledc_stop`の失敗を`unwrap`するため、失敗すると
+//!   panicになり、下のpanicの経路に入る。**
+//! - **panic、およびCPUのsoftware reset（watchdogによるresetを含む）では止まらない。**
+//!   firmwareは`panic = "abort"`でbuildする（`firmware/esp32/.cargo/config.toml`の`build-std`と、
+//!   target `xtensa-esp32-espidf`の`panic-strategy`）ため`Drop`は走らない。ESP-IDF v5.5.3の
+//!   panic handlerは、buildが生成する`sdkconfig`の`CONFIG_ESP_SYSTEM_PANIC_PRINT_REBOOT=y`
+//!   （既定値。`sdkconfig.defaults`では設定していない）により`esp_restart_noos`を呼ぶ。
+//!   これがresetするperipheralにLEDCは含まれない（`components/esp_system/port/soc/esp32/system_internal.c`の
+//!   `esp_system_reset_modules_on_exit`。`esp_system.h`の`esp_restart`のdocも
+//!   「Peripherals (except for Wi-Fi, BT, UART0, SPI1, and legacy timers) are not reset」と書く）。
+//!   reset理由がCPUのsoftware resetのとき、起動処理はそれまで有効だったperipheralのclockを
+//!   止めない（`components/esp_system/port/soc/esp32/clk.c`）。**したがってLEDCは最後のdutyを
+//!   出し続けうる。**既定buildはGPIO27を初期化しないため、電源を切るまで続きうる。
+//!   **止めるのは、起動の早い段階で[`Sg90::new`]を作り直すこと**（`LedcDriver::new`がchannelを
+//!   duty 0で設定し直す）**と、人が外部電源を切ることである。**起動時の配線（`main.rs`）はまだ無い
+//!   （`HW-TBD-019`の`Watchdog、panic、brownout reset後の動作`）。**いずれも実機では確かめていない。**
+//!   source を読んだ結果である
 //!
 //! **`Setpoint`の位置の単位は、下の角度規約の度である**（`SERVO_ANGLE_CONVENTION_MIN_DEG`〜
 //! `_MAX_DEG`）。`Limiter`へ渡す可動域・速度・加速度もこの単位で与える。**値はこのmoduleが
@@ -105,6 +135,7 @@
 #![allow(dead_code)]
 
 use core::fmt;
+use std::time::Instant;
 
 use deskcat_servo::{AdmittedTarget, Limiter, LimiterCounters, MotionRequest, Rejection, Setpoint};
 use esp_idf_svc::hal::gpio::OutputPin;
@@ -212,11 +243,33 @@ pub struct LimitedServo<'d> {
     servo: Sg90<'d>,
     limiter: Limiter,
     target: Option<AdmittedTarget>,
-    /// PWMの出力に失敗したか（module docの「PWMの出力に失敗したらlatchする」）。
+    /// 前回の`tick`の時刻。`admit`の後の最初の`tick`で基準として取る。
+    last_tick: Option<Instant>,
+    /// 最後に出力できた位置（角度規約の度）。一度も出力していなければ`None`。
+    last_output: Option<f32>,
+    /// latchしているか（module docの「間隔を測れなかったとき、出力に失敗したときはlatchする」）。
     faulted: bool,
 }
 
-/// [`LimitedServo::new`]が拒否した理由。
+/// [`LimitedServo::stop`]の後の状態。[`Sg90`]と最後に出力した位置を持つ。
+///
+/// **[`Sg90`]を取り出す手段は無い。**再開は[`LimitedServo::resume`]だけである
+/// （module docの「止めた後の再開は、最後に出力した位置からだけ」）。
+pub struct Stopped<'d> {
+    servo: Sg90<'d>,
+    last_output: Option<f32>,
+}
+
+impl Stopped<'_> {
+    /// 最後に出力した位置（角度規約の度）。再開の`Limiter`はこれを初期位置として作る。
+    /// 一度も出力していなければ`None`。
+    #[must_use]
+    pub fn last_output_position(&self) -> Option<f32> {
+        self.last_output
+    }
+}
+
+/// [`LimitedServo::new`]と[`LimitedServo::resume`]が拒否した理由。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LimitedServoError {
     /// `Limiter`の承認値の位置範囲が、角度規約（`SERVO_ANGLE_CONVENTION_MIN_DEG`〜
@@ -225,6 +278,8 @@ pub enum LimitedServoError {
     /// はみ出した分はpulse幅の変換で黙って飽和し、`Limiter`が認めた位置と
     /// 実際に出す位置が食い違う。**黙って受けずに構築を拒否する。**
     ApprovedRangeOutsideAngleConvention,
+    /// 再開の`Limiter`の位置が、最後に出力した位置と一致しない（[`LimitedServo::resume`]）。
+    PositionDiffersFromLastOutput,
 }
 
 impl fmt::Display for LimitedServoError {
@@ -233,54 +288,102 @@ impl fmt::Display for LimitedServoError {
             Self::ApprovedRangeOutsideAngleConvention => {
                 f.write_str("approved position range lies outside the servo angle convention")
             }
+            Self::PositionDiffersFromLastOutput => {
+                f.write_str("limiter position differs from the last output position")
+            }
         }
     }
 }
 
-/// [`LimitedServo::tick`]の失敗。
+/// [`LimitedServo::tick`]の失敗。**どれを受けても、呼び出し側は[`LimitedServo::stop`]を呼ぶ。**
 #[derive(Debug)]
 pub enum TickError {
-    /// `Limiter::step`がrejectした（呼び出し間隔が制御周期の範囲外等）。**何も出力していない。**
+    /// 測った間隔を`Limiter::step`がrejectした（制御周期の範囲外、または0）。
+    /// **何も出力せず、`Limiter`も進めていない。**ここでlatchする。
     Rejected(Rejection),
     /// `Limiter::step`は通ったが、PWMの出力に失敗した。
     ///
-    /// **`Limiter`の位置と速度はこのstep分だけ進んでいる。**戻さずにlatchし、
-    /// 以後の`tick`は[`TickError::Faulted`]を返す。呼び出し側は[`LimitedServo::stop`]を呼ぶ
-    /// （module docの「PWMの出力に失敗したらlatchする」）。
+    /// **`Limiter`の位置と速度はこのstep分だけ進んでいる。**戻さずにここでlatchする。
     Output(EspError),
-    /// 以前の`tick`でPWMの出力に失敗し、latchしている。**何も出力せず、`Limiter`も進めていない。**
-    /// 呼び出し側は[`LimitedServo::stop`]を呼ぶ。
+    /// 以前の`tick`でlatchしている。**何も出力せず、`Limiter`も進めていない。**
     Faulted,
 }
 
 impl fmt::Display for TickError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Rejected(rejection) => write!(f, "limiter rejected the step: {rejection}"),
+            Self::Rejected(rejection) => {
+                write!(f, "limiter rejected the measured interval: {rejection}")
+            }
             Self::Output(err) => write!(f, "servo output failed: {err}"),
-            Self::Faulted => f.write_str("servo output is latched after an earlier output failure"),
+            Self::Faulted => f.write_str("servo output is latched after an earlier failure"),
         }
     }
 }
 
+/// `limiter`の承認値の位置範囲が角度規約の内側にあるか。
+fn within_angle_convention(limiter: &Limiter) -> bool {
+    let range = limiter.limits().position();
+    range.approved_min() >= crate::config::SERVO_ANGLE_CONVENTION_MIN_DEG
+        && range.approved_max() <= crate::config::SERVO_ANGLE_CONVENTION_MAX_DEG
+}
+
 impl<'d> LimitedServo<'d> {
-    /// [`Sg90`]と`Limiter`を所有する。**この時点では何も出力しない。**
+    /// 起動時に[`Sg90`]と`Limiter`を所有する。**この時点では何も出力しない。**
+    ///
+    /// `limiter`の初期位置は実際の位置と一致する保証が無い（module docの「既知の制限」）。
     ///
     /// # Errors
     ///
-    /// `limiter`の承認値の位置範囲が角度規約の外へはみ出している場合に拒否する
-    /// （[`LimitedServoError::ApprovedRangeOutsideAngleConvention`]）。
-    pub fn new(servo: Sg90<'d>, limiter: Limiter) -> Result<Self, LimitedServoError> {
-        let range = limiter.limits().position();
-        if range.approved_min() < crate::config::SERVO_ANGLE_CONVENTION_MIN_DEG
-            || range.approved_max() > crate::config::SERVO_ANGLE_CONVENTION_MAX_DEG
-        {
-            return Err(LimitedServoError::ApprovedRangeOutsideAngleConvention);
+    /// `limiter`の承認値の位置範囲が角度規約の外へはみ出している場合に拒否し、
+    /// [`Sg90`]を返す（[`LimitedServoError::ApprovedRangeOutsideAngleConvention`]）。
+    pub fn new(servo: Sg90<'d>, limiter: Limiter) -> Result<Self, (Sg90<'d>, LimitedServoError)> {
+        if !within_angle_convention(&limiter) {
+            return Err((
+                servo,
+                LimitedServoError::ApprovedRangeOutsideAngleConvention,
+            ));
         }
         Ok(Self {
             servo,
             limiter,
             target: None,
+            last_tick: None,
+            last_output: None,
+            faulted: false,
+        })
+    }
+
+    /// [`LimitedServo::stop`]の後に、新しい`Limiter`で作り直す。**この時点では何も出力しない。**
+    ///
+    /// `limiter`は[`Stopped::last_output_position`]を初期位置として作る（速度0）。
+    ///
+    /// # Errors
+    ///
+    /// 承認値の位置範囲が角度規約の外へはみ出している場合、または`limiter`の位置が
+    /// 最後に出力した位置と一致しない場合に拒否し、[`Stopped`]を返す。
+    /// 位置は**bit単位で一致**を求める（近似で比べると、差の分だけ制限なしに跳べる）。
+    pub fn resume(
+        stopped: Stopped<'d>,
+        limiter: Limiter,
+    ) -> Result<Self, (Stopped<'d>, LimitedServoError)> {
+        if !within_angle_convention(&limiter) {
+            return Err((
+                stopped,
+                LimitedServoError::ApprovedRangeOutsideAngleConvention,
+            ));
+        }
+        if let Some(last) = stopped.last_output {
+            if limiter.position().to_bits() != last.to_bits() {
+                return Err((stopped, LimitedServoError::PositionDiffersFromLastOutput));
+            }
+        }
+        Ok(Self {
+            servo: stopped.servo,
+            limiter,
+            target: None,
+            last_tick: None,
+            last_output: stopped.last_output,
             faulted: false,
         })
     }
@@ -288,7 +391,7 @@ impl<'d> LimitedServo<'d> {
     /// motion commandを自分の`Limiter::admit`へ通し、受理したtargetを内部に持つ。
     ///
     /// **Pi由来でもdebug由来でも同じ判定を通る。**直前のtargetは置き換える。
-    /// **このcallは出力しない。**出力は次の[`LimitedServo::tick`]で行う。
+    /// **このcallは出力しない。**出力は[`LimitedServo::tick`]で行う。
     ///
     /// # Errors
     ///
@@ -299,49 +402,65 @@ impl<'d> LimitedServo<'d> {
         Ok(())
     }
 
-    /// 内部のtargetへ向けて自分の`Limiter::step`を`dt_s`秒分進め、その結果を出力する。
+    /// 前回の`tick`からの経過時間を自分で測り、内部のtargetへ向けて自分の`Limiter::step`を
+    /// その時間だけ進め、結果を出力する。
     ///
-    /// **targetが無い（まだ`admit`していない）ときは何も出力せず`Ok(None)`を返す。**起動時の出力は`HW-TBD-019`で未確定であり、
-    /// `servo-safety-limits.md`の`起動時とdriver故障時の動作`が「承認されるまで、
-    /// 安全状態は『未検証の動作出力を行わない』とする」としているためである。
+    /// **何も出力せず`Ok(None)`を返す場合が2つある。**targetが無い（まだ`admit`していない）とき、
+    /// と、`admit`の後の最初の`tick`（時刻の基準を取るだけ）である。起動時の出力は
+    /// `HW-TBD-019`で未確定であり、`servo-safety-limits.md`の`起動時とdriver故障時の動作`が
+    /// 「承認されるまで、安全状態は『未検証の動作出力を行わない』とする」としているためである。
     ///
     /// 返す`Setpoint`は**出力した値の報告**（log用）である。これを受け取る入口は無い。
     ///
     /// # Errors
     ///
-    /// `Limiter::step`がrejectした場合は[`TickError::Rejected`]（何も出力しない）、
-    /// PWMの出力に失敗した場合は[`TickError::Output`]（ここでlatchする）、
+    /// 測った間隔を`Limiter::step`がrejectした場合は[`TickError::Rejected`]（何も出力しない）、
+    /// PWMの出力に失敗した場合は[`TickError::Output`]を返し、どちらもここでlatchする。
     /// latchの後は[`TickError::Faulted`]を返す。
-    pub fn tick(&mut self, dt_s: f32) -> Result<Option<Setpoint>, TickError> {
+    pub fn tick(&mut self) -> Result<Option<Setpoint>, TickError> {
         if self.faulted {
             return Err(TickError::Faulted);
         }
         let Some(target) = self.target else {
             return Ok(None);
         };
-        let setpoint = self
-            .limiter
-            .step(target, dt_s)
-            .map_err(TickError::Rejected)?;
+        let now = Instant::now();
+        let Some(previous) = self.last_tick.replace(now) else {
+            return Ok(None);
+        };
+        let dt_s = now.duration_since(previous).as_secs_f32();
+        let setpoint = match self.limiter.step(target, dt_s) {
+            Ok(setpoint) => setpoint,
+            Err(rejection) => {
+                self.faulted = true;
+                return Err(TickError::Rejected(rejection));
+            }
+        };
         if let Err(err) = self.servo.output_angle(setpoint.position()) {
             self.faulted = true;
             return Err(TickError::Output(err));
         }
+        self.last_output = Some(setpoint.position());
         Ok(Some(setpoint))
     }
 
-    /// dutyを0へ戻し（[`Sg90::stop`]）、**自分を消費して**[`Sg90`]を返す。
+    /// dutyを0へ戻し（[`Sg90::stop`]）、**自分を消費して**[`Stopped`]を返す。
     ///
-    /// `Limiter`とtargetはここで捨てる。再開には新しい`Limiter`で[`LimitedServo::new`]し直す
-    /// （module docの「既知の制限」）。止める直前の速度を持ち越さないためである。
+    /// `Limiter`とtargetはここで捨てる。再開は[`LimitedServo::resume`]だけである
+    /// （module docの「止めた後の再開は、最後に出力した位置からだけ」）。
     ///
-    /// 返す`Result`は[`Sg90::stop`]の結果である。**失敗を握りつぶさない。**失敗しても
-    /// [`Sg90`]は返す（呼び出し側が再試行するか、dropして`LedcDriver`の`Drop`に任せる）。
+    /// 返す`Result`は[`Sg90::stop`]の結果である。**失敗を握りつぶさない。**
+    /// **失敗したら、人が外部電源を切る**（module docの「出力を止めるものと、止めないもの」。
+    /// dropに任せると、`LedcDriver`の`Drop`の`unwrap`がpanicになり、LEDCが止まらない経路に入る）。
     #[must_use = "dutyを0へ戻せたかをResultで確かめること"]
-    pub fn stop(self) -> (Sg90<'d>, Result<(), EspError>) {
-        let Self { mut servo, .. } = self;
+    pub fn stop(self) -> (Stopped<'d>, Result<(), EspError>) {
+        let Self {
+            mut servo,
+            last_output,
+            ..
+        } = self;
         let result = servo.stop();
-        (servo, result)
+        (Stopped { servo, last_output }, result)
     }
 
     /// 自分の`Limiter`の累計counter（#19の受け入れ条件5）。
