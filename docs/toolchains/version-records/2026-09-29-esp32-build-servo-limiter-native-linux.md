@@ -17,12 +17,12 @@ Record ID: 2026-09-29-esp32-build-servo-limiter-native-linux
 Date: 2026-09-29
 Machine profile: ESP32 Build
 Operator role: AI agent作業（build-onlyのみ。flash・monitor・USBシリアルポートは開いていない）
-Repository commit: 09252a7f87b1a24c51bfc90d7b02ed05ac5f2e1f（#19の作業branchのcommit。
+Repository commit: 0257b104a6e090da780bd0693496b16937f45b03（#19の作業branchのcommit。
   origin/develop 52a8142c793a54aa4627bca5c3a32f8debf951d8 を取り込み済み）。
   **このcommitより後に同branchへ入れるcommitは、この記録とVersion Recordsの一覧だけを変える。**
   code、manifest、lockfileは変えない。squash mergeの後はこのSHAがdevelopから辿れなくなるため、
   そのときはPull Requestのcommit一覧から辿る
-Working tree clean: yes（`git archive 09252a7`でscratchpadへ展開した未改変コピーを使用。
+Working tree clean: yes（`git archive 0257b10`でscratchpadへ展開した未改変コピーを使用。
   worktree・main checkoutいずれのgit stateも変更していない）
 
 OS name: Ubuntu
@@ -41,6 +41,8 @@ Installed Rust targets: xtensa-esp32-espidf（esp toolchain同梱）
 Cargo version: cargo 1.95.0-nightly (f2d3ce0bd 2026-03-21) (1.95.0.0)
 rustfmt version: esp toolchain同梱版（rustfmt 1.9.0-nightly (95e5bda868 2026-04-15)）
 Clippy version: esp toolchain同梱版（clippy 0.1.95 (95e5bda868 2026-04-15)）
+Host stable toolchain（(0)で使用）: rustc 1.97.1 (8bab26f4f 2026-07-14)、cargo 1.97.1 (c980f4866 2026-06-30)、
+  clippy 0.1.97 (8bab26f4f6 2026-07-14)、rustfmt 1.9.0-stable (8bab26f4f6 2026-07-14)
 Linker identity and version: cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0（host側）。
   Xtensa側はesp toolchain同梱のxtensa-esp-elf（esp-15.2.0_20250920）
 
@@ -66,7 +68,7 @@ ESP32 only:
   USB-UART identity: 未確認（board未接続）
 
 Commands run:
-  (0) 展開先のrootで（host workspace、stable rustc 1.97.1。CARGO_TARGET_DIRはscratchpad）
+  (0) 展開先のrootで（host workspace、上のHost stable toolchain。CARGO_TARGET_DIRはscratchpad）
   cargo fmt --all -- --check
   cargo clippy --workspace --all-targets --locked
   cargo test --workspace --locked
@@ -103,19 +105,19 @@ Actual result:
   (2) cargo build --locked --features bringup-display-13              成功
 
 Build duration:
-  (0) fmt 約1秒、clippy 約14秒、test 約16秒
+  (0) fmt 1秒未満、clippy 約14秒、test 約17秒
   (1) test 約24秒、clippy 約10秒
-  cargo clippy（既定構成、ESP-IDF本体のcompileを含む）  約6分34秒
+  cargo clippy（既定構成、ESP-IDF本体のcompileを含む）  約6分21秒
   cargo build（既定構成、clippy後）                     約51秒
   cargo clippy／build（+pi-protocol-mode、増分）        約3秒／約8秒
-  cargo clippy／build（+bringup-display-13、増分）      約2秒／約7秒
+  cargo clippy／build（+bringup-display-13、増分）      約2秒／約8秒
 Peak memory if measured: 未測定
 Storage delta if measured:
   build前後の`df -h /` Used: 53G → 55G（scratchpad上のtarget。既存.embuildをsymlinkしたため.embuild分は増加なし）
 Generated artifact identity（いずれも target/xtensa-esp32-espidf/debug/deskcat-esp32。同じpathを構成ごとに上書きしたため、各build直後に取得した）:
-  既定構成            14,821,584 bytes  sha256 9e4e32c82fc7321fe5ee17700c518839a6b7e087d686301a73bbeebb835e825d
-  pi-protocol-mode    16,774,764 bytes  sha256 f476e8812218828f066b975cc3f41c5ced2ad8160074af576459a688de5628b8
-  bringup-display-13  15,477,004 bytes  sha256 f2b09a1471e4cfa4fbae81559442df55ede6361ac1eb5b65bf4793b68fdcbbe3
+  既定構成            14,821,556 bytes  sha256 5cdc400aba852ab6dbc906ac08620e93230626b8095548cca5728a8398e369b6
+  pi-protocol-mode    16,774,760 bytes  sha256 41485b72bb595bf169b7038e145a2ae4ad7c488d3ee6bc77c742e50896280668
+  bringup-display-13  15,476,980 bytes  sha256 ec1ab9f37cc7be3dc64600d42fec591e66c6c75038f6374ed657cee12f090daa
 Log or evidence path: この記録本文
 
 Known differences from documented profile:
