@@ -38,8 +38,44 @@
 //! 両者が食い違っていると、最初の`admit`の後の`tick`で、servoは実際の位置から
 //! その初期位置付近へ**limiterの速度・加速度の制限を受けずに**動きうる（servo内部の制御が
 //! 追従するため）。起動時の位置の扱いは`HW-TBD-019`／`HW-TBD-020`の範囲であり、
-//! **このmoduleは値も扱いも決めない。**[`LimitedServo::stop`]の後に`admit`し直す場合も同じである
-//! （`stop`は`Limiter`の位置と速度を戻さない）。
+//! **このmoduleは値も扱いも決めない。**
+//!
+//! **止めた後の再開も、この1か所に集める。**[`LimitedServo::stop`]は自分を消費して[`Sg90`]を返す。
+//! 再開するには、呼び出し側が新しい`Limiter`（速度0、初期位置は呼び出し側が渡す）で
+//! [`LimitedServo::new`]し直す。**止める直前の速度を持ち越す経路は無い。**持ち越すと、
+//! duty 0で止まっていたservoへ、再開の最初の周期にその速度を指令することになり、
+//! `最大加速度`を超えうるためである。
+//!
+//! # PWMの出力に失敗したらlatchする
+//!
+//! `tick`で`Limiter::step`が通った後に出力が失敗すると（[`TickError::Output`]）、`Limiter`だけが
+//! 1 step進み、実際の出力は前の値のまま残る。そのまま次の`tick`を出すと、**1周期で2 step分の
+//! 変化を指令し、`最大速度`（最大で2倍）と`最大加速度`を超えうる。**そこで出力の失敗を
+//! driverの故障として**latchし、以後の`tick`は出力も`Limiter`の更新もせず
+//! [`TickError::Faulted`]を返す。**解除の経路は、[`LimitedServo::stop`]の後に新しい`Limiter`で
+//! [`LimitedServo::new`]し直すことだけである（上の再開と同じ1つの経路）。
+//!
+//! これは`servo-safety-limits.md`の`起動時とdriver故障時の動作`（`HW-TBD-019`、PWM driverの
+//! 実行中の故障を検知したときの動作は未確定）の中で、「未検証の動作出力を行わない」側の
+//! 既定として置いたものである。**値も復帰の条件も決めていない。**
+//!
+//! **latchは「それ以上動かさない」までであり、「出力を止める」ではない。**LEDCは、失敗する前に
+//! 設定したduty（1つ前の位置）を出し続けうる。**[`TickError::Faulted`]または
+//! [`TickError::Output`]を受けた呼び出し側は、[`LimitedServo::stop`]を呼ぶ。**
+//! その配線（`main.rs`）はまだ無い。
+//!
+//! # `stop`を通らずに手放した場合
+//!
+//! - **drop（panicを除く）:** [`Sg90`]が持つ`esp_idf_svc::hal::ledc::LedcDriver`の`Drop`が
+//!   `ledc_stop`をidle level `0`で呼び、GPIO27をlowに固定する（`esp-idf-hal` 0.46.2の
+//!   `src/ledc.rs`で確認した）。**pulseは止まる側に倒れる。**
+//! - **panic:** firmwareは`panic = "abort"`でbuildする（`firmware/esp32/.cargo/config.toml`の
+//!   `build-std`と、target `xtensa-esp32-espidf`の`panic-strategy`）。**`Drop`は走らない。**
+//!   ESP-IDFのpanic handlerはbuildが生成する`sdkconfig`で`CONFIG_ESP_SYSTEM_PANIC_PRINT_REBOOT=y`
+//!   （既定値。`sdkconfig.defaults`では設定していない）であり、chipがresetする。
+//!   **reset後、GPIO27はdriverの初期化まで既定の状態（high-Z）に戻る。**pulseは止まるが、
+//!   信号線が浮いている間のservoの挙動と外部pull-down（`RES-PULL-01`）は
+//!   `HW-TBD-019`／`HW-TBD-027`の範囲であり、このmoduleは扱わない。
 //!
 //! **`Setpoint`の位置の単位は、下の角度規約の度である**（`SERVO_ANGLE_CONVENTION_MIN_DEG`〜
 //! `_MAX_DEG`）。`Limiter`へ渡す可動域・速度・加速度もこの単位で与える。**値はこのmoduleが
@@ -176,6 +212,8 @@ pub struct LimitedServo<'d> {
     servo: Sg90<'d>,
     limiter: Limiter,
     target: Option<AdmittedTarget>,
+    /// PWMの出力に失敗したか（module docの「PWMの出力に失敗したらlatchする」）。
+    faulted: bool,
 }
 
 /// [`LimitedServo::new`]が拒否した理由。
@@ -206,9 +244,13 @@ pub enum TickError {
     Rejected(Rejection),
     /// `Limiter::step`は通ったが、PWMの出力に失敗した。
     ///
-    /// **`Limiter`の位置と速度はこのstep分だけ進んでいる。**実際の出力との食い違いは
-    /// module docの「既知の制限」と同じ種類であり、ここでは戻さない。
+    /// **`Limiter`の位置と速度はこのstep分だけ進んでいる。**戻さずにlatchし、
+    /// 以後の`tick`は[`TickError::Faulted`]を返す。呼び出し側は[`LimitedServo::stop`]を呼ぶ
+    /// （module docの「PWMの出力に失敗したらlatchする」）。
     Output(EspError),
+    /// 以前の`tick`でPWMの出力に失敗し、latchしている。**何も出力せず、`Limiter`も進めていない。**
+    /// 呼び出し側は[`LimitedServo::stop`]を呼ぶ。
+    Faulted,
 }
 
 impl fmt::Display for TickError {
@@ -216,6 +258,7 @@ impl fmt::Display for TickError {
         match self {
             Self::Rejected(rejection) => write!(f, "limiter rejected the step: {rejection}"),
             Self::Output(err) => write!(f, "servo output failed: {err}"),
+            Self::Faulted => f.write_str("servo output is latched after an earlier output failure"),
         }
     }
 }
@@ -238,6 +281,7 @@ impl<'d> LimitedServo<'d> {
             servo,
             limiter,
             target: None,
+            faulted: false,
         })
     }
 
@@ -257,8 +301,7 @@ impl<'d> LimitedServo<'d> {
 
     /// 内部のtargetへ向けて自分の`Limiter::step`を`dt_s`秒分進め、その結果を出力する。
     ///
-    /// **targetが無い（まだ`admit`していない、または`stop`の後）ときは何も出力せず
-    /// `Ok(None)`を返す。**起動時の出力は`HW-TBD-019`で未確定であり、
+    /// **targetが無い（まだ`admit`していない）ときは何も出力せず`Ok(None)`を返す。**起動時の出力は`HW-TBD-019`で未確定であり、
     /// `servo-safety-limits.md`の`起動時とdriver故障時の動作`が「承認されるまで、
     /// 安全状態は『未検証の動作出力を行わない』とする」としているためである。
     ///
@@ -267,8 +310,12 @@ impl<'d> LimitedServo<'d> {
     /// # Errors
     ///
     /// `Limiter::step`がrejectした場合は[`TickError::Rejected`]（何も出力しない）、
-    /// PWMの出力に失敗した場合は[`TickError::Output`]を返す。
+    /// PWMの出力に失敗した場合は[`TickError::Output`]（ここでlatchする）、
+    /// latchの後は[`TickError::Faulted`]を返す。
     pub fn tick(&mut self, dt_s: f32) -> Result<Option<Setpoint>, TickError> {
+        if self.faulted {
+            return Err(TickError::Faulted);
+        }
         let Some(target) = self.target else {
             return Ok(None);
         };
@@ -276,23 +323,25 @@ impl<'d> LimitedServo<'d> {
             .limiter
             .step(target, dt_s)
             .map_err(TickError::Rejected)?;
-        self.servo
-            .output_angle(setpoint.position())
-            .map_err(TickError::Output)?;
+        if let Err(err) = self.servo.output_angle(setpoint.position()) {
+            self.faulted = true;
+            return Err(TickError::Output(err));
+        }
         Ok(Some(setpoint))
     }
 
-    /// targetを捨て、dutyを0へ戻す（[`Sg90::stop`]）。
+    /// dutyを0へ戻し（[`Sg90::stop`]）、**自分を消費して**[`Sg90`]を返す。
     ///
-    /// 以後の[`LimitedServo::tick`]は、次の`admit`まで何も出力しない。
-    /// **`Limiter`の位置と速度は戻さない**（module docの「既知の制限」）。
+    /// `Limiter`とtargetはここで捨てる。再開には新しい`Limiter`で[`LimitedServo::new`]し直す
+    /// （module docの「既知の制限」）。止める直前の速度を持ち越さないためである。
     ///
-    /// # Errors
-    ///
-    /// [`Sg90::stop`]の失敗をそのまま返す。**targetは失敗しても捨てる。**
-    pub fn stop(&mut self) -> Result<(), EspError> {
-        self.target = None;
-        self.servo.stop()
+    /// 返す`Result`は[`Sg90::stop`]の結果である。**失敗を握りつぶさない。**失敗しても
+    /// [`Sg90`]は返す（呼び出し側が再試行するか、dropして`LedcDriver`の`Drop`に任せる）。
+    #[must_use = "dutyを0へ戻せたかをResultで確かめること"]
+    pub fn stop(self) -> (Sg90<'d>, Result<(), EspError>) {
+        let Self { mut servo, .. } = self;
+        let result = servo.stop();
+        (servo, result)
     }
 
     /// 自分の`Limiter`の累計counter（#19の受け入れ条件5）。
