@@ -646,9 +646,12 @@ firmware（`firmware/esp32/src/servo.rs`、
    状態にする（ESP32はPCのUSBから給電する。servoの外部5 V系とは電源を分離する）。
    **2026-09-28追記: 項目6の構成では、servoの電源は`M-12001`（servo専用）から`MF-R135`を経て供給する。**
    手やcableを、サーボが動きうる範囲の外へ置く（[Hardware Safety Policy §6](../governance/hardware-safety-policy.md#6-サーボ)のPWM出力前7項目の1つ）。
-5. **`build`（AI、flashは人間）** **（2026-09-25追記: #474以降、次のcommandは`compile_error!`で止まる。[承認の状態](#承認の状態)参照。）**`cargo build --locked --features bench-servo-test-17`で
-   AIがfirmwareをbuildし、ESP32 Flash／HIL profileの端末で人間がflashする（`espflash`。
-   AIがこの端末を持たない場合、この工程は人間が行う）。このfeatureを付けない通常buildでは
+5. **`build`（AI。flashは人間の立ち会いのもとでAIまたは人間）** **（2026-09-25追記: #474以降、次のcommandは`compile_error!`で止まる。[承認の状態](#承認の状態)参照。）**`cargo build --locked --features bench-servo-test-17`で
+   AIがfirmwareをbuildし、ESP32 Flash／HIL profileの端末でflashする（`espflash`）。**flashの
+   実行者は、[power-budget.md](power-budget.md)の`ACCEL-01`／`ENV-01`単体bring-upの手順8と同じである**
+   （[#489](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/489)。書き込みのcommandと、USBの接続・
+   給電を止める判断を、同手順が分けて定めている）。AIがこの端末を持たない場合、この工程は人間が行う。
+   `再武装`と`終了処理`の再flashも同じである。このfeatureを付けない通常buildでは
    `crate::servo`は`main()`から呼ばれず、GPIO27は駆動されない。build検証の状況は
    PR本文参照。
    `run_servo_bench_test`は手動triggerを持たずESP32起動のたびに呼ばれるため、
@@ -783,3 +786,4 @@ firmware（`firmware/esp32/src/servo.rs`、
 | 2026-09-28 | 30 | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。**`承認の状態`の項目6の条件(a)へ、2026-09-28のユーザー決定を記録した**（購入なし）。試験の間だけ`M-12001`をservo専用にし、予備の`MF-R135`を直列に入れる。3 A付近でPTCのトリップが遅く、短絡時に実際に止める手段は人間が電源を抜くことである、という弱点を記録した。**状態は「まだ実行しない」のままであり、条件(b)(c)と`compile_error!`は変えていない** |
 | 2026-09-28 | 31 | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。**`承認の状態`の項目6の条件(b)を行った。**`サーボ出力を有効化してよい条件`へ`測定のための駆動（承認の状態の項目6）`を足し、ゲートを開かないまま、項目6の(a)〜(c)がそろったときだけ#17〜#19の測定に限って駆動してよい条件と、未解決の`TBD`ごとの扱いを書いた。`初回動作の実行手順`を(a)の構成（`M-12001`をservo専用、`MF-R135`を直列、Piを外す）に合わせ、`通電前の現物確認`の(a)(b)を試験を始める条件にした。**状態は「まだ実行しない」のままであり、測定用のbuildのfirmware側の変更と`compile_error!`は変えていない** |
 | 2026-09-28 | 32 | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。PR #500へのCodeRabbitの指摘（人が電源を抜くことを短絡保護として扱わない）を受け、項目6の(a)の弱点へ、安全要件の5項目「短絡」が述べる「人が電源を落とすのでは止まらない」を書き足した。servo電源の経路を`M-12001`の出力定格3 Aに耐える手持ちの部品（端子台、AWG22の線材）だけで組み、breadboardとjumper wireを使わないことを、測定のための駆動の条件と`通電前の現物確認`へ加えた（購入なし）。短絡時の電流が3 Aを超えない場合にしか経路を守れないこと、servo本体のリード線とconnectorの定格が不明であることは弱点として残した |
+| 2026-09-29 | 33 | [#489](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/489)。`初回動作の実行手順`の`build`stepが「flashは人間」としており、[power-budget.md](power-budget.md)のbring-up手順（書き込みのcommandは、人間が立ち会って監視している状態であれば実機LinuxのAIセッションが実行してよい）と食い違っていた。flashの実行者を同文書の`ACCEL-01`／`ENV-01`単体bring-upの手順8への参照に改め（規則をここへ書き写さない）、`再武装`と`終了処理`の再flashも同じであることを書いた。**USBの接続と給電を止める判断は人間のままであり、`承認の状態`、`サーボ出力を有効化してよい条件`、停止基準、各stepの条件は変えていない** |

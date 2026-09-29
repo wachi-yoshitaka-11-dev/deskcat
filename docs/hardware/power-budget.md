@@ -344,10 +344,10 @@ I2C addressを`0x53`、`ENV-01`のI2C addressを`0x76`へhardcodeしており（
 条件(1)（項目5）が未達のままこの節に着手できないため（`J3`のはんだ付けはこの節の対象外）。
 
 **条件(2)の根拠。**実装commitは`4486de5`であり、`origin/develop`上に存在する。**書き込み自体は
-手順8で行う（書き込みはUSB接続＝通電を伴うため、この節の実行前提には含めない）。**firmwareの
-書き込みとUSBシリアルでのlog読み取りは人間が行う（[machine-profiles.md](../toolchains/machine-profiles.md)は
-`ESP32 Flash / HIL`profileの必須要件を「実機 Linux に限る」「人間の監視」と定めており、AI session
-はこの環境・監視のいずれも持たない。同文書自体は「AIがUSB busへアクセスできない」とは書いていない）。
+手順8で行う（書き込みはUSB接続＝通電を伴うため、この節の実行前提には含めない）。**書き込みの
+実行者は手順8が定める（[machine-profiles.md](../toolchains/machine-profiles.md)は`ESP32 Flash / HIL`
+profileの必須要件を「実機 Linux に限る」「人間の監視」と定めている。同文書自体は「AIがUSB busへ
+アクセスできない」とは書いていない）。USBシリアルでのlog読み取りは人間が行う（手順10）。
 
 **条件(3)の根拠。**同計算はWi-Fi/BT不使用を前提とする。**この前提は満たされる**（現在の
 firmwareの`main.rs`はWi-Fi／Bluetooth APIを一切呼び出しておらず、`Cargo.toml`にも該当featureが
