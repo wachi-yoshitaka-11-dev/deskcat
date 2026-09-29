@@ -10,14 +10,22 @@
 //! 出力について、次の2つを保証する。
 //!
 //! - **出力の元になる`Setpoint`の列（量子化の前）が、自分で測った間隔で`Limiter`の制限**
-//!   （位置、速度、加速度、1 stepあたりの`単一commandの最大変化量`）**を満たす。**`Limiter`が加速度の
+//!   （位置、速度、加速度）**を満たす。**`Limiter`が加速度の
 //!   上限を譲ったSetpoint（`acceleration_bound_conceded`）は出力せずにlatchする（下の「制御周期の外の間隔、加速度の譲り、出力の失敗ではlatchする」）
 //! - **LEDCへ設定するdutyは、承認値の位置範囲の両端を変換した値の内側に収まる。**dutyへの量子化は
 //!   最も近い整数へ丸めたうえで、下端は切り上げ、上端は切り捨てた範囲へclampする。**位置だけは
 //!   量子化の後も型で締める。**速度と加速度は量子化の刻みの分だけずれうる（下の「実機での実現は保証しない」）
 //!
+//! **`単一commandの最大変化量`は、この保証に入れていない。**`Limiter::step`がそれで制限するのは、
+//! 加速度のclampより前の要求値だけであり、測った間隔が制御周期の許容幅の中で揺れると、1 stepの
+//! 移動量はそれを超えうる（`deskcat_servo`のdocが保つと書くのも位置・速度・加速度の3つである）。
+//! 1 stepあたりか1 commandあたりかも、正本がまだ決めていない（[#19の残件](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/19#issuecomment-5892732352)）。
+//!
+//! **この保証はcodeを読んで立てたものである。**`LimitedServo`、dutyの量子化、latchを実行して
+//! 確かめた試験は、hostにもtargetにも無い（testがあるのは`deskcat_servo`の`Limiter`だけである）。
+//!
 //! **保証は、[`LimitedServo::new`]または[`LimitedServo::resume`]から[`LimitedServo::stop`]までの
-//! 区間ごとである。**`stop`はその境界であり、軌道の制限を受けない非常停止である（減速しない）。
+//! 区間ごとである。**`stop`はその境界であり、dutyを0にするだけで、軌道の制限を受けない（減速しない）。
 //! `stop`の直前の位置と`resume`の後の最初の位置の間は、`Limiter`が測っていない。
 //!
 //! **実機がdutyの列をどう実現するか（PWMのframe、servo内部の追従、resetの後）は保証しない。**
@@ -41,8 +49,10 @@
 //!   速度と加速度の制限を通らずに位置を跳ばせてしまうためである
 //! - **制御周期の間隔を呼び出し側から受け取らない。**`tick`は前回の`tick`からの経過時間を
 //!   単調時計（`std::time::Instant`）で**自分で測り**、それを`Limiter::step`へ渡す。
-//!   間隔を申告させると、公称値を申告したまま短い間隔で呼ぶだけで、設定する位置の列が
-//!   実時間で`Limiter`の制限を満たさなくなるためである
+//!   間隔を申告させると、公称値を申告したまま短い間隔で呼ぶだけで、`Setpoint`の列が
+//!   実時間で`Limiter`の制限を満たさなくなるためである。**測っているのは連続する`tick`の冒頭の
+//!   時刻の間隔であり、`set_duty`を呼ぶ時刻の間隔ではない**（stepの計算やpreemptionによる遅れは
+//!   測定に入らない）
 //! - **servo 1つにつき`Limiter`は1つである。**[`LimitedServo::new`]は[`Sg90`]を値で受け取り、
 //!   [`Sg90::new`]はLEDC timer・channel・pinを消費する。これらが`Peripherals`から1回だけ取れるのは、
 //!   `unsafe`の`steal`／`reborrow`を使わない場合であり、firmwareは`unsafe_code = "forbid"`で
@@ -70,7 +80,7 @@
 //!   長すぎる場合（遅れ）にそのまま続けると、`Limiter`に残った速度で次の位置を設定することになり、
 //!   その間の位置の列が`Limiter`の制限を満たさなくなる。短すぎる場合は、`Limiter`がその間隔では
 //!   `最大加速度`を保証できない（`deskcat_servo::Limiter::step`のdocの「`dt_s`は
-//!   `ControlPeriod`の範囲内でなければならない」）。**jitterが許容幅を超えると、そこで止まる。**
+//!   `ControlPeriod`の範囲内でなければならない」）。**jitterが許容幅を超えると、そこで新しい位置を設定しなくなる**（LEDCは最後のdutyを出し続けうる）。
 //!   安全側に倒れる既知の性質である
 //! - **`Limiter::step`の後にPWMの出力が失敗した**（[`TickError::Output`]）。`Limiter`だけが1 step進み、
 //!   LEDCに設定した位置は前の値のまま残る（esp-idf-hal 0.46.2の`LedcDriver::set_duty`が呼ぶ
@@ -100,7 +110,8 @@
 //! # 止めた後の再開
 //!
 //! [`LimitedServo::stop`]は自分を消費して[`Stopped`]を返す。[`Stopped`]は[`Sg90`]と**再開の位置**
-//! （最後にLEDCへ設定できた位置。一度も設定していなければ起動時の初期位置）をprivateに持つ。
+//! （最後に出力できた`Setpoint`の位置。量子化の前の値であり、LEDCへ書いたdutyそのものではない。
+//! 一度も出力していなければ起動時の初期位置）をprivateに持つ。
 //! [`LimitedServo::resume`]は**位置を受け取らず**、その位置から速度0の`Limiter`を作る。
 //!
 //! - **止める直前の速度を持ち越さない。**持ち越すと、再開の最初の位置が、止まっていた間を
@@ -118,7 +129,7 @@
 //! # 実機での実現は保証しない
 //!
 //! 次は型でも、ESP-IDFのsourceを読むことでも確かめきれない。**量を主張しない。**
-//! 段3の監視下の試験（#19の受け入れ条件7）の項目として扱う（#19のコメントに記録する）。
+//! 段3の監視下の試験（#19の受け入れ条件7）の項目として扱う（[#19のコメント](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/19#issuecomment-5891754488)に記録した）。
 //!
 //! - **dutyへの量子化。**設定するdutyは`Setpoint`の位置を最も近い整数へ丸めた値であり、
 //!   その刻みの分だけ、設定する列の速度と加速度は`Limiter`の制限からずれうる（位置は上の範囲に収まる）。
@@ -132,7 +143,7 @@
 //! - **servoが受け取った位置へどう追従するか**（速さ、遅れ、行き過ぎ）は確かめていない
 //! - **[`LimitedServo::stop`]の後にservoがどう止まるか。**信号を止めてもservo側が駆動を止める
 //!   保証は無い（[`Sg90::stop`]のdoc）
-//! - **再開の位置は、最後にLEDCへ設定した値であり、実機に届いたとは限らない。**次のframeより前に
+//! - **再開の位置は、最後に出力した`Setpoint`の位置であり、実機に届いたとは限らない。**次のframeより前に
 //!   `stop`のduty 0が上書きした場合や、duty 0の間にservoが押されて動いた場合は、実機の位置と食い違う
 //! - **reset、panic、drop、`core::mem::forget`の後の出力は保証しない。**範囲外のpulseになりうる。
 //!   **止めるのは、人が外部電源を切ることである。**panicの方式はabortである（target
@@ -144,7 +155,7 @@
 //!   するperipheralにLEDCを含まず（`components/esp_system/port/soc/esp32/system_internal.c`、
 //!   `esp_system.h`の`esp_restart`のdoc）、reset前にCPUとAPBのclockを切り替える（同fileの
 //!   `rtc_clk_cpu_set_to_default_config`）。LEDCの`Drop`は`ledc_stop`を呼ぶが、その失敗を`unwrap`する。
-//!   **経路ごとの分析と、起動時にservoのLEDCを最初に止める要件は、#19のコメントに置く。**
+//!   **経路ごとの分析と、起動時にservoのLEDCを最初に止める要件は、[#19のコメント](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/19#issuecomment-5891754488)に置いた。**
 //!
 //! **`Setpoint`の位置の単位は、下の角度規約の度である**（`SERVO_ANGLE_CONVENTION_MIN_DEG`〜
 //! `_MAX_DEG`）。`Limiter`へ渡す可動域・速度・加速度もこの単位で与える。**値はこのmoduleが
@@ -238,8 +249,8 @@ impl<'d> Sg90<'d> {
         pulse_us * f64::from(self.driver.get_max_duty()) / period_us
     }
 
-    /// 承認値の位置範囲の両端を、dutyの整数の**内側**へ丸めた範囲。範囲がdutyの1刻みより
-    /// 狭ければ`None`。
+    /// 承認値の位置範囲の両端を、dutyの整数の**内側**へ丸めた範囲。範囲の中にdutyの整数が
+    /// 1つも無ければ`None`。
     fn duty_bounds(&self, approved_min_deg: f32, approved_max_deg: f32) -> Option<DutyBounds> {
         let low = self.exact_duty(approved_min_deg).ceil();
         let high = self.exact_duty(approved_max_deg).floor();
@@ -343,7 +354,8 @@ pub struct LimitedServo<'d> {
     /// 前回の`tick`の時刻。`new`／`resume`の後で、targetがあるときの最初の`tick`で基準として取る
     /// （module docの「間隔の基準と、tickを呼び続ける前提」）。
     last_tick: Option<Instant>,
-    /// 再開の位置（角度規約の度）。最後に出力できた位置、一度も出力していなければ起動時の初期位置。
+    /// 再開の位置（角度規約の度）。最後に出力できた`Setpoint`の位置（量子化の前）、一度も出力して
+    /// いなければ起動時の初期位置。
     resume_position: f32,
     /// latchしているか（module docの「制御周期の外の間隔、加速度の譲り、出力の失敗ではlatchする」）。
     faulted: bool,
@@ -360,8 +372,8 @@ pub struct Stopped<'d> {
 }
 
 impl Stopped<'_> {
-    /// 再開の位置（角度規約の度。log用）。最後に出力できた位置、一度も出力していなければ
-    /// 起動時の初期位置である。**これを渡す入口は無い。**
+    /// 再開の位置（角度規約の度。log用）。最後に出力できた`Setpoint`の位置（量子化の前）、
+    /// 一度も出力していなければ起動時の初期位置である。**これを渡す入口は無い。**
     #[must_use]
     pub fn resume_position(&self) -> f32 {
         self.resume_position
@@ -385,7 +397,7 @@ pub enum LimitedServoError {
     /// はみ出した分はpulse幅の変換で黙って飽和し、`Limiter`が認めた位置と
     /// 実際に出す位置が食い違う。**黙って受けずに構築を拒否する。**
     ApprovedRangeOutsideAngleConvention,
-    /// 承認値の位置範囲が、LEDCのdutyの1刻みより狭い。内側へ丸めると範囲が空になる。
+    /// 承認値の位置範囲の中に、LEDCのdutyの整数が1つも無い（内側へ丸めると範囲が空になる）。
     ApprovedRangeNarrowerThanDutyStep,
 }
 
@@ -595,7 +607,7 @@ impl<'d> LimitedServo<'d> {
     /// `Limiter`とtargetはここで捨てる。[`ServoFaultCounters`]は[`Stopped`]へ引き継ぐ。
     /// 再開は[`LimitedServo::resume`]だけである（module docの「止めた後の再開」）。
     ///
-    /// **軌道の制限を受けない非常停止である**（減速しない。module docの「型が保証すること」）。
+    /// **dutyを0にするだけで、軌道の制限を受けない**（減速しない。module docの「型が保証すること」）。
     ///
     /// 返す`Result`は[`Sg90::stop`]の結果である。**失敗を握りつぶさない。失敗したら、人が外部電源を
     /// 切る。**dropやpanicの後の出力は保証しない（module docの「実機での実現は保証しない」）。
