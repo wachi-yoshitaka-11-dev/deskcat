@@ -487,6 +487,7 @@ Raspberry Pi公式文書「Configure UARTs」（上で引いた`interfaces.adoc`
    入れてから信号線をつなぎ、どちらかの電源を切るとき（USBや電源cableを抜くときを含む）は、先に信号線を外す。
 3. firmwareとhostがこのUARTに対応している。firmwareは`pi-protocol-mode`のbuildが対応する（[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)。対応するのは`boot`→ACKだけであり、このbuildをつなぐのは[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)の受け入れ条件4の試験に限る。理由は`firmware/esp32/src/console.rs`のmodule doc）。hostは上の`Pi側の設定`を済ませたPiで`/dev/serial0`を開く（実portでのopenは、hostの側でもまだ確かめていない。`crates/deskcat-serial/README.md`）。
 4. 初回の接続と通電は、人間が監視する。baud 115200で直列抵抗を入れたまま通信できるかも、初回の接続で確かめる。
+5. **PiとESP32は別々に給電し、GNDを共通にする**（検証の構成では、PiはM-12001、ESP32はPCのUSB）。**ESP32をPiのUSB OTGから給電した状態では、信号線をつながない。**給電の構成はユーザーの決定である（[#446の決定](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446#issuecomment-5863027108)、[別電源接続の安全](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446#issuecomment-5863142360)）。後半の一文（USB OTG給電ではつながない）は、決定の「別電源にする」から導いたものである。`power-budget.md`の`ESP32の給電経路（案Aで確定。実測待ち）`節（PiのUSB OTGからの給電）は以前の方式を前提にしており、その改訂は[#488](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/488)の`A4`で扱う（下の`以前の方式`）。
 
 **この対策は2026-09-28のユーザー決定であり、弱点を記録したうえで採った**（`HW-TBD-036`）。
 ESP32の入力の上限はVDD＋0.3 V（Table 5-3）であり、ESP32の電源が切れているときにPiの送信線が
