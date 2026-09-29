@@ -13,9 +13,11 @@ harness = false # do not use the built-in cargo test harness -> resolve rust-ana
 
 [features]
 default = []
-# UART0をdebug log用ではなくPi-ESP32 protocol stream用に使うbuild。既定では無効
-# （debug logモード）。詳細は`docs/hardware/gpio-assignment.md`「信号inventory」の
-# `UART-TX`／`UART-RX`行、`#446`参照。
+# Pi linkのUART（`PI-UART-TX`＝GPIO13、`PI-UART-RX`＝GPIO14）でPi-ESP32 protocol
+# stream（`boot`のACK待ち・再送）を動かすbuild。既定では無効。UART0はどちらのbuildでも
+# debug log専用である（#487。それより前はUART0をprotocol streamへ使い、loggingを
+# 止めていた）。詳細は`docs/hardware/gpio-assignment.md`「信号inventory」の
+# `PI-UART-TX`／`PI-UART-RX`行、`#446`、`#487`参照。
 pi-protocol-mode = []
 # Issue #17の単発servo bench試験だけを有効にする。既定ではoffであり、
 # 通常のbuildはこのfeatureを持たず`crate::servo`を呼ばない。承認の状態は

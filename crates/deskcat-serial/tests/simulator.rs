@@ -260,7 +260,7 @@ fn an_oversize_line_is_rejected_and_the_next_line_still_decodes() {
 /// **これは受信byte streamの方向を模したものではない。**`Session::pump_read`の
 /// 行境界での再同期が、message種別や方向によらず機能することを確認する
 /// generic testであり、混ぜるprotocol行には`ping`（`Pi→ESP32`）を使うが、
-/// 実際にESP32のUART0出力へ`ping`が現れるわけではない。
+/// 実際にESP32が送る行に`ping`が現れるわけではない。
 #[test]
 fn a_debug_log_line_interleaved_with_a_protocol_line_does_not_corrupt_the_next_frame() {
     let log_line = b"I (356) deskcat_esp32: hb seq=1 uptime_ms=1006\n".to_vec();
@@ -288,8 +288,8 @@ fn a_debug_log_line_interleaved_with_a_protocol_line_does_not_corrupt_the_next_f
 }
 
 /// baud不一致等で生じる不正byte列（invalid UTF-8）が混ざっても、続く正常なframeは
-/// 拒否されずに復元される。**§2が明記する既知の例外（起動時出力、panic handler）の
-/// どちらでもない、一般的な通信noiseへの耐性を確認する。**確認したいのはbaudの
+/// 拒否されずに復元される。**§2が明記する既知の例外（UART1のdriverの初期化時の
+/// glitch、ROM／bootloader・panic handlerの出力）でもない、一般的な通信noiseへの耐性を確認する。**確認したいのはbaudの
 /// 値ではなく、化けたbyte列の後に受信側が復帰できるかである。これは実機・
 /// 一次資料の両方に依存せず、host側のreceiverだけで確定できる。
 #[test]
@@ -323,8 +323,8 @@ fn invalid_utf8_noise_interleaved_with_a_protocol_line_does_not_corrupt_the_next
 /// debug logとprotocol行が複数回混ざっても、protocol行はすべて正しい順序で
 /// 復元される。
 ///
-/// fixtureの1行目（`main_task: Started on CPU0`）は§2の既知の例外（ESP32→Pi方向の
-/// 起動時出力）の見た目を模した行であり、それ以降のASCII log行（`hb`／
+/// fixtureの1行目（`main_task: Started on CPU0`）は、#487より前の§2の既知の例外（ESP32のUART0を
+/// Pi linkと共有していた頃の、ESP32→Pi方向の起動時出力）の見た目を模した行であり、それ以降のASCII log行（`hb`／
 /// `heartbeat_overrun`）は例外の対象外の場面を模した仮想の行である。**混ぜる
 /// protocol行（`ping`）は実際にはPi→ESP32方向であり、この fixture は実際の
 /// wire上のbyte streamを再現したものではない**（上の単発testと同じ理由）。
@@ -375,8 +375,9 @@ fn multiple_interleaved_log_and_protocol_lines_all_resolve_correctly() {
 /// `\r\n`終端の行も正しく復元される。
 ///
 /// ESP-IDFのconsole出力は既定で`\n`を`\r\n`へ変換する（`CONFIG_LIBC_STDOUT_LINE_ENDING`
-/// 既定`CRLF`。`docs/protocol/esp32-pi-protocol.md`§2参照）。`pi-protocol-mode`の
-/// `write_line`が実際にUART0へ出すframeの行末は、この変換を経て`\r\n`になる。**この
+/// 既定`CRLF`。`docs/protocol/esp32-pi-protocol.md`§2参照）。#446のPR Aまでの`pi-protocol-mode`は
+/// `write_line`（stdio経由）でUART0へframeを出しており、その行末はこの変換を経て`\r\n`になっていた
+/// （今の送信経路は`UartDriver::write`であり、§2のとおり`\n`終端になるはずである）。**この
 /// testは、その行末で受信側が実際に正しく復元できることを確認する**（`crates/deskcat-protocol`
 /// の`framing.rs`単体testが`\r`除去を確認しているが、`Session::pump_read`を通した
 /// 統合levelでは、それまで`\n`終端のfixtureしか使っていなかった）。

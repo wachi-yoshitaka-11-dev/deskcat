@@ -59,7 +59,7 @@ impl core::error::Error for ConfigError {}
 /// Serial linkのport設定。
 ///
 /// **既定値を持たない。**`Default`を実装していないのは意図的である。
-/// device名（`/dev/ttyUSB*`など）を「たぶんこれ」で埋めると、確認していない値が
+/// device名（`/dev/serial0`など）を「たぶんこれ」で埋めると、確認していない値が
 /// 設定の既定として固定される。実機のdevice名はまだ確認されていない
 /// （[Issue #8]の受け入れ条件に含まれず、確定は[Issue #11]の後半に残る）。
 ///

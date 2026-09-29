@@ -28,11 +28,12 @@
 //! **上の一覧は既定buildの動作を述べる。**`pi-protocol-mode`はI2Cの
 //! bring-upを行わず、`bringup-display-13`とは同時に有効にできない（下記
 //! `compile_error!`）。build identity／board ID／reset reasonのlogと、
-//! heartbeat／health snapshotのloopは`pi-protocol-mode`でも実行されるが、
-//! loggingを止めているため出力は既定buildにしか出ない（`crate::console`
-//! 参照）。`pi-protocol-mode`は代わりに`boot`のACK待ち・再送・`sid`選び直しを行う
-//! （`crate::boot_session`参照。`#446` PR B。制約は`crate::console`のmodule docに
-//! まとめてある）。
+//! heartbeat／health snapshotのloopは`pi-protocol-mode`でも実行され、どちらの
+//! buildでもlogはUART0（USB）へ出る（`#487`。`crate::console`参照）。
+//! `pi-protocol-mode`は加えて、UART0以外のUART（`PI-UART-TX`＝GPIO13、
+//! `PI-UART-RX`＝GPIO14）で`boot`のACK待ち・再送・`sid`選び直しを行う
+//! （`crate::boot_session`参照。`#446` PR B、`#487`。制約は`crate::console`の
+//! module docにまとめてある）。
 //!
 //! 既定buildで`Peripherals::take()`の戻り値から実際にdriverへ渡すのは、I2C関連2本
 //! （`crate::accel`・`crate::env`のmodule doc参照）だけである。
@@ -40,9 +41,9 @@
 //! `bench-servo-test-17` feature付きbuildは`SERVO-PWM`（GPIO27）と
 //! `peripherals.ledc.timer0`／`channel0`を、それぞれ追加で渡す（`bench-servo-test-17`付きbuildは
 //! #474でcompileが止まる。下記`compile_error!`）。`pi-protocol-mode`は
-//! UART0関連（`peripherals.uart0`、GPIO1＝TX、GPIO3＝RX。`crate::boot_session`が
-//! 使う`UartDriver`）だけを渡す（`#446` PR B。それ以前は`Peripherals::take()`自体を
-//! 呼ばなかった）。
+//! Pi link関連（`peripherals.uart1`、GPIO13＝TX、GPIO14＝RX。`crate::boot_session`が
+//! 使う`UartDriver`）だけを渡す（`#487`。`#446` PR BではUART0（GPIO1／GPIO3）を
+//! 渡しており、それ以前は`Peripherals::take()`自体を呼ばなかった）。
 //!
 //! **I2Cはこの版でも実機通電していない。**この版の検証は`cargo build`でのcross-compile
 //! 確認までであり、実機へflashして確認するのは別工程である（[Hardware Safety
@@ -132,8 +133,9 @@
 //! （上のLCD関連6+1本のGPIOを駆動するか、`lcd.backlight_on()`を呼ぶか、`display_*`の
 //! logを出すか）。回路側の制約も、`DISP-01`を接続してよいかの判定も、これで変わらない。
 
-// `pi-protocol-mode`ではLCD／I2Cのbring-upとdemo用moduleをcompileしない
-// （`crate::console`のmodule doc参照）。
+// `pi-protocol-mode`ではLCD／I2Cのbring-upとdemo用moduleをcompileしない。この排他は
+// Pi linkがUART0を使っていた頃からのものである。featureの排他をやめて1つのbuildへ
+// まとめるのは`#487`の残りの作業であり、それまではこの排他を保つ。
 #[cfg(not(feature = "pi-protocol-mode"))]
 mod accel;
 #[cfg(feature = "pi-protocol-mode")]
@@ -149,7 +151,7 @@ mod health;
 mod protocol;
 mod servo;
 
-// `pi-protocol-mode`はUART0向けに`Peripherals::take()`を呼ぶが（`#446` PR B）、
+// `pi-protocol-mode`はPi link向けに`Peripherals::take()`を呼ぶが（`#446` PR B、`#487`）、
 // `run_servo_bench_test`の呼び出し自体が`#[cfg(not(feature = "pi-protocol-mode"))]`の
 // blockの中にあるため、servo bench試験経路（`run_servo_bench_test`）は呼ばれない。
 // 両方を有効にしてもbuildは通るが、servoのfeatureが黙って無効になる。それより、
@@ -341,10 +343,7 @@ fn main() {
     // implemented by esp-idf-sys might not link properly. See https://github.com/esp-rs/esp-idf-template/issues/71
     esp_idf_svc::sys::link_patches();
 
-    // `crate::console`のmodule doc参照。
-    #[cfg(feature = "pi-protocol-mode")]
-    console::silence_logging();
-    #[cfg(not(feature = "pi-protocol-mode"))]
+    // どちらのbuildでもUART0はdebug log専用である（`crate::console`のmodule doc参照）。
     console::init_log_mode();
 
     // build identity。profile は `Cargo.toml` の `[profile.dev]`／`[profile.release]` に対応する。
@@ -376,12 +375,13 @@ fn main() {
     let mut health = Health::new(reset_reason);
 
     // **両buildで`Peripherals::take()`を呼ぶ**（`#446` PR B）。既定buildはLCD／I2C／
-    // servo benchのbring-upへ、`pi-protocol-mode`はUART0（`boot`のACK待ち・再送。
+    // servo benchのbring-upへ、`pi-protocol-mode`はPi linkのUART（`boot`のACK待ち・再送。
     // `crate::boot_session`参照）へ使う。1度しか成功しないため`expect`で即座に気付く。
     let peripherals = Peripherals::take().expect("Peripherals::take must succeed exactly once");
 
     // `pi-protocol-mode`ではLCD／I2C／servo benchのbring-upを一切行わない
-    // （`crate::console`のmodule doc参照）。`pi-protocol-mode`と`bench-servo-test-17`を
+    // （featureの排他をやめて1つのbuildへまとめるのは`#487`の残りの作業であり、それまでは
+    // この排他を保つ）。`pi-protocol-mode`と`bench-servo-test-17`を
     // 同時に有効にした場合も、servo benchは実行されない（上の`compile_error!`参照）。
     #[cfg(not(feature = "pi-protocol-mode"))]
     {
@@ -453,16 +453,20 @@ fn main() {
     let mut next_heartbeat = bringup_done_ms + u64::from(config::HEARTBEAT_PERIOD_MS);
     let mut next_snapshot = bringup_done_ms + u64::from(config::HEALTH_SNAPSHOT_PERIOD_MS);
 
-    // `pi-protocol-mode`では、**このfirmwareのcodeが行うUART0のI/Oを**
-    // protocol専用の`UartDriver`へ一本化する（`crate::console`のmodule doc参照）。
-    // 送信も受信もこのdriver経由に揃える。**ESP-IDFのROM／bootloader起動出力や
-    // panic出力は対象外である**（`UartDriver`をinstallする前、またはこのfirmware
-    // のcode外で書かれるため。§2の既知の逸脱として別途扱う）。
-    // TX=GPIO1、RX=GPIO3はUART0のROM固定pin（`docs/hardware/gpio-assignment.md`の
-    // `Pi–ESP32間のtransport`節。GPIO headerへの配線は無く内部USB-UARTブリッジへ
-    // 接続する）。baudは既定build側のconsoleと同じ115200
-    // （`CONFIG_ESP_CONSOLE_UART_BAUDRATE`）に揃える。ring buffer容量の根拠は
-    // `config::PI_PROTOCOL_UART_RX_BUFFER_BYTES`のdoc参照。
+    // `pi-protocol-mode`では、Pi linkの送信も受信もprotocol専用の`UartDriver`経由に
+    // 揃える。**UART0は使わない**（debug log専用。`crate::console`のmodule doc参照）。
+    // UART0以外のUARTをGPIO matrixで`PI-UART-TX`＝GPIO13、`PI-UART-RX`＝GPIO14へ
+    // 割り当てる（`docs/hardware/gpio-assignment.md`の`Pi–ESP32間のtransport`節。
+    // 同節は「UART0以外」とだけ定める。UART1とUART2のどちらでもよく、番号の小さい
+    // UART1を使う。UART1の既定のpinはTX＝GPIO10、RX＝GPIO9で、どちらもflash用の使用禁止pin
+    // である（ESP-IDF v5.5.3 `soc/esp32/include/soc/uart_pins.h`20〜21行、gpio-assignment.mdの
+    // `ESP32の使用制限pin`節）。`UartDriver::new`は渡したGPIO13／GPIO14だけを設定し、既定のpinには
+    // 触れない。esp-idf-hal 0.46.2 `uart.rs`2023行〜の`new_common`が`uart_set_pin`へ渡すのは
+    // この2本だけであり、ESP-IDF v5.5.3 `esp_driver_uart/src/uart.c`819行〜の`uart_set_pin`は
+    // 負の番号のpinを設定しない）。8N1でflow control（RTS／CTS）なし（`esp32-pi-protocol.md`§2の
+    // `UART framing`、`Candidate`）は`UartConfig::default()`のまま得る（esp-idf-hal 0.46.2
+    // `uart.rs`579〜596行の`Config::new`）。baudは`config::PI_PROTOCOL_UART_BAUDRATE_HZ`のdoc参照。
+    // ring buffer容量の根拠は`config::PI_PROTOCOL_UART_RX_BUFFER_BYTES`のdoc参照。
     #[cfg(feature = "pi-protocol-mode")]
     let mut uart = {
         let uart_config = UartConfig::default()
@@ -470,14 +474,14 @@ fn main() {
             .rx_fifo_size(config::PI_PROTOCOL_UART_RX_BUFFER_BYTES)
             .tx_fifo_size(config::PI_PROTOCOL_UART_TX_BUFFER_BYTES);
         UartDriver::new(
-            peripherals.uart0,
-            peripherals.pins.gpio1,
-            peripherals.pins.gpio3,
+            peripherals.uart1,
+            peripherals.pins.gpio13,
+            peripherals.pins.gpio14,
             Option::<esp_idf_svc::hal::gpio::AnyIOPin>::None,
             Option::<esp_idf_svc::hal::gpio::AnyIOPin>::None,
             &uart_config,
         )
-        .expect("UartDriver::new for UART0 must succeed exactly once")
+        .expect("UartDriver::new for the Pi link UART must succeed exactly once")
     };
 
     // `pi-protocol-mode`でだけ`boot`のACK待ち・再送sessionを開始する（`#446` PR B、
@@ -604,8 +608,8 @@ const SID_NVS_KEY_NEXT: &str = "next_sid";
 /// `bootloader_random_enable()`を呼んでいるか、second-stage bootloader実行中の
 /// いずれかを満たさない限り、RNGの出力は「pseudo-random only」と明記する。
 /// このfirmwareは`pi-protocol-mode`でWi-Fi／Bluetoothを一切初期化しない
-/// （`Peripherals::take()`はUART0向けに呼ぶが、Wi-Fi／Bluetoothの初期化は
-/// 別の話であり行わない。`#446` PR B）。`bootloader_random_enable()`も呼ばない
+/// （`Peripherals::take()`はPi linkのUART向けに呼ぶが、Wi-Fi／Bluetoothの初期化は
+/// 別の話であり行わない。`#446` PR B、`#487`）。`bootloader_random_enable()`も呼ばない
 /// （呼ぶには`unsafe`が要る）。**したがって乱数側を使っても、
 /// 上記の非衝突要件に対する根拠のある確率は示せない。**
 ///
@@ -646,9 +650,9 @@ const SID_NVS_KEY_NEXT: &str = "next_sid";
 /// いずれかが失敗した場合、`health.uptime_ms()`の下位32 bitへ縮退する
 /// （旧`sid_from_uptime`と同じ値）。**この経路では非衝突を主張しない。**
 /// bring-upを行わないため起動ごとにほぼ同じ小さい値になり、§3の要件を
-/// 満たさないまま`boot`を送る。エラーは`log::error!`で分類するが、
-/// `pi-protocol-mode`はloggingを止めているため出力されない
-/// （観測経路が無い。counterは持たない。`boot_session`のmodule doc「停止理由の区別」参照）。
+/// 満たさないまま`boot`を送る。エラーは`log::error!`で分類し、UART0（USB）の
+/// debug logへ出る（`#487`より前の`pi-protocol-mode`はloggingを止めており、出力されなかった）。
+/// counterは持たない（`boot_session`のmodule doc「停止理由の区別」参照）。
 #[cfg(feature = "pi-protocol-mode")]
 fn generate_sid(health: &Health) -> u32 {
     use esp_idf_svc::nvs::{EspDefaultNvsPartition, EspNvs};

@@ -115,13 +115,16 @@ simulator test（`tests/simulator.rs`）までの検証であり、実機での�
 
 [Issue #11](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11)の後半に残るもの:
 
-- `/dev/ttyUSB*`のdevice名の確定
+- 実機でのdevice名の確定（Pi linkはGPIOのUARTであり、Pi側は`/dev/serial0`を使う。この名前はRaspberry Pi公式文書から導いたもので、現物では確かめていない。正は[gpio-assignment.md](../../docs/hardware/gpio-assignment.md)の`Pi側の設定`）
 - 実portでのread／write、切断、reconnect、partial I/Oの確認
 - `CLOCAL`をdriverが受け付けること（受け付けなければopenが失敗する）
 - **`HUPCL`の判断。**既定ではcloseでDTRが落ちる。**本projectのESP32 boardでDTR／RTSが
   自動resetへ繋がっているかは確認していない。**繋がっていれば再接続のたびにESP32が
   再起動することになり、`boot`／`hello`のhandshakeに効く。現物の確認と判断はprotocol側の
-  話であり、**このcrateでは触っていない**
+  話であり、**このcrateでは触っていない**。**Pi linkはGPIOのUART（TX／RX／GNDだけ。[gpio-assignment.md](../../docs/hardware/gpio-assignment.md)の
+  `Pi–ESP32間のtransport`節）であり、PiのDTRはESP32へつながらないため、Pi linkではこの再起動は起きない。**
+  当てはまるのは、hostがESP32 board上のUSB-UARTブリッジ（USB）を開く場合だけである（Pi linkの試験中に、
+  PCのserial monitorでESP32のdebug logを読む場合もこれに当たる。再起動が起きるかは確かめていない）
 - Pi上でこのcrateをbuildできるか（memory）
 
 ## 既定値は暫定である
