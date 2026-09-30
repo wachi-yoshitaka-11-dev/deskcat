@@ -549,7 +549,7 @@ ESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`の負荷合計（測定ではない。
       この手順は条件(3)(a)によりPiを同時に接続しないため、GPIO13に接続先は無い。`gpio-assignment.md`の
       `PI-UART-TX`行）。既定buildのままでは
       `run_display_bringup`が呼ばれず、受け入れ条件（初期化・fill・四隅・timing）を確認する材料と、
-      controllerの識別に使うcommandの実機での効果が得られない。**この構成の正式なVersion Recordは無い**（1回の実施記録は`docs/toolchains/version-records/`の2026-09-26の記録であり、#487より前のtree（Pi linkなし）についてのものである。[検証済みコマンド](../toolchains/verified-commands.md)
+      controllerの識別に使うcommandの実機での効果が得られない。**この構成の正式なVersion Recordは無い**（この構成の実施記録（`docs/toolchains/version-records/`）は、どれも#487のPR B1より前のtreeのものである。[検証済みコマンド](../toolchains/verified-commands.md)
       が明記するとおり、`bringup-display-13`構成は正式なVersion Recordを持たない。build-onlyの
       検証を誰がいつどの端末で行ったかは、実施時にVersion Recordまたは相当の記録を別途作る）
 - [ ] (3) 電流の余裕計算（[HW-TBD-024の判断記録](tbd-register-history.md#hw-tbd-024)の2026-09-23追記）を
