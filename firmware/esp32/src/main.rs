@@ -847,8 +847,8 @@ fn demonstrate_pi_session(health: &mut Health) {
 /// （[#415](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/415)）は、`run_display_bringup`が
 /// main loopの開始より前に複数のSPI転送（単色fill×5、四隅pattern）を連続実行しており、その間
 /// heartbeatが一度も出ないことを指摘した。この関数はそのとき足した簡易版だった。`#487`からは、
-/// LCDの描画をmain loopの中で1段ずつ進め（`crate::display_test`）、本来のheartbeatが描画の間も
-/// 続く。
+/// LCDの描画をmain loopの中で1段ずつ進め（`crate::display_test`）、本来のheartbeatを描画の間も
+/// 回す構造にした（見込みの範囲は`crate::display_test`のmodule doc）。
 fn service_bringup_step(health: &mut Health, step: &str) {
     FreeRtos::delay_ms(1);
     // **`bringup_hb`と`hb`は別の名前にする。**main loopの`hb seq=`（`config::HEARTBEAT_PERIOD_MS`
