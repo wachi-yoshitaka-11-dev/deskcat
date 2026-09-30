@@ -182,7 +182,7 @@ mod servo;
 // #487で`pi-protocol-mode`を廃止したため、その`compile_error!`はもう無い。代わりに、このfeature付き
 // buildはPi link（`crate::boot_session`とUART1）をcompileしない（上の`mod boot_session`の
 // `#[cfg]`）。**測定用のbuildがPiとの通信linkを持たないこと（同文書の`測定のための駆動`節）は、
-// compile_errorではなく構造で保っている。**再開するときに外すのは、下の#474の`compile_error!`だけである。
+// compile_errorではなく構造で保っている。**再開するときに外すのは、下の#474の`compile_error!`と、同節の項目5が挙げる注記だけである。
 // ただし、このfeature付きbuildは#474の`compile_error!`があるためbuildしておらず、外した後にcompileが通るかは
 // 確かめていない（#487でmain loopを組み替えた）。
 #[cfg(feature = "bench-servo-test-17")]

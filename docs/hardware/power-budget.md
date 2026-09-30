@@ -733,8 +733,13 @@ ESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`の負荷合計（測定ではない。
     `UartObservations`）と`overrun_ticks`、および`heartbeat_overrun`の行の有無である。**`hb`の行は補助に
     とどめる。**`hb`の周期（1000 ms、`config::HEARTBEAT_PERIOD_MS`）は1色を描く区間より長くなりうる
     （帯1本の転送の計算は`display_test.rs`のmodule doc。実測ではない）ため、保持の間に出た`hb`の行は、
-    描画の間もloopが回った証拠にならない。**判定の数値の基準はここでは置かない。**値を記録し、判定は
-    `EXP-0xx`の側で行う。
+    描画の間もloopが回った証拠にならない。**これらの値は描画の間だけを表さない。**`max_read_gap_ms`は
+    health snapshotの周期（`config::HEALTH_SNAPSHOT_PERIOD_MS`）の窓の中の最大値、`overrun_ticks`は起動からの
+    累積であり、どちらも描画の外の処理（描画の後にmain loopの中で走るI2Cのbring-up、最初の窓では
+    `demonstrate_pi_session`など）を含む上限である。上限が小さければ描画の間も小さいと言えるが、大きくても
+    描画のせいとは言えない。手順9の給電を止める条件は変えない。**描画の最後（`display_pattern_hold`の行）より
+    後に出た`health`の行が無ければ、条件6は未達として記録する。** **判定の数値の基準はここでは置かない。**
+    値を記録し、判定は`EXP-0xx`の側で行う。
     **ただしこの手順はPiを接続しない（条件(3)(a)）ため、`boot`→ACKは成立せず、実protocol sessionを確立しない。
     したがってこの手順だけでは条件6の「通信」を示せない見込みである。**「watchdog」の側は、
     heartbeatの行だけでは示せない。TWDTが有効であることと、描画の間に`task_wdt`のerrorのlogが

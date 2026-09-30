@@ -40,8 +40,9 @@
 //!   描いた値と同じ量を測っているとは限らない。
 //! - `display_corner_pattern`：四隅と軸の要素の描画時間の合計である。背景を含めない点は以前と
 //!   同じだが、#487の直前の計時の区間（`EXP-018`の値）は、要素の間の`bringup_hb`（1 msの待ち＝
-//!   0〜10 msと、logの出力）を5回含んでいた。今の値はそれを含めないため、`EXP-018`の値より
-//!   小さくなっても描画が速くなったことを示さない。
+//!   0〜10 msと、logの出力）を5回と、すべての要素の`display_pattern_element`のlogを含んでいた。
+//!   今の値はそれを含めないため、`EXP-018`の値より小さくなっても描画が速くなったことを示さない
+//!   （要素の描画が失敗したときの`display_*_failed`のlogは、以前と同じく含む）。
 //!
 //! **失敗したときの振る舞いは、1回で描き切っていた頃と同じにする**（`docs/hardware/power-budget.md`の
 //! `DISP-01`追加接続の手順9の「失敗時の扱い」が、この振る舞いを前提にしている）。
@@ -292,13 +293,15 @@ impl<'d> DisplayBringup<'d> {
                 ) {
                     log::error!("display_axis_failed axis=x_axis error={err}");
                 }
+                // 計時は`y_axis`の要素のlogより前で止める（module doc「logの行」）。
+                let drawn_us = drawn_us + start.elapsed().as_micros();
                 let y_len = display::HEIGHT - Y_END - ORIGIN;
                 log::info!(
                     "display_pattern_element name=y_axis x={AXIS_OFFSET} y={ORIGIN} width={AXIS} height={y_len} style=dashed dash={DASH}"
                 );
                 Step::YAxis {
                     offset: 0,
-                    drawn_us: drawn_us + start.elapsed().as_micros(),
+                    drawn_us,
                 }
             }
             Step::YAxis { offset, drawn_us } => {
