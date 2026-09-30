@@ -1,12 +1,13 @@
 //! `boot`の受理確認・再送（§4.1）と、`sid`選び直し（§3.1「`sid`が衝突した場合」）。
 //!
-//! `pi-protocol-mode`でだけ使う（`#446` PR B）。`main.rs`の`generate_sid`が選んだ`sid`で
+//! Pi linkを持つbuild（`bench-servo-test-17`以外のすべて。`#487`）で使う（`#446` PR B）。`main.rs`の`generate_sid`が選んだ`sid`で
 //! `boot`を送り、Pi linkのUART（`PI-UART-RX`、`#487`）から届く`ack`を待つ。§4.1の終了条件の表が定める**state遷移**
 //! （いつ再送するか、いつ`sid`を選び直すか、いつ止めるか）を実装する狙いで
 //! 書いたものであり、**state遷移が§4.1の表どおりに正しいことをhost側の
 //! unit testでは確かめていない**（`firmware/esp32`はhostのworkspaceから
 //! 除外されており、`esp_idf_svc`の型へ直接依存するため）。3構成
-//! （既定・`pi-protocol-mode`・`bringup-display-13`）でのbuild（`cargo build`／
+//! （`#446` PR Bの時点では既定・`pi-protocol-mode`・`bringup-display-13`。`#487`からは既定と
+//! `bringup-display-13`の2構成）でのbuild（`cargo build`／
 //! `cargo clippy`）が通ることは、compileが通ることの根拠であり、**state遷移が
 //! 正しいことの根拠ではない。**state遷移の正しさの根拠は、この`boot_session.rs`
 //! を導入したPull Request（`#446` PR B）の自己レビュー記録（複数回のcode
@@ -39,17 +40,16 @@
 //! 対応するvariantが無い。**したがってこのmoduleは`protocol_fault`をwireへ送らない。**
 //! 「送出を止める」という動作面だけを実装する（`boot`送出を止めた状態で`main()`は
 //! 戻らずheartbeat／health snapshotのloopを続ける）。servo出力の無効化は、
-//! `pi-protocol-mode`のmain loopが`crate::servo`を呼ぶ箇所を持たない
-//! （`main.rs`の`#[cfg(feature = "pi-protocol-mode")]`区間を目視で確認した。
-//! `mod servo`自体はfeature条件無しでcompileされるが、呼び出しは
-//! `bench-servo-test-17` featureの下にしかない）ため満たされる。網羅的な
+//! Pi linkを持つbuildが`crate::servo`を呼ぶ箇所を持たない（`crate::servo`の呼び出しは
+//! `bench-servo-test-17` featureの下にしかなく、そのbuildはPi linkを持たない。`main.rs`を
+//! 目視で確認した。`mod servo`自体はfeature条件無しでcompileされる）ため満たされる。網羅的な
 //! 呼び出し元探索（例: 静的解析）はしていない。
 //!
 //! # 停止理由の区別
 //!
 //! 停止理由は[`TerminalReason`]（[`Phase::Terminated`]が保持する）として内部stateに
-//! 持ち、終端したときにUART0（USB）のdebug logへ出す（`#487`。それより前の
-//! `pi-protocol-mode`はloggingを止めており、出力されなかった）。`Health`の
+//! 持ち、終端したときにUART0（USB）のdebug logへ出す（`#487`。それより前、Pi linkを持つbuild
+//! （当時の`pi-protocol-mode`）はloggingを止めており、出力されなかった）。`Health`の
 //! `ProtocolCounters`はまだwireへ送る経路が無い（`#12`）。したがって`counter`は
 //! 増やさない——増やしても読む経路が無いcounterになる（`#448`で同じ理由から
 //! `boot_serialize_errors`を削除した判断に揃えた）。`TerminalReason`として
@@ -180,15 +180,15 @@ enum Phase {
     /// §4.1の表は、`RecoveryBudgetExhausted`で終端した場合に限り、Piから
     /// 有効な`hello`を受信したら同じ`(sid, id)`のまま1回だけ再開してよいと
     /// 定めている（`hello`はESP32が受信する側のmessageであり、`crate::protocol`の
-    /// `PiSession::handle_hello`が別途実装しているが、`pi-protocol-mode`の
-    /// runtime経路（`main.rs`のmain loop）へは配線していない）。**この実装は
+    /// `PiSession::handle_hello`が別途実装しているが、runtime経路（`main.rs`のmain loop）へは
+    /// まだ配線していない。`#487`の残りの作業である）。**この実装は
     /// 再開を使わない。**§4.1の規定は「再開してよい」であって「しなければ
     /// ならない」ではなく（許可であり義務ではない）、再開しないことは
     /// より厳しい側の選択であるため、どのMUSTにも反しない。それ以外の
     /// 終端理由（`RateLimitedBudgetExhausted`・`SidReselectLimitReached`・
     /// `Rejected`）には、そもそも再開の規定が無い。以降、processの再起動
-    /// までは自動では再開しない（`pi-protocol-mode`は`Ack`以外を受け付けない
-    /// ため、運用者が明示的にsession resetを指示する受信経路も無い）。
+    /// までは自動では再開しない（main loopは`Ack`以外をまだ受け付けないため、運用者が明示的に
+    /// session resetを指示する受信経路も無い）。
     Terminated(TerminalReason),
 }
 
@@ -268,13 +268,10 @@ impl BootSession {
     /// §8はidentityを復元できる要求に相関ACKを返すよう定めるが、この実装は
     /// `Ack`以外を一切処理しない（応答もしない）。**これは§8に反する既知の
     /// 逸脱として扱う。**義務は受信側の規範であり、実装しないことで消える
-    /// ものではない。`pi-protocol-mode`はPi→ESP32方向のrequest処理
-    /// （`hello`・`get_status`等の受理）を実装していない——`crate::protocol`の
-    /// `PiSession`は既定buildだけでcompileされ（`main.rs`の`mod protocol`は
-    /// `#[cfg(not(feature = "pi-protocol-mode"))]`）、`pi-protocol-mode`の
-    /// buildにはそもそも存在しない。この逸脱を解消するにはhello／get_status
-    /// 処理自体を`pi-protocol-mode`へ実装する必要があり、このPRの範囲外である
-    /// （console.rsのmodule doc「`pi-protocol-mode`のbuildを実際のPi hostへ接続する範囲」の
+    /// ものではない。main loopはPi→ESP32方向のrequest（`hello`・`get_status`等）の受理を
+    /// まだ持たない（`crate::protocol`の`PiSession`はcompileされるが、受信の経路へつないで
+    /// いない）。この逸脱を解消するのは`#487`の残りの作業（`hello`の処理を受信の経路へつなぐ
+    /// 変更）である（console.rsのmodule doc「Pi linkを持つbuildを実際のPi hostへ接続する範囲」の
     /// 理由でもある）。
     ///
     /// **§7「Parser counterでは…を区別する」の義務も満たしていない。**確立前
@@ -603,8 +600,9 @@ fn duration_to_ms(duration: Duration) -> u64 {
 ///
 /// **切り上げる。**1ms以上は`TickType::new_millis`（esp-idf-hal 0.46.2
 /// `delay.rs`89〜95行）が切り上げる。0msは0 tick（`delay::NON_BLOCK`）になり
-/// `UartRxDriver::read`が即時returnする（`uart.rs`1211〜1217行）。呼び出し側で
-/// 「締切に達した」場合は`Duration::ZERO`を渡し、即時returnさせる。
+/// `UartRxDriver::read`が即時returnする（`uart.rs`1211〜1217行）。**main loopは0 msを渡さず、
+/// 1 ms以上へ丸めてから渡す**（`#487`。0 tickの`read`はyieldせずに戻るため。`main.rs`のmain
+/// loopのcomment）。
 pub fn ticks_until(remaining: Duration) -> esp_idf_svc::hal::delay::TickType_t {
     TickType::from(remaining).into()
 }

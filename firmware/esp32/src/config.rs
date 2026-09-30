@@ -64,8 +64,6 @@ pub const HEALTH_SNAPSHOT_PERIOD_MS: u32 = 10_000;
 /// 上限が何によって効くか（ESP-IDFのどの機構が`Err`を返すか）と、
 /// `esp_idf_svc::hal::i2c::config::Config`の`timeout`フィールドを設定しない理由は、
 /// `main.rs`の`run_i2c_bringup`のdoc commentが持つ。**ここへ再掲しない。**
-// `pi-protocol-mode`では`crate::accel`／`crate::env`をcompileしないため未到達になる。
-#[allow(dead_code)]
 pub const I2C_TRANSACTION_TIMEOUT_MS: u64 = 100;
 
 /// `DISP-01`のbring-upで、単色fillの各色と向きのpatternを表示したまま保つ時間（milliseconds）。
@@ -143,7 +141,7 @@ pub const SERVO_BENCH_TEST_ARM_DELAY_MS: u32 = 10_000;
 #[allow(dead_code)]
 pub const SERVO_BENCH_TEST_EXPOSURE_MS: u32 = 300;
 
-/// `pi-protocol-mode`のPi link（`PI-UART-TX`／`PI-UART-RX`）のbaud（Hz）。
+/// Pi link（`PI-UART-TX`／`PI-UART-RX`）のbaud（Hz）。
 /// **確定値ではない。**`docs/protocol/esp32-pi-protocol.md`§2の`Baud`行が`Candidate`
 /// （両端で検証する）とする115200 bpsを使う（`PROTO-TBD-001`、最終baudは未確定）。
 /// 直列4.7 kΩを入れたままこのbaudで通信できるかは、初回の接続で確かめる
@@ -152,10 +150,10 @@ pub const SERVO_BENCH_TEST_EXPOSURE_MS: u32 = 300;
 /// **`#487`より前は、UART0のconsole（`CONFIG_ESP_CONSOLE_UART_BAUDRATE`）と揃える
 /// ことを根拠にしていた。**Pi linkがUART0から外れたため、その根拠は無くなった
 /// （UART0のconsoleとは別のUARTであり、揃える必要が無い）。
-#[cfg(feature = "pi-protocol-mode")]
+#[cfg(not(feature = "bench-servo-test-17"))]
 pub const PI_PROTOCOL_UART_BAUDRATE_HZ: u32 = 115_200;
 
-/// `pi-protocol-mode`のPi link UARTの受信ring buffer容量（byte）。`UartDriver`（interrupt駆動）が
+/// Pi link UARTの受信ring buffer容量（byte）。`UartDriver`（interrupt駆動）が
 /// hardware FIFOから継続的に吸い上げる先であり、hardware FIFO自体
 /// （`SOC_UART_FIFO_LEN`＝128 byte、ESP32の`soc_caps.h`）より大きくなければ
 /// `uart_driver_install`が`ESP_FAIL`を返す（ESP-IDF v5.5.3の
@@ -181,15 +179,18 @@ pub const PI_PROTOCOL_UART_BAUDRATE_HZ: u32 = 115_200;
 /// その間はring bufferが貯まり続ける。**このNVS操作の所要時間は未確認
 /// （下記）。
 ///
-/// **`#487`から、`read`と`read`の間にUART0へのdebug log出力も入る。**`pi-protocol-mode`が
-/// loggingを止めなくなったためである（`crate::console`参照）。heartbeat、health snapshot
+/// **`#487`から、`read`と`read`の間にUART0へのdebug log出力も入る。**Pi linkを持つbuildが
+/// loggingを止めなくなったためである（`crate::console`参照）。`bringup-display-13`付きbuildでは、
+/// LCDの描画の1段（`crate::display_test`）も入る。heartbeat、health snapshot
 /// （JSON 1行）、`boot_tx`等のlogを書いている間も、この`read`は呼ばれない。**log出力の
 /// 所要時間は測っていない。**consoleがbyteを送り終えるまで戻らない場合、所要時間は
 /// logのbyte数に比例する。UART0のbaudは生成された`sdkconfig`の`CONFIG_ESP_CONSOLE_UART_BAUDRATE`
 /// で`115200`と確かめた（`#487`、ESP-IDF v5.5.3、debug profileのbuild出力）。Pi linkも115200 bpsであるため、その間にPi linkへ
 /// 届きうるbyte数はlogのbyte数と同程度になる（計算であり、実測ではない）。health snapshotの
-/// 1行の長さも測っていない。**この見込みが512 byteに収まるかは確かめていない**（溢れを
-/// 数える経路もlogへ出す経路も無い。`console.rs`のmodule doc (2)）。
+/// 1行の長さも測っていない。**この見込みが512 byteに収まるかは確かめていない。**
+/// `#487`から、溢れはUART driverのevent（`UART_BUFFER_FULL`／`UART_FIFO_OVF`）として数え、
+/// 読みに行く間隔の最大値と一緒にhealth snapshotの行へ出す（`main.rs`の`drain_uart_events`、
+/// `crate::health::UartObservations`）。**eventが数えられなかった場合もありうる**（同関数のdoc）。
 ///
 /// **この値は理論値ではなく安全側の見込みである。**`boot`のACK（§6の例で約115 byte）に
 /// 続けて`get_status`等の別messageが即座に届く場合（`coordinator::handle_boot`が
@@ -213,16 +214,16 @@ pub const PI_PROTOCOL_UART_BAUDRATE_HZ: u32 = 115_200;
 /// 節参照。この経路の実在はesp-idf-svcのsourceで確認済み）。**この書き込み・
 /// 消去の間、UART受信interruptが遅延・停止しうるかどうかは一次資料で
 /// 確認しておらず、この版ではその影響を測っていない。**
-#[cfg(feature = "pi-protocol-mode")]
+#[cfg(not(feature = "bench-servo-test-17"))]
 pub const PI_PROTOCOL_UART_RX_BUFFER_BYTES: usize = 512;
 
-/// `pi-protocol-mode`のPi link UARTの送信ring buffer容量（byte）。受信側ほど余裕を必要と
+/// Pi link UARTの送信ring buffer容量（byte）。受信側ほど余裕を必要と
 /// しない。`UartDriver::write`が呼ぶ`uart_write_bytes`→`uart_tx_all`は
 /// `portMAX_DELAY`でblockし、渡した全byteをtx ring bufferへ積み終えるまで
 /// 戻らない（wireへ送り終えるまでではない。`crate::boot_session`の`send_boot`の
 /// comment参照）ため、tx ring bufferが溢れて送信側がdataを失うことは無い。`uart_driver_install`は`tx_fifo_size`にも
 /// `> UART_HW_FIFO_LEN`（または`0`）を要求するため、受信側と同じ値にしておく。
-#[cfg(feature = "pi-protocol-mode")]
+#[cfg(not(feature = "bench-servo-test-17"))]
 pub const PI_PROTOCOL_UART_TX_BUFFER_BYTES: usize = 512;
 
 /// `main()`のloopで1回の`UartDriver::read`に渡すstack buffer長（byte）。
@@ -231,5 +232,18 @@ pub const PI_PROTOCOL_UART_TX_BUFFER_BYTES: usize = 512;
 /// 受信済みbyteを跨いで行を組み立てる）。stack上に置くため小さく抑えた
 /// （ring buffer容量の半分）。**`main()`の他のlocal変数と合わせた合計stack使用量は
 /// 測っていない。**task stack sizeを圧迫しないという主張はしない。
-#[cfg(feature = "pi-protocol-mode")]
+#[cfg(not(feature = "bench-servo-test-17"))]
 pub const PI_PROTOCOL_UART_READ_CHUNK_BYTES: usize = 256;
+
+/// Pi link UARTのevent queueの長さ（件）。受信の異常（ring bufferの満杯、FIFOの溢れ、
+/// frame error）を数えるために使う（`main.rs`の`drain_uart_events`）。
+///
+/// **この値は安全要件の5項目に効かない**（観測の手段であり、送受信するbyteも電気の条件も
+/// 変えない）。ESP-IDFのUART driverは、受信のたびに`UART_DATA`のeventも積む。queueが満杯の
+/// 間に起きたeventは捨てられる（ESP-IDF v5.5.3 `esp_driver_uart/src/uart.c`の
+/// `UART event queue full`の`ESP_EARLY_LOGV`。既定のlog levelでは出ない）。main loopは周回
+/// ごとにqueueを空にするため、1周回の間に積まれる`UART_DATA`の数（通常は数件）より大きく
+/// とる。esp-idf-hal 0.46.2の既定（`Config::new`の`queue_size: 10`）より余裕を見た値であり、
+/// 導出した値ではない。
+#[cfg(not(feature = "bench-servo-test-17"))]
+pub const PI_PROTOCOL_UART_EVENT_QUEUE_LEN: usize = 32;

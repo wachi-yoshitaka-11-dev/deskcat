@@ -70,7 +70,7 @@ Issue本文・コメントは2026-09-27 JSTに再取得した。以後の実施�
   条件が揃わなければ#13へ不足と再予定を残す。#13全体の完了日と混同しない。
 
 **#13の条件6（描画更新中の通信とwatchdog）は未達のまま残す。**
-`bringup-display-13`と`pi-protocol-mode`は排他であり、描画段階の境界でのheartbeatだけでは足りない。
+#487で`bringup-display-13`のbuildも描画の間にPi linkとheartbeatを回すようになったが、実機での確認はまだ無い。
 [#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)の実sessionと、#13自身が持つ
 同時動作のfirmware変更・実機確認が要る。これらの完了を上の条件1〜5の開始へ逆流させない。
 

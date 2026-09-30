@@ -542,7 +542,9 @@ ESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`の負荷合計（測定ではない。
       `DISP-01`について完了している
 - [ ] (2) firmwareが`--features bringup-display-13`付きでbuild済みである。**commandの正本は
       [検証済みコマンド](../toolchains/verified-commands.md)であり、ここへ写さない。**同feature
-      は`pi-protocol-mode`と同時指定できない（`main.rs`の`compile_error!`）。既定buildのままでは
+      は製品build（既定build）へLCDの試験モードを加えるものであり、Pi link（UART1）も同時に動く
+      （[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)。GPIO13をTXとして駆動するが、
+      この手順ではGPIO13へ何もつながない。`gpio-assignment.md`の`PI-UART-TX`行）。既定buildのままでは
       `run_display_bringup`が呼ばれず、受け入れ条件（初期化・fill・四隅・timing）を確認する材料と、
       controllerの識別に使うcommandの実機での効果が得られない。**この構成のVersion Recordはまだ無い**（[検証済みコマンド](../toolchains/verified-commands.md)
       が明記するとおり、`bringup-display-13`構成は正式なVersion Recordを持たない。build-onlyの
@@ -721,10 +723,11 @@ ESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`の負荷合計（測定ではない。
     Measurement equipment／Procedure／Expected result／Measured result／Faults／Conclusion／
     Next safe step）に従う。**受け入れ条件6件（[Issue #13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)）
     のうち何が確認でき、何が未達のまま残るかを明記する。**「更新中も通信とwatchdogがactiveである」
-    （条件6）は、`main.rs`のmodule docが記録するとおり、既定buildでも`bringup-display-13`
-    buildでも実protocol sessionを確立せず（`pi-protocol-mode`は排他）、heartbeatは描画段階の
-    境界でだけ刻まれる（`service_bringup_step`）。**したがってこの手順だけでは条件6を示せない
-    見込みである。**示せなかった場合は未達とし、依存先（[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)
+    （条件6）について、#487から`bringup-display-13` buildは描画を1段ずつ進め、描画の間も
+    heartbeat（`hb`の行）とPi linkの`boot`の再送が止まらない（`firmware/esp32/src/display_test.rs`）。
+    **ただしこの手順はPiを接続しないため、`boot`→ACKは成立せず、実protocol sessionを確立しない。
+    したがってこの手順だけでは条件6の「通信」を示せない見込みである。**描画の間もheartbeatが
+    続くことは、この手順のlogで確かめられる。示せなかった場合は未達とし、依存先（[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)
     等）をIssue側の記録に残す。
 
 ##### `DISP-01`追加接続のbring-upの手順：条件の根拠
