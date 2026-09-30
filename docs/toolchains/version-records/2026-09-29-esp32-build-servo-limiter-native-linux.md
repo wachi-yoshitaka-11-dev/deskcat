@@ -24,8 +24,8 @@ Machine profile: ESP32 Build
 Operator role: AI agent作業（build-onlyのみ。flash・monitor・USBシリアルポートは開いていない）
 Repository commit: 4522d424b8a450b6bc4c3666534b83738b4b40cb（#19の作業branchのcommit。
   origin/develop d7743e7f65dabfd311dc907c3006b7bd224df52e を取り込み済み）。
-  **このcommitより後に同branchへ入れるcommitは、この記録とVersion Recordsの一覧だけを変える。**
-  code、manifest、lockfileは変えない。squash mergeの後はこのSHAがdevelopから辿れなくなるため、
+  **このcommitより後に同branchへ入れるcommitは、文書（この記録、Version Recordsの一覧、
+  `docs/toolchains/verified-commands.md`）だけを変える。code、manifest、lockfileは変えない。**squash mergeの後はこのSHAがdevelopから辿れなくなるため、
   そのときはPull Requestのcommit一覧から辿る
 Working tree clean: yes（`git archive 4522d42`でscratchpadへ展開した未改変コピーを使用。
   worktree・main checkoutいずれのgit stateも変更していない）
