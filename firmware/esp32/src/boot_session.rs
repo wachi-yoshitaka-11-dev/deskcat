@@ -7,7 +7,7 @@
 //! unit testでは確かめていない**（`firmware/esp32`はhostのworkspaceから
 //! 除外されており、`esp_idf_svc`の型へ直接依存するため）。3構成
 //! （`#446` PR Bの時点では既定・`pi-protocol-mode`・`bringup-display-13`。`#487`からは既定と
-//! `bringup-display-13`の2構成）でのbuild（`cargo build`／
+//! `bringup-display-13`の2構成。実行の記録はそれぞれのPull Request本文にある）でのbuild（`cargo build`／
 //! `cargo clippy`）が通ることは、compileが通ることの根拠であり、**state遷移が
 //! 正しいことの根拠ではない。**state遷移の正しさの根拠は、この`boot_session.rs`
 //! を導入したPull Request（`#446` PR B）の自己レビュー記録（複数回のcode

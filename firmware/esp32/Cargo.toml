@@ -14,7 +14,8 @@ harness = false # do not use the built-in cargo test harness -> resolve rust-ana
 [features]
 # **製品buildは既定build（featureなし）である**（#487）。Pi link（UART1、`PI-UART-TX`＝GPIO13、
 # `PI-UART-RX`＝GPIO14）、I2Cのbring-up、heartbeat／health snapshotを1本のmain loopで回す。
-# featureは加える向きだけにする。構成の一覧は`src/main.rs`のmodule doc「buildの構成」節が持つ。
+# featureは加える向きにする。例外は`bench-servo-test-17`だけであり、Pi linkを外す（下の注記）。
+# 構成の一覧は`src/main.rs`のmodule doc「buildの構成」節が持つ。
 # #487より前にあった`pi-protocol-mode`（Pi linkを持つbuild。LCD／I2Cと排他）は廃止した。
 default = []
 # Issue #17の単発servo bench試験だけを有効にする。既定ではoffであり、
@@ -31,7 +32,7 @@ bench-servo-test-17 = []
 # 呼ばず、`LCD-BL`（GPIO4）を含むLCD関連pinへ一切触れない。既定offにした理由と、
 # 有効化してよい条件・手順は`main.rs`のmodule docの
 # 「`DISP-01`のbring-upを有効にする手順」節を参照する（ここへ再掲しない）。
-# #487から、fillと四隅patternはmain loopの中で1段ずつ進み、Pi linkとheartbeatは描画の間も
+# #487から、fillと四隅patternはmain loopの中で1段ずつ進み、Pi linkの受信とheartbeatは描画の間も
 # 止まらない（`src/display_test.rs`）。
 bringup-display-13 = []
 

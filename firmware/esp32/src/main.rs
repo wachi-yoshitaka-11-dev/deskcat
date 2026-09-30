@@ -34,11 +34,12 @@
 //!
 //! **製品buildは既定build（featureなし）である。**Pi link、I2Cのbring-up、heartbeat／health
 //! snapshotを1本のmain loopで回す（thread は使わない）。logはどのbuildでもUART0（USB）へ出る
-//! （`crate::console`）。featureは加える向きだけにする。
+//! （`crate::console`）。featureは加える向きにする。**例外は`bench-servo-test-17`だけであり、Pi linkを
+//! 外す**（下の表。正本の要求による）。
 //!
 //! | feature | 加えるもの | 既定buildとの関係 |
 //! |---|---|---|
-//! | `bringup-display-13` | LCDの初期化、backlightの点灯、単色fillと四隅patternの試験モード | 製品buildに加える。Pi linkとheartbeatは描画の間も止まらない |
+//! | `bringup-display-13` | LCDの初期化、backlightの点灯、単色fillと四隅patternの試験モード | 製品buildに加える。Pi linkの受信とheartbeatは描画の間も止まらない |
 //! | `bench-servo-test-17` | servoの単発bench試験（#17の測定用build） | **Pi linkを外す。**正本`docs/hardware/servo-safety-limits.md`の`測定のための駆動（承認の状態の項目6）`節が、測定用のbuildは「Piとの通信linkを持たない」と定めているためである。#474で、このfeature付きbuildはcompileが止まる |
 //!
 //! `#487`より前は、`pi-protocol-mode` featureを付けたbuildだけがPi linkを持ち、LCD／I2Cの
@@ -85,6 +86,15 @@
 //! timeoutで待つ（main loop参照）。どちらもbusy wait をしないため、待ち時間は必ず 1 ms 以上へ
 //! 丸める（[`sleep_ms_until`] とmain loopのcomment参照）。LCDのbring-up（`bringup-display-13`
 //! feature付きbuild）は描画を1段ずつ進め、段と段の間でmain loopへ戻る（`crate::display_test`）。
+//!
+//! **Task Watchdog Timerの既定の設定と、発火したときの振る舞い。**生成された`sdkconfig`（debug profile、
+//! ESP-IDF v5.5.3）では`CONFIG_ESP_TASK_WDT_EN=y`・`CONFIG_ESP_TASK_WDT_INIT=y`・
+//! `CONFIG_ESP_TASK_WDT_TIMEOUT_S=5`で、両CPUのIDLE taskを監視する（`CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU0=y`／
+//! `CPU1=y`）。**`CONFIG_ESP_TASK_WDT_PANIC`は無効である。**このときTWDTが発火してもresetはせず、
+//! `task_wdt`のerrorのlog（`Tasks currently running:`等）とbacktraceをconsole（UART0）へ出すだけである
+//! （ESP-IDF v5.5.3 `components/esp_system/task_wdt/task_wdt.c`の`task_wdt_timeout_handling`と
+//! ISR handler）。**したがってwatchdogが発火しなかったことは、`reset_reason`ではなく、このerrorのlogが
+//! 出ないことで見る。**heartbeat（`hb`の行）が続くことだけでは、watchdogがactiveであることを示さない。
 //!
 //! # `DISP-01`のbring-upを有効にする手順
 //!
@@ -317,7 +327,7 @@ fn main() {
     // implemented by esp-idf-sys might not link properly. See https://github.com/esp-rs/esp-idf-template/issues/71
     esp_idf_svc::sys::link_patches();
 
-    // どちらのbuildでもUART0はdebug log専用である（`crate::console`のmodule doc参照）。
+    // どのbuildでもUART0はdebug log専用である（`crate::console`のmodule doc参照）。
     console::init_log_mode();
 
     // build identity。profile は `Cargo.toml` の `[profile.dev]`／`[profile.release]` に対応する。
@@ -429,7 +439,8 @@ fn main() {
     // **`health.uptime_ms()`起点で最初の締切を積む。**`0`起点で固定すると、起動時の
     // bring-up（LCDの初期化、I2CのID読み出し）の所要時間だけで最初のloop周回が即座に
     // `overrun`と判定されてしまう。bring-up自体の遅延であってmain loopの遅延ではないため、
-    // 混同しない。
+    // 混同しない。**ただし`bringup-display-13`付きbuildでは、I2Cのbring-upはmain loopの中で
+    // 動く**（下の`i2c_pending`）。その所要時間はloopの遅延として`overrun`と`max_read_gap_ms`に入る。
     let bringup_done_ms = health.uptime_ms();
     let mut next_heartbeat = bringup_done_ms + u64::from(config::HEARTBEAT_PERIOD_MS);
     let mut next_snapshot = bringup_done_ms + u64::from(config::HEALTH_SNAPSHOT_PERIOD_MS);

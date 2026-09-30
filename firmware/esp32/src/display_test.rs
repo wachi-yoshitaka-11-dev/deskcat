@@ -8,28 +8,42 @@
 //!
 //! [#487]以前は、`run_display_bringup`が5色のfillと四隅patternを1回の呼び出しで
 //! 描き切り、色ごとに[`config::DISPLAY_HOLD_MS`]の`FreeRtos::delay_ms`を挟んでいた。
-//! その間main loopへ戻らないため、heartbeatは描画段階の境界の`bringup_hb`だけになり、
-//! Pi linkの受信も止まっていた（[#13]の受け入れ条件6「更新中も通信とwatchdogがactiveで
-//! ある」を示せない理由）。
+//! その間main loopへ戻らないため、heartbeatは描画段階の境界の`bringup_hb`だけだった。
+//! またLCDを描くbuildはPi linkを持たなかった（当時の`pi-protocol-mode`と排他）。どちらも
+//! [#13]の受け入れ条件6「更新中も通信とwatchdogがactiveである」を示せない理由だった。
 //!
 //! このmoduleは描画を小さな段に分け、[`DisplayBringup::poll`]が1回に1段だけ描いて戻る。
 //! 1段は、画面の横幅いっぱいで[`BAND_ROWS`]行の帯1本、または四隅patternの要素1つである。
 //! 色を保つ間（[`config::DISPLAY_HOLD_MS`]）は描かず、締切だけを返す。main loopは
-//! 段と段の間に、heartbeat、health snapshot、Pi linkの受信と`boot`の再送を回す。
+//! 段と段の間に、heartbeat、health snapshot、Pi linkの受信と、budgetが残っている間の`boot`の
+//! 再送を回す（`crate::boot_session`。ACKを受けた後は再送しない）。
 //!
 //! **1段の所要時間は測っていない。**帯1本は`WIDTH`×[`BAND_ROWS`]×2 byte（320×16×2＝10,240 byte）
 //! であり、SPI clock 6 MHz（`docs/hardware/gpio-assignment.md`の`LCD-SCLK`行）なら
 //! 転送だけで約14 msになる（計算であり、実測ではない。command・CS・chunkの切れ目の分は含まない）。
-//! 各段の実測は`display_fill`等の行の`elapsed_us`に出る。
+//! **段ごとの所要時間はlogへ出さない。**出すのは、色ごとの帯の合計（`display_fill`の`elapsed_us`）と、
+//! 四隅patternの要素の合計（`display_corner_pattern`の`elapsed_us`）である。
 //!
 //! # logの行
 //!
 //! 行の名前（`display_fill`、`display_pattern_element`、`display_corner_pattern`、
 //! `display_pattern_hold`）は、1回で描き切っていた頃と同じにする。
 //! `docs/hardware/power-budget.md`の`DISP-01`追加接続の手順が、完了の証拠としてこれらの
-//! 行を挙げているためである。**`elapsed_us`の意味は1点だけ変わる。**帯の描画時間の
-//! 合計であり、帯と帯の間にmain loopが使った時間を含まない（1回で描き切っていた頃は、
-//! 間にmain loopが入らなかったため、両者は同じだった）。
+//! 行を挙げているためである。
+//!
+//! **`elapsed_us`の意味は変わる。**帯15本の描画時間の合計であり、帯と帯の間にmain loopが
+//! 使った時間を含まない。帯ごとにwindowの設定（CASET／PASET）とRAMWRのcommandを送るため、
+//! 1回の`fill_screen`で描いた値（`docs/hardware/experiment-log.md`の`EXP-016`）と直接比べられる
+//! とは限らない。
+//!
+//! **失敗したときの振る舞いは、1回で描き切っていた頃と同じにする**（`docs/hardware/power-budget.md`の
+//! `DISP-01`追加接続の手順9の「失敗時の扱い」が、この振る舞いを前提にしている）。
+//! - 単色fill：ある色の帯が1本でも失敗したら、`display_fill_failed`を出し、その色の残りの帯を
+//!   描かず、`display_fill`の行も保持も出さずに次の色へ進む。**`display_fill`の行は、その色の
+//!   帯をすべて描けたときだけ出る。**
+//! - 四隅patternの背景：帯が1本でも失敗したら、`display_corner_background_failed`を出し、四隅を
+//!   描かずにbring-upを終える（driverを手放し、backlightが消える）。
+//! - 四隅と軸：1つの要素の失敗は、他の要素の描画を止めない。
 //!
 //! # 単色fill
 //!
@@ -158,9 +172,8 @@ impl<'d> DisplayBringup<'d> {
 
     /// 締切に達していれば1段だけ進める。
     ///
-    /// **描画のerrorで止めない。**errorは`log::error!`へ分類して次の段へ進む（どの段で失敗しても
-    /// panicしない）。1回で描き切っていた頃との違いが1つある。以前は四隅patternの背景（黒）の
-    /// fillに失敗するとpatternを描かずに戻っていたが、今は背景の帯の失敗を記録して四隅へ進む。
+    /// **どの段で失敗してもpanicしない。**errorは`log::error!`へ分類する。失敗の後にどこへ進むかは、
+    /// 1回で描き切っていた頃と同じである（module doc「logの行」）。
     ///
     /// 最後の保持が済んだら`None`を返す。driverはここで手放され、backlightが消える
     /// （module doc「終わり方」）。
@@ -175,7 +188,15 @@ impl<'d> DisplayBringup<'d> {
                 drawn_us,
             } => {
                 let (name, color) = FILLS[index];
-                let drawn_us = drawn_us + self.band(row, color, "display_fill_failed", name);
+                let Some(band_us) = self.band(row, color, "display_fill_failed", name) else {
+                    // この色は描けなかった。残りの帯を描かず、保持もせずに次の色へ進む
+                    // （module doc「logの行」の失敗の扱い）。
+                    return Some(Self {
+                        step: Self::after_fill(index),
+                        ..self
+                    });
+                };
+                let drawn_us = drawn_us + band_us;
                 let next_row = row + BAND_ROWS;
                 if next_row < display::HEIGHT {
                     Step::Fill {
@@ -194,28 +215,18 @@ impl<'d> DisplayBringup<'d> {
                     }
                 }
             }
-            Step::FillHold { index, .. } => {
-                if index + 1 < FILLS.len() {
-                    Step::Fill {
-                        index: index + 1,
-                        row: 0,
-                        drawn_us: 0,
-                    }
-                } else {
-                    Step::PatternBackground {
-                        row: 0,
-                        drawn_us: 0,
-                    }
-                }
-            }
+            Step::FillHold { index, .. } => Self::after_fill(index),
             Step::PatternBackground { row, drawn_us } => {
-                let drawn_us = drawn_us
-                    + self.band(
-                        row,
-                        display::color::BLACK,
-                        "display_corner_background_failed",
-                        "background",
-                    );
+                let Some(band_us) = self.band(
+                    row,
+                    display::color::BLACK,
+                    "display_corner_background_failed",
+                    "background",
+                ) else {
+                    // 背景が描けなければ四隅を描かずに終える（module doc「logの行」の失敗の扱い）。
+                    return None;
+                };
+                let drawn_us = drawn_us + band_us;
                 let next_row = row + BAND_ROWS;
                 if next_row < display::HEIGHT {
                     Step::PatternBackground {
@@ -317,17 +328,36 @@ impl<'d> DisplayBringup<'d> {
         Some(self)
     }
 
+    /// `index`番目の色を終えた（描けた後の保持が済んだ、または描けなかった）後の段。
+    fn after_fill(index: usize) -> Step {
+        if index + 1 < FILLS.len() {
+            Step::Fill {
+                index: index + 1,
+                row: 0,
+                drawn_us: 0,
+            }
+        } else {
+            Step::PatternBackground {
+                row: 0,
+                drawn_us: 0,
+            }
+        }
+    }
+
     /// `row`行目から[`BAND_ROWS`]行の帯を`color`で塗り、描画時間（µs）を返す。
-    /// errorは`error_tag`の行へ分類し、時間はそのまま返す（止めない）。
-    fn band(&mut self, row: u16, color: u16, error_tag: &str, name: &str) -> u128 {
+    /// 失敗したら`error_tag`の行へ分類して`None`を返す（止めるかどうかは呼び出し側が決める）。
+    fn band(&mut self, row: u16, color: u16, error_tag: &str, name: &str) -> Option<u128> {
         let last_row = (row + BAND_ROWS - 1).min(display::HEIGHT - 1);
         let start = Instant::now();
-        if let Err(err) = self
+        match self
             .lcd
             .fill_rect(0, row, display::WIDTH - 1, last_row, color)
         {
-            log::error!("{error_tag} name={name} row={row} error={err}");
+            Ok(()) => Some(start.elapsed().as_micros()),
+            Err(err) => {
+                log::error!("{error_tag} name={name} row={row} error={err}");
+                None
+            }
         }
-        start.elapsed().as_micros()
     }
 }

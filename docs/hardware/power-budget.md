@@ -238,7 +238,9 @@ HW-TBD-024行が持つ事実であり、ここへ再掲しない。**この節�
       場合は対象外）
 - [ ] (2) firmware（`main()`の`run_i2c_bringup`）が**既定build**（`bringup-display-13` featureを
       付けない構成）でビルド済みである（書き込みは手順8で行う。featureを付けた構成は`DISP-01`の
-      bring-upを実行するため、条件(4)と両立しない。末尾`条件(4)の根拠`参照）
+      bring-upを実行するため、条件(4)と両立しない。末尾`条件(4)の根拠`参照）。#487から、既定buildは
+      Pi link（UART1）も持ち、GPIO13をTXとして駆動する。この手順の配線（手順1）にGPIO13は無く、
+      駆動しても接続先が無い（`gpio-assignment.md`の`PI-UART-TX`行）
 - [ ] (3) 電流の余裕計算（`B-2b を採る決定と MSP2807 の電流制限（2026-09-07）`節の
       2026-09-22追記、Revision 117）を確認した
 - [ ] (4) `DISP-01`が`3V3` pinへ接続されていない（この節の条件(1)〜(6)はすべて、
@@ -544,7 +546,8 @@ ESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`の負荷合計（測定ではない。
       [検証済みコマンド](../toolchains/verified-commands.md)であり、ここへ写さない。**同feature
       は製品build（既定build）へLCDの試験モードを加えるものであり、Pi link（UART1）も同時に動く
       （[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)。GPIO13をTXとして駆動するが、
-      この手順ではGPIO13へ何もつながない。`gpio-assignment.md`の`PI-UART-TX`行）。既定buildのままでは
+      この手順は条件(3)(a)によりPiを同時に接続しないため、GPIO13に接続先は無い。`gpio-assignment.md`の
+      `PI-UART-TX`行）。既定buildのままでは
       `run_display_bringup`が呼ばれず、受け入れ条件（初期化・fill・四隅・timing）を確認する材料と、
       controllerの識別に使うcommandの実機での効果が得られない。**この構成のVersion Recordはまだ無い**（[検証済みコマンド](../toolchains/verified-commands.md)
       が明記するとおり、`bringup-display-13`構成は正式なVersion Recordを持たない。build-onlyの
@@ -658,7 +661,7 @@ ESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`の負荷合計（測定ではない。
    その間に色ごとに写真を撮る）、
    (c) `display_pattern_element`と`display_corner_pattern`（受け入れ条件「四隅とorientationが正しい」。
    続く`display_pattern_hold`の`hold_ms`の間に、`J2`のheaderを入れて写真を撮る。patternの見方と
-   一致の判定のしかたは`main.rs`の`run_corner_pattern`のdoc commentが持つ。軸の線の描画失敗は
+   一致の判定のしかたは`firmware/esp32/src/display_test.rs`のmodule docの「四隅pattern」節が持つ（#487の前は`main.rs`の`run_corner_pattern`のdoc commentが持っていた）。軸の線の描画失敗は
    `display_axis_failed`として出て、後続を止めない）。**受け入れ条件
    「単色fillが正しい」「Color orderが正しい」「四隅とorientationが正しい」は、logに加えて
    人間がpanelを目視（写真記録）で確認し、その結果を手順11へ記録したときだけ達成とする。**
@@ -724,10 +727,13 @@ ESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`の負荷合計（測定ではない。
     Next safe step）に従う。**受け入れ条件6件（[Issue #13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)）
     のうち何が確認でき、何が未達のまま残るかを明記する。**「更新中も通信とwatchdogがactiveである」
     （条件6）について、#487から`bringup-display-13` buildは描画を1段ずつ進め、描画の間も
-    heartbeat（`hb`の行）とPi linkの`boot`の再送が止まらない（`firmware/esp32/src/display_test.rs`）。
-    **ただしこの手順はPiを接続しないため、`boot`→ACKは成立せず、実protocol sessionを確立しない。
-    したがってこの手順だけでは条件6の「通信」を示せない見込みである。**描画の間もheartbeatが
-    続くことは、この手順のlogで確かめられる。示せなかった場合は未達とし、依存先（[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)
+    heartbeat（`hb`の行）とPi linkの受信が止まらない（`firmware/esp32/src/display_test.rs`）。
+    **ただしこの手順はPiを接続しない（条件(3)(a)）ため、`boot`→ACKは成立せず、実protocol sessionを確立しない。
+    したがってこの手順だけでは条件6の「通信」を示せない見込みである。**「watchdog」の側は、
+    heartbeatの行だけでは示せない。TWDTが有効であることと、描画の間に`task_wdt`のerrorのlogが
+    UART0へ出ないことで見る（設定と、発火したときの振る舞い（resetせずlogを出す）の出典は
+    `firmware/esp32/src/main.rs`のmodule docの「Task Watchdog Timerの既定の設定と、発火したときの
+    振る舞い」の段落。**`reset_reason`では見られない**）。示せなかった場合は未達とし、依存先（[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)
     等）をIssue側の記録に残す。
 
 ##### `DISP-01`追加接続のbring-upの手順：条件の根拠

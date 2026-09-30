@@ -82,7 +82,8 @@ pub const I2C_TRANSACTION_TIMEOUT_MS: u64 = 100;
 /// （`main.rs`のmodule doc「`DISP-01`のbring-upを有効にする手順」節）。
 ///
 /// 5色とpatternの合計でこの値の6倍だけ、`run_i2c_bringup`のlog（`accel_device_id`・
-/// `env_chip_id`）が遅れて出る。`docs/hardware/power-budget.md`の`DISP-01`追加接続の手順で、
+/// `env_chip_id`）が遅れて出る。**#487からは、それに描画の時間と、描画の段ごとの待ち（main loopが
+/// 1段ごとに最低1 tick＝10 ms待つ。約100段。`crate::display_test`）が加わる**（計算であり、実測ではない）。`docs/hardware/power-budget.md`の`DISP-01`追加接続の手順で、
 /// 人間が決める待機時間の上限（手順5）はこの遅れを含めて決める。
 #[cfg(feature = "bringup-display-13")]
 pub const DISPLAY_HOLD_MS: u32 = 3_000;
