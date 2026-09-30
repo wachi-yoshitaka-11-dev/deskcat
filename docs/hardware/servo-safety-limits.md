@@ -721,7 +721,7 @@ firmware（`firmware/esp32/src/servo.rs`、
     承認を得てから`起動とarm delay`へ戻る。承認無く連続動作・再試行はしない。
 
     **2026-09-30追記（[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)のPR B1）: latchは、人間の
-    承認なしに消えうる。**#487以降、`bench-servo-test-17`以外のすべてのbuild（既定buildを含む）は、
+    承認なしに消えうる。**#487のPR B1以降、`bench-servo-test-17`以外のすべてのbuild（既定buildを含む）は、
     起動のたびに`generate_sid`（`firmware/esp32/src/main.rs`）から`EspDefaultNvsPartition::take()`を呼ぶ。
     起動のときだけではなく、`stale_session`を受けて`sid`を選び直すとき（`firmware/esp32/src/boot_session.rs`の
     `BootSession::reselect_sid`）にも、実行中に`generate_sid`を呼ぶ。

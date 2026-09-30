@@ -6,7 +6,7 @@
 //!
 //! # なぜ1段ずつ進めるか
 //!
-//! [#487]以前は、`run_display_bringup`が5色のfillと四隅patternを1回の呼び出しで
+//! [#487]のPR B1より前は、`run_display_bringup`が5色のfillと四隅patternを1回の呼び出しで
 //! 描き切り、色ごとに[`config::DISPLAY_HOLD_MS`]の`FreeRtos::delay_ms`を挟んでいた。
 //! その間main loopへ戻らないため、heartbeatは描画段階の境界の`bringup_hb`だけだった。
 //! またLCDを描くbuildはPi linkを持たなかった（当時の`pi-protocol-mode`と排他）。どちらも
@@ -30,10 +30,9 @@
 //! # logの行
 //!
 //! 行の名前（`display_fill`、`display_pattern_element`、`display_corner_pattern`、
-//! `display_pattern_hold`）は、1回で描き切っていた頃と同じにする。bring-upを終えた印の
-//! `display_bringup_done`だけは#487で足した行である（手順9の完了の証拠には挙がっていない）。
-//! `docs/hardware/power-budget.md`の`DISP-01`追加接続の手順が、完了の証拠としてこれらの
-//! 行を挙げているためである。
+//! `display_pattern_hold`）は、1回で描き切っていた頃と同じにする。`docs/hardware/power-budget.md`の
+//! `DISP-01`追加接続の手順が、完了の証拠としてこれらの行を挙げているためである。bring-upを終えた印の
+//! `display_bringup_done`だけは#487で足した行であり、同手順の手順9の完了の証拠には挙がっていない。
 //!
 //! **どちらの行も`elapsed_us`の意味は変わる。以前の値（`docs/hardware/experiment-log.md`の
 //! `EXP-016`〜`EXP-018`）と直接比べない。**

@@ -42,11 +42,11 @@
 //! | `bringup-display-13` | LCDの初期化、backlightの点灯、単色fillと四隅patternの試験モード | 製品buildに加える。描画の間のPi linkの受信とheartbeatは`crate::display_test`のmodule docを参照 |
 //! | `bench-servo-test-17` | servoの単発bench試験（#17の測定用build） | **Pi linkを外す。**正本`docs/hardware/servo-safety-limits.md`の`測定のための駆動（承認の状態の項目6）`節が、測定用のbuildは「Piとの通信linkを持たない」と定めているためである。#474で、このfeature付きbuildはcompileが止まる |
 //!
-//! `#487`より前は、`pi-protocol-mode` featureを付けたbuildだけがPi linkを持ち、LCD／I2Cの
+//! `#487`のPR B1より前は、`pi-protocol-mode` featureを付けたbuildだけがPi linkを持ち、LCD／I2Cの
 //! bring-upと排他だった。`#487`でfeatureをやめ、Pi linkを製品buildへ入れた。
 //!
-//! **既定buildは、起動のたびにGPIO13（`PI-UART-TX`）をUARTのTXとして駆動する。**`#487`より前は、
-//! `pi-protocol-mode`を付けたときだけだった。GPIO13／GPIO14に基板上の部品はつながっていない
+//! **既定buildは、起動のたびにGPIO13（`PI-UART-TX`）をUARTのTXとして駆動する。**`#487`のPR B1より前は、
+//! `pi-protocol-mode`を付けたときだけだった（PR Aより前は、どのbuildもGPIO13をUARTに使っていなかった）。GPIO13／GPIO14に基板上の部品はつながっていない
 //! （`docs/hardware/gpio-assignment.md`の`Pi–ESP32間のtransport`節、公式回路図で確かめたもの。
 //! 現物の導通は測っていない）。**GPIO13／GPIO14はJTAG（`MTCK`／`MTMS`）を兼ねるため、既定buildでは
 //! JTAG debugを使えない**（同文書の`PI-UART-TX`／`PI-UART-RX`行）。
@@ -83,8 +83,8 @@
 //! watchdog could trigger. **This delayer avoids that by yielding to the OS during the
 //! delay.**」と doc に明記しており、これが「logging が watchdog の進行を block しない」
 //! 根拠である。Pi linkを持つbuildは、[`FreeRtos::delay_ms`]の代わりに`UartDriver::read`の
-//! timeoutで待つ（main loop参照）。どちらもbusy wait をしないため、待ち時間は必ず 1 ms 以上へ
-//! 丸める（`sleep_ms_until`とmain loopのcomment参照）。LCDのbring-up（`bringup-display-13`
+//! timeoutで待つ（main loop参照）。どちらもbusy wait をしないよう、待ち時間は必ず 1 ms 以上へ
+//! 丸める（`sleep_ms_until`とmain loopのcomment参照。IDLE taskへ時間が回る条件は、main loopのcomment）。LCDのbring-up（`bringup-display-13`
 //! feature付きbuild）は描画を1段ずつ進め、段と段の間でmain loopへ戻る（`crate::display_test`）。
 //!
 //! **Task Watchdog Timerの既定の設定と、発火したときの振る舞い。**生成された`sdkconfig`（debug profile、
@@ -311,7 +311,9 @@ fn next_deadline(deadline: u64, period_ms: u32, now: u64) -> (u64, bool) {
 
 /// `until` まで待つ。
 ///
-/// **必ず 1 ms 以上待つ。**`delay_ms(0)` は yield せずに戻るため、loop に置くと
+/// **必ず 1 ms 以上を渡す。**（1 msは1 tickへ切り上がり、実際の待ちは次のtickまでの0〜10 msである。
+/// main loopのcomment。`delay_ms(1)`はそれでも必ずblockしてyieldする。ESP-IDF v5.5.3
+/// `components/freertos/FreeRTOS-Kernel/tasks.c`の`vTaskDelay`は、1 tick以上で自taskをdelayed listへ移す。）`delay_ms(0)` は yield せずに戻るため、loop に置くと
 /// busy wait になり、優先度の低い IDLE task を starve させる。IDLE task が回らないと
 /// Task Watchdog Timer が進まないため、これは watchdog の前提を壊す。
 ///
@@ -861,7 +863,7 @@ fn service_bringup_step(health: &mut Health, step: &str) {
 
 /// `DISP-01`を初期化してbacklightを点け、単色fillと四隅patternを1段ずつ進める状態機械を返す。
 ///
-/// fillと四隅patternはmain loopの中で進む（`crate::display_test`。`#487`より前は、この関数が
+/// fillと四隅patternはmain loopの中で進む（`crate::display_test`。`#487`のPR B1より前は、この関数が
 /// 1回の呼び出しで描き切っていた）。controllerのIDは読まない（`crate::display`のmodule doc）。
 /// 初期化の後に、書き込んだMADCTLの値と論理座標の幅・高さを`display_madctl`の行としてlogへ出す。
 ///

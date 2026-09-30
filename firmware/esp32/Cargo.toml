@@ -16,7 +16,7 @@ harness = false # do not use the built-in cargo test harness -> resolve rust-ana
 # `PI-UART-RX`＝GPIO14）、I2Cのbring-up、heartbeat／health snapshotを1本のmain loopで回す。
 # featureは加える向きにする。例外は`bench-servo-test-17`だけであり、Pi linkを外す（下の注記）。
 # 構成の一覧は`src/main.rs`のmodule doc「buildの構成」節が持つ。
-# #487より前にあった`pi-protocol-mode`（Pi linkを持つbuild。LCD／I2Cと排他）は廃止した。
+# #487のPR B1まであった`pi-protocol-mode`（Pi linkを持つbuild。LCD／I2Cと排他）は廃止した。
 default = []
 # Issue #17の単発servo bench試験だけを有効にする。既定ではoffであり、
 # 通常のbuildはこのfeatureを持たず`crate::servo`を呼ばない。承認の状態は

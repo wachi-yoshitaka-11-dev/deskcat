@@ -491,8 +491,8 @@ rail電圧だけで決まり、通常動作の値（LCD Wikiの0.31 W）もbackl
 
 **ここまでは電流上界の計算が成立する根拠であり、`run_display_bringup`を実行してよいかの
 承認ではない。**`main.rs`のmodule docが明記するとおり、**`#461`は接続そのものを許可するだけで、
-`run_display_bringup`（初期化・backlight点灯・fill・四隅patternを行う。GPIO4によるbacklight点灯を
-含む）を`3V3` pin経路で実行してよいかは決めていない。**この実行の承認は、下記条件(7)で人間から
+`run_display_bringup`（初期化とbacklight点灯を行う。GPIO4によるbacklight点灯を含む。#487のPR B1から、fill・四隅patternは
+この関数が返した後にmain loopの中で`crate::display_test`が進める。以下、この一連を指す）を`3V3` pin経路で実行してよいかは決めていない。**この実行の承認は、下記条件(7)で人間から
 個別に得る（`#461`の残余risk受け入れを再審議するものではない。firmwareの経路を1つ実行してよいか
 という別の判断である）。
 
@@ -661,7 +661,7 @@ ESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`の負荷合計（測定ではない。
    その間に色ごとに写真を撮る）、
    (c) `display_pattern_element`と`display_corner_pattern`（受け入れ条件「四隅とorientationが正しい」。
    続く`display_pattern_hold`の`hold_ms`の間に、`J2`のheaderを入れて写真を撮る。patternの見方と
-   一致の判定のしかたは`firmware/esp32/src/display_test.rs`のmodule docの「四隅pattern」節が持つ（#487の前は`main.rs`の`run_corner_pattern`のdoc commentが持っていた）。軸の線の描画失敗は
+   一致の判定のしかたは`firmware/esp32/src/display_test.rs`のmodule docの「四隅pattern」節が持つ（#487のPR B1の前は`main.rs`の`run_corner_pattern`のdoc commentが持っていた）。軸の線の描画失敗は
    `display_axis_failed`として出て、後続を止めない）。**受け入れ条件
    「単色fillが正しい」「Color orderが正しい」「四隅とorientationが正しい」は、logに加えて
    人間がpanelを目視（写真記録）で確認し、その結果を手順11へ記録したときだけ達成とする。**
@@ -758,8 +758,8 @@ Revision 39で、給電元（B-2bか`3V3` pinか）ごとに参照先の節が�
 だけから受電し、USBの5V・外部3.3V電源等が同時に到達しないこと）を適用する。
 
 **条件(2)の根拠。**`main.rs`の`run_display_bringup`は`bringup-display-13` feature付きbuildだけが
-持つ関数であり、既定buildは`main()`から呼ばない（`#451`）。受け入れ条件のうちfill・四隅・timingと
-初期化の記録は、この関数のlogから得る。controllerの識別は、moduleのsilkと資料、およびこの関数が
+持つ関数であり、既定buildは`main()`から呼ばない（`#451`）。受け入れ条件のうち初期化の記録は
+この関数のlogから、fill・四隅・timingの記録は`crate::display_test`（`firmware/esp32/src/display_test.rs`）のlogから得る。controllerの識別は、moduleのsilkと資料、およびこの関数が
 送るcommandの実機での効果から記録する（logだけの証拠にはしない）。
 
 **条件(3)の根拠。**[HW-TBD-024の判断記録](tbd-register-history.md#hw-tbd-024)の2026-09-23追記が持つ
