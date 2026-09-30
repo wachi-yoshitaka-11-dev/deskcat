@@ -88,7 +88,8 @@
 //! feature付きbuild）は描画を1段ずつ進め、段と段の間でmain loopへ戻る（`crate::display_test`）。
 //!
 //! **Task Watchdog Timerの既定の設定と、発火したときの振る舞い。**生成された`sdkconfig`（debug profile、
-//! ESP-IDF v5.5.3）では`CONFIG_ESP_TASK_WDT_EN=y`・`CONFIG_ESP_TASK_WDT_INIT=y`・
+//! ESP-IDF v5.5.3。#487のPR B1の2構成のbuildが使う`target/xtensa-esp32-espidf/debug/build/esp-idf-sys-*/out/sdkconfig`で
+//! 確かめた。`esp-idf-sys-*`は1つだけであり、PR B1は`sdkconfig.defaults`と`build.rs`を変えていない）では`CONFIG_ESP_TASK_WDT_EN=y`・`CONFIG_ESP_TASK_WDT_INIT=y`・
 //! `CONFIG_ESP_TASK_WDT_TIMEOUT_S=5`で、両CPUのIDLE taskを監視する（`CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU0=y`／
 //! `CPU1=y`）。**`CONFIG_ESP_TASK_WDT_PANIC`は無効である。**このときTWDTが発火してもresetはせず、
 //! `task_wdt`のerrorのlog（`Tasks currently running:`等）とbacktraceをconsole（UART0）へ出すだけである
@@ -580,13 +581,14 @@ fn main() {
         // timeoutいっぱいまで待たず即座に戻る（`config::PI_PROTOCOL_UART_RX_BUFFER_BYTES`の
         // doc「容量の根拠」参照）ため、busy-waitにならずACK受信への反応latencyも下がる。
         //
-        // **必ず1 ms以上待つ**（`sleep_ms_until`と同じ理由）。LCDのbring-upの描く段は、締切を
+        // **必ず1 ms以上を渡す**（`sleep_ms_until`と同じ理由）。LCDのbring-upの描く段は、締切を
         // 「すぐ」として返す（`crate::display_test::DisplayBringup::next_deadline_ms`）。0 tickの
         // `read`はdataが無ければyieldせずに戻るため、帯を続けて描く間、優先度の低いIDLE taskが
         // 回らず、Task Watchdog Timerの前提を壊す。1 msは`TickType::new_millis`（esp-idf-hal
         // 0.46.2 `delay.rs`89〜95行）が1 tickへ切り上げ、`CONFIG_FREERTOS_HZ=100`（生成された`sdkconfig`、
         // debug profile）では1 tick＝10 msになる。1 tickのblockは次のtickの割り込みで解けるため、
-        // 実際の待ちは0〜10 msであり、dataが届けばそれより早く戻る。
+        // 実際の待ちは0〜10 msであり、dataが届けばそれより早く戻る。受信が続く間は`read`がblockせずに
+        // 戻るため、IDLE taskへ時間が回るという前提は、受信が途切れる間に限って成り立つ。
         #[cfg(not(feature = "bench-servo-test-17"))]
         {
             drain_uart_events(&uart, &mut health);
@@ -697,7 +699,9 @@ const SID_NVS_KEY_NEXT: &str = "next_sid";
 /// `bootloader_random_enable()`を呼んでいるか、second-stage bootloader実行中の
 /// いずれかを満たさない限り、RNGの出力は「pseudo-random only」と明記する。
 /// このfirmwareはWi-Fi／Bluetoothを一切初期化しない（`Peripherals::take()`は呼ぶが、
-/// Wi-Fi／Bluetoothの初期化は別の話であり行わない。`#446` PR B、`#487`）。`bootloader_random_enable()`も呼ばない
+/// Wi-Fi／Bluetoothの初期化は別の話であり行わない。`#446` PR B、`#487`。根拠は、`docs/hardware/power-budget.md`の
+/// `ACCEL-01`／`ENV-01`単体bring-upの手順`条件(3)の根拠`が記録する走査である。#487のPR B1の後にも、
+/// `src`・`Cargo.toml`・`sdkconfig.defaults`でcommentを除いて0件だった）。`bootloader_random_enable()`も呼ばない
 /// （呼ぶには`unsafe`が要る）。**したがって乱数側を使っても、
 /// 上記の非衝突要件に対する根拠のある確率は示せない。**
 ///

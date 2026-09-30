@@ -78,7 +78,8 @@ pub struct UartObservations {
     /// 間隔は、`UartDriver::read`から戻ってから次の`read`を始めるまでの時間であり、`read`の中で
     /// 待っている時間を含まない（その間はdriverが受信を読み進める）。この間にring bufferへ貯まる
     /// byte数が、溢れの余裕を決める（`config::PI_PROTOCOL_UART_RX_BUFFER_BYTES`のdoc）。
-    /// health snapshotを出すたびに0へ戻す。serializeに失敗して行を出せなかった回も0へ戻すため、
+    /// health snapshotを出すたびに0へ戻す。0へ戻すのは間隔の途中であり、snapshotをまたいだ間隔は
+    /// 次の窓に数える。serializeに失敗して行を出せなかった回も0へ戻すため、
     /// その窓の値は残らない（`main.rs`の`emit_health_snapshot`）。
     pub max_read_gap_ms: u64,
 }

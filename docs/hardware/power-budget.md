@@ -353,7 +353,7 @@ profileの必須要件を「実機 Linux に限る」「人間の監視」と定
 
 **条件(3)の根拠。**同計算はWi-Fi/BT不使用を前提とする。**この前提は満たされる**（現在の
 firmwareの`main.rs`はWi-Fi／Bluetooth APIを一切呼び出しておらず、`Cargo.toml`にも該当featureが
-無い。2026-09-22に走査して確認した）。
+無い。2026-09-22に走査して確認した。#487のPR B1の後（2026-09-30）にも、`firmware/esp32/src`、`firmware/esp32/Cargo.toml`、`firmware/esp32/sdkconfig.defaults`を`wi-fi`（`wifi`を含む）／`bluetooth`／`ble`／`bt`／`nimble`／`bluedroid`（大文字小文字を区別しない。`ble`と`bt`は語として）で走査し、commentを除いて0件であることを確かめた）。
 
 **条件(4)の根拠。**計算はESP32＋`ACCEL-01`＋`ENV-01`の合計（約101.5 mA）であり、`DISP-01`を含まない。
 `DISP-01`が同じ`3V3` railに同時接続されている場合、この計算はDISP-01分の電流を含まないままになり、
@@ -549,7 +549,7 @@ ESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`の負荷合計（測定ではない。
       この手順は条件(3)(a)によりPiを同時に接続しないため、GPIO13に接続先は無い。`gpio-assignment.md`の
       `PI-UART-TX`行）。既定buildのままでは
       `run_display_bringup`が呼ばれず、受け入れ条件（初期化・fill・四隅・timing）を確認する材料と、
-      controllerの識別に使うcommandの実機での効果が得られない。**この構成の正式なVersion Recordは無い**（1回の実施記録は`docs/toolchains/version-records/`の2026-09-26の記録。[検証済みコマンド](../toolchains/verified-commands.md)
+      controllerの識別に使うcommandの実機での効果が得られない。**この構成の正式なVersion Recordは無い**（1回の実施記録は`docs/toolchains/version-records/`の2026-09-26の記録であり、#487より前のtree（Pi linkなし）についてのものである。[検証済みコマンド](../toolchains/verified-commands.md)
       が明記するとおり、`bringup-display-13`構成は正式なVersion Recordを持たない。build-onlyの
       検証を誰がいつどの端末で行ったかは、実施時にVersion Recordまたは相当の記録を別途作る）
 - [ ] (3) 電流の余裕計算（[HW-TBD-024の判断記録](tbd-register-history.md#hw-tbd-024)の2026-09-23追記）を
@@ -738,7 +738,7 @@ ESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`の負荷合計（測定ではない。
     累積であり、どちらも描画の外の処理（描画の後にmain loopの中で走るI2Cのbring-up、最初の窓では
     `demonstrate_pi_session`など）を含む上限である。上限が小さければ描画の間も小さいと言えるが、大きくても
     描画のせいとは言えない。手順9の給電を止める条件は変えない。**描画の最後（`display_pattern_hold`の行）より
-    後に出た`health`の行が無ければ、条件6は未達として記録する。** **判定の数値の基準はここでは置かない。**
+    後に出た`health`の行が無ければ、描画の最後の区間の値は得られていない、と記録する。** **判定の数値の基準はここでは置かない。**
     値を記録し、判定は`EXP-0xx`の側で行う。
     **ただしこの手順はPiを接続しない（条件(3)(a)）ため、`boot`→ACKは成立せず、実protocol sessionを確立しない。
     したがってこの手順だけでは条件6の「通信」を示せない見込みである。**「watchdog」の側は、

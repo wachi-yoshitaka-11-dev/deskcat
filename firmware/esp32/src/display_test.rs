@@ -13,7 +13,8 @@
 //! [#13]の受け入れ条件6「更新中も通信とwatchdogがactiveである」を示せない理由だった。
 //!
 //! このmoduleは描画を小さな段に分け、[`DisplayBringup::poll`]が1回に1段だけ描いて戻る。
-//! 1段は、画面の横幅いっぱいで[`BAND_ROWS`]行の帯1本、または四隅patternの要素1つである。
+//! 1段は、画面の横幅いっぱいで[`BAND_ROWS`]行の帯1本、または四隅patternの要素1つである（`y_axis`だけは
+//! 破線1本ごとに1段とする）。
 //! 色を保つ間（[`config::DISPLAY_HOLD_MS`]）は描かず、締切だけを返す。main loopは
 //! 段と段の間に、heartbeat、health snapshot、Pi linkの受信と、budgetが残っている間の`boot`の
 //! 再送を回す（`crate::boot_session`。ACKを受けた後は再送しない）。**したがって、描画の間も
