@@ -245,7 +245,7 @@ pub const PI_PROTOCOL_UART_READ_CHUNK_BYTES: usize = 256;
 /// 間に起きたeventは捨てられる（ESP-IDF v5.5.3 `esp_driver_uart/src/uart.c`の
 /// `UART event queue full`の`ESP_EARLY_LOGV`。既定のlog levelでは出ない）。main loopは周回
 /// ごとにqueueを空にするため、1周回の間に積まれる`UART_DATA`の数より大きく
-/// とる。esp-idf-hal 0.46.2の既定（`Config::new`の`queue_size: 10`）より余裕を見た値であり、
+/// とることを狙う（保証ではない。埋まる場合は`main.rs`の`drain_uart_events`のdoc「数えられない場合」）。esp-idf-hal 0.46.2の既定（`Config::new`の`queue_size: 10`）より余裕を見た値であり、
 /// 導出した値ではない。
 #[cfg(not(feature = "bench-servo-test-17"))]
 pub const PI_PROTOCOL_UART_EVENT_QUEUE_LEN: usize = 32;

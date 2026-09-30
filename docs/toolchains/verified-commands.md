@@ -69,7 +69,7 @@ Linux x86_64 で検証した。初回は 2026-08-06 で、これは VM 上の初
 
 **`pi-protocol-mode` featureは[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)で廃止した。**Pi linkは既定構成（製品build）に入った。**上の「Linux x86_64 で検証した」以下の記録は、「現行 tree に対する最新の検証」とした2026-09-29の記録を含め、#487より前のtreeについてのものであり、Pi linkを含む今の既定構成での記録ではない。**2026-09-29の記録は当時の`pi-protocol-mode`構成の`cargo clippy`と`cargo build`も記録しているが、1回の実施記録であり、検証済みcommandへは格上げしていない。#487より前は、`pi-protocol-mode`を有効にした構成も`cargo clippy`と`cargo build`へ`--features pi-protocol-mode`を足して通していた。
 
-**`bringup-display-13` feature（[#451](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/451)）を有効にする場合は、既定構成に加えて`cargo clippy`と`cargo build`（`cargo fmt`は対象外）へ`--features bringup-display-13`を足したものも通す。**#487から、このfeatureは既定構成へLCDの試験モードを加えるだけであり、他のfeatureと排他ではない。**この構成のVersion Recordはまだ無い。**`flash と serial monitor`節（下記）がcommand blockを持たないのは「Version Recordが再現手順であって追加の実行記録ではないと自認しているため」であり、ここはそもそもVersion Record自体が無い、という別の理由である。**理由は違うが、結論（検証済みcommandへ格上げする形で書かない）は同じであるため、ここでもcommand blockを写さない。**
+**`bringup-display-13` feature（[#451](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/451)）を有効にする場合は、既定構成に加えて`cargo clippy`と`cargo build`（`cargo fmt`は対象外）へ`--features bringup-display-13`を足したものも通す。**#487から、このfeatureは既定構成へLCDの試験モードを加えるだけであり、他のfeatureと排他ではない。**この構成の記録は、#487より前の構成で行った1回の実施記録（[2026-09-26のVersion Record](version-records/2026-09-26-esp32-build-bringup-display-13-native-linux.md)）だけである。**同記録は自身を「検証済みcommandへ格上げする記録ではなく、この1回の実施記録」としており、Pi linkを含む今の構成の記録でもない。**そのため、ここでもcommand blockを写さない**（`flash と serial monitor`節（下記）がcommand blockを持たない理由とは別である）。
 
 ### workspace との関係
 

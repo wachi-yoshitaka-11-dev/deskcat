@@ -723,16 +723,18 @@ firmware（`firmware/esp32/src/servo.rs`、
     **2026-09-30追記（[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)のPR B1）: latchは、人間の
     承認なしに消えうる。**#487以降、`bench-servo-test-17`以外のすべてのbuild（既定buildを含む）は、
     起動のたびに`generate_sid`（`firmware/esp32/src/main.rs`）から`EspDefaultNvsPartition::take()`を呼ぶ。
+    起動のときだけではなく、`stale_session`を受けて`sid`を選び直すとき（`firmware/esp32/src/boot_session.rs`の
+    `BootSession::reselect_sid`）にも、実行中に`generate_sid`を呼ぶ。
     これは`reinit=true`で初期化し（esp-idf-svc 0.52.1 `src/nvs.rs`）、`nvs_flash_init()`が
     `ESP_ERR_NVS_NO_FREE_PAGES`または`ESP_ERR_NVS_NEW_VERSION_FOUND`を返すと、default partition全体を
     `nvs_flash_erase()`で消してから再初期化する。**latch（namespace `bench17`、key `ran`）も同じpartitionに
     あるため、このときlatchも消える。**`終了処理`で通常buildへ戻した後も同じである。同じ消去の経路は
-    bench build自身の`run_servo_bench_test`の起動にもある。**firmwareの中で`bench17`／`ran`を読むのは
-    `run_servo_bench_test`だけであり、**bench buildを書き込む前にlatchの状態を確かめる手段は無い。**
-    **したがって、bench buildの書き込みは、latchが立っているはずの場合も含めて毎回「servoが1回動きうる
-    操作」として扱う。**この扱いは、既存の手順の順序（`電源準備`でservoの電源を入れる前にESP32側を
-    準備する）と、繰り返すときの改めての承認（この手順12）の中に入る。この追記は、値と手順の条件を
-    足さず、上の手順12と各stepの本文を書き換えていない。
+    bench build自身の`run_servo_bench_test`の起動にもある。firmwareの中で`bench17`／`ran`を読むのは
+    `run_servo_bench_test`だけであり、**firmwareの中には、bench buildを書き込む前にlatchの状態を確かめる
+    手段は無い。** **したがって、bench buildの書き込みは、latchが立っているはずの場合も含めて毎回
+    「servoが1回動きうる操作」として扱う。**この扱いは、既存の手順の順序（`電源準備`でservoの電源を
+    入れる前にESP32側を準備する）と、繰り返すときの改めての承認（この手順12）の中に入る。この追記は、
+    値と手順の条件を足さず、上の手順12と各stepの本文を書き換えていない。
 13. **`終了処理`（人間）** 試験終了後、外部5 V電源を遮断する。`単発動作`まで到達して
     いればGPIO27は`run_servo_bench_test`が返るとlowへ固定される（`Sg90`のdrop。
     [`crate::servo::Sg90::stop`]のdoc参照）。**`Sg90::new`より前にreturnした場合
@@ -804,4 +806,4 @@ firmware（`firmware/esp32/src/servo.rs`、
 | 2026-09-28 | 32 | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。PR #500へのCodeRabbitの指摘（人が電源を抜くことを短絡保護として扱わない）を受け、項目6の(a)の弱点へ、安全要件の5項目「短絡」が述べる「人が電源を落とすのでは止まらない」を書き足した。servo電源の経路を`M-12001`の出力定格3 Aに耐える手持ちの部品（端子台、AWG22の線材）だけで組み、breadboardとjumper wireを使わないことを、測定のための駆動の条件と`通電前の現物確認`へ加えた（購入なし）。短絡時の電流が3 Aを超えない場合にしか経路を守れないこと、servo本体のリード線とconnectorの定格が不明であることは弱点として残した |
 | 2026-09-29 | 33 | [#489](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/489)。`初回動作の実行手順`の`build`stepが「flashは人間」としており、[power-budget.md](power-budget.md)のbring-up手順（書き込みのcommandは、人間が立ち会って監視している状態であれば実機LinuxのAIセッションが実行してよい）と食い違っていた。flashの実行者を同文書の`ACCEL-01`／`ENV-01`単体bring-upの手順8への参照に改め（規則をここへ書き写さない）、`再武装`と`終了処理`の再flashも同じであることを書いた。**USBの接続と給電を止める判断は人間のままであり、`承認の状態`、`サーボ出力を有効化してよい条件`、停止基準、各stepの条件は変えていない** |
 | 2026-09-30 | 34 | [#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)のPR B1。`承認の状態`の項目5へ2026-09-30追記を足した。`pi-protocol-mode`を廃止したため、項目5が再開の手順として残すよう求めた`pi-protocol-mode`との排他の`compile_error!`は無くなった。測定用のbuildがPiとの通信linkを持たないことは`#[cfg(not(feature = "bench-servo-test-17"))]`の構造で保っている。**servo出力のgate、承認の状態、項目5の本文は変えていない** |
-| 2026-09-30 | 35 | [#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)のPR B1。`初回動作の実行手順`の`再武装`stepへ2026-09-30追記を足した。`bench-servo-test-17`以外のすべてのbuild（既定buildを含む）が起動のたびに`EspDefaultNvsPartition::take()`（`reinit=true`）を呼ぶようになり、NVSの初期化が`ESP_ERR_NVS_NO_FREE_PAGES`／`ESP_ERR_NVS_NEW_VERSION_FOUND`を返すとdefault partitionが消え、単発latchも人間の承認なしに消えうるためである。firmwareには書き込む前にlatchを確かめる手段が無いため、bench buildの書き込みを毎回「servoが1回動きうる操作」として扱う、と書いた。あわせて項目5への2026-09-30追記に、`bench-servo-test-17`付きbuildは#474の`compile_error!`を外した後にcompileが通るかを確かめていないことを書き足し、項目6の(c)の後の「外すときの手順」と`測定のための駆動`の`build`の参照先（どちらも「項目5の最後の段落」）を、項目5へ追記を足したことに合わせて改めた。**servo出力のgate、承認の状態、値、各stepの本文と条件は変えていない** |
+| 2026-09-30 | 35 | [#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)のPR B1。`初回動作の実行手順`の`再武装`stepへ2026-09-30追記を足した。`bench-servo-test-17`以外のすべてのbuild（既定buildを含む）が起動のたびに（`stale_session`による`sid`の選び直しでは実行中にも）`EspDefaultNvsPartition::take()`（`reinit=true`）を呼ぶようになり、NVSの初期化が`ESP_ERR_NVS_NO_FREE_PAGES`／`ESP_ERR_NVS_NEW_VERSION_FOUND`を返すとdefault partitionが消え、単発latchも人間の承認なしに消えうるためである。firmwareには書き込む前にlatchを確かめる手段が無いため、bench buildの書き込みを毎回「servoが1回動きうる操作」として扱う、と書いた。あわせて項目5への2026-09-30追記に、`bench-servo-test-17`付きbuildは#474の`compile_error!`を外した後にcompileが通るかを確かめていないことを書き足し、項目6の(c)の後の「外すときの手順」と`測定のための駆動`の`build`の参照先（どちらも「項目5の最後の段落」）を、項目5へ追記を足したことに合わせて改めた。**servo出力のgate、承認の状態、値、各stepの本文と条件は変えていない** |

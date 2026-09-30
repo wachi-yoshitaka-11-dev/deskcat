@@ -29,7 +29,8 @@
 //! # logの行
 //!
 //! 行の名前（`display_fill`、`display_pattern_element`、`display_corner_pattern`、
-//! `display_pattern_hold`）は、1回で描き切っていた頃と同じにする。
+//! `display_pattern_hold`）は、1回で描き切っていた頃と同じにする。bring-upを終えた印の
+//! `display_bringup_done`だけは#487で足した行である（手順9の完了の証拠には挙がっていない）。
 //! `docs/hardware/power-budget.md`の`DISP-01`追加接続の手順が、完了の証拠としてこれらの
 //! 行を挙げているためである。
 //!

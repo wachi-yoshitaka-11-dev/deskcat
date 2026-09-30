@@ -17,7 +17,7 @@
 //! - Pi link（UART1、`PI-UART-TX`＝GPIO13、`PI-UART-RX`＝GPIO14）で`boot`のACK待ち・再送・
 //!   `sid`選び直しを行う（`crate::boot_session`。[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)
 //!   PR B、[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)）。受信の異常
-//!   （ring bufferの満杯など）を数える（[`drain_uart_events`]）。制約は`crate::console`の
+//!   （ring bufferの満杯など）を数える（`drain_uart_events`）。制約は`crate::console`の
 //!   module docにまとめてある
 //! - **`DISP-01`（LCD）・`SERVO-PWM`・`ADC-*`・`TOUCH-*`は既定のbuildではdriveしない。**
 //!   [`crate::display`]と[`crate::servo`]はcross-compile確認用にcompileするだけであり、
@@ -84,7 +84,7 @@
 //! delay.**」と doc に明記しており、これが「logging が watchdog の進行を block しない」
 //! 根拠である。Pi linkを持つbuildは、[`FreeRtos::delay_ms`]の代わりに`UartDriver::read`の
 //! timeoutで待つ（main loop参照）。どちらもbusy wait をしないため、待ち時間は必ず 1 ms 以上へ
-//! 丸める（[`sleep_ms_until`] とmain loopのcomment参照）。LCDのbring-up（`bringup-display-13`
+//! 丸める（`sleep_ms_until`とmain loopのcomment参照）。LCDのbring-up（`bringup-display-13`
 //! feature付きbuild）は描画を1段ずつ進め、段と段の間でmain loopへ戻る（`crate::display_test`）。
 //!
 //! **Task Watchdog Timerの既定の設定と、発火したときの振る舞い。**生成された`sdkconfig`（debug profile、

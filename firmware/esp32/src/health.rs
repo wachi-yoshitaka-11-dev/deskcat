@@ -62,7 +62,8 @@ pub struct Health {
 
 /// Pi linkのUARTの受信で観測したeventの数と、受信を読みに行く間隔の最大値。
 ///
-/// **Protocol counterではない**（`Health`のmodule doc参照）。
+/// **Protocol counterではない**（`Health`のmodule doc参照）。Pi linkを持たない`bench-servo-test-17`付きbuildでは
+/// 数える経路が無く、health snapshotの行の値は常に0である（Pi linkの状態を表さない）。
 #[derive(Debug, Clone, Copy, Default)]
 pub struct UartObservations {
     /// ESP-IDFのUART driverが報告した、受信のring bufferの満杯（`UART_BUFFER_FULL`）の回数。
@@ -77,7 +78,8 @@ pub struct UartObservations {
     /// 間隔は、`UartDriver::read`から戻ってから次の`read`を始めるまでの時間であり、`read`の中で
     /// 待っている時間を含まない（その間はdriverが受信を読み進める）。この間にring bufferへ貯まる
     /// byte数が、溢れの余裕を決める（`config::PI_PROTOCOL_UART_RX_BUFFER_BYTES`のdoc）。
-    /// health snapshotを出すたびに0へ戻す。
+    /// health snapshotを出すたびに0へ戻す。serializeに失敗して行を出せなかった回も0へ戻すため、
+    /// その窓の値は残らない（`main.rs`の`emit_health_snapshot`）。
     pub max_read_gap_ms: u64,
 }
 
