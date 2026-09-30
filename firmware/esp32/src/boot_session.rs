@@ -5,10 +5,10 @@
 //! （いつ再送するか、いつ`sid`を選び直すか、いつ止めるか）を実装する狙いで
 //! 書いたものであり、**state遷移が§4.1の表どおりに正しいことをhost側の
 //! unit testでは確かめていない**（`firmware/esp32`はhostのworkspaceから
-//! 除外されており、`esp_idf_svc`の型へ直接依存するため）。3構成
-//! （`#446` PR Bの時点では既定・`pi-protocol-mode`・`bringup-display-13`。`#487`からは既定と
-//! `bringup-display-13`の2構成。実行の記録はそれぞれのPull Request本文にある）でのbuild（`cargo build`／
-//! `cargo clippy`）が通ることは、compileが通ることの根拠であり、**state遷移が
+//! 除外されており、`esp_idf_svc`の型へ直接依存するため）。featureの各構成でのbuild
+//! （`cargo build`／`cargo clippy`。`#446` PR Bの時点では既定・`pi-protocol-mode`・`bringup-display-13`
+//! の3構成、`#487`のPR B1からは既定と`bringup-display-13`の2構成。どのcommitで通したかの記録は、
+//! それぞれのPull Request本文にある）が通ることは、compileが通ることの根拠であり、**state遷移が
 //! 正しいことの根拠ではない。**state遷移の正しさの根拠は、この`boot_session.rs`
 //! を導入したPull Request（`#446` PR B）の自己レビュー記録（複数回のcode
 //! review。AIによる査読を含む。PR本文参照）だけである。**host testと実機確認

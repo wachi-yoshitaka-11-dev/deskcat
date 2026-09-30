@@ -16,7 +16,9 @@
 //! 1段は、画面の横幅いっぱいで[`BAND_ROWS`]行の帯1本、または四隅patternの要素1つである。
 //! 色を保つ間（[`config::DISPLAY_HOLD_MS`]）は描かず、締切だけを返す。main loopは
 //! 段と段の間に、heartbeat、health snapshot、Pi linkの受信と、budgetが残っている間の`boot`の
-//! 再送を回す（`crate::boot_session`。ACKを受けた後は再送しない）。
+//! 再送を回す（`crate::boot_session`。ACKを受けた後は再送しない）。**したがって、描画の間も
+//! heartbeatとPi linkの受信は止まらない見込みである。これはcodeの構造から導いたもので、実機では
+//! 確かめていない。**ほかの文書と注記は、この段落を参照する。
 //!
 //! **1段の所要時間は測っていない。**帯1本は`WIDTH`×[`BAND_ROWS`]×2 byte（320×16×2＝10,240 byte）
 //! であり、SPI clock 6 MHz（`docs/hardware/gpio-assignment.md`の`LCD-SCLK`行）なら
@@ -234,7 +236,12 @@ impl<'d> DisplayBringup<'d> {
                         drawn_us,
                     }
                 } else {
-                    Step::Corner { index: 0, drawn_us }
+                    // `display_corner_pattern`の`elapsed_us`は四隅と軸の合計であり、背景を含めない
+                    // （1回で描き切っていた頃の`run_corner_pattern`と同じ）。背景の時間は捨てる。
+                    Step::Corner {
+                        index: 0,
+                        drawn_us: 0,
+                    }
                 }
             }
             Step::Corner { index, drawn_us } => {

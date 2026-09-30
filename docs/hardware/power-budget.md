@@ -679,7 +679,7 @@ ESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`の負荷合計（測定ではない。
    直接読み取ったものではない。**それでも、`J3`のはんだ付け申告単独より、応答が実際にあった
    という記録の方が強い根拠である）。
 
-   **失敗時の扱い。**(a)〜(d)は独立ではない。**`run_display_bringup`のcode（`main.rs`）は、
+   **失敗時の扱い。**(a)〜(d)は独立ではない。**firmwareのcode（`main.rs`の`run_display_bringup`と、#487からは`display_test.rs`の`DisplayBringup::poll`）は、
    (a)（`display_madctl`）の段階で`display_driver_new_failed`または`display_init_failed`が出た場合、
    その場で関数を`return`し、(b)（`display_fill`）・(c)（`display_corner_pattern`）は一切
    実行されない。**この場合、(b)(c)のlogが無いのは異常ではなく(a)の失敗の帰結であるため、
@@ -727,7 +727,9 @@ ESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`の負荷合計（測定ではない。
     Next safe step）に従う。**受け入れ条件6件（[Issue #13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)）
     のうち何が確認でき、何が未達のまま残るかを明記する。**「更新中も通信とwatchdogがactiveである」
     （条件6）について、#487から`bringup-display-13` buildは描画を1段ずつ進め、描画の間も
-    heartbeat（`hb`の行）とPi linkの受信が止まらない（`firmware/esp32/src/display_test.rs`）。
+    heartbeat（`hb`の行）とPi linkの受信が止まらない見込みである（`firmware/esp32/src/display_test.rs`の
+    module doc。codeから導いたもので、実機では確かめていない。この手順では`hb`の行が描画の間も続くかを
+    logで確かめる）。
     **ただしこの手順はPiを接続しない（条件(3)(a)）ため、`boot`→ACKは成立せず、実protocol sessionを確立しない。
     したがってこの手順だけでは条件6の「通信」を示せない見込みである。**「watchdog」の側は、
     heartbeatの行だけでは示せない。TWDTが有効であることと、描画の間に`task_wdt`のerrorのlogが

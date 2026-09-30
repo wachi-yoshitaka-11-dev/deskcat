@@ -24,7 +24,8 @@ default = []
 # `main.rs`のmodule doc、`servo.rs`のmodule doc参照）。
 # **このfeature付きbuildはPi linkを持たない。**同文書の`測定のための駆動（承認の状態の項目6）`節が、
 # 測定用のbuildは「Piとの通信linkを持たない」と定めているためである。#487でfeatureの排他をやめた
-# ときに、ただ1つ残した排他である。
+# ときの、ただ1つの例外である（featureどうしの排他ではない。このbuildはPi linkを外すだけであり、
+# `bringup-display-13`と組み合わせることは禁じていない）。
 # **#474で、このfeatureは有効にするとcompileが止まる**（`main.rs`の`compile_error!`）。
 bench-servo-test-17 = []
 # Issue #13の`DISP-01`（MSP2807）bring-up（初期化、backlight点灯、単色fill、
@@ -32,8 +33,8 @@ bench-servo-test-17 = []
 # 呼ばず、`LCD-BL`（GPIO4）を含むLCD関連pinへ一切触れない。既定offにした理由と、
 # 有効化してよい条件・手順は`main.rs`のmodule docの
 # 「`DISP-01`のbring-upを有効にする手順」節を参照する（ここへ再掲しない）。
-# #487から、fillと四隅patternはmain loopの中で1段ずつ進み、Pi linkの受信とheartbeatは描画の間も
-# 止まらない（`src/display_test.rs`）。
+# #487から、fillと四隅patternはmain loopの中で1段ずつ進む（`src/display_test.rs`。描画の間の
+# Pi linkの受信とheartbeatは、同fileのmodule docを参照）。
 bringup-display-13 = []
 
 [profile.release]

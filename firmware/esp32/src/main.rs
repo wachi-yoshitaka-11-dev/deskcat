@@ -39,7 +39,7 @@
 //!
 //! | feature | 加えるもの | 既定buildとの関係 |
 //! |---|---|---|
-//! | `bringup-display-13` | LCDの初期化、backlightの点灯、単色fillと四隅patternの試験モード | 製品buildに加える。Pi linkの受信とheartbeatは描画の間も止まらない |
+//! | `bringup-display-13` | LCDの初期化、backlightの点灯、単色fillと四隅patternの試験モード | 製品buildに加える。描画の間のPi linkの受信とheartbeatは`crate::display_test`のmodule docを参照 |
 //! | `bench-servo-test-17` | servoの単発bench試験（#17の測定用build） | **Pi linkを外す。**正本`docs/hardware/servo-safety-limits.md`の`測定のための駆動（承認の状態の項目6）`節が、測定用のbuildは「Piとの通信linkを持たない」と定めているためである。#474で、このfeature付きbuildはcompileが止まる |
 //!
 //! `#487`より前は、`pi-protocol-mode` featureを付けたbuildだけがPi linkを持ち、LCD／I2Cの
@@ -157,7 +157,7 @@ mod accel;
 // Pi link（UART1）の`boot`の受理確認・再送。**`bench-servo-test-17`のbuildだけは持たない。**
 // 正本`docs/hardware/servo-safety-limits.md`の`測定のための駆動（承認の状態の項目6）`節が、
 // 測定用のbuildは「Piとの通信linkを持たない」と定めているためである（`#487`でfeatureの排他を
-// やめたときに、ただ1つ残した排他である）。
+// やめたときの、ただ1つの例外である。featureどうしの排他ではない。Pi linkを外すだけである）。
 #[cfg(not(feature = "bench-servo-test-17"))]
 mod boot_session;
 mod config;
@@ -477,6 +477,12 @@ fn main() {
         )
         .expect("UartDriver::new for the Pi link UART must succeed exactly once")
     };
+    // event queueが無ければ、受信の異常を数えられない（`drain_uart_events`のdoc「数えられない場合」）。
+    // 起動時に1回だけ確かめてlogへ出す。
+    #[cfg(not(feature = "bench-servo-test-17"))]
+    if uart.event_queue().is_none() {
+        log::error!("pi_uart_event_queue_missing (受信の異常を数えない)");
+    }
 
     // `boot`のACK待ち・再送sessionを開始する（`#446` PR B、`crate::boot_session`参照）。
     // `sid`は起動のたびに1回だけ選ぶ（§3）。`stale_session`を受けたときの選び直しは
@@ -574,8 +580,9 @@ fn main() {
         // 「すぐ」として返す（`crate::display_test::DisplayBringup::next_deadline_ms`）。0 tickの
         // `read`はdataが無ければyieldせずに戻るため、帯を続けて描く間、優先度の低いIDLE taskが
         // 回らず、Task Watchdog Timerの前提を壊す。1 msは`TickType::new_millis`（esp-idf-hal
-        // 0.46.2 `delay.rs`89〜95行）が切り上げ、`CONFIG_FREERTOS_HZ=100`（生成された`sdkconfig`、
-        // debug profile）では1 tick＝10 msになる。
+        // 0.46.2 `delay.rs`89〜95行）が1 tickへ切り上げ、`CONFIG_FREERTOS_HZ=100`（生成された`sdkconfig`、
+        // debug profile）では1 tick＝10 msになる。1 tickのblockは次のtickの割り込みで解けるため、
+        // 実際の待ちは0〜10 msであり、dataが届けばそれより早く戻る。
         #[cfg(not(feature = "bench-servo-test-17"))]
         {
             drain_uart_events(&uart, &mut health);
@@ -618,6 +625,9 @@ fn main() {
 /// `UART_DATA`等のそれ以外のeventは読み捨てる。**待たない**（`recv_front`へ0 tickを渡す）。
 ///
 /// # 数えられない場合
+///
+/// **event queueが作れなかった場合は何も数えない**（`config::PI_PROTOCOL_UART_EVENT_QUEUE_LEN`は0では
+/// ないため作られる見込みだが、無ければ起動時に`pi_uart_event_queue_missing`を1回出す）。
 ///
 /// **ここで数えた回数は、起きた回数の下限である。**ESP-IDFのUART driverは、event queueが
 /// 満杯の間に起きたeventを捨てる（`config::PI_PROTOCOL_UART_EVENT_QUEUE_LEN`のdoc）。main loopが

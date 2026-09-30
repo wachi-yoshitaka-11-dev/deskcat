@@ -17,7 +17,7 @@
 //!
 //! [`UartObservations`]は、Pi linkのUART（UART1）の受信で起きた異常のeventの数と、
 //! main loopが受信を読みに行く間隔の最大値を持つ。**Protocol counterではない**
-//! （§4.6の`protocol`へ載せず、health snapshotのlogの行にだけ出す）。受信のring buffer
+//! （§4.6の`protocol`へ載せない。eventごとの`pi_uart_event`のwarnの行と、health snapshotの行に出す）。受信のring buffer
 //! （`config::PI_PROTOCOL_UART_RX_BUFFER_BYTES`）が溢れたかどうかは、以前はどこからも
 //! 観測できなかった（`crate::console`のmodule doc (2)）。数え方と限界は`main.rs`の
 //! `drain_uart_events`のdocが持つ。
