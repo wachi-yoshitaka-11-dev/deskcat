@@ -12,7 +12,7 @@
 //! - **出力の元になる`Setpoint`の列（量子化の前）が、自分で測った間隔で`Limiter`の制限**
 //!   （位置、速度、加速度）**を満たす。**`Limiter`が加速度の
 //!   上限を譲ったSetpoint（`acceleration_bound_conceded`）は出力せずにlatchする（下の「制御周期の外の間隔、加速度の譲り、出力の失敗ではlatchする」）
-//! - **LEDCへ設定するdutyは、承認値の位置範囲の両端を変換した値の内側に収まる。**dutyへの量子化は
+//! - **`tick`がLEDCへ設定するdutyは、承認値の位置範囲の両端を変換した値の内側に収まる。**dutyへの量子化は
 //!   最も近い整数へ丸めたうえで、下端は切り上げ、上端は切り捨てた範囲へclampする。**位置だけは
 //!   量子化の後も型で締める。**速度と加速度は量子化の刻みの分だけずれうる（下の「実機での実現は保証しない」）
 //!
@@ -26,7 +26,8 @@
 //!
 //! **保証は、[`LimitedServo::new`]または[`LimitedServo::resume`]から[`LimitedServo::stop`]までの
 //! 区間ごとである。**`stop`はその境界であり、dutyを0にするだけで、軌道の制限を受けない（減速しない）。
-//! `stop`の直前の位置と`resume`の後の最初の位置の間は、`Limiter`が測っていない。
+//! `resume`は最後に出力した位置から速度0の`Limiter`を作るので、再開後の位置の列はその位置から
+//! 制限を受ける。**`Limiter`が測っていないのは、止める直前の速度から0への不連続と、duty 0の間である。**
 //!
 //! **実機がdutyの列をどう実現するか（PWMのframe、servo内部の追従、resetの後）は保証しない。**
 //! 下の「実機での実現は保証しない」に列挙し、段3の監視下の試験（#19の受け入れ条件7）で確かめる。
@@ -81,7 +82,7 @@
 //!   その間の位置の列が`Limiter`の制限を満たさなくなる。短すぎる場合は、`Limiter`がその間隔では
 //!   `最大加速度`を保証できない（`deskcat_servo::Limiter::step`のdocの「`dt_s`は
 //!   `ControlPeriod`の範囲内でなければならない」）。**jitterが許容幅を超えると、そこで新しい位置を設定しなくなる**（LEDCは最後のdutyを出し続けうる）。
-//!   安全側に倒れる既知の性質である
+//!   新しい位置を設定しない側に倒れる既知の性質である
 //! - **`Limiter::step`の後にPWMの出力が失敗した**（[`TickError::Output`]）。`Limiter`だけが1 step進み、
 //!   LEDCに設定した位置は前の値のまま残る（esp-idf-hal 0.46.2の`LedcDriver::set_duty`が呼ぶ
 //!   ESP-IDFの`ledc_set_duty_and_update`は、失敗をregisterへ書く前の検査で返す。source を読んだ結果）。
@@ -129,7 +130,8 @@
 //! # 実機での実現は保証しない
 //!
 //! 次は型でも、ESP-IDFのsourceを読むことでも確かめきれない。**量を主張しない。**
-//! 段3の監視下の試験（#19の受け入れ条件7）の項目として扱う（[#19のコメント](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/19#issuecomment-5891754488)に記録した）。
+//! 段3の監視下の試験（#19の受け入れ条件7）の項目として扱う（[#19のコメント](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/19#issuecomment-5891754488)に記録し、
+//! 保証の範囲と再開の位置は[訂正のコメント](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/19#issuecomment-5909603268)で置き換えた）。
 //!
 //! - **dutyへの量子化。**設定するdutyは`Setpoint`の位置を最も近い整数へ丸めた値であり、
 //!   その刻みの分だけ、設定する列の速度と加速度は`Limiter`の制限からずれうる（位置は上の範囲に収まる）。
@@ -148,7 +150,9 @@
 //! - **reset、panic、drop、`core::mem::forget`の後の出力は保証しない。**範囲外のpulseになりうる。
 //!   **止めるのは、人が外部電源を切ることである。**panicの方式はabortである（target
 //!   `xtensa-esp32-espidf`の`panic-strategy`が`abort`であり、`firmware/esp32/.cargo/config.toml`の
-//!   `build-std`も`panic_abort`を使う）ため、panicでは`Drop`が走らない。ESP-IDF v5.5.3のpanic handler
+//!   `build-std`も`panic_abort`を使う）ため、panicでは`Drop`が走らない。ESP-IDF v5.5.3では、newlibの
+//!   `abort()`が`esp_system_abort`を経て`panic_abort`へ進み（`components/newlib/src/abort.c`、
+//!   `components/esp_system/port/esp_system_chip.c`、`components/esp_system/panic.c`）、panic handler
 //!   （生成される`sdkconfig`の`CONFIG_ESP_SYSTEM_PANIC_PRINT_REBOOT=y`）は、cache errorのときは
 //!   `esp_restart_noos_dig`へ、それ以外は`esp_restart`と同じ`esp_restart_noos`へ進む
 //!   （`components/esp_system/port/panic_handler.c`の`panic_restart`）。`esp_restart_noos`は、reset
@@ -181,7 +185,8 @@
 //! [servo-safety-limits.md](../../../docs/hardware/servo-safety-limits.md)の残余riskを参照。
 
 // 既定buildは`main()`からこのmoduleを呼ばないためdead_codeになる（module doc参照）。
-// `bench-servo-test-17` feature付きbuildでは呼ばれるため無害（#474で、そのbuildはcompileが止まる）。
+// `Sg90`の一部は`bench-servo-test-17` feature付きbuildで呼ばれる（#474で、そのbuildはcompileが止まる）。
+// `LimitedServo`、`Stopped`、`ServoFaultCounters`は、今はどのbuildからも呼ばれない。
 #![allow(dead_code)]
 
 use core::fmt;
@@ -198,9 +203,10 @@ use esp_idf_svc::hal::units::FromValueType;
 use esp_idf_svc::sys::EspError;
 
 /// `SERVO-01`（SG90）のPWM driver。hardware LEDCでpulseを生成する（module doc参照）。
-/// `Sg90::new`でGPIO27の駆動が始まるが初期dutyは0%であり、[`LimitedServo::tick`]が
-/// 出力するまで有効なservo pulseは出ない（`bench-servo-test-17`付きbuildでは
-/// `move_to_angle_once`も同じ）。**角度を出す関数はこのmoduleのprivateである**（module doc参照）。
+/// `Sg90::new`はLEDC channelを初期duty 0%で設定する。**同じ起動の中で`Sg90::new`の後は、**
+/// [`LimitedServo::tick`]が出力するまで、このmoduleは有効なservo pulseを設定しない
+/// （`bench-servo-test-17`付きbuildでは`move_to_angle_once`も同じ）。**resetやpanicの後、`Sg90::new`より
+/// 前の出力は保証しない**（module docの「実機での実現は保証しない」）。**角度を出す関数はこのmoduleのprivateである**（module doc参照）。
 pub struct Sg90<'d> {
     driver: LedcDriver<'d>,
 }
