@@ -405,7 +405,7 @@ gate表のいずれの行も解決していない。動かなかった場合、�
 
    **再開の条件は、この節では定めない。**[サーボ出力を有効化してよい条件](#サーボ出力を有効化してよい条件)は`HW-TBD-010`（監視下calibration）を含む全行の解決を求めるが、`010`の実測にはservo出力が要る。**gateと5項目の範囲で最初の駆動をどう行うかは未決であり、[#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)が扱う。**`PROT-OC-01`の実装（[#405](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/405)）は、その前提の1つである。再開するには、この節の状態を改め、`main.rs`の#474の`compile_error!`を外し、#474の`compile_error!`で止まることを述べた注記を外す変更が要る。**`pi-protocol-mode`との排他の`compile_error!`とその注記は残し、#474に触れた括弧書き・文だけを外す。**外す注記は、`firmware/esp32`の`Cargo.toml`・`README.md`・`src/main.rs`・`src/servo.rs`のものと、この文書の`確定しているproject規則`・`build`stepへの2026-09-25追記である。**この項目5、残余riskへの2026-09-25追記、Revision 28は記録として残す。**これらの注記は承認の状態ではなく、`compile_error!`があるというfirmwareの挙動を述べたものであり、`compile_error!`を外すと偽になるため外す。
 
-   **2026-09-30追記（[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)のPR B1）: 上の「`pi-protocol-mode`との排他の`compile_error!`とその注記は残し」の`compile_error!`は、もう無い。**#487で`pi-protocol-mode` featureを廃止し、Piとの通信link（UART1）を製品build（既定build）へ入れたためである。**測定用のbuild（`bench-servo-test-17`）がPiとの通信linkを持たないこと（[測定のための駆動](#測定のための駆動承認の状態の項目6)の`build`）は、`firmware/esp32/src/main.rs`の`#[cfg(not(feature = "bench-servo-test-17"))]`で保っている**（このfeature付きbuildはPi link（`crate::boot_session`とUART1）をcompileしない）。**再開のときに外すのは、#474の`compile_error!`とその注記だけである。**この項目5の本文は、当時の記録として書き換えていない。
+   **2026-09-30追記（[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)のPR B1）: 上の「`pi-protocol-mode`との排他の`compile_error!`とその注記は残し」の`compile_error!`は、もう無い。**#487で`pi-protocol-mode` featureを廃止し、Piとの通信link（UART1）を製品build（既定build）へ入れたためである。**測定用のbuild（`bench-servo-test-17`）がPiとの通信linkを持たないこと（[測定のための駆動](#測定のための駆動承認の状態の項目6)の`build`）は、`firmware/esp32/src/main.rs`の`#[cfg(not(feature = "bench-servo-test-17"))]`で保っている**（このfeature付きbuildはPi link（`crate::boot_session`とUART1）をcompileしない）。**再開のときに外すのは、#474の`compile_error!`とその注記だけである。**ただし、このfeature付きbuildは#474の`compile_error!`があるためbuildしておらず、#487でmain loopを組み替えた後に、外してcompileが通るかは確かめていない。この項目5の本文は、当時の記録として書き換えていない。
 
 6. **2026-09-28、ユーザーが初回駆動の方法を決めた（[#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)）。**判断者はユーザー（wachi-yoshitaka-11-dev）であり、決定の記録は#17のコメントにある。**あわせてユーザーは、項目5の「実行しない」について「そのルールを出していない」と述べた**（#17、[#488](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/488)）。**上の1〜5の記録は書き換えていない。**
 
@@ -719,6 +719,17 @@ firmware（`firmware/esp32/src/servo.rs`、
     NVSを消去してから再flashする（`espflash`の`erase-flash`または`erase-parts nvs`
     相当。対象board・partition名を実行前に確認する。検証状況はPR本文参照）。
     承認を得てから`起動とarm delay`へ戻る。承認無く連続動作・再試行はしない。
+
+    **2026-09-30追記（[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)のPR B1）: latchは、人間の
+    承認なしに消えうる。**#487以降、`bench-servo-test-17`以外のすべてのbuild（既定buildを含む）は、
+    起動のたびに`generate_sid`（`firmware/esp32/src/main.rs`）から`EspDefaultNvsPartition::take()`を呼ぶ。
+    これは`reinit=true`で初期化し（esp-idf-svc 0.52.1 `src/nvs.rs`）、`nvs_flash_init()`が
+    `ESP_ERR_NVS_NO_FREE_PAGES`または`ESP_ERR_NVS_NEW_VERSION_FOUND`を返すと、default partition全体を
+    `nvs_flash_erase()`で消してから再初期化する。**latch（namespace `bench17`、key `ran`）も同じpartitionに
+    あるため、このときlatchも消える。**`終了処理`で通常buildへ戻した後も同じである。**したがって、
+    bench buildを書き込み直す前には、latchの状態を人が確かめ、「消えていないこと」を前提にしない。**
+    同じ消去の経路はbench build自身の`run_servo_bench_test`にもある。この追記は、値と手順の条件を
+    足さず、上の手順12と各stepの本文を書き換えていない。
 13. **`終了処理`（人間）** 試験終了後、外部5 V電源を遮断する。`単発動作`まで到達して
     いればGPIO27は`run_servo_bench_test`が返るとlowへ固定される（`Sg90`のdrop。
     [`crate::servo::Sg90::stop`]のdoc参照）。**`Sg90::new`より前にreturnした場合
@@ -790,3 +801,4 @@ firmware（`firmware/esp32/src/servo.rs`、
 | 2026-09-28 | 32 | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。PR #500へのCodeRabbitの指摘（人が電源を抜くことを短絡保護として扱わない）を受け、項目6の(a)の弱点へ、安全要件の5項目「短絡」が述べる「人が電源を落とすのでは止まらない」を書き足した。servo電源の経路を`M-12001`の出力定格3 Aに耐える手持ちの部品（端子台、AWG22の線材）だけで組み、breadboardとjumper wireを使わないことを、測定のための駆動の条件と`通電前の現物確認`へ加えた（購入なし）。短絡時の電流が3 Aを超えない場合にしか経路を守れないこと、servo本体のリード線とconnectorの定格が不明であることは弱点として残した |
 | 2026-09-29 | 33 | [#489](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/489)。`初回動作の実行手順`の`build`stepが「flashは人間」としており、[power-budget.md](power-budget.md)のbring-up手順（書き込みのcommandは、人間が立ち会って監視している状態であれば実機LinuxのAIセッションが実行してよい）と食い違っていた。flashの実行者を同文書の`ACCEL-01`／`ENV-01`単体bring-upの手順8への参照に改め（規則をここへ書き写さない）、`再武装`と`終了処理`の再flashも同じであることを書いた。**USBの接続と給電を止める判断は人間のままであり、`承認の状態`、`サーボ出力を有効化してよい条件`、停止基準、各stepの条件は変えていない** |
 | 2026-09-30 | 34 | [#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)のPR B1。`承認の状態`の項目5へ2026-09-30追記を足した。`pi-protocol-mode`を廃止したため、項目5が再開の手順として残すよう求めた`pi-protocol-mode`との排他の`compile_error!`は無くなった。測定用のbuildがPiとの通信linkを持たないことは`#[cfg(not(feature = "bench-servo-test-17"))]`の構造で保っている。**servo出力のgate、承認の状態、項目5の本文は変えていない** |
+| 2026-09-30 | 35 | [#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)のPR B1。`初回動作の実行手順`の`再武装`stepへ2026-09-30追記を足した。`bench-servo-test-17`以外のすべてのbuild（既定buildを含む）が起動のたびに`EspDefaultNvsPartition::take()`（`reinit=true`）を呼ぶようになり、NVSの初期化が`ESP_ERR_NVS_NO_FREE_PAGES`／`ESP_ERR_NVS_NEW_VERSION_FOUND`を返すとdefault partitionが消え、単発latchも人間の承認なしに消えうるためである。bench buildを書き込み直す前にlatchの状態を人が確かめ、消えていないことを前提にしない、と書いた。あわせて項目5への2026-09-30追記に、`bench-servo-test-17`付きbuildは#474の`compile_error!`を外した後にcompileが通るかを確かめていないことを書き足した。**servo出力のgate、承認の状態、値、各stepの本文と条件は変えていない** |

@@ -183,7 +183,7 @@ pub const PI_PROTOCOL_UART_BAUDRATE_HZ: u32 = 115_200;
 ///
 /// **`#487`から、`read`と`read`の間にUART0へのdebug log出力も入る。**Pi linkを持つbuildが
 /// loggingを止めなくなったためである（`crate::console`参照）。`bringup-display-13`付きbuildでは、
-/// LCDの描画の1段（`crate::display_test`）も入る。heartbeat、health snapshot
+/// LCDの描画の1段（`crate::display_test`）と、LCDのbring-upの後に1回だけ走るI2Cのbring-up（`main.rs`の`i2c_pending`）も入る。heartbeat、health snapshot
 /// （JSON 1行）、`boot_tx`等のlogを書いている間も、この`read`は呼ばれない。**log出力の
 /// 所要時間は測っていない。**consoleがbyteを送り終えるまで戻らない場合、所要時間は
 /// logのbyte数に比例する。UART0のbaudは生成された`sdkconfig`の`CONFIG_ESP_CONSOLE_UART_BAUDRATE`
@@ -244,7 +244,7 @@ pub const PI_PROTOCOL_UART_READ_CHUNK_BYTES: usize = 256;
 /// 変えない）。ESP-IDFのUART driverは、受信のたびに`UART_DATA`のeventも積む。queueが満杯の
 /// 間に起きたeventは捨てられる（ESP-IDF v5.5.3 `esp_driver_uart/src/uart.c`の
 /// `UART event queue full`の`ESP_EARLY_LOGV`。既定のlog levelでは出ない）。main loopは周回
-/// ごとにqueueを空にするため、1周回の間に積まれる`UART_DATA`の数（通常は数件）より大きく
+/// ごとにqueueを空にするため、1周回の間に積まれる`UART_DATA`の数より大きく
 /// とる。esp-idf-hal 0.46.2の既定（`Config::new`の`queue_size: 10`）より余裕を見た値であり、
 /// 導出した値ではない。
 #[cfg(not(feature = "bench-servo-test-17"))]

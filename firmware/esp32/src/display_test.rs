@@ -33,10 +33,15 @@
 //! `docs/hardware/power-budget.md`の`DISP-01`追加接続の手順が、完了の証拠としてこれらの
 //! 行を挙げているためである。
 //!
-//! **`elapsed_us`の意味は変わる。**帯15本の描画時間の合計であり、帯と帯の間にmain loopが
-//! 使った時間を含まない。帯ごとにwindowの設定（CASET／PASET）とRAMWRのcommandを送るため、
-//! 1回の`fill_screen`で描いた値（`docs/hardware/experiment-log.md`の`EXP-016`）と直接比べられる
-//! とは限らない。
+//! **どちらの行も`elapsed_us`の意味は変わる。以前の値（`docs/hardware/experiment-log.md`の
+//! `EXP-016`〜`EXP-018`）と直接比べない。**
+//! - `display_fill`：帯15本の描画時間の合計であり、帯と帯の間にmain loopが使った時間を含まない。
+//!   帯ごとにwindowの設定（CASET／PASET）とRAMWRのcommandを送るため、1回の`fill_screen`で
+//!   描いた値と同じ量を測っているとは限らない。
+//! - `display_corner_pattern`：四隅と軸の要素の描画時間の合計である。背景を含めない点は以前と
+//!   同じだが、#487の直前の計時の区間（`EXP-018`の値）は、要素の間の`bringup_hb`（1 msの待ち＝
+//!   0〜10 msと、logの出力）を5回含んでいた。今の値はそれを含めないため、`EXP-018`の値より
+//!   小さくなっても描画が速くなったことを示さない。
 //!
 //! **失敗したときの振る舞いは、1回で描き切っていた頃と同じにする**（`docs/hardware/power-budget.md`の
 //! `DISP-01`追加接続の手順9の「失敗時の扱い」が、この振る舞いを前提にしている）。
@@ -236,8 +241,8 @@ impl<'d> DisplayBringup<'d> {
                         drawn_us,
                     }
                 } else {
-                    // `display_corner_pattern`の`elapsed_us`は四隅と軸の合計であり、背景を含めない
-                    // （1回で描き切っていた頃の`run_corner_pattern`と同じ）。背景の時間は捨てる。
+                    // `display_corner_pattern`の`elapsed_us`は四隅と軸の合計であり、背景を含めない。
+                    // 以前の値と比べられるかはmodule doc「logの行」。背景の時間は捨てる。
                     Step::Corner {
                         index: 0,
                         drawn_us: 0,

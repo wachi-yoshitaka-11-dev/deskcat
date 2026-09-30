@@ -728,8 +728,13 @@ ESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`の負荷合計（測定ではない。
     のうち何が確認でき、何が未達のまま残るかを明記する。**「更新中も通信とwatchdogがactiveである」
     （条件6）について、#487から`bringup-display-13` buildは描画を1段ずつ進め、描画の間も
     heartbeat（`hb`の行）とPi linkの受信が止まらない見込みである（`firmware/esp32/src/display_test.rs`の
-    module doc。codeから導いたもので、実機では確かめていない。この手順では`hb`の行が描画の間も続くかを
-    logで確かめる）。
+    module doc。codeから導いたもので、実機では確かめていない）。この手順で確かめる対象は、`health`の行の
+    `max_read_gap_ms`（受信を読みに行く間隔の最大値。定義は`firmware/esp32/src/health.rs`の
+    `UartObservations`）と`overrun_ticks`、および`heartbeat_overrun`の行の有無である。**`hb`の行は補助に
+    とどめる。**`hb`の周期（1000 ms、`config::HEARTBEAT_PERIOD_MS`）は1色を描く区間より長くなりうる
+    （帯1本の転送の計算は`display_test.rs`のmodule doc。実測ではない）ため、保持の間に出た`hb`の行は、
+    描画の間もloopが回った証拠にならない。**判定の数値の基準はここでは置かない。**値を記録し、判定は
+    `EXP-0xx`の側で行う。
     **ただしこの手順はPiを接続しない（条件(3)(a)）ため、`boot`→ACKは成立せず、実protocol sessionを確立しない。
     したがってこの手順だけでは条件6の「通信」を示せない見込みである。**「watchdog」の側は、
     heartbeatの行だけでは示せない。TWDTが有効であることと、描画の間に`task_wdt`のerrorのlogが

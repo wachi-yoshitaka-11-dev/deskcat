@@ -149,9 +149,11 @@
 //! 手順に従う。**同節もこのfeatureを要求する（条件(2)）。
 //!
 //! **このfeatureはB-2bのgateを開けない。**開けてよいかの判定は上記の正本文書が
-//! 持つ。**このfeatureが変えるのは、既定buildが`DISP-01`へ触れるかどうかだけである**
-//! （上のLCD関連6+1本のGPIOを駆動するか、`lcd.backlight_on()`を呼ぶか、`display_*`の
-//! logを出すか）。回路側の制約も、`DISP-01`を接続してよいかの判定も、これで変わらない。
+//! 持つ。**このfeatureが変えるのは、既定buildが`DISP-01`へ触れるかどうかと、それに伴うI2Cの
+//! bring-upの時期だけである**（上のLCD関連6+1本のGPIOを駆動するか、`lcd.backlight_on()`を呼ぶか、
+//! `display_*`のlogを出すか。I2Cのbring-upはLCDのbring-upの後にmain loopの中で走り、その所要時間は
+//! `overrun`と`max_read_gap_ms`に入る。下の`i2c_pending`）。回路側の制約も、`DISP-01`を接続してよいかの
+//! 判定も、これで変わらない。
 
 mod accel;
 // Pi link（UART1）の`boot`の受理確認・再送。**`bench-servo-test-17`のbuildだけは持たない。**
@@ -181,6 +183,8 @@ mod servo;
 // buildはPi link（`crate::boot_session`とUART1）をcompileしない（上の`mod boot_session`の
 // `#[cfg]`）。**測定用のbuildがPiとの通信linkを持たないこと（同文書の`測定のための駆動`節）は、
 // compile_errorではなく構造で保っている。**再開するときに外すのは、下の#474の`compile_error!`だけである。
+// ただし、このfeature付きbuildは#474の`compile_error!`があるためbuildしておらず、外した後にcompileが通るかは
+// 確かめていない（#487でmain loopを組み替えた）。
 #[cfg(feature = "bench-servo-test-17")]
 compile_error!(
     "bench-servo-test-17付きbuildは#474でcompileを止めている。\
@@ -718,6 +722,10 @@ const SID_NVS_KEY_NEXT: &str = "next_sid";
 /// 人がflash全体を消去した場合も同じ結果になる。**したがって「commitが
 /// 成功する限り再利用しない」だけでは正しくない。**
 ///
+/// この消去は`run_servo_bench_test`の単発latch（namespace `bench17`）も消す。
+/// servoの安全に関わる性質であり、正本は`docs/hardware/servo-safety-limits.md`の
+/// `初回動作の実行手順`の`再武装`stepへの2026-09-30追記である（ここへ書き写さない）。
+///
 /// counterが`0`から数え直された後にESP32が送る小さい`sid`が、受信側のretired
 /// session集合に残っている値と一致すれば衝突する。この衝突は、protocol側の
 /// `stale_session`回復（§3.1「`sid`が衝突した場合」。ACKで`stale_session`を
@@ -733,7 +741,8 @@ const SID_NVS_KEY_NEXT: &str = "next_sid";
 /// `EspDefaultNvsPartition::take()`／`EspNvs::new`／`get_u32`／`set_u32`の
 /// いずれかが失敗した場合、`health.uptime_ms()`の下位32 bitへ縮退する
 /// （旧`sid_from_uptime`と同じ値）。**この経路では非衝突を主張しない。**
-/// bring-upを行わないため起動ごとにほぼ同じ小さい値になり、§3の要件を
+/// 値は起動からの経過時間であり、`generate_sid`より前に走る処理（bring-up）の所要時間が
+/// 起動ごとに大きく変わらなければ、起動ごとに近い小さい値になる。§3の要件を
 /// 満たさないまま`boot`を送る。エラーは`log::error!`で分類し、UART0（USB）の
 /// debug logへ出る（`#487`のPR Aより前、Pi linkを持つbuild（当時の`pi-protocol-mode`）は
 /// loggingを止めており、出力されなかった）。
