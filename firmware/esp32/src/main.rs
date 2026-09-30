@@ -32,8 +32,9 @@
 //!
 //! # buildの構成（[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)）
 //!
-//! **製品buildは既定build（featureなし）である。**Pi link、I2Cのbring-up、heartbeat／health
-//! snapshotを1本のmain loopで回す（thread は使わない）。logはどのbuildでもUART0（USB）へ出る
+//! **製品buildは既定build（featureなし）である。**Pi linkとheartbeat／health snapshotを1本のmain loopで
+//! 回す（thread は使わない）。I2Cのbring-upは起動時に1回走る（`bringup-display-13`付きbuildでは、LCDの
+//! bring-upの後にmain loopの中で1回。下の`i2c_pending`）。logはどのbuildでもUART0（USB）へ出る
 //! （`crate::console`）。featureは加える向きにする。**例外は`bench-servo-test-17`だけであり、Pi linkを
 //! 外す**（下の表。正本の要求による）。
 //!
