@@ -143,18 +143,19 @@ pub const SERVO_BENCH_TEST_ARM_DELAY_MS: u32 = 10_000;
 #[allow(dead_code)]
 pub const SERVO_BENCH_TEST_EXPOSURE_MS: u32 = 300;
 
-/// `pi-protocol-mode`のUART0 baud（Hz）。**一般値ではなく既定buildのconsoleと
-/// 揃えた値である。**`CONFIG_ESP_CONSOLE_UART_BAUDRATE`は、既定buildで
-/// `cargo build`が生成する`target/xtensa-esp32-espidf/debug/build/esp-idf-sys-*/out/sdkconfig`
-/// （`#446` PR B時点、ESP-IDF v5.5.3）で`115200`と確認した。一致させないと、
-/// 既定buildと`pi-protocol-mode`で通信速度が変わってしまう。`PROTO-TBD-001`
-/// （最終baud）は未確定のままであり、この値もその暫定値の一つである。この定数は
-/// `sdkconfig`の値から自動で導出していない（手で揃え続ける前提であり、
-/// `sdkconfig`側が変わっても黙ってずれる）。
+/// `pi-protocol-mode`のPi link（`PI-UART-TX`／`PI-UART-RX`）のbaud（Hz）。
+/// **確定値ではない。**`docs/protocol/esp32-pi-protocol.md`§2の`Baud`行が`Candidate`
+/// （両端で検証する）とする115200 bpsを使う（`PROTO-TBD-001`、最終baudは未確定）。
+/// 直列4.7 kΩを入れたままこのbaudで通信できるかは、初回の接続で確かめる
+/// （`docs/hardware/gpio-assignment.md`の`信号線をつないでよい条件`4）。
+///
+/// **`#487`より前は、UART0のconsole（`CONFIG_ESP_CONSOLE_UART_BAUDRATE`）と揃える
+/// ことを根拠にしていた。**Pi linkがUART0から外れたため、その根拠は無くなった
+/// （UART0のconsoleとは別のUARTであり、揃える必要が無い）。
 #[cfg(feature = "pi-protocol-mode")]
 pub const PI_PROTOCOL_UART_BAUDRATE_HZ: u32 = 115_200;
 
-/// `pi-protocol-mode`のUART0受信ring buffer容量（byte）。`UartDriver`（interrupt駆動）が
+/// `pi-protocol-mode`のPi link UARTの受信ring buffer容量（byte）。`UartDriver`（interrupt駆動）が
 /// hardware FIFOから継続的に吸い上げる先であり、hardware FIFO自体
 /// （`SOC_UART_FIFO_LEN`＝128 byte、ESP32の`soc_caps.h`）より大きくなければ
 /// `uart_driver_install`が`ESP_FAIL`を返す（ESP-IDF v5.5.3の
@@ -179,6 +180,16 @@ pub const PI_PROTOCOL_UART_BAUDRATE_HZ: u32 = 115_200;
 /// 処理中（`reselect_sid`のNVS操作を含む）はこの`read`を呼ばないため、
 /// その間はring bufferが貯まり続ける。**このNVS操作の所要時間は未確認
 /// （下記）。
+///
+/// **`#487`から、`read`と`read`の間にUART0へのdebug log出力も入る。**`pi-protocol-mode`が
+/// loggingを止めなくなったためである（`crate::console`参照）。heartbeat、health snapshot
+/// （JSON 1行）、`boot_tx`等のlogを書いている間も、この`read`は呼ばれない。**log出力の
+/// 所要時間は測っていない。**consoleがbyteを送り終えるまで戻らない場合、所要時間は
+/// logのbyte数に比例する。UART0のbaudは生成された`sdkconfig`の`CONFIG_ESP_CONSOLE_UART_BAUDRATE`
+/// で`115200`と確かめた（`#487`、ESP-IDF v5.5.3、debug profileのbuild出力）。Pi linkも115200 bpsであるため、その間にPi linkへ
+/// 届きうるbyte数はlogのbyte数と同程度になる（計算であり、実測ではない）。health snapshotの
+/// 1行の長さも測っていない。**この見込みが512 byteに収まるかは確かめていない**（溢れを
+/// 数える経路もlogへ出す経路も無い。`console.rs`のmodule doc (2)）。
 ///
 /// **この値は理論値ではなく安全側の見込みである。**`boot`のACK（§6の例で約115 byte）に
 /// 続けて`get_status`等の別messageが即座に届く場合（`coordinator::handle_boot`が
@@ -205,7 +216,7 @@ pub const PI_PROTOCOL_UART_BAUDRATE_HZ: u32 = 115_200;
 #[cfg(feature = "pi-protocol-mode")]
 pub const PI_PROTOCOL_UART_RX_BUFFER_BYTES: usize = 512;
 
-/// `pi-protocol-mode`のUART0送信ring buffer容量（byte）。受信側ほど余裕を必要と
+/// `pi-protocol-mode`のPi link UARTの送信ring buffer容量（byte）。受信側ほど余裕を必要と
 /// しない。`UartDriver::write`が呼ぶ`uart_write_bytes`→`uart_tx_all`は
 /// `portMAX_DELAY`でblockし、渡した全byteをtx ring bufferへ積み終えるまで
 /// 戻らない（wireへ送り終えるまでではない。`crate::boot_session`の`send_boot`の

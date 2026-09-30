@@ -12,12 +12,12 @@
 //! **この型はbyte列やUART peripheralを持たない。**`Hello`／`Ping`／`GetStatus`を
 //! 受け取り、返すべき[`Message`]を返すだけである。実serial linkからこの型へ
 //! byteを渡す**受信loopは、まだ実装していない。**GPIO割り当ての承認待ちではない
-//! （`docs/hardware/gpio-assignment.md`の`Pi–ESP32間のtransport`節が確定させて
-//! いるとおり、Pi linkはUSB serialであり、GPIO headerへの配線は無い）。
+//! （Pi linkのpin（`PI-UART-TX`＝GPIO13、`PI-UART-RX`＝GPIO14）は
+//! `docs/hardware/gpio-assignment.md`の`Pi–ESP32間のtransport`節が決めている）。
 //!
-//! **このmoduleは既定build（debug logモード）でだけcompileする**
-//! （`#[cfg(not(feature = "pi-protocol-mode"))]`、`main.rs`参照）。UART0を
-//! Pi–ESP32 protocol streamへ使う`pi-protocol-mode`のbuildは、この型を使わず
+//! **このmoduleは既定buildでだけcompileする**
+//! （`#[cfg(not(feature = "pi-protocol-mode"))]`、`main.rs`参照）。Pi linkのUARTを
+//! 使う`pi-protocol-mode`のbuildは、この型を使わず
 //! `boot`のACK待ち・再送・`sid`選び直しを行う
 //! （`crate::boot_session`参照。[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446) PR B）。
 //! `pi-protocol-mode`の受信loopは`ack`だけを扱い、`Hello`／`Ping`／`GetStatus`を
