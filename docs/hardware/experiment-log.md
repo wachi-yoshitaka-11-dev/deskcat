@@ -1951,30 +1951,27 @@ MADCTL=`0x28`（`MV=1`、`BGR=1`）で、判定の向き（横向き、`J2`を�
 
 ## EXP-019: 段階B-2（今の接続のまま B-2a）の、周辺 module 3点の 3.3 V 側の電流と電圧
 
-**目的**: [#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)の段階B-2の電流測定。[power-budget.md](power-budget.md)の`段階B-2の測定`の`今の接続のままB-2aとして測る（2026-09-28、ユーザー決定）`に従い、`ACCEL-01`／`ENV-01`／`DISP-01`を ESP32 の`3V3` pinから給電したまま、3点の電源 pinへ入る電流を`MEAS-01`（0.1 Ω）の両端電圧から求める。あわせて、shunt を入れた状態の 3.3 V 側の電圧を読む。
-
-**実施日**: 2026-10-01（JST）。非通電の確認は 2026-09-30〜2026-10-01。
-
-**実施者**: 配線の変更と戻し、非通電の測定、通電中の監視、USB の抜き差し、停止の判断、テスターの読み取りはユーザーが行った。firmware の build、書き込み（`espflash`）、serial log の読み取り、起動し直し、時刻の表の作成は実機 Linux のセッション（本記録の作成者）が行った。手順は本記録の作成者がユーザーとの会話の中で示した。時刻の表は試験中にその場で作り、本記録の時刻・log はその表と保存した log から写した。
-
-### 構成（[Hardware Safety Policy](../governance/hardware-safety-policy.md)「10. ベンチ試験記録」の項目）
+[#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)の段階B-2。[power-budget.md](power-budget.md)の`段階B-2の測定`の`今の接続のままB-2aとして測る（2026-09-28、ユーザー決定）`による。
 
 | 項目 | 内容 |
 |---|---|
 | Test ID | `EXP-019` |
-| Hardware revision／Exact components | `EXP-018`と同じ。`MCU-01`（書き込み時の表示は chip revision v1.0）、`ACCEL-01`、`ENV-01`、`DISP-01`。追加したのは`MEAS-01`（秋月 117836、`SQP5WJ0R1B`）1本 |
-| Wiring revision | 基準は`EXP-018`の配線。穴の番号は、ユーザーが2026-09-30に作った配線の地図（画像。commit していない。sha256 `978e2c6f85ad42fc28a43d8f2a4f7cf5c7ecfd580c57e0880608784113257b6b`）による。測定の間だけ次のとおり変えた。3点の電源の線を、ブレッドボードの上の＋列（3V3）の30番（`DISP-01` VCC）→`b11`、4番（`ACCEL-01` Vs/VDD）→`c11`、1番（`ENV-01` VDD）→`d11`へ移した。`MEAS-01`を上の＋列11番と`a11`に挿した。測定用のジャンパを上の＋列10番（点A）、`e11`（点B）、上の－列（GND）10番（点C）に差した。測定の後に元へ戻した（ユーザーの申告） |
-| Power supply and current limit | ESP32 は PC の USB から給電した（`/dev/ttyUSB0`、`CP2102N`）。servo と Pi は接続していない。**電流制限は設けていない。**故障電流を制限しうるのは board 上の regulator の保護だけで、その短絡保護と折り返し特性は未確定である（`HW-TBD-023`）。PC host の OCP は当てにしない（[power-budget.md](power-budget.md)の段階表の`B-1`行と`B-2a: 3V3 pinから給電する経路`）。接続は`#445`・`#461`で認められている。周囲温度 25.0 ℃（`MEAS-04`、非通電の確認の時点） |
-| 条件(7) | [power-budget.md](power-budget.md)の`DISP-01`追加接続のbring-upの手順の条件(7)。[#3 comment](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3#issuecomment-5914517437)。通電の前に記録した。承認の対象は、下の patch を当てた build である |
-| Measurement equipment | `MEAS-03`（`DT830B`）1台。200Ω、2000Ω、20V、200mV のレンジを使った。ワニ口のクリップで挟み、通電中は付け替えていない。確度は取得できない（[hardware-bom.md](hardware-bom.md)の`MEAS-03`） |
-| Firmware commit/profile | commit `52a8142`の`--features bringup-display-13`、debug profile。`firmware/esp32/src/config.rs`の`DISPLAY_HOLD_MS`を`3_000`から`15_000`へ変える patch を当てた（commit していない。patch を当てた tree で option なしの`git diff`を実行した出力の sha256 `ed36fb79531f808ab142d560e470ce97ca589c79552334b2106cb4a615691752`）。ELF sha256 `e92109b69fd35a23ddbac9ab73c59dca103853304423d41107f19f5be50ff115`。repository の外に置いた detached の worktree で build し、`.embuild`は共有した（clean build ではない）。`Cargo.lock`は変えていない。patch を当てた tree は削除した |
-| develop との違い | 試験の時点の`develop`は`710c67f`。`52a8142..710c67f`の`firmware/esp32/src/`の差分のうち、`main.rs`・`config.rs`の`+`/`-`行を、`display`・`bringup`・`bring-up`・`i2c`・`hold`で、大文字と小文字を区別せずに grep で検索した。当たったのはコメントの4行で、コードの行は当たらなかった。`display.rs`・`accel.rs`・`env.rs`は変わっていない。`boot_session.rs`・`console.rs`・`protocol.rs`・`servo.rs`も変わっているが、中身は確かめていない。[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)の PR A（[#511](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/511)、`d7743e7`）はこの範囲に入っている。試験の時点で、[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)の PR B（既定の build で UART1〈GPIO13〉を常に駆動する変更）は merge されていない |
+| Date | 通電は 2026-10-01（JST）。非通電の確認は 2026-09-30〜2026-10-01 |
+| Operator | 配線の変更と戻し、非通電の測定、通電中の監視、USB の抜き差し、停止の判断、テスターの読み取りはユーザー。firmware の build、書き込み（`espflash`）、serial log の読み取り、起動し直し、時刻の表の作成は実機 Linux の AI セッション（本記録の作成者） |
+| Hardware revision／Exact components | `EXP-018`と同じ（`MCU-01`、`ACCEL-01`、`ENV-01`、`DISP-01`）。加えて`MEAS-01`（秋月 117836、`SQP5WJ0R1B`）1本 |
+| Wiring revision | 基準は`EXP-018`の配線。穴の番号は、ユーザーが2026-09-30に作った配線の地図（画像。commit していない。sha256 `978e2c6f85ad42fc28a43d8f2a4f7cf5c7ecfd580c57e0880608784113257b6b`）による。測定の間だけ、3点の電源の線を、ブレッドボードの上の＋列（3V3）の30番（`DISP-01` VCC）→`b11`、4番（`ACCEL-01` Vs/VDD）→`c11`、1番（`ENV-01` VDD）→`d11`へ移し、`MEAS-01`を上の＋列11番と`a11`に挿し、測定用のジャンパを上の＋列10番（点A）、`e11`（点B）、上の－列（GND）10番（点C）に差した。測定の後に元へ戻した（ユーザーの申告） |
+| Power supply and current limit | ESP32 は PC の USB から給電（`/dev/ttyUSB0`、`CP2102N`）。servo と Pi は接続していない。電流制限は設けていない（[power-budget.md](power-budget.md)の`B-2a: 3V3 pinから給電する経路`、`HW-TBD-023`） |
+| Firmware commit/profile | commit `52a8142`の`--features bringup-display-13`、debug profile に、`firmware/esp32/src/config.rs`の`DISPLAY_HOLD_MS`を`3_000`から`15_000`へ変える patch（commit していない。option なしの`git diff`の出力の sha256 `ed36fb79531f808ab142d560e470ce97ca589c79552334b2106cb4a615691752`）を当てた。ELF sha256 `e92109b69fd35a23ddbac9ab73c59dca103853304423d41107f19f5be50ff115`。clean build ではない。試験の時点の`develop`は`710c67f`で、[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)の PR B は merge されていなかった |
+| Configuration | 条件(7)（[power-budget.md](power-budget.md)の`DISP-01`追加接続のbring-upの手順の条件(7)）の承認: [#3 comment](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3#issuecomment-5914517437)（通電の前。patch を当てた build、backlight を点ける起動4回）。停止条件: 20V レンジの表示が 3.23 V 以下または 3.37 V 以上（PM `#0PM`の判断）、brownout、予定外の reset、LCD の表示異常、regulator 周辺と部品の発熱、異音・異臭・変色、log が150秒出ない。停止はユーザーが USB を host 側から抜く |
+| Measurement equipment | `MEAS-03`（`DT830B`）1台。200Ω、2000Ω、20V、200mV のレンジ。ワニ口のクリップで挟み、通電中は付け替えていない。確度は取得できない（[hardware-bom.md](hardware-bom.md)の`MEAS-03`）。周囲温度は`MEAS-04` |
+| Procedure | 非通電の確認の後、3回通電した。回1 は点B–点C（20V）、回2 は点A–点C（20V）、回3 は`MEAS-01`の2本の線の間（200mV）を読んだ。ワニ口の付け替えとレンジの切り替えは USB を抜いている間に行った。回3 の前に、ワニ口が隣の線やジャンパに触れていないことを目で確かめるようユーザーに依頼した（確かめたという返答は記録していない）。回1・回2 のどちらかで停止条件の値に達したら回3 は行わない、と通電の前に決めた |
+| Expected result | 停止条件に当たる事象が無く、各区間の表示が読めること |
+| Measured result | 下の3つの表と、`戻した後` |
+| Faults | 下記 |
+| Conclusion | 下記 |
+| Next safe step | 下記 |
 
-`DISPLAY_HOLD_MS`を15秒にしたのは、ユーザーが一人で、撮影と監視を同時にできなかったためである。各区間を目で読める長さにした（PM `#0PM`の判断）。
-
-### 非通電の確認（2026-09-30〜10-01）
-
-レンジと表示はユーザーの申告である。
+**非通電の確認**（レンジと表示はユーザーの申告）
 
 | # | 測った所 | レンジ | 表示 |
 |---|---|---|---|
@@ -1990,96 +1987,74 @@ MADCTL=`0x28`（`MV=1`、`BGR=1`）で、判定の向き（横向き、`J2`を�
 | M3 | 点A–点C | 2000Ω | `1806`→`1215` |
 | M6 | 周囲温度 | `MEAS-04` | 25.0 ℃ |
 
-- [hardware-bom.md](hardware-bom.md)の`MEAS-03`行は、「`200 Ω`・ダイオード・電流測定は電池を交換して再確認するまで使わない」と定めている。今回は 200Ω レンジを使った。電流は、電流端子ではなく 200mV の電圧レンジで`MEAS-01`の両端電圧を読んで求めた。ユーザーの申告では、電池は交換済みで、今回の測定の間に電池のマークは出なかった。交換後に既知の値で 200Ω レンジを再確認した記録は無い。
-- 最初は、上の＋列11番と`a11`の間に、`MEAS-01`ではなく普通のジャンパが挿してあった（下記 Faults）。差し替える前の読みは M1 `1209`、M2 `02.5`、M3 `1512`→`1209`。
-- [gpio-assignment.md](gpio-assignment.md)の`電源pinの短絡・誤配線の確認（非通電）`の項目2〜7 は、本記録の作成者が、上の`Wiring revision`に挙げたユーザーの配線の地図と、同欄の変更とを照らして行った。現物を目で見て一覧と照合することは行っていない。ユーザーの申告では、指示どおりに変え、信号線は動かしていない。
-- 電流は、点A–点B ではなく、`MEAS-01`の2本の線にワニ口を直接挟んで読んだ。
+**時刻の表**（この端末の JST。読みはユーザーの申告）
 
-### 通電の手順と停止条件
-
-- 3回に分けて通電した。回1 は部品側の電圧（点B–点C、20V）、回2 は 3V3 側の電圧（点A–点C、20V）、回3 は`MEAS-01`の両端電圧（200mV）を読んだ。ワニ口の付け替えとレンジの切り替えは、USB を抜いている間だけ行った。回3 の前に、ワニ口が隣の線やジャンパに触れていないことをユーザーが目で確かめた。
-- 停止条件: 20V レンジの表示が 3.23 V 以下または 3.37 V 以上（PM `#0PM`の判断）、brownout、予定外の reset、LCD の表示異常、regulator 周辺と部品の発熱、異音・異臭・変色、log が150秒出ない。停止はユーザーが USB を host 側から抜く。
-- 回3 では電圧を読まない。回1・回2 のどちらかで範囲を外れたら回3 は行わない。通電の前にこう決めていた（PM `#0PM`の判断）。
-
-### 時刻の表（時刻はこの端末の JST）
-
-| # | 時刻 | 事象 | 主な log | 読み（ユーザーの申告） |
+| # | 時刻 | 事象 | 主な log | 読み |
 |---|---|---|---|---|
 | 1 | 00:39:35 | 回1: USB を挿した | — | — |
-| 2 | 00:39:43 | 書き込みの command が、環境変数`ESPFLASH_SKIP_UPDATE_CHECK`の値の誤り（`1`）で起動せずに止まった。chip には書いていない | `invalid value '1' for '--skip-update-check'` | — |
-| 3 | 00:40:12〜 | 書き込み（ELF `e92109b6…`）、monitor | `App version: 52a8142-dirty`、`POWERON_RESET`×2、`display_madctl value=0x28`、各`display_fill`の`hold_ms=15000` | — |
-| 4 | 00:41:58〜00:42:13 | 起動1: 白 | `display_fill name=white` | 部品側 **3.30 V** |
-| 5 | 00:42:29〜 | bring-up の後（画面が暗い） | `accel_device_id raw=0xe5`、`env_chip_id raw=0x60` | 部品側 **3.33 V** |
+| 2 | 00:39:43 | 書き込みの command が、環境変数の値の誤りで起動せずに止まった | `invalid value '1' for '--skip-update-check'` | — |
+| 3 | 00:40:12〜 | 書き込み（ELF `e92109b6…`）、monitor | `App version: 52a8142-dirty`、`POWERON_RESET`×2、`hold_ms=15000` | — |
+| 4 | 00:41:58〜00:42:13 | 起動1: 白 | `display_fill name=white` | 点B–点C **3.30 V** |
+| 5 | 00:42:29〜 | bring-up の後 | `accel_device_id raw=0xe5`、`env_chip_id raw=0x60` | 点B–点C **3.33 V** |
 | 6 | 00:43:04 | USB を抜いた | — | — |
 | 7 | 00:46:09〜 | 回2: USB を挿した（挿した時刻は記録していない）。この時刻に monitor を開き、起動し直した | `POWERON_RESET`×1 | — |
-| 8 | 00:47:19〜00:47:34 | 起動2: 白 | — | 3V3 側 **3.30 V** |
-| 9 | 00:47:49〜 | bring-up の後 | accel `0xe5`、env `0x60` | 3V3 側 **3.34 V** |
+| 8 | 00:47:19〜00:47:34 | 起動2: 白 | — | 点A–点C **3.30 V** |
+| 9 | 00:47:49〜 | bring-up の後 | accel `0xe5`、env `0x60` | 点A–点C **3.34 V** |
 | 10 | 00:48:51 | USB を抜いた | — | — |
 | 11 | 00:50:10〜 | 回3: USB を挿した（挿した時刻は記録していない）。この時刻に monitor を開き、起動し直した | `POWERON_RESET`×1 | — |
-| 12 | 00:50:17〜00:51:50 | 起動3（1回目） | — | **読みなし**（下記 Faults） |
-| 13 | 00:53:28〜 | monitor を開き直し（起動し直し） | `POWERON_RESET`×1 | — |
+| 12 | 00:50:17〜00:51:50 | 起動3（1回目） | — | 読みなし |
+| 13 | 00:53:28〜 | monitor を開き直し、起動し直した | `POWERON_RESET`×1 | — |
 | 14 | 00:53:36〜00:55:08 | 起動3 | accel `0xe5`、env `0x60` | 下の表 |
 | 15 | 00:55:46〜00:57:26 | monitor を開き直し、起動4 | `POWERON_RESET`×1。accel `0xe5`、env `0x60` | 下の表 |
 | 16 | 00:57:44 | USB を抜いた | — | — |
 
-serial log を取っていた区間に、brownout と、上の表に無い reset は出なかった。log が無いのは、USB を挿してから monitor を開くまで（#1〜#3、#7、#11 の各回の初め）と、monitor が止まっていた区間（#12 の終わりから #13 まで、#14 の後から #15 まで）である。LCD の表示異常・発熱・異音・異臭・変色の申告は無かった。
+回1・回2 の表示は、どれも停止条件の値に達しなかったので、回3 を行った。serial log を取っていた区間に、brownout と、上の表に無い reset は出なかった。LCD の表示異常・発熱・異音・異臭・変色の申告は無かった。
 
-### 回3 の読み（200mV レンジ、`MEAS-01`の2本の線の間）
+**回3 の読み**（200mV、`MEAS-01`の2本の線の間）
 
 | 区間 | 起動3 | 起動4 |
 |---|---|---|
-| 黒 | `04.4` | `04.4` |
-| 赤 | `04.4` | `04.4` |
-| 緑 | `04.4` | `04.4` |
-| 青 | `04.4` | `04.4` |
+| 黒・赤・緑・青 | `04.4` | `04.4` |
 | 白 | `04.3` | `04.3` |
 | 四隅の pattern | `04.4` | `04.4` |
-| bring-up の後（画面が暗い） | `00.5` | `00.5` |
+| bring-up の後 | `00.5` | `00.5` |
 
-**電流への換算（計算）。**M0 のゼロ点 0.2 mV を引き、0.1 Ω で割ると、backlight 点灯中が約 41〜42 mA、bring-up の後が約 3 mA になる。200mV レンジの表示の1桁（0.1 mV）は 1 mA に当たる。`MEAS-01`は breadboard に挿して使い、校正していない。抵抗値は許容差 ±5 %、温度係数 ±300 ppm/℃ で扱う（[power-budget.md](power-budget.md)の`DT830Bを電流測定に使うときの制約（2026-08-21）`）。[power-budget.md](power-budget.md)の`今の接続のままB-2aとして測る`が定めるとおり、確度が未取得の読みであり、しきい値との照合にそのまま使わない。
+M0 の 0.2 mV を引き 0.1 Ω で割ると、bring-up の後以外の区間が約 41〜42 mA、bring-up の後が約 3 mA（計算）。
 
-**電圧。**回1（部品側）と回2（3V3 側）の各回で、白の区間と bring-up の後の2点を読んだ。4点とも 3.30〜3.34 V だった（確度が未取得の読み）。どの表示も停止条件の値（3.23 V 以下／3.37 V 以上）に達しなかったので、回3 を行った。
-
-### 戻した後
-
-- 測定用のジャンパ3本と`MEAS-01`を抜き、3点の電源の線を元の穴（上の＋列30番・4番・1番）へ戻した（ユーザーの申告）。
-- 上の＋列–上の－列、2000Ω、`1276`→`1214`。
-- ユーザーの判断で、次は行わなかった: 戻す前の`VCC`–`GND`間の再測定（`DISP-01`追加接続の手順10）、戻した後に3点の電源 pin と ESP32 の`3V3` pinがつながっていることの測定、戻した後の写真。戻した後の配線で、[gpio-assignment.md](gpio-assignment.md)の非通電の確認（項目1〜7）はやり直していない。
+**戻した後**: 測定用のジャンパ3本と`MEAS-01`を抜き、3点の電源の線を上の＋列30番・4番・1番へ戻した（ユーザーの申告）。上の＋列–上の－列は 2000Ω で`1276`→`1214`。
 
 ### Faults
 
-- 書き込みの command を1回、環境変数の値の誤りで止めた（時刻の表の#2）。chip には書いていない。
-- 起動3 の1回目（#12）は、区間の時刻を知らせる連絡がユーザーに届かず、読みが無い。本記録の作成者のセッションが途中で切り替わり、monitor もそこで止まった。monitor を開き直して起動し直した。
-- 起動4 の前に monitor を止めるとき、`pkill -f`の pattern が、止める command を実行した shell 自身にも一致し、その shell も止まった。
-- 最初は`MEAS-01`の代わりにジャンパが挿してあった。本記録の作成者の指示が「`MEAS-01`を挿す」とだけ書き、それがセメント抵抗であることを書いていなかったためである。通電の前に見つけて差し替えた。
-- 200Ω レンジを、`MEAS-03`行の定めを確かめずに使った。
-- 条件(7)の承認は、backlight を点ける起動を4回としていた。書き込んだ版の起動は少なくとも7回あった。表示を最後まで行った5回（起動1、起動2、起動3 の1回目、起動3、起動4）と、回2・回3 で USB を挿してから monitor を開いて起動し直すまでの2回（挿した時刻は記録していない）である。このほか、回1 で書き込む前に chip に入っていた image（何かは記録していない）が約37秒動いた。承認の範囲を3回以上超えた。起動3 の1回目に読みが無かったため起動し直したが、その前にユーザーにも PM にも確かめていない。手順は、USB を挿した時点で書き込み済みの版が起動して backlight を点けることを、起動の回数に入れていなかった。PM（`#0PM`）も手順を確認し、見落とした（[#3 の訂正のコメント](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3#issuecomment-5932401221)）。
-- 回3 の間は電圧を見ていない。回1・回2 の電圧を、同じ配線と同じ firmware の動きの読みとして代わりにした。
-- [power-budget.md](power-budget.md)の`DISP-01`追加接続のbring-upの手順からの逸脱（`EXP-017`の記録に揃える）: 手順10（通電後の`VCC`–`GND`間の再測定）を行っていない。[gpio-assignment.md](gpio-assignment.md)の非通電の確認の項目1を、module の pin ではなく列と rail の単位で測った。項目2〜7 を、現物ではなく配線の地図と照らして行った。
+- 条件(7)の承認（backlight を点ける起動4回）を超えた。書き込んだ版の起動は少なくとも7回（表示を最後まで行った5回と、回2・回3 で USB を挿してから monitor を開くまでの2回）。回1 では書き込む前の image（何かは記録していない）が約37秒動いた。起動3 の1回目に読みが無かったため起動し直したが、その前にユーザーにも PM にも確かめていない。手順は USB を挿した時点の起動を回数に入れておらず、PM（`#0PM`）も見落とした（[#3 の訂正](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3#issuecomment-5932401221)）。
+- `DISP-01`追加接続の手順からの逸脱: 手順10（通電後の`VCC`–`GND`間の再測定）を行っていない。[gpio-assignment.md](gpio-assignment.md)の非通電の確認の項目1を module の pin ではなく列と rail の単位で測り、項目2〜7 を現物ではなく配線の地図と照らして行った。戻した後に項目1〜7 をやり直していない（ユーザーの判断）。
+- [#3 の決定1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3#issuecomment-5863139535)の「B-2 の測定より前に（要る確かさを）確定させる」は、満たさないまま測定した。測定は、後の[#488 の決定](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/488#issuecomment-5868418510)（手持ちの`DT830B`で測り、確度が分からないことは弱点として記録する）に基づく。この決定が順序の条件を外したかどうかは、決定の文に書かれていない。
+- 最初は上の＋列11番と`a11`の間に`MEAS-01`ではなくジャンパが挿してあった。指示が「`MEAS-01`を挿す」とだけ書き、セメント抵抗であることを書いていなかったためである。通電の前に差し替えた（差し替える前の M1 `1209`、M2 `02.5`、M3 `1512`→`1209`）。
+- [hardware-bom.md](hardware-bom.md)の`MEAS-03`行は「`200 Ω`・ダイオード・電流測定は電池を交換して再確認するまで使わない」と定めている。その定めを確かめずに 200Ω レンジを使った。電池はユーザーの申告で交換済みで、測定中に電池のマークは出なかったが、交換後の再確認の記録は無い。電流は、電流端子ではなく 200mV の電圧レンジで読んだ。
+- 書き込みの command を1回、環境変数の値の誤りで止めた（#2）。chip には書いていない。
+- 起動3 の1回目（#12）は、区間の時刻の連絡がユーザーに届かず、読みが無い。AI のセッションが途中で切り替わり、monitor もそこで止まった。
+- 起動4 の前に monitor を止めるとき、`pkill -f`の pattern が実行した shell 自身にも一致し、その shell も止まった。
+- 回3 の間は電圧を見ていない。
+- PM の条件（回3 の通電の前に、ワニ口が隣の線やジャンパに触れていないことをユーザーが目で確かめる）は依頼したが、実施の返答は記録していない。
 
 ### この記録が主張しないこと
 
-- 3点それぞれの電流。合計である
+- 3点それぞれの電流
 - 測った値が、MSP2807 の安全な電流上限（`HW-TBD-024`）や`3V3` pinの定格（`HW-TBD-023`）を下回ること
-- [power-budget.md](power-budget.md)の段階B-2の共通条件の`測る量`（backlight の点灯と LCD の描画、I2C 通信を継続した状態の定常電流）。bring-up の各区間は静止した表示で、I2C の読み出しは1回だけである
-- 200Ω レンジの読みが正しいこと（交換後の再確認の記録が無い）
-- 測っていない電流: GPIO4 から`DISP-01`の`LED` pin へ流れる電流、上の＋列にある pull-up と分圧器の電流、信号線を通って module へ入る電流
-- 3.3 V 側の電圧が[power-budget.md](power-budget.md)の`許容電圧範囲`行の範囲の中にあること（確度が未取得の読みであり、20V レンジの表示の1桁は 10 mV である）
-- shunt と接触による電圧降下の大きさ（部品側と 3V3 側は別々の通電で読んだ）
-- 試験した firmware が、試験の時点の`develop`（`710c67f`）の firmware と、この測定について同じ動きをすること
-- 白と bring-up の後以外の区間の電圧
-- 書き込み前に chip に入っていた image が何で、#1〜#3 の間に何をしたか
-- log が無い区間に brownout や reset が無かったこと。`POWERON_RESET`の原因と、回によって回数が違う理由
+- [power-budget.md](power-budget.md)の段階B-2の共通条件の`測る量`（backlight の点灯と LCD の描画、I2C 通信を継続した状態の定常電流）
+- 測っていない電流（GPIO4 から`DISP-01`の`LED` pin へ流れる電流、上の＋列にある pull-up と分圧器の電流、信号線を通って module へ入る電流）
+- 3.3 V 側の電圧が[power-budget.md](power-budget.md)の`許容電圧範囲`行の範囲の中にあること
+- 200Ω レンジの読みが正しいこと
+- log の無い区間（USB を挿してから monitor を開くまでと、monitor が止まっていた区間）に brownout や reset が無かったこと。`POWERON_RESET`の原因
+- 試験した firmware が、試験の時点の`develop`の firmware と同じ動きをすること
 - 3点の電源の線が戻ってつながっていること
-- [gpio-assignment.md](gpio-assignment.md)の非通電の確認の項目1を、手順どおり module の pin で測ったこと（M1 と、戻した後の＋列–－列の測定は、列と rail の単位で測った）
 
-### 結論
+### Conclusion
 
-今の接続（`3V3` pin給電）のまま、3点の電源 pin へ入る合計電流は、確度が未取得の読みとして backlight 点灯中が約 41〜42 mA、bring-up の後が約 3 mA だった。同じ構成の 3.3 V 側の電圧は、白の区間と bring-up の後の読みで 3.30〜3.34 V だった（確度が未取得の読み）。
+今の接続（`3V3` pin給電）のまま、3点の電源 pin へ入る合計電流は、確度が未取得の読みとして、bring-up の後以外の区間が約 41〜42 mA、bring-up の後が約 3 mA だった。3.3 V 側の電圧の読みは、白の区間と bring-up の後で 3.30〜3.34 V だった（確度が未取得）。
 
 ### Next safe step
 
-- 次に通電するのは別の Issue の試験（[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)の条件4、または[#13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)の条件6）である。その通電の前に、戻した後の配線で非通電の確認（項目1〜7）をやり直す。通電したら、表示と、`accel_device_id`／`env_chip_id`の応答で、3点の電源の線がつながっていることを確かめる
+- 次の通電（[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)の条件4、または[#13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)の条件6）の前に、戻した後の配線で非通電の確認（項目1〜7）をやり直す。通電したら、表示と`accel_device_id`／`env_chip_id`の応答で、3点の電源の線がつながっていることを確かめる
 - monitor の process は、次からは PID を指定して止める
 
 ## Revision履歴
