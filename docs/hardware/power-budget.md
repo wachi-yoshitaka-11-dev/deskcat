@@ -604,7 +604,7 @@ ESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`の負荷合計（測定ではない。
 4. [人間] 電源に手を掛けられる状態（USB cableをすぐ抜ける状態）を確保する。
 5. [人間] 通電開始前に、給電を止めるまでの待機時間の上限を決めておく。**単色fillの各色と
    向きのpatternは表示したまま保つため（保つ時間は`firmware/esp32/src/config.rs`の`DISPLAY_HOLD_MS`。
-   ここへ値を再掲しない）、手順9(d)のlogはその分だけ遅れて出る。上限はこの遅れを含めて決める。**
+   ここへ値を再掲しない）、手順9(d)のlogはその分と、描画の時間（`firmware/esp32/src/config.rs`の`DISPLAY_HOLD_MS`のdoc）の分だけ遅れて出る。上限はこの遅れを含めて決める。**
 6. [人間] 条件(7)（`run_display_bringup`を`3V3` pin経路で実行することの明示的な承認と、
    その記録）を満たしていることを確認する。
 7. [人間] USB経由でESP32へ接続し、`--features bringup-display-13`でbuildしたfirmwareを書き込む。
@@ -726,26 +726,10 @@ ESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`の負荷合計（測定ではない。
     Measurement equipment／Procedure／Expected result／Measured result／Faults／Conclusion／
     Next safe step）に従う。**受け入れ条件6件（[Issue #13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)）
     のうち何が確認でき、何が未達のまま残るかを明記する。**「更新中も通信とwatchdogがactiveである」
-    （条件6）について、#487から`bringup-display-13` buildは描画を1段ずつ進め、描画の間も
-    heartbeat（`hb`の行）とPi linkの受信が止まらない見込みである（`firmware/esp32/src/display_test.rs`の
-    module doc。codeから導いたもので、実機では確かめていない）。この手順で確かめる対象は、`health`の行の
-    `max_read_gap_ms`（受信を読みに行く間隔の最大値。定義は`firmware/esp32/src/health.rs`の
-    `UartObservations`）と`overrun_ticks`、および`heartbeat_overrun`の行の有無である。**`hb`の行は補助に
-    とどめる。**`hb`の周期（1000 ms、`config::HEARTBEAT_PERIOD_MS`）は1色を描く区間より長くなりうる
-    （帯1本の転送の計算は`display_test.rs`のmodule doc。実測ではない）ため、保持の間に出た`hb`の行は、
-    描画の間もloopが回った証拠にならない。**これらの値は描画の間だけを表さない。**`max_read_gap_ms`は
-    health snapshotの周期（`config::HEALTH_SNAPSHOT_PERIOD_MS`）の窓の中の最大値、`overrun_ticks`は起動からの
-    累積であり、どちらも描画の外の処理（描画の後にmain loopの中で走るI2Cのbring-up、最初の窓では
-    `demonstrate_pi_session`など）を含む上限である。上限が小さければ描画の間も小さいと言えるが、大きくても
-    描画のせいとは言えない。手順9の給電を止める条件は変えない。**描画の最後（`display_pattern_hold`の行）より
-    後に出た`health`の行が無ければ、描画の最後の区間の値は得られていない、と記録する。** **判定の数値の基準はここでは置かない。**
-    値を記録し、判定は`EXP-0xx`の側で行う。
-    **ただしこの手順はPiを接続しない（条件(3)(a)）ため、`boot`→ACKは成立せず、実protocol sessionを確立しない。
-    したがってこの手順だけでは条件6の「通信」を示せない見込みである。**「watchdog」の側は、
-    heartbeatの行だけでは示せない。TWDTが有効であることと、描画の間に`task_wdt`のerrorのlogが
-    UART0へ出ないことで見る（設定と、発火したときの振る舞い（resetせずlogを出す）の出典は
-    `firmware/esp32/src/main.rs`のmodule docの「Task Watchdog Timerの既定の設定と、発火したときの
-    振る舞い」の段落。**`reset_reason`では見られない**）。示せなかった場合は未達とし、依存先（[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)
+    （条件6）について、#487から、描画の間もheartbeatとPi linkの受信を回す構造にした（見込み。
+    `firmware/esp32/src/display_test.rs`のmodule doc）。**この手順はPiを接続しない（条件(3)(a)）ため、
+    実protocol sessionを確立せず、この手順だけでは条件6を示せない見込みである。**示せなかった場合は
+    未達とし、依存先（[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)
     等）をIssue側の記録に残す。
 
 ##### `DISP-01`追加接続のbring-upの手順：条件の根拠

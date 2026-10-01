@@ -73,13 +73,8 @@ pub struct UartObservations {
     pub rx_buffer_full: u32,
     /// hardware FIFOの溢れ（`UART_FIFO_OVF`）の回数。
     pub rx_fifo_overflow: u32,
-    /// 直前のhealth snapshotから今までの、受信を読みに行く間隔の最大値（ms）。
-    /// 間隔は、`UartDriver::read`から戻ってから次の`read`を始めるまでの時間であり、`read`の中で
-    /// 待っている時間を含まない（その間はdriverが受信を読み進める）。この間にring bufferへ貯まる
-    /// byte数が、溢れの余裕を決める（`config::PI_PROTOCOL_UART_RX_BUFFER_BYTES`のdoc）。
-    /// health snapshotを出すたびに0へ戻す。0へ戻すのは間隔の途中であり、snapshotをまたいだ間隔は
-    /// 次の窓に数える。serializeに失敗して行を出せなかった回も0へ戻すため、
-    /// その窓の値は残らない（`main.rs`の`emit_health_snapshot`）。
+    /// `UartDriver::read`から戻ってから次の`read`を始めるまでの時間の、health snapshotの窓の中の
+    /// 最大値（ms）。
     pub max_read_gap_ms: u64,
 }
 

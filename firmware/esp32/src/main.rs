@@ -88,16 +88,6 @@
 //! 丸める（`sleep_ms_until`とmain loopのcomment参照。IDLE taskへ時間が回る条件は、main loopのcomment）。LCDのbring-up（`bringup-display-13`
 //! feature付きbuild）は描画を1段ずつ進め、段と段の間でmain loopへ戻る（`crate::display_test`）。
 //!
-//! **Task Watchdog Timerの既定の設定と、発火したときの振る舞い。**生成された`sdkconfig`（debug profile、
-//! ESP-IDF v5.5.3。#487のPR B1の2構成のbuildが使う`target/xtensa-esp32-espidf/debug/build/esp-idf-sys-*/out/sdkconfig`で
-//! 確かめた。`esp-idf-sys-*`は1つだけであり、PR B1は`sdkconfig.defaults`と`build.rs`を変えていない）では`CONFIG_ESP_TASK_WDT_EN=y`・`CONFIG_ESP_TASK_WDT_INIT=y`・
-//! `CONFIG_ESP_TASK_WDT_TIMEOUT_S=5`で、両CPUのIDLE taskを監視する（`CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU0=y`／
-//! `CPU1=y`）。**`CONFIG_ESP_TASK_WDT_PANIC`は無効である。**このときTWDTが発火してもresetはせず、
-//! `task_wdt`のerrorのlog（`Tasks currently running:`等）とbacktraceをconsole（UART0）へ出すだけである
-//! （ESP-IDF v5.5.3 `components/esp_system/task_wdt/task_wdt.c`の`task_wdt_timeout_handling`と
-//! ISR handler）。**したがってwatchdogが発火しなかったことは、`reset_reason`ではなく、このerrorのlogが
-//! 出ないことで見る。**heartbeat（`hb`の行）が続くことだけでは、watchdogがactiveであることを示さない。
-//!
 //! # `DISP-01`のbring-upを有効にする手順
 //!
 //! **既定buildでLCDを動かさないのは、恒久的な無効化ではない。**このfeatureが有効にする
@@ -312,9 +302,7 @@ fn next_deadline(deadline: u64, period_ms: u32, now: u64) -> (u64, bool) {
 
 /// `until` まで待つ。
 ///
-/// **必ず 1 ms 以上を渡す。**（1 msは1 tickへ切り上がり、実際の待ちは次のtickまでの0〜10 msである。
-/// main loopのcomment。`delay_ms(1)`はそれでも必ずblockしてyieldする。ESP-IDF v5.5.3
-/// `components/freertos/FreeRTOS-Kernel/tasks.c`の`vTaskDelay`は、1 tick以上で自taskをdelayed listへ移す。）`delay_ms(0)` は yield せずに戻るため、loop に置くと
+/// **必ず 1 ms 以上を渡す。**`delay_ms(0)` は yield せずに戻るため、loop に置くと
 /// busy wait になり、優先度の低い IDLE task を starve させる。IDLE task が回らないと
 /// Task Watchdog Timer が進まないため、これは watchdog の前提を壊す。
 ///
@@ -641,7 +629,7 @@ fn main() {
 /// ないため作られる見込みだが、無ければ起動時に`pi_uart_event_queue_missing`を1回出す）。
 ///
 /// **ここで数えた回数は、起きた回数の下限である。**ESP-IDFのUART driverは、event queueが
-/// 満杯の間に起きたeventを捨てる（`config::PI_PROTOCOL_UART_EVENT_QUEUE_LEN`のdoc）。main loopが
+/// 満杯の間に起きたeventを捨てる（ESP-IDF v5.5.3 `esp_driver_uart/src/uart.c`の`UART event queue full`）。main loopが
 /// 長く戻らない間（LCDの1段、NVSの書き込み、長いlog）にqueueが`UART_DATA`で埋まると、その後の
 /// 溢れのeventは数えられない。**0件でも、溢れなかったことの証明にはならない。**
 ///
