@@ -62,6 +62,9 @@ pub struct Health {
 
 /// Pi linkのUARTの受信で観測したeventの数と、受信を読みに行く間隔の最大値。
 ///
+/// **frame errorとparity errorは数えない。**frame errorの割り込みは有効にしておらず、parityは使って
+/// いない（8N1）ため、どちらもeventが積まれる経路が無い（`main.rs`の`drain_uart_events`のdoc）。
+///
 /// **Protocol counterではない**（`Health`のmodule doc参照）。Pi linkを持たない`bench-servo-test-17`付きbuildでは
 /// 数える経路が無く、health snapshotの行の値は常に0である（Pi linkの状態を表さない）。
 #[derive(Debug, Clone, Copy, Default)]
@@ -70,10 +73,6 @@ pub struct UartObservations {
     pub rx_buffer_full: u32,
     /// hardware FIFOの溢れ（`UART_FIFO_OVF`）の回数。
     pub rx_fifo_overflow: u32,
-    /// frame error（`UART_FRAME_ERR`）の回数。baudの不一致や、信号の乱れで起きうる。
-    pub frame_error: u32,
-    /// parity error（`UART_PARITY_ERR`）の回数。8N1ではparityを使わないため、通常は0である。
-    pub parity_error: u32,
     /// 直前のhealth snapshotから今までの、受信を読みに行く間隔の最大値（ms）。
     /// 間隔は、`UartDriver::read`から戻ってから次の`read`を始めるまでの時間であり、`read`の中で
     /// 待っている時間を含まない（その間はdriverが受信を読み進める）。この間にring bufferへ貯まる

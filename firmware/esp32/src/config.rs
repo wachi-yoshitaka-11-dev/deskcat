@@ -237,8 +237,8 @@ pub const PI_PROTOCOL_UART_TX_BUFFER_BYTES: usize = 512;
 #[cfg(not(feature = "bench-servo-test-17"))]
 pub const PI_PROTOCOL_UART_READ_CHUNK_BYTES: usize = 256;
 
-/// Pi link UARTのevent queueの長さ（件）。受信の異常（ring bufferの満杯、FIFOの溢れ、
-/// frame error）を数えるために使う（`main.rs`の`drain_uart_events`）。
+/// Pi link UARTのevent queueの長さ（件）。受信の異常（ring bufferの満杯、FIFOの溢れ）を
+/// 数えるために使う（`main.rs`の`drain_uart_events`）。
 ///
 /// **この値は安全要件の5項目に効かない**（観測の手段であり、送受信するbyteも電気の条件も
 /// 変えない）。ESP-IDFのUART driverは、受信のたびに`UART_DATA`のeventも積む。queueが満杯の

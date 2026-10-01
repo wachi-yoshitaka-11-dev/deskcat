@@ -629,9 +629,11 @@ fn main() {
 
 /// Pi linkのUARTのevent queueを空になるまで吸い上げ、受信の異常を数えてlogへ出す。
 ///
-/// 数えるのは、受信のring bufferの満杯（`UART_BUFFER_FULL`）、hardware FIFOの溢れ
-/// （`UART_FIFO_OVF`）、frame error、parity errorである（`crate::health::UartObservations`）。
-/// `UART_DATA`等のそれ以外のeventは読み捨てる。**待たない**（`recv_front`へ0 tickを渡す）。
+/// 数えるのは、受信のring bufferの満杯（`UART_BUFFER_FULL`）とhardware FIFOの溢れ
+/// （`UART_FIFO_OVF`）である（`crate::health::UartObservations`）。`UART_DATA`等のそれ以外のeventは
+/// 読み捨てる。**frame errorとparity errorは数えない。**`UartConfig::default()`のevent設定
+/// （esp-idf-hal 0.46.2 `uart.rs`の`EventConfig::new`）はframe errorの割り込みを有効にせず、
+/// parityは`ParityNone`（ESP-IDF v5.5.3の`uart_ll_set_parity`が`parity_en`を0にする）である。**待たない**（`recv_front`へ0 tickを渡す）。
 ///
 /// # 数えられない場合
 ///
@@ -663,14 +665,6 @@ fn drain_uart_events(uart: &UartDriver<'_>, health: &mut Health) {
             UartEventPayload::RxFifoOverflow => {
                 observations.rx_fifo_overflow = observations.rx_fifo_overflow.saturating_add(1);
                 ("rx_fifo_overflow", observations.rx_fifo_overflow)
-            }
-            UartEventPayload::FrameError => {
-                observations.frame_error = observations.frame_error.saturating_add(1);
-                ("frame_error", observations.frame_error)
-            }
-            UartEventPayload::ParityError => {
-                observations.parity_error = observations.parity_error.saturating_add(1);
-                ("parity_error", observations.parity_error)
             }
             _ => continue,
         };
@@ -1171,13 +1165,11 @@ fn emit_health_snapshot(health: &mut Health, now: u64) {
     let uart = health.uart();
     match serde_json::to_string(&status) {
         Ok(payload) => log::info!(
-            "health uptime_ms={now} overrun_ticks={} snapshot_errors={} pi_uart_rx_buffer_full={} pi_uart_rx_fifo_overflow={} pi_uart_frame_error={} pi_uart_parity_error={} max_read_gap_ms={} status={payload}",
+            "health uptime_ms={now} overrun_ticks={} snapshot_errors={} pi_uart_rx_buffer_full={} pi_uart_rx_fifo_overflow={} max_read_gap_ms={} status={payload}",
             health.overrun_ticks(),
             health.snapshot_errors(),
             uart.rx_buffer_full,
             uart.rx_fifo_overflow,
-            uart.frame_error,
-            uart.parity_error,
             uart.max_read_gap_ms,
         ),
         Err(err) => {
