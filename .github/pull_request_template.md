@@ -71,7 +71,7 @@ Closes #
 
 ## 自己レビュー
 
-- [ ] 開始時に同一作業の通算巡数と人間の継続承認を確認した（差分・rebase・セッション変更でもリセットしない）
+- [ ] 開始時に同一作業の既実施巡数と人間の継続承認を確認した（同じreviewの中では差分・rebase・push・セッション変更でもリセットしない）
 - [ ] [自己レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/CONTRIBUTING.md#自己レビュー)の観点で見直し、下記の終端状態と未解決欠陥を記録した
 - [ ] **要件照合Pass**と**fresh-context Pass**を、同じ最終diffに対して別々に実施した（[2つのPass](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/CONTRIBUTING.md#2つのpass)）
 
@@ -82,15 +82,15 @@ Closes #
 
 対象Issue / 実行経路:
 
-開始時の既実施巡数 / 現在の通算巡数（最終diffの確認回数とは別）:
+このreviewの巡数（開始時の既実施 / 現在） / Issueの通算（情報。最終diffの確認回数とは別）:
 
 状態（`stopped` / `capped` / `converged`）と理由 / 未解決欠陥:
 
 最終diff hash / 同じdiffでの両Passと新規欠陥0件の巡:
 
-人間の継続承認（なし、または判断者・判断の出所・対象Issue・承認時の通算・終了巡数・範囲）:
+人間の継続承認・始め直し（なし、または判断と理由・承認者・承認の出所・対象Issue・承認時のreviewと巡数・終了巡数・範囲）:
 
-| 通算巡 | Passとdiff | 指摘の種類と出所 | 採否・理由・未解決 |
+| reviewの巡（Issueの通算） | Passとdiff | 指摘の種類と出所 | 採否・理由・未解決 |
 |---|---|---|---|
 | | | defect / out-of-scope / optional; diff / prior-explanation / pre-existing | |
 

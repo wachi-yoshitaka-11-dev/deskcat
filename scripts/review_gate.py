@@ -912,7 +912,7 @@ def main(argv=None):
     parser.add_argument("--base", default="origin/develop")
     parser.add_argument("--head", default="HEAD")
     parser.add_argument("--expect", default="")
-    parser.add_argument("--review-work", help="local Issue-scoped execution record; CI receipts remain declarations")
+    parser.add_argument("--review-work", help="local execution record of the Issue (limits counted per review); CI receipts remain declarations")
     # 起点の既定は`DECLARATION_CUTOVER`である。上書きはtestとdry runのためにある。
     parser.add_argument("--since", default="")
     # **`history`専用。**`--base`を使わず`--head`から辿れるcommitをすべて検査する。

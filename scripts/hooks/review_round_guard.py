@@ -33,7 +33,7 @@ def main():
             os.environ.get("DESKCAT_REVIEW_SCOPE", "Issue scope"),
         )
         print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse",
-            "additionalContext": f"Review round {entry['number']} reserved for Issue #{work}. Parent must record the result with review_gate.py session finish; do not reset the count."}}))
+            "additionalContext": f"Review round {entry['review_round']} of review {entry['review']} reserved for Issue #{work} (Issue total {entry['number']}). Parent must record the result with review_gate.py session finish; do not reset the count."}}))
         return 0
     except (OSError, ValueError, TypeError, KeyError, AttributeError, subprocess.CalledProcessError) as exc:
         print(f"Review dispatch stopped: {exc}", file=sys.stderr)

@@ -1,9 +1,14 @@
 #!/usr/bin/env python3
-"""Issue-scoped review admission, shared by review_gate and the Agent hook.
+"""Review admission per review, recorded per Issue; shared by review_gate and the Agent hook.
 
 This is an execution guard, not authentication or proof of review quality.
 The portable JSON is copied to the existing Issue/PR for handoff; the local
 copy lives in git-common-dir so branch changes cannot reset its history.
+One record holds every round of the Issue (the Issue total is kept as
+information). The free-round limit applies to one review: a review ends at the
+round that converges, at a human-approved ending, or where a recorded human
+restart begins a new one. Boundaries are computed from the recorded results, so
+there is no closing step to forget; a review that never ends keeps counting.
 """
 
 import argparse
@@ -21,7 +26,7 @@ class Stopped(ValueError):
     """Admission or completion requires human attention."""
 
 
-# Rounds that may start without a bounded human approval, counted per work (#490).
+# Rounds that may start without a bounded human approval, counted per review (#490, #526).
 # A diff made only of Markdown files outside every instruction source gets the
 # lower limit; anything else (code, scripts, safety/instruction documents,
 # or an empty diff) keeps the original limit. The limit only decides when a
@@ -81,25 +86,41 @@ def read_json(path):
 
 
 def validate(state, work):
-    if state.get("version") != 1 or state.get("work") != work:
+    # Version 1 records predate per-review counting (#526) and are read unchanged.
+    # A writer from before #526 stops on version 2 instead of appending old-style rounds.
+    if state.get("version") not in (1, 2) or state.get("work") != work:
         raise Stopped("record version/work mismatch")
     prior = state.get("prior_rounds")
     if type(prior) is not int or prior < 0 or not state.get("history_source"):
         raise Stopped("known prior round count and history source are required; unknown is not zero")
     if not isinstance(state.get("rounds"), list) or not isinstance(state.get("approvals"), list):
         raise Stopped("rounds and approvals must be lists")
-    if not isinstance(state.get("endings", []), list):
-        raise Stopped("endings must be a list")
-    for number, entry in enumerate(state["rounds"], prior + 1):
+    if not isinstance(state.get("endings", []), list) or not isinstance(state.get("restarts", []), list):
+        raise Stopped("endings and restarts must be lists")
+    for restart in state.get("restarts", []):
+        if (restart.get("actor_kind") != "human" or restart.get("work") != work
+                or not restart.get("actor") or not restart.get("source")
+                or type(restart.get("after_round")) is not int
+                or not 0 < restart["after_round"] <= prior + len(state["rounds"])):
+            raise Stopped("restart must name a human actor, source, this work and a recorded round")
+    reviewed = [entry for entry in state["rounds"] if "review_round" in entry]
+    if reviewed and (state["version"] != 2 or state["rounds"][-len(reviewed):] != reviewed):
+        raise Stopped("per-review rounds require version 2 and must follow every legacy round")
+    positions, _ = layout(state)
+    for (review, review_round), (number, entry) in zip(positions, enumerate(state["rounds"], prior + 1)):
         if entry.get("number") != number or not entry.get("diff"):
             raise Stopped("non-contiguous round history")
         limit = entry.get("free_limit", FREE_ROUNDS)
         if limit not in (FREE_ROUNDS, FREE_ROUNDS_DOCS):
             raise Stopped("round records an unknown free-round limit")
-        if number > limit:
-            approval = approval_for(state, number, entry.get("scope"))
-            if approval is None or entry.get("approval_source") != approval["source"]:
-                raise Stopped("round history exceeds its recorded human approval")
+        if "review_round" in entry:
+            if (entry.get("review"), entry["review_round"]) != (review, review_round):
+                raise Stopped("round review position does not match the recorded results")
+            over, approval = review_round > limit, approval_for(state, number, entry.get("scope"), review, review_round)
+        else:  # Legacy round: the Issue total was the limit (pre-#526 rule).
+            over, approval = number > limit, approval_for(state, number, entry.get("scope"))
+        if over and (approval is None or entry.get("approval_source") != approval["source"]):
+            raise Stopped("round history exceeds its recorded human approval")
     return state
 
 
@@ -129,22 +150,51 @@ def total(state):
     return state["prior_rounds"] + len(state["rounds"])
 
 
-def approval_for(state, number, scope):
+def approval_for(state, number, scope, review=None, review_round=None):
+    """Per-review approvals bound rounds of one review; legacy ones bound Issue totals."""
     for approval in state["approvals"]:
-        if (approval.get("actor_kind") == "human"
+        if not (approval.get("actor_kind") == "human"
                 and approval.get("work") == state["work"]
-                and type(approval.get("after_round")) is int
-                and type(approval.get("through_round")) is int
-                and approval["after_round"] < number <= approval["through_round"]
                 and approval.get("scope") == scope
                 and approval.get("actor") and approval.get("source")):
-            return approval
+            continue
+        if "review" in approval:
+            if (review is not None and approval["review"] == review
+                    and type(approval.get("review_after_round")) is int
+                    and type(approval.get("review_through_round")) is int
+                    and approval["review_after_round"] < review_round <= approval["review_through_round"]):
+                return approval
+        elif (type(approval.get("after_round")) is int
+                and type(approval.get("through_round")) is int
+                and approval["after_round"] < number <= approval["through_round"]
+                and (review is None or review_of(state, approval["after_round"]) == review)):
+            return approval  # A legacy approval stays inside the review it was granted in.
     return None
 
 
-def completed(state, diff):
-    """Terminal declarations cannot turn an unfinished/defective round green."""
-    rounds = state["rounds"]
+def review_of(state, number):
+    """Review that continues after Issue round `number`; none if that review has ended there."""
+    positions, (next_review, _) = layout(state)
+    index = number - state["prior_rounds"] - 1  # -1: the last prior round; below: earlier prior rounds.
+    if index < -1:
+        return 1  # Prior rounds and the round after them are all in review 1.
+    review = 1 if index == -1 else positions[index][0] if index < len(positions) else None
+    if index + 1 < len(positions):
+        return review if positions[index + 1][0] == review else None
+    return review if next_review == review else None
+
+
+def restart_points(state):
+    """Issue round numbers after which a human started a new review before it ended."""
+    return {restart["after_round"] for restart in state.get("restarts", [])}
+
+
+def status_of(state, start, count, diff):
+    """Terminal state of the review holding rounds[start:count], judged on `diff`.
+
+    Only rounds of that review count: a new review never borrows an earlier one's rounds.
+    """
+    rounds = state["rounds"][start:count]
     if not rounds or rounds[-1].get("result") is None:
         return "stopped"
     last = rounds[-1]
@@ -165,13 +215,79 @@ def completed(state, diff):
         return "converged"
     if result.get("disposition") == "capped":
         return "capped"
-    if human_ending(state, diff, len(rounds)) is not None:
+    if human_ending(state, diff, count) is not None:
         return "capped"
     return "stopped"
 
 
+def restart_carry(state):
+    """The previous review's last real result, while a restarted review has recorded none.
+
+    A restart does not clear defects: on the same diff they cannot have been fixed.
+    Interrupted rounds carry no evidence, so they are skipped on both sides.
+    """
+    starts, _ = reviews(state)
+    start, rounds = starts[-1], state["rounds"]
+    if not start or state["prior_rounds"] + start not in restart_points(state):
+        return None
+    if any(entry.get("result") and entry["result"]["disposition"] != "interrupted" for entry in rounds[start:]):
+        return None
+    for entry in reversed(rounds[:start]):
+        if entry.get("result") and entry["result"]["disposition"] != "interrupted":
+            return entry
+    return None
+
+
+def reviews(state):
+    """Start index of each review in rounds, and whether the latest review has ended.
+
+    A review ends at convergence, at a human-approved ending (session end), or where
+    a human restart begins the next one. A capped disposition declared in a round
+    result alone does not end it: it needs only a reason string, whereas convergence
+    needs two defect-free rounds on the same diff.
+    """
+    prior, rounds, restarts = state["prior_rounds"], state["rounds"], restart_points(state)
+    starts, ended = [0], False
+    for count in range(len(rounds) + 1):
+        ended = prior + count in restarts or (count > starts[-1] and (
+            status_of(state, starts[-1], count, rounds[count - 1]["diff"]) == "converged"
+            or (rounds[count - 1].get("result") is not None
+                and human_ending(state, rounds[count - 1]["diff"], count) is not None
+                and status_of(state, starts[-1], count, rounds[count - 1]["diff"]) == "capped")))
+        if ended and count < len(rounds):
+            starts.append(count)
+    return starts, bool(ended)
+
+
+def layout(state):
+    """(review, round within review) for each recorded round and for the next one.
+
+    Rounds before the record (prior_rounds) count into the first review, because
+    where they ended is not recorded: the unknown side is the stricter side.
+    """
+    starts, ended = reviews(state)
+    positions = []
+    for index in range(len(state["rounds"])):
+        review = max(n for n, start in enumerate(starts, 1) if start <= index)
+        offset = state["prior_rounds"] if review == 1 else 0
+        positions.append((review, offset + index - starts[review - 1] + 1))
+    if ended:
+        return positions, (len(starts) + 1, 1)
+    offset = state["prior_rounds"] if len(starts) == 1 else 0
+    return positions, (len(starts), offset + len(state["rounds"]) - starts[-1] + 1)
+
+
+def completed(state, diff):
+    """Terminal declarations cannot turn an unfinished/defective round green."""
+    starts, _ = reviews(state)
+    count = len(state["rounds"])
+    if state["prior_rounds"] + count in restart_points(state):
+        return "stopped"  # A restarted review has no round yet.
+    return status_of(state, starts[-1], count, diff)
+
+
 def human_ending(state, diff, after_round_index):
-    """A human decision to end review on this exact diff after the latest round."""
+    """A human-approved ending of review on this exact diff after the latest round."""
     for ending in state.get("endings", []):
         if (ending.get("actor_kind") == "human" and ending.get("work") == state["work"]
                 and ending.get("actor") and ending.get("source")
@@ -187,13 +303,16 @@ def begin(root, work, base, scope):
         if state["rounds"] and state["rounds"][-1].get("result") is None:
             raise Stopped("unfinished round: record its result/interruption before another review")
         number = total(state) + 1
-        approval = approval_for(state, number, scope)
+        _, (review, review_round) = layout(state)
+        approval = approval_for(state, number, scope, review, review_round)
         limit = free_limit(changed_paths(root, base))
-        if number > limit and approval is None:
-            raise Stopped(f"stopped: total={total(state)} limit={limit}; explicit bounded human approval required before round {number}")
+        if review_round > limit and approval is None:
+            raise Stopped(f"stopped: review={review} rounds={review_round - 1} limit={limit} total={total(state)}; "
+                          f"explicit bounded human approval required before round {review_round} of this review")
         entry = {"number": number, "diff": fingerprint(root, base), "scope": scope,
                  "approval_source": approval["source"] if approval else None,
-                 "free_limit": limit, "result": None}
+                 "free_limit": limit, "review": review, "review_round": review_round, "result": None}
+        state["version"] = 2
         state["rounds"].append(entry)
         save(path, state)  # Reserve before launching: crashes also consume the round.
         return entry
@@ -218,7 +337,7 @@ def finish(root, work, base, result):
         if finding["kind"] == "defect" and finding["decision"] != "fix":
             raise Stopped("blocking defects cannot be declined/deferred; keep them unresolved")
     if result["disposition"] == "capped" and not result.get("cap_reason"):
-        raise Stopped("capped requires the human decision source or the two-round optional-only rationale")
+        raise Stopped("capped requires the human approval source or the two-round optional-only rationale")
     with locked(root, work) as path:
         state = validate(read_json(path), work)
         if not state["rounds"] or state["rounds"][-1].get("result") is not None:
@@ -228,6 +347,11 @@ def finish(root, work, base, result):
             result["passes"] = []
         elif entry["diff"] != fingerprint(root, base):
             raise Stopped("diff changed during review; record interruption, then review the new diff")
+        else:
+            carried = restart_carry(state)
+            if carried is not None and carried["diff"] == entry["diff"] \
+                    and not set(carried["result"]["unresolved"]) <= set(result["unresolved"]):
+                raise Stopped("restarted review must carry the previous review's unresolved defects on the same diff")
         entry["result"] = result
         save(path, state)
         return state
@@ -235,14 +359,14 @@ def finish(root, work, base, result):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("init", "status", "begin", "finish", "approve", "end", "run", "check"))
+    parser.add_argument("action", choices=("init", "status", "begin", "finish", "approve", "end", "restart", "run", "check"))
     parser.add_argument("--repository-root", default=".")
     parser.add_argument("--work", required=True)
     parser.add_argument("--base", default="origin/develop")
     parser.add_argument("--scope", default="Issue scope")
     parser.add_argument("--prior-rounds", type=int)
     parser.add_argument("--history-source")
-    parser.add_argument("--record", help="portable handoff JSON (init), result JSON (finish), approval JSON (approve), or human ending JSON (end)")
+    parser.add_argument("--record", help="portable handoff JSON (init), result JSON (finish), approval JSON (approve), human ending JSON (end), or human restart JSON (restart)")
     args, command = parser.parse_known_args(argv)
     if command and (args.action != "run" or command[0] != "--"):
         parser.error("review command is allowed only after run options and --")
@@ -265,7 +389,7 @@ def main(argv=None):
             if len(command) < 2:
                 raise Stopped("run requires -- executable [args]; no shell parser is used")
             entry = begin(root, work, args.base, args.scope)
-            print(f"REVIEW_ROUND={entry['number']}", flush=True)
+            print(f"REVIEW_ROUND={entry['review_round']} REVIEW={entry['review']} TOTAL_ROUND={entry['number']}", flush=True)
             # Reviewer writes the same result schema used by finish to stdout.
             # A failure leaves an active round; no automatic refund/retry.
             child = subprocess.run(command[1:], cwd=root, capture_output=True, text=True, encoding="utf-8")
@@ -278,23 +402,26 @@ def main(argv=None):
             state = finish(root, work, args.base, read_json(args.record))
         elif args.action == "approve":
             if not args.record:
-                raise Stopped("approve requires --record with human decision provenance")
+                raise Stopped("approve requires --record with human approval provenance")
             approval = read_json(args.record)
             with locked(root, work) as path:
                 state = validate(read_json(path), work)
+                _, (review, review_round) = layout(state)
                 if (approval.get("actor_kind") != "human" or approval.get("work") != work
                         or not approval.get("actor") or not approval.get("source")
                         or not approval.get("scope")
-                        or type(approval.get("after_round")) is not int
-                        or type(approval.get("through_round")) is not int
-                        or approval["after_round"] != total(state)
-                        or approval["through_round"] <= total(state)):
-                    raise Stopped("human approval must name this work, current total, finite end round, scope, actor and source")
+                        or approval.get("review") != review
+                        or approval.get("review_after_round") != review_round - 1
+                        or type(approval.get("review_through_round")) is not int
+                        or approval["review_through_round"] < review_round):
+                    raise Stopped(f"human approval must name this work, review={review}, review_after_round={review_round - 1}, "
+                                  "a finite review_through_round, scope, actor and source")
                 state["approvals"].append(approval)
+                state["version"] = 2  # Writers from before #526 must not read per-review approvals as absent.
                 save(path, state)
         elif args.action == "end":
             if not args.record:
-                raise Stopped("end requires --record with human decision provenance")
+                raise Stopped("end requires --record with human approval provenance")
             ending = read_json(args.record)
             with locked(root, work) as path:
                 state = validate(read_json(path), work)
@@ -312,11 +439,32 @@ def main(argv=None):
                     raise Stopped("end requires both passes on this diff, no unresolved defect, and no convergence yet")
                 state["endings"] = trial["endings"]
                 save(path, state)
+        elif args.action == "restart":
+            if not args.record:
+                raise Stopped("restart requires --record with human approval provenance")
+            restart = read_json(args.record)
+            with locked(root, work) as path:
+                state = validate(read_json(path), work)
+                if (restart.get("actor_kind") != "human" or restart.get("work") != work
+                        or not restart.get("actor") or not restart.get("source")
+                        or restart.get("after_round") != total(state)):
+                    raise Stopped("human restart must name this work, the current total, actor and source")
+                if state["rounds"] and state["rounds"][-1].get("result") is None:
+                    raise Stopped("restart requires the latest round to be finished")
+                if not total(state) or reviews(state)[1]:
+                    raise Stopped("no review in progress; the next round already starts a new review")
+                state["restarts"] = [*state.get("restarts", []), restart]
+                state["version"] = 2  # Writers from before #526 would ignore the boundary.
+                validate(state, work)
+                save(path, state)
         else:
             state = validate(read_json(state_path(root, work)), work)
         if args.action == "check":
             status = completed(state, fingerprint(root, args.base))
-            print(f"REVIEW_STATE={status} TOTAL_ROUNDS={total(state)}")
+            positions, (next_review, next_round) = layout(state)
+            review, review_rounds = positions[-1] if positions else (1, state["prior_rounds"])
+            print(f"REVIEW_STATE={status} TOTAL_ROUNDS={total(state)} REVIEW={review} REVIEW_ROUNDS={review_rounds} "
+                  f"NEXT_REVIEW={next_review} NEXT_ROUND={next_round}")
             return 0 if status in ("converged", "capped") else 2
         print(json.dumps(state, ensure_ascii=False, indent=2))
         return 0
