@@ -979,7 +979,7 @@ Receiverは次の手順で動作する。
    - 単位時間あたりの受理上限（§8.1）は、上記の検証を通った未処理messageすべてへ適用する。`hello`／`boot`はこの判定に予約枠を使う。
    - **session遷移の上限とcooldown（§5.1）**は、現在のsessionと異なる`sid`の`hello`／`boot`、すなわち遷移候補だけに適用する。受理上限とは別のbudgetであり、予約枠では免除されない。現在の`sid`を維持する`port_reopen`／`resync`は遷移ではないため、このbudgetを消費しない。
    - いずれかの上限超過は`rate_limited`で拒否し、**session state、duplicate履歴、実行中motionのいずれも変更しない。`hello`／`boot`への`rate_limited`は最終結果として保存せず、同じ`(sid, id)`の再送でこの手順を再評価する。**通常commandへの`rate_limited`はそのrequestの最終拒否結果として保存し、再要求する場合はcooldown後に新しい`id`を使う。
-10. 上限内であれば、`sid`と`type`に応じて処理する（§5.2、§5.4の上限を含む）。現在の`sid`で未処理の`port_reopen`／`resync`の`hello`は、sessionを変更せず受理してACKを最終結果として保存する。`hello`／`boot`で`sid`が現在のsessionと異なる場合だけ遷移を確定する。それ以外の未知・retiredな`sid`は`stale_session`で拒否する（§5.1）。
+10. 上限内であれば、`sid`と`type`に応じて処理する。現在の`sid`で未処理の`port_reopen`／`resync`の`hello`は、sessionを変更せず受理してACKを最終結果として保存する。`hello`／`boot`で`sid`が現在のsessionと異なる場合だけ遷移を確定する。それ以外の未知・retiredな`sid`は`stale_session`で拒否する（§5.1）。
 11. 該当counterを増加させる。
 12. Resetせず後続lineのparseを続ける。
 13. Protocol出力によってsensor、motion safety、watchdogの進行をblockしない。
@@ -1200,7 +1200,7 @@ serial linkが切れて繋がり直しただけで、ESP32 processが再起動�
 - Duplicate command
 - 同じ`(sid, id)`によるretry
 
-type固有payloadの値について、共有fixtureが固定するのは§8の手順7で受理・拒否する範囲である。手順7が持たない上限（§5.2の`transition_ms`、§5.4の`duration_ms`と、行数またはlayout処理量）は手順10の処理で適用し、超えたら`out_of_range`で拒否する。
+type固有payloadの値について、共有fixtureが固定するのは§8の手順7で受理・拒否する範囲である。手順7が持たない上限（§5.2の`transition_ms`、§5.4の`duration_ms`と、行数またはlayout処理量）は手順10の処理で適用する。
 
 Session境界のfixtureは、遷移の有無で期待結果が逆になる。setupと期待値を分けて記述する。
 
@@ -1367,7 +1367,7 @@ Framing／parse層について、**host workspaceのRust実装**がfixtureに合
 | 2026-09-29 | Draft 2 uart migration | [Issue #487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)。firmwareの`pi-protocol-mode`をUART0からUART1（GPIO13／GPIO14）へ移し、UART0をdebug log専用にしたことに合わせて、§2のUART0共有の既知の例外2つ（debug logを止めるより前の起動時出力、panic handlerの出力）を、移行後の例外1つ（UART1のdriverの初期化時のglitchと、未確認のROM／bootloader・panic handlerの出力）へ置き換えた。改行を含まない不正byte列が後続frameへ連結するcaseが未検証であることは残した。Baud（115200、`Candidate`）とUART framing（8N1、`Candidate`）は変えていない。あわせて、§4.1の「`status: ok`のACK済みの`boot`を、新しいPi `sid`の`hello`で再送する理由」の説明で、firmwareへの実装先を[Issue #12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)の残作業から[Issue #487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)の残りの作業へ移した（`hello`の処理を受信の経路へつなぐ変更と一緒に行うため）。上の`Draft 2 boot resend on new pi session`の行は、その時点の記録として残す |
 | 2026-09-30 | Draft 2 integrated build | [Issue #487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)のPR B1。firmwareの`pi-protocol-mode` featureを廃止し、Pi linkを製品build（既定build）へ入れた。§2の記述を「Pi linkを持つbuild（`bench-servo-test-17`以外のすべて）」へ改めた。**wire formatとprotocolの規則は変えていない** |
 | 2026-10-02 | Draft 2 boot resume by hello | [Issue #487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)のPR B2。§4.1と§5.1で食い違っていた`boot`の再送の再開を、§4.1の「`hello`による再開」に1つにまとめ、§5.1の手順5と「現在sessionで未処理のsession確立message」はそこを参照する形にした。(1) recovery budgetを使い切った後の再開を「してよい」から「する」へ改めた。(2) 再開を起こす`hello`を、`status: ok`のACKの後は新しいPi `sid`の`hello`、budgetを使い切った後は受理した`hello`（同じPi `sid`の`port_reopen`／`resync`を含む）とした。(3) `rate_limited`のbudgetを使い切った停止も再開の対象とした。(4) 回数の単位を「Pi sessionにつき1回」に揃えた。(5) 終端として拒否された`boot`の「Piの介入を待つ」を、processの再起動または運用者の明示的なsession reset（§3.1）に改めた。§2の既知の逸脱を、`firmware/esp32/src/pi_link.rs`がPi→ESP32方向のrequestを処理するようになった後の範囲へ改めた。**wire formatは変更していない** |
-| 2026-10-02 | Draft 2 event and display types | [Issue #527](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/527)。§4.2〜§4.5の`head_touched`、`tapped`、`lifted`、`environment`と、§5.2の`set_expression`、§5.4の`show_text`を、`crates/deskcat-protocol`の型と§12.1のSchema群のfixtureへ入れた。仕様の文は次を足した: §3にtype固有payloadのfieldの型と必須（省略可のfieldの`null`は省略と同じ）、§5.4に`text`のbyte上限（884 byte、暫定）、§7に`text`の制御文字の規則、§8の手順10に§5.2・§5.4の上限への参照、§12に共有fixtureが受理として固定する範囲と、displayとfirmwareの上限を適用する手順。`head_touched.strength`と`tapped.magnitude_g`は型に持たない（受けた場合は§3により無視する）。§13のTBD行は外していない。`play_motion`、§4.7の完了・fault event、`show_choices`、`protocol_fault`は入れていない |
+| 2026-10-02 | Draft 2 event and display types | [Issue #527](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/527)。§4.2〜§4.5の`head_touched`、`tapped`、`lifted`、`environment`と、§5.2の`set_expression`、§5.4の`show_text`を、`crates/deskcat-protocol`の型と§12.1のSchema群のfixtureへ入れた。仕様の文は次を足した: §3にtype固有payloadのfieldの型と必須（省略可のfieldの`null`は省略と同じ）、§5.4に`text`のbyte上限（884 byte、暫定）、§7に`text`の制御文字の規則、§12に共有fixtureが受理として固定する範囲と、displayとfirmwareの上限を適用する手順。`head_touched.strength`と`tapped.magnitude_g`は型に持たない（受けた場合は§3により無視する）。§13のTBD行は外していない。`play_motion`、§4.7の完了・fault event、`show_choices`、`protocol_fault`は入れていない |
 
 ### Draft schemaの互換性
 
