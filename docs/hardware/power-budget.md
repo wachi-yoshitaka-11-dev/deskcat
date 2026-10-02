@@ -109,7 +109,7 @@ M-12001はMicro-Bオスplugであり、breadboardへ直接挿せない。
 
 - PiとESP32の間で電源の線（5 V、3.3 V）をつながない。合成給電ではないため、段階Cのgateは掛からない
 - 段階Aの「GPIOへ何も繋がない」の例外は、この3本だけである
-- 周辺moduleをつないだ台での検証の構成は、この節では定めない
+- 周辺moduleをつないだ台での検証の構成は、`DISP-01`追加接続のbring-upの手順の条件(3)(a)が、その手順に限って定める
 - 3本をつなぐ条件と、通電前の配線の確認は、同節の`信号線をつないでよい条件`が持つ
 - この扱いを、GNDを共通にしたときのPC–Pi間の電流経路を確かめた根拠にしない（`HW-TBD-036`）
 
@@ -554,9 +554,9 @@ ESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`の負荷合計（測定ではない。
 - [ ] (2) firmwareが`--features bringup-display-13`付きでbuild済みである。**commandの正本は
       [検証済みコマンド](../toolchains/verified-commands.md)であり、ここへ写さない。**同feature
       は製品build（既定build）へLCDの試験モードを加えるものであり、Pi link（UART1）も同時に動く
-      （[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)。GPIO13をTXとして駆動するが、
-      この手順は条件(3)(a)によりPiを同時に接続しないため、GPIO13に接続先は無い。`gpio-assignment.md`の
-      `PI-UART-TX`行）。既定buildのままでは
+      （[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)。GPIO13をTXとして駆動する。
+      Piをつながない回は、手順1の配線がGPIO13を使わないため、GPIO13に接続先は無い。Piをつなぐ回は
+      条件(3)(a)による。`gpio-assignment.md`の`PI-UART-TX`行）。既定buildのままでは
       `run_display_bringup`が呼ばれず、受け入れ条件（初期化・fill・四隅・timing）を確認する材料と、
       controllerの識別に使うcommandの実機での効果が得られない。**この構成の正式なVersion Recordは無い**（この構成の実施記録（`docs/toolchains/version-records/`）は、どれも#487のPR B1より前のtreeのものである。[検証済みコマンド](../toolchains/verified-commands.md)
       が明記するとおり、`bringup-display-13`構成は正式なVersion Recordを持たない。build-onlyの
@@ -566,7 +566,27 @@ ESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`の負荷合計（測定ではない。
       50 mA）の負荷合計（計算であり、段階B-2の定常電流「測定」ではない）を前提とする。**次の4点が
       すべて成立する場合にだけこの計算を使える。**1点でも異なれば通電を保留し、条件を揃え直す。**
       (a) `3V3` railに載る負荷はESP32本体・`ACCEL-01`・`ENV-01`・`DISP-01`だけである（servo・
-      Pi・他のmoduleを同時に接続しない）。(b) ESP32はUSB経由でPCから給電する（[EXP-015](experiment-log.md#exp-015-accel-01adxl345env-01bme280のesp323v3-pin給電による初回通電とdevice-id読み出し)と
+      Pi・他のmoduleを同時に接続しない）。**Piは、次をすべて満たす場合に限ってつないでよい。**Piを
+      別電源で給電する。PiとESP32の間は、UARTの信号線2本とGNDの線だけにする。
+      [gpio-assignment.md](gpio-assignment.md)の`信号線をつないでよい条件`の番号付きの条件をすべて守る。
+      servoと他のmoduleは、今までどおり同時に接続しない。Piをつなぐと、GPIO13（`PI-UART-TX`）が
+      直列抵抗の先のPiのRXを駆動する分が、`3V3` railに加わる。その上界は、Piの側の電位に関わらず、
+      `3V3` railの上限の電圧を直列抵抗で割った値である（PiのRXの入力の特性は使っていない）。
+      電圧は[3.3 V railの許容電圧範囲](#33-v-railの許容電圧範囲)の上限3.366 V、直列抵抗は
+      [gpio-assignment.md](gpio-assignment.md)の`信号線をつないでよい条件`の1の4.7 kΩである。
+      **抵抗の許容差は[hardware-bom.md](hardware-bom.md)の`RES-PULL-01`行に記録が無い。**許容差の代わりに、
+      抵抗が半分（2.35 kΩ）になる保守側の仮定を置く。上界は3.366 V ÷ 4.7 kΩ ≈ 0.72 mA、半分の仮定で
+      3.366 V ÷ 2.35 kΩ ≈ 1.43 mAである。この計算（[tbd-register.md](tbd-register.md#hw-tbd-024)の
+      `HW-TBD-024`。計算は同節が指す元の行）の余裕と比べる。電流は、`U2`の連続定格1 Aと通常動作の
+      合計約245.4 mAの差の約754.6 mAに対し、半分の仮定でも約1.43 mAで、約520倍の余裕がある。熱は、
+      損失の増分を電流 × `U2`の電圧降下（`Vdrop`≈1.7 V）× `Rθja`（88 ℃/W）とし（値はどれも同じ元の行の
+      熱の計算から取る）、半分の仮定で約1.43 mA × 1.7 V × 88 ℃/W ≈ 0.21 ℃である。故障時に`TSD`まで
+      残る約9 ℃に対し、約40倍の余裕がある（約9 ℃は、元の行が`TSD`のtyp 150 ℃から出した残りであり、
+      保証された値ではない。約40倍は、そのtypに基づく残りとの比較である）。GPIO14（`PI-UART-RX`）に
+      PiのTXから入る側は、`3V3` railの負荷として加わらない。PiのTXの電位がESP32の電源の電位を
+      上回るときに、入力の保護を通じてrailへ流れ込む向きの電流がありうる。これは直列抵抗で縛られるが、
+      許容値と、両者の電位の差がどれだけになりうるかは確かめていない。GNDを共通にしたときのPC–Pi間の
+      電流経路と、片方の電源が切れたときの回り込みの許容値も確かめていない（`HW-TBD-036`）。(b) ESP32はUSB経由でPCから給電する（[EXP-015](experiment-log.md#exp-015-accel-01adxl345env-01bme280のesp323v3-pin給電による初回通電とdevice-id読み出し)と
       同じ給電源。計算が`Vin=5V`前提の熱計算（`Vdrop`≈1.7 V）を使っているため、Piからの給電・
       5 V rail経由など別経路へは変えない）。(c) 周囲温度はambient 40℃の仮定に収まる範囲である。
       (d) firmwareがWi-Fi／Bluetoothを使用しない（計算の基礎となる101.54 mA自体がこの前提に
@@ -587,7 +607,11 @@ ESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`の負荷合計（測定ではない。
 - [ ] (7) 人間が、`run_display_bringup`（GPIO4による`DISP-01`のbacklight点灯を含む）を`3V3` pin
       経路で実行することを明示的に承認しており、その記録（[Issue #13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)
       のコメント等、通電前に確認できる記録）がある。**通電後に手順11で作る`EXP-0xx`は、この
-      条件の記録にはならない**（承認は通電前に済んでいる必要がある）
+      条件の記録にはならない**（承認は通電前に済んでいる必要がある）。承認を求めるときは、次を示す。
+      描画は`run_display_bringup`が返った後にmain loopの中で`firmware/esp32/src/display_test.rs`が
+      1段ずつ進めること。Piをつなぐかどうか。backlightが点く起動の回数（USBを挿した時点の起動、
+      monitorや`espflash`が起動し直す分、書き込みの前に前のimageが動く区間を含める）。**承認した
+      回数を超えそうなときは、通電の前に人間へ確かめる**
 
 1. [人間] `DISP-01`を配線する（`VCC`→ESP32の`3V3` pin（`ACCEL-01`／`ENV-01`と共通のrail）、
    `GND`→`GND`、`LCD-CS`→GPIO22、`LCD-DC`→GPIO17、`LCD-RST`→GPIO16、`LCD-MOSI`→GPIO23、
@@ -613,7 +637,8 @@ ESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`の負荷合計（測定ではない。
 4. [人間] 電源に手を掛けられる状態（USB cableをすぐ抜ける状態）を確保する。
 5. [人間] 通電開始前に、給電を止めるまでの待機時間の上限を決めておく。**単色fillの各色と
    向きのpatternは表示したまま保つため（保つ時間は`firmware/esp32/src/config.rs`の`DISPLAY_HOLD_MS`。
-   ここへ値を再掲しない）、手順9(d)のlogはその分と、描画の時間（`firmware/esp32/src/config.rs`の`DISPLAY_HOLD_MS`のdoc）の分だけ遅れて出る。上限はこの遅れを含めて決める。**
+   ここへ値を再掲しない）、手順9(d)のlogはその分と、描画の時間（`firmware/esp32/src/config.rs`の`DISPLAY_HOLD_MS`のdoc）の分と、描画の段と段の間の分（`firmware/esp32/src/display_test.rs`のmodule doc）だけ遅れて出る。
+   条件6を確かめる回は、手順9の末尾の延長の分も加わる。上限はこれらを含めて決める。**
 6. [人間] 条件(7)（`run_display_bringup`を`3V3` pin経路で実行することの明示的な承認と、
    その記録）を満たしていることを確認する。
 7. [人間] USB経由でESP32へ接続し、`--features bringup-display-13`でbuildしたfirmwareを書き込む。
@@ -659,14 +684,16 @@ ESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`の負荷合計（測定ではない。
    [HW-TBD-024の判断記録](tbd-register-history.md#hw-tbd-024)）。発熱の確認は`DISP-01`周辺と
    ESP32 board（`U2`周辺）の両方で行う。
 9. [人間] シリアルログを確認する。`main()`は`run_display_bringup`を`run_i2c_bringup`より先に
-   呼ぶ（`main.rs`）。
+   呼ぶ（`main.rs`）。`hb`のseqだけを見て行が抜けたと判断しない。抜けは`bringup_hb`と`hb`の行を
+   合わせて見る（`main.rs`の`service_bringup_step`のcomment）。
    (a) `display_madctl`（初期化が済んだことと、書き込んだMADCTLの値・論理座標の幅と高さ。
    受け入れ条件「Controller識別情報と初期化の根拠」の初期化の側）。**firmwareはcontrollerの
    IDを読まない**（`firmware/esp32/src/display.rs`のmodule doc。`EXP-018`でどのregisterも期待する
    値を返さなかったため。controllerの識別は、moduleのsilkと資料、およびcommandが実機で
    期待どおりに効いたことで記録する）、
    (b) `display_fill`×5色（受け入れ条件「単色fillが正しい」「Color orderが正しい」
-   「更新timingを測定した」。`elapsed_us`を記録する。各色は`hold_ms`だけ表示したまま保たれるので、
+   「更新timingを測定した」。`elapsed_us`を記録する。`elapsed_us`は#487から意味が変わったので、
+   `EXP-016`〜`EXP-018`の値と比べない（`firmware/esp32/src/display_test.rs`のmodule docの「logの行」）。各色は`hold_ms`だけ表示したまま保たれるので、
    その間に色ごとに写真を撮る）、
    (c) `display_pattern_element`と`display_corner_pattern`（受け入れ条件「四隅とorientationが正しい」。
    続く`display_pattern_hold`の`hold_ms`の間に、`J2`のheaderを入れて写真を撮る。patternの見方と
@@ -724,6 +751,9 @@ ESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`の負荷合計（測定ではない。
 
    **(a)〜(d)について、実行されるべきものがすべて出そろったら（成功・失敗いずれの結果で
    あっても）、給電を止める。**継続して観察する必要が無い限り、通電を漫然と続けない。
+   **ただし、条件6を確かめる回は、`display_pattern_hold`の行より後の`health`の行が1行出るまで
+   給電を続ける。**その間も手順8の停止条件は効く。出なければ、描画の最後の区間の値は得られて
+   いないと手順11に記録する。
 10. [人間] 給電を止めた後、`VCC`–`GND`間抵抗を再測定する。測定点は手順2の項目1（`DISP-01`の
     `VCC`／`GND`。ESP32・`ACCEL-01`・`ENV-01`と共通のrailを含む）と同一とし、手順2で得た
     通電前の読みと比較する。通電後に「低いまま動かない」への変化を認めた場合は、短絡が
@@ -735,11 +765,14 @@ ESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`の負荷合計（測定ではない。
     Measurement equipment／Procedure／Expected result／Measured result／Faults／Conclusion／
     Next safe step）に従う。**受け入れ条件6件（[Issue #13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)）
     のうち何が確認でき、何が未達のまま残るかを明記する。**「更新中も通信とwatchdogがactiveである」
-    （条件6）について、#487から、描画の間もheartbeatとPi linkの受信を回す構造にした（見込み。
-    `firmware/esp32/src/display_test.rs`のmodule doc）。**この手順はPiを接続しない（条件(3)(a)）ため、
-    実protocol sessionを確立せず、この手順だけでは条件6を示せない見込みである。**示せなかった場合は
-    未達とし、依存先（[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)
-    等）をIssue側の記録に残す。
+    （条件6）は、Piを条件(3)(a)に従ってつなぎ、#487のB2（Pi→ESP32の`hello`／`ping`／`get_status`を受信の
+    経路へつなぐ変更）がmergeされたbuildを使う回で確かめる。Piをつながない回では条件6を示せない。
+    条件6を確かめる回では、次を記録する。`health`の行の`max_read_gap_ms`と`overrun_ticks`、
+    `heartbeat_overrun`の行の有無、描画の間に`task_wdt`のerrorのlogが出たかどうか、Pi側のhostのlog
+    （描画の間に送ったrequestと、返ったACKの対応）、`rx_buffer_full`と`rx_fifo_overflow`。task watchdogが
+    有効であることは、書き込むdebug profileのbuildで生成されたsdkconfigの`CONFIG_ESP_TASK_WDT_EN`・
+    `CONFIG_ESP_TASK_WDT_INIT`で確かめる。`CONFIG_ESP_TASK_WDT_PANIC`の設定も記録する。次は根拠にしない。保持の間に出た
+    `hb`の行。`reset_reason`と`rst:`の行。ESP32の側のUARTの誤りのcounterと`ProtocolCounters`。
 
 ##### `DISP-01`追加接続のbring-upの手順：条件の根拠
 
