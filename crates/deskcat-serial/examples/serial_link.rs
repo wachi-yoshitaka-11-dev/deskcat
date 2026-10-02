@@ -14,7 +14,7 @@
 //! **`boot`確立より先のprotocol往復は確かめられない。**`handle_boot`は確立時に
 //! 内部で`get_status`を1件送るが、この実行体は[`deskcat_serial::retry_due_requests`]を
 //! 呼ばない。そのACKの相関・ACK timeoutの再送は配線していない。**呼んでも実効が無い**
-//! ためである。`pi-protocol-mode`（`firmware/esp32/src/boot_session.rs`）は`Established`後に
+//! ためである。ESP32のfirmware（`firmware/esp32/src/boot_session.rs`）は`Established`後に
 //! 届いたbyteを種類を問わず読み捨てるため（`docs/protocol/esp32-pi-protocol.md`§2の
 //! 既知の逸脱(i)(ii)）、確立後に送った`get_status`にESP32が応答することは無い。
 //! `ack`／`status`の受信処理は[`deskcat_serial::handle_frame`]にあるが、同じ理由でこの実行体は
