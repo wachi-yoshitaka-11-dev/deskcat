@@ -7,14 +7,22 @@
 //! [`ProtocolCounters`] をそのまま使う。各 field の意味の正本は Protocol §4.6 の
 //! counter 対応表であり、ここへ再掲しない。
 //!
-//! **Protocol session は確立しない。**この`Health`型はsession state（#12）を
-//! 持たない（既定buildが`crate::protocol::PiSession`で持つsession stateとは
-//! 別である）。`pi-protocol-mode`は`boot` frameのwire書き込みを1回試みるが
-//! （[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)、
-//! `crate::console`参照）、受理確認や応答の受信は無くsessionを確立しない。
-//! いずれの構成でも[`ProtocolCounters`]を増やす経路は無いため、**すべて 0 の
-//! ままである**。ここで示すのは「counter schema を `status` へ載せられる」
-//! ことであって、「counter が動いている」ことではない。
+//! **この`Health`型はsession state（#12）を持たない。**Pi linkの`boot`の受理確認・
+//! 再送は`crate::boot_session`が、`hello`等の受理は`crate::protocol::PiSession`が持つ。
+//! どの構成でも[`ProtocolCounters`]を増やす経路は無いため、**すべて 0 のままである**。
+//! ここで示すのは「counter schema を `status` へ載せられる」ことであって、
+//! 「counter が動いている」ことではない。
+//!
+//! # Pi linkのUARTの観測（[#487]）
+//!
+//! [`UartObservations`]は、Pi linkのUART（UART1）の受信で起きた異常のeventの数と、
+//! main loopが受信を読みに行く間隔の最大値を持つ。**Protocol counterではない**
+//! （§4.6の`protocol`へ載せない。eventごとの`pi_uart_event`のwarnの行と、health snapshotの行に出す）。受信のring buffer
+//! （`config::PI_PROTOCOL_UART_RX_BUFFER_BYTES`）が溢れたかどうかは、以前はどこからも
+//! 観測できなかった（`crate::console`のmodule doc (2)）。数え方と限界は`main.rs`の
+//! `drain_uart_events`のdocが持つ。
+//!
+//! [#487]: https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487
 
 use std::time::Instant;
 
@@ -48,6 +56,26 @@ pub struct Health {
     counters: ProtocolCounters,
     /// Machine-readable な reset reason。
     reset_reason: &'static str,
+    /// Pi linkのUARTの観測（module doc「Pi linkのUARTの観測」）。
+    uart: UartObservations,
+}
+
+/// Pi linkのUARTの受信で観測したeventの数と、受信を読みに行く間隔の最大値。
+///
+/// **frame errorとparity errorは数えない。**frame errorの割り込みは有効にしておらず、parityは使って
+/// いない（8N1）ため、どちらもeventが積まれる経路が無い（`main.rs`の`drain_uart_events`のdoc）。
+///
+/// **Protocol counterではない**（`Health`のmodule doc参照）。Pi linkを持たない`bench-servo-test-17`付きbuildでは
+/// 数える経路が無く、health snapshotの行の値は常に0である（Pi linkの状態を表さない）。
+#[derive(Debug, Clone, Copy, Default)]
+pub struct UartObservations {
+    /// ESP-IDFのUART driverが報告した、受信のring bufferの満杯（`UART_BUFFER_FULL`）の回数。
+    pub rx_buffer_full: u32,
+    /// hardware FIFOの溢れ（`UART_FIFO_OVF`）の回数。
+    pub rx_fifo_overflow: u32,
+    /// `UartDriver::read`から戻ってから次の`read`を始めるまでの時間の、health snapshotの窓の中の
+    /// 最大値（ms）。
+    pub max_read_gap_ms: u64,
 }
 
 impl Health {
@@ -60,7 +88,18 @@ impl Health {
             snapshot_errors: 0,
             counters: ProtocolCounters::default(),
             reset_reason,
+            uart: UartObservations::default(),
         }
+    }
+
+    /// Pi linkのUARTの観測を書き換えるために借りる。
+    pub fn uart_mut(&mut self) -> &mut UartObservations {
+        &mut self.uart
+    }
+
+    /// Pi linkのUARTの観測を返す。
+    pub fn uart(&self) -> UartObservations {
+        self.uart
     }
 
     /// 起動からの経過時間（milliseconds）。
@@ -68,8 +107,7 @@ impl Health {
     /// 型は `u64` である。Protocol §3 が `ts_ms` に `u64` を採ったのは
     /// 「`u32`は約49.7日でwrapし、長時間動作で`ts_ms`の単調性が崩れる」ためであり、
     /// **`u32` で持たない。**`Envelope::ts_ms` へそのまま載せられる型に揃えてある。
-    /// `pi-protocol-mode`は`crate::boot_session`（`#446` PR B）でこの値をすでに
-    /// `Envelope::ts_ms`へ載せている。session state（#12）が入るのは別工程である。
+    /// Pi linkの`crate::boot_session`（`#446` PR B）は、この値を`Envelope::ts_ms`へ載せている。
     ///
     /// [`Instant`] は単調性が型の契約であるため、この値も単調非減少である。
     /// `Duration::as_millis()` は `u128` を返すので飽和させるが、飽和しても
