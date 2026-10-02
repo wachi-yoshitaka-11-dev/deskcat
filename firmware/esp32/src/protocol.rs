@@ -15,13 +15,11 @@
 //! （Pi linkのpin（`PI-UART-TX`＝GPIO13、`PI-UART-RX`＝GPIO14）は
 //! `docs/hardware/gpio-assignment.md`の`Pi–ESP32間のtransport`節が決めている）。
 //!
-//! **このmoduleは既定buildでだけcompileする**
-//! （`#[cfg(not(feature = "pi-protocol-mode"))]`、`main.rs`参照）。Pi linkのUARTを
-//! 使う`pi-protocol-mode`のbuildは、この型を使わず
-//! `boot`のACK待ち・再送・`sid`選び直しを行う
-//! （`crate::boot_session`参照。[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446) PR B）。
-//! `pi-protocol-mode`の受信loopは`ack`だけを扱い、`Hello`／`Ping`／`GetStatus`を
-//! 実UARTから読む受信loopはどちらのbuildにも無い。
+//! **このmoduleはどのbuildでもcompileする**（`#487`。それより前は`pi-protocol-mode`の無い
+//! buildだけだった）。Pi linkの受信loop（`main.rs`のmain loop）は、今は`boot`のACK
+//! （`crate::boot_session`、[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446) PR B）
+//! だけを扱い、`Hello`／`Ping`／`GetStatus`をこの型へ渡す経路はまだ無い（`#487`の残りの作業）。
+//! `main.rs`の`demonstrate_pi_session`が、自己完結した例でこの型を1回動かしてlogへ出すだけである。
 //! **この点は`crates/deskcat-serial`側の`SerialDevice`の実機確認が
 //! [Issue #11]の後半に残っているのと対になる。**
 //!

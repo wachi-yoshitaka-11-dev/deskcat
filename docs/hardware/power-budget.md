@@ -238,7 +238,9 @@ HW-TBD-024行が持つ事実であり、ここへ再掲しない。**この節�
       場合は対象外）
 - [ ] (2) firmware（`main()`の`run_i2c_bringup`）が**既定build**（`bringup-display-13` featureを
       付けない構成）でビルド済みである（書き込みは手順8で行う。featureを付けた構成は`DISP-01`の
-      bring-upを実行するため、条件(4)と両立しない。末尾`条件(4)の根拠`参照）
+      bring-upを実行するため、条件(4)と両立しない。末尾`条件(4)の根拠`参照）。#487から、既定buildは
+      Pi link（UART1）も持ち、GPIO13をTXとして駆動する。この手順の配線（手順1）にGPIO13は無く、
+      駆動しても接続先が無い（`gpio-assignment.md`の`PI-UART-TX`行）
 - [ ] (3) 電流の余裕計算（`B-2b を採る決定と MSP2807 の電流制限（2026-09-07）`節の
       2026-09-22追記、Revision 117）を確認した
 - [ ] (4) `DISP-01`が`3V3` pinへ接続されていない（この節の条件(1)〜(6)はすべて、
@@ -351,7 +353,7 @@ profileの必須要件を「実機 Linux に限る」「人間の監視」と定
 
 **条件(3)の根拠。**同計算はWi-Fi/BT不使用を前提とする。**この前提は満たされる**（現在の
 firmwareの`main.rs`はWi-Fi／Bluetooth APIを一切呼び出しておらず、`Cargo.toml`にも該当featureが
-無い。2026-09-22に走査して確認した）。
+無い。2026-09-22に走査して確認した。#487のPR B1の後（2026-09-30）にも、`firmware/esp32/src`、`firmware/esp32/Cargo.toml`、`firmware/esp32/sdkconfig.defaults`を`wi-fi`（`wifi`を含む）／`bluetooth`／`ble`／`bt`／`nimble`／`bluedroid`（大文字小文字を区別しない。`ble`と`bt`は語として）で走査し、commentを除いて0件であることを確かめた）。
 
 **条件(4)の根拠。**計算はESP32＋`ACCEL-01`＋`ENV-01`の合計（約101.5 mA）であり、`DISP-01`を含まない。
 `DISP-01`が同じ`3V3` railに同時接続されている場合、この計算はDISP-01分の電流を含まないままになり、
@@ -489,8 +491,8 @@ rail電圧だけで決まり、通常動作の値（LCD Wikiの0.31 W）もbackl
 
 **ここまでは電流上界の計算が成立する根拠であり、`run_display_bringup`を実行してよいかの
 承認ではない。**`main.rs`のmodule docが明記するとおり、**`#461`は接続そのものを許可するだけで、
-`run_display_bringup`（初期化・backlight点灯・fill・四隅patternを行う。GPIO4によるbacklight点灯を
-含む）を`3V3` pin経路で実行してよいかは決めていない。**この実行の承認は、下記条件(7)で人間から
+`run_display_bringup`（初期化とbacklight点灯を行う。GPIO4によるbacklight点灯を含む。#487のPR B1から、fill・四隅patternは
+この関数が返した後にmain loopの中で`crate::display_test`が進める。以下、この一連を指す）を`3V3` pin経路で実行してよいかは決めていない。**この実行の承認は、下記条件(7)で人間から
 個別に得る（`#461`の残余risk受け入れを再審議するものではない。firmwareの経路を1つ実行してよいか
 という別の判断である）。
 
@@ -542,9 +544,12 @@ ESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`の負荷合計（測定ではない。
       `DISP-01`について完了している
 - [ ] (2) firmwareが`--features bringup-display-13`付きでbuild済みである。**commandの正本は
       [検証済みコマンド](../toolchains/verified-commands.md)であり、ここへ写さない。**同feature
-      は`pi-protocol-mode`と同時指定できない（`main.rs`の`compile_error!`）。既定buildのままでは
+      は製品build（既定build）へLCDの試験モードを加えるものであり、Pi link（UART1）も同時に動く
+      （[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)。GPIO13をTXとして駆動するが、
+      この手順は条件(3)(a)によりPiを同時に接続しないため、GPIO13に接続先は無い。`gpio-assignment.md`の
+      `PI-UART-TX`行）。既定buildのままでは
       `run_display_bringup`が呼ばれず、受け入れ条件（初期化・fill・四隅・timing）を確認する材料と、
-      controllerの識別に使うcommandの実機での効果が得られない。**この構成のVersion Recordはまだ無い**（[検証済みコマンド](../toolchains/verified-commands.md)
+      controllerの識別に使うcommandの実機での効果が得られない。**この構成の正式なVersion Recordは無い**（この構成の実施記録（`docs/toolchains/version-records/`）は、どれも#487のPR B1より前のtreeのものである。[検証済みコマンド](../toolchains/verified-commands.md)
       が明記するとおり、`bringup-display-13`構成は正式なVersion Recordを持たない。build-onlyの
       検証を誰がいつどの端末で行ったかは、実施時にVersion Recordまたは相当の記録を別途作る）
 - [ ] (3) 電流の余裕計算（[HW-TBD-024の判断記録](tbd-register-history.md#hw-tbd-024)の2026-09-23追記）を
@@ -599,7 +604,7 @@ ESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`の負荷合計（測定ではない。
 4. [人間] 電源に手を掛けられる状態（USB cableをすぐ抜ける状態）を確保する。
 5. [人間] 通電開始前に、給電を止めるまでの待機時間の上限を決めておく。**単色fillの各色と
    向きのpatternは表示したまま保つため（保つ時間は`firmware/esp32/src/config.rs`の`DISPLAY_HOLD_MS`。
-   ここへ値を再掲しない）、手順9(d)のlogはその分だけ遅れて出る。上限はこの遅れを含めて決める。**
+   ここへ値を再掲しない）、手順9(d)のlogはその分と、描画の時間（`firmware/esp32/src/config.rs`の`DISPLAY_HOLD_MS`のdoc）の分だけ遅れて出る。上限はこの遅れを含めて決める。**
 6. [人間] 条件(7)（`run_display_bringup`を`3V3` pin経路で実行することの明示的な承認と、
    その記録）を満たしていることを確認する。
 7. [人間] USB経由でESP32へ接続し、`--features bringup-display-13`でbuildしたfirmwareを書き込む。
@@ -656,7 +661,7 @@ ESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`の負荷合計（測定ではない。
    その間に色ごとに写真を撮る）、
    (c) `display_pattern_element`と`display_corner_pattern`（受け入れ条件「四隅とorientationが正しい」。
    続く`display_pattern_hold`の`hold_ms`の間に、`J2`のheaderを入れて写真を撮る。patternの見方と
-   一致の判定のしかたは`main.rs`の`run_corner_pattern`のdoc commentが持つ。軸の線の描画失敗は
+   一致の判定のしかたは`firmware/esp32/src/display_test.rs`のmodule docの「四隅pattern」節が持つ（#487のPR B1の前は`main.rs`の`run_corner_pattern`のdoc commentが持っていた）。軸の線の描画失敗は
    `display_axis_failed`として出て、後続を止めない）。**受け入れ条件
    「単色fillが正しい」「Color orderが正しい」「四隅とorientationが正しい」は、logに加えて
    人間がpanelを目視（写真記録）で確認し、その結果を手順11へ記録したときだけ達成とする。**
@@ -674,7 +679,7 @@ ESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`の負荷合計（測定ではない。
    直接読み取ったものではない。**それでも、`J3`のはんだ付け申告単独より、応答が実際にあった
    という記録の方が強い根拠である）。
 
-   **失敗時の扱い。**(a)〜(d)は独立ではない。**`run_display_bringup`のcode（`main.rs`）は、
+   **失敗時の扱い。**(a)〜(d)は独立ではない。**firmwareのcode（`main.rs`の`run_display_bringup`と、#487からは`display_test.rs`の`DisplayBringup::poll`）は、
    (a)（`display_madctl`）の段階で`display_driver_new_failed`または`display_init_failed`が出た場合、
    その場で関数を`return`し、(b)（`display_fill`）・(c)（`display_corner_pattern`）は一切
    実行されない。**この場合、(b)(c)のlogが無いのは異常ではなく(a)の失敗の帰結であるため、
@@ -721,10 +726,10 @@ ESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`の負荷合計（測定ではない。
     Measurement equipment／Procedure／Expected result／Measured result／Faults／Conclusion／
     Next safe step）に従う。**受け入れ条件6件（[Issue #13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)）
     のうち何が確認でき、何が未達のまま残るかを明記する。**「更新中も通信とwatchdogがactiveである」
-    （条件6）は、`main.rs`のmodule docが記録するとおり、既定buildでも`bringup-display-13`
-    buildでも実protocol sessionを確立せず（`pi-protocol-mode`は排他）、heartbeatは描画段階の
-    境界でだけ刻まれる（`service_bringup_step`）。**したがってこの手順だけでは条件6を示せない
-    見込みである。**示せなかった場合は未達とし、依存先（[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)
+    （条件6）について、#487から、描画の間もheartbeatとPi linkの受信を回す構造にした（見込み。
+    `firmware/esp32/src/display_test.rs`のmodule doc）。**この手順はPiを接続しない（条件(3)(a)）ため、
+    実protocol sessionを確立せず、この手順だけでは条件6を示せない見込みである。**示せなかった場合は
+    未達とし、依存先（[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)
     等）をIssue側の記録に残す。
 
 ##### `DISP-01`追加接続のbring-upの手順：条件の根拠
@@ -737,8 +742,8 @@ Revision 39で、給電元（B-2bか`3V3` pinか）ごとに参照先の節が�
 だけから受電し、USBの5V・外部3.3V電源等が同時に到達しないこと）を適用する。
 
 **条件(2)の根拠。**`main.rs`の`run_display_bringup`は`bringup-display-13` feature付きbuildだけが
-持つ関数であり、既定buildは`main()`から呼ばない（`#451`）。受け入れ条件のうちfill・四隅・timingと
-初期化の記録は、この関数のlogから得る。controllerの識別は、moduleのsilkと資料、およびこの関数が
+持つ関数であり、既定buildは`main()`から呼ばない（`#451`）。受け入れ条件のうち初期化の記録は
+この関数のlogから、fill・四隅・timingの記録は`crate::display_test`（`firmware/esp32/src/display_test.rs`）のlogから得る。controllerの識別は、moduleのsilkと資料、およびこの関数が
 送るcommandの実機での効果から記録する（logだけの証拠にはしない）。
 
 **条件(3)の根拠。**[HW-TBD-024の判断記録](tbd-register-history.md#hw-tbd-024)の2026-09-23追記が持つ
