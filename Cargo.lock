@@ -17,6 +17,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "deskcat-domain"
+version = "0.1.0"
+
+[[package]]
 name = "deskcat-protocol"
 version = "0.1.0"
 dependencies = [
