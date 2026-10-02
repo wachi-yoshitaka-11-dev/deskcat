@@ -37,6 +37,12 @@ bench-servo-test-17 = []
 # #487から、fillと四隅patternはmain loopの中で1段ずつ進む（`src/display_test.rs`。描画の間の
 # Pi linkの受信とheartbeatは、同fileのmodule docを参照）。
 bringup-display-13 = []
+# Issue #514の追加LED（`LED-COMM`＝白／GPIO2、`LED-REACT`＝赤／GPIO15）を駆動する。
+# 既定ではoffであり、通常のbuildはGPIO2／GPIO15に触れない。起動時に点灯試験
+# （赤→白→両方）を行い、その後は白を点滅させる（`src/led.rs`のmodule doc）。
+# 配線と試験の手順は`docs/hardware/led-514-demo.md`。既定buildとも
+# `bringup-display-13`とも組み合わせられる。
+bringup-led-514 = []
 
 [profile.release]
 opt-level = "s"
