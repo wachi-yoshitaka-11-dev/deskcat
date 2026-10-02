@@ -85,9 +85,9 @@
     },
     {
       "name": "unknown_message_type",
-      "line": "{\"v\":1,\"sid\":41207,\"id\":1,\"ts_ms\":100,\"type\":\"set_expression\",\"payload\":{\"name\":\"happy\"}}\n",
+      "line": "{\"v\":1,\"sid\":41207,\"id\":1,\"ts_ms\":100,\"type\":\"play_motion\",\"payload\":{\"name\":\"nod\",\"speed\":0.45,\"repeat\":1}}\n",
       "expect_error": "unknown_type",
-      "note": "今回型を起こさないtype。#13以降で追加する。"
+      "note": "今回型を起こさないtype（§5.3。PROTO-TBD-008）。play_motionを足すときは、このcaseのtypeを差し替える。"
     },
     {
       "name": "unsupported_version_takes_precedence_over_unknown_type",
@@ -149,6 +149,63 @@
       "line": "{\"v\":1,\"sid\":41207,\"id\":1,\"ts_ms\":100,\"type\":\"boot\",\"payload\":{\"firmware\":\"0.1.0\",\"board\":\"esp32\",\"reset_reason\":\"power_on\",\"unknown_pad\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}}\n",
       "expect_error": "line_too_long",
       "note": "改行を含めて1025 byte。"
+    },
+    {
+      "name": "set_expression_name_not_in_enum",
+      "line": "{\"v\":1,\"sid\":90312,\"id\":901,\"ts_ms\":52000,\"type\":\"set_expression\",\"payload\":{\"name\":\"sleepy\",\"transition_ms\":300}}\n",
+      "expect_error": "invalid_payload",
+      "note": "§5.2の初期名に無い名前。§7の表の「列挙外の値」。"
+    },
+    {
+      "name": "set_expression_missing_transition_ms",
+      "line": "{\"v\":1,\"sid\":90312,\"id\":901,\"ts_ms\":52000,\"type\":\"set_expression\",\"payload\":{\"name\":\"happy\"}}\n",
+      "expect_error": "invalid_payload"
+    },
+    {
+      "name": "show_text_over_byte_limit",
+      "line": "{\"v\":1,\"sid\":90312,\"id\":903,\"ts_ms\":52300,\"type\":\"show_text\",\"payload\":{\"text\":\"ありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありxxx\",\"duration_ms\":5000}}\n",
+      "expect_error": "out_of_range",
+      "note": "textがMAX_TEXT_BYTES＋1 byte（885 byte）。対はvalid.jsonのshow_text_at_byte_limit。"
+    },
+    {
+      "name": "show_text_control_character_newline",
+      "line": "{\"v\":1,\"sid\":90312,\"id\":903,\"ts_ms\":52300,\"type\":\"show_text\",\"payload\":{\"text\":\"なでて\\nくれた\",\"duration_ms\":5000}}\n",
+      "expect_error": "out_of_range",
+      "note": "制御文字（Unicodeの一般カテゴリCc）は1文字も許さない（§7）。改行も含む。"
+    },
+    {
+      "name": "show_text_control_character_delete",
+      "line": "{\"v\":1,\"sid\":90312,\"id\":903,\"ts_ms\":52300,\"type\":\"show_text\",\"payload\":{\"text\":\"a\\u007fb\",\"duration_ms\":5000}}\n",
+      "expect_error": "out_of_range",
+      "note": "C0の範囲外の制御文字（U+007F）も拒否する（§7）。"
+    },
+    {
+      "name": "show_text_negative_duration",
+      "line": "{\"v\":1,\"sid\":90312,\"id\":903,\"ts_ms\":52300,\"type\":\"show_text\",\"payload\":{\"text\":\"hi\",\"duration_ms\":-1}}\n",
+      "expect_error": "invalid_payload",
+      "note": "duration_msはu32である（§3のpayloadの数値の幅）。負数は幅に収まらないためinvalid_payloadとする。"
+    },
+    {
+      "name": "head_touched_missing_duration_ms",
+      "line": "{\"v\":1,\"sid\":41207,\"id\":22,\"ts_ms\":8400,\"type\":\"head_touched\",\"payload\":{\"strength\":0.68}}\n",
+      "expect_error": "invalid_payload",
+      "note": "strengthだけではduration_msの欠落を補わない。"
+    },
+    {
+      "name": "lifted_duration_ms_wrong_type",
+      "line": "{\"v\":1,\"sid\":41207,\"id\":24,\"ts_ms\":11000,\"type\":\"lifted\",\"payload\":{\"duration_ms\":\"1200\"}}\n",
+      "expect_error": "invalid_payload"
+    },
+    {
+      "name": "environment_value_not_finite_as_f32",
+      "line": "{\"v\":1,\"sid\":41207,\"id\":25,\"ts_ms\":15000,\"type\":\"environment\",\"payload\":{\"temperature_c\":1e39}}\n",
+      "expect_error": "invalid_payload",
+      "note": "environmentの測定量は有限の32-bit浮動小数点数である（§3）。JSONはNaNと無限大を書けないが、32-bitへ狭めた結果が有限でない数（例: 1e39）はinvalid_payloadとする。"
+    },
+    {
+      "name": "environment_value_wrong_type",
+      "line": "{\"v\":1,\"sid\":41207,\"id\":25,\"ts_ms\":15000,\"type\":\"environment\",\"payload\":{\"humidity_pct\":\"55.1\"}}\n",
+      "expect_error": "invalid_payload"
     }
   ]
 }

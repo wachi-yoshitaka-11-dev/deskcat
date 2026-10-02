@@ -156,6 +156,171 @@
         "id": 908
       },
       "note": "§2: 受信可能なline endingは`\\n`で、直前の`\\r`は除去する。"
+    },
+    {
+      "name": "set_expression_example",
+      "line": "{\"v\":1,\"sid\":90312,\"id\":901,\"ts_ms\":52000,\"type\":\"set_expression\",\"payload\":{\"name\":\"happy\",\"transition_ms\":300}}\n",
+      "canonical": true,
+      "expect": {
+        "type": "set_expression",
+        "sid": 90312,
+        "id": 901
+      },
+      "note": "§5.2の例。"
+    },
+    {
+      "name": "set_expression_each_initial_name_neutral",
+      "line": "{\"v\":1,\"sid\":90312,\"id\":911,\"ts_ms\":52010,\"type\":\"set_expression\",\"payload\":{\"name\":\"neutral\",\"transition_ms\":0}}\n",
+      "canonical": true,
+      "expect": {
+        "type": "set_expression",
+        "sid": 90312,
+        "id": 911
+      },
+      "note": "§5.2の初期のexpression名。transition_msの下限0。"
+    },
+    {
+      "name": "set_expression_each_initial_name_surprised",
+      "line": "{\"v\":1,\"sid\":90312,\"id\":912,\"ts_ms\":52020,\"type\":\"set_expression\",\"payload\":{\"name\":\"surprised\",\"transition_ms\":4294967295}}\n",
+      "canonical": true,
+      "expect": {
+        "type": "set_expression",
+        "sid": 90312,
+        "id": 912
+      },
+      "note": "§5.2の初期のexpression名。transition_msには数値の上限を置かず、u32の最大値まで受ける（上限はdisplay実装が持つ）。"
+    },
+    {
+      "name": "show_text_example",
+      "line": "{\"v\":1,\"sid\":90312,\"id\":903,\"ts_ms\":52300,\"type\":\"show_text\",\"payload\":{\"text\":\"なでてくれて、ありがと。\",\"duration_ms\":5000}}\n",
+      "canonical": true,
+      "expect": {
+        "type": "show_text",
+        "sid": 90312,
+        "id": 903
+      },
+      "note": "§5.4の例。"
+    },
+    {
+      "name": "show_text_at_byte_limit",
+      "line": "{\"v\":1,\"sid\":90312,\"id\":913,\"ts_ms\":52310,\"type\":\"show_text\",\"payload\":{\"text\":\"ありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありがとありxx\",\"duration_ms\":4294967295}}\n",
+      "canonical": true,
+      "expect": {
+        "type": "show_text",
+        "sid": 90312,
+        "id": 913
+      },
+      "note": "textがUTF-8でちょうどMAX_TEXT_BYTES（884 byte）。ASCII以外を含め、byte長と文字数を取り違えた実装を検出する。対はinvalid.jsonのshow_text_over_byte_limit。"
+    },
+    {
+      "name": "show_text_empty",
+      "line": "{\"v\":1,\"sid\":90312,\"id\":914,\"ts_ms\":52320,\"type\":\"show_text\",\"payload\":{\"text\":\"\",\"duration_ms\":0}}\n",
+      "canonical": true,
+      "expect": {
+        "type": "show_text",
+        "sid": 90312,
+        "id": 914
+      },
+      "note": "空文字列とduration_msの下限0。"
+    },
+    {
+      "name": "head_touched_without_strength",
+      "line": "{\"v\":1,\"sid\":41207,\"id\":22,\"ts_ms\":8400,\"type\":\"head_touched\",\"payload\":{\"duration_ms\":720}}\n",
+      "canonical": true,
+      "expect": {
+        "type": "head_touched",
+        "sid": 41207,
+        "id": 22
+      },
+      "note": "§4.2。strengthは意味が未定（PROTO-TBD-009）のため省略する。"
+    },
+    {
+      "name": "head_touched_with_strength_is_ignored",
+      "line": "{\"v\":1,\"sid\":41207,\"id\":26,\"ts_ms\":8500,\"type\":\"head_touched\",\"payload\":{\"duration_ms\":720,\"strength\":0.68}}\n",
+      "canonical": false,
+      "expect": {
+        "type": "head_touched",
+        "sid": 41207,
+        "id": 26
+      },
+      "note": "§4.2の例。strengthは型に持たず、§3の未知の追加fieldとして無視する。再encodeで落ちるためcanonicalではない。"
+    },
+    {
+      "name": "tapped_empty",
+      "line": "{\"v\":1,\"sid\":41207,\"id\":23,\"ts_ms\":9300,\"type\":\"tapped\",\"payload\":{}}\n",
+      "canonical": true,
+      "expect": {
+        "type": "tapped",
+        "sid": 41207,
+        "id": 23
+      },
+      "note": "§4.3。payloadは{}。"
+    },
+    {
+      "name": "tapped_with_magnitude_is_ignored",
+      "line": "{\"v\":1,\"sid\":41207,\"id\":27,\"ts_ms\":9400,\"type\":\"tapped\",\"payload\":{\"magnitude_g\":1.84}}\n",
+      "canonical": false,
+      "expect": {
+        "type": "tapped",
+        "sid": 41207,
+        "id": 27
+      },
+      "note": "§4.3の例。magnitude_gは意味が未定のため型に持たず、§3の未知の追加fieldとして無視する。"
+    },
+    {
+      "name": "lifted_example",
+      "line": "{\"v\":1,\"sid\":41207,\"id\":24,\"ts_ms\":11000,\"type\":\"lifted\",\"payload\":{\"duration_ms\":1200}}\n",
+      "canonical": true,
+      "expect": {
+        "type": "lifted",
+        "sid": 41207,
+        "id": 24
+      },
+      "note": "§4.4の例。型があることは送ってよいことを意味しない（classifierの検証後に有効化）。"
+    },
+    {
+      "name": "environment_example",
+      "line": "{\"v\":1,\"sid\":41207,\"id\":25,\"ts_ms\":15000,\"type\":\"environment\",\"payload\":{\"temperature_c\":27.4,\"humidity_pct\":55.1,\"pressure_hpa\":1008.3}}\n",
+      "canonical": true,
+      "expect": {
+        "type": "environment",
+        "sid": 41207,
+        "id": 25
+      },
+      "note": "§4.5の例。"
+    },
+    {
+      "name": "environment_single_quantity",
+      "line": "{\"v\":1,\"sid\":41207,\"id\":28,\"ts_ms\":15100,\"type\":\"environment\",\"payload\":{\"temperature_c\":-5.25}}\n",
+      "canonical": true,
+      "expect": {
+        "type": "environment",
+        "sid": 41207,
+        "id": 28
+      },
+      "note": "§4.5「選定したsensorが対応する測定量だけを含める」。他のfieldは省略できる。"
+    },
+    {
+      "name": "environment_no_quantity",
+      "line": "{\"v\":1,\"sid\":41207,\"id\":29,\"ts_ms\":15200,\"type\":\"environment\",\"payload\":{}}\n",
+      "canonical": true,
+      "expect": {
+        "type": "environment",
+        "sid": 41207,
+        "id": 29
+      },
+      "note": "仕様は少なくとも1つの測定量を要求していないため、空も受ける。"
+    },
+    {
+      "name": "environment_null_is_absent",
+      "line": "{\"v\":1,\"sid\":41207,\"id\":30,\"ts_ms\":15300,\"type\":\"environment\",\"payload\":{\"temperature_c\":21.5,\"humidity_pct\":null}}\n",
+      "canonical": false,
+      "expect": {
+        "type": "environment",
+        "sid": 41207,
+        "id": 30
+      },
+      "note": "§3: 省略可のfieldのnullは省略と同じに扱う。再encodeでhumidity_pctが落ちるためcanonicalではない。"
     }
   ]
 }
