@@ -28,7 +28,7 @@
 
 Protocol channelから送信するすべてのbyteは、有効にframe化されたmessageの一部でなければならない。自由形式のfirmware logでJSON lineを分断してはならない。
 
-**Pi linkはUART0を使わない**（[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)）。firmwareのPi linkを持つbuild（`bench-servo-test-17`以外のすべて。製品buildである既定buildを含む。[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)）は、UART0以外のUART（UART1）をGPIO13／GPIO14へ割り当ててPi linkに使い、UART0（board上のUSB-UARTブリッジ）はどのbuildでも書き込みとdebug logだけに使う。**firmware applicationがPi linkのUARTへ書くのは`boot`の送出（`BootSession::send_boot`）だけであり、debug log（`log`／`esp_log`）はESP-IDFのconsoleへ出る。**consoleがUART0であることは、`firmware/esp32`の`cargo build`が生成する`sdkconfig`（`target/xtensa-esp32-espidf/debug/build/esp-idf-sys-*/out/sdkconfig`）の`CONFIG_ESP_CONSOLE_UART_NUM=0`で確かめた（#487、ESP-IDF v5.5.3。debug profileで確かめた。release profileはbuildしていない。#487のPR Aの時点で、既定・`pi-protocol-mode`・`bringup-display-13`の3構成をbuildした後も、`target/xtensa-esp32-espidf/debug/build/`の`esp-idf-sys-*`は1つだけであり、3構成は同じ`sdkconfig`を使う。#487のPR B1の2構成（既定・`bringup-display-13`）のbuildの後も1つだけである。`sdkconfig.defaults`はconsoleのUART番号を指定しておらず、ESP-IDFの既定値である）。GPIO13（`PI-UART-TX`）の起動時の状態は[GPIO Assignment](../hardware/gpio-assignment.md)の`PI-UART-TX`行が持つ。確かめたのはreset中とreset直後の`IO_MUX`の値（出力が無効）だけであり、**resetからUART1のdriverの初期化までの区間（ROM／2nd-stage bootloaderが動く区間）の状態は、一次資料でも実機でも確かめていない**（下の例外）。
+**Pi linkはUART0を使わない**（[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)）。firmwareのPi linkを持つbuild（`bench-servo-test-17`以外のすべて。製品buildである既定buildを含む。[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)）は、UART0以外のUART（UART1）をGPIO13／GPIO14へ割り当ててPi linkに使い、UART0（board上のUSB-UARTブリッジ）はどのbuildでも書き込みとdebug logだけに使う。**firmware applicationがPi linkのUARTへ書くのは、`boot`の送出（`BootSession::send_boot`）と、Pi→ESP32方向のrequestへの応答（`firmware/esp32/src/pi_link.rs`。ACKと、`get_status`への`status`）だけであり、debug log（`log`／`esp_log`）はESP-IDFのconsoleへ出る。**consoleがUART0であることは、`firmware/esp32`の`cargo build`が生成する`sdkconfig`（`target/xtensa-esp32-espidf/debug/build/esp-idf-sys-*/out/sdkconfig`）の`CONFIG_ESP_CONSOLE_UART_NUM=0`で確かめた（#487、ESP-IDF v5.5.3。debug profileで確かめた。release profileはbuildしていない。#487のPR Aの時点で、既定・`pi-protocol-mode`・`bringup-display-13`の3構成をbuildした後も、`target/xtensa-esp32-espidf/debug/build/`の`esp-idf-sys-*`は1つだけであり、3構成は同じ`sdkconfig`を使う。#487のPR B1の2構成（既定・`bringup-display-13`）のbuildの後も1つだけである。`sdkconfig.defaults`はconsoleのUART番号を指定しておらず、ESP-IDFの既定値である）。GPIO13（`PI-UART-TX`）の起動時の状態は[GPIO Assignment](../hardware/gpio-assignment.md)の`PI-UART-TX`行が持つ。確かめたのはreset中とreset直後の`IO_MUX`の値（出力が無効）だけであり、**resetからUART1のdriverの初期化までの区間（ROM／2nd-stage bootloaderが動く区間）の状態は、一次資料でも実機でも確かめていない**（下の例外）。
 
 **#487より前は、UART0がPi–ESP32 protocol channelとdebug logを兼ねていたため、「firmwareがdebug logを止めるより前に生じる起動時出力」と「panic handlerの出力」の2つをこの規則の既知の例外としていた**（[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)。Revision履歴の`Draft 2 uart0 exception`）。Pi linkがUART0から外れたため、debug logを止める前の起動時出力が混ざる仕組みは無くなった。**それでも、次を既知の例外として残す**（ESP32→Pi方向）。
 
@@ -36,11 +36,11 @@ Protocol channelから送信するすべてのbyteは、有効にframe化され�
 
 受信側は、改行を含む化けたbyte列の後、改行境界で再同期できる（`crates/deskcat-serial/tests/simulator.rs`のtest群が手書きfixtureで確認している。どのfixtureも、初期化時のglitchそのものを模したものではない）。**実機では未検証であり、改行を含まない不正byte列が後続frameの先頭へ連結するcase（初期化時のglitchが最初の`boot`行の先頭へ付くcaseを含む）も未検証である。**連結した行は壊れた行として捨てられ、`boot`は§4.1の再送で送り直される見込みである（見込みであり、sourceでも実機でも確かめていない）。
 
-**Pi linkでfirmware application自身が送る行のline endingについて、過去の既知の不一致を記録していた（[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)のPR Aまで）。**PR B（`firmware/esp32/src/boot_session.rs`）は、この不一致をsource上は解消した（下記）。Pi linkでapplication levelが送る行は現状`boot`（`BootSession::send_boot`）のみであり（`console.rs`の`write_line`はPR Bで削除し、他に送信経路は無い）、それ以外の送信経路は無い。（ROM／bootloader起動出力とpanic出力はfirmware applicationの制御外であり、この解消の対象外である。出力先は上の段落参照。）
+**Pi linkでfirmware application自身が送る行のline endingについて、過去の既知の不一致を記録していた（[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)のPR Aまで）。**PR B（`firmware/esp32/src/boot_session.rs`）は、この不一致をsource上は解消した（下記）。Pi linkでapplication levelが送る行は、`boot`と、Pi→ESP32方向のrequestへの応答（ACKと`status`）である。どちらも`encode_line`でencodeし、`firmware/esp32/src/pi_link.rs`の`write_line`（`UartDriver::write`）で書く（`console.rs`の`write_line`はPR Bで削除した）。（ROM／bootloader起動出力とpanic出力はfirmware applicationの制御外であり、この解消の対象外である。出力先は上の段落参照。）
 
 1. 旧経路（`firmware/esp32/src/console.rs`の`write_line`、PR Aまで）は`std::io::stdout()`経由で書いており、本節の規定（`\n`）と実際にwireへ出るbyte（`\r\n`）が違っていた。原因はESP-IDFのconsole出力の既定`CONFIG_LIBC_STDOUT_LINE_ENDING_CRLF`（vendored ESP-IDF`components/newlib/Kconfig`で確認済み）である。
 2. PR Bは当時の`pi-protocol-mode`のPi link（当時はUART0、#487からはUART1）を`UartDriver`（interrupt駆動）へ一本化し、送信も`UartDriver::write`（`uart_write_bytes`を直接呼ぶ。esp-idf-hal 0.46.2の`uart.rs`で確認）へ変えた。**`uart_write_bytes`はbyte列をそのまま書き、`CONFIG_LIBC_STDOUT_LINE_ENDING_CRLF`が効くlibc／newlibのstdio層を経由しない。**`encode_line`（`crates/deskcat-protocol/src/decode.rs`）が既に`\n`だけを付与している（206行、`pub fn encode_line`参照）ため、これらのcodeを読んで導いた結論としては、wireへ出るbyteは本節の規定どおり`\n`終端になるはずである。**この結論はsourceを読んで導いたものであり、実機でwireのbyteを測ったものではない**（実機確認はまだ無い。状態はIssue #446の追跡を見る）。
-3. **したがって、この不一致は`boot`送出経路については、source上は解消している。**旧経路（stdio）はPR Bでもう使っていない。実機での確認はまだ無い。
+3. **したがって、この不一致は、Pi linkでapplication levelが送る行については、source上は解消している。**旧経路（stdio）はPR Bでもう使っていない。実機での確認はまだ無い。
 
 受信側は直前の`\r`を除去する（本節の受信可能なline ending。`crates/deskcat-protocol`の
 `framing.rs`が単体testを持ち、`crates/deskcat-serial/tests/simulator.rs`の
@@ -53,9 +53,13 @@ Protocol channelから送信するすべてのbyteは、有効にframe化され�
 （firmware版・board名・reset reasonの短い文字列のみ）はこの上限に対して大きな余裕が
 あるため実際には起きないが、**一般に「`\r\n`は常に壊れずに復元される」とは言えない。**
 
-上の不一致は`boot`送出経路に限り、source上はPR Bで解消している（本節の直前の3項目を参照。実機での確認はまだ無い）。
+上の不一致は、Pi linkでapplication levelが送る行に限り、source上は解消している（本節の直前の3項目を参照。実機での確認はまだ無い）。
 
-**もう2つ、Pi linkを持つbuildの既知の逸脱を記録する**（#446のPR Bから）。(i) `Ack`以外に届いたframeへ§8の相関ACKを返さない。(ii) §7のParser counterによる区別を、確立前に限り`log`でだけ分類する（分類はUART0のdebug logで見える。#487のPR Aより前は、当時の`pi-protocol-mode`がloggingを止めており、見えなかった）。確立後に届いたbyteは種類を問わず未分類のまま読み捨てる。詳細は`firmware/esp32/src/boot_session.rs`の`BootSession::on_bytes`のdocを参照する。
+**もう3つ、Pi linkを持つbuildの既知の逸脱を記録する**（#446のPR Bから。#487のPR B2で範囲を改めた）。受信の振り分けは`firmware/esp32/src/pi_link.rs`のmodule docが持つ。
+
+- (i) decodeで拒否した行（未対応のtype、payloadやenvelopeの不正）には、§8の相関ACKを返さない。`deskcat_protocol`の受信は、oversize以外の拒否した行の`(sid, id)`を復元しないためである。oversizeの行で`(sid, id)`と`hello`／`ping`／`get_status`のtypeを復元できた場合は、`line_too_long`の拒否ACKを返す。display／motionのcommand（§5.2〜§5.5）は`deskcat_protocol`のmessageに無く、この(i)に当たる。そのため§7の`hardware_unavailable`も返さない。
+- (ii) §7のParser counterによる区別を`log`でだけ行う（UART0のdebug logで見える）。`ProtocolCounters`は増やさず、`get_status`へ返す`status`のcounterは0のままである。
+- (iii) `ping`／`get_status`、`port_reopen`／`resync`の`hello`、拒否した`hello`の処理済みの結果を保持せず、同じ`(sid, id)`の再送をもう一度処理する（§8の手順8・9）。§8.1／§8.2の流量制限と、`hello`の拒否ACKの保留table（§5.1）も実装していない。
 
 ## 3. Envelope
 
@@ -260,15 +264,28 @@ Piは`boot`を受信したとき、`sid`が現在のESP32 sessionと**異なる�
 |---|---|
 | ACKが返らない（通常再送の回数以内） | 初期間隔でbackoffしながら再送する |
 | 通常再送の回数を超えた | **直ちには止めない。**recovery間隔まで延ばし、有限のrecovery budget内で再送を続ける |
-| ACKが無いままrecovery budgetを使い切った | `boot`の送出を止め、サーボ出力を有効にせず`protocol_fault`で報告する。Piから有効な`hello`を受信したら、**同じ`(sid, id)`のまま**新しい有限budgetで`boot`の再送を再開してよい。ただし**再開は1つのPi sessionにつき1回まで**とする（下記）。**`sid`は選び直さない。** |
+| ACKが無いままrecovery budgetを使い切った | `boot`の送出を止め、サーボ出力を有効にせず`protocol_fault`で報告する。Piの`hello`を受理したら、下の「`hello`による再開」に従って再開する。**`sid`は選び直さない。** |
 | `status: ok`のACKを受信 | 再送を終了する。ただし下の行の場合は再開する |
-| `status: ok`のACKを受けた後に、**現在と異なる（新しい）Pi `sid`の`hello`**を受理した（§5.1の手順1〜4を終えた） | **同じ`(sid, id)`のまま**、新しい有限budgetで`boot`の再送を再開する（§5.1の手順5）。**新しいPi `sid`の`hello`1件につき再開は1回まで**とする。**`sid`は選び直さない。**`reason`が`port_reopen`／`resync`の`hello`（Piの`sid`が同じ）では再開しない |
+| `status: ok`のACKを受けた後に、**現在と異なる（新しい）Pi `sid`の`hello`**を受理した（§5.1の手順1〜4を終えた） | 下の「`hello`による再開」に従って再開する。`reason`が`port_reopen`／`resync`の`hello`（Piの`sid`が同じ）では再開しない |
 | `status: rejected`かつ`code`が`stale_session`のACKを受信 | **終端ではない。**`sid`がretired sessionと衝突している。新しい`sid`を選び直し`id`を初期値へ戻して再送する（§3.1） |
-| `status: rejected`かつ`code`が`rate_limited`のACKを受信 | **終端ではない。**一時的な流量制限であり、再送で解消しうる。cooldown経過後に**同じ`(sid, id)`で**再送する。`PROTO-TBD-017`の有限budget内に収め、使い切ったら`protocol_fault`で報告して停止する |
-| `status: rejected`（`stale_session`／`rate_limited`以外）のACKを受信 | **終端応答として再送を終了する。**`code`を`protocol_fault`で報告し、Piの介入を待つ |
+| `status: rejected`かつ`code`が`rate_limited`のACKを受信 | **終端ではない。**一時的な流量制限であり、再送で解消しうる。cooldown経過後に**同じ`(sid, id)`で**再送する。`PROTO-TBD-017`の有限budget内に収め、使い切ったら`protocol_fault`で報告して停止する。停止の後は、Piの`hello`を受理したら下の「`hello`による再開」に従って再開する |
+| `status: rejected`（`stale_session`／`rate_limited`以外）のACKを受信 | **終端応答として再送を終了する。**`code`を`protocol_fault`で報告する。`hello`では再開しない。再開はprocessの再起動、または運用者の明示的なsession reset（§3.1）による |
 | `sid`／`id`を復元できず、Piが相関ACKを構成できない | 有限budgetまで再送し、使い切ったら送出を止める。サーボ出力を有効にせず`protocol_fault`で報告する（下記） |
 
-**`status: ok`のACK済みの`boot`を、新しいPi `sid`の`hello`で再送する理由。**Piが再起動すると、新しいPi processはESP32の`sid`を知らない。PiがESP32の`sid`を承認する経路は`boot`だけであり（§5.1「Session切り替えは`hello`／`boot`だけが起こす」、§8の手順8）、Piは、envelopeの`sid`が現在承認している応答送信側のsessionでないACKを、`hello`の結果として受理しない（§6）。そのためESP32が`boot`を再送しない限り、Piは新しいsessionでESP32の`sid`を承認できず、§10.2の手順が成り立たない。再開の回数は、Pi session遷移（`hello`による）1回につき1回に限る。Pi session遷移そのものは§5.1の遷移上限（`PROTO-TBD-012`）で有界であり、`boot`の再送が際限なく続く経路は作らない。**この行は`firmware/esp32`にまだ実装していない**（firmwareへの実装は[Issue #487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)の残りの作業であり、`hello`の処理を受信の経路へつなぐ変更と一緒に行う）。
+**`hello`による再開。**この規則の正本はここであり、§5.1の手順5はここを参照する。ESP32は、`hello`を受理してそのACKを返した後に、次の場合に限り、自分の現在の`boot`を**同じ`(sid, id)`のまま**、新しい有限budgetで再送する。
+
+| `boot`の状態 | 再開する`hello` |
+|---|---|
+| `status: ok`のACKを受けた後 | 現在と異なる（新しい）Pi `sid`の`hello`（§5.1の手順1〜4。Pi sessionの遷移） |
+| recovery budget、または`rate_limited`のbudgetを使い切って止めた後 | 受理した`hello`（Pi sessionの遷移、または現在のPi `sid`の`port_reopen`／`resync`の受理。§5.1「現在sessionで未処理のsession確立message」） |
+
+- 再開は**1つのPi sessionにつき1回まで**とする。再開したかどうかをPi sessionごとに記録し、記録は`hello`によるPi session遷移が確定したときにだけ解除する。
+- **`sid`は選び直さない**（下の「この再開で`sid`を選び直してはならない」）。
+- 再開しないのは、終端として拒否された`boot`（`stale_session`／`rate_limited`以外の`rejected`）と、`sid`の選び直しの上限（§3.1）で止めた場合である。
+
+**`status: ok`のACK済みの`boot`を、新しいPi `sid`の`hello`で再送する理由。**Piが再起動すると、新しいPi processはESP32の`sid`を知らない。PiがESP32の`sid`を承認する経路は`boot`だけであり（§5.1「Session切り替えは`hello`／`boot`だけが起こす」、§8の手順8）、Piは、envelopeの`sid`が現在承認している応答送信側のsessionでないACKを、`hello`の結果として受理しない（§6）。そのためESP32が`boot`を再送しない限り、Piは新しいsessionでESP32の`sid`を承認できず、§10.2の手順が成り立たない。再開の回数は、Pi session遷移（`hello`による）1回につき1回に限る。Pi session遷移そのものは§5.1の遷移上限（`PROTO-TBD-012`）で有界であり、`boot`の再送が際限なく続く経路は作らない。
+
+**budgetを使い切って止めた`boot`を、同じPi sessionの`port_reopen`／`resync`の`hello`でも再開する理由。**Piが`boot`を取りこぼしたままbudgetを使い切ると、PiはESP32の`sid`を承認できない。新しいPi `sid`の`hello`でだけ再開すると、Piがserial portを開き直すだけでは回復できず、Pi processの再起動が要る。再開はPi sessionごとに1回であり、有界である。
 
 通常再送の上限で**直ちに**止めないのは、Piが一時的に`boot`またはACKを取りこぼしただけでsessionを承認する経路が消えるためである。一方、無応答のまま無期限に送出するとlink帯域を占有する。有限のrecovery期間を確保し、満了後は物理出力を無効に保ったまま外部から観測可能な停止状態へ移る。
 
@@ -355,10 +372,7 @@ Piは何度受けても相関ACKを構成できない。通常再送とrecovery�
 - `protocol_fault`を送出し、`status`のcounterで観測できるようにする。
 - **motion commandを受理しない。**session未確立のまま届いたcommandは`stale_session`で拒否する。
   停止状態を抜けるには、**新しい`boot`のACKでsessionを確立することが必要**である。
-- Piからの有効な`hello`を受信したら、**同じ`(sid, id)`で**`boot`の再送を新しい有限budgetで再開してよい。
-  **ただし1つのPi sessionにつき1回だけである。**再開したかどうかをPi sessionごとに記録し、
-  同一Pi sessionからの2通目以降の`hello`ではbudgetを再生成しない。
-  記録は、`hello`によるPi session遷移が確定したときにだけ解除する。
+- Piの`hello`を受理したら、上の「`hello`による再開」に従って`boot`の再送を再開する。
 
 **この再開で`sid`を選び直してはならない。**`sid`が変わるのはprocessの再起動と衝突検知による
 選び直し（§3.1）だけであり（§3）、通常のcommand受信や`reason`が`resync`の`hello`は
@@ -538,7 +552,7 @@ ESP32は`hello`を受信したとき、`sid`が現在のPi sessionと異なる�
 2. 旧sessionのcommand ID追跡とduplicate履歴を、**現行session分として**破棄する。旧`sid`はretired session集合へ移し、保持期間中は`stale_session`判定に使う（§5.1）。
 3. 実行中のrelative motionを安全に停止する。
 4. ACKを返す。
-5. §4.1の表が再送を定める場合（`status: ok`のACKを受けた後、またはACKが無いままrecovery budgetを使い切った後）は、自分の現在の`boot`を**同じ`(sid, id)`のまま**再送する。新しいPi sessionは、ESP32の`sid`を`boot`でしか承認できないためである。終端として拒否された`boot`（§4.1の表）は再送しない。
+5. §4.1の「`hello`による再開」に当たる場合は、自分の現在の`boot`を**同じ`(sid, id)`のまま**再送する。新しいPi sessionは、ESP32の`sid`を`boot`でしか承認できないためである。
 
 `hello`はACKを必要とする。ACK後、Piは`get_status`で実stateを取得する。ただし新しい`sid`の`hello`では、Piは手順4のACKを`hello`の結果として受理せず（ESP32の`sid`をまだ承認していない。§6）、手順5の`boot`でESP32 sessionを承認してから`get_status`を送る（§10.2）。
 
@@ -550,7 +564,8 @@ ESP32は`hello`を受信したとき、`sid`が現在のPi sessionと異なる�
 - `hello`: `reason`が`port_reopen`または`resync`であれば、sessionを維持するための
   control messageとして受理する。通常の受理上限だけを適用し、遷移budgetとcooldownは
   消費しない。`status: ok`のACKを最終結果として保存して返すが、session遷移、
-  duplicate履歴の破棄、実行中motionの停止は行わない。`startup`で現在の`sid`を
+  duplicate履歴の破棄、実行中motionの停止は行わない。ESP32は、ACKを返した後に、§4.1の
+  「`hello`による再開」に当たる場合は`boot`の再送を再開する。`startup`で現在の`sid`を
   指定した`hello`は上記の整合規則どおり`invalid_payload`で拒否する。
 - `boot`: 現在の`sid`で正規の再送なら同じ`(sid, id)`であり、手順8のreplayで終わる。
   **現在の`sid`に未処理の新しい`id`を付けた`boot`は`invalid_payload`で拒否し、
@@ -1224,7 +1239,7 @@ Session境界のfixtureは、遷移の有無で期待結果が逆になる。set
 | `boot`再送が通常回数に達した状態 | 直ちには止めず、recovery間隔まで延ばして有限のrecovery budget内で継続する |
 | `boot`が無応答のままrecovery budgetに達した状態 | 送出を止め、サーボ出力を有効にせず`protocol_fault`を報告し、motion commandを`stale_session`で拒否する。有効な`hello`を受信したら**同じ`(sid, id)`のまま**有限budgetを再生成する。**`sid`は選び直さない**（§3、§4.1） |
 | 停止後に同一Pi sessionから`hello`を反復 | budgetの再生成は**1つのPi sessionにつき1回**まで。2通目以降では再生成せず、`boot`の送出も再開しない |
-| `rate_limited`で拒否された`boot` | 終端ではない。cooldown経過後に同じ`(sid, id)`で再送し、`PROTO-TBD-017`の有限budget内に収める。使い切ったら`protocol_fault`で報告して停止する |
+| `rate_limited`で拒否された`boot` | 終端ではない。cooldown経過後に同じ`(sid, id)`で再送し、`PROTO-TBD-017`の有限budget内に収める。使い切ったら`protocol_fault`で報告して停止する。停止の後は§4.1の「`hello`による再開」に従う |
 | 同一`(sid, id)`の`boot`が最大再送回数まで再送され、そのつど保持ACKを要求する | `PROTO-TBD-017`のquota内は予約容量から返す。quotaを超える反復は抑制し、Pi側のlocal `suppressed_responses`を増やす |
 | `reason`が`port_reopen`／`resync`の`hello`が無応答 | `sid`を選び直さず、同じ`(sid, id)`で有限budget内に再送する。使い切ったら`protocol_fault`で報告する。`reason`と`sid`が矛盾する`hello`を作らない |
 | `port_reopen`／`resync`のbudgetが満了した後 | `reason`を`startup`へ自動で切り替えない。`sid`を保ったまま停止状態に留まる。`startup`での再開はprocess再起動または運用者の明示的なsession reset指示に限る（§3.1） |
@@ -1335,6 +1350,7 @@ Framing／parse層について、**host workspaceのRust実装**がfixtureに合
 | 2026-09-29 | Draft 2 status reply order | [Issue #12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)。`status`が`get_status`への応答かどうかを、wire formatを変えずに送信の順序で決める規則を§5.6に書いた（送信側は`status: ok`のACKの直後に応答の`status`を送り、間に別の`status`を挟まない。受信側はそのACKの後に最初に届いた現在sessionの`status`を応答とみなす）。応答の`status`を得られないまま実stateが要る場合は、Piは新しい`id`で`get_status`を送る（同じ`(sid, id)`の再送は§9の保持したresultのreplayになる）。§4.6に、`status`が応答先のfieldを持たないことと§5.6への参照を足した。**wire formatは変更していない。**`firmware/esp32`はまだ`get_status`への応答をwireへ送っていない（`pi-protocol-mode`は確立後のbyteを読み捨てる）ため、送信側の規則はwireへの送出を実装する変更が守る |
 | 2026-09-29 | Draft 2 uart migration | [Issue #487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)。firmwareの`pi-protocol-mode`をUART0からUART1（GPIO13／GPIO14）へ移し、UART0をdebug log専用にしたことに合わせて、§2のUART0共有の既知の例外2つ（debug logを止めるより前の起動時出力、panic handlerの出力）を、移行後の例外1つ（UART1のdriverの初期化時のglitchと、未確認のROM／bootloader・panic handlerの出力）へ置き換えた。改行を含まない不正byte列が後続frameへ連結するcaseが未検証であることは残した。Baud（115200、`Candidate`）とUART framing（8N1、`Candidate`）は変えていない。あわせて、§4.1の「`status: ok`のACK済みの`boot`を、新しいPi `sid`の`hello`で再送する理由」の説明で、firmwareへの実装先を[Issue #12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)の残作業から[Issue #487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)の残りの作業へ移した（`hello`の処理を受信の経路へつなぐ変更と一緒に行うため）。上の`Draft 2 boot resend on new pi session`の行は、その時点の記録として残す |
 | 2026-09-30 | Draft 2 integrated build | [Issue #487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)のPR B1。firmwareの`pi-protocol-mode` featureを廃止し、Pi linkを製品build（既定build）へ入れた。§2の記述を「Pi linkを持つbuild（`bench-servo-test-17`以外のすべて）」へ改めた。**wire formatとprotocolの規則は変えていない** |
+| 2026-10-02 | Draft 2 boot resume by hello | [Issue #487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)のPR B2。§4.1と§5.1で食い違っていた`boot`の再送の再開を、§4.1の「`hello`による再開」に1つにまとめ、§5.1の手順5と「現在sessionで未処理のsession確立message」はそこを参照する形にした。(1) recovery budgetを使い切った後の再開を「してよい」から「する」へ改めた。(2) 再開を起こす`hello`を、`status: ok`のACKの後は新しいPi `sid`の`hello`、budgetを使い切った後は受理した`hello`（同じPi `sid`の`port_reopen`／`resync`を含む）とした。(3) `rate_limited`のbudgetを使い切った停止も再開の対象とした。(4) 回数の単位を「Pi sessionにつき1回」に揃えた。(5) 終端として拒否された`boot`の「Piの介入を待つ」を、processの再起動または運用者の明示的なsession reset（§3.1）に改めた。§2の既知の逸脱を、`firmware/esp32/src/pi_link.rs`がPi→ESP32方向のrequestを処理するようになった後の範囲へ改めた。**wire formatは変更していない** |
 
 ### Draft schemaの互換性
 

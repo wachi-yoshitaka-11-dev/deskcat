@@ -8,7 +8,8 @@
 //! counter 対応表であり、ここへ再掲しない。
 //!
 //! **この`Health`型はsession state（#12）を持たない。**Pi linkの`boot`の受理確認・
-//! 再送は`crate::boot_session`が、`hello`等の受理は`crate::protocol::PiSession`が持つ。
+//! 再送は`crate::boot_session`が、`hello`等の受理は`crate::protocol::PiSession`が持ち、
+//! Pi linkの受信の振り分けは`crate::pi_link`が持つ。
 //! どの構成でも[`ProtocolCounters`]を増やす経路は無いため、**すべて 0 のままである**。
 //! ここで示すのは「counter schema を `status` へ載せられる」ことであって、
 //! 「counter が動いている」ことではない。
