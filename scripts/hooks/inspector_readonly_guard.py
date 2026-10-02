@@ -57,7 +57,7 @@ frontmatterへ`hooks.PreToolUse`として書き、**その subagent の`Bash`呼
 **行はさらに pipe で区間へ割り、区間ごとに判定する**（#396）。`cat f | wc -l`は2つのcommandであり、
 **read-onlyはそれぞれの区間で決まる。**`cat f | tee out.txt`は2つ目の区間で落ちる。
 **以前は`|`を含む語をそれ自体で拒否していた。**効いたのは2つの側である（2026-09-14に旧版で実測）。
-**1つはpatternである。**`rg -c '^\|' <file>`も`grep -c '^|' <file>`も拒否されていた。
+**1つはpatternである。**`rg -c '^\\|' <file>`も`grep -c '^|' <file>`も拒否されていた。
 **この repository の正本はMarkdownの表であり、区切り文字が`|`である。**
 `docs/hardware/tbd-register.md`は519行で最長行が6778字あり、
 **表の構造についてpatternを書けなかった。**

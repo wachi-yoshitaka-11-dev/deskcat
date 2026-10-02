@@ -18,6 +18,7 @@ import sys
 import tempfile
 import time
 import unittest
+import warnings
 from pathlib import Path
 
 SCRIPTS_ROOT = Path(__file__).resolve().parent
@@ -2100,7 +2101,7 @@ class PushGateTests(unittest.TestCase):
         """複数行commandの2行目以降のpushを止める（#389）。
 
         **迂回を試みた形ではない。**`git fetch`や`git status`を先に書く、
-        `add`／`commit`／`push`を並べる、空行と字下げを挟む、`\`で行を継ぐ——
+        `add`／`commit`／`push`を並べる、空行と字下げを挟む、`\\`で行を継ぐ——
         いずれも通常の書き方であり、**5つとも素通りしていた。**
         **旧挙動は、`origin/develop`の`command_line.py`だけを別directoryへ取り出し、
         `sys.path`の先頭に置いた状態で`push_gate.pushed_source`を呼んで測った**
@@ -2110,7 +2111,7 @@ class PushGateTests(unittest.TestCase):
         再現はできる。**差し込みを前提にしたtestを置かないのは、旧走査を残す約束になるためである。**
         `invocations`の層での旧挙動は`CommandLineSegmentsTests`が形ごとに固定する
         （改行を挟む4形は`test_the_walk_without_segments_missed_the_second_line`、
-        `\`で継ぐ形は`test_the_walk_without_segments_broke_the_line_continuation`）。
+        `\\`で継ぐ形は`test_the_walk_without_segments_broke_the_line_continuation`）。
         """
         self._instruction_commit(declared=False)
         # `git push origin develop`は押す側のrefを`develop`として解決する。
@@ -3498,7 +3499,7 @@ class CommandLineSegmentsTests(unittest.TestCase):
         起動の有無や回数がずれる形も入れてある。
 
         **ここに在るのは乖離の全件ではない。**`;`の直前に空白が無い形は
-        `test_separator_without_a_leading_space_is_still_missed`が、引用の中の`\`改行は
+        `test_separator_without_a_leading_space_is_still_missed`が、引用の中の`\\`改行は
         `CodeRabbitGateTests.test_line_continuation_inside_the_body_is_still_missed`が固定しており、
         **bashと突き合わせる形では測っていない。**
         """
@@ -4139,7 +4140,7 @@ class InspectorReadonlyGuardTests(unittest.TestCase):
         """pipeを区間へ割り、**区間ごとに先頭programを検査する**（#396）。
 
         **read-onlyは各区間で保たれる。**以前は`|`を含む語をそれ自体で拒否していたため、
-        **patternに`|`を1文字も書けず**（`rg -c '^\|' <file>`は拒否されていた。2026-09-14に旧版で実測）、
+        **patternに`|`を1文字も書けず**（`rg -c '^\\|' <file>`は拒否されていた。2026-09-14に旧版で実測）、
         **`head`と`tail`を繋いで行の窓を取ることもできなかった**（`sed`はallowlistに無い）。
         `docs/hardware/tbd-register.md`は519行で最長行が6778字あり、
         **この repository の正本はMarkdownの表で区切り文字が`|`である。**
@@ -4220,7 +4221,7 @@ class InspectorReadonlyGuardTests(unittest.TestCase):
         """
         for command in (
             "rg -n 'a|b' AGENTS.md",
-            "rg -oP '(?<!\\\\)\|' AGENTS.md",
+            "rg -oP '(?<!\\\\)\\|' AGENTS.md",
             "rg -n 'foo(bar)' AGENTS.md",
             "rg -n 'a>b' AGENTS.md",
             "grep -n 'a;b' AGENTS.md",
@@ -4539,6 +4540,35 @@ class InspectorReadonlyGuardTests(unittest.TestCase):
         """**`.claude/settings.json`へは置かない。**置くと通常の作業 session が止まる。"""
         settings = REPO_ROOT_FOR_TEMPLATES / ".claude" / "settings.json"
         self.assertNotIn("inspector_readonly_guard", settings.read_text(encoding="utf-8"))
+
+
+class SourceCompileWarningTests(unittest.TestCase):
+    """**hooksに限らず、`git ls-files`の全`.py`を対象にする。**"""
+
+    def test_no_python_source_warns_on_compile(self):
+        """compileで警告を出す`.py`を置かない。
+
+        **新しいPythonでは、invalid escape sequenceがSyntaxWarningとしてstderrへ出る。**
+        hookの子processのstderrが空であることを確かめるtestがそれで落ち、
+        push前の検査を通せなくなった。**CIでは出ない。**このfileが先に`command_line`を
+        importして`.pyc`を作るため、子processはsourceをcompileし直さない。
+        `PYTHONDONTWRITEBYTECODE=1`の端末でだけ表に出る。
+        """
+        result = subprocess.run(
+            ["git", "ls-files", "-z", "*.py"],
+            cwd=REPO_ROOT_FOR_TEMPLATES, capture_output=True, check=True,
+        )
+        paths = [p for p in result.stdout.decode("utf-8").split("\0") if p]
+        self.assertTrue(paths, "git ls-filesが.pyを1本も返さない")
+        found = []
+        for path in paths:
+            source = (REPO_ROOT_FOR_TEMPLATES / path).read_text(encoding="utf-8")
+            with warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter("always")
+                compile(source, path, "exec")
+            found += [f"{path}:{w.lineno}: {w.message}" for w in caught
+                      if issubclass(w.category, (SyntaxWarning, DeprecationWarning))]
+        self.assertEqual(found, [])
 
 
 if __name__ == "__main__":
