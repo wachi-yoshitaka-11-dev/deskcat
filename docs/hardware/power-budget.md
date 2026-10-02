@@ -168,6 +168,7 @@ gateも経路ごとに違う。
   B-2aの`停止条件（電圧）`と`停止条件（その他）`（brownout、reset、LCDの表示異常、regulator周辺の発熱）は適用する。
   `停止条件（電流）`は、基にする`3V3` pinの定格が未確定のため数値を持たない。
 - **実施:** shuntを入れる配線替えは、通電前に配線を確かめてから行い、人間が監視する。停止手順は上の共通条件表のとおり（USB cableをhost側から抜く）。
+- **2026-10-01に実施した**（[experiment-log.md](experiment-log.md)の`EXP-019`）。上の共通条件表の`測る量`（backlightの点灯とLCDの描画、I2C通信を継続した状態の定常電流）は得ていない。
 
 #### B-2bの電流制限値の上限が決められない理由（要約）
 
@@ -2462,7 +2463,7 @@ servo branchは上記の正式改訂の手順による。それ以外のbranch�
 |---|---|---:|---:|---:|---:|---|---|
 | Logic | ESP-WROOM-32D board | 1 | 約80〜100mA（WiFi idle） | 約240mA（WiFi TX時、文献値） | 短時間で最大約500mA相当のspikeが報告例あり | [ESP32技術資料](https://www.espressif.com/sites/default/files/documentation/esp32_datasheet_en.pdf)を含む複数の技術資料（[参考](https://lastminuteengineers.com/esp32-sleep-modes-power-consumption/)） | **文献値。実測前** |
 | Logic | Raspberry Pi Zero W | 1 | 約140mA（公式spec） | 実測未定 | Stress時最大約350mAの報告例あり | [Raspberry Pi公式spec](https://www.raspberrypi.com/products/raspberry-pi-zero-w/) | **文献値。実測前** |
-| ESP32 3V3出力 | MSP2807（LCD＋backlight＋touch） | 1 | TBD（メーカー未公開） | TBD | TBD | 秋月商品ページに電流記載なし。logic IOが3.3V TTLのため3.3V給電とする（`電源rail構成案`参照）。backlight込みの電流次第では3V3 pinの供給能力を超える可能性があり、その場合は別途3.3V regulatorが必要 | Blocked（**入手済み・実測未実施**） |
+| ESP32 3V3出力 | MSP2807（LCD＋backlight＋touch） | 1 | TBD（メーカー未公開） | TBD | TBD | 秋月商品ページに電流記載なし。logic IOが3.3V TTLのため3.3V給電とする（`電源rail構成案`参照）。backlight込みの電流次第では3V3 pinの供給能力を超える可能性があり、その場合は別途3.3V regulatorが必要。2026-10-01に周辺module3点を合わせた電源pinの電流を読んだ（[experiment-log.md](experiment-log.md)の`EXP-019`。MSP2807単独の値ではない） | Blocked（**入手済み・単独の実測は未実施**） |
 | ESP32 3V3出力 | ADXL345（accelerometer） | 1 | 140µA typ（ODR ≥ 100Hz。standbyは0.1µA typ） | **TBD**（`HW-TBD-025`(b)） | **TBD**（`HW-TBD-025`(b)） | 消費電流の出典は[ADXL345 Data Sheet](https://www.analog.com/media/en/technical-documentation/data-sheets/adxl345.pdf) Rev. G Table 1 page 4およびTable 7 page 13（**data rate別の表で最大は140µAである。ただしtyp値であり、datasheetにmax欄は無い**）。**旧記載はDigi-Keyの解説記事を出典としていたが、2026-08-12にメーカー一次資料へ差し替えた**（Revision 37）。**Logic 5V railへは直結しない。****確認前の安全規則である**（ICの動作上限3.6Vも絶対最大定格3.9Vも超えうるため。**IC定格からmodule boardの許容入力電圧は決まらない**）。**3.3Vも唯一の候補であって確定ではない**（`HW-TBD-004`）。**旧記載の「M-06724はregulator非搭載のため3.3V直結必須」は、根拠資料（秋月 商品ページ。現在404）を失ったため2026-08-12に削除した**（Revision 36） | **文献値。実測前** |
 | ESP32 3V3出力 | BME280（environment sensor） | 1 | 数µA〜1mA未満（測定mode時） | 無視できるほど小さい想定 | 無視できるほど小さい想定 | Bosch公式BME280データシート（一般値）。現物付属説明書の電源電圧DC1.71～3.6Vのため5V直結不可（Logic 5V railへは直結しない） | **文献値。実測前** |
 | ESP32 3V3出力 | #514の白・赤LEDと起動用pull | 各2 | TBD（白の3.3 Vでの点灯量は未確認） | 最大約29 mA（3.6 V、270 Ω−5%のLED枝×2と10 kΩ pull×2から計算した計画値。実測ではない。抵抗の実測値で計算し直す） | 同左 | [初回デモ回路案](led-514-demo.md)。合成給電の差分計算は上の「#514のLEDを追加する場合の差分」 | 回路案・実機未確認 |
