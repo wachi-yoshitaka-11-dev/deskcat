@@ -7,21 +7,12 @@
 //! 受理上限、session遷移budget、cooldown（`PROTO-TBD-012`）、retired session保持件数
 //! （`PROTO-TBD-011`）は**ここでは実装しない。**
 //!
-//! # 実機への配線について
+//! # 受信の経路
 //!
 //! **この型はbyte列やUART peripheralを持たない。**`Hello`／`Ping`／`GetStatus`を
-//! 受け取り、返すべき[`Message`]を返すだけである。実serial linkからこの型へ
-//! byteを渡す**受信loopは、まだ実装していない。**GPIO割り当ての承認待ちではない
-//! （Pi linkのpin（`PI-UART-TX`＝GPIO13、`PI-UART-RX`＝GPIO14）は
-//! `docs/hardware/gpio-assignment.md`の`Pi–ESP32間のtransport`節が決めている）。
-//!
-//! **このmoduleはどのbuildでもcompileする**（`#487`。それより前は`pi-protocol-mode`の無い
-//! buildだけだった）。Pi linkの受信loop（`main.rs`のmain loop）は、今は`boot`のACK
-//! （`crate::boot_session`、[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446) PR B）
-//! だけを扱い、`Hello`／`Ping`／`GetStatus`をこの型へ渡す経路はまだ無い（`#487`の残りの作業）。
-//! `main.rs`の`demonstrate_pi_session`が、自己完結した例でこの型を1回動かしてlogへ出すだけである。
-//! **この点は`crates/deskcat-serial`側の`SerialDevice`の実機確認が
-//! [Issue #11]の後半に残っているのと対になる。**
+//! 受け取り、返すべき[`Message`]を返すだけである。Pi linkのUARTから届いた行は
+//! `crate::pi_link::PiLink`がdecodeしてこの型へ渡し、返った[`Message`]をPi linkへ書く。
+//! Pi linkを持つbuild（`bench-servo-test-17`以外のすべて。`#487`）だけでcompileする。
 //!
 //! ESP32自身の`sid`の生成方法は`main.rs`の`generate_sid`が決める
 //! （`PROTO-TBD-011`のうち生成方法を部分解決。
@@ -29,8 +20,6 @@
 //! この型自体は生成方法を持たず、呼び出し側が選んだ値を受け取るだけである
 //! （`crates/deskcat-serial`の`Session::new`が`sid`を呼び出し側から受け取るのと
 //! 同じ設計判断である）。
-//!
-//! [Issue #11]: https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11
 
 use std::collections::VecDeque;
 
