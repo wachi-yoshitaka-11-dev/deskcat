@@ -70,8 +70,8 @@
 //! **Protocol sessionはまだ確立を主張しない。**`boot`のACK待ち・再送・`stale_session`受信時の
 //! `sid`選び直しは実装した（[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446) PR B、
 //! `crate::boot_session`参照）が、実機での動作確認（受信経路がring buffer溢れなく動くか、実際に
-//! `boot`→ACKが成立するか）はまだ無い。`hello`／`ping`／`get_status`の受信はまだmain loopへ
-//! つないでいない（`#487`の残りの作業）。
+//! `boot`→ACKが成立するか）はまだ無い（`crate::pi_link`のmodule doc「確かめていないこと」）。
+//! Pi→ESP32方向の受信（`hello`／`ping`／`get_status`）は、main loopから`crate::pi_link::PiLink`へ渡す。
 //! `#446`より前は`boot=`というlog行を出していたが、その行は`#446`のPR Aで削除した。
 //! `boot=`行を目視で確認していた作業（`#7`／`#13`等）があれば、`boot=`行が
 //! 無くなったことを踏まえて確認し直すこと。
@@ -161,6 +161,9 @@ mod display;
 mod display_test;
 mod env;
 mod health;
+#[cfg(not(feature = "bench-servo-test-17"))]
+mod pi_link;
+#[cfg(not(feature = "bench-servo-test-17"))]
 mod protocol;
 mod servo;
 
@@ -172,7 +175,7 @@ mod servo;
 // **再開するときの注意（#487）。**同節の項目5は、再開の手順として「`pi-protocol-mode`との排他の
 // `compile_error!`とその注記は残し」と書いている（同項目は当時の記録であり、書き換えていない）。
 // #487で`pi-protocol-mode`を廃止したため、その`compile_error!`はもう無い。代わりに、このfeature付き
-// buildはPi link（`crate::boot_session`とUART1）をcompileしない（上の`mod boot_session`の
+// buildはPi link（`crate::boot_session`・`crate::pi_link`・`crate::protocol`とUART1）をcompileしない（上の`mod`の
 // `#[cfg]`）。**測定用のbuildがPiとの通信linkを持たないこと（同文書の`測定のための駆動`節）は、
 // compile_errorではなく構造で保っている。**再開するときに外すのは、下の#474の`compile_error!`と、同節の項目5が挙げる注記だけである。
 // ただし、このfeature付きbuildは#474の`compile_error!`があるためbuildしておらず、外した後にcompileが通るかは
@@ -183,7 +186,6 @@ compile_error!(
      理由と承認の状態はdocs/hardware/servo-safety-limits.mdの承認の状態節を見ること。"
 );
 
-use deskcat_protocol::{Hello, HelloReason};
 use esp_idf_svc::hal::delay::FreeRtos;
 use esp_idf_svc::hal::gpio::{InputPin, OutputPin};
 use esp_idf_svc::hal::i2c::{I2cConfig, I2cDriver, I2C0};
@@ -203,7 +205,8 @@ use crate::display::Ili9341;
 use crate::display_test::DisplayBringup;
 use crate::env::Bme280;
 use crate::health::Health;
-use crate::protocol::PiSession;
+#[cfg(not(feature = "bench-servo-test-17"))]
+use crate::pi_link::PiLink;
 
 /// `ACCEL-01`（ADXL345）のI2C address。**`SDO`を`GND`へ配線する前提の値である。**
 ///
@@ -494,8 +497,9 @@ fn main() {
     // 受信を読みに行く間隔を測る起点（`crate::health::UartObservations::max_read_gap_ms`）。
     #[cfg(not(feature = "bench-servo-test-17"))]
     let mut last_read_ms = health.uptime_ms();
-
-    demonstrate_pi_session(&mut health);
+    // Pi→ESP32方向の受信を振り分ける（`crate::pi_link`）。
+    #[cfg(not(feature = "bench-servo-test-17"))]
+    let mut pi_link = PiLink::new();
 
     // **`main()` から戻らない。**#6 の firmware は戻っていたため、task が進み続けて
     // いるかを外から確認できなかった。
@@ -606,7 +610,7 @@ fn main() {
             last_read_ms = health.uptime_ms();
             if let Ok(n) = read {
                 if n > 0 {
-                    boot_session.on_bytes(&buf[..n], &health, &mut uart);
+                    pi_link.on_bytes(&buf[..n], &mut boot_session, &health, &mut uart);
                 }
             }
         }
@@ -636,7 +640,7 @@ fn main() {
 /// **ring bufferが満杯になったとき、ESP-IDFのdriverは受信のinterruptを止め、`read`で空きが
 /// できるまでbyteをhardware FIFOに残す**（ESP-IDF v5.5.3 `esp_driver_uart/src/uart.c`の
 /// `rx_buffer_full_flg`）。FIFOも溢れたbyteは失われる。どちらの場合も、行が壊れれば
-/// `crate::boot_session::BootSession::on_bytes`が壊れた行として捨て、`boot`は§4.1の再送で
+/// `crate::pi_link::PiLink::on_bytes`が壊れた行として捨て、`boot`は§4.1の再送で
 /// 送り直される見込みである（確かめていない）。
 #[cfg(not(feature = "bench-servo-test-17"))]
 fn drain_uart_events(uart: &UartDriver<'_>, health: &mut Health) {
@@ -787,37 +791,6 @@ fn generate_sid(health: &Health) -> u32 {
 #[cfg(not(feature = "bench-servo-test-17"))]
 const fn sid_from_uptime(ts_ms: u64) -> u32 {
     ts_ms as u32
-}
-
-/// `crate::protocol::PiSession`が`hello`／`ping`／`get_status`を仕様どおり処理できることを、
-/// 自己完結した例で示す（実serial linkは無いため、入力もこの関数が作る）。
-///
-/// **これはprotocolの成立を主張しない。**`crates/deskcat-serial`の`tests/simulator.rs`が
-/// 持つ受け入れ条件のtestとは違い、これはbuildできることと、log出力を目視できることの
-/// 実物である。実serial linkの受信loopが入ったら、この呼び出し元をそちらへ置き換える。
-fn demonstrate_pi_session(health: &mut Health) {
-    let mut session = PiSession::new();
-    // 例として使うだけのPi `sid`／`id`である。実際の値は相手が選ぶ。
-    let pi_sid = 90_312;
-    let hello = Hello {
-        host: "deskcatd".to_owned(),
-        version: "0.1.0".to_owned(),
-        reason: HelloReason::Startup,
-    };
-    log::info!("protocol_demo pi_sid_before={:?}", session.pi_sid());
-    let established = session.handle_hello(pi_sid, 1, &hello);
-    log::info!(
-        "protocol_demo hello_outcome={:?} pi_sid_after={:?}",
-        established.outcome,
-        session.pi_sid()
-    );
-
-    let ping_reply = session.handle_ping(pi_sid, 2);
-    log::info!("protocol_demo ping_reply={ping_reply:?}");
-
-    let status = health.to_status();
-    let (get_status_ack, get_status_reply) = session.handle_get_status(pi_sid, 3, status);
-    log::info!("protocol_demo get_status_ack={get_status_ack:?} status={get_status_reply:?}");
 }
 
 /// I2Cのbring-upの各段階の境界で1回、heartbeatを刻みOSへyieldする。

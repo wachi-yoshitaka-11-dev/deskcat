@@ -43,16 +43,11 @@
 //! 起きた回数の下限であり（同関数のdoc「数えられない場合」）、**0件でも溢れなかったことの証明には
 //! ならない。**実機で`boot`→ACKが成立しても、同じく溢れなかったことの根拠にはならない。
 //!
-//! (3) Pi linkのmain loopは、Pi→ESP32方向のrequest（`hello`・`get_status`等）を
-//! 一切処理しない（`crate::protocol`の`PiSession`はcompileされるが、受信の経路へつないで
-//! いない。#487の残りの作業である）。§8はidentityを復元できる要求に
-//! 相関ACKを返すよう定めており、**これに反する既知の逸脱である**
-//! （`crate::boot_session::BootSession::on_bytes`のdoc参照）。**これは設計上の
-//! 性質であり、実機で確認して解消する類のものではない。**同じ理由で、§4.1の表の、
-//! `status: ok`のACKを受けた後に新しいPi `sid`の`hello`を受けたときの`boot`の再送
-//! （§5.1の手順5）も満たさない。この再送の規則と、firmwareへの実装先は、§4.1の本文
-//! （表の該当の行と、その下の「`status: ok`のACK済みの`boot`を、新しいPi `sid`の`hello`で
-//! 再送する理由」の説明）が持つ。
+//! (3) Pi→ESP32方向の受信（`crate::pi_link`）は、decodeで拒否した行（未対応のtype、payloadや
+//! envelopeの不正）の`(sid, id)`を復元しないため、相関ACKを返さない。§8は
+//! identityを復元できる要求に相関ACKを返すよう定めており、**これに反する既知の逸脱である**
+//! （正本は`docs/protocol/esp32-pi-protocol.md`§2）。§8.1／§8.2の流量制限も実装していない
+//! （`crate::pi_link`のmodule doc「実装していないもの」）。
 //!
 //! §2との関係、既知の逸脱、行長・line endingの扱いは
 //! `docs/protocol/esp32-pi-protocol.md`§2が正本として持つ。

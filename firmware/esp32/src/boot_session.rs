@@ -1,20 +1,11 @@
 //! `boot`の受理確認・再送（§4.1）と、`sid`選び直し（§3.1「`sid`が衝突した場合」）。
 //!
 //! Pi linkを持つbuild（`bench-servo-test-17`以外のすべて。`#487`）で使う（`#446` PR B）。`main.rs`の`generate_sid`が選んだ`sid`で
-//! `boot`を送り、Pi linkのUART（`PI-UART-RX`、`#487`）から届く`ack`を待つ。§4.1の終了条件の表が定める**state遷移**
-//! （いつ再送するか、いつ`sid`を選び直すか、いつ止めるか）を実装する狙いで
-//! 書いたものであり、**state遷移が§4.1の表どおりに正しいことをhost側の
-//! unit testでは確かめていない**（`firmware/esp32`はhostのworkspaceから
-//! 除外されており、`esp_idf_svc`の型へ直接依存するため）。featureの各構成でのbuild
-//! （`cargo build`／`cargo clippy`。`#446` PR Bの時点では既定・`pi-protocol-mode`・`bringup-display-13`、
-//! `#487`のPR B1からは既定と`bringup-display-13`。どのcommitで通したかの記録は、
-//! それぞれのPull Request本文にある）が通ることは、compileが通ることの根拠であり、**state遷移が
-//! 正しいことの根拠ではない。**state遷移の正しさの根拠は、この`boot_session.rs`
-//! を導入したPull Request（`#446` PR B）の自己レビュー記録（複数回のcode
-//! review。AIによる査読を含む。PR本文参照）だけである。**host testと実機確認
-//! （受信経路がsoftware ring buffer（`config::PI_PROTOCOL_UART_RX_BUFFER_BYTES`）
-//! を溢れなく動くか、実際に`boot`→ACKが成立するか）が前提として残る
-//! （Issue #446の追跡を見る）。
+//! `boot`を送り、`crate::pi_link::PiLink`がPi linkのUART（`PI-UART-RX`、`#487`）から受けて渡す`ack`を待つ。§4.1の終了条件の表が定める**state遷移**
+//! （いつ再送するか、いつ`sid`を選び直すか、いつ止めるか）を実装する。featureの各構成での
+//! build（`cargo build`／`cargo clippy`）が通ることはcompileが通ることの根拠であり、**state遷移が
+//! 正しいことの根拠ではない。**host testと実機で確かめていないことは`crate::pi_link`のmodule doc
+//! 「確かめていないこと」が持つ。
 //! **表が定める`protocol_fault`の送出（wireへの報告）は`PROTO-TBD-018`が
 //! 未確定のため実装しない**（下記）。
 //!
@@ -56,11 +47,26 @@
 //! 区別を保持し、将来`status`をwireへ送る段になったら`ProtocolCounters`へ写せる形に
 //! しておく。
 //!
+//! # `hello`による再送の再開（§4.1の「`hello`による再開」）
+//!
+//! `crate::pi_link::PiLink`は、`hello`を受理してそのACKを書いた後に
+//! [`BootSession::on_hello_accepted`]を呼ぶ。再開する条件は§4.1の「`hello`による再開」が持つ。この型は、
+//! 再開したかどうかを、Pi sessionごとに1つの記録（`resumed_in_pi_session`）で持ち、
+//! `hello`による遷移（[`HelloAccepted::Transition`]）でだけ解除する。再開は同じ`(sid, id)`のまま、
+//! 通常再送の最初（`Phase::Normal { attempt: 0 }`）から行う。
+//!
+//! # ESP32の`(sid, id)`の採番
+//!
+//! ESP32がPi linkへ送る`boot`以外のmessageの`(sid, id)`は、[`BootSession::next_envelope`]の1か所で払い出す
+//! （§3「採番は単一の点で直列化し」）。`boot`は`id`＝1、それ以外は2から単調に増やす。`sid`を
+//! 選び直したら初期値へ戻す（§3.1）。`u32`の上限値は`protocol_fault`のために予約し（§3）、払い出さない。
+//! `protocol_fault`を送らないため（上記）、上限値に達した後は新しい`id`を要する送出をすべて止める。
+//!
 //! # debug logへ出すもの
 //!
 //! `boot`の送出（`boot_tx`。1行の全byteをtx ring bufferへ積み終えた時点であり、wireへ出た
-//! 時点ではない。`send_boot`のcomment参照）、`status: ok`での確立（`boot_established`）、`sid`の
-//! 選び直し（`boot_sid_reselected`）、終端（`boot_terminated`）を`log`へ出す。
+//! 時点ではない。`crate::pi_link::write_line`のcomment参照）、`status: ok`での確立（`boot_established`）、`sid`の
+//! 選び直し（`boot_sid_reselected`）、終端（`boot_terminated`）、`hello`による再開（`boot_resumed`）を`log`へ出す。
 //! [#446]の受け入れ条件4（実機での`boot`→ACK）の試験で、ESP32側で何が起きたかを
 //! Pi側のlogと突き合わせるためである。出力先はUART0（USB）であり、Pi linkの
 //! UARTには出ない（`crate::console`参照）。
@@ -70,13 +76,15 @@
 use std::time::Duration;
 
 use deskcat_protocol::{
-    encode_line, limits, Ack, AckStatus, Boot, Cause, Envelope, ErrorCode, Frame, LineReceiver,
-    Message, Outcome,
+    encode_line, limits, Ack, AckStatus, Boot, Envelope, ErrorCode, Frame, Message,
 };
 use esp_idf_svc::hal::delay::TickType;
 use esp_idf_svc::hal::uart::UartDriver;
 
 use crate::health::Health;
+
+/// `boot`の`id`（§4.1。`sid`ごとに固定）。
+const BOOT_ID: u32 = 1;
 
 /// `PROTO-TBD-017`の暫定値。数値に根拠は無い（module doc参照）。
 #[derive(Debug, Clone, Copy)]
@@ -177,18 +185,10 @@ enum Phase {
     Established,
     /// 終端。理由は[`TerminalReason`]。
     ///
-    /// §4.1の表は、`RecoveryBudgetExhausted`で終端した場合に限り、Piから
-    /// 有効な`hello`を受信したら同じ`(sid, id)`のまま1回だけ再開してよいと
-    /// 定めている（`hello`はESP32が受信する側のmessageであり、`crate::protocol`の
-    /// `PiSession::handle_hello`が別途実装しているが、runtime経路（`main.rs`のmain loop）へは
-    /// まだ配線していない。`#487`の残りの作業である）。**この実装は
-    /// 再開を使わない。**§4.1の規定は「再開してよい」であって「しなければ
-    /// ならない」ではなく（許可であり義務ではない）、再開しないことは
-    /// より厳しい側の選択であるため、どのMUSTにも反しない。それ以外の
-    /// 終端理由（`RateLimitedBudgetExhausted`・`SidReselectLimitReached`・
-    /// `Rejected`）には、そもそも再開の規定が無い。以降、processの再起動
-    /// までは自動では再開しない（main loopは`Ack`以外をまだ受け付けないため、運用者が明示的に
-    /// session resetを指示する受信経路も無い）。
+    /// `hello`で再開するのは[`TerminalReason::resumable_by_hello`]が`true`を返す理由だけである
+    /// （module doc「`hello`による再送の再開」）。それ以外の理由では、processの再起動または
+    /// 運用者の明示的なsession reset（§3.1）まで再開しない。運用者のsession resetを受ける経路は
+    /// まだ無い。
     Terminated(TerminalReason),
 }
 
@@ -206,6 +206,25 @@ enum TerminalReason {
     Rejected(ErrorCode),
 }
 
+impl TerminalReason {
+    /// 受理した`hello`で`boot`の再送を再開する終端か（§4.1の「`hello`による再開」）。
+    const fn resumable_by_hello(self) -> bool {
+        matches!(
+            self,
+            Self::RecoveryBudgetExhausted | Self::RateLimitedBudgetExhausted
+        )
+    }
+}
+
+/// [`BootSession::on_hello_accepted`]へ渡す、受理した`hello`の種類。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HelloAccepted {
+    /// 新しいPi `sid`の`hello`で、Pi sessionが遷移した（§5.1の手順1〜4）。
+    Transition,
+    /// 現在のPi `sid`の`port_reopen`／`resync`の`hello`を、sessionを維持して受理した。
+    Maintained,
+}
+
 /// `boot`のACK待ち・再送・`sid`選び直しを行うsession。
 pub struct BootSession {
     policy: BootRetryPolicy,
@@ -218,7 +237,10 @@ pub struct BootSession {
     phase: Phase,
     next_deadline_ms: u64,
     sid_reselect_count: u32,
-    receiver: LineReceiver,
+    /// 次に払い出す`id`（module doc「ESP32の`(sid, id)`の採番」）。
+    next_id: u32,
+    /// 現在のPi sessionで、`hello`による再開を既に行ったか（module doc「`hello`による再送の再開」）。
+    resumed_in_pi_session: bool,
 }
 
 impl BootSession {
@@ -233,12 +255,13 @@ impl BootSession {
         let mut session = Self {
             policy,
             sid,
-            id: 1,
+            id: BOOT_ID,
             reset_reason,
             phase: Phase::Normal { attempt: 0 },
             next_deadline_ms: 0,
             sid_reselect_count: 0,
-            receiver: LineReceiver::with_protocol_limit(),
+            next_id: BOOT_ID + 1,
+            resumed_in_pi_session: false,
         };
         session.send_boot(health, uart);
         session.next_deadline_ms = health.uptime_ms() + duration_to_ms(policy.initial_interval);
@@ -256,107 +279,86 @@ impl BootSession {
         }
     }
 
-    /// Pi linkのUARTから読めた生byteを渡す。0 byteでもよい（timeoutで戻った場合）。
+    /// `crate::pi_link::PiLink`が受けたACKを渡す。§6のEnvelopeの`sid`の照合は`PiLink`が行い、
+    /// ここでは`reply_sid`／`reply_to`を自分の`boot`の`(sid, id)`と照合する。
     ///
-    /// 自分宛でないframe（`(sid, id)`が一致しないACK等）と、壊れた行
-    /// （`Outcome::Rejected`）は捨てる。**§4.1の終了条件はACKの到達・不到達で
-    /// 決まるものであり、受信できた壊れたbyte列の量では決めない。**壊れた行を
-    /// カウントして独自の終端条件を作ると、仕様に無い停止経路を持ち込むことになる。
-    ///
-    /// # `Ack`以外のmessage（`hello`／`get_status`等）を処理せずに捨てる
-    ///
-    /// §8はidentityを復元できる要求に相関ACKを返すよう定めるが、この実装は
-    /// `Ack`以外を一切処理しない（応答もしない）。**これは§8に反する既知の
-    /// 逸脱として扱う。**義務は受信側の規範であり、実装しないことで消える
-    /// ものではない。main loopはPi→ESP32方向のrequest（`hello`・`get_status`等）の受理を
-    /// まだ持たない（`crate::protocol`の`PiSession`はcompileされるが、受信の経路へつないで
-    /// いない）。この逸脱を解消するのは`#487`の残りの作業（`hello`の処理を受信の経路へつなぐ
-    /// 変更）である（console.rsのmodule doc「Pi linkを持つbuildを実際のPi hostへ接続する範囲」の
-    /// 理由でもある）。
-    ///
-    /// **§7「Parser counterでは…を区別する」の義務も満たしていない。**確立前
-    /// （`Normal`／`Recovery`／`RateLimited`）に受けたbyteに限り、`Ack`以外の
-    /// frame・`Outcome::Rejected`の`Cause`（`InvalidUtf8`／`Decode`／`Oversize`）・
-    /// session不一致のACKを`log::error!`で分類するが、`ProtocolCounters`へ実際に
-    /// 加算する経路は無い（`Health::counters`を増やす経路が無いことは
-    /// `health.rs`のmodule doc参照。`send_boot`・`generate_sid`のエラー分類と
-    /// 同じ扱い）。**`Established`／`Terminated`へ移った後に届いたbyteは、
-    /// `on_bytes`冒頭で`receiver.drain`へ通さずreturnするため、種類を問わず
-    /// 未分類のまま読み捨てる**（確立後の受信を分類する処理は、hello処理と
-    /// 同じくこのPRの範囲外）。分類したものはUART0（USB）のdebug logで見える
-    /// （`#487`。それより前はloggingを止めており、見えなかった）。
-    ///
-    /// # Envelopeの`sid`を検査しない理由
-    ///
-    /// §6は、ACKの受理条件としてEnvelopeの`sid`（応答送信側=Piのsession）も
-    /// 確認対象に含めるが、この実装は`reply_sid`／`reply_to`（要求送信側=ESP32の
-    /// sid／id）しか見ない。`boot`確立前はESP32がまだ「現在承認しているPi
-    /// session」を持たない（確立するのがこの`boot`のACKそのものであるため）ため、
-    /// この条件は適用対象が無い。確立後（`Established`）はこのmoduleが受信を
-    /// 止めるため、この検査を要する局面に達しない。
-    pub fn on_bytes(&mut self, buf: &[u8], health: &Health, uart: &mut UartDriver<'_>) {
+    /// 一致しないACKと、`Established`／`Terminated`の間に届いたACKは適用せず、logで分類する
+    /// （§7「Parser counterでは…session不一致を区別する」。counterは増やさない。
+    /// `health.rs`のmodule doc参照）。
+    pub fn on_ack(&mut self, ack: Ack, health: &Health, uart: &mut UartDriver<'_>) {
         if matches!(self.phase, Phase::Established | Phase::Terminated(_)) {
+            log::error!(
+                "boot_rx_ack_after_close reply_sid={} reply_to={}",
+                ack.reply_sid,
+                ack.reply_to
+            );
             return;
         }
-        // `drain`のclosureは`&mut self`を借りられないため、`Ack`だけを
-        // 取り出してloopの外で適用する。**受信順を保って全件検査する。**1回の
-        // `read`chunkに複数のACKが含まれる場合がありうる（例: 古い
-        // `rate_limited`の重複ACKと、それに続く新しい`ok`）。
-        let mut acks: Vec<Ack> = Vec::new();
-        self.receiver.drain(buf, |outcome| match outcome {
-            Outcome::Frame(Frame {
-                message: Message::Ack(ack),
-                ..
-            }) => acks.push(ack),
-            // 分類の理由は`on_bytes`のdoc「Ack以外のmessageを処理せずに捨てる」参照。
-            Outcome::Frame(other) => {
-                log::error!("boot_rx_unhandled_frame type={}", other.message.type_str());
-            }
-            Outcome::Rejected(rejection) => match rejection.cause() {
-                Cause::InvalidUtf8 { valid_up_to } => {
-                    log::error!("boot_rx_invalid_utf8 valid_up_to={valid_up_to}");
-                }
-                Cause::Decode => log::error!("boot_rx_decode_rejected"),
-                Cause::Oversize => log::error!("boot_rx_oversize_line"),
-                _ => log::error!("boot_rx_rejected_unknown_cause"),
-            },
-        });
-        for ack in acks {
-            // 直前の適用で`Established`／`Terminated`へ移っていたら、以降の
-            // ACKは適用しない（`on_bytes`冒頭と同じ判定）。§7「Parser counterでは
-            // …を区別する」の対象として分類だけしておく。
-            if matches!(self.phase, Phase::Established | Phase::Terminated(_)) {
-                log::error!(
-                    "boot_rx_ack_after_close reply_sid={} reply_to={}",
-                    ack.reply_sid,
-                    ack.reply_to
-                );
-                continue;
-            }
-            // **`self.sid`／`self.id`を、loopの外で1回だけ捕えたものではなく
-            // ここで毎回読み直す。**同じchunk内の先行ACKが`stale_session`で
-            // `reselect_sid`を起こすと`self.sid`／`self.id`が変わりうるため、
-            // それより後ろのACKは新しい値と照合しないと、旧`(sid, id)`宛の
-            // ACK（例: 旧sidへの`ok`）を現在のsessionへ誤って適用しうる。
-            // 一致しないACKは適用しない。**`generate_sid`が前回と異なる値を
-            // 返す保証は無い**（NVS counterの通常経路は単調増加で異なる値になるが、
-            // `generate_sid`のdoc「NVSが使えない場合」の縮退経路（uptime依存）へ
-            // 落ちた場合、たまたま前回と同じ値になりうる）。同じ値が返った場合、
-            // 旧`(sid, id)`宛の重複`stale_session`は次回も一致してしまい、
-            // 選び直しの回数（`sid_reselect_limit`）を消費し続ける。これは
-            // 縮退経路自体が非衝突を主張しないという既存の制約の一部として扱う。
-            if ack.reply_sid == self.sid && ack.reply_to == self.id {
-                self.apply_ack(ack, health, uart);
-            } else {
-                // §7「Parser counterでは…session不一致を区別する」の対象。
-                // counterは持たず、`generate_sid`等と同じくlogだけ分類する。
-                log::error!(
-                    "boot_rx_session_mismatch reply_sid={} reply_to={}",
-                    ack.reply_sid,
-                    ack.reply_to
-                );
-            }
+        // **`self.sid`／`self.id`を、呼び出しのたびに読み直す。**同じchunk内の先行ACKが
+        // `stale_session`で`reselect_sid`を起こすと`self.sid`／`self.id`が変わりうるため、
+        // 後続のACKは新しい値と照合しないと、旧`(sid, id)`宛のACK（例: 旧sidへの`ok`）を
+        // 現在のsessionへ誤って適用しうる。**`generate_sid`が前回と異なる値を返す保証は無い**
+        // （NVS counterの通常経路は単調増加で異なる値になるが、`generate_sid`のdoc
+        // 「NVSが使えない場合」の縮退経路（uptime依存）へ落ちた場合、たまたま前回と同じ値に
+        // なりうる）。同じ値が返った場合、旧`(sid, id)`宛の重複`stale_session`は次回も一致して
+        // しまい、選び直しの回数（`sid_reselect_limit`）を消費し続ける。これは縮退経路自体が
+        // 非衝突を主張しないという既存の制約の一部として扱う。
+        if ack.reply_sid == self.sid && ack.reply_to == self.id {
+            self.apply_ack(ack, health, uart);
+        } else {
+            log::error!(
+                "boot_rx_session_mismatch reply_sid={} reply_to={}",
+                ack.reply_sid,
+                ack.reply_to
+            );
         }
+    }
+
+    /// `hello`を受理し、そのACKを書いた後に呼ぶ（§5.1の手順5、§4.1の「`hello`による再開」）。
+    pub fn on_hello_accepted(
+        &mut self,
+        accepted: HelloAccepted,
+        health: &Health,
+        uart: &mut UartDriver<'_>,
+    ) {
+        if accepted == HelloAccepted::Transition {
+            self.resumed_in_pi_session = false;
+        }
+        let resume = match self.phase {
+            Phase::Established => accepted == HelloAccepted::Transition,
+            Phase::Terminated(reason) => reason.resumable_by_hello(),
+            Phase::Normal { .. } | Phase::Recovery { .. } | Phase::RateLimited { .. } => false,
+        };
+        if !resume || self.resumed_in_pi_session {
+            return;
+        }
+        self.resumed_in_pi_session = true;
+        let previous = self.phase;
+        self.phase = Phase::Normal { attempt: 0 };
+        log::info!(
+            "boot_resumed accepted={accepted:?} previous={previous:?} sid={} id={}",
+            self.sid,
+            self.id
+        );
+        self.next_deadline_ms = health.uptime_ms() + duration_to_ms(self.policy.initial_interval);
+        self.send_boot(health, uart);
+    }
+
+    /// `boot`以外のmessageに使う、新しい`(sid, id)`のEnvelopeを払い出す
+    /// （module doc「ESP32の`(sid, id)`の採番」）。上限値に達していれば`None`を返す。
+    pub fn next_envelope(&mut self, ts_ms: u64) -> Option<Envelope> {
+        if self.next_id == u32::MAX {
+            log::error!("pi_tx_id_exhausted sid={}", self.sid);
+            return None;
+        }
+        let id = self.next_id;
+        self.next_id += 1;
+        Some(Envelope {
+            v: limits::PROTOCOL_VERSION,
+            sid: self.sid,
+            id,
+            ts_ms,
+        })
     }
 
     /// 締切を過ぎた（＝ACKが届かないまま次の送出時刻に達した）ときに呼ぶ。
@@ -461,7 +463,7 @@ impl BootSession {
                                 // （期限を延ばさない。`attempt`も動かさない）。
                             }
                             Phase::Established | Phase::Terminated(_) => {
-                                // `on_bytes`の先頭で弾かれるため到達しない。
+                                // `on_ack`の先頭で弾かれるため到達しない。
                             }
                         }
                     }
@@ -507,7 +509,8 @@ impl BootSession {
         // `sid_from_uptime`へ縮退する。
         let previous_sid = self.sid;
         self.sid = crate::generate_sid(health);
-        self.id = 1;
+        self.id = BOOT_ID;
+        self.next_id = BOOT_ID + 1;
         self.phase = Phase::Normal { attempt: 0 };
         log::info!(
             "boot_sid_reselected previous_sid={previous_sid} sid={} count={}",
@@ -546,39 +549,13 @@ impl BootSession {
         );
         match encode_line(&frame) {
             Ok(line) => {
-                // §2は行の分断を禁じている。この保証は、esp-idf-hal
-                // `UartDriver::write`が呼ぶ`uart_write_bytes`→`uart_tx_all`が
-                // `portMAX_DELAY`でblockし、1回の呼び出しで渡した全byteを
-                // tx ring bufferへ積み終える（wireへ送り終えるまでではない）か
-                // （成功時は常に`Ok(bytes.len())`）、入力検証エラーで即座に
-                // 失敗するかのどちらかであること（`esp_driver_uart/src/uart.c`
-                // 1562〜1631行で確認済み。部分書き込みで戻る経路が無い）に依る。
-                // **このloopが部分書き込みを繰り返して完了させているわけではない。**
-                // `Ok(0)`／`Err`は現状の実装では実質到達しないが、型として
-                // 有り得る以上、到達したら送出を諦める（次の再送に委ねる。
-                // 行の途中で戻り値を無視して送り続けることはしない）。
-                let bytes = line.as_bytes();
-                let mut written = 0;
-                while written < bytes.len() {
-                    match uart.write(&bytes[written..]) {
-                        Ok(0) => {
-                            // これ以上進まない。送出を諦める（次の再送に委ねる）。
-                            log::error!("boot_uart_write_stalled written={written}");
-                            break;
-                        }
-                        Ok(n) => written += n,
-                        Err(err) => {
-                            log::error!("boot_uart_write_failed error={err} written={written}");
-                            break;
-                        }
-                    }
-                }
-                if written == bytes.len() {
+                if crate::pi_link::write_line(uart, line.as_bytes()) {
                     log::info!(
-                        "boot_tx sid={} id={} ts_ms={ts_ms} phase={:?} bytes={written}",
+                        "boot_tx sid={} id={} ts_ms={ts_ms} phase={:?} bytes={}",
                         self.sid,
                         self.id,
-                        self.phase
+                        self.phase,
+                        line.len()
                     );
                 }
             }

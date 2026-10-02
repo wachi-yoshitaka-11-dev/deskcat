@@ -175,8 +175,8 @@ pub const PI_PROTOCOL_UART_BAUDRATE_HZ: u32 = 115_200;
 /// `uart_read_bytes`（1662〜1701行）内部の`xRingbufferReceiveUpTo`は、
 /// その1 byteが来た時点で満たされ即座に戻る。同じ`uart_read_bytes`を
 /// buffer全長で呼んだ場合は、要求量を満たすかtimeoutまで戻らない
-/// （hal側がこの2段構えを採る理由）ため、通常は小さい。**ただし`on_bytes`の
-/// 処理中（`reselect_sid`のNVS操作を含む）はこの`read`を呼ばないため、
+/// （hal側がこの2段構えを採る理由）ため、通常は小さい。**ただし`crate::pi_link::PiLink::on_bytes`の
+/// 処理中（応答の書き込みと、`reselect_sid`のNVS操作を含む）はこの`read`を呼ばないため、
 /// その間はring bufferが貯まり続ける。**このNVS操作の所要時間は未確認
 /// （下記）。
 ///
@@ -196,12 +196,8 @@ pub const PI_PROTOCOL_UART_BAUDRATE_HZ: u32 = 115_200;
 /// **この値は理論値ではなく安全側の見込みである。**`boot`のACK（§6の例で約115 byte）に
 /// 続けて`get_status`等の別messageが即座に届く場合（`coordinator::handle_boot`が
 /// ACK後に同期送信する。`crates/deskcat-serial/src/coordinator.rs`参照）を想定し、
-/// hardware FIFO（128 byte）の4倍を確保して複数行分の余裕を見た。**`BootSession`は
-/// `boot`のACK以外を読み捨てる（`Established`後は`on_bytes`の冒頭で即return する。
-/// `crate::boot_session::BootSession::on_bytes`参照）ため、Piが送るこれらの
-/// messageは処理されずに読み捨てられるだけであり、この余裕（4倍）は「処理する
-/// ために必要」ではなく「読み捨てる前に受信bufferだけで溢れないため」の
-/// 根拠である。
+/// hardware FIFO（128 byte）の4倍を確保して複数行分の余裕を見た。この余裕（4倍）は、
+/// main loopが次に`read`を呼ぶまで、受信bufferだけで溢れないための根拠である。
 /// **このring bufferが実機で溢れないことはbuildでは示せない。**実機確認の項目とする
 /// （`console.rs`のmodule doc参照）。**`generate_sid`が行うNVSへの書き込み・
 /// 消去（flash操作）の間、UART受信interruptが遅延・停止しうるかどうかは

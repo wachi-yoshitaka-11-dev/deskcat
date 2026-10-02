@@ -72,7 +72,7 @@ Issue本文・コメントは2026-09-27 JSTに再取得した。以後の実施�
 **#13の条件6（描画更新中の通信とwatchdog）は未達のまま残す。**
 #487で`bringup-display-13`のbuildも描画の間にPi linkの受信とheartbeatを回すようになったが、実機での確認はまだ無い。
 [#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)の実sessionと、#13自身が持つ
-同時動作の実機確認が要る（同時動作のfirmware変更は#487で入れた。入れたのは描画の間の`boot`→ACKの受信とheartbeatであり、`hello`等の処理は#487の残りの作業である）。これらの完了を上の条件1〜5の開始へ逆流させない。
+同時動作の実機確認が要る（同時動作のfirmware変更は#487で入れた。入れたのは描画の間のPi linkの受信（`boot`→ACKと、`hello`／`ping`／`get_status`への応答）とheartbeatである）。これらの完了を上の条件1〜5の開始へ逆流させない。
 
 ### 依存図の変更と各辺の根拠
 

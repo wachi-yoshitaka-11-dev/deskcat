@@ -150,6 +150,7 @@ ESP32以外のマイコンを扱うため念のため`grep -i`で当てたが、
   `handle_get_status`（§5.6）と `handle_ping`（§5.7）は `&self` を取り、現在の `sid` と照合して
   `stale_session` を返すかどうかを決めるだけで、状態を変えない。
   `main.rs` の `demonstrate_pi_session` が3つとも実際に動かしている
+  （2026-10-02 追記：#487 の PR B2 で `demonstrate_pi_session` を削除した。今は `crate::pi_link` が Pi link の受信から3つとも呼ぶ。この決定の判断は変わらない）
 - host 側の `crates/deskcat-serial/src/peer.rs` は ESP32 側の session 遷移、duplicate 履歴、`stale_session` 判定を持つ
 - **`crates/deskcat-serial/src/session.rs` は、transport 層の断と再接続を状態機械として持つ。**
   `ConnectionState`（`Disconnected`／`Connected`／`Stopped`）、`note_disconnected`、
