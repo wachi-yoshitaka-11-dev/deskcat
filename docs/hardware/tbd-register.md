@@ -97,6 +97,8 @@
 接続許可とfirmware実行の承認も別である。実行には[電源文書](power-budget.md)の
 `DISP-01`追加接続手順の条件(1)〜(7)・停止条件を用い、人間の当日の判断を得る。
 
+2026-10-01の段階B-2（[experiment-log.md](experiment-log.md)の`EXP-019`）は、この行を解いていない。
+
 ### HW-TBD-025
 
 | 項目 | 現在の判定 |
@@ -113,6 +115,8 @@
 無条件の保証値ではない。ILI9341ロジック単体負荷を前提とする下限の再導出条件は
 [電源文書](power-budget.md#段階b-2の測定)、公開値不在の確認とmodule別の(b)判定は
 [元の行全文](tbd-register-history.md#hw-tbd-025)に残す。
+
+2026-10-01の段階B-2（[experiment-log.md](experiment-log.md)の`EXP-019`）は、この行を解いていない。
 
 ## 対応Issue列
 
