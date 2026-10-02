@@ -59,7 +59,7 @@ Protocol channelから送信するすべてのbyteは、有効にframe化され�
 
 - (i) decodeで拒否した行（未対応のtype、payloadやenvelopeの不正）には、§8の相関ACKを返さない。`deskcat_protocol`の受信は、oversize以外の拒否した行の`(sid, id)`を復元しないためである。oversizeの行で`(sid, id)`と`hello`／`ping`／`get_status`のtypeを復元できた場合は、`line_too_long`の拒否ACKを返す。display／motionのcommand（§5.2〜§5.5）は`deskcat_protocol`のmessageに無く、この(i)に当たる。そのため§7の`hardware_unavailable`も返さない。
 - (ii) §7のParser counterによる区別を`log`でだけ行う（UART0のdebug logで見える）。`ProtocolCounters`は増やさず、`get_status`へ返す`status`のcounterは0のままである。
-- (iii) `ping`／`get_status`、`port_reopen`／`resync`の`hello`、拒否した`hello`の処理済みの結果を保持せず、同じ`(sid, id)`の再送をもう一度処理する（§8の手順8・9）。§8.1／§8.2の流量制限と、`hello`の拒否ACKの保留table（§5.1）も実装していない。
+- (iii) `ping`／`get_status`、`port_reopen`／`resync`の`hello`、拒否した`hello`の処理済みの結果を保持せず、同じ`(sid, id)`の再送をもう一度処理する（§8の手順8・9）。§8.1／§8.2の流量制限、`hello`の拒否ACKの保留table（§5.1）、§5.1の遷移の上限とcooldown（`PROTO-TBD-012`）も実装していない。このため`hello`による`boot`の再開（§4.1）は、firmwareの中では遷移の回数で抑えられない。
 
 ## 3. Envelope
 

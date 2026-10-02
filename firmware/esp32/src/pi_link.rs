@@ -35,7 +35,8 @@
 //!
 //! - `ping`／`get_status`、`port_reopen`／`resync`の`hello`、拒否した`hello`の処理済みの結果を保持しない
 //!   （§8の手順8・9。保持件数は`PROTO-TBD-005`）。同じ`(sid, id)`の再送は、もう一度処理する。
-//! - §8.1／§8.2の流量制限と、`hello`の拒否ACKの保留table（`PROTO-TBD-012`）。
+//! - §8.1／§8.2の流量制限、`hello`の拒否ACKの保留table、§5.1の遷移の上限とcooldown（`PROTO-TBD-012`）。
+//!   影響は`docs/protocol/esp32-pi-protocol.md`§2の既知の逸脱(iii)。
 //! - `ProtocolCounters`を増やすこと（`health.rs`のmodule doc）。分類はlogだけであり、`get_status`へ返す
 //!   `status`のcounterは0のままである。
 //!
