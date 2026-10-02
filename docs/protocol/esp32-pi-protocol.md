@@ -64,7 +64,7 @@ Protocol channelから送信するすべてのbyteは、有効にframe化され�
 ## 3. Envelope
 
 ```json
-{"v":1,"sid":41207,"id":1234,"ts_ms":456789,"type":"head_touched","payload":{}}
+{"v":1,"sid":41207,"id":1234,"ts_ms":456789,"type":"head_touched","payload":{"duration_ms":720}}
 ```
 
 | Field | Type | 必須 | 意味 |
