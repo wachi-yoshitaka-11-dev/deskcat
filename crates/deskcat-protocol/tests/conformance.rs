@@ -68,16 +68,16 @@ fn invalid_doc() -> InvalidDoc {
 
 /// fixtureが空でも成功してしまうtestにしない。
 ///
-/// 件数の下限は、#9の受け入れ条件が要求するcase群を数えたものである。
-/// #10と#12がcaseを追加するため上限は設けない。
+/// 件数の下限は、#9の受け入れ条件が要求するcase群に、#527が足したcaseを加えて数えたものである。
+/// #12などがcaseを追加するため上限は設けない。
 #[test]
 fn fixtures_are_not_empty() {
     assert!(
-        valid_doc().cases.len() >= 15,
+        valid_doc().cases.len() >= 30,
         "valid fixture cases were removed"
     );
     assert!(
-        invalid_doc().cases.len() >= 28,
+        invalid_doc().cases.len() >= 38,
         "invalid fixture cases were removed"
     );
 }

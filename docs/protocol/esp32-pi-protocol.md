@@ -57,14 +57,14 @@ Protocol channelから送信するすべてのbyteは、有効にframe化され�
 
 **もう3つ、Pi linkを持つbuildの既知の逸脱を記録する**（#446のPR Bから。#487のPR B2で範囲を改めた）。受信の振り分けは`firmware/esp32/src/pi_link.rs`のmodule docが持つ。
 
-- (i) decodeで拒否した行（未対応のtype、payloadやenvelopeの不正）には、§8の相関ACKを返さない。`deskcat_protocol`の受信は、oversize以外の拒否した行の`(sid, id)`を復元しないためである。oversizeの行で`(sid, id)`と`hello`／`ping`／`get_status`のtypeを復元できた場合は、`line_too_long`の拒否ACKを返す。display／motionのcommand（§5.2〜§5.5）は`deskcat_protocol`のmessageに無く、この(i)に当たる。そのため§7の`hardware_unavailable`も返さない。
+- (i) decodeで拒否した行（未対応のtype、payloadやenvelopeの不正）には、§8の相関ACKを返さない。`deskcat_protocol`の受信は、oversize以外の拒否した行の`(sid, id)`を復元しないためである。oversizeの行で`(sid, id)`と`hello`／`ping`／`get_status`のtypeを復元できた場合は、`line_too_long`の拒否ACKを返す。display／motionのcommand（§5.2〜§5.5）にも相関ACKを返さない。`play_motion`と`show_choices`は`deskcat_protocol`のmessageに無く、この(i)に当たる。`set_expression`と`show_text`はdecodeを通るが、firmwareはまだ処理せず`log`で分類するだけである（`pi_link.rs`の`pi_rx_unhandled_frame`）。そのため§7の`hardware_unavailable`も返さない。
 - (ii) §7のParser counterによる区別を`log`でだけ行う（UART0のdebug logで見える）。`ProtocolCounters`は増やさず、`get_status`へ返す`status`のcounterは0のままである。
 - (iii) `ping`／`get_status`、`port_reopen`／`resync`の`hello`、拒否した`hello`の処理済みの結果を保持せず、同じ`(sid, id)`の再送をもう一度処理する（§8の手順8・9）。§8.1／§8.2の流量制限、`hello`の拒否ACKの保留table（§5.1）、§5.1の遷移の上限とcooldown（`PROTO-TBD-012`）も実装していない。このため`hello`による`boot`の再開（§4.1）は、firmwareの中では遷移の回数で抑えられない。
 
 ## 3. Envelope
 
 ```json
-{"v":1,"sid":41207,"id":1234,"ts_ms":456789,"type":"head_touched","payload":{}}
+{"v":1,"sid":41207,"id":1234,"ts_ms":456789,"type":"head_touched","payload":{"duration_ms":720}}
 ```
 
 | Field | Type | 必須 | 意味 |
@@ -107,6 +107,16 @@ Integer widthは、共有test fixture（§12.1）とあわせて次のとおり�
 | `sid` | `u32` | session ID |
 | `id` | `u32` | 同一session内のmessage ID |
 | `ts_ms` | `u64` | uptime ms。`u32`は約49.7日でwrapし、長時間動作で`ts_ms`の単調性が崩れる |
+
+§4.2〜§4.5、§5.2、§5.4のtype固有payloadのfieldは次のとおりとする（[Issue #527](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/527)）。必須fieldの欠落と、表の型に収まらない値は、payloadのschemaを満たさないため`invalid_payload`で拒否する。省略可のfieldの`null`は、省略と同じに扱う。
+
+| type固有payloadのfield | 型 | 必須 |
+|---|---|---|
+| `set_expression.name` | string。§5.2の初期のexpression名のいずれか | 必須 |
+| `set_expression.transition_ms`、`show_text.duration_ms`、`head_touched.duration_ms`、`lifted.duration_ms` | `u32`（ms） | 必須 |
+| `show_text.text` | UTF-8 string。上限は§5.4、制御文字は§7 | 必須 |
+| `environment.temperature_c`、`environment.humidity_pct`、`environment.pressure_hpa` | 有限の32-bit浮動小数点数 | 省略可 |
+| `head_touched.strength`、`tapped.magnitude_g` | 持たない。受けた場合は上の未知の追加fieldとして無視する | — |
 
 **送信側が`id`の上限に達したときの動作を次のとおり確定する**（`PROTO-TBD-003`）。受信側の判定ではなく送信側の運用である。
 
@@ -789,6 +799,8 @@ Firmwareは次に上限を設ける。
 - Control character
 - Line countまたはlayout処理量
 
+`text`のUTF-8 byte長の上限は884 byte（暫定）とする。§2の1024 byteの行に、envelopeの全integerを宣言した幅の最大値に、`duration_ms`を`u32`の最大値にした`show_text`が、escapeが起きない文字で収まる最大である。`"`や`\`、および`\uXXXX`で書いた文字はJSONで広がるため、これらを含む`text`は上限内でも`line_too_long`になりうる。
+
 Textとface描画の優先順位はUI state machineで定義する。
 
 ### 5.5 `show_choices`
@@ -916,6 +928,8 @@ Parser counterでは、invalid UTF-8、invalid JSON、invalid envelope、unknown
 | 改行を含むlineが最大長を超過 | `line_too_long`（送出条件は上記の個別規定に従う） |
 
 **string byte長の超過を`out_of_range`とするのは、この節で新たに決めた分類である。**§5.3は「値そのものが許容範囲外」を`out_of_range`としているが、§5.4のtext byte長のように、上限の存在だけを定めて超過時のcodeを書いていない箇所がある。`invalid_payload`（型と必須fieldの問題）と`out_of_range`（型は正しいが値が上限を超える）を分けることで、送信側は「payloadを直す」のか「値を縮める」のかを区別できる。分けない選択もありえたため、変更する場合は§12.1のfixtureも同時に変える。
+
+**`show_text`の`text`は制御文字を1文字も含めない。含む場合は`out_of_range`とする。**制御文字はUnicodeの一般カテゴリ`Cc`（U+0000〜U+001F、U+007F〜U+009F）であり、改行とtabも含む。§5.4は制御文字を、UTF-8 byte長やdisplay durationと並べて「上限を設ける」対象に挙げるが、上限の値は書いていない。**上限を0とした（全部拒否する）のは[Issue #527](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/527)の選択である。**理由は、LCDで制御文字をどう描くかが決まっておらず、改行の扱いは行数とlayoutの上限（`PROTO-TBD-007`）とともに決まるためである。分類は、上限のある値の範囲外として上の`out_of_range`に当てはめた
 
 判定は§8の手順どおりこの表の上から順に行う。**先に落ちたものが返るcodeを決める。**たとえば未対応`v`と未知`type`を同時に持つlineは`unsupported_version`であり、`unknown_type`ではない（§5.1の手順2が手順3より先である）。
 
@@ -1186,6 +1200,8 @@ serial linkが切れて繋がり直しただけで、ESP32 processが再起動�
 - Duplicate command
 - 同じ`(sid, id)`によるretry
 
+type固有payloadの値について、共有fixtureが固定するのは§8の手順7で受理・拒否する範囲である。手順7が持たない上限（§5.2の`transition_ms`、§5.4の`duration_ms`と、行数またはlayout処理量）は手順10の処理で適用する。
+
 Session境界のfixtureは、遷移の有無で期待結果が逆になる。setupと期待値を分けて記述する。
 
 | Fixture setup | 期待する結果 |
@@ -1283,7 +1299,7 @@ fixtureは最低限、次の5群をすべて含む。上の一覧と表がその
 
 | 群 | 対象 | 状態 |
 |---|---|---|
-| Schema | envelope、type固有payload、上限の境界、未知version／type | **作成済み**（#9） |
+| Schema | envelope、type固有payload、上限の境界、未知version／type | **作成済み**（#9。`set_expression`、`show_text`、`head_touched`、`tapped`、`lifted`、`environment`は#527） |
 | Framing／parse | 分割受信、CRLF、invalid UTF-8／JSON、line長境界 | **作成済み。**line長境界・CRLF・invalid JSONは#9、byte単位の分割受信とinvalid UTF-8は#10 |
 | Session判定 | 遷移の成否、`stale_session`、retired session、`hello`／`boot`再送、`sid`衝突時の選び直し、retired保持期間、方向が逆のsession確立messageの拒否 | 未作成（#12） |
 | Duplicate replay | 同一`(sid, id)`のretry、保持結果の返却、非idempotent動作の二重実行防止 | 未作成（#12） |
@@ -1351,6 +1367,7 @@ Framing／parse層について、**host workspaceのRust実装**がfixtureに合
 | 2026-09-29 | Draft 2 uart migration | [Issue #487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)。firmwareの`pi-protocol-mode`をUART0からUART1（GPIO13／GPIO14）へ移し、UART0をdebug log専用にしたことに合わせて、§2のUART0共有の既知の例外2つ（debug logを止めるより前の起動時出力、panic handlerの出力）を、移行後の例外1つ（UART1のdriverの初期化時のglitchと、未確認のROM／bootloader・panic handlerの出力）へ置き換えた。改行を含まない不正byte列が後続frameへ連結するcaseが未検証であることは残した。Baud（115200、`Candidate`）とUART framing（8N1、`Candidate`）は変えていない。あわせて、§4.1の「`status: ok`のACK済みの`boot`を、新しいPi `sid`の`hello`で再送する理由」の説明で、firmwareへの実装先を[Issue #12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)の残作業から[Issue #487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)の残りの作業へ移した（`hello`の処理を受信の経路へつなぐ変更と一緒に行うため）。上の`Draft 2 boot resend on new pi session`の行は、その時点の記録として残す |
 | 2026-09-30 | Draft 2 integrated build | [Issue #487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)のPR B1。firmwareの`pi-protocol-mode` featureを廃止し、Pi linkを製品build（既定build）へ入れた。§2の記述を「Pi linkを持つbuild（`bench-servo-test-17`以外のすべて）」へ改めた。**wire formatとprotocolの規則は変えていない** |
 | 2026-10-02 | Draft 2 boot resume by hello | [Issue #487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)のPR B2。§4.1と§5.1で食い違っていた`boot`の再送の再開を、§4.1の「`hello`による再開」に1つにまとめ、§5.1の手順5と「現在sessionで未処理のsession確立message」はそこを参照する形にした。(1) recovery budgetを使い切った後の再開を「してよい」から「する」へ改めた。(2) 再開を起こす`hello`を、`status: ok`のACKの後は新しいPi `sid`の`hello`、budgetを使い切った後は受理した`hello`（同じPi `sid`の`port_reopen`／`resync`を含む）とした。(3) `rate_limited`のbudgetを使い切った停止も再開の対象とした。(4) 回数の単位を「Pi sessionにつき1回」に揃えた。(5) 終端として拒否された`boot`の「Piの介入を待つ」を、processの再起動または運用者の明示的なsession reset（§3.1）に改めた。§2の既知の逸脱を、`firmware/esp32/src/pi_link.rs`がPi→ESP32方向のrequestを処理するようになった後の範囲へ改めた。**wire formatは変更していない** |
+| 2026-10-02 | Draft 2 event and display types | [Issue #527](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/527)。§4.2〜§4.5の`head_touched`、`tapped`、`lifted`、`environment`と、§5.2の`set_expression`、§5.4の`show_text`を、`crates/deskcat-protocol`の型と§12.1のSchema群のfixtureへ入れた。仕様の文は次を足した: §3にtype固有payloadのfieldの型と必須（省略可のfieldの`null`は省略と同じ）、§5.4に`text`のbyte上限（884 byte、暫定）、§7に`text`の制御文字の規則、§12に共有fixtureが固定する範囲と、displayとfirmwareの上限を適用する手順。§2の既知の逸脱(i)を、`set_expression`と`show_text`がdecodeを通る事実に合わせた。`head_touched.strength`と`tapped.magnitude_g`は型に持たない（受けた場合は§3により無視する）。§13のTBD行は外していない。`play_motion`、§4.7の完了・fault event、`show_choices`、`protocol_fault`は入れていない |
 
 ### Draft schemaの互換性
 

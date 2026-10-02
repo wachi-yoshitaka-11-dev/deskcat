@@ -85,3 +85,14 @@ pub const MAX_DETAIL_BYTES: usize = 128;
 /// 列挙値そのものは`PROTO-TBD-006`（最終status field）と`PROTO-TBD-008`（motion名）で
 /// 確定するため、ここでは長さだけを縛る。
 pub const MAX_STATE_NAME_BYTES: usize = 32;
+
+/// `show_text.text`のbyte上限。
+///
+/// **行長から計算した値であり、表示の都合で決めた値ではない。**escapeが起きない文字で
+/// `text`をこの長さまで詰め、envelopeの全integerを宣言した幅の最大値に、`duration_ms`を
+/// `u32`の最大値にした行が、改行を含めてちょうど[`MAX_LINE_BYTES`]になる。1 byte増やすと収まらないことを
+/// `tests/limits.rs`が検査する。
+///
+/// §5.4が求めるLCDのlayoutとmemoryに基づく上限は`PROTO-TBD-007`（layoutとmemoryの測定）
+/// であり、この値より小さくなりうる。**この値をlayout上の上限として扱わない。**
+pub const MAX_TEXT_BYTES: usize = 884;

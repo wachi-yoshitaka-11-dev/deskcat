@@ -13,6 +13,8 @@ decode／encode、および共有conformance fixtureを提供する。
 
 - envelope（§3）と、Issue #4が承認した最小message type
   （`boot`、`hello`、`ping`、`get_status`、`status`、`ack`）
+- Issue #527で足したmessage type
+  （`set_expression`、`show_text`、`head_touched`、`tapped`、`lifted`、`environment`）
 - error code（§7）と、それを計上する`status`のcounterへの対応付け
 - 1 lineのdecodeとencode、およびその検証順序
 - byte列からlineを組み立てる上限付きreceiver（§8手順1〜6、Issue #10）
@@ -24,8 +26,9 @@ decode／encode、および共有conformance fixtureを提供する。
 - session state、duplicate履歴、受理budget、遷移cooldown（Issue #12）
 - hardwareに依存する値と処理
 
-`set_expression`、`play_motion`、`show_text`、`show_choices`、sensor eventの型は起こしていない。
-上限値が`PROTO-TBD-007`／`008`／`009`／`014`で未確定であり、値を推測しないためである。
+`play_motion`、§4.7の完了・fault event、`show_choices`、`protocol_fault`の型は起こしていない。
+仕様が意味を決めていないfield（`head_touched.strength`、`tapped.magnitude_g`）も型に持たない。
+理由は`src/message.rs`のmodule docに置き、ここには複製しない。
 
 ## 検証順序
 

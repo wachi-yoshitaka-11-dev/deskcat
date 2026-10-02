@@ -12,7 +12,9 @@ use serde_json::value::RawValue;
 use crate::envelope::{Envelope, Frame};
 use crate::error::{DecodeError, ErrorCode};
 use crate::limits;
-use crate::message::{Ack, Boot, Hello, Message, Status};
+use crate::message::{
+    Ack, Boot, Environment, HeadTouched, Hello, Lifted, Message, SetExpression, ShowText, Status,
+};
 
 /// envelopeだけを解釈し、payloadは未解釈のまま保持する中間表現。
 ///
@@ -155,6 +157,12 @@ fn decode_payload(type_name: &str, payload: &RawValue) -> Result<Message, Decode
         "get_status" => parse_empty(payload).map(|()| Message::GetStatus),
         "status" => parse::<Status>(payload).map(|status| Message::Status(Box::new(status))),
         "ack" => parse::<Ack>(payload).map(Message::Ack),
+        "set_expression" => parse::<SetExpression>(payload).map(Message::SetExpression),
+        "show_text" => parse::<ShowText>(payload).map(Message::ShowText),
+        "head_touched" => parse::<HeadTouched>(payload).map(Message::HeadTouched),
+        "tapped" => parse_empty(payload).map(|()| Message::Tapped),
+        "lifted" => parse::<Lifted>(payload).map(Message::Lifted),
+        "environment" => parse::<Environment>(payload).map(Message::Environment),
         unknown => Err(DecodeError::new(
             ErrorCode::UnknownType,
             format!("unknown message type `{unknown}`"),
@@ -243,9 +251,14 @@ fn encode_payload(message: &Message) -> Result<String, DecodeError> {
     let result = match message {
         Message::Boot(boot) => serde_json::to_string(boot),
         Message::Hello(hello) => serde_json::to_string(hello),
-        Message::Ping | Message::GetStatus => Ok("{}".to_owned()),
+        Message::Ping | Message::GetStatus | Message::Tapped => Ok("{}".to_owned()),
         Message::Status(status) => serde_json::to_string(status),
         Message::Ack(ack) => serde_json::to_string(ack),
+        Message::SetExpression(set_expression) => serde_json::to_string(set_expression),
+        Message::ShowText(show_text) => serde_json::to_string(show_text),
+        Message::HeadTouched(head_touched) => serde_json::to_string(head_touched),
+        Message::Lifted(lifted) => serde_json::to_string(lifted),
+        Message::Environment(environment) => serde_json::to_string(environment),
     };
     result.map_err(|err| DecodeError::new(ErrorCode::InvalidPayload, err.to_string()))
 }
