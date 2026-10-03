@@ -23,10 +23,8 @@
 //! どれも最終的な拒否である。記録しないと、再送のたびに`admit`が走り、rejection counterを
 //! 二重に数える。
 //!
-//! **retryableな拒否を記録しない分岐は、今は無い。**Protocol §8は、保留した（retryableな）
-//! 拒否を手順8でreplayしないと定めている。今の`admit`はretryableな拒否を返さない
-//! （`rate_limited`と`busy`は[`crate::Limiter`]の範囲外である）。それを足すときは、
-//! 記録しない分岐をここへ足す。
+//! **記録しない例外は、`hello`／`boot`の`rate_limited`だけである**（Protocol §8）。
+//! motionは通常commandなので、拒否はすべて記録する。
 //!
 //! # 所有者との分担
 //!
@@ -39,7 +37,8 @@
 //!
 //! `now_ms`は単調に増加する値を渡す（[`DuplicateHistory::record`]の契約）。firmwareでは
 //! `std::time::Instant`（`CLOCK_MONOTONIC`）から取る前提である（firmware側の呼び出しはまだ無い）。
-//! **契約が破られて時刻が戻った場合は、記録した結果を返す（Replay）。**変わるのは、
+//! **契約が破られて時刻が戻った場合、entryが履歴に残っている間は、記録した結果を返す
+//! （Replay）。**件数の上限で追い出された後は`Expired`になる。変わるのは、
 //! `duplicate_expired`で拒否する代わりに記録した結果を返すことだけであり、どちらでも
 //! `admit`は呼ばれない。
 //!

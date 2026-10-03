@@ -25,6 +25,7 @@
 //!
 //! - serial deviceのopen、read／write、切断と再接続（Issue #11）
 //! - session state、受理budget、遷移cooldown（Issue #12）
+//! - hardwareに依存する値と処理
 //!
 //! duplicate履歴は、当初Issue #12が`crates/deskcat-serial`（host専用）に作り、このcrateの
 //! 範囲外としていた。Issue #19で、host（`deskcat-serial`）とfirmware（`deskcat-servo`経由）が
@@ -32,7 +33,6 @@
 //! 呼び出し側から受け取る形にしていたため、`PROTO-TBD-005`の値を先取りせずに移せる。
 //! **履歴をいつ照会し、いつ破棄するか（session state）は、引き続き所有者（`deskcat-serial`の
 //! `PeerSession`、firmwareのsession）が持つ。**
-//! - hardwareに依存する値と処理
 //!
 //! # 例
 //!

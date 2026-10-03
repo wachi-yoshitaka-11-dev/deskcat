@@ -39,13 +39,14 @@
 //!   うち、この層まで）。**このcrateは履歴を実装しない。**`deskcat-protocol`の`DuplicateHistory`を
 //!   使う側である
 //!
-//! duplicate suppressionは、PR #251のときにはこのcrateの範囲外とし、「`PROTO-TBD-005`
-//! （履歴の保持件数・期間）が未確定なうちは、共通の履歴型の抽出に着手しない」としていた。
-//! 理由は値を先取りしないことだった。Issue #12で`crates/deskcat-serial`の`DuplicateHistory`が
-//! 保持件数と保持期間を`DuplicatePolicy`として呼び出し側から受け取る形になり、その理由は
-//! 抽出しても守れるようになった。そこでIssue #19で、`DuplicateHistory`を`deskcat-protocol`へ
-//! 移してhostとfirmwareで共用し、このcrateはそれを使う層だけを持つ。**このcrateへ3つ目の
-//! 履歴の実装を作らない**ことは変わらない
+//! duplicate suppressionは、PR #251のときにはこのcrateの範囲外とし、共通の履歴型を
+//! `deskcat-protocol`へ抽出する後続について「`PROTO-TBD-005` が未確定なうちは着手しない。」
+//! としていた。理由は値を先取りしないことだった。Issue #12で`crates/deskcat-serial`の
+//! `DuplicateHistory`が保持件数と保持期間を`DuplicatePolicy`として呼び出し側から受け取る形になり、
+//! その理由は抽出しても守れるようになった。そこでIssue #19で、`DuplicateHistory`を
+//! `deskcat-protocol`へ、hostとfirmwareで共用できるように移した。firmware側の呼び出しは、
+//! `play_motion`の型が決まった後である。このcrateはそれを使う層だけを持つ。**このcrateへ
+//! 3つ目の履歴の実装を作らない**ことは変わらない
 //!
 //! 含まないもの:
 //!

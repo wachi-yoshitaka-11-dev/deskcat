@@ -261,7 +261,7 @@ fn distinct_ids_are_each_admitted_once() {
     assert_eq!(owner.admit_calls, 3);
 }
 
-/// 10. 時刻が記録より前に戻っても、同じ`id`の再送で`admit`は呼ばれない（Replayになる）。
+/// 9. 時刻が記録より前に戻っても、同じ`id`の再送で`admit`は呼ばれない（Replayになる）。
 ///
 /// **単調な時刻を渡す契約に依る**（`DuplicateHistory::record`のdoc）。契約が破られて時刻が
 /// 戻ったときに変わるのは、`duplicate_expired`で拒否する代わりに記録した結果を返すことだけで、

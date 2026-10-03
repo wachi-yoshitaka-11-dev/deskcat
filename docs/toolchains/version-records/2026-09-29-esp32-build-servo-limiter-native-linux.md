@@ -17,9 +17,11 @@ format、lint、buildが通ること（[Issue #19](https://github.com/wachi-yosh
 
 **2026-10-03の再検証で、構成が変わった。**`pi-protocol-mode`は[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)
 （PR B1）で廃止され、Pi linkは既定構成に入った。そのため(2)は既定と`bringup-display-13`の2構成である。
-2026-09-30までの実行は、`pi-protocol-mode`を含む3構成だった。あわせて、Issue #19の段2で
+2026-09-30までの実行は、`pi-protocol-mode`を含む3構成だった。3構成（`pi-protocol-mode`を含む）の結果は、
+developのcommit 710c67f（PR #513のsquash merge）の時点のこの記録にある。2026-10-03の再検証は、
+`pi-protocol-mode`の廃止後の2構成である。あわせて、Issue #19の段2で
 `DuplicateHistory`を`crates/deskcat-serial`から`crates/deskcat-protocol`へ移し、`crates/deskcat-servo`に
-`MotionDedup`を足したtreeで、(1)をやり直した。
+`MotionDedup`を足したtreeで、(0)〜(2)をやり直した。
 
 ## 記録
 
@@ -30,8 +32,7 @@ Machine profile: ESP32 Build
 Operator role: AI agent作業（build-onlyのみ。flash・monitor・USBシリアルポートは開いていない）
 Repository commit: 0bb0d6cfc962d774e5c609885685680b96a43c24（#19の段2の作業branchのcommit。
   親は origin/develop 43189b83f66042b22c3804dccf4e20fb3a1258fb）。
-  **このcommitより後に同branchへ入れるcommitは、文書（この記録、Version Recordsの一覧、
-  `docs/toolchains/verified-commands.md`）だけを変える。code、manifest、lockfileは変えない。**squash mergeの後はこのSHAがdevelopから辿れなくなるため、
+  **このcommitより後に同branchへ入れるcommitは、動作を変えない（doc commentを除き、code、manifest、lockfileは変えない）。**squash mergeの後はこのSHAがdevelopから辿れなくなるため、
   そのときはPull Requestのcommit一覧から辿る
 Working tree clean: yes（`git archive 0bb0d6c`でscratchpadへ展開した未改変コピーを使用。
   worktree・main checkoutいずれのgit stateも変更していない）
@@ -105,6 +106,7 @@ Actual result:
       （unit 58、conformance 11、error_codes 3、framing 5、limits 12）、deskcat-servo 41 tests
       （dedup 9、trajectory 32、unit 0）、doctest 4（deskcat-protocol 3、deskcat-servo 1）。失敗 0
   (1) cargo +esp-1.95.0.0 clippy（2 crate、--all-targets）            成功。warning 0件
+      （最終有効な検証とは別に、doc commentだけの直しの後に、esp-1.95.0.0のclippyを2026-10-03T10:36 JSTにworktreeで回し直した。warning 0件）
   (2) cargo fmt --all -- --check                                     成功。差分なし
   (2) cargo clippy --all-targets --locked -- -D warnings（既定構成）  成功。warning 0件
   (2) cargo build --locked（既定構成）                                成功
