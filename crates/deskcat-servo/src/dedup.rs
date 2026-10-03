@@ -14,16 +14,16 @@
 //! 「Relativeまたは名前付きの物理motionにはduplicate suppressionが必要である」である。
 //!
 //! **wireの`play_motion`の受信と振り分けは含まない。**`play_motion`の型が
-//! `deskcat-protocol`にまだ無い（上限値が`PROTO-TBD-007`／`008`／`009`／`014`で未確定）。
+//! `deskcat-protocol`にまだ無い（理由は`deskcat-protocol`の`message`のmodule docにある）。
 //! firmwareのsessionへの組み込みは、その型が決まった後に行う。
+//!
+//! `Expired`の扱いは[`DuplicateHistory`]のdocとProtocol §9による（受け入れ前の`TBD`が残っている）。
 //!
 //! # 拒否も記録する
 //!
-//! [`crate::Limiter::admit`]の拒否（`UnknownMotion`、`NonFiniteTarget`、`TargetOutOfHardRange`）は、
-//! どれも最終的な拒否である。記録しないと、再送のたびに`admit`が走り、rejection counterを
-//! 二重に数える。
+//! 記録しないと、再送のたびに`admit`が走り、rejection counterを二重に数える。
 //!
-//! `Limiter::admit`が返す拒否は、どれも最終的な拒否であり、記録する。§8が記録しないと
+//! [`crate::Limiter::admit`]が返す拒否（`UnknownMotion`、`NonFiniteTarget`、`TargetOutOfHardRange`）は、どれも最終的な拒否であり、記録する。§8が記録しないと
 //! 定めるのは`hello`／`boot`の`rate_limited`だけで（手順9）、motionはそれに当たらない。
 //! `busy`を記録するかは§8に定めが無く、ここでは扱わない。
 //!
@@ -38,10 +38,7 @@
 //!
 //! `now_ms`は単調に増加する値を渡す（[`DuplicateHistory::record`]の契約）。firmwareでは
 //! `std::time::Instant`（`CLOCK_MONOTONIC`）から取る前提である（firmware側の呼び出しはまだ無い）。
-//! **契約が破られて時刻が戻った場合、entryが履歴に残っている間は、記録した結果を返す
-//! （Replay）。**件数の上限か、別の`id`の記録で追い出された後は`Expired`になる。変わるのは、
-//! `duplicate_expired`で拒否する代わりに記録した結果を返すことだけであり、どちらでも
-//! `admit`は呼ばれない。
+//! 時刻が戻った場合の振る舞いは、[`DuplicateHistory::record`]のdocと`tests/dedup.rs`のtest 9による。
 //!
 //! # 値を持たない
 //!

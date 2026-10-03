@@ -21,7 +21,7 @@ decode／encode、および共有conformance fixtureを提供する。
 - 共有conformance fixture（[`tests/fixtures/`](tests/fixtures/README.md)）
 - 現在sessionのduplicate履歴（§8手順8、§9、`src/duplicate.rs`）。保持件数と保持期間
   （`PROTO-TBD-005`）は`DuplicatePolicy`として呼び出し側から受け取り、値を持たない。
-  Issue #12が`crates/deskcat-serial`に作ったものを、host とfirmwareで共用するためにIssue #19で移した
+  Issue #12が`crates/deskcat-serial`に作ったものを、hostとfirmwareで共用するためにIssue #19で移した
 
 含まないもの:
 
