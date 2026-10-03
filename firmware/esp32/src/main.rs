@@ -29,7 +29,7 @@
 //!   呼ぶ（[Issue #17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。
 //!   詳細は[`crate::servo`]と[`run_servo_bench_test`]のdoc参照）。**#474で、このfeature付きbuildは
 //!   `compile_error!`でcompileが止まる（下記）。**
-//! - **#514の追加LED（`LED-COMM`＝GPIO2、`LED-REACT`＝GPIO15）も既定のbuildではdriveしない。**
+//! - **#514の追加LED（`LED-COMM`＝GPIO2、`LED-REACT`＝GPIO5）も既定のbuildではdriveしない。**
 //!   `bringup-led-514` feature付きbuildだけが`crate::led`で点灯試験と白の点滅を行う
 //!   （[Issue #514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)）。このfeatureは
 //!   既定buildとも`bringup-display-13`とも組み合わせられる（pinが重ならない）。
@@ -45,7 +45,7 @@
 //! | feature | 加えるもの | 既定buildとの関係 |
 //! |---|---|---|
 //! | `bringup-display-13` | LCDの初期化、backlightの点灯、単色fillと四隅patternの試験モード | 製品buildに加える。描画の間のPi linkの受信とheartbeatは`crate::display_test`のmodule docを参照 |
-//! | `bringup-led-514` | #514の追加LED（GPIO2／GPIO15）の点灯試験と白の点滅（`crate::led`） | 製品buildに加える。`bringup-display-13`とも組み合わせられる |
+//! | `bringup-led-514` | #514の追加LED（GPIO2／GPIO5）の点灯試験と白の点滅（`crate::led`） | 製品buildに加える。`bringup-display-13`とも組み合わせられる |
 //! | `bench-servo-test-17` | servoの単発bench試験（#17の測定用build） | **Pi linkを外す。**正本`docs/hardware/servo-safety-limits.md`の`測定のための駆動（承認の状態の項目6）`節が、測定用のbuildは「Piとの通信linkを持たない」と定めているためである。#474で、このfeature付きbuildはcompileが止まる |
 //!
 //! `#487`のPR B1より前は、`pi-protocol-mode` featureを付けたbuildだけがPi linkを持ち、LCD／I2Cの
@@ -62,7 +62,7 @@
 //! GPIO14＝RX）である。`bringup-display-13` feature付きbuildはLCD関連6+1本（`crate::display`の
 //! module doc参照）を追加で渡す。`bench-servo-test-17` feature付きbuildは`SERVO-PWM`（GPIO27）と
 //! `peripherals.ledc.timer0`／`channel0`を追加で渡し、Pi link関連を渡さない。`bringup-led-514` feature付きbuildは
-//! GPIO2とGPIO15を追加で渡す。
+//! GPIO2とGPIO5を追加で渡す。
 //!
 //! **I2Cはこの版でも実機通電していない。**この版の検証は`cargo build`でのcross-compile
 //! 確認までであり、実機へflashして確認するのは別工程である（[Hardware Safety
@@ -374,7 +374,7 @@ fn main() {
     // module doc「起動からの状態」）。点灯試験の時計は`bringup_done_ms`から数える。
     // 失敗してもfirmwareは止めない。LEDは表示だけを担い、ほかの機能はLEDに依存しない。
     #[cfg(feature = "bringup-led-514")]
-    let mut leds = match Leds::new(peripherals.pins.gpio2, peripherals.pins.gpio15) {
+    let mut leds = match Leds::new(peripherals.pins.gpio2, peripherals.pins.gpio5) {
         Ok(leds) => Some(leds),
         Err(err) => {
             log::error!("led_init_error err={err}");

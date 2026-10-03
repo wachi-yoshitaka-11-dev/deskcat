@@ -75,7 +75,7 @@ GPIO割り当ての完了と、実機接続・サーボ出力の許可は別の�
 | `LCD-CS` | 22 | 39 | `VDD3P3_CPU` | `oe=0, ie=0` | 内部pullが無い |
 | `TOUCH-CS` | 21 | 42 | `VDD3P3_CPU` | `oe=0, ie=0` | 内部pullが無い |
 | `LED-COMM`（#514の初回デモ案） | 2 | 22 | `VDD3P3_RTC` | `oe=0, ie=1, wpd` | **内部weak pull-downが有効である。**strapping pin（`After Reset`も同じ） |
-| `LED-REACT`（#514の初回デモ案） | 15 | 21 | `VDD3P3_RTC` | `oe=0, ie=1, wpu` | **内部weak pull-upが有効である。**strapping pin `MTDO`（`After Reset`も同じ） |
+| `LED-REACT`（#514の初回デモ案） | 5 | 34 | `VDD3P3_CPU` | `oe=0, ie=1, wpu` | **内部weak pull-upが有効である。**strapping pin（`After Reset`も同じ） |
 
 **`SERVO-PWM`のreset時状態が`oe=0, ie=0`であることは、外部pull-downが必須である理由そのものである。**
 内部pullが無いため、**ESP32側には線をLowへ引く要素が何も無い。**
@@ -105,7 +105,7 @@ VDD = 3.3 Vである（`電圧domain`節）。受け側の`VIH`は0.7×3.3 = **2
 | `LCD-BL` | pull-down | **4.7 kΩ** | 1 | **2026-09-06に確定した。**極性は2026-09-05に一次資料（MSP2807公式User Manual）で`active-high`（`LED` pin「high level lighting」）と判明済みであり、`SERVO-PWM`と同じ理由（未知の競合電流に対しては、駆動側に余裕がある範囲で値を下げるほうが安全側）で`4.7 kΩ`を採った。下記「`LCD-BL`を決められない理由」 |
 | `TOUCH-IRQ` | **外部pullを付けない** | — | **0** | 下記「`TOUCH-IRQ`へ外部pull-upを付けてはならない」 |
 | `LED-COMM`（#514の初回デモ案、**未承認**） | pull-down | **10 kΩ** | 1 | 内部pull-down（上表）と同じ向き。download bootの条件「GPIO2＝0」と整合する（[led-514-demo.md](led-514-demo.md)の`起動時の電位`） |
-| `LED-REACT`（#514の初回デモ案、**未承認**） | pull-up | **10 kΩ** | 1 | 内部pull-up（上表）と同じ向き。`MTDO`＝1（boot logを出す、既定）と整合する（同上） |
+| `LED-REACT`（#514の初回デモ案、**未承認**） | pull-down | **10 kΩ** | 1 | 内部pull-up（上表）に対してLowへ定め、LEDを起動中に消灯側へ保つ。WROOM-32D datasheet v2.8 §3.4 Table 8でGPIO5が効くのはMTDOとの組でのSDIO slaveのtimingだけである（同上） |
 
 10 kΩ（秋月 125103）と4.7 kΩ（秋月 125472）がどちらも1袋100本入で2026-08-08に着荷している
 （[hardware-bom.md](hardware-bom.md) `RES-PULL-01`）。**確定した5本（4.7 kΩ×2 と 10 kΩ×3）は手元の2種でまかなえる。追加の発注は要らない。**#514の初回デモ案の10 kΩ×2（`LED-COMM`／`LED-REACT`）は確定した5本に含めない（未承認）。足しても手元の10 kΩでまかなえる。
@@ -387,7 +387,7 @@ I2C busの速度と無関係である。加速度の軽打検出は`ACCEL-IRQ`�
 | 区分 | GPIO | 制約 |
 |---|---|---|
 | Flash通信専用（**使用禁止**） | 6, 7, 8, 9, 10, 11（`CLK`／`D0`／`D1`／`D2`／`D3`／`CMD`） | 内蔵SPI Flashとの通信に使用。外部回路から絶対に使用しない |
-| Strapping pin（起動modeを決定。用途を厳選） | 0, 2, 5, 12, 15 | GPIO0: boot button。GPIO2: download mode判定。GPIO12(MTDI): flash電圧選択（Highだと起動しない可能性）。GPIO15(MTDO): boot logのsilence制御。GPIO2／15は[#514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)の初回デモ案として割り当てる（AIの選定、人間は未承認。未配線・未検証）。GPIO0／5／12は未使用。GPIO2／15の起動条件はdatasheetと回路図で確かめた（[回路案](led-514-demo.md)の`起動時の電位`と`board上の接続`）。実機の起動・書込み試験は未実施 |
+| Strapping pin（起動modeを決定。用途を厳選） | 0, 2, 5, 12, 15 | GPIO0: boot button。GPIO2: download mode判定。GPIO12(MTDI): flash電圧選択（Highだと起動しない可能性）。GPIO15(MTDO): boot logのsilence制御。GPIO5: MTDOとの組でSDIO slaveのtimingを決める（WROOM-32D datasheet v2.8 §3.4 Table 8）。GPIO2／5は[#514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)の初回デモ案として割り当てる（AIの選定、人間は未承認。未配線・未検証）。GPIO5は外部10 kΩでLowに定めるため、Table 8の組は（MTDO＝1、GPIO5＝0）になる。DeskCatはSDIO slaveを使わない。GPIO0／12／15は未使用。GPIO2／5の起動条件はdatasheetと回路図で確かめた（[回路案](led-514-demo.md)の`起動時の電位`と`board上の接続`）。実機の起動・書込み試験は未実施 |
 | UART0（board上USB-UARTブリッジ専用。書き込みとdebug logだけに使う） | 1（TX）, 3（RX） | board上のUSB-UARTブリッジが占有するため、外部配線用のGPIOとして使わない（新たな配線を追加しない、という意味）。**2026-09-28の決定でPi linkはUART0から外し、GPIO13／GPIO14のUARTへ移した**（下の`Pi–ESP32間のtransport`節）。firmwareは[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)で移行し、UART0はどのbuildでも書き込みとdebug logだけに使う（`firmware/esp32/src/console.rs`参照）。#487より前は、TX（GPIO1）をdebug logとPi–ESP32 protocol streamのどちらかへ`pi-protocol-mode`で排他的に使い、RX（GPIO3）を`pi-protocol-mode`の`boot`のACK受信に読んでいた（[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446) PR B） |
 | Input-only（出力不可） | 34, 35, 36（VP）, 39（VN） | 純粋なinput信号（interrupt、ADC）にのみ割り当て可 |
 | WROOM/SOLO-1専用（WROVERでは予約） | 16, 17 | 今回のmoduleはESP-WROOM-32Dのため使用可 |
@@ -419,7 +419,7 @@ I2C busの速度と無関係である。加速度の軽打検出は`ACCEL-IRQ`�
 | PI-UART-TX | SBC-01（Raspberry Pi Zero W。受ける側はPiのGPIO15＝header pin 10、`RXD`） | UART TX（ESP32→Pi） | Output | GPIO13（`MTCK`） | reset中`oe=0, ie=0`、reset直後`oe=0, ie=1, wpd`（ESP32 Series Datasheet v5.3 Appendix `IO_MUX`）。**確かめたのはreset中とreset直後の値だけである。**resetからUART driverの初期化までの区間（ROM／2nd-stage bootloaderが動く区間）の状態は、一次資料でも実機でも確かめていない（`esp32-pi-protocol.md`§2の既知の例外） | 外部pullは付けない（安全要件の5項目に効かない。初期化前のLowやglitchはPi側で不正なbyteとして受け、改行境界で再同期する前提である。改行を含む不正なbyte列の後に改行の境界で再同期する仕組みは、`crates/deskcat-serial/tests/simulator.rs`のtestで確かめた。**初期化時のglitchそのもの（とくに、改行を含まないbyteが最初の`boot`行の先頭へ連結するcase）は、testでも実機でも確かめていない**（`esp32-pi-protocol.md`§2） | UART（UART0以外。GPIO matrixで割り当てる。firmwareはUART1を使う（[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)。`bench-servo-test-17`以外のすべてのbuild。既定buildを含む））。115200 8N1（候補、`esp32-pi-protocol.md`§2） | なし | **2026-09-28に決定した**（[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)）。根拠は下の`Pi–ESP32間のtransport`節。GPIO13は`MTCK`（JTAG）を兼ねるため、この割り当てでJTAG debugは使えない。**Piとの信号線は、下の`信号線をつないでよい条件`（直列4.7 kΩ、両方の電源が入っている間だけつなぐ）に従って接続する。**[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)のPR B1から、**既定build（製品build）も起動のたびにこのpinをUARTのTXとして駆動する**（それより前は`pi-protocol-mode`のbuildだけだった）。GPIO13／GPIO14に基板上の部品がつながっていないことは公式回路図で確かめてある（下の`Pi–ESP32間のtransport`節、[#446のコメント](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446#issuecomment-5865068972)。現物の導通は測っていない）。したがってGPIO13に何もつないでいない台では、駆動しても電流の流れる先が無い。**既定buildでもJTAG debugは使えない** |
 | PI-UART-RX | SBC-01（送る側はPiのGPIO14＝header pin 8、`TXD`） | UART RX（Pi→ESP32） | Input | GPIO14（`MTMS`） | reset中`oe=0, ie=0`、reset直後`oe=0, ie=1, wpu`（同上）。resetからUART driverの初期化までの区間は、`PI-UART-TX`行と同じく確かめていない。[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)のPR B1から既定buildもこのpinをUARTのRXとして有効にする。ESP-IDF v5.5.3の`uart_set_pin`（`esp_driver_uart/src/uart.c`）はRXのpinのpullを変えないため、何もつないでいない台ではreset直後の`wpu`が残り、idleのHighに保たれる見込みである（sourceから導いたもので、実機では確かめていない。ROM／bootloaderの区間も確かめていない） | 外部pullは付けない（同上） | 同上 | なし | 同上。GPIO14は`MTMS`（JTAG）を兼ねる。**ESP32の電源が切れているときにPiの送信線がHighだと、ESP32の入力の上限（VDD＋0.3 V）を超える。**対策（直列4.7 kΩと接続の手順）と弱点は`HW-TBD-036` |
 | LED-COMM | LED-COMM-01（白） | 通信状態の点灯／点滅 | Output（Highで点灯） | GPIO2（J3-15、#514の初回デモ案） | reset時は内部pull-downでLow（上の`reset時のpin状態`）。外部10 kΩ pull-downも置く。bootloader期間の全波形と実機は未確認 | 外部10 kΩ pull-down。LEDへは直列の電流制限抵抗`R`（330 Ω、[hardware-bom.md](hardware-bom.md)の`RES-LED-01`）を入れる | GPIO（初回デモ案） | なし | Strapping pin。GPIO0をLowにして書き込むとき、GPIO2がLowならdownload modeへ入れる。[回路案](led-514-demo.md)の単体・書込み試験を通すまで実機配線は未完了。firmwareは`bringup-led-514` feature付きbuildだけが駆動する（既定buildは触れない） |
-| LED-REACT | LED-REACT-01（赤） | 猫の反応 | Output（Lowで点灯） | GPIO15（J3-16、#514の初回デモ案） | reset時は内部pull-upでHigh（上の`reset時のpin状態`）。外部10 kΩ pull-upも置く。bootloader期間の全波形と実機は未確認 | 外部10 kΩ pull-up。3V3からLEDへ直列の電流制限抵抗`R`（同上）を入れる | GPIO（初回デモ案） | なし | Strapping pin。Highならboot logを抑止しない。[回路案](led-514-demo.md)の単体・書込み試験を通すまで実機配線は未完了。firmwareは`bringup-led-514` feature付きbuildだけが駆動する（既定buildは触れない） |
+| LED-REACT | LED-REACT-01（赤） | 猫の反応 | Output（Highで点灯） | GPIO5（J3-10、#514の初回デモ案） | reset時は内部pull-up（上の`reset時のpin状態`）。外部10 kΩ pull-downでLowに定める。bootloader期間の全波形と実機は未確認 | 外部10 kΩ pull-down。LEDへは直列の電流制限抵抗`R`（同上）を入れる | GPIO（初回デモ案） | なし | Strapping pin。効くのはMTDOとの組でのSDIO slaveのtimingだけで、DeskCatはSDIO slaveを使わない。[回路案](led-514-demo.md)の単体・書込み試験を通すまで実機配線は未完了。firmwareは`bringup-led-514` feature付きbuildだけが駆動する（既定buildは触れない） |
 
 正確なmoduleが使用しない信号は削除し、不足しているreset、enable、address-select、interrupt、power-control信号はすべて追加する。
 
@@ -442,7 +442,7 @@ I2C busの速度と無関係である。加速度の軽打検出は`ACCEL-IRQ`�
 | Pi側のdevice | PL011を`dtoverlay=disable-bt`でGPIO14／GPIO15へ出す（Bluetoothは止める。MVPで使わない）。login consoleはserialから外す。hostが開くdeviceは`/dev/serial0`（下の`Pi側の設定`） |
 | 追加部品 | jumper wireと、2本の信号線にそれぞれ直列に入れる4.7 kΩ（手持ちの`RES-PULL-01`、秋月 125472）。**購入しない**（2026-09-28のユーザー決定） |
 
-**pinの選び方。**2026-09-28のUART選定時に未割当だったpinは、flash用とstrapping pin（[使用制限pin](#esp32の使用制限pinespressif公式資料よりこの基板に適用)）を除くとGPIO13、GPIO14、GPIO39の3本だった。GPIO13／GPIO14は現在PiとのUARTに割り当て済みなので、この条件では追加の出力は空いていない。一方、GPIO0／5／12は現在も未使用であり、GPIO2／15は[#514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)のLED用に初回デモの割当案を置いた。ESP32の出力pinがすべて埋まっていたわけではない。[Espressifの設計資料](https://docs.espressif.com/projects/esp-hardware-design-guidelines/en/latest/esp32/schematic-checklist.html#strapping-pins)によれば、strapping pinはreset時に設定を読み取った後、通常のGPIOとして動作する。GPIO2／15の起動時電位、基板回路と駆動回路の検討は[回路案](led-514-demo.md)に記録した。実機の起動・書込み確認は未実施である。
+**pinの選び方。**2026-09-28のUART選定時に未割当だったpinは、flash用とstrapping pin（[使用制限pin](#esp32の使用制限pinespressif公式資料よりこの基板に適用)）を除くとGPIO13、GPIO14、GPIO39の3本だった。GPIO13／GPIO14は現在PiとのUARTに割り当て済みなので、この条件では追加の出力は空いていない。一方、GPIO0／12／15は現在も未使用であり、GPIO2／5は[#514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)のLED用に初回デモの割当案を置いた。ESP32の出力pinがすべて埋まっていたわけではない。[Espressifの設計資料](https://docs.espressif.com/projects/esp-hardware-design-guidelines/en/latest/esp32/schematic-checklist.html#strapping-pins)によれば、strapping pinはreset時に設定を読み取った後、通常のGPIOとして動作する。GPIO2／5の起動時電位、基板回路と駆動回路の検討は[回路案](led-514-demo.md)に記録した。実機の起動・書込み確認は未実施である。
 GPIO39は入力専用で、ESP32 Series SoC Errata v3.0の`[GPIO-3.11]`（SAR ADCの電源投入時に
 GPIO36／GPIO39の入力が約80 ns Lowに引かれる）があり、ADC1を使うこの設計では受信に使えない。
 （errataの出典: https://docs.espressif.com/projects/esp-chip-errata/en/latest/esp32/esp-chip-errata-en-master-esp32.pdf 、
@@ -536,7 +536,7 @@ USB OTG変換cable（`hardware-bom.md`の`CABLE-PI-LINK-01`）はこの方式の
 ## 競合check
 
 - [x] 割り当てたpinがmodule flash用に予約されていない（GPIO6-11を使用していないことを確認済み）
-- [ ] Outputがbootstrap要件と競合しない（**2026-10-01に`[x]`から戻した。**それまでの根拠「GPIO0/2/5/12/15を一切使用していない」は、[#514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)の初回デモ案がGPIO2／15を`LED-COMM`／`LED-REACT`へ割り当てたため成り立たない。外部pullを既定と同じ向きに置く設計はdatasheetと整合する（[回路案](led-514-demo.md)の`起動時の電位`）が、起動と書き込みを実機で確かめるまで`[x]`にしない。GPIO0／5／12は引き続き使っていない）
+- [ ] Outputがbootstrap要件と競合しない（**2026-10-01に`[x]`から戻した。**それまでの根拠「GPIO0/2/5/12/15を一切使用していない」は、[#514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)の初回デモ案がGPIO2／5を`LED-COMM`／`LED-REACT`へ割り当てたため成り立たない。外部pullで起動時の値を定める設計はdatasheetと整合する（[回路案](led-514-demo.md)の`起動時の電位`）が、起動と書き込みを実機で確かめるまで`[x]`にしない。GPIO0／12／15は引き続き使っていない）
 - [x] UART flashingとboot logを引き続き利用できる（GPIO1/3を変更していない。既定buildのdebug logの仕組み自体は変えていないが、`boot=`というlog行はこの変更で削除した（`firmware/esp32/src/main.rs`参照）。[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)からはどのbuildでもdebug logが出る（それより前は、当時の`pi-protocol-mode`のbuildで`silence_logging`が`esp_log`経由の出力を止めていた）。詳細は`UART0`行、`docs/protocol/esp32-pi-protocol.md`§2参照）
 - [x] Input-only制約を守っている（GPIO34/35/36は入力専用として使用。GPIO36はADC-3V3、outputへ転用しない）
 - [x] ADC測定pinを予約済みで、ADC2をWi-Fi併用下で使っていない（GPIO32/33/36はすべてADC1）

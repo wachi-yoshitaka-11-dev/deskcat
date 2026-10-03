@@ -1,7 +1,7 @@
 //! [Issue #514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)の追加LEDの
-//! bring-up。`LED-COMM`（白、GPIO2、Highで点灯）と`LED-REACT`（赤、GPIO15、Lowで点灯）を駆動する。
+//! bring-up。`LED-COMM`（白、GPIO2）と`LED-REACT`（赤、GPIO5）を駆動する。どちらもHighで点灯する。
 //!
-//! **`bringup-led-514` feature付きbuildだけがcompileする。**既定buildはGPIO2／GPIO15に触れない。
+//! **`bringup-led-514` feature付きbuildだけがcompileする。**既定buildはGPIO2／GPIO5に触れない。
 //! 配線、抵抗、起動時の電位、試験の順序は
 //! [led-514-demo.md](../../../docs/hardware/led-514-demo.md)が正本であり、ここへ再掲しない。
 //!
@@ -24,12 +24,13 @@
 //!
 //! # 起動からの状態
 //!
-//! [`Leds::new`]が両pinを出力にし、消灯側（GPIO2はLow、GPIO15はHigh）へ設定する。
-//! reset中とreset直後は、IO_MUXの記載どおり内部pull（GPIO2はpull-down、GPIO15はpull-up）が
-//! 有効であり、外部pullも同じ向きに置く（`gpio-assignment.md`の`reset時のpin状態`）。
+//! [`Leds::new`]が両pinを出力にし、消灯側（Low）へ設定する。
+//! reset中とreset直後は、IO_MUXの記載どおり内部pull（GPIO2はpull-down、GPIO5はpull-up）が
+//! 有効である。外部10 kΩはどちらもpull-downとして置き、GPIO5も消灯側へ定める
+//! （`gpio-assignment.md`の`reset時のpin状態`と`選定した値と本数`）。
 //! **その後、ROM／2nd-stage bootloaderが動く区間と`main()`の先頭の実際の電位は、一次資料でも
 //! 実機でも確かめていない**（同文書の`LED-COMM`／`LED-REACT`行）。**向きの設定（`gpio_set_direction`）と消灯levelの設定の間に、出力registerの
-//! 値が一瞬出る。**GPIO15ではそれが点灯側（Low）になりうる。長さも実際のlevelも測っていない。
+//! 値が一瞬出る。**両pinとも、その値が点灯側（High）か消灯側（Low）かも、長さも確かめていない。
 //! 電流は直列抵抗`R`で制限される（led-514-demo.mdの`電流の見積もりと残る観察`）。esp-idf-halの
 //! `PinDriver`は向きを先に設定する。`unsafe`を使わずにこの区間を無くす方法は見つけていない（試していない）。
 //! Hardware Safety Policy §4からの逸脱であり、led-514-demo.mdの残余riskに挙げてある。
@@ -167,7 +168,7 @@ impl<'d> Leds<'d> {
         let mut comm = PinDriver::output(comm)?;
         comm.set_low()?;
         let mut react = PinDriver::output(react)?;
-        react.set_high()?;
+        react.set_low()?;
 
         Ok(Self {
             comm,
@@ -184,16 +185,16 @@ impl<'d> Leds<'d> {
         let phase = phase_at(elapsed_ms);
         let out = outputs_at(elapsed_ms);
 
-        // 白はHighで点灯、赤はLowで点灯（led-514-demo.mdの`初回デモの配線案`）。
+        // 白も赤もHighで点灯（led-514-demo.mdの`初回デモの配線案`）。
         let comm = if out.white_on {
             self.comm.set_high()
         } else {
             self.comm.set_low()
         };
         let react = if out.red_on {
-            self.react.set_low()
-        } else {
             self.react.set_high()
+        } else {
+            self.react.set_low()
         };
         for (pin, result) in [("comm", comm), ("react", react)] {
             if let Err(err) = result {

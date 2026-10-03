@@ -245,7 +245,7 @@ pub const LED_COMM_GPIO: u8 = 2;
 
 /// `LED-REACT`（赤、#514）のGPIO番号。出所と用途は[`LED_COMM_GPIO`]と同じ。
 #[cfg(feature = "bringup-led-514")]
-pub const LED_REACT_GPIO: u8 = 15;
+pub const LED_REACT_GPIO: u8 = 5;
 
 /// `LED-COMM`の点滅周期（milliseconds）。半分ずつ点灯と消灯にする。
 ///
