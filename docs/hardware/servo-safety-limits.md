@@ -748,6 +748,11 @@ firmware（`firmware/esp32/src/servo.rs`、
 
 ## 受け入れchecklist
 
+**2026-10-04追記。**ベンチ電源の購入申告は[hardware-bom.md](hardware-bom.md#ベンチ電源)に記録した。
+Pi最低入力電圧の復帰条件に関する現在の扱いは[power-budget.md](power-budget.md#受け入れ条件)の
+`(a)を要件から外す（2026-09-06、PM決定）`節の同日追記を参照する。
+下記のPi電圧droopの項目を合格にした記録ではなく、サーボ試験の電源構成や承認範囲も変更していない。
+
 - [ ] 正確なサーボとデータシートを記録した
 - [ ] **定常電流**でingressとconnectorの定格を確認した（[power-budget.md](power-budget.md)の`ingressの電流制限`。定格は熱の制限のため、判定量は定常電流である）
 - [ ] **peak時**の5 V／3.3 Vの電圧droopを測定し、**ESP32の**brownoutとresetが起きないことを確認した（peakはこの確認にのみ使う）
