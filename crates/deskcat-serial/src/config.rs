@@ -326,48 +326,24 @@ impl RetryPolicy {
 
 /// 現在sessionのduplicate履歴の保持件数と保持期間（§9、`PROTO-TBD-005`）。
 ///
-/// **既定値を持たない。**`provisional()`も用意しない。`PROTO-TBD-005`は保持期間、
-/// retry window、保持件数の上限のいずれも未確定であり、[`ReconnectPolicy::provisional`]や
-/// [`RetryPolicy::provisional`]のような仮の値もこのcrateでは決めない。呼び出し側が
-/// 値と、その値を選んだ根拠を持つ。
-///
-/// 期間は§13の`PROTO-TBD-005`行が定める下限（遅延messageの最大生存時間＋再送window）を
-/// 下回らないことが要求されているが、**この型はその下限を検査しない。**下限を構成する
-/// 2つの値自体が未確定だからである。
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DuplicatePolicy {
-    capacity: NonZeroUsize,
-    retention: Duration,
-}
+/// **定義は`deskcat_protocol::DuplicatePolicy`にある**（Issue #19で、hostとfirmwareが共用する
+/// ために移した）。以前のpath（`deskcat_serial::config::DuplicatePolicy`）を保つためにre-exportする。
+/// **既定値を持たない**ことも、[`ReconnectPolicy::provisional`]や[`RetryPolicy::provisional`]の
+/// ような仮の値を持たないことも、移す前と同じである。
+pub use deskcat_protocol::DuplicatePolicy;
 
-impl DuplicatePolicy {
-    /// 保持件数と保持期間を指定して方針を作る。
-    ///
-    /// # Errors
-    ///
-    /// `capacity`が0なら[`ConfigError::ZeroDuplicateCapacity`]、`retention`が0なら
-    /// [`ConfigError::ZeroDuplicateRetention`]を返す。
-    pub fn new(capacity: usize, retention: Duration) -> Result<Self, ConfigError> {
-        let capacity = NonZeroUsize::new(capacity).ok_or(ConfigError::ZeroDuplicateCapacity)?;
-        if retention.is_zero() {
-            return Err(ConfigError::ZeroDuplicateRetention);
+/// `DuplicatePolicy::new`の拒否（`deskcat_protocol::DuplicatePolicyError`）を、このcrateの
+/// [`ConfigError`]の同名の2つへ写す。種類は変えない。
+impl From<deskcat_protocol::DuplicatePolicyError> for ConfigError {
+    fn from(err: deskcat_protocol::DuplicatePolicyError) -> Self {
+        match err {
+            deskcat_protocol::DuplicatePolicyError::ZeroDuplicateCapacity => {
+                Self::ZeroDuplicateCapacity
+            }
+            deskcat_protocol::DuplicatePolicyError::ZeroDuplicateRetention => {
+                Self::ZeroDuplicateRetention
+            }
         }
-        Ok(Self {
-            capacity,
-            retention,
-        })
-    }
-
-    /// 保持する件数の上限。超えたら最も古いentryを捨てる。
-    #[must_use]
-    pub const fn capacity(&self) -> NonZeroUsize {
-        self.capacity
-    }
-
-    /// 記録してから保持する期間。
-    #[must_use]
-    pub const fn retention(&self) -> Duration {
-        self.retention
     }
 }
 
@@ -393,11 +369,11 @@ mod tests {
     #[test]
     fn a_duplicate_policy_rejects_zero_capacity_and_zero_retention() {
         assert_eq!(
-            DuplicatePolicy::new(0, Duration::from_secs(1)),
+            DuplicatePolicy::new(0, Duration::from_secs(1)).map_err(ConfigError::from),
             Err(ConfigError::ZeroDuplicateCapacity)
         );
         assert_eq!(
-            DuplicatePolicy::new(1, Duration::ZERO),
+            DuplicatePolicy::new(1, Duration::ZERO).map_err(ConfigError::from),
             Err(ConfigError::ZeroDuplicateRetention)
         );
         assert!(DuplicatePolicy::new(1, Duration::from_millis(1)).is_ok());

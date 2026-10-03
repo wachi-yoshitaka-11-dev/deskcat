@@ -19,8 +19,9 @@
 //!   `hello`／`boot`以外の`stale_session`判定、Piが送った要求への応答の相関
 //!   （[Issue #12]、`crates/deskcat-serial/src/peer.rs`）
 //! - 現在sessionのduplicate履歴（[`DuplicateHistory`]）。保持件数と保持期間
-//!   （`PROTO-TBD-005`）は[`DuplicatePolicy`]として呼び出し側から受け取る
-//!   （`crates/deskcat-serial/src/duplicate.rs`）
+//!   （`PROTO-TBD-005`）は[`DuplicatePolicy`]として呼び出し側から受け取る。
+//!   **定義は`crates/deskcat-protocol/src/duplicate.rs`にある**（Issue #19で、hostとfirmwareが
+//!   共用するために移した）。[`duplicate`]はそのmoduleのre-exportであり、以前のpathを保つ
 //! - [`Session`]と[`PeerSession`]をまたいだ受信と送信の判断（[`handle_frame`]、
 //!   [`handle_boot`]、[`retry_due_requests`]）。受信frameの振り分け（`ack`の相関、
 //!   `status`の受理）、`boot`確立後の`get_status`送出（§10.1 step1〜4）と、
@@ -80,7 +81,8 @@
 pub mod config;
 pub mod coordinator;
 pub mod device;
-pub mod duplicate;
+/// `deskcat_protocol::duplicate`のre-export（Issue #19で移した。以前のpathを保つ）。
+pub use deskcat_protocol::duplicate;
 pub mod ids;
 pub mod outbox;
 pub mod peer;
