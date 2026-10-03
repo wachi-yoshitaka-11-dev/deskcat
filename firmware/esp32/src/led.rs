@@ -18,15 +18,17 @@
 //!
 //! **白を点灯（通信成立）へ切り替える経路は無い。**継続通信の判定（`PROTO-TBD-010`／
 //! `HW-TBD-017`）がまだ無いためである。`boot`のACKや`ping`の受信だけでは、その後の
-//! 通信が続いていることを示せない。**赤を`happy`で点ける経路も無い。**`set_expression`の
-//! 受信がまだ無い。どちらも`HW-TBD-037`が追う。
+//! 通信が続いていることを示せない。**赤を`happy`で点ける経路も無い。**firmwareは受け取った
+//! `set_expression`を`pi_rx_unhandled_frame`としてlogに出すだけである（`crate::pi_link`）。
+//! どちらも`HW-TBD-037`が追う。
 //!
 //! # 起動からの状態
 //!
 //! [`Leds::new`]が両pinを出力にし、消灯側（GPIO2はLow、GPIO15はHigh）へ設定する。
-//! それより前（reset中、ROM／2nd-stage bootloader、`main()`の先頭）は、外部pullと内部pullで
-//! 消灯側に保つ設計である。**その区間の実際の電位は、一次資料でも実機でも確かめていない**
-//! （`gpio-assignment.md`の`LED-COMM`／`LED-REACT`行）。**向きの設定（`gpio_set_direction`）と消灯levelの設定の間に、出力registerの
+//! reset中とreset直後は、IO_MUXの記載どおり内部pull（GPIO2はpull-down、GPIO15はpull-up）が
+//! 有効であり、外部pullも同じ向きに置く（`gpio-assignment.md`の`reset時のpin状態`）。
+//! **その後、ROM／2nd-stage bootloaderが動く区間と`main()`の先頭の実際の電位は、一次資料でも
+//! 実機でも確かめていない**（同文書の`LED-COMM`／`LED-REACT`行）。**向きの設定（`gpio_set_direction`）と消灯levelの設定の間に、出力registerの
 //! 値が一瞬出る。**GPIO15ではそれが点灯側（Low）になりうる。長さも実際のlevelも測っていない。
 //! 電流は直列抵抗`R`で制限される（led-514-demo.mdの`電流の見積もりと残る観察`）。esp-idf-halの
 //! `PinDriver`は向きを先に設定する。`unsafe`を使わずにこの区間を無くす方法は見つけていない（試していない）。
