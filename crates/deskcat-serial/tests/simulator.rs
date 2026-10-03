@@ -1265,6 +1265,7 @@ mod peer_protocol {
         ProtocolCounters, Pump, SensorStatus, ServoStatus, Sim, Status, config, connected_session,
         decode_line, encode_line, limits,
     };
+    use deskcat_protocol::{Environment, ExpressionName, HeadTouched, Lifted, SetExpression};
     use deskcat_serial::{
         BootOutcome, OutstandingKind, PeerRejection, PeerSession, Received, RetryOutcome,
         RetryPolicy, Session, handle_boot, handle_frame, retry_due_requests,
@@ -2089,6 +2090,126 @@ mod peer_protocol {
         assert_eq!(peer.counters().unknown_types, 1);
         assert_eq!(peer.counters().stale_sessions, 0, "sidの判定より先に扱う");
         assert!(drain_sent(&mut pi).is_empty(), "応答しない");
+    }
+
+    /// ESP32→Piのeventを`sid`/`id`で1行にする。
+    fn event_line(sid: u32, id: u32, message: Message) -> String {
+        encode_line(&Frame::new(
+            Envelope {
+                v: limits::PROTOCOL_VERSION,
+                sid,
+                id,
+                ts_ms: 10,
+            },
+            message,
+        ))
+        .expect("encodeできる")
+    }
+
+    /// 現在sessionのeventは[`Received::Event`]として呼び出し側へ渡し、応答しない（§4.2〜§4.5、§8）。
+    #[test]
+    fn an_event_from_the_current_session_is_handed_to_the_caller_without_a_reply() {
+        let mut peer = PeerSession::new(super::duplicate_policy());
+        let mut pi = connected_session_with_sid(PI_SID);
+        let _ = establish(&mut pi, &mut peer, ESP32_SID, 0);
+
+        let events = [
+            Message::HeadTouched(HeadTouched { duration_ms: 720 }),
+            Message::Tapped,
+            Message::Lifted(Lifted { duration_ms: 1_200 }),
+            Message::Environment(Environment {
+                temperature_c: None,
+                humidity_pct: None,
+                pressure_hpa: None,
+            }),
+        ];
+        for (id, message) in (2_u32..).zip(events) {
+            let line = event_line(ESP32_SID, id, message.clone());
+            match receive(&mut pi, &mut peer, &line, 10) {
+                Received::Event(frame) => {
+                    assert_eq!(frame.message, message);
+                    assert_eq!(frame.envelope.sid, ESP32_SID);
+                    assert_eq!(frame.envelope.id, id);
+                }
+                other => panic!("Eventを期待した: {other:?}"),
+            }
+        }
+        assert!(drain_sent(&mut pi).is_empty(), "eventへは応答しない");
+        assert_eq!(
+            peer.counters().unknown_types,
+            0,
+            "定義されていないtypeではない"
+        );
+        assert_eq!(peer.counters().stale_sessions, 0);
+    }
+
+    /// 現在sessionでない`sid`のeventは`stale_session`として数え、渡さない（§5.1優先順位4）。
+    #[test]
+    fn an_event_from_an_unapproved_sid_is_rejected_as_stale_session() {
+        let mut peer = PeerSession::new(super::duplicate_policy());
+        let mut pi = connected_session_with_sid(PI_SID);
+
+        // sessionが未確立のとき。
+        let line = event_line(ESP32_SID, 2, Message::Tapped);
+        assert_eq!(
+            receive(&mut pi, &mut peer, &line, 10),
+            Received::Rejected {
+                type_str: "tapped",
+                rejection: PeerRejection::StaleSession
+            }
+        );
+
+        // 確立した後に、別の`sid`から届いたとき。
+        let _ = establish(&mut pi, &mut peer, ESP32_SID, 0);
+        let line = event_line(
+            ESP32_SID + 1,
+            3,
+            Message::HeadTouched(HeadTouched { duration_ms: 1 }),
+        );
+        assert_eq!(
+            receive(&mut pi, &mut peer, &line, 10),
+            Received::Rejected {
+                type_str: "head_touched",
+                rejection: PeerRejection::StaleSession
+            }
+        );
+        assert_eq!(peer.counters().stale_sessions, 2);
+        assert!(drain_sent(&mut pi).is_empty(), "応答しない");
+    }
+
+    /// `set_expression`へのACKを、Piが送った要求と相関できる（§6、#491）。
+    #[test]
+    fn a_set_expression_ack_is_correlated_with_the_outstanding_request() {
+        let mut peer = PeerSession::new(super::duplicate_policy());
+        let mut pi = connected_session_with_sid(PI_SID);
+        let _ = establish(&mut pi, &mut peer, ESP32_SID, 0);
+        let _ = drain_sent(&mut pi);
+
+        let command = Message::SetExpression(SetExpression {
+            name: ExpressionName::Happy,
+            transition_ms: 0,
+        });
+        let id = pi.send(command.clone(), 20).expect("queueへ入る");
+        assert_eq!(
+            peer.note_sent(id, command, 20),
+            Some(OutstandingKind::SetExpression)
+        );
+
+        let ack = Ack {
+            reply_sid: PI_SID,
+            reply_to: id,
+            status: AckStatus::Rejected,
+            code: Some(ErrorCode::StaleSession),
+            detail: None,
+        };
+        match receive(&mut pi, &mut peer, &ack_line(ESP32_SID, 5, ack), 30) {
+            Received::Ack(correlated) => {
+                assert_eq!(correlated.request, OutstandingKind::SetExpression);
+                assert_eq!(correlated.ack.code, Some(ErrorCode::StaleSession));
+            }
+            other => panic!("Ackを期待した: {other:?}"),
+        }
+        assert_eq!(peer.counters().unmatched_acks, 0);
     }
 
     /// Piが`hello`を送り、その`id`を記録する。
