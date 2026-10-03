@@ -85,19 +85,30 @@ baudの正本は`PROTO-TBD-001`でいずれも`Candidate`である。渡した�
 `--verbose`を付けない限り`Info`までを出す。`Debug`にするとread timeoutごとに1行出て
 （既定50 msなので毎秒20行）、長時間の観察では本当のeventが埋まる。
 
-**確かめられるのは「行が通ること」と、`boot`受信からsession確立までである。**それより先の
-protocol往復は確かめられない。この実行体は受信した`boot`だけを`handle_boot`経由で`PeerSession`
-（[Issue #12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)）へ渡し、`ack`／`status`を
-扱う`handle_frame`は呼ばない（理由は`examples/serial_link.rs`のmodule doc）。
-**ESP32側がprotocolを話すとは限らない。**接続のたびに`hello`を1件送るのは
-書き出し経路を通すためであって、handshakeではない（`reason`は初回が`Startup`、再接続が
-`PortReopen`。仕様§5.1）。記録では**「行が通った」と「protocolが成立した」を
-書き分ける。**`boot`／`ping`／`get_status`のsession logicそのものは`PeerSession`が持つが、
-simulator test（`tests/simulator.rs`）までの検証であり、実機での成立は確認していない。
+この実行体は、受信したframeを種類を問わず`handle_frame`で`PeerSession`
+（[Issue #12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)）へ渡し、送った`hello`の`id`を
+`note_hello_sent`で記録し、pumpの1周ごとに`retry_due_requests`でACK timeoutした`get_status`を送り直す
+（この実行体は`ping`を送らない）。`retry_due_requests`は、確立の直後にqueueへ入れられなかった`get_status`も送る。
+接続のたびに`hello`を1件送る（`reason`は初回が`Startup`、再接続が`PortReopen`。仕様§5.1）。
+
+**ESP32が`boot`→ACKより先の往復に応えるのは、`firmware/esp32`を
+[Issue #487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)のPR B2
+（[PR #529](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/529)）以降のsourceから、Pi linkを持つbuild（`bench-servo-test-17`以外）で書き込んだ場合である。**
+PR B2で、ESP32は`hello`／`ping`／`get_status`にACKを返し、`get_status`にはACKの直後に`status`を返す。
+初回の接続で`boot`より先に`hello`のACKが届けば、`hello`のACK（ESP32の`sid`を未承認のため
+`unapproved_hello_acks`へ数える。仕様§6）→`boot`とそのACK→`get_status`のACKと`status`、の順になる
+はずである。届く順序とESP32の状態によって`hello`のACKの数え方は変わる（正本は`PeerSession`の
+`pending_hello`のdocと`tests/simulator.rs`）。
+往復の順と、成り立つ条件は`examples/serial_link.rs`のmodule docにある。
+**実機ではまだ確かめていない。**ESP32側の振る舞いはsourceを読んで導いたものである。
+`PeerSession`のsession logicは、simulator test（`tests/simulator.rs`）と、この実行体を擬似端末で
+走らせた下の表の範囲までで確かめている。
+**ESP32側がprotocolを話すとは限らない。**記録では**「行が通った」と「protocolが成立した」を
+書き分ける。**
 
 ### host（VM）で確認済みの挙動
 
-**擬似端末を相手に実走させた。実serial portではない。**
+**擬似端末を相手に実走させた。実serial portではない。**下の表の「実行A」「実行B」は、このcrateの`serial_link`（#12の受信の配線を入れた版）を、fixtureの行で応える偽のESP32（repositoryに置いていないscript）と擬似端末で繋いだ別々の実行である。
 
 | 確認 | 結果 |
 |---|---|
@@ -105,6 +116,9 @@ simulator test（`tests/simulator.rs`）までの検証であり、実機での�
 | 行の往復 | `hello`を123 byte書き出して相手が受信。相手の`ping`行を受信して`sid`／`id`／型まで復元 |
 | idle | 4秒で`retries=80`、**`timeouts=0`**。「dataが無いだけ」をtimeoutとして数えていない |
 | 相手を落とす | 切断を観測（`disconnects=1`）し、再接続へ入って上限で停止 |
+| 未承認の`sid`の`hello`のACK（実行A。相手は`hello`を受けると、`boot`と同じ`sid`でACKを返す。`boot`はまだ送っていない） | `hello`の結果として受理せず、`unapproved_hello_acks=1`、`unmatched_acks=0` |
+| `boot`を受信（実行A。相手は上のACKの0.2秒後に`crates/deskcat-protocol/tests/fixtures/valid.json`の`boot_minimal`を送り、`get_status`を受けるとACKと同じfileの`status_snapshot`を続けて返す） | `Established`へ移り、`boot`のACKと`get_status`を送出。`get_status`のACKを相関させ（logの`ackを相関した: request=GetStatus`）、続く`status`を応答として扱う（`solicited=true`） |
+| `get_status`にACKが来ない（実行B。相手は実行Aと同じだが、`get_status`に応答しない） | ACK timeout（`SerialConfig::new`の既定の`RetryPolicy::provisional`。500 ms、`max_retries`は1）の後に同じ`id`で1回送り直し（偽のESP32が`id=3`の`get_status`を2回受信した）、予算を使い切って取り下げる（logの`応答待ちを取り下げた`） |
 
 ## 実機に残っていること
 
