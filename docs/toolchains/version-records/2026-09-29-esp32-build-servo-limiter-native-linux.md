@@ -105,7 +105,8 @@ Actual result:
   (1) cargo +esp-1.95.0.0 test（2 crate）                            成功。deskcat-protocol 89 tests
       （unit 58、conformance 11、error_codes 3、framing 5、limits 12）、deskcat-servo 41 tests
       （dedup 9、trajectory 32、unit 0）、doctest 4（deskcat-protocol 3、deskcat-servo 1）。失敗 0
-  (1) cargo +esp-1.95.0.0 clippy（2 crate、--all-targets）            成功。warning 0件  (2) cargo fmt --all -- --check                                     成功。差分なし
+  (1) cargo +esp-1.95.0.0 clippy（2 crate、--all-targets）            成功。warning 0件
+  (2) cargo fmt --all -- --check                                     成功。差分なし
   (2) cargo clippy --all-targets --locked -- -D warnings（既定構成）  成功。warning 0件
   (2) cargo build --locked（既定構成）                                成功
   (2) cargo clippy ... --features bringup-display-13                  成功。warning 0件
