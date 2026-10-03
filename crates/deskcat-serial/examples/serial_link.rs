@@ -267,8 +267,9 @@ fn report(counters: SessionCounters, peer: PeerCounters, state: ConnectionState)
     );
 }
 
-/// [`handle_frame`]の判断を1行のlogにする。**`status`の中身は出さない。**`boot`の`outcome`（確立した
-/// `boot`の`firmware`／`board`／`reset_reason`を含む）と、ACKの`reply_to`／`status`／`code`は出す。
+/// [`handle_frame`]の判断を1行のlogにする。**`status`とeventの中身は出さない。**`boot`の`outcome`（確立した
+/// `boot`の`firmware`／`board`／`reset_reason`を含む）と、ACKの`reply_to`／`status`／`code`と、
+/// eventの`type`と`id`は出す。
 ///
 /// `boot`への応答（ACKと、確立時の`get_status`）は[`handle_frame`]が送る。ここは出力だけである。
 fn log_received(received: &Received) {
@@ -284,6 +285,11 @@ fn log_received(received: &Received) {
         Received::Status(accepted) => {
             log::info!("statusを受理した: solicited={}", accepted.solicited);
         }
+        Received::Event(frame) => log::info!(
+            "eventを受けた: type={} id={}",
+            frame.message.type_str(),
+            frame.envelope.id
+        ),
         // 拒否と無視は`handle_frame`自身が`log::warn!`へ残している。ここでは重ねて出さない。
         Received::Rejected { .. } | Received::UndefinedType(_) => {}
         // `Received`は`#[non_exhaustive]`である。増えたvariantを黙って捨てない。

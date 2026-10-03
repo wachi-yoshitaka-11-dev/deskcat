@@ -20,11 +20,11 @@ message型、検証、上限付きline受信は[`deskcat-protocol`](../deskcat-p
   切断のerrnoと読みのtimeoutを契約どおりに正規化する（下記）
 - ESP32 peer sessionの状態（`PeerSession`、`src/peer.rs`）。`boot`のsession遷移、
   duplicate履歴、`hello`／`boot`以外の`stale_session`判定、Piが送った`ping`／
-  `get_status`への応答の相関（[Issue #12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)）
+  `get_status`／`set_expression`への応答の相関（[Issue #12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)）
 - 現在sessionのduplicate履歴（`DuplicateHistory`、`src/duplicate.rs`）。保持件数と保持期間
   （`PROTO-TBD-005`）は`DuplicatePolicy`として呼び出し側から受け取り、値を持たない
 - 受信frameの振り分け（`handle_frame`、`src/coordinator.rs`）。`ack`の相関、`status`の受理、
-  ESP32→Piで定義されていないtypeの計上
+  現在sessionのeventの受け渡し、ESP32→Piで定義されていないtypeの計上
 
 含まないもの:
 

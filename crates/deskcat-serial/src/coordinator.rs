@@ -4,8 +4,10 @@
 //! ここでやるのは3つだけである。
 //!
 //! - 受信した[`Frame`]をtypeごとに振り分ける（[`handle_frame`]）。`boot`は次項へ、
-//!   `ack`はPiの要求（`ping`／`get_status`）との相関へ、`status`は受理へ回し、
-//!   ESP32→Piで定義されていないtypeは応答せず計上する（§3、§6、§8）
+//!   `ack`はPiの要求（`ping`／`get_status`／`set_expression`）との相関へ、`status`は受理へ、
+//!   event（`head_touched`、`tapped`、`lifted`、`environment`）は現在sessionの判定を
+//!   通して呼び出し側へ回し、ESP32→Piで定義されていないtypeは応答せず計上する
+//!   （§3、§4.2〜§4.5、§6、§8）
 //! - `boot`を1件処理してACKを送り返す（outcomeによらず常に。§4.1）。ACKの
 //!   送信自体が失敗しても、この関数は再試行しない（回復はESP32側の`boot`再送に
 //!   頼る）。確立した場合は続けて現在状態を要求し（§10.1 step1〜4）、
@@ -35,7 +37,7 @@ pub enum Received {
     Ack(CorrelatedAck),
     /// 現在sessionの`status`を受理した。
     Status(Box<AcceptedStatus>),
-    /// `ack`または`status`を拒否した。**応答は返さない**（ESP32→Piのeventと、Piの要求への
+    /// `ack`、`status`、またはeventを拒否した。**応答は返さない**（ESP32→Piのeventと、Piの要求への
     /// 応答は、返す先の要求が無い。§8）。
     Rejected {
         /// 受信したmessageのtype。
@@ -43,7 +45,11 @@ pub enum Received {
         /// 拒否した理由。
         rejection: PeerRejection,
     },
-    /// ESP32→Piで定義されていないtype（`hello`・`ping`・`get_status`）を、応答せず無視した。
+    /// 現在sessionのevent（`head_touched`、`tapped`、`lifted`、`environment`。§4.2〜§4.5）を
+    /// 受けた。**応答は返さない**（§8）。何をするかは呼び出し側が決める。
+    Event(Frame),
+    /// ESP32→Piで定義されていないtype（`hello`・`ping`・`get_status`・`set_expression`・
+    /// `show_text`。いずれもPi→ESP32のmessageである）を、応答せず無視した。
     UndefinedType(&'static str),
 }
 
@@ -56,11 +62,12 @@ pub enum Received {
 /// | `boot` | [`handle_boot`]へ渡す。ACKは拒否でも返す（§4.1） |
 /// | `ack` | [`PeerSession::correlate_ack`]でPiの要求と相関する。`reply_sid`はこの`Session`の`sid`と照合する。Piの`hello`へのACKも相関する（下記） |
 /// | `status` | [`PeerSession::accept_status`]で受理する。`get_status`への応答かどうかも返す |
+/// | `head_touched`、`tapped`、`lifted`、`environment` | [`PeerSession::accept_event`]で現在sessionかを判定し、[`Received::Event`]にする。応答しない |
 /// | それ以外 | ESP32→Piでは定義されていない。応答せず[`PeerSession::note_undefined_type`]で計上する |
 ///
 /// 拒否と無視は`log::warn!`へ残す。握りつぶさない。
 ///
-/// **`ping`／`get_status`が`stale_session`で拒否された場合の再開（§3.1「現在の`sid`のまま`hello`から
+/// **`ping`／`get_status`／`set_expression`が`stale_session`で拒否された場合の再開（§3.1「現在の`sid`のまま`hello`から
 /// 再開する」、§10.2）は、ここでは行わない。**`hello`の送出と再送はPi自身のsession
 /// 確立の経路であり、この関数は判断を[`Received::Ack`]として呼び出し側へ返すだけである。
 ///
@@ -104,6 +111,16 @@ pub fn handle_frame(
         },
         Message::Status(status) => match peer.accept_status(envelope.sid, *status) {
             Ok(accepted) => Received::Status(Box::new(accepted)),
+            Err(rejection) => reject(type_str, envelope.sid, envelope.id, rejection),
+        },
+        event @ (Message::HeadTouched(_)
+        | Message::Tapped
+        | Message::Lifted(_)
+        | Message::Environment(_)) => match peer.accept_event(envelope.sid) {
+            Ok(()) => Received::Event(Frame {
+                envelope,
+                message: event,
+            }),
             Err(rejection) => reject(type_str, envelope.sid, envelope.id, rejection),
         },
         _ => {
