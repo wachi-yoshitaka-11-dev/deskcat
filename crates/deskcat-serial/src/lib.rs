@@ -24,7 +24,7 @@
 //!   共用するために移した）。[`duplicate`]はそのmoduleのre-exportであり、以前のpathを保つ
 //! - [`Session`]と[`PeerSession`]をまたいだ受信と送信の判断（[`handle_frame`]、
 //!   [`handle_boot`]、[`retry_due_requests`]）。受信frameの振り分け（`ack`の相関、
-//!   `status`の受理）、`boot`確立後の`get_status`送出（§10.1 step1〜4）と、
+//!   `status`の受理、現在sessionのeventの受け渡し）、`boot`確立後の`get_status`送出（§10.1 step1〜4）と、
 //!   ACK timeoutした要求の同一`id`再送（§9）に限る
 //!   （`crates/deskcat-serial/src/coordinator.rs`）
 //!
