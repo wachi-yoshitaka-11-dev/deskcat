@@ -487,14 +487,14 @@ Raspberry Pi公式文書「Configure UARTs」（上で引いた`interfaces.adoc`
 ### 信号線をつないでよい条件
 
 次をすべて守る。守れないときは、PiとESP32の間のUARTの信号線とGNDの線をつながない。
-電源側の条件（ESP32に周辺moduleをつながないことを含む）は、[power-budget.md](power-budget.md)の`5 V ingress`節の`検証の構成の扱い`が持つ。
+電源側の条件は、[power-budget.md](power-budget.md)の`5 V ingress`節の`検証の構成の扱い`が持つ。同節はESP32に周辺moduleをつながない構成を定める。周辺moduleをつないだ台は、power-budget.mdの`DISP-01`追加接続のbring-upの手順の条件(3)(a)が、その手順に限って定める。
 
 1. **2本の信号線（`PI-UART-TX`、`PI-UART-RX`）に、それぞれ4.7 kΩを直列に入れる。**
 2. **UARTの信号線は、PiとESP32の両方に電源が入っている間だけつなぐ。**電源を入れるときは両方を
    入れてから信号線をつなぎ、どちらかの電源を切るとき（USBや電源cableを抜くときを含む）は、先に信号線を外す。
-3. firmwareとhostがこのUARTに対応している。firmwareはPi linkを持つbuild（`bench-servo-test-17`以外のすべて。製品buildである既定buildを含む。#487）が対応する（[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)。対応するのは`boot`→ACKだけである。このbuildをつなぐのは、ユーザーの決定（[#446のコメント](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446#issuecomment-5863027108)。別電源とUARTの構成で、はんだ付け（#405）の前に進める試験を挙げている）が挙げる試験に限る。#446の受け入れ条件4、#11の実portの確認、#12の実機の確認、#13の受け入れ条件6である（このbuildで確かめられるのは`boot`→ACKの範囲だけであり、Pi→ESP32方向のrequestは処理しない。`firmware/esp32/src/console.rs`の(3)）。#13の受け入れ条件6の試験は、`power-budget.md`の`DISP-01`追加接続のbring-upの手順の条件(3)(a)（Piを同時に接続しない）を改めた後に行う（改訂は#13が行う）。**常時接続する製品の構成として使える段階ではない。**理由は`firmware/esp32/src/console.rs`のmodule doc）。hostは上の`Pi側の設定`を済ませたPiで`/dev/serial0`を開く（実portでのopenは、hostの側でもまだ確かめていない。`crates/deskcat-serial/README.md`）。
+3. firmwareとhostがこのUARTに対応している。firmwareはPi linkを持つbuild（`bench-servo-test-17`以外のすべて。製品buildである既定buildを含む。#487）が対応する（[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)。対応するのは、ESP32→Piの`boot`とそのACK、Pi→ESP32の`hello`／`ping`／`get_status`への応答である（`firmware/esp32/src/pi_link.rs`のmodule doc。同docの「実装していないもの」は対応しない）。このbuildをつなぐのは、ユーザーの決定（[#446のコメント](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446#issuecomment-5863027108)。別電源とUARTの構成で、はんだ付け（#405）の前に進める試験を挙げている）が挙げる試験に限る。#446の受け入れ条件4、#11の実portの確認、#12の実機の確認、#13の受け入れ条件6である（Pi→ESP32方向の受信は、decodeで拒否した行のうち、未対応のtypeとpayload・envelopeの不正の行には相関ACKを返さない既知の逸脱があり、流量制限も実装していない。`firmware/esp32/src/console.rs`の(3)、`firmware/esp32/src/pi_link.rs`のmodule doc）。#13の受け入れ条件6の試験は、`power-budget.md`の`DISP-01`追加接続のbring-upの手順の条件(3)(a)の、Piをつなぐ場合の扱いに従う。**常時接続する製品の構成として使える段階ではない。**理由は`firmware/esp32/src/console.rs`のmodule doc）。hostは上の`Pi側の設定`を済ませたPiで`/dev/serial0`を開く（実portでのopenは、hostの側でもまだ確かめていない。`crates/deskcat-serial/README.md`）。
 4. 初回の接続と通電は、人間が監視する。baud 115200で直列抵抗を入れたまま通信できるかも、初回の接続で確かめる。
-5. **PiとESP32は別々に給電し、GNDを共通にする**（検証の構成では、PiはM-12001、ESP32はPCのUSB）。**ESP32をPiのUSB OTGから給電した状態では、信号線をつながない。**給電の構成はユーザーの決定である（[#446の決定](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446#issuecomment-5863027108)、[別電源接続の安全](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446#issuecomment-5863142360)）。後半の一文（USB OTG給電ではつながない）は、決定の「別電源にする」から導いたものである。`power-budget.md`の`ESP32の給電経路（案Aで確定。実測待ち）`節（PiのUSB OTGからの給電）は以前の方式を前提にしており、その改訂は[#488](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/488)の`A4`で扱う（下の`以前の方式`）。
+5. **PiとESP32は別々に給電し、GNDを共通にする**（検証の構成では、PiはM-12001、ESP32はPCのUSB）。**ESP32をPiのUSB OTGから給電した状態では、信号線をつながない。**給電の構成はユーザーの決定である（[#446の決定](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446#issuecomment-5863027108)、[別電源接続の安全](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446#issuecomment-5863142360)）。後半の一文（USB OTG給電ではつながない）は、決定の「別電源にする」から導いたものである。`power-budget.md`の`ESP32の給電経路（最終の経路は未決定）`節は、以前の方式（PiのUSB OTGからの給電）を前提にしていた。この決定に合わせた改訂は[#488](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/488)の`A4`で行った（下の`以前の方式`）。
 6. **通電の前に、GNDの線と、UARTの2本の線のPiのheader側の端を確かめる。**方法と記録は[power-budget.md](power-budget.md)の`通電前の配線確認手順`の`確認の方法`の1、3、4、5による（1は、ESP32のUSBも抜いた状態で始める）。
    - GNDの線：Piのheaderの、線を挿していない別のGNDのpinと、ESP32 boardの、線を挿していない別のGNDのpinの間を、`MEAS-03`の`2000Ω` rangeで測る。確認の方法3(ii)の自己確認も同じrangeで行う。開放側の値として、GNDの線を挿す前に同じ2点間を読み、記録する。プローブを当てた瞬間の値だけで判定せず、数秒間読みを見る。**読みが、3(ii)の短絡の表示と同じ程度のまま変わらない場合を導通側として合格とする。**それ以外は通電しない
    - UARTの2本：Piのheader側の端が上の表の`物理接続`のpinに挿さっていることと、条件1の4.7 kΩが入っていることを、目で確かめる。ESP32側の端は、条件2でつなぐ前に、挿す先が`物理接続`のpinであることを目で確かめる
@@ -520,8 +520,8 @@ PiのUSB OTG portとESP32 boardのMicro USB portをUSB cable 1本でつなぎ、
 USB-UARTブリッジ経由でUART0（GPIO1／GPIO3）を使う方式である（Pi側のdeviceは`/dev/ttyUSB*`）。
 USB OTG変換cable（`hardware-bom.md`の`CABLE-PI-LINK-01`）はこの方式のために手持ちで充当していた。
 **firmwareは、[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)でこの方式（UART0）からGPIO13／GPIO14のUARTへ移した**（PR Aで当時の`pi-protocol-mode`を移し、PR B1でそのfeatureをやめて製品build（既定build）へ入れた）。
-**`power-budget.md`の`ESP32の給電経路（案Aで確定。実測待ち）`節（案A「USB VBUS単独給電」）は、この以前の方式を前提にしている。**
-同節の改訂は[#488](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/488)の一覧の`A4`で扱う（ESP32の最終の給電経路は[#405](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/405)の実装設計の見直しで決める）。
+**`power-budget.md`の`ESP32の給電経路（最終の経路は未決定）`節（案A「USB VBUS単独給電」）は、この以前の方式を前提にしていた。**
+同節の改訂は[#488](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/488)の一覧の`A4`で行った（ESP32の最終の給電経路は[#405](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/405)の実装設計の見直しで決める）。
 
 ## Bus計画
 
