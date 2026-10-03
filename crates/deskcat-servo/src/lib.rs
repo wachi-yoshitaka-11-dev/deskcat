@@ -30,7 +30,7 @@
 //!
 //! # 範囲
 //!
-//! 含むもの（`servo-safety-limits.md`の`Command処理`の中央3段）:
+//! 含むもの:
 //!
 //! - `motion-name/target validation`と`hard range clamp or rejection`（[`Limiter::admit`]）
 //! - `velocity and acceleration limiting`（[`Limiter::step`]）
