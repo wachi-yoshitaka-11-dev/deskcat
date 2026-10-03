@@ -330,6 +330,8 @@ impl RetryPolicy {
 /// ために移した）。以前のpath（`deskcat_serial::config::DuplicatePolicy`）を保つためにre-exportする。
 /// **既定値を持たない**ことも、[`ReconnectPolicy::provisional`]や[`RetryPolicy::provisional`]の
 /// ような仮の値を持たないことも、移す前と同じである。
+/// **`DuplicatePolicy::new`のerror型は、[`ConfigError`]から`deskcat_protocol::DuplicatePolicyError`に
+/// 変わった。**[`ConfigError`]が要る呼び出し側は、下の`From`で変換する（`?`、`map_err(ConfigError::from)`）。
 pub use deskcat_protocol::DuplicatePolicy;
 
 /// `DuplicatePolicy::new`の拒否（`deskcat_protocol::DuplicatePolicyError`）を、このcrateの

@@ -23,8 +23,9 @@
 //! どれも最終的な拒否である。記録しないと、再送のたびに`admit`が走り、rejection counterを
 //! 二重に数える。
 //!
-//! **記録しない例外は、`hello`／`boot`の`rate_limited`だけである**（Protocol §8）。
-//! motionは通常commandなので、拒否はすべて記録する。
+//! `Limiter::admit`が返す拒否は、どれも最終的な拒否であり、記録する。§8が記録しないと
+//! 定めるのは`hello`／`boot`の`rate_limited`だけで（手順9）、motionはそれに当たらない。
+//! `busy`を記録するかは§8に定めが無く、ここでは扱わない。
 //!
 //! # 所有者との分担
 //!
@@ -38,7 +39,7 @@
 //! `now_ms`は単調に増加する値を渡す（[`DuplicateHistory::record`]の契約）。firmwareでは
 //! `std::time::Instant`（`CLOCK_MONOTONIC`）から取る前提である（firmware側の呼び出しはまだ無い）。
 //! **契約が破られて時刻が戻った場合、entryが履歴に残っている間は、記録した結果を返す
-//! （Replay）。**件数の上限で追い出された後は`Expired`になる。変わるのは、
+//! （Replay）。**件数の上限か、別の`id`の記録で追い出された後は`Expired`になる。変わるのは、
 //! `duplicate_expired`で拒否する代わりに記録した結果を返すことだけであり、どちらでも
 //! `admit`は呼ばれない。
 //!
@@ -52,8 +53,10 @@ use deskcat_protocol::{DuplicateHistory, DuplicatePolicy, ErrorCode, Lookup};
 use crate::limiter::Rejection;
 
 /// [`MotionDedup::admit_once`]の結果。
+///
+/// **`#[non_exhaustive]`にしない。**[`Lookup`]と同じ理由である。別のcrate（firmware）の
+/// `match`が網羅的であることを保ち、種類を足したときにcompileで止めるためである。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[non_exhaustive]
 pub enum DedupOutcome {
     /// 初めての`id`だった。`admit`を1回呼び、その結果を記録した。
     Admitted(Result<(), Rejection>),

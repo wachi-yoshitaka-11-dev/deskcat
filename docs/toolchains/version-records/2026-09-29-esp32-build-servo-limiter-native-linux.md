@@ -32,7 +32,9 @@ Machine profile: ESP32 Build
 Operator role: AI agent作業（build-onlyのみ。flash・monitor・USBシリアルポートは開いていない）
 Repository commit: 0bb0d6cfc962d774e5c609885685680b96a43c24（#19の段2の作業branchのcommit。
   親は origin/develop 43189b83f66042b22c3804dccf4e20fb3a1258fb）。
-  **このcommitより後に同branchへ入れるcommitは、動作を変えない（doc commentを除き、code、manifest、lockfileは変えない）。**squash mergeの後はこのSHAがdevelopから辿れなくなるため、
+  **このcommitより後に同branchへ入れるcommitは、動作を変えない。依存とlockfileは変えない。**最終有効な検証の後の変更は、
+  下の再実行の行（esp-1.95.0.0のtestとclippy）で確かめ直した。firmwareから呼ばれるcodeは変えていないので、
+  firmwareのbuildは回し直していない。squash mergeの後はこのSHAがdevelopから辿れなくなるため、
   そのときはPull Requestのcommit一覧から辿る
 Working tree clean: yes（`git archive 0bb0d6c`でscratchpadへ展開した未改変コピーを使用。
   worktree・main checkoutいずれのgit stateも変更していない）
@@ -106,7 +108,8 @@ Actual result:
       （unit 58、conformance 11、error_codes 3、framing 5、limits 12）、deskcat-servo 41 tests
       （dedup 9、trajectory 32、unit 0）、doctest 4（deskcat-protocol 3、deskcat-servo 1）。失敗 0
   (1) cargo +esp-1.95.0.0 clippy（2 crate、--all-targets）            成功。warning 0件
-      （最終有効な検証とは別に、doc commentだけの直しの後に、esp-1.95.0.0のclippyを2026-10-03T10:36 JSTにworktreeで回し直した。warning 0件）
+      （最終有効な検証とは別に、その後の直しを入れたworktreeで、esp-1.95.0.0のtestとclippyを
+      2026-10-03T10:45 JSTに回し直した。test 134件（(1)と同じ内訳）、失敗 0、clippy warning 0件）
   (2) cargo fmt --all -- --check                                     成功。差分なし
   (2) cargo clippy --all-targets --locked -- -D warnings（既定構成）  成功。warning 0件
   (2) cargo build --locked（既定構成）                                成功

@@ -267,7 +267,7 @@ fn distinct_ids_are_each_admitted_once() {
 /// 戻ったときに変わるのは、`duplicate_expired`で拒否する代わりに記録した結果を返すことだけで、
 /// どちらでも`admit`は呼ばれない。
 #[test]
-fn a_clock_that_moves_backwards_replays_instead_of_expiring_under_the_monotonic_contract() {
+fn a_backwards_clock_replays_when_the_monotonic_contract_is_broken() {
     let mut owner = Owner::new(TEST_CAPACITY, TEST_RETENTION_MS);
     owner.command(1, 5_000, TEST_MOTION, 1.0);
 
