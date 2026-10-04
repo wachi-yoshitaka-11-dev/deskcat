@@ -29,7 +29,7 @@
 //! 有効である。外部10 kΩはどちらもpull-downとして置き、GPIO5も消灯側へ定める
 //! （`gpio-assignment.md`の`reset時のpin状態`と`選定した値と本数`）。
 //! **その後、ROM／2nd-stage bootloaderが動く区間と`main()`の先頭の実際の電位は、一次資料でも
-//! 実機でも確かめていない**（同文書の`LED-COMM`／`LED-REACT`行）。**向きの設定（`gpio_set_direction`）と消灯levelの設定の間に、出力registerの
+//! 実機でも確かめていない**（`gpio-assignment.md`の`LED-COMM`／`LED-REACT`行）。**向きの設定（`gpio_set_direction`）と消灯levelの設定の間に、出力registerの
 //! 値が一瞬出る。**両pinとも、その値が点灯側（High）か消灯側（Low）かも、長さも確かめていない。
 //! 電流は直列抵抗`R`で制限される（led-514-demo.mdの`電流の見積もりと残る観察`）。esp-idf-halの
 //! `PinDriver`は向きを先に設定する。`unsafe`を使わずにこの区間を無くす方法は見つけていない（試していない）。

@@ -1,7 +1,7 @@
 # #514 発光ダイオードのデモ回路案
 
 > 状態: 初回デモの配線案と、点灯試験用のfirmware（`bringup-led-514`。build確認まで）。実機での配線・通電・明るさ確認は未実施。
-> **`3V3` pinへLEDを足して通電することは、まだ人間の承認を得ていない**（下の`3V3 pinへ負荷を足す条件`）。
+> **LEDの2枝を足して通電することは、まだ人間の承認を得ていない**（その電流は安全側の仮定として`3V3`系に数える。下の`3V3 pinへ負荷を足す条件`）。
 > 対象: 筐体から見える白1本（通信）と赤1本（猫の反応）。フォトICダイオードは使わない。
 
 ## 判断の出所
@@ -36,7 +36,7 @@ ESP32 boardのGPIOから電流を出し、GPIOとLEDの間にそれぞれ独立�
     GPIO5 ─ 10 kΩ ─ GND                     (起動時のLowを定める)
 ```
 
-白はGPIO2を、赤はGPIO5をHighにすると点灯する。どちらもGPIOから電流を出す向き（source）で駆動する。GPIOが電流を引き込む向き（sink）には公開された定格が無いため、使わない（下の`電流の見積もりと残る観察`）。
+白はGPIO2を、赤はGPIO5をHighにすると点灯する。どちらもGPIOから電流を出す向き（source）で駆動する。GPIOが電流を引き込む向き（sink）には、絶対最大や保証値（max）が公開されていない。公開されているのは`IOL`のtyp 28 mAだけである（[GPIO Assignment](gpio-assignment.md)）。そのためsinkでは使わない（下の`電流の見積もりと残る観察`）。
 
 **起動時の電位。**[ESP32-WROOM-32D／32U datasheet v2.8](https://documentation.espressif.com/esp32-wroom-32d_esp32-wroom-32u_datasheet_en.pdf)の§3 Table 4は、strapping pinの既定をGPIO2がpull-down、GPIO5がpull-upとする。外部10 kΩはどちらもpull-downとして置く。同§3.1 Table 6はdownload bootを「GPIO0＝0かつGPIO2＝0」とし、GPIO2のLowはこれと整合する。同§3.4 Table 8によれば、GPIO5が効くのはMTDOとの組でのSDIO slaveのtimingだけであり、外部pull-downでGPIO5をLowに定めると、その組は（MTDO＝1、GPIO5＝0）になる。DeskCatはSDIO slaveを使わない。GPIO0／12／15には触れないので、MTDO（GPIO15）は既定のpull-up（boot logを出す側。同§3.3 Table 7）のままである。**reset中とreset直後の内部pullは[ESP32 Series Datasheet](https://documentation.espressif.com/esp32_datasheet_en.pdf) v5.3のA.4 `IO_MUX`による（[GPIO Assignment](gpio-assignment.md)の`reset時のpin状態`）。その後、bootloaderが動く区間の実際の電位は確かめていない。**
 
@@ -46,7 +46,7 @@ ESP32 boardのGPIOから電流を出し、GPIOとLEDの間にそれぞれ独立�
 
 ### 電流の見積もりと残る観察
 
-抵抗はdatasheetの許容差（`J = ± 5%`）の下限、公称の−5%の313.5 Ωとして、LEDを短絡した最悪側を、ESP32 moduleの推奨給電上限3.6 V（同datasheet §5.2 Table 14）で見積もる。
+抵抗はdatasheetの許容差（`J = ± 5%`）の下限、公称の−5%の313.5 Ωとして、LEDを短絡した最悪側を、ESP32 moduleの推奨給電上限3.6 V（ESP-WROOM-32D datasheet v2.8 §5.2 Table 14）で見積もる。
 
 ```text
 1枝の電流の見積もり    I_max = 3.6 V / 313.5 Ω ≈ 11.5 mA
@@ -57,17 +57,19 @@ pull 1本の電流          3.6 V / 5 kΩ ≈ 0.72 mA
 
 pullの10 kΩ（`RES-PULL-01`）は許容差の記録が無いため、[Power Budget](power-budget.md)と同じく抵抗の半分（5 kΩ）として見積もる。
 
-`I_max`は、白LEDのDC絶対最大30 mA、赤LEDの50 mAより低い。LEDが短絡すると、GPIO2とGPIO5はそれぞれ`I_max`を出す（source）。同datasheet §5.1 Table 13（Absolute Maximum Ratings）は`Cumulative IO output current`をmax 1,100 mAとし、そのNote 1は、3つのpower domainのIOをHighで出力してGNDへつないだ24時間の試験の後も正常に動いたとする（GPIO2は`VDD3P3_RTC`、GPIO5は`VDD3P3_CPU`）。GPIOが電流を引き込む向き（sink）の定格は公開されていないため、sinkで駆動する回路は使わない。firmwareはdrive strengthをESP-IDFの既定のままにする。電流を決めるのは`R`である。`P_max`（41.3 mW）は、datasheetの70 ℃での定格1/4 W（250 mW）の約17%である（計算）。**これは回路計算であり、実機測定ではない。**
+`I_max`は、白LEDのDC絶対最大30 mA、赤LEDの50 mAより低い。LEDが短絡すると、GPIO2とGPIO5はそれぞれ`I_max`を出す（source）。ESP-WROOM-32D datasheet v2.8 §5.1 Table 13（Absolute Maximum Ratings）は`Cumulative IO output current`をmax 1,100 mAとし、その表のNote 1は、3つのpower domainのIOをHighで出力してGNDへつないだ24時間の試験の後も正常に動いたとする（GPIO2は`VDD3P3_RTC`、GPIO5は`VDD3P3_CPU`）。GPIOが電流を引き込む向き（sink）は、絶対最大や保証値（max）が公開されておらず、公開されているのは`IOL`のtyp 28 mAだけであるため、sinkで駆動する回路は使わない。firmwareはdrive strengthをESP-IDFの既定のままにする。電流を決めるのは`R`である。`P_max`（41.3 mW）は、datasheetの70 ℃での定格1/4 W（250 mW）の約17%である（計算）。**これは回路計算であり、実機測定ではない。**
 
 白LED [`OSPW5111B-QR`](https://akizukidenshi.com/goodsaffix/OSPW5111B-QR.pdf)のVfは20 mA・25 ℃で2.8–4.0 Vなので、3.3 Vで期待する明るさは保証できない。同資料にVf–If曲線は無い。初回デモで視認できるか観察し、不足する場合は5 V系とスイッチ素子を使う回路を別途検討する。赤 [`OSHR5161A-QR`](https://akizukidenshi.com/goodsaffix/OSHR5161A-QR.pdf)も明るさを観察する。白の型番は、包装の型番とロットの表示で識別した。赤の型番は、セット写真の袋の印字とユーザーの申告で識別した。赤のロットは照合していない（2026-10-01のユーザー判断。[hardware-bom.md](hardware-bom.md)の`LED-COMM-01`／`LED-REACT-01`）。筐体の取付位置は[#34](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/34)と合わせて決める。
 
 ## `3V3` pinへ負荷を足す条件
 
+**LEDは`3V3` pinにつながない（GPIO → `R` → LED → GND）。LEDの電流はGPIOから出るが、その電流が`3V3` pinを経由するかは記録が無く、安全側の仮定として`3V3`系に数える。この仮定のもとで、LEDをこの条件の対象に入れる。**
+
 **この条件はまだ満たしていない。満たすまでLEDをつないで通電しない。**
 
-ESP32 boardの`3V3` pinから外部負荷を取ること（段階B-2a）は、[HW-TBD-023](tbd-register.md#hw-tbd-023)の(a)が未確定の間は許可されていない。例外は`ACCEL-01`／`ENV-01`（[#445](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/445)）と`DISP-01`（[#461](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/461)）だけであり、**どちらもLEDを含まない。**[Power Budget](power-budget.md)の`DISP-01`追加接続のbring-upの手順の条件(3)(a)も、`3V3` railに載る負荷をESP32本体・`ACCEL-01`・`ENV-01`・`DISP-01`だけに限っている。LEDの枝と10 kΩ pullを足すと、この条件から外れる。白の枝はGPIO2（`VDD3P3_RTC` domain）から流れる。その電流が`3V3` pinを経由するかは正本のどこにも記録が無い（[Power Budget](power-budget.md)のGPIO4について同じ扱い）。**ここでは安全側の仮定として`3V3`系に数える。**
+ESP32 boardの`3V3` pinから外部負荷を取ること（段階B-2a）は、[HW-TBD-023](tbd-register.md#hw-tbd-023)の(a)が未確定の間は許可されていない。例外は`ACCEL-01`／`ENV-01`（[#445](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/445)）と`DISP-01`（[#461](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/461)）だけであり、**どちらもLEDを含まない。**[Power Budget](power-budget.md)の`DISP-01`追加接続のbring-upの手順の条件(3)(a)も、`3V3` railに載る負荷をESP32本体・`ACCEL-01`・`ENV-01`・`DISP-01`だけに限っている。LEDの枝と10 kΩ pullを`3V3`系に数えると、この条件から外れる。白の枝はGPIO2（`VDD3P3_RTC` domain）から流れる。その電流が`3V3` pinを経由するかは正本のどこにも記録が無い（[Power Budget](power-budget.md)のGPIO4について同じ扱い）。**ここでは安全側の仮定として`3V3`系に数える。**
 
-**必要なのは、人間が「LEDの2枝を`3V3` pinへ足して通電してよい」と明示し、その記録が通電前に#514のコメント等で確認できることである。**AIの判断として、次の理由で承認を求める。
+**必要なのは、人間が「LEDの2枝を足して通電してよい（その電流は安全側の仮定として`3V3`系に数える）」と明示し、その記録が通電前に#514のコメント等で確認できることである。**AIの判断として、次の理由で承認を求める。
 
 - **増える電流の見積もり。**LEDが短絡した場合の計算値は、330 Ωの許容差の下限で各枝約11.5 mA、pullを含めた増分は約24.4 mAである（上の`電流の見積もりと残る観察`）。
 - **#461と同じ枠組みで余裕を見積もれる。**#461の判断は保守側の場合(a)を使い、`3V3`系の通常動作の合計を約245.4 mA、`U2`（UMW `LD1117-3.3`）の連続定格1 Aに対して約4.1倍と見積もった（[tbd-register-history.md](tbd-register-history.md)の`HW-TBD-024`、2026-09-23追記）。増分の約24.4 mAを足すと**約270 mAで、約3.7倍**になる（これは#461の比で、Power Budgetの`marginの定義`が5 V経路に当てる「定格の最小値の80%」の規則とは別の見積もりである。`U2`の1 Aの80%は800 mAで、270 mAはその内側にあるが、typ値を含む見積もりのため合否には使わない）。**#461と同じくtyp値を含む見積もりであり、worst-caseは未確定のままである。**`U2`の損失の増分は、USB給電（`Vin`＝5 V）で `0.0244 A × (5.0 − 3.3) V ≈ 41 mW`、同じ記録の熱計算（`Rθja` 88 ℃/W）で温度上昇は約3.7 ℃増える（計算）。
