@@ -5,7 +5,7 @@
 - Record ID: `2026-09-29-esp32-build-servo-limiter-native-linux`
 - 判定: `Partial`
 - 初回検証日: 2026-09-29
-- 最終有効な検証日時: 2026-10-03T10:08 JST（2026-10-03T09:59 JSTに開始した下の実行）
+- 最終有効な検証日時: 2026-10-04T12:26 JST（2026-10-04T12:18 JSTに開始した下の実行）
 
 **この記録は3つのことを示す。**(0) host workspaceの検証済みcommand（stable）が同じtreeで通ること、(1) ESP toolchainのrustc（`esp-1.95.0.0`）で`crates/deskcat-servo`と
 `crates/deskcat-protocol`のtestとlintが通ること（`deskcat-servo`の`rust-version = "1.95"`の根拠）、
@@ -27,15 +27,15 @@ developのcommit 710c67f（PR #513のsquash merge）の時点のこの記録に�
 
 ```text
 Record ID: 2026-09-29-esp32-build-servo-limiter-native-linux
-Date: 2026-09-29（初回）。下の値は最終有効な検証（2026-10-03T09:59〜10:08 JST）のもの
+Date: 2026-09-29（初回）。下の値は最終有効な検証（2026-10-04T12:18〜12:26 JST）のもの
 Machine profile: ESP32 Build
 Operator role: AI agent作業（build-onlyのみ。flash・monitor・USBシリアルポートは開いていない）
-Repository commit: 0bb0d6cfc962d774e5c609885685680b96a43c24（#19の段2の作業branchのcommit。
-  親は origin/develop 43189b83f66042b22c3804dccf4e20fb3a1258fb。
+Repository commit: 49aaa859ca035de98178b890d61ca466a7c5b282（#19の段2の作業branchのcommit。
+  親は 16c7fdb3adc8d428269fd991b76aee4c8cf06b60。
   このcommitのtreeだけを覆う。後のcommitの検証はPull Requestの本文にある）。
   squash mergeの後はこのSHAがdevelopから辿れなくなるため、
   そのときはPull Requestのcommit一覧から辿る
-Working tree clean: yes（`git archive 0bb0d6c`でscratchpadへ展開した未改変コピーを使用。
+Working tree clean: yes（`git archive 49aaa85`でscratchpadへ展開した未改変コピーを使用。
   worktree・main checkoutいずれのgit stateも変更していない）
 
 OS name: Ubuntu
@@ -100,9 +100,9 @@ Expected result: すべて成功する。warningを出さない。(1)は`--ignor
   （`deskcat-servo`が`rust-version = "1.95"`を宣言しているため）。
 
 Actual result:
-  (0) cargo fmt／clippy／test（host workspace）                        成功。warning 0件。269 tests、失敗 0
-      （test target 263件: deskcat-config 0＋4＋4＋2、deskcat-domain 0＋13、deskcat-protocol 58＋11＋3＋5＋12、
-      deskcat-serial 45＋65、deskcat-servo 0＋9＋32。doctest 6件: deskcat-protocol 3、deskcat-serial 2、deskcat-servo 1）
+  (0) cargo fmt／clippy／test（host workspace）                        成功。warning 0件。272 tests、失敗 0
+      （test target 266件: deskcat-config 0＋4＋4＋2、deskcat-domain 0＋13、deskcat-protocol 58＋11＋3＋5＋12、
+      deskcat-serial 45＋68、deskcat-servo 0＋9＋32。doctest 6件: deskcat-protocol 3、deskcat-serial 2、deskcat-servo 1）
   (1) cargo +esp-1.95.0.0 test（2 crate）                            成功。deskcat-protocol 89 tests
       （unit 58、conformance 11、error_codes 3、framing 5、limits 12）、deskcat-servo 41 tests
       （dedup 9、trajectory 32、unit 0）、doctest 4（deskcat-protocol 3、deskcat-servo 1）。失敗 0
@@ -116,15 +116,15 @@ Actual result:
 Build duration:
   (0) fmt 1秒未満、clippy 約15秒、test 約19秒
   (1) test 約26秒、clippy 約11秒
-  cargo clippy（既定構成、ESP-IDF本体のcompileを含む）  約6分16秒
-  cargo build（既定構成、clippy後）                     約52秒
+  cargo clippy（既定構成、ESP-IDF本体のcompileを含む）  約6分8秒
+  cargo build（既定構成、clippy後）                     約51秒
   cargo clippy／build（+bringup-display-13、増分）      約3秒／約10秒
 Peak memory if measured: 未測定
 Storage delta if measured:
-  build前後の`df -h /` Used: 44G → 46G（scratchpad上のtarget。既存.embuildをsymlinkしたため.embuild分は増加なし）
+  未測定
 Generated artifact identity（いずれも target/xtensa-esp32-espidf/debug/deskcat-esp32。同じpathを構成ごとに上書きしたため、各build直後に取得した）:
-  既定構成            17,316,424 bytes  sha256 2cadca05da7d18b9e7d9e724891dfbaaf7a05b7c9facedf98881617162c20a19
-  bringup-display-13  17,962,088 bytes  sha256 6c2a826010d9328d9acd4254deac291202e30bdc21fc393b7e199a7286aaa5e1
+  既定構成            17,316,136 bytes  sha256 3cdafe083387537d9dfae633c8431a7478fbd3a4842c867d12bc20f16321b13e
+  bringup-display-13  17,961,780 bytes  sha256 6c16ea63ea8dcb38c939dbfb00cc5df659b672ef97ad2f29fb2f0a29eaa5a898
 Log or evidence path: この記録本文
 
 Known differences from documented profile:

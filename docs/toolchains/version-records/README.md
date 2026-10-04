@@ -17,7 +17,7 @@ file 名と Record ID は初回検証日で固定し、以後の再検証でも�
 | [Raspberry Pi Direct Build (実機 Raspberry Pi Zero W)](2026-08-17-pi-direct-build-native.md) | Raspberry Pi Direct Build | `Partial` | 2026-08-17 | 2026-08-26 |
 | [ESP32 Flash / HIL (実機 Linux x86_64)](2026-08-20-esp32-flash-boot-native.md) | ESP32 Flash / HIL | `Partial` | 2026-08-20 | 2026-08-25 |
 | [ESP32 Build 既定構成＋bringup-display-13 (実機 Linux x86_64)](2026-09-26-esp32-build-bringup-display-13-native-linux.md) | ESP32 Build | `Partial` | 2026-09-26 | 2026-09-26 |
-| [ESP32 Build deskcat-servoの共有 (実機 Linux x86_64)](2026-09-29-esp32-build-servo-limiter-native-linux.md) | ESP32 Build | `Partial` | 2026-09-29 | 2026-10-03 |
+| [ESP32 Build deskcat-servoの共有 (実機 Linux x86_64)](2026-09-29-esp32-build-servo-limiter-native-linux.md) | ESP32 Build | `Partial` | 2026-09-29 | 2026-10-04 |
 
 **同じ profile の記録が複数あるのは、端末が違うためである。**`2026-08-06`と`2026-08-10`は VM 上、
 `2026-08-15`の2件は実機で取得した。`Container / VM / native:`が異なるため、
