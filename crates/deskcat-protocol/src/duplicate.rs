@@ -4,13 +4,24 @@
 //! 保持件数と保持期間は[`DuplicatePolicy`]として呼び出し側から受け取り、
 //! **このmoduleは値を決めない**（同型のdoc参照）。
 //!
+//! # このcrateに置く理由
+//!
+//! 当初は`crates/deskcat-serial`（host専用）に置いていた（Issue #12）。Issue #19で、host
+//! （`deskcat-serial`）とfirmware（`deskcat-servo`経由）の両方が同じ実装を使うために、
+//! 両方が既に依っているこのcrateへ移した。**履歴の振る舞いは変えていない。**変えたのは、
+//! crateの境界をまたぐために要った2点だけである（[`Lookup`]から`#[non_exhaustive]`を外した、
+//! [`DuplicatePolicy::new`]の拒否を[`DuplicatePolicyError`]で返す）。`deskcat-serial`は
+//! `deskcat_serial::duplicate`ごとre-exportし、以前のpathを保っている。
+//! 値を呼び出し側から受け取る形（Issue #12）のまま移したので、`PROTO-TBD-005`の値を
+//! 先取りしない。
+//!
 //! # `sid`を持たない理由
 //!
 //! 履歴は**現在sessionの分だけ**を持つ（§8手順8「duplicate照会は現在のsessionだけを対象とする」）。
 //! したがってkeyは`id`だけで足りる。**`(sid, id)`の組で判定する責務は所有者にある。**
 //! 所有者は、envelopeの`sid`が現在sessionであることを確かめてから[`DuplicateHistory::lookup`]を
 //! 呼び、異なる`sid`へのsession遷移を確定したときに[`DuplicateHistory::clear`]を呼ぶ
-//! （[`crate::PeerSession`]がそうしている）。retiredな`sid`は照会の前に`stale_session`で
+//! （`deskcat_serial::PeerSession`がそうしている）。retiredな`sid`は照会の前に`stale_session`で
 //! 拒否されるため（§8手順8）、ここへは届かない。
 //!
 //! # 履歴から失われたduplicate
@@ -27,13 +38,93 @@
 
 use std::collections::{HashMap, VecDeque};
 
+use core::num::NonZeroUsize;
 use core::time::Duration;
 
-use crate::config::DuplicatePolicy;
+/// [`DuplicatePolicy::new`]が拒否した理由。
+///
+/// **panicにしない。**呼び出し側から渡る値であり、分類して返す（`AGENTS.md`の
+/// 「エラーを握りつぶさず、分類、ログ、カウンタを用意する」）。種類は、
+/// `crates/deskcat-serial`の`ConfigError`の同名の2つと同じである（そちらは
+/// `From<DuplicatePolicyError>`で変換する）。
+///
+/// **`#[non_exhaustive]`にしない。**種類を足したときに、`deskcat-serial`の変換の`match`が
+/// compileで止まり、対応する`ConfigError`の種類を足し忘れないようにするためである。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DuplicatePolicyError {
+    /// duplicate履歴の保持件数が0である。**0にすると、処理した直後の再送も
+    /// 履歴に無く、保持した結果をreplayできない。**
+    ZeroDuplicateCapacity,
+    /// duplicate履歴の保持期間が0である。0件と同じく、記録した結果が即座に失われる。
+    ZeroDuplicateRetention,
+}
+
+impl core::fmt::Display for DuplicatePolicyError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let text = match self {
+            Self::ZeroDuplicateCapacity => "duplicate履歴の保持件数が0である",
+            Self::ZeroDuplicateRetention => "duplicate履歴の保持期間が0である",
+        };
+        f.write_str(text)
+    }
+}
+
+impl core::error::Error for DuplicatePolicyError {}
+
+/// 現在sessionのduplicate履歴の保持件数と保持期間（§9、`PROTO-TBD-005`）。
+///
+/// **既定値を持たない。**`provisional()`も用意しない。`PROTO-TBD-005`は保持期間、
+/// retry window、保持件数の上限のいずれも未確定であり、仮の値もこのcrateでは決めない。
+/// 呼び出し側が値と、その値を選んだ根拠を持つ。
+///
+/// 期間は§13の`PROTO-TBD-005`行が定める下限（遅延messageの最大生存時間＋再送window）を
+/// 下回らないことが要求されているが、**この型はその下限を検査しない。**下限を構成する
+/// 2つの値自体が未確定だからである。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DuplicatePolicy {
+    capacity: NonZeroUsize,
+    retention: Duration,
+}
+
+impl DuplicatePolicy {
+    /// 保持件数と保持期間を指定して方針を作る。
+    ///
+    /// # Errors
+    ///
+    /// `capacity`が0なら[`DuplicatePolicyError::ZeroDuplicateCapacity`]、`retention`が0なら
+    /// [`DuplicatePolicyError::ZeroDuplicateRetention`]を返す。
+    pub fn new(capacity: usize, retention: Duration) -> Result<Self, DuplicatePolicyError> {
+        let capacity =
+            NonZeroUsize::new(capacity).ok_or(DuplicatePolicyError::ZeroDuplicateCapacity)?;
+        if retention.is_zero() {
+            return Err(DuplicatePolicyError::ZeroDuplicateRetention);
+        }
+        Ok(Self {
+            capacity,
+            retention,
+        })
+    }
+
+    /// 保持する件数の上限。超えたら最も古いentryを捨てる。
+    #[must_use]
+    pub const fn capacity(&self) -> NonZeroUsize {
+        self.capacity
+    }
+
+    /// 記録してから保持する期間。
+    #[must_use]
+    pub const fn retention(&self) -> Duration {
+        self.retention
+    }
+}
 
 /// [`DuplicateHistory::lookup`]の結果。
+///
+/// **`#[non_exhaustive]`にしない。**別のcrate（`deskcat-serial`、`deskcat-servo`）の`match`が
+/// 網羅的であることを保ち、種類を足したときにcompileで止めるためである。`_`の腕で受けると、
+/// 新しい種類を黙って「実行する」側か「実行しない」側へ倒すことになる。`deskcat-serial`に
+/// あった間は同じcrateの中の`match`だけだったので、付いていても網羅的に書けた。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[non_exhaustive]
 pub enum Lookup<'a, R> {
     /// 未処理の`id`である。処理してよい。処理したら[`DuplicateHistory::record`]で結果を残す。
     New,
@@ -53,7 +144,7 @@ struct Entry<R> {
 
 /// 現在sessionのduplicate履歴。
 ///
-/// `R`は保持する結果の型である（`boot`ならPiが返した[`deskcat_protocol::Ack`]）。
+/// `R`は保持する結果の型である（`boot`ならPiが返した[`crate::Ack`]）。
 #[derive(Debug, Clone)]
 pub struct DuplicateHistory<R> {
     policy: DuplicatePolicy,
@@ -162,13 +253,26 @@ impl<R> DuplicateHistory<R> {
 mod tests {
     use core::time::Duration;
 
-    use super::{DuplicateHistory, Lookup};
-    use crate::config::DuplicatePolicy;
+    use super::{DuplicateHistory, DuplicatePolicy, DuplicatePolicyError, Lookup};
 
     fn history(capacity: usize, retention_ms: u64) -> DuplicateHistory<&'static str> {
         DuplicateHistory::new(
             DuplicatePolicy::new(capacity, Duration::from_millis(retention_ms)).expect("0ではない"),
         )
+    }
+
+    /// 保持件数・保持期間の0は、どちらも記録した結果を即座に失う設定であり、受け付けない。
+    #[test]
+    fn a_duplicate_policy_rejects_zero_capacity_and_zero_retention() {
+        assert_eq!(
+            DuplicatePolicy::new(0, Duration::from_secs(1)),
+            Err(DuplicatePolicyError::ZeroDuplicateCapacity)
+        );
+        assert_eq!(
+            DuplicatePolicy::new(1, Duration::ZERO),
+            Err(DuplicatePolicyError::ZeroDuplicateRetention)
+        );
+        assert!(DuplicatePolicy::new(1, Duration::from_millis(1)).is_ok());
     }
 
     /// 同じ`id`の再送は、保持した結果のreplayになる。処理は1回だけである。
