@@ -11,7 +11,7 @@
 | 用途（通信状態1本、猫の演出1本）と本数（計2本） | ユーザーが承認（2026-10-01） | [#514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)本文 |
 | 色の割当て（白＝通信、赤＝猫）と表示の意味 | ユーザーの「早く決めよう。どんどん進めよう」を受けてAIが選定（2026-10-01） | 同上 |
 | GPIO2／5、10 kΩ、配線、点滅周期・点灯時間 | **AI（作業セッション）が選定した。人間の承認は得ていない** | この文書 |
-| 電流制限抵抗は330 Ω（FAITHFUL LINK `CF25J330RB`）にする。W数はメーカーのdatasheetで確かめ、Hardware Safety PolicyのA（判定に効く数）として扱う。W数を確かめられない手持ちの270 Ωは使わない | PMの判断（W数を残余riskとして受け入れるとした前の判断を訂正した） | [#514のコメント](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514#issuecomment-5964034773) |
+| 電流制限抵抗は330 Ω（FAITHFUL LINK `CF25J330RB`）にする。W数はメーカーのdatasheetで確かめた値を使う。W数を確かめられない手持ちの270 Ωは使わない | PMの判断（W数を残余riskとして受け入れるとした前の判断を訂正した） | [#514のコメント](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514#issuecomment-5964034773) |
 
 ## 役割と表示
 
@@ -26,7 +26,7 @@ ESP32自体の電源断はLEDの消灯にしか見えない。白の消灯を「
 
 ## 初回デモの配線案
 
-ESP32 boardの`3V3`系だけを使い、GPIOとLEDの間にそれぞれ独立した電流制限抵抗`R`を入れる。LEDの向きは現物の極性を確認する。
+ESP32 boardのGPIOから電流を出し、GPIOとLEDの間にそれぞれ独立した電流制限抵抗`R`を入れる。LEDの向きは現物の極性を確認する。
 
 ```text
 白: ESP32 GPIO2 (J3-15) ─ R ─ 白LEDのアノード → カソード ─ GND
@@ -52,7 +52,7 @@ ESP32 boardの`3V3`系だけを使い、GPIOとLEDの間にそれぞれ独立し
 1枝の電流の見積もり    I_max = 3.6 V / 313.5 Ω ≈ 11.5 mA
 抵抗の損失の見積もり    P_max = (3.6 V)² / 313.5 Ω ≈ 41.3 mW
 pull 1本の電流          3.6 V / 5 kΩ ≈ 0.72 mA
-3V3系の増分の見積もり   2 × I_max + 2 × 0.72 mA ≈ 24.4 mA
+3V3系に数える増分の見積もり 2 × I_max + 2 × 0.72 mA ≈ 24.4 mA
 ```
 
 pullの10 kΩ（`RES-PULL-01`）は許容差の記録が無いため、[Power Budget](power-budget.md)と同じく抵抗の半分（5 kΩ）として見積もる。
@@ -70,7 +70,7 @@ ESP32 boardの`3V3` pinから外部負荷を取ること（段階B-2a）は、[H
 **必要なのは、人間が「LEDの2枝を`3V3` pinへ足して通電してよい」と明示し、その記録が通電前に#514のコメント等で確認できることである。**AIの判断として、次の理由で承認を求める。
 
 - **増える電流の見積もり。**LEDが短絡した場合の計算値は、330 Ωの許容差の下限で各枝約11.5 mA、pullを含めた増分は約24.4 mAである（上の`電流の見積もりと残る観察`）。
-- **#461と同じ枠組みで余裕を見積もれる。**#461の判断は保守側の場合(a)を使い、`3V3`系の通常動作の合計を約245.4 mA、`U2`（UMW `LD1117-3.3`）の連続定格1 Aに対して約4.1倍と見積もった（[tbd-register-history.md](tbd-register-history.md)の`HW-TBD-024`、2026-09-23追記）。増分の約24.4 mAを足すと**約270 mAで、約3.7倍**になる。**#461と同じくtyp値を含む見積もりであり、worst-caseは未確定のままである。**`U2`の損失の増分は、USB給電（`Vin`＝5 V）で `0.0244 A × (5.0 − 3.3) V ≈ 41 mW`、同じ記録の熱計算（`Rθja` 88 ℃/W）で温度上昇は約3.7 ℃増える（計算）。
+- **#461と同じ枠組みで余裕を見積もれる。**#461の判断は保守側の場合(a)を使い、`3V3`系の通常動作の合計を約245.4 mA、`U2`（UMW `LD1117-3.3`）の連続定格1 Aに対して約4.1倍と見積もった（[tbd-register-history.md](tbd-register-history.md)の`HW-TBD-024`、2026-09-23追記）。増分の約24.4 mAを足すと**約270 mAで、約3.7倍**になる（これは#461の比で、Power Budgetの`marginの定義`が5 V経路に当てる「定格の最小値の80%」の規則とは別の見積もりである。`U2`の1 Aの80%は800 mAで、270 mAはその内側にあるが、typ値を含む見積もりのため合否には使わない）。**#461と同じくtyp値を含む見積もりであり、worst-caseは未確定のままである。**`U2`の損失の増分は、USB給電（`Vin`＝5 V）で `0.0244 A × (5.0 − 3.3) V ≈ 41 mW`、同じ記録の熱計算（`Rθja` 88 ℃/W）で温度上昇は約3.7 ℃増える（計算）。
 - **故障時の熱の余裕が小さくなる。**同じ記録は、`DISP-01`の`R5`の先が短絡した場合の電流を約646.5 mAとし、そのとき働きうる保護は`U2`の熱shutdown（`TSD` typ 150 ℃）だけで、`TJ`は約141 ℃、`TSD`まで約9 ℃としている。LEDの増分を足すと約671 mA、`TJ`は約144.8 ℃で、**`TSD`までの余裕は約5.2 ℃に縮む**（計算）。
 - **余裕が足りなかったときの帰結が#461と同じである。**`U2`の電流制限（`Ilimit` min 1.25 A）か熱shutdownによるrail低下・reset・表示不良であり、#461はこれを機能の失敗として受け入れた。
 
@@ -92,13 +92,13 @@ UART0のlogには、区間が変わるたびに`led phase=<lamp_red|lamp_white|l
 
 **build端末と書き込み。**buildはESP32 Build profile（build-only）で、Hyper-V上のLinux VM（`systemd-detect-virt`＝`microsoft`）で行う。**この作業端末にはUSB deviceが無く、flashできない。**flashと実機試験は、USBを使える実機LinuxのESP32 Flash / HIL端末で人間が行う（[Machine Profiles](../toolchains/machine-profiles.md)）。
 
-**検証の記録。**develop `8c9582b`（#487のB1・B2、#532、#534、#518、#535、#536の後）を取り込んだ、この文書と同じ版のtreeで、`cargo fmt --all -- --check`と、`cargo clippy --all-targets --locked -- -D warnings`／`cargo build --locked`を既定、`bringup-led-514`、`bringup-display-13,bringup-led-514`の3構成で実行し、すべて成功した。**main checkoutの`.embuild`（ESP-IDF一式）を共有したbuildであり、clean buildではない。Version Recordは作っていない。**`bench-servo-test-17`は#474の`compile_error!`のため対象外である。点灯試験と点滅の時刻計算（`outputs_at`／`next_change_ms`）は、repository外の使い捨てのtestで確かめた（firmware crateはhostでtestを走らせる仕組みを持たない）。**flashと実機起動はしていない。**
+**検証の記録。**develop `5f5393c`（#487のB1・B2、#532、#534、#518、#535、#536、#539、#540、#537の後）を取り込んだ、firmwareがこの文書と同じ版のtreeで、`cargo fmt --all -- --check`と、`cargo clippy --all-targets --locked -- -D warnings`／`cargo build --locked`を既定、`bringup-led-514`、`bringup-display-13,bringup-led-514`の3構成で実行し、すべて成功した。**main checkoutの`.embuild`（ESP-IDF一式）と、前の複製の`target`のcacheを使ったbuildであり、clean buildではない。Version Recordは作っていない。**`bench-servo-test-17`は#474の`compile_error!`のため対象外である。点灯試験と点滅の時刻計算（`outputs_at`／`next_change_ms`）は、repository外の使い捨てのtestで確かめた（firmware crateはhostでtestを走らせる仕組みを持たない）。**flashと実機起動はしていない。**
 
 ## 段階的な確認
 
 0. 上の`3V3 pinへ負荷を足す条件`を満たしたことを確認する（人間の承認の記録がある）。
 1. 電源を切った状態でGPIO番号、3V3・GND、LEDの極性を確認する。`R`の袋の表示で、メーカーがFAITHFUL LINKで型番が`CF25J330RB`であることを確かめて記録する（[#538](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/538)の袋の表示の記録と同じ品であること）。違う品は使わない。各枝で`R`がLEDと直列に入っていることを目で確かめる。**`R` 2本と10 kΩ 2本を、接続前にテスター（`DT830B`）の`20k`rangeで測って記録する**（このrangeは`10 kΩ`で正常を確認済み。[hardware-bom.md](hardware-bom.md)の`MEAS-03`。最小単位は10 Ω）。テスターの確度は未取得なので（同`MEAS-03`）、この測定は取り違えの確認に使う。読みが330 Ωは`0.31`〜`0.35`、10 kΩは`10.0`前後の品だけを使い、外れた品は使わない。読みを記録する。
-2. まず赤の枝（`R`、赤LED、GPIO5の10 kΩ pull-down）だけを配線し、GPIO2には何もつながない。`bringup-led-514`付きのbuildで起動する。起動・reset中に消灯していること、logが`lamp_red`と`lamp_both`の区間だけ点灯すること（`lamp_white`と`link_unconfirmed`では消灯）を、人間の監視下で確認する。**pinの初期化の瞬間に一瞬光ることはありうる**（上の`点灯試験用のfirmware`の1）。`lamp_white`の区間や`link_unconfirmed`に入った後も点いたままなら異常として止める。点灯中に`R`の両端電圧をテスターで読み、電圧÷330 Ωを電流の推定値（テスターの確度は未取得）として記録する。次に赤の枝を外し、白の枝（`R`、白LED、GPIO2の10 kΩ pull-down）だけで同じ確認を行う（`lamp_white`と`lamp_both`で点灯し、その後は点滅）。白が3.3 Vで見えなければ回路を見直す。
+2. まず赤の枝（`R`、赤LED、GPIO5の10 kΩ pull-down）だけを配線し、GPIO2には何もつながない。`bringup-led-514`付きのbuildで起動する。起動・reset中に消灯していること、logが`lamp_red`と`lamp_both`の区間だけ点灯すること（`lamp_white`と`link_unconfirmed`では消灯）を、人間の監視下で確認する。**pinの初期化の瞬間に一瞬光ることはありうる**（上の`点灯試験用のfirmware`の1）。`lamp_white`の区間や`link_unconfirmed`に入った後も点いたままなら異常として止める。点灯中に`R`の両端電圧をテスターで読み、電圧÷330 Ωを電流の推定値（テスターの確度は未取得）として記録する。**この値は記録であり、合否には使わない**（[Power Budget](power-budget.md)の`電流の測定点と読みの確かさの基準`。読みを合否に使える条件は[#525](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/525)が持つ）。次に赤の枝を外し、白の枝（`R`、白LED、GPIO2の10 kΩ pull-down）だけで同じ確認を行う（`lamp_white`と`lamp_both`で点灯し、その後は点滅）。白が3.3 Vで見えなければ回路を見直す。
 3. 両方を接続し、起動・reset・書き込み時に想定外の点灯や起動失敗がないか確認する。ESP32の`boot:` logでstrapping値と起動modeを確認する。電源railの電圧、LEDの電流、発熱の有無を記録する。
 4. protocolの継続通信の判定と、`set_expression`から赤LEDへの経路が実装された後、Pi停止・再接続・撫で操作を含む表示動作を確認する。表示試験だけでservoの通信断安全試験を代替しない。
 
