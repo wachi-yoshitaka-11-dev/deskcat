@@ -15,10 +15,10 @@ format、lint、buildが通ること（[Issue #19](https://github.com/wachi-yosh
 **検証済みcommandへ格上げする記録ではなく、この1回の実施記録である**（`bringup-display-13`の扱いは
 [検証済みコマンド](../verified-commands.md)が持つ。ここで変えない）。
 
-**2026-10-03の再検証で、構成が変わった。**`pi-protocol-mode`は[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)
+**2026-09-30までの実行から、構成が変わった。**`pi-protocol-mode`は[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)
 （PR B1）で廃止され、Pi linkは既定構成に入った。そのため(2)は既定と`bringup-display-13`の2構成である。
 2026-09-30までの実行は、`pi-protocol-mode`を含む3構成だった。3構成（`pi-protocol-mode`を含む）の結果は、
-developのcommit 710c67f（PR #513のsquash merge）の時点のこの記録にある。2026-10-03の再検証は、
+developのcommit 710c67f（PR #513のsquash merge）の時点のこの記録にある。下の最終有効な検証は、
 `pi-protocol-mode`の廃止後の2構成である。あわせて、Issue #19の段2で
 `DuplicateHistory`を`crates/deskcat-serial`から`crates/deskcat-protocol`へ移し、`crates/deskcat-servo`に
 `MotionDedup`を足したtreeで、(0)〜(2)をやり直した。
