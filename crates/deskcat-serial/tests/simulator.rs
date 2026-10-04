@@ -1520,7 +1520,7 @@ mod peer_protocol {
 
     // 受け入れ条件の`duplicate_expired`: `boot`単独では、正規のtrafficで容量超過は
     // 起きない（1 sessionにつき1つの`id`しか処理しないため）。容量の境界そのものは
-    // `crates/deskcat-serial/src/duplicate.rs`の
+    // `crates/deskcat-protocol/src/duplicate.rs`（Issue #19で移した）の
     // `an_id_evicted_by_capacity_is_expired_not_new`が検査する。保持期間を過ぎた再送は
     // `a_repeated_boot_is_not_executed_twice`が公開APIを通して検査する。
 

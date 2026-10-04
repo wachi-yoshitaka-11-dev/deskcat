@@ -60,16 +60,16 @@ cargo build --locked
 
 Linux x86_64 で検証した。初回は 2026-08-06 で、これは VM 上の初回環境記録である
 （[Version Record](version-records/2026-08-06-esp32-build-linux.md)）。実機 Linux での最初の検証は
-2026-08-15 である（[Version Record](version-records/2026-08-15-esp32-build-native-linux.md)）。#487 の PR B1 より前の tree に対する最新の検証は
-2026-09-30 であり、`deskcat-servo` を共有した tree で実機 Linux で取得した（[Version Record](version-records/2026-09-29-esp32-build-servo-limiter-native-linux.md)。
-初回検証日は 2026-09-29、最終有効な検証日時は 2026-09-30）。
+2026-08-15 である（[Version Record](version-records/2026-08-15-esp32-build-native-linux.md)）。最新の検証は
+2026-10-04 であり、Version Record の `Repository commit` の tree（#487 の PR B1 の後の構成。Pi link を含む既定構成）で、`deskcat-servo` を共有した状態で実機 Linux で取得した（[Version Record](version-records/2026-09-29-esp32-build-servo-limiter-native-linux.md)。
+初回検証日は 2026-09-29、最終有効な検証日時は 2026-10-04）。
 別端末での再現は CI の `ubuntu-24.04` runner で満たした
 （#42。[Version Record](version-records/2026-08-10-esp32-build-ci.md)）。
 **build-only であり、flash と実機起動は主張しない。**
 
-**`pi-protocol-mode` featureは[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)で廃止した。**Pi linkは既定構成（製品build）に入った。**上の「Linux x86_64 で検証した」以下の記録は、「#487 の PR B1 より前の tree に対する最新の検証」とした2026-09-29の記録を含め、#487のPR B1より前のtreeについてのものであり、Pi linkを含む今の既定構成での記録ではない。**2026-09-29の記録のうち、既定構成の分は上の検証記録である。それ以外の構成の分は実施記録であり、検証済みcommandへは格上げしていない。#487のPR B1より前は、`pi-protocol-mode`を有効にした構成も`cargo clippy`と`cargo build`へ`--features pi-protocol-mode`を足して通していた。
+**`pi-protocol-mode` featureは[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)で廃止した。**Pi linkは既定構成（製品build）に入った。**上の「Linux x86_64 で検証した」以下の記録のうち、2026-08-15 までの記録は #487 の PR B1 より前の tree についてのものである。2026-09-29 の記録は、2026-10-04 に #487 の PR B1 の後の構成（Pi link を含む既定構成）で再検証した。**2026-09-29の記録のうち、既定構成の分は上の検証記録である。それ以外の構成の分は実施記録であり、検証済みcommandへは格上げしていない。#487のPR B1より前は、`pi-protocol-mode`を有効にした構成も`cargo clippy`と`cargo build`へ`--features pi-protocol-mode`を足して通していた。
 
-**`bringup-display-13` feature（[#451](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/451)）を有効にする場合は、既定構成に加えて`cargo clippy`と`cargo build`（`cargo fmt`は対象外）へ`--features bringup-display-13`を足したものも通す。**#487から、このfeatureは既定構成へLCDの試験モードを加えるだけであり、他のfeatureと排他ではない。**この構成の実施記録（[Version Records](version-records/README.md)）は、どれも#487のPR B1より前のtreeのものであり、検証済みcommandへ格上げする記録でも、Pi linkを含む今の構成の記録でもない。**そのため、ここでもcommand blockを写さない（`flash と serial monitor`節（下記）がcommand blockを持たない理由とは別である）。
+**`bringup-display-13` feature（[#451](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/451)）を有効にする場合は、既定構成に加えて`cargo clippy`と`cargo build`（`cargo fmt`は対象外）へ`--features bringup-display-13`を足したものも通す。**#487から、このfeatureは既定構成へLCDの試験モードを加えるだけであり、他のfeatureと排他ではない。**この構成の実施記録（[Version Records](version-records/README.md)）は、検証済みcommandへ格上げする記録ではない。2026-09-29の記録だけは、2026-10-04に#487のPR B1の後の構成（Pi linkを含む）でこの構成も再検証した。他の記録は、どれも#487のPR B1より前のtreeのものである。**そのため、ここでもcommand blockを写さない（`flash と serial monitor`節（下記）がcommand blockを持たない理由とは別である）。
 
 **`bringup-led-514` feature（[#514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)）を有効にする場合は、既定構成に加えて`cargo clippy`と`cargo build`へ`--features bringup-led-514`を足したものも通す。**`bringup-display-13`とも組み合わせられるため、`--features bringup-display-13,bringup-led-514`も通す。**これらの構成のVersion Recordは無い。**
 
