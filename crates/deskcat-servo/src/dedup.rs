@@ -78,7 +78,7 @@ impl DedupOutcome {
 }
 
 /// 現在のsessionのmotion commandの重複を判定し、`admit`を高々1回だけ呼ぶ（module doc参照）。
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct MotionDedup {
     history: DuplicateHistory<Result<(), Rejection>>,
 }

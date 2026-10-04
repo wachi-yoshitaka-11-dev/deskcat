@@ -31,7 +31,8 @@ Date: 2026-09-29（初回）。下の値は最終有効な検証（2026-10-03T09
 Machine profile: ESP32 Build
 Operator role: AI agent作業（build-onlyのみ。flash・monitor・USBシリアルポートは開いていない）
 Repository commit: 0bb0d6cfc962d774e5c609885685680b96a43c24（#19の段2の作業branchのcommit。
-  親は origin/develop 43189b83f66042b22c3804dccf4e20fb3a1258fb）。
+  親は origin/develop 43189b83f66042b22c3804dccf4e20fb3a1258fb。
+  このcommitのtreeだけを覆う。後のcommitの検証はPull Requestの本文にある）。
   squash mergeの後はこのSHAがdevelopから辿れなくなるため、
   そのときはPull Requestのcommit一覧から辿る
 Working tree clean: yes（`git archive 0bb0d6c`でscratchpadへ展開した未改変コピーを使用。
