@@ -104,7 +104,7 @@ VDD = 3.3 Vである（`電圧domain`節）。受け側の`VIH`は0.7×3.3 = **2
 | `TOUCH-CS` | pull-up | **10 kΩ** | 1 | `Rmax` 196 kΩに対して20倍の余裕 |
 | `LCD-BL` | pull-down | **4.7 kΩ** | 1 | **2026-09-06に確定した。**極性は2026-09-05に一次資料（MSP2807公式User Manual）で`active-high`（`LED` pin「high level lighting」）と判明済みであり、`SERVO-PWM`と同じ理由（未知の競合電流に対しては、駆動側に余裕がある範囲で値を下げるほうが安全側）で`4.7 kΩ`を採った。下記「`LCD-BL`を決められない理由」 |
 | `TOUCH-IRQ` | **外部pullを付けない** | — | **0** | 下記「`TOUCH-IRQ`へ外部pull-upを付けてはならない」 |
-| `LED-COMM`（#514の初回デモ案、**未承認**） | pull-down | **10 kΩ** | 1 | 内部pull-down（上表）と同じ向き。download bootの条件は「GPIO2＝0」。外部10 kΩ pull-downでGPIO2はLowになる（[led-514-demo.md](led-514-demo.md)の`起動時の電位`） |
+| `LED-COMM`（#514の初回デモ案、**未承認**） | pull-down | **10 kΩ** | 1 | 内部pull-down（上表）と同じ向き。download bootの条件は「GPIO0＝0かつGPIO2＝0」（ESP-WROOM-32D datasheet v2.8 §3.1 Table 6）。GPIO0には触らず、外部10 kΩ pull-downでGPIO2はLowになる（[led-514-demo.md](led-514-demo.md)の`起動時の電位`） |
 | `LED-REACT`（#514の初回デモ案、**未承認**） | pull-down | **10 kΩ** | 1 | 内部pull-up（上表）に対してLowへ定め、LEDを起動中に消灯側へ保つ。WROOM-32D datasheet v2.8 §3.4 Table 8でGPIO5が効くのはMTDOとの組でのSDIO slaveのtimingだけである（[led-514-demo.md](led-514-demo.md)の`起動時の電位`） |
 
 10 kΩ（秋月 125103）と4.7 kΩ（秋月 125472）がどちらも1袋100本入で2026-08-08に着荷している
