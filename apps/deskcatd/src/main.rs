@@ -12,7 +12,7 @@
 //! | **起動の期限を過ぎた**（sessionの確立と`hello`の結果がそろわない） | 75（`EXIT_SESSION_REDO`） |
 //!
 //! 起動の期限の値は引数で与える。**値の根拠は無い**（`ESP32`の起動時間は未測定。対応するTBDの登録は無い）。
-//! 置く場所は段階2b-iiiのunitの1か所だけである。ACK timeoutと再接続の方針は
+//! 置く場所は`deploy/systemd/deskcatd.service`の1か所だけである。ACK timeoutと再接続の方針は
 //! `SerialConfig::new`が持つ暫定値（`RetryPolicy::provisional`など）を、`hello`の再送回数などは`daemon`の暫定の定数
 //! （`HELLO_RETRY_LIMIT`など）を使い、ここでは値を足さない。いずれも根拠は無い。
 //!
