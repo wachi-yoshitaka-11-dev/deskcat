@@ -11,7 +11,7 @@
 | 用途（通信状態1本、猫の演出1本）と本数（計2本） | ユーザーが承認（2026-10-01） | [#514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)本文 |
 | 色の割当て（白＝通信、赤＝猫）と表示の意味 | ユーザーの「早く決めよう。どんどん進めよう」を受けてAIが選定（2026-10-01） | 同上 |
 | GPIO2／5、10 kΩ、配線、点滅周期・点灯時間 | **AI（作業セッション）が選定した。人間の承認は得ていない** | この文書 |
-| 電流制限抵抗は330 Ω（FAITHFUL LINK `CF25J330RB`）にする。W数はメーカーのdatasheetで確かめた値を使う。W数を確かめられない手持ちの270 Ωは使わない | PMの判断（W数を残余riskとして受け入れるとした前の判断を訂正した） | [#514のコメント](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514#issuecomment-5964034773) |
+| 電流制限抵抗は330 Ω（FAITHFUL LINK `CF25J330RB`）にする。W数はメーカーのdatasheetで確かめた値を使う。W数を確かめられない手持ちの270 Ωは使わない | 抵抗値（330 Ω）と品（`CF25J330RB`）はAIが選定した。人間の承認は得ていない。W数をメーカーのdatasheetで確かめた値にすることと、W数を確かめられない手持ちの270 Ωを使わないことは、PMの判断（W数を残余riskとして受け入れるとした前の判断を訂正した） | [#514のコメント](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514#issuecomment-5964034773) |
 
 ## 役割と表示
 
@@ -19,7 +19,7 @@ ESP32が両LEDを駆動する。通信LEDはESP32が自分のprotocol受信状�
 
 | LED | デモで表示する状態 | 実装上の前提 |
 |---|---|---|
-| 白 `LED-COMM-01` | ESP32が起動中でPiとの通信が未成立・喪失なら1秒周期で点滅（0.5秒ずつ）。通信が継続して成立すれば点灯 | 成立・喪失を決めるheartbeat／timeoutは[PROTO-TBD-010](../protocol/esp32-pi-protocol.md)と[HW-TBD-017](tbd-register.md)に依存する。現行firmwareは`hello`／`ping`／`get_status`を受信する（`firmware/esp32/src/pi_link.rs`）が、継続通信の判定（heartbeatとtimeout）はまだ無い。受信しただけでは、その後も通信が続いていることを示せないため、点灯へ切り替える判定はまだ実装できない。`bringup-led-514`は点滅だけを出す（下の`点灯試験用のfirmware`） |
+| 白 `LED-COMM-01` | ESP32が起動中でPiとの通信が未成立・喪失なら1秒周期で点滅（0.5秒ずつ）。通信が継続して成立すれば点灯 | 成立・喪失を決めるheartbeat／timeoutは[PROTO-TBD-010](../protocol/esp32-pi-protocol.md)と[HW-TBD-017](tbd-register.md)に依存する。現行firmwareは`hello`／`ping`／`get_status`を受信する（`firmware/esp32/src/pi_link.rs`）が、継続通信の判定（heartbeatとtimeout）はまだ無い。受信しただけでは、その後も通信が続いていることを示せないため、点灯へ切り替える判定はまだ実装できない。`bringup-led-514`は、点灯試験（赤→白→両方）の後は点滅だけを出す（下の`点灯試験用のfirmware`） |
 | 赤 `LED-REACT-01` | Piが撫でられた反応として`happy`を指示したら1秒点灯し、通常時は消灯 | 既存protocolの`set_expression`を候補に使う。protocol crateには`set_expression`の型とdecodeがある（#534）。firmwareは受け取った`set_expression`を`pi_rx_unhandled_frame`としてlogに出すだけで、赤LEDを点ける経路はまだ無い。`bringup-led-514`は点灯試験の区間だけ赤を点ける |
 
 ESP32自体の電源断はLEDの消灯にしか見えない。白の消灯を「通信正常」と解釈しない。
@@ -67,14 +67,14 @@ pullの10 kΩ（`RES-PULL-01`）は許容差の記録が無いため、[Power Bu
 
 **この条件はまだ満たしていない。満たすまでLEDをつないで通電しない。**
 
-ESP32 boardの`3V3` pinから外部負荷を取ること（段階B-2a）は、[HW-TBD-023](tbd-register.md#hw-tbd-023)の(a)が未確定の間は許可されていない。例外は`ACCEL-01`／`ENV-01`（[#445](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/445)）と`DISP-01`（[#461](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/461)）だけであり、**どちらもLEDを含まない。**[Power Budget](power-budget.md)の`DISP-01`追加接続のbring-upの手順の条件(3)(a)も、`3V3` railに載る負荷をESP32本体・`ACCEL-01`・`ENV-01`・`DISP-01`だけに限っている。LEDの枝と10 kΩ pullを`3V3`系に数えると、この条件から外れる。白の枝はGPIO2（`VDD3P3_RTC` domain）から流れる。その電流が`3V3` pinを経由するかは正本のどこにも記録が無い（[Power Budget](power-budget.md)のGPIO4について同じ扱い）。**ここでは安全側の仮定として`3V3`系に数える。**
+ESP32 boardの`3V3` pinから外部負荷を取ること（段階B-2a）は、[HW-TBD-023](tbd-register.md#hw-tbd-023)の(a)が未確定の間は許可されていない。例外は`ACCEL-01`／`ENV-01`（[#445](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/445)）と`DISP-01`（[#461](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/461)）だけであり、**どちらもLEDを含まない。**[Power Budget](power-budget.md)の`DISP-01`追加接続のbring-upの手順の条件(3)(a)も、`3V3` railに載る負荷をESP32本体・`ACCEL-01`・`ENV-01`・`DISP-01`だけに限っている。LEDの枝と10 kΩ pullを`3V3`系に数えると、この条件から外れる。白の枝はGPIO2（`VDD3P3_RTC` domain）から流れる。その電流が`3V3` pinを経由するかは正本のどこにも記録が無い（[Power Budget](power-budget.md)のGPIO4についても、経由するかを断定していない）。**ここでは安全側の仮定として`3V3`系に数える。**
 
 **必要なのは、人間が「LEDの2枝を足して通電してよい（その電流は安全側の仮定として`3V3`系に数える）」と明示し、その記録が通電前に#514のコメント等で確認できることである。**AIの判断として、次の理由で承認を求める。
 
 - **増える電流の見積もり。**LEDが短絡した場合の計算値は、330 Ωの許容差の下限で各枝約11.5 mA、pullを含めた増分は約24.4 mAである（上の`電流の見積もりと残る観察`）。
 - **#461と同じ枠組みで余裕を見積もれる。**#461の判断は保守側の場合(a)を使い、`3V3`系の通常動作の合計を約245.4 mA、`U2`（UMW `LD1117-3.3`）の連続定格1 Aに対して約4.1倍と見積もった（[tbd-register-history.md](tbd-register-history.md)の`HW-TBD-024`、2026-09-23追記）。増分の約24.4 mAを足すと**約270 mAで、約3.7倍**になる（これは#461の比で、Power Budgetの`marginの定義`が5 V経路に当てる「定格の最小値の80%」の規則とは別の見積もりである。`U2`の1 Aの80%は800 mAで、270 mAはその内側にあるが、typ値を含む見積もりのため合否には使わない）。**#461と同じくtyp値を含む見積もりであり、worst-caseは未確定のままである。**`U2`の損失の増分は、USB給電（`Vin`＝5 V）で `0.0244 A × (5.0 − 3.3) V ≈ 41 mW`、同じ記録の熱計算（`Rθja` 88 ℃/W）で温度上昇は約3.7 ℃増える（計算）。
 - **故障時の熱の余裕が小さくなる。**同じ記録は、`DISP-01`の`R5`の先が短絡した場合の電流を約646.5 mAとし、そのとき働きうる保護は`U2`の熱shutdown（`TSD` typ 150 ℃）だけで、`TJ`は約141 ℃、`TSD`まで約9 ℃としている。LEDの増分を足すと約671 mA、`TJ`は約144.8 ℃で、**`TSD`までの余裕は約5.2 ℃に縮む**（計算）。
-- **余裕が足りなかったときの帰結が#461と同じである。**`U2`の電流制限（`Ilimit` min 1.25 A）か熱shutdownによるrail低下・reset・表示不良であり、#461はこれを機能の失敗として受け入れた。
+- **#461の記録は、余裕が足りなかったときの帰結を受け入れたとは書いていない。**#461が受け入れた残余riskは、未知の経路の可能性と熱の余裕の薄さである（[tbd-register-history.md](tbd-register-history.md)の`HW-TBD-024`、2026-09-23追記）。同じ記録が「機能の失敗」と書くのは`U1`の出力不足（backlightが暗くなる・LCDが正常に動かない）の帰結であり、`U2`の電流制限（`Ilimit` min 1.25 A）か熱shutdownによるrail低下・reset・表示不良を受け入れたとは書いていない。`U2`の`TJ(max)`は同じ記録も`power-budget.md`も記録を持たず、約141 ℃が`U2`にとって許容される温度かどうかは、正本のどこにも書かれていない。
 
 - **残余risk（承認の文に入れる）：**
   - `U2`の余裕はtyp値を含む見積もりで、worst-caseは未確定である。`DISP-01`の`R5`の先が短絡する故障では、`TSD`までの余裕が約9 ℃から約5.2 ℃に縮む（計算）。
