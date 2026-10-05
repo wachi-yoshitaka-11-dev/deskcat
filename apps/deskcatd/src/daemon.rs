@@ -89,9 +89,12 @@
 //! `startup`は、§5.1がPiのprocessを起動した直後に送るものとして定める`reason`である。
 //! このprocessは実際に起動していて、`sid`もこのprocessのものであり、ESP32が一度も受けていない
 //! だけなので、意味は事実と一致する。`sid`を選び直していないので、processが動き続けたまま
-//! 新しい`sid`を名乗ることを禁じる§3.1にも当たらない。**ただし§3.1は、`startup`で再開してよい
-//! 場合を、processの再起動と運用者の明示的なsession resetに限っている。この再開はそのどちらでも
-//! ないため、仕様が明示的に許す形ではない。**
+//! 新しい`sid`を名乗ることを禁じる§3.1にも当たらない。**§3.1の「`startup`で再開してよいのは、
+//! processを再起動したとき、または運用者が明示的にsession resetを指示したときだけ」は、`reason`を`startup`へ
+//! 切り替えて新しい`sid`を名乗る経路を塞ぐ文脈にある。この再開の`hello`は、起動時に選んだ`sid`のまま送る。
+//! ただし、同じ`sid`の`startup`を新しい`id`でもう一度送る形は、仕様が例として挙げていない。通常commandの
+//! `stale_session`に「現在の`sid`のまま`hello`から再開する」（§3.1、§10.2）と、未知の`sid`は`startup`だけが
+//! 遷移の候補になる（§5.1、`firmware/esp32/src/protocol.rs`の`handle_hello`）ことの2つを、両方満たす形として採った解釈であり、仕様が明示的に許すと書いた形ではない。**
 //!
 //! **前の`hello`のACKが届かなかったとき**は、仕様どおり同じ`(sid, id)`で再送する
 //! （§5.1が、処理済みの`startup`の`hello`を現在の`sid`で再送した場合は手順8で保持ACKを返すと定める。§12のfixture表「同一sessionでの`hello`再送」）。
@@ -128,8 +131,8 @@
 //! **再開に期限は持たない。**再開の`hello`のACKまでは、同じ`(sid, id)`の再送と[`HELLO_RETRY_LIMIT`]で既に有限である。
 //! `ok`のACKの後の`status`の待ちは、§5.6の「Piは、応答の`status`を待つtimeoutを持たない」がそのまま当たる区間
 //! であり、ここに例外のtimeoutを持ち込まない。`status`の行だけが失われ続けた場合は、通常の`status`の再要求
-//! （下の「応答が無いとき」）が続く。外から見えるようにするのは、`DaemonCounters::status_reasked`と`log`、
-//! そして段階2b-iiのwatchdogである。
+//! （下の「応答が無いとき」）が続く。外から見えるようにするのは、`DaemonCounters::status_reasked`と`log`である。
+//! 起動からの期限（[`crate::watchdog::StartupWatchdog`]）は、sessionの確立と`hello`の結果がそろった時点で解除されるため、この待ち（確立の後）には当たらない。
 //! **再開の回数には上限を置く**（[`RESUME_LIMIT`]）。**暫定値であり、根拠は無い**。
 //! `PROTO-TBD-011`（「`stale_session`を契機とする選び直し回数の上限」「同一identityの最大retry回数」）の
 //! 確定値ではなく、その2つとは別の数である。回数を数える単位は「`status`を受けるまでの連続した再開」である。
@@ -140,7 +143,8 @@
 //! `deskcat-serial`が`UnapprovedHelloAck`として受理しない（§6）ので、**拒否のcode（`stale_session`の
 //! 衝突を含む）はこのcrateに届かない。**ESP32が`boot`を再送すれば確立する（§10.2手順5）が、
 //! `hello`が拒否されていて`boot`も再送されなければ、確立しないまま動き続ける。この経路は
-//! 起動からの期限（watchdog）で受け持つ（段階2b-ii）。それまでの残るリスクである。
+//! 起動からの期限（[`crate::watchdog::StartupWatchdog`]）で受け持つ。確立と`hello`の結果がそろわないまま期限を
+//! 過ぎると、終了75にする（[`crate::runner::RunEnd::StartupDeadline`]）。期限の値は引数で与え、**根拠は無い**（`ESP32`の起動時間は未測定）。
 //!
 //! # ESP32が応答しないとき（起動の順は保証されない）
 //!
@@ -149,8 +153,10 @@
 //! **この待ちの長さは、`HELLO_RETRY_LIMIT`とACK timeoutの積（暫定値の組で、約2秒）であり、根拠は無い。**
 //! その後はsupervisor（systemdの`Restart=`）が新しい`sid`で起動し直すが、再起動の回数が`StartLimitBurst`に
 //! 達すると、ESP32が後から起動しても復帰しない。unit（段階2b-iii）の再起動の間隔と上限、
-//! および起動を待つ間隔は、段階2b-iiのwatchdogと段階2b-iiiのunitが受け持つ。この差分では、
-//! 起動を待つ長さを決めていない。
+//! および起動を待つ間隔は、unitが受け持つ。**起動の期限（引数）は、この待ちを延ばさない。**期限が約2秒より長ければ、`hello`に応答が無い場合は
+//! 上の約2秒で終わり、期限が効くのは、`hello`に応答があり（`UnapprovedHelloAck`を含む）、`boot`が来ない場合である。
+//! 期限が約2秒より短ければ、`hello`に応答が無い場合も、期限が先に終わらせる。
+//! 期限の値は、段階2b-iiiのunitの1か所で決める。このcrateとbinaryは値を持たない。
 //!
 //! # 応答が無いとき
 //!
@@ -402,6 +408,16 @@ impl Daemon {
     #[must_use]
     pub const fn peer_counters(&self) -> PeerCounters {
         self.peer.counters()
+    }
+
+    /// 起動が済んだか。ESP32のsessionを1つ以上確立し、`hello`の結果（ACK、または相関できないACKの扱い）が出ている。
+    ///
+    /// 起動からの期限（watchdog）が使う。**時計は持たない**（期限の判断は呼び出し側のものである）。
+    #[must_use]
+    pub const fn startup_complete(&self) -> bool {
+        self.esp_sessions_established >= 1
+            && self.hello_msg.is_none()
+            && self.hello_to_send.is_none()
     }
 
     /// このdaemonのcounter。
