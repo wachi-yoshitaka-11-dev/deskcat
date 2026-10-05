@@ -1,0 +1,22 @@
+[package]
+name = "deskcatd"
+version = "0.1.0"
+description = "Raspberry Pi側のservice。接触eventから表情を決め、ESP32へ送る"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+deskcat-domain = { path = "../../crates/deskcat-domain" }
+deskcat-protocol = { path = "../../crates/deskcat-protocol" }
+deskcat-serial = { path = "../../crates/deskcat-serial" }
+# **facadeだけに依存する。**loggerの実装はbinary側が選ぶ（`deskcat-serial`と同じ方針）。
+log = "0.4"
+
+[dev-dependencies]
+# 表情名の写しが`deskcat-protocol`のserdeの出力と食い違わないことをtestで確かめる。
+serde_json = { workspace = true }
+
+[lints]
+workspace = true

@@ -285,12 +285,19 @@ pub struct PeerSession {
     ///
     /// **最新の1件だけを持つ。**Piは起動時とportを開き直すたびに`hello`を送るため、
     /// 古い`hello`へ遅れて届いたACKは[`PeerRejection::UnmatchedAck`]になる。
-    /// 消すのは、現在のESP32 sessionから相関したACKを受けたときと、ESP32 sessionの遷移を
-    /// 確定したとき（[`Self::handle_boot`]）だけである。**遷移の後に届いた、遷移前の
+    /// 消すのは、現在のESP32 sessionから相関したACKを受けたときと、**2回目以降の**ESP32 sessionの遷移を
+    /// 確定したとき（[`Self::handle_boot`]）だけである。**2回目以降の遷移の後に届いた、遷移前の
     /// `hello`へのACK（未承認のACKを受け、その`sid`の`boot`で承認した後の再送など）は
     /// [`PeerRejection::UnmatchedAck`]になる。**新しいsessionへ古い要求の結果を持ち越さない（§6）。
+    ///
     /// `outstanding`と分けるのは、[`Self::poll_outstanding`]の再送の対象にしないためである
     /// （[`OutstandingKind::Hello`]のdoc参照）。
+    ///
+    /// **例外: 最初の確立（それまでESP32 sessionを1つも持っていなかった場合）では消さない。**
+    /// 持ち越す旧sessionがそもそも無く、§6の理由が当たらない。Piは起動直後に`hello`を送るので
+    /// （§5.1）、`boot`が`hello`より先に届いていても、その`hello`のACKは`boot`の後に、確立した
+    /// そのESP32 sessionから届く。ここで消すと、その`hello`の結果（拒否のcodeを含む）が`UnmatchedAck`に
+    /// 埋もれる。
     pending_hello: Option<u32>,
     counters: PeerCounters,
 }
@@ -585,6 +592,7 @@ impl PeerSession {
 
         // **ここからが旧sessionの追跡のreset（§10.1 step2）である。**遷移を確定した
         // ときだけ行い、拒否の経路（上）では何も変えない。
+        let first_session = self.esp32_sid.is_none();
         self.retire_current();
         self.boot_history.clear();
         self.esp32_sid = Some(sid);
@@ -594,7 +602,11 @@ impl PeerSession {
         // 旧sessionの`get_status`に対する`status`は、もう届いても応答として扱わない。
         self.status_awaited = false;
         // 旧ESP32 sessionへ送った`hello`のACKも、新sessionからは届かない（§6）。
-        self.pending_hello = None;
+        // **最初の確立では消さない**（`pending_hello`のdoc参照）。旧sessionが無いので、持ち越す
+        // ものが無い。
+        if !first_session {
+            self.pending_hello = None;
+        }
         self.counters.session_switches = self.counters.session_switches.saturating_add(1);
 
         let ack = Ack {
