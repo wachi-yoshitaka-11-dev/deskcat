@@ -2303,10 +2303,11 @@ mod peer_protocol {
         );
     }
 
-    /// 既知の制限: 未承認のACKを受け、同じESP32の`boot`でその`sid`を承認した後に届いた
-    /// 同じ`hello`へのACKは、遷移で記録を消しているため`UnmatchedAck`になる（§6）。
+    /// 最初のESP32 sessionの確立では、先に送った`hello`の待ちを残す。持ち越す旧sessionが無く、
+    /// §6の理由が当たらない。`boot`が`hello`より先に届いていても、`hello`のACKは確立した
+    /// そのESP32 sessionから`boot`の後に届き、`hello`の結果として相関する。
     #[test]
-    fn a_hello_ack_resent_after_the_session_switch_is_unmatched() {
+    fn a_hello_sent_before_the_first_esp32_session_is_answered_after_it() {
         let mut peer = PeerSession::new(super::duplicate_policy());
         let mut pi = connected_session_with_sid(PI_SID);
         let hello_id = send_hello(&mut pi, &mut peer, 0);
@@ -2331,6 +2332,43 @@ mod peer_protocol {
             &mut peer,
             &ack_line(ESP32_SID, 8, ok_ack(hello_id)),
             30,
+        );
+        assert!(
+            matches!(resent, Received::Ack(ref c) if c.request == OutstandingKind::Hello),
+            "{resent:?}"
+        );
+        assert_eq!(peer.counters().unmatched_acks, 0);
+    }
+
+    /// 既知の制限: 2回目以降の確立（ESP32 sessionの遷移）では、遷移前の`hello`への待ちを消す（§6）。
+    /// 遷移の後に届いた、遷移前の`hello`へのACKは`UnmatchedAck`になる。
+    #[test]
+    fn a_hello_ack_resent_after_a_later_session_switch_is_unmatched() {
+        let mut peer = PeerSession::new(super::duplicate_policy());
+        let mut pi = connected_session_with_sid(PI_SID);
+        let _ = establish(&mut pi, &mut peer, ESP32_SID, 0);
+        let hello_id = send_hello(&mut pi, &mut peer, 10);
+
+        let unapproved = receive(
+            &mut pi,
+            &mut peer,
+            &ack_line(ESP32_SID + 1, 7, ok_ack(hello_id)),
+            20,
+        );
+        assert_eq!(
+            unapproved,
+            Received::Rejected {
+                type_str: "ack",
+                rejection: PeerRejection::UnapprovedHelloAck
+            }
+        );
+
+        let _ = establish(&mut pi, &mut peer, ESP32_SID + 1, 30);
+        let resent = receive(
+            &mut pi,
+            &mut peer,
+            &ack_line(ESP32_SID + 1, 8, ok_ack(hello_id)),
+            40,
         );
         assert_eq!(
             resent,

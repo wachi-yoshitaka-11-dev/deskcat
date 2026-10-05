@@ -33,7 +33,7 @@ log = "0.4"
 # - security: buildscriptを持たない。`unsafe`はcrate内部のsyscall呼び出しにあり、
 #   workspaceの`unsafe_code = "forbid"`はこちらのcodeにのみ効く（依存の内部には及ばない）
 # - binary sizeとruntimeへの影響: **どちらも測っていない。**このworkspaceにbinary target が
-#   無く（`apps/deskcatd`は未作成）、測る対象がまだない。runtimeについて言えるのは、
+#   無く（`apps/deskcatd`はlibraryだけで、binaryは未作成）、測る対象がまだない。runtimeについて言えるのは、
 #   sourceを読んだ範囲で`read`／`write`が`poll`1回とsyscall 1回であり、
 #   呼び出しごとのallocationを持たないことである。実測は`deskcatd`ができてから行う
 # - build負荷（上の項目とは別に記録する。**これが選定の決め手である**）:

@@ -14,4 +14,10 @@
 - アイドル時の独り言
 - 設定、API、ストレージの統合
 
-toolchainと最初のIssueが準備できた時点でpackageを作成する。このREADMEでは、空のmanifestを先行作成せずに責務境界だけを定義する。
+## 現在の実装
+
+[Issue #491](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/491)の段階2bとして、libraryを作成した
+（`src/`。2b-i）。接触eventから表情を決めてESP32へ送り、sessionのやり直しをprocessの終了で行う。
+終了と再開の規則は`src/daemon.rs`のmodule docが持つ。
+
+**binary、logger、systemdのunitはまだ無い**（2b-ii、2b-iii）。Pi実機での動作は未確認である。
