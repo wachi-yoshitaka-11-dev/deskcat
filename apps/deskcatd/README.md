@@ -20,4 +20,6 @@
 （`src/`。2b-i）。接触eventから表情を決めてESP32へ送り、sessionのやり直しをprocessの終了で行う。
 終了と再開の規則は`src/daemon.rs`のmodule docが持つ。
 
-**binary、logger、systemdのunitはまだ無い**（2b-ii、2b-iii）。Pi実機での動作は未確認である。
+binary（`src/main.rs`）、stderrのlogger、引数、起動からの期限（watchdog）は2b-iiで足した。**引数は既定値を持たない**
+（`--help`を参照）。**systemdのunitはまだ無い**（2b-iii）。起動の期限の値は根拠が無く、unitの1か所で決める。
+Pi実機での動作は未確認である。

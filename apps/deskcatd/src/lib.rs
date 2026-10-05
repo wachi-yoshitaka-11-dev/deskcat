@@ -12,15 +12,18 @@
 //! - 欲しい表情と、ESP32が出している表情の同期（[`expression_sync`]）
 //! - 要求への結果を振る舞いへ写す分類（[`disposition`]）
 //! - linkの1周（[`daemon`]）。受信、再送、感情の時間進行、送信、終了の判断
+//! - 引数の解析（[`cli`]）、起動からの期限（[`watchdog`]）、loop（[`runner`]）。実体は`src/main.rs`が渡す
 //!
 //! 含まないもの（段階2bの後続のPR）:
 //!
-//! - 実portを開くbinary、logger、引数（2b-ii）
 //! - systemdのunit（2b-iii）
 //! - 首の動き。`play_motion`は送らない（`PROTO-TBD-008`）
 //! - Pi実機での確認（#11の後半）
 
+pub mod cli;
 pub mod daemon;
 pub mod disposition;
 pub mod expression_sync;
+pub mod runner;
 pub mod sid;
+pub mod watchdog;
