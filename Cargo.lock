@@ -54,6 +54,7 @@ dependencies = [
  "deskcat-serial",
  "log",
  "serde_json",
+ "serial2",
 ]
 
 [[package]]

@@ -21,6 +21,9 @@ deskcat-serial = { path = "../../crates/deskcat-serial" }
 log = "0.4"
 
 [dev-dependencies]
+# `deskcat-serial`と同じcrate・version・feature。`SerialPort::pair()`のPTYをtestから使うため。
+# 根拠は`crates/deskcat-serial/Cargo.toml`。
+serial2 = { version = "0.2.38", features = ["unix"] }
 # 表情名の写しが`deskcat-protocol`のserdeの出力と食い違わないことをtestで確かめる。
 serde_json = { workspace = true }
 
