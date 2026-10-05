@@ -771,13 +771,10 @@ Firmwareは次を実行する。
 | 実行中trajectoryによるresourceの一時的な占有 | `busy` |
 | 値そのものが許容範囲外 | `out_of_range` |
 
-**`busy`は、そのrequestの最終拒否結果として保存する。**同じ`(sid, id)`の再送は、占有を再評価せず、保存した`busy`のACKのreplayになる（§9）。保存した結果は他の拒否結果と同じ履歴に入り、履歴から失われた後の再送は、再評価せず`duplicate_expired`で拒否する（`PROTO-TBD-005`）。Piが再要求する場合は新しい`id`を使う。
+**`busy`は、そのrequestの最終拒否結果として保存する。**同じ`(sid, id)`の再送は、占有を再評価せず、保存した`busy`のACKのreplayになる（§9）。Piが再要求する場合は新しい`id`を使う。
 
 - **占有の判定は、§8の手順8のduplicate照会で未処理と判定された`(sid, id)`にだけ行う。**照会より前に判定すると、受理済みcommandの再送が、そのcommand自身の実行中trajectoryを理由に`busy`で拒否される。
-- **占有の判定は、§5.3の検証と制限の適用を通ったcommandにだけ行う。**そこで拒否されるcommandは、占有に関係なくそのcode（`invalid_payload`、`out_of_range`など）で拒否する。判定の前に実行中の動作を変更しない（(a)のとおり、拒否しても実行中の動作は継続する）。`busy`を先に返すと、Piは「待てば受け付けられる」と読み、再要求を続けるが、そのcommandは待っても受け付けられない。
-- **保存しないと、ACKを失った再送が、trajectoryの終了後に受理されうる。**Piが`busy`と受け取った、あるいは結果を知らないmotionが、遅れて始まる。
-- **`busy`の判定は手順10で行うため、手順9の受理上限は、その`(sid, id)`へ先に適用される。**新しい`id`での再要求も§8.1の受理上限の対象で、超えれば`rate_limited`になる。
-- `hello`／`boot`の`rate_limited`を保存しないのは、session確立を再送で復旧するためである（§9）。通常commandには当たらない。
+- **占有の判定は、§5.3の検証と制限の適用を通ったcommandにだけ行う。**そこで拒否されるcommandは、占有に関係なくそのcodeで拒否する。`busy`は待てば受け付けられる状態に限る（§7）。検証・制限で拒否されるcommandは待っても受け付けられないので、`busy`にしない。
 
 **(b) 実行時の安全制限を超過した場合** — 実行中のtrajectoryを中止する。
 
@@ -988,7 +985,7 @@ Receiverは次の手順で動作する。
    - **session遷移の上限とcooldown（§5.1）**は、現在のsessionと異なる`sid`の`hello`／`boot`、すなわち遷移候補だけに適用する。受理上限とは別のbudgetであり、予約枠では免除されない。現在の`sid`を維持する`port_reopen`／`resync`は遷移ではないため、このbudgetを消費しない。
    - いずれかの上限超過は`rate_limited`で拒否し、**session state、duplicate履歴、実行中motionのいずれも変更しない。`hello`／`boot`への`rate_limited`は最終結果として保存せず、同じ`(sid, id)`の再送でこの手順を再評価する。**通常commandへの`rate_limited`はそのrequestの最終拒否結果として保存し、再要求する場合はcooldown後に新しい`id`を使う。
 10. 上限内であれば、`sid`と`type`に応じて処理する。現在の`sid`で未処理の`port_reopen`／`resync`の`hello`は、sessionを変更せず受理してACKを最終結果として保存する。`hello`／`boot`で`sid`が現在のsessionと異なる場合だけ遷移を確定する。それ以外の未知・retiredな`sid`は`stale_session`で拒否する（§5.1）。
-    実行中trajectoryによるresourceの一時的な占有（§5.3）があれば、`busy`で拒否して最終拒否結果として保存する（§5.3）。この判定は、手順8で未処理と判定された`(sid, id)`のうち、§5.3の検証と制限の適用を通ったcommandにだけ行う。そこで拒否されるcommandは、占有に関係なくそのcodeで拒否する（§5.3）。
+    通常commandで、実行中trajectoryによるresourceの一時的な占有（§5.3）があれば、`busy`で拒否して最終拒否結果として保存する。この判定は、手順10の中で、手順8で未処理と判定された`(sid, id)`に、§5.3の検証と制限の適用の後で行う。そこで拒否されるcommandは、占有に関係なくそのcodeで拒否する（§5.3）。
 11. 該当counterを増加させる。
 12. Resetせず後続lineのparseを続ける。
 13. Protocol出力によってsensor、motion safety、watchdogの進行をblockしない。
