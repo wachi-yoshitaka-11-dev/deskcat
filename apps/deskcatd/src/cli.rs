@@ -4,7 +4,7 @@
 //! `PROTO-TBD-001`、duplicate履歴の正本は`PROTO-TBD-005`で、いずれも未確定である。起動の期限に対応するTBDの
 //! 登録は無く、値の根拠も無い（`ESP32`の起動時間は未測定）。
 //! **確認していない値を既定として固定しない。**足りなければ起動せず、終了1にする（[`CliError`]）。
-//! 値の暫定の置き場所は、段階2b-iiiのunitの1か所だけである。
+//! 値の暫定の置き場所は、`deploy/systemd/deskcatd.service`の1か所だけである。
 //!
 //! 同じ引数を重ねたときは、後の値で上書きする（`deskcat-serial`の`serial_link`と同じ。検出しない）。
 //! baudの0は、ここでは検査しない。`SerialConfig::new`が弾く（判断は`deskcat-serial`に置く）。

@@ -1,7 +1,7 @@
 //! `run_loop`と`StartupWatchdog`のtest。実portは開かず、台本どおりに振る舞うfake transportを注入する。
 //!
 //! 時計も注入する。閉じるのは、**`Step::Exit`を捨てないこと**と、**起動の期限が終了75になること**である。
-//! 実portと`main`の引数・終了コードの写像は、ここでは確かめない（段階2b-iiiか実機）。
+//! 実portと`main`の引数・終了コードの写像は、ここでは確かめない。
 
 use std::collections::VecDeque;
 use std::io;

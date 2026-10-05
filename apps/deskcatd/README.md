@@ -21,5 +21,6 @@
 終了と再開の規則は`src/daemon.rs`のmodule docが持つ。
 
 binary（`src/main.rs`）、stderrのlogger、引数、起動からの期限（watchdog）は2b-iiで足した。**引数は既定値を持たない**
-（`--help`を参照）。**systemdのunitはまだ無い**（2b-iii）。起動の期限の値は根拠が無く、unitの1か所で決める。
-Pi実機での動作は未確認である。
+（`--help`を参照）。
+
+systemdのunitは`deploy/systemd/deskcatd.service`にある。値は暫定で、根拠は無い。Pi実機で未確認である。

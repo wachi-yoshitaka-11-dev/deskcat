@@ -40,9 +40,9 @@
 //! | `Session`が停止した（`id`空間の枯渇） | 75 | §3。新しいsessionが要る。再起動が復帰の経路である |
 //! | Piの`hello`が上の以外の理由で拒否された、`get_status`が決まった拒否（下の表）を受けた、または`hello`をencodeできない | 1 | 設定か実装の誤り。決まった拒否は再送でも変わらない |
 //!
-//! **75も1も、再起動の回数の上限はsupervisor（systemdの`StartLimitBurst`）が持つ。**このcrateは持たない。
-//! 選び直しの回数の上限は`PROTO-TBD-011`が未確定であり、unit（段階2b-iii）が入るまで、上限の担保は
-//! この差分の中に無い。
+//! **再起動の回数の上限はsupervisor（systemdの`StartLimitBurst`）が持つ。**このcrateは持たない。
+//! 選び直しの回数の上限は`PROTO-TBD-011`が未確定である。unit（`deploy/systemd/deskcatd.service`）の
+//! `StartLimitBurst`（暫定。根拠は無い）に達するかどうかは、起動の周期による。
 //!
 //! # 要求の結果と振る舞いの表
 //!
@@ -152,11 +152,11 @@
 //! `hello`を同じ`(sid, id)`で[`HELLO_RETRY_LIMIT`]回再送し、さらにACK timeoutを待っても無ければ、終了する（75）。
 //! **この待ちの長さは、`HELLO_RETRY_LIMIT`とACK timeoutの積（暫定値の組で、約2秒）であり、根拠は無い。**
 //! その後はsupervisor（systemdの`Restart=`）が新しい`sid`で起動し直すが、再起動の回数が`StartLimitBurst`に
-//! 達すると、ESP32が後から起動しても復帰しない。unit（段階2b-iii）の再起動の間隔と上限、
+//! 達すると、ESP32が後から起動しても復帰しない。unit（`deploy/systemd/deskcatd.service`）の再起動の間隔と上限、
 //! および起動を待つ間隔は、unitが受け持つ。**起動の期限（引数）は、この待ちを延ばさない。**期限が約2秒より長ければ、`hello`に応答が無い場合は
 //! 上の約2秒で終わり、期限が効くのは、`hello`に応答があり（`UnapprovedHelloAck`を含む）、`boot`が来ない場合である。
 //! 期限が約2秒より短ければ、`hello`に応答が無い場合も、期限が先に終わらせる。
-//! 期限の値は、段階2b-iiiのunitの1か所で決める。このcrateとbinaryは値を持たない。
+//! 起動の期限の値は、`deploy/systemd/deskcatd.service`の1か所に置く（このcrateとbinaryは、その値を持たない）。
 //!
 //! # 応答が無いとき
 //!

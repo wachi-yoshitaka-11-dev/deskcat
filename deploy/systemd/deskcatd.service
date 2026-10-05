@@ -1,0 +1,33 @@
+# port と baud を除く値は、すべて暫定である。根拠は無い。
+# Pi実機で起動できることは確かめていない。
+# 終了コードと値の意味は、`apps/deskcatd/src/main.rs`と`apps/deskcatd/src/daemon.rs`のmodule docを参照する。
+
+[Unit]
+Description=DeskCat Raspberry Pi service (deskcatd)
+# 暫定。根拠なし（`PROTO-TBD-011`）。
+StartLimitIntervalSec=300
+StartLimitBurst=30
+
+[Service]
+Type=simple
+User=deskcatd
+Group=deskcatd
+SupplementaryGroups=dialout
+NoNewPrivileges=yes
+# port と baud は未確認の値なので、ここに書かない（baud: `PROTO-TBD-001`）。
+EnvironmentFile=/etc/deskcatd/deskcatd.env
+# 起動の期限: 暫定。根拠なし。duplicate履歴: 暫定。根拠なし（`PROTO-TBD-005`）。
+ExecStart=/usr/local/bin/deskcatd \
+    --port ${DESKCATD_PORT} \
+    --baud ${DESKCATD_BAUD} \
+    --duplicate-capacity 8 \
+    --duplicate-retention-ms 5000 \
+    --startup-deadline-ms 10000
+Restart=on-failure
+# 1は再起動しない。
+RestartPreventExitStatus=1
+# 暫定。根拠なし。
+RestartSec=3s
+
+[Install]
+WantedBy=multi-user.target
