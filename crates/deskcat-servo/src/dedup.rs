@@ -25,7 +25,7 @@
 //!
 //! [`crate::Limiter::admit`]が返す拒否（`UnknownMotion`、`NonFiniteTarget`、`TargetOutOfHardRange`）は、どれも最終的な拒否であり、記録する。§8が記録しないと
 //! 定めるのは`hello`／`boot`の`rate_limited`だけで（手順9）、motionはそれに当たらない。
-//! `busy`を記録するかは§8に定めが無く、ここでは扱わない。
+//! §8の手順10は、`play_motion`の`busy`を最終拒否結果として保存すると定める。ここでは扱わない。
 //!
 //! # 所有者との分担
 //!

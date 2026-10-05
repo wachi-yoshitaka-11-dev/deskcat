@@ -771,10 +771,9 @@ Firmwareは次を実行する。
 | 実行中trajectoryによるresourceの一時的な占有 | `busy` |
 | 値そのものが許容範囲外 | `out_of_range` |
 
-**`busy`は、そのrequestの最終拒否結果として保存する。**同じ`(sid, id)`の再送は、占有を再評価せず、保存した`busy`のACKのreplayになる（§9）。Piが再要求する場合は新しい`id`を使う。
+**`play_motion`の`busy`は、そのrequestの最終拒否結果として保存する。**同じ`(sid, id)`の再送は、占有を再評価せず、保存した`busy`のACKのreplayになる（§9）。
 
-- **占有の判定は、§8の手順8のduplicate照会で未処理と判定された`(sid, id)`にだけ行う。**照会より前に判定すると、受理済みcommandの再送が、そのcommand自身の実行中trajectoryを理由に`busy`で拒否される。
-- **占有の判定は、§5.3の検証と制限の適用を通ったcommandにだけ行う。**そこで拒否されるcommandは、占有に関係なくそのcodeで拒否する。
+- **占有の判定は、§8の手順8のduplicate照会で未処理と判定された`(sid, id)`にだけ行う。**
 
 **(b) 実行時の安全制限を超過した場合** — 実行中のtrajectoryを中止する。
 
@@ -985,7 +984,7 @@ Receiverは次の手順で動作する。
    - **session遷移の上限とcooldown（§5.1）**は、現在のsessionと異なる`sid`の`hello`／`boot`、すなわち遷移候補だけに適用する。受理上限とは別のbudgetであり、予約枠では免除されない。現在の`sid`を維持する`port_reopen`／`resync`は遷移ではないため、このbudgetを消費しない。
    - いずれかの上限超過は`rate_limited`で拒否し、**session state、duplicate履歴、実行中motionのいずれも変更しない。`hello`／`boot`への`rate_limited`は最終結果として保存せず、同じ`(sid, id)`の再送でこの手順を再評価する。**通常commandへの`rate_limited`はそのrequestの最終拒否結果として保存し、再要求する場合はcooldown後に新しい`id`を使う。
 10. 上限内であれば、`sid`と`type`に応じて処理する。現在の`sid`で未処理の`port_reopen`／`resync`の`hello`は、sessionを変更せず受理してACKを最終結果として保存する。`hello`／`boot`で`sid`が現在のsessionと異なる場合だけ遷移を確定する。それ以外の未知・retiredな`sid`は`stale_session`で拒否する（§5.1）。
-    `play_motion`で、実行中trajectoryによるresourceの一時的な占有（§5.3）があれば、`busy`で拒否して最終拒否結果として保存する。この判定は、手順8で未処理と判定された`(sid, id)`にだけ行う。§5.3の検証と制限の適用で拒否されるcommandは、占有に関係なくそのcodeで拒否する。
+    `play_motion`で占有があれば、`busy`で拒否して最終拒否結果として保存する（§5.3）。
 11. 該当counterを増加させる。
 12. Resetせず後続lineのparseを続ける。
 13. Protocol出力によってsensor、motion safety、watchdogの進行をblockしない。
@@ -1117,7 +1116,7 @@ Draft 2のpolicy:
 - 通常commandが明示的な`rate_limited`を受けた場合、そのrequestは最終的に拒否された
   ものとして扱う。同じ`(sid, id)`をretryせず、cooldown後に改めて要求する場合は
   新しい`id`を割り当てる。ACKが無い場合の1回retryとは区別する。
-- `play_motion`が`busy`を受けた場合、同じ`(sid, id)`をretryしても、保存した`busy`のACKがreplayされるだけである。改めて要求するときは新しい`id`を割り当てる。ACKが無い場合の1回retryとは区別する。
+- `play_motion`が`busy`を受けた場合、同じ`(sid, id)`をretryしても、保存した`busy`のACKがreplayされるだけである。ACKが無い場合の1回retryとは区別する。
 - 同じ`(sid, id)`を再利用する。
 - `id`が上限に達した送信側は、新しい`(sid, id)`を作らない（§3）。**未ACK messageの再送は同じ
   `(sid, id)`で行うため、上限到達後もこのretryは実行できる。**止まるのは新しい`(sid, id)`を要する送出だけである。
@@ -1378,7 +1377,7 @@ Framing／parse層について、**host workspaceのRust実装**がfixtureに合
 | 2026-10-02 | Draft 2 boot resume by hello | [Issue #487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)のPR B2。§4.1と§5.1で食い違っていた`boot`の再送の再開を、§4.1の「`hello`による再開」に1つにまとめ、§5.1の手順5と「現在sessionで未処理のsession確立message」はそこを参照する形にした。(1) recovery budgetを使い切った後の再開を「してよい」から「する」へ改めた。(2) 再開を起こす`hello`を、`status: ok`のACKの後は新しいPi `sid`の`hello`、budgetを使い切った後は受理した`hello`（同じPi `sid`の`port_reopen`／`resync`を含む）とした。(3) `rate_limited`のbudgetを使い切った停止も再開の対象とした。(4) 回数の単位を「Pi sessionにつき1回」に揃えた。(5) 終端として拒否された`boot`の「Piの介入を待つ」を、processの再起動または運用者の明示的なsession reset（§3.1）に改めた。§2の既知の逸脱を、`firmware/esp32/src/pi_link.rs`がPi→ESP32方向のrequestを処理するようになった後の範囲へ改めた。**wire formatは変更していない** |
 | 2026-10-02 | Draft 2 event and display types | [Issue #527](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/527)。§4.2〜§4.5の`head_touched`、`tapped`、`lifted`、`environment`と、§5.2の`set_expression`、§5.4の`show_text`を、`crates/deskcat-protocol`の型と§12.1のSchema群のfixtureへ入れた。仕様の文は次を足した: §3にtype固有payloadのfieldの型と必須（省略可のfieldの`null`は省略と同じ）、§5.4に`text`のbyte上限（884 byte、暫定）、§7に`text`の制御文字の規則、§12に共有fixtureが固定する範囲と、displayとfirmwareの上限を適用する手順。§2の既知の逸脱(i)を、`set_expression`と`show_text`がdecodeを通る事実に合わせた。`head_touched.strength`と`tapped.magnitude_g`は型に持たない（受けた場合は§3により無視する）。§13のTBD行は外していない。`play_motion`、§4.7の完了・fault event、`show_choices`、`protocol_fault`は入れていない |
 | 2026-10-03 | Draft 2 Pi sid and ESP32 restart | [Issue #491](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/491)の決定2件を写した。§13の`PROTO-TBD-011`の行に、Pi側の`sid`の生成方法（processの起動ごとにOSの乱数から選ぶ）を記録した。§10.1の手順の後に、再起動したESP32がPiの`sid`を失っているため手順4の`get_status`が`stale_session`になること、Piが`boot`で遷移を確定したらprocessを再起動して§10.2に従うことを書いた（[決定](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/491#issuecomment-5965360345)）。§9の受け入れ前の`TBD`の`sid`の生成方法に取り消し線を付けた。**wire formatは変更していない。**§5.1の整合規則とfirmwareも変えていない |
-| 2026-10-05 | Draft 2 busy | [Issue #19](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/19)。`play_motion`の`busy`を、そのrequestの最終拒否結果として保存し、同じ`(sid, id)`の再送を保存したACKのreplayとすることを、§5.3、§8手順10、§9へ明記した。占有の判定は、duplicate照会で未処理と判定され、検証と制限の適用を通った`(sid, id)`にだけ行い、そこで拒否されるcommandは占有に関係なくそのcodeで拒否する |
+| 2026-10-05 | Draft 2 busy | [Issue #19](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/19)。`play_motion`の`busy`を、そのrequestの最終拒否結果として保存し、同じ`(sid, id)`の再送を保存したACKのreplayとすることを、§5.3、§8手順10、§9へ明記した。**wire formatは変えていない。** |
 
 ### Draft schemaの互換性
 
