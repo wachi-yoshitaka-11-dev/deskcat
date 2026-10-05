@@ -7,6 +7,12 @@ rust-version.workspace = true
 license.workspace = true
 publish.workspace = true
 
+[[bin]]
+name = "deskcatd"
+path = "src/main.rs"
+# libraryと同名のため、docの出力が衝突する。
+doc = false
+
 [dependencies]
 deskcat-domain = { path = "../../crates/deskcat-domain" }
 deskcat-protocol = { path = "../../crates/deskcat-protocol" }
