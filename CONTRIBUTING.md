@@ -621,6 +621,7 @@ reviewがまだ走っていないPRでは空振りしうる。依頼したreview
 **reviewが開始したら依頼は最大1回。**`Review rate limited`で開始されなかった投稿はこの1回に
 数えない。枠切れが確定した後は、PMへ知らせ、全PRの最新投稿時刻から1時間以上経ち、
 投稿直前にも新しい依頼がないと確認できた場合に限り、PR担当のセッションが`full review`を再依頼できる。
+`Review stopped after lock loss`でreviewが完走していないと確定した場合（checkが`failure`で、`Review completed`へ到達していない）も、この1回に数えず、PMへ知らせ、1時間以上の間隔と投稿直前の再確認という同じ条件を満たせば`full review`を再依頼できる。再依頼は1回のlock lossにつき1回で、再び止まった場合も同じ条件を満たすまで待つ。
 `Review in progress`など結果が確定していない間は再依頼しない。枠切れのまま再び投稿した場合も
 同じ条件を満たすまで待つ。**同じ状態で2回以上投げない。**
 安全・電気・protocol・firmwareに関わる変更は、reviewが完走するまでmergeしない
@@ -668,7 +669,7 @@ headは`develop`であり、**`develop`へcommitが入るとPull Requestのhead�
 古くなるのは本文の測定値とtitleだけである。**closeして作り直す必要は無い。**
 
 **reviewが開始した後は、同じPull Requestで`full review`を投げ直さない**
-（[手動で依頼する前に状態を確認する](#手動で依頼する前に状態を確認する)）。
+（[手動で依頼する前に状態を確認する](#手動で依頼する前に状態を確認する)。完走しなかったlock lossの後の再依頼は、その節の条件で行う）。
 
 > **依頼したreviewの指摘に対応したcommitは、自己レビューで見る。ここで投げ直さない。**
 > 投げ直すと1つのPull Requestでreviewを何度も消費する。

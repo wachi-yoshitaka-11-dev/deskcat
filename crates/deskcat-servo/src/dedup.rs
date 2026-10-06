@@ -25,7 +25,10 @@
 //!
 //! [`crate::Limiter::admit`]が返す拒否（`UnknownMotion`、`NonFiniteTarget`、`TargetOutOfHardRange`）は、どれも最終的な拒否であり、記録する。§8が記録しないと
 //! 定めるのは`hello`／`boot`の`rate_limited`だけで（手順9）、motionはそれに当たらない。
-//! §8の手順10は、`play_motion`の`busy`を最終拒否結果として保存すると定める。ここでは扱わない。
+//! §8の手順10は、`play_motion`の`busy`を最終拒否結果として保存すると定める。占有の判定は
+//! 呼び出し側が行い、この層は判定しない。この層は、`admit`のclosureが返した拒否を、種類を問わず
+//! 記録して同じ`id`の再送へ再生する（再送で占有を再評価しない、§9）。[`crate::Rejection`]に
+//! `busy`はまだ無い。
 //!
 //! # 所有者との分担
 //!

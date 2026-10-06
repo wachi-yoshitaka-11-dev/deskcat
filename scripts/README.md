@@ -122,7 +122,7 @@ python3 -m unittest discover --start-directory scripts --pattern "test_*.py" --v
 ```
 
 Pages CIは`test_link_validators.py`、`test_pages_guards.py`、
-`test_instruction_entrypoint.py`、`test_review_gate.py`、`test_hooks.py`をrunnerの一時directoryから
+`test_instruction_entrypoint.py`、`test_review_gate.py`、`test_hooks.py`、`test_publication_guard.py`をrunnerの一時directoryから
 絶対pathで起動する。
 いずれもrepository root以外のcurrent directoryで成功しなければならない。
 `test_link_validators.py`と`test_pages_guards.py`は、あわせて`PAGES_SOURCE=.pages-src`を
