@@ -144,7 +144,7 @@ Integer widthは、共有test fixture（§12.1）とあわせて次のとおり�
 
 **`sid`の変化を検知しただけでは切り替えない。**`sid`は乱数を含みうるため、未知の値が新しいsessionなのか遅れて届いた古いmessageなのかを区別できない。切り替えの条件は§5.1で規定する。
 
-`sid`の生成方法（乱数、不揮発カウンタ、またはその併用）、再起動直後に同じ値を選ぶ確率の許容値、retired sessionの保持件数と期間、および`hello`の同一identity最大retry回数は`PROTO-TBD-011`とする。
+`sid`の生成方法は確定済みである（ESP32は不揮発counter、Piはprocessの起動ごとにOSの乱数。§13の`PROTO-TBD-011`の行）。再起動直後に同じ値を選ぶ確率の許容値、retired sessionの保持件数と期間、および`hello`の同一identity最大retry回数は`PROTO-TBD-011`とする。
 
 **保持件数の上限によって、保持期間の満了前にretired sessionを追い出してはならない。**
 追い出すと、その`sid`は「未知」に戻る。遅れて届いた`hello`／`boot`が遷移候補として
