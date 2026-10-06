@@ -66,7 +66,7 @@ Pull Request templateの「検証」表と「安全とsecurity」は、何を確
    本ADRは判断を記録するもので、設定値を再掲しない
 2. 自己レビューの観点を`CONTRIBUTING.md`にchecklistとして定める。回数は減らさない
 3. Issueを立てずに直接反映してよい範囲（typo、リンク、表記ゆれ、規約の言い回し、metadata記入漏れ）を定める。
-   **変更内容の承認は必ず得る**
+   **repository変更の内容は承認を得る。**GitHub操作の承認区分は[AI Agent Policy](../governance/ai-agent-policy.md#6-責務マトリクス)に従う
 4. `develop`のbranch protectionで`Require conversation resolution before merging`を有効化し、
    手作業のGraphQL確認を廃止する。**必須reviewと必須status checkは設定しない**
 5. **templateは変更しない**
@@ -93,7 +93,7 @@ Pull Request templateの「検証」表と「安全とsecurity」は、何を確
 | labelの付け忘れで、高リスク変更がreviewされない | Pull Requestのlabelは既に必須運用である。昇格Pull Requestには対象範囲に応じたlabelを必ず付ける。**ただしlabelは作成時に付ける。**CodeRabbitは対象判定を作成直後に行い、後からのlabel追加では再判定しない（[#94](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/94)でのCodeRabbitの回答。**こちらの実測ではない**）。`gh pr create --label`で作成時に指定する運用を`CONTRIBUTING.md`へ定めた |
 | **`auto_incremental_review: false`により、指摘対応後のcommitがreviewされない** | **対応commitは自己レビューで見る。`@coderabbitai review`を投げ直さない。**投げ直すと1つのPull Requestでreviewを何度も消費し、`false`にした意味が無くなる（[#91](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/91)で実際に発生）。手動依頼は**初回のreviewが一度も得られなかったときだけ**とし、安全・電気・protocol・firmwareに関わる変更ではrate limitが解けるまで待つ |
 | `Review rate limited`がcheck上`pass`と表示され、reviewされていないのにmergeされる | GitHubは止められない。`CONTRIBUTING.md`の「Merge前の確認」に手作業の確認として明記する。**本ADRを入れるPR #90 自身で2回連続して発生し、機械reviewを受けられなかった** |
-| 直接反映の範囲が拡大解釈される | 「Issueを立てない」は「勝手に変えてよい」ではない。承認は必ず得る。迷うものはIssue必須側として扱う |
+| 直接反映の範囲が拡大解釈される | repository変更の承認は必ず得る。GitHub操作の承認区分は[AI Agent Policy](../governance/ai-agent-policy.md#6-責務マトリクス)に従う。迷うものはIssue必須側として扱う |
 
 ## 検証
 
