@@ -68,13 +68,7 @@ gh api graphql -f query='query { repository(owner:"wachi-yoshitaka-11-dev", name
 [GitHubが強制しないもの](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/CONTRIBUTING.md#githubが強制しないもの)が持つ。
 **ここへ写さない。**
 
-CodeRabbitへ投げる場合は、**先に残数を確認する。**
-
-```text
-@coderabbitai rate limit
-```
-
-**`review`ではなく`full review`。**使い分けと、投げてよい条件は
+CodeRabbitへ投げる場合の時刻確認、投稿、再依頼の条件は
 [手動で依頼する前に状態を確認する](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/CONTRIBUTING.md#手動で依頼する前に状態を確認する)が持つ。
 
 **人間の承認を得る。CIが緑でも機械reviewが完走しても承認ではない。**

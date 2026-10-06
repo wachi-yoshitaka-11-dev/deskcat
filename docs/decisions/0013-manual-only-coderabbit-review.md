@@ -1,6 +1,6 @@
 # ADR-0013: CodeRabbitの自動reviewを廃止し、手動依頼だけにする
 
-> 状態: Accepted
+> 状態: Accepted (partially superseded)
 > 日付: 2026-08-22
 
 ## 背景
@@ -164,3 +164,9 @@ CodeRabbit自身の回答。実測ではない）。
 **本ADRが変えるのは決定1だけである。**決定2・決定4・決定5は同ADRのままである。
 決定3は本ADRとは別に、[ADR-0010](0010-change-class-and-review-declaration.md)と
 [ADR-0011](0011-issue-optional-pull-request-required.md)が狭めている。
+
+## 後継の決定
+
+[ADR-0025](0025-coderabbit-rate-limit-retry.md)が、決定2の判断主体と「最大1回」の数え方、
+決定3の依頼前の残数確認・枠切れ後の再依頼条件を置き換える。
+決定1・4・5と、決定2・3のその他の部分は本ADRのままである。

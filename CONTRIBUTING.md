@@ -403,8 +403,8 @@ Issueの通算は情報として記録に残し、上限の判定には使わな
 [`.coderabbit.yaml`](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/.coderabbit.yaml)は
 `enabled: false`だけを持つ。**したがって、この自己レビューが既定で唯一のreviewである。**
 
-**意味上criticalな変更では、自己レビューの後で手動でreviewを依頼する。最大1回。**
-判断は人が行い、機械的な判定は置かない。安全・電気・protocol・firmwareに関わる変更を
+**意味上criticalな変更では、自己レビューの後で手動でreviewを依頼する。**
+依頼するかはPMが判断し、機械的な判定は置かない。安全・電気・protocol・firmwareに関わる変更を
 自己レビューで代替しない。手順は[手動で依頼する前に状態を確認する](#手動で依頼する前に状態を確認する)にある。
 
 回数だけを守っても、同じ観点を繰り返しなぞるだけになる。次の観点で見る。
@@ -588,8 +588,7 @@ allowlistに言及する記述は、廃止前の設定に対する観測であ�
 枠が空けば同じPull Requestで実行できる。`Review skipped`は**対象判定で外れている**ため、
 枠が空いても自動では走らない。
 [#89](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/89)では**両方が別々の理由で観測されている**
-（[#94](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/94#issuecomment-5242073164)。
-枠を使い切った経緯は後述の[手動で依頼する前に状態を確認する](#手動で依頼する前に状態を確認する)にある）。
+（[#94](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/94#issuecomment-5242073164)）。
 **「skipされた」と「rate limitに当たった」を同じ言葉で記録しない。**
 
 **`Review skipped`でも`Review rate limited`でもない中断もある。**
@@ -609,30 +608,23 @@ allowlistに言及する記述は、廃止前の設定に対する観測であ�
 
 #### 手動で依頼する前に状態を確認する
 
-**投げる前に必ず次を実行する。**これは**reviewを消費せず**、残数と次に空く時刻を返す。
+PMは依頼を判断し、投稿前に時刻を調整する。PR担当のセッションは投稿前にPMへ知らせ、
+**開いている全PRの最新の`@coderabbitai`投稿時刻**を確認する。いずれかが1時間以内なら待ち、
+投稿直前に全PRを再確認する。投稿はPR担当のセッションが行い、`coderabbit_gate.py`がユーザーの許可を求める。
+投稿時刻は対象Issueのコメントに残す。
+依頼前の`@coderabbitai rate limit`による残数確認は必須としない。
 
-```text
-@coderabbitai rate limit
-```
+初回は`@coderabbitai full review`を使う。`review`は新しい変更のみを見るため、
+reviewがまだ走っていないPRでは空振りしうる。依頼したreviewが走った後の対応commitは
+自己レビューで見て、投げ直さない。
 
-| 確認結果 | 行動 |
-|---|---|
-| 残数が0 | **投げない。**返ってきた時刻まで待つ |
-| 残数があり、**まだ一度もreviewが走っていない** | **`@coderabbitai full review` を使う。**自動reviewを行わないため、依頼はいつもこの状態から始まる。`review`はincrementalであり、skip後は空振りしうる |
-| 残数があり、依頼したreviewは走ったが対応commitが未review | `@coderabbitai review`。**ただし対応commitは自己レビューで見るのが既定であり、投げ直さない**（[Merge前の確認](#merge前の確認)） |
-
-`review`と`full review`は別物である。`review`は**新しい変更のみ**、`full review`は**全fileを最初から**
-review する。**どちらも同じ毎時上限を消費する。**`full review`は枠を回避する手段ではない。
-
-**同じ状態で2回以上投げない。**空振りなのかrate limitなのかを判別せずに繰り返すと、
-枠だけを消費して**他のPull Requestのreviewを止める。**
-実際、[#88](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/88)・
-[#90](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/90)・
-[#91](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/91)で計4回投げ、3回がrate limitに当たり、
-[#89](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/89)のreviewを遅らせた。
-
-上限は開発者identity単位のrolling windowである。一定時刻にまとめて戻るのではなく、
-古いreviewが枠から抜けるたびに1件ずつ空く。
+**reviewが開始したら依頼は最大1回。**`Review rate limited`で開始されなかった投稿はこの1回に
+数えない。枠切れが確定した後は、PMへ知らせ、全PRの最新投稿時刻から1時間以上経ち、
+投稿直前にも新しい依頼がないと確認できた場合に限り、PR担当のセッションが`full review`を再依頼できる。
+`Review in progress`など結果が確定していない間は再依頼しない。枠切れのまま再び投稿した場合も
+同じ条件を満たすまで待つ。**同じ状態で2回以上投げない。**
+安全・電気・protocol・firmwareに関わる変更は、reviewが完走するまでmergeしない
+（[Merge前の確認](#merge前の確認)）。
 
 **「reviewを依頼した」を「reviewを受けた」と書かない。**`Review rate limited`は`pass`と表示されるため、
 依頼の事実だけで完了扱いにすると検出が抜ける。
@@ -658,7 +650,7 @@ mergeされ、追跡も無かった。後から[#74](https://github.com/wachi-yo
 手動reviewを2回投げる違反と、未解決を残してmergeしかける判断が起きた（追跡は[#327](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/327)）。
 
 **1. 昇格は手動reviewの対象である。**`main`に載るためである。
-**回数は[自己レビュー](#自己レビュー)のとおり最大1回で、昇格も例外ではない。**
+**回数は[手動依頼の手順](#手動で依頼する前に状態を確認する)のとおりで、昇格も例外ではない。**
 
 **2. 未解決threadを残してmergeしない。**[未解決を残してmergeする場合](#未解決を残してmergeする場合)は
 **昇格では使わない。**`main`をbaseとするmerge済みPull Request 18本を全数走査した結果、
@@ -675,13 +667,14 @@ mergeされ、追跡も無かった。後から[#74](https://github.com/wachi-yo
 headは`develop`であり、**`develop`へcommitが入るとPull Requestのheadも一緒に動く。**
 古くなるのは本文の測定値とtitleだけである。**closeして作り直す必要は無い。**
 
-**同じPull Requestで`full review`を投げ直さない**（[手動で依頼する前に状態を確認する](#手動で依頼する前に状態を確認する)）。
+**reviewが開始した後は、同じPull Requestで`full review`を投げ直さない**
+（[手動で依頼する前に状態を確認する](#手動で依頼する前に状態を確認する)）。
 
 > **依頼したreviewの指摘に対応したcommitは、自己レビューで見る。ここで投げ直さない。**
 > 投げ直すと1つのPull Requestでreviewを何度も消費する。
-> （[観測記録](docs/runbooks/coderabbit-review-observations.md)。回数の根拠は[ADR-0013](docs/decisions/0013-manual-only-coderabbit-review.md)決定2の「最大1回」）
+> （[観測記録](docs/runbooks/coderabbit-review-observations.md)。回数の扱いは[ADR-0025](docs/decisions/0025-coderabbit-rate-limit-retry.md)）
 
-**増えたcommitは自己レビューで見る。**規則1の1回は、その昇格に対する1回である。
+**増えたcommitは自己レビューで見る。**規則1の1回は、その昇格で開始したreviewに対する1回である。
 **Pull Requestを作り直した回数ではない。**昇格の差分は1回のreviewで閉じないが、
 それは投げ直す理由にならない。**枠は1件/時であり、待ち時間も同じだけ積む。**
 
@@ -1104,8 +1097,8 @@ Issue本文）に残るべきものは、成果物へ書く。**報告と成果�
   疑わしい場合はblob hashまたは実際のfile内容を突き合わせる。
 - **`@coderabbitai rate limit`への返答時間に上限が無い。**6秒で返った例と22分35秒
   かかった例の両方が観測されている（[CodeRabbitのreview状態の観測記録](docs/runbooks/coderabbit-review-observations.md)）。
-  **無応答と遅延は区別できない。**待つ上限を決めずに「投げる直前に1回確認する」
-  運用を続ける。
+  **無応答と遅延は区別できない。**これは以前の残数確認運用に関する観測である。
+  現行の依頼手順は[手動で依頼する前に状態を確認する](#手動で依頼する前に状態を確認する)を参照する。
 - **quoteしていないheredoc（`<<EOF`）は、`\|`とbacktickを含む文書を壊す。**
   このrepositoryの文書はどちらも高頻度で使う。**heredocは`<<'EOF'`で書く。**
 - **走査結果を数として報告するときは、patternが何を含み何を落とすかを一緒に書く。**
