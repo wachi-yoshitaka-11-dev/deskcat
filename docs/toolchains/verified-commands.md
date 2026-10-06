@@ -59,25 +59,29 @@ cargo build --locked
 **`cargo fmt` はこの option を受け付けない。**
 
 Linux x86_64 で検証した。初回は 2026-08-06 で、これは VM 上の初回環境記録である
-（[Version Record](version-records/2026-08-06-esp32-build-linux.md)）。現行 tree に対する最新の検証は
-2026-08-15 であり、実機 Linux で取得した（[Version Record](version-records/2026-08-15-esp32-build-native-linux.md)）。
+（[Version Record](version-records/2026-08-06-esp32-build-linux.md)）。実機 Linux での最初の検証は
+2026-08-15 である（[Version Record](version-records/2026-08-15-esp32-build-native-linux.md)）。最新の検証は
+2026-10-04 であり、Version Record の `Repository commit` の tree（#487 の PR B1 の後の構成。Pi link を含む既定構成）で、`deskcat-servo` を共有した状態で実機 Linux で取得した（[Version Record](version-records/2026-09-29-esp32-build-servo-limiter-native-linux.md)。
+初回検証日は 2026-09-29、最終有効な検証日時は 2026-10-04）。
 別端末での再現は CI の `ubuntu-24.04` runner で満たした
 （#42。[Version Record](version-records/2026-08-10-esp32-build-ci.md)）。
 **build-only であり、flash と実機起動は主張しない。**
 
-**`pi-protocol-mode` feature（[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)）を有効にする場合は、既定構成に加えて`cargo clippy`と`cargo build`（`cargo fmt`は対象外）へ`--features pi-protocol-mode`を足したものも通す。**この構成のVersion Recordはまだ無い。**`flash と serial monitor`節（下記）がcommand blockを持たないのは「Version Recordが再現手順であって追加の実行記録ではないと自認しているため」であり、ここはそもそもVersion Record自体が無い、という別の理由である。**理由は違うが、結論（検証済みcommandへ格上げする形で書かない）は同じであるため、ここでもcommand blockを写さない。**上の「Linux x86_64 で検証した」以下の記録は既定構成についてのものであり、`pi-protocol-mode`構成を含まない。
+**`pi-protocol-mode` featureは[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)で廃止した。**Pi linkは既定構成（製品build）に入った。**上の「Linux x86_64 で検証した」以下の記録のうち、2026-08-15 までの記録は #487 の PR B1 より前の tree についてのものである。2026-09-29 の記録は、2026-10-04 に #487 の PR B1 の後の構成（Pi link を含む既定構成）で再検証した。**2026-09-29の記録のうち、既定構成の分は上の検証記録である。それ以外の構成の分は実施記録であり、検証済みcommandへは格上げしていない。#487のPR B1より前は、`pi-protocol-mode`を有効にした構成も`cargo clippy`と`cargo build`へ`--features pi-protocol-mode`を足して通していた。
 
-**`bringup-display-13` feature（[#451](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/451)）も同じ扱いである。**有効にする場合は、既定構成に加えて`cargo clippy`と`cargo build`へ`--features bringup-display-13`を足したものも通す。**`bringup-display-13`と`pi-protocol-mode`を同時に指定した構成は`compile_error!`で落ちる。**これは意図した挙動であり、検証済みcommandの対象外である（理由は`firmware/esp32/src/main.rs`の該当`compile_error!`。**ここへ再掲しない**）。**この構成のVersion Recordも無い。**
+**`bringup-display-13` feature（[#451](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/451)）を有効にする場合は、既定構成に加えて`cargo clippy`と`cargo build`（`cargo fmt`は対象外）へ`--features bringup-display-13`を足したものも通す。**#487から、このfeatureは既定構成へLCDの試験モードを加えるだけであり、他のfeatureと排他ではない。**この構成の実施記録（[Version Records](version-records/README.md)）は、検証済みcommandへ格上げする記録ではない。2026-09-29の記録だけは、2026-10-04に#487のPR B1の後の構成（Pi linkを含む）でこの構成も再検証した。他の記録は、どれも#487のPR B1より前のtreeのものである。**そのため、ここでもcommand blockを写さない（`flash と serial monitor`節（下記）がcommand blockを持たない理由とは別である）。
 
 ### workspace との関係
 
 `firmware/esp32` は root workspace から `exclude` している。firmware の manifest は
 `[workspace]` 節を持たないため、**exclude を外すと firmware の build が壊れる。**
 
-firmware は `crates/deskcat-protocol` を path dependency で使う（[ADR-0008](../decisions/0008-firmware-protocol-crate-reuse.md)）。
-**同 crate の `rust-version` は host と ESP toolchain の両方を満たす下限にしてある。**
+firmware は `crates/deskcat-protocol` と `crates/deskcat-servo` を path dependency で使う
+（[ADR-0008](../decisions/0008-firmware-protocol-crate-reuse.md)。`deskcat-servo` は同 ADR の追記）。
+**両 crate の `rust-version` は host と ESP toolchain の両方を満たす下限にしてある。**
 上げると firmware の build が compile 前に停止する。
-**`crates/deskcat-protocol/` を変更したら、host だけでなく ESP32 build も回す。**
+**`crates/deskcat-protocol/` と `crates/deskcat-servo/` を変更したら、host だけでなく ESP32 build も回す。**
+`deskcat-servo` の下限の根拠は [Version Record](version-records/2026-09-29-esp32-build-servo-limiter-native-linux.md) にある。
 
 ### flash と serial monitor
 

@@ -18,15 +18,21 @@
 //! - ESP32 peer sessionの状態（[`PeerSession`]）。`boot`のsession遷移、duplicate履歴、
 //!   `hello`／`boot`以外の`stale_session`判定、Piが送った要求への応答の相関
 //!   （[Issue #12]、`crates/deskcat-serial/src/peer.rs`）
-//! - [`Session`]と[`PeerSession`]をまたいだ送信の判断（[`handle_boot`]、
-//!   [`retry_due_requests`]）。`boot`確立後の`get_status`送出（§10.1 step1〜4）と、
+//! - 現在sessionのduplicate履歴（[`DuplicateHistory`]）。保持件数と保持期間
+//!   （`PROTO-TBD-005`）は[`DuplicatePolicy`]として呼び出し側から受け取る。
+//!   **定義は`crates/deskcat-protocol/src/duplicate.rs`にある**（Issue #19で、hostとfirmwareが
+//!   共用するために移した）。[`duplicate`]はそのmoduleのre-exportであり、以前のpathを保つ
+//! - [`Session`]と[`PeerSession`]をまたいだ受信と送信の判断（[`handle_frame`]、
+//!   [`handle_boot`]、[`retry_due_requests`]）。受信frameの振り分け（`ack`の相関、
+//!   `status`の受理、現在sessionのeventの受け渡し）、`boot`確立後の`get_status`送出（§10.1 step1〜4）と、
 //!   ACK timeoutした要求の同一`id`再送（§9）に限る
 //!   （`crates/deskcat-serial/src/coordinator.rs`）
 //!
 //! 含まないもの:
 //!
 //! - **実portを開いての確認。**このcrateの検証はhost（VM）上であり、擬似端末
-//!   （`SerialPort::pair`）までである。`/dev/ttyUSB*`のdevice名の確定と、実機での
+//!   （`SerialPort::pair`）までである。実機でのdevice名の確定（Pi側は`/dev/serial0`を使う。
+//!   現物では確かめていない。`docs/hardware/gpio-assignment.md`の`Pi側の設定`）と、実機での
 //!   read／write、切断、再接続、partial I/Oの確認は[Issue #11]の後半に残る
 //! - **domain動作。**感情、性格、行動判断、独り言はこのcrateに入らない。
 //!   §10.1 step6（実際のstateとdesired stateの比較）とstep7（安全な状態設定command
@@ -75,20 +81,23 @@
 pub mod config;
 pub mod coordinator;
 pub mod device;
+/// `deskcat_protocol::duplicate`のre-export（Issue #19で移した。以前のpathを保つ）。
+pub use deskcat_protocol::duplicate;
 pub mod ids;
 pub mod outbox;
 pub mod peer;
 pub mod session;
 pub mod transport;
 
-pub use config::{ConfigError, ReconnectPolicy, RetryPolicy, SerialConfig};
-pub use coordinator::{RetryOutcome, handle_boot, retry_due_requests};
+pub use config::{ConfigError, DuplicatePolicy, ReconnectPolicy, RetryPolicy, SerialConfig};
+pub use coordinator::{Received, RetryOutcome, handle_boot, handle_frame, retry_due_requests};
 pub use device::SerialDevice;
+pub use duplicate::{DuplicateHistory, Lookup};
 pub use ids::{IdAllocator, IdSpaceExhausted};
 pub use outbox::{Enqueued, Outbox};
 pub use peer::{
-    BootHandled, BootOutcome, CorrelatedAck, OutstandingAction, OutstandingKind, PeerRejection,
-    PeerSession,
+    AcceptedStatus, BootHandled, BootOutcome, CorrelatedAck, OutstandingAction, OutstandingKind,
+    PeerCounters, PeerRejection, PeerSession,
 };
 pub use session::{ConnectionState, Pump, SendError, Session, SessionCounters, StopReason};
 pub use transport::{IoDisposition, Transport};

@@ -31,6 +31,11 @@ pub enum ConfigError {
     /// ACK timeoutが0である。**0にすると、ACKを受け取る前に即timeoutし、
     /// 送るそばから再送することになる。**
     ZeroAckTimeout,
+    /// duplicate履歴の保持件数が0である。**0にすると、処理した直後の再送も
+    /// 履歴に無く、保持した結果をreplayできない。**
+    ZeroDuplicateCapacity,
+    /// duplicate履歴の保持期間が0である。0件と同じく、記録した結果が即座に失われる。
+    ZeroDuplicateRetention,
 }
 
 impl core::fmt::Display for ConfigError {
@@ -42,6 +47,8 @@ impl core::fmt::Display for ConfigError {
             Self::ZeroInitialBackoff => "backoffの初期値が0である",
             Self::BackoffBoundsInverted => "backoffの初期値が上限を超えている",
             Self::ZeroAckTimeout => "ACK timeoutが0である",
+            Self::ZeroDuplicateCapacity => "duplicate履歴の保持件数が0である",
+            Self::ZeroDuplicateRetention => "duplicate履歴の保持期間が0である",
         };
         f.write_str(text)
     }
@@ -52,7 +59,7 @@ impl core::error::Error for ConfigError {}
 /// Serial linkのport設定。
 ///
 /// **既定値を持たない。**`Default`を実装していないのは意図的である。
-/// device名（`/dev/ttyUSB*`など）を「たぶんこれ」で埋めると、確認していない値が
+/// device名（`/dev/serial0`など）を「たぶんこれ」で埋めると、確認していない値が
 /// 設定の既定として固定される。実機のdevice名はまだ確認されていない
 /// （[Issue #8]の受け入れ条件に含まれず、確定は[Issue #11]の後半に残る）。
 ///
@@ -317,9 +324,36 @@ impl RetryPolicy {
     }
 }
 
+/// 現在sessionのduplicate履歴の保持件数と保持期間（§9、`PROTO-TBD-005`）。
+///
+/// **定義は`deskcat_protocol::DuplicatePolicy`にある**（Issue #19で、hostとfirmwareが共用する
+/// ために移した）。以前のpath（`deskcat_serial::config::DuplicatePolicy`）を保つためにre-exportする。
+/// **既定値を持たない**ことも、[`ReconnectPolicy::provisional`]や[`RetryPolicy::provisional`]の
+/// ような仮の値を持たないことも、移す前と同じである。
+/// **`DuplicatePolicy::new`のerror型は、[`ConfigError`]から`deskcat_protocol::DuplicatePolicyError`に
+/// 変わった。**[`ConfigError`]が要る呼び出し側は、下の`From`で変換する（`?`、`map_err(ConfigError::from)`）。
+pub use deskcat_protocol::DuplicatePolicy;
+
+/// `DuplicatePolicy::new`の拒否（`deskcat_protocol::DuplicatePolicyError`）を、このcrateの
+/// [`ConfigError`]の同名の2つへ写す。種類は変えない。
+impl From<deskcat_protocol::DuplicatePolicyError> for ConfigError {
+    fn from(err: deskcat_protocol::DuplicatePolicyError) -> Self {
+        match err {
+            deskcat_protocol::DuplicatePolicyError::ZeroDuplicateCapacity => {
+                Self::ZeroDuplicateCapacity
+            }
+            deskcat_protocol::DuplicatePolicyError::ZeroDuplicateRetention => {
+                Self::ZeroDuplicateRetention
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::RetryPolicy;
+    use core::time::Duration;
+
+    use super::{ConfigError, DuplicatePolicy, RetryPolicy};
 
     /// `max_retries`は§9のDraft 2 policy（「ACKが必要なcommandはtimeout後に
     /// 1回retryする」）が確定した値であり、`PROTO-TBD-011`（`hello`専用）待ちの
@@ -331,5 +365,19 @@ mod tests {
             1,
             "§9のDraft 2 policyが確定した値"
         );
+    }
+
+    /// 保持件数・保持期間の0は、どちらも記録した結果を即座に失う設定であり、受け付けない。
+    #[test]
+    fn a_duplicate_policy_rejects_zero_capacity_and_zero_retention() {
+        assert_eq!(
+            DuplicatePolicy::new(0, Duration::from_secs(1)).map_err(ConfigError::from),
+            Err(ConfigError::ZeroDuplicateCapacity)
+        );
+        assert_eq!(
+            DuplicatePolicy::new(1, Duration::ZERO).map_err(ConfigError::from),
+            Err(ConfigError::ZeroDuplicateRetention)
+        );
+        assert!(DuplicatePolicy::new(1, Duration::from_millis(1)).is_ok());
     }
 }

@@ -36,7 +36,8 @@ conformance testに合格しなければならない」と定めているため�
 | `note` | 任意。そのcaseが何を固定しているか |
 
 `canonical`が`false`なのは、未知の追加payload fieldを含むcase（§3によりdecodeで無視され、
-再encodeで落ちる）と、CRLFで終わるcase（再encodeでは`\n`になる）である。
+再encodeで落ちる）、省略可のfieldに`null`を置いたcase（§3により省略と同じに扱われ、
+再encodeで落ちる）、CRLFで終わるcase（再encodeでは`\n`になる）である。
 これらは値の一致だけを要求する。
 
 ### `invalid.json`のcase

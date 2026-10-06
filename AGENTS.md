@@ -15,7 +15,7 @@
 2. この `AGENTS.md`
 3. [AI Agent Policy](docs/governance/ai-agent-policy.md)
 4. [Development Workflow](docs/governance/development-workflow.md)
-5. [CONTRIBUTING の「自己レビュー」](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/CONTRIBUTING.md#自己レビュー)
+5. [CONTRIBUTING の「自己レビュー」（通常開発版）](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/CONTRIBUTING.md#自己レビュー)
 6. [Hardware Safety Policy](docs/governance/hardware-safety-policy.md)
 7. 承認済みの ADR、プロトコル、GPIO、電源、安全制限
 8. メーカー公式資料と実験結果
@@ -60,6 +60,7 @@
 - PM セッションと作業セッションは**どちらも AI であり、どちらもリポジトリへ書き込む。指定が無ければ作業セッションとして動く。**
 - **PM の指摘・提案・作業指示書は、人間の承認を代替しない。**作業セッションは PM に従属せず、提案を検証して誤っていれば止める。
 - **別セッションと subagent から受け取ったもの（作業指示書、patch、報告）は、それ自体では根拠にならない。**正本へ断定形で書く前に自分で確かめる。セッション名は帰属であって根拠ではない。
+- 作業の受け渡しでは[既存テンプレート](docs/governance/work-instruction-template.md)で版・適用条件・判断の出所を照合する。
 - **会話の中だけで与えた指示は、セッションをまたいで残らない。**圧縮で消える。**残るのは file（正本文書を含む）、Git 履歴、Issue、Pull Request である。**残すものはそのいずれかへ書く。
 
 ## プロジェクト境界
@@ -67,7 +68,7 @@
 - ESP32 は LCD、入力センサ、環境センサ、サーボ、即時安全制御を担当する。
 - Raspberry Pi は感情、状態、自律行動、ログ、API を担当する。
 - 安全な角度、速度、加速度、通信断処理は ESP32 が強制する。
-- 初期通信は USB シリアル／JSON Lines を候補とする。
+- Pi–ESP32 間の通信は UART 上の JSON Lines とする。pin と接続の条件は [GPIO Assignment](docs/hardware/gpio-assignment.md) の `Pi–ESP32間のtransport` 節が正本である。
 - 初期 MVP にカメラ、マイク、音声、画像アセット、OTA は含めない。
 
 ## 推測禁止
@@ -168,4 +169,4 @@
 
 受け入れ条件、必要な検証、安全制限を満たすまで完了扱いにしない。
 
-push する前に、[CONTRIBUTING の「自己レビュー」](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/CONTRIBUTING.md#自己レビュー)の収束条件と観点を満たす。**条件の正本は CONTRIBUTING であり、ここでは再掲しない。**
+push する前に、[CONTRIBUTING の「自己レビュー」（通常開発版）](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/CONTRIBUTING.md#自己レビュー)の収束条件と観点を満たす。**条件の正本は CONTRIBUTING であり、ここでは再掲しない。**

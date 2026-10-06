@@ -9,19 +9,30 @@
 //! 含むもの:
 //!
 //! - envelope（§3）とIssue #4が承認した最小message type（`boot`、`hello`、`ping`、
-//!   `get_status`、`status`、`ack`）
+//!   `get_status`、`status`、`ack`）、およびIssue #527で足したtype（`set_expression`、
+//!   `show_text`、`head_touched`、`tapped`、`lifted`、`environment`）。含めないtypeと
+//!   その理由は[`message`]のmodule docにある
 //! - error code（§7）と、それを計上するcounterへの対応付け
 //! - 1 lineのdecodeとencode、および検証順序
 //! - byte列からlineを組み立てる上限付きreceiver（§8手順1〜6、Issue #10）。
 //!   分割受信、1回のreadに含まれる複数line、CRLF、invalid UTF-8の分類、
 //!   oversize行の破棄と上限付きprefixからのidentity復元を含む
 //! - 共有conformance fixture（`tests/fixtures/`）
+//! - 現在sessionのduplicate履歴（§8手順8、§9、[`duplicate`]）。保持件数と保持期間
+//!   （`PROTO-TBD-005`）は[`DuplicatePolicy`]として呼び出し側から受け取り、値を持たない
 //!
 //! 含まないもの:
 //!
 //! - serial deviceのopen、read／write、切断と再接続（Issue #11）
-//! - session state、duplicate履歴、受理budget、遷移cooldown（Issue #12）
+//! - session state、受理budget、遷移cooldown（Issue #12）
 //! - hardwareに依存する値と処理
+//!
+//! duplicate履歴は、当初Issue #12が`crates/deskcat-serial`（host専用）に作り、このcrateの
+//! 範囲外としていた。Issue #19で、host（`deskcat-serial`）とfirmware（`deskcat-servo`経由）が
+//! 同じ実装を使うために、このcrateへ移した。#12が`DuplicateHistory`を、保持件数と保持期間を
+//! 呼び出し側から受け取る形にしていたため、`PROTO-TBD-005`の値を先取りせずに移せる。
+//! **履歴をいつ照会し、いつ破棄するか（session state）は、引き続き所有者（`deskcat-serial`の
+//! `PeerSession`、firmwareのsession）が持つ。**
 //!
 //! # 例
 //!
@@ -49,6 +60,7 @@
 //! ```
 
 pub mod decode;
+pub mod duplicate;
 pub mod envelope;
 pub mod error;
 pub mod framing;
@@ -58,12 +70,14 @@ pub mod prefix;
 pub mod receiver;
 
 pub use decode::{decode_line, encode_line};
+pub use duplicate::{DuplicateHistory, DuplicatePolicy, DuplicatePolicyError, Lookup};
 pub use envelope::{Envelope, Frame};
 pub use error::{DecodeError, ErrorCode};
 pub use framing::{Framed, LineFramer, Progress};
 pub use message::{
-    Ack, AckStatus, Boot, DisplayStatus, Hello, HelloReason, Message, ProtocolCounters,
-    SensorStatus, ServoStatus, Status,
+    Ack, AckStatus, Boot, DisplayStatus, Environment, ExpressionName, FiniteF32, HeadTouched,
+    Hello, HelloReason, Lifted, Message, ProtocolCounters, SensorStatus, ServoStatus,
+    SetExpression, ShowText, Status,
 };
 pub use prefix::{PrefixEnvelope, recover_identity};
 pub use receiver::{Cause, LineReceiver, Outcome, Received, Rejection};

@@ -20,7 +20,14 @@ message型、検証、上限付きline受信は[`deskcat-protocol`](../deskcat-p
   切断のerrnoと読みのtimeoutを契約どおりに正規化する（下記）
 - ESP32 peer sessionの状態（`PeerSession`、`src/peer.rs`）。`boot`のsession遷移、
   duplicate履歴、`hello`／`boot`以外の`stale_session`判定、Piが送った`ping`／
-  `get_status`への応答の相関（[Issue #12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)）
+  `get_status`／`set_expression`への応答の相関（[Issue #12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)）
+- 現在sessionのduplicate履歴（`DuplicateHistory`）。保持件数と保持期間
+  （`PROTO-TBD-005`）は`DuplicatePolicy`として呼び出し側から受け取り、値を持たない。
+  **定義は`crates/deskcat-protocol/src/duplicate.rs`にある**（hostとfirmwareで共用するために
+  [Issue #19](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/19)で移した）。
+  このcrateは`deskcat_serial::duplicate`ごとre-exportし、以前のpathを保つ
+- 受信frameの振り分け（`handle_frame`、`src/coordinator.rs`）。`ack`の相関、`status`の受理、
+  現在sessionのeventの受け渡し、ESP32→Piで定義されていないtypeの計上
 
 含まないもの:
 
@@ -66,12 +73,14 @@ linkの上で起きたerrorである。openの`ENOENT`／`EACCES`／`EBUSY`はUS
 transportを所有せず、pumpの引数で受け取る）ため、呼び出し側の形をここに置く。
 
 ```bash
-cargo run --example serial_link -- --port <path> --baud <rate> [--seconds <n>] [--verbose]
+cargo run --example serial_link -- --port <path> --baud <rate> --duplicate-capacity <n> --duplicate-retention-ms <ms> [--seconds <n>] [--verbose]
 ```
 
 `--port`と`--baud`は**どちらも必須である。既定値を持たせない。**device名は未確認であり
 （確定は[Issue #11](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11)の後半）、
 baudの正本は`PROTO-TBD-001`でいずれも`Candidate`である。渡した値は記録にそのまま残る。
+`--duplicate-capacity`と`--duplicate-retention-ms`（`boot`のduplicate履歴の保持件数と保持期間）も
+同じ理由で必須である。正本は`PROTO-TBD-005`で未確定である。
 
 **出力にdevice名を書かない。**`Version Record Template`の禁止項目であり、出力を
 そのまま記録へ貼れるようにしてある。
@@ -79,17 +88,30 @@ baudの正本は`PROTO-TBD-001`でいずれも`Candidate`である。渡した�
 `--verbose`を付けない限り`Info`までを出す。`Debug`にするとread timeoutごとに1行出て
 （既定50 msなので毎秒20行）、長時間の観察では本当のeventが埋まる。
 
-**確かめられるのは「行が通ること」までである。**`protocol`が成立したことは確かめられない。
-この実行体は`PeerSession`（[Issue #12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)）を
-呼んでおらず、**ESP32側がprotocolを話すとは限らない。**接続のたびに`hello`を1件送るのは
-書き出し経路を通すためであって、handshakeではない（`reason`は初回が`Startup`、再接続が
-`PortReopen`。仕様§5.1）。記録では**「行が通った」と「protocolが成立した」を
-書き分ける。**`boot`／`ping`／`get_status`のsession logicそのものは`PeerSession`が持つが、
-simulator test（`tests/simulator.rs`）までの検証であり、実機での成立は確認していない。
+この実行体は、受信したframeを種類を問わず`handle_frame`で`PeerSession`
+（[Issue #12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)）へ渡し、送った`hello`の`id`を
+`note_hello_sent`で記録し、pumpの1周ごとに`retry_due_requests`でACK timeoutした`get_status`を送り直す
+（この実行体は`ping`を送らない）。`retry_due_requests`は、確立の直後にqueueへ入れられなかった`get_status`も送る。
+接続のたびに`hello`を1件送る（`reason`は初回が`Startup`、再接続が`PortReopen`。仕様§5.1）。
+
+**ESP32が`boot`→ACKより先の往復に応えるのは、`firmware/esp32`を
+[Issue #487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)のPR B2
+（[PR #529](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/529)）以降のsourceから、Pi linkを持つbuild（`bench-servo-test-17`以外）で書き込んだ場合である。**
+PR B2で、ESP32は`hello`／`ping`／`get_status`にACKを返し、`get_status`にはACKの直後に`status`を返す。
+初回の接続で`boot`より先に`hello`のACKが届けば、`hello`のACK（ESP32の`sid`を未承認のため
+`unapproved_hello_acks`へ数える。仕様§6）→`boot`とそのACK→`get_status`のACKと`status`、の順になる
+はずである。届く順序とESP32の状態によって`hello`のACKの数え方は変わる（正本は`PeerSession`の
+`pending_hello`のdocと`tests/simulator.rs`）。
+往復の順と、成り立つ条件は`examples/serial_link.rs`のmodule docにある。
+**実機ではまだ確かめていない。**ESP32側の振る舞いはsourceを読んで導いたものである。
+`PeerSession`のsession logicは、simulator test（`tests/simulator.rs`）と、この実行体を擬似端末で
+走らせた下の表の範囲までで確かめている。
+**ESP32側がprotocolを話すとは限らない。**記録では**「行が通った」と「protocolが成立した」を
+書き分ける。**
 
 ### host（VM）で確認済みの挙動
 
-**擬似端末を相手に実走させた。実serial portではない。**
+**擬似端末を相手に実走させた。実serial portではない。**下の表の「実行A」「実行B」は、このcrateの`serial_link`（#12の受信の配線を入れた版）を、fixtureの行で応える偽のESP32（repositoryに置いていないscript）と擬似端末で繋いだ別々の実行である。
 
 | 確認 | 結果 |
 |---|---|
@@ -97,6 +119,9 @@ simulator test（`tests/simulator.rs`）までの検証であり、実機での�
 | 行の往復 | `hello`を123 byte書き出して相手が受信。相手の`ping`行を受信して`sid`／`id`／型まで復元 |
 | idle | 4秒で`retries=80`、**`timeouts=0`**。「dataが無いだけ」をtimeoutとして数えていない |
 | 相手を落とす | 切断を観測（`disconnects=1`）し、再接続へ入って上限で停止 |
+| 未承認の`sid`の`hello`のACK（実行A。相手は`hello`を受けると、`boot`と同じ`sid`でACKを返す。`boot`はまだ送っていない） | `hello`の結果として受理せず、`unapproved_hello_acks=1`、`unmatched_acks=0` |
+| `boot`を受信（実行A。相手は上のACKの0.2秒後に`crates/deskcat-protocol/tests/fixtures/valid.json`の`boot_minimal`を送り、`get_status`を受けるとACKと同じfileの`status_snapshot`を続けて返す） | `Established`へ移り、`boot`のACKと`get_status`を送出。`get_status`のACKを相関させ（logの`ackを相関した: request=GetStatus`）、続く`status`を応答として扱う（`solicited=true`） |
+| `get_status`にACKが来ない（実行B。相手は実行Aと同じだが、`get_status`に応答しない） | ACK timeout（`SerialConfig::new`の既定の`RetryPolicy::provisional`。500 ms、`max_retries`は1）の後に同じ`id`で1回送り直し（偽のESP32が`id=3`の`get_status`を2回受信した）、予算を使い切って取り下げる（logの`応答待ちを取り下げた`） |
 
 ## 実機に残っていること
 
@@ -107,13 +132,16 @@ simulator test（`tests/simulator.rs`）までの検証であり、実機での�
 
 [Issue #11](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11)の後半に残るもの:
 
-- `/dev/ttyUSB*`のdevice名の確定
+- 実機でのdevice名の確定（Pi linkはGPIOのUARTであり、Pi側は`/dev/serial0`を使う。この名前はRaspberry Pi公式文書から導いたもので、現物では確かめていない。正は[gpio-assignment.md](../../docs/hardware/gpio-assignment.md)の`Pi側の設定`）
 - 実portでのread／write、切断、reconnect、partial I/Oの確認
 - `CLOCAL`をdriverが受け付けること（受け付けなければopenが失敗する）
 - **`HUPCL`の判断。**既定ではcloseでDTRが落ちる。**本projectのESP32 boardでDTR／RTSが
   自動resetへ繋がっているかは確認していない。**繋がっていれば再接続のたびにESP32が
   再起動することになり、`boot`／`hello`のhandshakeに効く。現物の確認と判断はprotocol側の
-  話であり、**このcrateでは触っていない**
+  話であり、**このcrateでは触っていない**。**Pi linkはGPIOのUART（TX／RX／GNDだけ。[gpio-assignment.md](../../docs/hardware/gpio-assignment.md)の
+  `Pi–ESP32間のtransport`節）であり、PiのDTRはESP32へつながらないため、Pi linkではこの再起動は起きない。**
+  当てはまるのは、hostがESP32 board上のUSB-UARTブリッジ（USB）を開く場合だけである（Pi linkの試験中に、
+  PCのserial monitorでESP32のdebug logを読む場合もこれに当たる。再起動が起きるかは確かめていない）
 - Pi上でこのcrateをbuildできるか（memory）
 
 ## 既定値は暫定である

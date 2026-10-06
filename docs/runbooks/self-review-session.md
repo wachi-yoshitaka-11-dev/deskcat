@@ -1,0 +1,196 @@
+# 自己レビューの停止と再開
+
+規則の正本は[CONTRIBUTINGの自己レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/CONTRIBUTING.md#自己レビュー)。
+この手順は`review_gate.py session`の操作と引き継ぎを説明する。
+既存の`receipt`は宣言の形式検査として残し、巡数を別の軸で扱う。
+
+## 開始と実行
+
+既存Issue/PRを開き、同じ作業の全巡数と承認を確認する。以下の`465`は例であり、
+実際の対象Issue番号を使う。初回だけ、確認できた既実施巡数と確認元を渡す。
+不明な巡数を0として初期化しない。既存の記録は`init`で上書きできない。
+記録より前の巡は、どこでreviewが終わったかが記録に無いため、最初のreviewへ数え込む。
+
+```bash
+python3 scripts/review_gate.py session init --work 465 --prior-rounds 0 --history-source https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/465
+python3 scripts/review_gate.py session status --work 465
+```
+
+記録は`git rev-parse --git-common-dir`配下の`deskcat-review/465.json`。
+commit、rebase、差分更新で書き換えず、同じcloneのworktreeで共有する。
+書き込みは排他lockを取り、開始巡の予約を保存してからreviewerへ進む。
+途中停止でも予約を払い戻さない。lockが残った場合は書き手が停止したことを確認して復旧する。
+
+CLI reviewerは次の経路で起動する。`--`以降はargvとして直接実行し、shellは解釈しない。
+reviewerは下記の結果JSONだけを標準出力へ返す。成功時に自動保存し、失敗・不正JSONなら
+巡を未完了のまま残して停止する。実際にレビューするcommandを指定し、no-opで代用しない。
+
+```bash
+python3 scripts/review_gate.py session run --work 465 -- reviewer-command argument
+```
+
+Claudeでは、開始前に`DESKCAT_REVIEW_WORK=465`を環境へ設定する。
+登録済み`Agent|Task`の`fresh-context-reviewer` / `consistency-inspector`呼び出しはhookが
+予約するため、親で`begin`を重ねない。親が結果を保存するまで次のreviewerは起動できない。
+baseが既定の`origin/develop`と異なるなら`DESKCAT_REVIEW_BASE`も設定する。
+hookの不足・異常終了は対象reviewerの起動拒否になる。
+
+Codex等で会話内レビューを行う場合は各巡の前に次を実行し、**exit 2なら見直しを始めず
+人へ返す**。この経路はCodexのtool自体へhookを登録していないので、手順による停止である。
+
+```bash
+python3 scripts/review_gate.py session begin --work 465
+```
+
+1回の起動を1巡とし、両Passを同じ巡で実施しても巡数は増やさない。
+機械checkや実装をレビューと取り違えない。予約したdiffはbaseのmerge-baseからの差分に、
+未commit変更とignoreされていない新規fileを含めたSHA-256。Pass中にdiffが変わった場合は
+`interrupted`として記録し、新しいdiffで次の巡を予約する。修正は巡の結果保存後に行う。
+
+## 結果と終了判定
+
+結果JSONの最小例（承認や検証結果を表す実記録ではない）:
+
+```json
+{
+  "passes": ["requirements-pass", "fresh-context-pass"],
+  "findings": [
+    {
+      "kind": "optional",
+      "origin": "prior-explanation",
+      "decision": "decline",
+      "reason": "同じ意味の注記を足すだけで、実行条件や判断は変わらない",
+      "evidence": "対象fileの該当行"
+    }
+  ],
+  "unresolved": [],
+  "disposition": "continue"
+}
+```
+
+`findings`は`defect` / `out-of-scope` / `optional`、出所は`diff` / `prior-explanation` /
+`pre-existing`、採否は`fix` / `defer` / `decline`。重大な欠陥は`defect`として影響を理由へ書く。
+`defect`を修正予定として採用しただけで解決済みにせず、残るものを`unresolved`に列挙する。
+`passes`は実施したものだけを書く。中断時は`disposition: interrupted`でPassの証拠を残さない。
+`capped`の場合は`cap_reason`へ人間の承認元、または直近2巡が任意改善だけだった根拠を足す。
+
+```bash
+python3 scripts/review_gate.py session finish --work 465 --record result.local.json
+python3 scripts/review_gate.py session check --work 465
+python3 scripts/review_gate.py gate --base origin/develop --head HEAD --review-work 465
+```
+
+`check`は現在のdiffに対して両Passと未解決欠陥を確認する。新規欠陥0件が2巡続けば
+`converged`、それより前の明示的な打ち切りは条件が揃った場合だけ`capped`、それ以外は
+`stopped`（exit 2）。無承認の上限（1回のreviewにつき通常5巡、文書だけのdiffは3巡。範囲はCONTRIBUTINGの
+`打ち切り`）の巡の終わりに条件が揃っていれば完了判定はできるが、揃わない場合は未完了である。
+`begin` / `run` / hookは、そのreviewで上限を超える承認なしの巡を拒否する。各巡の記録には、開始時に判定した
+上限を`free_limit`、何回目のreviewかを`review`、そのreviewの何巡目かを`review_round`として残す。
+`number`はIssueの通算で、情報として残る。
+
+reviewは`converged`に達した巡か、下の`session end`で記録した終了で終わり、次の`begin`は新しいreviewの1巡目になる。
+区切りは記録にある巡の結果と、終了・始め直しの記録から計算する。`stopped`のreviewは終わらない。
+結果JSONの`disposition: capped`だけでは終わらない。pushやbranchの変更でも終わらない。
+新しいreviewは、前のreviewの巡を収束に数えない。`check`は`TOTAL_ROUNDS`（Issueの通算）、
+`REVIEW` / `REVIEW_ROUNDS`（最新の巡のreviewとその巡数）、`NEXT_REVIEW` / `NEXT_ROUND`（次に始める巡の位置）を出す。
+新しい形の巡、`review`付きの承認、始め直しを書いた記録は`version: 2`になる。#526より前のscriptはこの記録を読むと停止するので、
+そのworktreeを最新のdevelopへ追い付かせてから使う。`version: 1`の記録は書き換えずに読める。
+その中の巡の結果と終了の記録も、同じ計算でreviewの区切りと終端状態を決める。
+`--review-work`付きのgateは、実行記録の終端状態と既存trailerが一致しなければ失敗する。
+CIの通常のgateはローカル記録を持たず、形式検査のままである。
+
+## 承認を得て終える
+
+最新の巡が両Passを終え、未解決の欠陥が無く、`converged`でない状態でPM／作業セッションが理由を示して
+終了を判断し、人間が承認したら、承認の出所を既存Issue/PRへ残し、次の形で記録する。**書式の例であり承認ではない。**
+`after_round`は記録時点のIssueの通算巡数（`check`の`TOTAL_ROUNDS`）と一致させる。
+
+```json
+{
+  "work": "465",
+  "actor_kind": "human",
+  "actor": "実際に承認した人間",
+  "source": "人間の終了の承認を保存したIssue/PRコメントのURL",
+  "after_round": 3,
+  "read_diff": "判断する側が読んだ最終diffのhash"
+}
+```
+
+```bash
+python3 scripts/review_gate.py session end --work 465 --record ending.local.json
+python3 scripts/review_gate.py session check --work 465
+```
+
+記録した時点のdiffに限って`check`が`capped`を返す。diffが変われば無効になる。
+記録した時点でそのreviewは終わり、次の巡は新しいreviewになる。
+条件を満たさない終了（未解決の欠陥がある、最新の巡が未完了、AIによる記録）は拒否する。
+
+## 終わる前に始め直す
+
+reviewが終わる前に人間が新しいreviewを依頼したとき、またはPM／作業セッションの始め直しの判断を人間が承認したときは、
+依頼か承認を保存したIssue/PRコメントを出所として次の形で記録する。
+**書式の例であり依頼ではない。**`after_round`は記録時点のIssueの通算巡数と一致させる。
+
+```json
+{
+  "work": "465",
+  "actor_kind": "human",
+  "actor": "実際に依頼または承認した人間",
+  "source": "人間の依頼または承認を保存したIssue/PRコメントのURL",
+  "after_round": 5
+}
+```
+
+```bash
+python3 scripts/review_gate.py session restart --work 465 --record restart.local.json
+```
+
+次の巡は新しいreviewの1巡目になる。
+同じdiffのまま始め直した場合、前の巡の未解決の欠陥を新しい巡の`unresolved`から落とすと`finish`が拒否する。
+AIによる記録、最新の巡が未完了、既に終わったreview（次の巡が既に新しいreview）は拒否する。
+
+## 人間の承認と引き継ぎ
+
+上限の巡を超える続行は、PM／作業セッションが理由を示して判断し、人間の承認の出所を既存Issue/PRへ残し、次の形で取り込む。
+これは**書式の例であり承認ではない**。`actor`と`source`は実在する承認者と承認の出所にする。
+
+```json
+{
+  "work": "465",
+  "actor_kind": "human",
+  "actor": "実際に承認した人間",
+  "source": "人間の明示承認を保存したIssue/PRコメントのURL",
+  "review": 1,
+  "review_after_round": 5,
+  "review_through_round": 7,
+  "scope": "残存欠陥D1の修正確認",
+  "read_diff": "判断する側が読んだ最終diffのhash（`session status`の最新の巡の`diff`）"
+}
+```
+
+```bash
+python3 scripts/review_gate.py session approve --work 465 --record approval.local.json
+python3 scripts/review_gate.py session begin --work 465 --scope 残存欠陥D1の修正確認
+```
+
+`review`は`check`の`NEXT_REVIEW`と、`review_after_round`は`NEXT_ROUND`の1つ前と一致させる。
+`read_diff`は記録のためだけにあり、scriptは検査しない（判断する側が読む範囲は[CONTRIBUTINGの打ち切り](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/CONTRIBUTING.md#打ち切り)）。
+終了巡数は判断側が理由とともに示し、人間が承認する。例の7を既定値として使わない。scopeの完全一致と終了巡数で
+限定し、Claude hookでは`DESKCAT_REVIEW_SCOPE`に同じ範囲を設定する。
+AI/PM、別作業、承認時のreviewや巡数の不一致、終了巡数の欠落は拒否する。
+承認はそのreviewにだけ効く。`version: 1`の記録にある通算の承認（`after_round` / `through_round`）は、
+その範囲の巡のうち、承認したときのreviewの巡にだけ引き続き効く。
+
+各区切りで`session status`のJSON全体と未実行check・残件を既存Issue/PRに保存する。
+新しいcloneでは保存済みJSONを`session init --work 465 --record handoff.local.json`で復元する。
+元cloneの担当を止めてから引き継ぎ、2つのcloneで同じ作業の巡を並行消費しない。
+ローカルに記録が無いだけでは新規作業と判断しない。
+
+## 強制できる範囲
+
+テストは子processの起動有無、登録hookのexit、状態の継続、diff変更によるPass無効化を確認する。
+これで保証するのは**この記録を使ってこの起動経路を通った操作**である。
+別種agent、直接CLI、MCP、会話内の読み直し、無効化したhookは自動捕捉しない。
+状態fileを改ざんできる主体からの防御や、人間と同じアカウントを使うAIの本人性判定はしない。
+`actor_kind: human`をAIが偽って入力すれば機械だけでは見破れない。
+人間の承認元と申告の真偽の確認は残る。単なる文字列を認証済み承認・review実施の証拠とは呼ばない。

@@ -41,8 +41,7 @@
 //!   Read Only）。reset値`11100101`＝`0xE5`（`The DEVID register holds a fixed device
 //!   ID code of 0xE5 (345 octal)`）。Table 19 page 23、Register 0x00節 page 24」。
 //!   **ここへ再掲しない**）。identify判定（`0xE5`との一致）は呼び出し側の責務とする
-//!   （[`crate::env::Bme280::read_chip_id`]・`display.rs`の
-//!   [`DisplayId`](crate::display::DisplayId)と同じ「捏造しない」形。このmoduleは
+//!   （[`crate::env::Bme280::read_chip_id`]と同じ「捏造しない」形。このmoduleは
 //!   生byteを返すだけで、ADXL345であると断定しない）。
 //!
 //! `main()`は`crate::run_i2c_bringup`からこのdriverを呼び、生byteをlogへ出す

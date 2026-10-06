@@ -27,6 +27,10 @@
 | [EXP-013](#exp-013-ブレッドボード上でのingress保護回路ptcmosfetの通電検証) | `HW-TBD-030`（`PROT-RP-01`の向き）、`HW-TBD-034`（`この試験から次へ渡すもの`の宛先） | 値の正なし（仮組みでの動作確認。定格表の検証ではない） |
 | [EXP-014](#exp-014-env-01bme280のj3はんだジャンパの実施記録) | `HW-TBD-005`（`J3`のはんだ付け。**closeしていない**） | 値の正なし（**測定値を1つも持たない。**状態の正は[sensor-datasheet-notes.md](sensor-datasheet-notes.md)の`jumper（AE-BME280）`節） |
 | [EXP-015](#exp-015-accel-01adxl345env-01bme280のesp323v3-pin給電による初回通電とdevice-id読み出し) | [#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)／[#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16)受け入れ条件 | [sensor-datasheet-notes.md](sensor-datasheet-notes.md)のDevice ID行、[gpio-assignment.md](gpio-assignment.md)の`電源pinの短絡・誤配線の確認（非通電）`表 |
+| [EXP-016](#exp-016-disp-01msp2807esp323v3-pin追加接続のbring-upcontroller識別単色fill四隅pattern) | [#13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)受け入れ条件 | 値の正なし（bring-upの記録。判定は#13） |
+| `EXP-017`（見出しに`—`を含み、`scripts/validate_doc_links.py`がanchorを確かめられないためlinkしない） | [#13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)受け入れ条件 | 値の正なし（bring-upの記録。判定は#13） |
+| [EXP-018](#exp-018-disp-01msp2807横向きの向きの決定と単色fill色の並び四隅の写真記録idの読み出しの打ち止め) | [#13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)受け入れ条件1〜5 | 値の正なし（bring-upの記録。判定は#13） |
+| [EXP-019](#exp-019-段階b-2今の接続のまま-b-2aの周辺-module-3点の-33-v-側の電流と電圧) | [#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)の段階B-2（`HW-TBD-024`／`HW-TBD-025`は解いていない） | 値の正なし（確度が未取得の読み。[power-budget.md](power-budget.md)の`負荷表`は、この記録を参照するだけで値を持たない） |
 
 **大容量の生dataはこのrepositoryへ入れていない。**保存場所は
 [development-foundation-plan.md](../planning/development-foundation-plan.md)の
@@ -1616,6 +1620,443 @@ USB接続によりfirmware書き込み＝初回通電。約3分間、異音・�
 
 `ACCEL-01`（ADXL345）・`ENV-01`（BME280）とも、ESP32`3V3` pin給電下でDevice ID読み出しに応答があった（生byte: `0xe5`、`0x60`）。通電中・通電後とも異常の兆候は認められなかった。**条件(5)(a)は未達のまま通電に至っており、この点は正本（`power-budget.md`）の手順の想定（条件を満たしてから通電）と食い違う。**`Issue #15`／`#16`の受け入れ条件はいずれも未達（配線・初回通電という現物作業は完了したが、calibration・sampling等のソフトウェア側の検証は残っている）。この判定は記録者からPM（`#0PM`）へ報告し、PMは異論無しと確認した。その後、`EXP-014`との相互参照linkを追加した版の本文をPMが読み、祖先関係の記述の反転（`firmware commit`行）と`bus容量Cb`の判定根拠の帰属（数値の出所を特定できないため削除した）の2点を指摘した。いずれもこの記録の現在の本文へ反映済みである。
 
+## EXP-016: `DISP-01`（MSP2807）ESP32`3V3` pin追加接続のbring-up（controller識別・単色fill・四隅pattern）
+
+**目的**: [power-budget.md](power-budget.md)の「`DISP-01`追加接続のbring-upの手順（ESP32`3V3` pin給電、`#461`承認範囲）」を実施し、`ACCEL-01`／`ENV-01`が既に`3V3` pinへ接続・通電済みの状態（[EXP-015](#exp-015-accel-01adxl345env-01bme280のesp323v3-pin給電による初回通電とdevice-id読み出し)）へ`DISP-01`を追加接続する。[Issue #13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)の受け入れ条件6件のうち1〜5の判定材料とする。
+
+**実施日**: 2026-09-27（JST）。
+
+**実施者**: 配線、非通電確認、通電中の監視、停止判断、写真・動画撮影はユーザーが物理的に行った。firmwareのbuild、書き込み（`espflash`）、シリアルログの読み取りは実機Linuxのセッション（本記録の作成者）が行った。**手順7（書き込み）は正本（`power-budget.md`）が`[人間]`と指定しているが、実際にはユーザーの立ち会い・監視のもとでこのセッションが`espflash`を実行した。手順の指定と異なる。**詳細はFaultsを参照。
+
+### 構成
+
+| 項目 | 内容 |
+|---|---|
+| 給電 | ESP32単体、PCのUSBから。`ACCEL-01`／`ENV-01`は既存配線（`EXP-015`）のまま、`DISP-01`を同じ`3V3` railへ追加接続 |
+| firmware commit | `9fdaee417e7803df9c928b54d8b390bc7dc3f9a0`（`origin/develop`）。試験直前に`origin/develop`を再確認し、進行が無い（`9fdaee4`のまま）ことを確認した上でこのcommitのbuildを使用した。試験後に`origin/develop`が`bb5cfc2`（`#446` PR B、[PR #480](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/480)）へ進んだが、この記録の対象は`9fdaee4`のbuildである（`#0PM`の判定） |
+| build | `--features bringup-display-13`（debug）。`cargo fmt`（既定構成）／`cargo clippy --all-targets --locked -- -D warnings`（既定構成・`bringup-display-13`構成の両方）／`cargo build --locked`（同）すべて成功。Version Record: [2026-09-26-esp32-build-bringup-display-13-native-linux.md](../toolchains/version-records/2026-09-26-esp32-build-bringup-display-13-native-linux.md) |
+| 配線（`DISP-01`、9本） | 基板印字での対応: `VCC`→ESP32`3V3` pin、`GND`→GND、`CS`→GPIO22、`RESET`→GPIO16、`DC/RS`→GPIO17、`SDI`→GPIO23、`SCK`→GPIO18、`LED`→GPIO4、`SDO`→GPIO19。touch用5pinは未配線 |
+| 待機時間の上限 | 5分（ユーザーが通電開始前に決定） |
+
+### 条件(1)〜(7)の充足状況
+
+条件(1)（電源pinの短絡・誤配線の確認）・(2)（`bringup-display-13` build済み）・(3)（電流余裕計算の前提(a)〜(d)）・(4)（`ACCEL-01`／`ENV-01`接続済みへの追加）・(6)（`HW-TBD-025`(b)未解決の把握）・(7)（`run_display_bringup`実行の承認記録、[Issue #13コメント](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13#issuecomment-5804046159)）はいずれも満たした。
+
+**条件(5)（`module電源pinの独立性`／`pin header対応`）は未達のまま通電に至った。**`EXP-015`と同じ理由（ESP32側の対応pinとmoduleの電源・信号pinが同一ブレッドボード行にあり、2点間の抵抗測定が物理的に成立しない）。確認できたのは「他のGPIO・5V rail・GND・`3V3`への意図しない導通が無いこと」だけである。この状態のまま、ユーザーの現場判断で通電へ進んだ（ユーザーの言葉: 「このまま進めて」）。
+
+### 通電前の非通電確認（`gpio-assignment.md`の`電源pinの短絡・誤配線の確認（非通電）`表、項目1〜4）
+
+| # | 項目 | 結果 |
+|---|---|---|
+| 1 | `VCC`–`GND`間短絡検出 | 2000Ωレンジで測定。プローブ接触時**2000**、数秒後**1212 Ωで安定**。「低いまま動かない」には該当せず、正常と判定した |
+| 2 | 一覧との目視照合 | ユーザーが実施し、9本すべて一致・touch用5本は未配線と申告 |
+| 3 | 逆極性・電圧違いpinの確認 | 同上、異常なしと申告 |
+| 4 | 給電経路の重複確認 | 同上、単一経路（`3V3` pin）であることを申告 |
+
+### Faults（実施中に生じた想定外の事象。手順9の判定とは区別して記録する）
+
+- **手順7（書き込み）は正本が`[人間]`と指定しているが、実際にはこのセッション（AI）が`espflash`を実行した。**ユーザーは立ち会い・物理的な監視（異音・発熱・変色・異臭の確認、停止判断）を行ったが、コマンドの実行そのものは手順の指定と異なる。**この経緯の中で、ESP32のUSBポートを、同じマシンに接続されていたArduino Unoのポート（`/dev/ttyACM0`）と取り違え、そちらへの書き込み・接続を複数回試行して失敗した。**`lsusb`でUSBデバイス一覧を確認し、`Silicon Labs CP210x`（`/dev/ttyUSB0`）が正しいESP32のポートであると判明してから、以降の試行を`/dev/ttyUSB0`へ切り替えた。
+- **配線作業中（通電前）、旧firmware（前回書き込んだ`bringup-display-13`構成）が動作している状態でUSBを接続した際、backlightが一瞬点灯してすぐ消えたことをユーザーが観測した。**これは`power-budget.md`の手順7が明記する想定内の事象（書き込み前に残っている旧imageが`run_display_bringup`を呼びうる）であり、この記録の手順9判定には使っていない。
+- **`DISP-01`の`VCC`ジャンパ配線の途上で、moduleのheader pin（`VCC`）を一度曲げ、その後まっすぐに戻した。**pin単体の健全性（表側先端と基板裏はんだ部分の導通、ほぼ0Ω）は確認済みで、これ自体が原因ではなかった。
+- **`DISP-01`の`VCC`とESP32の`3V3` pinの間の導通が、複数回の測定でオーバーレンジ（未導通）だった。**`VCC`–`GND`間、pinの健全性はいずれも正常だったため、ブレッドボードの接触不良（該当ジャンパ経路のどこか）が原因と推定される。ジャンパの取り扱い・接続し直しの後、再測定で**0 Ω**（導通あり）を確認し、以降の通電試験へ進んだ。**断線箇所（ジャンパ線自体か、ブレッドボードの接触か）は特定できていない。**
+- **`ADC-5V`測定用の配線（青、GPIO33用の分圧回路の一部）が、`DISP-01`配線作業中に一時的に脱落した。**復旧後、(a) USB抜去でESP32board上のLEDが消灯することを確認し独立電源でないことを確認、(b) 分圧回路の構成（`5V pin`→抵抗→分圧点→`GPIO33`、分圧点→抵抗→`GND`）が保たれていることをユーザーが申告した。この配線は`DISP-01`回路とは無関係である。**この脱落・復旧の際にUSBが抜けていたかどうかは不明（ユーザーが覚えていない）。**
+- **配線を変えた（`VCC`ジャンパの付け直し、`VCC` header pinの曲げ・戻し、`ADC-5V`配線の脱落・復旧）後、`gpio-assignment.md`の`電源pinの短絡・誤配線の確認（非通電）`項目1〜4（手順2）をやり直さずに、`VCC`–`3V3`間の導通だけを確認して通電を再開した。**条件(1)は、項目1〜4が`DISP-01`について完了していることを通電の前提にしている。配線を変えた後の状態について、この前提を確かめ直さずに通電した。
+- **ソフトウェア（`pyserial`経由のRTS pin toggle）によるESP32のリセットは、本機では機能しないことを複数回の試行で確認した。**`espflash`自身が内部で行うhard reset（flash完了後）は機能する。USBの完全な抜き差し（電源の再投入）も確実にリセットを引き起こした。
+- **試験中に同じマシンへ接続されていたArduino Unoについて、DeskCatのブレッドボード（GND・5V・信号線のいずれか）への接続は無く、PCのUSBに挿してあっただけであることをユーザーに確認した。**条件(3)(a)（`3V3` railの負荷は4点のみ）・項目4（給電経路の重複）の前提には影響しない。
+
+### 通電と結果（手順7〜10）
+
+複数回の通電・書き込みを行った（`VCC`接触不良の切り分けのため）。**この記録が判定に使うのは、`VCC`導通（0 Ω）を確認した後に実施した試験である。**通電中・通電後とも、異音・発熱（`DISP-01`、`ACCEL-01`、`ENV-01`、ESP32 board）・火花・変色・異臭はいずれも認めなかった（ユーザーの申告、複数回）。
+
+シリアルログ（`--features bringup-display-13` build、`espflash flash --monitor`で取得）:
+
+```text
+I (621) deskcat_esp32: display_id raw=[00, 00, 00, 00] matches_ili9341=false
+E (621) deskcat_esp32: display_id_mismatch expected_id_hi=0x93 expected_id_lo=0x41 got_hi=0x00 got_lo=0x00
+I (871) deskcat_esp32: display_fill name=black color=0x0000 elapsed_us=244820
+I (1121) deskcat_esp32: display_fill name=red color=0xf800 elapsed_us=244779
+I (1371) deskcat_esp32: display_fill name=green color=0x07e0 elapsed_us=244752
+I (1621) deskcat_esp32: display_fill name=blue color=0x001f elapsed_us=244767
+I (1871) deskcat_esp32: display_fill name=white color=0xffff elapsed_us=244773
+I (2171) deskcat_esp32: display_corner_pattern elapsed_us=39995
+I (2171) deskcat_esp32: accel_device_id raw=0xe5
+I (2181) deskcat_esp32: env_chip_id raw=0x60
+```
+
+（複数回の試行で、`display_fill`のelapsed_usは244752〜244820 usの範囲に収まり、`display_corner_pattern`のelapsed_usは全試行で39995 usと一定だった。いずれも再現性があった）
+
+**目視・写真・動画による確認（ユーザー実施）**:
+
+- **backlight**: bring-up実行中（約2.2秒間）のみ点灯を複数回にわたり再現性をもって確認した。それ以外の時間は消灯している（firmwareが明示的に消灯させる処理は`main.rs`に見当たらないため、原因は未確認のまま残す）。
+- **単色fill**: 黒→青→緑→赤→白の順で表示された（firmware側の送信順は黒→赤→緑→青→白）。**黒・緑・白は一致、赤と青が入れ替わって表示された。**
+- **四隅pattern**: 4隅それぞれに色付きの四角が表示された（写真2枚で確認。基板を180度回転させて撮った2枚の内容が対角に一致しており、同一フレームであることを確認した）。firmware（`main.rs`の`run_corner_pattern`）の指定は左上=赤、右上=緑、左下=青、右下=白（背景は黒）。写真での見え方は、左上=青系、右上=緑、左下=赤系（写真では薄いピンクがかって写っている。反射・露出の影響の可能性）、右下=青系（本来白だが、青みがかって写っている。安価なLCDパネルの視野角特性、または写真のホワイトバランスの影響である可能性があり、電気的な問題である証拠は無い）。**色は上記の赤/青入れ替わりと整合しており、四隅の物理的な配置（orientation）自体はfirmwareの意図（左上/右上/左下/右下）と一致していると判断する。**
+- **「上下」の判断基準**（DeskCatへ搭載時にどちらを上にするか）は、正本（`sensor-datasheet-notes.md`の`対応orientation command`行、`TBD`）にも`display.rs`のmodule docにも定義が無く、この試験で新たに決定するものでもない。この記録は「firmwareが指定した論理座標`(0,0)`が、物理的にどちらの隅に対応するか」を示すにとどまる。
+
+### 通電後の抵抗再測定（手順10）
+
+`DISP-01`の`VCC`–`GND`間、2000Ωレンジ。通電前**1212 Ω**→通電直後の測定で**オーバーレンジ**。「低いまま動かない」への変化ではないため、この時点では新たな短絡の兆候は無いと判定した。
+
+**この読みの整合性について、同日（2026-09-27、JST。PMの指摘を受けて）USBを抜いた状態で再測定した。**結果: (a) `DISP-01`の`VCC`pin⇔ESP32の`3V3` pin間の導通=**0 Ω**（導通あり）、(b) `DISP-01`の`VCC`–`GND`間=**1212 Ω**（手順2の項目1の値と一致）。**この再測定は、上記「通電直後のオーバーレンジ」と同じ`VCC`–`GND`間の測定でありながら異なる値を示しており、整合していない。**測定点・レンジ・手順が同一であることは確認したが、値の食い違いの原因（測定時点でのジャンパ接触状態の違い、プローブの当て方の違い等）は特定できていない。**この食い違いにより、上記「通電と結果」節が記録した試験の間、`DISP-01`の`VCC`接触が安定して保たれていたかどうかは確認できない。**（受け入れ条件の判定への留保は下表に記載する）
+
+### 受け入れ条件との対応（[Issue #13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)）
+
+| # | 受け入れ条件 | 判定 | 根拠 |
+|---|---|---|---|
+| 1 | Controller識別情報と初期化の根拠 | **未達** | `display_id raw=[00,00,00,00]`、期待値`0x9341`と不一致。書き込み方向（`MOSI`／`SCLK`／`CS`／`DC`）はfillの実測結果（後述）から機能していると判断できるため、原因は読み出し方向（`MISO`）または`RESET`関連の可能性が高い。`gpio-assignment.md`が事前に記録していた`MISO`方向の`VOH`余裕不足の懸念（約34–133 mV不足の可能性）が一因である可能性がある。特定はできていない。**加えて、手順10の再測定（上記）が`VCC`–`GND`間で整合しない値を示しており、`VCC`の接触が試験中を通じて安定していたかは確認できない。この`display_id`不一致が接触不良の影響である可能性も排除できない** |
+| 2 | 単色fillが正しい | **部分的**（色の正しさは条件3参照） | 5色とも一様に表示され、ちらつき等の異常は無かった（目視・写真）。fill自体の実行は正常 |
+| 3 | Color orderが正しい | **未達** | 赤と青が入れ替わって表示される（黒・緑・白は一致）。`ILI9341`のcolor order設定（`COLMOD`／`MADCTL`のBGRビット等）がpanelの実際の配線と一致していない可能性が高い |
+| 4 | 四隅とorientationが正しい | **orientation（位置）は一致、色は条件3に従う** | 4隅の物理配置はfirmwareの意図と一致。「上下」の絶対的な正解は正本に定義が無く、DeskCat搭載時の向きという別の設計判断を要する |
+| 5 | 更新timingを測定した | **達成** | `display_fill`×5色（elapsed_us≈244752〜244820）、`display_corner_pattern`（elapsed_us=39995）を記録した |
+| 6 | 更新中も通信とwatchdogがactiveである | **未達（既知）** | このbuildは`pi-protocol-mode`と排他のため実protocol sessionを確立できない。依存先は[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)およびLCD・通信同時動作のfirmware変更（`#13`残作業） |
+
+### この記録が主張しないこと
+
+- **`display_id`不一致の根本原因（`MISO`か`RESET`か、あるいは別要因か）は特定していない。**さらなる切り分け（信号レベルの実測、オシロスコープ等）を要する
+- **色入れ替わり（赤/青）の修正箇所（firmwareのcolor order設定変更）は行っていない。**この記録は現象の確認までである
+- **backlightが bring-up 完了後に消灯する挙動の原因は特定していない。**firmwareが明示的に消灯させているのか、単に何も保持していないだけなのかは未確認
+- **`DISP-01`の`VCC`接触不良の断線箇所（ジャンパ線自体かブレッドボードの接触か）は特定していない。**再現性の確認や部品交換による切り分けは行っていない
+- **写真・動画は現場（ユーザーの手元）に保管されており、この記録に添付・commitしていない。**内容の記述はユーザーの申告と、共有された画像2枚の目視に基づく
+- **DeskCat搭載時の「上」の向きは、この記録では決定していない。**別途の設計判断が要る
+- **条件(5)（`module電源pinの独立性`／`pin header対応`）は未達のまま通電した。**`EXP-015`と同じ制約であり、この記録で解消したとは主張しない
+- **`ACCEL-01`／`ENV-01`のDevice ID読み出し（`raw=0xe5`、`raw=0x60`）は期待値と一致しているが、これは`EXP-015`で既に確認済みの再確認であり、新規の知見ではない**
+
+### 結論
+
+`DISP-01`（MSP2807）をESP32`3V3` pinへ追加接続してのbring-upを実施した。**受け入れ条件のうち、条件5（timing測定）は達成、条件2（fillの実行自体）は部分的に達成、条件1（controller識別）・3（color order）・6（通信とwatchdog）は未達、条件4（orientation）は位置についてのみ確認できた（色は条件3のバグを反映）。**通電中・通電後とも安全上の異常（異音・発熱・変色・異臭・新たな短絡）は認めなかった。試験の過程で`DISP-01`の`VCC`配線に一時的な接触不良が見つかり、修正したが、手順10の再測定でこの接触の安定性に食い違いが見つかり、試験全体を通じて`VCC`が安定して接続されていたかは確認できていない。**手順7（書き込み）を正本の指定と異なりAIが実行したこと、配線変更後に手順2をやり直さなかったことも、正本からの逸脱として記録する。**`Issue #13`の受け入れ条件6件のうち、条件5以外は達成していない。
+
+## EXP-017: `DISP-01`（MSP2807）`BGR=1`適用後の再確認——色順の確認と、四隅・格子patternでの位置の食い違いの発見
+
+**目的**: `EXP-016`で見つかった赤/青入れ替わりに対する`#485`（MADCTL `BGR=1`）の修正を実機で確認し、`display_id`不一致の追加切り分けを行う。[Issue #13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)受け入れ条件1・3・4の判定材料とする。
+
+**実施日**: 2026-09-27（JST）。
+
+**実施者**: 配線確認（非通電）、通電中の監視、停止判断、写真撮影はユーザーが行った。firmwareの変更・build・書き込み（`espflash`）・シリアルログの読み取りは実機Linuxのセッション（本記録の作成者）が行った。**手順7（書き込み）は正本（`power-budget.md`）が`[人間]`と指定しているが、実際にはユーザーの立ち会い・監視のもとこのセッションが`espflash`を実行した。`EXP-016`に続いて2回目の同じ逸脱である。**
+
+### 構成
+
+| 項目 | 内容 |
+|---|---|
+| 給電・配線 | `EXP-016`から変更なし。`DISP-01`の`VCC`ジャンパを挿し直して導通を再確立した（下記「配線変更後の再確認」参照）。pin割り当て・backlight制御経路・SPI構成は変更していない |
+| firmware base commit | `0797525`（このworktreeのHEAD、`#485`のMADCTL `BGR=1`）。**`git diff 0797525 a404de2`は空（tree同一）であることを確認した。**`a404de2`は`origin/develop`上でこのcommitをsquash mergeした結果であり、内容は同一である |
+| **firmwareの追加変更（未commit）** | 本記録の試験のため、`firmware/esp32/src/main.rs`へ診断用の暫定変更を加えた。**この変更はcommitしていない。**現時点のsha256: `2143d7d3b7228f94a8ba428a446939a2a2f3bd00643f99f052091d1fa6430e07`（`git diff --stat`: 80行追加・2行削除、`display.rs`は変更なし）。変更内容は3段階: (a) `run_corner_pattern`実行後に1秒間隔で無限に再描画するloopを追加、(b) `corners`配列のGREEN/BLUE割り当てを一時的に入れ替え、(c) 四隅pattern（2箇所のみ）では位置由来か色の値由来かを切り分けられないため、新規関数`run_grid_pattern`（4列×5行・20 cell、外側＋内側に別色の入れ子四角、`[RED,GREEN,BLUE,WHITE]`巡回）を追加し、loopの呼び出し先をこちらへ切り替えた |
+| build | `--features bringup-display-13`（debug）。各段階で`cargo fmt --check`／`cargo clippy --all-targets --locked -- -D warnings`／`cargo build --locked`をすべて実行し成功（scratchpad上のworktree外copyでbuild） |
+
+### 条件(7)の範囲についての記録
+
+[Issue #13コメント](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13#issuecomment-5804046159)が承認した条件(7)は、`run_display_bringup`の内容（controller識別→単色fill→四隅pattern）を前提にしていた。**本記録の試験は、その内容を診断目的で変更している**（無限loop化、色割り当て入れ替え、四隅pattern→格子patternへの差し替え）。**実行経路（`run_display_bringup`が呼ばれること）・使用pin・backlight制御は`#485`から変えていない**が、描画内容自体は承認時点の前提と異なる。**この変更をユーザーが指示・承認した上で実施した**（ユーザーの言葉:「やれ」「格子状などのより切り分けやすいpatternでの追加testをやれ」）が、承認の記録が会話内のみであり、正本・Issueへの記録はこの`EXP-017`が初出である。**無限loop化によりbacklightが継続点灯し続けたが、これは条件(3)（電流余裕計算）が前提とする通常動作（backlight点灯を含む）の範囲内である（`#0PM`が確かめた判断）。**
+
+### 配線変更後の再確認（`gpio-assignment.md`の`電源pinの短絡・誤配線の確認（非通電）`項目1〜4、`DISP-01`の`VCC`）
+
+- 項目1（`VCC`–`GND`間短絡検出）: `DISP-01`の`VCC`ジャンパを挿し直し、2000Ωレンジで複数回測定。挿し直し前後・ケーブルを動かしても**1212 Ω**で安定（`EXP-016`の基準値と一致）。
+- `VCC`pin⇔ESP32`3V3` pin間の導通: **0 Ω**（複数回、安定）。
+- **`MISO`線（`DISP-01`の`SDO` pin⇔ESP32 GPIO19）の導通確認を実施した。**結果: **0 Ω**（導通あり、単純な断線ではない）。`display_id`不一致の原因切り分けに使える情報として記録するが、原因の断定はしない。
+- 項目2〜4（目視照合・逆極性確認・給電経路重複確認）: ユーザーが実施し、`EXP-016`と変わらないと申告。
+- **手順10（通電後の抵抗再測定）は行っていない。**
+
+### backlightが消灯する挙動について
+
+**`EXP-016`ではこの挙動を「原因未確認」としていたが、firmwareのsourceを読んで説明がついた。実測では確かめていない。**
+
+`Ili9341`構造体は`bl: PinDriver<'d, Output>`を持つ（`display.rs` 147〜152行）。`run_display_bringup`（無限loop追加前の版）が`run_corner_pattern`実行後に関数を抜けると、`lcd`（と`bl`）がdropされる。`esp-idf-hal 0.46.2`の`impl Drop for PinDriver`（`gpio.rs` 1153〜1157行、このセッションでsourceを直接読んで確認した）は`gpio_reset_without_pull(self.pin)`を呼び、同関数（`gpio.rs` 1384行〜、同様にsourceを確認した）は`GPIO_MODE_DISABLE`・`pull_up_en=DISABLE`・`pull_down_en=DISABLE`でpinを再設定する。GPIO4（`LCD-BL`）は`EXP-011`が記録した外部`4.7 kΩ` pull-downにより、この時点でLowへ落ちる。**backlightがsoftware駆動でHighを保っていたのが、`lcd` dropによる暗黙のGPIOリセットで失われ、外部pull-downでLowになる、という一連の流れがsource上で説明できる。**電源側の問題ではない。**この経路をsourceの読解で示しただけであり、実測（オシロスコープ等でGPIO4の電圧推移を確認する等）では確認していない。**
+
+### 単色fill色順の確認（受け入れ条件3）
+
+シリアルログ（`display_fill`）は黒→赤→緑→青→白の順で送信。**目視結果: 黒→赤→緑→青→白の順で一致した（`EXP-016`で見つかった赤/青入れ替わりは解消した）。**この確認は**画面全体を単色で塗る`fill_screen`によるものであり、位置に関係しない。**複数回のflash（無限loop化版・GREEN/BLUE入れ替え版・格子pattern版のいずれも単色fill部分は共通）で再現性を確認した。**目視のみ。写真記録は無い。**`power-budget.md`の手順9は「logに加えて人間がpanelを目視（写真記録）で確認」したときに達成としており、**写真記録が無いため、正本が定める達成の条件は満たしていない。**「目視で確認した」限りで記録する。
+
+### 四隅pattern・格子patternでの位置の食い違い（受け入れ条件4、未解決）
+
+**この節は上記の色順確認とは別の現象であり、原因を共有するとは主張しない。**
+
+四隅patternの目視結果のうち、**firmwareの版を直前に明示した上でユーザーが直接その場で述べた**ものは次の2件である（**いずれも背景は黒ではなく濃紺に見えた**。写真のwhite balance等の影響である可能性があり、電気的な問題である証拠はない）:
+
+| 表示条件 | firmwareの版 | 左上 | 右上 | 左下 | 右下 |
+|---|---|---|---|---|---|
+| 無限loop化版・継続表示（写真あり） | `corners`配列: 右上=GREEN・左下=BLUE（元の割り当て） | 赤 | 青 | 緑 | 白 |
+| 無限loop化版・継続表示 | `corners`配列: 右上=BLUE・左下=GREEN（GREEN/BLUEを入れ替え） | 赤 | 緑 | 青 | 白 |
+
+firmwareが右上の座標に指定した色は、1行目ではGREEN、2行目ではBLUEである。実際に右上の位置に見えた色は、1行目ではBLUE（＝firmwareが左下に指定した色）、2行目ではGREEN（＝firmwareが左下に指定した色）だった。左下についても同様に、firmwareが左下に指定した色ではなく右上に指定した色が見えた。**色は、firmwareがその座標へ指定した値には従っていない。指定どおりの色は、意図と別の位置（右上の座標に指定した四角が左下に、左下の座標に指定した四角が右上に）に現れている。**色の値そのものに原因があるのではなく、**位置（どちらの座標に描かれるか）が入れ替わっている。**
+
+**ほかに、診断用の変更を入れる前のbuild（`0797525`そのまま、単発flash）でも四隅patternを目視したが、見え方とfirmwareの版・flashの回・timingの対応を、会話記録から確実に再構成できなかった**（後日この記録を書く際に複数回試みたが、結果が一致しなかった）。したがってこの回の観測は上表に含めない。
+
+格子pattern（20 cell、写真あり）でも同じ性質が見られた。firmwareが`COLS=4`（`WIDTH`軸のつもり）×`ROWS=5`（`HEIGHT`軸のつもり）で意図した配置に対し、**実際に写真で見えたのは4行×5列で、物理的な「行」ごとに色が同じで「列」方向には変わらないパターンだった。**この見え方は、色を決めるのがfirmwareの`col`変数（`WIDTH`軸のつもり）のみであり`row`変数（`HEIGHT`軸のつもり）が色に影響しないという計算結果と一致する。**四隅の結果と同じく、色の値ではなく座標の対応関係の食い違いである。**
+
+**この観測から、「firmwareが`x`（CASET）に渡す値と`y`（PASET）に渡す値が、物理的にどちらの軸へ対応するか」について、firmwareの想定と実際の見え方が食い違っている、とまでは言えるが、それ以上の断定はしない。**理由:
+
+- **向きの基準が無い。**「縦」「横」「右上」は、moduleをどちら向きに持って見たかに依存する。本記録の上記2件の写真および格子patternの写真では、module上の目印（左上の緑色tab、左edgeの`J4`表記の小pin header、右edgeの`J2`表記の長いpin header）が同じframe位置に写っており、**このセッション内では同じ持ち方だったと判断できる。**しかし`EXP-016`の写真は本記録の作成時点でこのセッションから参照できず、`EXP-016`と本記録の間で基準となる向きが同一だったかは確認できない。
+- `CMD_CASET`=0x2A・`CMD_PASET`=0x2B（標準値、取り違えなし）、`set_window`のx0/x1→CASET・y0/y1→PASET対応は確認済み。MADCTLは本記録の試験を通じて`BGR=1`のまま変えていない（`MY`/`MX`/`MV`は`0`のまま）。**`EXP-016`（`MADCTL=00h`）時点では、色の入れ替わりを差し引くと四隅の位置はfirmwareの意図と一致していたと記録されている。**BGRビットだけを変えて位置の対応関係が変わる理由は無いはずだが、本記録はこの食い違いの原因を特定していない。
+
+### `display_id`（受け入れ条件1、未解決）
+
+本記録の試験期間中、複数回のflashにわたり`display_id`のraw値を確認した。少なくとも`[00,00,00,00]`／`[ff,ff,ff,ff]`／`[00,40,71,fb]`の3種類の異なる値を観測しており、期待値`0x9341`とはいずれも不一致だった。**flashの回数・順序・各flashのfirmware版との対応は、会話記録から確実に再構成できなかった**（後日この記録を書く際に複数回試みたが、結果が一致しなかった）。安定した固定値ではないこと自体は、複数回の観測から確からしい。原因は特定していない（`MISO`導通は上記のとおり確認済みで、単純な断線ではない）。
+
+### この記録が主張しないこと
+
+- 四隅・格子patternでの位置の食い違いの原因（MADCTLのbit配置の想定違い、clone chipの個体差、その他）は特定していない
+- 単色fillの色順修正（`BGR=1`）と、四隅・格子patternの位置の食い違いが同一原因であるとは主張しない。**別の未解決事項として扱う**
+- `EXP-016`と本記録の間で、moduleを持つ向きの基準が同一だったかは確認していない
+- backlight消灯の説明はsourceの読解によるものであり、実測（オシロスコープ等）では確認していない
+- `display_id`不一致の原因は特定していない
+- 本記録のfirmware変更（無限loop化、色配列入れ替え、格子pattern）はいずれも診断用でありcommitしていない。**本番のbring-up手順には含まれない**
+- 条件(7)の承認範囲を、描画内容の変更について厳密には超えている（上記「条件(7)の範囲についての記録」参照）
+- 単色fillの色順確認は目視のみであり、正本の手順9が定める写真記録による達成の条件は満たしていない
+- 手順10（通電後の抵抗再測定）は行っていない
+- **この記録は、試験の後に会話から再構成した。flashごとの版・log・見え方の対応は、直接引用できたもの以外は確認できていない。**次回以降の実機試験では、試験中にflashごとの表（時刻、firmwareの版またはdiffのsha256、`display_id`等のlog行、目視した見え方）をその場で作ることが要る
+
+### 結論
+
+`#485`（MADCTL `BGR=1`）は、画面全体の単色fillにおける赤/青入れ替わりを解消した（目視で確認したが、写真記録が無いため正本の達成条件は満たしていない）。一方、四隅・格子patternでは、色の値ではなく位置（座標の対応関係）が入れ替わるという別の未解決現象が見つかった（受け入れ条件4は未達のまま）。`display_id`不一致（受け入れ条件1）も未解決。`MISO`線の導通は確認済みで単純な断線ではないが、これが`display_id`不一致の原因かどうかは特定できていない。手順7（書き込み）を正本の指定と異なりAIが実行したこと（`EXP-016`に続いて2回目）、手順10（通電後の抵抗再測定）を行っていないことも、正本からの逸脱・未実施として記録する。安全上の異常は認めなかった。
+
+## EXP-018: `DISP-01`（MSP2807）横向きの向きの決定と、単色fill・色の並び・四隅の写真記録、IDの読み出しの打ち止め
+
+**目的**: [Issue #13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)の受け入れ条件1〜4の証拠を揃える。(1) Read ID1〜3（DAh・DBh・DCh）を読み、D3hが期待する値を返さない理由を切り分ける。(2) 単色fillの5色を写真で記録する。(3) 判定の向き（横向き320×240、14 pinの`J2`のheaderを右の辺。[#13の判断(2)](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13#issuecomment-5860773100)）に合うMADCTLの`MY`／`MX`／`MV`を写真から決め、その値で四隅が一致することを確かめる。
+
+**実施日**: 2026-09-28（JST）。
+
+**実施者**: 通電中の監視、USBの抜き差し、停止の判断、動画の撮影とスクリーンショットの切り出し、通電後の抵抗測定はユーザーが行った。firmwareのbuild、書き込み（`espflash`）、シリアルlogの読み取り、flashごとの表の作成は実機Linuxのセッション（本記録の作成者）が行った。**書き込みは、ユーザーの指示（「お前が実行するんだよ」）でこのセッションが実行した。**
+
+**flashごとの表は、試験中にその場で作った。**本記録の時刻・log・見え方は、その表から写した。
+
+### 構成（[Hardware Safety Policy](../governance/hardware-safety-policy.md)「10. ベンチ試験記録」の項目）
+
+| 項目 | 内容 |
+|---|---|
+| Test ID | `EXP-018` |
+| Hardware revision／Exact components | `EXP-017`と同じ。`MCU-01`（[hardware-bom.md](hardware-bom.md)。書き込み時の表示はchip revision v1.0）、`ACCEL-01`、`ENV-01`、`DISP-01`（MSP2807、silk `2.8 TFT SPI 240X320 V1.2`、panel `HSD028309 A2`） |
+| Wiring revision | `EXP-017`から変更なし。**`EXP-017`の後に配線を変えた記録は無く、ユーザーからも変更の申告は無かった。**このため[power-budget.md](power-budget.md)の`DISP-01`追加接続の手順2（非通電確認の項目1〜4）はやり直していない（PMの判断） |
+| Power supply and current limit | ESP32はPCのUSBから給電。`3V3` railに載るのはESP32・`ACCEL-01`・`ENV-01`・`DISP-01`だけ。servoとPiは接続していない。port確認で`CP210x`（`/dev/ttyUSB0`）だけが見え、Arduino（`ttyACM*`）は接続されていなかった。電流制限は`#461`の範囲（`HW-TBD-024`の計算）のまま。**周囲温度は測っていない。**[power-budget.md](power-budget.md)の条件(3)(c)（ambient 40℃の仮定に収まる）の成立は、測定では確かめていない |
+| 条件(7) | [#13 comment（条件(7)の承認）](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13#issuecomment-5868974805)。通電の前に記録した。backlightの点灯が起動1回あたり約2秒から約20秒へ延びること、Read ID1〜3の読み出しを足すこと（Interface Iなら`MOSI`の線で出力がぶつかりうる）を示したうえでの承認である。B2の手順8・9の(a)の読み替えと、待ち時間の上限（60秒、ユーザーがAIに任せた）も同じcommentにある |
+| Measurement equipment | テスター（2000Ωレンジ。機種はこの試験では記録していない）。表示の記録はユーザーの動画 |
+| build | debug profile、`--features bringup-display-13`。repositoryの外に置いたdetachedのworktreeでbuildし、`.embuild`は共有した（**clean buildではない**）。`Cargo.lock`は変えていない |
+
+### firmware（書き込んだ3本）
+
+| 呼び名 | 元 | 変更 | ELF sha256 |
+|---|---|---|---|
+| B1 | commit `213a107`（[PR #497](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/497)のhead）そのまま | なし。MADCTL=`0x08`。D3hと、DAh・DBh・DChを各1回読む | `6412e46370483987d7dc5ab1f8086d0cfcb139d8d4d74e4261b617720a2fa53d` |
+| B1' | `213a107`＋診断用のpatch（commitしていない。`git diff`のsha256 `b9d0057dcf002764ffcc948586b8a5c6e3524024cadc6f6d706e184a9d1d9b6e`） | IDを1つも読まない。MADCTL=`0x08`、`WIDTH`／`HEIGHT`=240／320（B1と同じ生の座標） | `94e43cfa932ccea8dad8a99820fc22ced3673ffcfdd903d054386a1eb64f50b5` |
+| B2 | `213a107`＋診断用のpatch（commitしていない。`git diff`のsha256 `ebeec01e67fce9f4f8662616e441aba069d32e599be239217f4d3d9c1f1e231f`） | IDを1つも読まない。MADCTL=`0x28`（`MV=1`、`BGR=1`）、`WIDTH`／`HEIGHT`=320／240 | `22e3ad3e97671675be03f8ce80fa2d40f7bf2f864f669c04ea6d9a71a3067d44` |
+
+B2は、`MY`／`MX`の4通り（`0x28`・`0x68`・`0xa8`・`0xe8`）を通電の前にbuildしておき、B1'の写真から決めた1本（`0x28`）だけを書き込んだ。**B1'は、B1の写真を撮れなかったため、IDを読まずに撮り直すために足した。**PMに連絡がつかなかったため、「読まない版なら、読み出しを重ねないという決め事に反しない」とユーザーに示して、PMの確認より前に実行した。B2は、PMの判断（書き込んでよい）の後に実行した。
+
+**本記録の後に`firmware/esp32/src/display.rs`・`main.rs`へ入れた変更（MADCTL=`0x28`、`WIDTH`／`HEIGHT`=320／240、IDの読み出しのcodeの削除）は、B2と同じcommandの列を送る。**B2との違いは、`display_madctl`の行の末尾の`id_reads=skipped`を外したことと、呼ばれていなかった読み出しの関数を消したことである。**その版そのものは書き込んでいない。**
+
+### flashごとの表（時刻はこの端末のJST）
+
+| # | 時刻 | 事象 | 主なlog | 見え方（ユーザーの申告と写真） |
+|---|---|---|---|---|
+| 0 | 20:31:45までに | USB接続 | — | 書き込み前のimage（`EXP-017`の診断buildの見込み。未確認）による表示は、判定に使わない |
+| 1 | 20:33:10〜20:35:00 | B1を書き込み、monitor | 下記「B1のlog」 | **写真は撮っていない。**撮る向きと`J2`が何かを、このセッションが伝えていなかったため |
+| 2 | 20:41:25〜20:42:55 | B1'を書き込み、monitor。ユーザーは書き込みの前から録画した | `display_madctl value=0x08 width=240 height=320 id_reads=skipped`、fill×5、`display_corner_pattern elapsed_us=89985`、`accel_device_id raw=0xe5`、`env_chip_id raw=0x60` | 5色とpattern（下記） |
+| 3 | 20:53:32〜20:55:02 | B2を書き込み、monitor。ユーザーは書き込みの前から録画した | `display_madctl value=0x28 width=320 height=240 id_reads=skipped`、fill×5、`display_corner_pattern elapsed_us=89989`、accel `0xe5`、env `0x60` | pattern（下記） |
+
+どの起動でも、`rst:0x1 (POWERON_RESET)`が2回出た。原因は調べていない。monitorの中でreset（Ctrl+R）はしていない。IDの読み出しは、B1の起動1回で各registerを1回ずつだけ行った。
+
+### B1のlog（条件1）
+
+```text
+I (622) deskcat_esp32: display_id raw=[00, 00, 00, 00] matches_ili9341=false
+E (622) deskcat_esp32: display_id_mismatch expected_id_hi=0x93 expected_id_lo=0x41 got_hi=0x00 got_lo=0x00
+I (632) deskcat_esp32: display_rdid register=id1 cmd=0xda raw=[00, 00]
+I (632) deskcat_esp32: display_rdid register=id2 cmd=0xdb raw=[00, 00]
+I (642) deskcat_esp32: display_rdid register=id3 cmd=0xdc raw=[00, 00]
+I (902) deskcat_esp32: display_fill name=black color=0x0000 elapsed_us=244770 hold_ms=3000
+I (4152) deskcat_esp32: display_fill name=red color=0xf800 elapsed_us=244739 hold_ms=3000
+I (7402) deskcat_esp32: display_fill name=green color=0x07e0 elapsed_us=244722 hold_ms=3000
+I (10652) deskcat_esp32: display_fill name=blue color=0x001f elapsed_us=244737 hold_ms=3000
+I (13902) deskcat_esp32: display_fill name=white color=0xffff elapsed_us=244717 hold_ms=3000
+I (17252) deskcat_esp32: display_corner_pattern elapsed_us=90021
+I (20262) deskcat_esp32: accel_device_id raw=0xe5
+I (20272) deskcat_esp32: env_chip_id raw=0x60
+```
+
+### 写真（動画から切り出したスクリーンショット）
+
+**写真と動画はcommitしていない**（`EXP-016`と同じ扱い。手や部屋が写っているため）。切り出した画像は実機端末のrepositoryの外に保管し、元の動画はユーザーの手元にある。
+
+| 画像 | 取った動画 | sha256 | 見えた内容 |
+|---|---|---|---|
+| fill 黒 | B1' | `d34848fef532f0ea06ba25350402a46c09788b7dc2ca4127d04cdebed0e81c0f` | 画面全体が一様に暗い。横向きで、右の辺に`J2`のheaderとsilk `J2`、左の辺に`J4`が写る（5枚とも同じ） |
+| fill 赤 | B1' | `f33ef891d564057283ef31bce84803085d25c0068592b58e413579e8193d213b` | 画面全体が一様に赤。細かい網目の模様が写るが、撮影のmoiréの見込み |
+| fill 緑 | B1' | `76664ad75a1984b11fe492f67fa7799824c35af3e77e86980e5a8463004d2887` | 画面全体が一様に緑 |
+| fill 青 | B1' | `aaae94ba797aa297a1a62506c730b56ea6107aa279bc07ee78338b3374819563` | 画面全体が一様に青。赤と同じ網目の模様 |
+| fill 白 | B1' | `b1f706f964c7bc337de43b0a62566ef85b9450c6810e4be280e58cdcda138153` | 画面全体が一様に白（やや青み） |
+| pattern | B1' | `7779997545e0b5870148098e48c45c21a5671be4c71f814eb29f0e392a5c6de9` | 赤・大（`origin`）＝左上。破線（`y_axis`、行＝PASETの増える向き）＝左上から右へ。実線（`x_axis`、列＝CASETの増える向き）＝左上から下へ。緑（`x_end`）＝左下、青（`y_end`）＝右上、白・小（`far`）＝右下 |
+| pattern | B2 | `cfbb83684550d7186e60f27e78d69fd6351b40de3ba620333aff32cff319d5a1` | 赤・大（`origin`）＝左上、緑（`x_end`）＝右上、青（`y_end`）＝左下、白・小（`far`）＝右下。実線＝左上から右へ、破線＝左上から下へ（破線は約6本で、`y_axis`の168 pxに合う） |
+
+ユーザーは、fillの色の順を「黒・赤・緑・青・白の順に見えた」と述べた（firmwareが送った順と同じ）。**B2の後に、B1'のpatternのスクリーンショットを1枚、B2のものと取り違えて受け取った。**ユーザーの「間違えた、今回のはこれ」で差し替えた。取り違えた1枚は、会話の途中で送られたため、fileとして残っていない。
+
+**5色のframeはB1'（MADCTL=`0x08`）から取った。**これを条件2・3の証拠に使う理由: fillは画面全体を塗るため、向きによって見え方が変わらない。B1'とB2の違いはMADCTLの`MV`・`MY`・`MX`だけで、`BGR`（B3）は同じである。
+
+### 向きの決め方（条件4）
+
+ILI9341 Datasheet V1.11 §9.3 MCU to memory write/read direction（p.208）の表では、`MV=1`のとき、CASETは`MY=0`なら物理のpage（0〜319）へ、`MY=1`なら`319−page`へ向かう。PASETは`MX=0`なら物理のcolumn（0〜239）へ、`MX=1`なら`239−column`へ向かう。
+
+B1'（`MV=0`）の写真で、破線（PASET＝物理のpageの向き）は右へ、実線（CASET＝物理のcolumnの向き）は下へ伸びていた。したがって`MV=1`、`MY=0`、`MX=0`で、論理の`x`は右へ、`y`は下へ伸び、原点は左上に来る。→ MADCTL=`0x28`。**この読み方は、PM（`#0PM`）が§9.3 p.208の表と照合した。**読み方は、2本の線がどちらも原点から伸びていることを前提とする（`213a107`の`run_corner_pattern`は、どちらの軸も`origin`から描く）。
+
+**B2（`0x28`）の写真で、論理の四隅が物理の四隅と一致した。**
+
+補足: `MV=0`の横向きでは、生の座標は転置に見える（左上は合い、右上と左下が入れ替わる）。`EXP-017`の四隅の記録（「左上は合い、右上と左下が入れ替わる」）はこれと一致する。`EXP-016`の四隅の記録（位置は意図どおり）は、横向きではない向きで見ていた見込みがある。どちらの向きで見たかの記録が無いため、確かめられない。
+
+### IDの読み出しの結果と切り分け（条件1）
+
+**事実:**
+- B1で、D3hの4 byteも、DAh・DBh・DChの各2 byteも、すべて`00`だった。DBh（ID2）の値の範囲は、datasheetでは80h〜FFhであり、`00`はその外である。
+- `DISP-01`の`SDO`とESP32のGPIO19（`LCD-MISO`）の間の導通は0 Ω（`EXP-017`）。
+- D3hの値は、`EXP-016`では`00000000`、`EXP-017`では複数回の書き込みで3種類（`00000000`、`ffffffff`、`004071fb`）だった。今回はすべて`00`だった。値が変わった理由は分からない。
+
+**残る候補（どちらも断定しない）:**
+- 読み出しのdataが`SDO`に出ていない。§7.1.10（p.38）の4-wire serialの図では、Interface Iは読み出しdataを`SDA`（この配線では`MOSI`の線）へ出す。
+- module上で、controllerの`SDO`が`SDO(MISO)`のpinへ引き出されていない。
+
+**限界:** どちらかは、moduleを改変しない方法では確かめられない。**読み出しはB1で打ち止めにした。**この後のfirmwareは、IDを読まない（`firmware/esp32/src/display.rs`のmodule doc）。
+
+### 通電後の抵抗再測定（手順10）
+
+USBを抜いた後、`DISP-01`の`VCC`–`GND`間、2000Ωレンジで**1210 Ω**（ユーザーの申告）。通電前の基準値（`EXP-016`・`EXP-017`）は1212 Ω。「低いまま動かない」への変化ではない。
+
+### Faults
+
+- 実施前の条件(3)(c)（周囲温度がambient 40℃の仮定に収まる）を、測定で確かめずに通電した。
+- 停止条件（手順8）にかかる事象は、どの起動でも無かった。異音・発熱・火花・変色・異臭について、ユーザーからの申告は無かった。logは、どの起動でも待ち時間の上限（60秒）より前に(a)〜(d)まで出そろった。
+- B1の写真を撮れなかった（上記）。そのため、起動が1回（B1'）増えた。B1'ではIDを読んでいない。
+- B2では、試験の時点でmerge済みだった手順9の(a)（`display_id`）の代わりに、`display_madctl`の行、または`display_driver_new_failed`／`display_init_failed`の行で(a)を判断した（条件(7)と同じcommentで、通電の前にユーザーが確認した）。
+
+### 受け入れ条件との対応（[Issue #13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)）
+
+| # | 受け入れ条件 | 判定 | 根拠 |
+|---|---|---|---|
+| 1 | Controller識別情報と初期化の根拠 | **達成**（[判断(1)](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13#issuecomment-5860773100)による） | (a) 識別情報: moduleのsilk（`2.8 TFT SPI 240X320 V1.2`）と、MSP2807の資料がcontrollerを`ILI9341`としていること（[sensor-datasheet-notes.md](sensor-datasheet-notes.md)のLCD moduleの表）。(b) 初期化の根拠: `display.rs`のmodule docが引くdatasheetの節（SWRESET、SLPOUT、COLMOD、MADCTL。CASET／PASETの制約は`fill_rect`のdoc）と、そのcommandが実機で期待どおりに効いたこと（`BGR`で赤と青の入れ替わりが解消、`MV`で向きが§9.3の表のとおりに変わった）。(c) 読み返し: 上記の結果と切り分け |
+| 2 | 単色fillが正しい | **達成** | 5色の写真（B1'）で、画面全体が一様に塗れた。`display_fill`×5のlog |
+| 3 | Color orderが正しい | **達成** | 同じ写真と、ユーザーの申告（黒・赤・緑・青・白の順）。送った色と見えた色が一致した |
+| 4 | 四隅とorientationが正しい | **達成**（判断(2)の向き） | B2の写真で、論理の四隅が物理の四隅と一致した。`display_pattern_element`と`display_corner_pattern`のlog |
+| 5 | 更新timingを測定した | 達成（`EXP-016`で達成済み） | 今回も`display_fill`は約244.7〜244.9 ms。patternは内容を変えたため約90.0 ms |
+| 6 | 更新中も通信とwatchdogがactiveである | 未達 | このbuildはprotocol sessionを動かさない。[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)の統合buildと[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)の後に確かめる |
+
+### この記録が主張しないこと
+
+- IDの読み出しが期待する値を返さない原因は特定していない
+- `POWERON_RESET`が起動ごとに2回出る理由は調べていない
+- 本記録の後にcommitしたfirmware（B2と同じcommandの列）そのものは書き込んでいない
+- `EXP-016`が横向きではない向きで見ていたことは確かめていない（見込み）
+- 条件4の判定の向きは、[#34](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/34)の仮筐体で頭への載せ方が決まったら見直す
+
+### 結論
+
+MADCTL=`0x28`（`MV=1`、`BGR=1`）で、判定の向き（横向き、`J2`を右）の論理の四隅が物理の四隅と一致した。単色fillの5色と色の並びも、写真で記録した。IDの読み出しは、どのregisterも期待する値を返さず、moduleを改変しない方法ではこれ以上切り分けられないため、打ち止めにした。受け入れ条件1〜5は達成、6は未達である。
+
+### Next safe step
+
+- 受け入れ条件6は、[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)（firmwareの統合build）と[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)（UARTでの接続）の後に確かめる
+- 仮筐体で向きが変わる場合は、`display.rs`の`MADCTL_LANDSCAPE`と`WIDTH`／`HEIGHT`を変え、四隅を写真で確かめ直す
+
+## EXP-019: 段階B-2（今の接続のまま B-2a）の、周辺 module 3点の 3.3 V 側の電流と電圧
+
+[#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)の段階B-2。[power-budget.md](power-budget.md)の`段階B-2の測定`の`今の接続のままB-2aとして測る（2026-09-28、ユーザー決定）`による。
+
+| 項目 | 内容 |
+|---|---|
+| Test ID | `EXP-019` |
+| Date | 通電は 2026-10-01（JST）。非通電の確認は 2026-09-30〜2026-10-01 |
+| Operator | 配線の変更と戻し、非通電の測定、通電中の監視、USB の抜き差し、停止の判断、テスターの読み取りはユーザー。firmware の build、書き込み（`espflash`）、serial log の読み取り、起動し直し、時刻の表の作成は実機 Linux の AI セッション（本記録の作成者） |
+| Hardware revision／Exact components | `EXP-018`と同じ（`MCU-01`、`ACCEL-01`、`ENV-01`、`DISP-01`）。加えて`MEAS-01`（秋月 117836、`SQP5WJ0R1B`）1本 |
+| Wiring revision | 基準は`EXP-018`の配線。穴の番号は、ユーザーが2026-09-30に作った配線の地図（画像。commit していない。sha256 `978e2c6f85ad42fc28a43d8f2a4f7cf5c7ecfd580c57e0880608784113257b6b`）による。測定の間だけ、3点の電源の線を、ブレッドボードの上の＋列（3V3）の30番（`DISP-01` VCC）→`b11`、4番（`ACCEL-01` Vs/VDD）→`c11`、1番（`ENV-01` VDD）→`d11`へ移し、`MEAS-01`を上の＋列11番と`a11`に挿し、測定用のジャンパを上の＋列10番（点A）、`e11`（点B）、上の－列（GND）10番（点C）に差した。測定の後に元へ戻した（ユーザーの申告） |
+| Power supply and current limit | ESP32 は PC の USB から給電（`/dev/ttyUSB0`、`CP2102N`）。servo と Pi は接続していない。電流制限は設けていない（[power-budget.md](power-budget.md)の`B-2a: 3V3 pinから給電する経路`、`HW-TBD-023`） |
+| Firmware commit/profile | commit `52a8142`の`--features bringup-display-13`、debug profile に、`firmware/esp32/src/config.rs`の`DISPLAY_HOLD_MS`を`3_000`から`15_000`へ変える patch（commit していない。option なしの`git diff`の出力の sha256 `ed36fb79531f808ab142d560e470ce97ca589c79552334b2106cb4a615691752`）を当てた。ELF sha256 `e92109b69fd35a23ddbac9ab73c59dca103853304423d41107f19f5be50ff115`。clean build ではない。試験の時点の`develop`は`710c67f`で、[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)の PR B は merge されていなかった |
+| Configuration | 条件(7)（[power-budget.md](power-budget.md)の`DISP-01`追加接続のbring-upの手順の条件(7)）の承認: [#3 comment](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3#issuecomment-5914517437)（通電の前。patch を当てた build、backlight を点ける起動4回）。停止条件: 20V レンジの表示が 3.23 V 以下または 3.37 V 以上（PM `#0PM`の判断）、brownout、予定外の reset、LCD の表示異常、regulator 周辺と部品の発熱、異音・異臭・変色、log が150秒出ない。停止はユーザーが USB を host 側から抜く |
+| Measurement equipment | `MEAS-03`（`DT830B`）1台。200Ω、2000Ω、20V、200mV のレンジ。ワニ口のクリップで挟み、通電中は付け替えていない。確度は取得できない（[hardware-bom.md](hardware-bom.md)の`MEAS-03`）。周囲温度は`MEAS-04` |
+| Procedure | 非通電の確認の後、3回通電した。回1 は点B–点C（20V）、回2 は点A–点C（20V）、回3 は`MEAS-01`の2本の線の間（200mV）を読んだ。ワニ口の付け替えとレンジの切り替えは USB を抜いている間に行った。回3 の通電の前に、ワニ口が隣の線やジャンパに触れていないことを、ユーザーが目で確かめた（ユーザーの回答。回答は試験の後に得た）。回1・回2 のどちらかで停止条件の値に達したら回3 は行わない、と通電の前に決めた |
+| Expected result | 停止条件に当たる事象が無く、各区間の表示が読めること |
+| Measured result | 下の3つの表と、`戻した後` |
+| Faults | 下記 |
+| Conclusion | 下記 |
+| Next safe step | 下記 |
+
+**非通電の確認**（レンジと表示はユーザーの申告）
+
+| # | 測った所 | レンジ | 表示 |
+|---|---|---|---|
+| M0 | リード同士 | 200mV | `00.2` |
+| M0 | リード同士 | 200Ω | `0` |
+| M0' | リード同士を押し当てた（取り直し） | 200Ω | `01.6` |
+| M2a | ESP32 の`3V3` pinと、3点それぞれの電源 pin（電源の線を移した後、`MEAS-01`もジャンパも挿す前） | 2000Ω | 3つともオーバーレンジ |
+| M1 | 点B–点C | 2000Ω | `1217` |
+| M2 | 点A–点B | 200Ω | `02.2` |
+| M2b | `MEAS-01`の2本の線（穴より上） | 200Ω | `01.7` |
+| M2c | 点A–`MEAS-01`の＋列側の線 | 200Ω | `01.9` |
+| M2d | 点B–`MEAS-01`の`a11`側の線 | 200Ω | `01.9` |
+| M3 | 点A–点C | 2000Ω | `1806`→`1215` |
+| M6 | 周囲温度 | `MEAS-04` | 25.0 ℃ |
+
+**時刻の表**（この端末の JST。読みはユーザーの申告）
+
+| # | 時刻 | 事象 | 主な log | 読み |
+|---|---|---|---|---|
+| 1 | 00:39:35 | 回1: USB を挿した | — | — |
+| 2 | 00:39:43 | 書き込みの command が、環境変数の値の誤りで起動せずに止まった | `invalid value '1' for '--skip-update-check'` | — |
+| 3 | 00:40:12〜 | 書き込み（ELF `e92109b6…`）、monitor | `App version: 52a8142-dirty`、`POWERON_RESET`×2、`hold_ms=15000` | — |
+| 4 | 00:41:58〜00:42:13 | 起動1: 白 | `display_fill name=white` | 点B–点C **3.30 V** |
+| 5 | 00:42:29〜 | bring-up の後（画面が暗い。ユーザーの申告） | `accel_device_id raw=0xe5`、`env_chip_id raw=0x60` | 点B–点C **3.33 V** |
+| 6 | 00:43:04 | USB を抜いた | — | — |
+| 7 | 00:46:09〜 | 回2: USB を挿した（挿した時刻は記録していない）。この時刻に monitor を開き、起動し直した | `POWERON_RESET`×1 | — |
+| 8 | 00:47:19〜00:47:34 | 起動2: 白 | — | 点A–点C **3.30 V** |
+| 9 | 00:47:49〜 | bring-up の後（画面が暗い。ユーザーの申告） | accel `0xe5`、env `0x60` | 点A–点C **3.34 V** |
+| 10 | 00:48:51 | USB を抜いた | — | — |
+| 11 | 00:50:10〜 | 回3: USB を挿した（挿した時刻は記録していない）。この時刻に monitor を開き、起動し直した | `POWERON_RESET`×1 | — |
+| 12 | 00:50:17〜00:51:50 | 起動3（1回目） | — | 読みなし |
+| 13 | 00:53:28〜 | monitor を開き直し、起動し直した | `POWERON_RESET`×1 | — |
+| 14 | 00:53:36〜00:55:08 | 起動3 | accel `0xe5`、env `0x60` | 下の表 |
+| 15 | 00:55:46〜00:57:26 | monitor を開き直し、起動4 | `POWERON_RESET`×1。accel `0xe5`、env `0x60` | 下の表 |
+| 16 | 00:57:44 | USB を抜いた | — | — |
+
+回1・回2 で読んだ4つの表示は、どれも停止条件の値に達しなかったので、回3 を行った。serial log を取っていた区間に、brownout と、上の表に無い reset は出なかった。LCD の表示異常・発熱・異音・異臭・変色の申告は無かった。
+
+**回3 の読み**（200mV、`MEAS-01`の2本の線の間）
+
+| 区間 | 起動3 | 起動4 |
+|---|---|---|
+| 黒・赤・緑・青 | `04.4` | `04.4` |
+| 白 | `04.3` | `04.3` |
+| 四隅の pattern | `04.4` | `04.4` |
+| bring-up の後（画面が暗い。ユーザーの申告） | `00.5` | `00.5` |
+
+M0 の 0.2 mV を引き 0.1 Ω で割ると、bring-up の後以外の区間が約 41〜42 mA、bring-up の後が約 3 mA（計算）。
+
+**戻した後**: 測定用のジャンパ3本と`MEAS-01`を抜き、3点の電源の線を上の＋列30番・4番・1番へ戻した（ユーザーの申告）。上の＋列–上の－列は 2000Ω で`1276`→`1214`。項目1〜7 はやり直していない（ユーザーの判断。その後は通電していない）。
+
+### Faults
+
+- 条件(7)の承認（backlight を点ける起動4回）を超えた。書き込んだ版の起動は少なくとも7回（表示を最後まで行った5回と、回2・回3 で USB を挿してから monitor を開くまでの2回）。起動1 の前の`POWERON_RESET`×2（時刻の表の行3）が、書き込んだ版の起動の回数に当たるかは分からない（`EXP-018`でも、どの起動でも2回出ている）。回1 では書き込む前の image（何かは記録していない）が約37秒動いた。起動3 の1回目に読みが無かったため起動し直したが、その前にユーザーにも PM にも確かめていない。手順は USB を挿した時点の起動を回数に入れておらず、PM（`#0PM`）も見落とした（[#3 の訂正](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3#issuecomment-5932401221)）。
+- `DISP-01`追加接続の手順からの逸脱: 手順10（通電後の`VCC`–`GND`間の再測定）を行っていない。[gpio-assignment.md](gpio-assignment.md)の非通電の確認の項目1を module の pin ではなく列と rail の単位で測り、項目2〜7 を現物ではなく配線の地図と照らして行った。
+- [#3 の決定1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3#issuecomment-5863139535)の「B-2 の測定より前に（要る確かさを）確定させる」は、満たさないまま測定した。測定は、後の[#488 の決定](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/488#issuecomment-5868418510)（手持ちの`DT830B`で測り、確度が分からないことは弱点として記録する）に基づく。この決定が順序の条件を外したかどうかは、決定の文に書かれていない。
+- 最初は上の＋列11番と`a11`の間に`MEAS-01`ではなくジャンパが挿してあった。指示が「`MEAS-01`を挿す」とだけ書き、セメント抵抗であることを書いていなかったためである。通電の前に差し替えた（差し替える前の M1 `1209`、M2 `02.5`、M3 `1512`→`1209`）。
+- [hardware-bom.md](hardware-bom.md)の`MEAS-03`行は「`200 Ω`・ダイオード・電流測定は電池を交換して再確認するまで使わない」と定めている。その定めを確かめずに 200Ω レンジを使った。電池はユーザーの申告で交換済みで、測定中に電池のマークは出なかったが、交換後の再確認の記録は無い。電流は、電流端子ではなく 200mV の電圧レンジで読んだ。
+- 書き込みの command を1回、環境変数の値の誤りで止めた。chip には書いていない。
+- 起動3 の1回目は、区間の時刻の連絡がユーザーに届かず、読みが無い。AI のセッションが途中で切り替わり、monitor もそこで止まった。
+- 起動4 の前に monitor を止めるとき、`pkill -f`の pattern が実行した shell 自身にも一致し、その shell も止まった。
+- 回3 の間は電圧を見ていない。
+
+### この記録が主張しないこと
+
+- 3点それぞれの電流
+- 測った値が、MSP2807 の安全な電流上限（`HW-TBD-024`）や`3V3` pinの定格（`HW-TBD-023`）を下回ること
+- [power-budget.md](power-budget.md)の段階B-2の共通条件の`測る量`（backlight の点灯と LCD の描画、I2C 通信を継続した状態の定常電流）
+- 測っていない電流（GPIO4 から`DISP-01`の`LED` pin へ流れる電流、上の＋列にある pull-up と分圧器の電流、信号線を通って module へ入る電流）
+- 3.3 V 側の電圧が[power-budget.md](power-budget.md)の`許容電圧範囲`行の範囲の中にあること
+- 200Ω レンジの読みが正しいこと
+- log の無い区間（USB を挿してから monitor を開くまでと、monitor が止まっていた区間）に brownout や reset が無かったこと。`POWERON_RESET`の原因
+- 試験した firmware が、試験の時点の`develop`の firmware と同じ動きをすること
+- 3点の電源の線が戻ってつながっていること
+- 読んだ点以外の区間と、log の無い区間で、停止条件を監視したこと
+
+### Conclusion
+
+今の接続（`3V3` pin給電）のまま、3点の電源 pin へ入る合計電流は、確度が未取得の読みとして、bring-up の後以外の区間が約 41〜42 mA、bring-up の後が約 3 mA だった。3.3 V 側の電圧の読みは、白の区間と bring-up の後で 3.30〜3.34 V だった（確度が未取得）。
+
+### Next safe step
+
+- 次の通電（[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)の条件4、または[#13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)の条件6）の前に、戻した後の配線で非通電の確認（項目1〜7）をやり直す。通電したら、表示と`accel_device_id`／`env_chip_id`の応答で、3点の電源の線がつながっていることを確かめる
+- monitor の process は、次からは PID を指定して止める
+
 ## Revision履歴
 
 | 日付 | Revision | 変更 | 根拠 |
@@ -1642,3 +2083,7 @@ USB接続によりfirmware書き込み＝初回通電。約3分間、異音・�
 | 2026-09-16 | 19 | [#407](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/407)（昇格[PR #383](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/383)のCodeRabbit指摘、🟡Minor 1件・🟠Major 1件の余波）。2点。(a) `EXP-001`の`結論`にあった「**`MEAS-02`の採否は未確定である。****2026-09-14に採否を決定した。**」が、同じ対象を未決と既決の両方で述べていた。**記録時点の記述はそのまま残し、2026-09-14の決定を追記として分離した。****採否の決定（済）と、この品で足りるかの判定（未）は別のものである、と明示した。**(b) `EXP-013`の「**その判定はこの記録では行わない。****引き受け先は決めていない。**」の段落は書き換えず、**引き受け先が`#407`に決まったことを日付つきの訂正として直後へ置いた。**同Issueで[power-budget.md](power-budget.md)を全数走査して5箇所を訂正し、**(2)の実施と通電を反映したうえで、(3)の未決と`通電前の配線確認手順`の記録要件の未充足はどちらも残した。****測定値も結論も1つも変えていない。** | [PR #383](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/383)のCodeRabbit `full review` |
 | 2026-09-22 | 20 | [#453](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/453)（[#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16)の残件1件の記録。**`#16`自体はcloseしない**）。**`EXP-014`を追加した。**`ENV-01`（AE-BME280）の`J3`はんだジャンパ（`CSB`→`VDD`）の実施記録である。**実施は2026-09-07、記録は2026-09-22であり、15日遅れている。****2026-09-07の時点でAI側がこの作業を知らされていたかどうかは記録が無く、判定しない。**確かなのは、15日間どの正本にも記録が無かったことである。その間、正本のどこにも、はんだ付け済みであるという記録が無かった**（この文書は`J3`に関する記述を1件も持っておらず、[sensor-datasheet-notes.md](sensor-datasheet-notes.md)・[gpio-assignment.md](gpio-assignment.md)・[tbd-register.md](tbd-register.md)・Issue `#16`は`未実施`／`開放`と書いていた。**不在と誤記は別である**）。この記録は他の`EXP`と水準が違う。測定表（測定点・レンジ・読み・判定）を持たない。**根拠はユーザーの申告だけである（確認方法は写真とテスターだが、**測定点・レンジ・読みは覚えていないとの回答であり記録に残っていない**）。**2026-08-22の導通確認は測定表を持つため、同じ体裁で並べないよう水準の違いを冒頭に明示した。**`主張しないこと`として、この記録を書いたAIセッションが閉を確認していないこと、`VDD`↔`CSB`の導通を測定値として持たないこと、通電の有無を主張しないこと（Chip ID読み出しをAIが行っていないことだけは言える）、`J1`／`J2`を測り直していないこと、はんだ付けの品質を判定していないこと、`HW-TBD-005`をcloseしていないこと、[power-budget.md](power-budget.md)を1文字も変更していないことを挙げた。**`J1`／`J2`は2026-09-22時点でも開放のままである**（ユーザーの申告）。これにより[power-budget.md](power-budget.md)の`単体bring-upとB-2の区別`行が置いたfault電流上界の前提は崩れない。**ただし根拠は2026-09-22のユーザーの回答だけであり、再測定はしていない。「前提が確認された」とは書かない。****`#16`が2026-09-21に条件付きで引き受けていた再計算は、この申告のもとでは発生しない**（引き受けの記述は同Issueの本文にあり、`power-budget.md`のRevision 115は同じ件を`#15`へ帰属させている）。**あわせて`EXP-013`の`主張しないこと`が`PROTO-02`上の実装と配置の確定へ予約していた`EXP-014`という番号を、この記録が取った。**番号を先に予約しない、という`#0PM`の判定（2026-09-22）による。**この判定はPMセッションのものであり、正本文書に置かれた規則ではない。****該当箇所へ日付つきの追記を入れ、本文は書き換えていない。**`PROTO-02`側は記録を書く時点で空き番号を取る（Revision 17の本文も同じ予約を述べているが、過去のRevision行は書き換えないため、この行で訂正する） | ユーザーの言明（2026-09-22）、[sensor-datasheet-notes.md](sensor-datasheet-notes.md) Revision 16、[gpio-assignment.md](gpio-assignment.md) Revision 38、[tbd-register.md](tbd-register.md) `HW-TBD-005` |
 | 2026-09-22 | 21 | [#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)／[#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16)。**`EXP-015`を追加した。**[#445](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/445)承認範囲でのESP32`3V3` pin給電により、`ACCEL-01`（ADXL345）／`ENV-01`（BME280）へ初回通電し、Device ID読み出しに成功した（`accel_device_id raw=0xe5`、`env_chip_id raw=0x60`。一致・不一致の判定は行っていない）。通電中・通電後とも異常の兆候は無かった（通電後`VCC`–`GND`間抵抗1218 Ω、通電前1210 Ωと近い）。**条件(5)(a)（`module電源pinの独立性`／`pin header対応`）は未達のまま通電に至った。**ESP32側の対応pinとmoduleの電源・信号pinが同一ブレッドボード行に直接配線されており、2点間の抵抗測定が物理的に成立しないため。この状態のまま人間の現場判断で通電した。**`bus容量Cb`も未測定のまま、PM判定（通電を止めない）に基づき進めた。**`#0PM`の判定に従い、`EXP-014`（上記Revision 20）のmergeを待ってから本Revisionを起こし、`EXP-015`本文へ`EXP-014`への相互参照linkを追加した | ユーザーによる現物作業と監視、別のClaude Codeセッション（Linux実機）によるfirmware build・書き込み・ログ読み取り（いずれも2026-09-22）、`#0PM`の判定（merge順・相互参照） |
+| 2026-09-27 | 22 | [#13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)。**`EXP-016`を追加した。**[power-budget.md](power-budget.md)の`DISP-01`追加接続のbring-upの手順（`#461`承認範囲）に従い、`ACCEL-01`／`ENV-01`が接続済みの`3V3` railへ`DISP-01`を追加接続し、`--features bringup-display-13` buildで通電した。`display_id`はcontroller識別に不一致（`raw=[00,00,00,00]`、期待値`0x9341`）。単色fillと四隅patternは目視・写真で表示を確認したが、赤と青が入れ替わって表示された（黒・緑・白は一致）。`accel_device_id`／`env_chip_id`は期待どおり応答した（`EXP-015`の再確認）。安全上の異常（異音・発熱・変色・異臭・新たな短絡）は認めなかったが、試験の過程で`DISP-01`の`VCC`配線に一時的な接触不良が見つかり、手順10の再測定で接触の安定性に食い違いが生じたため、試験期間中の`VCC`接続の安定性は確認できていない。**正本からの逸脱2件を記録した。**(1) 手順7（書き込み）を、正本が`[人間]`と指定するところ、ユーザーの立ち会い・監視のもとAIセッションが実行した。(2) 配線変更（`VCC`ジャンパの付け直し等）後に、`gpio-assignment.md`の`電源pinの短絡・誤配線の確認（非通電）`項目1〜4（手順2）をやり直さずに通電を再開した。`Issue #13`の受け入れ条件6件のうち、条件5（timing測定）は達成、それ以外は達成していない | ユーザーによる現物作業と監視、実機Linuxのセッションによるfirmware build・書き込み・ログ読み取り（いずれも2026-09-27）、`#0PM`の指摘・確認 |
+| 2026-09-27 | 23 | [#13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)。**`EXP-017`を追加した。**`#485`（MADCTL `BGR=1`）適用後の再確認である。**単色fillの赤/青入れ替わりは解消した**（目視のみ、写真記録は無いため正本の手順9が定める達成の条件は満たしていない）。**四隅pattern・格子pattern（診断用に追加した20 cellのpattern、未commit）では、色の値ではなく位置（座標の対応関係）が入れ替わるという別の未解決現象を見つけた**（右上の座標に指定した色が左下に、左下の座標に指定した色が右上に現れる。原因未特定、向きの基準の記録が無いため断定しない）。`MISO`線（`DISP-01` `SDO`⇔GPIO19）の導通を確認した（0 Ω、単純な断線ではない）。`display_id`は複数回のflashで`[00,00,00,00]`／`[ff,ff,ff,ff]`／`[00,40,71,fb]`の3種類の値を観測し、いずれも期待値`0x9341`と不一致だった（flashごとの回数・順序・firmware版との対応は会話記録から再構成できなかった）。**backlightが`run_display_bringup`終了後に消灯する挙動を、`esp-idf-hal`の`PinDriver`の`Drop`実装（`gpio_reset_without_pull`と外部pull-downによる）としてsourceの読解で説明した**（実測はしていない）。**正本からの逸脱・未実施を記録した。**(1) 手順7（書き込み）を、`EXP-016`に続き2回目、AIセッションが実行した。(2) 手順10（通電後の抵抗再測定）を行っていない。(3) 条件(7)の承認範囲（`run_display_bringup`の描画内容）を、診断目的の変更（無限loop化・色配列入れ替え・四隅→格子pattern）が厳密には超えている（実行経路・pin・backlight制御は変更していない） | ユーザーによる現物作業と監視、実機Linuxのセッションによるfirmware変更・build・書き込み・ログ読み取り（いずれも2026-09-27）、`#0PM`の指摘・確認 |
+| 2026-09-28 | 24 | [#13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)。**`EXP-018`を追加した。**判定の向き（横向き、`J2`を右）に合うMADCTL（`0x28`）を写真から決め、四隅の一致を確かめた。単色fillの5色と色の並びを写真で記録した。Read ID1〜3を含むIDの読み出しがすべて`00`で、moduleを改変しない方法ではこれ以上切り分けられないため、打ち止めにした。受け入れ条件1〜5を達成、6を未達とした。写真と動画はcommitしていない | [#13の条件(7)の承認](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13#issuecomment-5868974805)、[判断(1)(2)](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13#issuecomment-5860773100)、[PR #497](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/497) |
+| 2026-10-01 | 25 | [#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)。**`EXP-019`を追加した。**今の接続（`3V3` pin給電）のまま、周辺module3点の電源pinへ入る合計電流を`MEAS-01`の両端電圧から求め、確度が未取得の読みとして記録した。3.3 V側の電圧も読んだ。patchを当てたbuild（`DISPLAY_HOLD_MS`を15秒）を使ったこと、`MEAS-01`の代わりにジャンパを挿していた件、200Ωレンジを`MEAS-03`の定めを確かめずに使った件、読みの無い起動1回、省いた確認を記録した。**条件(7)の承認（backlightを点ける起動4回）を3回以上超えたこと、および`DISP-01`追加接続の手順からの逸脱3件（手順10を行っていない、項目1を列とrailの単位で測った、項目2〜7を地図と照らして行った）**（正本からの逸脱）も Faults に記録した。**あわせて、索引の表に`EXP-016`〜`EXP-019`の行を足した**（`EXP-016`〜`EXP-018`は既存の抜け。索引の抜けを埋めた Revision 11 の前例に倣った。`EXP-017`は見出しに`—`を含みanchorを検査できないため、linkせずに名前だけを置いた） | [#3の通電の承認](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3#issuecomment-5914517437)、[#488のユーザーの決定](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/488#issuecomment-5868418510) |

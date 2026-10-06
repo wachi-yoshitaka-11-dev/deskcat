@@ -5,8 +5,9 @@
 //! 確認する。上限定数を動かしたときに、この検査が破綻を検知する。
 
 use deskcat_protocol::{
-    Ack, AckStatus, Boot, DisplayStatus, Envelope, ErrorCode, Frame, Hello, HelloReason, Message,
-    ProtocolCounters, SensorStatus, ServoStatus, Status, encode_line, limits,
+    Ack, AckStatus, Boot, DisplayStatus, Envelope, Environment, ErrorCode, ExpressionName,
+    FiniteF32, Frame, HeadTouched, Hello, HelloReason, Lifted, Message, ProtocolCounters,
+    SensorStatus, ServoStatus, SetExpression, ShowText, Status, encode_line, limits,
 };
 
 /// 最悪のenvelope。`v`は受理される値ではなく、宣言した幅の最大値を使う。
@@ -86,7 +87,54 @@ fn worst_case_messages() -> Vec<Message> {
             code: Some(ErrorCode::HardwareUnavailable),
             detail: Some(filled(limits::MAX_DETAIL_BYTES)),
         }),
+        Message::SetExpression(SetExpression {
+            // 最も長い列挙値を選ぶ。
+            name: ExpressionName::Surprised,
+            transition_ms: u32::MAX,
+        }),
+        worst_case_show_text(limits::MAX_TEXT_BYTES),
+        Message::HeadTouched(HeadTouched {
+            duration_ms: u32::MAX,
+        }),
+        Message::Tapped,
+        Message::Lifted(Lifted {
+            duration_ms: u32::MAX,
+        }),
+        Message::Environment(Environment {
+            temperature_c: Some(longest_finite_f32()),
+            humidity_pct: Some(longest_finite_f32()),
+            pressure_hpa: Some(longest_finite_f32()),
+        }),
     ]
+}
+
+/// `text`を`text_bytes`まで詰め、`duration_ms`を最大値にした`show_text`。
+fn worst_case_show_text(text_bytes: usize) -> Message {
+    Message::ShowText(ShowText {
+        text: filled(text_bytes),
+        duration_ms: u32::MAX,
+    })
+}
+
+/// 長くencodeされる有限の`f32`。
+///
+/// 手で選んだ候補を実際にencodeし、その中で最長のものを選ぶ。**全有限値の中の最長である
+/// ことは示していない。**
+fn longest_finite_f32() -> FiniteF32 {
+    [
+        f32::MIN,
+        f32::MAX,
+        f32::MIN_POSITIVE,
+        -f32::MIN_POSITIVE,
+        -1.175_494_2e-38,
+        -1.234_567_9e-7,
+        -1.234_567_9e7,
+        -123_456.79,
+    ]
+    .into_iter()
+    .map(|value| FiniteF32::new(value).expect("finite"))
+    .max_by_key(|value| serde_json::to_string(value).expect("serializes").len())
+    .expect("candidates are not empty")
 }
 
 /// escapeが起きない文字であれば、全fieldを上限まで詰めても行長に収まる。
@@ -354,4 +402,75 @@ fn the_newline_counts_toward_the_line_limit() {
     let err = deskcat_protocol::decode_line(&without_newline)
         .expect_err("the newline is counted even when it is absent");
     assert_eq!(err.code(), ErrorCode::LineTooLong);
+}
+
+/// `MAX_TEXT_BYTES`は行長から計算した最大値である。
+///
+/// 上の`worst_case_lines_without_escapes_fit_in_the_line_limit`は「収まる」ことだけを見る。
+/// ここでは**ちょうど`MAX_LINE_BYTES`になり、1 byte増やすと収まらない**ことを見る。
+/// 勘で置いた値ではなく、行長とenvelopeのworst caseから決まる値であることの検査である。
+#[test]
+fn max_text_bytes_is_the_largest_that_fits_in_the_line_limit() {
+    let at_limit = Frame::new(
+        worst_case_envelope(),
+        worst_case_show_text(limits::MAX_TEXT_BYTES),
+    );
+    let line = encode_line(&at_limit).expect("the worst case at the text limit fits");
+    assert_eq!(line.len(), limits::MAX_LINE_BYTES);
+
+    // textを1 byte増やした同じworst caseを、wire lineとして手で組む。encode_lineはbyte上限で
+    // 先に止めるため、こうしないと行長を確かめられない。decodeは行長を最初に見る。
+    let one_more = format!(
+        "{{\"v\":{},\"sid\":{},\"id\":{},\"ts_ms\":{},\"type\":\"show_text\",\"payload\":{{\"text\":\"{}\",\"duration_ms\":{}}}}}\n",
+        u16::MAX,
+        u32::MAX,
+        u32::MAX,
+        u64::MAX,
+        filled(limits::MAX_TEXT_BYTES + 1),
+        u32::MAX,
+    );
+    assert_eq!(one_more.len(), limits::MAX_LINE_BYTES + 1);
+    let err = deskcat_protocol::decode_line(&one_more).expect_err("one byte over the line limit");
+    assert_eq!(err.code(), ErrorCode::LineTooLong);
+}
+
+/// `show_text`のbyte上限と制御文字は、encodeとdecodeで同じ`out_of_range`になる。
+///
+/// 送信側で止めるだけでなく、他実装が送ってきたlineを受信側でも止める。
+#[test]
+fn show_text_bounds_are_enforced_on_both_paths() {
+    let envelope = Envelope {
+        v: limits::PROTOCOL_VERSION,
+        sid: 1,
+        id: 1,
+        ts_ms: 0,
+    };
+
+    for text in [filled(limits::MAX_TEXT_BYTES + 1), "a\nb".to_owned()] {
+        let frame = Frame::new(
+            envelope,
+            Message::ShowText(ShowText {
+                text: text.clone(),
+                duration_ms: 0,
+            }),
+        );
+        let encode_err = encode_line(&frame).expect_err("must not reach the wire");
+        assert_eq!(encode_err.code(), ErrorCode::OutOfRange);
+
+        let line = format!(
+            r#"{{"v":1,"sid":1,"id":1,"ts_ms":0,"type":"show_text","payload":{{"text":{},"duration_ms":0}}}}"#,
+            serde_json::to_string(&text).expect("a string serializes"),
+        );
+        let decode_err = deskcat_protocol::decode_line(&line).expect_err("is rejected");
+        assert_eq!(decode_err.code(), encode_err.code());
+    }
+}
+
+/// `FiniteF32`はNaNと無限大を持てない。encodeへ非有限値が届く経路が無いことの検査である。
+#[test]
+fn finite_f32_refuses_non_finite_values() {
+    assert!(FiniteF32::new(f32::NAN).is_none());
+    assert!(FiniteF32::new(f32::INFINITY).is_none());
+    assert!(FiniteF32::new(f32::NEG_INFINITY).is_none());
+    assert_eq!(FiniteF32::new(27.4).map(FiniteF32::get), Some(27.4));
 }

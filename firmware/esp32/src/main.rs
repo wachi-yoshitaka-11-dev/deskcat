@@ -14,33 +14,49 @@
 //!   [#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16)）。
 //!   **一致判定はここでは行わない。**生byteをlogへ残すだけで、識別の断定は
 //!   log を読む人間の責務とする（[`run_i2c_bringup`]参照）。
+//! - Pi link（UART1、`PI-UART-TX`＝GPIO13、`PI-UART-RX`＝GPIO14）で`boot`のACK待ち・再送・
+//!   `sid`選び直しを行う（`crate::boot_session`。[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)
+//!   PR B、[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)）。受信の異常
+//!   （ring bufferの満杯など）を数える（`drain_uart_events`）。制約は`crate::console`の
+//!   module docにまとめてある
 //! - **`DISP-01`（LCD）・`SERVO-PWM`・`ADC-*`・`TOUCH-*`は既定のbuildではdriveしない。**
 //!   [`crate::display`]と[`crate::servo`]はcross-compile確認用にcompileするだけであり、
-//!   `main()`からは呼ばない。`bringup-display-13` feature付きbuildだけが
-//!   [`run_display_bringup`]経由でLCDを初期化し、識別・backlight点灯・単色fill・
-//!   四隅patternを行う（[Issue #13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)。
+//!   既定buildの`main()`からは呼ばない。`bringup-display-13` feature付きbuildだけが
+//!   [`run_display_bringup`]経由でLCDを初期化してbacklightを点け、単色fill・四隅patternを
+//!   main loopの中で1段ずつ進める（`crate::display_test`、[Issue #13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)。
 //!   **既定offにした理由と有効化の手順は下の「`DISP-01`のbring-upを有効にする手順」節。**）。
 //!   `bench-servo-test-17` feature付きbuildだけが[`run_servo_bench_test`]経由でservoを
 //!   呼ぶ（[Issue #17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。
 //!   詳細は[`crate::servo`]と[`run_servo_bench_test`]のdoc参照）。**#474で、このfeature付きbuildは
 //!   `compile_error!`でcompileが止まる（下記）。**
 //!
-//! **上の一覧は既定buildの動作を述べる。**`pi-protocol-mode`はI2Cの
-//! bring-upを行わず、`bringup-display-13`とは同時に有効にできない（下記
-//! `compile_error!`）。build identity／board ID／reset reasonのlogと、
-//! heartbeat／health snapshotのloopは`pi-protocol-mode`でも実行されるが、
-//! loggingを止めているため出力は既定buildにしか出ない（`crate::console`
-//! 参照）。`pi-protocol-mode`は代わりに`boot` frameの書き込みを1回だけ試みる
-//! （`send_boot_frame_once`参照。制約は`crate::console`のmodule docに
-//! まとめてある）。
+//! # buildの構成（[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)）
+//!
+//! **製品buildは既定build（featureなし）である。**Pi linkとheartbeat／health snapshotを1本のmain loopで
+//! 回す（thread は使わない）。I2Cのbring-upは起動時に1回走る（`bringup-display-13`付きbuildでは、LCDの
+//! bring-upの後にmain loopの中で1回。下の`i2c_pending`）。logはどのbuildでもUART0（USB）へ出る
+//! （`crate::console`）。featureは加える向きにする。**例外は`bench-servo-test-17`だけであり、Pi linkを
+//! 外す**（下の表。正本の要求による）。
+//!
+//! | feature | 加えるもの | 既定buildとの関係 |
+//! |---|---|---|
+//! | `bringup-display-13` | LCDの初期化、backlightの点灯、単色fillと四隅patternの試験モード | 製品buildに加える。描画の間のPi linkの受信とheartbeatは`crate::display_test`のmodule docを参照 |
+//! | `bench-servo-test-17` | servoの単発bench試験（#17の測定用build） | **Pi linkを外す。**正本`docs/hardware/servo-safety-limits.md`の`測定のための駆動（承認の状態の項目6）`節が、測定用のbuildは「Piとの通信linkを持たない」と定めているためである。#474で、このfeature付きbuildはcompileが止まる |
+//!
+//! `#487`のPR B1より前は、`pi-protocol-mode` featureを付けたbuildだけがPi linkを持ち、LCD／I2Cの
+//! bring-upと排他だった。`#487`でfeatureをやめ、Pi linkを製品buildへ入れた。
+//!
+//! **既定buildは、起動のたびにGPIO13（`PI-UART-TX`）をUARTのTXとして駆動する。**`#487`のPR B1より前は、
+//! `pi-protocol-mode`を付けたときだけだった（PR Aより前は、どのbuildもGPIO13をUARTに使っていなかった）。GPIO13／GPIO14に基板上の部品はつながっていない
+//! （`docs/hardware/gpio-assignment.md`の`Pi–ESP32間のtransport`節、公式回路図で確かめたもの。
+//! 現物の導通は測っていない）。**GPIO13／GPIO14はJTAG（`MTCK`／`MTMS`）を兼ねるため、既定buildでは
+//! JTAG debugを使えない**（同文書の`PI-UART-TX`／`PI-UART-RX`行）。
 //!
 //! 既定buildで`Peripherals::take()`の戻り値から実際にdriverへ渡すのは、I2C関連2本
-//! （`crate::accel`・`crate::env`のmodule doc参照）だけである。
-//! `bringup-display-13` feature付きbuildはLCD関連6+1本（`crate::display`のmodule doc参照）を、
-//! `bench-servo-test-17` feature付きbuildは`SERVO-PWM`（GPIO27）と
-//! `peripherals.ledc.timer0`／`channel0`を、それぞれ追加で渡す（`bench-servo-test-17`付きbuildは
-//! #474でcompileが止まる。下記`compile_error!`）。`pi-protocol-mode`は
-//! `Peripherals::take()`自体を呼ばない（`main()`参照）。
+//! （`crate::accel`・`crate::env`のmodule doc参照）と、Pi link関連（`peripherals.uart1`、GPIO13＝TX、
+//! GPIO14＝RX）である。`bringup-display-13` feature付きbuildはLCD関連6+1本（`crate::display`の
+//! module doc参照）を追加で渡す。`bench-servo-test-17` feature付きbuildは`SERVO-PWM`（GPIO27）と
+//! `peripherals.ledc.timer0`／`channel0`を追加で渡し、Pi link関連を渡さない。
 //!
 //! **I2Cはこの版でも実機通電していない。**この版の検証は`cargo build`でのcross-compile
 //! 確認までであり、実機へflashして確認するのは別工程である（[Hardware Safety
@@ -51,12 +67,14 @@
 //! [EXP-015](../../../docs/hardware/experiment-log.md)にある。それより後の変更を含むbuildは、
 //! 実機で動かした記録が無い。
 //!
-//! **Protocol sessionは確立しない。**`pi-protocol-mode`は`Boot` frameの書き込みを
-//! 1回試みるだけで（[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)、
-//! `send_boot_frame_once`参照）、受理確認・再送・受信loopを持たない。
-//! **既定buildは`boot`を一切組み立てない。**`#446`より前は`boot=`というlog行を
-//! 出していたが、その行はこの変更で削除した。`boot=`行を目視で確認していた
-//! 作業（`#7`／`#13`等）があれば、この変更を踏まえて確認し直すこと。
+//! **Protocol sessionはまだ確立を主張しない。**`boot`のACK待ち・再送・`stale_session`受信時の
+//! `sid`選び直しは実装した（[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446) PR B、
+//! `crate::boot_session`参照）が、実機での動作確認（受信経路がring buffer溢れなく動くか、実際に
+//! `boot`→ACKが成立するか）はまだ無い（`crate::pi_link`のmodule doc「確かめていないこと」）。
+//! Pi→ESP32方向の受信（`hello`／`ping`／`get_status`）は、main loopから`crate::pi_link::PiLink`へ渡す。
+//! `#446`より前は`boot=`というlog行を出していたが、その行は`#446`のPR Aで削除した。
+//! `boot=`行を目視で確認していた作業（`#7`／`#13`等）があれば、`boot=`行が
+//! 無くなったことを踏まえて確認し直すこと。
 //!
 //! **Watchdog の設定を変えない。**Task Watchdog Timer は ESP-IDF の既定値のままである。
 //! `sdkconfig.defaults` に watchdog の項目を足していない。heartbeat loop は
@@ -65,10 +83,10 @@
 //! starve the FreeRTOS IDLE tasks as they are low prio tasks and hence the IDLE task's
 //! watchdog could trigger. **This delayer avoids that by yielding to the OS during the
 //! delay.**」と doc に明記しており、これが「logging が watchdog の進行を block しない」
-//! 根拠である。busy wait をしないため、待ち時間は必ず 1 ms 以上へ丸める
-//! （[`sleep_ms_until`] 参照）。`run_display_bringup`（#13の LCD bring-up。
-//! `bringup-display-13` feature付きbuildだけが呼ぶ）も同じ
-//! [`FreeRtos::delay_ms`] を段階ごとに挟む（`service_bringup_step` 参照）。
+//! 根拠である。Pi linkを持つbuildは、[`FreeRtos::delay_ms`]の代わりに`UartDriver::read`の
+//! timeoutで待つ（main loop参照）。どちらもbusy wait をしないよう、待ち時間は必ず 1 ms 以上へ
+//! 丸める（`sleep_ms_until`とmain loopのcomment参照。IDLE taskへ時間が回る条件は、main loopのcomment）。LCDのbring-up（`bringup-display-13`
+//! feature付きbuild）は描画を1段ずつ進め、段と段の間でmain loopへ戻る（`crate::display_test`）。
 //!
 //! # `DISP-01`のbring-upを有効にする手順
 //!
@@ -92,7 +110,7 @@
 //! 作成した。`ACCEL-01`／`ENV-01`が同じ`3V3` railへ既に接続済みの状態
 //! （[EXP-015](../../../docs/hardware/experiment-log.md)）へ`DISP-01`を追加する場合を扱い、
 //! `ACCEL-01`／`ENV-01`単体bring-upの手順とは別節である）。`#461`は接続そのものを
-//! 許可するだけで、`run_display_bringup`（識別・backlight点灯・fill・四隅patternを行う）を
+//! 許可するだけで、`run_display_bringup`（初期化・backlight点灯を行い、fill・四隅patternをmain loopの中で進める。`#487`）を
 //! `3V3` pin経路で呼んでよいかは決めない。**`#461`の余裕解析はbacklightが点灯した状態を含む
 //! （通常動作の合計にbacklightのtypical値とILI9341ロジック50 mAが入っている）。
 //! `run_display_bringup`が追加で引く負荷は無い。**したがって上記の新設手順は、この余裕解析を
@@ -123,89 +141,72 @@
 //! 手順に従う。**同節もこのfeatureを要求する（条件(2)）。
 //!
 //! **このfeatureはB-2bのgateを開けない。**開けてよいかの判定は上記の正本文書が
-//! 持つ。**このfeatureが変えるのは、既定buildが`DISP-01`へ触れるかどうかだけである**
-//! （上のLCD関連6+1本のGPIOを駆動するか、`lcd.backlight_on()`を呼ぶか、`display_*`の
-//! logを出すか）。回路側の制約も、`DISP-01`を接続してよいかの判定も、これで変わらない。
+//! 持つ。**このfeatureが変えるのは、既定buildが`DISP-01`へ触れるかどうかと、それに伴うI2Cの
+//! bring-upの時期だけである**（上のLCD関連6+1本のGPIOを駆動するか、`lcd.backlight_on()`を呼ぶか、
+//! `display_*`のlogを出すか。I2Cのbring-upはLCDのbring-upの後にmain loopの中で走り、その所要時間は
+//! `overrun`と`max_read_gap_ms`に入る。下の`i2c_pending`）。回路側の制約も、`DISP-01`を接続してよいかの
+//! 判定も、これで変わらない。
 
-// `pi-protocol-mode`ではLCD／I2Cのbring-upとdemo用moduleをcompileしない
-// （`crate::console`のmodule doc参照）。
-#[cfg(not(feature = "pi-protocol-mode"))]
 mod accel;
+// Pi link（UART1）の`boot`の受理確認・再送。**`bench-servo-test-17`のbuildだけは持たない。**
+// 正本`docs/hardware/servo-safety-limits.md`の`測定のための駆動（承認の状態の項目6）`節が、
+// 測定用のbuildは「Piとの通信linkを持たない」と定めているためである（`#487`でfeatureの排他を
+// やめたときの、ただ1つの例外である。featureどうしの排他ではない。Pi linkを外すだけである）。
+#[cfg(not(feature = "bench-servo-test-17"))]
+mod boot_session;
 mod config;
 mod console;
-#[cfg(not(feature = "pi-protocol-mode"))]
 mod display;
-#[cfg(not(feature = "pi-protocol-mode"))]
+#[cfg(feature = "bringup-display-13")]
+mod display_test;
 mod env;
 mod health;
-#[cfg(not(feature = "pi-protocol-mode"))]
+#[cfg(not(feature = "bench-servo-test-17"))]
+mod pi_link;
+#[cfg(not(feature = "bench-servo-test-17"))]
 mod protocol;
 mod servo;
-
-// `pi-protocol-mode`は`Peripherals::take()`を行わないため、`bench-servo-test-17`の
-// servo bench試験経路（`run_servo_bench_test`）は呼ばれない。両方を有効にしても
-// buildは通るが、servoのfeatureが黙って無効になる。それより、compile時に理由を
-// 示して止めるほうがよいと判断した。**#474以降、`bench-servo-test-17`は単独でもcompileが
-// 止まる（下記）。**この排他は、#474の`compile_error!`を外したあとも効くよう残す。
-#[cfg(all(feature = "pi-protocol-mode", feature = "bench-servo-test-17"))]
-compile_error!(
-    "pi-protocol-modeとbench-servo-test-17は同時に有効にできない。\
-     pi-protocol-modeはPeripherals::take()を行わないためservoのbench試験経路が\
-     呼ばれず、featureが黙って無効になる。どちらか一方だけを有効にすること\
-     （bench-servo-test-17は#474により単独でもcompileが止まる）。"
-);
-
-// `bringup-display-13`も同じ理由で`pi-protocol-mode`と排他にする。**servoと同じ形を
-// 採ったのは、失敗の仕方が同じだからである。**`pi-protocol-mode`は`Peripherals::take()`を
-// 呼ばず`crate::display`もcompileしないため、両方を有効にしてもLCDのbring-upは実行され
-// ない。「LCDを有効にしたつもりの構成が黙ってLCDを動かさない」状態を作らず、compile時に
-// 理由を示して止める（`#451`）。
-#[cfg(all(feature = "pi-protocol-mode", feature = "bringup-display-13"))]
-compile_error!(
-    "pi-protocol-modeとbringup-display-13は同時に有効にできない。\
-     pi-protocol-modeはPeripherals::take()を行わずcrate::displayもcompileしないため\
-     LCDのbring-up経路が呼ばれず、featureが黙って無効になる。\
-     どちらか一方だけを有効にすること。"
-);
 
 // `bench-servo-test-17`付きbuildは、#474でcompileを止めた（理由と承認の状態は
 // `docs/hardware/servo-safety-limits.md`の`承認の状態`節が持つ。ここへ再掲しない）。
 // **docへ書くだけでは、featureを付ければbuildでき動いてしまう。**
 // codeとfeatureの定義は残す。
+//
+// **再開するときの注意（#487）。**同節の項目5は、再開の手順として「`pi-protocol-mode`との排他の
+// `compile_error!`とその注記は残し」と書いている（同項目は当時の記録であり、書き換えていない）。
+// #487で`pi-protocol-mode`を廃止したため、その`compile_error!`はもう無い。代わりに、このfeature付き
+// buildはPi link（`crate::boot_session`・`crate::pi_link`・`crate::protocol`とUART1）をcompileしない（上の`mod`の
+// `#[cfg]`）。**測定用のbuildがPiとの通信linkを持たないこと（同文書の`測定のための駆動`節）は、
+// compile_errorではなく構造で保っている。**再開するときに外すのは、下の#474の`compile_error!`と、同節の項目5が挙げる注記だけである。
+// ただし、このfeature付きbuildは#474の`compile_error!`があるためbuildしておらず、外した後にcompileが通るかは
+// 確かめていない（#487でmain loopを組み替えた）。
 #[cfg(feature = "bench-servo-test-17")]
 compile_error!(
     "bench-servo-test-17付きbuildは#474でcompileを止めている。\
      理由と承認の状態はdocs/hardware/servo-safety-limits.mdの承認の状態節を見ること。"
 );
 
-#[cfg(feature = "bringup-display-13")]
-use std::time::Instant;
-
-#[cfg(feature = "pi-protocol-mode")]
-use deskcat_protocol::{encode_line, limits, Boot, Envelope, Frame, Message};
-#[cfg(not(feature = "pi-protocol-mode"))]
-use deskcat_protocol::{Hello, HelloReason};
 use esp_idf_svc::hal::delay::FreeRtos;
-#[cfg(not(feature = "pi-protocol-mode"))]
 use esp_idf_svc::hal::gpio::{InputPin, OutputPin};
-#[cfg(not(feature = "pi-protocol-mode"))]
 use esp_idf_svc::hal::i2c::{I2cConfig, I2cDriver, I2C0};
-#[cfg(not(feature = "pi-protocol-mode"))]
 use esp_idf_svc::hal::peripherals::Peripherals;
 #[cfg(feature = "bringup-display-13")]
 use esp_idf_svc::hal::spi::SpiAnyPins;
-#[cfg(not(feature = "pi-protocol-mode"))]
+#[cfg(not(feature = "bench-servo-test-17"))]
+use esp_idf_svc::hal::uart::{config::Config as UartConfig, UartDriver, UartEventPayload};
 use esp_idf_svc::hal::units::Hertz;
 
-#[cfg(not(feature = "pi-protocol-mode"))]
 use crate::accel::Adxl345;
+#[cfg(not(feature = "bench-servo-test-17"))]
+use crate::boot_session::{BootRetryPolicy, BootSession};
 #[cfg(feature = "bringup-display-13")]
 use crate::display::Ili9341;
-#[cfg(not(feature = "pi-protocol-mode"))]
+#[cfg(feature = "bringup-display-13")]
+use crate::display_test::DisplayBringup;
 use crate::env::Bme280;
 use crate::health::Health;
-#[cfg(not(feature = "pi-protocol-mode"))]
-use crate::protocol::PiSession;
+#[cfg(not(feature = "bench-servo-test-17"))]
+use crate::pi_link::PiLink;
 
 /// `ACCEL-01`（ADXL345）のI2C address。**`SDO`を`GND`へ配線する前提の値である。**
 ///
@@ -220,7 +221,6 @@ use crate::protocol::PiSession;
 /// である」）、`SDO`配線を決める側（現物作業）がこの値と異なる配線を選ぶ場合は、この
 /// 定数を実際の配線へ合わせて直す。`ENV-01`側も`GND`側を前提にした
 /// （[`ENV_I2C_ADDRESS`]参照）。
-#[cfg(not(feature = "pi-protocol-mode"))]
 const ACCEL_I2C_ADDRESS: u8 = 0x53;
 
 /// `ENV-01`（BME280）のI2C address。**`SDO`を`GND`へ配線する前提の値である。**
@@ -233,7 +233,6 @@ const ACCEL_I2C_ADDRESS: u8 = 0x53;
 /// [`ACCEL_I2C_ADDRESS`]と同じ根拠（一般値で開始してよい側、`gpio-assignment.md`の
 /// `I2C addressの選択`節「addressは一般値で開始してよい側である」行）で、GND側を
 /// 前提にした。**現物確認まで確定しない点も`ACCEL_I2C_ADDRESS`と同じである。**
-#[cfg(not(feature = "pi-protocol-mode"))]
 const ENV_I2C_ADDRESS: u8 = 0x76;
 
 /// I2C busのbaudrate。Standard-mode（100 kHz）。
@@ -245,7 +244,6 @@ const ENV_I2C_ADDRESS: u8 = 0x76;
 /// 「rise timeの制約に余裕がある」ことと「実効抵抗がStandard-modeの規定範囲内にあることの
 /// 確認」は別であり、後者はこの変更の時点でも未達のまま残る**（[#2](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/2)
 /// の受け入れchecklist項目。この変更はその項目を閉じない）。
-#[cfg(not(feature = "pi-protocol-mode"))]
 const I2C_BAUDRATE_HZ: u32 = 100_000;
 
 /// `ResetReason` を Protocol の語彙（snake_case）へ写す。
@@ -307,12 +305,16 @@ fn next_deadline(deadline: u64, period_ms: u32, now: u64) -> (u64, bool) {
 
 /// `until` まで待つ。
 ///
-/// **必ず 1 ms 以上待つ。**`delay_ms(0)` は yield せずに戻るため、loop に置くと
+/// **必ず 1 ms 以上を渡す。**`delay_ms(0)` は yield せずに戻るため、loop に置くと
 /// busy wait になり、優先度の低い IDLE task を starve させる。IDLE task が回らないと
 /// Task Watchdog Timer が進まないため、これは watchdog の前提を壊す。
 ///
 /// 待ち時間が `u32` に収まらない場合は `u32::MAX` で頭打ちにする。頭打ちにしても
 /// 次の周回で残りを待ち直すだけであり、期限を飛ばさない。
+///
+/// Pi linkを持つbuild（`bench-servo-test-17`以外のすべて）は、この関数の代わりに
+/// `UartDriver::read`のtimeoutで待つ（main loop参照。同じく1 ms以上へ丸める）。
+#[cfg(feature = "bench-servo-test-17")]
 fn sleep_ms_until(until: u64, now: u64) {
     let remaining = until.saturating_sub(now);
     let ms = u32::try_from(remaining).unwrap_or(u32::MAX).max(1);
@@ -324,10 +326,7 @@ fn main() {
     // implemented by esp-idf-sys might not link properly. See https://github.com/esp-rs/esp-idf-template/issues/71
     esp_idf_svc::sys::link_patches();
 
-    // `crate::console`のmodule doc参照。
-    #[cfg(feature = "pi-protocol-mode")]
-    console::silence_logging();
-    #[cfg(not(feature = "pi-protocol-mode"))]
+    // どのbuildでもUART0はdebug log専用である（`crate::console`のmodule doc参照）。
     console::init_log_mode();
 
     // build identity。profile は `Cargo.toml` の `[profile.dev]`／`[profile.release]` に対応する。
@@ -353,67 +352,80 @@ fn main() {
     let reset_reason = reset_reason_str(reason);
     log::info!("reset_reason={reset_reason} raw={reason:?}");
 
-    // **`Health`はdisplay bring-upより前に作る。**bring-up中もheartbeatを刻めるように
-    // するためであり（下記`run_display_bringup`参照）、heartbeatのdeadline計算
-    // （`next_heartbeat`／`next_snapshot`）は従来どおりbring-upの後で初期化する。
+    // **`Health`はbring-upより前に作る。**I2Cのbring-upの段の境界でheartbeatを刻むため
+    // である（`service_bringup_step`参照）。heartbeatのdeadline計算（`next_heartbeat`／
+    // `next_snapshot`）は、起動時のbring-upの後で初期化する。
     let mut health = Health::new(reset_reason);
 
-    // `pi-protocol-mode`ではLCD／I2C／servo benchのbring-up（`Peripherals::take()`を
-    // 含む）を一切行わない（`crate::console`のmodule doc参照）。`pi-protocol-mode`と
-    // `bench-servo-test-17`を同時に有効にした場合も、servo benchは実行されない。
-    #[cfg(not(feature = "pi-protocol-mode"))]
-    {
-        // 実際にdriverへ渡す範囲はmodule doc参照。1度しか成功しないため`expect`で即座に気付く。
-        let peripherals = Peripherals::take().expect("Peripherals::take must succeed exactly once");
-        // **bring-up経路ごとに1 fieldで出す。**featureが2つになったため、行ごと`#[cfg]`で
-        // 分けると組み合わせの数だけ同じ行を書くことになる。`cfg!`はcompile時に定数へ
-        // 畳まれるため、有効でない経路の文字列が実行時に選ばれることはない。
-        let display_state = if cfg!(feature = "bringup-display-13") {
-            "bringup_enabled"
-        } else {
-            "not_driven"
-        };
-        let servo_state = if cfg!(feature = "bench-servo-test-17") {
-            "bench_test_pending"
-        } else {
-            "not_driven"
-        };
-        log::info!(
-            "peripherals=taken display={display_state} servo={servo_state} i2c=id_read_attempt adc=not_driven touch=not_driven"
-        );
-        log::info!(
-            "i2c_addresses accel=0x{ACCEL_I2C_ADDRESS:02x} env=0x{ENV_I2C_ADDRESS:02x} baudrate_hz={I2C_BAUDRATE_HZ}"
-        );
+    // **どのbuildでも`Peripherals::take()`を呼ぶ。**1度しか成功しないため`expect`で即座に気付く。
+    let peripherals = Peripherals::take().expect("Peripherals::take must succeed exactly once");
 
-        // featureが無ければこのblockはbuildへ含まれない（`run_display_bringup`のdoc参照）。
-        #[cfg(feature = "bringup-display-13")]
-        run_display_bringup(
-            peripherals.spi3,
-            peripherals.pins.gpio18,
-            peripherals.pins.gpio23,
-            peripherals.pins.gpio19,
-            peripherals.pins.gpio22,
-            peripherals.pins.gpio17,
-            peripherals.pins.gpio16,
-            peripherals.pins.gpio4,
-            &mut health,
-        );
+    // **bring-up経路ごとに1 fieldで出す。**行ごと`#[cfg]`で分けると、featureの組み合わせの数
+    // だけ同じ行を書くことになる。`cfg!`はcompile時に定数へ畳まれるため、有効でない経路の
+    // 文字列が実行時に選ばれることはない。
+    let display_state = if cfg!(feature = "bringup-display-13") {
+        "bringup_enabled"
+    } else {
+        "not_driven"
+    };
+    let servo_state = if cfg!(feature = "bench-servo-test-17") {
+        "bench_test_pending"
+    } else {
+        "not_driven"
+    };
+    let pi_link = if cfg!(feature = "bench-servo-test-17") {
+        "none"
+    } else {
+        "uart1"
+    };
+    log::info!(
+        "peripherals=taken display={display_state} servo={servo_state} i2c=id_read_attempt pi_link={pi_link} adc=not_driven touch=not_driven"
+    );
+    log::info!(
+        "i2c_addresses accel=0x{ACCEL_I2C_ADDRESS:02x} env=0x{ENV_I2C_ADDRESS:02x} baudrate_hz={I2C_BAUDRATE_HZ}"
+    );
 
-        run_i2c_bringup(
-            peripherals.i2c0,
-            peripherals.pins.gpio25,
-            peripherals.pins.gpio26,
-            &mut health,
-        );
+    // featureが無ければこのblockはbuildへ含まれない（`run_display_bringup`のdoc参照）。
+    // 初期化とbacklightの点灯だけをここで行い、fillと四隅patternはmain loopの中で1段ずつ
+    // 進める（`crate::display_test`）。
+    #[cfg(feature = "bringup-display-13")]
+    let mut display = run_display_bringup(
+        peripherals.spi3,
+        peripherals.pins.gpio18,
+        peripherals.pins.gpio23,
+        peripherals.pins.gpio19,
+        peripherals.pins.gpio22,
+        peripherals.pins.gpio17,
+        peripherals.pins.gpio16,
+        peripherals.pins.gpio4,
+    );
 
-        // featureが無ければこのblockはbuildへ含まれない（`run_servo_bench_test`のdoc参照）。
-        #[cfg(feature = "bench-servo-test-17")]
-        run_servo_bench_test(
-            peripherals.ledc.timer0,
-            peripherals.ledc.channel0,
-            peripherals.pins.gpio27,
-        );
-    }
+    // **I2Cのbring-upは、`bringup-display-13`付きbuildではLCDのbring-upが終わってから行う。**
+    // 1回で描き切っていた頃と同じlogの順（LCDの初期化、fill、四隅pattern、I2C）を保つため
+    // である。`docs/hardware/power-budget.md`の`DISP-01`追加接続の手順は、この順を前提に
+    // 待機時間の上限（手順5）と停止の条件（手順8）を決めている。LCDを持たないbuildでは、
+    // 今までどおり起動時に行う。
+    #[cfg(feature = "bringup-display-13")]
+    let mut i2c_pending = Some((
+        peripherals.i2c0,
+        peripherals.pins.gpio25,
+        peripherals.pins.gpio26,
+    ));
+    #[cfg(not(feature = "bringup-display-13"))]
+    run_i2c_bringup(
+        peripherals.i2c0,
+        peripherals.pins.gpio25,
+        peripherals.pins.gpio26,
+        &mut health,
+    );
+
+    // featureが無ければこのblockはbuildへ含まれない（`run_servo_bench_test`のdoc参照）。
+    #[cfg(feature = "bench-servo-test-17")]
+    run_servo_bench_test(
+        peripherals.ledc.timer0,
+        peripherals.ledc.channel0,
+        peripherals.pins.gpio27,
+    );
 
     // 周期は `config` が持つ。**ここへ数値を直接書かない。**暫定値である根拠は
     // `config` の doc comment にある。
@@ -423,21 +435,71 @@ fn main() {
         config::HEALTH_SNAPSHOT_PERIOD_MS
     );
 
-    // **`health.uptime_ms()`起点で最初の締切を積む。**`0`起点で固定すると、
-    // 既定build（LCD／I2C bring-upを行う）ではbring-upの所要時間（複数のSPI
-    // fillで実測1秒前後かかりうる）だけで最初のloop周回が即座に`overrun`と
-    // 判定されてしまう。bring-up自体の遅延であってmain loopの遅延ではないため、
-    // 混同しない。`pi-protocol-mode`はbring-upを行わないためこの遅延は生じないが、
-    // 締切の起点をuptimeにする扱い自体は両buildで共通にしている。
+    // **`health.uptime_ms()`起点で最初の締切を積む。**`0`起点で固定すると、起動時の
+    // bring-up（LCDの初期化、I2CのID読み出し）の所要時間だけで最初のloop周回が即座に
+    // `overrun`と判定されてしまう。bring-up自体の遅延であってmain loopの遅延ではないため、
+    // 混同しない。**ただし`bringup-display-13`付きbuildでは、I2Cのbring-upはmain loopの中で
+    // 動く**（下の`i2c_pending`）。その所要時間はloopの遅延として`overrun`と`max_read_gap_ms`に入る。
     let bringup_done_ms = health.uptime_ms();
     let mut next_heartbeat = bringup_done_ms + u64::from(config::HEARTBEAT_PERIOD_MS);
     let mut next_snapshot = bringup_done_ms + u64::from(config::HEALTH_SNAPSHOT_PERIOD_MS);
 
-    // `pi-protocol-mode`でだけ`boot`を1回試みる（`#446`。`send_boot_frame_once`参照）。
-    #[cfg(feature = "pi-protocol-mode")]
-    send_boot_frame_once(&health, reset_reason);
-    #[cfg(not(feature = "pi-protocol-mode"))]
-    demonstrate_pi_session(&mut health);
+    // Pi linkの送信も受信も、protocol専用の`UartDriver`経由に揃える。**UART0は使わない**
+    // （debug log専用。`crate::console`のmodule doc参照）。UART0以外のUARTをGPIO matrixで
+    // `PI-UART-TX`＝GPIO13、`PI-UART-RX`＝GPIO14へ割り当てる（`docs/hardware/gpio-assignment.md`の
+    // `Pi–ESP32間のtransport`節。同節は「UART0以外」とだけ定める。UART1とUART2のどちらでもよく、
+    // 番号の小さいUART1を使う。UART1の既定のpinはTX＝GPIO10、RX＝GPIO9で、どちらもflash用の
+    // 使用禁止pinである（ESP-IDF v5.5.3 `soc/esp32/include/soc/uart_pins.h`20〜21行、
+    // gpio-assignment.mdの`ESP32の使用制限pin`節）。`UartDriver::new`は渡したGPIO13／GPIO14だけを
+    // 設定し、既定のpinには触れない。esp-idf-hal 0.46.2 `uart.rs`2023行〜の`new_common`が
+    // `uart_set_pin`へ渡すのはこの2本だけであり、ESP-IDF v5.5.3 `esp_driver_uart/src/uart.c`819行〜の
+    // `uart_set_pin`は負の番号のpinを設定しない）。8N1でflow control（RTS／CTS）なし
+    // （`esp32-pi-protocol.md`§2の`UART framing`、`Candidate`）は`UartConfig::default()`のまま得る
+    // （esp-idf-hal 0.46.2 `uart.rs`579〜596行の`Config::new`）。baudは
+    // `config::PI_PROTOCOL_UART_BAUDRATE_HZ`、ring buffer容量は
+    // `config::PI_PROTOCOL_UART_RX_BUFFER_BYTES`、event queueの長さは
+    // `config::PI_PROTOCOL_UART_EVENT_QUEUE_LEN`のdoc参照。
+    #[cfg(not(feature = "bench-servo-test-17"))]
+    let mut uart = {
+        let uart_config = UartConfig::default()
+            .baudrate(Hertz(config::PI_PROTOCOL_UART_BAUDRATE_HZ))
+            .rx_fifo_size(config::PI_PROTOCOL_UART_RX_BUFFER_BYTES)
+            .tx_fifo_size(config::PI_PROTOCOL_UART_TX_BUFFER_BYTES)
+            .queue_size(config::PI_PROTOCOL_UART_EVENT_QUEUE_LEN);
+        UartDriver::new(
+            peripherals.uart1,
+            peripherals.pins.gpio13,
+            peripherals.pins.gpio14,
+            Option::<esp_idf_svc::hal::gpio::AnyIOPin>::None,
+            Option::<esp_idf_svc::hal::gpio::AnyIOPin>::None,
+            &uart_config,
+        )
+        .expect("UartDriver::new for the Pi link UART must succeed exactly once")
+    };
+    // event queueが無ければ、受信の異常を数えられない（`drain_uart_events`のdoc「数えられない場合」）。
+    // 起動時に1回だけ確かめてlogへ出す。
+    #[cfg(not(feature = "bench-servo-test-17"))]
+    if uart.event_queue().is_none() {
+        log::error!("pi_uart_event_queue_missing (受信の異常を数えない)");
+    }
+
+    // `boot`のACK待ち・再送sessionを開始する（`#446` PR B、`crate::boot_session`参照）。
+    // `sid`は起動のたびに1回だけ選ぶ（§3）。`stale_session`を受けたときの選び直しは
+    // `BootSession`内部が行うため、ここで選び直さない。
+    #[cfg(not(feature = "bench-servo-test-17"))]
+    let mut boot_session = BootSession::start(
+        BootRetryPolicy::provisional(),
+        generate_sid(&health),
+        reset_reason,
+        &health,
+        &mut uart,
+    );
+    // 受信を読みに行く間隔を測る起点（`crate::health::UartObservations::max_read_gap_ms`）。
+    #[cfg(not(feature = "bench-servo-test-17"))]
+    let mut last_read_ms = health.uptime_ms();
+    // Pi→ESP32方向の受信を振り分ける（`crate::pi_link`）。
+    #[cfg(not(feature = "bench-servo-test-17"))]
+    let mut pi_link = PiLink::new();
 
     // **`main()` から戻らない。**#6 の firmware は戻っていたため、task が進み続けて
     // いるかを外から確認できなかった。
@@ -478,110 +540,277 @@ fn main() {
             }
         }
 
+        // LCDのbring-upを1段だけ進める（`crate::display_test`）。終わったら、持ち越していた
+        // I2Cのbring-upを1回だけ行う（上の`i2c_pending`のcomment）。
+        #[cfg(feature = "bringup-display-13")]
+        {
+            if let Some(bringup) = display.take() {
+                display = bringup.poll(health.uptime_ms());
+            }
+            if display.is_none() {
+                if let Some((i2c0, sda, scl)) = i2c_pending.take() {
+                    run_i2c_bringup(i2c0, sda, scl, &mut health);
+                }
+            }
+        }
+
+        #[cfg(not(feature = "bench-servo-test-17"))]
+        boot_session.on_deadline(&health, &mut uart);
+
         // 期限を積み直した後の時刻で残りを測る。log の所要時間を待ち時間から差し引く。
-        let until = next_heartbeat.min(next_snapshot);
+        #[cfg_attr(
+            all(feature = "bench-servo-test-17", not(feature = "bringup-display-13")),
+            allow(unused_mut)
+        )]
+        let mut until = next_heartbeat.min(next_snapshot);
+        #[cfg(not(feature = "bench-servo-test-17"))]
+        if let Some(retry_deadline) = boot_session.next_deadline_ms() {
+            until = until.min(retry_deadline);
+        }
+        #[cfg(feature = "bringup-display-13")]
+        if let Some(bringup) = &display {
+            until = until.min(bringup.next_deadline_ms(health.uptime_ms()));
+        }
+
+        // sleepの代わりに`UartDriver::read`へ残り時間をtimeoutとして渡す。data到着があれば
+        // timeoutいっぱいまで待たず即座に戻る（`config::PI_PROTOCOL_UART_RX_BUFFER_BYTES`の
+        // doc「容量の根拠」参照）ため、busy-waitにならずACK受信への反応latencyも下がる。
+        //
+        // **必ず1 ms以上を渡す**（`sleep_ms_until`と同じ理由）。LCDのbring-upの描く段は、締切を
+        // 「すぐ」として返す（`crate::display_test::DisplayBringup::next_deadline_ms`）。0 tickの
+        // `read`はdataが無ければyieldせずに戻るため、帯を続けて描く間、優先度の低いIDLE taskが
+        // 回らず、Task Watchdog Timerの前提を壊す。1 msは`TickType::new_millis`（esp-idf-hal
+        // 0.46.2 `delay.rs`89〜95行）が1 tickへ切り上げ、`CONFIG_FREERTOS_HZ=100`（生成された`sdkconfig`、
+        // debug profile）では1 tick＝10 msになる。1 tickのblockは次のtickの割り込みで解けるため、
+        // 実際の待ちは0〜10 msであり、dataが届けばそれより早く戻る。受信が続く間は`read`がblockせずに
+        // 戻るため、IDLE taskへ時間が回るという前提は、受信が途切れる間に限って成り立つ。
+        #[cfg(not(feature = "bench-servo-test-17"))]
+        {
+            drain_uart_events(&uart, &mut health);
+            let now2 = health.uptime_ms();
+            let gap_ms = now2.saturating_sub(last_read_ms);
+            let observations = health.uart_mut();
+            observations.max_read_gap_ms = observations.max_read_gap_ms.max(gap_ms);
+            let remaining_ms = until.saturating_sub(now2).max(1);
+            let ticks = boot_session::ticks_until(std::time::Duration::from_millis(remaining_ms));
+            let mut buf = [0_u8; config::PI_PROTOCOL_UART_READ_CHUNK_BYTES];
+            // **`Err`を無視する。**esp-idf-hal 0.46.2の`UartRxDriver::read`
+            // （`uart.rs`1179〜1246行）は、timeout（data未到着、毎周回起こりうる
+            // 正常系）と`uart_read_bytes`自体の失敗（`-1`）を、どちらも同じ
+            // `Err(ESP_ERR_TIMEOUT)`に畳んでおり、この版のAPIでは型で区別できない
+            // （`len`が`-1`でも`0`でも同じ分岐、doc commentも「timeoutならErr」と
+            // 明記している）。両者を区別する手段（別のAPIや`unsafe`）は導入しない。
+            // `uart_read_bytes`の`ESP_RETURN_ON_FALSE`（不正な`uart_num`／
+            // null buffer／未installのdriver。`uart.c`1662〜1666行）は即時
+            // returnであり、繰り返し起きればbusy-waitになる。ここではinstall
+            // 済みの`uart`・固定長の`buf`しか渡さないためこの経路は実質
+            // 到達しないという前提に立つ。`rx_mux`取得待ち（同1670〜1671行）は
+            // `ticks`の間blockするため問題にならない。
+            let read = uart.read(&mut buf, ticks);
+            last_read_ms = health.uptime_ms();
+            if let Ok(n) = read {
+                if n > 0 {
+                    pi_link.on_bytes(&buf[..n], &mut boot_session, &health, &mut uart);
+                }
+            }
+        }
+        #[cfg(feature = "bench-servo-test-17")]
         sleep_ms_until(until, health.uptime_ms());
     }
 }
 
-/// `boot` frameを1回だけ組み立て、`write_line`で直接UART0へ書き込みを試みる
-/// （`pi-protocol-mode`でだけ呼ぶ。制約は`crate::console`のmodule doc参照）。
+/// Pi linkのUARTのevent queueを空になるまで吸い上げ、受信の異常を数えてlogへ出す。
 ///
-/// 受理確認・再送・recovery budget（§4.1）・受信loopを実装していないため
-/// sessionは確立しない（`#12`の受け入れ条件は満たさない。残りは`#12`本文が
-/// 引き続き追跡する）。
+/// 数えるのは、受信のring bufferの満杯（`UART_BUFFER_FULL`）とhardware FIFOの溢れ
+/// （`UART_FIFO_OVF`）である（`crate::health::UartObservations`）。`UART_DATA`等のそれ以外のeventは
+/// 読み捨てる。**frame errorとparity errorは数えない。**`UartConfig::default()`のevent設定
+/// （esp-idf-hal 0.46.2 `uart.rs`の`EventConfig::new`）はframe errorの割り込みを有効にせず、
+/// parityは`ParityNone`（ESP-IDF v5.5.3の`uart_ll_set_parity`が`parity_en`を0にする）である。**待たない**（`recv_front`へ0 tickを渡す）。
 ///
-/// `sid`には`health.uptime_ms()`を使う。bring-upを行わないため起動ごとに
-/// ほぼ同じ小さい値になり、§3が求める再起動間の非衝突を満たさない
-/// （`PROTO-TBD-011`待ちの暫定値。`crate::console`の制約参照）。
+/// # 数えられない場合
 ///
-/// `id`は1固定。`reset_reason`は実際の`ResetReason`から得た値である。
-#[cfg(feature = "pi-protocol-mode")]
-fn send_boot_frame_once(health: &Health, reset_reason: &str) {
-    let boot = Boot {
-        firmware: env!("CARGO_PKG_VERSION").to_owned(),
-        board: config::BOARD.to_owned(),
-        reset_reason: reset_reason.to_owned(),
+/// **event queueが作れなかった場合は何も数えない**（`config::PI_PROTOCOL_UART_EVENT_QUEUE_LEN`は0では
+/// ないため作られる見込みだが、無ければ起動時に`pi_uart_event_queue_missing`を1回出す）。
+///
+/// **ここで数えた回数は、起きた回数の下限である。**ESP-IDFのUART driverは、event queueが
+/// 満杯の間に起きたeventを捨てる（ESP-IDF v5.5.3 `esp_driver_uart/src/uart.c`の`UART event queue full`）。main loopが
+/// 長く戻らない間（LCDの1段、NVSの書き込み、長いlog）にqueueが`UART_DATA`で埋まると、その後の
+/// 溢れのeventは数えられない。**0件でも、溢れなかったことの証明にはならない。**
+///
+/// **ring bufferが満杯になったとき、ESP-IDFのdriverは受信のinterruptを止め、`read`で空きが
+/// できるまでbyteをhardware FIFOに残す**（ESP-IDF v5.5.3 `esp_driver_uart/src/uart.c`の
+/// `rx_buffer_full_flg`）。FIFOも溢れたbyteは失われる。どちらの場合も、行が壊れれば
+/// `crate::pi_link::PiLink::on_bytes`が壊れた行として捨て、`boot`は§4.1の再送で
+/// 送り直される見込みである（確かめていない）。
+#[cfg(not(feature = "bench-servo-test-17"))]
+fn drain_uart_events(uart: &UartDriver<'_>, health: &mut Health) {
+    let Some(queue) = uart.event_queue() else {
+        return;
     };
-    let ts_ms = health.uptime_ms();
-    let frame = Frame::new(
-        Envelope {
-            v: limits::PROTOCOL_VERSION,
-            sid: sid_from_uptime(ts_ms),
-            id: 1,
-            ts_ms,
-        },
-        Message::Boot(boot),
-    );
-    // encode失敗はlog::warn!で分類する（`AGENTS.md`「エラーを握りつぶさず、分類、
-    // ログ、カウンタを用意する」に沿った形）。ただし`pi-protocol-mode`では
-    // loggingを止めているため、この`log::warn!`自体は出力されない。counterは
-    // 持たない（同じ理由で増やしても観測できないため）。
-    match encode_line(&frame) {
-        Ok(line) => console::write_line(&line),
-        Err(err) => {
-            log::warn!("boot_encode_failed error={err}");
-        }
+    while let Some((event, _)) = queue.recv_front(esp_idf_svc::hal::delay::NON_BLOCK) {
+        let observations = health.uart_mut();
+        let (name, count) = match event.payload() {
+            UartEventPayload::RxBufferFull => {
+                observations.rx_buffer_full = observations.rx_buffer_full.saturating_add(1);
+                ("rx_buffer_full", observations.rx_buffer_full)
+            }
+            UartEventPayload::RxFifoOverflow => {
+                observations.rx_fifo_overflow = observations.rx_fifo_overflow.saturating_add(1);
+                ("rx_fifo_overflow", observations.rx_fifo_overflow)
+            }
+            _ => continue,
+        };
+        log::warn!("pi_uart_event kind={name} count={count}");
     }
 }
 
-/// `send_boot_frame_once`のdoc参照。`ts_ms`（`u64`）を`sid`（`u32`）へ切り詰める（下位32 bit）。
-#[cfg(feature = "pi-protocol-mode")]
+/// NVS namespace。`bench17`（`run_servo_bench_test`が使うnamespace）とは別の名前にする。
+/// 用途が異なるnamespaceを共有すると、片方のkey追加がもう片方の`erase_all`等を
+/// 誤って巻き込みうる。
+#[cfg(not(feature = "bench-servo-test-17"))]
+const SID_NVS_NAMESPACE: &str = "pi_session";
+/// 次回起動が使う`sid`をこのkeyへ保存する。
+#[cfg(not(feature = "bench-servo-test-17"))]
+const SID_NVS_KEY_NEXT: &str = "next_sid";
+
+/// 起動のたびに新しい`sid`を選ぶ（`PROTO-TBD-011`のうち`sid`の生成方法に
+/// 当たる部分。§3.1参照。生成方法は確定するが、衝突許容確率は未確定のまま
+/// 残る。下の「衝突許容確率」節参照）。
+///
+/// # 生成方法: NVSの不揮発counter
+///
+/// **乱数ではなく不揮発counterを使う。**§3.1は生成方法として「乱数、不揮発カウンタ、
+/// またはその併用」を挙げている。この crate は`Cargo.toml`で`unsafe_code = "forbid"`
+/// としており、`esp_random()`／`bootloader_random_enable()`（ESP-IDF v5.5.3
+/// `components/esp_hw_support/include/esp_random.h`・`bootloader_random.h`）は
+/// `unsafe extern "C"` fnであるため直接呼べない。加えて、ESP-IDF公式資料
+/// （`docs/en/api-reference/system/random.rst`）は、Wi-Fi／Bluetoothが有効か、
+/// `bootloader_random_enable()`を呼んでいるか、second-stage bootloader実行中の
+/// いずれかを満たさない限り、RNGの出力は「pseudo-random only」と明記する。
+/// このfirmwareはWi-Fi／Bluetoothを一切初期化しない（`Peripherals::take()`は呼ぶが、
+/// Wi-Fi／Bluetoothの初期化は別の話であり行わない。`#446` PR B、`#487`。根拠は、`docs/hardware/power-budget.md`の
+/// `ACCEL-01`／`ENV-01`単体bring-upの手順`条件(3)の根拠`が記録する走査である。#487のPR B1の後にも、
+/// `src`・`Cargo.toml`・`sdkconfig.defaults`でcommentを除いて0件だった）。`bootloader_random_enable()`も呼ばない
+/// （呼ぶには`unsafe`が要る）。**したがって乱数側を使っても、
+/// 上記の非衝突要件に対する根拠のある確率は示せない。**
+///
+/// 不揮発counterは`unsafe`もWi-Fi／Bluetoothの初期化も要らず、§3.1の要件
+/// （再起動のたびに新しい値を選ぶ）を確率ではなく構造で満たそうとする。
+/// [`EspNvs::get_u32`]で前回保存した値を読み、1加算し、**使う前に**
+/// [`EspNvs::set_u32`]で保存する（保存後に停電しても、次回起動は保存済みの
+/// 値から続くため、このboot分の値が失われるだけで、値の再利用は起きない）。
+///
+/// # 衝突許容確率
+///
+/// **0ではない。**`u32`一周（`u32::MAX`回のcommit）は実運用で起こらないが、
+/// counterが`0`へ戻る経路が一周以外にもある。
+///
+/// `EspDefaultNvsPartition::take()`は`take_with(true)`（`reinit=true`）を呼ぶ
+/// （esp-idf-svc 0.52.1 `src/nvs.rs`の`EspNvsPartition<NvsDefault>::take`）。
+/// `NvsDefault::init(reinit=true)`は、`nvs_flash_init()`が
+/// `ESP_ERR_NVS_NO_FREE_PAGES`または`ESP_ERR_NVS_NEW_VERSION_FOUND`を返すと、
+/// **`nvs_flash_erase()`でdefault partition全体を消去してから再初期化する**
+/// （同fileの`NvsDefault::init`）。この経路を通ると[`SID_NVS_KEY_NEXT`]も失われ、
+/// counterは`0`から数え直しになり、以前使った小さい`sid`を再び選びうる。
+/// 人がflash全体を消去した場合も同じ結果になる。**したがって「commitが
+/// 成功する限り再利用しない」だけでは正しくない。**
+///
+/// この消去は`run_servo_bench_test`の単発latch（namespace `bench17`）も消す。
+/// servoの安全に関わる性質であり、正本は`docs/hardware/servo-safety-limits.md`の
+/// `初回動作の実行手順`の`再武装`stepへの2026-09-30追記である（ここへ書き写さない）。
+///
+/// counterが`0`から数え直された後にESP32が送る小さい`sid`が、受信側のretired
+/// session集合に残っている値と一致すれば衝突する。この衝突は、protocol側の
+/// `stale_session`回復（§3.1「`sid`が衝突した場合」。ACKで`stale_session`を
+/// 受けたら新しい`sid`を選び直して再送する）で扱う対象である。**この回復経路は
+/// `crate::boot_session::BootSession::reselect_sid`が実装している
+/// （`#446` PR B）。**選び直しの回数には上限がある（`BootRetryPolicy`の
+/// `sid_reselect_limit`）ため、counterが`0`から数え直された後に連続して選ぶ
+/// `sid`が、上限+1回分以上retired session集合に含まれていると衝突から
+/// 抜けられないまま終端しうる。
+///
+/// # NVSが使えない場合
+///
+/// `EspDefaultNvsPartition::take()`／`EspNvs::new`／`get_u32`／`set_u32`の
+/// いずれかが失敗した場合、`health.uptime_ms()`の下位32 bitへ縮退する
+/// （旧`sid_from_uptime`と同じ値）。**この経路では非衝突を主張しない。**
+/// 値は起動からの経過時間であり、`generate_sid`より前に走る処理（bring-up）の所要時間が
+/// 起動ごとに大きく変わらなければ、起動ごとに近い小さい値になる。§3の要件を
+/// 満たさないまま`boot`を送る。エラーは`log::error!`で分類し、UART0（USB）の
+/// debug logへ出る（`#487`のPR Aより前、Pi linkを持つbuild（当時の`pi-protocol-mode`）は
+/// loggingを止めており、出力されなかった）。
+/// counterは持たない（`boot_session`のmodule doc「停止理由の区別」参照）。
+#[cfg(not(feature = "bench-servo-test-17"))]
+fn generate_sid(health: &Health) -> u32 {
+    use esp_idf_svc::nvs::{EspDefaultNvsPartition, EspNvs};
+
+    let nvs_partition = match EspDefaultNvsPartition::take() {
+        Ok(partition) => partition,
+        Err(err) => {
+            log::error!("sid_nvs_partition_failed error={err}");
+            return sid_from_uptime(health.uptime_ms());
+        }
+    };
+    let nvs = match EspNvs::new(nvs_partition, SID_NVS_NAMESPACE, true) {
+        Ok(nvs) => nvs,
+        Err(err) => {
+            log::error!("sid_nvs_open_failed error={err}");
+            return sid_from_uptime(health.uptime_ms());
+        }
+    };
+
+    // `None`（keyが無い＝初回起動）は`0`とみなす。protocolはsid=0を特別扱いしない
+    // ため（Envelope §3、`u32`の正当な値）、「保存されていない」と「0が保存されている」を
+    // 区別する必要は無い。どちらでも次のsidは`1`加算した値になる（最初の起動なら`1`）。
+    let previous = match nvs.get_u32(SID_NVS_KEY_NEXT) {
+        Ok(value) => value.unwrap_or(0),
+        Err(err) => {
+            log::error!("sid_nvs_get_failed error={err}");
+            return sid_from_uptime(health.uptime_ms());
+        }
+    };
+    // **`wrapping_add`のままにする。**`u32`一周（`generate_sid`のdoc「衝突許容確率」
+    // 参照）は実運用では起こらないため、その先のsidが`0`や過去の小さい値と
+    // 見た目上一致しても、`max(1)`のような補正は入れない。補正を入れると、
+    // 一周した直後のsidが常に同じ値（`1`）へ寄せられ、実際に一周する状況では
+    // 逆に衝突を作り込む。
+    let sid = previous.wrapping_add(1);
+
+    // **実際に返す前にcommitする。**`run_servo_bench_test`の「実際に動かす前に
+    // latchをcommitする」と同じ順序（module doc参照）。
+    if let Err(err) = nvs.set_u32(SID_NVS_KEY_NEXT, sid) {
+        log::error!("sid_nvs_set_failed error={err}");
+        return sid_from_uptime(health.uptime_ms());
+    }
+
+    sid
+}
+
+/// [`generate_sid`]のNVS不使用時の縮退経路が使う。`ts_ms`（`u64`）を`sid`（`u32`）へ
+/// 切り詰める（下位32 bit）。**非衝突を主張しない**（[`generate_sid`]のdoc参照）。
+#[cfg(not(feature = "bench-servo-test-17"))]
 const fn sid_from_uptime(ts_ms: u64) -> u32 {
     ts_ms as u32
 }
 
-/// `crate::protocol::PiSession`が`hello`／`ping`／`get_status`を仕様どおり処理できることを、
-/// 自己完結した例で示す（実serial linkは無いため、入力もこの関数が作る）。
-/// **既定buildでだけ呼ぶ**（`pi-protocol-mode`ではlog出力を止めており、この関数の
-/// 目的である「log出力を目視できること」が成立しないため）。
+/// I2Cのbring-upの各段階の境界で1回、heartbeatを刻みOSへyieldする。
 ///
-/// **これはprotocolの成立を主張しない。**`crates/deskcat-serial`の`tests/simulator.rs`が
-/// 持つ受け入れ条件のtestとは違い、これはbuildできることと、log出力を目視できることの
-/// 実物である。実serial linkの受信loopが入ったら、この呼び出し元をそちらへ置き換える。
-#[cfg(not(feature = "pi-protocol-mode"))]
-fn demonstrate_pi_session(health: &mut Health) {
-    let mut session = PiSession::new();
-    // 例として使うだけのPi `sid`／`id`である。実際の値は相手が選ぶ。
-    let pi_sid = 90_312;
-    let hello = Hello {
-        host: "deskcatd".to_owned(),
-        version: "0.1.0".to_owned(),
-        reason: HelloReason::Startup,
-    };
-    log::info!("protocol_demo pi_sid_before={:?}", session.pi_sid());
-    let established = session.handle_hello(pi_sid, 1, &hello);
-    log::info!(
-        "protocol_demo hello_outcome={:?} pi_sid_after={:?}",
-        established.outcome,
-        session.pi_sid()
-    );
-
-    let ping_reply = session.handle_ping(pi_sid, 2);
-    log::info!("protocol_demo ping_reply={ping_reply:?}");
-
-    let status = health.to_status();
-    let (get_status_ack, get_status_reply) = session.handle_get_status(pi_sid, 3, status);
-    log::info!("protocol_demo get_status_ack={get_status_ack:?} status={get_status_reply:?}");
-}
-
-/// bring-up中の各段階の境界で1回、heartbeatを刻みOSへyieldする。
+/// `main`のloopが使う`next_heartbeat`によるdeadline schedulingとは別の、bring-up専用の
+/// 簡易版である。[`FreeRtos::delay_ms`]はmodule doc冒頭が引用するとおりOSへyieldする。
 ///
-/// 受け入れ条件「更新中も通信とwatchdogがactiveである」に対応する。CodeRabbitの
-/// review（[#415](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/415)）が、
-/// `run_display_bringup`が`Health::new`とmain loopの開始より前に複数のSPI転送
-/// （単色fill×5、四隅pattern）を連続実行しており、その間heartbeatが一度も
-/// 出ないことを指摘した。`main`のloopが使う`next_heartbeat`によるdeadline
-/// schedulingとは別の、bring-up専用の簡易版である。[`FreeRtos::delay_ms`]は
-/// module doc冒頭が引用するとおりOSへyieldするため、SPI転送が連続する区間でも
-/// idle taskのwatchdogに機会を与える。
-#[cfg(not(feature = "pi-protocol-mode"))]
+/// **LCDのbring-upはもうこの関数を使わない**（`#487`）。CodeRabbitのreview
+/// （[#415](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/415)）は、`run_display_bringup`が
+/// main loopの開始より前に複数のSPI転送（単色fill×5、四隅pattern）を連続実行しており、その間
+/// heartbeatが一度も出ないことを指摘した。この関数はそのとき足した簡易版だった。`#487`からは、
+/// LCDの描画をmain loopの中で1段ずつ進め（`crate::display_test`）、本来のheartbeatを描画の間も
+/// 回す構造にした（見込みの範囲は`crate::display_test`のmodule doc）。
 fn service_bringup_step(health: &mut Health, step: &str) {
     FreeRtos::delay_ms(1);
     // **`bringup_hb`と`hb`は別の名前にする。**main loopの`hb seq=`（`config::HEARTBEAT_PERIOD_MS`
     // 周期の本来のheartbeat）とlog上の接頭辞を分け、読み手が混同しないようにする。
-    // seqの連番自体は`Health`の同じcounterを共有するため単調増加のままである
-    // （bring-up段階の分だけ、main loop側の最初のheartbeatのseqが0からは始まらない）。
+    // `bringup_hb`と`hb`は`Health`の同じcounterを使うため、両方の行を合わせると連番になる。
+    // `hb`のseqの始まりと欠番の位置は、bring-upの経路（buildと、失敗の有無）で変わる。
+    // **`hb`のseqだけを見て、行が抜けたと判断しない。**
     let seq = health.next_heartbeat_seq();
     log::info!(
         "bringup_hb seq={seq} uptime_ms={} bringup_step={step}",
@@ -589,11 +818,14 @@ fn service_bringup_step(health: &mut Health, step: &str) {
     );
 }
 
-/// `DISP-01`を初期化し、識別・単色fill・四隅patternを実行する。
+/// `DISP-01`を初期化してbacklightを点け、単色fillと四隅patternを1段ずつ進める状態機械を返す。
 ///
-/// **どの段階で失敗しても、この関数はpanicしない。**この関数はエラーを
-/// `log::error!`へ分類して返すだけで、呼び出し元の`main`を止めない。
-/// heartbeatは[`service_bringup_step`]で段階ごとに刻む（同関数のdoc参照）。
+/// fillと四隅patternはmain loopの中で進む（`crate::display_test`。`#487`のPR B1より前は、この関数が
+/// 1回の呼び出しで描き切っていた）。controllerのIDは読まない（`crate::display`のmodule doc）。
+/// 初期化の後に、書き込んだMADCTLの値と論理座標の幅・高さを`display_madctl`の行としてlogへ出す。
+///
+/// **どの段階で失敗しても、この関数はpanicしない。**driverの作成か初期化に失敗したら
+/// `log::error!`へ分類して`None`を返し、main loopはLCDを描かずに進む。
 ///
 /// **`bringup-display-13` feature付きbuildだけがこの関数を持つ。**既定buildはこの関数を
 /// compileせず、`main()`から呼ばない。したがって既定buildは`LCD-BL`（GPIO4）を含む
@@ -612,53 +844,40 @@ fn run_display_bringup<SPI: SpiAnyPins + 'static>(
     dc: impl OutputPin + 'static,
     rst: impl OutputPin + 'static,
     bl: impl OutputPin + 'static,
-    health: &mut Health,
-) {
+) -> Option<DisplayBringup<'static>> {
     // pinは`docs/hardware/gpio-assignment.md`の`信号inventory`に従う
     // （`LCD-SCLK`=18, `LCD-MOSI`=23, `LCD-MISO`=19, `LCD-CS`=22, `LCD-DC`=17,
     // `LCD-RST`=16, `LCD-BL`=4）。`TOUCH-CS`(21)はbusを共有するが、このfirmwareは
     // touchへは触れない（`crate::display`のmodule doc参照）。
-    // **`Peripherals`全体ではなく個々のfieldを受け取る。**`main()`がI2C用の
-    // fieldも同じ`Peripherals`から取り出す必要があるため（`run_i2c_bringup`参照）、
-    // 呼び出し元でfieldを分けてから渡す。
+    // **`Peripherals`全体ではなく個々のfieldを受け取る。**`main()`がI2C用とPi link用の
+    // fieldも同じ`Peripherals`から取り出す必要があるため、呼び出し元でfieldを分けてから渡す。
     let mut lcd = match Ili9341::new(spi3, sclk, mosi, miso, cs, dc, rst, bl) {
         Ok(lcd) => lcd,
         Err(err) => {
             log::error!("display_driver_new_failed error={err}");
-            return;
+            return None;
         }
     };
 
-    let id = match lcd.init() {
-        Ok(id) => id,
-        Err(err) => {
-            log::error!("display_init_failed error={err}");
-            return;
-        }
-    };
-    service_bringup_step(health, "init");
-
-    // **識別結果を捏造しない。**読めた生byteと判定を両方logへ残す
-    // （受け入れ条件「Controller識別情報と初期化の根拠を記録した」）。
-    log::info!(
-        "display_id raw={:02x?} matches_ili9341={}",
-        id.raw,
-        id.matches_ili9341()
-    );
-    if !id.matches_ili9341() {
-        log::error!(
-            "display_id_mismatch expected_id_hi=0x93 expected_id_lo=0x41 got_hi=0x{:02x} got_lo=0x{:02x}",
-            id.raw[2],
-            id.raw[3]
-        );
+    if let Err(err) = lcd.init() {
+        log::error!("display_init_failed error={err}");
+        return None;
     }
+
+    // 初期化で書き込んだ向きの設定を残す（`docs/hardware/power-budget.md`の`DISP-01`
+    // 追加接続の手順9(a)）。
+    log::info!(
+        "display_madctl value=0x{:02x} width={} height={}",
+        display::MADCTL_LANDSCAPE,
+        display::WIDTH,
+        display::HEIGHT
+    );
 
     if let Err(err) = lcd.backlight_on() {
         log::error!("display_backlight_on_failed error={err}");
     }
 
-    run_fill_tests(&mut lcd, health);
-    run_corner_pattern(&mut lcd, health);
+    Some(DisplayBringup::new(lcd))
 }
 
 /// `ACCEL-01`（ADXL345）と`ENV-01`（BME280）のDevice ID／Chip IDを読み、生byteをlogへ出す。
@@ -667,8 +886,7 @@ fn run_display_bringup<SPI: SpiAnyPins + 'static>(
 /// [Issue #16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16)の
 /// bring-up手順の1工程である。**一致判定はここでは行わない。**`crate::accel::Adxl345`・
 /// `crate::env::Bme280`が返す生byteをそのままlogへ出すだけであり、期待値
-/// （`0xE5`／`0x60`）との一致は、logを読む人間の判断とする（`display_id`の
-/// `matches_ili9341()`とは異なる扱いである。**この関数へ判定を持ち込まない。**）。
+/// （`0xE5`／`0x60`）との一致は、logを読む人間の判断とする。**この関数へ判定を持ち込まない。**
 ///
 /// 2つのsensorは同じI2C bus（`GPIO25`＝SDA、`GPIO26`＝SCL）を共有するため
 /// （`docs/hardware/gpio-assignment.md`の`信号inventory`の`ACCEL-SDA`／`ACCEL-SCL`／
@@ -746,7 +964,6 @@ fn run_display_bringup<SPI: SpiAnyPins + 'static>(
 ///
 /// **実機で`Err`が返るまでの実測時間は、まだ取っていない。**上の上限はESP-IDF実装を
 /// 読んだ結果であって実機観測ではない（この変更の検証は`cargo build`までである）。
-#[cfg(not(feature = "pi-protocol-mode"))]
 fn run_i2c_bringup(
     i2c0: I2C0<'static>,
     sda: impl InputPin + OutputPin + 'static,
@@ -891,102 +1108,30 @@ fn run_servo_bench_test(
     }
 }
 
-/// 単色fillを既知のRGB565値で順に実行し、所要時間を計測してlogへ出す。
-///
-/// 受け入れ条件「単色fillが正しい」「Color orderが正しい」「更新timingを測定した」に
-/// 対応する。**正しいかどうかの判定はこの関数では行わない。**実機のLCDを目視して
-/// 判定するのは人間であり（`AGENTS.md`ハードウェア安全、初回通電は人間監視下）、
-/// この関数は色と所要時間を機械可読な形でlogへ残すだけである。
-#[cfg(feature = "bringup-display-13")]
-fn run_fill_tests(lcd: &mut Ili9341<'_>, health: &mut Health) {
-    let fills: [(&str, u16); 5] = [
-        ("black", display::color::BLACK),
-        ("red", display::color::RED),
-        ("green", display::color::GREEN),
-        ("blue", display::color::BLUE),
-        ("white", display::color::WHITE),
-    ];
-
-    for (name, color) in fills {
-        let start = Instant::now();
-        match lcd.fill_screen(color) {
-            Ok(()) => {
-                let elapsed_us = start.elapsed().as_micros();
-                log::info!("display_fill name={name} color=0x{color:04x} elapsed_us={elapsed_us}");
-            }
-            Err(err) => {
-                log::error!("display_fill_failed name={name} error={err}");
-            }
-        }
-        service_bringup_step(health, "fill");
-    }
-}
-
-/// 四隅へ異なる色の正方形を描き、orientationとcolor orderを実機で確認できるようにする。
-///
-/// 受け入れ条件「四隅とorientationが正しい」に対応する。**MADCTLはreset時default
-/// （`00h`）のままである**（`crate::display`のmodule doc参照）。この patternを見て
-/// 向きと色順が期待どおりでなければ、`docs/hardware/gpio-assignment.md`の`MADCTL`欄と
-/// `crate::display`のMADCTL定数を実測結果で更新する必要がある。
-#[cfg(feature = "bringup-display-13")]
-fn run_corner_pattern(lcd: &mut Ili9341<'_>, health: &mut Health) {
-    if let Err(err) = lcd.fill_screen(display::color::BLACK) {
-        log::error!("display_corner_background_failed error={err}");
-        return;
-    }
-    service_bringup_step(health, "corner_background");
-
-    const SQUARE: u16 = 24;
-    let corners: [(&str, u16, u16, u16); 4] = [
-        ("top_left", 0, 0, display::color::RED),
-        (
-            "top_right",
-            display::WIDTH - SQUARE,
-            0,
-            display::color::GREEN,
-        ),
-        (
-            "bottom_left",
-            0,
-            display::HEIGHT - SQUARE,
-            display::color::BLUE,
-        ),
-        (
-            "bottom_right",
-            display::WIDTH - SQUARE,
-            display::HEIGHT - SQUARE,
-            display::color::WHITE,
-        ),
-    ];
-
-    let start = Instant::now();
-    for (name, x, y, color) in corners {
-        if let Err(err) = lcd.fill_rect(x, y, x + SQUARE - 1, y + SQUARE - 1, color) {
-            log::error!("display_corner_failed corner={name} error={err}");
-        }
-        service_bringup_step(health, "corner");
-    }
-    let elapsed_us = start.elapsed().as_micros();
-    log::info!("display_corner_pattern elapsed_us={elapsed_us}");
-}
-
 /// Health snapshot を 1 行の JSON として log へ出す。
 ///
 /// `crates/deskcat-protocol` の `Status` をそのまま serialize する。
 /// **これが「counter schema を protocol status へ使用できる」ことの実物である。**
 /// 出力するのは `status` の payload であり、envelope を付けた wire line ではない
-/// （health snapshotをwireへ送るにはsessionが要る。#12。`pi-protocol-mode`が
-/// `boot`用に選ぶ`sid`は`send_boot_frame_once`参照。両者は別の判断である）。
+/// （health snapshotをwireへ送るにはsessionが要る。#12。Pi linkの`boot`用に選ぶ`sid`は
+/// `generate_sid`参照。両者は別の判断である）。
+///
+/// Pi linkのUARTの観測（`crate::health::UartObservations`）も同じ行に出し、受信を読みに行く
+/// 間隔の最大値（`max_read_gap_ms`）はこの行を出すたびに0へ戻す。
 ///
 /// **error を握りつぶさない。**serialize は事実上失敗しないが、`expect()` で潰さず
 /// 分類して log し、counter を進める。
 fn emit_health_snapshot(health: &mut Health, now: u64) {
     let status = health.to_status();
+    let uart = health.uart();
     match serde_json::to_string(&status) {
         Ok(payload) => log::info!(
-            "health uptime_ms={now} overrun_ticks={} snapshot_errors={} status={payload}",
+            "health uptime_ms={now} overrun_ticks={} snapshot_errors={} pi_uart_rx_buffer_full={} pi_uart_rx_fifo_overflow={} max_read_gap_ms={} status={payload}",
             health.overrun_ticks(),
             health.snapshot_errors(),
+            uart.rx_buffer_full,
+            uart.rx_fifo_overflow,
+            uart.max_read_gap_ms,
         ),
         Err(err) => {
             health.record_snapshot_error();
@@ -996,4 +1141,6 @@ fn emit_health_snapshot(health: &mut Health, now: u64) {
             );
         }
     }
+    // 次の行の`max_read_gap_ms`は、この行から後の最大値にする。
+    health.uart_mut().max_read_gap_ms = 0;
 }

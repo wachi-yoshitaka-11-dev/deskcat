@@ -354,6 +354,7 @@ name = "deskcat-esp32"
 version = "0.1.0"
 dependencies = [
  "deskcat-protocol",
+ "deskcat-servo",
  "embassy-time",
  "embuild",
  "esp-idf-svc",
@@ -367,6 +368,13 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "deskcat-servo"
+version = "0.1.0"
+dependencies = [
+ "deskcat-protocol",
 ]
 
 [[package]]

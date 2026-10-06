@@ -15,7 +15,7 @@ DeskCat は、机上で静かに振る舞う猫型ペットロボットです。
 - 軽く叩くと驚く
 - 首を安全な範囲で動かす
 - アイドル時に短い独り言を表示する
-- Raspberry Pi と ESP32 が USB シリアルで状態と命令を交換する
+- Raspberry Pi と ESP32 が UART で状態と命令を交換する
 
 カメラ、マイク、音声出力、画像アセット中心の表情、ネットワーク OTA は初期 MVP に含めません。
 
@@ -25,7 +25,7 @@ DeskCat は、机上で静かに振る舞う猫型ペットロボットです。
 flowchart LR
     User[User] -->|Touch / tap / choices| ESP[ESP32]
     Sensors[Sensors] --> ESP
-    ESP -->|JSON Lines over USB serial| Pi[Raspberry Pi Zero W]
+    ESP -->|JSON Lines over UART| Pi[Raspberry Pi Zero W]
     Pi -->|Expression / text / motion commands| ESP
     ESP --> LCD[LCD]
     ESP --> Servo[Servo]
@@ -35,7 +35,7 @@ flowchart LR
 |---|---|
 | ESP-WROOM-32D開発ボード（秋月電子 M-13628） | LCD、touch、加速度、環境sensor、サーボ、即時安全制御 |
 | Raspberry Pi Zero W（V1.1） | 感情、行動、独り言、log、設定、API |
-| Protocol | 初期USB serial link上の、version付き・最大長制限付きJSON Lines |
+| Protocol | UART上の、version付き・最大長制限付きJSON Lines（pinと接続の条件は[GPIO Assignment](docs/hardware/gpio-assignment.md)の`Pi–ESP32間のtransport`節） |
 
 Piから不正なcommandを受け取った場合も、ESP32が物理安全制限を強制する。
 

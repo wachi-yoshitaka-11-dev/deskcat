@@ -61,6 +61,12 @@
 //! protocol側の話であり、backendが黙って選ぶことではない。**触らない**（＝既定のまま）。
 //! `TBD`として残す。
 //!
+//! **Pi linkはGPIOのUART（TX／RX／GNDだけ。`docs/hardware/gpio-assignment.md`の
+//! `Pi–ESP32間のtransport`節）であり、Piの`DTR`は`ESP32`へつながらないため、Pi linkでは
+//! この再起動は起きない。**当てはまるのは、hostが`ESP32` board上のUSB-UARTブリッジ（USB）を
+//! 開く場合だけである（Pi linkの試験中に、PCのserial monitorで`ESP32`のdebug logを読む場合も
+//! これに当たる。再起動が起きるかは確かめていない）。
+//!
 //! [Issue #12]: https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12
 //! [`Pump::TimedOut`]: crate::Pump::TimedOut
 //! [`SessionCounters::timeouts`]: crate::SessionCounters::timeouts
@@ -127,7 +133,7 @@ impl SerialDevice {
     /// use deskcat_serial::{Pump, SerialConfig, SerialDevice, Session};
     ///
     /// // device名は呼び出し側が設定として渡す。**ここに実機の名前を書かない。**
-    /// // `/dev/ttyUSB*`の実際の名前は未確認であり、確定はIssue #11の後半である。
+    /// // 実機のdevice名は現物で確かめておらず、確定はIssue #11の後半である。
     /// let config = SerialConfig::new("/dev/example", 115_200)?;
     /// let mut session = Session::new(config.clone(), 90_312);
     ///

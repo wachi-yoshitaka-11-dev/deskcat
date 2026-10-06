@@ -14,13 +14,13 @@
 
 ## 現在の状態
 
-Issue #5 でtoolchainを固定し、最小projectのclean buildを確認した。実装済みなのは`link_patches()`、logger初期化、起動logの出力、Issue #7 の heartbeat と health snapshot、Issue #12 の`crate::protocol::PiSession`（`hello`／`ping`／`get_status`の受信側logic）、および Issue #13 の`crate::display::Ili9341`（`DISP-01`／ILI9341のSPI driver）である。**`crate::display`のbring-upは、既定buildでは実行しない。**`bringup-display-13` feature（既定off）を付けたbuildだけが実行する（[#451](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/451)。既定offにした理由と有効化の手順は`src/main.rs`のmodule docの「`DISP-01`のbring-upを有効にする手順」節が正本であり、**ここへ再掲しない**）。`pi-protocol-mode`は`display`／`protocol`のbring-up・demoを行わず、`bringup-display-13`とは同時に有効にできない（[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)。詳細は後続段落）。
+Issue #5 でtoolchainを固定し、最小projectのclean buildを確認した。実装済みなのは`link_patches()`、logger初期化、起動logの出力、Issue #7 の heartbeat と health snapshot、Issue #12 の`crate::protocol::PiSession`（`hello`／`ping`／`get_status`の受信側logic）、および Issue #13 の`crate::display::Ili9341`（`DISP-01`／ILI9341のSPI driver）である。**`crate::display`のbring-upは、既定buildでは実行しない。**`bringup-display-13` feature（既定off）を付けたbuildだけが実行する（[#451](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/451)。既定offにした理由と有効化の手順は`src/main.rs`のmodule docの「`DISP-01`のbring-upを有効にする手順」節が正本であり、**ここへ再掲しない**）。**製品buildは既定build（featureなし）であり、Pi linkも持つ**（[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)）。`bringup-display-13`は製品buildへLCDの試験モードを加えるfeatureであり、描画の間のPi linkの受信とheartbeatは`src/display_test.rs`のmodule docを参照（codeから導いたもので、実機では確かめていない）。#487のPR B1まであった`pi-protocol-mode`（Pi linkを持つbuild。LCD／I2Cと排他）は廃止した。構成の一覧は`src/main.rs`のmodule doc「buildの構成」節が持つ。
 
-`crate::display`は`docs/hardware/gpio-assignment.md`の`信号inventory`のうち`LCD-SCLK`／`LCD-MOSI`／`LCD-MISO`／`LCD-CS`／`LCD-DC`／`LCD-RST`／`LCD-BL`の7本だけを配線する。**`bringup-display-13` featureを付けたbuildでだけ、`main()`が起動直後にcontroller識別（Read ID4）、backlight点灯、単色fill、四隅test patternを実行し、結果をlogへ出す。既定buildはこの7本のいずれにも触れない。**一次資料の引用はmodule docにある。**この版で確認できているのはESP32 Build profile端末でのbuild成功までである。**flash・実機通電・LCD panelの目視確認は未実施であり、実機のtouch／servoは引き続き未実装のままである（`ADC-*`・`TOUCH-*`はこの版でも一切GPIOへ触れない。`DISP-01`と`SERVO-PWM`は既定のbuildでは一切GPIOへ触れず、それぞれ`bringup-display-13`／`bench-servo-test-17` featureを付けたbuildだけが触れる。`bench-servo-test-17`を付けたbuildは、#474で`compile_error!`によりcompileが止まる（`src/main.rs`）。servo側の手順は`docs/hardware/servo-safety-limits.md`の`初回動作の実行手順`に沿う）。`ACCEL-*`・`ENV-*`はIssue #15で`crate::accel`・`crate::env`のI2C driverを追加済みであり、上記「未実装」の対象外である（生byteをlogへ出すのみで、値の解釈は別途）。
+`crate::display`は`docs/hardware/gpio-assignment.md`の`信号inventory`のうち`LCD-SCLK`／`LCD-MOSI`／`LCD-MISO`／`LCD-CS`／`LCD-DC`／`LCD-RST`／`LCD-BL`の7本だけを配線する。**`bringup-display-13` featureを付けたbuildでだけ、`main()`が起動時にLCDを初期化し（横向きのMADCTL。controllerのIDは読まない）、backlightを点け、単色fillと四隅test patternをmain loopの中で1段ずつ描き（`src/display_test.rs`）、結果をlogへ出す。既定buildはこの7本のいずれにも触れない。**一次資料の引用はmodule docにある。**flash・実機通電・LCD panelの目視確認は`docs/hardware/experiment-log.md`の`EXP-016`〜`EXP-018`で行った。**これは#487のPR B1より前の、fillとpatternを1回で描き切る描画経路での結果であり、1段ずつ描く今の経路は実機で動かしていない。実機のtouch／servoは引き続き未実装のままである（`ADC-*`・`TOUCH-*`はこの版でも一切GPIOへ触れない。`DISP-01`と`SERVO-PWM`は既定のbuildでは一切GPIOへ触れず、それぞれ`bringup-display-13`／`bench-servo-test-17` featureを付けたbuildだけが触れる。`bench-servo-test-17`を付けたbuildは、#474で`compile_error!`によりcompileが止まる（`src/main.rs`）。servo側の手順は`docs/hardware/servo-safety-limits.md`の`初回動作の実行手順`に沿う）。`ACCEL-*`・`ENV-*`はIssue #15で`crate::accel`・`crate::env`のI2C driverを追加済みであり、上記「未実装」の対象外である（生byteをlogへ出すのみで、値の解釈は別途）。
 
-heartbeat と health snapshot は、いずれのbuildでもloopが動き続けるが、**既定buildでだけ**ESP logger の log にのみ出す（`pi-protocol-mode`はloggingを止めるため出力されない。`src/main.rs`参照）。**「log へ出す」は「serial へ出ない」ではない。**既定buildでのlogger の出力は UART を通って serial monitor に現れる。送らないのは、protocol の message として application の serial link（#11）へ流すことである。周期は `src/config.rs` が持ち、**いずれも暫定値である**（Protocol §5.7 が heartbeat の interval を `TBD` としているため、一次資料の根拠が無い）。health snapshot は `crates/deskcat-protocol` の `Status` を組み立てて JSON 1 行として出す。**`ProtocolCounters` はすべて 0 のままである。**いずれのbuildにも`ProtocolCounters`を増やす経路が無いためである（`src/health.rs`のmodule doc参照）。
+heartbeat と health snapshot は、いずれのbuildでもloopが動き続け、ESP logger の log にのみ出す（どのbuildでも出る。[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)より前の`pi-protocol-mode`はloggingを止めており、出力されなかった。`src/console.rs`参照）。**「log へ出す」は「serial へ出ない」ではない。**logger の出力は UART0（USB）を通って serial monitor に現れる。送らないのは、protocol の message として application の serial link（#11）へ流すことである。周期は `src/config.rs` が持ち、**いずれも暫定値である**（Protocol §5.7 が heartbeat の interval を `TBD` としているため、一次資料の根拠が無い）。health snapshot は `crates/deskcat-protocol` の `Status` を組み立てて JSON 1 行として出す。**`ProtocolCounters` はすべて 0 のままである。**いずれのbuildにも`ProtocolCounters`を増やす経路が無いためである（`src/health.rs`のmodule doc参照）。
 
-`src/protocol.rs`の`PiSession`は`hello`のsession遷移、`ping`／`get_status`への応答、`stale_session`の判定を実装し、`crates/deskcat-serial/src/peer.rs`（Pi側、Issue #12）と対になる。**既定buildでは実serial linkへは配線していない。**`main()`はこの型を自己完結した例（`demonstrate_pi_session`）で1回動かしてlogへ出すだけであり、実際のUART受信loopではない。[gpio-assignment.md](../../docs/hardware/gpio-assignment.md)の`Pi–ESP32間のtransport`節がPi linkをUSB serialに確定させており、board上のUSB-UARTブリッジICが内部でUART0（GPIO1／GPIO3）へ接続するためGPIO headerへの配線は無い。**このUART0は、build時のfeature（`pi-protocol-mode`。[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)）でdebug logとPi–ESP32 protocol streamのどちらかへ排他的に使う。**詳細は`docs/protocol/esp32-pi-protocol.md`§2、`src/console.rs`参照。`pi-protocol-mode`を有効にしたbuildは、ESP32自身が送る`boot` frameを`send_boot_frame_once`が1回だけUART0への書き込みを試みる。**受信loopは無いためsession確立は主張しない。**`sid`の生成方法は`PROTO-TBD-011`が未確定であり、この型（`PiSession`）は決めない。
+`src/protocol.rs`の`PiSession`は`hello`のsession遷移、`ping`／`get_status`への応答、`stale_session`の判定を実装し、`crates/deskcat-serial/src/peer.rs`（Pi側、Issue #12）と対になる。Pi linkを持つbuildでは、`src/pi_link.rs`の`PiLink`がPi linkのUARTから受けた行をdecodeし、`hello`／`ping`／`get_status`をこの型へ渡して応答を書き、`boot`のACKを`BootSession`へ渡す（#487）。**Pi linkはGPIOのUARTである**（`PI-UART-TX`＝GPIO13、`PI-UART-RX`＝GPIO14。pinと接続の条件の正は[gpio-assignment.md](../../docs/hardware/gpio-assignment.md)の`Pi–ESP32間のtransport`節）。`bench-servo-test-17`以外のすべてのbuild（既定buildを含む）が、UART0以外のUART（UART1）をこの2本へ割り当てて使う（[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)。`bench-servo-test-17`のbuildは、#17の測定用buildとしてPi linkを持たない）。**既定buildも起動のたびにGPIO13をTXとして駆動し、既定buildでもJTAG debugは使えない**（gpio-assignment.mdの`PI-UART-TX`行）。**UART0（board上のUSB-UARTブリッジ、GPIO1／GPIO3）は、どのbuildでも書き込みとdebug log専用である。**#487より前は、UART0をbuild時のfeatureでdebug logとPi–ESP32 protocol streamのどちらかへ排他的に使っていた。詳細は`docs/protocol/esp32-pi-protocol.md`§2、`src/console.rs`参照。Pi linkを持つbuildは、`src/boot_session.rs`の`BootSession`が`boot`のACK待ち・再送・`stale_session`受信時の`sid`選び直しを行い（[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446) PR B）、受信の異常（ring bufferの満杯など）を数えてhealth snapshotの行へ出す（#487）。**Piとつないでよい場面と条件は、gpio-assignment.mdの`信号線をつないでよい条件`が持つ**（とくに条件3（つないでよい試験）と条件5（給電の構成）。ここへ書き写さない。protocolの既知の制約は`src/console.rs`）。**host testと実機での動作確認はまだ無いため、session確立の成立は主張しない**（確かめていないことは`src/pi_link.rs`のmodule doc「確かめていないこと」）。`sid`の生成方法は`src/main.rs`の`generate_sid`が決める（`PROTO-TBD-011`のうち生成方法を部分解決。PR A）。この型（`PiSession`）自体は生成方法を持たない。
 
 | 項目 | 確定版 |
 |---|---|
@@ -45,20 +45,31 @@ ESP32 Build profileの端末で、このディレクトリにて実行する。*
 
 ## host crateの再利用
 
-`deskcat-protocol`をpath dependencyで使う。wire protocolの実装を両側で1つに保つためであり、
-判断の記録は[ADR-0008](../../docs/decisions/0008-firmware-protocol-crate-reuse.md)にある。
+`deskcat-protocol`と`deskcat-servo`をpath dependencyで使う。wire protocolの実装と、
+servoのhard limitとtrajectory limitingの実装を、それぞれ両側で1つに保つためである。
+判断の記録は[ADR-0008](../../docs/decisions/0008-firmware-protocol-crate-reuse.md)にある
+（`deskcat-servo`は同ADRの追記）。
 
 ```toml
 deskcat-protocol = { path = "../../crates/deskcat-protocol" }
+deskcat-servo = { path = "../../crates/deskcat-servo" }
 ```
 
 - root workspaceの`exclude = ["firmware/esp32"]`は**維持する。**lockfileはroot `Cargo.lock`と
   このディレクトリの`Cargo.lock`の2つに分かれたままでよい。
 - **共有crateの`rust-version`は、host（1.97.1）とESP toolchain（rustc 1.95.0-nightly）の
-  両方を満たす下限にしてある。**`crates/deskcat-protocol/Cargo.toml`が理由込みで宣言している。
+  両方を満たす下限にしてある。**`crates/deskcat-protocol/Cargo.toml`と
+  `crates/deskcat-servo/Cargo.toml`が理由込みで宣言している。
   ここを上げるとfirmwareのbuildが`rustc 1.95.0-nightly is not supported`でcompile前に止まる。
-- `crates/deskcat-protocol/**`の変更でも`.github/workflows/firmware.yml`が発火する。
+- `crates/deskcat-protocol/**`と`crates/deskcat-servo/**`の変更でも
+  `.github/workflows/firmware.yml`が発火する。
   host側だけの変更でfirmware buildが壊れるのを検知するためである。
+- compileできるbuildで、`src/servo.rs`を通って角度を出せるのは、同fileの`LimitedServo`だけである。
+  `Sg90`と`deskcat-servo`の`Limiter`を1つずつ所有し、`Limiter`も`Setpoint`も受理済みのtargetも
+  外から受け取らず、`tick`の間隔を自分で測る。**成立の条件**（`bench-servo-test-17`の経路を除く、
+  `LedcDriver`を直接作る経路は型では止められない、`unsafe`を使わない）は同fileのmodule docにある。
+  **既定buildの`main()`はservoを駆動しない。**
+  limiterへ渡す値（可動域、速度、加速度等）はどれも未確定であり、firmwareはまだ持たない。
 
 `src/health.rs`がこのcrateの`Status`と`ProtocolCounters`を組み立てる。ただし**送信はしない。**
 serial deviceは[#11](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11)、
@@ -77,10 +88,10 @@ session stateとserial taskの配線は
 
 機種と搭載moduleは確定している（ESP-WROOM-32D開発ボード／秋月電子 M-13628。基板にrevision表示は無い）。根拠は[hardware-bom.md](../../docs/hardware/hardware-bom.md)のMCU-01である。
 
-**公式pin表と現物pin表記の照合は2026-08-15に完了し、[HW-TBD-001](../../docs/hardware/tbd-register.md)はcloseした**（38pinヘッダ両側のsilkが公式`J2`／`J3`と19pin×2列すべてで一致した）。照合先は[ESP32-DevKitC V4公式回路図](https://dl.espressif.com/dl/schematics/esp32_devkitc_v4-sch.pdf)と公式guideのpin description表である（秋月商品ページの添付はモジュールとチップのdatasheetのみで、boardのpin配列表を含まない）。**ただしGPIO割り当てを伴う変更は、まだ入れない。**[gpio-assignment.md](../../docs/hardware/gpio-assignment.md)は実機での電源off導通check、MSP2807のlogic IO levelの現物確認、servo起動時状態の安全review待ちで`Blocked`のままである。**中核chipの識別（`HW-TBD-031`）は2026-08-20に満たした。**中核chipは半田付けされた金属シールドの内側にあり刻印を読めないため、要件は2026-08-15にesptoolの報告で満たす形へ再定義され（[esp32-rust-toolchain.md](../../docs/toolchains/esp32-rust-toolchain.md)の`chip識別の満たし方`）、#6のflash時に`esptool`が`ESP32-D0WD`を報告した。**値と未加工の出力はそちらとVersion Recordが持ち、ここへ再掲しない。**
+**公式pin表と現物pin表記の照合は2026-08-15に完了し、[HW-TBD-001](../../docs/hardware/tbd-register.md)はcloseした**（38pinヘッダ両側のsilkが公式`J2`／`J3`と19pin×2列すべてで一致した）。照合先は[ESP32-DevKitC V4公式回路図](https://dl.espressif.com/dl/schematics/esp32_devkitc_v4-sch.pdf)と公式guideのpin description表である（秋月商品ページの添付はモジュールとチップのdatasheetのみで、boardのpin配列表を含まない）。GPIO割り当ては[gpio-assignment.md](../../docs/hardware/gpio-assignment.md)の`信号inventory`に従う。**中核chipの識別（`HW-TBD-031`）は2026-08-20に満たした。**中核chipは半田付けされた金属シールドの内側にあり刻印を読めないため、要件は2026-08-15にesptoolの報告で満たす形へ再定義され（[esp32-rust-toolchain.md](../../docs/toolchains/esp32-rust-toolchain.md)の`chip識別の満たし方`）、#6のflash時に`esptool`が`ESP32-D0WD`を報告した。**値と未加工の出力はそちらとVersion Recordが持ち、ここへ再掲しない。**
 
 ESP-WROOM-32D datasheet v2.7にはPSRAM内蔵variantの記載が無いため、PSRAMを前提とする設定は不要である。
 
 **flash、serial monitor、実機起動は2026-08-20に#6で実施した**（記録は[Version Record](../../docs/toolchains/version-records/2026-08-20-esp32-flash-boot-native.md)）。**確認したのは起動出力とchip名までであり、周辺回路とservoには触れていない。****USB抜き差しによる電源再投入後の起動出力は未検証である**（host側のserial portがUSB enumerate後にしか存在せず、その時点で起動出力が終わっているため。再現は`espflash`のresetによる4回で示した）。
 
-**Issue #13の`DISP-01`driverはこの版ではESP32 Build profile端末でのbuild確認までである。**flash・実機通電はESP32 Flash / HIL profile端末と人間の監視を要する（[Hardware Safety Policy](../../docs/governance/hardware-safety-policy.md)、初回通電）。実機での識別結果（Read ID4の一致）、単色fillの色、四隅patternの向きとcolor order、更新timingの実測値は、実機試験後に`docs/hardware/experiment-log.md`へ記録する（**この版ではまだ記録していない**）。
+**Issue #13の`DISP-01`driverのこの版そのものは、ESP32 Build profile端末でのbuild確認までである**（書き込んだのは`EXP-018`のB2である。driver（`src/display.rs`）は、B2と同じcommandの列を送る版として`EXP-018`の後にcommitしたものであり、それ自体は書き込んでいない。#487からbring-upの描画は帯ごとにCASET／PASET／RAMWRを送るため、bring-up全体として送るcommandの列はB2と同じではなく、実機では動かしていない）。flash・実機通電はESP32 Flash / HIL profile端末と人間の監視を要する（[Hardware Safety Policy](../../docs/governance/hardware-safety-policy.md)、初回通電）。実機での結果（単色fillの色、color order、四隅と向き、更新timing。controllerのIDは読まない）は`docs/hardware/experiment-log.md`の`EXP-016`〜`EXP-018`にある。

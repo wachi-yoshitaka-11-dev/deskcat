@@ -30,24 +30,31 @@
 //!
 //! # 範囲
 //!
-//! 含むもの（`servo-safety-limits.md`の`Command処理`の中央3段）:
+//! 含むもの:
 //!
 //! - `motion-name/target validation`と`hard range clamp or rejection`（[`Limiter::admit`]）
 //! - `velocity and acceleration limiting`（[`Limiter::step`]）
 //! - `state and clamp-counter report`のcounter（[`LimiterCounters`]、[`ClampReport`]）
+//! - 同じcommandの再送でmotionを二重に始めない層（[`MotionDedup`]。Issue #19の受け入れ条件4の
+//!   うち、この層まで）。**このcrateは履歴を実装しない。**`deskcat-protocol`の`DuplicateHistory`を
+//!   使う側である
+//!
+//! duplicate suppressionは、PR #251のときにはこのcrateの範囲外とし、共通の履歴型を
+//! `deskcat-protocol`へ抽出する後続について「`PROTO-TBD-005` が未確定なうちは着手しない。」
+//! としていた。理由は値を先取りしないことだった。Issue #12で`crates/deskcat-serial`の
+//! `DuplicateHistory`が保持件数と保持期間を`DuplicatePolicy`として呼び出し側から受け取る形になり、
+//! その理由は抽出しても守れるようになった。そこでIssue #19で、`DuplicateHistory`を
+//! `deskcat-protocol`へ、hostとfirmwareで共用できるように移した。firmware側の呼び出しは、
+//! `play_motion`の型が決まった後である。**このcrateは履歴の実装を持たない**（`deskcat-protocol`の
+//! `DuplicateHistory`を使う）
 //!
 //! 含まないもの:
 //!
 //! - `protocol validation`（`crates/deskcat-protocol`）
 //! - `calibrated pulse conversion`と`hardware PWM`（calibration値が`TBD`、PWMは実機）
 //! - `単位時間あたりの受理数`（`rate_limited`）と`実行中trajectoryの占有`（`busy`）
-//! - duplicate suppression。**Issue #19 の受け入れ条件4 だが、この作業の範囲外である。**
-//!   `PROTO-TBD-005`（履歴の保持件数・期間）が未確定であり、
-//!   [`deskcat_protocol::ProtocolCounters::duplicate_expired`]自身が
-//!   「発火条件は未確定である。このcounterはそれらの値を先取りしない」と定めている。
-//!   **後続のIssueはまだ立っていない**（2026-08-28時点）。想定している形は、
-//!   `crates/deskcat-serial`の`BootHistory`と`firmware/esp32`の`processed_hello`から
-//!   共通の履歴型を抽出して共用することであり、**このcrateへ3つ目の実装を作らない**
+//! - wireの`play_motion`の受信と振り分け。`play_motion`の型が`deskcat-protocol`にまだ無い
+//!   （理由は`deskcat-protocol`の`message`のmodule docにある）
 //! - servoの駆動、GPIO、通電に関わる一切
 //!
 //! # 例
@@ -95,10 +102,12 @@
 //! ```
 
 pub mod counters;
+pub mod dedup;
 pub mod limiter;
 pub mod limits;
 
 pub use counters::{ClampReport, LimiterCounters};
+pub use dedup::{DedupOutcome, MotionDedup};
 pub use limiter::{
     AdmittedTarget, CommandSource, Limiter, MotionCatalog, MotionRequest, Rejection, Setpoint,
 };

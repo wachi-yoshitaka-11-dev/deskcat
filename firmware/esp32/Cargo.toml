@@ -12,30 +12,30 @@ name = "deskcat-esp32"
 harness = false # do not use the built-in cargo test harness -> resolve rust-analyzer errors
 
 [features]
+# **製品buildは既定build（featureなし）である**（#487）。Pi link（UART1、`PI-UART-TX`＝GPIO13、
+# `PI-UART-RX`＝GPIO14）とheartbeat／health snapshotを1本のmain loopで回す。I2Cのbring-upは起動時に1回走る
+# （`bringup-display-13`付きbuildでは、LCDのbring-upの後にmain loopの中で1回）。
+# featureは加える向きにする。例外は`bench-servo-test-17`だけであり、Pi linkを外す（下の注記）。
+# 構成の一覧は`src/main.rs`のmodule doc「buildの構成」節が持つ。
+# #487のPR B1まであった`pi-protocol-mode`（Pi linkを持つbuild。LCD／I2Cと排他）は廃止した。
 default = []
-# UART0をdebug log用ではなくPi-ESP32 protocol stream用に使うbuild。既定では無効
-# （debug logモード）。詳細は`docs/hardware/gpio-assignment.md`「信号inventory」の
-# `UART-TX`／`UART-RX`行、`#446`参照。
-pi-protocol-mode = []
 # Issue #17の単発servo bench試験だけを有効にする。既定ではoffであり、
 # 通常のbuildはこのfeatureを持たず`crate::servo`を呼ばない。承認の状態は
 # `docs/hardware/servo-safety-limits.md`の`承認の状態`節を参照する（ここへ再掲しない。
 # `main.rs`のmodule doc、`servo.rs`のmodule doc参照）。
-# **`pi-protocol-mode`と同時に有効にした構成は意図的にcompileできない。**
-# `main.rs`が`compile_error!`で拒否する。理由は、`pi-protocol-mode`が
-# `Peripherals::take()`を行わずservoのbench試験経路が呼ばれないため、
-# featureが黙って無効になることである。両方を同時に有効にするbuildは作らない。
-# **#474で、このfeatureは単独で有効にしてもcompileが止まる**（`main.rs`の`compile_error!`）。
+# **このfeature付きbuildはPi linkを持たない。**同文書の`測定のための駆動（承認の状態の項目6）`節が、
+# 測定用のbuildは「Piとの通信linkを持たない」と定めているためである。#487でfeatureの排他をやめた
+# ときの、ただ1つの例外である（featureどうしの排他ではない。このbuildはPi linkを外すだけであり、
+# `bringup-display-13`と組み合わせることは禁じていない）。
+# **#474で、このfeatureは有効にするとcompileが止まる**（`main.rs`の`compile_error!`）。
 bench-servo-test-17 = []
-# Issue #13の`DISP-01`（MSP2807）bring-up（controller識別、backlight点灯、単色fill、
-# 四隅pattern）だけを有効にする。既定ではoffであり、通常のbuildは`run_display_bringup`を
+# Issue #13の`DISP-01`（MSP2807）bring-up（初期化、backlight点灯、単色fill、
+# 四隅pattern）を製品buildへ加える。既定ではoffであり、既定buildは`run_display_bringup`を
 # 呼ばず、`LCD-BL`（GPIO4）を含むLCD関連pinへ一切触れない。既定offにした理由と、
 # 有効化してよい条件・手順は`main.rs`のmodule docの
 # 「`DISP-01`のbring-upを有効にする手順」節を参照する（ここへ再掲しない）。
-# **`pi-protocol-mode`と同時に有効にした構成は意図的にcompileできない。**
-# `main.rs`が`compile_error!`で拒否する。理由は`bench-servo-test-17`と同じで、
-# `pi-protocol-mode`が`Peripherals::take()`を行わずbring-up経路が呼ばれないため、
-# featureが黙って無効になることである。
+# #487から、fillと四隅patternはmain loopの中で1段ずつ進む（`src/display_test.rs`。描画の間の
+# Pi linkの受信とheartbeatは、同fileのmodule docを参照）。
 bringup-display-13 = []
 
 [profile.release]
@@ -50,6 +50,10 @@ opt-level = "z"
 # root workspaceの`exclude = ["firmware/esp32"]`は維持したまま、依存だけを張る。
 # lockfileは`firmware/esp32/Cargo.lock`とroot `Cargo.lock`の2つに分かれたままでよい。
 deskcat-protocol = { path = "../../crates/deskcat-protocol" }
+# servoのhard limitとtrajectory limitingを、hostと同じ実装で強制する（ADR-0008の追記、#19）。
+# compileできるbuildで、`crate::servo`を通って角度を出せるのは、`Sg90`とこのcrateの`Limiter`を
+# 1つずつ所有する`crate::servo::LimitedServo`だけである（成立の条件は`src/servo.rs`のmodule doc）。
+deskcat-servo = { path = "../../crates/deskcat-servo" }
 log = "0.4"
 # health snapshotを`deskcat-protocol`の`Status`と同じ形へserializeするために使う。
 # 同crateが既に依存しており、`firmware/esp32/Cargo.lock`にも推移的に入っている。

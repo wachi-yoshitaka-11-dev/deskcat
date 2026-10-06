@@ -6,25 +6,61 @@
 //!
 //! # これで確かめられること／確かめられないこと
 //!
-//! **確かめられるのは「行が通ること」までである。**open、byteのread／write、行の復元、
-//! 切断の観測、再接続の上限、partial I/Oはここで見える。
+//! 行の層では、open、byteのread／write、行の復元、切断の観測、再接続の上限、partial I/Oを確かめられる。
+//! protocolの層は、次のように[`deskcat_serial::PeerSession`]（[Issue #12]、
+//! `crates/deskcat-serial/src/peer.rs`と`coordinator.rs`）へつないである。
 //!
-//! **`protocol`が成立したことは確かめられない。**`boot`／`ping`／`status`／ACK／reconnect
-//! 同期の実装は[Issue #12]であり、**`ESP32`側がprotocolを話すとは限らない。**
-//! 接続のたびに`hello`を1件送るのは書き出し経路を通すためであって、handshakeではない。
-//! `reason`は初回が`Startup`、再接続が`PortReopen`である（仕様§5.1）。
-//! **相手がこれに応答するとは限らない。**
+//! - 接続のたびに`hello`を1件送り、その`id`を[`deskcat_serial::PeerSession::note_hello_sent`]で記録する。
+//!   `reason`は初回が`Startup`、再接続が`PortReopen`である（仕様§5.1）。
+//! - 受信したframeは、種類を問わず[`deskcat_serial::handle_frame`]へ渡す。`boot`にはACKを返し、
+//!   新しいsessionを確立した場合は`get_status`を1件送る。`ack`は送ったrequestと相関させる。`status`は
+//!   `get_status`への応答かどうかを分ける（仕様§5.6）。
+//! - pumpの1周ごとに[`deskcat_serial::retry_due_requests`]を呼ぶ。ACK timeoutした`get_status`を
+//!   同じ`id`で送り直し（仕様§9）、確立の直後にqueueへ入れられなかった`get_status`を送る。
+//!
+//! **ESP32が`boot`→ACKより先の往復に応えるのは、`firmware/esp32`を[Issue #487]のPR B2
+//! （[PR #529]）以降のsourceから、Pi linkを持つbuild（`bench-servo-test-17`以外）で書き込んだ場合である。**PR B2で、
+//! ESP32は`hello`／`ping`／`get_status`にACKを返し、`get_status`にはACKの直後に`status`を返す
+//! （`firmware/esp32/src/pi_link.rs`のmodule doc）。そのため、実機で次の往復が成り立つはずである。
+//!
+//! 1. この実行体の`hello`にESP32がACKを返す。初回の接続で`boot`より先に届いたACKは、ESP32の
+//!    `sid`をまだ承認していないため`hello`の結果として受理せず、`unapproved_hello_acks`へ数える
+//!    （仕様§6）。届く順序とESP32の状態によって数え方は変わる。その正本は`PeerSession`の
+//!    `pending_hello`のdocと、`tests/simulator.rs`の`hello`への`ack`を扱うtestである。
+//! 2. ESP32が`boot`を送る（起動後の再送、または`hello`による再開）。`boot`が届く条件は仕様§4.1の
+//!    表と「`hello`による再開」が持つ。この実行体はACKを返し、`get_status`を送る。
+//! 3. ESP32が`get_status`へACKと`status`を返す。`status`のcounterは0のままである
+//!    （仕様§2の既知の逸脱(ii)）。
+//!
+//! **3が成り立つのは、ESP32がこの実行体の`hello`を受理し、その後に再起動していない場合だけである。**
+//! それ以外では、ESP32は`get_status`を`stale_session`で拒否し、`status`を返さない
+//! （`firmware/esp32/src/protocol.rs`の`PiSession::handle_get_status`）。`hello`がESP32へ届かなかった
+//! 場合が当たる（この実行体は`hello`を再送しない。`PROTO-TBD-011`）。
+//! 仕様は、Piが`stale_session`を受けたら`hello`から再開すると定める（§10.2）。**この実行体は
+//! それを実装していない**（[`deskcat_serial::handle_frame`]のdocは、再開を呼び出し側の責務とする）。
+//! 再接続で送るのも`PortReopen`の`hello`だけである。そのため、この場合は実行体を起動し直す。
+//!
+//! **この往復は、実機ではまだ確かめていない。**`ESP32`側の振る舞いはsourceを読んで導いたもので
+//! あり、ESP32側の振る舞いを確かめるhost testは無い（`pi_link.rs`のmodule doc「確かめていないこと」）。
+//! host（VM）では擬似端末で確かめたが、相手はfixtureの行で応える偽のESP32である
+//! （`crates/deskcat-serial/README.md`の「host（VM）で確認済みの挙動」）。実機の確認は
+//! [Issue #446]と[Issue #12]が追跡する。
+//! **`ESP32`側がprotocolを話すとは限らない**という留保は、実機で確かめるまで変わらない。
 //! 記録するときは「行が通った」と「protocolが成立した」を書き分ける。
 //!
 //! # 使い方
 //!
 //! ```text
-//! cargo run --example serial_link -- --port <path> --baud <rate> [--seconds <n>] [--verbose]
+//! cargo run --example serial_link -- --port <path> --baud <rate> \
+//!     --duplicate-capacity <n> --duplicate-retention-ms <ms> [--seconds <n>] [--verbose]
 //! ```
 //!
 //! `--port`と`--baud`は**どちらも必須である。**既定値を持たせない。device名は未確認で
 //! あり（確定はIssue #11の後半）、baudの正本は`PROTO-TBD-001`でいずれも`Candidate`である。
 //! **確認していない値を既定として固定しない。**渡した値は記録にそのまま残る。
+//!
+//! `--duplicate-capacity`と`--duplicate-retention-ms`（`boot`のduplicate履歴の保持件数と
+//! 保持期間）も同じ理由で必須である。正本は`PROTO-TBD-005`で未確定である。
 //!
 //! `--seconds`を省くと、再接続の上限に達してsessionが停止するまで走り続ける。
 //!
@@ -39,27 +75,36 @@
 //!
 //! [Issue #11]: https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11
 //! [Issue #12]: https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12
+//! [Issue #446]: https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446
+//! [Issue #487]: https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487
+//! [PR #529]: https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/529
 
 use std::process::ExitCode;
 use std::thread::sleep;
 use std::time::{Duration, Instant};
 
-use deskcat_protocol::{Hello, HelloReason, Message, Outcome};
-use deskcat_serial::{ConnectionState, Pump, SerialConfig, SerialDevice, Session, SessionCounters};
+use deskcat_protocol::{Frame, Hello, HelloReason, Message, Outcome};
+use deskcat_serial::{
+    ConnectionState, DuplicatePolicy, PeerCounters, PeerSession, Pump, Received, RetryOutcome,
+    SerialConfig, SerialDevice, Session, SessionCounters, handle_frame, retry_due_requests,
+};
 
 /// 呼び出し側の引数。
 struct Args {
     port: String,
     baud: u32,
+    /// `--duplicate-capacity`と`--duplicate-retention-ms`から作る。
+    duplicate_policy: DuplicatePolicy,
     seconds: Option<u64>,
     verbose: bool,
 }
 
 fn usage() -> &'static str {
-    "usage: serial_link --port <path> --baud <rate> [--seconds <n>] [--verbose]\n\
+    "usage: serial_link --port <path> --baud <rate> \
+     --duplicate-capacity <n> --duplicate-retention-ms <ms> [--seconds <n>] [--verbose]\n\
      \n\
-     --port と --baud は必須である。既定値を持たせない。\n\
-     device名は未確認であり、baudの正本は PROTO-TBD-001 である。"
+     --port、--baud、--duplicate-capacity、--duplicate-retention-ms は必須である。既定値を持たせない。\n\
+     device名は未確認であり、baudの正本は PROTO-TBD-001、duplicate履歴の正本は PROTO-TBD-005 である。"
 }
 
 /// 引数の解析結果。
@@ -76,6 +121,8 @@ enum Parsed {
 fn parse_args() -> Result<Parsed, String> {
     let mut port = None;
     let mut baud = None;
+    let mut duplicate_capacity = None;
+    let mut duplicate_retention_ms = None;
     let mut seconds = None;
     let mut verbose = false;
     let mut argv = std::env::args().skip(1);
@@ -89,6 +136,20 @@ fn parse_args() -> Result<Parsed, String> {
                     value()?
                         .parse::<u32>()
                         .map_err(|e| format!("--baudが数値でない: {e}"))?,
+                );
+            }
+            "--duplicate-capacity" => {
+                duplicate_capacity = Some(
+                    value()?
+                        .parse::<usize>()
+                        .map_err(|e| format!("--duplicate-capacityが数値でない: {e}"))?,
+                );
+            }
+            "--duplicate-retention-ms" => {
+                duplicate_retention_ms = Some(
+                    value()?
+                        .parse::<u64>()
+                        .map_err(|e| format!("--duplicate-retention-msが数値でない: {e}"))?,
                 );
             }
             "--seconds" => {
@@ -107,6 +168,16 @@ fn parse_args() -> Result<Parsed, String> {
     Ok(Parsed::Run(Box::new(Args {
         port: port.ok_or_else(|| format!("--portが必要である\n\n{}", usage()))?,
         baud: baud.ok_or_else(|| format!("--baudが必要である\n\n{}", usage()))?,
+        duplicate_policy: DuplicatePolicy::new(
+            duplicate_capacity
+                .ok_or_else(|| format!("--duplicate-capacityが必要である\n\n{}", usage()))?,
+            Duration::from_millis(
+                duplicate_retention_ms.ok_or_else(|| {
+                    format!("--duplicate-retention-msが必要である\n\n{}", usage())
+                })?,
+            ),
+        )
+        .map_err(|e| format!("duplicate履歴の設定が不正である: {e}"))?,
         seconds,
         verbose,
     })))
@@ -131,7 +202,7 @@ fn uptime_ms(started: Instant) -> u64 {
     u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX)
 }
 
-/// 接続ごとに1件送る`hello`。**handshakeではない**（module docを読む）。
+/// 接続ごとに1件送る`hello`（仕様§5.1）。ACKとの相関と、ESP32側での扱いはmodule docを読む。
 ///
 /// `reason`は初回だけ[`HelloReason::Startup`]で、**再接続では
 /// [`HelloReason::PortReopen`]である。**仕様§5.1が両者を別の値として定義しており
@@ -146,7 +217,18 @@ fn hello(reason: HelloReason) -> Message {
     })
 }
 
-fn report(counters: SessionCounters, state: ConnectionState) {
+/// `hello`をqueueへ入れ、ESP32からのACKをこの`hello`と相関させるために記録する（#12）。
+fn send_hello(session: &mut Session, peer: &mut PeerSession, reason: HelloReason, now_ms: u64) {
+    match session.send(hello(reason), now_ms) {
+        Ok(id) => {
+            peer.note_hello_sent(id);
+            log::info!("hello を queue へ入れた（id={id}, reason={reason:?}）");
+        }
+        Err(error) => log::warn!("hello を送れない: {error}"),
+    }
+}
+
+fn report(counters: SessionCounters, peer: PeerCounters, state: ConnectionState) {
     log::info!("state: {state:?}");
     log::info!(
         "counters: bytes_in={} bytes_out={} frames_in={} rejected_in={}",
@@ -168,6 +250,65 @@ fn report(counters: SessionCounters, state: ConnectionState) {
         counters.discarded_on_disconnect,
         counters.encode_failed
     );
+    log::info!(
+        "peer: session_switches={} duplicate_replays={} stale_sessions={} duplicate_expired={}",
+        peer.session_switches,
+        peer.duplicate_replays,
+        peer.stale_sessions,
+        peer.duplicate_expired
+    );
+    log::info!(
+        "peer: invalid_payloads={} rate_limited={} unmatched_acks={} unapproved_hello_acks={} unknown_types={}",
+        peer.invalid_payloads,
+        peer.rate_limited,
+        peer.unmatched_acks,
+        peer.unapproved_hello_acks,
+        peer.unknown_types
+    );
+}
+
+/// [`handle_frame`]の判断を1行のlogにする。**`status`とeventの中身は出さない。**`boot`の`outcome`（確立した
+/// `boot`の`firmware`／`board`／`reset_reason`を含む）と、ACKの`reply_to`／`status`／`code`と、
+/// eventの`type`と`id`は出す。
+///
+/// `boot`への応答（ACKと、確立時の`get_status`）は[`handle_frame`]が送る。ここは出力だけである。
+fn log_received(received: &Received) {
+    match received {
+        Received::Boot(handled) => log::info!("bootを処理した: outcome={:?}", handled.outcome),
+        Received::Ack(correlated) => log::info!(
+            "ackを相関した: request={:?} reply_to={} status={:?} code={:?}",
+            correlated.request,
+            correlated.ack.reply_to,
+            correlated.ack.status,
+            correlated.ack.code
+        ),
+        Received::Status(accepted) => {
+            log::info!("statusを受理した: solicited={}", accepted.solicited);
+        }
+        Received::Event(frame) => log::info!(
+            "eventを受けた: type={} id={}",
+            frame.message.type_str(),
+            frame.envelope.id
+        ),
+        // 拒否と無視は`handle_frame`自身が`log::warn!`へ残している。ここでは重ねて出さない。
+        Received::Rejected { .. } | Received::UndefinedType(_) => {}
+        // `Received`は`#[non_exhaustive]`である。増えたvariantを黙って捨てない。
+        other => log::warn!("未知のReceived: {other:?}"),
+    }
+}
+
+/// [`retry_due_requests`]の再送をlogにする。
+///
+/// 再送の失敗と取り下げは[`retry_due_requests`]自身が`log::warn!`へ残している。ここでは重ねて出さない。
+fn log_retries(outcomes: &[RetryOutcome]) {
+    for outcome in outcomes {
+        match outcome {
+            RetryOutcome::Resent(id, kind) => log::info!("再送した: id={id} kind={kind:?}"),
+            RetryOutcome::ResendFailed(..) | RetryOutcome::GaveUp(..) => {}
+            // `RetryOutcome`は`#[non_exhaustive]`である。増えたvariantを黙って捨てない。
+            other => log::warn!("未知のRetryOutcome: {other:?}"),
+        }
+    }
 }
 
 fn main() -> ExitCode {
@@ -213,6 +354,10 @@ fn main() -> ExitCode {
     // ここではprocessのidを種にする。乱数を持ち込まない。
     let sid = std::process::id();
     let mut session = Session::new(config.clone(), sid);
+    // ESP32側のsession state。**再接続をまたいで1つだけ持つ。**Piの再接続
+    // （`PortReopen`）はESP32側のsessionを暗黙に変えない。ESP32が再起動すれば
+    // 新しい`sid`の`boot`として届き、`PeerSession`自身がsession遷移として扱う（§3.1）。
+    let mut peer = PeerSession::new(args.duplicate_policy.clone());
     let started = Instant::now();
     // **`started + Duration`にしない。**`--seconds`は任意の`u64`を受け取るため、
     // 表現できないdeadlineでpanicする（実測: `u64::MAX`で
@@ -257,19 +402,17 @@ fn main() -> ExitCode {
         log::info!("portを開いた");
         session.note_connected();
 
-        // 書き出し経路を通すために1件送る。**handshakeではない。**
+        // 接続ごとに`hello`を1件送る（module doc）。
         let reason = if first_connect {
             HelloReason::Startup
         } else {
             HelloReason::PortReopen
         };
         first_connect = false;
-        match session.send(hello(reason), uptime_ms(started)) {
-            Ok(id) => log::info!("hello を queue へ入れた（id={id}, reason={reason:?}）"),
-            Err(error) => log::warn!("hello を送れない: {error}"),
-        }
+        send_hello(&mut session, &mut peer, reason, uptime_ms(started));
 
-        let disconnected = pump_until_break(&mut session, &mut device, deadline);
+        let disconnected =
+            pump_until_break(&mut session, &mut peer, &mut device, started, deadline);
 
         if !disconnected {
             break; // deadline到達、または停止済み。summaryはloopの外で1度だけ出す
@@ -277,7 +420,7 @@ fn main() -> ExitCode {
 
         // 切断ごとの区切りとして出す。**loopを抜けた後にもう一度出さない**
         // （同じ数字が2回並ぶと、どちらが最終値か読めない）。
-        report(session.counters(), session.state());
+        report(session.counters(), peer.counters(), session.state());
 
         let Some(backoff) = session.begin_reconnect() else {
             log::error!("再接続の上限に達した。停止する");
@@ -288,7 +431,7 @@ fn main() -> ExitCode {
         sleep(wait);
     }
 
-    report(session.counters(), session.state());
+    report(session.counters(), peer.counters(), session.state());
     log::info!("経過 {:?}", started.elapsed());
 
     // **握りつぶしていないことをここで示す。**0件でも出す。
@@ -309,7 +452,9 @@ fn main() -> ExitCode {
 /// linkが切れるか、期限に達するまでpumpを回す。切断で抜けたときだけ`true`。
 fn pump_until_break(
     session: &mut Session,
+    peer: &mut PeerSession,
     device: &mut SerialDevice,
+    started: Instant,
     deadline: Option<Instant>,
 ) -> bool {
     loop {
@@ -317,11 +462,20 @@ fn pump_until_break(
             return false;
         }
 
+        // frameを集めてから、`pump_read`（`session`を`&mut self`で借用中）を
+        // 抜けたあとに[`handle_frame`]へ渡す。**その場で`handle_frame(session, ...)`は
+        // 呼べない**（`session`の二重可変借用）。`firmware/esp32/src/pi_link.rs`の
+        // `PiLink::on_bytes`が採る「集めてから扱う」パターンと同じ理由である。
+        let mut frames: Vec<Frame> = Vec::new();
         let read = session.pump_read(device, |outcome| match outcome {
             Outcome::Frame(frame) => {
                 let (sid, id) = frame.envelope.identity();
-                // **payloadを出さない。**上位（Issue #12）が扱う。ここはlinkの確認である。
-                log::info!("行を復元した: sid={sid} id={id} type={:?}", frame.message);
+                // **payloadを出さない。**種類だけを出す。中身の扱いは`handle_frame`である。
+                log::info!(
+                    "行を復元した: sid={sid} id={id} type={}",
+                    frame.message.type_str()
+                );
+                frames.push(frame);
             }
             Outcome::Rejected(rejection) => {
                 log::warn!(
@@ -332,6 +486,14 @@ fn pump_until_break(
                 );
             }
         });
+        for frame in frames {
+            let received = handle_frame(session, peer, frame, uptime_ms(started));
+            log_received(&received);
+        }
+        // ACK timeoutした`ping`／`get_status`を同じ`id`で送り直す（§9）。この実行体は`ping`を
+        // 送らないため、対象は`get_status`だけである。`hello`は対象外
+        // （`PROTO-TBD-011`。`OutstandingKind::Hello`のdoc参照）。
+        log_retries(&retry_due_requests(session, peer, uptime_ms(started)));
         let write = session.pump_write(device);
 
         for pump in [read, write] {

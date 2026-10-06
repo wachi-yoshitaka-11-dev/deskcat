@@ -64,9 +64,29 @@ pub const HEALTH_SNAPSHOT_PERIOD_MS: u32 = 10_000;
 /// 上限が何によって効くか（ESP-IDFのどの機構が`Err`を返すか）と、
 /// `esp_idf_svc::hal::i2c::config::Config`の`timeout`フィールドを設定しない理由は、
 /// `main.rs`の`run_i2c_bringup`のdoc commentが持つ。**ここへ再掲しない。**
-// `pi-protocol-mode`では`crate::accel`／`crate::env`をcompileしないため未到達になる。
-#[allow(dead_code)]
 pub const I2C_TRANSACTION_TIMEOUT_MS: u64 = 100;
+
+/// `DISP-01`のbring-upで、単色fillの各色と向きのpatternを表示したまま保つ時間（milliseconds）。
+///
+/// [Issue #13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)の条件2〜4
+/// （単色fill、color order、四隅とorientation）を写真で残すための待ちである。以前は各色を
+/// 描いた直後に次の色を描いていた。patternも描いた直後に`run_display_bringup`が戻り、
+/// driverのDropでbacklightが消える（`docs/hardware/experiment-log.md`の`EXP-017`。sourceの
+/// 読解による説明であり実測ではない）。どちらも、人が撮る時間が無かった。
+///
+/// **一般値である。一次資料に基づく値ではない。**表示を保つ時間は
+/// [Hardware Safety Policy](../../../docs/governance/hardware-safety-policy.md)の安全要件5項目の
+/// いずれにも効かない。外した場合の帰結は「撮り直す」に留まる。**どの値が5項目に効くかの判定は
+/// 同policyが正本であり、ここへ5項目を再掲しない。**この待ちはbacklightの点灯時間を延ばすが、
+/// 流れる電流は変えない。`#461`の余裕解析はbacklightが点灯した状態を含む
+/// （`main.rs`のmodule doc「`DISP-01`のbring-upを有効にする手順」節）。
+///
+/// 5色とpatternの合計でこの値の6倍だけ、`run_i2c_bringup`のlog（`accel_device_id`・
+/// `env_chip_id`）が遅れて出る。**#487からは、それに描画の時間と、描画の段ごとの待ち（main loopが
+/// 1段ごとに最大1 tick＝0〜10 ms待つ。描く段は約100。`crate::display_test`）が加わる**（計算であり、
+/// 実測ではない。待ちは上限の見積もりである）。
+#[cfg(feature = "bringup-display-13")]
+pub const DISPLAY_HOLD_MS: u32 = 3_000;
 
 /// `SERVO-PWM`（SG90への制御信号）のGPIO番号。出所は
 /// [gpio-assignment.md](../../../docs/hardware/gpio-assignment.md)の`信号inventory`。
@@ -121,3 +141,98 @@ pub const SERVO_BENCH_TEST_ARM_DELAY_MS: u32 = 10_000;
 /// （ミリ秒）。安全な保持時間の主張ではなく露出時間の最小化。
 #[allow(dead_code)]
 pub const SERVO_BENCH_TEST_EXPOSURE_MS: u32 = 300;
+
+/// Pi link（`PI-UART-TX`／`PI-UART-RX`）のbaud（Hz）。
+/// **確定値ではない。**`docs/protocol/esp32-pi-protocol.md`§2の`Baud`行が`Candidate`
+/// （両端で検証する）とする115200 bpsを使う（`PROTO-TBD-001`、最終baudは未確定）。
+/// 直列4.7 kΩを入れたままこのbaudで通信できるかは、初回の接続で確かめる
+/// （`docs/hardware/gpio-assignment.md`の`信号線をつないでよい条件`4）。
+///
+/// **`#487`より前は、UART0のconsole（`CONFIG_ESP_CONSOLE_UART_BAUDRATE`）と揃える
+/// ことを根拠にしていた。**Pi linkがUART0から外れたため、その根拠は無くなった
+/// （UART0のconsoleとは別のUARTであり、揃える必要が無い）。
+#[cfg(not(feature = "bench-servo-test-17"))]
+pub const PI_PROTOCOL_UART_BAUDRATE_HZ: u32 = 115_200;
+
+/// Pi link UARTの受信ring buffer容量（byte）。`UartDriver`（interrupt駆動）が
+/// hardware FIFOから継続的に吸い上げる先であり、hardware FIFO自体
+/// （`SOC_UART_FIFO_LEN`＝128 byte、ESP32の`soc_caps.h`）より大きくなければ
+/// `uart_driver_install`が`ESP_FAIL`を返す（ESP-IDF v5.5.3の
+/// `esp_driver_uart/src/uart.c`の`rx_buffer_size > UART_HW_FIFO_LEN`検査）。
+///
+/// # 容量の根拠
+///
+/// `main()`のloopは、次の締切（heartbeat／health snapshot／`boot`再送）までの
+/// 残り時間を`UartDriver::read`のtimeoutへ渡す（`sleep_ms_until`の代わり）。
+/// interrupt駆動のring bufferはこの待ちの間もhardware FIFOから継続的に吸い上げる
+/// ため、**待ち時間の長さ（heartbeatの`1_000` msなど）そのものはring buffer容量に
+/// 効かない。**効くのは、1回の`read`呼び出しから次の呼び出しまでの間にどれだけ
+/// 溜まりうるかであり、`read`はdataが来ればtimeoutを待たずに戻る
+/// （esp-idf-hal 0.46.2の`UartRxDriver::read`（`uart.rs`1179〜1246行）が、
+/// まずnon-blockingで試し、無ければ**1 byteだけ**を実際のtimeoutでblocking
+/// 読みし、来たら残りをnon-blockingで拾う、という2段構えの実装になっている
+/// ため。「1 byteだけ」の要求に対して、ESP-IDF v5.5.3の`uart.c`の
+/// `uart_read_bytes`（1662〜1701行）内部の`xRingbufferReceiveUpTo`は、
+/// その1 byteが来た時点で満たされ即座に戻る。同じ`uart_read_bytes`を
+/// buffer全長で呼んだ場合は、要求量を満たすかtimeoutまで戻らない
+/// （hal側がこの2段構えを採る理由）ため、通常は小さい。**ただし`crate::pi_link::PiLink::on_bytes`の
+/// 処理中（応答の書き込みと、`reselect_sid`のNVS操作を含む）はこの`read`を呼ばないため、
+/// その間はring bufferが貯まり続ける。**このNVS操作の所要時間は未確認
+/// （下記）。
+///
+/// **`#487`から、`read`と`read`の間にUART0へのdebug log出力も入る。**Pi linkを持つbuildが
+/// loggingを止めなくなったためである（`crate::console`参照）。`bringup-display-13`付きbuildでは、
+/// LCDの描画の1段（`crate::display_test`）と、LCDのbring-upの後に1回だけ走るI2Cのbring-up（`main.rs`の`i2c_pending`）も入る。heartbeat、health snapshot
+/// （JSON 1行）、`boot_tx`等のlogを書いている間も、この`read`は呼ばれない。**log出力の
+/// 所要時間は測っていない。**consoleがbyteを送り終えるまで戻らない場合、所要時間は
+/// logのbyte数に比例する。UART0のbaudは生成された`sdkconfig`の`CONFIG_ESP_CONSOLE_UART_BAUDRATE`
+/// で`115200`と確かめた（`#487`、ESP-IDF v5.5.3、debug profileのbuild出力）。Pi linkも115200 bpsであるため、その間にPi linkへ
+/// 届きうるbyte数はlogのbyte数と同程度になる（計算であり、実測ではない）。health snapshotの
+/// 1行の長さも測っていない。**この見込みが512 byteに収まるかは確かめていない。**
+/// `#487`から、溢れはUART driverのevent（`UART_BUFFER_FULL`／`UART_FIFO_OVF`）として数え、
+/// 読みに行く間隔の最大値と一緒にhealth snapshotの行へ出す（`main.rs`の`drain_uart_events`、
+/// `crate::health::UartObservations`）。**eventが数えられなかった場合もありうる**（同関数のdoc）。
+///
+/// **この値は理論値ではなく安全側の見込みである。**`boot`のACK（§6の例で約115 byte）に
+/// 続けて`get_status`等の別messageが即座に届く場合（`coordinator::handle_boot`が
+/// ACK後に同期送信する。`crates/deskcat-serial/src/coordinator.rs`参照）を想定し、
+/// hardware FIFO（128 byte）の4倍を確保して複数行分の余裕を見た。この余裕（4倍）は、
+/// main loopが次に`read`を呼ぶまで、受信bufferだけで溢れないための根拠である。
+/// **このring bufferが実機で溢れないことはbuildでは示せない。**実機確認の項目とする
+/// （`console.rs`のmodule doc参照）。**`generate_sid`が行うNVSへの書き込み・
+/// 消去（flash操作）の間、UART受信interruptが遅延・停止しうるかどうかは
+/// 確認していない。**`generate_sid`は起動直後の初回呼び出し（`main.rs`の
+/// `BootSession::start`の引数評価）でも、`reselect_sid`からの再呼び出しでも
+/// 同じ経路を通る。前者は`UartDriver`のinstall後に評価されるため、受信
+/// interruptが有効な状態で発生する。書き込みは通常`set_u32`1回分だが、
+/// `EspDefaultNvsPartition::take()`が`ESP_ERR_NVS_NO_FREE_PAGES`／
+/// `ESP_ERR_NVS_NEW_VERSION_FOUND`を検知した場合は`nvs_flash_erase()`で
+/// partition全体を消去する経路もある（`generate_sid`のdoc「衝突許容確率」
+/// 節参照。この経路の実在はesp-idf-svcのsourceで確認済み）。**この書き込み・
+/// 消去の間、UART受信interruptが遅延・停止しうるかどうかは一次資料で
+/// 確認しておらず、この版ではその影響を測っていない。**
+#[cfg(not(feature = "bench-servo-test-17"))]
+pub const PI_PROTOCOL_UART_RX_BUFFER_BYTES: usize = 512;
+
+/// Pi link UARTの送信ring buffer容量（byte）。受信側ほど余裕を必要と
+/// しない。`UartDriver::write`が呼ぶ`uart_write_bytes`→`uart_tx_all`は
+/// `portMAX_DELAY`でblockし、渡した全byteをtx ring bufferへ積み終えるまで
+/// 戻らない（wireへ送り終えるまでではない。`crate::boot_session`の`send_boot`の
+/// comment参照）ため、tx ring bufferが溢れて送信側がdataを失うことは無い。`uart_driver_install`は`tx_fifo_size`にも
+/// `> UART_HW_FIFO_LEN`（または`0`）を要求するため、受信側と同じ値にしておく。
+#[cfg(not(feature = "bench-servo-test-17"))]
+pub const PI_PROTOCOL_UART_TX_BUFFER_BYTES: usize = 512;
+
+/// `main()`のloopで1回の`UartDriver::read`に渡すstack buffer長（byte）。
+/// Ring buffer容量（[`PI_PROTOCOL_UART_RX_BUFFER_BYTES`]）より小さくてよい
+/// （`read`は複数回に分けて呼ばれ、`crate::boot_session::BootSession`が
+/// 受信済みbyteを跨いで行を組み立てる）。stack上に置くため小さく抑えた
+/// （ring buffer容量の半分）。**`main()`の他のlocal変数と合わせた合計stack使用量は
+/// 測っていない。**task stack sizeを圧迫しないという主張はしない。
+#[cfg(not(feature = "bench-servo-test-17"))]
+pub const PI_PROTOCOL_UART_READ_CHUNK_BYTES: usize = 256;
+
+/// Pi link UARTのevent queueの長さ（件）。受信の異常（ring bufferの満杯、FIFOの溢れ）を
+/// 数えるために使う（`main.rs`の`drain_uart_events`）。**導出した値ではない。**
+#[cfg(not(feature = "bench-servo-test-17"))]
+pub const PI_PROTOCOL_UART_EVENT_QUEUE_LEN: usize = 32;

@@ -71,13 +71,31 @@ Closes #
 
 ## 自己レビュー
 
-- [ ] [自己レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/CONTRIBUTING.md#自己レビュー)の観点で見直し、新規指摘0件が2 round続いた
+- [ ] 開始時に同一作業の既実施巡数と人間の継続承認を確認した（同じreviewの中では差分・rebase・push・セッション変更でもリセットしない）
+- [ ] [自己レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/CONTRIBUTING.md#自己レビュー)の観点で見直し、下記の終端状態と未解決欠陥を記録した
 - [ ] **要件照合Pass**と**fresh-context Pass**を、同じ最終diffに対して別々に実施した（[2つのPass](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/CONTRIBUTING.md#2つのpass)）
 
 **自動reviewは行わない。**既定ではこれが唯一のreviewである（[ADR-0013](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/docs/decisions/0013-manual-only-coderabbit-review.md)）。
 
 宣言はhead commitのtrailerで行う。**checkboxとtrailerの両方が要る。**checkboxは本文の記述であり、
 差分が変わっても残る。trailerはcommitへ結び付くため、差分を変えると無効になる。
+
+対象Issue / 実行経路:
+
+このreviewの巡数（開始時の既実施 / 現在） / Issueの通算（情報。最終diffの確認回数とは別）:
+
+状態（`stopped` / `capped` / `converged`）と理由 / 未解決欠陥:
+
+最終diff hash / 同じdiffでの両Passと新規欠陥0件の巡:
+
+人間の継続承認・始め直し（なし、または判断と理由・承認者・承認の出所・対象Issue・承認時のreviewと巡数・終了巡数・範囲）:
+
+| reviewの巡（Issueの通算） | Passとdiff | 指摘の種類と出所 | 採否・理由・未解決 |
+|---|---|---|---|
+| | | defect / out-of-scope / optional; diff / prior-explanation / pre-existing | |
+
+引き継ぎ: `review_gate.py session status`のJSONをこのPRまたは対応Issueへ保存する。
+上限による停止は完了ではない。`stopped`をreceiptの終端値にしない。
 
 ## Review thread
 

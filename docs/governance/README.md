@@ -5,6 +5,13 @@
 
 このディレクトリには、DeskCatの開発時に人間とAIエージェントが使用する永続的なポリシーを置く。
 
+## 参照する版
+
+作業の基準は対象baseの承認済みcommitで揃える。通常開発は`develop`、安定版と公開Pagesは`main`。
+Pagesから公開対象外のCONTRIBUTING等へは絶対URLでリンクするため、`blob/main/`は安定版を示す。
+`develop`作業では、取得したbase SHAの同じpathを読む。判断に使ったSHA・節はIssue／PRへ残す。
+過去の証拠を読む固定commitリンクと、現在の規則を読むリンクを混同しない。
+
 ## 文書一覧
 
 | 文書 | 目的 |
@@ -13,7 +20,7 @@
 | [Development Workflow](development-workflow.md) | Issue、実装、検証、文書化、Gitの作業手順 |
 | [Hardware Safety Policy](hardware-safety-policy.md) | 電気、機構、ベンチ試験に関する必須安全規則 |
 | [公開asset register](published-asset-register.md) | 公開するbinary assetの出所と再配布許諾 |
-| [作業指示書テンプレート](work-instruction-template.md) | 人間がAIエージェントへ1つの作業を渡すときの様式 |
+| [作業指示書テンプレート](work-instruction-template.md) | 人間・PM・別のAIセッションからの作業引き継ぎと、受け手による根拠・条件の照合 |
 
 ルートの[AGENTS.md](../../AGENTS.md)は、AIエージェントが実行時に参照する簡潔な指示である。背景情報を重複させず、このディレクトリのポリシーを参照する。
 

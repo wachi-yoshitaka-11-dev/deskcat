@@ -31,12 +31,16 @@ hookの一覧と回避手順は[hookが止めたとき](#hookが止めたとき)
 ## 作業開始前
 
 1. `git fetch origin`し、`origin/develop`を基点にする。
-2. [AGENTS.md](AGENTS.md)を読む。
+2. 対象baseのcommit SHAを記録し、その版の[AGENTS.md](AGENTS.md)とリンク先の規則を読む。
 3. [Governance](docs/governance/README.md)を読む。
 4. 一つの目的に絞ったIssueを探すか作成する。
 5. 依存関係と受け入れ条件を確認する。
 6. [ハードウェアTBD](docs/hardware/tbd-register.md)を確認する。
 7. 編集前にworking treeを確認する。
+
+通常開発は`develop`、安定版・公開Pagesは`main`を参照する。公開文書の`blob/main/`リンクは
+安定版へのリンクであり、`develop`作業の規則を読むときは記録したbase SHAの同じpathを開く。
+相対リンクは同じcheckoutの版を辿る。未mergeの差分は規則として適用しない。
 
 正確な部品、関連GPIO、電源、安全値が`TBD`のときはhardware driverへ着手しない。
 
@@ -166,7 +170,9 @@ GitHubのIssue一覧はlabelを常にtitleの横に表示するため、titleに
 何本のPull Requestに割ったかでmilestoneの件数が動く。
 
 boardの`Item closed` workflowは`Status`を`Done`にするが、**日付fieldは更新しない。**
-そのためIssueのclose後は、close実施者が手作業で`Target date`を実績日へ設定する。
+そのためIssueのclose後は、close実施者が`Target date`を実績日へ設定し、APIで読み戻す。
+作成・更新・close/reopen後は[metadata操作手順](docs/runbooks/github-metadata.md)の
+`check`または`apply`で保存された実値を照合する。checkboxだけを設定済みの証拠にしない。
 
 ## Branches
 
@@ -249,6 +255,9 @@ PC testはLCD、電気、timing、sensor、機構の検証を代替しない。
 - build、flash、test手順
 
 複数componentに影響する判断や、戻すコストが高い判断にはADRを使う。
+現在の状態は正本へ集約し、日付付きの根拠・実験・訂正は履歴として参照する。
+TBD変更では[状態変更時の参照確認](docs/hardware/tbd-register.md#状態変更時の参照確認)を行う。
+本書の[過去事例](docs/runbooks/contributing-history.md)は現在の手順と分けて読む。
 
 ## Pull request
 
@@ -263,9 +272,9 @@ Pull requestには次を含める。
 - 残存riskと`TBD`
 - 無関係なformat変更やrefactorがないこと
 
-作成直後に、boardへitemを追加して次を設定する。**空欄を検出する自動化は無いため、
-ここが唯一のgateである**（詳細は[Pull Request itemの開始日／終了日](#pull-request-itemの開始日終了日)の
-[誰がいつ確認するか](#誰がいつ確認するか)）。
+作成直後に、boardへitemを追加して次を設定し、APIで読み戻す。
+更新や終了後も[metadata操作手順](docs/runbooks/github-metadata.md)の検査を行う
+（確認者は[誰がいつ確認するか](#誰がいつ確認するか)）。
 
 - [ ] `Status`
 - [ ] `Start date`（作成日。JSTで判断する）
@@ -333,7 +342,7 @@ Issue itemでは両fieldが予定であるのに対し、Pull Request itemの`St
 | `Target date` | 作成時はmergeを見込む日（予定）、mergeまたはclose後はその実績日 | 作成時に見込みを設定し、**merge完了後またはclose完了後**に実績値へ更新する |
 
 `Target date`だけが予定から実績へ変わる。merge時に`Status`を`Done`にするworkflowは
-日付を書き換えないため、実績値への更新は手作業で行う。mergeせずcloseした場合の実績日は
+日付を書き換えないため、実績値への更新は操作実施者が行う。mergeせずcloseした場合の実績日は
 close日である。
 
 **Issue itemでも、完了時には空欄を残さない。**起票時に設定した値は予定であり、
@@ -346,7 +355,8 @@ close日である。
 
 #### 誰がいつ確認するか
 
-この2 fieldを強制する自動化は無い。**空欄を検出する仕組みが無いため、次の手作業をgateとする。**
+次の担当者が更新後のAPI実値を検査する。ローカルcommandを通さない操作も`check`/全件`audit`で
+事後検出できるが、すべての経路を強制停止する仕組みではない。API失敗を合格にしない。
 
 | 時期 | 実施者 | 確認内容 |
 |---|---|---|
@@ -358,7 +368,7 @@ close日である。
 **更新は「後」であって「直前」ではない。**merge前に実績日を確定できないためである。JSTの日付を
 またいだ場合や、mergeを中止した場合に、誤った実績日が残る。
 
-**自動化しない。**理由は2段ある。
+**CIによる日付の自動更新は採らない。**理由は2段ある。
 
 1. Projects v2のboard workflowは日付fieldを更新できない。`Status`を`Done`にするworkflowでは書き換えられない
 2. GitHub Actionsから叩く案も採らない。**`GITHUB_TOKEN`はrepository scopeであり、Projects v2へ
@@ -366,18 +376,28 @@ close日である。
    `project` scopeを持つclassic personal access token、またはGitHub Appが必要になる。
    日付2 fieldのためにCIへ長期secretを持ち込む取引は成立しない
 
-したがって**手作業を正式な手順とする。**これは妥協ではなく判断である。
-以後「自動化できるはず」として再検討しない。前提が変わるのは、Projects v2のworkflowが
-日付fieldを扱えるようになったときだけである。
-
-**忘れることが唯一の失敗モードである。**実際に[#71](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/71)・
-[#72](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/72)・[#73](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/73)で
-3件続けて空のままcloseした。**空欄を検出する仕組みは無い。**closeの操作と同じ場面で設定する。
+操作端末の既存認証を使う明示的なcommandで更新・読み戻す方法を正式手順へ加える（#466）。
+従来の手作業限定という結論をこの範囲で改定し、CIへ長期secretを置かない判断は維持する。
+UI/APIで直接操作した場合も読み戻して検証する。空欄だけでなく不一致・取得失敗・部分成功を扱い、
+予定日・担当者・条件付きlabelを推測で埋めない。操作と再開の詳細は
+[metadata操作手順](docs/runbooks/github-metadata.md)へ集約する。
+CIのrepository内field検査はProject・日付の保証ではなく、保護設定の必須化もこの変更に含めない。
 
 ### 自己レビュー
 
-pushする前に、作成者自身が差分を見直す。**新規指摘が0件の状態が2 round続くまで繰り返す。**
-続けても実りが無いと判断する場合は[打ち切り](#打ち切り)に従う。
+pushする前に、作成者自身が差分を見直す。**開始前にIssue/PRの記録から同一作業の
+既実施巡数と継続承認を確認する。不明は0巡ではない。**
+**巡数の上限は1回のreviewごとに数える**（[#526](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/526)）。
+1回のreviewで5巡が終わったら、人間の明示承認なしに6巡目を開始しない（[打ち切り](#打ち切り)）。
+**文書だけの変更（下の[打ち切り](#打ち切り)が定める範囲）は3巡である。**
+reviewは`converged`に達した巡か、人間が承認した終了（下の[打ち切り](#打ち切り)）で終わる。
+終わった後の次のreviewは、きっかけ（pushの前、人間の依頼）を問わず0巡から数える。
+進行中のreviewを0巡に戻すのは、下の[打ち切り](#打ち切り)の始め直しだけである。
+実行記録より前の巡は、どこでreviewが終わったかが記録に無いため、最初のreviewへ数え込む。
+同じreviewの中では、差分更新、commit、rebase、push、外部review対応、セッション・端末の変更でも巡数を戻さない。
+Issueの通算は情報として記録に残し、上限の判定には使わない。
+収束は、最終diffで必要な欠陥が未解決でなく、新規の実体ある指摘0件が2 round続いた状態とする。
+任意の改善を採らない理由も残す。上限で止まっただけでは収束・完了にならない。
 
 **自動reviewは行わない**（[ADR-0013](docs/decisions/0013-manual-only-coderabbit-review.md)）。
 [`.coderabbit.yaml`](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/.coderabbit.yaml)は
@@ -403,12 +423,7 @@ pushする前に、作成者自身が差分を見直す。**新規指摘が0件�
 - [ ] **Pull Request本文の記述が、実際の差分と一致している。**対象file数、含まれる変更、
       検証欄の「実行した／していない」が実態と合っている
 
-各項目は過去に実際に起きた失敗に対応する。順に
-[#72](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/72)（規則を守っているか一度も照合していなかった）、
-[hardware-bom.md Revision 20](docs/hardware/hardware-bom.md)（同じ条件を2文書に書き、式が食い違った）、
-[#63](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/63)・[#82](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/82)（未検証の動作を断定した）、
-[#82](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/82)（存在しない照合先を参照していた）、
-[#61](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/61)（本文が「4 Pull Request、14 file」のまま、実際は9 commitへ増えていた）である。
+各観点の由来は[過去事例](docs/runbooks/contributing-history.md#自己レビュー観点の由来)を参照する。
 
 #### 2つのPass
 
@@ -427,36 +442,50 @@ pushする前に、作成者自身が差分を見直す。**新規指摘が0件�
 
 **2つのPassは同じ最終diffに対して行う。**どちらかの後に差分が変わったら、
 **両方が無効**になる。差分を変えたら2つとも実施し直す。
+**無効になるのは最終diffへのPassの証拠であり、そのreviewの巡数ではない。**
+1回のまとまった見直しを1巡と数え、別々に起動したreviewerはそれぞれ1巡とする。
+1巡内で両Passを行った場合はPassを2つ記録するが、2巡とは数えない。
+開始した巡は中断・失敗しても消さない。機械checkや修正作業はreview巡と分けて記録する。
 
 #### 打ち切り
 
-「新規指摘が0件の状態が2 round続く」（収束）に、上限は無い。**巡数の上限を固定では
-置かない。**過去の実績で、回した巡数と指摘の中身は対応しなかった。
+**無承認で継続できるのは、1回のreviewにつき5巡までである。**必要な欠陥を巡数で無視する規則ではない。
+**レビューするdiffがMarkdown fileだけで、どれも`scripts/review_gate.py`の`INSTRUCTION_SOURCES`
+（安全・指示の正本）に入らない場合は、3巡までとする**（[#490](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/490)）。
+code、script、安全・指示の正本を1つでも含むdiffと、空のdiffは5巡のままである。
+上限は人間の承認を求める時点を決めるだけであり、`converged`と`capped`の要件は変えない。
+判定は各巡の開始時にそのdiffで行い、実行記録の各巡へ残す。
+reviewの区切りは記録にある巡の結果から決まる。巡の結果で`capped`を申告しただけでは終わらない。
+新しいreviewは、前のreviewの巡を収束に数えない。
 
-| 作業 | 巡 | 内容 |
-|---|---|---|
-| [#384](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/384) | 22巡以上 | 17〜20巡で「guardの判定位置がbashとずれる」型の実体ある欠陥が出た（[ADR-0020](docs/decisions/0020-inspector-readonly-by-hook.md)）。別の実体ある欠陥が22巡目にも出た（`scripts/hooks/inspector_readonly_guard.py`のコメント） |
-| [#396](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/396) | 9巡 | 9巡すべてが実体のある欠陥だった（[PR #400](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/400)） |
-| [#397](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/397) | 7巡 | 要件照合Passは7巡中5巡が0件で、早期に収束していた。残りはcommit messageの書き方と指示語の先行詞（[#398](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/398)） |
-| #389（[PR #395](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/395)） | 11巡 | 実装への指摘は2巡で尽き、残り9巡は前の巡で自分が書き足した説明文が次の巡の指摘源になったものだった |
-| `#3` B1・B2（[PR #399](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/399)） | 3巡 | 3巡目に出た実質4件のうち3件は、前の巡で自分が入れた文から出ていた |
+**reviewは終わる前に始め直せる。**人間が新しいreviewを依頼したとき、またはPM／作業セッションが
+理由を示して始め直しを判断し人間が承認したときである。その依頼か承認（回答者と、回答を保存した
+Issue/PRのcomment）を`review_gate.py session restart`で記録し、次の巡を0巡から数える。
+依頼か承認が新しいreviewを指すと読めないとき（上限の後の「もう一度見て」など）は、継続承認として扱う。
+PM/AIの判断だけでは始め直さない。前のreviewの未解決の欠陥は消さず、新しいreviewへ持ち越す。
+過去の巡数・指摘内容は[記録](docs/runbooks/contributing-history.md#レビュー巡数の過去事例)に分離する。
 
-**巡数だけでは、まだ実りがあるかを判定できない。**判定するのは指摘の出所である。
+**指摘は重要度と出所を別々に記録する。**型ごとに根拠、採否、理由を短く残す。
 
-**AIが打ち切りを判定してよい条件。**直近2 roundで採った指摘が、すべて直前の巡で
-自分が書き足した記述（説明文、注記、訂正）を発生源としている場合。**この場合、
-差分そのものが持つ欠陥はもう出ていない**と見なす。前提として、対象（最終diff）を
-凍結してから回していること、機械で検出できるもの（リンク切れ、表の列ずれ、数の
-不一致など）は巡に含めず最初に0件にしてあることが要る。
+| 種類 | 採否の基準・例 |
+|---|---|
+| 重大な欠陥・今回の差分が作った欠陥（`defect`） | 安全違反、誤った停止条件、受け入れ条件未達、誤った検証主張は修正対象。前巡で書いた説明が危険な実行を許す場合もこちら。未解決なら完了にしない |
+| 既存の範囲外問題（`out-of-scope`） | baseにもある別機能の不具合は本差分へ混ぜず、既存Issueへの参照または残件として残す。本作業の受け入れを妨げるなら未解決欠陥として扱う |
+| 任意の説明改善（`optional`） | 同じ意味の言い換え、不要な注記・例の追加は採らなくてよい。例えば「承認が必要」に同義の説明を足す提案は不採用とし、本文を膨らませない |
 
-**人間の承認が要る関門。**通算5 roundを超えて続ける場合は、巡ごとの指摘件数と
-出所（差分由来か、自分の前巡の記述由来か）を示し、続けてよいかの承認を得る。
-5 round目の終わりに1回。以後は指摘の出所の性質が変わったとき（例: 自分の記述由来
-だけだった状態から、差分由来の指摘が再び出た）に再度求める。**5という数は、
-上の実績から導いた閾値ではない。**`#396`は9巡すべてが実体のある欠陥で、`#384`は
-17〜20巡目でも実体のある欠陥が出ている。**正当な発見は何巡目にでも出うる。**
-5に置いたのは、続けてよいかを人へ1回尋ねる費用が低いためであり、**それを超えて
-続けるコストを人へ可視化する点である。**巡数そのものを止める基準にはしない。
+出所は`diff`（今回の差分）、`prior-explanation`（前巡で自分が加えた説明）、
+`pre-existing`（既存）のいずれかを記録する。**説明由来という理由だけで欠陥なしとはしない。**
+採らない任意改善を次巡へ持ち越して収束を妨げない。リンク切れ等の機械checkは先に解消する。
+
+**継続承認は有限の範囲で保存する。**続行はPM／作業セッションが理由を示して判断し、人間が承認する。
+継続と終了を判断する側は、判断の前にこのreviewの全巡の指摘と最終diffを自分で開く。記録には、読んだdiffのhashを書く。
+同じIssue/PRへ、判断と理由、人間の承認の出所、承認者、対象Issue、
+承認時のreviewとその巡数、続行を許すそのreviewの最終巡数、対象の残存欠陥または範囲を書く。
+追加巡数は判断側が理由とともに示して人間が承認し、実装では絶対的な終了巡数へ換算する。固定の追加巡数は設けない。
+例えば「D1の修正確認のためこのreviewの7巡まで」は8巡目や別目的の継続を許さない。
+承認はそのreviewにだけ効き、次のreviewへ持ち越さない。
+終了巡数に到達した場合や範囲が変わる場合は再承認が要る。PM/AIの判断、無回答、時間経過、
+出所の無い「承認済み」は承認の代替にならない。既存の無期限な承認を新たな無期限許可へ転記しない。
 
 **打ち切ったときに記録する。**Pull Request本文の自己レビュー欄へ次を書く。
 
@@ -465,26 +494,53 @@ pushする前に、作成者自身が差分を見直す。**新規指摘が0件�
 - 凍結した最終diffのhash（`git diff <base>..HEAD`のsha256などで固定した値）
 - 最後の版に、2つのPassの両方を実施したかどうか
 
-**打ち切りは`converged`と別の値で申告する。**commit trailerへ`Self-Review: capped`を
-書く（[Merge方式](#merge方式)）。**収束したのか打ち切ったのかを、trailerの値から
-区別できるようにする。**どちらを選んでも、`requirements-pass`と`fresh-context-pass`は
-別途要る——打ち切りは2つのPassの実施を免除しない。
+| 状態 | 意味とgateの扱い |
+|---|---|
+| `stopped` | 上限で判断待ち、未完了の巡、最終diffのPass不足、未解決欠陥など。完了宣言はできない。上限で止まった場合は継続承認、未完了巡は結果の保存が次巡の前提。receiptの終端値には使えない |
+| `capped` | 収束前の打ち切り。未解決の実体ある欠陥がなく、同一最終diffの両Passを実施し、採らなかった指摘の理由を残した場合だけ宣言できる。上限到達による自動付与はしない |
+| `converged` | 同じ最終diffで実体ある新規指摘0件が2巡続き、未解決欠陥がなく両Passの証拠が揃った状態。上限や承認の有無とは別軸 |
+
+`capped`の理由は、PM／作業セッションの判断を人間が承認したこと、または直近2巡が任意の説明改善のみだったことを記録する。
+
+**reviewは承認を得て終えられる。**最終diffで最新の巡が両Passを終え、未解決の欠陥が無く、まだ`converged`で
+ない場合に、PM／作業セッションが理由を示して終了を判断し、人間が承認したら、その承認（承認者と、承認を保存したIssue/PRのcomment）を
+`review_gate.py session end`で記録する。記録した時点のdiffと巡に限って`capped`になり、
+diffが変われば無効になる。手順は[自己レビューの停止と再開](docs/runbooks/self-review-session.md)にある。
+PM/AIの判断や無回答は承認の代替にならない。
+`requirements-pass`と`fresh-context-pass`はどちらの終端値でも必要である。
+宣言形式の正本は`scripts/review_gate.py`、実行記録の検査は同scriptの`session`経路が持つ。
 
 **`main`昇格時の`history`検査でも区別できる。**値はcommitのtrailerに残り続けるため、
 `git log`から常に読める。`history`が値の組み合わせを検証しないのは、過去のcommitへの
 要求をhead commitより軽くする既存の設計（`Self-Review`が1つ以上あることだけを見る。
 下の「Merge方式」）と一貫させたためであり、区別できないからではない。
 
-**[#397](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/397)はこの規則で説明できる。**
-7巡目で人間が打ち切りを決定した時点は、上の表のとおり「要件照合Passは7巡中5巡が0件」
-という状態であり、この規則があれば`Self-Review: capped`を宣言し、巡ごとの件数と
-採否の内訳をPull Request本文へ書けば足りた。**過去のcommitを遡って書き換える必要は
-無い。**次に同じ状況（収束条件に届く前に打ち切る）が起きたら、この節に従う。
+[#397での打ち切りの解釈](docs/runbooks/contributing-history.md#打ち切りの過去事例)は履歴として残す。過去のcommitを遡って書き換えない。
 
 宣言はcommit trailerで行う。**書式の例は[Merge方式](#merge方式)にあり、値の正本は
 `scripts/review_gate.py`である。**trailerはcommitへ結び付くため、差分を変えると宣言が
 自動的に無効になる。**収束の宣言も同じtrailerで行う。**回数と2つのPassは別の軸であり、
 1つの値にまとめるとどちらをやっていないのかが分からなくなる。
+
+#### 実行経路と引き継ぎ
+
+操作例・JSON形式・強制の限界は[自己レビューの停止と再開](docs/runbooks/self-review-session.md)を参照する。
+`review_gate.py session`とClaudeの`Agent|Task` hookは、同じIssueの実行記録を使う。
+開始の予約はreviewer起動前に保存し、そのreviewの上限を超える未承認の起動を拒否する。
+既存のBash parserやread-only guardへshell構文を追加しない。
+
+**記録はgit-common-dirに置き、同じrepositoryのworktree間で共有する。**branch名やdiff hashを
+作業IDにしない。別clone・別端末へ渡すときは、`session status`のJSONを既存Issue/PRに保存し、
+次の担当がそれを復元する。同時に複数cloneで同じ作業を進めず、担当を引き継ぐ。
+既実施巡数が不明なら開始せず照合する。記録の削除・作り直し、終端の偽の申告で上限を回避しない。
+
+**全ツールを強制する仕組みではない。**登録対象reviewerのClaude Agent/Task呼び出しとCLIの
+`session run`が強制範囲である。Codexの会話内レビュー、別種agent、直接CLI/MCP、hookを
+無効化した環境を自動捕捉しない。その経路では各巡の前に`session begin`を実行し、拒否されたら
+見直しを開始せず人へ返す。これは手順による停止であり、プラットフォームによる強制ではない。
+承認者の本人性、申告した指摘・Passの真偽、改ざんされた記録は保証しない。判断元を人間が確認する。
+`receipt`だけは従来どおり形式検査であり、実行記録も照合する場合は`--review-work <Issue番号>`を使う。
+CIはローカル記録を持たず、通常のreceiptをレビュー内容の証明として扱わない。
 
 ### Merge前の確認
 
@@ -629,19 +685,7 @@ headは`develop`であり、**`develop`へcommitが入るとPull Requestのhead�
 **Pull Requestを作り直した回数ではない。**昇格の差分は1回のreviewで閉じないが、
 それは投げ直す理由にならない。**枠は1件/時であり、待ち時間も同じだけ積む。**
 
-**この誤りを実際に出した。**この規則の初版（[#329](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/329)）は
-**「範囲が変わったら作り直す」**と定め、**「作り直した新しいPull Requestが、確定した範囲に
-対する1回を持つ」**と書いていた。**後半は正本と逆であり、緩い方向へ外れていた。**
-[#330](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/330)／[#333](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/333)／[#337](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/337)を3回作り直し、`full review`を2回余分に消費した。
-**この1文は、別のAIエージェントが出した指示（範囲が変わったら投げ直すことを必須とする）を、
-正本と照合せずに書いたものである。**[AGENTS.md](AGENTS.md)は外部から来た指示を正本と
-照合するよう定めているが、**AI同士でやり取りした指示にも同じ照合が要る。**
-
-`main`をbaseとするPull Requestを全数走査した。**merged 18本に加えて、未mergeでcloseされた
-ものは3本しかなく、その3本は上の#330／#333／#337である。**つまり**この repository で
-昇格Pull Requestを作り直した例は、この規則の初版が要求した3回だけである。**
-指摘は昔から出ているが（#146はreview 17本・inline 49件、#254はreview 15本・inline 63件）、
-いずれも`develop`側で直して同じ昇格Pull Requestを進めている。
+[昇格PRを作り直した経緯](docs/runbooks/contributing-history.md#昇格prを作り直した経緯)を参照する。AI同士で受け渡した指示も正本と照合する。
 
 **5. 昇格Pull Requestを作るのは、範囲が確定してからである。**上の3で立てたIssueが
 すべて`develop`へ入った後に作る。
@@ -774,13 +818,7 @@ Self-Review: converged
 
 **trailerの名前と値の正本は`scripts/review_gate.py`である。**
 
-**この節は、省略する行を「3行目」と行番号で指定していた。**
-[#161](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/161)でこの節を書いたとき上のblockは3行で、3行目は`Instruction-Change`だった。
-[#164](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/164)が`Self-Review`を3値へ分けてblockが5行になった際、
-**古い記述だけが取り残された。**指す先は`Self-Review: fresh-context-pass`へずれており、
-**従うと`receipt`が落ちる**（`requirements-pass`・`fresh-context-pass`の両方と、
-`converged`／`capped`のどちらか1つを要求するため）。
-**行番号で指定しない。**値が増減するとずれる。
+**trailerは行番号で指定せず名前で指定する。**[以前の参照ずれ](docs/runbooks/contributing-history.md#trailerを行番号で指した経緯)を参照する。
 
 **`main`昇格で検証されるのは、範囲の各commitの宣言である。**squash commitへtrailerを書き忘れると、その回のmergeは通っても次の昇格で落ちる。
 **head commit 1本を見る検査は`main`昇格では走らない**（上の「Merge方式」を参照）。
@@ -888,14 +926,7 @@ bodyに書いたpushを証拠として数えなくなる**（`stop_claim_guard.p
 **条件分岐の中の行は、独立した行にあれば検査の対象になる。実行されるかは判定しない。**
 **理由と、判定の細かい境界は`scripts/hooks/command_line.py`のdocstringが持つ。ここへ複製しない。**
 
-> **`gh pr merge`の検査は、以前は文字列の部分一致だった。**2026-09-02に、squash message
-> のtrailer blockと同じ段落へコロン無しの行（`Closes` と `#304`）を置いたcommitで、
-> `Change-Class:`／`Self-Review:`という文字列は存在したためhookは通したが、
-> `git interpret-trailers --parse`は空を返した。**文字列としてある**ことと
-> **trailerとして解釈される**ことは別である。
-> [#312](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/312)／[#313](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/313)で
-> 判定を`review_gate.trailers_from_message`へ寄せ、**この形は止まるようになった。**
-> 回帰testは`scripts/test_hooks.py`が持つ。
+[merge hookをtrailer解釈へ変更した経緯](docs/runbooks/contributing-history.md#merge-hookの変更履歴)を参照する。
 
 ### 止まったときにどうするか
 

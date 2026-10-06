@@ -10,6 +10,7 @@
 - ESP32はRaspberry Piから独立して、hard motion limitを強制する。
 - AIが生成したcommandやdebug commandでもhard limitを迂回できない。**`bench-servo-test-17`
   featureによる単発bench試験は、この規則が禁じる迂回に該当する（[承認の状態](#承認の状態)参照）。**
+  **2026-09-28追記: 初回駆動の方法はユーザーが決めた（[承認の状態](#承認の状態)の項目6）。**
   **2026-09-25追記（[#474](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/474)）: この試験の扱いは[承認の状態](#承認の状態)が持つ。`bench-servo-test-17` featureを有効にするとcompileが止まる（`firmware/esp32/src/main.rs`の`compile_error!`）。**
 - 初回動作では負荷を外すか、意図的に狭い安全範囲を使用する。
 
@@ -224,6 +225,32 @@ field単位の正は[TBD台帳](tbd-register.md)に定義しており、一部�
 ゲートは、列挙したすべての依存が解決するまで閉じたままとする。
 ゲートの状態と個別項目の状態を同じ記述で扱わない。
 
+### 測定のための駆動（承認の状態の項目6）
+
+**このゲートは開かない。**上の`TBD`を解決するための測定（#17の電気特性、#18の可動域・速度・加速度の校正、#19の実機limiterの監視下試験）に限り、
+[承認の状態](#承認の状態)の項目6の条件(a)〜(c)がすべてそろったときだけ、servoを駆動してよい。これはユーザーの決定（2026-09-28、#17）による限定した例外であり、
+一般の運用やPiからのcommandによる駆動を認めるものではない。**(c)（ユーザーの実行承認）は駆動の回ごとに取る。**
+
+駆動してよいのは、次をすべて満たすときだけである。
+
+- **電源:** 項目6の(a)の構成（`M-12001`を試験の間だけservo専用にし、予備の`MF-R135`を直列に入れる。Piは外す。ESP32はPCのUSBから給電する。servo電源の経路は端子台と線材で組み、breadboardとjumper wireを使わない）。
+- **build:** 測定用のbuildだけを使い、**Piとの通信linkを持たない。**初回（#17）は、1回の起動で1 commandだけを出し、動作角を狭い仮の制限でclampし、露出時間の後にdutyを0へ戻し、NVSのlatchで再実行を止めるbuildを使う（下の`初回動作の実行手順`の`build`と`単発動作`）。**#18の校正と#19の実機limiter試験で使うbuild（複数のcommandやlimiterを通す駆動）は、その動作と仮の制限をこの文書に書いたうえで、その回の実行承認で範囲を決める。**firmwareの変更と`compile_error!`の扱いは、項目5の、外す注記を挙げた段落（「再開の条件は、この節では定めない。」で始まる段落）とその後の2026-09-30追記の手順に従う別のPull Requestで行う。
+- **負荷:** 初回は無負荷（ホーンを外す）。頭を載せる駆動（#18の校正）は、その回の実行承認で範囲を決める。
+- **監視:** 人間が立ち会い、`M-12001`を直ちに抜ける状態を保つ。無人で続けない。停止基準は`初回動作の実行手順`の`停止基準`に従う。
+
+未解決の`TBD`ごとの扱いは次のとおりである。**いずれも解決したことにはしない。**
+
+| TBD | この駆動での扱い |
+|---|---|
+| `HW-TBD-007`（電源とpower budget） | servoは専用の`M-12001`から給電し、ESP32はPCのUSBから給電する。servoの電流でESP32の電源が落ちる経路を作らない |
+| `HW-TBD-009`（backfeed） | 解決しない。servoとESP32が共有するのは信号線とGNDだけである。残余riskとして`初回動作の実行手順`に記録する |
+| `HW-TBD-010`／`HW-TBD-011`（可動域、速度・加速度） | この駆動が測る対象である。値が決まるまでは、狭い仮の制限で駆動する（初回は単発command。#18・#19はそのbuildに書く仮の制限） |
+| `HW-TBD-035`（servoへ入れてよい電圧） | 解決しない。`M-12001`の5 Vを監視下で入れて観察する（同行の解決手段(3)にあたる）。同行は(3)が`HW-TBD-007`／`009`のgateに従うとするが、この例外の中では、その2行を上の行の扱いで代える（どちらも解決はしていない） |
+| `HW-TBD-026`（logic閾値、PWM周期、pulse幅） | 解決しない。一般的な値で駆動し、観察を記録する |
+| `HW-TBD-017`／`018`（通信断） | 該当しない。測定用のbuildはPiとの通信linkを持たない |
+| `HW-TBD-019`／`HW-TBD-027`（起動時の状態、外部pull-down） | 解決しない。`RES-PULL-01`の実装状況を`通電前の現物確認`で記録する |
+| `HW-TBD-020`（実行時の安全制御） | 解決しない。初回は単発command、露出時間、NVSのlatchで、#18・#19はそのbuildに書く仮の制限で代え、どちらも人間の監視と電源遮断を併せる |
+
 ## Command処理
 
 ```text
@@ -378,6 +405,40 @@ gate表のいずれの行も解決していない。動かなかった場合、�
 
    **再開の条件は、この節では定めない。**[サーボ出力を有効化してよい条件](#サーボ出力を有効化してよい条件)は`HW-TBD-010`（監視下calibration）を含む全行の解決を求めるが、`010`の実測にはservo出力が要る。**gateと5項目の範囲で最初の駆動をどう行うかは未決であり、[#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)が扱う。**`PROT-OC-01`の実装（[#405](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/405)）は、その前提の1つである。再開するには、この節の状態を改め、`main.rs`の#474の`compile_error!`を外し、#474の`compile_error!`で止まることを述べた注記を外す変更が要る。**`pi-protocol-mode`との排他の`compile_error!`とその注記は残し、#474に触れた括弧書き・文だけを外す。**外す注記は、`firmware/esp32`の`Cargo.toml`・`README.md`・`src/main.rs`・`src/servo.rs`のものと、この文書の`確定しているproject規則`・`build`stepへの2026-09-25追記である。**この項目5、残余riskへの2026-09-25追記、Revision 28は記録として残す。**これらの注記は承認の状態ではなく、`compile_error!`があるというfirmwareの挙動を述べたものであり、`compile_error!`を外すと偽になるため外す。
 
+   **2026-09-30追記（[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)のPR B1）: 上の「`pi-protocol-mode`との排他の`compile_error!`とその注記は残し」の`compile_error!`は、もう無い。**#487で`pi-protocol-mode` featureを廃止し、Piとの通信link（UART1）を製品build（既定build）へ入れたためである。**測定用のbuild（`bench-servo-test-17`）がPiとの通信linkを持たないこと（[測定のための駆動](#測定のための駆動承認の状態の項目6)の`build`）は、`firmware/esp32/src/main.rs`の`#[cfg(not(feature = "bench-servo-test-17"))]`で保っている**（このfeature付きbuildはPi link（`crate::boot_session`とUART1）をcompileしない）。**再開のときに外すのは、#474の`compile_error!`とその注記だけである。**ただし、このfeature付きbuildは#474の`compile_error!`があるためbuildしておらず、#487でmain loopを組み替えた後に、外してcompileが通るかは確かめていない。この項目5の本文は、当時の記録として書き換えていない。
+
+6. **2026-09-28、ユーザーが初回駆動の方法を決めた（[#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)）。**判断者はユーザー（wachi-yoshitaka-11-dev）であり、決定の記録は#17のコメントにある。**あわせてユーザーは、項目5の「実行しない」について「そのルールを出していない」と述べた**（#17、[#488](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/488)）。**上の1〜5の記録は書き換えていない。**
+
+   決定の内容は次のとおりである。
+   - #17（電気特性）、#18（可動域・速度・加速度の校正）、#19（実機limiterの監視下試験）は、**servo専用の別電源に故障電流を制限する手段を置いて、はんだ付け（[#405](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/405)）より前に行う。**`PROT-OC-01`の実装を待たない。
+   - 初回は無負荷・単発commandから始め、人間が立ち会って監視する。
+   - 故障電流を制限する手段は手持ち部品から選び、**根拠（一次資料または実測）を確認してから決める。**
+
+   **項目5の2つの理由に対する扱い。**
+   - **短絡:** 故障電流を制限する手段を経路に置くことを条件にする。[Hardware Safety Policy](../governance/hardware-safety-policy.md)の`安全要件の5項目`は変えない。
+   - **循環:** 最初の駆動は、上の条件を満たしたうえで`HW-TBD-010`等を測るための監視下の測定として行う。ユーザーが判断した。
+
+   **現在の状態: まだ実行しない。**次の(a)〜(c)がそろうまで、この項目による駆動を始めない。
+   - (a) servo専用の別電源と、故障電流を制限する手段を選び、手段・値・根拠をこの節へ記録する。
+     **(a)の記録（2026-09-28、ユーザー決定。購入なし）。**決定の記録は[#488](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/488)のコメントにある。
+     - **別電源:** `M-12001`（5 V／3 A）を、servoの試験の間だけservo専用にする。Piは外す（試験にPiは要らない）。ESP32はPCのUSBから給電する。
+     - **故障電流を制限する手段:** 手持ちの予備のPTC（`PROT-OC-01`と同じBourns `MF-R135`）を、servo電源の経路に直列に入れる。
+       `Ihold` 1.35 A／`Itrip` 2.70 A（23 ℃）、`5×Ihold`＝6.75 Aでの最大トリップ時間7.3秒（MF-R Series datasheet REV. AG。
+       sha256 `7d980de97abdadc53465454d48a39c6926f1287a2fcfca77d0520a7512245fe4`、[hardware-bom.md](hardware-bom.md)の`PROT-OC-01`の記録と一致）。
+     - **弱点（ユーザーが記録したうえで採った）:** `M-12001`の出力定格は3 Aであり、[power-budget.md](power-budget.md)はこれを短絡時に流れる電流として扱っている。`MF-R135`の3 A付近のtypのトリップ時間は1000秒前後以上である
+       （同文書の`3 Aでのトリップ時間を読み、線材と嵌合接点の判定で止まった（2026-08-27）`節）。
+       `M-12001`の短絡時の特性は公開されていない（[#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)の2026-09-28の調査コメント）。
+       **したがって短絡時に実際に電流を止める手段は、人間が電源を抜くことである。**この試験は人間の監視を前提とし、無人で続けない。
+       **ただし人間が電源を抜くのでは、配線と接点の発熱に間に合わないことがある。**[Hardware Safety Policy](../governance/hardware-safety-policy.md)の`安全要件の5項目`の「短絡」は、connectorと線材の発熱は秒から分のorderで進み、人が読み取って電源を落とすのでは止まらない、としている。
+     - **経路の部品（2026-09-28、CodeRabbitの指摘を受けて追加）:** 上の弱点を小さくするため、servo電源の経路は`M-12001`の出力定格3 Aに耐える手持ちの部品だけで組む。端子台（`114217`、定格6 A。[hardware-bom.md](hardware-bom.md)の`WIRE-PWR-01`）と線材（`111641`、AWG22相当。servo railの5 V線として周囲30 ℃・2条密着で約6.6 A。[power-budget.md](power-budget.md)の`経路部品と定格`）を使い、**breadboardとjumper wireをservo電源の経路に使わない。**`MF-R135`の`Imax`は40 Aである（同datasheet）。**これで経路が守れるのは、短絡時の電流が`M-12001`の出力定格3 Aを超えない場合だけである。**`M-12001`の短絡時の特性は公開されていない（上記）。**servo本体のリード線とconnectorの定格は資料が無く、弱点として残る。**
+     - 配線の方法（PTCの置き場所、GNDの共通化の方法）は、(b)では決めていない。初回の実行承認（(c)）を求めるときに、配線図とあわせて示す。
+   - (b) 別電源の構成に合わせて、下の`初回動作の実行手順`を改める。現行の手順は`M-12001`からの分岐と`PROT-OC-01`を前提に書かれている。測定用のbuildも、項目5が挙げた「hard limitの迂回」に当たらない形（試験の範囲を狭い仮の制限で強制する等）にする。あわせて、[サーボ出力を有効化してよい条件](#サーボ出力を有効化してよい条件)（有効化条件の正本）に、この測定のための駆動をどう扱うかを書く。**それまで同節の「すべて解決するまで出力を有効にしない」がそのまま適用される。**
+     **(b)の記録（2026-09-28）。**下の`初回動作の実行手順`を(a)の構成に合わせ、[サーボ出力を有効化してよい条件](#サーボ出力を有効化してよい条件)へ`測定のための駆動（承認の状態の項目6）`を足した。
+     **測定用のbuildのfirmware側の変更（`compile_error!`の扱いを含む）はまだ行っていない。**別のPull Requestで行い、それまでこの項目による駆動は始めない。
+   - (c) (a)(b)の変更をPull Requestでreviewし、ユーザーが実行を承認する。
+
+   **`firmware/esp32/src/main.rs`の#474の`compile_error!`は、(a)〜(c)がそろうまで外さない。**外すときの手順は項目5の、外す注記を挙げた段落（「再開の条件は、この節では定めない。」で始まる段落）と、その後の2026-09-30追記に従う。
+
 ## 初回動作の実行手順（人間とAIの作業順序）
 
 [Calibration手順](#calibration手順)の2〜7を、`SERVO-01`（TowerPro SG90）とこのリポジトリの
@@ -398,6 +459,8 @@ firmware（`firmware/esp32/src/servo.rs`、
 
 **実行条件はここでは再掲しない。**[承認の状態](#承認の状態)が「進めてよい」に
 なるまで、以下のstepは`ホーン除去`以降へ進まない（`gate確認`参照）。
+
+**2026-09-28、項目6の条件(b)としてこの手順を別電源の構成に合わせた。**電源は項目6の(a)の構成（`M-12001`を試験の間だけservo専用にし、予備の`MF-R135`を直列に入れる。Piは外す）である。下の残余riskのうち、`PSU-SERVO-01`の共用、`PROT-OC-01`が経路に入っているか、故障電流を制限する手段が無いこと、を述べた3項目は、この構成で扱いが変わる（各項目の末尾の2026-09-28の追記）。駆動してよい条件の全体は[サーボ出力を有効化してよい条件](#サーボ出力を有効化してよい条件)の`測定のための駆動（承認の状態の項目6）`が持つ。
 
 **この手順は`HW-TBD-010`（機械的可動域とneutral）の実測に着手する最初のstepである**
 （`HW-TBD-010`自体は`HW-TBD-007`〜`009`によりBlockedのまま。closeするものではない。
@@ -441,11 +504,13 @@ firmware（`firmware/esp32/src/servo.rs`、
   `通電前の現物確認`で人間が確認し記録する。**接続されている場合、servoの過電流はPi側の電圧降下・
   brownoutを経路として引き起こしうる（残余riskに追加）。接続されていなければこの経路は
   生じない。**どちらであるかをこの文書だけでは決められない。**
+  **2026-09-28追記: 項目6の構成では、試験の間`M-12001`をservo専用にし、Piは外す。**`通電前の現物確認`の(a)は記録ではなく、満たさなければ試験を始めない条件になる。
 - `hardware-bom.md`の`PROT-OC-01`（Bourns MF-R135、`Ihold` 1.35 A／`Itrip` 2.70 A）は
   5 V ingressの過電流保護として`Selected`だが、**この部品がこの試験の物理経路に
   実際に入っているかはBOMからもこの文書からも確認できない。**入っていれば、servoの
   動作電流（`TBD`。目安は0.5–2 A、上記参照）は保持帯とtrip帯の間に架かりうる。
   `通電前の現物確認`で人間が現物を確認して記録する。
+  **2026-09-28追記: 項目6の構成では、予備の`MF-R135`をservo電源の経路に直列に入れる。**`通電前の現物確認`の(b)は、満たさなければ試験を始めない条件になる。
 - `動作制限`表が定める**最大連続電流の予算は250 mA**である。SG90の動作電流
   （`TBD`。目安は0.5–2 A）はこの予算を大きく超える見込みである。**この試験は可動域・速度・duty
   cycleでこの予算内に収める調整を行っていない**（そのための実測自体が`HW-TBD-010`／
@@ -496,6 +561,7 @@ firmware（`firmware/esp32/src/servo.rs`、
   `Max. Time to Trip`は5×`Ihold`（6.75 A）で7.3秒であり、**動作電流の目安である
   0.5–2 A付近の電流ではtripまでの時間ははるかに長い**（一般にPTCのtrip時間は電流が低いほど
   長くなる。具体的な秒数は`hardware-bom.md`にも記載が無く、この文書では算出しない）。
+  **2026-09-28追記: 項目6の構成では、故障電流を制限する手段は直列の`MF-R135`である。**ただし`M-12001`の出力定格3 A付近ではtypのトリップ時間が1000秒前後以上であり（項目6の(a)の記録）、**短絡時に実際に電流を止める手段は、引き続き人間が`M-12001`を抜くことである。**
 - この試験がもたらしうる最悪の事態: SG90の**動作電流**は、上表`サーボ識別情報`の
   `動作電流`行によれば**`TBD`のまま**（0.5–2 Aと負荷依存で幅が広く、確定は
   `HW-TBD-010`／`011`の範囲）であり、値の出所もDigital側ページのQ&A欄の`admin`
@@ -536,7 +602,7 @@ firmware（`firmware/esp32/src/servo.rs`、
 - SG90のstall電流はメーカー資料に無く`TBD`である。0.5–2 Aはメーカー回答由来の
   **動作電流**の目安であり、stall電流ではない。stall電流は一般に動作電流より高い。
 - `通電前の現物確認`（(a)(b)(c)）はgateではなく記録である。結果がどうであれ
-  試験を中止しない（中止基準は`停止基準`が別に定める）。**(c)（`RES-PULL-01`未実装）
+  試験を中止しない（中止基準は`停止基準`が別に定める）。**2026-09-28追記: 項目6の構成では、(a)（Piを外している）と(b)（`MF-R135`が経路に入っている）は満たさなければ試験を始めない条件である。(c)(d)の扱いは変わらない。** **(c)（`RES-PULL-01`未実装）
   でも続けてよいと判定済み。**`Sg90::new`が呼ばれる（`起動とarm delay`終了後）まで
   GPIO27は未configuredのままであり、`起動とarm delay`の間（servoへ5 V電源が入る
   window）を含めて未定義状態が続く。**この未定義windowの長さや servoの給電有無に
@@ -549,6 +615,7 @@ firmware（`firmware/esp32/src/servo.rs`、
 1. **`gate確認`（人間）** gateの解決状況を[TBD台帳](tbd-register.md)で確認する。
    **加えて、[承認の状態](#承認の状態)が「進めてよい」になっていることを確認する。**
    なっていない間は、`ホーン除去`以降へ進まない。
+   **2026-09-28追記: 項目6による駆動では、同項目の条件(a)〜(c)がそろい、その回のユーザーの実行承認があることを確認する。**
 2. **`ホーン除去`（人間）** サーボのホーンを外す（未装着なら不要）。軸が自由に
    回ることを確認する。
 3. **`通電前の現物確認`（人間）** `SERVO-PWM`（GPIO27）からサーボの信号線、外部
@@ -559,6 +626,7 @@ firmware（`firmware/esp32/src/servo.rs`、
    [experiment-log.md](experiment-log.md)へまとめて記録する）。**
    (a) この試験でRaspberry Pi（`PSU-PI-01`）が`PSU-SERVO-01`と同じM-12001に接続されて
    いるか。(b) `PROT-OC-01`（過電流保護PTC）がこの経路に物理的に入っているか。
+   **2026-09-28追記: 項目6の構成では、(a)はPiが`M-12001`から外れていること、(b)は予備の`MF-R135`がservo電源の経路に直列に入っていること、あわせてservo電源の経路が端子台と線材だけで組まれ、breadboardとjumper wireを通っていないことを確認する。**どれかを満たさなければ、servoの電源を入れずに報告する。
    (c) `RES-PULL-01`（GPIO27の外部pull-down、4.7 kΩ）が現物に実装されているか。
    (d) `DISP-01`（MSP2807）がESP32の`3V3` pinへ接続されていないことを確認する。
    `HW-TBD-024`は2026-09-23（[#461](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/461)）で
@@ -578,10 +646,14 @@ firmware（`firmware/esp32/src/servo.rs`、
    （上記「決定事項」参照）。
 4. **`電源準備`（人間）** サーボの電源をまだ入れない。ESP32側だけ電源を入れられる
    状態にする（ESP32はPCのUSBから給電する。servoの外部5 V系とは電源を分離する）。
+   **2026-09-28追記: 項目6の構成では、servoの電源は`M-12001`（servo専用）から`MF-R135`を経て供給する。**
    手やcableを、サーボが動きうる範囲の外へ置く（[Hardware Safety Policy §6](../governance/hardware-safety-policy.md#6-サーボ)のPWM出力前7項目の1つ）。
-5. **`build`（AI、flashは人間）** **（2026-09-25追記: #474以降、次のcommandは`compile_error!`で止まる。[承認の状態](#承認の状態)参照。）**`cargo build --locked --features bench-servo-test-17`で
-   AIがfirmwareをbuildし、ESP32 Flash／HIL profileの端末で人間がflashする（`espflash`。
-   AIがこの端末を持たない場合、この工程は人間が行う）。このfeatureを付けない通常buildでは
+5. **`build`（AI。flashは人間の立ち会いのもとでAIまたは人間）** **（2026-09-25追記: #474以降、次のcommandは`compile_error!`で止まる。[承認の状態](#承認の状態)参照。）**`cargo build --locked --features bench-servo-test-17`で
+   AIがfirmwareをbuildし、ESP32 Flash／HIL profileの端末でflashする（`espflash`）。**flashの
+   実行者は、[power-budget.md](power-budget.md)の`ACCEL-01`／`ENV-01`単体bring-upの手順8と同じである**
+   （[#489](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/489)。書き込みのcommandと、USBの接続・
+   給電を止める判断を、同手順が分けて定めている）。AIがこの端末を持たない場合、この工程は人間が行う。
+   `再武装`と`終了処理`の再flashも同じである。このfeatureを付けない通常buildでは
    `crate::servo`は`main()`から呼ばれず、GPIO27は駆動されない。build検証の状況は
    PR本文参照。
    `run_servo_bench_test`は手動triggerを持たずESP32起動のたびに呼ばれるため、
@@ -647,6 +719,22 @@ firmware（`firmware/esp32/src/servo.rs`、
     NVSを消去してから再flashする（`espflash`の`erase-flash`または`erase-parts nvs`
     相当。対象board・partition名を実行前に確認する。検証状況はPR本文参照）。
     承認を得てから`起動とarm delay`へ戻る。承認無く連続動作・再試行はしない。
+
+    **2026-09-30追記（[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)のPR B1）: latchは、人間の
+    承認なしに消えうる。**#487のPR B1以降、`bench-servo-test-17`以外のすべてのbuild（既定buildを含む）は、
+    起動のたびに`generate_sid`（`firmware/esp32/src/main.rs`）から`EspDefaultNvsPartition::take()`を呼ぶ。
+    起動のときだけではなく、`stale_session`を受けて`sid`を選び直すとき（`firmware/esp32/src/boot_session.rs`の
+    `BootSession::reselect_sid`）にも、実行中に`generate_sid`を呼ぶ。
+    これは`reinit=true`で初期化し（esp-idf-svc 0.52.1 `src/nvs.rs`）、`nvs_flash_init()`が
+    `ESP_ERR_NVS_NO_FREE_PAGES`または`ESP_ERR_NVS_NEW_VERSION_FOUND`を返すと、default partition全体を
+    `nvs_flash_erase()`で消してから再初期化する。**latch（namespace `bench17`、key `ran`）も同じpartitionに
+    あるため、このときlatchも消える。**`終了処理`で通常buildへ戻した後も同じである。同じ消去の経路は
+    bench build自身の`run_servo_bench_test`の起動にもある。firmwareの中で`bench17`／`ran`を読むのは
+    `run_servo_bench_test`だけであり、**firmwareの中には、bench buildを書き込む前にlatchの状態を確かめる
+    手段は無い。** **したがって、bench buildの書き込みは、latchが立っているはずの場合も含めて毎回
+    「servoが1回動きうる操作」として扱う。**この扱いは、既存の手順の順序（`電源準備`でservoの電源を
+    入れる前にESP32側を準備する）と、繰り返すときの改めての承認（この手順12）の中に入る。この追記は、
+    値と手順の条件を足さず、上の手順12と各stepの本文を書き換えていない。
 13. **`終了処理`（人間）** 試験終了後、外部5 V電源を遮断する。`単発動作`まで到達して
     いればGPIO27は`run_servo_bench_test`が返るとlowへ固定される（`Sg90`のdrop。
     [`crate::servo::Sg90::stop`]のdoc参照）。**`Sg90::new`より前にreturnした場合
@@ -659,6 +747,11 @@ firmware（`firmware/esp32/src/servo.rs`、
     次番号）で記録する。観察から確定値を導かない。calibrationとgate解決は別途進める。
 
 ## 受け入れchecklist
+
+**2026-10-04追記。**ベンチ電源の購入申告は[hardware-bom.md](hardware-bom.md#ベンチ電源)に記録した。
+Pi最低入力電圧の復帰条件に関する現在の扱いは[power-budget.md](power-budget.md#受け入れ条件)の
+`(a)を要件から外す（2026-09-06、PM決定）`節の同日追記を参照する。
+下記のPi電圧droopの項目を合格にした記録ではなく、サーボ試験の電源構成や承認範囲も変更していない。
 
 - [ ] 正確なサーボとデータシートを記録した
 - [ ] **定常電流**でingressとconnectorの定格を確認した（[power-budget.md](power-budget.md)の`ingressの電流制限`。定格は熱の制限のため、判定量は定常電流である）
@@ -712,3 +805,10 @@ firmware（`firmware/esp32/src/servo.rs`、
 | 2026-09-23 | 26 | [#451](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/451)。**firmware側の2つの変更に追随した。**3箇所。(1) 残余riskの`DISP-01` backlight項は「firmwareが無条件に点灯させる」と書いていたが、`run_display_bringup`が`bringup-display-13` feature（既定off）付きbuildだけの経路になり、この試験のbuild（`--features bench-servo-test-17`）には点灯経路が無い。**`HW-TBD-024`は解けていないため、`DISP-01`を接続しない要求は維持する。**(2) `通電前の現物確認`(d)も同じ理由で書き換え、**(d)の確認自体は省かないことを明記した**（`HW-TBD-024`未解決、`EXP-011`はESP32側の信号レベルまで）。(3) `起動とarm delay`は「このlogが出るまでの時間に定義された上限は無い（I2Cが無期限timeoutのため）」と書いていたが、`#451`でI2C読み出しは有限timeoutになった。**永久に出ないことは無い**旨と、**`Err`までの実機実測はまだ無いため秒数を示さない**旨、切り分けはlog行の有無で行う旨へ書き換えた。**承認の状態、安全値、手順の順序、停止基準は1つも変えていない。** |
 | 2026-09-23 | 27 | [#461](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/461)。**`HW-TBD-024`が「`DISP-01`を3.3 V系へ通常接続すること自体」を一律に妨げる扱いではなくなったこと（ユーザー承認）に追随した。**2箇所。(1) 残余riskの`DISP-01`項を、「`HW-TBD-024`が未解決のため」という理由から「この試験がservoの拘束・過負荷を対象とし、`DISP-01`を試験変数に含めないため」という理由へ書き換えた。**`DISP-01`を接続しないという結論、確認先（`通電前の現物確認`(d)）は変えていない。**(2) `通電前の現物確認`(d)も同じ理由で書き換えた。**(d)の確認自体は省かない。**承認の状態、安全値、手順の順序、停止基準は1つも変えていない。 |
 | 2026-09-25 | 28 | [#474](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/474)（PR #471 のCodeRabbit review指摘）。`承認の状態`節に項目5を追記した（内容と現在の状態は同節が持つ。ここへ再掲しない）。`bench-servo-test-17` featureを`compile_error!`で塞いだことに合わせ、`確定しているproject規則`、残余riskの「この試験は止まらずに進む」の箇所（#474より前の扱いであることも書いた）、手順の`build`stepに、`承認の状態`への参照を足した。**`承認の状態`の1〜4の記録、安全値、手順の順序、停止基準は変えていない。** |
+| 2026-09-28 | 29 | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。**`承認の状態`へ項目6を追加した。**ユーザーが初回駆動の方法（servo専用の別電源と故障電流の制限手段を置き、はんだ付け前に、無負荷・単発・人間の監視下で行う）を決めたことを記録し、実行の前にそろえる条件(a)〜(c)を定めた。**状態は「まだ実行しない」のままであり、`compile_error!`も外していない。**`確定しているproject規則`へ項目6への参照を1行足した。項目1〜5とRevision 28は書き換えていない |
+| 2026-09-28 | 30 | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。**`承認の状態`の項目6の条件(a)へ、2026-09-28のユーザー決定を記録した**（購入なし）。試験の間だけ`M-12001`をservo専用にし、予備の`MF-R135`を直列に入れる。3 A付近でPTCのトリップが遅く、短絡時に実際に止める手段は人間が電源を抜くことである、という弱点を記録した。**状態は「まだ実行しない」のままであり、条件(b)(c)と`compile_error!`は変えていない** |
+| 2026-09-28 | 31 | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。**`承認の状態`の項目6の条件(b)を行った。**`サーボ出力を有効化してよい条件`へ`測定のための駆動（承認の状態の項目6）`を足し、ゲートを開かないまま、項目6の(a)〜(c)がそろったときだけ#17〜#19の測定に限って駆動してよい条件と、未解決の`TBD`ごとの扱いを書いた。`初回動作の実行手順`を(a)の構成（`M-12001`をservo専用、`MF-R135`を直列、Piを外す）に合わせ、`通電前の現物確認`の(a)(b)を試験を始める条件にした。**状態は「まだ実行しない」のままであり、測定用のbuildのfirmware側の変更と`compile_error!`は変えていない** |
+| 2026-09-28 | 32 | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。PR #500へのCodeRabbitの指摘（人が電源を抜くことを短絡保護として扱わない）を受け、項目6の(a)の弱点へ、安全要件の5項目「短絡」が述べる「人が電源を落とすのでは止まらない」を書き足した。servo電源の経路を`M-12001`の出力定格3 Aに耐える手持ちの部品（端子台、AWG22の線材）だけで組み、breadboardとjumper wireを使わないことを、測定のための駆動の条件と`通電前の現物確認`へ加えた（購入なし）。短絡時の電流が3 Aを超えない場合にしか経路を守れないこと、servo本体のリード線とconnectorの定格が不明であることは弱点として残した |
+| 2026-09-29 | 33 | [#489](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/489)。`初回動作の実行手順`の`build`stepが「flashは人間」としており、[power-budget.md](power-budget.md)のbring-up手順（書き込みのcommandは、人間が立ち会って監視している状態であれば実機LinuxのAIセッションが実行してよい）と食い違っていた。flashの実行者を同文書の`ACCEL-01`／`ENV-01`単体bring-upの手順8への参照に改め（規則をここへ書き写さない）、`再武装`と`終了処理`の再flashも同じであることを書いた。**USBの接続と給電を止める判断は人間のままであり、`承認の状態`、`サーボ出力を有効化してよい条件`、停止基準、各stepの条件は変えていない** |
+| 2026-09-30 | 34 | [#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)のPR B1。`承認の状態`の項目5へ2026-09-30追記を足した。`pi-protocol-mode`を廃止したため、項目5が再開の手順として残すよう求めた`pi-protocol-mode`との排他の`compile_error!`は無くなった。測定用のbuildがPiとの通信linkを持たないことは`#[cfg(not(feature = "bench-servo-test-17"))]`の構造で保っている。**servo出力のgate、承認の状態、項目5の本文は変えていない** |
+| 2026-09-30 | 35 | [#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)のPR B1。`初回動作の実行手順`の`再武装`stepへ2026-09-30追記を足した。`bench-servo-test-17`以外のすべてのbuild（既定buildを含む）が起動のたびに（`stale_session`による`sid`の選び直しでは実行中にも）`EspDefaultNvsPartition::take()`（`reinit=true`）を呼ぶようになり、NVSの初期化が`ESP_ERR_NVS_NO_FREE_PAGES`／`ESP_ERR_NVS_NEW_VERSION_FOUND`を返すとdefault partitionが消え、単発latchも人間の承認なしに消えうるためである。firmwareには書き込む前にlatchを確かめる手段が無いため、bench buildの書き込みを毎回「servoが1回動きうる操作」として扱う、と書いた。あわせて項目5への2026-09-30追記に、`bench-servo-test-17`付きbuildは#474の`compile_error!`を外した後にcompileが通るかを確かめていないことを書き足し、項目6の(c)の後の「外すときの手順」と`測定のための駆動`の`build`の参照先（どちらも「項目5の最後の段落」）を、項目5へ追記を足したことに合わせて改めた。**servo出力のgate、承認の状態、値、各stepの本文と条件は変えていない** |
