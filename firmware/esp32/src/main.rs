@@ -714,8 +714,8 @@ const SID_NVS_KEY_NEXT: &str = "next_sid";
 ///
 /// # 生成方法: NVSの不揮発counter
 ///
-/// **乱数ではなく不揮発counterを使う。**§3.1は生成方法として「乱数、不揮発カウンタ、
-/// またはその併用」を挙げている。この crate は`Cargo.toml`で`unsafe_code = "forbid"`
+/// **乱数ではなく不揮発counterを使う。**§3.1は生成方法を§13の`PROTO-TBD-011`の行で
+/// 確定済みとしている（ESP32は不揮発counter）。この crate は`Cargo.toml`で`unsafe_code = "forbid"`
 /// としており、`esp_random()`／`bootloader_random_enable()`（ESP-IDF v5.5.3
 /// `components/esp_hw_support/include/esp_random.h`・`bootloader_random.h`）は
 /// `unsafe extern "C"` fnであるため直接呼べない。加えて、ESP-IDF公式資料
