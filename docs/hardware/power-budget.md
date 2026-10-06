@@ -378,7 +378,7 @@ firmwareの`main.rs`はWi-Fi／Bluetooth APIを一切呼び出しておらず、
 **この条件の根拠は2026-09-23に変わった。**[#451](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/451)
 より前は、firmware側の理由が主だった。`main()`が`run_display_bringup`を無条件に呼び、その中で
 `lcd.backlight_on()`を実行していたため、`DISP-01`が配線されているだけでbacklightへ給電された。
-**`#451`で`run_display_bringup`は`bringup-display-13` feature（既定off）の付いたbuildだけが
+**`#451`で`run_display_bringup`は`bringup-display-13`か`face-21`のfeature（既定off）の付いたbuildだけが
 呼ぶようになり、既定buildはLCD関連pinへ一切触れない。**手順8で書き込むfirmwareを既定buildで
 作る限り、firmwareがbacklightを点ける経路は無い（正は`firmware/esp32/src/main.rs`のmodule docの
 「`DISP-01`のbring-upを有効にする手順」節。**ここへfeature名以外を再掲しない**）。
@@ -440,7 +440,7 @@ railを含んでいても成立する（railを含む短絡もrailを含まな�
 **手順10の根拠。**手順の(a)(b)(c)は`run_i2c_bringup`側（`ACCEL-01`／`ENV-01`のDevice ID
 読み出し）のlogを指す。**既定buildでは、その手前にdisplay側のlog（`display_madctl`／`display_fill`／
 `display_corner_pattern`）は出ない。**[#451](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/451)
-で`run_display_bringup`が`bringup-display-13` feature（既定off）の付いたbuildだけの経路に
+で`run_display_bringup`が`bringup-display-13`か`face-21`のfeature（既定off）の付いたbuildだけの経路に
 なったためである（`main.rs`）。**`#451`より前の記述（display側のlogが先に現れるのは異常では
 ない）は、既定buildについてはもう当てはまらない。**`--features bringup-display-13`を付けて
 buildした場合は従来どおりdisplay側のlogが先に出るが、その構成はこの節の対象外である
@@ -789,7 +789,7 @@ Revision 39で、給電元（B-2bか`3V3` pinか）ごとに参照先の節が�
 （`3V3` pin経路）を実施する際は、項目4が定める判定基準「単一経路であること」（`3V3` pinの1系統
 だけから受電し、USBの5V・外部3.3V電源等が同時に到達しないこと）を適用する。
 
-**条件(2)の根拠。**`main.rs`の`run_display_bringup`は`bringup-display-13` feature付きbuildだけが
+**条件(2)の根拠。**`main.rs`の`run_display_bringup`は`bringup-display-13`か`face-21`のfeature付きbuildだけが
 持つ関数であり、既定buildは`main()`から呼ばない（`#451`）。受け入れ条件のうち初期化の記録は
 この関数のlogから、fill・四隅・timingの記録は`crate::display_test`（`firmware/esp32/src/display_test.rs`）のlogから得る。controllerの識別は、moduleのsilkと資料、およびこの関数が
 送るcommandの実機での効果から記録する（logだけの証拠にはしない）。
@@ -824,6 +824,16 @@ Revision 39で、給電元（B-2bか`3V3` pinか）ごとに参照先の節が�
 ものではない。**`#461`が既に受け入れた残余risk（未知の経路の可能性、故障時の熱余裕の薄さ、`R5`の
 公差不明）は変わらない。ここで人間から個別に得るのは、firmwareの実行経路を1つ実行してよいかと
 いう別の判断であり、条件(1)〜(4)(6)（および条件(5)の例外規定に従った状態）を満たしたうえで問う。
+
+**`face-21` feature（[#21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)）の常時点灯。**
+条件(3)の計算は、`HW-TBD-024`の判断記録の2026-09-23追記が「通常動作（定常）」として出した値（約245.4 mA、
+熱の見積もりも定常状態）であり、点灯の時間では限っていない。そのため、backlightを点けたまま動かす
+`face-21`の通常動作は、この計算に含まれる。ただし、この計算は周囲40 ℃（`Rθja` 88 ℃/W）を仮定する。
+筐体に入れた状態は、この計算に含まれない。故障時（`R5`の先の短絡）の電流上界は、`R5`の値とrail電圧だけで
+決まり、点灯の長さを入力に使っていない（`DISP-01`追加接続のbring-upの手順の前提の節）。
+`face-21`付きbuildの実行は、実行する日に、条件(7)と同じ形（`3V3` pin経路でbacklightを点けたまま
+動かすことの承認）で人間から1件得る。条件(2)は`bringup-display-13`付きbuildを要求する。**`face-21`単独のbuildは条件(2)を満たさない
+ため、このchecklistで通電してよいbuildとして扱わない。**通電は`face-21,bringup-display-13`のbuildで行う。
 
 ##### 3.3 V railの許容電圧範囲
 

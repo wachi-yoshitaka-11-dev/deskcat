@@ -353,6 +353,7 @@ dependencies = [
 name = "deskcat-esp32"
 version = "0.1.0"
 dependencies = [
+ "deskcat-face",
  "deskcat-protocol",
  "deskcat-servo",
  "embassy-time",
@@ -360,6 +361,13 @@ dependencies = [
  "esp-idf-svc",
  "log",
  "serde_json",
+]
+
+[[package]]
+name = "deskcat-face"
+version = "0.1.0"
+dependencies = [
+ "deskcat-protocol",
 ]
 
 [[package]]

@@ -20,7 +20,7 @@ ESP32が両LEDを駆動する。通信LEDはESP32が自分のprotocol受信状�
 | LED | デモで表示する状態 | 実装上の前提 |
 |---|---|---|
 | 白 `LED-COMM-01` | ESP32が起動中でPiとの通信が未成立・喪失なら1秒周期で点滅（0.5秒ずつ）。通信が継続して成立すれば点灯 | 成立・喪失を決めるheartbeat／timeoutは[PROTO-TBD-010](../protocol/esp32-pi-protocol.md)と[HW-TBD-017](tbd-register.md)に依存する。現行firmwareは`hello`／`ping`／`get_status`を受信する（`firmware/esp32/src/pi_link.rs`）が、継続通信の判定（heartbeatとtimeout）はまだ無い。受信しただけでは、その後も通信が続いていることを示せないため、点灯へ切り替える判定はまだ実装できない。`bringup-led-514`は、点灯試験（赤→白→両方）の後は点滅だけを出す（下の`点灯試験用のfirmware`） |
-| 赤 `LED-REACT-01` | Piが撫でられた反応として`happy`を指示したら1秒点灯し、通常時は消灯 | 既存protocolの`set_expression`を候補に使う。protocol crateには`set_expression`の型とdecodeがある（#534）。firmwareは受け取った`set_expression`を`pi_rx_unhandled_frame`としてlogに出すだけで、赤LEDを点ける経路はまだ無い。`bringup-led-514`は点灯試験の区間だけ赤を点ける |
+| 赤 `LED-REACT-01` | Piが撫でられた反応として`happy`を指示したら1秒点灯し、通常時は消灯 | 既存protocolの`set_expression`を候補に使う。protocol crateには`set_expression`の型とdecodeがある（#534）。`face-21`付きbuildは受け取った`set_expression`をLCDへ描く（#21）が、赤LEDを点ける経路はまだ無い。`bringup-led-514`は点灯試験の区間だけ赤を点ける |
 
 ESP32自体の電源断はLEDの消灯にしか見えない。白の消灯を「通信正常」と解釈しない。
 

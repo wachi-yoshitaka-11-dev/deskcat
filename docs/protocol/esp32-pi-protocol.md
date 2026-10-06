@@ -57,9 +57,9 @@ Protocol channelから送信するすべてのbyteは、有効にframe化され�
 
 **もう3つ、Pi linkを持つbuildの既知の逸脱を記録する**（#446のPR Bから。#487のPR B2で範囲を改めた）。受信の振り分けは`firmware/esp32/src/pi_link.rs`のmodule docが持つ。
 
-- (i) decodeで拒否した行（未対応のtype、payloadやenvelopeの不正）には、§8の相関ACKを返さない。`deskcat_protocol`の受信は、oversize以外の拒否した行の`(sid, id)`を復元しないためである。oversizeの行で`(sid, id)`と`hello`／`ping`／`get_status`のtypeを復元できた場合は、`line_too_long`の拒否ACKを返す。display／motionのcommand（§5.2〜§5.5）にも相関ACKを返さない。`play_motion`と`show_choices`は`deskcat_protocol`のmessageに無く、この(i)に当たる。`set_expression`と`show_text`はdecodeを通るが、firmwareはまだ処理せず`log`で分類するだけである（`pi_link.rs`の`pi_rx_unhandled_frame`）。そのため§7の`hardware_unavailable`も返さない。
+- (i) decodeで拒否した行（未対応のtype、payloadやenvelopeの不正）には、§8の相関ACKを返さない。`deskcat_protocol`の受信は、oversize以外の拒否した行の`(sid, id)`を復元しないためである。oversizeの行で`(sid, id)`と`hello`／`ping`／`get_status`のtypeを復元できた場合は、`line_too_long`の拒否ACKを返す。display／motionのcommand（§5.3〜§5.5）にも相関ACKを返さない。`play_motion`と`show_choices`は`deskcat_protocol`のmessageに無く、この(i)に当たる。`show_text`はdecodeを通るが、firmwareはまだ処理せず`log`で分類するだけである（`pi_link.rs`の`pi_rx_unhandled_frame`）。そのため§7の`hardware_unavailable`も返さない。`set_expression`はfirmwareが処理する（[Issue #21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)）。`face-21` feature付きbuildは、session（`stale_session`）→値の範囲（`transition_ms`の上限。`out_of_range`。§12のとおり手順10で適用する）の順に判定して`ok`のACKを返し、LCDへ表情を描く。LCDを初期化しないbuild（既定build）は`hardware_unavailable`、`bringup-display-13`と組み合わせたbuildのbring-upの間は`busy`で拒否する。`transition_ms`は上限の検査だけに使い、切り替えを補間しない。
 - (ii) §7のParser counterによる区別を`log`でだけ行う（UART0のdebug logで見える）。`ProtocolCounters`は増やさず、`get_status`へ返す`status`のcounterは0のままである。
-- (iii) `ping`／`get_status`、`port_reopen`／`resync`の`hello`、拒否した`hello`の処理済みの結果を保持せず、同じ`(sid, id)`の再送をもう一度処理する（§8の手順8・9）。§8.1／§8.2の流量制限、`hello`の拒否ACKの保留table（§5.1）、§5.1の遷移の上限とcooldown（`PROTO-TBD-012`）も実装していない。このため`hello`による`boot`の再開（§4.1）は、firmwareの中では遷移の回数で抑えられない。
+- (iii) `ping`／`get_status`、`set_expression`、`port_reopen`／`resync`の`hello`、拒否した`hello`の処理済みの結果を保持せず、同じ`(sid, id)`の再送をもう一度処理する（§8の手順8・9）。§8.1／§8.2の流量制限、`hello`の拒否ACKの保留table（§5.1）、§5.1の遷移の上限とcooldown（`PROTO-TBD-012`）も実装していない。このため`hello`による`boot`の再開（§4.1）は、firmwareの中では遷移の回数で抑えられない。
 
 ## 3. Envelope
 
@@ -1379,6 +1379,7 @@ Framing／parse層について、**host workspaceのRust実装**がfixtureに合
 | 2026-10-03 | Draft 2 Pi sid and ESP32 restart | [Issue #491](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/491)の決定2件を写した。§13の`PROTO-TBD-011`の行に、Pi側の`sid`の生成方法（processの起動ごとにOSの乱数から選ぶ）を記録した。§10.1の手順の後に、再起動したESP32がPiの`sid`を失っているため手順4の`get_status`が`stale_session`になること、Piが`boot`で遷移を確定したらprocessを再起動して§10.2に従うことを書いた（[決定](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/491#issuecomment-5965360345)）。§9の受け入れ前の`TBD`の`sid`の生成方法に取り消し線を付けた。**wire formatは変更していない。**§5.1の整合規則とfirmwareも変えていない |
 | 2026-10-05 | Draft 2 Pi sid implemented | [Issue #491](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/491)の段階2b-iii。§13の`PROTO-TBD-011`の行にある、Pi側の`sid`の生成方法の「実装は#491の段階2b（`apps/deskcatd`。未実装）」を、`apps/deskcatd/src/sid.rs`の`sid_from_os`で実装済みの記述へ直した。**wire formatは変えていない。**`PROTO-TBD-011`の値は決めていない |
 | 2026-10-05 | Draft 2 busy | [Issue #19](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/19)。`play_motion`の`busy`を、そのrequestの最終拒否結果として保存し、同じ`(sid, id)`の再送を保存したACKのreplayとすることを、§5.3、§8手順10、§9へ明記した。**wire formatは変えていない。** |
+| 2026-10-07 | Draft 2 set_expression | [Issue #21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)。§2の既知の逸脱(i)から`set_expression`を外し、(iii)へ足した（処理済みの結果を保持しない）。firmwareが受信して判定し、ACKを返す |
 
 ### Draft schemaの互換性
 

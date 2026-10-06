@@ -18,8 +18,8 @@
 //!
 //! **白を点灯（通信成立）へ切り替える経路は無い。**継続通信の判定（`PROTO-TBD-010`／
 //! `HW-TBD-017`）がまだ無いためである。`boot`のACKや`ping`の受信だけでは、その後の
-//! 通信が続いていることを示せない。**赤を`happy`で点ける経路も無い。**firmwareは受け取った
-//! `set_expression`を`pi_rx_unhandled_frame`としてlogに出すだけである（`crate::pi_link`）。
+//! 通信が続いていることを示せない。**赤を`happy`で点ける経路も無い。**`face-21`付きbuildは受け取った
+//! `set_expression`をLCDへ描くが（`crate::face`）、LEDは駆動しない。
 //! どちらも`HW-TBD-037`が追う。
 //!
 //! # 起動からの状態
