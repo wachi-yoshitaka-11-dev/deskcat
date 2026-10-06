@@ -2119,7 +2119,7 @@ M0 の 0.2 mV を引き 0.1 Ω で割ると、bring-up の後以外の区間が�
 
 ### Conclusion
 
-journalが続いた起動（起動2・5）では、Piは止まっておらず、Wi-Fiだけが切れていた。中継機へ移った後に`Association request to the driver failed`が続いて戻らない形であり、bssidをrouterへ固定した後は、②と`CABLE-PI-A-01`でも1時間networkから消えなかった。PiのUARTは、`dtoverlay=disable-bt`と`raspi-config`の2つの設定で`/dev/serial0`が`ttyAMA0`を指すようになった。
+journalが続いた起動（起動2・5）では、Piは止まっておらず、Wi-Fiだけが切れていた。中継機へ移った後に`Association request to the driver failed`が続いて戻らない形であり、bssidをrouterへ固定した後は、②と`CABLE-PI-A-01`でも1時間networkから消えなかった。PiのUARTは、`dtoverlay=disable-bt`と`raspi-config`の2つの設定の後に、`/dev/serial0`は`ttyAMA0`を指していた。
 
 ### Next safe step
 
