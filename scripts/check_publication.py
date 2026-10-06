@@ -4,12 +4,15 @@
 Examples: python3 scripts/check_publication.py --file BODY
           python3 scripts/check_publication.py --staged
           python3 scripts/check_publication.py --stdin
+          python3 scripts/check_publication.py --commit-message MESSAGE
 """
 
 import argparse
 from pathlib import Path
+import re
 import subprocess
 import sys
+import tempfile
 
 from lib.publication_guard import (
     CONFIG_NAME, INPUT_LIMIT, ScanError, load_config, read_text, scan_text,
@@ -17,6 +20,50 @@ from lib.publication_guard import (
 
 
 ROOT = Path(__file__).resolve().parent.parent
+VERBOSE_HEADER_RE = re.compile(
+    r"(?m)^# ------------------------ >8 ------------------------\r?\n"
+    r"# Do not modify or remove the line above\.\r?\n"
+    r"# Everything below it will be ignored\.\r?\n"
+)
+
+
+def _without_verified_verbose_diff(message: str) -> str:
+    """Omit Git's generated diff only when it matches the staged patch exactly."""
+    headers = list(VERBOSE_HEADER_RE.finditer(message))
+    if not headers:
+        return message
+    try:
+        with tempfile.TemporaryFile() as output:
+            result = subprocess.run(
+                ["git", "diff", "--cached", "--no-ext-diff", "--no-textconv",
+                 "--no-color"], cwd=ROOT, stdout=output, stderr=subprocess.DEVNULL,
+                timeout=30, check=False,
+            )
+            output.seek(0)
+            raw_patch = output.read(INPUT_LIMIT + 1)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise ScanError("commit verbose diff cannot be verified") from exc
+    if result.returncode:
+        raise ScanError("commit verbose diff cannot be verified")
+    if len(raw_patch) > INPUT_LIMIT:
+        raise ScanError("commit verbose diff is too large")
+    try:
+        patch = raw_patch.decode("utf-8")
+    except UnicodeError as exc:
+        raise ScanError("commit verbose diff is not UTF-8 text") from exc
+    for header in reversed(headers):
+        if patch and message[header.end():] == patch:
+            return message[:header.end()]
+    return message
+
+
+def commit_message_text(path: Path) -> str:
+    """Scan all possible message content except Git's verified verbose diff.
+
+    The hook cannot see a `git commit --cleanup` command-line override, so
+    comment lines must stay in the scan even when one mode would remove them.
+    """
+    return _without_verified_verbose_diff(read_text(path))
 
 
 def staged_text(root: Path = ROOT) -> str:
@@ -75,11 +122,14 @@ def main(argv=None) -> int:
     source.add_argument("--file", type=Path)
     source.add_argument("--stdin", action="store_true")
     source.add_argument("--staged", action="store_true")
+    source.add_argument("--commit-message", type=Path)
     args = parser.parse_args(argv)
     try:
         config = load_config(ROOT)
         if args.file is not None:
             text = read_text(args.file)
+        elif args.commit_message is not None:
+            text = commit_message_text(args.commit_message)
         elif args.stdin:
             text = stdin_text()
         else:

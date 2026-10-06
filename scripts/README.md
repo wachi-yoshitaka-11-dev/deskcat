@@ -36,6 +36,9 @@ commit前の自動検査は`.githooks/pre-commit`と`.githooks/commit-msg`が呼
 この設定を無断で変更しない。設定できない場合はcommit時に
 `git -c core.hooksPath=.githooks commit ...`を使い、両hookを起動する。
 新しいfileもstaged additionsへ含める。binaryの中身は判定できないため止める。
+`git commit -v`でeditor用messageに付く差分は、Gitのmarkerとstaged差分が一致した場合だけ
+commit messageの走査から外す。Gitの`--cleanup`指定はhookから確定できないため、
+comment行は残して走査する。判定できない形は保守的に止める。
 
 Claude Codeでは`.claude/settings.json`が`publication_guard_hook.py`を起動する。
 `gh`の本文引数／読める本文file／API fieldを対象にするが、shell展開、対話editor、
@@ -107,6 +110,7 @@ python3 scripts/test_procurement_mentions.py
 python3 scripts/review_gate.py classify --base origin/develop --head HEAD
 python3 scripts/test_review_gate.py
 python3 scripts/test_hooks.py
+python3 scripts/test_publication_guard.py
 python3 scripts/prepare_pages.py
 python3 scripts/test_pages_guards.py
 ```
