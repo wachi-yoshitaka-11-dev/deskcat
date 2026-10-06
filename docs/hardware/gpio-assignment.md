@@ -476,8 +476,11 @@ Raspberry Pi公式文書「Configure UARTs」（上で引いた`interfaces.adoc`
 - `Disable Bluetooth and make UART0 primary`: `sudo systemctl disable hciuart`でBluetooth modemの
   初期化serviceを止め、`/boot/firmware/config.txt`へ`dtoverlay=disable-bt`を足して再起動する。
   これで最初のPL011（Pi側の呼び名で`UART0`。**ESP32のUART0とは別物である**）がprimary UARTになる。
-  現物（raspi-config 20260522のRaspberry Pi OS）では`hciuart`のunitが無かった（`systemctl is-enabled hciuart`が`not-found`）。
-  `dtoverlay=disable-bt`を足して再起動した後、`/dev/serial0`は`ttyAMA0`を指した。
+  現物（raspi-config 20260522のRaspberry Pi OS）で行ったこと：`dtoverlay=disable-bt`を足し、
+  `raspi-config nonint do_serial_cons 1`と`do_serial_hw 0`を実行して再起動した。`hciuart`のunitは無かった
+  （`systemctl is-enabled hciuart`が`not-found`）ので、その手順は行っていない。
+  結果として見えたもの：`config.txt`に`enable_uart=1`が入っていた（足したのは`disable-bt`だけで、
+  どちらの操作が入れたかは確かめていない）、`/dev/serial0`は`ttyAMA0`を指した、`serial-getty@ttyAMA0`は`inactive`だった。
 - `Disable the Linux serial console`: `raspi-config`の`Interface Options > Serial Port`で、
   serialのlogin shellを`No`、serial port hardwareを`Yes`にして再起動する。
 - `Linux device names`: `/dev/serial0`はprimary UARTを指すsymbolic linkであり、`/dev/ttyAMA0`は
