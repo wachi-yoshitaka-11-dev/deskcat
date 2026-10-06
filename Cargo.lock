@@ -46,6 +46,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "deskcatd"
+version = "0.1.0"
+dependencies = [
+ "deskcat-domain",
+ "deskcat-protocol",
+ "deskcat-serial",
+ "log",
+ "serde_json",
+ "serial2",
+]
+
+[[package]]
 name = "itoa"
 version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"

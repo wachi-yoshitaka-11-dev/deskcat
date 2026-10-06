@@ -2,10 +2,65 @@
 
 このディレクトリには、project作業を再現するための小さくreview可能な補助scriptを置く。
 
+## GitHub 投稿と commit の前の公開情報検査
+
+`check_publication.py`は投稿本文、commit message、staged additionsを同じ判定で検査する。
+Issue／PR本文、コメント、review返信は本文をfileへ保存してから投稿し、直前に次を実行する。
+
+```bash
+python3 scripts/check_publication.py --file <body-file>
+python3 scripts/check_publication.py --staged
+```
+
+標準入力から渡す場合は`--stdin`を使う。終了codeは検出なしが0、公開禁止情報の検出が1、
+入力を読めない・設定不正・staged binaryを検査できない場合が2である。
+診断には種別と行番号だけを出し、検出値は再掲しない。
+
+個人に固有の名前、メール、SSID、その他の識別子は、repository rootの`.publication.local.json`へ置く。
+この名前は既存の`*.local.json`でgitignoreされる。fileはUTF-8のJSONで、次の4つの配列を持つ。
+実際の値はこのfileだけに記入し、例やtest、Issue、PRへ転記しない。
+各値はUnicode正規化と大文字・小文字の差を吸収して照合する。全配列の合計は256件まで。
+
+```json
+{"names": [], "emails": [], "ssids": [], "identifiers": []}
+```
+
+このfileが無ければ、共通pattern（指定されたプライベートIPv4範囲、区切り付きMAC／BSSID、
+秘密情報、証明書、一般的なメール形式）は引き続き検査し、固有文字列だけを省いたことを表示する。
+fileが読めない、構造が不正、または入力が読めない場合は失敗する。
+
+commit前の自動検査は`.githooks/pre-commit`と`.githooks/commit-msg`が呼ぶ。
+**追跡されているだけではGit hookは動かない。**専用cloneでは
+`git config --local core.hooksPath .githooks`で有効にする。
+複数worktreeが同じGit設定を共有する環境では、他のworktreeにも効くため、
+この設定を無断で変更しない。設定できない場合はcommit時に
+`git -c core.hooksPath=.githooks commit ...`を使い、両hookを起動する。
+新しいfileもstaged additionsへ含める。binaryの中身は判定できないため止める。
+`git commit -v`でeditor用messageに付く差分は、Gitのmarkerとstaged差分が一致した場合だけ
+commit messageの走査から外す。Gitの`--cleanup`指定はhookから確定できないため、
+comment行は残して走査する。判定できない形は保守的に止める。
+
+Claude Codeでは`.claude/settings.json`が`publication_guard_hook.py`を起動する。
+`gh`の本文引数／読める本文file／API fieldを対象にするが、shell展開、対話editor、
+GitHub UI、MCP、その他のclientはhookから事前検査できない。これらの経路では、
+送信する本文をfileへ保存して手動commandを通す。Codexでも同じ手動commandを使う。
+本文を特定できない`gh`の投稿はhookが拒否する。
+
+文書用IPv4範囲は指定のプライベート範囲でないため許可する。プライベートIPv4の例示値を
+広く許可せず、文書ではplaceholderへ置き換える。メールは文書用domain、および
+bot／noreply形式のmailboxを例外とする。接尾辞だけがbot形のmailboxはcommit trailer内に限り例外とし、
+実在の個人メールはcommit trailer内でも検出する。
+秘密値の例示は既知のplaceholder語だけを許し、任意の山括弧内の値は許可しない。
+例外と検出は`test_publication_guard.py`の合成値で検証する。
+
 ## 現在のscript
 
 | Script | 用途 | 実行元 |
 |---|---|---|
+| `check_publication.py` | 投稿本文・commit message・staged additionsを共通判定で検査する | 手動commandとgit hook |
+| `test_publication_guard.py` | 合成データで判定、CLI、Claude Code hook、git hookを検証する | Pages workflowとlocal |
+| `hooks/publication_guard_hook.py` | `gh`の本文・title・API fieldを投稿前に検査する | Claude Codeのhook |
+| `lib/publication_guard.py` | 個人情報・ネットワーク識別子・秘密情報の共通判定とローカル設定を扱う | import専用 |
 | `validate_doc_links.py` | リポジトリ全体のMarkdown相対linkを検査する。公開対象の判定は`prepare_pages.py`と揃え、Gitのmode 120000のsymlinkを経由するpathは複製されないため未公開として扱う。**扱いが未確認の文字を含む見出しへのfragment linkを拒否する**（anchorが一致していても通さない。一致しているのはこちらの計算どうしであり、生成site側と一致する保証が無い。外した場合に落ちるのはJekyll buildの後であり、localでは分からない）。**走査に先立ち、閉じていないcode fenceを検出して打ち切る**（fenceが奇数個だと以降の行がすべてfence内と見なされ、linkも見出しも検査されないまま`BROKEN=0`になる） | Pages workflowとlocal |
 | `prepare_pages.py` | 公開対象を`.pages-src/`へ複製し、公開禁止情報を検査する。診断のfile pathはstaging-root相対で出力する | Pages workflowとlocal |
 | `validate_pages_output.py` | 生成済み`_site/`のlinkと公開禁止情報を検査する。拡張子allowlistとsize上限は`.pages-src/`側と同じ値を使う。診断のfile pathはsite-root相対で出力し、`EXTENSIONS=`／`UNSCANNED=`／`LARGEST=`で公開物の内訳を残す | Pages workflowとlocal |
@@ -55,6 +110,7 @@ python3 scripts/test_procurement_mentions.py
 python3 scripts/review_gate.py classify --base origin/develop --head HEAD
 python3 scripts/test_review_gate.py
 python3 scripts/test_hooks.py
+python3 scripts/test_publication_guard.py
 python3 scripts/prepare_pages.py
 python3 scripts/test_pages_guards.py
 ```
@@ -66,7 +122,7 @@ python3 -m unittest discover --start-directory scripts --pattern "test_*.py" --v
 ```
 
 Pages CIは`test_link_validators.py`、`test_pages_guards.py`、
-`test_instruction_entrypoint.py`、`test_review_gate.py`、`test_hooks.py`をrunnerの一時directoryから
+`test_instruction_entrypoint.py`、`test_review_gate.py`、`test_hooks.py`、`test_publication_guard.py`をrunnerの一時directoryから
 絶対pathで起動する。
 いずれもrepository root以外のcurrent directoryで成功しなければならない。
 `test_link_validators.py`と`test_pages_guards.py`は、あわせて`PAGES_SOURCE=.pages-src`を

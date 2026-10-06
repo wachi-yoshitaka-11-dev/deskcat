@@ -33,7 +33,7 @@ log = "0.4"
 # - security: buildscriptを持たない。`unsafe`はcrate内部のsyscall呼び出しにあり、
 #   workspaceの`unsafe_code = "forbid"`はこちらのcodeにのみ効く（依存の内部には及ばない）
 # - binary sizeとruntimeへの影響: **どちらも測っていない。**このworkspaceにbinary target が
-#   無く（`apps/deskcatd`は未作成）、測る対象がまだない。runtimeについて言えるのは、
+#   無く（`apps/deskcatd`はlibraryだけで、binaryは未作成）、測る対象がまだない。runtimeについて言えるのは、
 #   sourceを読んだ範囲で`read`／`write`が`poll`1回とsyscall 1回であり、
 #   呼び出しごとのallocationを持たないことである。実測は`deskcatd`ができてから行う
 # - build負荷（上の項目とは別に記録する。**これが選定の決め手である**）:
@@ -71,6 +71,12 @@ serial2 = { version = "0.2.38", features = ["unix"] }
 #   名前と出典がcodeから失われるため採らない
 libc = "0.2"
 
+
+# exampleの単体testは、既定では`cargo test`が実行しない。`serial_link`は`ping`の送信の
+# 状態（`PingProbe`）の単体testを持つため、`cargo test --workspace`に含める。
+[[example]]
+name = "serial_link"
+test = true
 
 # workspaceのlintはmemberへ自動継承されない。これを書き忘れると
 # `unsafe_code = "forbid"`、`missing_docs = "warn"`、`clippy::all = deny`が

@@ -115,6 +115,22 @@ pub enum SendError {
     EmptyPayload,
 }
 
+impl SendError {
+    /// 失敗の原因が**送ろうとしたmessage自身**にあるか。
+    ///
+    /// `true`（[`Self::Encode`]、[`Self::EmptyPayload`]）は、同じmessageをencodeし直しても、
+    /// `Session`を替えても同じ結果になる。送り直しても直らない。`false`は
+    /// 原因がmessageの外（queueの満杯、`Session`の停止、`id`空間の枯渇）にある。
+    ///
+    /// `apps/deskcatd`が、送り直さない失敗（`true`）と、送り直す・止める失敗を分けるために使う。
+    /// **`SendError`は拡張されうる。**未知のvariantは`false`になるので、呼び出し側は、扱うvariantを
+    /// 列挙し、残りを`false`と同じに扱わず、致命として扱うこと。
+    #[must_use]
+    pub const fn is_input_fault(&self) -> bool {
+        matches!(self, Self::Encode(_) | Self::EmptyPayload)
+    }
+}
+
 impl core::fmt::Display for SendError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {

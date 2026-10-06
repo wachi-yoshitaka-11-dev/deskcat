@@ -29,6 +29,10 @@
 //!   呼ぶ（[Issue #17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。
 //!   詳細は[`crate::servo`]と[`run_servo_bench_test`]のdoc参照）。**#474で、このfeature付きbuildは
 //!   `compile_error!`でcompileが止まる（下記）。**
+//! - **#514の追加LED（`LED-COMM`＝GPIO2、`LED-REACT`＝GPIO5）も既定のbuildではdriveしない。**
+//!   `bringup-led-514` feature付きbuildだけが`crate::led`で点灯試験と白の点滅を行う
+//!   （[Issue #514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)）。このfeatureは
+//!   既定buildとも`bringup-display-13`とも組み合わせられる（pinが重ならない）。
 //!
 //! # buildの構成（[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)）
 //!
@@ -41,6 +45,7 @@
 //! | feature | 加えるもの | 既定buildとの関係 |
 //! |---|---|---|
 //! | `bringup-display-13` | LCDの初期化、backlightの点灯、単色fillと四隅patternの試験モード | 製品buildに加える。描画の間のPi linkの受信とheartbeatは`crate::display_test`のmodule docを参照 |
+//! | `bringup-led-514` | #514の追加LED（GPIO2／GPIO5）の点灯試験と白の点滅（`crate::led`） | 製品buildに加える。`bringup-display-13`とも組み合わせられる |
 //! | `bench-servo-test-17` | servoの単発bench試験（#17の測定用build） | **Pi linkを外す。**正本`docs/hardware/servo-safety-limits.md`の`測定のための駆動（承認の状態の項目6）`節が、測定用のbuildは「Piとの通信linkを持たない」と定めているためである。#474で、このfeature付きbuildはcompileが止まる |
 //!
 //! `#487`のPR B1より前は、`pi-protocol-mode` featureを付けたbuildだけがPi linkを持ち、LCD／I2Cの
@@ -56,7 +61,8 @@
 //! （`crate::accel`・`crate::env`のmodule doc参照）と、Pi link関連（`peripherals.uart1`、GPIO13＝TX、
 //! GPIO14＝RX）である。`bringup-display-13` feature付きbuildはLCD関連6+1本（`crate::display`の
 //! module doc参照）を追加で渡す。`bench-servo-test-17` feature付きbuildは`SERVO-PWM`（GPIO27）と
-//! `peripherals.ledc.timer0`／`channel0`を追加で渡し、Pi link関連を渡さない。
+//! `peripherals.ledc.timer0`／`channel0`を追加で渡し、Pi link関連を渡さない。`bringup-led-514` feature付きbuildは
+//! GPIO2とGPIO5を追加で渡す。
 //!
 //! **I2Cはこの版でも実機通電していない。**この版の検証は`cargo build`でのcross-compile
 //! 確認までであり、実機へflashして確認するのは別工程である（[Hardware Safety
@@ -161,6 +167,8 @@ mod display;
 mod display_test;
 mod env;
 mod health;
+#[cfg(feature = "bringup-led-514")]
+mod led;
 #[cfg(not(feature = "bench-servo-test-17"))]
 mod pi_link;
 #[cfg(not(feature = "bench-servo-test-17"))]
@@ -205,6 +213,8 @@ use crate::display::Ili9341;
 use crate::display_test::DisplayBringup;
 use crate::env::Bme280;
 use crate::health::Health;
+#[cfg(feature = "bringup-led-514")]
+use crate::led::Leds;
 #[cfg(not(feature = "bench-servo-test-17"))]
 use crate::pi_link::PiLink;
 
@@ -360,6 +370,18 @@ fn main() {
     // **どのbuildでも`Peripherals::take()`を呼ぶ。**1度しか成功しないため`expect`で即座に気付く。
     let peripherals = Peripherals::take().expect("Peripherals::take must succeed exactly once");
 
+    // **bring-upより前に作る。**両LEDを早く消灯側へ固定するためである（`crate::led`の
+    // module doc「起動からの状態」）。点灯試験の時計は`bringup_done_ms`から数える。
+    // 失敗してもfirmwareは止めない。LEDは表示だけを担い、ほかの機能はLEDに依存しない。
+    #[cfg(feature = "bringup-led-514")]
+    let mut leds = match Leds::new(peripherals.pins.gpio2, peripherals.pins.gpio5) {
+        Ok(leds) => Some(leds),
+        Err(err) => {
+            log::error!("led_init_error err={err}");
+            None
+        }
+    };
+
     // **bring-up経路ごとに1 fieldで出す。**行ごと`#[cfg]`で分けると、featureの組み合わせの数
     // だけ同じ行を書くことになる。`cfg!`はcompile時に定数へ畳まれるため、有効でない経路の
     // 文字列が実行時に選ばれることはない。
@@ -443,6 +465,8 @@ fn main() {
     let bringup_done_ms = health.uptime_ms();
     let mut next_heartbeat = bringup_done_ms + u64::from(config::HEARTBEAT_PERIOD_MS);
     let mut next_snapshot = bringup_done_ms + u64::from(config::HEALTH_SNAPSHOT_PERIOD_MS);
+    #[cfg(feature = "bringup-led-514")]
+    let led_start_ms = bringup_done_ms;
 
     // Pi linkの送信も受信も、protocol専用の`UartDriver`経由に揃える。**UART0は使わない**
     // （debug log専用。`crate::console`のmodule doc参照）。UART0以外のUARTをGPIO matrixで
@@ -559,7 +583,11 @@ fn main() {
 
         // 期限を積み直した後の時刻で残りを測る。log の所要時間を待ち時間から差し引く。
         #[cfg_attr(
-            all(feature = "bench-servo-test-17", not(feature = "bringup-display-13")),
+            all(
+                feature = "bench-servo-test-17",
+                not(feature = "bringup-display-13"),
+                not(feature = "bringup-led-514")
+            ),
             allow(unused_mut)
         )]
         let mut until = next_heartbeat.min(next_snapshot);
@@ -570,6 +598,13 @@ fn main() {
         #[cfg(feature = "bringup-display-13")]
         if let Some(bringup) = &display {
             until = until.min(bringup.next_deadline_ms(health.uptime_ms()));
+        }
+        #[cfg(feature = "bringup-led-514")]
+        if let Some(leds) = leds.as_mut() {
+            let now_led = health.uptime_ms();
+            let elapsed = now_led.saturating_sub(led_start_ms);
+            leds.update(elapsed, now_led);
+            until = until.min(led_start_ms + led::next_change_ms(elapsed));
         }
 
         // sleepの代わりに`UartDriver::read`へ残り時間をtimeoutとして渡す。data到着があれば
@@ -679,8 +714,8 @@ const SID_NVS_KEY_NEXT: &str = "next_sid";
 ///
 /// # 生成方法: NVSの不揮発counter
 ///
-/// **乱数ではなく不揮発counterを使う。**§3.1は生成方法として「乱数、不揮発カウンタ、
-/// またはその併用」を挙げている。この crate は`Cargo.toml`で`unsafe_code = "forbid"`
+/// **乱数ではなく不揮発counterを使う。**§3.1は生成方法を§13の`PROTO-TBD-011`の行で
+/// 確定済みとしている（ESP32は不揮発counter）。この crate は`Cargo.toml`で`unsafe_code = "forbid"`
 /// としており、`esp_random()`／`bootloader_random_enable()`（ESP-IDF v5.5.3
 /// `components/esp_hw_support/include/esp_random.h`・`bootloader_random.h`）は
 /// `unsafe extern "C"` fnであるため直接呼べない。加えて、ESP-IDF公式資料

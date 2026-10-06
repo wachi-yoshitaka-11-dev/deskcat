@@ -71,6 +71,8 @@ Linux x86_64 で検証した。初回は 2026-08-06 で、これは VM 上の初
 
 **`bringup-display-13` feature（[#451](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/451)）を有効にする場合は、既定構成に加えて`cargo clippy`と`cargo build`（`cargo fmt`は対象外）へ`--features bringup-display-13`を足したものも通す。**#487から、このfeatureは既定構成へLCDの試験モードを加えるだけであり、他のfeatureと排他ではない。**この構成の実施記録（[Version Records](version-records/README.md)）は、検証済みcommandへ格上げする記録ではない。2026-09-29の記録だけは、2026-10-04に#487のPR B1の後の構成（Pi linkを含む）でこの構成も再検証した。他の記録は、どれも#487のPR B1より前のtreeのものである。**そのため、ここでもcommand blockを写さない（`flash と serial monitor`節（下記）がcommand blockを持たない理由とは別である）。
 
+**`bringup-led-514` feature（[#514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)）を有効にする場合は、既定構成に加えて`cargo clippy`と`cargo build`へ`--features bringup-led-514`を足したものも通す。**`bringup-display-13`とも組み合わせられるため、`--features bringup-display-13,bringup-led-514`も通す。**これらの構成のVersion Recordは無い。**
+
 ### workspace との関係
 
 `firmware/esp32` は root workspace から `exclude` している。firmware の manifest は

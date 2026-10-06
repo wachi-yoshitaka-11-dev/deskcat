@@ -39,8 +39,13 @@ def git(root, *args):
     return subprocess.check_output(["git", "-C", str(root), *args])
 
 
+def toplevel(root):
+    return git(root, "rev-parse", "--show-toplevel").decode().strip()
+
+
 def fingerprint(root, base):
     """Include pending changes and nonignored new files; never key by HEAD."""
+    root = toplevel(root)
     ancestor = git(root, "merge-base", base, "HEAD").decode().strip()
     digest = hashlib.sha256(git(
         root, "diff", "--no-ext-diff", "--no-textconv", "--binary",
@@ -55,6 +60,7 @@ def fingerprint(root, base):
 
 def changed_paths(root, base):
     """Paths in the reviewed diff: tracked changes since merge-base plus new files."""
+    root = toplevel(root)
     ancestor = git(root, "merge-base", base, "HEAD").decode().strip()
     names = git(root, "diff", "--name-only", "-z", ancestor).split(b"\0")
     names += git(root, "ls-files", "--others", "--exclude-standard", "-z").split(b"\0")

@@ -225,7 +225,7 @@ pub const PI_PROTOCOL_UART_TX_BUFFER_BYTES: usize = 512;
 
 /// `main()`のloopで1回の`UartDriver::read`に渡すstack buffer長（byte）。
 /// Ring buffer容量（[`PI_PROTOCOL_UART_RX_BUFFER_BYTES`]）より小さくてよい
-/// （`read`は複数回に分けて呼ばれ、`crate::boot_session::BootSession`が
+/// （`read`は複数回に分けて呼ばれ、`crate::pi_link::PiLink`の`LineReceiver`が
 /// 受信済みbyteを跨いで行を組み立てる）。stack上に置くため小さく抑えた
 /// （ring buffer容量の半分）。**`main()`の他のlocal変数と合わせた合計stack使用量は
 /// 測っていない。**task stack sizeを圧迫しないという主張はしない。
@@ -236,3 +236,34 @@ pub const PI_PROTOCOL_UART_READ_CHUNK_BYTES: usize = 256;
 /// 数えるために使う（`main.rs`の`drain_uart_events`）。**導出した値ではない。**
 #[cfg(not(feature = "bench-servo-test-17"))]
 pub const PI_PROTOCOL_UART_EVENT_QUEUE_LEN: usize = 32;
+
+/// `LED-COMM`（白、[Issue #514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)）の
+/// GPIO番号。出所は[gpio-assignment.md](../../../docs/hardware/gpio-assignment.md)の`信号inventory`。
+/// `SERVO_PWM_GPIO`と同じく確認用途のみ（[`crate::led::Leds::new`]の`debug_assert_eq!`。debug buildだけ）。
+#[cfg(feature = "bringup-led-514")]
+pub const LED_COMM_GPIO: u8 = 2;
+
+/// `LED-REACT`（赤、#514）のGPIO番号。出所と用途は[`LED_COMM_GPIO`]と同じ。
+#[cfg(feature = "bringup-led-514")]
+pub const LED_REACT_GPIO: u8 = 5;
+
+/// `LED-COMM`の点滅周期（milliseconds）。半分ずつ点灯と消灯にする。
+///
+/// **一般値である。**値は[led-514-demo.md](../../../docs/hardware/led-514-demo.md)の
+/// `役割と表示`が選んだ1秒周期であり、一次資料に基づかない。表示の周期は流れる電流を変えず、
+/// 外した場合の帰結は見え方が変わるだけなので、
+/// [Hardware Safety Policy](../../../docs/governance/hardware-safety-policy.md)の安全要件5項目の
+/// いずれにも効かない（**どの値が5項目に効くかの判定は同policyが正本であり、ここへ再掲しない**）。
+/// **2以上の偶数**であること（[`crate::led`]の割り算の前提。`led.rs`のconst assertが検査する）。
+#[cfg(feature = "bringup-led-514")]
+pub const LED_BLINK_PERIOD_MS: u32 = 1_000;
+
+/// 起動時の点灯試験で、赤だけ・白だけ・両方の各区間を保つ時間（milliseconds）。
+///
+/// 人間が極性と明るさを見て、点灯中の電流制限抵抗`R`の両端電圧をテスターで読むための待ちである
+/// （[led-514-demo.md](../../../docs/hardware/led-514-demo.md)の`段階的な確認`）。
+/// **一般値である。**外した場合の帰結は「試験をやり直す」に留まり、安全要件5項目に効かない。
+/// 3区間の合計（この値の3倍）だけ、白の点滅が始まるのが遅れる。
+/// 0にしない（`led.rs`のconst assertが検査する）。
+#[cfg(feature = "bringup-led-514")]
+pub const LED_LAMP_TEST_HOLD_MS: u32 = 10_000;
