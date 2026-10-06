@@ -19,11 +19,15 @@ decode／encode、および共有conformance fixtureを提供する。
 - 1 lineのdecodeとencode、およびその検証順序
 - byte列からlineを組み立てる上限付きreceiver（§8手順1〜6、Issue #10）
 - 共有conformance fixture（[`tests/fixtures/`](tests/fixtures/README.md)）
+- 現在sessionのduplicate履歴（§8手順8、§9、`src/duplicate.rs`）。保持件数と保持期間
+  （`PROTO-TBD-005`）は`DuplicatePolicy`として呼び出し側から受け取り、値を持たない。
+  Issue #12が`crates/deskcat-serial`に作ったものを、hostとfirmwareで共用するためにIssue #19で移した
 
 含まないもの:
 
 - serial deviceのopen、read／write、切断と再接続（Issue #11）
-- session state、duplicate履歴、受理budget、遷移cooldown（Issue #12）
+- session state、受理budget、遷移cooldown（Issue #12）。duplicate履歴をいつ照会し、いつ破棄するかも
+  所有者（`deskcat-serial`の`PeerSession`、firmwareのsession）が持つ
 - hardwareに依存する値と処理
 
 `play_motion`、§4.7の完了・fault event、`show_choices`、`protocol_fault`の型は起こしていない。

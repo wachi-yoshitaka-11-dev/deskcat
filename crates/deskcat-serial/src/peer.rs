@@ -52,6 +52,11 @@ pub enum OutstandingKind {
     Ping,
     /// `get_status`（§5.6）。
     GetStatus,
+    /// `set_expression`（§5.2）。ACKを要するcommandであり（§8の表「Pi→ESP32」）、timeout後の
+    /// 再送は`ping`／`get_status`と同じ[`PeerSession::poll_outstanding`]の経路に乗る（§9）。
+    /// 回数は[`RetryPolicy`]に従う。
+    /// §9は「状態設定commandはidempotentにする」と定めている。
+    SetExpression,
     /// Pi自身の`hello`（§5.1）。**[`PeerSession::note_hello_sent`]だけが記録し、
     /// [`PeerSession::poll_outstanding`]の対象にしない**（`hello`の最大retry回数は
     /// `PROTO-TBD-011`が未確定であり、拒否code別の扱いも§5.1が`ping`／`get_status`と
@@ -72,6 +77,7 @@ impl OutstandingKind {
         match message {
             Message::Ping => Some(Self::Ping),
             Message::GetStatus => Some(Self::GetStatus),
+            Message::SetExpression(_) => Some(Self::SetExpression),
             _ => None,
         }
     }
@@ -279,12 +285,19 @@ pub struct PeerSession {
     ///
     /// **最新の1件だけを持つ。**Piは起動時とportを開き直すたびに`hello`を送るため、
     /// 古い`hello`へ遅れて届いたACKは[`PeerRejection::UnmatchedAck`]になる。
-    /// 消すのは、現在のESP32 sessionから相関したACKを受けたときと、ESP32 sessionの遷移を
-    /// 確定したとき（[`Self::handle_boot`]）だけである。**遷移の後に届いた、遷移前の
+    /// 消すのは、現在のESP32 sessionから相関したACKを受けたときと、**2回目以降の**ESP32 sessionの遷移を
+    /// 確定したとき（[`Self::handle_boot`]）だけである。**2回目以降の遷移の後に届いた、遷移前の
     /// `hello`へのACK（未承認のACKを受け、その`sid`の`boot`で承認した後の再送など）は
     /// [`PeerRejection::UnmatchedAck`]になる。**新しいsessionへ古い要求の結果を持ち越さない（§6）。
+    ///
     /// `outstanding`と分けるのは、[`Self::poll_outstanding`]の再送の対象にしないためである
     /// （[`OutstandingKind::Hello`]のdoc参照）。
+    ///
+    /// **例外: 最初の確立（それまでESP32 sessionを1つも持っていなかった場合）では消さない。**
+    /// 持ち越す旧sessionがそもそも無く、§6の理由が当たらない。Piは起動直後に`hello`を送るので
+    /// （§5.1）、`boot`が`hello`より先に届いていても、その`hello`のACKは`boot`の後に、確立した
+    /// そのESP32 sessionから届く。ここで消すと、その`hello`の結果（拒否のcodeを含む）が`UnmatchedAck`に
+    /// 埋もれる。
     pending_hello: Option<u32>,
     counters: PeerCounters,
 }
@@ -335,7 +348,7 @@ impl PeerSession {
 
     /// ESP32→Piで定義されていないtypeを受けたと計上する（§3、§8）。
     ///
-    /// `hello`・`ping`・`get_status`はPi→ESP32のmessageであり、Piが受ける方向では
+    /// `hello`・`ping`・`get_status`・`set_expression`・`show_text`はPi→ESP32のmessageであり、Piが受ける方向では
     /// 定義されていない。§8は、Piが受けた`hello`を`unknown_type`として扱い、応答せず、
     /// duplicate照会もsession遷移も行わないと定める。**`sid`の判定より先に扱う**（§3）ため、
     /// `stale_sessions`には数えない。
@@ -354,8 +367,8 @@ impl PeerSession {
     /// [`PeerRejection::UnmatchedAck`]になる。
     ///
     /// **`kind`は`message`から導く**（呼び出し側が別々に指定する経路は無い。
-    /// `OutstandingKind::classify`参照）。`message`が`ping`／`get_status`の
-    /// どちらでもない場合は追跡せず`None`を返す。
+    /// `OutstandingKind::classify`参照）。`message`が`ping`／`get_status`／
+    /// `set_expression`のいずれでもない場合は追跡せず`None`を返す。
     ///
     /// **`message`が`get_status`なら、[`Self::status_sync_pending`]も
     /// 合わせて`false`にする。**呼び出し側へ2手を強いると対が崩れうるため、
@@ -579,6 +592,7 @@ impl PeerSession {
 
         // **ここからが旧sessionの追跡のreset（§10.1 step2）である。**遷移を確定した
         // ときだけ行い、拒否の経路（上）では何も変えない。
+        let first_session = self.esp32_sid.is_none();
         self.retire_current();
         self.boot_history.clear();
         self.esp32_sid = Some(sid);
@@ -588,7 +602,11 @@ impl PeerSession {
         // 旧sessionの`get_status`に対する`status`は、もう届いても応答として扱わない。
         self.status_awaited = false;
         // 旧ESP32 sessionへ送った`hello`のACKも、新sessionからは届かない（§6）。
-        self.pending_hello = None;
+        // **最初の確立では消さない**（`pending_hello`のdoc参照）。旧sessionが無いので、持ち越す
+        // ものが無い。
+        if !first_session {
+            self.pending_hello = None;
+        }
         self.counters.session_switches = self.counters.session_switches.saturating_add(1);
 
         let ack = Ack {
@@ -704,10 +722,28 @@ impl PeerSession {
         }
     }
 
+    /// ESP32→Piのevent（`head_touched`、`tapped`、`lifted`、`environment`。§4.2〜§4.5）を
+    /// 受けてよいかを判定する。
+    ///
+    /// eventには応答を返さない（返す先の要求が無い。§8）。duplicate履歴も引かない
+    /// （eventの再送とduplicateの扱いは§9の「ACKを必要とするmessage」が未確定である）。
+    ///
+    /// # Errors
+    ///
+    /// envelopeの`sid`が現在のESP32 sessionと異なる場合は[`PeerRejection::StaleSession`]を
+    /// 返し、`stale_sessions`へ計上する（§5.1優先順位4）。
+    pub fn accept_event(&mut self, envelope_sid: u32) -> Result<(), PeerRejection> {
+        if self.esp32_sid == Some(envelope_sid) {
+            Ok(())
+        } else {
+            self.count_rejection(PeerRejection::StaleSession);
+            Err(PeerRejection::StaleSession)
+        }
+    }
+
     /// 復元した[`Frame`]の送信元`sid`が、現在のESP32 sessionと一致するか。
     ///
-    /// `boot`／`ack`／`status`以外の、このcrateがまだ扱わないtypeを受けたときに
-    /// 呼び出し側が使う。一致しなければ`stale_session`として計数してよい
+    /// 判定だけを行い、計数しない。ESP32→Piのeventの判定と計数は[`Self::accept_event`]が行う
     /// （§5.1優先順位4: `hello`／`boot`以外の未知`sid`は`stale_session`）。
     #[must_use]
     pub fn is_current_session(&self, frame: &Frame) -> bool {
@@ -1099,7 +1135,7 @@ mod tests {
         );
     }
 
-    /// 追跡対象外の`message`（`ping`／`get_status`以外）は記録しない。
+    /// 追跡対象外の`message`（`ping`／`get_status`／`set_expression`以外）は記録しない。
     ///
     /// `kind`を`message`から導くようにしたのは、呼び出し側が`kind`と`message`を
     /// 食い違う組み合わせで渡せてしまう経路を無くすためである

@@ -20,11 +20,14 @@ message型、検証、上限付きline受信は[`deskcat-protocol`](../deskcat-p
   切断のerrnoと読みのtimeoutを契約どおりに正規化する（下記）
 - ESP32 peer sessionの状態（`PeerSession`、`src/peer.rs`）。`boot`のsession遷移、
   duplicate履歴、`hello`／`boot`以外の`stale_session`判定、Piが送った`ping`／
-  `get_status`への応答の相関（[Issue #12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)）
-- 現在sessionのduplicate履歴（`DuplicateHistory`、`src/duplicate.rs`）。保持件数と保持期間
-  （`PROTO-TBD-005`）は`DuplicatePolicy`として呼び出し側から受け取り、値を持たない
+  `get_status`／`set_expression`への応答の相関（[Issue #12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)）
+- 現在sessionのduplicate履歴（`DuplicateHistory`）。保持件数と保持期間
+  （`PROTO-TBD-005`）は`DuplicatePolicy`として呼び出し側から受け取り、値を持たない。
+  **定義は`crates/deskcat-protocol/src/duplicate.rs`にある**（hostとfirmwareで共用するために
+  [Issue #19](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/19)で移した）。
+  このcrateは`deskcat_serial::duplicate`ごとre-exportし、以前のpathを保つ
 - 受信frameの振り分け（`handle_frame`、`src/coordinator.rs`）。`ack`の相関、`status`の受理、
-  ESP32→Piで定義されていないtypeの計上
+  現在sessionのeventの受け渡し、ESP32→Piで定義されていないtypeの計上
 
 含まないもの:
 
@@ -70,7 +73,7 @@ linkの上で起きたerrorである。openの`ENOENT`／`EACCES`／`EBUSY`はUS
 transportを所有せず、pumpの引数で受け取る）ため、呼び出し側の形をここに置く。
 
 ```bash
-cargo run --example serial_link -- --port <path> --baud <rate> --duplicate-capacity <n> --duplicate-retention-ms <ms> [--seconds <n>] [--verbose]
+cargo run --example serial_link -- --port <path> --baud <rate> --duplicate-capacity <n> --duplicate-retention-ms <ms> [--seconds <n>] [--ping-count <n>] [--verbose]
 ```
 
 `--port`と`--baud`は**どちらも必須である。既定値を持たせない。**device名は未確認であり
@@ -87,9 +90,11 @@ baudの正本は`PROTO-TBD-001`でいずれも`Candidate`である。渡した�
 
 この実行体は、受信したframeを種類を問わず`handle_frame`で`PeerSession`
 （[Issue #12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)）へ渡し、送った`hello`の`id`を
-`note_hello_sent`で記録し、pumpの1周ごとに`retry_due_requests`でACK timeoutした`get_status`を送り直す
-（この実行体は`ping`を送らない）。`retry_due_requests`は、確立の直後にqueueへ入れられなかった`get_status`も送る。
+`note_hello_sent`で記録し、pumpの1周ごとに`retry_due_requests`でACK timeoutした`get_status`を送り直す。
+`retry_due_requests`は、確立の直後にqueueへ入れられなかった`get_status`も送る。
 接続のたびに`hello`を1件送る（`reason`は初回が`Startup`、再接続が`PortReopen`。仕様§5.1）。
+`--ping-count <n>`（1以上）を付けたときだけ、ESP32 sessionの確立のたびに`ping`を1件ずつ最大n件送る。ACKの相関と、ACK timeoutでの同じ`id`の再送は、`get_status`と同じ経路である。周期は持たない（`PROTO-TBD-010`）。省けば`ping`を送らない。
+根拠の読み方: 終了時の`counters: pings_sent=… ping_acks=… ping_rejected=… ping_retries=… ping_gave_up=…`は通算である。`pings_sent`と`ping_acks`が等しくn以上なら、送った`ping`のすべてに`ok`のACKを相関できた（n未満なら、まだ送り終えていない。等しくなければ、拒否・取り下げ・未決のまま終了・ESP32 sessionの切替で捨てた`ping`がある。`peer: session_switches`は最初の確立でも1になり、2以上なら切替があった）。これは「`ping`へのACKを相関した」根拠であり、`boot`→ACK→`get_status`→`status`の往復の成立とは別に記録する。ESP32側のlogと突き合わせる。
 
 **ESP32が`boot`→ACKより先の往復に応えるのは、`firmware/esp32`を
 [Issue #487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)のPR B2
@@ -108,7 +113,7 @@ PR B2で、ESP32は`hello`／`ping`／`get_status`にACKを返し、`get_status`
 
 ### host（VM）で確認済みの挙動
 
-**擬似端末を相手に実走させた。実serial portではない。**下の表の「実行A」「実行B」は、このcrateの`serial_link`（#12の受信の配線を入れた版）を、fixtureの行で応える偽のESP32（repositoryに置いていないscript）と擬似端末で繋いだ別々の実行である。
+**擬似端末を相手に実走させた。実serial portではない。**下の表の「実行A」「実行B」「実行C1」「実行C2」は、このcrateの`serial_link`（#12の受信の配線を入れた版。実行C1・C2は`--ping-count`を入れた版）を、fixtureの行で応える偽のESP32（repositoryに置いていないscript）と擬似端末で繋いだ別々の実行である。
 
 | 確認 | 結果 |
 |---|---|
@@ -119,6 +124,8 @@ PR B2で、ESP32は`hello`／`ping`／`get_status`にACKを返し、`get_status`
 | 未承認の`sid`の`hello`のACK（実行A。相手は`hello`を受けると、`boot`と同じ`sid`でACKを返す。`boot`はまだ送っていない） | `hello`の結果として受理せず、`unapproved_hello_acks=1`、`unmatched_acks=0` |
 | `boot`を受信（実行A。相手は上のACKの0.2秒後に`crates/deskcat-protocol/tests/fixtures/valid.json`の`boot_minimal`を送り、`get_status`を受けるとACKと同じfileの`status_snapshot`を続けて返す） | `Established`へ移り、`boot`のACKと`get_status`を送出。`get_status`のACKを相関させ（logの`ackを相関した: request=GetStatus`）、続く`status`を応答として扱う（`solicited=true`） |
 | `get_status`にACKが来ない（実行B。相手は実行Aと同じだが、`get_status`に応答しない） | ACK timeout（`SerialConfig::new`の既定の`RetryPolicy::provisional`。500 ms、`max_retries`は1）の後に同じ`id`で1回送り直し（偽のESP32が`id=3`の`get_status`を2回受信した）、予算を使い切って取り下げる（logの`応答待ちを取り下げた`） |
+| `--ping-count 3`（実行C1。相手は実行Aと同じだが、`ping`にもACKを返す） | `pings_sent=3 ping_acks=3 ping_rejected=0 ping_retries=0 ping_gave_up=0`。logの順は、`ping`をqueueへ入れる→そのACKを相関→次の`ping`、の繰り返し。偽のESP32は`ping`の`id`4・5・6を各1回受信した |
+| `--ping-count 3`（実行C2。相手は実行C1と同じだが、1件目の`ping`にだけACKを返す） | `pings_sent=3 ping_acks=1 ping_rejected=0 ping_retries=2 ping_gave_up=2`。偽のESP32が`ping`の`id`5・6を各2回受信し（同じ`id`で1回再送）、予算を使い切って取り下げる（logの`応答待ちを取り下げた`）。ESP32側のlogとの突き合わせは、偽のESP32のため行っていない |
 
 ## 実機に残っていること
 

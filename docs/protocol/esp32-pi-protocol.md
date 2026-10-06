@@ -771,6 +771,10 @@ Firmwareは次を実行する。
 | 実行中trajectoryによるresourceの一時的な占有 | `busy` |
 | 値そのものが許容範囲外 | `out_of_range` |
 
+**`play_motion`の`busy`は、そのrequestの最終拒否結果として保存する。**同じ`(sid, id)`の再送は、占有を再評価せず、保存した`busy`のACKのreplayになる（§9）。
+
+- **占有の判定は、§8の手順8のduplicate照会で未処理と判定された`(sid, id)`にだけ行う。**
+
 **(b) 実行時の安全制限を超過した場合** — 実行中のtrajectoryを中止する。
 
 連続動作時間とduty cycleの超過、および拘束・過負荷の検知は、
@@ -980,6 +984,7 @@ Receiverは次の手順で動作する。
    - **session遷移の上限とcooldown（§5.1）**は、現在のsessionと異なる`sid`の`hello`／`boot`、すなわち遷移候補だけに適用する。受理上限とは別のbudgetであり、予約枠では免除されない。現在の`sid`を維持する`port_reopen`／`resync`は遷移ではないため、このbudgetを消費しない。
    - いずれかの上限超過は`rate_limited`で拒否し、**session state、duplicate履歴、実行中motionのいずれも変更しない。`hello`／`boot`への`rate_limited`は最終結果として保存せず、同じ`(sid, id)`の再送でこの手順を再評価する。**通常commandへの`rate_limited`はそのrequestの最終拒否結果として保存し、再要求する場合はcooldown後に新しい`id`を使う。
 10. 上限内であれば、`sid`と`type`に応じて処理する。現在の`sid`で未処理の`port_reopen`／`resync`の`hello`は、sessionを変更せず受理してACKを最終結果として保存する。`hello`／`boot`で`sid`が現在のsessionと異なる場合だけ遷移を確定する。それ以外の未知・retiredな`sid`は`stale_session`で拒否する（§5.1）。
+    `play_motion`で占有があれば、`busy`で拒否して最終拒否結果として保存する（§5.3）。
 11. 該当counterを増加させる。
 12. Resetせず後続lineのparseを続ける。
 13. Protocol出力によってsensor、motion safety、watchdogの進行をblockしない。
@@ -1111,6 +1116,7 @@ Draft 2のpolicy:
 - 通常commandが明示的な`rate_limited`を受けた場合、そのrequestは最終的に拒否された
   ものとして扱う。同じ`(sid, id)`をretryせず、cooldown後に改めて要求する場合は
   新しい`id`を割り当てる。ACKが無い場合の1回retryとは区別する。
+- `play_motion`が`busy`を受けた場合、同じ`(sid, id)`をretryしても、保存した`busy`のACKがreplayされるだけである。ACKが無い場合の1回retryとは区別する。
 - 同じ`(sid, id)`を再利用する。
 - `id`が上限に達した送信側は、新しい`(sid, id)`を作らない（§3）。**未ACK messageの再送は同じ
   `(sid, id)`で行うため、上限到達後もこのretryは実行できる。**止まるのは新しい`(sid, id)`を要する送出だけである。
@@ -1132,7 +1138,7 @@ Draft 2のpolicy:
 - ~~Integer wrapの処理~~（envelopeの`id`は§3で確定した。wrapさせず、上限で新しい`(sid, id)`を要する送出を止める。**残るのは`status.payload.protocol`のcounterの幅と飽和時の扱いである。**§3の型表はenvelope fieldだけを対象とし、§4.6もcounterの幅とoverflow時の動作を規定していない。連続運転では`id`と同じ桁で到達するため、「最終status field」を扱う`PROTO-TBD-006`の範囲とする）
 - Duplicateが保持履歴より古い場合の動作
 - ACKを必要とするmessage
-- `sid`の生成方法と衝突許容確率
+- ~~`sid`の生成方法~~と衝突許容確率（生成方法はESP32側とPi側の両方を§13の`PROTO-TBD-011`の行で確定した。**残るのは衝突許容確率である。**）
 
 状態設定commandはidempotentにする。Relativeまたは名前付きの物理motionにはduplicate suppressionが必要である。
 
@@ -1150,6 +1156,8 @@ Draft 2のpolicy:
 6. Piが実際のdisplay／motion stateとdesired stateを比較する。
 7. Piが安全な状態設定commandを送信する。
 8. どちらも古いrelative motionを自動再実行しない。
+
+**再起動したESP32はPiの`sid`を失っている。**手順4の`get_status`は§5.1の優先順位4で`stale_session`になる。そのためPiは、確立していたESP32 sessionから別の`sid`の`boot`で遷移を確定したら、processを終了してsupervisorに再起動させ、新しい`sid`の`startup`の`hello`から§10.2の手順に従う（§3の「protocolはその再起動の自動化を禁じない」。[#491の決定](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/491#issuecomment-5965360345)）。手順4〜8は、§10.2の手順6から行う。
 
 serial linkが切れて繋がり直しただけで、ESP32 processが再起動していない場合はこの手順に入らない。`sid`を変えず、`boot`も送らない（§3）。Piは現在のESP32 sessionとduplicate履歴をそのまま保持する。link断を再起動と誤って扱うと、動作中のmotionを不要に停止し、retryを二重実行に変える。
 
@@ -1335,7 +1343,7 @@ Framing／parse層について、**host workspaceのRust実装**がfixtureに合
 | PROTO-TBD-008 | Motion名と範囲 | Servo calibrationと動作設計 |
 | PROTO-TBD-009 | Touch strengthの意味 | **touch controllerは`XPT2046`と確定した**（2026-08-13の現物確認。[HW-TBD-003](../hardware/tbd-register.md)はclose）。残るのは同ICのdatasheetでの意味づけと実験である |
 | PROTO-TBD-010 | Heartbeat方式とlink-loss判定 | 測定latencyとfail-safe試験。[HW-TBD-017](../hardware/tbd-register.md)と対で確定する。**サーボ出力の有効化条件に含まれる**（[servo-safety-limits](../hardware/servo-safety-limits.md#サーボ出力を有効化してよい条件)） |
-| PROTO-TBD-011 | ~~`sid`の生成方法~~（[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)のPR AでESP32側だけ確定。NVSの不揮発counterを使う。**Pi側（`crates/deskcat-serial`）は未確定のまま残る**。詳細は`firmware/esp32/src/main.rs`の`generate_sid`のdoc）、`sid`の**衝突許容確率**（未確定。ESP32側の実装が衝突しうる経路は`generate_sid`のdoc「衝突許容確率」節。回復は§3.1の`stale_session`経路に委ね、`#446`のPR Bで実装する）、**retired session**の保持件数と期間（下限は遅延messageの最大生存時間＋再送window。期間は`T_retention`と時間単位を一組で記録する。保持件数は`PROTO-TBD-012`の`N_transition`回／`T_window`から`N_transition × ceil(T_retention / T_window)`件以上とし、端数windowを切り上げる。retired `sid`を`stale_session`で遮蔽するためのものであり、`PROTO-TBD-005`とは目的が異なる）、`stale_session`受信による`sid`選び直し回数の上限、`hello`無応答時のrecovery budgetと同一identityの最大retry回数（`boot`のrecovery再開は`sid`を選び直さない。§4.1） | 再起動試験とRust実装の検討。[HW-TBD-020](../hardware/tbd-register.md)と対で確定する。**サーボ出力の有効化条件に含まれる**（残る項目がある限り、この行はgateを開けない） |
+| PROTO-TBD-011 | ~~`sid`の生成方法~~（ESP32側は[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)のPR Aで確定。NVSの不揮発counterを使う。詳細は`firmware/esp32/src/main.rs`の`generate_sid`のdoc。Pi側は[#491の決定](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/491#issuecomment-5965350355)で確定。processの起動ごとにOSの乱数（`/dev/urandom`の4 byte）から選ぶ。実装は`apps/deskcatd/src/sid.rs`の`sid_from_os`（#491の段階2b-iで実装済み。Pi実機では未確認））、`sid`の**衝突許容確率**（未確定。ESP32側の実装が衝突しうる経路は`generate_sid`のdoc「衝突許容確率」節。回復は§3.1の`stale_session`経路に委ね、`#446`のPR Bで実装する）、**retired session**の保持件数と期間（下限は遅延messageの最大生存時間＋再送window。期間は`T_retention`と時間単位を一組で記録する。保持件数は`PROTO-TBD-012`の`N_transition`回／`T_window`から`N_transition × ceil(T_retention / T_window)`件以上とし、端数windowを切り上げる。retired `sid`を`stale_session`で遮蔽するためのものであり、`PROTO-TBD-005`とは目的が異なる）、`stale_session`受信による`sid`選び直し回数の上限、`hello`無応答時のrecovery budgetと同一identityの最大retry回数（`boot`のrecovery再開は`sid`を選び直さない。§4.1） | 再起動試験とRust実装の検討。[HW-TBD-020](../hardware/tbd-register.md)と対で確定する。**サーボ出力の有効化条件に含まれる**（残る項目がある限り、この行はgateを開けない） |
 | PROTO-TBD-012 | 単位時間あたりの受理上限、応答の送出上限と集約window、**`boot`への拒否ACK専用budget**、**`hello`への拒否ACK専用budget**、**受信側が所有する方向別応答保留table**（ESP32所有のPi→ESP32 `hello` tableと、Pi所有のESP32→Pi `boot` table）の件数上限・TTL・公平性規則、二つの件数上限の和として定義するlink全体の静的上限（entry keyは`(sender_role, sid, id)`。方向間で未使用枠を貸し出さない。TTLは最悪送出待ち時間以上。`rate_limited`は最終結果としてreplayしない）、各保留entryの初回送出機会とsession messageの最大retry回数を合わせた有限送出quota、**`rate_limited`で拒否された`hello`のretry budget**、duplicateへ非ACKの保持結果をreplayする時間窓と回数の上限、**正規retry quota内の保持ACK replay予約容量**（送出総数上限と通常のper-identity上限に優先。通常commandは1回、`hello`は`PROTO-TBD-011`、`boot`は`PROTO-TBD-017`の最大retry回数を使い、各identityの残quotaと同一windowの最大retry到着数から有限容量を算出する）、`hello`／`boot`の受理予約枠割合、session遷移の上限（任意の連続`T_window`あたり`N_transition`回。数値と時間単位を一組で記録し、固定window境界で上限を迂回できない方式にしてPROTO-TBD-011の保持件数式へ渡す）、cooldown、ACK・完了event・fault event・`status`用に確保する帯域 | protocolの負荷試験（throughput、応答遅延、buffer占有、枯渇の有無）。これらはlinkの負荷管理parameterであり、温度／電流試験では決まらない。[HW-TBD-020](../hardware/tbd-register.md)のservoの秒あたり受理command数と対で確定する。その値はhardware台帳が正本であり、ここではlink全体のbudgetへ組み込む条件だけを扱う。**サーボ出力の有効化条件に含まれる**（[servo-safety-limits](../hardware/servo-safety-limits.md#サーボ出力を有効化してよい条件)） |
 | PROTO-TBD-013 | Stale commandの拒否条件（command age、session遷移後の未ACK commandの扱い） | Reconnect試験とfail-safe試験。[HW-TBD-018](../hardware/tbd-register.md)の通信断時fail-safe／reconnect条件、および[HW-TBD-020](../hardware/tbd-register.md)のCommand timeout fieldと対で確定する。Command timeoutの実測値はhardware側、stale commandの拒否条件はProtocol側を正とする。**サーボ出力の有効化条件に含まれる**（[servo-safety-limits](../hardware/servo-safety-limits.md#サーボ出力を有効化してよい条件)） |
 | PROTO-TBD-014 | 実行時安全制限の超過を報告するfault eventの名前とpayload schema。拘束／過負荷、最大連続動作時間の超過、duty cycle上限の超過を、payload fieldまたはcodeで**区別できる**こと | [Servo Safety Limits](../hardware/servo-safety-limits.md#拘束stallと過負荷)の検知手段確定後。[HW-TBD-020](../hardware/tbd-register.md)と対で確定する。**サーボ出力の有効化条件に含まれる**（[servo-safety-limits](../hardware/servo-safety-limits.md#サーボ出力を有効化してよい条件)） |
@@ -1368,6 +1376,9 @@ Framing／parse層について、**host workspaceのRust実装**がfixtureに合
 | 2026-09-30 | Draft 2 integrated build | [Issue #487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)のPR B1。firmwareの`pi-protocol-mode` featureを廃止し、Pi linkを製品build（既定build）へ入れた。§2の記述を「Pi linkを持つbuild（`bench-servo-test-17`以外のすべて）」へ改めた。**wire formatとprotocolの規則は変えていない** |
 | 2026-10-02 | Draft 2 boot resume by hello | [Issue #487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)のPR B2。§4.1と§5.1で食い違っていた`boot`の再送の再開を、§4.1の「`hello`による再開」に1つにまとめ、§5.1の手順5と「現在sessionで未処理のsession確立message」はそこを参照する形にした。(1) recovery budgetを使い切った後の再開を「してよい」から「する」へ改めた。(2) 再開を起こす`hello`を、`status: ok`のACKの後は新しいPi `sid`の`hello`、budgetを使い切った後は受理した`hello`（同じPi `sid`の`port_reopen`／`resync`を含む）とした。(3) `rate_limited`のbudgetを使い切った停止も再開の対象とした。(4) 回数の単位を「Pi sessionにつき1回」に揃えた。(5) 終端として拒否された`boot`の「Piの介入を待つ」を、processの再起動または運用者の明示的なsession reset（§3.1）に改めた。§2の既知の逸脱を、`firmware/esp32/src/pi_link.rs`がPi→ESP32方向のrequestを処理するようになった後の範囲へ改めた。**wire formatは変更していない** |
 | 2026-10-02 | Draft 2 event and display types | [Issue #527](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/527)。§4.2〜§4.5の`head_touched`、`tapped`、`lifted`、`environment`と、§5.2の`set_expression`、§5.4の`show_text`を、`crates/deskcat-protocol`の型と§12.1のSchema群のfixtureへ入れた。仕様の文は次を足した: §3にtype固有payloadのfieldの型と必須（省略可のfieldの`null`は省略と同じ）、§5.4に`text`のbyte上限（884 byte、暫定）、§7に`text`の制御文字の規則、§12に共有fixtureが固定する範囲と、displayとfirmwareの上限を適用する手順。§2の既知の逸脱(i)を、`set_expression`と`show_text`がdecodeを通る事実に合わせた。`head_touched.strength`と`tapped.magnitude_g`は型に持たない（受けた場合は§3により無視する）。§13のTBD行は外していない。`play_motion`、§4.7の完了・fault event、`show_choices`、`protocol_fault`は入れていない |
+| 2026-10-03 | Draft 2 Pi sid and ESP32 restart | [Issue #491](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/491)の決定2件を写した。§13の`PROTO-TBD-011`の行に、Pi側の`sid`の生成方法（processの起動ごとにOSの乱数から選ぶ）を記録した。§10.1の手順の後に、再起動したESP32がPiの`sid`を失っているため手順4の`get_status`が`stale_session`になること、Piが`boot`で遷移を確定したらprocessを再起動して§10.2に従うことを書いた（[決定](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/491#issuecomment-5965360345)）。§9の受け入れ前の`TBD`の`sid`の生成方法に取り消し線を付けた。**wire formatは変更していない。**§5.1の整合規則とfirmwareも変えていない |
+| 2026-10-05 | Draft 2 Pi sid implemented | [Issue #491](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/491)の段階2b-iii。§13の`PROTO-TBD-011`の行にある、Pi側の`sid`の生成方法の「実装は#491の段階2b（`apps/deskcatd`。未実装）」を、`apps/deskcatd/src/sid.rs`の`sid_from_os`で実装済みの記述へ直した。**wire formatは変えていない。**`PROTO-TBD-011`の値は決めていない |
+| 2026-10-05 | Draft 2 busy | [Issue #19](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/19)。`play_motion`の`busy`を、そのrequestの最終拒否結果として保存し、同じ`(sid, id)`の再送を保存したACKのreplayとすることを、§5.3、§8手順10、§9へ明記した。**wire formatは変えていない。** |
 
 ### Draft schemaの互換性
 
