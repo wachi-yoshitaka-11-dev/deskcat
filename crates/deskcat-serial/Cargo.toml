@@ -72,6 +72,12 @@ serial2 = { version = "0.2.38", features = ["unix"] }
 libc = "0.2"
 
 
+# exampleの単体testは、既定では`cargo test`が実行しない。`serial_link`は`ping`の送信の
+# 状態（`PingProbe`）の単体testを持つため、`cargo test --workspace`に含める。
+[[example]]
+name = "serial_link"
+test = true
+
 # workspaceのlintはmemberへ自動継承されない。これを書き忘れると
 # `unsafe_code = "forbid"`、`missing_docs = "warn"`、`clippy::all = deny`が
 # すべて無効になり、しかもbuildは通るため気づかない。
