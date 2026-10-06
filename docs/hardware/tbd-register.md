@@ -88,7 +88,7 @@
 | 不足している情報／判断 | MSP2807が耐えられる電流の上限。U1の供給能力だけでは決まらない |
 | 必要な根拠 | [調査・測定・#461の承認と計算](tbd-register-history.md#hw-tbd-024)。公開資料と非通電導通測定ではbacklight経路・LED個数を確定できず、上限は未解決。非破壊の原則を維持する |
 | 妨げる対象 | B-2（B-2a／B-2b）とB-2bの制限値決定。**DISP-01のESP32 3V3 pinへの通常接続（backlight点灯、ACCEL-01／ENV-01への追加を含む）は#461の承認範囲**。B-2・外部電源・段階Cへ広げない |
-| 対応Issue | [#1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1)、[#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)、[#461](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/461) |
+| 対応Issue | [#1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1)、[#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)、[#461](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/461)、[#556](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/556) |
 | Owner | Human |
 | 状態 | Open（接続判断と上限値を区別） |
 
@@ -108,7 +108,7 @@
 | 不足している情報／判断 | B-2共通条件。(a) moduleとしての許容電圧範囲、(b) 全moduleの安全な電流上限／代替の現物回路確認 |
 | 必要な根拠 | (a) [電源文書の許容電圧範囲](power-budget.md#段階b-2の測定)の限定付き設計判断を使う。(b) ACCEL-01／ENV-01は確認済み、DISP-01は未達。[判定の出所と訂正](tbd-register-history.md#hw-tbd-025) |
 | 妨げる対象 | B-2a／B-2bとも。(b)は**電流の大きさでなく現物回路確認の手続き**を判定する。HW-TBD-024の通常接続判断・電流上界計算を代替にしない |
-| 対応Issue | [#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3) |
+| 対応Issue | [#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)、[#556](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/556) |
 | Owner | Human |
 | 状態 | Open（(b)のDISP-01が残る） |
 
