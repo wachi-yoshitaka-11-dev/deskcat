@@ -2071,7 +2071,7 @@ M0 の 0.2 mV を引き 0.1 Ω で割ると、bring-up の後以外の区間が�
 | Wiring revision | PiのGPIOには何もつないでいない。ESP32はつないでいない |
 | Power supply and current limit | 起動ごとに下の表のとおり。電流制限は設けていない |
 | Firmware commit/profile | 対象外（ESP32を使っていない）。PiはRaspberry Pi OS（kernel `6.18.34+rpt-rpi-v6`、`raspi-config` 20260522） |
-| Configuration | 承認：②での初回起動とPiの設定（[#446の記録](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446#issuecomment-5952463629)）、bssidの固定（ユーザーの回答「どうぞ」）。③への切り替えと`CABLE-PI-PWR-01`への切り替えは、ユーザー自身の判断と操作である。`CABLE-PI-A-01`：本体表記が無い。[#247の決定](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/247#issuecomment-5863026168)（表記なしは使わない）に対する例外として、段階AのPiの給電の間だけ使うことを、ユーザーが決めた（[#446のコメント](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446#issuecomment-6016369799)）。このcableが`EXP-009`の「表記なし」と同じ現物かは、同定していない。 |
+| Configuration | 承認：②での初回起動とPiの設定（[#446の記録](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446#issuecomment-5952463629)）、bssidの固定（ユーザーの回答「どうぞ」）。③への切り替えと`CABLE-PI-PWR-01`への切り替えは、ユーザー自身の判断と操作である。`CABLE-PI-A-01`：本体表記が無い。`EXP-009`の「表記なし」と同じ現物かは、同定していない。 |
 | Measurement equipment | この端末からのping（1 sおき）とssh。Pi上の`journalctl`（`Storage=persistent`）、`nmcli` |
 | Procedure | 下の表の順に起動した。Piが届いている間にsshで前の起動のjournalを読んだ。bssidの固定の後と、②と`CABLE-PI-A-01`へ戻した後に、それぞれ1時間監視した。最後にPiのUARTを設定し、再起動して確かめた |
 | Expected result | Piがnetworkから消えず、`/dev/serial0`が`ttyAMA0`を指すこと |
