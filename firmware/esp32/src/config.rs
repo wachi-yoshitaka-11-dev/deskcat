@@ -225,7 +225,7 @@ pub const PI_PROTOCOL_UART_TX_BUFFER_BYTES: usize = 512;
 
 /// `main()`のloopで1回の`UartDriver::read`に渡すstack buffer長（byte）。
 /// Ring buffer容量（[`PI_PROTOCOL_UART_RX_BUFFER_BYTES`]）より小さくてよい
-/// （`read`は複数回に分けて呼ばれ、`crate::boot_session::BootSession`が
+/// （`read`は複数回に分けて呼ばれ、`crate::pi_link::PiLink`の`LineReceiver`が
 /// 受信済みbyteを跨いで行を組み立てる）。stack上に置くため小さく抑えた
 /// （ring buffer容量の半分）。**`main()`の他のlocal変数と合わせた合計stack使用量は
 /// 測っていない。**task stack sizeを圧迫しないという主張はしない。

@@ -235,6 +235,15 @@ class ReviewSessionTests(unittest.TestCase):
         self.finish(disposition="interrupted")
         self.cli("check", expected=2)
 
+    def test_subdirectory_root_gives_same_fingerprint_and_paths(self):
+        (self.root / "sub").mkdir()
+        (self.root / "sub" / "inner.md").write_text("inner\n", encoding="utf-8")
+        (self.root / "outer.py").write_text("print()\n", encoding="utf-8")
+        sub = self.root / "sub"
+        self.assertEqual(session.fingerprint(sub, "base"), session.fingerprint(self.root, "base"))
+        self.assertEqual(session.changed_paths(sub, "base"), ["outer.py", "sub/inner.md"])
+        self.assertEqual(session.changed_paths(sub, "base"), session.changed_paths(self.root, "base"))
+
     def test_lock_denies_concurrent_start(self):
         path = session.state_path(self.root, "465").with_suffix(".lock")
         path.write_text("", encoding="utf-8")

@@ -65,8 +65,9 @@ GitHubはthreadが存在しないものをblockできない。**reviewの到着�
 **自動reviewは行わない**（[ADR-0013](../decisions/0013-manual-only-coderabbit-review.md)）。
 既定では[自己レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/CONTRIBUTING.md#自己レビュー)が唯一のreviewである。
 
-**手動で依頼するのは、意味上criticalな変更に対してだけ、自己レビューの後で、最大1回である。**
-判断は人が行う。
+**手動で依頼するのは、意味上criticalな変更に対してだけ、自己レビューの後である。**
+依頼回数、判断と投稿の分担、投稿前の時刻確認は
+[CONTRIBUTINGの手順](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/CONTRIBUTING.md#手動で依頼する前に状態を確認する)による。
 
 **依頼したreviewの指摘に対応したcommitは、自己レビューで見る。ここで投げ直さない。**
 投げ直すと1つのPull Requestでreviewを何度も消費する。
@@ -77,7 +78,7 @@ GitHubはthreadが存在しないものをblockできない。**reviewの到着�
 
 | 変更の種類 | reviewが得られなかったとき |
 |---|---|
-| 安全、電気、protocol、firmware | **rate limitが解けるまで待つ。**自己レビューで代替しない |
+| 安全、電気、protocol、firmware | **reviewが完走するまで待つ。**`Review rate limited`後の再依頼は[CONTRIBUTINGの手順](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/CONTRIBUTING.md#手動で依頼する前に状態を確認する)に従う。自己レビューで代替しない |
 | 上記以外 | **自己レビューで通してよい。**Pull Request本文へ機械reviewを通していない旨と、その判断の根拠を書く |
 
 ## `rate limit`への返答時間に上限が無い
@@ -88,8 +89,7 @@ GitHubはthreadが存在しないものをblockできない。**reviewの到着�
 こちらは「rate limitの確認command自体に、いつ返答が来るか」の話である。
 
 **無応答と遅延は表示だけでは区別できない。**上限が無いため、「まだ返ってこない」を
-「無応答である」と判断する基準を正本は持たない。[手動で依頼する前に状態を確認する](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/CONTRIBUTING.md#手動で依頼する前に状態を確認する)の
-「投げる直前に確認する」運用を、待機時間の長さによらず続ける。
+「無応答である」と判断する基準を正本は持たない。
 
 **`Review stopped after lock loss`もこの表の対象である。**`state`が`failure`でcheckは赤くなるため`Review rate limited`／`Review skipped`とは表示で見分けられるが、**reviewが完走していない点は同じ**である。したがって初回reviewが得られなかった場合として扱い、上の表に従う。**安全・電気・protocol・firmwareに関わる変更では、`Review completed`へ到達するか手動の`full review`が完走するまでmergeしない。**赤いcheckを「reviewは走ったが失敗しただけ」と読み替えない。観測例は[GitHubが強制しないもの](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/CONTRIBUTING.md#githubが強制しないもの)にある。
 
@@ -129,7 +129,7 @@ commit statusは`Review queued`が6件出たあと、**4行目の文言が5件�
 
 **`full review`自体もrate limitで空振りする。**空振りしても同じCodeRabbit checkが
 `Review rate limited`という**別の説明文**で`pass`になるため、投げっぱなしにすると走ったように見える。
-[手動で依頼する前に状態を確認する](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/CONTRIBUTING.md#手動で依頼する前に状態を確認する)の手順を省かない。
+[手動で依頼する前に状態を確認する](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/CONTRIBUTING.md#手動で依頼する前に状態を確認する)の再依頼条件に従う。
 `26 minutes`の案内どおりに待っても枠が空いていなかった点にも注意する。**案内の時刻は保証ではない。**
 
 **#125（作成`13:41:11Z`、allowlistのlabel`area:hardware`を`13:41:13Z`に付与）でも同じ並びが再現した。**
