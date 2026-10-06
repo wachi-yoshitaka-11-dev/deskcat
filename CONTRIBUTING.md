@@ -72,14 +72,14 @@ Issueには次を含める。
 
 | 対象 | Issue | Pull Request |
 |---|---|---|
-| boardのmetadata記入漏れ。repositoryの変更ではない | 不要 | 不要 |
+| boardのmetadata記入漏れ。repositoryの変更ではない | 不要 | 不要。`Status: Done`を含む操作の承認区分は[AI Agent Policy](docs/governance/ai-agent-policy.md#6-責務マトリクス)に従う |
 | `review_gate.py`が`CLASS=minor`と判定した変更 | 不要 | 不要。承認を得たうえで`develop`へ直接反映してよい |
 | **既にmergeされreviewを通った作業の後始末。**`Change-Class: fixup`と`Refs: #<番号>`を宣言する | 不要 | 不要。承認を得たうえで`develop`へ直接反映してよい |
 | typo、リンク修正、表記ゆれ、言い回しの修正で、**意味を変えないもの** | 不要 | **必要** |
 | 規約、仕様、安全、電気、protocol、GPIO、電源、toolchain、CI、依存の**意味**を変えるもの | **必須** | **必要** |
 | 複数のPull Requestに跨る、または他の作業をblockするもの | **必須** | **必要** |
 
-Issue不要の側でも、**変更内容の承認は必ず得る。**「Issueを立てない」は「勝手に変えてよい」ではない。
+repository変更はIssue不要の側でも、**変更内容の承認を必ず得る。**GitHub操作の承認区分は[AI Agent Policy](docs/governance/ai-agent-policy.md#6-責務マトリクス)に従う。
 判断に迷うものはIssue必須の側として扱う。安全に関わる範囲は緩めない。
 
 **「言い回しの修正」と「意味の変更」の境界は機械的に判定できない。**両者を区別するcodeは
@@ -385,8 +385,9 @@ CIのrepository内field検査はProject・日付の保証ではなく、保護�
 
 ### 自己レビュー
 
-pushする前に、作成者自身が差分を見直す。**開始前にIssue/PRの記録から同一作業の
-既実施巡数と継続承認を確認する。不明は0巡ではない。**
+pushする前に、作成者自身が差分を見直す。**開始前に実行記録とPull Request本文（引き継ぎ時は
+Issue／Pull Requestに保存したJSON）から同一作業の既実施巡数と継続承認を確認する。
+不明は0巡ではない。**
 **巡数の上限は1回のreviewごとに数える**（[#526](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/526)）。
 1回のreviewで5巡が終わったら、人間の明示承認なしに6巡目を開始しない（[打ち切り](#打ち切り)）。
 **文書だけの変更（下の[打ち切り](#打ち切り)が定める範囲）は3巡である。**
@@ -459,8 +460,8 @@ reviewの区切りは記録にある巡の結果から決まる。巡の結果�
 新しいreviewは、前のreviewの巡を収束に数えない。
 
 **reviewは終わる前に始め直せる。**人間が新しいreviewを依頼したとき、またはPM／作業セッションが
-理由を示して始め直しを判断し人間が承認したときである。その依頼か承認（回答者と、回答を保存した
-Issue/PRのcomment）を`review_gate.py session restart`で記録し、次の巡を0巡から数える。
+理由を示して始め直しを判断し人間が承認したときである。その依頼か承認の文面と出所を
+`review_gate.py session restart`で記録し、次の巡を0巡から数える。
 依頼か承認が新しいreviewを指すと読めないとき（上限の後の「もう一度見て」など）は、継続承認として扱う。
 PM/AIの判断だけでは始め直さない。前のreviewの未解決の欠陥は消さず、新しいreviewへ持ち越す。
 過去の巡数・指摘内容は[記録](docs/runbooks/contributing-history.md#レビュー巡数の過去事例)に分離する。
@@ -479,7 +480,7 @@ PM/AIの判断だけでは始め直さない。前のreviewの未解決の欠陥
 
 **継続承認は有限の範囲で保存する。**続行はPM／作業セッションが理由を示して判断し、人間が承認する。
 継続と終了を判断する側は、判断の前にこのreviewの全巡の指摘と最終diffを自分で開く。記録には、読んだdiffのhashを書く。
-同じIssue/PRへ、判断と理由、人間の承認の出所、承認者、対象Issue、
+実行記録とPull Request本文へ、判断と理由、人間の承認の文面と出所、承認者、対象Issue、
 承認時のreviewとその巡数、続行を許すそのreviewの最終巡数、対象の残存欠陥または範囲を書く。
 追加巡数は判断側が理由とともに示して人間が承認し、実装では絶対的な終了巡数へ換算する。固定の追加巡数は設けない。
 例えば「D1の修正確認のためこのreviewの7巡まで」は8巡目や別目的の継続を許さない。
@@ -503,7 +504,7 @@ PM/AIの判断だけでは始め直さない。前のreviewの未解決の欠陥
 `capped`の理由は、PM／作業セッションの判断を人間が承認したこと、または直近2巡が任意の説明改善のみだったことを記録する。
 
 **reviewは承認を得て終えられる。**最終diffで最新の巡が両Passを終え、未解決の欠陥が無く、まだ`converged`で
-ない場合に、PM／作業セッションが理由を示して終了を判断し、人間が承認したら、その承認（承認者と、承認を保存したIssue/PRのcomment）を
+ない場合に、PM／作業セッションが理由を示して終了を判断し人間が承認したら、その承認の文面・承認者・出所を
 `review_gate.py session end`で記録する。記録した時点のdiffと巡に限って`capped`になり、
 diffが変われば無効になる。手順は[自己レビューの停止と再開](docs/runbooks/self-review-session.md)にある。
 PM/AIの判断や無回答は承認の代替にならない。
@@ -530,7 +531,9 @@ PM/AIの判断や無回答は承認の代替にならない。
 既存のBash parserやread-only guardへshell構文を追加しない。
 
 **記録はgit-common-dirに置き、同じrepositoryのworktree間で共有する。**branch名やdiff hashを
-作業IDにしない。別clone・別端末へ渡すときは、`session status`のJSONを既存Issue/PRに保存し、
+作業IDにしない。通常は各巡の結果と承認を実行記録へ保存し、Pull Request本文へ要約する。
+Issue／Pull Requestのcommentへ各巡や承認を重複投稿しない。別clone・別端末へ渡すと決めた時点で、
+元cloneの最後の操作後に`session status`のJSON全体を既存Issue／Pull Requestへ保存し、
 次の担当がそれを復元する。同時に複数cloneで同じ作業を進めず、担当を引き継ぐ。
 既実施巡数が不明なら開始せず照合する。記録の削除・作り直し、終端の偽の申告で上限を回避しない。
 
