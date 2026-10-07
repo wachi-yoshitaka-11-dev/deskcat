@@ -6,9 +6,12 @@
 //! # 構成
 //!
 //! - `FaceState`: 全buildが持つ。LCDの状態（`DisplayState`）と、受理した最新の表情を持つ。
-//!   `face-21` feature付きbuildだけが`Busy`／`Ready`にする。**LCDを初期化しないbuildは、
-//!   `set_expression`を`hardware_unavailable`で拒否する**（§7。既定buildはLCD関連pinへ触れない。#451）。
+//!   `face-21` feature付きbuildだけが`Busy`／`Ready`にする。**`face-21`を持たないbuild
+//!   （既定buildと`bringup-display-13`単独）は、`set_expression`を`hardware_unavailable`で拒否する**
+//!   （§7。既定buildはLCD関連pinへ触れない。#451）。
 //!   `bringup-display-13`と組み合わせたbuildは、bring-upの間`busy`で拒否する。
+//!   **`face-21`付きbuildは、Pi commandを受けなくても、描ける状態になった時点（`face-21`単独は起動直後、
+//!   `bringup-display-13`との組み合わせはbring-upが済んだ時点）で`neutral`を1回描く。**
 //! - `FaceDrawer`: LCD driverを持ち、受けた表情を帯1本ずつ塗る。1回の`FaceDrawer::poll`で帯1本だけ
 //!   塗ってmain loopへ戻るため、描画の間もheartbeatとPi linkの受信は止まらない見込みである
 //!   （`crate::display_test`の同じ方式。**実機では確かめていない**）。
@@ -52,7 +55,7 @@ impl Default for FaceState {
 }
 
 impl FaceState {
-    /// LCDを初期化しない状態で作る。
+    /// 表情を描かない状態（`face-21`を持たないbuild）で作る。
     #[must_use]
     pub const fn new() -> Self {
         Self {

@@ -46,7 +46,7 @@
 //! |---|---|---|
 //! | `bringup-display-13` | LCDの初期化、backlightの点灯、単色fillと四隅patternの試験モード | 製品buildに加える。描画の間のPi linkの受信とheartbeatは`crate::display_test`のmodule docを参照 |
 //! | `bringup-led-514` | #514の追加LED（GPIO2／GPIO5）の点灯試験と白の点滅（`crate::led`） | 製品buildに加える。`bringup-display-13`とも組み合わせられる |
-//! | `face-21` | LCDの初期化とbacklightの点灯を保ち、`set_expression`の3表情を描く（#21、`crate::face`） | 製品buildに加える。`bringup-display-13`とも組み合わせられる（bring-upが終わった後にdriverを手放さず、表情の描画へ渡す）。**このfeatureが無いbuildは`set_expression`を`hardware_unavailable`で拒否する** |
+//! | `face-21` | LCDの初期化とbacklightの点灯を保ち、`set_expression`の3表情を描く。Pi commandを受けなくても、描ける状態になった時点で`neutral`を1回描く（#21、`crate::face`） | 製品buildに加える。`bringup-display-13`とも組み合わせられる（bring-upが終わった後にdriverを手放さず、表情の描画へ渡す）。**このfeatureが無いbuildは`set_expression`を`hardware_unavailable`で拒否する** |
 //! | `bench-servo-test-17` | servoの単発bench試験（#17の測定用build） | **Pi linkを外す。**正本`docs/hardware/servo-safety-limits.md`の`測定のための駆動（承認の状態の項目6）`節が、測定用のbuildは「Piとの通信linkを持たない」と定めているためである。#474で、このfeature付きbuildはcompileが止まる |
 //!
 //! `#487`のPR B1より前は、`pi-protocol-mode` featureを付けたbuildだけがPi linkを持ち、LCD／I2Cの

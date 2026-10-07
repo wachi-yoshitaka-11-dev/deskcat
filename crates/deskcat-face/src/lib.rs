@@ -115,7 +115,7 @@ pub const fn check_transition(transition_ms: u32) -> Result<(), ErrorCode> {
 /// LCDの状態。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DisplayState {
-    /// LCDを初期化しない構成（既定build）。待っても描けない。
+    /// 表情を描かない構成（`face-21`を持たないbuild。既定buildと`bringup-display-13`単独）。待っても描けない。
     Unavailable,
     /// LCDは初期化済みだが、bring-upの試験が使っている間である。終われば描ける。
     Busy,
@@ -135,7 +135,7 @@ pub enum DisplayState {
 /// - `ErrorCode::OutOfRange`: `transition_ms`が[`MAX_TRANSITION_MS`]を超える。
 /// - `ErrorCode::InvalidPayload`: 名前に対応する表情が無い（`ExpressionName`は`non_exhaustive`）。
 /// - `ErrorCode::StaleSession`: `sid`が現在のPi sessionでない。
-/// - `ErrorCode::HardwareUnavailable`: LCDを初期化しない構成である（待っても受け付けられない。§7）。
+/// - `ErrorCode::HardwareUnavailable`: 表情を描かない構成である（`face-21`を持たないbuild。待っても受け付けられない。§7）。
 /// - `ErrorCode::Busy`: LCDがbring-upの試験で塞がっている（終われば受け付けられる。§7）。
 pub fn judge(
     command: &SetExpression,

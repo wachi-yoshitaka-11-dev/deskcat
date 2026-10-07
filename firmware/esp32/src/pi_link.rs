@@ -10,7 +10,7 @@
 //! | `hello` | `crate::protocol::PiSession::handle_hello`のACKを書く。受理した場合は、その後に`BootSession::on_hello_accepted`を呼ぶ（§5.1の手順4・5） |
 //! | `ping` | `PiSession::handle_ping`のACKを書く |
 //! | `get_status` | `PiSession::handle_get_status`のACKと`status`を書く（下記） |
-//! | `set_expression` | `deskcat_face::judge`で判定する（session→値の範囲→LCDの準備の順。§8）。受理なら`crate::face::FaceState`へ記録して`ok`のACKを書く。拒否なら該当のcodeの拒否ACKを書く。**LCDを初期化しないbuildは`hardware_unavailable`、bring-upの間は`busy`で拒否する**（§7） |
+//! | `set_expression` | `deskcat_face::judge`で判定する（session→値の範囲→LCDの準備の順。§8）。受理なら`crate::face::FaceState`へ記録して`ok`のACKを書く。拒否なら該当のcodeの拒否ACKを書く。**`face-21`を持たないbuildは`hardware_unavailable`、bring-upの間は`busy`で拒否する**（§7） |
 //! | `boot` | `unknown_type`の拒否ACKを書く（§8の表「方向が逆のsession確立message」） |
 //! | `status` | 応答しない（ESP32→Piのmessageである）。logで分類する |
 //! | decodeで拒否した行 | oversizeの行から`(sid, id)`と`hello`／`ping`／`get_status`のtypeを復元できた場合は`line_too_long`の拒否ACKを書く（§7）。それ以外はlogで分類し、応答しない（§2の既知の逸脱） |
