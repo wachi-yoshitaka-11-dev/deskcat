@@ -47,25 +47,26 @@ ESP32 Build profileの端末で、このディレクトリにて実行する。*
 
 ## host crateの再利用
 
-`deskcat-protocol`、`deskcat-servo`、`deskcat-face`をpath dependencyで使う。wire protocolの実装、
-servoのhard limitとtrajectory limitingの実装、`set_expression`の表情の図形と受理の判定の順序を、
+`deskcat-protocol`、`deskcat-servo`、`deskcat-face`、`deskcat-tap`をpath dependencyで使う。wire protocolの実装、
+servoのhard limitとtrajectory limitingの実装、`set_expression`の表情の図形と受理の判定の順序、tap検出の設定値と`tapped`の送出条件を、
 それぞれhostのtestとfirmwareで1つに保つためである。
 判断の記録は[ADR-0008](../../docs/decisions/0008-firmware-protocol-crate-reuse.md)にある
-（`deskcat-servo`と`deskcat-face`は同ADRの追記）。
+（`deskcat-servo`、`deskcat-face`、`deskcat-tap`は同ADRの追記）。
 
 ```toml
 deskcat-protocol = { path = "../../crates/deskcat-protocol" }
 deskcat-servo = { path = "../../crates/deskcat-servo" }
 deskcat-face = { path = "../../crates/deskcat-face" }
+deskcat-tap = { path = "../../crates/deskcat-tap" }
 ```
 
 - root workspaceの`exclude = ["firmware/esp32"]`は**維持する。**lockfileはroot `Cargo.lock`と
   このディレクトリの`Cargo.lock`の2つに分かれたままでよい。
 - **共有crateの`rust-version`は、host（1.97.1）とESP toolchain（rustc 1.95.0-nightly）の
   両方を満たす下限にしてある。**`crates/deskcat-protocol/Cargo.toml`、
-  `crates/deskcat-servo/Cargo.toml`、`crates/deskcat-face/Cargo.toml`が理由込みで宣言している。
+  `crates/deskcat-servo/Cargo.toml`、`crates/deskcat-face/Cargo.toml`、`crates/deskcat-tap/Cargo.toml`が理由込みで宣言している。
   ここを上げるとfirmwareのbuildが`rustc 1.95.0-nightly is not supported`でcompile前に止まる。
-- `crates/deskcat-protocol/**`、`crates/deskcat-servo/**`、`crates/deskcat-face/**`の変更でも
+- `crates/deskcat-protocol/**`、`crates/deskcat-servo/**`、`crates/deskcat-face/**`、`crates/deskcat-tap/**`の変更でも
   `.github/workflows/firmware.yml`が発火する。
   host側だけの変更でfirmware buildが壊れるのを検知するためである。
 - compileできるbuildで、`src/servo.rs`を通って角度を出せるのは、同fileの`LimitedServo`だけである。

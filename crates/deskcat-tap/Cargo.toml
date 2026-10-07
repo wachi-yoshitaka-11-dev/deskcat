@@ -1,0 +1,15 @@
+[package]
+name = "deskcat-tap"
+version = "0.1.0"
+description = "ADXL345のtap検出の設定値、INT_SOURCEの読み方、tappedの送出条件（値を持つ純粋なlogic）"
+edition.workspace = true
+# `deskcat-face`と同じ理由で、workspaceの`rust-version`を継承しない。
+# `firmware/esp32`からもpath dependencyで使うため、hostとESP toolchainの両方を満たす下限を宣言する。
+# 宣言した1.95は、ESP toolchain（`esp-1.95.0.0`）で`firmware/esp32`のbuildとlint、hostで`cargo test`を通した結果である
+# （PRの検証欄を参照。build-onlyであり、Version Recordは無い）。
+rust-version = "1.95"
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true

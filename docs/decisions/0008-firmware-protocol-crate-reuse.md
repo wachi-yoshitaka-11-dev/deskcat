@@ -197,3 +197,17 @@ hostのtestで固定するためである。**上の決定は変えていない�
 
 **根拠。**ESP toolchain（`esp-1.95.0.0`）で`firmware/esp32`の既定構成・`face-21`・`face-21,bringup-display-13`・`bringup-display-13`の4構成のbuildとlintを通し、hostで`cargo test`を通した。**Version Recordは作っていない。build-onlyであり、flashと実機起動は含まない。**
 **flash sizeへの影響は測っていない。**
+
+## 追記（2026-10-08）: 4つ目の共有crate`deskcat-tap`
+
+[Issue #21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)のF1で、`firmware/esp32`が
+`crates/deskcat-tap`もpath dependencyで使うようにした。ADXL345のtap検出の設定値と、`tapped`を送ってよいかの判定を、
+hostのtestで固定するためである。**上の決定は変えていない。**
+
+- root `Cargo.toml`の`exclude = ["firmware/esp32"]`を維持し、lockfileは2つに分かれたままである。
+- `rust-version`は、`deskcat-face`と同じく両toolchainの下限（1.95）を明示した。
+- `.github/workflows/firmware.yml`の`paths`へ`crates/deskcat-tap/**`を加えた。
+
+**根拠。**ESP toolchain（`esp-1.95.0.0`）で`firmware/esp32`の実際に実行した構成のbuildとlintを通し、hostで`cargo test`を通した
+（構成は[検証済みコマンド](../toolchains/verified-commands.md)が要求するものと、PRの検証欄）。
+**Version Recordは作っていない。build-onlyであり、flashと実機起動は含まない。flash sizeへの影響は測っていない。**

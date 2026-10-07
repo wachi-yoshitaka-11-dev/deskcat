@@ -47,6 +47,7 @@
 //! | `bringup-display-13` | LCDの初期化、backlightの点灯、単色fillと四隅patternの試験モード | 製品buildに加える。描画の間のPi linkの受信とheartbeatは`crate::display_test`のmodule docを参照 |
 //! | `bringup-led-514` | #514の追加LED（GPIO2／GPIO5）の点灯試験と白の点滅（`crate::led`） | 製品buildに加える。`bringup-display-13`とも組み合わせられる |
 //! | `face-21` | LCDの初期化とbacklightの点灯を保ち、`set_expression`の3表情を描く。Pi commandを受けなくても、描ける状態になった時点で`neutral`を1回描く（#21、`crate::face`） | 製品buildに加える。`bringup-display-13`とも組み合わせられる（bring-upが終わった後にdriverを手放さず、表情の描画へ渡す）。**このfeatureが無いbuildは`set_expression`を`hardware_unavailable`で拒否する** |
+//! | `tap-21` | ADXL345のtap検出を設定し、`INT_SOURCE`をI2Cで読み、bootのACK後に`tapped`を送る（#21のF1、`crate::tap`）。I2Cのdriverを手放さず持ち続ける | 製品buildに加える。INT線は使わない（配線は要らない）。`face-21`・`bringup-display-13`とも組み合わせられる。**このfeatureが無いbuildはADXL345へ書き込まず、Device IDを読むだけである** |
 //! | `bench-servo-test-17` | servoの単発bench試験（#17の測定用build） | **Pi linkを外す。**正本`docs/hardware/servo-safety-limits.md`の`測定のための駆動（承認の状態の項目6）`節が、測定用のbuildは「Piとの通信linkを持たない」と定めているためである。#474で、このfeature付きbuildはcompileが止まる |
 //!
 //! `#487`のPR B1より前は、`pi-protocol-mode` featureを付けたbuildだけがPi linkを持ち、LCD／I2Cの
@@ -177,6 +178,7 @@ mod pi_link;
 #[cfg(not(feature = "bench-servo-test-17"))]
 mod protocol;
 mod servo;
+mod tap;
 
 // `bench-servo-test-17`付きbuildは、#474でcompileを止めた（理由と承認の状態は
 // `docs/hardware/servo-safety-limits.md`の`承認の状態`節が持つ。ここへ再掲しない）。
@@ -223,13 +225,18 @@ use crate::health::Health;
 use crate::led::Leds;
 #[cfg(not(feature = "bench-servo-test-17"))]
 use crate::pi_link::PiLink;
+#[cfg(feature = "tap-21")]
+use crate::tap::TapDetector;
+#[cfg(feature = "tap-21")]
+use deskcat_protocol::Message;
 
-/// `ACCEL-01`（ADXL345）のI2C address。**`SDO`を`GND`へ配線する前提の値である。**
+/// `ACCEL-01`（ADXL345）のI2C address。**`SDO`を`GND`へ配線した値（`0x53`）である。**
 ///
 /// `SDO`／`ALT ADDRESS`をGNDへ配線すると`0x53`になる
 /// （[`docs/hardware/sensor-datasheet-notes.md`](../../../docs/hardware/sensor-datasheet-notes.md)
-/// 170行目。**ただしどちらになるかはmodule board上の実装で決まり、現物確認まで確定しない**
-/// （[`HW-TBD-004`](../../../docs/hardware/tbd-register.md)）。この定数は`SDO`→GND前提の値である）。
+/// 170行目）。**`SDO`は`GND`へ配線済みで、このaddressでDevice ID `0xE5`の読み出しに応答を得た**
+/// （`docs/hardware/experiment-log.md`の`EXP-015`が正本であり、**ここへ再掲しない**。上の「現物確認まで
+/// 確定しない」は古い記述だった）。
 /// addressは一般値で開始してよい側であり
 /// （[`docs/hardware/gpio-assignment.md`](../../../docs/hardware/gpio-assignment.md)
 /// 372行目「addressは一般値で開始してよい側である」（hardware-safety-policy.mdの
@@ -462,12 +469,19 @@ fn main() {
         peripherals.pins.gpio26,
     ));
     #[cfg(not(feature = "bringup-display-13"))]
-    run_i2c_bringup(
+    let i2c_driver = run_i2c_bringup(
         peripherals.i2c0,
         peripherals.pins.gpio25,
         peripherals.pins.gpio26,
         &mut health,
     );
+    // `tap-21`付きbuildは、I2Cのdriverを持ち続けてtap検出を始める（`crate::tap`）。それ以外は手放す。
+    #[cfg(all(feature = "tap-21", feature = "bringup-display-13"))]
+    let mut tap: Option<TapDetector> = None;
+    #[cfg(all(feature = "tap-21", not(feature = "bringup-display-13")))]
+    let mut tap = start_tap(i2c_driver, health.uptime_ms());
+    #[cfg(all(not(feature = "tap-21"), not(feature = "bringup-display-13")))]
+    drop(i2c_driver);
 
     // featureが無ければこのblockはbuildへ含まれない（`run_servo_bench_test`のdoc参照）。
     #[cfg(feature = "bench-servo-test-17")]
@@ -624,7 +638,13 @@ fn main() {
             }
             if display.is_none() {
                 if let Some((i2c0, sda, scl)) = i2c_pending.take() {
-                    run_i2c_bringup(i2c0, sda, scl, &mut health);
+                    let i2c_driver = run_i2c_bringup(i2c0, sda, scl, &mut health);
+                    #[cfg(feature = "tap-21")]
+                    {
+                        tap = start_tap(i2c_driver, health.uptime_ms());
+                    }
+                    #[cfg(not(feature = "tap-21"))]
+                    drop(i2c_driver);
                 }
             }
         }
@@ -640,6 +660,14 @@ fn main() {
 
         #[cfg(not(feature = "bench-servo-test-17"))]
         boot_session.on_deadline(&health, &mut uart);
+
+        // tap検出を1回読み、送ってよいときだけ`tapped`を送る（`crate::tap`）。
+        #[cfg(feature = "tap-21")]
+        if let Some(detector) = tap.as_mut() {
+            if detector.poll(health.uptime_ms(), boot_session.is_established()) {
+                pi_link::send_event(Message::Tapped, &mut boot_session, &health, &mut uart);
+            }
+        }
 
         // 期限を積み直した後の時刻で残りを測る。log の所要時間を待ち時間から差し引く。
         #[cfg_attr(
@@ -663,6 +691,10 @@ fn main() {
         #[cfg(feature = "face-21")]
         if face_drawer.as_ref().is_some_and(FaceDrawer::is_drawing) {
             until = until.min(health.uptime_ms());
+        }
+        #[cfg(feature = "tap-21")]
+        if let Some(deadline) = tap.as_ref().and_then(TapDetector::next_deadline_ms) {
+            until = until.min(deadline);
         }
         #[cfg(feature = "bringup-led-514")]
         if let Some(leds) = leds.as_mut() {
@@ -980,6 +1012,14 @@ fn run_display_bringup<SPI: SpiAnyPins + 'static>(
     Some(lcd)
 }
 
+/// I2C bring-upが返したdriverで、tap検出を設定して始める（`tap-21`付きbuildだけ）。driverが無ければ`None`。
+#[cfg(feature = "tap-21")]
+fn start_tap(i2c: Option<I2cDriver<'static>>, now_ms: u64) -> Option<TapDetector> {
+    let mut detector = TapDetector::new(Adxl345::new(ACCEL_I2C_ADDRESS), i2c?);
+    detector.configure(now_ms);
+    Some(detector)
+}
+
 /// `ACCEL-01`（ADXL345）と`ENV-01`（BME280）のDevice ID／Chip IDを読み、生byteをlogへ出す。
 ///
 /// [Issue #15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)／
@@ -1069,7 +1109,7 @@ fn run_i2c_bringup(
     sda: impl InputPin + OutputPin + 'static,
     scl: impl InputPin + OutputPin + 'static,
     health: &mut Health,
-) {
+) -> Option<I2cDriver<'static>> {
     // ESP32内蔵のweak pull-upは有効にしない。`gpio-assignment.md`の実効pull-up計算が
     // 外部pull-upだけを前提にしているため（`crate::env`のmodule doc「bus speedは
     // Standard-mode」節と同じ根拠。**ここへ再掲しない**）。
@@ -1084,7 +1124,7 @@ fn run_i2c_bringup(
         Ok(i2c) => i2c,
         Err(err) => {
             log::error!("i2c_driver_new_failed error={err}");
-            return;
+            return None;
         }
     };
 
@@ -1101,6 +1141,8 @@ fn run_i2c_bringup(
         Err(err) => log::error!("env_chip_id_read_failed error={err}"),
     }
     service_bringup_step(health, "env_chip_id");
+    // `tap-21`付きbuildは、このdriverでtap検出を続ける（`crate::tap`）。それ以外は呼び出し側が手放す。
+    Some(i2c)
 }
 
 /// `SERVO-01`（SG90）の単発bench試験（[Issue #17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)）。

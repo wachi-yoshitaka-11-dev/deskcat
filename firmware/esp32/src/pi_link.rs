@@ -229,6 +229,19 @@ fn rejection_ack(reply_sid: u32, reply_to: u32, code: ErrorCode) -> Message {
     })
 }
 
+/// ESP32からのevent（ACKを要さないmessage。`tapped`など。§4）を1つ送る。
+///
+/// sessionが確立している（`BootSession::is_established`）ことは、呼び出し側が確かめる。
+#[cfg_attr(not(feature = "tap-21"), allow(dead_code))]
+pub fn send_event(
+    message: Message,
+    boot: &mut BootSession,
+    health: &Health,
+    uart: &mut UartDriver<'_>,
+) {
+    send(vec![message], boot, health, uart);
+}
+
 /// `messages`を順に新しい`(sid, id)`でencodeし、連結して1回の[`write_line`]で書く。
 ///
 /// `id`を払い出せない、またはencodeできないmessageがあれば、そこから後ろは書かない

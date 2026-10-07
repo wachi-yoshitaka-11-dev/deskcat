@@ -433,6 +433,8 @@ budget値は`PROTO-TBD-017`に含める。
 
 正確なevent classifierと報告するmagnitudeの意味は、選定したaccelerometerと実験根拠を必要とする。
 
+`tap-21` feature付きのfirmware（[Issue #21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)のF1）は、ADXL345の単tapを`INT_SOURCE`のpollingで検出し、**payloadなしの`tapped`**を送る（`magnitude_g`は持たない。§3）。送るのは**`boot`のACKを受けてsessionが確立した後だけ**で、前の`tapped`から500 ms未満のtapは送らず捨てる（捨てた数はfirmwareのlogに数える。`status`のcounterへは出さない）。閾値（1 g）・持続時間・500 msは暫定の一般値であり、実機で詰める。この間隔は§8.2の送出の上限（`PROTO-TBD-012`）が決まるまでの置き場であり、決まれば置き換える。
+
 ### 4.4 `lifted`
 
 ```json
@@ -1380,6 +1382,7 @@ Framing／parse層について、**host workspaceのRust実装**がfixtureに合
 | 2026-10-05 | Draft 2 Pi sid implemented | [Issue #491](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/491)の段階2b-iii。§13の`PROTO-TBD-011`の行にある、Pi側の`sid`の生成方法の「実装は#491の段階2b（`apps/deskcatd`。未実装）」を、`apps/deskcatd/src/sid.rs`の`sid_from_os`で実装済みの記述へ直した。**wire formatは変えていない。**`PROTO-TBD-011`の値は決めていない |
 | 2026-10-05 | Draft 2 busy | [Issue #19](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/19)。`play_motion`の`busy`を、そのrequestの最終拒否結果として保存し、同じ`(sid, id)`の再送を保存したACKのreplayとすることを、§5.3、§8手順10、§9へ明記した。**wire formatは変えていない。** |
 | 2026-10-07 | Draft 2 set_expression | [Issue #21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)。§2の既知の逸脱(i)から`set_expression`を外し、(iii)へ足した（処理済みの結果を保持しない）。firmwareが受信して判定し、ACKを返す |
+| 2026-10-08 | Draft 2 tapped | [Issue #21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)のF1。§4.3へ、`tap-21` feature付きfirmwareが`tapped`を送る条件（`boot`のACK後だけ、500 ms未満は捨てる、payloadなし）を足した |
 
 ### Draft schemaの互換性
 

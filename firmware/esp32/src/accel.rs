@@ -26,11 +26,15 @@
 //! # I2C addressについて
 //!
 //! **このmoduleはaddressを定数で持たない。**`SDO`（`ALT ADDRESS`）の配線で
-//! `0x1D`（`SDO`→VDD）／`0x53`（`SDO`→GND）のどちらになるかが決まり、まだ配線して
-//! いない（同文書「I2C addressの選択」節。安全要件5項目に効かない一般値扱いであり、
-//! 未確定でも着手を止めない）。呼び出し側が[`Adxl345::new`]へ渡す。
+//! `0x1D`（`SDO`→VDD）／`0x53`（`SDO`→GND）のどちらになるかが決まる。**`SDO`は`GND`へ配線済みで、`0x53`である**
+//! （`EXP-015`が、この配線でDevice ID `0xE5`の読み出しに応答を得た。記録は
+//! [`docs/hardware/experiment-log.md`](../../../docs/hardware/experiment-log.md)の`EXP-015`が正本であり、
+//! **ここへ再掲しない**）。呼び出し側（`main.rs`の`ACCEL_I2C_ADDRESS`）が[`Adxl345::new`]へ渡す。
 //!
 //! # register・timingの根拠
+//!
+//! tap検出のレジスタ（`crate::accel`の`configure_tap`・`read_int_source`）の出所は、`deskcat_tap`のcrate docが持つ
+//! （**Rev. 0**を読んだ。**Rev. Gと同じかは独立に確認していない**）。
 //!
 //! 一次資料は**Analog Devices ADXL345 Data Sheet Rev. G**
 //! （<https://www.analog.com/media/en/technical-documentation/data-sheets/adxl345.pdf>、
@@ -104,6 +108,27 @@ impl Adxl345 {
     pub fn read_device_id(&self, i2c: &mut I2cDriver<'_>) -> Result<u8, EspError> {
         let mut buf = [0u8; 1];
         i2c.write_read(self.address, &[REG_DEVID], &mut buf, READ_TIMEOUT_TICKS)?;
+        Ok(buf[0])
+    }
+
+    /// tap検出の設定を書く（`deskcat_tap::SETUP`の順）。最初に失敗した書き込みで止めて`Err`を返す。
+    /// 1 transactionごとに[`READ_TIMEOUT_TICKS`]で有限時間に返る。
+    pub fn configure_tap(&self, i2c: &mut I2cDriver<'_>) -> Result<(), EspError> {
+        for (register, value) in deskcat_tap::SETUP {
+            i2c.write(self.address, &[register, value], READ_TIMEOUT_TICKS)?;
+        }
+        Ok(())
+    }
+
+    /// `INT_SOURCE`（`0x30`）を読む。**読むとtapのbitが消える**（`deskcat_tap`のcrate doc）。
+    pub fn read_int_source(&self, i2c: &mut I2cDriver<'_>) -> Result<u8, EspError> {
+        let mut buf = [0u8; 1];
+        i2c.write_read(
+            self.address,
+            &[deskcat_tap::REG_INT_SOURCE],
+            &mut buf,
+            READ_TIMEOUT_TICKS,
+        )?;
         Ok(buf[0])
     }
 }
