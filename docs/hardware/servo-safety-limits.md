@@ -582,8 +582,8 @@ firmware（`firmware/esp32/src/servo.rs`、
   加わる。試験を単純に保つため、`DISP-01`は引き続き接続しない。
   [#451](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/451)より前、
   `run_display_bringup`は既定buildでも常時実行され`lcd.backlight_on()`を呼んでいた。
-  **`#451`で同関数は`bringup-display-13` feature（既定off）付きbuildだけの経路になり、
-  この試験のbuild（`--features bench-servo-test-17`）はそのfeatureを付けないため、
+  **`#451`で同関数は`bringup-display-13`か`face-21`のfeature（既定off）付きbuildだけの経路になり、
+  この試験のbuild（`--features bench-servo-test-17`）はそれらのfeatureを付けないため、
   firmwareがbacklightを点ける経路は無い。**確認は下の`通電前の現物確認`(d)で行う
   （backlight以外に残る理由もそちらが持つ。**ここへ再掲しない**）。
 
@@ -636,8 +636,8 @@ firmware（`firmware/esp32/src/servo.rs`、
    ESP32へのUSB接続と同時に`DISP-01`のlogic側へ給電される。
    **backlightについては、この試験のbuildにfirmware側の点灯経路が無い**
    （[#451](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/451)。
-   `run_display_bringup`は`bringup-display-13` feature付きbuildだけが呼び、
-   手順`build`はそのfeatureを付けない）。**ただし(d)の確認はそれでも省かない。**
+   `run_display_bringup`は`bringup-display-13`か`face-21`のfeature付きbuildだけが呼び、
+   手順`build`はそれらのfeatureを付けない）。**ただし(d)の確認はそれでも省かない。**
    GPIO4がreset中Lowへ確定することも
    ESP32側の信号レベルまでしか確認できていない
    （[gpio-assignment.md](gpio-assignment.md)の`信号inventory`の`LCD-BL`行、

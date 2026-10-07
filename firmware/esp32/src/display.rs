@@ -72,7 +72,7 @@
 //!   Mode 0で確定する根拠はここにある。
 
 // 既定buildは`main()`からこのmoduleを呼ばないためdead_codeになる
-// （`bringup-display-13` featureが無いと`run_display_bringup`ごとcompileされない。
+// （`bringup-display-13`も`face-21`も無いと`run_display_bringup`ごとcompileされない。
 // `main.rs`のmodule docの「`DISP-01`のbring-upを有効にする手順」節、`#451`）。
 // **moduleごと`#[cfg]`で落とさないのは、既定buildでもcross-compileを確認し続けるため
 // である**（`crate::servo`と同じ扱い）。feature付きbuildでは呼ばれるため無害。

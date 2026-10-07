@@ -73,16 +73,18 @@ Linux x86_64 で検証した。初回は 2026-08-06 で、これは VM 上の初
 
 **`bringup-led-514` feature（[#514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)）を有効にする場合は、既定構成に加えて`cargo clippy`と`cargo build`へ`--features bringup-led-514`を足したものも通す。**`bringup-display-13`とも組み合わせられるため、`--features bringup-display-13,bringup-led-514`も通す。**これらの構成のVersion Recordは無い。**
 
+**`face-21` feature（[#21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)）を有効にする場合は、既定構成に加えて`cargo clippy`と`cargo build`へ`--features face-21`を足したものも通す。**`bringup-display-13`とも組み合わせられるため、`--features face-21,bringup-display-13`も通す。**これらの構成のVersion Recordは無い。**
+
 ### workspace との関係
 
 `firmware/esp32` は root workspace から `exclude` している。firmware の manifest は
 `[workspace]` 節を持たないため、**exclude を外すと firmware の build が壊れる。**
 
-firmware は `crates/deskcat-protocol` と `crates/deskcat-servo` を path dependency で使う
-（[ADR-0008](../decisions/0008-firmware-protocol-crate-reuse.md)。`deskcat-servo` は同 ADR の追記）。
-**両 crate の `rust-version` は host と ESP toolchain の両方を満たす下限にしてある。**
+firmware は `crates/deskcat-protocol`、`crates/deskcat-servo`、`crates/deskcat-face` を path dependency で使う
+（[ADR-0008](../decisions/0008-firmware-protocol-crate-reuse.md)。`deskcat-servo` と `deskcat-face` は同 ADR の追記）。
+**3 crate の `rust-version` は host と ESP toolchain の両方を満たす下限にしてある。**
 上げると firmware の build が compile 前に停止する。
-**`crates/deskcat-protocol/` と `crates/deskcat-servo/` を変更したら、host だけでなく ESP32 build も回す。**
+**`crates/deskcat-protocol/`、`crates/deskcat-servo/`、`crates/deskcat-face/` を変更したら、host だけでなく ESP32 build も回す。**
 `deskcat-servo` の下限の根拠は [Version Record](version-records/2026-09-29-esp32-build-servo-limiter-native-linux.md) にある。
 
 ### flash と serial monitor

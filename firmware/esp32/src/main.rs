@@ -21,9 +21,9 @@
 //!   module docにまとめてある
 //! - **`DISP-01`（LCD）・`SERVO-PWM`・`ADC-*`・`TOUCH-*`は既定のbuildではdriveしない。**
 //!   [`crate::display`]と[`crate::servo`]はcross-compile確認用にcompileするだけであり、
-//!   既定buildの`main()`からは呼ばない。`bringup-display-13` feature付きbuildだけが
-//!   [`run_display_bringup`]経由でLCDを初期化してbacklightを点け、単色fill・四隅patternを
-//!   main loopの中で1段ずつ進める（`crate::display_test`、[Issue #13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)。
+//!   既定buildの`main()`からは呼ばない。`bringup-display-13`か`face-21`のfeature付きbuildだけが
+//!   [`run_display_bringup`]経由でLCDを初期化してbacklightを点ける。`bringup-display-13`は単色fill・四隅patternを
+//!   main loopの中で1段ずつ進め、`face-21`は点けたまま`set_expression`の表情を描く（`crate::face`）（`crate::display_test`、[Issue #13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)。
 //!   **既定offにした理由と有効化の手順は下の「`DISP-01`のbring-upを有効にする手順」節。**）。
 //!   `bench-servo-test-17` feature付きbuildだけが[`run_servo_bench_test`]経由でservoを
 //!   呼ぶ（[Issue #17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。
@@ -46,6 +46,7 @@
 //! |---|---|---|
 //! | `bringup-display-13` | LCDの初期化、backlightの点灯、単色fillと四隅patternの試験モード | 製品buildに加える。描画の間のPi linkの受信とheartbeatは`crate::display_test`のmodule docを参照 |
 //! | `bringup-led-514` | #514の追加LED（GPIO2／GPIO5）の点灯試験と白の点滅（`crate::led`） | 製品buildに加える。`bringup-display-13`とも組み合わせられる |
+//! | `face-21` | LCDの初期化とbacklightの点灯を保ち、`set_expression`の3表情を描く。Pi commandを受けなくても、描ける状態になった時点で`neutral`を1回描く（#21、`crate::face`） | 製品buildに加える。`bringup-display-13`とも組み合わせられる（bring-upが終わった後にdriverを手放さず、表情の描画へ渡す）。**このfeatureが無いbuildは`set_expression`を`hardware_unavailable`で拒否する** |
 //! | `bench-servo-test-17` | servoの単発bench試験（#17の測定用build） | **Pi linkを外す。**正本`docs/hardware/servo-safety-limits.md`の`測定のための駆動（承認の状態の項目6）`節が、測定用のbuildは「Piとの通信linkを持たない」と定めているためである。#474で、このfeature付きbuildはcompileが止まる |
 //!
 //! `#487`のPR B1より前は、`pi-protocol-mode` featureを付けたbuildだけがPi linkを持ち、LCD／I2Cの
@@ -59,7 +60,7 @@
 //!
 //! 既定buildで`Peripherals::take()`の戻り値から実際にdriverへ渡すのは、I2C関連2本
 //! （`crate::accel`・`crate::env`のmodule doc参照）と、Pi link関連（`peripherals.uart1`、GPIO13＝TX、
-//! GPIO14＝RX）である。`bringup-display-13` feature付きbuildはLCD関連6+1本（`crate::display`の
+//! GPIO14＝RX）である。`bringup-display-13`か`face-21`のfeature付きbuildはLCD関連6+1本（`crate::display`の
 //! module doc参照）を追加で渡す。`bench-servo-test-17` feature付きbuildは`SERVO-PWM`（GPIO27）と
 //! `peripherals.ledc.timer0`／`channel0`を追加で渡し、Pi link関連を渡さない。`bringup-led-514` feature付きbuildは
 //! GPIO2とGPIO5を追加で渡す。
@@ -134,7 +135,8 @@
 //!
 //! 1. `power-budget.md`の`DISP-01`初回通電の手順（給電構成の確定待ち）が挙げる
 //!    B-2bの前提2点を満たす。
-//! 2. `--features bringup-display-13`を付けてbuildする。**commandの正本は
+//! 2. `--features bringup-display-13`を付けてbuildする（`face-21`の通電は`face-21,bringup-display-13`で行う。
+//!    `docs/hardware/power-budget.md`の条件(2)）。**commandの正本は
 //!    [検証済みコマンド](../../../docs/toolchains/verified-commands.md)であり、
 //!    ここへ写さない。**
 //! 3. ESP32 Flash / HIL profileの端末で人間がflashし、人間の監視下で通電する
@@ -166,6 +168,7 @@ mod display;
 #[cfg(feature = "bringup-display-13")]
 mod display_test;
 mod env;
+mod face;
 mod health;
 #[cfg(feature = "bringup-led-514")]
 mod led;
@@ -198,7 +201,7 @@ use esp_idf_svc::hal::delay::FreeRtos;
 use esp_idf_svc::hal::gpio::{InputPin, OutputPin};
 use esp_idf_svc::hal::i2c::{I2cConfig, I2cDriver, I2C0};
 use esp_idf_svc::hal::peripherals::Peripherals;
-#[cfg(feature = "bringup-display-13")]
+#[cfg(any(feature = "bringup-display-13", feature = "face-21"))]
 use esp_idf_svc::hal::spi::SpiAnyPins;
 #[cfg(not(feature = "bench-servo-test-17"))]
 use esp_idf_svc::hal::uart::{config::Config as UartConfig, UartDriver, UartEventPayload};
@@ -207,11 +210,14 @@ use esp_idf_svc::hal::units::Hertz;
 use crate::accel::Adxl345;
 #[cfg(not(feature = "bench-servo-test-17"))]
 use crate::boot_session::{BootRetryPolicy, BootSession};
-#[cfg(feature = "bringup-display-13")]
+#[cfg(any(feature = "bringup-display-13", feature = "face-21"))]
 use crate::display::Ili9341;
 #[cfg(feature = "bringup-display-13")]
 use crate::display_test::DisplayBringup;
 use crate::env::Bme280;
+#[cfg(feature = "face-21")]
+use crate::face::FaceDrawer;
+use crate::face::FaceState;
 use crate::health::Health;
 #[cfg(feature = "bringup-led-514")]
 use crate::led::Leds;
@@ -385,7 +391,11 @@ fn main() {
     // **bring-up経路ごとに1 fieldで出す。**行ごと`#[cfg]`で分けると、featureの組み合わせの数
     // だけ同じ行を書くことになる。`cfg!`はcompile時に定数へ畳まれるため、有効でない経路の
     // 文字列が実行時に選ばれることはない。
-    let display_state = if cfg!(feature = "bringup-display-13") {
+    let display_state = if cfg!(all(feature = "face-21", feature = "bringup-display-13")) {
+        "bringup_and_face_enabled"
+    } else if cfg!(feature = "face-21") {
+        "face_enabled"
+    } else if cfg!(feature = "bringup-display-13") {
         "bringup_enabled"
     } else {
         "not_driven"
@@ -409,9 +419,9 @@ fn main() {
 
     // featureが無ければこのblockはbuildへ含まれない（`run_display_bringup`のdoc参照）。
     // 初期化とbacklightの点灯だけをここで行い、fillと四隅patternはmain loopの中で1段ずつ
-    // 進める（`crate::display_test`）。
-    #[cfg(feature = "bringup-display-13")]
-    let mut display = run_display_bringup(
+    // 進める（`crate::display_test`）。`face-21`単独のbuildは進めず、表情を描く（`crate::face`）。
+    #[cfg(any(feature = "bringup-display-13", feature = "face-21"))]
+    let lcd = run_display_bringup(
         peripherals.spi3,
         peripherals.pins.gpio18,
         peripherals.pins.gpio23,
@@ -421,12 +431,30 @@ fn main() {
         peripherals.pins.gpio16,
         peripherals.pins.gpio4,
     );
+    // `set_expression`を受理できるか（`crate::face`）。LCDを描けるbuild（`face-21`）だけが立てる。
+    let mut face = FaceState::new();
+    #[cfg(feature = "bringup-display-13")]
+    let mut display = lcd.map(DisplayBringup::new);
+    // `bringup-display-13`と組み合わせたbuildは、bring-upが終わった後にdriverを受け取る（main loop）。
+    #[cfg(all(feature = "face-21", feature = "bringup-display-13"))]
+    let mut face_drawer: Option<FaceDrawer<'static>> = None;
+    #[cfg(all(feature = "face-21", feature = "bringup-display-13"))]
+    if display.is_some() {
+        face.set_busy();
+    }
+    #[cfg(all(feature = "face-21", not(feature = "bringup-display-13")))]
+    let mut face_drawer = lcd.map(FaceDrawer::new);
+    #[cfg(all(feature = "face-21", not(feature = "bringup-display-13")))]
+    if let Some(drawer) = face_drawer.as_mut() {
+        face.set_ready();
+        drawer.show(deskcat_protocol::ExpressionName::Neutral);
+    }
 
     // **I2Cのbring-upは、`bringup-display-13`付きbuildではLCDのbring-upが終わってから行う。**
     // 1回で描き切っていた頃と同じlogの順（LCDの初期化、fill、四隅pattern、I2C）を保つため
     // である。`docs/hardware/power-budget.md`の`DISP-01`追加接続の手順は、この順を前提に
-    // 待機時間の上限（手順5）と停止の条件（手順8）を決めている。LCDを持たないbuildでは、
-    // 今までどおり起動時に行う。
+    // 待機時間の上限（手順5）と停止の条件（手順8）を決めている。`bringup-display-13`を
+    // 持たないbuild（`face-21`単独を含む）では、今までどおり起動時に行う。
     #[cfg(feature = "bringup-display-13")]
     let mut i2c_pending = Some((
         peripherals.i2c0,
@@ -569,13 +597,45 @@ fn main() {
         #[cfg(feature = "bringup-display-13")]
         {
             if let Some(bringup) = display.take() {
-                display = bringup.poll(health.uptime_ms());
+                display = match bringup.poll(health.uptime_ms()) {
+                    Some(done) if done.is_done() => {
+                        let lcd = done.into_lcd();
+                        // `face-21`付きbuildは、driverを手放さず表情の描画へ渡す（backlightは点いたまま）。
+                        // それ以外は手放し、backlightを消す（bring-upの試験手順のとおり）。
+                        #[cfg(feature = "face-21")]
+                        {
+                            let mut drawer = FaceDrawer::new(lcd);
+                            face.set_ready();
+                            drawer.show(deskcat_protocol::ExpressionName::Neutral);
+                            face_drawer = Some(drawer);
+                        }
+                        #[cfg(not(feature = "face-21"))]
+                        drop(lcd);
+                        None
+                    }
+                    Some(running) => Some(running),
+                    // bring-upが失敗して終わった。driverは手放され、以後も描けない。
+                    None => {
+                        #[cfg(feature = "face-21")]
+                        face.set_unavailable();
+                        None
+                    }
+                };
             }
             if display.is_none() {
                 if let Some((i2c0, sda, scl)) = i2c_pending.take() {
                     run_i2c_bringup(i2c0, sda, scl, &mut health);
                 }
             }
+        }
+
+        // 受理した表情を描く。帯を1本だけ塗って戻る（`crate::face`）。
+        #[cfg(feature = "face-21")]
+        if let Some(drawer) = face_drawer.as_mut() {
+            if let Some(name) = face.take_request() {
+                drawer.show(name);
+            }
+            drawer.poll();
         }
 
         #[cfg(not(feature = "bench-servo-test-17"))]
@@ -598,6 +658,11 @@ fn main() {
         #[cfg(feature = "bringup-display-13")]
         if let Some(bringup) = &display {
             until = until.min(bringup.next_deadline_ms(health.uptime_ms()));
+        }
+        // 塗る帯が残っている間は、待たずに次の周回へ進む（read timeoutは1 tick以上で、IDLE taskへ回る）。
+        #[cfg(feature = "face-21")]
+        if face_drawer.as_ref().is_some_and(FaceDrawer::is_drawing) {
+            until = until.min(health.uptime_ms());
         }
         #[cfg(feature = "bringup-led-514")]
         if let Some(leds) = leds.as_mut() {
@@ -645,7 +710,7 @@ fn main() {
             last_read_ms = health.uptime_ms();
             if let Ok(n) = read {
                 if n > 0 {
-                    pi_link.on_bytes(&buf[..n], &mut boot_session, &health, &mut uart);
+                    pi_link.on_bytes(&buf[..n], &mut boot_session, &health, &mut face, &mut uart);
                 }
             }
         }
@@ -853,22 +918,22 @@ fn service_bringup_step(health: &mut Health, step: &str) {
     );
 }
 
-/// `DISP-01`を初期化してbacklightを点け、単色fillと四隅patternを1段ずつ進める状態機械を返す。
+/// `DISP-01`を初期化してbacklightを点け、driverを返す。
 ///
-/// fillと四隅patternはmain loopの中で進む（`crate::display_test`。`#487`のPR B1より前は、この関数が
-/// 1回の呼び出しで描き切っていた）。controllerのIDは読まない（`crate::display`のmodule doc）。
+/// `bringup-display-13`付きbuildでは、呼び出し側がfillと四隅patternをmain loopの中で進める（`crate::display_test`。
+/// `#487`のPR B1より前は、この関数が1回の呼び出しで描き切っていた）。controllerのIDは読まない（`crate::display`のmodule doc）。
 /// 初期化の後に、書き込んだMADCTLの値と論理座標の幅・高さを`display_madctl`の行としてlogへ出す。
 ///
 /// **どの段階で失敗しても、この関数はpanicしない。**driverの作成か初期化に失敗したら
 /// `log::error!`へ分類して`None`を返し、main loopはLCDを描かずに進む。
 ///
-/// **`bringup-display-13` feature付きbuildだけがこの関数を持つ。**既定buildはこの関数を
+/// **`bringup-display-13`か`face-21`のfeature付きbuildだけがこの関数を持つ。**既定buildはこの関数を
 /// compileせず、`main()`から呼ばない。したがって既定buildは`LCD-BL`（GPIO4）を含む
 /// LCD関連pinへ一切触れず、`lcd.backlight_on()`も実行しない
 /// （[#451](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/451)。既定offにした
 /// 理由と有効化の手順はmodule docの「`DISP-01`のbring-upを有効にする手順」節が持つ。
 /// **ここへ再掲しない。**）。
-#[cfg(feature = "bringup-display-13")]
+#[cfg(any(feature = "bringup-display-13", feature = "face-21"))]
 #[allow(clippy::too_many_arguments)]
 fn run_display_bringup<SPI: SpiAnyPins + 'static>(
     spi3: SPI,
@@ -879,7 +944,7 @@ fn run_display_bringup<SPI: SpiAnyPins + 'static>(
     dc: impl OutputPin + 'static,
     rst: impl OutputPin + 'static,
     bl: impl OutputPin + 'static,
-) -> Option<DisplayBringup<'static>> {
+) -> Option<Ili9341<'static>> {
     // pinは`docs/hardware/gpio-assignment.md`の`信号inventory`に従う
     // （`LCD-SCLK`=18, `LCD-MOSI`=23, `LCD-MISO`=19, `LCD-CS`=22, `LCD-DC`=17,
     // `LCD-RST`=16, `LCD-BL`=4）。`TOUCH-CS`(21)はbusを共有するが、このfirmwareは
@@ -912,7 +977,7 @@ fn run_display_bringup<SPI: SpiAnyPins + 'static>(
         log::error!("display_backlight_on_failed error={err}");
     }
 
-    Some(DisplayBringup::new(lcd))
+    Some(lcd)
 }
 
 /// `ACCEL-01`（ADXL345）と`ENV-01`（BME280）のDevice ID／Chip IDを読み、生byteをlogへ出す。

@@ -14,9 +14,9 @@
 
 ## 現在の状態
 
-Issue #5 でtoolchainを固定し、最小projectのclean buildを確認した。実装済みなのは`link_patches()`、logger初期化、起動logの出力、Issue #7 の heartbeat と health snapshot、Issue #12 の`crate::protocol::PiSession`（`hello`／`ping`／`get_status`の受信側logic）、および Issue #13 の`crate::display::Ili9341`（`DISP-01`／ILI9341のSPI driver）である。**`crate::display`のbring-upは、既定buildでは実行しない。**`bringup-display-13` feature（既定off）を付けたbuildだけが実行する（[#451](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/451)。既定offにした理由と有効化の手順は`src/main.rs`のmodule docの「`DISP-01`のbring-upを有効にする手順」節が正本であり、**ここへ再掲しない**）。**製品buildは既定build（featureなし）であり、Pi linkも持つ**（[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)）。`bringup-display-13`は製品buildへLCDの試験モードを加えるfeatureであり、描画の間のPi linkの受信とheartbeatは`src/display_test.rs`のmodule docを参照（codeから導いたもので、実機では確かめていない）。#487のPR B1まであった`pi-protocol-mode`（Pi linkを持つbuild。LCD／I2Cと排他）は廃止した。構成の一覧は`src/main.rs`のmodule doc「buildの構成」節が持つ。
+Issue #5 でtoolchainを固定し、最小projectのclean buildを確認した。実装済みなのは`link_patches()`、logger初期化、起動logの出力、Issue #7 の heartbeat と health snapshot、Issue #12 の`crate::protocol::PiSession`（`hello`／`ping`／`get_status`の受信側logic）、および Issue #13 の`crate::display::Ili9341`（`DISP-01`／ILI9341のSPI driver）である。**`crate::display`のbring-upは、既定buildでは実行しない。**`bringup-display-13`か`face-21`のfeature（既定off）を付けたbuildだけが実行する（[#451](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/451)。既定offにした理由と有効化の手順は`src/main.rs`のmodule docの「`DISP-01`のbring-upを有効にする手順」節が正本であり、**ここへ再掲しない**）。**製品buildは既定build（featureなし）であり、Pi linkも持つ**（[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)）。`bringup-display-13`は製品buildへLCDの試験モードを加えるfeatureであり、描画の間のPi linkの受信とheartbeatは`src/display_test.rs`のmodule docを参照（codeから導いたもので、実機では確かめていない）。#487のPR B1まであった`pi-protocol-mode`（Pi linkを持つbuild。LCD／I2Cと排他）は廃止した。構成の一覧は`src/main.rs`のmodule doc「buildの構成」節が持つ。
 
-`crate::display`は`docs/hardware/gpio-assignment.md`の`信号inventory`のうち`LCD-SCLK`／`LCD-MOSI`／`LCD-MISO`／`LCD-CS`／`LCD-DC`／`LCD-RST`／`LCD-BL`の7本だけを配線する。**`bringup-display-13` featureを付けたbuildでだけ、`main()`が起動時にLCDを初期化し（横向きのMADCTL。controllerのIDは読まない）、backlightを点け、単色fillと四隅test patternをmain loopの中で1段ずつ描き（`src/display_test.rs`）、結果をlogへ出す。既定buildはこの7本のいずれにも触れない。**一次資料の引用はmodule docにある。**flash・実機通電・LCD panelの目視確認は`docs/hardware/experiment-log.md`の`EXP-016`〜`EXP-018`で行った。**これは#487のPR B1より前の、fillとpatternを1回で描き切る描画経路での結果であり、1段ずつ描く今の経路は実機で動かしていない。実機のtouch／servoは引き続き未実装のままである（`ADC-*`・`TOUCH-*`はこの版でも一切GPIOへ触れない。`DISP-01`と`SERVO-PWM`は既定のbuildでは一切GPIOへ触れず、それぞれ`bringup-display-13`／`bench-servo-test-17` featureを付けたbuildだけが触れる。`bench-servo-test-17`を付けたbuildは、#474で`compile_error!`によりcompileが止まる（`src/main.rs`）。servo側の手順は`docs/hardware/servo-safety-limits.md`の`初回動作の実行手順`に沿う）。`ACCEL-*`・`ENV-*`はIssue #15で`crate::accel`・`crate::env`のI2C driverを追加済みであり、上記「未実装」の対象外である（生byteをlogへ出すのみで、値の解釈は別途）。
+`crate::display`は`docs/hardware/gpio-assignment.md`の`信号inventory`のうち`LCD-SCLK`／`LCD-MOSI`／`LCD-MISO`／`LCD-CS`／`LCD-DC`／`LCD-RST`／`LCD-BL`の7本だけを配線する。**`bringup-display-13`か`face-21`のfeatureを付けたbuildでだけ、`main()`が起動時にLCDを初期化し（横向きのMADCTL。controllerのIDは読まない）、backlightを点ける。`bringup-display-13`のbuildは単色fillと四隅test patternをmain loopの中で1段ずつ描き（`src/display_test.rs`）、結果をlogへ出す。`face-21`のbuildは点けたまま`set_expression`の表情を描き、Pi commandを受けなくても、描ける状態になった時点で`neutral`を1回描く（`src/face.rs`）。既定buildはこの7本のいずれにも触れない。**一次資料の引用はmodule docにある。**flash・実機通電・LCD panelの目視確認は`docs/hardware/experiment-log.md`の`EXP-016`〜`EXP-018`で行った。**これは#487のPR B1より前の、fillとpatternを1回で描き切る描画経路での結果であり、1段ずつ描く今の経路は実機で動かしていない。実機のtouch／servoは引き続き未実装のままである（`ADC-*`・`TOUCH-*`はこの版でも一切GPIOへ触れない。`DISP-01`と`SERVO-PWM`は既定のbuildでは一切GPIOへ触れず、それぞれ`bringup-display-13`／`bench-servo-test-17` featureを付けたbuildだけが触れる。`bench-servo-test-17`を付けたbuildは、#474で`compile_error!`によりcompileが止まる（`src/main.rs`）。servo側の手順は`docs/hardware/servo-safety-limits.md`の`初回動作の実行手順`に沿う）。`ACCEL-*`・`ENV-*`はIssue #15で`crate::accel`・`crate::env`のI2C driverを追加済みであり、上記「未実装」の対象外である（生byteをlogへ出すのみで、値の解釈は別途）。
 
 `crate::led`（[#514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)）は`LED-COMM`（GPIO2）と`LED-REACT`（GPIO5）を駆動する。**既定buildはこの2本に触れない。**`bringup-led-514` feature（既定off）を付けたbuildだけが、起動時に両pinを消灯側へ設定し、点灯試験（赤→白→両方）の後に白を点滅させる。既定buildとも`bringup-display-13`とも組み合わせられる（`bench-servo-test-17`は#474の`compile_error!`のため対象外）。通信状態による白の点灯と、`happy`による赤の点灯はまだ無い。配線と試験の手順は[led-514-demo.md](../../docs/hardware/led-514-demo.md)が持つ。**実機では動かしていない。**
 
@@ -47,23 +47,25 @@ ESP32 Build profileの端末で、このディレクトリにて実行する。*
 
 ## host crateの再利用
 
-`deskcat-protocol`と`deskcat-servo`をpath dependencyで使う。wire protocolの実装と、
-servoのhard limitとtrajectory limitingの実装を、それぞれ両側で1つに保つためである。
+`deskcat-protocol`、`deskcat-servo`、`deskcat-face`をpath dependencyで使う。wire protocolの実装、
+servoのhard limitとtrajectory limitingの実装、`set_expression`の表情の図形と受理の判定の順序を、
+それぞれhostのtestとfirmwareで1つに保つためである。
 判断の記録は[ADR-0008](../../docs/decisions/0008-firmware-protocol-crate-reuse.md)にある
-（`deskcat-servo`は同ADRの追記）。
+（`deskcat-servo`と`deskcat-face`は同ADRの追記）。
 
 ```toml
 deskcat-protocol = { path = "../../crates/deskcat-protocol" }
 deskcat-servo = { path = "../../crates/deskcat-servo" }
+deskcat-face = { path = "../../crates/deskcat-face" }
 ```
 
 - root workspaceの`exclude = ["firmware/esp32"]`は**維持する。**lockfileはroot `Cargo.lock`と
   このディレクトリの`Cargo.lock`の2つに分かれたままでよい。
 - **共有crateの`rust-version`は、host（1.97.1）とESP toolchain（rustc 1.95.0-nightly）の
-  両方を満たす下限にしてある。**`crates/deskcat-protocol/Cargo.toml`と
-  `crates/deskcat-servo/Cargo.toml`が理由込みで宣言している。
+  両方を満たす下限にしてある。**`crates/deskcat-protocol/Cargo.toml`、
+  `crates/deskcat-servo/Cargo.toml`、`crates/deskcat-face/Cargo.toml`が理由込みで宣言している。
   ここを上げるとfirmwareのbuildが`rustc 1.95.0-nightly is not supported`でcompile前に止まる。
-- `crates/deskcat-protocol/**`と`crates/deskcat-servo/**`の変更でも
+- `crates/deskcat-protocol/**`、`crates/deskcat-servo/**`、`crates/deskcat-face/**`の変更でも
   `.github/workflows/firmware.yml`が発火する。
   host側だけの変更でfirmware buildが壊れるのを検知するためである。
 - compileできるbuildで、`src/servo.rs`を通って角度を出せるのは、同fileの`LimitedServo`だけである。
