@@ -31,6 +31,7 @@
 | `EXP-017`（見出しに`—`を含み、`scripts/validate_doc_links.py`がanchorを確かめられないためlinkしない） | [#13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)受け入れ条件 | 値の正なし（bring-upの記録。判定は#13） |
 | [EXP-018](#exp-018-disp-01msp2807横向きの向きの決定と単色fill色の並び四隅の写真記録idの読み出しの打ち止め) | [#13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)受け入れ条件1〜5 | 値の正なし（bring-upの記録。判定は#13） |
 | [EXP-019](#exp-019-段階b-2今の接続のまま-b-2aの周辺-module-3点の-33-v-側の電流と電圧) | [#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)の段階B-2（`HW-TBD-024`／`HW-TBD-025`は解いていない） | 値の正なし（確度が未取得の読み。[power-budget.md](power-budget.md)の`負荷表`は、この記録を参照するだけで値を持たない） |
+| [EXP-020](#exp-020-段階aのpiの給電を手持ちのadapterへ移しwi-fiの切断を切り分けpiのuartを設定した) | [#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)の受け入れ条件4の準備。段階AのPiの給電（`PSU-PI-A-01`と`CABLE-PI-A-01`）、Wi-Fiの切断の観察、PiのUARTの設定 | 値の正なし（観察の記録。電源の適否は判断していない） |
 
 **大容量の生dataはこのrepositoryへ入れていない。**保存場所は
 [development-foundation-plan.md](../planning/development-foundation-plan.md)の
@@ -2057,6 +2058,74 @@ M0 の 0.2 mV を引き 0.1 Ω で割ると、bring-up の後以外の区間が�
 - 次の通電（[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)の条件4、または[#13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)の条件6）の前に、戻した後の配線で非通電の確認（項目1〜7）をやり直す。通電したら、表示と`accel_device_id`／`env_chip_id`の応答で、3点の電源の線がつながっていることを確かめる
 - monitor の process は、次からは PID を指定して止める
 
+## EXP-020: 段階AのPiの給電を手持ちのadapterへ移し、Wi-Fiの切断を切り分け、PiのUARTを設定した
+
+[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)の受け入れ条件4の試験の準備。M-12001のplugは`EXP-012`で切断済みであり、[power-budget.md](power-budget.md)の段階表のA行が定める段階Aの給電に、M-12001は使えない。
+
+| 項目 | 内容 |
+|---|---|
+| Test ID | `EXP-020` |
+| Date | 2026-10-02〜2026-10-03（JST） |
+| Operator | adapterとcableの抜き挿し、監視中の目視（LED、発熱、異臭）はユーザー。ssh経由の読み出し、監視、Piの設定の変更と再起動はAIセッション（ユーザーの指示「piの設定はあなたがssh経由でする」による） |
+| Hardware revision／Exact components | `SBC-01`（Raspberry Pi Zero W Rev 1.1）、`SD-01`。adapterは`PSU-PI-A-01`（②）とANKER `A2014`（③、USB-C PD）。cableは`CABLE-PI-A-01`と`CABLE-PI-PWR-01` |
+| Wiring revision | PiのGPIOには何もつないでいない。ESP32はつないでいない |
+| Power supply and current limit | 起動ごとに下の表のとおり。電流制限は設けていない |
+| Firmware commit/profile | 対象外（ESP32を使っていない）。PiはRaspberry Pi OS（kernel `6.18.34+rpt-rpi-v6`、`raspi-config` 20260522） |
+| Configuration | 承認：②での初回起動とPiの設定（[#446の記録](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446#issuecomment-5952463629)）、bssidの固定（ユーザーの回答「どうぞ」）。③への切り替えと`CABLE-PI-PWR-01`への切り替えは、ユーザー自身の判断と操作である。`CABLE-PI-A-01`：本体表記が無い。`EXP-009`の「表記なし」と同じ現物かは、同定していない。 |
+| Measurement equipment | この端末からのping（1 sおき）とssh。Pi上の`journalctl`（`Storage=persistent`）、`nmcli` |
+| Procedure | 下の表の順に起動した。Piが届いている間にsshで前の起動のjournalを読んだ。bssidの固定の後と、②と`CABLE-PI-A-01`へ戻した後に、それぞれ1時間監視した。最後にPiのUARTを設定し、再起動して確かめた |
+| Expected result | Piがnetworkから消えず、`/dev/serial0`が`ttyAMA0`を指すこと |
+| Measured result | 下の表と`PiのUARTの設定` |
+| Faults | 下記 |
+| Conclusion | 下記 |
+| Next safe step | 下記 |
+
+**起動ごとの結果**（時刻はJST。routerと中継機は同じSSIDを出す。値は書かない）
+
+| 起動 | adapter／cable | bssidの固定 | 観察 |
+|---|---|---|---|
+| 1 | ②／`CABLE-PI-A-01` | なし | 21:45:03にsshで届いた（uptime 2 min、`throttled=0x0`。`SBC-01`（Pi Zero W）には低電圧検出が無く、この値は電圧について何も語らない（`EXP-009`））。00:45:44には届かない（ARP `FAILED`）。ユーザーの回答：LEDは点いたまま、発熱・異臭なし、誰も触れていない |
+| 2 | 同上（01:16ごろ抜き挿し） | なし | 01:18:58にsshが1回届き、01:22:16には届かない。journalは03:10:36まで続いた。`CTRL-EVENT-DISCONNECTED`（`reason=0 locally_generated=1`）が144回。routerと中継機の間を行き来し、終わりは`Association request to the driver failed`が続いた |
+| 3 | 同上（03:12ごろ挿し直し） | なし | 起動2と同じ形 |
+| 4 | ③／`CABLE-PI-A-01`（変換コネクタ） | なし | 32 minで`CTRL-EVENT-DISCONNECTED`が46回。routerのSIGNALは70、中継機は49 |
+| 5 | ③／`CABLE-PI-PWR-01`（変換コネクタ） | なし | 約28 minは切断0回、ping 1702/1704。11:04:13に1回切れて中継機へ移り、11:04:46から`Association request to the driver failed`が続いて、挿し直しまで戻らない。journalは続いていた |
+| 6 | 同上（12:16ごろ挿し直し） | 12:27にrouterへ固定 | 12:27:39〜13:29:00の監視で、固定の後の切断は4回、どれもrouterへすぐ戻った。`driver failed` 0回、ping 3587/3594、5分おきのsshは12回とも届いた |
+| 7 | ②／`CABLE-PI-A-01`（18:17ごろ挿し替え） | あり | 18:17:57〜19:20:40の監視で、切断1回、`driver failed` 0回、ping 3589/3595、sshは12回とも届いた |
+
+**bssidの固定**：NetworkManagerの接続（netplanが作ったもの）の`802-11-wireless.bssid`をrouterへ固定した。変える前に`/etc/netplan`をPi上へ写し、10分後に元へ戻す`systemd-run`のtimerを先に仕掛けてから変え、届いた後にtimerを止めた。netplanのyamlに`bssid`の行が足された。
+
+**PiのUARTの設定**（[gpio-assignment.md](gpio-assignment.md)の`Pi側の設定`）
+
+- 変える前に`/boot/firmware/config.txt`と`cmdline.txt`をPi上の`*.before-446`へ写した。戻せなくなったときは、card readerでmicroSDをこの端末で読み、写しから戻す
+- `systemctl is-enabled hciuart`は`not-found`で、この手順は行っていない
+- `config.txt`の最後の`[all]`の下へ`dtoverlay=disable-bt`を足した
+- 対話の画面の代わりに`raspi-config nonint do_serial_cons 1`（serialのlogin shellを無効）と`raspi-config nonint do_serial_hw 0`（serial port hardwareを有効）を使った。引数の意味と変えるfileは、Pi上の`/usr/bin/raspi-config`（sha256 `b82c777132fa945a7b548e6826493f2f65364b062973860467d525a468e1d5a3`）の`do_serial_cons`・`do_serial_hw`・`do_serial`で確かめた
+- diff：`config.txt`は`[all]`の下に`dtoverlay=disable-bt`と`enable_uart=1`、`cmdline.txt`は`console=serial0,115200`が消えた
+- 再起動の後：`/dev/serial0 -> ttyAMA0`（root:dialout）、`/proc/cmdline`に`console=serial0`は無い、`serial-getty@ttyAMA0`は`inactive`、journalに`hci_uart`の行は無い、`deskcat`は`dialout`に入っている
+
+### Faults
+
+- 作業セッションは`EXP-012`を確かめずに、M-12001を`PWR IN`へ挿す手順を立て、ユーザーの「M-12001はとっくに切った」を、コンセントから抜いたことと読み違えた
+- 作業セッションは一度「②と③は別のcable」とPMへ送った（実際は同じcableで、③は変換コネクタを通した）
+- 起動5の監視は、この端末の裏の実行の上限で11:04ごろに止まった（sshの最後の読みは11:01:19）
+- 起動6の最初の読みで、固定の後の3回の切断を固定の操作によるものと注記したが、journalの時刻で固定の後の切断と分かった
+
+### この記録が主張しないこと
+
+- 電源経路の受け入れ。`PSU-PI-A-01`が公式の推奨1.2 Aを下回ることは変わらない
+- ③がPDでない機器へ5 Vを出すこと
+- 切断の原因。adapter、cable、routerのchannel、Wi-Fiの省電力のどれが効いたかは切り分けていない
+- `/dev/serial0`を開けること、UARTで通信できること
+
+### Conclusion
+
+journalが続いた起動（起動2・5）では、Piは止まっておらず、Wi-Fiだけが切れていた。中継機へ移った後に`Association request to the driver failed`が続いて戻らない形であり、bssidをrouterへ固定した後は、②と`CABLE-PI-A-01`でも1時間networkから消えなかった。PiのUARTは、`dtoverlay=disable-bt`と`raspi-config`の2つの設定の後に、`/dev/serial0`は`ttyAMA0`を指していた。
+
+### Next safe step
+
+- Piでhostの`serial_link` exampleをbuildする（PiのGPIOには何もつながない）
+- UARTの線をつなぐ条件4の試験は、[gpio-assignment.md](gpio-assignment.md)の`信号線をつないでよい条件`に従う
+
 ## Revision履歴
 
 | 日付 | Revision | 変更 | 根拠 |
@@ -2087,3 +2156,4 @@ M0 の 0.2 mV を引き 0.1 Ω で割ると、bring-up の後以外の区間が�
 | 2026-09-27 | 23 | [#13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)。**`EXP-017`を追加した。**`#485`（MADCTL `BGR=1`）適用後の再確認である。**単色fillの赤/青入れ替わりは解消した**（目視のみ、写真記録は無いため正本の手順9が定める達成の条件は満たしていない）。**四隅pattern・格子pattern（診断用に追加した20 cellのpattern、未commit）では、色の値ではなく位置（座標の対応関係）が入れ替わるという別の未解決現象を見つけた**（右上の座標に指定した色が左下に、左下の座標に指定した色が右上に現れる。原因未特定、向きの基準の記録が無いため断定しない）。`MISO`線（`DISP-01` `SDO`⇔GPIO19）の導通を確認した（0 Ω、単純な断線ではない）。`display_id`は複数回のflashで`[00,00,00,00]`／`[ff,ff,ff,ff]`／`[00,40,71,fb]`の3種類の値を観測し、いずれも期待値`0x9341`と不一致だった（flashごとの回数・順序・firmware版との対応は会話記録から再構成できなかった）。**backlightが`run_display_bringup`終了後に消灯する挙動を、`esp-idf-hal`の`PinDriver`の`Drop`実装（`gpio_reset_without_pull`と外部pull-downによる）としてsourceの読解で説明した**（実測はしていない）。**正本からの逸脱・未実施を記録した。**(1) 手順7（書き込み）を、`EXP-016`に続き2回目、AIセッションが実行した。(2) 手順10（通電後の抵抗再測定）を行っていない。(3) 条件(7)の承認範囲（`run_display_bringup`の描画内容）を、診断目的の変更（無限loop化・色配列入れ替え・四隅→格子pattern）が厳密には超えている（実行経路・pin・backlight制御は変更していない） | ユーザーによる現物作業と監視、実機Linuxのセッションによるfirmware変更・build・書き込み・ログ読み取り（いずれも2026-09-27）、`#0PM`の指摘・確認 |
 | 2026-09-28 | 24 | [#13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)。**`EXP-018`を追加した。**判定の向き（横向き、`J2`を右）に合うMADCTL（`0x28`）を写真から決め、四隅の一致を確かめた。単色fillの5色と色の並びを写真で記録した。Read ID1〜3を含むIDの読み出しがすべて`00`で、moduleを改変しない方法ではこれ以上切り分けられないため、打ち止めにした。受け入れ条件1〜5を達成、6を未達とした。写真と動画はcommitしていない | [#13の条件(7)の承認](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13#issuecomment-5868974805)、[判断(1)(2)](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13#issuecomment-5860773100)、[PR #497](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/497) |
 | 2026-10-01 | 25 | [#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)。**`EXP-019`を追加した。**今の接続（`3V3` pin給電）のまま、周辺module3点の電源pinへ入る合計電流を`MEAS-01`の両端電圧から求め、確度が未取得の読みとして記録した。3.3 V側の電圧も読んだ。patchを当てたbuild（`DISPLAY_HOLD_MS`を15秒）を使ったこと、`MEAS-01`の代わりにジャンパを挿していた件、200Ωレンジを`MEAS-03`の定めを確かめずに使った件、読みの無い起動1回、省いた確認を記録した。**条件(7)の承認（backlightを点ける起動4回）を3回以上超えたこと、および`DISP-01`追加接続の手順からの逸脱3件（手順10を行っていない、項目1を列とrailの単位で測った、項目2〜7を地図と照らして行った）**（正本からの逸脱）も Faults に記録した。**あわせて、索引の表に`EXP-016`〜`EXP-019`の行を足した**（`EXP-016`〜`EXP-018`は既存の抜け。索引の抜けを埋めた Revision 11 の前例に倣った。`EXP-017`は見出しに`—`を含みanchorを検査できないため、linkせずに名前だけを置いた） | [#3の通電の承認](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3#issuecomment-5914517437)、[#488のユーザーの決定](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/488#issuecomment-5868418510) |
+| 2026-10-06 | 26 | [#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)。**`EXP-020`を追加した。**段階AのPiの給電を手持ちのadapterとcableへ移し、Wi-Fiの切断を観察し、PiのUARTを設定した | [#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446) |
