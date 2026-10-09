@@ -65,6 +65,11 @@ use crate::config;
 /// Device ID register。Analog Devices ADXL345 Data Sheet Rev. G（module doc参照）。
 const REG_DEVID: u8 = 0x00;
 
+/// `DEVID`のreset値（固定のdevice ID）。`docs/hardware/sensor-datasheet-notes.md`の`Device ID register／value`行が出所である。
+/// tap検出の設定を書く前に、このaddressの先がADXL345であることを、この値で確かめる（`main.rs`の`start_tap`）。
+#[cfg_attr(not(feature = "tap-21"), allow(dead_code))]
+pub const EXPECTED_DEVICE_ID: u8 = 0xE5;
+
 /// [`Adxl345::read_device_id`]・[`Adxl345::configure_tap`]・[`Adxl345::read_int_source`]の1 transactionのtimeout（tick）。
 ///
 /// **`esp_idf_svc::hal::delay::BLOCK`（無期限）を使わない。**`SDA`がLowのまま固着した

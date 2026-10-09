@@ -1016,10 +1016,28 @@ fn run_display_bringup<SPI: SpiAnyPins + 'static>(
 
 /// I2C bring-upが返したdriverで、tap検出を設定して始める（`tap-21`付きbuildだけ）。driverが無ければ`None`。
 #[cfg(feature = "tap-21")]
-fn start_tap(i2c: Option<I2cDriver<'static>>, now_ms: u64) -> Option<TapDetector> {
-    let mut detector = TapDetector::new(Adxl345::new(ACCEL_I2C_ADDRESS), i2c?);
+fn start_tap(bringup: Option<I2cBringup>, now_ms: u64) -> Option<TapDetector> {
+    let bringup = bringup?;
+    // **ADXL345のDevice IDを確かめてから設定を書く。**IDが違う（別のdeviceがこのaddressにいる、配線が違う）、
+    // または読めなかったときは、何も書かず、検出を始めない（失敗はlogへ出す）。
+    if bringup.accel_id != Some(accel::EXPECTED_DEVICE_ID) {
+        log::error!(
+            "tap_not_started accel_id={:?} expected=0x{:02x}",
+            bringup.accel_id,
+            accel::EXPECTED_DEVICE_ID
+        );
+        return None;
+    }
+    let mut detector = TapDetector::new(Adxl345::new(ACCEL_I2C_ADDRESS), bringup.driver);
     detector.configure(now_ms);
     Some(detector)
+}
+
+/// [`run_i2c_bringup`]が返す、I2Cのdriverと、`ACCEL-01`のDevice IDの読み出し結果（読めなければ`None`）。
+#[cfg_attr(not(feature = "tap-21"), allow(dead_code))]
+struct I2cBringup {
+    driver: I2cDriver<'static>,
+    accel_id: Option<u8>,
 }
 
 /// `ACCEL-01`（ADXL345）と`ENV-01`（BME280）のDevice ID／Chip IDを読み、生byteをlogへ出す。
@@ -1111,7 +1129,7 @@ fn run_i2c_bringup(
     sda: impl InputPin + OutputPin + 'static,
     scl: impl InputPin + OutputPin + 'static,
     health: &mut Health,
-) -> Option<I2cDriver<'static>> {
+) -> Option<I2cBringup> {
     // ESP32内蔵のweak pull-upは有効にしない。`gpio-assignment.md`の実効pull-up計算が
     // 外部pull-upだけを前提にしているため（`crate::env`のmodule doc「bus speedは
     // Standard-mode」節と同じ根拠。**ここへ再掲しない**）。
@@ -1131,10 +1149,16 @@ fn run_i2c_bringup(
     };
 
     let accel = Adxl345::new(ACCEL_I2C_ADDRESS);
-    match accel.read_device_id(&mut i2c) {
-        Ok(raw) => log::info!("accel_device_id raw=0x{raw:02x}"),
-        Err(err) => log::error!("accel_device_id_read_failed error={err}"),
-    }
+    let accel_id = match accel.read_device_id(&mut i2c) {
+        Ok(raw) => {
+            log::info!("accel_device_id raw=0x{raw:02x}");
+            Some(raw)
+        }
+        Err(err) => {
+            log::error!("accel_device_id_read_failed error={err}");
+            None
+        }
+    };
     service_bringup_step(health, "accel_device_id");
 
     let env = Bme280::new(ENV_I2C_ADDRESS);
@@ -1144,7 +1168,10 @@ fn run_i2c_bringup(
     }
     service_bringup_step(health, "env_chip_id");
     // `tap-21`付きbuildは、このdriverでtap検出を続ける（`crate::tap`）。それ以外は呼び出し側が手放す。
-    Some(i2c)
+    Some(I2cBringup {
+        driver: i2c,
+        accel_id,
+    })
 }
 
 /// `SERVO-01`（SG90）の単発bench試験（[Issue #17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)）。
