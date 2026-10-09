@@ -4,11 +4,17 @@
 //! Issue #527で`set_expression`、`show_text`、`head_touched`、`tapped`、`lifted`、`environment`を
 //! 足した。足したtypeのfieldは、安全要件の5項目（`docs/governance/hardware-safety-policy.md`）の
 //! どれにも効かない。5項目のうちmessageが関わりうるのはservoの持続的拘束だけであり、
-//! servoを動かす経路は`play_motion`（§5.3）だけで、それを含めないためである。
+//! servoを動かす経路は`play_motion`（§5.3）だけで、これは後から足した（下記）ためである。
+//!
+//! **`play_motion`（§5.3）は、Issue #19で型だけを足した。**受信して型に解釈できることと、
+//! servoを動かしてよいことは別である。`name`は閉じたenumにせず、有界でない`String`とする。
+//! 受理する名前はfirmwareのmotion catalogが持ち、motion名をこのcrateに書くと
+//! `PROTO-TBD-008`を先取りするためである。`speed`と`repeat`の上限値も、ここでは決めない。
+//! 型の幅が縛るだけである。
 //!
 //! 含めないtypeと理由:
 //!
-//! - `play_motion`と§4.7の`motion_completed`／`motion_stopped`: motion名と範囲が`PROTO-TBD-008`
+//! - §4.7の`motion_completed`／`motion_stopped`: motion名と範囲が`PROTO-TBD-008`
 //! - §5.3の(b)のservoのfault event: `PROTO-TBD-014`。§4.7の`sensor_fault`: 仕様にschemaが無い
 //! - `show_choices`: touchとlayoutの選定待ち（§5.5）
 //! - `protocol_fault`: 仕様にpayload schemaが無い（`PROTO-TBD-018`）
@@ -65,6 +71,11 @@ pub enum Message {
     Lifted(Lifted),
     /// ESP32→Pi。環境sensorの測定値（§4.5）。
     Environment(Environment),
+    /// Pi→ESP32。名前付きの高水準motionを要求する（§5.3）。
+    ///
+    /// **型があることは、motionを実行してよいことを意味しない。**受理する名前と
+    /// `speed`／`repeat`の上限はfirmwareが持つ（module doc）。
+    PlayMotion(PlayMotion),
 }
 
 impl Message {
@@ -84,6 +95,7 @@ impl Message {
             Self::Tapped => "tapped",
             Self::Lifted(_) => "lifted",
             Self::Environment(_) => "environment",
+            Self::PlayMotion(_) => "play_motion",
         }
     }
 
@@ -100,7 +112,7 @@ impl Message {
     }
 
     /// 受理するtype名の一覧。[`Self::type_str`]と同じ綴りを使う。
-    const TYPE_NAMES: [&'static str; 12] = [
+    const TYPE_NAMES: [&'static str; 13] = [
         "boot",
         "hello",
         "ping",
@@ -113,6 +125,7 @@ impl Message {
         "tapped",
         "lifted",
         "environment",
+        "play_motion",
     ];
 
     /// 上限のある値が範囲内かを検査する。
@@ -134,7 +147,8 @@ impl Message {
             | Self::HeadTouched(_)
             | Self::Tapped
             | Self::Lifted(_)
-            | Self::Environment(_) => Ok(()),
+            | Self::Environment(_)
+            | Self::PlayMotion(_) => Ok(()),
         }
     }
 
@@ -161,7 +175,8 @@ impl Message {
             | Self::HeadTouched(_)
             | Self::Tapped
             | Self::Lifted(_)
-            | Self::Environment(_) => Ok(()),
+            | Self::Environment(_)
+            | Self::PlayMotion(_) => Ok(()),
         }
     }
 }
@@ -551,4 +566,26 @@ pub struct Environment {
     /// 気圧（hPa）。
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pressure_hpa: Option<FiniteF32>,
+}
+
+/// `play_motion`のpayload（§5.3）。
+///
+/// 3つのfieldはすべて必須である。必須から省略可へ緩めても互換は壊れないが、逆は壊すため、
+/// 省略を許すのは意味が決まってからにする。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PlayMotion {
+    /// motion名。
+    ///
+    /// 閉じたenumにしない。**受理する名前はfirmwareのmotion catalogが持つ**（module doc）。
+    /// byte長に、このcrateでは数を置かない。行の最大長（[`limits::MAX_LINE_BYTES`]）が縛る。
+    /// 未知の名前とcatalogが空の間の拒否はfirmwareが`invalid_payload`で行う。
+    pub name: String,
+    /// 正規化されたspeed。
+    ///
+    /// 有限であることだけを検査する。上限は§5.3で`TBD`であり、ここでは決めない。
+    pub speed: FiniteF32,
+    /// 繰り返す回数。
+    ///
+    /// 幅は§3の型表の先例に合わせて`u32`とする。上限は§5.3で`TBD`であり、ここでは決めない。
+    pub repeat: u32,
 }

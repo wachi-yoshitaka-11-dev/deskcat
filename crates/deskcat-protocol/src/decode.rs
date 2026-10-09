@@ -13,7 +13,8 @@ use crate::envelope::{Envelope, Frame};
 use crate::error::{DecodeError, ErrorCode};
 use crate::limits;
 use crate::message::{
-    Ack, Boot, Environment, HeadTouched, Hello, Lifted, Message, SetExpression, ShowText, Status,
+    Ack, Boot, Environment, HeadTouched, Hello, Lifted, Message, PlayMotion, SetExpression,
+    ShowText, Status,
 };
 
 /// envelopeだけを解釈し、payloadは未解釈のまま保持する中間表現。
@@ -163,6 +164,7 @@ fn decode_payload(type_name: &str, payload: &RawValue) -> Result<Message, Decode
         "tapped" => parse_empty(payload).map(|()| Message::Tapped),
         "lifted" => parse::<Lifted>(payload).map(Message::Lifted),
         "environment" => parse::<Environment>(payload).map(Message::Environment),
+        "play_motion" => parse::<PlayMotion>(payload).map(Message::PlayMotion),
         unknown => Err(DecodeError::new(
             ErrorCode::UnknownType,
             format!("unknown message type `{unknown}`"),
@@ -259,6 +261,7 @@ fn encode_payload(message: &Message) -> Result<String, DecodeError> {
         Message::HeadTouched(head_touched) => serde_json::to_string(head_touched),
         Message::Lifted(lifted) => serde_json::to_string(lifted),
         Message::Environment(environment) => serde_json::to_string(environment),
+        Message::PlayMotion(play_motion) => serde_json::to_string(play_motion),
     };
     result.map_err(|err| DecodeError::new(ErrorCode::InvalidPayload, err.to_string()))
 }

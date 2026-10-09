@@ -57,7 +57,7 @@ Protocol channelから送信するすべてのbyteは、有効にframe化され�
 
 **もう3つ、Pi linkを持つbuildの既知の逸脱を記録する**（#446のPR Bから。#487のPR B2で範囲を改めた）。受信の振り分けは`firmware/esp32/src/pi_link.rs`のmodule docが持つ。
 
-- (i) decodeで拒否した行（未対応のtype、payloadやenvelopeの不正）には、§8の相関ACKを返さない。`deskcat_protocol`の受信は、oversize以外の拒否した行の`(sid, id)`を復元しないためである。oversizeの行で`(sid, id)`と`hello`／`ping`／`get_status`のtypeを復元できた場合は、`line_too_long`の拒否ACKを返す。display／motionのcommand（§5.3〜§5.5）にも相関ACKを返さない。`play_motion`と`show_choices`は`deskcat_protocol`のmessageに無く、この(i)に当たる。`show_text`はdecodeを通るが、firmwareはまだ処理せず`log`で分類するだけである（`pi_link.rs`の`pi_rx_unhandled_frame`）。そのため§7の`hardware_unavailable`も返さない。`set_expression`はfirmwareが処理する（[Issue #21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)）。製品buildと`face-21`試験buildは、session（`stale_session`）→値の範囲（`transition_ms`の上限。`out_of_range`。§12のとおり手順10で適用する）の順に判定して`ok`のACKを返し、LCDへ表情を描く。表情を持たない試験build（`bringup-display-13`単独など）は`hardware_unavailable`、`bringup-display-13`と組み合わせたbuildのbring-upの間は`busy`で拒否する。製品buildと`face-21`試験buildは、Pi commandを受けなくても、描ける状態になった時点で`neutral`を1回描く。`transition_ms`は上限の検査だけに使い、切り替えを補間しない。
+- (i) decodeで拒否した行（未対応のtype、payloadやenvelopeの不正）には、§8の相関ACKを返さない。`deskcat_protocol`の受信は、oversize以外の拒否した行の`(sid, id)`を復元しないためである。oversizeの行で`(sid, id)`と`hello`／`ping`／`get_status`のtypeを復元できた場合は、`line_too_long`の拒否ACKを返す。display／motionのcommand（§5.3〜§5.5）にも相関ACKを返さない。`show_choices`は`deskcat_protocol`のmessageに無く、この(i)に当たる。`play_motion`はdecodeを通るが、firmwareはまだ処理せず、どのservoのcodeにも渡さず、`log`で分類するだけである（`pi_link.rs`の`pi_rx_play_motion_not_supported`）。そのため相関ACKも§7の`hardware_unavailable`も返さない。`show_text`はdecodeを通るが、firmwareはまだ処理せず`log`で分類するだけである（`pi_link.rs`の`pi_rx_unhandled_frame`）。そのため§7の`hardware_unavailable`も返さない。`set_expression`はfirmwareが処理する（[Issue #21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)）。製品buildと`face-21`試験buildは、session（`stale_session`）→値の範囲（`transition_ms`の上限。`out_of_range`。§12のとおり手順10で適用する）の順に判定して`ok`のACKを返し、LCDへ表情を描く。表情を持たない試験build（`bringup-display-13`単独など）は`hardware_unavailable`、`bringup-display-13`と組み合わせたbuildのbring-upの間は`busy`で拒否する。製品buildと`face-21`試験buildは、Pi commandを受けなくても、描ける状態になった時点で`neutral`を1回描く。`transition_ms`は上限の検査だけに使い、切り替えを補間しない。
 - (ii) §7のParser counterによる区別を`log`でだけ行う（UART0のdebug logで見える）。`ProtocolCounters`は増やさず、`get_status`へ返す`status`のcounterは0のままである。
 - (iii) `ping`／`get_status`、`set_expression`、`port_reopen`／`resync`の`hello`、拒否した`hello`の処理済みの結果を保持せず、同じ`(sid, id)`の再送をもう一度処理する（§8の手順8・9）。§8.1／§8.2の流量制限、`hello`の拒否ACKの保留table（§5.1）、§5.1の遷移の上限とcooldown（`PROTO-TBD-012`）も実装していない。このため`hello`による`boot`の再開（§4.1）は、firmwareの中では遷移の回数で抑えられない。
 
@@ -108,13 +108,16 @@ Integer widthは、共有test fixture（§12.1）とあわせて次のとおり�
 | `id` | `u32` | 同一session内のmessage ID |
 | `ts_ms` | `u64` | uptime ms。`u32`は約49.7日でwrapし、長時間動作で`ts_ms`の単調性が崩れる |
 
-§4.2〜§4.5、§5.2、§5.4のtype固有payloadのfieldは次のとおりとする（[Issue #527](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/527)）。必須fieldの欠落と、表の型に収まらない値は、payloadのschemaを満たさないため`invalid_payload`で拒否する。省略可のfieldの`null`は、省略と同じに扱う。
+§4.2〜§4.5、§5.2、§5.4のtype固有payloadのfieldは次のとおりとする（[Issue #527](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/527)）。§5.3の`play_motion`の3 fieldは[Issue #19](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/19)で足した。必須fieldの欠落と、表の型に収まらない値は、payloadのschemaを満たさないため`invalid_payload`で拒否する。省略可のfieldの`null`は、省略と同じに扱う。
 
 | type固有payloadのfield | 型 | 必須 |
 |---|---|---|
 | `set_expression.name` | string。§5.2の初期のexpression名のいずれか | 必須 |
 | `set_expression.transition_ms`、`show_text.duration_ms`、`head_touched.duration_ms`、`lifted.duration_ms` | `u32`（ms） | 必須 |
 | `show_text.text` | UTF-8 string。上限は§5.4、制御文字は§7 | 必須 |
+| `play_motion.name` | UTF-8 string。byte長にこの型の上限を置かず、行の最大長（§2）が縛る。受理する名前はfirmwareが持つ（§5.3） | 必須 |
+| `play_motion.speed` | 有限の32-bit浮動小数点数。上限は§5.3で`TBD` | 必須 |
+| `play_motion.repeat` | `u32`。上限は§5.3で`TBD` | 必須 |
 | `environment.temperature_c`、`environment.humidity_pct`、`environment.pressure_hpa` | 有限の32-bit浮動小数点数 | 省略可 |
 | `head_touched.strength`、`tapped.magnitude_g` | 持たない。受けた場合は上の未知の追加fieldとして無視する | — |
 
@@ -763,6 +766,8 @@ Firmwareは次を実行する。
 
 初期に受け入れるmotion名は、サーボ機構のcalibrationが完了するまで`TBD`とする。
 
+**`play_motion`の型（[Issue #19](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/19)）。**`name`、`speed`、`repeat`の3つはすべて必須である（§3の型表）。`name`は閉じた列挙にせず、有界でない文字列とする。受理する名前はfirmwareが持つmotion catalogが決め、motion名はprotocolの型に書かない。未知の`name`と、catalogが空の間の`name`は、`invalid_payload`で拒否する。`hardware_unavailable`は、サーボ出力の有効化条件が決まってから扱う。**型があることは、motionを実行してよいことを意味しない。**`speed`と`repeat`の上限値は`TBD`のままであり、**catalogが空でなくなる（motionを受理し始める）前に、この上限が決まっていることを、有効化の条件とする。**
+
 上限を超えた場合は、制限の種類に応じたcodeを返し、新しいtrajectoryを開始しない。
 
 **(a) commandを受理しない場合** — 実行中の動作は継続する。
@@ -1383,6 +1388,7 @@ Framing／parse層について、**host workspaceのRust実装**がfixtureに合
 | 2026-10-05 | Draft 2 busy | [Issue #19](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/19)。`play_motion`の`busy`を、そのrequestの最終拒否結果として保存し、同じ`(sid, id)`の再送を保存したACKのreplayとすることを、§5.3、§8手順10、§9へ明記した。**wire formatは変えていない。** |
 | 2026-10-07 | Draft 2 set_expression | [Issue #21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)。§2の既知の逸脱(i)から`set_expression`を外し、(iii)へ足した（処理済みの結果を保持しない）。firmwareが受信して判定し、ACKを返す |
 | 2026-10-09 | Draft 2 tapped | [Issue #21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)のF1。§4.3へ、`tap-21` feature付きfirmwareが`tapped`を送る条件（`boot`のACK後だけ、最小間隔未満は捨てる、空のpayload（`{}`））を足し、§2へ`tapped`を書き手として加えた |
+| 2026-10-10 | Draft 2 play_motion type | [Issue #19](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/19)。`play_motion`の型を`crates/deskcat-protocol`と§12.1のSchema群のfixtureへ入れた。`name`は有界でない文字列、`speed`は有限の32-bit浮動小数点数、`repeat`は`u32`で、3つとも必須とした（§3）。受理する名前はfirmwareのmotion catalogが持ち、未知の名前とcatalogが空の間は`invalid_payload`で拒否する（§5.3）。**`speed`と`repeat`の上限は`TBD`のままで、catalogが空でなくなる前に決めることを有効化の条件とした。**§2の既知の逸脱(i)を、`play_motion`がdecodeを通る事実に合わせた。motionの実行と拒否ACKは入れていない。§4.7の完了・fault eventは入れていない |
 
 ### Draft schemaの互換性
 

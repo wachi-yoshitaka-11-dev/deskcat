@@ -6,8 +6,9 @@
 
 use deskcat_protocol::{
     Ack, AckStatus, Boot, DisplayStatus, Envelope, Environment, ErrorCode, ExpressionName,
-    FiniteF32, Frame, HeadTouched, Hello, HelloReason, Lifted, Message, ProtocolCounters,
-    SensorStatus, ServoStatus, SetExpression, ShowText, Status, encode_line, limits,
+    FiniteF32, Frame, HeadTouched, Hello, HelloReason, Lifted, Message, PlayMotion,
+    ProtocolCounters, SensorStatus, ServoStatus, SetExpression, ShowText, Status, encode_line,
+    limits,
 };
 
 /// 最悪のenvelope。`v`は受理される値ではなく、宣言した幅の最大値を使う。
@@ -104,6 +105,14 @@ fn worst_case_messages() -> Vec<Message> {
             temperature_c: Some(longest_finite_f32()),
             humidity_pct: Some(longest_finite_f32()),
             pressure_hpa: Some(longest_finite_f32()),
+        }),
+        // `name`は個別の上限を持たず、行の最大長が縛る（`PlayMotion::name`）。ここでは固定部分
+        // （`speed`と`repeat`）の最大だけを詰める。`name`を詰めると行が上限を超えて当然であり、
+        // 上限の不変条件を確かめることにならない。
+        Message::PlayMotion(PlayMotion {
+            name: filled(1),
+            speed: longest_finite_f32(),
+            repeat: u32::MAX,
         }),
     ]
 }

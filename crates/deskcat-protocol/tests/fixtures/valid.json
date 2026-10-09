@@ -191,6 +191,28 @@
       "note": "§5.2の初期のexpression名。transition_msには数値の上限を置かず、u32の最大値まで受ける（上限はdisplay実装が持つ）。"
     },
     {
+      "name": "play_motion_example",
+      "line": "{\"v\":1,\"sid\":90312,\"id\":902,\"ts_ms\":52200,\"type\":\"play_motion\",\"payload\":{\"name\":\"nod\",\"speed\":0.45,\"repeat\":1}}\n",
+      "canonical": true,
+      "expect": {
+        "type": "play_motion",
+        "sid": 90312,
+        "id": 902
+      },
+      "note": "§5.3の例。`name`の値はcatalogが決めるため、例の`nod`は型の検査にだけ使う。"
+    },
+    {
+      "name": "play_motion_unbounded_name_and_repeat_max",
+      "line": "{\"v\":1,\"sid\":90312,\"id\":913,\"ts_ms\":52030,\"type\":\"play_motion\",\"payload\":{\"name\":\"x\",\"speed\":0.0,\"repeat\":4294967295}}\n",
+      "canonical": true,
+      "expect": {
+        "type": "play_motion",
+        "sid": 90312,
+        "id": 913
+      },
+      "note": "`repeat`には数値の上限を置かず、u32の最大値まで受ける（上限はfirmwareが持つ。§5.3は`TBD`）。`speed`の0.0も型としては有限である。名前の妥当性は型の外にある。"
+    },
+    {
       "name": "show_text_example",
       "line": "{\"v\":1,\"sid\":90312,\"id\":903,\"ts_ms\":52300,\"type\":\"show_text\",\"payload\":{\"text\":\"なでてくれて、ありがと。\",\"duration_ms\":5000}}\n",
       "canonical": true,
