@@ -48,7 +48,7 @@
 //!   生byteを返すだけで、ADXL345であると断定しない）。
 //!
 //! `main()`は`crate::run_i2c_bringup`からこのdriverを呼び、生byteをlogへ出す
-//! （一致判定はしない。`main.rs`のmodule doc参照）。**2026-09-22に、`35bcc36`のbuildをESP32へ書き込み、ESP32`3V3` pin給電で
+//! （`run_i2c_bringup`は一致判定をしない。`tap-21`付きbuildでは呼び出し側の`start_tap`が判定する。`main.rs`のmodule doc参照）。**2026-09-22に、`35bcc36`のbuildをESP32へ書き込み、ESP32`3V3` pin給電で
 //! `ACCEL-01`／`ENV-01`へ初回通電して、この読み出しに応答を得た**（生byte `0xe5`。
 //! 一致判定はしていない。記録は[EXP-015](../../../docs/hardware/experiment-log.md)が正本であり、
 //! **ここへ再掲しない**）。**それより後の変更を含むbuildは、実機で動かした記録が無い。**

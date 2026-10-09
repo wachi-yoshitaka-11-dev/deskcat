@@ -101,8 +101,8 @@ build構成の説明を書き写さない（featureの一覧と、各featureが�
 | `bringup-display-13` | 初期化と点灯。fillと四隅patternの後に消灯 | 書かない | 同上 | `DISP-01`追加接続の手順で可 | — |
 | `face-21` | 初期化と点灯。点けたまま表情を描く | 書かない | 同上。`set_expression`に受理のACKを返しうる（既定buildは`hardware_unavailable`の拒否ACKを返す） | **不可**（`ACCEL-01`／`ENV-01`単体の手順は既定build限定、`DISP-01`の手順は`bringup-display-13`必須） | `crates/deskcat-face` |
 | `face-21,bringup-display-13` | bring-upの後も点灯のまま表情を描く（bring-upの間は`set_expression`を`busy`で拒否） | 書かない | 同上 | `DISP-01`追加接続の手順で可（条件(7)の承認は実行する日） | `crates/deskcat-face` |
-| `tap-21` | 触れない | **書く**（`deskcat_tap::SETUP`）。INT線は使わず`INT_SOURCE`をI2Cで読む | `boot`、ACK、`status`、`tapped` | **不可**（`ACCEL-01`／`ENV-01`単体の手順は既定build限定） | `crates/deskcat-tap` |
-| `tap-21,face-21,bringup-display-13`（デモ用） | `face-21,bringup-display-13`と同じ | 書く | 上の全部 | `DISP-01`追加接続の手順で可（条件(7)の承認は実行する日） | `crates/deskcat-face`、`crates/deskcat-tap` |
+| `tap-21` | 触れない | **ADXL345のDevice IDが`0xE5`のときだけ書く**（`deskcat_tap::SETUP`。一致しなければ何も書かず、既定buildと同じくDevice IDを読むだけ）。INT線は使わず`INT_SOURCE`をI2Cで読む | `boot`、ACK、`status`、`tapped`（Device IDが`0xE5`でなければ`tapped`は送らない） | **不可**（`ACCEL-01`／`ENV-01`単体の手順は既定build限定） | `crates/deskcat-tap` |
+| `tap-21,face-21,bringup-display-13`（デモ用） | `face-21,bringup-display-13`と同じ | `tap-21`と同じ（Device IDが`0xE5`のときだけ書く） | 上の全部 | `DISP-01`追加接続の手順で可（条件(7)の承認は実行する日） | `crates/deskcat-face`、`crates/deskcat-tap` |
 
 この表に無い組み合わせ（`bringup-led-514`、`bench-servo-test-17`との組み合わせなど）は対象外であり、通電の可否を決めていない。
 `tap-21`が足す負荷（測定modeの`ACCEL-01`の約140 µA typ）の扱いは、Power Budgetの`face-21`の常時点灯の段落が持つ。

@@ -8,16 +8,20 @@
 //!
 //! # I2C driverの所有
 //!
-//! `tap-21`付きbuildでは、`TapDetector`が起動時のI2C bring-upの`I2cDriver`を唯一の所有者として持ち続ける。そのため、
+//! `tap-21`付きbuildで、ADXL345のDevice IDが`0xE5`のとき（`main.rs`の`start_tap`が確かめる。一致しなければ何も書かず、
+//! `I2cDriver`も手放す）、`TapDetector`が起動時のI2C bring-upの`I2cDriver`を唯一の所有者として持ち続ける。そのため、
 //! bring-upの後に`ENV-01`（BME280）をI2Cで読む経路は、このbuildには無い（今は誰も読まない）。
 //!
 //! # 失敗の扱い
 //!
 //! I2Cの読み出しが失敗しても止まらない（1 transactionは有限時間で返る。上限は`config::I2C_TRANSACTION_TIMEOUT_MS`の100 ms。
-//! 設定の書き込みは6 transactionと捨て読み1 transactionなので最大700 ms、読み出しの失敗は1周回あたり最大100 ms）。
+//! 設定（`configure`）の滞留の**上界**は、全部成功する経路で700 ms（6書き込み＋捨て読み1。各transactionのtimeout×7の上界で、
+//! 成功したtransactionはその前に終わる）、書き込みが途中で失敗する経路で600 ms（最初の失敗で止まる）、読み出しの失敗は1周回あたり
+//! 最大100 ms）。
+//! **設定（`configure`）は、Device IDが一致したときだけ走る**（一致しなければ`start_tap`が`tap_not_started`をlogへ出す）。
 //! **設定（`configure`）が走る場所はbuildで違う。**`bringup-display-13`を持たないbuildは、起動時のI2C bring-upの直後、
-//! main loopの前で走る（`BootSession::start`の前でもあるため、bus固着のときは最大700 msが最初の`boot`の送出を遅らせる）。
-//! `bringup-display-13`付きbuildは、LCDのbring-upが済んだ後にmain loopの1周回の中で走る（その1周回が最大700 ms延びる）。
+//! main loopの前で走る（`BootSession::start`の前でもあるため、上の時間が最初の`boot`の送出を遅らせうる）。
+//! `bringup-display-13`付きbuildは、LCDのbring-upが済んだ後にmain loopの1周回の中で走る（その1周回が、上の時間だけ延びうる）。
 //! 読み出しは、いずれのbuildでもmain loopの1周回に乗る。[`MAX_CONSECUTIVE_ERRORS`]回続けて失敗したら、
 //! 検出をやめる（bus固着のとき、main loopを毎周回I2C timeoutで塞がないため）。やめたことはlogへ出す。
 //!

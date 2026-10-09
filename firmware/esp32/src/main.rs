@@ -12,8 +12,9 @@
 //! - `ACCEL-01`（ADXL345）／`ENV-01`（BME280）のDevice ID／Chip IDを読み、生byteを
 //!   logへ出す（[#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)／
 //!   [#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16)）。
-//!   **一致判定はここでは行わない。**生byteをlogへ残すだけで、識別の断定は
-//!   log を読む人間の責務とする（[`run_i2c_bringup`]参照）。
+//!   **一致判定は、`run_i2c_bringup`自身は行わない。**生byteをlogへ残すだけで、識別の断定は
+//!   log を読む人間の責務とする（[`run_i2c_bringup`]参照）。**ただし`tap-21`付きbuildでは、呼び出し側の`start_tap`が
+//!   `ACCEL-01`のDevice IDを`0xE5`と比べ、一致したときだけtapの設定を書く。**
 //! - Pi link（UART1、`PI-UART-TX`＝GPIO13、`PI-UART-RX`＝GPIO14）で`boot`のACK待ち・再送・
 //!   `sid`選び直しを行う（`crate::boot_session`。[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)
 //!   PR B、[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)）。受信の異常
@@ -47,7 +48,7 @@
 //! | `bringup-display-13` | LCDの初期化、backlightの点灯、単色fillと四隅patternの試験モード | 製品buildに加える。描画の間のPi linkの受信とheartbeatは`crate::display_test`のmodule docを参照 |
 //! | `bringup-led-514` | #514の追加LED（GPIO2／GPIO5）の点灯試験と白の点滅（`crate::led`） | 製品buildに加える。`bringup-display-13`とも組み合わせられる |
 //! | `face-21` | LCDの初期化とbacklightの点灯を保ち、`set_expression`の3表情を描く。Pi commandを受けなくても、描ける状態になった時点で`neutral`を1回描く（#21、`crate::face`） | 製品buildに加える。`bringup-display-13`とも組み合わせられる（bring-upが終わった後にdriverを手放さず、表情の描画へ渡す）。**このfeatureが無いbuildは`set_expression`を`hardware_unavailable`で拒否する** |
-//! | `tap-21` | ADXL345のtap検出を設定し、`INT_SOURCE`をI2Cで読み、bootのACK後に`tapped`を送る（#21のF1、`crate::tap`）。I2Cのdriverを手放さず持ち続ける | 製品buildに加える。INT線は使わない（配線は要らない）。`face-21`・`bringup-display-13`とも組み合わせられる。**このfeatureが無いbuildはADXL345へ書き込まず、Device IDを読むだけである** |
+//! | `tap-21` | ADXL345のtap検出を設定し、`INT_SOURCE`をI2Cで読み、bootのACK後に`tapped`を送る（#21のF1、`crate::tap`）。ADXL345のDevice IDが`0xE5`のときだけ設定を書き、I2Cのdriverを持ち続ける（一致しなければ何も書かず、driverを手放す） | 製品buildに加える。INT線は使わない（配線は要らない）。`face-21`・`bringup-display-13`とも組み合わせられる。**このfeatureが無いbuildはADXL345へ書き込まず、Device IDを読むだけである** |
 //! | `bench-servo-test-17` | servoの単発bench試験（#17の測定用build） | **Pi linkを外す。**正本`docs/hardware/servo-safety-limits.md`の`測定のための駆動（承認の状態の項目6）`節が、測定用のbuildは「Piとの通信linkを持たない」と定めているためである。#474で、このfeature付きbuildはcompileが止まる |
 //!
 //! `#487`のPR B1より前は、`pi-protocol-mode` featureを付けたbuildだけがPi linkを持ち、LCD／I2Cの
@@ -477,7 +478,8 @@ fn main() {
         peripherals.pins.gpio26,
         &mut health,
     );
-    // `tap-21`付きbuildは、I2Cのdriverを持ち続けてtap検出を始める（`crate::tap`）。それ以外は手放す。
+    // `tap-21`付きbuildは、ADXL345のDevice IDが一致したときだけ、I2Cのdriverを持ち続けてtap検出を始める（`crate::tap`）。
+    // 一致しなければ（`tap-21`でないbuildも）手放す。
     #[cfg(all(feature = "tap-21", feature = "bringup-display-13"))]
     let mut tap: Option<TapDetector> = None;
     #[cfg(all(feature = "tap-21", not(feature = "bringup-display-13")))]
@@ -1014,16 +1016,19 @@ fn run_display_bringup<SPI: SpiAnyPins + 'static>(
     Some(lcd)
 }
 
-/// I2C bring-upが返したdriverで、tap検出を設定して始める（`tap-21`付きbuildだけ）。driverが無ければ`None`。
+/// I2C bring-upが返したdriverで、tap検出を設定して始める（`tap-21`付きbuildだけ）。driverが無い、またはDevice IDが`0xE5`でない（読めなかった場合を含む）ときは、何も書かず`None`を返す。
 #[cfg(feature = "tap-21")]
 fn start_tap(bringup: Option<I2cBringup>, now_ms: u64) -> Option<TapDetector> {
     let bringup = bringup?;
     // **ADXL345のDevice IDを確かめてから設定を書く。**IDが違う（別のdeviceがこのaddressにいる、配線が違う）、
     // または読めなかったときは、何も書かず、検出を始めない（失敗はlogへ出す）。
     if bringup.accel_id != Some(accel::EXPECTED_DEVICE_ID) {
+        // 16進で出す（`accel_device_id raw=0x..`の行と同じ基数。読めなかったときは`none`）。
+        let found = bringup
+            .accel_id
+            .map_or_else(|| "none".to_owned(), |raw| format!("0x{raw:02x}"));
         log::error!(
-            "tap_not_started accel_id={:?} expected=0x{:02x}",
-            bringup.accel_id,
+            "tap_not_started accel_id={found} expected=0x{:02x}",
             accel::EXPECTED_DEVICE_ID
         );
         return None;
@@ -1047,6 +1052,8 @@ struct I2cBringup {
 /// bring-up手順の1工程である。**一致判定はここでは行わない。**`crate::accel::Adxl345`・
 /// `crate::env::Bme280`が返す生byteをそのままlogへ出すだけであり、期待値
 /// （`0xE5`／`0x60`）との一致は、logを読む人間の判断とする。**この関数へ判定を持ち込まない。**
+/// **ただし`tap-21`付きbuildでは、この関数が返す生byte（`ACCEL-01`の`accel_id`）を、呼び出し側の`start_tap`が`0xE5`と比べ、
+/// 一致したときだけtapの設定を書く**（判定するのは呼び出し側であり、この関数ではない）。
 ///
 /// 2つのsensorは同じI2C bus（`GPIO25`＝SDA、`GPIO26`＝SCL）を共有するため
 /// （`docs/hardware/gpio-assignment.md`の`信号inventory`の`ACCEL-SDA`／`ACCEL-SCL`／
@@ -1167,7 +1174,7 @@ fn run_i2c_bringup(
         Err(err) => log::error!("env_chip_id_read_failed error={err}"),
     }
     service_bringup_step(health, "env_chip_id");
-    // `tap-21`付きbuildは、このdriverでtap検出を続ける（`crate::tap`）。それ以外は呼び出し側が手放す。
+    // `tap-21`付きbuildは、Device IDが一致したとき、このdriverでtap検出を続ける（`crate::tap`）。それ以外は呼び出し側が手放す。
     Some(I2cBringup {
         driver: i2c,
         accel_id,
