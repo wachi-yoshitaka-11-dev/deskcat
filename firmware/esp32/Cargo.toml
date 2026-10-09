@@ -48,6 +48,9 @@ bringup-led-514 = []
 # 触れない（#451）。`bringup-display-13`とも組み合わせられる（その場合、bring-upが終わった後に
 # driverを手放さず、表情の描画へ渡す。bring-upの試験手順は変えない）。
 face-21 = []
+# Issue #21のF1。ADXL345のtap検出を設定し、`INT_SOURCE`をI2Cで読んで、bootのACK後に`tapped`を送る（`src/main.rs`）。
+# 既定ではoffであり、既定buildはADXL345へ書き込まない（device IDを読むだけ）。`face-21`・`bringup-display-13`とも組み合わせられる。
+tap-21 = []
 
 [profile.release]
 opt-level = "s"
@@ -67,6 +70,8 @@ deskcat-protocol = { path = "../../crates/deskcat-protocol" }
 deskcat-servo = { path = "../../crates/deskcat-servo" }
 # `set_expression`の3表情の図形と、受理の判定の順序（#21）。LCDもSPIも知らず、hostでtestできる。
 deskcat-face = { path = "../../crates/deskcat-face" }
+# ADXL345のtap検出の設定値と`tapped`の送出条件（#21のF1）。I2Cを知らず、hostでtestできる。
+deskcat-tap = { path = "../../crates/deskcat-tap" }
 log = "0.4"
 # health snapshotを`deskcat-protocol`の`Status`と同じ形へserializeするために使う。
 # 同crateが既に依存しており、`firmware/esp32/Cargo.lock`にも推移的に入っている。

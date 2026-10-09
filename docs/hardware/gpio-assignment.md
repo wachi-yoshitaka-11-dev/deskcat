@@ -340,6 +340,7 @@ tapしきい値・retrigger動作・end-to-end latencyを「測定する」と�
 I2C busの速度と無関係である。加速度の軽打検出は`ACCEL-IRQ`によるhardware割り込みで受ける設計（`信号inventory`）であり、
 割り込み後にレジスタを数byte読むだけであれば100 kHzでも遅延はサブミリ秒order、BME280のpollingは秒orderであるため、
 **bus速度がこれらの検出遅延を決めない。**したがってStandard-modeを妨げる下流要件は現時点で見つからない。
+（`tap-21`付きbuildは、この設計と別に、`ACCEL-IRQ`を使わずpollingで検出する（[#21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)のF1。内容は`firmware/esp32/README.md`の「build構成と通電」の表。`ACCEL-IRQ`の確保は変えない）。検出遅延を決めるのはpollの間隔であり、bus速度ではない。結論は変わらない。）
 
 **この決定の性質を明記する。**これは**初回bring-upの選択であり、恒久的な確定ではない。**
 見直す条件は次のとおりである。

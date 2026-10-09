@@ -7,6 +7,7 @@
 | [`deskcat-protocol`](deskcat-protocol/README.md) | ESP32–Pi間のmessage型、serialization、byte列からの上限付き受信 | 作成済み（#9、#10） |
 | [`deskcat-serial`](deskcat-serial/README.md) | host側のserial session。上限付きI/O、切断の観測、再接続の上限とrate limit、上限のある送信queue。**実deviceのopenは含まない** | 作成済み（#11） |
 | [`deskcat-face`](deskcat-face/src/lib.rs) | `set_expression`の3表情の図形（矩形の列）、受理の判定の順序、帯への分け方。LCDもSPIも知らない | 作成済み（#21） |
+| [`deskcat-tap`](deskcat-tap/src/lib.rs) | ADXL345のtap検出の設定値（レジスタへ書く(address, 値)の列）、`INT_SOURCE`の読み方、`tapped`を送ってよいかの判定（boot ACK後だけ、最小間隔）。I2Cを知らない | 作成済み（#21） |
 | [`deskcat-domain`](deskcat-domain/README.md) | 感情、接触event、行動判断、純粋ロジック | 作成済み（#491） |
 | `deskcat-config` | 型付き設定と検証 | 予定 |
 | `deskcat-api` | 文章生成の境界とfallback動作 | 予定 |

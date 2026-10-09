@@ -53,6 +53,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "deskcat-tap"
+version = "0.1.0"
+
+[[package]]
 name = "deskcatd"
 version = "0.1.0"
 dependencies = [
