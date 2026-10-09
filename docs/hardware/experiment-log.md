@@ -32,7 +32,7 @@
 | [EXP-018](#exp-018-disp-01msp2807横向きの向きの決定と単色fill色の並び四隅の写真記録idの読み出しの打ち止め) | [#13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)受け入れ条件1〜5 | 値の正なし（bring-upの記録。判定は#13） |
 | [EXP-019](#exp-019-段階b-2今の接続のまま-b-2aの周辺-module-3点の-33-v-側の電流と電圧) | [#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)の段階B-2（`HW-TBD-024`／`HW-TBD-025`は解いていない） | 値の正なし（確度が未取得の読み。[power-budget.md](power-budget.md)の`負荷表`は、この記録を参照するだけで値を持たない） |
 | [EXP-020](#exp-020-段階aのpiの給電を手持ちのadapterへ移しwi-fiの切断を切り分けpiのuartを設定した) | [#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)の受け入れ条件4の準備。段階AのPiの給電（`PSU-PI-A-01`と`CABLE-PI-A-01`）、Wi-Fiの切断の観察、PiのUARTの設定 | 値の正なし（観察の記録。電源の適否は判断していない） |
-| [EXP-021](#exp-021-条件6のuart通信とlcdの描画叩いて表情が変わるデモの通電) | [#13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)の受け入れ条件6、[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)の受け入れ条件4、[#21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)の通電。PiとESP32のUART通信、LCDの描画、叩いて表情が変わるデモ | 値の正なし（試験の記録。`THRESH_TAP`の値の所在は[firmware/esp32/README.md](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/firmware/esp32/README.md)の`build構成と通電`の表） |
+| [EXP-021](#exp-021-叩いて表情が変わるデモの通電) | [#21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)の通電。叩いて表情が変わるデモ（ADXL345の`tapped`、Piの`set_expression`、LCDの表情） | 値の正なし（試験の記録。`THRESH_TAP`の値は`crates/deskcat-tap`が持つ。所在は[firmware/esp32/README.md](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/firmware/esp32/README.md)の`build構成と通電`の表） |
 
 **大容量の生dataはこのrepositoryへ入れていない。**保存場所は
 [development-foundation-plan.md](../planning/development-foundation-plan.md)の
@@ -2127,94 +2127,96 @@ journalが続いた起動（起動2・5）では、Piは止まっておらず、
 - Piでhostの`serial_link` exampleをbuildする（PiのGPIOには何もつながない）
 - UARTの線をつなぐ条件4の試験は、[gpio-assignment.md](gpio-assignment.md)の`信号線をつないでよい条件`に従う
 
-## EXP-021: 条件6のUART通信とLCDの描画、叩いて表情が変わるデモの通電
+## EXP-021: 叩いて表情が変わるデモの通電
 
-**目的**: (1) [#13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)の受け入れ条件6（LCDの描画の間も通信とwatchdogが生きている）と、[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)の受け入れ条件4（PiとESP32のUARTで`boot`のACKと`ping`が通る）の試験を、周辺module3点とPiをつないだ台で行う。(2) [#21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)のデモ（ADXL345のモジュールを叩く→`tapped`→Piが`set_expression`を送る→LCDの表情が変わる）の通電を、LCDとbacklightを点けたまま行う。**2つの試験を、1件の記録にまとめた。**
+**目的**: [#21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)のデモ（ADXL345のモジュールを叩く→`tapped`→Piの`set_expression`→LCDの表情）の通電の記録。[#13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)の受け入れ条件6の試験（2026-10-07〜08。日付は、#13の承認と結果のcommentの時刻による）は、この記録に入れない。その記録は[#13のcomment](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13#issuecomment-6042642898)にある。
 
-**実施日（JST）**: 試験1（条件6）は2026-10-07〜2026-10-08（承認の記録とbuildの結果の記録の時刻から読んだ。[承認](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13#issuecomment-6040631378)は2026-10-07 23:55、[結果](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13#issuecomment-6042642898)は2026-10-08 01:51）。試験2（デモ）は2026-10-09の17:22:24〜17:31:02。
+**実施日（JST）**: 2026-10-09。
 
-**実施者**: 電源の投入、USBとUART線の抜き差し、通電中の目視（発熱、異臭、LCDの表示）、ADXL345のモジュールを叩くことは、ユーザーが行った。firmwareのbuild、書き込み（`espflash`）、ESP32のシリアルlogの記録は、#21のセッション（AI）が行った。`deskcatd`の起動と停止、Pi側の記録は、#446のセッション（AI）が行った。条件6の試験のPi側の`serial_link`と、試験1の記録は、#13のセッション（AI）が行った。
+**実施者**: 電源、USBとUART線の抜き差し、通電中の目視、ADXL345のモジュールを叩くことはユーザー。firmwareのbuild、書き込み、ESP32のシリアルlogの記録は#21のセッション（AI）。`deskcatd`の起動と停止は#446のセッション（AI）。
 
-### 構成（[Hardware Safety Policy](../governance/hardware-safety-policy.md)「10. ベンチ試験記録」の項目）
+### 構成
 
 | 項目 | 内容 |
 |---|---|
 | Test ID | `EXP-021` |
-| Hardware revision／Exact components | `MCU-01`（ESP32。書き込み時の表示はchip revision v1.0）、`ACCEL-01`（ADXL345）、`ENV-01`（BME280）、`DISP-01`（MSP2807）、`SBC-01`（Raspberry Pi Zero W） |
-| Wiring revision | 周辺module3点の配線は、`EXP-018`の後に`EXP-019`を経て戻した配線のまま（ユーザーの言葉。条件(1)は再測定していない）。試験2の前に、ユーザーは「前回の試験のあとで、UART線の抜き差し以外に、配線を動かしていない」と回答した。UART線は、ESP32側の端（橙＝`14`、黄＝`13`）を、両方の電源が入った状態で挿し、デモの後に、先に抜いた |
-| Power supply and current limit | ESP32はPCのUSBから給電（`3V3` pin経路で周辺module3点へ）。Piは手持ちのadapter ②（`PSU-PI-A-01`）と手持ちのcableで給電（推奨の1.2 Aに足りない）。電流制限は設けていない |
-| 承認 | 試験1: [#13のcomment（条件(7)）](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13#issuecomment-6040631378)と[起動の回数の追加](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13#issuecomment-6042340375)。試験2: [#21のcomment（条件(7)。常時点灯を含む）](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21#issuecomment-6077223726)。いずれも通電の前に記録した |
-| Measurement equipment | 試験1: DT830B（LCDの`VCC`–`GND`間、`2000`レンジ）。試験2: 測定器は使っていない（ESP32のシリアルlogとユーザーの目視） |
-| build | 下の表 |
+| Date／Operator | 上の「実施日」「実施者」 |
+| Firmware commit/profile | 下の「firmware」の表 |
+| Configuration | 下の「条件(7)の承認」の行と、「firmware」の表 |
+| Hardware revision／Exact components | `MCU-01`（ESP32）、`ACCEL-01`（ADXL345）、`ENV-01`（BME280）、`DISP-01`（MSP2807）、`SBC-01`（Raspberry Pi Zero W） |
+| Expected result | 叩くとLCDの表情が変わる |
+| Procedure | 下の「試験」の「時刻」と「ESP32のlog」。順序: USBを挿す、flash、起動の確認、UART線を挿す、`deskcatd`の起動、叩く、UART線を先に抜く、`deskcatd`の停止、monitorの停止、USBを抜く |
+| 停止条件 | 発熱、異臭、LCDの異常（乱れ、点滅）、電圧降下を認めたとき。Piがpingに応じなくなる、またはsshが切れたとき（先にESP32側の線を抜く）。最初の2分は目視、表情が変わる証拠が出たらすぐ止める、上限15分（根拠の無い暫定の値。承認の記録のとおり） |
+| Wiring revision | 周辺module3点の配線は、`EXP-018`の後に`EXP-019`を経て戻した配線のまま（ユーザーの回答。質問と回答は[#21のcomment](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21#issuecomment-6077223726)にある）。[power-budget.md](power-budget.md)の`DISP-01`追加接続のbring-upの手順の条件(1)は再測定していない。`EXP-019`の`Next safe step`が求めた非通電の確認（項目1〜7）をやり直した記録は無い。UART線のESP32側の端は、承認の順序（[#21のcomment](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21#issuecomment-6077223726)）では、両方の電源が入った状態で挿し、先に抜く。挿した、抜いたという報告は、ユーザーの会話での回答による。[gpio-assignment.md](gpio-assignment.md)の`信号線をつないでよい条件`の条件1（直列4.7 kΩ）、条件5のGND共通、条件6（通電前の目視と導通の確認）を、このデモで確かめた記録は無い（ユーザーの回答だけ。質問と回答は上のcomment）。条件5の別電源は、下の「Power supply and current limit」の行にある。`HW-TBD-036`（片方だけ電源が入っているときの回り込み）は、[tbd-register.md](tbd-register.md)で、対策を決定済み（2026-09-28）、保証値が無いことを弱点として記録している状態である |
+| Power supply and current limit | ESP32はPCのUSBから給電（`3V3` pin経路で周辺module3点へ）。Piは手持ちのadapter ②（`PSU-PI-A-01`）と、本体表記の無い手持ちのcable（[hardware-bom.md](hardware-bom.md)の`CABLE-PI-A-01`も本体表記が無い。同じ現物かは、同定していない）。電流制限は設けていない |
+| 条件(7)の承認（[power-budget.md](power-budget.md)の`DISP-01`追加接続のbring-upの手順） | [#21のcomment](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21#issuecomment-6077223726)（常時点灯を含む）。通電の前に記録した |
+| Measured result | 下の「試験」 |
+| Measurement equipment | 測定器を使っていない（ESP32のシリアルlogとユーザーの目視） |
 
-### firmware（書き込んだ2本）
+### firmware
 
-| 試験 | commit／tree | features／profile | ELF sha256 | sdkconfig sha256 |
-|---|---|---|---|---|
-| 1 | origin/develop `2e165dc2f48725bd2f62829bca7fbde30b8f2971`（firmwareのtree `86dd0e758591f4c03fea30864d6e1f02d983b8a9`） | `bringup-display-13`、debug、`cargo build --locked` | `9308e09871043158b2036a01369bcda2bef8115e610fed94b0487026dc6e8f8d` | `97b835f65058e5ee7ca510b2e74e365f393ee1da2137ee52a72a151ed184d7d3` |
-| 2 | origin/develop `cd878542a4772d762599224af3e770b30d895fcf`（firmwareのtree `4f6d000fee192a82044382555090436e13199276`） | `tap-21,face-21,bringup-display-13`、debug、`cargo build --locked` | `14297916fbb00b7ec58d19542c6131c394717876334d26384e56ae89a42f676b` | `97b835f65058e5ee7ca510b2e74e365f393ee1da2137ee52a72a151ed184d7d3` |
+| commit | `firmware/`のtree | `firmware/esp32/`のtree | features／profile | ELF sha256 | sdkconfig sha256 |
+|---|---|---|---|---|---|
+| `cd878542a4772d762599224af3e770b30d895fcf` | `b230cc82d0e957b16bb97bc21fef610b9f66f4e4` | `4f6d000fee192a82044382555090436e13199276` | `tap-21,face-21,bringup-display-13`、debug | `14297916fbb00b7ec58d19542c6131c394717876334d26384e56ae89a42f676b` | `97b835f65058e5ee7ca510b2e74e365f393ee1da2137ee52a72a151ed184d7d3` |
 
-どちらも、repositoryの外に置いたdetached worktreeでbuildし、`.embuild`は共有した（**clean buildではない**。CIはこれらのfeature構成をbuildしていない）。sdkconfigは`CONFIG_ESP_TASK_WDT_EN=y`、`CONFIG_ESP_TASK_WDT_INIT=y`、`CONFIG_ESP_TASK_WDT_PANIC`は未設定（debug profileでは、task watchdogが発火してもresetしない）。試験2のflashの前に、ELFとsdkconfigのsha256を`sha256sum -c`で照合した。
+`cargo build --locked`、repositoryの外のdetached worktree（CIはこれらのfeature構成をbuildしていない）。sdkconfig（表のsha256）は、`CONFIG_ESP_TASK_WDT_EN=y`、`CONFIG_ESP_TASK_WDT_INIT=y`、`CONFIG_ESP_TASK_WDT_TIMEOUT_S=5`で、`CONFIG_ESP_TASK_WDT_PANIC`だけが未設定。1130〜1133行で読んだ。flashの前に`sha256sum -c`で照合した（出力は保存していない）。
 
-### 試験1: 条件6（#13の記録から写した。Pi側のhostは`serial_link`）
+### 試験
 
-Pi側は、`serial_link`（`cargo build --locked -p deskcat-serial --example serial_link`、develop `36ba8f38`のsource）を`--baud 115200 --duplicate-capacity 16 --duplicate-retention-ms 60000 --seconds 240 --ping-count 2000`で動かした。3回目のmonitorで、Pi側のhostは、ESP32の最初の`boot`の1byteを待って起動した。
+**時刻（2026-10-09。JSTとZ〔UTC〕を併記。JSTはZに9時間を足した値）**: flash開始17:22:24 JST（08:22:24Z。`flash-start.txt`と`monitor.log`の1行目）。flash完了08:23:12Z（17:23:12 JST。`Flashing has completed!`のlogの時刻）。その後、`monitor.log`に`POWERON_RESET`が2回あり（15行目と40行目）、app のlogは2回目からである。この記録のuptimeは、2回目の`POWERON_RESET`からの値で、2回目の時刻は記録していない。`deskcatd`の起動08:26:57Z（17:26:57 JST。Piの時計）、停止08:29:51Zごろ（17:29:51 JST）。monitor停止17:31:02 JST（08:31:02Z。`monitor-stop.txt`の時刻。停止の操作の後に書いた。`monitor.log`自身の末尾は17:30:58 JST）。USBを抜いた時刻は記録していない。
 
-- ESP32: `pi_rx_hello`は起動の762 ms、`boot_established`は942 ms。描画（5色の塗り、四隅pattern、保持。uptime 1.0〜20.7秒）の間に、`pi_tx`でACKを約709件返した。`display_pattern_hold`（17.76秒）の後の`health`（uptime 20169 ms）は、`overrun_ticks=0`、`snapshot_errors=0`、`max_read_gap_ms=77`、`pi_uart_rx_buffer_full=0`、`pi_uart_rx_fifo_overflow=0`。`heartbeat_overrun`と`task_wdt`の行は0件。以降の`health`（140秒まで）も`overrun_ticks=0`。`accel_device_id raw=0xe5`、`env_chip_id raw=0x60`
-- Pi側のhost（終了時のcounters。log出力の失敗0件、ERROR 0件）: `pings_sent=2000 ping_acks=2000 ping_rejected=0 ping_retries=0 ping_gave_up=0`、`bytes_in=222251 bytes_out=138757 frames_in=2003 rejected_in=1`、`disconnects=0 timeouts=0 unmatched_acks=0 unapproved_hello_acks=0`。WARNは1件（`rejected_in=1`。待機側が消費した1byteの後の`boot`の残りの行と読めるが、行の中身はlogに無く未確定）
-- LCD（ユーザーの目視。写真は無い）: 黒・赤・緑・青・白の塗りと、四隅のpatternが、最後まで出た。描画が終わると約20秒でbacklightが消えた
-- 通電後のLCDの`VCC`–`GND`間（DT830B、`2000`レンジ）: 1381 Ω → 1211 Ω（下がって安定）。`EXP-015`の再測定の値（1218 Ω。通電前の安定値1210 Ω）に近く、「低いまま動かない」ではなかった
-- 根拠にしないもの: 保持の間の`hb`の行、`reset_reason`と`rst:`の行、ESP32側のUART誤りのcounterと`ProtocolCounters`
+**ESP32のlog（`monitor.log`。sha256 `1c60c727600ec35d7779d51a6fa08ee4045e5f44b62404e9c7d5da0d3a193698`。端末のlocalで、repositoryに入れない）**:
 
-### 試験2: デモ（叩いて表情が変わる。`face-21`の常時点灯）
+- 起動: `display_bringup_done`（uptime 20.6秒）、`face_show name=Neutral`、`accel_device_id raw=0xe5`、`env_chip_id raw=0x60`、`tap_configured bw_rate=0x0a thresh_tap=0x18 dur=0x10 tap_axes=0x07 poll_interval_ms=20`
+- 接続: uptime 36.9秒に`boot_terminated reason=RecoveryBudgetExhausted`（`deskcatd`が起動する前。下の「時刻の関係」）。uptime 224.8秒に`pi_rx_hello`、続いて`boot_resumed`（`previous=Terminated(RecoveryBudgetExhausted)`）、uptime 224.9秒に`boot_established`。`rst:0x1 (POWERON_RESET)`の行が2回ある（flash完了の後。1回目は`esp_image: segment 0:`の行の後に出力が無いまま、2回目の`POWERON_RESET`が来ている）
+- `tapped`の送出（`pi_tx`）: 9回。uptime 247.6〜336.1秒。`tapped`のid: 6、8、9、10、12、15、17、18、20
+- `pi_rx_set_expression`の受理: 9件（`Neutral` 5件〔うち1件は`boot_established`の直後の`set_expression`のid 4〕、`Surprised` 4件）。`Surprised`は`tapped`のid 6、12、15、20の後。（`tapped`のid〔ESP32のtx〕と`set_expression`のid〔Piのtx〕は別の系列で、数値が重なる。以下の「id」は、書いてある限り`tapped`のidである。）`tapped`のid 8、9、10、17、18の直後には、`Surprised`の`set_expression`が無かった（`Neutral`の`set_expression`は、その後に別に受理されている）。**`Surprised`の`set_expression`が無かった理由は未確認**。時刻の事実: id 8・9・10（uptime 249.3〜250.3秒）は、`tapped`のid 6の後の`Surprised`の受理（247.65秒）から`Neutral`の受理（252.37秒）までの間に出ている。id 17・18（263.5、264.7秒）は、`tapped`のid 15の後の`Surprised`の受理（262.15秒）から`Neutral`の受理（266.77秒）までの間に出ている。`Surprised`の`set_expression`があった`tapped`のid 6・12・15・20は、いずれも直前の`Neutral`の受理の後。`Surprised`から`Neutral`までが4.72秒と4.62秒の2回には、その間に`tapped`が3回と2回あり、2.07秒と2.09秒の2回には無い
+- 描画側の`face_show`: `Surprised`は4件（uptime 247.663、258.993、262.153、336.143秒）、`Neutral`は6件（20.613〔起動〕、225.013〔`boot_established`の直後〕、252.373、261.063、266.773、338.233秒）。受理と描画は別の事象で、どちらもlogの行である
+- tapの内訳（最後の`tap_detected`の行）: `sent=9 dropped_no_session=315 dropped_too_soon=20`。`dropped_no_session`は検出の回数であって、叩いた回数ではない（uptime 58.1〜156.7秒の区間で、`pi_rx_hello`〔uptime 224.8秒〕より前）。`dropped_too_soon`の20件は、uptime 247.653〜336.133秒の区間（`boot_established`の後）で、この区間の検出は`sent`と合わせて29件。`tap_detected`の行は344件で、`sent`、`dropped_no_session`、`dropped_too_soon`の合計と同じ
+- 最後の`health`の行: `overrun_ticks=0`、`snapshot_errors=0`、`pi_uart_rx_buffer_full=0`、`pi_uart_rx_fifo_overflow=0`。`panic`、`heartbeat_overrun`、`task_wdt`の行は0件。`health`の行46件の`max_read_gap_ms`は19〜67（最後の行は50）
+- 時刻の関係: 3つの時計がある。ESP32のuptime、PCの時計（flash完了08:23:12Zは`flash.out`、monitor停止08:31:02Zは`monitor-stop.txt`の時刻）、Piの時計（`deskcatd`の起動08:26:57Z、停止08:29:51Zごろ）。PCとPiの時計を直接照合した記録は無い。uptime 0をflash完了（08:23:12Z）に置くと、uptime 224.8秒は約08:26:57Zで、`deskcatd`の起動とほぼ一致する（uptime 0の置き方は近似。実際のuptime 0は2回目の`POWERON_RESET`で、flash完了より後なので、この置き方で算出した時刻は、実際より早い側にある）。この置き方で、最初の`Surprised`の受理（uptime 247.65秒）は約08:27:20Zで、`deskcatd`の停止まで約2分30秒、monitorの停止まで約3分40秒
 
-**手順（時刻は2026-10-09のJST。log内の時刻はESP32のuptime）**: ESP32のUSBを挿し、17:22:24にflashを始めた（`espflash flash --monitor`。書き込みの後の起動を1回だけ記録した）。起動は17:23:12ごろで、LCDのbring-up（fillと四隅pattern）は起動の20.6秒で終わり（`display_bringup_done`）、続けて`face_show name=Neutral`と`face_drawn`。ユーザーが最初の2分のLCDを見て、異常は無かった（ユーザーの申告）。ユーザーがUART線のESP32側の端を挿した。#446が、Pi側の`deskcatd`を08:26:57Z（Piの時計。JSTでは17:26:57）に起動した（`--port /dev/serial0 --baud 115200 --duplicate-capacity 16 --duplicate-retention-ms 60000 --startup-deadline-ms 60000`。試験用の暫定値）。ユーザーがADXL345のモジュールを指先で叩いた。叩いた後、ユーザーがUART線のESP32側の端を先に抜き、#446が`deskcatd`（PID 8254）を08:29:51Zごろ（JSTでは17:29:51ごろ）に止め、ESP32のmonitorを17:31:02に止め、最後にユーザーがESP32のUSBを抜いた（抜いた時刻は記録していない。承認した上限の15分以内）。
+**ユーザーの申告**（出所は、#21のセッションの会話からの転記。commentには無い）: 叩いた後、LCDの表情が驚いた顔に変わり、2秒ほどで戻った。最初の2分のLCDの観察とUART線を挿したことへの回答は「両方OK」。叩いた回数、間隔、叩き方、変わった回数は申告に無い。logの`face_show name=Surprised`から`face_show name=Neutral`まで: 4.71、2.07、4.62、2.09秒（4回。`set_expression`の受理の間隔は、上の「ESP32のlog」にある）。「2秒ほど」が4回のどれに当たるかは分からない。UART線の状態と配線の変更についての質問と回答は、[#21のcomment](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21#issuecomment-6077223726)にある。
 
-**ESP32のlog（`monitor.log`）**:
-
-- 起動: `accel_device_id raw=0xe5`、`env_chip_id raw=0x60`、`tap_configure_discard int_source=0x02`、`tap_configured bw_rate=0x0a thresh_tap=0x18 dur=0x10 tap_axes=0x07 poll_interval_ms=20`。`THRESH_TAP`の`0x18`は1.5 g（値の所在は[firmware/esp32/README.md](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/firmware/esp32/README.md)の`build構成と通電`の表）
-- 接続: UART線を挿すまで、`boot`の再送は`Recovery`の段まで進み、`Terminated(RecoveryBudgetExhausted)`になった。`deskcatd`の`hello(Startup)`を受けて、`boot_resumed`と`boot_established`（uptime 224.8秒）。続いて`get_status`のACKと`status`、`set_expression`（Neutral）の受理と描画
-- 叩いた後: ESP32が`tapped`を9回送った（`tapped`のid 6、8、9、10、12、15、17、18、20）。ESP32は、Piの`set_expression`を、起動の直後の`Neutral`（id 4）の後に8件受理した（`Surprised` 4件、`Neutral` 4件）。全体では9件（`Neutral` 5件〔id 4を含む〕、`Surprised` 4件）である。**`tapped` 9回のうち、`Surprised`へ変わったのは4回（`tapped`のid 6、12、15、20の後。受理まで、logの時刻でいずれも20 ms。logの時刻の刻みは10 msで、ESP32側のlogだけの値であり、LCDが変わるまでのend-to-end latencyではない）。残りの5回（`tapped`のid 8、9、10、17、18）の後には、`set_expression`が無かった。理由は未確認**（Pi側の扱い〔保持中のtapの扱いなど〕かもしれないが、logに無い）。`Surprised`の後は、約2秒（保持の時間）で`Neutral`に戻った（`Neutral` 4件）
-- tapの扱いの内訳（最後の`tap_detected`の行）: `sent=9 dropped_no_session=315 dropped_too_soon=20`。`dropped_no_session`の315件は、uptime 58〜157秒（UART線を挿し、手で触れていた間と読めるが、未確認。session確立の前）に、すべて捨てた。最小間隔（500 ms）で捨てたのは20件
-- 検出が無かった時間: uptime 156.7〜247.6秒（90.9秒）と、264.8〜336.1秒（71.3秒）。**ユーザーが触れていなかったかは、記録していない**
-- `health`の最後の行（uptime 460秒）: `overrun_ticks=0`、`snapshot_errors=0`、`pi_uart_rx_buffer_full=0`、`pi_uart_rx_fifo_overflow=0`、`max_read_gap_ms=50`。`panic`、`heartbeat_overrun`、`task_wdt`の行は0件
-
-**ユーザーの目視**: 叩いた後、LCDの表情が驚いた顔に変わり、2秒ほどで戻った（ユーザーの申告。写真は無い。変わった回数と、どの叩きで変わったかは、ユーザーの申告に無い。申告は、1回以上変わったこと）。
-
-**Pi側**: `deskcatd`のlog（`deskcatd-20261009T082657Z.log`、sha256 `b35a89377c2c556d7314e9076eb01b46ef0cdbcdac94ac90e0648beebba9846d`）は3行（portを開く、`hello(Startup)`の送信、`hello`のACKが未承認のsidのため受理されなかったWARN 1件）。`deskcatd`はSIGTERMで止め、終了時のcounterは出ない。起動の前後で`throttled=0x0`、journalの警告は0件、Piは起動したまま。`boot`の受理と`set_expression`の送出は`deskcatd`のlogに出ない。**デモの証拠は、ESP32のlogとユーザーの目視である。**
+**Pi側**（#446のセッションの報告。Piで読んだ事実。この記録を書いたセッションは、Piの側を確かめていない。確かめた箇所は、その箇所に書く）: `deskcatd`のlog（`deskcatd-20261009T082657Z.log`、sha256 `b35a89377c2c556d7314e9076eb01b46ef0cdbcdac94ac90e0648beebba9846d`）は3行。起動の前後で`throttled=0x0`、journalの警告は0件。
+`deskcatd`の同定: sourceは`ddf16c9`（[#569](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/569)、F2）の`apps/`、`crates/`、`Cargo.toml`、`Cargo.lock`の79 file。Piには`git`も`.git`も無く、この記録の端末で`git archive`したtreeをsshでPiへ展開した。79 fileのsha256は、この端末の`git archive ddf16c9`と全件一致（`sha256sum -c`。fileの集合も一致）。**firmwareのcommit（`cd878542`）とは違う。**`ddf16c9`から`cd878542`への`apps/`、`crates/`、`Cargo.*`の差は、`crates/deskcat-tap`（追加）、`Cargo.toml`、`Cargo.lock`、`crates/README.md`（`git diff --stat`で確かめた）。`Cargo.lock`のsha256 `b1d8ca0e7a3188e9bb68c83953ef33be8ad7df2f779b0591f210729dc3461a61`、`apps/deskcatd/src/main.rs`のsha256 `60636adeb604d4bae1e2de1dcee13068db98a514611e58b6a33473d40374efff`（どちらも`git show ddf16c9:`の内容と一致を、この記録を書いたセッションが確かめた）。`rustc 1.97.1 (8bab26f4f 2026-07-14)`、`cargo 1.97.1 (c980f4866 2026-06-30)`。command `cargo build --locked -p deskcatd`、build 2026-10-09 04:09:39Z〜04:10:38Z（13:09:39〜13:10:38 JST。Piの時計）、成果物`target/debug/deskcatd`のsha256 `238339ebda46d5b1ac92e63f7740a37cec9326c8df650c227449e39762d9fc20`（8,992,404 byte。#446の報告による。この記録を書いたセッションはPiで再計算していない）。`--locked`は、#446が発行したcommandの報告による。logにcommand行は無い（記録が無い）。`Cargo.lock`のsha256は、buildの前後で一致している。buildの`Compiling`は`deskcat-domain`と`deskcatd`の2件。`SBC-01`（Pi Zero W）には低電圧検出が無く、`throttled=0x0`は電圧について何も語らない（[power-budget.md](power-budget.md)の`Pi Zero Wには低電圧検出が無い`節、`EXP-009`）。
 
 ### 起動の回数（backlightが点く起動。計算であり、実測ではない）
 
-試験1: 最初の承認の前に最大5回（USBを挿した時点、`espflash board-info`、書き込みの後、最初のmonitor）。追加の承認の後に3回。合計は最大8回で、承認した範囲（最大6回に追加で最大3回）に収まる。試験2: 2回（USBを挿した時点、書き込みの後）。承認した範囲（最大5回）に収まる。
+USBを挿した時点の起動と、`monitor.log`の`POWERON_RESET`の行2回（flash完了の後。1回目は`esp_image: segment 0:`の行の後に出力が無い）。全部を起動と数えても3回で、承認した範囲（最大5回。[#21のcomment](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21#issuecomment-6077223726)の「含む」の欄にある見積もりで、計算であり実測ではない）に収まる。
 
 ### Faults
 
-- (a) 試験1: 黄（Pi pin 10側）を、ESP32の`13`ではなく`12`に挿した状態で、最初のmonitor（約112秒）を取った。`boot`のACKは0件で、`RecoveryBudgetExhausted`（約37秒）。Pi側は`bytes_in=0`。挿し直した後は成立した
-- (b) 試験1: 作業セッション（AI）の手順の誤りで、UART線をESP32に挿したまま、ESP32のUSBを抜き、Piを動かしたまま数分間置いた（`gpio-assignment.md`の`信号線をつないでよい条件`の条件2に反する状態。Piの送信線がHighのまま、電源の無いESP32の入力に4.7 kΩ越しにつながった。`HW-TBD-036`の既知の弱点の状態）。試験2は、線の順序（先に挿さない、先に抜く）を守った
-- (c) 試験1: 最初の書き込みの前に、`espflash board-info`で1回起動した
-- (d) 条件(1)は再測定していない。条件(5)のpull-upの実効抵抗は未測定（[#13のcomment](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13#issuecomment-6040402283)）
-- (e) 試験2: UART線を挿す前に、`boot`の再送が`RecoveryBudgetExhausted`で止まった。`deskcatd`の`hello`で再開した（予定どおりの順序）
-- (f) ESP32に損傷の兆候は、logから見えていない（`accel_device_id`と`env_chip_id`が期待どおり出ている。電気的な損傷の有無を判定したものではない）
+- USBを抜いた時刻を記録していない
+- 停止条件のうち、電圧降下は、観測する手段が無かった（測定器を使っていない）。Piがpingに応じなくなる、またはsshが切れたことの監視は、記録していない。上限15分は、flash開始17:22:24 JSTからmonitor停止17:31:02 JSTまでが約8分38秒で、起点の取り方による
+- uptime 58.1〜156.7秒に`dropped_no_session`が315件ある。手順のどの段（UART線を挿す前か後か）に当たるかは記録していない（UART線を挿した時刻も記録していない）。uptime 0をflash完了に置く近似では、この区間は、停止条件の「最初の2分は目視」（flash完了から）の中に重なりうる
+- 停止条件「表情が変わる証拠が出たら、すぐ止める」について、証拠を認めた時刻は記録していない。最初の`Surprised`の受理（uptime 247.65秒、約17:27:20 JST）からmonitorの停止（17:31:02 JST）まで約3分40秒で、その間に`tapped`のid 20（uptime 336.1秒）が出ている。満たしたかは、この記録から判定できない
+- [gpio-assignment.md](gpio-assignment.md)の`信号線をつないでよい条件`の条件3が挙げる試験は、#446の受け入れ条件4、#11、#12、#13の受け入れ条件6である。このデモは#21の通電で、この列挙に#21は含まれない。承認は[#21のcomment](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21#issuecomment-6077223726)にあり、条件3の列挙を更新した記録は無い
+- `monitor.log`に`POWERON_RESET`の行が2回ある（上の「ESP32のlog」）。`EXP-018`は「どの起動でも、`rst:0x1 (POWERON_RESET)`が2回出た。原因は調べていない」と記録している。`EXP-018`は「起動ごとに2回出る理由は調べていない」とも書いている。`EXP-019`は、書き込み後の最初の起動で2回、monitorを開き直した起動で1回と記録し（時刻の表の行3、7、11、13、15）、`POWERON_RESET`の原因を主張しないとしている
+- [power-budget.md](power-budget.md)の`DISP-01`追加接続のbring-upの手順の条件(1)（[gpio-assignment.md](gpio-assignment.md)の非通電の確認の項目1〜4）を、このデモの前に行った記録は無い。`EXP-019`の`Next safe step`が求めた非通電の確認（項目1〜7）も同じ。出所: 上の「Wiring revision」の行
+- gpio-assignment.mdの`信号線をつないでよい条件`の条件1（直列4.7 kΩ）、条件5のGND共通、条件6（通電前の目視と導通の確認）を確かめた記録は無い。条件5の別電源は、上の「Power supply and current limit」の行にある。条件2（両方の電源が入ってからつなぐ、先に外す）は、承認の順序と、挿した、抜いたというユーザーの会話での報告だけが出所で、両方の電源が入っていたことを示す時刻は記録していない。条件4（人間の監視）は上の「実施者」のとおり。UART線を挿した時刻と抜いた時刻は記録していない。出所: 同じ行
+- power-budget.mdの`DISP-01`追加接続のbring-upの手順の条件(3)(a)のPiをつなぐ場合の条件は、gpio-assignment.mdの条件1・5のGND共通・6の記録が、上の行のとおり無い。同手順の条件(3)(c)の周囲温度と、条件(6)の実施者の把握は、記録していない
+- 同手順の条件(5)（`module電源pinの独立性`／`pin header対応`、pull-upの実効抵抗）を確かめた記録は無い。同手順の条件(2)が課すVersion Recordまたは相当の記録は、このデモのbuildについて作っていない（上の「firmware」の表が、commit、tree、sha256を持つ）
+- gpio-assignment.mdの条件3が挙げるfirmwareの対応範囲（`boot`とそのACK、`hello`／`ping`／`get_status`）の外の`tapped`（ESP32→Pi）と`set_expression`（Pi→ESP32）を、UARTに流した。出所: [esp32-pi-protocol.md](../protocol/esp32-pi-protocol.md)の§4.3、§5.2と、上の「ESP32のlog」
 
 ### この記録が主張しないこと
 
-- 常時点灯の熱の適否。backlightを点けた時間は、少なくとも約7分50秒（起動の17:23:12からmonitor停止の17:31:02まで。USBを抜いた時刻は記録していない）で、承認の上限（15分）以内であり、発熱は測っていない（ユーザーの申告は、通電中に異常を認めなかったこと）
-- 静止中に`tapped`が出ないこと。検出が無かった時間にユーザーが触れていなかったかは記録していない
-- 閾値（1.5 g）の適否。叩きは検出できたが、強さと検出の関係は測っていない。叩く強さは記録していない
-- end-to-endのlatency。受け入れ条件の測定ではない
-- Pi側の`deskcatd`の常駐運用（systemd unitは無い）。`set_expression`の送出は、`deskcatd`のlogに出ない
-- ADXL345のRev. Gでのtap registerの記述の一致（Rev. 0で読んだ値を使った）
+- 常時点灯の熱の適否（発熱は測っていない）
+- `POWERON_RESET`の原因
+- power-budget.mdの`DISP-01`追加接続のbring-upの手順の条件(1)、(3)(c)、(5)、(6)と、gpio-assignment.mdの`信号線をつないでよい条件`の条件1・2・5のGND共通・6が満たされていたこと
+- 閾値（1.5 g）の適否、静止中に`tapped`が出ないこと、end-to-endのlatency
+- #13の受け入れ条件6の試験の結果（別の記録が#13のcommentにある）
 
 ### Conclusion
 
-条件6の試験は、描画の間も通信とwatchdogが生きていた（`overrun_ticks=0`、受信の溢れ0、`ping` 2000/2000）。デモは、`tap-21,face-21,bringup-display-13`のfirmwareで、叩いて表情が変わることを、ESP32のlog上で4回確かめた（`tapped`を送り、Piが`Surprised`の`set_expression`を送り、ESP32が受理して描画し、約2秒で`Neutral`に戻った）。ユーザーの目視は、驚いた顔に変わって戻ったことまでである。**`tapped` 9回のうち5回は、`set_expression`の応答が無かった。理由は未確認である。**条件6の記録の値とデモの値は、それぞれの試験の記録のものである。
+このデモで、ESP32のlogに`tapped`の送出と、`Surprised`の`set_expression`の受理と、`face_show name=Surprised`が出た。叩いた時刻との対応は記録していない。ユーザーの申告は、上の「ユーザーの申告」のとおり。`tapped` 9回のうち5回には、直後の`Surprised`の`set_expression`が無かった（理由は未確認）。
 
 ### Next safe step
 
-- 応答の無かった5回（`tapped`のid 8、9、10、17、18）の理由を調べる（Pi側の保持中の扱いかもしれないが、logに無い。Piの`deskcatd`のlogは終了時のcounterだけである）
-- 閾値の調整が要る場合は、別の版のfirmwareと、追加の起動の回数の承認が要る（`doc`は`0x14`〔1.25 g〕まで下げると書くが、testの下限は1.5 gである。下げるときにtestも直す）
-- `deskcatd`の常駐運用（systemd unit）と、`set_expression`の送出を見える形にすること
-- [#13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)・[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)・[#21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)の受け入れ条件のチェックとcloseの判断は、この記録に含めない
+- `tapped`のid 8、9、10、17、18の直後に`Surprised`の`set_expression`が無かった理由を調べる
+- [gpio-assignment.md](gpio-assignment.md)の`信号線をつないでよい条件`の条件3（つないでよい試験の列挙と、firmwareが対応する範囲）の更新は、別のdocsの変更で、ユーザーの決定が要る
+- 閾値を変える場合は、別の版のfirmwareと追加の起動の回数の承認が要る
+- [#21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)の受け入れ条件のチェックとcloseの判断は、この記録に含めない
 
 ## Revision履歴
 
@@ -2247,4 +2249,4 @@ Pi側は、`serial_link`（`cargo build --locked -p deskcat-serial --example ser
 | 2026-09-28 | 24 | [#13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)。**`EXP-018`を追加した。**判定の向き（横向き、`J2`を右）に合うMADCTL（`0x28`）を写真から決め、四隅の一致を確かめた。単色fillの5色と色の並びを写真で記録した。Read ID1〜3を含むIDの読み出しがすべて`00`で、moduleを改変しない方法ではこれ以上切り分けられないため、打ち止めにした。受け入れ条件1〜5を達成、6を未達とした。写真と動画はcommitしていない | [#13の条件(7)の承認](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13#issuecomment-5868974805)、[判断(1)(2)](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13#issuecomment-5860773100)、[PR #497](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/497) |
 | 2026-10-01 | 25 | [#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)。**`EXP-019`を追加した。**今の接続（`3V3` pin給電）のまま、周辺module3点の電源pinへ入る合計電流を`MEAS-01`の両端電圧から求め、確度が未取得の読みとして記録した。3.3 V側の電圧も読んだ。patchを当てたbuild（`DISPLAY_HOLD_MS`を15秒）を使ったこと、`MEAS-01`の代わりにジャンパを挿していた件、200Ωレンジを`MEAS-03`の定めを確かめずに使った件、読みの無い起動1回、省いた確認を記録した。**条件(7)の承認（backlightを点ける起動4回）を3回以上超えたこと、および`DISP-01`追加接続の手順からの逸脱3件（手順10を行っていない、項目1を列とrailの単位で測った、項目2〜7を地図と照らして行った）**（正本からの逸脱）も Faults に記録した。**あわせて、索引の表に`EXP-016`〜`EXP-019`の行を足した**（`EXP-016`〜`EXP-018`は既存の抜け。索引の抜けを埋めた Revision 11 の前例に倣った。`EXP-017`は見出しに`—`を含みanchorを検査できないため、linkせずに名前だけを置いた） | [#3の通電の承認](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3#issuecomment-5914517437)、[#488のユーザーの決定](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/488#issuecomment-5868418510) |
 | 2026-10-06 | 26 | [#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)。**`EXP-020`を追加した。**段階AのPiの給電を手持ちのadapterとcableへ移し、Wi-Fiの切断を観察し、PiのUARTを設定した | [#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446) |
-| 2026-10-09 | 27 | [#21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)。**`EXP-021`を追加した。**#13の受け入れ条件6、#446の受け入れ条件4の試験と、叩いて表情が変わるデモ（`tap-21,face-21,bringup-display-13`、`face-21`の常時点灯）の通電を、1件の記録にまとめた。 | #13、#446、#21の作業セッションの記録（#13のcomment 6042642898、#21のcomment 6077223726）と、ESP32のシリアルlog（端末のlocal） |
+| 2026-10-09 | 27 | [#21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)。**`EXP-021`を追加した。**叩いて表情が変わるデモ（`tap-21,face-21,bringup-display-13`、`face-21`の常時点灯）の通電の記録である。**Faultsに、正本からの逸脱と記録の無い確認を記録した**（`信号線をつないでよい条件`の条件3の列挙と対応範囲の外であること、`DISP-01`追加接続のbring-upの手順の条件(1)と非通電の確認の記録が無いこと） | [#21のcomment 6077223726](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21#issuecomment-6077223726)と、ESP32のシリアルlog（端末のlocal） |
