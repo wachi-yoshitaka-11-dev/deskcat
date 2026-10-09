@@ -11,10 +11,8 @@
 //! [`docs/hardware/gpio-assignment.md`](../../../docs/hardware/gpio-assignment.md)
 //! の`信号inventory`が正本である。`ACCEL-SDA`はGPIO25、`ACCEL-SCL`はGPIO26であり、
 //! いずれも`ENV-01`（[Issue #16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16)、
-//! [`crate::env`]）と共有するbusである（同文書414行目「ACCEL-SDA | ACCEL-01 | I2C SDA |
-//! Bidirectional | GPIO25」、415行目「ACCEL-SCL | ACCEL-01 | I2C SCL | Bidirectional |
-//! GPIO26」、417行目「ENV-SDA | ENV-01 | ... | GPIO25（ACCEL-01と共有）」、418行目
-//! 「ENV-SCL | ENV-01 | ... | GPIO26（ACCEL-01と共有）」）。**このmoduleはbus
+//! [`crate::env`]）と共有するbusである（同文書の`信号inventory`の`ACCEL-SDA`／`ACCEL-SCL`／`ENV-SDA`／
+//! `ENV-SCL`の各行。`ENV-SDA`／`ENV-SCL`の行に「ACCEL-01と共有」とある）。**このmoduleはbus
 //! (`I2cDriver`)を所有しない。**[`crate::env::Bme280`]と同じ理由（呼び出し側が1つの
 //! busを作り、2つのdriverで共有する）で、[`Adxl345`]は自分のI2C addressだけを持ち、
 //! 各methodは呼び出し側が渡す`&mut I2cDriver`を借りる。**`#16`のdriverと重複する
@@ -26,10 +24,11 @@
 //! # I2C addressについて
 //!
 //! **このmoduleはaddressを定数で持たない。**`SDO`（`ALT ADDRESS`）の配線で
-//! `0x1D`（`SDO`→VDD）／`0x53`（`SDO`→GND）のどちらになるかが決まる。**`SDO`は`GND`へ配線済みで、`0x53`である**
-//! （`EXP-015`が、この配線でDevice ID `0xE5`の読み出しに応答を得た。記録は
-//! [`docs/hardware/experiment-log.md`](../../../docs/hardware/experiment-log.md)の`EXP-015`が正本であり、
-//! **ここへ再掲しない**）。呼び出し側（`main.rs`の`ACCEL_I2C_ADDRESS`）が[`Adxl345::new`]へ渡す。
+//! `0x1D`（`SDO`→VDD）／`0x53`（`SDO`→GND）のどちらになるかが決まる（同文書「I2C addressの選択」節。
+//! 安全要件5項目に効かない一般値扱いであり、未確定でも着手を止めない。台帳は`HW-TBD-004`）。
+//! `EXP-015`は、`SDO`を`GND`へ配線した`0x53`でDevice ID `0xE5`（期待値と同じ値）の読み出しを得た記録である
+//! （[`docs/hardware/experiment-log.md`](../../../docs/hardware/experiment-log.md)が正本で、ここへ再掲しない）。
+//! 呼び出し側（`main.rs`の`ACCEL_I2C_ADDRESS`）が[`Adxl345::new`]へ渡す。
 //!
 //! # register・timingの根拠
 //!
@@ -41,7 +40,7 @@
 //! `docs/hardware/sensor-datasheet-notes.md`が既に引用しているものと同一revision）。
 //!
 //! - Device ID register（`0x00`、`DEVID`、Read Only）。reset値は`0xE5`
-//!   （`docs/hardware/sensor-datasheet-notes.md`165行目「`DEVID`（address `0x00`、
+//!   （`docs/hardware/sensor-datasheet-notes.md`の`Accelerometer`節`ICの値`表の`Device ID register／value`行「`DEVID`（address `0x00`、
 //!   Read Only）。reset値`11100101`＝`0xE5`（`The DEVID register holds a fixed device
 //!   ID code of 0xE5 (345 octal)`）。Table 19 page 23、Register 0x00節 page 24」。
 //!   **ここへ再掲しない**）。identify判定（`0xE5`との一致）は呼び出し側の責務とする
@@ -66,7 +65,7 @@ use crate::config;
 /// Device ID register。Analog Devices ADXL345 Data Sheet Rev. G（module doc参照）。
 const REG_DEVID: u8 = 0x00;
 
-/// [`Adxl345::read_device_id`]の1 transactionのtimeout（tick）。
+/// [`Adxl345::read_device_id`]・[`Adxl345::configure_tap`]・[`Adxl345::read_int_source`]の1 transactionのtimeout（tick）。
 ///
 /// **`esp_idf_svc::hal::delay::BLOCK`（無期限）を使わない。**`SDA`がLowのまま固着した
 /// 場合（配線ミス、jumper未設定など）に呼び出しが返らず、`main()`がheartbeatのloopへ

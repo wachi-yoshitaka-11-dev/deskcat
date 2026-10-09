@@ -230,17 +230,19 @@ use crate::tap::TapDetector;
 #[cfg(feature = "tap-21")]
 use deskcat_protocol::Message;
 
-/// `ACCEL-01`（ADXL345）のI2C address。**`SDO`を`GND`へ配線した値（`0x53`）である。**
+/// `ACCEL-01`（ADXL345）のI2C address。**`SDO`を`GND`へ配線する前提の値である。**
 ///
 /// `SDO`／`ALT ADDRESS`をGNDへ配線すると`0x53`になる
 /// （[`docs/hardware/sensor-datasheet-notes.md`](../../../docs/hardware/sensor-datasheet-notes.md)
-/// 170行目）。**`SDO`は`GND`へ配線済みで、このaddressでDevice ID `0xE5`の読み出しに応答を得た**
-/// （`docs/hardware/experiment-log.md`の`EXP-015`が正本であり、**ここへ再掲しない**。上の「現物確認まで
-/// 確定しない」は古い記述だった）。
+/// の`Accelerometer`節`ICの値`表の`I2Cアドレスの選択方式`行。**ただしどちらになるかはmodule board上の実装で決まり、現物確認まで確定しない**
+/// （[`HW-TBD-004`](../../../docs/hardware/tbd-register.md)）。この定数は`SDO`→GND前提の値である）。
+/// **`EXP-015`は、この配線でこのaddress（`0x53`）にDevice ID `0xE5`（期待値と同じ値）の読み出しを得た記録である**
+/// （記録は`docs/hardware/experiment-log.md`が正本であり、ここへ再掲しない。
+/// **台帳（`HW-TBD-004`）の状態は、このdocでは更新していない**）。
 /// addressは一般値で開始してよい側であり
 /// （[`docs/hardware/gpio-assignment.md`](../../../docs/hardware/gpio-assignment.md)
-/// 372行目「addressは一般値で開始してよい側である」（hardware-safety-policy.mdの
-/// 対応表に基づく分類）、388行目「上の材料には電気的な優劣が無く、実装コストの差だけ
+/// `I2C addressの選択`節「addressは一般値で開始してよい側である」（hardware-safety-policy.mdの
+/// 対応表に基づく分類）、同節「どちらのaddressを採るか」の項「上の材料には電気的な優劣が無く、実装コストの差だけ
 /// である」）、`SDO`配線を決める側（現物作業）がこの値と異なる配線を選ぶ場合は、この
 /// 定数を実際の配線へ合わせて直す。`ENV-01`側も`GND`側を前提にした
 /// （[`ENV_I2C_ADDRESS`]参照）。
@@ -250,7 +252,7 @@ const ACCEL_I2C_ADDRESS: u8 = 0x53;
 ///
 /// `SDO`をGNDへ配線すると`0x76`になる
 /// （[`docs/hardware/sensor-datasheet-notes.md`](../../../docs/hardware/sensor-datasheet-notes.md)
-/// 211行目）。module資料の既定でもある
+/// の`Environmental sensor`節の`Address／select pin`行）。module資料の既定でもある
 /// （[`docs/hardware/gpio-assignment.md`](../../../docs/hardware/gpio-assignment.md)の
 /// `I2C addressの選択`節「`0x76`はmodule資料が「既定」と記す側である」行）。
 /// [`ACCEL_I2C_ADDRESS`]と同じ根拠（一般値で開始してよい側、`gpio-assignment.md`の
@@ -261,8 +263,8 @@ const ENV_I2C_ADDRESS: u8 = 0x76;
 /// I2C busのbaudrate。Standard-mode（100 kHz）。
 ///
 /// [`docs/hardware/gpio-assignment.md`](../../../docs/hardware/gpio-assignment.md)
-/// 329行目「2026-09-06に、初回bring-upで採るmodeをStandard-mode（100 kHz）と決定した」。
-/// `初回bring-upのmode決定`節が根拠（実効pull-up 約2.42 kΩは規定`Cb`上限でもStandard-modeの
+/// `初回bring-upのmode決定`節「2026-09-06に、初回bring-upで採るmodeをStandard-mode（100 kHz）と決定した」。
+/// 同節が根拠（実効pull-up 約2.42 kΩは規定`Cb`上限でもStandard-modeの
 /// rise time制約を満たす。Fast-modeは成立しない）。**ただし同節が明記するとおり、
 /// 「rise timeの制約に余裕がある」ことと「実効抵抗がStandard-modeの規定範囲内にあることの
 /// 確認」は別であり、後者はこの変更の時点でも未達のまま残る**（[#2](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/2)
@@ -1037,15 +1039,15 @@ fn start_tap(i2c: Option<I2cDriver<'static>>, now_ms: u64) -> Option<TapDetector
 /// **両deviceがI2Cモードでbusに応答する前提は、まだ現物で確定していない。**
 /// ADXL345は`CS` pinを`VDD I/O`へ配線する必要がある（Analog Devices ADXL345 Data
 /// Sheet **Rev. 0**（SparkFunがhostする版、`docs/hardware/sensor-datasheet-notes.md`
-/// 134行目が「Revision 4までの出典」と記録する版と同一）「I2C mode is enabled if
+/// の「Rev. 0（Revision 4までの出典）とRev. Gには差がある」の節が「Revision 4までの出典」と記録する版と同一）「I2C mode is enabled if
 /// the CS pin is tied high to VDD I/O... there is no default mode if the CS pin
 /// is left unconnected」page 8・10。**この版とRev. G（同文書が正とする版）の既知の
-/// 差異一覧（同文書140行目「Rev. 0とRev. Gには差がある」以下のtable）にSerial Communications／I2Cの記載は含まれない
+/// 差異一覧（同節「Rev. 0とRev. Gには差がある」以下のtable）にSerial Communications／I2Cの記載は含まれない
 /// が、CLIからRev. Gを取得できないため、Rev. G側でこの記述が同一であることは
 /// 独立に確認していない**）。
 /// 裏面はんだジャンパ2箇所は開放だが何を選ぶ設定かboard資料が無く不明
 /// （[`docs/hardware/sensor-datasheet-notes.md`](../../../docs/hardware/sensor-datasheet-notes.md)
-/// 213行目「実装されているinterface（jumper設定）| TBD」）。BME280側の`J3`（`CSB`→`VDD`）は
+/// の`module boardの値（秋月 M-06724）`の表の`実装されているinterface（jumper設定）`行「TBD」）。BME280側の`J3`（`CSB`→`VDD`）は
 /// **はんだ付けされた**（実施日・状態・根拠の水準は
 /// [`docs/hardware/sensor-datasheet-notes.md`](../../../docs/hardware/sensor-datasheet-notes.md)の
 /// `jumper（AE-BME280）`節が正であり、ここへ再掲しない。実施の記録は同dir の

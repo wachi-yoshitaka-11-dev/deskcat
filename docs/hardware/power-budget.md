@@ -248,9 +248,9 @@ HW-TBD-024行が持つ事実であり、ここへ再掲しない。**この節�
 - [ ] (1) [gpio-assignment.md](gpio-assignment.md)の`電源pinの短絡・誤配線の確認（非通電）`の
       項目1・5・6・7が完了している（`ENV-01`の項目5`CSB`→`VDD`は、上で`J3`未はんだを選んだ
       場合は対象外）
-- [ ] (2) firmware（`main()`の`run_i2c_bringup`）が**既定build**（`bringup-display-13` featureを
+- [ ] (2) firmware（`main()`の`run_i2c_bringup`）が**既定build**（featureを**一切**
       付けない構成）でビルド済みである（書き込みは手順8で行う。featureを付けた構成は`DISP-01`の
-      bring-upを実行するため、条件(4)と両立しない。末尾`条件(4)の根拠`参照）。#487から、既定buildは
+      bring-upを実行するため、条件(4)と両立しない。末尾`条件(4)の根拠`参照）。**この手順で通電してよいのは、featureを一切付けない既定buildだけである。`face-21`／`tap-21`を付けた構成は、この条件を満たさないため、この手順では通電してよいbuildとして扱わない**（各構成にこの条件を当てた結果は、`firmware/esp32/README.md`の「build構成と通電」の表）。#487から、既定buildは
       Pi link（UART1）も持ち、GPIO13をTXとして駆動する。この手順の配線（手順1）にGPIO13は無く、
       駆動しても接続先が無い（`gpio-assignment.md`の`PI-UART-TX`行）
 - [ ] (3) 電流の余裕計算（`B-2b を採る決定と MSP2807 の電流制限（2026-09-07）`節の
@@ -833,8 +833,7 @@ Revision 39で、給電元（B-2bか`3V3` pinか）ごとに参照先の節が�
 筐体に入れた状態は、この計算に含まれない。故障時（`R5`の先の短絡）の電流上界は、`R5`の値とrail電圧だけで
 決まり、点灯の長さを入力に使っていない（`DISP-01`追加接続のbring-upの手順の前提の節）。
 `face-21`付きbuildの実行は、実行する日に、条件(7)と同じ形（`3V3` pin経路でbacklightを点けたまま
-動かすことの承認）で人間から1件得る。条件(2)は`bringup-display-13`付きbuildを要求する。**`face-21`単独のbuildは条件(2)を満たさない
-ため、このchecklistで通電してよいbuildとして扱わない。**通電は`face-21,bringup-display-13`のbuildで行う。
+動かすことの承認）で人間から1件得る。**`DISP-01`追加接続の手順の条件(2)は`bringup-display-13`付きbuildを要求する。**そのため、`face-21`単独と`tap-21`単独のbuildは、この手順でも通電してよいbuildではない（各構成にこの条件を当てた結果は、`firmware/esp32/README.md`の「build構成と通電」の表）。`tap-21`は`ACCEL-01`を測定modeにする。その約140 µA typ（`sensor-datasheet-notes.md`の`Supply Current`行、Rev. G、ODR 100 Hz以上）は、条件(3)の計算（約245.4 mA）が内訳として持つ101.54 mA（内訳は本書の「この2点限定の給電」の行）に既に含まれる。`tap-21`が足す負荷は、この計算の外には無い見込みである。
 
 ##### 3.3 V railの許容電圧範囲
 
