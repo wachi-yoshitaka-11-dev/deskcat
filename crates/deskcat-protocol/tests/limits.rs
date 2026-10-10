@@ -2,7 +2,8 @@
 //!
 //! string上限を勘で置かないための検査である。各message typeについて、全string fieldを
 //! 上限まで、全integerを最大値まで詰めたlineが[`limits::MAX_LINE_BYTES`]に収まることを
-//! 確認する。上限定数を動かしたときに、この検査が破綻を検知する。
+//! 確認する。上限定数を動かしたときに、この検査が破綻を検知する。**`play_motion.name`だけは
+//! 個別の上限が無く、詰められない**ため例外である（該当のcaseの注記）。
 
 use deskcat_protocol::{
     Ack, AckStatus, Boot, DisplayStatus, Envelope, Environment, ErrorCode, ExpressionName,

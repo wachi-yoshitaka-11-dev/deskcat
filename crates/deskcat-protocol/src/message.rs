@@ -9,9 +9,11 @@
 //!
 //! **`play_motion`（§5.3）は、Issue #19で型だけを足した。**受信して型に解釈できることと、
 //! servoを動かしてよいことは別である。`name`は閉じたenumにせず、有界でない`String`とする。
-//! 受理する名前はfirmwareのmotion catalogが持ち、motion名をこのcrateに書くと
+//! 受理する名前は、firmwareのmotion catalogが持つ方針である。motion名をこのcrateに書くと
 //! `PROTO-TBD-008`を先取りするためである。`speed`と`repeat`の上限値も、ここでは決めない。
-//! 型の幅が縛るだけである。
+//! 型の幅が縛るだけである。**catalog、上限の適用、未知の名前の拒否は、まだ実装していない**
+//! （§5.3、`firmware/esp32`の`pi_link.rs`）。`speed`と`repeat`が安全要件の5項目に効くかの判定は、
+//! ここでは行わない。上限が決まる前にmotionを受理しない（§5.3の有効化の条件）。
 //!
 //! 含めないtypeと理由:
 //!
@@ -75,7 +77,7 @@ pub enum Message {
     /// Pi→ESP32。名前付きの高水準motionを要求する（§5.3）。
     ///
     /// **型があることは、motionを実行してよいことを意味しない。**受理する名前と
-    /// `speed`／`repeat`の上限はfirmwareが持つ（module doc）。
+    /// `speed`／`repeat`の上限は、firmwareが持つ方針である。まだ実装していない（module doc）。
     PlayMotion(PlayMotion),
 }
 
@@ -577,9 +579,10 @@ pub struct Environment {
 pub struct PlayMotion {
     /// motion名。
     ///
-    /// 閉じたenumにしない。**受理する名前はfirmwareのmotion catalogが持つ**（module doc）。
-    /// byte長に、このcrateでは数を置かない。行の最大長（[`limits::MAX_LINE_BYTES`]）が縛る。
-    /// 未知の名前とcatalogが空の間の拒否はfirmwareが`invalid_payload`で行う。
+    /// 閉じたenumにしない。**受理する名前は、firmwareのmotion catalogが持つ方針である**
+    /// （module doc）。byte長に、このcrateでは数を置かない。行の最大長
+    /// （[`limits::MAX_LINE_BYTES`]）が縛る。未知の名前とcatalogが空の間は、`invalid_payload`で
+    /// 拒否すると§5.3が定める。その拒否はまだ実装していない。
     pub name: String,
     /// 正規化されたspeed。
     ///

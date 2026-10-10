@@ -1314,7 +1314,7 @@ fixtureは最低限、次の5群をすべて含む。上の一覧と表がその
 
 | 群 | 対象 | 状態 |
 |---|---|---|
-| Schema | envelope、type固有payload、上限の境界、未知version／type | **作成済み**（#9。`set_expression`、`show_text`、`head_touched`、`tapped`、`lifted`、`environment`は#527） |
+| Schema | envelope、type固有payload、上限の境界、未知version／type | **作成済み**（#9。`set_expression`、`show_text`、`head_touched`、`tapped`、`lifted`、`environment`は#527。`play_motion`は#19） |
 | Framing／parse | 分割受信、CRLF、invalid UTF-8／JSON、line長境界 | **作成済み。**line長境界・CRLF・invalid JSONは#9、byte単位の分割受信とinvalid UTF-8は#10 |
 | Session判定 | 遷移の成否、`stale_session`、retired session、`hello`／`boot`再送、`sid`衝突時の選び直し、retired保持期間、方向が逆のsession確立messageの拒否 | 未作成（#12） |
 | Duplicate replay | 同一`(sid, id)`のretry、保持結果の返却、非idempotent動作の二重実行防止 | 未作成（#12） |
