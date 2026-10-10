@@ -244,6 +244,14 @@ pub struct BootSession {
 }
 
 impl BootSession {
+    /// `boot`のACKを受け、Piとのsessionが確立しているか（`Phase::Established`）。
+    /// event（`tapped`）を送ってよいかの判定に使う（Issue #21、F1）。
+    #[must_use]
+    #[cfg_attr(not(feature = "tap-21"), allow(dead_code))]
+    pub fn is_established(&self) -> bool {
+        matches!(self.phase, Phase::Established)
+    }
+
     /// 初期`sid`で`boot`を1回送り、sessionを開始する。
     pub fn start(
         policy: BootRetryPolicy,

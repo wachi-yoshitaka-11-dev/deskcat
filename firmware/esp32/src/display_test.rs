@@ -1,8 +1,8 @@
 //! `DISP-01`のbring-up（単色fill、四隅pattern）を、main loopの中で1段ずつ進める試験モード。
 //!
 //! `bringup-display-13` feature付きbuildだけがこのmoduleを持つ（`main.rs`の
-//! module doc「`DISP-01`のbring-upを有効にする手順」節。**既定buildがLCD関連pinへ
-//! 触れないことは#451の決定であり、変えない**）。
+//! module doc「`DISP-01`のbring-upを有効にする手順」節。製品buildは表情を描き、
+//! この試験patternを描かない）。
 //!
 //! # なぜ1段ずつ進めるか
 //!
@@ -84,9 +84,11 @@
 //!
 //! # 終わり方
 //!
-//! 最後の保持（`display_pattern_hold`）が済むと、[`DisplayBringup::poll`]はdriverを
-//! 手放して[`None`]を返す。driverが持つ`LCD-BL`のpinが解放され、backlightが消える
-//! （1回で描き切っていた頃に`run_display_bringup`から戻ったときと同じである）。
+//! 最後の保持（`display_pattern_hold`）が済むと、[`DisplayBringup::poll`]は終わった状態
+//! （[`DisplayBringup::is_done`]）で返り、呼び出し側（`main()`）が手放す。driverが持つ`LCD-BL`の
+//! pinが解放され、backlightが消える（1回で描き切っていた頃に`run_display_bringup`から戻ったときと
+//! 同じである）。**`face-21`付きbuildだけは手放さず、表情の描画へ渡すため、backlightは点いたままである**
+//! （`crate::face`）。失敗で終えるときは、[`DisplayBringup::poll`]がその場で[`None`]を返して手放す。
 //!
 //! [#13]: https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13
 //! [#487]: https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487
@@ -141,6 +143,8 @@ enum Step {
     YAxis { offset: u16, drawn_us: u128 },
     /// patternを保つ。`until_ms`まで描かない。
     PatternHold { until_ms: u64 },
+    /// bring-upを終えた。呼び出し側が[`DisplayBringup::into_lcd`]でdriverを受け取るか、手放す。
+    Done,
 }
 
 /// `DISP-01`のbring-upの状態機械。
@@ -162,6 +166,16 @@ impl<'d> DisplayBringup<'d> {
         }
     }
 
+    /// bring-upの段を全部終えたか。
+    pub fn is_done(&self) -> bool {
+        matches!(self.step, Step::Done)
+    }
+
+    /// driverを受け取る。手放せばbacklightが消える。
+    pub fn into_lcd(self) -> Ili9341<'d> {
+        self.lcd
+    }
+
     /// 次の段の締切（uptimeのms）を返す。描く段なら`now_ms`（すぐ描いてよい）、
     /// 保つ段ならその終わりの時刻である。
     pub fn next_deadline_ms(&self, now_ms: u64) -> u64 {
@@ -176,8 +190,9 @@ impl<'d> DisplayBringup<'d> {
     /// **どの段で失敗してもpanicしない。**errorは`log::error!`へ分類する。失敗の後にどこへ進むかは、
     /// 1回で描き切っていた頃と同じである（module doc「logの行」）。
     ///
-    /// 最後の保持が済んだら`None`を返す。driverはここで手放され、backlightが消える
-    /// （module doc「終わり方」）。
+    /// 失敗で終える場合は`None`を返す。driverはここで手放され、backlightが消える。最後の保持が済んだら
+    /// 終わった状態（[`DisplayBringup::is_done`]）で返し、呼び出し側が[`DisplayBringup::into_lcd`]で
+    /// driverを受け取るか、手放す（手放せば、module doc「終わり方」のとおりbacklightが消える）。
     pub fn poll(mut self, now_ms: u64) -> Option<Self> {
         if now_ms < self.next_deadline_ms(now_ms) {
             return Some(self);
@@ -330,8 +345,9 @@ impl<'d> DisplayBringup<'d> {
             }
             Step::PatternHold { .. } => {
                 log::info!("display_bringup_done");
-                return None;
+                Step::Done
             }
+            Step::Done => Step::Done,
         };
         Some(self)
     }

@@ -184,3 +184,29 @@ xtensaの上でtestを走らせたのではない**）、`firmware/esp32`の既�
 **flash sizeへの影響はまだ測っていない。**既定buildの`main()`は`deskcat-servo`を呼ばないため、
 link後の実行物に同crateのcodeが入っているかを確かめておらず、今の実行物の大きさを比べても
 影響の上限にならない。**servoを駆動する経路を`main()`へ足すときに測る。**
+
+## 追記（2026-10-07）: 3つ目の共有crate`deskcat-face`
+
+[Issue #21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)で、`firmware/esp32`が
+`crates/deskcat-face`もpath dependencyで使うようにした。`set_expression`の3表情の図形と受理の判定の順序を、
+hostのtestで固定するためである。**上の決定は変えていない。**
+
+- root `Cargo.toml`の`exclude = ["firmware/esp32"]`を維持し、lockfileは2つに分かれたままである。
+- `rust-version`は、`deskcat-servo`と同じく両toolchainの下限（1.95）を明示した。
+- `.github/workflows/firmware.yml`の`paths`へ`crates/deskcat-face/**`を加えた。
+
+**根拠。**ESP toolchain（`esp-1.95.0.0`）で`firmware/esp32`の既定構成・`face-21`・`face-21,bringup-display-13`・`bringup-display-13`の4構成のbuildとlintを通し、hostで`cargo test`を通した。**Version Recordは作っていない。build-onlyであり、flashと実機起動は含まない。**
+**flash sizeへの影響は測っていない。**
+
+## 追記（2026-10-09）: 4つ目の共有crate`deskcat-tap`
+
+[Issue #21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)のF1で、`firmware/esp32`が
+`crates/deskcat-tap`もpath dependencyで使うようにした。ADXL345のtap検出の設定値と、`tapped`を送ってよいかの判定を、
+hostのtestで固定するためである。**上の決定は変えていない。**
+
+- root `Cargo.toml`の`exclude = ["firmware/esp32"]`を維持し、lockfileは2つに分かれたままである。
+- `rust-version`は、`deskcat-face`と同じく両toolchainの下限（1.95）を明示した。
+- `.github/workflows/firmware.yml`の`paths`へ`crates/deskcat-tap/**`を加えた。
+
+**根拠。**ESP toolchain（`esp-1.95.0.0`）で`firmware/esp32`の既定構成・`tap-21`・`tap-21,face-21,bringup-display-13`・`bringup-display-13`・`face-21`・`face-21,bringup-display-13`の6構成のbuildとlintを通し、hostで`cargo test`を通した。
+**Version Recordは作っていない。build-onlyであり、flashと実機起動は含まない。flash sizeへの影響は測っていない。**
