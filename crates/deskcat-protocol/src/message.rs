@@ -4,7 +4,8 @@
 //! Issue #527で`set_expression`、`show_text`、`head_touched`、`tapped`、`lifted`、`environment`を
 //! 足した。足したtypeのfieldは、安全要件の5項目（`docs/governance/hardware-safety-policy.md`）の
 //! どれにも効かない。5項目のうちmessageが関わりうるのはservoの持続的拘束だけであり、
-//! servoを動かす経路は`play_motion`（§5.3）だけで、これは後から足した（下記）ためである。
+//! servoを動かす経路は`play_motion`（§5.3）だけで、Issue #527ではそれを足さなかったためである。
+//! `play_motion`はIssue #19で足した（下記）。
 //!
 //! **`play_motion`（§5.3）は、Issue #19で型だけを足した。**受信して型に解釈できることと、
 //! servoを動かしてよいことは別である。`name`は閉じたenumにせず、有界でない`String`とする。
@@ -582,7 +583,8 @@ pub struct PlayMotion {
     pub name: String,
     /// 正規化されたspeed。
     ///
-    /// 有限であることだけを検査する。上限は§5.3で`TBD`であり、ここでは決めない。
+    /// 有限であることだけを検査する。上限は§5.3で`TBD`であり、ここでは決めない。下限（負の値を
+    /// 受けるか）も同じく決めない（`PROTO-TBD-008`）。
     pub speed: FiniteF32,
     /// 繰り返す回数。
     ///

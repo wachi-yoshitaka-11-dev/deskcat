@@ -11,7 +11,7 @@
 //! [`MotionDedup::admit_once`]が、同じ`id`に対して`admit`を高々1回しか呼ばないことである。
 //! `admit`には[`Limiter::admit`]を包んだclosureを渡し、呼ばれた回数と[`Limiter::counters`]で
 //! 確かめる。**wireの`play_motion`の受信と、firmwareのsessionへの組み込みは試していない**
-//! （`play_motion`の型がまだ無い）。
+//! （型は`deskcat-protocol`にあるが、受信してこのcrateへ渡す経路がまだ無い）。
 
 use core::time::Duration;
 
