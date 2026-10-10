@@ -113,7 +113,9 @@
 //! 2点を挙げている）。**[Issue #451](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/451)より前、
 //! `run_display_bringup`は既定buildでも無条件に呼ばれ、その中で`lcd.backlight_on()`を
 //! 実行していた。**そのため`DISP-01`が配線されているだけでbacklightへ給電された。
-//! **#451で、このfeatureを指定した試験buildだけがLCDを使う構成へ変えた。**
+//! **#451当時は、このfeatureを指定した試験buildだけがLCDを使う構成へ変えた。**
+//! #487以後、featureなしの製品buildもLCDを使う。`bringup-display-13`は、
+//! 試験構成で単色fill・四隅patternを描くモードを選ぶ。
 //!
 //! **`#461`（2026-09-23）が認めたのは、B-2bではなくESP32`3V3` pinからの通常接続である。**
 //! `#445`が`ACCEL-01`／`ENV-01`に採った経路（B-2bではなく`3V3` pin）と同じであり、
