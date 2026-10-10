@@ -766,7 +766,7 @@ Firmwareは次を実行する。
 
 初期に受け入れるmotion名は、サーボ機構のcalibrationが完了するまで`TBD`とする。
 
-**`play_motion`の型（[Issue #19](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/19)）。**`name`、`speed`、`repeat`の3つはすべて必須である（§3の型表）。`name`は閉じた列挙にせず、有界でない文字列とする。受理する名前はfirmwareが持つmotion catalogが決め、motion名はprotocolの型に書かない。未知の`name`と、catalogが空の間の`name`は、`invalid_payload`で拒否する（§7の「列挙外の値」。`out_of_range`は型が正しい値の上限超過に使う。拒否ACKを返す実装は、まだ無い。§2の既知の逸脱(i)）。`hardware_unavailable`は、サーボ出力の有効化条件が決まってから扱う。**型があることは、motionを実行してよいことを意味しない。**`speed`と`repeat`の上限値は`TBD`のままであり（記録先は§13の`PROTO-TBD-008`）、**catalogが空でなくなる（motionを受理し始める）前に、この上限が決まっていることを、有効化の条件とする。**
+**`play_motion`の型（[Issue #19](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/19)）。**`name`、`speed`、`repeat`の3つはすべて必須である（§3の型表）。`name`は閉じた列挙にせず、有界でない文字列とする。受理する名前はfirmwareが持つmotion catalogが決め、motion名はprotocolの型に書かない。未知の`name`と、catalogが空の間の`name`は、`invalid_payload`で拒否する（§7の「列挙外の値」。`out_of_range`は型が正しい値の上限超過に使う。拒否ACKを返す実装は、まだ無い。§2の既知の逸脱(i)）。`hardware_unavailable`は、サーボ出力の有効化条件が決まってから扱う。**型があることは、motionを実行してよいことを意味しない。**`speed`と`repeat`の上限値は`TBD`のままであり（記録先は§13の`PROTO-TBD-008`）、**catalogが空でなくなる（motionを受理し始める）前に、この上限が決まっていることを、有効化の条件とする。**これはサーボ出力の有効化条件（[Servo Safety Limits](../hardware/servo-safety-limits.md)）を置き換えず、それとは別に要る条件である。
 
 上限を超えた場合は、制限の種類に応じたcodeを返し、新しいtrajectoryを開始しない。
 

@@ -147,7 +147,8 @@ fn longest_finite_f32() -> FiniteF32 {
     .expect("candidates are not empty")
 }
 
-/// escapeが起きない文字であれば、全fieldを上限まで詰めても行長に収まる。
+/// escapeが起きない文字であれば、全fieldを上限まで詰めても行長に収まる。ただし`play_motion.name`は
+/// 個別の上限が無く、詰めていない（module doc）。
 ///
 /// **これは「string上限を守れば行長も収まる」という意味ではない。**escapeを含む場合は
 /// 収まらないことがあり、それは下の`strings_needing_json_escapes_can_exceed_the_line_limit`が

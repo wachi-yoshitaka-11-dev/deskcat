@@ -348,7 +348,7 @@ impl PeerSession {
 
     /// ESP32→Piで定義されていないtypeを受けたと計上する（§3、§8）。
     ///
-    /// `hello`・`ping`・`get_status`・`set_expression`・`show_text`はPi→ESP32のmessageであり、Piが受ける方向では
+    /// `hello`・`ping`・`get_status`・`set_expression`・`show_text`・`play_motion`はPi→ESP32のmessageであり、Piが受ける方向では
     /// 定義されていない。§8は、Piが受けた`hello`を`unknown_type`として扱い、応答せず、
     /// duplicate照会もsession遷移も行わないと定める。**`sid`の判定より先に扱う**（§3）ため、
     /// `stale_sessions`には数えない。

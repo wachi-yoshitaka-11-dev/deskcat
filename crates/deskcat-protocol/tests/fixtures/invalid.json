@@ -87,7 +87,7 @@
       "name": "unknown_message_type",
       "line": "{\"v\":1,\"sid\":41207,\"id\":1,\"ts_ms\":100,\"type\":\"motion_completed\",\"payload\":{\"name\":\"nod\"}}\n",
       "expect_error": "unknown_type",
-      "note": "今回型を起こさないtype（§4.7。PROTO-TBD-008）。motion_completedの型を足すときは、このcaseのtypeを差し替える。"
+      "note": "今回型を起こさないtype（§4.7。PROTO-TBD-008）。motion_completedの型を足すときは、このcaseのtypeを差し替える。unknown_typeではpayloadを解釈しないため、payloadの形は§4.7由来ではなく任意である。"
     },
     {
       "name": "play_motion_missing_name",
