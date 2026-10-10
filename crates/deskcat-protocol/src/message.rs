@@ -14,8 +14,9 @@
 //! 型の幅が縛るだけである。**受信した`play_motion`をcatalogと上限で判定してservoへ渡す経路は、まだ無い**
 //! （§5.3、`firmware/esp32`の`pi_link.rs`）。catalogの型（`deskcat-servo`の`MotionCatalog`。
 //! 既定は空で何も受理しない）と、名前が無いときの拒否（`Rejection::UnknownMotion`）は
-//! `deskcat-servo`にある。まだ無いのは、catalogの中身の名前と、`speed`／`repeat`の上限である。`speed`と`repeat`が安全要件の5項目に効くかの判定は、
-//! ここでは行わない。上限が決まる前にmotionを受理しない（§5.3の有効化の条件）。
+//! `deskcat-servo`にある。まだ無いのは、catalogの中身の名前と、`speed`／`repeat`の上限である。
+//! 上限値は、決める前に、安全要件の5項目に効くかを`docs/governance/hardware-safety-policy.md`で
+//! 判定する。上限が決まる前にmotionを受理しない（§5.3の有効化の条件）。
 //!
 //! 含めないtypeと理由:
 //!
@@ -587,8 +588,8 @@ pub struct PlayMotion {
     pub name: String,
     /// 正規化されたspeed。
     ///
-    /// 有限であることだけを検査する。上限は§5.3で`TBD`であり、ここでは決めない。下限（負の値を
-    /// 受けるか）も同じく決めない（`PROTO-TBD-008`）。
+    /// 有限であることだけを検査する。上限は§5.3で`TBD`であり、ここでは決めない。下限は検査せず、
+    /// 負の有限値もdecodeを通る。その扱いは固定しない（`PROTO-TBD-008`。fixtureも置かない）。
     pub speed: FiniteF32,
     /// 繰り返す回数。
     ///
