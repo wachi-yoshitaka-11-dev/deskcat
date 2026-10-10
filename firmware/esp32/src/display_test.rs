@@ -1,8 +1,8 @@
 //! `DISP-01`のbring-up（単色fill、四隅pattern）を、main loopの中で1段ずつ進める試験モード。
 //!
 //! `bringup-display-13` feature付きbuildだけがこのmoduleを持つ（`main.rs`の
-//! module doc「`DISP-01`のbring-upを有効にする手順」節。**既定buildがLCD関連pinへ
-//! 触れないことは#451の決定であり、変えない**）。
+//! module doc「`DISP-01`のbring-upを有効にする手順」節。製品buildは表情を描き、
+//! この試験patternを描かない）。
 //!
 //! # なぜ1段ずつ進めるか
 //!

@@ -63,19 +63,23 @@ Linux x86_64 で検証した。初回は 2026-08-06 で、これは VM 上の初
 2026-08-15 である（[Version Record](version-records/2026-08-15-esp32-build-native-linux.md)）。最新の検証は
 2026-10-04 であり、Version Record の `Repository commit` の tree（#487 の PR B1 の後の構成。Pi link を含む既定構成）で、`deskcat-servo` を共有した状態で実機 Linux で取得した（[Version Record](version-records/2026-09-29-esp32-build-servo-limiter-native-linux.md)。
 初回検証日は 2026-09-29、最終有効な検証日時は 2026-10-04）。
+この検証記録は、現在の#487製品build統合前のtreeについてのものである。製品buildと試験構成の
+CIでの成否は、この変更を含むPull Requestのcheck結果で確認する。
 別端末での再現は CI の `ubuntu-24.04` runner で満たした
 （#42。[Version Record](version-records/2026-08-10-esp32-build-ci.md)）。
 **build-only であり、flash と実機起動は主張しない。**
 
 **`pi-protocol-mode` featureは[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)で廃止した。**Pi linkは既定構成（製品build）に入った。**上の「Linux x86_64 で検証した」以下の記録のうち、2026-08-15 までの記録は #487 の PR B1 より前の tree についてのものである。2026-09-29 の記録は、2026-10-04 に #487 の PR B1 の後の構成（Pi link を含む既定構成）で再検証した。**2026-09-29の記録のうち、既定構成の分は上の検証記録である。それ以外の構成の分は実施記録であり、検証済みcommandへは格上げしていない。#487のPR B1より前は、`pi-protocol-mode`を有効にした構成も`cargo clippy`と`cargo build`へ`--features pi-protocol-mode`を足して通していた。
 
-**`bringup-display-13` feature（[#451](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/451)）を有効にする場合は、既定構成に加えて`cargo clippy`と`cargo build`（`cargo fmt`は対象外）へ`--features bringup-display-13`を足したものも通す。**#487から、このfeatureは既定構成へLCDの試験モードを加えるだけであり、他のfeatureと排他ではない。**この構成の実施記録（[Version Records](version-records/README.md)）は、検証済みcommandへ格上げする記録ではない。2026-09-29の記録だけは、2026-10-04に#487のPR B1の後の構成（Pi linkを含む）でこの構成も再検証した。他の記録は、どれも#487のPR B1より前のtreeのものである。**そのため、ここでもcommand blockを写さない（`flash と serial monitor`節（下記）がcommand blockを持たない理由とは別である）。
+**`bringup-i2c-15-16`は、旧・featureなしbuildのセンサー単体試験である。**製品buildの確認に加え、`cargo clippy`と`cargo build`へ`--features bringup-i2c-15-16`を付けたものも通す。`cargo fmt`にはfeatureを付けない。
 
-**`bringup-led-514` feature（[#514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)）を有効にする場合は、既定構成に加えて`cargo clippy`と`cargo build`へ`--features bringup-led-514`を足したものも通す。**`bringup-display-13`とも組み合わせられるため、`--features bringup-display-13,bringup-led-514`も通す。**これらの構成のVersion Recordは無い。**
+**`bringup-display-13` feature（[#451](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/451)）を有効にする場合は、既定構成に加えて`cargo clippy`と`cargo build`（`cargo fmt`は対象外）へ`--features bringup-display-13`を足したものも通す。**#487の製品build統合後、このfeatureは単色fill・四隅patternの試験構成を選び、表情とtapは明示的にfeatureを加えたときだけ有効になる。**以前の実施記録（[Version Records](version-records/README.md)）では、2026-09-29の記録だけが2026-10-04に#487のPR B1後の構成（Pi linkを含む）で再検証された。今回の製品build統合差分は、firmware CIの`Build test modes`がこの構成のClippyとbuildを確認する。**command blockは上の検証済みコマンドにfeatureを付ける方式とし、ここへ重複して写さない。
 
-**`face-21` feature（[#21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)）を有効にする場合は、既定構成に加えて`cargo clippy`と`cargo build`へ`--features face-21`を足したものも通す。**`bringup-display-13`とも組み合わせられるため、`--features face-21,bringup-display-13`も通す。**これらの構成のVersion Recordは無い。**
+**`bringup-led-514` feature（[#514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)）を有効にする場合は、既定構成に加えて`cargo clippy`と`cargo build`へ`--features bringup-led-514`を足したものも通す。**`bringup-display-13`とも組み合わせられるため、`--features bringup-display-13,bringup-led-514`も通す。今回の差分では、firmware CIの`Build test modes`が両構成を確認する。
 
-**`tap-21` feature（[#21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)のF1）を有効にする場合は、既定構成に加えて`cargo clippy`と`cargo build`へ`--features tap-21`を足したものも通す。**`face-21`・`bringup-display-13`とも組み合わせられるため、`--features tap-21,face-21,bringup-display-13`も通す。**これらの構成のVersion Recordは無い。**
+**`face-21` feature（[#21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)）を有効にする場合は、既定構成に加えて`cargo clippy`と`cargo build`へ`--features face-21`を足したものも通す。**`bringup-display-13`とも組み合わせられるため、`--features face-21,bringup-display-13`も通す。今回の差分では、firmware CIの`Build test modes`が両構成を確認する。
+
+**`tap-21` feature（[#21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)のF1）を有効にする場合は、既定構成に加えて`cargo clippy`と`cargo build`へ`--features tap-21`を足したものも通す。**`face-21`・`bringup-display-13`とも組み合わせられるため、`--features tap-21,face-21,bringup-display-13`も通す。今回の差分では、firmware CIの`Build test modes`が両構成を確認する。
 
 ### workspace との関係
 

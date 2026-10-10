@@ -84,7 +84,7 @@ ESP32 boardの`3V3` pinから外部負荷を取ること（段階B-2a）は、[H
 
 ## 点灯試験用のfirmware
 
-`firmware/esp32`の`bringup-led-514` featureを付けたbuildだけがGPIO2／GPIO5を駆動する。既定buildは両pinに触れない。既定buildとも`bringup-display-13`とも組み合わせられる（`bench-servo-test-17`は#474で`compile_error!`のため対象外）。build commandの正本は[検証済みコマンド](../toolchains/verified-commands.md)である。
+`firmware/esp32`の`bringup-led-514` featureを付けたbuildだけがGPIO2／GPIO5を駆動する。既定buildは両pinに触れない。`bringup-display-13`とも組み合わせられる（`bench-servo-test-17`は#474で`compile_error!`のため対象外）。build commandの正本は[検証済みコマンド](../toolchains/verified-commands.md)である。
 
 1. `Peripherals::take()`の直後に両pinを出力にし、消灯側（Low）へ設定する。**向きの設定と消灯levelの設定の間に、出力registerの値が一瞬出る。その値が点灯側（High）か消灯側かも、長さも確かめていない。**[Hardware Safety Policy](../governance/hardware-safety-policy.md)の§4は「output modeへ切り替える前に、安全な初期出力を定義する」とする。esp-idf-halの`PinDriver`は向きを先に設定する。`unsafe`を使わずにこの区間を無くす方法は見つけていない（試していない）。電流は`R`で制限される。この点は、上の`3V3 pinへ負荷を足す条件`の残余riskに挙げた。
 2. 起動時のbring-upが終わった時刻（`main.rs`の`bringup_done_ms`）から、赤だけ→白だけ→両方を10秒ずつ点ける（点灯試験）。その後のPi linkのUART初期化と`boot`送信の分だけ、最初の区間が短くなる。`bringup-display-13`付きbuildでは、LCDの描画とI2Cのbring-upがmain loopの中で進み、点灯試験はそれと並行して進む。

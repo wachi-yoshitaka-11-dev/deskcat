@@ -248,17 +248,20 @@ HW-TBD-024行が持つ事実であり、ここへ再掲しない。**この節�
 - [ ] (1) [gpio-assignment.md](gpio-assignment.md)の`電源pinの短絡・誤配線の確認（非通電）`の
       項目1・5・6・7が完了している（`ENV-01`の項目5`CSB`→`VDD`は、上で`J3`未はんだを選んだ
       場合は対象外）
-- [ ] (2) firmware（`main()`の`run_i2c_bringup`）が**既定build**（featureを**一切**
-      付けない構成）でビルド済みである（書き込みは手順8で行う。featureを付けた構成は`DISP-01`の
-      bring-upを実行するため、条件(4)と両立しない。末尾`条件(4)の根拠`参照）。**この手順で通電してよいのは、featureを一切付けない既定buildだけである。`face-21`／`tap-21`を付けた構成は、この条件を満たさないため、この手順では通電してよいbuildとして扱わない**（各構成にこの条件を当てた結果は、`firmware/esp32/README.md`の「build構成と通電」の表）。#487から、既定buildは
-      Pi link（UART1）も持ち、GPIO13をTXとして駆動する。この手順の配線（手順1）にGPIO13は無く、
+- [ ] (2) firmware（`main()`の`run_i2c_bringup`）が**`bringup-i2c-15-16`だけを付けたbuild**で
+      ビルド済みである（書き込みは手順8で行う）。**この手順で通電してよいのは、この単体試験buildだけである。**
+      featureなしの製品buildはLCDを点灯し、ADXL345のDevice IDが一致した場合は設定を書くため、
+      この手順の条件(4)と両立しない。
+      他の試験featureを組み合わせたbuildもこの条件を満たさない（各構成にこの条件を当てた結果は、
+      `firmware/esp32/README.md`の「build構成と通電」の表）。`bringup-i2c-15-16`も
+      Pi link（UART1）を持ち、GPIO13をTXとして駆動する。この手順の配線（手順1）にGPIO13は無く、
       駆動しても接続先が無い（`gpio-assignment.md`の`PI-UART-TX`行）
 - [ ] (3) 電流の余裕計算（`B-2b を採る決定と MSP2807 の電流制限（2026-09-07）`節の
       2026-09-22追記、Revision 117）を確認した
 - [ ] (4) `DISP-01`が`3V3` pinへ接続されていない（この節の条件(1)〜(6)はすべて、
       `ACCEL-01`／`ENV-01`だけを`3V3` pinへ接続する場合の前提である。`DISP-01`を追加接続する
       場合は、この節の条件ではなく`DISP-01`追加接続のbring-upの手順が持つ条件(1)〜(7)を
-      別途満たす。特に条件(2)（既定build限定）と条件(3)（101.5 mAの計算）は、同手順の
+      別途満たす。特に条件(2)（`bringup-i2c-15-16`単独限定）と条件(3)（101.5 mAの計算）は、同手順の
       条件(2)（`bringup-display-13`必須）・条件(3)（4点合算の計算）と両立しない）
 - [ ] (5) [gpio-assignment.md](gpio-assignment.md)の`module電源pinの独立性`／`pin header対応`と、
       受け入れchecklistの`Moduleのpull-upを並列合成した実効抵抗が有効範囲内である`が完了している
@@ -379,9 +382,10 @@ firmwareの`main.rs`はWi-Fi／Bluetooth APIを一切呼び出しておらず、
 **この条件の根拠は2026-09-23に変わった。**[#451](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/451)
 より前は、firmware側の理由が主だった。`main()`が`run_display_bringup`を無条件に呼び、その中で
 `lcd.backlight_on()`を実行していたため、`DISP-01`が配線されているだけでbacklightへ給電された。
-**`#451`で`run_display_bringup`は`bringup-display-13`か`face-21`のfeature（既定off）の付いたbuildだけが
-呼ぶようになり、既定buildはLCD関連pinへ一切触れない。**手順8で書き込むfirmwareを既定buildで
-作る限り、firmwareがbacklightを点ける経路は無い（正は`firmware/esp32/src/main.rs`のmodule docの
+**`#451`で`run_display_bringup`は`bringup-display-13`か`face-21`のfeature付きbuildだけが
+呼ぶようになり、当時の既定buildはLCD関連pinへ触れなかった。**#487の製品build統合以降、
+この手順は`bringup-i2c-15-16`単独buildを使う。この試験buildにはbacklightを点ける経路が無い
+（正は`firmware/esp32/src/main.rs`のmodule docの
 「`DISP-01`のbring-upを有効にする手順」節。**ここへfeature名以外を再掲しない**）。
 
 **それでも条件(4)は外さない。**理由が1つ減っただけである。(1) この節の電流の余裕計算は
@@ -398,7 +402,7 @@ ESP32`3V3` pinへ通常接続すること自体は2026-09-23（`#461`）で別�
 この手順（`#445`の余裕計算）へ`DISP-01`を合流させることを意味しない。**`DISP-01`を含む構成の
 手順は、この節とは別になる（作成は`#13`が引き受け、`DISP-01`追加接続のbring-upの手順として
 本節の下に新設済みである。同手順は`HW-TBD-024`行が既に持つ計算をそのまま参照し、余裕の
-再計算はしていない）。**したがって「既定buildならLCDを繋いでよい」とは読まない。**
+再計算はしていない）。**したがって「製品buildならLCDを繋いでよい」とは読まない。**
 
 **条件(5)の根拠。**`main.rs`の`run_i2c_bringup`のdoc commentが「実機で動かす前に要る」と挙げる
 現物確認2件を指す。**(a) `module電源pinの独立性`／`pin header対応`（[gpio-assignment.md](gpio-assignment.md)
@@ -439,11 +443,11 @@ railを含んでいても成立する（railを含む短絡もrailを含まな�
 この手順の必須条件ではない。
 
 **手順10の根拠。**手順の(a)(b)(c)は`run_i2c_bringup`側（`ACCEL-01`／`ENV-01`のDevice ID
-読み出し）のlogを指す。**既定buildでは、その手前にdisplay側のlog（`display_madctl`／`display_fill`／
-`display_corner_pattern`）は出ない。**[#451](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/451)
+読み出し）のlogを指す。**この手順の`bringup-i2c-15-16`単独buildでは、その手前にdisplay側のlog
+（`display_madctl`／`display_fill`／`display_corner_pattern`）は出ない。**[#451](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/451)
 で`run_display_bringup`が`bringup-display-13`か`face-21`のfeature（既定off）の付いたbuildだけの経路に
 なったためである（`main.rs`）。**`#451`より前の記述（display側のlogが先に現れるのは異常では
-ない）は、既定buildについてはもう当てはまらない。**`--features bringup-display-13`を付けて
+ない）は、この手順の試験buildについては当てはまらない。**`--features bringup-display-13`を付けて
 buildした場合は従来どおりdisplay側のlogが先に出るが、その構成はこの節の対象外である
 （この節は`DISP-01`を接続しない手順である。条件(4)参照）。
 
@@ -556,14 +560,13 @@ ESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`の負荷合計（測定ではない。
       `DISP-01`について完了している
 - [ ] (2) firmwareが`--features bringup-display-13`付きでbuild済みである。**commandの正本は
       [検証済みコマンド](../toolchains/verified-commands.md)であり、ここへ写さない。**同feature
-      は製品build（既定build）へLCDの試験モードを加えるものであり、Pi link（UART1）も同時に動く
+      はLCDの試験構成を選び、Pi link（UART1）も同時に動く
       （[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)。GPIO13をTXとして駆動する。
       Piをつながない回は、手順1の配線がGPIO13を使わないため、GPIO13に接続先は無い。Piをつなぐ回は
-      条件(3)(a)による。`gpio-assignment.md`の`PI-UART-TX`行）。既定buildのままでは
-      `run_display_bringup`が呼ばれず、受け入れ条件（初期化・fill・四隅・timing）を確認する材料と、
-      controllerの識別に使うcommandの実機での効果が得られない。**この構成の正式なVersion Recordは無い**（この構成の実施記録（`docs/toolchains/version-records/`）は、どれも#487のPR B1より前のtreeのものである。[検証済みコマンド](../toolchains/verified-commands.md)
-      が明記するとおり、`bringup-display-13`構成は正式なVersion Recordを持たない。build-onlyの
-      検証を誰がいつどの端末で行ったかは、実施時にVersion Recordまたは相当の記録を別途作る）
+      条件(3)(a)による。`gpio-assignment.md`の`PI-UART-TX`行）。既定の製品buildでは
+      表情を描き、fill・四隅patternの試験を行わないため、受け入れ条件（初期化・fill・四隅・timing）を確認する材料と、
+      controllerの識別に使うcommandの実機での効果が得られない。build-onlyのCI結果は
+      実機通電の根拠ではなく、実行する端末でbuildと通電条件を別途確認する）
 - [ ] (3) 電流の余裕計算（[HW-TBD-024の判断記録](tbd-register-history.md#hw-tbd-024)の2026-09-23追記）を
       確認した。**この計算はESP32＋`ACCEL-01`＋`ENV-01`＋`DISP-01`（backlight点灯＋ILI9341ロジック
       50 mA）の負荷合計（計算であり、段階B-2の定常電流「測定」ではない）を前提とする。**次の4点が
@@ -790,8 +793,8 @@ Revision 39で、給電元（B-2bか`3V3` pinか）ごとに参照先の節が�
 （`3V3` pin経路）を実施する際は、項目4が定める判定基準「単一経路であること」（`3V3` pinの1系統
 だけから受電し、USBの5V・外部3.3V電源等が同時に到達しないこと）を適用する。
 
-**条件(2)の根拠。**`main.rs`の`run_display_bringup`は`bringup-display-13`か`face-21`のfeature付きbuildだけが
-持つ関数であり、既定buildは`main()`から呼ばない（`#451`）。受け入れ条件のうち初期化の記録は
+**条件(2)の根拠。**`main.rs`の`run_display_bringup`は製品buildと`bringup-display-13`か`face-21`の試験buildが
+持つ関数である。ただしfill・四隅・timingの試験を行うのは`bringup-display-13`付きbuildだけである。受け入れ条件のうち初期化の記録は
 この関数のlogから、fill・四隅・timingの記録は`crate::display_test`（`firmware/esp32/src/display_test.rs`）のlogから得る。controllerの識別は、moduleのsilkと資料、およびこの関数が
 送るcommandの実機での効果から記録する（logだけの証拠にはしない）。
 
@@ -833,7 +836,7 @@ Revision 39で、給電元（B-2bか`3V3` pinか）ごとに参照先の節が�
 筐体に入れた状態は、この計算に含まれない。故障時（`R5`の先の短絡）の電流上界は、`R5`の値とrail電圧だけで
 決まり、点灯の長さを入力に使っていない（`DISP-01`追加接続のbring-upの手順の前提の節）。
 `face-21`付きbuildの実行は、実行する日に、条件(7)と同じ形（`3V3` pin経路でbacklightを点けたまま
-動かすことの承認）で人間から1件得る。**`DISP-01`追加接続の手順の条件(2)は`bringup-display-13`付きbuildを要求する。**そのため、`face-21`単独と`tap-21`単独のbuildは、この手順でも通電してよいbuildではない（各構成にこの条件を当てた結果は、`firmware/esp32/README.md`の「build構成と通電」の表）。`tap-21`は`ACCEL-01`を測定modeにする。その約140 µA typ（`sensor-datasheet-notes.md`の`Supply Current`行、Rev. G、ODR 100 Hz以上）は、条件(3)の計算（約245.4 mA）が内訳として持つ101.54 mA（内訳は本書の「この2点限定の給電」の行）に既に含まれる。`tap-21`が足す負荷は、この計算の外には無い見込みである。
+動かすことの承認）で人間から1件得る。**`DISP-01`追加接続の手順の条件(2)は`bringup-display-13`付きbuildを要求する。**そのため、`face-21`単独、`tap-21`単独、featureなしの製品buildは、この手順でも通電してよいbuildではない（各構成にこの条件を当てた結果は、`firmware/esp32/README.md`の「build構成と通電」の表）。`tap-21`は`ACCEL-01`を測定modeにする。その約140 µA typ（`sensor-datasheet-notes.md`の`Supply Current`行、Rev. G、ODR 100 Hz以上）は、条件(3)の計算（約245.4 mA）が内訳として持つ101.54 mA（内訳は本書の「この2点限定の給電」の行）に既に含まれる。`tap-21`が足す負荷は、この計算の外には無い見込みである。
 
 ##### 3.3 V railの許容電圧範囲
 

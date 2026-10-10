@@ -1,6 +1,6 @@
 //! ADXL345のtap検出を、main loopの中で周期的に読む（[#21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)、F1）。
 //!
-//! `tap-21` feature付きbuildだけがこのmoduleを使う。起動時のI2C bring-upが返す`I2cDriver`を持ち続け、
+//! 製品buildと`tap-21`試験buildがこのmoduleを使う。起動時のI2C bring-upが返す`I2cDriver`を持ち続け、
 //! [`TapDetector::configure`]でtap検出を設定し、[`TapDetector::poll`]が[`POLL_INTERVAL_MS`]ごとに
 //! `INT_SOURCE`をI2Cで読む（**割り込みのINT線は使わない。配線は要らない**）。tapを見つけたら
 //! `deskcat_tap::TapFilter`が送ってよいかを決める（bootのACK後だけ、前の`tapped`から最小間隔以上）。
@@ -8,7 +8,7 @@
 //!
 //! # I2C driverの所有
 //!
-//! `tap-21`付きbuildで、ADXL345のDevice IDが`0xE5`のとき（`main.rs`の`start_tap`が確かめる。一致しなければ何も書かず、
+//! 製品buildと`tap-21`付き試験buildで、ADXL345のDevice IDが`0xE5`のとき（`main.rs`の`start_tap`が確かめる。一致しなければ何も書かず、
 //! `I2cDriver`も手放す）、`TapDetector`が起動時のI2C bring-upの`I2cDriver`を唯一の所有者として持ち続ける。そのため、
 //! bring-upの後に`ENV-01`（BME280）をI2Cで読む経路は、このbuildには無い（今は誰も読まない）。
 //!
@@ -32,8 +32,8 @@
 //! 実機の確認（指で軽く叩いて`tapped`がPiへ届くこと、閾値の適否、誤検出）は#21の実機統合が持つ。`configure`は、測定modeへ入れた直後に`INT_SOURCE`を
 //! 1回読んで捨てる（過渡でtapのbitが立つかは確かめていない。立っても誤った`tapped`を送らないための備えである）。
 
-// 既定buildは`main()`から使わないためdead_codeになる（`tap-21` featureが無いと呼ばない）。moduleごと`#[cfg]`で
-// 落とさないのは、既定buildでもcross-compileを確認し続けるためである（`crate::display`と同じ）。
+// tapを持たない試験buildではdead_codeになる。moduleごと`#[cfg]`で落とさず、
+// 各試験buildでもcross-compileを確認する。
 #![allow(dead_code)]
 
 use deskcat_tap::{Decision, TapFilter};

@@ -10,8 +10,8 @@
 //! | `hello` | `crate::protocol::PiSession::handle_hello`のACKを書く。受理した場合は、その後に`BootSession::on_hello_accepted`を呼ぶ（§5.1の手順4・5） |
 //! | `ping` | `PiSession::handle_ping`のACKを書く |
 //! | `get_status` | `PiSession::handle_get_status`のACKと`status`を書く（下記） |
-//! | `set_expression` | `deskcat_face::judge`で判定する（session→値の範囲→LCDの準備の順。§8）。受理なら`crate::face::FaceState`へ記録して`ok`のACKを書く。拒否なら該当のcodeの拒否ACKを書く。**`face-21`を持たないbuildは`hardware_unavailable`、bring-upの間は`busy`で拒否する**（§7） |
-//! | （受信ではない）`tapped` | `tap-21`付きbuildが、bootのACKを受けた後に[`send_event`]で書く。受信の振り分けとは別の経路である（`crate::tap`） |
+//! | `set_expression` | `deskcat_face::judge`で判定する（session→値の範囲→LCDの準備の順。§8）。受理なら`crate::face::FaceState`へ記録して`ok`のACKを書く。拒否なら該当のcodeの拒否ACKを書く。**製品buildと`face-21`試験buildが受理できる。表情を持たない試験buildは`hardware_unavailable`、bring-upの間は`busy`で拒否する**（§7） |
+//! | （受信ではない）`tapped` | 製品buildと`tap-21`試験buildが、bootのACKを受けた後に[`send_event`]で書く。受信の振り分けとは別の経路である（`crate::tap`） |
 //! | `boot` | `unknown_type`の拒否ACKを書く（§8の表「方向が逆のsession確立message」） |
 //! | `status` | 応答しない（ESP32→Piのmessageである）。logで分類する |
 //! | decodeで拒否した行 | oversizeの行から`(sid, id)`と`hello`／`ping`／`get_status`のtypeを復元できた場合は`line_too_long`の拒否ACKを書く（§7）。それ以外はlogで分類し、応答しない（§2の既知の逸脱） |
@@ -29,7 +29,7 @@
 //!
 //! `get_status`への`status: ok`のACKと`status`は、1つのbufferへ連結し、1回の[`write_line`]で
 //! 送信のring bufferへ積む。Pi linkのUARTへ書くのは、このmoduleの応答と`BootSession`の`boot`の
-//! 送出と、`tap-21`付きbuildが[`send_event`]で送る`tapped`だけであり、どれもmain loopの同じtaskから呼ぶ。そのため、連結した2行の間に他の行は
+//! 送出と、製品build／`tap-21`試験buildが[`send_event`]で送る`tapped`だけであり、どれもmain loopの同じtaskから呼ぶ。そのため、連結した2行の間に他の行は
 //! 入らない。health snapshot（`main.rs`の`emit_health_snapshot`）はUART0のlogであり、Pi linkへ
 //! `status`を送らない。
 //!

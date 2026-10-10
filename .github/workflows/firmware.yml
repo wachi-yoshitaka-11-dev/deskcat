@@ -110,3 +110,20 @@ jobs:
 
       - name: Build
         run: cargo build --locked
+
+      # 製品buildのほか、既存の試験構成と#21のデモを確認する。
+      # bench-servo-test-17は#474のcompile_error!で意図的に停止するため含めない。
+      - name: Build test modes
+        run: |
+          for features in \
+            bringup-i2c-15-16 \
+            bringup-display-13 \
+            bringup-led-514 \
+            bringup-display-13,bringup-led-514 \
+            face-21 \
+            face-21,bringup-display-13 \
+            tap-21 \
+            tap-21,face-21,bringup-display-13; do
+            cargo clippy --all-targets --locked --features "$features" -- -D warnings
+            cargo build --locked --features "$features"
+          done
