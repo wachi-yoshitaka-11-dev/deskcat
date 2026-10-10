@@ -11,8 +11,10 @@
 //! servoを動かしてよいことは別である。`name`は閉じたenumにせず、有界でない`String`とする。
 //! 受理する名前は、firmwareのmotion catalogが持つ方針である。motion名をこのcrateに書くと
 //! `PROTO-TBD-008`を先取りするためである。`speed`と`repeat`の上限値も、ここでは決めない。
-//! 型の幅が縛るだけである。**catalog、上限の適用、未知の名前の拒否は、まだ実装していない**
-//! （§5.3、`firmware/esp32`の`pi_link.rs`）。`speed`と`repeat`が安全要件の5項目に効くかの判定は、
+//! 型の幅が縛るだけである。**受信した`play_motion`をcatalogと上限で判定してservoへ渡す経路は、まだ無い**
+//! （§5.3、`firmware/esp32`の`pi_link.rs`）。catalogの型（`deskcat-servo`の`MotionCatalog`。
+//! 既定は空で何も受理しない）と、名前が無いときの拒否（`Rejection::UnknownMotion`）は
+//! `deskcat-servo`にある。まだ無いのは、catalogの中身の名前と、`speed`／`repeat`の上限である。`speed`と`repeat`が安全要件の5項目に効くかの判定は、
 //! ここでは行わない。上限が決まる前にmotionを受理しない（§5.3の有効化の条件）。
 //!
 //! 含めないtypeと理由:
@@ -77,7 +79,7 @@ pub enum Message {
     /// Pi→ESP32。名前付きの高水準motionを要求する（§5.3）。
     ///
     /// **型があることは、motionを実行してよいことを意味しない。**受理する名前と
-    /// `speed`／`repeat`の上限は、firmwareが持つ方針である。まだ実装していない（module doc）。
+    /// `speed`／`repeat`の上限は、firmwareが持つ方針である。受信から判定する経路はまだ無い（module doc）。
     PlayMotion(PlayMotion),
 }
 
@@ -573,8 +575,7 @@ pub struct Environment {
 
 /// `play_motion`のpayload（§5.3）。
 ///
-/// 3つのfieldはすべて必須である。必須から省略可へ緩めても互換は壊れないが、逆は壊すため、
-/// 省略を許すのは意味が決まってからにする。
+/// 3つのfieldはすべて必須である。省略を許す変更は、意味が決まってから別に扱う。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PlayMotion {
     /// motion名。
@@ -582,7 +583,7 @@ pub struct PlayMotion {
     /// 閉じたenumにしない。**受理する名前は、firmwareのmotion catalogが持つ方針である**
     /// （module doc）。byte長に、このcrateでは数を置かない。行の最大長
     /// （[`limits::MAX_LINE_BYTES`]）が縛る。未知の名前とcatalogが空の間は、`invalid_payload`で
-    /// 拒否すると§5.3が定める。その拒否はまだ実装していない。
+    /// 拒否すると§5.3が定める。その拒否をwireの受信から呼ぶ経路は、まだ無い。
     pub name: String,
     /// 正規化されたspeed。
     ///
