@@ -112,7 +112,8 @@ wireへ出す`code`とは別に`cause`を持つ。**JSONの不正とenvelopeの�
 - `MAX_LINE_BYTES`は改行を含む1 lineの上限（§2の候補値、`PROTO-TBD-002`）。
 - string上限は勘で置かず、**escapeが起きない文字であれば**`MAX_LINE_BYTES`から導出できることを
   `tests/limits.rs`が検査する。各message typeについて、全string fieldを上限まで、
-  全integerを最大値まで詰めたlineが収まることを確認している。
+  全integerを最大値まで詰めたlineが収まることを確認している。**`play_motion.name`だけは個別の
+  上限が無く（行の最大長が縛る）、詰めていない。**
 
 **string上限を守っても行長は保証されない。**string上限はUTF-8 byte長で測るが、JSON encodeは
 `"`を`\"`、`\`を`\\`、制御文字を`\u00XX`（1 byte→6 byte）へ広げる。全fieldが上限内でも

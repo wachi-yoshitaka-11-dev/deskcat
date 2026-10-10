@@ -54,7 +54,7 @@
 //! - `calibrated pulse conversion`と`hardware PWM`（calibration値が`TBD`、PWMは実機）
 //! - `単位時間あたりの受理数`（`rate_limited`）と`実行中trajectoryの占有`（`busy`）
 //! - wireの`play_motion`の受信と振り分け。型は`deskcat-protocol`にあるが、受信してこのcrateへ渡す
-//!   経路はまだ無い（受け入れる名前と上限は`deskcat-protocol`の`message`のmodule docにある）
+//!   経路はまだ無い（受け入れる名前と上限は未決である。Protocol §5.3と`PROTO-TBD-008`）
 //! - servoの駆動、GPIO、通電に関わる一切
 //!
 //! # 例
