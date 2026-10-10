@@ -115,7 +115,7 @@ pub const fn check_transition(transition_ms: u32) -> Result<(), ErrorCode> {
 /// LCDの状態。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DisplayState {
-    /// 表情を描かない構成（`face-21`を持たないbuild。既定buildと`bringup-display-13`単独）。待っても描けない。
+    /// 現時点で表情を描けない。表情を持たない試験構成や、LCDの初期化前・初期化失敗時に使う。
     Unavailable,
     /// LCDは初期化済みだが、bring-upの試験が使っている間である。終われば描ける。
     Busy,

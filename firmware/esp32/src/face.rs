@@ -6,11 +6,10 @@
 //! # 構成
 //!
 //! - `FaceState`: 全buildが持つ。LCDの状態（`DisplayState`）と、受理した最新の表情を持つ。
-//!   `face-21` feature付きbuildだけが`Busy`／`Ready`にする。**`face-21`を持たないbuild
-//!   （既定buildと`bringup-display-13`単独）は、`set_expression`を`hardware_unavailable`で拒否する**
-//!   （§7。既定buildはLCD関連pinへ触れない。#451）。
+//!   製品buildと`face-21`試験buildが`Busy`／`Ready`にする。**表情を持たない試験build
+//!   （`bringup-display-13`単独など）は、`set_expression`を`hardware_unavailable`で拒否する**（§7）。
 //!   `bringup-display-13`と組み合わせたbuildは、bring-upの間`busy`で拒否する。
-//!   **`face-21`付きbuildは、Pi commandを受けなくても、描ける状態になった時点（`face-21`単独は起動直後、
+//!   **製品buildと`face-21`付き試験buildは、Pi commandを受けなくても、描ける状態になった時点（製品と`face-21`単独は起動直後、
 //!   `bringup-display-13`との組み合わせはbring-upが済んだ時点）で`neutral`を1回描く。**
 //! - `FaceDrawer`: LCD driverを持ち、受けた表情を帯1本ずつ塗る。1回の`FaceDrawer::poll`で帯1本だけ
 //!   塗ってmain loopへ戻るため、描画の間もheartbeatとPi linkの受信は止まらない見込みである
@@ -24,8 +23,8 @@
 //! （#21の実機統合）。切り替えの補間はしない。`transition_ms`は上限の検査だけに使い、受けた表情へ
 //! 即座に描き替える。
 
-// 既定buildは`FaceDrawer`を使わないためdead_codeになる（`face-21` featureが無いと`main()`から呼ばない）。
-// moduleごと`#[cfg]`で落とさないのは、既定buildでもcross-compileを確認し続けるためである（`crate::display`と同じ）。
+// 表情を持たない試験buildは`FaceDrawer`を使わないためdead_codeになる。
+// moduleごと`#[cfg]`で落とさず、各試験buildでもcross-compileを確認する。
 #![allow(dead_code)]
 
 use deskcat_face::{DisplayState, Painter};
