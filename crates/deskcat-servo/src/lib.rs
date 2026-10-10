@@ -44,8 +44,8 @@
 //! としていた。理由は値を先取りしないことだった。Issue #12で`crates/deskcat-serial`の
 //! `DuplicateHistory`が保持件数と保持期間を`DuplicatePolicy`として呼び出し側から受け取る形になり、
 //! その理由は抽出しても守れるようになった。そこでIssue #19で、`DuplicateHistory`を
-//! `deskcat-protocol`へ、hostとfirmwareで共用できるように移した。firmware側の呼び出しは、
-//! `play_motion`の型が決まった後である。**このcrateは履歴の実装を持たない**（`deskcat-protocol`の
+//! `deskcat-protocol`へ、hostとfirmwareで共用できるように移した。firmware側の呼び出しは、まだ無い。
+//! `play_motion`の型は`deskcat-protocol`にあるが、受信と振り分けの組み込みは後続である。**このcrateは履歴の実装を持たない**（`deskcat-protocol`の
 //! `DuplicateHistory`を使う）
 //!
 //! 含まないもの:
@@ -53,8 +53,8 @@
 //! - `protocol validation`（`crates/deskcat-protocol`）
 //! - `calibrated pulse conversion`と`hardware PWM`（calibration値が`TBD`、PWMは実機）
 //! - `単位時間あたりの受理数`（`rate_limited`）と`実行中trajectoryの占有`（`busy`）
-//! - wireの`play_motion`の受信と振り分け。`play_motion`の型が`deskcat-protocol`にまだ無い
-//!   （理由は`deskcat-protocol`の`message`のmodule docにある）
+//! - wireの`play_motion`の受信と振り分け。型は`deskcat-protocol`にあるが、受信してこのcrateへ渡す
+//!   経路はまだ無い（受け入れる名前と上限は`deskcat-protocol`の`message`のmodule docにある）
 //! - servoの駆動、GPIO、通電に関わる一切
 //!
 //! # 例

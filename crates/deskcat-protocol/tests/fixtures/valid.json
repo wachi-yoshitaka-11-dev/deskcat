@@ -202,7 +202,7 @@
       "note": "§5.3の例。`name`の値はcatalogが決めるため、例の`nod`は型の検査にだけ使う。"
     },
     {
-      "name": "play_motion_unbounded_name_and_repeat_max",
+      "name": "play_motion_repeat_max_and_zero_speed",
       "line": "{\"v\":1,\"sid\":90312,\"id\":913,\"ts_ms\":52030,\"type\":\"play_motion\",\"payload\":{\"name\":\"x\",\"speed\":0.0,\"repeat\":4294967295}}\n",
       "canonical": true,
       "expect": {
@@ -210,7 +210,7 @@
         "sid": 90312,
         "id": 913
       },
-      "note": "`repeat`には数値の上限を置かず、u32の最大値まで受ける（上限はfirmwareが持つ。§5.3は`TBD`）。`speed`の0.0も型としては有限である。名前の妥当性は型の外にある。"
+      "note": "`repeat`には数値の上限を置かず、u32の最大値まで受ける（上限はfirmwareが持つ。§5.3は`TBD`）。`speed`の0.0も型としては有限である。名前の妥当性は型の外にある。名前の長さの境界は、このcaseでは固定しない。"
     },
     {
       "name": "show_text_example",
