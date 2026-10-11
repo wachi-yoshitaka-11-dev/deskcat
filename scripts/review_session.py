@@ -216,10 +216,12 @@ def status_of(state, start, count, diff):
     passes = {p for item in same for p in item["passes"]}
     if not {"requirements-pass", "fresh-context-pass"} <= passes:
         return "stopped"
-    if len(same) >= 2 and all(not any(f["kind"] == "defect" for f in item["findings"])
-                              and not item["unresolved"] for item in same[:2]):
+    if len(same) >= 2 and all(not item["unresolved"] and not any(
+            finding["kind"] == "defect" for finding in item["findings"])
+            for item in same[:2]):
         return "converged"
-    if result.get("disposition") == "capped":
+    if result.get("disposition") == "capped" and last.get("criteria_version") != 2:
+        # Existing records may contain an ending written under the old rule.
         return "capped"
     if human_ending(state, diff, count) is not None:
         return "capped"
@@ -317,7 +319,8 @@ def begin(root, work, base, scope):
                           f"explicit bounded human approval required before round {review_round} of this review")
         entry = {"number": number, "diff": fingerprint(root, base), "scope": scope,
                  "approval_source": approval["source"] if approval else None,
-                 "free_limit": limit, "review": review, "review_round": review_round, "result": None}
+                 "free_limit": limit, "review": review, "review_round": review_round,
+                 "criteria_version": 2, "result": None}
         state["version"] = 2
         state["rounds"].append(entry)
         save(path, state)  # Reserve before launching: crashes also consume the round.
@@ -332,7 +335,7 @@ def finish(root, work, base, result):
             or not isinstance(result.get("findings"), list)
             or not isinstance(result.get("passes"), list)
             or not set(result["passes"]) <= {"requirements-pass", "fresh-context-pass"}
-            or result.get("disposition") not in ("continue", "capped", "interrupted")):
+            or result.get("disposition") not in ("continue", "interrupted")):
         raise Stopped("result requires passes, findings, unresolved and disposition")
     for finding in result["findings"]:
         if (finding.get("kind") not in ("defect", "out-of-scope", "optional")
@@ -342,8 +345,6 @@ def finish(root, work, base, result):
             raise Stopped("each finding requires kind, origin, decision, reason and evidence")
         if finding["kind"] == "defect" and finding["decision"] != "fix":
             raise Stopped("blocking defects cannot be declined/deferred; keep them unresolved")
-    if result["disposition"] == "capped" and not result.get("cap_reason"):
-        raise Stopped("capped requires the human approval source or the two-round optional-only rationale")
     with locked(root, work) as path:
         state = validate(read_json(path), work)
         if not state["rounds"] or state["rounds"][-1].get("result") is not None:

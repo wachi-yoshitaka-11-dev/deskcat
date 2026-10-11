@@ -55,7 +55,7 @@ class ReviewSessionTests(unittest.TestCase):
 
     def result(self, **changes):
         result = {"passes": ["requirements-pass", "fresh-context-pass"], "findings": [],
-                  "unresolved": [], "disposition": "continue", "cap_reason": "fixture: human decided to cap"}
+                  "unresolved": [], "disposition": "continue"}
         result.update(changes)
         return result
 
@@ -204,29 +204,42 @@ class ReviewSessionTests(unittest.TestCase):
     def test_unresolved_and_interrupted_never_converge_or_cap(self):
         self.run_review()
         self.cli("begin")
-        self.finish(unresolved=["D1: execution bypass"], disposition="capped")
+        self.finish(unresolved=["D1: execution bypass"])
         self.cli("check", expected=2)
         self.cli("begin")
         self.finish(disposition="interrupted")
         self.cli("check", expected=2)
 
-    def test_capped_is_distinct_and_requires_both_passes(self):
+    def test_declined_optional_findings_do_not_block_convergence(self):
         self.cli("begin")
-        self.finish(passes=["requirements-pass"], disposition="capped")
+        self.finish(passes=["requirements-pass"], findings=[{
+            "kind": "optional", "origin": "diff", "decision": "decline",
+            "reason": "No behavior or decision changes", "evidence": "note.md:1"}])
         self.cli("check", expected=2)
         self.cli("begin")
-        self.finish(passes=["fresh-context-pass"], disposition="capped", findings=[{
+        self.finish(passes=["fresh-context-pass"], findings=[{
             "kind": "optional", "origin": "prior-explanation", "decision": "decline",
             "reason": "No behavior or decision changes", "evidence": "note.md:1"}])
-        # Two rounds free of defects may converge even with declined optional wording.
-        self.assertIn("converged", self.cli("check").stdout)
+        self.assertIn("REVIEW_STATE=converged", self.cli("check").stdout)
 
-    def test_explicit_cap_is_not_convergence_or_automatic_at_limit(self):
+    def test_self_declared_cap_is_rejected(self):
         self.cli("begin")
-        self.finish(disposition="capped")
-        self.assertIn("REVIEW_STATE=capped", self.cli("check").stdout)
-        self.cli("begin")
-        self.cli("finish", "--record", self.write(self.result(disposition="capped", cap_reason="")), expected=2)
+        self.cli("finish", "--record", self.write(self.result(disposition="capped")), expected=2)
+        self.finish()
+        self.assertIn("REVIEW_STATE=stopped", self.cli("check", expected=2).stdout)
+
+    def test_saved_legacy_endings_keep_their_previous_meaning(self):
+        self.run_review(findings=[{"kind": "optional", "origin": "diff", "decision": "decline",
+                                   "reason": "legacy fixture", "evidence": "note.md:1"}])
+        self.run_review(findings=[{"kind": "optional", "origin": "diff", "decision": "decline",
+                                   "reason": "legacy fixture", "evidence": "note.md:1"}])
+        state = json.loads(self.cli("status").stdout)
+        for round_record in state["rounds"]:
+            del round_record["criteria_version"]
+        diff = state["rounds"][-1]["diff"]
+        self.assertEqual(session.status_of(state, 0, 2, diff), "converged")
+        state["rounds"][0]["result"]["disposition"] = "capped"
+        self.assertEqual(session.status_of(state, 0, 1, diff), "capped")
 
     def test_diff_mutation_during_review_requires_interruption(self):
         self.cli("begin")
@@ -332,12 +345,14 @@ class ReviewSessionTests(unittest.TestCase):
         self.change("still open\n")
         self.assertEqual(json.loads(self.cli("begin").stdout)["review"], 2)
 
-    def test_self_declared_cap_does_not_end_the_review(self):
+    def test_new_record_cannot_self_cap_at_free_round_limit(self):
         for _ in range(4):
             self.run_review(**OPEN)
         self.cli("begin")
-        self.finish(disposition="capped", cap_reason="fixture: reviewer's own claim")
-        self.assertIn("REVIEW_STATE=capped", self.cli("check").stdout)
+        self.cli("finish", "--record", self.write(self.result(disposition="capped")), expected=2)
+        self.finish(findings=[{"kind": "optional", "origin": "diff", "decision": "decline",
+                              "reason": "No behavior or decision changes", "evidence": "note.md:1"}])
+        self.assertIn("REVIEW_STATE=stopped", self.cli("check", expected=2).stdout)
         blocked = self.run_review(expected=2)
         self.assertIn("review=1 rounds=5 limit=5", blocked.stderr)
 
