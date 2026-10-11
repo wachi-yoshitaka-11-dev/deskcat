@@ -6,8 +6,9 @@
 use core::time::Duration;
 use std::collections::VecDeque;
 use std::io;
+use std::num::NonZeroU64;
 
-use deskcat_domain::{Millis, Mind, Timing};
+use deskcat_domain::{LOCAL_SPEECH_LINES, Millis, Mind, Timing};
 use deskcat_protocol::{
     Ack, AckStatus, Boot, DisplayStatus, Envelope, ErrorCode, ExpressionName, Frame, HeadTouched,
     HelloReason, Message, ProtocolCounters, SensorStatus, ServoStatus, Status, decode_line,
@@ -208,6 +209,153 @@ fn established_with(mut d: Daemon, shown: &str) -> (Daemon, Fake) {
     t.feed(status(shown), ESP_SID, 3);
     assert_eq!(run(&mut d, &mut t, 20), Step::Continue);
     (d, t)
+}
+
+#[test]
+fn speech_candidates_satisfy_protocol_bounds_and_control_rules() {
+    for line in LOCAL_SPEECH_LINES {
+        let message = Message::ShowText(deskcat_protocol::ShowText {
+            text: (*line).to_owned(),
+            duration_ms: u32::MAX,
+        });
+        assert!(line.len() <= limits::MAX_TEXT_BYTES);
+        assert!(!line.chars().any(char::is_control));
+        assert!(message.check_bounds().is_ok());
+        let frame = Frame::new(
+            Envelope {
+                v: limits::PROTOCOL_VERSION,
+                sid: u32::MAX,
+                id: u32::MAX,
+                ts_ms: u64::MAX,
+            },
+            message,
+        );
+        assert!(
+            encode_line(&frame).is_ok(),
+            "最大幅のenvelopeでもlineへ収まる"
+        );
+    }
+}
+
+#[test]
+fn speech_follows_expression_and_busy_is_counted_without_blocking_expression() {
+    let (mut d, mut t) = established("neutral");
+    let _ = t.sent();
+    assert!(d.speech_ready());
+    d.queue_speech(LOCAL_SPEECH_LINES[0], 200, NonZeroU64::new(200).unwrap());
+    t.feed(
+        Message::HeadTouched(HeadTouched { duration_ms: 700 }),
+        ESP_SID,
+        4,
+    );
+    assert_eq!(run(&mut d, &mut t, 100), Step::Continue);
+    let sent = t.sent();
+    assert_eq!(command_order(&sent), ["set_expression", "show_text"]);
+    let expression_id = find_id(&sent, |m| matches!(m, Message::SetExpression(_))).unwrap();
+    let text_id = find_id(&sent, |m| matches!(m, Message::ShowText(_))).unwrap();
+    assert!(
+        matches!(&sent[1].message, Message::ShowText(text) if text.text == LOCAL_SPEECH_LINES[0] && text.duration_ms == 200)
+    );
+    assert!(!d.speech_ready(), "ACK待ちの間は次の候補を消費しない");
+
+    t.feed(
+        ack(text_id, AckStatus::Rejected, Some(ErrorCode::Busy)),
+        ESP_SID,
+        5,
+    );
+    t.feed(ack(expression_id, AckStatus::Ok, None), ESP_SID, 6);
+    assert_eq!(run(&mut d, &mut t, 110), Step::Continue);
+    assert_eq!(d.counters().show_text_transient_rejections, 1);
+    assert!(d.speech_ready(), "busyの後は次の間隔で候補を出せる");
+    let interval = NonZeroU64::new(200).unwrap();
+    assert!(t.sent().is_empty());
+    d.queue_speech(LOCAL_SPEECH_LINES[1], 200, interval);
+    assert_eq!(run(&mut d, &mut t, 299), Step::Continue);
+    assert!(t.sent().is_empty(), "前の送信から最短間隔までは保留する");
+    assert_eq!(run(&mut d, &mut t, 300), Step::Continue);
+    let sent = t.sent();
+    let next_text_id = find_id(&sent, |m| matches!(m, Message::ShowText(_))).unwrap();
+    t.feed(ack(next_text_id, AckStatus::Ok, None), ESP_SID, 7);
+    assert_eq!(run(&mut d, &mut t, 310), Step::Continue);
+    assert_eq!(d.counters().show_text_accepted, 1);
+}
+
+#[test]
+fn stale_speech_ack_is_counted_and_resumes_session() {
+    let (mut d, mut t) = established("neutral");
+    let _ = t.sent();
+    d.queue_speech(LOCAL_SPEECH_LINES[0], 200, NonZeroU64::new(200).unwrap());
+    assert_eq!(run(&mut d, &mut t, 100), Step::Continue);
+    let sent = t.sent();
+    let text_id = find_id(&sent, |m| matches!(m, Message::ShowText(_))).unwrap();
+    t.feed(
+        ack(text_id, AckStatus::Rejected, Some(ErrorCode::StaleSession)),
+        ESP_SID,
+        4,
+    );
+    assert_eq!(run(&mut d, &mut t, 110), Step::Continue);
+    assert_eq!(d.counters().show_text_stale_sessions, 1);
+    assert_eq!(d.counters().resumes, 1);
+    assert_eq!(command_order(&t.sent()), ["hello"]);
+    assert!(!d.speech_ready());
+}
+
+#[test]
+fn speech_rejections_and_silence_are_classified_and_stop_repeated_sends() {
+    let (mut d, mut t) = established("neutral");
+    let _ = t.sent();
+    d.queue_speech(LOCAL_SPEECH_LINES[0], 200, NonZeroU64::new(200).unwrap());
+    assert_eq!(run(&mut d, &mut t, 100), Step::Continue);
+    let sent = t.sent();
+    let text_id = find_id(&sent, |m| matches!(m, Message::ShowText(_))).unwrap();
+    t.feed(
+        ack(
+            text_id,
+            AckStatus::Rejected,
+            Some(ErrorCode::HardwareUnavailable),
+        ),
+        ESP_SID,
+        4,
+    );
+    assert_eq!(run(&mut d, &mut t, 110), Step::Continue);
+    assert_eq!(d.counters().show_text_fixed_rejections, 1);
+    assert!(!d.speech_ready());
+    assert!(t.sent().is_empty());
+
+    let (mut d, mut t) = established("neutral");
+    let _ = t.sent();
+    d.queue_speech(LOCAL_SPEECH_LINES[0], 200, NonZeroU64::new(200).unwrap());
+    assert_eq!(run(&mut d, &mut t, 100), Step::Continue);
+    let first = t.sent();
+    let text_id = find_id(&first, |m| matches!(m, Message::ShowText(_))).unwrap();
+    for now in [1_000, 2_000, 3_000, 4_000] {
+        assert_eq!(run(&mut d, &mut t, now), Step::Continue);
+        for frame in t.sent() {
+            if let Message::ShowText(_) = frame.message {
+                assert_eq!(frame.envelope.id, text_id, "再送は同じidを使う");
+            }
+        }
+    }
+    assert_eq!(d.counters().show_text_no_response, 1);
+    assert!(!d.speech_ready());
+}
+
+#[test]
+fn invalid_speech_is_rejected_before_send() {
+    let (mut d, mut t) = established("neutral");
+    let _ = t.sent();
+    d.queue_speech("line\nsecond", 200, NonZeroU64::new(200).unwrap());
+    assert_eq!(run(&mut d, &mut t, 100), Step::Continue);
+    assert_eq!(d.counters().show_text_input_faults, 1);
+    assert!(t.sent().is_empty());
+
+    let (mut d, mut t) = established("neutral");
+    let _ = t.sent();
+    let too_long = Box::leak("a".repeat(limits::MAX_TEXT_BYTES + 1).into_boxed_str());
+    d.queue_speech(too_long, 200, NonZeroU64::new(200).unwrap());
+    assert_eq!(run(&mut d, &mut t, 100), Step::Continue);
+    assert_eq!(d.counters().show_text_input_faults, 1);
+    assert!(t.sent().is_empty());
 }
 
 #[test]

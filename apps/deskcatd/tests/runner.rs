@@ -5,14 +5,16 @@
 
 use std::collections::VecDeque;
 use std::io;
+use std::num::NonZeroU64;
 
-use deskcat_domain::{Millis, Mind, Timing};
+use deskcat_domain::{LOCAL_SPEECH_LINES, Millis, Mind, Timing};
 use deskcat_protocol::{
-    Ack, AckStatus, Boot, Envelope, Frame, Message, decode_line, encode_line, limits,
+    Ack, AckStatus, Boot, DisplayStatus, Envelope, Frame, Message, ProtocolCounters, SensorStatus,
+    ServoStatus, Status, decode_line, encode_line, limits,
 };
 use deskcat_serial::{DuplicatePolicy, PeerSession, SerialConfig, Session, Transport};
 use deskcatd::daemon::{Daemon, EXIT_SESSION_REDO, ExitReason, Identity, Step};
-use deskcatd::runner::{RunEnd, run_loop};
+use deskcatd::runner::{RunEnd, SpeechConfig, run_loop, run_loop_with_speech};
 use deskcatd::watchdog::StartupWatchdog;
 
 const PI_SID: u32 = 1000;
@@ -24,6 +26,10 @@ struct Fake {
     reads: VecDeque<Vec<u8>>,
     written: Vec<u8>,
     eof: bool,
+    eof_after_idle_reads: Option<usize>,
+    idle_reads: usize,
+    auto_ack_text: bool,
+    acked_text_id: Option<u32>,
 }
 
 impl Transport for Fake {
@@ -38,7 +44,51 @@ impl Transport for Fake {
                 Ok(n)
             }
             None if self.eof => Ok(0),
-            None => Err(io::Error::from(io::ErrorKind::WouldBlock)),
+            None => {
+                if self.auto_ack_text {
+                    let written = std::str::from_utf8(&self.written).expect("UTF-8");
+                    if let Some(id) = written
+                        .lines()
+                        .filter_map(|line| {
+                            let frame = decode_line(line).expect("frame");
+                            matches!(frame.message, Message::ShowText(_))
+                                .then_some(frame.envelope.id)
+                        })
+                        .next_back()
+                        && self.acked_text_id != Some(id)
+                    {
+                        self.acked_text_id = Some(id);
+                        let answer = Frame::new(
+                            Envelope {
+                                v: limits::PROTOCOL_VERSION,
+                                sid: ESP_SID,
+                                id: 100 + id,
+                                ts_ms: 1,
+                            },
+                            Message::Ack(Ack {
+                                reply_sid: PI_SID,
+                                reply_to: id,
+                                status: AckStatus::Ok,
+                                code: None,
+                                detail: None,
+                            }),
+                        );
+                        let line = encode_line(&answer).expect("ACKはencodeできる");
+                        let bytes = line.as_bytes();
+                        buf[..bytes.len()].copy_from_slice(bytes);
+                        return Ok(bytes.len());
+                    }
+                }
+                self.idle_reads += 1;
+                if self
+                    .eof_after_idle_reads
+                    .is_some_and(|limit| self.idle_reads >= limit)
+                {
+                    Ok(0)
+                } else {
+                    Err(io::Error::from(io::ErrorKind::WouldBlock))
+                }
+            }
         }
     }
 
@@ -101,6 +151,161 @@ fn clock(start: u64, by: u64) -> impl FnMut() -> u64 {
         now += by;
         v
     }
+}
+
+fn ready() -> (Daemon, Fake) {
+    let mut d = daemon();
+    let mut t = Fake::default();
+    assert_eq!(d.step(&mut t, 0), Step::Continue);
+    let hello_id = t.hello_id();
+    t.feed(
+        Message::Ack(Ack {
+            reply_sid: PI_SID,
+            reply_to: hello_id,
+            status: AckStatus::Ok,
+            code: None,
+            detail: None,
+        }),
+        ESP_SID,
+        1,
+    );
+    t.feed(
+        Message::Boot(Boot {
+            firmware: "0.1.0".to_owned(),
+            board: "esp32".to_owned(),
+            reset_reason: "power_on".to_owned(),
+        }),
+        ESP_SID,
+        2,
+    );
+    for _ in 0..4 {
+        assert_eq!(d.step(&mut t, 10), Step::Continue);
+    }
+    let sent = String::from_utf8(core::mem::take(&mut t.written)).unwrap();
+    let status_id = sent
+        .lines()
+        .map(|line| decode_line(line).unwrap())
+        .find(|f| matches!(f.message, Message::GetStatus))
+        .unwrap()
+        .envelope
+        .id;
+    t.feed(
+        Message::Ack(Ack {
+            reply_sid: PI_SID,
+            reply_to: status_id,
+            status: AckStatus::Ok,
+            code: None,
+            detail: None,
+        }),
+        ESP_SID,
+        3,
+    );
+    t.feed(
+        Message::Status(Box::new(Status {
+            firmware: "0.1.0".to_owned(),
+            reset_reason: "power_on".to_owned(),
+            display: DisplayStatus {
+                state: "ready".to_owned(),
+                expression: "neutral".to_owned(),
+            },
+            servo: ServoStatus {
+                state: "disabled".to_owned(),
+            },
+            sensors: SensorStatus {
+                touch: "unknown".to_owned(),
+                acceleration: "unknown".to_owned(),
+                environment: "unknown".to_owned(),
+            },
+            protocol: ProtocolCounters::default(),
+        })),
+        ESP_SID,
+        4,
+    );
+    for _ in 0..4 {
+        assert_eq!(d.step(&mut t, 20), Step::Continue);
+    }
+    assert!(d.speech_ready());
+    t.written.clear();
+    t.idle_reads = 0;
+    t.eof_after_idle_reads = Some(2);
+    (d, t)
+}
+
+#[test]
+fn runner_uses_local_speech_only_with_explicit_config() {
+    let (mut d, mut t) = ready();
+    assert_eq!(
+        run_loop(&mut d, &mut t, clock(100, 100), StartupWatchdog::new(1_000)),
+        RunEnd::Exited(ExitReason::LinkLost)
+    );
+    assert!(t.written.is_empty(), "既定はoff");
+
+    let (mut d, mut t) = ready();
+    let config = SpeechConfig {
+        min_interval_ms: NonZeroU64::new(200).unwrap(),
+        duration_ms: 500,
+    };
+    assert_eq!(
+        run_loop_with_speech(
+            &mut d,
+            &mut t,
+            clock(100, 100),
+            StartupWatchdog::new(1_000),
+            Some(config)
+        ),
+        RunEnd::Exited(ExitReason::LinkLost)
+    );
+    let sent = String::from_utf8(t.written).unwrap();
+    let frames: Vec<_> = sent
+        .lines()
+        .map(|line| decode_line(line).unwrap())
+        .collect();
+    assert_eq!(frames.len(), 1);
+    assert!(
+        matches!(&frames[0].message, Message::ShowText(text) if text.text == LOCAL_SPEECH_LINES[0] && text.duration_ms == 500)
+    );
+    assert_eq!(d.counters().show_text_sent, 1);
+}
+
+#[test]
+fn runner_keeps_the_interval_after_each_correlated_ack() {
+    let (mut d, mut t) = ready();
+    t.auto_ack_text = true;
+    t.eof_after_idle_reads = Some(8);
+    let config = SpeechConfig {
+        min_interval_ms: NonZeroU64::new(300).unwrap(),
+        duration_ms: 500,
+    };
+    assert_eq!(
+        run_loop_with_speech(
+            &mut d,
+            &mut t,
+            clock(100, 100),
+            StartupWatchdog::new(1_000),
+            Some(config)
+        ),
+        RunEnd::Exited(ExitReason::LinkLost)
+    );
+    let sent = String::from_utf8(t.written).unwrap();
+    let texts: Vec<_> = sent
+        .lines()
+        .map(|line| decode_line(line).unwrap())
+        .filter(|frame| matches!(frame.message, Message::ShowText(_)))
+        .collect();
+    assert!(texts.len() >= 2);
+    assert!(
+        matches!(&texts[0].message, Message::ShowText(text) if text.text == LOCAL_SPEECH_LINES[0])
+    );
+    assert!(
+        matches!(&texts[1].message, Message::ShowText(text) if text.text == LOCAL_SPEECH_LINES[1])
+    );
+    for pair in texts.windows(2) {
+        assert!(pair[1].envelope.ts_ms - pair[0].envelope.ts_ms >= 300);
+    }
+    assert!(
+        d.counters().show_text_accepted >= 2,
+        "ACK後にも次の候補が出る"
+    );
 }
 
 #[test]

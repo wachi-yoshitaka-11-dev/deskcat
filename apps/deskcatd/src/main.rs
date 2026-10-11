@@ -28,7 +28,7 @@ use deskcat_domain::{Millis, Mind, Timing};
 use deskcat_serial::{PeerSession, SerialConfig, SerialDevice, Session};
 use deskcatd::cli::{self, Parsed};
 use deskcatd::daemon::{Daemon, EXIT_FATAL, EXIT_SESSION_REDO, Identity};
-use deskcatd::runner::run_loop;
+use deskcatd::runner::run_loop_with_speech;
 use deskcatd::sid::sid_from_os;
 use deskcatd::watchdog::StartupWatchdog;
 
@@ -110,11 +110,12 @@ fn main() -> ExitCode {
     );
     daemon.on_connected();
 
-    let end = run_loop(
+    let end = run_loop_with_speech(
         &mut daemon,
         &mut device,
         || uptime_ms(started),
         StartupWatchdog::new(args.startup_deadline_ms.get()),
+        args.speech,
     );
 
     log::info!("終了する: {end:?}");
