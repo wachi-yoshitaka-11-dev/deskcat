@@ -2,12 +2,14 @@
 //!
 //! string上限を勘で置かないための検査である。各message typeについて、全string fieldを
 //! 上限まで、全integerを最大値まで詰めたlineが[`limits::MAX_LINE_BYTES`]に収まることを
-//! 確認する。上限定数を動かしたときに、この検査が破綻を検知する。
+//! 確認する。上限定数を動かしたときに、この検査が破綻を検知する。**`play_motion.name`だけは
+//! 個別の上限が無く、詰められない**ため例外である（該当のcaseの注記）。
 
 use deskcat_protocol::{
     Ack, AckStatus, Boot, DisplayStatus, Envelope, Environment, ErrorCode, ExpressionName,
-    FiniteF32, Frame, HeadTouched, Hello, HelloReason, Lifted, Message, ProtocolCounters,
-    SensorStatus, ServoStatus, SetExpression, ShowText, Status, encode_line, limits,
+    FiniteF32, Frame, HeadTouched, Hello, HelloReason, Lifted, Message, PlayMotion,
+    ProtocolCounters, SensorStatus, ServoStatus, SetExpression, ShowText, Status, encode_line,
+    limits,
 };
 
 /// 最悪のenvelope。`v`は受理される値ではなく、宣言した幅の最大値を使う。
@@ -105,6 +107,14 @@ fn worst_case_messages() -> Vec<Message> {
             humidity_pct: Some(longest_finite_f32()),
             pressure_hpa: Some(longest_finite_f32()),
         }),
+        // `name`は個別の上限を持たず、行の最大長が縛る（`PlayMotion::name`）。ここでは固定部分
+        // （`speed`と`repeat`）の最大だけを詰める。`name`を詰めると行が上限を超えて当然であり、
+        // 上限の不変条件を確かめることにならない。
+        Message::PlayMotion(PlayMotion {
+            name: filled(1),
+            speed: longest_finite_f32(),
+            repeat: u32::MAX,
+        }),
     ]
 }
 
@@ -137,7 +147,8 @@ fn longest_finite_f32() -> FiniteF32 {
     .expect("candidates are not empty")
 }
 
-/// escapeが起きない文字であれば、全fieldを上限まで詰めても行長に収まる。
+/// escapeが起きない文字であれば、全fieldを上限まで詰めても行長に収まる。ただし`play_motion.name`は
+/// 個別の上限が無く、詰めていない（module doc）。
 ///
 /// **これは「string上限を守れば行長も収まる」という意味ではない。**escapeを含む場合は
 /// 収まらないことがあり、それは下の`strings_needing_json_escapes_can_exceed_the_line_limit`が

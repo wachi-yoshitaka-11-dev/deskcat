@@ -49,7 +49,7 @@ pub enum Received {
     /// 受けた。**応答は返さない**（§8）。何をするかは呼び出し側が決める。
     Event(Frame),
     /// ESP32→Piで定義されていないtype（`hello`・`ping`・`get_status`・`set_expression`・
-    /// `show_text`。いずれもPi→ESP32のmessageである）を、応答せず無視した。
+    /// `show_text`・`play_motion`。いずれもPi→ESP32のmessageである）を、応答せず無視した。
     UndefinedType(&'static str),
 }
 

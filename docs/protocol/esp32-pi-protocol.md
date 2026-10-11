@@ -57,7 +57,7 @@ Protocol channelから送信するすべてのbyteは、有効にframe化され�
 
 **もう3つ、Pi linkを持つbuildの既知の逸脱を記録する**（#446のPR Bから。#487のPR B2で範囲を改めた）。受信の振り分けは`firmware/esp32/src/pi_link.rs`のmodule docが持つ。
 
-- (i) decodeで拒否した行（未対応のtype、payloadやenvelopeの不正）には、§8の相関ACKを返さない。`deskcat_protocol`の受信は、oversize以外の拒否した行の`(sid, id)`を復元しないためである。oversizeの行で`(sid, id)`と`hello`／`ping`／`get_status`のtypeを復元できた場合は、`line_too_long`の拒否ACKを返す。display／motionのcommand（§5.3〜§5.5）にも相関ACKを返さない。`play_motion`と`show_choices`は`deskcat_protocol`のmessageに無く、この(i)に当たる。`show_text`はdecodeを通るが、firmwareはまだ処理せず`log`で分類するだけである（`pi_link.rs`の`pi_rx_unhandled_frame`）。そのため§7の`hardware_unavailable`も返さない。`set_expression`はfirmwareが処理する（[Issue #21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)）。製品buildと`face-21`試験buildは、session（`stale_session`）→値の範囲（`transition_ms`の上限。`out_of_range`。§12のとおり手順10で適用する）の順に判定して`ok`のACKを返し、LCDへ表情を描く。表情を持たない試験build（`bringup-display-13`単独など）は`hardware_unavailable`、`bringup-display-13`と組み合わせたbuildのbring-upの間は`busy`で拒否する。製品buildと`face-21`試験buildは、Pi commandを受けなくても、描ける状態になった時点で`neutral`を1回描く。`transition_ms`は上限の検査だけに使い、切り替えを補間しない。
+- (i) decodeで拒否した行（未対応のtype、payloadやenvelopeの不正）には、§8の相関ACKを返さない。`deskcat_protocol`の受信は、oversize以外の拒否した行の`(sid, id)`を復元しないためである。oversizeの行で`(sid, id)`と`hello`／`ping`／`get_status`のtypeを復元できた場合は、`line_too_long`の拒否ACKを返す。display／motionのcommand（§5.3〜§5.5）にも相関ACKを返さない。`show_choices`は`deskcat_protocol`のmessageに無く、この(i)に当たる。`play_motion`はdecodeを通るが、firmwareはまだ処理せず、どのservoのcodeにも渡さず、`log`で分類するだけである（`pi_link.rs`の`pi_rx_play_motion_not_supported`）。そのため相関ACKも§7の`hardware_unavailable`も返さない。`show_text`はdecodeを通るが、firmwareはまだ処理せず`log`で分類するだけである（`pi_link.rs`の`pi_rx_unhandled_frame`）。そのため§7の`hardware_unavailable`も返さない。`set_expression`はfirmwareが処理する（[Issue #21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)）。製品buildと`face-21`試験buildは、session（`stale_session`）→値の範囲（`transition_ms`の上限。`out_of_range`。§12のとおり手順10で適用する）の順に判定して`ok`のACKを返し、LCDへ表情を描く。表情を持たない試験build（`bringup-display-13`単独など）は`hardware_unavailable`、`bringup-display-13`と組み合わせたbuildのbring-upの間は`busy`で拒否する。製品buildと`face-21`試験buildは、Pi commandを受けなくても、描ける状態になった時点で`neutral`を1回描く。`transition_ms`は上限の検査だけに使い、切り替えを補間しない。
 - (ii) §7のParser counterによる区別を`log`でだけ行う（UART0のdebug logで見える）。`ProtocolCounters`は増やさず、`get_status`へ返す`status`のcounterは0のままである。
 - (iii) `ping`／`get_status`、`set_expression`、`port_reopen`／`resync`の`hello`、拒否した`hello`の処理済みの結果を保持せず、同じ`(sid, id)`の再送をもう一度処理する（§8の手順8・9）。§8.1／§8.2の流量制限、`hello`の拒否ACKの保留table（§5.1）、§5.1の遷移の上限とcooldown（`PROTO-TBD-012`）も実装していない。このため`hello`による`boot`の再開（§4.1）は、firmwareの中では遷移の回数で抑えられない。
 
@@ -108,13 +108,16 @@ Integer widthは、共有test fixture（§12.1）とあわせて次のとおり�
 | `id` | `u32` | 同一session内のmessage ID |
 | `ts_ms` | `u64` | uptime ms。`u32`は約49.7日でwrapし、長時間動作で`ts_ms`の単調性が崩れる |
 
-§4.2〜§4.5、§5.2、§5.4のtype固有payloadのfieldは次のとおりとする（[Issue #527](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/527)）。必須fieldの欠落と、表の型に収まらない値は、payloadのschemaを満たさないため`invalid_payload`で拒否する。省略可のfieldの`null`は、省略と同じに扱う。
+§4.2〜§4.5、§5.2、§5.4のtype固有payloadのfieldは次のとおりとする（[Issue #527](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/527)）。§5.3の`play_motion`の3 fieldは[Issue #19](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/19)で足した。必須fieldの欠落と、表の型に収まらない値は、payloadのschemaを満たさないため`invalid_payload`で拒否する。省略可のfieldの`null`は、省略と同じに扱う。
 
 | type固有payloadのfield | 型 | 必須 |
 |---|---|---|
 | `set_expression.name` | string。§5.2の初期のexpression名のいずれか | 必須 |
 | `set_expression.transition_ms`、`show_text.duration_ms`、`head_touched.duration_ms`、`lifted.duration_ms` | `u32`（ms） | 必須 |
 | `show_text.text` | UTF-8 string。上限は§5.4、制御文字は§7 | 必須 |
+| `play_motion.name` | UTF-8 string。byte長にこの型の上限を置かず、行の最大長（§2）が縛る。受理する名前はfirmwareが持つ（§5.3） | 必須 |
+| `play_motion.speed` | 有限の32-bit浮動小数点数。上限を設けることは§5.3が定め、値は`PROTO-TBD-008`（§13）で未決 | 必須 |
+| `play_motion.repeat` | `u32`。上限を設けることは§5.3が定め、値は`PROTO-TBD-008`（§13）で未決 | 必須 |
 | `environment.temperature_c`、`environment.humidity_pct`、`environment.pressure_hpa` | 有限の32-bit浮動小数点数 | 省略可 |
 | `head_touched.strength`、`tapped.magnitude_g` | 持たない。受けた場合は上の未知の追加fieldとして無視する | — |
 
@@ -763,6 +766,8 @@ Firmwareは次を実行する。
 
 初期に受け入れるmotion名は、サーボ機構のcalibrationが完了するまで`TBD`とする。
 
+**`play_motion`の型（[Issue #19](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/19)）。**`name`、`speed`、`repeat`の3つはすべて必須である（§3の型表）。`name`は閉じた列挙にせず、有界でない文字列とする。受理する名前はfirmwareが持つmotion catalogが決め、motion名はprotocolの型に書かない。未知の`name`と、catalogが空の間の`name`は、`invalid_payload`で拒否する（§7の「列挙外の値」。`out_of_range`は型が正しい値の上限超過に使う。拒否ACKを返す実装は、まだ無い。§2の既知の逸脱(i)）。`hardware_unavailable`は、サーボ出力の有効化条件が決まってから扱う。**型があることは、motionを実行してよいことを意味しない。**`speed`と`repeat`の上限値は`TBD`のままであり（記録先は§13の`PROTO-TBD-008`）、**catalogが空でなくなる（motionを受理し始める）前に、この上限が決まっていることを、有効化の条件とする。**これはサーボ出力の有効化条件（[Servo Safety Limits](../hardware/servo-safety-limits.md)）を置き換えず、それとは別に要る条件である。
+
 上限を超えた場合は、制限の種類に応じたcodeを返し、新しいtrajectoryを開始しない。
 
 **(a) commandを受理しない場合** — 実行中の動作は継続する。
@@ -1309,7 +1314,7 @@ fixtureは最低限、次の5群をすべて含む。上の一覧と表がその
 
 | 群 | 対象 | 状態 |
 |---|---|---|
-| Schema | envelope、type固有payload、上限の境界、未知version／type | **作成済み**（#9。`set_expression`、`show_text`、`head_touched`、`tapped`、`lifted`、`environment`は#527） |
+| Schema | envelope、type固有payload、上限の境界、未知version／type | **作成済み**（#9。`set_expression`、`show_text`、`head_touched`、`tapped`、`lifted`、`environment`は#527。`play_motion`は#19） |
 | Framing／parse | 分割受信、CRLF、invalid UTF-8／JSON、line長境界 | **作成済み。**line長境界・CRLF・invalid JSONは#9、byte単位の分割受信とinvalid UTF-8は#10 |
 | Session判定 | 遷移の成否、`stale_session`、retired session、`hello`／`boot`再送、`sid`衝突時の選び直し、retired保持期間、方向が逆のsession確立messageの拒否 | 未作成（#12） |
 | Duplicate replay | 同一`(sid, id)`のretry、保持結果の返却、非idempotent動作の二重実行防止 | 未作成（#12） |
@@ -1342,7 +1347,7 @@ Framing／parse層について、**host workspaceのRust実装**がfixtureに合
 | PROTO-TBD-005 | **現在のsession**のduplicate履歴の保持期間とretry window、および**保持件数の上限と超過時の動作**。期間の下限は遅延messageの最大生存時間＋再送windowを下回らない。件数上限は受理budget（§8.2）と保持する結果の最大sizeから導出する。上限超過時は最も古いentryをevictしてよいが、evictしたentryへの再送は新規commandとして実行しない（`duplicate_expired`で拒否する。§9参照）。`PROTO-TBD-011`のretired session保持期間から導出しない（目的の異なる別モデル。§5.1） | Memory予算とretry window。[HW-TBD-020](../hardware/tbd-register.md)と対で確定する。サーボ出力の有効化条件に含まれる |
 | PROTO-TBD-006 | 最終status field | 診断要件とencode size test |
 | PROTO-TBD-007 | Textとchoiceの制限 | LCD layoutとmemory測定 |
-| PROTO-TBD-008 | Motion名と範囲 | Servo calibrationと動作設計 |
+| PROTO-TBD-008 | Motion名と範囲（`play_motion`の`speed`と`repeat`の上限を含む） | Servo calibrationと動作設計。**`speed`と`repeat`の上限は、catalogが空でなくなる（motionを受理し始める）前に決める**（§5.3の有効化の条件。[Servo Safety Limits](../hardware/servo-safety-limits.md)の有効化条件の一覧には、まだ載せていない） |
 | PROTO-TBD-009 | Touch strengthの意味 | **touch controllerは`XPT2046`と確定した**（2026-08-13の現物確認。[HW-TBD-003](../hardware/tbd-register.md)はclose）。残るのは同ICのdatasheetでの意味づけと実験である |
 | PROTO-TBD-010 | Heartbeat方式とlink-loss判定 | 測定latencyとfail-safe試験。[HW-TBD-017](../hardware/tbd-register.md)と対で確定する。**サーボ出力の有効化条件に含まれる**（[servo-safety-limits](../hardware/servo-safety-limits.md#サーボ出力を有効化してよい条件)） |
 | PROTO-TBD-011 | ~~`sid`の生成方法~~（ESP32側は[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)のPR Aで確定。NVSの不揮発counterを使う。詳細は`firmware/esp32/src/main.rs`の`generate_sid`のdoc。Pi側は[#491の決定](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/491#issuecomment-5965350355)で確定。processの起動ごとにOSの乱数（`/dev/urandom`の4 byte）から選ぶ。実装は`apps/deskcatd/src/sid.rs`の`sid_from_os`（#491の段階2b-iで実装済み。Pi実機では未確認））、`sid`の**衝突許容確率**（未確定。ESP32側の実装が衝突しうる経路は`generate_sid`のdoc「衝突許容確率」節。回復は§3.1の`stale_session`経路に委ね、`#446`のPR Bで実装する）、**retired session**の保持件数と期間（下限は遅延messageの最大生存時間＋再送window。期間は`T_retention`と時間単位を一組で記録する。保持件数は`PROTO-TBD-012`の`N_transition`回／`T_window`から`N_transition × ceil(T_retention / T_window)`件以上とし、端数windowを切り上げる。retired `sid`を`stale_session`で遮蔽するためのものであり、`PROTO-TBD-005`とは目的が異なる）、`stale_session`受信による`sid`選び直し回数の上限、`hello`無応答時のrecovery budgetと同一identityの最大retry回数（`boot`のrecovery再開は`sid`を選び直さない。§4.1） | 再起動試験とRust実装の検討。[HW-TBD-020](../hardware/tbd-register.md)と対で確定する。**サーボ出力の有効化条件に含まれる**（残る項目がある限り、この行はgateを開けない） |
@@ -1383,6 +1388,7 @@ Framing／parse層について、**host workspaceのRust実装**がfixtureに合
 | 2026-10-05 | Draft 2 busy | [Issue #19](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/19)。`play_motion`の`busy`を、そのrequestの最終拒否結果として保存し、同じ`(sid, id)`の再送を保存したACKのreplayとすることを、§5.3、§8手順10、§9へ明記した。**wire formatは変えていない。** |
 | 2026-10-07 | Draft 2 set_expression | [Issue #21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)。§2の既知の逸脱(i)から`set_expression`を外し、(iii)へ足した（処理済みの結果を保持しない）。firmwareが受信して判定し、ACKを返す |
 | 2026-10-09 | Draft 2 tapped | [Issue #21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)のF1。§4.3へ、`tap-21` feature付きfirmwareが`tapped`を送る条件（`boot`のACK後だけ、最小間隔未満は捨てる、空のpayload（`{}`））を足し、§2へ`tapped`を書き手として加えた |
+| 2026-10-10 | Draft 2 play_motion type | [Issue #19](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/19)。`play_motion`の型を`crates/deskcat-protocol`と§12.1のSchema群のfixtureへ入れた。`name`は有界でない文字列、`speed`は有限の32-bit浮動小数点数、`repeat`は`u32`で、3つとも必須とした（§3）。受理する名前はfirmwareのmotion catalogが持ち、未知の名前とcatalogが空の間は`invalid_payload`で拒否する（§5.3）。**`speed`と`repeat`の上限は`TBD`のままで、catalogが空でなくなる前に決めることを有効化の条件とした。**§13の`PROTO-TBD-008`の項目名に、この上限を含めた。§2の既知の逸脱(i)を、`play_motion`がdecodeを通る事実に合わせた。motionの実行と拒否ACKは入れていない。§4.7の完了・fault eventは入れていない |
 
 ### Draft schemaの互換性
 

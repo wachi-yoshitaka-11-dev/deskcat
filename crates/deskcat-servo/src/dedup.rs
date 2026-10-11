@@ -13,9 +13,9 @@
 //! 「Duplicateには…保持したresultのreplay経路を使い、非idempotentな動作を再実行しない」
 //! 「Relativeまたは名前付きの物理motionにはduplicate suppressionが必要である」である。
 //!
-//! **wireの`play_motion`の受信と振り分けは含まない。**`play_motion`の型が
-//! `deskcat-protocol`にまだ無い（理由は`deskcat-protocol`の`message`のmodule docにある）。
-//! firmwareのsessionへの組み込みは、その型が決まった後に行う。
+//! **wireの`play_motion`の受信と振り分けは含まない。**型は`deskcat-protocol`にあるが、
+//! 受信してこのcrateへ渡す経路はまだ無い（受け入れる名前と上限は未決である。Protocol §5.3と
+//! `PROTO-TBD-008`）。firmwareのsessionへの組み込みは後続である。
 //!
 //! `Expired`の扱いは[`DuplicateHistory`]のdocとProtocol §9による（受け入れ前の`TBD`が残っている）。
 //!

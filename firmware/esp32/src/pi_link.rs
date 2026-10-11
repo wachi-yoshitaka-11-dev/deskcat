@@ -13,6 +13,7 @@
 //! | `set_expression` | `deskcat_face::judge`で判定する（session→値の範囲→LCDの準備の順。§8）。受理なら`crate::face::FaceState`へ記録して`ok`のACKを書く。拒否なら該当のcodeの拒否ACKを書く。**製品buildと`face-21`試験buildが受理できる。表情を持たない試験buildは`hardware_unavailable`、bring-upの間は`busy`で拒否する**（§7） |
 //! | （受信ではない）`tapped` | 製品buildと`tap-21`試験buildが、bootのACKを受けた後に[`send_event`]で書く。受信の振り分けとは別の経路である（`crate::tap`） |
 //! | `boot` | `unknown_type`の拒否ACKを書く（§8の表「方向が逆のsession確立message」） |
+//! | `play_motion` | decodeは通る。**どのservoのcodeにも渡さず、ACKも書かない。**logで分類するだけである（`pi_rx_play_motion_not_supported`）。motionの実行と拒否ACKは、まだ実装していない（[Issue #19](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/19)） |
 //! | `status` | 応答しない（ESP32→Piのmessageである）。logで分類する |
 //! | decodeで拒否した行 | oversizeの行から`(sid, id)`と`hello`／`ping`／`get_status`のtypeを復元できた場合は`line_too_long`の拒否ACKを書く（§7）。それ以外はlogで分類し、応答しない（§2の既知の逸脱） |
 //!
@@ -176,6 +177,12 @@ impl PiLink {
                     health,
                     uart,
                 );
+            }
+            // `play_motion`はdecodeを通るが、どのservoのcodeにも渡さない。motionの実行も
+            // ACKも、まだ実装していない（§2の既知の逸脱(i)）。**既定枝（下の`other`）へ任せず明示する**のは、
+            // servoへ届かないことをコードの形で読めるようにするためである。
+            Message::PlayMotion(_) => {
+                log::error!("pi_rx_play_motion_not_supported sid={sid} id={id}");
             }
             other => {
                 log::error!(
