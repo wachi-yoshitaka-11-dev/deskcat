@@ -57,6 +57,8 @@ pub enum OutstandingKind {
     /// 回数は[`RetryPolicy`]に従う。
     /// §9は「状態設定commandはidempotentにする」と定めている。
     SetExpression,
+    /// `show_text`（§5.4）。ACKを相関し、応答が無ければ同じ要求を再送する。
+    ShowText,
     /// Pi自身の`hello`（§5.1）。**[`PeerSession::note_hello_sent`]だけが記録し、
     /// [`PeerSession::poll_outstanding`]の対象にしない**（`hello`の最大retry回数は
     /// `PROTO-TBD-011`が未確定であり、拒否code別の扱いも§5.1が`ping`／`get_status`と
@@ -78,6 +80,7 @@ impl OutstandingKind {
             Message::Ping => Some(Self::Ping),
             Message::GetStatus => Some(Self::GetStatus),
             Message::SetExpression(_) => Some(Self::SetExpression),
+            Message::ShowText(_) => Some(Self::ShowText),
             _ => None,
         }
     }
@@ -368,7 +371,7 @@ impl PeerSession {
     ///
     /// **`kind`は`message`から導く**（呼び出し側が別々に指定する経路は無い。
     /// `OutstandingKind::classify`参照）。`message`が`ping`／`get_status`／
-    /// `set_expression`のいずれでもない場合は追跡せず`None`を返す。
+    /// `set_expression`／`show_text`のいずれでもない場合は追跡せず`None`を返す。
     ///
     /// **`message`が`get_status`なら、[`Self::status_sync_pending`]も
     /// 合わせて`false`にする。**呼び出し側へ2手を強いると対が崩れうるため、
@@ -1103,7 +1106,18 @@ mod tests {
             peer.note_sent(2, super::Message::GetStatus, 0),
             Some(OutstandingKind::GetStatus)
         );
-        assert_eq!(peer.outstanding_len(), 2);
+        assert_eq!(
+            peer.note_sent(
+                3,
+                super::Message::ShowText(deskcat_protocol::ShowText {
+                    text: "こんにちは".to_owned(),
+                    duration_ms: 1,
+                }),
+                0,
+            ),
+            Some(OutstandingKind::ShowText)
+        );
+        assert_eq!(peer.outstanding_len(), 3);
     }
 
     /// `note_sent`が`get_status`を追跡したら、`status_sync_pending`が
@@ -1135,7 +1149,7 @@ mod tests {
         );
     }
 
-    /// 追跡対象外の`message`（`ping`／`get_status`／`set_expression`以外）は記録しない。
+    /// 追跡対象外の`message`（`ping`／`get_status`／`set_expression`／`show_text`以外）は記録しない。
     ///
     /// `kind`を`message`から導くようにしたのは、呼び出し側が`kind`と`message`を
     /// 食い違う組み合わせで渡せてしまう経路を無くすためである
