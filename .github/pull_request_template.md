@@ -86,13 +86,13 @@ Closes #
 
 状態（`stopped` / `capped` / `converged`）と理由 / 未解決欠陥:
 
-最終diff hash / 同じdiffでの両Passと新規欠陥0件の巡:
+最終diff hash / 同じdiffでの両Passと修正対象の新規指摘0件の巡:
 
 人間の継続・終了・始め直し（なし、または判断と理由・承認者・承認の問いと回答の文面・出所・対象Issue・承認時のreviewと巡数・終了巡数・範囲）:
 
-| reviewの巡（Issueの通算） | Passとdiff | 指摘の種類と出所 | 採否・理由・未解決 |
+| reviewの巡（Issueの通算） | Passとdiff | [修正対象](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/CONTRIBUTING.md#自己レビュー)の該当種別と出所 | 採否・採らない理由（1行）・未解決 |
 |---|---|---|---|
-| | | defect / out-of-scope / optional; diff / prior-explanation / pre-existing | |
+| | | | |
 
 引き継ぎ時: 元cloneの最後の操作後に`review_gate.py session status`のJSON全体をこのPRまたは対応Issueへ保存する。
 上限による停止は完了ではない。`stopped`をreceiptの終端値にしない。
