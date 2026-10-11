@@ -111,6 +111,9 @@ Raspberry Piは動作を要求できるが、その実行が妥当かつ安全�
 - ログ、エラー、diff、取得済み測定値を分析する
 - `TBD`、リスク、regression、根拠不足を特定する
 - 公式資料から検証項目を抽出する
+- GitHubのcommentを投稿・修正する、Issue／Pull Request本文を修正する、review threadへ返信・resolveする、起票・Pull Request作成の直後または以後にmetadataを設定する（boardの`Status`を`Done`にする操作を除く）
+
+GitHubへの書き込みで個別承認なしに行える操作は上記の列挙に限る。列挙にない操作は人間の確認を要する。
 
 ### 人間の確認が必要なこと
 
@@ -121,7 +124,8 @@ Raspberry Piは動作を要求できるが、その実行が妥当かつ安全�
 - 資格情報または秘密鍵の取り扱い
 - GitHubのvisibility変更
 - push、release、deploy、外部公開
-- 外部serviceへの書き込み
+- Issue／Pull Requestの作成、merge、close、reopen、commentの削除、boardの`Status`を`Done`にする操作
+- 上記の承認不要の列挙にない外部serviceへの書き込み
 - 既に依頼されていない破壊的な削除
 - 共有branch（`main`／`develop`）の履歴書き換え。**自分の未push・未mergeのbranchでのrebaseは含まない**（[Development Workflow](development-workflow.md)）
 - `unsafe`の導入

@@ -23,7 +23,8 @@ Issueには次を記載する。
 別の不具合またはrefactorを発見した場合、現在の目的を妨げるものでなければ、別Issueを作成または提案する。
 
 **ただし、すべての気づきをIssueにしない。**typo、リンク修正、表記ゆれ、規約の言い回し、
-boardのmetadata記入漏れは、変更内容の承認を得たうえで直接反映してよい。
+boardのmetadata記入漏れは直接反映してよい。GitHub操作の承認区分は
+[AI Agent Policy](ai-agent-policy.md#6-責務マトリクス)に従う。
 判断基準は[CONTRIBUTING](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/CONTRIBUTING.md)に定める。
 
 ## 2. Issueの着手条件

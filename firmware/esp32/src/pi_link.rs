@@ -10,6 +10,8 @@
 //! | `hello` | `crate::protocol::PiSession::handle_hello`のACKを書く。受理した場合は、その後に`BootSession::on_hello_accepted`を呼ぶ（§5.1の手順4・5） |
 //! | `ping` | `PiSession::handle_ping`のACKを書く |
 //! | `get_status` | `PiSession::handle_get_status`のACKと`status`を書く（下記） |
+//! | `set_expression` | `deskcat_face::judge`で判定する（session→値の範囲→LCDの準備の順。§8）。受理なら`crate::face::FaceState`へ記録して`ok`のACKを書く。拒否なら該当のcodeの拒否ACKを書く。**製品buildと`face-21`試験buildが受理できる。表情を持たない試験buildは`hardware_unavailable`、bring-upの間は`busy`で拒否する**（§7） |
+//! | （受信ではない）`tapped` | 製品buildと`tap-21`試験buildが、bootのACKを受けた後に[`send_event`]で書く。受信の振り分けとは別の経路である（`crate::tap`） |
 //! | `boot` | `unknown_type`の拒否ACKを書く（§8の表「方向が逆のsession確立message」） |
 //! | `status` | 応答しない（ESP32→Piのmessageである）。logで分類する |
 //! | decodeで拒否した行 | oversizeの行から`(sid, id)`と`hello`／`ping`／`get_status`のtypeを復元できた場合は`line_too_long`の拒否ACKを書く（§7）。それ以外はlogで分類し、応答しない（§2の既知の逸脱） |
@@ -27,13 +29,13 @@
 //!
 //! `get_status`への`status: ok`のACKと`status`は、1つのbufferへ連結し、1回の[`write_line`]で
 //! 送信のring bufferへ積む。Pi linkのUARTへ書くのは、このmoduleの応答と`BootSession`の`boot`の
-//! 送出だけであり、どちらもmain loopの同じtaskから呼ぶ。そのため、連結した2行の間に他の行は
+//! 送出と、製品build／`tap-21`試験buildが[`send_event`]で送る`tapped`だけであり、どれもmain loopの同じtaskから呼ぶ。そのため、連結した2行の間に他の行は
 //! 入らない。health snapshot（`main.rs`の`emit_health_snapshot`）はUART0のlogであり、Pi linkへ
 //! `status`を送らない。
 //!
 //! # 実装していないもの
 //!
-//! - `ping`／`get_status`、`port_reopen`／`resync`の`hello`、拒否した`hello`の処理済みの結果を保持しない
+//! - `ping`／`get_status`、`set_expression`、`port_reopen`／`resync`の`hello`、拒否した`hello`の処理済みの結果を保持しない
 //!   （§8の手順8・9。保持件数は`PROTO-TBD-005`）。同じ`(sid, id)`の再送は、もう一度処理する。
 //! - §8.1／§8.2の流量制限、`hello`の拒否ACKの保留table、§5.1の遷移の上限とcooldown（`PROTO-TBD-012`）。
 //!   影響は`docs/protocol/esp32-pi-protocol.md`§2の既知の逸脱(iii)。
@@ -53,6 +55,7 @@ use deskcat_protocol::{
 use esp_idf_svc::hal::uart::UartDriver;
 
 use crate::boot_session::{BootSession, HelloAccepted};
+use crate::face::FaceState;
 use crate::health::Health;
 use crate::protocol::{HelloOutcome, PiSession};
 
@@ -77,6 +80,7 @@ impl PiLink {
         buf: &[u8],
         boot: &mut BootSession,
         health: &Health,
+        face: &mut FaceState,
         uart: &mut UartDriver<'_>,
     ) {
         // `drain`のclosureは`&mut self`を借りられないため、結果を受信の順に集めてから扱う。
@@ -84,7 +88,7 @@ impl PiLink {
         self.receiver.drain(buf, |outcome| outcomes.push(outcome));
         for outcome in outcomes {
             match outcome {
-                Outcome::Frame(frame) => self.on_frame(frame, boot, health, uart),
+                Outcome::Frame(frame) => self.on_frame(frame, boot, health, face, uart),
                 Outcome::Rejected(rejection) => on_rejected(&rejection, boot, health, uart),
             }
         }
@@ -95,6 +99,7 @@ impl PiLink {
         frame: Frame,
         boot: &mut BootSession,
         health: &Health,
+        face: &mut FaceState,
         uart: &mut UartDriver<'_>,
     ) {
         let Frame { envelope, message } = frame;
@@ -138,6 +143,30 @@ impl PiLink {
                 let mut replies = vec![ack];
                 replies.extend(status);
                 send(replies, boot, health, uart);
+            }
+            Message::SetExpression(command) => {
+                let current = self.pi.pi_sid() == Some(sid);
+                let reply = match deskcat_face::judge(&command, current, face.display_state()) {
+                    Ok(name) => {
+                        face.request(name);
+                        log::info!("pi_rx_set_expression sid={sid} id={id} name={name:?} accepted");
+                        Message::Ack(Ack {
+                            reply_sid: sid,
+                            reply_to: id,
+                            status: AckStatus::Ok,
+                            code: None,
+                            detail: None,
+                        })
+                    }
+                    Err(code) => {
+                        log::error!(
+                            "pi_rx_set_expression_rejected sid={sid} id={id} code={}",
+                            code.as_str()
+                        );
+                        rejection_ack(sid, id, code)
+                    }
+                };
+                send(vec![reply], boot, health, uart);
             }
             Message::Boot(_) => {
                 log::error!("pi_rx_reverse_boot sid={sid} id={id}");
@@ -199,6 +228,23 @@ fn rejection_ack(reply_sid: u32, reply_to: u32, code: ErrorCode) -> Message {
         code: Some(code),
         detail: None,
     })
+}
+
+/// ESP32からのevent（`tapped`など。§4）を1つ送る。
+///
+/// **ACKを待たず、再送しない。**§8の表はeventを要求として扱わない（応答を返さない）が、ACKの要否そのものは§9の
+/// 受け入れ前TBD（「ACKを必要とするmessage」）で未決である。`write_line`が失敗した場合は、その行のeventを失い、
+/// logにだけ残る（`pi_uart_write_failed`か`pi_uart_write_stalled`）。
+///
+/// sessionが確立している（`BootSession::is_established`）ことは、呼び出し側が確かめる。
+#[cfg_attr(not(feature = "tap-21"), allow(dead_code))]
+pub fn send_event(
+    message: Message,
+    boot: &mut BootSession,
+    health: &Health,
+    uart: &mut UartDriver<'_>,
+) {
+    send(vec![message], boot, health, uart);
 }
 
 /// `messages`を順に新しい`(sid, id)`でencodeし、連結して1回の[`write_line`]で書く。

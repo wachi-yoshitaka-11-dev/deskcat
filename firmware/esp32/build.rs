@@ -1,4 +1,17 @@
 fn main() {
+    // No non-default feature selects the product path. Any non-default Cargo
+    // feature uses the existing test path, including future features.
+    // This cfg is also emitted for clippy's check-cfg validation.
+    println!("cargo:rustc-check-cfg=cfg(deskcat_product_mode)");
+    let test_mode = std::env::vars_os().any(|(name, _)| {
+        name.to_str().is_some_and(|name| {
+            name.starts_with("CARGO_FEATURE_") && name != "CARGO_FEATURE_DEFAULT"
+        })
+    });
+    if !test_mode {
+        println!("cargo:rustc-cfg=deskcat_product_mode");
+    }
+
     // `IDF_PATH`が設定されていると、`.cargo/config.toml`が`force = true`で固定した
     // `ESP_IDF_VERSION`（v5.5.3）より優先され、Version Recordが識別していないESP-IDFで
     // buildされる。生成物は記録と対応しなくなるが、buildは成功するため気づけない。

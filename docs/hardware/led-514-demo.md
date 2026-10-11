@@ -20,7 +20,7 @@ ESP32が両LEDを駆動する。通信LEDはESP32が自分のprotocol受信状�
 | LED | デモで表示する状態 | 実装上の前提 |
 |---|---|---|
 | 白 `LED-COMM-01` | ESP32が起動中でPiとの通信が未成立・喪失なら1秒周期で点滅（0.5秒ずつ）。通信が継続して成立すれば点灯 | 成立・喪失を決めるheartbeat／timeoutは[PROTO-TBD-010](../protocol/esp32-pi-protocol.md)と[HW-TBD-017](tbd-register.md)に依存する。現行firmwareは`hello`／`ping`／`get_status`を受信する（`firmware/esp32/src/pi_link.rs`）が、継続通信の判定（heartbeatとtimeout）はまだ無い。受信しただけでは、その後も通信が続いていることを示せないため、点灯へ切り替える判定はまだ実装できない。`bringup-led-514`は、点灯試験（赤→白→両方）の後は点滅だけを出す（下の`点灯試験用のfirmware`） |
-| 赤 `LED-REACT-01` | Piが撫でられた反応として`happy`を指示したら1秒点灯し、通常時は消灯 | 既存protocolの`set_expression`を候補に使う。protocol crateには`set_expression`の型とdecodeがある（#534）。firmwareは受け取った`set_expression`を`pi_rx_unhandled_frame`としてlogに出すだけで、赤LEDを点ける経路はまだ無い。`bringup-led-514`は点灯試験の区間だけ赤を点ける |
+| 赤 `LED-REACT-01` | Piが撫でられた反応として`happy`を指示したら1秒点灯し、通常時は消灯 | 既存protocolの`set_expression`を候補に使う。protocol crateには`set_expression`の型とdecodeがある（#534）。`face-21`付きbuildは受け取った`set_expression`をLCDへ描く（#21）が、赤LEDを点ける経路はまだ無い。`bringup-led-514`は点灯試験の区間だけ赤を点ける |
 
 ESP32自体の電源断はLEDの消灯にしか見えない。白の消灯を「通信正常」と解釈しない。
 
@@ -84,7 +84,7 @@ ESP32 boardの`3V3` pinから外部負荷を取ること（段階B-2a）は、[H
 
 ## 点灯試験用のfirmware
 
-`firmware/esp32`の`bringup-led-514` featureを付けたbuildだけがGPIO2／GPIO5を駆動する。既定buildは両pinに触れない。既定buildとも`bringup-display-13`とも組み合わせられる（`bench-servo-test-17`は#474で`compile_error!`のため対象外）。build commandの正本は[検証済みコマンド](../toolchains/verified-commands.md)である。
+`firmware/esp32`の`bringup-led-514` featureを付けたbuildだけがGPIO2／GPIO5を駆動する。既定buildは両pinに触れない。`bringup-display-13`とも組み合わせられる（`bench-servo-test-17`は#474で`compile_error!`のため対象外）。build commandの正本は[検証済みコマンド](../toolchains/verified-commands.md)である。
 
 1. `Peripherals::take()`の直後に両pinを出力にし、消灯側（Low）へ設定する。**向きの設定と消灯levelの設定の間に、出力registerの値が一瞬出る。その値が点灯側（High）か消灯側かも、長さも確かめていない。**[Hardware Safety Policy](../governance/hardware-safety-policy.md)の§4は「output modeへ切り替える前に、安全な初期出力を定義する」とする。esp-idf-halの`PinDriver`は向きを先に設定する。`unsafe`を使わずにこの区間を無くす方法は見つけていない（試していない）。電流は`R`で制限される。この点は、上の`3V3 pinへ負荷を足す条件`の残余riskに挙げた。
 2. 起動時のbring-upが終わった時刻（`main.rs`の`bringup_done_ms`）から、赤だけ→白だけ→両方を10秒ずつ点ける（点灯試験）。その後のPi linkのUART初期化と`boot`送信の分だけ、最初の区間が短くなる。`bringup-display-13`付きbuildでは、LCDの描画とI2Cのbring-upがmain loopの中で進み、点灯試験はそれと並行して進む。

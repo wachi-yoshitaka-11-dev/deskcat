@@ -351,6 +351,18 @@ class ReviewSessionTests(unittest.TestCase):
         self.run_review()
         self.assertIn("REVIEW_STATE=converged TOTAL_ROUNDS=4 REVIEW=2 REVIEW_ROUNDS=2", self.cli("check").stdout)
 
+    def test_handoff_to_new_clone_preserves_ended_review_boundary(self):
+        self.run_review()
+        self.run_review()
+        self.assertIn("NEXT_REVIEW=2 NEXT_ROUND=1", self.cli("check").stdout)
+        handoff = json.loads(self.cli("status").stdout)
+        clone = Path(self.temp.name) / "handoff-clone"
+        self.git("clone", "-q", str(self.root), str(clone))
+        subprocess.check_call(["git", "-C", str(clone), "branch", "base"])
+        self.cli("init", "--record", self.write(handoff), root=clone)
+        entry = json.loads(self.cli("begin", root=clone).stdout)
+        self.assertEqual((entry["number"], entry["review"], entry["review_round"]), (3, 2, 1))
+
     def restart(self, **changes):
         record = {"work": "465", "actor_kind": "human", "actor": "fixture-human",
                   "source": "https://github.com/example/repo/issues/465#issuecomment-789", "after_round": 5}

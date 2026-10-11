@@ -6,8 +6,11 @@
 
 ## 開始と実行
 
-既存Issue/PRを開き、同じ作業の全巡数と承認を確認する。以下の`465`は例であり、
-実際の対象Issue番号を使う。初回だけ、確認できた既実施巡数と確認元を渡す。
+実行記録とPull Request本文を開き、同じ作業の全巡数と承認を確認する。引き継ぎ時は
+Issue／Pull Requestに保存したJSONも確認する。以下の`465`は例であり、
+実際の対象Issue番号を使う。初回だけ、記録導入前に実施した巡数と確認元を
+`--prior-rounds`と`--history-source`に渡す。終了境界が分かる保存済みJSONの引き継ぎには
+`--record`を使い、`--prior-rounds`へ通算巡数を入れ直さない。
 不明な巡数を0として初期化しない。既存の記録は`init`で上書きできない。
 記録より前の巡は、どこでreviewが終わったかが記録に無いため、最初のreviewへ数え込む。
 
@@ -99,10 +102,15 @@ reviewは`converged`に達した巡か、下の`session end`で記録した終�
 `--review-work`付きのgateは、実行記録の終端状態と既存trailerが一致しなければ失敗する。
 CIの通常のgateはローカル記録を持たず、形式検査のままである。
 
+## 承認の記録
+
+継続・終了・始め直しの承認を問うときは、実行記録とPull Request本文へ残す文面を問いに同梱する。
+回答の文面、承認者、出所を両方へ記録する。Issue／Pull Requestのcommentへ承認ごとに投稿しない。
+
 ## 承認を得て終える
 
 最新の巡が両Passを終え、未解決の欠陥が無く、`converged`でない状態でPM／作業セッションが理由を示して
-終了を判断し、人間が承認したら、承認の出所を既存Issue/PRへ残し、次の形で記録する。**書式の例であり承認ではない。**
+終了を判断し、人間が承認したら、次の形で記録する。**書式の例であり承認ではない。**
 `after_round`は記録時点のIssueの通算巡数（`check`の`TOTAL_ROUNDS`）と一致させる。
 
 ```json
@@ -110,7 +118,7 @@ CIの通常のgateはローカル記録を持たず、形式検査のままで�
   "work": "465",
   "actor_kind": "human",
   "actor": "実際に承認した人間",
-  "source": "人間の終了の承認を保存したIssue/PRコメントのURL",
+  "source": "人間の終了の承認を確認できる会話と文面",
   "after_round": 3,
   "read_diff": "判断する側が読んだ最終diffのhash"
 }
@@ -128,7 +136,7 @@ python3 scripts/review_gate.py session check --work 465
 ## 終わる前に始め直す
 
 reviewが終わる前に人間が新しいreviewを依頼したとき、またはPM／作業セッションの始め直しの判断を人間が承認したときは、
-依頼か承認を保存したIssue/PRコメントを出所として次の形で記録する。
+依頼か承認を次の形で記録する。
 **書式の例であり依頼ではない。**`after_round`は記録時点のIssueの通算巡数と一致させる。
 
 ```json
@@ -136,7 +144,7 @@ reviewが終わる前に人間が新しいreviewを依頼したとき、また�
   "work": "465",
   "actor_kind": "human",
   "actor": "実際に依頼または承認した人間",
-  "source": "人間の依頼または承認を保存したIssue/PRコメントのURL",
+  "source": "人間の依頼または承認を確認できる会話と文面",
   "after_round": 5
 }
 ```
@@ -151,7 +159,7 @@ AIによる記録、最新の巡が未完了、既に終わったreview（次の
 
 ## 人間の承認と引き継ぎ
 
-上限の巡を超える続行は、PM／作業セッションが理由を示して判断し、人間の承認の出所を既存Issue/PRへ残し、次の形で取り込む。
+上限の巡を超える続行は、PM／作業セッションが理由を示して判断し、人間が承認したら次の形で取り込む。
 これは**書式の例であり承認ではない**。`actor`と`source`は実在する承認者と承認の出所にする。
 
 ```json
@@ -159,7 +167,7 @@ AIによる記録、最新の巡が未完了、既に終わったreview（次の
   "work": "465",
   "actor_kind": "human",
   "actor": "実際に承認した人間",
-  "source": "人間の明示承認を保存したIssue/PRコメントのURL",
+  "source": "人間の明示承認を確認できる会話と文面",
   "review": 1,
   "review_after_round": 5,
   "review_through_round": 7,
@@ -181,7 +189,8 @@ AI/PM、別作業、承認時のreviewや巡数の不一致、終了巡数の欠
 承認はそのreviewにだけ効く。`version: 1`の記録にある通算の承認（`after_round` / `through_round`）は、
 その範囲の巡のうち、承認したときのreviewの巡にだけ引き続き効く。
 
-各区切りで`session status`のJSON全体と未実行check・残件を既存Issue/PRに保存する。
+別clone・別端末へ渡すと決めた時点で、元cloneの最後の操作後に`session status`のJSON全体と
+未実行check・残件を既存Issue／Pull Requestへ保存する。各巡や承認ごとのcommentは要らない。
 新しいcloneでは保存済みJSONを`session init --work 465 --record handoff.local.json`で復元する。
 元cloneの担当を止めてから引き継ぎ、2つのcloneで同じ作業の巡を並行消費しない。
 ローカルに記録が無いだけでは新規作業と判断しない。

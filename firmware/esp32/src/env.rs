@@ -20,8 +20,8 @@
 //! [`docs/hardware/gpio-assignment.md`](../../../docs/hardware/gpio-assignment.md)
 //! の`信号inventory`が正本である。`ENV-SDA`はGPIO25、`ENV-SCL`はGPIO26であり、いずれも
 //! `ACCEL-01`（[Issue #15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)）
-//! と共有するbusである（同文書418行目「ENV-SCL | ENV-01 | I2C SCL | Bidirectional |
-//! GPIO26（ACCEL-01と共有）」、415行目「ACCEL-SCL | ACCEL-01 | ... | GPIO26」と一致）。
+//! と共有するbusである（同文書の`信号inventory`の`ENV-SCL`行「ACCEL-01と共有」が、`ACCEL-SCL`行と同じ
+//! GPIO26であることと一致）。
 //! **このmoduleはbus(`I2cDriver`)を所有しない。**呼び出し側（`main.rs`）が1つのbusを
 //! 作り、`Adxl345`（`#15`側のdriver、`crate::accel`）と共有する設計であるため、
 //! [`Bme280`]は自分のI2C addressだけを持ち、各methodは呼び出し側が渡す

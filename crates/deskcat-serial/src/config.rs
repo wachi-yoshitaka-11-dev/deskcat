@@ -60,7 +60,8 @@ impl core::error::Error for ConfigError {}
 ///
 /// **既定値を持たない。**`Default`を実装していないのは意図的である。
 /// device名（`/dev/serial0`など）を「たぶんこれ」で埋めると、確認していない値が
-/// 設定の既定として固定される。実機のdevice名はまだ確認されていない
+/// 設定の既定として固定される。`/dev/serial0`が`ttyAMA0`を指すことは`docs/hardware/experiment-log.md`の`EXP-020`で確かめたが、
+/// 開けることとUARTでの通信は確認されていない
 /// （[Issue #8]の受け入れ条件に含まれず、確定は[Issue #11]の後半に残る）。
 ///
 /// baudも同様に呼び出し側が渡す。仕様§2の`115200`は`Candidate`であり、
