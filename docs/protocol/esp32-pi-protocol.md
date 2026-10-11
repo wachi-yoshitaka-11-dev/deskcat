@@ -1123,7 +1123,7 @@ Draft 2のpolicy:
 - 通常commandが明示的な`rate_limited`を受けた場合、そのrequestは最終的に拒否された
   ものとして扱う。同じ`(sid, id)`をretryせず、cooldown後に改めて要求する場合は
   新しい`id`を割り当てる。ACKが無い場合の1回retryとは区別する。
-- `play_motion`が`busy`を受けた場合、同じ`(sid, id)`をretryしても、保存した`busy`のACKがreplayされるだけである。ACKが無い場合の1回retryとは区別する。
+- `play_motion`が`busy`を受けた場合、同じ`(sid, id)`をretryしても、保存した`busy`のACKがreplayされるだけである。ACKが無い場合の1回retryとは区別する。改めて要求するときは新しい`id`を割り当てる。
 - 同じ`(sid, id)`を再利用する。
 - `id`が上限に達した送信側は、新しい`(sid, id)`を作らない（§3）。**未ACK messageの再送は同じ
   `(sid, id)`で行うため、上限到達後もこのretryは実行できる。**止まるのは新しい`(sid, id)`を要する送出だけである。
@@ -1238,6 +1238,7 @@ Session境界のfixtureは、遷移の有無で期待結果が逆になる。set
 | `invalid_payload`／`unsupported_version`で拒否された`hello` | 送信側は**終端**として`hello`の送出を止め、`protocol_fault`で報告する。`sid`を選び直さず、motion commandも送らない（§5.1） |
 | `rate_limited`で拒否された`hello` | 終端ではない。cooldown経過後に**同じ`(sid, id)`で**再送する。`sid`を選び直さない |
 | `hello`／`boot`が飽和中に`rate_limited`で拒否され、同じ`(sid, id)`でcooldown後に再送 | 最初の拒否を最終結果としてreplayせず、手順9でbudgetを再評価する。上限内なら同じentryの未送出拒否ACKを取り消して受理し、`status: ok`を最終結果として保存する。古い`rate_limited`を後から送らない |
+| `play_motion`が`busy`で拒否された後に、占有が解けてから同じ`(sid, id)`を再送 | 占有を再評価せず、保存した`busy`のACKをreplayする。motionを開始しない。改めて要求する場合は新しい`id`を割り当てる |
 | 通常commandが`rate_limited`で拒否された後に同じ`(sid, id)`を再送 | 最終の拒否結果をreplayし、commandを実行しない。cooldown後に再要求する場合は新しい`id`を割り当てる |
 | 保留済み`hello`の拒否ACKが抑制または喪失した | 送信側は`sid`を選び直さず、同じ`(sid, id)`で有限budget内に再送する。受信側は保留tableから拒否理由を返す。budget満了で`protocol_fault`として停止する |
 | ESP32側の保留tableが満杯のときに新しいidentityの不正`hello`を受信 | 新規entryを受け付けず応答しない。`suppressed_responses`を増やす。送信側は有限budget満了で停止し、`sid`を選び直さない |
@@ -1389,6 +1390,7 @@ Framing／parse層について、**host workspaceのRust実装**がfixtureに合
 | 2026-10-07 | Draft 2 set_expression | [Issue #21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)。§2の既知の逸脱(i)から`set_expression`を外し、(iii)へ足した（処理済みの結果を保持しない）。firmwareが受信して判定し、ACKを返す |
 | 2026-10-09 | Draft 2 tapped | [Issue #21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)のF1。§4.3へ、`tap-21` feature付きfirmwareが`tapped`を送る条件（`boot`のACK後だけ、最小間隔未満は捨てる、空のpayload（`{}`））を足し、§2へ`tapped`を書き手として加えた |
 | 2026-10-10 | Draft 2 play_motion type | [Issue #19](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/19)。`play_motion`の型を`crates/deskcat-protocol`と§12.1のSchema群のfixtureへ入れた。`name`は有界でない文字列、`speed`は有限の32-bit浮動小数点数、`repeat`は`u32`で、3つとも必須とした（§3）。受理する名前はfirmwareのmotion catalogが持ち、未知の名前とcatalogが空の間は`invalid_payload`で拒否する（§5.3）。**`speed`と`repeat`の上限は`TBD`のままで、catalogが空でなくなる前に決めることを有効化の条件とした。**§13の`PROTO-TBD-008`の項目名に、この上限を含めた。§2の既知の逸脱(i)を、`play_motion`がdecodeを通る事実に合わせた。motionの実行と拒否ACKは入れていない。§4.7の完了・fault eventは入れていない |
+| 2026-10-11 | Draft 2 busy type | [Issue #19](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/19)。§9へ、`busy`の後に改めて要求するときは新しい`id`を割り当てる旨を足し、§12のfixture表へ`busy`の再送の行を足した。`crates/deskcat-servo`に`Rejection::Busy`の型を足した。**wire formatは変えていない。** |
 
 ### Draft schemaの互換性
 
