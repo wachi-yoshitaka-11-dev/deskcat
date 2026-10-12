@@ -83,7 +83,7 @@
 //! `sid`選び直しは実装した（[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446) PR B、
 //! `crate::boot_session`参照）が、実機での動作確認（受信経路がring buffer溢れなく動くか、実際に
 //! `boot`→ACKが成立するか）はまだ無い（`crate::pi_link`のmodule doc「確かめていないこと」）。
-//! Pi→ESP32方向の受信（`hello`／`ping`／`get_status`）は、main loopから`crate::pi_link::PiLink`へ渡す。
+//! Pi→ESP32方向の受信は、main loopから`crate::pi_link::PiLink`へ渡す。
 //! `#446`より前は`boot=`というlog行を出していたが、その行は`#446`のPR Aで削除した。
 //! `boot=`行を目視で確認していた作業（`#7`／`#13`等）があれば、`boot=`行が
 //! 無くなったことを踏まえて確認し直すこと。
@@ -238,7 +238,7 @@ use crate::health::Health;
 #[cfg(feature = "bringup-led-514")]
 use crate::led::Leds;
 #[cfg(not(feature = "bench-servo-test-17"))]
-use crate::pi_link::PiLink;
+use crate::pi_link::{FaceTargets, PiLink};
 #[cfg(any(feature = "tap-21", deskcat_product_mode))]
 use crate::tap::TapDetector;
 #[cfg(any(feature = "tap-21", deskcat_product_mode))]
@@ -791,12 +791,20 @@ fn main() {
             last_read_ms = health.uptime_ms();
             if let Ok(n) = read {
                 if n > 0 {
+                    #[cfg(any(feature = "face-21", deskcat_product_mode))]
+                    let drawer = face_drawer.as_mut();
+                    #[cfg(not(any(feature = "face-21", deskcat_product_mode)))]
+                    let drawer = None;
+                    let mut face_targets = FaceTargets {
+                        state: &mut face,
+                        drawer,
+                    };
                     pi_link.on_bytes(
                         &buf[..n],
                         health.uptime_ms(),
                         &mut boot_session,
                         &health,
-                        &mut face,
+                        &mut face_targets,
                         &mut uart,
                     );
                 }

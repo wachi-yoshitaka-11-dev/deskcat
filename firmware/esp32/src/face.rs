@@ -1,5 +1,5 @@
 //! `set_expression`（Protocol §5.2）の受理状態と、LCDへの表情の描画（[#21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)）。
-//! #23 の日本語 `show_text` 描画 adapter も持つ。Pi link からの受信・ACKは #19 PR-3 後の別段階で接続する。
+//! #23 の日本語 `show_text` 描画 adapter も持つ。Pi link からの受信・ACKは`crate::pi_link`が扱う。
 //!
 //! 表情の図形と、受理の判定の順序、帯への分け方は`deskcat_face`が持つ（hostでtestできる）。
 //! このmoduleは、それをLCD driver（`crate::display`）とPi link（`crate::pi_link`）へつなぐだけである。
