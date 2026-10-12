@@ -11,6 +11,7 @@
 //! | `ping` | `PiSession::handle_ping`のACKを書く |
 //! | `get_status` | `PiSession::handle_get_status`のACKと`status`を書く（下記） |
 //! | `set_expression` | `deskcat_face::judge`で判定する（session→値の範囲→LCDの準備の順。§8）。受理なら`crate::face::FaceState`へ記録して`ok`のACKを書く。拒否なら該当のcodeの拒否ACKを書く。**製品buildと`face-21`試験buildが受理できる。表情を持たない試験buildは`hardware_unavailable`、bring-upの間は`busy`で拒否する**（§7） |
+//! | `show_text` | 現在のPi sessionと`boot`のACKを確認し、LCDが使える場合は`crate::face::FaceDrawer::show_text`へ渡す。受理なら`ok`、文字・時間が描画範囲外なら`out_of_range`、LCDが使えなければ`busy`または`hardware_unavailable`、session未確立なら`stale_session`のACKを書く |
 //! | （受信ではない）`tapped` | 製品buildと`tap-21`試験buildが、bootのACKを受けた後に[`send_event`]で書く。受信の振り分けとは別の経路である（`crate::tap`） |
 //! | `boot` | `unknown_type`の拒否ACKを書く（§8の表「方向が逆のsession確立message」） |
 //! | `play_motion` | session権限（現在のPi `sid`でない、またはESP32の`boot`がACKされていない間は`stale_session`。§4.1、§8手順8）→`deskcat_servo::MotionDedup::admit_once`の順に扱い、**どの経路でも拒否ACKを書く**（下記「`play_motion`」）。**どのservoのcodeにも渡さない**（[Issue #19](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/19)） |
@@ -51,7 +52,7 @@
 //!
 //! - `play_motion`の保持した結果の再送の送出上限（§8.2のretry quota。`PROTO-TBD-012`が未決）。
 //!   同じ`(sid, id)`の再送には、そのたびに保持した結果を返す。
-//! - `ping`／`get_status`、`set_expression`、`port_reopen`／`resync`の`hello`、拒否した`hello`の処理済みの結果を保持しない
+//! - `ping`／`get_status`、`set_expression`、`show_text`、`port_reopen`／`resync`の`hello`、拒否した`hello`の処理済みの結果を保持しない
 //!   （§8の手順8・9。保持件数は`PROTO-TBD-005`）。同じ`(sid, id)`の再送は、もう一度処理する。
 //! - §8.1／§8.2の流量制限、`hello`の拒否ACKの保留table、§5.1の遷移の上限とcooldown（`PROTO-TBD-012`）。
 //!   影響は`docs/protocol/esp32-pi-protocol.md`§2の既知の逸脱(iii)。
@@ -67,6 +68,7 @@
 
 use std::time::Duration;
 
+use deskcat_face::DisplayState;
 use deskcat_protocol::{
     encode_line, Ack, AckStatus, Cause, DuplicatePolicy, ErrorCode, Frame, LineReceiver, Message,
     Outcome, PlayMotion, Rejection,
@@ -75,7 +77,7 @@ use deskcat_servo::{DedupOutcome, MotionCatalog, MotionDedup, Rejection as Motio
 use esp_idf_svc::hal::uart::UartDriver;
 
 use crate::boot_session::{BootSession, HelloAccepted};
-use crate::face::FaceState;
+use crate::face::{FaceDrawer, FaceState};
 use crate::health::Health;
 use crate::protocol::{HelloOutcome, PiSession};
 
@@ -89,6 +91,12 @@ const MOTION_DUPLICATE_CAPACITY: usize = 8;
 /// `play_motion`の保持期間（暫定）。**確定値ではない。**`PROTO-TBD-005`が未決で、数値そのものに根拠は無い。
 /// 扱いは[`MOTION_DUPLICATE_CAPACITY`]と同じ。
 const MOTION_DUPLICATE_RETENTION: Duration = Duration::from_secs(10);
+
+/// Pi linkが参照するLCDの状態と描画器。表情を持たない試験構成では描画器を持たない。
+pub struct FaceTargets<'a, 'd> {
+    pub state: &'a mut FaceState,
+    pub drawer: Option<&'a mut FaceDrawer<'d>>,
+}
 
 /// Pi linkの受信の状態。
 pub struct PiLink {
@@ -121,7 +129,7 @@ impl PiLink {
         now_ms: u64,
         boot: &mut BootSession,
         health: &Health,
-        face: &mut FaceState,
+        face: &mut FaceTargets<'_, '_>,
         uart: &mut UartDriver<'_>,
     ) {
         // `drain`のclosureは`&mut self`を借りられないため、結果を受信の順に集めてから扱う。
@@ -141,7 +149,7 @@ impl PiLink {
         now_ms: u64,
         boot: &mut BootSession,
         health: &Health,
-        face: &mut FaceState,
+        face: &mut FaceTargets<'_, '_>,
         uart: &mut UartDriver<'_>,
     ) {
         let Frame { envelope, message } = frame;
@@ -192,9 +200,10 @@ impl PiLink {
             }
             Message::SetExpression(command) => {
                 let current = self.pi.pi_sid() == Some(sid);
-                let reply = match deskcat_face::judge(&command, current, face.display_state()) {
+                let reply = match deskcat_face::judge(&command, current, face.state.display_state())
+                {
                     Ok(name) => {
-                        face.request(name);
+                        face.state.request(name);
                         log::info!("pi_rx_set_expression sid={sid} id={id} name={name:?} accepted");
                         Message::Ack(Ack {
                             reply_sid: sid,
@@ -207,6 +216,47 @@ impl PiLink {
                     Err(code) => {
                         log::error!(
                             "pi_rx_set_expression_rejected sid={sid} id={id} code={}",
+                            code.as_str()
+                        );
+                        rejection_ack(sid, id, code)
+                    }
+                };
+                send(vec![reply], boot, health, uart);
+            }
+            Message::ShowText(command) => {
+                let result = if self.pi.pi_sid() != Some(sid) || !boot.is_established() {
+                    Err(ErrorCode::StaleSession)
+                } else {
+                    match face.state.display_state() {
+                        DisplayState::Unavailable => Err(ErrorCode::HardwareUnavailable),
+                        DisplayState::Busy => Err(ErrorCode::Busy),
+                        DisplayState::Ready => match face.drawer.as_deref_mut() {
+                            Some(drawer) => drawer
+                                .show_text(&command.text, command.duration_ms, now_ms)
+                                .map_err(deskcat_face::text::TextError::code),
+                            None => {
+                                log::error!(
+                                    "pi_rx_show_text_ready_without_drawer sid={sid} id={id}"
+                                );
+                                Err(ErrorCode::HardwareUnavailable)
+                            }
+                        },
+                    }
+                };
+                let reply = match result {
+                    Ok(()) => {
+                        log::info!("pi_rx_show_text sid={sid} id={id} accepted");
+                        Message::Ack(Ack {
+                            reply_sid: sid,
+                            reply_to: id,
+                            status: AckStatus::Ok,
+                            code: None,
+                            detail: None,
+                        })
+                    }
+                    Err(code) => {
+                        log::error!(
+                            "pi_rx_show_text_rejected sid={sid} id={id} code={}",
                             code.as_str()
                         );
                         rejection_ack(sid, id, code)
