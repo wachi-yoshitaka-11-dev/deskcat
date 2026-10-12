@@ -49,6 +49,6 @@ glyph を1文字ずつ描き、指定された表示時間の間は文字画面�
 短い時間では描画完了前に期限に達する可能性があるため、実 LCD の所要時間を測って
 PROTO-TBD-007 の最終値と起算点を決める。表情の3種類と矩形は変更しない。
 
-段階 (a) では firmware の描画 adapter と main loop の期限監視だけを追加する。
-`pi_link.rs` が `show_text` を渡す経路は #19 PR-3 の merge と PM からの連絡まで
-実装しないため、現時点の製品 build は独り言を表示しない。
+段階 (a) では firmware の描画 adapter と main loop の期限監視を追加した。
+段階 (b)（#587）で、`pi_link.rs` が受けた `show_text` を `FaceDrawer::show_text` へ渡し、
+受理と拒否の ACK を返すようになった。実 LCD での表示は、まだ確かめていない。
