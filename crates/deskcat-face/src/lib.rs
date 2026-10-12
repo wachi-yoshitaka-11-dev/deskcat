@@ -12,6 +12,8 @@
 
 use deskcat_protocol::{ErrorCode, ExpressionName, SetExpression};
 
+pub mod text;
+
 /// 論理座標での画面の幅（`firmware/esp32/src/display.rs`の`WIDTH`と同じ。firmwareが一致を検査する）。
 pub const SCREEN_WIDTH: u16 = 320;
 /// 論理座標での画面の高さ（同`HEIGHT`）。
