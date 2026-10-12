@@ -158,15 +158,13 @@ impl<'d> FaceDrawer<'d> {
         duration_ms: u32,
         now_ms: u64,
     ) -> Result<(), TextError> {
-        let layout = TextLayout::new(text).map_err(|error| {
+        let layout = TextLayout::new(text).inspect_err(|&error| {
             self.record_text_rejection(error);
-            error
         })?;
         self.presentation
             .show_text(duration_ms, now_ms)
-            .map_err(|error| {
+            .inspect_err(|&error| {
                 self.record_text_rejection(error);
-                error
             })?;
         self.painter = None;
         self.text = Some(layout);
