@@ -178,7 +178,7 @@ partitionの4,128,768 bytesに対し9.24 %である（`espflash`の`App/part. si
 （testはhost target `x86_64-unknown-linux-gnu`で実行した。**その版のrustcで通るかの確認であり、
 xtensaの上でtestを走らせたのではない**）、`firmware/esp32`の既定構成・`pi-protocol-mode`・`bringup-display-13`の
 3構成でformat、lint、buildを通した。
-実行した版と結果は[Version Record](../toolchains/version-records/2026-09-29-esp32-build-servo-limiter-native-linux.md)にある。
+3構成の結果は、developの`710c67f`（PR #513のsquash merge）の時点の[Version Record](../toolchains/version-records/2026-09-29-esp32-build-servo-limiter-native-linux.md)にある。現在の記録は、`pi-protocol-mode`廃止後の2構成（既定、`bringup-display-13`）である。
 **build-onlyであり、flashと実機起動は含まない。**
 
 **flash sizeへの影響はまだ測っていない。**既定buildの`main()`は`deskcat-servo`を呼ばないため、

@@ -173,6 +173,46 @@ fn a_rejected_id_replays_the_same_rejection_without_counting_twice() {
     );
 }
 
+/// 3b. `busy`も最終拒否として記録する。同じ`id`の再送は占有を再評価せず、保存した`busy`を返す。
+#[test]
+fn a_busy_rejection_is_recorded_and_replayed_without_reevaluating_occupancy() {
+    let mut dedup = MotionDedup::new(policy(TEST_CAPACITY, TEST_RETENTION_MS));
+    let mut evaluations = 0_u32;
+
+    let first = dedup.admit_once(1, 0, || {
+        evaluations += 1;
+        Err(Rejection::Busy)
+    });
+    // 占有が解けた後の再送でも、保存した`busy`を返す。closureは呼ばれない。
+    let second = dedup.admit_once(1, 10, || {
+        evaluations += 1;
+        Ok(())
+    });
+
+    assert_eq!(first, DedupOutcome::Admitted(Err(Rejection::Busy)));
+    assert_eq!(second, DedupOutcome::Replayed(Err(Rejection::Busy)));
+    assert_eq!(second.code(), Some(ErrorCode::Busy));
+    assert_eq!(evaluations, 1, "再送で占有を再評価しない");
+
+    // 改めて要求するときは新しい`id`であり、新規として判定される。
+    let third = dedup.admit_once(2, 20, || {
+        evaluations += 1;
+        Ok(())
+    });
+    assert_eq!(third, DedupOutcome::Admitted(Ok(())));
+    assert_eq!(evaluations, 2);
+}
+
+/// 3c. `busy`の対応するwire codeは`busy`である。
+#[test]
+fn busy_maps_to_the_busy_code() {
+    assert_eq!(Rejection::Busy.code(), ErrorCode::Busy);
+    assert_eq!(
+        Rejection::Busy.to_string(),
+        "a running trajectory occupies the servo (busy)"
+    );
+}
+
 /// 4. 保持件数を超えて捨てられた`id`の再送は、`admit`を呼ばずに`duplicate_expired`で拒否する。
 #[test]
 fn an_id_evicted_by_capacity_is_expired_and_never_admitted() {
