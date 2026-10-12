@@ -245,9 +245,9 @@ pub struct BootSession {
 
 impl BootSession {
     /// `boot`のACKを受け、Piとのsessionが確立しているか（`Phase::Established`）。
-    /// event（`tapped`）を送ってよいかの判定に使う（Issue #21、F1）。
+    /// event（`tapped`）を送ってよいかの判定（Issue #21、F1）と、`play_motion`を`stale_session`で
+    /// 拒否するかの判定（Issue #19、§4.1）に使う。
     #[must_use]
-    #[cfg_attr(not(feature = "tap-21"), allow(dead_code))]
     pub fn is_established(&self) -> bool {
         matches!(self.phase, Phase::Established)
     }

@@ -791,7 +791,14 @@ fn main() {
             last_read_ms = health.uptime_ms();
             if let Ok(n) = read {
                 if n > 0 {
-                    pi_link.on_bytes(&buf[..n], &mut boot_session, &health, &mut face, &mut uart);
+                    pi_link.on_bytes(
+                        &buf[..n],
+                        health.uptime_ms(),
+                        &mut boot_session,
+                        &health,
+                        &mut face,
+                        &mut uart,
+                    );
                 }
             }
         }
