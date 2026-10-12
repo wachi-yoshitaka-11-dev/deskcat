@@ -2350,7 +2350,7 @@ Piの時計の時刻は次のとおり。出所: #446のセッションの報告
 | Operator | 給電の差し替えと電源の入り切り、信号線の接続、目視（熱・異音・焦げ臭さ）はユーザー（初回の通電に立ち会った）。sshでの読み出しと`deskcatd`／`serial_link`の起動は#446のセッション（AI） |
 | Hardware revision／Exact components | `SBC-01`（Raspberry Pi Zero W）、`MCU-01`（ESP32）。adapterは`PSU-PI-A-02`（112001。label：入力`AC100-240V 41-55VA 50/60Hz`、出力`DC5V 3.0A`。cable一体） |
 | Wiring revision | `PSU-PI-A-02`のcableのplugを、Piの`PWR IN`へ挿した。信号線のESP32側の端は、ユーザーが戻した（ユーザーの申告）。Pi側の端とGND線は触っていない。それ以外の配線の変更の有無は、comment 6109307768に記録が無い |
-| Power supply and current limit | Piは`PSU-PI-A-02`。ESP32はUSBでつないで給電した（給電元は、comment 6109307768に記載が無い）。電流制限は設けていない。**112001の極性と出力電圧は実測していない**（事前測定を行わない決定はユーザー。[#446のcomment 6105175775](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446#issuecomment-6105175775)）。Hardware Safety Policyが逆極性・電圧に求める根拠の水準を、この個体は満たしていない |
+| Power supply and current limit | Piは`PSU-PI-A-02`。ESP32はUSBでつないで給電した（給電元は、comment 6109307768に記載が無い）。電流制限は設けていない。**112001の極性と出力電圧は実測していない**（事前測定を行わない決定はユーザー。[#446のcomment 6105175775](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446#issuecomment-6105175775)）。事前測定を行わない決定はユーザーが行った |
 | Firmware commit/profile | ESP32：**書かれているfirmwareのbuildは確かめていない**。Pi：`deskcatd`は`ddf16c9`のソースのbuild（sha256は先頭8桁`238339eb`だけを記録する。#446のcomment 6109307768は末尾を`9c20`と書くが、`EXP-021`の記録の完全な値の末尾は`9fc20`で食い違う。Piで再計算していない）、`serial_link`のsha256は`64a3c3a9…0439` |
 | Configuration | 112001への差し替えと初回の通電は、ユーザーが立ち会った（[#446のcomment 6109307768](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446#issuecomment-6109307768)）。**差し替えと初回の通電の承認を記録したcommentは確認できない**（関連するcommentは、表記の記録〔[6104039603](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446#issuecomment-6104039603)〕、出力端の形の申告〔[6104068278](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446#issuecomment-6104068278)〕、事前測定を行わない決定〔[6105175775](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446#issuecomment-6105175775)〕で、いずれも承認ではない）。順序は、条件2（[gpio-assignment.md](gpio-assignment.md)の`信号線をつないでよい条件`）に従い、ESP32の電源を入れた後で、信号線のESP32側の端を戻した。Pi側の端とGND線は触っていない |
 | Measurement equipment | テスター等は使っていない（電圧・電流を測った記録は無い）。Piの`vcgencmd get_throttled`、Pi上のlog |
@@ -2381,7 +2381,7 @@ Piの時計の時刻は次のとおり。出所: #446のセッションの報告
 
 ### この記録が主張しないこと
 
-- 電源経路の受け入れ。極性・電圧の実測が無く、根拠の水準を満たさない
+- 電源経路の受け入れ。極性と電圧を実測していない
 - 112001が安全であること、または`PSU-PI-A-01`より優れていること。電圧を測っておらず、比較していない
 - 長時間の運転。運転したのは約6分だけである
 - `throttled=0x0`を電圧の根拠とすること

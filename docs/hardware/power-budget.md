@@ -2645,8 +2645,8 @@ required_transient_current
 `配線・保護表`の`逆極性保護`行は`Blocked`のままである。**
 
 **下表は段階C（合成給電）の構成に、段階B-2の周辺module配線を加えたものである。**
-段階A・B-1にはbreadboard railが無く、Piは段階Aのadapter（段階表のA行）からUSBの嵌合で`PWR IN`へ、ESP32はUSBへ直挿しするため、
-**そもそも極性を間違えられない**（`合成給電を部品が揃うまで行わない理由`）。
+段階A・B-1にはbreadboard railが無く、Piは段階Aのadapter（段階表のA行）から`PWR IN`へ、ESP32はUSBへ直挿しする。
+2026-10-11の差し替えまでの`PSU-PI-A-01`と`CABLE-PI-A-01`はUSBの嵌合であり、**そもそも極性を間違えられない**（`合成給電を部品が揃うまで行わない理由`）。2026-10-11以降の`PSU-PI-A-02`は、plugの形と極性を確かめておらず、この表の区間に入れていない（可否の分類は決めていない。[hardware-bom.md](hardware-bom.md)の`PSU-PI-A-02`）。
 **検証の構成（`5 V ingress`節の`検証の構成の扱い`）でPiとESP32の間につなぐGNDの線とUARTの信号線は手配線であり、この前提から外れる。**
 その確認は、この節の手順の対象ではなく、[gpio-assignment.md](gpio-assignment.md)の`信号線をつないでよい条件`の6が持つ。
 **段階B-2は例外で、`3V3` pinから周辺module3点へ引く配線が手配線になる**（表の最終行）。
