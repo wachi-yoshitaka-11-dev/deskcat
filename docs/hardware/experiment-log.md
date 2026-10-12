@@ -34,6 +34,7 @@
 | [EXP-020](#exp-020-段階aのpiの給電を手持ちのadapterへ移しwi-fiの切断を切り分けpiのuartを設定した) | [#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)の受け入れ条件4の準備。段階AのPiの給電（`PSU-PI-A-01`と`CABLE-PI-A-01`）、Wi-Fiの切断の観察、PiのUARTの設定 | 値の正なし（観察の記録。電源の適否は判断していない） |
 | [EXP-021](#exp-021-叩いて表情が変わるデモの通電) | [#21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)の通電。叩いて表情が変わるデモ（ADXL345の`tapped`、Piの`set_expression`、LCDの表情） | 値の正なし（試験の記録。`THRESH_TAP`の値は`crates/deskcat-tap`が持つ。所在は[firmware/esp32/README.md](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/firmware/esp32/README.md)の`build構成と通電`の表） |
 | [EXP-022](#exp-022-周辺moduleをつないだesp32へpiをuartでつなぎlcdの描画の間の通信を確かめた受け入れ条件6) | [#13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)受け入れ条件6 | 値の正なし（試験の記録。判定は#13） |
+| [EXP-023](#exp-023-piの給電を112001へ差し替えuartの通信を確かめた) | [#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)の受け入れ条件4。段階AのPiの給電の差し替え（`PSU-PI-A-02`）と、UART越しの`serial_link`の確認 | 値の正なし（観察の記録。電源の適否は判断していない） |
 
 **大容量の生dataはこのrepositoryへ入れていない。**保存場所は
 [development-foundation-plan.md](../planning/development-foundation-plan.md)の
@@ -2338,6 +2339,63 @@ Piの時計の時刻は次のとおり。出所: #446のセッションの報告
 - 黄が`12`（`MTDI`）にあった間のreset時の電位と`VDD_SDIO`への影響の評価は、まだ無い。この試験の後の`EXP-021`（2026-10-09、同じ`MCU-01`）にも、この評価の記録は無い。次の通電の前に要る
 - #13の受け入れ条件のチェックとcloseの判断は、この記録に含めない
 
+## EXP-023: Piの給電を112001へ差し替え、UARTの通信を確かめた
+
+[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)の受け入れ条件4の試験。段階AのPiの給電を、`PSU-PI-A-01`と`CABLE-PI-A-01`から112001（cable一体のACアダプター。[hardware-bom.md](hardware-bom.md)の`PSU-PI-A-02`）へ差し替えた。記録の出所は[#446のcomment 6109307768](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446#issuecomment-6109307768)である。Pi側の事実は#446のセッション（AI）がsshで読んだ報告で、ESP32側のlogはこの記録の作成者は読んでいない。
+
+| 項目 | 内容 |
+|---|---|
+| Test ID | `EXP-023` |
+| Date | 2026-10-11（Piの時計で、通信の確認は13:00:51Z〜13:02:36Z。差し替えと起動の時刻の記録は無い。運転は約6分である〔#446のcomment 6109307768〕。Piの時計とこの端末の時計の差は測っていない） |
+| Operator | 給電の差し替えと電源の入り切り、信号線の接続、目視（熱・異音・焦げ臭さ）はユーザー（初回の通電に立ち会った）。sshでの読み出しと`deskcatd`／`serial_link`の起動は#446のセッション（AI） |
+| Hardware revision／Exact components | `SBC-01`（Raspberry Pi Zero W）、`MCU-01`（ESP32）。adapterは`PSU-PI-A-02`（112001。label：入力`AC100-240V 41-55VA 50/60Hz`、出力`DC5V 3.0A`。cable一体） |
+| Wiring revision | `PSU-PI-A-02`のcableのplugを、Piの`PWR IN`へ挿した。信号線のESP32側の端は、ユーザーが戻した（ユーザーの申告）。Pi側の端とGND線は触っていない。それ以外の配線の変更の有無は、comment 6109307768に記録が無い |
+| Power supply and current limit | Piは`PSU-PI-A-02`。ESP32はUSBでつないで給電した（給電元は、comment 6109307768に記載が無い）。電流制限は設けていない。**112001の極性と出力電圧は実測していない**（事前測定を行わない決定はユーザー。[#446のcomment 6105175775](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446#issuecomment-6105175775)）。Hardware Safety Policyが逆極性・電圧に求める根拠の水準を、この個体は満たしていない |
+| Firmware commit/profile | ESP32：**書かれているfirmwareのbuildは確かめていない**。Pi：`deskcatd`は`ddf16c9`のソースのbuild（sha256は先頭8桁`238339eb`だけを記録する。#446のcomment 6109307768は末尾を`9c20`と書くが、`EXP-021`の記録の完全な値の末尾は`9fc20`で食い違う。Piで再計算していない）、`serial_link`のsha256は`64a3c3a9…0439` |
+| Configuration | 112001への差し替えと初回の通電は、ユーザーが立ち会った（[#446のcomment 6109307768](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446#issuecomment-6109307768)）。**差し替えと初回の通電の承認を記録したcommentは確認できない**（関連するcommentは、表記の記録〔[6104039603](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446#issuecomment-6104039603)〕、出力端の形の申告〔[6104068278](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446#issuecomment-6104068278)〕、事前測定を行わない決定〔[6105175775](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446#issuecomment-6105175775)〕で、いずれも承認ではない）。順序は、条件2（[gpio-assignment.md](gpio-assignment.md)の`信号線をつないでよい条件`）に従い、ESP32の電源を入れた後で、信号線のESP32側の端を戻した。Pi側の端とGND線は触っていない |
+| Measurement equipment | テスター等は使っていない（電圧・電流を測った記録は無い）。Piの`vcgencmd get_throttled`、Pi上のlog |
+| Procedure | Piの給電を差し替え、Pi単独で起動（信号線のESP32側の端は外したまま）。起動の確認の後、ESP32を入れ、信号線の端を戻して、`deskcatd`を約40秒動かし、続けて`serial_link --ping-count 20`を実行した |
+| Expected result | Piが起動し、UARTでESP32と通信できること |
+| Measured result | 下記 |
+| Faults | 下記 |
+| Conclusion | 下記 |
+| Next safe step | 下記 |
+
+### 結果
+
+- 熱・異音・焦げ臭さは無かった（ユーザーの申告）
+- Pi単独の起動：差し替え後2分で`throttled=0x0`、`/dev/serial0`あり、`deskcatd`は動いていない。起動時のカーネルlogに`EXT4-fs: orphan cleanup on readonly fs`が1行あるが、I/Oエラーは無く、rootは`rw`。**Pi Zero Wは低電圧を検出しないので、`throttled=0x0`は電圧について何も語らない**（`EXP-009`）
+- `deskcatd`：Piの時計で13:00:51Zに起動。logは3行で、`hello`を送り、ESP32のACKに「応答送信側のsessionが未承認のため受理しない」というWARNが1件出た（`EXP-021`の`deskcatd`のlogと同じ形）
+- `serial_link --ping-count 20`：13:01:56Z〜13:02:36Z。`state: Connected`、`pings_sent=20 ping_acks=20 ping_rejected=0 ping_retries=0 ping_gave_up=0`、`rejected_in=0`、`disconnects=0`、`timeouts=0`、`unmatched_acks=0`。`retries=785`（`SessionCounters::retries`は、送信の再送ではなく、I/Oの進捗が無かった回数である〔`crates/deskcat-serial/examples/serial_link.rs`のdoc〕。#446のcomment 6109307768は「`hello`の再送を含む」と書くが、この実装と合わない。内訳は読んでいない）
+- logのsha256：`serial_link`は`fcf8bc86…e1a0`、`deskcatd`は`9eb02203…cf03`
+
+### Faults
+
+- **この試験の前の出来事（旧adapterの運転中）：**2026-10-11T01:10:46Zに、停止の命令を送ろうとしてsshをつないだところ`No route to host`で届かず（名前は引けたが、pingに応答が無かった）、停止の命令は実行されなかった。ユーザーがPiの電源を切った。切る前のPiの状態は確かめていない。SDカードへの影響の確認は、次の起動に回した。原因は特定しておらず、過去のWi-Fiの切断の記録（`EXP-020`）と同じ原因かも分からない（[#446のcomment 6105181072](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446#issuecomment-6105181072)）。この試験の約6分の間に、sshが届かなくなったことは記録していない
+- `retries=785`の内訳を読んでいない
+- ESP32に書かれているfirmwareのbuildを確かめていない。ESP32側のlogを読んでいない
+- 112001の電圧、極性、plugの形を測っていない。Piの入力電圧を測った記録は無い
+- 起動時のカーネルlogの`EXT4-fs: orphan cleanup on readonly fs`が、直前の電源断（上）によるものかは確かめていない
+- [gpio-assignment.md](gpio-assignment.md)の`信号線をつないでよい条件`のうち、条件2（順序）以外の確認の記録が、comment 6109307768に無い：条件1（各信号線への直列4.7 kΩ）、条件5（別々に給電し、GNDを共通にする）、条件6（通電前のGNDの線とUARTの線のPi側の端の確認）。確認したか否かは、この記録からは分からない
+- 条件3（firmwareとhostがこのUARTに対応している）は、ESP32に書かれているfirmwareのbuildを確かめていないため、この記録からは確かめられない（`ping`のACKが返ったことは、対応の証拠の一部にとどまる）
+
+### この記録が主張しないこと
+
+- 電源経路の受け入れ。極性・電圧の実測が無く、根拠の水準を満たさない
+- 112001が安全であること、または`PSU-PI-A-01`より優れていること。電圧を測っておらず、比較していない
+- 長時間の運転。運転したのは約6分だけである
+- `throttled=0x0`を電圧の根拠とすること
+- 直前のssh不通の原因
+
+### Conclusion
+
+112001で、Piは差し替え後2分で起動し、UART越しに`serial_link`の`ping`20件に20件のACKが返った。熱・異音・焦げ臭さの申告は無かった。電源の適否は、この記録では判断しない。
+
+### Next safe step
+
+- 112001で長く運転する場合は、人間の監視のもとで行い、その前に、sshが届かなくなった件（上）の原因を切り分ける（Piのjournalで、Wi-Fiの切断かPiの停止かを分ける）
+- ESP32のfirmwareのbuildを確かめてから、次の通電に進む
+
 ## Revision履歴
 
 | 日付 | Revision | 変更 | 根拠 |
@@ -2371,3 +2429,4 @@ Piの時計の時刻は次のとおり。出所: #446のセッションの報告
 | 2026-10-06 | 26 | [#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)。**`EXP-020`を追加した。**段階AのPiの給電を手持ちのadapterとcableへ移し、Wi-Fiの切断を観察し、PiのUARTを設定した | [#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446) |
 | 2026-10-09 | 27 | [#21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)。**`EXP-021`を追加した。**叩いて表情が変わるデモ（`tap-21,face-21,bringup-display-13`、`face-21`の常時点灯）の通電の記録である。**Faultsに、正本からの逸脱と記録の無い確認を記録した**（`信号線をつないでよい条件`の条件3の列挙と対応範囲の外であること、`DISP-01`追加接続のbring-upの手順の条件(1)と非通電の確認の記録が無いこと） | [#21のcomment 6077223726](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21#issuecomment-6077223726)と、ESP32のシリアルlog（端末のlocal） |
 | 2026-10-10 | 28 | [#13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)。**`EXP-022`を追加した。**構成（v）（周辺moduleをつないだESP32へPiをUARTでつなぐ）の、受け入れ条件6の試験の記録である。黄が`13`でなく`12`に刺さっていた1回目と、2回目・3回目、描画の間の通信の数字、Faultsを記録した | [#13のcomment 6042642898](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13#issuecomment-6042642898)、ESP32のシリアルlog（端末のlocal）、#446のセッションの報告 |
+| 2026-10-12 | 29 | [#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)。**`EXP-023`を追加した。**Piの給電を112001（`PSU-PI-A-02`、cable一体）へ差し替え、UART越しの`serial_link`の`ping`を20件通した記録である。極性・電圧の実測が無いこと、`retries=785`の内訳を読んでいないこと、ESP32のfirmwareのbuildを確かめていないこと、約6分しか運転していないこと、試験の前に旧adapterでsshが届かなくなり電源を切った件をFaultsに記録した | [#446のcomment 6109307768](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446#issuecomment-6109307768) |
