@@ -3,7 +3,8 @@
 //! # 範囲
 //!
 //! [`MotionDedup::admit_once`]は、現在のsessionの`id`ごとに、`admit`（hostでは
-//! [`crate::Limiter::admit`]、firmwareでは`LimitedServo::admit`）を**高々1回**しか呼ばない。
+//! [`crate::Limiter::admit`]、firmwareのservo経路では`LimitedServo::admit`。**現在のfirmwareの`pi_link.rs`は
+//! `MotionCatalog`を引くclosureを渡し、`LimitedServo`は呼ばない**。servo経路の接続は#487のPR D）を**高々1回**しか呼ばない。
 //!
 //! - 初めての`id`（[`Lookup::New`]）: `admit`を1回呼び、結果を**`Ok`でも`Err`でも**記録する
 //! - 処理済みの`id`（[`Lookup::Replay`]）: `admit`を呼ばず、記録した結果を返す
@@ -13,9 +14,9 @@
 //! 「Duplicateには…保持したresultのreplay経路を使い、非idempotentな動作を再実行しない」
 //! 「Relativeまたは名前付きの物理motionにはduplicate suppressionが必要である」である。
 //!
-//! **wireの`play_motion`の受信と振り分けは含まない。**型は`deskcat-protocol`にあるが、
-//! 受信してこのcrateへ渡す経路はまだ無い（受け入れる名前と上限は未決である。Protocol §5.3と
-//! `PROTO-TBD-008`）。firmwareのsessionへの組み込みは後続である。
+//! **wireの`play_motion`の受信と振り分けは含まない。**それはfirmwareの`pi_link.rs`が行い、
+//! `admit`のclosureの中で`MotionCatalog`を引く（受け入れる名前と上限は未決である。Protocol §5.3と
+//! `PROTO-TBD-008`）。
 //!
 //! `Expired`の扱いは[`DuplicateHistory`]のdocとProtocol §9による（受け入れ前の`TBD`が残っている）。
 //!
@@ -40,7 +41,7 @@
 //! # 時刻
 //!
 //! `now_ms`は単調に増加する値を渡す（[`DuplicateHistory::record`]の契約）。firmwareでは
-//! `std::time::Instant`（`CLOCK_MONOTONIC`）から取る前提である（firmware側の呼び出しはまだ無い）。
+//! `std::time::Instant`（`CLOCK_MONOTONIC`）から取る前提である（firmwareの`pi_link.rs`は`Health::uptime_ms`を渡す）。
 //! 時刻が戻った場合の振る舞いは、[`DuplicateHistory::record`]のdocと`tests/dedup.rs`のtest 9による。
 //!
 //! # 値を持たない

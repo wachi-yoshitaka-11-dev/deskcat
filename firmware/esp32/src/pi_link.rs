@@ -13,7 +13,7 @@
 //! | `set_expression` | `deskcat_face::judge`で判定する（session→値の範囲→LCDの準備の順。§8）。受理なら`crate::face::FaceState`へ記録して`ok`のACKを書く。拒否なら該当のcodeの拒否ACKを書く。**製品buildと`face-21`試験buildが受理できる。表情を持たない試験buildは`hardware_unavailable`、bring-upの間は`busy`で拒否する**（§7） |
 //! | （受信ではない）`tapped` | 製品buildと`tap-21`試験buildが、bootのACKを受けた後に[`send_event`]で書く。受信の振り分けとは別の経路である（`crate::tap`） |
 //! | `boot` | `unknown_type`の拒否ACKを書く（§8の表「方向が逆のsession確立message」） |
-//! | `play_motion` | decodeは通る。**どのservoのcodeにも渡さず、ACKも書かない。**logで分類するだけである（`pi_rx_play_motion_not_supported`）。motionの実行と拒否ACKは、まだ実装していない（[Issue #19](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/19)） |
+//! | `play_motion` | session権限（現在のPi `sid`でない、またはESP32の`boot`がACKされていない間は`stale_session`。§4.1、§8手順8）→`deskcat_servo::MotionDedup::admit_once`の順に扱い、**どの経路でも拒否ACKを書く**（下記「`play_motion`」）。**どのservoのcodeにも渡さない**（[Issue #19](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/19)） |
 //! | `status` | 応答しない（ESP32→Piのmessageである）。logで分類する |
 //! | decodeで拒否した行 | oversizeの行から`(sid, id)`と`hello`／`ping`／`get_status`のtypeを復元できた場合は`line_too_long`の拒否ACKを書く（§7）。それ以外はlogで分類し、応答しない（§2の既知の逸脱） |
 //!
@@ -34,8 +34,23 @@
 //! 入らない。health snapshot（`main.rs`の`emit_health_snapshot`）はUART0のlogであり、Pi linkへ
 //! `status`を送らない。
 //!
+//! # `play_motion`
+//!
+//! `catalog`は`MotionCatalog::empty()`のままで、**これを変更する経路は無い**（motion名は
+//! 未確定。Protocol §5.3）。そのため、現在の`sid`の`play_motion`は、初めての`id`なら
+//! `invalid_payload`（`MotionCatalog`に無い名前）で拒否してその結果を`MotionDedup`へ記録し、同じ`id`の再送には
+//! 記録した結果を返す。履歴から失われた`id`は`duplicate_expired`、現在のsessionでない`sid`は
+//! `stale_session`である（**ESP32の`boot`がACKされていない間も`stale_session`で、履歴へは記録しない**。§4.1の停止状態を含む）。**`MotionDedup::admit_once`の`admit`のclosureは、`LimitedServo`も`Limiter`も
+//! 呼ばない**（firmwareの`main`はそれらを作らない。接続は#487のPR D）。**そのため`busy`は返らない。**
+//! catalogに名前がある場合も、servoへ渡す経路が無いので`invalid_payload`で拒否し、logに残す。
+//!
+//! 履歴を`clear`するのは、`hello`が新しいPi sessionを確立したとき（`HelloOutcome::Established`）だけである（§9）。保持件数と保持期間で失われた`id`の再送は`duplicate_expired`になる。
+//! **保持件数と保持期間は暫定値である**（[`MOTION_DUPLICATE_CAPACITY`]、[`MOTION_DUPLICATE_RETENTION`]）。
+//!
 //! # 実装していないもの
 //!
+//! - `play_motion`の保持した結果の再送の送出上限（§8.2のretry quota。`PROTO-TBD-012`が未決）。
+//!   同じ`(sid, id)`の再送には、そのたびに保持した結果を返す。
 //! - `ping`／`get_status`、`set_expression`、`port_reopen`／`resync`の`hello`、拒否した`hello`の処理済みの結果を保持しない
 //!   （§8の手順8・9。保持件数は`PROTO-TBD-005`）。同じ`(sid, id)`の再送は、もう一度処理する。
 //! - §8.1／§8.2の流量制限、`hello`の拒否ACKの保留table、§5.1の遷移の上限とcooldown（`PROTO-TBD-012`）。
@@ -50,9 +65,13 @@
 //! ため、host testでは動かせない。実機の確認（`boot`→ACK、`hello`の後の`boot`の再送、`get_status`の
 //! ACKと`status`の順序、受信のring bufferが溢れないこと）はIssue #446と#12が追跡する。
 
+use std::time::Duration;
+
 use deskcat_protocol::{
-    encode_line, Ack, AckStatus, Cause, ErrorCode, Frame, LineReceiver, Message, Outcome, Rejection,
+    encode_line, Ack, AckStatus, Cause, DuplicatePolicy, ErrorCode, Frame, LineReceiver, Message,
+    Outcome, PlayMotion, Rejection,
 };
+use deskcat_servo::{DedupOutcome, MotionCatalog, MotionDedup, Rejection as MotionRejection};
 use esp_idf_svc::hal::uart::UartDriver;
 
 use crate::boot_session::{BootSession, HelloAccepted};
@@ -60,10 +79,25 @@ use crate::face::FaceState;
 use crate::health::Health;
 use crate::protocol::{HelloOutcome, PiSession};
 
+/// `play_motion`の保持件数（暫定）。**確定値ではない。**`PROTO-TBD-005`が未決で、数値そのものに根拠は無い。
+///
+/// `0`でないという性質だけを満たす仮置きである。catalogが空の間は、motionを実行しないので、この値がservoの動きを変えることは無い。
+/// **ただし、保持件数と保持期間を超えた再送には、記録した`invalid_payload`ではなく`duplicate_expired`を返す**ので、再送へ返すcodeはこの値で変わる。**catalogが空でなくなる（motionを受理し始める）前に、確定値にする**
+/// （Protocol §5.3の有効化の条件と同じ扱い）。
+const MOTION_DUPLICATE_CAPACITY: usize = 8;
+
+/// `play_motion`の保持期間（暫定）。**確定値ではない。**`PROTO-TBD-005`が未決で、数値そのものに根拠は無い。
+/// 扱いは[`MOTION_DUPLICATE_CAPACITY`]と同じ。
+const MOTION_DUPLICATE_RETENTION: Duration = Duration::from_secs(10);
+
 /// Pi linkの受信の状態。
 pub struct PiLink {
     receiver: LineReceiver,
     pi: PiSession,
+    /// 現在のPi sessionの`play_motion`の履歴。session遷移で`clear`する。
+    motion_dedup: MotionDedup,
+    /// 受理するmotion名。**空のまま変更しない**（module doc「`play_motion`」）。
+    motion_catalog: MotionCatalog,
 }
 
 impl PiLink {
@@ -72,13 +106,19 @@ impl PiLink {
         Self {
             receiver: LineReceiver::with_protocol_limit(),
             pi: PiSession::new(),
+            motion_dedup: MotionDedup::new(
+                DuplicatePolicy::new(MOTION_DUPLICATE_CAPACITY, MOTION_DUPLICATE_RETENTION)
+                    .expect("暫定値は0ではない"),
+            ),
+            motion_catalog: MotionCatalog::empty(),
         }
     }
 
-    /// Pi linkのUARTから読めた生byteを渡す。
+    /// Pi linkのUARTから読めた生byteを渡す。`now_ms`は単調に増える時刻（`Health::uptime_ms`）である。
     pub fn on_bytes(
         &mut self,
         buf: &[u8],
+        now_ms: u64,
         boot: &mut BootSession,
         health: &Health,
         face: &mut FaceState,
@@ -89,7 +129,7 @@ impl PiLink {
         self.receiver.drain(buf, |outcome| outcomes.push(outcome));
         for outcome in outcomes {
             match outcome {
-                Outcome::Frame(frame) => self.on_frame(frame, boot, health, face, uart),
+                Outcome::Frame(frame) => self.on_frame(frame, now_ms, boot, health, face, uart),
                 Outcome::Rejected(rejection) => on_rejected(&rejection, boot, health, uart),
             }
         }
@@ -98,6 +138,7 @@ impl PiLink {
     fn on_frame(
         &mut self,
         frame: Frame,
+        now_ms: u64,
         boot: &mut BootSession,
         health: &Health,
         face: &mut FaceState,
@@ -132,6 +173,10 @@ impl PiLink {
                     HelloOutcome::Maintained => Some(HelloAccepted::Maintained),
                     _ => None,
                 };
+                // 新しいPi sessionの確立は、旧sessionの履歴を捨てる唯一の経路である（§9）。
+                if matches!(handled.outcome, HelloOutcome::Established { .. }) {
+                    self.motion_dedup.clear();
+                }
                 if let Some(accepted) = accepted {
                     boot.on_hello_accepted(accepted, health, uart);
                 }
@@ -178,17 +223,67 @@ impl PiLink {
                     uart,
                 );
             }
-            // `play_motion`はdecodeを通るが、どのservoのcodeにも渡さない。motionの実行も
-            // ACKも、まだ実装していない（§2の既知の逸脱(i)）。**既定枝（下の`other`）へ任せず明示する**のは、
-            // servoへ届かないことをコードの形で読めるようにするためである。
-            Message::PlayMotion(_) => {
-                log::error!("pi_rx_play_motion_not_supported sid={sid} id={id}");
+            Message::PlayMotion(command) => {
+                let reply = self.on_play_motion(sid, id, &command, now_ms, boot.is_established());
+                send(vec![reply], boot, health, uart);
             }
             other => {
                 log::error!(
                     "pi_rx_unhandled_frame type={} sid={sid} id={id}",
                     other.type_str()
                 );
+            }
+        }
+    }
+}
+
+impl PiLink {
+    /// `play_motion`を、session権限→`MotionDedup`の順に扱い、返すACKを作る（§8手順8・10）。
+    ///
+    /// `boot_established`は`BootSession::is_established`である。**`boot`がACKされていない間（§4.1の停止状態を含む）は、
+    /// motion commandを`stale_session`で拒否し、履歴へ記録しない**（§4.1、§12）。
+    ///
+    /// **servoへは何も渡さない。**`admit`のclosureは`MotionCatalog`を引くだけである。
+    fn on_play_motion(
+        &mut self,
+        sid: u32,
+        id: u32,
+        command: &PlayMotion,
+        now_ms: u64,
+        boot_established: bool,
+    ) -> Message {
+        if self.pi.pi_sid() != Some(sid) || !boot_established {
+            log::error!("pi_rx_play_motion_rejected sid={sid} id={id} code=stale_session");
+            return rejection_ack(sid, id, ErrorCode::StaleSession);
+        }
+        let catalog = &self.motion_catalog;
+        let outcome = self.motion_dedup.admit_once(id, now_ms, || {
+            if !catalog.contains(&command.name) {
+                return Err(MotionRejection::UnknownMotion);
+            }
+            // servoへ渡す経路が無い（`LimitedServo`は作らない。#487のPR D）。catalogは空のまま
+            // 変更しないのでここへは来ないが、来ても実行せず拒否する側へ倒す。
+            log::error!("pi_rx_play_motion_catalog_without_servo sid={sid} id={id}");
+            Err(MotionRejection::UnknownMotion)
+        });
+        match outcome.code() {
+            None => {
+                log::info!("pi_rx_play_motion sid={sid} id={id} outcome={outcome:?}");
+                Message::Ack(Ack {
+                    reply_sid: sid,
+                    reply_to: id,
+                    status: AckStatus::Ok,
+                    code: None,
+                    detail: None,
+                })
+            }
+            Some(code) => {
+                let replayed = matches!(outcome, DedupOutcome::Replayed(_));
+                log::error!(
+                    "pi_rx_play_motion_rejected sid={sid} id={id} code={} replayed={replayed}",
+                    code.as_str()
+                );
+                rejection_ack(sid, id, code)
             }
         }
     }

@@ -10,8 +10,8 @@
 //!
 //! [`MotionDedup::admit_once`]が、同じ`id`に対して`admit`を高々1回しか呼ばないことである。
 //! `admit`には[`Limiter::admit`]を包んだclosureを渡し、呼ばれた回数と[`Limiter::counters`]で
-//! 確かめる。**wireの`play_motion`の受信と、firmwareのsessionへの組み込みは試していない**
-//! （型は`deskcat-protocol`にあるが、受信してこのcrateへ渡す経路がまだ無い）。
+//! 確かめる。**wireの`play_motion`の受信と、firmwareのsessionへの組み込み（`pi_link.rs`）は試していない**
+//! （`esp_idf_svc`へ依存するため、host testでは動かせない。最後のtestは、そのclosureと同じ形を再現するだけである）。
 
 use core::time::Duration;
 
@@ -315,4 +315,27 @@ fn a_backwards_clock_replays_when_the_monotonic_contract_is_broken() {
 
     assert_eq!(outcome, DedupOutcome::Replayed(Ok(())));
     assert_eq!(owner.admit_calls, 1);
+}
+
+/// 空のcatalogでは、どの名前も`invalid_payload`で拒否され、その結果が記録されて再送に再生される。
+/// firmwareの`pi_link.rs`の`admit`のclosure（catalogを引くだけ）と同じ形である。
+#[test]
+fn with_an_empty_catalog_every_name_is_rejected_as_invalid_payload_and_replayed() {
+    let catalog = MotionCatalog::empty();
+    let mut dedup = MotionDedup::new(policy(TEST_CAPACITY, TEST_RETENTION_MS));
+    for (id, name) in [(1, TEST_MOTION), (2, ""), (3, "nod")] {
+        // 時刻は`id`ごとに単調に増やす（`DuplicateHistory::record`の契約）。
+        let now_ms = u64::from(id) * 2;
+        let first = dedup.admit_once(id, now_ms, || {
+            if catalog.contains(name) {
+                Ok(())
+            } else {
+                Err(Rejection::UnknownMotion)
+            }
+        });
+        assert_eq!(first, DedupOutcome::Admitted(Err(Rejection::UnknownMotion)));
+        assert_eq!(first.code(), Some(ErrorCode::InvalidPayload));
+        let again = dedup.admit_once(id, now_ms + 1, || panic!("再送でadmitを呼んではならない"));
+        assert_eq!(again, DedupOutcome::Replayed(Err(Rejection::UnknownMotion)));
+    }
 }
