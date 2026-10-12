@@ -35,6 +35,7 @@
 | [EXP-021](#exp-021-叩いて表情が変わるデモの通電) | [#21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)の通電。叩いて表情が変わるデモ（ADXL345の`tapped`、Piの`set_expression`、LCDの表情） | 値の正なし（試験の記録。`THRESH_TAP`の値は`crates/deskcat-tap`が持つ。所在は[firmware/esp32/README.md](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/firmware/esp32/README.md)の`build構成と通電`の表） |
 | [EXP-022](#exp-022-周辺moduleをつないだesp32へpiをuartでつなぎlcdの描画の間の通信を確かめた受け入れ条件6) | [#13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)受け入れ条件6 | 値の正なし（試験の記録。判定は#13） |
 | [EXP-023](#exp-023-piの給電を112001へ差し替えuartの通信を確かめた) | [#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)の受け入れ条件4。段階AのPiの給電の差し替え（`PSU-PI-A-02`）と、UART越しの`serial_link`の確認 | 値の正なし（観察の記録。電源の適否は判断していない） |
+| [EXP-024](#exp-024-deskcatdの常駐systemdをpiへ導入し電源投入での起動とfailedからの戻しを確かめた) | [#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)の受け入れ条件4。deskcatdのsystemd unitの導入、Piの起動での自動の開始、failedとreset-failedでの戻し、ESP32のfirmwareの特定 | 値の正なし（観察の記録。電源の適否は判断していない） |
 
 **大容量の生dataはこのrepositoryへ入れていない。**保存場所は
 [development-foundation-plan.md](../planning/development-foundation-plan.md)の
@@ -2396,6 +2397,80 @@ Piの時計の時刻は次のとおり。出所: #446のセッションの報告
 - 112001で長く運転する場合は、人間の監視のもとで行い、その前に、sshが届かなくなった件（上）の原因を切り分ける（Piのjournalで、Wi-Fiの切断かPiの停止かを分ける）
 - ESP32のfirmwareのbuildを確かめてから、次の通電に進む
 
+## EXP-024: deskcatdの常駐（systemd）をPiへ導入し、電源投入での起動とfailedからの戻しを確かめた
+
+[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)の受け入れ条件4の試験。`deploy/systemd/deskcatd.service`をPiへ導入し、Piの起動での自動の開始、ESP32とつながらないときの再起動とfailed、`reset-failed`と`restart`での戻しを観察した。記録の出所は[#446のcomment 6123783146](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446#issuecomment-6123783146)（導入と起動の確認）と[comment 6123004894](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446#issuecomment-6123004894)（firmwareの特定）である。承認は[comment 6123867297](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446#issuecomment-6123867297)に問いと回答の文面を保存した。時刻はUTCで、「ユーザーの報告」の時刻は、報告を受けて作業セッション（AI）が記録した時刻である。
+
+| 項目 | 内容 |
+|---|---|
+| Test ID | `EXP-024` |
+| Date | 2026-10-12（UTC 11:01〜11:55。JST 20:01〜20:55。内訳：Piでのbuild 11:01:28〜11:21:02、ESP32のflashの読み出し 11:04:39〜11:05:03、導入 11:40ごろ〔Pi上のfileの更新時刻がJST 20:40:25〜20:40:37、UTC 11:40:25〜11:40:37〕、起動の確認 11:45:25〜11:55。点灯は11:45:25から） |
+| Operator | ESP32のUSBの抜き挿し、Piの電源の入れ直し、信号線のESP32側の端の抜き挿しと挿し先の目視、LCDと熱・異音・焦げ臭さの目視はユーザー。sshでの導入、`systemctl`の操作、journalの読み出し、ESP32のflashの読み出しは作業セッション（AI） |
+| Hardware revision／Exact components | `SBC-01`（Raspberry Pi Zero W）、`MCU-01`（ESP32、revision v1.0、flash 4MB）。adapterは`PSU-PI-A-02`（112001） |
+| Wiring revision | 信号線2本とGND線は、`EXP-023`のまま。ユーザーの申告：前回（2026-10-11）の接続から、ESP32側の端の抜き挿し以外に配線を動かしていない（問いの文面は[comment 6123783146](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446#issuecomment-6123783146)）。測定も目視もしていない |
+| Power supply and current limit | Piは`PSU-PI-A-02`（極性と出力電圧は実測していない。事前測定を行わない決定はユーザー。[comment 6105175775](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446#issuecomment-6105175775)）。ESP32はこの端末のUSBから給電。電流制限は設けていない |
+| Firmware commit/profile | ESP32：flashのapp descriptorの`app_elf_sha256`が`14297916fbb00b7ec58d19542c6131c394717876334d26384e56ae89a42f676b`で、`EXP-021`の表のELF sha256（commit `cd878542a4772d762599224af3e770b30d895fcf`、`tap-21,face-21,bringup-display-13`、debug）と全桁一致。読んだのは先頭0x100 byteだけで、imageの残りは読んでいない。Pi：`deskcatd`はdevelop `f0925027619066ace3153f30a52fe2607e940297`のsourceのbuild（debug。sha256 `38a47c1567d1e6748a05552c675dba4eb0f581a6054f2c82a55d8a3f67b684a5`）、`deskcatd.service`のsha256は`032541225e9ec62d02391dab6bea9b0ea5bb544b85aef4bc1fc4c3a3873ca8de` |
+| Configuration | 承認3件：[comment 6123867297](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446#issuecomment-6123867297)。点灯時間の上限は「1回の通し・30分」（根拠の無い暫定値）。条件1・5（[gpio-assignment.md](gpio-assignment.md)の`信号線をつないでよい条件`）：「前回からの配線のまま」というユーザーの申告だけで、測定も目視もしていない。条件6：ESP32側の端を挿す前に、ユーザーが挿し先を目で確かめた（申告「13と14に合っている」）。GND線の導通確認はこの回はしていない（2026-10-11の接続の分は[comment 6122958112](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446#issuecomment-6122958112)の申告）。条件2：切るときは先にESP32側の端を外してからUSBを抜いた |
+| Measurement equipment | テスター等は使っていない。Piの`vcgencmd get_throttled`、`systemctl`、`journalctl` |
+| Procedure | 下の「導入」と「起動の確認」 |
+| Expected result | Piの起動で`deskcatd`が始まる。ESP32側の端を外した間は`HelloRetryExhausted`で再起動し、約150秒で`failed`になる（承認の問いに書いた見込み。根拠は`daemon.rs`のmodule docと`deskcatd.service`の値からの計算で、実測ではない）。端を挿した後は`reset-failed`と`restart`でESP32とつながる |
+| Measured result | 下記 |
+| Faults | 下記 |
+| Conclusion | 下記 |
+| Next safe step | 下記 |
+
+### 導入（Piに書き込む操作。ESP32・信号線・電源には触れていない）
+
+- build：develop `f0925027`の`apps/`・`crates/`・`Cargo.*`（85 file）をPiの新しいdirへ展開し、`cargo build --locked -p deskcatd`（debug、targetも新規）。開始11:01:28Z、終了11:21:02Z（記録した時刻の差は19分34秒）。cargoの表示は`Finished … in 19m 32s`。exit 0。peak RSSは248,644 kB（5秒ごとのsamplingの最大値）。この間、Piは再起動せず、カーネルlogに低電圧・OOM・I/Oエラーの行は無かった。`throttled=0x0`と、このlogは電圧の根拠ではない
+- 配置：専用ユーザー`deskcatd`（system、nologin）、`/usr/local/bin/deskcatd`、`/etc/deskcatd/deskcatd.env`（`DESKCATD_PORT=/dev/serial0`、`DESKCATD_BAUD=115200`）、`/etc/systemd/system/deskcatd.service`（develop `deploy/systemd/`のまま）。`systemd-analyze verify`は警告なし。`daemon-reload`と`enable`。startはしていない
+- 手順は[deploy/README](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/deploy/README.md)の`導入`に書いた
+
+### 起動の確認
+
+| 時刻（Z） | 事実 |
+|---|---|
+| 11:04:39〜11:05:03 | `espflash read-flash`でflashの2か所を読んだ（partition tableと、appの先頭0x100 byte）。`--after no-reset`で、2回とも`Staying in bootloader`。firmwareは実行していない。partitionは`nvs`・`phy_init`・`factory`の3つ（appは`factory`の1つ） |
+| 11:45:25 | ユーザーがESP32のUSBを挿し直した（firmwareの最初の起動。ESP32側の信号線の端は外れた状態）。この時刻から点灯の上限30分 |
+| 〜11:47 | ユーザーの報告：LCDが点いた、異常なし |
+| 11:45:55 | Piに停止の命令（`deskcatd`は`inactive`、`throttled=0x0`） |
+| 11:47:28 | ユーザーの報告：Piの電源を入れ直した、LEDは点滅している |
+| 11:49:21 | sshが届いた。uptime 2分。`deskcatd`はPiの起動で自動で始まっていて、ESP32とつながらず`HelloRetryExhausted`（終了コード75）で終わり、systemdが再起動していた。1回の実行は約2秒、`RestartSec`の3秒を足して約5〜12秒の周期 |
+| 11:51:27 | journal：`Start request repeated too quickly`（`NRestarts=30`）。11:51:40の確認で`failed` |
+| 〜11:52:56 | ユーザーがESP32側の端を2本挿した（時刻の報告は無い）。挿す前の目視：「13と14に合ってる」。ユーザーの申告：熱・異音・焦げ臭さ・LCDの乱れ・電圧降下は無かった |
+| 11:52:56 | `systemctl reset-failed deskcatd`と`systemctl restart deskcatd`。11:53:11に`active`（`NRestarts=0`）。`hello(Startup)`を送り、ESP32のACKに「応答送信側のsessionが未承認のため受理しない」というWARNが1件（`EXP-021`・`EXP-023`と同じ形）。11:54:21まで再起動0回、`throttled=0x0` |
+| 〜11:54 | ユーザーの報告：ADXL345を叩いたら、LCDの表情が変わった |
+| 11:54:39 | `systemctl stop deskcatd`（`inactive`、`enabled`のまま）。ログは`Deactivated successfully` |
+| 〜11:55 | ユーザーがESP32側の端を2本抜き、その後でESP32のUSBを抜いた（時刻の報告は無い。記録したのは11:55:28） |
+
+終わりの状態：ESP32は電源なしで、ESP32側の端は外れている（ユーザーの申告）。Piは電源が入っていて（112001）、`deskcatd`は`enabled`・`inactive`。Pi header側の端とGND線は触っていない。点灯の合計は約10分（上限30分の内）。数えた起動：ESP32のfirmwareの起動1回（11:45:25）、Piの電源の入れ直し1回。Piは、11:45:55の停止の前、uptime 22時間47分で連続して電源が入っていた。
+
+### Faults
+
+- 承認の問いに書いた「約150秒で`failed`」は、実測と合わなかった。`failed`は、Piの起動（約11:47:25）から約4分後（11:51:27）で、`NRestarts=30`に達した時点である。1回の再起動の周期は約5〜12秒で、幅がある。この間のjournalの時刻は、一部が飛んでいる（`timedatectl`は`System clock synchronized: yes`。同じjournalに、`systemd-timesyncd`の`Initial clock synchronization`がJST 20:49:26に記録されている。時刻の飛びとの関係は確かめていない）。そのため、周期と時間の対応は読みきれない
+- 同じ日の11:39ごろ、この端末からPiの名前が一度引けなくなり、数秒後に戻った。原因は切り分けていない
+- 叩いた回数、どの表情に変わったか、`set_expression`の送出のlogは無い（`deskcatd`はinfo水準で送出をlogしない）。ESP32側のlogは読んでいない（monitorを開いていない）
+- 条件1（各信号線への直列4.7 kΩ）、条件5（別給電・GND共通）は、ユーザーの申告だけで、測定も目視もしていない。条件6のGND線の導通確認の測定値は、この回は取っていない
+- 条件3（firmwareとhostがこのUARTに対応している）の根拠は、descriptorの先頭0x100 byteの一致までで、imageの残りは読んでいない
+- 「ユーザーの報告」の時刻は、報告を受けて記録した時刻で、挿した時刻・抜いた時刻の報告は無い
+- 起動の確認の間、Piの入力電圧は測っていない。`throttled=0x0`は、Pi Zero Wが低電圧を検出しないため、電圧について何も語らない（`EXP-009`）
+
+### この記録が主張しないこと
+
+- 電源経路の受け入れ。極性と電圧を実測していない
+- PiとESP32を同時に入れたときに、`deskcatd`が自動でESP32とつながること。Piが上がった時点でESP32側の端は外れていて、端を挿した後は`reset-failed`と`restart`を手で実行した
+- `deskcatd`の長時間の運転、updateの手順、`RestartSec`などの値が適切であること（どれも根拠は無い。選び直しの回数の上限は`PROTO-TBD-011`が未確定で、`RestartSec`と`--startup-deadline-ms`に対応するTBDの登録は無い）
+- ESP32のimage全体の一致、`tapped`から表情までの時間
+
+### Conclusion
+
+Piの起動で`deskcatd`が自動で始まった。ESP32側の端を外した間は`HelloRetryExhausted`（終了コード75）で再起動を繰り返し、Piの起動から約4分で`failed`になった。端を挿した後、`reset-failed`と`restart`で`active`になった。`hello`へのESP32のACKは届いたが、`deskcatd`は「応答送信側のsessionが未承認のため受理しない」というWARNを出した（`EXP-021`・`EXP-023`と同じ形）。`active`は、sessionの確立を示さない。ユーザーの申告では、叩くとLCDの表情が変わった。電源の適否は、この記録では判断しない。
+
+### Next safe step
+
+- PiとESP32を同時に入れて、`deskcatd`が自動でESP32とつながるかの確認（人間の監視と、新しい承認が要る）
+- `retries`の観察、updateの手順、`failed`になった後の自動の復帰が要るかは、運用を見てから決める（ユーザーの判断）
+- ESP32側のlogと、`set_expression`の送出の記録の取り方
+
 ## Revision履歴
 
 | 日付 | Revision | 変更 | 根拠 |
@@ -2430,3 +2505,4 @@ Piの時計の時刻は次のとおり。出所: #446のセッションの報告
 | 2026-10-09 | 27 | [#21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)。**`EXP-021`を追加した。**叩いて表情が変わるデモ（`tap-21,face-21,bringup-display-13`、`face-21`の常時点灯）の通電の記録である。**Faultsに、正本からの逸脱と記録の無い確認を記録した**（`信号線をつないでよい条件`の条件3の列挙と対応範囲の外であること、`DISP-01`追加接続のbring-upの手順の条件(1)と非通電の確認の記録が無いこと） | [#21のcomment 6077223726](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21#issuecomment-6077223726)と、ESP32のシリアルlog（端末のlocal） |
 | 2026-10-10 | 28 | [#13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)。**`EXP-022`を追加した。**構成（v）（周辺moduleをつないだESP32へPiをUARTでつなぐ）の、受け入れ条件6の試験の記録である。黄が`13`でなく`12`に刺さっていた1回目と、2回目・3回目、描画の間の通信の数字、Faultsを記録した | [#13のcomment 6042642898](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13#issuecomment-6042642898)、ESP32のシリアルlog（端末のlocal）、#446のセッションの報告 |
 | 2026-10-12 | 29 | [#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)。**`EXP-023`を追加した。**Piの給電を112001（`PSU-PI-A-02`、cable一体）へ差し替え、UART越しの`serial_link`の`ping`を20件通した記録である。極性・電圧の実測が無いこと、`retries=785`の内訳を読んでいないこと、ESP32のfirmwareのbuildを確かめていないこと、約6分しか運転していないこと、試験の前に旧adapterでsshが届かなくなり電源を切った件をFaultsに記録した | [#446のcomment 6109307768](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446#issuecomment-6109307768) |
+| 2026-10-12 | 30 | [#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)。**`EXP-024`を追加した。**deskcatdのsystemd unitをPiへ導入し、Piの起動での自動の開始、ESP32側の端を外した間の再起動と約4分での`failed`、`reset-failed`と`restart`での戻し（`hello`へのACKは届いたが、`deskcatd`は未承認のsessionとしてWARNを出した。`active`はsessionの確立を示さない）、ESP32のfirmwareの特定（flashのpartition tableとappの先頭0x100 byteを読むだけ）を記録した。承認の問いの「約150秒」と実測の差、journalの時刻の飛び、条件1・5・6の記録が申告だけであること、自動でつながることは確かめていないことをFaultsと「主張しないこと」に書いた | [#446のcomment 6123783146](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446#issuecomment-6123783146)、[6123004894](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446#issuecomment-6123004894)、[6123867297](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446#issuecomment-6123867297) |

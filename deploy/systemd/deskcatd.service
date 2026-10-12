@@ -1,5 +1,6 @@
 # port と baud を除く値は、すべて暫定である。根拠は無い。
-# Pi実機で起動できることは確かめていない。
+# Pi実機で、Piの起動で始まり、ESP32とつながらない間は再起動して約4分でfailedになり、reset-failedとrestartでactiveになった。ESP32のACKは届いたが、deskcatdは未承認のsessionとしてWARNを出した。activeはsessionの確立を示さない（2026-10-12。docs/hardware/experiment-log.mdのEXP-024）。
+# PiとESP32を同時に入れて自動でつながることは、確かめていない。
 # 終了コードと値の意味は、`apps/deskcatd/src/main.rs`と`apps/deskcatd/src/daemon.rs`のmodule docを参照する。
 
 [Unit]
