@@ -340,4 +340,36 @@ impl<'d> Ili9341<'d> {
     pub fn fill_screen(&mut self, color: u16) -> Result<(), EspError> {
         self.fill_rect(0, 0, WIDTH - 1, HEIGHT - 1, color)
     }
+
+    /// k8x12 の1文字を2倍に拡大して書く。1 cell 分だけを stack buffer に置く。
+    ///
+    /// bitmap と配置は LCD/SPI を知らない deskcat-face が決める。ここでは
+    /// RGB565 への展開と SPI 転送だけを行い、背景を黒、文字を白にする。
+    pub fn draw_glyph_cell(&mut self, cell: deskcat_face::text::GlyphCell) -> Result<(), EspError> {
+        use deskcat_face::text::{GLYPH_HEIGHT, GLYPH_WIDTH, SCALE};
+
+        let width = GLYPH_WIDTH * SCALE;
+        let height = GLYPH_HEIGHT * SCALE;
+        if cell.x.checked_add(width).is_none_or(|end| end > WIDTH)
+            || cell.y.checked_add(height).is_none_or(|end| end > HEIGHT)
+        {
+            return Err(EspError::from_infallible::<{ ESP_ERR_INVALID_ARG }>());
+        }
+        let mut pixels = [0_u8; (GLYPH_WIDTH * GLYPH_HEIGHT * SCALE * SCALE * 2) as usize];
+        for y in 0..usize::from(height) {
+            let row = cell.rows[y / usize::from(SCALE)];
+            for x in 0..usize::from(width) {
+                let bit = 0x80 >> (x / usize::from(SCALE));
+                let color = if row & bit != 0 {
+                    color::WHITE
+                } else {
+                    color::BLACK
+                };
+                let index = (y * usize::from(width) + x) * 2;
+                pixels[index..index + 2].copy_from_slice(&color.to_be_bytes());
+            }
+        }
+        self.set_window(cell.x, cell.y, cell.x + width - 1, cell.y + height - 1)?;
+        self.with_transaction(CMD_RAMWR, |this| this.bus.write(&pixels))
+    }
 }

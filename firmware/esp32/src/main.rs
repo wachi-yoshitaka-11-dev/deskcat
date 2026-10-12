@@ -700,7 +700,7 @@ fn main() {
             if let Some(name) = face.take_request() {
                 drawer.show(name);
             }
-            drawer.poll();
+            drawer.poll(health.uptime_ms());
         }
 
         #[cfg(not(feature = "bench-servo-test-17"))]
@@ -736,6 +736,10 @@ fn main() {
         #[cfg(any(feature = "face-21", deskcat_product_mode))]
         if face_drawer.as_ref().is_some_and(FaceDrawer::is_drawing) {
             until = until.min(health.uptime_ms());
+        }
+        #[cfg(any(feature = "face-21", deskcat_product_mode))]
+        if let Some(deadline) = face_drawer.as_ref().and_then(FaceDrawer::text_deadline_ms) {
+            until = until.min(deadline);
         }
         #[cfg(any(feature = "tap-21", deskcat_product_mode))]
         if let Some(deadline) = tap.as_ref().and_then(TapDetector::next_deadline_ms) {
