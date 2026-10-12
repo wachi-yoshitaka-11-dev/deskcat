@@ -31,7 +31,7 @@ unitが渡す引数は`--port`、`--baud`、`--duplicate-capacity 8`、`--duplic
 
 - 信号線は、PiとESP32の両方に電源が入っている間だけつなぐ。入れるときは両方を入れてからつなぎ、切るときは先にESP32側の端を外す（`信号線をつないでよい条件`の条件2）
 - **`enable`したので、Piの起動で`deskcatd`が始まる。**ESP32とつながらない間は、`HelloRetryExhausted`（終了コード75）で終わり、systemdが再起動する（実施：1回の実行は約2秒、周期は約5〜12秒）。実施では、ESP32側の端を外したPiの起動から約4分で、`StartLimitBurst`（30回）に達して`failed`になった（journal：`Start request repeated too quickly`）
-- `failed`からの戻し（実施）：ESP32側の端を挿した後、`sudo systemctl reset-failed deskcatd`と`sudo systemctl restart deskcatd`で`active`になり、ESP32のACKを受けた
+- `failed`からの戻し（実施）：ESP32側の端を挿した後、`sudo systemctl reset-failed deskcatd`と`sudo systemctl restart deskcatd`で`active`になった。`hello`へのESP32のACKは届いたが、`deskcatd`は「応答送信側のsessionが未承認のため受理しない」というWARNを出した（`active`は、sessionの確立を示さない）
 - 止めるとき：`sudo systemctl stop deskcatd`の後、ESP32側の端を外してから、電源を切る。`stop`しても`enabled`のままである。止めたままにするなら`disable`が要る（未実施）
 
 ## 未確認
