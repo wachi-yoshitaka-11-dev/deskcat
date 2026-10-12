@@ -36,6 +36,7 @@
 | [EXP-022](#exp-022-周辺moduleをつないだesp32へpiをuartでつなぎlcdの描画の間の通信を確かめた受け入れ条件6) | [#13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)受け入れ条件6 | 値の正なし（試験の記録。判定は#13） |
 | [EXP-023](#exp-023-piの給電を112001へ差し替えuartの通信を確かめた) | [#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)の受け入れ条件4。段階AのPiの給電の差し替え（`PSU-PI-A-02`）と、UART越しの`serial_link`の確認 | 値の正なし（観察の記録。電源の適否は判断していない） |
 | [EXP-024](#exp-024-deskcatdの常駐systemdをpiへ導入し電源投入での起動とfailedからの戻しを確かめた) | [#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)の受け入れ条件4。deskcatdのsystemd unitの導入、Piの起動での自動の開始、failedとreset-failedでの戻し、ESP32のfirmwareの特定 | 値の正なし（観察の記録。電源の適否は判断していない） |
+| [EXP-025](#exp-025-追加ledの点灯試験赤だけ白だけ両方) | [#514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)の追加LED（白＝GPIO2、赤＝GPIO5）の点灯試験（赤だけ・白だけ・両方） | 値の正なし（観察の記録。起動時の電位・電流・rail電圧は計測していない） |
 
 **大容量の生dataはこのrepositoryへ入れていない。**保存場所は
 [development-foundation-plan.md](../planning/development-foundation-plan.md)の
@@ -2471,6 +2472,59 @@ Piの起動で`deskcatd`が自動で始まった。ESP32側の端を外した間
 - `retries`の観察、updateの手順、`failed`になった後の自動の復帰が要るかは、運用を見てから決める（ユーザーの判断）
 - ESP32側のlogと、`set_expression`の送出の記録の取り方
 
+## EXP-025: 追加LEDの点灯試験（赤だけ・白だけ・両方）
+
+[#514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)の追加LED（白＝GPIO2、赤＝GPIO5）を、赤だけ→白だけ→両方の順に点灯させた。ESP32単体で、Pi linkの信号線は接続しない。**[回路案](led-514-demo.md)の`段階的な確認`の2と3のうち、点灯の観察だけを行った。**`R`両端の電圧の読み、`boot:` logのstrapping値と起動modeの確認、電源railの電圧・LED電流・発熱の計測、白の枝をつないだ状態での書き込みは行っていない（ユーザーの指示で、抵抗の値の実測も行わない）。この記録は、各comment（出所）にある事実だけを書く。
+
+| 項目 | 内容 |
+|---|---|
+| Test ID | `EXP-025` |
+| Date | 2026-10-12（JST） |
+| Operator | 配線、USBの抜き差し、目視はユーザー。書き込み、reset、ログの取得は#514のセッション（AI） |
+| Hardware revision／Exact components | `MCU-01`（ESP32-DevKitC V4）、`LED-COMM-01`（白）、`LED-REACT-01`（赤）、`RES-LED-01`（330 Ω×2。袋の表示はFAITHFUL LINKの`CF25J330RB`。[#538 comment 6124184737](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/538#issuecomment-6124184737)）、`RES-PULL-01`（10 kΩ×2）、ブレッドボード、ジャンパー線 |
+| Wiring revision | 各枝は GPIO → 330 Ω → LEDのアノード → カソード → GND、GPIOとカソード側のGNDの間に10 kΩ。白はGPIO2、赤はGPIO5。GNDはESP32のGNDにつながる`-`レール経由（ユーザーの申告）。LEDの極性は、脚の長さと樹脂のふちの平らな面が反対側であることで確かめた（ユーザーの申告）。`3V3`には何もつないでいない。Pi linkの信号線はESP32側の端を外し、ブレッドボードの導体に触れないことをユーザーが目視で確かめた（[#514 comment 6125689974](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514#issuecomment-6125689974)）。2回目の試験ではGPIO5の線を外した（[comment 6125489454](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514#issuecomment-6125489454)） |
+| Power supply and current limit | ESP32はPCのUSBのみ。電流制限は各枝の330 Ω（短絡側の最悪約11.5 mAは[回路案](led-514-demo.md)の計算値） |
+| Firmware commit/profile | developの`63c2e7d`に`bringup-led-514`を足したbuild（artifactのsha256は先頭16桁`f0e1f61f8d86d7f9`）。`espflash` 4.5.0。実機Linuxの端末（`systemd-detect-virt`＝`none`）（[#514 comment 6125689974](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514#issuecomment-6125689974)、[comment 6125063215](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514#issuecomment-6125063215)） |
+| Configuration | 承認は[#514 comment 6124265343](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514#issuecomment-6124265343)（LEDの2枝を足して通電すること）と[comment 6125689974](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514#issuecomment-6125689974)（書き込みと各回の通電の版・回数・停止条件）にある。抵抗の値をテスターで測らない判断は[#538 comment 6124219128](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/538#issuecomment-6124219128) |
+| Measurement equipment | 使っていない。ログ（UART0）とユーザーの目視 |
+| Procedure | 1回目（赤だけ）：書き込み、書き込み直後のresetからの起動を観察。2回目（白だけ）と3回目（両方）：書き込みはせず、USBを挿し、`espflash reset`をかけてログを取った |
+| Expected result | `led phase`が`lamp_red`→`lamp_white`→`lamp_both`→`link_unconfirmed`の順に進むこと（[回路案](led-514-demo.md)の`点灯試験用のfirmware`） |
+| Measured result | 下記 |
+| Faults | 下記 |
+| Conclusion | 下記 |
+| Next safe step | 下記 |
+
+### 結果
+
+- ログの`led phase`は、3回とも`lamp_red`（uptime 78 ms、赤 on）、`lamp_white`（約10.1 s、白 on・赤 off）、`lamp_both`（約20.1 s、両方 on）、`link_unconfirmed`（約30.1 s、白の点滅へ・赤 off）の順だった。`led_init_error`と`led_write_error`は出ていない（[comment 6125063215](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514#issuecomment-6125063215)、[6125489454](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514#issuecomment-6125489454)、[6125555742](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514#issuecomment-6125555742)）。
+- ユーザーの目視の申告：赤だけの構成では、赤が約10秒点灯→消灯→約10秒点灯→消灯の順だった。白だけの構成では、白が約10秒から点灯し、はっきり見え、約30秒から1秒周期で点滅した。両方の構成では、0〜10秒が赤、10〜20秒が白、20〜30秒が両方、30秒以降が白の点滅だった（同じ3つのcomment）。
+- 起動時の一瞬の点灯（目視の申告）：白だけの構成では、USBを挿した瞬間とresetの瞬間のどちらでも、白は光らなかった。両方の構成では、resetの瞬間に白は光らなかった。赤は、このfirmwareでは起動の直後から点灯するため、起動の瞬間の一瞬の点灯は判別できない。旧firmwareでUSBを挿した起動で、赤は光らなかった（同じ3つのcomment）。
+- 熱・異音・異臭は、ユーザーの申告では無かった（同じ3つのcomment）。
+- 赤の試験の書き込み後のログに、`boot_tx`の再試行と`boot_terminated reason=RecoveryBudgetExhausted`が出た。Piにつないでいない構成である（[comment 6125689974](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514#issuecomment-6125689974)）。
+
+### Faults
+
+- 白の試験の1回目のログ取得は、`espflash monitor`がログを出さずに終わった。`espflash reset`の後に`cat`でUART0を読む方法へ替えて取り直した（[comment 6125689974](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514#issuecomment-6125689974)）。
+- `-`レールがESP32のGNDピンにつながっていることは、ユーザーの申告に頼った。導通は測っていない（[comment 6125489454](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514#issuecomment-6125489454)）。
+
+### この記録が主張しないこと
+
+- GPIO2／GPIO5の起動時の電位。TRM v5.8は`GPIO_OUT_REG`のresetの値を規定していない（[#514 comment 6124124400](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514#issuecomment-6124124400)）。目視の申告は、ROMの挙動と電位の実測を代替しない
+- `段階的な確認`の2と3のうち、`R`両端の電圧の読み、`boot:` logのstrapping値と起動modeの確認、白の枝をつないだ状態での書き込み。行っていない
+- LEDの電流、`3V3` railの電圧、`U2`の温度。計測していない
+- Piとの通信中の動作。継続通信の判定と、`set_expression`から赤LEDへの経路は未実装である
+- 長時間の運転
+- 330 Ωの抵抗値。袋の表示だけで確かめ、テスターでは測っていない（ユーザーの判断。[#538 comment 6124219128](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/538#issuecomment-6124219128)）
+
+### Conclusion
+
+赤だけ・白だけ・両方の構成で、ログの`led phase`の順と、ユーザーが申告した点灯の順は同じだった。
+
+### Next safe step
+
+- 継続通信の判定と`set_expression`から赤LEDへの経路の実装の後に、`段階的な確認`の4を、人間の監視のもとで行う
+- 起動時の電位を実測で確かめる手段を決める
+
 ## Revision履歴
 
 | 日付 | Revision | 変更 | 根拠 |
@@ -2506,3 +2560,4 @@ Piの起動で`deskcatd`が自動で始まった。ESP32側の端を外した間
 | 2026-10-10 | 28 | [#13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)。**`EXP-022`を追加した。**構成（v）（周辺moduleをつないだESP32へPiをUARTでつなぐ）の、受け入れ条件6の試験の記録である。黄が`13`でなく`12`に刺さっていた1回目と、2回目・3回目、描画の間の通信の数字、Faultsを記録した | [#13のcomment 6042642898](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13#issuecomment-6042642898)、ESP32のシリアルlog（端末のlocal）、#446のセッションの報告 |
 | 2026-10-12 | 29 | [#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)。**`EXP-023`を追加した。**Piの給電を112001（`PSU-PI-A-02`、cable一体）へ差し替え、UART越しの`serial_link`の`ping`を20件通した記録である。極性・電圧の実測が無いこと、`retries=785`の内訳を読んでいないこと、ESP32のfirmwareのbuildを確かめていないこと、約6分しか運転していないこと、試験の前に旧adapterでsshが届かなくなり電源を切った件をFaultsに記録した | [#446のcomment 6109307768](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446#issuecomment-6109307768) |
 | 2026-10-12 | 30 | [#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)。**`EXP-024`を追加した。**deskcatdのsystemd unitをPiへ導入し、Piの起動での自動の開始、ESP32側の端を外した間の再起動と約4分での`failed`、`reset-failed`と`restart`での戻し（`hello`へのACKは届いたが、`deskcatd`は未承認のsessionとしてWARNを出した。`active`はsessionの確立を示さない）、ESP32のfirmwareの特定（flashのpartition tableとappの先頭0x100 byteを読むだけ）を記録した。承認の問いの「約150秒」と実測の差、journalの時刻の飛び、条件1・5・6の記録が申告だけであること、自動でつながることは確かめていないことをFaultsと「主張しないこと」に書いた | [#446のcomment 6123783146](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446#issuecomment-6123783146)、[6123004894](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446#issuecomment-6123004894)、[6123867297](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446#issuecomment-6123867297) |
+| 2026-10-12 | 31 | [#514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)。**`EXP-025`を追加した。**追加LED（白＝GPIO2、赤＝GPIO5）の点灯試験（赤だけ・白だけ・両方）の記録である。各comment（出所）にある事実だけを書いた。LED電流・`3V3` railの電圧・`U2`の温度は計測していない | [#514のコメント](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514#issuecomment-6125555742) |
