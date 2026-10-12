@@ -345,7 +345,6 @@ impl<'d> Ili9341<'d> {
     ///
     /// bitmap と配置は LCD/SPI を知らない deskcat-face が決める。ここでは
     /// RGB565 への展開と SPI 転送だけを行い、背景を黒、文字を白にする。
-    #[cfg(any(feature = "face-21", deskcat_product_mode))]
     pub fn draw_glyph_cell(&mut self, cell: deskcat_face::text::GlyphCell) -> Result<(), EspError> {
         use deskcat_face::text::{GLYPH_HEIGHT, GLYPH_WIDTH, SCALE};
 
