@@ -6,8 +6,8 @@
 //!
 //! # 型が保証すること
 //!
-//! **この型が保証するのは、command の水準までである。**compileできるbuildで、このmoduleを通る
-//! 出力について、次の2つを保証する。
+//! **この型が保証するのは、command の水準までである。**`bench-servo-test-17`付きのbuildを除くbuildで、このmoduleを通る
+//! 出力について、次の2つを保証する（`bench-servo-test-17`付きのbuildは、下の例外段落のとおり、この保証の外にある）。
 //!
 //! - **出力の元になる`Setpoint`の列（量子化の前）が、自分で測った間隔で`Limiter`の制限**
 //!   （位置、速度、加速度）**を満たす。**`Limiter`が加速度の
@@ -34,7 +34,7 @@
 //!
 //! # 角度を出せるのは、limiterを所有する[`LimitedServo`]だけである
 //!
-//! **compileできるbuildで、このmoduleの外から角度を指定してpulseを出す入口は
+//! **`bench-servo-test-17`付きのbuildを除くbuildで、このmoduleの外から角度を指定してpulseを出す入口は
 //! [`LimitedServo::tick`]だけである。**[`LimitedServo`]は[`Sg90`]と`deskcat_servo::Limiter`を
 //! **1つずつ所有**し、外へ出す操作は[`LimitedServo::new`]、[`LimitedServo::resume`]、
 //! [`LimitedServo::admit`]、[`LimitedServo::tick`]、[`LimitedServo::stop`]、

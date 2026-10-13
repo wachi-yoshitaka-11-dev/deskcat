@@ -69,7 +69,7 @@ deskcat-tap = { path = "../../crates/deskcat-tap" }
 - `crates/deskcat-protocol/**`、`crates/deskcat-servo/**`、`crates/deskcat-face/**`、`crates/deskcat-tap/**`の変更でも
   `.github/workflows/firmware.yml`が発火する。
   host側だけの変更でfirmware buildが壊れるのを検知するためである。
-- compileできるbuildで、`src/servo.rs`を通って角度を出せるのは、同fileの`LimitedServo`だけである。
+- `bench-servo-test-17`付きのbuildを除くbuildで、`src/servo.rs`を通って角度を出せるのは、同fileの`LimitedServo`だけである。`bench-servo-test-17`付きのbuildは、`Sg90::move_to_angle_once`でlimiterを通らずに1回動かす（`src/servo.rs`のmodule docの例外段落）。
   `Sg90`と`deskcat-servo`の`Limiter`を1つずつ所有し、`Limiter`も`Setpoint`も受理済みのtargetも
   外から受け取らず、`tick`の間隔を自分で測る。**成立の条件**（`bench-servo-test-17`の経路を除く、
   `LedcDriver`を直接作る経路は型では止められない、`unsafe`を使わない）は同fileのmodule docにある。
