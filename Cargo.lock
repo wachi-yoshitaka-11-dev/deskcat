@@ -21,6 +21,10 @@ name = "deskcat-domain"
 version = "0.1.0"
 
 [[package]]
+name = "deskcat-env"
+version = "0.1.0"
+
+[[package]]
 name = "deskcat-face"
 version = "0.1.0"
 dependencies = [
