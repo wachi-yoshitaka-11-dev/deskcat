@@ -23,4 +23,10 @@
 binary（`src/main.rs`）、stderrのlogger、引数、起動からの期限（watchdog）は2b-iiで足した。**引数は既定値を持たない**
 （`--help`を参照）。
 
+#23 の Host 段階では、`--speech-min-interval-ms` と `--speech-duration-ms` を両方指定した場合に限り、
+`deskcat-domain` の固定文候補を `show_text` として送る。最短間隔と表示時間の運用値は未確定で、
+systemd unit には指定していないため既定は off である。送信前には protocol の文字列制限を検査し、
+拒否と無応答を分類して counter と log に残す。firmware は `show_text` を受けて描画へ渡し、ACK を返す（#587）が、
+実 LCD での表示は未確認である。
+
 systemdのunitは`deploy/systemd/deskcatd.service`にある。値は暫定で、根拠は無い。Pi実機で未確認である。

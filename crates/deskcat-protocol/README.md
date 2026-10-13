@@ -15,6 +15,7 @@ decode／encode、および共有conformance fixtureを提供する。
   （`boot`、`hello`、`ping`、`get_status`、`status`、`ack`）
 - Issue #527で足したmessage type
   （`set_expression`、`show_text`、`head_touched`、`tapped`、`lifted`、`environment`）
+- Issue #19で足したmessage type `play_motion`（型だけ。motionの実行は含まない）
 - error code（§7）と、それを計上する`status`のcounterへの対応付け
 - 1 lineのdecodeとencode、およびその検証順序
 - byte列からlineを組み立てる上限付きreceiver（§8手順1〜6、Issue #10）
@@ -30,7 +31,7 @@ decode／encode、および共有conformance fixtureを提供する。
   所有者（`deskcat-serial`の`PeerSession`、firmwareのsession）が持つ
 - hardwareに依存する値と処理
 
-`play_motion`、§4.7の完了・fault event、`show_choices`、`protocol_fault`の型は起こしていない。
+§4.7の完了・fault event、`show_choices`、`protocol_fault`の型は起こしていない。
 仕様が意味を決めていないfield（`head_touched.strength`、`tapped.magnitude_g`）も型に持たない。
 理由は`src/message.rs`のmodule docに置き、ここには複製しない。
 
@@ -111,7 +112,8 @@ wireへ出す`code`とは別に`cause`を持つ。**JSONの不正とenvelopeの�
 - `MAX_LINE_BYTES`は改行を含む1 lineの上限（§2の候補値、`PROTO-TBD-002`）。
 - string上限は勘で置かず、**escapeが起きない文字であれば**`MAX_LINE_BYTES`から導出できることを
   `tests/limits.rs`が検査する。各message typeについて、全string fieldを上限まで、
-  全integerを最大値まで詰めたlineが収まることを確認している。
+  全integerを最大値まで詰めたlineが収まることを確認している。**`play_motion.name`だけは個別の
+  上限が無く（行の最大長が縛る）、詰めていない。**
 
 **string上限を守っても行長は保証されない。**string上限はUTF-8 byte長で測るが、JSON encodeは
 `"`を`\"`、`\`を`\\`、制御文字を`\u00XX`（1 byte→6 byte）へ広げる。全fieldが上限内でも

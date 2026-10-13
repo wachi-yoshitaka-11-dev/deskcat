@@ -188,13 +188,14 @@
 
 use deskcat_domain::{ContactEvent, Millis, Mind, Reaction};
 use deskcat_protocol::{
-    AckStatus, ErrorCode, Frame, Hello, HelloReason, Message, Outcome, SetExpression,
+    AckStatus, ErrorCode, Frame, Hello, HelloReason, Message, Outcome, SetExpression, ShowText,
 };
 use deskcat_serial::{
     BootOutcome, ConnectionState, CorrelatedAck, OutstandingKind, PeerCounters, PeerRejection,
     PeerSession, Pump, Received, RetryOutcome, SendError, Session, SessionCounters, StopReason,
     Transport, handle_frame, retry_due_requests,
 };
+use std::num::NonZeroU64;
 
 use crate::disposition::{Answer, Disposition, Request, disposition};
 use crate::expression_sync::{ExpressionSync, SILENT_RETRY_LIMIT, from_status_name, to_wire};
@@ -281,6 +282,20 @@ pub enum Step {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct DaemonCounters {
+    /// 送信queueへ入れた`show_text`（再送を除く）。
+    pub show_text_sent: u64,
+    /// `show_text`の受理ACK。
+    pub show_text_accepted: u64,
+    /// 一時的な拒否（`busy`、`rate_limited`、`duplicate_expired`）。
+    pub show_text_transient_rejections: u64,
+    /// `stale_session`で拒否された`show_text`。
+    pub show_text_stale_sessions: u64,
+    /// `hardware_unavailable`などの固定的な拒否。
+    pub show_text_fixed_rejections: u64,
+    /// `show_text`に応答が無く、再送予算を使い切った回数。
+    pub show_text_no_response: u64,
+    /// 送信前検査またはencodeに失敗した回数。
+    pub show_text_input_faults: u64,
     /// 送った`set_expression`（再送を除く）。
     pub set_expression_sent: u64,
     /// 拒否された`set_expression`。
@@ -333,6 +348,10 @@ pub struct Daemon {
     sync: ExpressionSync,
     identity: Identity,
     counters: DaemonCounters,
+    speech_pending: Option<(&'static str, u32, NonZeroU64)>,
+    speech_in_flight: Option<u32>,
+    last_speech_sent_at: Option<u64>,
+    speech_disabled: bool,
     /// まだ送れていない`hello`の`reason`（`startup`だけ）。
     hello_to_send: Option<HelloReason>,
     /// 送ったがまだACKを受けていない`hello`の、送信時刻。
@@ -368,6 +387,10 @@ impl Daemon {
             sync: ExpressionSync::new(),
             identity,
             counters: DaemonCounters::default(),
+            speech_pending: None,
+            speech_in_flight: None,
+            last_speech_sent_at: None,
+            speech_disabled: false,
             hello_to_send: None,
             hello_sent: None,
             hello_msg: None,
@@ -426,6 +449,28 @@ impl Daemon {
         self.counters
     }
 
+    /// 起動と表示同期が済み、前の独り言の結果待ちが無いときだけ候補を求める。
+    #[must_use]
+    pub fn speech_ready(&self) -> bool {
+        self.startup_complete()
+            && self.sync.is_ready()
+            && self.speech_pending.is_none()
+            && self.speech_in_flight.is_none()
+            && !self.speech_disabled
+    }
+
+    /// runnerが選んだ候補を次の`step`へ渡す。
+    pub fn queue_speech(
+        &mut self,
+        text: &'static str,
+        duration_ms: u32,
+        min_interval_ms: NonZeroU64,
+    ) {
+        if self.speech_ready() {
+            self.speech_pending = Some((text, duration_ms, min_interval_ms));
+        }
+    }
+
     /// 1周進める。`now_ms`はprocess起動からの経過時間（単調。wall-clock timeではない）。
     pub fn step<T: Transport>(&mut self, transport: &mut T, now_ms: u64) -> Step {
         // **`hello`を、他のcommandより先に送る**（§5.1。「Piがprocessを起動した直後、およびserial portを
@@ -477,6 +522,7 @@ impl Daemon {
         self.apply_reaction(reaction);
         self.send_hello(now_ms);
         self.send_expression(now_ms);
+        self.send_speech(now_ms);
         if let Some(reason) = self.exit {
             return Step::Exit(reason);
         }
@@ -578,6 +624,34 @@ impl Daemon {
                         self.counters.set_expression_rejected += 1;
                         self.sync.acked_rejected(ack.reply_to);
                     }
+                }
+            }
+            OutstandingKind::ShowText => {
+                self.speech_in_flight = None;
+                match answer {
+                    Answer::Ok => {
+                        self.counters.show_text_accepted += 1;
+                        log::debug!("show_textが受理された: id={}", ack.reply_to);
+                    }
+                    Answer::Rejected(Some(ErrorCode::StaleSession)) => {
+                        self.counters.show_text_stale_sessions += 1;
+                        log::warn!("show_textがstale_sessionで拒否された。sessionを再開する");
+                        self.request_resume();
+                    }
+                    Answer::Rejected(Some(
+                        code @ (ErrorCode::Busy
+                        | ErrorCode::RateLimited
+                        | ErrorCode::DuplicateExpired),
+                    )) => {
+                        self.counters.show_text_transient_rejections += 1;
+                        log::warn!("show_textが一時的に拒否された: code={code:?}");
+                    }
+                    Answer::Rejected(code) => {
+                        self.counters.show_text_fixed_rejections += 1;
+                        self.speech_disabled = true;
+                        log::error!("show_textが固定的に拒否された。独り言を止める: code={code:?}");
+                    }
+                    Answer::NoResponse => unreachable!("ACKから無応答は作らない"),
                 }
             }
             // `ping`は送らない。`OutstandingKind`は拡張されうるため、未知の種別も何もしない。
@@ -724,6 +798,14 @@ impl Daemon {
                     {
                         self.status_not_delivered();
                     }
+                    OutstandingKind::ShowText if self.speech_in_flight == Some(*id) => {
+                        self.speech_in_flight = None;
+                        self.speech_disabled = true;
+                        self.counters.show_text_no_response += 1;
+                        log::error!(
+                            "show_textに応答が無い。再送予算を使い切ったため独り言を止める: id={id}"
+                        );
+                    }
                     _ => {}
                 }
             }
@@ -864,6 +946,55 @@ impl Daemon {
                 log::error!("set_expressionを送れない（未分類の失敗）。送り直さない: {err}");
                 self.counters.input_faults += 1;
                 self.sync.input_fault();
+            }
+        }
+    }
+
+    fn send_speech(&mut self, now_ms: u64) {
+        let Some((text, duration_ms, min_interval_ms)) = self.speech_pending else {
+            return;
+        };
+        if !self.startup_complete() || !self.sync.is_ready() || self.speech_disabled {
+            return;
+        }
+        // `LocalSpeech`は候補を選んだ時刻を制限する。queue満杯などで送信が
+        // 後ろへずれたときは、実際に送信queueへ入れた時刻からも間隔を保つ。
+        if self
+            .last_speech_sent_at
+            .is_some_and(|sent_at| now_ms.saturating_sub(sent_at) < min_interval_ms.get())
+        {
+            return;
+        }
+        let message = Message::ShowText(ShowText {
+            text: text.to_owned(),
+            duration_ms,
+        });
+        // `deskcat-protocol`が§5.4のbyte長と§7の制御文字を一箇所で検査する。
+        if let Err(err) = message.check_bounds() {
+            self.speech_pending = None;
+            self.speech_disabled = true;
+            self.counters.show_text_input_faults += 1;
+            log::error!("show_textの送信前検査に失敗した。独り言を止める: {err}");
+            return;
+        }
+        match self.session.send(message.clone(), now_ms) {
+            Ok(id) => {
+                self.speech_pending = None;
+                self.speech_in_flight = Some(id);
+                self.last_speech_sent_at = Some(now_ms);
+                let tracked = self.peer.note_sent(id, message, now_ms);
+                debug_assert_eq!(tracked, Some(OutstandingKind::ShowText));
+                self.counters.show_text_sent += 1;
+            }
+            Err(SendError::Dropped) => {
+                log::debug!("show_textの送信queueが満杯。次の周で再試行する");
+            }
+            Err(SendError::Stopped(_) | SendError::IdSpaceExhausted) => {}
+            Err(err) => {
+                self.speech_pending = None;
+                self.speech_disabled = true;
+                self.counters.show_text_input_faults += 1;
+                log::error!("show_textを送れない。独り言を止める: {err}");
             }
         }
     }

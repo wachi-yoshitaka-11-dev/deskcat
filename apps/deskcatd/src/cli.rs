@@ -17,7 +17,8 @@ use deskcat_serial::DuplicatePolicy;
 
 /// 使い方。
 pub const USAGE: &str = "usage: deskcatd --port <path> --baud <rate> \
---duplicate-capacity <n> --duplicate-retention-ms <ms> --startup-deadline-ms <ms> [--verbose]\n\
+--duplicate-capacity <n> --duplicate-retention-ms <ms> --startup-deadline-ms <ms> \
+[--speech-min-interval-ms <ms> --speech-duration-ms <ms>] [--verbose]\n\
 \n\
 --port、--baud、--duplicate-capacity、--duplicate-retention-ms、--startup-deadline-ms は必須である。\
 既定値を持たせない。\n\
@@ -35,6 +36,8 @@ pub struct Args {
     pub duplicate_policy: DuplicatePolicy,
     /// 起動から、ESP32のsessionの確立と`hello`の結果がそろうまでの期限（ms）。0は受け付けない。
     pub startup_deadline_ms: NonZeroU64,
+    /// 両方の引数がある場合だけ独り言を出す。運用値の既定は無い。
+    pub speech: Option<crate::runner::SpeechConfig>,
     /// `Debug`まで出す。
     pub verbose: bool,
 }
@@ -107,6 +110,8 @@ where
     let mut duplicate_capacity = None;
     let mut duplicate_retention_ms = None;
     let mut startup_deadline_ms = None;
+    let mut speech_min_interval_ms = None;
+    let mut speech_duration_ms = None;
     let mut verbose = false;
     let mut argv = raw.into_iter();
 
@@ -124,6 +129,13 @@ where
             }
             "--startup-deadline-ms" => {
                 startup_deadline_ms = Some(number::<u64>("--startup-deadline-ms", &value()?)?);
+            }
+            "--speech-min-interval-ms" => {
+                speech_min_interval_ms =
+                    Some(number::<u64>("--speech-min-interval-ms", &value()?)?);
+            }
+            "--speech-duration-ms" => {
+                speech_duration_ms = Some(number::<u32>("--speech-duration-ms", &value()?)?);
             }
             "--verbose" => verbose = true,
             "-h" | "--help" => return Ok(Parsed::Help),
@@ -147,12 +159,28 @@ where
         flag: "--startup-deadline-ms",
         reason: "0は起動直後に必ず超過する".to_owned(),
     })?;
+    let speech = match (speech_min_interval_ms, speech_duration_ms) {
+        (None, None) => None,
+        (Some(interval), Some(duration)) => {
+            let min_interval_ms = NonZeroU64::new(interval).ok_or(CliError::Invalid {
+                flag: "--speech-min-interval-ms",
+                reason: "0は最短間隔にならない".to_owned(),
+            })?;
+            Some(crate::runner::SpeechConfig {
+                min_interval_ms,
+                duration_ms: duration,
+            })
+        }
+        (None, Some(_)) => return Err(CliError::Missing("--speech-min-interval-ms")),
+        (Some(_), None) => return Err(CliError::Missing("--speech-duration-ms")),
+    };
 
     Ok(Parsed::Run(Box::new(Args {
         port: port.ok_or(CliError::Missing("--port"))?,
         baud: baud.ok_or(CliError::Missing("--baud"))?,
         duplicate_policy,
         startup_deadline_ms,
+        speech,
         verbose,
     })))
 }
@@ -201,6 +229,7 @@ mod tests {
         assert_eq!(args.port, "/dev/x");
         assert_eq!(args.baud, 115_200);
         assert_eq!(args.startup_deadline_ms.get(), 5000);
+        assert_eq!(args.speech, None);
         assert!(!args.verbose);
     }
 
@@ -293,5 +322,51 @@ mod tests {
             panic!("実行になる");
         };
         assert_eq!(args.port, "/dev/y");
+    }
+
+    #[test]
+    fn speech_requires_both_nonzero_values_and_is_off_by_default() {
+        let mut only_interval = ALL.to_vec();
+        only_interval.extend(["--speech-min-interval-ms", "100"]);
+        assert_eq!(
+            run(&only_interval),
+            Err(CliError::Missing("--speech-duration-ms"))
+        );
+
+        let mut only_duration = ALL.to_vec();
+        only_duration.extend(["--speech-duration-ms", "200"]);
+        assert_eq!(
+            run(&only_duration),
+            Err(CliError::Missing("--speech-min-interval-ms"))
+        );
+
+        let mut zero_interval = ALL.to_vec();
+        zero_interval.extend([
+            "--speech-min-interval-ms",
+            "0",
+            "--speech-duration-ms",
+            "200",
+        ]);
+        assert!(matches!(
+            run(&zero_interval),
+            Err(CliError::Invalid {
+                flag: "--speech-min-interval-ms",
+                ..
+            })
+        ));
+
+        let mut values = ALL.to_vec();
+        values.extend([
+            "--speech-min-interval-ms",
+            "100",
+            "--speech-duration-ms",
+            "200",
+        ]);
+        let Ok(Parsed::Run(args)) = run(&values) else {
+            panic!("独り言を有効にする")
+        };
+        let speech = args.speech.expect("両方を指定した");
+        assert_eq!(speech.min_interval_ms.get(), 100);
+        assert_eq!(speech.duration_ms, 200);
     }
 }

@@ -85,9 +85,63 @@
     },
     {
       "name": "unknown_message_type",
-      "line": "{\"v\":1,\"sid\":41207,\"id\":1,\"ts_ms\":100,\"type\":\"play_motion\",\"payload\":{\"name\":\"nod\",\"speed\":0.45,\"repeat\":1}}\n",
+      "line": "{\"v\":1,\"sid\":41207,\"id\":1,\"ts_ms\":100,\"type\":\"motion_completed\",\"payload\":{\"name\":\"nod\"}}\n",
       "expect_error": "unknown_type",
-      "note": "今回型を起こさないtype（§5.3。PROTO-TBD-008）。play_motionを足すときは、このcaseのtypeを差し替える。"
+      "note": "今回型を起こさないtype（§4.7。PROTO-TBD-008）。motion_completedの型を足すときは、このcaseのtypeを差し替える。unknown_typeではpayloadを解釈しないため、payloadの形は§4.7由来ではなく任意である。"
+    },
+    {
+      "name": "play_motion_missing_name",
+      "line": "{\"v\":1,\"sid\":41207,\"id\":30,\"ts_ms\":100,\"type\":\"play_motion\",\"payload\":{\"speed\":0.45,\"repeat\":1}}\n",
+      "expect_error": "invalid_payload",
+      "note": "`name`は必須である（§3）。"
+    },
+    {
+      "name": "play_motion_missing_speed",
+      "line": "{\"v\":1,\"sid\":41207,\"id\":31,\"ts_ms\":100,\"type\":\"play_motion\",\"payload\":{\"name\":\"nod\",\"repeat\":1}}\n",
+      "expect_error": "invalid_payload",
+      "note": "`speed`は必須である（§3）。省略を許すのは意味が決まってからにする。"
+    },
+    {
+      "name": "play_motion_missing_repeat",
+      "line": "{\"v\":1,\"sid\":41207,\"id\":32,\"ts_ms\":100,\"type\":\"play_motion\",\"payload\":{\"name\":\"nod\",\"speed\":0.45}}\n",
+      "expect_error": "invalid_payload",
+      "note": "`repeat`は必須である（§3）。"
+    },
+    {
+      "name": "play_motion_speed_not_finite",
+      "line": "{\"v\":1,\"sid\":41207,\"id\":33,\"ts_ms\":100,\"type\":\"play_motion\",\"payload\":{\"name\":\"nod\",\"speed\":1e39,\"repeat\":1}}\n",
+      "expect_error": "invalid_payload",
+      "note": "`speed`は有限の32-bit浮動小数点数である（§3）。32-bitへ狭めた結果が有限でない数（例: 1e39）は拒否する。"
+    },
+    {
+      "name": "play_motion_speed_not_a_number",
+      "line": "{\"v\":1,\"sid\":41207,\"id\":34,\"ts_ms\":100,\"type\":\"play_motion\",\"payload\":{\"name\":\"nod\",\"speed\":\"fast\",\"repeat\":1}}\n",
+      "expect_error": "invalid_payload",
+      "note": "`speed`は数である。"
+    },
+    {
+      "name": "play_motion_repeat_negative",
+      "line": "{\"v\":1,\"sid\":41207,\"id\":35,\"ts_ms\":100,\"type\":\"play_motion\",\"payload\":{\"name\":\"nod\",\"speed\":0.45,\"repeat\":-1}}\n",
+      "expect_error": "invalid_payload",
+      "note": "`repeat`はu32である（§3）。負数は幅に収まらない。"
+    },
+    {
+      "name": "play_motion_repeat_over_u32",
+      "line": "{\"v\":1,\"sid\":41207,\"id\":36,\"ts_ms\":100,\"type\":\"play_motion\",\"payload\":{\"name\":\"nod\",\"speed\":0.45,\"repeat\":4294967296}}\n",
+      "expect_error": "invalid_payload",
+      "note": "`repeat`はu32である（§3）。u32の最大値を1超える値は幅に収まらない。"
+    },
+    {
+      "name": "play_motion_repeat_fractional",
+      "line": "{\"v\":1,\"sid\":41207,\"id\":37,\"ts_ms\":100,\"type\":\"play_motion\",\"payload\":{\"name\":\"nod\",\"speed\":0.45,\"repeat\":1.5}}\n",
+      "expect_error": "invalid_payload",
+      "note": "`repeat`は整数である（§3）。"
+    },
+    {
+      "name": "play_motion_name_not_a_string",
+      "line": "{\"v\":1,\"sid\":41207,\"id\":38,\"ts_ms\":100,\"type\":\"play_motion\",\"payload\":{\"name\":7,\"speed\":0.45,\"repeat\":1}}\n",
+      "expect_error": "invalid_payload",
+      "note": "`name`はstringである（§3）。"
     },
     {
       "name": "unsupported_version_takes_precedence_over_unknown_type",

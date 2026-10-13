@@ -3,7 +3,8 @@
 //! # 範囲
 //!
 //! [`MotionDedup::admit_once`]は、現在のsessionの`id`ごとに、`admit`（hostでは
-//! [`crate::Limiter::admit`]、firmwareでは`LimitedServo::admit`）を**高々1回**しか呼ばない。
+//! [`crate::Limiter::admit`]、firmwareのservo経路では`LimitedServo::admit`。**現在のfirmwareの`pi_link.rs`は
+//! `MotionCatalog`を引くclosureを渡し、`LimitedServo`は呼ばない**。servo経路の接続は#487のPR D）を**高々1回**しか呼ばない。
 //!
 //! - 初めての`id`（[`Lookup::New`]）: `admit`を1回呼び、結果を**`Ok`でも`Err`でも**記録する
 //! - 処理済みの`id`（[`Lookup::Replay`]）: `admit`を呼ばず、記録した結果を返す
@@ -13,9 +14,9 @@
 //! 「Duplicateには…保持したresultのreplay経路を使い、非idempotentな動作を再実行しない」
 //! 「Relativeまたは名前付きの物理motionにはduplicate suppressionが必要である」である。
 //!
-//! **wireの`play_motion`の受信と振り分けは含まない。**`play_motion`の型が
-//! `deskcat-protocol`にまだ無い（理由は`deskcat-protocol`の`message`のmodule docにある）。
-//! firmwareのsessionへの組み込みは、その型が決まった後に行う。
+//! **wireの`play_motion`の受信と振り分けは含まない。**それはfirmwareの`pi_link.rs`が行い、
+//! `admit`のclosureの中で`MotionCatalog`を引く（受け入れる名前と上限は未決である。Protocol §5.3と
+//! `PROTO-TBD-008`）。
 //!
 //! `Expired`の扱いは[`DuplicateHistory`]のdocとProtocol §9による（受け入れ前の`TBD`が残っている）。
 //!
@@ -26,9 +27,9 @@
 //! [`crate::Limiter::admit`]が返す拒否（`UnknownMotion`、`NonFiniteTarget`、`TargetOutOfHardRange`）は、どれも最終的な拒否であり、記録する。§8が記録しないと
 //! 定めるのは`hello`／`boot`の`rate_limited`だけで（手順9）、motionはそれに当たらない。
 //! §8の手順10は、`play_motion`の`busy`を最終拒否結果として保存すると定める。占有の判定は
-//! 呼び出し側が行い、この層は判定しない。この層は、`admit`のclosureが返した拒否を、種類を問わず
-//! 記録して同じ`id`の再送へ再生する（再送で占有を再評価しない、§9）。[`crate::Rejection`]に
-//! `busy`はまだ無い。
+//! 呼び出し側が行い、この層は判定しない。**保存するのはこの層である。**`admit`のclosureが返した拒否
+//! （[`crate::Rejection::Busy`]を含む）を、種類を問わず記録して同じ`id`の再送へ再生する
+//! （再送で占有を再評価しない、§9）。
 //!
 //! # 所有者との分担
 //!
@@ -40,7 +41,7 @@
 //! # 時刻
 //!
 //! `now_ms`は単調に増加する値を渡す（[`DuplicateHistory::record`]の契約）。firmwareでは
-//! `std::time::Instant`（`CLOCK_MONOTONIC`）から取る前提である（firmware側の呼び出しはまだ無い）。
+//! `std::time::Instant`（`CLOCK_MONOTONIC`）から取る前提である（firmwareの`pi_link.rs`は`Health::uptime_ms`を渡す）。
 //! 時刻が戻った場合の振る舞いは、[`DuplicateHistory::record`]のdocと`tests/dedup.rs`のtest 9による。
 //!
 //! # 値を持たない

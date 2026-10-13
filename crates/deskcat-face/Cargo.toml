@@ -14,5 +14,8 @@ publish.workspace = true
 [dependencies]
 deskcat-protocol = { path = "../deskcat-protocol" }
 
+[dev-dependencies]
+deskcat-domain = { path = "../deskcat-domain" }
+
 [lints]
 workspace = true

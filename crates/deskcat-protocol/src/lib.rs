@@ -10,7 +10,8 @@
 //!
 //! - envelope（§3）とIssue #4が承認した最小message type（`boot`、`hello`、`ping`、
 //!   `get_status`、`status`、`ack`）、およびIssue #527で足したtype（`set_expression`、
-//!   `show_text`、`head_touched`、`tapped`、`lifted`、`environment`）。含めないtypeと
+//!   `show_text`、`head_touched`、`tapped`、`lifted`、`environment`）、およびIssue #19で足した
+//!   `play_motion`。含めないtypeと
 //!   その理由は[`message`]のmodule docにある
 //! - error code（§7）と、それを計上するcounterへの対応付け
 //! - 1 lineのdecodeとencode、および検証順序
@@ -76,7 +77,7 @@ pub use error::{DecodeError, ErrorCode};
 pub use framing::{Framed, LineFramer, Progress};
 pub use message::{
     Ack, AckStatus, Boot, DisplayStatus, Environment, ExpressionName, FiniteF32, HeadTouched,
-    Hello, HelloReason, Lifted, Message, ProtocolCounters, SensorStatus, ServoStatus,
+    Hello, HelloReason, Lifted, Message, PlayMotion, ProtocolCounters, SensorStatus, ServoStatus,
     SetExpression, ShowText, Status,
 };
 pub use prefix::{PrefixEnvelope, recover_identity};

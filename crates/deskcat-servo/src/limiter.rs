@@ -28,7 +28,8 @@
 //! **`単位時間あたりの受理数`と`実行中trajectoryによる占有`も含まない。**
 //! Protocol §5.3 はそれぞれ`rate_limited`と`busy`を返すと定めているが、
 //! `動作制限`表の`秒あたり受理motion command数`は`HW-TBD-020`で未確定であり、
-//! trajectoryの実行管理はこの型の範囲外である。
+//! trajectoryの実行管理はこの型の範囲外である。`busy`の型（[`Rejection::Busy`]）はあるが、
+//! [`Limiter::admit`]は返さない。
 //!
 //! **正規化speedとrepeat countの上限も含まない。**Protocol §5.3 が上限を要求しているが、
 //! 値の持ち主が`動作制限`表に無く、受理するmotion名自体が同§で`TBD`である。
@@ -156,6 +157,13 @@ pub enum Rejection {
     ///
     /// §5.3 が「値そのものが許容範囲外」を`out_of_range`としている。
     TargetOutOfHardRange,
+    /// 実行中のtrajectoryがservoを占有していて、新しいcommandを受けられない。
+    ///
+    /// §5.3 が「実行中trajectoryによるresourceの一時的な占有」を`busy`としている。
+    /// **[`Limiter::admit`]は返さない。**占有の判定は、trajectoryを持つ呼び出し側が行い、
+    /// [`crate::MotionDedup::admit_once`]の`admit`のclosureから返す。そのため
+    /// [`LimiterCounters`]には数えない（Protocolの`busy` counterが数える）。
+    Busy,
 }
 
 impl Rejection {
@@ -169,6 +177,7 @@ impl Rejection {
             Self::TargetOutOfHardRange | Self::IntervalOutsideControlPeriod => {
                 ErrorCode::OutOfRange
             }
+            Self::Busy => ErrorCode::Busy,
         }
     }
 }
@@ -183,6 +192,7 @@ impl fmt::Display for Rejection {
             Self::IntervalOutsideControlPeriod => {
                 "interval lies outside the configured control period"
             }
+            Self::Busy => "a running trajectory occupies the servo",
         };
         write!(f, "{reason} ({})", self.code().as_str())
     }

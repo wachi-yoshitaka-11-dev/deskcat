@@ -72,10 +72,11 @@ python3 scripts/review_gate.py session begin --work 465
 ```
 
 `findings`は`defect` / `out-of-scope` / `optional`、出所は`diff` / `prior-explanation` /
-`pre-existing`、採否は`fix` / `defer` / `decline`。重大な欠陥は`defect`として影響を理由へ書く。
+`pre-existing`、採否は`fix` / `defer` / `decline`。修正対象の判定は[CONTRIBUTINGの自己レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/CONTRIBUTING.md#自己レビュー)に従う。
 `defect`を修正予定として採用しただけで解決済みにせず、残るものを`unresolved`に列挙する。
 `passes`は実施したものだけを書く。中断時は`disposition: interrupted`でPassの証拠を残さない。
-`capped`の場合は`cap_reason`へ人間の承認元、または直近2巡が任意改善だけだった根拠を足す。
+新しい巡の`disposition`は`continue`または`interrupted`とする。`capped`は人間の承認を
+`session end`で記録したときの終端状態であり、巡の結果だけでは宣言しない。
 
 ```bash
 python3 scripts/review_gate.py session finish --work 465 --record result.local.json
@@ -83,17 +84,17 @@ python3 scripts/review_gate.py session check --work 465
 python3 scripts/review_gate.py gate --base origin/develop --head HEAD --review-work 465
 ```
 
-`check`は現在のdiffに対して両Passと未解決欠陥を確認する。新規欠陥0件が2巡続けば
-`converged`、それより前の明示的な打ち切りは条件が揃った場合だけ`capped`、それ以外は
-`stopped`（exit 2）。無承認の上限（1回のreviewにつき通常5巡、文書だけのdiffは3巡。範囲はCONTRIBUTINGの
-`打ち切り`）の巡の終わりに条件が揃っていれば完了判定はできるが、揃わない場合は未完了である。
+`check`は現在のdiffに対して両Passと未解決欠陥を確認する。修正対象の新規指摘0件が
+2巡続けば`converged`、人間が承認して`session end`を記録した終了は`capped`、それ以外は
+`stopped`（exit 2）。巡の目安と継続・終了の判断は[CONTRIBUTINGの打ち切り](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/CONTRIBUTING.md#打ち切り)に従う。
 `begin` / `run` / hookは、そのreviewで上限を超える承認なしの巡を拒否する。各巡の記録には、開始時に判定した
 上限を`free_limit`、何回目のreviewかを`review`、そのreviewの何巡目かを`review_round`として残す。
 `number`はIssueの通算で、情報として残る。
 
 reviewは`converged`に達した巡か、下の`session end`で記録した終了で終わり、次の`begin`は新しいreviewの1巡目になる。
 区切りは記録にある巡の結果と、終了・始め直しの記録から計算する。`stopped`のreviewは終わらない。
-結果JSONの`disposition: capped`だけでは終わらない。pushやbranchの変更でも終わらない。
+新しい結果JSONは`disposition: capped`を受け付けない。旧記録の終端は保存時の扱いを維持する。
+pushやbranchの変更だけでも終わらない。
 新しいreviewは、前のreviewの巡を収束に数えない。`check`は`TOTAL_ROUNDS`（Issueの通算）、
 `REVIEW` / `REVIEW_ROUNDS`（最新の巡のreviewとその巡数）、`NEXT_REVIEW` / `NEXT_ROUND`（次に始める巡の位置）を出す。
 新しい形の巡、`review`付きの承認、始め直しを書いた記録は`version: 2`になる。#526より前のscriptはこの記録を読むと停止するので、
@@ -109,7 +110,7 @@ CIの通常のgateはローカル記録を持たず、形式検査のままで�
 
 ## 承認を得て終える
 
-最新の巡が両Passを終え、未解決の欠陥が無く、`converged`でない状態でPM／作業セッションが理由を示して
+最終diffに両Passの記録があり、未解決の欠陥が無く、`converged`でない状態でPM／作業セッションが理由を示して
 終了を判断し、人間が承認したら、次の形で記録する。**書式の例であり承認ではない。**
 `after_round`は記録時点のIssueの通算巡数（`check`の`TOTAL_ROUNDS`）と一致させる。
 

@@ -178,12 +178,13 @@ partitionの4,128,768 bytesに対し9.24 %である（`espflash`の`App/part. si
 （testはhost target `x86_64-unknown-linux-gnu`で実行した。**その版のrustcで通るかの確認であり、
 xtensaの上でtestを走らせたのではない**）、`firmware/esp32`の既定構成・`pi-protocol-mode`・`bringup-display-13`の
 3構成でformat、lint、buildを通した。
-実行した版と結果は[Version Record](../toolchains/version-records/2026-09-29-esp32-build-servo-limiter-native-linux.md)にある。
+3構成の結果は、developの`710c67f`（PR #513のsquash merge）の時点の[Version Record](../toolchains/version-records/2026-09-29-esp32-build-servo-limiter-native-linux.md)にある。現在の記録は、`pi-protocol-mode`廃止後の2構成（既定、`bringup-display-13`）である。
 **build-onlyであり、flashと実機起動は含まない。**
 
-**flash sizeへの影響はまだ測っていない。**既定buildの`main()`は`deskcat-servo`を呼ばないため、
-link後の実行物に同crateのcodeが入っているかを確かめておらず、今の実行物の大きさを比べても
-影響の上限にならない。**servoを駆動する経路を`main()`へ足すときに測る。**
+**flash sizeへの影響はまだ測っていない。**既定buildは、[Issue #19](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/19)のPR-3bから、
+`pi_link.rs`が`MotionDedup`と`MotionCatalog`（`deskcat-servo`）を使う（`main()`が`PiLink`を作る）。
+**servoを駆動する`LimitedServo`は`main()`が呼ばない。**link後の実行物に同crateのcodeがどれだけ入っているかは
+確かめておらず、今の実行物の大きさを比べても影響の上限にならない。**servoを駆動する経路を`main()`へ足すときに測る。**
 
 ## 追記（2026-10-07）: 3つ目の共有crate`deskcat-face`
 

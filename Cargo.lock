@@ -24,6 +24,7 @@ version = "0.1.0"
 name = "deskcat-face"
 version = "0.1.0"
 dependencies = [
+ "deskcat-domain",
  "deskcat-protocol",
 ]
 
