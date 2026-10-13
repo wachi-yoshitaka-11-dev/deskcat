@@ -130,7 +130,7 @@ B-2の経路別条件（未解決）→ 3点定常電流 + 電源/pin/単体動�
 | #14 | firmware担当が既存LCD/controller/bus仕様から実装準備 | #13のLCD/SPI単体証拠を利用し、touch配線・電圧・bus条件を別途確認。raw sample・debounce・LCD併用loss・誤検出を実機測定。#13条件6のcloseは準備の前提にしない |
 | #15 | #445構成でsampling・変換・静止noiseの実装／実機確認 | EXP-015はID応答のみ。servo振動sampleは#17以降の安全な動作を待つ。これを単体samplingの開始条件にしない |
 | #16 | #445構成でraw/変換/calibration/faultの実装／実機確認 | EXP-014のJ3は申告、EXP-015はID応答。reference比較・timeout等の証拠が必要。J3記述の整合は#16担当、#13を待たない |
-| #17 | 人間とDocs / Reviewで初回駆動方法を判断 | 最新#474はbench実行禁止。servo識別・電源・全出力gateと校正循環の解消が必要。実測はその後の実機Linux/HIL |
+| #17 | 人間とDocs / Reviewで初回駆動方法を判断 | #474のbench実行禁止は、servo-safety-limitsの承認の状態の項目6（監視下の測定のための駆動）へ置き換わった。駆動はその回の実行承認があるときだけ行う。全出力gateは開いていない。実測は実機Linux/HIL |
 | #18 | #34の機構案検討と測定準備 | #17の電気的根拠・#34の固定方法、安全な校正、可動域/速度/加速度/fail-safeの人間承認 |
 | #19 | Host Rustで純粋limiter/trajectoryの境界test | #18の実測制限値と監視下試験。仮値testの成功を実動作の合格にしない |
 | #20 | fault scenarioの準備 | #12/#13/#19と出力gate。実機で通信断/reset/同時動作/電源遮断の証拠 |
