@@ -42,7 +42,7 @@
 //! bring-upの後にmain loopの中で1回。下の`i2c_pending`を参照）。logはどのbuildでもUART0（USB）へ出る
 //! （`crate::console`）。表の試験featureを指定すると既存の試験構成を選び、
 //! 試験feature同士は加える向きにする。**例外は`bench-servo-test-17`だけであり、Pi linkを
-//! 外す**（下の表。正本の要求による）。
+//! 外す**（下の表。正本の要求による）。そのため、Pi linkで送る`tap-21`とは併用できない（`compile_error!`で止める）。
 //!
 //! | 試験feature | その試験buildで有効になるもの | 製品buildとの関係 |
 //! |---|---|---|
@@ -166,6 +166,14 @@ mod accel;
 // 正本`docs/hardware/servo-safety-limits.md`の`測定のための駆動（承認の状態の項目6）`節が、
 // 測定用のbuildは「Piとの通信linkを持たない」と定めているためである（`#487`でfeatureの排他を
 // やめたときの、ただ1つの例外である。featureどうしの排他ではない。Pi linkを外すだけである）。
+// `tap-21`は、検出を`tapped`としてPi linkで送る。測定用build（`bench-servo-test-17`）はPi linkを
+// 持たないため、この2つは併用できない。併用すると`boot_session`と`pi_link`が無いことで
+// 分かりにくいcompile errorになるので、ここで理由を示して止める。
+#[cfg(all(feature = "bench-servo-test-17", feature = "tap-21"))]
+compile_error!(
+    "bench-servo-test-17とtap-21は併用できない。tapの検出はPi linkで送るが、\
+     測定用buildはPi linkを持たない。"
+);
 #[cfg(not(feature = "bench-servo-test-17"))]
 mod boot_session;
 mod config;

@@ -29,7 +29,7 @@ bringup-i2c-15-16 = []
 # **このfeature付きbuildはPi linkを持たない。**同文書の`測定のための駆動（承認の状態の項目6）`節が、
 # 測定用のbuildは「Piとの通信linkを持たない」と定めているためである。#487でfeatureの排他をやめた
 # ときの、ただ1つの例外である（featureどうしの排他ではない。このbuildはPi linkを外すだけであり、
-# `bringup-display-13`と組み合わせることは禁じていない）。
+# `bringup-display-13`と組み合わせることは禁じていない。ただしPi linkで`tapped`を送る`tap-21`とは併用できず、`main.rs`の`compile_error!`で止める）。
 bench-servo-test-17 = []
 # Issue #13の`DISP-01`（MSP2807）bring-up（初期化、backlight点灯、単色fill、
 # 四隅pattern）の試験構成を選ぶ。このfeatureだけを指定したbuildは表情とtapを有効にしない。
