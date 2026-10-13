@@ -112,7 +112,7 @@ jobs:
         run: cargo build --locked
 
       # 製品buildのほか、既存の試験構成と#21のデモを確認する。
-      # bench-servo-test-17は#474のcompile_error!で意図的に停止するため含めない。
+      # bench-servo-test-17（#17の測定用build）もcompileだけを確かめる。flashはしない。
       - name: Build test modes
         run: |
           for features in \
@@ -123,7 +123,8 @@ jobs:
             face-21 \
             face-21,bringup-display-13 \
             tap-21 \
-            tap-21,face-21,bringup-display-13; do
+            tap-21,face-21,bringup-display-13 \
+            bench-servo-test-17; do
             cargo clippy --all-targets --locked --features "$features" -- -D warnings
             cargo build --locked --features "$features"
           done

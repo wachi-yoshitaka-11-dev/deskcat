@@ -112,7 +112,7 @@ B-2の経路別条件（未解決）→ 3点定常電流 + 電源/pin/単体動�
 | #3の定義・承認 + #405等 → 段階C | 設計の確定・物理的安全条件 | power-budget「経路部品と定格」「過電流保護（段階Cのgate）」。margin・受け入れ数値・測定系・実装の全条件が必要。#405 closeだけでも#3 closeだけでも通電許可にならない |
 | 段階C → 案A再試験（案Aを最終の給電に採る場合のみ。#405の見直しの候補として引き継いだ） | 物理的安全条件・成果物の利用 | power-budget「ESP32の給電経路」、#247、[Safety Policy §11](../governance/hardware-safety-policy.md#11-緊急時の対応)。安全な再開条件と観測結果が必要。#247という番号のcloseだけでは判定しない。host実装・PC testは先行可能。#446/#11/#12の実機通信は別電源＋UARTの構成（`gpio-assignment.md`の`Pi–ESP32間のtransport`節）で行い、この辺を通らない |
 | #446 → #13条件6 | 成果物の利用 | #13条件6、[protocol §4.1](../protocol/esp32-pi-protocol.md)、firmwareの統合（#487。feature排他は廃止した）。PR #476/#480はmerge済み。暫定sid・送信1回だけという旧説明は更新し、PR Cと実機・同時動作を残す |
-| servo gate ↔ 初回校正 | 未解決の安全・設計依存 | [servo-safety-limits「承認の状態」](../hardware/servo-safety-limits.md#承認の状態)、#17/#474。現在は「実行しない」。HW-TBD-010の測定に出力が要る一方、出力gateは010の解決を要求する。#405追加だけで解けず、人間が最初の駆動方法を判断する |
+| servo gate ↔ 初回校正 | 未解決の安全・設計依存 | [servo-safety-limits「承認の状態」](../hardware/servo-safety-limits.md#承認の状態)、#17/#474。HW-TBD-010の測定に出力が要る一方、出力gateは010の解決を要求する。#405追加だけで解けない。最初の駆動方法は人間が判断した（同節の項目6）。駆動はその回の実行承認があるときだけ行う |
 
 ### 既存Issueの開始条件と完了条件
 

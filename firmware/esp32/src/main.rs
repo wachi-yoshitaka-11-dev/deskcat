@@ -28,8 +28,7 @@
 //!   **試験buildでの有効化の手順は下の「`DISP-01`のbring-upを有効にする手順」節。**）。
 //!   `bench-servo-test-17` feature付きbuildだけが[`run_servo_bench_test`]経由でservoを
 //!   呼ぶ（[Issue #17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。
-//!   詳細は[`crate::servo`]と[`run_servo_bench_test`]のdoc参照）。**#474で、このfeature付きbuildは
-//!   `compile_error!`でcompileが止まる（下記）。**
+//!   詳細は[`crate::servo`]と[`run_servo_bench_test`]のdoc参照）。
 //! - **#514の追加LED（`LED-COMM`＝GPIO2、`LED-REACT`＝GPIO5）も既定のbuildではdriveしない。**
 //!   `bringup-led-514` feature付きbuildだけが`crate::led`で点灯試験と白の点滅を行う
 //!   （[Issue #514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)）。このfeatureは
@@ -52,7 +51,7 @@
 //! | `bringup-led-514` | #514の追加LED（GPIO2／GPIO5）の点灯試験と白の点滅（`crate::led`） | 表情とtapは有効にしない。`bringup-display-13`とも組み合わせられる |
 //! | `face-21` | LCDの初期化とbacklightの点灯を保ち、`set_expression`の3表情を描く。Pi commandを受けなくても、描ける状態になった時点で`neutral`を1回描く（#21、`crate::face`） | `bringup-display-13`とも組み合わせられる。**表情を持たない試験buildは`set_expression`を`hardware_unavailable`で拒否する** |
 //! | `tap-21` | ADXL345のtap検出を設定し、`INT_SOURCE`をI2Cで読み、bootのACK後に`tapped`を送る（#21のF1、`crate::tap`）。ADXL345のDevice IDが`0xE5`のときだけ設定を書き、I2Cのdriverを持ち続ける（一致しなければ何も書かず、driverを手放す） | INT線は使わない（配線は要らない）。`face-21`・`bringup-display-13`とも組み合わせられる。**tapを持たない試験buildはADXL345へ書き込まず、Device IDを読むだけである** |
-//! | `bench-servo-test-17` | servoの単発bench試験（#17の測定用build） | **Pi linkを外す。**正本`docs/hardware/servo-safety-limits.md`の`測定のための駆動（承認の状態の項目6）`節が、測定用のbuildは「Piとの通信linkを持たない」と定めているためである。#474で、このfeature付きbuildはcompileが止まる |
+//! | `bench-servo-test-17` | servoの単発bench試験（#17の測定用build） | **Pi linkを外す。**正本`docs/hardware/servo-safety-limits.md`の`測定のための駆動（承認の状態の項目6）`節が、測定用のbuildは「Piとの通信linkを持たない」と定めているためである |
 //!
 //! `#487`のPR B1より前は、`pi-protocol-mode` featureを付けたbuildだけがPi linkを持ち、LCD／I2Cの
 //! bring-upと排他だった。`#487`でfeatureをやめ、Pi linkを製品buildへ入れた。
@@ -185,25 +184,6 @@ mod pi_link;
 mod protocol;
 mod servo;
 mod tap;
-
-// `bench-servo-test-17`付きbuildは、#474でcompileを止めた（理由と承認の状態は
-// `docs/hardware/servo-safety-limits.md`の`承認の状態`節が持つ。ここへ再掲しない）。
-// **docへ書くだけでは、featureを付ければbuildでき動いてしまう。**
-// codeとfeatureの定義は残す。
-//
-// **再開するときの注意（#487）。**同節の項目5は、再開の手順として「`pi-protocol-mode`との排他の
-// `compile_error!`とその注記は残し」と書いている（同項目は当時の記録であり、書き換えていない）。
-// #487で`pi-protocol-mode`を廃止したため、その`compile_error!`はもう無い。代わりに、このfeature付き
-// buildはPi link（`crate::boot_session`・`crate::pi_link`・`crate::protocol`とUART1）をcompileしない（上の`mod`の
-// `#[cfg]`）。**測定用のbuildがPiとの通信linkを持たないこと（同文書の`測定のための駆動`節）は、
-// compile_errorではなく構造で保っている。**再開するときに外すのは、下の#474の`compile_error!`と、同節の項目5が挙げる注記だけである。
-// ただし、このfeature付きbuildは#474の`compile_error!`があるためbuildしておらず、外した後にcompileが通るかは
-// 確かめていない（#487でmain loopを組み替えた）。
-#[cfg(feature = "bench-servo-test-17")]
-compile_error!(
-    "bench-servo-test-17付きbuildは#474でcompileを止めている。\
-     理由と承認の状態はdocs/hardware/servo-safety-limits.mdの承認の状態節を見ること。"
-);
 
 use esp_idf_svc::hal::delay::FreeRtos;
 use esp_idf_svc::hal::gpio::{InputPin, OutputPin};
@@ -462,6 +442,8 @@ fn main() {
         peripherals.pins.gpio4,
     );
     // `set_expression`を受理できるか（`crate::face`）。LCDを描けるbuild（`face-21`）だけが立てる。
+    // `bench-servo-test-17`だけのbuildはPi linkも表情も持たず、これを読まない。
+    #[cfg_attr(feature = "bench-servo-test-17", allow(unused_mut, unused_variables))]
     let mut face = FaceState::new();
     #[cfg(feature = "bringup-display-13")]
     let mut display = lcd.map(DisplayBringup::new);
@@ -1242,8 +1224,7 @@ fn run_i2c_bringup(
 }
 
 /// `SERVO-01`（SG90）の単発bench試験（[Issue #17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)）。
-/// `bench-servo-test-17` feature付きbuildだけがこの関数を呼ぶ（#474で、そのbuildは
-/// `compile_error!`でcompileが止まる）。承認の状態は
+/// `bench-servo-test-17` feature付きbuildだけがこの関数を呼ぶ。承認の状態は
 /// [servo-safety-limits.md](../../../docs/hardware/servo-safety-limits.md)の
 /// `承認の状態`節が正本（ここへ再掲しない）。
 ///

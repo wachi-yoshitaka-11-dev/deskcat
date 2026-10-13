@@ -68,9 +68,13 @@
 //! `SERVO-PWM`へ触る経路をこのmoduleの外に作らないことは、呼び出し側（`main.rs`）の規則である。
 //!
 //! **例外は`bench-servo-test-17`の`Sg90::move_to_angle_once`である。**limiterを通らない。
-//! 同featureのbuildでだけcompileされ、そのbuildは#474の`compile_error!`で止まる
-//! （下記）。**compileできるbuildからは呼べない。**bench経路をlimiterへ通す書き換えは、
-//! 測定用のbuild（`servo-safety-limits.md`の`承認の状態`の項目6(b)）で行う。
+//! 同featureのbuildでだけcompileされる。このbuildは#17の初回の駆動のためのものであり、
+//! `servo-safety-limits.md`の`承認の状態`の項目6（2026-09-28、ユーザーの決定）と
+//! `測定のための駆動`節が定める、狭い仮の制限で強制する単発のbuildである（1回の起動で1 command、
+//! 動作角のclamp、露出時間の後にdutyを0、NVSのlatch。`main.rs`の`run_servo_bench_test`）。
+//! **clampの幅は一次資料にも実測にも基づかない暫定値であり**（`crate::config::SERVO_FIRST_MOTION_MAX_DEVIATION_DEG`）、
+//! 露出時間は安全な保持時間の主張ではない（`crate::config::SERVO_BENCH_TEST_EXPOSURE_MS`）。
+//! limiterを通す駆動は、#18・#19のbuildで扱う（同節）。
 //!
 //! # 制御周期の外の間隔、加速度の譲り、出力の失敗ではlatchする
 //!
@@ -172,8 +176,7 @@
 //! [servo-safety-limits.md](../../../docs/hardware/servo-safety-limits.md)の
 //! `サーボ出力を有効化してよい条件`が正本）。`bench-servo-test-17` feature付きbuild
 //! だけが[`run_servo_bench_test`](../../../firmware/esp32/src/main.rs)経由で呼ぶ
-//! （承認の状態は同文書の`承認の状態`節が正本）。**#474で、このfeature付きbuildは
-//! `main.rs`の`compile_error!`でcompileが止まる。**
+//! （承認の状態は同文書の`承認の状態`節が正本）。
 //!
 //! pin割り当ては[gpio-assignment.md](../../../docs/hardware/gpio-assignment.md)の
 //! `信号inventory`が正本（`SERVO-PWM`＝GPIO27、[`crate::config::SERVO_PWM_GPIO`]）。
@@ -185,7 +188,7 @@
 //! [servo-safety-limits.md](../../../docs/hardware/servo-safety-limits.md)の残余riskを参照。
 
 // 既定buildは`main()`からこのmoduleを呼ばないためdead_codeになる（module doc参照）。
-// `Sg90`の一部は`bench-servo-test-17` feature付きbuildで呼ばれる（#474で、そのbuildはcompileが止まる）。
+// `Sg90`の一部は`bench-servo-test-17` feature付きbuildで呼ばれる。
 // `LimitedServo`、`Stopped`、`ServoFaultCounters`は、今はどのbuildからも呼ばれない。
 #![allow(dead_code)]
 
