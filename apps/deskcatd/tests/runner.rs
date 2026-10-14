@@ -6,6 +6,11 @@
 use std::collections::VecDeque;
 use std::io;
 use std::num::NonZeroU64;
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+    mpsc::{self, Receiver, Sender},
+};
 use std::time::Duration;
 
 use deskcat_domain::{LOCAL_SPEECH_LINES, Millis, Mind, Timing};
@@ -30,6 +35,8 @@ struct Fake {
     eof: bool,
     eof_after_idle_reads: Option<usize>,
     idle_reads: usize,
+    cloud_request_started: Option<Receiver<()>>,
+    uart_progress: Option<Sender<()>>,
     auto_ack_text: bool,
     acked_text_id: Option<u32>,
 }
@@ -82,6 +89,12 @@ impl Transport for Fake {
                     }
                 }
                 self.idle_reads += 1;
+                if let (Some(started), Some(progress)) =
+                    (&self.cloud_request_started, &self.uart_progress)
+                    && started.try_recv().is_ok()
+                {
+                    progress.send(()).expect("workerへUART進行を通知");
+                }
                 if self
                     .eof_after_idle_reads
                     .is_some_and(|limit| self.idle_reads >= limit)
@@ -271,11 +284,22 @@ fn runner_uses_local_speech_only_with_explicit_config() {
 
 struct StubClaude {
     result: Result<String, Failure>,
+    cloud_request_started: Sender<()>,
+    uart_progress: Receiver<()>,
+    progress_during_request: Arc<AtomicBool>,
 }
 
 impl Client for StubClaude {
     fn count_tokens(&mut self, _: Context) -> Result<u32, Failure> {
-        std::thread::sleep(Duration::from_millis(20));
+        self.cloud_request_started
+            .send(())
+            .expect("UARTへ要求開始を通知");
+        self.progress_during_request.store(
+            self.uart_progress
+                .recv_timeout(Duration::from_secs(1))
+                .is_ok(),
+            Ordering::Relaxed,
+        );
         Ok(20)
     }
 
@@ -287,13 +311,21 @@ impl Client for StubClaude {
 #[test]
 fn cloud_worker_keeps_uart_running_and_failure_shows_local_line() {
     let (mut d, mut t) = ready();
-    t.eof_after_idle_reads = Some(100);
+    t.eof_after_idle_reads = Some(200);
+    let (request_started_tx, request_started_rx) = mpsc::channel();
+    let (uart_progress_tx, uart_progress_rx) = mpsc::channel();
+    let progress_during_request = Arc::new(AtomicBool::new(false));
+    t.cloud_request_started = Some(request_started_rx);
+    t.uart_progress = Some(uart_progress_tx);
     let dir =
         std::env::temp_dir().join(format!("deskcat-runner-cloud-test-{}", std::process::id()));
     std::fs::create_dir_all(&dir).expect("test dir");
     let worker = CloudSpeech::start(
         StubClaude {
             result: Err(Failure::Timeout),
+            cloud_request_started: request_started_tx,
+            uart_progress: uart_progress_rx,
+            progress_during_request: Arc::clone(&progress_during_request),
         },
         dir.join("budget.json"),
     )
@@ -321,7 +353,10 @@ fn cloud_worker_keeps_uart_running_and_failure_shows_local_line() {
         .lines()
         .map(|line| decode_line(line).expect("frame"))
         .collect();
-    assert!(t.idle_reads > 2, "HTTPを待つ間もUARTを回す");
+    assert!(
+        progress_during_request.load(Ordering::Relaxed),
+        "HTTP処理中もUARTを読む"
+    );
     assert!(
         matches!(&frames[0].message, Message::ShowText(text) if text.text == LOCAL_SPEECH_LINES[0])
     );
