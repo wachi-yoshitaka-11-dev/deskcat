@@ -52,7 +52,7 @@
       "top": 520,
       "left": 40,
       "attrs": {
-        "text": "Wokwi LCD RST and LED are not simulated.\nDo not use this diagram to approve real power or startup safety."
+        "text": "Wokwi LCD RST and backlight are not simulated.\nGeneric LED models do not establish the electrical characteristics of LED-COMM-01 or LED-REACT-01.\nDo not use this diagram to approve real power or startup safety."
       }
     },
     {
