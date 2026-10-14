@@ -23,8 +23,8 @@
 ```text
 Record ID: VR-2026-08-06-ESP32-BUILD-01
 Date: 2026-08-06（初回検証）
-最終有効な検証日時: 2026-08-11T11:13:22Z
-  現行のsource tree fb4425a8 に対する実行日である（#102。下の「`IDF_PATH` guard の検証log」節）。
+最終有効な検証日時: 2026-10-14T03:18:30Z（#522 の追記節を参照）
+  2026-08-11T11:13:22Z はsource tree fb4425a8 に対する実行日である（#102。下の「`IDF_PATH` guard の検証log」節）。
   前回は2026-08-10T02:47:29Z、tree cf3fcdb4 であった。
   reviewを受けた修正と、developへのrebaseでtreeが変わるたびに再検証している。
   Record IDとfile名は初回検証日のまま維持し、追跡の連続性を保つ。
@@ -1334,3 +1334,67 @@ IDF_PATH is set to <home>/deskcat/firmware/esp32/.embuild/espressif/esp-idf/v5.5
 - **別版のESP-IDFに対するguardの有効性。**用意していない
 - `cargo clean`からのfull clean build（cache利用のincremental buildのみ）
 - `cargo fmt`／`cargo clippy`（#102の対象外。CIが判定済み）
+
+## #522 の glyph 拡張前後の製品 build（2026-10-14 追記）
+
+この節は2026-08月の試験結果を書き換えず、同じ VM の ESP32 Build profile で
+取得した新しい測定を記録する。製品経路は `firmware/esp32` の既定 feature であり、
+`dev` profile（`opt-level = "z"`、debug 情報あり）で比較した。物理 board は接続せず、
+flash・実 LCD の表示・描画時間は測っていない。
+
+```text
+Record ID: VR-2026-08-06-ESP32-BUILD-01（追加測定）
+Date: 2026-10-14 JST
+Machine profile: ESP32 Build
+Operator role: AI作業セッション
+Repository commit: 変更前は e2fcfb7626e9f60c68cf45e19a114e0de1b431f6（develop）
+Working tree clean: 変更前 yes、変更後 no（#522 の glyph・文書差分）
+OS name/version: Ubuntu 22.04 / kernel 5.15.0-194-generic
+CPU architecture/userspace: x86_64 / 64-bit
+Container / VM / native: VM（systemd-detect-virt = microsoft）
+Rust channel/compiler: esp-1.95.0.0 / rustc 1.95.0-nightly (95e5bda86 2026-04-15)
+Cargo version: cargo 1.95.0-nightly (f2d3ce0bd 2026-03-21)
+Linker: ldproxy 0.3.5、ESP-IDF が要求する xtensa-esp-elf-gcc esp-14.2.0_20251107
+Rust target: xtensa-esp32-espidf
+ESP-IDF version/source: v5.5.3 / 2c211b236707889e8400c4dc5644dd5c4ee071e0
+ESP-IDF tools location mode: fromenv（一時的に既存 cache を使用。追跡下の設定は復元）
+IDF_PATH present: yes（build guard に DESKCAT_ALLOW_EXTERNAL_IDF_PATH=1 を指定）
+IDF_TOOLS_PATH present: yes（既存 cache）
+sdkconfig.defaults SHA-256: 4907245b9e964d0c7643f48c3e04fbe40c468e0d31ad7ee7fe3c0ee1ad9efc21
+partition-table.bin SHA-256: 7f00b6c042a89b15b0cac534f82ed988caf29278ff5700b0c511eb1b5bb7c820
+Physical board / USB-UART: 接続なし。module marking、board revision は本測定では未確認
+Peak memory: 未測定（ELF section の静的使用量だけを比較）
+```
+
+既存の SDK cache を参照すると `IDF_PATH` が設定され、`firmware/esp32/build.rs` は
+そのままでは止まる。tag `v5.5.3` と commit を確認し、明示的な override を
+有効にした。`ESP_IDF_TOOLS_INSTALL_DIR` は一時的に `fromenv` とした。
+Clippy は CLI `--config` を内側の Cargo へ渡さなかったため、追跡下の
+`.cargo/config.toml` を一時的に同じ値へ変更して実行し、直後に元の byte 列へ
+戻した。最初の試行は SDK 取得時の DNS 失敗、次の試行は GCC 15.2 と SDK が要求する
+GCC 14.2 の不一致で失敗した。既存 SDK と対応する GCC 14.2 を使用した再実行は成功した。
+
+| 確認 | 変更前22字 | 変更後3,584字 |
+|---|---:|---:|
+| `cargo fmt --all -- --check` | 対象外 | 成功 |
+| `cargo clippy --all-targets --locked -- -D warnings` | 対象外 | 成功 |
+| `cargo build --locked`、既定 feature | 成功 | 成功 |
+| `esptool.py --chip esp32 elf2image` app image | 850,912 byte | 908,112 byte |
+| factory app partition | 1,048,576 byte | 1,048,576 byte |
+| `.flash.rodata` | 264,036 byte | 321,108 byte |
+| `.flash.text` | 509,820 byte | 509,948 byte |
+| `.iram0.vectors` | 1,028 byte | 1,028 byte |
+| `.iram0.text` | 62,103 byte | 62,103 byte |
+| `.dram0.data` | 13,522 byte | 13,522 byte |
+| `.dram0.bss` | 3,448 byte | 3,448 byte |
+| `.noinit` | 2 byte | 2 byte |
+
+image の増分は57,200 byteで、変更後の factory partition の残りは140,464 byte。
+変更前 image SHA-256 は
+`fdd2c84f28183588ff90116f63a578573f2a96192e3f3084bf353fb302abfc0e`、
+変更後は`81488c3be6b09047786fa741ababb3c73665d1318b1edd9bd034c8c24bcaaea8`。
+静的 IRAM 2 section と DRAM 3 section に差は無い。Stack 使用量、動作中の peak RAM、LCD の字形と
+描画時間はこの build からは分からない。
+
+Conclusion: `Partial`（製品経路の VM build と静的容量比較は成功。実 LCD と描画時間は未実施）
+Next action: 実機担当が LCD の字形・描画時間・動作中の memory を確認する。

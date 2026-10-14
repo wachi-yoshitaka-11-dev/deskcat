@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Extract the #23 local speech characters from the official k8x12 BDF archive.
+"""Extract printable ASCII and JIS X 0208 non-kanji/level-1 glyphs from k8x12.
 
 Run from the repository root:
   python3 scripts/generate_speech_glyphs.py /path/to/k8x12_bdf_2021-05-05.zip
@@ -23,6 +23,7 @@ OUTPUT = Path("crates/deskcat-face/src/speech_glyphs.rs")
 FONT_ASCENT = 10
 GLYPH_WIDTH = 8
 GLYPH_HEIGHT = 12
+CHARSET_SHA256 = "e774450028a3108ac7d391d79db3691000f5b6eaf131c1c2efe0913a87324531"
 
 
 def needed_chars() -> list[str]:
@@ -33,7 +34,22 @@ def needed_chars() -> list[str]:
     lines = re.findall(r'^\s*"([^"\\]*)",\s*$', match.group(1), re.M)
     if len(lines) != 3:
         raise ValueError("expected the three literal LOCAL_SPEECH_LINES")
-    return sorted(set("".join(lines)))
+    chars = set("".join(lines))
+    chars.update(chr(code) for code in range(0x20, 0x7F))
+    # JIS X 0208 ku 1-8: symbols, full-width alphanumerics, kana, and
+    # non-kanji scripts. Ku 16-47 is the first-level kanji repertoire.
+    for ku in (*range(1, 9), *range(16, 48)):
+        for ten in range(1, 95):
+            encoded = bytes((0x1B, 0x24, 0x42, ku + 0x20, ten + 0x20, 0x1B, 0x28, 0x42))
+            try:
+                chars.add(encoded.decode("iso2022_jp"))
+            except UnicodeDecodeError:
+                # Unassigned JIS cells have no glyph to request.
+                pass
+    result = sorted(chars)
+    if hashlib.sha256("".join(result).encode("utf-8")).hexdigest() != CHARSET_SHA256:
+        raise ValueError("JIS X 0208 character mapping differs from the reviewed set")
+    return result
 
 
 def read_glyphs(bdf: str, chars: list[str]) -> dict[str, list[int]]:
@@ -82,9 +98,11 @@ def rust_source(glyphs: dict[str, list[int]]) -> str:
         "#[rustfmt::skip]",
         "pub(super) const GLYPHS: &[(char, [u8; 12])] = &[",
     ]
-    for char, rows in glyphs.items():
+    for char in sorted(glyphs):
+        rows = glyphs[char]
+        label = "SPACE" if char == " " else char
         lines.append(
-            f"    ('\\u{{{ord(char):04x}}}', [{', '.join(f'0x{row:02x}' for row in rows)}]), // {char}"
+            f"    ('\\u{{{ord(char):04x}}}', [{', '.join(f'0x{row:02x}' for row in rows)}]), // {label}"
         )
     lines.extend(["];", ""])
     return "\n".join(lines)

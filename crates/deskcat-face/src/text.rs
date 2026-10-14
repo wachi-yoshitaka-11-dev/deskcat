@@ -1,6 +1,6 @@
 //! #23 の日本語独り言を、LCD/SPI を知らずに 8×12 glyph と画面上の cell へ変換する。
 //!
-//! k8x12 の必要文字だけを使う。画面全体に1行で出す仮 layout と最大表示時間は
+//! k8x12 の ASCII・JIS X 0208 非漢字・第一水準を使う。画面全体に1行で出す仮 layout と最大表示時間は
 //! PROTO-TBD-007 の実機測定前の暫定値であり、protocol の最終制限ではない。
 
 use deskcat_protocol::{ErrorCode, ExpressionName};
@@ -28,7 +28,7 @@ pub enum TextError {
     Empty,
     /// 1行の仮 layout に入らない。
     TooLong,
-    /// 固定候補に無い文字。表示を途中で切らず、全体を拒否する。
+    /// 収録していない文字。表示を途中で切らず、全体を拒否する。
     MissingGlyph(char),
     /// 暫定の表示時間上限を超えた、または0である。
     Duration,
@@ -56,7 +56,7 @@ pub struct GlyphCell {
 /// 1行の配置。文字列は保持せず、静的 glyph table の index だけを固定長配列に入れる。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TextLayout {
-    indices: [u8; MAX_TEXT_CHARS],
+    indices: [u16; MAX_TEXT_CHARS],
     len: usize,
     start_x: u16,
 }
@@ -74,10 +74,10 @@ impl TextLayout {
             if len == MAX_TEXT_CHARS {
                 return Err(TextError::TooLong);
             }
-            let Some(index) = glyphs::GLYPHS.iter().position(|(c, _)| *c == char) else {
-                return Err(TextError::MissingGlyph(char));
-            };
-            indices[len] = u8::try_from(index).map_err(|_| TextError::MissingGlyph(char))?;
+            let index = glyphs::GLYPHS
+                .binary_search_by_key(&char, |(c, _)| *c)
+                .map_err(|_| TextError::MissingGlyph(char))?;
+            indices[len] = u16::try_from(index).map_err(|_| TextError::MissingGlyph(char))?;
             len += 1;
         }
         if len == 0 {
@@ -212,6 +212,29 @@ mod tests {
             Err(TextError::MissingGlyph('🐈'))
         );
         assert_eq!(TextError::MissingGlyph('🐈').code(), ErrorCode::OutOfRange);
+    }
+
+    #[test]
+    fn expanded_table_is_sorted_and_reaches_beyond_u8_indices() {
+        assert!(glyphs::GLYPHS.len() > usize::from(u8::MAX));
+        assert!(glyphs::GLYPHS.windows(2).all(|pair| pair[0].0 < pair[1].0));
+        for (character, _) in [glyphs::GLYPHS[256], *glyphs::GLYPHS.last().unwrap()] {
+            let layout = TextLayout::new(&character.to_string()).unwrap();
+            assert_eq!(
+                layout.cell(0).unwrap().rows,
+                glyphs::GLYPHS[glyphs::GLYPHS
+                    .binary_search_by_key(&character, |(c, _)| *c)
+                    .unwrap()]
+                .1
+            );
+        }
+    }
+
+    #[test]
+    fn kana_kanji_punctuation_and_ascii_are_displayable() {
+        let layout = TextLayout::new("猫、こんにちは！").unwrap();
+        assert_eq!(layout.len(), 8);
+        assert!(TextLayout::new("Cat 123").is_ok());
     }
 
     #[test]
