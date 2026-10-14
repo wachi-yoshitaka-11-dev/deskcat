@@ -16,9 +16,9 @@
 
 Issue #5 でtoolchainを固定し、最小projectのclean buildを確認した。既定の製品build（featureなし）は、Pi link、heartbeat／health snapshot、`ACCEL-01`／`ENV-01`のID読み出し、LCDの表情描画、ADXL345のtap検出を1つのmain loopで扱う（#487）。表情とtapの動作は、それぞれ`face-21`と`tap-21`の試験buildから製品経路へ接続した。列挙した試験featureを指定すると試験構成を選び、従来の`tap-21,face-21,bringup-display-13`のデモを含め、各featureが有効にするI/Oは従来どおりである。`bringup-i2c-15-16`は、以前のfeatureなしbuildと同じ、LCDに触れないセンサー単体試験である。構成の一覧は`src/main.rs`のmodule doc「buildの構成」節が持つ。
 
-LCDのpinは`docs/hardware/gpio-assignment.md`の`信号inventory`が正本である。製品buildと`face-21`試験buildはLCDを初期化し、backlightを点けたまま`set_expression`の表情を描く。Pi commandを受けなくても、描ける状態になった時点で`neutral`を1回描く。`bringup-display-13`試験buildは単色fillと四隅patternを1段ずつ描く（`src/display_test.rs`）。その試験のflash・通電・目視結果は`docs/hardware/experiment-log.md`の`EXP-016`〜`EXP-018`にあるが、現在の段階描画経路と製品経路は実機で確認していない。`ACCEL-01`／`ENV-01`のID読み出しは既存のI2C driverを使う。製品buildと`tap-21`試験buildは、ADXL345のIDが一致した場合だけ設定を書き、tapを検出する。`SERVO-PWM`、`ADC-*`、`TOUCH-*`は製品buildでは駆動しない。servoの安全gateは[servo-safety-limits.md](../../docs/hardware/servo-safety-limits.md)が持ち、`bench-servo-test-17`試験buildは#474の`compile_error!`で止まる。製品buildの通電手順は未確定であり、下の「build構成と通電」の表で通電可能とは扱わない。
+LCDのpinは`docs/hardware/gpio-assignment.md`の`信号inventory`が正本である。製品buildと`face-21`試験buildはLCDを初期化し、backlightを点けたまま`set_expression`の表情を描く。Pi commandを受けなくても、描ける状態になった時点で`neutral`を1回描く。`bringup-display-13`試験buildは単色fillと四隅patternを1段ずつ描く（`src/display_test.rs`）。その試験のflash・通電・目視結果は`docs/hardware/experiment-log.md`の`EXP-016`〜`EXP-018`にあるが、現在の段階描画経路と製品経路は実機で確認していない。`ACCEL-01`／`ENV-01`のID読み出しは既存のI2C driverを使う。製品buildと`tap-21`試験buildは、ADXL345のIDが一致した場合だけ設定を書き、tapを検出する。`SERVO-PWM`、`ADC-*`、`TOUCH-*`は製品buildでは駆動しない。servoの安全gateは[servo-safety-limits.md](../../docs/hardware/servo-safety-limits.md)が持つ。製品buildの通電手順は未確定であり、下の「build構成と通電」の表で通電可能とは扱わない。
 
-`crate::led`（[#514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)）は`LED-COMM`（GPIO2）と`LED-REACT`（GPIO5）を駆動する。**既定buildはこの2本に触れない。**`bringup-led-514` featureを付けた試験buildだけが、起動時に両pinを消灯側へ設定し、点灯試験（赤→白→両方）の後に白を点滅させる。`bringup-display-13`とも組み合わせられる（`bench-servo-test-17`は#474の`compile_error!`のため対象外）。通信状態による白の点灯と、`happy`による赤の点灯はまだ無い。配線と試験の手順は[led-514-demo.md](../../docs/hardware/led-514-demo.md)が持つ。実機での点灯の観察は[EXP-025](../../docs/hardware/experiment-log.md#exp-025-追加ledの点灯試験赤だけ白だけ両方)にある。
+`crate::led`（[#514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)）は`LED-COMM`（GPIO2）と`LED-REACT`（GPIO5）を駆動する。**既定buildはこの2本に触れない。**`bringup-led-514` featureを付けた試験buildだけが、起動時に両pinを消灯側へ設定し、点灯試験（赤→白→両方）の後に白を点滅させる。`bringup-display-13`とも組み合わせられる。通信状態による白の点灯と、`happy`による赤の点灯はまだ無い。配線と試験の手順は[led-514-demo.md](../../docs/hardware/led-514-demo.md)が持つ。実機での点灯の観察は[EXP-025](../../docs/hardware/experiment-log.md#exp-025-追加ledの点灯試験赤だけ白だけ両方)にある。
 
 heartbeat と health snapshot は、いずれのbuildでもloopが動き続け、ESP logger の log にのみ出す（どのbuildでも出る。[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)より前の`pi-protocol-mode`はloggingを止めており、出力されなかった。`src/console.rs`参照）。**「log へ出す」は「serial へ出ない」ではない。**logger の出力は UART0（USB）を通って serial monitor に現れる。送らないのは、protocol の message として application の serial link（#11）へ流すことである。周期は `src/config.rs` が持ち、**いずれも暫定値である**（Protocol §5.7 が heartbeat の interval を `TBD` としているため、一次資料の根拠が無い）。health snapshot は `crates/deskcat-protocol` の `Status` を組み立てて JSON 1 行として出す。**`ProtocolCounters` はすべて 0 のままである。**いずれのbuildにも`ProtocolCounters`を増やす経路が無いためである（`src/health.rs`のmodule doc参照）。
 
@@ -69,7 +69,7 @@ deskcat-tap = { path = "../../crates/deskcat-tap" }
 - `crates/deskcat-protocol/**`、`crates/deskcat-servo/**`、`crates/deskcat-face/**`、`crates/deskcat-tap/**`の変更でも
   `.github/workflows/firmware.yml`が発火する。
   host側だけの変更でfirmware buildが壊れるのを検知するためである。
-- compileできるbuildで、`src/servo.rs`を通って角度を出せるのは、同fileの`LimitedServo`だけである。
+- `bench-servo-test-17`付きのbuildを除くbuildで、`src/servo.rs`を通って角度を出せるのは、同fileの`LimitedServo`だけである。`bench-servo-test-17`付きのbuildは、`Sg90::move_to_angle_once`でlimiterを通らずに1回動かす（`src/servo.rs`のmodule docの例外段落）。
   `Sg90`と`deskcat-servo`の`Limiter`を1つずつ所有し、`Limiter`も`Setpoint`も受理済みのtargetも
   外から受け取らず、`tick`の間隔を自分で測る。**成立の条件**（`bench-servo-test-17`の経路を除く、
   `LedcDriver`を直接作る経路は型では止められない、`unsafe`を使わない）は同fileのmodule docにある。
