@@ -21,14 +21,16 @@
 //! 終了時にcounterを1行ずつ出す。**device名は出力しない。**
 
 use std::io::Write as _;
+use std::path::PathBuf;
 use std::process::ExitCode;
 use std::time::Instant;
 
 use deskcat_domain::{Millis, Mind, Timing};
 use deskcat_serial::{PeerSession, SerialConfig, SerialDevice, Session};
 use deskcatd::cli::{self, Parsed};
+use deskcatd::cloud_speech::{ClaudeClient, CloudSpeech, Failure};
 use deskcatd::daemon::{Daemon, EXIT_FATAL, EXIT_SESSION_REDO, Identity};
-use deskcatd::runner::run_loop_with_speech;
+use deskcatd::runner::run_loop_with_cloud;
 use deskcatd::sid::sid_from_os;
 use deskcatd::watchdog::StartupWatchdog;
 
@@ -110,12 +112,34 @@ fn main() -> ExitCode {
     );
     daemon.on_connected();
 
-    let end = run_loop_with_speech(
+    // unitは既定で--cloud-speechを渡さない。credentialが欠ければローカルだけで続ける。
+    let cloud = if args.cloud_speech {
+        let started = std::env::var_os("CREDENTIALS_DIRECTORY")
+            .ok_or(Failure::Credential)
+            .and_then(|path| ClaudeClient::from_credential_dir(&PathBuf::from(path)))
+            .and_then(|client| {
+                CloudSpeech::start(
+                    client,
+                    PathBuf::from("/var/lib/deskcatd/cloud-speech-budget.json"),
+                )
+            });
+        match started {
+            Ok(worker) => Some(worker),
+            Err(kind) => {
+                log::warn!("cloud_speech: {kind:?} count=1; local fallback");
+                None
+            }
+        }
+    } else {
+        None
+    };
+    let end = run_loop_with_cloud(
         &mut daemon,
         &mut device,
         || uptime_ms(started),
         StartupWatchdog::new(args.startup_deadline_ms.get()),
         args.speech,
+        cloud,
     );
 
     log::info!("終了する: {end:?}");
@@ -147,11 +171,16 @@ mod logger {
     struct Stderr;
 
     impl log::Log for Stderr {
-        fn enabled(&self, _metadata: &log::Metadata<'_>) -> bool {
-            true
+        fn enabled(&self, metadata: &log::Metadata<'_>) -> bool {
+            // HTTP依存のtargetは将来増えうる。DeskCat自身のlogだけを許す。
+            // ureqのTRACEは非redactなので、global levelを変えても記録させない。
+            metadata.target().starts_with("deskcat")
         }
 
         fn log(&self, record: &log::Record<'_>) {
+            if !self.enabled(record.metadata()) {
+                return;
+            }
             let mut err = std::io::stderr().lock();
             if writeln!(err, "[{:5}] {}", record.level(), record.args()).is_err() {
                 WRITE_FAILURES.fetch_add(1, Ordering::Relaxed);
@@ -176,5 +205,26 @@ mod logger {
         log::set_logger(&LOGGER)?;
         log::set_max_level(level);
         Ok(())
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn only_deskcat_logs_can_reach_stderr() {
+            for target in ["ureq::run", "ureq_proto::client", "native_tls", "openssl"] {
+                let metadata = log::Metadata::builder()
+                    .target(target)
+                    .level(log::Level::Trace)
+                    .build();
+                assert!(!log::Log::enabled(&LOGGER, &metadata));
+            }
+            let own = log::Metadata::builder()
+                .target("deskcatd::cloud_speech")
+                .level(log::Level::Warn)
+                .build();
+            assert!(log::Log::enabled(&LOGGER, &own));
+        }
     }
 }

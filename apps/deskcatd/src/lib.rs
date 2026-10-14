@@ -20,6 +20,7 @@
 //! - Pi実機での確認（#11の後半）
 
 pub mod cli;
+pub mod cloud_speech;
 pub mod daemon;
 pub mod disposition;
 pub mod expression_sync;

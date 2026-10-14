@@ -6,6 +6,7 @@
 use std::collections::VecDeque;
 use std::io;
 use std::num::NonZeroU64;
+use std::time::Duration;
 
 use deskcat_domain::{LOCAL_SPEECH_LINES, Millis, Mind, Timing};
 use deskcat_protocol::{
@@ -13,8 +14,9 @@ use deskcat_protocol::{
     ServoStatus, Status, decode_line, encode_line, limits,
 };
 use deskcat_serial::{DuplicatePolicy, PeerSession, SerialConfig, Session, Transport};
+use deskcatd::cloud_speech::{Client, CloudSpeech, Context, Failure};
 use deskcatd::daemon::{Daemon, EXIT_SESSION_REDO, ExitReason, Identity, Step};
-use deskcatd::runner::{RunEnd, SpeechConfig, run_loop, run_loop_with_speech};
+use deskcatd::runner::{RunEnd, SpeechConfig, run_loop, run_loop_with_cloud, run_loop_with_speech};
 use deskcatd::watchdog::StartupWatchdog;
 
 const PI_SID: u32 = 1000;
@@ -265,6 +267,65 @@ fn runner_uses_local_speech_only_with_explicit_config() {
         matches!(&frames[0].message, Message::ShowText(text) if text.text == LOCAL_SPEECH_LINES[0] && text.duration_ms == 500)
     );
     assert_eq!(d.counters().show_text_sent, 1);
+}
+
+struct StubClaude {
+    result: Result<String, Failure>,
+}
+
+impl Client for StubClaude {
+    fn count_tokens(&mut self, _: Context) -> Result<u32, Failure> {
+        std::thread::sleep(Duration::from_millis(20));
+        Ok(20)
+    }
+
+    fn generate(&mut self, _: Context) -> Result<String, Failure> {
+        self.result.clone()
+    }
+}
+
+#[test]
+fn cloud_worker_keeps_uart_running_and_failure_shows_local_line() {
+    let (mut d, mut t) = ready();
+    t.eof_after_idle_reads = Some(100);
+    let dir =
+        std::env::temp_dir().join(format!("deskcat-runner-cloud-test-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).expect("test dir");
+    let worker = CloudSpeech::start(
+        StubClaude {
+            result: Err(Failure::Timeout),
+        },
+        dir.join("budget.json"),
+    )
+    .expect("worker");
+    let config = SpeechConfig {
+        min_interval_ms: NonZeroU64::new(60_000).expect("nonzero"),
+        duration_ms: 500,
+    };
+    let mut now = 100;
+    let end = run_loop_with_cloud(
+        &mut d,
+        &mut t,
+        || {
+            std::thread::sleep(Duration::from_millis(1));
+            now += 1;
+            now
+        },
+        StartupWatchdog::new(1_000),
+        Some(config),
+        Some(worker),
+    );
+    assert_eq!(end, RunEnd::Exited(ExitReason::LinkLost));
+    let frames: Vec<_> = String::from_utf8(t.written)
+        .expect("UTF-8")
+        .lines()
+        .map(|line| decode_line(line).expect("frame"))
+        .collect();
+    assert!(t.idle_reads > 2, "HTTPを待つ間もUARTを回す");
+    assert!(
+        matches!(&frames[0].message, Message::ShowText(text) if text.text == LOCAL_SPEECH_LINES[0])
+    );
+    std::fs::remove_dir_all(dir).expect("cleanup");
 }
 
 #[test]

@@ -15,6 +15,14 @@ User=deskcatd
 Group=deskcatd
 SupplementaryGroups=dialout
 NoNewPrivileges=yes
+LimitCORE=0
+UMask=0077
+# systemdがroot-only sourceからサービス専用のread-only credentialへコピーする。
+# 空のfallbackによりfile未設置でもserviceを起動できる（クラウドはoff）。
+LoadCredential=anthropic-api-key:/etc/deskcatd/anthropic-api-key
+SetCredential=anthropic-api-key:
+StateDirectory=deskcatd
+StateDirectoryMode=0700
 # port と baud は未確認の値なので、ここに書かない（baud: `PROTO-TBD-001`）。
 EnvironmentFile=/etc/deskcatd/deskcatd.env
 # 起動の期限: 暫定。根拠なし。duplicate履歴: 暫定。根拠なし（`PROTO-TBD-005`）。

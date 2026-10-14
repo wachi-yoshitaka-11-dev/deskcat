@@ -18,7 +18,7 @@ use deskcat_serial::DuplicatePolicy;
 /// 使い方。
 pub const USAGE: &str = "usage: deskcatd --port <path> --baud <rate> \
 --duplicate-capacity <n> --duplicate-retention-ms <ms> --startup-deadline-ms <ms> \
-[--speech-min-interval-ms <ms> --speech-duration-ms <ms>] [--verbose]\n\
+[--speech-min-interval-ms <ms> --speech-duration-ms <ms>] [--cloud-speech] [--verbose]\n\
 \n\
 --port、--baud、--duplicate-capacity、--duplicate-retention-ms、--startup-deadline-ms は必須である。\
 既定値を持たせない。\n\
@@ -38,6 +38,8 @@ pub struct Args {
     pub startup_deadline_ms: NonZeroU64,
     /// 両方の引数がある場合だけ独り言を出す。運用値の既定は無い。
     pub speech: Option<crate::runner::SpeechConfig>,
+    /// 明示した場合だけクラウド経路を試す。credentialが無ければローカルだけ。
+    pub cloud_speech: bool,
     /// `Debug`まで出す。
     pub verbose: bool,
 }
@@ -113,6 +115,7 @@ where
     let mut speech_min_interval_ms = None;
     let mut speech_duration_ms = None;
     let mut verbose = false;
+    let mut cloud_speech = false;
     let mut argv = raw.into_iter();
 
     while let Some(flag) = argv.next() {
@@ -138,6 +141,7 @@ where
                 speech_duration_ms = Some(number::<u32>("--speech-duration-ms", &value()?)?);
             }
             "--verbose" => verbose = true,
+            "--cloud-speech" => cloud_speech = true,
             "-h" | "--help" => return Ok(Parsed::Help),
             other => return Err(CliError::Unknown(other.to_owned())),
         }
@@ -174,6 +178,26 @@ where
         (None, Some(_)) => return Err(CliError::Missing("--speech-min-interval-ms")),
         (Some(_), None) => return Err(CliError::Missing("--speech-duration-ms")),
     };
+    if cloud_speech && speech.is_none() {
+        return Err(CliError::Missing(
+            "--speech-min-interval-ms/--speech-duration-ms",
+        ));
+    }
+    if cloud_speech
+        && let Some(config) = speech
+        && (config.min_interval_ms.get() < crate::cloud_speech::MIN_INTERVAL_SECS * 1000
+            || config.duration_ms == 0
+            || config.duration_ms > deskcat_face::text::MAX_TEXT_DURATION_MS)
+    {
+        return Err(CliError::Invalid {
+            flag: "--cloud-speech",
+            reason: format!(
+                "間隔は{}ms以上、表示時間は1..={}msが必要",
+                crate::cloud_speech::MIN_INTERVAL_SECS * 1000,
+                deskcat_face::text::MAX_TEXT_DURATION_MS
+            ),
+        });
+    }
 
     Ok(Parsed::Run(Box::new(Args {
         port: port.ok_or(CliError::Missing("--port"))?,
@@ -181,6 +205,7 @@ where
         duplicate_policy,
         startup_deadline_ms,
         speech,
+        cloud_speech,
         verbose,
     })))
 }
@@ -230,6 +255,7 @@ mod tests {
         assert_eq!(args.baud, 115_200);
         assert_eq!(args.startup_deadline_ms.get(), 5000);
         assert_eq!(args.speech, None);
+        assert!(!args.cloud_speech);
         assert!(!args.verbose);
     }
 
@@ -241,6 +267,46 @@ mod tests {
             panic!("実行になる");
         };
         assert!(args.verbose);
+    }
+
+    #[test]
+    fn cloud_requires_explicit_local_speech_config() {
+        let mut v = ALL.to_vec();
+        v.push("--cloud-speech");
+        assert_eq!(
+            run(&v),
+            Err(CliError::Missing(
+                "--speech-min-interval-ms/--speech-duration-ms"
+            ))
+        );
+        v.extend([
+            "--speech-min-interval-ms",
+            "60000",
+            "--speech-duration-ms",
+            "3000",
+        ]);
+        let Ok(Parsed::Run(args)) = run(&v) else {
+            panic!("有効な設定");
+        };
+        assert!(args.cloud_speech);
+        let last = v.len() - 3;
+        v[last] = "1000";
+        assert!(matches!(
+            run(&v),
+            Err(CliError::Invalid {
+                flag: "--cloud-speech",
+                ..
+            })
+        ));
+        v[last] = "60000";
+        *v.last_mut().expect("duration") = "0";
+        assert!(matches!(
+            run(&v),
+            Err(CliError::Invalid {
+                flag: "--cloud-speech",
+                ..
+            })
+        ));
     }
 
     #[test]
