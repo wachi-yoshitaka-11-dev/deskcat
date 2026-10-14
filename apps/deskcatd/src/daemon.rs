@@ -186,7 +186,7 @@
 //!
 //! [#491の決定]: https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/491#issuecomment-5965360345
 
-use deskcat_domain::{ContactEvent, Millis, Mind, Reaction};
+use deskcat_domain::{ContactEvent, Expression, Millis, Mind, Reaction};
 use deskcat_protocol::{
     AckStatus, ErrorCode, Frame, Hello, HelloReason, Message, Outcome, SetExpression, ShowText,
 };
@@ -348,7 +348,7 @@ pub struct Daemon {
     sync: ExpressionSync,
     identity: Identity,
     counters: DaemonCounters,
-    speech_pending: Option<(&'static str, u32, NonZeroU64)>,
+    speech_pending: Option<(String, u32, NonZeroU64)>,
     speech_in_flight: Option<u32>,
     last_speech_sent_at: Option<u64>,
     speech_disabled: bool,
@@ -459,15 +459,21 @@ impl Daemon {
             && !self.speech_disabled
     }
 
+    /// クラウドへ渡せる感情enumだけを返す。入力eventや識別子は渡さない。
+    #[must_use]
+    pub const fn speech_expression(&self) -> Expression {
+        self.mind.expression()
+    }
+
     /// runnerが選んだ候補を次の`step`へ渡す。
     pub fn queue_speech(
         &mut self,
-        text: &'static str,
+        text: impl Into<String>,
         duration_ms: u32,
         min_interval_ms: NonZeroU64,
     ) {
         if self.speech_ready() {
-            self.speech_pending = Some((text, duration_ms, min_interval_ms));
+            self.speech_pending = Some((text.into(), duration_ms, min_interval_ms));
         }
     }
 
@@ -951,7 +957,7 @@ impl Daemon {
     }
 
     fn send_speech(&mut self, now_ms: u64) {
-        let Some((text, duration_ms, min_interval_ms)) = self.speech_pending else {
+        let Some((ref text, duration_ms, min_interval_ms)) = self.speech_pending else {
             return;
         };
         if !self.startup_complete() || !self.sync.is_ready() || self.speech_disabled {

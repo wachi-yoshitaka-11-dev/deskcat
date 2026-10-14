@@ -2,6 +2,26 @@
 
 Raspberry Pi用serviceとinstall用artifactをこのディレクトリに置く。
 
+## #522 クラウド独り言の有効化条件（未実施）
+
+現行のunitはクラウド独り言を起動しない。`--cloud-speech`を追加する前に、
+Pi Zero W上で`deskcatd`とHTTPSを確認し、#23のローカル独り言を表示できること、
+非DefaultのAnthropic Workspaceに月額`$2`の上限が設定され、専用キーがその
+Workspaceだけで使えることを人間が確認する（[ADR-0026](../docs/decisions/0026-cloud-speech-generation.md)）。
+元のキーはPiの`/etc/deskcatd/anthropic-api-key`へroot所有・mode `0600`で置く。
+unitの`LoadCredential=`がサービスへ渡し、欠けた場合は空の`SetCredential=`へ戻る。
+キーの値をunit、環境file、CLI引数、log、repositoryへ書かない。
+予算の記録は`StateDirectory=deskcatd`が作る`/var/lib/deskcatd`へ保存する。
+予算fileの読書きに失敗した場合はクラウドへ送らず、ローカル独り言を使う。
+
+既定の`ExecStart`は独り言そのものもoffのままである。表示の実機確認を終えた後、
+ローカル独り言の2引数を先に有効化する。上のクラウドの有効化条件をすべて
+確認した後だけ`--cloud-speech`を追加する。サービスの詳細logでもキーを
+出さないよう、`deskcatd`はHTTPライブラリのlogを抑止する。
+キーの漏洩が疑われる場合はクラウド経路を無効にし、その専用キーをAnthropic側で
+失効させてWorkspaceの使用量を確認する。再発行後も、Workspaceのscopeと月額上限を
+確認してからPiへ置き直す。キーの値はIssueやPRの報告にも載せない。
+
 置いたもの（Issue #491 段階2b-iii）:
 
 - `systemd/deskcatd.service`（port と baud を除く値は暫定で、根拠は無い）、`systemd/deskcatd.env.example`
