@@ -36,6 +36,7 @@
 | [ADR-0023](0023-no-model-checking-for-now.md) | Accepted | サーボ安全制限と通信断の状態機械へ、いまモデル検査を導入しない |
 | [ADR-0024](0024-terminology-index-in-single-source-of-truth.md) | Accepted | 用語の索引を、既存の Single Source of Truth 表へ追加する形で置く |
 | [ADR-0025](0025-coderabbit-rate-limit-retry.md) | Accepted | CodeRabbitの事前残数確認を外し、枠切れ後の再依頼を定める |
+| [ADR-0026](0026-cloud-speech-generation.md) | Accepted | 独り言のクラウド生成を表示可能な文字と費用上限の内側で行う |
 
 ## 新規作成
 
