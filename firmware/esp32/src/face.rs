@@ -29,6 +29,8 @@
 // moduleごと`#[cfg]`で落とさず、各試験buildでもcross-compileを確認する。
 #![allow(dead_code)]
 
+use std::time::Instant;
+
 use deskcat_face::{
     color,
     text::{TextError, TextLayout, TextPresentation},
@@ -108,6 +110,7 @@ pub struct FaceDrawer<'d> {
     text: Option<TextLayout>,
     text_clear_y: u16,
     text_next_index: usize,
+    text_started_at: Option<Instant>,
     presentation: TextPresentation,
     text_counters: TextCounters,
 }
@@ -131,6 +134,7 @@ impl<'d> FaceDrawer<'d> {
             text: None,
             text_clear_y: 0,
             text_next_index: 0,
+            text_started_at: None,
             presentation: TextPresentation::new(),
             text_counters: TextCounters::default(),
         }
@@ -170,6 +174,7 @@ impl<'d> FaceDrawer<'d> {
         self.text = Some(layout);
         self.text_clear_y = 0;
         self.text_next_index = 0;
+        self.text_started_at = Some(Instant::now());
         log::info!(
             "text_show chars={} duration_ms={duration_ms}",
             text.chars().count()
@@ -216,6 +221,7 @@ impl<'d> FaceDrawer<'d> {
     pub fn poll(&mut self, now_ms: u64) {
         if let Some(name) = self.presentation.expire(now_ms) {
             self.text = None;
+            self.text_started_at = None;
             self.painter = Painter::new(name, FACE_BAND_ROWS);
             log::info!("text_expired_restore_face name={name:?}");
         }
@@ -240,6 +246,15 @@ impl<'d> FaceDrawer<'d> {
                     self.text_draw_failed("glyph", err);
                 } else {
                     self.text_next_index += 1;
+                    if self.text_next_index == layout.len() {
+                        if let Some(started_at) = self.text_started_at.take() {
+                            log::info!(
+                                "text_drawn chars={} accept_to_draw_ms={}",
+                                layout.len(),
+                                started_at.elapsed().as_millis()
+                            );
+                        }
+                    }
                 }
                 return;
             }
@@ -265,6 +280,7 @@ impl<'d> FaceDrawer<'d> {
         self.text_counters.draw_failed = self.text_counters.draw_failed.saturating_add(1);
         log::error!("text_draw_failed step={step} error={err}");
         self.text = None;
+        self.text_started_at = None;
         if let Some(name) = self.presentation.cancel() {
             self.painter = Painter::new(name, FACE_BAND_ROWS);
         }
