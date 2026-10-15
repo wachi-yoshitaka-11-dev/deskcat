@@ -101,7 +101,7 @@ impl Counters {
 pub struct Context {
     /// 現在の表情。センサ生値は含めない。
     pub expression: Expression,
-    /// UTCの時刻帯。0: 深夜、1: 朝、2: 昼、3: 夜。
+    /// 日本時間（UTC+9）の時刻帯。0: 深夜、1: 朝、2: 昼、3: 夜。
     pub time_band: Option<u8>,
 }
 
@@ -123,14 +123,18 @@ impl Context {
     }
 }
 
-/// UTC時刻を取得できるときだけ時刻帯を返す。料金の日付判定は別に行う。
+/// 時刻帯を決めるときにUTCへ足す秒数。DeskCatは日本で使うため、日本時間（UTC+9、夏時間なし）に固定する。
+/// 料金の日付判定（予算file）はUTCの日のまま変えない。
+const TIME_BAND_UTC_OFFSET_SECS: u64 = 9 * 3600;
+
+/// 時計が有効なときだけ、日本時間の時刻帯を返す。料金の日付判定は別に行う。
 #[must_use]
 pub fn time_band(now: SystemTime) -> Option<u8> {
     let secs = now.duration_since(UNIX_EPOCH).ok()?.as_secs();
     if secs < MIN_VALID_UNIX_SECS {
         return None;
     }
-    let hour = (secs % 86_400) / 3600;
+    let hour = ((secs + TIME_BAND_UTC_OFFSET_SECS) % 86_400) / 3600;
     Some(match hour {
         0..=5 => 0,
         6..=11 => 1,
@@ -540,6 +544,35 @@ impl CloudSpeech {
 mod tests {
     use super::*;
     use std::sync::{Arc, Mutex};
+
+    /// UTCの日の始まり（2026-10-14T00:00:00Z）。時計が有効な範囲にある。
+    const UTC_MIDNIGHT: u64 = 1_791_936_000;
+
+    fn band_at_utc(secs: u64) -> Option<u8> {
+        time_band(UNIX_EPOCH + Duration::from_secs(secs))
+    }
+
+    #[test]
+    fn time_band_uses_japan_time_at_each_boundary() {
+        // JSTの0時・6時・12時・18時は、UTCの15時・21時・3時・9時にあたる。
+        for (jst_hour, before, after) in [(0, 3, 0), (6, 0, 1), (12, 1, 2), (18, 2, 3)] {
+            let utc_hour = (jst_hour + 24 - 9) % 24;
+            let at = UTC_MIDNIGHT + utc_hour * 3600;
+            assert_eq!(band_at_utc(at - 1), Some(before), "JST {jst_hour}時の直前");
+            assert_eq!(band_at_utc(at), Some(after), "JST {jst_hour}時");
+        }
+    }
+
+    #[test]
+    fn time_band_reports_afternoon_not_morning_at_utc_six() {
+        // UTC 06:00 は JST 15:00。CodeRabbitが#599で示した、朝と送ってしまう時刻。
+        assert_eq!(band_at_utc(UTC_MIDNIGHT + 6 * 3600), Some(2));
+    }
+
+    #[test]
+    fn time_band_is_omitted_before_the_clock_is_valid() {
+        assert_eq!(band_at_utc(MIN_VALID_UNIX_SECS - 1), None);
+    }
 
     struct Fake {
         calls: Arc<Mutex<Vec<&'static str>>>,
