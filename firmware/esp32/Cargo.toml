@@ -29,8 +29,7 @@ bringup-i2c-15-16 = []
 # **このfeature付きbuildはPi linkを持たない。**同文書の`測定のための駆動（承認の状態の項目6）`節が、
 # 測定用のbuildは「Piとの通信linkを持たない」と定めているためである。#487でfeatureの排他をやめた
 # ときの、ただ1つの例外である（featureどうしの排他ではない。このbuildはPi linkを外すだけであり、
-# `bringup-display-13`と組み合わせることは禁じていない）。
-# **#474で、このfeatureは有効にするとcompileが止まる**（`main.rs`の`compile_error!`）。
+# `bringup-display-13`と組み合わせることは禁じていない。ただしPi linkで`tapped`を送る`tap-21`とは併用できず、`main.rs`の`compile_error!`で止める）。
 bench-servo-test-17 = []
 # Issue #13の`DISP-01`（MSP2807）bring-up（初期化、backlight点灯、単色fill、
 # 四隅pattern）の試験構成を選ぶ。このfeatureだけを指定したbuildは表情とtapを有効にしない。
@@ -66,7 +65,7 @@ opt-level = "z"
 # lockfileは`firmware/esp32/Cargo.lock`とroot `Cargo.lock`の2つに分かれたままでよい。
 deskcat-protocol = { path = "../../crates/deskcat-protocol" }
 # servoのhard limitとtrajectory limitingを、hostと同じ実装で強制する（ADR-0008の追記、#19）。
-# compileできるbuildで、`crate::servo`を通って角度を出せるのは、`Sg90`とこのcrateの`Limiter`を
+# `bench-servo-test-17`付きのbuildを除くbuildで、`crate::servo`を通って角度を出せるのは、`Sg90`とこのcrateの`Limiter`を
 # 1つずつ所有する`crate::servo::LimitedServo`だけである（成立の条件は`src/servo.rs`のmodule doc）。
 deskcat-servo = { path = "../../crates/deskcat-servo" }
 # `set_expression`の3表情の図形と、受理の判定の順序（#21）。LCDもSPIも知らず、hostでtestできる。

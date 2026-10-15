@@ -86,7 +86,7 @@ ESP32 boardの`3V3` pinから外部負荷を取ること（段階B-2a）は、[H
 
 ## 点灯試験用のfirmware
 
-`firmware/esp32`の`bringup-led-514` featureを付けたbuildだけがGPIO2／GPIO5を駆動する。既定buildは両pinに触れない。`bringup-display-13`とも組み合わせられる（`bench-servo-test-17`は#474で`compile_error!`のため対象外）。build commandの正本は[検証済みコマンド](../toolchains/verified-commands.md)である。
+`firmware/esp32`の`bringup-led-514` featureを付けたbuildだけがGPIO2／GPIO5を駆動する。既定buildは両pinに触れない。`bringup-display-13`とも組み合わせられる。build commandの正本は[検証済みコマンド](../toolchains/verified-commands.md)である。
 
 1. `Peripherals::take()`の直後に両pinを出力にし、消灯側（Low）へ設定する。**向きの設定と消灯levelの設定の間に、出力registerの値が一瞬出る。その値が点灯側（High）か消灯側かも、長さも確かめていない。**[Hardware Safety Policy](../governance/hardware-safety-policy.md)の§4は「output modeへ切り替える前に、安全な初期出力を定義する」とする。esp-idf-halの`PinDriver`は向きを先に設定する。`unsafe`を使わずにこの区間を無くす方法は見つけていない（試していない）。電流は`R`で制限される。この点は、上の`3V3 pinへ負荷を足す条件`の残余riskに挙げた。
 2. 起動時のbring-upが終わった時刻（`main.rs`の`bringup_done_ms`）から、赤だけ→白だけ→両方を10秒ずつ点ける（点灯試験）。その後のPi linkのUART初期化と`boot`送信の分だけ、最初の区間が短くなる。`bringup-display-13`付きbuildでは、LCDの描画とI2Cのbring-upがmain loopの中で進み、点灯試験はそれと並行して進む。
@@ -96,7 +96,7 @@ UART0のlogには、区間が変わるたびに`led phase=<lamp_red|lamp_white|l
 
 **build端末と書き込み。**buildはESP32 Build profile（build-only）で、Hyper-V上のLinux VM（`systemd-detect-virt`＝`microsoft`）で行う。**この作業端末にはUSB deviceが無く、flashできない。**flashと実機試験は、USBを使える実機LinuxのESP32 Flash / HIL端末で行う（[Machine Profiles](../toolchains/machine-profiles.md)）。
 
-**検証の記録。**develop `e7ae286`（#487のB1・B2、#532、#534、#518、#535、#536、#539、#540、#537、#543、#541の後）を取り込んだ、firmwareがこの文書と同じ版のtreeで、`cargo fmt --all -- --check`と、`cargo clippy --all-targets --locked -- -D warnings`／`cargo build --locked`を既定、`bringup-led-514`、`bringup-display-13,bringup-led-514`の3構成で実行し、すべて成功した。**main checkoutの`.embuild`（ESP-IDF一式）と、前の複製の`target`のcacheを使ったbuildであり、clean buildではない。Version Recordは作っていない。**`bench-servo-test-17`は#474の`compile_error!`のため対象外である。点灯試験と点滅の時刻計算（`outputs_at`／`next_change_ms`）は、repository外の使い捨てのtestで確かめた（firmware crateはhostでtestを走らせる仕組みを持たない）。**この検証の記録の時点では、flashと実機起動はしていない。**2026-10-12の書き込みと起動は[EXP-025](experiment-log.md#exp-025-追加ledの点灯試験赤だけ白だけ両方)にある。
+**検証の記録。**develop `e7ae286`（#487のB1・B2、#532、#534、#518、#535、#536、#539、#540、#537、#543、#541の後）を取り込んだ、firmwareがこの文書と同じ版のtreeで、`cargo fmt --all -- --check`と、`cargo clippy --all-targets --locked -- -D warnings`／`cargo build --locked`を既定、`bringup-led-514`、`bringup-display-13,bringup-led-514`の3構成で実行し、すべて成功した。**main checkoutの`.embuild`（ESP-IDF一式）と、前の複製の`target`のcacheを使ったbuildであり、clean buildではない。Version Recordは作っていない。**`bench-servo-test-17`は、当時は#474の`compile_error!`のため対象外だった。点灯試験と点滅の時刻計算（`outputs_at`／`next_change_ms`）は、repository外の使い捨てのtestで確かめた（firmware crateはhostでtestを走らせる仕組みを持たない）。**この検証の記録の時点では、flashと実機起動はしていない。**2026-10-12の書き込みと起動は[EXP-025](experiment-log.md#exp-025-追加ledの点灯試験赤だけ白だけ両方)にある。
 
 **実機の記録（2026-10-12）。**赤だけ・白だけ・両方の点灯試験の条件、観察、計測しなかった項目は[EXP-025](experiment-log.md#exp-025-追加ledの点灯試験赤だけ白だけ両方)にある。書き込みと各回の通電の承認の記録は[#514のコメント](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514#issuecomment-6125689974)にある。
 

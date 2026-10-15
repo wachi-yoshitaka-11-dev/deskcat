@@ -1,0 +1,358 @@
+{
+  "version": 1,
+  "author": "DeskCat",
+  "editor": "wokwi",
+  "parts": [
+    {
+      "type": "board-esp32-devkit-c-v4",
+      "id": "mcu",
+      "top": 60,
+      "left": 80,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-ili9341",
+      "id": "lcd",
+      "top": 40,
+      "left": 450,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-led",
+      "id": "white",
+      "top": 310,
+      "left": 480,
+      "attrs": {
+        "color": "white",
+        "label": "LED-COMM-01"
+      }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "red",
+      "top": 390,
+      "left": 480,
+      "attrs": {
+        "color": "red",
+        "label": "LED-REACT-01"
+      }
+    },
+    {
+      "type": "wokwi-text",
+      "id": "scope",
+      "top": 5,
+      "left": 40,
+      "attrs": {
+        "text": "#512 initial boot-pull evaluation. Not a physical breadboard layout.\nADXL345, BME280, XPT2046 and Pi UART are not modeled here."
+      }
+    },
+    {
+      "type": "wokwi-text",
+      "id": "limits",
+      "top": 520,
+      "left": 40,
+      "attrs": {
+        "text": "Wokwi LCD RST and backlight are not simulated.\nGeneric LED models do not establish the electrical characteristics of LED-COMM-01 or LED-REACT-01.\nDo not use this diagram to approve real power or startup safety."
+      }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "pull_lcd_cs",
+      "top": 30,
+      "left": 300,
+      "attrs": {
+        "value": "10000"
+      }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "pull_lcd_rst",
+      "top": 70,
+      "left": 300,
+      "attrs": {
+        "value": "10000"
+      }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "pull_touch_cs",
+      "top": 110,
+      "left": 300,
+      "attrs": {
+        "value": "10000"
+      }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "pull_lcd_bl",
+      "top": 150,
+      "left": 300,
+      "attrs": {
+        "value": "4700"
+      }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "pull_servo_pwm",
+      "top": 190,
+      "left": 300,
+      "attrs": {
+        "value": "4700"
+      }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "pull_led_white",
+      "top": 230,
+      "left": 300,
+      "attrs": {
+        "value": "10000"
+      }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "pull_led_red",
+      "top": 270,
+      "left": 300,
+      "attrs": {
+        "value": "10000"
+      }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "pull_i2c_scl",
+      "top": 310,
+      "left": 300,
+      "attrs": {
+        "value": "4700"
+      }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "pull_i2c_sda",
+      "top": 350,
+      "left": 300,
+      "attrs": {
+        "value": "4700"
+      }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "limit_white",
+      "top": 380,
+      "left": 365,
+      "attrs": {
+        "value": "330"
+      }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "limit_red",
+      "top": 430,
+      "left": 365,
+      "attrs": {
+        "value": "330"
+      }
+    }
+  ],
+  "connections": [
+    [
+      "pull_lcd_cs:1",
+      "mcu:3V3",
+      "red",
+      []
+    ],
+    [
+      "pull_lcd_cs:2",
+      "mcu:22",
+      "green",
+      []
+    ],
+    [
+      "pull_lcd_rst:1",
+      "mcu:3V3",
+      "red",
+      []
+    ],
+    [
+      "pull_lcd_rst:2",
+      "mcu:16",
+      "green",
+      []
+    ],
+    [
+      "pull_touch_cs:1",
+      "mcu:3V3",
+      "red",
+      []
+    ],
+    [
+      "pull_touch_cs:2",
+      "mcu:21",
+      "green",
+      []
+    ],
+    [
+      "pull_lcd_bl:1",
+      "mcu:4",
+      "green",
+      []
+    ],
+    [
+      "pull_lcd_bl:2",
+      "mcu:GND.1",
+      "black",
+      []
+    ],
+    [
+      "pull_servo_pwm:1",
+      "mcu:27",
+      "green",
+      []
+    ],
+    [
+      "pull_servo_pwm:2",
+      "mcu:GND.1",
+      "black",
+      []
+    ],
+    [
+      "pull_led_white:1",
+      "mcu:2",
+      "green",
+      []
+    ],
+    [
+      "pull_led_white:2",
+      "mcu:GND.1",
+      "black",
+      []
+    ],
+    [
+      "pull_led_red:1",
+      "mcu:5",
+      "green",
+      []
+    ],
+    [
+      "pull_led_red:2",
+      "mcu:GND.1",
+      "black",
+      []
+    ],
+    [
+      "pull_i2c_scl:1",
+      "mcu:3V3",
+      "red",
+      []
+    ],
+    [
+      "pull_i2c_scl:2",
+      "mcu:26",
+      "green",
+      []
+    ],
+    [
+      "pull_i2c_sda:1",
+      "mcu:3V3",
+      "red",
+      []
+    ],
+    [
+      "pull_i2c_sda:2",
+      "mcu:25",
+      "green",
+      []
+    ],
+    [
+      "limit_white:1",
+      "mcu:2",
+      "green",
+      []
+    ],
+    [
+      "limit_white:2",
+      "white:A",
+      "green",
+      []
+    ],
+    [
+      "limit_red:1",
+      "mcu:5",
+      "green",
+      []
+    ],
+    [
+      "limit_red:2",
+      "red:A",
+      "green",
+      []
+    ],
+    [
+      "white:C",
+      "mcu:GND.1",
+      "black",
+      []
+    ],
+    [
+      "red:C",
+      "mcu:GND.1",
+      "black",
+      []
+    ],
+    [
+      "lcd:VCC",
+      "mcu:3V3",
+      "green",
+      []
+    ],
+    [
+      "lcd:GND",
+      "mcu:GND.1",
+      "black",
+      []
+    ],
+    [
+      "lcd:CS",
+      "mcu:22",
+      "green",
+      []
+    ],
+    [
+      "lcd:RST",
+      "mcu:16",
+      "green",
+      []
+    ],
+    [
+      "lcd:D/C",
+      "mcu:17",
+      "green",
+      []
+    ],
+    [
+      "lcd:MOSI",
+      "mcu:23",
+      "green",
+      []
+    ],
+    [
+      "lcd:SCK",
+      "mcu:18",
+      "green",
+      []
+    ],
+    [
+      "lcd:LED",
+      "mcu:4",
+      "green",
+      []
+    ],
+    [
+      "lcd:MISO",
+      "mcu:19",
+      "green",
+      []
+    ]
+  ]
+}

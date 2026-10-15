@@ -112,7 +112,7 @@ B-2の経路別条件（未解決）→ 3点定常電流 + 電源/pin/単体動�
 | #3の定義・承認 + #405等 → 段階C | 設計の確定・物理的安全条件 | power-budget「経路部品と定格」「過電流保護（段階Cのgate）」。margin・受け入れ数値・測定系・実装の全条件が必要。#405 closeだけでも#3 closeだけでも通電許可にならない |
 | 段階C → 案A再試験（案Aを最終の給電に採る場合のみ。#405の見直しの候補として引き継いだ） | 物理的安全条件・成果物の利用 | power-budget「ESP32の給電経路」、#247、[Safety Policy §11](../governance/hardware-safety-policy.md#11-緊急時の対応)。安全な再開条件と観測結果が必要。#247という番号のcloseだけでは判定しない。host実装・PC testは先行可能。#446/#11/#12の実機通信は別電源＋UARTの構成（`gpio-assignment.md`の`Pi–ESP32間のtransport`節）で行い、この辺を通らない |
 | #446 → #13条件6 | 成果物の利用 | #13条件6、[protocol §4.1](../protocol/esp32-pi-protocol.md)、firmwareの統合（#487。feature排他は廃止した）。PR #476/#480はmerge済み。暫定sid・送信1回だけという旧説明は更新し、PR Cと実機・同時動作を残す |
-| servo gate ↔ 初回校正 | 未解決の安全・設計依存 | [servo-safety-limits「承認の状態」](../hardware/servo-safety-limits.md#承認の状態)、#17/#474。現在は「実行しない」。HW-TBD-010の測定に出力が要る一方、出力gateは010の解決を要求する。#405追加だけで解けず、人間が最初の駆動方法を判断する |
+| servo gate ↔ 初回校正 | 未解決の安全・設計依存 | [servo-safety-limits「承認の状態」](../hardware/servo-safety-limits.md#承認の状態)、#17/#474。HW-TBD-010の測定に出力が要る一方、出力gateは010の解決を要求する。#405追加だけで解けない。最初の駆動方法は人間が判断した（同節の項目6）。駆動はその回の実行承認があるときだけ行う |
 
 ### 既存Issueの開始条件と完了条件
 
@@ -130,7 +130,7 @@ B-2の経路別条件（未解決）→ 3点定常電流 + 電源/pin/単体動�
 | #14 | firmware担当が既存LCD/controller/bus仕様から実装準備 | #13のLCD/SPI単体証拠を利用し、touch配線・電圧・bus条件を別途確認。raw sample・debounce・LCD併用loss・誤検出を実機測定。#13条件6のcloseは準備の前提にしない |
 | #15 | #445構成でsampling・変換・静止noiseの実装／実機確認 | EXP-015はID応答のみ。servo振動sampleは#17以降の安全な動作を待つ。これを単体samplingの開始条件にしない |
 | #16 | #445構成でraw/変換/calibration/faultの実装／実機確認 | EXP-014のJ3は申告、EXP-015はID応答。reference比較・timeout等の証拠が必要。J3記述の整合は#16担当、#13を待たない |
-| #17 | 人間とDocs / Reviewで初回駆動方法を判断 | 最新#474はbench実行禁止。servo識別・電源・全出力gateと校正循環の解消が必要。実測はその後の実機Linux/HIL |
+| #17 | 人間とDocs / Reviewで初回駆動方法を判断 | #474のbench実行禁止は、servo-safety-limitsの承認の状態の項目6（監視下の測定のための駆動）へ置き換わった。駆動はその回の実行承認があるときだけ行う。全出力gateは開いていない。実測は実機Linux/HIL |
 | #18 | #34の機構案検討と測定準備 | #17の電気的根拠・#34の固定方法、安全な校正、可動域/速度/加速度/fail-safeの人間承認 |
 | #19 | Host Rustで純粋limiter/trajectoryの境界test | #18の実測制限値と監視下試験。仮値testの成功を実動作の合格にしない |
 | #20 | fault scenarioの準備 | #12/#13/#19と出力gate。実機で通信断/reset/同時動作/電源遮断の証拠 |

@@ -15,8 +15,12 @@ doc = false
 
 [dependencies]
 deskcat-domain = { path = "../../crates/deskcat-domain" }
+deskcat-face = { path = "../../crates/deskcat-face" }
 deskcat-protocol = { path = "../../crates/deskcat-protocol" }
 deskcat-serial = { path = "../../crates/deskcat-serial" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+ureq = { version = "=3.4.1", default-features = false, features = ["json", "native-tls"] }
 # **facadeだけに依存する。**loggerの実装はbinary側が選ぶ（`deskcat-serial`と同じ方針）。
 log = "0.4"
 
@@ -24,8 +28,6 @@ log = "0.4"
 # `deskcat-serial`と同じcrate・version・feature。`SerialPort::pair()`のPTYをtestから使うため。
 # 根拠は`crates/deskcat-serial/Cargo.toml`。
 serial2 = { version = "0.2.38", features = ["unix"] }
-# 表情名の写しが`deskcat-protocol`のserdeの出力と食い違わないことをtestで確かめる。
-serde_json = { workspace = true }
 
 [lints]
 workspace = true
