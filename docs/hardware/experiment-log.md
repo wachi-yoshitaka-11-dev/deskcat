@@ -38,6 +38,7 @@
 | [EXP-024](#exp-024-deskcatdの常駐systemdをpiへ導入し電源投入での起動とfailedからの戻しを確かめた) | [#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)の受け入れ条件4。deskcatdのsystemd unitの導入、Piの起動での自動の開始、failedとreset-failedでの戻し、ESP32のfirmwareの特定 | 値の正なし（観察の記録。電源の適否は判断していない） |
 | [EXP-025](#exp-025-追加ledの点灯試験赤だけ白だけ両方) | [#514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)の追加LED（白＝GPIO2、赤＝GPIO5）の点灯試験（赤だけ・白だけ・両方） | 値の正なし（観察の記録。起動時の電位・電流・rail電圧は計測していない） |
 | [EXP-026](#exp-026-piの独り言show_textをlcdへ出し受理と拒否のackと表情の戻りを確かめた) | [#23](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/23)の実機確認。Piの`deskcatd`の独り言（`show_text`）、受理と拒否のACK、表示期限の後の表情の戻り | 値の正なし（試験の記録。描画時間とRAMの最大使用量は測っていない） |
+| [EXP-027](#exp-027-pi-zero-wでdeskcatdを直接buildしhttps接続とsystemd-credentialと偽esp32での常駐を観察した) | [#522](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/522)の[ADR-0026](../decisions/0026-cloud-speech-generation.md)の決定2・3・5・7が確認を求める項目のうち、Piの上の作業（直接build、キーなしのHTTPS接続、systemd credential、偽ESP32での常駐） | 値の正なし（観察の記録。ADR-0026の確認項目を満たしたとは書かない。実ESP32との常駐と`--cloud-speech`有効時は未確認） |
 
 **大容量の生dataはこのrepositoryへ入れていない。**保存場所は
 [development-foundation-plan.md](../planning/development-foundation-plan.md)の
@@ -2580,6 +2581,153 @@ Piの起動で`deskcatd`が自動で始まった。ESP32側の端を外した間
 - 描画時間とRAMの最大使用量を測るには、計測のログを足すfirmwareの変更が要る
 - 終わりの状態：ESP32は電源なし、信号線のESP32側の端は外れている。GPIO2・GPIO5の線はESP32から抜いたまま（#514を再開するときに、`power-budget.md`の`DISP-01`追加接続の手順の条件(3)(a)と、#514の承認の範囲を照らす）。Piは電源が入っていて、`deskcatd`は`enabled`・`inactive`
 
+## EXP-027: Pi Zero Wでdeskcatdを直接buildし、HTTPS接続とsystemd credentialと偽ESP32での常駐を観察した
+
+[#522](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/522)の[ADR-0026](../decisions/0026-cloud-speech-generation.md)の決定2・3・5・7が、クラウド経路を有効にする前に確かめるよう求める項目のうち、Piの上の作業を観察した。**この記録は観察だけを書く。ADRの確認項目を満たしたとは書かない。**`--cloud-speech`は有効にしていない。本物のAPIキーはPiに置いていない。ダミー値（キーではない文字列）の値は、記録に書かない。
+
+| 項目 | 内容 |
+|---|---|
+| Test ID | `EXP-027` |
+| Date | 2026-10-15（JST 00:56〜01:21。最初のbuildと中断）と、2026-10-16（JST 22:11〜23:28。Piの起動から(4)の終了まで。その後の読み出しを除く。build、HTTPS、systemd、常駐）と、2026-10-17（JST 02:39〜02:41。(3)(g)）。時刻は下の各節にUTCで書く（UTC＝JST−9時間） |
+| Operator | Piの電源の抜き差しはユーザー。ssh、apt、build、systemctl、journalの読み出し、偽ESP32の実行は作業セッション（AI） |
+| Hardware revision／Exact components | `SBC-01`（Raspberry Pi Zero W。`armv6l`、Raspbian GNU/Linux 13〔trixie〕、systemd 257.9-1~deb13u1+rpi1、メモリ426 MiB、swap約425〜426 MiB）。ESP32は使っていない |
+| Wiring revision | ESP32側の信号線の端は、外した状態を保つという指示の前提で作業した（Piからは確認できない）。Pi側は動かしていない |
+| Power supply and current limit | Piの給電は`EXP-024`以降、確かめていない。`vcgencmd get_throttled`は観察した各時点で`0x0`（Pi Zero Wでは電圧の根拠にならない。`EXP-009`）。電流制限は設けていない |
+| Firmware commit/profile | ESP32は無し。Pi：下記のcommitのsourceを直接build（debug）。`rustc 1.97.1 (8bab26f4f 2026-07-14)`、`cargo 1.97.1` |
+| Configuration | `ureq =3.4.1`（`json`・`native-tls`）、`ureq-proto 0.6.4`、`native-tls 0.2.18`、`openssl 0.10.81`、`openssl-sys 0.9.117`（`Cargo.lock`）。OSの`openssl`3.5.6-1~deb13u2+rpt1、`ca-certificates`20250419、`pkg-config`1.8.1-4は導入済み。`libssl-dev`は、下の(1)で導入した |
+| Measurement equipment | 使っていない。Pi上の`time`、`/proc`、`journalctl`、`systemctl`、`systemd-analyze`、`openssl s_client`、samplingのscript（(1)は`sleep 5`を挟むloop、(4)は5秒ごと） |
+| Procedure | 下の(1)〜(4) |
+| Expected result | ADR-0026の決定2・3・5・7が確認を求める内容（Piでのbuild、HTTPS接続、systemd credentialの動作、常駐時のmemoryと時間） |
+| Measured result | 下記 |
+| Faults | 下記 |
+| Conclusion | 下記 |
+| Next safe step | 下記 |
+
+### (1) 直接build
+
+**commit。**build（1回目・中断）は`2105702dd9079ac6b145d685fabe1ffb8c425cbf`の`apps/`・`crates/`・`Cargo.toml`・`Cargo.lock`、build（3回目）はdevelop `66214235e1becb4e596a5fa5152e78891877afac`の同じ範囲（88 file。`git archive`をsshでPiへ流した）。コマンドは`cargo build --locked -p deskcatd`（debug）。
+
+| 回 | 時刻（UTC） | 結果 |
+|---|---|---|
+| 1回目（`libssl-dev`無し、`2105702`） | 2026-10-14T15:56:45Z開始 | exit 101、`real 8m16.090s`。`openssl-sys 0.9.117`が`Package openssl was not found in the pkg-config search path`、`Could not find directory of OpenSSL installation`、`Make sure you also have the development packages of openssl installed. For example, libssl-dev on Ubuntu`と表示して停止 |
+| 導入 | 2026-10-14（UTC。1回目の後、2回目の前） | `sudo apt-get install -y libssl-dev`：`libssl-dev:armhf 3.5.6-1~deb13u2+rpt1`。取得3,655 kB。`/`の使用量は3,570,632 kBから3,586,108 kBへ増えた（15,476 kB）。**Piのpackageの状態を変えた** |
+| 2回目（`libssl-dev`有り、`2105702`） | 2026-10-14T16:06Zごろ開始 | 完走していない。`Compiling http v1.5.0`の表示まで進んだ約15分の時点（最後のsampling 16:21:00Z）で、Piへのsshが切れた。ユーザーの申告：停止は電源を抜いたため。journalに、停止の直前までshutdown・OOM・低電圧・mmcエラーの行は無い（下の「Wi-Fiの切断」） |
+| 3回目（`libssl-dev`有り、develop `6621423`、clean） | 2026-10-16T13:17:01Z〜13:56:07Z | exit 0。`Finished dev profile [unoptimized + debuginfo] target(s) in 39m 03s`。`real 39m5.401s`、`user 31m21.649s`、`sys 0m59.155s` |
+
+3回目の観察（`sleep 5`を挟むloopで441 sample。13:17:01Z〜13:56:07Zの約2346秒に対し、実効の間隔は約5.3秒）：
+
+- `MemAvailable`の最小203,152 kB（開始時は335,156 kB）。`SwapFree`の最小344,356 kB（開始時436,220 kB）。OOM・低電圧・I/Oエラーの行は、この起動のカーネルlogに0件（`journalctl -k`）
+- 指定したcommand名（`rustc|cc1|cargo|ld|build-script|collect2`。`ld`は部分一致で、`systemd-journald`など他のprocessも含みうる）のprocessのRSSの最大は291,388 kB。**これは「build中の単一processの最大」とは言えない**（下のFaults）
+- `/`：使用3,673,960 kB（build前）→3,942,468 kB（後）、空き25,002,292 kB。`target/`は272,760 kB。debugの`deskcatd`は23,322,164 byte
+- 比較の事実：[EXP-024](#exp-024-deskcatdの常駐systemdをpiへ導入し電源投入での起動とfailedからの戻しを確かめた)の最初のbuild（`f0925027`のsource。この記録のcommitとは依存が違う）は、`Finished … in 19m 32s`、peak RSS 248,644 kB（5秒ごとのsamplingの最大）だった。**時間の差の原因は切り分けていない**
+- この間、Wi-Fiの切断が318回あった（下の「Wi-Fiの切断」）
+
+### (2) Anthropicのendpointへの、キーなしのHTTPS接続
+
+2026-10-16T13:56:57Z〜13:57:50Z。`NTPSynchronized=yes`。`apps/deskcatd/examples/tls_probe.rs`（Piの作業copyにだけ置いた。repositoryへは入れていない）で、`cloud_speech.rs`の`ClaudeClient`と同じTLS設定（`TlsProvider::NativeTls`、`RootCerts::PlatformVerifier`、`https_only`、proxyなし、`max_redirects(0)`、`timeout_global` 5秒）に`http_status_as_error(false)`を足し、**キー・`x-api-key`header・POSTを使わずに**`GET`を送った。example buildは42.34秒。
+
+| 宛先 | 観察 |
+|---|---|
+| `https://api.anthropic.com/v1/messages`（3回） | `status=405`、1240／1020／1113 ms |
+| `https://expired.badssl.com/` | `NativeTls(Ssl(… reason: "certificate verify failed" …))` |
+| `https://self-signed.badssl.com/` | 同上 |
+| `https://wrong.host.badssl.com/` | 同上 |
+| `http://api.anthropic.com/v1/messages` | `RequireHttpsOnly`、0 ms |
+
+参考：`openssl s_client -connect api.anthropic.com:443 -verify_return_error`は`Verification: OK`、`TLSv1.3`、`TLS_AES_256_GCM_SHA384`。この53秒の窓に、Wi-Fiの切断が3回あった。
+
+### (3) systemdのcredential
+
+unitは、develop `6621423`の`deploy/systemd/deskcatd.service`（sha256 `395be6ad34474bc3614109a7050f0b0d249cb9f2f47c1cfeb973a7e8f0c7294a`。最後に変えたcommitは`546bb6d`）。deskcatdそのものは起動していない。unitの複製（`/run/systemd/system/`に一時的に置き、試験の後に削除）は、`[Unit]`・`User=`・`LoadCredential=`・`SetCredential=`・`StateDirectory=`などを変えず、`ExecStart=`だけを短いscript（credentialのbyte数と`id`を表示する）へ、`EnvironmentFile=`と`Restart*`を外して差し替えた。
+
+| 試験 | 観察 |
+|---|---|
+| (a) `systemd-analyze verify`（上のunit） | `deskcatd.service:23: Invalid syntax, ignoring: anthropic-api-key:`（23行目は`SetCredential=anthropic-api-key:`） |
+| (b) 複製、`/etc/deskcatd/anthropic-api-key`が無い | `Failed to set up credentials: Protocol error`、`Failed at step CREDENTIALS`、`status=243/CREDENTIALS`。起動しない |
+| (c) 複製から`SetCredential=`の行を外した版、fileが無い | (b)と同じ`status=243/CREDENTIALS` |
+| (d) 最小再現：`sudo systemd-run --wait --collect --pipe -p LoadCredential=anthropic-api-key:/etc/deskcatd/anthropic-api-key /bin/true`、fileが無い | `status=243/CREDENTIALS`、`systemd-run`のexit 243。同じ指定に`-p SetCredential=anthropic-api-key:`（空の値）を足すとexit 0（CLI経由。0 byteのcredentialができた） |
+| (e) 複製の`SetCredential=`を、空でない値（キーではない11文字。値は書かない）に変えた版、fileが無い | 起動し、`$CREDENTIALS_DIRECTORY/anthropic-api-key`を11 byte読めた（uid 999） |
+| (f) ダミー値（キーではない22文字）のfileを、root所有・mode `0600`で`/etc/deskcatd/anthropic-api-key`に置く、unitの複製（credentialの行は元のまま） | 起動した。uid 999（`deskcatd`）が22 byte読めた。`/var/lib/deskcatd`は`drwx------ deskcatd deskcatd`で作られた |
+| (g1) develop `3a73475`（#603）の`deploy/systemd/deskcatd.service`（sha256 `d1e81a0fb2df1a8e2f1be7fd66913d0384d70f3660d89d51faa851dc24359c60`。`SetCredential=anthropic-api-key:deskcatd-no-api-key`）に`systemd-analyze verify` | 出力なし |
+| (g2) (g1)のunitの複製（上と同じ差し替え）、`/etc/deskcatd/anthropic-api-key`が無い | 起動した（uid 999）。credentialは19 byteで、内容は`SetCredential=`の値`deskcatd-no-api-key`と一致した（`cmp`） |
+| (g3) (g1)のunitの複製、ダミー値（キーではない23文字。値は書かない）のfileをroot所有・mode `0600`で置く | 起動した（uid 999）。credentialは23 byteで、内容は`deskcatd-no-api-key`と一致しなかった |
+
+(f)のとき、別の保持用の一時unit（同じ`User=`・`LoadCredential=`）で読める範囲を見た（値は表示せず、byte数と拒否の表示だけ）：
+
+- 一般user（`deskcat`）による元fileの読み出し：`Permission denied`
+- `/run/credentials/<unit>/`は`dr-xr-x---+ root root`、中のfileは`-r--r-----+ root root`（`+`はACL。`getfacl`が無く、ACLの中身は見ていない）。一般userと`nobody`：`Permission denied`。同じ`deskcatd`の別process：22 byteを読めた
+- unit停止の後、`/run/credentials/<unit>`は無くなった
+- 値の文字列は、起動中processの`/proc/<pid>/environ`と`cmdline`、`systemctl show`の出力に無かった（一致0件。`LoadCredential=`は`[unprintable]`と表示された）
+
+(g)は2026-10-16T17:39Z〜17:41Zに行った（Pi上のfileの時刻は2026-10-17 02:39〜02:40 JST）。(g2)・(g3)のとき、(f)と同じ形の保持用の一時unit（`ExecStart=/bin/sleep 25`）で、読める範囲を見た：
+
+- (g2)：`SetCredential=`と`LoadCredential=`は`systemctl show`で`[unprintable]`。`deskcatd-no-api-key`の文字列は、`/proc/<pid>/environ`・`cmdline`・`systemctl show`の出力に0件。`/run/credentials/<unit>/`は`dr-xr-x---+ root root`、中のfileは`-r--r-----+ root root`（19 byte）。一般user（`deskcat`）と`nobody`：`Permission denied`。`deskcatd`のuid：19 byteを読めた。unit停止の後、置き場は無くなった
+- (g3)：元fileを一般userが読む：`Permission denied`。service用のcopyを一般userと`nobody`が読む：`Permission denied`。`deskcatd`のuid：23 byteを読めた。ダミー値の文字列は、`/proc/<pid>/environ`・`cmdline`・`systemctl show`の出力に0件
+- **rootによる値の読み出しは試していない。**複製のunitだけを使い、`/etc/systemd/system/deskcatd.service`（sha256 `032541225e9ec62d02391dab6bea9b0ea5bb544b85aef4bc1fc4c3a3873ca8de`）は変えていない。ダミー値のfileと一時unitは、確認の後に削除した
+
+**未確認：**空の値の行がunit fileで無視される理由（systemdの仕様か、この版の挙動か）。空の値の行を外しても(b)と同じ結果だった(c)ことと、空でない値の行が働いた(e)ことは観察した。**この作業では、unitを直す方法を試していない。**直しは#603（develop `3a73475`）で行われ、(g)はその版のunitの複製の観察である。実際の`deskcatd`を、このunitの複製（`ExecStart=`を差し替えたもの）で起動したことは無い。
+
+### (4) 偽のESP32（PTY、Python）を相手にした`deskcatd`の常駐のmemoryと時間
+
+**この節の観察は、「偽のESP32（PTY、Python）を相手にした`deskcatd`の常駐のmemoryと時間」である。実ESP32との常駐、`--cloud-speech`有効時の常駐memory、HTTPS client実行中のピークは未確認である。ADR-0026の決定2の「常駐時のmemory・時間」は、この範囲では満たしていない。**
+
+- 偽のESP32：`fake_esp.py`（67行、sha256 `5bdc39ecbd8c50a859989c32850096c3fa4301974d2e2ce11b3954f86b28c688`。この作業の観察の道具で、repositoryへ入れていない）。PTYのmasterを持ち、`deskcatd`の実binaryをPTYのslaveにつなぐ。`hello`（`esp32-pi-protocol.md`§5.1）へ`boot`（§4.1）と`ack`（§6）を返し、`get_status`（§5.6）へ`ack`と`status`（§4.6）を返し、それ以外のPi→ESP32のmessageへ`status: ok`の`ack`を返す。**protocolへの適合の確認ではない**（envelopeの検証、再送、拒否、`reply_sid`の整合などは試していない）。実UARTと実ESP32には触れていない
+- 実行：2026-10-16T13:58:08Z〜14:28:11Z。`deskcatd`（sha256 `ebfd1c9dea69e79d52639d87ab12aef59e19681e114df46307a69c5f683bb51f`、`6621423`のdebug build）を、`--speech-min-interval-ms 60000 --speech-duration-ms 5000`で起動した（`--cloud-speech`と`--verbose`は付けていない）。`--duplicate-capacity 8 --duplicate-retention-ms 5000`はunitと同じ値。`--startup-deadline-ms`はunitの`10000`ではなく`60000`を使った。loginユーザーで手で起動し、systemdのunitは使っていない
+- 継続：1800秒。`deskcatd`は1800秒の間、終了せず、scriptが1800秒でSIGTERMを送った（script側の表示`exit=-15`は、`deskcatd`自身の終了コードではない）。`deskcatd`のlogは2行（`serial portを開く`と`hello(Startup)を送った`）で、WARN・ERRORは0件
+- memory（5秒ごと、360 sample。t=0〜1795秒）：`VmRSS` 4,896〜4,900 kB（t=5秒から。t=0の1回は1,636 kB）、`VmHWM` 4,900 kB。RSSの値は3通り（1,636、4,896、4,900 kB）で、変化は2回
+- 偽のESP32が受けたPi→ESP32のmessage：`hello` 1、`ack` 1、`get_status` 2、`show_text` 30（60秒ごと）
+- この間、Wi-Fiの切断が257回あった。Piの負荷平均は終わりの時点で0.35（1分）、`throttled=0x0`
+
+### Wi-Fiの切断（観察）
+
+`journalctl`の`wpa_supplicant`の`CTRL-EVENT-DISCONNECTED`（`reason=0 locally_generated=1`）の件数。**network識別子（BSSID、SSID、IP、MAC）は書かない。**
+
+| 起動 | 件数 |
+|---|---|
+| 2026-10-12の起動（-3）、2026-10-12〜13の起動（-2） | 0、0 |
+| 2026-10-14〜15の起動（-1。0の起動の1つ前。起動は2026-10-14 22:56 JSTごろ〔1回目のbuildの前の2026-10-15 00:56:24 JSTの`uptime`が2時間だったことからの逆算〕。journalの最初の行の時刻は2026-10-15 00:00:59 JSTで、この逆算と合わない） | 706。終わりの前の12分間（01:09〜01:20 JST）は1分に6〜10回。切断の直後に再接続していた（journalの`CONNECTED`。1回目のbuildの8分間のssh sessionも切れなかった） |
+| 2026-10-16の起動（0。22:11:34 JST起動） | 625（(4)の終了後の確認の時点）。(1)の39分間に318、(4)の30分間に257 |
+
+-1の起動の終わり：journalの最後は2026-10-15 01:20:55 JST（＝2026-10-14T16:20:55Z）で、切断の直後の再接続（`CONNECTED`、DHCPの新規lease）で終わる。shutdownの記録、OOM、低電圧、mmcエラーの行は無い。journalは書き出しの遅れがありうるため、最後の数秒は失われうる。ユーザーの申告：停止は電源を抜いたため。**切断が続いた原因（電源、cable、省電力、AP側）は切り分けていない**（[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)に同種の記録がある）。
+
+### Piに入っているもの（この作業の前後）
+
+- `/etc/systemd/system/deskcatd.service`のsha256は`032541225e9ec62d02391dab6bea9b0ea5bb544b85aef4bc1fc4c3a3873ca8de`のまま（`EXP-024`で導入した版。credentialの行は無い）。`/usr/local/bin/deskcatd`、`/etc/deskcatd/deskcatd.env`も2026-10-12のまま。**この作業ではPiの`deskcatd`のunitとbinaryを入れ替えていない**
+- `libssl-dev`を導入した（上の(1)）。ダミー値のfileと一時unitは削除した（`/etc/deskcatd`は`deskcatd.env`だけ）。(3)の試験の複製unitの`StateDirectory=deskcatd`が、`/var/lib/deskcatd`（`drwx------ deskcatd deskcatd`）を作り、残っている。中身は見ていない（(4)の`deskcatd`は予算fileを作らない）。Piの作業dirとして、2回目までの`2105702`のdirと3回目のdirが残っている（約140 MBと約293 MB）
+- (g)の後、2026-10-17 02:58 JSTの時点：`deskcatd`は`enabled`・`inactive`、`ExecMainStatus=75`、`NRestarts=0`。`/etc/systemd/system/deskcatd.service`のsha256は上と同じ。`/etc/deskcatd`は`deskcatd.env`だけ。`/run/systemd/system`に一時unitは無く、`failed`のunitは0件
+- `deskcatd`は`enabled`のまま。起動の後、ESP32と通信できずに再起動を30回繰り返し、2026-10-16 22:15:46 JSTに`failed`（`Start request repeated too quickly`）になった。**その後、作業セッションが、対象を指定しない`systemctl reset-failed`を1回実行した**（(3)の試験の片付けのとき）。そのため、`failed`の印が消えて`inactive (dead)`、`enabled`、`ExecMainStatus=75`になっている。他のunitの`failed`の印も消えた可能性がある（この起動で他に`failed`のunitがあったかは見ていない）
+
+### Faults
+
+- (1)のRSSのsamplingは、command名の部分一致（`ld`を含む）で選んだprocessの最大であり、cargo・rustc・linkerの単一processの最大とは限らない。システム全体の`MemAvailable`と`SwapFree`は、processに依らない
+- (1)の3回目の間（13:19〜13:30Zごろ）に、(3)の短い一時unitの試験とsshでの読み出しを同じPiで行った。build時間への影響は測っていない。Wi-Fiの切断も続いていた
+- journalの時刻は、起動の直後は時計の同期の前の値が混ざりうる（-1の起動の最初の数分など。上の起動時刻の食い違いを含む）。-1の起動の件数は、終わりの12分間の1分あたりの値と、全体の合計だけを書いた
+- 偽のESP32は、hello・get_status・ackだけを返す。`show_text`の描画、LCD、UARTの電気的な条件、実ESP32のtimingは含まない
+- 2026-10-17 02:58 JSTの時点で、`journalctl --list-boots`は現在の起動（0）だけを示し、-1以前の起動は読めない（上の件数は、それ以前の読み出し）。`/etc/systemd/journald.conf.d/50-persistent-storage.conf`は`Storage=persistent`と`SystemMaxUse=32M`で、`/var/log/journal`は4 MiBのfileが約6分ごとに並び、合計は28.3 MiB。古いjournalが消えた理由は調べていない
+- ESP32側の信号線が外れていたことは、Piからは確認していない
+- `2105702`と`6621423`の`apps/deskcatd/`の差は`cloud_speech.rs`だけ（36行追加、3行削除）で、1回目・2回目は後者の前のsourceである。時刻帯を日本時間で決める版（`25f68fd`、#601）は3回目に含まれる
+
+### この記録が主張しないこと
+
+- ADR-0026の決定2・3・5・7の確認項目を満たしたこと。特に、`--cloud-speech`有効時の常駐memory・時間、HTTPS client実行中のピーク、キーを使うAPI要求、`$2`の月額上限とWorkspaceのscope（決定3・5。人間の作業）
+- 実ESP32との常駐、ローカル独り言のLCD表示（別の確認。#16・#595）
+- `rustls`構成、他のHTTPS clientとの比較。**`ureq`と`native-tls`を確定した、とも書かない**
+- 時間の差（19分32秒と39分03秒）、Wi-Fiの切断の原因、(3)(a)の空の値の行が無視される理由
+
+### Conclusion
+
+- (1) `libssl-dev`が無いPiでは、`ureq`の`native-tls`を含む`deskcatd`のbuildは`openssl-sys`の段階で止まった（exit 101、8分16秒）。`libssl-dev` 3.5.6を入れたPiで、develop `6621423`のclean buildは39分03秒でexit 0になった
+- (2) キーなしの`GET`は、OSの証明書検証を通って`api.anthropic.com`のHTTPS応答（405）を得た。期限切れ・自己署名・host名違いの3つは、同じ設定で`certificate verify failed`になり、`http://`は拒否された
+- (3) develop `6621423`のunitは、`/etc/deskcatd/anthropic-api-key`が無いと、この版のsystemd（257.9）で`status=243/CREDENTIALS`になり起動しなかった。unitのコメント（`deploy/systemd/deskcatd.service`の「空のfallbackによりfile未設置でもserviceを起動できる」）と、`deploy/README.md`の「欠けた場合は空の`SetCredential=`へ戻る」の記述は、この観察（`6621423`の版）と一致しない。fileがあれば起動し、`deskcatd`のuidは読めた。一般user（`deskcat`）と`nobody`は読めなかった（rootによる値の読み出しは試していない）。#603（`3a73475`）は`SetCredential=`の値を、空から`deskcatd-no-api-key`へ替えた。その版のunitの複製は、fileが無くても起動し（credentialは19 byteの`deskcatd-no-api-key`）、fileを置くとその内容（23 byte）が渡り、`deskcatd`のuidは読めて一般userと`nobody`は読めなかった（(g)）
+- (4) 偽のESP32を相手にした1800秒の常駐で、`deskcatd`（ローカル独り言のみ）は終了せず、`VmRSS`は約4.9 MBだった
+
+### Next safe step
+
+- (3)の食い違いは、#603（`3a73475`）で`SetCredential=`の値を空から印へ替えた。この作業はunitを修正していない。(g)は、その版のunitの複製の観察で、Piの`/etc/systemd/system/deskcatd.service`は`EXP-024`で入れた版のまま。実際の`deskcatd`をその版のunitで起動することは未実施
+- 実ESP32との常駐と、ローカル独り言のLCD表示は、実機の窓（#16・#595）で、信号線の条件（[gpio-assignment.md](gpio-assignment.md)の`信号線をつないでよい条件`）に従って行う
+- `--cloud-speech`有効時のmemory・時間は、キーの発行とWorkspaceの`$2`上限の設定（ユーザーの作業）の後に、人間の管理下で確かめる
+- 終わりの状態：Piは電源が入っている。ESP32は使っていない。`deskcatd`は`enabled`・`inactive (dead)`
+
 ## Revision履歴
 
 | 日付 | Revision | 変更 | 根拠 |
@@ -2617,3 +2765,4 @@ Piの起動で`deskcatd`が自動で始まった。ESP32側の端を外した間
 | 2026-10-12 | 30 | [#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)。**`EXP-024`を追加した。**deskcatdのsystemd unitをPiへ導入し、Piの起動での自動の開始、ESP32側の端を外した間の再起動と約4分での`failed`、`reset-failed`と`restart`での戻し（`hello`へのACKは届いたが、`deskcatd`は未承認のsessionとしてWARNを出した。`active`はsessionの確立を示さない）、ESP32のfirmwareの特定（flashのpartition tableとappの先頭0x100 byteを読むだけ）を記録した。承認の問いの「約150秒」と実測の差、journalの時刻の飛び、条件1・5・6の記録が申告だけであること、自動でつながることは確かめていないことをFaultsと「主張しないこと」に書いた | [#446のcomment 6123783146](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446#issuecomment-6123783146)、[6123004894](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446#issuecomment-6123004894)、[6123867297](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446#issuecomment-6123867297) |
 | 2026-10-12 | 31 | [#514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)。**`EXP-025`を追加した。**追加LED（白＝GPIO2、赤＝GPIO5）の点灯試験（赤だけ・白だけ・両方）の記録である。各comment（出所）にある事実だけを書いた。LED電流・`3V3` railの電圧・`U2`の温度は計測していない | [#514のコメント](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514#issuecomment-6125555742) |
 | 2026-10-13 | 32 | [#23](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/23)。**`EXP-026`を追加した。**Piの`deskcatd`の独り言（`show_text`）をLCDへ出し、受理と拒否のACKと、表示期限の後の表情の戻りを確かめた記録である。製品buildではなく`tap-21,face-21,bringup-display-13`で行った。描画時間とRAMの最大使用量は測っていない | [#23のコメント](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/23#issuecomment-6145205989) |
+| 2026-10-17 | 33 | [#522](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/522)。**`EXP-027`を追加した。**Pi Zero Wで`deskcatd`（`ureq`＋`native-tls`）を直接build（`libssl-dev`無しではexit 101、有りではdevelop `6621423`が39分03秒でexit 0）、キーなしのHTTPS接続と証明書検証、systemd credentialの動作（`6621423`のunitは、キーのfileが無いと`status=243/CREDENTIALS`で起動しなかったこと。#603の`3a73475`のunitの複製の観察(g)を含む）、偽のESP32（PTY）を相手にした`deskcatd`の1800秒の常駐を観察した。ADR-0026の確認項目を満たしたとは書いていない。Wi-Fiの切断の件数と、作業中に対象を指定しない`reset-failed`を1回実行した操作を記録した | [#522](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/522) |
