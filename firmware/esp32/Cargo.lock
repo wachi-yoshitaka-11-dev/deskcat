@@ -350,9 +350,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "deskcat-env"
+version = "0.1.0"
+
+[[package]]
 name = "deskcat-esp32"
 version = "0.1.0"
 dependencies = [
+ "deskcat-env",
  "deskcat-face",
  "deskcat-protocol",
  "deskcat-servo",

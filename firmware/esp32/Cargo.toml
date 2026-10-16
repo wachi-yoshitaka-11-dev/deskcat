@@ -22,6 +22,8 @@ default = []
 # ACCEL-01／ENV-01のID読み出しだけを試す。旧・featureなしbuildのI/Oを保つ。
 # LCD関連pinとADXL345の設定には触れない。Pi linkとhealthは維持する。
 bringup-i2c-15-16 = []
+# #16 の raw／補償値観測専用。BME280 の ID 一致後だけ forced 測定を書き込む。
+env-sample-16 = []
 # Issue #17の単発servo bench試験だけを有効にする。既定ではoffであり、
 # 通常のbuildはこのfeatureを持たず`crate::servo`を呼ばない。承認の状態は
 # `docs/hardware/servo-safety-limits.md`の`承認の状態`節を参照する（ここへ再掲しない。
@@ -72,6 +74,7 @@ deskcat-servo = { path = "../../crates/deskcat-servo" }
 deskcat-face = { path = "../../crates/deskcat-face" }
 # ADXL345のtap検出の設定値と`tapped`の送出条件（#21のF1）。I2Cを知らず、hostでtestできる。
 deskcat-tap = { path = "../../crates/deskcat-tap" }
+deskcat-env = { path = "../../crates/deskcat-env" }
 log = "0.4"
 # health snapshotを`deskcat-protocol`の`Status`と同じ形へserializeするために使う。
 # 同crateが既に依存しており、`firmware/esp32/Cargo.lock`にも推移的に入っている。

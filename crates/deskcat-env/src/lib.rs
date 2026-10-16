@@ -1,7 +1,7 @@
 //! `ENV-01` の BME280 生値と補正係数から温度・気圧・相対湿度を計算する。
 //!
-//! I2C、レジスタの読み出しと byte の組み立て、測定設定は firmware の責務。
-//! この crate は読み出し済みの数値だけを受け取り、内部状態を持たない。
+//! I2C と測定設定は firmware の責務。レジスタの byte の組み立ては
+//! host で境界を試験できるよう、この crate の純粋な関数に置く。
 //!
 //! 出所: [Bosch Sensortec BME280 Data sheet, BST-BME280-DS001-24,
 //! Revision 1.24 (February 2024)](https://www.bosch-sensortec.com/media/boschsensortec/downloads/datasheets/bst-bme280-ds002.pdf)。
@@ -12,8 +12,7 @@
 
 /// BME280 の読み出し済み補正係数。各 field の型はデータシート §4.2.2 Table 16 に従う。
 ///
-/// `dig_h4` と `dig_h5` は 12 bit の符号付き値として firmware 側で組み立て、
-/// `i16` へ符号拡張して渡す。ここでレジスタ byte を解釈しない。
+/// `dig_h4` と `dig_h5` は [`decode_calibration`] が 12 bit から符号拡張する。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Calibration {
     /// Unsigned temperature coefficient 1.
@@ -63,6 +62,145 @@ pub struct RawSample {
     pub pressure: u32,
     /// Humidity ADC value (16 bit).
     pub humidity: u16,
+}
+
+/// Bosch §4.2.2 Table 16 の 0x88..0xA1 の長さ。
+pub const CALIB_TP_LEN: usize = 26;
+/// Bosch §4.2.2 Table 16 の 0xE1..0xE7 の長さ。
+pub const CALIB_H_LEN: usize = 7;
+/// Bosch §4.1, §5.4.7–5.4.9 の 0xF7..0xFE の burst read 長。
+pub const RAW_LEN: usize = 8;
+/// Bosch §5.4.1 Table 18 の Chip ID。
+pub const CHIP_ID: u8 = 0x60;
+
+/// register の観測値から判定できる fault。I2C 自身の fault は firmware が分類する。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RegisterFault {
+    /// Chip ID が BME280 ではない。
+    WrongChipId,
+    /// NVM image copy 中。
+    CalibrationNotReady,
+    /// 変換中。
+    MeasurementNotReady,
+    /// 測定を skip した channel の sentinel。
+    SkippedChannel,
+}
+
+/// I2C error の分類。コードの由来と具体値は firmware 側の ESP-IDF が持つ。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IoFault {
+    /// transaction の有限時間上限に達した。
+    Timeout,
+    /// timeout 以外。NACK と物理的 disconnect は、この情報だけでは区別できない。
+    Other,
+}
+
+/// ESP-IDF の error code と timeout code の一致だけを純粋に判定する。
+/// どの code が timeout かは firmware が SDK の定数として渡す。
+#[must_use]
+pub const fn classify_io_error(code: i32, timeout_code: i32) -> IoFault {
+    if code == timeout_code {
+        IoFault::Timeout
+    } else {
+        IoFault::Other
+    }
+}
+
+/// §5.4.1 の Chip ID を確認する。
+///
+/// # Errors
+///
+/// `id` が [`CHIP_ID`] と異なる場合。
+pub const fn check_identity(id: u8) -> Result<(), RegisterFault> {
+    if id == CHIP_ID {
+        Ok(())
+    } else {
+        Err(RegisterFault::WrongChipId)
+    }
+}
+
+/// NVM image copy 中には補正係数を使わない（§5.4.4 Table 21）。
+///
+/// # Errors
+///
+/// `status.im_update` が 1 の場合。
+pub const fn check_calibration_ready(status: u8) -> Result<(), RegisterFault> {
+    if status & 0x01 == 0 {
+        Ok(())
+    } else {
+        Err(RegisterFault::CalibrationNotReady)
+    }
+}
+
+/// 変換中または NVM image copy 中は data register を読まない（§5.4.4 Table 21）。
+///
+/// # Errors
+///
+/// `status.measuring` または `status.im_update` が 1 の場合。
+pub const fn check_measurement_ready(status: u8) -> Result<(), RegisterFault> {
+    if status & 0x09 == 0 {
+        Ok(())
+    } else {
+        Err(RegisterFault::MeasurementNotReady)
+    }
+}
+
+/// Bosch §4.2.2 Table 16 の byte 配置を `Calibration` へ復号する。
+/// 配列はそれぞれ 0x88..0xA1、0xE1..0xE7 の連続 read。
+#[must_use]
+pub fn decode_calibration(tp: &[u8; CALIB_TP_LEN], h: &[u8; CALIB_H_LEN]) -> Calibration {
+    fn le_u16(data: &[u8], i: usize) -> u16 {
+        u16::from_le_bytes([data[i], data[i + 1]])
+    }
+    fn le_i16(data: &[u8], i: usize) -> i16 {
+        i16::from_le_bytes([data[i], data[i + 1]])
+    }
+    // 12 bit の符号 bit を i16 の bit 15 へ移して算術右 shift。
+    fn signed12(bits: u16) -> i16 {
+        (bits << 4).cast_signed() >> 4
+    }
+    Calibration {
+        dig_t1: le_u16(tp, 0),
+        dig_t2: le_i16(tp, 2),
+        dig_t3: le_i16(tp, 4),
+        dig_p1: le_u16(tp, 6),
+        dig_p2: le_i16(tp, 8),
+        dig_p3: le_i16(tp, 10),
+        dig_p4: le_i16(tp, 12),
+        dig_p5: le_i16(tp, 14),
+        dig_p6: le_i16(tp, 16),
+        dig_p7: le_i16(tp, 18),
+        dig_p8: le_i16(tp, 20),
+        dig_p9: le_i16(tp, 22),
+        dig_h1: tp[25],
+        dig_h2: le_i16(h, 0),
+        dig_h3: h[2],
+        dig_h4: signed12((u16::from(h[3]) << 4) | u16::from(h[4] & 0x0f)),
+        dig_h5: signed12((u16::from(h[5]) << 4) | u16::from(h[4] >> 4)),
+        dig_h6: h[6].cast_signed(),
+    }
+}
+
+/// Bosch §4.1, §5.4.7–5.4.9 の連続 8 byte を復号する。
+/// skipped channel の sentinel は測定値として補償しない（Tables 20, 23, 24）。
+///
+/// # Errors
+///
+/// 温度・気圧・湿度のいずれかが skipped channel の sentinel である場合。
+pub fn decode_raw(bytes: &[u8; RAW_LEN]) -> Result<RawSample, RegisterFault> {
+    fn adc20(msb: u8, lsb: u8, xlsb: u8) -> u32 {
+        (u32::from(msb) << 12) | (u32::from(lsb) << 4) | u32::from(xlsb >> 4)
+    }
+    let raw = RawSample {
+        pressure: adc20(bytes[0], bytes[1], bytes[2]),
+        temperature: adc20(bytes[3], bytes[4], bytes[5]),
+        humidity: u16::from_be_bytes([bytes[6], bytes[7]]),
+    };
+    if raw.pressure == 0x80000 || raw.temperature == 0x80000 || raw.humidity == 0x8000 {
+        Err(RegisterFault::SkippedChannel)
+    } else {
+        Ok(raw)
+    }
 }
 
 /// 補償後の値。単位・Q 形式はデータシート §4.2.3 に従う。
@@ -192,6 +330,79 @@ pub fn compensate(raw: RawSample, c: &Calibration) -> Result<Reading, Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn calibration_register_boundaries_and_signed_nibbles() {
+        // 人工 byte。位置と符号の根拠は Bosch Rev. 1.24 §4.2.2 Table 16。
+        let mut tp = [0u8; CALIB_TP_LEN];
+        tp[0..4].copy_from_slice(&[0x34, 0x12, 0xfe, 0xff]);
+        tp[6..8].copy_from_slice(&[0x78, 0x56]);
+        tp[22..24].copy_from_slice(&[0x02, 0x80]);
+        tp[25] = 0xa5;
+        let h = [0x01, 0x80, 0x5a, 0x80, 0xf0, 0x7f, 0xff];
+        let c = decode_calibration(&tp, &h);
+        assert_eq!((c.dig_t1, c.dig_t2, c.dig_p1), (0x1234, -2, 0x5678));
+        assert_eq!(
+            (c.dig_p9, c.dig_h1, c.dig_h2, c.dig_h3),
+            (-32766, 0xa5, -32767, 0x5a)
+        );
+        assert_eq!((c.dig_h4, c.dig_h5, c.dig_h6), (-2048, 2047, -1));
+
+        let h = [0, 0, 0, 0x7f, 0x0f, 0x80, 0];
+        let c = decode_calibration(&tp, &h);
+        assert_eq!((c.dig_h4, c.dig_h5), (2047, -2048));
+    }
+
+    #[test]
+    fn raw_burst_boundaries_and_skipped_channel_faults() {
+        // 人工 byte。Bosch Rev. 1.24 §5.4.7–5.4.9 Tables 29–31 の配置。
+        let bytes = [0x12, 0x34, 0x5f, 0xab, 0xcd, 0xe1, 0x34, 0x56];
+        assert_eq!(
+            decode_raw(&bytes),
+            Ok(RawSample {
+                pressure: 0x12345,
+                temperature: 0xabcde,
+                humidity: 0x3456,
+            })
+        );
+        let mut skipped = bytes;
+        skipped[0..3].copy_from_slice(&[0x80, 0x00, 0x00]);
+        assert_eq!(decode_raw(&skipped), Err(RegisterFault::SkippedChannel));
+        skipped = bytes;
+        skipped[3..6].copy_from_slice(&[0x80, 0x00, 0x00]);
+        assert_eq!(decode_raw(&skipped), Err(RegisterFault::SkippedChannel));
+        skipped = bytes;
+        skipped[6..8].copy_from_slice(&[0x80, 0x00]);
+        assert_eq!(decode_raw(&skipped), Err(RegisterFault::SkippedChannel));
+    }
+
+    #[test]
+    fn status_and_identity_faults_follow_register_bits() {
+        // Bosch Rev. 1.24 §5.4.1 Table 18、§5.4.4 Table 21。
+        assert_eq!(check_identity(CHIP_ID), Ok(()));
+        assert_eq!(check_identity(0x00), Err(RegisterFault::WrongChipId));
+        assert_eq!(
+            check_calibration_ready(0x01),
+            Err(RegisterFault::CalibrationNotReady)
+        );
+        assert_eq!(check_calibration_ready(0x08), Ok(()));
+        assert_eq!(
+            check_measurement_ready(0x08),
+            Err(RegisterFault::MeasurementNotReady)
+        );
+        assert_eq!(
+            check_measurement_ready(0x01),
+            Err(RegisterFault::MeasurementNotReady)
+        );
+        assert_eq!(check_measurement_ready(0x00), Ok(()));
+    }
+
+    #[test]
+    fn io_faults_separate_timeout_from_other_errors() {
+        // 人工的な code。ESP-IDF の数値や実機の error として扱わない。
+        assert_eq!(classify_io_error(7, 7), IoFault::Timeout);
+        assert_eq!(classify_io_error(8, 7), IoFault::Other);
+    }
 
     // 人工的な入力。メーカーの校正値や実測値として扱わない。
     // 公式 §4.2.3 の式で手計算可能な係数だけを立て、3経路を試す。

@@ -3,7 +3,8 @@ name = "deskcat-env"
 version = "0.1.0"
 description = "Pure BME280 temperature, pressure, and humidity compensation for ENV-01"
 edition.workspace = true
-rust-version.workspace = true
+# ESP32 firmware からも path dependency で使う。ESP toolchain での build を PR で確認する。
+rust-version = "1.95"
 license.workspace = true
 publish.workspace = true
 
