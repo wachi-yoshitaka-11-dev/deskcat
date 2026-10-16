@@ -2763,12 +2763,12 @@ unitは、develop `6621423`の`deploy/systemd/deskcatd.service`（sha256 `395be6
 
 **1回目の試み**
 
-1. 約05:50：書き込み済みだった過去の試験build（#23の`tap-21,face-21,bringup-display-13`）で、記録用の読み取りを試した。ポートを開くとESP32がリセットされることを確認した。`stty -hupcl`を指定して`cat`で読むと、リセットされずに読めることを確認した
+1. 約05:50：書き込み済みだった過去の試験build（#23の`tap-21,face-21,bringup-display-13`）で、記録用の読み取りを試した。pyserialでポートを開くと（DTRとRTSをFalseにする設定。ログの見出しに「open without reset」と書いたのは、作業セッションの意図であり、実際には、開いた直後にESP32がリセットされた）、`rst:0x1 (POWERON_RESET)`の起動の出力が出た。`stty -hupcl`を指定して`cat`で読むと、起動中のappの出力（`hb`）が続いて読め、リセットの出力は出なかった
 2. 書き込みのドライラン：同じ過去の試験buildを`espflash flash --after no-reset`で書き込み、書き込みの後にESP32が起動せず、出力が0バイトであることを確認した（ENは押していない）
 3. 05:53:44：`bench-servo-test-17`のELFを`espflash flash --after no-reset`で書き込んだ。sha256は書き込みの直前に照合。書き込みの後はブートローダで止まった。ACは抜いた状態。ホーンを外す指示と、ACを抜いたまま行う指示は、書き込みの後に出した
 4. ユーザーがENボタンを押し、M-12001のACプラグを挿した（指示は『押してから5秒数えて挿す』。指示どおりの時間だったかは、申告に明示が無い。時刻も申告に無い。05:53:44から05:56:44のあいだ）。ユーザーの申告：**サーボは動いた。異常なし。端子台・PTC・線の周りは熱くない**（手の背。触れていない）。動いた向きと角度は、申告に含まれていない。この回の起動ログは**取れていない**（記録用の読み取りは、起動の出力を1行も取らなかった）
-5. 05:56:44：作業セッションが、ポートを開いてESP32をリセットした。**この時点で、ACが抜けているかを、作業セッションは確認していなかった。**ユーザーは、サーボが動いたとは申告していない。ログ：`reset_reason=power_on`、`servo_bench_test_nvs_latch_set`、`servo_bench_test_arm_delay_start ms=10000`、uptime 10513 msに`servo_bench_test_arm_delay_done`、`servo_bench_test_move target_deg=105`（uptime 10553 ms）、`servo_bench_test_stop`（10853 ms）。**この回が、latchが立つ前の最初の実行に見える**
-6. 05:58:44：ユーザーに「ACプラグは抜けていますか」と聞き、「抜けています」の返答を得てから、ポートを開いてリセットした。ログ：`servo_bench_test_skipped_already_ran reason=nvs_latch_set`
+5. 05:56:44：作業セッションが、pyserialでポートを開いた（ログの見出しは「open without reset」だが、上の1のとおり、開いた直後にリセットされ、起動の出力〔`rst:0x1 (POWERON_RESET)`〕が出た）。**この時点で、ACが抜けているかを、作業セッションは確認していなかった。**ユーザーは、サーボが動いたとは申告していない。ログ：`reset_reason=power_on`、`servo_bench_test_nvs_latch_set`、`servo_bench_test_arm_delay_start ms=10000`、uptime 10513 msに`servo_bench_test_arm_delay_done`、`servo_bench_test_move target_deg=105`（uptime 10553 ms）、`servo_bench_test_stop`（10853 ms）。**この回が、latchが立つ前の最初の実行に見える**
+6. 05:58:44：ユーザーに「ACプラグは抜けていますか」と聞き、「抜けています」の返答を得てから、同じ方法でポートを開いた（開いた直後にリセットされた）。ログ：`servo_bench_test_skipped_already_ran reason=nvs_latch_set`
 7. 06:00:41：サーボを動かす機能のない過去の試験build（ELFのsha256は`14297916fbb00b7ec58d19542c6131c394717876334d26384e56ae89a42f676b`）を書き込み、起動と1秒ごとの`hb`のログを確認した
 
 **1回目の試みの原因の調べ（サーボの電源なし。ACは抜いたまま）**
@@ -2826,7 +2826,7 @@ unitは、develop `6621423`の`deploy/systemd/deskcatd.service`（sha256 `395be6
 ### Next safe step
 
 - **この測定用build（`e0e959f`）での、これ以降の駆動は、行わない。**起動だけでは動かさず、UART0の入力で1回だけ動かす直しがdevelopに入るまで待つ
-- 書き込みの直後（`--after no-reset`）は、ENを押しても、`espflash reset`でも、appが起動しなかった（上の8、9）。起動の合図は、DTRを解除し、RTSでリセットを保持・解除する形（上の10、14）で行う
+- 書き込みの直後（`--after no-reset`）は、ENを押したあとに出力が無く（上の8）、`espflash reset`のあとにダウンロードモードの出力が出た（上の9）。起動の合図は、DTRを解除し、RTSでリセットを保持・解除する形（上の10、14）で行う
 - 再起動のたびに、サーボの外部5 V電源（ACプラグ）が抜けていることを確認してから、ポートを開く・リセットする
 - 終わりの状態：ACプラグは抜けている（ユーザーの申告。上の15〜16の前）。ESP32はPCのUSBにつながっていて、サーボを動かす機能のない過去の試験build（上の17）が書き込まれている。NVSのlatchは、2回目の試みの実行で立った。サーボは、ジャンパー線で端子台Sにつながったまま（撤去の指示は出していない）。信号用の330 Ωは、ESP32のGPIO27とサーボの黄の穴のあいだに入ったまま。電源の経路の330 Ωは外した。LCDのVCCの線は、LCD側で抜いたまま（ユーザーの申告）。Piとの線は外した状態
 
