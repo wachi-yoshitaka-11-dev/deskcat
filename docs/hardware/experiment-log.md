@@ -2767,7 +2767,7 @@ unitは、develop `6621423`の`deploy/systemd/deskcatd.service`（sha256 `395be6
 2. 書き込みのドライラン：同じ過去の試験buildを`espflash flash --after no-reset`で書き込み、書き込みの後にESP32が起動せず、出力が0バイトであることを確認した（ENは押していない）
 3. 05:53:44：`bench-servo-test-17`のELFを`espflash flash --after no-reset`で書き込んだ。sha256は書き込みの直前に照合。書き込みの後はブートローダで止まった。ACは抜いた状態。ホーンを外す指示と、ACを抜いたまま行う指示は、書き込みの後に出した
 4. ユーザーがENボタンを押し、M-12001のACプラグを挿した（指示は『押してから5秒数えて挿す』。指示どおりの時間だったかは、申告に明示が無い。時刻も申告に無い。05:53:44から05:56:44のあいだ）。ユーザーの申告：**サーボは動いた。異常なし。端子台・PTC・線の周りは熱くない**（手の背。触れていない）。動いた向きと角度は、申告に含まれていない。この回の起動ログは**取れていない**（記録用の読み取りは、起動の出力を1行も取らなかった）
-5. 05:56:44：作業セッションが、ポートを開いてESP32をリセットした。**この時点で、ACが抜けているかを、作業セッションは確認していなかった。**ユーザーは、サーボが動いたとは申告していない。ログ：`reset_reason=power_on`、`servo_bench_test_nvs_latch_set`、`servo_bench_test_arm_delay_start ms=10000`、約10.55秒後に`servo_bench_test_arm_delay_done`、`servo_bench_test_move target_deg=105`（uptime 10553 ms）、`servo_bench_test_stop`（10853 ms）。**この回が、latchが立つ前の最初の実行に見える**
+5. 05:56:44：作業セッションが、ポートを開いてESP32をリセットした。**この時点で、ACが抜けているかを、作業セッションは確認していなかった。**ユーザーは、サーボが動いたとは申告していない。ログ：`reset_reason=power_on`、`servo_bench_test_nvs_latch_set`、`servo_bench_test_arm_delay_start ms=10000`、uptime 10513 msに`servo_bench_test_arm_delay_done`、`servo_bench_test_move target_deg=105`（uptime 10553 ms）、`servo_bench_test_stop`（10853 ms）。**この回が、latchが立つ前の最初の実行に見える**
 6. 05:58:44：ユーザーに「ACプラグは抜けていますか」と聞き、「抜けています」の返答を得てから、ポートを開いてリセットした。ログ：`servo_bench_test_skipped_already_ran reason=nvs_latch_set`
 7. 06:00:41：サーボを動かす機能のない過去の試験build（ELFのsha256は`14297916fbb00b7ec58d19542c6131c394717876334d26384e56ae89a42f676b`）を書き込み、起動と1秒ごとの`hb`のログを確認した
 
@@ -2781,7 +2781,7 @@ unitは、develop `6621423`の`deploy/systemd/deskcatd.service`（sha256 `395be6
 
 11. 06:34:15：`bench-servo-test-17`のELFを`espflash flash --after no-reset`で書き込んだ（sha256は直前に照合）。06:34:44：NVSの領域（0x9000から0x6000バイト。起動ログの partition table による）を`espflash erase-region`で消し、先頭の64バイトが`0xff`であることを読み戻して確認した（latchを消す再武装。`espflash erase-parts nvs`は、partition tableの指定が要り、失敗した）
 12. 06:35:16：pyserialでDTRを解除、RTSを保持してポートを開いた（ESP32はリセットのまま。出力なし）。ユーザーに、ホーンと配線の確認、ACプラグをすぐ抜ける位置に持つことを指示した
-13. ユーザーがM-12001のACプラグを挿した。ユーザーの申告：**挿した直後にサーボが動いた**（ESP32はリセットのまま。サーボ自身の電源投入時の動き。時刻、向き、角度は申告に無い）
+13. ユーザーがM-12001のACプラグを挿した。ユーザーの申告：**挿した直後にサーボが動いた**（ESP32はリセットのまま。動きの原因は確かめていない。サーボの電源投入時の動きの可能性がある。GPIO27は、リセットの間、未設定で、実際のレベルは測っていない。時刻、向き、角度は申告に無い）
 14. ユーザーが「どうぞ」と返した。06:38:01：RTSを解除した。ログ：`rst:0x1 (POWERON_RESET),boot:0x13`、`servo_bench_test_nvs_latch_set`、`servo_bench_test_arm_delay_start ms=10000`（06:38:01）、`servo_bench_test_arm_delay_done`（06:38:11、uptime 10513 ms）、`servo_bench_test_move target_deg=105`（06:38:12、uptime 10553 ms）、`servo_bench_test_stop`（uptime 10853 ms）
 15. ユーザーの申告：「うごいた」。動いた時刻（「どうぞ」から何秒後か）、向き、角度は、申告に無い（動かす前に、向きを見るよう頼んでいなかった。作業セッションの段取りの誤り）。異音・熱・異臭、端子台・PTC・線の周りの熱の有無は、申告されていない。ユーザーは、AC プラグが抜けていることを「ぬけている」と申告した（時刻は申告に無い）
 16. 06:39:01：ACが抜けている状態で、ポートを開いてリセットした。ログ：`servo_bench_test_skipped_already_ran reason=nvs_latch_set`。動作の行は無い
@@ -2789,14 +2789,16 @@ unitは、develop `6621423`の`deploy/systemd/deskcatd.service`（sha256 `395be6
 
 ### 結果
 
-- 1回目の試み：ユーザーの申告では、サーボは動いた。ESP32の起動ログは無い。上の8〜10で、書き込みの後の状態では、ENを押してもappが起動せず、ダウンロードモードに入ることが再現した。1回目も同じ状態だった可能性が高い。その場合、サーボの動きは、AC電源を挿した時の電源投入時の動きで、bench-servo-test-17のfirmwareは走っていない。**ただし、1回目の起動ログが無いため、確かめていない**
-- 2回目の試み：ユーザーがACを先に挿し、挿した直後にサーボが動いた（申告。ESP32はリセットのまま）。RTSの解除（06:38:01）の約10.55秒後に、ESP32のログに`servo_bench_test_move target_deg=105`が出て、300 ms後に`stop`が出た。ユーザーは「うごいた」と申告した。動いた時刻、向き、角度、熱・異常の有無は申告に無い
+- 1回目の試み：ユーザーの申告では、サーボは動いた。ESP32の起動ログは無い。上の8で、書き込みの後にENを押したあと、出力が0行だった。上の9で、`espflash reset`のあとに、ダウンロードモードの出力（`waiting for download.`）が出た。この2つから、書き込みの後の状態では、リセットしてもappが起動しないことが再現した（8は出力が無いだけで、ダウンロードモードの出力は9で出た）。1回目も同じ状態だった可能性が高い。その場合、サーボの動きは、AC電源を挿した時の電源投入時の動きで、bench-servo-test-17のfirmwareは走っていない。**ただし、1回目の起動ログが無いため、確かめていない**
+- 2回目の試み：ユーザーがACを先に挿し、挿した直後にサーボが動いた（申告。ESP32はリセットのまま。原因は確かめていない）。RTSの解除（06:38:01）の後、arm delayの10秒（uptime 10513 ms）が過ぎて、06:38:12（uptime 10553 ms）にESP32のログへ`servo_bench_test_move target_deg=105`が出て、300 ms後に`stop`が出た。ユーザーは「うごいた」と申告した。動いた時刻、向き、角度、熱・異常の有無は申告に無い
 - latch：2回目の試みの動作のあとの最初の再起動（上の16）で、latchが効いて`skipped_already_ran`が出た。1回目の動作のあとの最初の再起動（上の5）で動作の手前まで進んだことは、上の5が、latchが立つ前の最初の実行だった（1回目の試みでbenchが走っていなかった）と読めば整合する。**latchが効かなかった、とは言えない**
 - ESP32のログ（上の5、6、14、16）に`panic`は無い。`health`の行で`overrun_ticks=0`。意図したリセット（ENボタン、ポートの開閉、RTSの操作）が複数回あった
 
 ### Faults
 
 - **1回目の起動ログが無い。**1回目のサーボの動きが、firmwareの指令だったかは、未確認である
+- **手順書からの逸脱1（ユーザーの決定）：**サーボの電源の経路に、ジャンパー線を使った。[servo-safety-limits.md](servo-safety-limits.md)の手順の`通電前の現物確認`と、承認の状態の項目6は、servo電源の経路にbreadboardとjumper wireを使わないことを、満たさなければ試験を始めない条件とする。ユーザーの決定（[comment 6222108076](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6222108076)）で、この文面と食い違ったまま使った。ジャンパー線の太さ・定格は記録に無い
+- **手順書からの逸脱2（作業順序）：**サーボへの給電が、手順書の`起動とarm delay`の窓（ESP32を起動し、`servo_bench_test_arm_delay_start`のlogを見たあと、arm delayの間にサーボの外部5 V電源を入れる）の外で行われた。1回目は、logを待たず、ENのあと約5秒数えて挿す指示にした（ESP32はダウンロードモードに留まっていた可能性が高い）。2回目は、ESP32をリセットしたまま先にACを挿した（PMとVMが決めた順序で、ユーザーの指示の範囲〔[comment 6224969168](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6224969168)〕に書いた。サーボの動きを、AC投入の動きと、firmwareの動作で区別するため）。GPIO27は、この間、未設定で、実際のレベルとpull-downの有無は確かめていない
 - **作業セッションの誤り1：**上の5のリセットを、ACが抜けているかを確認せずに行った。[servo-safety-limits.md](servo-safety-limits.md)の手順の`latch検証`は「servoの外部5 V電源を先に遮断してから」と定める。この順序を、この回は守っていなかった
 - **作業セッションの誤り2：**`pkill -f logger2.py`のcommand文字列に`logger2.py`を含めたため、作業セッション自身のshellが止まった。上の17の前にも、`hold.py`を止める操作の文字列で同じ誤りをした。実害は無い
 - **作業セッションの誤り3：**2回目の試みで、サーボの動いた向きを、動かした後で聞いた。動かす前に、向きを見るよう頼んでいなかった
@@ -2810,7 +2812,7 @@ unitは、develop `6621423`の`deploy/systemd/deskcatd.service`（sha256 `395be6
 ### この記録が主張しないこと
 
 - サーボの線の並び（赤＝＋5 V、茶＝GND、黄＝信号）が正しいこと。電流制限つきの通電で、赤の穴が茶の穴より正だったことと矛盾しない、までである
-- 2回目の試みでサーボが動いたことの原因が、firmwareの指令（`servo_bench_test_move`）であること。ESP32のログに指令が出た約10.55秒後に、ユーザーが「うごいた」と申告したが、動いた時刻の申告が無い
+- 2回目の試みでサーボが動いたことの原因が、firmwareの指令（`servo_bench_test_move`）であること。ESP32のログに指令が出た後に、ユーザーが「うごいた」と申告したが、動いた時刻の申告が無い。ログの指令（06:38:12）と、ユーザーの申告の時間差は、記録に無い
 - 起動時と小動作時の電流、5 Vと3.3 Vのtransient、ESP32のreset回数が0であること。いずれも測っていない（意図したリセットがあった）。[#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)の受け入れ条件は満たしていない
 - latchが、書き込みの直後の最初の再起動でも再実行を止めること。1回目の試みでbenchが走っていなければ、この条件は一度も試していない
 - ジャンパー線の針・端子台・3導体の穴・PTCが、サーボの戻りの電流で、熱に耐えること
@@ -2819,7 +2821,7 @@ unitは、develop `6621423`の`deploy/systemd/deskcatd.service`（sha256 `395be6
 
 ### Conclusion
 
-1回目の試みは、サーボが動いたが、ESP32がappとして起動していなかった可能性が高く、firmwareの指令との対応は未確認である。2回目の試みは、サーボの電源を先に入れ、ESP32のリセットを解除して起動すると、約10.55秒後に`servo_bench_test_move`が出て、ユーザーは「うごいた」と申告した。latchは、2回目の試みの動作のあとの最初の再起動で効いた。
+1回目の試みは、サーボが動いたが、ESP32がappとして起動していなかった可能性が高く、firmwareの指令との対応は未確認である。2回目の試みは、サーボの電源を先に入れ、ESP32のリセットを解除して起動すると、約11秒後（uptime 10553 ms）に`servo_bench_test_move`が出て、ユーザーは「うごいた」と申告した。latchは、2回目の試みの動作のあとの最初の再起動で効いた。
 
 ### Next safe step
 
@@ -2866,4 +2868,4 @@ unitは、develop `6621423`の`deploy/systemd/deskcatd.service`（sha256 `395be6
 | 2026-10-12 | 31 | [#514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)。**`EXP-025`を追加した。**追加LED（白＝GPIO2、赤＝GPIO5）の点灯試験（赤だけ・白だけ・両方）の記録である。各comment（出所）にある事実だけを書いた。LED電流・`3V3` railの電圧・`U2`の温度は計測していない | [#514のコメント](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514#issuecomment-6125555742) |
 | 2026-10-13 | 32 | [#23](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/23)。**`EXP-026`を追加した。**Piの`deskcatd`の独り言（`show_text`）をLCDへ出し、受理と拒否のACKと、表示期限の後の表情の戻りを確かめた記録である。製品buildではなく`tap-21,face-21,bringup-display-13`で行った。描画時間とRAMの最大使用量は測っていない | [#23のコメント](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/23#issuecomment-6145205989) |
 | 2026-10-17 | 33 | [#522](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/522)。**`EXP-027`を追加した。**Pi Zero Wで`deskcatd`（`ureq`＋`native-tls`）を直接build（`libssl-dev`無しではexit 101、有りではdevelop `6621423`が39分03秒でexit 0）、キーなしのHTTPS接続と証明書検証、systemd credentialの動作（`6621423`のunitは、キーのfileが無いと`status=243/CREDENTIALS`で起動しなかったこと。#603の`3a73475`のunitの複製の観察(g)を含む）、偽のESP32（PTY）を相手にした`deskcatd`の1800秒の常駐を観察した。ADR-0026の確認項目を満たしたとは書いていない。Wi-Fiの切断の件数と、作業中に対象を指定しない`reset-failed`を1回実行した操作を記録した | [#522](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/522) |
-| 2026-10-17 | 34 | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。**`EXP-028`を追加した。**SG90の初回のサーボ動作を、測定用build `bench-servo-test-17`（developの`e0e959f`）、ジャンパー線の接続、電源の経路のPTC直列、信号用の330 Ωで、2回試みた記録。1回目は、サーボは動いたが、書き込みの後にESP32がダウンロードモードに留まったため、appが起動していなかった可能性が高く、起動ログが無く、指令との対応は未確認。2回目は、サーボの電源を先に入れ、ESP32のリセットを解除して起動した約10.55秒後に`servo_bench_test_move`が出て、ユーザーは「うごいた」と申告した（時刻・向き・角度・熱は申告に無い）。latchは2回目の動作のあとの再起動で効いた。サーボの線の並びはユーザーの決定（慣行）で、実測で確かめていない。#17の受け入れ条件（電流、transient、reset回数）は満たしていない。AC電源の確認なしにリセットした作業セッションの誤りを含む | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17) |
+| 2026-10-17 | 34 | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。**`EXP-028`を追加した。**SG90の初回のサーボ動作を、測定用build `bench-servo-test-17`（developの`e0e959f`）、ジャンパー線の接続、電源の経路のPTC直列、信号用の330 Ωで、2回試みた記録。1回目は、サーボは動いたが、書き込みの後にESP32がダウンロードモードに留まったため、appが起動していなかった可能性が高く、起動ログが無く、指令との対応は未確認。2回目は、サーボの電源を先に入れ、ESP32のリセットを解除して起動した約11秒後（uptime 10553 ms）に`servo_bench_test_move`が出て、ユーザーは「うごいた」と申告した（時刻・向き・角度・熱は申告に無い）。latchは2回目の動作のあとの再起動で効いた。サーボの線の並びはユーザーの決定（慣行）で、実測で確かめていない。#17の受け入れ条件（電流、transient、reset回数）は満たしていない。AC電源の確認なしにリセットした作業セッションの誤りを含む | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17) |
