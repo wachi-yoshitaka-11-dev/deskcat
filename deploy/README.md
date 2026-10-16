@@ -9,7 +9,7 @@ Pi Zero W上で`deskcatd`とHTTPSを確認し、#23のローカル独り言を�
 非DefaultのAnthropic Workspaceに月額`$2`の上限が設定され、専用キーがその
 Workspaceだけで使えることを人間が確認する（[ADR-0026](../docs/decisions/0026-cloud-speech-generation.md)）。
 元のキーはPiの`/etc/deskcatd/anthropic-api-key`へroot所有・mode `0600`で置く。
-unitの`LoadCredential=`がサービスへ渡し、fileが無い場合は`SetCredential=`の既定値（キーではない印の`deskcatd-no-api-key`）へ戻る。`deskcatd`はこの印をキーとして使わず、クラウドを使わずにローカル独り言だけで動く。既定値を空にすると、systemd 257.9 は空の値を捨て、fileが無いと起動しない（#522 の Pi での観察）。
+unitの`LoadCredential=`がサービスへ渡し、fileが無い場合は`SetCredential=`の既定値（キーではない印の`deskcatd-no-api-key`）へ戻る。`deskcatd`はこの印をキーとして使わず、クラウドの経路を使わない（serviceは起動する）。ローカル独り言は、`ExecStart`に独り言の2引数を足したときだけ動く（既定の`ExecStart`には無い）。既定値を空にすると、systemd 257.9 は空の値を捨て、fileが無いと起動しない（#522 の Pi での観察）。
 キーの値をunit、環境file、CLI引数、log、repositoryへ書かない。
 予算の記録は`StateDirectory=deskcatd`が作る`/var/lib/deskcatd`へ保存する。
 予算fileの読書きに失敗した場合はクラウドへ送らず、ローカル独り言を使う。
