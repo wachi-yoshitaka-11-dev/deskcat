@@ -530,14 +530,8 @@ fn main() {
     ))]
     let mut tap = start_tap(i2c_driver, health.uptime_ms());
     #[cfg(feature = "env-sample-16")]
-    let mut env_sampler = i2c_driver.map(|bringup| {
-        EnvSampler::new(
-            bringup.driver,
-            bringup.env_id,
-            health.uptime_ms(),
-            ENV_I2C_ADDRESS,
-        )
-    });
+    let mut env_sampler =
+        i2c_driver.map(|bringup| EnvSampler::new(bringup.driver, bringup.env_id, ENV_I2C_ADDRESS));
     #[cfg(all(
         not(any(feature = "tap-21", deskcat_product_mode)),
         not(feature = "bringup-display-13"),

@@ -25,7 +25,7 @@ const DEADLINE_MS: u64 = 30;
 
 #[derive(Clone, Copy)]
 enum State {
-    WaitCalibration { deadline_ms: u64 },
+    WaitCalibration { deadline_ms: Option<u64> },
     ReadCalibration,
     ConfigureHumidity,
     StartForced,
@@ -65,18 +65,11 @@ pub fn report_bus_init_fault(err: &EspError) {
 }
 
 impl EnvSampler {
-    pub fn new(
-        driver: I2cDriver<'static>,
-        chip_id: Result<u8, EspError>,
-        now_ms: u64,
-        address: u8,
-    ) -> Self {
+    pub fn new(driver: I2cDriver<'static>, chip_id: Result<u8, EspError>, address: u8) -> Self {
         let mut sampler = Self {
             driver,
             sensor: Bme280::new(address),
-            state: State::WaitCalibration {
-                deadline_ms: now_ms + DEADLINE_MS,
-            },
+            state: State::WaitCalibration { deadline_ms: None },
             calibration: None,
             counters: Counters::default(),
         };
@@ -99,6 +92,16 @@ impl EnvSampler {
     pub fn poll(&mut self, now_ms: u64) -> bool {
         match self.state {
             State::WaitCalibration { deadline_ms } => {
+                let deadline_ms = match deadline_ms {
+                    Some(deadline_ms) => deadline_ms,
+                    None => {
+                        let deadline_ms = now_ms.saturating_add(DEADLINE_MS);
+                        self.state = State::WaitCalibration {
+                            deadline_ms: Some(deadline_ms),
+                        };
+                        deadline_ms
+                    }
+                };
                 match self.sensor.read_status(&mut self.driver) {
                     Ok(status) if check_calibration_ready(status).is_ok() => {
                         self.state = State::ReadCalibration;
