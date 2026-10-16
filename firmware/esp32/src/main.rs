@@ -47,6 +47,7 @@
 //! | 試験feature | その試験buildで有効になるもの | 製品buildとの関係 |
 //! |---|---|---|
 //! | `bringup-i2c-15-16` | ACCEL-01／ENV-01のID読み出し。LCDに触れず、ADXL345へ設定を書かない | 従来のfeatureなしbuildの単体bring-upを保つ |
+//! | `env-sample-16` | BME280のChip IDが一致した場合だけ補正係数を読み、forced測定を1回行う。raw・補償値・faultはUART0にlog | 単独指定のみ。実機未確認で通電不可。Pi linkのpayloadは変更しない |
 //! | `bringup-display-13` | LCDの初期化、backlightの点灯、単色fillと四隅pattern | 表情とtapは有効にしない。描画の間のPi linkの受信とheartbeatは`crate::display_test`のmodule docを参照 |
 //! | `bringup-led-514` | #514の追加LED（GPIO2／GPIO5）の点灯試験と白の点滅（`crate::led`） | 表情とtapは有効にしない。`bringup-display-13`とも組み合わせられる |
 //! | `face-21` | LCDの初期化とbacklightの点灯を保ち、`set_expression`の3表情を描く。Pi commandを受けなくても、描ける状態になった時点で`neutral`を1回描く（#21、`crate::face`） | `bringup-display-13`とも組み合わせられる。**表情を持たない試験buildは`set_expression`を`hardware_unavailable`で拒否する** |
@@ -174,6 +175,18 @@ compile_error!(
     "bench-servo-test-17とtap-21は併用できない。tapの検出はPi linkで送るが、\
      測定用buildはPi linkを持たない。"
 );
+#[cfg(all(
+    feature = "env-sample-16",
+    any(
+        feature = "bringup-i2c-15-16",
+        feature = "bringup-display-13",
+        feature = "bringup-led-514",
+        feature = "face-21",
+        feature = "tap-21",
+        feature = "bench-servo-test-17"
+    )
+))]
+compile_error!("env-sample-16 は単独の試験 build として使う");
 #[cfg(not(feature = "bench-servo-test-17"))]
 mod boot_session;
 mod config;
@@ -182,6 +195,8 @@ mod display;
 #[cfg(feature = "bringup-display-13")]
 mod display_test;
 mod env;
+#[cfg(feature = "env-sample-16")]
+mod env_sample;
 mod face;
 mod health;
 #[cfg(feature = "bringup-led-514")]
@@ -219,6 +234,8 @@ use crate::display::Ili9341;
 #[cfg(feature = "bringup-display-13")]
 use crate::display_test::DisplayBringup;
 use crate::env::Bme280;
+#[cfg(feature = "env-sample-16")]
+use crate::env_sample::EnvSampler;
 #[cfg(any(feature = "face-21", deskcat_product_mode))]
 use crate::face::FaceDrawer;
 use crate::face::FaceState;
@@ -512,9 +529,13 @@ fn main() {
         not(feature = "bringup-display-13")
     ))]
     let mut tap = start_tap(i2c_driver, health.uptime_ms());
+    #[cfg(feature = "env-sample-16")]
+    let mut env_sampler =
+        i2c_driver.map(|bringup| EnvSampler::new(bringup.driver, bringup.env_id, ENV_I2C_ADDRESS));
     #[cfg(all(
         not(any(feature = "tap-21", deskcat_product_mode)),
-        not(feature = "bringup-display-13")
+        not(feature = "bringup-display-13"),
+        not(feature = "env-sample-16")
     ))]
     drop(i2c_driver);
 
@@ -701,6 +722,14 @@ fn main() {
         if let Some(detector) = tap.as_mut() {
             if detector.poll(health.uptime_ms(), boot_session.is_established()) {
                 pi_link::send_event(Message::Tapped, &mut boot_session, &health, &mut uart);
+            }
+        }
+
+        // 変換時間を待たず、1周回で1段だけ進める。UART0 の log のみ。
+        #[cfg(feature = "env-sample-16")]
+        if let Some(sampler) = env_sampler.as_mut() {
+            if sampler.poll(health.uptime_ms()) {
+                env_sampler = None;
             }
         }
 
@@ -1093,6 +1122,8 @@ fn start_tap(bringup: Option<I2cBringup>, now_ms: u64) -> Option<TapDetector> {
 struct I2cBringup {
     driver: I2cDriver<'static>,
     accel_id: Option<u8>,
+    #[cfg(feature = "env-sample-16")]
+    env_id: Result<u8, esp_idf_svc::sys::EspError>,
 }
 
 /// `ACCEL-01`（ADXL345）と`ENV-01`（BME280）のDevice ID／Chip IDを読み、生byteをlogへ出す。
@@ -1200,6 +1231,9 @@ fn run_i2c_bringup(
     let mut i2c = match I2cDriver::new(i2c0, sda, scl, &config) {
         Ok(i2c) => i2c,
         Err(err) => {
+            #[cfg(feature = "env-sample-16")]
+            crate::env_sample::report_bus_init_fault(&err);
+            #[cfg(not(feature = "env-sample-16"))]
             log::error!("i2c_driver_new_failed error={err}");
             return None;
         }
@@ -1219,15 +1253,20 @@ fn run_i2c_bringup(
     service_bringup_step(health, "accel_device_id");
 
     let env = Bme280::new(ENV_I2C_ADDRESS);
-    match env.read_chip_id(&mut i2c) {
+    let env_id = env.read_chip_id(&mut i2c);
+    match &env_id {
         Ok(raw) => log::info!("env_chip_id raw=0x{raw:02x}"),
         Err(err) => log::error!("env_chip_id_read_failed error={err}"),
     }
+    #[cfg(not(feature = "env-sample-16"))]
+    let _ = env_id;
     service_bringup_step(health, "env_chip_id");
     // `tap-21`付きbuildは、Device IDが一致したとき、このdriverでtap検出を続ける（`crate::tap`）。それ以外は呼び出し側が手放す。
     Some(I2cBringup {
         driver: i2c,
         accel_id,
+        #[cfg(feature = "env-sample-16")]
+        env_id,
     })
 }
 

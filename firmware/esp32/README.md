@@ -16,7 +16,7 @@
 
 Issue #5 でtoolchainを固定し、最小projectのclean buildを確認した。既定の製品build（featureなし）は、Pi link、heartbeat／health snapshot、`ACCEL-01`／`ENV-01`のID読み出し、LCDの表情描画、ADXL345のtap検出を1つのmain loopで扱う（#487）。表情とtapの動作は、それぞれ`face-21`と`tap-21`の試験buildから製品経路へ接続した。列挙した試験featureを指定すると試験構成を選び、従来の`tap-21,face-21,bringup-display-13`のデモを含め、各featureが有効にするI/Oは従来どおりである。`bringup-i2c-15-16`は、以前のfeatureなしbuildと同じ、LCDに触れないセンサー単体試験である。構成の一覧は`src/main.rs`のmodule doc「buildの構成」節が持つ。
 
-LCDのpinは`docs/hardware/gpio-assignment.md`の`信号inventory`が正本である。製品buildと`face-21`試験buildはLCDを初期化し、backlightを点けたまま`set_expression`の表情を描く。Pi commandを受けなくても、描ける状態になった時点で`neutral`を1回描く。`bringup-display-13`試験buildは単色fillと四隅patternを1段ずつ描く（`src/display_test.rs`）。その試験のflash・通電・目視結果は`docs/hardware/experiment-log.md`の`EXP-016`〜`EXP-018`にあるが、現在の段階描画経路と製品経路は実機で確認していない。`ACCEL-01`／`ENV-01`のID読み出しは既存のI2C driverを使う。製品buildと`tap-21`試験buildは、ADXL345のIDが一致した場合だけ設定を書き、tapを検出する。`SERVO-PWM`、`ADC-*`、`TOUCH-*`は製品buildでは駆動しない。servoの安全gateは[servo-safety-limits.md](../../docs/hardware/servo-safety-limits.md)が持つ。製品buildの通電手順は未確定であり、下の「build構成と通電」の表で通電可能とは扱わない。
+LCDのpinは`docs/hardware/gpio-assignment.md`の`信号inventory`が正本である。製品buildと`face-21`試験buildはLCDを初期化し、backlightを点けたまま`set_expression`の表情を描く。Pi commandを受けなくても、描ける状態になった時点で`neutral`を1回描く。`bringup-display-13`試験buildは単色fillと四隅patternを1段ずつ描く（`src/display_test.rs`）。その試験のflash・通電・目視結果は`docs/hardware/experiment-log.md`の`EXP-016`〜`EXP-018`にあるが、現在の段階描画経路と製品経路は実機で確認していない。`ACCEL-01`／`ENV-01`のID読み出しは既存のI2C driverを使う。`env-sample-16`試験buildだけがBME280のID一致後に補正係数とraw値を読み、測定設定を書いて補償値をUART0にlogする。製品buildと`tap-21`試験buildは、ADXL345のIDが一致した場合だけ設定を書き、tapを検出する。`SERVO-PWM`、`ADC-*`、`TOUCH-*`は製品buildでは駆動しない。servoの安全gateは[servo-safety-limits.md](../../docs/hardware/servo-safety-limits.md)が持つ。製品buildの通電手順は未確定であり、下の「build構成と通電」の表で通電可能とは扱わない。
 
 `crate::led`（[#514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)）は`LED-COMM`（GPIO2）と`LED-REACT`（GPIO5）を駆動する。**既定buildはこの2本に触れない。**`bringup-led-514` featureを付けた試験buildだけが、起動時に両pinを消灯側へ設定し、点灯試験（赤→白→両方）の後に白を点滅させる。`bringup-display-13`とも組み合わせられる。通信状態による白の点灯と、`happy`による赤の点灯はまだ無い。配線と試験の手順は[led-514-demo.md](../../docs/hardware/led-514-demo.md)が持つ。実機での点灯の観察は[EXP-025](../../docs/hardware/experiment-log.md#exp-025-追加ledの点灯試験赤だけ白だけ両方)にある。
 
@@ -95,15 +95,16 @@ session stateとserial taskの配線は
 build構成の説明を書き写さない（featureの一覧と、各featureが足すものは`src/main.rs`のmodule doc「buildの構成」節）。
 通電の手順と条件は[Power Budget](../../docs/hardware/power-budget.md)が正本であり（`ACCEL-01`／`ENV-01`単体bring-upの手順の条件(2)は`bringup-i2c-15-16`単独、`DISP-01`追加接続の手順の条件(2)は`bringup-display-13`付きbuildを要求する）、この表の「通電」欄は、その条件を各構成に当てた結果である。
 
-| build構成（`--features`） | LCD・backlight | ADXL345へ書く | Piへ送る | 通電（Power Budgetの手順） | 値の所在 |
-|---|---|---|---|---|---|
-| （既定・製品） | 初期化と点灯。点けたまま表情を描く | **ADXL345のDevice IDが`0xE5`のときだけ書く**。INT線を使わず`INT_SOURCE`をI2Cで読む | `boot`、ACK、`status`、`tapped`（IDが一致した場合） | **不可**（製品buildの通電手順は未確定） | `crates/deskcat-face`、`crates/deskcat-tap` |
-| `bringup-i2c-15-16` | 触れない | 書かない（Device IDを読むだけ） | `boot`、ACK、`status` | `ACCEL-01`／`ENV-01`単体bring-upの手順で可 | — |
-| `bringup-display-13` | 初期化と点灯。fillと四隅patternの後に消灯 | 書かない | 同上 | `DISP-01`追加接続の手順で可 | — |
-| `face-21` | 初期化と点灯。点けたまま表情を描く | 書かない | 同上。`set_expression`に受理のACKを返しうる | **不可**（`ACCEL-01`／`ENV-01`単体の手順は`bringup-i2c-15-16`単独限定、`DISP-01`の手順は`bringup-display-13`必須） | `crates/deskcat-face` |
-| `face-21,bringup-display-13` | bring-upの後も点灯のまま表情を描く（bring-upの間は`set_expression`を`busy`で拒否） | 書かない | 同上 | `DISP-01`追加接続の手順で可（条件(7)の承認は実行する日） | `crates/deskcat-face` |
-| `tap-21` | 触れない | **ADXL345のDevice IDが`0xE5`のときだけ書く**（`deskcat_tap::SETUP`。一致しなければ何も書かず、Device IDを読むだけ）。INT線は使わず`INT_SOURCE`をI2Cで読む | `boot`、ACK、`status`、`tapped`（Device IDが`0xE5`でなければ`tapped`は送らない） | **不可**（`ACCEL-01`／`ENV-01`単体の手順は`bringup-i2c-15-16`単独限定） | `crates/deskcat-tap` |
-| `tap-21,face-21,bringup-display-13`（デモ用） | `face-21,bringup-display-13`と同じ | `tap-21`と同じ（Device IDが`0xE5`のときだけ書く） | 上の全部 | `DISP-01`追加接続の手順で可（条件(7)の承認は実行する日） | `crates/deskcat-face`、`crates/deskcat-tap` |
+| build構成（`--features`） | LCD・backlight | ADXL345へ書く | BME280へ書く | Piへ送る | 通電（Power Budgetの手順） | 値の所在 |
+|---|---|---|---|---|---|---|
+| （既定・製品） | 初期化と点灯。点けたまま表情を描く | **ADXL345のDevice IDが`0xE5`のときだけ書く**。INT線を使わず`INT_SOURCE`をI2Cで読む | 書かない（Chip IDを読むだけ） | `boot`、ACK、`status`、`tapped`（IDが一致した場合） | **不可**（製品buildの通電手順は未確定） | `crates/deskcat-face`、`crates/deskcat-tap` |
+| `bringup-i2c-15-16` | 触れない | 書かない（Device IDを読むだけ） | 書かない（Chip IDを読むだけ） | `boot`、ACK、`status` | `ACCEL-01`／`ENV-01`単体bring-upの手順で可 | — |
+| `env-sample-16`（単独） | 触れない | 書かない（Device IDを読むだけ） | **Chip IDが`0x60`のときだけ** `ctrl_hum` と `ctrl_meas` へ書き、forced測定を1回行う。raw・補償値・fault件数はUART0へlog | `boot`、ACK、`status`（センサー値は載せない） | **不可**（新しい書き込みを含む構成の通電手順と承認は未確定） | `crates/deskcat-env` |
+| `bringup-display-13` | 初期化と点灯。fillと四隅patternの後に消灯 | 書かない | 書かない | 同上 | `DISP-01`追加接続の手順で可 | — |
+| `face-21` | 初期化と点灯。点けたまま表情を描く | 書かない | 書かない | 同上。`set_expression`に受理のACKを返しうる | **不可**（`ACCEL-01`／`ENV-01`単体の手順は`bringup-i2c-15-16`単独限定、`DISP-01`の手順は`bringup-display-13`必須） | `crates/deskcat-face` |
+| `face-21,bringup-display-13` | bring-upの後も点灯のまま表情を描く（bring-upの間は`set_expression`を`busy`で拒否） | 書かない | 書かない | 同上 | `DISP-01`追加接続の手順で可（条件(7)の承認は実行する日） | `crates/deskcat-face` |
+| `tap-21` | 触れない | **ADXL345のDevice IDが`0xE5`のときだけ書く**（`deskcat_tap::SETUP`。一致しなければ何も書かず、Device IDを読むだけ）。INT線は使わず`INT_SOURCE`をI2Cで読む | 書かない | `boot`、ACK、`status`、`tapped`（Device IDが`0xE5`でなければ`tapped`は送らない） | **不可**（`ACCEL-01`／`ENV-01`単体の手順は`bringup-i2c-15-16`単独限定） | `crates/deskcat-tap` |
+| `tap-21,face-21,bringup-display-13`（デモ用） | `face-21,bringup-display-13`と同じ | `tap-21`と同じ（Device IDが`0xE5`のときだけ書く） | 書かない | 上の全部 | `DISP-01`追加接続の手順で可（条件(7)の承認は実行する日） | `crates/deskcat-face`、`crates/deskcat-tap` |
 
 この表に無い組み合わせ（`bringup-led-514`、`bench-servo-test-17`との組み合わせなど）は対象外であり、この表は通電の可否を決めていない。`bringup-led-514`は、2026-10-12にユーザーが承認した条件（LEDの2枝を足して通電すること。書き込みと各回の通電）で、ESP32単体へ通電した。承認と観察は[led-514-demo.md](../../docs/hardware/led-514-demo.md)と[EXP-025](../../docs/hardware/experiment-log.md#exp-025-追加ledの点灯試験赤だけ白だけ両方)にある。
 `tap-21`が足す負荷（測定modeの`ACCEL-01`の約140 µA typ）の扱いは、Power Budgetの`face-21`の常時点灯の段落が持つ。
