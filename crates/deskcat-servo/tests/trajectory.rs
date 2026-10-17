@@ -680,9 +680,7 @@ fn a_wide_tolerance_stays_within_every_bound_and_never_concedes() {
 #[test]
 fn tolerance_sweep_preserves_all_three_bounds() {
     const STEPS_PER_WIDTH: usize = 49_440;
-    const WIDTH_FRACTIONS: [f32; 11] = [
-        0.0, 0.01, 0.02, 0.04, 0.06, 0.08, 0.1, 0.2, 0.4, 0.7, 0.9,
-    ];
+    const WIDTH_FRACTIONS: [f32; 11] = [0.0, 0.01, 0.02, 0.04, 0.06, 0.08, 0.1, 0.2, 0.4, 0.7, 0.9];
 
     for width_fraction in WIDTH_FRACTIONS {
         let tolerance = TEST_DT_S * width_fraction;
