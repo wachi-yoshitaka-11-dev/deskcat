@@ -370,7 +370,7 @@ fn main() {
     // implemented by esp-idf-sys might not link properly. See https://github.com/esp-rs/esp-idf-template/issues/71
     esp_idf_svc::sys::link_patches();
 
-    // どのbuildでもUART0はdebug log専用である（`crate::console`のmodule doc参照）。
+    // UART0はdebug logに使う（`bench-servo-test-17`だけは確認の語も読む。`crate::console`のmodule doc参照）。
     console::init_log_mode();
 
     // build identity。profile は `Cargo.toml` の `[profile.dev]`／`[profile.release]` に対応する。
@@ -1277,16 +1277,19 @@ fn run_i2c_bringup(
 ///
 /// # NVSによる単発latch
 ///
-/// この関数はESP32起動のたびに呼ばれ、手動triggerは無い。brownout resetでの
-/// 意図しない再実行を防ぐため、**実際にPWMで動かす前に**NVSへ実行済みflagをcommitする
+/// この関数はESP32起動のたびに呼ばれる。**起動だけでは動かさない。**latchが立っていなければ、
+/// 人間がUART0のconsoleへ[`BENCH_CONFIRM_TOKEN`]を入力して改行するまで待つ
+/// （[`wait_for_bench_confirmation`]）。書き込みの後のreset、記録用の読み取りがportを開いたときの
+/// DTR／RTSのreset、brownout resetなど、人間が意図しない起動では動かない（#17）。
+/// 確認を受けた後、**実際にPWMで動かす前に**NVSへ実行済みflagをcommitする
 /// （`EspNvs::set_u8`。`unsafe`は増やさない）。commit済みなら次回起動時にskipする。
 /// flagのcommit自体に失敗した場合はservoを動かさずに抜ける（誤判定を避けるため
 /// 動かさない側へ倒す）。再武装（NVS消去して再実行）には改めて承認が要る
 /// （[servo-safety-limits.md](../../../docs/hardware/servo-safety-limits.md)の
 /// `再武装`step参照）。
 ///
-/// `config::SERVO_BENCH_TEST_ARM_DELAY_MS`の間、heartbeatは出ない。人間は
-/// `servo_bench_test_arm_delay_start`等のlogで状況を判断する
+/// 確認の入力を待つ間と`config::SERVO_BENCH_TEST_ARM_DELAY_MS`の間、heartbeatは出ない。人間は
+/// `servo_bench_test_waiting_for_confirmation`／`servo_bench_test_arm_delay_start`等のlogで状況を判断する
 /// （検討経緯・前提の検証状況はPR本文参照）。
 ///
 /// 中央（`config::SERVO_ANGLE_CONVENTION_NEUTRAL_DEG`）から
@@ -1335,6 +1338,11 @@ fn run_servo_bench_test(
         }
     }
 
+    // 人間の明示の確認を待つ。確認の前にresetされても、latchは消費されず、次の起動でも待つ。
+    if !wait_for_bench_confirmation() {
+        return;
+    }
+
     // **実際に動かす前にlatchをcommitする。**動作中・動作直後のbrownout resetでも
     // 次回起動でこのflagが読め、再実行しない（module doc「NVSによる単発latch」参照）。
     if let Err(err) = nvs.set_u8(NVS_KEY_RAN, 1) {
@@ -1371,6 +1379,71 @@ fn run_servo_bench_test(
     match servo.stop() {
         Ok(()) => log::info!("servo_bench_test_stop"),
         Err(err) => log::error!("servo_bench_test_stop_failed error={err}"),
+    }
+}
+
+/// `bench-servo-test-17`で、人間がUART0のconsoleへ入力してservoの動作を確かめる語。
+/// 秘密ではない。誤って改行だけ・別の語を送っても動かないよう、完全一致だけを受ける。
+#[cfg(feature = "bench-servo-test-17")]
+const BENCH_CONFIRM_TOKEN: &str = "GO17";
+
+/// [`BENCH_CONFIRM_TOKEN`]の長さを超える入力行を捨てる上限（byte）。
+#[cfg(feature = "bench-servo-test-17")]
+const BENCH_CONFIRM_MAX_LINE: usize = 16;
+
+/// UART0のconsole（stdin）から1行ずつ読み、[`BENCH_CONFIRM_TOKEN`]と完全一致した行を
+/// 受けたら`true`を返す。一致しない行は捨てて待ち続ける。読み取りの失敗（データが無い場合を除く）は
+/// `false`を返し、servoを動かさない側へ倒す。
+///
+/// 期限は置かない（人間が入力するまで、servoへ信号を出さずに待つ）。データが無いときは
+/// `FreeRtos::delay_ms`でtaskを譲る。
+#[cfg(feature = "bench-servo-test-17")]
+fn wait_for_bench_confirmation() -> bool {
+    use std::io::{ErrorKind, Read};
+
+    log::warn!(
+        "servo_bench_test_waiting_for_confirmation token={BENCH_CONFIRM_TOKEN}. \
+         servo電源を入れ、立ち会いを確かめてから、このconsoleへ{BENCH_CONFIRM_TOKEN}と入力して改行する"
+    );
+    let mut stdin = std::io::stdin();
+    let mut line: Vec<u8> = Vec::with_capacity(BENCH_CONFIRM_MAX_LINE);
+    let mut overflowed = false;
+    let mut byte = [0_u8; 1];
+    loop {
+        match stdin.read(&mut byte) {
+            Ok(1) => match byte[0] {
+                b'\r' | b'\n' => {
+                    if overflowed {
+                        log::warn!("servo_bench_test_confirmation_rejected reason=too_long");
+                    } else if line == BENCH_CONFIRM_TOKEN.as_bytes() {
+                        log::info!("servo_bench_test_confirmed");
+                        return true;
+                    } else if !line.is_empty() {
+                        log::warn!(
+                            "servo_bench_test_confirmation_rejected reason=mismatch len={}",
+                            line.len()
+                        );
+                    }
+                    line.clear();
+                    overflowed = false;
+                }
+                other => {
+                    if line.len() < BENCH_CONFIRM_MAX_LINE {
+                        line.push(other);
+                    } else {
+                        overflowed = true;
+                    }
+                }
+            },
+            Ok(_) => FreeRtos::delay_ms(20),
+            Err(err) if matches!(err.kind(), ErrorKind::WouldBlock | ErrorKind::Interrupted) => {
+                FreeRtos::delay_ms(20);
+            }
+            Err(err) => {
+                log::error!("servo_bench_test_console_read_failed error={err}");
+                return false;
+            }
+        }
     }
 }
 
