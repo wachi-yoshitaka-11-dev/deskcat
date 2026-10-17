@@ -183,12 +183,22 @@ fn empty_catalog_never_reaches_admit() {
         panic!("test line must be play_motion");
     };
 
-    let first = dispatch.handle(MotionSession::new(Some(10), true), 10, 1, &command, 0, |_| {
-        panic!("empty catalog must not reach an actuator")
-    });
-    let retry = dispatch.handle(MotionSession::new(Some(10), true), 10, 1, &command, 1, |_| {
-        panic!("replay must not reach an actuator")
-    });
+    let first = dispatch.handle(
+        MotionSession::new(Some(10), true),
+        10,
+        1,
+        &command,
+        0,
+        |_| panic!("empty catalog must not reach an actuator"),
+    );
+    let retry = dispatch.handle(
+        MotionSession::new(Some(10), true),
+        10,
+        1,
+        &command,
+        1,
+        |_| panic!("replay must not reach an actuator"),
+    );
     assert_eq!(
         first,
         MotionDecision::Dedup(DedupOutcome::Admitted(Err(Rejection::UnknownMotion)))
