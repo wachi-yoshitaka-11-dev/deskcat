@@ -38,13 +38,15 @@
 //! - 同じcommandの再送でmotionを二重に始めない層（[`MotionDedup`]。Issue #19の受け入れ条件4の
 //!   うち、この層まで）。**このcrateは履歴を実装しない。**`deskcat-protocol`の`DuplicateHistory`を
 //!   使う側である
+//! - 受信後のsession・duplicate・catalog判定（[`MotionDispatch`]）
 //!
 //! duplicate suppressionは、PR #251のときにはこのcrateの範囲外とし、共通の履歴型を
 //! `deskcat-protocol`へ抽出する後続について「`PROTO-TBD-005` が未確定なうちは着手しない。」
 //! としていた。理由は値を先取りしないことだった。Issue #12で`crates/deskcat-serial`の
 //! `DuplicateHistory`が保持件数と保持期間を`DuplicatePolicy`として呼び出し側から受け取る形になり、
 //! その理由は抽出しても守れるようになった。そこでIssue #19で、`DuplicateHistory`を
-//! `deskcat-protocol`へ、hostとfirmwareで共用できるように移した。firmwareの`pi_link.rs`が`MotionDedup`経由で呼ぶ。
+//! `deskcat-protocol`へ、hostとfirmwareで共用できるように移した。firmwareの`pi_link.rs`は
+//! [`MotionDispatch`]を通して`MotionDedup`を呼ぶ。
 //! `play_motion`の型は`deskcat-protocol`にあるが、受信と振り分けはfirmwareの`pi_link.rs`が行う。**このcrateは履歴の実装を持たない**（`deskcat-protocol`の
 //! `DuplicateHistory`を使う）
 //!
@@ -103,11 +105,13 @@
 
 pub mod counters;
 pub mod dedup;
+pub mod dispatch;
 pub mod limiter;
 pub mod limits;
 
 pub use counters::{ClampReport, LimiterCounters};
 pub use dedup::{DedupOutcome, MotionDedup};
+pub use dispatch::{MotionDecision, MotionDispatch};
 pub use limiter::{
     AdmittedTarget, CommandSource, Limiter, MotionCatalog, MotionRequest, Rejection, Setpoint,
 };
