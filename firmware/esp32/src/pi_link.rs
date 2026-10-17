@@ -77,7 +77,8 @@ use deskcat_protocol::{
     Outcome, PlayMotion, Rejection,
 };
 use deskcat_servo::{
-    DedupOutcome, MotionCatalog, MotionDecision, MotionDispatch, Rejection as MotionRejection,
+    DedupOutcome, MotionCatalog, MotionDecision, MotionDispatch, MotionSession,
+    Rejection as MotionRejection,
 };
 use esp_idf_svc::hal::uart::UartDriver;
 
@@ -306,8 +307,7 @@ impl PiLink {
         boot_established: bool,
     ) -> Message {
         let outcome = self.motion_dispatch.handle(
-            self.pi.pi_sid(),
-            boot_established,
+            MotionSession::new(self.pi.pi_sid(), boot_established),
             sid,
             id,
             command,

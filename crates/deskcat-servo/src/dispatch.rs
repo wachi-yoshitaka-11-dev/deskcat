@@ -12,6 +12,24 @@ use deskcat_protocol::{DuplicatePolicy, ErrorCode, PlayMotion};
 
 use crate::{DedupOutcome, MotionCatalog, MotionDedup, Rejection};
 
+/// Pi sessionと`ESP32` bootの現在状態。firmwareが受信ごとに渡す。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MotionSession {
+    current_sid: Option<u32>,
+    boot_established: bool,
+}
+
+impl MotionSession {
+    /// 判定に使う現在のPi `sid`と`ESP32`の`boot`確立状態を作る。
+    #[must_use]
+    pub const fn new(current_sid: Option<u32>, boot_established: bool) -> Self {
+        Self {
+            current_sid,
+            boot_established,
+        }
+    }
+}
+
 /// Session判定またはduplicate判定を終えた結果。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MotionDecision {
@@ -22,7 +40,7 @@ pub enum MotionDecision {
 }
 
 impl MotionDecision {
-    /// WireのACKへ載せるerror code。成功なら`None`。
+    /// Wireの`ACK`へ載せるerror code。成功なら`None`。
     #[must_use]
     pub const fn code(self) -> Option<ErrorCode> {
         match self {
@@ -34,7 +52,7 @@ impl MotionDecision {
 
 /// 現在のPi sessionのmotion受理を、session→duplicate→catalog→`admit`の順に扱う。
 ///
-/// `current_sid`はfirmwareの`PiSession`が持つ値を毎回渡す。`on_new_session`は
+/// `MotionSession`の`current_sid`はfirmwareの`PiSession`が持つ値を毎回渡す。`on_new_session`は
 /// `HelloOutcome::Established`のときだけ呼び、旧sessionの履歴を消す。
 #[derive(Debug)]
 pub struct MotionDispatch {
@@ -59,19 +77,18 @@ impl MotionDispatch {
 
     /// `admit`を、現在sessionの初回commandで、catalogに名前がある場合だけ呼ぶ。
     ///
-    /// `boot_established`が偽の場合は履歴にも触れず`stale_session`を返す。
+    /// `session`の`boot_established`が偽の場合は履歴にも触れず`stale_session`を返す。
     /// `admit`は検査と動作開始を一つの呼び出しとして扱い、失敗も履歴に記録する。
     pub fn handle(
         &mut self,
-        current_sid: Option<u32>,
-        boot_established: bool,
+        session: MotionSession,
         sid: u32,
         id: u32,
         command: &PlayMotion,
         now_ms: u64,
         admit: impl FnOnce(&PlayMotion) -> Result<(), Rejection>,
     ) -> MotionDecision {
-        if current_sid != Some(sid) || !boot_established {
+        if session.current_sid != Some(sid) || !session.boot_established {
             return MotionDecision::StaleSession;
         }
         let catalog = &self.catalog;

@@ -6,7 +6,9 @@
 use core::time::Duration;
 
 use deskcat_protocol::{DuplicatePolicy, ErrorCode, Frame, Message, decode_line};
-use deskcat_servo::{DedupOutcome, MotionCatalog, MotionDecision, MotionDispatch, Rejection};
+use deskcat_servo::{
+    DedupOutcome, MotionCatalog, MotionDecision, MotionDispatch, MotionSession, Rejection,
+};
 
 const TEST_MOTION: &str = "test-relative";
 const TEST_CAPACITY: usize = 2;
@@ -38,8 +40,7 @@ fn run(
         panic!("test line must be play_motion");
     };
     dispatch.handle(
-        current_sid,
-        boot_established,
+        MotionSession::new(current_sid, boot_established),
         envelope.sid,
         envelope.id,
         &command,
@@ -182,10 +183,10 @@ fn empty_catalog_never_reaches_admit() {
         panic!("test line must be play_motion");
     };
 
-    let first = dispatch.handle(Some(10), true, 10, 1, &command, 0, |_| {
+    let first = dispatch.handle(MotionSession::new(Some(10), true), 10, 1, &command, 0, |_| {
         panic!("empty catalog must not reach an actuator")
     });
-    let retry = dispatch.handle(Some(10), true, 10, 1, &command, 1, |_| {
+    let retry = dispatch.handle(MotionSession::new(Some(10), true), 10, 1, &command, 1, |_| {
         panic!("replay must not reach an actuator")
     });
     assert_eq!(

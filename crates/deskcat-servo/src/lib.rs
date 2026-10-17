@@ -111,7 +111,7 @@ pub mod limits;
 
 pub use counters::{ClampReport, LimiterCounters};
 pub use dedup::{DedupOutcome, MotionDedup};
-pub use dispatch::{MotionDecision, MotionDispatch};
+pub use dispatch::{MotionDecision, MotionDispatch, MotionSession};
 pub use limiter::{
     AdmittedTarget, CommandSource, Limiter, MotionCatalog, MotionRequest, Rejection, Setpoint,
 };
