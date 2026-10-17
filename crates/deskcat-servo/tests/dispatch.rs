@@ -116,7 +116,10 @@ fn evicted_id_returns_duplicate_expired_without_running_again() {
             u64::from(id),
             &mut position,
         );
-        assert_eq!(decision, MotionDecision::Dedup(DedupOutcome::Admitted(Ok(()))));
+        assert_eq!(
+            decision,
+            MotionDecision::Dedup(DedupOutcome::Admitted(Ok(())))
+        );
     }
     let expired = run(
         &mut dispatch,
