@@ -76,9 +76,9 @@ transportを所有せず、pumpの引数で受け取る）ため、呼び出し�
 cargo run --example serial_link -- --port <path> --baud <rate> --duplicate-capacity <n> --duplicate-retention-ms <ms> [--seconds <n>] [--ping-count <n>] [--verbose]
 ```
 
-`--port`と`--baud`は**どちらも必須である。既定値を持たせない。**device名は未確認であり
-（確定は[Issue #11](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11)の後半）、
-baudの正本は`PROTO-TBD-001`でいずれも`Candidate`である。渡した値は記録にそのまま残る。
+`--port`と`--baud`は**どちらも必須である。既定値を持たせない。**Pi linkの`/dev/serial0`は
+[EXP-029](../../docs/hardware/experiment-log.md)でopenと往復を観察した。
+baudの確定は`PROTO-TBD-001`で、115200は`Candidate`である。渡した値は記録にそのまま残る。
 `--duplicate-capacity`と`--duplicate-retention-ms`（`boot`のduplicate履歴の保持件数と保持期間）も
 同じ理由で必須である。正本は`PROTO-TBD-005`で未確定である。
 
@@ -92,8 +92,13 @@ baudの正本は`PROTO-TBD-001`でいずれも`Candidate`である。渡した�
 （[Issue #12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)）へ渡し、送った`hello`の`id`を
 `note_hello_sent`で記録し、pumpの1周ごとに`retry_due_requests`でACK timeoutした`get_status`を送り直す。
 `retry_due_requests`は、確立の直後にqueueへ入れられなかった`get_status`も送る。
-接続のたびに`hello`を1件送る（`reason`は初回が`Startup`、再接続が`PortReopen`。仕様§5.1）。
-`--ping-count <n>`（1以上）を付けたときだけ、ESP32 sessionの確立のたびに`ping`を1件ずつ最大n件送る。ACKの相関と、ACK timeoutでの同じ`id`の再送は、`get_status`と同じ経路である。周期は持たない（`PROTO-TBD-010`）。省けば`ping`を送らない。
+接続のたびに`hello`を送る。未ACKなら同じ`(sid, id)`と`reason`で再送し、新しい送出では
+`reason`を初回の`Startup`と再接続の`PortReopen`に分ける（仕様§5.1）。
+GPIO UARTで相手が応答しなくなってもdevice errorが出ない場合に備え、実行体は定期的な
+`ping`の相関ACKを監視する。再送予算を使い切ったprobeが連続したら`disconnects`へ計上して
+portを開き直す。周期1秒、連続2 probeの閾値は**暫定値**である（`PROTO-TBD-010`）。
+単発のread timeoutは切断にしない。再接続の予算はbyte受信では戻さず、相関ACKを受けたときに戻す。
+`--ping-count <n>`（1以上）は別の診断用`ping`を最大n件送る。ACKの相関と、ACK timeoutでの同じ`id`の再送は、`get_status`と同じ経路である。診断用pingに周期は持たない。省いてもlink監視のprobeは動く。
 根拠の読み方: 終了時の`counters: pings_sent=… ping_acks=… ping_rejected=… ping_retries=… ping_gave_up=…`は通算である。`pings_sent`と`ping_acks`が等しくn以上なら、送った`ping`のすべてに`ok`のACKを相関できた（n未満なら、まだ送り終えていない。等しくなければ、拒否・取り下げ・未決のまま終了・ESP32 sessionの切替で捨てた`ping`がある。`peer: session_switches`は最初の確立でも1になり、2以上なら切替があった）。これは「`ping`へのACKを相関した」根拠であり、`boot`→ACK→`get_status`→`status`の往復の成立とは別に記録する。ESP32側のlogと突き合わせる。
 
 **ESP32が`boot`→ACKより先の往復に応えるのは、`firmware/esp32`を
@@ -105,13 +110,13 @@ PR B2で、ESP32は`hello`／`ping`／`get_status`にACKを返し、`get_status`
 はずである。届く順序とESP32の状態によって`hello`のACKの数え方は変わる（正本は`PeerSession`の
 `pending_hello`のdocと`tests/simulator.rs`）。
 往復の順と、成り立つ条件は`examples/serial_link.rs`のmodule docにある。
-**実機ではまだ確かめていない。**ESP32側の振る舞いはsourceを読んで導いたものである。
-`PeerSession`のsession logicは、simulator test（`tests/simulator.rs`）と、この実行体を擬似端末で
-走らせた下の表の範囲までで確かめている。
-**ESP32側がprotocolを話すとは限らない。**記録では**「行が通った」と「protocolが成立した」を
+[EXP-029](../../docs/hardware/experiment-log.md)で、実portからの`boot`→ACK→`get_status`→`status`と
+診断用`ping`3件へのACKを観察した。`PeerSession`のsession logicのhost testは、simulator test
+（`tests/simulator.rs`）と、この実行体を擬似端末で走らせた下の表の範囲である。
+実portでのlink喪失判定と再接続は未確認である。記録では**「行が通った」と「protocolが成立した」を
 書き分ける。**
 
-### host（VM）で確認済みの挙動
+### host（VM）で確認済みの挙動（link監視追加前の実行記録）
 
 **擬似端末を相手に実走させた。実serial portではない。**下の表の「実行A」「実行B」「実行C1」「実行C2」は、このcrateの`serial_link`（#12の受信の配線を入れた版。実行C1・C2は`--ping-count`を入れた版）を、fixtureの行で応える偽のESP32（repositoryに置いていないscript）と擬似端末で繋いだ別々の実行である。
 
@@ -129,16 +134,14 @@ PR B2で、ESP32は`hello`／`ping`／`get_status`にACKを返し、`get_status`
 
 ## 実機に残っていること
 
-**このcrateの検証はhost（VM）上である。**testは`SerialPort::pair()`の擬似端末を使い、
+**このcrateの自動testはhost（VM）上である。**testは`SerialPort::pair()`の擬似端末を使い、
 実のfile descriptor越しに行の復元、切断（`EIO`）、idle、送出を確認している。
-**`SerialDevice::open()`はtestで呼んでいない。**openこそがhardware無しに検証できない
-部分であり、通したことにしない。
+**`SerialDevice::open()`は自動testで呼んでいない。**実機でのopenと往復は
+[EXP-029](../../docs/hardware/experiment-log.md)に記録した。
 
 [Issue #11](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11)の後半に残るもの:
 
-- 実機でのdevice名の確定（Pi linkはGPIOのUARTであり、Pi側は`/dev/serial0`を使う。この名前はRaspberry Pi公式文書から導いた。Piでは`/dev/serial0`が`ttyAMA0`を指すことを確かめた（[experiment-log.md](../../docs/hardware/experiment-log.md)の`EXP-020`）。開けることとUARTでの通信は確かめていない。正は[gpio-assignment.md](../../docs/hardware/gpio-assignment.md)の`Pi側の設定`）
-- 実portでのread／write、切断、reconnect、partial I/Oの確認
-- `CLOCAL`をdriverが受け付けること（受け付けなければopenが失敗する）
+- 実portでのlink喪失判定、切断後のreconnect、partial I/Oの確認（openと行の往復は`EXP-029`で観察済み）
 - **`HUPCL`の判断。**既定ではcloseでDTRが落ちる。**本projectのESP32 boardでDTR／RTSが
   自動resetへ繋がっているかは確認していない。**繋がっていれば再接続のたびにESP32が
   再起動することになり、`boot`／`hello`のhandshakeに効く。現物の確認と判断はprotocol側の
@@ -146,7 +149,7 @@ PR B2で、ESP32は`hello`／`ping`／`get_status`にACKを返し、`get_status`
   `Pi–ESP32間のtransport`節）であり、PiのDTRはESP32へつながらないため、Pi linkではこの再起動は起きない。**
   当てはまるのは、hostがESP32 board上のUSB-UARTブリッジ（USB）を開く場合だけである（Pi linkの試験中に、
   PCのserial monitorでESP32のdebug logを読む場合もこれに当たる。再起動が起きるかは確かめていない）
-- Pi上でこのcrateをbuildできるか（memory）
+- Pi上で変更後のcrateをbuildできるか（変更前の`serial_link`は`EXP-029`でbuild済み）
 
 ## 既定値は暫定である
 
