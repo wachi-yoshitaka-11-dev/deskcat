@@ -13,15 +13,16 @@
 //! - 接続のたびに`hello`を送り、その`id`を[`deskcat_serial::PeerSession::note_hello_sent`]で記録する。
 //!   未ACKの`hello`は同じ`(sid, id)`と`reason`で送り直す。新しい`hello`の`reason`は
 //!   初回が`Startup`、再接続が`PortReopen`である（仕様§5.1）。
-//! - 受信したframeは、種類を問わず[`deskcat_serial::handle_frame`]へ渡す。`boot`にはACKを返し、
+//! - 通常時の受信frameは[`deskcat_serial::handle_frame`]へ渡す。`boot`にはACKを返し、
 //!   新しいsessionを確立した場合は`get_status`を1件送る。`ack`は送ったrequestと相関させる。`status`は
-//!   `get_status`への応答かどうかを分ける（仕様§5.6）。
+//!   `get_status`への応答かどうかを分ける（仕様§5.6）。診断中のmotionと切替用helloのACKだけは
+//!   この実行体がreply identityとESP32 sidを照合し、専用counterへ記録する。
 //! - `--ping-count`を付けたときだけ、ESP32 sessionの確立のたびに`ping`を1件ずつ最大その件数送る
 //!   （前の`ping`がACKの相関か取り下げで決着してから次を送る。ESP32 sessionの確立でも未決は手放す。周期は持たない。`PROTO-TBD-010`）。
 //! - GPIO UARTの無応答を検出するため、上の診断用pingとは別に、1件ずつ周期的なlink probeを送る。
 //!   相関ACKが再送込みで連続して得られなければlink喪失として再openする。周期と閾値は
 //!   `LinkWatch`の暫定値であり、`PROTO-TBD-010`と実機試験で見直す。
-//! - pumpの1周ごとに[`deskcat_serial::retry_due_requests`]を呼ぶ。ACK timeoutした`ping`と`get_status`を
+//! - 通常時はpumpの1周ごとに[`deskcat_serial::retry_due_requests`]を呼ぶ。ACK timeoutした`ping`と`get_status`を
 //!   同じ`id`で送り直し（仕様§9）、確立の直後にqueueへ入れられなかった`get_status`を送る。
 //!
 //! **ESP32が`boot`→ACKより先の往復に応えるのは、`firmware/esp32`を[Issue #487]のPR B2
@@ -56,7 +57,7 @@
 //!
 //! ```text
 //! cargo run --example serial_link -- --port <path> --baud <rate> \
-//!     --duplicate-capacity <n> --duplicate-retention-ms <ms> [--seconds <n>] [--ping-count <n>] [--verbose]
+//!     --duplicate-capacity <n> --duplicate-retention-ms <ms> [--seconds <n>] [--ping-count <n>] [--motion-expire-after-ms <ms>] [--verbose]
 //! ```
 //!
 //! `--port`と`--baud`は**どちらも必須である。**既定値を持たせない。Pi linkの`/dev/serial0`は
@@ -75,6 +76,31 @@
 //! これは「`ping`へのACKを相関した」ことの根拠であり、`boot`→ACK→`get_status`→`status`の往復の成立とは
 //! 別に記録する。
 //!
+//! `--motion-expire-after-ms <ms>`は#12の拒否経路の診断を有効にする。`--seconds`も必須で、
+//! `--ping-count`とは同時に使わない。**実行前にfirmwareが`b3d86ce`以降でcatalogが空の
+//! 拒否専用buildであると確認する。**送る名前は`__deskcat_issue_12_reject_only_probe__`だけで、
+//! 実在しそうなmotion名は使わない。firmwareの暫定保持期間は`pi_link.rs`の
+//! `MOTION_DUPLICATE_RETENTION`（現版10秒、`PROTO-TBD-005`）なので、指定する待ち時間は
+//! それより長くする。Piの`--duplicate-retention-ms`は待ち時間より十分長くし、切替後の
+//! `boot`再送をPiが拒否しないようにする。例（baudの115200も`PROTO-TBD-001`の候補値）:
+//!
+//! ```text
+//! cargo run --example serial_link -- --port /dev/serial0 --baud 115200 \
+//!     --duplicate-capacity 8 --duplicate-retention-ms 30000 \
+//!     --motion-expire-after-ms 12000 --seconds 60
+//! ```
+//!
+//! `get_status`への応答を受けたあとに、同じ`(sid, id)`の`play_motion`を2回送り、
+//! 保持期間を越えてもう1回送り、新しいPi `sid`の`hello`と`boot`再送のACKを経て旧`sid`から送る。
+//! 期待するmotion ACKは順に`rejected/invalid_payload`、同じ`rejected/invalid_payload`、
+//! `rejected/duplicate_expired`、`rejected/stale_session`。終了時の専用counterは
+//! `motion: first_rejected=1 replay_rejected=1 duplicate_expired=1 stale_session=1 complete=true`。
+//! firmware logでも初回の`replayed=false`、2回目の`replayed=true`、期限切れの
+//! `duplicate_expired`、旧sidの`stale_session`を同じidentityと突き合わせる。
+//! firmwareの`status.payload.protocol` counterは現版では0固定なので、診断の根拠にしない。
+//! 空catalogとservoへ渡さない経路の下での拒否試験であり、実motionの非二重実行を実機で
+//! 観測したことにはならない。未確定の`PROTO-TBD-005`・`008`・`012`・`013`は残る。
+//!
 //! `--verbose`を付けない限り`Info`までを出す。`Debug`まで上げるとread timeoutごとに
 //! 1行出るため（既定50 msなので毎秒20行）、長時間の観察では本当のeventが埋まる。
 //! 切り分けが要るときだけ上げる。
@@ -91,14 +117,18 @@
 //! [Issue #487]: https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487
 //! [PR #529]: https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/529
 
+use std::io::Read;
 use std::process::ExitCode;
 use std::thread::sleep;
 use std::time::{Duration, Instant};
 
-use deskcat_protocol::{AckStatus, Frame, Hello, HelloReason, Message, Outcome};
+use deskcat_protocol::{
+    AckStatus, ErrorCode, FiniteF32, Frame, Hello, HelloReason, Message, Outcome, PlayMotion,
+};
 use deskcat_serial::{
     BootOutcome, ConnectionState, DuplicatePolicy, OutstandingKind, PeerSession, Pump, Received,
-    RetryOutcome, SendError, SerialConfig, SerialDevice, Session, handle_frame, retry_due_requests,
+    RetryOutcome, SendError, SerialConfig, SerialDevice, Session, Transport, handle_frame,
+    retry_due_requests,
 };
 
 /// 呼び出し側の引数。
@@ -110,12 +140,14 @@ struct Args {
     seconds: Option<u64>,
     /// `--ping-count`。省くと`ping`を送らない。
     ping_count: Option<u32>,
+    /// 診断で最初のIDの保持期間を越えるまで待つ時間（PROTO-TBD-005）。
+    motion_expire_after_ms: Option<u64>,
     verbose: bool,
 }
 
 fn usage() -> &'static str {
     "usage: serial_link --port <path> --baud <rate> \
-     --duplicate-capacity <n> --duplicate-retention-ms <ms> [--seconds <n>] [--ping-count <n>] [--verbose]\n\
+     --duplicate-capacity <n> --duplicate-retention-ms <ms> [--seconds <n>] [--ping-count <n>] [--motion-expire-after-ms <ms>] [--verbose]\n\
      \n\
      --port、--baud、--duplicate-capacity、--duplicate-retention-ms は必須である。既定値を持たせない。\n\
      Pi linkの /dev/serial0 は EXP-029 でopenと往復を観察した。baudの確定は PROTO-TBD-001、duplicate履歴は PROTO-TBD-005 である。\n\
@@ -140,6 +172,7 @@ fn parse_args() -> Result<Parsed, String> {
     let mut duplicate_retention_ms = None;
     let mut seconds = None;
     let mut ping_count = None;
+    let mut motion_expire_after_ms = None;
     let mut verbose = false;
     let mut argv = std::env::args().skip(1);
 
@@ -186,10 +219,31 @@ fn parse_args() -> Result<Parsed, String> {
                 }
                 ping_count = Some(n);
             }
+            "--motion-expire-after-ms" => {
+                let ms = value()?
+                    .parse::<u64>()
+                    .map_err(|e| format!("--motion-expire-after-msが数値でない: {e}"))?;
+                if ms == 0 {
+                    return Err("--motion-expire-after-msは1以上である".to_owned());
+                }
+                motion_expire_after_ms = Some(ms);
+            }
             "--verbose" => verbose = true,
             "-h" | "--help" => return Ok(Parsed::Help),
             other => return Err(format!("不明な引数: {other}\n\n{}", usage())),
         }
+    }
+
+    if motion_expire_after_ms.is_some() && seconds.is_none() {
+        return Err("play_motion診断では--secondsも必要である".to_owned());
+    }
+    if motion_expire_after_ms.is_some() && ping_count.is_some() {
+        return Err("play_motion診断と--ping-countは同時に使えない".to_owned());
+    }
+    if let (Some(expire), Some(host_retention)) = (motion_expire_after_ms, duplicate_retention_ms)
+        && host_retention <= expire
+    {
+        return Err("--duplicate-retention-msは--motion-expire-after-msより大きくする".to_owned());
     }
 
     Ok(Parsed::Run(Box::new(Args {
@@ -207,6 +261,7 @@ fn parse_args() -> Result<Parsed, String> {
         .map_err(|e| format!("duplicate履歴の設定が不正である: {e}"))?,
         seconds,
         ping_count,
+        motion_expire_after_ms,
         verbose,
     })))
 }
@@ -431,6 +486,254 @@ struct Monitoring {
     probe: Option<PingProbe>,
     link_watch: LinkWatch,
     pending_hello: Option<(u32, HelloReason)>,
+    motion: Option<MotionDiagnostic>,
+}
+
+/// 空catalogに存在しない診断専用名。実行するfirmwareのcatalogが空であることを先に確認する。
+const DIAGNOSTIC_MOTION_NAME: &str = "__deskcat_issue_12_reject_only_probe__";
+
+fn diagnostic_motion() -> Message {
+    Message::PlayMotion(PlayMotion {
+        name: DIAGNOSTIC_MOTION_NAME.to_owned(),
+        speed: FiniteF32::new(0.0).expect("0は有限"),
+        repeat: 1,
+    })
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum MotionStep {
+    WaitBoot,
+    FirstAck,
+    ReplayAck,
+    WaitExpiry(u64),
+    ExpiredAck,
+    NewHelloAck(u32),
+    WaitNewBoot,
+    StaleAck,
+    Done,
+    Failed,
+}
+
+struct MotionDiagnostic {
+    step: MotionStep,
+    expire_after_ms: u64,
+    first_id: Option<u32>,
+    old_sid: u32,
+    old_session: Option<Session>,
+    ready: bool,
+    new_boot_seen: bool,
+    first_rejections: u32,
+    replay_rejections: u32,
+    expired_rejections: u32,
+    stale_rejections: u32,
+}
+
+impl MotionDiagnostic {
+    fn new(old_sid: u32, expire_after_ms: u64) -> Self {
+        Self {
+            step: MotionStep::WaitBoot,
+            expire_after_ms,
+            first_id: None,
+            old_sid,
+            old_session: None,
+            ready: false,
+            new_boot_seen: false,
+            first_rejections: 0,
+            replay_rejections: 0,
+            expired_rejections: 0,
+            stale_rejections: 0,
+        }
+    }
+
+    fn fail(&mut self, reason: &str) {
+        log::error!("play_motion診断を停止した: {reason}");
+        self.step = MotionStep::Failed;
+    }
+
+    fn send_first(&mut self, session: &mut Session, now_ms: u64) {
+        match session.send(diagnostic_motion(), now_ms) {
+            Ok(id) => {
+                self.first_id = Some(id);
+                self.step = MotionStep::FirstAck;
+                log::info!("play_motion診断: 初回 sid={} id={id}", self.old_sid);
+            }
+            Err(SendError::Dropped) => {} // 次のpumpで再試行する。
+            Err(error) => self.fail(&format!("初回をqueueへ入れられない: {error}")),
+        }
+    }
+
+    /// motionと切替用helloのACKはPeerSessionの追跡対象外なので、reply identityをここで照合する。
+    /// 対象のACKを消費した場合だけ`true`を返す。
+    fn on_ack(
+        &mut self,
+        frame: &Frame,
+        now_ms: u64,
+        session: &mut Session,
+        esp32_sid: Option<u32>,
+    ) -> bool {
+        let Message::Ack(ack) = &frame.message else {
+            return false;
+        };
+        let expected = match self.step {
+            MotionStep::FirstAck | MotionStep::ReplayAck | MotionStep::ExpiredAck => {
+                self.first_id.map(|id| (self.old_sid, id))
+            }
+            MotionStep::NewHelloAck(id) => Some((session.sid(), id)),
+            MotionStep::StaleAck => self.first_id.map(|id| (self.old_sid, id)),
+            _ => None,
+        };
+        if expected != Some((ack.reply_sid, ack.reply_to)) {
+            return false;
+        }
+        if esp32_sid != Some(frame.envelope.sid) {
+            self.fail("ACKの送信sidが承認したESP32 sidと違う");
+            return true;
+        }
+        let expected_code = match self.step {
+            MotionStep::FirstAck | MotionStep::ReplayAck => Some(ErrorCode::InvalidPayload),
+            MotionStep::ExpiredAck => Some(ErrorCode::DuplicateExpired),
+            MotionStep::StaleAck => Some(ErrorCode::StaleSession),
+            MotionStep::NewHelloAck(_) => None,
+            _ => unreachable!(),
+        };
+        let expected_status = if expected_code.is_some() {
+            AckStatus::Rejected
+        } else {
+            AckStatus::Ok
+        };
+        if ack.status != expected_status || ack.code != expected_code {
+            self.fail(&format!(
+                "ACKが期待と違う: status={:?} code={:?}",
+                ack.status, ack.code
+            ));
+            return true;
+        }
+        session.note_peer_responsive();
+        log::info!(
+            "play_motion診断: ACK reply_sid={} reply_to={} status={:?} code={:?}",
+            ack.reply_sid,
+            ack.reply_to,
+            ack.status,
+            ack.code
+        );
+        match self.step {
+            MotionStep::FirstAck => {
+                self.first_rejections += 1;
+                self.resend_first(session, now_ms, MotionStep::ReplayAck);
+            }
+            MotionStep::ReplayAck => {
+                self.replay_rejections += 1;
+                self.step = MotionStep::WaitExpiry(now_ms.saturating_add(self.expire_after_ms));
+            }
+            MotionStep::ExpiredAck => {
+                self.expired_rejections += 1;
+                self.switch_session(session, now_ms);
+            }
+            MotionStep::NewHelloAck(_) => {
+                // bootの再送とそのACKを待ってから旧sidのcommandを送る。
+                self.step = MotionStep::WaitNewBoot;
+            }
+            MotionStep::StaleAck => {
+                self.stale_rejections += 1;
+                self.step = MotionStep::Done;
+            }
+            _ => unreachable!(),
+        }
+        true
+    }
+
+    fn resend_first(&mut self, session: &mut Session, now_ms: u64, next: MotionStep) {
+        let Some(id) = self.first_id else {
+            self.fail("初回IDが無い");
+            return;
+        };
+        match session.resend(id, diagnostic_motion(), now_ms) {
+            Ok(()) => self.step = next,
+            Err(error) => self.fail(&format!("再送をqueueへ入れられない: {error}")),
+        }
+    }
+
+    fn switch_session(&mut self, session: &mut Session, now_ms: u64) {
+        let new_sid = match random_sid_except(self.old_sid) {
+            Ok(sid) => sid,
+            Err(error) => {
+                self.fail(&format!("新sidを選べない: {error}"));
+                return;
+            }
+        };
+        let mut next = Session::new(session.config().clone(), new_sid);
+        next.note_connected();
+        let id = match next.send(hello(HelloReason::Startup), now_ms) {
+            Ok(id) => id,
+            Err(error) => {
+                self.fail(&format!("新sidのhelloを送れない: {error}"));
+                return;
+            }
+        };
+        self.old_session = Some(std::mem::replace(session, next));
+        self.step = MotionStep::NewHelloAck(id);
+        log::info!("play_motion診断: 新sid={new_sid} のhelloを送った id={id}");
+    }
+
+    fn tick(&mut self, session: &mut Session, now_ms: u64) {
+        match self.step {
+            MotionStep::WaitBoot if self.ready => self.send_first(session, now_ms),
+            MotionStep::WaitExpiry(deadline) if now_ms >= deadline => {
+                self.resend_first(session, now_ms, MotionStep::ExpiredAck);
+            }
+            MotionStep::WaitNewBoot if self.new_boot_seen && session.pending_out() == 0 => {
+                let Some(old) = self.old_session.as_mut() else {
+                    self.fail("旧sessionが無い");
+                    return;
+                };
+                let Some(id) = self.first_id else {
+                    self.fail("初回IDが無い");
+                    return;
+                };
+                match old.resend(id, diagnostic_motion(), now_ms) {
+                    Ok(()) => {
+                        self.step = MotionStep::StaleAck;
+                        log::info!("play_motion診断: 旧sid={} id={id}を再送", self.old_sid);
+                    }
+                    Err(error) => self.fail(&format!("旧sidの送出に失敗: {error}")),
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn report(&self) {
+        log::info!(
+            "motion: first_rejected={} replay_rejected={} duplicate_expired={} stale_session={} complete={}",
+            self.first_rejections,
+            self.replay_rejections,
+            self.expired_rejections,
+            self.stale_rejections,
+            self.step == MotionStep::Done
+        );
+    }
+}
+
+fn random_sid_except(excluded: u32) -> std::io::Result<u32> {
+    let mut random = std::fs::File::open("/dev/urandom")?;
+    loop {
+        let mut bytes = [0_u8; 4];
+        random.read_exact(&mut bytes)?;
+        let sid = u32::from_le_bytes(bytes);
+        if sid != 0 && sid != excluded {
+            return Ok(sid);
+        }
+    }
+}
+
+/// 診断は2つのPi sessionを作るので、両方ともOS乱数からsidを選ぶ（仕様§3.1）。
+fn initial_sid(motion_diagnostic: bool) -> std::io::Result<u32> {
+    if motion_diagnostic {
+        random_sid_except(0)
+    } else {
+        // 通常実行のPID由来のsidは既存の挙動として残す。
+        Ok(std::process::id())
+    }
 }
 
 impl LinkWatch {
@@ -686,9 +989,11 @@ fn main() -> ExitCode {
         }
     };
 
-    // sidは起動ごとに新しい値を選ぶ（仕様§3）。**自動で選び直さない。**
-    // ここではprocessのidを種にする。乱数を持ち込まない。
-    let sid = std::process::id();
+    let sid = initial_sid(args.motion_expire_after_ms.is_some())
+        .map_err(|error| log::error!("診断の初期sidを選べない: {error}"));
+    let Ok(sid) = sid else {
+        return ExitCode::FAILURE;
+    };
     let mut session = Session::new(config.clone(), sid);
     // ESP32側のsession state。**再接続をまたいで1つだけ持つ。**Piの再接続
     // （`PortReopen`）はESP32側のsessionを暗黙に変えない。ESP32が再起動すれば
@@ -707,6 +1012,9 @@ fn main() -> ExitCode {
         probe: args.ping_count.map(PingProbe::new),
         link_watch: LinkWatch::new(),
         pending_hello: None,
+        motion: args
+            .motion_expire_after_ms
+            .map(|ms| MotionDiagnostic::new(sid, ms)),
     };
 
     loop {
@@ -759,10 +1067,17 @@ fn main() -> ExitCode {
         }
 
         monitoring.link_watch.on_disconnect(&mut peer);
+        if let Some(motion) = monitoring.motion.as_mut() {
+            motion.fail("診断中にlinkが切れた。再接続後の続行はしない");
+        }
 
         // 切断ごとの区切りとして出す。**loopを抜けた後にもう一度出さない**
         // （同じ数字が2回並ぶと、どちらが最終値か読めない）。
         report(&session, &peer, monitoring.probe.as_ref());
+
+        if monitoring.motion.is_some() {
+            break;
+        }
 
         let Some(backoff) = session.begin_reconnect() else {
             log::error!("再接続の上限に達した。停止する");
@@ -773,7 +1088,19 @@ fn main() -> ExitCode {
         sleep(wait);
     }
 
-    report(&session, &peer, monitoring.probe.as_ref());
+    finish_run(&session, &peer, &monitoring, started)
+}
+
+fn finish_run(
+    session: &Session,
+    peer: &PeerSession,
+    monitoring: &Monitoring,
+    started: Instant,
+) -> ExitCode {
+    report(session, peer, monitoring.probe.as_ref());
+    if let Some(motion) = monitoring.motion.as_ref() {
+        motion.report();
+    }
     log::info!("経過 {:?}", started.elapsed());
 
     // **握りつぶしていないことをここで示す。**0件でも出す。
@@ -784,11 +1111,96 @@ fn main() -> ExitCode {
         log::info!("log出力の失敗: 0 件");
     }
 
-    if matches!(session.state(), ConnectionState::Stopped(_)) {
+    if matches!(session.state(), ConnectionState::Stopped(_))
+        || monitoring
+            .motion
+            .as_ref()
+            .is_some_and(|motion| motion.step != MotionStep::Done)
+    {
         ExitCode::FAILURE
     } else {
         ExitCode::SUCCESS
     }
+}
+
+fn process_frames(
+    frames: Vec<Frame>,
+    session: &mut Session,
+    peer: &mut PeerSession,
+    monitoring: &mut Monitoring,
+    started: Instant,
+) {
+    for frame in frames {
+        let now_ms = uptime_ms(started);
+        if let Some(motion) = monitoring.motion.as_mut()
+            && motion.on_ack(&frame, now_ms, session, peer.esp32_sid())
+        {
+            if session.sid() != motion.old_sid {
+                monitoring.pending_hello = None;
+            }
+            continue;
+        }
+        let had_esp32_session = peer.esp32_sid().is_some();
+        let received = handle_frame(session, peer, frame, now_ms);
+        if let Some(motion) = monitoring.motion.as_mut()
+            && matches!(&received, Received::Status(accepted) if accepted.solicited)
+        {
+            motion.ready = true;
+        }
+        if let Some(motion) = monitoring.motion.as_mut()
+            && motion.step == MotionStep::WaitNewBoot
+            && let Received::Boot(handled) = &received
+        {
+            match handled.outcome {
+                BootOutcome::Replayed => motion.new_boot_seen = true,
+                BootOutcome::Established { .. } => {
+                    motion.fail("新Pi sidへの切替中にESP32 sidが変わった");
+                }
+                _ => {}
+            }
+        }
+        if matches!(received, Received::Ack(_)) {
+            session.note_peer_responsive();
+        }
+        if matches!(&received, Received::Ack(ack) if matches!(ack.request, OutstandingKind::Hello))
+        {
+            monitoring.pending_hello = None;
+        }
+        if had_esp32_session
+            && matches!(&received, Received::Boot(handled) if matches!(handled.outcome, BootOutcome::Established { .. }))
+        {
+            monitoring.pending_hello = None; // PeerSessionも旧sessionへのhello追跡を捨てた。
+        }
+        log_received(&received);
+        monitoring.link_watch.observe(&received, now_ms);
+        if let Some(probe) = monitoring.probe.as_mut() {
+            probe.observe(&received);
+        }
+    }
+}
+
+/// 旧sidの1行がpartial writeになっても、新sidの行のbyteを途中に挟まない。
+fn pump_writes<T: Transport>(
+    session: &mut Session,
+    monitoring: &mut Monitoring,
+    device: &mut T,
+) -> (Pump, Pump) {
+    let old_pending = monitoring
+        .motion
+        .as_ref()
+        .and_then(|motion| motion.old_session.as_ref())
+        .is_some_and(|old| old.pending_out() > 0);
+    let active = if old_pending {
+        Pump::Idle
+    } else {
+        session.pump_write(device)
+    };
+    let old = monitoring
+        .motion
+        .as_mut()
+        .and_then(|motion| motion.old_session.as_mut())
+        .map_or(Pump::Idle, |old| old.pump_write(device));
+    (active, old)
 }
 
 /// linkが切れるか、期限に達するまでpumpを回す。切断で抜けたときだけ`true`。
@@ -829,40 +1241,30 @@ fn pump_until_break(
                 );
             }
         });
-        for frame in frames {
-            let now_ms = uptime_ms(started);
-            let had_esp32_session = peer.esp32_sid().is_some();
-            let received = handle_frame(session, peer, frame, now_ms);
-            if matches!(received, Received::Ack(_)) {
-                session.note_peer_responsive();
-            }
-            if matches!(&received, Received::Ack(ack) if matches!(ack.request, OutstandingKind::Hello))
-            {
-                monitoring.pending_hello = None;
-            }
-            if had_esp32_session
-                && matches!(&received, Received::Boot(handled) if matches!(handled.outcome, BootOutcome::Established { .. }))
-            {
-                monitoring.pending_hello = None; // PeerSessionも旧sessionへのhello追跡を捨てた。
-            }
-            log_received(&received);
-            monitoring.link_watch.observe(&received, now_ms);
-            if let Some(probe) = monitoring.probe.as_mut() {
-                probe.observe(&received);
-            }
+        process_frames(frames, session, peer, monitoring, started);
+        if !matches!(read, Pump::Disconnected | Pump::Fatal)
+            && let Some(motion) = monitoring.motion.as_mut()
+        {
+            motion.tick(session, uptime_ms(started));
         }
         // **切断を観測した周回では、再送も新規の`ping`も出さない。**`note_disconnected`が送信queueを
         // 捨てた後に積むと、再接続の`hello`より先に、別のlinkへ出る。未決の要求は`PeerSession`に残り、
         // 再接続後の周回で再送か取り下げに至る。
-        if !matches!(read, Pump::Disconnected) {
+        if !matches!(read, Pump::Disconnected)
+            && !monitoring
+                .motion
+                .as_ref()
+                .is_some_and(|motion| motion.ready)
+        {
             // ACK timeoutした`ping`／`get_status`を同じ`id`で送り直す（§9）。対象は`get_status`と、
             // `--ping-count`を付けたときの`ping`である。`hello`は対象外
             // （`PROTO-TBD-011`。`OutstandingKind::Hello`のdoc参照）。
             let retries = retry_due_requests(session, peer, uptime_ms(started));
             log_retries(&retries);
-            if monitoring
-                .link_watch
-                .observe_retries(&retries, uptime_ms(started))
+            if monitoring.motion.is_none()
+                && monitoring
+                    .link_watch
+                    .observe_retries(&retries, uptime_ms(started))
             {
                 session.note_peer_unresponsive();
                 return true;
@@ -871,11 +1273,24 @@ fn pump_until_break(
                 probe.observe_retries(&retries);
                 send_ping(session, peer, probe, uptime_ms(started));
             }
-            monitoring
-                .link_watch
-                .send_due(session, peer, uptime_ms(started));
+            if monitoring.motion.is_none() {
+                monitoring
+                    .link_watch
+                    .send_due(session, peer, uptime_ms(started));
+            }
         }
-        let write = session.pump_write(device);
+        let (write, old_write) = pump_writes(session, monitoring, device);
+        match old_write {
+            Pump::Disconnected => {
+                log::warn!("旧sidの送出中に切断した");
+                return true;
+            }
+            Pump::Fatal => {
+                log::error!("旧sidの送出中に回復不能なI/O error");
+                return false;
+            }
+            _ => {}
+        }
 
         for pump in [read, write] {
             match pump {
@@ -898,6 +1313,238 @@ fn pump_until_break(
         if matches!(session.state(), ConnectionState::Stopped(_)) {
             return false;
         }
+        if monitoring
+            .motion
+            .as_ref()
+            .is_some_and(|motion| matches!(motion.step, MotionStep::Done | MotionStep::Failed))
+        {
+            return false;
+        }
+    }
+}
+
+#[cfg(test)]
+mod simulator_tests {
+    use super::*;
+    use deskcat_protocol::{Ack, Envelope, decode_line, limits};
+    use std::io::{self, Cursor};
+
+    struct PartialWire {
+        bytes: Vec<u8>,
+    }
+
+    impl Transport for PartialWire {
+        fn read(&mut self, _: &mut [u8]) -> io::Result<usize> {
+            Err(io::ErrorKind::WouldBlock.into())
+        }
+
+        fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+            let n = buf.len().min(3);
+            self.bytes.extend_from_slice(&buf[..n]);
+            Ok(n)
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    fn ack(reply_sid: u32, reply_to: u32, status: AckStatus, code: Option<ErrorCode>) -> Frame {
+        Frame::new(
+            Envelope {
+                v: limits::PROTOCOL_VERSION,
+                sid: 42,
+                id: 100,
+                ts_ms: 0,
+            },
+            Message::Ack(Ack {
+                reply_sid,
+                reply_to,
+                status,
+                code,
+                detail: None,
+            }),
+        )
+    }
+
+    fn written(session: &mut Session) -> Frame {
+        let mut wire = Cursor::new(Vec::new());
+        assert!(matches!(session.pump_write(&mut wire), Pump::Progress(_)));
+        let line = String::from_utf8(wire.into_inner()).expect("UTF-8のJSONL");
+        decode_line(line.trim_end()).expect("送出したJSONLをdecodeできる")
+    }
+
+    #[test]
+    fn motion_diagnostic_sends_same_identity_then_expired_then_old_sid() {
+        let config = SerialConfig::new("/dev/simulated", 115_200).unwrap();
+        let mut session = Session::new(config, 7);
+        session.note_connected();
+        let mut diagnostic = MotionDiagnostic::new(7, 100);
+        diagnostic.ready = true; // fake ESP32のboot→ACK→get_status→statusを受理した状態。
+        diagnostic.tick(&mut session, 0);
+        let first = written(&mut session);
+        let id = first.envelope.id;
+        assert_eq!(first.envelope.sid, 7);
+        assert_eq!(first.message, diagnostic_motion());
+
+        assert!(diagnostic.on_ack(
+            &ack(7, id, AckStatus::Rejected, Some(ErrorCode::InvalidPayload)),
+            1,
+            &mut session,
+            Some(42)
+        ));
+        let replay = written(&mut session);
+        assert_eq!(replay.envelope.identity(), first.envelope.identity());
+        assert_eq!(replay.message, first.message);
+
+        assert!(diagnostic.on_ack(
+            &ack(7, id, AckStatus::Rejected, Some(ErrorCode::InvalidPayload)),
+            2,
+            &mut session,
+            Some(42)
+        ));
+        diagnostic.tick(&mut session, 101);
+        assert_eq!(diagnostic.step, MotionStep::WaitExpiry(102));
+        diagnostic.tick(&mut session, 102);
+        let expired = written(&mut session);
+        assert_eq!(expired.envelope.identity(), first.envelope.identity());
+
+        assert!(diagnostic.on_ack(
+            &ack(
+                7,
+                id,
+                AckStatus::Rejected,
+                Some(ErrorCode::DuplicateExpired)
+            ),
+            103,
+            &mut session,
+            Some(42)
+        ));
+        let new_sid = session.sid();
+        assert_ne!(new_sid, 7);
+        let new_hello = written(&mut session);
+        assert_eq!(new_hello.envelope.sid, new_sid);
+        assert!(matches!(
+            new_hello.message,
+            Message::Hello(Hello {
+                reason: HelloReason::Startup,
+                ..
+            })
+        ));
+
+        assert!(diagnostic.on_ack(
+            &ack(new_sid, new_hello.envelope.id, AckStatus::Ok, None),
+            104,
+            &mut session,
+            Some(42)
+        ));
+        diagnostic.new_boot_seen = true; // fake ESP32のboot再送を受理した状態。
+        diagnostic.tick(&mut session, 105);
+        let stale = written(diagnostic.old_session.as_mut().unwrap());
+        assert_eq!(stale.envelope.identity(), first.envelope.identity());
+        assert_eq!(stale.message, first.message);
+        assert!(diagnostic.on_ack(
+            &ack(7, id, AckStatus::Rejected, Some(ErrorCode::StaleSession)),
+            106,
+            &mut session,
+            Some(42)
+        ));
+        assert_eq!(diagnostic.step, MotionStep::Done);
+        assert_eq!(
+            (
+                diagnostic.first_rejections,
+                diagnostic.replay_rejections,
+                diagnostic.expired_rejections,
+                diagnostic.stale_rejections
+            ),
+            (1, 1, 1, 1)
+        );
+    }
+
+    #[test]
+    fn diagnostic_does_not_accept_an_ack_from_a_different_esp32_session() {
+        let config = SerialConfig::new("/dev/simulated", 115_200).unwrap();
+        let mut session = Session::new(config, 7);
+        session.note_connected();
+        let mut diagnostic = MotionDiagnostic::new(7, 100);
+        diagnostic.ready = true;
+        diagnostic.tick(&mut session, 0);
+        let id = diagnostic.first_id.unwrap();
+        assert!(diagnostic.on_ack(
+            &ack(7, id, AckStatus::Rejected, Some(ErrorCode::InvalidPayload)),
+            1,
+            &mut session,
+            Some(99)
+        ));
+        assert_eq!(diagnostic.step, MotionStep::Failed);
+        assert_eq!(diagnostic.first_rejections, 0);
+    }
+
+    #[test]
+    fn diagnostic_stops_when_the_firmware_returns_the_wrong_rejection() {
+        let config = SerialConfig::new("/dev/simulated", 115_200).unwrap();
+        let mut session = Session::new(config, 7);
+        session.note_connected();
+        let mut diagnostic = MotionDiagnostic::new(7, 100);
+        diagnostic.ready = true;
+        diagnostic.tick(&mut session, 0);
+        let id = diagnostic.first_id.unwrap();
+        assert!(diagnostic.on_ack(
+            &ack(7, id, AckStatus::Rejected, Some(ErrorCode::StaleSession)),
+            1,
+            &mut session,
+            Some(42)
+        ));
+        assert_eq!(diagnostic.step, MotionStep::Failed);
+        assert_eq!(diagnostic.first_rejections, 0);
+    }
+
+    #[test]
+    fn old_and_new_sessions_do_not_interleave_partial_lines() {
+        let config = SerialConfig::new("/dev/simulated", 115_200).unwrap();
+        let mut old = Session::new(config.clone(), 7);
+        old.note_connected();
+        old.send(diagnostic_motion(), 0).unwrap();
+        let mut active = Session::new(config, 8);
+        active.note_connected();
+        active.send(hello(HelloReason::Startup), 0).unwrap();
+        let mut motion = MotionDiagnostic::new(7, 100);
+        motion.old_session = Some(old);
+        let mut monitoring = Monitoring {
+            probe: None,
+            link_watch: LinkWatch::new(),
+            pending_hello: None,
+            motion: Some(motion),
+        };
+        let mut wire = PartialWire { bytes: Vec::new() };
+        for _ in 0..200 {
+            let (active_result, old_result) = pump_writes(&mut active, &mut monitoring, &mut wire);
+            assert!(matches!(active_result, Pump::Idle | Pump::Progress(_)));
+            assert!(matches!(old_result, Pump::Idle | Pump::Progress(_)));
+            if active.pending_out() == 0
+                && monitoring
+                    .motion
+                    .as_ref()
+                    .unwrap()
+                    .old_session
+                    .as_ref()
+                    .unwrap()
+                    .pending_out()
+                    == 0
+            {
+                break;
+            }
+        }
+        let lines = String::from_utf8(wire.bytes).unwrap();
+        let frames: Vec<Frame> = lines
+            .lines()
+            .map(|line| decode_line(line).unwrap())
+            .collect();
+        assert_eq!(frames.len(), 2);
+        assert_eq!(frames[0].envelope.sid, 7);
+        assert_eq!(frames[0].message, diagnostic_motion());
+        assert_eq!(frames[1].envelope.sid, 8);
+        assert!(matches!(frames[1].message, Message::Hello(_)));
     }
 }
 

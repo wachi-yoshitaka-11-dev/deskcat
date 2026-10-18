@@ -73,7 +73,7 @@ linkの上で起きたerrorである。openの`ENOENT`／`EACCES`／`EBUSY`はUS
 transportを所有せず、pumpの引数で受け取る）ため、呼び出し側の形をここに置く。
 
 ```bash
-cargo run --example serial_link -- --port <path> --baud <rate> --duplicate-capacity <n> --duplicate-retention-ms <ms> [--seconds <n>] [--ping-count <n>] [--verbose]
+cargo run --example serial_link -- --port <path> --baud <rate> --duplicate-capacity <n> --duplicate-retention-ms <ms> [--seconds <n>] [--ping-count <n>] [--motion-expire-after-ms <ms>] [--verbose]
 ```
 
 `--port`と`--baud`は**どちらも必須である。既定値を持たせない。**Pi linkの`/dev/serial0`は
@@ -100,6 +100,39 @@ portを開き直す。周期1秒、連続2 probeの閾値は**暫定値**であ�
 単発のread timeoutは切断にしない。再接続の予算はbyte受信では戻さず、相関ACKを受けたときに戻す。
 `--ping-count <n>`（1以上）は別の診断用`ping`を最大n件送る。ACKの相関と、ACK timeoutでの同じ`id`の再送は、`get_status`と同じ経路である。診断用pingに周期は持たない。省いてもlink監視のprobeは動く。
 根拠の読み方: 終了時の`counters: pings_sent=… ping_acks=… ping_rejected=… ping_retries=… ping_gave_up=…`は通算である。`pings_sent`と`ping_acks`が等しくn以上なら、送った`ping`のすべてに`ok`のACKを相関できた（n未満なら、まだ送り終えていない。等しくなければ、拒否・取り下げ・未決のまま終了・ESP32 sessionの切替で捨てた`ping`がある。`peer: session_switches`は最初の確立でも1になり、2以上なら切替があった）。これは「`ping`へのACKを相関した」根拠であり、`boot`→ACK→`get_status`→`status`の往復の成立とは別に記録する。ESP32側のlogと突き合わせる。
+
+### #12 の `play_motion` 拒否診断
+
+`--motion-expire-after-ms <ms>`を指定すると、空catalogに存在しない
+`__deskcat_issue_12_reject_only_probe__`だけを送る。**実行前にESP32へ書いたfirmwareが
+`develop`の`b3d86ce`以降で、`MotionCatalog::empty()`を使い、servoへ渡さず必ず拒否する版か確認する。**
+これはmotionの動作を試すコマンドではない。`--seconds`も指定する。診断中は通常のlink probeを
+止め、`--ping-count`との併用を拒否する。
+
+```bash
+cargo run --example serial_link -- --port /dev/serial0 --baud 115200 \
+  --duplicate-capacity 8 --duplicate-retention-ms 30000 \
+  --motion-expire-after-ms 12000 --seconds 60
+```
+
+115200は`PROTO-TBD-001`の候補値、firmwareの保持件数8・期間10秒は`pi_link.rs`の**暫定値**
+（`PROTO-TBD-005`）である。別のfirmware版ではその値を読み直し、`--motion-expire-after-ms`を
+firmwareの保持期間より長く、Piの`--duplicate-retention-ms`を待ち時間より十分長くする。
+後者が短いとsession切替後の`boot`再送がPi側で`duplicate_expired`になり、診断は完了しない。
+
+| 送信 | 期待するACK | 実行体の専用counter | ESP32 log |
+|---|---|---|---|
+| 初回の`play_motion` | `rejected/invalid_payload` | `first_rejected=1` | `pi_rx_play_motion_rejected ... replayed=false` |
+| 同じ`(sid, id)`を再送 | 同じ`rejected/invalid_payload` | `replay_rejected=1` | 同じidentityで`replayed=true` |
+| 保持期間を越えて同じIDを再送 | `rejected/duplicate_expired` | `duplicate_expired=1` | `code=duplicate_expired` |
+| 新しいPi sidの`hello`後に旧sidから再送 | `rejected/stale_session` | `stale_session=1` | `code=stale_session` |
+
+成功時は`motion: first_rejected=1 replay_rejected=1 duplicate_expired=1 stale_session=1 complete=true`
+を出す。これは**実行体が相関したACKの数**である。firmwareの`status.payload.protocol` counterは
+現版で0固定なので、この表の観測には使わない。firmware logと`sid`・`id`を突き合わせて
+replayの判定を確認する。空catalogの拒否経路での観測であり、実motionの実行が二度起きないことを
+実機で確かめた結果とは扱わない。motion名・speed/repeatの上限、保持方針、受理budget、
+command ageは`PROTO-TBD-008`・`005`・`012`・`013`のままである。
 
 **ESP32が`boot`→ACKより先の往復に応えるのは、`firmware/esp32`を
 [Issue #487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)のPR B2
