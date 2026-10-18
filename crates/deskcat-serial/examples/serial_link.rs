@@ -495,7 +495,8 @@ impl LinkWatch {
     }
 
     fn send_due(&mut self, session: &mut Session, peer: &mut PeerSession, now_ms: u64) {
-        if self.in_flight.is_some() || now_ms < self.next_probe_ms {
+        // 相手のsidをbootで承認するまで、pingのACKは相関できない。
+        if self.in_flight.is_some() || now_ms < self.next_probe_ms || peer.esp32_sid().is_none() {
             return;
         }
         match session.send(Message::Ping, now_ms) {
@@ -1018,6 +1019,35 @@ mod tests {
         assert!(!watch.observe_retries(&[RetryOutcome::GaveUp(12, OutstandingKind::Ping)], 3_000));
         watch.in_flight = Some(13);
         assert!(watch.observe_retries(&[RetryOutcome::GaveUp(13, OutstandingKind::Ping)], 5_000));
+    }
+
+    #[test]
+    fn link_watch_starts_probing_only_after_boot_establishes_the_peer_session() {
+        let config = SerialConfig::new("/dev/simulated", 115_200).unwrap();
+        let mut session = Session::new(config, 7);
+        let duplicate_policy = DuplicatePolicy::new(2, Duration::from_secs(1)).unwrap();
+        let mut peer = PeerSession::new(duplicate_policy);
+        let mut watch = LinkWatch::new();
+
+        session.note_connected();
+        watch.send_due(&mut session, &mut peer, 0);
+        assert_eq!(watch.in_flight, None);
+        assert_eq!(session.pending_out(), 0);
+
+        let handled = peer.handle_boot(
+            41_207,
+            1,
+            Boot {
+                firmware: "0.1.0".to_owned(),
+                board: "esp32".to_owned(),
+                reset_reason: "power_on".to_owned(),
+            },
+            1,
+        );
+        watch.observe(&Received::Boot(handled), 1);
+        watch.send_due(&mut session, &mut peer, 1);
+        assert!(watch.in_flight.is_some());
+        assert_eq!(session.pending_out(), 1);
     }
 
     #[test]
