@@ -262,12 +262,12 @@ impl Session {
     /// **実deviceのopenはこのcrateが行わない。**呼び出し側がtransportを用意し、
     /// ここでstateを揃える。
     ///
-    /// **再接続の予算はここでresetしない。**openが成功しただけでは、linkが
-    /// 生きている証拠にならない。device nodeは列挙されるが応答しないという状態は
-    /// 実際に起きる（USB adapterの半挿し、相手の電源断）。ここでresetすると、
+    /// **再接続の予算はここでresetしない。**openが成功しただけでは、相手が
+    /// 応答する証拠にならない。device nodeは列挙されるが応答しない状態がある。
+    /// ここでresetすると、
     /// 「open成功 → 予算が戻る → すぐ切断 → 再試行」が延々と回り、
     /// **[`ReconnectPolicy::max_attempts`](crate::ReconnectPolicy::max_attempts)に永久に到達せず、backoffも初期値から
-    /// 伸びない。**予算が戻るのは[`Self::pump_read`]が実際にbyteを読めたときである。
+    /// 伸びない。**予算が戻るのは[`Self::note_peer_responsive`]で相関ACKを記録したときである。
     pub fn note_connected(&mut self) {
         if self.stopped.is_some() {
             return;
@@ -276,6 +276,28 @@ impl Session {
         // port再openとreconnectでは受信中の断片を捨てる（§10）。
         // 途中まで読んだlineの続きが、新しい接続の先頭と繋がってはならない。
         self.receiver.reset();
+    }
+
+    /// 相手の応答が有限のACK retryを終えても戻らなかったとき、link喪失を記録する。
+    ///
+    /// GPIO UARTでは信号線を外してもdeviceは開いたままで、readはidleのままになりうる。
+    /// 単発のI/O timeoutは切断としない。呼び出し側が相関ACKの不在を確認してから
+    /// このmethodを呼ぶ。serialの再openだけでは`sid`を変更しない（protocol §3）。
+    pub fn note_peer_unresponsive(&mut self) {
+        if self.link_connected {
+            log::warn!("serial peer: ACK応答が途絶えた -> Disconnected");
+            self.note_disconnected();
+        }
+    }
+
+    /// 相関が取れた相手のACKを確認したとき、再接続の予算を戻す。
+    ///
+    /// `pump_read`でbyteを読めただけでは戻さない。不正なbyteや無関係なframeでも
+    /// 予算が戻ると、UARTが開いたまま応答しない状態で再接続を無制限に繰り返す。
+    pub fn note_peer_responsive(&mut self) {
+        if self.link_connected {
+            self.reconnect_attempts = 0;
+        }
     }
 
     /// 切断を記録する。
@@ -310,7 +332,7 @@ impl Session {
     /// `None`を返したときsessionは[`StopReason::ReconnectExhausted`]で停止する。
     /// **上限後も自動試行を続けると、上限が実質的に無くなる。**
     ///
-    /// 予算は[`Self::pump_read`]が実際にbyteを読めた時点で戻る。
+    /// 予算は[`Self::note_peer_responsive`]で相関ACKを確認した時点で戻る。
     /// [`Self::note_connected`]では戻らない（理由は同methodのdocにある）。
     pub fn begin_reconnect(&mut self) -> Option<Duration> {
         if self.stopped.is_some() {
@@ -475,10 +497,6 @@ impl Session {
             }
             Ok(n) => {
                 self.counters.bytes_in += n as u64;
-                // **linkが生きている唯一の証拠である。**ここで再接続の予算を戻す。
-                // `note_connected`（＝openが成功しただけ）では戻さない。
-                // 累計の`counters.reconnect_attempts`はresetしない。
-                self.reconnect_attempts = 0;
                 let mut frames = 0_u64;
                 let mut rejected = 0_u64;
                 self.receiver.drain(&self.read_buf[..n], |outcome| {

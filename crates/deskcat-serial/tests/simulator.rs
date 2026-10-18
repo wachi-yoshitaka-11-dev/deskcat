@@ -205,6 +205,43 @@ fn timed_out_is_distinguished_from_a_disconnect() {
     assert_eq!(session.counters().disconnects, 0);
 }
 
+/// GPIO `UART`の信号線喪失ではdevice errorが無い。ACK監視から明示的に
+/// 喪失を通知した後だけ、既存の有界な再接続経路へ進む。
+#[test]
+fn silent_peer_loss_disconnects_and_uses_the_bounded_reconnect_policy() {
+    let policy =
+        ReconnectPolicy::new(2, Duration::from_millis(100), Duration::from_millis(400)).unwrap();
+    let mut session = Session::new(config().with_reconnect(policy), 90_312);
+    session.note_connected();
+    let mut sim = Sim::with_reads(vec![Err(io::Error::from(io::ErrorKind::TimedOut))]);
+    assert_eq!(session.pump_read(&mut sim, |_| {}), Pump::TimedOut);
+    assert_eq!(session.counters().disconnects, 0);
+
+    session.note_peer_unresponsive();
+    assert_eq!(session.state(), ConnectionState::Disconnected);
+    assert_eq!(session.counters().disconnects, 1);
+    session.note_peer_unresponsive();
+    assert_eq!(
+        session.counters().disconnects,
+        1,
+        "同じ喪失を二重計上しない"
+    );
+
+    assert_eq!(session.begin_reconnect(), Some(Duration::from_millis(100)));
+    session.note_connected(); // device openだけでは応答確認にならない
+    session.note_peer_unresponsive();
+    assert_eq!(session.begin_reconnect(), Some(Duration::from_millis(200)));
+    session.note_connected();
+    session.note_peer_unresponsive();
+    assert_eq!(session.begin_reconnect(), None);
+    assert_eq!(
+        session.state(),
+        ConnectionState::Stopped(StopReason::ReconnectExhausted)
+    );
+    assert_eq!(session.counters().disconnects, 3);
+    assert_eq!(session.counters().reconnect_attempts, 2);
+}
+
 /// `BrokenPipe`は再接続の対象、`PermissionDenied`は再接続で直らない。
 #[test]
 fn broken_pipe_disconnects_while_permission_denied_stops_the_session() {
@@ -1206,11 +1243,11 @@ fn a_link_that_opens_but_never_carries_bytes_still_exhausts_the_reconnect_budget
     );
 }
 
-/// 予算が戻るのは、実際にbyteが流れたときである。
+/// 予算が戻るのは、相手の相関ACKを受理したときである。
 ///
 /// 上のtestの裏側。**正当な復帰まで塞いでいないこと**を固定する。
 #[test]
-fn the_reconnect_budget_is_restored_by_bytes_not_by_opening() {
+fn the_reconnect_budget_is_restored_by_peer_response_not_by_bytes() {
     let policy = ReconnectPolicy::new(3, Duration::from_millis(10), Duration::from_millis(40))
         .expect("方針は妥当である");
     let config = SerialConfig::new("/dev/simulated", 115_200)
@@ -1232,7 +1269,7 @@ fn the_reconnect_budget_is_restored_by_bytes_not_by_opening() {
         "openが成功しただけでは予算は戻らない"
     );
 
-    // byteが流れたら戻る。
+    // byteが流れても、まだ相手からの有効な応答と確認していない。
     let incoming = ping_line(1);
     let mut healthy = Sim::with_reads(vec![Ok(incoming.as_bytes().to_vec())]);
     assert!(matches!(
@@ -1241,8 +1278,14 @@ fn the_reconnect_budget_is_restored_by_bytes_not_by_opening() {
     ));
     assert_eq!(
         session.reconnect_attempts(),
+        1,
+        "byteだけでは予算を戻さない"
+    );
+    session.note_peer_responsive();
+    assert_eq!(
+        session.reconnect_attempts(),
         0,
-        "実際にbyteが読めたら予算は戻る"
+        "相関ACKを確認したら予算は戻る"
     );
     assert_eq!(
         session.counters().reconnect_attempts,

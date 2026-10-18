@@ -10,13 +10,17 @@
 //! protocolの層は、次のように[`deskcat_serial::PeerSession`]（[Issue #12]、
 //! `crates/deskcat-serial/src/peer.rs`と`coordinator.rs`）へつないである。
 //!
-//! - 接続のたびに`hello`を1件送り、その`id`を[`deskcat_serial::PeerSession::note_hello_sent`]で記録する。
-//!   `reason`は初回が`Startup`、再接続が`PortReopen`である（仕様§5.1）。
+//! - 接続のたびに`hello`を送り、その`id`を[`deskcat_serial::PeerSession::note_hello_sent`]で記録する。
+//!   未ACKの`hello`は同じ`(sid, id)`と`reason`で送り直す。新しい`hello`の`reason`は
+//!   初回が`Startup`、再接続が`PortReopen`である（仕様§5.1）。
 //! - 受信したframeは、種類を問わず[`deskcat_serial::handle_frame`]へ渡す。`boot`にはACKを返し、
 //!   新しいsessionを確立した場合は`get_status`を1件送る。`ack`は送ったrequestと相関させる。`status`は
 //!   `get_status`への応答かどうかを分ける（仕様§5.6）。
 //! - `--ping-count`を付けたときだけ、ESP32 sessionの確立のたびに`ping`を1件ずつ最大その件数送る
 //!   （前の`ping`がACKの相関か取り下げで決着してから次を送る。ESP32 sessionの確立でも未決は手放す。周期は持たない。`PROTO-TBD-010`）。
+//! - GPIO UARTの無応答を検出するため、上の診断用pingとは別に、1件ずつ周期的なlink probeを送る。
+//!   相関ACKが再送込みで連続して得られなければlink喪失として再openする。周期と閾値は
+//!   `LinkWatch`の暫定値であり、`PROTO-TBD-010`と実機試験で見直す。
 //! - pumpの1周ごとに[`deskcat_serial::retry_due_requests`]を呼ぶ。ACK timeoutした`ping`と`get_status`を
 //!   同じ`id`で送り直し（仕様§9）、確立の直後にqueueへ入れられなかった`get_status`を送る。
 //!
@@ -37,17 +41,15 @@
 //! **3が成り立つのは、ESP32がこの実行体の`hello`を受理し、その後に再起動していない場合だけである。**
 //! それ以外では、ESP32は`get_status`を`stale_session`で拒否し、`status`を返さない
 //! （`firmware/esp32/src/protocol.rs`の`PiSession::handle_get_status`）。`hello`がESP32へ届かなかった
-//! 場合が当たる（この実行体は`hello`を再送しない。`PROTO-TBD-011`）。
+//! 場合が当たる（この実行体は同一port内で`hello`のACK timeout再送をしない。`PROTO-TBD-011`）。
 //! 仕様は、Piが`stale_session`を受けたら`hello`から再開すると定める（§10.2）。**この実行体は
 //! それを実装していない**（[`deskcat_serial::handle_frame`]のdocは、再開を呼び出し側の責務とする）。
 //! 再接続で送るのも`PortReopen`の`hello`だけである。そのため、この場合は実行体を起動し直す。
 //!
-//! **この往復は、実機ではまだ確かめていない。**`ESP32`側の振る舞いはsourceを読んで導いたもので
-//! あり、ESP32側の振る舞いを確かめるhost testは無い（`pi_link.rs`のmodule doc「確かめていないこと」）。
-//! host（VM）では擬似端末で確かめたが、相手はfixtureの行で応える偽のESP32である
-//! （`crates/deskcat-serial/README.md`の「host（VM）で確認済みの挙動」）。実機の確認は
-//! [Issue #446]と[Issue #12]が追跡する。
-//! **`ESP32`側がprotocolを話すとは限らない**という留保は、実機で確かめるまで変わらない。
+//! [EXP-029]で、Piの`/dev/serial0`から`boot`→ACK→`get_status`→`status`と、診断用`ping`3件への
+//! ACKを実portで観察した。host（VM）の擬似端末試験はfixtureの行で応える偽のESP32を使う
+//! （`crates/deskcat-serial/README.md`の「host（VM）で確認済みの挙動」）。
+//! **実portでのlink喪失判定と再接続は未確認である。**[Issue #11]で追跡する。
 //! 記録するときは「行が通った」と「protocolが成立した」を書き分ける。
 //!
 //! # 使い方
@@ -57,8 +59,8 @@
 //!     --duplicate-capacity <n> --duplicate-retention-ms <ms> [--seconds <n>] [--ping-count <n>] [--verbose]
 //! ```
 //!
-//! `--port`と`--baud`は**どちらも必須である。**既定値を持たせない。device名は未確認で
-//! あり（確定はIssue #11の後半）、baudの正本は`PROTO-TBD-001`でいずれも`Candidate`である。
+//! `--port`と`--baud`は**どちらも必須である。**既定値を持たせない。Pi linkの`/dev/serial0`は
+//! [EXP-029]でopenと往復を観察した。baudの確定は`PROTO-TBD-001`で、115200は`Candidate`である。
 //! **確認していない値を既定として固定しない。**渡した値は記録にそのまま残る。
 //!
 //! `--duplicate-capacity`と`--duplicate-retention-ms`（`boot`のduplicate履歴の保持件数と
@@ -66,7 +68,7 @@
 //!
 //! `--seconds`を省くと、再接続の上限に達してsessionが停止するまで走り続ける。
 //!
-//! `--ping-count <n>`は1以上で、省くと`ping`を送らない。終了時の`counters: pings_sent=… ping_acks=…
+//! `--ping-count <n>`は1以上で、省くと診断用`ping`を送らない（link probeは動く）。終了時の`counters: pings_sent=… ping_acks=…
 //! ping_rejected=… ping_retries=… ping_gave_up=…`は通算である。**`pings_sent`と`ping_acks`が等しく、
 //! n以上であれば、送った`ping`のすべてに`ok`のACKを相関できた（n未満なら、まだ送り終えていない）。**等しくなければ、拒否・取り下げ・
 //! 未決のまま終わった、またはESP32 sessionの切替で捨てた`ping`がある（`peer: session_switches`は最初の確立でも1になる。2以上なら切替があった）。
@@ -84,6 +86,7 @@
 //!
 //! [Issue #11]: https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11
 //! [Issue #12]: https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12
+//! [EXP-029]: https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/docs/hardware/experiment-log.md
 //! [Issue #446]: https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446
 //! [Issue #487]: https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487
 //! [PR #529]: https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/529
@@ -115,8 +118,8 @@ fn usage() -> &'static str {
      --duplicate-capacity <n> --duplicate-retention-ms <ms> [--seconds <n>] [--ping-count <n>] [--verbose]\n\
      \n\
      --port、--baud、--duplicate-capacity、--duplicate-retention-ms は必須である。既定値を持たせない。\n\
-     device名は未確認であり、baudの正本は PROTO-TBD-001、duplicate履歴の正本は PROTO-TBD-005 である。\n\
-     --ping-count を省くと ping を送らない。"
+     Pi linkの /dev/serial0 は EXP-029 でopenと往復を観察した。baudの確定は PROTO-TBD-001、duplicate履歴は PROTO-TBD-005 である。\n\
+     --ping-count を省くと診断用pingを送らない。link probeは常に動く。"
 }
 
 /// 引数の解析結果。
@@ -177,7 +180,9 @@ fn parse_args() -> Result<Parsed, String> {
                     .parse::<u32>()
                     .map_err(|e| format!("--ping-countが数値でない: {e}"))?;
                 if n == 0 {
-                    return Err("--ping-countは1以上である（省けばpingを送らない）".to_owned());
+                    return Err(
+                        "--ping-countは1以上である（省けば診断用pingを送らない）".to_owned()
+                    );
                 }
                 ping_count = Some(n);
             }
@@ -241,10 +246,24 @@ fn hello(reason: HelloReason) -> Message {
 }
 
 /// `hello`をqueueへ入れ、ESP32からのACKをこの`hello`と相関させるために記録する（#12）。
-fn send_hello(session: &mut Session, peer: &mut PeerSession, reason: HelloReason, now_ms: u64) {
+fn send_hello(
+    session: &mut Session,
+    peer: &mut PeerSession,
+    pending: &mut Option<(u32, HelloReason)>,
+    reason: HelloReason,
+    now_ms: u64,
+) {
+    if let Some((id, pending_reason)) = *pending {
+        match session.resend(id, hello(pending_reason), now_ms) {
+            Ok(()) => log::info!("未ACKのhelloを再送した（id={id}, reason={pending_reason:?}）"),
+            Err(error) => log::warn!("未ACKのhelloを再送できない: {error}"),
+        }
+        return;
+    }
     match session.send(hello(reason), now_ms) {
         Ok(id) => {
             peer.note_hello_sent(id);
+            *pending = Some((id, reason));
             log::info!("hello を queue へ入れた（id={id}, reason={reason:?}）");
         }
         Err(error) => log::warn!("hello を送れない: {error}"),
@@ -399,6 +418,107 @@ fn send_ping(session: &mut Session, peer: &mut PeerSession, probe: &mut PingProb
     }
 }
 
+/// GPIO UARTの相手応答を監視する。周期と喪失閾値は実機評価前の暫定値
+/// （PROTO-TBD-010、PROTO-TBD-004）であり、確定したheartbeat仕様ではない。
+/// 1件ずつ送るため、未ACK要求と送信queueは有界のままである。
+struct LinkWatch {
+    in_flight: Option<u32>,
+    next_probe_ms: u64,
+    missed: u32,
+}
+
+struct Monitoring {
+    probe: Option<PingProbe>,
+    link_watch: LinkWatch,
+    pending_hello: Option<(u32, HelloReason)>,
+}
+
+impl LinkWatch {
+    const INTERVAL_MS: u64 = 1_000; // 暫定。heartbeatの周期はPROTO-TBD-010。
+    const MISSED_LIMIT: u32 = 2; // 暫定。1回のGaveUpは初回と再送の2回のACK timeout。
+
+    fn new() -> Self {
+        Self {
+            in_flight: None,
+            next_probe_ms: 0,
+            missed: 0,
+        }
+    }
+
+    fn observe(&mut self, received: &Received, now_ms: u64) {
+        match received {
+            Received::Boot(handled)
+                if matches!(handled.outcome, BootOutcome::Established { .. }) =>
+            {
+                // PeerSessionはsession遷移時に旧outstandingを捨てる。
+                self.in_flight = None;
+                self.missed = 0;
+                self.next_probe_ms = now_ms;
+            }
+            Received::Ack(ack)
+                if matches!(ack.request, OutstandingKind::Ping)
+                    && self.in_flight == Some(ack.ack.reply_to) =>
+            {
+                // rejectedでも相関ACKが返ったなら、対向processは応答している。
+                self.in_flight = None;
+                self.missed = 0;
+                self.next_probe_ms = now_ms.saturating_add(Self::INTERVAL_MS);
+            }
+            Received::Ack(_) => {
+                // 別の要求への相関ACKも、双方向のlinkが生きている証拠である。
+                // probe自身の未完了IDはそのまま追跡する。
+                self.missed = 0;
+            }
+            _ => {}
+        }
+    }
+
+    fn observe_retries(&mut self, outcomes: &[RetryOutcome], now_ms: u64) -> bool {
+        for outcome in outcomes {
+            if let RetryOutcome::GaveUp(id, OutstandingKind::Ping) = outcome
+                && self.in_flight == Some(*id)
+            {
+                self.in_flight = None;
+                self.missed += 1;
+                self.next_probe_ms = now_ms.saturating_add(Self::INTERVAL_MS);
+                log::warn!(
+                    "link probeのACKが無い: {}/{}",
+                    self.missed,
+                    Self::MISSED_LIMIT
+                );
+                if self.missed >= Self::MISSED_LIMIT {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    fn send_due(&mut self, session: &mut Session, peer: &mut PeerSession, now_ms: u64) {
+        // 相手のsidをbootで承認するまで、pingのACKは相関できない。
+        if self.in_flight.is_some() || now_ms < self.next_probe_ms || peer.esp32_sid().is_none() {
+            return;
+        }
+        match session.send(Message::Ping, now_ms) {
+            Ok(id) => {
+                let _ = peer.note_sent(id, Message::Ping, now_ms);
+                self.in_flight = Some(id);
+                log::debug!("link probeを送った: id={id}");
+            }
+            Err(SendError::Dropped) => log::warn!("link probeのqueueが満杯。次のtickで再試行する"),
+            Err(error) => log::error!("link probeを送れない: {error}"),
+        }
+    }
+
+    fn on_disconnect(&mut self, peer: &mut PeerSession) {
+        if let Some(id) = self.in_flight.take() {
+            let _ = peer.forget_sent(id);
+        }
+        self.missed = 0;
+        self.next_probe_ms = 0;
+    }
+}
+
 fn report(session: &Session, peer: &PeerSession, probe: Option<&PingProbe>) {
     let (counters, peer, ping, state) = (
         session.counters(),
@@ -515,6 +635,28 @@ fn deadline_after(started: Instant, seconds: Option<u64>) -> Result<Option<Insta
         })
 }
 
+fn next_hello_reason(first_connect: &mut bool) -> HelloReason {
+    let reason = if *first_connect {
+        HelloReason::Startup
+    } else {
+        HelloReason::PortReopen
+    };
+    *first_connect = false;
+    reason
+}
+
+fn install_logger(verbose: bool) -> Result<(), ()> {
+    // 長時間観察のread timeoutを埋めないよう、既定はInfoとする。
+    let level = if verbose {
+        log::LevelFilter::Debug
+    } else {
+        log::LevelFilter::Info
+    };
+    logger::install(level).map_err(|error| {
+        eprintln!("loggerを入れられない: {error}");
+    })
+}
+
 fn main() -> ExitCode {
     let args = match parse_args() {
         Ok(Parsed::Run(args)) => *args,
@@ -528,17 +670,7 @@ fn main() -> ExitCode {
         }
     };
 
-    // **既定はInfoである。**`Debug`にすると、dataが来ていないだけの状態でも
-    // read timeoutごとに1行出る（既定50 msなので毎秒20行）。長時間の実機観察では
-    // それが本当のeventを埋めてしまう。切り分けが要るときだけ`--verbose`で上げる。
-    let level = if args.verbose {
-        log::LevelFilter::Debug
-    } else {
-        log::LevelFilter::Info
-    };
-    if let Err(error) = logger::install(level) {
-        // logが使えないのでstderrへ直接出す。ここだけは例外である。
-        eprintln!("loggerを入れられない: {error}");
+    if install_logger(args.verbose).is_err() {
         return ExitCode::FAILURE;
     }
 
@@ -571,8 +703,11 @@ fn main() -> ExitCode {
 
     // 初回接続かどうか。`hello`の`reason`を分けるために持つ。
     let mut first_connect = true;
-    // `--ping-count`を省いたら持たない。
-    let mut probe = args.ping_count.map(PingProbe::new);
+    let mut monitoring = Monitoring {
+        probe: args.ping_count.map(PingProbe::new),
+        link_watch: LinkWatch::new(),
+        pending_hello: None,
+    };
 
     loop {
         if deadline.is_some_and(|d| Instant::now() >= d) {
@@ -601,18 +736,19 @@ fn main() -> ExitCode {
         session.note_connected();
 
         // 接続ごとに`hello`を1件送る（module doc）。
-        let reason = if first_connect {
-            HelloReason::Startup
-        } else {
-            HelloReason::PortReopen
-        };
-        first_connect = false;
-        send_hello(&mut session, &mut peer, reason, uptime_ms(started));
+        let reason = next_hello_reason(&mut first_connect);
+        send_hello(
+            &mut session,
+            &mut peer,
+            &mut monitoring.pending_hello,
+            reason,
+            uptime_ms(started),
+        );
 
         let disconnected = pump_until_break(
             &mut session,
             &mut peer,
-            &mut probe,
+            &mut monitoring,
             &mut device,
             started,
             deadline,
@@ -622,9 +758,11 @@ fn main() -> ExitCode {
             break; // deadline到達、または停止済み。summaryはloopの外で1度だけ出す
         }
 
+        monitoring.link_watch.on_disconnect(&mut peer);
+
         // 切断ごとの区切りとして出す。**loopを抜けた後にもう一度出さない**
         // （同じ数字が2回並ぶと、どちらが最終値か読めない）。
-        report(&session, &peer, probe.as_ref());
+        report(&session, &peer, monitoring.probe.as_ref());
 
         let Some(backoff) = session.begin_reconnect() else {
             log::error!("再接続の上限に達した。停止する");
@@ -635,7 +773,7 @@ fn main() -> ExitCode {
         sleep(wait);
     }
 
-    report(&session, &peer, probe.as_ref());
+    report(&session, &peer, monitoring.probe.as_ref());
     log::info!("経過 {:?}", started.elapsed());
 
     // **握りつぶしていないことをここで示す。**0件でも出す。
@@ -657,7 +795,7 @@ fn main() -> ExitCode {
 fn pump_until_break(
     session: &mut Session,
     peer: &mut PeerSession,
-    probe: &mut Option<PingProbe>,
+    monitoring: &mut Monitoring,
     device: &mut SerialDevice,
     started: Instant,
     deadline: Option<Instant>,
@@ -692,9 +830,24 @@ fn pump_until_break(
             }
         });
         for frame in frames {
-            let received = handle_frame(session, peer, frame, uptime_ms(started));
+            let now_ms = uptime_ms(started);
+            let had_esp32_session = peer.esp32_sid().is_some();
+            let received = handle_frame(session, peer, frame, now_ms);
+            if matches!(received, Received::Ack(_)) {
+                session.note_peer_responsive();
+            }
+            if matches!(&received, Received::Ack(ack) if matches!(ack.request, OutstandingKind::Hello))
+            {
+                monitoring.pending_hello = None;
+            }
+            if had_esp32_session
+                && matches!(&received, Received::Boot(handled) if matches!(handled.outcome, BootOutcome::Established { .. }))
+            {
+                monitoring.pending_hello = None; // PeerSessionも旧sessionへのhello追跡を捨てた。
+            }
             log_received(&received);
-            if let Some(probe) = probe.as_mut() {
+            monitoring.link_watch.observe(&received, now_ms);
+            if let Some(probe) = monitoring.probe.as_mut() {
                 probe.observe(&received);
             }
         }
@@ -707,10 +860,20 @@ fn pump_until_break(
             // （`PROTO-TBD-011`。`OutstandingKind::Hello`のdoc参照）。
             let retries = retry_due_requests(session, peer, uptime_ms(started));
             log_retries(&retries);
-            if let Some(probe) = probe.as_mut() {
+            if monitoring
+                .link_watch
+                .observe_retries(&retries, uptime_ms(started))
+            {
+                session.note_peer_unresponsive();
+                return true;
+            }
+            if let Some(probe) = monitoring.probe.as_mut() {
                 probe.observe_retries(&retries);
                 send_ping(session, peer, probe, uptime_ms(started));
             }
+            monitoring
+                .link_watch
+                .send_due(session, peer, uptime_ms(started));
         }
         let write = session.pump_write(device);
 
@@ -804,6 +967,99 @@ mod tests {
     use deskcat_serial::{BootHandled, CorrelatedAck};
 
     use super::*;
+
+    #[test]
+    fn reconnect_resends_unanswered_hello_with_the_same_identity_and_reason() {
+        let config = SerialConfig::new("/dev/simulated", 115_200).unwrap();
+        let mut session = Session::new(config, 7);
+        let duplicate_policy = DuplicatePolicy::new(2, Duration::from_secs(1)).unwrap();
+        let mut peer = PeerSession::new(duplicate_policy);
+        let mut pending = None;
+
+        session.note_connected();
+        send_hello(
+            &mut session,
+            &mut peer,
+            &mut pending,
+            HelloReason::Startup,
+            0,
+        );
+        let first = pending;
+        session.note_peer_unresponsive();
+        session.note_connected();
+        send_hello(
+            &mut session,
+            &mut peer,
+            &mut pending,
+            HelloReason::PortReopen,
+            1_000,
+        );
+        assert_eq!(pending, first);
+        assert_eq!(
+            session.pending_out(),
+            1,
+            "切断時のqueueを捨てて同じhelloだけを再送"
+        );
+    }
+
+    #[test]
+    fn link_watch_requires_consecutive_exhausted_ping_retries() {
+        let mut watch = LinkWatch::new();
+        watch.in_flight = Some(10);
+        assert!(!watch.observe_retries(&[RetryOutcome::GaveUp(99, OutstandingKind::Ping)], 1_000));
+        assert!(!watch.observe_retries(&[RetryOutcome::GaveUp(10, OutstandingKind::Ping)], 1_000));
+        assert_eq!(watch.missed, 1);
+        assert_eq!(watch.next_probe_ms, 2_000, "次のprobeまで間隔を空ける");
+
+        watch.in_flight = Some(11);
+        watch.observe(&ack(OutstandingKind::Ping, 11, AckStatus::Ok), 2_000);
+        assert_eq!(watch.missed, 0, "相関ACKで連続喪失数を戻す");
+
+        watch.in_flight = Some(12);
+        assert!(!watch.observe_retries(&[RetryOutcome::GaveUp(12, OutstandingKind::Ping)], 3_000));
+        watch.in_flight = Some(13);
+        assert!(watch.observe_retries(&[RetryOutcome::GaveUp(13, OutstandingKind::Ping)], 5_000));
+    }
+
+    #[test]
+    fn link_watch_starts_probing_only_after_boot_establishes_the_peer_session() {
+        let config = SerialConfig::new("/dev/simulated", 115_200).unwrap();
+        let mut session = Session::new(config, 7);
+        let duplicate_policy = DuplicatePolicy::new(2, Duration::from_secs(1)).unwrap();
+        let mut peer = PeerSession::new(duplicate_policy);
+        let mut watch = LinkWatch::new();
+
+        session.note_connected();
+        watch.send_due(&mut session, &mut peer, 0);
+        assert_eq!(watch.in_flight, None);
+        assert_eq!(session.pending_out(), 0);
+
+        let handled = peer.handle_boot(
+            41_207,
+            1,
+            Boot {
+                firmware: "0.1.0".to_owned(),
+                board: "esp32".to_owned(),
+                reset_reason: "power_on".to_owned(),
+            },
+            1,
+        );
+        watch.observe(&Received::Boot(handled), 1);
+        watch.send_due(&mut session, &mut peer, 1);
+        assert!(watch.in_flight.is_some());
+        assert_eq!(session.pending_out(), 1);
+    }
+
+    #[test]
+    fn link_watch_keeps_its_probe_but_recognizes_other_correlated_acks() {
+        let mut watch = LinkWatch::new();
+        watch.in_flight = Some(10);
+        watch.missed = 1;
+        watch.observe(&ack(OutstandingKind::Ping, 99, AckStatus::Ok), 1_000);
+        watch.observe(&ack(OutstandingKind::GetStatus, 10, AckStatus::Ok), 1_000);
+        assert_eq!(watch.in_flight, Some(10));
+        assert_eq!(watch.missed, 0);
+    }
 
     fn established() -> Received {
         Received::Boot(BootHandled {
