@@ -1099,6 +1099,34 @@ fn finish_run(
 ) -> ExitCode {
     report(session, peer, monitoring.probe.as_ref());
     if let Some(motion) = monitoring.motion.as_ref() {
+        if let Some(old) = motion.old_session.as_ref() {
+            let counters = old.counters();
+            log::info!(
+                "motion old_session sid={} state={:?}",
+                old.sid(),
+                old.state()
+            );
+            log::info!(
+                "motion old_session counters: bytes_in={} bytes_out={} frames_in={} rejected_in={}",
+                counters.bytes_in,
+                counters.bytes_out,
+                counters.frames_in,
+                counters.rejected_in
+            );
+            log::info!(
+                "motion old_session counters: disconnects={} reconnect_attempts={} timeouts={} retries={}",
+                counters.disconnects,
+                counters.reconnect_attempts,
+                counters.timeouts,
+                counters.retries
+            );
+            log::info!(
+                "motion old_session counters: dropped_out={} discarded_on_disconnect={} encode_failed={}",
+                counters.dropped_out,
+                counters.discarded_on_disconnect,
+                counters.encode_failed
+            );
+        }
         motion.report();
     }
     log::info!("経過 {:?}", started.elapsed());
