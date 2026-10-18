@@ -2,8 +2,9 @@
 //!
 //! [Issue #15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15) の受け入れ条件
 //! （Device IDと正確な変換の検証、offsetとnoiseの測定など）のうち、この段階では
-//! **Device ID (register `0x00`) の読み出しだけを扱う**（[AGENTS.md](../../../AGENTS.md)
-//! 「最終形を一度に作らず、単体から統合へ進める」）。calibration・測定値の読み出しは別途進める。
+//! **Device ID (register `0x00`) の読み出しに加え、`accel-sample-15`のための連続測定の設定とFIFOの読み出し**
+//! （`configure_sampling`・`read_fifo_status`・`read_sample_bytes`）**を扱う**（[AGENTS.md](../../../AGENTS.md)
+//! 「最終形を一度に作らず、単体から統合へ進める」）。calibration（offsetの補正）は別途進める。
 //!
 //! # 配線の根拠
 //!
@@ -35,6 +36,10 @@
 //! tap検出のレジスタ（`crate::accel`の`configure_tap`・`read_int_source`）の出所は、`deskcat_tap`のcrate docが持つ
 //! （**Rev. 0**を読んだ。**Rev. Gと同じかは独立に確認していない**）。
 //!
+//! 連続測定のregister（`configure_sampling`・`read_fifo_status`・`read_sample_bytes`）の出所は、`deskcat_accel`のcrate docが持つ
+//! （**Rev. E**を読んだ。**Rev. Gと同じかは独立に確認していない**）。連続測定も`read_int_source`でOverrunを読む。
+//! addressは上のtapと同じ`deskcat_tap::REG_INT_SOURCE`で、Overrun（D0）の読み方の出所は`deskcat_accel`のcrate docである。
+//!
 //! 一次資料は**Analog Devices ADXL345 Data Sheet Rev. G**
 //! （<https://www.analog.com/media/en/technical-documentation/data-sheets/adxl345.pdf>、
 //! `docs/hardware/sensor-datasheet-notes.md`が既に引用しているものと同一revision）。
@@ -51,7 +56,7 @@
 //! （`run_i2c_bringup`は一致判定をしない。`tap-21`付きbuildでは呼び出し側の`start_tap`が判定する。`main.rs`のmodule doc参照）。**2026-09-22に、`35bcc36`のbuildをESP32へ書き込み、ESP32`3V3` pin給電で
 //! `ACCEL-01`／`ENV-01`へ初回通電して、この読み出しに応答を得た**（生byte `0xe5`。
 //! 一致判定はしていない。記録は[EXP-015](../../../docs/hardware/experiment-log.md)が正本であり、
-//! **ここへ再掲しない**）。**それより後の変更を含むbuildは、実機で動かした記録が無い。**
+//! **ここへ再掲しない**）。**それより後の変更を含むbuildの実機の記録は、tap用の`configure_tap`が`EXP-021`（`read_int_source`は`EXP-021`と`EXP-033`の両方で動いた）、連続測定用の`configure_sampling`・`read_fifo_status`・`read_sample_bytes`が`EXP-033`にある（`EXP-033`で書き込んだ版は、overrunの確認の位置などが今のcodeと違う。`crate::accel_sample`のmodule doc）。それ以外の変更を含むbuildは、実機で動かした記録が無い。**
 //! 実機での動作確認は人間の監視下で行う別工程である
 //! （[Hardware Safety Policy](../../../docs/governance/hardware-safety-policy.md)
 //! 「人間の監視が必要な操作」）。
@@ -67,10 +72,13 @@ const REG_DEVID: u8 = 0x00;
 
 /// `DEVID`のreset値（固定のdevice ID）。`docs/hardware/sensor-datasheet-notes.md`の`Device ID register／value`行が出所である。
 /// tap検出の設定を書く前に、このaddressの先がADXL345であることを、この値で確かめる（`main.rs`の`start_tap`）。
-#[cfg_attr(not(feature = "tap-21"), allow(dead_code))]
+#[cfg_attr(
+    not(any(feature = "tap-21", feature = "accel-sample-15")),
+    allow(dead_code)
+)]
 pub const EXPECTED_DEVICE_ID: u8 = 0xE5;
 
-/// [`Adxl345::read_device_id`]・[`Adxl345::configure_tap`]・[`Adxl345::read_int_source`]の1 transactionのtimeout（tick）。
+/// [`Adxl345::read_device_id`]・[`Adxl345::configure_tap`]・[`Adxl345::read_int_source`]・[`Adxl345::configure_sampling`]・[`Adxl345::read_fifo_status`]・[`Adxl345::read_sample_bytes`]の1 transactionのtimeout（tick）。
 ///
 /// **`esp_idf_svc::hal::delay::BLOCK`（無期限）を使わない。**`SDA`がLowのまま固着した
 /// 場合（配線ミス、jumper未設定など）に呼び出しが返らず、`main()`がheartbeatのloopへ
@@ -134,5 +142,42 @@ impl Adxl345 {
             READ_TIMEOUT_TICKS,
         )?;
         Ok(buf[0])
+    }
+
+    /// 連続測定の設定を書く（`deskcat_accel::SETUP`の順）。最初に失敗した書き込みで止めて`Err`を返す。
+    /// 1 transactionごとに[`READ_TIMEOUT_TICKS`]で有限時間に返る。
+    #[cfg_attr(not(feature = "accel-sample-15"), allow(dead_code))]
+    pub fn configure_sampling(&self, i2c: &mut I2cDriver<'_>) -> Result<(), EspError> {
+        for (register, value) in deskcat_accel::SETUP {
+            i2c.write(self.address, &[register, value], READ_TIMEOUT_TICKS)?;
+        }
+        Ok(())
+    }
+
+    /// `FIFO_STATUS`（`0x39`）を読む。生byteを返す（entriesは`deskcat_accel::fifo_entries`）。
+    #[cfg_attr(not(feature = "accel-sample-15"), allow(dead_code))]
+    pub fn read_fifo_status(&self, i2c: &mut I2cDriver<'_>) -> Result<u8, EspError> {
+        let mut buf = [0u8; 1];
+        i2c.write_read(
+            self.address,
+            &[deskcat_accel::REG_FIFO_STATUS],
+            &mut buf,
+            READ_TIMEOUT_TICKS,
+        )?;
+        Ok(buf[0])
+    }
+
+    /// `DATAX0`から6 byteを1 transactionで読む（datasheetは複数byteの一括読み出しを勧める）。
+    /// Stream modeでは、読むたびにFIFOの先頭が1件進む。**復号は呼び出し側**（`deskcat_accel::decode_sample`）。
+    #[cfg_attr(not(feature = "accel-sample-15"), allow(dead_code))]
+    pub fn read_sample_bytes(&self, i2c: &mut I2cDriver<'_>) -> Result<[u8; 6], EspError> {
+        let mut buf = [0u8; 6];
+        i2c.write_read(
+            self.address,
+            &[deskcat_accel::REG_DATAX0],
+            &mut buf,
+            READ_TIMEOUT_TICKS,
+        )?;
+        Ok(buf)
     }
 }

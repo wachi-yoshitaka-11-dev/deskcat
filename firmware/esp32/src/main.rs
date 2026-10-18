@@ -48,10 +48,11 @@
 //! |---|---|---|
 //! | `bringup-i2c-15-16` | ACCEL-01／ENV-01のID読み出し。LCDに触れず、ADXL345へ設定を書かない | 従来のfeatureなしbuildの単体bring-upを保つ |
 //! | `env-sample-16` | BME280のChip IDが一致した場合だけ補正係数を読み、forced測定を1回行う。raw・補償値・faultはUART0にlog | 単独指定のみ。実機未確認で通電不可。Pi linkのpayloadは変更しない |
+//! | `accel-sample-15` | ADXL345のDevice IDが`0xE5`のときだけ、±2 g・100 Hz・FIFO Streamの連続測定を設定し、raw値と窓ごとの統計をUART0にlog（#15、`crate::accel_sample`）。tapの機能は止める（`INT_ENABLE`＝0） | 単独指定のみ。通電は2026-10-17の1回だけ（`EXP-033`）で、新しい書き込みを含む構成の通電手順と承認は未確定。Pi linkのpayloadは変更しない |
 //! | `bringup-display-13` | LCDの初期化、backlightの点灯、単色fillと四隅pattern | 表情とtapは有効にしない。描画の間のPi linkの受信とheartbeatは`crate::display_test`のmodule docを参照 |
 //! | `bringup-led-514` | #514の追加LED（GPIO2／GPIO5）の点灯試験と白の点滅（`crate::led`） | 表情とtapは有効にしない。`bringup-display-13`とも組み合わせられる |
 //! | `face-21` | LCDの初期化とbacklightの点灯を保ち、`set_expression`の3表情を描く。Pi commandを受けなくても、描ける状態になった時点で`neutral`を1回描く（#21、`crate::face`） | `bringup-display-13`とも組み合わせられる。**表情を持たない試験buildは`set_expression`を`hardware_unavailable`で拒否する** |
-//! | `tap-21` | ADXL345のtap検出を設定し、`INT_SOURCE`をI2Cで読み、bootのACK後に`tapped`を送る（#21のF1、`crate::tap`）。ADXL345のDevice IDが`0xE5`のときだけ設定を書き、I2Cのdriverを持ち続ける（一致しなければ何も書かず、driverを手放す） | INT線は使わない（配線は要らない）。`face-21`・`bringup-display-13`とも組み合わせられる。**tapを持たない試験buildはADXL345へ書き込まず、Device IDを読むだけである** |
+//! | `tap-21` | ADXL345のtap検出を設定し、`INT_SOURCE`をI2Cで読み、bootのACK後に`tapped`を送る（#21のF1、`crate::tap`）。ADXL345のDevice IDが`0xE5`のときだけ設定を書き、I2Cのdriverを持ち続ける（一致しなければ何も書かず、driverを手放す） | INT線は使わない（配線は要らない）。`face-21`・`bringup-display-13`とも組み合わせられる。**試験buildのうち`tap-21`も`accel-sample-15`も持たないものは、ADXL345へ書き込まず、Device IDを読むだけである**（既定・製品buildは`tap-21`と同じく書く） |
 //! | `bench-servo-test-17` | servoの単発bench試験（#17の測定用build） | **Pi linkを外す。**正本`docs/hardware/servo-safety-limits.md`の`測定のための駆動（承認の状態の項目6）`節が、測定用のbuildは「Piとの通信linkを持たない」と定めているためである |
 //! | `bench-servo-90-17` | 上の単発bench試験で、指令角だけを規約上の90度にする | `bench-servo-test-17`を含む。90度が機械的中央かどうかは未確認（`HW-TBD-010`） |
 //!
@@ -77,8 +78,8 @@
 //! 操作」。初回配線revisionでの初回通電は人間監視下で行う）。
 //! **2026-09-24追記（#472）: 上の2文は`4486de5`の時点の記述である。**2026-09-22に`35bcc36`の
 //! buildで`ACCEL-01`／`ENV-01`へ初回通電し、Device ID読み出しに応答を得た記録が
-//! [EXP-015](../../../docs/hardware/experiment-log.md)にある。それより後の変更を含むbuildは、
-//! 実機で動かした記録が無い。
+//! [EXP-015](../../../docs/hardware/experiment-log.md)にある。それより後のbuildの実機の記録は、
+//! 構成ごとに同じ文書の`EXP-021`（`tap-21`）、`EXP-033`（`accel-sample-15`）などにあり、記録の無い構成は実機で動かしていない。
 //!
 //! **Protocol sessionはまだ確立を主張しない。**`boot`のACK待ち・再送・`stale_session`受信時の
 //! `sid`選び直しは実装した（[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446) PR B、
@@ -164,6 +165,8 @@
 //! 判定も、これで変わらない。
 
 mod accel;
+#[cfg(feature = "accel-sample-15")]
+mod accel_sample;
 // Pi link（UART1）の`boot`の受理確認・再送。**`bench-servo-test-17`のbuildだけは持たない。**
 // 正本`docs/hardware/servo-safety-limits.md`の`測定のための駆動（承認の状態の項目6）`節が、
 // 測定用のbuildは「Piとの通信linkを持たない」と定めているためである（`#487`でfeatureの排他を
@@ -188,6 +191,19 @@ compile_error!(
     )
 ))]
 compile_error!("env-sample-16 は単独の試験 build として使う");
+#[cfg(all(
+    feature = "accel-sample-15",
+    any(
+        feature = "bringup-i2c-15-16",
+        feature = "bringup-display-13",
+        feature = "bringup-led-514",
+        feature = "face-21",
+        feature = "tap-21",
+        feature = "bench-servo-test-17",
+        feature = "env-sample-16"
+    )
+))]
+compile_error!("accel-sample-15 は単独の試験 build として使う");
 #[cfg(not(feature = "bench-servo-test-17"))]
 mod boot_session;
 mod config;
@@ -224,6 +240,8 @@ use esp_idf_svc::hal::uart::{config::Config as UartConfig, UartDriver, UartEvent
 use esp_idf_svc::hal::units::Hertz;
 
 use crate::accel::Adxl345;
+#[cfg(feature = "accel-sample-15")]
+use crate::accel_sample::AccelSampler;
 #[cfg(not(feature = "bench-servo-test-17"))]
 use crate::boot_session::{BootRetryPolicy, BootSession};
 #[cfg(any(
@@ -533,10 +551,14 @@ fn main() {
     #[cfg(feature = "env-sample-16")]
     let mut env_sampler =
         i2c_driver.map(|bringup| EnvSampler::new(bringup.driver, bringup.env_id, ENV_I2C_ADDRESS));
+    #[cfg(feature = "accel-sample-15")]
+    let mut accel_sampler =
+        i2c_driver.and_then(|bringup| start_accel_sample(bringup, health.uptime_ms()));
     #[cfg(all(
         not(any(feature = "tap-21", deskcat_product_mode)),
         not(feature = "bringup-display-13"),
-        not(feature = "env-sample-16")
+        not(feature = "env-sample-16"),
+        not(feature = "accel-sample-15")
     ))]
     drop(i2c_driver);
 
@@ -729,6 +751,14 @@ fn main() {
             }
         }
 
+        // FIFOを読み、窓ごとの統計をUART0へlogする（`crate::accel_sample`）。
+        #[cfg(feature = "accel-sample-15")]
+        if let Some(sampler) = accel_sampler.as_mut() {
+            if sampler.poll(health.uptime_ms()) {
+                accel_sampler = None;
+            }
+        }
+
         // 変換時間を待たず、1周回で1段だけ進める。UART0 の log のみ。
         #[cfg(feature = "env-sample-16")]
         if let Some(sampler) = env_sampler.as_mut() {
@@ -766,6 +796,13 @@ fn main() {
         }
         #[cfg(any(feature = "tap-21", deskcat_product_mode))]
         if let Some(deadline) = tap.as_ref().and_then(TapDetector::next_deadline_ms) {
+            until = until.min(deadline);
+        }
+        #[cfg(feature = "accel-sample-15")]
+        if let Some(deadline) = accel_sampler
+            .as_ref()
+            .and_then(AccelSampler::next_deadline_ms)
+        {
             until = until.min(deadline);
         }
         #[cfg(feature = "bringup-led-514")]
@@ -1121,8 +1158,32 @@ fn start_tap(bringup: Option<I2cBringup>, now_ms: u64) -> Option<TapDetector> {
     Some(detector)
 }
 
+/// `accel-sample-15`付きbuildで、ADXL345のDevice IDが`0xE5`のときだけ連続測定の設定を始める。
+/// 一致しなければ何も書かず、driverを手放す（`start_tap`と同じ形）。**設定の書き込みは`AccelSampler::poll`の最初の周回で行う。**
+#[cfg(feature = "accel-sample-15")]
+fn start_accel_sample(bringup: I2cBringup, now_ms: u64) -> Option<AccelSampler> {
+    if bringup.accel_id != Some(accel::EXPECTED_DEVICE_ID) {
+        let found = bringup
+            .accel_id
+            .map_or_else(|| "none".to_owned(), |raw| format!("0x{raw:02x}"));
+        log::error!(
+            "accel_sample_not_started accel_id={found} expected=0x{:02x}",
+            accel::EXPECTED_DEVICE_ID
+        );
+        return None;
+    }
+    Some(AccelSampler::new(
+        bringup.driver,
+        Adxl345::new(ACCEL_I2C_ADDRESS),
+        now_ms,
+    ))
+}
+
 /// [`run_i2c_bringup`]が返す、I2Cのdriverと、`ACCEL-01`のDevice IDの読み出し結果（読めなければ`None`）。
-#[cfg_attr(not(any(feature = "tap-21", deskcat_product_mode)), allow(dead_code))]
+#[cfg_attr(
+    not(any(feature = "tap-21", feature = "accel-sample-15", deskcat_product_mode)),
+    allow(dead_code)
+)]
 struct I2cBringup {
     driver: I2cDriver<'static>,
     accel_id: Option<u8>,

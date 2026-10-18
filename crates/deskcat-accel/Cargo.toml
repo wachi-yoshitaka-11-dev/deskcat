@@ -1,0 +1,17 @@
+[package]
+name = "deskcat-accel"
+version = "0.1.0"
+description = "ADXL345の連続測定の設定値、生データの復号、窓ごとの統計（平均・標準偏差・最小・最大。値を持つ純粋なlogic）"
+edition.workspace = true
+# `deskcat-env`・`deskcat-tap`と同じ理由で、workspaceの`rust-version`を継承しない。
+# `firmware/esp32`からもpath dependencyで使うため、hostとESP toolchainの両方を満たす下限を宣言する。
+rust-version = "1.95"
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+# `BW_RATE`・`POWER_CTL`・`INT_ENABLE`のaddressと値を、二重に持たずに再利用する。
+deskcat-tap = { path = "../deskcat-tap" }
+
+[lints]
+workspace = true

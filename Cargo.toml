@@ -8,6 +8,7 @@
 resolver = "3"
 members = [
     "apps/deskcatd",
+    "crates/deskcat-accel",
     "crates/deskcat-config",
     "crates/deskcat-env",
     "crates/deskcat-domain",

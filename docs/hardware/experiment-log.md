@@ -44,6 +44,7 @@
 | [EXP-030](#exp-030-sg90の測定用buildgo17入りでサーボを接続しない状態と接続した状態のpwmac投入と動作時の5-vと33-vの変化をarduinoで記録した) | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)の受け入れ条件2・5・6（段1・段1b・段2と再駆動2回） | 値の正なし（観察の記録。条件5の値は`HW-TBD-034`が未解決のため合否を導かない） |
 | [EXP-031](#exp-031-bme280env-01の試験buildenv-sample-16でraw値と変換値を観測しswitchbotの表示と並べた) | [#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16)の実機確認。BME280（`ENV-01`）のraw値と変換値の観測、`MEAS-04`（SwitchBot）の表示との並置 | 値の正なし（観測の記録。確度・気圧・timeout・disconnect・CRC・not-readyは取れていない） |
 | [EXP-032](#exp-032-piのserial_linkで実portgpio-uartを開きlink-probeによる切断の判定と再接続の上限11とplay_motionの拒否の4経路12を観察した) | [#11](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11)の実port（GPIO UARTの`/dev/serial0`、115200）でのlink probeによる切断の判定と再接続の上限の観察と、[#12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)の`play_motion`の拒否4経路の確認 | 値の正なし（観察の記録。受け入れ条件を満たしたとは書かない。「1回の喪失判定と回復」だけの観察、実motionの非二重実行は取れていない） |
+| [EXP-033](#exp-033-accel-01adxl345の静止sampleaccel-sample-15の初回通電) | [#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)の静止sample（`accel-sample-15`、ESP32の`3V3` pin給電、LCDは切り離し） | 値の正なし（観察の記録。offset、個体の感度、noiseの下限は確かめていない。**#15の受け入れ条件は「静止姿勢のsampleを保存した」の一部以外、満たしていない**） |
 
 **大容量の生dataはこのrepositoryへ入れていない。**保存場所は
 [development-foundation-plan.md](../planning/development-foundation-plan.md)の
@@ -2801,7 +2802,7 @@ unitは、develop `6621423`の`deploy/systemd/deskcatd.service`（sha256 `395be6
 ### Faults
 
 - **1回目の起動ログが無い。**1回目のサーボの動きが、firmwareの指令だったかは、未確認である
-- **手順書からの逸脱1（ユーザーの決定）：**サーボの電源の経路に、ジャンパー線を使った。[servo-safety-limits.md](servo-safety-limits.md)の手順の`通電前の現物確認`と、承認の状態の項目6は、servo電源の経路にbreadboardとjumper wireを使わないことを、満たさなければ試験を始めない条件とする。ユーザーの決定（[comment 6222108076](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6222108076)）で、この文面と食い違ったまま使った。ジャンパー線の太さ・定格は記録に無い
+- **満たしていない条件1（ユーザーの決定）：**サーボの電源の経路に、ジャンパー線を使った。[servo-safety-limits.md](servo-safety-limits.md)の手順の`通電前の現物確認`と、承認の状態の項目6は、servo電源の経路にbreadboardとjumper wireを使わないことを、満たさなければ試験を始めない条件とする。ユーザーの決定（[comment 6222108076](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6222108076)）で、この文面と食い違ったまま使った。ジャンパー線の太さ・定格は記録に無い
 - **手順書からの逸脱2（作業順序）：**サーボへの給電が、手順書の`起動とarm delay`の窓（ESP32を起動し、`servo_bench_test_arm_delay_start`のlogを見たあと、arm delayの間にサーボの外部5 V電源を入れる）の外で行われた。1回目は、logを待たず、ENのあと約5秒数えて挿す指示にした（ESP32はダウンロードモードに留まっていた可能性が高い）。2回目は、ESP32をリセットしたまま先にACを挿した（作業セッションの案を、PMが了承した順序で、VMも了解した。ユーザーの指示の範囲〔[comment 6224969168](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6224969168)〕に書いた。サーボの動きを、AC投入の動きと、firmwareの動作で区別するため）。GPIO27は、この間、未設定で、実際のレベルとpull-downの有無は確かめていない
 - **作業セッションの誤り1：**上の5のリセットを、ACが抜けているかを確認せずに行った。[servo-safety-limits.md](servo-safety-limits.md)の手順の`latch検証`は「servoの外部5 V電源を先に遮断してから」と定める。この順序を、この回は守っていなかった
 - **作業セッションの誤り2：**`pkill -f logger2.py`のcommand文字列に`logger2.py`を含めたため、作業セッション自身のshellが止まった。上の17の前にも、`hold.py`を止める操作の文字列で同じ誤りをした。実害は無い
@@ -3185,6 +3186,80 @@ log出力の失敗: 0 件
 - 正本の更新（`crates/deskcat-serial/examples/serial_link.rs`のmodule docの「実portでのlink喪失判定と再接続は未確認である」、`crates/deskcat-serial/README.md`の「実機に残っていること」の切断・reconnectの項）は、この記録を出所にして別の変更で行う。
 - 終わりの状態：ESP32は電源なし（USB抜き）、ESP32側の黄・橙・灰は外れている。Pi側の青・紫・灰は挿したまま。ACプラグは抜けている。`i25`のジャンパー線・端子台S「−」へ行くGNDの線・Arduinoの線は`EXP-031`の返却のまま外れており、緑・青のジャンパー線と分圧の10 kΩは付けたまま。LCDは切り離したまま。Piは電源が入っていて、`deskcatd`は`inactive`（`enabled`）、`throttled=0x0`。
 
+## EXP-033: `ACCEL-01`（ADXL345）の静止sample（`accel-sample-15`の初回通電）
+
+[#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)の単体samplingを、人間の立ち会いのもとで1回行った記録。ADXL345を±2 g・100 Hz・FIFO Streamで連続測定し、静止状態の生値と窓ごとの統計をUART0へ出した。**offset（0 g Output）は出せていない。**基板は水平ではなく、姿勢を記録していない。
+
+| 項目 | 内容 |
+|---|---|
+| Test ID | `EXP-033` |
+| Date | 2026-10-17（書き込み 20:04:56〜20:06:36 JST〔11:04:56Z〜11:06:36Z〕、log取得 20:06:47〜20:09:48 JST〔11:06:47Z〜11:09:48Z〕） |
+| Operator | 配線の切り離し、USBの抜き挿し、ACプラグが抜けていることの確認、見張りはユーザー。ESP32の書き込みとlogの取得は#15のセッション（AI） |
+| Hardware revision／Exact components | `MCU-01`（ESP32-DevKitC V4）、`ACCEL-01`（秋月 M-06724のADXL345）、`ENV-01`（BME280。測定はしない。起動時にChip IDだけ読む。下の結果の`env_chip_id`）。`DISP-01`は切り離し |
+| Wiring revision | `EXP-015`の配線のまま（`Vs`／`VDD`→`3V3`、`GND`、`SDA`→GPIO25、`SCL`→GPIO26、`CS`→`VDD`、`SDO`→`GND`＝address `0x53`）。変更は`DISP-01`のVCCと信号線をESP32側につながない状態にしたことだけ（ユーザーの申告「済んだ」）。サーボ系とESP32を結ぶ2か所（ブレッドボードi25のジャンパー線、端子台Sの−の穴のESP32 GNDの針）とPiとの線は、[#15の承認comment](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15#issuecomment-6231364839)が「外れたまま」を条件とした。**EXP-028の終わりの状態は、信号用の330 ΩがESP32のGPIO27とサーボの黄の穴のあいだに入ったままで、この試験の前に外したかの記録は無い**。**現物の配線を、このセッションは確かめていない** |
+| Power supply and current limit | PCのUSBから給電（`3V3` pin経由で`ACCEL-01`／`ENV-01`）。電流制限は設けていない。サーボの外部5 V（M-12001のACプラグ）は抜けたまま（ユーザーの申告） |
+| Firmware commit/profile | developの`045aab4`の上の未commitの差分。`--features accel-sample-15`（debug）。ELF sha256 `e287da22f5a7bf15e7a4aa7e4564fdf78fab098b9670729ca8e046eb9d87b0ba`。書き込みの直前にsha256を取った。差分は`crates/deskcat-accel`、`firmware/esp32/src/accel.rs`、`accel_sample.rs`、`main.rs`、`Cargo.toml`、`README.md`。**この版はcommitしていない** |
+| Configuration | `POWER_CTL`＝`0x00`→最後に`0x08`、`INT_ENABLE`＝`0x00`、`BW_RATE`＝`0x0A`、`DATA_FORMAT`＝`0x08`、`FIFO_CTL`＝`0x00`→`0x80`。20 msごとにFIFOを空ける。warm-up 10件を捨てる。500件を1窓として6窓。出所はADXL345 Data Sheet **Rev. E**（`BW_RATE`・`POWER_CTL` p.25、`DATA_FORMAT`・`DATAX` p.26、`FIFO_CTL` p.27、Table 1 p.4）。**Rev. G（[sensor-datasheet-notes.md](sensor-datasheet-notes.md)が正とする、2026-08-12にブラウザで取得した版）は、このセッションでは開いていない。`FIFO_CTL`・`FIFO_STATUS`・`DATAX0`のaddressと`INT_SOURCE`のOverrun bitは、同文書がRev. Gで確認済みとして持つ範囲に無く、Rev. Eとの一致は確認していない** |
+| Measurement equipment | 測定器を使っていない。ESP32のUART0 log。logの原本は端末のlocal（`monitor.log`、sha256 `03f33222ca0a16b203e30011d6b102d7c82fd9528d6e95d655fd54aaae13604c`）で、repositoryに入れない |
+| Procedure | ユーザーがLCDのVCCと信号線を切り離す→ユーザーがUSBを挿す→（約2.5時間後）ユーザーが、ESP32に異常がなく、ACプラグが抜けたままで、見張れる状態で、承認が有効であると回答→`espflash`で書き込み→RTSでリセットしてlogを180秒取得→ユーザーがUSBを抜く |
+| Expected result | Device ID `0xe5`の後に、静止した生値が連続して出る。fault・overrunが出ない |
+| Measured result | 下記 |
+| Faults | 下記 |
+| Conclusion | 下記 |
+| Next safe step | 下記 |
+
+### 承認と、満たしていない条件
+
+- 承認：[#15のcomment](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15#issuecomment-6231364839)（2026-10-17 07:46:33Z）。作業セッションが、PMとVMのOKはユーザーの承認の代わりにならないと示したうえで、1問で訊き、ユーザーが「承認する」を選んだ。USBを挿してから約2.5時間後、書き込みの直前に、承認が有効かを別の1問で訊き、ユーザーは「すべて OK、有効」を選んだ。
+- **`power-budget.md`の単体bring-upの手順の条件(2)（通電してよいのは`bringup-i2c-15-16`だけ）を満たさない。**この試験は、ADXL345の設定registerへ書く。この条件を満たさない通電として、この1件の試験の承認を取った（下記の承認comment）。条件を緩めるdocsの変更は、人間のreviewを通す別の変更である。
+- **無給電の確認（`gpio-assignment.md`の項目1・5・6・7）は、ユーザーが不要としたので、行っていない。**ユーザーの回答の原文：「1はOK。2は不要」。満たしたとは書かない。
+- 条件(5)(a)（module電源pinの独立性／pin header対応）と(b)（pull-upの実効抵抗）は、`EXP-015`と同じく未達のまま。測っていない。
+
+### 結果
+
+- 書き込み：`espflash` 4.5.0（`--no-stub`）。`Flashing has completed!`。
+- UART0 log（180秒）：`accel_device_id raw=0xe5`、`env_chip_id raw=0x60`（BME280のChip IDの読み出しだけ。測定はしていない）、`accel_sample_configured data_format=0x08 bw_rate=0x0a fifo_ctl=0x80 poll_interval_ms=20 warmup=10 window=500 windows=6`、`accel_raw`を100件、`accel_window`を6件、`accel_sample_done windows=6`（起動から約29.9秒）。`accel_fault`、`accel_overrun`、`out_of_range`、panic、`task_wdt`は0件。
+- 窓ごとの結果（単位はLSB。6窓の範囲）：
+
+| 軸 | 平均 | 標本標準偏差 | 最小〜最大 |
+|---|---|---|---|
+| X | 226.34〜226.38 | 0.74〜0.80 | 224〜230 |
+| Y | 108.45〜108.53 | 0.82〜0.86 | 106〜112 |
+| Z | 67.04〜67.14 | 0.82〜0.89 | 64〜71 |
+
+- 3軸の平均ベクトルの大きさ：259.81〜259.85 LSB（256 LSB/g typなら約1.015 g。Table 1のsensitivity 230〜282 LSB/gの内側）。
+- `polls`は窓6の終わりで1449、`overrun_polls`は0。
+
+### 読み方と、主張しないこと
+
+- 基板は水平ではなく、重力が3軸に分かれている。姿勢を記録していない。**offset（0 g Output。X・Yが±150 mg、Zが±250 mg）は、この読みから出せない。**
+- 標準偏差の約0.8 LSBは、typ感度で約3 mgに当たる。**机の上に置いた姿勢と周囲の振動を管理していないので、センサー自体のnoiseとは言えない。**6窓は同じ姿勢の連続で、独立な再現ではない。
+- 平均ベクトルの大きさは、個体の感度と0 g offsetの合成であり、どちらか一方の根拠にならない。mgへの換算は典型値256 LSB/gによる近似。
+- 窓の長さ、窓数、warm-up、poll間隔は暫定の一般値（安全要件の5項目に効かない）。
+- 温度・電流・電圧は測っていない。通電中の発熱はユーザーの見張りの範囲で、記録は無い。
+- `POWERON_RESET`の行は1回（RTSによるリセット）。
+- **書き込んだ版は、`INT_SOURCE`のOverrunをFIFOの読み出しの後に読んでいた。**Overrunは読み出しで消えるため、上の「`accel_overrun`0件」「`overrun_polls`0」は、取りこぼしが無かったことの根拠にならない。この記録の後、コードはOverrunの確認を読み出しの前へ移した（この記録を含むcommitに入っている。書き込んでいない）。取りこぼしの有無を言うには、移した版での再測定が要る。
+
+### Faults
+
+- UART0 logに、`accel_fault`・`accel_overrun`・`out_of_range`・panic・`task_wdt`は0件。ただし書き込んだ版はOverrunをFIFOの読み出しの後に読んでいたため、`accel_overrun`の0件は取りこぼしが無かったことの根拠にならない（上の「読み方と、主張しないこと」）
+- **満たしていない条件1（ユーザーの決定）：**`power-budget.md`の単体bring-upの手順の条件(2)を満たさないまま、この1件の試験として通電した（上の「承認と、満たしていない条件」）
+- **満たしていない条件2（ユーザーの決定）：**`gpio-assignment.md`の無給電の確認（項目1・5・6・7）を行っていない。ユーザーが不要とした
+- 条件(5)(a)（module電源pinの独立性／pin header対応）と(b)（pull-upの実効抵抗）は未達のまま通電した。`EXP-015`と同じ状態である
+- 通電中の発熱・異音・異臭は、ユーザーに聞いていない。申告が無いため、「異常なし」とは書かない
+- 現物の配線を、このセッションは確かめていない（Wiring revision行のとおり。ユーザーの申告だけ）
+
+### Conclusion
+
+`accel-sample-15`の初回通電で、ADXL345のDevice ID `0xe5`の応答と、±2 g・100 Hzの連続測定が得られた。fault・overrunは0件だった。**#15の受け入れ条件のうち、「静止姿勢のsampleを保存した」の一部だけを支える。**「Device IDと正確な変換を検証した」は、変換係数を典型値で近似しており、個体の感度を確かめていないため満たしていない。「offsetとnoiseを測定した」は、offsetを出せていないため満たしていない。机とサーボの振動sample、tapしきい値とretrigger、false positiveと見逃しは、安全なサーボ動作（#17）と仮筐体を待つ依存で、満たしていない。
+
+### Next safe step
+
+- offsetは、姿勢が分かる向き（例：基板を水平に置いたZ上向きと、反転したZ下向き）での読みを、別の通電で取る。通電の承認は別に要る。
+- 周囲の振動を管理した状態でnoiseを取り直すかは、人間の判断。
+- 条件(2)を緩めるかどうかは、`power-budget.md`の別の変更として、人間のreviewを通す（この記録を含むPull Requestは`power-budget.md`を変えていない。`firmware/esp32/README.md`の`accel-sample-15`行も、可否を変えないと書いている）。
+- Rev. G（手元の取得済みの版）で、`FIFO_CTL`・`FIFO_STATUS`・`DATAX0`のaddressと`INT_SOURCE`のOverrun bitを確かめ、[sensor-datasheet-notes.md](sensor-datasheet-notes.md)へ載せる。
+
 ## Revision履歴
 
 | 日付 | Revision | 変更 | 根拠 |
@@ -3228,3 +3303,4 @@ log出力の失敗: 0 件
 | 2026-10-18 | 36 | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。**`EXP-030`を追加した。**測定用build（develop `014d058`、GO17入り）で、サーボを接続しない状態（段1b。ユーザーの申告）と接続した状態（段1）のPWM、AC投入と動作時の5 Vと3.3 VをArduinoで記録した、段1・段1b・段2と再駆動2回の記録。段1が「サーボ未接続」でなかったこと（作業セッションの前提の誤り）、`GO17`をAIが送った形（手順書の`監視維持`と違う）、`GO17`の二重送信、動く前の軸の位置が不明で向き・角度は言えないこと、ESP32が応答しなくなった1回（原因未確認）を書いた。条件4は測っていない | [#17の各comment](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17) |
 | 2026-10-19 | 37 | [#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16)。**`EXP-031`を追加した。**BME280（`ENV-01`）の試験build（develop `01a9d8c`の`env-sample-16`）でraw値と変換値を3回の起動で観測し、`MEAS-04`の表示と並べた記録。確度は言えず、気圧のreference、timeout・disconnect・CRC・not-readyの分類は取れていない | [#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16) |
 | 2026-10-20 | 38 | [#11](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11)・[#12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)。**`EXP-032`を追加した。**Piの`serial_link`（develop `01a9d8c`）で実port（`/dev/serial0`、115200）を開き、信号線を外した間のlink probeによる`disconnects`の増加（11回）と再接続の待機（`100ms`〜`1.6s`）、`Stopped(ReconnectExhausted)`、ACKの相関で待機が`100ms`から戻ったこと、`play_motion`の拒否4経路（ESP32のlogと突き合わせ）を観察した。**受け入れ条件を満たしたとは書いていない。**「1回の喪失判定と回復」だけの観察は取れていない。log取得のためRTSの`reset`を1回使ったことを記録した | #11 comment 6272131988、#12 comment 6272140365 |
+| 2026-10-20 | 39 | [#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)。**`EXP-033`を追加した。**`accel-sample-15`（ADXL345を±2 g・100 Hz・FIFO Streamで連続測定する試験build）の初回通電。Device ID `0xe5`、6窓×500件でfault・overrun 0件、各軸の標本標準偏差は約0.8 LSB、3軸の平均ベクトルの大きさは約259.8 LSB。基板は水平ではなく姿勢を記録していないため、offsetは出せていない。`power-budget.md`の単体bring-upの手順の条件(2)を満たさないまま、ユーザーが1件の試験として承認した。無給電の確認はユーザーが不要とし、未実施。Rev. Gの手元の版は開いておらず、Rev. Eで示した | ユーザーの承認と現物作業、#15のセッションによる書き込みとlogの取得（いずれも2026-10-17） |
