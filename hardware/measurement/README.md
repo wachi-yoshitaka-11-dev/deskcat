@@ -127,6 +127,7 @@ arduino-cli compile --fqbn arduino:avr:uno --build-property compiler.cpp.extra_f
 | `LOGGER_BAUD` | UART の baud。**PC 側の `--baud` と一致させる** |
 | `LOGGER_ADPS` | ADPS2:0。ADC clock = F_CPU / 2^ADPS。`DS40002061B` §24.4 は最大分解能に 50〜200 kHz を要求する |
 | `LOGGER_NCH` | 1 または 2。2 のとき `A0` と `A1` を交互に読む |
+| `LOGGER_REF` | ADC の基準電圧（ADMUX の REFS1:0）。1 = AVCC（既定）、3 = 内部 1.1 V。**3 は `LOGGER_NCH=1` のときだけ。**`DS40002061B` §24.5.2 は、基準を切り替えた後の最初の変換結果は不正確なことがあると述べる。1.1 V 基準の実値は個体・AVCC・温度に紐づく（`EXP-002`、`EXP-005`） |
 | `LOGGER_BLOCK` | 1 block の sample 数。header 24 B に対する payload の割合を決める |
 
 ## 入力の配線（作業1）
