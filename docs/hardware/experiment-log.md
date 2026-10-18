@@ -41,6 +41,7 @@
 | [EXP-027](#exp-027-pi-zero-wでdeskcatdを直接buildしhttps接続とsystemd-credentialと偽esp32での常駐を観察した) | [#522](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/522)の[ADR-0026](../decisions/0026-cloud-speech-generation.md)の決定2・3・5・7が確認を求める項目のうち、Piの上の作業（直接build、キーなしのHTTPS接続、systemd credential、偽ESP32での常駐） | 値の正なし（観察の記録。ADR-0026の確認項目を満たしたとは書かない。実ESP32との常駐と`--cloud-speech`有効時は未確認） |
 | [EXP-028](#exp-028-sg90の初回のサーボ動作の試み測定用buildジャンパー線の接続2回試みた) | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)の初回のサーボ動作の試み（測定用build `bench-servo-test-17`、ジャンパー線の接続、PTC直列。2回） | 値の正なし（観察の記録。サーボの線の並び、電流・transient、1回目の動きが指令だったことは確かめていない。**#17の受け入れ条件は満たしていない**） |
 | [EXP-029](#exp-029-piのserial_linkで実portgpio-uartdevserial0を開き行の往復とprotocolの往復と信号線を外したときの観察を行った) | [#11](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11)の実port（GPIO UARTの`/dev/serial0`、115200）での`serial_link`の実行（600秒）と、信号線を抜いた観察（少なくとも1分55秒）。存在しないpathのopen失敗をPi上で別に見た（実portの切断ではない） | 値の正なし（観察の記録。`boot`→ACK→`get_status`→`status`と`ping` 3件のACKを実portで観察した。切断は観測されず、**#11の受け入れ条件3・4は実portで得られていない**。非通電の確認の項目2〜4と条件6の数値は申告だけ） |
+| [EXP-030](#exp-030-sg90の測定用buildgo17入りでサーボを接続しない状態と接続した状態のpwmac投入と動作時の5-vと33-vの変化をarduinoで記録した) | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)の受け入れ条件2・5・6（段1・段1b・段2と再駆動2回） | 値の正なし（観察の記録。条件5の値は`HW-TBD-034`が未解決のため合否を導かない。**#17の受け入れ条件は満たしていない**） |
 
 **大容量の生dataはこのrepositoryへ入れていない。**保存場所は
 [development-foundation-plan.md](../planning/development-foundation-plan.md)の
@@ -2950,6 +2951,84 @@ log出力の失敗: 0 件
 - 終わりの状態：ESP32は電源なし（USB抜き）、Pi–ESP32の線3本のESP32側の端は外れている。サーボ系とESP32を結ぶ2か所は外れたまま。`DISP-01`の`VCC`は戻した。Piは電源が入っていて、`deskcatd`は`inactive`（`enabled`）。ACプラグは抜けている。
 
 
+## EXP-030: SG90の測定用build（GO17入り）で、サーボを接続しない状態と接続した状態のPWM、AC投入と動作時の5 Vと3.3 Vの変化を、Arduinoで記録した
+
+[#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)の受け入れ条件2（接続前のPWM）・5（5 Vと3.3 Vのtransient）・6（reset回数）に関わる記録を、EXP-028の後に、人間の立ち会いのもとで取った。段1（サーボを接続し、ACなし）、段1b（サーボのplugを外し、ACなし）、段2とその再駆動2回（サーボを接続し、ACあり）を、1つにまとめる。記録の出所は[#17の各comment](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)（承認の記録：[6233425841](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6233425841)、[6245097549](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6245097549)、[6247875156](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6247875156)、[6248294282](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6248294282)。結果：[6235969143](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6235969143)、[6245272851](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6245272851)、[6248240717](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6248240717)、[6248439744](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6248439744)。訂正：[6245054273](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6245054273)）にある。**この記録は事実と未確認だけを書く。**ESP32のログと生のCSVは、repositoryの外の証拠用directory（MACを含むため、repositoryとIssueへ入れていない）にある。
+
+| 項目 | 内容 |
+|---|---|
+| Test ID | `EXP-030` |
+| Date | 2026-10-17 21:51〜23:52（段1）、2026-10-18 12:20〜12:38（段1b）、2026-10-18 18:05〜18:50（段2と再駆動2回）。すべてJST |
+| Operator | 配線、サーボのplugの抜き挿し、USBの抜き挿し、M-12001のACプラグの抜き挿し、`GO17`の入力（段1・段1b・段2の1回目と2回目）は**ユーザー**。ESP32の書き込みとNVSの消去、ログの取得、Arduinoの記録、`GO17`の送信（再駆動の2回）は作業セッション（AI） |
+| Hardware revision／Exact components | `SERVO-01`（TowerPro SG90）、`MCU-01`（ESP32-DevKitC V4）、`PSU-SERVO-01`（`M-12001`）、`PROT-OC-01`（予備の`MF-R135`）、信号用の330 Ω、`WIRE-PWR-01`（`111641`、端子台`114217`×3）、ジャンパー線（両端オス。種類・太さ・定格の記録は無い）、`MEAS-02`（Arduino Uno R3）、10 kΩの抵抗2本（秋月`125103`の手持ちの袋のバラ。購入していない） |
+| Wiring revision | 段1・段2：EXP-028の配線（サーボのplugをジャンパー線へつないだまま。信号用330 Ωは、ESP32のGPIO27とサーボの黄の穴のあいだ）。段1bはサーボのplugをジャンパー線の針から抜いた（ユーザーの申告）。Arduino：A0＝段1・段1bは信号用330 ΩのESP32側（ブレッドボードi28）、段2以降はサーボ側5 Vの分圧点（10 kΩ 2本は、作業セッションが指示した位置a10〜a12、b12〜b14、中点c12へA0。ユーザーが報告したのは、c10から端子台Sの＋の穴への緑のジャンパー線と、c14から−18への青のジャンパー線だけで、抵抗の位置とA0の移動は、報告が無い。A0の読み（AC投入の前は0、投入後は541カウント）は、分圧点につながっていることと矛盾しない）。A1＝「＋8」に赤のジャンパー線（ユーザーの申告。「上の＋列」は、読みの679カウントがESP32の3V3 pinの読みと一致したことからの推定）。Arduino GND＝上の−列の−20（ESP32のGNDと同じ列）。ArduinoとESP32はPCのUSB給電。AC：段1・段1bは抜けたまま。段2は挿した状態で駆動（時刻は下）。LCDとPiの線は外したまま |
+| Power supply and current limit | EXP-028と同じ（`M-12001`＋PTC直列。[servo-safety-limits.md](servo-safety-limits.md)の承認の状態の項目6の(a)）。電流の測定は無い |
+| Firmware commit/profile | developの`014d058`の`bench-servo-test-17`（debug）。ELFのsha256は`bd6694927e028c298baea1fa72cf21948e19346a872ddae45482e3fd4808fbee`。`git archive`をrepositoryの外へ展開してbuild（`cargo build --locked --features bench-servo-test-17`。clean buildで14分、exit 0。main checkoutの`.embuild`を借りた。Version Recordは無い） |
+| Configuration | `GO17`の入力で、10秒後に1回、`target_deg=105`、露出300 ms、dutyを0へ。NVSのlatch。Pi linkを持たない。LCDの信号線を駆動しない（`display=not_driven`） |
+| Measurement equipment | Arduino（`MEAS-02`）。段1・段1bは1ch（約9615 Sample/s、約104 µs刻み）、段2以降は2ch（1chあたり約4808 Sample/s、約208 µs刻み）。連続streaming（`hardware/measurement/arduino-transient-logger`）、基準はUSBの5 V。ESP32のログ（UART0）。作業用の一時script（console、解析。repositoryへ入れていない） |
+| Procedure | 下の「手順と時刻」 |
+| Expected result | 入力前は信号が出ず、resetで印が付かない。`GO17`の約10秒後にPWMが出る。サーボを外した状態のPWMを記録する。AC投入と動作時の5 Vと3.3 Vを記録する |
+| Measured result | 下記 |
+| Faults | 下記 |
+| Conclusion | 下記 |
+| Next safe step | 下記 |
+
+### 手順と時刻（JST。ESP32のログとArduinoの記録の時刻）
+
+- **段1（2026-10-17。承認A）：**NVS（0x9000から0x6000バイト）を消し、測定用buildを書き込み（`--after no-reset`）、入力前にRTSでresetを3回かけ（最初の起動を含めて4回の起動）、毎回`waiting_for_confirmation`で止まった。入力前のA0の読みは、`GO17`の約224秒前から最大0。`GO17`を22:00:39に入力：`confirmed`→`nvs_latch_set`→22:00:49に`move target_deg=105`→`stop`。このときのArduinoの記録は、150秒で切れており、PWMを含まない（作業セッションの設定ミス）。再武装し、22:06:07に`GO17`：`move`22:06:17。10分間のArduinoの記録は、USBのブロックが3件落ちてCSVが書かれず、最大値643カウントだけが残った。再武装し、`--allow-drops`を付けて、23:48:11に`GO17`：`move`23:48:21。この回のCSVを解析した（下の結果）。動作の後のreset（23:52）で`skipped_already_ran`。
+- **段1の終わり近く（22:58）：**ESP32が応答しなくなった（下の「Faults」）。ユーザーがUSBを抜き挿しして復旧した。
+- **段1b（2026-10-18。承認はユーザーの回答「長くて読めない。いいよ進めて」。問いの全文は読まれていない）：**サーボのplugを、ジャンパー線の針から抜いた（ユーザーの申告）。再武装し、Arduinoを1chにして、12:22:57に`GO17`：`move`12:23:07。動作の後のresetで`skipped_already_ran`。
+- **段2（2026-10-18。承認B）：**1回目：18:06:41に、ユーザーが`GO17`を、AC投入の前に入力した（コンソールの表示に従った）。サーボは無給電で、動いていない（ESP32は18:06:51に`move`、`stop`のログを出した。GPIO27にはPWMが出ている）。再武装し、Arduinoを2chにして分圧を作り、AC投入（約18:11:29.9。A0の立ち上がりからの推定）、18:12:18に`GO17`（ユーザーが入力した。ESP32のログの`TX GO17`に、作業セッションが送った印は無い）、`move`18:12:28、`stop`。ユーザーがACを抜いた。
+- **再駆動1回目（承認：[6248294282](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6248294282)）：**AC投入18:35:25.6、18:36:05に`GO17`（作業セッションが送った）、`move`18:36:15。18:38:09にも`GO17`を送った（二重。理由は未特定。`move`は出ていない）。AC抜け18:42:26。
+- **再駆動2回目：**AC投入18:44:19.8、18:44:43に`GO17`（ユーザーの「今」の返事を受けて、作業セッションが送った）、`move`18:44:53。AC抜け18:45:14。ユーザーの回答：「動いたが、方向と角度はわからない」（原文）。
+
+### 結果
+
+- **GO17の確認3点：**入力前のresetで印が付かない（resetを3回。最初の起動を含めて4回の起動）。入力前はGPIO27の線に信号が出ない（A0の読みは最大0〜4）。consoleで`GO17`を受け取る（ユーザーが打った回と、作業セッションが送った回）。動作の後のresetで`skipped_already_ran`。
+- **条件2（PWM）：**段1（サーボ接続・無給電）と段1b（サーボのplugを外した。ユーザーの申告）は、どちらも16パルスを301.5 msの間に記録した。周期は19.97〜20.07 ms、パルス幅は1.56〜1.66 ms（刻みは約0.104 ms）。高い側の読みは、段1が641〜643カウント、段1bが674〜676カウント（段1bのほうが高い。原因は確かめていない）。firmwareの一般値（50 Hz、1.0〜2.0 msを0〜180°へ線形対応）から、105°の計算値は約1.58 ms。
+- **条件5（Arduino、2ch）：**A0（サーボ側5 Vを1/2に分圧）は、AC投入の前は0。AC投入で、約2.5 msで45→195→338→472→510カウント、約10 msで最大544、1秒後に540〜543で安定。動作のとき、最小・最大は、18:12：505・567（偏差3カウント以上の区間 約265 ms）、18:36：508・568（同 約266 ms）、18:44：505・558（同 約97 ms）。動作の前の中央値は541。A1（3V3）は、記録の全体で676〜682カウント（動作とAC投入の前後は678〜681）。電圧への換算は、A1の読み（679カウントを3.3 Vと仮定）から1カウントが約4.9 mV、分圧1/2として、動作のときの5 V側の最小は動作前より約0.35 V低い（概算。確度は主張しない）。
+- **条件6の下調べ：**段2の2回目の起動（18:10:30）から最後のreset（18:27）まで、`rst:`の行は、意図したresetのほかに無い。uptimeは連続（最後のheartbeatは18:27:05の`uptime_ms=994029`で、約16分34秒）。ほかの回も、各回の起動と、動作の後のlatch確認のreset以外に、`rst:`の行は無い。`panic`・`task_wdt`・`brownout`の行は、どの回にも無い。
+- **サーボまわりの確認（ユーザーの回答の原文）：**段1のあと、8項目のうち2項目：「問題ない」（サーボ本体の外側の変色）、「異常なし」（手の背でサーボ本体に触れた）。残りは「手間が多くて実施不可能」とのことで、確かめていない。駆動の前の4項目（ホーンが外れている、plugが戻っている、ACプラグが手の届く位置にある、手とケーブルが動く範囲の外にある）は、ユーザーが「4点ともOK」と回答した（長い文章を読み飛ばしていた、とも述べた）。
+- **サーボが動いたか：**ユーザーの回答は「動いたが、方向と角度はわからない」（再駆動2回目）。段2の回について、ユーザーは「もう覚えてない」と述べた。
+
+### Faults
+
+- **作業セッションの誤り1（段1の前提）：**段1の配線の照合の項目に「サーボのplugは外れている」と書いた。記録で確かめた事実ではなく、作業セッションの前提だった。ユーザーは「全部そのとおり」と答えた。段2の準備のなかで、ユーザーが「plugはもともと抜いていない」と申告し、段1は**サーボ接続・無給電**だったと分かった。**段1の条件2は「接続前のPWM」ではない。**承認Aの問いは、実際の配線と違う前提で受けた。その範囲は広げていない。無給電のサーボの信号入力へ、GPIO27が4回パルスを出した（段1の3回と、段2の1回目の1回。[訂正のcomment](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6245054273)は3回と書いたが、段2の1回目を数えていなかった。backfeedの影響は未確認。`HW-TBD-009`）。
+- **作業セッションの誤り2：**Arduinoの記録の設定ミスで、段1のPWMの記録を2回取りこぼした（150秒で切れた、ブロックの落ちでCSVが書かれなかった）。再武装とGO17が3回になった。
+- **作業セッションの誤り3：**動かす前に、予想（パルス幅の増分は約+0.08 ms、設定の対応が合えば+15°、向きは確かめていない）と、動く前のサーボの位置を確かめる手順を、ユーザーへ伝えていなかった。firmwareは、動作の直前までサーボに信号を出さず、105°の指令だけを出す（90°へ動かす操作は無い）。動く前の位置は不明である。
+- **GO17の送信の形（手順書との違い）：**[servo-safety-limits.md](servo-safety-limits.md)の手順の`監視維持`は「動作の合図は人間の`GO17`の入力だけであり、AIへの実行指示は無い」と定める。再駆動の2回は、consoleのタブをこれ以上開けないため、ユーザーが「今」と返事をし、その返事を受けて作業セッションが`GO17`を送る形を、ユーザーが選んだ（問いの選択肢「承認する（GO17は私が、あなたの「今」の返事で送る）」）。手順書の定めとは違う形である。
+- **GO17の二重送信：**再駆動1回目で、18:36:05のあと18:38:09にも`GO17`を送った。理由は特定していない。その後、`move`は出ていない。1回目の送信が、ユーザーの「今」より前だったかも確かめていない（ユーザーは、その回について「まだこない」と述べた）。
+- **段2の1回目の`GO17`がACの前に入った：**ユーザーが、consoleの表示（「`GO17`と入力して」）に従った。作業セッションが「まだ入力しない」と先に書かなかった。この回は駆動に数えず、再武装の承認を受け直した。
+- **段1bの承認：**ユーザーの回答は「長くて読めない。いいよ進めて」で、問いの全文は読まれていない。問いの範囲（`GO17` 1回、再武装1回、plug外し、ACなし）に限って進めた。
+- **ESP32が応答しなくなった1回（原因未確認）：**段1の終わり近く（22:58）。ESP32は約52分間、heartbeatを出し続け、`panic`・`task_wdt`・`brownout`の行は無い。22:58:02に作業セッションがconsoleのスクリプトを閉じ、22:58:45に別のスクリプトを開いてresetを保持し、release せずに22:58:56に閉じた。その直後から、`espflash`が接続できず、resetにも書き込みモードにも反応しなかった。ユーザーは、電源LEDが点いていることを見て、ENボタンを押した。それでも応答せず、USBを抜き挿しして復旧した（`espflash board-info`が通った）。このとき、サーボのplugはジャンパー線につながっていた。候補（ArduinoとESP32が同じPCのUSBにある、A0をGPIO27の線につないだ、スクリプトの閉じ方）はあるが、どれも原因とは確かめていない。以後、resetを保持したスクリプトは、閉じる前に必ず`DTR`と`RTS`をreleaseし、logに残した。
+- **NVSの消去の後の読み戻し：**段1の最初の消去は、`--after no-reset`を付けておらず、消去の後にESP32が自動で起動し、NVSが初期化された（先頭が`0xff`でなかった）。以後は`--after no-reset`を付け、全部`0xff`を確認した。
+- **Arduinoの記録：**USBのブロックの落ちが、回ごとに3〜6件。`--allow-drops`で記録した（時刻はmark間の線形復元。PCの時計との対応はblockの受信時刻で、約0.1秒の誤差）。
+- ジャンパー線の使用は、ユーザーの決定（[#17のcomment 6247875156](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6247875156)。今回の駆動に限る）。[servo-safety-limits.md](servo-safety-limits.md)の承認の状態の項目6の(a)の文面「breadboardとjumper wireを使わない」は変えていない。
+- ユーザーは、確認と読む量の多さを、必要量の約4倍と述べ、強く不満を述べた。駆動の後の質問は、動いたかの1行に絞る、とPMが決めた。
+
+### この記録が主張しないこと
+
+- **サーボが動いた向き、角度、量。**動く前の位置が不明で、ユーザーの回答は「向きと角度はわからない」。段2と再駆動は、直前の駆動で軸が105°付近に残っていた可能性があり、その場合、A0の落ち込みは、動き始めの電流ではなく、保持している状態の値かもしれない。ユーザーの「動いた」が、指令の動きか、AC投入や信号の始まりの動きかは、区別できない。
+- **条件5の値が、5 Vと3.3 Vのtransientの全体であること。**刻みは約208 µs（2ch）で、これより短い変化は見えない。`HW-TBD-034`は未解決で、GND topologyの(ii)も未確認であり、この測定値から合否を導かない（[power-budget.md](power-budget.md)）。電圧への換算の確度は主張しない。Arduinoの時計の確度は資料が無い。
+- **条件2が「接続前のPWM」であること（段1）。**段1はサーボ接続・無給電である。段1bは、サーボのplugを外したというユーザーの申告に依り、作業セッションは目で見ていない。高い側の読みの差（段1と段1b）の原因は確かめていない。
+- **条件4（起動時と小動作時の電流）。**測っていない。測る手段が無い。
+- **条件6が受け入れ試験として満たされたこと。**1回だけの観察で、設計した受け入れ試験ではない。意図したresetが各回にある。
+- **サーボの線の並び（赤＝＋5 V、茶＝GND、黄＝信号）が正しいこと。**慣行の仮説（EXP-028）。
+- **ジャンパー線の針・端子台・3導体の穴・PTCが、サーボの戻りの電流で、熱に耐えること。**
+- **ESP32が応答しなくなった原因。**
+- **サーボまわりの変色・熱・臭いが無いこと。**8項目のうち2項目だけユーザーが答えた（原文のまま）。
+
+### Conclusion
+
+測定用build（`bd669492…fbee`）で、`GO17`の確認3点（入力前のresetで印が付かない、入力前は信号が出ない、consoleで`GO17`を受け取る）の記録を得た。PWM（周期 約20 ms、パルス幅 1.56〜1.66 ms。刻み約0.104 ms）を、サーボ接続・無給電（段1）と、サーボのplugを外した状態（段1b。ユーザーの申告）で記録した。AC投入と動作のときの5 Vの分圧の読み（動作の前の中央値541カウント、動作のとき最小505〜508、最大558〜568）と3V3の読み（676〜682カウント）を、限界つきで記録した。サーボを動かした3回で、ユーザーは「動いた」と答えた回があるが、向き・角度は言えず、動く前の位置は不明である。ESP32が応答しなくなった1回があり、原因は未確認である。条件4は測っていない。
+
+### Next safe step
+
+- 動き始めの電流を捉える駆動のためには、ACを抜いた状態で軸を手で105°から離す手順と、動く前の予想の伝達が要る。**今回は行っていない。**条件5は、`HW-TBD-034`が未解決の間、合否を導かない（[power-budget.md](power-budget.md)）ため、再駆動は予定しない（PMの判断）。
+- 駆動の前に、確認の項目を、見て分かる言葉で、1項目ずつ書き、回答を項目ごとに求める。「全部」で済ませない。記録で確かめていない状態は「前提」と書く。
+- ESP32のresetを保持するスクリプトは、閉じる前に必ず`DTR`と`RTS`をreleaseし、logに残す。
+- 終わりの状態：ACプラグは抜けている（ユーザーの申告）。ESP32とArduinoのUSBは、PCから抜けている（作業セッションが`lsusb`で確認）。サーボのplugはジャンパー線につながっている。Arduinoの線（A0＝分圧点、A1＝3V3）と分圧の抵抗は、ブレッドボードに挿したまま。ESP32には、測定用build（上のELF）が書き込まれ、NVSのlatchは立っている（`skipped_already_ran`で確認）。
+
 ## Revision履歴
 
 | 日付 | Revision | 変更 | 根拠 |
@@ -2990,3 +3069,4 @@ log出力の失敗: 0 件
 | 2026-10-17 | 33 | [#522](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/522)。**`EXP-027`を追加した。**Pi Zero Wで`deskcatd`（`ureq`＋`native-tls`）を直接build（`libssl-dev`無しではexit 101、有りではdevelop `6621423`が39分03秒でexit 0）、キーなしのHTTPS接続と証明書検証、systemd credentialの動作（`6621423`のunitは、キーのfileが無いと`status=243/CREDENTIALS`で起動しなかったこと。#603の`3a73475`のunitの複製の観察(g)を含む）、偽のESP32（PTY）を相手にした`deskcatd`の1800秒の常駐を観察した。ADR-0026の確認項目を満たしたとは書いていない。Wi-Fiの切断の件数と、作業中に対象を指定しない`reset-failed`を1回実行した操作を記録した | [#522](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/522) |
 | 2026-10-17 | 34 | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。**`EXP-028`を追加した。**SG90の初回のサーボ動作を、測定用build `bench-servo-test-17`（developの`e0e959f`）、ジャンパー線の接続、電源の経路のPTC直列、信号用の330 Ωで、2回試みた記録。1回目は、サーボは動いたが、書き込みの後にESP32がダウンロードモードに留まり、appが起動していなかった可能性が高い（確かめていない）。起動ログが無く、指令との対応は未確認。2回目は、サーボの電源を先に入れ、ESP32のリセットを解除して起動した約11秒後（uptime 10553 ms）に`servo_bench_test_move`が出て、ユーザーは「うごいた」と申告した（時刻・向き・角度・熱は申告に無い）。latchは2回目の動作のあとの再起動で効いた。サーボの線の並びはユーザーの決定（慣行）で、実測で確かめていない。#17の受け入れ条件（電流、transient、reset回数）は満たしていない。AC電源の確認なしにリセットした作業セッションの誤りを含む | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17) |
 | 2026-10-17 | 35 | [#11](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11)。**`EXP-029`を追加した。**PiのGPIO UART（`/dev/serial0`、115200）で`serial_link`を600秒走らせ、行の往復（21 frame）と、`boot`→ACK→`get_status`→`status`、`ping` 3件のACKの相関を観察した。信号線を少なくとも1分55秒抜いても`disconnects=0`で、切断は観測されなかった（GPIO UARTではdeviceのerrorまたはEOFによる切断検出が働かない見込み。根拠はコードの読み）。存在しないpathのopen失敗はPi上で見た（実portの切断ではない）。受け入れ条件3・4は実portで得られていない。サーボ系の2か所を外した状態で、`DISP-01`の`VCC`を戻して行った。非通電の確認の項目2〜4と条件6の数値は申告だけである | [#11](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11) |
+| 2026-10-18 | 36 | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。**`EXP-030`を追加した。**測定用build（develop `014d058`、GO17入り）で、サーボを接続しない状態（段1b。ユーザーの申告）と接続した状態（段1）のPWM、AC投入と動作時の5 Vと3.3 VをArduinoで記録した、段1・段1b・段2と再駆動2回の記録。段1が「サーボ未接続」でなかったこと（作業セッションの前提の誤り）、`GO17`をAIが送った形（手順書の`監視維持`と違う）、`GO17`の二重送信、動く前の軸の位置が不明で向き・角度は言えないこと、ESP32が応答しなくなった1回（原因未確認）を書いた。条件4は測っていない。**#17の受け入れ条件は満たしていない** | [#17の各comment](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17) |
