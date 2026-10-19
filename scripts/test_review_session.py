@@ -282,9 +282,12 @@ class ReviewSessionTests(unittest.TestCase):
                 self.finish(**OPEN)
         self.assertEqual(self.marker.read_text(), "5")
 
-    def hook(self, root, agent="fresh-context-reviewer"):
-        env = dict(os.environ, CLAUDE_PROJECT_DIR=str(root))
-        payload = json.dumps({"tool_name": "Agent", "tool_input": {"subagent_type": agent}})
+    def hook(self, root, agent="fresh-context-reviewer", project_root=None, cwd=None):
+        env = dict(os.environ, CLAUDE_PROJECT_DIR=str(project_root or root))
+        data = {"tool_name": "Agent", "tool_input": {"subagent_type": agent}}
+        if cwd is not None:
+            data["cwd"] = str(cwd)
+        payload = json.dumps(data)
         return subprocess.run([sys.executable, str(SCRIPTS / "hooks/review_round_guard.py")],
                               input=payload, env=env, capture_output=True, text=True)
 
@@ -292,20 +295,20 @@ class ReviewSessionTests(unittest.TestCase):
         self.cli("select")
         other = Path(self.temp.name) / "worktree"
         self.git("worktree", "add", "--detach", str(other), "HEAD")
-        missing = self.hook(other)
+        missing = self.hook(other, project_root=self.root, cwd=other)
         self.assertEqual(missing.returncode, 2, missing.stdout + missing.stderr)
         self.assertIn("session select", missing.stderr)
         self.assertEqual(json.loads(self.cli("status").stdout)["rounds"], [])
 
         self.cli("select", root=other)
-        admitted = self.hook(other)
+        admitted = self.hook(other, project_root=self.root, cwd=other)
         self.assertEqual(admitted.returncode, 0, admitted.stdout + admitted.stderr)
         self.assertIn("Issue #465", admitted.stdout)
         self.finish()
         self.assertEqual(json.loads(self.cli("status").stdout)["rounds"][0]["number"], 1)
         self.git("worktree", "remove", str(other))
         self.git("worktree", "add", "--detach", str(other), "HEAD")
-        recreated = self.hook(other)
+        recreated = self.hook(other, project_root=self.root, cwd=other)
         self.assertEqual(recreated.returncode, 2, recreated.stdout + recreated.stderr)
         self.assertIn("session select", recreated.stderr)
         self.assertEqual(len(json.loads(self.cli("status").stdout)["rounds"]), 1)

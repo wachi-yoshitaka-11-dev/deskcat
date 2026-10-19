@@ -24,7 +24,7 @@ def main():
         agent = payload.get("tool_input", {}).get("subagent_type")
         if agent not in ("fresh-context-reviewer", "consistency-inspector"):
             return 0
-        root = os.environ.get("CLAUDE_PROJECT_DIR") or payload.get("cwd")
+        root = payload.get("cwd") or os.environ.get("CLAUDE_PROJECT_DIR")
         if not root:
             raise review_session.Stopped("CLAUDE_PROJECT_DIR or hook cwd is required to locate the review worktree")
         choice = review_session.selected(root)

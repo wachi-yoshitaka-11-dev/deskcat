@@ -44,7 +44,8 @@ python3 scripts/review_gate.py session run --work 465 -- reviewer-command argume
 ```
 
 Claudeでは、登録reviewerの起動前に、そのworktreeで`session select`を実行する。
-hookは呼ばれるたびに選択を読むため、起動済みのClaudeセッションも開き直さずに使える。
+hookは入力JSONの`cwd`が示す現在のworktreeから、呼ばれるたびに選択を読む。
+`cwd`が無い場合だけ`CLAUDE_PROJECT_DIR`を使うため、起動済みのClaudeセッションも開き直さずに使える。
 登録済み`Agent|Task`の`fresh-context-reviewer` / `consistency-inspector`呼び出しはhookが
 予約するため、親で`begin`を重ねない。親が結果を保存するまで次のreviewerは起動できない。
 hookは選択fileのIssue番号、base、scopeだけを使う。選択が無いか不正なら、
