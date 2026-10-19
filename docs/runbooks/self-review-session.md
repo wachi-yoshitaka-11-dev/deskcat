@@ -17,12 +17,23 @@ Issue／Pull Requestに保存したJSONも確認する。以下の`465`は例で
 ```bash
 python3 scripts/review_gate.py session init --work 465 --prior-rounds 0 --history-source https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/465
 python3 scripts/review_gate.py session status --work 465
+python3 scripts/review_gate.py session select --work 465
 ```
 
 記録は`git rev-parse --git-common-dir`配下の`deskcat-review/465.json`。
 commit、rebase、差分更新で書き換えず、同じcloneのworktreeで共有する。
 書き込みは排他lockを取り、開始巡の予約を保存してからreviewerへ進む。
 途中停止でも予約を払い戻さない。lockが残った場合は書き手が停止したことを確認して復旧する。
+
+`session select`は現在のworktreeで使うIssue番号、base、scopeを、
+`git rev-parse --git-dir`が示すworktree専用のGit管理directoryの
+`deskcat-review/selection.json`へ保存する。worktreeを削除すると選択も消える。
+選択は巡や承認の記録ではなく、既存のIssue記録を指定するだけである。
+作業を切り替えたときは、そのworktreeで`select`を再実行する。
+既定のbaseは`origin/develop`、scopeは`Issue scope`。
+別のbaseやscopeを使う場合は`select --work 465 --base <base> --scope <scope>`とし、
+後続の`finish` / `check`も同じ`--base`を指定する。`select`は記録とbaseを確認し、
+存在しない記録、使えないbase、空のscopeなら、前の選択を変更せず停止する。
 
 CLI reviewerは次の経路で起動する。`--`以降はargvとして直接実行し、shellは解釈しない。
 reviewerは下記の結果JSONだけを標準出力へ返す。成功時に自動保存し、失敗・不正JSONなら
@@ -32,10 +43,13 @@ reviewerは下記の結果JSONだけを標準出力へ返す。成功時に自�
 python3 scripts/review_gate.py session run --work 465 -- reviewer-command argument
 ```
 
-Claudeでは、開始前に`DESKCAT_REVIEW_WORK=465`を環境へ設定する。
+Claudeでは、登録reviewerの起動前に、そのworktreeで`session select`を実行する。
+hookは入力JSONの`cwd`が示す現在のworktreeから、呼ばれるたびに選択を読む。
+`cwd`が無い場合だけ`CLAUDE_PROJECT_DIR`を使うため、起動済みのClaudeセッションも開き直さずに使える。
 登録済み`Agent|Task`の`fresh-context-reviewer` / `consistency-inspector`呼び出しはhookが
 予約するため、親で`begin`を重ねない。親が結果を保存するまで次のreviewerは起動できない。
-baseが既定の`origin/develop`と異なるなら`DESKCAT_REVIEW_BASE`も設定する。
+hookは選択fileのIssue番号、base、scopeだけを使う。選択が無いか不正なら、
+`session select`の案内を出して対象reviewerを拒否する。
 hookの不足・異常終了は対象reviewerの起動拒否になる。
 
 Codex等で会話内レビューを行う場合は各巡の前に次を実行し、**exit 2なら見直しを始めず
@@ -185,7 +199,8 @@ python3 scripts/review_gate.py session begin --work 465 --scope 残存欠陥D1�
 `review`は`check`の`NEXT_REVIEW`と、`review_after_round`は`NEXT_ROUND`の1つ前と一致させる。
 `read_diff`は記録のためだけにあり、scriptは検査しない（判断する側が読む範囲は[CONTRIBUTINGの打ち切り](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/CONTRIBUTING.md#打ち切り)）。
 終了巡数は判断側が理由とともに示し、人間が承認する。例の7を既定値として使わない。scopeの完全一致と終了巡数で
-限定し、Claude hookでは`DESKCAT_REVIEW_SCOPE`に同じ範囲を設定する。
+限定し、Claude hookではreviewer起動前に`session select --work 465 --base <base> --scope <承認した範囲>`で
+選択を更新する。親で`begin`を重ねない。
 AI/PM、別作業、承認時のreviewや巡数の不一致、終了巡数の欠落は拒否する。
 承認はそのreviewにだけ効く。`version: 1`の記録にある通算の承認（`after_round` / `through_round`）は、
 その範囲の巡のうち、承認したときのreviewの巡にだけ引き続き効く。
@@ -193,6 +208,7 @@ AI/PM、別作業、承認時のreviewや巡数の不一致、終了巡数の欠
 別clone・別端末へ渡すと決めた時点で、元cloneの最後の操作後に`session status`のJSON全体と
 未実行check・残件を既存Issue／Pull Requestへ保存する。各巡や承認ごとのcommentは要らない。
 新しいcloneでは保存済みJSONを`session init --work 465 --record handoff.local.json`で復元する。
+復元後、そのcloneのworktreeで`session select --work 465 --base <base> --scope <scope>`を実行する。
 元cloneの担当を止めてから引き継ぎ、2つのcloneで同じ作業の巡を並行消費しない。
 ローカルに記録が無いだけでは新規作業と判断しない。
 
