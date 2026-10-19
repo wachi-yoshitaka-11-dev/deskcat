@@ -282,6 +282,8 @@ pub enum Step {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct DaemonCounters {
+    /// 現在のESP32 sessionから受理した`tapped` event。Mindで抑えたeventも含む。
+    pub tapped_received: u64,
     /// 送信queueへ入れた`show_text`（再送を除く）。
     pub show_text_sent: u64,
     /// `show_text`の受理ACK。
@@ -567,7 +569,20 @@ impl Daemon {
                 }
                 self.sync.status_reported(reported, accepted.solicited);
             }
-            Received::Event(frame) => self.on_event(&frame.message, now_ms),
+            Received::Event(frame) => {
+                if matches!(frame.message, Message::Tapped) {
+                    self.counters.tapped_received = self.counters.tapped_received.saturating_add(1);
+                    log::info!(
+                        "tapped_received sid={} id={} esp_ts_ms={} pi_uptime_ms={} total={}",
+                        frame.envelope.sid,
+                        frame.envelope.id,
+                        frame.envelope.ts_ms,
+                        now_ms,
+                        self.counters.tapped_received
+                    );
+                }
+                self.on_event(&frame.message, now_ms);
+            }
             // ESP32のsidが未承認のため`hello`の結果としては受理されなかったが、ESP32は
             // 応答した。ACKを待つ理由は無い（起動直後の通常の順序である）。
             Received::Rejected {
@@ -936,6 +951,9 @@ impl Daemon {
                 let _ = self.peer.note_sent(id, message, now_ms);
                 self.sync.sent(id, expression);
                 self.counters.set_expression_sent += 1;
+                log::info!(
+                    "set_expression_queued id={id} name={expression:?} pi_uptime_ms={now_ms}"
+                );
             }
             Err(SendError::Dropped) => {
                 log::debug!("set_expressionを送れなかった。次の周で再試行する");

@@ -405,6 +405,7 @@ fn only_one_set_expression_is_in_flight_and_the_latest_is_sent_after_the_ack() {
 
     t.feed(Message::Tapped, ESP_SID, 5);
     assert_eq!(run(&mut d, &mut t, 200), Step::Continue);
+    assert_eq!(d.counters().tapped_received, 1);
     assert!(expressions(&t.sent()).is_empty(), "応答待ちの間は送らない");
 
     t.feed(ack(id, AckStatus::Ok, None), ESP_SID, 6);
@@ -415,6 +416,18 @@ fn only_one_set_expression_is_in_flight_and_the_latest_is_sent_after_the_ack() {
         0,
         "古い追跡を外さないので、ACKは不一致にならない"
     );
+}
+
+#[test]
+fn one_tap_sends_surprised_without_motion() {
+    let (mut d, mut t) = established("neutral");
+    let _ = t.sent();
+
+    t.feed(Message::Tapped, ESP_SID, 4);
+    assert_eq!(run(&mut d, &mut t, 100), Step::Continue);
+    assert_eq!(expressions(&t.sent()), [ExpressionName::Surprised]);
+    assert_eq!(d.counters().tapped_received, 1);
+    assert_eq!(d.counters().motions_not_sent, 0);
 }
 
 #[test]
@@ -1329,7 +1342,7 @@ fn a_resume_has_no_deadline_and_keeps_asking_for_a_status_that_never_arrives() {
 
 #[test]
 fn cell_set_expression_without_any_ack_stops_after_the_limit_and_resumes_when_the_desire_changes() {
-    // 現行のfirmwareはset_expressionにACKを返さない（pi_link.rsのother腕。処理を足すのは#21）。
+    // ACKが届かない場合も、無期限には再送しない。
     // 保つ時間を長くして、時間でneutralへ戻る送信と区別する。
     let timing = Timing {
         happy_hold_ms: 600_000,

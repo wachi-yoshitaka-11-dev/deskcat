@@ -720,7 +720,10 @@ fn main() {
         // 製品buildとtap試験buildで検出を1回読み、送ってよいときだけ`tapped`を送る（`crate::tap`）。
         #[cfg(any(feature = "tap-21", deskcat_product_mode))]
         if let Some(detector) = tap.as_mut() {
-            if detector.poll(health.uptime_ms(), boot_session.is_established()) {
+            // `poll`内のI2C readと検出logも含む、検出→描画時間の保守的な始点。
+            let poll_started_at_ms = health.uptime_ms();
+            if detector.poll(poll_started_at_ms, boot_session.is_established()) {
+                log::info!("tap_event_poll_start uptime_ms={poll_started_at_ms}");
                 pi_link::send_event(Message::Tapped, &mut boot_session, &health, &mut uart);
             }
         }

@@ -107,6 +107,7 @@ impl FaceState {
 pub struct FaceDrawer<'d> {
     lcd: Ili9341<'d>,
     painter: Option<Painter>,
+    painter_name: Option<ExpressionName>,
     text: Option<TextLayout>,
     text_clear_y: u16,
     text_next_index: usize,
@@ -131,6 +132,7 @@ impl<'d> FaceDrawer<'d> {
         Self {
             lcd,
             painter: None,
+            painter_name: None,
             text: None,
             text_clear_y: 0,
             text_next_index: 0,
@@ -144,6 +146,7 @@ impl<'d> FaceDrawer<'d> {
     pub fn show(&mut self, name: ExpressionName) {
         if let Some(name) = self.presentation.show_expression(name) {
             self.painter = Painter::new(name, FACE_BAND_ROWS);
+            self.painter_name = Some(name);
             log::info!("face_show name={name:?}");
         } else {
             log::info!("face_deferred_during_text name={name:?}");
@@ -171,6 +174,7 @@ impl<'d> FaceDrawer<'d> {
                 self.record_text_rejection(error);
             })?;
         self.painter = None;
+        self.painter_name = None;
         self.text = Some(layout);
         self.text_clear_y = 0;
         self.text_next_index = 0;
@@ -223,6 +227,7 @@ impl<'d> FaceDrawer<'d> {
             self.text = None;
             self.text_started_at = None;
             self.painter = Painter::new(name, FACE_BAND_ROWS);
+            self.painter_name = Some(name);
             log::info!("text_expired_restore_face name={name:?}");
         }
         if let Some(layout) = self.text.as_ref() {
@@ -267,11 +272,13 @@ impl<'d> FaceDrawer<'d> {
                 if let Err(err) = self.lcd.fill_rect(s.x0, s.y0, s.x1, s.y1, s.color) {
                     log::error!("face_draw_failed y={} error={err}", s.y0);
                     self.painter = None;
+                    self.painter_name = None;
                 }
             }
             None => {
                 self.painter = None;
-                log::info!("face_drawn");
+                let name = self.painter_name.take();
+                log::info!("face_drawn name={name:?} uptime_ms={now_ms}");
             }
         }
     }
@@ -283,6 +290,7 @@ impl<'d> FaceDrawer<'d> {
         self.text_started_at = None;
         if let Some(name) = self.presentation.cancel() {
             self.painter = Painter::new(name, FACE_BAND_ROWS);
+            self.painter_name = Some(name);
         }
     }
 }
