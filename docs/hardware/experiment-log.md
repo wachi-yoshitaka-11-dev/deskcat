@@ -42,6 +42,7 @@
 | [EXP-028](#exp-028-sg90の初回のサーボ動作の試み測定用buildジャンパー線の接続2回試みた) | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)の初回のサーボ動作の試み（測定用build `bench-servo-test-17`、ジャンパー線の接続、PTC直列。2回） | 値の正なし（観察の記録。サーボの線の並び、電流・transient、1回目の動きが指令だったことは確かめていない。**#17の受け入れ条件は満たしていない**） |
 | [EXP-029](#exp-029-piのserial_linkで実portgpio-uartdevserial0を開き行の往復とprotocolの往復と信号線を外したときの観察を行った) | [#11](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11)の実port（GPIO UARTの`/dev/serial0`、115200）での`serial_link`の実行（600秒）と、信号線を抜いた観察（少なくとも1分55秒）。存在しないpathのopen失敗をPi上で別に見た（実portの切断ではない） | 値の正なし（観察の記録。`boot`→ACK→`get_status`→`status`と`ping` 3件のACKを実portで観察した。切断は観測されず、**#11の受け入れ条件3・4は実portで得られていない**。非通電の確認の項目2〜4と条件6の数値は申告だけ） |
 | [EXP-030](#exp-030-sg90の測定用buildgo17入りでサーボを接続しない状態と接続した状態のpwmac投入と動作時の5-vと33-vの変化をarduinoで記録した) | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)の受け入れ条件2・5・6（段1・段1b・段2と再駆動2回） | 値の正なし（観察の記録。条件5の値は`HW-TBD-034`が未解決のため合否を導かない） |
+| [EXP-031](#exp-031-bme280env-01の試験buildenv-sample-16でraw値と変換値を観測しswitchbotの表示と並べた) | [#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16)の実機確認。BME280（`ENV-01`）のraw値と変換値の観測、`MEAS-04`（SwitchBot）の表示との並置 | 値の正なし（観測の記録。確度・気圧・timeout・disconnect・CRC・not-readyは取れていない） |
 
 **大容量の生dataはこのrepositoryへ入れていない。**保存場所は
 [development-foundation-plan.md](../planning/development-foundation-plan.md)の
@@ -3028,6 +3029,66 @@ log出力の失敗: 0 件
 - ESP32のresetを保持するスクリプトは、閉じる前に必ず`DTR`と`RTS`をreleaseし、logに残す。
 - 終わりの状態：ACプラグは抜けている（ユーザーの申告）。ESP32とArduinoのUSBは、PCから抜けている（作業セッションが`lsusb`で確認）。サーボのplugはジャンパー線につながっている。Arduinoの線（A0＝分圧点、A1＝3V3）と分圧の抵抗は、ブレッドボードに挿したまま。ESP32には、測定用build（上のELF）が書き込まれ、NVSのlatchは立っている（`skipped_already_ran`で確認）。
 
+## EXP-031: BME280（`ENV-01`）の試験build（`env-sample-16`）でraw値と変換値を観測し、SwitchBotの表示と並べた
+
+[#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16)の受け入れ条件（raw値と変換値の観測、reference比較）に関わる実機確認。結果の最初の記録は[#16のcomment 6266876276](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16#issuecomment-6266876276)である。受け入れ条件のチェックは入れていない。
+
+| 項目 | 内容 |
+|---|---|
+| Test ID | `EXP-031` |
+| Date | 2026-10-19 20:58〜21:06（JST。UTC 11:58〜12:06。始まりはUSBを挿した時刻（`/dev/ttyUSB0`の作成時刻）、終わりは最後のlogの時刻。USBを抜いた時刻は記録していない） |
+| Operator | 配線の変更、USBの抜き挿し、SwitchBotの表示の読み取り、異常の目視はユーザー。build、書き込み、UART0のlogの取得は作業セッション（AI） |
+| Hardware revision／Exact components | `MCU-01`（ESP32-DevKitC V4）、`ACCEL-01`、`ENV-01`（BME280、AE-BME280）、`MEAS-04`（SwitchBot温湿度計。model名と確度は未取得） |
+| Wiring revision | `EXP-015`のI2C配線（`ACCEL-01`／`ENV-01`とも`3V3` pin給電、`SDA`→GPIO25、`SCL`→GPIO26、`SDO`→GND、`ENV-01`の`CSB`は`J3`経由）から、I2Cの線を変えたという申告は無い（`ACCEL-01`と`ENV-01`のDevice IDの両方が読めた）。配線は測っていない。`DISP-01`は切り離したまま。**サーボ系の線は一部を付けたまま通電した**：緑のジャンパー線（c10→端子台Sの「＋」）、青のジャンパー線（c14→−18）、分圧の10 kΩ 2本、サーボのplug。抜いたもの：Arduinoの線3本、ブレッドボードi25のジャンパー線、端子台Sの「−」の穴の−20へ行くジャンパー線。**サーボのACプラグは抜けている**（ユーザーが見た）。通電の前に、これらをユーザーへ文で示して承認を得た |
+| Power supply and current limit | ESP32のUSB（PC）。電流制限は設けていない。電流は測っていない |
+| Firmware commit/profile | develop `01a9d8c`の`env-sample-16`（debug、単独）。ELF sha256 `9c41657d70f5aecc7f768ebbf4ff949c9668679457bd86b49b7c0614fb00e801`。`firmware/esp32`で、build時だけ`[workspace]`を足して`cargo fmt --check`・`cargo clippy --all-targets --locked --features env-sample-16 -- -D warnings`・`cargo build --locked --features env-sample-16`を実行し、成功した |
+| Configuration | Chip IDが`0x60`のときだけ、`ctrl_hum`（0xF2）と`ctrl_meas`（0xF4）へ書き、forced modeで1回測る。I2Cは100 kHz、address `0x76` |
+| Measurement equipment | UART0のlog（115200）。`MEAS-04`の表示のユーザーの読み取り |
+| Procedure | USBを挿す → `espflash`で書き込み（`--no-stub --after no-reset`） → RTSでresetしてlogを180秒取る → 8秒ずつ2回resetしてlogを取る → SwitchBotの表示をユーザーが読む → USBを抜く |
+| Expected result | `env_chip_id raw=0x60`、`env_raw`と`env_reading`のlog、faultが出ない |
+| Measured result | 下記 |
+| Faults | 下記 |
+| Conclusion | raw値と変換値は観測できた。reference比較は観測値の並置までで、確度は言えない。timeout・CRC・not-ready・disconnectの分類は取れていない |
+| Next safe step | 下記 |
+
+### 結果
+
+- 書き込み：1回目は`FlashEnd`で`Other (0x1)`のエラー。2回目は`Flashing has completed!`。読み戻しの照合はしていない
+- 起動3回（UTC 12:01:53、12:05:29、12:05:37）とも`reset_reason=power_on`、`accel_device_id raw=0xe5`、`env_chip_id raw=0x60`。`env_calibration_read dig_p1=37064 dig_h4=391 dig_h5=50`
+- panic、task_wdt、brownout、`env_fault`は3回とも0件。180秒のlogの`health`の`max_read_gap_ms`は最大50、`overrun_ticks=0`
+- ユーザーの申告：異音・発熱・異臭なし
+
+| 起動 | raw温度 | raw気圧 | raw湿度 | 温度 | 気圧 | 湿度 |
+|---|---|---|---|---|---|---|
+| 12:01:56Z | 537744 | 303840 | 36195 | 27.18 ℃ | 1016.64 hPa | 57.04 % |
+| 12:05:32Z | 537776 | 303712 | 36142 | 27.19 ℃ | 1016.88 hPa | 56.78 % |
+| 12:05:40Z | 537776 | 303760 | 36145 | 27.19 ℃ | 1016.80 hPa | 56.79 % |
+
+- `MEAS-04`の表示（ユーザーが読んだ。時刻は記録していない）：26.9 ℃、59 %。置いた場所は基板から約2 m。BME280との差は、温度が約+0.3 ℃、湿度が約−2 %
+- calibrationの読み（uptime 811 ms）から`env_reading`（2581 ms）のあいだに、heartbeat（1049・2049 ms）とbootの送信（1211・2011 ms）が予定どおり出た
+
+### Faults
+
+- 書き込みの1回目の`FlashEnd`エラーは、原因を調べていない
+- 無給電の確認（`gpio-assignment.md`の項目1・5・6・7）は、ユーザーが「省く」を選んだので実施していない。条件(5)(a)は`EXP-015`と同じ理由で未達
+
+### Next safe step
+
+- 次に実機で`env-sample-16`を通電する場合は、その回の構成を文で示して、ユーザーの承認を新たに取る
+- timeout・disconnectの分類を取る場合は、先に、moduleを抜いたあとに戻す穴の位置を、ユーザーが覚える方法を決める。それまで頼まない
+- [#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16)の受け入れ条件のチェックは、この記録だけでは入れない
+
+### この記録が主張しないこと
+
+- BME280の確度。`MEAS-04`の確度が未取得で、置いた場所が約2 m違い、ESP32の発熱による温度の上昇を測っていない
+- 気圧の比較。referenceが無い
+- timeout・disconnectの分類。SDAが切れた状態を作っていない。取れない理由：`ENV-01`の`SDA`は、moduleのpinがESP32と同じ行に刺さっていて、SDAだけを外せる線が無い。module自体を抜く試験は、戻す穴の位置の記録が無く、誤って挿し直すとI2Cと電源が壊れかねないため、頼んでいない
+- CRCの分類。BME280のI2Cにデータのcrcが無い
+- not-readyの分類。意図して作れず、自然には起きなかった
+- 遅い変換が上位taskをblockしないこと。変換の所要時間を単独で測るlogが無く、遅い変換を作っていない
+- NVSのlatchが残るか。この`env-sample-16`はlatchを読まない
+- 製品buildの動作、`J3`のはんだ付けの電気的な導通
+
 ## Revision履歴
 
 | 日付 | Revision | 変更 | 根拠 |
@@ -3069,3 +3130,4 @@ log出力の失敗: 0 件
 | 2026-10-17 | 34 | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。**`EXP-028`を追加した。**SG90の初回のサーボ動作を、測定用build `bench-servo-test-17`（developの`e0e959f`）、ジャンパー線の接続、電源の経路のPTC直列、信号用の330 Ωで、2回試みた記録。1回目は、サーボは動いたが、書き込みの後にESP32がダウンロードモードに留まり、appが起動していなかった可能性が高い（確かめていない）。起動ログが無く、指令との対応は未確認。2回目は、サーボの電源を先に入れ、ESP32のリセットを解除して起動した約11秒後（uptime 10553 ms）に`servo_bench_test_move`が出て、ユーザーは「うごいた」と申告した（時刻・向き・角度・熱は申告に無い）。latchは2回目の動作のあとの再起動で効いた。サーボの線の並びはユーザーの決定（慣行）で、実測で確かめていない。#17の受け入れ条件（電流、transient、reset回数）は満たしていない。AC電源の確認なしにリセットした作業セッションの誤りを含む | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17) |
 | 2026-10-17 | 35 | [#11](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11)。**`EXP-029`を追加した。**PiのGPIO UART（`/dev/serial0`、115200）で`serial_link`を600秒走らせ、行の往復（21 frame）と、`boot`→ACK→`get_status`→`status`、`ping` 3件のACKの相関を観察した。信号線を少なくとも1分55秒抜いても`disconnects=0`で、切断は観測されなかった（GPIO UARTではdeviceのerrorまたはEOFによる切断検出が働かない見込み。根拠はコードの読み）。存在しないpathのopen失敗はPi上で見た（実portの切断ではない）。受け入れ条件3・4は実portで得られていない。サーボ系の2か所を外した状態で、`DISP-01`の`VCC`を戻して行った。非通電の確認の項目2〜4と条件6の数値は申告だけである | [#11](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11) |
 | 2026-10-18 | 36 | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。**`EXP-030`を追加した。**測定用build（develop `014d058`、GO17入り）で、サーボを接続しない状態（段1b。ユーザーの申告）と接続した状態（段1）のPWM、AC投入と動作時の5 Vと3.3 VをArduinoで記録した、段1・段1b・段2と再駆動2回の記録。段1が「サーボ未接続」でなかったこと（作業セッションの前提の誤り）、`GO17`をAIが送った形（手順書の`監視維持`と違う）、`GO17`の二重送信、動く前の軸の位置が不明で向き・角度は言えないこと、ESP32が応答しなくなった1回（原因未確認）を書いた。条件4は測っていない | [#17の各comment](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17) |
+| 2026-10-19 | 37 | [#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16)。**`EXP-031`を追加した。**BME280（`ENV-01`）の試験build（develop `01a9d8c`の`env-sample-16`）でraw値と変換値を3回の起動で観測し、`MEAS-04`の表示と並べた記録。確度は言えず、気圧のreference、timeout・disconnect・CRC・not-readyの分類は取れていない | [#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16) |
