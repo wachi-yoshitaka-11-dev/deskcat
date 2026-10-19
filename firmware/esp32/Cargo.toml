@@ -33,6 +33,8 @@ env-sample-16 = []
 # ときの、ただ1つの例外である（featureどうしの排他ではない。このbuildはPi linkを外すだけであり、
 # `bringup-display-13`と組み合わせることは禁じていない。ただしPi linkで`tapped`を送る`tap-21`とは併用できず、`main.rs`の`compile_error!`で止める）。
 bench-servo-test-17 = []
+# #17の90度指令用。元のbench構成を含み、指令角だけを規約上の中央にする。
+bench-servo-90-17 = ["bench-servo-test-17"]
 # Issue #13の`DISP-01`（MSP2807）bring-up（初期化、backlight点灯、単色fill、
 # 四隅pattern）の試験構成を選ぶ。このfeatureだけを指定したbuildは表情とtapを有効にしない。
 # 有効化してよい条件・手順は`main.rs`のmodule docの

@@ -418,6 +418,7 @@ gate表のいずれの行も解決していない。動かなかった場合、�
    - **循環:** 最初の駆動は、上の条件を満たしたうえで`HW-TBD-010`等を測るための監視下の測定として行う。ユーザーが判断した。
 
    **現在の状態: その回の実行承認が無い間は、駆動しない。**（2026-10-13に改めた。それまでは「まだ実行しない。次の(a)〜(c)がそろうまで、この項目による駆動を始めない。」だった。）(a)(b)は下の記録のとおりそろった。(c)は、reviewと、駆動の回ごとの実行承認に分ける（下の(c)の記録）。**駆動してよいかは、その回の実行承認の記録（[#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)のcomment。判断者・出所・内容の形）が持つ。**この節が承認の状態を持つこと（この節の冒頭）は変えない。この節が定めるのは、回ごとの実行承認のcommentをその回の状態の記録とする規則であり、駆動のたびにこの節を書き換えない。**上の項目4の「進めてよい」は、2026-09-22の承認（項目1〜4）の範囲の語であり、この項目による駆動には使わない。**
+   **2026-10-19追記（ユーザーの作業指示）:** ユーザーは、#17を完成させるための実機作業を1回だけ行い、測定用buildの指令角を規約上の90度に変えてAC投入時と動作時の電流を測り、reset回数を数えるというPMの判断を承認した。この追記とbuildの変更は、実機での動作・測定を記録するものではない。これまでの105度指令から軸が105度付近にあるという読みは未確認であり、90度がこの個体の機械的中央かどうかも未確認（`HW-TBD-010`）である。回ごとの実行承認を[#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)のcommentで確認する条件と停止基準は維持する。
    - (a) servo専用の別電源と、故障電流を制限する手段を選び、手段・値・根拠をこの節へ記録する。
      **(a)の記録（2026-09-28、ユーザー決定。購入なし）。**決定の記録は[#488](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/488)のコメントにある。
      - **別電源:** `M-12001`（5 V／3 A）を、servoの試験の間だけservo専用にする。Piは外す（試験にPiは要らない）。ESP32はPCのUSBから給電する。
@@ -655,7 +656,7 @@ firmware（`firmware/esp32/src/servo.rs`、
    状態にする（ESP32はPCのUSBから給電する。servoの外部5 V系とは電源を分離する）。
    **2026-09-28追記: 項目6の構成では、servoの電源は`M-12001`（servo専用）から`MF-R135`を経て供給する。**
    手やcableを、サーボが動きうる範囲の外へ置く（[Hardware Safety Policy §6](../governance/hardware-safety-policy.md#6-サーボ)のPWM出力前7項目の1つ）。
-5. **`build`（AI。flashは人間の立ち会いのもとでAIまたは人間）** `cargo build --locked --features bench-servo-test-17`で
+5. **`build`（AI。flashは人間の立ち会いのもとでAIまたは人間）** 既存の105度指令には`cargo build --locked --features bench-servo-test-17`、2026-10-19に承認された90度指令には`cargo build --locked --features bench-servo-90-17`を使って
    AIがfirmwareをbuildし、ESP32 Flash／HIL profileの端末でflashする（`espflash`）。**flashの
    実行者は、[power-budget.md](power-budget.md)の`ACCEL-01`／`ENV-01`単体bring-upの手順8と同じである**
    （[#489](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/489)。書き込みのcommandと、USBの接続・
@@ -696,10 +697,12 @@ firmware（`firmware/esp32/src/servo.rs`、
    ものではない）。動作の合図は人間の`GO17`の入力だけであり、AIへの実行指示は無い
    （firmwareは入力と`arm delay`の後に1回だけ動かす）。
 8. **`単発動作`（firmware、`GO17`の入力と`arm delay`の後に実行）** `Sg90::move_to_angle_once`を
-   1回だけ呼ぶ短いtest経路（`bench-servo-test-17` feature）により、中央から
+   1回だけ呼ぶ短いtest経路を使う。既存の`bench-servo-test-17`単独では、規約上の中央から
    `config::SERVO_FIRST_MOTION_MAX_DEVIATION_DEG`（既定15度、一次資料にも実測にも
-   基づかない暫定値）**だけ+側（`main::run_servo_bench_test`が`neutral + max_deviation`で
-   呼ぶ、片側のみ）**へ1回動かす。`config::SERVO_BENCH_TEST_EXPOSURE_MS`
+   基づかない暫定値）だけ+側の105度を指令する。`bench-servo-90-17`では、
+   規約上の中央である90度を指令する。**90度が機械的中央であるとは確認していない**
+   （`HW-TBD-010`）。指令後に実際に軸が動くか、動く向きと角度は観察する。
+   `config::SERVO_BENCH_TEST_EXPOSURE_MS`
    （既定300 ms。安全な保持時間の主張ではなく露出時間の技術的最小化）の後、`Sg90::stop`で
    dutyを0へ戻す（連続で保持しない）。**信号を止めてもservoが駆動を止める保証は無い**
    （上記「残余risk」参照）。
@@ -832,3 +835,4 @@ Pi最低入力電圧の復帰条件に関する現在の扱いは[power-budget.m
 | 2026-10-13 | 36 | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。`承認の状態`の項目6の(b)の残り（測定用のbuildのfirmware側の変更）を行った。#474の`compile_error!`と、項目5が挙げた注記（`確定しているproject規則`と`build`stepへの2026-09-25追記を含む）を外した。項目6の文のとおりだと、`compile_error!`を外すPull Requestのreview自体が(c)に含まれ、外せなかったため、(c)をこのPull Requestのreview（ユーザーがmergeを承認）と駆動の回ごとの実行承認（#17のcomment）に分け、**現在の状態を「まだ実行しない」から「その回の実行承認が無い間は、駆動しない」へ改めた。**`gate確認`と手順の冒頭の「進めてよい」の読みを合わせた。測定用のbuildの動作、動作制限表、有効化gate表、受け入れchecklistは変えていない。項目1〜5、残余riskへの2026-09-25追記、Revision 28は書き換えていない |
 | 2026-10-17 | 37 | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。**`承認の状態`の項目6の(a)へ、`ジャンパー線`と`サーボの線の並び`の追記を足した。**EXP-028（PR #606）の記録を出所にする。`初回動作の実行手順`の`起動とarm delay`、`latch検証`、`再武装`に、EXP-028の実施の記録（書き込み直後のダウンロードモード、ポートを開いた時のリセット、サーボの電源を先に入れた順序、latchの観察、`erase-parts nvs`が失敗し`erase-region`で消したこと、AC電源の確認なしにリセットした誤り）を追記した。`latch検証`の追記には、ポートを開く、閉じる、リセットする操作の前に、servoの外部5 V電源が抜けているかを確認する、という運用の記述も含む（記録でなく、運用の追加）。**項目6の条件の文面、手順の順序、動作制限表、有効化gate表、受け入れchecklist、承認の状態は書き換えていない。**サーボの線の並びは慣行であり仮説で、ユーザーの決定は根拠水準の例外として置いていない。ジャンパー線は、ユーザーの決定で使い、条件の文面と食い違ったままである。項目1〜5、Revision 28は書き換えていない |
 | 2026-10-17 | 38 | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。**測定用のbuild（`bench-servo-test-17`）を、起動だけでは動かさず、人間がUART0のconsoleへ`GO17`を入力したときだけ1回動かす形に変えた**（`firmware/esp32/src/main.rs`の`wait_for_bench_confirmation`）。EXP-028で、起動のたびに自動で動く作りが、書き込みの手順とDTR／RTSの扱い次第で意図しない起動を動作にしうると分かったため。`決定事項`の`arm delay`の行、`build`・`起動とarm delay`・`監視維持`・`単発動作`・`latch検証`の各stepを合わせて直した。latch（NVSの実行済みflag）は残し、入力を受けた後、動かす前にcommitする。動作制限表、有効化gate表、`承認の状態`、項目6の条件は変えていない |
+| 2026-10-19 | 39 | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。測定用の90度指令を`bench-servo-90-17`で選べるようにした。既存の`bench-servo-test-17`単独の105度指令は維持した。`承認の状態`の項目6へユーザーの2026-10-19の判断と未確認の前提を追記し、`初回動作の実行手順`の`build`・`単発動作`stepを両buildに合わせた。動作制限表、有効化gate表、停止基準、NVS latch、`GO17`、arm delay、露出時間、dutyを0へ戻す処理は変更していない。実機での動作・測定は行っていない |
