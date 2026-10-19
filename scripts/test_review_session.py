@@ -39,9 +39,9 @@ class ReviewSessionTests(unittest.TestCase):
     def git(self, *args):
         return subprocess.check_output(["git", "-C", str(self.root), *args], stderr=subprocess.STDOUT).decode().strip()
 
-    def cli(self, *args, expected=0, root=None):
+    def cli(self, *args, expected=0, root=None, work="465"):
         command = [sys.executable, str(SCRIPTS / "review_gate.py"), "session", args[0],
-                   "--repository-root", str(root or self.root), "--work", "465", "--base", "base", *args[1:]]
+                   "--repository-root", str(root or self.root), "--work", work, "--base", "base", *args[1:]]
         result = subprocess.run(command, capture_output=True, text=True, encoding="utf-8")
         self.assertEqual(result.returncode, expected, result.stdout + result.stderr)
         return result
@@ -271,7 +271,8 @@ class ReviewSessionTests(unittest.TestCase):
         # Repository fixture needs the guard code at the configured project path.
         import shutil
         shutil.copytree(SCRIPTS, self.root / "scripts", ignore=shutil.ignore_patterns("__pycache__"))
-        env = dict(os.environ, CLAUDE_PROJECT_DIR=str(self.root), DESKCAT_REVIEW_WORK="465", DESKCAT_REVIEW_BASE="base")
+        self.cli("select")
+        env = dict(os.environ, CLAUDE_PROJECT_DIR=str(self.root))
         payload = json.dumps({"tool_name": "Agent", "tool_input": {"subagent_type": "fresh-context-reviewer"}})
         for number in range(1, 7):
             result = subprocess.run(["bash", "-c", command], input=payload, env=env, capture_output=True, text=True)
@@ -280,6 +281,106 @@ class ReviewSessionTests(unittest.TestCase):
                 self.marker.write_text(str(number), encoding="utf-8")
                 self.finish(**OPEN)
         self.assertEqual(self.marker.read_text(), "5")
+
+    def hook(self, root, agent="fresh-context-reviewer"):
+        env = dict(os.environ, CLAUDE_PROJECT_DIR=str(root))
+        payload = json.dumps({"tool_name": "Agent", "tool_input": {"subagent_type": agent}})
+        return subprocess.run([sys.executable, str(SCRIPTS / "hooks/review_round_guard.py")],
+                              input=payload, env=env, capture_output=True, text=True)
+
+    def test_hook_selection_is_worktree_local_and_count_is_shared(self):
+        self.cli("select")
+        other = Path(self.temp.name) / "worktree"
+        self.git("worktree", "add", "--detach", str(other), "HEAD")
+        missing = self.hook(other)
+        self.assertEqual(missing.returncode, 2, missing.stdout + missing.stderr)
+        self.assertIn("session select", missing.stderr)
+        self.assertEqual(json.loads(self.cli("status").stdout)["rounds"], [])
+
+        self.cli("select", root=other)
+        admitted = self.hook(other)
+        self.assertEqual(admitted.returncode, 0, admitted.stdout + admitted.stderr)
+        self.assertIn("Issue #465", admitted.stdout)
+        self.finish()
+        self.assertEqual(json.loads(self.cli("status").stdout)["rounds"][0]["number"], 1)
+        self.git("worktree", "remove", str(other))
+        self.git("worktree", "add", "--detach", str(other), "HEAD")
+        recreated = self.hook(other)
+        self.assertEqual(recreated.returncode, 2, recreated.stdout + recreated.stderr)
+        self.assertIn("session select", recreated.stderr)
+        self.assertEqual(len(json.loads(self.cli("status").stdout)["rounds"]), 1)
+
+    def test_select_switches_work_without_resetting_rounds(self):
+        self.cli("select")
+        first = self.hook(self.root)
+        self.assertEqual(first.returncode, 0, first.stderr)
+        self.finish(**OPEN)
+        self.cli("init", "--prior-rounds", "0", "--history-source", "fixture", work="466")
+        self.cli("select", work="466")
+        second = self.hook(self.root)
+        self.assertEqual(second.returncode, 0, second.stderr)
+        self.assertIn("Issue #466", second.stdout)
+        self.cli("finish", "--record", self.write(self.result(**OPEN)), work="466")
+        self.cli("select")
+        resumed = self.hook(self.root)
+        self.assertEqual(resumed.returncode, 0, resumed.stderr)
+        self.assertIn("Issue total 2", resumed.stdout)
+
+    def test_hook_requires_selection_and_reads_its_scope(self):
+        missing = self.hook(self.root)
+        self.assertEqual(missing.returncode, 2, missing.stdout + missing.stderr)
+        self.assertIn("session select", missing.stderr)
+        self.cli("select", "--scope", "remaining defect D1")
+        admitted = self.hook(self.root)
+        self.assertEqual(admitted.returncode, 0, admitted.stdout + admitted.stderr)
+        state = json.loads(self.cli("status").stdout)
+        self.assertEqual(state["rounds"][0]["scope"], "remaining defect D1")
+        self.assertEqual(json.loads(session.selection_path(self.root).read_text())["scope"], "remaining defect D1")
+
+    def test_hook_uses_selected_scope_for_bounded_approval(self):
+        self.cli("select")
+        for _ in range(5):
+            admitted = self.hook(self.root)
+            self.assertEqual(admitted.returncode, 0, admitted.stderr)
+            self.finish(**OPEN)
+        self.cli("approve", "--record", self.write(self.approval()))
+        blocked = self.hook(self.root)
+        self.assertEqual(blocked.returncode, 2, blocked.stdout + blocked.stderr)
+        self.cli("select", "--scope", "remaining defect D1")
+        admitted = self.hook(self.root)
+        self.assertEqual(admitted.returncode, 0, admitted.stderr)
+        self.finish(**OPEN)
+        self.cli("select")
+        blocked_again = self.hook(self.root)
+        self.assertEqual(blocked_again.returncode, 2, blocked_again.stdout + blocked_again.stderr)
+        self.assertEqual(len(json.loads(self.cli("status").stdout)["rounds"]), 6)
+
+    def test_select_failure_keeps_previous_selection(self):
+        self.cli("select")
+        path = session.selection_path(self.root)
+        before = path.read_bytes()
+        missing = self.cli("select", work="999", expected=2)
+        self.assertIn("run session init or restore", missing.stderr)
+        invalid_base = self.cli("select", "--base", "missing-base", expected=2)
+        self.assertIn("REVIEW_STATE=stopped", invalid_base.stderr)
+        invalid_scope = self.cli("select", "--scope", "", expected=2)
+        self.assertIn("scope", invalid_scope.stderr)
+        self.assertEqual(path.read_bytes(), before)
+        self.assertEqual(self.hook(self.root).returncode, 0)
+
+    def test_invalid_selection_fails_closed_only_for_registered_reviewer(self):
+        self.cli("select")
+        selection = session.selection_path(self.root)
+        selection.write_text("{", encoding="utf-8")
+        blocked = self.hook(self.root)
+        self.assertEqual(blocked.returncode, 2, blocked.stdout + blocked.stderr)
+        self.assertIn("session select", blocked.stderr)
+        selection.write_text(json.dumps({"version": 1, "work": "465", "base": "base"}), encoding="utf-8")
+        old_selection = self.hook(self.root)
+        self.assertEqual(old_selection.returncode, 2, old_selection.stdout + old_selection.stderr)
+        other_agent = self.hook(self.root, agent="unrelated-agent")
+        self.assertEqual(other_agent.returncode, 0, other_agent.stderr)
+        self.assertEqual(json.loads(self.cli("status").stdout)["rounds"], [])
 
     def test_local_receipt_rejects_unfinished_stale_or_wrong_head_record(self):
         (self.root / "note.md").write_text("updated\n", encoding="utf-8")
@@ -302,7 +403,9 @@ class ReviewSessionTests(unittest.TestCase):
 
     def test_hook_missing_record_and_invalid_json_fail_closed(self):
         hook = str(SCRIPTS / "hooks/review_round_guard.py")
-        env = dict(os.environ, CLAUDE_PROJECT_DIR=str(self.root), DESKCAT_REVIEW_WORK="999")
+        self.cli("select")
+        session.state_path(self.root, "465").unlink()
+        env = dict(os.environ, CLAUDE_PROJECT_DIR=str(self.root))
         for payload in ("{", json.dumps({"tool_name": "Task", "tool_input": {"subagent_type": "consistency-inspector"}})):
             result = subprocess.run([sys.executable, hook], input=payload, env=env, capture_output=True, text=True)
             self.assertEqual(result.returncode, 2, result.stdout + result.stderr)

@@ -536,9 +536,14 @@ PM/AIの判断や無回答は承認の代替にならない。
 `review_gate.py session`とClaudeの`Agent|Task` hookは、同じIssueの実行記録を使う。
 開始の予約はreviewer起動前に保存し、そのreviewの上限を超える未承認の起動を拒否する。
 既存のBash parserやread-only guardへshell構文を追加しない。
+Claudeの登録reviewerを使うworktreeでは、既存のIssue記録を
+`session select --work <Issue番号> --base <base> --scope <scope>`で選ぶ
+（baseとscopeの指定は省略可）。hookは呼び出し時に選択だけを読むため、
+起動済みセッションでも適用される。
 
 **記録はgit-common-dirに置き、同じrepositoryのworktree間で共有する。**branch名やdiff hashを
 作業IDにしない。通常は各巡の結果と承認を実行記録へ保存し、Pull Request本文へ要約する。
+選択はworktree専用のgit-dirへ保存し、巡数や承認は持たない。
 Issue／Pull Requestのcommentへ各巡や承認を重複投稿しない。別clone・別端末へ渡すと決めた時点で、
 元cloneの最後の操作後に`session status`のJSON全体を既存Issue／Pull Requestへ保存し、
 次の担当がそれを復元する。同時に複数cloneで同じ作業を進めず、担当を引き継ぐ。

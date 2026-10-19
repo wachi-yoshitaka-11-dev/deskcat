@@ -25,13 +25,16 @@ def main():
         if agent not in ("fresh-context-reviewer", "consistency-inspector"):
             return 0
         root = os.environ.get("CLAUDE_PROJECT_DIR") or payload.get("cwd")
-        work = os.environ.get("DESKCAT_REVIEW_WORK", "")
-        if not root or not work:
-            raise review_session.Stopped("set DESKCAT_REVIEW_WORK to the Issue number and initialize/restore its record before review")
-        entry = review_session.begin(
-            root, work, os.environ.get("DESKCAT_REVIEW_BASE", "origin/develop"),
-            os.environ.get("DESKCAT_REVIEW_SCOPE", "Issue scope"),
-        )
+        if not root:
+            raise review_session.Stopped("CLAUDE_PROJECT_DIR or hook cwd is required to locate the review worktree")
+        choice = review_session.selected(root)
+        work, base, scope = choice["work"], choice["base"], choice["scope"]
+        try:
+            entry = review_session.begin(root, work, base, scope)
+        except FileNotFoundError as exc:
+            raise review_session.Stopped(
+                f"Issue #{work} has no review record; run session init or restore its saved record before review"
+            ) from exc
         print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse",
             "additionalContext": f"Review round {entry['review_round']} of review {entry['review']} reserved for Issue #{work} (Issue total {entry['number']}). Parent must record the result with review_gate.py session finish; do not reset the count."}}))
         return 0
