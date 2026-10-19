@@ -53,6 +53,7 @@
 //! | `face-21` | LCDの初期化とbacklightの点灯を保ち、`set_expression`の3表情を描く。Pi commandを受けなくても、描ける状態になった時点で`neutral`を1回描く（#21、`crate::face`） | `bringup-display-13`とも組み合わせられる。**表情を持たない試験buildは`set_expression`を`hardware_unavailable`で拒否する** |
 //! | `tap-21` | ADXL345のtap検出を設定し、`INT_SOURCE`をI2Cで読み、bootのACK後に`tapped`を送る（#21のF1、`crate::tap`）。ADXL345のDevice IDが`0xE5`のときだけ設定を書き、I2Cのdriverを持ち続ける（一致しなければ何も書かず、driverを手放す） | INT線は使わない（配線は要らない）。`face-21`・`bringup-display-13`とも組み合わせられる。**tapを持たない試験buildはADXL345へ書き込まず、Device IDを読むだけである** |
 //! | `bench-servo-test-17` | servoの単発bench試験（#17の測定用build） | **Pi linkを外す。**正本`docs/hardware/servo-safety-limits.md`の`測定のための駆動（承認の状態の項目6）`節が、測定用のbuildは「Piとの通信linkを持たない」と定めているためである |
+//! | `bench-servo-90-17` | 上の単発bench試験で、指令角だけを規約上の90度にする | `bench-servo-test-17`を含む。90度が機械的中央かどうかは未確認（`HW-TBD-010`） |
 //!
 //! `#487`のPR B1より前は、`pi-protocol-mode` featureを付けたbuildだけがPi linkを持ち、LCD／I2Cの
 //! bring-upと排他だった。`#487`でfeatureをやめ、Pi linkを製品buildへ入れた。
@@ -1295,9 +1296,10 @@ fn run_i2c_bringup(
 /// `servo_bench_test_waiting_for_confirmation`／`servo_bench_test_arm_delay_start`等のlogで状況を判断する
 /// （検討経緯・前提の検証状況はPR本文参照）。
 ///
-/// 中央（`config::SERVO_ANGLE_CONVENTION_NEUTRAL_DEG`）から
-/// `config::SERVO_FIRST_MOTION_MAX_DEVIATION_DEG`だけ偏った角度へ1回動かし、
-/// `config::SERVO_BENCH_TEST_EXPOSURE_MS`を挟んでdutyを0へ戻す。
+/// 既存の`bench-servo-test-17`単独では、規約上の中央から
+/// `config::SERVO_FIRST_MOTION_MAX_DEVIATION_DEG`だけ+側の角度を1回指令する。
+/// `bench-servo-90-17`では指令角だけを規約上の中央にする。
+/// どちらも`config::SERVO_BENCH_TEST_EXPOSURE_MS`を挟んでdutyを0へ戻す。
 #[cfg(feature = "bench-servo-test-17")]
 fn run_servo_bench_test(
     timer0: esp_idf_svc::hal::ledc::TIMER0<'static>,
@@ -1369,8 +1371,11 @@ fn run_servo_bench_test(
         }
     };
 
+    #[cfg(not(feature = "bench-servo-90-17"))]
     let target_deg =
         config::SERVO_ANGLE_CONVENTION_NEUTRAL_DEG + config::SERVO_FIRST_MOTION_MAX_DEVIATION_DEG;
+    #[cfg(feature = "bench-servo-90-17")]
+    let target_deg = config::SERVO_ANGLE_CONVENTION_NEUTRAL_DEG;
     match servo.move_to_angle_once(target_deg) {
         Ok(()) => log::info!("servo_bench_test_move target_deg={target_deg}"),
         Err(err) => log::error!("servo_bench_test_move_failed error={err}"),
