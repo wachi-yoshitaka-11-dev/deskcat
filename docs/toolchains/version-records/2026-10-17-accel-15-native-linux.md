@@ -44,6 +44,7 @@ Commands run / Actual result:
   firmware の unit test は実行していない。
   上の結果は、前の会話での実行を #15 の comment 6233673175 に残した記録による。
   **0b5ca5a の上へ載せ替えた後（2026-10-20）に再実行した：**host の cargo test -p deskcat-accel（9件）、cargo fmt --all --check、cargo clippy -p deskcat-accel --all-targets -D warnings、firmware の cargo clippy --offline --all-targets --locked -D warnings（accel-sample-15、既定、tap-21,face-21,bringup-display-13）と cargo build --offline --locked --features accel-sample-15（いずれも成功。build 時だけ [workspace] を足して戻した）。
+  **CodeRabbit の指摘（mg の換算）を直した後（2026-10-20）：**host の cargo test -p deskcat-accel（10件）、fmt、clippy（-D warnings）、firmware の clippy 3 構成と cargo build --features accel-sample-15 を再実行し、いずれも成功した（build 時だけ [workspace] を足して戻した）。
   **自己レビュー1巡目の指摘を直した後の差分で、次を再実行した（同じ端末・同じ tree）：**
   Host: cargo fmt --all -- --check、cargo clippy --locked -p deskcat-accel --all-targets、
     cargo test --locked -p deskcat-accel（9件）: 成功。validate_doc_links.py BROKEN=0、validate_table_columns.py MISMATCHES=0。
@@ -55,7 +56,7 @@ Commands run / Actual result:
 
 Generated artifact identity:
   accel-sample-15 build の deskcat-esp32 ELF sha256
-  fa391f90c54e33c1be6afc84eef744fc4b1dcaa6251342d4b80cb15ddae0e4cc（overrun の確認を FIFO 読み出しの前へ移し、連続失敗の数え方を直した後の版。50eb97f の上の build と、0b5ca5a の上へ載せ替えて EXP 番号の記述を直した後の build で、同じ値だった）
+  d222579b09bddeaa7413162c1f19ea293e94c40d6cb48d4bb4d3807f350e99aa（overrun の確認を FIFO 読み出しの前へ移し、連続失敗の数え方を直し、mean_mg_typ の換算を mLSB から 1 回の丸めにした後の版。PR #622 の CodeRabbit の指摘への対応後の build。直前の fa391f90c54e33c1be6afc84eef744fc4b1dcaa6251342d4b80cb15ddae0e4cc は、mg の換算を直す前の版）
   git 管理外の target 配下。**実機へ書き込んでいない。**
   実機へ書き込んだのは、移す前の版（sha256 e287da22f5a7bf15e7a4aa7e4564fdf78fab098b9670729ca8e046eb9d87b0ba）で、
   その観察は EXP-033 にある（この記録の対象外）。

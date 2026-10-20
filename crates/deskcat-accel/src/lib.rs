@@ -130,6 +130,13 @@ pub const fn lsb_to_mg(lsb: i32) -> i32 {
     lsb * 1000 / TYPICAL_LSB_PER_G
 }
 
+/// mLSB（LSBの1/1000）を、典型のsensitivity（256 LSB/g）でmgへ換算する（0へ向けて切り捨て。丸めは1回）。
+/// `mg = LSB × 1000 / 256 = mLSB / 256`。窓の平均（mLSB）のsub-LSBの部分を、換算の前に捨てない。
+#[must_use]
+pub const fn mlsb_to_mg(mlsb: i64) -> i64 {
+    mlsb / TYPICAL_LSB_PER_G as i64
+}
+
 /// 窓の集計の結果（1軸）。平均と標準偏差はmLSB（LSBの1/1000）、最小と最大はLSB。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AxisSummary {
@@ -302,6 +309,16 @@ mod tests {
         assert_eq!(lsb_to_mg(256), 1000);
         assert_eq!(lsb_to_mg(-256), -1000);
         assert_eq!(lsb_to_mg(0), 0);
+    }
+
+    #[test]
+    fn mlsb_to_mg_keeps_sub_lsb() {
+        // 255.9 LSB は 999 mg（LSBへ丸めてから換算すると 996 mg になる）。
+        assert_eq!(mlsb_to_mg(255_900), 999);
+        assert_eq!(lsb_to_mg(255), 996);
+        assert_eq!(mlsb_to_mg(256_000), 1000);
+        assert_eq!(mlsb_to_mg(-255_900), -999);
+        assert_eq!(mlsb_to_mg(0), 0);
     }
 
     #[test]

@@ -12,7 +12,7 @@
 //! 生値（LSB）。`accel_window` は [`WINDOW_SAMPLES`] 件ごとの平均・標準偏差（mLSB は LSB の 1/1000）と
 //! 最小・最大（LSB）。[`WINDOWS`] 窓で終わる。**この file の現在の手順は、実機で動かした記録が無い。**
 //! 2026-10-17 に実機へ書き込んだ版（`docs/hardware/experiment-log.md` の `EXP-033`）は、`INT_SOURCE` の Overrun を
-//! FIFO の読み出しの**後**に読み、連続失敗の数え方も今と違う。
+//! FIFO の読み出しの**後**に読み、連続失敗の数え方も今と違う。`mean_mg_typ` も、平均を LSB へ切り捨ててから換算していた（今は mLSB から 1 回の丸めで換算する）。
 //!
 //! # 確かめていないこと
 //!
@@ -23,7 +23,7 @@
 //! - 窓の長さと窓数は、noise を見るための暫定の一般値。
 
 use deskcat_accel::{
-    decode_sample, fifo_entries, is_overrun, lsb_to_mg, mean_magnitude_mlsb, SampleFault, Stats,
+    decode_sample, fifo_entries, is_overrun, mean_magnitude_mlsb, mlsb_to_mg, SampleFault, Stats,
 };
 use esp_idf_svc::hal::i2c::I2cDriver;
 use esp_idf_svc::sys::{EspError, ESP_ERR_TIMEOUT};
@@ -200,9 +200,9 @@ impl AccelSampler {
             x.stddev_mlsb, y.stddev_mlsb, z.stddev_mlsb,
             x.min, y.min, z.min,
             x.max, y.max, z.max,
-            lsb_to_mg(i32::try_from(x.mean_mlsb / 1000).unwrap_or(0)),
-            lsb_to_mg(i32::try_from(y.mean_mlsb / 1000).unwrap_or(0)),
-            lsb_to_mg(i32::try_from(z.mean_mlsb / 1000).unwrap_or(0)),
+            mlsb_to_mg(x.mean_mlsb),
+            mlsb_to_mg(y.mean_mlsb),
+            mlsb_to_mg(z.mean_mlsb),
             self.counters.polls,
             self.counters.overrun_polls,
             self.counters.out_of_range

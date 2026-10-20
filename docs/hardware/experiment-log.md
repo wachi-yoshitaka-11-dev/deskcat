@@ -44,7 +44,7 @@
 | [EXP-030](#exp-030-sg90の測定用buildgo17入りでサーボを接続しない状態と接続した状態のpwmac投入と動作時の5-vと33-vの変化をarduinoで記録した) | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)の受け入れ条件2・5・6（段1・段1b・段2と再駆動2回） | 値の正なし（観察の記録。条件5の値は`HW-TBD-034`が未解決のため合否を導かない） |
 | [EXP-031](#exp-031-bme280env-01の試験buildenv-sample-16でraw値と変換値を観測しswitchbotの表示と並べた) | [#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16)の実機確認。BME280（`ENV-01`）のraw値と変換値の観測、`MEAS-04`（SwitchBot）の表示との並置 | 値の正なし（観測の記録。確度・気圧・timeout・disconnect・CRC・not-readyは取れていない） |
 | [EXP-032](#exp-032-piのserial_linkで実portgpio-uartを開きlink-probeによる切断の判定と再接続の上限11とplay_motionの拒否の4経路12を観察した) | [#11](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11)の実port（GPIO UARTの`/dev/serial0`、115200）でのlink probeによる切断の判定と再接続の上限の観察と、[#12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)の`play_motion`の拒否4経路の確認 | 値の正なし（観察の記録。受け入れ条件を満たしたとは書かない。「1回の喪失判定と回復」だけの観察、実motionの非二重実行は取れていない） |
-| [EXP-033](#exp-033-accel-01adxl345の静止sampleaccel-sample-15の初回通電) | [#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)の静止sample（`accel-sample-15`、ESP32の`3V3` pin給電、LCDは切り離し） | 値の正なし（観察の記録。offset、個体の感度、noiseの下限は確かめていない。**#15の受け入れ条件は「静止姿勢のsampleを保存した」の一部以外、満たしていない**） |
+| [EXP-033](#exp-033-accel-01adxl345の静止sampleaccel-sample-15の初回通電) | [#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)の静止sample（`accel-sample-15`、ESP32の`3V3` pin給電、LCDは切り離し） | 値の正なし（観察の記録。offset、個体の感度、noiseの下限は確かめていない） |
 
 **大容量の生dataはこのrepositoryへ入れていない。**保存場所は
 [development-foundation-plan.md](../planning/development-foundation-plan.md)の
