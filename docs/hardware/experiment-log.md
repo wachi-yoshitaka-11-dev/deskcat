@@ -45,7 +45,7 @@
 | [EXP-031](#exp-031-bme280env-01の試験buildenv-sample-16でraw値と変換値を観測しswitchbotの表示と並べた) | [#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16)の実機確認。BME280（`ENV-01`）のraw値と変換値の観測、`MEAS-04`（SwitchBot）の表示との並置 | 値の正なし（観測の記録。確度・気圧・timeout・disconnect・CRC・not-readyは取れていない） |
 | [EXP-032](#exp-032-piのserial_linkで実portgpio-uartを開きlink-probeによる切断の判定と再接続の上限11とplay_motionの拒否の4経路12を観察した) | [#11](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11)の実port（GPIO UARTの`/dev/serial0`、115200）でのlink probeによる切断の判定と再接続の上限の観察と、[#12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)の`play_motion`の拒否4経路の確認 | 値の正なし（観察の記録。受け入れ条件を満たしたとは書かない。「1回の喪失判定と回復」だけの観察、実motionの非二重実行は取れていない） |
 | [EXP-033](#exp-033-accel-01adxl345の静止sampleaccel-sample-15の初回通電) | [#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)の静止sample（`accel-sample-15`、ESP32の`3V3` pin給電、LCDは切り離し） | 値の正なし（観察の記録。offset、個体の感度、noiseの下限は確かめていない） |
-| [EXP-034](#exp-034-sg90の90度指令でshuntを戻りに入れac投入時と動作時のarduinoの読みとreset回数を記録した) | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)の90度指令の測定窓。shunt（`MEAS-01`）をサーボのGNDの戻りに入れたArduinoの読み（AC投入時と動作時）と、ESP32のreset回数 | 値の正なし（観測の記録。電流への換算の確度は主張しない。`HW-TBD-034`は未解決） |
+| [EXP-034](#exp-034-sg90の90度指令でshuntを戻りに入れた配線ユーザーの申告導通は未確認でac投入時と動作時のarduinoの読みとreset回数を記録した) | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)の90度指令の測定窓。shunt（`MEAS-01`）をサーボのGNDの戻りに入れた配線（ユーザーの申告。導通は未確認）でのArduinoの読み（AC投入時と動作時。記録Bは欠番1件を含む。位置は動作の約28秒前）と、ESP32のreset回数 | 値の正なし（観測の記録。電流への換算の確度は主張しない。`HW-TBD-034`は未解決） |
 
 **大容量の生dataはこのrepositoryへ入れていない。**保存場所は
 [development-foundation-plan.md](../planning/development-foundation-plan.md)の
@@ -3261,7 +3261,7 @@ log出力の失敗: 0 件
 - 条件(2)を緩めるかどうかは、`power-budget.md`の別の変更として、人間のreviewを通す（この記録を含むPull Requestは`power-budget.md`を変えていない。`firmware/esp32/README.md`の`accel-sample-15`行も、可否を変えないと書いている）。
 - Rev. G（手元の取得済みの版）で、`FIFO_CTL`・`FIFO_STATUS`・`DATAX0`のaddressと`INT_SOURCE`のOverrun bitを確かめ、[sensor-datasheet-notes.md](sensor-datasheet-notes.md)へ載せる。
 
-## EXP-034: SG90の90度指令で、shuntを戻りに入れ、AC投入時と動作時のArduinoの読みとreset回数を記録した
+## EXP-034: SG90の90度指令で、shuntを戻りに入れた配線（ユーザーの申告。導通は未確認）で、AC投入時と動作時のArduinoの読みとreset回数を記録した
 
 [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)の受け入れ条件4（起動時と小動作時の電流）と6（reset回数）に関わる記録を、人間の立ち会いのもとで1回取った。実行承認は[#17のcomment 6290714653](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6290714653)（回答の原文「はい」）。この窓の設計は、EXP-030の次の窓として、PMへ送った案である。**この記録は事実と未確認だけを書く。**ESP32のログとArduinoの生のCSVは、repositoryの外の証拠用directory（MACを含むため、repositoryとIssueへ入れていない）にある。
 
@@ -3295,8 +3295,8 @@ log出力の失敗: 0 件
 ### 結果
 
 - **記録A（AC投入）：**A0の生ADC値（0〜1023）は、AC投入の前は0.5秒ごとのblockの最大が2以下（記録の開始から約43.9秒まで）。AC投入のとき、約36 ms（21:46:28.900〜28.936）に、100以上の読みが339 sample、最大498（記録の開始から約44.307秒）。その後の待機の間、0.5秒ごとのblockの中央値は0、最大は4〜14。記録の最後の10秒の中央値は0、最大は13。
-- **記録B（動作）：**動作の前の5秒の中央値は0、最大は14。動作の約143 ms（21:52:33.303〜33.446。時刻は復元値）に、20以上の読みが786 sample、100以上が769 sample、300以上が237 sample、最大663（21:52:33.404）。その前後の0.05秒ごとのblockは、最大2〜12。
-- **換算（計算。確度は主張しない）：**1カウントは、1.112 V÷1024で約1.086 mV。0.1 Ωのshuntの両端の電圧をそのまま電流として読むと、1カウントは約10.9 mA。最大498は約0.54 V（約5.4 A）、最大663は約0.72 V（約7.2 A）になる。**この計算値は、`M-12001`の定格出力3 Aを超える。**待機の間の最大14は約15 mV（約0.15 A）。shuntの許容差（±5 %）、ブレッドボードの接点とジャンパー線の抵抗、配線のインダクタンス、ADCの確度（今回の条件では資料に無い）は、いずれも計算に入れていない。
+- **記録B（動作）：**動作の前の5秒の中央値は0、最大は14。動作の約143 ms（21:52:33.303〜33.446。時刻は復元値）に、20以上の読みが786 sample、100以上が769 sample、300以上が237 sample、受信・採用できたsampleの最大663（21:52:33.404）。記録Bのblock欠番1件（128 sample、約13 ms）の位置は、CSVの時刻の復元で21:52:05.600（動作の約28秒前、`GO17`の入力の約17秒前）であり、動作の区間には欠番が無い。その前後の0.05秒ごとのblockは、最大2〜12。
+- **換算（計算。確度は主張しない）：**1カウントは、1.112 V÷1024で約1.086 mV。0.1 Ωのshuntの両端の電圧をそのまま電流として読むと、1カウントは約10.9 mA。最大498（記録A。欠番0）は約0.54 V（約5.4 A）、受信・採用できたsampleの最大663（記録B）は約0.72 V（約7.2 A）になる。**この計算値は、`M-12001`の定格出力3 Aを超える。**待機の間の最大14は約15 mV（約0.15 A）。shuntの許容差（±5 %）、ブレッドボードの接点とジャンパー線の抵抗、配線のインダクタンス、ADCの確度（今回の条件では資料に無い）は、いずれも計算に入れていない。
 - **記録の健全性：**記録A：block欠番0、ISRが捨てたsample 0、予約bit破れ0。記録B：block欠番1（128 sample）、ISRが捨てたsample 0、予約bit破れ1、再同期で捨てたbyte 460。実効rateは約9616 Sample/s。
 - **ESP32のreset：**コンソールのログ（21:45:31〜21:55:13）の`rst:`の行は、21:45:31の意図した起動だけ。コンソールを閉じた後の、latch確認と通常buildの書き込みのresetは別（意図したreset）。`panic`・`task_wdt`・`brownout`・`Guru`の行は0。
 - **サーボ：**AC投入のとき、ユーザーは「動いた」と申告した（向きと角度の申告は無い）。`GO17`の後の動作のとき、ユーザーは「動いた。左に30度くらい。確証はない」と答えた（見づらかったとのこと。見る向きの申告は無い。最初の答えは「15度くらい」で、直後に「30度くらいかも」へ改めた）。動く前の軸の位置は不明（AC投入のとき動いた）。
@@ -3314,7 +3314,7 @@ log出力の失敗: 0 件
 
 ### この記録が主張しないこと
 
-- 最大498・最大663が、サーボの電流であること。計算値が電源の定格を超えており、shunt以外の電圧（接触抵抗、配線のインダクタンス、ADCの誤差など）が入っている可能性を、今回は切り分けていない。
+- 最大498・受信・採用できたsampleの最大663が、サーボの電流であること。記録Bの最大663が、約104 µs刻みの間を含む過渡全体のピークであること（刻みより短い変化は見えない）。計算値が電源の定格を超えており、shunt以外の電圧（接触抵抗、配線のインダクタンス、ADCの誤差など）が入っている可能性を、今回は切り分けていない。
 - サーボの起動時・動作時の電流の値。受け入れ条件4を満たしたかどうかの判定は、この記録に書かない。
 - サーボが動いた向き、角度、量。ユーザーは「左に30度くらい。確証はない」と答えた。動く前の位置は不明。
 - shuntの値（0.1 Ω）。現物は測っていない。
@@ -3325,7 +3325,7 @@ log出力の失敗: 0 件
 
 ### Conclusion
 
-90度指令の測定用build（`9cb25b44…3265`）で、shuntをサーボのGNDの戻りに入れ、AC投入時と動作時のArduinoの読みを記録した。AC投入で最大498、動作で最大663のカウントが出た。計算値は`M-12001`の定格出力を超えており、電流の値としては読めない。ESP32の`rst:`は意図した1回の起動だけだった。
+90度指令の測定用build（`9cb25b44…3265`）で、shuntをサーボのGNDの戻りに入れた配線（ユーザーの申告。導通は未確認）で、AC投入時と動作時のArduinoの読みを記録した。AC投入（記録A。欠番0）で最大498、動作（記録B。欠番1件は動作の約28秒前）で受信・採用できたsampleの最大663のカウントが出た。約104 µs刻みの間は見えない。計算値は`M-12001`の定格出力を超えており、電流の値としては読めない。ESP32の`rst:`は意図した1回の起動だけだった。
 
 ### Next safe step
 
@@ -3377,4 +3377,4 @@ log出力の失敗: 0 件
 | 2026-10-19 | 37 | [#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16)。**`EXP-031`を追加した。**BME280（`ENV-01`）の試験build（develop `01a9d8c`の`env-sample-16`）でraw値と変換値を3回の起動で観測し、`MEAS-04`の表示と並べた記録。確度は言えず、気圧のreference、timeout・disconnect・CRC・not-readyの分類は取れていない | [#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16) |
 | 2026-10-20 | 38 | [#11](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11)・[#12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)。**`EXP-032`を追加した。**Piの`serial_link`（develop `01a9d8c`）で実port（`/dev/serial0`、115200）を開き、信号線を外した間のlink probeによる`disconnects`の増加（11回）と再接続の待機（`100ms`〜`1.6s`）、`Stopped(ReconnectExhausted)`、ACKの相関で待機が`100ms`から戻ったこと、`play_motion`の拒否4経路（ESP32のlogと突き合わせ）を観察した。**受け入れ条件を満たしたとは書いていない。**「1回の喪失判定と回復」だけの観察は取れていない。log取得のためRTSの`reset`を1回使ったことを記録した | #11 comment 6272131988、#12 comment 6272140365 |
 | 2026-10-20 | 39 | [#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)。**`EXP-033`を追加した。**`accel-sample-15`（ADXL345を±2 g・100 Hz・FIFO Streamで連続測定する試験build）の初回通電。Device ID `0xe5`、6窓×500件でfault・overrun 0件、各軸の標本標準偏差は約0.8 LSB、3軸の平均ベクトルの大きさは約259.8 LSB。基板は水平ではなく姿勢を記録していないため、offsetは出せていない。`power-budget.md`の単体bring-upの手順の条件(2)を満たさないまま、ユーザーが1件の試験として承認した。無給電の確認はユーザーが不要とし、未実施。Rev. Gの手元の版は開いておらず、Rev. Eで示した | ユーザーの承認と現物作業、#15のセッションによる書き込みとlogの取得（いずれも2026-10-17） |
-| 2026-10-20 | 40 | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。**`EXP-034`を追加した。**90度指令の測定用build（develop `41fc159`の`bench-servo-90-17`）で、shuntをサーボのGNDの戻りに入れ、AC投入時と動作時のArduinoの読みと、ESP32のreset回数を記録した。計算値が`M-12001`の定格出力を超え、電流の値としては読めない。判定は書いていない | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17) |
+| 2026-10-20 | 40 | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。**`EXP-034`を追加した。**90度指令の測定用build（develop `41fc159`の`bench-servo-90-17`）で、shuntをサーボのGNDの戻りに入れた配線（ユーザーの申告。導通は未確認）で、AC投入時と動作時のArduinoの読みと、ESP32のreset回数を記録した。記録Bは欠番1件を含む（位置は動作の約28秒前）。計算値が`M-12001`の定格出力を超え、電流の値としては読めない。判定は書いていない | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17) |
