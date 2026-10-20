@@ -127,6 +127,7 @@ jobs:
             face-21,bringup-display-13 \
             tap-21 \
             tap-21,face-21,bringup-display-13 \
+            mem-probe-23,face-21,tap-21 \
             accel-sample-15 \
             bench-servo-test-17 \
             bench-servo-90-17; do
