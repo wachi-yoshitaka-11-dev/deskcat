@@ -43,6 +43,7 @@
 | [EXP-029](#exp-029-piのserial_linkで実portgpio-uartdevserial0を開き行の往復とprotocolの往復と信号線を外したときの観察を行った) | [#11](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11)の実port（GPIO UARTの`/dev/serial0`、115200）での`serial_link`の実行（600秒）と、信号線を抜いた観察（少なくとも1分55秒）。存在しないpathのopen失敗をPi上で別に見た（実portの切断ではない） | 値の正なし（観察の記録。`boot`→ACK→`get_status`→`status`と`ping` 3件のACKを実portで観察した。切断は観測されず、**#11の受け入れ条件3・4は実portで得られていない**。非通電の確認の項目2〜4と条件6の数値は申告だけ） |
 | [EXP-030](#exp-030-sg90の測定用buildgo17入りでサーボを接続しない状態と接続した状態のpwmac投入と動作時の5-vと33-vの変化をarduinoで記録した) | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)の受け入れ条件2・5・6（段1・段1b・段2と再駆動2回） | 値の正なし（観察の記録。条件5の値は`HW-TBD-034`が未解決のため合否を導かない） |
 | [EXP-031](#exp-031-bme280env-01の試験buildenv-sample-16でraw値と変換値を観測しswitchbotの表示と並べた) | [#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16)の実機確認。BME280（`ENV-01`）のraw値と変換値の観測、`MEAS-04`（SwitchBot）の表示との並置 | 値の正なし（観測の記録。確度・気圧・timeout・disconnect・CRC・not-readyは取れていない） |
+| [EXP-032](#exp-032-piのserial_linkで実portgpio-uartを開きlink-probeによる切断の判定と再接続の上限11とplay_motionの拒否の4経路12を観察した) | [#11](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11)の実port（GPIO UARTの`/dev/serial0`、115200）でのlink probeによる切断の判定と再接続の上限の観察と、[#12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)の`play_motion`の拒否4経路の確認 | 値の正なし（観察の記録。受け入れ条件を満たしたとは書かない。「1回の喪失判定と回復」だけの観察、実motionの非二重実行は取れていない） |
 
 **大容量の生dataはこのrepositoryへ入れていない。**保存場所は
 [development-foundation-plan.md](../planning/development-foundation-plan.md)の
@@ -3089,6 +3090,101 @@ log出力の失敗: 0 件
 - NVSのlatchが残るか。この`env-sample-16`はlatchを読まない
 - 製品buildの動作、`J3`のはんだ付けの電気的な導通
 
+## EXP-032: Piの`serial_link`で実port（GPIO UART）を開き、link probeによる切断の判定と再接続の上限（#11）と、`play_motion`の拒否の4経路（#12）を観察した
+
+[#11](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11)と[#12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)の、2回目の実port（PiのGPIO UARTの`/dev/serial0`、115200）の試験。`EXP-029`では信号線を外しても`disconnects=0`だった。その後、PR #612（develop `48974ef`）が周期1秒のlink probe（連続2件のACK無しで喪失と判定）を足し、PR #613（develop `01a9d8c`）が`--motion-expire-after-ms`を足した。同じ窓で、(1) 信号線を外して戻し、もう一度外したままにした観察（実行B）と、(2) `play_motion`の拒否の4経路の確認（実行A）を行った。**この記録は観察だけを書く。#11・#12の受け入れ条件を満たしたとは書かない（判断はPMがmergeの後に行う）。**時刻はUTCで、Date欄だけJSTも併記する。network識別子は書かない。
+
+| 項目 | 内容 |
+|---|---|
+| Test ID | `EXP-032` |
+| Date | 2026-10-20 JST（UTC 2026-10-19 16:20〜16:31）。書き込み 16:20:12Z〜16:21:49Z、ESP32のlog取得の開始 16:22:11Z、実行A 16:24:48Z〜16:25:01Z、実行B 16:25:29Z〜16:28:22Z、log取得の終了 16:30:52Z |
+| Operator | 配線の抜き差し（GND線・信号線のESP32側の端）、ESP32のUSBの抜き挿し、テスターの操作と目視、は**ユーザー**。書き込み、PCでのlog取得、Piでの`serial_link`の実行は**作業セッション（AI）**。 |
+| Hardware revision／Exact components | `SBC-01`（Raspberry Pi Zero W）、`MCU-01`（ESP32-DevKitC V4）、`ACCEL-01`、`ENV-01`、`MEAS-03`（`DT830B`）。`DISP-01`は切り離したまま。Piのadapterは`PSU-PI-A-02`。 |
+| Wiring revision | 出所は`EXP-031`の返却の報告（[#16のcomment 6266876276](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16#issuecomment-6266876276)）。**作業セッションは現物を見ていない。**外れていた線：Arduinoの線3本、`i25`のジャンパー線（GPIO27からサーボの黄の穴）、端子台S「−」へ行くESP32のGNDの線。付けたままの線：緑・青のジャンパー線、分圧の10 kΩ 2本（ESP32のGNDとサーボ側「＋」が20 kΩでつながる。サーボの電源は無い）、サーボのplug。Piとの線：Pi側の青（10番）・紫（8番）・灰（39番）は挿したまま。ESP32側の黄（GPIO13）・橙（GPIO14）は、窓の始めは抜けており、ESP32の起動の後に挿した。灰（GND）は、導通の確認の後、ESP32のUSBを挿す前に挿していた（ユーザーの申告）。色は配線図（`hardware/breadboard/layout.svg`）と`EXP-022`の記録による。 |
+| Power supply and current limit | ESP32はPCのUSB。Piは`PSU-PI-A-02`（`EXP-029`と同じ構成のはずだが、今回は確認していない）。サーボのAC（`M-12001`）は窓の間ずっと抜けていた（ユーザーの申告）。電流制限は設けていない。 |
+| Firmware commit/profile | ESP32：develop `19634f3`、`bringup-i2c-15-16`（debug）。ELF sha256 `1b3e21fbd49ebd9e166223f71b52b2b18591c1fd50829ccb6a521deaed722a39`。書き込みは`espflash` 4.5.0（`--no-stub --chip esp32 --after no-reset`）、exit 0。**読み戻しの照合はしていない。**Pi：`serial_link`はdevelop `01a9d8c96246fb71fdc3fce2e8e52fc27f611742`の`apps/`・`crates/`・`Cargo.toml`・`Cargo.lock`をPiの新しいdirへ展開し、`cargo build --locked --example serial_link -p deskcat-serial`（debug。14:15:54Z〜14:31:19Z、exit 0）。sha256 `b521b23602c923e2b640a557e2b18bdd6463e987340b0e91ae98425863972b0c`。 |
+| Configuration | 承認：[#11のcomment 6267083691](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11#issuecomment-6267083691)（通電の前に保存した）。実行A：`--port /dev/serial0 --baud 115200 --duplicate-capacity 8 --duplicate-retention-ms 30000 --motion-expire-after-ms 12000 --seconds 90`。実行B：`--duplicate-capacity 8 --duplicate-retention-ms 5000 --seconds 180`（`--ping-count`なし）。**`--duplicate-*`の値と`--seconds`には根拠が無い。baud 115200は`Candidate`（`PROTO-TBD-001`）。**実行の前に`deskcatd`は`inactive`で、`serial_link`のprocessは無かった。**Pi側のUART設定（信号線をつなぐ前に確かめる項目。`gpio-assignment.md`の`Pi側の設定`）は、窓の前と窓の間の読みがこの記録に無い（窓では未確認）。**窓の後（2026-10-20 11:26Z。窓の約19時間後）に、作業セッションがsshで読んだだけである（設定は変えていない）：`/dev/serial0`→`ttyAMA0`、`/boot/firmware/config.txt`に`dtoverlay=disable-bt`と`enable_uart=1`、`/proc/cmdline`の`console=`は`tty1`のみ（`serial0`・`ttyAMA0`無し）、`serial-getty@ttyAMA0`は`inactive`かつ`disabled`、`deskcatd`は`inactive`、`serial_link`のprocessは無い。**`EXP-029`の同じ項目（2026-10-17）が窓でも有効だったかは、次の事実から見込みとして言えるだけである（窓で読んだ値ではない）。**Piの起動は2026-10-16 22:11 JSTの1回で（`journalctl --list-boots`は現在のbootだけ、`uptime`は約3.9日）、`EXP-029`の読みと窓はどちらもこのbootの中にある。`config.txt`と`cmdline.txt`の更新時刻は2026-10-03 22:10 JSTで、このbootより前である。**ただしこれは、窓の間のgettyの稼働状態と`/dev/serial0`の指す先を読んだものではない。**この窓の実行は`/dev/serial0`を開いて行・protocolの往復を得ており（下の結果）、設定が壊れていなかったことと矛盾しないが、設定の読みの代わりにしない。 |
+| Measurement equipment | `DT830B`（GND線の導通）、`serial_link`の出力（Pi上）、ESP32のUART0のlog（PCで取得） |
+| Procedure | 下の「手順」 |
+| Expected result | 予測は[#11のcomment 6266441205](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11#issuecomment-6266441205)（コードの読み）。**実行Bの外す時間は予定より長かった**（下の「Faults」） |
+| Measured result | 下記 |
+| Faults | 下記 |
+| Conclusion | 下記 |
+| Next safe step | 下記 |
+
+### 手順
+
+1. ユーザーが、サーボのACプラグとESP32のUSBが抜けていると申告した。PCにESP32のUSBが見えず、Piで`deskcatd`が`inactive`であることを、作業セッションが確かめた。
+2. GND線の導通（`DT830B`、2000 Ωレンジ、Piの6番とESP32の「23」の隣のGNDの間。ユーザーの申告による読み）：GND線のESP32側の端が挿さった状態で`004`、抜いた状態で`1`。**挿し直した後の測定は、ユーザーの判断で省いた**（「同じ結果になるはず」）。プローブ同士の短絡・開放の自己確認の表示は、申告を受けていない。
+3. GND線を挿した状態でESP32のUSBを挿し、書き込んだ（16:21:49Zに完了、`Staying in bootloader`）。
+4. 16:22:11Zに、PCのlog取得scriptがRTSで`reset`を約0.2秒かけて解除した（firmwareの起動のため。信号線のESP32側は抜いた状態）。以降、script（`pyserial`）が16:30:52ZにSIGINTで止まるまでUART0のlogを取った。**この`reset`は、承認の文面の「ESP32 の reset を最大1回（新しい Pi `sid` の `hello` を受けないときだけ。信号線は挿したまま）」が想定した場面ではない。**窓の中でのresetは無い。scriptは終了時にRTS・DTRを解除してlogに残した。
+5. ユーザーが黄をGPIO13、橙をGPIO14に挿した（異常の申告なし）。
+6. 16:24:48Zに実行A（Piで`serial_link`）。12.55秒で終了、exit 0。
+7. 16:25:29Zに実行B。開始の連絡の後、ユーザーに、1秒ずつ20まで数えてから黄と橙の両方を外し、10まで数えて挿し直し、20まで数えてもう一度外し、私が「停止しました」と書くまで外したままにする、と依頼した（依頼文の要約。原文ではない）。実行Bは16:28:22Zに`Stopped(ReconnectExhausted)`で終わった。ユーザーが線を外した・挿した時刻の申告は取っていない（時刻はESP32のlogのACKの送出の間隔から読んだ）。『停止しました』の連絡は、その後だった。
+8. 信号線3本（黄・橙・灰）のESP32側の端を抜き、ESP32のUSBを抜いた（ユーザーの申告）。
+
+### 結果
+
+**実行A（#12）。**ESP32のUART0のlogと、同じ`(sid, id)`で突き合わせた（出力のsha256 `e1a34e0b22449f04d025098d682c259449724d7aa4b396846fa178111f03e930`）。
+
+| 段 | Piの出力（`play_motion診断: ACK`） | ESP32のlog（`pi_rx_play_motion_rejected`） |
+|---|---|---|
+| 初回（旧Pi sid、`id=4`） | `Rejected`・`InvalidPayload` | `code=invalid_payload replayed=false` |
+| 同じ`(sid, id)`の再送 | `Rejected`・`InvalidPayload` | `code=invalid_payload replayed=true` |
+| 12秒後の再送（firmwareの暫定保持10秒を越えた） | `Rejected`・`DuplicateExpired` | `code=duplicate_expired replayed=false` |
+| 新Pi sidの`hello`（`Startup`）とESP32の`boot`の再送 | `hello`のACKは`Ok`、`boot`は`Replayed` | `pi_rx_hello … outcome=Established`、`boot_resumed accepted=Transition` |
+| 新sidの後に旧sidの`id=4` | `Rejected`・`StaleSession` | `code=stale_session replayed=false` |
+
+終了時：`motion: first_rejected=1 replay_rejected=1 duplicate_expired=1 stale_session=1 complete=true`、`counters: disconnects=0 reconnect_attempts=0 timeouts=0 rejected_in=0`、`peer: session_switches=1 duplicate_replays=1`。
+
+**実行B（#11）。**出力のsha256（Pi上）`01f6dbb560341c25b6ebed8cec9f7e8623c5b6aa20f90fdc0a16d8e599a78d74`。
+
+- 行の層（行が通った）：外すまで、ESP32のACKがおよそ1秒ごとに`ackを相関した: request=Ping`として届いた。`rejected_in=0`。
+- protocolの層（成立した範囲）：`hello`（`Startup`）→ ESP32が`Established`、`boot`を再送 → 以降の`ping`に`ok`のACK。ESP32の`sid`は5のまま、`session_switches=1`。
+- 1回目に外した間：ESP32のlogで`ping`へのACKの送出が16:27:18Zで止まり、次は16:27:34Z（間隔15.56秒）。Piの出力では、`link probeのACKが無い: 1/2`、`2/2`、`serial peer: ACK応答が途絶えた -> Disconnected`の組が5つ（`disconnects`が1〜5）。再接続の待機は`100ms`、`200ms`、`400ms`、`800ms`、`1.6s`。5つ目の待機の後に`未ACKのhelloを再送した`、その`hello`をESP32は16:27:36Zに`Replayed`として受けた。probe（`id=119`）の取り下げ（1/2）の途中でACKが戻り、`reply_to=120`以降の`Ping`のACKを相関した。
+- 2回目に外した間：待機が`100ms`からやり直され（`100ms`、`200ms`、`400ms`、`800ms`、`1.6s`）、組がさらに6つ（`disconnects`が6〜11）出て、`再接続の上限に達した。停止する`、`state: Stopped(ReconnectExhausted)`、exit 1。ESP32の最後のACK（16:28:01Z）から終了ファイルの時刻（16:28:22Z）まで約21秒。
+- 終了時のcounters：`bytes_in=14678 bytes_out=13383 frames_in=130 rejected_in=0`、`disconnects=11 reconnect_attempts=10 timeouts=0 retries=3227`、`dropped_out=0 discarded_on_disconnect=0 encode_failed=0`、`peer: session_switches=1 duplicate_replays=0 stale_sessions=0 duplicate_expired=0`、`invalid_payloads=0 rate_limited=0 unmatched_acks=0 unapproved_hello_acks=1 unknown_types=0`、`log出力の失敗: 0 件`。経過172.96秒。
+- ESP32：panic・brownout・task_wdtは0件。`reset_reason=power_on`のまま。信号線を挿した時点の「異常なし」の申告のほかに、異音・発熱・臭いの申告は無かった。
+
+**コードの読み（実機で理由を確かめていない）。**`session.rs`の`note_peer_unresponsive`が、呼び出し側が相関ACKの不在を確かめた後に`disconnects`を増やし、`note_peer_responsive`が相関ACKで再接続の予算を戻す。待機が`100ms`からやり直されたことは、この読みと合う。理由は確定していない。
+
+### 受け入れ条件ごと
+
+| 条件 | 実portで得られた事実 | 得られていないもの |
+|---|---|---|
+| #11-3 disconnectを観測できる | 信号線を外した間に、`disconnects`が1〜5、6〜11と増えた（`EXP-029`では0）。**得られた事実は、link probeの相関ACKの不在による判定であり、deviceのerrorやEOFによる検出ではない。** | 「1回の喪失判定と回復」だけを切り出した観察（1回目の外しは`disconnects`が5になるまで続いた）。外す時間と`disconnects`の関係の測定 |
+| #11-4 reconnectに上限とrate limitがある | 待機`100ms`〜`1.6s`が、1回目に5回、2回目に5回。2回目の6つ目の喪失の後に`Stopped(ReconnectExhausted)`。ACKの相関の後、待機が`100ms`からやり直された。 | 上限（5）・待機・probeの周期（1秒）・閾値（2件）の根拠（`PROTO-TBD-010`・`012`・`017`は暫定） |
+| #12 `play_motion`の拒否（`invalid_payload`、その再送、`duplicate_expired`、`stale_session`） | 上の表の4段。ESP32のlogと同じ`(sid, id)` | 実際のmotionが二重に実行されないこと（catalogは空でサーボへ渡さない経路）。`PROTO-TBD-005`・`008`・`012`・`013` |
+
+### Faults
+
+- 実行Bで、1回目の外しが予定（数秒）より長く続いた（ESP32のlogで約15.6秒）。原因は確かめていない。
+- 『停止しました』の連絡は、実行Bの終了（16:28:22Z）より遅れた。
+- 測る2点のGNDの穴（Piの6番とESP32の「23」の隣）の指定を、問いの前に書かなかった。ユーザーに聞かれて、配線図と過去の記録から特定した。
+- 条件5（別給電）と、信号線の4.7 kΩの目視は、今回は申告も取っていない。
+- GND線の挿し直し後の測定は省いた（ユーザーの判断）。
+- 書き込み後の起動のため、承認の想定とは別にRTSの`reset`を1回使った（上の手順4）。
+- 信号線をつなぐ前のPi側のUART設定の確認（`dtoverlay`、`enable_uart`、console／getty、`/dev/serial0`の指す先）の読みが、窓の前の記録に無い（行ったかどうかは、この記録からは言えない）。上のConfigurationのとおり、窓の約19時間後に読んだ値と、同じboot・設定file未更新という間接の事実だけがある。
+
+### この記録が主張しないこと
+
+- #11の受け入れ条件3・4、#12の残りの条件を満たしたこと（PMがmergeの後に判断する）。
+- 製品buildでの動作、`deskcatd`での動作。
+- device名の確定、`PROTO-TBD-010`・`012`・`017`・`005`の値の妥当性。probeの周期・閾値、再接続の上限・待機の根拠。
+- 外した時間と判定の関係、1回の喪失判定と回復だけを切り出した観察。
+- ESP32側の振る舞いがprotocolの全体に適合すること。
+- 電流、`3V3` railの電圧、温度。
+
+### Conclusion
+
+実port（GPIO UARTの`/dev/serial0`、115200）で、`serial_link`のlink probeが、信号線を外した間に相関ACKの不在を判定して`disconnects`を増やし、再接続の待機（`100ms`〜`1.6s`）を経て、外したままで`Stopped(ReconnectExhausted)`に至った。ACKが戻ると待機が`100ms`からやり直された。`play_motion`の拒否の4段は、PiとESP32のlogで同じ`(sid, id)`として突き合わせた。
+
+### Next safe step
+
+- #11・#12の条件の扱いと窓の追加は、PMの判断（merge後）。
+- 正本の更新（`crates/deskcat-serial/examples/serial_link.rs`のmodule docの「実portでのlink喪失判定と再接続は未確認である」、`crates/deskcat-serial/README.md`の「実機に残っていること」の切断・reconnectの項）は、この記録を出所にして別の変更で行う。
+- 終わりの状態：ESP32は電源なし（USB抜き）、ESP32側の黄・橙・灰は外れている。Pi側の青・紫・灰は挿したまま。ACプラグは抜けている。`i25`のジャンパー線・端子台S「−」へ行くGNDの線・Arduinoの線は`EXP-031`の返却のまま外れており、緑・青のジャンパー線と分圧の10 kΩは付けたまま。LCDは切り離したまま。Piは電源が入っていて、`deskcatd`は`inactive`（`enabled`）、`throttled=0x0`。
+
 ## Revision履歴
 
 | 日付 | Revision | 変更 | 根拠 |
@@ -3131,3 +3227,4 @@ log出力の失敗: 0 件
 | 2026-10-17 | 35 | [#11](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11)。**`EXP-029`を追加した。**PiのGPIO UART（`/dev/serial0`、115200）で`serial_link`を600秒走らせ、行の往復（21 frame）と、`boot`→ACK→`get_status`→`status`、`ping` 3件のACKの相関を観察した。信号線を少なくとも1分55秒抜いても`disconnects=0`で、切断は観測されなかった（GPIO UARTではdeviceのerrorまたはEOFによる切断検出が働かない見込み。根拠はコードの読み）。存在しないpathのopen失敗はPi上で見た（実portの切断ではない）。受け入れ条件3・4は実portで得られていない。サーボ系の2か所を外した状態で、`DISP-01`の`VCC`を戻して行った。非通電の確認の項目2〜4と条件6の数値は申告だけである | [#11](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11) |
 | 2026-10-18 | 36 | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。**`EXP-030`を追加した。**測定用build（develop `014d058`、GO17入り）で、サーボを接続しない状態（段1b。ユーザーの申告）と接続した状態（段1）のPWM、AC投入と動作時の5 Vと3.3 VをArduinoで記録した、段1・段1b・段2と再駆動2回の記録。段1が「サーボ未接続」でなかったこと（作業セッションの前提の誤り）、`GO17`をAIが送った形（手順書の`監視維持`と違う）、`GO17`の二重送信、動く前の軸の位置が不明で向き・角度は言えないこと、ESP32が応答しなくなった1回（原因未確認）を書いた。条件4は測っていない | [#17の各comment](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17) |
 | 2026-10-19 | 37 | [#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16)。**`EXP-031`を追加した。**BME280（`ENV-01`）の試験build（develop `01a9d8c`の`env-sample-16`）でraw値と変換値を3回の起動で観測し、`MEAS-04`の表示と並べた記録。確度は言えず、気圧のreference、timeout・disconnect・CRC・not-readyの分類は取れていない | [#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16) |
+| 2026-10-20 | 38 | [#11](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11)・[#12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)。**`EXP-032`を追加した。**Piの`serial_link`（develop `01a9d8c`）で実port（`/dev/serial0`、115200）を開き、信号線を外した間のlink probeによる`disconnects`の増加（11回）と再接続の待機（`100ms`〜`1.6s`）、`Stopped(ReconnectExhausted)`、ACKの相関で待機が`100ms`から戻ったこと、`play_motion`の拒否4経路（ESP32のlogと突き合わせ）を観察した。**受け入れ条件を満たしたとは書いていない。**「1回の喪失判定と回復」だけの観察は取れていない。log取得のためRTSの`reset`を1回使ったことを記録した | #11 comment 6272131988、#12 comment 6272140365 |
