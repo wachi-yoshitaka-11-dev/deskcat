@@ -5,7 +5,7 @@
 | データ | 対象と状態 |
 | --- | --- |
 | [`deskcat.kicad_pro`](deskcat.kicad_pro)、[`deskcat.kicad_sch`](deskcat.kicad_sch) | #512 の論理回路。EXP-019 測定前の基準配線に、EXP-022 の UART と EXP-025 の LED 2枝を加えた設計上の合成図。抵抗の `Value` は数値の代わりに値の正本文書名を示す。`ACCEL-01`・`ENV-01` の KiCad pin 番号の `TBD-*` は物理端子番号ではない。 |
-| [`breadboard/layout.svg`](breadboard/layout.svg) | 左側は [#512 の図①](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/512#issuecomment-5951254069)を基にした EXP-019 測定前の配線。右側の追加情報とブレッドボード上の `h1–h4`、`i2–i5` は EXP-022・EXP-025 の記録から追記した。追加情報の穴位置を推定して描いていない。 |
+| [`breadboard/layout.svg`](breadboard/layout.svg) | 左側は [#512 の図①](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/512#issuecomment-5951254069)を基にした EXP-019 測定前の配線。右側の追加情報とブレッドボード上の `h1–h4`、`i2–i5` は EXP-022・EXP-025 の記録から追記した。LED の脚（白 `i12`・`i13`、赤 `i7`・`i8`）は [#514 の 2026-10-20 の申告](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514#issuecomment-6291626373)を実線で、同 comment の 2026-10-12 の組立時の抵抗4本と黄ジャンパー（`－14`↔`f12`、`－13`↔`f7` の `f7` 端だけ）を点線で描いた。穴位置を推定して描いていない。 |
 | [`wokwi/esp32-boot-pulls/diagram.json`](wokwi/esp32-boot-pulls/diagram.json) | 起動時 GPIO と外部 pull の初期評価用。ESP32、pull、LED の枝、ILI9341 互換表示部だけを配置した。全機器をシミュレーションした構成ではない。 |
 
 基準図①は、ユーザーの配線地図と回答から AI が作り、ユーザーが照合した版である。SVG 本文の SHA-256 は末尾改行を除いて `a91e6d1e669258f477fcde5e0d77fda64260d6a0d322a3c12491654c39a985fa` と一致した。基準時点は EXP-019 の測定前で、測定のためだけに抵抗やジャンパを挿した状態は含めない。EXP-021・EXP-022 は `ACCEL-01`、`ENV-01`、`DISP-01` の配線が戻した状態から変わっていないと記録する。Pi の給電差し替え（EXP-020、EXP-023）は USB 端子側であり、ブレッドボードの変更ではない。
@@ -25,7 +25,7 @@ Wokwi の [ILI9341 部品](https://docs.wokwi.com/parts/wokwi-ili9341)では RST
 ## 現物照合待ち（TBD）
 
 - 新しい UART 抵抗の `h1–h4` と `i2–i5` の各信号への対応、および抵抗両端につながる線の穴位置。EXP-022 にない線色と穴位置は追加しない。
-- LED 2枝の抵抗・LED・ジャンパの穴位置、線色、各脚の置き方。LED 極性の申告と値の正本は [EXP-025](../docs/hardware/experiment-log.md)を参照する。
+- LED 2枝の抵抗とジャンパーの今の穴位置・線色。LED の脚の位置は 2026-10-20 の申告（白 長 `i13`・短 `i12`、赤 長 `i8`・短 `i7`）で、2026-10-12 の位置と同じである。抵抗（赤枝 330 Ω `h8–h10`・10 kΩ `g10–g7`、白枝 330 Ω `h13–h15`・10 kΩ `g15–g12`）と黄ジャンパー2本は 2026-10-12 の申告だけで、当日 13:33 の変更と EXP-026 の後の今の位置は申告されていない。黄の `－13` は図の上の－列の番号づけで穴のない隙間に当たり、－側の端の穴は TBD である。黒・茶は 13:33 に外し、灰（GPIO2→j15）は EXP-026 で ESP32 側を抜いたため、図に描かない。LED 極性の申告と値の正本は [EXP-025](../docs/hardware/experiment-log.md)を参照する。
 - 上の電源・GND rail の途中の分断の有無、基準図から復帰後の非通電確認、各抵抗の現物表示と位置の対応、`ENV-01` の `CSB`–`VDD` はんだジャンパ `J3` の導通。
 - `PROTO-02` の実装する部品、表裏、穴、はんだ接続、線材、基板外の接続点。物理実装図は現物との照合後に作る。基板の未実装状態を完成図として描かない。
 - Wokwi のブラウザ表示、起動時 GPIO と boot mode の挙動、KiCad でのファイル読み込みと ERC。実機の電源・安全確認は図やシミュレーションで代替できない。

@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2700 1250" font-family="Noto Sans CJK JP, Hiragino Sans, Meiryo, sans-serif" font-size="13">
-<rect width="2700" height="1250" fill="#fff"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2700 1480" font-family="Noto Sans CJK JP, Hiragino Sans, Meiryo, sans-serif" font-size="13">
+<rect width="2700" height="1480" fill="#fff"/>
 <text x="30" y="36" font-size="22" font-weight="bold">基準配線（EXP-019測定前）と後日の追加回路 — #512</text>
 <text x="30" y="60" fill="#444">左の基準図は #512 コメントの図①（ユーザー照合済み）。追加分は EXP-022 と EXP-025 による。両追加分を同時に通電した記録ではない。</text>
 <rect x="524" y="302" width="826" height="460" rx="10" fill="#f3f1ea" stroke="#bbb"/>
@@ -690,15 +690,15 @@
 <circle cx="318" cy="795" r="5" fill="#caa53d"/><text x="306" y="799" fill="#fff" font-size="12" text-anchor="end">D0</text>
 <circle cx="318" cy="830" r="5" fill="#caa53d"/><text x="306" y="834" fill="#fff" font-size="12" text-anchor="end">CLK</text>
 <text x="190" y="865" text-anchor="middle" fill="#bbb" font-size="11">左列 J2／右列 J3（公式回路図の並び）。USB は下側</text>
-<text x="30" y="1090" font-size="13">凡例: 抵抗＝ベージュ、灰色の太線＝溝をまたぐ接続（26・24・18・17・16 番）。上の＋列＝3V3、上の－列＝GND。下の＋列・－列と、10〜15 番の a〜j は空き。</text>
+<text x="30" y="1090" font-size="13">凡例: 抵抗＝ベージュ、灰色の太線＝溝をまたぐ接続（26・24・18・17・16 番）。上の＋列＝3V3、上の－列＝GND。下の＋列・－列と、10〜15 番の a〜j は基準時点で空き（後日の点線・実線の追記を除く）。</text>
 <text x="30" y="1116" font-size="13">電源（ユーザー回答）: ＋30 赤・－30 黒＝LCD、＋4 赤・－4 黒＝加速度、＋1 赤・－1 黒＝環境、＋12 赤・－12 橙＝ESP32。SDO（ユーザー回答）: －2 白＝加速度、－3 </text>
 <text x="30" y="1136" font-size="13">白＝環境（地図の「灰」をユーザーが白へ訂正）。</text>
 
 <g id="post-exp019-overlay">
-  <rect x="1930" y="85" width="735" height="1060" rx="14" fill="#f8fafc" stroke="#64748b" stroke-width="2"/>
+  <rect x="1930" y="85" width="735" height="1360" rx="14" fill="#f8fafc" stroke="#64748b" stroke-width="2"/>
   <text x="1960" y="126" font-size="23" font-weight="bold">追加配線の記録</text>
   <text x="1960" y="157" font-size="15">EXP-022: UART / EXP-025: LED 2枝</text>
-  <text x="1960" y="184" font-size="14">LEDの穴位置、UARTの抵抗へのwire端は記録なし = TBD</text>
+  <text x="1960" y="184" font-size="14">LEDの脚は2026-10-20の申告。UART抵抗の線端はTBD</text>
   <line x1="1960" y1="205" x2="2630" y2="205" stroke="#94a3b8"/>
   <text x="1960" y="242" font-size="20" font-weight="bold">Pi–ESP32 UART（EXP-022）</text>
   <text x="1960" y="278" font-size="16">Pi pin 8 / GPIO14 TXD → R-UART-RX → ESP32 GPIO14 RX</text>
@@ -715,7 +715,7 @@
   <text x="1960" y="622" font-size="16">GPIO5 → R-LED-R → 赤LED A → K → GND</text>
   <text x="1960" y="649" font-size="16">GPIO5 → R-PULL-R → GND</text>
   <text x="1960" y="687" font-size="15">LEDは3V3 railへ直結しない。GND rail接続は申告。</text>
-  <text x="1960" y="718" font-size="15">枝の穴位置・線色・抵抗の脚位置 = TBD</text>
+  <text x="1960" y="718" font-size="15">抵抗・ジャンパーの今の位置・色 = TBD（下の時点別記録）</text>
   <line x1="1960" y1="744" x2="2630" y2="744" stroke="#94a3b8"/>
   <text x="1960" y="785" font-size="20" font-weight="bold">この図の範囲</text>
   <text x="1960" y="820" font-size="15">左: EXP-019測定前の配線。測定中の変更は含めない。</text>
@@ -729,6 +729,18 @@
   <text x="1960" y="1072" font-size="15">ADC分圧点の線色: 図①の時点（2026-10-02）は5V黒・3V3灰。</text>
   <text x="1960" y="1098" font-size="15">2026-09-07の実装記録は5V青・3V3白。変更時点はTBD。</text>
   <text x="1960" y="1128" font-size="15">図面を電源・安全の実機確認に使わない。</text>
+  <line x1="1960" y1="1150" x2="2630" y2="1150" stroke="#94a3b8"/>
+  <text x="1960" y="1184" font-size="20" font-weight="bold">LEDの位置の時点別記録（#514）</text>
+  <text x="1960" y="1216" font-size="15" font-weight="bold">2026-10-20 申告（実線で描画）: LEDの脚だけ</text>
+  <text x="1960" y="1242" font-size="15">白 LED-COMM-01: 長(A) i13・短(K) i12</text>
+  <text x="1960" y="1268" font-size="15">赤 LED-REACT-01: 長(A) i8・短(K) i7</text>
+  <text x="1960" y="1302" font-size="15" font-weight="bold">2026-10-12 組立時の申告（抵抗と黄の線を点線で描画）</text>
+  <text x="1960" y="1328" font-size="14">赤枝: 330Ω h8–h10、10kΩ g10–g7</text>
+  <text x="1960" y="1352" font-size="14">白枝: 330Ω h13–h15、10kΩ g15–g12</text>
+  <text x="1960" y="1376" font-size="14">黄: －14↔f12、－13↔f7。申告は「－13」。図の番号づけでは</text>
+  <text x="1960" y="1400" font-size="14">隙間に当たるため、－側の端の穴はTBD（f7の端だけ描く）。</text>
+  <text x="1960" y="1424" font-size="13">黒（右列最上段↔f7）・茶（GPIO5→j10）は13:33に外した。灰（GPIO2→j15）は</text>
+  <text x="1960" y="1446" font-size="13">EXP-026でESP32側を抜いた。描かない。今の位置・色は申告無し、TBD。</text>
 </g>
 <g id="uart-resistor-hole-evidence" fill="none" stroke="#8b5e3c" stroke-width="3">
   <line x1="1314" y1="624" x2="1236" y2="624"/>
@@ -739,4 +751,23 @@
 <rect x="1263" y="618" width="24" height="12" rx="4" fill="#e9cfa0" stroke="#8b5e3c"/>
 <rect x="1237" y="644" width="24" height="12" rx="4" fill="#e9cfa0" stroke="#8b5e3c"/>
 <text x="1060" y="798" font-size="14" fill="#7e22ce">EXP-022 追加: h1–h4 / i2–i5（信号との対応TBD）</text>
+<g id="led-leg-evidence-2026-10-20">
+<rect x="1120" y="634" width="50" height="24" rx="12" fill="#d33" fill-opacity="0.9" stroke="#000" stroke-width="2"/>
+<text x="1132" y="651" text-anchor="middle" font-size="12" font-weight="bold" fill="#fff">A</text>
+<text x="1158" y="651" text-anchor="middle" font-size="12" font-weight="bold" fill="#fff">K</text>
+<text x="1145.0" y="558" text-anchor="middle" font-size="11" fill="#000">赤 LED-REACT-01</text>
+<rect x="990" y="634" width="50" height="24" rx="12" fill="#fff" fill-opacity="0.9" stroke="#000" stroke-width="2"/>
+<text x="1002" y="651" text-anchor="middle" font-size="12" font-weight="bold" fill="#000">A</text>
+<text x="1028" y="651" text-anchor="middle" font-size="12" font-weight="bold" fill="#000">K</text>
+<text x="1015" y="558" text-anchor="end" font-size="11" fill="#000">白 LED-COMM-01</text>
+</g>
+<g id="resistor-evidence-2026-10-12" fill="none" stroke="#64748b" stroke-width="2.5" stroke-dasharray="5 4">
+<line x1="1132" y1="620" x2="1080" y2="620"/><circle cx="1132" cy="620" r="7"/><circle cx="1080" cy="620" r="7"/><rect x="1094.0" y="614" width="24" height="12" rx="4"/>
+<line x1="1080" y1="594" x2="1158" y2="594"/><circle cx="1080" cy="594" r="7"/><circle cx="1158" cy="594" r="7"/><rect x="1107.0" y="588" width="24" height="12" rx="4"/>
+<line x1="1002" y1="620" x2="950" y2="620"/><circle cx="1002" cy="620" r="7"/><circle cx="950" cy="620" r="7"/><rect x="964.0" y="614" width="24" height="12" rx="4"/>
+<line x1="950" y1="594" x2="1028" y2="594"/><circle cx="950" cy="594" r="7"/><circle cx="1028" cy="594" r="7"/><rect x="977.0" y="588" width="24" height="12" rx="4"/>
+<line x1="976" y1="356" x2="1028" y2="568" stroke="#e8c400" stroke-width="3"/><circle cx="976" cy="356" r="7" stroke="#e8c400"/><circle cx="1028" cy="568" r="7" stroke="#e8c400"/>
+<circle cx="1158" cy="568" r="7" stroke="#e8c400" stroke-width="3"/>
+</g>
+<text x="540" y="822" font-size="14" fill="#334155">実線＝2026-10-20申告のLED脚（A=長・K=短）。点線＝2026-10-12組立時の抵抗・黄の線の申告で、今の位置はTBD。</text>
 </svg>
