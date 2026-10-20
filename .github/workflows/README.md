@@ -44,6 +44,17 @@ top-level directoryを列挙すると検査対象と起動条件がずれる。�
 - commit messageのtrailerを読むため`fetch-depth: 0`でcheckoutする。
 - 権限はread-onlyとし、tokenをscriptから読めないよう`persist-credentials: false`を指定する。
 
+### `wiring-figure-sync.yml` — 配線の記録と配線図の同期確認
+
+- base が`develop`のPull Requestだけで起動する。**`main`への昇格では走らせない。**範囲に多くのcommitを含み、`develop`で通った変更を再検査しても得るものが無く、過去の範囲のずれで昇格が止まるためである。
+- `docs/hardware/experiment-log.md`の`Wiring revision`の行が追加・変更され、
+  `hardware/breadboard/layout.svg`が同じ範囲で変わっていなければ、`scripts/check_wiring_figure_sync.py`が落とす（[#512](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/512)）。
+- 図に関係しない変更は、head commitのtrailerまたはPull Request本文の`Wiring-Figure: not-applicable <理由>`
+  （理由10字以上）だけで通す。Pull Request本文は環境変数で渡し、宣言の行を探すためだけに読む。
+- Pull Request本文の編集（`edited`）でも走り直す。落ちた後に本文へ宣言を足せば通る。
+- 判定は字句だけである。図の内容が記録と合うかは判定しない。
+- merge baseとcommit messageのtrailerを読むため`fetch-depth: 0`、tokenをscriptから読めないよう`persist-credentials: false`を指定する。
+
 ### `declaration-audit.yml` — 共有branchへ入った後の宣言確認
 
 - `main`と`develop`への**push**で起動する。**Pull Requestでは起動しない。**

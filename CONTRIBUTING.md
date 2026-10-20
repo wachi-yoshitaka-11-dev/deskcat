@@ -241,6 +241,14 @@ PC testはLCD、電気、timing、sensor、機構の検証を代替しない。
 
 初回通電、初回サーボ動作、動作範囲拡張、電源・GPIO変更後のtestでは、人間がactuator電源を切れる状態にする。
 
+**配線を変えたら、記録だけで終わらせず、同じPull Requestでブレッドボード配線図（`hardware/breadboard/layout.svg`）も更新する**（`hardware/README.md`）。`docs/hardware/experiment-log.md`の`Wiring revision`の行を追加・変更し、配線図を更新しないPull Requestは、`Wiring figure sync` workflow（`scripts/check_wiring_figure_sync.py`）が落とす。この検査は、base が`develop`のPull Requestだけで走る。配線を変えていない試験の記録など、図に関係しない場合だけ、head commitのtrailerまたはPull Request本文に次の1行を書く。**コロンが要る**（`Refs`と同じ理由で、コロンの無い行はtrailerとして読まれない）。理由は10字以上が要り、名前と値の正本は`scripts/check_wiring_figure_sync.py`である。
+
+```text
+Wiring-Figure: not-applicable <配線を変えていない理由>
+```
+
+**検査は字句だけで、図の内容が記録と合っているかは判定しない。**照合は人が行う。
+
 ## 文書
 
 次を変更する場合は正式文書を更新する。
