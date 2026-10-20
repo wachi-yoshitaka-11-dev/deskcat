@@ -81,16 +81,18 @@ CIでの成否は、この変更を含むPull Requestのcheck結果で確認す�
 
 **`tap-21` feature（[#21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)のF1）を有効にする場合は、既定構成に加えて`cargo clippy`と`cargo build`へ`--features tap-21`を足したものも通す。**`face-21`・`bringup-display-13`とも組み合わせられるため、`--features tap-21,face-21,bringup-display-13`も通す。今回の差分では、firmware CIの`Build test modes`が両構成を確認する。
 
+**`accel-sample-15` feature（[#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)）を有効にする場合は、既定構成に加えて`cargo clippy`と`cargo build`へ`--features accel-sample-15`を足したものも通す。**他の試験featureとは併用できず（`compile_error!`）、`cargo fmt`にはfeatureを付けない。firmware CIの`Build test modes`は、この構成も`cargo clippy`と`cargo build`で確認する。`crates/deskcat-accel`はhostの`cargo test --locked -p deskcat-accel`と`cargo clippy --locked -p deskcat-accel --all-targets`も通す。2026-10-17に実機LinuxでESP32 Build profileのclippy（`-D warnings --locked`。`accel-sample-15`、既定、`tap-21,face-21,bringup-display-13`）と`cargo build --locked --features accel-sample-15`を通した。**worktreeの下ではfirmwareのcargoが上位のworkspaceを拾うため、build時だけ`firmware/esp32/Cargo.toml`の末尾へ`[workspace]`を足し、終えたら戻した。**build-onlyであり、実機の通電の記録は`docs/hardware/experiment-log.md`の`EXP-033`である。
+
 ### workspace との関係
 
 `firmware/esp32` は root workspace から `exclude` している。firmware の manifest は
 `[workspace]` 節を持たないため、**exclude を外すと firmware の build が壊れる。**
 
-firmware は `crates/deskcat-protocol`、`crates/deskcat-servo`、`crates/deskcat-face`、`crates/deskcat-tap` を path dependency で使う
-（[ADR-0008](../decisions/0008-firmware-protocol-crate-reuse.md)。`deskcat-servo`、`deskcat-face`、`deskcat-tap` は同 ADR の追記）。
-**4 crate の `rust-version` は host と ESP toolchain の両方を満たす下限にしてある。**
+firmware は `crates/deskcat-protocol`、`crates/deskcat-servo`、`crates/deskcat-face`、`crates/deskcat-accel`、`crates/deskcat-tap` を path dependency で使う
+（[ADR-0008](../decisions/0008-firmware-protocol-crate-reuse.md)。`deskcat-servo`、`deskcat-face`、`deskcat-tap`、`deskcat-accel` は同 ADR の追記）。
+**これらの crate の `rust-version` は host と ESP toolchain の両方を満たす下限にしてある。**
 上げると firmware の build が compile 前に停止する。
-**`crates/deskcat-protocol/`、`crates/deskcat-servo/`、`crates/deskcat-face/`、`crates/deskcat-tap/` を変更したら、host だけでなく ESP32 build も回す。**
+**`crates/deskcat-protocol/`、`crates/deskcat-servo/`、`crates/deskcat-face/`、`crates/deskcat-accel/`、`crates/deskcat-tap/` を変更したら、host だけでなく ESP32 build も回す。**
 `deskcat-servo` の下限の根拠は [Version Record](version-records/2026-09-29-esp32-build-servo-limiter-native-linux.md) にある。
 
 ### flash と serial monitor

@@ -24,6 +24,9 @@ default = []
 bringup-i2c-15-16 = []
 # #16 の raw／補償値観測専用。BME280 の ID 一致後だけ forced 測定を書き込む。
 env-sample-16 = []
+# #15 の ADXL345 連続測定専用。Device ID が 0xE5 のときだけ設定を書き、FIFO を読んで
+# raw 値と静止時の統計を UART0 に出す。他の試験 feature とは併用しない。
+accel-sample-15 = []
 # Issue #17の単発servo bench試験だけを有効にする。既定ではoffであり、
 # 通常のbuildはこのfeatureを持たず`crate::servo`を呼ばない。承認の状態は
 # `docs/hardware/servo-safety-limits.md`の`承認の状態`節を参照する（ここへ再掲しない。
@@ -74,6 +77,8 @@ deskcat-protocol = { path = "../../crates/deskcat-protocol" }
 deskcat-servo = { path = "../../crates/deskcat-servo" }
 # `set_expression`の3表情の図形と、受理の判定の順序（#21）。LCDもSPIも知らず、hostでtestできる。
 deskcat-face = { path = "../../crates/deskcat-face" }
+# `accel-sample-15`のADXL345連続測定の設定値・復号・統計（#15）。I2Cを知らず、hostでtestできる。
+deskcat-accel = { path = "../../crates/deskcat-accel" }
 # ADXL345のtap検出の設定値と`tapped`の送出条件（#21のF1）。I2Cを知らず、hostでtestできる。
 deskcat-tap = { path = "../../crates/deskcat-tap" }
 deskcat-env = { path = "../../crates/deskcat-env" }

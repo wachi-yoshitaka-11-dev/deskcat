@@ -350,6 +350,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "deskcat-accel"
+version = "0.1.0"
+dependencies = [
+ "deskcat-tap",
+]
+
+[[package]]
 name = "deskcat-env"
 version = "0.1.0"
 
@@ -357,6 +364,7 @@ version = "0.1.0"
 name = "deskcat-esp32"
 version = "0.1.0"
 dependencies = [
+ "deskcat-accel",
  "deskcat-env",
  "deskcat-face",
  "deskcat-protocol",
