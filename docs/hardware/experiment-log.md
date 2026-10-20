@@ -2802,7 +2802,7 @@ unitは、develop `6621423`の`deploy/systemd/deskcatd.service`（sha256 `395be6
 ### Faults
 
 - **1回目の起動ログが無い。**1回目のサーボの動きが、firmwareの指令だったかは、未確認である
-- **満たしていない条件1（ユーザーの決定）：**サーボの電源の経路に、ジャンパー線を使った。[servo-safety-limits.md](servo-safety-limits.md)の手順の`通電前の現物確認`と、承認の状態の項目6は、servo電源の経路にbreadboardとjumper wireを使わないことを、満たさなければ試験を始めない条件とする。ユーザーの決定（[comment 6222108076](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6222108076)）で、この文面と食い違ったまま使った。ジャンパー線の太さ・定格は記録に無い
+- **手順書からの逸脱1（ユーザーの決定）：**サーボの電源の経路に、ジャンパー線を使った。[servo-safety-limits.md](servo-safety-limits.md)の手順の`通電前の現物確認`と、承認の状態の項目6は、servo電源の経路にbreadboardとjumper wireを使わないことを、満たさなければ試験を始めない条件とする。ユーザーの決定（[comment 6222108076](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6222108076)）で、この文面と食い違ったまま使った。ジャンパー線の太さ・定格は記録に無い
 - **手順書からの逸脱2（作業順序）：**サーボへの給電が、手順書の`起動とarm delay`の窓（ESP32を起動し、`servo_bench_test_arm_delay_start`のlogを見たあと、arm delayの間にサーボの外部5 V電源を入れる）の外で行われた。1回目は、logを待たず、ENのあと約5秒数えて挿す指示にした（ESP32はダウンロードモードに留まっていた可能性が高い）。2回目は、ESP32をリセットしたまま先にACを挿した（作業セッションの案を、PMが了承した順序で、VMも了解した。ユーザーの指示の範囲〔[comment 6224969168](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6224969168)〕に書いた。サーボの動きを、AC投入の動きと、firmwareの動作で区別するため）。GPIO27は、この間、未設定で、実際のレベルとpull-downの有無は確かめていない
 - **作業セッションの誤り1：**上の5のリセットを、ACが抜けているかを確認せずに行った。[servo-safety-limits.md](servo-safety-limits.md)の手順の`latch検証`は「servoの外部5 V電源を先に遮断してから」と定める。この順序を、この回は守っていなかった
 - **作業セッションの誤り2：**`pkill -f logger2.py`のcommand文字列に`logger2.py`を含めたため、作業セッション自身のshellが止まった。上の17の前にも、`hold.py`を止める操作の文字列で同じ誤りをした。実害は無い
