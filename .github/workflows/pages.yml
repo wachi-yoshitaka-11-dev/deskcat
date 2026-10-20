@@ -76,6 +76,10 @@ jobs:
         working-directory: ${{ runner.temp }}
         run: python3 "$GITHUB_WORKSPACE/scripts/test_review_gate.py"
 
+      - name: Test wiring figure sync check
+        working-directory: ${{ runner.temp }}
+        run: python3 "$GITHUB_WORKSPACE/scripts/test_check_wiring_figure_sync.py"
+
       - name: Test promotion closing keyword report
         working-directory: ${{ runner.temp }}
         run: python3 "$GITHUB_WORKSPACE/scripts/test_promotion_closing_keywords.py"

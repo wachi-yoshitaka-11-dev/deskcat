@@ -1,0 +1,50 @@
+name: Wiring figure sync
+
+# 配線の記録（`docs/hardware/experiment-log.md`の`Wiring revision`の行）が変わったのに
+# `hardware/breadboard/layout.svg`が変わらないPull Requestを落とす。
+# `hardware/README.md`の「配線を変えるPRは図も更新する」は文書に書かれていただけで、
+# EXP-026〜034の配線の変更は図へ反映されなかった（#512、PR #624で追いつかせた）。
+# 図に関係しない変更は、理由つきの宣言（`Wiring-Figure: not-applicable <理由>`）がある
+# ときだけ通す。判定は`scripts/check_wiring_figure_sync.py`が持つ。
+on:
+  pull_request:
+    # 本文の宣言を受け付けるため、本文の編集（`edited`）でも走り直す。既定の
+    # `opened`・`synchronize`・`reopened`だけでは、落ちた後に本文へ宣言を足しても赤のまま残る。
+    types: [opened, synchronize, reopened, edited]
+    # base が`develop`のPull Requestだけを見る。`main`への昇格は範囲に多くのcommitを含み、
+    # `develop`で通った変更を再び検査しても得るものが無く、過去の範囲のずれで昇格が止まる。
+    branches:
+      - develop
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wiring-figure-sync-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Verify wiring figure is updated with wiring records
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # merge baseとcommit messageのtrailerを読むため、履歴を切り詰めない。
+          fetch-depth: 0
+          # このstepの後にPR側のscriptを実行する。checkoutが残すtokenを
+          # そのscriptから読めないようにする。
+          persist-credentials: false
+
+      - name: Check wiring figure sync
+        # 値は環境変数で渡す。`run`へ直接展開すると、PR本文やshaがshellの構文として
+        # 解釈される余地が残る。PR本文は宣言の行を探すためだけに読み、実行しない。
+        env:
+          GATE_BASE: ${{ github.event.pull_request.base.sha }}
+          GATE_HEAD: ${{ github.event.pull_request.head.sha }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          python3 scripts/check_wiring_figure_sync.py \
+            --base "$GATE_BASE" --head "$GATE_HEAD" --pr-body-env PR_BODY
