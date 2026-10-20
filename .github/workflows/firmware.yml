@@ -117,6 +117,7 @@ jobs:
         run: |
           for features in \
             bringup-i2c-15-16 \
+            env-sample-16 \
             bringup-display-13 \
             bringup-led-514 \
             bringup-display-13,bringup-led-514 \
