@@ -16,6 +16,7 @@ on:
       - "crates/deskcat-face/**"
       - "crates/deskcat-accel/**"
       - "crates/deskcat-tap/**"
+      - "crates/deskcat-env/**"
       - ".github/workflows/firmware.yml"
   push:
     branches:
@@ -30,6 +31,7 @@ on:
       - "crates/deskcat-face/**"
       - "crates/deskcat-accel/**"
       - "crates/deskcat-tap/**"
+      - "crates/deskcat-env/**"
       - ".github/workflows/firmware.yml"
   workflow_dispatch:
 
@@ -120,6 +122,7 @@ jobs:
           for features in \
             bringup-i2c-15-16 \
             env-sample-16 \
+            env-sample-16-slow \
             bringup-display-13 \
             bringup-led-514 \
             bringup-display-13,bringup-led-514 \

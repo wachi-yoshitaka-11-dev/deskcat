@@ -88,11 +88,11 @@ CIでの成否は、この変更を含むPull Requestのcheck結果で確認す�
 `firmware/esp32` は root workspace から `exclude` している。firmware の manifest は
 `[workspace]` 節を持たないため、**exclude を外すと firmware の build が壊れる。**
 
-firmware は `crates/deskcat-protocol`、`crates/deskcat-servo`、`crates/deskcat-face`、`crates/deskcat-accel`、`crates/deskcat-tap` を path dependency で使う
+firmware は `crates/deskcat-protocol`、`crates/deskcat-servo`、`crates/deskcat-face`、`crates/deskcat-accel`、`crates/deskcat-tap`、`crates/deskcat-env` を path dependency で使う
 （[ADR-0008](../decisions/0008-firmware-protocol-crate-reuse.md)。`deskcat-servo`、`deskcat-face`、`deskcat-tap`、`deskcat-accel` は同 ADR の追記）。
 **これらの crate の `rust-version` は host と ESP toolchain の両方を満たす下限にしてある。**
 上げると firmware の build が compile 前に停止する。
-**`crates/deskcat-protocol/`、`crates/deskcat-servo/`、`crates/deskcat-face/`、`crates/deskcat-accel/`、`crates/deskcat-tap/` を変更したら、host だけでなく ESP32 build も回す。**
+**`crates/deskcat-protocol/`、`crates/deskcat-servo/`、`crates/deskcat-face/`、`crates/deskcat-accel/`、`crates/deskcat-tap/`、`crates/deskcat-env/` を変更したら、host だけでなく ESP32 build も回す。**
 `deskcat-servo` の下限の根拠は [Version Record](version-records/2026-09-29-esp32-build-servo-limiter-native-linux.md) にある。
 
 ### flash と serial monitor

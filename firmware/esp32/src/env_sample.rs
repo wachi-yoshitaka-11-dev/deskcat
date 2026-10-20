@@ -17,19 +17,41 @@ use esp_idf_svc::sys::{EspError, ESP_ERR_TIMEOUT};
 
 use crate::env::Bme280;
 
-/// Bosch §9.1 の ×1/×1/×1 測定時間は typ 8 ms、max 9.3 ms。
-/// typ の時点から status を確かめ始め、[`DEADLINE_MS`] まで待つ。
+/// Bosch §9.1 の測定時間。typ = 1 + 2·T + (2·P + 0.5) + (2·H + 0.5) ms、
+/// max = 1.25 + 2.3·T + (2.3·P + 0.575) + (2.3·H + 0.575) ms（T・P・H は oversampling 倍率）。
+/// ×1/×1/×1 は typ 8 ms、max 9.3 ms。×16/×16/×16 は typ 98 ms、max 112.8 ms。
+/// max の係数（1250・2300・575 µs）は Bosch 公開 driver `bme280_defs.h` の
+/// `BME280_MEAS_OFFSET`・`BME280_MEAS_DUR`・`BME280_PRES_HUM_MEAS_OFFSET` と一致する。
+///
+/// status は ×1 の typ（8 ms）の時点から確かめ始める（`measuring` は変換の間 1 のままなので、
+/// ×16 でも同じ点から読んでよい。変換の開始直後には読まない）。変換の所要時間を測るため、
+/// ×16 の typ まで待たない。
 const READY_AFTER_MS: u64 = 8;
-/// 状態異常の診断用上限。測定最大時間と loop の遅延を含む余裕を設ける。
+/// 状態異常の診断用上限。測定最大時間と loop の遅延を含む余裕を設ける（×1 は max の約 3 倍、
+/// ×16 は約 1.3 倍）。
+#[cfg(not(feature = "env-sample-16-slow"))]
 const DEADLINE_MS: u64 = 30;
+#[cfg(feature = "env-sample-16-slow")]
+const DEADLINE_MS: u64 = 150;
+/// log に出す oversampling の名前。
+#[cfg(not(feature = "env-sample-16-slow"))]
+const OVERSAMPLING: &str = "x1";
+#[cfg(feature = "env-sample-16-slow")]
+const OVERSAMPLING: &str = "x16";
 
 #[derive(Clone, Copy)]
 enum State {
-    WaitCalibration { deadline_ms: Option<u64> },
+    WaitCalibration {
+        deadline_ms: Option<u64>,
+    },
     ReadCalibration,
     ConfigureHumidity,
     StartForced,
-    WaitConversion { ready_ms: u64, deadline_ms: u64 },
+    WaitConversion {
+        started_ms: u64,
+        ready_ms: u64,
+        deadline_ms: u64,
+    },
     ReadSample,
     Done,
 }
@@ -137,6 +159,7 @@ impl EnvSampler {
                 Ok(()) => {
                     let started_ms = now_ms;
                     self.state = State::WaitConversion {
+                        started_ms,
                         ready_ms: started_ms + READY_AFTER_MS,
                         deadline_ms: started_ms + DEADLINE_MS,
                     };
@@ -144,12 +167,19 @@ impl EnvSampler {
                 Err(err) => self.io_fault("ctrl_meas_write", err),
             },
             State::WaitConversion {
+                started_ms,
                 ready_ms,
                 deadline_ms,
             } => {
                 if now_ms >= ready_ms {
                     match self.sensor.read_status(&mut self.driver) {
                         Ok(status) if check_measurement_ready(status).is_ok() => {
+                            // `ctrl_meas` を書いた poll の開始時刻（書き込みの直前）から、この status 読み出しまで。
+                            // main loop の周期と I2C の時間を含む上限寄りの値であり、変換時間そのものではない。
+                            log::info!(
+                                "env_conversion elapsed_ms={} osrs={OVERSAMPLING}",
+                                now_ms.saturating_sub(started_ms)
+                            );
                             self.state = State::ReadSample;
                         }
                         Ok(_) if now_ms > deadline_ms => self.not_ready("measurement_timeout"),

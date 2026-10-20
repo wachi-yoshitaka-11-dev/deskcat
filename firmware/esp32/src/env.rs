@@ -74,11 +74,17 @@ const REG_CTRL_HUM: u8 = 0xF2;
 const REG_CTRL_MEAS: u8 = 0xF4;
 #[cfg(feature = "env-sample-16")]
 const REG_RAW: u8 = 0xF7;
-/// Bosch §5.4.3 Table 20、§5.4.5 Tables 23–25: 全 channel ×1、forced。
-#[cfg(feature = "env-sample-16")]
-const CTRL_HUM_X1: u8 = 0x01;
-#[cfg(feature = "env-sample-16")]
-const CTRL_MEAS_X1_FORCED: u8 = 0x25;
+/// Bosch §5.4.3 Table 20（`osrs_h`）、§5.4.5 Tables 23–25（`osrs_t`・`osrs_p`・`mode`）。
+/// 既定は全 channel ×1、forced（`ctrl_meas` = `0b001_001_01`）。
+/// `env-sample-16-slow` は全 channel ×16（`osrs_*` = `0b101`、`ctrl_meas` = `0b101_101_01`）。
+#[cfg(all(feature = "env-sample-16", not(feature = "env-sample-16-slow")))]
+const CTRL_HUM: u8 = 0x01;
+#[cfg(all(feature = "env-sample-16", not(feature = "env-sample-16-slow")))]
+const CTRL_MEAS_FORCED: u8 = 0x25;
+#[cfg(feature = "env-sample-16-slow")]
+const CTRL_HUM: u8 = 0x05;
+#[cfg(feature = "env-sample-16-slow")]
+const CTRL_MEAS_FORCED: u8 = 0xB5;
 
 /// [`Bme280::read_chip_id`]の1 transactionのtimeout（tick）。
 ///
@@ -146,23 +152,19 @@ impl Bme280 {
         Ok((tp, h))
     }
 
-    /// §5.4.3 の湿度 oversampling ×1 を設定する。ID 一致後だけ呼ぶ。
+    /// §5.4.3 の湿度 oversampling（既定 ×1、`env-sample-16-slow` は ×16）を設定する。ID 一致後だけ呼ぶ。
     #[cfg(feature = "env-sample-16")]
     pub fn configure_humidity(&self, i2c: &mut I2cDriver<'_>) -> Result<(), EspError> {
-        i2c.write(
-            self.address,
-            &[REG_CTRL_HUM, CTRL_HUM_X1],
-            READ_TIMEOUT_TICKS,
-        )
+        i2c.write(self.address, &[REG_CTRL_HUM, CTRL_HUM], READ_TIMEOUT_TICKS)
     }
 
-    /// §5.4.5 の温度・気圧 oversampling ×1 で forced mode を開始する。
+    /// §5.4.5 の温度・気圧 oversampling（既定 ×1、`env-sample-16-slow` は ×16）で forced mode を開始する。
     /// `ctrl_hum` の後に書く。ID 一致後だけ呼ぶ。
     #[cfg(feature = "env-sample-16")]
     pub fn start_forced(&self, i2c: &mut I2cDriver<'_>) -> Result<(), EspError> {
         i2c.write(
             self.address,
-            &[REG_CTRL_MEAS, CTRL_MEAS_X1_FORCED],
+            &[REG_CTRL_MEAS, CTRL_MEAS_FORCED],
             READ_TIMEOUT_TICKS,
         )
     }
