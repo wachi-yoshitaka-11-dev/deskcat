@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2700 2262" font-family="Noto Sans CJK JP, Hiragino Sans, Meiryo, sans-serif" font-size="13">
-<rect width="2700" height="2262" fill="#fff"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2700 2322" font-family="Noto Sans CJK JP, Hiragino Sans, Meiryo, sans-serif" font-size="13">
+<rect width="2700" height="2322" fill="#fff"/>
 <text x="30" y="36" font-size="22" font-weight="bold">基準配線（EXP-019測定前）と後日の追加回路 — #512</text>
 <text x="30" y="60" fill="#444">左の基準図は #512 コメントの図①（ユーザー照合済み）。追加分は EXP-022 と EXP-025 による。両追加分を同時に通電した記録ではない。</text>
 <rect x="524" y="302" width="826" height="460" rx="10" fill="#f3f1ea" stroke="#bbb"/>
@@ -695,7 +695,7 @@
 <text x="30" y="1136" font-size="13">白＝環境（地図の「灰」をユーザーが白へ訂正）。</text>
 
 <g id="post-exp019-overlay">
-  <rect x="1930" y="85" width="735" height="2137" rx="14" fill="#f8fafc" stroke="#64748b" stroke-width="2"/>
+  <rect x="1930" y="85" width="735" height="2197" rx="14" fill="#f8fafc" stroke="#64748b" stroke-width="2"/>
   <text x="1960" y="126" font-size="23" font-weight="bold">追加配線の記録</text>
   <text x="1960" y="157" font-size="15">EXP-022: UART / EXP-025: LED 2枝</text>
   <text x="1960" y="184" font-size="14">LEDの脚は2026-10-20の申告。UART抵抗の線端はTBD</text>
@@ -743,37 +743,40 @@
   <text x="1960" y="1446" font-size="13">EXP-026でESP32側を抜いた。描かない。今の位置・色は申告無し、TBD。</text>
   <line x1="1960" y1="1470" x2="2630" y2="1470" stroke="#94a3b8"/>
   <text x="1960" y="1500" font-size="20" font-weight="bold">EXP-026〜034 の配線（最後の記録の状態）</text>
-  <text x="1960" y="1536" font-size="15" font-weight="bold">EXP-034 は PR #623（未 merge）の記録。番号は図の丸に対応。</text>
+  <text x="1960" y="1536" font-size="15" font-weight="bold">EXP-034（docs/hardware/experiment-log.md）の記録。番号は図の丸に対応。</text>
   <text x="1960" y="1562" font-size="13.5">① c10 緑 → 端子台S ＋（端子台は図に無い）</text>
   <text x="1960" y="1584" font-size="12" fill="#475569">　EXP-030・031・034</text>
   <text x="1960" y="1604" font-size="13.5">② 上－20 ESP32のGNDの線 → 端子台S －</text>
   <text x="1960" y="1626" font-size="12" fill="#475569">　EXP-028・034（EXP-029・031 で外し、034 で戻した）</text>
   <text x="1960" y="1646" font-size="13.5">③ i25 黄のジャンパー → サーボの黄の穴（2026-10-16 20:01:27 の原文）</text>
   <text x="1960" y="1668" font-size="12" fill="#475569">　EXP-028・034（EXP-029・031 で外し、034 で戻した）</text>
-  <text x="1960" y="1688" font-size="13.5">④ g11 サーボの茶のジャンパーの針　EXP-034</text>
-  <text x="1960" y="1710" font-size="13.5">⑤ 下－14 青のジャンパー → 端子台S －　EXP-034</text>
-  <text x="1960" y="1732" font-size="13.5">⑥ h11 Arduino A0　EXP-034</text>
-  <text x="1960" y="1754" font-size="13.5">⑦ 上－21 Arduino GND　EXP-034</text>
-  <text x="1960" y="1776" font-size="13.5">MEAS-01 シャント: j11 と下－11（下－11と14は同じ列）　EXP-034</text>
-  <text x="1960" y="1798" font-size="13.5">330Ω（信号用）: h25–h28　EXP-028（外した記録なし）</text>
-  <text x="1960" y="1820" font-size="13.5">10kΩ 分圧: a10–a12、b12–b14（橙の点線）</text>
-  <text x="1960" y="1842" font-size="12" fill="#475569">　EXP-030。位置は作業セッションの指示で、ユーザーの報告なし</text>
-  <text x="1960" y="1868" font-size="15" font-weight="bold">描かない（外れた・挿さない）</text>
-  <text x="1960" y="1894" font-size="13.5">青 c14→上－18（EXP-034 で c14 から抜いた）</text>
-  <text x="1960" y="1916" font-size="13.5">A1 の赤「＋8」（EXP-030。EXP-034 で A1 は挿さない）</text>
-  <text x="1960" y="1938" font-size="13.5">A0 の c12・i28（EXP-030 の段階の位置。以後 h11 へ）</text>
-  <text x="1960" y="1960" font-size="13.5">LED の GPIO2・GPIO5 の線は ESP32 側を抜いた（EXP-026、#23 comment 6145008461）</text>
-  <text x="1960" y="1982" font-size="13.5">LCD と Pi の線は外したまま（EXP-034）。LCD の VCC は EXP-029 で戻した</text>
-  <text x="1960" y="2010" font-size="15" font-weight="bold">TBD</text>
-  <text x="1960" y="2036" font-size="13.5">GPIO27: 基準図は ESP32 の27 → d28。EXP-028 は h28 と記録</text>
-  <text x="1960" y="2054" font-size="12" fill="#475569">　原文（2026-10-16 20:01:27）は、h28 が GPIO27 と同じ導体</text>
-  <text x="1960" y="2070" font-size="12" fill="#475569">　（列28）である前提の返事。基準図の d28 と EXP-028 の h28 は</text>
-  <text x="1960" y="2086" font-size="12" fill="#475569">　同じ列28の別の穴で、e と f がつながっていれば同じ導体になる。</text>
-  <text x="1960" y="2102" font-size="12" fill="#475569">　ただし、どこで e と f をつないだかの位置は原文に無い。</text>
-  <text x="1960" y="2118" font-size="12" fill="#475569">　GPIO27 の線は描かない</text>
-  <text x="1960" y="2142" font-size="13.5">線色の記録なし: ②⑥⑦。端子台S・サーボの穴・Arduino の位置</text>
-  <text x="1960" y="2164" font-size="13.5">黄の－13・－14: 上の－列か下の－列か原文から決まらず、－側の端はTBD</text>
-  <text x="1960" y="2186" font-size="13.5">EXP-033 は PR #622（未 merge、#15 の記録）。この図には関係しない</text>
+  <text x="1960" y="1688" font-size="12" fill="#475569">　EXP-034 の分は個別の答え無し（指示どおり扱い）。2026-10-16 の原文が裏付け</text>
+  <text x="1960" y="1708" font-size="13.5">④ g11 サーボの茶のジャンパーの針　EXP-034</text>
+  <text x="1960" y="1728" font-size="12" fill="#475569">　個別の答え無し（指示どおりに配線したものとして扱った。EXP-034）</text>
+  <text x="1960" y="1750" font-size="13.5">⑤ 下－14 青のジャンパー → 端子台S －　EXP-034</text>
+  <text x="1960" y="1772" font-size="13.5">⑥ h11 Arduino A0　EXP-034</text>
+  <text x="1960" y="1794" font-size="13.5">⑦ 上－21 Arduino GND　EXP-034</text>
+  <text x="1960" y="1816" font-size="13.5">MEAS-01 シャント: j11 と下－11（下－11と14は同じ列）　EXP-034</text>
+  <text x="1960" y="1836" font-size="12" fill="#475569">　j11 は個別の答え無し（指示どおりに配線したものとして扱った。EXP-034）</text>
+  <text x="1960" y="1858" font-size="13.5">330Ω（信号用）: h25–h28　EXP-028（外した記録なし）</text>
+  <text x="1960" y="1880" font-size="13.5">10kΩ 分圧: a10–a12、b12–b14（橙の点線）</text>
+  <text x="1960" y="1902" font-size="12" fill="#475569">　EXP-030。位置は作業セッションの指示で、ユーザーの報告なし</text>
+  <text x="1960" y="1928" font-size="15" font-weight="bold">描かない（外れた・挿さない）</text>
+  <text x="1960" y="1954" font-size="13.5">青 c14→上－18（EXP-034 で c14 から抜いた）</text>
+  <text x="1960" y="1976" font-size="13.5">A1 の赤「＋8」（EXP-030。EXP-034 で A1 は挿さない）</text>
+  <text x="1960" y="1998" font-size="13.5">A0 の c12・i28（EXP-030 の段階の位置。以後 h11 へ）</text>
+  <text x="1960" y="2020" font-size="13.5">LED の GPIO2・GPIO5 の線は ESP32 側を抜いた（EXP-026、#23 comment 6145008461）</text>
+  <text x="1960" y="2042" font-size="13.5">LCD と Pi の線は外したまま（EXP-034）。LCD の VCC は EXP-029 で戻した</text>
+  <text x="1960" y="2070" font-size="15" font-weight="bold">TBD</text>
+  <text x="1960" y="2096" font-size="13.5">GPIO27: 基準図は ESP32 の27 → d28。EXP-028 は h28 と記録</text>
+  <text x="1960" y="2114" font-size="12" fill="#475569">　原文（2026-10-16 20:01:27）は、h28 が GPIO27 と同じ導体</text>
+  <text x="1960" y="2130" font-size="12" fill="#475569">　（列28）である前提の返事。基準図の d28 と EXP-028 の h28 は</text>
+  <text x="1960" y="2146" font-size="12" fill="#475569">　同じ列28の別の穴で、e と f がつながっていれば同じ導体になる。</text>
+  <text x="1960" y="2162" font-size="12" fill="#475569">　ただし、どこで e と f をつないだかの位置は原文に無い。</text>
+  <text x="1960" y="2178" font-size="12" fill="#475569">　GPIO27 の線は描かない</text>
+  <text x="1960" y="2202" font-size="13.5">線色の記録なし: ②⑥⑦。端子台S・サーボの穴・Arduino の位置</text>
+  <text x="1960" y="2224" font-size="13.5">黄の－13・－14: 上の－列か下の－列か原文から決まらず、－側の端はTBD</text>
+  <text x="1960" y="2246" font-size="13.5">EXP-033 は #15 の記録で、この図には関係しない</text>
 </g>
 <g id="uart-resistor-hole-evidence" fill="none" stroke="#8b5e3c" stroke-width="3">
   <line x1="1314" y1="624" x2="1236" y2="624"/>
