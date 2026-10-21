@@ -224,3 +224,17 @@ hostのtestで固定するためである。**上の決定は変えていない�
 
 **根拠。**ESP toolchain（`esp-1.95.0.0`）で`firmware/esp32`の既定構成・`accel-sample-15`・`tap-21,face-21,bringup-display-13`の3構成のlintと、`accel-sample-15`のbuildを通し、hostで`cargo test`を通した。
 build-onlyの記録は[Version Record](../toolchains/version-records/2026-10-17-accel-15-native-linux.md)にある。flashと実機起動は含まない（実機への書き込みは[EXP-033](../hardware/experiment-log.md)）。**flash sizeへの影響は測っていない。**
+
+## 追記（2026-10-21）: 共有crate`deskcat-touch`
+
+[Issue #14](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/14)で、`firmware/esp32`が
+`crates/deskcat-touch`もpath dependencyで使うようにした。`touch-sample-14`の試験buildが使う、XPT2046の制御byteと3 byte応答の復号を、
+hostのtestで固定するためである。同crateは、raw sampleの列から触れた・離れた・撫でのeventを導く状態機械も持つが、**この版のfirmwareは状態機械を使わない**
+（しきい値の根拠になる実機のraw sampleを取る前のため）。**上の決定は変えていない。**
+
+- root `Cargo.toml`の`exclude = ["firmware/esp32"]`を維持し、lockfileは2つに分かれたままである。
+- `rust-version`は、`deskcat-tap`と同じく両toolchainの下限（1.95）を明示した。
+- `.github/workflows/firmware.yml`の`paths`へ`crates/deskcat-touch/**`を加えた。
+
+**根拠。**ESP toolchain（`esp-1.95.0.0`）で`firmware/esp32`の既定構成・`touch-sample-14`・`tap-21,face-21,bringup-display-13`の3構成のlintとbuildを通し、hostで`cargo test --locked`を通した。
+**Version Recordは作っていない。build-onlyであり、flashと実機起動は含まない。flash sizeへの影響は測っていない。**
