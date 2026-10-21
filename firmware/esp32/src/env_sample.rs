@@ -14,6 +14,7 @@ use deskcat_env::{
 };
 use esp_idf_svc::hal::i2c::I2cDriver;
 use esp_idf_svc::sys::{EspError, ESP_ERR_TIMEOUT};
+use std::time::Instant;
 
 use crate::env::Bme280;
 
@@ -48,7 +49,7 @@ enum State {
     ConfigureHumidity,
     StartForced,
     WaitConversion {
-        started_ms: u64,
+        started_at: Instant,
         ready_ms: u64,
         deadline_ms: u64,
     },
@@ -159,7 +160,7 @@ impl EnvSampler {
                 Ok(()) => {
                     let started_ms = now_ms;
                     self.state = State::WaitConversion {
-                        started_ms,
+                        started_at: Instant::now(),
                         ready_ms: started_ms + READY_AFTER_MS,
                         deadline_ms: started_ms + DEADLINE_MS,
                     };
@@ -167,18 +168,19 @@ impl EnvSampler {
                 Err(err) => self.io_fault("ctrl_meas_write", err),
             },
             State::WaitConversion {
-                started_ms,
+                started_at,
                 ready_ms,
                 deadline_ms,
             } => {
                 if now_ms >= ready_ms {
                     match self.sensor.read_status(&mut self.driver) {
                         Ok(status) if check_measurement_ready(status).is_ok() => {
-                            // `ctrl_meas` を書いた poll の開始時刻（書き込みの直前）から、この status 読み出しまで。
+                            // `ctrl_meas` の書き込みが返った時点から、ready を読んだ status 読み出しの後まで。
+                            // `now_ms` は読み出しの前に取った値なので使わず、同じ単調時計（`Instant`）で取り直す。
                             // main loop の周期と I2C の時間を含む上限寄りの値であり、変換時間そのものではない。
                             log::info!(
                                 "env_conversion elapsed_ms={} osrs={OVERSAMPLING}",
-                                now_ms.saturating_sub(started_ms)
+                                u64::try_from(started_at.elapsed().as_millis()).unwrap_or(u64::MAX)
                             );
                             self.state = State::ReadSample;
                         }
