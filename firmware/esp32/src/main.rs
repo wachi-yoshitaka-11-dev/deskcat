@@ -868,6 +868,10 @@ fn main() {
         if let Some(deadline) = tap.as_ref().and_then(TapDetector::next_deadline_ms) {
             until = until.min(deadline);
         }
+        #[cfg(feature = "env-sample-16")]
+        if let Some(deadline) = env_sampler.as_ref().and_then(EnvSampler::next_deadline_ms) {
+            until = until.min(deadline);
+        }
         #[cfg(feature = "accel-sample-15")]
         if let Some(deadline) = accel_sampler
             .as_ref()
