@@ -61,6 +61,14 @@ face-21 = []
 # Issue #21のF1。ADXL345のtap検出を設定し、`INT_SOURCE`をI2Cで読んで、bootのACK後に`tapped`を送る（`src/main.rs`）。
 # 製品buildもこの経路を持つ。`face-21`・`bringup-display-13`とも組み合わせられる。
 tap-21 = []
+# Issue #23のPROTO-TBD-007（LCD layoutとmemory測定）用。health snapshotと同じ周期で、空きheap、
+# 起動からの最小の空きheap、main taskのstackのhigh water markを1行logへ出す（`src/mem_probe.rs`）。
+# **logを足すだけで、LCD・Pi link・tapの挙動は変えない。製品buildには入らない。**ESP-IDFの統計を読むAPIは
+# すべて`unsafe`であり、この featureのときだけ`main.rs`の`unsafe_code`が`deny`へ下がる（下の`unsafe_code`の注記）。
+# featureを1つでも指定すると製品経路のcfgが外れるため、製品buildと同じ構成で測るときは
+# `face-21`と`tap-21`を足す。`bench-servo-test-17`・`env-sample-16`・`accel-sample-15`・
+# `bringup-i2c-15-16`・`bringup-led-514`とは併用できない（`main.rs`の`compile_error!`）。
+mem-probe-23 = []
 
 [profile.release]
 opt-level = "s"
@@ -93,8 +101,10 @@ esp-idf-svc = { version = "0.52.1", features = ["critical-section", "embassy-tim
 # Remove `generic-queue-8` if you plan to use `embassy-time` WITH `embassy-executor`
 embassy-time = { version = "0.5", features = ["generic-queue-8"] }
 
-[lints.rust]
-unsafe_code = "forbid"
+# **`unsafe_code`の水準は`[lints.rust]`では持たない。**`src/main.rs`の先頭の`cfg_attr`が持つ。
+# featureなしのbuild（製品build）は`forbid(unsafe_code)`で、これまでと同じである。`mem-probe-23`を
+# 付けたbuildだけが`deny`へ下げ、`src/mem_probe.rs`の`unsafe`を許す（#23。理由は同fileのmodule doc）。
+# `forbid`は`allow`で局所的に下げられないため、manifestの`[lints.rust]`には置けない。
 
 [build-dependencies]
 embuild = "0.33"

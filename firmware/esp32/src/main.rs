@@ -54,6 +54,7 @@
 //! | `bringup-led-514` | #514の追加LED（GPIO2／GPIO5）の点灯試験と白の点滅（`crate::led`） | 表情とtapは有効にしない。`bringup-display-13`とも組み合わせられる |
 //! | `face-21` | LCDの初期化とbacklightの点灯を保ち、`set_expression`の3表情を描く。Pi commandを受けなくても、描ける状態になった時点で`neutral`を1回描く（#21、`crate::face`） | `bringup-display-13`とも組み合わせられる。**表情を持たない試験buildは`set_expression`を`hardware_unavailable`で拒否する** |
 //! | `tap-21` | ADXL345のtap検出を設定し、`INT_SOURCE`をI2Cで読み、bootのACK後に`tapped`を送る（#21のF1、`crate::tap`）。ADXL345のDevice IDが`0xE5`のときだけ設定を書き、I2Cのdriverを持ち続ける（一致しなければ何も書かず、driverを手放す） | INT線は使わない（配線は要らない）。`face-21`・`bringup-display-13`とも組み合わせられる。**試験buildのうち`tap-21`も`accel-sample-15`も持たないものは、ADXL345へ書き込まず、Device IDを読むだけである**（既定・製品buildは`tap-21`と同じく書く） |
+//! | `mem-probe-23` | health snapshotと同じ周期で、空きheap・起動からの最小の空きheap・main taskのstackのhigh water markを1行logへ出す（#23の`PROTO-TBD-007`、`crate::mem_probe`）。**このfeatureのbuildだけが`unsafe`を持つ**（`unsafe_code`を`deny`へ下げ、`mem_probe`の3呼び出しだけ`allow`） | logを足すだけで、LCD・Pi link・tapの挙動は変えない。featureを指定すると製品経路のcfgが外れるので、製品buildと同じ構成で測るときは`face-21`と`tap-21`を足す。`bringup-display-13`とも組み合わせられる。単独の試験build（`env-sample-16`・`accel-sample-15`）、`bringup-i2c-15-16`、`bringup-led-514`、`bench-servo-test-17`とは併用できない（`compile_error!`） |
 //! | `bench-servo-test-17` | servoの単発bench試験（#17の測定用build） | **Pi linkを外す。**正本`docs/hardware/servo-safety-limits.md`の`測定のための駆動（承認の状態の項目6）`節が、測定用のbuildは「Piとの通信linkを持たない」と定めているためである |
 //! | `bench-servo-90-17` | 上の単発bench試験で、指令角だけを規約上の90度にする | `bench-servo-test-17`を含む。90度が機械的中央かどうかは未確認（`HW-TBD-010`） |
 //!
@@ -165,6 +166,13 @@
 //! `overrun`と`max_read_gap_ms`に入る（下の`i2c_pending`）。回路側の制約も、`DISP-01`を接続してよいかの
 //! 判定も、これで変わらない。
 
+// **`unsafe_code`の水準はここで持つ**（`Cargo.toml`の`[lints.rust]`には置かない。`forbid`は
+// moduleの`allow`で下げられないため）。featureなしのbuild（製品build）は`forbid`のままである。
+// `mem-probe-23`（#23の計測用。`src/mem_probe.rs`のmodule doc）を付けたbuildだけが`deny`へ下げ、
+// `mem_probe`の中の`#![allow(unsafe_code)]`が3つの`unsafe`を許す。他のmoduleの`unsafe`は`deny`で止まる。
+#![cfg_attr(not(feature = "mem-probe-23"), forbid(unsafe_code))]
+#![cfg_attr(feature = "mem-probe-23", deny(unsafe_code))]
+
 mod accel;
 #[cfg(feature = "accel-sample-15")]
 mod accel_sample;
@@ -205,6 +213,20 @@ compile_error!("env-sample-16 は単独の試験 build として使う");
     )
 ))]
 compile_error!("accel-sample-15 は単独の試験 build として使う");
+#[cfg(all(
+    feature = "mem-probe-23",
+    any(
+        feature = "bringup-i2c-15-16",
+        feature = "bringup-led-514",
+        feature = "bench-servo-test-17",
+        feature = "env-sample-16",
+        feature = "accel-sample-15"
+    )
+))]
+compile_error!(
+    "mem-probe-23は、製品経路（face-21、tap-21、bringup-display-13）と組み合わせる。\
+     単独の試験buildや別の試験featureとは併用しない。"
+);
 #[cfg(not(feature = "bench-servo-test-17"))]
 mod boot_session;
 mod config;
@@ -219,6 +241,8 @@ mod face;
 mod health;
 #[cfg(feature = "bringup-led-514")]
 mod led;
+#[cfg(feature = "mem-probe-23")]
+mod mem_probe;
 #[cfg(not(feature = "bench-servo-test-17"))]
 mod pi_link;
 #[cfg(not(feature = "bench-servo-test-17"))]
@@ -395,7 +419,7 @@ fn main() {
 
     // build identity。profile は `Cargo.toml` の `[profile.dev]`／`[profile.release]` に対応する。
     // **`esp_app_desc!()` は使わない。**`#[no_mangle]`／`#[link_section]` を展開するため
-    // `Cargo.toml` の `unsafe_code = "forbid"` に触れる。
+    // `main.rs` 先頭の `forbid(unsafe_code)`（`mem-probe-23` なしの build）に触れる。
     let profile = if cfg!(debug_assertions) {
         "debug"
     } else {
@@ -672,6 +696,8 @@ fn main() {
 
         if now >= next_snapshot {
             emit_health_snapshot(&mut health, now);
+            #[cfg(feature = "mem-probe-23")]
+            mem_probe::log(now);
             let after = health.uptime_ms();
             let (next, overrun) =
                 next_deadline(next_snapshot, config::HEALTH_SNAPSHOT_PERIOD_MS, after);
@@ -937,7 +963,7 @@ const SID_NVS_KEY_NEXT: &str = "next_sid";
 /// # 生成方法: NVSの不揮発counter
 ///
 /// **乱数ではなく不揮発counterを使う。**§3.1は生成方法を§13の`PROTO-TBD-011`の行で
-/// 確定済みとしている（ESP32は不揮発counter）。この crate は`Cargo.toml`で`unsafe_code = "forbid"`
+/// 確定済みとしている（ESP32は不揮発counter）。この crate は`mem-probe-23`なしの build で`main.rs`先頭の`forbid(unsafe_code)`
 /// としており、`esp_random()`／`bootloader_random_enable()`（ESP-IDF v5.5.3
 /// `components/esp_hw_support/include/esp_random.h`・`bootloader_random.h`）は
 /// `unsafe extern "C"` fnであるため直接呼べない。加えて、ESP-IDF公式資料

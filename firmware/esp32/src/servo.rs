@@ -56,8 +56,8 @@
 //!   測定に入らない）
 //! - **servo 1つにつき`Limiter`は1つである。**[`LimitedServo::new`]は[`Sg90`]を値で受け取り、
 //!   [`Sg90::new`]はLEDC timer・channel・pinを消費する。これらが`Peripherals`から1回だけ取れるのは、
-//!   `unsafe`の`steal`／`reborrow`を使わない場合であり、firmwareは`unsafe_code = "forbid"`で
-//!   それを禁じている（`firmware/esp32/Cargo.toml`）。止めた後は[`Stopped`]になり、
+//!   `unsafe`の`steal`／`reborrow`を使わない場合であり、製品buildは`forbid(unsafe_code)`で
+//!   それを禁じている（`src/main.rs`先頭の`cfg_attr`。`mem-probe-23`のbuildは`deny`で、`mem_probe`だけが`allow`する）。止めた後は[`Stopped`]になり、
 //!   [`Stopped`]から[`Sg90`]を取り出す手段は無い
 //! - [`Sg90`]が外へ出すのは[`Sg90::new`]と[`Sg90::stop`]（dutyを0へ戻す。角度を指定しない）
 //!   だけであり、角度を出す関数はこのmoduleのprivateである
