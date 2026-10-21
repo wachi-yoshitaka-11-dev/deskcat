@@ -59,15 +59,16 @@ deskcat-servo = { path = "../../crates/deskcat-servo" }
 deskcat-face = { path = "../../crates/deskcat-face" }
 deskcat-accel = { path = "../../crates/deskcat-accel" }
 deskcat-tap = { path = "../../crates/deskcat-tap" }
+deskcat-touch = { path = "../../crates/deskcat-touch" }
 ```
 
 - root workspaceの`exclude = ["firmware/esp32"]`は**維持する。**lockfileはroot `Cargo.lock`と
   このディレクトリの`Cargo.lock`の2つに分かれたままでよい。
 - **共有crateの`rust-version`は、host（1.97.1）とESP toolchain（rustc 1.95.0-nightly）の
   両方を満たす下限にしてある。**`crates/deskcat-protocol/Cargo.toml`、
-  `crates/deskcat-servo/Cargo.toml`、`crates/deskcat-face/Cargo.toml`、`crates/deskcat-accel/Cargo.toml`、`crates/deskcat-tap/Cargo.toml`が理由込みで宣言している。
+  `crates/deskcat-servo/Cargo.toml`、`crates/deskcat-face/Cargo.toml`、`crates/deskcat-accel/Cargo.toml`、`crates/deskcat-tap/Cargo.toml`、`crates/deskcat-touch/Cargo.toml`が理由込みで宣言している。
   ここを上げるとfirmwareのbuildが`rustc 1.95.0-nightly is not supported`でcompile前に止まる。
-- `crates/deskcat-protocol/**`、`crates/deskcat-servo/**`、`crates/deskcat-face/**`、`crates/deskcat-accel/**`、`crates/deskcat-tap/**`の変更でも
+- `crates/deskcat-protocol/**`、`crates/deskcat-servo/**`、`crates/deskcat-face/**`、`crates/deskcat-accel/**`、`crates/deskcat-tap/**`、`crates/deskcat-touch/**`の変更でも
   `.github/workflows/firmware.yml`が発火する。
   host側だけの変更でfirmware buildが壊れるのを検知するためである。
 - `bench-servo-test-17`付きのbuildを除くbuildで、`src/servo.rs`を通って角度を出せるのは、同fileの`LimitedServo`だけである。`bench-servo-test-17`付きのbuildは、`Sg90::move_to_angle_once`でlimiterを通らずに1回動かす（`src/servo.rs`のmodule docの例外段落）。
