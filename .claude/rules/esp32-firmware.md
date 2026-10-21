@@ -6,6 +6,7 @@ paths:
   - "crates/deskcat-face/**"
   - "crates/deskcat-accel/**"
   - "crates/deskcat-tap/**"
+  - "crates/deskcat-env/**"
 ---
 
 # ESP32 firmware を触るとき
@@ -16,7 +17,7 @@ paths:
 踏みやすいものだけを挙げる。
 
 - **`firmware/esp32` は root workspace から `exclude` している。**`--workspace` に入らない。
-- **`crates/deskcat-protocol/`、`crates/deskcat-servo/`、`crates/deskcat-face/`、`crates/deskcat-accel/`、`crates/deskcat-tap/` を変更したら、host だけでなく ESP32 build も回す。**
+- **`crates/deskcat-protocol/`、`crates/deskcat-servo/`、`crates/deskcat-face/`、`crates/deskcat-accel/`、`crates/deskcat-tap/`、`crates/deskcat-env/` を変更したら、host だけでなく ESP32 build も回す。**
   各 crate の `rust-version` は host と ESP toolchain の両方を満たす下限であり、**上げると
   firmware の build が compile 前に停止する**（[ADR-0008](../../docs/decisions/0008-firmware-protocol-crate-reuse.md)とその追記）。
 - **ESP32 build は ESP32 Build profile の端末でしか実行できない**（[Machine Profiles](../../docs/toolchains/machine-profiles.md)）。

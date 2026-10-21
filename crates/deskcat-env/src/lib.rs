@@ -557,4 +557,164 @@ mod tests {
         assert_ne!(a.pressure_q24_8_pa, b.pressure_q24_8_pa);
         assert!(a.humidity_q22_10_percent < b.humidity_q22_10_percent);
     }
+
+    /// 係数の組。`dig_p1`・`dig_h4`・`dig_h5` だけが EXP-031 の実機の記録値
+    /// （`dig_p1=37064`、`dig_h4=391`、`dig_h5=50`）。**他の係数は記録に無いので人工値**であり、
+    /// この組から出る温度・気圧・湿度は実機の値ではない。
+    const EXP031_P1_H4_H5: Calibration = Calibration {
+        dig_t1: 28_000,
+        dig_t2: 26_000,
+        dig_t3: -1_000,
+        dig_p1: 37_064,
+        dig_p2: -10_500,
+        dig_p3: 3_024,
+        dig_p4: 8_000,
+        dig_p5: -100,
+        dig_p6: -7,
+        dig_p7: 9_900,
+        dig_p8: -10_230,
+        dig_p9: 4_285,
+        dig_h1: 75,
+        dig_h2: 370,
+        dig_h3: 0,
+        dig_h4: 391,
+        dig_h5: 50,
+        dig_h6: 30,
+    };
+
+    /// 上と同じ実機の3値に、`dig_h3`・`dig_h6`（湿度式の入れ子の項）が 0 でない人工値を足した組。
+    const WITH_H3_H6: Calibration = Calibration {
+        dig_t1: 27_504,
+        dig_t2: 26_435,
+        dig_t3: 50,
+        dig_p2: -10_685,
+        dig_p4: 2_855,
+        dig_p5: 140,
+        dig_p7: 15_500,
+        dig_p8: -14_600,
+        dig_p9: 6_000,
+        dig_h2: 360,
+        dig_h3: 40,
+        dig_h6: -20,
+        ..EXP031_P1_H4_H5
+    };
+
+    /// 独立に求めた期待値。1 行 = (係数, raw 値, 温度 0.01 °C, 気圧 Q24.8 Pa, 湿度 Q22.10 %RH,
+    /// Bosch driver の 0.01 Pa 単位の気圧, Bosch driver の湿度 Q22.10)。
+    ///
+    /// **出し方**（どちらも Python の任意精度整数。この crate の Rust 実装とは別の実装）:
+    ///
+    /// 1. 前 5 列: Bosch BME280 Data sheet Rev. 1.24 §4.2.3 の 32 bit 温度・64 bit 気圧・32 bit 湿度の
+    ///    整数補償式を、`>>`（負数は床方向）で Python に書いて計算した。**datasheet 本文はこの追加の
+    ///    作業では開き直していない。**式の構造は、下の 2. の driver と、各列の差が負の中間値の
+    ///    丸めだけに収まることで確かめた。
+    /// 2. 後 2 列と温度の検算: Bosch Sensortec の公開 driver
+    ///    （<https://github.com/boschsensortec/BME280_SensorAPI> の `bme280.c` v3.5.1 2020-12-17、
+    ///    BSD-3-Clause）の、`BME280_DOUBLE_ENABLE`・`BME280_32BIT_ENABLE` を定義しない既定の整数版
+    ///    `compensate_temperature`・`compensate_pressure`（64 bit）・`compensate_humidity` を 1 行ずつ
+    ///    写して計算した。driver は `>>` の代わりに `/`（0 方向への切り捨て）を使うので、負の中間値
+    ///    （`dig_t3 < 0`、`dig_p8 < 0`、`dig_h6 < 0` など）で datasheet 式と最下位 bit がずれうる。
+    ///    そのため driver の値は完全一致でなく、**温度は一致、気圧は 0.05 Pa 以内、湿度は 2 LSB 以内**
+    ///    で比べる（下の test）。driver は気圧を 0.01 Pa 単位、−40..85 °C・0..100 %RH に clamp する
+    ///    ので、入力は clamp に当たらず、int32 の途中値も溢れない範囲にしてある。
+    ///
+    /// 参考（test には含めない）: driver の `BME280_DOUBLE_ENABLE` 版は、`dig_h3 == 0` の組では上の
+    /// 値と温度 0.01 °C・気圧 0.1 Pa・湿度 0.01 %RH 以内で一致した。`dig_h3 != 0` では湿度が約
+    /// 2.7 %RH ずれる（その版の湿度式は `var5` を 1 回余分に掛けており、同 driver の整数版と式が
+    /// 揃わない）ので使わなかった。
+    ///
+    /// 入力の raw 値のうち最初の 3 つは EXP-031 が記録した実機の 3 回の raw 値。
+    #[allow(clippy::type_complexity)]
+    const GOLDEN: &[(&Calibration, RawSample, i32, u32, u32, u32, u32)] = &[
+        (
+            &EXP031_P1_H4_H5,
+            raw(537_744, 303_840, 36_195),
+            2_772,
+            26_725_823,
+            64_683,
+            10_439_778,
+            64_683,
+        ),
+        (
+            &EXP031_P1_H4_H5,
+            raw(537_776, 303_712, 36_142),
+            2_773,
+            26_731_824,
+            64_381,
+            10_442_121,
+            64_381,
+        ),
+        (
+            &EXP031_P1_H4_H5,
+            raw(537_776, 303_760, 36_145),
+            2_773,
+            26_729_729,
+            64_392,
+            10_441_303,
+            64_392,
+        ),
+        (
+            &EXP031_P1_H4_H5,
+            raw(500_000, 400_000, 30_000),
+            1_609,
+            22_113_231,
+            28_630,
+            8_637_982,
+            28_630,
+        ),
+        (
+            &WITH_H3_H6,
+            raw(537_744, 303_840, 36_195),
+            3_079,
+            30_477_164,
+            59_394,
+            11_905_142,
+            59_395,
+        ),
+        (
+            &WITH_H3_H6,
+            raw(480_000, 420_000, 30_000),
+            1_259,
+            24_666_675,
+            28_194,
+            9_635_419,
+            28_194,
+        ),
+        (
+            &WITH_H3_H6,
+            raw(530_000, 330_000, 40_000),
+            2_835,
+            29_212_921,
+            80_385,
+            11_411_296,
+            80_387,
+        ),
+    ];
+
+    const fn raw(temperature: u32, pressure: u32, humidity: u16) -> RawSample {
+        RawSample {
+            temperature,
+            pressure,
+            humidity,
+        }
+    }
+
+    #[test]
+    fn compensation_matches_independent_calculations() {
+        for &(c, sample, temperature, pressure, humidity, bosch_centi_pa, bosch_humidity) in GOLDEN
+        {
+            let r = compensate(sample, c).unwrap();
+            assert_eq!(r.temperature_centi_c, temperature, "{sample:?}");
+            assert_eq!(r.pressure_q24_8_pa, pressure, "{sample:?}");
+            assert_eq!(r.humidity_q22_10_percent, humidity, "{sample:?}");
+            // Bosch driver との比較。気圧は Q24.8 を driver の 0.01 Pa 単位へ換算する。
+            let centi_pa = i64::from(r.pressure_q24_8_pa) * 100 / 256;
+            assert!(
+                (centi_pa - i64::from(bosch_centi_pa)).abs() <= 5,
+                "{sample:?}"
+            );
+            let h = i64::from(r.humidity_q22_10_percent) - i64::from(bosch_humidity);
+            assert!(h.abs() <= 2, "{sample:?}");
+        }
+    }
 }
