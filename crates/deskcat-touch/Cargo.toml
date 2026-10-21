@@ -1,0 +1,13 @@
+[package]
+name = "deskcat-touch"
+version = "0.1.0"
+description = "XPT2046の制御byteと3 byte応答の復号、raw sampleの列から触れた・離れた・撫でのeventを導く状態機械（値を持たない純粋なlogic）"
+edition.workspace = true
+# `deskcat-tap`と同じ理由で、workspaceの`rust-version`を継承しない。
+# `firmware/esp32`からもpath dependencyで使うため、hostとESP toolchainの両方を満たす下限を宣言する。
+rust-version = "1.95"
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true

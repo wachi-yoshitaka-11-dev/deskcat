@@ -50,11 +50,12 @@
 //! | `env-sample-16` | BME280のChip IDが一致した場合だけ補正係数を読み、forced測定を1回行う。raw・補償値・faultはUART0にlog | 単独指定のみ。実機未確認で通電不可。Pi linkのpayloadは変更しない |
 //! | `env-sample-16-slow` | `env-sample-16`に加え、BME280の温度・気圧・湿度のoversamplingを×16にして変換を遅くする（Bosch §9.1でmax 112.8 ms）。変換の所要時間を`env_conversion`としてlogする | `env-sample-16`を含み、同じく単独指定のみ。実機未確認で通電不可 |
 //! | `accel-sample-15` | ADXL345のDevice IDが`0xE5`のときだけ、±2 g・100 Hz・FIFO Streamの連続測定を設定し、raw値と窓ごとの統計をUART0にlog（#15、`crate::accel_sample`）。tapの機能は止める（`INT_ENABLE`＝0） | 単独指定のみ。通電は2026-10-17の1回だけ（`EXP-033`）で、新しい書き込みを含む構成の通電手順と承認は未確定。Pi linkのpayloadは変更しない |
+//! | `touch-sample-14` | `TOUCH-01`（XPT2046）の raw 読み出し。SPI3（GPIO18/23/19）、`TOUCH-CS`＝GPIO21、`TOUCH-IRQ`＝GPIO34 で X・Y・Z1・Z2 を読み、IRQ の level とあわせて UART0 に log（#14、`crate::touch`）。LCD は初期化せず、`LCD-CS`（GPIO22）を High に固定する。状態機械は配線しない | 単独指定のみ。実機未確認で、touch 用 5 pin は未配線のため通電・書き込みには実機側の新たな承認が要る。Pi link の payload は変更しない |
 //! | `bringup-display-13` | LCDの初期化、backlightの点灯、単色fillと四隅pattern | 表情とtapは有効にしない。描画の間のPi linkの受信とheartbeatは`crate::display_test`のmodule docを参照 |
 //! | `bringup-led-514` | #514の追加LED（GPIO2／GPIO5）の点灯試験と白の点滅（`crate::led`） | 表情とtapは有効にしない。`bringup-display-13`とも組み合わせられる |
 //! | `face-21` | LCDの初期化とbacklightの点灯を保ち、`set_expression`の3表情を描く。Pi commandを受けなくても、描ける状態になった時点で`neutral`を1回描く（#21、`crate::face`） | `bringup-display-13`とも組み合わせられる。**表情を持たない試験buildは`set_expression`を`hardware_unavailable`で拒否する** |
 //! | `tap-21` | ADXL345のtap検出を設定し、`INT_SOURCE`をI2Cで読み、bootのACK後に`tapped`を送る（#21のF1、`crate::tap`）。ADXL345のDevice IDが`0xE5`のときだけ設定を書き、I2Cのdriverを持ち続ける（一致しなければ何も書かず、driverを手放す） | INT線は使わない（配線は要らない）。`face-21`・`bringup-display-13`とも組み合わせられる。**試験buildのうち`tap-21`も`accel-sample-15`も持たないものは、ADXL345へ書き込まず、Device IDを読むだけである**（既定・製品buildは`tap-21`と同じく書く） |
-//! | `mem-probe-23` | health snapshotと同じ周期で、空きheap・起動からの最小の空きheap・main taskのstackのhigh water markを1行logへ出す（#23の`PROTO-TBD-007`、`crate::mem_probe`）。**このfeatureのbuildだけが`unsafe`を持つ**（`unsafe_code`を`deny`へ下げ、`mem_probe`の3呼び出しだけ`allow`） | logを足すだけで、LCD・Pi link・tapの挙動は変えない。featureを指定すると製品経路のcfgが外れるので、製品buildと同じ構成で測るときは`face-21`と`tap-21`を足す。`bringup-display-13`とも組み合わせられる。単独の試験build（`env-sample-16`・`accel-sample-15`）、`bringup-i2c-15-16`、`bringup-led-514`、`bench-servo-test-17`とは併用できない（`compile_error!`） |
+//! | `mem-probe-23` | health snapshotと同じ周期で、空きheap・起動からの最小の空きheap・main taskのstackのhigh water markを1行logへ出す（#23の`PROTO-TBD-007`、`crate::mem_probe`）。**このfeatureのbuildだけが`unsafe`を持つ**（`unsafe_code`を`deny`へ下げ、`mem_probe`の3呼び出しだけ`allow`） | logを足すだけで、LCD・Pi link・tapの挙動は変えない。featureを指定すると製品経路のcfgが外れるので、製品buildと同じ構成で測るときは`face-21`と`tap-21`を足す。`bringup-display-13`とも組み合わせられる。単独の試験build（`env-sample-16`・`accel-sample-15`・`touch-sample-14`）、`bringup-i2c-15-16`、`bringup-led-514`、`bench-servo-test-17`とは併用できない（`compile_error!`） |
 //! | `bench-servo-test-17` | servoの単発bench試験（#17の測定用build） | **Pi linkを外す。**正本`docs/hardware/servo-safety-limits.md`の`測定のための駆動（承認の状態の項目6）`節が、測定用のbuildは「Piとの通信linkを持たない」と定めているためである |
 //! | `bench-servo-90-17` | 上の単発bench試験で、指令角だけを規約上の90度にする | `bench-servo-test-17`を含む。90度が機械的中央かどうかは未確認（`HW-TBD-010`） |
 //!
@@ -214,13 +215,28 @@ compile_error!("env-sample-16 は単独の試験 build として使う");
 ))]
 compile_error!("accel-sample-15 は単独の試験 build として使う");
 #[cfg(all(
+    feature = "touch-sample-14",
+    any(
+        feature = "bringup-i2c-15-16",
+        feature = "bringup-display-13",
+        feature = "bringup-led-514",
+        feature = "face-21",
+        feature = "tap-21",
+        feature = "bench-servo-test-17",
+        feature = "env-sample-16",
+        feature = "accel-sample-15"
+    )
+))]
+compile_error!("touch-sample-14 は単独の試験 build として使う（SPI3 を LCD と共有できない）");
+#[cfg(all(
     feature = "mem-probe-23",
     any(
         feature = "bringup-i2c-15-16",
         feature = "bringup-led-514",
         feature = "bench-servo-test-17",
         feature = "env-sample-16",
-        feature = "accel-sample-15"
+        feature = "accel-sample-15",
+        feature = "touch-sample-14"
     )
 ))]
 compile_error!(
@@ -249,6 +265,8 @@ mod pi_link;
 mod protocol;
 mod servo;
 mod tap;
+#[cfg(feature = "touch-sample-14")]
+mod touch;
 
 use esp_idf_svc::hal::delay::FreeRtos;
 use esp_idf_svc::hal::gpio::{InputPin, OutputPin};
@@ -257,6 +275,7 @@ use esp_idf_svc::hal::peripherals::Peripherals;
 #[cfg(any(
     feature = "bringup-display-13",
     feature = "face-21",
+    feature = "touch-sample-14",
     deskcat_product_mode
 ))]
 use esp_idf_svc::hal::spi::SpiAnyPins;
@@ -290,6 +309,8 @@ use crate::led::Leds;
 use crate::pi_link::{FaceTargets, PiLink};
 #[cfg(any(feature = "tap-21", deskcat_product_mode))]
 use crate::tap::TapDetector;
+#[cfg(feature = "touch-sample-14")]
+use crate::touch::TouchSampler;
 #[cfg(any(feature = "tap-21", deskcat_product_mode))]
 use deskcat_protocol::Message;
 
@@ -480,13 +501,18 @@ fn main() {
     } else {
         "not_driven"
     };
+    let touch_state = if cfg!(feature = "touch-sample-14") {
+        "raw_sample"
+    } else {
+        "not_driven"
+    };
     let pi_link = if cfg!(feature = "bench-servo-test-17") {
         "none"
     } else {
         "uart1"
     };
     log::info!(
-        "peripherals=taken display={display_state} servo={servo_state} i2c=id_read_attempt pi_link={pi_link} adc=not_driven touch=not_driven"
+        "peripherals=taken display={display_state} servo={servo_state} i2c=id_read_attempt pi_link={pi_link} adc=not_driven touch={touch_state}"
     );
     log::info!(
         "i2c_addresses accel=0x{ACCEL_I2C_ADDRESS:02x} env=0x{ENV_I2C_ADDRESS:02x} baudrate_hz={I2C_BAUDRATE_HZ}"
@@ -579,6 +605,17 @@ fn main() {
     #[cfg(feature = "accel-sample-15")]
     let mut accel_sampler =
         i2c_driver.and_then(|bringup| start_accel_sample(bringup, health.uptime_ms()));
+    #[cfg(feature = "touch-sample-14")]
+    let mut touch_sampler = run_touch_sample(
+        peripherals.spi3,
+        peripherals.pins.gpio18,
+        peripherals.pins.gpio23,
+        peripherals.pins.gpio19,
+        peripherals.pins.gpio21,
+        peripherals.pins.gpio34,
+        peripherals.pins.gpio22,
+        health.uptime_ms(),
+    );
     #[cfg(all(
         not(any(feature = "tap-21", deskcat_product_mode)),
         not(feature = "bringup-display-13"),
@@ -786,6 +823,12 @@ fn main() {
             }
         }
 
+        // XPT2046 の raw を1 sample 読み、UART0 へ log する（`crate::touch`）。
+        #[cfg(feature = "touch-sample-14")]
+        if let Some(sampler) = touch_sampler.as_mut() {
+            sampler.poll(health.uptime_ms());
+        }
+
         // 変換時間を待たず、1周回で1段だけ進める。UART0 の log のみ。
         #[cfg(feature = "env-sample-16")]
         if let Some(sampler) = env_sampler.as_mut() {
@@ -829,6 +872,13 @@ fn main() {
         if let Some(deadline) = accel_sampler
             .as_ref()
             .and_then(AccelSampler::next_deadline_ms)
+        {
+            until = until.min(deadline);
+        }
+        #[cfg(feature = "touch-sample-14")]
+        if let Some(deadline) = touch_sampler
+            .as_ref()
+            .and_then(TouchSampler::next_deadline_ms)
         {
             until = until.min(deadline);
         }
@@ -1161,6 +1211,39 @@ fn run_display_bringup<SPI: SpiAnyPins + 'static>(
     }
 
     Some(lcd)
+}
+
+/// `touch-sample-14`付きbuildで、`TOUCH-01`（XPT2046）の読み出しを始める。**この段では何も送らない**（最初の転送は`TouchSampler::poll`）。
+///
+/// pinは`docs/hardware/gpio-assignment.md`の`信号inventory`に従う（`LCD-SCLK`=18、`LCD-MOSI`=23、`LCD-MISO`=19、`TOUCH-CS`=21、
+/// `TOUCH-IRQ`=34、`LCD-CS`=22。`LCD-CS`はHighに固定してLCDを選択させない）。失敗してもpanicせず、`log::error!`へ出して`None`を返す。
+#[cfg(feature = "touch-sample-14")]
+#[allow(clippy::too_many_arguments)]
+fn run_touch_sample<SPI: SpiAnyPins + 'static>(
+    spi3: SPI,
+    sclk: impl OutputPin + 'static,
+    mosi: impl OutputPin + 'static,
+    miso: impl InputPin + 'static,
+    touch_cs: impl OutputPin + 'static,
+    touch_irq: impl InputPin + 'static,
+    lcd_cs: impl OutputPin + 'static,
+    now_ms: u64,
+) -> Option<TouchSampler> {
+    match TouchSampler::new(spi3, sclk, mosi, miso, touch_cs, touch_irq, lcd_cs, now_ms) {
+        Ok(sampler) => {
+            log::info!(
+                "touch_sample_started spi_clock_hz={} poll_interval_ms={} window={}",
+                touch::SPI_CLOCK_HZ,
+                touch::POLL_INTERVAL_MS,
+                touch::WINDOW_SAMPLES
+            );
+            Some(sampler)
+        }
+        Err(err) => {
+            log::error!("touch_driver_new_failed error={err}");
+            None
+        }
+    }
 }
 
 /// I2C bring-upが返したdriverで、tap検出を設定して始める（`tap-21`付きbuildだけ）。driverが無い、またはDevice IDが`0xE5`でない（読めなかった場合を含む）ときは、何も書かず`None`を返す。

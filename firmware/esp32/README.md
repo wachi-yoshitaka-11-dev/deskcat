@@ -47,11 +47,11 @@ ESP32 Build profileの端末で、このディレクトリにて実行する。*
 
 ## host crateの再利用
 
-`deskcat-protocol`、`deskcat-servo`、`deskcat-face`、`deskcat-accel`、`deskcat-tap`をpath dependencyで使う。wire protocolの実装、
-servoのhard limitとtrajectory limitingの実装、`set_expression`の表情の図形と受理の判定の順序、`accel-sample-15`のADXL345連続測定の設定値と復号・統計、tap検出の設定値と`tapped`の送出条件を、
+`deskcat-protocol`、`deskcat-servo`、`deskcat-face`、`deskcat-accel`、`deskcat-tap`、`deskcat-touch`をpath dependencyで使う。wire protocolの実装、
+servoのhard limitとtrajectory limitingの実装、`set_expression`の表情の図形と受理の判定の順序、`accel-sample-15`のADXL345連続測定の設定値と復号・統計、tap検出の設定値と`tapped`の送出条件、`touch-sample-14`のXPT2046の制御byteと応答の復号を、
 それぞれhostのtestとfirmwareで1つに保つためである。
 判断の記録は[ADR-0008](../../docs/decisions/0008-firmware-protocol-crate-reuse.md)にある
-（`deskcat-servo`、`deskcat-face`、`deskcat-tap`、`deskcat-accel`は同ADRの追記）。
+（`deskcat-servo`、`deskcat-face`、`deskcat-tap`、`deskcat-accel`、`deskcat-touch`は同ADRの追記）。
 
 ```toml
 deskcat-protocol = { path = "../../crates/deskcat-protocol" }
@@ -104,6 +104,7 @@ build構成の説明を書き写さない（featureの一覧と、各featureが�
 | `env-sample-16`（単独） | 触れない | 書かない（Device IDを読むだけ） | **Chip IDが`0x60`のときだけ** `ctrl_hum` と `ctrl_meas` へ書き、forced測定を1回行う。raw・補償値・fault件数と、変換の所要時間（`env_conversion`）はUART0へlog | `boot`、ACK、`status`（センサー値は載せない） | **不可**（新しい書き込みを含む構成の通電手順と承認は未確定） | `crates/deskcat-env` |
 | `env-sample-16-slow`（単独。`env-sample-16`を含む） | 触れない | 書かない（Device IDを読むだけ） | 上と同じ。ただしoversamplingを温度・気圧・湿度とも×16にして変換を遅くする | 上と同じ | **不可**（実機未確認） | `crates/deskcat-env` |
 | `accel-sample-15`（単独） | 触れない | **Device IDが`0xE5`のときだけ**、`POWER_CTL`・`INT_ENABLE`（tapを止める）・`BW_RATE`・`DATA_FORMAT`・`FIFO_CTL`へ書き、±2 g・100 Hzの連続測定を始める。FIFOを読み、raw値と窓ごとの統計をUART0へlog | 書かない（Chip IDを読むだけ） | `boot`、ACK、`status`（センサー値は載せない） | **不可**（新しい書き込みを含む構成の通電手順と承認は未確定。2026-10-17にユーザーが承認した1回の通電が[EXP-033](../../docs/hardware/experiment-log.md#exp-033-accel-01adxl345の静止sampleaccel-sample-15の初回通電)にあり、この表の可否を変えない） | `crates/deskcat-accel`、`crates/deskcat-tap`（`INT_SOURCE`のaddress） |
+| `touch-sample-14`（単独） | 初期化しない。`LCD-CS`（GPIO22）をHighに固定するだけ | 書かない（Device IDを読むだけ） | 書かない（Chip IDを読むだけ） | `boot`、ACK、`status` | **不可**（touch用5 pinは未配線。Power Budgetにこの構成の手順が無い。LCD module上のXPT2046はLCDのVCCで動くため、LCDのVCCを抜いたまま起動しない。実機側でユーザーの新たな承認が要る） | `crates/deskcat-touch`、`src/touch.rs` |
 | `bringup-display-13` | 初期化と点灯。fillと四隅patternの後に消灯 | 書かない | 書かない | 同上 | `DISP-01`追加接続の手順で可 | — |
 | `face-21` | 初期化と点灯。点けたまま表情を描く | 書かない | 書かない | 同上。`set_expression`に受理のACKを返しうる | **不可**（`ACCEL-01`／`ENV-01`単体の手順は`bringup-i2c-15-16`単独限定、`DISP-01`の手順は`bringup-display-13`必須） | `crates/deskcat-face` |
 | `face-21,bringup-display-13` | bring-upの後も点灯のまま表情を描く（bring-upの間は`set_expression`を`busy`で拒否） | 書かない | 書かない | 同上 | `DISP-01`追加接続の手順で可（条件(7)の承認は実行する日） | `crates/deskcat-face` |

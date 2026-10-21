@@ -83,18 +83,20 @@ CIでの成否は、この変更を含むPull Requestのcheck結果で確認す�
 
 **`accel-sample-15` feature（[#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)）を有効にする場合は、既定構成に加えて`cargo clippy`と`cargo build`へ`--features accel-sample-15`を足したものも通す。**他の試験featureとは併用できず（`compile_error!`）、`cargo fmt`にはfeatureを付けない。firmware CIの`Build test modes`は、この構成も`cargo clippy`と`cargo build`で確認する。`crates/deskcat-accel`はhostの`cargo test --locked -p deskcat-accel`と`cargo clippy --locked -p deskcat-accel --all-targets`も通す。2026-10-17に実機LinuxでESP32 Build profileのclippy（`-D warnings --locked`。`accel-sample-15`、既定、`tap-21,face-21,bringup-display-13`）と`cargo build --locked --features accel-sample-15`を通した。**worktreeの下ではfirmwareのcargoが上位のworkspaceを拾うため、build時だけ`firmware/esp32/Cargo.toml`の末尾へ`[workspace]`を足し、終えたら戻した。**build-onlyであり、実機の通電の記録は`docs/hardware/experiment-log.md`の`EXP-033`である。
 
-**`mem-probe-23` feature（[#23](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/23)）を有効にする場合は、既定構成に加えて`cargo clippy`と`cargo build`へ`--features mem-probe-23,face-21,tap-21`を足したものも通す。**製品buildと同じ構成（`face-21`と`tap-21`は製品経路のcfgを持つ）に、空きheapと main taskのstackのlogを足す試験buildである。`bringup-display-13`とも組み合わせられ、`env-sample-16`・`accel-sample-15`・`bringup-i2c-15-16`・`bringup-led-514`・`bench-servo-test-17`とは併用できない（`compile_error!`）。**このfeatureのbuildだけが`unsafe`を持つ。**`firmware/esp32/src/main.rs`の先頭の`cfg_attr`が`unsafe_code`の水準を持ち、featureなしのbuildは`forbid`のままである。firmware CIの`Build test modes`がこの構成を確認する。build-onlyであり、実機の通電の記録は無い。
+**`mem-probe-23` feature（[#23](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/23)）を有効にする場合は、既定構成に加えて`cargo clippy`と`cargo build`へ`--features mem-probe-23,face-21,tap-21`を足したものも通す。**製品buildと同じ構成（`face-21`と`tap-21`は製品経路のcfgを持つ）に、空きheapと main taskのstackのlogを足す試験buildである。`bringup-display-13`とも組み合わせられ、`env-sample-16`・`accel-sample-15`・`touch-sample-14`・`bringup-i2c-15-16`・`bringup-led-514`・`bench-servo-test-17`とは併用できない（`compile_error!`）。**このfeatureのbuildだけが`unsafe`を持つ。**`firmware/esp32/src/main.rs`の先頭の`cfg_attr`が`unsafe_code`の水準を持ち、featureなしのbuildは`forbid`のままである。firmware CIの`Build test modes`がこの構成を確認する。build-onlyであり、実機の通電の記録は無い。
+
+**`touch-sample-14` feature（[#14](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/14)）を有効にする場合は、既定構成に加えて`cargo clippy`と`cargo build`へ`--features touch-sample-14`を足したものも通す。**他の試験featureとは併用できず（`compile_error!`）、`cargo fmt`にはfeatureを付けない。firmware CIの`Build test modes`は、この構成も`cargo clippy`と`cargo build`で確認する。`crates/deskcat-touch`はhostの`cargo test --locked -p deskcat-touch`と`cargo clippy --locked -p deskcat-touch --all-targets`も通す。2026-10-21に作業用のLinux VM（ESP32 Build profileの正式な検証端末ではない）で、既定・`touch-sample-14`・`tap-21,face-21,bringup-display-13`のclippy（`-D warnings`）とbuildを通した。**worktreeの下ではfirmwareのcargoが上位のworkspaceを拾うため、repository外へ複製し、複製側の`firmware/esp32/Cargo.toml`の末尾へ`[workspace]`を足してbuildした**（`firmware/esp32/Cargo.lock`は`--locked`なしの最初のbuildで更新し、書き戻した）。build-onlyであり、実機の通電の記録は無い。
 
 ### workspace との関係
 
 `firmware/esp32` は root workspace から `exclude` している。firmware の manifest は
 `[workspace]` 節を持たないため、**exclude を外すと firmware の build が壊れる。**
 
-firmware は `crates/deskcat-protocol`、`crates/deskcat-servo`、`crates/deskcat-face`、`crates/deskcat-accel`、`crates/deskcat-tap`、`crates/deskcat-env` を path dependency で使う
+firmware は `crates/deskcat-protocol`、`crates/deskcat-servo`、`crates/deskcat-face`、`crates/deskcat-accel`、`crates/deskcat-tap`、`crates/deskcat-env`、`crates/deskcat-touch` を path dependency で使う
 （[ADR-0008](../decisions/0008-firmware-protocol-crate-reuse.md)。`deskcat-servo`、`deskcat-face`、`deskcat-tap`、`deskcat-accel` は同 ADR の追記）。
 **これらの crate の `rust-version` は host と ESP toolchain の両方を満たす下限にしてある。**
 上げると firmware の build が compile 前に停止する。
-**`crates/deskcat-protocol/`、`crates/deskcat-servo/`、`crates/deskcat-face/`、`crates/deskcat-accel/`、`crates/deskcat-tap/`、`crates/deskcat-env/` を変更したら、host だけでなく ESP32 build も回す。**
+**`crates/deskcat-protocol/`、`crates/deskcat-servo/`、`crates/deskcat-face/`、`crates/deskcat-accel/`、`crates/deskcat-tap/`、`crates/deskcat-env/`、`crates/deskcat-touch/` を変更したら、host だけでなく ESP32 build も回す。**
 `deskcat-servo` の下限の根拠は [Version Record](version-records/2026-09-29-esp32-build-servo-limiter-native-linux.md) にある。
 
 ### flash と serial monitor

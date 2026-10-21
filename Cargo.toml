@@ -17,6 +17,7 @@ members = [
     "crates/deskcat-serial",
     "crates/deskcat-servo",
     "crates/deskcat-tap",
+    "crates/deskcat-touch",
 ]
 exclude = ["firmware/esp32"]
 

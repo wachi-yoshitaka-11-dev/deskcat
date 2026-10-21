@@ -9,6 +9,7 @@
 | [`deskcat-face`](deskcat-face/src/lib.rs) | `set_expression`の3表情の図形（矩形の列）、受理の判定の順序、帯への分け方。LCDもSPIも知らない | 作成済み（#21） |
 | [`deskcat-tap`](deskcat-tap/src/lib.rs) | ADXL345のtap検出の設定値（レジスタへ書く(address, 値)の列）、`INT_SOURCE`の読み方、`tapped`を送ってよいかの判定（boot ACK後だけ、最小間隔）。I2Cを知らない | 作成済み（#21） |
 | [`deskcat-accel`](deskcat-accel/src/lib.rs) | ADXL345の連続測定（±2 g・100 Hz・FIFO Stream）の設定値（レジスタへ書く(address, 値)の列）、FIFO_STATUSとINT_SOURCEの読み方、3軸の復号、窓ごとの統計。I2Cを知らない | 作成済み（#15） |
+| [`deskcat-touch`](deskcat-touch/src/lib.rs) | XPT2046の制御byteと3 byte応答の復号、raw sampleの列から触れた・離れた・撫でのeventを導く状態機械（しきい値は呼び出し側が渡す。値を持たない）。SPIを知らない | 作成済み（#14。firmwareは制御byteと復号だけを使い、状態機械は未配線） |
 | [`deskcat-domain`](deskcat-domain/README.md) | 感情、接触event、行動判断、純粋ロジック | 作成済み（#491） |
 | `deskcat-config` | 型付き設定と検証 | 予定 |
 | `deskcat-api` | 文章生成の境界とfallback動作 | 予定 |

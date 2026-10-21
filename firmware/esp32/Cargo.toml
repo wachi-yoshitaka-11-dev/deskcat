@@ -67,8 +67,11 @@ tap-21 = []
 # すべて`unsafe`であり、この featureのときだけ`main.rs`の`unsafe_code`が`deny`へ下がる（下の`unsafe_code`の注記）。
 # featureを1つでも指定すると製品経路のcfgが外れるため、製品buildと同じ構成で測るときは
 # `face-21`と`tap-21`を足す。`bench-servo-test-17`・`env-sample-16`・`accel-sample-15`・
-# `bringup-i2c-15-16`・`bringup-led-514`とは併用できない（`main.rs`の`compile_error!`）。
+# `touch-sample-14`・`bringup-i2c-15-16`・`bringup-led-514`とは併用できない（`main.rs`の`compile_error!`）。
 mem-probe-23 = []
+# Issue #14 の `TOUCH-01`（XPT2046）の raw 読み出し専用。SPI3（GPIO18/23/19）で X・Y・Z1・Z2 を読み、`TOUCH-IRQ`（GPIO34）の level とあわせて
+# UART0 に出す。LCD は初期化せず（`LCD-CS` を High に固定するだけ）、状態機械は配線しない（`src/touch.rs`）。単独の試験 build として使う。
+touch-sample-14 = []
 
 [profile.release]
 opt-level = "s"
@@ -93,6 +96,8 @@ deskcat-accel = { path = "../../crates/deskcat-accel" }
 # ADXL345のtap検出の設定値と`tapped`の送出条件（#21のF1）。I2Cを知らず、hostでtestできる。
 deskcat-tap = { path = "../../crates/deskcat-tap" }
 deskcat-env = { path = "../../crates/deskcat-env" }
+# XPT2046 の制御 byte と 3 byte 応答の復号（#14）。SPI を知らず、host で test できる。
+deskcat-touch = { path = "../../crates/deskcat-touch" }
 log = "0.4"
 # health snapshotを`deskcat-protocol`の`Status`と同じ形へserializeするために使う。
 # 同crateが既に依存しており、`firmware/esp32/Cargo.lock`にも推移的に入っている。
