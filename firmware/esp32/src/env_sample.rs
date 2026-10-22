@@ -28,6 +28,10 @@ use crate::env::Bme280;
 /// ×16 でも同じ点から読んでよい。変換の開始直後には読まない）。変換の所要時間を測るため、
 /// ×16 の typ まで待たない。
 const READY_AFTER_MS: u64 = 8;
+/// 変換待ちの間に status を読み直す間隔。main loop が次の締切（heartbeat など）まで眠ると、
+/// `env_conversion` が loop の周期（数百 ms）になり、×1 と ×16 の差が見えない。変換待ちの間だけ
+/// [`EnvSampler::next_deadline_ms`] でこの間隔の締切を出す。実際の分解能は 1 tick（`CONFIG_FREERTOS_HZ=100` で 10 ms）。
+const POLL_INTERVAL_MS: u64 = 10;
 /// 状態異常の診断用上限。測定最大時間と loop の遅延を含む余裕を設ける（×1 は max の約 3 倍、
 /// ×16 は約 1.3 倍）。
 #[cfg(not(feature = "env-sample-16-slow"))]
@@ -51,6 +55,7 @@ enum State {
     WaitConversion {
         started_at: Instant,
         ready_ms: u64,
+        next_poll_ms: u64,
         deadline_ms: u64,
     },
     ReadSample,
@@ -111,6 +116,15 @@ impl EnvSampler {
         sampler
     }
 
+    /// 変換待ちの間だけ、次に status を読む時刻（uptime の ms）。ほかの状態は締切を出さず、
+    /// main loop が次に起きたときに 1 段進める。
+    pub fn next_deadline_ms(&self) -> Option<u64> {
+        match self.state {
+            State::WaitConversion { next_poll_ms, .. } => Some(next_poll_ms),
+            _ => None,
+        }
+    }
+
     /// true なら試行は終了。失敗後に新たな書き込みをしない。
     pub fn poll(&mut self, now_ms: u64) -> bool {
         match self.state {
@@ -162,6 +176,7 @@ impl EnvSampler {
                     self.state = State::WaitConversion {
                         started_at: Instant::now(),
                         ready_ms: started_ms + READY_AFTER_MS,
+                        next_poll_ms: started_ms + READY_AFTER_MS,
                         deadline_ms: started_ms + DEADLINE_MS,
                     };
                 }
@@ -170,9 +185,10 @@ impl EnvSampler {
             State::WaitConversion {
                 started_at,
                 ready_ms,
+                next_poll_ms,
                 deadline_ms,
             } => {
-                if now_ms >= ready_ms {
+                if now_ms >= ready_ms.max(next_poll_ms) {
                     match self.sensor.read_status(&mut self.driver) {
                         Ok(status) if check_measurement_ready(status).is_ok() => {
                             // `ctrl_meas` の書き込みが返った時点から、ready を読んだ status 読み出しの後まで。
@@ -185,7 +201,15 @@ impl EnvSampler {
                             self.state = State::ReadSample;
                         }
                         Ok(_) if now_ms > deadline_ms => self.not_ready("measurement_timeout"),
-                        Ok(_) => {} // 変換中。main loop を止めず再確認する。
+                        Ok(_) => {
+                            // 変換中。main loop を止めず、次の締切で再確認する。
+                            self.state = State::WaitConversion {
+                                started_at,
+                                ready_ms,
+                                next_poll_ms: now_ms + POLL_INTERVAL_MS,
+                                deadline_ms,
+                            };
+                        }
                         Err(err) => self.io_fault("status_measurement", err),
                     }
                 }
