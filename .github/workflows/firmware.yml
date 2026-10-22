@@ -125,6 +125,7 @@ jobs:
             bringup-i2c-15-16 \
             env-sample-16 \
             env-sample-16-slow \
+            env-sample-16-repeat \
             bringup-display-13 \
             bringup-led-514 \
             bringup-display-13,bringup-led-514 \
