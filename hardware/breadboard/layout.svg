@@ -766,7 +766,7 @@
   <text x="1960" y="1976" font-size="13.5">A1 の赤「＋8」（EXP-030。EXP-034 で A1 は挿さない）</text>
   <text x="1960" y="1998" font-size="13.5">A0 の c12・i28（EXP-030 の段階の位置。以後 h11 へ）</text>
   <text x="1960" y="2020" font-size="13.5">LED の GPIO2・GPIO5 の線は ESP32 側を抜いた（EXP-026、#23 comment 6145008461）</text>
-  <text x="1960" y="2042" font-size="13.5">LCD と Pi の線は外したまま（EXP-034）。LCD の VCC は EXP-029 で戻した</text>
+  <text x="1960" y="2042" font-size="13.5">LCD の9本は挿さっている（EXP-037 のユーザー申告。VCC だけ外していた）</text>
   <text x="1960" y="2070" font-size="15" font-weight="bold">TBD</text>
   <text x="1960" y="2096" font-size="13.5">GPIO27: 基準図は ESP32 の27 → d28。EXP-028 は h28 と記録</text>
   <text x="1960" y="2114" font-size="12" fill="#475569">　原文（2026-10-16 20:01:27）は、h28 が GPIO27 と同じ導体</text>
