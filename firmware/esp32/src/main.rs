@@ -49,6 +49,7 @@
 //! | `bringup-i2c-15-16` | ACCEL-01／ENV-01のID読み出し。LCDに触れず、ADXL345へ設定を書かない | 従来のfeatureなしbuildの単体bring-upを保つ |
 //! | `env-sample-16` | BME280のChip IDが一致した場合だけ補正係数を読み、forced測定を1回行う。raw・補償値・faultはUART0にlog | 単独指定のみ。実機未確認で通電不可。Pi linkのpayloadは変更しない |
 //! | `env-sample-16-slow` | `env-sample-16`に加え、BME280の温度・気圧・湿度のoversamplingを×16にして変換を遅くする（Bosch §9.1でmax 112.8 ms）。変換の所要時間を`env_conversion`としてlogする | `env-sample-16`を含み、同じく単独指定のみ。実機未確認で通電不可 |
+//! | `env-sample-16-repeat` | `env-sample-16-slow`に加え、×16の変換を最初の変換の開始から30秒、130 ms周期で繰り返し、変換がheartbeatの時刻を何度もまたぐ状態を作る（#16の「遅い変換が上位taskをblockしない」の観察用）。`env_conversion`は毎回`seq`・`started_ms`付きで、`env_raw`・`env_reading`は1回目だけlogする | `env-sample-16-slow`を含み、同じく単独指定のみ。実機未確認で通電不可 |
 //! | `accel-sample-15` | ADXL345のDevice IDが`0xE5`のときだけ、±2 g・100 Hz・FIFO Streamの連続測定を設定し、raw値と窓ごとの統計をUART0にlog（#15、`crate::accel_sample`）。tapの機能は止める（`INT_ENABLE`＝0） | 単独指定のみ。通電は2026-10-17の1回だけ（`EXP-033`）で、新しい書き込みを含む構成の通電手順と承認は未確定。Pi linkのpayloadは変更しない |
 //! | `touch-sample-14` | `TOUCH-01`（XPT2046）の raw 読み出し。SPI3（GPIO18/23/19）、`TOUCH-CS`＝GPIO21、`TOUCH-IRQ`＝GPIO34 で X・Y・Z1・Z2 を読み、IRQ の level とあわせて UART0 に log（#14、`crate::touch`）。LCD は初期化せず、`LCD-CS`（GPIO22）を High に固定する。状態機械は配線しない | 単独指定のみ。実機未確認で、touch 用 5 pin は未配線のため通電・書き込みには実機側の新たな承認が要る。Pi link の payload は変更しない |
 //! | `bringup-display-13` | LCDの初期化、backlightの点灯、単色fillと四隅pattern | 表情とtapは有効にしない。描画の間のPi linkの受信とheartbeatは`crate::display_test`のmodule docを参照 |

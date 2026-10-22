@@ -1,4 +1,4 @@
-//! #16 の試験 build 専用の一回測定。bus はこの main-loop task が所有し、
+//! #16 の試験 build 専用の測定（既定は起動ごとに一回。`env-sample-16-repeat` は繰り返す）。bus はこの main-loop task が所有し、
 //! `env::Bme280` は各 transaction の間だけ借りる。
 //!
 //! Bosch BME280 Data Sheet BST-BME280-DS001-24 Rev. 1.24 §4.1, §4.2.2,
@@ -38,6 +38,21 @@ const POLL_INTERVAL_MS: u64 = 10;
 const DEADLINE_MS: u64 = 30;
 #[cfg(feature = "env-sample-16-slow")]
 const DEADLINE_MS: u64 = 150;
+/// `env-sample-16-repeat` の繰り返し。#16 の「遅い変換が上位 task を block しない」を、変換が
+/// heartbeat（1000 ms）の時刻を何度もまたぐ状態で観察する。`env-sample-16`／`-slow` の動き
+/// （起動ごとに 1 回）は変えない。
+///
+/// 周期 130 ms：×16 の変換は max 112.8 ms（Bosch §9.1）、`EXP-036` の実測は約 99 ms で、`DEADLINE_MS`
+/// （150 ms）の内に収まる。変換の長さを約 99 ms とすると duty は約 76%（99/130）で、heartbeat の時刻の
+/// 多くが変換の最中に来る（見積もり。実機では `started_ms` と `env_conversion` を `hb` の uptime と重ねて数える）。
+/// 1000 ms が 130 ms で割り切れない（1000 mod 130 = 90 ms ずつずれる）ので、heartbeat は変換の窓の
+/// 先頭・中ほど・終わりに当たる。125 ms のように 1000 ms を割り切ると、同じ位置へ固定される。
+#[cfg(feature = "env-sample-16-repeat")]
+const REPEAT_PERIOD_MS: u64 = 130;
+/// 繰り返す時間。最初の変換の開始から数える。`EXP-036` の窓（30 秒、heartbeat 29 回）に合わせる。
+/// 約 230 回の変換と約 30 回の heartbeat になる。
+#[cfg(feature = "env-sample-16-repeat")]
+const REPEAT_DURATION_MS: u64 = 30_000;
 /// log に出す oversampling の名前。
 #[cfg(not(feature = "env-sample-16-slow"))]
 const OVERSAMPLING: &str = "x1";
@@ -59,7 +74,26 @@ enum State {
         deadline_ms: u64,
     },
     ReadSample,
+    /// 次の変換の開始時刻（uptime の ms）まで待つ。
+    #[cfg(feature = "env-sample-16-repeat")]
+    Idle {
+        next_start_ms: u64,
+    },
     Done,
+}
+
+/// `env-sample-16-repeat` の進行。時刻は uptime の ms。
+#[cfg(feature = "env-sample-16-repeat")]
+#[derive(Default)]
+struct Repeat {
+    /// 最初の変換を始めた時刻。
+    begin_ms: Option<u64>,
+    /// 次に変換を始める予定の時刻（前回の予定＋周期。now 基準にせず、ずれを積まない）。
+    schedule_ms: u64,
+    /// 始めた変換の回数（1 始まり）。
+    seq: u32,
+    /// 今の変換を始めた時刻。
+    started_ms: u64,
 }
 
 /// protocol counter ではない。UART0 の fault 行ごとに更新後の件数を出す。
@@ -80,6 +114,8 @@ pub struct EnvSampler {
     state: State,
     calibration: Option<Calibration>,
     counters: Counters,
+    #[cfg(feature = "env-sample-16-repeat")]
+    repeat: Repeat,
 }
 
 /// bus 初期化は sampler を作る前に 1 回だけ試すので、失敗件数は 1 として記録する。
@@ -100,6 +136,8 @@ impl EnvSampler {
             state: State::WaitCalibration { deadline_ms: None },
             calibration: None,
             counters: Counters::default(),
+            #[cfg(feature = "env-sample-16-repeat")]
+            repeat: Repeat::default(),
         };
         match chip_id {
             Ok(id) if check_identity(id).is_ok() => {}
@@ -117,10 +155,16 @@ impl EnvSampler {
     }
 
     /// 変換待ちの間だけ、次に status を読む時刻（uptime の ms）。ほかの状態は締切を出さず、
-    /// main loop が次に起きたときに 1 段進める。
+    /// main loop が次に起きたときに 1 段進める。`env-sample-16-repeat` だけは、次の変換の開始待ち
+    /// （`Idle`）でその開始時刻を、開始の書き込みと読み出しの段（`StartForced`・`ReadSample`）で 0 を出す。
     pub fn next_deadline_ms(&self) -> Option<u64> {
         match self.state {
             State::WaitConversion { next_poll_ms, .. } => Some(next_poll_ms),
+            // 繰り返す間は、heartbeat まで眠らず次の段へ進む（変換の間隔を周期どおりにする）。
+            #[cfg(feature = "env-sample-16-repeat")]
+            State::Idle { next_start_ms } => Some(next_start_ms),
+            #[cfg(feature = "env-sample-16-repeat")]
+            State::StartForced | State::ReadSample => Some(0),
             _ => None,
         }
     }
@@ -173,6 +217,18 @@ impl EnvSampler {
             State::StartForced => match self.sensor.start_forced(&mut self.driver) {
                 Ok(()) => {
                     let started_ms = now_ms;
+                    #[cfg(feature = "env-sample-16-repeat")]
+                    {
+                        let repeat = &mut self.repeat;
+                        repeat.begin_ms.get_or_insert(now_ms);
+                        repeat.seq = repeat.seq.saturating_add(1);
+                        repeat.started_ms = now_ms;
+                        repeat.schedule_ms = if repeat.seq == 1 {
+                            now_ms + REPEAT_PERIOD_MS
+                        } else {
+                            (repeat.schedule_ms + REPEAT_PERIOD_MS).max(now_ms)
+                        };
+                    }
                     self.state = State::WaitConversion {
                         started_at: Instant::now(),
                         ready_ms: started_ms + READY_AFTER_MS,
@@ -194,9 +250,18 @@ impl EnvSampler {
                             // `ctrl_meas` の書き込みが返った時点から、ready を読んだ status 読み出しの後まで。
                             // `now_ms` は読み出しの前に取った値なので使わず、同じ単調時計（`Instant`）で取り直す。
                             // main loop の周期と I2C の時間を含む上限寄りの値であり、変換時間そのものではない。
+                            let elapsed_ms =
+                                u64::try_from(started_at.elapsed().as_millis()).unwrap_or(u64::MAX);
+                            // 繰り返す build は、heartbeat の uptime と重ねられるよう開始時刻と通し番号を足す。
+                            #[cfg(feature = "env-sample-16-repeat")]
                             log::info!(
-                                "env_conversion elapsed_ms={} osrs={OVERSAMPLING}",
-                                u64::try_from(started_at.elapsed().as_millis()).unwrap_or(u64::MAX)
+                                "env_conversion elapsed_ms={elapsed_ms} osrs={OVERSAMPLING} seq={} started_ms={}",
+                                self.repeat.seq,
+                                self.repeat.started_ms
+                            );
+                            #[cfg(not(feature = "env-sample-16-repeat"))]
+                            log::info!(
+                                "env_conversion elapsed_ms={elapsed_ms} osrs={OVERSAMPLING}"
                             );
                             self.state = State::ReadSample;
                         }
@@ -214,15 +279,23 @@ impl EnvSampler {
                     }
                 }
             }
+            #[cfg(feature = "env-sample-16-repeat")]
+            State::Idle { next_start_ms } => {
+                if now_ms >= next_start_ms {
+                    self.state = State::StartForced;
+                }
+            }
             State::ReadSample => match self.sensor.read_raw(&mut self.driver) {
                 Ok(bytes) => match decode_raw(&bytes) {
                     Ok(raw) => {
-                        log::info!(
-                            "env_raw temperature={} pressure={} humidity={}",
-                            raw.temperature,
-                            raw.pressure,
-                            raw.humidity
-                        );
+                        if self.log_sample() {
+                            log::info!(
+                                "env_raw temperature={} pressure={} humidity={}",
+                                raw.temperature,
+                                raw.pressure,
+                                raw.humidity
+                            );
+                        }
                         // ReadCalibration からしかここへ進まない。状態の破綻も fault として記録する。
                         let Some(calibration) = self.calibration.as_ref() else {
                             self.invalid_data("calibration_missing");
@@ -231,8 +304,10 @@ impl EnvSampler {
                         match compensate(raw, calibration) {
                             Ok(reading) => {
                                 self.counters.samples = self.counters.samples.saturating_add(1);
-                                log::info!("env_reading temperature_centi_c={} pressure_q24_8_pa={} humidity_q22_10_percent={} samples={}", reading.temperature_centi_c, reading.pressure_q24_8_pa, reading.humidity_q22_10_percent, self.counters.samples);
-                                self.state = State::Done;
+                                if self.log_sample() {
+                                    log::info!("env_reading temperature_centi_c={} pressure_q24_8_pa={} humidity_q22_10_percent={} samples={}", reading.temperature_centi_c, reading.pressure_q24_8_pa, reading.humidity_q22_10_percent, self.counters.samples);
+                                }
+                                self.finish_sample(now_ms);
                             }
                             Err(err) => {
                                 self.counters.compensation =
@@ -253,6 +328,37 @@ impl EnvSampler {
             State::Done => return true,
         }
         matches!(self.state, State::Done)
+    }
+
+    /// raw と補償値の log を出すか。繰り返す build は 1 回目だけ出す。毎回出すと、130 ms 周期のたびに
+    /// env_raw・env_reading の 2 行ぶんの UART0 送信が入り、上位の処理の遅れが変換によるのか log によるのかを分けられない
+    /// （送信時間は測っていない）。decode・補償・fault の log は毎回行う。`env_conversion` は毎回出す。
+    fn log_sample(&self) -> bool {
+        #[cfg(feature = "env-sample-16-repeat")]
+        return self.repeat.seq <= 1;
+        #[cfg(not(feature = "env-sample-16-repeat"))]
+        true
+    }
+
+    /// 1 回の測定が済んだ後の状態。繰り返す build は、時間内なら次の開始時刻まで待つ。
+    #[cfg_attr(not(feature = "env-sample-16-repeat"), allow(unused_variables))]
+    fn finish_sample(&mut self, now_ms: u64) {
+        #[cfg(feature = "env-sample-16-repeat")]
+        {
+            let begin_ms = self.repeat.begin_ms.unwrap_or(now_ms);
+            if now_ms.saturating_sub(begin_ms) < REPEAT_DURATION_MS {
+                self.state = State::Idle {
+                    next_start_ms: self.repeat.schedule_ms,
+                };
+                return;
+            }
+            log::info!(
+                "env_repeat_done conversions={} duration_ms={}",
+                self.repeat.seq,
+                now_ms.saturating_sub(begin_ms)
+            );
+        }
+        self.state = State::Done;
     }
 
     fn io_fault(&mut self, stage: &'static str, err: EspError) {
