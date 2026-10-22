@@ -47,6 +47,7 @@
 | [EXP-033](#exp-033-accel-01adxl345の静止sampleaccel-sample-15の初回通電) | [#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)の静止sample（`accel-sample-15`、ESP32の`3V3` pin給電、LCDは切り離し） | 値の正なし（観察の記録。offset、個体の感度、noiseの下限は確かめていない） |
 | [EXP-034](#exp-034-sg90の90度指令でshuntを戻りに入れた配線ユーザーの申告導通は未確認でac投入時と動作時のarduinoの読みとreset回数を記録した) | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)の90度指令の測定窓。shunt（`MEAS-01`）をサーボのGNDの戻りに入れた配線（ユーザーの申告。導通は未確認）でのArduinoの読み（AC投入時と動作時。記録Bは欠番1件を含む。位置は動作の約28秒前）と、ESP32のreset回数 | 値の正なし（観測の記録。電流への換算の確度は主張しない。`HW-TBD-034`は未解決） |
 | [EXP-035](#exp-035-サーボを外し既知の負荷で戻りの経路の抵抗を調べa0の読みと電流の関係を記録した) | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)の案2の窓。サーボを外し、`EXP-034`の戻りの経路へ330 Ωの並列の負荷（10本・20本）をつないだときのArduinoの読み（A0）と、レーン間の電圧。段2bで、負荷20本のまま戻りの経路を6区間に分けた電圧降下（`DT830B`の`200 mV`レンジ）。窓の終わりにサーボ系の線を外した | 値の正なし（観測の記録。サーボの電流は主張しない。`HW-TBD-034`は未解決） |
+| [EXP-036](#exp-036-bme280env-01の変換時間をoversampling-1倍と16倍で観察しその間のheartbeatの間隔を記録したenv-sample-16とenv-sample-16-slow) | [#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16)の受け入れ条件5（遅い変換が上位taskをblockしない）の実機観察。`env-sample-16`（oversampling ×1）と`env-sample-16-slow`（×16）を、起動ごとの`env_conversion`の所要時間と、heartbeat・health snapshotの間隔で比べた。各3回、30秒ずつ | 値の正なし（観測の記録。BME280の確度、受け入れ条件5の判定は主張しない） |
 
 **大容量の生dataはこのrepositoryへ入れていない。**保存場所は
 [development-foundation-plan.md](../planning/development-foundation-plan.md)の
@@ -3415,6 +3416,81 @@ log出力の失敗: 0 件
 - 次の窓（#16の`env-sample-16`、LCDは切り離したまま）の前に、上の(a)〜(d)の状態を、無電源のテスターで確かめる。サーボをつなぎ直してACを入れる前にも、無電源のテスターの読みを取り、負荷ボードを外す。
 - 受け入れ条件4・6の判定は、PMが行う。この記録は、サーボの電流を主張しない。
 
+## EXP-036: BME280（`ENV-01`）の変換時間をoversampling 1倍と16倍で観察し、その間のheartbeatの間隔を記録した（`env-sample-16`と`env-sample-16-slow`）
+
+[#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16)の受け入れ条件5（遅い変換が上位taskをblockしない）のため、BME280の変換を遅くした試験build（`env-sample-16-slow`。温度・気圧・湿度とも×16）と、通常の試験build（`env-sample-16`。×1）を実機で通電し、変換の所要時間（`env_conversion elapsed_ms osrs`）と、その間のheartbeatの間隔を記録した。受け入れ条件3・4はこの窓の範囲外である。**この記録は事実と未確認だけを書く。受け入れ条件5を満たしたかの判定は書かない（PM（実機）が行う）。**
+
+| 項目 | 内容 |
+|---|---|
+| Test ID | `EXP-036` |
+| Date | 2026-10-22 JST 16:30〜16:43ごろ（UTC 07:30〜07:43。始まりは`/dev/ttyUSB0`の作成時刻16:30:34、終わりは最後のlogの約07:42:48Z。USBを抜いた時刻は記録していない） |
+| Operator | USBの抜き挿しはユーザー。build、書き込み、UART0のlogの取得、記録は作業セッション（AI） |
+| Hardware revision／Exact components | `MCU-01`（ESP32-DevKitC V4）、`ACCEL-01`、`ENV-01`（BME280、AE-BME280）。`DISP-01`は切り離したまま |
+| Wiring revision | **`EXP-035`の終わりの状態のまま**（ユーザーの申告。2通り：(1) 作業セッションの問い「`EXP-035`の後に、配線に触れましたか」への回答の原文「いいえ」、(2) PM（実機）への発言の原文「前と配線が変わっていないのになんで確認するの？」）。I2Cと電源の配線は`EXP-015`のまま（記録からの照合。`Vs`／`VDD`→`3V3`、`GND`、`SDA`→GPIO25、`SCL`→GPIO26、`SDO`→GND）。サーボ系の線は`EXP-035`の終わりに外した状態（(a)〜(d)）。LCDとPiの線は外れたまま。LEDの枝（GPIO2・GPIO5）の今の状態は、記録が無く、訊いていない（PM（実機）の判断。この窓に影響しない扱い）。**現物の配線を、作業セッションは目で見ていない。**配線は測っていない |
+| Power supply and current limit | ESP32のUSB（PC）のみ。電流制限は設けていない。電流は測っていない。**AC（`M-12001`）のプラグは抜けたまま**（ユーザーの申告：EXP-035の終わりの申告「ACプラグは抜けている」と、PM（実機）への発言の原文「ACは抜けているって前に言わなかったっけ？」。この窓の中で別に訊き直していない） |
+| Firmware commit/profile | develop `62d58d2`の`env-sample-16`と`env-sample-16-slow`（debug、それぞれ単独）。ELF sha256：`env-sample-16`＝`0f8a418aa8615e9a9feb0292b331840bdf6bedd7e401a850bacd94771c90c124`、`env-sample-16-slow`＝`cdc584c4f9112adad0368331b3049d324477aa8e6cb3b696f51013a950c8fdd4`。書き込みの直前に両ELFのsha256が上の値と一致することを確かめた。`firmware/esp32`で、build時だけ`[workspace]`を足し（worktree配下のため）、`cargo fmt --check`・`cargo clippy --all-targets --locked --features <feature> -- -D warnings`・`cargo build --locked --features <feature>`を各featureで実行し、成功した。`Cargo.toml`は戻して`git diff`が空であることを確かめた。**起動logの`App version: 62d58d2-dirty`は、build時に足した`[workspace]`による** |
+| Configuration | `env-sample-16`：Chip IDが`0x60`のときだけ`ctrl_hum`・`ctrl_meas`へ書き、forced modeで測る（oversampling ×1）。`env-sample-16-slow`：同じで、温度・気圧・湿度ともoversampling ×16。I2Cは100 kHz、address `0x76`。heartbeat周期1000 ms、health snapshot周期10000 ms（起動logの`heartbeat_period_ms`・`health_snapshot_period_ms`） |
+| Measurement equipment | UART0のlog（115200）。Linux上のpythonでRTS（EN）を落として起こしたreset。時刻はファームの`uptime_ms`とlogの`I (ms)`の値。ファーム側の時計の分解能（ms）より細かい値は取れない |
+| Procedure | USBを挿す（ユーザー。PM（実機）経由で受けた発言の原文「挿した」）→ `/dev/ttyUSB0`の出現を確認 → `env-sample-16`を`espflash`で書き込み（`--no-stub --after no-reset`） → RTSでresetして30秒のlogを3回 → `env-sample-16-slow`を同じ方法で書き込み → 同じく3回 → USBを抜く（ユーザー。原文「USB 抜いた」。`/dev/ttyUSB*`が消えたことをPCで確認） |
+| Expected result | `env_conversion`の`elapsed_ms`が、×1と×16で分かれる。heartbeatの間隔が、×16でも1000 msのまま。panic・task_wdt・brownout・`env_fault`が出ない（この窓の依頼で決めた観察項目。受け入れ条件5の判定そのものではない） |
+| Measured result | 下記 |
+| Faults | 下記 |
+| Conclusion | 下記 |
+| Next safe step | 下記 |
+
+### 結果
+
+- **書き込み：**`env-sample-16`は1回目が`FlashEnd`で`Other (0x1)`のエラー、2回目（07:37:28Z）が`Flashing has completed!`。`env-sample-16-slow`も同じ（1回目がエラー、2回目（07:41:12Z）が成功）。読み戻しの照合はしていない。起動logの`ELF file SHA256`の先頭（`0f8a418aa...`、`cdc584c4f...`）は、書いたELFと一致した（先頭9桁まで）
+- **起動6回（各30秒。UTC 07:37:43、07:38:13、07:38:43、07:41:17、07:41:47、07:42:18）：**すべて`reset_reason=power_on`、`env_chip_id raw=0x60`、`env_calibration_read dig_p1=37064 dig_h4=391 dig_h5=50`（uptime 812 ms）。`accel_device_id raw=0xe5`（`ACCEL-01`。uptime 552 ms前後）
+- **変換の所要時間（起動ごとに1回。`samples=1`）：**
+
+| build | 起動 | `env_conversion` | `env_raw`（温度／気圧／湿度） | `env_reading`の`temperature_centi_c` |
+|---|---|---|---|---|
+| `env-sample-16` | 1 | `elapsed_ms=9 osrs=x1` | 534784／301664／36144 | 2625 |
+| `env-sample-16` | 2 | `elapsed_ms=9 osrs=x1` | 534832／301648／36032 | 2626 |
+| `env-sample-16` | 3 | `elapsed_ms=9 osrs=x1` | 534800／301632／35872 | 2625 |
+| `env-sample-16-slow` | 1 | `elapsed_ms=99 osrs=x16` | 534444／301535／35760 | 2614 |
+| `env-sample-16-slow` | 2 | `elapsed_ms=99 osrs=x16` | 534499／301539／36089 | 2616 |
+| `env-sample-16-slow` | 3 | `elapsed_ms=99 osrs=x16` | 534609／301547／36106 | 2619 |
+
+- **heartbeat（`hb`）：**6回とも、`hb seq=3`（uptime 1049 ms）から`seq=31`（29049 ms）まで29行、**隣り合う`uptime_ms`の差はすべて1000 ms**だった（logの`I (ms)`の時刻の差も1000 ms）。`env_conversion`のlogの時刻から所要時間を引くと（計算）、変換の開始は両buildとも1583 msごろ（`hb seq=3`の直後。×1：1592−9、×16：1682−99）で、終わりは×1が1592 ms、×16が1682 msである。次の`hb seq=4`（log時刻2582 ms）は、どちらの変換の終わりよりも後である。`env_raw`・`env_reading`は両buildとも2012 ms・2022 msに出た。`heartbeat_overrun`の行は0件
+- **health snapshot（10049 ms、20049 ms）：**6回とも`overrun_ticks=0 snapshot_errors=0 pi_uart_rx_buffer_full=0 pi_uart_rx_fifo_overflow=0`。**最初のsnapshotの`max_read_gap_ms`は6回とも22、2つ目は6回とも49**（×1と×16で同じ値。×1でも2つ目が49であり、この値と変換の所要時間の関係は、この記録では切り分けていない）
+- **panic、task_wdt、brownout、`env_fault`、`heartbeat_overrun`：**6回とも0件
+- **ユーザーの異常の申告（異音・発熱・異臭・変色）：**無かった。作業セッションは、窓の中で問いを増やさない方針（PM（実機）の指示）に従い、訊いていない
+
+### 承認と判断の記録
+
+- **通電の承認：**作業セッションがユーザーへ1問で訊いた（満たさない条件を問いの本文に明記）。回答の原文は「無給電の確認も行って承認する」（選択肢の1つ）。満たさない条件：`power-budget.md`の条件(2)（通電してよいのは`bringup-i2c-15-16`だけ。この2つのbuildは`ctrl_hum`・`ctrl_meas`へ書く）、条件(5)(a)（module電源pinの独立性）と(b)（pull-upの実効抵抗）は未達、`ENV-01`の`J3`の導通は未測定、`firmware/esp32/README.md`の表で通電「不可」。前例は`EXP-031`・`EXP-033`
+- **無給電の確認：**項目1（`ADXL345`の`Vs`／`VDD`–GND間と`BME280`の`VDD`–GND間）は、ユーザーが行い、回答の原文は「両方とも、上がっていくか、最初から高く安定した」。**項目5・6・7は、行わなかった。**ユーザーの発言（PM（実機）経由。原文）：「いやだから、さっきの答えじゃだめなの？」。意図は、配線が変わっていないので目視を改めて行わなくてよい、とPM（実機）が伝えた。作業セッションは、代わりに記録の照合（`EXP-015`・`EXP-031`・`EXP-033`・`EXP-035`の終わりの状態と`gpio-assignment.md`のpin表）を行い、食い違いは見つからなかった。**これは現物の確認ではなく、項目5・6・7を満たしたとは書かない。**
+- **書き込みの再承認：**自動モードの分類器が書き込みを一度拒否した（理由は「Security Weaken」）。作業セッションは回避せず、拒否の内容と、進める場合の手順をユーザーへ示した。ユーザーの回答の原文は「書き込みを進めて」。
+
+### Faults
+
+- 書き込みの1回目が両buildとも`FlashEnd`のエラーだった（`EXP-031`と同じ。原因は調べていない）。読み戻しの照合はしていない
+- 満たさなかった条件：`power-budget.md`の条件(2)・(5)(a)・(5)(b)、`J3`の導通は未測定、無給電の確認の項目5・6・7（ユーザーの決定で行わなかった。記録の照合のみ）、`README`の表で通電「不可」
+- 現物の配線を作業セッションは見ていない。配線の根拠は、ユーザーの申告と記録
+- 6回の起動とも、第2のsnapshotの`max_read_gap_ms`が49だった理由を調べていない
+- 作業セッションが、ユーザーが既に答えたこと（配線に触れていないこと、ACが抜けていること）を訊き直す結果になった場面があった。PM（実機）が訂正し、以降は訊かなかった。項目5・6・7の答えの待ちも、ユーザーの意図とずれた（PM（実機）が訂正した）
+- 窓の中の異常の有無（異音・発熱など）は、ユーザーへ問わず、申告が無かったことだけを記録した
+- logは、repositoryの外の作業用directoryにある。証拠用directoryへは移していない
+
+### この記録が主張しないこと
+
+- 受け入れ条件5を満たしたかの判定。この観察は、変換が1回（起動ごと）だけの試験buildで、×16でもheartbeatの間隔が1000 msのままだったことまでである。変換が繰り返される製品経路での動作は、観察していない
+- `max_read_gap_ms`と変換の所要時間の関係
+- 変換がheartbeatの時刻をまたいだ状態での間隔。この観察では、変換（最長でも約100 ms）が起動ごとに1回、heartbeatの1000 msの周期の間に収まっており、変換とheartbeatの時刻は重なっていない
+- 変換時間の値（9 ms、99 ms）が資料のBME280の仕様と合うこと
+- BME280の確度。温度・気圧・湿度の値（6回）はreferenceと比べていない
+- timeout・disconnect・not-readyの分類、`env_fault`が出る経路
+- 製品buildの動作。`J3`のはんだ付けの電気的な導通。`module電源pinの独立性`、pull-upの実効抵抗
+
+### Next safe step
+
+- 終わりの状態：USBは抜けている（ユーザーの申告「USB 抜いた」と、PCから`/dev/ttyUSB*`・`/dev/ttyACM*`が消えたことの確認）。ACプラグは抜けたまま（ユーザーの申告）。サーボ系の線は`EXP-035`の終わりの状態のまま。配線を変えたという申告は無い
+- 次に実機で通電する場合は、その回の構成を文で示し、ユーザーの承認を新たに取る
+- PM（実機）の判断により、この窓ではサーボ系を外した状態（`EXP-035`の(a)〜(d)）を無電源のテスターで確かめ直さなかった。**ACを挿さないことが安全の条件**である
+- [#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16)の受け入れ条件5の判定と、チェックを入れるかは、PM（実機）が行う
+
 ## Revision履歴
 
 | 日付 | Revision | 変更 | 根拠 |
@@ -3461,3 +3537,4 @@ log出力の失敗: 0 件
 | 2026-10-20 | 39 | [#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)。**`EXP-033`を追加した。**`accel-sample-15`（ADXL345を±2 g・100 Hz・FIFO Streamで連続測定する試験build）の初回通電。Device ID `0xe5`、6窓×500件でfault・overrun 0件、各軸の標本標準偏差は約0.8 LSB、3軸の平均ベクトルの大きさは約259.8 LSB。基板は水平ではなく姿勢を記録していないため、offsetは出せていない。`power-budget.md`の単体bring-upの手順の条件(2)を満たさないまま、ユーザーが1件の試験として承認した。無給電の確認はユーザーが不要とし、未実施。Rev. Gの手元の版は開いておらず、Rev. Eで示した | ユーザーの承認と現物作業、#15のセッションによる書き込みとlogの取得（いずれも2026-10-17） |
 | 2026-10-20 | 40 | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。**`EXP-034`を追加した。**90度指令の測定用build（develop `41fc159`の`bench-servo-90-17`）で、shuntをサーボのGNDの戻りに入れた配線（ユーザーの申告。導通は未確認）で、AC投入時と動作時のArduinoの読みと、ESP32のreset回数を記録した。記録Bは欠番1件を含む（位置は動作の約28秒前）。計算値が`M-12001`の定格出力を超え、電流の値としては読めない。判定は書いていない | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17) |
 | 2026-10-22 | 41 | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。**`EXP-035`を追加した。**サーボを外し、`EXP-034`の戻りの経路へ330 Ωの並列の負荷（10本・20本）をつないで、A0の読みを記録した。電流を約2倍にしても、A0は約1.64倍にしかならなかった。段2bで、約0.27 AのときのA0の電圧の約13 %がシャント本体、約82 %がシャントの2本のリードの接点だった。サーボの電流は主張していない。窓の終わりにサーボ系の線（ESP32のGND、Arduinoの2本、緑の線、負荷ボードの赤・茶の先）を外した。配線の変更（サーボのplugと黄の線を外し、別のブレッドボードに負荷を作った）は、測定のための一時的な配線のため、`hardware/breadboard/layout.svg`（本来の配線を描く図）には反映していない | [#17のcomment 6294677352](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6294677352)、[#17のcomment 6333259715](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6333259715)（段2b）、`EXP-035`の記録 |
+| 2026-10-22 | 42 | [#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16)。**`EXP-036`を追加した。**`env-sample-16`（×1）と`env-sample-16-slow`（×16）を実機で通電し、`env_conversion`の所要時間（9 ms、99 ms）と、その間のheartbeatの間隔（1000 ms）を、各3回、記録した。無給電の確認の項目5・6・7は、ユーザーの決定で行わなかった（記録の照合のみ）。受け入れ条件5の判定は書いていない。配線は変えていない | [#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16)、`EXP-036`の記録 |
