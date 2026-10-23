@@ -12,7 +12,7 @@
 //! **この型はbyte列やUART peripheralを持たない。**`Hello`／`Ping`／`GetStatus`を
 //! 受け取り、返すべき[`Message`]を返すだけである。Pi linkのUARTから届いた行は
 //! `crate::pi_link::PiLink`がdecodeしてこの型へ渡し、返った[`Message`]をPi linkへ書く。
-//! Pi linkを持つbuild（`bench-servo-test-17`以外のすべて。`#487`）だけでcompileする。
+//! Pi linkを持つbuild（`bench-servo-test-17`を有効にするbuild以外のすべて。`#487`）だけでcompileする。
 //!
 //! ESP32自身の`sid`の生成方法は`main.rs`の`generate_sid`が決める
 //! （`PROTO-TBD-011`のうち生成方法を部分解決。

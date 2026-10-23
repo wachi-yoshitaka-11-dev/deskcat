@@ -31,8 +31,10 @@ commit、rebase、差分更新で書き換えず、同じcloneのworktreeで共�
 選択は巡や承認の記録ではなく、既存のIssue記録を指定するだけである。
 作業を切り替えたときは、そのworktreeで`select`を再実行する。
 既定のbaseは`origin/develop`、scopeは`Issue scope`。
-別のbaseやscopeを使う場合は`select --work 465 --base <base> --scope <scope>`とし、
-後続の`finish` / `check`も同じ`--base`を指定する。`select`は記録とbaseを確認し、
+別のbaseやscopeを使う場合は`select --work 465 --base <base> --scope <scope>`とする。
+**`select`が保存した選択を読むのはhookだけである。**CLIの各subcommandは選択を読まず、
+`--base`／`--scope`を省くと上の既定値を使う。そのため後続の`run` / `begin`には同じ`--base`と`--scope`を、
+`finish` / `end` / `check`には同じ`--base`を指定する。`select`は記録とbaseを確認し、
 存在しない記録、使えないbase、空のscopeなら、前の選択を変更せず停止する。
 
 CLI reviewerは次の経路で起動する。`--`以降はargvとして直接実行し、shellは解釈しない。

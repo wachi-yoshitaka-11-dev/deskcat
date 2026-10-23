@@ -9,7 +9,7 @@
 **規則を文書に書くだけでは守られなかったため、機械で止める。**
 
 検出は字句だけで行う。`base`と`head`の差分に、`experiment-log.md`の`| Wiring revision |`で
-始まる行の**追加または変更**があり、`hardware/breadboard/layout.svg`が差分に無ければ、
+始まる行の**追加または変更**があり、`hardware/breadboard/layout.svg`が差分に無いか削除されていれば、
 図の更新漏れとして落とす。意味は判定しない。
 
 図に関係しない変更（配線を変えていない試験の記録など）は、**理由を書いた明示の宣言**が
@@ -64,8 +64,14 @@ def changed_wiring_rows(root, merge_base, head):
 
 
 def figure_changed(root, merge_base, head):
+    """配線図が`head`に在り、範囲内で変わっていれば`True`。
+
+    **削除は更新に数えない。**`--diff-filter=d`で削除を除く。図を消したPull Requestは、
+    理由つきの宣言（`declared_reason`）が無ければ通らない。
+    """
     names = review_gate._git(
-        root, ["diff", "--name-only", merge_base, head, "--", FIGURE_PATH]
+        root,
+        ["diff", "--name-only", "--diff-filter=d", merge_base, head, "--", FIGURE_PATH],
     )
     return bool(names.strip())
 

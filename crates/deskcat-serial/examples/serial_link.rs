@@ -26,7 +26,7 @@
 //!   同じ`id`で送り直し（仕様§9）、確立の直後にqueueへ入れられなかった`get_status`を送る。
 //!
 //! **ESP32が`boot`→ACKより先の往復に応えるのは、`firmware/esp32`を[Issue #487]のPR B2
-//! （[PR #529]）以降のsourceから、Pi linkを持つbuild（`bench-servo-test-17`以外）で書き込んだ場合である。**PR B2で、
+//! （[PR #529]）以降のsourceから、Pi linkを持つbuild（`bench-servo-test-17`を有効にするbuild以外）で書き込んだ場合である。**PR B2で、
 //! ESP32は`hello`／`ping`／`get_status`にACKを返し、`get_status`にはACKの直後に`status`を返す
 //! （`firmware/esp32/src/pi_link.rs`のmodule doc）。そのため、実機で次の往復が成り立つはずである。
 //!

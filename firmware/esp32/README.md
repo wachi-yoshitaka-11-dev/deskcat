@@ -22,7 +22,7 @@ LCDのpinは`docs/hardware/gpio-assignment.md`の`信号inventory`が正本で�
 
 heartbeat と health snapshot は、いずれのbuildでもloopが動き続け、ESP logger の log にのみ出す（どのbuildでも出る。[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)より前の`pi-protocol-mode`はloggingを止めており、出力されなかった。`src/console.rs`参照）。**「log へ出す」は「serial へ出ない」ではない。**logger の出力は UART0（USB）を通って serial monitor に現れる。送らないのは、protocol の message として application の serial link（#11）へ流すことである。周期は `src/config.rs` が持ち、**いずれも暫定値である**（Protocol §5.7 が heartbeat の interval を `TBD` としているため、一次資料の根拠が無い）。health snapshot は `crates/deskcat-protocol` の `Status` を組み立てて JSON 1 行として出す。**`ProtocolCounters` はすべて 0 のままである。**いずれのbuildにも`ProtocolCounters`を増やす経路が無いためである（`src/health.rs`のmodule doc参照）。
 
-`src/protocol.rs`の`PiSession`は`hello`のsession遷移、`ping`／`get_status`への応答、`stale_session`の判定を実装し、`crates/deskcat-serial/src/peer.rs`（Pi側、Issue #12）と対になる。Pi linkを持つbuildでは、`src/pi_link.rs`の`PiLink`がPi linkのUARTから受けた行をdecodeし、`hello`／`ping`／`get_status`をこの型へ渡して応答を書き、`boot`のACKを`BootSession`へ渡す（#487）。**Pi linkはGPIOのUARTである**（`PI-UART-TX`＝GPIO13、`PI-UART-RX`＝GPIO14。pinと接続の条件の正は[gpio-assignment.md](../../docs/hardware/gpio-assignment.md)の`Pi–ESP32間のtransport`節）。`bench-servo-test-17`以外のすべてのbuild（既定buildを含む）が、UART0以外のUART（UART1）をこの2本へ割り当てて使う（[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)。`bench-servo-test-17`のbuildは、#17の測定用buildとしてPi linkを持たない）。**既定buildも起動のたびにGPIO13をTXとして駆動し、既定buildでもJTAG debugは使えない**（gpio-assignment.mdの`PI-UART-TX`行）。**UART0（board上のUSB-UARTブリッジ、GPIO1／GPIO3）は書き込みとdebug logに使う。**例外として、`bench-servo-test-17`のbuildは、servoを動かす前に人間が入力する確認の語をstdin（UART0）から読む（[#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。`src/main.rs`の`wait_for_bench_confirmation`）。`touch-sample-14`の試験buildも、操作の区切りの`MARK`をstdin（UART0）から別threadで読む（[#14](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/14)、`src/touch.rs`。Pi linkのUARTではない）。#487より前は、UART0をbuild時のfeatureでdebug logとPi–ESP32 protocol streamのどちらかへ排他的に使っていた。詳細は`docs/protocol/esp32-pi-protocol.md`§2、`src/console.rs`参照。Pi linkを持つbuildは、`src/boot_session.rs`の`BootSession`が`boot`のACK待ち・再送・`stale_session`受信時の`sid`選び直しを行い（[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446) PR B）、受信の異常（ring bufferの満杯など）を数えてhealth snapshotの行へ出す（#487）。**Piとつないでよい場面と条件は、gpio-assignment.mdの`信号線をつないでよい条件`が持つ**（とくに条件3（つないでよい試験）と条件5（給電の構成）。ここへ書き写さない。protocolの既知の制約は`src/console.rs`）。**host testと実機での動作確認はまだ無いため、session確立の成立は主張しない**（確かめていないことは`src/pi_link.rs`のmodule doc「確かめていないこと」）。`sid`の生成方法は`src/main.rs`の`generate_sid`が決める（`PROTO-TBD-011`のうち生成方法を部分解決。PR A）。この型（`PiSession`）自体は生成方法を持たない。
+`src/protocol.rs`の`PiSession`は`hello`のsession遷移、`ping`／`get_status`への応答、`stale_session`の判定を実装し、`crates/deskcat-serial/src/peer.rs`（Pi側、Issue #12）と対になる。Pi linkを持つbuildでは、`src/pi_link.rs`の`PiLink`がPi linkのUARTから受けた行をdecodeし、`hello`／`ping`／`get_status`をこの型へ渡して応答を書き、`boot`のACKを`BootSession`へ渡す（#487）。**Pi linkはGPIOのUARTである**（`PI-UART-TX`＝GPIO13、`PI-UART-RX`＝GPIO14。pinと接続の条件の正は[gpio-assignment.md](../../docs/hardware/gpio-assignment.md)の`Pi–ESP32間のtransport`節）。`bench-servo-test-17`を有効にするbuild（`bench-servo-90-17`を含む）以外のすべてのbuild（既定buildを含む）が、UART0以外のUART（UART1）をこの2本へ割り当てて使う（[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)。`bench-servo-test-17`のbuildは、#17の測定用buildとしてPi linkを持たない）。**既定buildも起動のたびにGPIO13をTXとして駆動し、既定buildでもJTAG debugは使えない**（gpio-assignment.mdの`PI-UART-TX`行）。**UART0（board上のUSB-UARTブリッジ、GPIO1／GPIO3）は書き込みとdebug logに使う。**例外として、`bench-servo-test-17`を有効にするbuild（`bench-servo-90-17`を含む）は、servoを動かす前に人間が入力する確認の語をstdin（UART0）から読む（[#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。`src/main.rs`の`wait_for_bench_confirmation`）。`touch-sample-14`の試験buildも、操作の区切りの`MARK`をstdin（UART0）から別threadで読む（[#14](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/14)、`src/touch.rs`。Pi linkのUARTではない）。#487より前は、UART0をbuild時のfeatureでdebug logとPi–ESP32 protocol streamのどちらかへ排他的に使っていた。詳細は`docs/protocol/esp32-pi-protocol.md`§2、`src/console.rs`参照。Pi linkを持つbuildは、`src/boot_session.rs`の`BootSession`が`boot`のACK待ち・再送・`stale_session`受信時の`sid`選び直しを行い（[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446) PR B）、受信の異常（ring bufferの満杯など）を数えてhealth snapshotの行へ出す（#487）。**Piとつないでよい場面と条件は、gpio-assignment.mdの`信号線をつないでよい条件`が持つ**（とくに条件3（つないでよい試験）と条件5（給電の構成）。ここへ書き写さない。protocolの既知の制約は`src/console.rs`）。**host testと実機での動作確認はまだ無いため、session確立の成立は主張しない**（確かめていないことは`src/pi_link.rs`のmodule doc「確かめていないこと」）。`sid`の生成方法は`src/main.rs`の`generate_sid`が決める（`PROTO-TBD-011`のうち生成方法を部分解決。PR A）。この型（`PiSession`）自体は生成方法を持たない。
 
 | 項目 | 確定版 |
 |---|---|
@@ -47,11 +47,11 @@ ESP32 Build profileの端末で、このディレクトリにて実行する。*
 
 ## host crateの再利用
 
-`deskcat-protocol`、`deskcat-servo`、`deskcat-face`、`deskcat-accel`、`deskcat-tap`、`deskcat-touch`をpath dependencyで使う。wire protocolの実装、
-servoのhard limitとtrajectory limitingの実装、`set_expression`の表情の図形と受理の判定の順序、`accel-sample-15`のADXL345連続測定の設定値と復号・統計、tap検出の設定値と`tapped`の送出条件、`touch-sample-14`のXPT2046の制御byteと応答の復号を、
+`deskcat-protocol`、`deskcat-servo`、`deskcat-face`、`deskcat-accel`、`deskcat-tap`、`deskcat-env`、`deskcat-touch`をpath dependencyで使う。wire protocolの実装、
+servoのhard limitとtrajectory limitingの実装、`set_expression`の表情の図形と受理の判定の順序、`accel-sample-15`のADXL345連続測定の設定値と復号・統計、tap検出の設定値と`tapped`の送出条件、BME280の生値と補正係数からの補償計算、`touch-sample-14`のXPT2046の制御byteと応答の復号を、
 それぞれhostのtestとfirmwareで1つに保つためである。
 判断の記録は[ADR-0008](../../docs/decisions/0008-firmware-protocol-crate-reuse.md)にある
-（`deskcat-servo`、`deskcat-face`、`deskcat-tap`、`deskcat-accel`、`deskcat-touch`は同ADRの追記）。
+（`deskcat-servo`、`deskcat-face`、`deskcat-tap`、`deskcat-accel`、`deskcat-touch`は同ADRの追記。`deskcat-env`には同ADRの追記が無い）。
 
 ```toml
 deskcat-protocol = { path = "../../crates/deskcat-protocol" }
@@ -59,6 +59,7 @@ deskcat-servo = { path = "../../crates/deskcat-servo" }
 deskcat-face = { path = "../../crates/deskcat-face" }
 deskcat-accel = { path = "../../crates/deskcat-accel" }
 deskcat-tap = { path = "../../crates/deskcat-tap" }
+deskcat-env = { path = "../../crates/deskcat-env" }
 deskcat-touch = { path = "../../crates/deskcat-touch" }
 ```
 
@@ -66,9 +67,9 @@ deskcat-touch = { path = "../../crates/deskcat-touch" }
   このディレクトリの`Cargo.lock`の2つに分かれたままでよい。
 - **共有crateの`rust-version`は、host（1.97.1）とESP toolchain（rustc 1.95.0-nightly）の
   両方を満たす下限にしてある。**`crates/deskcat-protocol/Cargo.toml`、
-  `crates/deskcat-servo/Cargo.toml`、`crates/deskcat-face/Cargo.toml`、`crates/deskcat-accel/Cargo.toml`、`crates/deskcat-tap/Cargo.toml`、`crates/deskcat-touch/Cargo.toml`が理由込みで宣言している。
+  `crates/deskcat-servo/Cargo.toml`、`crates/deskcat-face/Cargo.toml`、`crates/deskcat-accel/Cargo.toml`、`crates/deskcat-tap/Cargo.toml`、`crates/deskcat-env/Cargo.toml`、`crates/deskcat-touch/Cargo.toml`が理由込みで宣言している。
   ここを上げるとfirmwareのbuildが`rustc 1.95.0-nightly is not supported`でcompile前に止まる。
-- `crates/deskcat-protocol/**`、`crates/deskcat-servo/**`、`crates/deskcat-face/**`、`crates/deskcat-accel/**`、`crates/deskcat-tap/**`、`crates/deskcat-touch/**`の変更でも
+- `crates/deskcat-protocol/**`、`crates/deskcat-servo/**`、`crates/deskcat-face/**`、`crates/deskcat-accel/**`、`crates/deskcat-tap/**`、`crates/deskcat-env/**`、`crates/deskcat-touch/**`の変更でも
   `.github/workflows/firmware.yml`が発火する。
   host側だけの変更でfirmware buildが壊れるのを検知するためである。
 - `bench-servo-test-17`付きのbuildを除くbuildで、`src/servo.rs`を通って角度を出せるのは、同fileの`LimitedServo`だけである。`bench-servo-test-17`付きのbuildは、`Sg90::move_to_angle_once`でlimiterを通らずに1回動かす（`src/servo.rs`のmodule docの例外段落）。

@@ -1,6 +1,6 @@
 //! Pi linkの受信の振り分けと、Pi linkのUARTへの書き込み（§8）。
 //!
-//! Pi linkを持つbuild（`bench-servo-test-17`以外のすべて。`#487`）で使う。main loopがPi linkの
+//! Pi linkを持つbuild（`bench-servo-test-17`を有効にするbuild以外のすべて。`#487`）で使う。main loopがPi linkの
 //! UARTから読んだbyteを[`PiLink::on_bytes`]へ渡す。`PiLink`は行を組み立ててdecodeし、受信の順に
 //! 次のとおり扱う。
 //!

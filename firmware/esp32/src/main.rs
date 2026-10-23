@@ -179,7 +179,7 @@
 mod accel;
 #[cfg(feature = "accel-sample-15")]
 mod accel_sample;
-// Pi link（UART1）の`boot`の受理確認・再送。**`bench-servo-test-17`のbuildだけは持たない。**
+// Pi link（UART1）の`boot`の受理確認・再送。**`bench-servo-test-17`を有効にするbuild（`bench-servo-90-17`を含む）だけは持たない。**
 // 正本`docs/hardware/servo-safety-limits.md`の`測定のための駆動（承認の状態の項目6）`節が、
 // 測定用のbuildは「Piとの通信linkを持たない」と定めているためである（`#487`でfeatureの排他を
 // やめたときの、ただ1つの例外である。featureどうしの排他ではない。Pi linkを外すだけである）。
@@ -446,7 +446,7 @@ fn next_deadline(deadline: u64, period_ms: u32, now: u64) -> (u64, bool) {
 /// 待ち時間が `u32` に収まらない場合は `u32::MAX` で頭打ちにする。頭打ちにしても
 /// 次の周回で残りを待ち直すだけであり、期限を飛ばさない。
 ///
-/// Pi linkを持つbuild（`bench-servo-test-17`以外のすべて）は、この関数の代わりに
+/// Pi linkを持つbuild（`bench-servo-test-17`を有効にするbuild（`bench-servo-90-17`を含む）以外のすべて）は、この関数の代わりに
 /// `UartDriver::read`のtimeoutで待つ（main loop参照。同じく1 ms以上へ丸める）。
 #[cfg(feature = "bench-servo-test-17")]
 fn sleep_ms_until(until: u64, now: u64) {
