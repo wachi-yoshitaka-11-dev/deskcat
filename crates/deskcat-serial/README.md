@@ -136,7 +136,7 @@ command ageは`PROTO-TBD-008`・`005`・`012`・`013`のままである。
 
 **ESP32が`boot`→ACKより先の往復に応えるのは、`firmware/esp32`を
 [Issue #487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)のPR B2
-（[PR #529](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/529)）以降のsourceから、Pi linkを持つbuild（`bench-servo-test-17`以外）で書き込んだ場合である。**
+（[PR #529](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/529)）以降のsourceから、Pi linkを持つbuild（`bench-servo-test-17`を有効にするbuild以外）で書き込んだ場合である。**
 PR B2で、ESP32は`hello`／`ping`／`get_status`にACKを返し、`get_status`にはACKの直後に`status`を返す。
 初回の接続で`boot`より先に`hello`のACKが届けば、`hello`のACK（ESP32の`sid`を未承認のため
 `unapproved_hello_acks`へ数える。仕様§6）→`boot`とそのACK→`get_status`のACKと`status`、の順になる

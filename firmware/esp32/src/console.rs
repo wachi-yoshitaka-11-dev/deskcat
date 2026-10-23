@@ -17,7 +17,7 @@
 //!
 //! # Pi linkを持つbuildを実際のPi hostへ接続する範囲
 //!
-//! Pi linkを持つのは、`bench-servo-test-17`以外のすべてのbuild（製品buildである既定buildを含む）
+//! Pi linkを持つのは、`bench-servo-test-17`を有効にするbuild（`bench-servo-90-17`を含む）以外のすべてのbuild（製品buildである既定buildを含む）
 //! である（#487。`main.rs`のmodule doc「buildの構成」）。
 //!
 //! **接続してよい場面と条件は、`docs/hardware/gpio-assignment.md`の`信号線をつないでよい条件`が

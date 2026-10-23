@@ -95,7 +95,7 @@ CIでの成否は、この変更を含むPull Requestのcheck結果で確認す�
 `[workspace]` 節を持たないため、**exclude を外すと firmware の build が壊れる。**
 
 firmware は `crates/deskcat-protocol`、`crates/deskcat-servo`、`crates/deskcat-face`、`crates/deskcat-accel`、`crates/deskcat-tap`、`crates/deskcat-env`、`crates/deskcat-touch` を path dependency で使う
-（[ADR-0008](../decisions/0008-firmware-protocol-crate-reuse.md)。`deskcat-servo`、`deskcat-face`、`deskcat-tap`、`deskcat-accel` は同 ADR の追記）。
+（[ADR-0008](../decisions/0008-firmware-protocol-crate-reuse.md)。`deskcat-servo`、`deskcat-face`、`deskcat-tap`、`deskcat-accel`、`deskcat-touch` は同 ADR の追記。`deskcat-env` には同 ADR の追記が無い）。
 **これらの crate の `rust-version` は host と ESP toolchain の両方を満たす下限にしてある。**
 上げると firmware の build が compile 前に停止する。
 **`crates/deskcat-protocol/`、`crates/deskcat-servo/`、`crates/deskcat-face/`、`crates/deskcat-accel/`、`crates/deskcat-tap/`、`crates/deskcat-env/`、`crates/deskcat-touch/` を変更したら、host だけでなく ESP32 build も回す。**

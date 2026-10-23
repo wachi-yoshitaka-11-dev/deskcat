@@ -82,6 +82,12 @@ class DetectionTests(FixtureCase):
         ok, _ = self.run_check(self.commit())
         self.assertTrue(ok)
 
+    def test_row_with_deleted_figure_fails(self):
+        self.write(sync.LOG_PATH, f"# log\n\n{ROW_CHANGED}\n| Other | x |\n")
+        (Path(self.root) / sync.FIGURE_PATH).unlink()
+        ok, _ = self.run_check(self.commit())
+        self.assertFalse(ok)
+
     def test_other_row_only_passes(self):
         self.write(sync.LOG_PATH, f"# log\n\n{ROW}\n| Other | y |\n")
         ok, _ = self.run_check(self.commit())
