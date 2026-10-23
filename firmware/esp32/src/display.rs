@@ -76,18 +76,21 @@
 // moduleごと`#[cfg]`で落とさない。製品buildではLCDを使う。
 #![allow(dead_code)]
 
+use std::rc::Rc;
+
 use esp_idf_svc::hal::delay::{Ets, FreeRtos};
 use esp_idf_svc::hal::gpio::{InputPin, Level, Output, OutputPin, PinDriver};
-use esp_idf_svc::hal::spi::config::{Config as SpiConfig, DriverConfig, MODE_0};
-use esp_idf_svc::hal::spi::{SpiAnyPins, SpiBusDriver, SpiDriver};
-use esp_idf_svc::hal::units::Hertz;
+use esp_idf_svc::hal::spi::config::DriverConfig;
+use esp_idf_svc::hal::spi::{SpiAnyPins, SpiDriver};
 use esp_idf_svc::sys::{EspError, ESP_ERR_INVALID_ARG};
+
+use crate::spi_port::SpiPort;
 
 /// SPI clockの上限。read timing（`trc`最小150ns→最大約6.67 MHz）を基準に、
 /// write（`twc`最小100ns→最大10 MHz）にも共通で使えるよう余裕を持たせた値。
 /// **測定や一般値ではなく、上記一次資料の上限から導いた値である。**
 /// 今は読み出しをしない（module doc）が、`LCD-MISO`はbusに残るため値は変えない。
-const SPI_CLOCK_HZ: u32 = 6_000_000;
+pub const SPI_CLOCK_HZ: u32 = 6_000_000;
 
 const CMD_SWRESET: u8 = 0x01;
 const CMD_SLPOUT: u8 = 0x11;
@@ -142,7 +145,7 @@ pub mod color {
 /// 送る設計であり（datasheetの各command図がS...Pの1区間で示す）、途中でCSを
 /// 上げ下げしない。
 pub struct Ili9341<'d> {
-    bus: SpiBusDriver<'d, SpiDriver<'d>>,
+    bus: SpiPort<'d>,
     cs: PinDriver<'d, Output>,
     dc: PinDriver<'d, Output>,
     rst: PinDriver<'d, Output>,
@@ -151,6 +154,7 @@ pub struct Ili9341<'d> {
 
 impl<'d> Ili9341<'d> {
     /// SPI busとGPIOを結線し、driverを作る。**まだ初期化commandは送らない。**
+    /// busは専有し、bus lockを握り続ける（製品buildの型。[`SpiPort::Held`]）。
     #[allow(clippy::too_many_arguments)]
     pub fn new<SPI: SpiAnyPins + 'd>(
         spi: SPI,
@@ -163,13 +167,30 @@ impl<'d> Ili9341<'d> {
         bl: impl OutputPin + 'd,
     ) -> Result<Self, EspError> {
         let driver = SpiDriver::new(spi, sclk, mosi, Some(miso), &DriverConfig::new())?;
-        let bus = SpiBusDriver::new(
-            driver,
-            &SpiConfig::new()
-                .baudrate(Hertz(SPI_CLOCK_HZ))
-                .data_mode(MODE_0),
-        )?;
+        let bus = SpiPort::held(driver, SPI_CLOCK_HZ)?;
+        Self::with_port(bus, cs, dc, rst, bl)
+    }
 
+    /// `touch-lcd-14`用。**別のdeviceと共有する`driver`**に、`SPI_CLOCK_HZ`のdeviceを足して作る。
+    /// busは転送ごとに取る（[`SpiPort::Shared`]）。CSは`new`と同じく自前のGPIOで扱う。
+    pub fn with_shared_bus(
+        driver: Rc<SpiDriver<'d>>,
+        cs: impl OutputPin + 'd,
+        dc: impl OutputPin + 'd,
+        rst: impl OutputPin + 'd,
+        bl: impl OutputPin + 'd,
+    ) -> Result<Self, EspError> {
+        let bus = SpiPort::shared(driver, SPI_CLOCK_HZ)?;
+        Self::with_port(bus, cs, dc, rst, bl)
+    }
+
+    fn with_port(
+        bus: SpiPort<'d>,
+        cs: impl OutputPin + 'd,
+        dc: impl OutputPin + 'd,
+        rst: impl OutputPin + 'd,
+        bl: impl OutputPin + 'd,
+    ) -> Result<Self, EspError> {
         let mut cs = PinDriver::output(cs)?;
         let mut dc = PinDriver::output(dc)?;
         let mut rst = PinDriver::output(rst)?;

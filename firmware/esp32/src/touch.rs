@@ -1,4 +1,4 @@
-//! #14 の試験 build 専用の `TOUCH-01`（XPT2046）の raw 読み出し。bus はこの main-loop task が所有する。
+//! #14 の試験 build（`touch-sample-14`、`touch-lcd-14`）専用の `TOUCH-01`（XPT2046）の raw 読み出し。bus はこの main-loop task が使う。
 //!
 //! 制御 byte と 3 byte 応答の復号は `deskcat_touch` が持つ（host test 済み。ここへ再掲しない）。
 //! `POLL_INTERVAL_MS` ごとに `X`・`Y`・`Z1`・`Z2` を 1 回ずつ読み（4 回の転送で 1 sample）、`T_IRQ`（`TOUCH-IRQ`）の level とあわせて
@@ -9,10 +9,15 @@
 //!
 //! pin は [`docs/hardware/gpio-assignment.md`](../../../docs/hardware/gpio-assignment.md) の信号 inventory が正本で、
 //! `LCD-SCLK`＝GPIO18、`LCD-MOSI`＝GPIO23、`LCD-MISO`＝GPIO19（`TOUCH-01` と共有）、`TOUCH-CS`＝GPIO21、`TOUCH-IRQ`＝GPIO34 を使う。
-//! **この build は LCD を初期化せず、`crate::display` を使わない**（LCD の driver は `SpiBusDriver` で 6 MHz の bus lock を握り続けるため、
-//! 同じ SPI host を 2 つの driver で共有できない。両者を同じ bus で動かすには `display.rs` と製品 build を変える必要があり、この build の範囲外である）。
-//! **LCD が接続されていても選択されないよう、`LCD-CS`（GPIO22）を High に固定する**（`crate::display` と同じく CS は active low）。
-//! CS は `crate::display` と同じく、`SpiBusDriver`（hardware CS なし）と自前の GPIO で扱う: idle は High、転送ごとに Low にし、
+//! bus の持ち方は 2 通りで、[`crate::spi_port::SpiPort`] が切り替える。
+//!
+//! - **`touch-sample-14`（[`TouchSampler::new`]）は LCD を初期化せず、`crate::display` を使わない。**bus は `SpiBusDriver` で専有し、
+//!   bus lock を握り続ける。**LCD が接続されていても選択されないよう、`LCD-CS`（GPIO22）を High に固定する**（`crate::display` と同じく CS は active low）。
+//! - **`touch-lcd-14`（[`TouchSampler::with_shared_bus`]）は LCD と `SpiDriver` を共有する。**`SpiDeviceDriver` で転送ごとに bus を取る。
+//!   `LCD-CS` は LCD の driver（`crate::display`）が持つ。使い方は `crate::touch_lcd`。**この経路は console（stdin）を読まず、`MARK` を受け付けない**
+//!   （`T_IRQ` の変化の記録は同じ）。
+//!
+//! どちらも CS は `crate::display` と同じく、hardware CS なしと自前の GPIO で扱う: idle は High、転送ごとに Low にし、
 //! 転送が失敗しても High へ戻す。
 //!
 //! # SPI の設定
@@ -54,12 +59,15 @@ use std::io::{ErrorKind, Read};
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
+use std::rc::Rc;
+
 use deskcat_touch::{decode_12bit, frame, Channel, FRAME_LEN};
 use esp_idf_svc::hal::gpio::{Input, InputPin, Output, OutputPin, PinDriver, Pull};
-use esp_idf_svc::hal::spi::config::{Config as SpiConfig, DriverConfig, MODE_0};
-use esp_idf_svc::hal::spi::{SpiAnyPins, SpiBusDriver, SpiDriver};
-use esp_idf_svc::hal::units::Hertz;
+use esp_idf_svc::hal::spi::config::DriverConfig;
+use esp_idf_svc::hal::spi::{SpiAnyPins, SpiDriver};
 use esp_idf_svc::sys::EspError;
+
+use crate::spi_port::SpiPort;
 
 /// 読む間隔（ms）。1 sample は 4 回の転送で、1 MHz なら 1 回 24 µs 強。触れ方を見るための一般値で、`crate::config` の周期とは独立。
 pub const POLL_INTERVAL_MS: u64 = 20;
@@ -219,18 +227,23 @@ struct Marks {
 }
 
 impl Marks {
-    fn new() -> Self {
-        let (tx, rx) = mpsc::channel();
-        let console = match std::thread::Builder::new()
-            .name("touch_console".into())
-            .stack_size(MARK_THREAD_STACK_BYTES)
-            .spawn(move || read_console(&tx))
-        {
-            Ok(_) => Some(rx),
-            Err(err) => {
-                log::error!("touch_mark_console_spawn_failed error={err}");
-                None
+    /// `with_console` が偽なら、stdin を読む thread を起こさない（`MARK` を受け付けず、`T_IRQ` の変化の記録だけ行う）。
+    fn new(with_console: bool) -> Self {
+        let console = if with_console {
+            let (tx, rx) = mpsc::channel();
+            match std::thread::Builder::new()
+                .name("touch_console".into())
+                .stack_size(MARK_THREAD_STACK_BYTES)
+                .spawn(move || read_console(&tx))
+            {
+                Ok(_) => Some(rx),
+                Err(err) => {
+                    log::error!("touch_mark_console_spawn_failed error={err}");
+                    None
+                }
             }
+        } else {
+            None
         };
         Self {
             console,
@@ -312,11 +325,12 @@ impl Marks {
 }
 
 pub struct TouchSampler {
-    bus: SpiBusDriver<'static, SpiDriver<'static>>,
+    bus: SpiPort<'static>,
     cs: PinDriver<'static, Output>,
     irq: PinDriver<'static, Input>,
     /// `LCD-CS`。High に固定して LCD を選択させない。値は読まないが、drop で pin が戻らないよう保持する。
-    _lcd_cs: PinDriver<'static, Output>,
+    /// LCD と bus を共有する build（`touch-lcd-14`）では LCD の driver が持つので `None`。
+    _lcd_cs: Option<PinDriver<'static, Output>>,
     next_poll_ms: u64,
     consecutive_errors: u32,
     stopped: bool,
@@ -332,6 +346,8 @@ pub struct TouchSampler {
 
 impl TouchSampler {
     /// SPI host と GPIO を結線する。**まだ何も送らない。**CS は idle の High、`LCD-CS` も High にする。
+    /// bus は専有し、bus lock を握り続ける（`touch-sample-14` の型。[`SpiPort::Held`]）。
+    #[cfg_attr(feature = "touch-lcd-14", allow(dead_code))]
     #[allow(clippy::too_many_arguments)]
     pub fn new<SPI: SpiAnyPins + 'static>(
         spi: SPI,
@@ -344,17 +360,36 @@ impl TouchSampler {
         now_ms: u64,
     ) -> Result<Self, EspError> {
         let driver = SpiDriver::new(spi, sclk, mosi, Some(miso), &DriverConfig::new())?;
-        let bus = SpiBusDriver::new(
-            driver,
-            &SpiConfig::new()
-                .baudrate(Hertz(SPI_CLOCK_HZ))
-                .data_mode(MODE_0),
-        )?;
-        let mut cs = PinDriver::output(cs)?;
+        let bus = SpiPort::held(driver, SPI_CLOCK_HZ)?;
         let mut lcd_cs = PinDriver::output(lcd_cs)?;
+        lcd_cs.set_high()?;
+        Self::with_port(bus, cs, irq, Some(lcd_cs), true, now_ms)
+    }
+
+    /// `touch-lcd-14` 用。**LCD と共有する `driver`** に、[`SPI_CLOCK_HZ`] の device を足して作る。bus は転送ごとに取る
+    /// （[`SpiPort::Shared`]）。`LCD-CS` は LCD の driver が持つ。
+    #[cfg_attr(not(feature = "touch-lcd-14"), allow(dead_code))]
+    pub fn with_shared_bus(
+        driver: Rc<SpiDriver<'static>>,
+        cs: impl OutputPin + 'static,
+        irq: impl InputPin + 'static,
+        now_ms: u64,
+    ) -> Result<Self, EspError> {
+        let bus = SpiPort::shared(driver, SPI_CLOCK_HZ)?;
+        Self::with_port(bus, cs, irq, None, false, now_ms)
+    }
+
+    fn with_port(
+        bus: SpiPort<'static>,
+        cs: impl OutputPin + 'static,
+        irq: impl InputPin + 'static,
+        lcd_cs: Option<PinDriver<'static, Output>>,
+        with_console: bool,
+        now_ms: u64,
+    ) -> Result<Self, EspError> {
+        let mut cs = PinDriver::output(cs)?;
         // 外部 pull-up が無い間の浮きを避けるため、driver を作ったらすぐ High にする。
         cs.set_high()?;
-        lcd_cs.set_high()?;
         // `TOUCH-IRQ` は外部 pull を付けない（`gpio-assignment.md`）。XPT2046 の `PENIRQ` が内部 pull-up 付きの出力なので、ESP32 側も pull しない。
         let irq = PinDriver::input(irq, Pull::Floating)?;
         Ok(Self {
@@ -372,8 +407,14 @@ impl TouchSampler {
             z1: MinMax::new(),
             z2: MinMax::new(),
             counters: Counters::default(),
-            marks: Marks::new(),
+            marks: Marks::new(with_console),
         })
+    }
+
+    /// 起動からの SPI 転送の失敗の件数。
+    #[cfg_attr(not(feature = "touch-lcd-14"), allow(dead_code))]
+    pub fn spi_errors(&self) -> u32 {
+        self.counters.spi_errors
     }
 
     /// 次に動く時刻（uptime の ms）。止まっていれば `None`。
