@@ -44,8 +44,8 @@
 //!   （`level=low after=high` なら、転送の前は low で後は high。この build は毎 poll 転送するので、転送をしない poll は無い）。
 //! - `touch_mark`: UART0 の console（stdin）から [`MARK_TOKEN`] の行を受けたとき出す（SPI の失敗が続いて停止した後は `MARK` を取り込まず、`touch_mark` は出ない）。操作を始める前に人間が `MARK` と入力して改行すれば、
 //!   次の `touch_mark` までの `touch_irq_edge` を、その操作のものとして時刻で対応づけられる（`touch_raw` の payload は時刻を持たない。
-//!   行頭の log の時刻（`t_ms` と同じ clock かは未確認）か、行の並びで対応づける）。`t_ms` は改行を読んだ時刻（poll の時刻から、
-//!   thread が読んでからの経過を引いたもの）で、完全一致の行だけを受ける。
+//!   行頭の log の時刻（`t_ms` と同じ clock かは未確認）か、行の並びで対応づける）。`t_ms` は改行を読んだ時刻（poll の先頭の時刻と `Instant` の対を基準に、
+//!   thread が読んだ `Instant` との差を足し引きしたもの）で、完全一致の行だけを受ける。
 //!   **console は別 thread（`touch_console`）で読む。**`stdin.read` が入力を待って blocking なのか `WouldBlock` を返すのかは、実機で確かめていない
 //!   （`bench-servo-test-17` の確認語は入力を待つ loop で、どちらでも動くため、実績はどちらも示さない）。別 thread なら、どちらでも poll は止まらない。
 //!   **この thread が実機で動くこと（MARK を打たずに `touch_raw` が続くこと、MARK で `touch_mark` が出ること）は未確認である。**
@@ -196,6 +196,16 @@ fn read_console(tx: &mpsc::Sender<ConsoleEvent>) {
     }
 }
 
+/// `MARK` の改行を読んだ時刻（uptime の ms）。`(now_ms, poll_at)` を同じ時点の対として、`at` との差を足し引きする。
+fn mark_time_ms(now_ms: u64, poll_at: Instant, at: Instant) -> u64 {
+    let ms = |d: Duration| u64::try_from(d.as_millis()).unwrap_or(u64::MAX);
+    if at >= poll_at {
+        now_ms.saturating_add(ms(at.saturating_duration_since(poll_at)))
+    } else {
+        now_ms.saturating_sub(ms(poll_at.saturating_duration_since(at)))
+    }
+}
+
 /// `T_IRQ` の変化の記録と、操作の区切り（`MARK`）の受け付け。
 struct Marks {
     /// console の読み取り thread からの事象。thread を起こせなかったときは `None`（touch の sample は続ける）。
@@ -267,18 +277,17 @@ impl Marks {
         );
     }
 
-    /// thread が受けた事象を取り込み、`MARK` なら区切りを log へ出す。`now_ms` は poll の時刻で、`MARK` の時刻はそこから
-    /// 改行を読んでからの経過を引いて求める。
-    fn poll_console(&mut self, now_ms: u64) {
+    /// thread が受けた事象を取り込み、`MARK` なら区切りを log へ出す。`now_ms` は poll の時刻、`poll_at` は同じ時点で取った `Instant`
+    /// （対にして基準にする）で、`MARK` の時刻は改行を読んだ `Instant` との差を `now_ms` へ足し引きして求める。
+    fn poll_console(&mut self, now_ms: u64, poll_at: Instant) {
         while let Some(rx) = &self.console {
             match rx.try_recv() {
                 Ok(ConsoleEvent::Mark { at }) => {
-                    let age_ms = u64::try_from(at.elapsed().as_millis()).unwrap_or(u64::MAX);
                     self.mark = self.mark.saturating_add(1);
                     self.edge = 0;
                     log::info!(
                         "touch_mark t_ms={} mark={}",
-                        now_ms.saturating_sub(age_ms),
+                        mark_time_ms(now_ms, poll_at, at),
                         self.mark
                     );
                 }
@@ -378,9 +387,10 @@ impl TouchSampler {
             return;
         }
         self.next_poll_ms = now_ms + POLL_INTERVAL_MS;
+        // `MARK` は IRQ を読む前に取り込む。この poll の IRQ の変化は、取り込んだ `MARK` の番号に数える（読んだ後に届いた `MARK` は次の poll）。
+        self.marks.poll_console(now_ms, Instant::now());
         // **IRQ は転送の前に読む。**転送の間は `PENIRQ` が無効になり low を示すため（資料 `PENIRQ Output`）、後で読むと touch と区別できない。
         let irq_low = self.irq.is_low();
-        self.marks.poll_console(now_ms);
         let edge = self.marks.observe_irq(now_ms, irq_low);
         let result = self.read_raw();
         if let Some(edge) = edge {
@@ -402,6 +412,9 @@ impl TouchSampler {
                 if self.consecutive_errors >= MAX_CONSECUTIVE_ERRORS {
                     log::error!("touch_sample_stopped");
                     self.stopped = true;
+                    // 停止の後は `MARK` を取り込まない。受け口を捨てて、読み取り thread の event が溜まらないようにする
+                    // （thread は次の送信の失敗で終わる）。
+                    self.marks.console = None;
                 }
             }
         }
