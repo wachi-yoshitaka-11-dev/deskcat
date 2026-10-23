@@ -6,7 +6,7 @@
 | --- | --- |
 | [`deskcat.kicad_pro`](deskcat.kicad_pro)、[`deskcat.kicad_sch`](deskcat.kicad_sch) | #512 の論理回路。EXP-019 測定前の基準配線に、EXP-022 の UART と EXP-025 の LED 2枝を加えた設計上の合成図。抵抗の `Value` は数値の代わりに値の正本文書名を示す。`ACCEL-01`・`ENV-01` の KiCad pin 番号の `TBD-*` は物理端子番号ではない。 |
 | [`breadboard/layout.svg`](breadboard/layout.svg) | 最終の配線の図。測定のためだけの一時配線（EXP-030〜035 の Arduino・分圧・シャント・測定用の戻り線）は描かない。基準は [#512 の図①](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/512#issuecomment-5951254069)。EXP-022（UART）・EXP-025（LED）・EXP-028（サーボの信号と電源の経路。端子台・PTC・M-12001・サーボは板の外）・EXP-038（touch の 5 本）を足した。LED の脚は [#514 の 2026-10-20 の申告](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514#issuecomment-6291626373)、抵抗・GPIO2・GPIO5 の線は同 comment の 2026-10-12 の申告、黄の線2本・基準線の色・UART の穴・e28–f28 は 2026-10-22 のユーザーの申告である。出所は右パネルに一覧。穴位置を推定して描いていない。 |
-| [`breadboard-rebuild/`](breadboard-rebuild/README.md) | #512 の組み直しの配置（設計で、まだ組んでいない）。配置図 `layout.svg` と結線表 `wiring-table.md` は `generate.py` のデータから生成する。今の配線は上の `breadboard/layout.svg` が描いている。組み直した後は、この配置でその図を置き換える。 |
+| [`breadboard-rebuild/`](breadboard-rebuild/README.md) | #512 の組み直しの配置（設計で、まだ組んでいない）。配置図 `layout.svg` と結線表 `wiring-table.md` は `generate.py` のデータから生成する。組み直す前の配線は上の `breadboard/layout.svg` が描いている。組み直した後は、この配置でその図を置き換える。 |
 | [`wokwi/esp32-boot-pulls/diagram.json`](wokwi/esp32-boot-pulls/diagram.json) | 起動時 GPIO と外部 pull の初期評価用。ESP32、pull、LED の枝、ILI9341 互換表示部だけを配置した。全機器をシミュレーションした構成ではない。 |
 
 基準図①は、ユーザーの配線地図と回答から AI が作り、ユーザーが照合した版である。SVG 本文の SHA-256 は末尾改行を除いて `a91e6d1e669258f477fcde5e0d77fda64260d6a0d322a3c12491654c39a985fa` と一致した。基準時点は EXP-019 の測定前で、測定のためだけに抵抗やジャンパを挿した状態は含めない。EXP-021・EXP-022 は `ACCEL-01`、`ENV-01`、`DISP-01` の配線が戻した状態から変わっていないと記録する。Pi の給電差し替え（EXP-020、EXP-023）は USB 端子側であり、ブレッドボードの変更ではない。

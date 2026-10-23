@@ -84,8 +84,8 @@
 | S18 | B1 K30 | B1 G8 | 5V（J2-19 の 5V pin） | G8 側を先に挿し、K30 側を後に挿す（5 V の端を最後にする） |
 | S19 | B1 A26 | B1 G5 | GPIO2（LED-COMM） | A26 側を抜いておく（EXP-026 で ESP32 側を抜いた状態） |
 | S20 | B1 A21 | B1 G2 | GPIO5（LED-REACT） | A21 側を抜いておく（EXP-026 で ESP32 側を抜いた状態） |
-| S21 | B1 K23 | B1 F1 | GPIO14（PI-UART-RX） | 挿す |
-| S22 | B1 K26 | B1 F2 | GPIO13（PI-UART-TX） | 挿す |
+| S21 | B1 K23 | B1 F1 | GPIO14（PI-UART-RX） | K23 側を抜いておく。挿すのは gpio-assignment.md の `信号線をつないでよい条件` を満たすときだけ（ESP32 側の端で抜き差しする） |
+| S22 | B1 K26 | B1 F2 | GPIO13（PI-UART-TX） | K26 側を抜いておく。条件は S21 と同じ |
 | S23 | B1 K22 | B1 F3 | GPIO27（SERVO-PWM） | 挿す |
 | S24 | B3 h5 | B3 b13 | GPIO25（I2C SDA） | 挿す |
 | S25 | B3 h6 | B3 b15 | GPIO26（I2C SCL） | 挿す |
@@ -98,11 +98,11 @@
 
 | ID | 板の端 | 板の外の端 | 信号 | 組み直した直後 |
 |---|---|---|---|---|
-| X1 | B1 D5 | Pi の header pin 8（GPIO14 `TXD`） | PI_TXD（Pi pin 8 TXD 側） | D5 側を抜いておく。挿すのは gpio-assignment.md の `信号線をつないでよい条件` を満たすときだけ |
-| X2 | B1 D6 | Pi の header pin 10（GPIO15 `RXD`） | PI_RXD（Pi pin 10 RXD 側） | D6 側を抜いておく。条件は X1 と同じ |
-| X3 | B1 A18 | Pi の header pin 39（GND） | GND | 条件は X1 と同じ（GND の線の確かめ方も同じ節） |
-| X4 | B1 D7 | サーボの plug の黄の穴 | SERVO_SIG（サーボの黄の線の側） | サーボの試験の記録（#17）の状態に合わせる |
-| X5 | B1 −30 | 端子台S の −（ESP32 の GND をサーボの GND と共通にする線。EXP-034 の ②） | GND | サーボの試験の記録（#17）の状態に合わせる |
+| X1 | B1 D5 | Pi の header pin 8（GPIO14 `TXD`） | PI_TXD（Pi pin 8 TXD 側） | 挿す（抜き差しは S21 の K23 側で行う。Pi の header 側では抜き差ししない） |
+| X2 | B1 D6 | Pi の header pin 10（GPIO15 `RXD`） | PI_RXD（Pi pin 10 RXD 側） | 挿す（抜き差しは S22 の K26 側で行う。Pi の header 側では抜き差ししない） |
+| X3 | B1 A18 | Pi の header pin 39（GND） | GND | A18 側を抜いておく。挿す前に、gpio-assignment.md の `信号線をつないでよい条件` の6の開放側の値を読む |
+| X4 | B1 D7 | サーボの plug の黄の穴 | SERVO_SIG（サーボの黄の線の側） | D7 側を抜いておく。挿すのは #17 のサーボの試験の手順と承認に従うときだけ |
+| X5 | B1 −30 | 端子台S の −（ESP32 の GND をサーボの GND と共通にする線。EXP-034 の Wiring revision、hardware/breadboard/layout.svg の基準線） | GND | −30 側を抜いておく。条件は X4 と同じ |
 
 ## 首を通る LCD の14本（両端メスの線）
 

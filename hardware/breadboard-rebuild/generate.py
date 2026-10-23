@@ -200,8 +200,9 @@ SOFT = [
     ("S18", "B1:K30", "B1:G8", "5V", "G8 側を先に挿し、K30 側を後に挿す（5 V の端を最後にする）"),
     ("S19", "B1:A26", "B1:G5", "GPIO2", "A26 側を抜いておく（EXP-026 で ESP32 側を抜いた状態）"),
     ("S20", "B1:A21", "B1:G2", "GPIO5", "A21 側を抜いておく（EXP-026 で ESP32 側を抜いた状態）"),
-    ("S21", "B1:K23", "B1:F1", "GPIO14", ""),
-    ("S22", "B1:K26", "B1:F2", "GPIO13", ""),
+    ("S21", "B1:K23", "B1:F1", "GPIO14",
+     "K23 側を抜いておく。挿すのは gpio-assignment.md の `信号線をつないでよい条件` を満たすときだけ（ESP32 側の端で抜き差しする）"),
+    ("S22", "B1:K26", "B1:F2", "GPIO13", "K26 側を抜いておく。条件は S21 と同じ"),
     ("S23", "B1:K22", "B1:F3", "GPIO27", ""),
     ("S24", "B3:h5", "B3:b13", "GPIO25", ""),
     ("S25", "B3:h6", "B3:b15", "GPIO26", ""),
@@ -214,13 +215,15 @@ SOFT = [
 # 板の外へ出る線。(id, 板の端, 板の端の信号, 板の外の端, 状態)
 OFFBOARD = [
     ("X1", "B1:D5", "PI_TXD", "Pi の header pin 8（GPIO14 `TXD`）",
-     "D5 側を抜いておく。挿すのは gpio-assignment.md の `信号線をつないでよい条件` を満たすときだけ"),
+     "挿す（抜き差しは S21 の K23 側で行う。Pi の header 側では抜き差ししない）"),
     ("X2", "B1:D6", "PI_RXD", "Pi の header pin 10（GPIO15 `RXD`）",
-     "D6 側を抜いておく。条件は X1 と同じ"),
-    ("X3", "B1:A18", "GND", "Pi の header pin 39（GND）", "条件は X1 と同じ（GND の線の確かめ方も同じ節）"),
-    ("X4", "B1:D7", "SERVO_SIG", "サーボの plug の黄の穴", "サーボの試験の記録（#17）の状態に合わせる"),
-    ("X5", "B1:-30", "GND", "端子台S の −（ESP32 の GND をサーボの GND と共通にする線。EXP-034 の ②）",
-     "サーボの試験の記録（#17）の状態に合わせる"),
+     "挿す（抜き差しは S22 の K26 側で行う。Pi の header 側では抜き差ししない）"),
+    ("X3", "B1:A18", "GND", "Pi の header pin 39（GND）",
+     "A18 側を抜いておく。挿す前に、gpio-assignment.md の `信号線をつないでよい条件` の6の開放側の値を読む"),
+    ("X4", "B1:D7", "SERVO_SIG", "サーボの plug の黄の穴",
+     "D7 側を抜いておく。挿すのは #17 のサーボの試験の手順と承認に従うときだけ"),
+    ("X5", "B1:-30", "GND", "端子台S の −（ESP32 の GND をサーボの GND と共通にする線。EXP-034 の Wiring revision、hardware/breadboard/layout.svg の基準線）",
+     "−30 側を抜いておく。条件は X4 と同じ"),
 ]
 
 # 首を通る14本（LCD 側は MSP2807 の pin 番号。#34 の決定）。線は両端メス（enclosure-and-neck.md の仮筐体）。
@@ -549,7 +552,7 @@ def check_5v(ck, find, node, used, parts):
 
 P = 22  # 1ピッチの px
 BOARD_POS = {"B1": (60, 560), "B2": (60, 130), "B3": (900, 560)}
-SVG_W, SVG_H = 1700, 1480
+SVG_W, SVG_H = 1700, 1560
 
 NET_COLOR = {"3V3": "#d62728", "GND": "#111111", "5V": "#e377c2"}
 
@@ -659,16 +662,19 @@ def draw_soft(out):
     for sid, a, b, net, state in SOFT:
         (x1, y1), (x2, y2) = soft_end_xy(a), soft_end_xy(b)
         color = NET_COLOR.get(net, "#2f6fb0")
-        dash = ' stroke-dasharray="6 4"' if state.startswith(("A26", "A21")) else ""
+        dash = ' stroke-dasharray="6 4"' if "抜いておく" in state else ""
         cx, cy = (x1 + x2) / 2, min(y1, y2) - 40
         out.append(f'<path d="M{x1} {y1} Q{cx} {cy} {x2} {y2}" stroke="{color}" stroke-width="1.6" fill="none" opacity="0.55"{dash}/>')
         for x, y in ((x1, y1), (x2, y2)):
             out.append(f'<circle cx="{x}" cy="{y}" r="4.5" fill="#fff" stroke="{color}" stroke-width="2"/>')
         out.append(f'<text x="{x2 + 6}" y="{y2 - 6}" font-size="9" fill="{color}">{sid}</text>')
         out.append(f'<text x="{x1 + 6}" y="{y1 - 6}" font-size="9" fill="{color}">{sid}</text>')
-    for xid, h, _net, far, _s in OFFBOARD:
+    for xid, h, _net, far, state in OFFBOARD:
         x, y = hole_xy(parse_hole(h))
-        out.append(f'<circle cx="{x}" cy="{y}" r="5" fill="#ffd54d" stroke="#a07800" stroke-width="2"/>')
+        if "抜いておく" in state:  # 板の端を抜いておく線は、白抜きの点線の丸
+            out.append(f'<circle cx="{x}" cy="{y}" r="5" fill="#fff" stroke="#a07800" stroke-width="2" stroke-dasharray="2 2"/>')
+        else:
+            out.append(f'<circle cx="{x}" cy="{y}" r="5" fill="#ffd54d" stroke="#a07800" stroke-width="2"/>')
         out.append(f'<text x="{x + 7}" y="{y + 12}" font-size="9" fill="#806000">{xid}</text>')
     for n, name, h, _net in NECK:
         x, y = hole_xy(parse_hole(h))
@@ -709,12 +715,29 @@ NOTES = [
     "結線表と出所・TBD は同じ場所の wiring-table.md と README.md。図と表は generate.py から生成する。",
     "灰の四角＝穴。金の丸＝ピン。ベージュ＝抵抗（板に沿わせて寝かせる）。太い線＝硬いジャンパー（被覆あり）。",
     "白丸と曲線＝柔らかい線（S番号、両端に同じ番号）。点線の曲線＝組み直した直後は ESP32 側を抜いておく線。",
-    "黄の丸＝板の外へ出る線（X番号）。紫の丸＝首を通る LCD の線（数字は LCD の pin 番号）。",
+    "黄の丸＝板の外へ出る線（X番号）。白抜きの点線の丸＝そのうち組み直した直後は板の端を抜いておく線。紫の丸＝首を通る LCD の線（数字は LCD の pin 番号）。",
     "＋の列＝3V3、−の列＝GND（主板の下側の1組だけ）。5 V の線は S18 だけで、ADC-5V の分圧へ行く。",
     "サーボの電源・Pi の給電はブレッドボードを通さない（power-budget.md、#34）。",
     "溝の幅、L 行から電源列までの距離は写真からの目安。部品の足の長さと硬いジャンパーの長さは現物で合わせる。",
     "図面を電源・安全の実機確認に使わない。通電前の照合は実機側が行う。",
 ]
+
+
+def text_width(text, size):
+    """文字の幅の見積もり（全角を 1 em、それ以外を 0.55 em とする。描画して測った値ではない）。"""
+    return sum(size if ord(ch) > 0x2E7F else size * 0.55 for ch in text)
+
+
+def check_text_fits(lines):
+    """図の下の文字が図の幅に収まり、同じ高さで重ならないことを確かめる。"""
+    for x, y, size, text, _bold in lines:
+        if x + text_width(text, size) > SVG_W - 10:
+            raise SystemExit(f"NG: 図の幅に収まらない文字（y={y}）: {text}")
+    ys = [y for _x, y, _s, _t, _b in lines]
+    if len(ys) != len(set(ys)):
+        raise SystemExit("NG: 図の下の文字が同じ高さに2行ある")
+    if max(ys) > SVG_H - 10:
+        raise SystemExit("NG: 図の下の文字が図の高さに収まらない")
 
 
 def build_svg():
@@ -731,17 +754,22 @@ def build_svg():
     draw_modules(out)
     draw_parts(out)
     draw_soft(out)
-    y = 1070  # 板（B1・B3 の下端は y=1024）より下に置く
-    out.append(f'<text x="60" y="{y}" font-size="15" font-weight="bold">凡例と注意</text>')
-    for i, line in enumerate(NOTES):
-        out.append(f'<text x="60" y="{y + 26 + i * 22}" font-size="12.5">{esc(line)}</text>')
-    y2 = 1070
-    out.append(f'<text x="900" y="{y2}" font-size="15" font-weight="bold">板の外へ出る線</text>')
-    for i, (xid, h, _net, far, _s) in enumerate(OFFBOARD):
-        out.append(f'<text x="900" y="{y2 + 26 + i * 22}" font-size="12">{xid}: {esc(hole_name(parse_hole(h)))} → {esc(far.replace("`", ""))}</text>')
+    # 板（B1・B3 の下端は y=1024）より下に、凡例と板の外へ出る線を縦に並べる（横に並べると長い行が重なる）
+    lines = [(60, 1070, 15, "凡例と注意", True)]
+    lines += [(60, 1096 + i * 22, 12.5, line, False) for i, line in enumerate(NOTES)]
+    y2 = 1096 + len(NOTES) * 22 + 20
+    lines.append((60, y2, 15, "板の外へ出る線", True))
+    for i, (xid, h, _net, far, state) in enumerate(OFFBOARD):
+        mark = "（板の端を抜いておく）" if "抜いておく" in state else ""
+        lines.append((60, y2 + 26 + i * 22, 12,
+                      f'{xid}: {hole_name(parse_hole(h))} → {far.replace("`", "")}{mark}', False))
     yy = y2 + 26 + len(OFFBOARD) * 22 + 10
-    out.append(f'<text x="900" y="{yy}" font-size="12">首の14本: LCD 側は MSP2807 の pin 番号。線は両端メス。B2 の a・b 行に立てた細ピンヘッダで受ける。</text>')
-    out.append(f'<text x="900" y="{yy + 22}" font-size="12">SCK と T_CLK、SDI と T_DIN、SDO と T_DO は同じ列に挿して共有する（#34）。</text>')
+    lines.append((60, yy, 12, "首の14本: LCD 側は MSP2807 の pin 番号。線は両端メス。B2 の a・b 行に立てた細ピンヘッダで受ける。", False))
+    lines.append((60, yy + 22, 12, "SCK と T_CLK、SDI と T_DIN、SDO と T_DO は同じ列に挿して共有する（#34）。", False))
+    check_text_fits(lines)
+    for x, y, size, text, bold in lines:
+        weight = ' font-weight="bold"' if bold else ""
+        out.append(f'<text x="{x}" y="{y}" font-size="{size}"{weight}>{esc(text)}</text>')
     out.append("</svg>")
     return "\n".join(out) + "\n"
 

@@ -1,6 +1,6 @@
 # ブレッドボードの組み直し配置（#512）
 
-> 状態: 設計。**まだ組んでいない。**組み直しと通電前の照合は実機側が行う。今の配線の記録は [`../breadboard/layout.svg`](../breadboard/layout.svg) と [実験記録](../../docs/hardware/experiment-log.md) の `Wiring revision` であり、この設計はそれを変えない。組み直した後に、この配置が `../breadboard/layout.svg` の最終版になる。
+> 状態: 設計。**まだ組んでいない。**組み直しと通電前の照合は実機側が行う。組み直す前の配線の記録は [`../breadboard/layout.svg`](../breadboard/layout.svg) と [実験記録](../../docs/hardware/experiment-log.md) の `Wiring revision` であり、この設計はそれを変えない。組み直した後に、この配置が `../breadboard/layout.svg` の最終版になる。
 > この文書は配線の許可ではない。通電、書き込み、UART の信号線の接続、サーボの駆動は、それぞれの正本の条件と承認に従う。
 
 | file | 中身 |
@@ -80,5 +80,5 @@ python3 -I hardware/breadboard-rebuild/generate.py --check
 
 - 組み直しは電源を切った状態で行う（ESP32 の USB、Pi、サーボの電源を外す）。初回通電と回路変更後の試験は人間が監視する（[Hardware Safety Policy](../../docs/governance/hardware-safety-policy.md)）。通電前の照合は実機側が行う。
 - 通電の前に、ESP32 の向きを基板の silk で確かめる。J2-1（3V3）が B1 の J 行・12列、J2-19（5V）が J 行・30列、J3-1（GND）が B 行・12列に挿さっていること。向きは寸法図からの読みであり（`値と並びの出所`）、逆向き（180度回した向き）に挿すと、H1（3V3）が J3-19（CLK、flash 用）に、H2（GND）が J3-6（GPIO21）につながる。
-- 組み直した直後に抜いておく線は、結線表の `組み直した直後` 欄にある（LED の GPIO の線、Pi との UART の線）。挿すのは、それぞれの正本の条件を満たしたときだけである。
+- 組み直した直後に抜いておく線は、結線表の `組み直した直後` 欄にある（LED の GPIO の線、Pi との UART の線の ESP32 側の端と Pi の GND の線、サーボの信号線と GND を共通にする線）。挿すのは、それぞれの正本の条件を満たしたときだけである。
 - 組み直した後、実機側が実験記録の `Wiring revision` と `../breadboard/layout.svg` を同じ PR で更新する（[hardware/README.md](../README.md)）。そのとき、この配置から変えた所があれば、ここの `generate.py` も直す。

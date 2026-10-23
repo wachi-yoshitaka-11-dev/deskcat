@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1700 1480" font-family="Noto Sans CJK JP, Hiragino Sans, Meiryo, sans-serif" font-size="13">
-<rect width="1700" height="1480" fill="#fff"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1700 1560" font-family="Noto Sans CJK JP, Hiragino Sans, Meiryo, sans-serif" font-size="13">
+<rect width="1700" height="1560" fill="#fff"/>
 <text x="30" y="36" font-size="22" font-weight="bold">ブレッドボードの組み直し配置（設計。#512）</text>
 <text x="30" y="62" fill="#444">生成元: hardware/breadboard-rebuild/generate.py。組み直した後に hardware/breadboard/layout.svg の最終版になる。</text>
 <rect x="60" y="560" width="718" height="464" rx="10" fill="#f4f4f0" stroke="#888"/>
@@ -1161,12 +1161,12 @@
 <circle cx="122" cy="786" r="4.5" fill="#fff" stroke="#2f6fb0" stroke-width="2"/>
 <text x="128" y="780" font-size="9" fill="#2f6fb0">S20</text>
 <text x="546" y="604" font-size="9" fill="#2f6fb0">S20</text>
-<path d="M584 874 Q342.0 680 100 720" stroke="#2f6fb0" stroke-width="1.6" fill="none" opacity="0.55"/>
+<path d="M584 874 Q342.0 680 100 720" stroke="#2f6fb0" stroke-width="1.6" fill="none" opacity="0.55" stroke-dasharray="6 4"/>
 <circle cx="584" cy="874" r="4.5" fill="#fff" stroke="#2f6fb0" stroke-width="2"/>
 <circle cx="100" cy="720" r="4.5" fill="#fff" stroke="#2f6fb0" stroke-width="2"/>
 <text x="106" y="714" font-size="9" fill="#2f6fb0">S21</text>
 <text x="590" y="868" font-size="9" fill="#2f6fb0">S21</text>
-<path d="M650 874 Q386.0 680 122 720" stroke="#2f6fb0" stroke-width="1.6" fill="none" opacity="0.55"/>
+<path d="M650 874 Q386.0 680 122 720" stroke="#2f6fb0" stroke-width="1.6" fill="none" opacity="0.55" stroke-dasharray="6 4"/>
 <circle cx="650" cy="874" r="4.5" fill="#fff" stroke="#2f6fb0" stroke-width="2"/>
 <circle cx="122" cy="720" r="4.5" fill="#fff" stroke="#2f6fb0" stroke-width="2"/>
 <text x="128" y="714" font-size="9" fill="#2f6fb0">S22</text>
@@ -1210,11 +1210,11 @@
 <text x="195" y="688" font-size="9" fill="#806000">X1</text>
 <circle cx="210" cy="676" r="5" fill="#ffd54d" stroke="#a07800" stroke-width="2"/>
 <text x="217" y="688" font-size="9" fill="#806000">X2</text>
-<circle cx="474" cy="610" r="5" fill="#ffd54d" stroke="#a07800" stroke-width="2"/>
+<circle cx="474" cy="610" r="5" fill="#fff" stroke="#a07800" stroke-width="2" stroke-dasharray="2 2"/>
 <text x="481" y="622" font-size="9" fill="#806000">X3</text>
-<circle cx="232" cy="676" r="5" fill="#ffd54d" stroke="#a07800" stroke-width="2"/>
+<circle cx="232" cy="676" r="5" fill="#fff" stroke="#a07800" stroke-width="2" stroke-dasharray="2 2"/>
 <text x="239" y="688" font-size="9" fill="#806000">X4</text>
-<circle cx="738" cy="962" r="5" fill="#ffd54d" stroke="#a07800" stroke-width="2"/>
+<circle cx="738" cy="962" r="5" fill="#fff" stroke="#a07800" stroke-width="2" stroke-dasharray="2 2"/>
 <text x="745" y="974" font-size="9" fill="#806000">X5</text>
 <circle cx="100" cy="180" r="5.5" fill="#9b59b6" stroke="#4a235a" stroke-width="1.5"/>
 <text x="100" y="183" text-anchor="middle" font-size="7.5" fill="#fff">1</text>
@@ -1249,17 +1249,17 @@
 <text x="60" y="1118" font-size="12.5">結線表と出所・TBD は同じ場所の wiring-table.md と README.md。図と表は generate.py から生成する。</text>
 <text x="60" y="1140" font-size="12.5">灰の四角＝穴。金の丸＝ピン。ベージュ＝抵抗（板に沿わせて寝かせる）。太い線＝硬いジャンパー（被覆あり）。</text>
 <text x="60" y="1162" font-size="12.5">白丸と曲線＝柔らかい線（S番号、両端に同じ番号）。点線の曲線＝組み直した直後は ESP32 側を抜いておく線。</text>
-<text x="60" y="1184" font-size="12.5">黄の丸＝板の外へ出る線（X番号）。紫の丸＝首を通る LCD の線（数字は LCD の pin 番号）。</text>
+<text x="60" y="1184" font-size="12.5">黄の丸＝板の外へ出る線（X番号）。白抜きの点線の丸＝そのうち組み直した直後は板の端を抜いておく線。紫の丸＝首を通る LCD の線（数字は LCD の pin 番号）。</text>
 <text x="60" y="1206" font-size="12.5">＋の列＝3V3、−の列＝GND（主板の下側の1組だけ）。5 V の線は S18 だけで、ADC-5V の分圧へ行く。</text>
 <text x="60" y="1228" font-size="12.5">サーボの電源・Pi の給電はブレッドボードを通さない（power-budget.md、#34）。</text>
 <text x="60" y="1250" font-size="12.5">溝の幅、L 行から電源列までの距離は写真からの目安。部品の足の長さと硬いジャンパーの長さは現物で合わせる。</text>
 <text x="60" y="1272" font-size="12.5">図面を電源・安全の実機確認に使わない。通電前の照合は実機側が行う。</text>
-<text x="900" y="1070" font-size="15" font-weight="bold">板の外へ出る線</text>
-<text x="900" y="1096" font-size="12">X1: B1 D5 → Pi の header pin 8（GPIO14 TXD）</text>
-<text x="900" y="1118" font-size="12">X2: B1 D6 → Pi の header pin 10（GPIO15 RXD）</text>
-<text x="900" y="1140" font-size="12">X3: B1 A18 → Pi の header pin 39（GND）</text>
-<text x="900" y="1162" font-size="12">X4: B1 D7 → サーボの plug の黄の穴</text>
-<text x="900" y="1184" font-size="12">X5: B1 −30 → 端子台S の −（ESP32 の GND をサーボの GND と共通にする線。EXP-034 の ②）</text>
-<text x="900" y="1216" font-size="12">首の14本: LCD 側は MSP2807 の pin 番号。線は両端メス。B2 の a・b 行に立てた細ピンヘッダで受ける。</text>
-<text x="900" y="1238" font-size="12">SCK と T_CLK、SDI と T_DIN、SDO と T_DO は同じ列に挿して共有する（#34）。</text>
+<text x="60" y="1314" font-size="15" font-weight="bold">板の外へ出る線</text>
+<text x="60" y="1340" font-size="12">X1: B1 D5 → Pi の header pin 8（GPIO14 TXD）</text>
+<text x="60" y="1362" font-size="12">X2: B1 D6 → Pi の header pin 10（GPIO15 RXD）</text>
+<text x="60" y="1384" font-size="12">X3: B1 A18 → Pi の header pin 39（GND）（板の端を抜いておく）</text>
+<text x="60" y="1406" font-size="12">X4: B1 D7 → サーボの plug の黄の穴（板の端を抜いておく）</text>
+<text x="60" y="1428" font-size="12">X5: B1 −30 → 端子台S の −（ESP32 の GND をサーボの GND と共通にする線。EXP-034 の Wiring revision、hardware/breadboard/layout.svg の基準線）（板の端を抜いておく）</text>
+<text x="60" y="1460" font-size="12">首の14本: LCD 側は MSP2807 の pin 番号。線は両端メス。B2 の a・b 行に立てた細ピンヘッダで受ける。</text>
+<text x="60" y="1482" font-size="12">SCK と T_CLK、SDI と T_DIN、SDO と T_DO は同じ列に挿して共有する（#34）。</text>
 </svg>
