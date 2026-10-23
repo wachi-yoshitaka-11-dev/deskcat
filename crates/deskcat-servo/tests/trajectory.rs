@@ -675,6 +675,65 @@ fn a_wide_tolerance_stays_within_every_bound_and_never_concedes() {
     }
 }
 
+/// 11通りの許容幅で、境界と反転を含む49,440 stepずつを再現する。
+/// 値と周期はtest専用であり、実機の制御周期や安全値ではない。
+#[test]
+fn tolerance_sweep_preserves_all_three_bounds() {
+    const STEPS_PER_WIDTH: usize = 49_440;
+    const WIDTH_FRACTIONS: [f32; 11] = [0.0, 0.01, 0.02, 0.04, 0.06, 0.08, 0.1, 0.2, 0.4, 0.7, 0.9];
+
+    for width_fraction in WIDTH_FRACTIONS {
+        let tolerance = TEST_DT_S * width_fraction;
+        let period = ControlPeriod::new(TEST_DT_S, tolerance).expect("test period");
+        let mut limiter = Limiter::new(
+            test_limits(),
+            period,
+            MotionCatalog::new([TEST_MOTION]),
+            TEST_NEUTRAL,
+        )
+        .expect("test start");
+        let mut previous_velocity = limiter.velocity();
+
+        for index in 0..STEPS_PER_WIDTH {
+            let target = SWEEP_TARGETS[(index / 1_200) % SWEEP_TARGETS.len()];
+            let jitter = match index % 5 {
+                0 => 0.0,
+                1 => -0.9,
+                2 => 0.9,
+                3 => -0.5,
+                _ => 0.5,
+            };
+            let dt = TEST_DT_S + tolerance * jitter;
+            let admitted = limiter
+                .admit(&request(target, CommandSource::Pi))
+                .expect("target stays in hard range");
+            let setpoint = limiter.step(admitted, dt).expect("dt stays in period");
+            let position = setpoint.position();
+            let velocity = setpoint.velocity();
+            let acceleration = (velocity - previous_velocity).abs() / dt;
+
+            assert!(
+                (TEST_APPROVED_MIN - EPSILON..=TEST_APPROVED_MAX + EPSILON).contains(&position),
+                "width {width_fraction}, step {index}: position {position}"
+            );
+            assert!(
+                velocity.abs() <= TEST_MAX_VELOCITY + EPSILON,
+                "width {width_fraction}, step {index}: velocity {velocity}"
+            );
+            assert!(
+                acceleration <= acceleration_ceiling(dt),
+                "width {width_fraction}, step {index}: acceleration {acceleration}"
+            );
+            assert!(
+                !setpoint.clamps().acceleration_bound_conceded,
+                "width {width_fraction}, step {index}: acceleration bound conceded"
+            );
+            previous_velocity = velocity;
+        }
+        assert_eq!(limiter.counters().acceleration_bound_conceded, 0);
+    }
+}
+
 /// 広い許容幅でも境界へ到達し、速度が0まで落ちきる。**保守的にしすぎて手前で止まらない。**
 #[test]
 fn a_wide_tolerance_still_reaches_the_bound_and_stops() {

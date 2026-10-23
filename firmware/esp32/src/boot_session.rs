@@ -1,6 +1,6 @@
 //! `boot`の受理確認・再送（§4.1）と、`sid`選び直し（§3.1「`sid`が衝突した場合」）。
 //!
-//! Pi linkを持つbuild（`bench-servo-test-17`以外のすべて。`#487`）で使う（`#446` PR B）。`main.rs`の`generate_sid`が選んだ`sid`で
+//! Pi linkを持つbuild（`bench-servo-test-17`を有効にするbuild以外のすべて。`#487`）で使う（`#446` PR B）。`main.rs`の`generate_sid`が選んだ`sid`で
 //! `boot`を送り、`crate::pi_link::PiLink`がPi linkのUART（`PI-UART-RX`、`#487`）から受けて渡す`ack`を待つ。§4.1の終了条件の表が定める**state遷移**
 //! （いつ再送するか、いつ`sid`を選び直すか、いつ止めるか）を実装する。featureの各構成での
 //! build（`cargo build`／`cargo clippy`）が通ることはcompileが通ることの根拠であり、**state遷移が

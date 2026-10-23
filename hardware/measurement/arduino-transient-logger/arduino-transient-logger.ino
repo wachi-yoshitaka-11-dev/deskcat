@@ -35,6 +35,17 @@
 #define LOGGER_NCH 2
 #endif
 
+// ADC の基準電圧。ADMUX の REFS1:0（`DS40002061B` §24.9.1）。
+//   1 = AVCC（既定。従来の測定と同じ）
+//   3 = 内部 1.1 V 基準（shunt の小さな電圧を細かく読むときに使う）
+// **3 は LOGGER_NCH=1 のときだけ許す。**§24.5.2 は「基準を切り替えた後の最初の変換結果は
+// 不正確なことがあり、捨てることを勧める」と述べる。2 channel を交互に読む実装は、
+// channel ごとに基準を切り替えないため、基準を channel ごとに変える使い方は実装していない。
+// 1 channel なら基準は起動時に 1 度だけ設定し、先頭の block を捨てる（PC 側の既存の扱い）。
+#ifndef LOGGER_REF
+#define LOGGER_REF 1
+#endif
+
 // 1 blockで送るsample数。header 24 B に対する payload の割合を決める。
 #ifndef LOGGER_BLOCK
 #define LOGGER_BLOCK 128
@@ -51,6 +62,12 @@
 #endif
 #if (LOGGER_NCH != 1) && (LOGGER_NCH != 2)
 #error "LOGGER_NCH must be 1 or 2"
+#endif
+#if (LOGGER_REF != 1) && (LOGGER_REF != 3)
+#error "LOGGER_REF must be 1 (AVCC) or 3 (internal 1.1 V)"
+#endif
+#if (LOGGER_REF == 3) && (LOGGER_NCH != 1)
+#error "LOGGER_REF=3 (internal 1.1 V) is only supported with LOGGER_NCH=1"
 #endif
 #if (LOGGER_BLOCK < 1) || (LOGGER_BLOCK > 255) || (LOGGER_BLOCK >= RING_SIZE)
 #error "LOGGER_BLOCK must be 1..255 and smaller than RING_SIZE"
@@ -91,8 +108,12 @@ static uint16_t g_blkseq;
 // ---- ADC ------------------------------------------------------------------
 
 static inline void adc_select_channel(uint8_t ch) {
-  // REFS1:0 = 01 で AV_CC を基準にする（`DS40002061B` §24.9.1）。
+  // REFS1:0 は LOGGER_REF で決める（`DS40002061B` §24.9.1）。01 = AVCC、11 = 内部 1.1 V。
+#if LOGGER_REF == 3
+  ADMUX = (uint8_t)((1 << REFS1) | (1 << REFS0) | (ch & 0x0F));
+#else
   ADMUX = (uint8_t)((1 << REFS0) | (ch & 0x0F));
+#endif
 }
 
 ISR(ADC_vect) {

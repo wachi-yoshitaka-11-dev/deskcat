@@ -241,6 +241,14 @@ PC testはLCD、電気、timing、sensor、機構の検証を代替しない。
 
 初回通電、初回サーボ動作、動作範囲拡張、電源・GPIO変更後のtestでは、人間がactuator電源を切れる状態にする。
 
+**配線を変えたら、記録だけで終わらせず、同じPull Requestでブレッドボード配線図（`hardware/breadboard/layout.svg`）も更新する**（`hardware/README.md`）。`docs/hardware/experiment-log.md`の`Wiring revision`の行を追加・変更し、配線図を更新しないPull Requestは、`Wiring figure sync` workflow（`scripts/check_wiring_figure_sync.py`）が落とす。この検査は、base が`develop`のPull Requestだけで走る。配線を変えていない試験の記録など、図に関係しない場合だけ、head commitのtrailerまたはPull Request本文に次の1行を書く。**コロンが要る**（`Refs`と同じ理由で、コロンの無い行はtrailerとして読まれない）。理由は10字以上が要り、名前と値の正本は`scripts/check_wiring_figure_sync.py`である。
+
+```text
+Wiring-Figure: not-applicable <配線を変えていない理由>
+```
+
+**検査は字句だけで、図の内容が記録と合っているかは判定しない。**照合は人が行う。
+
 ## 文書
 
 次を変更する場合は正式文書を更新する。
@@ -536,9 +544,14 @@ PM/AIの判断や無回答は承認の代替にならない。
 `review_gate.py session`とClaudeの`Agent|Task` hookは、同じIssueの実行記録を使う。
 開始の予約はreviewer起動前に保存し、そのreviewの上限を超える未承認の起動を拒否する。
 既存のBash parserやread-only guardへshell構文を追加しない。
+Claudeの登録reviewerを使うworktreeでは、既存のIssue記録を
+`session select --work <Issue番号> --base <base> --scope <scope>`で選ぶ
+（baseとscopeの指定は省略可）。hookは呼び出し時に選択だけを読むため、
+起動済みセッションでも適用される。
 
 **記録はgit-common-dirに置き、同じrepositoryのworktree間で共有する。**branch名やdiff hashを
 作業IDにしない。通常は各巡の結果と承認を実行記録へ保存し、Pull Request本文へ要約する。
+選択はworktree専用のgit-dirへ保存し、巡数や承認は持たない。
 Issue／Pull Requestのcommentへ各巡や承認を重複投稿しない。別clone・別端末へ渡すと決めた時点で、
 元cloneの最後の操作後に`session status`のJSON全体を既存Issue／Pull Requestへ保存し、
 次の担当がそれを復元する。同時に複数cloneで同じ作業を進めず、担当を引き継ぐ。

@@ -117,26 +117,37 @@ ESP32は無い）。**したがってESP32側のGPIO割り当てはこの節で�
 
 ## Touch controller
 
-出典: 上記と同じdatasheet。**controllerの型番はdatasheetに記載が無い**ため、
-**型番は2026-08-13に現物chip刻印で`XPT2046`と確定した**（追跡は[tbd-register HW-TBD-003](tbd-register.md)）。
+出典: moduleは上記と同じdatasheet（`msp2807.pdf`。**controllerの型番は記載が無い**ため、
+**型番は2026-08-13に現物chip刻印で`XPT2046`と確定した**。追跡は[tbd-register HW-TBD-003](tbd-register.md)）。
+**controllerの挙動は、メーカー（SHENZHEN XPTEK TECHNOLOGY CO.,LTD）の`XPT2046 Data Sheet`による。**
+表紙は`2007.5`、全30ページ。
 
-**下表の`TBD`は、型番が決まったことで「現物確認待ち」から「`XPT2046`のdatasheetを当てる作業」へ移った。**
-まだ当てていないため値は入れない（[AGENTS.md](../../AGENTS.md) 推測禁止）。
+- URL: `https://grobotronics.com/images/datasheets/xpt2046-datasheet.pdf`（販売店のmirror。XPTEKの配布先`http://www.xptek.com.cn`は表紙・頁脚に書かれているが、今回は取得していない）
+- sha256: `90d1c9dcf8c53fc79e40c53f5045c3b6d7634826daece83326ff80e6076bc6c4`
+- 取得日: 2026-10-21（HTTP 200、`application/pdf`、810641 byte）。PDF metadataのCreatorは`Google`、CreationDateは2013-10-31であり、**PDFの作成日は版（2007.5）の根拠にならない。版は表紙の表記による**
+- **mirrorであり、XPTEK公式配布物との同一性は確認していない。**gpio-assignment.mdが既に引く`XPT2046 Datasheet（2007.5）`と同じ表記の版である
+- **TIの`ADS7843` datasheetなど別ICの資料は、この節の値の根拠にしていない。**datasheet自身が`ADS7843`との互換に言及する箇所（`Internal Reference`、p.15）は、`XPT2046`の挙動の記述として読んだだけである
+- **資料の欠陥**（読み取りの注意）: (1) 表4（p.15、`VBAT`／`AUXIN`／`TEMP`を含む表）の見出しが`Differential Reference Mode (SER/DFR low)`となっているが、同じ頁の表5と同じ文言であり、本文が「差動modeは`X`・`Y`・圧力の測定だけに使える。他は単一端modeを要する」と書くこととも合わない。**表4は単一端（`SER/DFR`＝1）の表の誤記と読む**（本文に基づく読み。資料内の訂正は無い）。(2) pin表（p.9）の`DOUT`の説明が`This output is high`で終わり、文が途切れている。(3) 本文は表を`Table 3`／`Table 1`などと番号がずれて参照している（`Control Byte`節が制御bitの表を`Table 3`と呼ぶが、実際の表番号は6）。**この節は表の番号ではなく、表の見出しと中身で引く**
+
+**下表の値のうち、「導出」と書いたものは、資料の記載から読んだ結果であり、資料が明記した値ではない。**
+実機で確かめるまでは、導出と明記したまま扱う。
 
 | 項目 | 値 |
 |---|---|
-| Module／controller識別情報 | Moduleは MSP2807（DISP-01と同一）。**controller ICは`XPT2046`（確定）。**現物裏面`U2`（TSSOP-16）の刻印を2026-08-13に読み取った（`XPT`ロゴ、`XPT2046`、ロット`ABDEAB`）。**メーカーdatasheetには型番の記載が無いため、刻印が唯一の根拠である** |
-| Touch方式 | TBD（`XPT2046`のdatasheetで確認する） |
-| Interface | SPI（LCDとbusを共有し、`T_CS`で分ける）。信号は`T_CLK`／`T_CS`／`T_DIN`／`T_DO`／`T_IRQ` |
-| 供給／logic電圧 | DISP-01と同一（VCC 3.3–5 V、logic 3.3 V TTL） |
-| AddressまたはSPI mode | TBD |
-| 検証済み最大bus速度 | TBD |
-| IRQ polarity／type | **touch検出時にlow**（datasheet記載）。edge／levelの別はTBD |
-| Raw出力 | TBD |
-| 座標／強度の動作 | TBD |
-| Reset／起動sequence | TBD |
-| Module pull-up | TBD |
-| Calibration方法 | TBD |
+| Module／controller識別情報 | Moduleは MSP2807（DISP-01と同一）。**controller ICは`XPT2046`（確定）。**現物裏面`U2`（TSSOP-16）の刻印を2026-08-13に読み取った（`XPT`ロゴ、`XPT2046`、ロット`ABDEAB`）。**メーカーdatasheetには型番の記載が無いため、刻印が唯一の根拠である**。`-90`版（`PENIRQ`のpull-upが約90 kΩ）かどうかは刻印からは判別していない |
+| Touch方式 | **4線式抵抗膜のtouch screen controller。**12 bit・125 kHz samplingのSAR型ADCを内蔵する（`General Description`、p.3）。入力は`XP`／`YP`／`XN`／`YN`の4線、ほかに`VBAT`・`AUX`・温度（温度は`MUX`経由） |
+| Interface | SPI（LCDとbusを共有し、`T_CS`で分ける）。信号は`T_CLK`／`T_CS`／`T_DIN`／`T_DO`／`T_IRQ`。**資料の端子名は`DCLK`／`CS`／`DIN`／`DOUT`／`PENIRQ`であり、`BUSY`も持つが、14pinのmoduleには`BUSY`の端子が出ていない**（module側の対応は`pin定義`表） |
+| 供給／logic電圧 | DISP-01と同一（VCC 3.3–5 V、logic 3.3 V TTL）。**ICの規格は、`+VCC`が`Specified Performance`で2.7–3.6 V、`Operating Range`で2.2–5.25 V、`IOVDD`が1.5 V〜`VCC`**（`Electrical Characteristics`、p.6）。**3.3 V給電は`Specified Performance`の範囲内である** |
+| AddressまたはSPI mode | **Mode 0（`CPOL=0, CPHA=0`）。導出。**(a) `DIN`は`DCLK`の立ち上がりで取り込まれる（pin表、p.9`If CS is low, data is latched on the rising edge of DCLK`）。(b) `DOUT`は`DCLK`の立ち下がりで出る（同`Data is shifted on the falling edge of DCLK`、`tDO`＝`DCLK`の立ち下がりから`DOUT`有効まで最大200 ns、`Table 9`）。(c) Figure 12（p.23）の`DCLK`は`CS`がlowになった後、先頭のclockが立ち上がるまでlowである（idle low）。**資料は「Mode 0」という語を使っていない。**addressは無い（`CS`で選ぶ） |
+| 検証済み最大bus速度 | **検証済みは無い（TBD。実機で`DOUT`が読めることを確かめる）。**資料から導ける上限は**2.5 MHz**（`tCH`＝`DCLK` high最小200 ns、`tCL`＝`DCLK` low最小200 ns、`Table 9`から周期400 ns以上。導出）。電気特性表の測定条件は`fCLK = 16 × fSAMPLE = 2 MHz`（`fSAMPLE`＝125 kHz）。**8 bit modeでは「clockを最大50 %速くできる」と資料は述べる**（`8-Bit Conversion`、p.29）が、`試験build`は使わない。`15 clocks-per-conversion`は、ほとんどのMCUのserial interfaceでは1回の転送を15 clockにできないと資料が書く（p.28）ため、使わない。`16 clocks-per-conversion`の重ねる方式（p.26）も、1回24 clockの転送を重ねないこの試験buildは使わない |
+| IRQ polarity／type | **touch検出時にlow。**`PENIRQ`はactive lowで、`X+`入力が`Y−`側（power-down中は`Y−`switchがon）へtouch screenを介して引かれることでlowになる（`PENIRQ Output`、p.24）。**内部pull-up付きの出力**（公称50 kΩ、36 k〜67 kΩ。`logic low 0.35 × (+VCC)`を保証するには`X+`と`Y−`の間の合成抵抗が21 kΩ未満。**`-90`版は公称90 kΩで30 kΩまで**）。**edge／levelの語は資料に無い。**動作は、touch中lowが保たれるlevel出力と読める（導出）。**測定中の動作: `X`／`Y`／`Z`測定のあいだ`PENIRQ`は無効でlowになり、`VBAT`／`AUX`／温度の測定のあいだは無効でhighになる。**最後の制御byteが`PD0=1`だと`PENIRQ`は無効のままである。**資料は、制御byteを送るあいだ`PENIRQ`に結ぶ割り込みをmaskするよう勧める**（`PENIRQ Output`）。**試験buildはISRを使わず、`T_IRQ`のlevelをpollする** |
+| 制御byte | `S`（bit7、常に1）\|`A2 A1 A0`（bit6–4）\|`MODE`（bit3。0＝12 bit、1＝8 bit）\|`SER/DFR`（bit2。0＝差動、1＝単一端）\|`PD1 PD0`（bit1–0）（表6）。`PD`: `00`＝変換ごとにpower-down（`PENIRQ`有効。**最初の変換から有効**）、`01`＝reference off・ADC on（`PENIRQ`無効）、`10`＝reference on・ADC off（`PENIRQ`有効）、`11`＝常時電源on（`PENIRQ`無効）（表8）。**差動modeで`X`・`Y`・圧力を測るチャネル（表5）: `A2 A1 A0`＝`001`が`Y`位置、`101`が`X`位置、`011`が`Z1`、`100`が`Z2`。**12 bit・差動・`PD=00`にすると制御byteは、`Y`＝`0x90`、`X`＝`0xD0`、`Z1`＝`0xB0`、`Z2`＝`0xC0`（導出。bit配置から組み立てた値であり、資料が16進で示した値ではない） |
+| Raw出力 | **12 bit、straight binary**（`DIGITAL INPUT/OUTPUT`表の`Data Format`、`Data Format`節）。8 bit modeもある（`MODE=1`）。**1回の変換は8 clockの転送3回（計24 clock）。**1回目の8 clockで制御byteを送り（`DOUT`は無視する）、変換結果は2回目の転送から`DOUT`へ上位bitから出る（Figure 12）。**24 clockの転送のbit位置は、図の`DOUT`が、制御byteの後でまだ`BUSY`の区間を示すlowの後に`11`から始まることと、`DOUT`が立ち下がりで変わる（Mode 0でmasterが立ち上がりで読む）ことからの導出である:** 2回目の転送の先頭bitは0、続く7 bitが`D11`〜`D5`、3回目の転送の上位5 bitが`D4`〜`D0`で、残りは0。したがって12 bitの値は`((rx[1] << 8) \| rx[2]) >> 3`と読める（**資料にこの式は無い。導出であり、実機で、復号した値がtouch無しとtouch有りで妥当な範囲に収まること（例: 上位bitを落とした値と比べて、`>> 3`が12 bitの全範囲を使うこと）を確かめるまで確定しない**） |
+| 座標／強度の動作 | `X`・`Y`は差動modeで測る（`ratiometric`。資料が推奨）。**圧力は`Z1`と`Z2`（または`X`・`Y`・`Z1`）から接触抵抗を求める**（`Pressure Measurement`、p.20。式(3)`Rtouch = RX-plate × X-Position/4096 × (Z2/Z1 − 1)`、式(4)）。**`RX-plate`（`X`面板の抵抗）はmoduleのtouch panelについて未測定であり、TBD。**資料は圧力の測定に8 bit modeを勧める（「高い性能は要らない」） |
+| Reset／起動sequence | **reset端子は無い。**電源投入後は、`CS=0`かつ`DCLK=IOVDD`で立ち上げるのでなければ、制御byteに`PD0=0`を書くまで約20 µAを流す（`Power Dissipation`、p.30）。**電源投入後は`PD1=0`の書き込みでreferenceをoffにする必要がある**（`Internal Reference`、p.15。`ADS7843`との互換のため、後の書き込みなしにはoffにならない）。**`PD=00`の制御byteを送れば両方を満たす。**`CS`がhighになると変換を打ち切ってpower-downに入る（internal referenceはoffにならない） |
+| 変換timing | `tACQ`（acquisition time）最小1.5 µs（`Table 9`）。`CS`の立ち下がりから最初の`DCLK`まで最小100 ns（`tCSS`）。`DIN`のsetupは`DCLK`の立ち上がりの前に最小100 ns、holdは立ち上がりの後に最小50 ns。`DOUT`は`CS`の立ち下がりから最大200 nsで有効、`CS`の立ち上がりから最大200 nsでdisable（**非選択時は`DOUT`がhigh impedanceになる**と読める。導出。pin表の`DOUT`の説明は途切れているが、`tDV`／`tTR`は有効／無効の切り替えを示す）。**この導出は`LCD-MISO`と`TOUCH-DOUT`が同じ線であるため重要であり、`T_CS`がhighの間に`T_DO`が線を駆動しないことの根拠になるが、実機（`T_CS`の外部pull-upが効くこと）で確認していない。** |
+| Module pull-up | TBD（moduleの回路図は未確認。`T_CS`の外部10 kΩ pull-upは[gpio-assignment.md](gpio-assignment.md)が選定済み） |
+| Calibration方法 | TBD。**資料にcalibrationの手順の記載は無い。**raw値から画面座標への変換は、受け入れ条件「該当する場合は座標変換をcalibrationした」のとおり、実機の四隅と中央のraw sampleから決める |
 
 必要なベンチ試験の根拠:
 
@@ -192,7 +203,7 @@ module boardの値は、これとは別に現物でしか決まらない（[AGEN
 | 絶対最大定格 | `VS`／`VDD I/O`とも**−0.3 V to +3.9 V**。Digital Pinsは`VDD I/O` + 0.3 Vか3.9 Vの**小さい方**、All Other Pinsは−0.3 V to +3.9 V。Acceleration 10,000 g（Unpowered／Poweredとも）。Output Short-Circuit Duration（Any Pin to Ground）は`Indefinite`。Temperature RangeはPowered／Storageとも−40°C to +105°C。Table 2、page 5。**電流の上限はこの表に記載が無い**（`HW-TBD-025`(b)、Issue [#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)。**無いことを2026-08-12に確認した**） |
 | 測定range | ±2 g／±4 g／±8 g／±16 g 選択式 |
 | Interface（ICの対応） | I2C／SPI（3線式・4線式）の両対応（`SPI (3- and 4-wire) and I2C digital interfaces`） |
-| Filter／FIFO機能 | **32段のFIFOを内蔵**（`embedded 32-level FIFO`）。modeは`bypass`／`FIFO`／`stream`／`trigger`の4種で、`FIFO_CTL` registerの`FIFO_MODE` bitsで選ぶ。**各modeの詳細な挙動と、driverでどれを使うかはTBD** |
+| Filter／FIFO機能 | **32段のFIFOを内蔵**（`embedded 32-level FIFO`）。modeは`bypass`／`FIFO`／`stream`／`trigger`の4種で、`FIFO_CTL` registerの`FIFO_MODE` bitsで選ぶ。**各modeの詳細な挙動と、driverでどれを使うかはTBD。**`accel-sample-15`の試験build（[#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)）が使うmodeは、試験の暫定の一般値として`crates/deskcat-accel`が持つ。**この表の値ではなく、Rev. Gで確認していない** |
 | Device ID register／value | `DEVID`（address `0x00`、Read Only）。**reset値`11100101`＝`0xE5`**（`The DEVID register holds a fixed device ID code of 0xE5 (345 octal)`）。Table 19 page 23、Register 0x00節 page 24。**実機で読み出して一致を確認するのは[#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)の受け入れ条件である** |
 | Sensitivity変換 | 全g-rangeのfull resolutionで**256 LSB/g typ**（min 230／max 282）、Scale Factorは**3.9 mg/LSB typ**（min 3.5／max 4.3）。Table 1、page 3。**10-bit固定分解能で使う場合はg-rangeごとに異なる**（同表）。**実測offsetとnoiseの確認は[#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)** |
 | Output data rate | ICは**0.1–3200 Hz**に対応する（Table 1 page 3）。`BW_RATE` register（address `0x2C`）のrate codeで選び、reset値は`00001010`＝100 Hzである（Table 19 page 23）。data rateごとの消費電流はTable 7 page 13。**DeskCatがどのODRを使うかは設計判断であり[#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)で決める。** tap検出のために100 Hz（`BW_RATE`＝`0x0A`）を明示して書くbuildがある（[#21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)のF1。下の`tap検出のregister`行、内容は`firmware/esp32/README.md`の「build構成と通電」の表）。**これはtap検出のための値であり、#15のODR設計判断を先取りしない** |
@@ -499,3 +510,5 @@ M-06724に何が実装済みかが未確認である以上、外付けの要否�
 | 2026-09-24 | 18 | [#472](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/472)（[PR #471](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/471)のCodeRabbit review指摘）。`closeまでに要ること（実装と確認を含む）`の後の段落への2026-09-22追記が挙げた欠落(1)（I2Cを採る決定がどの正本にも無い）を埋めた。**2026-09-24にユーザーがI2Cの採用を承認した**ことを日付つきの追記で残し、[hardware-bom.md](hardware-bom.md)と[tbd-register.md](tbd-register.md)の`HW-TBD-005`にも同じ決定を記録した。**欠落(2)は判定していない。**あわせて、`closeまでに要ること`表の#3〜#5へ、`EXP-015`とADXL345側のpin接続の確定（2026-08-27）より前の記述であることを日付つきで追記した。**表の状態列の判定は変えていない。既存の文言は書き換えていない** |
 | 2026-09-28 | 19 | [#13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)。LCD moduleの表の`Color format／order`（TBD）と`対応orientation command`（TBD）を、[experiment-log.md](experiment-log.md)の`EXP-018`の結果で埋めた。byte order（big-endian）と色の並び（BGR）は別の事柄として分けて書いた。`解像度`行の「どちらをdriverの基準にするかはbench試験で確定する」を、firmwareが横向き（320×240）を基準にすることへ改めた（物理の240×320の記述は変えていない）。`Readback機能`行へ、IDの読み出しが期待する値を返さず、firmwareは読み出しを行わないことを足した |
 | 2026-10-09 | 20 | [#21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)のF1。ADXL345の`ICの値`の表へ、tap検出のregister（`BW_RATE`・`THRESH_TAP`・`DUR`・`TAP_AXES`・`POWER_CTL`・`INT_ENABLE`・`INT_SOURCE`）を、Rev. 0で読んだ値として足し、`Output data rate`行に`tap-21`が100 Hzを書くことを足した（Rev. Gでの確認は未了） |
+| 2026-10-18 | 21 | [#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)。`ICの値`の表の`Filter／FIFO機能`行へ、`accel-sample-15`の試験buildが使うFIFO modeは`crates/deskcat-accel`が持つ暫定の一般値であり、この表の値ではなく、Rev. Gで確認していないことを足した。製品のdriverでどれを使うかはTBDのままである |
+| 2026-10-21 | 22 | [#14](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/14)。`Touch controller`節の`TBD`のうち、`XPT2046 Data Sheet 2007.5`（XPTEK、販売店mirror、sha256を記録）から読める欄を埋めた。**SPI mode（Mode 0）、bus速度の上限（2.5 MHz）、制御byteの16進値、24 clock転送のbit位置、`DOUT`のhigh impedanceは、資料が明記した値ではなく導出であり、そのまま書いた。**資料の欠陥（表4の見出しの誤記、`DOUT`の説明の途切れ）も記録した。`RX-plate`、`Module pull-up`、`Calibration方法`、検証済みbus速度は`TBD`のまま。実機には触れていない |

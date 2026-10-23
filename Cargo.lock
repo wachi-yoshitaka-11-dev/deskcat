@@ -104,6 +104,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9e9de72ce2ad1f90dc62fa25f0f430ef85eb4b0d8fa0be4f30373bc40a21d28e"
 
 [[package]]
+name = "deskcat-accel"
+version = "0.1.0"
+dependencies = [
+ "deskcat-tap",
+]
+
+[[package]]
 name = "deskcat-config"
 version = "0.1.0"
 dependencies = [
@@ -154,6 +161,10 @@ dependencies = [
 
 [[package]]
 name = "deskcat-tap"
+version = "0.1.0"
+
+[[package]]
+name = "deskcat-touch"
 version = "0.1.0"
 
 [[package]]

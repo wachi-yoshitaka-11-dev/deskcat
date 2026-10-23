@@ -1,0 +1,393 @@
+//! #16 の試験 build 専用の測定（既定は起動ごとに一回。`env-sample-16-repeat` は繰り返す）。bus はこの main-loop task が所有し、
+//! `env::Bme280` は各 transaction の間だけ借りる。
+//!
+//! Bosch BME280 Data Sheet BST-BME280-DS001-24 Rev. 1.24 §4.1, §4.2.2,
+//! §5.4.3–5.4.9, §9.1 に従う。現時点の証拠は VM の ESP32 build・Clippy と
+//! host test まで。raw／変換値と reference の実機比較は未実施。
+//!
+//! 各 poll は有限 timeout の I2C transaction だけを行い、変換時間は待たずに
+//! main loop へ戻す。log は `crate::console` により UART0 へ出す。
+
+use deskcat_env::{
+    check_calibration_ready, check_identity, check_measurement_ready, classify_io_error,
+    compensate, decode_calibration, decode_raw, Calibration, IoFault, RegisterFault,
+};
+use esp_idf_svc::hal::i2c::I2cDriver;
+use esp_idf_svc::sys::{EspError, ESP_ERR_TIMEOUT};
+use std::time::Instant;
+
+use crate::env::Bme280;
+
+/// Bosch §9.1 の測定時間。typ = 1 + 2·T + (2·P + 0.5) + (2·H + 0.5) ms、
+/// max = 1.25 + 2.3·T + (2.3·P + 0.575) + (2.3·H + 0.575) ms（T・P・H は oversampling 倍率）。
+/// ×1/×1/×1 は typ 8 ms、max 9.3 ms。×16/×16/×16 は typ 98 ms、max 112.8 ms。
+/// max の係数（1250・2300・575 µs）は Bosch 公開 driver `bme280_defs.h` の
+/// `BME280_MEAS_OFFSET`・`BME280_MEAS_DUR`・`BME280_PRES_HUM_MEAS_OFFSET` と一致する。
+///
+/// status は ×1 の typ（8 ms）の時点から確かめ始める（`measuring` は変換の間 1 のままなので、
+/// ×16 でも同じ点から読んでよい。変換の開始直後には読まない）。変換の所要時間を測るため、
+/// ×16 の typ まで待たない。
+const READY_AFTER_MS: u64 = 8;
+/// 変換待ちの間に status を読み直す間隔。main loop が次の締切（heartbeat など）まで眠ると、
+/// `env_conversion` が loop の周期（数百 ms）になり、×1 と ×16 の差が見えない。変換待ちの間だけ
+/// [`EnvSampler::next_deadline_ms`] でこの間隔の締切を出す。実際の分解能は 1 tick（`CONFIG_FREERTOS_HZ=100` で 10 ms）。
+const POLL_INTERVAL_MS: u64 = 10;
+/// 状態異常の診断用上限。測定最大時間と loop の遅延を含む余裕を設ける（×1 は max の約 3 倍、
+/// ×16 は約 1.3 倍）。
+#[cfg(not(feature = "env-sample-16-slow"))]
+const DEADLINE_MS: u64 = 30;
+#[cfg(feature = "env-sample-16-slow")]
+const DEADLINE_MS: u64 = 150;
+/// `env-sample-16-repeat` の繰り返し。#16 の「遅い変換が上位 task を block しない」を、変換が
+/// heartbeat（1000 ms）の時刻を何度もまたぐ状態で観察する。`env-sample-16`／`-slow` の動き
+/// （起動ごとに 1 回）は変えない。
+///
+/// 周期 130 ms：×16 の変換は max 112.8 ms（Bosch §9.1）、`EXP-036` の実測は約 99 ms で、`DEADLINE_MS`
+/// （150 ms）の内に収まる。変換の長さを約 99 ms とすると duty は約 76%（99/130）で、heartbeat の時刻の
+/// 多くが変換の最中に来る（見積もり。実機では `started_ms` と `env_conversion` を `hb` の uptime と重ねて数える）。
+/// 1000 ms が 130 ms で割り切れない（1000 mod 130 = 90 ms ずつずれる）ので、heartbeat は変換の窓の
+/// 先頭・中ほど・終わりに当たる。125 ms のように 1000 ms を割り切ると、同じ位置へ固定される。
+#[cfg(feature = "env-sample-16-repeat")]
+const REPEAT_PERIOD_MS: u64 = 130;
+/// 繰り返す時間。最初の変換の開始から数える。`EXP-036` の窓（30 秒、heartbeat 29 回）に合わせる。
+/// 約 230 回の変換と約 30 回の heartbeat になる。
+#[cfg(feature = "env-sample-16-repeat")]
+const REPEAT_DURATION_MS: u64 = 30_000;
+/// log に出す oversampling の名前。
+#[cfg(not(feature = "env-sample-16-slow"))]
+const OVERSAMPLING: &str = "x1";
+#[cfg(feature = "env-sample-16-slow")]
+const OVERSAMPLING: &str = "x16";
+
+#[derive(Clone, Copy)]
+enum State {
+    WaitCalibration {
+        deadline_ms: Option<u64>,
+    },
+    ReadCalibration,
+    ConfigureHumidity,
+    StartForced,
+    WaitConversion {
+        started_at: Instant,
+        ready_ms: u64,
+        next_poll_ms: u64,
+        deadline_ms: u64,
+    },
+    ReadSample,
+    /// 次の変換の開始時刻（uptime の ms）まで待つ。
+    #[cfg(feature = "env-sample-16-repeat")]
+    Idle {
+        next_start_ms: u64,
+    },
+    Done,
+}
+
+/// `env-sample-16-repeat` の進行。時刻は uptime の ms。
+#[cfg(feature = "env-sample-16-repeat")]
+#[derive(Default)]
+struct Repeat {
+    /// 最初の変換を始めた時刻。
+    begin_ms: Option<u64>,
+    /// 次に変換を始める予定の時刻（前回の予定＋周期。now 基準にせず、ずれを積まない）。
+    schedule_ms: u64,
+    /// 始めた変換の回数（1 始まり）。
+    seq: u32,
+    /// 今の変換を始めた時刻。
+    started_ms: u64,
+}
+
+/// protocol counter ではない。UART0 の fault 行ごとに更新後の件数を出す。
+#[derive(Default)]
+struct Counters {
+    identity: u32,
+    io_timeout: u32,
+    io_other: u32,
+    not_ready: u32,
+    invalid_data: u32,
+    compensation: u32,
+    samples: u32,
+}
+
+pub struct EnvSampler {
+    driver: I2cDriver<'static>,
+    sensor: Bme280,
+    state: State,
+    calibration: Option<Calibration>,
+    counters: Counters,
+    #[cfg(feature = "env-sample-16-repeat")]
+    repeat: Repeat,
+}
+
+/// bus 初期化は sampler を作る前に 1 回だけ試すので、失敗件数は 1 として記録する。
+pub fn report_bus_init_fault(err: &EspError) {
+    let kind = if classify_io_error(err.code(), ESP_ERR_TIMEOUT) == IoFault::Timeout {
+        "i2c_timeout"
+    } else {
+        "i2c_other"
+    };
+    log::error!("env_fault kind={kind} stage=driver_new error={err} count=1");
+}
+
+impl EnvSampler {
+    pub fn new(driver: I2cDriver<'static>, chip_id: Result<u8, EspError>, address: u8) -> Self {
+        let mut sampler = Self {
+            driver,
+            sensor: Bme280::new(address),
+            state: State::WaitCalibration { deadline_ms: None },
+            calibration: None,
+            counters: Counters::default(),
+            #[cfg(feature = "env-sample-16-repeat")]
+            repeat: Repeat::default(),
+        };
+        match chip_id {
+            Ok(id) if check_identity(id).is_ok() => {}
+            Ok(id) => {
+                sampler.counters.identity += 1;
+                log::error!(
+                    "env_fault kind=chip_id_mismatch raw=0x{id:02x} count={}",
+                    sampler.counters.identity
+                );
+                sampler.state = State::Done;
+            }
+            Err(err) => sampler.io_fault("chip_id", err),
+        }
+        sampler
+    }
+
+    /// 変換待ちの間だけ、次に status を読む時刻（uptime の ms）。ほかの状態は締切を出さず、
+    /// main loop が次に起きたときに 1 段進める。`env-sample-16-repeat` だけは、次の変換の開始待ち
+    /// （`Idle`）でその開始時刻を、開始の書き込みと読み出しの段（`StartForced`・`ReadSample`）で 0 を出す。
+    pub fn next_deadline_ms(&self) -> Option<u64> {
+        match self.state {
+            State::WaitConversion { next_poll_ms, .. } => Some(next_poll_ms),
+            // 繰り返す間は、heartbeat まで眠らず次の段へ進む（変換の間隔を周期どおりにする）。
+            #[cfg(feature = "env-sample-16-repeat")]
+            State::Idle { next_start_ms } => Some(next_start_ms),
+            #[cfg(feature = "env-sample-16-repeat")]
+            State::StartForced | State::ReadSample => Some(0),
+            _ => None,
+        }
+    }
+
+    /// true なら試行は終了。失敗後に新たな書き込みをしない。
+    pub fn poll(&mut self, now_ms: u64) -> bool {
+        match self.state {
+            State::WaitCalibration { deadline_ms } => {
+                let deadline_ms = match deadline_ms {
+                    Some(deadline_ms) => deadline_ms,
+                    None => {
+                        let deadline_ms = now_ms.saturating_add(DEADLINE_MS);
+                        self.state = State::WaitCalibration {
+                            deadline_ms: Some(deadline_ms),
+                        };
+                        deadline_ms
+                    }
+                };
+                match self.sensor.read_status(&mut self.driver) {
+                    Ok(status) if check_calibration_ready(status).is_ok() => {
+                        self.state = State::ReadCalibration;
+                    }
+                    Ok(_) if now_ms > deadline_ms => self.not_ready("calibration_timeout"),
+                    Ok(_) => {} // 次の loop で確認する。
+                    Err(err) => self.io_fault("status_calibration", err),
+                }
+            }
+            State::ReadCalibration => match self.sensor.read_calibration(&mut self.driver) {
+                Ok((tp, h)) => {
+                    let c = decode_calibration(&tp, &h);
+                    if c.dig_p1 == 0 {
+                        self.invalid_data("calibration_p1_zero");
+                    } else {
+                        self.calibration = Some(c);
+                        self.state = State::ConfigureHumidity;
+                        log::info!(
+                            "env_calibration_read dig_p1={} dig_h4={} dig_h5={}",
+                            c.dig_p1,
+                            c.dig_h4,
+                            c.dig_h5
+                        );
+                    }
+                }
+                Err(err) => self.io_fault("calibration", err),
+            },
+            State::ConfigureHumidity => match self.sensor.configure_humidity(&mut self.driver) {
+                Ok(()) => self.state = State::StartForced,
+                Err(err) => self.io_fault("ctrl_hum_write", err),
+            },
+            State::StartForced => match self.sensor.start_forced(&mut self.driver) {
+                Ok(()) => {
+                    let started_ms = now_ms;
+                    #[cfg(feature = "env-sample-16-repeat")]
+                    {
+                        let repeat = &mut self.repeat;
+                        repeat.begin_ms.get_or_insert(now_ms);
+                        repeat.seq = repeat.seq.saturating_add(1);
+                        repeat.started_ms = now_ms;
+                        repeat.schedule_ms = if repeat.seq == 1 {
+                            now_ms + REPEAT_PERIOD_MS
+                        } else {
+                            (repeat.schedule_ms + REPEAT_PERIOD_MS).max(now_ms)
+                        };
+                    }
+                    self.state = State::WaitConversion {
+                        started_at: Instant::now(),
+                        ready_ms: started_ms + READY_AFTER_MS,
+                        next_poll_ms: started_ms + READY_AFTER_MS,
+                        deadline_ms: started_ms + DEADLINE_MS,
+                    };
+                }
+                Err(err) => self.io_fault("ctrl_meas_write", err),
+            },
+            State::WaitConversion {
+                started_at,
+                ready_ms,
+                next_poll_ms,
+                deadline_ms,
+            } => {
+                if now_ms >= ready_ms.max(next_poll_ms) {
+                    match self.sensor.read_status(&mut self.driver) {
+                        Ok(status) if check_measurement_ready(status).is_ok() => {
+                            // `ctrl_meas` の書き込みが返った時点から、ready を読んだ status 読み出しの後まで。
+                            // `now_ms` は読み出しの前に取った値なので使わず、同じ単調時計（`Instant`）で取り直す。
+                            // main loop の周期と I2C の時間を含む上限寄りの値であり、変換時間そのものではない。
+                            let elapsed_ms =
+                                u64::try_from(started_at.elapsed().as_millis()).unwrap_or(u64::MAX);
+                            // 繰り返す build は、heartbeat の uptime と重ねられるよう開始時刻と通し番号を足す。
+                            #[cfg(feature = "env-sample-16-repeat")]
+                            log::info!(
+                                "env_conversion elapsed_ms={elapsed_ms} osrs={OVERSAMPLING} seq={} started_ms={}",
+                                self.repeat.seq,
+                                self.repeat.started_ms
+                            );
+                            #[cfg(not(feature = "env-sample-16-repeat"))]
+                            log::info!(
+                                "env_conversion elapsed_ms={elapsed_ms} osrs={OVERSAMPLING}"
+                            );
+                            self.state = State::ReadSample;
+                        }
+                        Ok(_) if now_ms > deadline_ms => self.not_ready("measurement_timeout"),
+                        Ok(_) => {
+                            // 変換中。main loop を止めず、次の締切で再確認する。
+                            self.state = State::WaitConversion {
+                                started_at,
+                                ready_ms,
+                                next_poll_ms: now_ms + POLL_INTERVAL_MS,
+                                deadline_ms,
+                            };
+                        }
+                        Err(err) => self.io_fault("status_measurement", err),
+                    }
+                }
+            }
+            #[cfg(feature = "env-sample-16-repeat")]
+            State::Idle { next_start_ms } => {
+                if now_ms >= next_start_ms {
+                    self.state = State::StartForced;
+                }
+            }
+            State::ReadSample => match self.sensor.read_raw(&mut self.driver) {
+                Ok(bytes) => match decode_raw(&bytes) {
+                    Ok(raw) => {
+                        if self.log_sample() {
+                            log::info!(
+                                "env_raw temperature={} pressure={} humidity={}",
+                                raw.temperature,
+                                raw.pressure,
+                                raw.humidity
+                            );
+                        }
+                        // ReadCalibration からしかここへ進まない。状態の破綻も fault として記録する。
+                        let Some(calibration) = self.calibration.as_ref() else {
+                            self.invalid_data("calibration_missing");
+                            return true;
+                        };
+                        match compensate(raw, calibration) {
+                            Ok(reading) => {
+                                self.counters.samples = self.counters.samples.saturating_add(1);
+                                if self.log_sample() {
+                                    log::info!("env_reading temperature_centi_c={} pressure_q24_8_pa={} humidity_q22_10_percent={} samples={}", reading.temperature_centi_c, reading.pressure_q24_8_pa, reading.humidity_q22_10_percent, self.counters.samples);
+                                }
+                                self.finish_sample(now_ms);
+                            }
+                            Err(err) => {
+                                self.counters.compensation =
+                                    self.counters.compensation.saturating_add(1);
+                                log::error!(
+                                    "env_fault kind=compensation detail={err:?} count={}",
+                                    self.counters.compensation
+                                );
+                                self.state = State::Done;
+                            }
+                        }
+                    }
+                    Err(RegisterFault::SkippedChannel) => self.invalid_data("skipped_channel"),
+                    Err(_) => self.invalid_data("raw_register_fault"),
+                },
+                Err(err) => self.io_fault("raw", err),
+            },
+            State::Done => return true,
+        }
+        matches!(self.state, State::Done)
+    }
+
+    /// raw と補償値の log を出すか。繰り返す build は 1 回目だけ出す。毎回出すと、130 ms 周期のたびに
+    /// env_raw・env_reading の 2 行ぶんの UART0 送信が入り、上位の処理の遅れが変換によるのか log によるのかを分けられない
+    /// （送信時間は測っていない）。decode・補償・fault の log は毎回行う。`env_conversion` は毎回出す。
+    fn log_sample(&self) -> bool {
+        #[cfg(feature = "env-sample-16-repeat")]
+        return self.repeat.seq <= 1;
+        #[cfg(not(feature = "env-sample-16-repeat"))]
+        true
+    }
+
+    /// 1 回の測定が済んだ後の状態。繰り返す build は、時間内なら次の開始時刻まで待つ。
+    #[cfg_attr(not(feature = "env-sample-16-repeat"), allow(unused_variables))]
+    fn finish_sample(&mut self, now_ms: u64) {
+        #[cfg(feature = "env-sample-16-repeat")]
+        {
+            let begin_ms = self.repeat.begin_ms.unwrap_or(now_ms);
+            if now_ms.saturating_sub(begin_ms) < REPEAT_DURATION_MS {
+                self.state = State::Idle {
+                    next_start_ms: self.repeat.schedule_ms,
+                };
+                return;
+            }
+            log::info!(
+                "env_repeat_done conversions={} duration_ms={}",
+                self.repeat.seq,
+                now_ms.saturating_sub(begin_ms)
+            );
+        }
+        self.state = State::Done;
+    }
+
+    fn io_fault(&mut self, stage: &'static str, err: EspError) {
+        if classify_io_error(err.code(), ESP_ERR_TIMEOUT) == IoFault::Timeout {
+            self.counters.io_timeout = self.counters.io_timeout.saturating_add(1);
+            log::error!(
+                "env_fault kind=i2c_timeout stage={stage} error={err} count={}",
+                self.counters.io_timeout
+            );
+        } else {
+            // ESP-IDF の一般 I2C error だけから配線断と NACK は区別できない。
+            self.counters.io_other = self.counters.io_other.saturating_add(1);
+            log::error!(
+                "env_fault kind=i2c_other stage={stage} error={err} count={}",
+                self.counters.io_other
+            );
+        }
+        self.state = State::Done;
+    }
+
+    fn not_ready(&mut self, kind: &'static str) {
+        self.counters.not_ready = self.counters.not_ready.saturating_add(1);
+        log::error!("env_fault kind={kind} count={}", self.counters.not_ready);
+        self.state = State::Done;
+    }
+
+    fn invalid_data(&mut self, kind: &'static str) {
+        self.counters.invalid_data = self.counters.invalid_data.saturating_add(1);
+        log::error!("env_fault kind={kind} count={}", self.counters.invalid_data);
+        self.state = State::Done;
+    }
+}

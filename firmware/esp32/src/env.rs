@@ -2,14 +2,16 @@
 //!
 //! [Issue #16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16) の受け入れ条件
 //! （Device識別情報とcalibration処理の検証、raw値と変換値の観測）のうち、この段階では
-//! **Chip ID (register `0xD0`) の読み出しだけを扱う**（[AGENTS.md](../../../AGENTS.md)
-//! 「最終形を一度に作らず、単体から統合へ進める」）。calibration・測定値の読み出しは別途進める。
+//! Chip ID と補正係数の読み出し、forced mode での測定開始、raw burst read を扱う。
+//! byte の復号・補償演算は host test 可能な `deskcat-env` が担う。
 //!
 //! `main()`は`crate::run_i2c_bringup`からこのdriverを呼び、生byteをlogへ出す
 //! （一致判定はしない。`main.rs`のmodule doc参照）。**2026-09-22に、`35bcc36`のbuildをESP32へ書き込み、ESP32`3V3` pin給電で
 //! `ACCEL-01`／`ENV-01`へ初回通電して、この読み出しに応答を得た**（生byte `0x60`。
 //! 一致判定はしていない。記録は[EXP-015](../../../docs/hardware/experiment-log.md)が正本であり、
 //! **ここへ再掲しない**）。**それより後の変更を含むbuildは、実機で動かした記録が無い。**
+//! この追加実装も VM の ESP32 build・Clippy と host test までであり、
+//! raw／変換値、reference との比較、通電中の動作は未検証である。
 //! 実機での動作確認は人間の監視下で行う別工程である
 //! （[Hardware Safety Policy](../../../docs/governance/hardware-safety-policy.md)
 //! 「人間の監視が必要な操作」）。
@@ -55,9 +57,34 @@ use esp_idf_svc::hal::i2c::I2cDriver;
 use esp_idf_svc::sys::EspError;
 
 use crate::config;
+#[cfg(feature = "env-sample-16")]
+use deskcat_env::{CALIB_H_LEN, CALIB_TP_LEN, RAW_LEN};
 
 /// Chip ID register。Bosch BME280 Data Sheet Revision 1.24（module doc参照）。
 const REG_CHIP_ID: u8 = 0xD0;
+#[cfg(feature = "env-sample-16")]
+const REG_CALIB_TP: u8 = 0x88;
+#[cfg(feature = "env-sample-16")]
+const REG_CALIB_H: u8 = 0xE1;
+#[cfg(feature = "env-sample-16")]
+const REG_STATUS: u8 = 0xF3;
+#[cfg(feature = "env-sample-16")]
+const REG_CTRL_HUM: u8 = 0xF2;
+#[cfg(feature = "env-sample-16")]
+const REG_CTRL_MEAS: u8 = 0xF4;
+#[cfg(feature = "env-sample-16")]
+const REG_RAW: u8 = 0xF7;
+/// Bosch §5.4.3 Table 20（`osrs_h`）、§5.4.5 Tables 23–25（`osrs_t`・`osrs_p`・`mode`）。
+/// 既定は全 channel ×1、forced（`ctrl_meas` = `0b001_001_01`）。
+/// `env-sample-16-slow` は全 channel ×16（`osrs_*` = `0b101`、`ctrl_meas` = `0b101_101_01`）。
+#[cfg(all(feature = "env-sample-16", not(feature = "env-sample-16-slow")))]
+const CTRL_HUM: u8 = 0x01;
+#[cfg(all(feature = "env-sample-16", not(feature = "env-sample-16-slow")))]
+const CTRL_MEAS_FORCED: u8 = 0x25;
+#[cfg(feature = "env-sample-16-slow")]
+const CTRL_HUM: u8 = 0x05;
+#[cfg(feature = "env-sample-16-slow")]
+const CTRL_MEAS_FORCED: u8 = 0xB5;
 
 /// [`Bme280::read_chip_id`]の1 transactionのtimeout（tick）。
 ///
@@ -96,8 +123,57 @@ impl Bme280 {
     /// `Err(EspError)`（`ESP_ERR_TIMEOUT`）になる。応答しないsensorとbus固着を
     /// この関数は区別しない。**区別するのはlogを読む人間である。**
     pub fn read_chip_id(&self, i2c: &mut I2cDriver<'_>) -> Result<u8, EspError> {
+        self.read_byte(i2c, REG_CHIP_ID)
+    }
+
+    fn read_byte(&self, i2c: &mut I2cDriver<'_>, register: u8) -> Result<u8, EspError> {
         let mut buf = [0u8; 1];
-        i2c.write_read(self.address, &[REG_CHIP_ID], &mut buf, READ_TIMEOUT_TICKS)?;
+        i2c.write_read(self.address, &[register], &mut buf, READ_TIMEOUT_TICKS)?;
         Ok(buf[0])
+    }
+
+    /// §5.4.4 Table 21 の `measuring` と `im_update` を読む。
+    #[cfg(feature = "env-sample-16")]
+    pub fn read_status(&self, i2c: &mut I2cDriver<'_>) -> Result<u8, EspError> {
+        self.read_byte(i2c, REG_STATUS)
+    }
+
+    /// §4.2.2 Table 16 の連続した補正レジスタ 2 領域を読む。
+    /// byte の解釈は `deskcat_env::decode_calibration` が行う。
+    #[cfg(feature = "env-sample-16")]
+    pub fn read_calibration(
+        &self,
+        i2c: &mut I2cDriver<'_>,
+    ) -> Result<([u8; CALIB_TP_LEN], [u8; CALIB_H_LEN]), EspError> {
+        let mut tp = [0; CALIB_TP_LEN];
+        let mut h = [0; CALIB_H_LEN];
+        i2c.write_read(self.address, &[REG_CALIB_TP], &mut tp, READ_TIMEOUT_TICKS)?;
+        i2c.write_read(self.address, &[REG_CALIB_H], &mut h, READ_TIMEOUT_TICKS)?;
+        Ok((tp, h))
+    }
+
+    /// §5.4.3 の湿度 oversampling（既定 ×1、`env-sample-16-slow` は ×16）を設定する。ID 一致後だけ呼ぶ。
+    #[cfg(feature = "env-sample-16")]
+    pub fn configure_humidity(&self, i2c: &mut I2cDriver<'_>) -> Result<(), EspError> {
+        i2c.write(self.address, &[REG_CTRL_HUM, CTRL_HUM], READ_TIMEOUT_TICKS)
+    }
+
+    /// §5.4.5 の温度・気圧 oversampling（既定 ×1、`env-sample-16-slow` は ×16）で forced mode を開始する。
+    /// `ctrl_hum` の後に書く。ID 一致後だけ呼ぶ。
+    #[cfg(feature = "env-sample-16")]
+    pub fn start_forced(&self, i2c: &mut I2cDriver<'_>) -> Result<(), EspError> {
+        i2c.write(
+            self.address,
+            &[REG_CTRL_MEAS, CTRL_MEAS_FORCED],
+            READ_TIMEOUT_TICKS,
+        )
+    }
+
+    /// §4.1 の 0xF7..0xFE を 1 回の burst で読む。
+    #[cfg(feature = "env-sample-16")]
+    pub fn read_raw(&self, i2c: &mut I2cDriver<'_>) -> Result<[u8; RAW_LEN], EspError> {
+        let mut bytes = [0; RAW_LEN];
+        i2c.write_read(self.address, &[REG_RAW], &mut bytes, READ_TIMEOUT_TICKS)?;
+        Ok(bytes)
     }
 }

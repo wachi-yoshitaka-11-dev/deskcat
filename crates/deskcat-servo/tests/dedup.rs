@@ -11,7 +11,8 @@
 //! [`MotionDedup::admit_once`]が、同じ`id`に対して`admit`を高々1回しか呼ばないことである。
 //! `admit`には[`Limiter::admit`]を包んだclosureを渡し、呼ばれた回数と[`Limiter::counters`]で
 //! 確かめる。**wireの`play_motion`の受信と、firmwareのsessionへの組み込み（`pi_link.rs`）は試していない**
-//! （`esp_idf_svc`へ依存するため、host testでは動かせない。最後のtestは、そのclosureと同じ形を再現するだけである）。
+//! （`esp_idf_svc`へ依存するため、host testでは動かせない。sessionとcatalogの共用経路は
+//! `tests/dispatch.rs`で検査する）。
 
 use core::time::Duration;
 
@@ -318,7 +319,7 @@ fn a_backwards_clock_replays_when_the_monotonic_contract_is_broken() {
 }
 
 /// 空のcatalogでは、どの名前も`invalid_payload`で拒否され、その結果が記録されて再送に再生される。
-/// firmwareの`pi_link.rs`の`admit`のclosure（catalogを引くだけ）と同じ形である。
+/// 空catalogの拒否と結果のreplayを、重複判定の層だけでも確かめる。
 #[test]
 fn with_an_empty_catalog_every_name_is_rejected_as_invalid_payload_and_replayed() {
     let catalog = MotionCatalog::empty();

@@ -29,6 +29,9 @@ const MAX_ESTIMATE_NANO_USD: u64 = 512 * 100 + 128 * 500;
 const DAILY_ESTIMATE_NANO_USD: u64 = 40_000_000;
 const MIN_VALID_UNIX_SECS: u64 = 1_735_689_600; // 2025-01-01 UTC。未同期時計での送信を避ける。
 const RESPONSE_LIMIT_BYTES: u64 = 4096;
+/// unitの`SetCredential=`が、キーのfileが無いときに渡す既定値。キーではない印であり、
+/// この値ならクラウドの経路を使わない（`deploy/systemd/deskcatd.service`）。秘密情報ではない。
+const NO_KEY_MARKER: &str = "deskcatd-no-api-key";
 
 /// 秘密情報を含まない失敗分類。raw HTTP errorや応答本文は保持しない。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -187,7 +190,11 @@ impl ClaudeClient {
         while key.ends_with('\n') || key.ends_with('\r') {
             key.pop();
         }
-        if key.is_empty() || key.len() > 512 || !key.bytes().all(|byte| byte.is_ascii_graphic()) {
+        if key.is_empty()
+            || key == NO_KEY_MARKER
+            || key.len() > 512
+            || !key.bytes().all(|byte| byte.is_ascii_graphic())
+        {
             return Err(Failure::Credential);
         }
         let tls = TlsConfig::builder()
@@ -572,6 +579,57 @@ mod tests {
     #[test]
     fn time_band_is_omitted_before_the_clock_is_valid() {
         assert_eq!(band_at_utc(MIN_VALID_UNIX_SECS - 1), None);
+    }
+
+    /// testごとに別のcredential directoryを作る。値は秘密情報ではない。
+    fn credential_dir(name: &str, key: Option<&str>) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("deskcatd-cred-{name}-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).expect("dir");
+        if let Some(key) = key {
+            fs::write(dir.join("anthropic-api-key"), key).expect("write");
+        }
+        dir
+    }
+
+    #[test]
+    fn unit_fallback_marker_is_not_used_as_a_key() {
+        let dir = credential_dir("marker", Some(NO_KEY_MARKER));
+        assert!(matches!(
+            ClaudeClient::from_credential_dir(&dir),
+            Err(Failure::Credential)
+        ));
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn missing_or_empty_credential_is_not_used_as_a_key() {
+        let missing = credential_dir("missing", None);
+        assert!(matches!(
+            ClaudeClient::from_credential_dir(&missing),
+            Err(Failure::Credential)
+        ));
+        let empty = credential_dir("empty", Some(""));
+        assert!(matches!(
+            ClaudeClient::from_credential_dir(&empty),
+            Err(Failure::Credential)
+        ));
+        let _ = fs::remove_dir_all(&missing);
+        let _ = fs::remove_dir_all(&empty);
+    }
+
+    #[test]
+    fn unit_fallback_value_matches_the_marker() {
+        let unit = include_str!("../../../deploy/systemd/deskcatd.service");
+        assert!(
+            unit.lines()
+                .any(|line| line == format!("SetCredential=anthropic-api-key:{NO_KEY_MARKER}"))
+        );
+        assert!(
+            !unit
+                .lines()
+                .any(|line| line == "SetCredential=anthropic-api-key:")
+        );
     }
 
     struct Fake {

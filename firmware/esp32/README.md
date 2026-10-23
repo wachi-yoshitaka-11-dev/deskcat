@@ -16,13 +16,13 @@
 
 Issue #5 でtoolchainを固定し、最小projectのclean buildを確認した。既定の製品build（featureなし）は、Pi link、heartbeat／health snapshot、`ACCEL-01`／`ENV-01`のID読み出し、LCDの表情描画、ADXL345のtap検出を1つのmain loopで扱う（#487）。表情とtapの動作は、それぞれ`face-21`と`tap-21`の試験buildから製品経路へ接続した。列挙した試験featureを指定すると試験構成を選び、従来の`tap-21,face-21,bringup-display-13`のデモを含め、各featureが有効にするI/Oは従来どおりである。`bringup-i2c-15-16`は、以前のfeatureなしbuildと同じ、LCDに触れないセンサー単体試験である。構成の一覧は`src/main.rs`のmodule doc「buildの構成」節が持つ。
 
-LCDのpinは`docs/hardware/gpio-assignment.md`の`信号inventory`が正本である。製品buildと`face-21`試験buildはLCDを初期化し、backlightを点けたまま`set_expression`の表情を描く。Pi commandを受けなくても、描ける状態になった時点で`neutral`を1回描く。`bringup-display-13`試験buildは単色fillと四隅patternを1段ずつ描く（`src/display_test.rs`）。その試験のflash・通電・目視結果は`docs/hardware/experiment-log.md`の`EXP-016`〜`EXP-018`にあるが、現在の段階描画経路と製品経路は実機で確認していない。`ACCEL-01`／`ENV-01`のID読み出しは既存のI2C driverを使う。製品buildと`tap-21`試験buildは、ADXL345のIDが一致した場合だけ設定を書き、tapを検出する。`SERVO-PWM`、`ADC-*`、`TOUCH-*`は製品buildでは駆動しない。servoの安全gateは[servo-safety-limits.md](../../docs/hardware/servo-safety-limits.md)が持つ。製品buildの通電手順は未確定であり、下の「build構成と通電」の表で通電可能とは扱わない。
+LCDのpinは`docs/hardware/gpio-assignment.md`の`信号inventory`が正本である。製品buildと`face-21`試験buildはLCDを初期化し、backlightを点けたまま`set_expression`の表情を描く。Pi commandを受けなくても、描ける状態になった時点で`neutral`を1回描く。`bringup-display-13`試験buildは単色fillと四隅patternを1段ずつ描く（`src/display_test.rs`）。その試験のflash・通電・目視結果は`docs/hardware/experiment-log.md`の`EXP-016`〜`EXP-018`にあるが、現在の段階描画経路と製品経路は実機で確認していない。`ACCEL-01`／`ENV-01`のID読み出しは既存のI2C driverを使う。`env-sample-16`試験buildだけがBME280のID一致後に補正係数とraw値を読み、測定設定を書いて補償値をUART0にlogする。製品buildと`tap-21`試験buildは、ADXL345のIDが一致した場合だけ設定を書き、tapを検出する。`SERVO-PWM`、`ADC-*`、`TOUCH-*`は製品buildでは駆動しない。servoの安全gateは[servo-safety-limits.md](../../docs/hardware/servo-safety-limits.md)が持つ。製品buildの通電手順は未確定であり、下の「build構成と通電」の表で通電可能とは扱わない。
 
 `crate::led`（[#514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)）は`LED-COMM`（GPIO2）と`LED-REACT`（GPIO5）を駆動する。**既定buildはこの2本に触れない。**`bringup-led-514` featureを付けた試験buildだけが、起動時に両pinを消灯側へ設定し、点灯試験（赤→白→両方）の後に白を点滅させる。`bringup-display-13`とも組み合わせられる。通信状態による白の点灯と、`happy`による赤の点灯はまだ無い。配線と試験の手順は[led-514-demo.md](../../docs/hardware/led-514-demo.md)が持つ。実機での点灯の観察は[EXP-025](../../docs/hardware/experiment-log.md#exp-025-追加ledの点灯試験赤だけ白だけ両方)にある。
 
 heartbeat と health snapshot は、いずれのbuildでもloopが動き続け、ESP logger の log にのみ出す（どのbuildでも出る。[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)より前の`pi-protocol-mode`はloggingを止めており、出力されなかった。`src/console.rs`参照）。**「log へ出す」は「serial へ出ない」ではない。**logger の出力は UART0（USB）を通って serial monitor に現れる。送らないのは、protocol の message として application の serial link（#11）へ流すことである。周期は `src/config.rs` が持ち、**いずれも暫定値である**（Protocol §5.7 が heartbeat の interval を `TBD` としているため、一次資料の根拠が無い）。health snapshot は `crates/deskcat-protocol` の `Status` を組み立てて JSON 1 行として出す。**`ProtocolCounters` はすべて 0 のままである。**いずれのbuildにも`ProtocolCounters`を増やす経路が無いためである（`src/health.rs`のmodule doc参照）。
 
-`src/protocol.rs`の`PiSession`は`hello`のsession遷移、`ping`／`get_status`への応答、`stale_session`の判定を実装し、`crates/deskcat-serial/src/peer.rs`（Pi側、Issue #12）と対になる。Pi linkを持つbuildでは、`src/pi_link.rs`の`PiLink`がPi linkのUARTから受けた行をdecodeし、`hello`／`ping`／`get_status`をこの型へ渡して応答を書き、`boot`のACKを`BootSession`へ渡す（#487）。**Pi linkはGPIOのUARTである**（`PI-UART-TX`＝GPIO13、`PI-UART-RX`＝GPIO14。pinと接続の条件の正は[gpio-assignment.md](../../docs/hardware/gpio-assignment.md)の`Pi–ESP32間のtransport`節）。`bench-servo-test-17`以外のすべてのbuild（既定buildを含む）が、UART0以外のUART（UART1）をこの2本へ割り当てて使う（[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)。`bench-servo-test-17`のbuildは、#17の測定用buildとしてPi linkを持たない）。**既定buildも起動のたびにGPIO13をTXとして駆動し、既定buildでもJTAG debugは使えない**（gpio-assignment.mdの`PI-UART-TX`行）。**UART0（board上のUSB-UARTブリッジ、GPIO1／GPIO3）は、どのbuildでも書き込みとdebug log専用である。**#487より前は、UART0をbuild時のfeatureでdebug logとPi–ESP32 protocol streamのどちらかへ排他的に使っていた。詳細は`docs/protocol/esp32-pi-protocol.md`§2、`src/console.rs`参照。Pi linkを持つbuildは、`src/boot_session.rs`の`BootSession`が`boot`のACK待ち・再送・`stale_session`受信時の`sid`選び直しを行い（[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446) PR B）、受信の異常（ring bufferの満杯など）を数えてhealth snapshotの行へ出す（#487）。**Piとつないでよい場面と条件は、gpio-assignment.mdの`信号線をつないでよい条件`が持つ**（とくに条件3（つないでよい試験）と条件5（給電の構成）。ここへ書き写さない。protocolの既知の制約は`src/console.rs`）。**host testと実機での動作確認はまだ無いため、session確立の成立は主張しない**（確かめていないことは`src/pi_link.rs`のmodule doc「確かめていないこと」）。`sid`の生成方法は`src/main.rs`の`generate_sid`が決める（`PROTO-TBD-011`のうち生成方法を部分解決。PR A）。この型（`PiSession`）自体は生成方法を持たない。
+`src/protocol.rs`の`PiSession`は`hello`のsession遷移、`ping`／`get_status`への応答、`stale_session`の判定を実装し、`crates/deskcat-serial/src/peer.rs`（Pi側、Issue #12）と対になる。Pi linkを持つbuildでは、`src/pi_link.rs`の`PiLink`がPi linkのUARTから受けた行をdecodeし、`hello`／`ping`／`get_status`をこの型へ渡して応答を書き、`boot`のACKを`BootSession`へ渡す（#487）。**Pi linkはGPIOのUARTである**（`PI-UART-TX`＝GPIO13、`PI-UART-RX`＝GPIO14。pinと接続の条件の正は[gpio-assignment.md](../../docs/hardware/gpio-assignment.md)の`Pi–ESP32間のtransport`節）。`bench-servo-test-17`を有効にするbuild（`bench-servo-90-17`を含む）以外のすべてのbuild（既定buildを含む）が、UART0以外のUART（UART1）をこの2本へ割り当てて使う（[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)。`bench-servo-test-17`のbuildは、#17の測定用buildとしてPi linkを持たない）。**既定buildも起動のたびにGPIO13をTXとして駆動し、既定buildでもJTAG debugは使えない**（gpio-assignment.mdの`PI-UART-TX`行）。**UART0（board上のUSB-UARTブリッジ、GPIO1／GPIO3）は書き込みとdebug logに使う。**例外として、`bench-servo-test-17`を有効にするbuild（`bench-servo-90-17`を含む）は、servoを動かす前に人間が入力する確認の語をstdin（UART0）から読む（[#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。`src/main.rs`の`wait_for_bench_confirmation`）。`touch-sample-14`の試験buildも、操作の区切りの`MARK`をstdin（UART0）から別threadで読む（[#14](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/14)、`src/touch.rs`。Pi linkのUARTではない）。#487より前は、UART0をbuild時のfeatureでdebug logとPi–ESP32 protocol streamのどちらかへ排他的に使っていた。詳細は`docs/protocol/esp32-pi-protocol.md`§2、`src/console.rs`参照。Pi linkを持つbuildは、`src/boot_session.rs`の`BootSession`が`boot`のACK待ち・再送・`stale_session`受信時の`sid`選び直しを行い（[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446) PR B）、受信の異常（ring bufferの満杯など）を数えてhealth snapshotの行へ出す（#487）。**Piとつないでよい場面と条件は、gpio-assignment.mdの`信号線をつないでよい条件`が持つ**（とくに条件3（つないでよい試験）と条件5（給電の構成）。ここへ書き写さない。protocolの既知の制約は`src/console.rs`）。**host testと実機での動作確認はまだ無いため、session確立の成立は主張しない**（確かめていないことは`src/pi_link.rs`のmodule doc「確かめていないこと」）。`sid`の生成方法は`src/main.rs`の`generate_sid`が決める（`PROTO-TBD-011`のうち生成方法を部分解決。PR A）。この型（`PiSession`）自体は生成方法を持たない。
 
 | 項目 | 確定版 |
 |---|---|
@@ -47,29 +47,33 @@ ESP32 Build profileの端末で、このディレクトリにて実行する。*
 
 ## host crateの再利用
 
-`deskcat-protocol`、`deskcat-servo`、`deskcat-face`、`deskcat-tap`をpath dependencyで使う。wire protocolの実装、
-servoのhard limitとtrajectory limitingの実装、`set_expression`の表情の図形と受理の判定の順序、tap検出の設定値と`tapped`の送出条件を、
+`deskcat-protocol`、`deskcat-servo`、`deskcat-face`、`deskcat-accel`、`deskcat-tap`、`deskcat-env`、`deskcat-touch`をpath dependencyで使う。wire protocolの実装、
+servoのhard limitとtrajectory limitingの実装、`set_expression`の表情の図形と受理の判定の順序、`accel-sample-15`のADXL345連続測定の設定値と復号・統計、tap検出の設定値と`tapped`の送出条件、BME280の生値と補正係数からの補償計算、`touch-sample-14`のXPT2046の制御byteと応答の復号を、
 それぞれhostのtestとfirmwareで1つに保つためである。
 判断の記録は[ADR-0008](../../docs/decisions/0008-firmware-protocol-crate-reuse.md)にある
-（`deskcat-servo`、`deskcat-face`、`deskcat-tap`は同ADRの追記）。
+（`deskcat-servo`、`deskcat-face`、`deskcat-tap`、`deskcat-accel`、`deskcat-touch`は同ADRの追記。`deskcat-env`には同ADRの追記が無い）。
 
 ```toml
 deskcat-protocol = { path = "../../crates/deskcat-protocol" }
 deskcat-servo = { path = "../../crates/deskcat-servo" }
 deskcat-face = { path = "../../crates/deskcat-face" }
+deskcat-accel = { path = "../../crates/deskcat-accel" }
 deskcat-tap = { path = "../../crates/deskcat-tap" }
+deskcat-env = { path = "../../crates/deskcat-env" }
+deskcat-touch = { path = "../../crates/deskcat-touch" }
 ```
 
 - root workspaceの`exclude = ["firmware/esp32"]`は**維持する。**lockfileはroot `Cargo.lock`と
   このディレクトリの`Cargo.lock`の2つに分かれたままでよい。
 - **共有crateの`rust-version`は、host（1.97.1）とESP toolchain（rustc 1.95.0-nightly）の
   両方を満たす下限にしてある。**`crates/deskcat-protocol/Cargo.toml`、
-  `crates/deskcat-servo/Cargo.toml`、`crates/deskcat-face/Cargo.toml`、`crates/deskcat-tap/Cargo.toml`が理由込みで宣言している。
+  `crates/deskcat-servo/Cargo.toml`、`crates/deskcat-face/Cargo.toml`、`crates/deskcat-accel/Cargo.toml`、`crates/deskcat-tap/Cargo.toml`、`crates/deskcat-env/Cargo.toml`、`crates/deskcat-touch/Cargo.toml`が理由込みで宣言している。
   ここを上げるとfirmwareのbuildが`rustc 1.95.0-nightly is not supported`でcompile前に止まる。
-- `crates/deskcat-protocol/**`、`crates/deskcat-servo/**`、`crates/deskcat-face/**`、`crates/deskcat-tap/**`の変更でも
+- `crates/deskcat-protocol/**`、`crates/deskcat-servo/**`、`crates/deskcat-face/**`、`crates/deskcat-accel/**`、`crates/deskcat-tap/**`、`crates/deskcat-env/**`、`crates/deskcat-touch/**`の変更でも
   `.github/workflows/firmware.yml`が発火する。
   host側だけの変更でfirmware buildが壊れるのを検知するためである。
 - `bench-servo-test-17`付きのbuildを除くbuildで、`src/servo.rs`を通って角度を出せるのは、同fileの`LimitedServo`だけである。`bench-servo-test-17`付きのbuildは、`Sg90::move_to_angle_once`でlimiterを通らずに1回動かす（`src/servo.rs`のmodule docの例外段落）。
+  `bench-servo-test-17`単独の指令角は規約上の105度、派生の`bench-servo-90-17`は規約上の90度である。実機の機械的中央は未確認（`HW-TBD-010`）。buildと実行の条件は[servo-safety-limits.md](../../docs/hardware/servo-safety-limits.md#初回動作の実行手順人間とaiの作業順序)に従う。
   `Sg90`と`deskcat-servo`の`Limiter`を1つずつ所有し、`Limiter`も`Setpoint`も受理済みのtargetも
   外から受け取らず、`tick`の間隔を自分で測る。**成立の条件**（`bench-servo-test-17`の経路を除く、
   `LedcDriver`を直接作る経路は型では止められない、`unsafe`を使わない）は同fileのmodule docにある。
@@ -95,15 +99,22 @@ session stateとserial taskの配線は
 build構成の説明を書き写さない（featureの一覧と、各featureが足すものは`src/main.rs`のmodule doc「buildの構成」節）。
 通電の手順と条件は[Power Budget](../../docs/hardware/power-budget.md)が正本であり（`ACCEL-01`／`ENV-01`単体bring-upの手順の条件(2)は`bringup-i2c-15-16`単独、`DISP-01`追加接続の手順の条件(2)は`bringup-display-13`付きbuildを要求する）、この表の「通電」欄は、その条件を各構成に当てた結果である。
 
-| build構成（`--features`） | LCD・backlight | ADXL345へ書く | Piへ送る | 通電（Power Budgetの手順） | 値の所在 |
-|---|---|---|---|---|---|
-| （既定・製品） | 初期化と点灯。点けたまま表情を描く | **ADXL345のDevice IDが`0xE5`のときだけ書く**。INT線を使わず`INT_SOURCE`をI2Cで読む | `boot`、ACK、`status`、`tapped`（IDが一致した場合） | **不可**（製品buildの通電手順は未確定） | `crates/deskcat-face`、`crates/deskcat-tap` |
-| `bringup-i2c-15-16` | 触れない | 書かない（Device IDを読むだけ） | `boot`、ACK、`status` | `ACCEL-01`／`ENV-01`単体bring-upの手順で可 | — |
-| `bringup-display-13` | 初期化と点灯。fillと四隅patternの後に消灯 | 書かない | 同上 | `DISP-01`追加接続の手順で可 | — |
-| `face-21` | 初期化と点灯。点けたまま表情を描く | 書かない | 同上。`set_expression`に受理のACKを返しうる | **不可**（`ACCEL-01`／`ENV-01`単体の手順は`bringup-i2c-15-16`単独限定、`DISP-01`の手順は`bringup-display-13`必須） | `crates/deskcat-face` |
-| `face-21,bringup-display-13` | bring-upの後も点灯のまま表情を描く（bring-upの間は`set_expression`を`busy`で拒否） | 書かない | 同上 | `DISP-01`追加接続の手順で可（条件(7)の承認は実行する日） | `crates/deskcat-face` |
-| `tap-21` | 触れない | **ADXL345のDevice IDが`0xE5`のときだけ書く**（`deskcat_tap::SETUP`。一致しなければ何も書かず、Device IDを読むだけ）。INT線は使わず`INT_SOURCE`をI2Cで読む | `boot`、ACK、`status`、`tapped`（Device IDが`0xE5`でなければ`tapped`は送らない） | **不可**（`ACCEL-01`／`ENV-01`単体の手順は`bringup-i2c-15-16`単独限定） | `crates/deskcat-tap` |
-| `tap-21,face-21,bringup-display-13`（デモ用） | `face-21,bringup-display-13`と同じ | `tap-21`と同じ（Device IDが`0xE5`のときだけ書く） | 上の全部 | `DISP-01`追加接続の手順で可（条件(7)の承認は実行する日） | `crates/deskcat-face`、`crates/deskcat-tap` |
+| build構成（`--features`） | LCD・backlight | ADXL345へ書く | BME280へ書く | Piへ送る | 通電（Power Budgetの手順） | 値の所在 |
+|---|---|---|---|---|---|---|
+| （既定・製品） | 初期化と点灯。点けたまま表情を描く | **ADXL345のDevice IDが`0xE5`のときだけ書く**。INT線を使わず`INT_SOURCE`をI2Cで読む | 書かない（Chip IDを読むだけ） | `boot`、ACK、`status`、`tapped`（IDが一致した場合） | **不可**（製品buildの通電手順は未確定） | `crates/deskcat-face`、`crates/deskcat-tap` |
+| `bringup-i2c-15-16` | 触れない | 書かない（Device IDを読むだけ） | 書かない（Chip IDを読むだけ） | `boot`、ACK、`status` | `ACCEL-01`／`ENV-01`単体bring-upの手順で可 | — |
+| `env-sample-16`（単独） | 触れない | 書かない（Device IDを読むだけ） | **Chip IDが`0x60`のときだけ** `ctrl_hum` と `ctrl_meas` へ書き、forced測定を1回行う。raw・補償値・fault件数と、変換の所要時間（`env_conversion`）はUART0へlog | `boot`、ACK、`status`（センサー値は載せない） | **不可**（新しい書き込みを含む構成の通電手順と承認は未確定） | `crates/deskcat-env` |
+| `env-sample-16-slow`（単独。`env-sample-16`を含む） | 触れない | 書かない（Device IDを読むだけ） | 上と同じ。ただしoversamplingを温度・気圧・湿度とも×16にして変換を遅くする | 上と同じ | **不可**（実機未確認） | `crates/deskcat-env` |
+| `env-sample-16-repeat`（単独。`env-sample-16-slow`を含む） | 触れない | 書かない（Device IDを読むだけ） | 上と同じ（×16）。ただし変換を、最初の変換の開始から30秒、130 ms周期で繰り返す（`ctrl_meas`への書き込みも毎回）。`env_conversion`は毎回（`seq`・`started_ms`付き）、`env_raw`・`env_reading`は1回目だけ、終了時に`env_repeat_done`をUART0へlog | 上と同じ | **不可**（実機未確認） | `crates/deskcat-env` |
+| `accel-sample-15`（単独） | 触れない | **Device IDが`0xE5`のときだけ**、`POWER_CTL`・`INT_ENABLE`（tapを止める）・`BW_RATE`・`DATA_FORMAT`・`FIFO_CTL`へ書き、±2 g・100 Hzの連続測定を始める。FIFOを読み、raw値と窓ごとの統計をUART0へlog | 書かない（Chip IDを読むだけ） | `boot`、ACK、`status`（センサー値は載せない） | **不可**（新しい書き込みを含む構成の通電手順と承認は未確定。2026-10-17にユーザーが承認した1回の通電が[EXP-033](../../docs/hardware/experiment-log.md#exp-033-accel-01adxl345の静止sampleaccel-sample-15の初回通電)にあり、この表の可否を変えない） | `crates/deskcat-accel`、`crates/deskcat-tap`（`INT_SOURCE`のaddress） |
+| `touch-sample-14`（単独） | 初期化しない。`LCD-CS`（GPIO22）をHighに固定するだけ | 書かない（Device IDを読むだけ） | 書かない（Chip IDを読むだけ） | `boot`、ACK、`status` | **不可**（`EXP-038`はこの表の「不可」のまま、条件6つを満たさずにユーザーの承認を得て1回書き込んだ。touch用5本は足した配線のままにするようユーザーに伝えてあるが、現物は確認していない。実機に書き込んだのはdevelop `79f29ea`の版で、その後に足した`T_IRQ`の変化と`MARK`のlog、busの持ち方の置き換えは実機未確認。Power Budgetにこの構成の手順が無い。LCD module上のXPT2046はLCDのVCCで動くため、LCDのVCCを抜いたまま起動しない。実機側でユーザーの新たな承認が要る） | `crates/deskcat-touch`、`src/touch.rs` |
+| `touch-lcd-14`（単独） | 初期化と点灯。表情を帯ごとに塗り続ける。**LCDとタッチは`SpiDriver`を共有し、busは転送ごとに取る**（製品と`touch-sample-14`は握り続ける型のまま） | 書かない（Device IDを読むだけ） | 書かない（Chip IDを読むだけ） | `boot`、ACK、`status`。`set_expression`は`hardware_unavailable`で拒否する | **不可**（実機未確認。LCDのVCC・9本・touch用5本が挿さった構成の手順と承認が要る。Power Budgetにこの構成の手順が無い） | `crates/deskcat-touch`、`crates/deskcat-face`、`src/touch_lcd.rs` |
+| `bringup-display-13` | 初期化と点灯。fillと四隅patternの後に消灯 | 書かない | 書かない | 同上 | `DISP-01`追加接続の手順で可 | — |
+| `face-21` | 初期化と点灯。点けたまま表情を描く | 書かない | 書かない | 同上。`set_expression`に受理のACKを返しうる | **不可**（`ACCEL-01`／`ENV-01`単体の手順は`bringup-i2c-15-16`単独限定、`DISP-01`の手順は`bringup-display-13`必須） | `crates/deskcat-face` |
+| `face-21,bringup-display-13` | bring-upの後も点灯のまま表情を描く（bring-upの間は`set_expression`を`busy`で拒否） | 書かない | 書かない | 同上 | `DISP-01`追加接続の手順で可（条件(7)の承認は実行する日） | `crates/deskcat-face` |
+| `tap-21` | 触れない | **ADXL345のDevice IDが`0xE5`のときだけ書く**（`deskcat_tap::SETUP`。一致しなければ何も書かず、Device IDを読むだけ）。INT線は使わず`INT_SOURCE`をI2Cで読む | 書かない | `boot`、ACK、`status`、`tapped`（Device IDが`0xE5`でなければ`tapped`は送らない） | **不可**（`ACCEL-01`／`ENV-01`単体の手順は`bringup-i2c-15-16`単独限定） | `crates/deskcat-tap` |
+| `mem-probe-23,face-21,tap-21`（#23の計測用。製品buildと同じ構成にlogを足す） | 初期化と点灯。点けたまま表情を描く（製品buildと同じ） | **ADXL345のDevice IDが`0xE5`のときだけ書く**（製品buildと同じ） | 書かない（Chip IDを読むだけ） | `boot`、ACK、`status`、`tapped`（IDが一致した場合）。`show_text`と`set_expression`を受理する | **不可**（製品buildと同じ理由。条件(2)は`bringup-display-13`を要求する。この構成の通電は、ユーザーの承認が要る） | `src/mem_probe.rs`。health snapshotと同じ周期（10秒）で、空きheap、起動からの最小の空きheap、main taskのstackのhigh water markを1行logへ出す。**この構成だけが`unsafe`を持つ**（`main.rs`の先頭の`cfg_attr`。製品buildは`forbid(unsafe_code)`のまま） |
+| `tap-21,face-21,bringup-display-13`（デモ用） | `face-21,bringup-display-13`と同じ | `tap-21`と同じ（Device IDが`0xE5`のときだけ書く） | 書かない | 上の全部 | `DISP-01`追加接続の手順で可（条件(7)の承認は実行する日） | `crates/deskcat-face`、`crates/deskcat-tap` |
 
 この表に無い組み合わせ（`bringup-led-514`、`bench-servo-test-17`との組み合わせなど）は対象外であり、この表は通電の可否を決めていない。`bringup-led-514`は、2026-10-12にユーザーが承認した条件（LEDの2枝を足して通電すること。書き込みと各回の通電）で、ESP32単体へ通電した。承認と観察は[led-514-demo.md](../../docs/hardware/led-514-demo.md)と[EXP-025](../../docs/hardware/experiment-log.md#exp-025-追加ledの点灯試験赤だけ白だけ両方)にある。
 `tap-21`が足す負荷（測定modeの`ACCEL-01`の約140 µA typ）の扱いは、Power Budgetの`face-21`の常時点灯の段落が持つ。

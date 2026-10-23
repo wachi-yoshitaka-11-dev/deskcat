@@ -2,9 +2,10 @@
 //!
 //! # 範囲
 //!
-//! [`MotionDedup::admit_once`]は、現在のsessionの`id`ごとに、`admit`（hostでは
-//! [`crate::Limiter::admit`]、firmwareのservo経路では`LimitedServo::admit`。**現在のfirmwareの`pi_link.rs`は
-//! `MotionCatalog`を引くclosureを渡し、`LimitedServo`は呼ばない**。servo経路の接続は#487のPR D）を**高々1回**しか呼ばない。
+//! [`MotionDedup::admit_once`]は、現在のsessionの`id`ごとに、`admit`（既存のdedup host testでは
+//! [`crate::Limiter::admit`]、将来のfirmwareのservo経路では`LimitedServo::admit`）を
+//! **高々1回**しか呼ばない。現在のfirmwareは[`crate::MotionDispatch`]経由で使い、
+//! 空catalogのため`LimitedServo`を呼ばない。
 //!
 //! - 初めての`id`（[`Lookup::New`]）: `admit`を1回呼び、結果を**`Ok`でも`Err`でも**記録する
 //! - 処理済みの`id`（[`Lookup::Replay`]）: `admit`を呼ばず、記録した結果を返す
@@ -15,8 +16,8 @@
 //! 「Relativeまたは名前付きの物理motionにはduplicate suppressionが必要である」である。
 //!
 //! **wireの`play_motion`の受信と振り分けは含まない。**それはfirmwareの`pi_link.rs`が行い、
-//! `admit`のclosureの中で`MotionCatalog`を引く（受け入れる名前と上限は未決である。Protocol §5.3と
-//! `PROTO-TBD-008`）。
+//! [`crate::MotionDispatch`]がcatalogを引いてから`admit`のclosureを呼ぶ
+//! （受け入れる名前と上限は未決である。Protocol §5.3と`PROTO-TBD-008`）。
 //!
 //! `Expired`の扱いは[`DuplicateHistory`]のdocとProtocol §9による（受け入れ前の`TBD`が残っている）。
 //!

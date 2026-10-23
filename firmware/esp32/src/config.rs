@@ -130,8 +130,9 @@ pub const SERVO_ANGLE_CONVENTION_MAX_DEG: f32 = 180.0;
 #[allow(dead_code)]
 pub const SERVO_FIRST_MOTION_MAX_DEVIATION_DEG: f32 = 15.0;
 
-/// `bench-servo-test-17` featureで、firmware起動からservoを動かすまで待つ時間
-/// （ミリ秒）。人間がservo電源を投入する運用上の猶予であり、安全要件には効かない。
+/// `bench-servo-test-17` featureで、人間がUART0のconsoleへ確認の語を入力してから
+/// servoを動かすまで待つ時間（ミリ秒）。人間が手を離して見守る運用上の猶予であり、安全要件には効かない。
+/// 起動だけではservoを動かさない（`main.rs`の`wait_for_bench_confirmation`）。
 /// 詳細は[servo-safety-limits.md](../../../docs/hardware/servo-safety-limits.md)の
 /// `決定事項`と`起動とarm delay`stepを参照。
 #[allow(dead_code)]

@@ -38,6 +38,18 @@
 | [EXP-024](#exp-024-deskcatdの常駐systemdをpiへ導入し電源投入での起動とfailedからの戻しを確かめた) | [#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)の受け入れ条件4。deskcatdのsystemd unitの導入、Piの起動での自動の開始、failedとreset-failedでの戻し、ESP32のfirmwareの特定 | 値の正なし（観察の記録。電源の適否は判断していない） |
 | [EXP-025](#exp-025-追加ledの点灯試験赤だけ白だけ両方) | [#514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)の追加LED（白＝GPIO2、赤＝GPIO5）の点灯試験（赤だけ・白だけ・両方） | 値の正なし（観察の記録。起動時の電位・電流・rail電圧は計測していない） |
 | [EXP-026](#exp-026-piの独り言show_textをlcdへ出し受理と拒否のackと表情の戻りを確かめた) | [#23](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/23)の実機確認。Piの`deskcatd`の独り言（`show_text`）、受理と拒否のACK、表示期限の後の表情の戻り | 値の正なし（試験の記録。描画時間とRAMの最大使用量は測っていない） |
+| [EXP-027](#exp-027-pi-zero-wでdeskcatdを直接buildしhttps接続とsystemd-credentialと偽esp32での常駐を観察した) | [#522](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/522)の[ADR-0026](../decisions/0026-cloud-speech-generation.md)の決定2・3・5・7が確認を求める項目のうち、Piの上の作業（直接build、キーなしのHTTPS接続、systemd credential、偽ESP32での常駐） | 値の正なし（観察の記録。ADR-0026の確認項目を満たしたとは書かない。実ESP32との常駐と`--cloud-speech`有効時は未確認） |
+| [EXP-028](#exp-028-sg90の初回のサーボ動作の試み測定用buildジャンパー線の接続2回試みた) | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)の初回のサーボ動作の試み（測定用build `bench-servo-test-17`、ジャンパー線の接続、PTC直列。2回） | 値の正なし（観察の記録。サーボの線の並び、電流・transient、1回目の動きが指令だったことは確かめていない。**#17の受け入れ条件は満たしていない**） |
+| [EXP-029](#exp-029-piのserial_linkで実portgpio-uartdevserial0を開き行の往復とprotocolの往復と信号線を外したときの観察を行った) | [#11](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11)の実port（GPIO UARTの`/dev/serial0`、115200）での`serial_link`の実行（600秒）と、信号線を抜いた観察（少なくとも1分55秒）。存在しないpathのopen失敗をPi上で別に見た（実portの切断ではない） | 値の正なし（観察の記録。`boot`→ACK→`get_status`→`status`と`ping` 3件のACKを実portで観察した。切断は観測されず、**#11の受け入れ条件3・4は実portで得られていない**。非通電の確認の項目2〜4と条件6の数値は申告だけ） |
+| [EXP-030](#exp-030-sg90の測定用buildgo17入りでサーボを接続しない状態と接続した状態のpwmac投入と動作時の5-vと33-vの変化をarduinoで記録した) | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)の受け入れ条件2・5・6（段1・段1b・段2と再駆動2回） | 値の正なし（観察の記録。条件5の値は`HW-TBD-034`が未解決のため合否を導かない） |
+| [EXP-031](#exp-031-bme280env-01の試験buildenv-sample-16でraw値と変換値を観測しswitchbotの表示と並べた) | [#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16)の実機確認。BME280（`ENV-01`）のraw値と変換値の観測、`MEAS-04`（SwitchBot）の表示との並置 | 値の正なし（観測の記録。確度・気圧・timeout・disconnect・CRC・not-readyは取れていない） |
+| [EXP-032](#exp-032-piのserial_linkで実portgpio-uartを開きlink-probeによる切断の判定と再接続の上限11とplay_motionの拒否の4経路12を観察した) | [#11](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11)の実port（GPIO UARTの`/dev/serial0`、115200）でのlink probeによる切断の判定と再接続の上限の観察と、[#12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)の`play_motion`の拒否4経路の確認 | 値の正なし（観察の記録。受け入れ条件を満たしたとは書かない。「1回の喪失判定と回復」だけの観察、実motionの非二重実行は取れていない） |
+| [EXP-033](#exp-033-accel-01adxl345の静止sampleaccel-sample-15の初回通電) | [#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)の静止sample（`accel-sample-15`、ESP32の`3V3` pin給電、LCDは切り離し） | 値の正なし（観察の記録。offset、個体の感度、noiseの下限は確かめていない） |
+| [EXP-034](#exp-034-sg90の90度指令でshuntを戻りに入れた配線ユーザーの申告導通は未確認でac投入時と動作時のarduinoの読みとreset回数を記録した) | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)の90度指令の測定窓。shunt（`MEAS-01`）をサーボのGNDの戻りに入れた配線（ユーザーの申告。導通は未確認）でのArduinoの読み（AC投入時と動作時。記録Bは欠番1件を含む。位置は動作の約28秒前）と、ESP32のreset回数 | 値の正なし（観測の記録。電流への換算の確度は主張しない。`HW-TBD-034`は未解決） |
+| [EXP-035](#exp-035-サーボを外し既知の負荷で戻りの経路の抵抗を調べa0の読みと電流の関係を記録した) | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)の案2の窓。サーボを外し、`EXP-034`の戻りの経路へ330 Ωの並列の負荷（10本・20本）をつないだときのArduinoの読み（A0）と、レーン間の電圧。段2bで、負荷20本のまま戻りの経路を6区間に分けた電圧降下（`DT830B`の`200 mV`レンジ）。窓の終わりにサーボ系の線を外した | 値の正なし（観測の記録。サーボの電流は主張しない。`HW-TBD-034`は未解決） |
+| [EXP-036](#exp-036-bme280env-01の変換時間をoversampling-1倍と16倍で観察しその間のheartbeatの間隔を記録したenv-sample-16とenv-sample-16-slow) | [#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16)の受け入れ条件5（遅い変換が上位taskをblockしない）の実機観察。`env-sample-16`（oversampling ×1）と`env-sample-16-slow`（×16）を、起動ごとの`env_conversion`の所要時間と、heartbeat・health snapshotの間隔で比べた。各3回、30秒ずつ | 値の正なし（観測の記録。BME280の確度、受け入れ条件5の判定は主張しない） |
+| [EXP-037](#exp-037-lcdをつないだesp32へmem-probe-23のbuildaと製品buildbを書き込みpiの独り言show_textで描画時間とheapstackを観察した) | [#23](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/23)の実機の窓。LCDをつないだESP32へ、`mem-probe-23`のbuild（A）と製品build（B）を書き込み、Piの独り言（`show_text`）の描画時間（`accept_to_draw_ms`）と、Aの`mem_probe`（空きheap、最小の空きheap、main taskのstack残量）を、固定文（10字・13字）で観察した | 値の正なし（観測の記録。RAMの最大使用量は測っていない。`PROTO-TBD-007`は未解決。BのESP32のログは取れていない） |
+| [EXP-038](#exp-038-touch-sample-14のbuildでlcd-module上のxpt2046touch-01のraw値をtouch用5本を足した配線で観察した) | [#14](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/14)の実機の窓。touch用の5本を足し、`touch-sample-14`のbuildでXPT2046のraw値（X・Y・Z1・Z2、`T_IRQ`のlevel）をidleと操作の間に観察した | 値の正なし（観測の記録。操作の指示35回に対し`irq_low=1`の連続する塊は9個で、原因は調べていない。受け入れ条件の判定は書かない） |
 
 **大容量の生dataはこのrepositoryへ入れていない。**保存場所は
 [development-foundation-plan.md](../planning/development-foundation-plan.md)の
@@ -2580,6 +2592,1167 @@ Piの起動で`deskcatd`が自動で始まった。ESP32側の端を外した間
 - 描画時間とRAMの最大使用量を測るには、計測のログを足すfirmwareの変更が要る
 - 終わりの状態：ESP32は電源なし、信号線のESP32側の端は外れている。GPIO2・GPIO5の線はESP32から抜いたまま（#514を再開するときに、`power-budget.md`の`DISP-01`追加接続の手順の条件(3)(a)と、#514の承認の範囲を照らす）。Piは電源が入っていて、`deskcatd`は`enabled`・`inactive`
 
+## EXP-027: Pi Zero Wでdeskcatdを直接buildし、HTTPS接続とsystemd credentialと偽ESP32での常駐を観察した
+
+[#522](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/522)の[ADR-0026](../decisions/0026-cloud-speech-generation.md)の決定2・3・5・7が、クラウド経路を有効にする前に確かめるよう求める項目のうち、Piの上の作業を観察した。**この記録は観察だけを書く。ADRの確認項目を満たしたとは書かない。**`--cloud-speech`は有効にしていない。本物のAPIキーはPiに置いていない。ダミー値（キーではない文字列）の値は、記録に書かない。
+
+| 項目 | 内容 |
+|---|---|
+| Test ID | `EXP-027` |
+| Date | 2026-10-15（JST 00:56〜01:21。最初のbuildと中断）と、2026-10-16（JST 22:11〜23:28。Piの起動から(4)の終了まで。その後の読み出しを除く。build、HTTPS、systemd、常駐）と、2026-10-17（JST 02:39〜02:41。(3)(g)）。時刻は下の各節にUTCで書く（UTC＝JST−9時間） |
+| Operator | Piの電源の抜き差しはユーザー。ssh、apt、build、systemctl、journalの読み出し、偽ESP32の実行は作業セッション（AI） |
+| Hardware revision／Exact components | `SBC-01`（Raspberry Pi Zero W。`armv6l`、Raspbian GNU/Linux 13〔trixie〕、systemd 257.9-1~deb13u1+rpi1、メモリ426 MiB、swap約425〜426 MiB）。ESP32は使っていない |
+| Wiring revision | ESP32側の信号線の端は、外した状態を保つという指示の前提で作業した（Piからは確認できない）。Pi側は動かしていない |
+| Power supply and current limit | Piの給電は`EXP-024`以降、確かめていない。`vcgencmd get_throttled`は観察した各時点で`0x0`（Pi Zero Wでは電圧の根拠にならない。`EXP-009`）。電流制限は設けていない |
+| Firmware commit/profile | ESP32は無し。Pi：下記のcommitのsourceを直接build（debug）。`rustc 1.97.1 (8bab26f4f 2026-07-14)`、`cargo 1.97.1` |
+| Configuration | `ureq =3.4.1`（`json`・`native-tls`）、`ureq-proto 0.6.4`、`native-tls 0.2.18`、`openssl 0.10.81`、`openssl-sys 0.9.117`（`Cargo.lock`）。OSの`openssl`3.5.6-1~deb13u2+rpt1、`ca-certificates`20250419、`pkg-config`1.8.1-4は導入済み。`libssl-dev`は、下の(1)で導入した |
+| Measurement equipment | 使っていない。Pi上の`time`、`/proc`、`journalctl`、`systemctl`、`systemd-analyze`、`openssl s_client`、samplingのscript（(1)は`sleep 5`を挟むloop、(4)は5秒ごと） |
+| Procedure | 下の(1)〜(4) |
+| Expected result | ADR-0026の決定2・3・5・7が確認を求める内容（Piでのbuild、HTTPS接続、systemd credentialの動作、常駐時のmemoryと時間） |
+| Measured result | 下記 |
+| Faults | 下記 |
+| Conclusion | 下記 |
+| Next safe step | 下記 |
+
+### (1) 直接build
+
+**commit。**build（1回目・中断）は`2105702dd9079ac6b145d685fabe1ffb8c425cbf`の`apps/`・`crates/`・`Cargo.toml`・`Cargo.lock`、build（3回目）はdevelop `66214235e1becb4e596a5fa5152e78891877afac`の同じ範囲（88 file。`git archive`をsshでPiへ流した）。コマンドは`cargo build --locked -p deskcatd`（debug）。
+
+| 回 | 時刻（UTC） | 結果 |
+|---|---|---|
+| 1回目（`libssl-dev`無し、`2105702`） | 2026-10-14T15:56:45Z開始 | exit 101、`real 8m16.090s`。`openssl-sys 0.9.117`が`Package openssl was not found in the pkg-config search path`、`Could not find directory of OpenSSL installation`、`Make sure you also have the development packages of openssl installed. For example, libssl-dev on Ubuntu`と表示して停止 |
+| 導入 | 2026-10-14（UTC。1回目の後、2回目の前） | `sudo apt-get install -y libssl-dev`：`libssl-dev:armhf 3.5.6-1~deb13u2+rpt1`。取得3,655 kB。`/`の使用量は3,570,632 kBから3,586,108 kBへ増えた（15,476 kB）。**Piのpackageの状態を変えた** |
+| 2回目（`libssl-dev`有り、`2105702`） | 2026-10-14T16:06Zごろ開始 | 完走していない。`Compiling http v1.5.0`の表示まで進んだ約15分の時点（最後のsampling 16:21:00Z）で、Piへのsshが切れた。ユーザーの申告：停止は電源を抜いたため。journalに、停止の直前までshutdown・OOM・低電圧・mmcエラーの行は無い（下の「Wi-Fiの切断」） |
+| 3回目（`libssl-dev`有り、develop `6621423`、clean） | 2026-10-16T13:17:01Z〜13:56:07Z | exit 0。`Finished dev profile [unoptimized + debuginfo] target(s) in 39m 03s`。`real 39m5.401s`、`user 31m21.649s`、`sys 0m59.155s` |
+
+3回目の観察（`sleep 5`を挟むloopで441 sample。13:17:01Z〜13:56:07Zの約2346秒に対し、実効の間隔は約5.3秒）：
+
+- `MemAvailable`の最小203,152 kB（開始時は335,156 kB）。`SwapFree`の最小344,356 kB（開始時436,220 kB）。OOM・低電圧・I/Oエラーの行は、この起動のカーネルlogに0件（`journalctl -k`）
+- 指定したcommand名（`rustc|cc1|cargo|ld|build-script|collect2`。`ld`は部分一致で、`systemd-journald`など他のprocessも含みうる）のprocessのRSSの最大は291,388 kB。**これは「build中の単一processの最大」とは言えない**（下のFaults）
+- `/`：使用3,673,960 kB（build前）→3,942,468 kB（後）、空き25,002,292 kB。`target/`は272,760 kB。debugの`deskcatd`は23,322,164 byte
+- 比較の事実：[EXP-024](#exp-024-deskcatdの常駐systemdをpiへ導入し電源投入での起動とfailedからの戻しを確かめた)の最初のbuild（`f0925027`のsource。この記録のcommitとは依存が違う）は、`Finished … in 19m 32s`、peak RSS 248,644 kB（5秒ごとのsamplingの最大）だった。**時間の差の原因は切り分けていない**
+- この間、Wi-Fiの切断が318回あった（下の「Wi-Fiの切断」）
+
+### (2) Anthropicのendpointへの、キーなしのHTTPS接続
+
+2026-10-16T13:56:57Z〜13:57:50Z。`NTPSynchronized=yes`。`apps/deskcatd/examples/tls_probe.rs`（Piの作業copyにだけ置いた。repositoryへは入れていない）で、`cloud_speech.rs`の`ClaudeClient`と同じTLS設定（`TlsProvider::NativeTls`、`RootCerts::PlatformVerifier`、`https_only`、proxyなし、`max_redirects(0)`、`timeout_global` 5秒）に`http_status_as_error(false)`を足し、**キー・`x-api-key`header・POSTを使わずに**`GET`を送った。example buildは42.34秒。
+
+| 宛先 | 観察 |
+|---|---|
+| `https://api.anthropic.com/v1/messages`（3回） | `status=405`、1240／1020／1113 ms |
+| `https://expired.badssl.com/` | `NativeTls(Ssl(… reason: "certificate verify failed" …))` |
+| `https://self-signed.badssl.com/` | 同上 |
+| `https://wrong.host.badssl.com/` | 同上 |
+| `http://api.anthropic.com/v1/messages` | `RequireHttpsOnly`、0 ms |
+
+参考：`openssl s_client -connect api.anthropic.com:443 -verify_return_error`は`Verification: OK`、`TLSv1.3`、`TLS_AES_256_GCM_SHA384`。この53秒の窓に、Wi-Fiの切断が3回あった。
+
+### (3) systemdのcredential
+
+unitは、develop `6621423`の`deploy/systemd/deskcatd.service`（sha256 `395be6ad34474bc3614109a7050f0b0d249cb9f2f47c1cfeb973a7e8f0c7294a`。最後に変えたcommitは`546bb6d`）。deskcatdそのものは起動していない。unitの複製（`/run/systemd/system/`に一時的に置き、試験の後に削除）は、`[Unit]`・`User=`・`LoadCredential=`・`SetCredential=`・`StateDirectory=`などを変えず、`ExecStart=`だけを短いscript（credentialのbyte数と`id`を表示する）へ、`EnvironmentFile=`と`Restart*`を外して差し替えた。
+
+| 試験 | 観察 |
+|---|---|
+| (a) `systemd-analyze verify`（上のunit） | `deskcatd.service:23: Invalid syntax, ignoring: anthropic-api-key:`（23行目は`SetCredential=anthropic-api-key:`） |
+| (b) 複製、`/etc/deskcatd/anthropic-api-key`が無い | `Failed to set up credentials: Protocol error`、`Failed at step CREDENTIALS`、`status=243/CREDENTIALS`。起動しない |
+| (c) 複製から`SetCredential=`の行を外した版、fileが無い | (b)と同じ`status=243/CREDENTIALS` |
+| (d) 最小再現：`sudo systemd-run --wait --collect --pipe -p LoadCredential=anthropic-api-key:/etc/deskcatd/anthropic-api-key /bin/true`、fileが無い | `status=243/CREDENTIALS`、`systemd-run`のexit 243。同じ指定に`-p SetCredential=anthropic-api-key:`（空の値）を足すとexit 0（CLI経由。0 byteのcredentialができた） |
+| (e) 複製の`SetCredential=`を、空でない値（キーではない11文字。値は書かない）に変えた版、fileが無い | 起動し、`$CREDENTIALS_DIRECTORY/anthropic-api-key`を11 byte読めた（uid 999） |
+| (f) ダミー値（キーではない22文字）のfileを、root所有・mode `0600`で`/etc/deskcatd/anthropic-api-key`に置く、unitの複製（credentialの行は元のまま） | 起動した。uid 999（`deskcatd`）が22 byte読めた。`/var/lib/deskcatd`は`drwx------ deskcatd deskcatd`で作られた |
+| (g1) develop `3a73475`（#603）の`deploy/systemd/deskcatd.service`（sha256 `d1e81a0fb2df1a8e2f1be7fd66913d0384d70f3660d89d51faa851dc24359c60`。`SetCredential=anthropic-api-key:deskcatd-no-api-key`）に`systemd-analyze verify` | 出力なし |
+| (g2) (g1)のunitの複製（上と同じ差し替え）、`/etc/deskcatd/anthropic-api-key`が無い | 起動した（uid 999）。credentialは19 byteで、内容は`SetCredential=`の値`deskcatd-no-api-key`と一致した（`cmp`） |
+| (g3) (g1)のunitの複製、ダミー値（キーではない23文字。値は書かない）のfileをroot所有・mode `0600`で置く | 起動した（uid 999）。credentialは23 byteで、内容は`deskcatd-no-api-key`と一致しなかった |
+
+(f)のとき、別の保持用の一時unit（同じ`User=`・`LoadCredential=`）で読める範囲を見た（値は表示せず、byte数と拒否の表示だけ）：
+
+- 一般user（`deskcat`）による元fileの読み出し：`Permission denied`
+- `/run/credentials/<unit>/`は`dr-xr-x---+ root root`、中のfileは`-r--r-----+ root root`（`+`はACL。`getfacl`が無く、ACLの中身は見ていない）。一般userと`nobody`：`Permission denied`。同じ`deskcatd`の別process：22 byteを読めた
+- unit停止の後、`/run/credentials/<unit>`は無くなった
+- 値の文字列は、起動中processの`/proc/<pid>/environ`と`cmdline`、`systemctl show`の出力に無かった（一致0件。`LoadCredential=`は`[unprintable]`と表示された）
+
+(g)は2026-10-16T17:39Z〜17:41Zに行った（Pi上のfileの時刻は2026-10-17 02:39〜02:40 JST）。(g2)・(g3)のとき、(f)と同じ形の保持用の一時unit（`ExecStart=/bin/sleep 25`）で、読める範囲を見た：
+
+- (g2)：`SetCredential=`と`LoadCredential=`は`systemctl show`で`[unprintable]`。`deskcatd-no-api-key`の文字列は、`/proc/<pid>/environ`・`cmdline`・`systemctl show`の出力に0件。`/run/credentials/<unit>/`は`dr-xr-x---+ root root`、中のfileは`-r--r-----+ root root`（19 byte）。一般user（`deskcat`）と`nobody`：`Permission denied`。`deskcatd`のuid：19 byteを読めた。unit停止の後、置き場は無くなった
+- (g3)：元fileを一般userが読む：`Permission denied`。service用のcopyを一般userと`nobody`が読む：`Permission denied`。`deskcatd`のuid：23 byteを読めた。ダミー値の文字列は、`/proc/<pid>/environ`・`cmdline`・`systemctl show`の出力に0件
+- **rootによる値の読み出しは試していない。**複製のunitだけを使い、`/etc/systemd/system/deskcatd.service`（sha256 `032541225e9ec62d02391dab6bea9b0ea5bb544b85aef4bc1fc4c3a3873ca8de`）は変えていない。ダミー値のfileと一時unitは、確認の後に削除した
+
+**未確認：**空の値の行がunit fileで無視される理由（systemdの仕様か、この版の挙動か）。空の値の行を外しても(b)と同じ結果だった(c)ことと、空でない値の行が働いた(e)ことは観察した。**この作業では、unitを直す方法を試していない。**直しは#603（develop `3a73475`）で行われ、(g)はその版のunitの複製の観察である。実際の`deskcatd`を、このunitの複製（`ExecStart=`を差し替えたもの）で起動したことは無い。
+
+### (4) 偽のESP32（PTY、Python）を相手にした`deskcatd`の常駐のmemoryと時間
+
+**この節の観察は、「偽のESP32（PTY、Python）を相手にした`deskcatd`の常駐のmemoryと時間」である。実ESP32との常駐、`--cloud-speech`有効時の常駐memory、HTTPS client実行中のピークは未確認である。ADR-0026の決定2の「常駐時のmemory・時間」は、この範囲では満たしていない。**
+
+- 偽のESP32：`fake_esp.py`（67行、sha256 `5bdc39ecbd8c50a859989c32850096c3fa4301974d2e2ce11b3954f86b28c688`。この作業の観察の道具で、repositoryへ入れていない）。PTYのmasterを持ち、`deskcatd`の実binaryをPTYのslaveにつなぐ。`hello`（`esp32-pi-protocol.md`§5.1）へ`boot`（§4.1）と`ack`（§6）を返し、`get_status`（§5.6）へ`ack`と`status`（§4.6）を返し、それ以外のPi→ESP32のmessageへ`status: ok`の`ack`を返す。**protocolへの適合の確認ではない**（envelopeの検証、再送、拒否、`reply_sid`の整合などは試していない）。実UARTと実ESP32には触れていない
+- 実行：2026-10-16T13:58:08Z〜14:28:11Z。`deskcatd`（sha256 `ebfd1c9dea69e79d52639d87ab12aef59e19681e114df46307a69c5f683bb51f`、`6621423`のdebug build）を、`--speech-min-interval-ms 60000 --speech-duration-ms 5000`で起動した（`--cloud-speech`と`--verbose`は付けていない）。`--duplicate-capacity 8 --duplicate-retention-ms 5000`はunitと同じ値。`--startup-deadline-ms`はunitの`10000`ではなく`60000`を使った。loginユーザーで手で起動し、systemdのunitは使っていない
+- 継続：1800秒。`deskcatd`は1800秒の間、終了せず、scriptが1800秒でSIGTERMを送った（script側の表示`exit=-15`は、`deskcatd`自身の終了コードではない）。`deskcatd`のlogは2行（`serial portを開く`と`hello(Startup)を送った`）で、WARN・ERRORは0件
+- memory（5秒ごと、360 sample。t=0〜1795秒）：`VmRSS` 4,896〜4,900 kB（t=5秒から。t=0の1回は1,636 kB）、`VmHWM` 4,900 kB。RSSの値は3通り（1,636、4,896、4,900 kB）で、変化は2回
+- 偽のESP32が受けたPi→ESP32のmessage：`hello` 1、`ack` 1、`get_status` 2、`show_text` 30（60秒ごと）
+- この間、Wi-Fiの切断が257回あった。Piの負荷平均は終わりの時点で0.35（1分）、`throttled=0x0`
+
+### Wi-Fiの切断（観察）
+
+`journalctl`の`wpa_supplicant`の`CTRL-EVENT-DISCONNECTED`（`reason=0 locally_generated=1`）の件数。**network識別子（BSSID、SSID、IP、MAC）は書かない。**
+
+| 起動 | 件数 |
+|---|---|
+| 2026-10-12の起動（-3）、2026-10-12〜13の起動（-2） | 0、0 |
+| 2026-10-14〜15の起動（-1。0の起動の1つ前。起動は2026-10-14 22:56 JSTごろ〔1回目のbuildの前の2026-10-15 00:56:24 JSTの`uptime`が2時間だったことからの逆算〕。journalの最初の行の時刻は2026-10-15 00:00:59 JSTで、この逆算と合わない） | 706。終わりの前の12分間（01:09〜01:20 JST）は1分に6〜10回。切断の直後に再接続していた（journalの`CONNECTED`。1回目のbuildの8分間のssh sessionも切れなかった） |
+| 2026-10-16の起動（0。22:11:34 JST起動） | 625（(4)の終了後の確認の時点）。(1)の39分間に318、(4)の30分間に257 |
+
+-1の起動の終わり：journalの最後は2026-10-15 01:20:55 JST（＝2026-10-14T16:20:55Z）で、切断の直後の再接続（`CONNECTED`、DHCPの新規lease）で終わる。shutdownの記録、OOM、低電圧、mmcエラーの行は無い。journalは書き出しの遅れがありうるため、最後の数秒は失われうる。ユーザーの申告：停止は電源を抜いたため。**切断が続いた原因（電源、cable、省電力、AP側）は切り分けていない**（[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)に同種の記録がある）。
+
+### Piに入っているもの（この作業の前後）
+
+- `/etc/systemd/system/deskcatd.service`のsha256は`032541225e9ec62d02391dab6bea9b0ea5bb544b85aef4bc1fc4c3a3873ca8de`のまま（`EXP-024`で導入した版。credentialの行は無い）。`/usr/local/bin/deskcatd`、`/etc/deskcatd/deskcatd.env`も2026-10-12のまま。**この作業ではPiの`deskcatd`のunitとbinaryを入れ替えていない**
+- `libssl-dev`を導入した（上の(1)）。ダミー値のfileと一時unitは削除した（`/etc/deskcatd`は`deskcatd.env`だけ）。(3)の試験の複製unitの`StateDirectory=deskcatd`が、`/var/lib/deskcatd`（`drwx------ deskcatd deskcatd`）を作り、残っている。中身は見ていない（(4)の`deskcatd`は予算fileを作らない）。Piの作業dirとして、2回目までの`2105702`のdirと3回目のdirが残っている（約140 MBと約293 MB）
+- (g)の後、2026-10-17 02:58 JSTの時点：`deskcatd`は`enabled`・`inactive`、`ExecMainStatus=75`、`NRestarts=0`。`/etc/systemd/system/deskcatd.service`のsha256は上と同じ。`/etc/deskcatd`は`deskcatd.env`だけ。`/run/systemd/system`に一時unitは無く、`failed`のunitは0件
+- `deskcatd`は`enabled`のまま。起動の後、ESP32と通信できずに再起動を30回繰り返し、2026-10-16 22:15:46 JSTに`failed`（`Start request repeated too quickly`）になった。**その後、作業セッションが、対象を指定しない`systemctl reset-failed`を1回実行した**（(3)の試験の片付けのとき）。そのため、`failed`の印が消えて`inactive (dead)`、`enabled`、`ExecMainStatus=75`になっている。他のunitの`failed`の印も消えた可能性がある（この起動で他に`failed`のunitがあったかは見ていない）
+
+### Faults
+
+- (1)のRSSのsamplingは、command名の部分一致（`ld`を含む）で選んだprocessの最大であり、cargo・rustc・linkerの単一processの最大とは限らない。システム全体の`MemAvailable`と`SwapFree`は、processに依らない
+- (1)の3回目の間（13:19〜13:30Zごろ）に、(3)の短い一時unitの試験とsshでの読み出しを同じPiで行った。build時間への影響は測っていない。Wi-Fiの切断も続いていた
+- journalの時刻は、起動の直後は時計の同期の前の値が混ざりうる（-1の起動の最初の数分など。上の起動時刻の食い違いを含む）。-1の起動の件数は、終わりの12分間の1分あたりの値と、全体の合計だけを書いた
+- 偽のESP32は、hello・get_status・ackだけを返す。`show_text`の描画、LCD、UARTの電気的な条件、実ESP32のtimingは含まない
+- 2026-10-17 02:58 JSTの時点で、`journalctl --list-boots`は現在の起動（0）だけを示し、-1以前の起動は読めない（上の件数は、それ以前の読み出し）。`/etc/systemd/journald.conf.d/50-persistent-storage.conf`は`Storage=persistent`と`SystemMaxUse=32M`で、`/var/log/journal`は4 MiBのfileが約6分ごとに並び、合計は28.3 MiB。古いjournalが消えた理由は調べていない
+- ESP32側の信号線が外れていたことは、Piからは確認していない
+- `2105702`と`6621423`の`apps/deskcatd/`の差は`cloud_speech.rs`だけ（36行追加、3行削除）で、1回目・2回目は後者の前のsourceである。時刻帯を日本時間で決める版（`25f68fd`、#601）は3回目に含まれる
+
+### この記録が主張しないこと
+
+- ADR-0026の決定2・3・5・7の確認項目を満たしたこと。特に、`--cloud-speech`有効時の常駐memory・時間、HTTPS client実行中のピーク、キーを使うAPI要求、`$2`の月額上限とWorkspaceのscope（決定3・5。人間の作業）
+- 実ESP32との常駐、ローカル独り言のLCD表示（別の確認。#16・#595）
+- `rustls`構成、他のHTTPS clientとの比較。**`ureq`と`native-tls`を確定した、とも書かない**
+- 時間の差（19分32秒と39分03秒）、Wi-Fiの切断の原因、(3)(a)の空の値の行が無視される理由
+
+### Conclusion
+
+- (1) `libssl-dev`が無いPiでは、`ureq`の`native-tls`を含む`deskcatd`のbuildは`openssl-sys`の段階で止まった（exit 101、8分16秒）。`libssl-dev` 3.5.6を入れたPiで、develop `6621423`のclean buildは39分03秒でexit 0になった
+- (2) キーなしの`GET`は、OSの証明書検証を通って`api.anthropic.com`のHTTPS応答（405）を得た。期限切れ・自己署名・host名違いの3つは、同じ設定で`certificate verify failed`になり、`http://`は拒否された
+- (3) develop `6621423`のunitは、`/etc/deskcatd/anthropic-api-key`が無いと、この版のsystemd（257.9）で`status=243/CREDENTIALS`になり起動しなかった。unitのコメント（`deploy/systemd/deskcatd.service`の「空のfallbackによりfile未設置でもserviceを起動できる」）と、`deploy/README.md`の「欠けた場合は空の`SetCredential=`へ戻る」の記述は、この観察（`6621423`の版）と一致しない。fileがあれば起動し、`deskcatd`のuidは読めた。一般user（`deskcat`）と`nobody`は読めなかった（rootによる値の読み出しは試していない）。#603（`3a73475`）は`SetCredential=`の値を、空から`deskcatd-no-api-key`へ替えた。その版のunitの複製は、fileが無くても起動し（credentialは19 byteの`deskcatd-no-api-key`）、fileを置くとその内容（23 byte）が渡り、`deskcatd`のuidは読めて一般userと`nobody`は読めなかった（(g)）
+- (4) 偽のESP32を相手にした1800秒の常駐で、`deskcatd`（ローカル独り言のみ）は終了せず、`VmRSS`は約4.9 MBだった
+
+### Next safe step
+
+- (3)の食い違いは、#603（`3a73475`）で`SetCredential=`の値を空から印へ替えた。この作業はunitを修正していない。(g)は、その版のunitの複製の観察で、Piの`/etc/systemd/system/deskcatd.service`は`EXP-024`で入れた版のまま。実際の`deskcatd`をその版のunitで起動することは未実施
+- 実ESP32との常駐と、ローカル独り言のLCD表示は、実機の窓（#16・#595）で、信号線の条件（[gpio-assignment.md](gpio-assignment.md)の`信号線をつないでよい条件`）に従って行う
+- `--cloud-speech`有効時のmemory・時間は、キーの発行とWorkspaceの`$2`上限の設定（ユーザーの作業）の後に、人間の管理下で確かめる
+- 終わりの状態：Piは電源が入っている。ESP32は使っていない。`deskcatd`は`enabled`・`inactive (dead)`
+
+## EXP-028: SG90の初回のサーボ動作の試み（測定用build、ジャンパー線の接続。2回試みた）
+
+[#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)の初回のサーボ動作を、人間の立ち会いのもとで試みた記録。1回目の試みは、ESP32がappとして起動していなかった可能性が高く、firmwareの指令との対応は未確認である。2回目の試みは、ESP32のログにサーボへの指令が出た。記録の出所は[#17の各comment](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)（下の各節が個別にlinkする）。ユーザーの決定（サーボの線の並びは、メーカー資料に無く、慣行に頼る。接続にジャンパー線を使う）は[comment 6222108076](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6222108076)にある。実行承認は[comment 6222753542](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6222753542)（1回目）と[comment 6224969168](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6224969168)（2回目。ユーザーの指示「覚えてないから再計測白」）。**この記録は事実と未確認だけを書く。**
+
+| 項目 | 内容 |
+|---|---|
+| Test ID | `EXP-028` |
+| Date | 2026-10-17（JST 05:50〜06:41。UTC 2026-10-16 20:50〜21:41）。その前の無電源の測定と、電流制限つきの通電は、2026-10-14〜10-17（JST。下の「事前の測定」） |
+| Operator | 配線、ESP32のENボタンを押す、M-12001のACプラグの抜き挿し、サーボの動きと熱（手の背）の確認はユーザー。ESP32の書き込み、NVSの消去、ログの取得、起動の合図（リセットの保持と解除）、書き戻しは作業セッション（AI） |
+| Hardware revision／Exact components | `SERVO-01`（TowerPro SG90。袋の表示は`TH270`）、`MCU-01`（ESP32-DevKitC V4）、`PSU-SERVO-01`（`M-12001`）、`PROT-OC-01`（予備の`MF-R135`）、`RES-LED-01`と同じ袋の`CF25J330RB`（信号用の330 Ω）、`WIRE-PWR-01`（`111641`、端子台`114217`×3）、ジャンパー線（両端オス。購入品で、種類・太さ・定格の記録は無い）、`MEAS-03`（`DT830B`） |
+| Wiring revision | M-12001（赤・黒のcableを端子台Aで受ける）→ PTC → 端子台B → 赤い線（`111641`）→ 端子台Sの＋の穴 → ジャンパー線 → サーボの赤い線の穴。サーボの茶色い線の穴 → ジャンパー線 → 端子台Sの−の穴 → 黒い線（`111641`）→ 端子台Aの黒の穴。サーボの黄色い線の穴 ← ジャンパー線 ← 330 Ω ← ESP32のGPIO27（ブレッドボードの列28のh28、抵抗のもう一端はh25、ジャンパー線はi25）。ESP32のGNDのジャンパー線の針を、端子台Sの−の穴へ、黒い線とサーボの茶のジャンパー線の針と一緒に入れた（1つの穴に3導体。導体の断面積の合計の目安の上限〔AWG18＝0.8230 mm²〕を、ジャンパー線の針の断面積〔記録に無い〕を0.64 mm角と仮定した計算で超える。ユーザーの案で試し、3本とも入り、軽く引いて抜けないことを申告）。ESP32のGNDのジャンパー線のもう一端は、ブレッドボードの「−20」（図では上の−列＝GND。ユーザーの申告）。電源の経路の330 Ωは、駆動の前に外した。ホーンは外す指示を出した（外したことの明示の返答は無い。無負荷かどうかは未確認）。Piとの線と、ESP32のLCD（`DISP-01`のVCC。LCD側で抜いた）は外した（ユーザーの「できた」）。ESP32はPCのUSBから給電。**GPIO27に、`RES-PULL-01`の4.7 kΩのpull-downが、いまの配線に入っているかは確かめていない**（事前の導通`0.32`は、信号用330 Ωの値で、pull-downは見えない。サーボ内部の入力の約13 kΩ〔黄−茶〕が、結果として黄の線をGND側へ引く可能性がある） |
+| Power supply and current limit | 駆動：`M-12001`（5 V／3 A。無負荷の出力は`+5.35 V`。テスターの読み）から、PTC（`MF-R135`）を直列に入れて給電。**故障電流を制限する手段はPTCで、`M-12001`の短絡特性は公開されておらず、3 A付近でPTCのtripは遅い**（[servo-safety-limits.md](servo-safety-limits.md)の承認の状態の項目6の(a)）。電流制限つきの事前の通電（下記）では、電源の経路に330 Ωを入れた。ESP32側の電流制限は設けていない |
+| Firmware commit/profile | developの`e0e959fb17900f49ceff2a9d3a3cb3cf9b8e893c`の`bench-servo-test-17`（debug）。ELFのsha256は`4d3c6d8b612ee5de224f6e2b35dc91399fe623ce7aef6198d99dcb3ee8620062`で、書き込みの直前に毎回照合して一致した。`git archive`をrepositoryの外へ展開してbuild（main checkoutの`.embuild`を借りた。clean buildではない。Version Recordは無い） |
+| Configuration | 1回の起動で1 command、中央から`+15`度（`target_deg=105`。暫定値。一次資料も実測も無い）、露出300 ms、dutyを0へ。NVSのlatch（namespace `bench17`、key `ran`）。arm delay 10秒。Pi linkを持たない |
+| Measurement equipment | `DT830B`（`MEAS-03`。直流電圧`20V`は最小単位10 mV、抵抗は`20k`／`200k`／`2000k`。確度の資料は無い）。ESP32のログ（UART0）。電流・過渡は測っていない |
+| Procedure | 下の「手順と時刻」 |
+| Expected result | 動作の前に電流制限つきの通電で、サーボの電源の入力に電流が流れ、赤の穴が茶の穴より正であること。1回の起動でサーボが+15度の側へ1回だけ動き、再起動ではlatchにより動かないこと |
+| Measured result | 下記 |
+| Faults | 下記 |
+| Conclusion | 下記 |
+| Next safe step | 下記 |
+
+### 事前の測定（出所はそれぞれのcomment。ユーザーの申告）
+
+- 無電源の抵抗（plugの穴へプローブを直接当てた。`DT830B`の`2000k`、最小単位1 kΩ）：黄−赤＝`OL`、黄−茶＝`013`、赤−茶＝`OL`。プローブを入れ替えても同じ。測定者のプローブの当て方は穴ごとに記録していない（[comment 6167929762](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6167929762)）
+- 端子台の足をサーボのplugの穴へ挿し、330 Ωを直列にして電源を入れた回（2026-10-15）：330 Ωの両端`0.00`（10 mV未満）、端子台Sの＋−間`5.34`、端子台Aの赤−黒`5.35`。端子台の足は、ユーザーの申告で「ゆるゆる」。電流がほとんど流れなかった理由は、足がplugの穴に電気的につながっていなかった可能性と区別できない。**並びの根拠にしていない**（[comment 6172945059](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6172945059)）
+- ピンヘッダの針の接触（無電源。黄と茶の穴へ別々に挿し、短い側の針の先で`2000k`）：`013`が直後から10秒後まで変わらない。嵌合は「ゆるゆるですぐとれる」。針は端子台のclampに入らない（[comment 6221675954](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6221675954)）
+- ジャンパー線の接続（両端オス。切らない）で、電流制限つきの通電（2026-10-17。信号の線と、ESP32は何もつながない。330 Ωを電源の経路に入れたまま）：端子台Sの＋−間`+2.10 V`、330 Ωの両端`+3.22 V`、端子台Aの赤−黒`+5.30 V`（負荷時）。電流は`3.22 V÷330 Ω`の資料値の計算で約9.8 mA（測定値ではない）。異臭・熱・煙・異音・サーボの動きは申告されていない。AC電源を挿した時刻、抜いた時刻は申告に無い（[comment 6222964661](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6222964661)）
+- 無電源の確認（駆動の前）：端子台Sの＋−間＝`20k`で`1.77`、ESP32のGND↔端子台Sの−＝`0.01`、端子台Sの＋↔ESP32のGND＝`1.47`、GPIO27↔信号用330 Ωの先（i25）＝`0.32`。目視と引っ張りは問題なしの申告
+
+### 手順と時刻（JST、2026-10-17。作業セッションのログの時刻）
+
+**1回目の試み**
+
+1. 約05:50：書き込み済みだった過去の試験build（#23の`tap-21,face-21,bringup-display-13`）で、記録用の読み取りを試した。pyserialでポートを開くと（DTRとRTSをFalseにする設定。ログの見出しに「open without reset」と書いたのは、作業セッションの意図であり、実際には、開いた直後にESP32がリセットされた）、`rst:0x1 (POWERON_RESET)`の起動の出力が出た。`stty -hupcl`を指定して`cat`で読むと、起動中のappの出力（`hb`）が続いて読め、リセットの出力は出なかった
+2. 書き込みのドライラン：同じ過去の試験buildを`espflash flash --after no-reset`で書き込み、書き込みの後にESP32が起動せず、出力が0バイトであることを確認した（ENは押していない）
+3. 05:53:44：`bench-servo-test-17`のELFを`espflash flash --after no-reset`で書き込んだ。sha256は書き込みの直前に照合。書き込みの後はブートローダで止まった。ACは抜いた状態。ホーンを外す指示と、ACを抜いたまま行う指示は、書き込みの後に出した
+4. ユーザーがENボタンを押し、M-12001のACプラグを挿した（指示は『押してから5秒数えて挿す』。指示どおりの時間だったかは、申告に明示が無い。時刻も申告に無い。05:53:44から05:56:44のあいだ）。ユーザーの申告：**サーボは動いた。異常なし。端子台・PTC・線の周りは熱くない**（手の背。触れていない）。動いた向きと角度は、申告に含まれていない。この回の起動ログは**取れていない**（記録用の読み取りは、起動の出力を1行も取らなかった）
+5. 05:56:44：作業セッションが、pyserialでポートを開いた（ログの見出しは「open without reset」だが、上の1のとおり、開いた直後にリセットされ、起動の出力〔`rst:0x1 (POWERON_RESET)`〕が出た）。**この時点で、ACが抜けているかを、作業セッションは確認していなかった。**ユーザーは、サーボが動いたとは申告していない。ログ：`reset_reason=power_on`、`servo_bench_test_nvs_latch_set`、`servo_bench_test_arm_delay_start ms=10000`、uptime 10513 msに`servo_bench_test_arm_delay_done`、`servo_bench_test_move target_deg=105`（uptime 10553 ms）、`servo_bench_test_stop`（10853 ms）。**この回が、latchが立つ前の最初の実行に見える**
+6. 05:58:44：ユーザーに「ACプラグは抜けていますか」と聞き、「抜けています」の返答を得てから、同じ方法でポートを開いた（開いた直後にリセットされた）。ログ：`servo_bench_test_skipped_already_ran reason=nvs_latch_set`
+7. 06:00:41：サーボを動かす機能のない過去の試験build（ELFのsha256は`14297916fbb00b7ec58d19542c6131c394717876334d26384e56ae89a42f676b`）を書き込み、起動と1秒ごとの`hb`のログを確認した
+
+**1回目の試みの原因の調べ（サーボの電源なし。ACは抜いたまま）**
+
+8. 06:22:47：過去の試験buildを`espflash flash --after no-reset`で書き込み、`stty hupcl`でポートを開閉し、`cat`の読み取りを06:22:48に開始した。ユーザーが「ENを押して離した」（時刻は申告に無い）。**その後のログは0行**。読み取りを止めて、6秒間、生の読み取りも0バイト
+9. `espflash reset`（RTSでリセット）を、読み取りを開いたまま行った。出力：`rst:0x1 (POWERON_RESET),boot:0x3 (DOWNLOAD_BOOT(UART0/UART1/SDIO_REI_REO_V2))`、`waiting for download.`（繰り返し）。**この`espflash reset`のあと、ESP32はappでなくダウンロードモードに入った。**原因（DTRが直前の書き込みのあとアサートされたままで、IO0が低いままだった可能性）は、確かめていない。下の10では、DTRを解除すると、appが起動した
+10. 06:32:28：pyserialで、DTRを解除、RTSを保持（リセットを保持）してポートを開いた。保持している間、出力は無かった。06:32:33にRTSを解除すると、`rst:0x1 (POWERON_RESET),boot:0x13 (SPI_FAST_FLASH_BOOT)`でappが起動し、1秒ごとの`hb`が出た
+
+**2回目の試み**
+
+11. 06:34:15：`bench-servo-test-17`のELFを`espflash flash --after no-reset`で書き込んだ（sha256は直前に照合）。06:34:44：NVSの領域（0x9000から0x6000バイト。起動ログの partition table による）を`espflash erase-region`で消し、先頭の64バイトが`0xff`であることを読み戻して確認した（latchを消す再武装。`espflash erase-parts nvs`は、partition tableの指定が要り、失敗した）
+12. 06:35:16：pyserialでDTRを解除、RTSを保持してポートを開いた（ESP32はリセットのまま。出力なし）。ユーザーに、ホーンと配線の確認、ACプラグをすぐ抜ける位置に持つことを指示した
+13. ユーザーがM-12001のACプラグを挿した。ユーザーの申告：**挿した直後にサーボが動いた**（ESP32はリセットのまま。動きの原因は確かめていない。サーボの電源投入時の動きの可能性がある。GPIO27は、リセットの間、未設定で、実際のレベルは測っていない。時刻、向き、角度は申告に無い）
+14. ユーザーが「どうぞ」と返した。06:38:01：RTSを解除した。ログ：`rst:0x1 (POWERON_RESET),boot:0x13`、`servo_bench_test_nvs_latch_set`、`servo_bench_test_arm_delay_start ms=10000`（06:38:01）、`servo_bench_test_arm_delay_done`（06:38:11、uptime 10513 ms）、`servo_bench_test_move target_deg=105`（06:38:12、uptime 10553 ms）、`servo_bench_test_stop`（uptime 10853 ms）
+15. ユーザーの申告：「うごいた」。動いた時刻（「どうぞ」から何秒後か）、向き、角度は、申告に無い（動かす前に、向きを見るよう頼んでいなかった。作業セッションの段取りの誤り）。異音・熱・異臭、端子台・PTC・線の周りの熱の有無は、申告されていない。ユーザーは、AC プラグが抜けていることを「ぬけている」と申告した（時刻は申告に無い）
+16. 06:39:01：ACが抜けている状態で、RTSの保持と解除でリセットした。ログ：`servo_bench_test_skipped_already_ran reason=nvs_latch_set`。動作の行は無い
+17. 06:40:31：サーボを動かす機能のない過去の試験build（上と同じsha256）を書き込み、06:40:38の起動のあと、06:40:39の`servo=not_driven`、1秒ごとの`hb`のログを確認した
+
+### 結果
+
+- 1回目の試み：ユーザーの申告では、サーボは動いた。ESP32の起動ログは無い。上の8（書き込みの後にENを押したあと、出力は0行）と、上の9（`espflash reset`のあとに、ダウンロードモードの出力`waiting for download.`）の観察から、1回目も同じ状態だった可能性が高い。その場合、サーボの動きは、AC電源を挿した時の電源投入時の動きの可能性があり、bench-servo-test-17のfirmwareは走っていない。**ただし、1回目の起動ログが無いため、確かめていない**
+- 2回目の試み：ユーザーがACを先に挿し、挿した直後にサーボが動いた（申告。ESP32はリセットのまま。原因は確かめていない）。RTSの解除（06:38:01）の後、arm delayの10秒（uptime 10513 ms）が過ぎて、06:38:12（uptime 10553 ms）にESP32のログへ`servo_bench_test_move target_deg=105`が出て、300 ms後に`stop`が出た。ユーザーは「うごいた」と申告した。動いた時刻、向き、角度、熱・異常の有無は申告に無い
+- latch：2回目の試みの動作のあとの最初の再起動（上の16）で、latchが効いて`skipped_already_ran`が出た。上の5（1回目の試みのあとの最初の再起動）では、動作の指令の行（`servo_bench_test_move`、`stop`）まで出た。上の5が、latchの立つ前の最初の実行だった（1回目の試みでbenchが走っていなかった）と読めば整合する。サーボの電源が入っていたかは、確認していなかった。**latchが効かなかった、とは言えない**
+- ESP32のログ（上の5、6、14、16）に`panic`は無い。`health`の行で`overrun_ticks=0`。意図したリセット（ENボタン、ポートの開閉、RTSの操作）が複数回あった
+
+### Faults
+
+- **1回目の起動ログが無い。**1回目のサーボの動きが、firmwareの指令だったかは、未確認である
+- **手順書からの逸脱1（ユーザーの決定）：**サーボの電源の経路に、ジャンパー線を使った。[servo-safety-limits.md](servo-safety-limits.md)の手順の`通電前の現物確認`と、承認の状態の項目6は、servo電源の経路にbreadboardとjumper wireを使わないことを、満たさなければ試験を始めない条件とする。ユーザーの決定（[comment 6222108076](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6222108076)）で、この文面と食い違ったまま使った。ジャンパー線の太さ・定格は記録に無い
+- **手順書からの逸脱2（作業順序）：**サーボへの給電が、手順書の`起動とarm delay`の窓（ESP32を起動し、`servo_bench_test_arm_delay_start`のlogを見たあと、arm delayの間にサーボの外部5 V電源を入れる）の外で行われた。1回目は、logを待たず、ENのあと約5秒数えて挿す指示にした（ESP32はダウンロードモードに留まっていた可能性が高い）。2回目は、ESP32をリセットしたまま先にACを挿した（作業セッションの案を、PMが了承した順序で、VMも了解した。ユーザーの指示の範囲〔[comment 6224969168](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6224969168)〕に書いた。サーボの動きを、AC投入の動きと、firmwareの動作で区別するため）。GPIO27は、この間、未設定で、実際のレベルとpull-downの有無は確かめていない
+- **作業セッションの誤り1：**上の5のリセットを、ACが抜けているかを確認せずに行った。[servo-safety-limits.md](servo-safety-limits.md)の手順の`latch検証`は「servoの外部5 V電源を先に遮断してから」と定める。この順序を、この回は守っていなかった
+- **作業セッションの誤り2：**`pkill -f logger2.py`のcommand文字列に`logger2.py`を含めたため、作業セッション自身のshellが止まった。上の17の前にも、`hold.py`を止める操作の文字列で同じ誤りをした。実害は無い
+- **作業セッションの誤り3：**2回目の試みで、サーボの動いた向きを、動かした後で聞いた。動かす前に、向きを見るよう頼んでいなかった
+- **作業セッションの誤り4：**書き込みの手順（`--after no-reset`）が、ESP32をダウンロードモードに留めることを、1回目の前に確かめていなかった。ドライランでは、書き込みの後の出力が0バイトであることだけを確かめ、ENで起動するかは試していなかった
+- 端子台Sの−の穴の3導体は、ジャンパー線の針の断面積の目安（0.64 mm角と仮定した計算）で、導体の断面積の合計の目安の上限を超える。ジャンパー線の太さ・定格は記録に無い。短絡や拘束での発熱は検証していない
+- 無電源の確認の`端子台Sの＋↔ESP32のGND＝1.47`は、前の読み（`1.77`〜`1.79`）と差がある。M-12001の出力コンデンサの充電の影響の範囲とみなしたが、確かめていない
+- ユーザーの決定（サーボの線の並びを慣行とする）は、[Hardware Safety Policy](../governance/hardware-safety-policy.md)の一次資料または実測を要する水準の根拠ではない。この記録は、並びを実測で確かめた記録ではない
+- ACを挿した時刻・抜いた時刻、2回目の試みでサーボの動いた時刻は、ユーザーの申告に無い。ESP32のログの時刻だけを根拠にした
+- 上の15の、動いた後の熱・異音・異臭は、ユーザーに聞いていない。申告が無いため、「異常なし」とは書かない
+
+### この記録が主張しないこと
+
+- サーボの線の並び（赤＝＋5 V、茶＝GND、黄＝信号）が正しいこと。電流制限つきの通電で、赤の穴が茶の穴より正だったことと矛盾しない、までである
+- 2回目の試みでサーボが動いたことの原因が、firmwareの指令（`servo_bench_test_move`）であること。ESP32のログに指令が出た後に、ユーザーが「うごいた」と申告したが、動いた時刻の申告が無い。ログの指令（06:38:12）と、ユーザーの申告の時間差は、記録に無い
+- 起動時と小動作時の電流、5 Vと3.3 Vのtransient、ESP32のreset回数が0であること。いずれも測っていない（意図したリセットがあった）。[#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)の受け入れ条件は満たしていない
+- latchが、書き込みの直後の最初の再起動でも再実行を止めること。1回目の試みでbenchが走っていなければ、この条件は一度も試していない
+- ジャンパー線の針・端子台・3導体の穴・PTCが、サーボの戻りの電流で、熱に耐えること
+- サーボの動作の向き、角度、機構の可動域（`HW-TBD-010`／`011`）
+- 製品buildでの動作
+
+### Conclusion
+
+1回目の試みは、サーボが動いたが、ESP32がappとして起動していなかった可能性が高く、firmwareの指令との対応は未確認である。2回目の試みは、サーボの電源を先に入れ、ESP32のリセットを解除して起動すると、約11秒後（uptime 10553 ms）に`servo_bench_test_move`が出て、ユーザーは「うごいた」と申告した。latchは、2回目の試みの動作のあとの最初の再起動で効いた。
+
+### Next safe step
+
+- **この測定用build（`e0e959f`）での、これ以降の駆動は、行わない。**起動だけでは動かさず、UART0の入力で1回だけ動かす直しがdevelopに入るまで待つ
+- 書き込みの直後（`--after no-reset`）の起動の合図は、DTRを解除し、RTSでリセットを保持・解除する形（上の10、14）で行う（上の8、9の観察による）
+- 再起動のたびに、サーボの外部5 V電源（ACプラグ）が抜けていることを確認してから、ポートを開く・リセットする
+- 終わりの状態：ACプラグは抜けている（ユーザーの申告。上の15〜16の前）。ESP32はPCのUSBにつながっていて、サーボを動かす機能のない過去の試験build（上の17）が書き込まれている。NVSのlatchは、2回目の試みの実行で立った。サーボは、ジャンパー線で端子台Sにつながったまま（撤去の指示は出していない）。信号用の330 Ωは、ESP32のGPIO27とサーボの黄の穴のあいだに入ったまま。電源の経路の330 Ωは外した。LCDのVCCの線は、LCD側で抜いたまま（ユーザーの申告）。Piとの線は外した状態
+
+## EXP-029: Piの`serial_link`で実port（GPIO UART、`/dev/serial0`）を開き、行の往復とprotocolの往復と、信号線を外したときの観察を行った
+
+[#11](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11)の後半（実portでの確認）の試験。PiのGPIO UARTを`crates/deskcat-serial`の`serial_link` exampleで開き、ESP32（`DISP-01`を接続した台）と600秒つないだ。途中で信号線のESP32側の端を抜き（少なくとも1分55秒。下の手順8）、挿し直した。**この記録は観察だけを書く。#11の受け入れ条件を満たしたとは書かない。**時刻はUTCで、ユーザーの報告の時刻は、報告を受けて作業セッション（AI）が記録した時刻である。network識別子は書かない。
+
+| 項目 | 内容 |
+|---|---|
+| Test ID | `EXP-029` |
+| Date | 2026-10-17（UTC 07:12〜07:40。JST 16:12〜16:40）。内訳：ESP32のUSB挿入 07:12Zごろ（`ttyUSB0`の出現は`16:12 JST`）、flashの読み出し 07:15:23Z〜07:15:46Z、`serial_link`の実行 07:25:52Z〜07:35:52Z、存在しないpathのopen失敗の確認（Pi上のみ。実機を使わない）07:39:47Z〜07:39:50Z |
+| Operator | 配線の変更（サーボ系の線の取り外し、`DISP-01`の`VCC`の戻し、信号線・GND線のESP32側の端の抜き挿し）、ESP32のUSBの抜き挿し、テスターの操作と目視、ADXL345を叩くこと、は**ユーザー**。flashの読み出し、Piでの`serial_link`の実行とログの読み出しは**作業セッション（AI）**（sshで届いた範囲）。手順の説明に誤りと不足があった（下の「手順の説明の誤り」） |
+| Hardware revision／Exact components | `SBC-01`（Raspberry Pi Zero W）、`MCU-01`（ESP32-DevKitC V4、revision v1.0、flash 4MB）、`DISP-01`、`ACCEL-01`、`ENV-01`、`MEAS-03`（`DT830B`）。Piのadapterは`PSU-PI-A-02`（`EXP-024`・`EXP-026`と同じ） |
+| Wiring revision | 基準は`EXP-026`の配線。差分：(1) **サーボ系とESP32を結ぶ2か所を外した**（ブレッドボードの`i25`のジャンパー線＝サーボの黄の穴へ行く線。端子台Sの−の穴のESP32のGNDのジャンパー線の針。ユーザーの申告「全部できた」）。サーボ側の線、端子台、`M-12001`には触れていない（ACプラグは窓の間、抜けたまま。ユーザーの申告）。(2) `DISP-01`の`VCC`（地図で「＋30 赤」。`hardware/breadboard/layout.svg`）を、LCD側へ戻した（`EXP-028`の時点でLCD側で抜いてあった。理由は記録に無い）。(3) 窓の始めは、Piとの線3本（GPIO13、GPIO14、GND）のESP32側の端が外れていた（ユーザーの申告）。GPIO13の線のPi側はheader 10番（`RXD`）、GPIO14の線のPi側は8番（`TXD`）。各信号線に4.7 kΩが直列に入っている（目視の申告）。Piのheader側は触っていない |
+| Power supply and current limit | Piは`PSU-PI-A-02`（電圧は実測していない）。ESP32はこの端末のUSB。電流制限は設けていない |
+| Firmware commit/profile | ESP32：app descriptorの`version`が`cd87854`、`app_elf_sha256`が`14297916fbb00b7ec58d19542c6131c394717876334d26384e56ae89a42f676b`（`EXP-021`・`EXP-024`のELFと全桁一致。`tap-21,face-21,bringup-display-13`、debug）。**読んだのはpartition table（0x8000から0x100 byte）とappの先頭0x100 byteだけで、imageの残りは読んでいない。**Pi：`serial_link`はdevelop `014d05803b4a02e4e2903362b712487f3db12093`の`apps/`・`crates/`・`Cargo.toml`・`Cargo.lock`（88 file。`git archive`をsshでPiへ流し、Pi上で`SOURCE_COMMIT`を1 file足したので、Piの`find`の数は89）をPiの新しいdirへ展開し、`cargo build --locked -p deskcat-serial --example serial_link`（debug）。開始06:39:41Z、終了06:55:00Z、exit 0、`Finished … in 15m 18s`。sha256は`34760a322f96078b0ebea8dfe563a7b517432e1f20f56f2c4f4e6724bd996d40` |
+| Configuration | 承認：下の「承認」。引数：`--port /dev/serial0 --baud 115200 --duplicate-capacity 8 --duplicate-retention-ms 5000 --seconds 600 --ping-count 3`（`--verbose`なし）。**`--duplicate-capacity`と`--duplicate-retention-ms`は`deskcatd`のunitと同じ値で、`PROTO-TBD-005`は未確定。`--seconds`の600と`--ping-count`の3は根拠が無い。baud 115200は`Candidate`（`PROTO-TBD-001`）。**`deskcatd`は`inactive`（`enabled`）で、実行の前に`serial_link`と`deskcatd`のprocessが無いことを確かめた。Pi側の設定の読み取り（2026-10-17）：`/dev/serial0`→`ttyAMA0`、`dtoverlay=disable-bt`と`enable_uart=1`、`/proc/cmdline`に`console=serial0`無し、`serial-getty@ttyAMA0`は`inactive` |
+| Measurement equipment | `DT830B`（ユーザーの操作）、`espflash` 4.5.0、`serial_link`のログ（`run1.out`。sha256 `e08a24d8ed66ebb060ce3b62c7a07bf79323ce6da7a56fa01e1f765ce16f58d0`） |
+| Procedure | 下の「手順」 |
+| Expected result | `serial_link`が`/dev/serial0`を開き、`hello`を送り、ESP32の`boot`をACKして`get_status`へ`status`を得る（`serial_link`のmodule docが、firmwareのsourceから導いた予測）。信号線を外したときの`disconnects`と再接続は、予測を持たなかった |
+| Measured result | 下記 |
+| Faults | 下記 |
+| Conclusion | 下記 |
+| Next safe step | 下記 |
+
+### 承認
+
+窓の承認は、作業セッションが`AskUserQuestion`でユーザーへ直接訊いた。問いは「上の内容で、#11 の実機の窓を承認しますか。サーボ系の線を外し、LCD の VCC を戻して ESP32 の USB を挿し、起動は最大2回、点灯の上限は30分（根拠のない暫定値）です。」で、回答は「承認する」である。問いの本文に、`power-budget.md`の`DISP-01`追加接続の手順の条件(1)(2)(3)(6)(7)が窓で満たせるか／満たせないかと、PMとVMのOKは承認の代わりにならないことを書いた。**この問いと回答は、通電の前にIssueのcommentとして保存していない**（条件(7)は「通電前に確認できる記録」を求める）。この記録と#11のcommentが、通電の後の保存である。
+
+### 手順
+
+1. 無給電で、サーボ系の2か所を外した。ユーザーが、ACプラグとESP32のUSBが抜けていることを申告した。
+2. `DISP-01`の`VCC`を戻した。非通電の確認の項目1：ユーザーが`VCC`–`GND`をテスターの20kレンジで測り、**表示1.50（約1.50 kΩ）**と申告した。**数秒間の読みの動きは申告が無い。**この読みを短絡かどうかに判定していない。項目2〜4（9本の目視照合、逆極性、給電経路）は、ユーザーの申告「`VCC`以外は変えていないので不要」だけで、測定も目視もしていない。
+   - **この読みで通電した**（次の手順3）。**通電後に、熱・臭い・異音・LCDの乱れの申告は無かった。**（別の事実として並べる。前者は後者の根拠にしない）
+3. ESP32のUSBを挿した（BOOTを押したまま挿す指示を出したが、LCDが点いた。**firmwareが走った。これがbacklightが点く1回目の起動**）。`ttyUSB0`の出現は16:12 JST。
+4. 07:15:23Z〜07:15:46Zに、`espflash read-flash --after no-reset`でpartition table（`nvs`、`phy_init`、`factory`の3つ）とappの先頭0x100 byteを読んだ（`Staying in bootloader`）。
+5. USBを抜き、条件6（GNDの線）の確認を行った：テスターの2000 Ωレンジで、A（プローブ同士）、B（GND線のESP32側の端が外れている状態のPiのGND–ESP32のGND）、C（GND線を挿した後の同じ2点）を測った。ユーザーの申告は「AとCが同じ程度、Bは開放」で、**数値は聞いていない。**
+6. ESP32のUSBを挿した（BOOTを押さずに。**2回目の起動**）。LCDが点いた後に、GPIO13とGPIO14の線のESP32側の端を挿した（Pi 10番→IO13、Pi 8番→IO14を目で辿ったという申告）。異常（熱、臭い、異音、LCDの乱れ）は無いという申告。
+7. 07:25:52Zに、Piで`serial_link`を始めた。
+8. 07:26:59Zより前に、GPIO13とGPIO14の線のESP32側の端を抜いた。07:27:46Zと07:28:54Zの読みの間、`run1.out`は21行のままだった（抜いていた長さは、少なくとも1分55秒。07:26:59Zより前に抜き、07:28:54Zの読みの時点で抜いたままだった。上限は記録していない）。07:28:54Zの読みの後〜07:30:30Zの読みの前に、挿し直し、ADXL345を軽く叩いた（ユーザーの申告：2回）。
+9. 07:35:52Zに終了（exit 0）。条件2の順序で、信号線2本とGND線のESP32側の端を抜き、その後でUSBを抜いた（ユーザーの申告）。
+
+### 結果
+
+**行の層（行が通った）。**`/dev/serial0`を開き（`baud=115200 で serial portを開く`、`portを開いた`）、byteを読み書きし、行を復元した。終了時のcounters：
+
+```text
+counters: bytes_in=2142 bytes_out=488 frames_in=21 rejected_in=0
+counters: disconnects=0 reconnect_attempts=0 timeouts=0 retries=11907
+counters: dropped_out=0 discarded_on_disconnect=0 encode_failed=0
+peer: session_switches=1 duplicate_replays=0 stale_sessions=0 duplicate_expired=0
+peer: invalid_payloads=0 rate_limited=0 unmatched_acks=0 unapproved_hello_acks=1 unknown_types=0
+counters: pings_sent=3 ping_acks=3 ping_rejected=0 ping_retries=0 ping_gave_up=0
+経過 600.004702917s
+log出力の失敗: 0 件
+```
+
+**protocolの層（protocolが成立した範囲）。**ログの順序：`hello`（`id=1`、`reason=Startup`）を送った → ESP32の`ack`（`sid=4 id=2`）を受けたが、ESP32のsessionが未承認のため`hello`の結果として受理しなかった（`unapproved_hello_acks=1`。ログの文面のとおりに書く。原因は推測しない）→ `boot`（`sid=4 id=1`）を処理して`Established`（`firmware: "0.1.0"`、`board: "esp32"`、`reset_reason: "power_on"`）→ `get_status`へESP32の`ack`（`reply_to=3`、`status=Ok`）と`status`（`id=4`、`solicited=true`）→ `ping` 3件それぞれにESP32の`ack`（`reply_to=4,5,6`、`status=Ok`）。**`boot`→ACK→`get_status`→`status`の往復と、`ping`の3件のACKの相関は、実portで観察した。**
+
+**信号線を外した間。**GPIO13とGPIO14のESP32側の端を少なくとも1分55秒抜いた。この間、`serial_link`は新しい行を出さず、プロセスは動き続けた（`disconnects=0`、`reconnect_attempts=0`、`timeouts=0`）。**切断は観測されなかった。**（実機で確かめたのは`disconnects=0`、`reconnect_attempts=0`、`timeouts=0`だけである。理由は下の受け入れ条件3の行にコードの読みとして書く。）挿し直した後、同じ`sid=4`で`tapped`が14件届いた（`id=8`〜`21`）。叩いたのは2回という申告で、件数の差は確かめていない。LCDの表情は変わらなかった（`serial_link`は`set_expression`を送らない）。
+
+**その他。**Pi側：実行後も`deskcatd`は`inactive`、`serial_link`のprocessは無く、`throttled=0x0`。ESP32側のログ（UART0）は読んでいない。
+
+**存在しないpathのopen失敗（Pi上のみ。実機を使わない。実portの切断ではない）。**`serial_link --port /dev/deskcat-no-such-port --baud 115200 --duplicate-capacity 8 --duplicate-retention-ms 5000 --seconds 60`（同じbuild）を、07:39:47Zから約3秒走らせた。exit 1。`openに失敗した: No such file or directory (os error 2)`が6回、待機は100→200→400→800→1600 ms、`再接続の上限に達した`、`state: Stopped(ReconnectExhausted)`、`counters: reconnect_attempts=5 disconnects=0 timeouts=0 bytes_in=0 bytes_out=0`。出力のsha256は`7790b9326cbd30718595068d6069f6747c64f22ba5103f65c05d884331098624`。**これは存在しないpathのopen失敗であり、実portの切断ではない。受け入れ条件3・4を実portで満たした根拠にしない**（host（VM）の擬似端末の表と同じ形の事実である）。
+
+### 受け入れ条件ごと（#11）
+
+| # | 条件 | 実portで得られた事実 | 得られていないもの |
+|---|---|---|---|
+| 1 | portとbaudを設定として扱う | `--port /dev/serial0 --baud 115200`を引数で渡して開いた | — |
+| 2 | readerとwriterがpartial I/Oを処理する | 21 frame（2142 byte受信、488 byte送信）を、`rejected_in=0`で復元した | partial I/Oそのもの（分割して届いたread）は、観察する手段が無い |
+| 3 | disconnectを観測できる | 信号線のESP32側の端を少なくとも1分55秒抜いたが、`disconnects=0`、`reconnect_attempts=0`、`timeouts=0`だった。**切断は観測されなかった** | **GPIO UARTでは、deviceのerrorまたはEOFによる切断検出が働かない見込みである。**見込みの根拠は、コードの読みだけである（実機で理由を確かめていない）。`crates/deskcat-serial/src/session.rs`：`disconnects`を数えるのは`note_disconnected`（282〜284行）で、呼ぶのは次の4つである。(i) I/Oのerrorを`IoDisposition::classify`が`Disconnected`と読んだとき（557行、581〜583行）、(ii) `read`が`Ok(0)`（EOF）を返したとき（473行）、(iii) `write`が`Ok(0)`を返したとき（528行）、(iv) `IoDisposition::Fatal`（587行）。timeoutは別に数える（60行、577行）。信号線を外した少なくとも1分55秒の間`disconnects=0`だったので、実機ではこの4つのどれも働かなかった（どれが働かなかったかは区別していない。`read`の戻り値は記録していない）。`classify`の対象は`transport.rs`（84〜92行付近）と`device.rs`（288行。`EIO`／`ENXIO`／`ENODEV`を切断へ寄せる）。信号線を外しても`/dev/serial0`（Pi自身のUART）からerrorもEOFも出なければ、この経路は働かない。**相手の応答の途絶で切断と判定する実装は無い**（PMがsession.rsを開いて確かめた）。この条件は、本文がUSB serialの構成だったときに書かれている |
+| 4 | reconnectに上限とrate limitがある | 実portでは`reconnect_attempts=0`。**試せていない** | 3の切断が検出されないため、再接続に入らなかった。存在しないpathのopen失敗（上）は、実portの切断ではない |
+| 5 | 上限のないmessage queueが存在しない | `dropped_out=0`、`discarded_on_disconnect=0`。**queueが満杯になる状況は作っていない** | 上限での動作 |
+| 6 | simulator testで一般的なfailureを網羅する | 該当なし（simulator test） | — |
+
+### `DISP-01`追加接続の手順の条件（窓で満たせたか）
+
+- (1) 非通電の確認：項目1は測った（上の1.50 kΩ。動きの申告は無い。`gpio-assignment.md`の項目1は、数秒間の読みの変化を観察して判定する）。項目2〜4はユーザーの申告だけ（測定も目視もしていない）。**`power-budget.md`は条件(1)〜(7)をすべて満たすまで通電しないと定める（先例のある例外は条件(5)）。この窓は、条件(1)の項目2〜4を測定も目視もしない状態、項目1の読みの動きを観察していない状態で通電した。**
+- (2) `bringup-display-13`のbuild：appの先頭0x100 byteのdescriptorが`EXP-021`・`EXP-024`のELFと全桁一致した。imageの残りと、featureの組み合わせはflashから確認していない（`EXP-021`の表による）。
+- (3)(a) `3V3` railの負荷：サーボ系とESP32を結ぶ2か所を外した状態で行った。LEDの2枝（#514）は`EXP-026`のとおり、ESP32のpinから抜いてある（今回の確認はしていない）。(3)(b) ESP32はUSB給電。(3)(c) 周囲温度40 ℃の仮定：確かめていない。(3)(d) Wi-Fi／Bluetooth：`power-budget.md`の記録による。
+- (4) 給電経路：`DISP-01`が`ACCEL-01`／`ENV-01`と同じ`3V3` railにつながる構成は、`EXP-026`から変えていない（ユーザーの申告。確かめていない）。(5) `module電源pinの独立性`／`pin header対応`／pull-upの合成の確認は、この窓で行っていない（未達のまま通電した。先例は`EXP-015`）。
+- (6) `HW-TBD-025`(b)は満たされていない（変わらない）。
+- (7) 承認：通電前にIssueのcommentとして保存していない（上の「承認」）。回数：backlightが点く起動は2回（上限の2回を使った）。点灯の合計時間は測っていない（1回目の起動は07:12Zごろ、途中でUSBを抜いた時間がある。2回目の起動は07:15:46Zより後、07:25:52Zより前で、終了は07:36Zより前なので、2回目の起動から終了までは最大でも約20分。1回目の起動からの合計時間は測っていない。上限30分に対する記録は、この範囲まで）。
+
+### Faults
+
+- 条件1（4.7 kΩ）、5（別給電・GND共通）は、ユーザーの目視・申告だけ。条件6のGND線の測定は数値の申告が無い。非通電の項目2〜4は申告だけ。
+- 「BOOTを押したまま挿せばLCDは点かない」と案内したが、LCDが点いた（firmwareが走った）。**backlightが点く起動の上限2回のうち、1回目をこれで使った。**BOOTを押す手順が効かなかった原因は確かめていない。
+- `serial_link`は`--verbose`なしで実行した。readのtimeoutごとのログと、ESP32側のログ（UART0）は無い。`tapped`の件数（14）と叩いた回数（2）の差は確かめていない。
+- Piの`journalctl -b`でのWi-Fi切断の件数は、窓の後で761件（窓の前の読みは784件。journalの保持上限で古い行が消えているため、件数の比較は成り立たない）。実行の間、sshは切れなかった。
+
+### 手順の説明の誤り
+
+次に同じ窓を組むときに読めるよう、ユーザーの指摘を書く（誰の責任かは書かない）。
+
+- テスターを使う指示に、**レンジ（ダイヤルの位置）と表示の読み方を書いていなかった。**ユーザーは確認の問いに答えられず、同じことを複数回訊き直した。次は、レンジ、プローブを当てる2点、表示の単位、判定に使う動き（上がる／最初から高い／低いまま）を、最初の指示に書く。
+- **起動回数の上限（`power-budget.md`の条件(7)が求める、backlightが点く起動の回数）の理由を、問いに書かなかった。**ユーザーは「何の話か不明」と答えた。次は、上限を置く理由（隠れた電流の経路が確認できていない）と、数えるもの（USBの挿入、リセット、書き込みのたびのLCDの点灯）を、問いの前に説明する。
+- LCDの`VCC`の線を、ユーザーに「どの線か」と訊かれた。資料（`hardware/breadboard/layout.svg`）で特定できたが、指示を出す前に特定していなかった。次は、線の色・列・LCD側のピンを、指示に先に書く。
+- 「ほかは変えていないので不要」という申告を、項目2〜4の代わりにした。手順の項目を省いた事実として、上の手順2に残した。
+
+### この記録が主張しないこと
+
+- #11の受け入れ条件3・4を実portで満たしたこと。
+- 切断の検出が、USB-UARTブリッジの抜去（`EIO`）では働くこと（PTYの試験は別である）。
+- 製品buildでの動作、`deskcatd`での動作。`deskcatd`は止めたまま、使っていない。
+- 電流、`3V3` railの電圧、温度。長時間の運転。
+- ESP32側がprotocolの全体に適合すること（`ping`と`get_status`に対する応答と、`tapped`の送出だけを観察した）。
+
+### Conclusion
+
+実port（GPIO UARTの`/dev/serial0`、115200）で、`serial_link`が`hello`を送り、`boot`を処理して`get_status`の`status`を受け、`ping`の3件のACKを相関した。信号線を少なくとも1分55秒抜いても`disconnects`は増えず、挿し直した後に同じsessionで`tapped`が届いた。切断は観測されなかった。GPIO UARTでは、deviceのerrorまたはEOFによる切断検出が働かない見込みである（根拠はコードの読み。実機で理由を確かめていない）。
+
+### Next safe step
+
+- 受け入れ条件3・4：openの失敗を実portで作る方法があるか（たとえば、他のprocessがportを排他的に開いている状態）を、人間の承認のもとで検討する。作らない場合は、満たせない理由として#11へ残す。
+- `serial_link`を`--verbose`付きで、`ESP32`のUART0のログと並べて読む。
+- 次に同じ台で通電する窓の前に、非通電の確認の項目2〜4（一覧照合、逆極性、給電経路）と、条件(5)の確認を、測定または目視で行う（この窓では申告だけだった）。
+- 正本の更新：実portでのopenと往復を「未確認」と書いている記述（`crates/deskcat-serial/examples/serial_link.rs`のmodule doc、`crates/deskcat-serial/README.md`、`docs/hardware/gpio-assignment.md`の条件3）は、この記録の範囲外である。別の変更で、この記録を出所にして更新する。
+- 終わりの状態：ESP32は電源なし（USB抜き）、Pi–ESP32の線3本のESP32側の端は外れている。サーボ系とESP32を結ぶ2か所は外れたまま。`DISP-01`の`VCC`は戻した。Piは電源が入っていて、`deskcatd`は`inactive`（`enabled`）。ACプラグは抜けている。
+
+
+## EXP-030: SG90の測定用build（GO17入り）で、サーボを接続しない状態と接続した状態のPWM、AC投入と動作時の5 Vと3.3 Vの変化を、Arduinoで記録した
+
+[#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)の受け入れ条件2（接続前のPWM）・5（5 Vと3.3 Vのtransient）・6（reset回数）に関わる記録を、EXP-028の後に、人間の立ち会いのもとで取った。段1（サーボを接続し、ACなし）、段1b（サーボのplugを外し、ACなし）、段2とその再駆動2回（サーボを接続し、ACあり）を、1つにまとめる。記録の出所は[#17の各comment](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)（承認の記録：[6233425841](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6233425841)、[6245097549](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6245097549)、[6247875156](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6247875156)、[6248294282](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6248294282)。結果：[6235969143](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6235969143)、[6245272851](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6245272851)、[6248240717](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6248240717)、[6248439744](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6248439744)。訂正：[6245054273](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6245054273)）にある。**この記録は事実と未確認だけを書く。**ESP32のログと生のCSVは、repositoryの外の証拠用directory（MACを含むため、repositoryとIssueへ入れていない）にある。
+
+| 項目 | 内容 |
+|---|---|
+| Test ID | `EXP-030` |
+| Date | 2026-10-17 21:51〜23:52（段1）、2026-10-18 12:20〜12:38（段1b）、2026-10-18 18:05〜18:50（段2と再駆動2回）。すべてJST |
+| Operator | 配線、サーボのplugの抜き挿し、USBの抜き挿し、M-12001のACプラグの抜き挿し、`GO17`の入力（段1・段1b・段2の1回目と2回目）は**ユーザー**。ESP32の書き込みとNVSの消去、ログの取得、Arduinoの記録、`GO17`の送信（再駆動の2回）は作業セッション（AI） |
+| Hardware revision／Exact components | `SERVO-01`（TowerPro SG90）、`MCU-01`（ESP32-DevKitC V4）、`PSU-SERVO-01`（`M-12001`）、`PROT-OC-01`（予備の`MF-R135`）、信号用の330 Ω、`WIRE-PWR-01`（`111641`、端子台`114217`×3）、ジャンパー線（両端オス。種類・太さ・定格の記録は無い）、`MEAS-02`（Arduino Uno R3）、10 kΩの抵抗2本（秋月`125103`の手持ちの袋のバラ。購入していない） |
+| Wiring revision | 段1・段2：EXP-028の配線（サーボのplugをジャンパー線へつないだまま。信号用330 Ωは、ESP32のGPIO27とサーボの黄の穴のあいだ）。段1bはサーボのplugをジャンパー線の針から抜いた（ユーザーの申告）。Arduino：A0＝段1・段1bは信号用330 ΩのESP32側（ブレッドボードi28）、段2以降はサーボ側5 Vの分圧点（10 kΩ 2本は、作業セッションが指示した位置a10〜a12、b12〜b14、中点c12へA0。ユーザーが報告したのは、c10から端子台Sの＋の穴への緑のジャンパー線と、c14から−18への青のジャンパー線だけで、抵抗の位置とA0の移動は、報告が無い。A0の読み（AC投入の前は0、投入後は541カウント）は、分圧点につながっていることと矛盾しない）。A1＝「＋8」に赤のジャンパー線（ユーザーの申告。「上の＋列」は、読みの679カウントがESP32の3V3 pinの読みと一致したことからの推定）。Arduino GND＝上の−列の−20（ESP32のGNDと同じ列）。ArduinoとESP32はPCのUSB給電。AC：段1・段1bは抜けたまま。段2は挿した状態で駆動（時刻は下）。LCDとPiの線は外したまま |
+| Power supply and current limit | EXP-028と同じ（`M-12001`＋PTC直列。[servo-safety-limits.md](servo-safety-limits.md)の承認の状態の項目6の(a)）。電流の測定は無い |
+| Firmware commit/profile | developの`014d058`の`bench-servo-test-17`（debug）。ELFのsha256は`bd6694927e028c298baea1fa72cf21948e19346a872ddae45482e3fd4808fbee`。`git archive`をrepositoryの外へ展開してbuild（`cargo build --locked --features bench-servo-test-17`。clean buildで14分、exit 0。main checkoutの`.embuild`を借りた。Version Recordは無い） |
+| Configuration | `GO17`の入力で、10秒後に1回、`target_deg=105`、露出300 ms、dutyを0へ。NVSのlatch。Pi linkを持たない。LCDの信号線を駆動しない（`display=not_driven`） |
+| Measurement equipment | Arduino（`MEAS-02`）。段1・段1bは1ch（約9615 Sample/s、約104 µs刻み）、段2以降は2ch（1chあたり約4808 Sample/s、約208 µs刻み）。連続streaming（`hardware/measurement/arduino-transient-logger`）、基準はUSBの5 V。ESP32のログ（UART0）。作業用の一時script（console、解析。repositoryへ入れていない） |
+| Procedure | 下の「手順と時刻」 |
+| Expected result | 入力前は信号が出ず、resetで印が付かない。`GO17`の約10秒後にPWMが出る。サーボを外した状態のPWMを記録する。AC投入と動作時の5 Vと3.3 Vを記録する |
+| Measured result | 下記 |
+| Faults | 下記 |
+| Conclusion | 下記 |
+| Next safe step | 下記 |
+
+### 手順と時刻（JST。ESP32のログとArduinoの記録の時刻）
+
+- **段1（2026-10-17。承認A）：**NVS（0x9000から0x6000バイト）を消し、測定用buildを書き込み（`--after no-reset`）、入力前にRTSでresetを3回かけ（最初の起動を含めて4回の起動）、毎回`waiting_for_confirmation`で止まった。入力前のA0の読みは、Arduinoの記録の開始（23:44:37）から`GO17`の入力（23:48:11）までの約214秒、最大0（その後、`GO17`の約10秒後のPWMの直前まで約224秒、最大0）。`GO17`を22:00:39に入力：`confirmed`→`nvs_latch_set`→22:00:49に`move target_deg=105`→`stop`。このときのArduinoの記録は、150秒で切れており、PWMを含まない（作業セッションの設定ミス）。再武装し、22:06:07に`GO17`：`move`22:06:17。10分間のArduinoの記録は、USBのブロックが3件落ちてCSVが書かれず、最大値643カウントだけが残った。再武装し、`--allow-drops`を付けて、23:48:11に`GO17`：`move`23:48:21。この回のCSVを解析した（下の結果）。動作の後のreset（23:52）で`skipped_already_ran`。
+- **段1の終わり近く（22:58）：**ESP32が応答しなくなった（下の「Faults」）。ユーザーがUSBを抜き挿しして復旧した。
+- **段1b（2026-10-18。承認はユーザーの回答「長くて読めない。いいよ進めて」。問いの全文は読まれていない）：**サーボのplugを、ジャンパー線の針から抜いた（ユーザーの申告）。再武装し、Arduinoを1chにして、12:22:57に`GO17`：`move`12:23:07。動作の後のresetで`skipped_already_ran`。
+- **段2（2026-10-18。承認B）：**1回目：18:06:41に、ユーザーが`GO17`を、AC投入の前に入力した（コンソールの表示に従った）。サーボは無給電で、動いていない（ESP32は18:06:51に`move`、`stop`のログを出した。GPIO27にはPWMが出ている）。再武装し、Arduinoを2chにして分圧を作り、AC投入（約18:11:29.9。A0の立ち上がりからの推定）、18:12:18に`GO17`（ユーザーが入力した。ESP32のログの`TX GO17`に、作業セッションが送った印は無い）、`move`18:12:28、`stop`。ユーザーがACを抜いた。
+- **再駆動1回目（承認：[6248294282](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6248294282)）：**AC投入18:35:25.6、18:36:05に`GO17`（作業セッションが送った）、`move`18:36:15。18:38:09にも`GO17`を送った（二重。理由は未特定。`move`は出ていない）。AC抜け18:42:26。
+- **再駆動2回目：**AC投入18:44:19.8、18:44:43に`GO17`（ユーザーの「今」の返事を受けて、作業セッションが送った）、`move`18:44:53。AC抜け18:45:14。ユーザーの回答：「動いたが、方向と角度はわからない」（原文）。
+
+### 結果
+
+- **GO17の確認3点：**入力前のresetで印が付かない（resetを3回。最初の起動を含めて4回の起動）。入力前はGPIO27の線に信号が出ない（A0の読みは最大0〜4）。consoleで`GO17`を受け取る（ユーザーが打った回と、作業セッションが送った回）。動作の後のresetで`skipped_already_ran`。
+- **条件2（PWM）：**段1（サーボ接続・無給電）と段1b（サーボのplugを外した。ユーザーの申告）は、どちらも16パルスを301.5 msの間に記録した。周期は19.97〜20.07 ms、パルス幅は1.56〜1.66 ms（刻みは約0.104 ms）。高い側の読みは、段1が641〜643カウント、段1bが674〜676カウント（段1bのほうが高い。原因は確かめていない）。firmwareの一般値（50 Hz、1.0〜2.0 msを0〜180°へ線形対応）から、105°の計算値は約1.58 ms。
+- **条件5（Arduino、2ch）：**A0（サーボ側5 Vを1/2に分圧）は、AC投入の前は0。AC投入で、約2.5 msで45→195→338→472→510カウント、約10 msで最大544、1秒後に540〜543で安定。動作のとき、最小・最大は、18:12：505・567（偏差3カウント以上の区間 約265 ms）、18:36：508・568（同 約266 ms）、18:44：505・558（同 約97 ms）。動作の前の中央値は541。A1（3V3）は、記録の全体で676〜682カウント（動作とAC投入の前後は678〜681）。電圧への換算は、A1の読み（679カウントを3.3 Vと仮定）から1カウントが約4.9 mV、分圧1/2として、動作のときの5 V側の最小は動作前より約0.35 V低い（概算。確度は主張しない）。
+- **条件6の下調べ：**段2の2回目の起動（18:10:30）から最後のreset（18:27）まで、`rst:`の行は、意図したresetのほかに無い。uptimeは連続（最後のheartbeatは18:27:05の`uptime_ms=994029`で、約16分34秒）。ほかの回も、各回の起動と、動作の後のlatch確認のreset以外に、`rst:`の行は無い。`panic`・`task_wdt`・`brownout`の行は、どの回にも無い。
+- **サーボまわりの確認（ユーザーの回答の原文）：**段1のあと、8項目のうち2項目：「問題ない」（サーボ本体の外側の変色）、「異常なし」（手の背でサーボ本体に触れた）。残りは「手間が多くて実施不可能」とのことで、確かめていない。駆動の前の4項目（ホーンが外れている、plugが戻っている、ACプラグが手の届く位置にある、手とケーブルが動く範囲の外にある）は、ユーザーが「4点ともOK」と回答した（長い文章を読み飛ばしていた、とも述べた）。
+- **サーボが動いたか：**ユーザーの回答は「動いたが、方向と角度はわからない」（再駆動2回目）。段2の回について、ユーザーは「もう覚えてない」と述べた。
+
+### Faults
+
+- **作業セッションの誤り1（段1の前提）：**段1の配線の照合の項目に「サーボのplugは外れている」と書いた。記録で確かめた事実ではなく、作業セッションの前提だった。ユーザーは「全部そのとおり」と答えた。段2の準備のなかで、ユーザーが「plugはもともと抜いていない」と申告し、段1は**サーボ接続・無給電**だったと分かった。**段1の条件2は「接続前のPWM」ではない。**承認Aの問いは、実際の配線と違う前提で受けた。その範囲は広げていない。無給電のサーボの信号入力へ、GPIO27が4回パルスを出した（段1の3回と、段2の1回目の1回。[訂正のcomment](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6245054273)は3回と書いたが、段2の1回目を数えていなかった。backfeedの影響は未確認。`HW-TBD-009`）。
+- **作業セッションの誤り2：**Arduinoの記録の設定ミスで、段1のPWMの記録を2回取りこぼした（150秒で切れた、ブロックの落ちでCSVが書かれなかった）。再武装とGO17が3回になった。
+- **作業セッションの誤り3：**動かす前に、予想（パルス幅の増分は約+0.08 ms、設定の対応が合えば+15°、向きは確かめていない）と、動く前のサーボの位置を確かめる手順を、ユーザーへ伝えていなかった。firmwareは、動作の直前までサーボに信号を出さず、105°の指令だけを出す（90°へ動かす操作は無い）。動く前の位置は不明である。
+- **GO17の送信の形（手順書との違い）：**[servo-safety-limits.md](servo-safety-limits.md)の手順の`監視維持`は「動作の合図は人間の`GO17`の入力だけであり、AIへの実行指示は無い」と定める。再駆動の2回は、consoleのタブをこれ以上開けないため、ユーザーが「今」と返事をし、その返事を受けて作業セッションが`GO17`を送る形を、ユーザーが選んだ（問いの選択肢「承認する（GO17は私が、あなたの「今」の返事で送る）」）。手順書の定めとは違う形である。
+- **GO17の二重送信：**再駆動1回目で、18:36:05のあと18:38:09にも`GO17`を送った。理由は特定していない。その後、`move`は出ていない。1回目の送信が、ユーザーの「今」より前だったかも確かめていない（ユーザーは、その回について「まだこない」と述べた）。
+- **段2の1回目の`GO17`がACの前に入った：**ユーザーが、consoleの表示（「`GO17`と入力して」）に従った。作業セッションが「まだ入力しない」と先に書かなかった。この回は駆動に数えず、再武装の承認を受け直した。
+- **段1bの承認：**ユーザーの回答は「長くて読めない。いいよ進めて」で、問いの全文は読まれていない。問いの範囲（`GO17` 1回、再武装1回、plug外し、ACなし）に限って進めた。
+- **ESP32が応答しなくなった1回（原因未確認）：**段1の終わり近く（22:58）。ESP32は約52分間、heartbeatを出し続け、`panic`・`task_wdt`・`brownout`の行は無い。22:58:02に作業セッションがconsoleのスクリプトを閉じ、22:58:45に別のスクリプトを開いてresetを保持し、release せずに22:58:56に閉じた。その直後から、`espflash`が接続できず、resetにも書き込みモードにも反応しなかった。ユーザーは、電源LEDが点いていることを見て、ENボタンを押した。それでも応答せず、USBを抜き挿しして復旧した（`espflash board-info`が通った）。このとき、サーボのplugはジャンパー線につながっていた。候補（ArduinoとESP32が同じPCのUSBにある、A0をGPIO27の線につないだ、スクリプトの閉じ方）はあるが、どれも原因とは確かめていない。以後、resetを保持したスクリプトは、閉じる前に必ず`DTR`と`RTS`をreleaseし、logに残した。
+- **NVSの消去の後の読み戻し：**段1の最初の消去は、`--after no-reset`を付けておらず、消去の後にESP32が自動で起動し、NVSが初期化された（先頭が`0xff`でなかった）。以後は`--after no-reset`を付け、全部`0xff`を確認した。
+- **Arduinoの記録：**USBのブロックの落ちが、回ごとに3〜6件。`--allow-drops`で記録した（時刻はmark間の線形復元。PCの時計との対応はblockの受信時刻で、約0.1秒の誤差）。
+- ジャンパー線の使用は、ユーザーの決定（[#17のcomment 6247875156](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6247875156)。今回の駆動に限る）。[servo-safety-limits.md](servo-safety-limits.md)の承認の状態の項目6の(a)の文面「breadboardとjumper wireを使わない」は変えていない。
+
+### この記録が主張しないこと
+
+- **サーボが動いた向き、角度、量。**動く前の位置が不明で、ユーザーの回答は「向きと角度はわからない」。段2と再駆動は、直前の駆動で軸が105°付近に残っていた可能性があり、その場合、A0の落ち込みは、動き始めの電流ではなく、保持している状態の値かもしれない。ユーザーの「動いた」が、指令の動きか、AC投入や信号の始まりの動きかは、区別できない。
+- **条件5の値が、5 Vと3.3 Vのtransientの全体であること。**刻みは約208 µs（2ch）で、これより短い変化は見えない。`HW-TBD-034`は未解決で、GND topologyの(ii)も未確認であり、この測定値から合否を導かない（[power-budget.md](power-budget.md)）。電圧への換算の確度は主張しない。Arduinoの時計の確度は資料が無い。
+- **条件2が「接続前のPWM」であること（段1と段1bのどちらも）。**段1はサーボ接続・無給電である。段1bは、サーボを接続して4回PWMを出した後（段1の3回と、段2の1回目）に、サーボのplugを外して測ったもので、順序としての「接続前」ではない。plugを外したことは、ユーザーの申告に依り、作業セッションは目で見ていない。[servo-safety-limits.md](servo-safety-limits.md)の`初回動作の実行手順`は、この試験が手順4（waveform確認）を満たさず、受け入れchecklistの「サーボ接続前にPWMを測定した」は、この試験だけでは満たされない、と定める。高い側の読みの差（段1と段1b）の原因は確かめていない。
+- **条件4（起動時と小動作時の電流）。**測っていない。測る手段が無い。
+- **条件6が受け入れ試験として満たされたこと。**1回だけの観察で、設計した受け入れ試験ではない。意図したresetが各回にある。
+- **サーボの線の並び（赤＝＋5 V、茶＝GND、黄＝信号）が正しいこと。**慣行の仮説（EXP-028）。
+- **ジャンパー線の針・端子台・3導体の穴・PTCが、サーボの戻りの電流で、熱に耐えること。**
+- **ESP32が応答しなくなった原因。**
+- **サーボまわりの変色・熱・臭いが無いこと。**8項目のうち2項目だけユーザーが答えた（原文のまま）。
+
+### Conclusion
+
+測定用build（`bd669492…fbee`）で、`GO17`の確認3点（入力前のresetで印が付かない、入力前は信号が出ない、consoleで`GO17`を受け取る）の記録を得た。PWM（周期 約20 ms、パルス幅 1.56〜1.66 ms。刻み約0.104 ms）を、サーボ接続・無給電（段1）と、サーボのplugを外した状態（段1b。ユーザーの申告）で記録した。AC投入と動作のときの5 Vの分圧の読み（動作の前の中央値541カウント、動作のとき最小505〜508、最大558〜568）と3V3の読み（676〜682カウント）を、限界つきで記録した。サーボを動かした3回で、ユーザーは「動いた」と答えた回があるが、向き・角度は言えず、動く前の位置は不明である。ESP32が応答しなくなった1回があり、原因は未確認である。条件4は測っていない。条件4は測っていない。条件5は限界つきで記録した（`HW-TBD-034`が未解決のため、合否を導かない）。
+
+### Next safe step
+
+- 動き始めの電流を捉える駆動のためには、ACを抜いた状態で軸を手で105°から離す手順と、動く前の予想の伝達が要る。**今回は行っていない。**条件5は、`HW-TBD-034`が未解決の間、合否を導かない（[power-budget.md](power-budget.md)）。
+- 駆動の前に、確認の項目を、見て分かる言葉で、1項目ずつ書き、回答を項目ごとに求める。「全部」で済ませない。記録で確かめていない状態は「前提」と書く。
+- ESP32のresetを保持するスクリプトは、閉じる前に必ず`DTR`と`RTS`をreleaseし、logに残す。
+- 終わりの状態：ACプラグは抜けている（ユーザーの申告）。ESP32とArduinoのUSBは、PCから抜けている（作業セッションが`lsusb`で確認）。サーボのplugはジャンパー線につながっている。Arduinoの線（A0＝分圧点、A1＝3V3）と分圧の抵抗は、ブレッドボードに挿したまま。ESP32には、測定用build（上のELF）が書き込まれ、NVSのlatchは立っている（`skipped_already_ran`で確認）。
+
+## EXP-031: BME280（`ENV-01`）の試験build（`env-sample-16`）でraw値と変換値を観測し、SwitchBotの表示と並べた
+
+[#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16)の受け入れ条件（raw値と変換値の観測、reference比較）に関わる実機確認。結果の最初の記録は[#16のcomment 6266876276](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16#issuecomment-6266876276)である。受け入れ条件のチェックは入れていない。
+
+| 項目 | 内容 |
+|---|---|
+| Test ID | `EXP-031` |
+| Date | 2026-10-19 20:58〜21:06（JST。UTC 11:58〜12:06。始まりはUSBを挿した時刻（`/dev/ttyUSB0`の作成時刻）、終わりは最後のlogの時刻。USBを抜いた時刻は記録していない） |
+| Operator | 配線の変更、USBの抜き挿し、SwitchBotの表示の読み取り、異常の目視はユーザー。build、書き込み、UART0のlogの取得は作業セッション（AI） |
+| Hardware revision／Exact components | `MCU-01`（ESP32-DevKitC V4）、`ACCEL-01`、`ENV-01`（BME280、AE-BME280）、`MEAS-04`（SwitchBot温湿度計。model名と確度は未取得） |
+| Wiring revision | `EXP-015`のI2C配線（`ACCEL-01`／`ENV-01`とも`3V3` pin給電、`SDA`→GPIO25、`SCL`→GPIO26、`SDO`→GND、`ENV-01`の`CSB`は`J3`経由）から、I2Cの線を変えたという申告は無い（`ACCEL-01`と`ENV-01`のDevice IDの両方が読めた）。配線は測っていない。`DISP-01`は切り離したまま。**サーボ系の線は一部を付けたまま通電した**：緑のジャンパー線（c10→端子台Sの「＋」）、青のジャンパー線（c14→−18）、分圧の10 kΩ 2本、サーボのplug。抜いたもの：Arduinoの線3本、ブレッドボードi25のジャンパー線、端子台Sの「−」の穴の−20へ行くジャンパー線。**サーボのACプラグは抜けている**（ユーザーが見た）。通電の前に、これらをユーザーへ文で示して承認を得た |
+| Power supply and current limit | ESP32のUSB（PC）。電流制限は設けていない。電流は測っていない |
+| Firmware commit/profile | develop `01a9d8c`の`env-sample-16`（debug、単独）。ELF sha256 `9c41657d70f5aecc7f768ebbf4ff949c9668679457bd86b49b7c0614fb00e801`。`firmware/esp32`で、build時だけ`[workspace]`を足して`cargo fmt --check`・`cargo clippy --all-targets --locked --features env-sample-16 -- -D warnings`・`cargo build --locked --features env-sample-16`を実行し、成功した |
+| Configuration | Chip IDが`0x60`のときだけ、`ctrl_hum`（0xF2）と`ctrl_meas`（0xF4）へ書き、forced modeで1回測る。I2Cは100 kHz、address `0x76` |
+| Measurement equipment | UART0のlog（115200）。`MEAS-04`の表示のユーザーの読み取り |
+| Procedure | USBを挿す → `espflash`で書き込み（`--no-stub --after no-reset`） → RTSでresetしてlogを180秒取る → 8秒ずつ2回resetしてlogを取る → SwitchBotの表示をユーザーが読む → USBを抜く |
+| Expected result | `env_chip_id raw=0x60`、`env_raw`と`env_reading`のlog、faultが出ない |
+| Measured result | 下記 |
+| Faults | 下記 |
+| Conclusion | raw値と変換値は観測できた。reference比較は観測値の並置までで、確度は言えない。timeout・CRC・not-ready・disconnectの分類は取れていない |
+| Next safe step | 下記 |
+
+### 結果
+
+- 書き込み：1回目は`FlashEnd`で`Other (0x1)`のエラー。2回目は`Flashing has completed!`。読み戻しの照合はしていない
+- 起動3回（UTC 12:01:53、12:05:29、12:05:37）とも`reset_reason=power_on`、`accel_device_id raw=0xe5`、`env_chip_id raw=0x60`。`env_calibration_read dig_p1=37064 dig_h4=391 dig_h5=50`
+- panic、task_wdt、brownout、`env_fault`は3回とも0件。180秒のlogの`health`の`max_read_gap_ms`は最大50、`overrun_ticks=0`
+- ユーザーの申告：異音・発熱・異臭なし
+
+| 起動 | raw温度 | raw気圧 | raw湿度 | 温度 | 気圧 | 湿度 |
+|---|---|---|---|---|---|---|
+| 12:01:56Z | 537744 | 303840 | 36195 | 27.18 ℃ | 1016.64 hPa | 57.04 % |
+| 12:05:32Z | 537776 | 303712 | 36142 | 27.19 ℃ | 1016.88 hPa | 56.78 % |
+| 12:05:40Z | 537776 | 303760 | 36145 | 27.19 ℃ | 1016.80 hPa | 56.79 % |
+
+- `MEAS-04`の表示（ユーザーが読んだ。時刻は記録していない）：26.9 ℃、59 %。置いた場所は基板から約2 m。BME280との差は、温度が約+0.3 ℃、湿度が約−2 %
+- calibrationの読み（uptime 811 ms）から`env_reading`（2581 ms）のあいだに、heartbeat（1049・2049 ms）とbootの送信（1211・2011 ms）が予定どおり出た
+
+### Faults
+
+- 書き込みの1回目の`FlashEnd`エラーは、原因を調べていない
+- 無給電の確認（`gpio-assignment.md`の項目1・5・6・7）は、ユーザーが「省く」を選んだので実施していない。条件(5)(a)は`EXP-015`と同じ理由で未達
+
+### Next safe step
+
+- 次に実機で`env-sample-16`を通電する場合は、その回の構成を文で示して、ユーザーの承認を新たに取る
+- timeout・disconnectの分類を取る場合は、先に、moduleを抜いたあとに戻す穴の位置を、ユーザーが覚える方法を決める。それまで頼まない
+- [#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16)の受け入れ条件のチェックは、この記録だけでは入れない
+
+### この記録が主張しないこと
+
+- BME280の確度。`MEAS-04`の確度が未取得で、置いた場所が約2 m違い、ESP32の発熱による温度の上昇を測っていない
+- 気圧の比較。referenceが無い
+- timeout・disconnectの分類。SDAが切れた状態を作っていない。取れない理由：`ENV-01`の`SDA`は、moduleのpinがESP32と同じ行に刺さっていて、SDAだけを外せる線が無い。module自体を抜く試験は、戻す穴の位置の記録が無く、誤って挿し直すとI2Cと電源が壊れかねないため、頼んでいない
+- CRCの分類。BME280のI2Cにデータのcrcが無い
+- not-readyの分類。意図して作れず、自然には起きなかった
+- 遅い変換が上位taskをblockしないこと。変換の所要時間を単独で測るlogが無く、遅い変換を作っていない
+- NVSのlatchが残るか。この`env-sample-16`はlatchを読まない
+- 製品buildの動作、`J3`のはんだ付けの電気的な導通
+
+## EXP-032: Piの`serial_link`で実port（GPIO UART）を開き、link probeによる切断の判定と再接続の上限（#11）と、`play_motion`の拒否の4経路（#12）を観察した
+
+[#11](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11)と[#12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)の、2回目の実port（PiのGPIO UARTの`/dev/serial0`、115200）の試験。`EXP-029`では信号線を外しても`disconnects=0`だった。その後、PR #612（develop `48974ef`）が周期1秒のlink probe（連続2件のACK無しで喪失と判定）を足し、PR #613（develop `01a9d8c`）が`--motion-expire-after-ms`を足した。同じ窓で、(1) 信号線を外して戻し、もう一度外したままにした観察（実行B）と、(2) `play_motion`の拒否の4経路の確認（実行A）を行った。**この記録は観察だけを書く。#11・#12の受け入れ条件を満たしたとは書かない（判断はPMがmergeの後に行う）。**時刻はUTCで、Date欄だけJSTも併記する。network識別子は書かない。
+
+| 項目 | 内容 |
+|---|---|
+| Test ID | `EXP-032` |
+| Date | 2026-10-20 JST（UTC 2026-10-19 16:20〜16:31）。書き込み 16:20:12Z〜16:21:49Z、ESP32のlog取得の開始 16:22:11Z、実行A 16:24:48Z〜16:25:01Z、実行B 16:25:29Z〜16:28:22Z、log取得の終了 16:30:52Z |
+| Operator | 配線の抜き差し（GND線・信号線のESP32側の端）、ESP32のUSBの抜き挿し、テスターの操作と目視、は**ユーザー**。書き込み、PCでのlog取得、Piでの`serial_link`の実行は**作業セッション（AI）**。 |
+| Hardware revision／Exact components | `SBC-01`（Raspberry Pi Zero W）、`MCU-01`（ESP32-DevKitC V4）、`ACCEL-01`、`ENV-01`、`MEAS-03`（`DT830B`）。`DISP-01`は切り離したまま。Piのadapterは`PSU-PI-A-02`。 |
+| Wiring revision | 出所は`EXP-031`の返却の報告（[#16のcomment 6266876276](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16#issuecomment-6266876276)）。**作業セッションは現物を見ていない。**外れていた線：Arduinoの線3本、`i25`のジャンパー線（GPIO27からサーボの黄の穴）、端子台S「−」へ行くESP32のGNDの線。付けたままの線：緑・青のジャンパー線、分圧の10 kΩ 2本（ESP32のGNDとサーボ側「＋」が20 kΩでつながる。サーボの電源は無い）、サーボのplug。Piとの線：Pi側の青（10番）・紫（8番）・灰（39番）は挿したまま。ESP32側の黄（GPIO13）・橙（GPIO14）は、窓の始めは抜けており、ESP32の起動の後に挿した。灰（GND）は、導通の確認の後、ESP32のUSBを挿す前に挿していた（ユーザーの申告）。色は配線図（`hardware/breadboard/layout.svg`）と`EXP-022`の記録による。 |
+| Power supply and current limit | ESP32はPCのUSB。Piは`PSU-PI-A-02`（`EXP-029`と同じ構成のはずだが、今回は確認していない）。サーボのAC（`M-12001`）は窓の間ずっと抜けていた（ユーザーの申告）。電流制限は設けていない。 |
+| Firmware commit/profile | ESP32：develop `19634f3`、`bringup-i2c-15-16`（debug）。ELF sha256 `1b3e21fbd49ebd9e166223f71b52b2b18591c1fd50829ccb6a521deaed722a39`。書き込みは`espflash` 4.5.0（`--no-stub --chip esp32 --after no-reset`）、exit 0。**読み戻しの照合はしていない。**Pi：`serial_link`はdevelop `01a9d8c96246fb71fdc3fce2e8e52fc27f611742`の`apps/`・`crates/`・`Cargo.toml`・`Cargo.lock`をPiの新しいdirへ展開し、`cargo build --locked --example serial_link -p deskcat-serial`（debug。14:15:54Z〜14:31:19Z、exit 0）。sha256 `b521b23602c923e2b640a557e2b18bdd6463e987340b0e91ae98425863972b0c`。 |
+| Configuration | 承認：[#11のcomment 6267083691](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11#issuecomment-6267083691)（通電の前に保存した）。実行A：`--port /dev/serial0 --baud 115200 --duplicate-capacity 8 --duplicate-retention-ms 30000 --motion-expire-after-ms 12000 --seconds 90`。実行B：`--duplicate-capacity 8 --duplicate-retention-ms 5000 --seconds 180`（`--ping-count`なし）。**`--duplicate-*`の値と`--seconds`には根拠が無い。baud 115200は`Candidate`（`PROTO-TBD-001`）。**実行の前に`deskcatd`は`inactive`で、`serial_link`のprocessは無かった。**Pi側のUART設定（信号線をつなぐ前に確かめる項目。`gpio-assignment.md`の`Pi側の設定`）は、窓の前と窓の間の読みがこの記録に無い（窓では未確認）。**窓の後（2026-10-20 11:26Z。窓の約19時間後）に、作業セッションがsshで読んだだけである（設定は変えていない）：`/dev/serial0`→`ttyAMA0`、`/boot/firmware/config.txt`に`dtoverlay=disable-bt`と`enable_uart=1`、`/proc/cmdline`の`console=`は`tty1`のみ（`serial0`・`ttyAMA0`無し）、`serial-getty@ttyAMA0`は`inactive`かつ`disabled`、`deskcatd`は`inactive`、`serial_link`のprocessは無い。**`EXP-029`の同じ項目（2026-10-17）が窓でも有効だったかは、次の事実から見込みとして言えるだけである（窓で読んだ値ではない）。**Piの起動は2026-10-16 22:11 JSTの1回で（`journalctl --list-boots`は現在のbootだけ、`uptime`は約3.9日）、`EXP-029`の読みと窓はどちらもこのbootの中にある。`config.txt`と`cmdline.txt`の更新時刻は2026-10-03 22:10 JSTで、このbootより前である。**ただしこれは、窓の間のgettyの稼働状態と`/dev/serial0`の指す先を読んだものではない。**この窓の実行は`/dev/serial0`を開いて行・protocolの往復を得ており（下の結果）、設定が壊れていなかったことと矛盾しないが、設定の読みの代わりにしない。 |
+| Measurement equipment | `DT830B`（GND線の導通）、`serial_link`の出力（Pi上）、ESP32のUART0のlog（PCで取得） |
+| Procedure | 下の「手順」 |
+| Expected result | 予測は[#11のcomment 6266441205](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11#issuecomment-6266441205)（コードの読み）。**実行Bの外す時間は予定より長かった**（下の「Faults」） |
+| Measured result | 下記 |
+| Faults | 下記 |
+| Conclusion | 下記 |
+| Next safe step | 下記 |
+
+### 手順
+
+1. ユーザーが、サーボのACプラグとESP32のUSBが抜けていると申告した。PCにESP32のUSBが見えず、Piで`deskcatd`が`inactive`であることを、作業セッションが確かめた。
+2. GND線の導通（`DT830B`、2000 Ωレンジ、Piの6番とESP32の「23」の隣のGNDの間。ユーザーの申告による読み）：GND線のESP32側の端が挿さった状態で`004`、抜いた状態で`1`。**挿し直した後の測定は、ユーザーの判断で省いた**（「同じ結果になるはず」）。プローブ同士の短絡・開放の自己確認の表示は、申告を受けていない。
+3. GND線を挿した状態でESP32のUSBを挿し、書き込んだ（16:21:49Zに完了、`Staying in bootloader`）。
+4. 16:22:11Zに、PCのlog取得scriptがRTSで`reset`を約0.2秒かけて解除した（firmwareの起動のため。信号線のESP32側は抜いた状態）。以降、script（`pyserial`）が16:30:52ZにSIGINTで止まるまでUART0のlogを取った。**この`reset`は、承認の文面の「ESP32 の reset を最大1回（新しい Pi `sid` の `hello` を受けないときだけ。信号線は挿したまま）」が想定した場面ではない。**窓の中でのresetは無い。scriptは終了時にRTS・DTRを解除してlogに残した。
+5. ユーザーが黄をGPIO13、橙をGPIO14に挿した（異常の申告なし）。
+6. 16:24:48Zに実行A（Piで`serial_link`）。12.55秒で終了、exit 0。
+7. 16:25:29Zに実行B。開始の連絡の後、ユーザーに、1秒ずつ20まで数えてから黄と橙の両方を外し、10まで数えて挿し直し、20まで数えてもう一度外し、私が「停止しました」と書くまで外したままにする、と依頼した（依頼文の要約。原文ではない）。実行Bは16:28:22Zに`Stopped(ReconnectExhausted)`で終わった。ユーザーが線を外した・挿した時刻の申告は取っていない（時刻はESP32のlogのACKの送出の間隔から読んだ）。『停止しました』の連絡は、その後だった。
+8. 信号線3本（黄・橙・灰）のESP32側の端を抜き、ESP32のUSBを抜いた（ユーザーの申告）。
+
+### 結果
+
+**実行A（#12）。**ESP32のUART0のlogと、同じ`(sid, id)`で突き合わせた（出力のsha256 `e1a34e0b22449f04d025098d682c259449724d7aa4b396846fa178111f03e930`）。
+
+| 段 | Piの出力（`play_motion診断: ACK`） | ESP32のlog（`pi_rx_play_motion_rejected`） |
+|---|---|---|
+| 初回（旧Pi sid、`id=4`） | `Rejected`・`InvalidPayload` | `code=invalid_payload replayed=false` |
+| 同じ`(sid, id)`の再送 | `Rejected`・`InvalidPayload` | `code=invalid_payload replayed=true` |
+| 12秒後の再送（firmwareの暫定保持10秒を越えた） | `Rejected`・`DuplicateExpired` | `code=duplicate_expired replayed=false` |
+| 新Pi sidの`hello`（`Startup`）とESP32の`boot`の再送 | `hello`のACKは`Ok`、`boot`は`Replayed` | `pi_rx_hello … outcome=Established`、`boot_resumed accepted=Transition` |
+| 新sidの後に旧sidの`id=4` | `Rejected`・`StaleSession` | `code=stale_session replayed=false` |
+
+終了時：`motion: first_rejected=1 replay_rejected=1 duplicate_expired=1 stale_session=1 complete=true`、`counters: disconnects=0 reconnect_attempts=0 timeouts=0 rejected_in=0`、`peer: session_switches=1 duplicate_replays=1`。
+
+**実行B（#11）。**出力のsha256（Pi上）`01f6dbb560341c25b6ebed8cec9f7e8623c5b6aa20f90fdc0a16d8e599a78d74`。
+
+- 行の層（行が通った）：外すまで、ESP32のACKがおよそ1秒ごとに`ackを相関した: request=Ping`として届いた。`rejected_in=0`。
+- protocolの層（成立した範囲）：`hello`（`Startup`）→ ESP32が`Established`、`boot`を再送 → 以降の`ping`に`ok`のACK。ESP32の`sid`は5のまま、`session_switches=1`。
+- 1回目に外した間：ESP32のlogで`ping`へのACKの送出が16:27:18Zで止まり、次は16:27:34Z（間隔15.56秒）。Piの出力では、`link probeのACKが無い: 1/2`、`2/2`、`serial peer: ACK応答が途絶えた -> Disconnected`の組が5つ（`disconnects`が1〜5）。再接続の待機は`100ms`、`200ms`、`400ms`、`800ms`、`1.6s`。5つ目の待機の後に`未ACKのhelloを再送した`、その`hello`をESP32は16:27:36Zに`Replayed`として受けた。probe（`id=119`）の取り下げ（1/2）の途中でACKが戻り、`reply_to=120`以降の`Ping`のACKを相関した。
+- 2回目に外した間：待機が`100ms`からやり直され（`100ms`、`200ms`、`400ms`、`800ms`、`1.6s`）、組がさらに6つ（`disconnects`が6〜11）出て、`再接続の上限に達した。停止する`、`state: Stopped(ReconnectExhausted)`、exit 1。ESP32の最後のACK（16:28:01Z）から終了ファイルの時刻（16:28:22Z）まで約21秒。
+- 終了時のcounters：`bytes_in=14678 bytes_out=13383 frames_in=130 rejected_in=0`、`disconnects=11 reconnect_attempts=10 timeouts=0 retries=3227`、`dropped_out=0 discarded_on_disconnect=0 encode_failed=0`、`peer: session_switches=1 duplicate_replays=0 stale_sessions=0 duplicate_expired=0`、`invalid_payloads=0 rate_limited=0 unmatched_acks=0 unapproved_hello_acks=1 unknown_types=0`、`log出力の失敗: 0 件`。経過172.96秒。
+- ESP32：panic・brownout・task_wdtは0件。`reset_reason=power_on`のまま。信号線を挿した時点の「異常なし」の申告のほかに、異音・発熱・臭いの申告は無かった。
+
+**コードの読み（実機で理由を確かめていない）。**`session.rs`の`note_peer_unresponsive`が、呼び出し側が相関ACKの不在を確かめた後に`disconnects`を増やし、`note_peer_responsive`が相関ACKで再接続の予算を戻す。待機が`100ms`からやり直されたことは、この読みと合う。理由は確定していない。
+
+### 受け入れ条件ごと
+
+| 条件 | 実portで得られた事実 | 得られていないもの |
+|---|---|---|
+| #11-3 disconnectを観測できる | 信号線を外した間に、`disconnects`が1〜5、6〜11と増えた（`EXP-029`では0）。**得られた事実は、link probeの相関ACKの不在による判定であり、deviceのerrorやEOFによる検出ではない。** | 「1回の喪失判定と回復」だけを切り出した観察（1回目の外しは`disconnects`が5になるまで続いた）。外す時間と`disconnects`の関係の測定 |
+| #11-4 reconnectに上限とrate limitがある | 待機`100ms`〜`1.6s`が、1回目に5回、2回目に5回。2回目の6つ目の喪失の後に`Stopped(ReconnectExhausted)`。ACKの相関の後、待機が`100ms`からやり直された。 | 上限（5）・待機・probeの周期（1秒）・閾値（2件）の根拠（`PROTO-TBD-010`・`012`・`017`は暫定） |
+| #12 `play_motion`の拒否（`invalid_payload`、その再送、`duplicate_expired`、`stale_session`） | 上の表の4段。ESP32のlogと同じ`(sid, id)` | 実際のmotionが二重に実行されないこと（catalogは空でサーボへ渡さない経路）。`PROTO-TBD-005`・`008`・`012`・`013` |
+
+### Faults
+
+- 実行Bで、1回目の外しが予定（数秒）より長く続いた（ESP32のlogで約15.6秒）。原因は確かめていない。
+- 『停止しました』の連絡は、実行Bの終了（16:28:22Z）より遅れた。
+- 測る2点のGNDの穴（Piの6番とESP32の「23」の隣）の指定を、問いの前に書かなかった。ユーザーに聞かれて、配線図と過去の記録から特定した。
+- 条件5（別給電）と、信号線の4.7 kΩの目視は、今回は申告も取っていない。
+- GND線の挿し直し後の測定は省いた（ユーザーの判断）。
+- 書き込み後の起動のため、承認の想定とは別にRTSの`reset`を1回使った（上の手順4）。
+- 信号線をつなぐ前のPi側のUART設定の確認（`dtoverlay`、`enable_uart`、console／getty、`/dev/serial0`の指す先）の読みが、窓の前の記録に無い（行ったかどうかは、この記録からは言えない）。上のConfigurationのとおり、窓の約19時間後に読んだ値と、同じboot・設定file未更新という間接の事実だけがある。
+
+### この記録が主張しないこと
+
+- #11の受け入れ条件3・4、#12の残りの条件を満たしたこと（PMがmergeの後に判断する）。
+- 製品buildでの動作、`deskcatd`での動作。
+- device名の確定、`PROTO-TBD-010`・`012`・`017`・`005`の値の妥当性。probeの周期・閾値、再接続の上限・待機の根拠。
+- 外した時間と判定の関係、1回の喪失判定と回復だけを切り出した観察。
+- ESP32側の振る舞いがprotocolの全体に適合すること。
+- 電流、`3V3` railの電圧、温度。
+
+### Conclusion
+
+実port（GPIO UARTの`/dev/serial0`、115200）で、`serial_link`のlink probeが、信号線を外した間に相関ACKの不在を判定して`disconnects`を増やし、再接続の待機（`100ms`〜`1.6s`）を経て、外したままで`Stopped(ReconnectExhausted)`に至った。ACKが戻ると待機が`100ms`からやり直された。`play_motion`の拒否の4段は、PiとESP32のlogで同じ`(sid, id)`として突き合わせた。
+
+### Next safe step
+
+- #11・#12の条件の扱いと窓の追加は、PMの判断（merge後）。
+- 正本の更新（`crates/deskcat-serial/examples/serial_link.rs`のmodule docの「実portでのlink喪失判定と再接続は未確認である」、`crates/deskcat-serial/README.md`の「実機に残っていること」の切断・reconnectの項）は、この記録を出所にして別の変更で行う。
+- 終わりの状態：ESP32は電源なし（USB抜き）、ESP32側の黄・橙・灰は外れている。Pi側の青・紫・灰は挿したまま。ACプラグは抜けている。`i25`のジャンパー線・端子台S「−」へ行くGNDの線・Arduinoの線は`EXP-031`の返却のまま外れており、緑・青のジャンパー線と分圧の10 kΩは付けたまま。LCDは切り離したまま。Piは電源が入っていて、`deskcatd`は`inactive`（`enabled`）、`throttled=0x0`。
+
+## EXP-033: `ACCEL-01`（ADXL345）の静止sample（`accel-sample-15`の初回通電）
+
+[#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)の単体samplingを、人間の立ち会いのもとで1回行った記録。ADXL345を±2 g・100 Hz・FIFO Streamで連続測定し、静止状態の生値と窓ごとの統計をUART0へ出した。**offset（0 g Output）は出せていない。**基板は水平ではなく、姿勢を記録していない。
+
+| 項目 | 内容 |
+|---|---|
+| Test ID | `EXP-033` |
+| Date | 2026-10-17（書き込み 20:04:56〜20:06:36 JST〔11:04:56Z〜11:06:36Z〕、log取得 20:06:47〜20:09:48 JST〔11:06:47Z〜11:09:48Z〕） |
+| Operator | 配線の切り離し、USBの抜き挿し、ACプラグが抜けていることの確認、見張りはユーザー。ESP32の書き込みとlogの取得は#15のセッション（AI） |
+| Hardware revision／Exact components | `MCU-01`（ESP32-DevKitC V4）、`ACCEL-01`（秋月 M-06724のADXL345）、`ENV-01`（BME280。測定はしない。起動時にChip IDだけ読む。下の結果の`env_chip_id`）。`DISP-01`は切り離し |
+| Wiring revision | `EXP-015`の配線のまま（`Vs`／`VDD`→`3V3`、`GND`、`SDA`→GPIO25、`SCL`→GPIO26、`CS`→`VDD`、`SDO`→`GND`＝address `0x53`）。変更は`DISP-01`のVCCと信号線をESP32側につながない状態にしたことだけ（ユーザーの申告「済んだ」）。サーボ系とESP32を結ぶ2か所（ブレッドボードi25のジャンパー線、端子台Sの−の穴のESP32 GNDの針）とPiとの線は、[#15の承認comment](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15#issuecomment-6231364839)が「外れたまま」を条件とした。**EXP-028の終わりの状態は、信号用の330 ΩがESP32のGPIO27とサーボの黄の穴のあいだに入ったままで、この試験の前に外したかの記録は無い**。**現物の配線を、このセッションは確かめていない** |
+| Power supply and current limit | PCのUSBから給電（`3V3` pin経由で`ACCEL-01`／`ENV-01`）。電流制限は設けていない。サーボの外部5 V（M-12001のACプラグ）は抜けたまま（ユーザーの申告） |
+| Firmware commit/profile | developの`045aab4`の上の未commitの差分。`--features accel-sample-15`（debug）。ELF sha256 `e287da22f5a7bf15e7a4aa7e4564fdf78fab098b9670729ca8e046eb9d87b0ba`。書き込みの直前にsha256を取った。差分は`crates/deskcat-accel`、`firmware/esp32/src/accel.rs`、`accel_sample.rs`、`main.rs`、`Cargo.toml`、`README.md`。**この版はcommitしていない** |
+| Configuration | `POWER_CTL`＝`0x00`→最後に`0x08`、`INT_ENABLE`＝`0x00`、`BW_RATE`＝`0x0A`、`DATA_FORMAT`＝`0x08`、`FIFO_CTL`＝`0x00`→`0x80`。20 msごとにFIFOを空ける。warm-up 10件を捨てる。500件を1窓として6窓。出所はADXL345 Data Sheet **Rev. E**（`BW_RATE`・`POWER_CTL` p.25、`DATA_FORMAT`・`DATAX` p.26、`FIFO_CTL` p.27、Table 1 p.4）。**Rev. G（[sensor-datasheet-notes.md](sensor-datasheet-notes.md)が正とする、2026-08-12にブラウザで取得した版）は、このセッションでは開いていない。`FIFO_CTL`・`FIFO_STATUS`・`DATAX0`のaddressと`INT_SOURCE`のOverrun bitは、同文書がRev. Gで確認済みとして持つ範囲に無く、Rev. Eとの一致は確認していない** |
+| Measurement equipment | 測定器を使っていない。ESP32のUART0 log。logの原本は端末のlocal（`monitor.log`、sha256 `03f33222ca0a16b203e30011d6b102d7c82fd9528d6e95d655fd54aaae13604c`）で、repositoryに入れない |
+| Procedure | ユーザーがLCDのVCCと信号線を切り離す→ユーザーがUSBを挿す→（約2.5時間後）ユーザーが、ESP32に異常がなく、ACプラグが抜けたままで、見張れる状態で、承認が有効であると回答→`espflash`で書き込み→RTSでリセットしてlogを180秒取得→ユーザーがUSBを抜く |
+| Expected result | Device ID `0xe5`の後に、静止した生値が連続して出る。fault・overrunが出ない |
+| Measured result | 下記 |
+| Faults | 下記 |
+| Conclusion | 下記 |
+| Next safe step | 下記 |
+
+### 承認と、満たしていない条件
+
+- 承認：[#15のcomment](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15#issuecomment-6231364839)（2026-10-17 07:46:33Z）。作業セッションが、PMとVMのOKはユーザーの承認の代わりにならないと示したうえで、1問で訊き、ユーザーが「承認する」を選んだ。USBを挿してから約2.5時間後、書き込みの直前に、承認が有効かを別の1問で訊き、ユーザーは「すべて OK、有効」を選んだ。
+- **`power-budget.md`の単体bring-upの手順の条件(2)（通電してよいのは`bringup-i2c-15-16`だけ）を満たさない。**この試験は、ADXL345の設定registerへ書く。この条件を満たさない通電として、この1件の試験の承認を取った（下記の承認comment）。条件を緩めるdocsの変更は、人間のreviewを通す別の変更である。
+- **無給電の確認（`gpio-assignment.md`の項目1・5・6・7）は、ユーザーが不要としたので、行っていない。**ユーザーの回答の原文：「1はOK。2は不要」。満たしたとは書かない。
+- 条件(5)(a)（module電源pinの独立性／pin header対応）と(b)（pull-upの実効抵抗）は、`EXP-015`と同じく未達のまま。測っていない。
+
+### 結果
+
+- 書き込み：`espflash` 4.5.0（`--no-stub`）。`Flashing has completed!`。
+- UART0 log（180秒）：`accel_device_id raw=0xe5`、`env_chip_id raw=0x60`（BME280のChip IDの読み出しだけ。測定はしていない）、`accel_sample_configured data_format=0x08 bw_rate=0x0a fifo_ctl=0x80 poll_interval_ms=20 warmup=10 window=500 windows=6`、`accel_raw`を100件、`accel_window`を6件、`accel_sample_done windows=6`（起動から約29.9秒）。`accel_fault`、`accel_overrun`、`out_of_range`、panic、`task_wdt`は0件。
+- 窓ごとの結果（単位はLSB。6窓の範囲）：
+
+| 軸 | 平均 | 標本標準偏差 | 最小〜最大 |
+|---|---|---|---|
+| X | 226.34〜226.38 | 0.74〜0.80 | 224〜230 |
+| Y | 108.45〜108.53 | 0.82〜0.86 | 106〜112 |
+| Z | 67.04〜67.14 | 0.82〜0.89 | 64〜71 |
+
+- 3軸の平均ベクトルの大きさ：259.81〜259.85 LSB（256 LSB/g typなら約1.015 g。Table 1のsensitivity 230〜282 LSB/gの内側）。
+- `polls`は窓6の終わりで1449、`overrun_polls`は0。
+
+### 読み方と、主張しないこと
+
+- 基板は水平ではなく、重力が3軸に分かれている。姿勢を記録していない。**offset（0 g Output。X・Yが±150 mg、Zが±250 mg）は、この読みから出せない。**
+- 標準偏差の約0.8 LSBは、typ感度で約3 mgに当たる。**机の上に置いた姿勢と周囲の振動を管理していないので、センサー自体のnoiseとは言えない。**6窓は同じ姿勢の連続で、独立な再現ではない。
+- 平均ベクトルの大きさは、個体の感度と0 g offsetの合成であり、どちらか一方の根拠にならない。mgへの換算は典型値256 LSB/gによる近似。
+- 窓の長さ、窓数、warm-up、poll間隔は暫定の一般値（安全要件の5項目に効かない）。
+- 温度・電流・電圧は測っていない。通電中の発熱はユーザーの見張りの範囲で、記録は無い。
+- `POWERON_RESET`の行は1回（RTSによるリセット）。
+- **書き込んだ版は、`INT_SOURCE`のOverrunをFIFOの読み出しの後に読んでいた。**Overrunは読み出しで消えるため、上の「`accel_overrun`0件」「`overrun_polls`0」は、取りこぼしが無かったことの根拠にならない。この記録の後、コードはOverrunの確認を読み出しの前へ移した（この記録を含むcommitに入っている。書き込んでいない）。取りこぼしの有無を言うには、移した版での再測定が要る。
+
+### Faults
+
+- UART0 logに、`accel_fault`・`accel_overrun`・`out_of_range`・panic・`task_wdt`は0件。ただし書き込んだ版はOverrunをFIFOの読み出しの後に読んでいたため、`accel_overrun`の0件は取りこぼしが無かったことの根拠にならない（上の「読み方と、主張しないこと」）
+- **満たしていない条件1（ユーザーの決定）：**`power-budget.md`の単体bring-upの手順の条件(2)を満たさないまま、この1件の試験として通電した（上の「承認と、満たしていない条件」）
+- **満たしていない条件2（ユーザーの決定）：**`gpio-assignment.md`の無給電の確認（項目1・5・6・7）を行っていない。ユーザーが不要とした
+- 条件(5)(a)（module電源pinの独立性／pin header対応）と(b)（pull-upの実効抵抗）は未達のまま通電した。`EXP-015`と同じ状態である
+- 通電中の発熱・異音・異臭は、ユーザーに聞いていない。申告が無いため、「異常なし」とは書かない
+- 現物の配線を、このセッションは確かめていない（Wiring revision行のとおり。ユーザーの申告だけ）
+
+### Conclusion
+
+`accel-sample-15`の初回通電で、ADXL345のDevice ID `0xe5`の応答と、±2 g・100 Hzの連続測定が得られた。fault・overrunは0件だった。**#15の受け入れ条件のうち、「静止姿勢のsampleを保存した」の一部だけを支える。**「Device IDと正確な変換を検証した」は、変換係数を典型値で近似しており、個体の感度を確かめていないため満たしていない。「offsetとnoiseを測定した」は、offsetを出せていないため満たしていない。机とサーボの振動sample、tapしきい値とretrigger、false positiveと見逃しは、安全なサーボ動作（#17）と仮筐体を待つ依存で、満たしていない。
+
+### Next safe step
+
+- offsetは、姿勢が分かる向き（例：基板を水平に置いたZ上向きと、反転したZ下向き）での読みを、別の通電で取る。通電の承認は別に要る。
+- 周囲の振動を管理した状態でnoiseを取り直すかは、人間の判断。
+- 条件(2)を緩めるかどうかは、`power-budget.md`の別の変更として、人間のreviewを通す（この記録を含むPull Requestは`power-budget.md`を変えていない。`firmware/esp32/README.md`の`accel-sample-15`行も、可否を変えないと書いている）。
+- Rev. G（手元の取得済みの版）で、`FIFO_CTL`・`FIFO_STATUS`・`DATAX0`のaddressと`INT_SOURCE`のOverrun bitを確かめ、[sensor-datasheet-notes.md](sensor-datasheet-notes.md)へ載せる。
+
+## EXP-034: SG90の90度指令で、shuntを戻りに入れた配線（ユーザーの申告。導通は未確認）で、AC投入時と動作時のArduinoの読みとreset回数を記録した
+
+[#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)の受け入れ条件4（起動時と小動作時の電流）と6（reset回数）に関わる記録を、人間の立ち会いのもとで1回取った。実行承認は[#17のcomment 6290714653](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6290714653)（回答の原文「はい」）。この窓の設計は、EXP-030の次の窓として、PMへ送った案である。**この記録は事実と未確認だけを書く。**ESP32のログとArduinoの生のCSVは、repositoryの外の証拠用directory（MACを含むため、repositoryとIssueへ入れていない）にある。
+
+| 項目 | 内容 |
+|---|---|
+| Test ID | `EXP-034` |
+| Date | 2026-10-20 JST 21:40〜21:56（USBを挿した時刻から、通常buildの書き込みの確認まで） |
+| Operator | 配線の変更、USBの抜き挿し、M-12001のACプラグの抜き挿し、`GO17`の入力、サーボの軸の目視はユーザー。ESP32の書き込みとNVSの消去、Arduinoの書き込みと記録、ログの取得、解析は作業セッション（AI） |
+| Hardware revision／Exact components | `SERVO-01`（TowerPro SG90）、`MCU-01`（ESP32-DevKitC V4）、`PSU-SERVO-01`（`M-12001`）、`PROT-OC-01`（予備の`MF-R135`）、`MEAS-01`（秋月117836、`SQP5WJ0R1B`。0.1 Ω／5 W。現物の値は測っていない）、`MEAS-02`（Arduino Uno R3）、信号用の330 Ω、`WIRE-PWR-01`（`111641`、端子台`114217`×3）、ジャンパー線（両端オス。太さ・定格の記録は無い） |
+| Wiring revision | 作業セッションは目で見ていない。**ユーザーが個別に答えた項目：**新しいジャンパー線は青、`MEAS-01`の脚の1本は下の「−」列の11番、青のジャンパー線のもう一端は下の「−」列の14番（11番と同じ列。ユーザーの申告「そういう仕様のブレッドボードです」）、A0はh11、Arduino GNDは上の「−」列の21番、元の青のジャンパー線をc14から抜いた、手順4の目視は「おおよそ問題ない」。**次の項目は、個別の答えが無く、ユーザーの「ここまでOK？」への返答の範囲で、指示どおりに配線したものとして扱った：**茶の針のg11、`MEAS-01`のもう1本の脚のj11、端子台Sの「−」の穴の3導体（ESP32のGNDの針と、新しいジャンパー線の針を入れたこと）、`i25`のジャンパー線、サーボのplugの3本。配線の内容：端子台Sの「−」の穴：黒い線（`111641`）、ESP32のGNDの針（上の「−」列の−20へ行く線）、新しいジャンパー線（青）の針の3導体。サーボの茶のジャンパー線の針はブレッドボードのg11。`MEAS-01`の脚はj11と、下の「−」列の11番。青のジャンパー線のもう一端は下の「−」列の14番。Arduino：A0＝h11、GND＝上の「−」列の21番、A1は挿さない。`i25`のジャンパー線（サーボの黄の穴へ）を戻した。分圧の元の青のジャンパー線（c14→−18）は、c14から抜いた。緑のジャンパー線（c10→端子台Sの「＋」）と分圧の10 kΩ 2本は付けたまま。サーボのホーンは外した（ユーザーの申告）。LCDとPiの線は外したまま。ESP32とArduinoはPCのUSB給電。**無電源のテスターの読みは取っていない。** |
+| Power supply and current limit | EXP-028・EXP-030と同じ（`M-12001`＋PTC直列。[servo-safety-limits.md](servo-safety-limits.md)の承認の状態の項目6の(a)）。戻りの経路が、ブレッドボードの接点とジャンパー線を通る（今回の1回に限る例外。承認の記録に書いた） |
+| Firmware commit/profile | developの`41fc159`の`bench-servo-90-17`（debug）。ELFのsha256は`9cb25b44e8fa55122ea837d03eccdf4bea8dddeeea8c811b60cb33d53aa63265`。`git archive`をrepositoryの外へ展開してbuild（`cargo build --locked --features bench-servo-90-17`、7分24秒、exit 0。main checkoutの`.embuild`を借りた。Version Recordは無い）。終わりの通常build（featureなし）のELFのsha256は`ddcac7ad06cd2238eb21f17f9d8de043ff02f3be01eda0c2e171efff92eea22e` |
+| Configuration | `GO17`の入力から10秒後に1回、`target_deg=90`、露出300 ms、dutyを0へ。NVSのlatch（namespace `bench17`、key `ran`）。Pi linkを持たない。Arduino：`hardware/measurement/arduino-transient-logger`の`82cced6`（`-DLOGGER_NCH=1 -DLOGGER_REF=3`。内部1.1 V基準、1ch、約9615 Sample/s、約104 µs刻み）。hexのsha256は`7aa787622b1c421cf99f201814b039b7acda3a60b62c577cdec92919f68befe8`。基準電圧の値はEXP-002の約1.112 Vの代理値（個体・AVCCの代理値・温度に紐づく） |
+| Measurement equipment | Arduino（`MEAS-02`）。連続streaming、`--allow-drops`付き。ESP32のログ（UART0）。テスターは使っていない |
+| Procedure | 下の「手順と時刻」 |
+| Expected result | AC投入と動作のときに、A0（shuntの両端のうちサーボ側のnodeの、star pointを基準とした電位）が0より大きくなる。動作の前後の`rst:`が、意図した1回の起動だけである |
+| Measured result | 下記 |
+| Faults | 下記 |
+| Conclusion | 下記 |
+| Next safe step | 下記 |
+
+### 手順と時刻（JST。ESP32のログとArduinoの記録の時刻。Arduinoの記録の時刻は壁時計への線形復元）
+
+- 21:40：ユーザーがUSB 2本を挿した（ACプラグが抜けていることは、ユーザーの申告）。ESP32のELFを`espflash flash --after no-reset`で書き込み（書き込みの直前にsha256を照合して一致）、NVSの領域（0x9000から0x6000バイト）を`espflash erase-region`で消し、先頭64バイトが`0xff`であることを読み戻して確認した。ArduinoのhexをUSBから書き込んだ。
+- 21:45:31：コンソール（`console17.py`。RTSでresetを保持、`GO17`はユーザーが端末へ入力）のresetを解除した。`reset_reason=power_on`、`servo_bench_test_waiting_for_confirmation`。**この起動が、記録の間の`rst:`の唯一の行**（意図した起動）。
+- 記録A（Arduino、150秒。開始は21:45:44.594の壁時計anchor）：ユーザーがACプラグを挿した（約21:46:28.9。A0の立ち上がりからの推定。ユーザーの申告：「さした、うごいた」。向きと角度の申告は無い）。
+- 記録B（Arduino、150秒。開始は21:50:47）：21:52:23にユーザーが`GO17`を入力した。`servo_bench_test_confirmed`、`servo_bench_test_nvs_latch_set`、21:52:33（uptime 421414 ms）に`servo_bench_test_move target_deg=90`、300 ms後（uptime 421714 ms）に`servo_bench_test_stop`。動いた直後にACプラグを抜く指示を出し、ユーザーはACプラグを抜いた（抜いた時刻は申告に無い。動作の直後に抜いたかは確かめていない）。
+- コンソールのログは21:55:13まで取った（最後のheartbeatはuptime 580269 ms）。`GO17`の入力から約2分50秒、動作（21:52:33）の後は約2分40秒、`rst:`の行が無い。
+- ユーザーが「ACプラグは抜けている」と申告した後、コンソールを閉じ（DTRとRTSを解除）、resetして`servo_bench_test_skipped_already_ran reason=nvs_latch_set`を確認した。通常build（上のELF）を書き込み、起動のログで`servo=not_driven`、`display=face_enabled`、`pi_link=uart1`を確認した。
+
+### 結果
+
+- **記録A（AC投入）：**A0の生ADC値（0〜1023）は、AC投入の前は0.5秒ごとのblockの最大が2以下（記録の開始から約43.9秒まで）。AC投入のとき、約36 ms（21:46:28.900〜28.936）に、100以上の読みが339 sample、最大498（記録の開始から約44.307秒）。その後の待機の間、0.5秒ごとのblockの中央値は0、最大は4〜14。記録の最後の10秒の中央値は0、最大は13。
+- **記録B（動作）：**動作の前の5秒の中央値は0、最大は14。動作の約143 ms（21:52:33.303〜33.446。時刻は復元値）に、20以上の読みが786 sample、100以上が769 sample、300以上が237 sample、受信・採用できたsampleの最大663（21:52:33.404）。記録Bのblock欠番1件（128 sample、約13 ms）の位置は、CSVの時刻の復元で21:52:05.600（動作の約28秒前、`GO17`の入力の約17秒前）であり、動作の区間には欠番が無い。その前後の0.05秒ごとのblockは、最大2〜12。
+- **換算（計算。確度は主張しない）：**1カウントは、1.112 V÷1024で約1.086 mV。0.1 Ωのshuntの両端の電圧をそのまま電流として読むと、1カウントは約10.9 mA。最大498（記録A。欠番0）は約0.54 V（約5.4 A）、受信・採用できたsampleの最大663（記録B）は約0.72 V（約7.2 A）になる。**この計算値は、`M-12001`の定格出力3 Aを超える。**待機の間の最大14は約15 mV（約0.15 A）。shuntの許容差（±5 %）、ブレッドボードの接点とジャンパー線の抵抗、配線のインダクタンス、ADCの確度（今回の条件では資料に無い）は、いずれも計算に入れていない。
+- **記録の健全性：**記録A：block欠番0、ISRが捨てたsample 0、予約bit破れ0。記録B：block欠番1（128 sample）、ISRが捨てたsample 0、予約bit破れ1、再同期で捨てたbyte 460。実効rateは約9616 Sample/s。
+- **ESP32のreset：**コンソールのログ（21:45:31〜21:55:13）の`rst:`の行は、21:45:31の意図した起動だけ。コンソールを閉じた後の、latch確認と通常buildの書き込みのresetは別（意図したreset）。`panic`・`task_wdt`・`brownout`・`Guru`の行は0。
+- **サーボ：**AC投入のとき、ユーザーは「動いた」と申告した（向きと角度の申告は無い）。`GO17`の後の動作のとき、ユーザーは「動いた。左に30度くらい。確証はない」と答えた（見づらかったとのこと。見る向きの申告は無い。最初の答えは「15度くらい」で、直後に「30度くらいかも」へ改めた）。動く前の軸の位置は不明（AC投入のとき動いた）。
+- **latch：**動作の後のresetで`skipped_already_ran`。
+
+### Faults
+
+- 配線の位置は、Wiring revisionのとおり、ユーザーの個別の答えか、「ここまでOK？」への返答の範囲での扱いで、作業セッションは目で見ていない。無電源のテスターの読み（star pointとg11の間、端子台Sの＋−間、リード同士）は取っていない。**戻りの経路が通っていることを、無電源の読みでは確かめていない。**AC投入のときA0が0より大きくなったこと（上の結果）が、通電後の唯一の手がかりである。shuntを迂回する経路が無いことは、確かめていない（A0が0のままの場合と区別する手段が、今回は無い）。
+- 無電源のテスターの読みを取らずに、ACを入れた。
+- 通電前の現物確認（servo-safety-limits.mdの手順の(a)〜(d)）を、項目ごとには確かめていない（Piが`M-12001`から外れていること、`MF-R135`が経路に入っていること、`RES-PULL-01`の実装、`DISP-01`が3V3へ接続されていないこと）。EXP-028・EXP-030の配線を前提にした。
+- 配線の確認で、作業セッションがユーザーの答えを取り違えて追加の確認を求めた。窓の進行には影響しなかった。
+- 「ACが抜けているか」を、書き込みのためにESP32のportを開く前に、ユーザーの申告で確かめた（毎回ではなく、USBを挿す指示の前の1回と、記録の後の1回）。
+- 動作の後のACプラグを抜いた時刻は、ユーザーの申告に無い。
+- PM（`#0PM-実機`）の通電前の照合も、窓の前に出せなかった（PMの申告）。
+
+### この記録が主張しないこと
+
+- 最大498・受信・採用できたsampleの最大663が、サーボの電流であること。記録Bの最大663が、約104 µs刻みの間を含む過渡全体のピークであること（刻みより短い変化は見えない）。計算値が電源の定格を超えており、shunt以外の電圧（接触抵抗、配線のインダクタンス、ADCの誤差など）が入っている可能性を、今回は切り分けていない。
+- サーボの起動時・動作時の電流の値。受け入れ条件4を満たしたかどうかの判定は、この記録に書かない。
+- サーボが動いた向き、角度、量。ユーザーは「左に30度くらい。確証はない」と答えた。動く前の位置は不明。
+- shuntの値（0.1 Ω）。現物は測っていない。
+- 動作時のサーボ側のGNDの持ち上がりの影響（サーボのlogic閾値は`HW-TBD-026`で未確定）。
+- 条件6が設計した受け入れ試験として満たされたこと。1回の観察で、意図した起動が1回ある。
+- ジャンパー線・ブレッドボードの接点・端子台Sの3導体の穴・PTCが、戻りの電流で熱に耐えること。
+- `HW-TBD-034`・`HW-TBD-009`・`HW-TBD-010`／`011`・`HW-TBD-026`の解決。
+
+### Conclusion
+
+90度指令の測定用build（`9cb25b44…3265`）で、shuntをサーボのGNDの戻りに入れた配線（ユーザーの申告。導通は未確認）で、AC投入時と動作時のArduinoの読みを記録した。AC投入（記録A。欠番0）で最大498、動作（記録B。欠番1件は動作の約28秒前）で受信・採用できたsampleの最大663のカウントが出た。約104 µs刻みの間は見えない。計算値は`M-12001`の定格出力を超えており、電流の値としては読めない。ESP32の`rst:`は意図した1回の起動だけだった。
+
+### Next safe step
+
+- 終わりの状態：ACプラグは抜けている（ユーザーの申告）。ESP32とArduinoはPCのUSBにつながっている。ESP32には通常build（`servo=not_driven`）が書き込まれ、NVSのlatchは立っている。配線はこの記録の「Wiring revision」のまま（shuntと戻りのジャンパー線は付いたまま。撤去の指示は出していない）。
+- 次にこの配線でACを入れる前に、無電源のテスターの読み（star pointとg11の間など）を取る。
+- 読みの扱い（shunt以外の電圧の切り分け）は、PMが判断する。
+
+## EXP-035: サーボを外し、既知の負荷で戻りの経路の抵抗を調べ、A0の読みと電流の関係を記録した
+
+[#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)の受け入れ条件4（起動時と小動作時の電流）の読み方を決めるため、`EXP-034`の戻りの経路（シャントを含む）に、サーボの代わりに既知の負荷（330 Ωの抵抗の並列）をつなぎ、Arduinoの読みを記録した。人間の立ち会いのもとで1回取った。実行承認は[#17のcomment 6294677352](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6294677352)（回答の原文「はい」）。段2b（区間ごとの電圧降下）は、別の承認（[#17のcomment 6333259715](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6333259715)。回答の原文「はい」）で、同じ窓の続きとして行った。この窓の設計は、`EXP-034`の次の窓として、PM（実機）が案2として選んだ。**この記録は事実と未確認だけを書く。**Arduinoの生のCSVは、repositoryの外の証拠用directoryにある。
+
+| 項目 | 内容 |
+|---|---|
+| Test ID | `EXP-035` |
+| Date | 2026-10-22 JST 13:08〜14:20ごろ（Arduinoの基線の記録から、サーボ系の線を外した後まで） |
+| Operator | 配線の変更、USBの抜き挿し、M-12001のACプラグの抜き挿し、テスターの読みはユーザー。Arduinoの記録と解析は作業セッション（AI） |
+| Hardware revision／Exact components | `PSU-SERVO-01`（`M-12001`）、`PROT-OC-01`（予備の`MF-R135`）、`MEAS-01`（秋月117836、`SQP5WJ0R1B`。0.1 Ω／5 W。現物の値は測っていない）、`MEAS-02`（Arduino Uno R3）、`MEAS-03`（`DT830B`）、`MCU-01`（ESP32-DevKitC V4。通常build。コンソールは開いていない）、負荷用の330 Ω `CF25J330RB`（`RES-LED-01`と同じ袋。許容差±5 %は袋の表示。値の実測はしていない。段1で10本、段2で20本）、ブレッドボード（配線済みのもののほかに、手元の別の1枚。型番の記録は無い）、ジャンパー線（両端オス。太さ・定格の記録は無い）。サーボ（`SERVO-01`）は外した |
+| Wiring revision | 作業セッションは目で見ていない。**`EXP-034`からの変更（ユーザーの申告）：**サーボのplugを、茶・赤・黄のジャンパー線の針から外した。黄のジャンパー線の`i25`側を抜いた。**配線済みのブレッドボードには、ほかに触れていない**（ユーザーの申告「元あるブレッドボードは一切触っていない」）。**負荷（別のブレッドボード。ユーザーは「負荷ボードは作りました」「ささっている」と申告し、穴ごとの報告は無い。作業セッションの指示どおりに作ったものとして扱った）：**A〜Fの行と、G〜Lの行に、列1と列5（グループ1：`A1`–`A5`から`E1`–`E5`、グループ2：`H1`–`H5`から`L1`–`L5`）、段2で列7と列11（グループ3・4）に、330 Ωを5本ずつ跨がせた。各グループの列1・7の`F`と`G`の穴から＋用レーンへ、列5・11の`F`と`G`の穴から−用レーンへ、ジャンパー線をつないだ（レーン側の穴の位置は指示せず、報告も無い）。**サーボの赤のジャンパー線**（端子台Sの「＋」から来る線）の**plug側の先**を、＋用レーンの列20の近く、**茶のジャンパー線**（g11から来る線）のplug側の先を、−用レーンの列20の近くへ差した（段0は茶を差していない）。端子台Sの「＋」の穴には3本の導体が入っている（ユーザーの申告）。`EXP-034`のシャント（`j11`と下の「−」列11番）、青のジャンパー線（下の「−」列14番と端子台Sの「−」の穴）、`h11`のA0、上の「−」列21番のArduino GND、上の「−」列20番のESP32のGNDには触れていない（ユーザーの申告）。**無電源の読み（ユーザーの申告。`DT830B`。リード同士を短絡した読みが2.0 Ω）：**端子台Sの「−」の足と、茶のジャンパー線の針の間が3.1 Ω（200 Ωレンジ。針は茶のジャンパー線のplug側の先。負荷の前に読んだ）。負荷のレーン間：段1の前が38.0 Ω（200 Ωレンジ）、段2の前が20.0 Ω（200 Ωレンジ）。ESP32とArduinoはPCのUSB給電（USBはACを挿す前に挿し、記録の後に抜いた）。AC（`M-12001`）は、各段の記録の間だけ挿した |
+| Power supply and current limit | `EXP-034`と同じ（`M-12001`＋PTC直列。[servo-safety-limits.md](servo-safety-limits.md)の承認の状態の項目6の(a)）。戻りの経路が、ブレッドボードの接点とジャンパー線を通る。負荷ボードのブレッドボードの接点に、定格が資料に無いまま、最大約0.3 Aを流した（今回の1回に限る例外。承認の記録に書いた。段2bの追加も同じ例外で、承認は[#17のcomment 6333259715](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6333259715)）。サーボは動かしていない |
+| Firmware commit/profile | ESP32：通常build（`servo=not_driven`）のまま。書き込みもコンソールも使っていない。Arduino：`hardware/measurement/arduino-transient-logger`の`9ae203a`（`-DLOGGER_NCH=1 -DLOGGER_REF=3`。内部1.1 V基準、1ch、約9615 Sample/s、約104 µs刻み）。**基板に書いてあるhexは、書き直していない。**同じ構成で再buildしたhexのsha256が、`EXP-034`のhex（`7aa787622b1c421cf99f201814b039b7acda3a60b62c577cdec92919f68befe8`）と一致したことは確かめた。基板の中のhex自体のsha256は読んでいない。基準電圧の値は`EXP-002`の約1.112 Vの代理値（個体・AVCCの代理値・温度に紐づく） |
+| Configuration | `adc_stream_rate.py`（`--baud 1000000 --allow-drops`）。基線8秒（AC無し）、段0・段1・段2は各100秒。段1・段2は、ACを挿して約30秒でユーザーがテスターで負荷のレーン間の電圧を読み、60秒以内にACを抜いた |
+| Measurement equipment | Arduino（`MEAS-02`）。`DT830B`（`MEAS-03`。直流`20V`レンジの最小単位は10 mV、段2bで使った`200 mV`レンジは0.1 mV、`2000 mV`レンジは1 mV。**確度の資料は無い**）。ESP32のログは使っていない |
+| Procedure | 下の「手順と時刻」 |
+| Expected result | 段1（10本）で、A0は約15〜45カウント（R_xが0.1〜0.3 Ωの仮説）。段2（20本）で、段1の約2倍。段0は、サーボ側の電流が0のため、基線のまま。直線から±10 %以上外れた場合は、接触抵抗が電流で変わると読む（先に決めた読み方） |
+| Measured result | 下記 |
+| Faults | 下記 |
+| Conclusion | 下記 |
+| Next safe step | 下記 |
+
+### 手順と時刻（JST。Arduinoの記録の時刻。記録の開始時刻は、コマンドを起動した時刻）
+
+- 13:08：ユーザーがUSB 2本を挿し、「ACは抜けている」と申告した。ポートを開く前に、毎回ACが抜けていることを申告してもらった。**基線（AC無し）：**8秒（13:08:52）。
+- **段0（13:09:11、100秒）：**負荷は接続し、茶の線の先は差していない（電流は流れない）。ユーザーがACを挿して約30秒で抜いた。
+- **段1（13:16:50、100秒）：**茶の線の先を−用レーンへ差した（負荷10本）。ACを挿して約30秒で、ユーザーがレーン間を読んだ：5.05 V。ACを抜いた。
+- **段2（13:44:59、100秒）：**負荷を20本にした。ACを挿して約30秒で、ユーザーがレーン間を読んだ：4.90 V。ACを抜いた。
+- **段2b（区間ごとの電圧降下。14:13:13、150秒）：**実行承認は[#17のcomment 6333259715](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6333259715)（回答の原文「はい」）。負荷は20本のまま、サーボは外したまま。ユーザーがUSB 2本を挿し（「ACは抜けている」の申告の後にポートを開いた）、ACを挿して、`DT830B`の直流`200 mV`レンジで6区間と全体を読み、ACを抜いた。ACを挿した時刻は、Arduinoの記録の開始から約132秒で、記録（150秒）の終わりでもACは挿したままだった（記録に入った約18秒の間に、7つの読みの全部が入ったかは分からない）。
+- **窓の終わり（ユーザーが、USB 2本を抜いた後に行った）：**サーボ系の線を外した（下の「Next safe step」）。USB 2本が抜けていることは、PCからデバイス（`/dev/ttyACM*`、`/dev/ttyUSB*`）が消えたことで確かめた。
+- **段3（30本）は行っていない。**直線から外れた結果を見て、3点目を足してもサーボの電流の域への外挿は裏づけられないと判断したため（PM（実機）も同意した）。
+
+### 結果
+
+- **記録の健全性：**基線：block欠番0、予約bit破れ0。段0：block欠番2、予約bit破れ2、ISRが捨てたsample 0。段1：block欠番1、予約bit破れ1、ISRが捨てたsample 0。段2：block欠番0、予約bit破れ0、ISRが捨てたsample 0。
+- **基線と段0：**基線（AC無し）のA0は、平均0.034カウント、最大3。段0（負荷接続、茶は差さない、ACを挿した）は、平均0.03カウント、最大3。記録の途中で、基線から変わる区間は無い。**ACの投入は、段0では計器で確かめていない**（ユーザーが挿して抜いた操作が根拠）。
+- **段1（負荷10本）：**A0は、ACの投入（記録の開始から約20.5秒）から約3 msで立ち上がり、約29.5秒の間、130.2カウント（後半の平均。ばらつきの標準偏差は約0.7カウント）で安定した。ACを抜く（約50.0秒）と0に戻った。負荷のレーン間：5.05 V（ユーザーの読み）。
+- **段2（負荷20本）：**A0は、ACの投入（記録の開始から約12.5秒）から約3 msで立ち上がり、約31.8秒の間、213.5カウント（後半の平均。標準偏差は約0.9カウント）で安定した。ACを抜く（約44.3秒）と0に戻った。負荷のレーン間：4.90 V（ユーザーの読み）。
+- **換算（計算。確度は主張しない）：**1カウントは、1.112 V÷1024で約1.086 mV。段1のA0は約0.141 V、段2は約0.232 V。負荷の電流は、レーン間の電圧を、負荷の抵抗で割って出した。負荷の抵抗は、(i) レーン間の読みからリードの2.0 Ωを引いた値（段1が36.0 Ω、段2が18.0 Ω）、(ii) 公称（330 Ω÷本数。段1が33 Ω、段2が16.5 Ω）の2通り。**(i) の電流は、段1が約0.140 A、段2が約0.272 A。(ii) は、段1が約0.153 A、段2が約0.297 A。** A0の電圧を電流で割ると、(i) は段1が約1.01 Ω、段2が約0.85 Ω。(ii) は段1が約0.92 Ω、段2が約0.78 Ω。**どちらの割り方でも、段2のほうが約15 %小さい。**
+- **直線との比較：**段1から段2へ、電流は約1.94倍（(i) と (ii) で同じ）になったが、A0は約1.64倍にしかならなかった。**先に決めた予想（段1の約2倍。段2のA0は約230〜280カウント）から外れた（実測は213.5）。**負荷0のときのA0は約0（段0。ACの投入は計器で確かめていない）で、ゼロでない切片では説明できない。
+- **抵抗の公称値との差：**レーン間の読み（リード2.0 Ωを引いた値）は、段1・段2とも公称より約9 %大きい（36.0 Ωと33 Ω、18.0 Ωと16.5 Ω）。許容差±5 %、レーンとジャンパー線の接触、`DT830B`の確度（資料が無い）、読みの最小単位（0.1 Ω）を、切り分けていない。**この差は、段1と段2の比較の結論（直線から外れたこと）には効かない**（両段に共通のため）。
+- **段2b（負荷20本。ユーザーの読み。単位mV。`200 mV`レンジ。上流を赤、下流を黒のプローブ）：**① 茶のジャンパー線の負荷ボード側の先↔`i11`：**93.2**。② `i11`↔シャントの`j11`側のリードの金属：**89.9**。③ シャントの両リードの金属の間（シャント本体）：**29.1**。④ シャントの下側のリードの金属↔下の「−」列の12番：**91.3**。⑤ 下の「−」列の12番↔13番：**0.1**。⑥ 下の「−」列の13番↔端子台Sの「−」の足：**9.5**。全体（茶のジャンパー線の先↔端子台Sの「−」の足）は`200 mV`レンジでOL、`2000 mV`レンジで**314**（1 mV刻み）。①〜⑥の合計は313.1 mVで、全体と、読みの最小単位の範囲で合う。区間の穴（`i11`、下の「−」列の12・13番）は、ユーザーの答えと先の記録から、空き穴として指示した。
+- **A0との突き合わせ（段2b）：**A0（`h11`の列。A0の経路は区間②〜⑥）は、記録に入ったACの約18秒の間、約206カウント（約224 mV。後半の平均207.1、最小203、最大217）で安定した。②〜⑥の合計は219.9 mVで、約2 %の差で合う。段2のA0（213.5カウント）より約3 %低い。記録の健全性：block欠番1、予約bit破れ1、ISRが捨てたsample 0。
+- **A0の電圧の内訳（約0.27 Aのとき。計算）：**②〜⑥の合計219.9 mVのうち、シャント本体（③）は約13 %（29.1 mV）、シャントの両リードのブレッドボードの接点（②と④）は約82 %（89.9 mVと91.3 mV）、下の「−」列の線路（⑤）は約0.05 %、青いジャンパー線と端子台（⑥）は約4 %。①（茶のジャンパー線とg11の接点。93.2 mV）は、A0の経路に入らない。電流を0.272 A（レーン間の読みからリードを引いた負荷の抵抗で割った値）とすると、③は約0.107 Ω、②は約0.33 Ω、④は約0.34 Ω。公称（0.297 A）では、③は約0.098 Ω、②は約0.30 Ω、④は約0.31 Ω。
+- **`EXP-034`との関係（計算ではなく、突き合わせ）：**`EXP-034`の最大498（AC投入）・最大663（動作）は、この窓の約0.14〜0.27 Aの域では、シャント0.1 Ωだけの電圧としては読めない（この域の戻りの経路の抵抗の換算は約0.8〜1.0 Ω）。**サーボの動作のときの電流の域（不明）での値は、この窓では分からない。**
+
+### Faults
+
+- 配線の位置は、ユーザーの個別の答えか、作業セッションの指示どおりに作ったものとしての扱いで、作業セッションは目で見ていない。負荷の穴ごとの報告は無い。
+- 作業セッションが、ユーザーの答えを取り違えた。ユーザーの「抵抗の線も入っている」（元の板の上のレーンの話）を、「負荷ボードを作った」と読み替え、作っていない物を抜くように指示した。ユーザーは、元の板の上のレーンの間（1212 Ω。2000 Ωレンジ）を読んでいた。**この間、ACも、USBも、入れていない。配線の変更は起きなかった。**元の板の上の＋レーンには3V3（`EXP-030`のA1の読みからの推定）、−レーンにはGNDがつながっている（記録）ため、取り違えたまま赤い線の先を差していれば、`M-12001`の出力が3V3側へ入る恐れがあった。赤い線の先は、その時点で、どこにも差していなかった（ユーザーの申告）。
+- 作業セッションが、ユーザーが既に答えた質問（別の板があること）を聞き直した。板を使わない組み方を一度指示したが、ユーザーが使わなかったため、取り消した。
+- 段3（30本）、基準電圧の照合（段V）は行っていない。
+- 動作時の電流の域（サーボ）の確認は、この窓で取れていない。
+- 負荷のレーン間の読みは、リードの抵抗2.0 Ωを、ユーザーが短絡して読んだ値で引いた。プローブの接触の抵抗は、段ごとに変わりうる。
+- 段0は、ACの投入を計器で確かめていない。
+- 段2bで、ACを挿すのが遅れ、Arduinoの記録の150秒に、ACの入った区間が約18秒しか入らなかった。7つの読みを取った時刻は、記録していない。
+- 区間の電圧降下は、プローブの当て方（リードの金属、穴）に依存する。ユーザーの申告どおりに当てたものとして扱った。下の「−」列の12・13番が空き穴であることは、ユーザーの先の答え（下の「−」列は11と14のみ使われている）による。
+- 窓の終わりにサーボ系を外した後の穴の位置は、導体の本数のほかは、報告が無い。
+
+### この記録が主張しないこと
+
+- サーボの起動時・動作時の電流の値。受け入れ条件4を満たしたかどうかの判定。
+- 戻りの経路の抵抗の、サーボの電流の域での値。この窓の電流の域（約0.14〜0.27 A）の外への外挿。
+- 戻りの経路の内訳（シャント本体、接点、ジャンパー線、レーン、端子台）の、約0.27 A以外の電流での値。段2bの内訳は約0.27 Aのときの1回の読みである。
+- 基準電圧の約1.112 V（代理値）と、`DT830B`の確度。
+- 電源（`M-12001`）の出力インピーダンスの値。
+- ブレッドボードの接点とジャンパー線が、数Aの電流で熱に耐えること。
+- シャントの接点の割合（約82 %）が、サーボの電流の域でも成り立つこと。接点の抵抗は、電流が増えると下がる傾向が段1・段2で見えている（この記録の「直線との比較」）。
+- シャントの値（0.1 Ω）。単体の抵抗として測ってはいない。段2bの③は0.1 Ωと矛盾しない（約0.098〜0.107 Ω）が、`DT830B`の確度の資料と、電流の確度（負荷の抵抗の許容差±5 %）が揃っていない。
+- `HW-TBD-034`・`HW-TBD-026`の解決。
+
+### Conclusion
+
+サーボを外し、330 Ωの並列の負荷（10本、20本）を戻りの経路へつなぎ、A0を記録した。A0の安定値は、負荷10本で130.2カウント、20本で213.5カウントだった。電流を約2倍にしても、A0は約1.64倍にしかならず、戻りの経路の抵抗の換算は約1.0 Ωから約0.85 Ωへ下がった。この域（約0.14〜0.27 A）の抵抗は、シャント0.1 Ωだけの値より約7〜10倍大きい。サーボの電流の域での抵抗は、この窓では分からない。サーボの電流の値は主張しない。段2b（負荷20本、約0.27 A）で戻りの経路を区間に分けて電圧降下を読むと、A0の電圧のうち、シャント本体は約13 %、シャントの2本のリードのブレッドボードの接点が約82 %、残りが約4〜5 %だった。A0の電圧は、シャント本体の電圧ではなく、その大半が接点の電圧降下だった（約0.27 Aのとき）。
+
+### Next safe step
+
+- 終わりの状態（ユーザーの申告と、PCからのデバイスの確認）：ACプラグは抜けている。ESP32とArduinoのUSBは抜けている。**サーボ系の線を外した：**(a) 上の「−」列20番から端子台Sの「−」へ行くESP32のGNDの線の、端子台S側の端。(b) Arduinoの2本の線（A0とGND）の、ブレッドボード側の端（`h11`と、上の「−」列21番）。(c) 端子台Sの「＋」へ行く緑の線（もう一端は`c10`）の、端子台S側の端。(d) 負荷ボードの赤と茶のジャンパー線のplug側の先（レーンから抜いて、何にも触れない所へ置いた）。**分圧の10 kΩ 2本は付けたまま。**外した後、端子台Sの「−」の穴に残っている導体は2本、「＋」の穴は2本（ユーザーの申告）。残っているもの：シャント（`j11`と下の「−」列11番）、青のジャンパー線（下の「−」列14番と端子台Sの「−」の穴）、負荷ボード（別のブレッドボード）、サーボ（外してある）。
+- 次の窓（#16の`env-sample-16`、LCDは切り離したまま）の前に、上の(a)〜(d)の状態を、無電源のテスターで確かめる。サーボをつなぎ直してACを入れる前にも、無電源のテスターの読みを取り、負荷ボードを外す。
+- 受け入れ条件4・6の判定は、PMが行う。この記録は、サーボの電流を主張しない。
+
+## EXP-036: BME280（`ENV-01`）の変換時間をoversampling 1倍と16倍で観察し、その間のheartbeatの間隔を記録した（`env-sample-16`と`env-sample-16-slow`）
+
+[#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16)の受け入れ条件5（遅い変換が上位taskをblockしない）のため、BME280の変換を遅くした試験build（`env-sample-16-slow`。温度・気圧・湿度とも×16）と、通常の試験build（`env-sample-16`。×1）を実機で通電し、変換の所要時間（`env_conversion elapsed_ms osrs`）と、その間のheartbeatの間隔を記録した。受け入れ条件3・4はこの窓の範囲外である。**この記録は事実と未確認だけを書く。受け入れ条件5を満たしたかの判定は書かない（PM（実機）が行う）。**
+
+| 項目 | 内容 |
+|---|---|
+| Test ID | `EXP-036` |
+| Date | 2026-10-22 JST 16:30〜16:43ごろ（UTC 07:30〜07:43。始まりは`/dev/ttyUSB0`の作成時刻16:30:34、終わりは最後のlogの約07:42:48Z。USBを抜いた時刻は記録していない） |
+| Operator | USBの抜き挿しはユーザー。build、書き込み、UART0のlogの取得、記録は作業セッション（AI） |
+| Hardware revision／Exact components | `MCU-01`（ESP32-DevKitC V4）、`ACCEL-01`、`ENV-01`（BME280、AE-BME280）。`DISP-01`は切り離したまま |
+| Wiring revision | **`EXP-035`の終わりの状態のまま**（ユーザーの申告。2通り：(1) 作業セッションの問い「`EXP-035`の後に、配線に触れましたか」への回答の原文「いいえ」、(2) PM（実機）への発言の原文「前と配線が変わっていないのになんで確認するの？」）。I2Cと電源の配線は`EXP-015`のまま（記録からの照合。`Vs`／`VDD`→`3V3`、`GND`、`SDA`→GPIO25、`SCL`→GPIO26、`SDO`→GND）。サーボ系の線は`EXP-035`の終わりに外した状態（(a)〜(d)）。LCDとPiの線は外れたまま。LEDの枝（GPIO2・GPIO5）の今の状態は、記録が無く、訊いていない（PM（実機）の判断。この窓に影響しない扱い）。**現物の配線を、作業セッションは目で見ていない。**配線は測っていない |
+| Power supply and current limit | ESP32のUSB（PC）のみ。電流制限は設けていない。電流は測っていない。**AC（`M-12001`）のプラグは抜けたまま**（ユーザーの申告：EXP-035の終わりの申告「ACプラグは抜けている」と、PM（実機）への発言の原文「ACは抜けているって前に言わなかったっけ？」。この窓の中で別に訊き直していない） |
+| Firmware commit/profile | develop `62d58d2`の`env-sample-16`と`env-sample-16-slow`（debug、それぞれ単独）。ELF sha256：`env-sample-16`＝`0f8a418aa8615e9a9feb0292b331840bdf6bedd7e401a850bacd94771c90c124`、`env-sample-16-slow`＝`cdc584c4f9112adad0368331b3049d324477aa8e6cb3b696f51013a950c8fdd4`。書き込みの直前に両ELFのsha256が上の値と一致することを確かめた。`firmware/esp32`で、build時だけ`[workspace]`を足し（worktree配下のため）、`cargo fmt --check`・`cargo clippy --all-targets --locked --features <feature> -- -D warnings`・`cargo build --locked --features <feature>`を各featureで実行し、成功した。`Cargo.toml`は戻して`git diff`が空であることを確かめた。**起動logの`App version: 62d58d2-dirty`は、build時に足した`[workspace]`による** |
+| Configuration | `env-sample-16`：Chip IDが`0x60`のときだけ`ctrl_hum`・`ctrl_meas`へ書き、forced modeで測る（oversampling ×1）。`env-sample-16-slow`：同じで、温度・気圧・湿度ともoversampling ×16。I2Cは100 kHz、address `0x76`。heartbeat周期1000 ms、health snapshot周期10000 ms（起動logの`heartbeat_period_ms`・`health_snapshot_period_ms`） |
+| Measurement equipment | UART0のlog（115200）。Linux上のpythonでRTS（EN）を落として起こしたreset。時刻はファームの`uptime_ms`とlogの`I (ms)`の値。ファーム側の時計の分解能（ms）より細かい値は取れない |
+| Procedure | USBを挿す（ユーザー。PM（実機）経由で受けた発言の原文「挿した」）→ `/dev/ttyUSB0`の出現を確認 → `env-sample-16`を`espflash`で書き込み（`--no-stub --after no-reset`） → RTSでresetして30秒のlogを3回 → `env-sample-16-slow`を同じ方法で書き込み → 同じく3回 → USBを抜く（ユーザー。原文「USB 抜いた」。`/dev/ttyUSB*`が消えたことをPCで確認） |
+| Expected result | `env_conversion`の`elapsed_ms`が、×1と×16で分かれる。heartbeatの間隔が、×16でも1000 msのまま。panic・task_wdt・brownout・`env_fault`が出ない（この窓の依頼で決めた観察項目。受け入れ条件5の判定そのものではない） |
+| Measured result | 下記 |
+| Faults | 下記 |
+| Conclusion | 下記 |
+| Next safe step | 下記 |
+
+### 結果
+
+- **書き込み：**`env-sample-16`は1回目が`FlashEnd`で`Other (0x1)`のエラー、2回目（07:37:28Z）が`Flashing has completed!`。`env-sample-16-slow`も同じ（1回目がエラー、2回目（07:41:12Z）が成功）。読み戻しの照合はしていない。起動logの`ELF file SHA256`の先頭（`0f8a418aa...`、`cdc584c4f...`）は、書いたELFと一致した（先頭9桁まで）
+- **起動6回（各30秒。UTC 07:37:43、07:38:13、07:38:43、07:41:17、07:41:47、07:42:18）：**すべて`reset_reason=power_on`、`env_chip_id raw=0x60`、`env_calibration_read dig_p1=37064 dig_h4=391 dig_h5=50`（uptime 812 ms）。`accel_device_id raw=0xe5`（`ACCEL-01`。uptime 552 ms前後）
+- **変換の所要時間（起動ごとに1回。`samples=1`）：**
+
+| build | 起動 | `env_conversion` | `env_raw`（温度／気圧／湿度） | `env_reading`の`temperature_centi_c` |
+|---|---|---|---|---|
+| `env-sample-16` | 1 | `elapsed_ms=9 osrs=x1` | 534784／301664／36144 | 2625 |
+| `env-sample-16` | 2 | `elapsed_ms=9 osrs=x1` | 534832／301648／36032 | 2626 |
+| `env-sample-16` | 3 | `elapsed_ms=9 osrs=x1` | 534800／301632／35872 | 2625 |
+| `env-sample-16-slow` | 1 | `elapsed_ms=99 osrs=x16` | 534444／301535／35760 | 2614 |
+| `env-sample-16-slow` | 2 | `elapsed_ms=99 osrs=x16` | 534499／301539／36089 | 2616 |
+| `env-sample-16-slow` | 3 | `elapsed_ms=99 osrs=x16` | 534609／301547／36106 | 2619 |
+
+- **heartbeat（`hb`）：**6回とも、`hb seq=3`（uptime 1049 ms）から`seq=31`（29049 ms）まで29行、**隣り合う`uptime_ms`の差はすべて1000 ms**だった（logの`I (ms)`の時刻の差も1000 ms）。`env_conversion`のlogの時刻から所要時間を引くと（計算）、変換の開始は両buildとも1583 msごろ（`hb seq=3`の直後。×1：1592−9、×16：1682−99）で、終わりは×1が1592 ms、×16が1682 msである。次の`hb seq=4`（log時刻2582 ms）は、どちらの変換の終わりよりも後である。`env_raw`・`env_reading`は両buildとも2012 ms・2022 msに出た。`heartbeat_overrun`の行は0件
+- **health snapshot（10049 ms、20049 ms）：**6回とも`overrun_ticks=0 snapshot_errors=0 pi_uart_rx_buffer_full=0 pi_uart_rx_fifo_overflow=0`。**最初のsnapshotの`max_read_gap_ms`は6回とも22、2つ目は6回とも49**（×1と×16で同じ値。×1でも2つ目が49であり、この値と変換の所要時間の関係は、この記録では切り分けていない）
+- **panic、task_wdt、brownout、`env_fault`、`heartbeat_overrun`：**6回とも0件
+- **ユーザーの異常の申告（異音・発熱・異臭・変色）：**無かった。作業セッションは、窓の中で問いを増やさない方針（PM（実機）の指示）に従い、訊いていない
+
+### 承認と判断の記録
+
+- **通電の承認：**作業セッションがユーザーへ1問で訊いた（満たさない条件を問いの本文に明記）。回答の原文は「無給電の確認も行って承認する」（選択肢の1つ）。満たさない条件：`power-budget.md`の条件(2)（通電してよいのは`bringup-i2c-15-16`だけ。この2つのbuildは`ctrl_hum`・`ctrl_meas`へ書く）、条件(5)(a)（module電源pinの独立性）と(b)（pull-upの実効抵抗）は未達、`ENV-01`の`J3`の導通は未測定、`firmware/esp32/README.md`の表で通電「不可」。前例は`EXP-031`・`EXP-033`
+- **無給電の確認：**項目1（`ADXL345`の`Vs`／`VDD`–GND間と`BME280`の`VDD`–GND間）は、ユーザーが行い、回答の原文は「両方とも、上がっていくか、最初から高く安定した」。**項目5・6・7は、行わなかった。**ユーザーの発言（PM（実機）経由。原文）：「いやだから、さっきの答えじゃだめなの？」。意図は、配線が変わっていないので目視を改めて行わなくてよい、とPM（実機）が伝えた。作業セッションは、代わりに記録の照合（`EXP-015`・`EXP-031`・`EXP-033`・`EXP-035`の終わりの状態と`gpio-assignment.md`のpin表）を行い、食い違いは見つからなかった。**これは現物の確認ではなく、項目5・6・7を満たしたとは書かない。**
+- **書き込みの再承認：**自動モードの分類器が書き込みを一度拒否した（理由は「Security Weaken」）。作業セッションは回避せず、拒否の内容と、進める場合の手順をユーザーへ示した。ユーザーの回答の原文は「書き込みを進めて」。
+
+### Faults
+
+- 書き込みの1回目が両buildとも`FlashEnd`のエラーだった（`EXP-031`と同じ。原因は調べていない）。読み戻しの照合はしていない
+- 満たさなかった条件：`power-budget.md`の条件(2)・(5)(a)・(5)(b)、`J3`の導通は未測定、無給電の確認の項目5・6・7（ユーザーの決定で行わなかった。記録の照合のみ）、`README`の表で通電「不可」
+- 現物の配線を作業セッションは見ていない。配線の根拠は、ユーザーの申告と記録
+- 6回の起動とも、第2のsnapshotの`max_read_gap_ms`が49だった理由を調べていない
+- 作業セッションが、ユーザーが既に答えたこと（配線に触れていないこと、ACが抜けていること）を訊き直す結果になった場面があった。PM（実機）が訂正し、以降は訊かなかった。項目5・6・7の答えの待ちも、ユーザーの意図とずれた（PM（実機）が訂正した）
+- 窓の中の異常の有無（異音・発熱など）は、ユーザーへ問わず、申告が無かったことだけを記録した
+- logは、repositoryの外の作業用directoryにある。証拠用directoryへは移していない
+
+### この記録が主張しないこと
+
+- 受け入れ条件5を満たしたかの判定。この観察は、変換が1回（起動ごと）だけの試験buildで、×16でもheartbeatの間隔が1000 msのままだったことまでである。変換が繰り返される製品経路での動作は、観察していない
+- `max_read_gap_ms`と変換の所要時間の関係
+- 変換がheartbeatの時刻をまたいだ状態での間隔。この観察では、変換（最長でも約100 ms）が起動ごとに1回、heartbeatの1000 msの周期の間に収まっており、変換とheartbeatの時刻は重なっていない
+- 変換時間の値（9 ms、99 ms）が資料のBME280の仕様と合うこと
+- BME280の確度。温度・気圧・湿度の値（6回）はreferenceと比べていない
+- timeout・disconnect・not-readyの分類、`env_fault`が出る経路
+- 製品buildの動作。`J3`のはんだ付けの電気的な導通。`module電源pinの独立性`、pull-upの実効抵抗
+
+### Next safe step
+
+- 終わりの状態：USBは抜けている（ユーザーの申告「USB 抜いた」と、PCから`/dev/ttyUSB*`・`/dev/ttyACM*`が消えたことの確認）。ACプラグは抜けたまま（ユーザーの申告）。サーボ系の線は`EXP-035`の終わりの状態のまま。配線を変えたという申告は無い
+- 次に実機で通電する場合は、その回の構成を文で示し、ユーザーの承認を新たに取る
+- PM（実機）の判断により、この窓ではサーボ系を外した状態（`EXP-035`の(a)〜(d)）を無電源のテスターで確かめ直さなかった。**ACを挿さないことが安全の条件**である
+- [#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16)の受け入れ条件5の判定と、チェックを入れるかは、PM（実機）が行う
+
+## EXP-037: LCDをつないだESP32へ、`mem-probe-23`のbuild（A）と製品build（B）を書き込み、Piの独り言（`show_text`）で描画時間とheap・stackを観察した
+
+[#23](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/23)の実機の窓。LCD（`DISP-01`）をつないだESP32へ、`mem-probe-23,face-21,tap-21`のbuild（A）と、featureなしの製品build（B）を1回ずつ書き込み、Piの`deskcatd`の独り言（`show_text`）を受けた間の`text_drawn`の`accept_to_draw_ms`と、Aの`mem_probe`の行を取った。人間の立ち会いのもとで1回取った。実行承認は[#23のcomment 6336377068](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/23#issuecomment-6336377068)（回答の原文「はい」。満たさない条件7つを含む）。**この記録は事実と未確認だけを書く。**ESP32のログとPiのログの原本は、MACを含みうるので、repositoryの外の証拠用directoryにある。
+
+| 項目 | 内容 |
+|---|---|
+| Test ID | `EXP-037` |
+| Date | 2026-10-22（UTC 08:44〜09:12。JST 17:44〜18:12）。時刻は下の「手順と時刻」 |
+| Operator | 線の挿し抜き、BOOTボタン、USBの抜き挿し、LCDの目視、テスターの読みはユーザー。flashの読み出しと書き込み（`espflash`）、ESP32のresetとログの取得、sshでの`deskcatd`の起動は作業セッション（AI） |
+| Hardware revision／Exact components | `SBC-01`（Raspberry Pi Zero W）、`MCU-01`（ESP32-DevKitC V4）、`DISP-01`、`ACCEL-01`、`ENV-01`。Piの給電は`EXP-026`のとおり（今回は確認していない） |
+| Wiring revision | 下の「配線の状態」 |
+| Power supply and current limit | ESP32はこの端末のUSBから給電。電流制限は設けていない。電流・`3V3` railの電圧・温度は測っていない。**AC（`M-12001`）は使っていない**（抜けたまま。ユーザーの申告は`EXP-035`の終わりの申告と、PM（実機）経由の窓の前の申告で、この窓の中で別に訊き直していない）。Piは電源が入っていた。Piの`throttled`は、A・Bの各起動の前と後で`0x0`（Pi Zero Wでは電圧の根拠にならない。`EXP-009`） |
+| Firmware commit/profile | ESP32：develop `00fe999c377b7af50216e542ee21ccd7ea912fc3`、debug。`git archive`をrepositoryの外へ展開してbuild（`.embuild`はmain checkoutのものを借りた。Version Recordは無い）。**A**：`--features mem-probe-23,face-21,tap-21`。ELFのsha256は`2c9238f3af16606f5919ec152c557628927f51ac57844d0d67b0cffa9cbed1ec`。**B**：featureなしの製品build。ELFのsha256は`90846aa389eb5bb4c0b32d7c33bc9458a0df7d0b53faf121024cd2a0a7921c37`。書き込みの直前に、両方とも`sha256sum -c`で承認の値と照合した。書き込みの前のflash：app descriptorの`app_elf_sha256`が`cdc584c4f9112adad0368331b3049d324477aa8e6cb3b696f51013a950c8fdd4`で、`EXP-036`の`env-sample-16-slow`のELFと一致した（`version`は`62d58d2-dirty`）。前のfirmwareは走らせていない。Pi：`deskcatd`はsha256の先頭`38a47c15`で、`EXP-026`と同じbuild |
+| Configuration | `deskcatd`はsystemdのunitを使わず、loginユーザーでsshから手で起動した（unitは`inactive`・`enabled`のまま）。引数は`--port /dev/serial0 --baud 115200 --duplicate-capacity 8 --duplicate-retention-ms 5000 --startup-deadline-ms 10000 --speech-min-interval-ms 20000 --speech-duration-ms 5000 --verbose`（`EXP-026`の1回目と同じ形）。Aは`timeout 125`、Bは`timeout 65`で起動した |
+| Measurement equipment | テスター（LCDの`VCC`–`GND`間の抵抗。2000 Ωレンジ）。ESP32のUART0のログ（`pyserial`で取得。起動は`RTS`で1回だけresetし、`DTR`は常にFalse）。`deskcatd`のログ。LCDの目視はユーザー |
+| Procedure | 下の「手順と時刻」 |
+| Expected result | A：`show_text`が受理され、`text_drawn`と`mem_probe`の行が出て、表示期限の後に表情へ戻る。B：`show_text`が受理され、表示期限の後に表情へ戻る |
+| Measured result | 下記 |
+| Faults | 下記 |
+| Conclusion | 下記 |
+| Next safe step | 下記 |
+
+### 配線の状態
+
+- **窓の前：**`EXP-036`の終わりの状態（USBとACは抜けている。サーボ系の線は`EXP-035`の終わりに外した状態（(a)〜(d)）。LCDとPiの線は外れたまま、と`EXP-036`は書いている。LEDの枝（GPIO2・GPIO5）の線はESP32側を抜いたまま）。
+- **LCDの線（ユーザーの申告。表との見比べと足りない線の数も申告）：**窓の前に、ユーザーは「外していたVCCを指した」と答えた。ユーザーの申告では、外していたのは`VCC`だけで、それを戻した。ほかの線（`GND`と信号線7本）は外した記憶が無く、挿さったままだった（PM（実機）経由の発言の原文：「VCC以外外した記憶がないが／VCCは戻した」「外していたVCCを指したといっただろうが。」。「刺さったままかどうかの確認していない」とも答えた）。**足りなかった線は0本**（ユーザーの申告）。**作業セッションは目で見ていない。**行き先の表（作業セッションがPM（実機）経由で示した）は、`VCC`＝赤→電源列の「＋30」、`GND`＝黒→電源列の「−30」、`CS`＝茶→GPIO22、`RESET`＝橙→GPIO16、`DC/RS`＝黄→GPIO17、`SDI`＝緑→GPIO23、`SCK`＝青→GPIO18、`LED`＝紫→GPIO4、`SDO`＝灰→GPIO19。記録に穴の番号があるのは「＋30」「−30」までで、信号線のESP32側の列の番号は記録に無い。
+- **LCDの`VCC`–`GND`間の抵抗（通電の前。ユーザーが測った）：1214 Ω（2000 Ωレンジ）。**ユーザーの回答の原文は「1214（2000）」。`EXP-016`の再測定（2026-09-27）の1212 Ωと2 Ωの範囲で合う。数秒間の変化の観察は、報告に無い。
+- **GPIO2・GPIO5（LEDの線）：**挿さっていない（ユーザーのPM（実機）への発言の原文、2026-10-22：「GPIO2・GPIO5 は挿さっていないが、それは作業の都合上はずしているだけであって、本来いれていたものじゃないのか？」）。窓の中では確かめていない。
+- **Pi側の3本（紫＝pin 8、青＝pin 10、灰＝pin 39）：**記録の照合。`EXP-026`の`Wiring revision`は、Pi側の端を`EXP-024`の後に動かしていないと記録し（[#23のcomment 6145008461](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/23#issuecomment-6145008461)）、`EXP-033`・`EXP-035`・`EXP-036`にPi側の線を動かした記録は無い。**作業セッションは現物を見ていない。**
+- **灰（GND）のESP32側：**手順は「灰の線のESP32側をESP32のGNDに挿す（挿さっていればそのまま）→ BOOTを押したままUSBを挿す」。ユーザーの「USB 挿した」を手順の完了として受けた。灰の線が挿さっていたかは、個別に確認していない。
+- **橙（GPIO14）・黄（GPIO13）のESP32側：**Aの起動の後に挿した（ユーザーの申告「さした」）→ Aの観察の後、Bの書き込みの前に抜いた（「抜いた」）→ Bの起動の後に挿した（「挿した」）→ 窓の終わりに、USBを抜く前に抜いた（「抜いた」）。ピンの穴の位置は見ていない。各操作の時刻は記録していない。
+- **サーボ系：**`EXP-035`の終わりのまま（この窓では触っていない。確かめていない）。
+
+### 手順と時刻（UTC）
+
+- 08:43ごろ：`/dev/ttyUSB0`が現れた（`ls -l`の作成時刻がJST 17:43）。08:44:13：その存在を確認（ユーザーの「USB 挿した」の後）。`espflash board-info`（`--after no-reset`）でbootloaderに入っていることを確認し、flashの0x8000（partition table）と0x10000（app）の先頭0x100 byteを読んだ（08:44:39、08:44:47）。前のfirmwareは走らせていない。
+- 08:45:03〜08:45:54：Aを書き込み（`espflash flash --after no-reset`、`Flashing has completed!`）。
+- ユーザーの申告「BOOTボタンはとっくに離してます。」
+- **08:48:15：`RTS`で1回だけreset。Aの起動（backlightが点く起動の1回目）。**`monitorA.log`（`rst:`の行は1本）。
+- ユーザーの申告「さした／顔が出ている／発熱、異臭、乱れ、点滅が無い」（橙・黄を挿した後。起動の直後から、この時点まで）。
+- 08:50:17：Piで`deskcatd`（A用。`timeout 125`）を起動。08:52:27までに終了していることを確認（`timeout`による）。ESP32のログは08:52:45ごろまで取った（取得を止めた）。
+- ユーザーの申告「独り言の字形が読める」（どの件を見たかの個別の記録は無い）。
+- 橙・黄を抜いた（ユーザーの申告「抜いた」）。
+- 08:53:56〜08:54:48：Bを書き込み（`--after no-reset`。USBは挿したまま。`espflash`がESP32をbootloaderに入れて書き込んだ）。
+- **08:55:03：`RTS`で1回だけreset。Bの起動（backlightが点く起動の2回目）。**`monitorB.log`（取得は600秒。09:05:03で終わった。`rst:`の行は1本）。
+- 橙・黄を挿した（ユーザーの申告「挿した」）。時刻は記録していない。
+- 09:07:08：Piで`deskcatd`（B用。`timeout 65`）を起動。09:08:16までに終了していることを確認（`expB.stop`は09:08:17）。
+- 橙・黄を抜き、USBを抜いた（ユーザーの申告「抜いた」）。時刻は記録していない。**09:12:14：`/dev/ttyUSB*`と`/dev/ttyACM*`がPCから消えていることを確認した。**
+- backlightが点く起動は、確認できた範囲で2回（承認の最大4回の内）。09:05:03以降のESP32のログは取っていないため、その間のresetの有無は不明。
+
+### 結果
+
+**A（`mem-probe-23,face-21,tap-21`）**
+
+- 起動：`reset_reason=power_on`、`display=face_enabled servo=not_driven pi_link=uart1`、`display_madctl value=0x28 width=320 height=240`、`face_show name=Neutral`、`face_drawn name=Some(Neutral) uptime_ms=639`。`accel_device_id raw=0xe5`、`env_chip_id raw=0x60`、`tap_configured`。ELFのsha256の起動ログの表示は`2c9238f3a...`。
+- Piをつなぐ前：`boot_tx`の再送が続き、`boot_terminated reason=RecoveryBudgetExhausted sid=12 id=1`が約37.1秒で出た（`EXP-026`と同じ形）。
+- Pi link：約121.7秒に`pi_rx_hello … outcome=Established`、`boot_established`、`pi_rx_set_expression name=Neutral accepted`。Piのログに`WARN: helloへのACKを受けたが、応答送信側のsessionが未承認のため受理しない（§6）: sid=12 id=2`が1件ある（`EXP-026`には記録が無く、この窓で観察した）。
+- `show_text`は7件受理された（id 5〜11。約20秒ごと）。Piのログの`show_textが受理された`も7件。拒否は0件。
+- `text_drawn`（`accept_to_draw_ms`は、`text_show`の行からglyphの描画の完了までの経過時間。`crates/deskcat-face`の`text_drawn`のlog。LCDへの転送だけの時間ではない）：
+
+| 件 | `chars` | `accept_to_draw_ms` | `text_show`から`text_expired_restore_face`まで |
+|---|---:|---:|---:|
+| id 5 | 13 | 441 | 約5000 ms |
+| id 6 | 10 | 406 | 約5010 ms |
+| id 7 | 10 | 402 | 約5000 ms |
+| id 8 | 13 | 432 | 約5000 ms |
+| id 9 | 10 | 404 | 約5010 ms |
+| id 10 | 10 | 406 | 約5010 ms |
+| id 11 | 13 | 431 | 約5000 ms |
+
+  各件で、`text_expired_restore_face name=Neutral`の後に表情が描かれた（`face_drawn`の確認は件ごとには取っていない）。
+- `mem_probe`（約10秒ごと。26行。起動から約10.2秒〜260.2秒）：
+
+| 区間（uptime） | `free_heap` | `min_free_heap` | `main_stack_hwm` |
+|---|---:|---:|---:|
+| 10.2 s | 277776 | 277128 | 5036 |
+| 20.2〜120.2 s（Pi linkの確立の前） | 277716 | 277068 | 5036 |
+| 130.2〜260.2 s（Pi linkの確立と7件の`show_text`の後） | 277660 | 275116 | 4444 |
+
+  単位はbyte（`main_stack_hwm`は、main taskのstackの残りの最小値）。`min_free_heap`と`main_stack_hwm`が下がったのは、約120.2秒の行と約130.2秒の行の間（Pi linkの確立、`set_expression`、最初の`show_text`が約121.7〜122.3秒に入った区間）だけで、その後の6件の`show_text`の間は変わらなかった。**使った文は`deskcatd`の固定文（10字と13字）だけである。**
+- `panic`・`task_wdt`・`brownout`・`Guru`の行は0。healthの最後の行：`overrun_ticks=0 snapshot_errors=0 pi_uart_rx_buffer_full=0 pi_uart_rx_fifo_overflow=0 max_read_gap_ms=61`。
+- ユーザーの申告（原文）：「さした／顔が出ている／発熱、異臭、乱れ、点滅が無い」「独り言の字形が読める」。
+
+**B（featureなしの製品build）**
+
+- 起動（`monitorB.log`、起動の約0〜37秒）：ELFのsha256の表示は`90846aa38...`、`reset_reason=power_on`、`display=face_enabled servo=not_driven pi_link=uart1`、`face_drawn name=Some(Neutral) uptime_ms=639`。`boot_terminated reason=RecoveryBudgetExhausted sid=13 id=1`が約37.1秒で出た。`mem_probe`の行は0（Bは持たない）。`panic`等は0。
+- 09:07:08〜09:08:13ごろのPi側：`show_textが受理された`が4件（id 5〜8）。`WARN: helloへのACKを受けたが…: sid=13 id=2`が1件。
+- **BのESP32のログは、この`deskcatd`の実行の間は取れていない**（取得が09:05:03で終わっていた。下のFaults）。したがって、Bの`text_show`・`text_drawn`・`text_expired_restore_face`のログは無い。
+- **Bの表示（日本語の独り言、表情）：ユーザーの申告**（PM（実機）経由。原文、2026-10-22）：「だから！Bも『顔が出ている』『字形が読める』だったといっただろうが！」（原文は「読める」）。どの件を見たかの個別の記録は無い。Bの間の発熱・異臭・乱れ・点滅の有無は、この申告に含まれていない（Aの間の申告は上のとおり「無い」）。作業セッションは、Bの間にLCDを見る問いを2回出した（橙・黄を挿す指示と同じmessage、`deskcatd`の起動の後の単独のmessage）。PM（実機）は、その問いがユーザーに伝わらなかったと伝えたが、後でユーザーは上の申告をした。**このユーザーの申告は、ESP32のログの裏付けが無い。**
+
+### 承認と、満たしていない条件
+
+- 承認：[#23のcomment 6336377068](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/23#issuecomment-6336377068)。満たさない条件7つの原文は同commentにある。この窓で満たしていない条件：(1) `power-budget.md`の`DISP-01`追加接続の手順の条件(2)（`bringup-display-13`付きbuild）。(2) `firmware/esp32/README.md`の通電表（製品buildは「不可」、Aの構成は表に無い）。(3) `gpio-assignment.md`の信号線の条件3（この窓は挙げられた試験に入らない）。(4) 条件(1)の無給電の確認の項目2〜4（行ったのは項目1だけ）。(5) 条件(5)（module電源pinの独立性、pull-upの実効抵抗）。(6) LCDの線の状態（ユーザーの申告だけ）。(7) 条件(3)(a)のLEDの2枝（挿さっていない、というユーザーの申告だけ）。
+- 承認した起動の回数（最大4回）の内で、確認できた起動は2回。時間（Aの最初の起動から20分＝09:08:15まで）は超えた（下のFaults）。
+
+### LCDの線の状態の記録の食い違い
+
+- `EXP-033`の`Wiring revision`は、「`DISP-01`のVCCと信号線をESP32側につながない状態にしたことだけ（ユーザーの申告「済んだ」）」と書き、`Procedure`は「ユーザーがLCDのVCCと信号線を切り離す」と書く。#15の承認comment（[6231364839](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15#issuecomment-6231364839)）にも「LCD は VCC と信号線を ESP32 から切り離す。」とある（原文を読んで確かめた）。
+- **今のユーザーの申告では、外したのは`VCC`だけで、信号線と`GND`は外していない。**
+- **2026-10-17の#15の窓の指示（「LCDのVCCと信号線をESP32から切り離す」）は、線ごとの表も、確認の方法も無い、曖昧な文面だった。その結果、ユーザーはVCCだけを外し、信号線とGNDは外さなかった（ユーザーの申告）。`EXP-033`の「VCCと信号線を切り離した」は、この指示と、ユーザーの「済んだ」の申告だけを根拠にした記録で、現物は誰も確かめていなかった。**責任は、指示を出した側（PM（実機）と作業セッション）にある。
+- **訂正が要る点：**`EXP-033`の`Wiring revision`の「信号線をつながない状態にした」は、実際にはVCCだけだった（ユーザーの申告）。`EXP-033`の本文は記録なので書き換えない。訂正はこの記録で行う。
+- **その間の窓で使ったbuildがLCD側のpin（GPIO22・16・17・23・18・4・19）を駆動したか（`firmware/esp32/src/main.rs`の`run_display_bringup`の呼び出し条件の確認。各窓のcommit（`EXP-031`＝`01a9d8c`、`EXP-033`の土台＝`045aab4`、`EXP-034`＝`41fc159`、`EXP-036`＝`62d58d2`）で、同じ条件`any(bringup-display-13, face-21, deskcat_product_mode)`であることを`git show`で読んだ。`EXP-033`の未commitの差分は読み直していない。実機での電圧は測っていない）：**
+  - `EXP-031`・`EXP-036`（`env-sample-16`、`env-sample-16-slow`）、`EXP-033`（`accel-sample-15`）：`run_display_bringup`は`bringup-display-13`・`face-21`・製品経路のbuildだけが呼ぶ。この3つのbuildはどれも持たないので、LCD側のpinは渡されない（駆動しない）。
+  - `EXP-034`の終わり、`EXP-035`：ESP32は通常build（featureなし）だった。**製品経路は`run_display_bringup`を呼び、LCDを初期化してbacklightのpin（GPIO4）を駆動する。**`EXP-034`は終わりの通常buildの起動ログに`display=face_enabled`を記録している。`EXP-035`は段2bでユーザーがUSBを挿した（挿していた長さの記録は無い）。**LCDの信号線が挿さっていた場合に限り、LCDの`VCC`が外れた状態のLCDの入力へ、ESP32がこれらのpinを駆動したことになる**（信号線が挿さっていたかは、今回のユーザーの申告が根拠で、確認していない。`VCC`が外れていた期間の正確な範囲も、記録に無い）。その間のLCDの状態（発熱、故障の有無）は、記録が無く、不明。
+
+### Faults
+
+- **時間の上限を超えた。**承認の上限は、Aの最初の起動（08:48:15）から20分（09:08:15）。Bの`deskcatd`は09:08:13ごろまで走り、ESP32はその後もUSBから給電されたままだった。USBを抜いた時刻は記録していない（09:12:14に消えていることを確認した）。上限に近づいたときに、手順（Bの確認）を、上限の内に収める計画にしていなかった。
+- **BのESP32のログを取り損ねた。**`monitorB.log`の取得の長さを600秒にしたが、橙・黄を挿す操作が約12分後だったため、`deskcatd`の起動（09:07:08）の前の09:05:03に取得が終わっていた。取得の長さは、作業セッションの設計の不備である。
+- **Bの間にLCDを見る問いが、ユーザーに伝わったかが、窓の中では分からなかった。**問いは2回出した（上の結果）。答えは窓の中では受けず、PM（実機）経由で後から原文で受けた。
+- 満たしていない条件7つ（上の「承認と、満たしていない条件」）。
+- LCDの線の状態の食い違い（上の節）。窓の前の状態は、ユーザーの申告だけで、現物の確認は無かった。
+- **作業セッションが、ユーザーへ出した問い（LCDの9本を「前と同じ穴へ戻してください」、GPIO2・GPIO5が挿さっていないかの確認、Pi側の3本の位置の確認、窓の後にBの表示の再確認）は、記録から答えられる、またはユーザーがすでに答えた内容を含んでいた。**GPIO2・GPIO5とPi側の3本はPM（実機）の指摘で取り下げた。「前と同じ穴」は、行き先が示されていない曖昧な指示だった（表を後から出した）。Bの再確認は、ユーザーがすでにBの間の申告をしていたため、取り下げた（ユーザーの返答の原文は「どういうこと？」。承認は得ていない）。
+- 通電中の発熱・異臭・乱れ・点滅は、ユーザーの申告「無い」（起動直後から、Aの観察の間）。Bの間の申告は無い。電流・電圧・温度の測定は無い。
+- ESP32のログとPiのログの時刻の対応（2つの時計の差）は、測っていない。
+
+### この記録が主張しないこと
+
+- **RAMの最大使用量。**取れたのは、`deskcatd`の固定文（10字と13字）で動いたときの、`free_heap`・`min_free_heap`・main taskの`stack`残量の観測値だけである。最悪入力（textの884 byte、行の1024 byte、20字の受理）では測っていない。`PROTO-TBD-007`は未解決のままである。
+- 計算値（実測ではない）：バッファの大きさは、行が`1024` byte（Protocol §2）、`show_text`の`text`が`884` byte（暫定、同§5.4）、`TextLayout`が`20`字×`u16`＝`40` byte（`MAX_TEXT_CHARS`、`crates/deskcat-face`）、1 cellのRGB565展開bufferが`16×24×2＝768` byte（stack。`docs/fonts/k8x12-speech.md`）。これらが同時に使われるか、decode時のheapの確保の量は、見積もっていない。
+- main task以外のtaskのstack。`min_free_heap`は起動からの全体の最小値で、どの処理が下げたかは分からない。
+- `accept_to_draw_ms`の内訳（clearの帯、glyphごと、LCDへの転送）。最大文字数（20字）での描画時間。duration上限の確定。
+- Bでの`text_drawn`の値と、BのESP32のログ（取れていない）。Bの表示は、ユーザーの目視の申告だけで、ESP32のログの裏付けは無い。Piの受理のACK 4件は、BのESP32が表示を行ったことを示さない。
+- 文字の見え方の細部（どの文が出たか、字形の崩れの有無）。ユーザーの申告「読める」以上は記録していない。
+- 長時間の運転、電流、`3V3` railの電圧、温度、発熱の定量。
+- LCDの線（GND・信号線7本）が挿さっていたことの確認（ユーザーの申告だけ）、Pi側の3本の位置、GPIO2・GPIO5が挿さっていないこと（申告・記録の照合だけ）。
+
+### Conclusion
+
+A：`mem-probe-23`のbuildは、LCDをつないだESP32で動き、`show_text`を7件受理し、`text_drawn`の`accept_to_draw_ms`は10字で402〜406 ms、13字で431〜441 ms、`mem_probe`は最小の空きheap（`min_free_heap`）が277068→275116 byte、main taskのstack残量が5036→4444 byteと下がった（Pi linkの確立と最初の`show_text`の区間で）。B：Pi側で`show_text`の受理のACKを4件受けた。ユーザーの申告は「顔が出ている」「字形が読める」。BのESP32のログは取れていない。
+
+### Next safe step
+
+- 終わりの状態：ESP32のUSBは抜けている（PCから`/dev/ttyUSB*`が消えたことを09:12:14に確認）。ESP32のflashにはB（製品build）が入っている。次にUSBを挿すと、製品buildが走り、LCDのbacklightが点く（BOOTを押したままなら走らない）。ACは抜けたまま（ユーザーの申告）。Piは電源が入っていて、`deskcatd`は止まっている（unitは`inactive`・`enabled`）。橙・黄のESP32側は抜けている（ユーザーの申告）。LCDの9本、Pi側の3本、灰のGNDは挿さったまま（ユーザーの申告・記録の照合）。LEDの枝（GPIO2・GPIO5）の線は挿さっていない。サーボ系の線は外れたまま。
+- 次の窓（[#14](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/14)：touch用の5 pin）の前に、USBを挿さない。挿すときは、その窓の通電の承認の後に、BOOTを押したまま挿す。
+- 次に実機で通電する場合は、その回の構成を文で示し、ユーザーの承認を新たに取る。
+- 受け入れ条件の判定と、`PROTO-TBD-007`の扱いは、PM（実機）が行う。
+
+## EXP-038: `touch-sample-14`のbuildで、LCD module上のXPT2046（`TOUCH-01`）のraw値を、touch用5本を足した配線で観察した
+
+[#14](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/14)の実機の窓。touch用の5本（`T_CLK`／`T_CS`／`T_DIN`／`T_DO`／`T_IRQ`）を足し、`touch-sample-14`のbuildを1回書き込んで、idle（A・C）と操作（B）の間の`touch_raw`と`touch_window`を取った。人間の立ち会いのもとで1回取った。実行承認は[#14のcomment 6339548472](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/14#issuecomment-6339548472)（回答の原文「はい」。満たさない条件6つを含む）。**この記録は事実と未確認だけを書く。受け入れ条件の判定は書かない。**ESP32のログの原本は、MACを含みうるので、repositoryの外の証拠用directoryにある。
+
+| 項目 | 内容 |
+|---|---|
+| Test ID | `EXP-038` |
+| Date | 2026-10-22（UTC 12:29〜12:40。JST 21:29〜21:40）。時刻は下の「手順と時刻」 |
+| Operator | 線の挿し、導通確認（テスター）、BOOTボタン、USBの抜き挿し、画面を触る操作はユーザー。flashの読み出しと書き込み（`espflash`）、ESP32のresetとログの取得は作業セッション（AI） |
+| Hardware revision／Exact components | `MCU-01`（ESP32-DevKitC V4）、`DISP-01`／`TOUCH-01`（MSP2807。touch controllerは`XPT2046`）、`ACCEL-01`、`ENV-01`。`SBC-01`（Pi）は作業セッションが使っていない |
+| Wiring revision | 下の「配線の状態」。**`EXP-037`の終わりの状態に、touch用の5本を足した。** |
+| Power supply and current limit | ESP32はこの端末のUSBから給電。電流制限は設けていない。電流・`3V3` railの電圧・温度は測っていない。**AC（`M-12001`）は使っていない**（抜けたまま。ユーザーの申告は`EXP-035`の終わりと`EXP-037`のとおりで、この窓の中で訊き直していない）。Piの電源の状態は確認していない |
+| Firmware commit/profile | ESP32：develop `79f29ea5f0d659966eff1b5365a8425330196499`、debug、`--features touch-sample-14`。`git archive`をrepositoryの外へ展開してbuild（`.embuild`はmain checkoutのものを借りた。Version Recordは無い）。`cargo clippy --all-targets --locked --features touch-sample-14 -- -D warnings`と`cargo build --locked --features touch-sample-14`が成功し、`Cargo.lock`は変わらなかった（sha256 `5c3fbc5fcee9d06a6d0321e949052b1fbf184a4820b51d80313f11b6518bee09`）。ELFのsha256は`319eb679368be649669d0a41e9e6b32e149c92a22f4898a20b5468535f9dea39`。書き込みの直前に`sha256sum -c`で承認の値と照合した。書き込みはespflash 4.5.0（`--after no-reset`）。前のimageが走ったかは確認していない（ユーザーの申告は、BOOTを押したままUSBを挿し、挿した直後に離した。`board-info`は`Staying in bootloader`を示したが、espflashは接続時にbootloaderへ入れるため、USBを挿してから`board-info`までの間に前のimageが走ったかは区別できない。ESP32のlogの取得は12:30:45からである）。書き込み前のflashのapp descriptorの確認は、この窓では行っていない |
+| Configuration | `touch.rs`の値のまま（SPI Mode 0、`SPI_CLOCK_HZ`＝1 MHz、poll間隔20 ms、窓250件）。`LCD-CS`（GPIO22）はHighに固定され、LCDは初期化されない（backlightのGPIO4は駆動されない）。ESP32のUART0のログは`pyserial`で取得し、起動は`RTS`で1回だけresetした（`DTR`は常にFalse） |
+| Measurement equipment | テスター`DT830B`（導通確認と、LCDの`VCC`–`GND`間の抵抗。2000 Ωレンジ）。ESP32のUART0のログ。電流・電圧・温度の計器は使っていない |
+| Procedure | 下の「手順と時刻」 |
+| Expected result | `touch_sample_started`が出て、`touch_raw`と`touch_window`が出る。idleでは`irq_low`が0、接触している間は`irq_low`が1になる（`sensor-datasheet-notes.md`の`Touch controller`節の導出。実機では未確認だった） |
+| Measured result | 下記 |
+| Faults | 下記 |
+| Conclusion | 下記 |
+
+### 配線の状態
+
+この節の線の状態は、すべて記録とユーザーの申告に基づく。作業セッションとPM（実機）は現物を見ていない。この窓でユーザーが何を触ったかは訊いていない（5本を挿す、導通、`VCC`–`GND`、USB、BOOT、画面の操作を除く）。
+
+- **窓の前：**`EXP-037`の終わりの状態（USBとACは抜けている。サーボ系の線は`EXP-035`の終わりに外した状態。LCDの9本は挿さっている。LEDの枝（GPIO2・GPIO5）の線はESP32側を抜いたまま。UARTの橙・黄のESP32側は抜けたまま。Pi側3本と灰のGNDは挿さったまま）。いずれも記録とユーザーの申告に基づき、**現物は作業セッションが見ていない。**ESP32のflashは製品build（B）だった（`EXP-037`の記録）。
+- **足した5本（ユーザーの申告）：**通電の前（UTC 11:52:37）の返事は、原文「紫、青、緑、黄、灰の順でジャンパを刺しました。」で、**穴の指定は含まない**。**穴の確認の返事「そのとおり」は、窓の後（12:41:41）である**（作業セッションの問い「5本は、指示した穴どおりに挿しましたか？」への答え）。LCD moduleのpinの並び順（10〜14番）で、紫＝`T_CLK`（10番、列29の溝の下側＝`LCD-SCLK`と同じ導体、穴f29）、青＝`T_CS`（11番、列22の溝の上側＝`TOUCH-CS`（GPIO21）と同じ導体、穴b22）、緑＝`T_DIN`（12番、列30の溝の下側＝`LCD-MOSI`と同じ導体、穴h30）、黄＝`T_DO`（13番、列29の溝の上側＝`LCD-MISO`と同じ導体、穴a29）、灰＝`T_IRQ`（14番、ESP32の「34」のpinへ直接）。**穴は作業セッションが`hardware/breadboard/layout.svg`の記録から選んで指示した穴で、ユーザーはその穴どおりに挿したと、窓の後に答えた。通電の前に確かめたのは導通だけで、ユーザーの目視による穴の確認は、通電の前には無い。**どの線も、穴に挿した後の目視の確認は作業セッションに無い。
+- **導通確認（ユーザーの申告。原文「全部〇」）：**つながるはずの5組（module側の10番–ESP32の「18」、11番–「21」、12番–「23」、13番–「19」、14番–「34」）と、つながらないはずの4組（10番–12番、10番–13番、12番–13番、11番–LCDの`CS`）。**当てた場所（moduleの裏のはんだ付けの部分、ブレッドボードの空き穴）は作業セッションが指示したが、ユーザーがどこに当てたかの報告と、各組の読みの数値は無い。**判定の基準は、プローブ同士を触れ合わせた値（導通側）と、離したときの「1」だけの表示（開放側）とした。
+- **`VCC`–`GND`（ユーザーの申告。通電の前）：1212 Ω（2000 Ωレンジ）。**`EXP-037`の1214 Ω、`EXP-016`の再測定の1212 Ωと合う。数秒間の変化の報告は無い。
+- **LCDの既存の9本：**表（色、行き先、図の穴）を示して、違う線があれば答えるよう求めた。**返事は「全部〇」（導通の項目への答え）で、9本について個別の答えは無かった。**違う線の申告は無い。
+
+### 手順と時刻（UTC）
+
+- 配線の前に、`origin/develop`が`79f29ea`のままであることと、ELFのsha256を確認した。`/dev/ttyUSB*`と`/dev/ttyACM*`が無いことを確認した。
+- 約12:29：ユーザーがUSBを挿した（`/dev/ttyUSB0`の作成時刻が12:29、JST 21:29）。**ユーザーはBOOTを押したままテキストを入力できず、挿した直後にBOOTを離した（ユーザーの申告）。**12:29:38〜12:29:45：`espflash board-info --after no-reset`で`Staying in bootloader`を確認した。
+- 12:29:49：`sha256sum -c`で一致。12:30:40：書き込み完了（`Flashing has completed!`、`App/part. size: 904,256/4,128,768 bytes`）。
+- **12:30:45：log取得を始め、`RTS`で1回だけreset。logに残った起動の1回目。**ログの先頭は`rst:0x1 (POWERON_RESET)`。以降、log上の時刻（取得開始からの秒）を「log t」と書く。
+- 約12:31:00〜12:32:03（log t≒15〜78 s）：**A（idle）。**ユーザーへ「60秒、画面に触らず、机を叩かない」と指示した。12:32:03に「A終わり」と伝えた。
+- 12:32:03以降：**B（操作）。**ユーザーへ、画面を上向き、14 pinのheaderを右の辺にして、五点（中央、左上、右上、左下、右下の順に押して5秒、離して3秒）、横5回、縦5回、タップ20回、を指示した。ユーザーの返事は「大変だった。終わった。」（12:36:07）。**B1〜B3が表のとおりの回数でできたかは、訊いていない。**B4は、別の返事で「B4は20回やった」（申告）。
+- 12:36:12〜12:38:18：**C（idle）。**「120秒、触らない」と指示し、12:38:18に終了を確認した。
+- 12:38:24：log取得を止めた（最後の行はlog t＝456.747 s、`touch_raw n=22701`）。
+- 12:40:02：`/dev/ttyUSB*`と`/dev/ttyACM*`が無いことを確認した（ユーザーの申告「抜いた」の後）。USBを挿してから約10分半（挿した時刻は約12:29:30で、秒までは記録していない。承認の上限15分の内）。
+
+### 結果
+
+- 起動のlog（取得を始めた12:30:45以降。それより前の起動の有無は、記録の外である）：`peripherals=taken display=not_driven servo=not_driven i2c=id_read_attempt pi_link=uart1 adc=not_driven touch=raw_sample`、`touch_sample_started spi_clock_hz=1000000 poll_interval_ms=20 window=250`。logに残った起動は1回（`rst:`の行は1本）。
+- `panic`・`brownout`・`task_wdt`・`touch_fault`・`touch_sample_stopped`は0件。ERRORレベルの行は0件。WARNは2件：`i2c: This driver is an old driver, please migrate your application code to adapt driver/i2c_master.h`（起動時）と、log t＝36.894 sに`boot_terminated reason=RecoveryBudgetExhausted sid=15 id=1`。原因は調べていない。
+- `touch_window`は90窓（log t＝5.818〜452.736 s）。最後の窓：`irq_low_total=201`、`all_zero_total=0`、`all_ones_total=0`、`spi_errors_total=0`。
+- `touch_raw`は1102行（`irq_low=0`が901行、`irq_low=1`が201行）。
+- **idle（Aの12窓と、Cの25窓。時刻は上の「手順と時刻」のlog tで、窓の最後のsampleの時刻がAは20.9〜76.2 s、Cは332.2〜452.7 s。`irq_low_total`の増分は両方とも0）：**
+  - A（w4〜w15）：x＝0〜486、y＝4095（全窓）、z1＝0〜68、z2＝3909〜4095（`touch_window`の最小・最大の全体）。
+  - C（w66〜w90）：x＝0〜515、y＝4095（全窓）、z1＝0〜69、z2＝3895〜4095。
+  - idleの`touch_raw`は例えば`x=0 y=4095 z1=1 z2=4079`。
+- **Bの間（log t≒78〜327 s）の窓：**`irq_low_total`が増えなかった窓は44窓（w16〜w65のうち）で、x＝0〜499、y＝4095（全窓）、z1＝0〜66、z2＝3895〜4095。**`irq_low_total`が増えた窓は6窓（w42、w43、w48、w55、w57、w58。窓の最後のsampleのlog tが211.7〜292.1 s）**で、x＝0〜3653、y＝435〜4095、z1＝0〜1275、z2＝2537〜4095、増分の合計は201。
+- **`irq_low=1`のsampleは201件で、連続する塊（sample番号の間隔が3以下）は9個**（log tは塊の最初のsample）：
+
+| 塊 | log t（s） | sample数 | x | y | z1 |
+|---|---|---|---|---|---|
+| 1 | 209.5 | 167 | 3367〜3653 | 3655〜3704 | 674〜1275 |
+| 2 | 238.2 | 1 | 0 | 4095 | 2 |
+| 3 | 238.4 | 7 | 2039〜2373 | 1826〜2489 | 328〜819 |
+| 4 | 238.8 | 2 | 2519〜2521 | 694〜737 | 424〜652 |
+| 5 | 239.0 | 2 | 2479〜2482 | 435 | 475〜517 |
+| 6 | 275.3 | 5 | 651〜1163 | 1919〜1942 | 227〜299 |
+| 7 | 284.3 | 3 | 2302〜2399 | 2023〜2033 | 218〜270 |
+| 8 | 285.9 | 9 | 2235〜2443 | 1919〜2186 | 213〜586 |
+| 9 | 288.9 | 5 | 2175〜2431 | 1935〜2031 | 316〜596 |
+
+  最初の塊は167 sample（poll間隔20 msなら約3.3秒）。`irq_low_total`は、最初の塊（log t＝209.5 s）より前の約209秒間は0のまま、最後の塊（最後の`irq_low=1`のsampleはlog t＝289.1 s）の後も最後の窓（452.736 s）まで201のままだった。**Bの指示（log t≒78 s）から最初の塊まで約131秒、最後の塊（289.1 s）からユーザーの返事「終わった」（12:36:07、log t≒322 s）まで約33秒。**
+- **操作の件数と塊の数：**ユーザーが指示を受けた操作は35回（五点5、横5、縦5、タップ20）。ユーザーの申告はB4＝20回で、B1〜B3の回数は訊いていない（申告であり、真値ではない）。log上の塊は9個、`irq_low=1`のsampleは201件。**塊と操作の個々の対応づけは、時刻の裏付けが無いので行っていない。操作の時刻の記録は無い。**
+- **この差の原因は調べていない。**
+- LCD：touchのbuildはLCDを初期化せず、画面の表示は確認していない。backlightの状態はユーザーに訊いていない。
+- 発熱・異臭・異音：ユーザーから、停止を求める申告は無かった。個別に「無い」と訊いた記録も無い。
+
+### 承認と、満たしていない条件
+
+- 承認：[#14のcomment 6339548472](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/14#issuecomment-6339548472)。満たさない条件6つの原文は同commentにある：(1) `power-budget.md`の`DISP-01`追加接続の手順の条件(1)項目2（touch 5本は未配線であること。配線を足す窓では成り立たないため、読み替えた）、(2) 条件(2)（`bringup-display-13`付きbuild）と`firmware/esp32/README.md`の通電表の`touch-sample-14`（「不可」）、(3) 条件(3)（XPT2046の電流が`HW-TBD-024`の計算に入っているかは未確認）、(4) 条件(5)（module電源pinの独立性）、(5) LCDの線の状態とLEDの枝（ユーザーの申告だけ）、(6) `T_DO`と`LCD-MISO`が同じ線であること（ILI9341の`SDO`が`LCD-CS`のHighの間に高インピーダンスになることは実機で未確認）。
+- **`power-budget.md`の条件(1)〜(7)と、`gpio-assignment.md`の`信号線をつないでよい条件`に対する、この窓の状態（承認の問いの6つに入れていなかったものを含む）：**
+  - 条件(1)：`gpio-assignment.md`の項目1は`VCC`–`GND`を測った（1212 Ω。数秒間の読みの変化の報告は無い）。項目2は表を示したが、9本の個別の答えは無い。**項目3（逆極性・電圧違いのpin）と項目4（給電経路の重複）は、行った記録が無い。**
+  - 条件(2)：満たさない（承認の6つの(2)）。条件(5)：満たさない（同(4)）。
+  - 条件(3)：(a) Piとの信号線（橙・黄）のESP32側は使っていない。灰のGND線は、窓の前の記録では挿さったままで、Piの電源の状態は確認していない。(b) ESP32は端末のUSBから給電した。(c) 周囲温度の記録は無い。(d) `touch-sample-14`がWi-Fi・Bluetoothを使わないことは確認していない。XPT2046の電流は承認の6つの(3)のとおり未確認。
+  - 条件(4)：記録の照合だけで、現物は見ていない。条件(6)：実施者が`HW-TBD-025`(b)を把握していることの確認は、承認の問いの本文に入れていなかった。条件(7)：承認は`touch-sample-14`の書き込みと通電に対するもので、`run_display_bringup`の承認ではない。
+  - `信号線をつないでよい条件`：UARTの信号線を使った通信は行っていない。灰のGND線が記録上挿さったままだったため、条件5（別給電、GND共通）と条件6（通電前のGND線の確認）の確認は行っていない。`HW-TBD-036`が扱うPC–Pi間の電流経路は確認していない。
+  - `EXP-037`は、同じ系統の窓で項目2〜4を未達として挙げていた。
+- 承認した起動の回数（最大3回）の内で、logに残った起動は1回（12:30:45以降。USBを挿してから取得を始めるまでの間の起動の有無は確認していない）。時間（USBを挿してから15分）の内で、約10分半。
+
+### Faults
+
+**指示を出した側（作業セッションとPM（実機））の欠陥を、事実として書く。**
+
+- **最初の配線の指示（touch 5本の表）が、ブレッドボード側の挿す先を「`SCK`の線と同じ導体」のように導体の名前で書き、穴の位置は「図から読んだ空き。参考」として並べただけだった。**ユーザーが挿す先が示されていないことを訊いた後、穴（f29・b22・h30・a29）を示した。**表の並びも、LCD moduleのpinの並び順（10〜14番）ではなく、T1〜T5の作業番号の順だった。**ユーザーが並び順に書くよう求め、10〜14番の順に書き直した。
+- **LCDの9本の見比べ表が、最初の指示の文面に入っていなかった。**文面は「9本の表と違うものがあれば、その線だけ」と書きながら、表を載せていなかった。PM（実機）の指摘で、追加の文面として表を出した。
+- **導通確認の測り方の最初の指示が、ユーザーの現物のテスターの型（`DT830B`、`hardware-bom.md`の`MEAS-03`）を調べずに書かれていた。**最初の文面は「導通（ブザー）に合わせる」と書いた。ユーザーが「ブザーのレンジはどれか、私のテスターではどれか」と訊き、作業セッションは`MEAS-03`と`power-budget.md`の「通電前の配線確認手順」（抵抗レンジで読む先例）を読み直して、2000 Ωレンジに直した。**次に、ユーザーが「ピンはジャンパで覆われていて当てられない」と指摘した。**最初の文面は、プローブを当てる場所を、module側もESP32側も書いていなかった。その後、module裏のはんだ付けの部分とブレッドボードの空き穴を指示した。
+- **ユーザーがBOOTを押したままUSBを挿す指示は、ユーザーがBOOTを押したままテキストを入力できないことを考えていなかった。**ユーザーは、挿した直後にBOOTを離したと申告した。書き込みは成功した（`board-info`が`Staying in bootloader`を示し、ELFの照合と書き込み完了を確認した）。
+- **作業セッションの文「5本の穴は、指示した穴どおりに挿した扱いでよいか、PM（実機）に確かめます。」（問いの形ではない、報告の文）に対して、ユーザーが「はい」と返事した（12:41:00）。**この「はい」は、穴の申告として扱わなかった。作業セッションは改めて「5本は、指示した穴どおりに挿しましたか？」と訊き、返事は「そのとおり」（12:41:41）だった。
+- **最初の配線の指示の文面が長く、ユーザーから、最終的に何をすればよいかを短く言うよう求められた**（その後、短い手順に書き直した）。
+- 満たしていない条件6つと、承認の問いに入れていなかった行っていない確認（上の「承認と、満たしていない条件」）。
+- 導通確認の読みの数値、9本の個別の答え、操作の時刻は、ユーザーの申告・記録に無い。
+- ESP32のログとPiのログの時刻の対応は、Piのログを取っていないので測っていない。
+
+### この記録が主張しないこと
+
+- 受け入れ条件の判定。
+- 24 clockの転送のbit位置（`deskcat_touch::decode_12bit`）が妥当であること。操作の値（例えば塊1のx 3367〜3653、y 3655〜3704）の範囲は上のとおりで、四隅や中央との対応づけをしていない。
+- 塊の数が操作の件数より少ない原因。
+- LCDと同じbusで動くこと。LCDの`SDO`（ILI9341）が`LCD-CS`のHighの間に高インピーダンスになること。
+- 状態機械、しきい値、calibration。この窓の`touch-sample-14`のbuildは状態機械を配線していない。
+- `T_IRQ`のlevelとX/Y/Zの値の関係の一般化。この窓のsample 201件に限る観測である。
+- 操作ごとの時刻（五点のどの塊がどの点か）。
+- 電流・電圧・温度。
+
+### Conclusion
+
+`touch-sample-14`のbuildは、touch用5本を足した配線で起動し、SPIの失敗なしに`touch_raw`と`touch_window`を出した。idleでは`irq_low`が増えず、`irq_low=1`のsampleは201件、連続する塊は9個だった。ユーザーの操作の件数（35回の指示、B4は20回の申告）と塊の数の差の原因は調べていない。
+
+### Next safe step
+
+- 終わりの状態：ESP32のUSBは抜けている（12:40:02に`/dev/ttyUSB*`が無いことを確認）。ESP32のflashには`touch-sample-14`のbuildが入っている。次にUSBを挿すと、このbuildが走る（LCDは初期化されない）。ACは抜けたまま（ユーザーの申告）。touch用の5本は、ユーザーに外さないよう伝えた。
+- 次の窓の前に、配線の状態を記録の照合として確かめる。
+- 次に実機で通電する場合は、その回の構成を文で示し、ユーザーの承認を新たに取る。
+- 受け入れ条件の判定は、PM（実機）が行う。
+
 ## Revision履歴
 
 | 日付 | Revision | 変更 | 根拠 |
@@ -2617,3 +3790,15 @@ Piの起動で`deskcatd`が自動で始まった。ESP32側の端を外した間
 | 2026-10-12 | 30 | [#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)。**`EXP-024`を追加した。**deskcatdのsystemd unitをPiへ導入し、Piの起動での自動の開始、ESP32側の端を外した間の再起動と約4分での`failed`、`reset-failed`と`restart`での戻し（`hello`へのACKは届いたが、`deskcatd`は未承認のsessionとしてWARNを出した。`active`はsessionの確立を示さない）、ESP32のfirmwareの特定（flashのpartition tableとappの先頭0x100 byteを読むだけ）を記録した。承認の問いの「約150秒」と実測の差、journalの時刻の飛び、条件1・5・6の記録が申告だけであること、自動でつながることは確かめていないことをFaultsと「主張しないこと」に書いた | [#446のcomment 6123783146](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446#issuecomment-6123783146)、[6123004894](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446#issuecomment-6123004894)、[6123867297](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446#issuecomment-6123867297) |
 | 2026-10-12 | 31 | [#514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)。**`EXP-025`を追加した。**追加LED（白＝GPIO2、赤＝GPIO5）の点灯試験（赤だけ・白だけ・両方）の記録である。各comment（出所）にある事実だけを書いた。LED電流・`3V3` railの電圧・`U2`の温度は計測していない | [#514のコメント](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514#issuecomment-6125555742) |
 | 2026-10-13 | 32 | [#23](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/23)。**`EXP-026`を追加した。**Piの`deskcatd`の独り言（`show_text`）をLCDへ出し、受理と拒否のACKと、表示期限の後の表情の戻りを確かめた記録である。製品buildではなく`tap-21,face-21,bringup-display-13`で行った。描画時間とRAMの最大使用量は測っていない | [#23のコメント](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/23#issuecomment-6145205989) |
+| 2026-10-17 | 33 | [#522](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/522)。**`EXP-027`を追加した。**Pi Zero Wで`deskcatd`（`ureq`＋`native-tls`）を直接build（`libssl-dev`無しではexit 101、有りではdevelop `6621423`が39分03秒でexit 0）、キーなしのHTTPS接続と証明書検証、systemd credentialの動作（`6621423`のunitは、キーのfileが無いと`status=243/CREDENTIALS`で起動しなかったこと。#603の`3a73475`のunitの複製の観察(g)を含む）、偽のESP32（PTY）を相手にした`deskcatd`の1800秒の常駐を観察した。ADR-0026の確認項目を満たしたとは書いていない。Wi-Fiの切断の件数と、作業中に対象を指定しない`reset-failed`を1回実行した操作を記録した | [#522](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/522) |
+| 2026-10-17 | 34 | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。**`EXP-028`を追加した。**SG90の初回のサーボ動作を、測定用build `bench-servo-test-17`（developの`e0e959f`）、ジャンパー線の接続、電源の経路のPTC直列、信号用の330 Ωで、2回試みた記録。1回目は、サーボは動いたが、書き込みの後にESP32がダウンロードモードに留まり、appが起動していなかった可能性が高い（確かめていない）。起動ログが無く、指令との対応は未確認。2回目は、サーボの電源を先に入れ、ESP32のリセットを解除して起動した約11秒後（uptime 10553 ms）に`servo_bench_test_move`が出て、ユーザーは「うごいた」と申告した（時刻・向き・角度・熱は申告に無い）。latchは2回目の動作のあとの再起動で効いた。サーボの線の並びはユーザーの決定（慣行）で、実測で確かめていない。#17の受け入れ条件（電流、transient、reset回数）は満たしていない。AC電源の確認なしにリセットした作業セッションの誤りを含む | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17) |
+| 2026-10-17 | 35 | [#11](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11)。**`EXP-029`を追加した。**PiのGPIO UART（`/dev/serial0`、115200）で`serial_link`を600秒走らせ、行の往復（21 frame）と、`boot`→ACK→`get_status`→`status`、`ping` 3件のACKの相関を観察した。信号線を少なくとも1分55秒抜いても`disconnects=0`で、切断は観測されなかった（GPIO UARTではdeviceのerrorまたはEOFによる切断検出が働かない見込み。根拠はコードの読み）。存在しないpathのopen失敗はPi上で見た（実portの切断ではない）。受け入れ条件3・4は実portで得られていない。サーボ系の2か所を外した状態で、`DISP-01`の`VCC`を戻して行った。非通電の確認の項目2〜4と条件6の数値は申告だけである | [#11](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11) |
+| 2026-10-18 | 36 | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。**`EXP-030`を追加した。**測定用build（develop `014d058`、GO17入り）で、サーボを接続しない状態（段1b。ユーザーの申告）と接続した状態（段1）のPWM、AC投入と動作時の5 Vと3.3 VをArduinoで記録した、段1・段1b・段2と再駆動2回の記録。段1が「サーボ未接続」でなかったこと（作業セッションの前提の誤り）、`GO17`をAIが送った形（手順書の`監視維持`と違う）、`GO17`の二重送信、動く前の軸の位置が不明で向き・角度は言えないこと、ESP32が応答しなくなった1回（原因未確認）を書いた。条件4は測っていない | [#17の各comment](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17) |
+| 2026-10-19 | 37 | [#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16)。**`EXP-031`を追加した。**BME280（`ENV-01`）の試験build（develop `01a9d8c`の`env-sample-16`）でraw値と変換値を3回の起動で観測し、`MEAS-04`の表示と並べた記録。確度は言えず、気圧のreference、timeout・disconnect・CRC・not-readyの分類は取れていない | [#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16) |
+| 2026-10-20 | 38 | [#11](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/11)・[#12](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/12)。**`EXP-032`を追加した。**Piの`serial_link`（develop `01a9d8c`）で実port（`/dev/serial0`、115200）を開き、信号線を外した間のlink probeによる`disconnects`の増加（11回）と再接続の待機（`100ms`〜`1.6s`）、`Stopped(ReconnectExhausted)`、ACKの相関で待機が`100ms`から戻ったこと、`play_motion`の拒否4経路（ESP32のlogと突き合わせ）を観察した。**受け入れ条件を満たしたとは書いていない。**「1回の喪失判定と回復」だけの観察は取れていない。log取得のためRTSの`reset`を1回使ったことを記録した | #11 comment 6272131988、#12 comment 6272140365 |
+| 2026-10-20 | 39 | [#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)。**`EXP-033`を追加した。**`accel-sample-15`（ADXL345を±2 g・100 Hz・FIFO Streamで連続測定する試験build）の初回通電。Device ID `0xe5`、6窓×500件でfault・overrun 0件、各軸の標本標準偏差は約0.8 LSB、3軸の平均ベクトルの大きさは約259.8 LSB。基板は水平ではなく姿勢を記録していないため、offsetは出せていない。`power-budget.md`の単体bring-upの手順の条件(2)を満たさないまま、ユーザーが1件の試験として承認した。無給電の確認はユーザーが不要とし、未実施。Rev. Gの手元の版は開いておらず、Rev. Eで示した | ユーザーの承認と現物作業、#15のセッションによる書き込みとlogの取得（いずれも2026-10-17） |
+| 2026-10-20 | 40 | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。**`EXP-034`を追加した。**90度指令の測定用build（develop `41fc159`の`bench-servo-90-17`）で、shuntをサーボのGNDの戻りに入れた配線（ユーザーの申告。導通は未確認）で、AC投入時と動作時のArduinoの読みと、ESP32のreset回数を記録した。記録Bは欠番1件を含む（位置は動作の約28秒前）。計算値が`M-12001`の定格出力を超え、電流の値としては読めない。判定は書いていない | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17) |
+| 2026-10-22 | 41 | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。**`EXP-035`を追加した。**サーボを外し、`EXP-034`の戻りの経路へ330 Ωの並列の負荷（10本・20本）をつないで、A0の読みを記録した。電流を約2倍にしても、A0は約1.64倍にしかならなかった。段2bで、約0.27 AのときのA0の電圧の約13 %がシャント本体、約82 %がシャントの2本のリードの接点だった。サーボの電流は主張していない。窓の終わりにサーボ系の線（ESP32のGND、Arduinoの2本、緑の線、負荷ボードの赤・茶の先）を外した。配線の変更（サーボのplugと黄の線を外し、別のブレッドボードに負荷を作った）は、測定のための一時的な配線のため、`hardware/breadboard/layout.svg`（本来の配線を描く図）には反映していない | [#17のcomment 6294677352](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6294677352)、[#17のcomment 6333259715](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6333259715)（段2b）、`EXP-035`の記録 |
+| 2026-10-22 | 42 | [#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16)。**`EXP-036`を追加した。**`env-sample-16`（×1）と`env-sample-16-slow`（×16）を実機で通電し、`env_conversion`の所要時間（9 ms、99 ms）と、その間のheartbeatの間隔（1000 ms）を、各3回、記録した。無給電の確認の項目5・6・7は、ユーザーの決定で行わなかった（記録の照合のみ）。受け入れ条件5の判定は書いていない。配線は変えていない | [#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16)、`EXP-036`の記録 |
+| 2026-10-22 | 43 | [#23](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/23)。**`EXP-037`を追加した。**LCDをつないだESP32へ、`mem-probe-23`のbuild（A）と製品build（B）を書き込み、Piの`deskcatd`の独り言を受けた間の`accept_to_draw_ms`（10字で402〜406 ms、13字で431〜441 ms）と、Aの`mem_probe`を記録した。BのESP32のログは取れていない。**`EXP-033`の「信号線をつながない状態にした」は、実際にはVCCだけだった（ユーザーの申告）という訂正と、その指示の曖昧さを、事実として書いた。**承認した時間の上限を超えたこと、満たさない条件7つを記録した。受け入れ条件の判定は書いていない。LCDの線は、ユーザーの申告では窓の前から挿さっていた（現物は未確認） | [#23](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/23)、`EXP-037`の記録 |
+| 2026-10-22 | 44 | [#14](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/14)。**`EXP-038`を追加した。**touch用の5本（`T_CLK`／`T_CS`／`T_DIN`／`T_DO`／`T_IRQ`）を足した配線で、`touch-sample-14`のbuildを書き込み、idleと操作の間のraw値を取った。`irq_low=1`のsampleは201件、塊は9個で、ユーザーの操作の件数との差の原因は調べていない。**指示を出した側の欠陥（挿す先と並び順、9本の表、テスターの型を調べない測り方の指示、BOOT）を、事実としてFaultsへ書いた。**承認の出所と満たさない条件6つを記録した。 | [#14のcomment 6339548472](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/14#issuecomment-6339548472)、`EXP-038`の記録 |

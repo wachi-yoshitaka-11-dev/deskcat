@@ -18,9 +18,11 @@ NoNewPrivileges=yes
 LimitCORE=0
 UMask=0077
 # systemdがroot-only sourceからサービス専用のread-only credentialへコピーする。
-# 空のfallbackによりfile未設置でもserviceを起動できる（クラウドはoff）。
+# fileが無いときはSetCredential=の値が既定値になり、serviceは起動する（クラウドはoff）。
+# 既定値はキーではない印で、deskcatdはこの値をキーとして使わない（`apps/deskcatd/src/cloud_speech.rs`の`NO_KEY_MARKER`）。
+# 値を空にしない。systemd 257.9は空の値を"Invalid syntax"として捨て、fileが無いと243/CREDENTIALSで起動しない（#522）。
 LoadCredential=anthropic-api-key:/etc/deskcatd/anthropic-api-key
-SetCredential=anthropic-api-key:
+SetCredential=anthropic-api-key:deskcatd-no-api-key
 StateDirectory=deskcatd
 StateDirectoryMode=0700
 # port と baud は未確認の値なので、ここに書かない（baud: `PROTO-TBD-001`）。

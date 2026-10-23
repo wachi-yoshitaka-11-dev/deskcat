@@ -20,6 +20,7 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+import tempfile
 
 
 class Stopped(ValueError):
@@ -78,13 +79,67 @@ def free_limit(paths):
     return FREE_ROUNDS
 
 
-def state_path(root, work):
-    if not re.fullmatch(r"[1-9][0-9]*", work):
-        raise Stopped("work must be the existing Issue number (not a branch or diff ID)")
+def review_dir(root):
+    root = toplevel(root)
     common = Path(os.fsdecode(git(root, "rev-parse", "--git-common-dir")).strip())
     if not common.is_absolute():
         common = Path(root) / common
-    return common / "deskcat-review" / (work + ".json")
+    return common / "deskcat-review"
+
+
+def state_path(root, work):
+    if not isinstance(work, str) or not re.fullmatch(r"[1-9][0-9]*", work):
+        raise Stopped("work must be the existing Issue number (not a branch or diff ID)")
+    return review_dir(root) / (work + ".json")
+
+
+def selection_path(root):
+    """One current Issue/base per worktree; never use this file as round history."""
+    top = toplevel(root)
+    git_dir = Path(os.fsdecode(git(top, "rev-parse", "--git-dir")).strip())
+    if not git_dir.is_absolute():
+        git_dir = Path(top) / git_dir
+    return git_dir / "deskcat-review" / "selection.json"
+
+
+def selected(root):
+    instruction = "run python3 scripts/review_gate.py session select --work <Issue number> [--base <base>] [--scope <scope>] in this worktree"
+    try:
+        choice = read_json(selection_path(root))
+    except (OSError, ValueError) as exc:
+        raise Stopped(f"review selection unavailable or invalid; {instruction}") from exc
+    if (not isinstance(choice, dict) or type(choice.get("version")) is not int
+            or choice["version"] != 2 or not isinstance(choice.get("work"), str)
+            or not re.fullmatch(r"[1-9][0-9]*", choice["work"])
+            or not isinstance(choice.get("base"), str) or not choice["base"].strip()
+            or not isinstance(choice.get("scope"), str) or not choice["scope"].strip()):
+        raise Stopped(f"review selection invalid; {instruction}")
+    return choice
+
+
+def select(root, work, base, scope):
+    """Select an existing record for this worktree without modifying its history."""
+    if not isinstance(scope, str) or not scope.strip():
+        raise Stopped("scope must be non-empty")
+    try:
+        state = read_json(state_path(root, work))
+    except FileNotFoundError as exc:
+        raise Stopped(f"Issue #{work} has no review record; run session init or restore its saved record before select") from exc
+    validate(state, work)
+    fingerprint(root, base)  # Reject an unusable base before replacing the selection.
+    choice = {"version": 2, "work": work, "base": base, "scope": scope}
+    path = selection_path(root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, temporary = tempfile.mkstemp(prefix=path.name + ".", suffix=".tmp", dir=path.parent)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as output:
+            json.dump(choice, output, ensure_ascii=False)
+            output.write("\n")
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+    return choice
 
 
 def read_json(path):
@@ -366,7 +421,7 @@ def finish(root, work, base, result):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("init", "status", "begin", "finish", "approve", "end", "restart", "run", "check"))
+    parser.add_argument("action", choices=("init", "select", "status", "begin", "finish", "approve", "end", "restart", "run", "check"))
     parser.add_argument("--repository-root", default=".")
     parser.add_argument("--work", required=True)
     parser.add_argument("--base", default="origin/develop")
@@ -389,6 +444,9 @@ def main(argv=None):
                 if path.exists():
                     raise Stopped("existing work record cannot be reset or replaced; use status")
                 save(path, state)
+        elif args.action == "select":
+            print(json.dumps(select(root, work, args.base, args.scope), ensure_ascii=False))
+            return 0
         elif args.action == "begin":
             print(json.dumps(begin(root, work, args.base, args.scope), ensure_ascii=False))
             return 0

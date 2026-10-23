@@ -14,7 +14,10 @@ on:
       - "crates/deskcat-protocol/**"
       - "crates/deskcat-servo/**"
       - "crates/deskcat-face/**"
+      - "crates/deskcat-accel/**"
       - "crates/deskcat-tap/**"
+      - "crates/deskcat-env/**"
+      - "crates/deskcat-touch/**"
       - ".github/workflows/firmware.yml"
   push:
     branches:
@@ -27,7 +30,10 @@ on:
       - "crates/deskcat-protocol/**"
       - "crates/deskcat-servo/**"
       - "crates/deskcat-face/**"
+      - "crates/deskcat-accel/**"
       - "crates/deskcat-tap/**"
+      - "crates/deskcat-env/**"
+      - "crates/deskcat-touch/**"
       - ".github/workflows/firmware.yml"
   workflow_dispatch:
 
@@ -112,11 +118,14 @@ jobs:
         run: cargo build --locked
 
       # 製品buildのほか、既存の試験構成と#21のデモを確認する。
-      # bench-servo-test-17（#17の測定用build）もcompileだけを確かめる。flashはしない。
+      # #17の105度・90度の測定用buildもcompileだけを確かめる。flashはしない。
       - name: Build test modes
         run: |
           for features in \
             bringup-i2c-15-16 \
+            env-sample-16 \
+            env-sample-16-slow \
+            env-sample-16-repeat \
             bringup-display-13 \
             bringup-led-514 \
             bringup-display-13,bringup-led-514 \
@@ -124,7 +133,12 @@ jobs:
             face-21,bringup-display-13 \
             tap-21 \
             tap-21,face-21,bringup-display-13 \
-            bench-servo-test-17; do
+            mem-probe-23,face-21,tap-21 \
+            accel-sample-15 \
+            touch-sample-14 \
+            touch-lcd-14 \
+            bench-servo-test-17 \
+            bench-servo-90-17; do
             cargo clippy --all-targets --locked --features "$features" -- -D warnings
             cargo build --locked --features "$features"
           done

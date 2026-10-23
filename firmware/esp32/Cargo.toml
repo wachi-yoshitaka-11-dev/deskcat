@@ -22,6 +22,18 @@ default = []
 # ACCEL-01／ENV-01のID読み出しだけを試す。旧・featureなしbuildのI/Oを保つ。
 # LCD関連pinとADXL345の設定には触れない。Pi linkとhealthは維持する。
 bringup-i2c-15-16 = []
+# #16 の raw／補償値観測専用。BME280 の ID 一致後だけ forced 測定を書き込む。
+env-sample-16 = []
+# env-sample-16 の変換を遅い設定（温度・気圧・湿度とも oversampling ×16）にする。#16 の
+# 「遅い変換が上位 task を block しない」の実機観察用。env-sample-16 を含み、単独の試験 build として使う。
+env-sample-16-slow = ["env-sample-16"]
+# env-sample-16-slow の変換（×16）を、最初の変換の開始から30秒、130 ms 周期で繰り返す。#16 の「遅い変換が上位 task を
+# block しない」を、変換が heartbeat の時刻を何度もまたぐ状態で観察する。env-sample-16-slow を含み、
+# 単独の試験 build として使う。env-sample-16／-slow の動き（起動ごとに1回）は変えない。
+env-sample-16-repeat = ["env-sample-16-slow"]
+# #15 の ADXL345 連続測定専用。Device ID が 0xE5 のときだけ設定を書き、FIFO を読んで
+# raw 値と静止時の統計を UART0 に出す。他の試験 feature とは併用しない。
+accel-sample-15 = []
 # Issue #17の単発servo bench試験だけを有効にする。既定ではoffであり、
 # 通常のbuildはこのfeatureを持たず`crate::servo`を呼ばない。承認の状態は
 # `docs/hardware/servo-safety-limits.md`の`承認の状態`節を参照する（ここへ再掲しない。
@@ -31,6 +43,8 @@ bringup-i2c-15-16 = []
 # ときの、ただ1つの例外である（featureどうしの排他ではない。このbuildはPi linkを外すだけであり、
 # `bringup-display-13`と組み合わせることは禁じていない。ただしPi linkで`tapped`を送る`tap-21`とは併用できず、`main.rs`の`compile_error!`で止める）。
 bench-servo-test-17 = []
+# #17の90度指令用。元のbench構成を含み、指令角だけを規約上の中央にする。
+bench-servo-90-17 = ["bench-servo-test-17"]
 # Issue #13の`DISP-01`（MSP2807）bring-up（初期化、backlight点灯、単色fill、
 # 四隅pattern）の試験構成を選ぶ。このfeatureだけを指定したbuildは表情とtapを有効にしない。
 # 有効化してよい条件・手順は`main.rs`のmodule docの
@@ -51,6 +65,21 @@ face-21 = []
 # Issue #21のF1。ADXL345のtap検出を設定し、`INT_SOURCE`をI2Cで読んで、bootのACK後に`tapped`を送る（`src/main.rs`）。
 # 製品buildもこの経路を持つ。`face-21`・`bringup-display-13`とも組み合わせられる。
 tap-21 = []
+# Issue #23のPROTO-TBD-007（LCD layoutとmemory測定）用。health snapshotと同じ周期で、空きheap、
+# 起動からの最小の空きheap、main taskのstackのhigh water markを1行logへ出す（`src/mem_probe.rs`）。
+# **logを足すだけで、LCD・Pi link・tapの挙動は変えない。製品buildには入らない。**ESP-IDFの統計を読むAPIは
+# すべて`unsafe`であり、この featureのときだけ`main.rs`の`unsafe_code`が`deny`へ下がる（下の`unsafe_code`の注記）。
+# featureを1つでも指定すると製品経路のcfgが外れるため、製品buildと同じ構成で測るときは
+# `face-21`と`tap-21`を足す。`bench-servo-test-17`・`env-sample-16`・`accel-sample-15`・
+# `touch-sample-14`・`touch-lcd-14`・`bringup-i2c-15-16`・`bringup-led-514`とは併用できない（`main.rs`の`compile_error!`）。
+mem-probe-23 = []
+# Issue #14 の `TOUCH-01`（XPT2046）の raw 読み出し専用。SPI3（GPIO18/23/19）で X・Y・Z1・Z2 を読み、`TOUCH-IRQ`（GPIO34）の level とあわせて
+# UART0 に出す。LCD は初期化せず（`LCD-CS` を High に固定するだけ）、状態機械は配線しない（`src/touch.rs`）。単独の試験 build として使う。
+touch-sample-14 = []
+# Issue #14 の受け入れ条件「LCD 通信による許容できない data loss がない」の観察用。LCD を初期化して点灯し、表情を帯ごとに塗り続けながら、
+# 同じ SPI host（SPI3）で `TOUCH-01` の raw を読む（`src/touch_lcd.rs`）。LCD とタッチは `SpiDriver` を共有し、bus は転送ごとに取る。
+# 製品 build と `touch-sample-14` は bus を握り続ける今の型のまま。単独の試験 build として使う。
+touch-lcd-14 = []
 
 [profile.release]
 opt-level = "s"
@@ -70,8 +99,13 @@ deskcat-protocol = { path = "../../crates/deskcat-protocol" }
 deskcat-servo = { path = "../../crates/deskcat-servo" }
 # `set_expression`の3表情の図形と、受理の判定の順序（#21）。LCDもSPIも知らず、hostでtestできる。
 deskcat-face = { path = "../../crates/deskcat-face" }
+# `accel-sample-15`のADXL345連続測定の設定値・復号・統計（#15）。I2Cを知らず、hostでtestできる。
+deskcat-accel = { path = "../../crates/deskcat-accel" }
 # ADXL345のtap検出の設定値と`tapped`の送出条件（#21のF1）。I2Cを知らず、hostでtestできる。
 deskcat-tap = { path = "../../crates/deskcat-tap" }
+deskcat-env = { path = "../../crates/deskcat-env" }
+# XPT2046 の制御 byte と 3 byte 応答の復号（#14）。SPI を知らず、host で test できる。
+deskcat-touch = { path = "../../crates/deskcat-touch" }
 log = "0.4"
 # health snapshotを`deskcat-protocol`の`Status`と同じ形へserializeするために使う。
 # 同crateが既に依存しており、`firmware/esp32/Cargo.lock`にも推移的に入っている。
@@ -80,8 +114,10 @@ esp-idf-svc = { version = "0.52.1", features = ["critical-section", "embassy-tim
 # Remove `generic-queue-8` if you plan to use `embassy-time` WITH `embassy-executor`
 embassy-time = { version = "0.5", features = ["generic-queue-8"] }
 
-[lints.rust]
-unsafe_code = "forbid"
+# **`unsafe_code`の水準は`[lints.rust]`では持たない。**`src/main.rs`の先頭の`cfg_attr`が持つ。
+# featureなしのbuild（製品build）は`forbid(unsafe_code)`で、これまでと同じである。`mem-probe-23`を
+# 付けたbuildだけが`deny`へ下げ、`src/mem_probe.rs`の`unsafe`を許す（#23。理由は同fileのmodule doc）。
+# `forbid`は`allow`で局所的に下げられないため、manifestの`[lints.rust]`には置けない。
 
 [build-dependencies]
 embuild = "0.33"

@@ -24,8 +24,7 @@ pub const TRANSIENT_RETRY_LIMIT: u32 = 3;
 /// ACKが無いまま取り下げてから、同じ表情を新しい`id`で送り直してよい連続の回数。**暫定値。**
 ///
 /// 根拠は無い。「有限である」という性質だけを満たす。超えたら、欲しい表情が変わるまで送らない。
-/// 現行のfirmwareは`set_expression`にACKを返さない（`firmware/esp32/src/pi_link.rs`。処理を足すのは#21）ので、
-/// 上限が無いと、新しい`id`で送り続ける。
+/// ACKが失われた場合、上限が無いと新しい`id`で送り続ける。
 pub const SILENT_RETRY_LIMIT: u32 = 3;
 
 /// 応答待ちの`set_expression`。
