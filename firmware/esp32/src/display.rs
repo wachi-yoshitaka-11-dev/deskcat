@@ -10,7 +10,7 @@
 //! の`信号inventory`が正本である。ここでは`LCD-SCLK`(GPIO18)／`LCD-MOSI`(GPIO23)／
 //! `LCD-MISO`(GPIO19)／`LCD-CS`(GPIO22)／`LCD-DC`(GPIO17)／`LCD-RST`(GPIO16)の6本だけを
 //! 扱う。`TOUCH-CS`(GPIO21)は同一SPI busを共有するが、touch driverは別Issue
-//! （[#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)）の範囲であり、
+//! （[#14](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/14)）の範囲であり、
 //! このmoduleは触れない。`LCD-BL`(GPIO4)はbacklightの点灯／消灯だけを扱う
 //! （PWM調光は将来検討、`信号inventory`の同行）。
 //!
