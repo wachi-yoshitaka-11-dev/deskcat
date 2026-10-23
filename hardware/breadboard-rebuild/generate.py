@@ -8,7 +8,8 @@
 - 板の上に寝かせる抵抗・LED と硬いジャンパーは、縦か横の直線である。両端の間の穴は空いている
   （ほかの足の上を通らない）。互いに交差しない。
 - 論理接続が意図どおりである。穴の列（つながっている5〜6穴）と、ジャンパー・柔らかい線で
-  つながる範囲ごとに、ピン・板の外の端・抵抗とLEDの端が期待する信号名が1つにそろう。
+  つながる範囲ごとに、ピン・板の外の端・抵抗とLEDの端が期待する信号名が1つにそろう（混ざらない）。
+  逆に、同じ信号名の端はすべて1つの導体につながる（断線しない）。
 
 使い方: `python3 hardware/breadboard-rebuild/generate.py`（標準ライブラリだけを使う。ADR-0006）。
 `--check` を付けると、検査だけを行い、生成した内容が file と一致するかを確かめる。
@@ -222,7 +223,8 @@ OFFBOARD = [
      "サーボの試験の記録（#17）の状態に合わせる"),
 ]
 
-# 首を通る14本（LCD 側は MSP2807 の pin 番号。#34 の決定。胴側の端はオス、2026-10-23 のユーザーの回答）
+# 首を通る14本（LCD 側は MSP2807 の pin 番号。#34 の決定）。線は両端メス（enclosure-and-neck.md の仮筐体）。
+# 胴側は、細ピンヘッダ（PROTO-01）を1本ずつ下の穴に立てて受ける（VM 側の PM の決定、2026-10-23）。
 NECK = [
     (1, "VCC", "B2:a1", "3V3"), (2, "GND", "B2:a2", "GND"), (3, "CS", "B2:a3", "GPIO22"),
     (4, "RESET", "B2:a4", "GPIO16"), (5, "DC/RS", "B2:a5", "GPIO17"), (6, "SDI", "B2:a6", "GPIO23"),
@@ -244,6 +246,15 @@ MODULE_PINS = [
 # 2〜5列とする（写真の読み。挿すときに確かめる）。行は2列の間隔が記録にもメーカーの資料にも無く TBD。
 # 間隔が3〜6ピッチなら上段は上半分の e〜b 行に来て、上に空き穴が1つ以上残る。各ピンの列の空き穴へ線を挿す。
 ACCEL_UPPER = [("CS", "3V3"), ("Vs", "3V3"), ("GND", "GND"), ("VDD", "3V3")]
+# module の中でつながっている pin。ACCEL-01 の Vs と VDD は、2026-09-05 の非通電の導通測定で同じ net
+# （sensor-datasheet-notes.md の `module boardの値（秋月 M-06724）`）。
+# ESP32 の GND の3本（J2-14、J3-1、J3-7）は、公式回路図（gpio-assignment.md の `Board識別情報`）で同じ GND。
+# 現物の導通は測っていない。
+MODULE_INTERNAL = [
+    ("ACCEL:Vs", "ACCEL:VDD"),
+    (f"B1:{ESP_J2_ROW}{ESP_FIRST_COL + 13}", f"B1:{ESP_J3_ROW}{ESP_FIRST_COL}"),
+    (f"B1:{ESP_J2_ROW}{ESP_FIRST_COL + 13}", f"B1:{ESP_J3_ROW}{ESP_FIRST_COL + 6}"),
+]
 
 
 # ---------------------------------------------------------------- 検査
@@ -416,6 +427,8 @@ def run_checks():
         union(node(a), node(b))
     for _sid, a, b, _n, _s in SOFT:
         union(node(a), node(b))
+    for a, b in MODULE_INTERNAL:
+        union(node(a), node(b))
     # 期待（union の後に集める）
     labels = []
     for p in esp_pins():
@@ -432,8 +445,10 @@ def run_checks():
         labels.append((node(k), "GND", f"{did} カソード"))
     for hid, a, b, net in HARD:
         labels.append((node(a), net, hid))
+        labels.append((node(b), net, hid))
     for sid, a, b, net, _s in SOFT:
         labels.append((node(a), net, sid))
+        labels.append((node(b), net, sid))
     for xid, h, net, _far, _s in OFFBOARD:
         labels.append((node(h), net, xid))
     for n, _name, h, net in NECK:
@@ -444,6 +459,15 @@ def run_checks():
         nets = sorted({net for net, _ in items})
         if len(nets) != 1:
             ck.fail("1つの導体に別の信号が混ざる: " + "、".join(f"{w}={n}" for n, w in items))
+    # 断線: 同じ信号名の端は、すべて1つの導体につながっている（つながない pin は除く）
+    roots = {}
+    for n, net, why in labels:
+        if not net.startswith("使わない:"):
+            roots.setdefault(net, {}).setdefault(find(n), []).append(why)
+    for net, parts_of in roots.items():
+        if len(parts_of) > 1:
+            ck.fail(f"{net} が {len(parts_of)} つの導体に分かれている（断線）: "
+                    + " ／ ".join("、".join(w) for w in parts_of.values()))
     for rid, _v, _p, a, _na, b, _nb, _u in RESISTORS:
         if find(node(a)) == find(node(b)):
             ck.fail(f"{rid} の両端が同じ導体（短絡）")
@@ -585,7 +609,6 @@ def draw_esp(out):
         x, y = hole_xy(p["hole"])
         name = p["label"].split()[1]
         out.append(f'<circle cx="{x}" cy="{y}" r="4" fill="#caa53d"/>')
-        ty = y - 9 if p["hole"][1] == ESP_J3_ROW else y + 15
         if p["hole"][1] == ESP_J3_ROW:
             ty = y + 15
         else:
@@ -708,16 +731,16 @@ def build_svg():
     draw_modules(out)
     draw_parts(out)
     draw_soft(out)
-    y = 1010
+    y = 1070  # 板（B1・B3 の下端は y=1024）より下に置く
     out.append(f'<text x="60" y="{y}" font-size="15" font-weight="bold">凡例と注意</text>')
     for i, line in enumerate(NOTES):
         out.append(f'<text x="60" y="{y + 26 + i * 22}" font-size="12.5">{esc(line)}</text>')
-    y2 = 1010
+    y2 = 1070
     out.append(f'<text x="900" y="{y2}" font-size="15" font-weight="bold">板の外へ出る線</text>')
     for i, (xid, h, _net, far, _s) in enumerate(OFFBOARD):
         out.append(f'<text x="900" y="{y2 + 26 + i * 22}" font-size="12">{xid}: {esc(hole_name(parse_hole(h)))} → {esc(far.replace("`", ""))}</text>')
     yy = y2 + 26 + len(OFFBOARD) * 22 + 10
-    out.append(f'<text x="900" y="{yy}" font-size="12">首の14本: LCD 側は MSP2807 の pin 番号。胴側のオスの端を B2 の a・b 行へ。</text>')
+    out.append(f'<text x="900" y="{yy}" font-size="12">首の14本: LCD 側は MSP2807 の pin 番号。線は両端メス。B2 の a・b 行に立てた細ピンヘッダで受ける。</text>')
     out.append(f'<text x="900" y="{yy + 22}" font-size="12">SCK と T_CLK、SDI と T_DIN、SDO と T_DO は同じ列に挿して共有する（#34）。</text>')
     out.append("</svg>")
     return "\n".join(out) + "\n"
@@ -797,7 +820,9 @@ def build_table():
     for xid, h, net, far, state in OFFBOARD:
         L.append(f"| {xid} | {hole_name(parse_hole(h))} | {far} | {net_text(net)} | {state} |")
     L.append("")
-    L.append("## 首を通る LCD の14本（胴側のオスの端）")
+    L.append("## 首を通る LCD の14本（両端メスの線）")
+    L.append("")
+    L.append("細ピンヘッダ（`PROTO-01`）を1本ずつに切り離して下の穴に立て、線の胴側のメスの端をそこへ挿す。LCD 側のメスの端は module のピンに挿す。")
     L.append("")
     L.append("| LCD pin | 表記 | 挿す穴 | 信号 |")
     L.append("|---:|---|---|---|")
