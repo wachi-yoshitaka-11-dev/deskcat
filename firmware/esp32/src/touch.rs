@@ -31,8 +31,10 @@
 //! すべて UART0 の log。`touch_raw` は IRQ が low の sample と、idle の [`IDLE_LOG_EVERY`] 件に 1 件。
 //! `touch_window` は [`WINDOW_SAMPLES`] 件ごとに、各値の窓内の最小・最大と、起動からの累計（IRQ が low だった件数、全値が 0 または 0x0FFF の sample の件数、SPI の失敗）を出す
 //! （`DOUT` が読めていないとき（線が駆動されていない、つながっていない）に、期待どおりの idle と区別するため）。
-//! **この file の手順は実機で動かしていない。**ESP32 build と Clippy までである。24 clock の転送での bit 位置（`deskcat_touch::decode_12bit`）、
-//! `T_CS` が High の間 `T_DO` が線を駆動しないこと、`T_IRQ` の level と X/Y/Z の値の関係はすべて未確認である。
+//! **実機で動かしたのは `touch-sample-14` の `EXP-038` の版（develop `79f29ea`）だけである**（touch 用 5 本を足した配線で、SPI の失敗なしに
+//! `touch_raw` と `touch_window` が出た。`docs/hardware/experiment-log.md`）。**その後に足した `T_IRQ` の変化と `MARK` の log、bus の持ち方の置き換え（`crate::spi_port`）、`touch-lcd-14`（LCD と bus を共有する経路）は実機で動かしていない。**
+//! 24 clock の転送での bit 位置（`deskcat_touch::decode_12bit`）、`T_CS` が High の間 `T_DO` が線を駆動しないこと、LCD と同じ bus で動くことは未確認である。
+//! `T_IRQ` の level と X/Y/Z の値の関係は、`EXP-038` の観測（`irq_low=1` の 201 sample と idle の sample）に限り、一般化していない。
 //! `T_IRQ` は poll で読み、ISR は使わない（資料は、制御 byte を送る間は `PENIRQ` が無効になるため、割り込みを mask するよう勧める）。
 //!
 //! # 操作との突き合わせ（#14 条件 6）
