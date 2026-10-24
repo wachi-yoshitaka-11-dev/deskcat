@@ -3867,6 +3867,95 @@ A：`mem-probe-23`のbuildは、LCDをつないだESP32で動き、`show_text`�
 - 次に実機で通電する場合は、その回の構成を文で示し、ユーザーの承認を新たに取る。
 - 受け入れ条件の判定は、PM（実機）が行う。
 
+## EXP-040: 製品build（featureなし）を、入れ替えた`deskcatd`（develop `c9c3d25`）につないで、tapの`Surprised`までをPi側の受信時刻つきで取り、Piに届く経路で静止区間を2回取った
+
+[#22](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/22)の2回目の実機の窓。`EXP-039`で取れなかった、Pi側の`tapped_received`の受信時刻と、Piに届く経路での静止区間を、同じ配線・同じESP32 firmwareで取った。人間の立ち会いのもとで1回。実行承認は[#22のcomment 6382431151](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/22#issuecomment-6382431151)（回答の原文「はい」。満たさない条件を含む）。**この記録は事実と未確認だけを書く。受け入れ条件の判定は書かない。**ログの原本はrepositoryの外にある（MACを含みうる）。sha256は下の「ログ」。
+
+| 項目 | 内容 |
+|---|---|
+| Test ID | `EXP-040` |
+| Date | 2026-10-24（UTC 08:44〜08:58。JST 17:44〜17:58。USBを挿したのは08:50:10Z、抜いたのは08:57:32Zより前） |
+| Operator | 線の挿し抜き、USBの抜き挿し、`PSU-PI-A-02`の抜き挿し、ADXL345を叩く操作、LCDの目視はユーザー。ESP32のログ取得、sshでのPiの確認と`deskcatd`の起動・停止、合図の記録はこのセッション（AI） |
+| Hardware revision／Exact components | `EXP-039`と同じ（`SBC-01`、`MCU-01`、`DISP-01`、`ACCEL-01`、`ENV-01`）。Piの給電は`PSU-PI-A-02` |
+| Wiring revision | `EXP-039`の終わりの状態のまま（touch用の5本、LEDの枝、サーボ系は外れたまま）。通電前の目視（ユーザーの回答の原文「5点とも合っている」）：USB抜け、AC抜け、橙・黄のESP32側が抜け、touch・LED・サーボ系が外れている、灰のGND線は前回から抜き差ししていない、LCDの9本は前回のまま。**現物は作業セッションが見ていない。GND線の導通は測り直していない。** 橙（GPIO14）・黄（GPIO13）は、ESP32の起動と2分の目視の後にユーザーが挿し、窓の終わりにUSBより先に抜いた（原文「異常なし、挿した」「抜いた」） |
+| Power supply and current limit | `EXP-039`と同じ。ESP32はこの端末のUSB。Piは別電源。電流・電圧・温度は測っていない。Piの`throttled`は窓の前後で`0x0`（Pi Zero Wでは電圧の根拠にならない。`EXP-009`） |
+| Firmware commit/profile | ESP32：develop `4a1ad55`、featureなし（製品build）。**書き込みはしていない。**flashには`EXP-039`で書いた版が残る。起動logの`ELF file SHA256: afe1013ea...`（先頭9桁）が`EXP-039`のELF（`afe1013ea7427bfc3b79cd8fb6aa7d8d38b654ce00dd4de8b0a0da05f6f731ff`）と一致した。**全桁は照合できていない。** Pi：`/usr/local/bin/deskcatd`はdevelop `c9c3d25`のbuild、sha256 `5b6bb7cfb1e4ac9495d25c9ed475b584684bdf1ff5ac5553bd0a4675617a0b87`（Piの上で照合）。元の版（`38a47c15…`）はPiの`~/deskcatd-backup/`に退避済み。**このbuildは、窓の前にsystemdのunitとして再起動を繰り返したが、ESP32が無くhelloのACKが得られず`HelloRetryExhausted`で終了していた（journal）。ESP32とつないで動かしたのは、この窓が初めて。** |
+| Configuration | tapの設定は`EXP-039`と同じ（`tap_configured bw_rate=0x0a thresh_tap=0x18 dur=0x10 tap_axes=0x07 poll_interval_ms=20`）。`deskcatd`はsshで手で起動（`timeout 420 /usr/local/bin/deskcatd --port /dev/serial0 --baud 115200 --duplicate-capacity 8 --duplicate-retention-ms 5000 --startup-deadline-ms 10000 --verbose`。独り言の引数なし）。systemdのunitは変えていない（窓の前に実行中の`deskcatd.service`を`stop`しただけ）。ESP32のUART0のログは、USBを挿す前から待機させたスクリプトが1回のopenで取り切った（`DTR`・`RTS`は常にFalse。resetを指示していない。ログの`rst:`の行は1本＝USBを挿したときの`POWERON_RESET`） |
+| Measurement equipment | 無し（ログのみ）。LCDの目視はユーザー |
+| Procedure | 下の「手順と時刻」 |
+| Expected result | tapがPi側で`tapped_received`として記録され、`Surprised`が描かれる。Piに届く経路の静止区間では`tap_detected`が出ない（暫定値の評価の材料。期待値の数は定めていない） |
+| Measured result | 下記 |
+| Faults | 下記 |
+| Conclusion | 下記 |
+
+### 手順と時刻（UTC。2026-10-24）
+
+- 08:44：承認（#22のcomment）。通電前の目視の回答。Pi側の電源（`PSU-PI-A-02`）は、08:47:57のpingの時点で起動していた（ユーザーが挿した時刻は記録に無い）。
+- 08:48：Pi：sha256照合、`--help`が成功（exit 0）、実行中の`deskcatd.service`を`stop`（inactive）。
+- 08:50:10：ユーザーがUSBを挿した（`/dev/ttyUSB0`の作成時刻）。起動のlog：`ELF file SHA256: afe1013ea...`、`peripherals=taken display=face_enabled servo=not_driven i2c=id_read_attempt pi_link=uart1 adc=not_driven touch=not_driven`、`accel_device_id raw=0xe5`、`face_drawn name=Some(Neutral) uptime_ms=639`。**セッション確立の前、起動の約8秒後に、`tap_detected decision=DropNoSession`が7件**（ユーザーが機械に触れた時間かは確認していない）。
+- 08:50:26：ユーザーが最初の回答「顔が出ていて、異常なし」。**挿してから約16秒で、承認が定めた2分の目視ではなかった。**作業セッションがログの時刻から気づき、08:52:12まで目視を続けるよう伝えた。08:52:12以降の回答「異常なし、挿した」（橙・黄）。
+- 08:52:42：Piで`deskcatd`を起動。**08:52:47.87（ESP32の取得の時計）：`pi_rx_hello … outcome=Established`、`boot_established sid=19`。**
+- 08:52:53〜08:53:53：**静止区間（1回目）**。合図を出した時刻から60秒。
+- 08:53:57〜08:55:33：叩く合図（チャットの1行、10回、約10秒おき）。
+- 08:55:45〜08:56:48：**静止区間（2回目）**。
+- 08:57:00：作業セッションが、Piの`timeout`へSIGTERMを送って`deskcatd`を止めた（`pgrep`で不在を確認）。**Piのlogに、終了時のcounterの行は無い**（停止の仕方による。確認していない）。
+- 08:57:32より前：ユーザーが橙・黄を抜き（原文「抜いた」）、続いてUSBを抜いた（原文「抜いた」）。`/dev/ttyUSB*`・`/dev/ttyACM*`が無いことを確認した。**USBを挿してから約7.5分。承認の20分の内。backlightが点く起動は1回（`rst:`の行が1本）。**
+
+### 結果
+
+- `panic`・`brownout`・`task_wdt`・`Guru`は、ESP32のログで0件。ユーザーの申告：起動後の「顔が出ていて、異常なし」。窓の終わりの発熱・異臭・乱れ・点滅の申告は、このsessionでは訊いていない。
+- **静止区間（Piに届く経路。`deskcatd`はEstablishedのまま動作中）：1回目 60秒＝`tap_detected` 0件、2回目 60秒＝0件。**区間の境は作業セッションが合図を出した時刻で、ユーザーが実際に触れなかったかはlog以外に根拠が無い。
+- **叩く合図：10回出した。`tap_detected decision=Send`は9件、`DropTooSoon`は61件（叩く区間の合計）。`tapped_received`は9件（`total=9`）。**Sendの時刻は、合図の時刻（チャットに出した時刻）より約9.3〜10.3秒後で、次の合図の直前に当たる（下の表）。**合図の表示の遅れと、ユーザーが叩くまでの時間は分けられない。**1回目の合図（08:53:57）に対応するSendは無く、10回目の合図に対応するSendも無い。実際に叩いた回数は、ログ上のSend 9件が上限の根拠で、ユーザーに回数を訊いていない。
+- Pi側：9件すべての`tapped_received`（`sid=19`）に、`set_expression_queued … Surprised`が同じ`pi_uptime_ms`で続いた8件と、続かない1件（`tapped id=8`。直前の`Surprised`の約1.8秒後。`Neutral`が`set_expression_queued id=6`で出ただけ）。この1件を標本から除外した（`EXP-039`の`tapped id=26`と同じ型）。
+- 受信時刻の対（`esp_ts_ms`はESP32のuptime、`pi_uptime_ms`はPiの`deskcatd`のuptime）：`tapped id=6`＝`esp_ts_ms=247526`、`pi_uptime_ms=90677`（最初の標本）。**2つの時計の差（offset）は測っていない。**
+- **End-to-end（`B − A`、ESP32のuptime、8件）：540 ms×5、550 ms×2、590 ms×1（下の表）。最小540、中央値545、最大590。**`EXP-039`は540〜550（12件）。
+- 分解（ESP32のlogの10 ms刻みのtick同士、Piはmsの`pi_uptime_ms`同士。**どちらも自分の時計の中の区間で、2つの時計を突き合わせていない**）：`tap_event_poll_start`から`pi_tx tapped`＝0 ms（同じtick）。`pi_tx tapped`から`pi_rx_set_expression`＝20〜30 ms（これはPiの処理時間を含む）。Pi側の`tapped_received`から`set_expression_queued`＝0 ms。**この2つの区間の差（20〜30 ms − 0 ms）を「導出」の列に置いた。測定値ではなく、往きと復りの内訳は分からない。**`pi_rx_set_expression`から`face_drawn`＝510〜570 ms（LCDの描画。区間の大半）。
+- 8件の表（除外した1件は表の外。`tapped id=8`、`tap_event_poll_start`は249299、自身の`Surprised`の`set_expression`なし）。区間の単位はms。`合図→Send`の列は、直前の合図の時刻から`Send`のlogまでのms。`tick`の列はESP32のlogの10 ms刻みのtickの差、`Pi`の列はPiの`pi_uptime_ms`の差。**「導出」の列は、2つの区間の引き算で、測定値ではない。**
+
+| # | 合図→Send | tapped id | set_expression id | A（uptime） | esp_ts − A | A→tx（tick） | tx→rx（tick） | Pi: queued − received | 導出: (tx→rx) − (Pi: queued − received) | B − A | rx→drawn（tick） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+|1|9259|6|5|247519|7|0|30|0|30|540|510|
+|2|10090|10|7|259059|7|0|20|0|20|550|530|
+|3|10303|13|9|269719|7|0|20|0|20|590|570|
+|4|10234|16|11|280259|16|0|20|0|20|550|520|
+|5|10209|19|13|290679|7|0|30|0|30|540|510|
+|6|10141|22|15|301059|7|0|30|0|30|550|520|
+|7|10130|25|17|311579|7|0|30|0|30|540|510|
+|8|10068|28|19|321959|7|0|30|0|30|540|510|
+
+### ログ（原本はrepositoryの外。sha256）
+
+- ESP32 UART0（`esp32.log`）：`57ea327e2d653f757199980e7752dddb4d9524db051b5d0d6d749a59df2a038c`
+- Pi `deskcatd`（`pi-deskcatd.log`）：`675570b6e3d716c94ce09e16859ee828f6b0d55d5050942a37e719f0f4bedbba`
+- 合図の時刻（`cues.txt`）：`f5827c1aec8db40e8829edf597d92a92322be1eac3b86c61ce69533b37f617be`
+
+### Faults
+
+- **承認の2分の目視が、最初は約16秒で打ち切られた。**作業セッションが気づき、08:52:12まで続けさせた。
+- **合図はチャットの1行で、表示の遅れが分からない。**Sendが合図の約10秒後に集中し、1回目の合図と10回目の合図に対応するSendが無い。叩いた時刻と回数の根拠は、ESP32のlogのSendだけ。
+- 音声と端末（Terminal）の合図は、ユーザーが確認できなかったため使っていない。
+- 起動の約8秒後（セッション確立の前）の`DropNoSession`7件の原因は確認していない。
+- `deskcatd`は`timeout`へのSIGTERMで止めた。終了時のcounter行が無い。
+- Piの`WARN`は1件（helloへのACKを受けたが応答送信側のsessionが未承認のため受理しない。`EXP-039`のPiのlogにも1件ある）。
+- 満たしていない条件：承認の範囲（#22のcomment）のとおり。GND線の導通は測り直していない。`HW-TBD-036`は未確認。
+
+### 主張しないこと
+
+- 2つの時計の差は測っていない。上の分解は、それぞれの時計の中の区間である。UART往復の内訳（ESP32→Pi、Pi→ESP32）は分からない。
+- 実際に叩いた回数と時刻は、ESP32のlogの検出が根拠で、独立した記録ではない。
+- 静止区間の「触れていない」は、ユーザーの行動の記録が無い。0件は、この60秒×2の範囲の事実であり、誤検出率ではない。
+- 受け入れ条件の判定は書かない（PMの判断）。サーボ自身の振動の再triggerは未確認（サーボを駆動していない）。
+
+### Conclusion
+
+入れ替えた`deskcatd`（develop `c9c3d25`）をESP32につなぎ、ADXL345のmoduleを叩いた。ESP32の`Send`は9件、Pi側の`tapped_received`は9件で一致し、8件で`Surprised`が描かれた（`B − A`は540〜590 ms）。Piに届く経路の静止区間（60秒×2）の`tap_detected`は0件だった。2つの時計の差は測っていない。叩いた回数と時刻は、ESP32のlogの検出以外に根拠が無い。受け入れ条件の判定は、この記録を読んでPMが行う。
+
+### Next safe step
+
+- 終わりの状態：ESP32のUSBは抜け、AC・橙・黄も抜けている。flashには製品build（`afe1013e…`）が残る。Piは電源が入ったまま（`deskcatd`は停止。systemdの`deskcatd.service`は停止した状態）。灰のGND線は挿さったまま（ESP32は無給電）。
+- 次に実機で通電する場合は、その回の構成を文で示し、ユーザーの承認を新たに取る。
+- 受け入れ条件の判定は、PM（実機）が行う。
+
 ## Revision履歴
 
 | 日付 | Revision | 変更 | 根拠 |
@@ -3917,3 +4006,4 @@ A：`mem-probe-23`のbuildは、LCDをつないだESP32で動き、`show_text`�
 | 2026-10-22 | 43 | [#23](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/23)。**`EXP-037`を追加した。**LCDをつないだESP32へ、`mem-probe-23`のbuild（A）と製品build（B）を書き込み、Piの`deskcatd`の独り言を受けた間の`accept_to_draw_ms`（10字で402〜406 ms、13字で431〜441 ms）と、Aの`mem_probe`を記録した。BのESP32のログは取れていない。**`EXP-033`の「信号線をつながない状態にした」は、実際にはVCCだけだった（ユーザーの申告）という訂正と、その指示の曖昧さを、事実として書いた。**承認した時間の上限を超えたこと、満たさない条件7つを記録した。受け入れ条件の判定は書いていない。LCDの線は、ユーザーの申告では窓の前から挿さっていた（現物は未確認） | [#23](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/23)、`EXP-037`の記録 |
 | 2026-10-22 | 44 | [#14](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/14)。**`EXP-038`を追加した。**touch用の5本（`T_CLK`／`T_CS`／`T_DIN`／`T_DO`／`T_IRQ`）を足した配線で、`touch-sample-14`のbuildを書き込み、idleと操作の間のraw値を取った。`irq_low=1`のsampleは201件、塊は9個で、ユーザーの操作の件数との差の原因は調べていない。**指示を出した側の欠陥（挿す先と並び順、9本の表、テスターの型を調べない測り方の指示、BOOT）を、事実としてFaultsへ書いた。**承認の出所と満たさない条件6つを記録した。 | [#14のcomment 6339548472](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/14#issuecomment-6339548472)、`EXP-038`の記録 |
 | 2026-10-24 | 45 | [#22](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/22)。**`EXP-039`を追加した。**製品build（featureなし、develop `4a1ad55`）をESP32に書き込み、Piの`deskcatd`をつないで、ADXL345のmoduleを指で軽く叩いた。ESP32の`tapped`送出、Piからの`set_expression Surprised`の受理、`face_drawn`が12件続き、`B − A`は540〜550 ms。静止区間の`tap_detected`は1回目の60秒で0件。2回目の静止区間は、1つがESP32のログの欠測、取り直した1つが`deskcatd`の停止中でPiに届く経路ではない。Pi側のlogに受理の行は無い（10月12日のbuild）。**touch用の5本を窓の前に外した理由（記録で示せなかった2点）、時間の上限の超過と延長、承認の出所と満たさない条件9つを記録した。** | [#22のcomment 6381126124](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/22#issuecomment-6381126124)、`EXP-039`の記録 |
+| 2026-10-24 | 46 | [#22](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/22)。**`EXP-040`を追加した。**製品build（featureなし、develop `4a1ad55`、書き込みなし）に、入れ替えた`deskcatd`（develop `c9c3d25`）をつなぎ、ADXL345のmoduleを叩いた。Pi側の`tapped_received`は9件（ESP32の`Send`と同数）、`B − A`は540〜590 ms（8件）、Piに届く経路の静止60秒×2の`tap_detected`は0件。2つの時計の差は測っていない。**承認の2分の目視が最初は約16秒だった点、合図と`Send`の約10秒のずれを記録した。** | [#22のcomment 6382431151](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/22#issuecomment-6382431151)、`EXP-040`の記録 |
