@@ -51,6 +51,7 @@
 | [EXP-037](#exp-037-lcdをつないだesp32へmem-probe-23のbuildaと製品buildbを書き込みpiの独り言show_textで描画時間とheapstackを観察した) | [#23](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/23)の実機の窓。LCDをつないだESP32へ、`mem-probe-23`のbuild（A）と製品build（B）を書き込み、Piの独り言（`show_text`）の描画時間（`accept_to_draw_ms`）と、Aの`mem_probe`（空きheap、最小の空きheap、main taskのstack残量）を、固定文（10字・13字）で観察した | 値の正なし（観測の記録。RAMの最大使用量は測っていない。`PROTO-TBD-007`は未解決。BのESP32のログは取れていない） |
 | [EXP-038](#exp-038-touch-sample-14のbuildでlcd-module上のxpt2046touch-01のraw値をtouch用5本を足した配線で観察した) | [#14](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/14)の実機の窓。touch用の5本を足し、`touch-sample-14`のbuildでXPT2046のraw値（X・Y・Z1・Z2、`T_IRQ`のlevel）をidleと操作の間に観察した | 値の正なし（観測の記録。操作の指示35回に対し`irq_low=1`の連続する塊は9個で、原因は調べていない。受け入れ条件の判定は書かない） |
 | [EXP-039](#exp-039-製品buildfeatureなしでadxl345accel-01を叩きtappedがpiへ届いてsurprisedがlcdに出るまでを観察した) | [#22](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/22)の実機の窓。製品build（featureなし）で、ADXL345のmoduleを指で軽く叩いた間の経路（`tap_detected`→`tapped`→Pi→`set_expression Surprised`→`face_drawn`）と、静止区間の`tap_detected`の件数を観察した | 値の正なし（観測の記録。12件の標本で`B − A`は540〜550 ms。静止区間は1回目60秒で0件、取り直しは`deskcatd`が止まっていてPiに届く経路ではない。Pi側のlogに受理の行は無い。受け入れ条件の判定は書かない） |
+| [EXP-041](#exp-041-touch-sample-14とtouch-lcd-14をtouch用5本を足した配線で動かしmarkの時刻つきで見逃しを数えlcdを描きながらtouchを読んだ) | [#14](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/14)の2回目の実機の窓。製品build（書き込みなし）でLCDの描画を目視し、`touch-sample-14`で操作ごとの`MARK`と`T_IRQ`の変化の時刻を突き合わせ、`touch-lcd-14`でLCDを描きながらtouchを読んだ | 値の正なし（観測の記録。受け入れ条件の判定は書かない） |
 
 **大容量の生dataはこのrepositoryへ入れていない。**保存場所は
 [development-foundation-plan.md](../planning/development-foundation-plan.md)の
@@ -3956,6 +3957,109 @@ A：`mem-probe-23`のbuildは、LCDをつないだESP32で動き、`show_text`�
 - 次に実機で通電する場合は、その回の構成を文で示し、ユーザーの承認を新たに取る。
 - 受け入れ条件の判定は、PM（実機）が行う。
 
+## EXP-041: `touch-sample-14`と`touch-lcd-14`を、touch用5本を足した配線で動かし、MARKの時刻つきで見逃しを数え、LCDを描きながらtouchを読んだ
+
+[#14](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/14)の2回目の実機の窓。`EXP-038`で測れなかった見逃しを、操作ごとの`MARK`の時刻つきで数え（`touch-sample-14`）、LCDを描きながらtouchを読んだ（`touch-lcd-14`）。人間の立ち会いのもとで1回。実行承認は[#14のcomment 6384786098](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/14#issuecomment-6384786098)（回答の原文「はい」。満たさない条件8つを含む）。操作の仕方と数え方は、ログを取る前に[comment 6384939613](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/14#issuecomment-6384939613)へ決めて残した。**この記録は事実と未確認だけを書く。受け入れ条件の判定は書かない。**ログの原本はrepositoryの外の証拠用directoryにある（MACを含みうる）。sha256は下の「ログ」。
+
+| 項目 | 内容 |
+|---|---|
+| Test ID | `EXP-041` |
+| Date | 2026-10-24（UTC 13:40〜14:08。USBを挿してから抜くまで約28分） |
+| Operator | 線の挿し、画面を押す・なぞる操作、LCDの目視、USBの抜き挿しはユーザー。flashの書き込み（`espflash`）、ESP32のreset（`RTS`）とログの取得・集計、`MARK`の送信は作業セッション（AI） |
+| Hardware revision／Exact components | `MCU-01`、`DISP-01`／`TOUCH-01`（MSP2807、`XPT2046`）、`ACCEL-01`、`ENV-01`。`SBC-01`（Pi）は使っていない |
+| Wiring revision | 下の「配線の状態」 |
+| Power supply and current limit | ESP32はこの端末のUSB。電流・電圧・温度は測っていない。AC・サーボ・LEDの枝は使っていない。Piは電源が入ったまま（`EXP-040`の終わりの記録に基づく。この窓では確認していない）。灰のGND線は挿したまま（通電前の目視の回答「全部合っている」の項目5） |
+| Firmware commit/profile | develop `b9a04e8`、debug。`git archive`をrepositoryの外へ展開してbuild（`.embuild`はmain checkoutのものを借りた）。`cargo clippy --all-targets --locked --features <f> -- -D warnings`と`cargo build --locked --features <f>`が両featureで成功し（警告0）、`Cargo.lock`は変わらなかった（sha256 `5c3fbc5fcee9d06a6d0321e949052b1fbf184a4820b51d80313f11b6518bee09`）。ELFのsha256：`touch-sample-14`＝`0f0d1e980078ea8b67e80627aee9ddec393c4c2c8629596fc6aaa355288edc07`、`touch-lcd-14`＝`b13d766083749a54b108704e6b68cb2df1236249ec717b15a1ca972df8ace6d0`。書き込みの直前に`sha256sum -c`で照合した。製品buildは書き込まず、flashに残る版（起動logのELF SHA256の先頭9桁`afe1013ea`。全桁は照合していない。`b9a04e8`との間でfirmware・crates・apps・Cargoに差分が無いことは`git log`で確かめた）。書き込みはespflash（`--after no-reset`）で、**BOOTボタンは使わず、自動で書き込みモードに入った**（2回とも） |
+| Configuration | touch：SPI Mode 0、1 MHz、poll間隔20 ms、窓250件（`touch.rs`）。LCD：6 MHz（`display.rs`）。`touch-lcd-14`はLCDとtouchが`SpiDriver`を共有し、それぞれ別の`SpiDeviceDriver`にclockを設定し、CSは自前のGPIO。帯16行、200本で1窓。ESP32のUART0のログは`pyserial`で1回のopenで取り切った（`DTR`は常にFalse）。`touch-sample-14`と`touch-lcd-14`はscriptが`RTS`で1回だけresetした。`MARK`は`touch-sample-14`のconsoleだけが受け付ける（`touch-lcd-14`は受け付けず、合図の時刻はPC側の時刻で記録した） |
+| Measurement equipment | テスター`DT830B`（GPIO21–3V3間の抵抗）。ESP32のUART0のログ。電流・電圧・温度の計器は使っていない |
+| Procedure | 下の「手順と時刻」 |
+| Expected result | `T_IRQ`が操作の間だけ下がり、`MARK`の窓の中に`touch_irq_edge level=low`が出る。`touch-lcd-14`では`touch_lcd_window`が出て、`lcd_errors_total`・`touch_spi_errors_total`が増えない（`touch.rs`・`touch_lcd.rs`のmodule docの意図） |
+| Measured result | 下記 |
+| Faults | 下記 |
+| Conclusion | 下記 |
+
+### 配線の状態
+
+すべて記録とユーザーの申告に基づく。作業セッションは現物を見ていない。
+
+- **窓の前（通電前の目視。回答の原文「全部合っている」）：**USB抜け、AC抜け、橙・黄のESP32側が抜け、touch用の5本・LEDの枝・サーボ系が外れ、灰のGND線は前回から抜き差ししていない、LCDの9本は前回のまま。
+- **GPIO21（`TOUCH-CS`）の外部10 kΩ pull-up：**USBを挿す前、touch 5本を足す前に、ユーザーがテスター（`DT830B`、20 kΩレンジ）でESP32 boardの「21」のピンと上の＋列（3V3）の間を読み、**9.90**（kΩ。原文「9.90です。」）。**この読みは、そのpinに茶のジャンパが付いているというユーザーの申告つきである。** `EXP-039`で「示せなかった」点について、10 kΩ前後の読みが得られた。ただし、読みが外部pull-up1本だけの値かは、他の経路を切り離して確かめていない。
+- **足した5本（`EXP-038`と同じ穴）：**表（LCD moduleの10〜14番の順）を示し、ユーザーが穴を目で見て確かめた（回答の原文「表どおりに指した」）：10 紫 `T_CLK`→f29、11 青 `T_CS`→b22、12 緑 `T_DIN`→h30、13 黄 `T_DO`→a29、14 灰 `T_IRQ`→ESP32の「34」へ直接。**通電前の導通確認は、この窓では行っていない。**作業セッションが9組（つながる5組・つながらない4組）の測定を求めたのに対し、ユーザーは不要と答えた（理由は、前の窓と同じ配線であること）。
+
+### 手順と時刻（UTC）
+
+- 13:40：ユーザーがUSBを挿した（BOOTは押さない）。flashの製品buildが走った（LCDのbacklightが点く）。13:40:19からlogを取得（`rst:0x1 (POWERON_RESET)`の1本）。**この起動が、LCDとtouch 5本が両方挿さった配線で製品buildが走った最初の記録である。**約63秒で取得を止めた。
+- 13:41〜13:42：`touch-sample-14`を書き込んだ（`App/part. size: 951,728/4,128,768 bytes`）。
+- 13:44〜13:48：**`touch-sample-14` 1回目（操作の合図を出したが、ユーザーは画面を触っていない）。**最初に35秒の時点に`MARK`を1回（触らずに）、70秒から五点以降の合図を出した。236秒で打ち切った。
+- 13:48〜13:49：**2回目（打ち切り）。**先頭の60秒の待ちを外すため、約1分半で打ち切って作り直した。
+- 13:50〜13:56：**`touch-sample-14` 3回目（取り直し）。**先頭の待ちを外し、合図の最初を12秒後にした。合図に対応して`T_IRQ`が下がった（下の結果）。スクリプトのlog取得は365秒で終わった（最後の「触らず待つ」は約118秒）。
+- 13:56〜13:57：`touch-lcd-14`を書き込んだ（`App/part. size: 958,064/4,128,768 bytes`）。
+- 14:01:54〜14:04:31：**`touch-lcd-14`**（157秒）。LCDが表情を描き続けた。12秒後から、押す合図を15回、横になぞる合図を5回出し、最後の約30秒は触らずにLCDを見る合図を出した。
+- 14:08：ユーザーがUSBを抜いた（原文「抜いた」）。`/dev/ttyUSB*`が無いことを14:08:15に確認した。
+
+### 結果
+
+**製品build（13:40、約63秒）：**`display_madctl value=0x28 width=320 height=240`、`face_drawn name=Some(Neutral) uptime_ms=639`、`health`の行が約10秒ごとに出た（`overrun_ticks=0 snapshot_errors=0`、`max_read_gap_ms`は21〜50）。`panic`・`brownout`・`task_wdt`は0件。WARNは1件（`boot_terminated reason=RecoveryBudgetExhausted sid=21 id=1`。Piが無い。`EXP-038`にも同型の行がある）。ユーザーの申告（原文「顔が出て問題もない」）：LCDに顔が出て、異常は無い。**承認が定めた「最初の2分」の目視は、約2分待たずに結果が答えられた**（ユーザーが待たずに次へ進めるよう求めた）。ESP32のlogの取得も約63秒で止めた。**touch 5本が挿さった配線で、製品buildのLCDの描画が壊れなかった（目視の申告）。**
+
+**`touch-sample-14` 1回目：**起動のlog、`touch_raw`は`MARK`を打たずに続き、`touch_mark`は`MARK`を打った31回に31件（`mark=1`〜`31`）。**ユーザーは画面を触っていなかった（原文「触っていない」）。**その間（約236秒）の`level=low`の`touch_irq_edge`は0件、`irq_low=1`のsampleは0件。
+
+**`touch-sample-14` 3回目（数え方は事前の決定どおり）：**操作40件（`MARK`40件。五点5、押し込む15、軽く触れる10、横になぞる5、縦になぞる5）。`touch_fault`・`touch_sample_stopped`・`panic`・`brownout`・`task_wdt`は0件。最後の`touch_window`：`irq_low_total=1701`、`all_zero_total=0`、`all_ones_total=0`、`spi_errors_total=0`。`touch_irq_edge`94件のうち`level=low`が47件。`xfer`が`ok`でない変化は0件。
+
+| 操作 | 件数 | 見逃し（窓内に`level=low`が無い） | `MARK`から最初の`level=low`まで | 窓内の`level=low`が2つ以上 |
+|---|---|---|---|---|
+| 五点 | 5 | 0 | 1249〜3029 ms | 0件 |
+| 押し込む | 15 | 0 | 349〜1979 ms | 0件 |
+| 軽く触れる | 10 | **6**（light2、4、5、7、8、10） | 329〜1989 ms（反応した4件） | 0件 |
+| 横になぞる | 5 | 0 | 409〜1809 ms | 5件 |
+| 縦になぞる | 5 | 0 | 369〜1389 ms | 2件 |
+
+- 窓の外の`level=low`（false positive）：**0件**（47件すべてがいずれかの操作の窓の中）。最後の約118秒の「触らない」の間も0件。
+- **「軽く触れる」の見逃しは、触れた事実が独立に分からない。**ユーザーが触れたかは、ログの外の記録が無い。
+- **五点のraw値（反応した間の`irq_low=1`のsampleの中央値と範囲、画面を上向き・14 pinのheaderを右の辺にした向き）：**中央 x≈2367（2279〜2559）y≈2303（2183〜2361）／左上 x≈3551（3499〜3695）y≈3599（3526〜3626）／右上 x≈3711（2575〜3767）y≈696（674〜1134）／左下 x≈715（687〜947）y≈3643（3611〜3726）／右下 x≈799（693〜1011）y≈797（687〜826）。z1の中央値：中央1062、左上2251、右上1008、左下652、右下342。**xは左ほど大きく、yは上ほど大きい。**右上のxの下側（2575）は、接触の始まりか終わりの過渡である可能性があるが、原因は調べていない。四隅の目標位置の座標は定義していない。
+- **`touch-sample-14`のstate machine（`crates/deskcat-touch`）：**入力は`pressure`（呼び出し側の定義）・`x`・`y`のraw値で、撫では隣り合うsample間の`|Δx|+|Δy|`の累計（raw単位）が`stroke_travel`に達したとき。画面座標への変換は、このcrateに無い。`T_IRQ`は入力ではない。この窓では、state machineを配線していない。
+
+**`touch-lcd-14`（157秒）：**起動のlog：`display_madctl value=0x28 width=320 height=240`、`touch_lcd_started lcd_clock_hz=6000000 touch_clock_hz=1000000 band_rows=16 stripes_per_window=200 poll_interval_ms=20`。`touch_lcd_window`は35窓。最後の窓：`stripes_total=7000`、`expressions_total=263`、**`lcd_errors_total=0`、`touch_spi_errors_total=0`**。`stripe_us_avg`は11782〜13078、`stripe_us_max`は19911〜20319（µs）。操作の期間の窓（24窓）と、それ以外の窓（11窓）で、`stripe_us_avg`は11784〜13077と11782〜13078、`stripe_us_max`の最大は20139と20319で、違いは見えない。最後の`touch_window`：`irq_low_total=331`、`spi_errors_total=0`、`all_zero_total=0`、`all_ones_total=0`。`panic`・`brownout`・`task_wdt`・`touch_lcd_fault`・`touch_lcd_draw_stopped`は0件。`touch_irq_edge`48件のうち`level=low`が24件。合図20件（押す15、横になぞる5。窓は4秒・5秒、**時刻はPC側のログ受信時刻と合図の時刻**）：見逃し0件、合図から最初の`level=low`まで0.45〜2.01秒、窓の外の`level=low`は0件。ユーザーの申告（原文「乱れ無し・異常無し」）：押している間と最後の約30秒に、LCDに乱れ（線・ノイズ・色の崩れ・チラつき）は無く、発熱・異臭・異音も無い。
+
+### 承認と、満たしていない条件
+
+- 承認：[#14のcomment 6384786098](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/14#issuecomment-6384786098)（満たさない条件8つの原文は同comment）。
+- 回数と時間：起動は、製品build（USBを挿した1回）、`touch-sample-14`の`RTS`のreset 3回、`touch-lcd-14`の`RTS`のreset 1回で、backlightが点いた起動は2回（製品build、`touch-lcd-14`）。上限は6回・うちbacklight 4回で、その内。USBを挿してから約28分（上限40分）の内。
+- **行っていない確認：**touch 5本の通電前の導通確認（ユーザーが不要と答えた）。条件(1)の項目3・4。GND線の導通の測り直し。ILI9341の`SDO`が`LCD-CS`のHighの間に高インピーダンスになることの確認（`LCD-MISO`と`T_DO`は同じ線。この窓の`touch-sample-14`・`touch-lcd-14`は、SPIの失敗なしに`touch_raw`の値を出した。この事実を、`SDO`が高インピーダンスになることの確認としては扱わない）。
+
+### Faults
+
+**指示を出した側（作業セッションとPM（実機））の欠陥を、事実として書く。**
+
+- **`touch-sample-14`の1回目は、操作の合図の意味が伝わらないまま始まり、ユーザーは画面を触らなかった。**合図が端末のタブの文字（と、ベル）であり、LCDには何も出ない（この回はLCDを初期化しない）ことを、始める前に伝えていなかった。作業セッションは、始めてから約3分半の時点で、反応が0件であることに気づき、ユーザーに触ったかを訊いた。
+- **先頭に60秒の「触らない」区間を置いた設計だった。2回目から外した。**
+- **操作の回数（押し込む15回など）に、導出した根拠が無い。**作業セッションが決めた数である。
+- **`touch-lcd-14`で、`MARK`を受け付けないことを、操作の設計で補わず、PC側の時刻で記録した。**`touch-sample-14`と`touch-lcd-14`を別の窓に分けたことを、ユーザーへ始める前に説明していなかった（2つのfeatureは同時に有効にできない。`compile_error!`）。
+- 満たしていない条件と、行っていない確認（上の「承認と、満たしていない条件」）。
+
+### ログ
+
+repositoryの外の証拠用directory（`window-14b-2026-10-24`）。sha256：`c-product.log`＝`f4886f3ac1d27a6cfc97988ddfe181d9d24dcb1342e9bf850561b30886282856`、`d-sample.log`（3回目）＝`4ac034117d6f5721d1e377c98eadb2f91bc0e3429ba923ac1d6b86f05af80f5c`、`d-sample.log.events`＝`3fce30297d9af681dc88a42d58723a0e28cee13561964a0bf3b5404ec9a70400`、`e-lcd.log`＝`6208f9e15508cf0b789d6a65e76edf88d4c063770c4ac681dc9b8409f204c903`、`e-lcd.log.events`＝`04d130b9ad7fa98fe032968887d725379c791bf0d286df5a738a9d1d7e4ddc51`、`d-sample-run1-untouched.log`＝`daed5c284d625ea7bb0d0b0dcc756ba396b72577d44b671e72ef904b61c066a0`、`d-sample-run2-aborted.log`＝`74e2ba331e40311fbd8b5a0da2ab48a3ddd87aa0fc5b457f8e04b850f1437385`。
+
+### この記録が主張しないこと
+
+- 受け入れ条件の判定。「許容できないdata loss」の基準はIssueに無く、この記録は件数と所要時間と目視の申告だけを持つ。
+- 見逃しが無いこと、または「軽く触れる」の見逃しの原因。窓は事前の決定どおりの4・5秒で、反応が遅れた操作は見逃しに数える。
+- 一般の指・圧での再現性。操作はユーザーの人差し指の腹、スタイラスなし、40件・20件の標本である。
+- 画面座標への変換（calibration）。五点のraw値は、四隅の座標の定義と対応づけていない。
+- LCDの転送が壊れなかったこと。LCDは書き込み専用で、転送が壊れても件数に出ない（`touch_lcd.rs`）。目視の申告と、SPI driverの失敗0件だけが根拠である。
+- 電流・電圧・温度。ILI9341の`SDO`が高インピーダンスになること。
+- 2つのbuildが同じ配線・同じ操作で動いたときの比較。
+
+### Conclusion
+
+touch用5本を足した配線で、製品buildはLCDに顔を描いた（目視の申告）。`touch-sample-14`では、操作40件のうち見逃しは6件（すべて「軽く触れる」）、窓の外の`level=low`は0件だった。`touch-lcd-14`では、LCDを描きながらtouchを読み、LCDとtouchのSPIの失敗は0件、合図20件の見逃しは0件、LCDの乱れは申告に無かった。
+
+### Next safe step
+
+- 終わりの状態：ESP32のUSBは抜けている（14:08:15に`/dev/ttyUSB*`が無いことを確認）。flashには`touch-lcd-14`のbuildが入っている。**次にUSBを挿すと、このbuildが走り、LCDのbacklightが点く**（BOOTを押したままなら走らない）。ACは抜けたまま。touch用の5本は、この窓で足した状態のまま（外す指示は出していない。USBを抜いた後の現物は見ていない）。橙・黄のESP32側は抜けたまま。LEDの枝とサーボ系の線は外れたまま。Piは電源が入ったまま（`deskcatd`は停止）。
+- 次に実機で通電する場合は、その回の構成を文で示し、ユーザーの承認を新たに取る。
+- 受け入れ条件の判定は、PM（実機）が行う。
+
 ## Revision履歴
 
 | 日付 | Revision | 変更 | 根拠 |
@@ -4007,3 +4111,4 @@ A：`mem-probe-23`のbuildは、LCDをつないだESP32で動き、`show_text`�
 | 2026-10-22 | 44 | [#14](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/14)。**`EXP-038`を追加した。**touch用の5本（`T_CLK`／`T_CS`／`T_DIN`／`T_DO`／`T_IRQ`）を足した配線で、`touch-sample-14`のbuildを書き込み、idleと操作の間のraw値を取った。`irq_low=1`のsampleは201件、塊は9個で、ユーザーの操作の件数との差の原因は調べていない。**指示を出した側の欠陥（挿す先と並び順、9本の表、テスターの型を調べない測り方の指示、BOOT）を、事実としてFaultsへ書いた。**承認の出所と満たさない条件6つを記録した。 | [#14のcomment 6339548472](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/14#issuecomment-6339548472)、`EXP-038`の記録 |
 | 2026-10-24 | 45 | [#22](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/22)。**`EXP-039`を追加した。**製品build（featureなし、develop `4a1ad55`）をESP32に書き込み、Piの`deskcatd`をつないで、ADXL345のmoduleを指で軽く叩いた。ESP32の`tapped`送出、Piからの`set_expression Surprised`の受理、`face_drawn`が12件続き、`B − A`は540〜550 ms。静止区間の`tap_detected`は1回目の60秒で0件。2回目の静止区間は、1つがESP32のログの欠測、取り直した1つが`deskcatd`の停止中でPiに届く経路ではない。Pi側のlogに受理の行は無い（10月12日のbuild）。**touch用の5本を窓の前に外した理由（記録で示せなかった2点）、時間の上限の超過と延長、承認の出所と満たさない条件9つを記録した。** | [#22のcomment 6381126124](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/22#issuecomment-6381126124)、`EXP-039`の記録 |
 | 2026-10-24 | 46 | [#22](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/22)。**`EXP-040`を追加した。**製品build（featureなし、develop `4a1ad55`、書き込みなし）に、入れ替えた`deskcatd`（develop `c9c3d25`）をつなぎ、ADXL345のmoduleを叩いた。Pi側の`tapped_received`は9件（ESP32の`Send`と同数）、`B − A`は540〜590 ms（8件）、Piに届く経路の静止60秒×2の`tap_detected`は0件。2つの時計の差は測っていない。**承認の2分の目視が最初は約16秒だった点、合図と`Send`の約10秒のずれを記録した。** | [#22のcomment 6382431151](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/22#issuecomment-6382431151)、`EXP-040`の記録 |
+| 2026-10-24 | 47 | [#14](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/14)。**`EXP-041`を追加した。**touch用5本を足した配線で、製品build（書き込みなし）のLCDの描画を目視し、`touch-sample-14`で操作40件の`MARK`と`T_IRQ`の変化の時刻を突き合わせ（見逃し6件はすべて「軽く触れる」、窓の外の`level=low`は0件）、`touch-lcd-14`でLCDを描きながらtouchを読んだ（LCD・touchのSPIの失敗0件、合図20件の見逃し0件）。**1回目は画面が触られていない回で、取り直した経緯、導通確認を行っていないこと、操作の回数に導出した根拠が無いことを記録した。** | [#14のcomment 6384786098](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/14#issuecomment-6384786098)、`EXP-041`の記録 |
