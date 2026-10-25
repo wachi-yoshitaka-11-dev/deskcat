@@ -79,9 +79,8 @@
 use std::rc::Rc;
 
 use esp_idf_svc::hal::delay::{Ets, FreeRtos};
-use esp_idf_svc::hal::gpio::{InputPin, Level, Output, OutputPin, PinDriver};
-use esp_idf_svc::hal::spi::config::DriverConfig;
-use esp_idf_svc::hal::spi::{SpiAnyPins, SpiDriver};
+use esp_idf_svc::hal::gpio::{Level, Output, OutputPin, PinDriver};
+use esp_idf_svc::hal::spi::SpiDriver;
 use esp_idf_svc::sys::{EspError, ESP_ERR_INVALID_ARG};
 
 use crate::spi_port::SpiPort;
@@ -139,8 +138,8 @@ pub mod color {
 
 /// `DISP-01`のILI9341 driver。
 ///
-/// **CSは常にこのdriverが自前のGPIOで管理する**（`SpiBusDriver`はhardware CSを
-/// 持たない。moduleのCS制御table「Managed CS: N」の構成）。ILI9341の各commandは
+/// **CSは常にこのdriverが自前のGPIOで管理する**（`SpiDeviceDriver`をhardware CSなしで
+/// 作る。moduleのCS制御table「Managed CS: N」の構成）。ILI9341の各commandは
 /// 「command byte → (D/CXをHighへ) → parameter byte列」を**1回のCSX assertionの中で**
 /// 送る設計であり（datasheetの各command図がS...Pの1区間で示す）、途中でCSを
 /// 上げ下げしない。
@@ -153,26 +152,9 @@ pub struct Ili9341<'d> {
 }
 
 impl<'d> Ili9341<'d> {
-    /// SPI busとGPIOを結線し、driverを作る。**まだ初期化commandは送らない。**
-    /// busは専有し、bus lockを握り続ける（製品buildの型。[`SpiPort::Held`]）。
-    #[allow(clippy::too_many_arguments)]
-    pub fn new<SPI: SpiAnyPins + 'd>(
-        spi: SPI,
-        sclk: impl OutputPin + 'd,
-        mosi: impl OutputPin + 'd,
-        miso: impl InputPin + 'd,
-        cs: impl OutputPin + 'd,
-        dc: impl OutputPin + 'd,
-        rst: impl OutputPin + 'd,
-        bl: impl OutputPin + 'd,
-    ) -> Result<Self, EspError> {
-        let driver = SpiDriver::new(spi, sclk, mosi, Some(miso), &DriverConfig::new())?;
-        let bus = SpiPort::held(driver, SPI_CLOCK_HZ)?;
-        Self::with_port(bus, cs, dc, rst, bl)
-    }
-
-    /// `touch-lcd-14`用。**別のdeviceと共有する`driver`**に、`SPI_CLOCK_HZ`のdeviceを足して作る。
-    /// busは転送ごとに取る（[`SpiPort::Shared`]）。CSは`new`と同じく自前のGPIOで扱う。
+    /// **別のdeviceと共有する`driver`**に、`SPI_CLOCK_HZ`のdeviceを足して作る。**まだ初期化commandは送らない。**
+    /// busは転送ごとに取る（[`SpiPort::Shared`]）。CSは自前のGPIOで扱う。製品buildと、LCDを使うどの試験buildもこの型である
+    /// （共有の相手は、`touch-lcd-14`では読み出すtouch、ほかのbuildでは読まないtouchのdevice。`crate::touch`）。
     pub fn with_shared_bus(
         driver: Rc<SpiDriver<'d>>,
         cs: impl OutputPin + 'd,

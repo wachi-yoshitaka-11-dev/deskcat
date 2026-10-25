@@ -1,4 +1,5 @@
-//! #14 の試験 build（`touch-sample-14`、`touch-lcd-14`）専用の `TOUCH-01`（XPT2046）の raw 読み出し。bus はこの main-loop task が使う。
+//! #14 の試験 build（`touch-sample-14`、`touch-lcd-14`）の `TOUCH-01`（XPT2046）の raw 読み出しと、LCD を描く build が touch を読まずに持つ device（[`IdleTouch`]）。
+//! bus はこの main-loop task が使う。
 //!
 //! 制御 byte と 3 byte 応答の復号は `deskcat_touch` が持つ（host test 済み。ここへ再掲しない）。
 //! `POLL_INTERVAL_MS` ごとに `X`・`Y`・`Z1`・`Z2` を 1 回ずつ読み（4 回の転送で 1 sample）、`T_IRQ`（`TOUCH-IRQ`）の level とあわせて
@@ -16,8 +17,12 @@
 //! - **`touch-lcd-14`（[`TouchSampler::with_shared_bus`]）は LCD と `SpiDriver` を共有する。**`SpiDeviceDriver` で転送ごとに bus を取る。
 //!   `LCD-CS` は LCD の driver（`crate::display`）が持つ。使い方は `crate::touch_lcd`。**この経路は console（stdin）を読まず、`MARK` を受け付けない**
 //!   （`T_IRQ` の変化の記録は同じ）。
+//! - **製品 build と、LCD を描く試験 build（`bringup-display-13`、`face-21`）は [`IdleTouch`] を持つ。**LCD と `SpiDriver` を共有し、touch の
+//!   device を足すが、**touch を読まない**（転送しない）。`TOUCH-CS` を High に保ち、LCD の転送中に XPT2046 を選ばない。`TOUCH-IRQ` は取らない。
+//!   GPIO21 には外部 10 kΩ の pull-up があり（`gpio-assignment.md`）、High に保つのはその電気的な状態と同じ側である。
+//!   touch を読む処理は、状態機械を Pi への撫でる event へつなぐとき（#21）に足す。
 //!
-//! どちらも CS は `crate::display` と同じく、hardware CS なしと自前の GPIO で扱う: idle は High、転送ごとに Low にし、
+//! どの経路も CS は `crate::display` と同じく、hardware CS なしと自前の GPIO で扱う: idle は High、転送ごとに Low にし、
 //! 転送が失敗しても High へ戻す。
 //!
 //! # SPI の設定
@@ -31,9 +36,10 @@
 //! すべて UART0 の log。`touch_raw` は IRQ が low の sample と、idle の [`IDLE_LOG_EVERY`] 件に 1 件。
 //! `touch_window` は [`WINDOW_SAMPLES`] 件ごとに、各値の窓内の最小・最大と、起動からの累計（IRQ が low だった件数、全値が 0 または 0x0FFF の sample の件数、SPI の失敗）を出す
 //! （`DOUT` が読めていないとき（線が駆動されていない、つながっていない）に、期待どおりの idle と区別するため）。
-//! **実機で動かしたのは `touch-sample-14` の `EXP-038` の版（develop `79f29ea`）だけである**（touch 用 5 本を足した配線で、SPI の失敗なしに
-//! `touch_raw` と `touch_window` が出た。`docs/hardware/experiment-log.md`）。**その後に足した `T_IRQ` の変化と `MARK` の log、bus の持ち方の置き換え（`crate::spi_port`）、`touch-lcd-14`（LCD と bus を共有する経路）は実機で動かしていない。**
-//! 24 clock の転送での bit 位置（`deskcat_touch::decode_12bit`）、`T_CS` が High の間 `T_DO` が線を駆動しないこと、LCD と同じ bus で動くことは未確認である。
+//! **実機で動かしたのは、`touch-sample-14` の `EXP-038`（develop `79f29ea`）と `EXP-041`（develop `b9a04e8`）の版、`touch-lcd-14` の `EXP-041` の版である**
+//! （どれも touch 用 5 本を足した配線で、SPI の失敗なしに `touch_raw` と `touch_window` が出た。`EXP-041` の版は `T_IRQ` の変化と `MARK` の log、
+//! `crate::spi_port` の bus の持ち方を含む。`touch-lcd-14` は LCD を描きながら 157 秒読み、`touch_spi_errors_total=0`。`docs/hardware/experiment-log.md`）。
+//! 24 clock の転送での bit 位置（`deskcat_touch::decode_12bit`）と、`T_CS` が High の間 `T_DO` が線を駆動しないことは未確認である。
 //! `T_IRQ` の level と X/Y/Z の値の関係は、`EXP-038` の観測（`irq_low=1` の 201 sample と idle の sample）に限り、一般化していない。
 //! `T_IRQ` は poll で読み、ISR は使わない（資料は、制御 byte を送る間は `PENIRQ` が無効になるため、割り込みを mask するよう勧める）。
 //!
@@ -55,7 +61,7 @@
 //!   thread が読んだ `Instant` との差を足し引きしたもの）で、完全一致の行だけを受ける。
 //!   **console は別 thread（`touch_console`）で読む。**`stdin.read` が入力を待って blocking なのか `WouldBlock` を返すのかは、実機で確かめていない
 //!   （`bench-servo-test-17` の確認語は入力を待つ loop で、どちらでも動くため、実績はどちらも示さない）。別 thread なら、どちらでも poll は止まらない。
-//!   **この thread が実機で動くこと（MARK を打たずに `touch_raw` が続くこと、MARK で `touch_mark` が出ること）は未確認である。**
+//!   **この thread は `EXP-041` で実機で動いた**（`MARK` を打たずに `touch_raw` が続き、`MARK` を打った 31 回に `touch_mark` 31 件）。
 
 use std::io::{ErrorKind, Read};
 use std::sync::mpsc;
@@ -323,6 +329,37 @@ impl Marks {
                 }
             }
         }
+    }
+}
+
+/// LCD と bus を共有し、touch の device を持つが読まない（module doc「配線と bus の共有」）。値は読まないが、drop で pin と device が
+/// 戻らないよう保持する。
+#[cfg_attr(
+    any(feature = "touch-sample-14", feature = "touch-lcd-14"),
+    allow(dead_code)
+)]
+pub struct IdleTouch {
+    _device: SpiPort<'static>,
+    _cs: PinDriver<'static, Output>,
+}
+
+#[cfg_attr(
+    any(feature = "touch-sample-14", feature = "touch-lcd-14"),
+    allow(dead_code)
+)]
+impl IdleTouch {
+    /// **LCD と共有する `driver`** に [`SPI_CLOCK_HZ`] の device を足し、`TOUCH-CS` を High にする。**何も送らない。**
+    pub fn with_shared_bus(
+        driver: Rc<SpiDriver<'static>>,
+        cs: impl OutputPin + 'static,
+    ) -> Result<Self, EspError> {
+        let mut cs = PinDriver::output(cs)?;
+        cs.set_high()?;
+        let device = SpiPort::shared(driver, SPI_CLOCK_HZ)?;
+        Ok(Self {
+            _device: device,
+            _cs: cs,
+        })
     }
 }
 
