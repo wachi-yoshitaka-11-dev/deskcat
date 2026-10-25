@@ -4,7 +4,7 @@
 //!   **`touch-sample-14`だけがこちらである**。1つのdriverがhostを専有し、転送ごとのbusの取り直しがない。
 //! - [`SpiPort::Shared`]: `SpiDeviceDriver`（hardware CSなし）。busを転送ごとに取り、`Rc<SpiDriver>`を共有する。
 //!   LCDを使うbuild（製品build、`bringup-display-13`、`face-21`、`touch-lcd-14`）が使い、LCDとタッチが同じhostにdeviceを持つ。
-//!   `touch-lcd-14`はタッチを読み、ほかのbuildはタッチのdeviceを持つが読まない（`crate::touch`）。
+//!   `touch-lcd-14`と製品buildはタッチを読み、`bringup-display-13`・`face-21`はタッチのdeviceを持つが読まない（`crate::touch`）。
 //!
 //! どちらも`spi_transmit`へ渡す転送は同じで、CSは持たない（呼び出し側が自前のGPIOで扱う）。
 //! 違うのはbus lockを握り続けるか、転送ごとに取るかだけである。

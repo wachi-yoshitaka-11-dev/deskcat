@@ -1,8 +1,12 @@
-//! #14 の試験 build（`touch-sample-14`、`touch-lcd-14`）の `TOUCH-01`（XPT2046）の raw 読み出しと、LCD を描く build が touch を読まずに持つ device（[`IdleTouch`]）。
-//! bus はこの main-loop task が使う。
+//! `TOUCH-01`（XPT2046）の読み出し。3 つの型がある。bus はどれもこの main-loop task が使う。
+//!
+//! - [`StrokeDetector`]：製品 build の撫での判定。状態機械（`deskcat_touch::TouchTracker`）で撫でを判定し、呼び出し側が
+//!   `head_touched` を Pi へ送る（#21）。
+//! - [`TouchSampler`]：#14 の試験 build（`touch-sample-14`、`touch-lcd-14`）の raw 読み出し。下の段落と「出力と、確かめていないこと」。
+//! - [`IdleTouch`]：LCD を描く試験 build が、touch を読まずに持つ device。
 //!
 //! 制御 byte と 3 byte 応答の復号は `deskcat_touch` が持つ（host test 済み。ここへ再掲しない）。
-//! `POLL_INTERVAL_MS` ごとに `X`・`Y`・`Z1`・`Z2` を 1 回ずつ読み（4 回の転送で 1 sample）、`T_IRQ`（`TOUCH-IRQ`）の level とあわせて
+//! 試験 build（[`TouchSampler`]）は `POLL_INTERVAL_MS` ごとに `X`・`Y`・`Z1`・`Z2` を 1 回ずつ読み（4 回の転送で 1 sample）、`T_IRQ`（`TOUCH-IRQ`）の level とあわせて
 //! UART0 の log へ出す。**状態機械（`deskcat_touch::TouchTracker`）はこの build へ配線しない。**しきい値の根拠になる raw sample を
 //! 取る build であり、仮の値を入れない（`deskcat_touch` の module doc）。
 //!
@@ -17,10 +21,13 @@
 //! - **`touch-lcd-14`（[`TouchSampler::with_shared_bus`]）は LCD と `SpiDriver` を共有する。**`SpiDeviceDriver` で転送ごとに bus を取る。
 //!   `LCD-CS` は LCD の driver（`crate::display`）が持つ。使い方は `crate::touch_lcd`。**この経路は console（stdin）を読まず、`MARK` を受け付けない**
 //!   （`T_IRQ` の変化の記録は同じ）。
-//! - **製品 build と、LCD を描く試験 build（`bringup-display-13`、`face-21`）は [`IdleTouch`] を持つ。**LCD と `SpiDriver` を共有し、touch の
-//!   device を足すが、**touch を読まない**（転送しない）。`TOUCH-CS` を High に保ち、LCD の転送中に XPT2046 を選ばない。`TOUCH-IRQ` は取らない。
-//!   GPIO21 には外部 10 kΩ の pull-up があり（`gpio-assignment.md`）、High に保つのはその電気的な状態と同じ側である。
-//!   touch を読む処理は、状態機械を Pi への撫でる event へつなぐとき（#21）に足す。
+//! - **製品 build（[`StrokeDetector`]）は LCD と `SpiDriver` を共有し、touch を読む。**`X`・`Y`・`Z1` の 3 回の転送で 1 sample で、
+//!   `T_IRQ` は読まず、`TOUCH-IRQ` は取らない。LCD の帯と帯の間（main loop の周回）で読み、帯の途中では読まない（`touch-lcd-14` と同じ）。
+//! - **LCD を描く試験 build（`bringup-display-13`、`face-21` を含む構成）は [`IdleTouch`] を持つ。**LCD と `SpiDriver` を共有し、touch の
+//!   device を足すが、**touch を読まない**（転送しない）。`TOUCH-IRQ` は取らない。
+//!
+//! 製品 build と LCD を描く試験 build は、`TOUCH-CS` を High に保ち、LCD の転送中に XPT2046 を選ばない。GPIO21 には外部 10 kΩ の
+//! pull-up があり（`gpio-assignment.md`）、High に保つのはその電気的な状態と同じ側である。
 //!
 //! どの経路も CS は `crate::display` と同じく、hardware CS なしと自前の GPIO で扱う: idle は High、転送ごとに Low にし、
 //! 転送が失敗しても High へ戻す。
@@ -69,7 +76,9 @@ use std::time::{Duration, Instant};
 
 use std::rc::Rc;
 
-use deskcat_touch::{decode_12bit, frame, Channel, FRAME_LEN};
+use deskcat_touch::{
+    decode_12bit, frame, Channel, Sample, TouchConfig, TouchEvent, TouchTracker, FRAME_LEN,
+};
 use esp_idf_svc::hal::gpio::{Input, InputPin, Output, OutputPin, PinDriver, Pull};
 use esp_idf_svc::hal::spi::config::DriverConfig;
 use esp_idf_svc::hal::spi::{SpiAnyPins, SpiDriver};
@@ -97,6 +106,52 @@ const MARK_READ_BYTES: usize = 32;
 const MARK_IDLE_SLEEP_MS: u64 = 20;
 /// console の読み取り thread の stack（byte）。この stack の大きさで足りるかは、実機で確かめていない。
 const MARK_THREAD_STACK_BYTES: usize = 6144;
+
+/// 製品 build の撫での判定（[`StrokeDetector`]）に渡す値。**どれも暫定の一般値である。**触覚の感度は安全要件の 5 項目に効かない
+/// （外れても誤検出か見逃しになるだけで、何も壊れない。`deskcat_touch` の module doc）。値の置き場はここで、`deskcat_touch` は値を持たない。
+///
+/// `pressure` には `Z1` の raw 値をそのまま使う。根拠は `EXP-038` と `EXP-041`（`docs/hardware/experiment-log.md`）の観測である：`EXP-038` の idle の `z1` は
+/// 0〜69（A・C の窓）、`irq_low=1` の塊 9 個のうち 8 個の `z1` は 213 以上で、残る 1 個は 1 sample で `z1`=2（`x`=0、`y`=4095）だった。`EXP-041` の五点の `z1` の中央値は 342〜2251。
+/// 移動量は隣り合う sample の `|Δx| + |Δy|` を足していくので、押したまま動かさなくても揺れが積もり、長押しが撫でと判定されうる
+/// （`EXP-038` の塊 1 は、167 sample の間に `x` が 3367〜3653 の範囲で揺れた）。誤検出の側の誤りである。
+/// **値は、製品 build を書き込む実機の窓で、撫でと長押しと軽く触れるの判定を数えてから決める。**
+pub const STROKE_PRESS_THRESHOLD: u16 = 150;
+/// 離れたと判定する `Z1` の下限（これ未満）。[`STROKE_PRESS_THRESHOLD`] の doc を参照する。
+pub const STROKE_RELEASE_THRESHOLD: u16 = 100;
+/// 触れたと判定するのに要る、続けて [`STROKE_PRESS_THRESHOLD`] 以上の sample の数。
+pub const STROKE_PRESS_SAMPLES: u16 = 2;
+/// 離れたと判定するのに要る、続けて [`STROKE_RELEASE_THRESHOLD`] 未満の sample の数。
+pub const STROKE_RELEASE_SAMPLES: u16 = 3;
+/// 撫でと判定する、1 回の接触の移動量（raw 値の単位）。`EXP-041` の五点の raw 値は、四隅の中央値の間で `x` も `y` も約 2900〜3000 動く。
+pub const STROKE_TRAVEL: u32 = 600;
+
+const STROKE_CONFIG: TouchConfig = match TouchConfig::new(
+    STROKE_PRESS_THRESHOLD,
+    STROKE_RELEASE_THRESHOLD,
+    STROKE_PRESS_SAMPLES,
+    STROKE_RELEASE_SAMPLES,
+    STROKE_TRAVEL,
+) {
+    Ok(config) => config,
+    Err(_) => panic!("STROKE_* の組み合わせを TouchConfig::new が拒んだ"),
+};
+
+/// 1 回の変換。CS を Low にして 3 byte を転送し、**転送の成否に関わらず** CS を High へ戻す（`crate::display::Ili9341::with_transaction` と同じ）。
+fn convert(
+    bus: &mut SpiPort<'static>,
+    cs: &mut PinDriver<'static, Output>,
+    channel: Channel,
+) -> Result<u16, EspError> {
+    let tx = frame(channel);
+    let mut rx = [0u8; FRAME_LEN];
+    cs.set_low()?;
+    let result = bus.transfer(&mut rx, &tx);
+    let released = cs.set_high();
+    match result {
+        Ok(()) => released.map(|()| decode_12bit(rx)),
+        Err(err) => Err(err),
+    }
+}
 
 /// 1 回の変換の結果（12 bit、straight binary）。
 #[derive(Clone, Copy)]
@@ -363,6 +418,144 @@ impl IdleTouch {
     }
 }
 
+/// 製品 build の撫での判定。LCD と bus を共有し、[`POLL_INTERVAL_MS`] ごとに `X`・`Y`・`Z1` を読んで `deskcat_touch::TouchTracker` へ渡す
+/// （module doc「配線と bus の共有」）。`T_IRQ` は読まない（状態機械の入力ではない）。
+///
+/// [`StrokeDetector::poll`] は、状態機械が `Stroke` を出した poll で、Pi link の session が確立していれば、接触の始まりからの時間（ms）を返す。
+/// 呼び出し側はそれを `head_touched` の `duration_ms` として送る（`docs/protocol/esp32-pi-protocol.md` §4.2）。`Stroke` は 1 回の接触につき
+/// 1 回しか出ないので、送るのも接触 1 回につき 1 回である（転送の失敗で接触の状態を捨てると、その後は別の接触として数えるので、
+/// 指を置いたままの 1 回の操作で 2 回送りうる）。session が無いときの `Stroke` は送らずに捨て、件数を数える。
+/// UART0 の log は event の 3 種類（`touch_event kind=pressed|stroke|released`）と失敗だけで、raw は出さない。
+#[cfg_attr(
+    any(feature = "touch-sample-14", feature = "touch-lcd-14"),
+    allow(dead_code)
+)]
+pub struct StrokeDetector {
+    bus: SpiPort<'static>,
+    cs: PinDriver<'static, Output>,
+    tracker: TouchTracker,
+    next_poll_ms: u64,
+    consecutive_errors: u32,
+    enabled: bool,
+    /// 触れたと判定した poll の時刻。接触していなければ `None`。
+    pressed_at_ms: Option<u64>,
+    spi_errors: u32,
+    strokes_sent: u32,
+    strokes_dropped_no_session: u32,
+}
+
+#[cfg_attr(
+    any(feature = "touch-sample-14", feature = "touch-lcd-14"),
+    allow(dead_code)
+)]
+impl StrokeDetector {
+    /// **LCD と共有する `driver`** に [`SPI_CLOCK_HZ`] の device を足し、`TOUCH-CS` を High にする。**この段では何も送らない**（最初の転送は `poll`）。
+    pub fn with_shared_bus(
+        driver: Rc<SpiDriver<'static>>,
+        cs: impl OutputPin + 'static,
+        now_ms: u64,
+    ) -> Result<Self, EspError> {
+        let mut cs = PinDriver::output(cs)?;
+        cs.set_high()?;
+        let bus = SpiPort::shared(driver, SPI_CLOCK_HZ)?;
+        Ok(Self {
+            bus,
+            cs,
+            tracker: TouchTracker::new(STROKE_CONFIG),
+            next_poll_ms: now_ms,
+            consecutive_errors: 0,
+            enabled: true,
+            pressed_at_ms: None,
+            spi_errors: 0,
+            strokes_sent: 0,
+            strokes_dropped_no_session: 0,
+        })
+    }
+
+    /// 次に動く時刻（uptime の ms）。止まっていれば `None`。
+    pub fn next_deadline_ms(&self) -> Option<u64> {
+        self.enabled.then_some(self.next_poll_ms)
+    }
+
+    /// 時刻に達していれば 1 sample 読む。**`head_touched` を送るべきなら、接触の始まりからの時間（ms）を返す。**
+    pub fn poll(&mut self, now_ms: u64, session_established: bool) -> Option<u32> {
+        if !self.enabled || now_ms < self.next_poll_ms {
+            return None;
+        }
+        self.next_poll_ms = now_ms + POLL_INTERVAL_MS;
+        let sample = match self.read_sample() {
+            Ok(sample) => sample,
+            Err(err) => {
+                self.on_spi_error(&err);
+                return None;
+            }
+        };
+        self.consecutive_errors = 0;
+        match self.tracker.update(sample)? {
+            TouchEvent::Pressed { x, y } => {
+                self.pressed_at_ms = Some(now_ms);
+                log::info!(
+                    "touch_event kind=pressed x={x} y={y} z1={}",
+                    sample.pressure
+                );
+                None
+            }
+            TouchEvent::Stroke { travel } => {
+                let started = self.pressed_at_ms.unwrap_or(now_ms);
+                let duration_ms = u32::try_from(now_ms.saturating_sub(started)).unwrap_or(u32::MAX);
+                if session_established {
+                    self.strokes_sent = self.strokes_sent.saturating_add(1);
+                } else {
+                    self.strokes_dropped_no_session =
+                        self.strokes_dropped_no_session.saturating_add(1);
+                }
+                log::info!(
+                    "touch_event kind=stroke travel={travel} duration_ms={duration_ms} send={session_established} sent={} dropped_no_session={}",
+                    self.strokes_sent,
+                    self.strokes_dropped_no_session
+                );
+                session_established.then_some(duration_ms)
+            }
+            TouchEvent::Released {
+                samples,
+                travel,
+                stroked,
+            } => {
+                self.pressed_at_ms = None;
+                log::info!(
+                    "touch_event kind=released samples={samples} travel={travel} stroked={stroked}"
+                );
+                None
+            }
+        }
+    }
+
+    fn read_sample(&mut self) -> Result<Sample, EspError> {
+        let x = convert(&mut self.bus, &mut self.cs, Channel::X)?;
+        let y = convert(&mut self.bus, &mut self.cs, Channel::Y)?;
+        let z1 = convert(&mut self.bus, &mut self.cs, Channel::Z1)?;
+        Ok(Sample { pressure: z1, x, y })
+    }
+
+    /// 転送の失敗。接触の途中の状態を捨て（失敗した sample の前後を 1 回の接触として扱わない）、続けて
+    /// [`MAX_CONSECUTIVE_ERRORS`] 回失敗したら止める。
+    fn on_spi_error(&mut self, err: &EspError) {
+        self.spi_errors = self.spi_errors.saturating_add(1);
+        self.consecutive_errors += 1;
+        self.tracker.reset();
+        self.pressed_at_ms = None;
+        log::error!(
+            "touch_fault kind=spi error={err} count={} consecutive={}",
+            self.spi_errors,
+            self.consecutive_errors
+        );
+        if self.consecutive_errors >= MAX_CONSECUTIVE_ERRORS {
+            self.enabled = false;
+            log::error!("touch_stroke_stopped spi_errors={}", self.spi_errors);
+        }
+    }
+}
+
 pub struct TouchSampler {
     bus: SpiPort<'static>,
     cs: PinDriver<'static, Output>,
@@ -509,17 +702,8 @@ impl TouchSampler {
         })
     }
 
-    /// 1 回の変換。CS を Low にして 3 byte を転送し、**転送の成否に関わらず** CS を High へ戻す（`crate::display::Ili9341::with_transaction` と同じ）。
     fn convert(&mut self, channel: Channel) -> Result<u16, EspError> {
-        let tx = frame(channel);
-        let mut rx = [0u8; FRAME_LEN];
-        self.cs.set_low()?;
-        let result = self.bus.transfer(&mut rx, &tx);
-        let released = self.cs.set_high();
-        match result {
-            Ok(()) => released.map(|()| decode_12bit(rx)),
-            Err(err) => Err(err),
-        }
+        convert(&mut self.bus, &mut self.cs, channel)
     }
 
     fn accept(&mut self, raw: Raw, irq_low: bool) {
