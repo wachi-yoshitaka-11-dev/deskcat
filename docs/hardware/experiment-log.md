@@ -53,6 +53,7 @@
 | [EXP-039](#exp-039-製品buildfeatureなしでadxl345accel-01を叩きtappedがpiへ届いてsurprisedがlcdに出るまでを観察した) | [#22](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/22)の実機の窓。製品build（featureなし）で、ADXL345のmoduleを指で軽く叩いた間の経路（`tap_detected`→`tapped`→Pi→`set_expression Surprised`→`face_drawn`）と、静止区間の`tap_detected`の件数を観察した | 値の正なし（観測の記録。12件の標本で`B − A`は540〜550 ms。静止区間は1回目60秒で0件、取り直しは`deskcatd`が止まっていてPiに届く経路ではない。Pi側のlogに受理の行は無い。受け入れ条件の判定は書かない） |
 | [EXP-040](#exp-040-製品buildfeatureなしを入れ替えたdeskcatddevelop-c9c3d25につないでtapのsurprisedまでをpi側の受信時刻つきで取りpiに届く経路で静止区間を2回取った) | [#22](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/22)の2回目の実機の窓。製品build（featureなし）を、入れ替えた`deskcatd`（develop `c9c3d25`）につなぎ、ADXL345のmoduleを叩いた間の経路をPi側の受信時刻つきで取り、Piに届く経路で静止区間を2回取った | 値の正なし（観測の記録。ESP32の`Send`は9件、Pi側の`tapped_received`は9件、`B − A`は540〜590 ms（8件）、静止区間の`tap_detected`は60秒×2とも0件。受け入れ条件の判定は書かない） |
 | [EXP-041](#exp-041-touch-sample-14とtouch-lcd-14をtouch用5本を足した配線で動かしmarkの時刻つきで見逃しを数えlcdを描きながらtouchを読んだ) | [#14](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/14)の2回目の実機の窓。製品build（書き込みなし）でLCDの描画を目視し、`touch-sample-14`で操作ごとの`MARK`と`T_IRQ`の変化の時刻を突き合わせ、`touch-lcd-14`でLCDを描きながらtouchを読んだ | 値の正なし（観測の記録。受け入れ条件の判定は書かない） |
+| [EXP-042](#exp-042-bme280env-01の試験buildenv-sample-16-repeatで変換を繰り返す間のheartbeatの間隔switchbotとの並置橙の線sdiを抜いた起動を観察した) | [#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16)の受け入れ条件3・4・5の実機観察。変換を繰り返す試験build（`env-sample-16-repeat`）で、heartbeatの間隔とmax_read_gap_msを5回の起動で取り、SwitchBotとBME280の値を3点並べ、橙の線（SDI）を抜いた起動で`env_fault`の分類を見た | 値の正なし（観測の記録。確度、not-ready・`i2c_timeout`の実機での出力、受け入れ条件の判定は書かない） |
 
 **大容量の生dataはこのrepositoryへ入れていない。**保存場所は
 [development-foundation-plan.md](../planning/development-foundation-plan.md)の
@@ -4061,6 +4062,94 @@ touch用5本を足した配線で、製品buildはLCDに顔を描いた（目視
 - 次に実機で通電する場合は、その回の構成を文で示し、ユーザーの承認を新たに取る。
 - 受け入れ条件の判定は、PM（実機）が行う。
 
+## EXP-042: BME280（`ENV-01`）の試験build（`env-sample-16-repeat`）で、変換を繰り返す間のheartbeatの間隔、SwitchBotとの並置、橙の線（SDI）を抜いた起動を観察した
+
+[#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16)の受け入れ条件3（値をreferenceと比較した）、4（該当するtimeout・CRC・not-ready・disconnect動作を分類した）、5（遅い変換が上位taskをblockしない）のための実機観察。`EXP-036`が残した「変換がheartbeatの時刻をまたいだ状態の間隔」を、変換を繰り返す試験build（[PR #636](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/636)）で観察した。**この記録は事実と未確認だけを書く。受け入れ条件を満たしたかの判定は書かない（PM（実機）が行う）。**
+
+| 項目 | 内容 |
+|---|---|
+| Test ID | `EXP-042` |
+| Date | 2026-10-25 JST 09:06〜09:37（UTC 00:06〜00:37。始まりは1回目にUSBを挿した時刻（`/dev/ttyUSB0`の作成時刻00:06:00Z）、終わりは3回目にUSBを抜いたと記録した時刻（00:37:26Z）。USBを挿していた時間は3回の接続の合計で約24.5分） |
+| Operator | USBの抜き挿し、BOOTボタン、橙の線の抜き挿し、DT830Bの読み、SwitchBotの表示の読み取りはユーザー。build、書き込み、UART0のlogの取得、解析、記録は作業セッション（AI） |
+| Hardware revision／Exact components | `MCU-01`（ESP32-DevKitC V4）、`ACCEL-01`、`ENV-01`（BME280、AE-BME280）、`MEAS-04`（SwitchBot温湿度計。model・確度は未取得）、`MEAS-03`（`DT830B`）。`DISP-01`と`TOUCH-01`は挿したまま（この試験buildはLCDを初期化しない） |
+| Wiring revision | 窓の前の状態は記録とユーザーの申告であり、現物は作業セッションが見ていない。LCDの9本とtouch用の5本は挿したまま、Pi側の橙・黄のESP32側、サーボ系、LEDの枝は外れ、ACは抜けている。**橙の線が`ENV-01`の`SDI`と印字されたpinに挿さっていること**は、ユーザーへの問いで確かめた（回答の原文：「橙の線が挿さっている」）。SwitchBotはBME280の基板のすぐ横（回答の原文：「置いた（2〜3 cm）」）。窓の間に触った線は橙の線だけで、ACは抜いたまま（回答の原文：「橙の線だけ・AC は抜いたまま」） |
+| Power supply and current limit | ESP32のUSB（PC）のみ。電流制限は設けていない。電流は測っていない。ACは抜けたまま |
+| Firmware commit/profile | develop `0f901cf259b772632bf03c71250b32372faa1eb1`、debug、`--features env-sample-16-repeat`。ELF sha256 `a09ed6adac5e45886924bc67eb03a1015a485b805bc9fc6ce283d3037f700435`。`git archive`をrepositoryの外へ展開してbuildした（`.embuild`はmain checkoutのものを借りた。Version Recordは無い）。`cargo fmt --all -- --check`・`cargo clippy --all-targets --locked --features env-sample-16-repeat -- -D warnings`・`cargo build --locked --features env-sample-16-repeat`が成功し、`Cargo.lock`は変わらなかった。書き込みの直前に`sha256sum -c`で照合した。起動logの`ELF file SHA256`の先頭（`a09ed6ada...`）は書いたELFと一致した |
+| Configuration | `env-sample-16-repeat`：Chip IDが`0x60`のときだけ`ctrl_hum`・`ctrl_meas`へ書き、oversampling ×16のforced測定を、最初の変換の開始から約30秒、130 ms周期で繰り返す（`ctrl_meas`への書き込みも毎回）。`env_conversion`は毎回（`seq`・`started_ms`付き）、`env_raw`・`env_reading`は1回目だけlogする。I2Cは100 kHz、address `0x76`。heartbeat周期1000 ms、health snapshot周期10000 ms |
+| Measurement equipment | UART0のlog（115200。1回のopenで取り切る`cap16.py`。DTRは常にFalse、RTSはresetの時刻だけ0.1秒True。hostのUTC時刻を各行に付けた）。`MEAS-04`の表示のユーザーの読み取り。`DT830B`（20 kΩレンジ） |
+| Procedure | 1) 1回目にUSBを挿す。BOOTを押したまま挿す手順だったが、**LCDが点いた＝BOOTが効かず、書き込み前の`touch-lcd-14`が1回走った**（ユーザーの回答の原文：「挿した（LCD が点いた）」）。2) `espflash`で書き込み（`--no-stub --after no-reset`）。1回目は`FlashEnd`の`Other (0x1)`で失敗し、2回目（00:08:23Z）が`Flashing has completed!`。読み戻しの照合はしていない。3) BOOTを離し、1回のopen（585秒。ログを開いた時のresetが1回あり、そのうえでスクリプトのRTS resetを5回（t=0.5・40・80・300・540秒））。4) USBを抜く（00:24:45Z）。5) 橙の線を`ENV-01`側だけ抜く。6) USBを挿し（BOOTなし）、60秒（ログを開いた時のresetとスクリプトのreset）。7) USBを抜く（00:28:16Z）。8) 橙の線を`SDI`へ戻し、USBを抜いたままGPIO25と`3V3` pinの間を測る。9) USBを挿し（BOOTなし）、40秒（同上）。10) USBを抜く（00:37:26Zと記録） |
+| Expected result | 変換が繰り返されても、heartbeatの`uptime_ms`の間隔が1000 msのまま、`heartbeat_overrun`が出ない。橙の線を抜いた起動で`env_fault`が出る。戻した後は`env_chip_id raw=0x60`（この窓の依頼で決めた観察項目。受け入れ条件の判定そのものではない） |
+| Measured result | 下記 |
+| Faults | 下記 |
+| Conclusion | 観察した事実は「結果」の節のとおり。受け入れ条件3・4・5の判定は書かない（PM（実機）が行う） |
+| Next safe step | 下記 |
+
+### 結果
+
+**変換を繰り返す間のheartbeat（`env_repeat_done`が出た`run1.log`の5回の起動とも同じ結果。起動の総数ではない）**
+
+- 変換230回（`env_repeat_done conversions=230 duration_ms=30040`）。最初の変換の開始は`started_ms=689`、最後の変換の終わりは30719 ms。この窓の中のheartbeatは30回で、**このうち21回は、ある変換の[`started_ms`, `started_ms`＋`elapsed_ms`]の中に来た**（`elapsed_ms`は`ctrl_meas`の書き込みが返ってから、readyを読んだ後までの値で、main loopの周期とI2Cの時間を含む上限寄りの値。変換時間そのものではない）。
+- heartbeat（`hb`）の`uptime_ms`の隣り合う差は、5回とも**すべて1000 ms**（この窓の中も、窓の後の起動全体〜最長約240秒も）。`heartbeat_overrun`は0件。`env_fault`・panic・task_wdt・brownoutは0件。
+- `env_conversion elapsed_ms`は99〜139 ms（130 ms以上は1回）。変換の開始の間隔は129〜180 ms。
+- health snapshotの`max_read_gap_ms`は、変換の窓の中の3回（10・20・30秒）が5回とも11・58・51。窓の後（変換が止まった後）は49〜50。`EXP-036`の値は22・49。**この値と変換の関係は切り分けていない。**`overrun_ticks=0`、`snapshot_errors=0`。
+- 起動ごとの`env_calibration_read dig_p1=37064 dig_h4=391 dig_h5=50`（`EXP-031`・`EXP-036`と同じ）。
+
+**SwitchBotとの並置**（SwitchBotの値はユーザーが読んだ原文。BME280の値は、各bootの最初の`env_reading`。湿度は`humidity_q22_10_percent`÷1024、気圧は`pressure_q24_8_pa`÷256÷100）
+
+| boot | BME280の時刻（UTC） | BME280の温度／湿度／気圧 | SwitchBot（原文） | 読みを受けた時刻（UTC） |
+|---|---|---|---|---|
+| 1 | 00:08:57.46 | 26.94 ℃／62.82 %／1012.50 hPa | 27.0 ℃、63 % | 2回目のboot（00:09:36）の前後。正確な時刻は記録していない |
+| 4 | 00:13:56.98 | 26.96 ℃／63.17 %／1012.29 hPa | 26.9 ℃、63 % | 00:14:23.9 |
+| 5 | 00:17:56.95 | 27.00 ℃／63.00 %／1012.50 hPa | 26.9 ℃、63 % | 00:22:15.0（**boot 5の約4分後**。回答が遅れた） |
+
+- BME280−SwitchBot：温度は−0.06／＋0.06／＋0.10 ℃、湿度は−0.2／＋0.2／0.0 %。boot 2・3のBME280は26.98・26.99 ℃、62.80・62.68 %（SwitchBotの読みは取っていない）。
+- 気圧は、手元にreferenceが無く比較していない。SwitchBotの確度は未取得で、BME280の確度の範囲内か（Bosch BME280 Data Sheet Rev 1.24：温度±0.5 ℃（0〜65 ℃）、湿度±3 %RH（20〜80 %RH、25 ℃、hysteresis込み）、気圧±1.0 hPa（300〜1100 hPa、0〜65 ℃））は、この比較からは言えない。
+
+**橙の線（SDI）を抜いた起動**（USBを抜いた状態で`ENV-01`側を抜いた。通電中の抜き挿しはしていない。ユーザーの回答の原文：「抜いて置いた」）
+
+- `accel_device_id raw=0xe5`（`ACCEL-01`は応答）。`env_chip_id_read_failed error=ESP_FAIL`、**`env_fault kind=i2c_other stage=chip_id error=ESP_FAIL count=1`**。`i2c_timeout`は出ていない。この起動では`env_calibration_read`以降は出ず、heartbeatは60秒のあいだ続いた。
+- firmwareが分けるのは`i2c_timeout`と`i2c_other`だけで、配線断とNACKは区別できない（`firmware/esp32/src/env_sample.rs`の`io_fault`のコメント）。
+- **戻した後の確認（USBを抜いたまま）：**GPIO25と`3V3` pinの間を`DT830B`の20 kΩレンジで読んだ（ユーザーの回答は「3.15」で、単位は20 kΩレンジの表示。**ユーザーの回答には測った点を聞き返す語が添えられていたため、測った2点がGPIO25と`3V3` pinであることは確認できていない**）。**期待していた約5 kΩ（`ACCEL-01`のpull-up 4個のうちSDAの2本の並列合成5.00 kΩ。[gpio-assignment.md](gpio-assignment.md)の`I2C busの実効pull-up`節）より低く、理由は説明できていない。**記録にある抵抗との並べ方：`ACCEL-01`のSDA側の5.00 kΩだけなら5.00 kΩ。`ENV-01`の`R1`（4.7 kΩ。[sensor-datasheet-notes.md](sensor-datasheet-notes.md)の`Module pull-up`）が`J1`で繋がっているとすると、5.00 kΩと4.7 kΩの並列は約2.42 kΩ。読みの3.15 kΩはどちらとも合わない。`J1`は2026-08-22に開放と実測され、2026-09-22にユーザーが開放のままと申告している。**0 Ωに近い値ではないので、SDAが`CSB`（`J3`経由で`VDD`）へ短絡した形ではない、と作業セッションが判断して通電した。**
+- 戻した後の起動：`env_chip_id raw=0x60`、`env_calibration_read dig_p1=37064 dig_h4=391 dig_h5=50`、変換230回。最初の`env_reading`の温度は27.98 ℃（直前の起動は26.94〜27.00 ℃。ユーザーが線を戻した直後で、この差の原因は調べていない）。
+
+**CRC・not-ready・timeout（コード上の分類。実機で起こしたのは上の`i2c_other`だけ）**
+
+- not-ready：`crates/deskcat-env/src/lib.rs`に`RegisterFault::CalibrationNotReady`・`MeasurementNotReady`、`firmware/esp32/src/env_sample.rs`に`env_fault kind=calibration_timeout`・`measurement_timeout`（develop `0f901cf`で確認）。**実機では起こしていない。**
+- timeout：`env_fault kind=i2c_timeout`が同fileで定義されている。**実機では出していない。**
+- CRC：BME280のI2Cにデータのcrcは無い。Bosch BME280 Data Sheet Rev 1.24（取得2026-10-24。sha256 `a2ccdb449fec94380742fe8eec851a11d9bd4142252d332b34682b4deecd7d89`）の本文に「CRC」の語が0件（`pdftotext`による）。
+
+### 承認と判断の記録
+
+- **通電の承認：**作業セッションがユーザーへ1問で訊いた（満たさない条件を問いの本文に明記）。回答の原文は「承認する」。満たさない条件：`power-budget.md`の条件(2)（通電してよいのは`bringup-i2c-15-16`だけ）、条件(5)(a)（module電源pinの独立性）と(b)（pull-upの実効抵抗）、`ENV-01`の`J3`の導通は未測定、`firmware/esp32/README.md`の表で`env-sample-16-repeat`は通電「不可」（理由は「新しい書き込みを含む構成の通電手順と承認が未確定」）、`env-sample-16-repeat`をLCDとtouchを挿した配線で通電した記録は無い。承認の上限は、USBを挿している時間の合計25分、ESP32の起動は最大10回。起動の回数の上限は超えた（Faultsのとおり）。LCDとtouchを挿したまま通電することは、PM（実機）の判断（この試験buildはLCDを初期化せず、LCD・touchのpin（GPIO4・16・17・18・19・21・22・23・34）はI2C（GPIO25・26）と重ならない。`gpio-assignment.md`と`main.rs`で確認）。
+- **橙の線の抜き挿し：**別の1問で訊いた。回答の原文は「承認する」。
+- **無給電の確認：**項目1（`ENV-01`・`ACCEL-01`の`VDD`–GND間）は**行わなかった**。理由はユーザーの判断で、前の窓で確認済みと認識していること（省くという決定の原文は「…であれば省いて」）。項目5・6・7（目視）は問わず、記録（`EXP-036`・`EXP-038`・`EXP-040`の終わりの状態）との照合だけを行った。**これは現物の確認ではなく、項目1・5・6・7を満たしたとは書かない。**
+- 書き込みの`FlashEnd`エラーは、`EXP-031`・`EXP-036`と同じく1回目に出て2回目に成功した。原因は調べていない。
+
+### Faults
+
+- 満たさなかった条件は上の「承認と判断の記録」のとおり。
+- 1回目のUSBでBOOTが効かず、書き込み前の`touch-lcd-14`が1回走ってLCDが点いた。
+- **起動の回数が、承認した上限（最大10回）を超えた。**ログの`rst:0x1`の行は、`run1.log`が6（ログを開いた時のreset 1と、スクリプトのRTS reset 5）、`run2-sda-off.log`が2、`run3-restored.log`が2で、計10。これに、1回目のUSBで走った`touch-lcd-14`の1回を足すと11回で、上限を1回超えた。`run2`・`run3`のUSBを挿した直後の起動は、ログを開く前に走るので`rst`の行が無く、さらに2回あったと考えられる（ログに残っていないので、この2回は推定）。ログを開いた時のresetは、DTRとRTSをFalseにしたスクリプトでも起きた（ログを開く操作でDTR・RTSの状態が変わったことが原因と作業セッションは推定した。切り分けていない）。窓の中では超えたことに気づかず、上限の延長を訊いていない。`env-sample-16-repeat`が最後まで走った（`env_repeat_done`が出た）のは`run1.log`の5回と`run3-restored.log`の1回。USBを挿していた時間は約24.5分で、上限の25分の手前。
+- 3回目のSwitchBotの読みがboot 5の約4分後だった。1回目の読みの時刻は記録していない。
+- GPIO25と`3V3`の間の3.15 kΩが、期待の約5 kΩと合わない理由は未解明。
+- 戻した後の最初の温度27.98 ℃が、直前より約1 ℃高い理由は調べていない。
+- ログの原本（3本）は、MACを含みうるのでrepositoryの外にある：`run1.log` sha256 `20cc8589184865324e587cb1a5dfe7331377e1359d13b6ad29a77144d18277c4`（585秒。`env_repeat_done`が5本）、`run2-sda-off.log` sha256 `b609ae38402d48efc05bca126c76988d45f93596e8872c2191de5e87fc08cf2b`、`run3-restored.log` sha256 `bdab1e020c5d4004dd2de9b76682be9dfeeb0ffdfd5b86f5ed2ba8693e04c64b`。
+
+### この記録が主張しないこと
+
+- 受け入れ条件3・4・5を満たしたかの判定。
+- BME280の確度。SwitchBotの確度が未取得で、気圧のreferenceが無く、ESP32の自己加熱の影響は切り分けていない。
+- not-readyと`i2c_timeout`が実機で出ること、通電中のdisconnect、存在しないaddress（0x77）のNACK。
+- 製品buildの動作。`J3`の導通。`module電源pinの独立性`、pull-upの実効抵抗。
+- `max_read_gap_ms`と変換の関係。
+
+### Next safe step
+
+- 終わりの状態：ESP32のUSBは抜けている（ユーザーの回答の原文：「抜いた」。PCから`/dev/ttyUSB*`が消えたことを確認）。ACは抜けたまま。触った線は橙の線だけで、`SDI`へ戻した。flashには`env-sample-16-repeat`が入っている。SwitchBotはBME280の横に置いたまま。
+- **次にUSBを挿すと`env-sample-16-repeat`が走る**（LCDは点かない。`ctrl_meas`へ約230回書く）。
+- 次に実機で通電する場合は、その回の構成を文で示し、ユーザーの承認を新たに取る。
+- 受け入れ条件の判定は、PM（実機）が行う。
+
 ## Revision履歴
 
 | 日付 | Revision | 変更 | 根拠 |
@@ -4114,3 +4203,4 @@ touch用5本を足した配線で、製品buildはLCDに顔を描いた（目視
 | 2026-10-24 | 46 | [#22](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/22)。**`EXP-040`を追加した。**製品build（featureなし、develop `4a1ad55`、書き込みなし）に、入れ替えた`deskcatd`（develop `c9c3d25`）をつなぎ、ADXL345のmoduleを叩いた。Pi側の`tapped_received`は9件（ESP32の`Send`と同数）、`B − A`は540〜590 ms（8件）、Piに届く経路の静止60秒×2の`tap_detected`は0件。2つの時計の差は測っていない。**承認の2分の目視が最初は約16秒だった点、合図と`Send`の約10秒のずれを記録した。** | [#22のcomment 6382431151](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/22#issuecomment-6382431151)、`EXP-040`の記録 |
 | 2026-10-24 | 47 | [#14](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/14)。**`EXP-041`を追加した。**touch用5本を足した配線で、製品build（書き込みなし）のLCDの描画を目視し、`touch-sample-14`で操作40件の`MARK`と`T_IRQ`の変化の時刻を突き合わせ（見逃し6件はすべて「軽く触れる」、窓の外の`level=low`は0件）、`touch-lcd-14`でLCDを描きながらtouchを読んだ（LCD・touchのSPIの失敗0件、合図20件の見逃し0件）。**1回目は画面が触られていない回で、取り直した経緯、導通確認を行っていないこと、操作の回数に導出した根拠が無いことを記録した。** | [#14のcomment 6384786098](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/14#issuecomment-6384786098)、`EXP-041`の記録 |
 | 2026-10-24 | 48 | [#22](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/22)。**後始末：`EXP-040`の行を、冒頭の一覧表へ足した。**`EXP-040`の節は[PR #647](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/647)で足してあり、一覧表の行だけが抜けていた。`EXP-040`の本文は変えていない。 | [PR #647](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/647)の差分、`EXP-040`の節 |
+| 2026-10-25 | 49 | [#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16)。**`EXP-042`を追加した。**変換を繰り返す試験build（`env-sample-16-repeat`、develop `0f901cf`）で、`env_repeat_done`が出た5回の起動のheartbeatの間隔（すべて1000 ms）、SwitchBotとBME280の3点の並置、橙の線（SDI）を抜いた起動の`env_fault kind=i2c_other`を記録した。GPIO25と`3V3`の間の3.15 kΩが期待と合わないことも事実として書いた。受け入れ条件の判定は書いていない | `EXP-042`。PM（実機）の依頼 |
