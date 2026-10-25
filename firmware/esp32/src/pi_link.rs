@@ -31,7 +31,7 @@
 //!
 //! `get_status`への`status: ok`のACKと`status`は、1つのbufferへ連結し、1回の[`write_line`]で
 //! 送信のring bufferへ積む。Pi linkのUARTへ書くのは、このmoduleの応答と`BootSession`の`boot`の
-//! 送出と、製品build／`tap-21`試験buildが[`send_event`]で送る`tapped`だけであり、どれもmain loopの同じtaskから呼ぶ。そのため、連結した2行の間に他の行は
+//! 送出と、製品build／`tap-21`試験buildが[`send_event`]で送る`tapped`と、製品buildが同じく送る`head_touched`だけであり、どれもmain loopの同じtaskから呼ぶ。そのため、連結した2行の間に他の行は
 //! 入らない。health snapshot（`main.rs`の`emit_health_snapshot`）はUART0のlogであり、Pi linkへ
 //! `status`を送らない。
 //!

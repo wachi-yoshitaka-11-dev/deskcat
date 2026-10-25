@@ -70,7 +70,7 @@ tap-21 = []
 # **logを足すだけで、LCD・Pi link・tapの挙動は変えない。製品buildには入らない。**ESP-IDFの統計を読むAPIは
 # すべて`unsafe`であり、この featureのときだけ`main.rs`の`unsafe_code`が`deny`へ下がる（下の`unsafe_code`の注記）。
 # featureを1つでも指定すると製品経路のcfgが外れるため、製品buildと同じ構成で測るときは
-# `face-21`と`tap-21`を足す。`bench-servo-test-17`・`env-sample-16`・`accel-sample-15`・
+# `face-21`と`tap-21`を足す（タッチの撫での判定は製品buildだけが持ち、この構成には入らない）。`bench-servo-test-17`・`env-sample-16`・`accel-sample-15`・
 # `touch-sample-14`・`touch-lcd-14`・`bringup-i2c-15-16`・`bringup-led-514`とは併用できない（`main.rs`の`compile_error!`）。
 mem-probe-23 = []
 # Issue #14 の `TOUCH-01`（XPT2046）の raw 読み出し専用。SPI3（GPIO18/23/19）で X・Y・Z1・Z2 を読み、`TOUCH-IRQ`（GPIO34）の level とあわせて
