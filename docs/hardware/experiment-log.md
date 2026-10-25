@@ -4077,7 +4077,7 @@ touch用5本を足した配線で、製品buildはLCDに顔を描いた（目視
 | Firmware commit/profile | develop `0f901cf259b772632bf03c71250b32372faa1eb1`、debug、`--features env-sample-16-repeat`。ELF sha256 `a09ed6adac5e45886924bc67eb03a1015a485b805bc9fc6ce283d3037f700435`。`git archive`をrepositoryの外へ展開してbuildした（`.embuild`はmain checkoutのものを借りた。Version Recordは無い）。`cargo fmt --all -- --check`・`cargo clippy --all-targets --locked --features env-sample-16-repeat -- -D warnings`・`cargo build --locked --features env-sample-16-repeat`が成功し、`Cargo.lock`は変わらなかった。書き込みの直前に`sha256sum -c`で照合した。起動logの`ELF file SHA256`の先頭（`a09ed6ada...`）は書いたELFと一致した |
 | Configuration | `env-sample-16-repeat`：Chip IDが`0x60`のときだけ`ctrl_hum`・`ctrl_meas`へ書き、oversampling ×16のforced測定を、最初の変換の開始から約30秒、130 ms周期で繰り返す（`ctrl_meas`への書き込みも毎回）。`env_conversion`は毎回（`seq`・`started_ms`付き）、`env_raw`・`env_reading`は1回目だけlogする。I2Cは100 kHz、address `0x76`。heartbeat周期1000 ms、health snapshot周期10000 ms |
 | Measurement equipment | UART0のlog（115200。1回のopenで取り切る`cap16.py`。DTRは常にFalse、RTSはresetの時刻だけ0.1秒True。hostのUTC時刻を各行に付けた）。`MEAS-04`の表示のユーザーの読み取り。`DT830B`（20 kΩレンジ） |
-| Procedure | 1) 1回目にUSBを挿す。BOOTを押したまま挿す手順だったが、**LCDが点いた＝BOOTが効かず、書き込み前の`touch-lcd-14`が1回走った**（ユーザーの回答の原文：「挿した（LCD が点いた）」）。2) `espflash`で書き込み（`--no-stub --after no-reset`）。1回目は`FlashEnd`の`Other (0x1)`で失敗し、2回目（00:08:23Z）が`Flashing has completed!`。読み戻しの照合はしていない。3) BOOTを離し、1回のopen（585秒）の中でRTS resetを5回（t=0.5・40・80・300・540秒）。4) USBを抜く（00:24:45Z）。5) 橙の線を`ENV-01`側だけ抜く。6) USBを挿し（BOOTなし）、60秒（resetを1回）。7) USBを抜く（00:28:16Z）。8) 橙の線を`SDI`へ戻し、USBを抜いたままGPIO25と`3V3` pinの間を測る。9) USBを挿し（BOOTなし）、40秒（resetを1回）。10) USBを抜く（00:37:26Zと記録） |
+| Procedure | 1) 1回目にUSBを挿す。BOOTを押したまま挿す手順だったが、**LCDが点いた＝BOOTが効かず、書き込み前の`touch-lcd-14`が1回走った**（ユーザーの回答の原文：「挿した（LCD が点いた）」）。2) `espflash`で書き込み（`--no-stub --after no-reset`）。1回目は`FlashEnd`の`Other (0x1)`で失敗し、2回目（00:08:23Z）が`Flashing has completed!`。読み戻しの照合はしていない。3) BOOTを離し、1回のopen（585秒。ログを開いた時のresetが1回あり、そのうえでスクリプトのRTS resetを5回（t=0.5・40・80・300・540秒））。4) USBを抜く（00:24:45Z）。5) 橙の線を`ENV-01`側だけ抜く。6) USBを挿し（BOOTなし）、60秒（ログを開いた時のresetとスクリプトのreset）。7) USBを抜く（00:28:16Z）。8) 橙の線を`SDI`へ戻し、USBを抜いたままGPIO25と`3V3` pinの間を測る。9) USBを挿し（BOOTなし）、40秒（同上）。10) USBを抜く（00:37:26Zと記録） |
 | Expected result | 変換が繰り返されても、heartbeatの`uptime_ms`の間隔が1000 msのまま、`heartbeat_overrun`が出ない。橙の線を抜いた起動で`env_fault`が出る。戻した後は`env_chip_id raw=0x60`（この窓の依頼で決めた観察項目。受け入れ条件の判定そのものではない） |
 | Measured result | 下記 |
 | Faults | 下記 |
@@ -4086,7 +4086,7 @@ touch用5本を足した配線で、製品buildはLCDに顔を描いた（目視
 
 ### 結果
 
-**変換を繰り返す間のheartbeat（5回の起動とも同じ結果）**
+**変換を繰り返す間のheartbeat（`env_repeat_done`が出た`run1.log`の5回の起動とも同じ結果。起動の総数ではない）**
 
 - 変換230回（`env_repeat_done conversions=230 duration_ms=30040`）。最初の変換の開始は`started_ms=689`、最後の変換の終わりは30719 ms。この窓の中のheartbeatは30回で、**このうち21回は、ある変換の[`started_ms`, `started_ms`＋`elapsed_ms`]の中に来た**（`elapsed_ms`は`ctrl_meas`の書き込みが返ってから、readyを読んだ後までの値で、main loopの周期とI2Cの時間を含む上限寄りの値。変換時間そのものではない）。
 - heartbeat（`hb`）の`uptime_ms`の隣り合う差は、5回とも**すべて1000 ms**（この窓の中も、窓の後の起動全体〜最長約240秒も）。`heartbeat_overrun`は0件。`env_fault`・panic・task_wdt・brownoutは0件。
@@ -4120,7 +4120,7 @@ touch用5本を足した配線で、製品buildはLCDに顔を描いた（目視
 
 ### 承認と判断の記録
 
-- **通電の承認：**作業セッションがユーザーへ1問で訊いた（満たさない条件を問いの本文に明記）。回答の原文は「承認する」。満たさない条件：`power-budget.md`の条件(2)（通電してよいのは`bringup-i2c-15-16`だけ）、条件(5)(a)（module電源pinの独立性）と(b)（pull-upの実効抵抗）、`ENV-01`の`J3`の導通は未測定、`firmware/esp32/README.md`の表で`env-sample-16-repeat`は通電「不可」（理由は「新しい書き込みを含む構成の通電手順と承認が未確定」）、`env-sample-16-repeat`をLCDとtouchを挿した配線で通電した記録は無い。承認の上限は、USBを挿している時間の合計25分、ESP32の起動は最大10回。LCDとtouchを挿したまま通電することは、PM（実機）の判断（この試験buildはLCDを初期化せず、LCD・touchのpin（GPIO4・16・17・18・19・21・22・23・34）はI2C（GPIO25・26）と重ならない。`gpio-assignment.md`と`main.rs`で確認）。
+- **通電の承認：**作業セッションがユーザーへ1問で訊いた（満たさない条件を問いの本文に明記）。回答の原文は「承認する」。満たさない条件：`power-budget.md`の条件(2)（通電してよいのは`bringup-i2c-15-16`だけ）、条件(5)(a)（module電源pinの独立性）と(b)（pull-upの実効抵抗）、`ENV-01`の`J3`の導通は未測定、`firmware/esp32/README.md`の表で`env-sample-16-repeat`は通電「不可」（理由は「新しい書き込みを含む構成の通電手順と承認が未確定」）、`env-sample-16-repeat`をLCDとtouchを挿した配線で通電した記録は無い。承認の上限は、USBを挿している時間の合計25分、ESP32の起動は最大10回。起動の回数の上限は超えた（Faultsのとおり）。LCDとtouchを挿したまま通電することは、PM（実機）の判断（この試験buildはLCDを初期化せず、LCD・touchのpin（GPIO4・16・17・18・19・21・22・23・34）はI2C（GPIO25・26）と重ならない。`gpio-assignment.md`と`main.rs`で確認）。
 - **橙の線の抜き挿し：**別の1問で訊いた。回答の原文は「承認する」。
 - **無給電の確認：**項目1（`ENV-01`・`ACCEL-01`の`VDD`–GND間）は**行わなかった**。理由はユーザーの判断で、前の窓で確認済みと認識していること（省くという決定の原文は「…であれば省いて」）。項目5・6・7（目視）は問わず、記録（`EXP-036`・`EXP-038`・`EXP-040`の終わりの状態）との照合だけを行った。**これは現物の確認ではなく、項目1・5・6・7を満たしたとは書かない。**
 - 書き込みの`FlashEnd`エラーは、`EXP-031`・`EXP-036`と同じく1回目に出て2回目に成功した。原因は調べていない。
@@ -4129,11 +4129,11 @@ touch用5本を足した配線で、製品buildはLCDに顔を描いた（目視
 
 - 満たさなかった条件は上の「承認と判断の記録」のとおり。
 - 1回目のUSBでBOOTが効かず、書き込み前の`touch-lcd-14`が1回走ってLCDが点いた。
-- 起動の回数は10回前後（`touch-lcd-14`1回、RTS reset 5回、橙の線を抜いた起動2回（USBを挿した起動とreset）、戻した後の起動2回）。上限は10回。USBを挿していた時間は約24.5分で、上限の25分の手前。
+- **起動の回数が、承認した上限（最大10回）を超えた。**ログの`rst:0x1`の行は、`run1.log`が6（ログを開いた時のreset 1と、スクリプトのRTS reset 5）、`run2-sda-off.log`が2、`run3-restored.log`が2で、計10。これに、1回目のUSBで走った`touch-lcd-14`の1回を足すと11回で、上限を1回超えた。`run2`・`run3`のUSBを挿した直後の起動は、ログを開く前に走るので`rst`の行が無く、さらに2回あったと考えられる（ログに残っていないので、この2回は推定）。ログを開いた時のresetは、DTRとRTSをFalseにしたスクリプトでも起きた（ログを開く操作でDTR・RTSの状態が変わったことが原因と作業セッションは推定した。切り分けていない）。窓の中では超えたことに気づかず、上限の延長を訊いていない。`env-sample-16-repeat`が最後まで走った（`env_repeat_done`が出た）のは`run1.log`の5回と`run3-restored.log`の1回。USBを挿していた時間は約24.5分で、上限の25分の手前。
 - 3回目のSwitchBotの読みがboot 5の約4分後だった。1回目の読みの時刻は記録していない。
 - GPIO25と`3V3`の間の3.15 kΩが、期待の約5 kΩと合わない理由は未解明。
 - 戻した後の最初の温度27.98 ℃が、直前より約1 ℃高い理由は調べていない。
-- ログの原本（3本）は、MACを含みうるのでrepositoryの外にある：`run1.log` sha256 `20cc8589184865324e587cb1a5dfe7331377e1359d13b6ad29a77144d18277c4`（5回のresetの585秒）、`run2-sda-off.log` sha256 `b609ae38402d48efc05bca126c76988d45f93596e8872c2191de5e87fc08cf2b`、`run3-restored.log` sha256 `bdab1e020c5d4004dd2de9b76682be9dfeeb0ffdfd5b86f5ed2ba8693e04c64b`。
+- ログの原本（3本）は、MACを含みうるのでrepositoryの外にある：`run1.log` sha256 `20cc8589184865324e587cb1a5dfe7331377e1359d13b6ad29a77144d18277c4`（585秒。`env_repeat_done`が5本）、`run2-sda-off.log` sha256 `b609ae38402d48efc05bca126c76988d45f93596e8872c2191de5e87fc08cf2b`、`run3-restored.log` sha256 `bdab1e020c5d4004dd2de9b76682be9dfeeb0ffdfd5b86f5ed2ba8693e04c64b`。
 
 ### この記録が主張しないこと
 
@@ -4203,4 +4203,4 @@ touch用5本を足した配線で、製品buildはLCDに顔を描いた（目視
 | 2026-10-24 | 46 | [#22](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/22)。**`EXP-040`を追加した。**製品build（featureなし、develop `4a1ad55`、書き込みなし）に、入れ替えた`deskcatd`（develop `c9c3d25`）をつなぎ、ADXL345のmoduleを叩いた。Pi側の`tapped_received`は9件（ESP32の`Send`と同数）、`B − A`は540〜590 ms（8件）、Piに届く経路の静止60秒×2の`tap_detected`は0件。2つの時計の差は測っていない。**承認の2分の目視が最初は約16秒だった点、合図と`Send`の約10秒のずれを記録した。** | [#22のcomment 6382431151](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/22#issuecomment-6382431151)、`EXP-040`の記録 |
 | 2026-10-24 | 47 | [#14](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/14)。**`EXP-041`を追加した。**touch用5本を足した配線で、製品build（書き込みなし）のLCDの描画を目視し、`touch-sample-14`で操作40件の`MARK`と`T_IRQ`の変化の時刻を突き合わせ（見逃し6件はすべて「軽く触れる」、窓の外の`level=low`は0件）、`touch-lcd-14`でLCDを描きながらtouchを読んだ（LCD・touchのSPIの失敗0件、合図20件の見逃し0件）。**1回目は画面が触られていない回で、取り直した経緯、導通確認を行っていないこと、操作の回数に導出した根拠が無いことを記録した。** | [#14のcomment 6384786098](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/14#issuecomment-6384786098)、`EXP-041`の記録 |
 | 2026-10-24 | 48 | [#22](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/22)。**後始末：`EXP-040`の行を、冒頭の一覧表へ足した。**`EXP-040`の節は[PR #647](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/647)で足してあり、一覧表の行だけが抜けていた。`EXP-040`の本文は変えていない。 | [PR #647](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/647)の差分、`EXP-040`の節 |
-| 2026-10-25 | 49 | [#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16)。**`EXP-042`を追加した。**変換を繰り返す試験build（`env-sample-16-repeat`、develop `0f901cf`）で、5回の起動のheartbeatの間隔（すべて1000 ms）、SwitchBotとBME280の3点の並置、橙の線（SDI）を抜いた起動の`env_fault kind=i2c_other`を記録した。GPIO25と`3V3`の間の3.15 kΩが期待と合わないことも事実として書いた。受け入れ条件の判定は書いていない | `EXP-042`。PM（実機）の依頼 |
+| 2026-10-25 | 49 | [#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16)。**`EXP-042`を追加した。**変換を繰り返す試験build（`env-sample-16-repeat`、develop `0f901cf`）で、`env_repeat_done`が出た5回の起動のheartbeatの間隔（すべて1000 ms）、SwitchBotとBME280の3点の並置、橙の線（SDI）を抜いた起動の`env_fault kind=i2c_other`を記録した。GPIO25と`3V3`の間の3.15 kΩが期待と合わないことも事実として書いた。受け入れ条件の判定は書いていない | `EXP-042`。PM（実機）の依頼 |
