@@ -55,6 +55,7 @@
 | [EXP-041](#exp-041-touch-sample-14とtouch-lcd-14をtouch用5本を足した配線で動かしmarkの時刻つきで見逃しを数えlcdを描きながらtouchを読んだ) | [#14](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/14)の2回目の実機の窓。製品build（書き込みなし）でLCDの描画を目視し、`touch-sample-14`で操作ごとの`MARK`と`T_IRQ`の変化の時刻を突き合わせ、`touch-lcd-14`でLCDを描きながらtouchを読んだ | 値の正なし（観測の記録。受け入れ条件の判定は書かない） |
 | [EXP-042](#exp-042-bme280env-01の試験buildenv-sample-16-repeatで変換を繰り返す間のheartbeatの間隔switchbotとの並置橙の線sdiを抜いた起動を観察した) | [#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16)の受け入れ条件3・4・5の実機観察。変換を繰り返す試験build（`env-sample-16-repeat`）で、heartbeatの間隔とmax_read_gap_msを5回の起動で取り、SwitchBotとBME280の値を3点並べ、橙の線（SDI）を抜いた起動で`env_fault`の分類を見た | 値の正なし（観測の記録。確度、not-ready・`i2c_timeout`の実機での出力、受け入れ条件の判定は書かない） |
 | [EXP-043](#exp-043-accel-01adxl345の静止sampleを5姿勢で取りaccel-sample-15叩く強さを段階づけてtap_detectedを合図の時刻つきで数えたtap-21) | [#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)の受け入れ条件の実機観察。`accel-sample-15`で5姿勢の静止sampleを取って3軸のoffsetと感度をあてはめ、`tap-21`で叩く強さを段階づけて`tap_detected`を合図の時刻つきで数えた | 値の正なし（観測の記録。受け入れ条件の判定は書かない） |
+| [EXP-044](#exp-044-製品buildfeatureなしdevelop-f3a3a97をesp32に書き込みdeskcatddevelop-c9c3d25につないで撫で長押し軽く触れるのstroke判定の回数とhead_touchedからhappyまで叩く回帰を観察した) | [#21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)の実機の窓。製品build（develop `f3a3a97`）を書き込み、`deskcatd`につないで、撫で・長押し・軽く触れるの`stroke`判定の回数と、`head_touched`から`Happy`まで、叩く回帰を観察した | 値の正なし（観測の記録。受け入れ条件の判定は書かない） |
 
 **大容量の生dataはこのrepositoryへ入れていない。**保存場所は
 [development-foundation-plan.md](../planning/development-foundation-plan.md)の
@@ -4238,6 +4239,110 @@ touch用5本を足した配線で、製品buildはLCDに顔を描いた（目視
 - 次に実機で通電する場合は、その回の構成を文で示し、ユーザーの承認を新たに取る。
 - 受け入れ条件の判定は、PM（実機）が行う。
 
+## EXP-044: 製品build（featureなし、develop `f3a3a97`）をESP32に書き込み、`deskcatd`（develop `c9c3d25`）につないで、撫で・長押し・軽く触れるの`stroke`判定の回数と、`head_touched`から`Happy`まで、叩く回帰を観察した
+
+[#21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)の実機の窓。#649でLCDとtouchがSPIを共有する型へ移した製品buildを実機で動かすのは、この窓が初めて。人間の立ち会いのもとで1回。実行承認は[#21のcomment 6399219883](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21#issuecomment-6399219883)（回答の原文「進めて」。操作・数え方・時間・起動回数は[事前のcomment 6399177700](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21#issuecomment-6399177700)）。**この記録は事実と未確認だけを書く。受け入れ条件の判定は書かない。**ログの原本はrepositoryの外にある（MACを含みうる）。sha256は下の「ログ」。
+
+| 項目 | 内容 |
+|---|---|
+| Test ID | `EXP-044` |
+| Date | 2026-10-26（JST 00:03〜00:23。UTC 2026-10-25 15:03〜15:23。USBを挿したのは15:03:16Z、抜けたのは15:22:50Zのログ） |
+| Operator | USBとUARTの線（橙・黄）の挿し抜き、画面を押す・なぞる・叩く操作、LCDの目視はユーザー。espflashの書き込み、ESP32のログ取得、sshでのPiの確認と`deskcatd`の起動・停止、合図の記録はこのセッション（AI） |
+| Hardware revision／Exact components | `MCU-01`、`DISP-01`／`TOUCH-01`、`ACCEL-01`、`ENV-01`、`SBC-01`。Piの給電は`PSU-PI-A-02` |
+| Wiring revision | 窓の前（通電前の目視。回答の原文「5点とも合っている」）：USB抜け、AC抜け、橙・黄のESP32側が抜け、LCDの9本・touch用5本が挿さっている、灰のGND線は抜き差ししていない、LED・サーボ系が外れている。**現物は作業セッションが見ていない。GND線の導通は測り直していない。**橙（GPIO14）・黄（GPIO13）は目視の後（回答「挿した」は15:06:48Z）にユーザーが挿し、窓の終わりにUSBより先に抜いた |
+| Power supply and current limit | ESP32はこの端末のUSB。Piは別電源。電流・電圧・温度は測っていない。Piの`throttled`は窓の前後で`0x0`（Pi Zero Wでは電圧の根拠にならない。`EXP-009`） |
+| Firmware commit/profile | ESP32：develop `f3a3a97`、featureなし、debug。`git archive`をrepositoryの外へ展開してbuild（`cargo clippy --all-targets --locked -- -D warnings`と`cargo build --locked`が成功、警告0、`Cargo.lock`不変）。ELFのsha256 `aaacf3adfaa796f92513d8bb03297073b46472bf82f49d9f98fa877e1be30c36`（書き込みの直前に`sha256sum -c`で照合。起動logの`ELF file SHA256: aaacf3adf...`の先頭9桁が一致）。書き込みは`espflash flash --after no-reset`（BOOTボタンは使わず自動でbootloaderに入った）。Pi：`/usr/local/bin/deskcatd`はdevelop `c9c3d25`のbuild、sha256 `5b6bb7cfb1e4ac9495d25c9ed475b584684bdf1ff5ac5553bd0a4675617a0b87`（窓の前にPiの上で照合）。systemdのunitは変えていない |
+| Configuration | 撫での判定は`touch.rs`の暫定値（Z1が150以上を2回で触れた、100未満を3回で離れた、移動量600）。touchの読みは20 msごと。`deskcatd`はsshで手で起動（`timeout 1200 /usr/local/bin/deskcatd --port /dev/serial0 --baud 115200 --duplicate-capacity 8 --duplicate-retention-ms 5000 --startup-deadline-ms 10000 --verbose`）。ESP32のUART0のログは1回のopenで取り切った（`DTR`・`RTS`は常にFalse。resetを指示していない） |
+| Measurement equipment | 無し（ログのみ）。LCDの目視はユーザー |
+| Procedure | 下の「手順と時刻」 |
+| Expected result | 撫でで`touch_event kind=stroke`が出て、`head_touched`がPiに届き、`Happy`が描かれる。叩くと`Surprised`が描かれる。判定の回数は材料（期待値の数は定めていない） |
+| Measured result | 下記 |
+| Faults | 下記 |
+| Conclusion | 下記 |
+
+### 手順と時刻（UTC。2026-10-25）
+
+- 15:03:16：ユーザーがUSBを挿した（`/dev/ttyUSB0`の作成時刻）。flashにはtap-21が残っていた（LCDは点かない見込み）。
+- 15:03:42〜15:04:34：`espflash`で製品buildを書き込んだ（`App/part. size: 924,960/4,128,768 bytes`）。`Staying in bootloader`。
+- 15:04:44：ESP32のログ取得を開始（ポートを開いたときのresetで製品buildが起動。`rst:0x1 (POWERON_RESET)`が1本。backlightが点く起動は1回）。起動のlog：`touch=stroke`、`display_madctl value=0x28 width=320 height=240`、`face_drawn name=Some(Neutral) uptime_ms=779`。
+- 15:04:44〜15:05:5x：LCDの目視（承認が定めた2分のうち約1分。ユーザーが2分待たずに次へ進めるよう求めた。目視の回答の原文は「みました。2分経ってないがこれ以上見なくていいので進めて」）。この間、ログに`panic`・`brownout`・`task_wdt`・`touch_fault`は0件。
+- 15:06:48：橙・黄をユーザーが挿した（回答の原文「挿した」）。**15:06:53.7：`deskcatd`を起動。15:06:53.8（ESP32のログ）：`pi_rx_hello … outcome=Established`、`boot_established sid=52`。**
+- 合図（Terminalパネルのタブの文字。音声はミュート）：静止60秒（15:07:52〜15:08:52）、撫でる15回（最初の合図15:09:04、8秒間隔）、長押し10回（8秒間隔）、軽く触れる10回（8秒間隔）、15:14:08に終了。叩くの前に、ADXL345が動かない状態かを1問で確かめた（回答の原文「いい」）。叩く10回（約10秒間隔）は15:17:30〜15:19:10。
+- 15:21:19：`deskcatd`を止める指示を出した（`timeout`へSIGTERM。`pi-deskcatd.log`の最終行は15:21:20.5。Piで不在を確認）。15:21:58：橙・黄を抜いた（原文「抜いた」）。15:22:50：USBが抜けた（ログのserial error。原文「抜いた」）。`/dev/ttyUSB*`・`/dev/ttyACM*`が無いことを確認した。**USBを挿してから約19.6分（上限30分の内）。**
+
+### 結果
+
+**起動（条件1）**：`panic`・`brownout`・`task_wdt`・`Guru`・`touch_fault`・`touch_stroke_stopped`・`display_driver_new_failed`・`touch_device_new_failed`は、窓の全体で0件。`health`の`overrun_ticks=0`・`snapshot_errors=0`。LCDの目視の申告：起動直後の回答に、顔が出たことと乱れの有無の明示は無い（原文「みました」）。叩いた後の回答で「異常はなかった」。
+
+**stroke判定の回数（条件3）**。窓＝各合図の時刻から次の合図の時刻まで（上限12秒）。`pressed`・`stroke`はESP32のlogの`touch_event`。ユーザーが実際に操作した回数は、logの外に根拠が無い。
+
+| 操作 | 合図 | `pressed`の合計 | `stroke`の合計 | `stroke`が1回以上の合図 | 2回以上の合図 |
+|---|---|---|---|---|---|
+| 静止（60秒） | 1 | 0 | 0 | 0 | 0 |
+| 撫でる | 15 | 25 | 22 | 15 | 4 |
+| 長押し | 10 | 14 | 9 | 7 | 2 |
+| 軽く触れる | 10 | **0** | 0 | 0 | 0 |
+| 叩く | 10 | 0 | 0 | 0 | 0 |
+
+- 窓の外（静止区間・叩く区間・操作の間）の`kind=stroke`：**0件**。全体で`pressed`39件・`stroke`31件・`released`39件（うち`stroked=false`が8件）。`stroke`はすべて`send=true`（`dropped_no_session=0`）。
+- `stroke`時点の`duration_ms`は31〜120 msが25件、414〜860 msが6件。`travel`は602〜984。**ほとんどの`stroke`は、`pressed`の3〜6 sample（約60〜120 ms）後に出ている。**
+- 軽く触れる10回では`pressed`が0件（`EXP-041`の`touch-sample-14`では10件中6件の見逃し）。
+- 直前の`stroke`から1秒未満で出た`stroke`が8件（0.20〜0.86秒）。
+
+**`head_touched`から`Happy`まで（条件2）**：ESP32の`pi_tx`が`head_touched`を送ったのは31件（`stroke`の31件と一致）。Piの`set_expression_queued … Happy`は23件、ESP32の`pi_rx_set_expression … Happy accepted`は23件、`face_drawn name=Some(Happy)`は21件。**Piは`head_touched`の受信を直接logに出さない**（`tapped_received`に当たる行が無い）。Pi側の根拠は`set_expression_queued Happy`と、ESP32側の`pi_rx_set_expression … Happy accepted`から`face_drawn Happy`までの間接的なものだけ。`stroke`のlog時刻から次の`face_drawn Happy`まで2.5秒以内に出たのは31件中23件で、そのうち21件の中央値は0.56秒（最大0.66秒、`face_drawn`が描く先のtickの刻み）。残る8件は、2.5秒以内に`Happy`が描かれなかった。理由を、既にあるログだけで1件ずつ確かめた（新しい測定はしていない）。時刻はESP32のlogのもので、Piの受信時刻との差は測っていない。Piのコードには、新しい`Happy`が描かれない経路が2つある：(1)`crates/deskcat-domain/src/mind.rs`の、同種のeventを前に受け付けてから`same_kind_cooldown_ms`（1000 ms）以内なら`suppressed`と数えて表情を変えない経路、(2)`apps/deskcatd/src/expression_sync.rs`の`next_to_send`が、確認済みの表情が欲しい表情と同じなら送らない経路（`happy_hold_ms`＝3000 msの間は`Happy`が保たれる）。
+
+| `stroke` | 時刻（UTC） | 直前の受理された`stroke`から（秒） | 1000 ms未満（(1)） | 直前の`face_drawn Happy`から（秒） | 3.0秒以内（(2)の前提） | `Happy`の受理（その`stroke`から1秒以内） | その後に受理された`Surprised`（その`stroke`から） |
+|---|---|---|---|---|---|---|---|
+|9|15:09:49.802|0.708|はい|4.19|いいえ|なし|なし|
+|13|15:10:03.269|0.758|はい|0.20|はい|なし|なし|
+|16|15:10:19.513|0.606|はい|0.05|はい|なし|なし|
+|20|15:10:44.534|0.657|はい|0.10|はい|なし|なし|
+|28|15:12:15.569|0.859|はい|0.25|はい|なし|なし|
+|30|15:12:23.238|0.758|はい|0.20|はい|なし|なし|
+|8|15:09:49.094|4.039|いいえ|3.48|いいえ|あり（0.05秒後）|あり（0.355秒後）|
+|25|15:11:43.039|8.224|いいえ|7.62|いいえ|あり（0.05秒後）|あり（0.556秒後）|
+
+- 6件（`stroke` 9・13・16・20・28・30）は、直前の受理された`stroke`から1000 ms未満である。`Happy`の受理が1件も無い。うち5件（13・16・20・28・30）は、直前の`face_drawn Happy`から3.0秒以内でもある。
+- **2件（`stroke` 8・25）は、(1)にも(2)にも当たらない。**どちらも`Happy`が受理され（`pi_rx_set_expression … Happy accepted`）、その後0.355秒・0.556秒に`tapped`による`Surprised`が受理され、次の`face_drawn`は`Surprised`だった（`Happy`の`face_drawn`が無い）。`tap_detected decision=Send`が`stroke`の0.303秒後（`stroke` 8）・0.505秒後（`stroke` 25）に出ている。**`Happy`はESP32まで届き、描かれる前に`Surprised`で上書きされた。**画面を押した振動が`ADXL345`に伝わって`tap_detected`が出た、というのは推定であり、確かめていない。
+- 数の突き合わせ：`stroke`31件のうち、受理された（直前の受理から1000 ms以上）のは23件で、Piの`set_expression_queued … Happy`23件、ESP32の`pi_rx_set_expression … Happy accepted`23件と一致する。`face_drawn Happy`21件は、この23件から上の2件を除いた数と一致する。
+- `deskcatd`は`timeout`へのSIGTERMで止めたため、終了時のcounter（`suppressed`を含む）の行はPiのlogに無い。`suppressed`の件数はPi側では確かめていない。ユーザーの申告：撫でるときにLCDが`Happy`に変わった（回答の原文「Happy が出ていました。」）。
+
+**叩く（条件4、回帰）**：叩く10回の合図に対し、窓内の`tap_detected`は39件、`decision=Send`は12件（合図ごとに1,2,1,1,1,1,1,1,1,2件）。合図から最初の`Send`まで0.7〜2.6秒（1回目の合図のみ9.5秒）。全体で`Send`は88件、Piの`tapped_received`は88件で一致、`set_expression_queued Surprised`は53件、`face_drawn Surprised`は39件。ユーザーの申告：叩いたとき顔が`Surprised`に変わり、異常はなかった（原文「叩いたときにLCDの顔が驚きに代わりました。」「異常はなかった」）。
+
+**tapの検出の分布**：静止区間（60秒：15:07:52〜15:08:52）の`tap_detected`は34件（`Send`3件、`DropTooSoon`31件）。**34件は15:08:09.4〜15:08:12.5の約3秒に集中した1つの塊（15:08:09に17件、15:08:10に13件、15:08:12に4件）で、静止区間の最初の約17秒と、塊の後の約40秒は0件である。**原因（モジュールが動いたか、人の動作か）は調べていない。静止区間の間にユーザーがモジュールに触れたかは、logの外に根拠が無い（`EXP-040`の静止60秒×2は0件）。撫でるの窓に86件（`Send`26件）、長押しの窓に33件（`Send`17件）、軽く触れるの窓に1件。画面を押す操作が`ADXL345`に伝わったかは区別していない。起動の約26秒後〜（セッション確立の前）にも`DropNoSession`が119件ある（目視の間にユーザーが機械を扱った可能性。確認していない）。
+
+### ログ（原本はrepositoryの外。sha256）
+
+- ESP32 UART0（`esp32.log`）：`9ab5013699d556708cd63e41dfd3178d84973646859d443d1997dcdf23ad7f9a`
+- Pi `deskcatd`（`pi-deskcatd.log`、PC側の受信時刻つき）：`74c0082ed7a3bc4cd05845c6763f11e126c051574fe1833a8c79455c3f877cf8`
+- 合図の時刻（`cues.txt`）：`bcfb9a33a72ed79d85894a89dbf703f8d1592a0922a3258fe13def3c9534ece7`
+- 書き込みの出力（`flash.out`。MACを含む）：`0b674a341a73fc143caeaef705493973cde8f66213034a69014be3de27adbd49`
+
+### Faults
+
+- **承認が定めた「最初の2分」の目視は、約1分で打ち切られた**（ユーザーの求め。承認の2分に足りない）。
+- 合図は文字だけで、操作が実際に行われた時刻と回数の独立した記録が無い。軽く触れるの`pressed`が0件の理由（触れなかったか、触れたが圧が足りなかったか）は区別できない。
+- **軽く触れる10回で、touchが0回反応した**（`pressed`0件）。`EXP-041`の`touch-sample-14`では10回中4回反応した。差の原因は調べていない。
+- 静止区間の`tap_detected`は約3秒の塊（上の「tapの検出の分布」）。ADXL345の固定の仕方は、叩く前に「いい」と答えられたが、記録していない。
+- Piの`WARN`は1件（helloのACKを受けたが応答送信側のsessionが未承認。`EXP-039`・`EXP-040`と同じ）。
+- 満たしていない条件：承認の範囲（#21のcomment）のとおり。GND線の導通・touch 5本の導通は測り直していない。`HW-TBD-036`は未確認。
+
+### 主張しないこと
+
+- 受け入れ条件の判定、判定の値（150／100／2／3／600）が妥当かどうか。
+- `Happy`が出なかった8件の理由、`tap_detected`の多さの原因。
+- 2つの時計の差。往きと復りの内訳。Piが`head_touched`を受けたこと（直接の根拠が無い）。
+- サーボとmotion（この窓は駆動していない）。
+
+### Conclusion
+
+製品build（develop `f3a3a97`）をESP32に書き込み、`deskcatd`（develop `c9c3d25`）につないだ。起動し、`touch_event kind=stroke`が31件出て、`head_touched`が31件送られ、Piの`set_expression_queued Happy`が23件、ESP32の`face_drawn Happy`が21件あった（ユーザーの申告：撫でるとLCDが`Happy`に変わった）。`stroke`は撫でるの合図15回に22件、長押し10回に9件、軽く触れる10回に0件（`pressed`も0件）で、静止区間と窓の外は0件だった。叩く10回に`Send`が12件で、`Surprised`が出た（ユーザーの申告）。静止区間の`tap_detected`34件は約3秒の1つの塊だった。受け入れ条件の判定は、この記録を読んでPMが行う。
+
+### Next safe step
+
+- 終わりの状態：ESP32のUSBは抜け、橙・黄も抜け、ACは最初から抜けたまま。灰のGND線・LCDの9本・touch用5本は挿さったまま。flashには製品build（`aaacf3ad…`）が残り、**次にUSBを挿すとLCDのbacklightが点く**。Piは電源が入ったまま（`deskcatd`は停止。`deskcatd.service`はinactive）。
+- 次に実機で通電する場合は、その回の構成を文で示し、ユーザーの承認を新たに取る。
+
 ## Revision履歴
 
 | 日付 | Revision | 変更 | 根拠 |
@@ -4293,3 +4398,4 @@ touch用5本を足した配線で、製品buildはLCDに顔を描いた（目視
 | 2026-10-24 | 48 | [#22](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/22)。**後始末：`EXP-040`の行を、冒頭の一覧表へ足した。**`EXP-040`の節は[PR #647](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/647)で足してあり、一覧表の行だけが抜けていた。`EXP-040`の本文は変えていない。 | [PR #647](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/647)の差分、`EXP-040`の節 |
 | 2026-10-25 | 49 | [#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16)。**`EXP-042`を追加した。**変換を繰り返す試験build（`env-sample-16-repeat`、develop `0f901cf`）で、`env_repeat_done`が出た5回の起動のheartbeatの間隔（すべて1000 ms）、SwitchBotとBME280の3点の並置、橙の線（SDI）を抜いた起動の`env_fault kind=i2c_other`を記録した。GPIO25と`3V3`の間の3.15 kΩが期待と合わないことも事実として書いた。受け入れ条件の判定は書いていない | `EXP-042`。PM（実機）の依頼 |
 | 2026-10-25 | 50 | [#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)。**`EXP-043`を追加した。**`accel-sample-15`（develop `483ac18`）で静止sampleを5姿勢（各500件×6窓）取り、3軸の大きさが一定という拘束でoffsetと感度（3軸で共通と仮定）を最小二乗であてはめた。`tap-21`（develop `2767ec6`）で、1.5 gの一点、軽く・普通・強く・机を叩くの各10回を、合図の時刻つき（5秒の窓）で数えた。受け入れ条件の判定は書かない | `EXP-043`。PM（実機）の依頼 |
+| 2026-10-26 | 51 | [#21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)。**`EXP-044`を追加した。**製品build（develop `f3a3a97`、featureなし）をESP32に書き込み、`deskcatd`（develop `c9c3d25`）につないで、撫でる15回・長押し10回・軽く触れる10回の`touch_event kind=stroke`の件数、`head_touched`から`Happy`の描画まで、叩く10回の`Surprised`を、合図の時刻つきで数えた。受け入れ条件の判定は書かない | `EXP-044`。PM（実機）の依頼 |
