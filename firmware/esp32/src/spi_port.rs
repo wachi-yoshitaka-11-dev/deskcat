@@ -1,14 +1,15 @@
 //! `LCD-*`と`TOUCH-*`が使うSPI hostへの書き込み口。bus（`SpiDriver`）の持ち方が2通りある。
 //!
 //! - [`SpiPort::Held`]: `SpiBusDriver`。作った時点でbus lockを取り、手放すまで握り続ける。
-//!   **製品buildと`touch-sample-14`はこちらである**。1つのdriverがhostを専有し、転送ごとのbusの取り直しがない。
+//!   **`touch-sample-14`だけがこちらである**。1つのdriverがhostを専有し、転送ごとのbusの取り直しがない。
 //! - [`SpiPort::Shared`]: `SpiDeviceDriver`（hardware CSなし）。busを転送ごとに取り、`Rc<SpiDriver>`を共有する。
-//!   LCDとタッチが同じhostを使う`touch-lcd-14`だけが使う。
+//!   LCDを使うbuild（製品build、`bringup-display-13`、`face-21`、`touch-lcd-14`）が使い、LCDとタッチが同じhostにdeviceを持つ。
+//!   `touch-lcd-14`はタッチを読み、ほかのbuildはタッチのdeviceを持つが読まない（`crate::touch`）。
 //!
 //! どちらも`spi_transmit`へ渡す転送は同じで、CSは持たない（呼び出し側が自前のGPIOで扱う）。
 //! 違うのはbus lockを握り続けるか、転送ごとに取るかだけである。
 
-// 製品buildと`touch-sample-14`は`Shared`を、`touch-lcd-14`は`Held`を作らない。`crate::display`と同じく、moduleごと`#[cfg]`で落とさず全buildでcompileする。
+// `touch-sample-14`は`Shared`を、それ以外のbuildは`Held`を作らない。`crate::display`と同じく、moduleごと`#[cfg]`で落とさず全buildでcompileする。
 #![allow(dead_code)]
 
 use std::rc::Rc;

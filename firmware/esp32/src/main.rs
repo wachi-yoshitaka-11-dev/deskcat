@@ -20,7 +20,11 @@
 //!   PR B、[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)）。受信の異常
 //!   （ring bufferの満杯など）を数える（`drain_uart_events`）。制約は`crate::console`の
 //!   module docにまとめてある
-//! - **既定の製品buildは`DISP-01`（LCD）を描画し、tap入力を読む。`SERVO-PWM`・`ADC-*`・`TOUCH-*`はdriveしない。**
+//! - **既定の製品buildは`DISP-01`（LCD）を描画し、tap入力を読む。`SERVO-PWM`・`ADC-*`はdriveしない。**
+//!   **`TOUCH-*`のうち`TOUCH-CS`（GPIO21）だけをHighに保ち、touchは読まない**（LCDと同じbusにtouchのdeviceを足すが転送しない。
+//!   `TOUCH-IRQ`は取らない。`crate::touch::IdleTouch`）。busは`SpiDriver`を共有し、転送ごとに取る（`crate::spi_port`）。
+//!   **この型の製品buildを実機で動かした記録はまだ無い。**共有の型が実機で動いた記録は`touch-lcd-14`の`EXP-041`だけで、
+//!   `EXP-039`〜`EXP-041`の製品build（develop `4a1ad55`の版）は、移す前のbusを握り続ける型である。
 //!   [`crate::servo`]はcross-compile確認用にcompileするだけであり、既定buildの`main()`からは呼ばない。
 //!   製品buildと`bringup-display-13`／`face-21`の試験buildは、
 //!   [`run_display_bringup`]経由でLCDを初期化してbacklightを点ける。`bringup-display-13`は単色fill・四隅patternを
@@ -51,8 +55,8 @@
 //! | `env-sample-16-slow` | `env-sample-16`に加え、BME280の温度・気圧・湿度のoversamplingを×16にして変換を遅くする（Bosch §9.1でmax 112.8 ms）。変換の所要時間を`env_conversion`としてlogする | `env-sample-16`を含み、同じく単独指定のみ。実機未確認で通電不可 |
 //! | `env-sample-16-repeat` | `env-sample-16-slow`に加え、×16の変換を最初の変換の開始から30秒、130 ms周期で繰り返し、変換がheartbeatの時刻を何度もまたぐ状態を作る（#16の「遅い変換が上位taskをblockしない」の観察用）。`env_conversion`は毎回`seq`・`started_ms`付きで、`env_raw`・`env_reading`は1回目だけlogする | `env-sample-16-slow`を含み、同じく単独指定のみ。実機未確認で通電不可 |
 //! | `accel-sample-15` | ADXL345のDevice IDが`0xE5`のときだけ、±2 g・100 Hz・FIFO Streamの連続測定を設定し、raw値と窓ごとの統計をUART0にlog（#15、`crate::accel_sample`）。tapの機能は止める（`INT_ENABLE`＝0） | 単独指定のみ。通電は2026-10-17の1回だけ（`EXP-033`）で、新しい書き込みを含む構成の通電手順と承認は未確定。Pi linkのpayloadは変更しない |
-//! | `touch-sample-14` | `TOUCH-01`（XPT2046）の raw 読み出し。SPI3（GPIO18/23/19）、`TOUCH-CS`＝GPIO21、`TOUCH-IRQ`＝GPIO34 で X・Y・Z1・Z2 を読み、IRQ の level とあわせて UART0 に log（#14、`crate::touch`）。`T_IRQ` の変化の時刻と、console から受けた `MARK` の時刻も log する（条件 6 の突き合わせ用）。LCD は初期化せず、`LCD-CS`（GPIO22）を High に固定する。状態機械は配線しない | 単独指定のみ。`EXP-038` で、develop `79f29ea` の版を、touch 用 5 本を足した配線で実機に書き込み、raw を取った。**その後に足した `T_IRQ` の変化と `MARK` の log、bus の持ち方の置き換え（`crate::spi_port`）は実機で未確認。**次の通電・書き込みにも実機側の新たな承認が要る。Pi link の payload は変更しない |
-//! | `touch-lcd-14` | LCDを初期化して点灯し、表情（neutral→happy→surprised）を帯1本ずつ塗り続けながら、同じSPI host（SPI3）で`TOUCH-01`のrawを読む（#14の受け入れ条件「LCD通信による許容できないdata lossがない」の観察用、`crate::touch_lcd`）。LCDとタッチは`SpiDriver`を共有し、busは転送ごとに取る。帯の途中ではタッチを読まない。console（stdin）は読まず、`MARK`は受け付けない（`T_IRQ`の変化は`touch-sample-14`と同じくlogする）。状態機械は配線しない | 単独指定のみ。**製品buildと`touch-sample-14`はbusを握り続ける今の型のままで、共有の型を使うのはこのbuildだけ。**`set_expression`は`hardware_unavailable`で拒否する。実機未確認で、通電にはLCDのVCC・9本・touch用5本が挿さった構成の承認が要る。Pi linkのpayloadは変更しない |
+//! | `touch-sample-14` | `TOUCH-01`（XPT2046）の raw 読み出し。SPI3（GPIO18/23/19）、`TOUCH-CS`＝GPIO21、`TOUCH-IRQ`＝GPIO34 で X・Y・Z1・Z2 を読み、IRQ の level とあわせて UART0 に log（#14、`crate::touch`）。`T_IRQ` の変化の時刻と、console から受けた `MARK` の時刻も log する（条件 6 の突き合わせ用）。LCD は初期化せず、`LCD-CS`（GPIO22）を High に固定する。状態機械は配線しない | 単独指定のみ。touch 用 5 本を足した配線で、`EXP-038`（develop `79f29ea`。raw を取った）と `EXP-041`（develop `b9a04e8`。`T_IRQ` の変化と `MARK` の log、`crate::spi_port` の bus の持ち方を含む版で、`MARK` 31 件に `touch_mark` 31 件、SPI の失敗 0 件）の版を実機に書き込んで動かした。次の通電・書き込みにも実機側の新たな承認が要る。Pi link の payload は変更しない |
+//! | `touch-lcd-14` | LCDを初期化して点灯し、表情（neutral→happy→surprised）を帯1本ずつ塗り続けながら、同じSPI host（SPI3）で`TOUCH-01`のrawを読む（#14の受け入れ条件「LCD通信による許容できないdata lossがない」の観察用、`crate::touch_lcd`）。LCDとタッチは`SpiDriver`を共有し、busは転送ごとに取る。帯の途中ではタッチを読まない。console（stdin）は読まず、`MARK`は受け付けない（`T_IRQ`の変化は`touch-sample-14`と同じくlogする）。状態機械は配線しない | 単独指定のみ。**製品buildも同じ共有の型を使う。busを握り続ける型は`touch-sample-14`だけ**（`crate::spi_port`）。`set_expression`は`hardware_unavailable`で拒否する。`EXP-041`で、develop `b9a04e8`の版を、LCDのVCC・9本・touch用5本が挿さった配線に書き込み、157秒動かした（帯7000本、`lcd_errors_total=0`、`touch_spi_errors_total=0`、LCDの乱れは目視の申告に無い）。次の通電・書き込みにも実機側の新たな承認が要る。Pi linkのpayloadは変更しない |
 //! | `bringup-display-13` | LCDの初期化、backlightの点灯、単色fillと四隅pattern | 表情とtapは有効にしない。描画の間のPi linkの受信とheartbeatは`crate::display_test`のmodule docを参照 |
 //! | `bringup-led-514` | #514の追加LED（GPIO2／GPIO5）の点灯試験と白の点滅（`crate::led`） | 表情とtapは有効にしない。`bringup-display-13`とも組み合わせられる |
 //! | `face-21` | LCDの初期化とbacklightの点灯を保ち、`set_expression`の3表情を描く。Pi commandを受けなくても、描ける状態になった時点で`neutral`を1回描く（#21、`crate::face`） | `bringup-display-13`とも組み合わせられる。**表情を持たない試験buildは`set_expression`を`hardware_unavailable`で拒否する** |
@@ -72,7 +76,7 @@
 //!
 //! 既定buildで`Peripherals::take()`の戻り値から実際にdriverへ渡すのは、I2C関連2本
 //! （`crate::accel`・`crate::env`のmodule doc参照）、Pi link関連（`peripherals.uart1`、GPIO13＝TX、
-//! GPIO14＝RX）、LCD関連6+1本（`crate::display`のmodule doc参照）である。
+//! GPIO14＝RX）、LCD関連6+1本（`crate::display`のmodule doc参照）、`TOUCH-CS`（GPIO21。Highに保つだけ）である。
 //! LCDに触れない試験buildはLCD関連pinを渡さない。`bench-servo-test-17` feature付きbuildは`SERVO-PWM`（GPIO27）と
 //! `peripherals.ledc.timer0`／`channel0`を追加で渡し、Pi link関連を渡さない。`bringup-led-514` feature付きbuildは
 //! GPIO2とGPIO5を追加で渡す。
@@ -284,7 +288,18 @@ mod protocol;
 mod servo;
 mod spi_port;
 mod tap;
-#[cfg(any(feature = "touch-sample-14", feature = "touch-lcd-14"))]
+// LCDを描くbuild（製品buildと`bringup-display-13`・`face-21`）は、touchを読まない`touch::IdleTouch`だけを使う。読み出しの型はdead_codeになる。
+#[cfg(any(
+    feature = "touch-sample-14",
+    feature = "touch-lcd-14",
+    feature = "bringup-display-13",
+    feature = "face-21",
+    deskcat_product_mode
+))]
+#[cfg_attr(
+    not(any(feature = "touch-sample-14", feature = "touch-lcd-14")),
+    allow(dead_code)
+)]
 mod touch;
 #[cfg(feature = "touch-lcd-14")]
 mod touch_lcd;
@@ -332,6 +347,12 @@ use crate::led::Leds;
 use crate::pi_link::{FaceTargets, PiLink};
 #[cfg(any(feature = "tap-21", deskcat_product_mode))]
 use crate::tap::TapDetector;
+#[cfg(any(
+    feature = "bringup-display-13",
+    feature = "face-21",
+    deskcat_product_mode
+))]
+use crate::touch::IdleTouch;
 #[cfg(any(feature = "touch-sample-14", feature = "touch-lcd-14"))]
 use crate::touch::TouchSampler;
 #[cfg(feature = "touch-lcd-14")]
@@ -532,6 +553,12 @@ fn main() {
         "raw_sample"
     } else if cfg!(feature = "touch-lcd-14") {
         "raw_sample_with_lcd"
+    } else if cfg!(any(
+        feature = "bringup-display-13",
+        feature = "face-21",
+        deskcat_product_mode
+    )) {
+        "cs_high_not_read"
     } else {
         "not_driven"
     };
@@ -550,12 +577,13 @@ fn main() {
     // 製品buildとLCDを有効にする試験buildだけがこのblockを持つ（`run_display_bringup`のdoc参照）。
     // 初期化とbacklightの点灯だけをここで行い、fillと四隅patternはmain loopの中で1段ずつ
     // 進める（`crate::display_test`）。`face-21`単独のbuildは進めず、表情を描く（`crate::face`）。
+    // `_idle_touch`はmain loopが終わらないかぎり持ち続ける（dropすると`TOUCH-CS`のdriverが戻る）。
     #[cfg(any(
         feature = "bringup-display-13",
         feature = "face-21",
         deskcat_product_mode
     ))]
-    let lcd = run_display_bringup(
+    let (lcd, _idle_touch) = run_display_bringup(
         peripherals.spi3,
         peripherals.pins.gpio18,
         peripherals.pins.gpio23,
@@ -564,6 +592,7 @@ fn main() {
         peripherals.pins.gpio17,
         peripherals.pins.gpio16,
         peripherals.pins.gpio4,
+        peripherals.pins.gpio21,
     );
     // `set_expression`を受理できるか（`crate::face`）。LCDを描けるbuild（`face-21`）だけが立てる。
     // `bench-servo-test-17`だけのbuildはPi linkも表情も持たず、これを読まない。
@@ -1211,14 +1240,15 @@ fn service_bringup_step(health: &mut Health, step: &str) {
     );
 }
 
-/// `DISP-01`を初期化してbacklightを点け、driverを返す。
+/// `DISP-01`を初期化してbacklightを点け、driverを返す。あわせて、同じbusにtouchのdeviceを足して`TOUCH-CS`をHighに保つ
+/// （`crate::touch::IdleTouch`。touchは読まない）。
 ///
 /// `bringup-display-13`付きbuildでは、呼び出し側がfillと四隅patternをmain loopの中で進める（`crate::display_test`。
 /// `#487`のPR B1より前は、この関数が1回の呼び出しで描き切っていた）。controllerのIDは読まない（`crate::display`のmodule doc）。
 /// 初期化の後に、書き込んだMADCTLの値と論理座標の幅・高さを`display_madctl`の行としてlogへ出す。
 ///
 /// **どの段階で失敗しても、この関数はpanicしない。**driverの作成か初期化に失敗したら
-/// `log::error!`へ分類して`None`を返し、main loopはLCDを描かずに進む。
+/// `log::error!`へ分類してLCDに`None`を返し、main loopはLCDを描かずに進む。touchのdeviceを作れなくてもLCDは続ける。
 ///
 /// **製品buildと、`bringup-display-13`か`face-21`の試験buildだけがこの関数を持つ。**
 /// LCDを持たない試験buildはこの関数をcompileせず、`main()`から呼ばない。
@@ -1237,21 +1267,43 @@ fn run_display_bringup<SPI: SpiAnyPins + 'static>(
     dc: impl OutputPin + 'static,
     rst: impl OutputPin + 'static,
     bl: impl OutputPin + 'static,
-) -> Option<Ili9341<'static>> {
+    touch_cs: impl OutputPin + 'static,
+) -> (Option<Ili9341<'static>>, Option<IdleTouch>) {
+    use esp_idf_svc::hal::spi::config::DriverConfig;
+    use esp_idf_svc::hal::spi::SpiDriver;
+    use std::rc::Rc;
+
     // pinは`docs/hardware/gpio-assignment.md`の`信号inventory`に従う
     // （`LCD-SCLK`=18, `LCD-MOSI`=23, `LCD-MISO`=19, `LCD-CS`=22, `LCD-DC`=17,
-    // `LCD-RST`=16, `LCD-BL`=4）。`TOUCH-CS`(21)はbusを共有するが、このfirmwareは
-    // touchへは触れない（`crate::display`のmodule doc参照）。
+    // `LCD-RST`=16, `LCD-BL`=4, `TOUCH-CS`=21）。
     // **`Peripherals`全体ではなく個々のfieldを受け取る。**`main()`がI2C用とPi link用の
     // fieldも同じ`Peripherals`から取り出す必要があるため、呼び出し元でfieldを分けてから渡す。
-    let lcd = match Ili9341::new(spi3, sclk, mosi, miso, cs, dc, rst, bl) {
+    // **busは`touch-lcd-14`と同じ共有の型で持つ**（`SpiDriver`を共有し、転送ごとにbusを取る。`crate::spi_port`）。
+    let bus = match SpiDriver::new(spi3, sclk, mosi, Some(miso), &DriverConfig::new()) {
+        Ok(driver) => Rc::new(driver),
+        Err(err) => {
+            // 以前は`Ili9341::new`の中で失敗し、同じ名前で出ていた（`docs/hardware/power-budget.md`の`DISP-01`追加接続の手順が待つ名前）。
+            log::error!("display_driver_new_failed error={err}");
+            return (None, None);
+        }
+    };
+    // **`TOUCH-CS`をHighにするため、touchのdeviceをLCDの初期化より前に作る。**touchは読まない（`crate::touch::IdleTouch`）。
+    // 作れなくてもLCDは続ける（GPIO21の外部pull-upがHighを保つ。`gpio-assignment.md`）。
+    let idle_touch = match IdleTouch::with_shared_bus(Rc::clone(&bus), touch_cs) {
+        Ok(touch) => Some(touch),
+        Err(err) => {
+            log::error!("touch_idle_new_failed error={err}");
+            None
+        }
+    };
+    let lcd = match Ili9341::with_shared_bus(bus, cs, dc, rst, bl) {
         Ok(lcd) => lcd,
         Err(err) => {
             log::error!("display_driver_new_failed error={err}");
-            return None;
+            return (None, idle_touch);
         }
     };
-    init_lcd(lcd)
+    (init_lcd(lcd), idle_touch)
 }
 
 /// 作ったLCD driverを初期化し、向きの設定をlogへ残し、backlightを点ける。`run_display_bringup`の後半と同じ手順で、

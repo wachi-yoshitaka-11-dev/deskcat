@@ -78,7 +78,7 @@ mem-probe-23 = []
 touch-sample-14 = []
 # Issue #14 の受け入れ条件「LCD 通信による許容できない data loss がない」の観察用。LCD を初期化して点灯し、表情を帯ごとに塗り続けながら、
 # 同じ SPI host（SPI3）で `TOUCH-01` の raw を読む（`src/touch_lcd.rs`）。LCD とタッチは `SpiDriver` を共有し、bus は転送ごとに取る。
-# 製品 build と `touch-sample-14` は bus を握り続ける今の型のまま。単独の試験 build として使う。
+# 製品 build も同じ型で、bus を握り続ける型は `touch-sample-14` だけ。単独の試験 build として使う。
 touch-lcd-14 = []
 
 [profile.release]
