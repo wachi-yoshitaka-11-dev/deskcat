@@ -54,6 +54,7 @@
 | [EXP-040](#exp-040-製品buildfeatureなしを入れ替えたdeskcatddevelop-c9c3d25につないでtapのsurprisedまでをpi側の受信時刻つきで取りpiに届く経路で静止区間を2回取った) | [#22](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/22)の2回目の実機の窓。製品build（featureなし）を、入れ替えた`deskcatd`（develop `c9c3d25`）につなぎ、ADXL345のmoduleを叩いた間の経路をPi側の受信時刻つきで取り、Piに届く経路で静止区間を2回取った | 値の正なし（観測の記録。ESP32の`Send`は9件、Pi側の`tapped_received`は9件、`B − A`は540〜590 ms（8件）、静止区間の`tap_detected`は60秒×2とも0件。受け入れ条件の判定は書かない） |
 | [EXP-041](#exp-041-touch-sample-14とtouch-lcd-14をtouch用5本を足した配線で動かしmarkの時刻つきで見逃しを数えlcdを描きながらtouchを読んだ) | [#14](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/14)の2回目の実機の窓。製品build（書き込みなし）でLCDの描画を目視し、`touch-sample-14`で操作ごとの`MARK`と`T_IRQ`の変化の時刻を突き合わせ、`touch-lcd-14`でLCDを描きながらtouchを読んだ | 値の正なし（観測の記録。受け入れ条件の判定は書かない） |
 | [EXP-042](#exp-042-bme280env-01の試験buildenv-sample-16-repeatで変換を繰り返す間のheartbeatの間隔switchbotとの並置橙の線sdiを抜いた起動を観察した) | [#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16)の受け入れ条件3・4・5の実機観察。変換を繰り返す試験build（`env-sample-16-repeat`）で、heartbeatの間隔とmax_read_gap_msを5回の起動で取り、SwitchBotとBME280の値を3点並べ、橙の線（SDI）を抜いた起動で`env_fault`の分類を見た | 値の正なし（観測の記録。確度、not-ready・`i2c_timeout`の実機での出力、受け入れ条件の判定は書かない） |
+| [EXP-043](#exp-043-accel-01adxl345の静止sampleを5姿勢で取りaccel-sample-15叩く強さを段階づけてtap_detectedを合図の時刻つきで数えたtap-21) | [#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)の受け入れ条件の実機観察。`accel-sample-15`で5姿勢の静止sampleを取って3軸のoffsetと感度をあてはめ、`tap-21`で叩く強さを段階づけて`tap_detected`を合図の時刻つきで数えた | 値の正なし（観測の記録。受け入れ条件の判定は書かない） |
 
 **大容量の生dataはこのrepositoryへ入れていない。**保存場所は
 [development-foundation-plan.md](../planning/development-foundation-plan.md)の
@@ -4150,6 +4151,93 @@ touch用5本を足した配線で、製品buildはLCDに顔を描いた（目視
 - 次に実機で通電する場合は、その回の構成を文で示し、ユーザーの承認を新たに取る。
 - 受け入れ条件の判定は、PM（実機）が行う。
 
+## EXP-043: `ACCEL-01`（ADXL345）の静止sampleを5姿勢で取り（`accel-sample-15`）、叩く強さを段階づけて`tap_detected`を合図の時刻つきで数えた（`tap-21`）
+
+[#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)の実機の窓。サーボは使っていない。人間の立ち会いのもとで1回。承認は#15のコメント（手順と数え方：6395824174、変更：6396232016、承認の記録：6396123356）。**この記録は事実と未確認だけを書く。受け入れ条件の判定は書かない（PM（実機）が行う）。**
+
+| 項目 | 内容 |
+|---|---|
+| Test ID | `EXP-043` |
+| Date | 2026-10-25（UTC 09:48〜11:23ごろ。JST 18:48〜20:23ごろ） |
+| Operator | 線の挿し抜き、USBの抜き挿し、BOOTボタン、基板の置き直し、叩く操作はユーザー。build、書き込み、ログの取得、集計、記録は作業セッション（AI） |
+| Hardware revision／Exact components | `MCU-01`、`ACCEL-01`（秋月 M-06724。6本の線でブレッドボードから浮いている〔ユーザーの回答〕）、`ENV-01`、`DISP-01`、`TOUCH-01`（LCDの9本とtouchの5本は、`EXP-042`の終わりの記録では挿したまま。今回は訊いていない） |
+| Wiring revision | 通電前の目視の問い（USB・ACプラグが抜け、橙・黄のESP32側とLED・サーボ系の線が外れ、`ACCEL-01`の6本が前回のままか）への回答の原文「全部合っている」。現物は作業セッションが見ていない。LCDの9本、touchの5本、灰のGND線は、今回は訊いておらず、`EXP-042`の終わりの記録によるもの。`ACCEL-01`は`EXP-015`の配線 |
+| Power supply and current limit | ESP32はこの端末のUSB。ACは抜けたまま。電流・電圧・温度は測っていない |
+| Firmware commit/profile | 静止sample：develop `483ac18`、`--features accel-sample-15`、ELF sha256 `bcf777496d52c60779eddb226d061041b53c9526ec51a3fd92bbe5d8bcbf2d76`。tap：develop `2767ec6`、`--features tap-21`、ELF sha256 `77b1efb526da9d6fc5ae933006fad43684fe221fc49a668da8f5ab7d1a295f66`。`git archive`をrepositoryの外へ展開してbuildし、`Cargo.lock`は変わらなかった。書き込みの直前にsha256を照合した |
+| Configuration | `accel-sample-15`：±2 g、100 Hz、FIFO Stream、500件×6窓。`tap-21`：`thresh_tap=0x18`、`dur=0x10`、`tap_axes=0x07`、poll 20 ms |
+| Measurement equipment | UART0のlog（115200。1回のopenで取り切るscript。DTR・RTSは常にFalse）。合図の時刻とlogの受信時刻はPCの同じ時計 |
+| Procedure | 下の「実施したこと」と#15のコメント |
+| Expected result | 期待値の数は定めていない（#15のコメントは数え方だけを事前に固定した） |
+| Measured result | 下記 |
+
+### 実施したこと
+- develop `483ac18` の `accel-sample-15`（ELF `bcf777496d52c60779eddb226d061041b53c9526ec51a3fd92bbe5d8bcbf2d76`）を書き込み、静止 sample を 5 姿勢で取った（各 1 起動、500 件×6 窓、約 30 秒）。
+- develop `2767ec6` の `tap-21`（ELF `77b1efb526da9d6fc5ae933006fad43684fe221fc49a668da8f5ab7d1a295f66`）を書き込み、叩く測定を 1 回行った。承認の変更：製品 build から tap-21 へ、USB の上限 20 分→30 分（ユーザーの回答の原文「承認する」。README の表で tap-21 の通電は「不可」と示して訊いた）。
+- 起動は 7 回（姿勢 A・B・C・D・E 各 1、取り消した 1、tap 1。書き込み 2 回の USB 挿入は BOOT を押して bootloader のまま）。上限 12 の内。USB を挿していた時間は、挿した時刻（ログの open と USB の作成時刻）から、抜けていることを確認した時刻または次に挿した時刻までを足した上限で約 27.7 分（実際に抜いた時刻は記録していない。承認した上限 30 分の内）。
+- `accel_device_id raw=0xe5` が全起動で出た。`accel_fault`・`out_of_range`・panic・brownout・`task_wdt` は 0 件。`accel_overrun int_source=0x83` が `accel-sample-15` の 5 起動それぞれの最初に 1 回（`polls_with_overrun=1`、以降増えない）。
+
+### 静止 sample（窓 6 つの平均。LSB）
+| 姿勢 | 依頼した置き方（実際の向きは確認していない。読みから読める向きを括弧に書く） | X | Y | Z | 3 軸の大きさ |
+|---|---|---|---|---|---|
+| A | 部品面を上（Z が約 +256） | 34.42 | -0.17 | 256.02 | 258.32 |
+| B | 部品面を下（Z が約 −207、X にも重力が分かれていた） | 119.53 | -23.49 | -207.23 | 240.38 |
+| C | 傾けるよう依頼（Z が約 −239 で、部品面を下に近い向き） | 26.03 | 27.62 | -239.35 | 242.34 |
+| D | 長い辺を下に立てるよう依頼（X が約 +254） | 254.30 | 7.94 | 17.34 | 255.02 |
+| E | 短い辺を下に立てるよう依頼（Y が約 +266） | 1.04 | 265.53 | 15.65 | 265.99 |
+
+- 水平にできない（ユーザーの回答の原文：「`平らに接する`不可能です。ケーブルがあるので。」）ため、2 姿勢では offset と感度が分けられず、5 姿勢にした（[変更の comment](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15#issuecomment-6396232016)）。
+- 各姿勢の傾きが分かる範囲は、3 軸の平均から読める値まで。基板の傾きの角度は、あてはめの結果としては出していない。
+- あてはめ：「3 軸の大きさ＝感度」を満たすように、offset 3 つと感度（3 軸で共通と仮定）を最小二乗で出した。5 姿勢：offset（X, Y, Z）＝（5.21, 16.77, 9.32）LSB、感度 249.04 LSB/g。残差（姿勢 A〜E）＝−0.04、−0.88、0.74、0.35、−0.16 LSB。mg にすると offset は約（21, 67, 37）mg（感度 249 LSB/g で換算）。
+- 1 姿勢を除いた 4 姿勢のあてはめ：A を除くと（B・C が近い向きのため）offset が（−18.6, −7.0, 28.3）、感度 273.6。B・C・D・E を除いたもの（ACDE、ABDE、ABCE、ABCD）は offset X 0.46〜6.30、Y 15.72〜25.06、Z 8.90〜9.94 LSB、感度 248.3〜249.9 LSB/g。
+- 重力が −X、−Y に向いた姿勢は取っていない。
+- 姿勢の中の動き：6 窓の平均が姿勢の中で動いた（窓 6 − 窓 1：A の X＋2.46、E の X＋2.13・Z＋2.11、D の Z＋1.61 LSB。B・C は 0.8 LSB 以内）。置いた基板がゆっくり動いたと考えられるが、原因は切り分けていない。
+- noise（窓ごとの標準偏差。LSB）：姿勢の平均は X 0.58〜0.80、Y 0.60〜0.89、Z 0.73〜0.94。窓ごとの範囲は 0.48〜1.11。±2 g・100 Hz・FIFO Stream。感度 249 LSB/g で換算すると約 2〜4.5 mg。
+- 規格の範囲（Rev. E Table 1：X・Y ±150 mg、Z ±250 mg、感度 230〜282 LSB/g）との比較は、上のあてはめ値が範囲の内側にあること。
+
+### tap（tap-21。`THRESH_TAP=0x18`＝1.5 g、`DUR=0x10`。叩く強さの段階づけ。合図から 5 秒の窓）
+数え方は[事前のコメント](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15#issuecomment-6395824174)のとおり（ログを取る前に固定）。合図の時刻と UART0 の行の受信時刻は PC の同じ時計。合図はターミナルのタブの文字（ベルつき）。
+
+| 段階 | 合図 | 検出 | 見逃し | 窓内に 2 件以上 |
+|---|---|---|---|---|
+| 軽く | 10 | 8 | 2（1 回目、10 回目） | 5 |
+| 普通 | 10 | 10 | 0 | 9 |
+| 強く | 10 | 10 | 0 | 10 |
+| 机を叩く（机の振動で検出） | 10 | 5 | 5 | 1 |
+
+- 窓の外の `tap_detected`：3 件（最初の合図から 5.09 秒後〔1 回目の窓の終わりの直後〕、7.75 秒後と 7.91 秒後〔2 回目の合図の約 0.25 秒前と 0.1 秒前〕）。事前の数え方に従い、誤検出として数える。
+- `tap_detected` は全体で 88 件、すべて `DropNoSession`（Pi の session が無い）。1 回の叩きで 1〜6 件出た。
+- 検出までの時間（合図から最初の `tap_detected`）：軽く 0.4〜0.7 秒（検出した 8 回）、普通 0.6〜2.6 秒、強く 0.4〜1.1 秒、机 0.45〜1.3 秒。
+- 合図を受け取れなかった叩きの申告は無い。
+- ユーザーの申告（窓の後。原文）：「軽くは最初軽すぎてほとんど振動がなかったようですね。」どの回を指すかは訊いていない。見逃し 2 件（1 回目、10 回目）との対応は確かめていない。数え方は事前に固定したとおりで、この申告で変えない。
+- retrigger（`DropTooSoon`）は Pi の session が無いので観察できていない。
+
+### 取り消した起動
+姿勢 B のログを取るスクリプトを、USB が挿さったままの状態で起動した。取得を始めた直後に `rst:0x1`（POWERON_RESET）が出た。ポートを開いたときの reset と読んでいる。ログは約 8 秒で止めたため窓の行が無く、その時点の基板の向きは確かめていない。姿勢 B として使わなかった（`poseB-aborted-open-reset.log`）。
+
+### ログの sha256（原本は repository の外）
+- poseA.log `d59e003b53026f0e5269b79ad0d432a4863db654dc4f2b5e82a99a5b33e7462b`
+- poseB.log `e5e12e67cba0fde69fa18d4741d87aa3fc2bfbb0165e2aa3700224a022d6a92b`
+- poseB-aborted-open-reset.log `6215c2e65027d559eba1d4f8ea4d8b7c50941e85e349a6b7dad73838bbb28cc3`
+- poseC.log `805c973e2d4fc303de33db074e2f44a44be9763166b71a882eebe48f893523d9`
+- poseD.log `a423b69df9020440b44211424f810b7cb7f3395800569f299314dfdfe058b801`
+- poseE.log `27220c3d73a2b7396a3a2eb11cf0bf515da6a07dfcd15664ed04203b22a47801`
+- tap.log `38fbc9f531c0596e386e3b8ce62b9223836d2e2a0e9efa43bed310276285fe49`
+- tap.log.events `cbe1331e85fa01e88c761a978e1dd44199d383560f678714d3bc4186e8cf3021`
+
+### 未確認・主張しないこと
+- 感度を 3 軸で共通とした仮定。姿勢の中の動き（上）。線が基板を引いた力。温度（測っていない）。
+- 叩く強さは人の動作の段階で、力は測っていない。しきい値は 1.5 g の一点で、振っていない（振る build は無い）。
+- 机の振動の段で検出した 5 件は、机を叩いた振動が module に伝わった結果と読めるが、伝わり方は切り分けていない。サーボの振動は #17 の後。
+- Pi の session 下の `tapped` の送出、retrigger は、この窓では取っていない。
+- 製品 build の新しい型（LCD とタッチの SPI 共有）の起動は、この窓では確かめていない（#21 の窓）。
+- 電流・電圧・温度。通電中の発熱・異臭は、ユーザーに訊いていない。
+
+### Next safe step
+
+- 終わりの状態：ESP32のUSBは抜けている。flashには`tap-21`（`77b1efb5…`）が入っている。次にUSBを挿すと`tap-21`が走る（LCDは初期化しない）。ACは抜けたまま。LCDの9本とtouchの5本、灰のGND線は、今回は触っておらず、`EXP-042`の終わりの記録では挿さったまま。ACCEL-01は線で浮いたまま。叩く測定のときの置き方は「机の上に動かない形で」と頼んだだけで、向きは記録していない。
+- 次に実機で通電する場合は、その回の構成を文で示し、ユーザーの承認を新たに取る。
+- 受け入れ条件の判定は、PM（実機）が行う。
+
 ## Revision履歴
 
 | 日付 | Revision | 変更 | 根拠 |
@@ -4204,3 +4292,4 @@ touch用5本を足した配線で、製品buildはLCDに顔を描いた（目視
 | 2026-10-24 | 47 | [#14](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/14)。**`EXP-041`を追加した。**touch用5本を足した配線で、製品build（書き込みなし）のLCDの描画を目視し、`touch-sample-14`で操作40件の`MARK`と`T_IRQ`の変化の時刻を突き合わせ（見逃し6件はすべて「軽く触れる」、窓の外の`level=low`は0件）、`touch-lcd-14`でLCDを描きながらtouchを読んだ（LCD・touchのSPIの失敗0件、合図20件の見逃し0件）。**1回目は画面が触られていない回で、取り直した経緯、導通確認を行っていないこと、操作の回数に導出した根拠が無いことを記録した。** | [#14のcomment 6384786098](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/14#issuecomment-6384786098)、`EXP-041`の記録 |
 | 2026-10-24 | 48 | [#22](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/22)。**後始末：`EXP-040`の行を、冒頭の一覧表へ足した。**`EXP-040`の節は[PR #647](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/647)で足してあり、一覧表の行だけが抜けていた。`EXP-040`の本文は変えていない。 | [PR #647](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/647)の差分、`EXP-040`の節 |
 | 2026-10-25 | 49 | [#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16)。**`EXP-042`を追加した。**変換を繰り返す試験build（`env-sample-16-repeat`、develop `0f901cf`）で、`env_repeat_done`が出た5回の起動のheartbeatの間隔（すべて1000 ms）、SwitchBotとBME280の3点の並置、橙の線（SDI）を抜いた起動の`env_fault kind=i2c_other`を記録した。GPIO25と`3V3`の間の3.15 kΩが期待と合わないことも事実として書いた。受け入れ条件の判定は書いていない | `EXP-042`。PM（実機）の依頼 |
+| 2026-10-25 | 50 | [#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)。**`EXP-043`を追加した。**`accel-sample-15`（develop `483ac18`）で静止sampleを5姿勢（各500件×6窓）取り、3軸の大きさが一定という拘束でoffsetと感度（3軸で共通と仮定）を最小二乗であてはめた。`tap-21`（develop `2767ec6`）で、1.5 gの一点、軽く・普通・強く・机を叩くの各10回を、合図の時刻つき（5秒の窓）で数えた。受け入れ条件の判定は書かない | `EXP-043`。PM（実機）の依頼 |
