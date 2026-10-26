@@ -3,7 +3,7 @@
 //! 製品buildと`tap-21`試験buildがこのmoduleを使う。起動時のI2C bring-upが返す`I2cDriver`を持ち続け、
 //! [`TapDetector::configure`]でtap検出を設定し、[`TapDetector::poll`]が[`POLL_INTERVAL_MS`]ごとに
 //! `INT_SOURCE`をI2Cで読む（**割り込みのINT線は使わない。配線は要らない**）。tapを見つけたら
-//! `deskcat_tap::TapFilter`が送ってよいかを決める（bootのACK後だけ、前の`tapped`から最小間隔以上）。
+//! `deskcat_tap::TapFilter`が送ってよいかを決める（bootのACK後だけ、前の`tapped`から最小間隔以上、製品buildはタッチの接触中と離れた直後でない）。
 //! 設定値・出所・暫定であることは`deskcat_tap`のcrate docが持つ（**ここへ再掲しない**）。
 //!
 //! # I2C driverの所有
@@ -101,8 +101,9 @@ impl TapDetector {
         self.enabled.then_some(self.next_poll_ms)
     }
 
-    /// 時刻に達していれば`INT_SOURCE`を1回読む。**`tapped`を送るべきなら`true`を返す。**
-    pub fn poll(&mut self, now_ms: u64, session_established: bool) -> bool {
+    /// 時刻に達していれば`INT_SOURCE`を1回読む。**`tapped`を送るべきなら`true`を返す。**`touch_blocks`は、タッチの接触中か離れた直後か
+    /// （`deskcat_tap::touch_blocks_tap`。タッチを読まないbuildは`false`）。`true`のtapは捨てて`dropped_touch`に数える。
+    pub fn poll(&mut self, now_ms: u64, session_established: bool, touch_blocks: bool) -> bool {
         if !self.enabled || now_ms < self.next_poll_ms {
             return false;
         }
@@ -115,12 +116,15 @@ impl TapDetector {
                 if !deskcat_tap::is_single_tap(int_source) {
                     return false;
                 }
-                let decision = self.filter.on_tap(now_ms, session_established);
+                let decision = self
+                    .filter
+                    .on_tap(now_ms, session_established, touch_blocks);
                 let c = self.filter.counters();
                 log::info!(
-                    "tap_detected decision={decision:?} int_source=0x{int_source:02x} sent={} dropped_no_session={} dropped_too_soon={}",
+                    "tap_detected decision={decision:?} int_source=0x{int_source:02x} sent={} dropped_no_session={} dropped_touch={} dropped_too_soon={}",
                     c.sent,
                     c.dropped_no_session,
+                    c.dropped_touch,
                     c.dropped_too_soon
                 );
                 decision == Decision::Send

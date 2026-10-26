@@ -125,6 +125,16 @@ pub const STROKE_RELEASE_SAMPLES: u16 = 3;
 /// 撫でと判定する、1 回の接触の移動量（raw 値の単位）。`EXP-041` の五点の raw 値は、四隅の中央値の間で `x` も `y` も約 2900〜3000 動く。
 pub const STROKE_TRAVEL: u32 = 600;
 
+/// タッチが離れてから、tap（ADXL345の単tap）を送らない時間（ms）。画面を撫でる力が加速度センサーに伝わってtapと判定される（と推定している。`EXP-044`は原因を確かめていない）のを、
+/// `tapped`として送らないための値で、接触の間（[`StrokeDetector::tap_blocked`]）に足す。**暫定の一般値である**（安全要件の5項目に効かない。
+/// 外れても、撫でに`Surprised`が混ざるか、離れた直後の本物の叩きを落とすだけで、何も壊れない）。`deskcat_tap::MIN_TAP_INTERVAL_MS`の半分にした。
+/// 根拠は `EXP-044` の観測：`stroke` 8（撫でる）と25（長押し）の2件で、`Happy` が ESP32 に受理された後、`stroke` の0.303秒後・0.505秒後の `tap_detected decision=Send` が
+/// `Surprised` を送らせ、`Happy` が描かれなかった。**離れた後に tap が出る遅れは測っていない。**
+/// **既知の穴：**触れたと判定する sample（[`STROKE_PRESS_SAMPLES`] 個目）より前の sample、つまり触れてから最大約40 msは接触中に数えないので、その間の tap は捨てない。
+/// 実機の窓の結果を見てから、塞ぐか決める。
+/// **値は、製品buildを書き込む実機の窓で、離れた後のtapの遅れを数えてから決める。**
+pub const TAP_HOLDOFF_AFTER_RELEASE_MS: u64 = 250;
+
 const STROKE_CONFIG: TouchConfig = match TouchConfig::new(
     STROKE_PRESS_THRESHOLD,
     STROKE_RELEASE_THRESHOLD,
@@ -439,6 +449,8 @@ pub struct StrokeDetector {
     enabled: bool,
     /// 触れたと判定した poll の時刻。接触していなければ `None`。
     pressed_at_ms: Option<u64>,
+    /// 接触が終わった（離れた、またはSPIの失敗で状態を捨てた）poll の時刻。まだ一度も離れていなければ `None`。
+    released_at_ms: Option<u64>,
     spi_errors: u32,
     strokes_sent: u32,
     strokes_dropped_no_session: u32,
@@ -466,6 +478,7 @@ impl StrokeDetector {
             consecutive_errors: 0,
             enabled: true,
             pressed_at_ms: None,
+            released_at_ms: None,
             spi_errors: 0,
             strokes_sent: 0,
             strokes_dropped_no_session: 0,
@@ -477,6 +490,16 @@ impl StrokeDetector {
         self.enabled.then_some(self.next_poll_ms)
     }
 
+    /// 接触中か、離れてから [`TAP_HOLDOFF_AFTER_RELEASE_MS`] 未満か。`true` の間の tap は `tapped` として送らない（`deskcat_tap::touch_blocks_tap`）。
+    pub fn tap_blocked(&self, now_ms: u64) -> bool {
+        deskcat_tap::touch_blocks_tap(
+            self.tracker.is_touching(),
+            self.released_at_ms,
+            now_ms,
+            TAP_HOLDOFF_AFTER_RELEASE_MS,
+        )
+    }
+
     /// 時刻に達していれば 1 sample 読む。**`head_touched` を送るべきなら、接触の始まりからの時間（ms）を返す。**
     pub fn poll(&mut self, now_ms: u64, session_established: bool) -> Option<u32> {
         if !self.enabled || now_ms < self.next_poll_ms {
@@ -486,7 +509,7 @@ impl StrokeDetector {
         let sample = match self.read_sample() {
             Ok(sample) => sample,
             Err(err) => {
-                self.on_spi_error(&err);
+                self.on_spi_error(&err, now_ms);
                 return None;
             }
         };
@@ -522,6 +545,7 @@ impl StrokeDetector {
                 stroked,
             } => {
                 self.pressed_at_ms = None;
+                self.released_at_ms = Some(now_ms);
                 log::info!(
                     "touch_event kind=released samples={samples} travel={travel} stroked={stroked}"
                 );
@@ -539,9 +563,12 @@ impl StrokeDetector {
 
     /// 転送の失敗。接触の途中の状態を捨て（失敗した sample の前後を 1 回の接触として扱わない）、続けて
     /// [`MAX_CONSECUTIVE_ERRORS`] 回失敗したら止める。
-    fn on_spi_error(&mut self, err: &EspError) {
+    fn on_spi_error(&mut self, err: &EspError, now_ms: u64) {
         self.spi_errors = self.spi_errors.saturating_add(1);
         self.consecutive_errors += 1;
+        if self.tracker.is_touching() {
+            self.released_at_ms = Some(now_ms);
+        }
         self.tracker.reset();
         self.pressed_at_ms = None;
         log::error!(
