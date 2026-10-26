@@ -25,14 +25,14 @@ import adc_stream_rate as asr  # noqa: E402
 
 
 def build_block(seq, taken, dropped, mark_us, mark_taken, values, nch=2, adps=7,
-                pending=None):
+                pending=None, ref=0):
     """sketch と同じ並びで1 block を組む。値は (ch, adc) の列で渡す。
 
     pending を省略した場合は「ring 滞留がこの block ぶんだけ」という素直な状態にする。
     """
     if pending is None:
         pending = len(values)
-    cfg = (adps & 0x07) | (0x08 if nch == 2 else 0x00)
+    cfg = (adps & 0x07) | (0x08 if nch == 2 else 0x00) | ((ref & 0x03) << 4)
     header = bytearray(asr.MAGIC)
     header += struct.pack(
         "<HIIIIBBB", seq, taken, dropped, mark_us, mark_taken, len(values), pending, cfg
@@ -97,6 +97,26 @@ class TestParser(unittest.TestCase):
         self.assertEqual(p.stats.header_xor_errors, 0)
         self.assertEqual(p.stats.reserved_bit_errors, 0)
         self.assertEqual(p.stats.resync_bytes, 0)
+
+    def test_reference_is_read_from_header(self):
+        """cfg の bit4-5（REFS1:0）から基準を読めること。0 は「記録していない」旧い header。"""
+        for ref, name in ((1, "AVCC"), (3, "内部 1.1 V"), (0, "記録なし（旧い header）")):
+            blk = build_block(0, 8, 0, 1000, 0, alt_values(8), ref=ref)
+            b = asr.BlockParser().feed(blk)[0]
+            self.assertEqual(b.ref, ref)
+            self.assertEqual(asr.REF_NAMES[b.ref], name)
+            # bit0-3 は基準によらず従来どおり
+            self.assertEqual(b.adps, 7)
+            self.assertEqual(b.nch, 2)
+
+    def test_old_header_without_reference_is_still_accepted(self):
+        """bit4-7 が 0 の旧い header（EXP-034 以前の記録を作った版）を、基準なしとして受け入れること。"""
+        blk = build_block(0, 8, 0, 1000, 0, alt_values(8))  # ref を渡さない＝cfg の bit4-7 は 0
+        p = asr.BlockParser()
+        got = p.feed(blk)
+        self.assertEqual(len(got), 1)
+        self.assertEqual(got[0].ref, 0)
+        self.assertEqual(p.stats.header_xor_errors, 0)
 
     def test_resync_after_leading_garbage(self):
         """起動直後の banner のような先行 text を読み飛ばせること。"""
@@ -313,6 +333,26 @@ class TestCsv(unittest.TestCase):
         self.assertAlmostEqual(float(rows[2 * n][0]), expect, places=1)
         wrong = base_us + (2 * n - base_idx) * period
         self.assertNotAlmostEqual(float(rows[2 * n][0]), wrong, places=1)
+
+    def test_csv_records_reference(self):
+        """CSV が基準を `#` 行で残すこと（記録のカウントを後で電圧へ換算するため）。"""
+        n, period = 128, 100
+        raw = b""
+        for seq, taken in [(0, 1 * n), (1, 2 * n)]:
+            raw += build_block(seq, taken, 0, 1_000_000 + (taken - n) * period, taken,
+                               alt_values(n), pending=n, ref=3)
+        p = asr.BlockParser()
+        blocks = p.feed(raw)
+        for k, b in enumerate(blocks):
+            b.t_recv = 100.0 + k * 0.1
+        r = asr.summarize(blocks, p.stats, 100.0, 100.1, discard_blocks=0)
+        self.assertEqual(r["ref"], 3)
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "out.csv")
+            asr.write_csv(path, r, False, (100.0, 1_800_000_000.0))
+            with io.open(path, encoding="utf-8") as fh:
+                lines = fh.read().splitlines()
+        self.assertIn("# ADC基準(REFS1:0): 内部 1.1 V", lines)
 
     def test_csv_wall_clock_anchor(self):
         """壁時計の anchor 行が、先頭 block の受信時刻と一致すること。

@@ -22,6 +22,13 @@ import termios
 import time
 
 MAGIC = b"\xa5\x5a"
+
+# header の cfg bit4-5（REFS1:0）の読み。0 は旧い header（基準を記録していない）。
+REF_NAMES = {
+    0: "記録なし（旧い header）",
+    1: "AVCC",
+    3: "内部 1.1 V",
+}
 HEADER_LEN = 24
 
 # micros() は uint32 で約71.6分で wrap する。
@@ -45,12 +52,13 @@ class Block:
         "pending",
         "adps",
         "nch",
+        "ref",
         "raw",
         "t_recv",
     )
 
     def __init__(self, seq, taken, dropped, mark_us, mark_taken, nsamples, pending,
-                 adps, nch, raw):
+                 adps, nch, raw, ref=0):
         self.seq = seq
         self.taken = taken
         self.dropped = dropped
@@ -62,6 +70,8 @@ class Block:
         self.pending = pending
         self.adps = adps
         self.nch = nch
+        # REFS1:0。1 = AVCC、3 = 内部 1.1 V、0 = 記録していない（この項目を持たない旧い header）。
+        self.ref = ref
         self.raw = raw  # tuple[int]。bit 0-9 が値、bit 10 が channel
         self.t_recv = None  # PC側で受け取った時刻（time.monotonic）。measure() が入れる
 
@@ -155,6 +165,7 @@ class BlockParser:
                     pending=pending,
                     adps=cfg & 0x07,
                     nch=2 if (cfg & 0x08) else 1,
+                    ref=(cfg >> 4) & 0x03,
                     raw=raw,
                 )
             )
@@ -333,6 +344,7 @@ def summarize(blocks, stats, t_start, t_end, discard_blocks: int):
         "blocks_discarded": discard_blocks,
         "nch": first.nch,
         "adps": first.adps,
+        "ref": first.ref,
         "nsamples_per_block": first.nsamples,
         "delivered": delivered,
         "delivered_between_snapshots": delivered_between_snapshots,
@@ -368,6 +380,7 @@ def print_report(r, baud: int):
         note = "50-200 kHz の規定内" if 50_000 <= adc_clock <= 200_000 else "**規定外（分解能を落とす取引）**"
         print("  ADC clock           : %.0f Hz  (%s)" % (adc_clock, note))
     print("  channel数           : %d" % r["nch"])
+    print("  ADC基準(REFS1:0)    : %s" % REF_NAMES.get(r["ref"], "不明(%d)" % r["ref"]))
     print("  block当たりsample数 : %d" % r["nsamples_per_block"])
 
     print("=== 実測 ===")
@@ -522,6 +535,10 @@ def write_csv(path: str, r, allow_drops: bool, clock_ref=None):
     with open(path, "w", encoding="utf-8", newline="\n") as fh:
         for line in anchor_line:
             fh.write(line + "\n")
+        # 基準が記録に無いと、後で生ADC値を電圧へ換算できない。header の値をそのまま残す。
+        # header が基準を持たない旧い版（ref=0）では、書かない（旧い版の CSV の形を変えない）。
+        if first.ref:
+            fh.write("# ADC基準(REFS1:0): %s\n" % REF_NAMES.get(first.ref, "不明(%d)" % first.ref))
         if nch > 1:
             fh.write("時刻[us],ch,生ADC値\n")
         else:

@@ -38,10 +38,15 @@
 // ADC の基準電圧。ADMUX の REFS1:0（`DS40002061B` §24.9.1）。
 //   1 = AVCC（既定。従来の測定と同じ）
 //   3 = 内部 1.1 V 基準（shunt の小さな電圧を細かく読むときに使う）
-// **3 は LOGGER_NCH=1 のときだけ許す。**§24.5.2 は「基準を切り替えた後の最初の変換結果は
-// 不正確なことがあり、捨てることを勧める」と述べる。2 channel を交互に読む実装は、
-// channel ごとに基準を切り替えないため、基準を channel ごとに変える使い方は実装していない。
-// 1 channel なら基準は起動時に 1 度だけ設定し、先頭の block を捨てる（PC 側の既存の扱い）。
+// §24.5.2 は「基準を切り替えた後の最初の変換結果は不正確なことがあり、捨てることを勧める」と
+// 述べる。**この sketch は、すべての channel で同じ基準を使う。**`adc_select_channel` は、
+// 変換のたびに ADMUX を書くが、REFS1:0 は channel によらず LOGGER_REF で決まる同じ値なので、
+// 2 channel を交互に読んでも基準は切り替わらない。基準を channel ごとに変える使い方は実装していない。
+// 2 channel のときは変換のたびに同じ REFS1:0 の値を書き直すだけで、基準の電圧源は切り替わらない。
+// 起動直後の変換は、PC 側が先頭の block を捨てる（既存の扱い）。
+// そのため LOGGER_REF=3 は LOGGER_NCH=1 でも 2 でも使える。2 channel のとき、
+// 各 channel の sample 間隔は 1 channel のときの 2 倍になり、2 つの channel の読みには
+// 1 変換ぶんの時間差が残る（ADC clock 125 kHz で約 104 µs）。
 #ifndef LOGGER_REF
 #define LOGGER_REF 1
 #endif
@@ -65,9 +70,6 @@
 #endif
 #if (LOGGER_REF != 1) && (LOGGER_REF != 3)
 #error "LOGGER_REF must be 1 (AVCC) or 3 (internal 1.1 V)"
-#endif
-#if (LOGGER_REF == 3) && (LOGGER_NCH != 1)
-#error "LOGGER_REF=3 (internal 1.1 V) is only supported with LOGGER_NCH=1"
 #endif
 #if (LOGGER_BLOCK < 1) || (LOGGER_BLOCK > 255) || (LOGGER_BLOCK >= RING_SIZE)
 #error "LOGGER_BLOCK must be 1..255 and smaller than RING_SIZE"
@@ -239,8 +241,11 @@ static void send_block(void) {
   put_u8(header, i, (uint8_t)LOGGER_BLOCK);
   // pending は ring 滞留数。0〜255 に収まる（ring は 256 で、snapshot 時は LOGGER_BLOCK 以上）。
   put_u8(header, i, pending);
-  // cfg: bit0-2 = ADPS、bit3 = (channel数 == 2)、bit4-7 は 0 で予約する。
-  put_u8(header, i, (uint8_t)((LOGGER_ADPS & 0x07) | ((LOGGER_NCH == 2) ? 0x08 : 0x00)));
+  // cfg: bit0-2 = ADPS、bit3 = (channel数 == 2)、bit4-5 = REFS1:0（01 = AVCC、11 = 内部 1.1 V。
+  // 00 は「記録していない」＝この項目を持たない旧い版の header）、bit6-7 は 0 で予約する。
+  // 基準が記録に残らないと、後で記録のカウントを電圧へ換算できない。
+  put_u8(header, i, (uint8_t)((LOGGER_ADPS & 0x07) | ((LOGGER_NCH == 2) ? 0x08 : 0x00) |
+                              ((uint8_t)(LOGGER_REF & 0x03) << 4)));
 
   uint8_t x = 0;
   for (uint8_t k = 0; k < i; k++) {
@@ -279,6 +284,8 @@ void setup(void) {
   Serial.print((uint8_t)LOGGER_ADPS);
   Serial.print(F(" nch="));
   Serial.print((uint8_t)LOGGER_NCH);
+  Serial.print(F(" ref="));
+  Serial.print((uint8_t)LOGGER_REF);
   Serial.print(F(" block="));
   Serial.print((uint8_t)LOGGER_BLOCK);
   Serial.print(F(" f_cpu="));
