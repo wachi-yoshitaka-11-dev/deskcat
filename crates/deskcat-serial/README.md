@@ -67,6 +67,21 @@ linkの上で起きたerrorである。openの`ENOENT`／`EACCES`／`EBUSY`はUS
 一時的なものだが、`classify`はこれらを`Fatal`にする。再接続のloopは、openの失敗を
 `Session::begin_reconnect()`が`None`を返すまで単純に再試行する。
 
+## 任意の`show_text`を送る（`show_text_probe` example）
+
+[Issue #23](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/23)の残作業である`PROTO-TBD-007`
+（textの上限とLCDのlayout・memoryの計測）の入力を、実機の窓で出すための試験用の送り手である。
+`hello`→`boot`のACKでESP32 sessionを確立してから、`show_text`を1件だけ送り、ACK（`ok`／`rejected`とcode）を
+`show_text_result: …`の1行で表示して終わる。`deskcatd`のoptionではなく、製品の動作は変えない。
+textそのものとdevice名は出力しない。
+
+```bash
+cargo run --example show_text_probe -- --port <path> --baud <rate> --duplicate-capacity <n> --duplicate-retention-ms <ms> --seconds <n> --text <string> [--repeat <n>] --duration-ms <ms> [--verbose]
+```
+
+送る4点（20字、21字、884 byte、30000 ms）と、送るときの注意は`examples/show_text_probe.rs`のmodule docにある。
+Piでの実行は実機側の担当で、この節の確認はhost（VM）のunit testまでである。
+
 ## 動かす（`serial_link` example）
 
 `SerialDevice`を呼ぶ実行体を1つ持つ。**このcrateはloopを持たない**（`Session`は
