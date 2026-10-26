@@ -127,7 +127,7 @@ arduino-cli compile --fqbn arduino:avr:uno --build-property compiler.cpp.extra_f
 | `LOGGER_BAUD` | UART の baud。**PC 側の `--baud` と一致させる** |
 | `LOGGER_ADPS` | ADPS2:0。ADC clock = F_CPU / 2^ADPS。`DS40002061B` §24.4 は最大分解能に 50〜200 kHz を要求する |
 | `LOGGER_NCH` | 1 または 2。2 のとき `A0` と `A1` を交互に読む |
-| `LOGGER_REF` | ADC の基準電圧（ADMUX の REFS1:0）。1 = AVCC（既定）、3 = 内部 1.1 V。**3 は `LOGGER_NCH` が 1 でも 2 でも使える**（全 channel で同じ基準で、channel の切り替えで基準は変わらない。2 channel のとき、各 channel の sample 間隔は 2 倍で、2 つの channel の読みには 1 変換ぶん〔ADC clock 125 kHz で約 104 µs〕の時間差が残る）。`DS40002061B` §24.5.2 は、基準を切り替えた後の最初の変換結果は不正確なことがあると述べる（2 channel のときは変換のたびに同じ REFS1:0 の値を書き直すだけで、基準の電圧源は切り替わらない。起動直後の変換は、PC 側が先頭の block を捨てる）。1.1 V 基準の実値は個体・AVCC・温度に紐づく（`EXP-002`、`EXP-005`） |
+| `LOGGER_REF` | ADC の基準電圧（ADMUX の REFS1:0）。1 = AVCC（既定）、3 = 内部 1.1 V。**3 は `LOGGER_NCH` が 1 でも 2 でも使える**（全 channel で同じ基準で、channel の切り替えで基準は変わらない。2 channel のとき、各 channel の sample 間隔は 2 倍で、2 つの channel の読みには 1 変換ぶん〔ADC clock 125 kHz で約 104 µs〕の時間差が残る）。`DS40002061B` §24.5.2 は、基準を切り替えた後の最初の変換結果は不正確なことがあると述べる（2 channel のときは変換のたびに同じ REFS1:0 の値を書き直すだけで、基準の電圧源は切り替わらない。起動直後の変換は、PC 側が先頭の block を捨てる）。1.1 V 基準の実値は個体・AVCC・温度に紐づく（`EXP-002`、`EXP-005`）。**3 は、AREF の pin に外から何もつながっていないことが条件**（`DS40002061B` §24.5.2。外部の電圧を AREF に加えると、内部基準はその電圧と短絡する。ADMUX の REFS の説明も、AREF に外部の基準電圧を加えているとき内部基準は使えない、と書く）。Uno R3 の回路図（`UNO-TH_Rev3e`）では、ATmega328P の AREF（21 番）は header の AREF の端子、テストパッド（TP_AREF）、100 nF（C4。GND へ）につながり、AVCC（20 番。L2 を経由）とは別の線である。**測定の前に、AREF の端子に何も挿さっていないことを確かめる** |
 | `LOGGER_BLOCK` | 1 block の sample 数。header 24 B に対する payload の割合を決める |
 
 ## 入力の配線（作業1）
