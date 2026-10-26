@@ -438,7 +438,7 @@ budget値は`PROTO-TBD-017`に含める。
 
 正確なevent classifierと報告するmagnitudeの意味は、選定したaccelerometerと実験根拠を必要とする。
 
-製品buildと`tap-21`試験build（構成ごとの動作は`firmware/esp32/README.md`の「build構成と通電」の表）は、ADXL345の単tapを検出し、**空のpayload（`{}`）の`tapped`**を送る（`magnitude_g`は持たない。上の例の`magnitude_g`は§3の表が「持たない」と決めている）。送るのは**`boot`のACKを受けてsessionが確立した後だけ**で、前の`tapped`から最小間隔未満のtapは送らず捨てる（捨てた数はfirmwareのlogに数える。`status`のcounterへは出さない）。閾値・持続時間・最小間隔・pollの間隔は暫定の一般値であり、実機で詰める。**値は`crates/deskcat-tap`のcrate docと定数が持つ**（ここへ再掲しない。閾値は、tapが重力の約1 gを含む未filterのデータで検出されるため、1 gより十分上に置く）。最小間隔は§8.2の送出の上限（`PROTO-TBD-012`）が決まるまでの置き場であり、決まれば置き換える。firmwareは`tapped`のACKを待たず、再送しない（eventは要求ではない。§8の表。ACKの要否は§9の受け入れ前TBDのままである）。書き込みに失敗した`tapped`は失われ、firmwareのlogにだけ残る。
+製品buildと`tap-21`試験build（構成ごとの動作は`firmware/esp32/README.md`の「build構成と通電」の表）は、ADXL345の単tapを検出し、**空のpayload（`{}`）の`tapped`**を送る（`magnitude_g`は持たない。上の例の`magnitude_g`は§3の表が「持たない」と決めている）。送るのは**`boot`のACKを受けてsessionが確立した後だけ**で、前の`tapped`から最小間隔未満のtapは送らず捨てる。**製品buildは、タッチ（§4.2）が触れている間と、離れてから短い間のtapも送らず捨てる**（画面を撫でる力が加速度センサーに伝わってtapと判定され、撫でたのに`Surprised`が混ざる、と推定している。`EXP-044`は原因を確かめていない。接触の始まりの約40 msは、まだ接触と判定されないため捨てない既知の穴がある。`tap-21`試験buildはタッチを読まないので、この条件を持たない）。捨てた数はfirmwareのlogに数える（`status`のcounterへは出さない）。閾値・持続時間・最小間隔・pollの間隔・タッチが離れてから送らない時間は暫定の一般値であり、実機で詰める。**値は`crates/deskcat-tap`のcrate docと定数、離れてから送らない時間は`firmware/esp32/src/touch.rs`の定数が持つ**（ここへ再掲しない。閾値は、tapが重力の約1 gを含む未filterのデータで検出されるため、1 gより十分上に置く）。最小間隔は§8.2の送出の上限（`PROTO-TBD-012`）が決まるまでの置き場であり、決まれば置き換える。firmwareは`tapped`のACKを待たず、再送しない（eventは要求ではない。§8の表。ACKの要否は§9の受け入れ前TBDのままである）。書き込みに失敗した`tapped`は失われ、firmwareのlogにだけ残る。
 
 ### 4.4 `lifted`
 
@@ -1396,6 +1396,7 @@ Framing／parse層について、**host workspaceのRust実装**がfixtureに合
 | 2026-10-12 | Draft 2 play_motion firmware | [Issue #19](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/19)のPR-3b。firmwareが現在のsessionの`play_motion`を`MotionDedup`経由で扱い、`invalid_payload`／`stale_session`／`duplicate_expired`の拒否ACKを返すようにした。§2の既知の逸脱(i)と§5.3の記述を事実に合わせた。**wire formatは変えていない。** |
 | 2026-10-17 | Draft 2 bench console input | [Issue #17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。§2の「UART0はどのbuildでも書き込みとdebug logだけに使う」が、`bench-servo-test-17`のbuildが確認の語をUART0のstdinから読む変更と食い違うため、その例外を書き足した。wire format、Pi link、Pi linkを持つbuildのUART0の扱いは変えない |
 | 2026-10-25 | Draft 2 head_touched firmware | [Issue #21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)。§4.2へ、製品buildが`head_touched`を送る条件（撫でと判定した時点で1回の接触につき1回、`boot`のACK後だけ、`strength`は省略、ACKを待たず再送しない、値は`firmware/esp32/src/touch.rs`の定数が持つ）を足した。fieldと型は変えていない。`duration_ms`は、送る時点までの接触の時間であることを書いた（§3の表は`u32`（ms）とだけ定め、測る区間を決めていなかった）。 |
+| 2026-10-26 | Draft 2 tapped touch holdoff | [Issue #21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)。§4.3へ、製品buildがタッチの接触中と離れた直後のtapを送らないことを足した（`Happy`が`Surprised`に上書きされた`EXP-044`の2件への対応。原因は画面を撫でる力が加速度に伝わることと推定しており、確かめていない。離れてからの時間は暫定で、実機の窓で詰める） |
 
 ### Draft schemaの互換性
 

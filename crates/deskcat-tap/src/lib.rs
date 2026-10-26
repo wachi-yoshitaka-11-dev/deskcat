@@ -11,6 +11,9 @@
 //! tap検出の節（p.20）による。**このcrateが使うレジスタの記述が、同文書が正とするRev. Gと同じかは、独立に確認していない**
 //! （Rev. GをCLIから取得できなかった）。
 //!
+//! `tapped`はタッチの接触中と離れた直後も送らない（[`touch_blocks_tap`]。画面を撫でる力が加速度に伝わると推定しているため（`EXP-044`は原因を確かめていない）。離れてからの時間は
+//! `firmware/esp32/src/touch.rs`の定数が持つ）。
+//!
 //! # 値の扱い
 //!
 //! 閾値・持続時間・最小間隔は**触覚の感度であり、安全要件の5項目に効かない**（外れても誤検出や検出漏れになるだけで、
@@ -92,6 +95,25 @@ pub const fn is_single_tap(int_source: u8) -> bool {
 /// **暫定の一般値である**（安全要件の5項目に効かない）。§8.2の送出の上限（`PROTO-TBD-012`）が決まれば置き換える。
 pub const MIN_TAP_INTERVAL_MS: u64 = 500;
 
+/// タッチが触れている間、または離れてから`holdoff_ms`未満のとき`true`。製品buildはこの間のtapを送らない
+/// （画面を撫でる力が加速度センサーに伝わって単tapと判定され、撫でたのに`Surprised`が混ざる、と推定している。`EXP-044`は原因を確かめていない。#21）。
+/// `released_at_ms`は、接触が終わった時刻（`None`は、まだ一度も離れていない）。
+#[must_use]
+pub const fn touch_blocks_tap(
+    touching: bool,
+    released_at_ms: Option<u64>,
+    now_ms: u64,
+    holdoff_ms: u64,
+) -> bool {
+    if touching {
+        return true;
+    }
+    match released_at_ms {
+        Some(released) => now_ms.saturating_sub(released) < holdoff_ms,
+        None => false,
+    }
+}
+
 /// tapを見つけたときの扱い。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Decision {
@@ -99,6 +121,8 @@ pub enum Decision {
     Send,
     /// bootのACKを受けておらず、Piのsessionが確立していない。捨てる。
     DropNoSession,
+    /// タッチの接触中か、離れた直後である（[`touch_blocks_tap`]）。画面を撫でる力が加速度に伝わったtapとみなして（推定）捨てる。
+    DropTouch,
     /// 前の`tapped`から[`MIN_TAP_INTERVAL_MS`]未満である。捨てる。
     DropTooSoon,
 }
@@ -110,6 +134,8 @@ pub struct TapCounters {
     pub sent: u32,
     /// sessionが確立していない間（確立前と、終了した後を含む）に捨てた数。
     pub dropped_no_session: u32,
+    /// タッチの接触中か離れた直後で捨てた数。
+    pub dropped_touch: u32,
     /// 間隔が短くて捨てた数。
     pub dropped_too_soon: u32,
 }
@@ -130,17 +156,28 @@ impl TapFilter {
             counters: TapCounters {
                 sent: 0,
                 dropped_no_session: 0,
+                dropped_touch: 0,
                 dropped_too_soon: 0,
             },
         }
     }
 
-    /// tapを1回見つけたときに呼ぶ。`now_ms`はuptime、`session_established`は`boot`のACKを受けたか。
-    /// `Send`を返したときだけ、送った時刻として記録する。
-    pub fn on_tap(&mut self, now_ms: u64, session_established: bool) -> Decision {
+    /// tapを1回見つけたときに呼ぶ。`now_ms`はuptime、`session_established`は`boot`のACKを受けたか、
+    /// `touch_blocks`は[`touch_blocks_tap`]の結果（タッチを読まないbuildは`false`）。
+    /// `Send`を返したときだけ、送った時刻として記録する（`DropTouch`は記録しない）。
+    pub fn on_tap(
+        &mut self,
+        now_ms: u64,
+        session_established: bool,
+        touch_blocks: bool,
+    ) -> Decision {
         if !session_established {
             self.counters.dropped_no_session = self.counters.dropped_no_session.saturating_add(1);
             return Decision::DropNoSession;
+        }
+        if touch_blocks {
+            self.counters.dropped_touch = self.counters.dropped_touch.saturating_add(1);
+            return Decision::DropTouch;
         }
         if self
             .last_sent_ms
@@ -211,32 +248,59 @@ mod tests {
     #[test]
     fn taps_before_the_session_is_established_are_dropped_and_counted() {
         let mut f = TapFilter::new();
-        assert_eq!(f.on_tap(100, false), Decision::DropNoSession);
-        assert_eq!(f.on_tap(5_000, false), Decision::DropNoSession);
+        assert_eq!(f.on_tap(100, false, false), Decision::DropNoSession);
+        assert_eq!(f.on_tap(5_000, false, false), Decision::DropNoSession);
         assert_eq!(f.counters().dropped_no_session, 2);
         assert_eq!(f.counters().sent, 0);
         // 確立後の最初のtapは、捨てた時刻に関係なく送る。
-        assert_eq!(f.on_tap(5_001, true), Decision::Send);
+        assert_eq!(f.on_tap(5_001, true, false), Decision::Send);
     }
 
     #[test]
     fn a_tap_within_the_minimum_interval_is_dropped_and_counted() {
         let mut f = TapFilter::new();
-        assert_eq!(f.on_tap(1_000, true), Decision::Send);
+        assert_eq!(f.on_tap(1_000, true, false), Decision::Send);
         assert_eq!(
-            f.on_tap(1_000 + MIN_TAP_INTERVAL_MS - 1, true),
+            f.on_tap(1_000 + MIN_TAP_INTERVAL_MS - 1, true, false),
             Decision::DropTooSoon
         );
         assert_eq!(f.counters().dropped_too_soon, 1);
         // 捨てたtapは「送った時刻」を更新しない。間隔は前の送出から数える。
-        assert_eq!(f.on_tap(1_000 + MIN_TAP_INTERVAL_MS, true), Decision::Send);
+        assert_eq!(
+            f.on_tap(1_000 + MIN_TAP_INTERVAL_MS, true, false),
+            Decision::Send
+        );
         assert_eq!(f.counters().sent, 2);
+    }
+
+    #[test]
+    fn a_tap_while_touching_is_dropped_counted_and_does_not_start_the_interval() {
+        let mut f = TapFilter::new();
+        assert_eq!(f.on_tap(1_000, true, true), Decision::DropTouch);
+        assert_eq!(f.counters().dropped_touch, 1);
+        assert_eq!(f.counters().sent, 0);
+        // 捨てたtapは「送った時刻」を更新しない。すぐ後のtapは送る。
+        assert_eq!(f.on_tap(1_001, true, false), Decision::Send);
+        // sessionが無ければ、タッチより先にそちらで数える。
+        assert_eq!(f.on_tap(2_000, false, true), Decision::DropNoSession);
+        assert_eq!(f.counters().dropped_touch, 1);
+    }
+
+    #[test]
+    fn touch_blocks_tap_while_touching_and_for_the_holdoff_after_release() {
+        assert!(touch_blocks_tap(true, None, 100, 300));
+        assert!(touch_blocks_tap(true, Some(0), 10_000, 300));
+        assert!(!touch_blocks_tap(false, None, 100, 300));
+        assert!(touch_blocks_tap(false, Some(1_000), 1_299, 300));
+        assert!(!touch_blocks_tap(false, Some(1_000), 1_300, 300));
+        // 時計が戻っても桁あふれしない（離れた直後として扱う）。
+        assert!(touch_blocks_tap(false, Some(5_000), 10, 300));
     }
 
     #[test]
     fn an_uptime_that_goes_backwards_does_not_underflow() {
         let mut f = TapFilter::new();
-        assert_eq!(f.on_tap(10_000, true), Decision::Send);
-        assert_eq!(f.on_tap(5, true), Decision::DropTooSoon);
+        assert_eq!(f.on_tap(10_000, true, false), Decision::Send);
+        assert_eq!(f.on_tap(5, true, false), Decision::DropTooSoon);
     }
 }

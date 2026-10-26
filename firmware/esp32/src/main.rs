@@ -895,7 +895,18 @@ fn main() {
         if let Some(detector) = tap.as_mut() {
             // `poll`内のI2C readと検出logも含む、検出→描画時間の保守的な始点。
             let poll_started_at_ms = health.uptime_ms();
-            if detector.poll(poll_started_at_ms, boot_session.is_established()) {
+            // 製品buildは、タッチの接触中と離れた直後のtapを送らない（撫でる力がtapと判定されると推定している。`crate::touch::TAP_HOLDOFF_AFTER_RELEASE_MS`）。
+            #[cfg(deskcat_product_mode)]
+            let touch_blocks = bus_touch
+                .as_ref()
+                .is_some_and(|touch| touch.tap_blocked(poll_started_at_ms));
+            #[cfg(not(deskcat_product_mode))]
+            let touch_blocks = false;
+            if detector.poll(
+                poll_started_at_ms,
+                boot_session.is_established(),
+                touch_blocks,
+            ) {
                 log::info!("tap_event_poll_start uptime_ms={poll_started_at_ms}");
                 pi_link::send_event(Message::Tapped, &mut boot_session, &health, &mut uart);
             }
