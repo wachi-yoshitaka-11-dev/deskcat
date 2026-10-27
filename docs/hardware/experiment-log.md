@@ -4576,7 +4576,7 @@ touch用5本を足した配線で、製品buildはLCDに顔を描いた（目視
 - cloud連携の成功側（キーがある場合）と、Workerの分岐は、この窓でも確かめていない（host testも無い）。この窓が確かめたのは、キー無しで`--cloud-speech`を付けて起動したときに、起動時に`Credential`のwarnが1回出て、ローカルの`show_text`が描かれたことだけである。
 - 長時間の運転、電流、`3V3` railの電圧、温度、発熱の定量。
 - LCDの線の導通、USB・ACの状態、LED・サーボ系の状態は、ユーザーの目視の申告・記録の照合だけである。作業セッションは現物を見ていない。
-- `tapped`の原因。Piのwpa_supplicantが切断を繰り返す原因。
+- `tapped`の原因。Piのwpa_supplicantが切断を繰り返す原因。窓の外でも切断と再接続が続いているか（見ていない）。
 
 ### Conclusion
 
