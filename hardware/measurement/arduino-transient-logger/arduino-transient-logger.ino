@@ -42,8 +42,10 @@
 // 述べる。**この sketch は、すべての channel で同じ基準を使う。**`adc_select_channel` は、
 // 変換のたびに ADMUX を書くが、REFS1:0 は channel によらず LOGGER_REF で決まる同じ値なので、
 // 2 channel を交互に読んでも基準は切り替わらない。基準を channel ごとに変える使い方は実装していない。
-// 内部 1.1 V 基準（3）は、AREF の pin に外から何もつながっていないことが条件（`DS40002061B` §24.5.2。
-// 外部の電圧を AREF に加えると、内部基準はその電圧と短絡する）。Uno R3 では AREF は header に出ている。
+// 内部 1.1 V 基準（3）は、AREF の pin に外から電圧を加えないことが条件（`DS40002061B` §24.5.2。
+// 外部の電圧を AREF に加えると、内部基準はその電圧と短絡する）。AREF の外付けのコンデンサは
+// 前提（Table 24-3：REFS1:0＝11 は「Internal 1.1V Voltage Reference with external capacitor at AREF pin」）で、
+// Uno R3 では基板側にある。AREF は header に出ている。
 // 2 channel のときは変換のたびに同じ REFS1:0 の値を書き直すだけで、基準の電圧源は切り替わらない。
 // 起動直後の変換は、PC 側が先頭の block を捨てる（既存の扱い）。
 // そのため LOGGER_REF=3 は LOGGER_NCH=1 でも 2 でも使える。2 channel のとき、
