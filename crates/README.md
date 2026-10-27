@@ -7,7 +7,7 @@
 | [`deskcat-protocol`](deskcat-protocol/README.md) | ESP32–Pi間のmessage型、serialization、byte列からの上限付き受信 | 作成済み（#9、#10） |
 | [`deskcat-serial`](deskcat-serial/README.md) | host側のserial session。上限付きI/O、切断の観測、再接続の上限とrate limit、上限のある送信queue。**実deviceのopenは含まない** | 作成済み（#11） |
 | [`deskcat-face`](deskcat-face/src/lib.rs) | `set_expression`の3表情の図形（矩形の列）、受理の判定の順序、帯への分け方。LCDもSPIも知らない | 作成済み（#21） |
-| [`deskcat-tap`](deskcat-tap/src/lib.rs) | ADXL345のtap検出の設定値（レジスタへ書く(address, 値)の列）、`INT_SOURCE`の読み方、`tapped`を送ってよいかの判定（boot ACK後だけ、最小間隔、タッチの接触中と直後は送らない）。I2Cを知らない | 作成済み（#21） |
+| [`deskcat-tap`](deskcat-tap/src/lib.rs) | ADXL345のtap検出の設定値（レジスタへ書く(address, 値)の列）、`INT_SOURCE`の読み方、`tapped`を送ってよいかの判定（boot ACK後だけ、最小間隔、製品buildはタッチの接触中と直後は送らず、見つけたtapを短く保留して接触が始まれば捨てる）。I2Cを知らない | 作成済み（#21） |
 | [`deskcat-accel`](deskcat-accel/src/lib.rs) | ADXL345の連続測定（±2 g・100 Hz・FIFO Stream）の設定値（レジスタへ書く(address, 値)の列）、FIFO_STATUSとINT_SOURCEの読み方、3軸の復号、窓ごとの統計。I2Cを知らない | 作成済み（#15） |
 | [`deskcat-touch`](deskcat-touch/src/lib.rs) | XPT2046の制御byteと3 byte応答の復号、raw sampleの列から触れた・離れた・撫でのeventを導く状態機械（しきい値は呼び出し側が渡す。値を持たない）。SPIを知らない | 作成済み（#14。製品buildが状態機械で撫でを判定する（#21）） |
 | [`deskcat-domain`](deskcat-domain/README.md) | 感情、接触event、行動判断、純粋ロジック | 作成済み（#491） |

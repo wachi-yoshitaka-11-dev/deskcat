@@ -15,18 +15,18 @@ session が確立し、LCD の bring-up と neutral 描画が終わった状態�
 
 | 場所 | 期待するログ | 読み方 |
 |---|---|---|
-| ESP32 UART0 | `tap_detected decision=Send ... sent=N`、`tap_event_poll_start uptime_ms=A`、`pi_tx frames=[("tapped", E)]` | filter を通過し、同じ `sid` の `id=E` を UART1 に書いたこと。`A` は検出した `poll` の開始時刻。`pi_uart_write_failed`／`pi_uart_write_stalled` がないことも確認する |
+| ESP32 UART0 | `tap_detected decision=Send ... sent=N`（**製品 build は保留するため、見つけたときは `tap_detected decision=Hold`、送るときは `tap_confirmed decision=Send ... sent=N`**）、`tap_event_poll_start uptime_ms=A`、`pi_tx frames=[("tapped", E)]` | filter を通過し、同じ `sid` の `id=E` を UART1 に書いたこと。`A` は `tapped` を送ると決めた `poll` の開始時刻（`tap-21` 構成は検出した `poll`。**製品 build は保留（`deskcat_tap::TAP_CONFIRM_MS`）の後なので、検出より保留（`deskcat_tap::TAP_CONFIRM_MS`）の分以上後**）。`pi_uart_write_failed`／`pi_uart_write_stalled` がないことも確認する |
 | Pi stderr | `tapped_received sid=S id=E esp_ts_ms=... pi_uptime_ms=... total=N` | 現在の ESP32 session で event が受理されたこと。`total` は daemon 起動からの受理件数で、Mind の cooldown で抑えた分も含む |
 | Pi stderr | `set_expression_queued id=C name=Surprised ...` | 感情 state が驚きを選び、表情 command を queue に入れたこと |
 | ESP32 UART0 | `pi_rx_set_expression sid=... id=C name=Surprised accepted`、`face_show name=Surprised`、`face_drawn name=Some(Surprised) uptime_ms=B` | command の受理、描画開始、最後の帯の後の描画完了。ACK 受理だけでは描画完了を意味しない |
 
 `E` は ESP32 の `pi_tx` と Pi の受信で一致させる。ESP32 の `pi_tx` ログには `sid` が無いため、`S` は Pi が現在の session の event として受理したことの確認に使う。`C` は Pi の送信と ESP32 の受信で一致させる。`face_draw_failed`、`pi_rx_set_expression_rejected`、session の再確立、別の `face_show`、文字表示が間に入った試行は latency の標本から除外し、除外理由と件数を残す。`face_drawn` が無ければ成功に数えない。
 
-**End-to-end latency の標本は `B - A` ms。**両方 ESP32 の起動からの uptime なので、Pi と ESP32 の時計を同期する必要はない。`A` は検出に至った `poll` の開始直前に採る。I2C の `INT_SOURCE` 読み出しと `tap_detected` log の時間も含むため、検出から描画までの**保守的な上限値**であり、物理接触の開始時刻からの時間ではない。終点は最後の帯の転送後、次の main loop で完了を記録した時刻であり、画面の物理的な発光遅延は含まない。各試行の `A`、`B`、差、対応する `S/E/C`、失敗・除外の有無を表にし、標本数、最小、中央値、最大を報告する。目標遅延値は #22 に定義されていないため、合否値を推測で置かない。
+**End-to-end latency の標本は `B - A` ms。**両方 ESP32 の起動からの uptime なので、Pi と ESP32 の時計を同期する必要はない。`A` は `tapped` を送ると決めた `poll` の開始直前に採る（`tap-21` 構成ではそれが検出に至った `poll`。製品 build では保留が明けた `poll`）。`tap-21` 構成では、I2C の `INT_SOURCE` 読み出しと `tap_detected` log の時間も含むため、検出から描画までの**保守的な上限値**（`tap-21` 構成。製品 build は上のとおり `A` が保留の分だけ遅れるので、`B - A` は検出から描画までの時間より短い）であり、物理接触の開始時刻からの時間ではない。終点は最後の帯の転送後、次の main loop で完了を記録した時刻であり、画面の物理的な発光遅延は含まない。各試行の `A`、`B`、差、対応する `S/E/C`、失敗・除外の有無を表にし、標本数、最小、中央値、最大を報告する。目標遅延値は #22 に定義されていないため、合否値を推測で置かない。
 
 ## 件数と誤検出
 
-意図した軽打の試行数と時刻を人間が記録する。触れない静止区間を分けて設け、開始・終了時刻と長さ、周囲の振動条件を記録する。この区間の `tap_detected decision=Send`／`tap_event_poll_start` の増分を **誤検出件数** とする。同じ区間の `tapped_received total` の増分は Pi に到達した件数である。抑制された検出は `tap_detected decision=DropTooSoon` 等の内訳として別に記録し、送信件数に混ぜない。`sent=N` は filter の送信判断の累積であり、UART 書き込み成功件数ではないため、`pi_tx` と Pi の受信も照合する。Pi 終了時の `daemon: ... tapped_received: N` は受理総数の補助確認になる。ログが欠けた区間は `0` 件とせず、欠測として扱う。
+意図した軽打の試行数と時刻を人間が記録する。触れない静止区間を分けて設け、開始・終了時刻と長さ、周囲の振動条件を記録する。この区間の `tap_event_poll_start` の増分（`tap_detected decision=Send`、製品 build は `tap_confirmed decision=Send` の増分と一致する）を **誤検出件数** とする。同じ区間の `tapped_received total` の増分は Pi に到達した件数である。抑制された検出は `tap_detected decision=DropTooSoon` 等の内訳として別に記録し、送信件数に混ぜない。`sent=N` は filter の送信判断の累積であり、UART 書き込み成功件数ではないため、`pi_tx` と Pi の受信も照合する。Pi 終了時の `daemon: ... tapped_received: N` は受理総数の補助確認になる。ログが欠けた区間は `0` 件とせず、欠測として扱う。
 
 servo 自身の振動による再 trigger は servo を使える安全条件と #20 の実機成果が揃うまで **未確認** とする。この PR は servo を駆動しない。後続の実機試験では、人間が承認した servo 操作の前後を別区間にし、同じ件数の取り方で比較する。tap のしきい値や安全値をこの結果なしに確定しない。
 
