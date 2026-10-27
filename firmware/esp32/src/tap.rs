@@ -4,6 +4,8 @@
 //! [`TapDetector::configure`]でtap検出を設定し、[`TapDetector::poll`]が[`POLL_INTERVAL_MS`]ごとに
 //! `INT_SOURCE`をI2Cで読む（**割り込みのINT線は使わない。配線は要らない**）。tapを見つけたら
 //! `deskcat_tap::TapFilter`が送ってよいかを決める（bootのACK後だけ、前の`tapped`から最小間隔以上、製品buildはタッチの接触中と離れた直後でない）。
+//! **製品buildは、tapを見つけてもすぐには送らず、`deskcat_tap::TAP_CONFIRM_MS`保留する**（待つ間に接触が始まれば捨てる）。保留は1件だけで、
+//! 待つ間の2件目は最小間隔未満として捨てる（先の1件を残す）。`tap-21`試験buildはタッチを読まないので保留せず、見つけたらすぐ送る。
 //! 設定値・出所・暫定であることは`deskcat_tap`のcrate docが持つ（**ここへ再掲しない**）。
 //!
 //! # I2C driverの所有
@@ -63,6 +65,10 @@ impl TapDetector {
         Self {
             accel,
             i2c,
+            // 製品buildだけが保留する。`tap-21`試験buildはタッチを読まないので、保留しない。
+            #[cfg(deskcat_product_mode)]
+            filter: TapFilter::with_confirmation(deskcat_tap::TAP_CONFIRM_MS),
+            #[cfg(not(deskcat_product_mode))]
             filter: TapFilter::new(),
             next_poll_ms: 0,
             consecutive_errors: 0,
@@ -101,8 +107,10 @@ impl TapDetector {
         self.enabled.then_some(self.next_poll_ms)
     }
 
-    /// 時刻に達していれば`INT_SOURCE`を1回読む。**`tapped`を送るべきなら`true`を返す。**`touch_blocks`は、タッチの接触中か離れた直後か
-    /// （`deskcat_tap::touch_blocks_tap`。タッチを読まないbuildは`false`）。`true`のtapは捨てて`dropped_touch`に数える。
+    /// 時刻に達していれば、保留中のtapを決め（`TapFilter::on_tick`）、`INT_SOURCE`を1回読む。**`tapped`を送るべきなら`true`を返す。**
+    /// `touch_blocks`は、タッチの接触中か離れた直後か（`deskcat_tap::touch_blocks_tap`。タッチを読まないbuildは`false`）。
+    /// 接触中か直後のtapは捨てて`dropped_touch`に数える。保留する構成では、見つけた周期ではなく、保留が明けた周期に`true`を返す。
+    /// 1周期に`true`は高々1回である（保留が明けた周期に新しく見つけたtapは、最小間隔未満として捨てる）。
     pub fn poll(&mut self, now_ms: u64, session_established: bool, touch_blocks: bool) -> bool {
         if !self.enabled || now_ms < self.next_poll_ms {
             return false;
@@ -110,24 +118,26 @@ impl TapDetector {
         // 次の期限は`now_ms`から積む（前の期限からではない）。main loopの1周回が延びた分だけ間隔が後ろへずれるが、
         // tapのbitは読むまで残るため、検出漏れにはならない。
         self.next_poll_ms = now_ms + POLL_INTERVAL_MS;
+        // 保留中のtapを先に決める（読み出しの失敗に関わらず）。
+        let confirmed = self
+            .filter
+            .on_tick(now_ms, session_established, touch_blocks);
+        if let Some(decision) = confirmed {
+            self.log_decision("tap_confirmed", decision, None);
+        }
+        let mut send = confirmed == Some(Decision::Send);
         match self.accel.read_int_source(&mut self.i2c) {
             Ok(int_source) => {
                 self.consecutive_errors = 0;
                 if !deskcat_tap::is_single_tap(int_source) {
-                    return false;
+                    return send;
                 }
                 let decision = self
                     .filter
                     .on_tap(now_ms, session_established, touch_blocks);
-                let c = self.filter.counters();
-                log::info!(
-                    "tap_detected decision={decision:?} int_source=0x{int_source:02x} sent={} dropped_no_session={} dropped_touch={} dropped_too_soon={}",
-                    c.sent,
-                    c.dropped_no_session,
-                    c.dropped_touch,
-                    c.dropped_too_soon
-                );
-                decision == Decision::Send
+                self.log_decision("tap_detected", decision, Some(int_source));
+                send |= decision == Decision::Send;
+                send
             }
             Err(err) => {
                 self.consecutive_errors += 1;
@@ -137,13 +147,29 @@ impl TapDetector {
                 );
                 if self.consecutive_errors >= MAX_CONSECUTIVE_ERRORS {
                     self.enabled = false;
+                    // 保留中の1件は、検出が止まると決められず、送られない（`on_tick`が呼ばれなくなる）。数えて log に残す。
+                    let pending_tap_lost = self.filter.abandon_pending();
                     log::error!(
-                        "tap_disabled consecutive_errors={}",
-                        self.consecutive_errors
+                        "tap_disabled consecutive_errors={} pending_tap_lost={pending_tap_lost} dropped_detection_stopped={}",
+                        self.consecutive_errors,
+                        self.filter.counters().dropped_detection_stopped
                     );
                 }
-                false
+                send
             }
         }
+    }
+
+    fn log_decision(&self, event: &str, decision: Decision, int_source: Option<u8>) {
+        let c = self.filter.counters();
+        let int_source = int_source.map_or(String::new(), |v| format!(" int_source=0x{v:02x}"));
+        log::info!(
+            "{event} decision={decision:?}{int_source} sent={} dropped_no_session={} dropped_touch={} dropped_too_soon={} dropped_detection_stopped={}",
+            c.sent,
+            c.dropped_no_session,
+            c.dropped_touch,
+            c.dropped_too_soon,
+            c.dropped_detection_stopped
+        );
     }
 }
