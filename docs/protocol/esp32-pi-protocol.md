@@ -814,6 +814,8 @@ Firmwareは次に上限を設ける。
 
 `text`のUTF-8 byte長の上限は884 byte（暫定）とする。§2の1024 byteの行に、envelopeの全integerを宣言した幅の最大値に、`duration_ms`を`u32`の最大値にした`show_text`が、escapeが起きない文字で収まる最大である。`"`や`\`、および`\uXXXX`で書いた文字はJSONで広がるため、これらを含む`text`は上限内でも`line_too_long`になりうる。
 
+**実機の計測（`PROTO-TBD-007`。[EXP-046](../hardware/experiment-log.md)。事実の記録であり、上限値の妥当性の判定ではない）。**`mem-probe-23,face-21,tap-21`のbuildへ、拒否の4入力（duration 0、duration 30001、21字、884 byte）と、受理の入力（20字、duration 30000 ms）5件を送った。拒否はいずれも`out_of_range`で、受理はいずれも`ok`のACKと`text_drawn`だった。`accept_to_draw_ms`は612〜709 msで、10字〜20字の間で字数による差は小さかった（描画の時間は上限の根拠に使わない）。基線からの`min_free_heap`の下がりは1976 byte、main taskのstackの残量の下がりは656 byte（21字と884 byteの拒否の区間では動かなかった）。**測っていないこと：**製品build（撫で付き）の絶対のメモリの余裕と、link確立と最悪入力による下がりの切り分け。20字・884 byte・30000 msは、この計測の後も暫定値である。
+
 Textとface描画の優先順位はUI state machineで定義する。
 
 ### 5.5 `show_choices`
@@ -822,7 +824,7 @@ Textとface描画の優先順位はUI state machineで定義する。
 {"v":1,"sid":90312,"id":904,"ts_ms":53000,"type":"show_choices","payload":{"prompt":"少し休憩する？","choices":[{"id":"yes","label":"する"},{"id":"later","label":"あとで"}],"timeout_ms":15000}}
 ```
 
-Choice count、ID、label、prompt length、timeoutに上限を設ける。正確なinteraction eventは、touch hardwareとlayoutの選定まで保留する。
+Choice count、ID、label、prompt length、timeoutに上限を設ける。正確なinteraction eventは、touch hardwareとlayoutの選定まで保留する。`PROTO-TBD-007`の実機の窓（EXP-046）は`choice`を扱っておらず、`choice`の制限は未着手である。
 
 ### 5.6 `get_status`
 
@@ -1349,7 +1351,7 @@ Framing／parse層について、**host workspaceのRust実装**がfixtureに合
 | PROTO-TBD-004 | ACK timeout | 測定latencyとrecovery test |
 | PROTO-TBD-005 | **現在のsession**のduplicate履歴の保持期間とretry window、および**保持件数の上限と超過時の動作**。期間の下限は遅延messageの最大生存時間＋再送windowを下回らない。件数上限は受理budget（§8.2）と保持する結果の最大sizeから導出する。上限超過時は最も古いentryをevictしてよいが、evictしたentryへの再送は新規commandとして実行しない（`duplicate_expired`で拒否する。§9参照）。`PROTO-TBD-011`のretired session保持期間から導出しない（目的の異なる別モデル。§5.1） | Memory予算とretry window。[HW-TBD-020](../hardware/tbd-register.md)と対で確定する。サーボ出力の有効化条件に含まれる |
 | PROTO-TBD-006 | 最終status field | 診断要件とencode size test |
-| PROTO-TBD-007 | Textとchoiceの制限 | LCD layoutとmemory測定 |
+| PROTO-TBD-007 | Textとchoiceの制限。**`text`：実機の窓（[EXP-046](../hardware/experiment-log.md)）で、最悪入力の拒否と受理、描画時間、heapとstackを計測した（§5.4）。上限値（20字、884 byte、30000 ms）の妥当性は判定しておらず、行は未解決のままである。`choice`：未着手。EXP-046は扱っていない** | `text`：行数・改行・layout処理量の上限（LCD layout）、製品build（撫で付き）での絶対のメモリの余裕の測定、link確立と最悪入力によるheapとstackの下がりの切り分け、上限値の判定。`choice`：LCD layoutとmemory測定 |
 | PROTO-TBD-008 | Motion名と範囲（`play_motion`の`speed`と`repeat`の上限を含む） | Servo calibrationと動作設計。**`speed`と`repeat`の上限は、catalogが空でなくなる（motionを受理し始める）前に決める**（§5.3の有効化の条件。[Servo Safety Limits](../hardware/servo-safety-limits.md)の有効化条件の一覧には、まだ載せていない） |
 | PROTO-TBD-009 | Touch strengthの意味 | **touch controllerは`XPT2046`と確定した**（2026-08-13の現物確認。[HW-TBD-003](../hardware/tbd-register.md)はclose）。残るのは同ICのdatasheetでの意味づけと実験である |
 | PROTO-TBD-010 | Heartbeat方式とlink-loss判定 | 測定latencyとfail-safe試験。[HW-TBD-017](../hardware/tbd-register.md)と対で確定する。**サーボ出力の有効化条件に含まれる**（[servo-safety-limits](../hardware/servo-safety-limits.md#サーボ出力を有効化してよい条件)） |
@@ -1397,6 +1399,7 @@ Framing／parse層について、**host workspaceのRust実装**がfixtureに合
 | 2026-10-17 | Draft 2 bench console input | [Issue #17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。§2の「UART0はどのbuildでも書き込みとdebug logだけに使う」が、`bench-servo-test-17`のbuildが確認の語をUART0のstdinから読む変更と食い違うため、その例外を書き足した。wire format、Pi link、Pi linkを持つbuildのUART0の扱いは変えない |
 | 2026-10-25 | Draft 2 head_touched firmware | [Issue #21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)。§4.2へ、製品buildが`head_touched`を送る条件（撫でと判定した時点で1回の接触につき1回、`boot`のACK後だけ、`strength`は省略、ACKを待たず再送しない、値は`firmware/esp32/src/touch.rs`の定数が持つ）を足した。fieldと型は変えていない。`duration_ms`は、送る時点までの接触の時間であることを書いた（§3の表は`u32`（ms）とだけ定め、測る区間を決めていなかった）。 |
 | 2026-10-26 | Draft 2 tapped touch holdoff | [Issue #21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)。§4.3へ、製品buildがタッチの接触中と離れた直後のtapを送らないことを足した（`Happy`が`Surprised`に上書きされた`EXP-044`の2件への対応。原因は画面を撫でる力が加速度に伝わることと推定しており、確かめていない。離れてからの時間は暫定で、実機の窓で詰める） |
+| 2026-10-27 | Draft 2 PROTO-TBD-007 measured | [Issue #23](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/23)。§5.4へ、実機の窓（`EXP-046`）で計測した`show_text`の事実（拒否4件、20字・30000 msの受理5件、`accept_to_draw_ms`、heapとstackの下がり）と、測っていないことを書いた。§5.5へ、`choice`は未着手であることを書いた。§13の`PROTO-TBD-007`を、`text`と`choice`に分けて書き直した。上限値（20字、884 byte、30000 ms）と、その妥当性の判定は変えていない。行は解決済みにしていない |
 | 2026-10-27 | Draft 2 tapped touch hold | [Issue #21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)。§4.3の製品buildの記述を、離れてから送らない時間を広げることと、tapを見つけてもすぐには送らず保留し、保留の間に接触が始まれば捨てることへ改めた（`EXP-044`の旧buildのlogの机上の再集計で、離れてから600・820 msと、接触の判定の前10〜260 msにtapが出ていたため。実測の窓ではない。値は暫定で、実機の窓で詰める）。「接触の始まりの約40 msは捨てない既知の穴」の記述を除いた |
 | 2026-10-27 | Draft 2 tapped hold session | [Issue #21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)。§4.3へ、保留中のtapを、Piとのsessionが入れ替わったとき（新しいPi `sid`の`hello`による遷移を含む。この遷移でESP32の`sid`は変わらない）に捨てて数えることを足した（前のsessionのtapを新しいsessionで送らないため） |
 

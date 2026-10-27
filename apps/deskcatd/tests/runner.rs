@@ -8,12 +8,12 @@ use std::io;
 use std::num::NonZeroU64;
 use std::sync::{
     Arc,
-    atomic::{AtomicBool, Ordering},
+    atomic::{AtomicBool, AtomicUsize, Ordering},
     mpsc::{self, Receiver, Sender},
 };
 use std::time::Duration;
 
-use deskcat_domain::{LOCAL_SPEECH_LINES, Millis, Mind, Timing};
+use deskcat_domain::{Expression, LOCAL_SPEECH_LINES, Millis, Mind, Timing};
 use deskcat_protocol::{
     Ack, AckStatus, Boot, DisplayStatus, Envelope, Frame, Message, ProtocolCounters, SensorStatus,
     ServoStatus, Status, decode_line, encode_line, limits,
@@ -359,6 +359,141 @@ fn cloud_worker_keeps_uart_running_and_failure_shows_local_line() {
     );
     assert!(
         matches!(&frames[0].message, Message::ShowText(text) if text.text == LOCAL_SPEECH_LINES[0])
+    );
+    std::fs::remove_dir_all(dir).expect("cleanup");
+}
+
+/// 依頼のたびにworker threadを落とす。意図したpanicであり、test出力に`PanicClaude`のpanicが1回出る。
+/// 呼ばれた回数を数え、2回目の依頼がworkerへ届いていないことを示す。
+struct PanicClaude {
+    calls: Arc<AtomicUsize>,
+}
+
+impl Client for PanicClaude {
+    fn count_tokens(&mut self, _: Context) -> Result<u32, Failure> {
+        self.calls.fetch_add(1, Ordering::Relaxed);
+        panic!("PanicClaude: worker threadを落とす意図したpanic");
+    }
+
+    fn generate(&mut self, _: Context) -> Result<String, Failure> {
+        unreachable!("count_tokensで落ちる");
+    }
+}
+
+fn panic_worker(name: &str) -> (CloudSpeech, Arc<AtomicUsize>, std::path::PathBuf) {
+    let dir = std::env::temp_dir().join(format!("deskcat-{name}-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).expect("test dir");
+    let calls = Arc::new(AtomicUsize::new(0));
+    let worker = CloudSpeech::start(
+        PanicClaude {
+            calls: Arc::clone(&calls),
+        },
+        dir.join("budget.json"),
+    )
+    .expect("worker");
+    (worker, calls, dir)
+}
+
+/// #23の「cloudのfailure時にローカルへfallbackする」のうち、依頼の時点の失敗（`submit`のErr）の根拠は、
+/// このtest（A）、下のrunnerのtest（B）、`runner.rs`の`submit`がErrなら`note_failure`してローカルの行を
+/// `queue_speech`する1行の分岐の3つを合わせたものである。**Bだけでは根拠にしない。**
+///
+/// A：`submit`が返すErrは`Failure::Worker`だけである（処理中の再依頼、または送信queueの満杯・切断）。
+/// Budgetの失敗はworker側で起き、`poll`のErrで届くため、この経路には来ない。workerが落ちた後の`submit`が
+/// `Err(Worker)`を返し、`in_flight()`がfalseである（処理中の守りに当たったのではない）ことを直接確かめる。
+/// workerが終わってからqueueが切れるまでの一瞬に`submit`がOkを返した場合は、`poll`で結果（Err）を受けて
+/// `in_flight`を戻してから、回数を決めた再試行でやり直す。
+#[test]
+fn cloud_submit_returns_worker_failure_after_the_worker_died() {
+    let (mut worker, calls, dir) = panic_worker("cloud-submit-api-test");
+    let context = Context {
+        expression: Expression::Neutral,
+        time_band: Some(2),
+    };
+    worker
+        .submit(context, 500)
+        .expect("生きているworkerは受け付ける");
+    let mut polled = None;
+    for _ in 0..2_000 {
+        if let Some(result) = worker.poll() {
+            polled = Some(result);
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(1));
+    }
+    assert_eq!(
+        polled,
+        Some(Err(Failure::Worker)),
+        "落ちたworkerは`poll`でErr"
+    );
+    assert!(!worker.in_flight());
+    let mut submitted = Ok(());
+    for _ in 0..2_000 {
+        submitted = worker.submit(context, 500);
+        if submitted.is_err() {
+            break;
+        }
+        while worker.poll().is_none() {
+            std::thread::sleep(Duration::from_millis(1));
+        }
+    }
+    assert_eq!(submitted, Err(Failure::Worker), "落ちたworkerへの依頼");
+    assert!(!worker.in_flight(), "処理中の守りではなくqueueの切断である");
+    assert_eq!(
+        calls.load(Ordering::Relaxed),
+        1,
+        "2回目の依頼はworkerへ届かない"
+    );
+    std::fs::remove_dir_all(dir).expect("cleanup");
+}
+
+/// B：runnerの振る舞い。workerが最初の依頼で落ちると、1回目は`poll`のErr、2回目は`submit`のErrで、
+/// どちらもローカルの行がそのまま送られ、UARTは止まらない。stubは1回だけ呼ばれる。
+/// 2行目だけでは`submit`のErrと`poll`のErrを区別できない（counterも同じ）。区別はAが受け持つ。
+#[test]
+fn cloud_submit_failure_after_worker_death_shows_local_line_and_keeps_uart_running() {
+    let (mut d, mut t) = ready();
+    t.auto_ack_text = true;
+    t.eof_after_idle_reads = Some(1_500);
+    let (worker, calls, dir) = panic_worker("runner-cloud-submit-test");
+    let config = SpeechConfig {
+        min_interval_ms: NonZeroU64::new(50).expect("nonzero"),
+        duration_ms: 500,
+    };
+    let mut now = 100;
+    let end = run_loop_with_cloud(
+        &mut d,
+        &mut t,
+        || {
+            std::thread::sleep(Duration::from_millis(1));
+            now += 1;
+            now
+        },
+        StartupWatchdog::new(1_000),
+        Some(config),
+        Some(worker),
+    );
+    assert_eq!(end, RunEnd::Exited(ExitReason::LinkLost));
+    let texts: Vec<_> = String::from_utf8(t.written)
+        .expect("UTF-8")
+        .lines()
+        .map(|line| decode_line(line).expect("frame"))
+        .filter_map(|frame| match frame.message {
+            Message::ShowText(text) => Some(text.text),
+            _ => None,
+        })
+        .collect();
+    assert!(texts.len() >= 2, "pollのErrとsubmitのErrの2回とも送る");
+    assert_eq!(texts[0], LOCAL_SPEECH_LINES[0]);
+    assert_eq!(texts[1], LOCAL_SPEECH_LINES[1]);
+    assert_eq!(
+        calls.load(Ordering::Relaxed),
+        1,
+        "2回目の依頼はworkerへ届かない"
+    );
+    assert!(
+        d.counters().show_text_accepted >= 2,
+        "どちらのあともUARTを回し、ACKを処理する"
     );
     std::fs::remove_dir_all(dir).expect("cleanup");
 }
