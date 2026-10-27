@@ -5,7 +5,7 @@
 //! `INT_SOURCE`をI2Cで読む（**割り込みのINT線は使わない。配線は要らない**）。tapを見つけたら
 //! `deskcat_tap::TapFilter`が送ってよいかを決める（bootのACK後だけ、前の`tapped`から最小間隔以上、製品buildはタッチの接触中と離れた直後でない）。
 //! **製品buildは、tapを見つけてもすぐには送らず、`deskcat_tap::TAP_CONFIRM_MS`保留する**（待つ間に接触が始まれば捨てる）。保留は1件だけで、
-//! 待つ間の2件目は最小間隔未満として捨てる（先の1件を残す）。`tap-21`試験buildはタッチを読まないので保留せず、見つけたらすぐ送る。
+//! 待つ間の2件目は最小間隔未満として捨てる（先の1件を残す）。保留中にPiとのsessionが入れ替わったら（`BootSession::session_epoch`が変わったら）、保留中の1件を捨てる。`tap-21`試験buildはタッチを読まないので保留せず、見つけたらすぐ送る。
 //! 設定値・出所・暫定であることは`deskcat_tap`のcrate docが持つ（**ここへ再掲しない**）。
 //!
 //! # I2C driverの所有
@@ -111,13 +111,24 @@ impl TapDetector {
     /// `touch_blocks`は、タッチの接触中か離れた直後か（`deskcat_tap::touch_blocks_tap`。タッチを読まないbuildは`false`）。
     /// 接触中か直後のtapは捨てて`dropped_touch`に数える。保留する構成では、見つけた周期ではなく、保留が明けた周期に`true`を返す。
     /// 1周期に`true`は高々1回である（保留が明けた周期に新しく見つけたtapは、最小間隔未満として捨てる）。
-    pub fn poll(&mut self, now_ms: u64, session_established: bool, touch_blocks: bool) -> bool {
+    /// `session_epoch`は`BootSession::session_epoch`（sessionが入れ替わったら、保留中の1件を捨てる。`TapFilter::on_session`）。
+    pub fn poll(
+        &mut self,
+        now_ms: u64,
+        session_established: bool,
+        session_epoch: u32,
+        touch_blocks: bool,
+    ) -> bool {
         if !self.enabled || now_ms < self.next_poll_ms {
             return false;
         }
         // 次の期限は`now_ms`から積む（前の期限からではない）。main loopの1周回が延びた分だけ間隔が後ろへずれるが、
         // tapのbitは読むまで残るため、検出漏れにはならない。
         self.next_poll_ms = now_ms + POLL_INTERVAL_MS;
+        // sessionの入れ替わりを、`on_tick`と`on_tap`の両方より先に反映する（新しい世代のtapを、前の世代の保留と取り違えない）。
+        if self.filter.on_session(session_epoch) {
+            self.log_decision("tap_confirmed", Decision::DropNoSession, None);
+        }
         // 保留中のtapを先に決める（読み出しの失敗に関わらず）。
         let confirmed = self
             .filter

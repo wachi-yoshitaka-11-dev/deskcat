@@ -241,6 +241,10 @@ pub struct BootSession {
     next_id: u32,
     /// 現在のPi sessionで、`hello`による再開を既に行ったか（module doc「`hello`による再送の再開」）。
     resumed_in_pi_session: bool,
+    /// `Phase::Established`へ入るたびに1増やす（入る経路は`apply_ack`の1か所だけ）。`hello`による遷移のようにESP32の`sid`が
+    /// 変わらずにsessionが入れ替わる場合も、値が変わる。比べるのは「等しいか」だけで、`wrapping_add`で増やす
+    /// （`u32`が一周して同じ値に戻るのは、現実の時間では起きない）。
+    session_epoch: u32,
 }
 
 impl BootSession {
@@ -250,6 +254,13 @@ impl BootSession {
     #[must_use]
     pub fn is_established(&self) -> bool {
         matches!(self.phase, Phase::Established)
+    }
+
+    /// `Phase::Established`へ入った回数（`wrapping_add`）。保留中のtapが、sessionの入れ替わり（ESP32の`sid`が変わらない
+    /// `hello`による遷移を含む）を越えて送られないよう、`deskcat_tap::TapFilter::on_session`へ渡す（Issue #21）。
+    #[must_use]
+    pub fn session_epoch(&self) -> u32 {
+        self.session_epoch
     }
 
     /// 初期`sid`で`boot`を1回送り、sessionを開始する。
@@ -270,6 +281,7 @@ impl BootSession {
             sid_reselect_count: 0,
             next_id: BOOT_ID + 1,
             resumed_in_pi_session: false,
+            session_epoch: 0,
         };
         session.send_boot(health, uart);
         session.next_deadline_ms = health.uptime_ms() + duration_to_ms(policy.initial_interval);
@@ -434,6 +446,7 @@ impl BootSession {
         match ack.status {
             AckStatus::Ok => {
                 self.phase = Phase::Established;
+                self.session_epoch = self.session_epoch.wrapping_add(1);
                 log::info!("boot_established sid={} id={}", self.sid, self.id);
             }
             AckStatus::Rejected => {

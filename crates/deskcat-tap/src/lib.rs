@@ -135,7 +135,7 @@ pub enum Decision {
     Send,
     /// 保留した。[`TAP_CONFIRM_MS`]の間に接触が始まらなければ、[`TapFilter::on_tick`]が`Send`を返す（始まれば`DropTouch`）。
     Hold,
-    /// bootのACKを受けておらず、Piのsessionが確立していない。捨てる。
+    /// bootのACKを受けておらず、Piのsessionが確立していない。捨てる。保留中にsessionが入れ替わって（[`TapFilter::on_session`]。確立し直し済みの場合を含む）捨てた場合も、この扱いで数える。
     DropNoSession,
     /// タッチの接触中か、離れた直後である（[`touch_blocks_tap`]）。画面を撫でる力が加速度に伝わったtapとみなして（推定）捨てる。
     /// 保留中のtapが、待つ間に接触が始まって捨てられた場合も含む。
@@ -168,6 +168,8 @@ pub struct TapFilter {
     pending_since_ms: Option<u64>,
     /// 0なら保留せず、見つけたtapをすぐ`Send`する。
     confirm_ms: u64,
+    /// 最後に見たsessionの世代（[`Self::on_session`]）。比べるのは「等しいか」だけである。
+    session_epoch: u32,
     counters: TapCounters,
 }
 
@@ -186,6 +188,7 @@ impl TapFilter {
             last_sent_ms: None,
             pending_since_ms: None,
             confirm_ms,
+            session_epoch: 0,
             counters: TapCounters {
                 sent: 0,
                 dropped_no_session: 0,
@@ -234,6 +237,23 @@ impl TapFilter {
         self.last_sent_ms = Some(now_ms);
         self.counters.sent = self.counters.sent.saturating_add(1);
         Decision::Send
+    }
+
+    /// tapを読む周期ごとに、**[`Self::on_tick`]と[`Self::on_tap`]の両方より前に**呼ぶ。`session_epoch`は、Piとのsessionが
+    /// 確立した（`Established`へ入った）回数である。前に見た値と違えば、sessionが入れ替わったので、保留中のtapを捨てて
+    /// `dropped_no_session`に数え、`true`を返す。新しいPi `sid`の`hello`による遷移のように、ESP32の`sid`が変わらず、tapを読む周期の間に入れ替わりきる場合も捨てられる。
+    /// 新しい世代で見つけたtapを、前の世代の保留と取り違えないよう、`on_tap`より前に呼ぶ。
+    /// 比べるのは「等しいか」だけで、一周して同じ値に戻るのは現実の時間では起きない。
+    pub fn on_session(&mut self, session_epoch: u32) -> bool {
+        if session_epoch == self.session_epoch {
+            return false;
+        }
+        self.session_epoch = session_epoch;
+        if self.pending_since_ms.take().is_none() {
+            return false;
+        }
+        self.counters.dropped_no_session = self.counters.dropped_no_session.saturating_add(1);
+        true
     }
 
     /// tap検出が止まる（`on_tick`が二度と呼ばれない）ときに呼ぶ。保留中のtapがあれば捨てて`dropped_detection_stopped`に数え、`true`を返す。
@@ -533,5 +553,51 @@ mod tests {
         // `EXP-044`の旧buildの再集計で、離れてから600・820 ms後にtapが出ていた。
         assert!(touch_blocks_tap(false, Some(5_000), 5_600, 1_000));
         assert!(touch_blocks_tap(false, Some(5_000), 5_820, 1_000));
+    }
+
+    #[test]
+    fn a_held_tap_is_dropped_when_the_session_epoch_changes_even_if_it_is_established_again() {
+        let mut f = TapFilter::with_confirmation(C);
+        assert!(!f.on_session(1));
+        assert_eq!(f.on_tap(1_000, true, false), Decision::Hold);
+        // 入れ替わった。周期の間に確立し直しているので、`session_established`は`true`のままである。
+        assert!(f.on_session(2));
+        assert_eq!(f.counters().dropped_no_session, 1);
+        assert_eq!(f.on_tick(1_000 + C, true, false), None);
+        assert_eq!(f.counters().sent, 0);
+    }
+
+    #[test]
+    fn a_session_change_without_a_held_tap_counts_nothing() {
+        let mut f = TapFilter::with_confirmation(C);
+        assert!(!f.on_session(1));
+        assert!(!f.on_session(2));
+        assert_eq!(f.counters().dropped_no_session, 0);
+    }
+
+    #[test]
+    fn the_same_epoch_keeps_the_hold_and_it_is_sent_when_due() {
+        let mut f = TapFilter::with_confirmation(C);
+        assert!(!f.on_session(3));
+        assert_eq!(f.on_tap(1_000, true, false), Decision::Hold);
+        assert!(!f.on_session(3));
+        assert_eq!(f.on_tick(1_000 + C, true, false), Some(Decision::Send));
+    }
+
+    #[test]
+    fn a_tap_found_in_the_new_epoch_is_held_afresh_when_on_session_runs_first() {
+        let mut f = TapFilter::with_confirmation(C);
+        assert!(!f.on_session(1));
+        assert_eq!(f.on_tap(1_000, true, false), Decision::Hold);
+        // 次の周期：入れ替わりと、新しい世代での新しいtapが同時に見つかる。呼ぶ順は on_session → on_tick → on_tap。
+        let now = 1_100;
+        assert!(f.on_session(2));
+        assert_eq!(f.on_tick(now, true, false), None);
+        assert_eq!(f.on_tap(now, true, false), Decision::Hold);
+        // 新しい保留は、古い保留の時刻ではなく、新しい tap を見つけた時刻から数える。
+        assert_eq!(f.on_tick(now + C - 1, true, false), None);
+        assert_eq!(f.on_tick(now + C, true, false), Some(Decision::Send));
+        assert_eq!(f.counters().dropped_no_session, 1);
+        assert_eq!(f.counters().sent, 1);
     }
 }

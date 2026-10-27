@@ -906,6 +906,7 @@ fn main() {
             if detector.poll(
                 poll_started_at_ms,
                 boot_session.is_established(),
+                boot_session.session_epoch(),
                 touch_blocks,
             ) {
                 log::info!("tap_event_poll_start uptime_ms={poll_started_at_ms}");
