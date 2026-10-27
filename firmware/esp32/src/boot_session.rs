@@ -259,6 +259,11 @@ impl BootSession {
     /// `Phase::Established`へ入った回数（`wrapping_add`）。保留中のtapが、sessionの入れ替わり（ESP32の`sid`が変わらない
     /// `hello`による遷移を含む）を越えて送られないよう、`deskcat_tap::TapFilter::on_session`へ渡す（Issue #21）。
     #[must_use]
+    // `tap-21`も製品buildも持たない試験構成では、呼ぶ側（`main.rs`のtapのpoll）が無く、読まれない。
+    #[cfg_attr(
+        not(any(feature = "tap-21", deskcat_product_mode)),
+        allow(dead_code)
+    )]
     pub fn session_epoch(&self) -> u32 {
         self.session_epoch
     }
