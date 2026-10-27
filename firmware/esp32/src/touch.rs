@@ -129,10 +129,13 @@ pub const STROKE_TRAVEL: u32 = 600;
 /// `tapped`として送らないための値で、接触の間（[`StrokeDetector::tap_blocked`]）に足す。**暫定の一般値である**（安全要件の5項目に効かない。
 /// 外れても、撫でに`Surprised`が混ざるか、離れた直後の本物の叩きを落とすだけで、何も壊れない）。
 /// **根拠は机上の再集計である。**`EXP-044`の旧buildのlogを実機側が再集計したところ、離れてから600・820 msにtapが出ていた（2件。`Happy`を上書きしうる位置）。
-/// 集計のscriptと原本は、この値を決めた時点で他の担当は開いていない。**実測の窓ではない。**当初の250 msでは止まらないため1000 msにした。
+/// さらに、離れてから1000 ms以上〜3秒に出るtap（7件）のうち、離れて1020 ms・2180 msの2件は、直前3秒以内に`Happy`が受理されていた。
+/// 集計のscriptと原本は、この値を決めた時点で他の担当は開いていない。**実測の窓ではない。**当初の250 msでは止まらず、1000 msでも1020・2180 msの2件が残るため3000 msにした。
+/// **値は、Pi側の`Happy`の保持時間（`crates/deskcat-domain/src/mind.rs`の`Timing::MVP`の`happy_hold_ms`）に合わせた**（撫でて`Happy`が出ている間に、撫でた後の揺れで`Surprised`に上書きされるのを止めるため）。
+/// **Pi側の値を変えたら、この値を見直す**（ここでは同期させる仕組みを作っていない）。代わりに、撫でて離れてからこの間の本物の叩きも捨てる（`dropped_touch`に数える）。デモの見え方としては許容と判断した。
 /// 接触の始まりの側は、この値ではなく`deskcat_tap::TAP_CONFIRM_MS`の保留が受ける（接触が「触れた」と判定される前の10〜260 msのtap）。
 /// **値は、製品buildを書き込む実機の窓で、離れた後のtapの遅れを数えてから詰める。**
-pub const TAP_HOLDOFF_AFTER_RELEASE_MS: u64 = 1000;
+pub const TAP_HOLDOFF_AFTER_RELEASE_MS: u64 = 3000;
 
 const STROKE_CONFIG: TouchConfig = match TouchConfig::new(
     STROKE_PRESS_THRESHOLD,

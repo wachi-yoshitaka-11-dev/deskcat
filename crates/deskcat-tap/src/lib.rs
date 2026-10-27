@@ -542,17 +542,23 @@ mod tests {
     }
 
     #[test]
-    fn the_holdoff_after_release_boundary_is_999_and_1000_ms() {
-        // 製品buildの値（`firmware/esp32/src/touch.rs`の`TAP_HOLDOFF_AFTER_RELEASE_MS`）と同じ1000 msで境界を確かめる。
-        assert!(touch_blocks_tap(false, Some(2_000), 2_999, 1_000));
-        assert!(!touch_blocks_tap(false, Some(2_000), 3_000, 1_000));
+    fn the_holdoff_after_release_boundary_is_2999_and_3000_ms() {
+        // 製品buildの値（`firmware/esp32/src/touch.rs`の`TAP_HOLDOFF_AFTER_RELEASE_MS`）と同じ3000 msで境界を確かめる。
+        assert!(touch_blocks_tap(false, Some(2_000), 4_999, 3_000));
+        assert!(!touch_blocks_tap(false, Some(2_000), 5_000, 3_000));
     }
 
     #[test]
-    fn a_touch_released_600_and_820_ms_ago_still_blocks_with_the_1000_ms_holdoff() {
-        // `EXP-044`の旧buildの再集計で、離れてから600・820 ms後にtapが出ていた。
-        assert!(touch_blocks_tap(false, Some(5_000), 5_600, 1_000));
-        assert!(touch_blocks_tap(false, Some(5_000), 5_820, 1_000));
+    fn a_touch_released_600_820_1020_and_2180_ms_ago_still_blocks_with_the_3000_ms_holdoff() {
+        // `EXP-044`の旧buildの再集計で、離れてから600・820 ms後と、`Happy`の直後の1020・2180 ms後にtapが出ていた。
+        for after_release_ms in [600, 820, 1_020, 2_180] {
+            assert!(touch_blocks_tap(
+                false,
+                Some(5_000),
+                5_000 + after_release_ms,
+                3_000
+            ));
+        }
     }
 
     #[test]
