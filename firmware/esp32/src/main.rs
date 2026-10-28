@@ -1878,7 +1878,8 @@ fn wait_for_bench_confirmation() -> bool {
 /// **error を握りつぶさない。**serialize は事実上失敗しないが、`expect()` で潰さず
 /// 分類して log し、counter を進める。
 fn emit_health_snapshot(health: &mut Health, now: u64) {
-    let status = health.to_status();
+    // `LimitedServo`を作らないbuildなので`servo.limiter`は省略する（`Health::to_status`のdoc）。
+    let status = health.to_status(None);
     let uart = health.uart();
     match serde_json::to_string(&status) {
         Ok(payload) => log::info!(

@@ -7,7 +7,7 @@
 
 use deskcat_protocol::{
     Ack, AckStatus, Boot, DisplayStatus, Envelope, Environment, ErrorCode, ExpressionName,
-    FiniteF32, Frame, HeadTouched, Hello, HelloReason, Lifted, Message, PlayMotion,
+    FiniteF32, Frame, HeadTouched, Hello, HelloReason, Lifted, LimiterStatus, Message, PlayMotion,
     ProtocolCounters, SensorStatus, ServoStatus, SetExpression, ShowText, Status, encode_line,
     limits,
 };
@@ -59,6 +59,17 @@ fn worst_case_messages() -> Vec<Message> {
             },
             servo: ServoStatus {
                 state: filled(limits::MAX_STATE_NAME_BYTES),
+                // `Some`が最悪のcaseである（省略より長い）。
+                limiter: Some(LimiterStatus {
+                    pos: u32::MAX,
+                    step: u32::MAX,
+                    vel: u32::MAX,
+                    brake: u32::MAX,
+                    acc: u32::MAX,
+                    conceded: u32::MAX,
+                    rej_payload: u32::MAX,
+                    rej_range: u32::MAX,
+                }),
             },
             sensors: SensorStatus {
                 touch: filled(limits::MAX_STATE_NAME_BYTES),
@@ -187,6 +198,7 @@ fn strings_needing_json_escapes_can_exceed_the_line_limit() {
         },
         servo: ServoStatus {
             state: filled_with_escapes(limits::MAX_STATE_NAME_BYTES),
+            limiter: None,
         },
         sensors: SensorStatus {
             touch: filled_with_escapes(limits::MAX_STATE_NAME_BYTES),
@@ -484,4 +496,131 @@ fn finite_f32_refuses_non_finite_values() {
     assert!(FiniteF32::new(f32::INFINITY).is_none());
     assert!(FiniteF32::new(f32::NEG_INFINITY).is_none());
     assert_eq!(FiniteF32::new(27.4).map(FiniteF32::get), Some(27.4));
+}
+
+/// `status`のworst case（全string fieldを上限まで、全integerを最大値まで、`servo.limiter`を持たせた形）の
+/// 行の長さ。**この値は`limits::MAX_STATE_NAME_BYTES`を32から16へ下げた根拠である**（§4.6、
+/// `limits::MAX_STATE_NAME_BYTES`のdoc）。
+fn worst_case_status_line_len() -> usize {
+    let status = worst_case_messages()
+        .into_iter()
+        .find(|message| matches!(message, Message::Status(_)))
+        .expect("the worst cases include a status");
+    let line = encode_line(&Frame::new(worst_case_envelope(), status))
+        .expect("the worst case status fits in the line limit");
+    line.len()
+}
+
+/// `servo.limiter`を持つworst caseのstatusが、行の上限に収まる。
+#[test]
+fn the_status_with_a_limiter_fits_in_the_line_limit() {
+    let len = worst_case_status_line_len();
+    assert!(
+        len <= limits::MAX_LINE_BYTES,
+        "status with servo.limiter is {len} bytes including the newline, limit is {}",
+        limits::MAX_LINE_BYTES
+    );
+}
+
+/// 省略可の`servo.limiter`を省いた形は、持たせた形より短い（`Some`が最悪のcaseである前提）。
+#[test]
+fn omitting_the_limiter_makes_the_status_shorter() {
+    let with_limiter = worst_case_status_line_len();
+    let status = worst_case_messages()
+        .into_iter()
+        .find_map(|message| match message {
+            Message::Status(status) => Some(status),
+            _ => None,
+        })
+        .expect("the worst cases include a status");
+    let mut without = (*status).clone();
+    without.servo.limiter = None;
+    let line = encode_line(&Frame::new(
+        worst_case_envelope(),
+        Message::Status(Box::new(without)),
+    ))
+    .expect("encodes");
+    assert!(line.len() < with_limiter);
+    assert!(
+        !line.contains("limiter"),
+        "an omitted limiter is not written"
+    );
+}
+
+/// 既知のstate名とexpression名は、全て上限に収まる。
+///
+/// 列挙は`ExpressionName::ALL`と、共有fixtureの`status`の各state名から取る（手で並べない）。
+/// **firmwareの`health.rs`の`UNKNOWN_STATE`はhostからは見えない。**同じ`unknown`はfixtureが持つ。
+#[test]
+fn known_state_names_fit_in_the_limit() {
+    let mut names: Vec<String> = ExpressionName::ALL
+        .iter()
+        .map(|name| {
+            serde_json::to_value(name)
+                .expect("serializes")
+                .as_str()
+                .expect("a string")
+                .to_owned()
+        })
+        .collect();
+
+    let fixture: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/valid.json")).expect("fixture parses");
+    for case in fixture["cases"].as_array().expect("cases") {
+        let line: serde_json::Value =
+            serde_json::from_str(case["line"].as_str().expect("line")).expect("line parses");
+        if line["type"] != "status" {
+            continue;
+        }
+        let payload = &line["payload"];
+        for (group, field) in [
+            ("display", "state"),
+            ("display", "expression"),
+            ("servo", "state"),
+            ("sensors", "touch"),
+            ("sensors", "acceleration"),
+            ("sensors", "environment"),
+        ] {
+            names.push(
+                payload[group][field]
+                    .as_str()
+                    .unwrap_or_else(|| panic!("{group}.{field} is a string"))
+                    .to_owned(),
+            );
+        }
+    }
+
+    assert!(!names.is_empty());
+    let longest = names.iter().max_by_key(|name| name.len()).expect("a name");
+    assert!(
+        longest.len() <= limits::MAX_STATE_NAME_BYTES,
+        "{longest:?} is {} bytes, limit is {}",
+        longest.len(),
+        limits::MAX_STATE_NAME_BYTES
+    );
+}
+
+/// `Some`の全て0は、省略されずにwireへ出る（省略は「limiterが無い」であり、全て0とは別の意味。§4.6）。
+#[test]
+fn an_all_zero_limiter_is_written_not_omitted() {
+    let status = worst_case_messages()
+        .into_iter()
+        .find_map(|message| match message {
+            Message::Status(status) => Some(status),
+            _ => None,
+        })
+        .expect("the worst cases include a status");
+    let mut zero = (*status).clone();
+    zero.servo.limiter = Some(LimiterStatus::default());
+    let line = encode_line(&Frame::new(
+        worst_case_envelope(),
+        Message::Status(Box::new(zero)),
+    ))
+    .expect("encodes");
+    assert!(
+        line.contains(
+            r#""limiter":{"pos":0,"step":0,"vel":0,"brake":0,"acc":0,"conceded":0,"rej_payload":0,"rej_range":0}"#
+        ),
+        "{line}"
+    );
 }
