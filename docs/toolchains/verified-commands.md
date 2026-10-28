@@ -89,6 +89,8 @@ CIでの成否は、この変更を含むPull Requestのcheck結果で確認す�
 
 **`touch-lcd-14` feature（[#14](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/14)）を有効にする場合は、既定構成に加えて`cargo clippy`と`cargo build`へ`--features touch-lcd-14`を足したものも通す。**LCDを初期化して表情を塗り続けながら、同じSPI hostでタッチを読む試験buildである。他の試験featureとは併用できず（`compile_error!`）、`cargo fmt`にはfeatureを付けない。firmware CIの`Build test modes`は、この構成も`cargo clippy`と`cargo build`で確認する。2026-10-22に作業用のLinux VM（ESP32 Build profileの正式な検証端末ではない）で、repository外へ複製し、複製側の`firmware/esp32/Cargo.toml`の末尾へ`[workspace]`を足して、既定・`touch-sample-14`・`touch-lcd-14`・`tap-21,face-21,bringup-display-13`のclippy（`-D warnings`）とbuildを通した（`--locked`なしで実行し、`Cargo.lock`に差は出なかった）。build-onlyである。実機の通電は、`EXP-041`（develop `b9a04e8`のbuild、1回）である。
 
+**`debug-motion-19` feature（[#19](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/19)）を有効にする場合は、既定構成に加えて`cargo clippy`と`cargo build`へ`--features debug-motion-19`を足したものも通す。**UART0のconsoleから`MOTION <name> <target>`の行を読み、Pi由来の`play_motion`と同じ`MotionDispatch`のcatalogへ渡す試験buildである。`LimitedServo`も`Limiter`も作らず、catalogが空のため、debugの指示も全て拒否される。製品buildには入らず、`bench-servo-test-17`・`touch-sample-14`・`touch-lcd-14`・`mem-probe-23`・`env-sample-16`・`accel-sample-15`・`bringup-i2c-15-16`・`bringup-led-514`とは併用できない（`compile_error!`）。firmware CIの`Build test modes`は、`debug-motion-19`と`debug-motion-19,face-21,tap-21`を`cargo clippy`と`cargo build`で確認する。build-onlyであり、実機の通電の記録は無い。この文を書いた時点では、VMで`cargo clippy`・`cargo build`を実行しておらず、CIの結果がこの構成を確認する根拠である。
+
 ### workspace との関係
 
 `firmware/esp32` は root workspace から `exclude` している。firmware の manifest は
