@@ -6,6 +6,8 @@
 //! Protocol §4.6のcounter対応表もclamp用のfieldを定義していない。
 //! 追加すればwire schemaの変更になり、正本は`docs/protocol/esp32-pi-protocol.md`である。
 //! **このcrateでwire schemaを変えない。**
+//! wireの`status.servo.limiter`（`deskcat_protocol::LimiterStatus`）は`ProtocolCounters`とは別の型で、
+//! 本crateは`From<LimiterCounters>`で変換だけを持つ（§4.6）。
 //!
 //! `firmware/esp32/src/health.rs`が`overrun_ticks`などを「Protocol counterではない」と
 //! 明記して別に持っているのと同じ形である。
@@ -159,5 +161,77 @@ impl LimiterCounters {
     pub const fn total_rejections(&self) -> u32 {
         self.rejected_invalid_payload
             .saturating_add(self.rejected_out_of_range)
+    }
+}
+
+/// `status.servo.limiter`（Protocol §4.6）へ載せる形へ変える。
+///
+/// **全fieldを分解して書く**（`..`を使わない）。`LimiterCounters`にfieldを足すと、ここがcompileできなくなり、
+/// wireへ出し忘れない。field名の対応は§4.6の表が持つ。
+impl From<LimiterCounters> for deskcat_protocol::LimiterStatus {
+    fn from(counters: LimiterCounters) -> Self {
+        let LimiterCounters {
+            clamped_position,
+            clamped_step,
+            clamped_velocity,
+            clamped_braking,
+            clamped_acceleration,
+            acceleration_bound_conceded,
+            rejected_invalid_payload,
+            rejected_out_of_range,
+        } = counters;
+        Self {
+            pos: clamped_position,
+            step: clamped_step,
+            vel: clamped_velocity,
+            brake: clamped_braking,
+            acc: clamped_acceleration,
+            conceded: acceleration_bound_conceded,
+            rej_payload: rejected_invalid_payload,
+            rej_range: rejected_out_of_range,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use deskcat_protocol::LimiterStatus;
+
+    /// 8個のcounterが、互いに違う値のまま、対応するwireのfieldへ入る。
+    #[test]
+    fn each_counter_maps_to_its_own_wire_field() {
+        let counters = LimiterCounters {
+            clamped_position: 1,
+            clamped_step: 2,
+            clamped_velocity: 3,
+            clamped_braking: 4,
+            clamped_acceleration: 5,
+            acceleration_bound_conceded: 6,
+            rejected_invalid_payload: 7,
+            rejected_out_of_range: 8,
+        };
+        assert_eq!(
+            LimiterStatus::from(counters),
+            LimiterStatus {
+                pos: 1,
+                step: 2,
+                vel: 3,
+                brake: 4,
+                acc: 5,
+                conceded: 6,
+                rej_payload: 7,
+                rej_range: 8,
+            }
+        );
+    }
+
+    /// 全て0のcounterは、全て0のwireになる（省略ではない。省略はfirmwareがlimiterを持たないときだけ）。
+    #[test]
+    fn zero_counters_stay_zero_not_omitted() {
+        assert_eq!(
+            LimiterStatus::from(LimiterCounters::default()),
+            LimiterStatus::default()
+        );
     }
 }

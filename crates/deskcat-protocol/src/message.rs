@@ -322,6 +322,41 @@ pub struct DisplayStatus {
 pub struct ServoStatus {
     /// Servo state名。
     pub state: String,
+    /// servo limiterのclamp／rejection counter。**省略と全て0は別の意味である**（[`LimiterStatus`]）。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub limiter: Option<LimiterStatus>,
+}
+
+/// `status.payload.servo.limiter`（§4.6）。servo limiterのclampとrejectionの累計。
+///
+/// **`ProtocolCounters`とは別である。**`ProtocolCounters`はwireの拒否と抑制を数える（§4.6の表）。
+/// こちらはlimiterが作用した回数であり、`deskcat-servo`の`LimiterCounters`と1対1に対応する
+/// （変換は`deskcat-servo`の`From<LimiterCounters>`が持つ。全fieldを書かないとcompileが通らない）。
+/// 各fieldの意味と飽和の扱いは`LimiterCounters`が正本である。
+/// **field名を短くしたのは、`status`の行が[`limits::MAX_LINE_BYTES`]に収まるためである**
+/// （`limits::MAX_STATE_NAME_BYTES`のdoc）。対応表は§4.6にある。
+///
+/// **`servo.limiter`の省略は「このbuildにlimiterが無い」を表し、全て0は「limiterがあり、
+/// 作用が1度も無い」を表す。**0を省略の代わりに出すと「clampが起きていない」と読めてしまうため、
+/// limiterを持たないbuildは`servo.limiter`を出さない。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub struct LimiterStatus {
+    /// `承認値`の位置範囲へclampした回数。
+    pub pos: u32,
+    /// `単一commandの最大変化量`へclampした回数。
+    pub step: u32,
+    /// `最大速度`へclampした回数。
+    pub vel: u32,
+    /// 位置境界へ向けた減速のために速度を制限した回数。
+    pub brake: u32,
+    /// `最大加速度`へclampした回数。
+    pub acc: u32,
+    /// `最大加速度`を守れず位置のboundを優先した回数。0以外は実装の前提が破れている。
+    pub conceded: u32,
+    /// `invalid_payload`でrejectした回数。
+    pub rej_payload: u32,
+    /// `out_of_range`でrejectした回数。
+    pub rej_range: u32,
 }
 
 /// `status.payload.sensors`（§4.6）。
@@ -450,6 +485,19 @@ pub enum ExpressionName {
     Happy,
     /// 驚いた顔。
     Surprised,
+}
+
+impl ExpressionName {
+    /// 全ての名前。`status.display.expression`のbyte上限の検査（`tests/limits.rs`）が列挙に使う。
+    pub const ALL: [Self; 3] = [Self::Neutral, Self::Happy, Self::Surprised];
+
+    // `ALL`の書き漏れを、variantを足したときのcompile errorで検出する（`match`が網羅でなくなる）。
+    #[allow(dead_code)]
+    const fn all_covers_every_variant(self) {
+        match self {
+            Self::Neutral | Self::Happy | Self::Surprised => {}
+        }
+    }
 }
 
 /// `set_expression`のpayload（§5.2）。

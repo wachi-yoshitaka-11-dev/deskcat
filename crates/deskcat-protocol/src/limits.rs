@@ -84,7 +84,14 @@ pub const MAX_DETAIL_BYTES: usize = 128;
 ///
 /// 列挙値そのものは`PROTO-TBD-006`（最終status field）と`PROTO-TBD-008`（motion名）で
 /// 確定するため、ここでは長さだけを縛る。
-pub const MAX_STATE_NAME_BYTES: usize = 32;
+///
+/// **32から16へ下げた（#19）。**`status.servo.limiter`（8個の`u32` counter）を足すと、全string fieldを
+/// 上限まで詰めた`status`の行が、32のままでは[`MAX_LINE_BYTES`]（1024、改行込み）を超えた
+/// （field名を短くしてもなお超えた）。state名はこの上限が6か所（`display.state`・`display.expression`・
+/// `servo.state`・`sensors`の3つ）に効くため、下げると行長の余裕が最も大きく空く。
+/// **既知のstate名とexpression名の最長は`surprised`（9 byte）である**
+/// （`tests/limits.rs`の`known_state_names_fit_in_the_limit`が検査する）。
+pub const MAX_STATE_NAME_BYTES: usize = 16;
 
 /// `show_text.text`のbyte上限。
 ///

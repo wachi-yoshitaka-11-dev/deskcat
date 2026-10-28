@@ -482,6 +482,29 @@ budget値は`PROTO-TBD-017`に含める。
 }
 ```
 
+**`servo.limiter`（[Issue #19](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/19)）。**`servo`は、servo limiterのclampとrejectionの累計を持つ`limiter` objectを省略可で持つ。
+
+```json
+"servo":{"state":"disabled","limiter":{"pos":0,"step":0,"vel":0,"brake":0,"acc":0,"conceded":0,"rej_payload":0,"rej_range":0}}
+```
+
+**`limiter`の省略と全て0は別の意味である。**省略は「このbuildにlimiter（`LimitedServo`）が無い」ことを表し、全て0は「limiterがあり、作用が1度も無い」ことを表す。limiterを持たないbuildが全て0を出すと「clampが起きていない」と読めてしまうため、持たないbuildは`limiter`を出さない。**現在のfirmwareは`LimitedServo`を作らないため、常に省略する。**
+
+各fieldは`deskcat-servo`の`LimiterCounters`と1対1に対応し、`u32`で、飽和加算する（wrapしない）。**`ProtocolCounters`ではない。**`protocol`のcounterはwireの拒否と抑制を数え、こちらはlimiterが作用した回数を数える。意味と飽和の扱いの正本は`LimiterCounters`であり、ここへ再掲しない。
+
+| wireのfield | `LimiterCounters`のfield |
+|---|---|
+| `pos` | `clamped_position` |
+| `step` | `clamped_step` |
+| `vel` | `clamped_velocity` |
+| `brake` | `clamped_braking` |
+| `acc` | `clamped_acceleration` |
+| `conceded` | `acceleration_bound_conceded`（clamp counterではない。0以外は実装の前提が破れている） |
+| `rej_payload` | `rejected_invalid_payload` |
+| `rej_range` | `rejected_out_of_range` |
+
+**field名を短くし、state名のbyte上限を32から16へ下げたのは、`limiter`を足した`status`の行が§2の行の上限（1024 byte、改行込み）に収まるためである。**全string fieldを上限まで、全integerを`u32`の最大値まで詰めた`status`の行は、32のまま`LimiterCounters`のfield名（`clamped_position`など）を使うと1200 byte、16に下げても同じ名前では1104 byte、16に下げて接頭辞を`clamp_`に縮めた名前（`clamp_pos`など）でも1033 byte、16に下げて上の短い名前にして**999 byte**になる（`crates/deskcat-protocol/tests/limits.rs`が検査する）。既知のstate名・expression名の最長は`surprised`（9 byte）であり、16に収まる。**この値は`PROTO-TBD-006`（最終status field）で確定するまでDraftである。確定とは書かない。**
+
 `protocol`のcounterは、拒否と抑制の規則が要求する事象をすべて観測可能にする。
 
 | Counter | 対応する規則 |
@@ -1402,6 +1425,7 @@ Framing／parse層について、**host workspaceのRust実装**がfixtureに合
 | 2026-10-27 | Draft 2 PROTO-TBD-007 measured | [Issue #23](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/23)。§5.4へ、実機の窓（`EXP-046`）で計測した`show_text`の事実（拒否4件、20字・30000 msの受理5件、`accept_to_draw_ms`、heapとstackの下がり）と、測っていないことを書いた。§5.5へ、`choice`は未着手であることを書いた。§13の`PROTO-TBD-007`を、`text`と`choice`に分けて書き直した。上限値（20字、884 byte、30000 ms）と、その妥当性の判定は変えていない。行は解決済みにしていない |
 | 2026-10-27 | Draft 2 tapped touch hold | [Issue #21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)。§4.3の製品buildの記述を、離れてから送らない時間を広げることと、tapを見つけてもすぐには送らず保留し、保留の間に接触が始まれば捨てることへ改めた（`EXP-044`の旧buildのlogの机上の再集計で、離れてから600・820 msと、接触の判定の前10〜260 msにtapが出ていたため。実測の窓ではない。値は暫定で、実機の窓で詰める）。「接触の始まりの約40 msは捨てない既知の穴」の記述を除いた |
 | 2026-10-27 | Draft 2 tapped hold session | [Issue #21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)。§4.3へ、保留中のtapを、Piとのsessionが入れ替わったとき（新しいPi `sid`の`hello`による遷移を含む。この遷移でESP32の`sid`は変わらない）に捨てて数えることを足した（前のsessionのtapを新しいsessionで送らないため） |
+| 2026-10-28 | Draft 2 servo.limiter | [Issue #19](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/19)。§4.6の`status.payload.servo`へ、省略可の`limiter`（`LimiterCounters`の8 counter）を足した。省略は「limiterが無い」、全て0は「limiterがあり作用が1度も無い」である。**これは`status`のwire format変更である。**旧schemaの`status`は`limiter`を持たず、新schemaでも省略として受理される（旧→新は互換。**ただし、state名が16 byte以下の旧形に限る。**17〜32 byteのstate名は新schemaで拒否される。そのような名前を出す実装は、本repositoryに無い）。新schemaの`limiter`を持つ`status`を、`limiter`を知らない旧実装がdecodeすると未知fieldとして無視される（§3）。行の上限に収めるため、`status`のstate名のbyte上限を32から16へ下げた（`limits::MAX_STATE_NAME_BYTES`）。既知のstate名の最長は9 byteで、既存のfixtureとfirmwareが出す名前は影響を受けない。Draft schemaは互換性の対象外であり`v`は上げない。`PROTO-TBD-006`は確定していない |
 
 ### Draft schemaの互換性
 

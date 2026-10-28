@@ -197,7 +197,8 @@ impl PiLink {
                 send(vec![self.pi.handle_ping(sid, id)], boot, health, uart);
             }
             Message::GetStatus => {
-                let (ack, status) = self.pi.handle_get_status(sid, id, health.to_status());
+                // `LimitedServo`をこのbuildは作らないため、`servo.limiter`は省略する（`Health::to_status`のdoc）。
+                let (ack, status) = self.pi.handle_get_status(sid, id, health.to_status(None));
                 let mut replies = vec![ack];
                 replies.extend(status);
                 send(replies, boot, health, uart);

@@ -72,6 +72,17 @@
       }
     },
     {
+      "name": "status_with_servo_limiter",
+      "line": "{\"v\":1,\"sid\":41207,\"id\":27,\"ts_ms\":15200,\"type\":\"status\",\"payload\":{\"firmware\":\"0.1.0\",\"reset_reason\":\"power_on\",\"display\":{\"state\":\"ready\",\"expression\":\"neutral\"},\"servo\":{\"state\":\"disabled\",\"limiter\":{\"pos\":1,\"step\":2,\"vel\":3,\"brake\":4,\"acc\":5,\"conceded\":0,\"rej_payload\":6,\"rej_range\":7}},\"sensors\":{\"touch\":\"unknown\",\"acceleration\":\"unknown\",\"environment\":\"unknown\"},\"protocol\":{\"parse_errors\":0,\"invalid_payloads\":0,\"unsupported_versions\":0,\"oversize_lines\":0,\"unknown_types\":0,\"rate_limited\":0,\"busy\":0,\"out_of_range\":0,\"stale_sessions\":0,\"hardware_unavailable\":0,\"duplicate_expired\":0,\"session_switches\":0,\"suppressed_responses\":0}}}\n",
+      "canonical": true,
+      "note": "servo.limiterがある形。status_snapshotは省略した形で、省略は「limiterが無い」を表す（§4.6）",
+      "expect": {
+        "type": "status",
+        "sid": 41207,
+        "id": 27
+      }
+    },
+    {
       "name": "ack_ok",
       "line": "{\"v\":1,\"sid\":41207,\"id\":905,\"ts_ms\":53100,\"type\":\"ack\",\"payload\":{\"reply_sid\":90312,\"reply_to\":903,\"status\":\"ok\"}}\n",
       "canonical": true,
