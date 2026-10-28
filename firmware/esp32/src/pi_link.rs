@@ -126,6 +126,38 @@ impl PiLink {
         }
     }
 
+    /// debug consoleの1行を、Pi由来の`play_motion`と同じ`MotionDispatch`のcatalogへ渡す
+    /// （`debug-motion-19` feature付きのbuildだけ。[Issue #19](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/19)の受け入れ条件3）。
+    ///
+    /// `boot_established`は`BootSession::is_established`である。`boot`がACKされていない間（§4.1の停止状態を含む）は、
+    /// Pi由来と同じく`admit`へ届かず拒否する。**session（`sid`）・duplicateの検査は通らない**
+    /// （`MotionDispatch::handle_debug`のdoc）。**servoへは何も渡さない。**
+    /// **このfirmwareには`LimitedServo`も`Limiter`も無い**ため、`admit`のclosureは`on_play_motion`と同じく
+    /// ログを出して`UnknownMotion`で拒否する。catalogが空のため、そもそもclosureは呼ばれない。
+    /// debugの指示が同じ`Limiter`（同じcounter）へ届くことは、`deskcat_servo`のhost testが示す。
+    /// firmwareでは、`LimitedServo`を作る後続の変更まで、limiterに届かない。
+    #[cfg(feature = "debug-motion-19")]
+    pub fn on_debug_line(&mut self, line: &str, boot_established: bool) {
+        let motion = match deskcat_servo::parse_debug_line(line) {
+            Ok(motion) => motion,
+            Err(err) => {
+                log::warn!("debug_motion_unparsed reason={err:?}");
+                return;
+            }
+        };
+        let name = motion.name;
+        let result =
+            self.motion_dispatch
+                .handle_debug(boot_established, name, motion.target, |_| {
+                    log::error!("debug_motion_catalog_without_servo name={name:?}");
+                    Err(MotionRejection::UnknownMotion)
+                });
+        match result {
+            Ok(()) => log::info!("debug_motion name={name:?} outcome=admitted"),
+            Err(refusal) => log::error!("debug_motion_rejected name={name:?} reason={refusal:?}"),
+        }
+    }
+
     /// Pi linkのUARTから読めた生byteを渡す。`now_ms`は単調に増える時刻（`Health::uptime_ms`）である。
     pub fn on_bytes(
         &mut self,

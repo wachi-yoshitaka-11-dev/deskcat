@@ -137,6 +137,8 @@ jobs:
             accel-sample-15 \
             touch-sample-14 \
             touch-lcd-14 \
+            debug-motion-19 \
+            debug-motion-19,face-21,tap-21 \
             bench-servo-test-17 \
             bench-servo-90-17; do
             cargo clippy --all-targets --locked --features "$features" -- -D warnings

@@ -1,6 +1,6 @@
 //! UART0（board上のUSB-UARTブリッジ）をdebug logに使う。
 //!
-//! **UART0は書き込みとdebug log専用である**（ただし2つのbuildだけは、人間が入力する語をstdinから読む。
+//! **UART0は書き込みとdebug log専用である**（ただし3つのbuildだけは、人間が入力する語をstdinから読む。`debug-motion-19`は`MOTION <name> <target>`の行を読む（`crate::debug_motion`）。
 //! `bench-servo-test-17`はservoを動かす前の確認の語を読み（`main.rs`の`wait_for_bench_confirmation`）、
 //! `touch-sample-14`は操作の区切りの`MARK`を別threadで読む（`crate::touch`のmodule doc））。Pi–ESP32 protocol streamは
 //! UART0を使わず、`main.rs`がUART0以外のUARTを`PI-UART-TX`（GPIO13）／

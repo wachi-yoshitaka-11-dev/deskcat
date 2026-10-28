@@ -63,6 +63,7 @@
 //! | `face-21` | LCDの初期化とbacklightの点灯を保ち、`set_expression`の3表情を描く。Pi commandを受けなくても、描ける状態になった時点で`neutral`を1回描く（#21、`crate::face`） | `bringup-display-13`とも組み合わせられる。**表情を持たない試験buildは`set_expression`を`hardware_unavailable`で拒否する** |
 //! | `tap-21` | ADXL345のtap検出を設定し、`INT_SOURCE`をI2Cで読み、bootのACK後に`tapped`を送る（#21のF1、`crate::tap`）。ADXL345のDevice IDが`0xE5`のときだけ設定を書き、I2Cのdriverを持ち続ける（一致しなければ何も書かず、driverを手放す） | INT線は使わない（配線は要らない）。`face-21`・`bringup-display-13`とも組み合わせられる。**試験buildのうち`tap-21`も`accel-sample-15`も持たないものは、ADXL345へ書き込まず、Device IDを読むだけである**（既定・製品buildは`tap-21`と同じく書く） |
 //! | `mem-probe-23` | health snapshotと同じ周期で、空きheap・起動からの最小の空きheap・main taskのstackのhigh water markを1行logへ出す（#23の`PROTO-TBD-007`、`crate::mem_probe`）。**このfeatureのbuildだけが`unsafe`を持つ**（`unsafe_code`を`deny`へ下げ、`mem_probe`の3呼び出しだけ`allow`） | logを足すだけで、LCD・Pi link・tapの挙動は変えない。featureを指定すると製品経路のcfgが外れるので、製品buildと同じ構成で測るときは`face-21`と`tap-21`を足す（タッチの撫での判定は製品buildだけが持ち、この構成には入らない）。`bringup-display-13`とも組み合わせられる。単独の試験build（`env-sample-16`・`accel-sample-15`・`touch-sample-14`・`touch-lcd-14`）、`bringup-i2c-15-16`、`bringup-led-514`、`bench-servo-test-17`とは併用できない（`compile_error!`） |
+//! | `debug-motion-19` | UART0のconsoleから`MOTION <name> <target>`の行を別threadで読み、Pi由来の`play_motion`と同じ`MotionDispatch`のcatalogへ渡す（#19の受け入れ条件3、`crate::debug_motion`、`crate::pi_link::PiLink::on_debug_line`）。**servoを駆動せず、`LimitedServo`も`Limiter`も作らない。catalogが空のため、debugの指示も全て拒否される。同じ`Limiter`（同じcounter）を通ることは、`deskcat_servo`のhost testが示す範囲である** | **製品buildには入らない**（featureなし）。featureを指定すると製品経路のcfgが外れる。Pi linkを持つ。`bench-servo-test-17`・`touch-sample-14`・`touch-lcd-14`・`mem-probe-23`・`env-sample-16`・`accel-sample-15`・`bringup-i2c-15-16`・`bringup-led-514`とは併用できない（`compile_error!`）。実機では動かしていない |
 //! | `bench-servo-test-17` | servoの単発bench試験（#17の測定用build） | **Pi linkを外す。**正本`docs/hardware/servo-safety-limits.md`の`測定のための駆動（承認の状態の項目6）`節が、測定用のbuildは「Piとの通信linkを持たない」と定めているためである |
 //! | `bench-servo-90-17` | 上の単発bench試験で、指令角だけを規約上の90度にする | `bench-servo-test-17`を含む。90度が機械的中央かどうかは未確認（`HW-TBD-010`） |
 //!
@@ -266,10 +267,34 @@ compile_error!(
     "mem-probe-23は、製品経路（face-21、tap-21、bringup-display-13）と組み合わせる。\
      単独の試験buildや別の試験featureとは併用しない。"
 );
+// `debug-motion-19`は、UART0のconsoleから読んだ行を、Pi linkの`MotionDispatch`へ渡す。Pi linkを持たない
+// 測定用build（`bench-servo-test-17`）、UART0のstdinを別の目的で読む`touch-sample-14`、
+// 単独の試験build（`touch-lcd-14`・`env-sample-16`・`accel-sample-15`・`bringup-i2c-15-16`・`bringup-led-514`）、
+// `unsafe`を持つ`mem-probe-23`とは併用できない。**製品build（featureなし）には入らない。**
+#[cfg(all(
+    feature = "debug-motion-19",
+    any(
+        feature = "bench-servo-test-17",
+        feature = "touch-sample-14",
+        feature = "touch-lcd-14",
+        feature = "mem-probe-23",
+        feature = "env-sample-16",
+        feature = "accel-sample-15",
+        feature = "bringup-i2c-15-16",
+        feature = "bringup-led-514"
+    )
+))]
+compile_error!(
+    "debug-motion-19は、Pi linkを持ち、UART0のstdinを他の目的で読まないbuildとだけ使う。\
+     bench-servo-test-17、touch-sample-14、touch-lcd-14、mem-probe-23、env-sample-16、accel-sample-15、\
+     bringup-i2c-15-16、bringup-led-514とは併用しない。"
+);
 #[cfg(not(feature = "bench-servo-test-17"))]
 mod boot_session;
 mod config;
 mod console;
+#[cfg(feature = "debug-motion-19")]
+mod debug_motion;
 mod display;
 #[cfg(feature = "bringup-display-13")]
 mod display_test;
@@ -495,7 +520,7 @@ fn main() {
     // implemented by esp-idf-sys might not link properly. See https://github.com/esp-rs/esp-idf-template/issues/71
     esp_idf_svc::sys::link_patches();
 
-    // UART0はdebug logに使う（`bench-servo-test-17`は確認の語、`touch-sample-14`は`MARK`も読む。`crate::console`のmodule doc参照）。
+    // UART0はdebug logに使う（`bench-servo-test-17`は確認の語、`touch-sample-14`は`MARK`、`debug-motion-19`は`MOTION`の行も読む。`crate::console`のmodule doc参照）。
     console::init_log_mode();
 
     // build identity。profile は `Cargo.toml` の `[profile.dev]`／`[profile.release]` に対応する。
@@ -793,11 +818,29 @@ fn main() {
     // Pi→ESP32方向の受信を振り分ける（`crate::pi_link`）。
     #[cfg(not(feature = "bench-servo-test-17"))]
     let mut pi_link = PiLink::new();
+    // debug consoleの読み取り（`crate::debug_motion`。`debug-motion-19`付きのbuildだけ）。
+    #[cfg(feature = "debug-motion-19")]
+    let debug_console = debug_motion::DebugConsole::start();
 
     // **`main()` から戻らない。**#6 の firmware は戻っていたため、task が進み続けて
     // いるかを外から確認できなかった。
     loop {
         let now = health.uptime_ms();
+        // debug consoleの行を、Pi由来と同じ`MotionDispatch`へ渡す（`PiLink::on_debug_line`）。
+        #[cfg(feature = "debug-motion-19")]
+        while let Some(event) = debug_console.try_recv() {
+            match event {
+                debug_motion::ConsoleEvent::Line(line) => {
+                    pi_link.on_debug_line(&line, boot_session.is_established());
+                }
+                debug_motion::ConsoleEvent::TooLong => {
+                    log::warn!("debug_motion_unparsed reason=TooLong")
+                }
+                debug_motion::ConsoleEvent::ReadFailed(err) => {
+                    log::error!("debug_motion_console_read_failed error={err}");
+                }
+            }
+        }
 
         if now >= next_heartbeat {
             let seq = health.next_heartbeat_seq();

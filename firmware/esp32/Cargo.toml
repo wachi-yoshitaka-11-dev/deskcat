@@ -73,6 +73,12 @@ tap-21 = []
 # `face-21`と`tap-21`を足す（タッチの撫での判定は製品buildだけが持ち、この構成には入らない）。`bench-servo-test-17`・`env-sample-16`・`accel-sample-15`・
 # `touch-sample-14`・`touch-lcd-14`・`bringup-i2c-15-16`・`bringup-led-514`とは併用できない（`main.rs`の`compile_error!`）。
 mem-probe-23 = []
+# Issue #19の受け入れ条件3。UART0のconsoleから`MOTION <name> <target>`の行を読み、Pi由来の`play_motion`と同じ
+# `MotionDispatch`のcatalogへ渡す（`src/debug_motion.rs`）。**製品buildには入らない**（既定buildはfeatureなし）。
+# servoを駆動せず、`LimitedServo`も`Limiter`も作らない。catalogが空のため、debugの指示も全て拒否される。Pi linkを持つ。
+# `bench-servo-test-17`・`touch-sample-14`・`touch-lcd-14`・`mem-probe-23`・`env-sample-16`・`accel-sample-15`・
+# `bringup-i2c-15-16`・`bringup-led-514`とは併用できない（`main.rs`の`compile_error!`）。
+debug-motion-19 = []
 # Issue #14 の `TOUCH-01`（XPT2046）の raw 読み出し専用。SPI3（GPIO18/23/19）で X・Y・Z1・Z2 を読み、`TOUCH-IRQ`（GPIO34）の level とあわせて
 # UART0 に出す。LCD は初期化せず（`LCD-CS` を High に固定するだけ）、状態機械は配線しない（`src/touch.rs`）。単独の試験 build として使う。
 touch-sample-14 = []
