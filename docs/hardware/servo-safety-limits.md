@@ -588,8 +588,9 @@ firmware（`firmware/esp32/src/servo.rs`、
   [#451](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/451)より前、
   `run_display_bringup`は既定buildでも常時実行され`lcd.backlight_on()`を呼んでいた。
   **`#451`で同関数は`bringup-display-13`か`face-21`のfeature（既定off）付きbuildだけの経路になり、
-  この試験のbuild（`--features bench-servo-test-17`）はそれらのfeatureを付けないため、
-  firmwareがbacklightを点ける経路は無い。**確認は下の`通電前の現物確認`(d)で行う
+  [#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)で製品build（featureなし）も加わった。
+  `bench-servo-test-17`単独のbuildは、製品buildではなく（featureを指定すると製品経路のcfgが外れる）、
+  それらのfeatureも付けないため、firmwareがbacklightを点ける経路は無い。**確認は下の`通電前の現物確認`(d)で行う
   （backlight以外に残る理由もそちらが持つ。**ここへ再掲しない**）。
 
 **対象部品の識別（Digital／Analog）は行わない**（2026-09-22、ユーザー決定。
