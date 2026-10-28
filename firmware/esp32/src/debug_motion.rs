@@ -26,6 +26,10 @@ use deskcat_servo::MAX_DEBUG_LINE_BYTES;
 const READ_BYTES: usize = 32;
 /// consoleにデータが無いとき、読み取りthreadが待つ時間（ms）。
 const IDLE_SLEEP_MS: u64 = 20;
+/// main loopへ渡す事象を溜める件数の上限。一般値で、安全要件の5項目に効かない。満杯の間は、読み取りthreadが
+/// 送る側で待つ（`std::sync::mpsc::sync_channel`）。入力は人が打つ行であり、上限のない確保を避けるための値である
+/// （`docs/governance/development-workflow.md`の「real-timeまたは長時間動作するpathでは、上限のないallocationを避ける」）。
+const EVENT_QUEUE_CAPACITY: usize = 16;
 /// 読み取りthreadのstack（byte）。`crate::touch`のconsole threadと同じ大きさで、足りるかは実機で確かめていない。
 const THREAD_STACK_BYTES: usize = 6144;
 
@@ -47,7 +51,7 @@ pub struct DebugConsole {
 impl DebugConsole {
     /// 読み取りthreadを起こす。
     pub fn start() -> Self {
-        let (tx, rx) = mpsc::channel();
+        let (tx, rx) = mpsc::sync_channel(EVENT_QUEUE_CAPACITY);
         let rx = match std::thread::Builder::new()
             .name("debug_motion_console".into())
             .stack_size(THREAD_STACK_BYTES)
@@ -68,7 +72,7 @@ impl DebugConsole {
     }
 }
 
-fn read_console(tx: &mpsc::Sender<ConsoleEvent>) {
+fn read_console(tx: &mpsc::SyncSender<ConsoleEvent>) {
     let mut stdin = std::io::stdin();
     let mut line: Vec<u8> = Vec::with_capacity(MAX_DEBUG_LINE_BYTES);
     let mut overflowed = false;
