@@ -71,7 +71,7 @@ tap-21 = []
 # すべて`unsafe`であり、この featureのときだけ`main.rs`の`unsafe_code`が`deny`へ下がる（下の`unsafe_code`の注記）。
 # featureを1つでも指定すると製品経路のcfgが外れるため、製品buildと同じ構成で測るときは
 # `face-21`と`tap-21`を足す（タッチの撫での判定は製品buildだけが持ち、この構成には入らない）。`bench-servo-test-17`・`env-sample-16`・`accel-sample-15`・
-# `touch-sample-14`・`touch-lcd-14`・`bringup-i2c-15-16`・`bringup-led-514`とは併用できない（`main.rs`の`compile_error!`）。
+# `touch-sample-14`・`touch-lcd-14`・`bringup-i2c-15-16`・`bringup-led-514`・`debug-motion-19`とは併用できない（`main.rs`の`compile_error!`）。
 mem-probe-23 = []
 # Issue #19の受け入れ条件3。UART0のconsoleから`MOTION <name> <target>`の行を読み、Pi由来の`play_motion`と同じ
 # `MotionDispatch`のcatalogへ渡す（`src/debug_motion.rs`）。**製品buildには入らない**（既定buildはfeatureなし）。
