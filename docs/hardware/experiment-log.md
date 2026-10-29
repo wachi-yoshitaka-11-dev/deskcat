@@ -61,6 +61,7 @@
 | [EXP-047](#exp-047-2-channelの内部11-v基準のarduino-loggerでa0とa1のchラベルのずれと同じ点の差をarduinoだけで取り無給電のpwmをa0とa1で記録した) | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)の実機の窓A。2 channel・内部1.1 V基準のArduino loggerを、C−1（Arduino だけ。A0＝3V3・A1＝GND、両方GND、両方を分圧の中点）とC0（AC なし・PWM・サーボのプラグ付き）で確かめ、chラベルのずれ、同じ点の差、無給電のPWMのA0・A1の読みを記録した | 値の正なし（観測の記録。受け入れ条件の判定は書かない） |
 | [EXP-048](#exp-048-端子台に付けたシャントの両端電圧をac投入と小動作と330オームの抵抗の並列の既知の負荷でarduinoとdt830bに並べて取った) | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)の実機の窓B。端子台に付けたシャントの両端電圧を、AC投入と小動作（D）と、330 Ωの並列の既知の負荷（E1・E1b）で、Arduinoの読みと`DT830B`の直接の読みに並べた。ADCは電流によらず約3.6 mV小さく出た（原因は未特定） | 値の正なし（観測の記録。受け入れ条件の判定は書かない） |
 | [EXP-049](#exp-049-5-vと3v3の電圧をac投入と小動作のときにarduinoで取り3v3は取れ5-vは取れなかった) | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)の実機の窓（5 V・3V3）。サーボ側5 V（1/2分圧）と3V3を、AC投入と小動作のときにArduino（AVCC基準）で記録した。3V3は、AC前・AC投入・待機・動作付近の各区間で678〜681カウント（記録全体では676〜682）で変わらず、5 V（A0）は1023に張り付いて取れなかった。取り直しは行わなかった | 値の正なし（観測の記録。受け入れ条件の判定は書かない） |
+| [EXP-050](#exp-050-662入りの製品buildで撫でる叩くなどを各5回取り撫でたときのtapは0件だった) | [#21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)の実機の窓（#662入りの製品build）。撫でる・叩く・撫でて離してすぐ叩く・叩いてすぐ撫でるを各5回。撫での窓（最初の5回と取り直しの5回）でtapを見つけた件は0。離れて1250〜1820 msのtap 24件はすべて`DropTouch`。保留は10件とも300 ms | 値の正なし（観測の記録。判定は[#21のcomment](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21#issuecomment-6499717081)） |
 
 **大容量の生dataはこのrepositoryへ入れていない。**保存場所は
 [development-foundation-plan.md](../planning/development-foundation-plan.md)の
@@ -4796,6 +4797,77 @@ touch用5本を足した配線で、製品buildはLCDに顔を描いた（目視
 
 `v5.csv` `e87df1221a90464fecfff09f43e0bf17d207c502224fa2121da141dc84cbc086`、`v5r.csv`（取り直しの準備。AC なし）`1879d8bc43da768da705f8e49797244dd3c28e19fd0c56ded39cf376e99bc8b3`。
 
+## EXP-050: #662入りの製品buildで、撫でる・叩くなどを各5回取り、撫でたときのtapは0件だった
+
+[#21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)の確認の窓。[#662](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/662)（tapを見つけても300 ms保留し、その間に接触が始まれば捨てる。離れてから3000 ms未満のtapは見つけた時点で捨てる）が入った製品buildを実機で動かした。サーボとACは使っていない。#21の条件4・5（サーボ・motion）は対象外で、受け入れ条件の判定は書かない（判定は[#21のcomment](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21#issuecomment-6499717081)）。計画は[comment 6498663520](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21#issuecomment-6498663520)、結果の事実は[comment 6499679340](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21#issuecomment-6499679340)にある。
+
+| 項目 | 内容 |
+|---|---|
+| Test ID | `EXP-050` |
+| Date | 2026-10-29 JST 23:08〜23:29（途中でUSBを一度抜いた。通電は約19分）。撫で5回の取り直しを含む |
+| Operator | 線の戻し、BOOTボタン、USBの抜き挿し、橙・黄の挿し抜き、撫でる・叩く操作、LCDの目視はユーザー。ESP32の書き込み、`deskcatd`の起動と停止、記録、集計は作業セッション |
+| Hardware revision／Exact components | `MCU-01`（ESP32）、`DISP-01`（LCD。touch付き）、`ACCEL-01`（ADXL345）、`SBC-01`（Raspberry Pi Zero W）。サーボ・`PSU-SERVO-01`・端子台・Arduinoは使わない |
+| Wiring revision | LCD moduleの`VCC`の赤い線を、上の「＋」の並び（3V3）へ戻した。Pi↔ESP32の灰色のGND線のESP32側を、ESP32の右列の`GND`へ戻した（どちらもユーザーの申告「2本とも戻した」）。橙（GPIO14）・黄（GPIO13）のESP32側は、書き込みと起動確認の後に挿し、窓の終わりにUSBより先に抜いた。**LCD・touch・ADXL345の線の通電前の目視は、ユーザーの指示で省いた。橙・黄・AC・ArduinoのUSBがUSBの前に抜けていたのは記録上の状態で、本人の申告ではない。**抵抗（Piから来る紫と青の線の先）は、実機側のPMのセッションでのユーザーの申告「ささったまま」（目視の問いは出していない）。恒久の配線は変えていない |
+| Power supply and current limit | ESP32：PCのUSB。Pi：別電源。AC・サーボは使わない。通電の上限30分（根拠の無い暫定値。docsに規則は無い） |
+| Firmware commit/profile | develop `4fee095`、featureなし（製品build）、debug。ELF sha256 `7c6f0973f29556718db2e457e680336f42ac6bd12e2af9dc49463392bf34429b`。書き込み前に`sha256sum -c`、書き込み後に読み戻したapp descriptorの`app_elf_sha256`が一致。書き込み前のflashは`847d817b8864c1c0f687525be2db5c125701f2c8eb9f279cf5d5987f76ebfc12`（`bench-servo-test-17`と一致）。Pi：`deskcatd`の sha256 `5b6bb7cf…0b87`（変更なし。窓の前に inactive、`throttled=0x0`） |
+| Configuration | tapの保留300 ms（`TAP_CONFIRM_MS`）、離れてからのholdoff 3000 ms（`TAP_HOLDOFF_AFTER_RELEASE_MS`）、最小間隔500 ms |
+| Measurement equipment | ESP32のUART0のlog、Piの`deskcatd`のlog、合図の時刻（PC側のUTC）。集計は`count662.py new` |
+| Procedure | 下の「手順と時刻」 |
+| Expected result | 計画comment（6498663520）のとおり。撫でたときのtapは捨てられ（位置A・D）、離れて3000 ms未満のtapも捨てられ、叩いたときはSurprisedが出る。机上の見込み（EXP-044の旧buildのlogへの当てはめ）は実測ではない |
+| Measured result | 下記 |
+| Faults | 下記 |
+| Conclusion | 下記 |
+| Next safe step | 下記 |
+
+### 承認（ユーザーの直接の回答の原文）
+
+計画（各5回に直したもの）の投稿と、窓の実行を1問で訊いた（2つを承認すると問いに明記）。回答の原文：「どちらも承認」。回数は、ユーザーの指示で各5回にした。問いと手作業の回数を減らした。取り直しの問い（撫で5回の追加）への回答の原文：「挿した」（USBを挿し直した後）。結果の comment の投稿：「投稿してよい」。
+
+### 手順と時刻（UTC）
+
+14:08 USBをBOOTを押したまま挿し、前のflashのapp descriptorを読んだ（`847d817b…fc12`）。`product-662.elf`を書き込み、読み戻して一致。BOOTを離して起動（`touch=stroke`、`face_drawn`。LCDの目視はユーザーの申告「問題なし」）。橙・黄を挿し、`deskcatd`を起動（`setsid nohup timeout 1800`、引数はEXP-040・044と同じ）。ESP32の`pi_rx_hello`は`Established`。14:17 から合図（撫で5回、叩く5回、撫でて離したらすぐ叩く5回、叩いてすぐ撫でる5回。合図の時刻は`cues-662.txt`）。`deskcatd`を停止し、橙・黄、USBの順に抜いた。
+
+取り直し（実機側のPMの決定。撫で5回で`DropTouch`が0件だったため、計画の取り直し条件1に従う）：14:25 USBを挿し直し（BOOTは押さない）、橙・黄を挿して`deskcatd`を起動、`Established`の後に撫で5回（14:27）。`deskcatd`を停止し、橙・黄、USBの順に抜いた（14:29）。
+
+### 結果
+
+- **ESP32のlog：**`tap_detected decision=Hold`は10、`DropTouch`は24。`tap_confirmed decision=Send`は10。保留の長さは10件とも300 ms。`DropTouch`の行数と最後の`dropped_touch=24`が一致。`panic`・`brownout`・`task_wdt`・`Guru`・`touch_fault`・`touch_stroke_stopped`・`tap_disabled`は0件。
+- **撫でる（最初の5回と取り直しの5回）：**どちらも、撫でに伴うtapを見つけた件は0（`DropTouch` 0）。
+- **叩く（回帰）：**5合図とも`Send` 1。
+- **撫でて離したらすぐ叩く：**tap 24件はすべて`DropTouch`（位置B。離れて1250〜1820 ms）。5合図とも`Send` 0（叩いたと置いた合図5をすべて捨てた）。
+- **叩いてすぐ撫でる：**`Send` 4、1合図は tap を見つけなかった。
+- **`Send` 10件の内訳：**叩く5＋叩いてすぐ撫でる4＝9件。残る1件は合図の窓の外（14:17:03Z）。原因は記録に無い。Piの`tapped_received`は10（窓全体の`Send` 10件と同数）。
+- **起動回数：**アプリが走る起動5、BOOTを押したままのUSB挿入1（アプリは走らない）、`espflash`の接続3。
+- **ユーザーの申告（原文）：**「撫でたとき、笑顔（Happy）になりました／撫でたあとに、驚いた顔（Surprised）はまざりませんでした／乱れ・点滅・発熱・異臭は、ありませんでした」（最初の窓の後。取り直しの後も同じ内容）。
+
+### Faults
+
+- 実機側のPMの決定で、撫で5回を1回だけ取り直した。その5回でもtapは0件。
+- LCD・touch・ADXL345の線の通電前の目視を省いた（ユーザーの指示）。橙・黄・AC・ArduinoのUSBがUSBの前に抜けていたかは、記録上の状態で、確かめていない。
+- 通電前の案内の一部が、ユーザーに伝わらなかった（「下の5点」など、中身を書かずに参照した）ため、問いを複数回出し直した。
+- 合図の窓の外に`Send`が1件ある（上の内訳）。原因は記録に無く、推定しない。
+
+### この記録が主張しないこと
+
+- 撫でている間・撫でる直前のtapを捨てること（位置A・D）。該当するtapが0件で、確かめていない。EXP-044（旧build）の撫で15回では86件出ていた。違いの原因は分からない。
+- 直しが効いたこと。撫でに伴うtapが0件のため、Happyを上書きしたSurprisedが0件でも、証拠にならない。
+- 300・3000 msの妥当性（暫定値）。回数が各5回で、分布は主張しない。
+- 「本物の叩きを落とした数」は、叩いたと置いた合図の数で、独立な計測ではない。撫でる・叩く操作が実際に行われた時刻と回数の独立した記録は無い。
+- Piが`head_touched`を受けたこと。サーボ・motion。製品buildの絶対のメモリ。
+
+### Conclusion
+
+受け入れ条件の判定は書かない。事実：保留の長さは10件とも300 ms。離れて1250〜1820 msのtap 24件はすべて`DropTouch`で捨てられた。叩く5合図は`Send` 1ずつ。撫でに伴うtapは、2回の撫で5回の両方で0件だった。
+
+### Next safe step
+
+- ESP32のflashには、この窓の製品build（`4fee095`）が残る。次にUSBを挿すと、LCDのbacklightが点き、表情を描き、タッチを読んで撫でを判定し、tapを保留して送る（Piにつながれば）。BOOTを押したまま挿せば走らない。ESP32のUSBは抜けた（serialの切断14:29:19Z）。ACとArduinoのUSBが抜けているかは、確かめていない。Piは電源が入ったまま（`deskcatd`は停止）。橙・黄のESP32側は抜けたまま。
+- 撫でたときのtapを捨てることの確認は、tapが再び出たとき（次にこの経路を使う窓）に、同じ数え方で取る。値（300・3000 ms）は、この窓では変える根拠が出ていない。
+
+### ログ（原本は repository の外。sha256）
+
+ESP32のlog（最初の窓）`7483a4d39f3e7309dfc7e9e83ee3e3e564a7919a820370ba6f8598476e04e12c`、（取り直し）`7a4d770e8b042d010e78f406312fa7fca9226444e7e662122462e65eb82d8924`。Piの`deskcatd`のlog（Pi上の原本）`6b377c4d51863d18e596601da0965708c7c74d9e724de33d45f0f28284386246`、`7e88b8a97e253a938e15251d48282b9b676929d2f7e03354468d4d14ee7ead09`。合図 `cues-662.txt` `f0ce02bebf6add62a87da3bc53189565406835c4648e77a44a263579408f9a55`。
+
 ## Revision履歴
 
 | 日付 | Revision | 変更 | 根拠 |
@@ -4855,3 +4927,4 @@ touch用5本を足した配線で、製品buildはLCDに顔を描いた（目視
 | 2026-10-26 | 52 | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。**`EXP-045`を追加した。**シャントの足を端子台の穴へ直接入れ、A0と基準をクリップで挟む配線（戻りの経路にブレッドボードの接点が入らない）で、90度指令（`bench-servo-90-17`）と105度指令（`bench-servo-test-17`。最初の試みはサーボに電源が来ないまま1回分を消費し、取り直した）のAC投入時と動作時のA0の最大（53〜64と72〜76カウント）、`rst:`の数（どちらも意図した起動1行）、サーボの動き（ユーザーの申告）を、Arduinoの記録とESP32のログで記録した。起動回数の数え違い、窓の終わりの順序の変更、シャントを迂回する戻りの確認を行っていないこと、製品buildの書き込みを検証していないことをFaultsに書いた。受け入れ条件の判定は書かない | `EXP-045`。実機側のPMの依頼 |
 | 2026-10-27 | 53 | [#23](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/23)。**`EXP-046`を追加した。**`mem-probe-23,face-21,tap-21`のbuild（develop `7e1c5a6`）をESP32に書き込み、Piの送り手（`show_text_probe`）から、20字・duration 30000 msの受理5件（`accept_to_draw_ms`は648〜709 ms）と、duration 0・30001、21字、884 byteの拒否4件（いずれも`out_of_range`）を送った。`mem_probe`は、基線の`min_free_heap`276596 byte・stack 4828 byteから、最後に274620 byte・4172 byteへ下がり、21字と884 byteの拒否の区間では動かなかった。キー無しの`--cloud-speech`では、Piのwarn`cloud_speech: Credential count=1; local fallback`が起動時に1回出て、ローカルの`show_text`が2件描かれた。Piへのsshが約10秒詰まったこと（窓の間にPiのWi-Fiの切断と再接続が各104回あり、Pi自身がアドレスが無い状態を記録した11:58:50から、次にjournalに行が現れる11:59:07までの間に当たった。その間にPiが動いていたかと、切断の原因は分からない）と、`tapped`が1件出たこと（原因の記録は無い）をFaultsに書いた。製品build（撫で付き）の絶対のメモリの余裕は測っていない。受け入れ条件と`PROTO-TBD-007`の判定は書かない | `EXP-046`。実機側のPMの依頼 |
 | 2026-10-29 | 54 | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。**`EXP-047`・`EXP-048`・`EXP-049`を追加した。**窓A（2 channel・内部1.1 V基準のArduino loggerのC−1とC0）、窓B（D・E1・E1b。端子台のシャントの両端電圧を、AC投入と小動作と既知の抵抗負荷で、Arduinoと`DT830B`に並べた）、5 V・3V3の窓（3V3は取れ、5 Vは取れなかった。取り直しは行わなかった）の事実を記録した。ADCが電流によらず約3.6 mV小さく出ること（原因は未特定）、AC回数が承認の範囲を超えたこと、作業セッションの案内の誤りをFaultsに書いた。受け入れ条件の判定は書かない | `EXP-047`〜`EXP-049`。実機側のPMの依頼 |
+| 2026-10-29 | 55 | [#21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)。**`EXP-050`を追加した。**#662入りの製品build（develop `4fee095`）で、撫でる・叩く・撫でて離してすぐ叩く・叩いてすぐ撫でるを各5回取った。撫での窓（最初の5回と取り直しの5回）でtapを見つけた件は0、離れて1250〜1820 msのtap 24件はすべて`DropTouch`、保留は10件とも300 ms。LCD・touch・ADXL345の線の通電前の目視を省いたことをFaultsに書いた。受け入れ条件の判定は書かない | `EXP-050`。実機側のPMの依頼 |
