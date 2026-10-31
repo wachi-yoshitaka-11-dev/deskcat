@@ -178,7 +178,7 @@ HARD = [
 ]
 
 # 柔らかい線（両端オスのジャンパー線）。端が板の外のものは文字列で書く。(id, 端1, 端2, 信号, 状態)
-# 状態: 空文字は「挿す」。それ以外は組み直した直後に抜いておく端と理由。
+# 状態: 「抜いておく」を含む文だけが、組み直した直後に抜いておく線として扱われる（図では点線）。
 SOFT = [
     ("S1", "B1:+26", "B2:b1", "3V3", ""),
     ("S2", "B1:-26", "B2:b2", "GND", ""),
@@ -193,19 +193,19 @@ SOFT = [
     ("S11", "B1:A19", "B2:c9", "GPIO19", ""),
     ("S12", "B1:A17", "B2:b10", "GPIO21", ""),
     ("S13", "B1:K16", "B2:b11", "GPIO34", ""),
-    ("S14", "B1:K20", "B3:g5", "GPIO25", ""),
-    ("S15", "B1:K21", "B3:g6", "GPIO26", ""),
+    ("S14", "B1:K20", "B3:g3", "GPIO25", ""),
+    ("S15", "B1:K21", "B3:g2", "GPIO26", ""),
     ("S16", "B1:K14", "B3:f14", "GPIO36", ""),
     ("S17", "B1:K19", "B1:G4", "GPIO33", ""),
     ("S18", "B1:K30", "B1:G8", "5V", "G8 側を先に挿し、K30 側を後に挿す（5 V の端を最後にする）"),
-    ("S19", "B1:A26", "B1:G5", "GPIO2", "A26 側を抜いておく（EXP-026 で ESP32 側を抜いた状態）"),
-    ("S20", "B1:A21", "B1:G2", "GPIO5", "A21 側を抜いておく（EXP-026 で ESP32 側を抜いた状態）"),
+    ("S19", "B1:A26", "B1:G5", "GPIO2", "挿す（USB を挿す前に挿し、窓の間は抜き差ししない。実機側の PM の決定、2026-10-31）"),
+    ("S20", "B1:A21", "B1:G2", "GPIO5", "挿す（USB を挿す前に挿し、窓の間は抜き差ししない。実機側の PM の決定、2026-10-31）"),
     ("S21", "B1:K23", "B1:F1", "GPIO14",
      "K23 側を抜いておく。挿すのは gpio-assignment.md の `信号線をつないでよい条件` を満たすときだけ（ESP32 側の端で抜き差しする）"),
     ("S22", "B1:K26", "B1:F2", "GPIO13", "K26 側を抜いておく。条件は S21 と同じ"),
     ("S23", "B1:K22", "B1:F3", "GPIO27", ""),
-    ("S24", "B3:h5", "B3:b13", "GPIO25", ""),
-    ("S25", "B3:h6", "B3:b15", "GPIO26", ""),
+    ("S24", "B3:h3", "B3:b13", "GPIO25", ""),
+    ("S25", "B3:h2", "B3:b15", "GPIO26", ""),
     ("S26", "B3:c10", "ACCEL:Vs", "3V3", ""),
     ("S27", "B3:d11", "ACCEL:GND", "GND", ""),
     ("S28", "ACCEL:CS", "ACCEL:VDD", "3V3", ""),
@@ -215,19 +215,23 @@ SOFT = [
 # 板の外へ出る線。(id, 板の端, 板の端の信号, 板の外の端, 状態)
 OFFBOARD = [
     ("X1", "B1:D5", "PI_TXD", "Pi の header pin 8（GPIO14 `TXD`）",
-     "挿す（抜き差しは S21 の K23 側で行う。Pi の header 側では抜き差ししない）"),
+     "板の側を挿す。Pi の header 側は挿していない（EXP-052）。以後の抜き差しは S21 の K23 側で行い、Pi の header 側では抜き差ししない"),
     ("X2", "B1:D6", "PI_RXD", "Pi の header pin 10（GPIO15 `RXD`）",
-     "挿す（抜き差しは S22 の K26 側で行う。Pi の header 側では抜き差ししない）"),
+     "板の側を挿す。Pi の header 側は挿していない（EXP-052）。以後の抜き差しは S22 の K26 側で行い、Pi の header 側では抜き差ししない"),
     ("X3", "B1:A18", "GND", "Pi の header pin 39（GND）",
      "A18 側を抜いておく。挿す前に、gpio-assignment.md の `信号線をつないでよい条件` の6の開放側の値を読む"),
     ("X4", "B1:D7", "SERVO_SIG", "サーボの plug の黄の穴",
      "D7 側を抜いておく。挿すのは #17 のサーボの試験の手順と承認に従うときだけ"),
-    ("X5", "B1:-30", "GND", "端子台S の −（ESP32 の GND をサーボの GND と共通にする線。EXP-034 の Wiring revision、hardware/breadboard/layout.svg の基準線）",
+    ("X5", "B1:-30", "GND", "端子台S の −（ESP32 の GND をサーボの GND と共通にする線。EXP-034 の Wiring revision、組み直す前の基準線。Git の履歴にある組み直す前の hardware/breadboard/layout.svg）",
      "−30 側を抜いておく。条件は X4 と同じ"),
 ]
 
-# 首を通る14本（LCD 側は MSP2807 の pin 番号。#34 の決定）。線は両端メス（enclosure-and-neck.md の仮筐体）。
-# 胴側は、細ピンヘッダ（PROTO-01）を1本ずつ下の穴に立てて受ける（VM 側の PM の決定、2026-10-23）。
+# 首を通る14本（LCD 側は MSP2807 の pin 番号。#34 の決定）。
+# 胴側は、仮組で LCD に付いているメスオス線のオス側を直接挿す（実機側の PM の判断、2026-10-31）。
+# 線の色（LCD に付いている線）。1〜9番は #512 のコメント（2026-10-02）のユーザーの回答、10〜14番は EXP-038 のユーザーの申告
+# （挿した順「紫、青、緑、黄、灰」に作業セッションが対応を付けた）。2026-10-31 の組み直しで、ユーザーが「色は記録どおり」と答えた。
+NECK_COLOR = {1: "赤", 2: "黒", 3: "茶", 4: "橙", 5: "黄", 6: "緑", 7: "青", 8: "紫", 9: "灰",
+              10: "紫", 11: "青", 12: "緑", 13: "黄", 14: "灰"}
 NECK = [
     (1, "VCC", "B2:a1", "3V3"), (2, "GND", "B2:a2", "GND"), (3, "CS", "B2:a3", "GPIO22"),
     (4, "RESET", "B2:a4", "GPIO16"), (5, "DC/RS", "B2:a5", "GPIO17"), (6, "SDI", "B2:a6", "GPIO23"),
@@ -236,19 +240,19 @@ NECK = [
     (13, "T_DO", "B2:b9", "GPIO19"), (14, "T_IRQ", "B2:a11", "GPIO34"),
 ]
 
-# module のピン（板の上）。ENV-01 は1列6本、ACCEL-01 は下段5本（上段4本は穴が TBD）。
+# module のピン（板の上）。ENV-01 は1列6本、ACCEL-01 は下段5本（上段4本は ACCEL_UPPER）。
 MODULE_PINS = [
     ("ENV-01", "VDD", "B3:a10", "3V3"), ("ENV-01", "GND", "B3:a11", "GND"),
     ("ENV-01", "CSB", "B3:a12", "使わない:ENV-CSB"), ("ENV-01", "SDI", "B3:a13", "GPIO25"),
     ("ENV-01", "SDO", "B3:a14", "GND"), ("ENV-01", "SCK", "B3:a15", "GPIO26"),
-    ("ACCEL-01", "INT1", "B3:f2", "使わない:ACCEL-INT1"), ("ACCEL-01", "INT2", "B3:f3", "使わない:ACCEL-INT2"),
-    ("ACCEL-01", "SDO", "B3:f4", "GND"), ("ACCEL-01", "SDA", "B3:f5", "GPIO25"),
-    ("ACCEL-01", "SCL", "B3:f6", "GPIO26"),
+    ("ACCEL-01", "SCL", "B3:f2", "GPIO26"), ("ACCEL-01", "SDA", "B3:f3", "GPIO25"),
+    ("ACCEL-01", "SDO", "B3:f4", "GND"), ("ACCEL-01", "INT2", "B3:f5", "使わない:ACCEL-INT2"),
+    ("ACCEL-01", "INT1", "B3:f6", "使わない:ACCEL-INT1"),
 ]
-# 上段4本（CS Vs GND VDD）。列はユーザーの写真（2026-10-23）で CS が INT1 の上、VDD が SDA の上に見えるので
-# 2〜5列とする（写真の読み。挿すときに確かめる）。行は2列の間隔が記録にもメーカーの資料にも無く TBD。
-# 間隔が3〜6ピッチなら上段は上半分の e〜b 行に来て、上に空き穴が1つ以上残る。各ピンの列の空き穴へ線を挿す。
-ACCEL_UPPER = [("CS", "3V3"), ("Vs", "3V3"), ("GND", "GND"), ("VDD", "3V3")]
+# 2026-10-31 の組み直しで、実物の基板の印字は左から下段 SCL SDA SDO INT2 INT1、上段 VDD GND Vs CS だった
+# （当初の読みの左右反転。CS が INT1 の上、VDD が SDA の上という関係は同じ）。2列の間隔は6穴分で、上段は b 行になる。
+ACCEL_UPPER = [("VDD", "3V3"), ("GND", "GND"), ("Vs", "3V3"), ("CS", "3V3")]
+ACCEL_UPPER_COL0 = 3
 # module の中でつながっている pin。ACCEL-01 の Vs と VDD は、2026-09-05 の非通電の導通測定で同じ net
 # （sensor-datasheet-notes.md の `module boardの値（秋月 M-06724）`）。
 # ESP32 の GND の3本（J2-14、J3-1、J3-7）は、公式回路図（gpio-assignment.md の `Board識別情報`）で同じ GND。
@@ -551,10 +555,82 @@ def check_5v(ck, find, node, used, parts):
 # ---------------------------------------------------------------- 図
 
 P = 22  # 1ピッチの px
-BOARD_POS = {"B1": (60, 560), "B2": (60, 130), "B3": (900, 560)}
-SVG_W, SVG_H = 1700, 1560
+BOARD_POS = {"B1": (290, 560), "B2": (290, 130), "B3": (1130, 560)}
+SVG_W, SVG_H = 1930, 1600
 
-NET_COLOR = {"3V3": "#d62728", "GND": "#111111", "5V": "#e377c2"}
+# 柔らかい線の色。手持ちの10色（赤 黒 白 灰 茶 橙 黄 緑 青 紫。#512 の旧配線の記録にある色）から選ぶ。
+# ユーザーの指示（2026-10-31）で、旧配線の色に合わせることより、同じ色を使い過ぎずバランスよく使うことを優先した。
+# 赤＝3V3、黒＝GND。信号の線の色は下の WIRE_ID_COLOR が線の ID ごとに決める（信号ごとの色は、ID の指定が無い線だけに使う）。
+# 線は結線表の ID で識別する。
+COLOR_HEX = {'赤': '#d62728', '黒': '#111111', '白': '#bdbdbd', '灰': '#7f7f7f', '茶': '#8c564b', '橙': '#ff7f0e', '黄': '#f2c500', '緑': '#2ca02c', '青': '#1f77d4', '紫': '#9467bd'}
+WIRE_COLOR = {
+    "3V3": ("赤", COLOR_HEX["赤"]),
+    "GND": ("黒", COLOR_HEX["黒"]),
+    "5V": ("青", COLOR_HEX["青"]),
+    "GPIO33": ("灰", COLOR_HEX["灰"]),
+    "GPIO19": ("灰", COLOR_HEX["灰"]),
+    "GPIO2": ("灰", COLOR_HEX["灰"]),
+    "PI_RXD": ("青", COLOR_HEX["青"]),
+    "GPIO23": ("青", COLOR_HEX["青"]),
+    "GPIO22": ("橙", COLOR_HEX["橙"]),
+    "GPIO14": ("橙", COLOR_HEX["橙"]),
+    "GPIO21": ("橙", COLOR_HEX["橙"]),
+    "GPIO16": ("茶", COLOR_HEX["茶"]),
+    "GPIO5": ("茶", COLOR_HEX["茶"]),
+    "GPIO34": ("茶", COLOR_HEX["茶"]),
+    "GPIO27": ("黄", COLOR_HEX["黄"]),
+    "SERVO_SIG": ("黄", COLOR_HEX["黄"]),
+    "GPIO13": ("黄", COLOR_HEX["黄"]),
+    "GPIO17": ("緑", COLOR_HEX["緑"]),
+    "GPIO18": ("緑", COLOR_HEX["緑"]),
+    "GPIO4": ("緑", COLOR_HEX["緑"]),
+    "PI_TXD": ("紫", COLOR_HEX["紫"]),
+    "GPIO25": ("紫", COLOR_HEX["紫"]),
+    "GPIO26": ("白", COLOR_HEX["白"]),
+    "GPIO36": ("白", COLOR_HEX["白"]),
+}
+
+
+# 柔らかい線の色（ユーザーの回答、2026-10-31）。同じ板の中の短い線は 青・橙・緑・黄だけ。板をまたぐ長い線はどの色でもよい。
+# 赤＝3V3、黒＝GND。LCD の板へ行く長い信号線（S5〜S13）は、同じ信号の LCD の線（NECK_COLOR）の色に合わせた（ユーザーの指示、2026-10-31）。
+# SCK と T_CLK のように LCD の線の色が違う組は SCK 側（紫が増えるのでユーザーの指示で T_CLK 側にはしない、2026-10-31）。LCD に無い S14〜S16 と短い線は、手持ちと挿し済みの線に合わせて振った。色は線の ID で決める（同じ信号でも、短い線と長い線で色が違う）。
+# 挿し済みの S18＝青、S17＝緑（灰から差し替え）は変えていない。S20 は緑の短い線が足りず黄に変えた（ユーザーの申告、2026-10-31）。
+WIRE_ID_COLOR = {
+    "S5": "茶", "S6": "橙", "S7": "黄", "S8": "緑", "S9": "青", "S10": "紫",
+    "S11": "灰", "S12": "青", "S13": "灰", "S14": "白", "S15": "茶", "S16": "白",
+    "S17": "緑", "S18": "青", "S19": "橙", "S20": "黄", "S21": "黄", "S22": "橙",
+    "S23": "黄", "S24": "緑", "S25": "橙",
+    "X1": "紫", "X2": "青", "X4": "黄",
+}
+
+
+def id_color(wid, net):
+    """(名前, 図の色)。ID の指定があればそれ、無ければ信号の色。"""
+    name = WIRE_ID_COLOR.get(wid)
+    if name:
+        return name, COLOR_HEX[name]
+    return WIRE_COLOR.get(net, ("", "#2f6fb0"))
+
+
+WIRE_OVERRIDE = {}
+WIRE_OVERRIDE_HEX = {}
+
+
+def net_color(net, default):
+    return WIRE_COLOR.get(net, (None, default))[1]
+
+
+# 硬いジャンパーの色は長さ（穴の数）で決まる（ユーザーの回答、2026-10-31）。1穴分＝灰、2穴分＝赤、6穴分＝青（ユーザーの回答、2026-10-31）。
+HARD_COLOR = {1: ("灰", COLOR_HEX["灰"]), 2: ("赤", COLOR_HEX["赤"]), 3: ("橙", COLOR_HEX["橙"]), 4: ("黄", COLOR_HEX["黄"]), 6: ("青", COLOR_HEX["青"])}
+HARD_COLOR_UNKNOWN = ("長さで決まる（未回答）", "#9e9e9e")
+
+
+def hard_color(a, b):
+    return HARD_COLOR.get(pitch_length(parse_hole(a), parse_hole(b)), HARD_COLOR_UNKNOWN)
+
+
+def wire_name(net):
+    return WIRE_COLOR.get(net, ("", ""))[0]
 
 
 def hole_xy(hole):
@@ -574,7 +650,7 @@ def draw_board(out, board):
     rows = spec["rows"]
     h = 50 + max(rows.values()) * P + 40
     out.append(f'<rect x="{ox}" y="{oy}" width="{w}" height="{h}" rx="10" fill="#f4f4f0" stroke="#888"/>')
-    out.append(f'<text x="{ox}" y="{oy - 10}" font-size="17" font-weight="bold">{esc(board + " " + spec["title"])}</text>')
+    out.append(f'<text x="{ox}" y="{oy + h + 22}" font-size="17" font-weight="bold">{esc(board + " " + spec["title"])}</text>')
     for col in range(1, spec["cols"] + 1):
         x, _ = hole_xy((board, next(iter(rows)), col))
         out.append(f'<text x="{x}" y="{oy + 30}" text-anchor="middle" font-size="10" fill="#666">{col}</text>')
@@ -642,7 +718,7 @@ def draw_parts(out):
         out.append(f'<text x="{xa + 12}" y="{(ya + yk) / 2 + 3}" font-size="9">{did}</text>')
     for hid, a, b, net in HARD:
         (x1, y1), (x2, y2) = hole_xy(parse_hole(a)), hole_xy(parse_hole(b))
-        color = NET_COLOR.get(net, "#2a9d8f")
+        color = hard_color(a, b)[1]
         out.append(f'<line x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" stroke="{color}" stroke-width="5" stroke-linecap="round" opacity="0.85"/>')
         out.append(f'<text x="{(x1 + x2) / 2 + 6}" y="{(y1 + y2) / 2 - 5}" font-size="9" fill="#0b5">{hid}</text>')
 
@@ -650,75 +726,121 @@ def draw_parts(out):
 def soft_end_xy(text):
     if is_hole(text):
         return hole_xy(parse_hole(text))
-    # ACCEL の上段（穴は TBD）。図では B3 の上半分の上に仮の位置で描く。
+    # ACCEL の上段の上の空き穴（a 行）。
     pins = [p for p, _n in ACCEL_UPPER]
     pin = text.split(":")[1]
-    x, _ = hole_xy(("B3", "a", 2 + pins.index(pin)))
-    _, y = hole_xy(("B3", "c", 1))
+    x, _ = hole_xy(("B3", "a", ACCEL_UPPER_COL0 + pins.index(pin)))
+    _, y = hole_xy(("B3", "a", 1))
     return x, y
+
+
+def offboard_end(xid, far):
+    """板の外へ出る線の、板の外の端の位置。Pi 側とサーボ側は別の枠に分けて並べる（重ならないように）。"""
+    ox0, _ = BOARD_POS["B1"]
+    pi = [x for x, _h, _n, f, _s in OFFBOARD if f.startswith("Pi")]
+    sv = [x for x, _h, _n, f, _s in OFFBOARD if not f.startswith("Pi")]
+    if far.startswith("Pi"):
+        return ox0 - 70, 500 + 28 * pi.index(xid)
+    return ox0 - 70, 700 + 28 * sv.index(xid)
 
 
 def draw_soft(out):
     for sid, a, b, net, state in SOFT:
         (x1, y1), (x2, y2) = soft_end_xy(a), soft_end_xy(b)
-        color = NET_COLOR.get(net, "#2f6fb0")
+        color = id_color(sid, net)[1]
         dash = ' stroke-dasharray="6 4"' if "抜いておく" in state else ""
         cx, cy = (x1 + x2) / 2, min(y1, y2) - 40
-        out.append(f'<path d="M{x1} {y1} Q{cx} {cy} {x2} {y2}" stroke="{color}" stroke-width="1.6" fill="none" opacity="0.55"{dash}/>')
+        out.append(f'<path d="M{x1} {y1} Q{cx} {cy} {x2} {y2}" stroke="{color}" stroke-width="2.4" fill="none" opacity="0.9"{dash}/>')
         for x, y in ((x1, y1), (x2, y2)):
             out.append(f'<circle cx="{x}" cy="{y}" r="4.5" fill="#fff" stroke="{color}" stroke-width="2"/>')
         out.append(f'<text x="{x2 + 6}" y="{y2 - 6}" font-size="9" fill="{color}">{sid}</text>')
         out.append(f'<text x="{x1 + 6}" y="{y1 - 6}" font-size="9" fill="{color}">{sid}</text>')
-    for xid, h, _net, far, state in OFFBOARD:
+    for xid, h, net, far, state in OFFBOARD:
         x, y = hole_xy(parse_hole(h))
-        if "抜いておく" in state:  # 板の端を抜いておく線は、白抜きの点線の丸
-            out.append(f'<circle cx="{x}" cy="{y}" r="5" fill="#fff" stroke="#a07800" stroke-width="2" stroke-dasharray="2 2"/>')
-        else:
-            out.append(f'<circle cx="{x}" cy="{y}" r="5" fill="#ffd54d" stroke="#a07800" stroke-width="2"/>')
-        out.append(f'<text x="{x + 7}" y="{y + 12}" font-size="9" fill="#806000">{xid}</text>')
+        color = id_color(xid, net)[1] or "#a07800"
+        pulled = "抜いておく" in state or "挿していない" in state
+        ox0, _oy0 = BOARD_POS[parse_hole(h)[0]]
+        # 板の外へ出る線は、穴から左の板の外へ向かう曲線で描く（板の外の端は文字で書く）。
+        ex, ey = offboard_end(xid, far)
+        dash = ' stroke-dasharray="6 4"' if pulled else ""
+        out.append(f'<path d="M{x} {y} Q{(x + ex) / 2} {y + 22} {ex} {ey}" stroke="{color}" stroke-width="3" fill="none"{dash}/>')
+        fill = "#fff" if "抜いておく" in state else color  # 板の端を挿してある X1・X2 は塗る（曲線の点線は Pi 側を挿していない印）
+        out.append(f'<circle cx="{x}" cy="{y}" r="5.5" fill="{fill}" stroke="{color}" stroke-width="2.5"/>')
+        out.append(f'<text x="{x + 7}" y="{y + 12}" font-size="9" fill="{color}" stroke="#fff" stroke-width="0.4">{xid}</text>')
+        out.append(f'<text x="{ex}" y="{ey - 4}" text-anchor="end" font-size="9" fill="#333">{xid} → {esc(far.split("（")[0])}</text>')
     for n, name, h, _net in NECK:
         x, y = hole_xy(parse_hole(h))
         out.append(f'<circle cx="{x}" cy="{y}" r="5.5" fill="#9b59b6" stroke="#4a235a" stroke-width="1.5"/>')
         out.append(f'<text x="{x}" y="{y + 3}" text-anchor="middle" font-size="7.5" fill="#fff">{n}</text>')
 
 
+def draw_external(out):
+    """板に載らない物（LCD、Pi、サーボ）を枠で描く。線の色は結線表と同じ。"""
+    # LCD module: B2 の上。14本の線が a・b 行の穴へ降りる。
+    xs = [hole_xy(parse_hole(h))[0] for _n, _name, h, _net in NECK]
+    ys = [hole_xy(parse_hole(h))[1] for _n, _name, h, _net in NECK]
+    x1, x2 = min(xs) - 20, max(xs) + 20
+    top = min(ys) - 78
+    out.append(f'<rect x="{x1}" y="{top}" width="{x2 - x1}" height="34" rx="6" fill="#e8f0ff" stroke="#335" stroke-dasharray="5 3"/>')
+    out.append(f'<text x="{(x1 + x2) / 2}" y="{top + 21}" text-anchor="middle" font-size="12" font-weight="bold">LCD module（14 pin。頭に付く）</text>')
+    for n, name, h, _net in NECK:
+        x, y = hole_xy(parse_hole(h))
+        color = COLOR_HEX[NECK_COLOR[n]]
+        out.append(f'<line x1="{x}" y1="{top + 34}" x2="{x}" y2="{y}" stroke="{color}" stroke-width="2.6"/>')
+    # Pi・サーボ: B1 の左。板の外へ出る線の行き先。
+    groups = {"Pi Zero W（板には載らない）": [], "サーボ側（端子台S・サーボの plug。板には載らない）": []}
+    for xid, h, _net, far, _state in OFFBOARD:
+        key = "Pi Zero W（板には載らない）" if far.startswith("Pi") else "サーボ側（端子台S・サーボの plug。板には載らない）"
+        groups[key].append(offboard_end(xid, far))
+    for title, pts in groups.items():
+        if not pts:
+            continue
+        ex = pts[0][0]
+        y1, y2 = min(p[1] for p in pts) - 34, max(p[1] for p in pts) + 12
+        out.append(f'<rect x="{ex - 215}" y="{y1}" width="228" height="{y2 - y1}" rx="6" fill="#f4f4f4" stroke="#555" stroke-dasharray="5 3" opacity="0.5"/>')
+        out.append(f'<text x="{ex - 208}" y="{y1 + 13}" font-size="10" font-weight="bold" fill="#333">{esc(title)}</text>')
+
+
 def draw_modules(out):
     # ENV-01: 1列6本。本体の向きと大きさは TBD（図は仮）。
     x1, y = hole_xy(("B3", "a", 10))
     x2, _ = hole_xy(("B3", "a", 15))
-    out.append(f'<rect x="{x1 - 12}" y="{y - 70}" width="{x2 - x1 + 24}" height="60" rx="6" fill="#b9e3c6" stroke="#333" stroke-dasharray="5 3"/>')
-    out.append(f'<text x="{(x1 + x2) / 2}" y="{y - 46}" text-anchor="middle" font-size="12" font-weight="bold">ENV-01（AE-BME280）</text>')
-    out.append(f'<text x="{(x1 + x2) / 2}" y="{y - 30}" text-anchor="middle" font-size="9.5">本体は板の外へ出す向き（形は TBD）</text>')
+    out.append(f'<rect x="{x1 - 12}" y="{y - 82}" width="{x2 - x1 + 24}" height="60" rx="6" fill="#b9e3c6" stroke="#333" stroke-dasharray="5 3"/>')
+    out.append(f'<text x="{(x1 + x2) / 2}" y="{y - 58}" text-anchor="middle" font-size="12" font-weight="bold">ENV-01（AE-BME280）</text>')
+    out.append(f'<text x="{(x1 + x2) / 2}" y="{y - 42}" text-anchor="middle" font-size="9.5">本体は板の外へ出す向き（形は TBD）</text>')
     for _mod, pin, h, _n in [m for m in MODULE_PINS if m[0] == "ENV-01"]:
         x, yy = hole_xy(parse_hole(h))
         out.append(f'<circle cx="{x}" cy="{yy}" r="4.5" fill="#caa53d"/>')
         out.append(f'<text x="{x}" y="{yy - 8}" text-anchor="middle" font-size="8.5">{pin}</text>')
-    # ACCEL-01: 下段5本を f2〜f6。上段4本は2列の間隔が記録に無く TBD。
+    # ACCEL-01: 下段5本を f2〜f6、上段4本を b3〜b6（2列の間隔は6穴分）。
     xl, yl = hole_xy(("B3", "f", 2))
     xr, _ = hole_xy(("B3", "f", 6))
-    _, yt = hole_xy(("B3", "c", 1))
+    _, yt = hole_xy(("B3", "b", 1))
     out.append(f'<rect x="{xl - 14}" y="{yt - 14}" width="{xr - xl + 28}" height="{yl - yt + 28}" rx="6" fill="#f2b8cc" opacity="0.7" stroke="#333" stroke-dasharray="5 3"/>')
     out.append(f'<text x="{(xl + xr) / 2}" y="{(yt + yl) / 2 + 4}" text-anchor="middle" font-size="11" font-weight="bold">ACCEL-01</text>')
     for _mod, pin, h, _n in [m for m in MODULE_PINS if m[0] == "ACCEL-01"]:
         x, yy = hole_xy(parse_hole(h))
         out.append(f'<circle cx="{x}" cy="{yy}" r="4.5" fill="#caa53d"/>')
-        out.append(f'<text x="{x}" y="{yy + 16}" text-anchor="middle" font-size="8">{pin}</text>')
+        out.append(f'<text x="{x}" y="{yy - 9}" text-anchor="middle" font-size="8">{pin}</text>')
     for i, (pin, _n) in enumerate(ACCEL_UPPER):
-        x, _ = hole_xy(("B3", "a", 2 + i))
-        out.append(f'<circle cx="{x}" cy="{yt}" r="4.5" fill="none" stroke="#a00" stroke-width="1.5" stroke-dasharray="2 2"/>')
-        out.append(f'<text x="{x}" y="{yt + 16}" text-anchor="middle" font-size="8" fill="#a00">{pin}</text>')
-    out.append(f'<text x="{xl - 14}" y="{yt - 20}" font-size="9.5" fill="#a00">上段4本は2〜5列（写真の読み）。行は TBD（点線は仮の位置）</text>')
+        x, _ = hole_xy(("B3", "a", ACCEL_UPPER_COL0 + i))
+        out.append(f'<circle cx="{x}" cy="{yt}" r="4.5" fill="#caa53d"/>')
+        out.append(f'<text x="{x}" y="{yt + 16}" text-anchor="middle" font-size="8">{pin}</text>')
 
 
 NOTES = [
-    "この図は組み直しの設計（#512）。まだ組んでいない。今の配線の記録は hardware/breadboard/layout.svg。",
-    "結線表と出所・TBD は同じ場所の wiring-table.md と README.md。図と表は generate.py から生成する。",
+    "この図は組み直した後の配置（#512。2026-10-31 に組んだ。EXP-052）。組み直す前の配線の図は Git の履歴にある。",
+    "結線表と出所・TBD は hardware/breadboard-rebuild/ の wiring-table.md と README.md。図と表は generate.py から生成する。",
+    "硬いジャンパーの色は長さで決まる（1穴分＝灰、2穴分＝赤、3穴分＝橙、4穴分＝黄、6穴分＝青）。",
+    "柔らかい線は、同じ板の中の短い線が青・橙・緑・黄だけ、板をまたぐ長い線はどの色でもよい。赤＝3V3、黒＝GND。",
+    "LCD へ行く長い線は同じ信号の LCD の線の色。それ以外は、手持ちと挿し済みの線に合わせて振った。色は線の ID で決め、結線表の `色` 欄と同じ。",
     "灰の四角＝穴。金の丸＝ピン。ベージュ＝抵抗（板に沿わせて寝かせる）。太い線＝硬いジャンパー（被覆あり）。",
     "白丸と曲線＝柔らかい線（S番号、両端に同じ番号）。点線の曲線＝組み直した直後は ESP32 側を抜いておく線。",
-    "黄の丸＝板の外へ出る線（X番号）。白抜きの点線の丸＝そのうち組み直した直後は板の端を抜いておく線。紫の丸＝首を通る LCD の線（数字は LCD の pin 番号）。",
+    "板の外へ出る線（X番号）は、線の色の曲線で左の枠（Pi・サーボ側）へ向かう。白抜きの丸＝板の端を抜いたままの線。点線の曲線＝抜いたまま、または Pi・サーボ側を挿していない線。紫の丸＝首を通る LCD の線（数字は LCD の pin 番号）。",
     "＋の列＝3V3、−の列＝GND（主板の下側の1組だけ）。5 V の線は S18 だけで、ADC-5V の分圧へ行く。",
     "サーボの電源・Pi の給電はブレッドボードを通さない（power-budget.md、#34）。",
     "溝の幅、L 行から電源列までの距離は写真からの目安。部品の足の長さと硬いジャンパーの長さは現物で合わせる。",
+    "ACCEL-01 の上段4本は b 行の3〜6列（2列の間隔は6穴分）。その上の a 行が空き穴で、S26・S27・S28 を挿す。",
     "図面を電源・安全の実機確認に使わない。通電前の照合は実機側が行う。",
 ]
 
@@ -745,8 +867,8 @@ def build_svg():
         f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {SVG_W} {SVG_H}" '
         'font-family="Noto Sans CJK JP, Hiragino Sans, Meiryo, sans-serif" font-size="13">',
         f'<rect width="{SVG_W}" height="{SVG_H}" fill="#fff"/>',
-        '<text x="30" y="36" font-size="22" font-weight="bold">ブレッドボードの組み直し配置（設計。#512）</text>',
-        '<text x="30" y="62" fill="#444">生成元: hardware/breadboard-rebuild/generate.py。組み直した後に hardware/breadboard/layout.svg の最終版になる。</text>',
+        '<text x="30" y="36" font-size="22" font-weight="bold">ブレッドボードの組み直し後の配置（#512。2026-10-31 に組んだ）</text>',
+        '<text x="30" y="62" fill="#444">生成元: hardware/breadboard-rebuild/generate.py。hardware/breadboard/layout.svg はこの図と同じ内容。</text>',
     ]
     for b in BOARDS:
         draw_board(out, b)
@@ -754,17 +876,18 @@ def build_svg():
     draw_modules(out)
     draw_parts(out)
     draw_soft(out)
+    draw_external(out)
     # 板（B1・B3 の下端は y=1024）より下に、凡例と板の外へ出る線を縦に並べる（横に並べると長い行が重なる）
     lines = [(60, 1070, 15, "凡例と注意", True)]
     lines += [(60, 1096 + i * 22, 12.5, line, False) for i, line in enumerate(NOTES)]
     y2 = 1096 + len(NOTES) * 22 + 20
     lines.append((60, y2, 15, "板の外へ出る線", True))
     for i, (xid, h, _net, far, state) in enumerate(OFFBOARD):
-        mark = "（板の端を抜いておく）" if "抜いておく" in state else ""
+        mark = "（板の端を抜いておく）" if "抜いておく" in state else ("（Pi の側は挿していない）" if "挿していない" in state else "")
         lines.append((60, y2 + 26 + i * 22, 12,
                       f'{xid}: {hole_name(parse_hole(h))} → {far.replace("`", "")}{mark}', False))
     yy = y2 + 26 + len(OFFBOARD) * 22 + 10
-    lines.append((60, yy, 12, "首の14本: LCD 側は MSP2807 の pin 番号。線は両端メス。B2 の a・b 行に立てた細ピンヘッダで受ける。", False))
+    lines.append((60, yy, 12, "首の14本: LCD 側は MSP2807 の pin 番号。線は LCD に付いているメスオス線のオス側を B2 の a・b 行の穴へ直接挿す（細ピンヘッダは使わない）。", False))
     lines.append((60, yy + 22, 12, "SCK と T_CLK、SDI と T_DIN、SDO と T_DO は同じ列に挿して共有する（#34）。", False))
     check_text_fits(lines)
     for x, y, size, text, bold in lines:
@@ -788,8 +911,8 @@ def end_text(e):
     if is_hole(e):
         return hole_name(parse_hole(e))
     pin = e.split(':')[1]
-    col = 2 + [p for p, _n in ACCEL_UPPER].index(pin)
-    return f"B3 の{col}列（ACCEL-01 上段の {pin}）の、上段より上の空き穴（行は TBD）"
+    col = ACCEL_UPPER_COL0 + [p for p, _n in ACCEL_UPPER].index(pin)
+    return f"B3 の{col}列（ACCEL-01 上段の {pin}）の、上段より上の空き穴（a 行）"
 
 
 def build_table():
@@ -806,7 +929,7 @@ def build_table():
     L.append("|---|---|---|")
     L.append(f"| ESP32 DevKitC V4（`MCU-01`） | B1。J3（GND 23 22 … CLK）を B 行の12〜30列、J2（3V3 EN VP … 5V）を J 行の12〜30列 | USB を30列の側（板の端）、アンテナを12列の側にする。B 行の上に1穴（A）、J 行の下に2穴（K・L）が残る |")
     L.append("| `ENV-01`（AE-BME280） | B3 の a 行。VDD 10、GND 11、CSB 12、SDI 13、SDO 14、SCK 15 | 本体を板の外（上の辺の外）へ出す向き。ピンの名前の順が逆になる向きしか取れないときは止める（TBD） |")
-    L.append("| `ACCEL-01`（M-06724） | 下段5本を B3 の f 行。INT1 2、INT2 3、SDO 4、SDA 5、SCL 6。上段4本（CS Vs GND VDD）は上半分の2〜5列（CS 2、Vs 3、GND 4、VDD 5。写真の読み）の、間隔に合う行 | 2列が溝をまたぐ向き。上段の行は TBD。間隔が7ピッチ以上で上段が a 行に来る（上に空き穴が残らない）ときは組めないので止める |")
+    L.append("| `ACCEL-01`（M-06724） | 下段5本を B3 の f 行。SCL 2、SDA 3、SDO 4、INT2 5、INT1 6（基板の印字で左から）。上段4本は 3〜6列の b 行（VDD 3、GND 4、Vs 5、CS 6）。2列の間隔は6穴分（ユーザーの計測、2026-10-31） | 2列が溝をまたぐ向き。上段の上の a 行が空き穴になる |")
     L.append("")
     L.append("## 抵抗（足は切る）")
     L.append("")
@@ -815,7 +938,7 @@ def build_table():
     for rid, val, part, a, na, b, nb, use in RESISTORS:
         L.append(f"| {rid} | {val} | `{part}` | {hole_name(parse_hole(a))} — {net_text(na)} | {hole_name(parse_hole(b))} — {net_text(nb)} | {use} |")
     L.append("")
-    L.append("## LED（足は切る。向きをこの表で残す）")
+    L.append("## LED（足は切っていない。向きをこの表で残す）")
     L.append("")
     L.append("| ID | 品 | アノード（長い足） | カソード（短い足） |")
     L.append("|---|---|---|---|")
@@ -824,43 +947,43 @@ def build_table():
     L.append("")
     L.append("## 硬いジャンパー（被覆あり）")
     L.append("")
-    L.append("長さは両端の穴の間隔（ピッチ＝2.54 mm の数）。溝をまたぐものと電源列へ下りるものは、写真からの目安で TBD（現物で合う長さを選ぶ）。")
+    L.append("長さは両端の穴の間隔（ピッチ＝2.54 mm の数）。溝をまたぐものと電源列へ下りるものは、写真からの目安で TBD（現物で合う長さを選ぶ）。色は長さで決まるので、現物の長さの色が正である。")
     L.append("")
-    L.append("| ID | 端1 | 端2 | 長さ（ピッチ） | 信号 |")
-    L.append("|---|---|---|---|---|")
+    L.append("| ID | 端1 | 端2 | 長さ（ピッチ） | 信号 | 色（長さで決まる） |")
+    L.append("|---|---|---|---|---|---|")
     for hid, a, b, net in HARD:
         ha, hb = parse_hole(a), parse_hole(b)
         n = pitch_length(ha, hb)
         tbd = "（目安、TBD）" if ha[1] != hb[1] else ""
-        L.append(f"| {hid} | {hole_name(ha)} | {hole_name(hb)} | {n}{tbd} | {net_text(net)} |")
+        L.append(f"| {hid} | {hole_name(ha)} | {hole_name(hb)} | {n}{tbd} | {net_text(net)} | {hard_color(a, b)[0]} |")
     L.append("")
     L.append("## 柔らかい線（両端オス）")
     L.append("")
-    L.append("| ID | 端1 | 端2 | 信号 | 組み直した直後 |")
-    L.append("|---|---|---|---|---|")
+    L.append("| ID | 端1 | 端2 | 信号 | 色 | 組み直した直後 |")
+    L.append("|---|---|---|---|---|---|")
     for sid, a, b, net, state in SOFT:
-        L.append(f"| {sid} | {end_text(a)} | {end_text(b)} | {net_text(net)} | {state or '挿す'} |")
+        L.append(f"| {sid} | {end_text(a)} | {end_text(b)} | {net_text(net)} | {id_color(sid, net)[0]} | {state or '挿す'} |")
     L.append("")
     L.append("## 板の外へ出る線（柔らかい線）")
     L.append("")
-    L.append("| ID | 板の端 | 板の外の端 | 信号 | 組み直した直後 |")
-    L.append("|---|---|---|---|---|")
+    L.append("| ID | 板の端 | 板の外の端 | 信号 | 色 | 組み直した直後 |")
+    L.append("|---|---|---|---|---|---|")
     for xid, h, net, far, state in OFFBOARD:
-        L.append(f"| {xid} | {hole_name(parse_hole(h))} | {far} | {net_text(net)} | {state} |")
+        L.append(f"| {xid} | {hole_name(parse_hole(h))} | {far} | {net_text(net)} | {id_color(xid, net)[0]} | {state} |")
     L.append("")
-    L.append("## 首を通る LCD の14本（両端メスの線）")
+    L.append("## 首を通る LCD の14本（メスオス線のオス側を直接挿す）")
     L.append("")
-    L.append("細ピンヘッダ（`PROTO-01`）を1本ずつに切り離して下の穴に立て、線の胴側のメスの端をそこへ挿す。LCD 側のメスの端は module のピンに挿す。")
+    L.append("今の仮組で LCD に付いているメスオス線のメス側を LCD のピンに挿したまま、オス側を下の穴へ直接挿す。細ピンヘッダ（`PROTO-01`）は使わない。#34 の決定（両端メス）とは違う暫定で、首の経路の長さは未確認（#34）。ユーザーの原文「仮組で接続している線はLCDのピンにメスオスをつけてたので、現状はメスオスがついてます」（2026-10-31）を受けた実機側の PM の判断。")
     L.append("")
-    L.append("| LCD pin | 表記 | 挿す穴 | 信号 |")
-    L.append("|---:|---|---|---|")
+    L.append("| LCD pin | 表記 | 挿す穴 | 信号 | 線の色（LCD に付いている線。記録の色で、ユーザーが「色は記録どおり」と答えた） |")
+    L.append("|---:|---|---|---|---|")
     for n, name, h, net in NECK:
-        L.append(f"| {n} | {name} | {hole_name(parse_hole(h))} | {net_text(net)} |")
+        L.append(f"| {n} | {name} | {hole_name(parse_hole(h))} | {net_text(net)} | {NECK_COLOR[n]} |")
     L.append("")
     L.append("## 足を切る部品・切らない部品")
     L.append("")
-    L.append(f"- 切る: 抵抗 {len(RESISTORS)} 本（R1〜R{len(RESISTORS)}）、LED 2 本（D1・D2）。穴の奥まで入る長さを残し、板の上に出る金属を短くする。")
-    L.append("- LED は切る前に長い足（アノード）を確かめ、上の表の穴に挿してから、もう一度向きを表と照らす。")
+    L.append(f"- 切る: 抵抗 {len(RESISTORS)} 本（R1〜R{len(RESISTORS)}）。穴の奥まで入る長さを残し、板の上に出る金属を短くする。LED（D1・D2）の足は切っていない（実機側の PM の決定、2026-10-31）。")
+    L.append("- LED は長い足（アノード）を確かめ、上の表の穴に挿してから、向きを表と照らした（足は切っていない）。")
     L.append("- 切らない: `PROTO-02` へ移す電源部の部品（`PROT-OC-01` の PTC、`WIRE-PWR-01` の端子台と線、`MEAS-01` の shunt）。どれもブレッドボードに載せない。")
     L.append("- module（ESP32、`ENV-01`、`ACCEL-01`）のピンは切らない。")
     L.append("")

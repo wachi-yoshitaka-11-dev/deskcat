@@ -10,7 +10,7 @@
 |---|---|---|
 | ESP32 DevKitC V4（`MCU-01`） | B1。J3（GND 23 22 … CLK）を B 行の12〜30列、J2（3V3 EN VP … 5V）を J 行の12〜30列 | USB を30列の側（板の端）、アンテナを12列の側にする。B 行の上に1穴（A）、J 行の下に2穴（K・L）が残る |
 | `ENV-01`（AE-BME280） | B3 の a 行。VDD 10、GND 11、CSB 12、SDI 13、SDO 14、SCK 15 | 本体を板の外（上の辺の外）へ出す向き。ピンの名前の順が逆になる向きしか取れないときは止める（TBD） |
-| `ACCEL-01`（M-06724） | 下段5本を B3 の f 行。INT1 2、INT2 3、SDO 4、SDA 5、SCL 6。上段4本（CS Vs GND VDD）は上半分の2〜5列（CS 2、Vs 3、GND 4、VDD 5。写真の読み）の、間隔に合う行 | 2列が溝をまたぐ向き。上段の行は TBD。間隔が7ピッチ以上で上段が a 行に来る（上に空き穴が残らない）ときは組めないので止める |
+| `ACCEL-01`（M-06724） | 下段5本を B3 の f 行。SCL 2、SDA 3、SDO 4、INT2 5、INT1 6（基板の印字で左から）。上段4本は 3〜6列の b 行（VDD 3、GND 4、Vs 5、CS 6）。2列の間隔は6穴分（ユーザーの計測、2026-10-31） | 2列が溝をまたぐ向き。上段の上の a 行が空き穴になる |
 
 ## 抵抗（足は切る）
 
@@ -35,7 +35,7 @@
 | R17 | 10 kΩ | `MEAS-01 分圧用` | B3 g10 — 3V3（J2-1 から） | B3 g14 — GPIO36（ADC-3V3） | ADC-3V3 分圧の上 |
 | R18 | 10 kΩ | `MEAS-01 分圧用` | B3 h14 — GPIO36（ADC-3V3） | B3 h11 — GND | ADC-3V3 分圧の下 |
 
-## LED（足は切る。向きをこの表で残す）
+## LED（足は切っていない。向きをこの表で残す）
 
 | ID | 品 | アノード（長い足） | カソード（短い足） |
 |---|---|---|---|
@@ -44,91 +44,91 @@
 
 ## 硬いジャンパー（被覆あり）
 
-長さは両端の穴の間隔（ピッチ＝2.54 mm の数）。溝をまたぐものと電源列へ下りるものは、写真からの目安で TBD（現物で合う長さを選ぶ）。
+長さは両端の穴の間隔（ピッチ＝2.54 mm の数）。溝をまたぐものと電源列へ下りるものは、写真からの目安で TBD（現物で合う長さを選ぶ）。色は長さで決まるので、現物の長さの色が正である。
 
-| ID | 端1 | 端2 | 長さ（ピッチ） | 信号 |
-|---|---|---|---|---|
-| H1 | B1 L12 | B1 ＋12 | 4（目安、TBD） | 3V3（J2-1 から） |
-| H2 | B1 L25 | B1 −25 | 3（目安、TBD） | GND |
-| H3 | B2 e1 | B2 f1 | 3（目安、TBD） | 3V3（J2-1 から） |
-| H4 | B2 e2 | B2 f2 | 3（目安、TBD） | GND |
-| H5 | B2 j1 | B2 j3 | 2 | 3V3（J2-1 から） |
-| H6 | B2 i3 | B2 i4 | 1 | 3V3（J2-1 から） |
-| H7 | B2 h4 | B2 h10 | 6 | 3V3（J2-1 から） |
-| H8 | B2 g2 | B2 g8 | 6 | GND |
-| H9 | B3 e10 | B3 f10 | 3（目安、TBD） | 3V3（J2-1 から） |
-| H10 | B3 e11 | B3 f11 | 3（目安、TBD） | GND |
-| H11 | B3 c11 | B3 c14 | 3 | GND |
+| ID | 端1 | 端2 | 長さ（ピッチ） | 信号 | 色（長さで決まる） |
+|---|---|---|---|---|---|
+| H1 | B1 L12 | B1 ＋12 | 4（目安、TBD） | 3V3（J2-1 から） | 黄 |
+| H2 | B1 L25 | B1 −25 | 3（目安、TBD） | GND | 橙 |
+| H3 | B2 e1 | B2 f1 | 3（目安、TBD） | 3V3（J2-1 から） | 橙 |
+| H4 | B2 e2 | B2 f2 | 3（目安、TBD） | GND | 橙 |
+| H5 | B2 j1 | B2 j3 | 2 | 3V3（J2-1 から） | 赤 |
+| H6 | B2 i3 | B2 i4 | 1 | 3V3（J2-1 から） | 灰 |
+| H7 | B2 h4 | B2 h10 | 6 | 3V3（J2-1 から） | 青 |
+| H8 | B2 g2 | B2 g8 | 6 | GND | 青 |
+| H9 | B3 e10 | B3 f10 | 3（目安、TBD） | 3V3（J2-1 から） | 橙 |
+| H10 | B3 e11 | B3 f11 | 3（目安、TBD） | GND | 橙 |
+| H11 | B3 c11 | B3 c14 | 3 | GND | 橙 |
 
 ## 柔らかい線（両端オス）
 
-| ID | 端1 | 端2 | 信号 | 組み直した直後 |
-|---|---|---|---|---|
-| S1 | B1 ＋26 | B2 b1 | 3V3（J2-1 から） | 挿す |
-| S2 | B1 −26 | B2 b2 | GND | 挿す |
-| S3 | B1 ＋27 | B3 b10 | 3V3（J2-1 から） | 挿す |
-| S4 | B1 −27 | B3 b11 | GND | 挿す |
-| S5 | B1 A14 | B2 b3 | GPIO22（LCD-CS） | 挿す |
-| S6 | B1 A23 | B2 b4 | GPIO16（LCD-RST） | 挿す |
-| S7 | B1 A22 | B2 b5 | GPIO17（LCD-DC） | 挿す |
-| S8 | B1 A13 | B2 c6 | GPIO23（LCD-MOSI） | 挿す |
-| S9 | B1 A20 | B2 c7 | GPIO18（LCD-SCLK） | 挿す |
-| S10 | B1 A24 | B2 b8 | GPIO4（LCD-BL） | 挿す |
-| S11 | B1 A19 | B2 c9 | GPIO19（LCD-MISO） | 挿す |
-| S12 | B1 A17 | B2 b10 | GPIO21（TOUCH-CS） | 挿す |
-| S13 | B1 K16 | B2 b11 | GPIO34（TOUCH-IRQ） | 挿す |
-| S14 | B1 K20 | B3 g5 | GPIO25（I2C SDA） | 挿す |
-| S15 | B1 K21 | B3 g6 | GPIO26（I2C SCL） | 挿す |
-| S16 | B1 K14 | B3 f14 | GPIO36（ADC-3V3） | 挿す |
-| S17 | B1 K19 | B1 G4 | GPIO33（ADC-5V） | 挿す |
-| S18 | B1 K30 | B1 G8 | 5V（J2-19 の 5V pin） | G8 側を先に挿し、K30 側を後に挿す（5 V の端を最後にする） |
-| S19 | B1 A26 | B1 G5 | GPIO2（LED-COMM） | A26 側を抜いておく（EXP-026 で ESP32 側を抜いた状態） |
-| S20 | B1 A21 | B1 G2 | GPIO5（LED-REACT） | A21 側を抜いておく（EXP-026 で ESP32 側を抜いた状態） |
-| S21 | B1 K23 | B1 F1 | GPIO14（PI-UART-RX） | K23 側を抜いておく。挿すのは gpio-assignment.md の `信号線をつないでよい条件` を満たすときだけ（ESP32 側の端で抜き差しする） |
-| S22 | B1 K26 | B1 F2 | GPIO13（PI-UART-TX） | K26 側を抜いておく。条件は S21 と同じ |
-| S23 | B1 K22 | B1 F3 | GPIO27（SERVO-PWM） | 挿す |
-| S24 | B3 h5 | B3 b13 | GPIO25（I2C SDA） | 挿す |
-| S25 | B3 h6 | B3 b15 | GPIO26（I2C SCL） | 挿す |
-| S26 | B3 c10 | B3 の3列（ACCEL-01 上段の Vs）の、上段より上の空き穴（行は TBD） | 3V3（J2-1 から） | 挿す |
-| S27 | B3 d11 | B3 の4列（ACCEL-01 上段の GND）の、上段より上の空き穴（行は TBD） | GND | 挿す |
-| S28 | B3 の2列（ACCEL-01 上段の CS）の、上段より上の空き穴（行は TBD） | B3 の5列（ACCEL-01 上段の VDD）の、上段より上の空き穴（行は TBD） | 3V3（J2-1 から） | 挿す |
-| S29 | B3 g4 | B3 i11 | GND | 挿す |
+| ID | 端1 | 端2 | 信号 | 色 | 組み直した直後 |
+|---|---|---|---|---|---|
+| S1 | B1 ＋26 | B2 b1 | 3V3（J2-1 から） | 赤 | 挿す |
+| S2 | B1 −26 | B2 b2 | GND | 黒 | 挿す |
+| S3 | B1 ＋27 | B3 b10 | 3V3（J2-1 から） | 赤 | 挿す |
+| S4 | B1 −27 | B3 b11 | GND | 黒 | 挿す |
+| S5 | B1 A14 | B2 b3 | GPIO22（LCD-CS） | 茶 | 挿す |
+| S6 | B1 A23 | B2 b4 | GPIO16（LCD-RST） | 橙 | 挿す |
+| S7 | B1 A22 | B2 b5 | GPIO17（LCD-DC） | 黄 | 挿す |
+| S8 | B1 A13 | B2 c6 | GPIO23（LCD-MOSI） | 緑 | 挿す |
+| S9 | B1 A20 | B2 c7 | GPIO18（LCD-SCLK） | 青 | 挿す |
+| S10 | B1 A24 | B2 b8 | GPIO4（LCD-BL） | 紫 | 挿す |
+| S11 | B1 A19 | B2 c9 | GPIO19（LCD-MISO） | 灰 | 挿す |
+| S12 | B1 A17 | B2 b10 | GPIO21（TOUCH-CS） | 青 | 挿す |
+| S13 | B1 K16 | B2 b11 | GPIO34（TOUCH-IRQ） | 灰 | 挿す |
+| S14 | B1 K20 | B3 g3 | GPIO25（I2C SDA） | 白 | 挿す |
+| S15 | B1 K21 | B3 g2 | GPIO26（I2C SCL） | 茶 | 挿す |
+| S16 | B1 K14 | B3 f14 | GPIO36（ADC-3V3） | 白 | 挿す |
+| S17 | B1 K19 | B1 G4 | GPIO33（ADC-5V） | 緑 | 挿す |
+| S18 | B1 K30 | B1 G8 | 5V（J2-19 の 5V pin） | 青 | G8 側を先に挿し、K30 側を後に挿す（5 V の端を最後にする） |
+| S19 | B1 A26 | B1 G5 | GPIO2（LED-COMM） | 橙 | 挿す（USB を挿す前に挿し、窓の間は抜き差ししない。実機側の PM の決定、2026-10-31） |
+| S20 | B1 A21 | B1 G2 | GPIO5（LED-REACT） | 黄 | 挿す（USB を挿す前に挿し、窓の間は抜き差ししない。実機側の PM の決定、2026-10-31） |
+| S21 | B1 K23 | B1 F1 | GPIO14（PI-UART-RX） | 黄 | K23 側を抜いておく。挿すのは gpio-assignment.md の `信号線をつないでよい条件` を満たすときだけ（ESP32 側の端で抜き差しする） |
+| S22 | B1 K26 | B1 F2 | GPIO13（PI-UART-TX） | 橙 | K26 側を抜いておく。条件は S21 と同じ |
+| S23 | B1 K22 | B1 F3 | GPIO27（SERVO-PWM） | 黄 | 挿す |
+| S24 | B3 h3 | B3 b13 | GPIO25（I2C SDA） | 緑 | 挿す |
+| S25 | B3 h2 | B3 b15 | GPIO26（I2C SCL） | 橙 | 挿す |
+| S26 | B3 c10 | B3 の5列（ACCEL-01 上段の Vs）の、上段より上の空き穴（a 行） | 3V3（J2-1 から） | 赤 | 挿す |
+| S27 | B3 d11 | B3 の4列（ACCEL-01 上段の GND）の、上段より上の空き穴（a 行） | GND | 黒 | 挿す |
+| S28 | B3 の6列（ACCEL-01 上段の CS）の、上段より上の空き穴（a 行） | B3 の3列（ACCEL-01 上段の VDD）の、上段より上の空き穴（a 行） | 3V3（J2-1 から） | 赤 | 挿す |
+| S29 | B3 g4 | B3 i11 | GND | 黒 | 挿す |
 
 ## 板の外へ出る線（柔らかい線）
 
-| ID | 板の端 | 板の外の端 | 信号 | 組み直した直後 |
-|---|---|---|---|---|
-| X1 | B1 D5 | Pi の header pin 8（GPIO14 `TXD`） | PI_TXD（Pi pin 8 TXD 側） | 挿す（抜き差しは S21 の K23 側で行う。Pi の header 側では抜き差ししない） |
-| X2 | B1 D6 | Pi の header pin 10（GPIO15 `RXD`） | PI_RXD（Pi pin 10 RXD 側） | 挿す（抜き差しは S22 の K26 側で行う。Pi の header 側では抜き差ししない） |
-| X3 | B1 A18 | Pi の header pin 39（GND） | GND | A18 側を抜いておく。挿す前に、gpio-assignment.md の `信号線をつないでよい条件` の6の開放側の値を読む |
-| X4 | B1 D7 | サーボの plug の黄の穴 | SERVO_SIG（サーボの黄の線の側） | D7 側を抜いておく。挿すのは #17 のサーボの試験の手順と承認に従うときだけ |
-| X5 | B1 −30 | 端子台S の −（ESP32 の GND をサーボの GND と共通にする線。EXP-034 の Wiring revision、hardware/breadboard/layout.svg の基準線） | GND | −30 側を抜いておく。条件は X4 と同じ |
+| ID | 板の端 | 板の外の端 | 信号 | 色 | 組み直した直後 |
+|---|---|---|---|---|---|
+| X1 | B1 D5 | Pi の header pin 8（GPIO14 `TXD`） | PI_TXD（Pi pin 8 TXD 側） | 紫 | 板の側を挿す。Pi の header 側は挿していない（EXP-052）。以後の抜き差しは S21 の K23 側で行い、Pi の header 側では抜き差ししない |
+| X2 | B1 D6 | Pi の header pin 10（GPIO15 `RXD`） | PI_RXD（Pi pin 10 RXD 側） | 青 | 板の側を挿す。Pi の header 側は挿していない（EXP-052）。以後の抜き差しは S22 の K26 側で行い、Pi の header 側では抜き差ししない |
+| X3 | B1 A18 | Pi の header pin 39（GND） | GND | 黒 | A18 側を抜いておく。挿す前に、gpio-assignment.md の `信号線をつないでよい条件` の6の開放側の値を読む |
+| X4 | B1 D7 | サーボの plug の黄の穴 | SERVO_SIG（サーボの黄の線の側） | 黄 | D7 側を抜いておく。挿すのは #17 のサーボの試験の手順と承認に従うときだけ |
+| X5 | B1 −30 | 端子台S の −（ESP32 の GND をサーボの GND と共通にする線。EXP-034 の Wiring revision、組み直す前の基準線。Git の履歴にある組み直す前の hardware/breadboard/layout.svg） | GND | 黒 | −30 側を抜いておく。条件は X4 と同じ |
 
-## 首を通る LCD の14本（両端メスの線）
+## 首を通る LCD の14本（メスオス線のオス側を直接挿す）
 
-細ピンヘッダ（`PROTO-01`）を1本ずつに切り離して下の穴に立て、線の胴側のメスの端をそこへ挿す。LCD 側のメスの端は module のピンに挿す。
+今の仮組で LCD に付いているメスオス線のメス側を LCD のピンに挿したまま、オス側を下の穴へ直接挿す。細ピンヘッダ（`PROTO-01`）は使わない。#34 の決定（両端メス）とは違う暫定で、首の経路の長さは未確認（#34）。ユーザーの原文「仮組で接続している線はLCDのピンにメスオスをつけてたので、現状はメスオスがついてます」（2026-10-31）を受けた実機側の PM の判断。
 
-| LCD pin | 表記 | 挿す穴 | 信号 |
-|---:|---|---|---|
-| 1 | VCC | B2 a1 | 3V3（J2-1 から） |
-| 2 | GND | B2 a2 | GND |
-| 3 | CS | B2 a3 | GPIO22（LCD-CS） |
-| 4 | RESET | B2 a4 | GPIO16（LCD-RST） |
-| 5 | DC/RS | B2 a5 | GPIO17（LCD-DC） |
-| 6 | SDI | B2 a6 | GPIO23（LCD-MOSI） |
-| 7 | SCK | B2 a7 | GPIO18（LCD-SCLK） |
-| 8 | LED | B2 a8 | GPIO4（LCD-BL） |
-| 9 | SDO | B2 a9 | GPIO19（LCD-MISO） |
-| 10 | T_CLK | B2 b7 | GPIO18（LCD-SCLK） |
-| 11 | T_CS | B2 a10 | GPIO21（TOUCH-CS） |
-| 12 | T_DIN | B2 b6 | GPIO23（LCD-MOSI） |
-| 13 | T_DO | B2 b9 | GPIO19（LCD-MISO） |
-| 14 | T_IRQ | B2 a11 | GPIO34（TOUCH-IRQ） |
+| LCD pin | 表記 | 挿す穴 | 信号 | 線の色（LCD に付いている線。記録の色で、ユーザーが「色は記録どおり」と答えた） |
+|---:|---|---|---|---|
+| 1 | VCC | B2 a1 | 3V3（J2-1 から） | 赤 |
+| 2 | GND | B2 a2 | GND | 黒 |
+| 3 | CS | B2 a3 | GPIO22（LCD-CS） | 茶 |
+| 4 | RESET | B2 a4 | GPIO16（LCD-RST） | 橙 |
+| 5 | DC/RS | B2 a5 | GPIO17（LCD-DC） | 黄 |
+| 6 | SDI | B2 a6 | GPIO23（LCD-MOSI） | 緑 |
+| 7 | SCK | B2 a7 | GPIO18（LCD-SCLK） | 青 |
+| 8 | LED | B2 a8 | GPIO4（LCD-BL） | 紫 |
+| 9 | SDO | B2 a9 | GPIO19（LCD-MISO） | 灰 |
+| 10 | T_CLK | B2 b7 | GPIO18（LCD-SCLK） | 紫 |
+| 11 | T_CS | B2 a10 | GPIO21（TOUCH-CS） | 青 |
+| 12 | T_DIN | B2 b6 | GPIO23（LCD-MOSI） | 緑 |
+| 13 | T_DO | B2 b9 | GPIO19（LCD-MISO） | 黄 |
+| 14 | T_IRQ | B2 a11 | GPIO34（TOUCH-IRQ） | 灰 |
 
 ## 足を切る部品・切らない部品
 
-- 切る: 抵抗 18 本（R1〜R18）、LED 2 本（D1・D2）。穴の奥まで入る長さを残し、板の上に出る金属を短くする。
-- LED は切る前に長い足（アノード）を確かめ、上の表の穴に挿してから、もう一度向きを表と照らす。
+- 切る: 抵抗 18 本（R1〜R18）。穴の奥まで入る長さを残し、板の上に出る金属を短くする。LED（D1・D2）の足は切っていない（実機側の PM の決定、2026-10-31）。
+- LED は長い足（アノード）を確かめ、上の表の穴に挿してから、向きを表と照らした（足は切っていない）。
 - 切らない: `PROTO-02` へ移す電源部の部品（`PROT-OC-01` の PTC、`WIRE-PWR-01` の端子台と線、`MEAS-01` の shunt）。どれもブレッドボードに載せない。
 - module（ESP32、`ENV-01`、`ACCEL-01`）のピンは切らない。
 
