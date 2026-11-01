@@ -64,6 +64,7 @@
 | [EXP-050](#exp-050-662入りの製品buildで撫でる叩くなどを各5回取り撫でたときのtapは0件だった) | [#21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)の実機の窓（#662入りの製品build）。撫でる・叩く・撫でて離してすぐ叩く・叩いてすぐ撫でるを各5回。撫での窓（最初の5回と取り直しの5回）でtapを見つけた件は0。離れて1250〜1820 msのtap 24件はすべて`DropTouch`。保留は10件とも300 ms | 値の正なし（観測の記録。判定は[#21のcomment](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21#issuecomment-6499717081)） |
 | [EXP-051](#exp-051-ベンチ電源psu-bench-01を無負荷と負荷ボードで初めて使いccに入ることを確かめた) | [#525](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/525)。`PSU-BENCH-01`（`SPS-3010V`）の新しい電源の初回使用（無負荷と負荷ボード。DeskCat の回路はつながない） | 値の正なし（初回使用の記録。`PSU-BENCH-01`の行は[hardware-bom.md](hardware-bom.md)） |
 | [EXP-052](#exp-052-組み直した3枚の板で初回通電しbringup-led-514のled点灯と導通を取った) | [#512](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/512)・[#514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)の実機の窓。ブレッドボードを3枚（ESP32の板、LCDの板、センサーの板）に組み直し、通電前の導通20項目、ESP32のUSBだけの初回通電、`bringup-led-514`の書き込み、LEDの点灯（赤→白→2本→白の点滅）、抵抗の両端と3V3の電圧を取った。導通20項目は期待どおり、LEDは設計どおりに点き、加速度センサー（`0xe5`）と温度センサー（`0x60`）のI2C読み出しが成功した | 値の正なし（観測の記録。判定は書かない） |
+| [EXP-053](#exp-053-専用キーをpiへ置き偽esp32を相手に--cloud-speechを4件通した) | [#522](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/522)の実機の窓。専用キーをPiへ置き、現在のdevelop `f2c4ea1`を直接buildして、偽ESP32を相手に`--cloud-speech`で動かした。4件の`show_text`が届いた | 値の正なし（観測の記録。専用Workspaceへの計上は未確認で、実ESP32・LCDでの表示も未確認） |
 
 **大容量の生dataはこのrepositoryへ入れていない。**保存場所は
 [development-foundation-plan.md](../planning/development-foundation-plan.md)の
@@ -5046,6 +5047,64 @@ ESP32のlog（最初の窓）`7483a4d39f3e7309dfc7e9e83ee3e3e564a7919a820370ba6f
 
 ESP32のlog：1回目`19f0ea679a88273c0df2bc8f4c68db7fbe6faff80a170a2d350ec41847756ea1`、測定1`9394fc544c67630478927776b6002ea90e4f5a6a63b5ecd1d501ce5f0c10a263`、測定2`b5981313489dd996b171b6128fb19cbb6c70f6a8c68d3173200444c32e4dfcf4`、測定3`04f9f4626b9e38f99ee47c9f85b7c223a3af880430c5da8167cd4a8e4c6019f0`。書き込み前のapp先頭0x100 byte`26f0388aefa4aea06e0391f9d034741f4c4001d1545d4aa21f44bf3ead076a43`、書き込み後`6fa46d86e45264072035a8b9eb5cd7f659a98aa2d6609b470257968733dba4ef`。ELF`0c417c85827d1701e78bc8616ff475e8dce5fdcb188264481ba7c15642388023`。
 
+## EXP-053: 専用キーをPiへ置き、偽ESP32を相手に`--cloud-speech`を4件通した
+
+[#522](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/522)で、ユーザーが発行した専用キーをPiへ置き、現在のdevelopの`deskcatd`が`--cloud-speech`でクラウドの独り言を取れるかを観測した。**キーの値、長さ、hashはこの記録に書かない。**ESP32は使っていない（`S21`・`S22`・`X3`は抜いたまま）。**この記録は観察だけを書く。ADR-0026の確認項目を満たしたとは書かない。**
+
+| 項目 | 内容 |
+|---|---|
+| Test ID | `EXP-053` |
+| Date | 2026-11-01 JST（Piの起動は約09:48。キーを置いたのは約09:58。buildは10:01〜10:37。確認の実行は10:39〜10:43。時刻は下にUTCで書く） |
+| Operator | Piの電源を入れたのとキーの入力（端末へ貼る）はユーザー。ssh、build、unitの入れ替え、確認の実行は作業セッション（AI） |
+| Hardware revision／Exact components | `SBC-01`（Raspberry Pi Zero W）。ESP32は使っていない |
+| Wiring revision | ESP32側の信号線の端は外したまま（Piからは確認できない） |
+| Power supply and current limit | Piの給電は`PSU-PI-A-02`。`vcgencmd get_throttled`は`0x0`（Pi Zero Wでは電圧の根拠にならない。`EXP-009`） |
+| Firmware commit/profile | ESP32は無し。Pi：develop `f2c4ea1`の`apps/`・`crates/`・`Cargo.toml`・`Cargo.lock`をPiで直接build（debug、`cargo build --locked -p deskcatd`）。`deskcatd`のsha256は`9464743133614f32431b0c77df0bd86a8c359355ff3ec2ff44f110ca3b40d31d` |
+| Configuration | `--speech-min-interval-ms 60000 --speech-duration-ms 5000 --cloud-speech`。`--startup-deadline-ms 60000`、`--duplicate-capacity 8 --duplicate-retention-ms 5000` |
+| Measurement equipment | Pi上の`systemd-run`、偽ESP32（`EXP-027`の`fake_esp.py`に、受けた`show_text`の本文を書き出す1行を足した。repositoryへ入れていない） |
+| Procedure | 下記 |
+| Expected result | キーがserviceのcredentialとして渡り、`deskcatd`が`show_text`の本文をクラウド由来の文へ置き換える |
+| Measured result | 下記 |
+| Faults | 下記 |
+| Conclusion | 下記 |
+| Next safe step | 下記 |
+
+### 手順と観察
+
+1. **キーの設置（約00:58Z）。**ユーザーが端末のタブで、キーを非表示で入力した。Piの`/etc/deskcatd/anthropic-api-key`は`root:root`・mode `0600`になった。キーはチャット、引数、logに通していない
+2. **build（2026-11-01T01:01:34Z〜01:37:57Z）。**`Finished dev profile [unoptimized + debuginfo] target(s) in 36m 20s`、exit 0。1回目の起動は`/usr/bin/time`がPiに無く失敗したため、`time`なしで再開した
+3. **確認の実行（01:39:20Zごろ〜01:42:40Zごろ、200秒）。**`sudo systemd-run --wait --collect --pipe -p User=deskcatd -p LoadCredential=anthropic-api-key:/etc/deskcatd/anthropic-api-key -p StateDirectory=deskcatd -p StateDirectoryMode=0700`の下で、偽ESP32が`deskcatd`をPTYへつないだ。unit（`ExecStart=`は偽ESP32のscript）を除く値は`deploy/systemd/deskcatd.service`と同じ指定を使った。偽ESP32は`hello`へ`boot`と`ack`、`get_status`へ`status`を返した
+
+観察：
+
+- 偽ESP32が受けたPi→ESP32のmessage：`hello` 1、`ack` 1、`get_status` 2、`show_text` 4（受信は4、64、124、184秒。60秒間隔）
+- 4件の`show_text`の本文（クラウド由来。`apps/`・`crates/`のローカル独り言の文には無い。`grep`で0件）：「ふあぁ、ひなたぼっこ、きもちいいにゃ。」「あさだな、ねむいにゃ。」「ふぁ、あさごはんまだかな。」「ふあぁ、おひさまが あったかいにゃ。」。`duration_ms`は5000
+- `deskcatd`のlogは2行（`serial portを開く`と`hello(Startup)を送った`）。`cloud_speech: …; local fallback`のWARNは0件
+- 予算file（`/var/lib/deskcatd/cloud-speech-budget.json`）：`attempts` 4、`estimated_nano_usd` 460800（アプリ側の見積）、最後の試行は01:42:24Z
+- `deskcatd`のVmHWM 11,732 kB（最後の2件のsampling。`--cloud-speech`有効時）。実行は200秒で、scriptがSIGTERMで止めた
+- 確認の後、Piの`/usr/local/bin/deskcatd`を上のbuildへ、`/etc/systemd/system/deskcatd.service`をdevelop `f2c4ea1`の`deploy/systemd/deskcatd.service`（sha256 `d1e81a0fb2df1a8e2f1be7fd66913d0384d70f3660d89d51faa851dc24359c60`）へ入れ替えた。`systemd-analyze verify`は出力なし、`deskcatd`は`inactive`・`enabled`。`ExecStart`に`--cloud-speech`も独り言の引数も足していない
+- この起動のWi-Fiの切断（`wpa_supplicant`の`CTRL-EVENT-DISCONNECTED`、`locally_generated=1`）は438件。network識別子は書かない
+
+### Faults
+
+- 1回目のbuildは、Piに`/usr/bin/time`が無く開始できなかった（確認の道具の問題）
+- 1回目の確認は、出力先dirの権限で偽ESP32が起動前に終わった（`PermissionError`）。dirの権限を直して再実行した
+- ユーザーへ伝えたAPI要求の時刻を、最初に誤って伝えた（正しくは01:39〜01:43Z）
+
+### Conclusion
+
+**観測したこと：**Piに置いた専用キーが`LoadCredential=`経由で`deskcatd`へ渡り、`--cloud-speech`で4件のクラウド由来の文を`show_text`として送れた。
+
+**確認していないこと：**
+
+- 4件の要求が専用の非Default Workspaceに計上されたこと（`anthropic-workspace-id`は`deskcatd`が記録しない。ユーザーがConsoleの使用量を見たところ「データがありません。最近の使用量がここに表示されるまで数時間かかる場合があります。」と表示されていた）。**計上の確認が済むまで、ADR-0026の決定5を満たしたと扱わない**
+- 実ESP32・LCDでの表示、Wi-Fiを切った状態での失敗の分類とfallback、1日の回数の上限の実際の効き方、HTTPS client実行中のmemoryのピーク（上の11,732 kBは5秒ごとのsampling）
+- 本番のunitで`--cloud-speech`を有効にした運転。**この記録の範囲では有効にしていない**
+
+### Next safe step
+
+数時間後にConsoleの使用量で、2026-11-01 01:39〜01:43Zの4件が専用Workspaceにあることを確認する。その後、実ESP32とLCDをつないだ窓（#34・#18・#19・#21の後）で、ローカル独り言の表示を確かめてから`--cloud-speech`を足す。
+
 ## Revision履歴
 
 | 日付 | Revision | 変更 | 根拠 |
@@ -5108,3 +5167,4 @@ ESP32のlog：1回目`19f0ea679a88273c0df2bc8f4c68db7fbe6faff80a170a2d350ec41847
 | 2026-10-29 | 55 | [#21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)。**`EXP-050`を追加した。**#662入りの製品build（develop `4fee095`）で、撫でる・叩く・撫でて離してすぐ叩く・叩いてすぐ撫でるを各5回取った。撫での窓（最初の5回と取り直しの5回）でtapを見つけた件は0、離れて1250〜1820 msのtap 24件はすべて`DropTouch`、保留は10件とも300 ms。LCD・touch・ADXL345の線の通電前の目視を省いたことをFaultsに書いた。受け入れ条件の判定は書かない | `EXP-050`。実機側のPMの依頼 |
 | 2026-10-31 | 56 | [#525](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/525)。**`EXP-051`を追加した。**`PSU-BENCH-01`（`SPS-3010V`）の新しい電源の初回使用。接地なしで、無負荷（本体 5.00 V、`DT830B` 5.02 V）と負荷ボード（CC に入り 0.100 A、3.80 V）を観察した。OCP などが未確認であることを書いた（負荷ボードの抵抗の確認は目的に含めない） | [#525](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/525) |
 | 2026-10-31 | 57 | [#512](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/512)・[#514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)。**`EXP-052`を追加した。**ブレッドボードを3枚（ESP32の板、LCDの板、センサーの板）に組み直し、`hardware/breadboard/layout.svg`を組み直した後の配置に置き換えた。通電前の導通20項目は期待どおり、`bringup-led-514`を書き込んで赤→白→2本→白の点滅が設計どおりに点き、加速度センサー（`0xe5`）と温度センサー（`0x60`）のI2C読み出しが成功した。LEDの足は切っていない、加速度センサーの向きを直した、LCDの14本はメスオス線のオス側を直接挿す暫定（#34まで）、Arduinoのloggerの線とクリップの線を板から外した、をWiring revisionに書いた。判定は書かない。`led-514-demo.md`の状態行に、この窓で取った項目を書いた | `EXP-052`。実機側のPMの依頼 |
+| 2026-11-01 | 58 | [#522](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/522)。**`EXP-053`を追加した。**専用キーをPiへ置き（root所有・mode `0600`）、develop `f2c4ea1`の`deskcatd`をPiで直接build（36分20秒、exit 0）して、偽ESP32を相手に`--cloud-speech`で200秒動かし、クラウド由来の`show_text` 4件を受けた記録。専用Workspaceへの計上、実ESP32・LCD、本番unitでの有効化は未確認 | `EXP-053`の観察。Consoleの使用量は反映待ち |
