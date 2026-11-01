@@ -3329,7 +3329,7 @@ log出力の失敗: 0 件
 - 配線の確認で、作業セッションがユーザーの答えを取り違えて追加の確認を求めた。窓の進行には影響しなかった。
 - 「ACが抜けているか」を、書き込みのためにESP32のportを開く前に、ユーザーの申告で確かめた（毎回ではなく、USBを挿す指示の前の1回と、記録の後の1回）。
 - 動作の後のACプラグを抜いた時刻は、ユーザーの申告に無い。
-- PM（`#0PM-実機`）の通電前の照合も、窓の前に出せなかった（PMの申告）。
+- 実機側の PM の通電前の照合も、窓の前に出せなかった（PMの申告）。
 
 ### この記録が主張しないこと
 
@@ -5181,3 +5181,4 @@ Consoleの使用量の画面へ、2026-11-01 01:39〜01:43Zの試行が計上さ
 | 2026-10-31 | 57 | [#512](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/512)・[#514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)。**`EXP-052`を追加した。**ブレッドボードを3枚（ESP32の板、LCDの板、センサーの板）に組み直し、`hardware/breadboard/layout.svg`を組み直した後の配置に置き換えた。通電前の導通20項目は期待どおり、`bringup-led-514`を書き込んで赤→白→2本→白の点滅が設計どおりに点き、加速度センサー（`0xe5`）と温度センサー（`0x60`）のI2C読み出しが成功した。LEDの足は切っていない、加速度センサーの向きを直した、LCDの14本はメスオス線のオス側を直接挿す暫定（#34まで）、Arduinoのloggerの線とクリップの線を板から外した、をWiring revisionに書いた。判定は書かない。`led-514-demo.md`の状態行に、この窓で取った項目を書いた | `EXP-052`。実機側のPMの依頼 |
 | 2026-11-01 | 58 | [#522](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/522)。**`EXP-053`を追加した。**専用キーをPiへ置き（root所有・mode `0600`）、develop `f2c4ea1`の`deskcatd`をPiで直接build（36分20秒、exit 0）して、偽ESP32を相手に`--cloud-speech`で200秒動かし、クラウド由来の`show_text` 4件を受けた記録。専用Workspaceへの計上、実ESP32・LCD、本番unitでの有効化は未確認 | `EXP-053`の観察。Consoleの使用量は反映待ち |
 | 2026-11-01 | 59 | [#522](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/522)。**`EXP-053`に「Consoleの観察」を足した。**Consoleのログの画面にWorkspace「DeskCat」の`claude-haiku-5-5`の要求が4件あり、使用量の画面は0（反映待ちと読んでいるが切り分けていない）。上限が効くこととキーのscopeは未確認のまま | ユーザーの画面の報告（画像はrepositoryへ入れない） |
+| 2026-11-01 | 60 | [#34](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/34)。公開の記録に PM のセッション名が入っていたため、3332 行目の PM のセッション名の表記を「実機側の PM」に置き換えた。意味は変えていない。観測値、判定、他の記述は変更していない | VM 側の PM の判断（実機側の PM 経由） |
