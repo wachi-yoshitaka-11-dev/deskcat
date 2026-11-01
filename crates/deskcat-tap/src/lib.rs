@@ -128,6 +128,19 @@ pub const fn touch_blocks_tap(
     }
 }
 
+/// タッチの検出器が止まっている（`detector_enabled`が`false`。SPIの失敗が続いて止めた）間は、接触を読めないので
+/// 常に`true`（tapを送らない）。動いている間は[`touch_blocks_tap`]と同じ。
+#[must_use]
+pub const fn touch_detection_blocks_tap(
+    detector_enabled: bool,
+    touching: bool,
+    released_at_ms: Option<u64>,
+    now_ms: u64,
+    holdoff_ms: u64,
+) -> bool {
+    !detector_enabled || touch_blocks_tap(touching, released_at_ms, now_ms, holdoff_ms)
+}
+
 /// tapを見つけたときの扱い。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Decision {
@@ -390,6 +403,34 @@ mod tests {
         // sessionが無ければ、タッチより先にそちらで数える。
         assert_eq!(f.on_tap(2_000, false, true), Decision::DropNoSession);
         assert_eq!(f.counters().dropped_touch, 1);
+    }
+
+    #[test]
+    fn stopped_touch_detector_blocks_tap_even_after_the_holdoff() {
+        // 動いている間は touch_blocks_tap と同じ。
+        assert!(!touch_detection_blocks_tap(
+            true,
+            false,
+            Some(1_000),
+            1_300,
+            300
+        ));
+        assert!(touch_detection_blocks_tap(
+            true,
+            false,
+            Some(1_000),
+            1_299,
+            300
+        ));
+        // 止まったら、離れてから holdoff を過ぎても、一度も触れていなくても止め続ける。
+        assert!(touch_detection_blocks_tap(
+            false,
+            false,
+            Some(1_000),
+            1_300,
+            300
+        ));
+        assert!(touch_detection_blocks_tap(false, false, None, 100, 300));
     }
 
     #[test]

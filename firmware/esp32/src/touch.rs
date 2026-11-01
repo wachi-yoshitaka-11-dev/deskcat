@@ -492,9 +492,11 @@ impl StrokeDetector {
         self.enabled.then_some(self.next_poll_ms)
     }
 
-    /// 接触中か、離れてから [`TAP_HOLDOFF_AFTER_RELEASE_MS`] 未満か。`true` の間の tap は `tapped` として送らない（`deskcat_tap::touch_blocks_tap`）。
+    /// 接触中か、離れてから [`TAP_HOLDOFF_AFTER_RELEASE_MS`] 未満か。**検出が止まっている間（SPI の失敗が続いた後）も `true`**（接触を読めないため）。
+    /// `true` の間の tap は `tapped` として送らない（`deskcat_tap::touch_detection_blocks_tap`）。
     pub fn tap_blocked(&self, now_ms: u64) -> bool {
-        deskcat_tap::touch_blocks_tap(
+        deskcat_tap::touch_detection_blocks_tap(
+            self.enabled,
             self.tracker.is_touching(),
             self.released_at_ms,
             now_ms,
