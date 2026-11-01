@@ -127,7 +127,7 @@ arduino-cli compile --fqbn arduino:avr:uno --build-property compiler.cpp.extra_f
 | `LOGGER_BAUD` | UART の baud。**PC 側の `--baud` と一致させる** |
 | `LOGGER_ADPS` | ADPS2:0。ADC clock = F_CPU / 2^ADPS。`DS40002061B` §24.4 は最大分解能に 50〜200 kHz を要求する |
 | `LOGGER_NCH` | 1 または 2。2 のとき `A0` と `A1` を交互に読む |
-| `LOGGER_REF` | ADC の基準電圧（ADMUX の REFS1:0）。1 = AVCC（既定）、3 = 内部 1.1 V。**3 は `LOGGER_NCH=1` のときだけ。**`DS40002061B` §24.5.2 は、基準を切り替えた後の最初の変換結果は不正確なことがあると述べる。1.1 V 基準の実値は個体・AVCC・温度に紐づく（`EXP-002`、`EXP-005`） |
+| `LOGGER_REF` | ADC の基準電圧（ADMUX の REFS1:0）。1 = AVCC（既定）、3 = 内部 1.1 V。**3 は `LOGGER_NCH` が 1 でも 2 でも使える**（全 channel で同じ基準で、channel の切り替えで基準は変わらない。2 channel のとき、各 channel の sample 間隔は 2 倍で、2 つの channel の読みには 1 変換ぶん〔ADC clock 125 kHz で約 104 µs〕の時間差が残る）。`DS40002061B` §24.5.2 は、基準を切り替えた後の最初の変換結果は不正確なことがあると述べる（2 channel のときは変換のたびに同じ REFS1:0 の値を書き直すだけで、基準の電圧源は切り替わらない。起動直後の変換は、PC 側が先頭の block を捨てる）。1.1 V 基準の実値は個体・AVCC・温度に紐づく（`EXP-002`、`EXP-005`）。**3 は、AREF の pin に外から電圧を加えないことが条件**（`DS40002061B` §24.5.2。外部の電圧を AREF に加えると、内部基準はその電圧と短絡する。ADMUX の REFS の説明も、AREF に外部の基準電圧を加えているとき内部基準は使えない、と書く。AREF の外付けのコンデンサは前提で、Table 24-3 の REFS1:0＝11 は `Internal 1.1V Voltage Reference with external capacitor at AREF pin`）。Uno R3 の回路図（`UNO-TH_Rev3e`）では、ATmega328P の AREF（21 番）は header の AREF の端子、テストパッド（TP_AREF）、100 nF（C4。GND へ）につながり、AVCC（20 番。L2 を経由）とは別の線である。**測定の前に、AREF の端子に何も挿さっていない（電圧を加える線が無い）ことを確かめる** |
 | `LOGGER_BLOCK` | 1 block の sample 数。header 24 B に対する payload の割合を決める |
 
 ## 入力の配線（作業1）
@@ -152,7 +152,7 @@ little endian。header は 24 B 固定。
 | 16 | 4 | `mark_taken` |
 | 20 | 1 | この block の sample 数 |
 | 21 | 1 | `pending`。**この block の sample を取り出す前の ring 滞留数** |
-| 22 | 1 | cfg。bit0-2 = ADPS、bit3 = (channel 数 == 2)、bit4-7 は 0 で予約 |
+| 22 | 1 | cfg。bit0-2 = ADPS、bit3 = (channel 数 == 2)、bit4-5 = REFS1:0（01 = AVCC、11 = 内部 1.1 V。00 は基準を記録していない旧い版）、bit6-7 は 0 で予約。PC 側は bit4-5 を読み、実行時の表示と CSV の `#` 行（`# ADC基準(REFS1:0): …`）に残す（旧い版の記録〔bit4-5 が 00〕には、基準の行を足さない） |
 | 23 | 1 | header 全 byte の XOR |
 
 **`dropped` は 32 bit である。**baud 115200 の実測では10秒で約4万件に達したため、

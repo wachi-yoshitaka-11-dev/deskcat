@@ -214,6 +214,7 @@ fn status(expression: &str) -> Message {
         },
         servo: ServoStatus {
             state: "disabled".to_owned(),
+            limiter: None,
         },
         sensors: SensorStatus {
             touch: "unknown".to_owned(),

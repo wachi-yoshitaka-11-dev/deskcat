@@ -3,7 +3,7 @@
 //! **`mem-probe-23` feature を付けた試験 build だけが、この module を持つ。**既定 build（製品 build）は
 //! この module をcompileせず、`unsafe`も持たない。この feature は log を足すだけで、LCD・Pi link・tap の
 //! 挙動を変えない。ただし feature を1つでも指定すると製品経路の cfg（`deskcat_product_mode`）が外れる
-//! （`build.rs`）ため、製品build と同じ構成の計測 build は `--features mem-probe-23,face-21,tap-21` になる。
+//! （`build.rs`）ため、製品build と同じ構成の計測 build は `--features mem-probe-23,face-21,tap-21` になる（ただし、タッチの撫での判定（`crate::touch::StrokeDetector`）は製品 build だけが持ち、この構成には入らない）。
 //!
 //! # 出すもの
 //!

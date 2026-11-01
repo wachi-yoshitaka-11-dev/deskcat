@@ -28,6 +28,7 @@
 use std::time::Instant;
 
 use deskcat_protocol::{DisplayStatus, ProtocolCounters, SensorStatus, ServoStatus, Status};
+use deskcat_servo::LimiterCounters;
 
 /// 未初期化の subsystem に使う状態名。
 ///
@@ -36,7 +37,7 @@ use deskcat_protocol::{DisplayStatus, ProtocolCounters, SensorStatus, ServoStatu
 /// `Peripherals::take()` を呼ばず、display も servo も sensor も存在しないため、
 /// それらの語を使うと実態より強い主張になる。
 ///
-/// `deskcat_protocol::limits::MAX_STATE_NAME_BYTES`（32）に収まる。
+/// `deskcat_protocol::limits::MAX_STATE_NAME_BYTES`（16）に収まる。
 const UNKNOWN_STATE: &str = "unknown";
 
 /// Firmware task の health。
@@ -152,7 +153,12 @@ impl Health {
     /// `firmware` は §4.6 の例に合わせて package version だけを入れる
     /// （`deskcat_protocol::limits::MAX_FIRMWARE_BYTES` = 64 に収まる）。
     /// 未初期化の subsystem は [`UNKNOWN_STATE`] で埋める。
-    pub fn to_status(&self) -> Status {
+    ///
+    /// **`limiter`は`LimitedServo`を持つbuildだけが`Some`で渡す**（`servo.limiter`、§4.6）。持たないbuildは
+    /// `None`を渡し、`servo.limiter`は省略される。**0を渡して省略の代わりにしない。**省略は「limiterが
+    /// 無い」、全て0は「limiterがあり、作用が1度も無い」であり、取り違えると「clampが起きていない」と
+    /// 読める。現在のbuildは`LimitedServo`を作らないため、全ての呼び出しが`None`である（#19）。
+    pub fn to_status(&self, limiter: Option<LimiterCounters>) -> Status {
         Status {
             firmware: env!("CARGO_PKG_VERSION").to_owned(),
             reset_reason: self.reset_reason.to_owned(),
@@ -162,6 +168,7 @@ impl Health {
             },
             servo: ServoStatus {
                 state: UNKNOWN_STATE.to_owned(),
+                limiter: limiter.map(Into::into),
             },
             sensors: SensorStatus {
                 touch: UNKNOWN_STATE.to_owned(),

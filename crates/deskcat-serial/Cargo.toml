@@ -78,6 +78,11 @@ libc = "0.2"
 name = "serial_link"
 test = true
 
+# 任意の`show_text`を1件送る試験用の送り手（#23）。同じく単体testを`cargo test --workspace`に含める。
+[[example]]
+name = "show_text_probe"
+test = true
+
 # workspaceのlintはmemberへ自動継承されない。これを書き忘れると
 # `unsafe_code = "forbid"`、`missing_docs = "warn"`、`clippy::all = deny`が
 # すべて無効になり、しかもbuildは通るため気づかない。

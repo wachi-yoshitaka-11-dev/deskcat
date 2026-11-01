@@ -256,7 +256,7 @@ module boardの値は、これとは別に現物でしか決まらない（[AGEN
 | 起動時間 | `t_startup` 2 ms（VDD > 1.58 V かつ VDDIO > 0.65 V を満たしてから最初の通信まで） |
 | 測定／変換時間 | oversampling設定に依存。詳細はBosch datasheet |
 | 測定range | 温度 -40〜+85 ℃、湿度 0〜100 %、気圧 300〜1100 hPa |
-| 精度と分解能 | 精度: 温度 ±1 ℃、湿度 ±3 %、気圧 ±1 hPa。分解能: 温度 0.01 ℃、湿度 0.008 %、気圧 0.18 Pa |
+| 精度と分解能 | 精度（Bosch Rev 1.24の`Table 2`〜`Table 4`。条件つきの値）: 温度 ±0.5 ℃（0〜65 ℃。内部の温度センサーの値で、PCB温度・自己加熱・周囲温度に依存し、周囲より高いのが典型、と脚注7）、湿度 ±3 %RH（20〜80 %RH、25 ℃、hysteresis込み）、気圧 ±1.0 hPa（300〜1100 hPa、0〜65 ℃）。分解能: 温度 0.01 ℃、湿度 0.008 %、気圧 0.18 Pa |
 | Calibration coefficientの処理 | `0x88`–`0xA1` と `0xE1`–`0xF0` の calibration data を読み出して補償演算に使う |
 | CRC／data integrity動作 | TBD |
 | Heaterがある場合の動作／電流 | Heaterなし |
@@ -512,3 +512,4 @@ M-06724に何が実装済みかが未確認である以上、外付けの要否�
 | 2026-10-09 | 20 | [#21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)のF1。ADXL345の`ICの値`の表へ、tap検出のregister（`BW_RATE`・`THRESH_TAP`・`DUR`・`TAP_AXES`・`POWER_CTL`・`INT_ENABLE`・`INT_SOURCE`）を、Rev. 0で読んだ値として足し、`Output data rate`行に`tap-21`が100 Hzを書くことを足した（Rev. Gでの確認は未了） |
 | 2026-10-18 | 21 | [#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)。`ICの値`の表の`Filter／FIFO機能`行へ、`accel-sample-15`の試験buildが使うFIFO modeは`crates/deskcat-accel`が持つ暫定の一般値であり、この表の値ではなく、Rev. Gで確認していないことを足した。製品のdriverでどれを使うかはTBDのままである |
 | 2026-10-21 | 22 | [#14](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/14)。`Touch controller`節の`TBD`のうち、`XPT2046 Data Sheet 2007.5`（XPTEK、販売店mirror、sha256を記録）から読める欄を埋めた。**SPI mode（Mode 0）、bus速度の上限（2.5 MHz）、制御byteの16進値、24 clock転送のbit位置、`DOUT`のhigh impedanceは、資料が明記した値ではなく導出であり、そのまま書いた。**資料の欠陥（表4の見出しの誤記、`DOUT`の説明の途切れ）も記録した。`RX-plate`、`Module pull-up`、`Calibration方法`、検証済みbus速度は`TBD`のまま。実機には触れていない |
+| 2026-10-25 | 23 | [#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16)。`Environmental sensor`節の`精度と分解能`行の精度を、Bosch Rev 1.24の`Table 2`〜`Table 4`（2026-10-24に取得し直した版で、`Table 4`の頁を画像で確かめた）の条件つきの値へ直した。温度は±1 ℃と書いていたが、表は±0.5 ℃（0〜65 ℃）で、内部の温度センサーの値であることを足した。湿度（20〜80 %RH、25 ℃、hysteresis込み）と気圧（300〜1100 hPa、0〜65 ℃）には条件を足した |

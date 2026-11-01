@@ -28,7 +28,7 @@
 
 Protocol channelから送信するすべてのbyteは、有効にframe化されたmessageの一部でなければならない。自由形式のfirmware logでJSON lineを分断してはならない。
 
-**Pi linkはUART0を使わない**（[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)）。firmwareのPi linkを持つbuild（`bench-servo-test-17`を有効にするbuild以外のすべて。`bench-servo-90-17`も`bench-servo-test-17`を有効にするbuildである。製品buildである既定buildを含む。[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)）は、UART0以外のUART（UART1）をGPIO13／GPIO14へ割り当ててPi linkに使い、UART0（board上のUSB-UARTブリッジ）は書き込みとdebug logに使う（例外として、Pi linkを持たない`bench-servo-test-17`を有効にするbuild（`bench-servo-90-17`を含む）は、servoを動かす前に人間が入力する確認の語をstdin〈UART0〉から読む。[#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)、`firmware/esp32/src/main.rs`の`wait_for_bench_confirmation`。このほか`touch-sample-14`の試験buildも、操作の区切りの`MARK`をstdin（UART0）から別threadで読む（[#14](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/14)、`firmware/esp32/src/touch.rs`。Pi linkのUARTではない））。**firmware applicationがPi linkのUARTへ書くのは、`boot`の送出（`BootSession::send_boot`）と、Pi→ESP32方向のrequestへの応答（`firmware/esp32/src/pi_link.rs`。ACKと、`get_status`への`status`）に加えて、製品buildと`tap-21`試験buildが送るevent `tapped`（§4.3。`pi_link::send_event`）だけであり、debug log（`log`／`esp_log`）はESP-IDFのconsoleへ出る。**consoleがUART0であることは、`firmware/esp32`の`cargo build`が生成する`sdkconfig`（`target/xtensa-esp32-espidf/debug/build/esp-idf-sys-*/out/sdkconfig`）の`CONFIG_ESP_CONSOLE_UART_NUM=0`で確かめた（#487、ESP-IDF v5.5.3。debug profileで確かめた。release profileはbuildしていない。#487のPR Aの時点で、既定・`pi-protocol-mode`・`bringup-display-13`の3構成をbuildした後も、`target/xtensa-esp32-espidf/debug/build/`の`esp-idf-sys-*`は1つだけであり、3構成は同じ`sdkconfig`を使う。#487のPR B1の2構成（既定・`bringup-display-13`）のbuildの後も1つだけである。`sdkconfig.defaults`はconsoleのUART番号を指定しておらず、ESP-IDFの既定値である）。GPIO13（`PI-UART-TX`）の起動時の状態は[GPIO Assignment](../hardware/gpio-assignment.md)の`PI-UART-TX`行が持つ。確かめたのはreset中とreset直後の`IO_MUX`の値（出力が無効）だけであり、**resetからUART1のdriverの初期化までの区間（ROM／2nd-stage bootloaderが動く区間）の状態は、一次資料でも実機でも確かめていない**（下の例外）。
+**Pi linkはUART0を使わない**（[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)）。firmwareのPi linkを持つbuild（`bench-servo-test-17`を有効にするbuild以外のすべて。`bench-servo-90-17`も`bench-servo-test-17`を有効にするbuildである。製品buildである既定buildを含む。[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)）は、UART0以外のUART（UART1）をGPIO13／GPIO14へ割り当ててPi linkに使い、UART0（board上のUSB-UARTブリッジ）は書き込みとdebug logに使う（例外として、Pi linkを持たない`bench-servo-test-17`を有効にするbuild（`bench-servo-90-17`を含む）は、servoを動かす前に人間が入力する確認の語をstdin〈UART0〉から読む。[#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)、`firmware/esp32/src/main.rs`の`wait_for_bench_confirmation`。このほか`touch-sample-14`の試験buildも、操作の区切りの`MARK`をstdin（UART0）から別threadで読む（[#14](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/14)、`firmware/esp32/src/touch.rs`。Pi linkのUARTではない）。`debug-motion-19`の試験build（Pi linkを持つ。製品buildには入らない）も、`MOTION <name> <target>`の行をstdin（UART0）から別threadで読む（[#19](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/19)、`firmware/esp32/src/debug_motion.rs`。Pi linkのUARTではない））。**firmware applicationがPi linkのUARTへ書くのは、`boot`の送出（`BootSession::send_boot`）と、Pi→ESP32方向のrequestへの応答（`firmware/esp32/src/pi_link.rs`。ACKと、`get_status`への`status`）に加えて、製品buildと`tap-21`試験buildが送るevent `tapped`（§4.3）と、製品buildが送るevent `head_touched`（§4.2）（どちらも`pi_link::send_event`）だけであり、debug log（`log`／`esp_log`）はESP-IDFのconsoleへ出る。**consoleがUART0であることは、`firmware/esp32`の`cargo build`が生成する`sdkconfig`（`target/xtensa-esp32-espidf/debug/build/esp-idf-sys-*/out/sdkconfig`）の`CONFIG_ESP_CONSOLE_UART_NUM=0`で確かめた（#487、ESP-IDF v5.5.3。debug profileで確かめた。release profileはbuildしていない。#487のPR Aの時点で、既定・`pi-protocol-mode`・`bringup-display-13`の3構成をbuildした後も、`target/xtensa-esp32-espidf/debug/build/`の`esp-idf-sys-*`は1つだけであり、3構成は同じ`sdkconfig`を使う。#487のPR B1の2構成（既定・`bringup-display-13`）のbuildの後も1つだけである。`sdkconfig.defaults`はconsoleのUART番号を指定しておらず、ESP-IDFの既定値である）。GPIO13（`PI-UART-TX`）の起動時の状態は[GPIO Assignment](../hardware/gpio-assignment.md)の`PI-UART-TX`行が持つ。確かめたのはreset中とreset直後の`IO_MUX`の値（出力が無効）だけであり、**resetからUART1のdriverの初期化までの区間（ROM／2nd-stage bootloaderが動く区間）の状態は、一次資料でも実機でも確かめていない**（下の例外）。
 
 **#487より前は、UART0がPi–ESP32 protocol channelとdebug logを兼ねていたため、「firmwareがdebug logを止めるより前に生じる起動時出力」と「panic handlerの出力」の2つをこの規則の既知の例外としていた**（[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)。Revision履歴の`Draft 2 uart0 exception`）。Pi linkがUART0から外れたため、debug logを止める前の起動時出力が混ざる仕組みは無くなった。**それでも、次を既知の例外として残す**（ESP32→Pi方向）。
 
@@ -36,7 +36,7 @@ Protocol channelから送信するすべてのbyteは、有効にframe化され�
 
 受信側は、改行を含む化けたbyte列の後、改行境界で再同期できる（`crates/deskcat-serial/tests/simulator.rs`のtest群が手書きfixtureで確認している。どのfixtureも、初期化時のglitchそのものを模したものではない）。**実機では未検証であり、改行を含まない不正byte列が後続frameの先頭へ連結するcase（初期化時のglitchが最初の`boot`行の先頭へ付くcaseを含む）も未検証である。**連結した行は壊れた行として捨てられ、`boot`は§4.1の再送で送り直される見込みである（見込みであり、sourceでも実機でも確かめていない）。
 
-**Pi linkでfirmware application自身が送る行のline endingについて、過去の既知の不一致を記録していた（[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)のPR Aまで）。**PR B（`firmware/esp32/src/boot_session.rs`）は、この不一致をsource上は解消した（下記）。Pi linkでapplication levelが送る行は、`boot`と、Pi→ESP32方向のrequestへの応答（ACKと`status`）と、製品buildおよび`tap-21`試験buildが送る`tapped`である。いずれも`encode_line`でencodeし、`firmware/esp32/src/pi_link.rs`の`write_line`（`UartDriver::write`）で書く（`console.rs`の`write_line`はPR Bで削除した）。（ROM／bootloader起動出力とpanic出力はfirmware applicationの制御外であり、この解消の対象外である。出力先は上の段落参照。）
+**Pi linkでfirmware application自身が送る行のline endingについて、過去の既知の不一致を記録していた（[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)のPR Aまで）。**PR B（`firmware/esp32/src/boot_session.rs`）は、この不一致をsource上は解消した（下記）。Pi linkでapplication levelが送る行は、`boot`と、Pi→ESP32方向のrequestへの応答（ACKと`status`）と、製品buildおよび`tap-21`試験buildが送る`tapped`と、製品buildが送る`head_touched`である。いずれも`encode_line`でencodeし、`firmware/esp32/src/pi_link.rs`の`write_line`（`UartDriver::write`）で書く（`console.rs`の`write_line`はPR Bで削除した）。（ROM／bootloader起動出力とpanic出力はfirmware applicationの制御外であり、この解消の対象外である。出力先は上の段落参照。）
 
 1. 旧経路（`firmware/esp32/src/console.rs`の`write_line`、PR Aまで）は`std::io::stdout()`経由で書いており、本節の規定（`\n`）と実際にwireへ出るbyte（`\r\n`）が違っていた。原因はESP-IDFのconsole出力の既定`CONFIG_LIBC_STDOUT_LINE_ENDING_CRLF`（vendored ESP-IDF`components/newlib/Kconfig`で確認済み）である。
 2. PR Bは当時の`pi-protocol-mode`のPi link（当時はUART0、#487からはUART1）を`UartDriver`（interrupt駆動）へ一本化し、送信も`UartDriver::write`（`uart_write_bytes`を直接呼ぶ。esp-idf-hal 0.46.2の`uart.rs`で確認）へ変えた。**`uart_write_bytes`はbyte列をそのまま書き、`CONFIG_LIBC_STDOUT_LINE_ENDING_CRLF`が効くlibc／newlibのstdio層を経由しない。**`encode_line`（`crates/deskcat-protocol/src/decode.rs`）が既に`\n`だけを付与している（206行、`pub fn encode_line`参照）ため、これらのcodeを読んで導いた結論としては、wireへ出るbyteは本節の規定どおり`\n`終端になるはずである。**この結論はsourceを読んで導いたものであり、実機でwireのbyteを測ったものではない**（実機確認はまだ無い。状態はIssue #446の追跡を見る）。
@@ -428,6 +428,8 @@ budget値は`PROTO-TBD-017`に含める。
 
 正確なtouch hardwareが確定するまで、`strength`の意味と範囲は`TBD`とする。比較可能なstrengthが存在しない場合、値を捏造せずfieldを省略する。
 
+製品build（構成ごとの動作は`firmware/esp32/README.md`の「build構成と通電」の表）は、`TOUCH-01`（XPT2046）のraw値を状態機械（`crates/deskcat-touch`）へ渡し、撫でと判定した時点で`head_touched`を送る。**送るのは1回の接触につき1回**で、状態機械が撫でを出した時点である（離れるのを待たない）。ただし、接触の途中でSPIの転送が失敗すると、firmwareはその接触の状態を捨て、その後を別の接触として数える。そのため、指を置いたままの1回の操作で2回送りうる。`duration_ms`は、送る時点までの接触の時間（触れたと判定してから撫でと判定するまで、ms）であり、離れるまでの時間ではない。送るのは**`boot`のACKを受けてsessionが確立した後だけ**で、その前の撫では送らず捨てる（捨てた数はfirmwareのlogに数える。`status`のcounterへは出さない）。`strength`は持たず、省略する。判定のしきい値・連続sample数・移動量・pollの間隔は暫定の一般値であり、実機で詰める。**値は`firmware/esp32/src/touch.rs`の定数とそのdocが持つ**（ここへ再掲しない）。firmwareは`head_touched`のACKを待たず、再送しない（`tapped`と同じ。§4.3）。書き込みに失敗した`head_touched`は失われ、firmwareのlogにだけ残る。
+
 ### 4.3 `tapped`
 
 ```json
@@ -436,7 +438,7 @@ budget値は`PROTO-TBD-017`に含める。
 
 正確なevent classifierと報告するmagnitudeの意味は、選定したaccelerometerと実験根拠を必要とする。
 
-製品buildと`tap-21`試験build（構成ごとの動作は`firmware/esp32/README.md`の「build構成と通電」の表）は、ADXL345の単tapを検出し、**空のpayload（`{}`）の`tapped`**を送る（`magnitude_g`は持たない。上の例の`magnitude_g`は§3の表が「持たない」と決めている）。送るのは**`boot`のACKを受けてsessionが確立した後だけ**で、前の`tapped`から最小間隔未満のtapは送らず捨てる（捨てた数はfirmwareのlogに数える。`status`のcounterへは出さない）。閾値・持続時間・最小間隔・pollの間隔は暫定の一般値であり、実機で詰める。**値は`crates/deskcat-tap`のcrate docと定数が持つ**（ここへ再掲しない。閾値は、tapが重力の約1 gを含む未filterのデータで検出されるため、1 gより十分上に置く）。最小間隔は§8.2の送出の上限（`PROTO-TBD-012`）が決まるまでの置き場であり、決まれば置き換える。firmwareは`tapped`のACKを待たず、再送しない（eventは要求ではない。§8の表。ACKの要否は§9の受け入れ前TBDのままである）。書き込みに失敗した`tapped`は失われ、firmwareのlogにだけ残る。
+製品buildと`tap-21`試験build（構成ごとの動作は`firmware/esp32/README.md`の「build構成と通電」の表）は、ADXL345の単tapを検出し、**空のpayload（`{}`）の`tapped`**を送る（`magnitude_g`は持たない。上の例の`magnitude_g`は§3の表が「持たない」と決めている）。送るのは**`boot`のACKを受けてsessionが確立した後だけ**で、前の`tapped`から最小間隔未満のtapは送らず捨てる。**製品buildは、タッチ（§4.2）が触れている間と、離れてから一定の間のtapも送らず捨てる**（画面を撫でる力が加速度センサーに伝わってtapと判定され、撫でたのに`Surprised`が混ざる、と推定している。`EXP-044`は原因を確かめていない）。**SPIの失敗が続いてタッチの検出が止まった後は、接触を読めないため、離れてから一定の間が過ぎてもtapを送らず捨て続ける。****さらに、tapを見つけてもすぐには送らず、一定の間保留する（送るのは見つけてから`TAP_CONFIRM_MS`（`crates/deskcat-tap`の定数）以上後。超える分はtapを読む周期とmain loopの遅れによる）。保留の間にタッチの接触が始まれば、そのtapは捨てる**（接触が「触れた」と判定されるより前に出るtapがあるため。叩いてから`tapped`が届くまでが保留の分だけ遅れる。保留の間にtap検出が止まったときの1件と、Piとのsessionが入れ替わったとき（新しいPi `sid`の`hello`による遷移を含む。この遷移でESP32の`sid`は変わらない）の1件も捨てて数える（前のsessionのtapを、新しいsessionで送らない））。保留は1件だけで、保留の間に見つけた2件目のtapは、最小間隔未満として捨てる（先の1件を残す）。`tap-21`試験buildはタッチを読まないので、これらの条件を持たず、見つけたらすぐ送る。捨てた数はfirmwareのlogに数える（`status`のcounterへは出さない）。閾値・持続時間・最小間隔・pollの間隔・保留の時間・タッチが離れてから送らない時間は暫定の一般値であり、**保留の時間と離れてから送らない時間の根拠は`EXP-044`の旧buildのlogの机上の再集計であって、実測の窓ではない**。実機の窓で詰める。**値は`crates/deskcat-tap`のcrate docと定数（保留の時間を含む）、離れてから送らない時間は`firmware/esp32/src/touch.rs`の定数が持つ**（ここへ再掲しない。閾値は、tapが重力の約1 gを含む未filterのデータで検出されるため、1 gより十分上に置く）。最小間隔は§8.2の送出の上限（`PROTO-TBD-012`）が決まるまでの置き場であり、決まれば置き換える。firmwareは`tapped`のACKを待たず、再送しない（eventは要求ではない。§8の表。ACKの要否は§9の受け入れ前TBDのままである）。書き込みに失敗した`tapped`は失われ、firmwareのlogにだけ残る。
 
 ### 4.4 `lifted`
 
@@ -479,6 +481,29 @@ budget値は`PROTO-TBD-017`に含める。
   }
 }
 ```
+
+**`servo.limiter`（[Issue #19](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/19)）。**`servo`は、servo limiterのclampとrejectionの累計を持つ`limiter` objectを省略可で持つ。
+
+```json
+"servo":{"state":"disabled","limiter":{"pos":0,"step":0,"vel":0,"brake":0,"acc":0,"conceded":0,"rej_payload":0,"rej_range":0}}
+```
+
+**`limiter`の省略と全て0は別の意味である。**省略は「このbuildにlimiter（`LimitedServo`）が無い」ことを表し、全て0は「limiterがあり、作用が1度も無い」ことを表す。limiterを持たないbuildが全て0を出すと「clampが起きていない」と読めてしまうため、持たないbuildは`limiter`を出さない。**現在のfirmwareは`LimitedServo`を作らないため、常に省略する。**
+
+各fieldは`deskcat-servo`の`LimiterCounters`と1対1に対応し、`u32`で、飽和加算する（wrapしない）。**`ProtocolCounters`ではない。**`protocol`のcounterはwireの拒否と抑制を数え、こちらはlimiterが作用した回数を数える。意味と飽和の扱いの正本は`LimiterCounters`であり、ここへ再掲しない。
+
+| wireのfield | `LimiterCounters`のfield |
+|---|---|
+| `pos` | `clamped_position` |
+| `step` | `clamped_step` |
+| `vel` | `clamped_velocity` |
+| `brake` | `clamped_braking` |
+| `acc` | `clamped_acceleration` |
+| `conceded` | `acceleration_bound_conceded`（clamp counterではない。0以外は実装の前提が破れている） |
+| `rej_payload` | `rejected_invalid_payload` |
+| `rej_range` | `rejected_out_of_range` |
+
+**field名を短くし、state名のbyte上限を32から16へ下げたのは、`limiter`を足した`status`の行が§2の行の上限（1024 byte、改行込み）に収まるためである。**全string fieldを上限まで、全integerを`u32`の最大値まで詰めた`status`の行は、32のまま`LimiterCounters`のfield名（`clamped_position`など）を使うと1200 byte、16に下げても同じ名前では1104 byte、16に下げて接頭辞を`clamp_`に縮めた名前（`clamp_pos`など）でも1033 byte、16に下げて上の短い名前にして**999 byte**になる（`crates/deskcat-protocol/tests/limits.rs`が検査する）。既知のstate名・expression名の最長は`surprised`（9 byte）であり、16に収まる。**この値は`PROTO-TBD-006`（最終status field）で確定するまでDraftである。確定とは書かない。**
 
 `protocol`のcounterは、拒否と抑制の規則が要求する事象をすべて観測可能にする。
 
@@ -812,6 +837,8 @@ Firmwareは次に上限を設ける。
 
 `text`のUTF-8 byte長の上限は884 byte（暫定）とする。§2の1024 byteの行に、envelopeの全integerを宣言した幅の最大値に、`duration_ms`を`u32`の最大値にした`show_text`が、escapeが起きない文字で収まる最大である。`"`や`\`、および`\uXXXX`で書いた文字はJSONで広がるため、これらを含む`text`は上限内でも`line_too_long`になりうる。
 
+**実機の計測（`PROTO-TBD-007`。[EXP-046](../hardware/experiment-log.md)。事実の記録であり、上限値の妥当性の判定ではない）。**`mem-probe-23,face-21,tap-21`のbuildへ、拒否の4入力（duration 0、duration 30001、21字、884 byte）と、受理の入力（20字、duration 30000 ms）5件を送った。拒否はいずれも`out_of_range`で、受理はいずれも`ok`のACKと`text_drawn`だった。`accept_to_draw_ms`は612〜709 msで、10字〜20字の間で字数による差は小さかった（描画の時間は上限の根拠に使わない）。基線からの`min_free_heap`の下がりは1976 byte、main taskのstackの残量の下がりは656 byte（21字と884 byteの拒否の区間では動かなかった）。**測っていないこと：**製品build（撫で付き）の絶対のメモリの余裕と、link確立と最悪入力による下がりの切り分け。20字・884 byte・30000 msは、この計測の後も暫定値である。
+
 Textとface描画の優先順位はUI state machineで定義する。
 
 ### 5.5 `show_choices`
@@ -820,7 +847,7 @@ Textとface描画の優先順位はUI state machineで定義する。
 {"v":1,"sid":90312,"id":904,"ts_ms":53000,"type":"show_choices","payload":{"prompt":"少し休憩する？","choices":[{"id":"yes","label":"する"},{"id":"later","label":"あとで"}],"timeout_ms":15000}}
 ```
 
-Choice count、ID、label、prompt length、timeoutに上限を設ける。正確なinteraction eventは、touch hardwareとlayoutの選定まで保留する。
+Choice count、ID、label、prompt length、timeoutに上限を設ける。正確なinteraction eventは、touch hardwareとlayoutの選定まで保留する。`PROTO-TBD-007`の実機の窓（EXP-046）は`choice`を扱っておらず、`choice`の制限は未着手である。
 
 ### 5.6 `get_status`
 
@@ -1347,7 +1374,7 @@ Framing／parse層について、**host workspaceのRust実装**がfixtureに合
 | PROTO-TBD-004 | ACK timeout | 測定latencyとrecovery test |
 | PROTO-TBD-005 | **現在のsession**のduplicate履歴の保持期間とretry window、および**保持件数の上限と超過時の動作**。期間の下限は遅延messageの最大生存時間＋再送windowを下回らない。件数上限は受理budget（§8.2）と保持する結果の最大sizeから導出する。上限超過時は最も古いentryをevictしてよいが、evictしたentryへの再送は新規commandとして実行しない（`duplicate_expired`で拒否する。§9参照）。`PROTO-TBD-011`のretired session保持期間から導出しない（目的の異なる別モデル。§5.1） | Memory予算とretry window。[HW-TBD-020](../hardware/tbd-register.md)と対で確定する。サーボ出力の有効化条件に含まれる |
 | PROTO-TBD-006 | 最終status field | 診断要件とencode size test |
-| PROTO-TBD-007 | Textとchoiceの制限 | LCD layoutとmemory測定 |
+| PROTO-TBD-007 | Textとchoiceの制限。**`text`：実機の窓（[EXP-046](../hardware/experiment-log.md)）で、最悪入力の拒否と受理、描画時間、heapとstackを計測した（§5.4）。上限値（20字、884 byte、30000 ms）の妥当性は判定しておらず、行は未解決のままである。`choice`：未着手。EXP-046は扱っていない** | `text`：行数・改行・layout処理量の上限（LCD layout）、製品build（撫で付き）での絶対のメモリの余裕の測定、link確立と最悪入力によるheapとstackの下がりの切り分け、上限値の判定。`choice`：LCD layoutとmemory測定 |
 | PROTO-TBD-008 | Motion名と範囲（`play_motion`の`speed`と`repeat`の上限を含む） | Servo calibrationと動作設計。**`speed`と`repeat`の上限は、catalogが空でなくなる（motionを受理し始める）前に決める**（§5.3の有効化の条件。[Servo Safety Limits](../hardware/servo-safety-limits.md)の有効化条件の一覧には、まだ載せていない） |
 | PROTO-TBD-009 | Touch strengthの意味 | **touch controllerは`XPT2046`と確定した**（2026-08-13の現物確認。[HW-TBD-003](../hardware/tbd-register.md)はclose）。残るのは同ICのdatasheetでの意味づけと実験である |
 | PROTO-TBD-010 | Heartbeat方式とlink-loss判定 | 測定latencyとfail-safe試験。[HW-TBD-017](../hardware/tbd-register.md)と対で確定する。**サーボ出力の有効化条件に含まれる**（[servo-safety-limits](../hardware/servo-safety-limits.md#サーボ出力を有効化してよい条件)） |
@@ -1393,6 +1420,14 @@ Framing／parse層について、**host workspaceのRust実装**がfixtureに合
 | 2026-10-11 | Draft 2 busy type | [Issue #19](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/19)。§9へ、`busy`の後に改めて要求するときは新しい`id`を割り当てる旨を足し、§12のfixture表へ`busy`の再送の行を足した。`crates/deskcat-servo`に`Rejection::Busy`の型を足した。**wire formatは変えていない。** |
 | 2026-10-12 | Draft 2 play_motion firmware | [Issue #19](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/19)のPR-3b。firmwareが現在のsessionの`play_motion`を`MotionDedup`経由で扱い、`invalid_payload`／`stale_session`／`duplicate_expired`の拒否ACKを返すようにした。§2の既知の逸脱(i)と§5.3の記述を事実に合わせた。**wire formatは変えていない。** |
 | 2026-10-17 | Draft 2 bench console input | [Issue #17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。§2の「UART0はどのbuildでも書き込みとdebug logだけに使う」が、`bench-servo-test-17`のbuildが確認の語をUART0のstdinから読む変更と食い違うため、その例外を書き足した。wire format、Pi link、Pi linkを持つbuildのUART0の扱いは変えない |
+| 2026-10-25 | Draft 2 head_touched firmware | [Issue #21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)。§4.2へ、製品buildが`head_touched`を送る条件（撫でと判定した時点で1回の接触につき1回、`boot`のACK後だけ、`strength`は省略、ACKを待たず再送しない、値は`firmware/esp32/src/touch.rs`の定数が持つ）を足した。fieldと型は変えていない。`duration_ms`は、送る時点までの接触の時間であることを書いた（§3の表は`u32`（ms）とだけ定め、測る区間を決めていなかった）。 |
+| 2026-10-26 | Draft 2 tapped touch holdoff | [Issue #21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)。§4.3へ、製品buildがタッチの接触中と離れた直後のtapを送らないことを足した（`Happy`が`Surprised`に上書きされた`EXP-044`の2件への対応。原因は画面を撫でる力が加速度に伝わることと推定しており、確かめていない。離れてからの時間は暫定で、実機の窓で詰める） |
+| 2026-10-27 | Draft 2 PROTO-TBD-007 measured | [Issue #23](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/23)。§5.4へ、実機の窓（`EXP-046`）で計測した`show_text`の事実（拒否4件、20字・30000 msの受理5件、`accept_to_draw_ms`、heapとstackの下がり）と、測っていないことを書いた。§5.5へ、`choice`は未着手であることを書いた。§13の`PROTO-TBD-007`を、`text`と`choice`に分けて書き直した。上限値（20字、884 byte、30000 ms）と、その妥当性の判定は変えていない。行は解決済みにしていない |
+| 2026-10-27 | Draft 2 tapped touch hold | [Issue #21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)。§4.3の製品buildの記述を、離れてから送らない時間を広げることと、tapを見つけてもすぐには送らず保留し、保留の間に接触が始まれば捨てることへ改めた（`EXP-044`の旧buildのlogの机上の再集計で、離れてから600・820 msと、接触の判定の前10〜260 msにtapが出ていたため。実測の窓ではない。値は暫定で、実機の窓で詰める）。「接触の始まりの約40 msは捨てない既知の穴」の記述を除いた |
+| 2026-10-27 | Draft 2 tapped hold session | [Issue #21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)。§4.3へ、保留中のtapを、Piとのsessionが入れ替わったとき（新しいPi `sid`の`hello`による遷移を含む。この遷移でESP32の`sid`は変わらない）に捨てて数えることを足した（前のsessionのtapを新しいsessionで送らないため） |
+| 2026-10-28 | Draft 2 servo.limiter | [Issue #19](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/19)。§4.6の`status.payload.servo`へ、省略可の`limiter`（`LimiterCounters`の8 counter）を足した。省略は「limiterが無い」、全て0は「limiterがあり作用が1度も無い」である。**これは`status`のwire format変更である。**旧schemaの`status`は`limiter`を持たず、新schemaでも省略として受理される（旧→新は互換。**ただし、state名が16 byte以下の旧形に限る。**17〜32 byteのstate名は新schemaで拒否される。そのような名前を出す実装は、本repositoryに無い）。新schemaの`limiter`を持つ`status`を、`limiter`を知らない旧実装がdecodeすると未知fieldとして無視される（§3）。行の上限に収めるため、`status`のstate名のbyte上限を32から16へ下げた（`limits::MAX_STATE_NAME_BYTES`）。既知のstate名の最長は9 byteで、既存のfixtureとfirmwareが出す名前は影響を受けない。Draft schemaは互換性の対象外であり`v`は上げない。`PROTO-TBD-006`は確定していない |
+| 2026-10-28 | Draft 2 debug motion console input | [Issue #19](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/19)。§2の、Pi linkを持つbuildでUART0のstdinを読む例外へ、`debug-motion-19`の試験buildを足した。**wire formatは変えていない**（Pi linkのUARTではなく、UART0のconsoleである）。製品buildには入らない |
+| 2026-11-01 | Draft 2 tap touch stopped | [Issue #679](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/679)。§4の`tapped`の送出条件へ、SPIの失敗が続いてタッチの検出が止まった後は、tapを送らず捨て続けることを足した（firmwareの実装が、検出の停止中に離れてから一定の間が過ぎるとtapを送りうる誤りを直した）。**wire formatは変えていない** |
 
 ### Draft schemaの互換性
 

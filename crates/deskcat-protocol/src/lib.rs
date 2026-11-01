@@ -77,8 +77,8 @@ pub use error::{DecodeError, ErrorCode};
 pub use framing::{Framed, LineFramer, Progress};
 pub use message::{
     Ack, AckStatus, Boot, DisplayStatus, Environment, ExpressionName, FiniteF32, HeadTouched,
-    Hello, HelloReason, Lifted, Message, PlayMotion, ProtocolCounters, SensorStatus, ServoStatus,
-    SetExpression, ShowText, Status,
+    Hello, HelloReason, Lifted, LimiterStatus, Message, PlayMotion, ProtocolCounters, SensorStatus,
+    ServoStatus, SetExpression, ShowText, Status,
 };
 pub use prefix::{PrefixEnvelope, recover_identity};
 pub use receiver::{Cause, LineReceiver, Outcome, Received, Rejection};

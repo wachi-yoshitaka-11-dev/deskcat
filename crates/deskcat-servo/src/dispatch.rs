@@ -10,7 +10,7 @@
 
 use deskcat_protocol::{DuplicatePolicy, ErrorCode, PlayMotion};
 
-use crate::{DedupOutcome, MotionCatalog, MotionDedup, Rejection};
+use crate::{CommandSource, DedupOutcome, MotionCatalog, MotionDedup, MotionRequest, Rejection};
 
 /// Pi sessionと`ESP32` bootの現在状態。firmwareが受信ごとに渡す。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -48,6 +48,16 @@ impl MotionDecision {
             Self::Dedup(outcome) => outcome.code(),
         }
     }
+}
+
+/// [`MotionDispatch::handle_debug`]が指示を受理しなかった理由。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum DebugRefusal {
+    /// ESP32の`boot`がACKされていない（Protocol §4.1の停止状態を含む）。Pi由来の`stale_session`と同じ基準である。
+    BootNotEstablished,
+    /// catalogの検査または`admit`が拒否した。
+    Rejected(Rejection),
 }
 
 /// 現在のPi sessionのmotion受理を、session→duplicate→catalog→`admit`の順に扱う。
@@ -98,5 +108,45 @@ impl MotionDispatch {
             }
             admit(command)
         }))
+    }
+
+    /// debug由来のmotion指示を、ESP32の`boot`の確立の検査とcatalogの名前の検査の後で`admit`へ渡す
+    /// （Issue #19の受け入れ条件3）。
+    ///
+    /// **`boot_established`とcatalogと`admit`は[`MotionDispatch::handle`]と同じ基準で通る。**
+    /// `boot_established`が偽（`boot`がACKされていない間。Protocol §4.1の停止状態を含む）なら、
+    /// Pi由来と同じく`admit`へ届かない。`admit`に渡す[`MotionRequest`]の`source`は
+    /// [`CommandSource::Debug`]に固定する。`Limiter::admit`は`source`で判定を分けないため
+    /// （範囲、clamp、counterはPi由来と同じ）、呼び出し側は、Pi由来と同じlimiter（同じcounter）へ届く
+    /// `admit`を渡す。
+    ///
+    /// **通さない検査は2つだけである。**Piのsession（`current_sid`と、指示の`sid`の一致）と
+    /// duplicate（`id`の履歴）は、Pi↔ESP32のwireの規則であり、debugの指示は`sid`も`id`も持たない。
+    /// 偽の`sid`で`handle`を通すと、Piのsession規則がdebugの都合でゆがむ。duplicateの履歴にも
+    /// 記録しない（Piの再送の判定へ影響しない）。
+    ///
+    /// # Errors
+    ///
+    /// `boot`が未確立なら[`DebugRefusal::BootNotEstablished`]、catalogに名前が無ければ
+    /// `Rejected(`[`Rejection::UnknownMotion`]`)`（どちらも`admit`は呼ばない）。それ以外は`admit`の結果。
+    pub fn handle_debug(
+        &self,
+        boot_established: bool,
+        name: &str,
+        target: f32,
+        admit: impl FnOnce(&MotionRequest<'_>) -> Result<(), Rejection>,
+    ) -> Result<(), DebugRefusal> {
+        if !boot_established {
+            return Err(DebugRefusal::BootNotEstablished);
+        }
+        if !self.catalog.contains(name) {
+            return Err(DebugRefusal::Rejected(Rejection::UnknownMotion));
+        }
+        admit(&MotionRequest {
+            name,
+            target,
+            source: CommandSource::Debug,
+        })
+        .map_err(DebugRefusal::Rejected)
     }
 }
