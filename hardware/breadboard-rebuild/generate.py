@@ -501,6 +501,10 @@ def check_5v(ck, find, node, used, parts):
        ほかの部品・硬いジャンパーが通らない。
     3. 板の外へ出る線にサーボの電源と Pi の給電が無い。
     """
+    for rid in ("R11", "R12"):
+        vals = [v for r, v, *_rest in RESISTORS if r == rid]
+        if vals != ["10 kΩ"]:
+            ck.fail(f"{rid} の値が 10 kΩ でない: {vals}")
     five = find(node("B1:K30"))
     pin33 = find(("S",) + strip_of(("B1", ESP_J2_ROW, ESP_FIRST_COL + J2.index("33"))))
     gnd = find(("S",) + strip_of(("B1", ESP_J2_ROW, ESP_FIRST_COL + J2.index("GND"))))

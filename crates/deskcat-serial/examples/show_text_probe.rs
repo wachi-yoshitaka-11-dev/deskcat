@@ -194,7 +194,7 @@ fn parse_args(argv: impl IntoIterator<Item = String>) -> Result<Parsed, String> 
             }
             "--verbose" => verbose = true,
             "-h" | "--help" => return Ok(Parsed::Help),
-            other => return Err(format!("不明な引数: {other}\n\n{}", usage())),
+            _ => return Err(format!("不明な引数がある\n\n{}", usage())),
         }
     }
 
