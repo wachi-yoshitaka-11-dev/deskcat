@@ -5049,7 +5049,7 @@ ESP32のlog：1回目`19f0ea679a88273c0df2bc8f4c68db7fbe6faff80a170a2d350ec41847
 
 ## EXP-053: 専用キーをPiへ置き、偽ESP32を相手に`--cloud-speech`を4件通した
 
-[#522](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/522)で、ユーザーが発行した専用キーをPiへ置き、現在のdevelopの`deskcatd`が`--cloud-speech`でクラウドの独り言を取れるかを観測した。**キーの値、長さ、hashはこの記録に書かない。**ESP32は使っていない（`S21`・`S22`・`X3`は抜いたまま）。**この記録は観察だけを書く。ADR-0026の確認項目を満たしたとは書かない。**
+[#522](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/522)で、ユーザーが発行した専用キーをPiへ置き、現在のdevelopの`deskcatd`が`--cloud-speech`でクラウドの独り言を取れるかを観測した。**キーの値、長さ、hashはこの記録に書かない。**ESP32は使っていない（`S21`・`S22`・`X3`は抜いたままという前提で作業した。Piからは確認できない）。**この記録は観察だけを書く。ADR-0026の確認項目を満たしたとは書かない。**
 
 | 項目 | 内容 |
 |---|---|
@@ -5058,7 +5058,7 @@ ESP32のlog：1回目`19f0ea679a88273c0df2bc8f4c68db7fbe6faff80a170a2d350ec41847
 | Operator | Piの電源を入れたのとキーの入力（端末へ貼る）はユーザー。ssh、build、unitの入れ替え、確認の実行は作業セッション（AI） |
 | Hardware revision／Exact components | `SBC-01`（Raspberry Pi Zero W）。ESP32は使っていない |
 | Wiring revision | ESP32側の信号線の端は外したまま（Piからは確認できない） |
-| Power supply and current limit | Piの給電は`PSU-PI-A-02`。`vcgencmd get_throttled`は`0x0`（Pi Zero Wでは電圧の根拠にならない。`EXP-009`） |
+| Power supply and current limit | Piの電源を入れたのはユーザー。どのアダプタかは確認していない（`EXP-024`以降の運用は`PSU-PI-A-02`）。`vcgencmd get_throttled`は`0x0`（Pi Zero Wでは電圧の根拠にならない。`EXP-009`） |
 | Firmware commit/profile | ESP32は無し。Pi：develop `f2c4ea1`の`apps/`・`crates/`・`Cargo.toml`・`Cargo.lock`をPiで直接build（debug、`cargo build --locked -p deskcatd`）。`deskcatd`のsha256は`9464743133614f32431b0c77df0bd86a8c359355ff3ec2ff44f110ca3b40d31d` |
 | Configuration | `--speech-min-interval-ms 60000 --speech-duration-ms 5000 --cloud-speech`。`--startup-deadline-ms 60000`、`--duplicate-capacity 8 --duplicate-retention-ms 5000` |
 | Measurement equipment | Pi上の`systemd-run`、偽ESP32（`EXP-027`の`fake_esp.py`に、受けた`show_text`の本文を書き出す1行を足した。repositoryへ入れていない） |
@@ -5073,7 +5073,7 @@ ESP32のlog：1回目`19f0ea679a88273c0df2bc8f4c68db7fbe6faff80a170a2d350ec41847
 
 1. **キーの設置（約00:58Z）。**ユーザーが端末のタブで、キーを非表示で入力した。Piの`/etc/deskcatd/anthropic-api-key`は`root:root`・mode `0600`になった。キーはチャット、引数、logに通していない
 2. **build（2026-11-01T01:01:34Z〜01:37:57Z）。**`Finished dev profile [unoptimized + debuginfo] target(s) in 36m 20s`、exit 0。1回目の起動は`/usr/bin/time`がPiに無く失敗したため、`time`なしで再開した
-3. **確認の実行（01:39:20Zごろ〜01:42:40Zごろ、200秒）。**`sudo systemd-run --wait --collect --pipe -p User=deskcatd -p LoadCredential=anthropic-api-key:/etc/deskcatd/anthropic-api-key -p StateDirectory=deskcatd -p StateDirectoryMode=0700`の下で、偽ESP32が`deskcatd`をPTYへつないだ。unit（`ExecStart=`は偽ESP32のscript）を除く値は`deploy/systemd/deskcatd.service`と同じ指定を使った。偽ESP32は`hello`へ`boot`と`ack`、`get_status`へ`status`を返した
+3. **確認の実行（01:39:20Zごろ〜01:42:40Zごろ、200秒）。**`sudo systemd-run --wait --collect --pipe -p User=deskcatd -p Group=deskcatd -p UMask=0077 -p LoadCredential=anthropic-api-key:/etc/deskcatd/anthropic-api-key -p StateDirectory=deskcatd -p StateDirectoryMode=0700`の下で、偽ESP32が`deskcatd`をPTYへつないだ。**本番のunitとは条件が違う。**`-p`で渡したのは`User`・`Group`・`UMask`・`LoadCredential`・`StateDirectory`・`StateDirectoryMode`の6つだけである。`SupplementaryGroups=dialout`・`NoNewPrivileges=yes`・`LimitCORE=0`・`SetCredential=`・`EnvironmentFile=`は渡していない。`ExecStart=`は偽ESP32のscriptで、`--startup-deadline-ms`は本番の`10000`でなく`60000`、`--duplicate-*`の2つはunitと同じ値である。偽ESP32は`hello`へ`boot`と`ack`、`get_status`へ`status`を返した
 
 観察：
 
@@ -5100,6 +5100,8 @@ ESP32のlog：1回目`19f0ea679a88273c0df2bc8f4c68db7fbe6faff80a170a2d350ec41847
 - 4件の要求が専用の非Default Workspaceに計上されたこと（`anthropic-workspace-id`は`deskcatd`が記録しない。ユーザーがConsoleの使用量を見たところ「データがありません。最近の使用量がここに表示されるまで数時間かかる場合があります。」と表示されていた）。**計上の確認が済むまで、ADR-0026の決定5を満たしたと扱わない**
 - 実ESP32・LCDでの表示、Wi-Fiを切った状態での失敗の分類とfallback、1日の回数の上限の実際の効き方、HTTPS client実行中のmemoryのピーク（上の11,732 kBは5秒ごとのsampling）
 - 本番のunitで`--cloud-speech`を有効にした運転。**この記録の範囲では有効にしていない**
+
+**ADR-0026の決定5との関係。**決定5は、月額`$2`の上限が有効でキーがその専用Workspaceだけで使えると確認するまで、クラウド経路を有効にしないと定める。この窓の前にあった記録は、2026-10-29のユーザーの申告（#522のcomment「専用 Workspace と月額上限の設定」）だけで、上限が効くことも、キーのscopeも、確認していなかった。**この窓は、その確認の前に`--cloud-speech`で実APIへ4件を送った。**送った内容は、固定の発話指示、感情enum、大まかな時刻帯だけ（`deskcatd`の実装どおり。送信内容そのものは取得していない）。確認が済むまで、本番のunitでは有効にしない
 
 ### Next safe step
 
