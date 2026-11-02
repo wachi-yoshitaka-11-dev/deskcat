@@ -1,6 +1,6 @@
 # #514 発光ダイオードのデモ回路案
 
-> 状態: 初回デモの配線案と、点灯試験用のfirmware（`bringup-led-514`）。2026-10-12に、赤だけ・白だけ・両方の点灯試験を実機で行った（観察は[EXP-025](experiment-log.md#exp-025-追加ledの点灯試験赤だけ白だけ両方)）。継続通信の判定と`set_expression`から赤LEDへの経路は未実装で、`段階的な確認`の4は未了である。2026-10-31の[EXP-052](experiment-log.md)で、組み直した板に白の枝をつないだ状態で書き込み、`R`両端の電圧の読み（赤1.38 V、白0.53 V）、`boot:` logの行（`rst:0x1 (POWERON_RESET),boot:0x12 (SPI_FAST_FLASH_BOOT)`）、3V3の列の電圧（3.34 V）を取った（値は記録で、合否には使わない）。起動時のpinの電位の確認、電流の測定、筐体への取付は未了である。
+> 状態: 初回デモの配線案と、点灯試験用のfirmware（`bringup-led-514`）。2026-10-12に、赤だけ・白だけ・両方の点灯試験を実機で行った（観察は[EXP-025](experiment-log.md#exp-025-追加ledの点灯試験赤だけ白だけ両方)）。製品build（featureなし）には、白の点滅と、`set_expression`で`happy`を受理したときの赤の1秒点灯を入れた（#514。build-onlyの確認までで、**製品buildを実機で動かした記録は無い**）。白を通信成立で点灯へ切り替える判定は、通信喪失を決める時間の値（`PROTO-TBD-010`／`HW-TBD-017`）が未確定のため入れていない。`段階的な確認`の4は未了である。2026-10-31の[EXP-052](experiment-log.md)で、組み直した板に白の枝をつないだ状態で書き込み、`R`両端の電圧の読み（赤1.38 V、白0.53 V）、`boot:` logの行（`rst:0x1 (POWERON_RESET),boot:0x12 (SPI_FAST_FLASH_BOOT)`）、3V3の列の電圧（3.34 V）を取った（値は記録で、合否には使わない）。起動時のpinの電位の確認、電流の測定、筐体への取付は未了である。
 > LEDの2枝を足して通電することは、2026-10-12にユーザーが承認した（その電流は安全側の仮定として`3V3`系に数える。[#514のコメント](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514#issuecomment-6124265343)。下の`3V3 pinへ負荷を足す条件`）。
 > 対象: 筐体から見える白1本（通信）と赤1本（猫の反応）。フォトICダイオードは使わない。
 
@@ -21,8 +21,8 @@ ESP32が両LEDを駆動する。通信LEDはESP32が自分のprotocol受信状�
 
 | LED | デモで表示する状態 | 実装上の前提 |
 |---|---|---|
-| 白 `LED-COMM-01` | ESP32が起動中でPiとの通信が未成立・喪失なら1秒周期で点滅（0.5秒ずつ）。通信が継続して成立すれば点灯 | 成立・喪失を決めるheartbeat／timeoutは[PROTO-TBD-010](../protocol/esp32-pi-protocol.md)と[HW-TBD-017](tbd-register.md)に依存する。現行firmwareは`hello`／`ping`／`get_status`を受信する（`firmware/esp32/src/pi_link.rs`）が、継続通信の判定（heartbeatとtimeout）はまだ無い。受信しただけでは、その後も通信が続いていることを示せないため、点灯へ切り替える判定はまだ実装できない。`bringup-led-514`は、点灯試験（赤→白→両方）の後は点滅だけを出す（下の`点灯試験用のfirmware`） |
-| 赤 `LED-REACT-01` | Piが撫でられた反応として`happy`を指示したら1秒点灯し、通常時は消灯 | 既存protocolの`set_expression`を候補に使う。protocol crateには`set_expression`の型とdecodeがある（#534）。`face-21`付きbuildは受け取った`set_expression`をLCDへ描く（#21）が、赤LEDを点ける経路はまだ無い。`bringup-led-514`は点灯試験の区間だけ赤を点ける |
+| 白 `LED-COMM-01` | ESP32が起動中でPiとの通信が未成立・喪失なら1秒周期で点滅（0.5秒ずつ）。通信が継続して成立すれば点灯 | 成立・喪失を決めるheartbeat／timeoutは[PROTO-TBD-010](../protocol/esp32-pi-protocol.md)と[HW-TBD-017](tbd-register.md)に依存する。現行firmwareは`hello`／`ping`／`get_status`を受信する（`firmware/esp32/src/pi_link.rs`）が、継続通信の判定（heartbeatとtimeout）はまだ無い。`BootSession::is_established`は`boot`のACKで一度立つと、Piが止まっても下りない（`hello`による遷移か終端でだけ変わる）。点灯に使うと、Piが止まっても点灯のままで「通信正常」を誤って示すため使わない。**製品buildも`bringup-led-514`も、白は点滅だけを出す**（`bringup-led-514`は点灯試験（赤→白→両方）の後に。下の`点灯試験用のfirmware`）。点滅は「通信の成立と継続を確認できていない」の表示であり、点灯が無いことを通信の異常と読まない |
+| 赤 `LED-REACT-01` | Piが撫でられた反応として`happy`を指示したら1秒点灯し、通常時は消灯 | 既存protocolの`set_expression`を候補に使う。protocol crateには`set_expression`の型とdecodeがある（#534）。製品buildと`face-21`付きbuildは受け取った`set_expression`をLCDへ描く（#21）。**製品buildは、`pi_link`が`happy`を受理した（session・値の範囲・LCDの準備の判定を通った）ときに赤を1秒（`LED_REACT_PULSE_MS`。一般値）点けて消す。点灯中に再び受理したら、その時刻から数え直す。拒否された`happy`では点かない。**`bringup-led-514`は表情を持たないため、点灯試験の区間だけ赤を点ける |
 
 ESP32自体の電源断はLEDの消灯にしか見えない。白の消灯を「通信正常」と解釈しない。
 
@@ -86,13 +86,13 @@ ESP32 boardの`3V3` pinから外部負荷を取ること（段階B-2a）は、[H
 
 ## 点灯試験用のfirmware
 
-`firmware/esp32`の`bringup-led-514` featureを付けたbuildだけがGPIO2／GPIO5を駆動する。既定buildは両pinに触れない。`bringup-display-13`とも組み合わせられる。build commandの正本は[検証済みコマンド](../toolchains/verified-commands.md)である。
+`firmware/esp32`の製品build（featureなし）と`bringup-led-514` featureを付けたbuildがGPIO2／GPIO5を駆動する。他の試験buildは両pinに触れない。点灯試験（下の2）を行うのは`bringup-led-514`付きbuildだけで、`bringup-display-13`とも組み合わせられる。製品buildは1と3だけを持つ（点灯試験は無く、起動直後から白の点滅を始める）。build commandの正本は[検証済みコマンド](../toolchains/verified-commands.md)である。
 
-1. `Peripherals::take()`の直後に両pinを出力にし、消灯側（Low）へ設定する。**向きの設定と消灯levelの設定の間に、出力registerの値が一瞬出る。その値が点灯側（High）か消灯側かも、長さも確かめていない。**[Hardware Safety Policy](../governance/hardware-safety-policy.md)の§4は「output modeへ切り替える前に、安全な初期出力を定義する」とする。esp-idf-halの`PinDriver`は向きを先に設定する。`unsafe`を使わずにこの区間を無くす方法は見つけていない（試していない）。電流は`R`で制限される。この点は、上の`3V3 pinへ負荷を足す条件`の残余riskに挙げた。
+1. `Peripherals::take()`の直後に両pinを出力にし、消灯側（Low）へ設定する（製品buildも同じ）。**向きの設定と消灯levelの設定の間に、出力registerの値が一瞬出る。その値が点灯側（High）か消灯側かも、長さも確かめていない。**[Hardware Safety Policy](../governance/hardware-safety-policy.md)の§4は「output modeへ切り替える前に、安全な初期出力を定義する」とする。esp-idf-halの`PinDriver`は向きを先に設定する。`unsafe`を使わずにこの区間を無くす方法は見つけていない（試していない）。電流は`R`で制限される。この点は、上の`3V3 pinへ負荷を足す条件`の残余riskに挙げた。
 2. 起動時のbring-upが終わった時刻（`main.rs`の`bringup_done_ms`）から、赤だけ→白だけ→両方を10秒ずつ点ける（点灯試験）。その後のPi linkのUART初期化と`boot`送信の分だけ、最初の区間が短くなる。`bringup-display-13`付きbuildでは、LCDの描画とI2Cのbring-upがmain loopの中で進み、点灯試験はそれと並行して進む。
-3. その後は白を1秒周期（0.5秒点灯・0.5秒消灯）で点滅させ、赤を消す。白を点灯へ切り替える経路と、赤を`happy`で点ける経路はまだ無い。
+3. その後（製品buildは起動直後から）は白を1秒周期（0.5秒点灯・0.5秒消灯）で点滅させ、赤を消す。白を点灯へ切り替える経路は無い（上の`役割と表示`）。製品buildは、`happy`の受理で赤を1秒点ける。
 
-UART0のlogには、区間が変わるたびに`led phase=<lamp_red|lamp_white|lamp_both|link_unconfirmed> white=<on|off> red=<on|off> uptime_ms=<…>`が出る。点滅の1回ごとには出さない。pinの初期化に失敗すると`led_init_error`を出し、LEDを使わずに起動を続ける。片方のpinだけ初期化できた後に失敗した場合、そのpinはDropで無効（内部pullなし）へ戻り、消灯は外部pullだけが保つ。書き込みの失敗は`led_write_error`として数える。値と根拠は`firmware/esp32/src/config.rs`の`LED_*`定数、動作は`firmware/esp32/src/led.rs`が持つ。
+UART0のlogには、赤を点けるたびに`led_react_pulse uptime_ms=<…> hold_ms=<…>`が出る。区間が変わるたびに`led phase=<lamp_red|lamp_white|lamp_both|link_unconfirmed> white=<on|off> red=<on|off> uptime_ms=<…>`が出る。点滅の1回ごとには出さない。pinの初期化に失敗すると`led_init_error`を出し、LEDを使わずに起動を続ける。片方のpinだけ初期化できた後に失敗した場合、そのpinはDropで無効（内部pullなし）へ戻り、消灯は外部pullだけが保つ。書き込みの失敗は`led_write_error`として数える。値と根拠は`firmware/esp32/src/config.rs`の`LED_*`定数、動作は`firmware/esp32/src/led.rs`が持つ。
 
 **build端末と書き込み。**buildはESP32 Build profile（build-only）で、Hyper-V上のLinux VM（`systemd-detect-virt`＝`microsoft`）で行う。**この作業端末にはUSB deviceが無く、flashできない。**flashと実機試験は、USBを使える実機LinuxのESP32 Flash / HIL端末で行う（[Machine Profiles](../toolchains/machine-profiles.md)）。
 
@@ -106,6 +106,6 @@ UART0のlogには、区間が変わるたびに`led phase=<lamp_red|lamp_white|l
 1. 電源を切った状態でGPIO番号、3V3・GND、LEDの極性を確認する。`R`の袋の表示で、メーカーがFAITHFUL LINKで型番が`CF25J330RB`であることを確かめて記録する（[#538](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/538)の袋の表示の記録と同じ品であること）。違う品は使わない。各枝で`R`がLEDと直列に入っていることを目で確かめる。**抵抗（330 Ωと10 kΩ）の値をテスターで測ることはしない**（ユーザーの判断。`判断の出所`）。品の確認は袋の表示で足りる。
 2. まず赤の枝（`R`、赤LED、GPIO5の10 kΩ pull-down）だけを配線し、GPIO2には何もつながない。`bringup-led-514`付きのbuildで起動する。起動・reset中に消灯していること、logが`lamp_red`と`lamp_both`の区間だけ点灯すること（`lamp_white`と`link_unconfirmed`では消灯）を、人間の監視下で確認する。**pinの初期化の瞬間に一瞬光ることはありうる**（上の`点灯試験用のfirmware`の1）。`lamp_white`の区間や`link_unconfirmed`に入った後も点いたままなら異常として止める。点灯中に`R`の両端電圧をテスターで読み、電圧÷330 Ωを電流の推定値（テスターの確度は未取得）として記録する。**この値は記録であり、合否には使わない**（[Power Budget](power-budget.md)の`電流の測定点と読みの確かさの基準`。読みを合否に使える条件は[#525](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/525)が持つ）。次に赤の枝を外し、白の枝（`R`、白LED、GPIO2の10 kΩ pull-down）だけで同じ確認を行う（`lamp_white`と`lamp_both`で点灯し、その後は点滅）。白が3.3 Vで見えなければ回路を見直す。
 3. 両方を接続し、起動・reset・書き込み時に想定外の点灯や起動失敗がないか確認する。ESP32の`boot:` logでstrapping値と起動modeを確認する。電源railの電圧、LEDの電流、発熱の有無を記録する。
-4. protocolの継続通信の判定と、`set_expression`から赤LEDへの経路が実装された後、Pi停止・再接続・撫で操作を含む表示動作を確認する。表示試験だけでservoの通信断安全試験を代替しない。
+4. 製品build（featureなし）を書き込み、起動直後から白が1秒周期で点滅すること、Piから`set_expression`の`happy`を送ったときだけ赤が約1秒点いて消えること（`neutral`／`surprised`と、拒否された`happy`では点かない）、log に`led_react_pulse`が出ることを確認する。製品buildの実機通電は[Power Budget](power-budget.md)の手順とユーザーの承認が要る。白の点灯（通信成立）と通信喪失の表示は、継続通信の判定（`PROTO-TBD-010`／`HW-TBD-017`）が実装された後に確認する。Pi停止・再接続・撫で操作を含む表示動作の確認はそのときに行う。表示試験だけでservoの通信断安全試験を代替しない。
 
 回路変更後の初回通電は[Hardware Safety Policy](../governance/hardware-safety-policy.md)に従い人間が監視する。電源予算への影響は2か所に分けて書いた。B-2a（`U2`）側は上の`3V3 pinへ負荷を足す条件`にある。段階C（合成給電）の境界は[Power Budget](power-budget.md)の`#514のLEDを追加する場合の差分`にある（23 ℃前提、実測前）。**どちらも承認そのものではなく、判断の材料と計算である。**LEDの2枝を足して通電することの承認は、上の`3V3 pinへ負荷を足す条件`にある。書き込みと初回通電の承認は、その都度別に取る。

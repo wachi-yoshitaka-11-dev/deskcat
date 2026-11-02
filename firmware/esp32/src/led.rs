@@ -1,8 +1,9 @@
 //! [Issue #514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)の追加LEDの
 //! bring-up。`LED-COMM`（白、GPIO2）と`LED-REACT`（赤、GPIO5）を駆動する。どちらもHighで点灯する。
 //!
-//! **`bringup-led-514` feature付きbuildだけがcompileする。**既定buildはGPIO2／GPIO5に触れない。
-//! 配線、抵抗、起動時の電位、試験の順序は
+//! **製品build（featureなし）と`bringup-led-514` feature付きbuildがcompileする。**それ以外の試験buildは
+//! GPIO2／GPIO5に触れない。点灯試験（下の1）を行うのは`bringup-led-514`付きbuildだけで、製品buildは
+//! 点灯試験を行わない。配線、抵抗、起動時の電位、試験の順序は
 //! [led-514-demo.md](../../../docs/hardware/led-514-demo.md)が正本であり、ここへ再掲しない。
 //!
 //! # 表示
@@ -12,19 +13,25 @@
 //! `bringup-display-13`付きbuildでは、LCDの描画とI2Cのbring-upがmain loopの中で進み、点灯試験は
 //! それと並行して進む。
 //!
-//! 1. 点灯試験。赤だけ→白だけ→両方を、それぞれ[`crate::config::LED_LAMP_TEST_HOLD_MS`]ずつ点ける。
-//!    人間が極性・明るさ・抵抗の両端電圧を確かめるための区間である。
+//! 1. 点灯試験（`bringup-led-514`付きbuildだけ）。赤だけ→白だけ→両方を、それぞれ
+//!    [`crate::config::LED_LAMP_TEST_HOLD_MS`]ずつ点ける。人間が極性・明るさ・抵抗の両端電圧を確かめる
+//!    ための区間である。製品buildにこの区間は無く、起動直後から2へ入る。
 //! 2. その後は、白を[`crate::config::LED_BLINK_PERIOD_MS`]周期で点滅させ、赤を消す。
+//! 3. **赤の反応。**Piの`set_expression`で`happy`を受理したら、赤を[`crate::config::LED_REACT_PULSE_MS`]
+//!    だけ点けて消す（[`Leds::pulse_react`]）。受理は`crate::pi_link`の判定を通った後であり
+//!    （session・値の範囲・LCDの準備。拒否された`happy`では点かない）、`crate::face::FaceState`が
+//!    `happy`の受理を1回分覚える。点灯中にもう一度受理したら、その時刻から数え直す。
 //!
-//! **白を点灯（通信成立）へ切り替える経路は無い。**継続通信の判定（`PROTO-TBD-010`／
-//! `HW-TBD-017`）がまだ無いためである。`boot`のACKや`ping`の受信だけでは、その後の
-//! 通信が続いていることを示せない。**赤を`happy`で点ける経路も無い。**`face-21`付きbuildは受け取った
-//! `set_expression`をLCDへ描くが（`crate::face`）、LEDは駆動しない。
-//! どちらも`HW-TBD-037`が追う。
+//! **白を点灯（通信成立）へ切り替える経路は無い。**`BootSession::is_established`は`boot`のACKで一度
+//! 立つと、`hello`による遷移か終端まで下りない。Piが止まっても下りないため、点灯に使うと
+//! 通信喪失を点滅で示せず、「通信正常」を誤って示す。喪失を決めるには時間の値（heartbeatとloss timeout。
+//! `PROTO-TBD-010`／`HW-TBD-017`）が要り、サーボの安全にも効くため、ここでは作らない。
+//! 白の点滅は「成立と継続を確認できていない」の表示であり、点灯が無いことを通信の異常と読まない。
+//! `HW-TBD-037`が追う。
 //!
 //! # 起動からの状態
 //!
-//! [`Leds::new`]が両pinを出力にし、消灯側（Low）へ設定する。
+//! [`Leds::new`]が両pinを出力にし、消灯側（Low）へ設定する。製品buildも同じである。
 //! reset中とreset直後は、IO_MUXの記載どおり内部pull（GPIO2はpull-down、GPIO5はpull-up）が
 //! 有効である。外部10 kΩはどちらもpull-downとして置き、GPIO5も消灯側へ定める
 //! （`gpio-assignment.md`の`reset時のpin状態`と`選定した値と本数`）。
@@ -44,7 +51,7 @@
 use esp_idf_svc::hal::gpio::{Output, OutputPin, PinDriver};
 use esp_idf_svc::sys::EspError;
 
-use crate::config::{LED_BLINK_PERIOD_MS, LED_LAMP_TEST_HOLD_MS};
+use crate::config::{LED_BLINK_PERIOD_MS, LED_LAMP_TEST_HOLD_MS, LED_REACT_PULSE_MS};
 
 /// 表示の区間。logへ出す名前は[`Phase::name`]。
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -80,8 +87,12 @@ pub struct Outputs {
     pub red_on: bool,
 }
 
-/// 点灯試験が終わる経過時間（milliseconds）。
-const LAMP_TEST_END_MS: u64 = 3 * LED_LAMP_TEST_HOLD_MS as u64;
+/// 点灯試験が終わる経過時間（milliseconds）。製品build（`bringup-led-514`なし）は点灯試験を行わず0にする。
+const LAMP_TEST_END_MS: u64 = if cfg!(feature = "bringup-led-514") {
+    3 * LED_LAMP_TEST_HOLD_MS as u64
+} else {
+    0
+};
 
 // [`outputs_at`]と[`next_change_ms`]は、点滅周期が2以上の偶数で、試験区間が0でないことを前提に
 // 割り算する。configの値を変えてこの前提を崩したらcompileを止める。
@@ -91,14 +102,14 @@ const _: () = assert!(LED_LAMP_TEST_HOLD_MS > 0);
 /// 経過時間`elapsed_ms`での区間。
 pub fn phase_at(elapsed_ms: u64) -> Phase {
     let hold = u64::from(LED_LAMP_TEST_HOLD_MS);
-    if elapsed_ms < hold {
+    if elapsed_ms >= LAMP_TEST_END_MS {
+        Phase::LinkUnconfirmed
+    } else if elapsed_ms < hold {
         Phase::LampRed
     } else if elapsed_ms < 2 * hold {
         Phase::LampWhite
-    } else if elapsed_ms < LAMP_TEST_END_MS {
-        Phase::LampBoth
     } else {
-        Phase::LinkUnconfirmed
+        Phase::LampBoth
     }
 }
 
@@ -145,6 +156,8 @@ pub struct Leds<'d> {
     react: PinDriver<'d, Output>,
     /// 最後にlogへ出した区間。区間が変わったときだけlogを出す（点滅の毎回は出さない）。
     logged_phase: Option<Phase>,
+    /// 赤の反応（`happy`）を消す時刻（uptime、milliseconds）。点灯中だけ`Some`。
+    react_until_ms: Option<u64>,
     /// pinへの書き込みに失敗した回数。**Protocol counterではない。**
     write_errors: u32,
 }
@@ -174,16 +187,41 @@ impl<'d> Leds<'d> {
             comm,
             react,
             logged_phase: None,
+            react_until_ms: None,
             write_errors: 0,
         })
     }
 
-    /// 経過時間`elapsed_ms`の出力をpinへ書く。`now_ms`はlog用のuptime。
+    /// `happy`の受理を受け、赤を[`LED_REACT_PULSE_MS`]だけ点ける。`now_ms`はuptime。
+    /// 点灯中に呼ばれたら、`now_ms`から数え直す。
+    pub fn pulse_react(&mut self, now_ms: u64) {
+        self.react_until_ms = Some(now_ms.saturating_add(u64::from(LED_REACT_PULSE_MS)));
+        log::info!("led_react_pulse uptime_ms={now_ms} hold_ms={LED_REACT_PULSE_MS}");
+    }
+
+    /// 次に`update`を呼ぶべきuptime。白の切り替えか赤の消灯の早い方。`start_ms`は`update`へ渡すものと同じ。
+    pub fn next_deadline_ms(&self, start_ms: u64, now_ms: u64) -> u64 {
+        let elapsed = now_ms.saturating_sub(start_ms);
+        let blink = start_ms + next_change_ms(elapsed);
+        match self.react_until_ms {
+            Some(until) if until > now_ms => blink.min(until),
+            _ => blink,
+        }
+    }
+
+    /// 起動からの経過時間`now_ms - start_ms`の出力をpinへ書く。`now_ms`はuptime。
     ///
     /// 書き込みの失敗は数えてlogへ出し、次の呼び出しで書き直す。**表示のためにmain loopを止めない。**
-    pub fn update(&mut self, elapsed_ms: u64, now_ms: u64) {
+    pub fn update(&mut self, start_ms: u64, now_ms: u64) {
+        let elapsed_ms = now_ms.saturating_sub(start_ms);
         let phase = phase_at(elapsed_ms);
-        let out = outputs_at(elapsed_ms);
+        let mut out = outputs_at(elapsed_ms);
+        // 赤の反応は区間の表示に重ねる。期限が過ぎたら消す。
+        match self.react_until_ms {
+            Some(until) if until > now_ms => out.red_on = true,
+            Some(_) => self.react_until_ms = None,
+            None => {}
+        }
 
         // 白も赤もHighで点灯（led-514-demo.mdの`初回デモの配線案`）。
         let comm = if out.white_on {
