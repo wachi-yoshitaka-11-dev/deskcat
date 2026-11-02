@@ -53,6 +53,9 @@ const _: () = assert!(deskcat_face::SCREEN_HEIGHT == crate::display::HEIGHT);
 pub struct FaceState {
     display: DisplayState,
     requested: Option<ExpressionName>,
+    /// `happy`の受理が、赤LED（#514）にまだ渡されていないか。描画の`requested`とは別に持つ
+    /// （描画が最新だけを残すのに対し、LEDは受理を取りこぼさないため）。
+    react_pending: bool,
 }
 
 impl Default for FaceState {
@@ -68,6 +71,7 @@ impl FaceState {
         Self {
             display: DisplayState::Unavailable,
             requested: None,
+            react_pending: false,
         }
     }
 
@@ -95,6 +99,14 @@ impl FaceState {
     /// 受理した表情を記録する。描画前に次が来たら、最新だけが残る。
     pub fn request(&mut self, name: ExpressionName) {
         self.requested = Some(name);
+        if name == ExpressionName::Happy {
+            self.react_pending = true;
+        }
+    }
+
+    /// 受理した`happy`を1回分取り出す（赤LEDを点けるため。[`crate::led`]）。
+    pub fn take_react_pulse(&mut self) -> bool {
+        std::mem::take(&mut self.react_pending)
     }
 
     /// 未描画の表情を取り出す。

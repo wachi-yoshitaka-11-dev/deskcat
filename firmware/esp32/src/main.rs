@@ -34,10 +34,12 @@
 //!   `bench-servo-test-17` feature付きbuildだけが[`run_servo_bench_test`]経由でservoを
 //!   呼ぶ（[Issue #17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。
 //!   詳細は[`crate::servo`]と[`run_servo_bench_test`]のdoc参照）。
-//! - **#514の追加LED（`LED-COMM`＝GPIO2、`LED-REACT`＝GPIO5）も既定のbuildではdriveしない。**
-//!   `bringup-led-514` feature付きbuildだけが`crate::led`で点灯試験と白の点滅を行う
-//!   （[Issue #514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)）。このfeatureは
-//!   `bringup-display-13`とも組み合わせられる（pinが重ならない）。
+//! - **#514の追加LED（`LED-COMM`＝GPIO2、`LED-REACT`＝GPIO5）は`crate::led`が駆動する**
+//!   （[Issue #514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)）。既定の製品buildは、
+//!   白の点滅（通信の成立と継続を確認できていない間の表示。点灯へ切り替える判定は無い）と、`set_expression`で
+//!   `happy`を受理したときの赤の1秒点灯を行う。`bringup-led-514` feature付きbuildは、その前に点灯試験
+//!   （赤→白→両方）を行う。このfeatureは`bringup-display-13`とも組み合わせられる（pinが重ならない）。
+//!   **実機で動かした記録は、点灯試験用のbuildだけである。**
 //!
 //! # buildの構成（[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)）
 //!
@@ -59,7 +61,7 @@
 //! | `touch-sample-14` | `TOUCH-01`（XPT2046）の raw 読み出し。SPI3（GPIO18/23/19）、`TOUCH-CS`＝GPIO21、`TOUCH-IRQ`＝GPIO34 で X・Y・Z1・Z2 を読み、IRQ の level とあわせて UART0 に log（#14、`crate::touch`）。`T_IRQ` の変化の時刻と、console から受けた `MARK` の時刻も log する（条件 6 の突き合わせ用）。LCD は初期化せず、`LCD-CS`（GPIO22）を High に固定する。状態機械は配線しない | 単独指定のみ。touch 用 5 本を足した配線で、`EXP-038`（develop `79f29ea`。raw を取った）と `EXP-041`（develop `b9a04e8`。`T_IRQ` の変化と `MARK` の log、`crate::spi_port` の bus の持ち方を含む版で、`MARK` 31 件に `touch_mark` 31 件、SPI の失敗 0 件）の版を実機に書き込んで動かした。次の通電・書き込みにも実機側の新たな承認が要る。Pi link の payload は変更しない |
 //! | `touch-lcd-14` | LCDを初期化して点灯し、表情（neutral→happy→surprised）を帯1本ずつ塗り続けながら、同じSPI host（SPI3）で`TOUCH-01`のrawを読む（#14の受け入れ条件「LCD通信による許容できないdata lossがない」の観察用、`crate::touch_lcd`）。LCDとタッチは`SpiDriver`を共有し、busは転送ごとに取る。帯の途中ではタッチを読まない。console（stdin）は読まず、`MARK`は受け付けない（`T_IRQ`の変化は`touch-sample-14`と同じくlogする）。状態機械は配線しない | 単独指定のみ。**製品buildも同じ共有の型を使う。busを握り続ける型は`touch-sample-14`だけ**（`crate::spi_port`）。`set_expression`は`hardware_unavailable`で拒否する。`EXP-041`で、develop `b9a04e8`の版を、LCDのVCC・9本・touch用5本が挿さった配線に書き込み、157秒動かした（帯7000本、`lcd_errors_total=0`、`touch_spi_errors_total=0`、LCDの乱れは目視の申告に無い）。次の通電・書き込みにも実機側の新たな承認が要る。Pi linkのpayloadは変更しない |
 //! | `bringup-display-13` | LCDの初期化、backlightの点灯、単色fillと四隅pattern | 表情とtapは有効にしない。描画の間のPi linkの受信とheartbeatは`crate::display_test`のmodule docを参照 |
-//! | `bringup-led-514` | #514の追加LED（GPIO2／GPIO5）の点灯試験と白の点滅（`crate::led`） | 表情とtapは有効にしない。`bringup-display-13`とも組み合わせられる |
+//! | `bringup-led-514` | #514の追加LED（GPIO2／GPIO5）の点灯試験（赤→白→両方）と、その後の白の点滅（`crate::led`）。製品buildにある赤の`happy`点灯も同じ経路を持つが、表情を持たないため`set_expression`を受理せず、点かない | 表情とtapは有効にしない。`bringup-display-13`とも組み合わせられる |
 //! | `face-21` | LCDの初期化とbacklightの点灯を保ち、`set_expression`の3表情を描く。Pi commandを受けなくても、描ける状態になった時点で`neutral`を1回描く（#21、`crate::face`） | `bringup-display-13`とも組み合わせられる。**表情を持たない試験buildは`set_expression`を`hardware_unavailable`で拒否する** |
 //! | `tap-21` | ADXL345のtap検出を設定し、`INT_SOURCE`をI2Cで読み、bootのACK後に`tapped`を送る（#21のF1、`crate::tap`）。ADXL345のDevice IDが`0xE5`のときだけ設定を書き、I2Cのdriverを持ち続ける（一致しなければ何も書かず、driverを手放す） | INT線は使わない（配線は要らない）。`face-21`・`bringup-display-13`とも組み合わせられる。**試験buildのうち`tap-21`も`accel-sample-15`も持たないものは、ADXL345へ書き込まず、Device IDを読むだけである**（既定・製品buildは`tap-21`と同じく書く） |
 //! | `mem-probe-23` | health snapshotと同じ周期で、空きheap・起動からの最小の空きheap・main taskのstackのhigh water markを1行logへ出す（#23の`PROTO-TBD-007`、`crate::mem_probe`）。**このfeatureのbuildだけが`unsafe`を持つ**（`unsafe_code`を`deny`へ下げ、`mem_probe`の3呼び出しだけ`allow`） | logを足すだけで、LCD・Pi link・tapの挙動は変えない。featureを指定すると製品経路のcfgが外れるので、製品buildと同じ構成で測るときは`face-21`と`tap-21`を足す（タッチの撫での判定は製品buildだけが持ち、この構成には入らない）。`bringup-display-13`とも組み合わせられる。単独の試験build（`env-sample-16`・`accel-sample-15`・`touch-sample-14`・`touch-lcd-14`）、`bringup-i2c-15-16`、`bringup-led-514`、`bench-servo-test-17`、`debug-motion-19`とは併用できない（`compile_error!`） |
@@ -80,8 +82,8 @@
 //! （`crate::accel`・`crate::env`のmodule doc参照）、Pi link関連（`peripherals.uart1`、GPIO13＝TX、
 //! GPIO14＝RX）、LCD関連6+1本（`crate::display`のmodule doc参照）、`TOUCH-CS`（GPIO21。idleはHigh、touchの転送の間だけLow）である。
 //! LCDに触れない試験buildはLCD関連pinを渡さない。`bench-servo-test-17` feature付きbuildは`SERVO-PWM`（GPIO27）と
-//! `peripherals.ledc.timer0`／`channel0`を追加で渡し、Pi link関連を渡さない。`bringup-led-514` feature付きbuildは
-//! GPIO2とGPIO5を追加で渡す。
+//! `peripherals.ledc.timer0`／`channel0`を追加で渡し、Pi link関連を渡さない。製品buildと`bringup-led-514` feature付きbuildは
+//! GPIO2とGPIO5を`crate::led`へ渡す。
 //!
 //! **I2Cはこの版でも実機通電していない。**この版の検証は`cargo build`でのcross-compile
 //! 確認までであり、実機へflashして確認するのは別工程である（[Hardware Safety
@@ -303,7 +305,7 @@ mod env;
 mod env_sample;
 mod face;
 mod health;
-#[cfg(feature = "bringup-led-514")]
+#[cfg(any(feature = "bringup-led-514", deskcat_product_mode))]
 mod led;
 #[cfg(feature = "mem-probe-23")]
 mod mem_probe;
@@ -368,7 +370,7 @@ use crate::env_sample::EnvSampler;
 use crate::face::FaceDrawer;
 use crate::face::FaceState;
 use crate::health::Health;
-#[cfg(feature = "bringup-led-514")]
+#[cfg(any(feature = "bringup-led-514", deskcat_product_mode))]
 use crate::led::Leds;
 #[cfg(not(feature = "bench-servo-test-17"))]
 use crate::pi_link::{FaceTargets, PiLink};
@@ -557,7 +559,7 @@ fn main() {
     // **bring-upより前に作る。**両LEDを早く消灯側へ固定するためである（`crate::led`の
     // module doc「起動からの状態」）。点灯試験の時計は`bringup_done_ms`から数える。
     // 失敗してもfirmwareは止めない。LEDは表示だけを担い、ほかの機能はLEDに依存しない。
-    #[cfg(feature = "bringup-led-514")]
+    #[cfg(any(feature = "bringup-led-514", deskcat_product_mode))]
     let mut leds = match Leds::new(peripherals.pins.gpio2, peripherals.pins.gpio5) {
         Ok(leds) => Some(leds),
         Err(err) => {
@@ -759,7 +761,7 @@ fn main() {
     let bringup_done_ms = health.uptime_ms();
     let mut next_heartbeat = bringup_done_ms + u64::from(config::HEARTBEAT_PERIOD_MS);
     let mut next_snapshot = bringup_done_ms + u64::from(config::HEALTH_SNAPSHOT_PERIOD_MS);
-    #[cfg(feature = "bringup-led-514")]
+    #[cfg(any(feature = "bringup-led-514", deskcat_product_mode))]
     let led_start_ms = bringup_done_ms;
 
     // Pi linkの送信も受信も、protocol専用の`UartDriver`経由に揃える。**UART0は使わない**
@@ -1063,12 +1065,15 @@ fn main() {
         {
             until = until.min(deadline);
         }
-        #[cfg(feature = "bringup-led-514")]
+        #[cfg(any(feature = "bringup-led-514", deskcat_product_mode))]
         if let Some(leds) = leds.as_mut() {
             let now_led = health.uptime_ms();
-            let elapsed = now_led.saturating_sub(led_start_ms);
-            leds.update(elapsed, now_led);
-            until = until.min(led_start_ms + led::next_change_ms(elapsed));
+            // 受理した`happy`を取り出すのはLEDがあるときだけにする（初期化に失敗したら点ける先が無い）。
+            if face.take_react_pulse() {
+                leds.pulse_react(now_led);
+            }
+            leds.update(led_start_ms, now_led);
+            until = until.min(leds.next_deadline_ms(led_start_ms, now_led));
         }
 
         // sleepの代わりに`UartDriver::read`へ残り時間をtimeoutとして渡す。data到着があれば
