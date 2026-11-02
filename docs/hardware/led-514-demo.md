@@ -22,7 +22,7 @@ ESP32が両LEDを駆動する。通信LEDはESP32が自分のprotocol受信状�
 | LED | デモで表示する状態 | 実装上の前提 |
 |---|---|---|
 | 白 `LED-COMM-01` | ESP32が起動中でPiとの通信が未成立・喪失なら1秒周期で点滅（0.5秒ずつ）。通信が継続して成立すれば点灯 | 成立・喪失を決めるheartbeat／timeoutは[PROTO-TBD-010](../protocol/esp32-pi-protocol.md)と[HW-TBD-017](tbd-register.md)に依存する。現行firmwareは`hello`／`ping`／`get_status`を受信する（`firmware/esp32/src/pi_link.rs`）が、継続通信の判定（heartbeatとtimeout）はまだ無い。`BootSession::is_established`は`boot`のACKで一度立つと、Piが止まっても下りない（`hello`による遷移か終端でだけ変わる）。点灯に使うと、Piが止まっても点灯のままで「通信正常」を誤って示すため使わない。**製品buildも`bringup-led-514`も、白は点滅だけを出す**（`bringup-led-514`は点灯試験（赤→白→両方）の後に。下の`点灯試験用のfirmware`）。点滅は「通信の成立と継続を確認できていない」の表示であり、点灯が無いことを通信の異常と読まない |
-| 赤 `LED-REACT-01` | Piが撫でられた反応として`happy`を指示したら1秒点灯し、通常時は消灯 | 既存protocolの`set_expression`を候補に使う。protocol crateには`set_expression`の型とdecodeがある（#534）。製品buildと`face-21`付きbuildは受け取った`set_expression`をLCDへ描く（#21）。**製品buildは、`pi_link`が`happy`を受理した（session・値の範囲・LCDの準備の判定を通った）ときに赤を1秒（`LED_REACT_PULSE_MS`。一般値）点けて消す。点灯中に再び受理したら、その時刻から数え直す。拒否された`happy`では点かない。**`bringup-led-514`は表情を持たないため、点灯試験の区間だけ赤を点ける |
+| 赤 `LED-REACT-01` | Piが撫でられた反応として`happy`を指示したら1秒点灯し、通常時は消灯 | 既存protocolの`set_expression`を候補に使う。protocol crateには`set_expression`の型とdecodeがある（#534）。製品buildと`face-21`付きbuildは受け取った`set_expression`をLCDへ描く（#21）。**製品buildは、`pi_link`が`happy`を受理した（session・値の範囲・LCDの準備の判定を通った）ときに赤を1秒（`LED_REACT_PULSE_MS`。一般値）点けて消す。点灯中に再び受理したら、その時刻から数え直す。拒否された`happy`では点かない。**`bringup-led-514`だけのbuildは表情を持たないため、点灯試験の区間だけ赤を点ける。`face-21`と組み合わせたbuildは`happy`を受理し、製品buildと同じく赤を1秒点ける（この併用は`compile_error!`で止めていない） |
 
 ESP32自体の電源断はLEDの消灯にしか見えない。白の消灯を「通信正常」と解釈しない。
 
