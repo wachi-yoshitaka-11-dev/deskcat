@@ -327,6 +327,16 @@ boardでは6つのworkflowが有効である。全一覧はRepository設定に�
 merge後に、対応するIssue itemの`Status`を`Done`にする。これにより`Auto-close issue`が
 Issueをcloseする。
 
+**IssueをcloseしないPull Request（`Refs: #N`だけのもの）をmergeしたら、mergeした者が、
+そのIssueへ「このmergeで済んだこと・残っていること」を1コメント書く。**
+記録（EXP・docs）を`develop`へ入れても、Issueのコメントは誰も更新しない。timelineにはPull Requestと
+commitの参照が自動で出るが、何が済んで何が残ったかは書かれない。最後のコメントを今の状態と読むと、
+その後に済んだことを残りと誤る。
+
+- コメントには、このmergeで済んだこと、まだ残っていること（残りが無ければ「残り無し」）、
+  参照するPull Requestとcommitを書く。
+- Issueをcloseする場合は、上の手順に従い、このコメントは要らない。
+
 作成時に、対応するIssueと同じassignee・labelを設定し、Projects v2 board
 （`deskcat`、`https://github.com/users/wachi-yoshitaka-11-dev/projects/5`）へitemとして
 追加して`Status`を設定する。boardが進行管理の正本であり、boardに無いPull Requestは
