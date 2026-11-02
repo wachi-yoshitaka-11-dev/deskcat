@@ -660,6 +660,21 @@ reviewがまだ走っていないPRでは空振りしうる。依頼したreview
 安全・電気・protocol・firmwareに関わる変更は、reviewが完走するまでmergeしない
 （[Merge前の確認](#merge前の確認)）。
 
+**これはhookが強制する**（`scripts/hooks/gh_metadata_guard.py`。[#688](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/688)）。
+`gh pr merge`の前に、Pull Requestの変更fileが次のどれかを含み、かつ**どのcommitでも**CodeRabbitの
+reviewが完走していなければdenyする。完走の後に対応commitを足してheadが`Review skipped`でも通る。
+base `main`の昇格も同じ検査を受ける。**解除の手段は無く、`DESKCAT_SKIP_GH_GUARD`も効かない。**
+確認できない場合もdenyする。
+
+- `firmware/esp32/src/`
+- `crates/deskcat-protocol`・`deskcat-servo`・`deskcat-face`・`deskcat-tap`・`deskcat-touch`・`deskcat-accel`・`deskcat-env`の`src/`
+- `docs/protocol/esp32-pi-protocol.md`
+- `docs/hardware/gpio-assignment.md`・`power-budget.md`・`servo-safety-limits.md`
+
+**範囲はこれ以上広げない。**実験記録、BOM、図、規則の文書、検査のscript、Pi側だけのアプリは対象外である
+（CodeRabbitにはクールタイムがあり、何でも通すと作業が止まる）。この一覧の外で「安全・電気・protocol・
+firmwareに関わる」変更は、従来どおり人が守る。
+
 **「reviewを依頼した」を「reviewを受けた」と書かない。**`Review rate limited`は`pass`と表示されるため、
 依頼の事実だけで完了扱いにすると検出が抜ける。
 
@@ -889,14 +904,14 @@ squash mergeしたbranchはcommit hashが変わるため、`git branch -d`が「
 
 ## hookが止めたとき
 
-`.claude/settings.json`が8つのscriptをhookとして起動する。**検査は11である。**
+`.claude/settings.json`が8つのscriptをhookとして起動する。**検査は12である。**
 **この数は下の表と一致させる。**一致していない間、表に無いhookは「無い」ものとして
 読まれる（`truncation_guard.py`と`stop_claim_guard.py`は、追加した
 [#349](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/349)／[#350](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/350)から
 [#325](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/325)まで表に無く、
 `gh_metadata_guard.py`の本文節の検査も同じく無かった）。**数えるのは検査であって
-scriptではない。**`gh_metadata_guard.py`は1 scriptで4つを見る
-（同fileのdocstring「止める対象は4つである」）。
+scriptではない。**`gh_metadata_guard.py`は1 scriptで5つを見る
+（同fileのdocstring「止める対象は5つである」）。
 
 **文書に書いても実行されないことが実測で分かっている。**
 [#204](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/204)、
@@ -911,6 +926,7 @@ scriptではない。**`gh_metadata_guard.py`は1 scriptで4つを見る
 | `gh issue create`／`gh pr create`の前 | `--project`（短縮形`-p`）があるか | `scripts/hooks/gh_metadata_guard.py` |
 | `gh pr create`の前 | `--base`（短縮形`-B`）があるか | 同上 |
 | `gh issue create`／`gh pr create`の前 | 本文がtemplateの`## `節を持つか | 同上 |
+| `gh pr merge`の前 | 対象file（[手動で依頼する前に状態を確認する](#手動で依頼する前に状態を確認する)）を含むPull Requestで、CodeRabbitのreviewがどれかのcommitで完走しているか。**解除の手段は無い** | 同上 |
 | `@coderabbitai`へreviewを投げる前 | 同じ行に`review`の語があるか | `scripts/hooks/coderabbit_gate.py` |
 | `gh pr merge`の前 | squash messageから`git`が`Change-Class`と`Self-Review`をtrailerとして読むか | `scripts/hooks/gh_metadata_guard.py` |
 | `git checkout -b`／`git switch -c`の前 | 基点が最新の`origin/develop`か | `scripts/hooks/branch_base_guard.py` |
@@ -1009,7 +1025,7 @@ Pull Requestを通る変更は`review-gate.yml`が`gate`を実行するためで
   （2026-08-28に[PR #250](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/250)が
   base `main`で作られ、変更まで1時間17分かかった）。
 - **`gh issue create`には`--base`を要求しない。**option自体が存在しない。
-- **`--help`／`-h`が付いた呼び出しは、`gh_metadata_guard.py`の4つの検査すべてを抜ける。**helpの表示は何も作らず、
+- **`--help`／`-h`が付いた呼び出しは、`gh_metadata_guard.py`の5つの検査すべてを抜ける。**helpの表示は何も作らず、
   mergeもしないため、誤検知しか生まない。**2026-08-28に`gh issue create --help`、
   `gh pr create --help`、`gh pr merge --help`の3つとも拒否されることを実測した。
   hookが要求するoption名を`--help`で調べる手段そのものが塞がっていた。**

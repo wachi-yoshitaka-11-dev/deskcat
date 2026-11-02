@@ -9,6 +9,7 @@ hookを子processとして起動し、stdinへhookの入力JSONを渡して、**
 また起きる。**そしてhookは失敗しても静かなため、壊れたことに気付けない。**
 """
 
+import atexit
 import json
 import os
 import re
@@ -88,6 +89,40 @@ def _git(root, *arguments):
         )
     return result.stdout
 
+# `gh`を差し替えるshim（#688）。`gh pr merge`の前にhookが呼ぶ`gh pr view`／`gh api`へ、
+# 環境変数`DESKCAT_TEST_GH`のJSONから答える。**hookの解除手段ではなく、testの入力である。**
+# 未設定なら対象fileを含まない1件のPull Requestとして答える。
+GH_SHIM = f"""#!{sys.executable}
+import json, os, sys
+fixture = json.loads(os.environ.get("DESKCAT_TEST_GH") or "{{}}")
+if fixture.get("fail"):
+    sys.stderr.write("gh: boom")
+    sys.exit(1)
+args = sys.argv[1:]
+if args[:2] == ["pr", "view"]:
+    print(json.dumps({{"number": 7, "url": "https://github.com/o/r/pull/7"}}))
+elif args[0] == "api":
+    path = [a for a in args[1:] if a.startswith("repos/")][0]
+    if path.startswith("repos/o/r/pulls/7/files"):
+        print("\\n".join(fixture.get("files", ["README.md"])))
+    elif path.startswith("repos/o/r/pulls/7/commits"):
+        print("\\n".join(fixture.get("commits", {{}}).keys()))
+    elif "/check-runs" in path:
+        sha = path.split("/commits/")[1].split("/")[0]
+        print(json.dumps({{"check_runs": fixture["commits"][sha].get("check_runs", [])}}))
+    elif "/statuses" in path:
+        sha = path.split("/commits/")[1].split("/")[0]
+        print(json.dumps(fixture["commits"][sha].get("statuses", [])))
+    else:
+        sys.exit(2)
+else:
+    sys.exit(2)
+"""
+_GH_SHIM_DIR = tempfile.mkdtemp(prefix="deskcat-gh-shim-")
+atexit.register(shutil.rmtree, _GH_SHIM_DIR, ignore_errors=True)
+Path(_GH_SHIM_DIR, "gh").write_text(GH_SHIM, encoding="utf-8")
+Path(_GH_SHIM_DIR, "gh").chmod(0o755)
+
 
 def _invoke(script, command, cwd=None, environment=None):
     """hookへcommandを渡し`(exit code, 解釈した出力)`を返す。
@@ -102,6 +137,9 @@ def _invoke(script, command, cwd=None, environment=None):
     env.pop("DESKCAT_SKIP_PUSH_GATE", None)
     env.pop("DESKCAT_SKIP_TRUNCATION_GUARD", None)
     env.pop("DESKCAT_SKIP_WORKTREE_GUARD", None)
+    env.pop("DESKCAT_TEST_GH", None)
+    if script == GH_GUARD:
+        env["PATH"] = f"{_GH_SHIM_DIR}{os.pathsep}{env['PATH']}"
     if environment:
         env.update(environment)
     result = subprocess.run(
@@ -779,6 +817,159 @@ class GhMetadataGuardTests(unittest.TestCase):
         self.assertAllowed(
             'gh issue create --title t --body "## 背景\nx\n" --help'
         )
+
+
+class CodeRabbitReviewMergeGateTests(unittest.TestCase):
+    """対象fileを含むPull Requestは、CodeRabbitのreviewが完走するまでmergeさせない（#688）。"""
+
+    MERGE = "gh pr merge 7 --squash --subject s --body-file {body}"
+    DONE = {"name": "CodeRabbit", "status": "completed", "conclusion": "success",
+            "output": {"title": "Finished", "summary": "Result: Success - Review completed"}}
+    SKIPPED = {"name": "CodeRabbit", "status": "completed", "conclusion": "skipped",
+               "output": {"title": "Review skipped", "summary": "Result: Skipped - Review skipped"}}
+    LIMITED = {"name": "CodeRabbit", "status": "completed", "conclusion": "success",
+               "output": {"title": "Review rate limited", "summary": "Rate limited"}}
+    PENDING = {"name": "CodeRabbit", "status": "in_progress", "conclusion": None,
+               "output": {"title": "Review in progress", "summary": ""}}
+
+    def _run(self, fixture, command=None, environment=None):
+        with tempfile.TemporaryDirectory() as directory:
+            body = Path(directory) / "body.txt"
+            body.write_text(
+                f"本文\n\n{gate.TRAILER_CLASS}: c\n{gate.TRAILER_REVIEW}: s\n",
+                encoding="utf-8",
+            )
+            env = {"DESKCAT_TEST_GH": json.dumps(fixture)}
+            env.update(environment or {})
+            return _invoke(
+                GH_GUARD, (command or self.MERGE).format(body=body), environment=env
+            )
+
+    def assertDenied(self, fixture, *contains, **kwargs):
+        code, output = self._run(fixture, **kwargs)
+        self.assertEqual(code, 0)
+        self.assertIsNotNone(output, "通してしまった")
+        self.assertEqual(output["hookSpecificOutput"]["permissionDecision"], "deny")
+        for text in contains:
+            self.assertIn(text, _reason(output))
+
+    def assertAllowed(self, fixture, **kwargs):
+        code, output = self._run(fixture, **kwargs)
+        self.assertEqual(code, 0)
+        self.assertIsNone(output, f"止めてしまった: {output}")
+
+    def _pr(self, files, **commits):
+        return {"files": files, "commits": {
+            sha: {"check_runs": runs} for sha, runs in commits.items()}}
+
+    def test_every_target_path_is_checked(self):
+        """対象のどれか1つに当たればdenyし、理由に当たったfileと状態を出す。"""
+        targets = [
+            "firmware/esp32/src/main.rs",
+            "crates/deskcat-protocol/src/lib.rs",
+            "crates/deskcat-servo/src/lib.rs",
+            "crates/deskcat-face/src/lib.rs",
+            "crates/deskcat-tap/src/lib.rs",
+            "crates/deskcat-touch/src/lib.rs",
+            "crates/deskcat-accel/src/lib.rs",
+            "crates/deskcat-env/src/lib.rs",
+            "docs/protocol/esp32-pi-protocol.md",
+            "docs/hardware/gpio-assignment.md",
+            "docs/hardware/power-budget.md",
+            "docs/hardware/servo-safety-limits.md",
+        ]
+        for name in targets:
+            with self.subTest(name=name):
+                self.assertDenied(
+                    self._pr(["README.md", name], a=[self.SKIPPED]),
+                    f"`{name}`", "Review skipped",
+                )
+
+    def test_files_outside_the_targets_are_allowed(self):
+        """対象外は、CodeRabbitの状態によらず通す（広げない範囲）。"""
+        outside = [
+            "docs/hardware/bom.md", "docs/experiments/exp-1.md",
+            "scripts/hooks/gh_metadata_guard.py", "CONTRIBUTING.md",
+            "crates/deskcat-pi/src/lib.rs", "crates/deskcat-protocol/Cargo.toml",
+            "firmware/esp32/Cargo.toml", "firmware/esp32/srcx/a.rs",
+        ]
+        for name in outside:
+            with self.subTest(name=name):
+                self.assertAllowed(self._pr([name], a=[self.SKIPPED]))
+
+    def test_not_completed_states_are_denied(self):
+        """完走でない状態は、すべてdenyする。"""
+        for label, run in (
+            ("skipped", self.SKIPPED), ("rate limited", self.LIMITED),
+            ("in progress", self.PENDING),
+        ):
+            with self.subTest(label=label):
+                self.assertDenied(
+                    self._pr(["firmware/esp32/src/a.rs"], a=[run]),
+                    run["output"]["title"],
+                )
+
+    def test_no_coderabbit_record_is_denied(self):
+        self.assertDenied(
+            self._pr(["firmware/esp32/src/a.rs"], a=[]), "CodeRabbitの記録なし"
+        )
+
+    def test_completed_review_allows_the_merge(self):
+        self.assertAllowed(self._pr(["firmware/esp32/src/a.rs"], a=[self.DONE]))
+
+    def test_commit_added_after_the_review_is_allowed(self):
+        """**review完走の後に対応commitを足し、headが`Review skipped`でも通す。**
+
+        CONTRIBUTINGは対応commitで投げ直さないと定める（#678の`431ca0e`→`0629fc7`）。
+        """
+        self.assertAllowed(
+            self._pr(["firmware/esp32/src/a.rs"], a=[self.SKIPPED],
+                     b=[self.DONE], c=[self.SKIPPED])
+        )
+
+    def test_legacy_commit_status_counts_as_completed(self):
+        fixture = {"files": ["docs/protocol/esp32-pi-protocol.md"], "commits": {
+            "a": {"statuses": [{"context": "CodeRabbit", "state": "success",
+                                "description": "Review completed"}]}}}
+        self.assertAllowed(fixture)
+
+    def test_legacy_skipped_status_is_denied(self):
+        fixture = {"files": ["docs/protocol/esp32-pi-protocol.md"], "commits": {
+            "a": {"statuses": [{"context": "CodeRabbit", "state": "success",
+                                "description": "Review skipped: automatic reviews are disabled"}]}}}
+        self.assertDenied(fixture, "Review skipped")
+
+    def test_promotion_is_checked_like_any_other(self):
+        """base `main`の昇格（`--merge`）にも同じ検査を掛ける。"""
+        command = "gh pr merge 7 --merge --subject s --body-file {body}"
+        self.assertDenied(
+            self._pr(["firmware/esp32/src/a.rs"], a=[self.SKIPPED]),
+            "firmware/esp32/src/a.rs", command=command,
+        )
+        self.assertAllowed(
+            self._pr(["firmware/esp32/src/a.rs"], a=[self.DONE]), command=command
+        )
+
+    def test_many_commits_are_checked(self):
+        """昇格は100件を超えるcommitを持つ。完走が最古にあっても見つける。"""
+        commits = {f"c{i:03d}": [self.SKIPPED] for i in range(120)}
+        commits["c000"] = [self.DONE]
+        self.assertAllowed(self._pr(["firmware/esp32/src/a.rs"], **commits))
+        del commits["c000"]
+        self.assertDenied(self._pr(["firmware/esp32/src/a.rs"], **commits), "Review skipped")
+
+    def test_gh_failure_is_denied(self):
+        self.assertDenied({"fail": True}, "確認できないまま通さない")
+
+    def test_skip_environment_does_not_disable_this_check(self):
+        """解除の手段を足さない。`DESKCAT_SKIP_GH_GUARD=1`でも止まる。"""
+        self.assertDenied(
+            self._pr(["firmware/esp32/src/a.rs"], a=[self.SKIPPED]),
+            "Review skipped", environment={"DESKCAT_SKIP_GH_GUARD": "1"},
+        )
+
+    def test_help_is_not_checked(self):
+        self.assertAllowed({"fail": True}, command="gh pr merge --help")
 
 
 class BranchBaseGuardTests(unittest.TestCase):
