@@ -82,3 +82,12 @@
 - power cycleとdisconnectのfault injectionに成功
 - queue、memory、parser、sensor、reset counterが制限内
 - deploymentとrecovery runbookを検証
+
+## M7 Expansion
+
+説明: MVP の後に足す拡張（移動、腕・挙手、フルカラー LED、音声、タクトスイッチ、設定画面、追加センサ）を扱う。
+
+完了条件:
+
+- 拡張の方向と購入品が正本文書に反映されている
+- 着手した拡張ごとに、安全要件と実機確認を個々の Issue で満たしている

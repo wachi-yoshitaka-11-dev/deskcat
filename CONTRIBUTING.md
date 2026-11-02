@@ -150,7 +150,7 @@ GitHubのIssue一覧はlabelを常にtitleの横に表示するため、titleに
 | 項目 | 必須／任意 | 値の決め方 |
 |---|---|---|
 | title | 必須 | 上記の形式 |
-| milestone | 必須 | 対応するM0〜M6 milestoneを設定する |
+| milestone | 必須 | 対応するM0〜M7 milestoneを設定する |
 | label（`type:*`／`priority:*`） | 必須 | それぞれ1つ設定する |
 | label（`area:*`） | 対象componentがある場合のみ | 対象componentに対応するlabelを設定する。repository全体の保守作業など特定componentに限らない場合は省略する |
 | label（`status:blocked`／`needs:*`） | 該当時のみ | 依存未解決なら`status:blocked`、実機証拠や人間の判断が必要なら`needs:hardware-test`／`needs:decision`を設定する |
