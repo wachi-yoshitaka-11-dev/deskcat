@@ -46,6 +46,13 @@ class PolicyTests(unittest.TestCase):
         self.assertEqual({"labels", "assignees", "milestone"}, {f["field"] for f in findings})
         self.assertTrue(any("unknown label" in f["reason"] for f in findings))
 
+    def test_issue_milestone_stage_range_ends_at_m7(self):
+        r = record()
+        r["milestone"] = {"number": 8, "title": "M7 Expansion"}
+        self.assertNotIn("milestone", {f["field"] for f in self.findings(r)})
+        r["milestone"] = {"number": 9, "title": "M8 Later"}
+        self.assertIn("milestone", {f["field"] for f in self.findings(r)})
+
     def test_pr_milestone_forbidden_and_area_required(self):
         r = record("pr")
         r["milestone"] = {"number": 1}

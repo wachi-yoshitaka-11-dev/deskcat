@@ -311,9 +311,9 @@ def validate(record, item, known, expected=None, context=None, repository_only=F
     if record["kind"] == "pr" and values["milestone"] is not None:
         add("milestone", None, "ADR-0012")
     if record["kind"] == "issue" and not values["milestone"]:
-        add("milestone", "M0–M6 milestone", "select from scope evidence", "pending")
-    elif record["kind"] == "issue" and not re.match(r"^M[0-6](?:\s|$)", record["milestone"]["title"]):
-        add("milestone", "M0–M6 milestone", "milestone outside repository stages")
+        add("milestone", "M0–M7 milestone", "select from scope evidence", "pending")
+    elif record["kind"] == "issue" and not re.match(r"^M[0-7](?:\s|$)", record["milestone"]["title"]):
+        add("milestone", "M0–M7 milestone", "milestone outside repository stages")
     if not repository_only:
         if not item:
             add("project", True, "deskcat board membership required")
