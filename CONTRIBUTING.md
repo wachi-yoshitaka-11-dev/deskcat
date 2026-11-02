@@ -327,6 +327,17 @@ boardでは6つのworkflowが有効である。全一覧はRepository設定に�
 merge後に、対応するIssue itemの`Status`を`Done`にする。これにより`Auto-close issue`が
 Issueをcloseする。
 
+**closeの前に、受け入れ条件を1つずつ照合し、満たしたものをIssue本文でチェックする。**
+これはhookが強制する（`scripts/hooks/gh_metadata_guard.py`。[#693](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/693)）。
+`gh issue close`と、`Status`を`Done`にする`gh project item-edit`の前に、Issue本文の
+「受け入れ条件」を含む見出し（`##`〜`######`）の節（次の同じかそれより上の階層の見出しまで）に
+`- [ ]`が1つでも残っていればdenyし、残っている項目を理由に出す。**その節が無い本文もdenyする。**
+満たせない項目があるIssueはcloseせず、openのまま残りを書く。
+**方針として閉じる場合だけ、`gh issue close --reason "not planned" --comment <理由>`は節を見ずに通す。**
+理由のコメントが無い`not planned`と、完了扱いの`Done`は止める。
+Pull Request itemと既にcloseされたIssueの`Done`は止めない。
+確認できない場合もdenyする。**解除の手段は無く、`DESKCAT_SKIP_GH_GUARD`も効かない。**
+
 **IssueをcloseしないPull Request（`Refs: #N`だけのもの）をmergeしたら、mergeした者が、
 そのIssueへ「このmergeで済んだこと・残っていること」を1コメント書く。**
 記録（EXP・docs）を`develop`へ入れても、Issueのコメントは誰も更新しない。timelineにはPull Requestと
@@ -904,14 +915,14 @@ squash mergeしたbranchはcommit hashが変わるため、`git branch -d`が「
 
 ## hookが止めたとき
 
-`.claude/settings.json`が8つのscriptをhookとして起動する。**検査は12である。**
+`.claude/settings.json`が8つのscriptをhookとして起動する。**検査は13である。**
 **この数は下の表と一致させる。**一致していない間、表に無いhookは「無い」ものとして
 読まれる（`truncation_guard.py`と`stop_claim_guard.py`は、追加した
 [#349](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/349)／[#350](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/350)から
 [#325](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/325)まで表に無く、
 `gh_metadata_guard.py`の本文節の検査も同じく無かった）。**数えるのは検査であって
-scriptではない。**`gh_metadata_guard.py`は1 scriptで5つを見る
-（同fileのdocstring「止める対象は5つである」）。
+scriptではない。**`gh_metadata_guard.py`は1 scriptで6つを見る
+（同fileのdocstring「止める対象は6つである」）。
 
 **文書に書いても実行されないことが実測で分かっている。**
 [#204](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/204)、
@@ -927,6 +938,7 @@ scriptではない。**`gh_metadata_guard.py`は1 scriptで5つを見る
 | `gh pr create`の前 | `--base`（短縮形`-B`）があるか | 同上 |
 | `gh issue create`／`gh pr create`の前 | 本文がtemplateの`## `節を持つか | 同上 |
 | `gh pr merge`の前 | 対象file（[手動で依頼する前に状態を確認する](#手動で依頼する前に状態を確認する)）を含むPull Requestで、CodeRabbitのreviewがどれかのcommitで完走しているか。**解除の手段は無い** | 同上 |
+| `gh issue close`の前、およびboardの`Status`を`Done`にする`gh project item-edit`の前 | 対象Issueの`受け入れ条件`の節に`- [ ]`が残っていないか（節が無い本文も止める）。**解除の手段は無い** | 同上 |
 | `@coderabbitai`へreviewを投げる前 | 同じ行に`review`の語があるか | `scripts/hooks/coderabbit_gate.py` |
 | `gh pr merge`の前 | squash messageから`git`が`Change-Class`と`Self-Review`をtrailerとして読むか | `scripts/hooks/gh_metadata_guard.py` |
 | `git checkout -b`／`git switch -c`の前 | 基点が最新の`origin/develop`か | `scripts/hooks/branch_base_guard.py` |
@@ -1025,12 +1037,14 @@ Pull Requestを通る変更は`review-gate.yml`が`gate`を実行するためで
   （2026-08-28に[PR #250](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/250)が
   base `main`で作られ、変更まで1時間17分かかった）。
 - **`gh issue create`には`--base`を要求しない。**option自体が存在しない。
-- **`--help`／`-h`が付いた呼び出しは、`gh_metadata_guard.py`の5つの検査すべてを抜ける。**helpの表示は何も作らず、
+- **`--help`／`-h`が付いた呼び出しは、`gh_metadata_guard.py`の6つの検査すべてを抜ける。**helpの表示は何も作らず、
   mergeもしないため、誤検知しか生まない。**2026-08-28に`gh issue create --help`、
   `gh pr create --help`、`gh pr merge --help`の3つとも拒否されることを実測した。
   hookが要求するoption名を`--help`で調べる手段そのものが塞がっていた。**
   判定は完全一致であり、`--title -h`のように値として`-h`を渡した呼び出しも
   検査を抜ける。**字句だけで区別する手立てが無い。**
+- **`gh api`や画面からIssueをcloseする経路。**closeの検査は`gh issue close`と`gh project item-edit`の字句だけを見る。
+  **boardの`Done`のoption idは`Status`fieldのものであり、boardを作り直すと変わる。**
 - **squash messageをstdin（`-F -`）で渡す経路。**hookからは読めないため、
   読めないことを理由に止める。`--body-file`を使う。
 - **`gh`や`git`を、alias、shell function、`xargs`、`sh -c`の内側から起動した場合。**

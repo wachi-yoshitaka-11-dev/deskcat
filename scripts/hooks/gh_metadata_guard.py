@@ -4,7 +4,7 @@
 Claude CodeのPreToolUse hookとして、Bash tool呼び出しの前に走る。stdinからhookの
 入力JSONを読み、`tool_input.command`だけを見る。実行はしない。
 
-止める対象は5つである。
+止める対象は6つである。
 
 1. `gh issue create`／`gh pr create`に`--project`が無い。Projects v2 boardへの
    item追加は`CONTRIBUTING.md`の起票規約で必須だが、**#204／#205／#206は3件とも
@@ -66,7 +66,16 @@ trailerとして解釈できる形かどうかだけで、値の正しさは見�
    mergeの時点で止める。**この検査は`DESKCAT_SKIP_GH_GUARD`で無効化できない**
    （`_check_coderabbit_review`）。
 
-`DESKCAT_SKIP_GH_GUARD=1`で5以外を丸ごと無効化できる。**誤検知で作業が止まったときの
+6. Issueのcloseの操作（`gh issue close`、およびboardの`Status`を`Done`にする
+   `gh project item-edit`）で、そのIssueの`受け入れ条件`の節に`- [ ]`が残っている（#693）。
+   2026-11-02に受け入れ条件を照合せずに#679がcloseされた。走査するとclose済み193件のうち
+   122件に未チェックが残っていた。人が覚えていても守られなかったため、closeの時点で止める。
+   Issueはboardの`Done`で自動closeされるため、`item-edit`が主な経路である。
+   **節が無い本文もdenyする**（CONTRIBUTINGの「Issueの範囲」が受け入れ条件を必須と
+   しており、無ければ照合できない）。**この検査は`DESKCAT_SKIP_GH_GUARD`で無効化できない**
+   （`_check_issue_close`／`_check_item_done`）。
+
+`DESKCAT_SKIP_GH_GUARD=1`で5と6以外を丸ごと無効化できる。**誤検知で作業が止まったときの
 逃げ道であり、常用するものではない。**使ったら理由をPull Request本文へ書く。
 **ただしcommand行頭へ置く形では効かない**（`SKIP_ENV`の隣に実測を書いてある）。
 """
@@ -95,6 +104,23 @@ import review_gate  # noqa: E402
 PR_CREATE_SUBCOMMAND = ("pr", "create")
 CREATE_SUBCOMMANDS = (("issue", "create"), PR_CREATE_SUBCOMMAND)
 MERGE_SUBCOMMAND = ("pr", "merge")
+ISSUE_CLOSE_SUBCOMMAND = ("issue", "close")
+ITEM_EDIT_SUBCOMMAND = ("project", "item-edit")
+
+# boardの`Status`fieldの`Done`のoption id（2026-11-02に`gh project field-list 5`で実測した値）。
+# **boardを作り直すと変わり、検査は素通りになる。**`Done`への変更だけを見る。
+STATUS_DONE_OPTION_ID = "98236657"
+# 見出しの書き方は揃っていない（`## この Issue の受け入れ条件・成果物`＝#546、
+# `### 測定可能な受け入れ条件`＝#236・#237）。「受け入れ条件」を含む見出しを節の始まりにする。
+HEADING = re.compile(r"^(#{1,6})\s+(.*?)\s*$")
+ACCEPTANCE_WORD = "受け入れ条件"
+NOT_PLANNED_REASON = "not planned"
+UNCHECKED_ITEM = re.compile(r"^\s*(?:[-*+]|\d+\.)\s+\[ \]\s*(.*)$")
+ISSUE_CLOSE_VALUE_OPTIONS = ("--comment", "-c", "--reason", "-r", "--duplicate-of", "--repo", "-R")
+ITEM_QUERY = (
+    "query($id: ID!) { node(id: $id) { ... on ProjectV2Item { content {"
+    " __typename ... on Issue { number state body } } } } }"
+)
 
 # squash messageが持たなければならないtrailerの名前。**値は見ない。**
 REQUIRED_MERGE_TRAILERS = (review_gate.TRAILER_CLASS, review_gate.TRAILER_REVIEW)
@@ -797,6 +823,125 @@ def _check_coderabbit_review(args, global_repo):
     )
 
 
+def _acceptance_denial(number, body):
+    """Issue本文の`受け入れ条件`の節を見て、止める理由を返す。通してよければ`None`。
+
+    節は「受け入れ条件」を含む見出し（`##`〜`######`）から、次の同じかそれより上の階層の
+    見出しまでである。字句だけで見る。
+    """
+    open_items = []
+    found = False
+    section_level = None
+    for line in (body or "").splitlines():
+        heading = HEADING.match(line)
+        if heading:
+            level = len(heading.group(1))
+            if section_level is not None and level <= section_level:
+                section_level = None
+            if section_level is None and ACCEPTANCE_WORD in heading.group(2) and level >= 2:
+                section_level = level
+                found = True
+            continue
+        item = UNCHECKED_ITEM.match(line) if section_level is not None else None
+        if item:
+            open_items.append(item.group(1).strip() or "（空の項目）")
+    if not found:
+        return (
+            f"Issue #{number}の本文に`受け入れ条件`の節が無く、照合できない。"
+            " CONTRIBUTINGの「Issueの範囲」は測定可能な受け入れ条件をIssueに含めると定める。"
+            " 本文へ「受け入れ条件」を含む`##`見出しの節を足し、満たしたものをチェックしてからcloseする。"
+            " この検査に解除の手段は無い（#693）。"
+        )
+    if not open_items:
+        return None
+    shown = "／".join(f"`{item}`" for item in open_items[:8])
+    more = f"（ほか{len(open_items) - 8}件）" if len(open_items) > 8 else ""
+    return (
+        f"Issue #{number}の`受け入れ条件`に未チェックの項目が{len(open_items)}件残っている: "
+        f"{shown}{more}。"
+        " 満たしたものをチェックし、満たせないものはIssueをopenのままにして残りを書く"
+        "（development-workflowの「未実行のcheckが受け入れ条件ならIssueをopenのままにする」）。"
+        " この検査に解除の手段は無い（#693）。"
+    )
+
+
+def _unverifiable_close(error):
+    _deny(
+        "Issueのcloseの対象が、受け入れ条件を満たしているかを確認できなかった"
+        f"（{type(error).__name__}: {error}）。**確認できないまま通さない。**"
+        " この検査に解除の手段は無い（#693）。"
+    )
+
+
+def _check_issue_close(args, global_repo):
+    """`gh issue close`の対象Issueの受け入れ条件に、未チェックが残っていないかを見る。
+
+    **確認できない場合もdenyする。**逃げ道は足さない（`DESKCAT_SKIP_GH_GUARD`も効かない）。
+    """
+    if _is_help(args):
+        return
+    if (
+        _option_value(args, "--reason", "-r") == NOT_PLANNED_REASON
+        and (_option_value(args, "--comment", "-c") or "").strip()
+    ):
+        # 方針として閉じるIssue（close済みのうち3件がnot planned）。完了扱いではないため、
+        # 理由のコメントが付いているときだけ受け入れ条件を見ない。boardの`Done`は完了扱いで、
+        # `_check_item_done`が見る。
+        return
+    repo_option = _option_value(args, "--repo", "-R") or global_repo
+    selector = None
+    index = 0
+    while index < len(args):
+        if args[index] in ISSUE_CLOSE_VALUE_OPTIONS:
+            index += 2
+            continue
+        if not args[index].startswith("-"):
+            selector = args[index]
+            break
+        index += 1
+    try:
+        if selector is None:
+            raise ValueError("Issueの番号またはURLが指定されていない")
+        view = ["issue", "view", selector] + (["-R", repo_option] if repo_option else [])
+        info = json.loads(_gh_json(view + ["--json", "number,body"]))
+        reason = _acceptance_denial(info["number"], info["body"])
+    except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError) as error:
+        _unverifiable_close(error)
+        return
+    if reason:
+        _deny(reason)
+
+
+def _check_item_done(args):
+    """boardの`Status`を`Done`にする`gh project item-edit`の対象を見る。
+
+    `Done`はIssueを自動closeする。Pull Request itemとDraft issueは対象外である。
+    既にCLOSEDのIssueは、`Done`が閉じるものが無いため止めない。
+    """
+    if _is_help(args):
+        return
+    if _option_value(args, "--single-select-option-id") != STATUS_DONE_OPTION_ID:
+        return
+    try:
+        item_id = _option_value(args, "--id")
+        if item_id is None:
+            raise ValueError("`--id`（item id）が指定されていない")
+        node = json.loads(_gh_json([
+            "api", "graphql", "-f", f"query={ITEM_QUERY}", "-f", f"id={item_id}",
+        ]))["data"]["node"]
+        content = node["content"]
+        if content["__typename"] != "Issue":
+            return
+        if content["state"] == "CLOSED":
+            return
+        reason = _acceptance_denial(content["number"], content["body"])
+    except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError) as error:
+        _unverifiable_close(error)
+        return
+    if reason:
+        _deny(reason)
+
+
 def main():
     skip = os.environ.get(SKIP_ENV) == "1"
     try:
@@ -826,6 +971,11 @@ def main():
                 _check_merge(args[2:])
             # **skipの指定に関わらず走らせる。**解除の手段を足さない（#688）。
             _check_coderabbit_review(args[2:], global_repo)
+        elif head == ISSUE_CLOSE_SUBCOMMAND:
+            # **skipの指定に関わらず走らせる。**解除の手段を足さない（#693）。
+            _check_issue_close(args[2:], global_repo)
+        elif head == ITEM_EDIT_SUBCOMMAND:
+            _check_item_done(args[2:])
     return 0
 
 
