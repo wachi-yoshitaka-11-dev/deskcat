@@ -100,6 +100,8 @@ const _: () = assert!(LED_BLINK_PERIOD_MS >= 2 && LED_BLINK_PERIOD_MS % 2 == 0);
 const _: () = assert!(LED_LAMP_TEST_HOLD_MS > 0);
 
 /// 経過時間`elapsed_ms`での区間。
+// 製品buildは`LAMP_TEST_END_MS`が0で、`elapsed_ms >= 0`は常に真になる（点灯試験の区間を持たない意図どおり）。
+#[allow(clippy::absurd_extreme_comparisons)]
 pub fn phase_at(elapsed_ms: u64) -> Phase {
     let hold = u64::from(LED_LAMP_TEST_HOLD_MS);
     if elapsed_ms >= LAMP_TEST_END_MS {
@@ -140,6 +142,8 @@ pub fn outputs_at(elapsed_ms: u64) -> Outputs {
 }
 
 /// `elapsed_ms`より後で、出力が次に変わる経過時間。main loopの待ちの上限に使う。
+// 製品buildは`LAMP_TEST_END_MS`が0で、`elapsed_ms < 0`は常に偽になる（`phase_at`と同じ）。
+#[allow(clippy::absurd_extreme_comparisons)]
 pub fn next_change_ms(elapsed_ms: u64) -> u64 {
     let hold = u64::from(LED_LAMP_TEST_HOLD_MS);
     if elapsed_ms < LAMP_TEST_END_MS {
