@@ -101,6 +101,10 @@ if fixture.get("fail"):
 args = sys.argv[1:]
 if args[:2] == ["pr", "view"]:
     print(json.dumps({{"number": 7, "url": "https://github.com/o/r/pull/7"}}))
+elif args[:2] == ["issue", "view"]:
+    print(json.dumps(fixture["issue"]))
+elif args[:2] == ["api", "graphql"]:
+    print(json.dumps({{"data": {{"node": fixture["item"]}}}}))
 elif args[0] == "api":
     path = [a for a in args[1:] if a.startswith("repos/")][0]
     if path.startswith("repos/o/r/pulls/7/files"):
@@ -970,6 +974,141 @@ class CodeRabbitReviewMergeGateTests(unittest.TestCase):
 
     def test_help_is_not_checked(self):
         self.assertAllowed({"fail": True}, command="gh pr merge --help")
+
+
+class AcceptanceCriteriaCloseGateTests(unittest.TestCase):
+    """受け入れ条件に未チェックが残るIssueをcloseさせない（#693）。"""
+
+    CLOSE = "gh issue close 9"
+    DONE_EDIT = ("gh project item-edit --id PVTI_x --project-id P --field-id F"
+                 " --single-select-option-id 98236657")
+    OPEN_BODY = "## 背景\nb\n\n## 受け入れ条件\n\n- [x] 済み\n- [ ] 残り1\n- [ ]\n\n## 検証\n- [ ] 範囲外\n"
+    DONE_BODY = "## 受け入れ条件\n\n- [x] 済み\n- [X] これも\n\n## 検証\n- [ ] 範囲外\n"
+
+    def _run(self, fixture, command, environment=None):
+        return _invoke(
+            GH_GUARD, command,
+            environment={"DESKCAT_TEST_GH": json.dumps(fixture), **(environment or {})},
+        )
+
+    def assertDenied(self, fixture, command, *contains, **kwargs):
+        code, output = self._run(fixture, command, **kwargs)
+        self.assertEqual(code, 0)
+        self.assertIsNotNone(output, "通してしまった")
+        self.assertEqual(output["hookSpecificOutput"]["permissionDecision"], "deny")
+        for text in contains:
+            self.assertIn(text, _reason(output))
+
+    def assertAllowed(self, fixture, command):
+        code, output = self._run(fixture, command)
+        self.assertEqual(code, 0)
+        self.assertIsNone(output, f"止めてしまった: {output}")
+
+    def _issue(self, body, number=9):
+        return {"issue": {"number": number, "body": body}}
+
+    def _item(self, typename="Issue", body="", state="OPEN", number=9):
+        content = {"__typename": typename}
+        if typename == "Issue":
+            content.update(number=number, body=body, state=state)
+        return {"item": {"content": content}}
+
+    def test_close_with_unchecked_items_is_denied_and_lists_them(self):
+        self.assertDenied(
+            self._issue(self.OPEN_BODY), self.CLOSE,
+            "#9", "2件", "`残り1`", "`（空の項目）`",
+        )
+
+    def test_unchecked_items_outside_the_section_are_not_counted(self):
+        code, output = self._run(self._issue(self.OPEN_BODY), self.CLOSE)
+        self.assertNotIn("範囲外", _reason(output))
+
+    def test_close_with_all_checked_is_allowed(self):
+        self.assertAllowed(self._issue(self.DONE_BODY), self.CLOSE)
+
+    def test_issue_without_the_section_is_denied(self):
+        self.assertDenied(
+            self._issue("## 背景\n- [x] a\n"), self.CLOSE, "受け入れ条件`の節が無く",
+        )
+
+    def test_section_ends_at_the_next_level2_heading_only(self):
+        body = "## 受け入れ条件\n- [x] a\n### 補足\n- [ ] 下位見出しの中\n## 検証\n"
+        self.assertDenied(self._issue(body), self.CLOSE, "下位見出しの中")
+
+    def test_options_and_repo_do_not_hide_the_issue(self):
+        for command in (
+            "gh issue close 9 --reason 'not planned' -c done",
+            "gh --repo o/r issue close 9",
+            "gh issue close -R o/r https://github.com/o/r/issues/9",
+        ):
+            with self.subTest(command=command):
+                self.assertDenied(self._issue(self.OPEN_BODY), command, "未チェック")
+
+    def test_done_on_an_issue_item_with_unchecked_items_is_denied(self):
+        self.assertDenied(
+            self._item(body=self.OPEN_BODY), self.DONE_EDIT, "#9", "`残り1`",
+        )
+
+    def test_done_on_an_issue_item_with_all_checked_is_allowed(self):
+        self.assertAllowed(self._item(body=self.DONE_BODY), self.DONE_EDIT)
+
+    def test_done_on_an_issue_item_without_the_section_is_denied(self):
+        self.assertDenied(self._item(body="本文"), self.DONE_EDIT, "節が無く")
+
+    def test_done_on_a_pull_request_item_is_allowed(self):
+        self.assertAllowed(self._item("PullRequest"), self.DONE_EDIT)
+
+    def test_done_on_a_draft_issue_item_is_allowed(self):
+        self.assertAllowed(self._item("DraftIssue"), self.DONE_EDIT)
+
+    def test_done_on_an_already_closed_issue_is_allowed(self):
+        """`Done`が閉じるものが無い。boardの同期を止めない。"""
+        self.assertAllowed(self._item(body=self.OPEN_BODY, state="CLOSED"), self.DONE_EDIT)
+
+    def test_other_status_changes_are_allowed(self):
+        """`Done`以外のStatusと、Status以外のfieldは、gh失敗でも見ない。"""
+        for command in (
+            "gh project item-edit --id I --project-id P --field-id F"
+            " --single-select-option-id 47fc9ee4",
+            "gh project item-edit --id I --project-id P --field-id F --date 2026-11-02",
+        ):
+            with self.subTest(command=command):
+                self.assertAllowed({"fail": True}, command)
+
+    def test_gh_failure_is_denied(self):
+        for command in (self.CLOSE, self.DONE_EDIT):
+            with self.subTest(command=command):
+                self.assertDenied({"fail": True}, command, "確認できないまま通さない")
+
+    def test_unreadable_responses_are_denied(self):
+        self.assertDenied({"issue": {"number": 9}}, self.CLOSE, "確認できないまま通さない")
+        self.assertDenied({"item": None}, self.DONE_EDIT, "確認できないまま通さない")
+        self.assertDenied(
+            {"item": {"content": None}}, self.DONE_EDIT, "確認できないまま通さない"
+        )
+
+    def test_missing_selector_or_item_id_is_denied(self):
+        self.assertDenied(self._issue(self.DONE_BODY), "gh issue close", "確認できない")
+        self.assertDenied(
+            self._item(body=self.DONE_BODY),
+            "gh project item-edit --project-id P --single-select-option-id 98236657",
+            "確認できない",
+        )
+
+    def test_skip_environment_does_not_disable_this_check(self):
+        for command, fixture in (
+            (self.CLOSE, self._issue(self.OPEN_BODY)),
+            (self.DONE_EDIT, self._item(body=self.OPEN_BODY)),
+        ):
+            with self.subTest(command=command):
+                self.assertDenied(
+                    fixture, command, "未チェック",
+                    environment={"DESKCAT_SKIP_GH_GUARD": "1"},
+                )
+
+    def test_help_is_not_checked(self):
+        self.assertAllowed({"fail": True}, "gh issue close --help")
+        self.assertAllowed({"fail": True}, self.DONE_EDIT + " --help")
 
 
 class BranchBaseGuardTests(unittest.TestCase):
