@@ -110,7 +110,11 @@ ITEM_EDIT_SUBCOMMAND = ("project", "item-edit")
 # boardの`Status`fieldの`Done`のoption id（2026-11-02に`gh project field-list 5`で実測した値）。
 # **boardを作り直すと変わり、検査は素通りになる。**`Done`への変更だけを見る。
 STATUS_DONE_OPTION_ID = "98236657"
-ACCEPTANCE_HEADING = re.compile(r"^#{2,6}\s*受け入れ条件(?![^\s（(])")
+# 見出しの書き方は揃っていない（`## この Issue の受け入れ条件・成果物`＝#546、
+# `### 測定可能な受け入れ条件`＝#236・#237）。「受け入れ条件」を含む見出しを節の始まりにする。
+HEADING = re.compile(r"^(#{1,6})\s+(.*?)\s*$")
+ACCEPTANCE_WORD = "受け入れ条件"
+NOT_PLANNED_REASON = "not planned"
 UNCHECKED_ITEM = re.compile(r"^\s*(?:[-*+]|\d+\.)\s+\[ \]\s*(.*)$")
 ISSUE_CLOSE_VALUE_OPTIONS = ("--comment", "-c", "--reason", "-r", "--duplicate-of", "--repo", "-R")
 ITEM_QUERY = (
@@ -822,29 +826,32 @@ def _check_coderabbit_review(args, global_repo):
 def _acceptance_denial(number, body):
     """Issue本文の`受け入れ条件`の節を見て、止める理由を返す。通してよければ`None`。
 
-    節は`受け入れ条件`の見出しから次の`## `見出しまでである。字句だけで見る。
+    節は「受け入れ条件」を含む見出し（`##`〜`######`）から、次の同じかそれより上の階層の
+    見出しまでである。字句だけで見る。
     """
-    lines = (body or "").splitlines()
-    start = next(
-        (index for index, line in enumerate(lines) if ACCEPTANCE_HEADING.match(line)),
-        None,
-    )
-    if start is None:
+    open_items = []
+    found = False
+    section_level = None
+    for line in (body or "").splitlines():
+        heading = HEADING.match(line)
+        if heading:
+            level = len(heading.group(1))
+            if section_level is not None and level <= section_level:
+                section_level = None
+            if section_level is None and ACCEPTANCE_WORD in heading.group(2) and level >= 2:
+                section_level = level
+                found = True
+            continue
+        item = UNCHECKED_ITEM.match(line) if section_level is not None else None
+        if item:
+            open_items.append(item.group(1).strip() or "（空の項目）")
+    if not found:
         return (
             f"Issue #{number}の本文に`受け入れ条件`の節が無く、照合できない。"
             " CONTRIBUTINGの「Issueの範囲」は測定可能な受け入れ条件をIssueに含めると定める。"
-            " 本文へ`## 受け入れ条件`の節を足し、満たしたものをチェックしてからcloseする。"
+            " 本文へ「受け入れ条件」を含む`##`見出しの節を足し、満たしたものをチェックしてからcloseする。"
             " この検査に解除の手段は無い（#693）。"
         )
-    end = next(
-        (index for index in range(start + 1, len(lines)) if lines[index].startswith("## ")),
-        len(lines),
-    )
-    open_items = [
-        match.group(1).strip() or "（空の項目）"
-        for match in (UNCHECKED_ITEM.match(line) for line in lines[start + 1:end])
-        if match
-    ]
     if not open_items:
         return None
     shown = "／".join(f"`{item}`" for item in open_items[:8])
@@ -872,6 +879,14 @@ def _check_issue_close(args, global_repo):
     **確認できない場合もdenyする。**逃げ道は足さない（`DESKCAT_SKIP_GH_GUARD`も効かない）。
     """
     if _is_help(args):
+        return
+    if (
+        _option_value(args, "--reason", "-r") == NOT_PLANNED_REASON
+        and (_option_value(args, "--comment", "-c") or "").strip()
+    ):
+        # 方針として閉じるIssue（close済みのうち3件がnot planned）。完了扱いではないため、
+        # 理由のコメントが付いているときだけ受け入れ条件を見ない。boardの`Done`は完了扱いで、
+        # `_check_item_done`が見る。
         return
     repo_option = _option_value(args, "--repo", "-R") or global_repo
     selector = None

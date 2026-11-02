@@ -330,9 +330,12 @@ Issueをcloseする。
 **closeの前に、受け入れ条件を1つずつ照合し、満たしたものをIssue本文でチェックする。**
 これはhookが強制する（`scripts/hooks/gh_metadata_guard.py`。[#693](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/693)）。
 `gh issue close`と、`Status`を`Done`にする`gh project item-edit`の前に、Issue本文の
-`受け入れ条件`の節（その見出しから次の`## `見出しまで）に`- [ ]`が1つでも残っていればdenyし、
-残っている項目を理由に出す。**`受け入れ条件`の節が無い本文もdenyする。**満たせない項目が
-あるIssueはcloseせず、openのまま残りを書く。Pull Request itemと既にcloseされたIssueの`Done`は止めない。
+「受け入れ条件」を含む見出し（`##`〜`######`）の節（次の同じかそれより上の階層の見出しまで）に
+`- [ ]`が1つでも残っていればdenyし、残っている項目を理由に出す。**その節が無い本文もdenyする。**
+満たせない項目があるIssueはcloseせず、openのまま残りを書く。
+**方針として閉じる場合だけ、`gh issue close --reason "not planned" --comment <理由>`は節を見ずに通す。**
+理由のコメントが無い`not planned`と、完了扱いの`Done`は止める。
+Pull Request itemと既にcloseされたIssueの`Done`は止めない。
 確認できない場合もdenyする。**解除の手段は無く、`DESKCAT_SKIP_GH_GUARD`も効かない。**
 
 **IssueをcloseしないPull Request（`Refs: #N`だけのもの）をmergeしたら、mergeした者が、

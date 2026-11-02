@@ -1035,9 +1035,44 @@ class AcceptanceCriteriaCloseGateTests(unittest.TestCase):
         body = "## 受け入れ条件\n- [x] a\n### 補足\n- [ ] 下位見出しの中\n## 検証\n"
         self.assertDenied(self._issue(body), self.CLOSE, "下位見出しの中")
 
+    def test_heading_variants_start_the_section(self):
+        """実例: `## この Issue の受け入れ条件・成果物`（#546）、`### 測定可能な受け入れ条件`（#236）。"""
+        for heading in ("## この Issue の受け入れ条件・成果物", "### 測定可能な受け入れ条件"):
+            body = f"## 背景\n- [ ] 範囲外\n\n{heading}\n- [x] 済み\n- [ ] 残り\n"
+            with self.subTest(heading=heading):
+                self.assertDenied(self._issue(body), self.CLOSE, "`残り`")
+                self.assertAllowed(
+                    self._issue(body.replace("- [ ] 残り", "- [x] 残り")), self.CLOSE
+                )
+
+    def test_level3_section_ends_at_a_level2_heading(self):
+        body = "### 測定可能な受け入れ条件\n- [x] a\n## 検証\n- [ ] 範囲外\n"
+        self.assertAllowed(self._issue(body), self.CLOSE)
+
+    def test_not_planned_with_a_comment_is_allowed(self):
+        for command in (
+            "gh issue close 9 --reason 'not planned' --comment 方針",
+            "gh issue close 9 -r 'not planned' -c 方針",
+        ):
+            with self.subTest(command=command):
+                self.assertAllowed(self._issue(self.OPEN_BODY), command)
+
+    def test_not_planned_without_a_comment_is_denied(self):
+        for command in (
+            "gh issue close 9 --reason 'not planned'",
+            "gh issue close 9 -r 'not planned' -c ''",
+            "gh issue close 9 --reason completed -c 方針",
+            "gh issue close 9 -c 方針",
+        ):
+            with self.subTest(command=command):
+                self.assertDenied(self._issue(self.OPEN_BODY), command, "未チェック")
+
+    def test_done_is_not_exempted_by_not_planned(self):
+        self.assertDenied(self._item(body=self.OPEN_BODY), self.DONE_EDIT, "未チェック")
+
     def test_options_and_repo_do_not_hide_the_issue(self):
         for command in (
-            "gh issue close 9 --reason 'not planned' -c done",
+            "gh issue close 9 --reason completed -c done",
             "gh --repo o/r issue close 9",
             "gh issue close -R o/r https://github.com/o/r/issues/9",
         ):
