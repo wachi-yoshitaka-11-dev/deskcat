@@ -101,8 +101,8 @@
 | X1 | B1 D5 | Pi の header pin 8（GPIO14 `TXD`） | PI_TXD（Pi pin 8 TXD 側） | 紫 | 板の側を挿す。Pi の header 側は挿していない（EXP-052）。以後の抜き差しは S21 の K23 側で行い、Pi の header 側では抜き差ししない |
 | X2 | B1 D6 | Pi の header pin 10（GPIO15 `RXD`） | PI_RXD（Pi pin 10 RXD 側） | 青 | 板の側を挿す。Pi の header 側は挿していない（EXP-052）。以後の抜き差しは S22 の K26 側で行い、Pi の header 側では抜き差ししない |
 | X3 | B1 A18 | Pi の header pin 39（GND） | GND | 黒 | A18 側を抜いておく。挿す前に、gpio-assignment.md の `信号線をつないでよい条件` の6の開放側の値を読む |
-| X4 | B1 D7 | サーボの plug の黄の穴 | SERVO_SIG（サーボの黄の線の側） | 黄 | D7 側を抜いておく。挿すのは #17 のサーボの試験の手順と承認に従うときだけ |
-| X5 | B1 −30 | 端子台S の −（ESP32 の GND をサーボの GND と共通にする線。EXP-034 の Wiring revision、組み直す前の基準線。Git の履歴にある組み直す前の hardware/breadboard/layout.svg） | GND | 黒 | −30 側を抜いておく。条件は X4 と同じ |
+| X4 | B1 D7 | サーボの plug の黄の穴 | SERVO_SIG（サーボの黄の線の側） | 黄 | D7 側を抜いておく。挿すのは #17 のサーボの試験、または #18 の段0・段1（docs/hardware/servo-safety-limits.md の「#18の校正（案）」の段0の2）の手順と承認に従うときだけ |
+| X5 | B1 −30 | 端子台S の −（ESP32 の GND をサーボの GND と共通にする線。EXP-034 の Wiring revision、組み直す前の基準線。Git の履歴にある組み直す前の hardware/breadboard/layout.svg） | GND | 黒 | −30 側を抜いておく。条件は X4 と同じ。#18 の段0・段1では、板の外の端を端子台S の − の穴へ挿さず、クリップ付コードで端子台S の − に入ったシャントの足を挟む（同じ段0の2） |
 
 ## 首を通る LCD の14本（メスオス線のオス側を直接挿す）
 
