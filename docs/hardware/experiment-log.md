@@ -5133,7 +5133,7 @@ Consoleの使用量の画面へ、2026-11-01 01:39〜01:43Zの試行が計上さ
 | Firmware commit/profile | 無し |
 | Configuration | 天板：発泡スチロール1枚 40 × 70 mm。底板：1枚 60 × 60 mm。帯：耳に2本、ホーンの腕に2本 |
 | Measurement equipment | 定規（厚みを「だいたい」で読む）。測定の精度は求めていない |
-| Procedure | [enclosure-and-neck.md](enclosure-and-neck.md#現物に当てた記録2026-11-03非通電発泡スチロール)の手順どおり。止まる点A〜E |
+| Procedure | 手順書は repository の外にあり、公開していない。作業チャットで、ユーザーへ1手ずつ案内した。手順の途中の確認点（止まる点A〜E）への答えは、[enclosure-and-neck.md](enclosure-and-neck.md#現物に当てた記録2026-11-03非通電発泡スチロール)の「止まる点A〜E」に書いた |
 | Expected result | 選んだ固定方法が、サーボ本体と十字形ホーンを動かなくできるか見る（期待値は設けていない） |
 | Measured result | [enclosure-and-neck.md](enclosure-and-neck.md#現物に当てた記録2026-11-03非通電発泡スチロール) |
 | Faults | 申告は無かった |
