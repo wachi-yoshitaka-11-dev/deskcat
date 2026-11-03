@@ -346,6 +346,10 @@ commitの参照が自動で出るが、何が済んで何が残ったかは書�
 
 - コメントには、このmergeで済んだこと、まだ残っていること（残りが無ければ「残り無し」）、
   参照するPull Requestとcommitを書く。
+- **同じ者が、このmergeで満たした受け入れ条件に、Issue本文でチェックを付ける**
+  （[#696](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/696)）。本文はIssueの今の状態であり、
+  コメントだけ書くと、本文を読んだ人が済んだ条件を残りと読む。チェックを付けるのは、満たしたと確かめた
+  条件だけである。満たしていない条件には付けない。
 - Issueをcloseする場合は、上の手順に従い、このコメントは要らない。
 
 作成時に、対応するIssueと同じassignee・labelを設定し、Projects v2 board
