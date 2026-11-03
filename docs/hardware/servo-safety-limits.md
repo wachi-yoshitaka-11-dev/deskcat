@@ -233,7 +233,7 @@ field単位の正は[TBD台帳](tbd-register.md)に定義しており、一部�
 駆動してよいのは、次をすべて満たすときだけである。
 
 - **電源:** 項目6の(a)の構成（`M-12001`を試験の間だけservo専用にし、予備の`MF-R135`を直列に入れる。Piは外す。ESP32はPCのUSBから給電する。servo電源の経路は端子台と線材で組み、breadboardとjumper wireを使わない）。
-- **build:** 測定用のbuildだけを使い、**Piとの通信linkを持たない。**初回（#17）は、1回の起動で1 commandだけを出し、動作角を狭い仮の制限でclampし、露出時間の後にdutyを0へ戻し、NVSのlatchで再実行を止めるbuildを使う（下の`初回動作の実行手順`の`build`と`単発動作`）。**#18の校正と#19の実機limiter試験で使うbuild（複数のcommandやlimiterを通す駆動）は、その動作と仮の制限をこの文書に書いたうえで、その回の実行承認で範囲を決める。**firmwareの変更と`compile_error!`の扱いは、項目5の、外す注記を挙げた段落（「再開の条件は、この節では定めない。」で始まる段落）とその後の2026-09-30追記の手順に従う別のPull Requestで行う（2026-10-13に行った。[承認の状態](#承認の状態)の項目6の(b)の記録）。
+- **build:** 測定用のbuildだけを使い、**Piとの通信linkを持たない。**初回（#17）は、1回の起動で1 commandだけを出し、動作角を狭い仮の制限でclampし、露出時間の後にdutyを0へ戻し、NVSのlatchで再実行を止めるbuildを使う（下の`初回動作の実行手順`の`build`と`単発動作`）。**#18の校正と#19の実機limiter試験で使うbuild（複数のcommandやlimiterを通す駆動）は、その動作と仮の制限をこの文書に書いたうえで、その回の実行承認で範囲を決める。**（#18の分の動作と仮の制限の案は[#18の校正（案）](#18の校正案)。承認していない。）firmwareの変更と`compile_error!`の扱いは、項目5の、外す注記を挙げた段落（「再開の条件は、この節では定めない。」で始まる段落）とその後の2026-09-30追記の手順に従う別のPull Requestで行う（2026-10-13に行った。[承認の状態](#承認の状態)の項目6の(b)の記録）。
 - **負荷:** 初回は無負荷（ホーンを外す）。頭を載せる駆動（#18の校正）は、その回の実行承認で範囲を決める。
 - **監視:** 人間が立ち会い、`M-12001`を直ちに抜ける状態を保つ。無人で続けない。停止基準は`初回動作の実行手順`の`停止基準`に従う。
 
@@ -767,6 +767,90 @@ firmware（`firmware/esp32/src/servo.rs`、
     含む）を[experiment-log.md](experiment-log.md)へ新しいEXP番号（着手時点で未使用の
     次番号）で記録する。観察から確定値を導かない。calibrationとgate解決は別途進める。
 
+## #18の校正（案）
+
+> **案である。まだ誰も承認していない。**[測定のための駆動](#測定のための駆動承認の状態の項目6)の`build`の項が求める、#18の校正で使うbuildの**動作と仮の制限**の下書きである。**手順・停止基準・受け入れ条件との対応は、この変更では書かない**（下の「手順・停止基準・受け入れ条件」）。
+> 承認の状態は[承認の状態](#承認の状態)が持つ（ここへ再掲しない）。**この節が書いてあることは、駆動してよいことを意味しない。**駆動の回ごとの実行承認（項目6の(c)）が要る。
+> firmwareの実装は別のPull Requestで行い、**この節がmergeされた後に着手する。この節の「校正buildの仕様」だけを仕様にする。**buildの名前（feature名）は`bench-servo-calib-18`を案とする。
+> **値は「出所あり」（記録を指す）、「運用上の値」（出所は無い。監視下の測定のための仮の制限で、回ごとの実行承認が決める。5項目の根拠にはしない。小さい側・短い側へ倒した）、「TBD」（決め方を書く）に分ける。AIの記憶では決めない。**
+
+### 前提（出所つきの事実。#17）
+
+| 項目 | 値 | 限界・出所 |
+|---|---|---|
+| 指令して動いた範囲 | 角度規約（一般値。確定値ではない）の90°と105°。無負荷（ホーンなし）、露出300 ms | 規約上の90°が機械的中央かは未確認。[EXP-028](experiment-log.md#exp-028-sg90の初回のサーボ動作の試み測定用buildジャンパー線の接続2回試みた)、[EXP-045](experiment-log.md)、[EXP-049](experiment-log.md)、[#17の判定comment 6474881537](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6474881537) |
+| 動いた向きと量 | 時計回り（軸を上から見て）、90°指令で約90°、105°指令で約105°（ユーザーの申告） | 目視。動く前の位置は不明。**機械的中央・可動域の根拠にしない** |
+| PWM（実測） | 周期19.97〜20.07 ms、パルス幅1.56〜1.66 ms（16パルス、301.5 ms） | 刻み約0.104 ms。[EXP-030](experiment-log.md)の段1・段1b |
+| 電流（無負荷） | AC投入 約0.51〜0.73 A、動作 約0.76〜0.86 A（山の幅 約144 ms） | 絶対値の確度は主張しない。[#17の判定comment 6474451236](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6474451236)。連続電流との比較は、手順のPull Requestで書く |
+| 熱・異音・唸り | 無し（ユーザーの申告） | 荷重をかけた駆動は未実施 |
+| 速度・加速度・stall電流 | **取っていない** | 無負荷の単発のみ。stall電流は取らない方針（[#17の判定comment 6474881537](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6474881537)の(d)）。**stall電流の実測は、`HW-TBD-010`／`011`で引き続き必要であり、未解決**（[tbd-register.md](tbd-register.md)） |
+| 首の固定 | 発泡スチロールの天板に帯で固定。ホーンは軸に嵌めていない。頭の荷重は未確認 | [EXP-054](experiment-log.md#exp-054-首の固定方法を発泡スチロールの天板と底板に非通電で当てた)、[enclosure-and-neck.md](enclosure-and-neck.md) |
+
+### 校正buildの仕様（案）
+
+**firmwareの実装はこの節だけを仕様にする**（実装の担当は、この節の変更が`develop`へmergeされた後に着手する）。実装に要ることはここへ書く。**値は「出所あり」「運用上の値」「TBD」に分ける。「運用上の値」は出所が無く、監視下の測定のための仮の制限であり、回ごとの実行承認が決める。5項目の根拠にはしない（実行承認は小さくしてよい。大きくするときは、直前の回の記録を根拠に示す）。いずれも、build定数として回ごとの実行承認が決める**（下の「build定数」）。この分け方は実機側のPMの決定（2026-11-03）による。
+
+**名前と構成**
+
+| 項目 | 仕様 |
+|---|---|
+| feature名 | **`bench-servo-calib-18`**（案。`firmware/esp32/Cargo.toml`の`[features]`へ`bench-servo-calib-18 = []`。他のfeatureを含まない） |
+| Pi link | **持たない。**`crate::boot_session`とUART1を、このfeatureのbuildでcompileしない。`bench-servo-test-17`と同じく、`#[cfg(not(feature = "bench-servo-calib-18"))]`で外す（製品経路の`cfg`も外れる） |
+| 併用 | **単独の試験buildとして使う。**他の試験feature（`bench-servo-test-17`、`bench-servo-90-17`、`tap-21`、`debug-motion-19`、`mem-probe-23`、`bringup-*`、`*-sample-*`、`touch-*`、`face-21`ほか）と併用できない（`compile_error!`で理由を示して止める。`main.rs`の既存の同種の止め方に合わせる）。LCD（`DISP-01`）は通電しない（`通電前の現物確認`(d)） |
+| 製品build | 変えない。featureを付けない通常buildは、`crate::servo`を呼ばず、GPIO27を駆動しない |
+| servoを駆動する型 | **`LimitedServo`（`Limiter`を通る）だけを使う。**`Sg90::move_to_angle_once`（limiterを通らない）をこのbuildから呼ばない。`bench-servo-test-17`の`GO17`・NVSのlatch・単発の経路をこのbuildへ持ち込まない |
+| `Sg90::new`を呼ぶ時点 | `GO18`の入力を受けた後。それまでGPIO27は未設定のまま（#17と同じ） |
+
+**build定数（`firmware/esp32/src/config.rs`の`SERVO_CALIB_18_*`）。**値は**回ごとの実行承認**が決める。実行承認で決まった値を書いたものが、その回のfirmwareの版になる（書き換えはその回の承認の範囲で行い、`承認の状態`の項目6の(c)に従う）。**値が未設定の間、このfeature付きの実機buildができてはならない**（`compile_error!`等。型検査・host testのための値を、実機buildに入る形で置かない。方法は実装が決めてPR本文に示す）。
+
+| 定数 | 意味 | 値 | 決め方・出所 |
+|---|---|---|---|
+| `APPROVED_MIN_DEG`／`APPROVED_MAX_DEG` | limiterの承認値の位置範囲（角度規約の度）。hard boundも同じ値にする（範囲を変える＝再build・再flash） | **TBD**（回ごと） | **範囲は、全ての回で、実測した機構の制限（非通電で手で測る）からmarginを引いた位置の内側でなければならない**（広げる回に限らない）。**ホーンや頭など荷重をかける回は、その状態で測った機構の制限による。**ホーンなしの回（軸の周りに機構が無い回）は、**#17で指令して動いた90°〜105°の内側**で足りる（`APPROVED_MAX_DEG`が105°を含む）。測り方とmarginの決め方は手順のPull Requestで書く。その外へ広げる量は、直前の回の記録を見て、その回の実行承認が決める。位置範囲の不変条件は、既存のlimiterが検査する |
+| `START_DEG` | `LimitedServo::new`へ渡す起動時の位置（承認値の範囲の内側） | **TBD**（回ごと） | 前の回の最後のlogの`position_deg`を第一にする。人が目盛で読んだ位置と食い違ったら、その回の実行承認で扱う。**最初の回は105°**（[EXP-049](experiment-log.md)の指令値。到達位置は未確認）。`APPROVED_MAX_DEG`が105°未満の回は、`START_DEG`を範囲の内側へ合わせる（外だと`LimitedServo::new`が拒否する）。**実機の位置と違えば、最初の出力はlimiterの速度制限を受けない**（`servo.rs`のmodule doc。動く量の上限は、実機の位置が不明なため決まらない。実機の位置が承認値の範囲の外にあれば、範囲の幅を超えうる）**同じ版のまま再起動して`GO18`を入れると、新しい回の`LimitedServo::new`には、flashした時点の`START_DEG`が渡る（前の回の終わりの位置ではない）。**そのため、回が終わった後、次の`GO18`の前に、(i) 前の回の最後のlogの`position_deg`で`START_DEG`を書き換えてflashし直すか、(ii) 人が目盛で軸が`START_DEG`にあることを確かめるか（**(ii)で軸が`START_DEG`にあると確かめられなければ、(i)を行う**）、のどちらかを行う（どちらを行うかは実行承認が決める。buildに、再起動後に`GO18`を受けない仕組みは足さない。NVSを使わない決定と両立しないため） |
+| `NEUTRAL_DEG` | `ServoLimits::new`へ渡すneutral（承認値の範囲の内側でなければならない） | **範囲が90°を含むときは90°**（規約上の仮定。運用上の値）。含まないときは、範囲の内側の値（`START_DEG`と同じでよい） | **検証していない。**機械的neutralとして記録しない（`HW-TBD-010`） |
+| `MAX_STEP_DEG` | 単一commandの最大変化量（`Cap`の承認値） | **2°**（運用上の値。約11 µs。規約の線形変換で） | 実行承認がこの値を大きくする場合も、最初の回は#17で指令した2点の差（15°）を超えない。目盛の読みの分解能より大きいことの確かめ方は、手順のPull Requestで書く |
+| `MAX_VELOCITY_DEG_S` | limiterの速度上限 | **10°/s**（運用上の値） | servoの実際の速度は取っていない。2°の移動は、加速と最初の`tick`の基準取り（出力しない）の分、算術の200 msより長くかかる。収まらなければ6の`exposure_elapsed`。**TBD：上げた後の値**（上げ方と見るものは、手順のPull Requestで書く） |
+| `REACHED_TOLERANCE_DEG` | 「目標へ着いた」と判定する、位置と目標の差 | **TBD**（最初の回の値は実行承認が置く） | LEDCのdutyの1刻みに相当する角度より大きく、`MAX_STEP_DEG`より小さい値 |
+| `MAX_ACCELERATION_DEG_S2` | limiterの加速度上限 | **TBD**（最初の回の値は実行承認が置く） | 手持ちに角加速度を測る手段が無い。**決め方：**最初の回は低い側から置き、行き過ぎ量・追従・音を見て上げる（手順のPull Requestで書く）。`acceleration_bound_conceded`が立たない組み合わせ（速度上限、制御周期との関係）は、実装が`Limiter`の仕様から確かめる。**測っているのは、上限を課したときの様子であり、servoの角加速度そのものではない** |
+| `CONTROL_PERIOD_NOMINAL_MS` | `ControlPeriod`の公称 | **20 ms**（運用上の値。PWM周期に合わせる選択。[EXP-030](experiment-log.md)は、PWM周期の実測19.97〜20.07 msであり、制御周期の出所ではない） | |
+| `CONTROL_PERIOD_TOLERANCE_MS` | `ControlPeriod`の許容幅 | **TBD**（最初の回の値は実行承認が置く） | **最初の回は、この値を決めるための回でもある**（`tick`の間隔をlogに出す）。外れるとlimiterがrejectしてlatchし、dutyは0になる。間隔はlogに残るので、次の回で値を決める |
+| `EXPOSURE_MS` | 1 commandの露出時間の上限（移動時間を含む） | **300 ms以下**（#17で駆動した値〔無負荷・ホーンなし、熱と異音の申告なし。安全の根拠ではない〕。ホーンなしより荷重をかける駆動は**TBD**） | 荷重（ホーン・底板・頭）をかけた値は#17に無い。その回の実行承認が、直前の記録（電流の山、熱、唸り）を見て決める |
+| `MAX_COMMANDS` | 1回の起動で受理するmotion commandの数（N） | **10**（運用上の値） | その回の目的に要るstep数が10を超えるときは、回を分ける（実行承認が決める） |
+| `MIN_COMMAND_INTERVAL_MS` | 前のcommandが終わってから、次を受けるまでの最短間隔 | **5000 ms**（運用上の値） | 人が結果を読む時間。`秒あたり受理command数`（`HW-TBD-020`）の仮の代わり |
+| `MAX_SESSION_S` | `GO18`から回を打ち切るまでの時間 | **TBD**（実行承認が、AC挿しの時間の上限から、AC挿しから`GO18`までの時間と、抜くまでの余裕を引いた値で置く） | 回がこの値まで続いても、AC挿しの時間の上限に先に当たらない値にする |
+
+**起動から終了までの動作**
+
+1. 起動する。**PWMを出さない（GPIO27を設定しない）。**`servo_calib_18_waiting_for_confirmation token=GO18`をlogに出し、UART0のconsoleで`GO18`（完全一致）を待つ。違う語・改行だけ・長すぎる行（16 byte超）は捨てて、`servo_calib_18_confirmation_rejected reason=mismatch|too_long`を出す。consoleの読み取りに失敗したら、**動かさずに終える（再起動まで何も受けない。`Sg90::new`を呼ばない）。`servo_calib_18_confirmation_failed error=...`をlogに出す。**待つ間の期限は置かない。**resetと書き込みとportを開いたときのresetは`GO18`を入力しないので動かない。NVSのlatchは使わない**（NVSは他のbuildの起動で消えうる。初回動作の実行手順の`再武装`stepの2026-09-30追記）。
+2. `GO18`を受けたら`servo_calib_18_confirmed`と、build定数の値（全部）を1行のlogに出す。`Sg90::new`、`LimitedServo::new`（`START_DEG`、`NEUTRAL_DEG`、上の制限、制御周期、catalog＝`calib`の1つ）を作る。作れなければ`servo_calib_18_limits_rejected error=...`を出して終える（PWMを出さない）。
+3. 以降、1つのloopで、(a) consoleの読み取り（別threadで読みmain loopへ渡す。`crate::debug_motion`と同じ形。`STOP`をtickの間隔の内で受けられるように、blockingで読まない。**読み取りthreadが失敗した場合（`ConsoleEvent::ReadFailed`、threadを起こせない）は、`servo_calib_18_console_failed error=...`を出し、dutyを0にして回を終える**）、(b) 動いている間は制御周期ごとに`LimitedServo::tick`を回す。
+4. 受けるcommandは**3種だけ**。大文字小文字を区別する。1行の長さの上限は既存の`MAX_DEBUG_LINE_BYTES`。
+   - `MOTION calib <deg>`：`<deg>`は角度規約の度（小数可）。形は`deskcat_servo::parse_debug_line`で読む。**`calib`以外のmotion名は、下の5の最初の判定で`UnknownMotion`として拒否する。**
+   - `STOP`：**進行中の動きを中止して、直ちにdutyを0にし、その回を終える**（下の「回の終わり」）。
+   - `END`：動いていないときに、dutyを0にして、その回を終える。動いている間に受けたら`Busy`で拒否する。
+   - それ以外の行は`UnknownCommand`で拒否し、logに残す。**拒否の名前は、`deskcat_servo::Rejection`の変数名をそのまま出す（`UnknownMotion`、`TargetOutOfHardRange`、`Busy`など）。校正buildが足す拒否は`UnknownCommand`、`RateLimited`、`ExceedsMaxStep`である。****無言で捨てない。**
+5. `MOTION calib <deg>`を受けたときの判定（この順）：(0) motion名が`calib`でなければ`UnknownMotion`、(i) 動いている間は`Busy`（N個目の動作中に届いたものもここ）、(ii) 前のcommandの終了から`MIN_COMMAND_INTERVAL_MS`未満なら`RateLimited`、(iii) 目標と現在位置（直前に出した位置。回の最初は`START_DEG`）の差の絶対値が`MAX_STEP_DEG`を超えるなら`ExceedsMaxStep`（**校正buildが自分で行う判定。**limiterの`max_step`は1 tick分のclampで、これではない。`ServoLimits`の`max_step`には`MAX_STEP_DEG`を渡す）、(iv) `LimitedServo::admit`が拒否したらその理由。拒否はどれも、dutyに触れず、動作を始めず、回も終えない。**次の目標は、前のcommandのlogの`position_deg`から`MAX_STEP_DEG`以内に置く**（着かずに終わった、または行き過ぎた後は、`ExceedsMaxStep`になりうる。人がlogを見て選び直す）。受理したら`servo_calib_18_command_accepted n=<何個目> target_deg=<値>`をlogに出す。
+6. **1 commandの動作：**受理した目標へ、`tick`ごとに`Limiter`を通した位置を出す。**目標へ着く（位置と目標の差が`REACHED_TOLERANCE_DEG`以内の状態が2 tick続く）か、`EXPOSURE_MS`に達した時点で`LimitedServo::stop`を呼び、dutyを0にする**（次のcommandは`LimitedServo::resume`で、`Stopped`が持つ最後の位置から作り直す）。dutyを保持しない。着いたら`servo_calib_18_motion_done reason=reached`、着かずに露出が尽きたら`reason=exposure_elapsed`。`Limiter`は目標の手前で減速しないため、加速度の上限が低いと行き過ぎて往復しうる（位置は承認値の範囲の内側）。`MAX_STEP_DEG`は目標の指定の上限で、行き過ぎの分を含まない。`position_deg=`（最後に出した位置）、`position_min_deg=`・`position_max_deg=`（そのcommandの間の最小・最大）、`pulse_us=`（位置から線形変換で計算した値。LEDCの量子化とclampの後の値ではない）、`elapsed_ms=`を出す。**`stop`の直前に、limiterのcounter（`LimitedServo::counters`）をcommandごとにlogへ出す**（`stop`で捨てるため、回全体の値はlogを足して読む）。**`stop`の失敗は握りつぶさずerrorで出し、その回を終える**（人が外部電源を切る）。
+7. **回の終わり**（次のどれか。終えたら**dutyを0にして、再起動まで何も受けない**。`servo_calib_18_session_end reason=... position_deg=<`Stopped::resume_position`>`を出し、`ServoFaultCounters`（`stop`と`resume`を越えて残る）を出す。limiterのcounterは上の6でcommandごとに出す）：`STOP`、`END`、`MAX_COMMANDS`個目の動作の終了（それまで次のcommandは上の5の(i)で`Busy`）、`MAX_SESSION_S`の経過、faultのlatch（`TickError`のどれか）、`stop`の失敗、consoleの読み取りの失敗（上の3）。**終えた後に届いた行は、`servo_calib_18_ignored_after_end len=<byte数>`をlogに出して捨てる**（無言で捨てない。動かさない。Nの後の拒否として、手順のPull Requestで観察する）。**`MAX_SESSION_S`の経過で動いている最中なら、動きを中止してdutyを0にする。**
+8. **fault：**`LimitedServo::tick`のエラー（測った間隔のreject、加速度の譲り、PWM出力の失敗）は、既存の動きどおりlatchし、`LimitedServo::stop`を呼び、回を終える。実機で確かめていないことは`servo.rs`のmodule docが持つ。
+9. logは全部UART0（`crate::console`）。**logの名前は上のとおり固定する**（人がgrepして記録する）。commandごとに`tick`の間隔の最小・最大（ms）も出す（`CONTROL_PERIOD_TOLERANCE_MS`を決めるため）。
+
+**この節の値は、`動作制限`表の承認値ではない。**表の承認値と設定可能なhard boundは、#18の測定が終わった後に、実測を根拠にPull Requestで埋める。
+
+### 手順・停止基準・受け入れ条件
+
+**手順、停止基準、受け入れ条件との対応は、この変更では書かない。**この build で最初に駆動する前に、別のPull Requestでこの節へ足す。**それまで、この buildで駆動しない。**（build定数の表の「手順のPull Requestで書く」は、そのPull Requestを指す。）
+
+### 決めたこと（実機側のPM、2026-11-03。build に関わるもの）
+
+**これは実機側のPMの決定であり、ユーザーの承認ではない。**承認は、回ごとの実行承認（項目6の(c)）と、この変更のPull Requestのmergeである。
+
+1. **NVSのlatchをやめ、起動のたびに`GO18`を要する形にする。**NVSは他のbuildの起動で消えうるため。
+2. **「運用上の値」**（build定数の表で、そう書いたもの）は、出所の無い、監視下の測定のための仮の制限であり、回ごとの実行承認が決める。5項目の根拠にはしない。
+3. **範囲は、全ての回で、機構の制限からmarginを引いた位置の内側**（広げる回に限らない。ホーンなしの回（軸の周りに機構が無い回）は#17の範囲で足りる。build定数`APPROVED_MIN_DEG`／`APPROVED_MAX_DEG`）。
+4. **jumper wireは、#18ではservo電源の経路に使わない。**
+5. 手順に関わる決定（servo内部の端を探さないこと、記録すること、加速度の扱いなど）は、手順のPull Requestで書く。
+
 ## 受け入れchecklist
 
 **2026-10-04追記。**ベンチ電源の購入申告は[hardware-bom.md](hardware-bom.md#ベンチ電源)に記録した。
@@ -838,3 +922,4 @@ Pi最低入力電圧の復帰条件に関する現在の扱いは[power-budget.m
 | 2026-10-17 | 38 | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。**測定用のbuild（`bench-servo-test-17`）を、起動だけでは動かさず、人間がUART0のconsoleへ`GO17`を入力したときだけ1回動かす形に変えた**（`firmware/esp32/src/main.rs`の`wait_for_bench_confirmation`）。EXP-028で、起動のたびに自動で動く作りが、書き込みの手順とDTR／RTSの扱い次第で意図しない起動を動作にしうると分かったため。`決定事項`の`arm delay`の行、`build`・`起動とarm delay`・`監視維持`・`単発動作`・`latch検証`の各stepを合わせて直した。latch（NVSの実行済みflag）は残し、入力を受けた後、動かす前にcommitする。動作制限表、有効化gate表、`承認の状態`、項目6の条件は変えていない |
 | 2026-10-19 | 39 | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。測定用の90度指令を`bench-servo-90-17`で選べるようにした。既存の`bench-servo-test-17`単独の105度指令は維持した。`承認の状態`の項目6へユーザーの2026-10-19の判断と未確認の前提を追記し、`初回動作の実行手順`の`build`・`単発動作`stepを両buildに合わせた。動作制限表、有効化gate表、停止基準、NVS latch、`GO17`、arm delay、露出時間、dutyを0へ戻す処理は変更していない。実機での動作・測定は行っていない |
 | 2026-10-20 | 40 | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。merge済みのPRを読み直して見つかった2点を直した。(1) **`起動とarm delay`の「`GO17`を入力した後は、servoの電源を抜き差ししない。」が、`停止基準`の「直ちに外部5 V電源を遮断する」を禁じるように読めた**（PR #608が、直前の「`arm delay`を過ぎたら、動かす意図で電源を入れない。」を置き換えた文）。意図は「動かす意図で入れ直さない」ことなので、その意図の文へ改め、`停止基準`に当たれば遮断することを同じ文に書いた。(2) **`承認の状態`の項目6の(a)の`ジャンパー線`の追記（PR #607）が、jumper wireを使わない条件もユーザーの継続承認の範囲に書いてあると読めた。**#17のcomment 5870421147の範囲にあるのはbreadboardを通さない条件だけで、jumper wireはPR #500のdiffでAIが範囲の外へ足したものである。事実のとおりに直した。手順の順序、動作制限表、有効化gate表、`承認の状態`が示す現在の状態、項目6の条件の文面は変えていない（項目6(a)の`ジャンパー線`の追記の出所の文だけを直した） |
+| 2026-11-03 | 41 | [#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)。**`#18の校正（案）`の節を足した。**測定のための駆動の`build`の項が求める、#18の校正buildの動作と仮の制限を、firmware実装の仕様として**案として**書いた（feature名`bench-servo-calib-18`、Pi linkを持たないこと、console command、log名、動作の順序、build定数）。値は、出所（#17の記録）のあるもの、出所の無い運用上の仮の制限（step 2°、速度10°/s、N＝10ほか。5項目の根拠にしない）。露出300 ms以下は#17で駆動した値、`TBD`に分けた。手順・停止基準・受け入れ条件との対応は、別のPull Requestで足す（それまでこのbuildで駆動しない）。実機側のPMの決定を、build に関わる範囲で書いた。ユーザーの承認ではない。**承認していない。**動作制限表、有効化gate表、`承認の状態`、受け入れchecklist、項目6の条件の文面は変えていない |
