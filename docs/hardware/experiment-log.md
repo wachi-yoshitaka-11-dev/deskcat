@@ -65,6 +65,7 @@
 | [EXP-051](#exp-051-ベンチ電源psu-bench-01を無負荷と負荷ボードで初めて使いccに入ることを確かめた) | [#525](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/525)。`PSU-BENCH-01`（`SPS-3010V`）の新しい電源の初回使用（無負荷と負荷ボード。DeskCat の回路はつながない） | 値の正なし（初回使用の記録。`PSU-BENCH-01`の行は[hardware-bom.md](hardware-bom.md)） |
 | [EXP-052](#exp-052-組み直した3枚の板で初回通電しbringup-led-514のled点灯と導通を取った) | [#512](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/512)・[#514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)の実機の窓。ブレッドボードを3枚（ESP32の板、LCDの板、センサーの板）に組み直し、通電前の導通20項目、ESP32のUSBだけの初回通電、`bringup-led-514`の書き込み、LEDの点灯（赤→白→2本→白の点滅）、抵抗の両端と3V3の電圧を取った。導通20項目は期待どおり、LEDは設計どおりに点き、加速度センサー（`0xe5`）と温度センサー（`0x60`）のI2C読み出しが成功した | 値の正なし（観測の記録。判定は書かない） |
 | [EXP-053](#exp-053-専用キーをpiへ置き偽esp32を相手に--cloud-speechを4件通した) | [#522](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/522)の実機の窓。専用キーをPiへ置き、現在のdevelop `f2c4ea1`を直接buildして、偽ESP32を相手に`--cloud-speech`で動かした。4件の`show_text`が届いた | 値の正なし（観測の記録。専用Workspaceへの計上は未確認で、実ESP32・LCDでの表示も未確認） |
+| [EXP-054](#exp-054-首の固定方法を発泡スチロールの天板と底板に非通電で当てた) | [#34](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/34)の実機の窓（非通電）。サーボ本体を天板の切り欠きへ入れて耳の上に結束バンドをかぶせ、十字形ホーンを底板へ結束バンドで留めた | 値の正なし（観測の記録。詳細は[enclosure-and-neck.md](enclosure-and-neck.md#現物に当てた記録2026-11-03非通電発泡スチロール)。段ボールでの当て合わせと、頭の重さをかけた保持は未確認） |
 
 **大容量の生dataはこのrepositoryへ入れていない。**保存場所は
 [development-foundation-plan.md](../planning/development-foundation-plan.md)の
@@ -5117,6 +5118,28 @@ ESP32のlog：1回目`19f0ea679a88273c0df2bc8f4c68db7fbe6faff80a170a2d350ec41847
 
 Consoleの使用量の画面へ、2026-11-01 01:39〜01:43Zの試行が計上されたことを数時間後に確認する。月額`$2`の上限が効くことの確認の手段と、キーのscopeの確認は、まだ決めていない（TBD）。その後、実ESP32とLCDをつないだ窓（#34・#18・#19・#21の後）で、ローカル独り言の表示を確かめてから`--cloud-speech`を足す。
 
+## EXP-054: 首の固定方法を発泡スチロールの天板と底板に非通電で当てた
+
+[#34](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/34)の「首の固定方法」（PR #673）を、非通電で現物に当てた。**サーボ・Pi・ESP32・14本の線には触れていない。**観察の内容は[enclosure-and-neck.md](enclosure-and-neck.md#現物に当てた記録2026-11-03非通電発泡スチロール)に書き、ここには窓の条件だけを置く。
+
+| 項目 | 内容 |
+|---|---|
+| Test ID | `EXP-054` |
+| Date | 2026-11-03 JST |
+| Operator | 切る・なぞる・結束バンドを通して締める・押して見る・見て答えるのはユーザー。手順の案内と記録は作業セッション（AI） |
+| Hardware revision／Exact components | `SERVO-01`（SG90 のサーボ本体。取付耳つき）、付属の十字形ホーン、結束バンド、発泡スチロール（ユーザーが段ボールの代わりに使った）。`ACCEL-01`（ADXL345）のモジュールは目で見ただけ |
+| Wiring revision | 無し（配線に触れていない。サーボのコネクタはどこにも挿していない） |
+| Power supply and current limit | 無し（サーボへ通電していない。AC は使っていない） |
+| Firmware commit/profile | 無し |
+| Configuration | 天板：発泡スチロール1枚 40 × 70 mm。底板：1枚 60 × 60 mm。帯：耳に2本、ホーンの腕に2本 |
+| Measurement equipment | 定規（厚みを「だいたい」で読む）。測定の精度は求めていない |
+| Procedure | [enclosure-and-neck.md](enclosure-and-neck.md#現物に当てた記録2026-11-03非通電発泡スチロール)の手順どおり。止まる点A〜E |
+| Expected result | 選んだ固定方法が、サーボ本体と十字形ホーンを動かなくできるか見る（期待値は設けていない） |
+| Measured result | [enclosure-and-neck.md](enclosure-and-neck.md#現物に当てた記録2026-11-03非通電発泡スチロール) |
+| Faults | 申告は無かった |
+| Conclusion | 判定の語を書かない。観察は上の文書のとおり |
+| Next safe step | 段ボールでの確認、頭の重さをかけた保持（#18 の監視下の試験）、14本の線の取り回し。いずれも未実施 |
+
 ## Revision履歴
 
 | 日付 | Revision | 変更 | 根拠 |
@@ -5182,3 +5205,4 @@ Consoleの使用量の画面へ、2026-11-01 01:39〜01:43Zの試行が計上さ
 | 2026-11-01 | 58 | [#522](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/522)。**`EXP-053`を追加した。**専用キーをPiへ置き（root所有・mode `0600`）、develop `f2c4ea1`の`deskcatd`をPiで直接build（36分20秒、exit 0）して、偽ESP32を相手に`--cloud-speech`で200秒動かし、クラウド由来の`show_text` 4件を受けた記録。専用Workspaceへの計上、実ESP32・LCD、本番unitでの有効化は未確認 | `EXP-053`の観察。Consoleの使用量は反映待ち |
 | 2026-11-01 | 59 | [#522](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/522)。**`EXP-053`に「Consoleの観察」を足した。**Consoleのログの画面にWorkspace「DeskCat」の`claude-haiku-5-5`の要求が4件あり、使用量の画面は0（反映待ちと読んでいるが切り分けていない）。上限が効くこととキーのscopeは未確認のまま | ユーザーの画面の報告（画像はrepositoryへ入れない） |
 | 2026-11-01 | 60 | [#34](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/34)。公開の記録に PM のセッション名が入っていたため、3332 行目の PM のセッション名の表記を「実機側の PM」に置き換えた。意味は変えていない。観測値、判定、他の記述は変更していない | VM 側の PM の判断（実機側の PM 経由） |
+| 2026-11-03 | 61 | [#34](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/34)。**`EXP-054`を追加した。**首の固定方法を、発泡スチロールの天板と底板に非通電で当てた。観察は[enclosure-and-neck.md](enclosure-and-neck.md)に書き、ここには窓の条件だけを置いた。観測値の判定は書いていない | 作業セッションの記録（ユーザーの回答による） |
