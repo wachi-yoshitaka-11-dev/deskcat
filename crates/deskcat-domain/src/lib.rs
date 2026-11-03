@@ -9,6 +9,7 @@
 //! - 時間の進行でneutralへ戻ること（[`Mind::tick`]）
 //! - 同じ種類のeventが短い間隔で続いたときの抑制と、その計数（[`Counters`]）
 //! - ローカル独り言の文候補と頻度制限（[`LocalSpeech`]、Issue #23）
+//! - 温湿度・気圧・揺れ・時刻による吹き出し・表情・首振りの要求（[`Companion`]、Issue #685）
 //!
 //! 含まないもの:
 //!
@@ -42,9 +43,14 @@
 //! （Protocol §4.7の完了eventは未導入）。どこで抑えるか（ESP32のclassifierか、
 //! 完了eventを使う`deskcatd`か）は#22と#491の段階2で決める。
 
+mod companion;
 mod local_speech;
 mod mind;
 
+pub use companion::{
+    Ambient, Bubble, Companion, Config, Counters as CompanionCounters, Face, LocalMinutes,
+    NeckRequest, Output,
+};
 pub use local_speech::{LOCAL_SPEECH_LINES, LocalSpeech, SpeechCounters};
 
 pub use mind::{
