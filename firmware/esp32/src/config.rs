@@ -143,6 +143,72 @@ pub const SERVO_BENCH_TEST_ARM_DELAY_MS: u32 = 10_000;
 #[allow(dead_code)]
 pub const SERVO_BENCH_TEST_EXPOSURE_MS: u32 = 300;
 
+// `bench-servo-calib-18`（#18の校正build）のbuild定数。仕様は
+// [servo-safety-limits.md](../../../docs/hardware/servo-safety-limits.md)の`#18の校正（案）`の
+// `校正buildの仕様（案）`節の表（定数の意味、決め方、出所はそこが正本。**ここへ写さない**）。
+//
+// **どの定数にも値を置かない（`None`）。**「運用上の値」を含め、既定値を置かない。**回ごとの実行承認が
+// 決めた値を、その回の版として`Some(..)`で書く**（`承認の状態`の項目6の(c)）。**値が1つでも`None`の間、
+// このfeature付きのbuildは、`servo_calib`の定数の評価（`calib_18_required`の`panic!`）で
+// compileが止まる。**型検査やhost testのための値を、この形で置かない。
+//
+// 単位は名前のとおり（`_DEG`は角度規約の度、`_MS`はミリ秒、`_S`は秒、`_DEG_S`は度毎秒、`_DEG_S2`は度毎秒毎秒）。
+
+/// limiterの承認値の位置範囲の下端。hard boundも同じ値にする。
+#[cfg(feature = "bench-servo-calib-18")]
+pub const SERVO_CALIB_18_APPROVED_MIN_DEG: Option<f32> = None;
+/// limiterの承認値の位置範囲の上端。hard boundも同じ値にする。
+#[cfg(feature = "bench-servo-calib-18")]
+pub const SERVO_CALIB_18_APPROVED_MAX_DEG: Option<f32> = None;
+/// `LimitedServo::new`へ渡す起動時の位置。
+#[cfg(feature = "bench-servo-calib-18")]
+pub const SERVO_CALIB_18_START_DEG: Option<f32> = None;
+/// `ServoLimits::new`へ渡すneutral。
+#[cfg(feature = "bench-servo-calib-18")]
+pub const SERVO_CALIB_18_NEUTRAL_DEG: Option<f32> = None;
+/// 単一commandの最大変化量（`Cap`の承認値。hard boundも同じ値にする）。
+#[cfg(feature = "bench-servo-calib-18")]
+pub const SERVO_CALIB_18_MAX_STEP_DEG: Option<f32> = None;
+/// limiterの速度上限（`Cap`の承認値。hard boundも同じ値にする）。
+#[cfg(feature = "bench-servo-calib-18")]
+pub const SERVO_CALIB_18_MAX_VELOCITY_DEG_S: Option<f32> = None;
+/// 「目標へ着いた」と判定する、位置と目標の差。
+#[cfg(feature = "bench-servo-calib-18")]
+pub const SERVO_CALIB_18_REACHED_TOLERANCE_DEG: Option<f32> = None;
+/// limiterの加速度上限（`Cap`の承認値。hard boundも同じ値にする）。
+#[cfg(feature = "bench-servo-calib-18")]
+pub const SERVO_CALIB_18_MAX_ACCELERATION_DEG_S2: Option<f32> = None;
+/// `ControlPeriod`の公称。
+#[cfg(feature = "bench-servo-calib-18")]
+pub const SERVO_CALIB_18_CONTROL_PERIOD_NOMINAL_MS: Option<u32> = None;
+/// `ControlPeriod`の許容幅。
+#[cfg(feature = "bench-servo-calib-18")]
+pub const SERVO_CALIB_18_CONTROL_PERIOD_TOLERANCE_MS: Option<u32> = None;
+/// 1 commandの露出時間の上限（移動時間を含む）。
+#[cfg(feature = "bench-servo-calib-18")]
+pub const SERVO_CALIB_18_EXPOSURE_MS: Option<u32> = None;
+/// 1回の起動で受理するmotion commandの数。
+#[cfg(feature = "bench-servo-calib-18")]
+pub const SERVO_CALIB_18_MAX_COMMANDS: Option<u32> = None;
+/// 前のcommandが終わってから、次を受けるまでの最短間隔。
+#[cfg(feature = "bench-servo-calib-18")]
+pub const SERVO_CALIB_18_MIN_COMMAND_INTERVAL_MS: Option<u32> = None;
+/// `GO18`から回を打ち切るまでの時間。
+#[cfg(feature = "bench-servo-calib-18")]
+pub const SERVO_CALIB_18_MAX_SESSION_S: Option<u32> = None;
+
+/// `SERVO_CALIB_18_*`の値を取り出す。**`None`（未設定）のとき、定数の評価が失敗し、compileが止まる。**
+/// 失敗の表示は、評価していた定数の名前（`crate::servo_calib`の同名の定数）を指す。
+#[cfg(feature = "bench-servo-calib-18")]
+pub const fn calib_18_required<T: Copy>(value: Option<T>) -> T {
+    match value {
+        Some(value) => value,
+        None => panic!(
+            "SERVO_CALIB_18_*が未設定である。回ごとの実行承認が決めた値を、config.rsへ書いてからbuildする"
+        ),
+    }
+}
+
 /// Pi link（`PI-UART-TX`／`PI-UART-RX`）のbaud（Hz）。
 /// **確定値ではない。**`docs/protocol/esp32-pi-protocol.md`§2の`Baud`行が`Candidate`
 /// （両端で検証する）とする115200 bpsを使う（`PROTO-TBD-001`、最終baudは未確定）。

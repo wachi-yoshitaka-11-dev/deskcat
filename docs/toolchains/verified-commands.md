@@ -91,6 +91,8 @@ CIでの成否は、この変更を含むPull Requestのcheck結果で確認す�
 
 **`debug-motion-19` feature（[#19](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/19)）を有効にする場合は、既定構成に加えて`cargo clippy`と`cargo build`へ`--features debug-motion-19`を足したものも通す。**UART0のconsoleから`MOTION <name> <target>`の行を読み、Pi由来の`play_motion`と同じ`MotionDispatch`のcatalogへ渡す試験buildである。`LimitedServo`も`Limiter`も作らず、catalogが空のため、debugの指示も全て拒否される。製品buildには入らず、`bench-servo-test-17`・`touch-sample-14`・`touch-lcd-14`・`mem-probe-23`・`env-sample-16`・`accel-sample-15`・`bringup-i2c-15-16`・`bringup-led-514`とは併用できない（`compile_error!`）。firmware CIの`Build test modes`は、`debug-motion-19`と`debug-motion-19,face-21,tap-21`を`cargo clippy`と`cargo build`で確認する。build-onlyであり、実機の通電の記録は無い。この文を書いた時点では、VMで`cargo clippy`・`cargo build`を実行しておらず、CIの結果がこの構成を確認する根拠である。
 
+**`bench-servo-calib-18` feature（[#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)の校正build）は、`firmware/esp32/src/config.rs`の`SERVO_CALIB_18_*`が1つでも`None`の間はcompileが止まる**（`E0080`。値は回ごとの実行承認が決めるため、既定値を置かない）。したがって、**この文書の検証済みコマンドへ`--features bench-servo-calib-18`を足した構成は、値を書いていない版では通らない。firmware CIの`Build test modes`にも入れない。**他の試験featureとは併用できない（`compile_error!`）。値を書いた版の`cargo clippy`と`cargo build`は、その回の実行承認の前に、値を書いた版で通す。build-onlyであり、実機で動かした記録は無い。
+
 ### workspace との関係
 
 `firmware/esp32` は root workspace から `exclude` している。firmware の manifest は

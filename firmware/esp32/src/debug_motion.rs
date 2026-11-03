@@ -1,5 +1,7 @@
 //! debug consoleから、motion指示を1行ずつ受ける（[Issue #19](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/19)の
-//! 受け入れ条件3。`debug-motion-19` feature付きのbuildだけが持つ）。
+//! 受け入れ条件3。`debug-motion-19` feature付きのbuildが持つ。**`bench-servo-calib-18`のbuildも、
+//! 読み取りthreadだけをこのmoduleから使う**（`crate::servo_calib`。行の判定は`crate::servo_calib`が行い、
+//! 下の`MotionDispatch`は使わない））。
 //!
 //! UART0のconsole（stdin）を別threadで読み、`MOTION <name> <target>`の形の行を main loop へ渡す。
 //! 行の読み方は`deskcat_servo::parse_debug_line`、判定は`crate::pi_link::PiLink::on_debug_line`を通る
@@ -37,10 +39,18 @@ const THREAD_STACK_BYTES: usize = 6144;
 pub enum ConsoleEvent {
     /// 改行までの1行（改行を含まない）。
     Line(String),
-    /// [`MAX_DEBUG_LINE_BYTES`]を超えた行。改行まで捨てた。
-    TooLong,
+    /// [`MAX_DEBUG_LINE_BYTES`]を超えた行。改行まで捨てた。値は、その行の改行を除くbyte数。
+    TooLong(usize),
     /// 読み取りに失敗した（threadは止まる）。
     ReadFailed(String),
+    /// 空の行（改行だけ）。**`bench-servo-calib-18`のbuildだけが受ける**（仕様が改行だけの行をlogに出すと定めるため。
+    /// `debug-motion-19`のbuildは空行を事象にしない）。CRとLFが続く場合は1つとして数える。
+    #[cfg(feature = "bench-servo-calib-18")]
+    Empty,
+    /// UTF-8として読めない行。値は、その行の改行を除くbyte数。**`bench-servo-calib-18`のbuildだけが受ける**
+    /// （他のbuildは、不正なbyteを置き換えて`Line`にする）。
+    #[cfg(feature = "bench-servo-calib-18")]
+    NotUtf8(usize),
 }
 
 /// debug consoleの読み取り。threadを起こせなかった場合は何も受けない。
@@ -66,6 +76,13 @@ impl DebugConsole {
         Self { rx }
     }
 
+    /// 読み取りthreadを起こせたか。起こせなかった場合、[`DebugConsole::try_recv`]は何も返さない
+    /// （`bench-servo-calib-18`は、これで`servo_calib_18_confirmation_failed`を出して終える）。
+    #[cfg(feature = "bench-servo-calib-18")]
+    pub fn is_running(&self) -> bool {
+        self.rx.is_some()
+    }
+
     /// 受けた事象を1件取り出す。無ければ`None`。
     pub fn try_recv(&self) -> Option<ConsoleEvent> {
         self.rx.as_ref()?.try_recv().ok()
@@ -76,6 +93,10 @@ fn read_console(tx: &mpsc::SyncSender<ConsoleEvent>) {
     let mut stdin = std::io::stdin();
     let mut line: Vec<u8> = Vec::with_capacity(MAX_DEBUG_LINE_BYTES);
     let mut overflowed = false;
+    // 現在の行の、改行を除くbyte数（上限を超えた分も数える）。
+    let mut line_bytes: usize = 0;
+    #[cfg(feature = "bench-servo-calib-18")]
+    let mut previous_was_cr = false;
     let mut buf = [0_u8; READ_BYTES];
     loop {
         let n = match stdin.read(&mut buf) {
@@ -94,19 +115,39 @@ fn read_console(tx: &mpsc::SyncSender<ConsoleEvent>) {
             let event = match byte {
                 b'\r' | b'\n' => {
                     let event = if overflowed {
-                        Some(ConsoleEvent::TooLong)
+                        Some(ConsoleEvent::TooLong(line_bytes))
                     } else if line.is_empty() {
-                        None
+                        // CRLFのLFは、CRで終えた行の続きであり、空行ではない。
+                        #[cfg(feature = "bench-servo-calib-18")]
+                        let empty = if byte == b'\n' && previous_was_cr {
+                            None
+                        } else {
+                            Some(ConsoleEvent::Empty)
+                        };
+                        #[cfg(not(feature = "bench-servo-calib-18"))]
+                        let empty = None;
+                        empty
                     } else {
-                        Some(ConsoleEvent::Line(
+                        // `bench-servo-calib-18`は、不正なUTF-8の行を置き換えずに、byte数だけを持つ事象にする
+                        // （`ignored_after_end`の`len`をbyte数にするため）。
+                        #[cfg(feature = "bench-servo-calib-18")]
+                        let text = match std::str::from_utf8(&line) {
+                            Ok(text) => Some(ConsoleEvent::Line(text.to_owned())),
+                            Err(_) => Some(ConsoleEvent::NotUtf8(line_bytes)),
+                        };
+                        #[cfg(not(feature = "bench-servo-calib-18"))]
+                        let text = Some(ConsoleEvent::Line(
                             String::from_utf8_lossy(&line).into_owned(),
-                        ))
+                        ));
+                        text
                     };
                     line.clear();
                     overflowed = false;
+                    line_bytes = 0;
                     event
                 }
                 other => {
+                    line_bytes = line_bytes.saturating_add(1);
                     if line.len() < MAX_DEBUG_LINE_BYTES {
                         line.push(other);
                     } else {
@@ -115,6 +156,10 @@ fn read_console(tx: &mpsc::SyncSender<ConsoleEvent>) {
                     None
                 }
             };
+            #[cfg(feature = "bench-servo-calib-18")]
+            {
+                previous_was_cr = byte == b'\r';
+            }
             if let Some(event) = event {
                 if tx.send(event).is_err() {
                     return;

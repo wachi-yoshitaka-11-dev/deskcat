@@ -79,6 +79,12 @@ mem-probe-23 = []
 # `bench-servo-test-17`・`touch-sample-14`・`touch-lcd-14`・`mem-probe-23`・`env-sample-16`・`accel-sample-15`・
 # `bringup-i2c-15-16`・`bringup-led-514`とは併用できない（`main.rs`の`compile_error!`）。
 debug-motion-19 = []
+# Issue #18の校正build。UART0のconsoleから`GO18`を受けた後、`MOTION calib <deg>`・`STOP`・`END`だけを受け、
+# `LimitedServo`（`Limiter`を通る）だけでservoを駆動する（`src/servo_calib.rs`。仕様は`docs/hardware/servo-safety-limits.md`の
+# `#18の校正（案）`の`校正buildの仕様（案）`）。**製品buildには入らない。Pi link（`boot_session`、UART1）、heartbeat、I2C、LCDを持たない。**
+# **`src/config.rs`の`SERVO_CALIB_18_*`が1つでも`None`の間は、compileが止まる**（値は回ごとの実行承認が決める。既定値を持たない）。
+# 他の試験featureとは併用できない（`main.rs`の`compile_error!`）。**実機では動かしていない。手順・停止基準のPull Requestがmergeされるまで駆動しない。**
+bench-servo-calib-18 = []
 # Issue #14 の `TOUCH-01`（XPT2046）の raw 読み出し専用。SPI3（GPIO18/23/19）で X・Y・Z1・Z2 を読み、`TOUCH-IRQ`（GPIO34）の level とあわせて
 # UART0 に出す。LCD は初期化せず（`LCD-CS` を High に固定するだけ）、状態機械は配線しない（`src/touch.rs`）。単独の試験 build として使う。
 touch-sample-14 = []

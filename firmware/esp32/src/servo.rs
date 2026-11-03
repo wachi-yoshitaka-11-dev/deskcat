@@ -103,7 +103,7 @@
 //!
 //! **latchは「それ以上動かさない」までであり、「出力を止める」ではない。**LEDCは最後に設定した
 //! dutyを出し続けうる。**[`TickError`]のどれを受けても、呼び出し側は[`LimitedServo::stop`]を呼ぶ。**
-//! その配線（`main.rs`）はまだ無い。
+//! その配線は`bench-servo-calib-18`のbuild（`crate::servo_calib`）だけが持つ（`tick`のエラーの後に`stop`を呼ぶ）。
 //!
 //! # 間隔の基準と、tickを呼び続ける前提
 //!
@@ -171,11 +171,12 @@
 //! 度からpulse幅への変換は、下の一般値による線形変換のままであり、**calibration済みの
 //! 変換ではない**（`HW-TBD-026`／`010`）。
 //!
-//! **既定build（`bench-servo-test-17` featureなし）は`main()`からこのmoduleを
+//! **既定build（`bench-servo-test-17`も`bench-servo-calib-18`も付けないbuild）は`main()`からこのmoduleを
 //! 呼ばない**（gate状態は[TBD台帳](../../../docs/hardware/tbd-register.md)、理由は
 //! [servo-safety-limits.md](../../../docs/hardware/servo-safety-limits.md)の
 //! `サーボ出力を有効化してよい条件`が正本）。`bench-servo-test-17` feature付きbuild
-//! だけが[`run_servo_bench_test`](../../../firmware/esp32/src/main.rs)経由で呼ぶ
+//! が[`run_servo_bench_test`](../../../firmware/esp32/src/main.rs)経由で、`bench-servo-calib-18` feature付きbuild
+//! が[`servo_calib::run`](../../../firmware/esp32/src/servo_calib.rs)経由で呼ぶ
 //! （承認の状態は同文書の`承認の状態`節が正本）。
 //!
 //! pin割り当ては[gpio-assignment.md](../../../docs/hardware/gpio-assignment.md)の
@@ -189,7 +190,7 @@
 
 // 既定buildは`main()`からこのmoduleを呼ばないためdead_codeになる（module doc参照）。
 // `Sg90`の一部は`bench-servo-test-17` feature付きbuildで呼ばれる。
-// `LimitedServo`、`Stopped`、`ServoFaultCounters`は、今はどのbuildからも呼ばれない。
+// `LimitedServo`、`Stopped`、`ServoFaultCounters`は、`bench-servo-calib-18`付きのbuild（`crate::servo_calib`）だけが呼ぶ。
 #![allow(dead_code)]
 
 use core::fmt;
@@ -658,6 +659,12 @@ impl<'d> LimitedServo<'d> {
 /// 角度（`SERVO_ANGLE_CONVENTION_MIN_DEG`〜`_MAX_DEG`）をpulse幅（マイクロ秒）へ
 /// 線形変換する（module doc参照）。
 fn pulse_width_us_for_angle(angle_deg: f32) -> u32 {
+    exact_pulse_width_us_for_angle(angle_deg).round() as u32
+}
+
+/// [`pulse_width_us_for_angle`]の、丸める前の値（マイクロ秒）。**LEDCの量子化とclampの前の、一般値の
+/// 線形変換の値である**（`bench-servo-calib-18`がlogへ出す`pulse_us`。`crate::servo_calib`）。
+pub(crate) fn exact_pulse_width_us_for_angle(angle_deg: f32) -> f32 {
     let min_deg = crate::config::SERVO_ANGLE_CONVENTION_MIN_DEG;
     let max_deg = crate::config::SERVO_ANGLE_CONVENTION_MAX_DEG;
     let min_us = crate::config::SERVO_PULSE_WIDTH_MIN_US as f32;
@@ -665,5 +672,5 @@ fn pulse_width_us_for_angle(angle_deg: f32) -> u32 {
 
     let angle_deg = angle_deg.clamp(min_deg, max_deg);
     let ratio = (angle_deg - min_deg) / (max_deg - min_deg);
-    (min_us + ratio * (max_us - min_us)).round() as u32
+    min_us + ratio * (max_us - min_us)
 }
