@@ -39,6 +39,9 @@
 //!   生成された`sdkconfig`で100なら10 ms）で待つ。最初のtickの前に1 tick待って、tickの境に揃えてから刻む。
 //!   **実機での間隔は確かめていない**（commandごとに`tick_min_ms`／`tick_max_ms`をlogに出す。`CONTROL_PERIOD_TOLERANCE_MS`を
 //!   決めるための値である）。
+//! - **露出の期限（`EXPOSURE_MS`）は、周の始めで判定する。厳密な上限ではない。**期限の前の最後の周で、
+//!   通常の待ち（`delay_ms(公称周期)`。tick単位へ切り上げる）、consoleの処理、判定の後のtick1回（limiterの計算と
+//!   PWMの設定）の分だけ、期限を超えうる。残りが公称周期以下になった周は、tickの整数倍へ切り下げた時間だけ待って止める。
 //! - **`MAX_ACCELERATION_DEG_S2`と速度上限・制御周期の組み合わせが`acceleration_bound_conceded`を立てないことは、
 //!   この実装では確かめていない。**`Limiter::step`のdocは、許容幅の内側で立たないとする（`deskcat_servo`の
 //!   `tests/trajectory.rs`の組み合わせで1度も立たなかった）が、この校正buildの値で確かめた試験は無い。
@@ -544,7 +547,9 @@ fn run_motion(
             break;
         }
 
-        // 期限に達していれば、tickせず（新しい位置を出さず）に終える。待ちやconsoleのlogで期限を過ぎることがある。
+        // 期限は、周の始めで判定する。達していれば、tickせず（新しい位置を出さず）に終える。前の周の待ち
+        // （tick単位へ切り上げる）とconsoleの処理で、期限を過ぎていることがある。判定の後のtick1回
+        // （limiterの計算とPWMの設定）の間も、期限を超えうる。
         if motion_start.elapsed() >= exposure {
             done_reason = Some("exposure_elapsed");
             break;
@@ -578,16 +583,20 @@ fn run_motion(
             done_reason = Some("reached");
         } else {
             // 次のtickの前に露出が尽きるなら、tickせず、残りだけ待って止める
-            // （`EXPOSURE_MS`は上限であり、期限の後に新しい位置を出さない）。
+            // （`EXPOSURE_MS`は厳密な上限ではない。期限は周の始めで判定するので、通常の待ち・consoleの処理・
+            // tick1回の分だけ超えうる）。
             // `delay_ms`はtick単位へ切り上げるので、待ちはtickの整数倍へ切り下げる。残りがtick1つに
             // 満たなければ待たずに止める（上限より早く止める側へ倒す）。
             let remaining = exposure.saturating_sub(motion_start.elapsed());
             if remaining <= period {
-                let tick_ms = (1000 / esp_idf_svc::sys::CONFIG_FREERTOS_HZ).max(1);
-                let remaining_ms = u32::try_from(remaining.as_millis()).unwrap_or(u32::MAX);
-                let wait_ms = remaining_ms / tick_ms * tick_ms;
-                if wait_ms > 0 {
-                    FreeRtos::delay_ms(wait_ms);
+                // tick数で数える（`CONFIG_FREERTOS_HZ`が1000を割り切れなくても、残りを超えて待たない）。
+                // `delay_ms`はmsをtick数へ切り上げるので、切り下げたtick数に対応するmsを切り上げて渡す。
+                let hz = u64::from(esp_idf_svc::sys::CONFIG_FREERTOS_HZ);
+                let wait_ticks =
+                    u64::try_from(remaining.as_millis()).unwrap_or(u64::MAX) * hz / 1000;
+                if wait_ticks > 0 {
+                    let wait_ms = (wait_ticks * 1000).div_ceil(hz);
+                    FreeRtos::delay_ms(u32::try_from(wait_ms).unwrap_or(u32::MAX));
                 }
                 done_reason = Some("exposure_elapsed");
             } else {
