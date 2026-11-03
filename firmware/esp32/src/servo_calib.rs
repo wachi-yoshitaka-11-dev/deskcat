@@ -32,7 +32,7 @@
 //!   `stop`の後は、すぐ`resume`で作り直して次のcommandを待つ（tickの履歴を持ち越すと、間隔が許容幅の外になりlatchするため）。
 //! - **`position_min_deg`／`position_max_deg`は、そのcommandの開始位置を含む。**
 //! - **logの名前を足した**: `servo_calib_18_command_refused`（拒否の記録。`reason=`は仕様の名前）、
-//!   `servo_calib_18_limiter_counters`（動作中のcommandでは、counterの値を`stop`の前に取り、logは`stop`の後に出す。dutyを先に0にするため。仕様は`stop`の直前に出すと書く）、`servo_calib_18_refusals_dropped`（動作中に拒否した行のlogが溜める上限を超えた件数）、`servo_calib_18_motion_interrupted`（途中で終えたcommandの`motion_done`と同じ項目。`reason=`は`session_end`と同じ）。`reason=`の値で仕様が列挙していない
+//!   `servo_calib_18_limiter_counters`（動作中のcommandでは、counterの値を`stop`の前に取り、logは`stop`の後に出す。dutyを先に0にするため。仕様の動作の6と同じ）、`servo_calib_18_refusals_dropped`（動作中に拒否した行のlogが溜める上限を超えた件数）、`servo_calib_18_motion_interrupted`（途中で終えたcommandの`motion_done`と同じ項目。`reason=`は`session_end`と同じ）。`reason=`の値で仕様が列挙していない
 //!   `session_end`のもの（`stop`、`end`、`max_commands`、`max_session`、`fault`、`stop_failed`、
 //!   `console_failed`、`limits_rejected`）は実装が付けた。
 //! - **tickの間隔は、`delay_ms(公称周期)`で刻む。**`FreeRtos::delay_ms`はtick単位（`CONFIG_FREERTOS_HZ`。

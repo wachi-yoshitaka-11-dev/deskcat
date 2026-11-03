@@ -814,7 +814,7 @@ firmware（`firmware/esp32/src/servo.rs`、
 | `MAX_ACCELERATION_DEG_S2` | limiterの加速度上限 | **TBD**（最初の回の値は実行承認が置く） | 手持ちに角加速度を測る手段が無い。**決め方：**最初の回は低い側から置き、行き過ぎ量・追従・音を見て上げる（範囲を広げる段のPull Requestで書く）。`acceleration_bound_conceded`が立たない組み合わせ（速度上限、制御周期との関係）は、実装が`Limiter`の仕様から確かめる。**測っているのは、上限を課したときの様子であり、servoの角加速度そのものではない** |
 | `CONTROL_PERIOD_NOMINAL_MS` | `ControlPeriod`の公称 | **20 ms**（運用上の値。PWM周期に合わせる選択。[EXP-030](experiment-log.md)は、PWM周期の実測19.97〜20.07 msであり、制御周期の出所ではない） | |
 | `CONTROL_PERIOD_TOLERANCE_MS` | `ControlPeriod`の許容幅 | **TBD**（最初の回の値は実行承認が置く） | **最初の回は、この値を決めるための回でもある**（`tick`の間隔をlogに出す）。外れるとlimiterがrejectしてlatchし、dutyは0になる。間隔はlogに残るので、次の回で値を決める |
-| `EXPOSURE_MS` | 1 commandの露出時間の期限（移動時間を含む。期限は制御の周の始めで判定するため、厳密な上限ではなく、公称周期と`tick`1つ程度超えうる） | **300 ms以下**（#17で駆動した値〔無負荷・ホーンなし、熱と異音の申告なし。安全の根拠ではない〕。ホーンなしより荷重をかける駆動は**TBD**） | 荷重（ホーン・底板・頭）をかけた値は#17に無い。その回の実行承認が、直前の記録（電流の山、熱、唸り）を見て決める |
+| `EXPOSURE_MS` | 1 commandの露出時間の期限（移動時間を含む。期限は制御の周の単位で判定するため、厳密な上限ではない） | **300 ms以下**（#17で駆動した値〔無負荷・ホーンなし、熱と異音の申告なし。安全の根拠ではない〕。ホーンなしより荷重をかける駆動は**TBD**） | 荷重（ホーン・底板・頭）をかけた値は#17に無い。その回の実行承認が、直前の記録（電流の山、熱、唸り）を見て決める |
 | `MAX_COMMANDS` | 1回の起動で受理するmotion commandの数（N） | **10**（運用上の値） | その回の目的に要るstep数が10を超えるときは、回を分ける（実行承認が決める） |
 | `MIN_COMMAND_INTERVAL_MS` | 前のcommandが終わってから、次を受けるまでの最短間隔 | **5000 ms**（運用上の値） | 人が結果を読む時間。`秒あたり受理command数`（`HW-TBD-020`）の仮の代わり |
 | `MAX_SESSION_S` | `GO18`から回を打ち切るまでの時間 | **TBD**（実行承認が、AC挿しの時間の上限から、AC挿しから`GO18`までの時間と、抜くまでの余裕を引いた値で置く） | 回がこの値まで続いても、AC挿しの時間の上限に先に当たらない値にする |
@@ -830,7 +830,7 @@ firmware（`firmware/esp32/src/servo.rs`、
    - `END`：動いていないときに、dutyを0にして、その回を終える。動いている間に受けたら`Busy`で拒否する。
    - それ以外の行は`UnknownCommand`で拒否し、logに残す。**拒否の名前は、`deskcat_servo::Rejection`の変数名をそのまま出す（`UnknownMotion`、`TargetOutOfHardRange`、`Busy`など）。校正buildが足す拒否は`UnknownCommand`、`RateLimited`、`ExceedsMaxStep`である。****無言で捨てない。**
 5. `MOTION calib <deg>`を受けたときの判定（この順）：(0) motion名が`calib`でなければ`UnknownMotion`、(i) 動いている間は`Busy`（N個目の動作中に届いたものもここ）、(ii) 前のcommandの終了から`MIN_COMMAND_INTERVAL_MS`未満なら`RateLimited`、(iii) 目標と現在位置（直前に出した位置。回の最初は`START_DEG`）の差の絶対値が`MAX_STEP_DEG`を超えるなら`ExceedsMaxStep`（**校正buildが自分で行う判定。**limiterの`max_step`は1 tick分のclampで、これではない。`ServoLimits`の`max_step`には`MAX_STEP_DEG`を渡す）、(iv) `LimitedServo::admit`が拒否したらその理由。拒否はどれも、dutyに触れず、動作を始めず、回も終えない。**次の目標は、前のcommandのlogの`position_deg`から`MAX_STEP_DEG`以内に置く**（着かずに終わった、または行き過ぎた後は、`ExceedsMaxStep`になりうる。人がlogを見て選び直す）。受理したら`servo_calib_18_command_accepted n=<何個目> target_deg=<値>`をlogに出す。
-6. **1 commandの動作：**受理した目標へ、`tick`ごとに`Limiter`を通した位置を出す。**目標へ着く（位置と目標の差が`REACHED_TOLERANCE_DEG`以内の状態が2 tick続く）か、`EXPOSURE_MS`の期限を過ぎた周で`LimitedServo::stop`を呼び、dutyを0にする**（期限は周の始めで判定するため、公称周期と`tick`1つ程度超えうる）（次のcommandは`LimitedServo::resume`で、`Stopped`が持つ最後の位置から作り直す）。dutyを保持しない。着いたら`servo_calib_18_motion_done reason=reached`、着かずに露出が尽きたら`reason=exposure_elapsed`。`Limiter`は目標の手前で減速しないため、加速度の上限が低いと行き過ぎて往復しうる（位置は承認値の範囲の内側）。`MAX_STEP_DEG`は目標の指定の上限で、行き過ぎの分を含まない。`position_deg=`（最後に出した位置）、`position_min_deg=`・`position_max_deg=`（そのcommandの間の最小・最大）、`pulse_us=`（位置から線形変換で計算した値。LEDCの量子化とclampの後の値ではない）、`elapsed_ms=`を出す。**limiterのcounter（`LimitedServo::counters`）の値を`stop`の前に取り、`stop`の後に`servo_calib_18_limiter_counters`としてcommandごとにlogへ出す**（dutyを先に0にするため。`stop`で捨てるため、回全体の値はlogを足して読む）。動作中に拒否した行のlog（`servo_calib_18_command_refused`）も`stop`の後に出す。**`stop`の失敗は握りつぶさずerrorで出し、その回を終える**（人が外部電源を切る）。
+6. **1 commandの動作：**受理した目標へ、`tick`ごとに`Limiter`を通した位置を出す。**目標へ着く（位置と目標の差が`REACHED_TOLERANCE_DEG`以内の状態が2 tick続く）か、`EXPOSURE_MS`の期限に達した時点で`LimitedServo::stop`を呼び、dutyを0にする**（期限は周の単位で判定するため、厳密な上限ではない）（次のcommandは`LimitedServo::resume`で、`Stopped`が持つ最後の位置から作り直す）。dutyを保持しない。着いたら`servo_calib_18_motion_done reason=reached`、着かずに露出が尽きたら`reason=exposure_elapsed`。`Limiter`は目標の手前で減速しないため、加速度の上限が低いと行き過ぎて往復しうる（位置は承認値の範囲の内側）。`MAX_STEP_DEG`は目標の指定の上限で、行き過ぎの分を含まない。`position_deg=`（最後に出した位置）、`position_min_deg=`・`position_max_deg=`（そのcommandの間の最小・最大）、`pulse_us=`（位置から線形変換で計算した値。LEDCの量子化とclampの後の値ではない）、`elapsed_ms=`を出す。**limiterのcounter（`LimitedServo::counters`）の値を`stop`の前に取り、`stop`の後に`servo_calib_18_limiter_counters`としてcommandごとにlogへ出す**（dutyを先に0にするため。`stop`で捨てるため、回全体の値はlogを足して読む）。動作中に拒否した行のlog（`servo_calib_18_command_refused`）も`stop`の後に出す。**`stop`の失敗は握りつぶさずerrorで出し、その回を終える**（人が外部電源を切る）。
 7. **回の終わり**（次のどれか。終えたら**dutyを0にして、再起動まで何も受けない**。`servo_calib_18_session_end reason=... position_deg=<`Stopped::resume_position`>`を出し、`ServoFaultCounters`（`stop`と`resume`を越えて残る）を出す。limiterのcounterは上の6でcommandごとに出す）：`STOP`、`END`、`MAX_COMMANDS`個目の動作の終了（それまで次のcommandは上の5の(i)で`Busy`）、`MAX_SESSION_S`の経過、faultのlatch（`TickError`のどれか）、`stop`の失敗、consoleの読み取りの失敗（上の3）。**終えた後に届いた行は、`servo_calib_18_ignored_after_end len=<byte数>`をlogに出して捨てる**（無言で捨てない。動かさない。Nの後の拒否として、段0の5で観察する）。**`MAX_SESSION_S`の経過で動いている最中なら、動きを中止してdutyを0にする。**
 8. **fault：**`LimitedServo::tick`のエラー（測った間隔のreject、加速度の譲り、PWM出力の失敗）は、既存の動きどおりlatchし、`LimitedServo::stop`を呼び、回を終える。実機で確かめていないことは`servo.rs`のmodule docが持つ。
 9. logは全部UART0（`crate::console`）。**logの名前は上のとおり固定する**（人がgrepして記録する）。commandごとに`tick`の間隔の最小・最大（ms）も出す（`CONTROL_PERIOD_TOLERANCE_MS`を決めるため）。
@@ -841,30 +841,30 @@ firmware（`firmware/esp32/src/servo.rs`、
 
 **この節は段0と段1だけを書く。**段1は、校正 build と limiter が仕様のとおりに動くかを確かめる段であり、受け入れ条件はどれも取らない。範囲を広げる段（ホーンを付ける段、機構の制限の測定を含む）は、段1の結果を見て、別の Pull Request でこの節へ足す。**それまで、ホーンを付けた駆動と、90°〜105°の外への駆動はしない。**
 
-**各回の最初に、その回の実行承認（[承認の状態](#承認の状態)の項目6の(c)）を取る。**承認を求めるときは、配線、build 定数の値、firmware の版、AC挿しの回数と1回の時間の上限、動かす回の数、停止基準を示す。
+**各回の最初に、その回の実行承認（[承認の状態](#承認の状態)の項目6の(c)）を取る。**承認を求めるときは、配線、手順、build 定数の値、firmware の版、起動の回数（port を開いたときの reset と、段0の5の再起動も数える）、AC挿しの回数と1回の時間の上限、動かす回の数、停止基準を示す。
 
 #### 段0：組み直しと照合（駆動ではない）
 
 1. 項目6の(a)の構成で組む（`M-12001`を servo 専用、`MF-R135`を直列、Pi はつながない、ESP32 は PC の USB、`DISP-01`は3.3 V へつながない）。
 2. **servo 電源の経路に jumper wire を使わない。**servo の plug と端子台を jumper wire なしでつなげるかを、手持ちの部品で確かめる。[EXP-028](experiment-log.md#exp-028-sg90の初回のサーボ動作の試み測定用buildジャンパー線の接続2回試みた)の事前の試み（端子台の足、ピンヘッダの針）はどちらも成り立たなかった。**つなげなければ、ここで止める**（購入を案に出さない。続きは PM とユーザーが決める）。
 3. `通電前の現物確認`の(a)〜(d)を、配線と現物で照合して記録する。
-4. **servo を接続しない状態で、PWM の波形を確かめる**（[Calibration手順](#calibration手順)の4）。servo の plug は挿さず、AC は挿さない。ESP32 に校正 build を書き、`GO18` を入れ、`MOTION calib <deg>` を1つ出して、信号線を Arduino（`MEAS-02`）で記録する。**周期とパルス幅**を読む。続けて、動作中に `STOP` を入れ、**`STOP` の入力から信号が止まるまでの時間**を、ESP32 の log の時刻と Arduino の記録で並べて読む。しきい値は置かず、実装の見積もり（公称周期＋読み取り thread の待ち＋FreeRTOS の tick）と並べて記録する。同じ記録で、**1 command の信号が`EXPOSURE_MS`を超えて出た幅**も読む（期限は周の始めで判定するため、公称周期と tick 1つ程度超えうる。PR #700）。
-5. 同じ状態で、**拒否と回の終わりを観察する**（servo を接続しないので動かない）：`UnknownCommand`、`UnknownMotion`、`RateLimited`、`ExceedsMaxStep`、`TargetOutOfHardRange`、動作中の `Busy`、`MAX_COMMANDS`個目の後の `servo_calib_18_ignored_after_end`。それぞれ `servo_calib_18_command_refused` と `servo_calib_18_session_end` の log で確かめる。**校正 build の判定には host test が無いため、駆動の前にここで確かめる。**
-6. **tick の間隔**（log の `tick_min_ms`・`tick_max_ms`）を記録する。`CONTROL_PERIOD_TOLERANCE_MS`の最初の値は、この記録を見て段1の実行承認が置く。
+4. **servo を接続しない状態で、PWM の波形を確かめる**（[Calibration手順](#calibration手順)の4）。servo の plug は挿さず、AC は挿さない。ESP32 に校正 build を書き（build 定数は全部に値が要る。値は段0の実行承認が置く）、`GO18` を入れ、信号線を Arduino（`MEAS-02`）で記録する。(i) `MOTION calib <deg>` を1つ出し、その command が終わるまで待って、**周期とパルス幅**を読む。(ii) 別の `MOTION calib <deg>` を出し、その動作の間に `STOP` を送る（console へ送るのは AI。`MOTION` を送ってから、動作が終わる前の間隔で送る）。`servo_calib_18_motion_interrupted reason=stop` と `servo_calib_18_session_end reason=stop` が出ること、Arduino の記録で信号が止まったことを確かめる。**`STOP` の入力の時刻は log に出ないため、入力から信号が止まるまでの時間は、この段では測らない。**
+5. 同じ状態で、**拒否と回の終わりを観察する**（servo を接続しないので動かない）。**回が終わると、校正 build は再起動まで何も受けないため、回が終わるたびに ESP32 を再起動し、`GO18` を入れ直してから次を観察する**（AC は挿さないので、再起動してよい）：`UnknownCommand`、`UnknownMotion`、`RateLimited`、`ExceedsMaxStep`、`TargetOutOfHardRange`、動作中の `Busy`（`MOTION` を送ってから、動作が終わる前の間隔でもう1つ `MOTION` を送る）、`MAX_COMMANDS`個目の後の `servo_calib_18_ignored_after_end`。それぞれ `servo_calib_18_command_refused` と `servo_calib_18_session_end` の log で確かめる。**校正 build の判定には host test が無いため、駆動の前にここで確かめる。**
+6. **tick の間隔**（log の `tick_min_ms`・`tick_max_ms`）を記録する。`CONTROL_PERIOD_TOLERANCE_MS`は、段0の build に段0の実行承認が置いた値が入っている。間隔がその値を外れると limiter が reject して latch する（その回は終わる。間隔は log に残る）。段1の値は、この記録を見て段1の実行承認が置く。
 
 #### 段1：無負荷（ホーンなし）、90°〜105°の内側
 
-- **最初の回の`GO18`の前に、軸が`START_DEG`にあることを確かめる。**角度の規約と軸の向きの対応は、駆動する前には分からないため、目で角度を読んでは確かめられない。そこで記録で確かめる：最後の指令が105°であること（[EXP-049](experiment-log.md)）、その後に servo を通電していないこと、軸を回していないこと（[EXP-054](experiment-log.md#exp-054-首の固定方法を発泡スチロールの天板と底板に非通電で当てた)）。**記録で確かめられなければ、始めない。**この回はホーンを付けないため、最初の出力で軸が跳んでも、当たるものが無い。
+- **最初の回は、軸が`START_DEG`にあることを確かめられない。**最後の指令は105°（[EXP-049](experiment-log.md)）だが、軸がどこへ着いたかは記録に無く（同 EXP の「主張しないこと」）、角度の規約と軸の向きの対応も駆動する前には分からない。そのため、最初の出力で軸は`START_DEG`へ、limiter の速度制限を受けずに動きうる（`START_DEG`の行）。**最初の回はホーンを付けず、軸の周りに当たるものが無いため、これを受け入れて始める。**最初の回の範囲は90°〜105°の内側とし、最初の出力の後の動きは limiter を通る。
 - 2回目以降は、`START_DEG`の行の(i)か(ii)を行う。
-- 軸の先に目印を付け、周りに置いた紙の目盛で位置を読む。**指令角を増やしたときに軸が回る向き**と、**指令の度の変化と軸の回転の変化が同じ大きさか**を読む。
+- 軸の先に目印を付け、周りに置いた紙の目盛で位置を読む。**指令角の変化に対して軸が回る向き**（最初の回は105°からのため、指令角を減らす向きで読む）と、**指令の度の変化と軸の回転の変化が同じ大きさか**を読む。
 - 1つの回で動かす向きは1つ（90°→105°、または105°→90°）。
 - この段は可動域を広げないため、[Hardware Safety Policy](../governance/hardware-safety-policy.md#6-サーボ) §6の電流・電圧の記録は、範囲を広げる段の Pull Request で扱う。この段で見るのは、唸り・異音・熱と ESP32 の log（reset・brownout）である。
 
 #### 停止基準
 
-[Hardware Safety Policy §6](../governance/hardware-safety-policy.md#6-サーボ)の7項目と、[初回動作の実行手順](#初回動作の実行手順人間とaiの作業順序)の`停止基準`による。次のどれかに当たれば、直ちに`M-12001`の AC プラグを抜く。
+[Hardware Safety Policy §6](../governance/hardware-safety-policy.md#6-サーボ)の7項目と、[初回動作の実行手順](#初回動作の実行手順人間とaiの作業順序)の`停止基準`による。次のどれかに当たれば、直ちに`M-12001`の AC プラグを抜く。**段0・段1では電流と電圧を計らないため、過電流と電源の電圧降下はその場で数値では読めない。**その代わりに、servo の動きが鈍る・止まる、唸り、熱、ESP32 の reset・brownout を見て止める（#17 の初回動作と同じく、人の目・耳・手の背で見る）。
 
-- 指令と逆の向きに動く。指令したのに動かない。唸りが出る。
+- 指令したのに動かない。唸りが出る。指令していないのに動く。**最初の回で、指令角の変化に対して軸が回る向きを読んだ後は、その向きと逆に動く。**（最初の回の最初の動作では、期待する向きがまだ決まっていない。）目標を行き過ぎて戻る動き（「校正buildの仕様」の6）も、この項目に含めて止める（安全側。止まった後、`MAX_ACCELERATION_DEG_S2`の置き方を次の回の実行承認で見直す）。
 - 手の背で、servo 本体・端子台・PTC・plug の接続部が熱い（触らない。数値の基準は置かない）。
 - ESP32 の意図しない reset、USB の切断、`panic`。limiter の fault。`STOP`への応答が無い。
 - その回の実行承認が置いた AC挿しの時間の上限を超えそうになる。
@@ -958,4 +958,4 @@ Pi最低入力電圧の復帰条件に関する現在の扱いは[power-budget.m
 | 2026-10-19 | 39 | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。測定用の90度指令を`bench-servo-90-17`で選べるようにした。既存の`bench-servo-test-17`単独の105度指令は維持した。`承認の状態`の項目6へユーザーの2026-10-19の判断と未確認の前提を追記し、`初回動作の実行手順`の`build`・`単発動作`stepを両buildに合わせた。動作制限表、有効化gate表、停止基準、NVS latch、`GO17`、arm delay、露出時間、dutyを0へ戻す処理は変更していない。実機での動作・測定は行っていない |
 | 2026-10-20 | 40 | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。merge済みのPRを読み直して見つかった2点を直した。(1) **`起動とarm delay`の「`GO17`を入力した後は、servoの電源を抜き差ししない。」が、`停止基準`の「直ちに外部5 V電源を遮断する」を禁じるように読めた**（PR #608が、直前の「`arm delay`を過ぎたら、動かす意図で電源を入れない。」を置き換えた文）。意図は「動かす意図で入れ直さない」ことなので、その意図の文へ改め、`停止基準`に当たれば遮断することを同じ文に書いた。(2) **`承認の状態`の項目6の(a)の`ジャンパー線`の追記（PR #607）が、jumper wireを使わない条件もユーザーの継続承認の範囲に書いてあると読めた。**#17のcomment 5870421147の範囲にあるのはbreadboardを通さない条件だけで、jumper wireはPR #500のdiffでAIが範囲の外へ足したものである。事実のとおりに直した。手順の順序、動作制限表、有効化gate表、`承認の状態`が示す現在の状態、項目6の条件の文面は変えていない（項目6(a)の`ジャンパー線`の追記の出所の文だけを直した） |
 | 2026-11-03 | 41 | [#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)。**`#18の校正（案）`の節を足した。**測定のための駆動の`build`の項が求める、#18の校正buildの動作と仮の制限を、firmware実装の仕様として**案として**書いた（feature名`bench-servo-calib-18`、Pi linkを持たないこと、console command、log名、動作の順序、build定数）。値は、出所（#17の記録）のあるもの、出所の無い運用上の仮の制限（step 2°、速度10°/s、N＝10ほか。5項目の根拠にしない）。露出300 ms以下は#17で駆動した値、`TBD`に分けた。手順・停止基準・受け入れ条件との対応は、別のPull Requestで足す（それまでこのbuildで駆動しない）。実機側のPMの決定を、build に関わる範囲で書いた。ユーザーの承認ではない。**承認していない。**動作制限表、有効化gate表、`承認の状態`、受け入れchecklist、項目6の条件の文面は変えていない |
-| 2026-11-03 | 42 | [#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)。**`#18の校正（案）`の「手順・停止基準・受け入れ条件」に、段0（組み直し、照合、servoを接続しないPWMの波形・`STOP`から信号が止まるまでの時間・露出を超えた幅・拒否と回の終わりの観察）と段1（ホーンなし、90°〜105°の内側）を案として書いた。**あわせて、校正buildの仕様の2か所（counterのlogを`stop`の後に出すこと、露出の期限は周の始めで判定し厳密な上限ではないこと）を、[PR #700](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/700)の実装に合わせた。範囲を広げる段は別のPull Request。動作制限表、有効化gate表、`承認の状態`、受け入れchecklist、項目6の条件は変えていない | PR #700の実装（squash `8ff836e`） |
+| 2026-11-03 | 42 | [#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)。**`#18の校正（案）`の「手順・停止基準・受け入れ条件」に、段0（組み直し、照合、servoを接続しないPWMの波形・`STOP`で信号が止まること・拒否と回の終わりの観察）と段1（ホーンなし、90°〜105°の内側）を案として書いた。**あわせて、校正buildの仕様の2か所（counterのlogを`stop`の後に出すこと、露出の期限は周の始めで判定し厳密な上限ではないこと）を、[PR #700](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/700)の実装に合わせた。範囲を広げる段は別のPull Request。動作制限表、有効化gate表、`承認の状態`、受け入れchecklist、項目6の条件は変えていない。出所はPR #700の実装（squash `8ff836e`） |
