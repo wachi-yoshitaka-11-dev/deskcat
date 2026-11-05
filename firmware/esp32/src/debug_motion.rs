@@ -90,6 +90,12 @@ impl DebugConsole {
 }
 
 fn read_console(tx: &mpsc::SyncSender<ConsoleEvent>) {
+    #[cfg(feature = "bench-servo-calib-18")]
+    log::info!(
+        "servo_calib_18_thread_info thread=console_reader name={:?} core={:?}",
+        std::thread::current().name(),
+        esp_idf_svc::hal::cpu::core(),
+    );
     let mut stdin = std::io::stdin();
     let mut line: Vec<u8> = Vec::with_capacity(MAX_DEBUG_LINE_BYTES);
     let mut overflowed = false;
