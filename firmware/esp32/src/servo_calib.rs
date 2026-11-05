@@ -32,13 +32,21 @@
 //!   `stop`の後は、すぐ`resume`で作り直して次のcommandを待つ（tickの履歴を持ち越すと、間隔が許容幅の外になりlatchするため）。
 //! - **`position_min_deg`／`position_max_deg`は、そのcommandの開始位置を含む。**
 //! - **logの名前を足した**: `servo_calib_18_command_refused`（拒否の記録。`reason=`は仕様の名前）、
-//!   `servo_calib_18_limiter_counters`（動作中のcommandでは、counterの値を`stop`の前に取り、logは`stop`の後に出す。dutyを先に0にするため。仕様の動作の6と同じ）、`servo_calib_18_refusals_dropped`（動作中に拒否した行のlogが溜める上限を超えた件数）、`servo_calib_18_motion_interrupted`（途中で終えたcommandの`motion_done`と同じ項目。`reason=`は`session_end`と同じ）。`reason=`の値で仕様が列挙していない
+//!   `servo_calib_18_limiter_counters`（動作中のcommandでは、counterの値を`stop`の前に取り、logは`stop`の後に出す。dutyを先に0にするため。仕様の動作の6と同じ）、`servo_calib_18_tick_trace`・`servo_calib_18_wake_trace`（診断用。各tickの時刻と、待ちから戻った時刻。下の「時刻の記録」）、`servo_calib_18_refusals_dropped`（動作中に拒否した行のlogが溜める上限を超えた件数）、`servo_calib_18_motion_interrupted`（途中で終えたcommandの`motion_done`と同じ項目。`reason=`は`session_end`と同じ）。`reason=`の値で仕様が列挙していない
 //!   `session_end`のもの（`stop`、`end`、`max_commands`、`max_session`、`fault`、`stop_failed`、
 //!   `console_failed`、`limits_rejected`）は実装が付けた。
 //! - **tickの間隔は、`delay_ms(公称周期)`で刻む。**`FreeRtos::delay_ms`はtick単位（`CONFIG_FREERTOS_HZ`。
 //!   生成された`sdkconfig`で100なら10 ms）で待つ。最初のtickの前に1 tick待って、tickの境に揃えてから刻む。
 //!   **実機での間隔は確かめていない**（commandごとに`tick_min_ms`／`tick_max_ms`をlogに出す。`CONTROL_PERIOD_TOLERANCE_MS`を
 //!   決めるための値である）。
+//! - **時刻の記録（`servo_calib_18_tick_trace`・`servo_calib_18_wake_trace`）。**`tick_min_ms`／`tick_max_ms`は最小と最大だけで、
+//!   どの周が伸びたかが分からないため、`motion_start`からの時刻（µs）を固定長の配列へ残し、`stop`の後にlogへ出す。
+//!   `tick_trace`（`at_us=`）は各tickの時刻で、基準のtickと`Limiter`がrejectしたtickも含む。時刻は、このloopが`servo.tick()`を呼ぶ
+//!   直前に取った`Instant`であり、`LimitedServo::tick`が中で取る`Instant`とは別の値である（ずれの大きさは測っていない）。`wake_trace`（`woke_us=`）は
+//!   待ち（最初の`delay_ms(1)`、各周の`delay_ms(公称周期)`、残りを待つ`delay_ms`）から戻った直後の時刻で、間隔が伸びたときに
+//!   「待ちから戻るのが遅れた」のか「戻った後のconsoleの処理などで時間を使った」のかを分ける。
+//!   **診断のための記録であり、limiterの判定・許容・出力の順序は変えない。**配列は`run_motion`のstackに置くので、長さは
+//!   `TRACE_CAPACITY_MAX`で切る。溢れた分は数だけ残す。
 //! - **露出の期限（`EXPOSURE_MS`）は、周の始めで判定する。厳密な上限ではない。**期限の前の最後の周で、
 //!   通常の待ち（`delay_ms(公称周期)`。tick単位へ切り上げる）、consoleの処理、判定の後のtick1回（limiterの計算と
 //!   PWMの設定）の分だけ、期限を超えうる。残りが公称周期以下になった周は、tickの整数倍へ切り下げた時間だけ待って止める。
@@ -418,6 +426,75 @@ fn session(servo: Sg90<'static>, console: &DebugConsole, started: Instant) -> He
     }
 }
 
+/// 時刻を残す配列の長さの絶対の上限（件）。**配列は`run_motion`のstack（mainのtask）に2本置くので、`EXPOSURE_MS`などの
+/// 値によらず、stackを使い切らないようにする**（1本 = この数 × 4 byte）。安全要件の5項目に効かない。
+const TRACE_CAPACITY_MAX: usize = 128;
+/// 時刻を残す配列の長さ（件）。最短の間隔（公称周期 − 許容）で`EXPOSURE_MS`が尽きるまでのtick数に、
+/// 基準tickと期限の判定の揺れの余裕を足した値を、`TRACE_CAPACITY_MAX`で切る。
+/// 溢れた分は数だけ残す。公称周期が許容以下の値でも評価が止まらないよう、分母は1以上にする。
+const TRACE_CAPACITY: usize = {
+    let shortest_ms = CONTROL_PERIOD_NOMINAL_MS.saturating_sub(CONTROL_PERIOD_TOLERANCE_MS);
+    let shortest_ms = if shortest_ms == 0 { 1 } else { shortest_ms };
+    let wanted = (EXPOSURE_MS / shortest_ms) as usize + 8;
+    if wanted < TRACE_CAPACITY_MAX {
+        wanted
+    } else {
+        TRACE_CAPACITY_MAX
+    }
+};
+/// `servo_calib_18_tick_trace`／`servo_calib_18_wake_trace`の1行に出す時刻の数。1行が長くなりすぎないための値で、
+/// 安全要件の5項目に効かない。
+const TRACE_PER_LINE: usize = 16;
+
+/// `motion_start`からの時刻（µs）の列。診断用（module docの「時刻の記録」）。
+struct Trace {
+    at_us: [u32; TRACE_CAPACITY],
+    len: usize,
+    /// 上限を超えて残さなかった件数。
+    dropped: u32,
+}
+
+impl Trace {
+    const fn new() -> Self {
+        Self {
+            at_us: [0; TRACE_CAPACITY],
+            len: 0,
+            dropped: 0,
+        }
+    }
+
+    fn record(&mut self, elapsed: Duration) {
+        if let Some(slot) = self.at_us.get_mut(self.len) {
+            *slot = u32::try_from(elapsed.as_micros()).unwrap_or(u32::MAX);
+            self.len += 1;
+        } else {
+            self.dropped = self.dropped.saturating_add(1);
+        }
+    }
+
+    /// logへ出す。1行に`TRACE_PER_LINE`個まで。`first=`はその行の最初の時刻の通し番号（0始まり）。
+    /// `name`は行の名前、`key`は時刻の項目名。
+    fn log(&self, name: &str, key: &str, n: u32) {
+        if self.len == 0 {
+            log::info!("{name} n={n} count=0 dropped={}", self.dropped);
+            return;
+        }
+        for (line, chunk) in self.at_us[..self.len].chunks(TRACE_PER_LINE).enumerate() {
+            let values = chunk
+                .iter()
+                .map(u32::to_string)
+                .collect::<Vec<_>>()
+                .join(",");
+            log::info!(
+                "{name} n={n} count={} dropped={} first={} {key}={values}",
+                self.len,
+                self.dropped,
+                line * TRACE_PER_LINE,
+            );
+        }
+    }
+}
+
 /// 動作中に拒否した行のlogを、`stop`の後まで溜める上限（件）。上限のないallocationを避けるための値で、
 /// 安全要件の5項目に効かない。超えた分は件数だけ数える。
 const DEFERRED_MAX: usize = 16;
@@ -491,6 +568,9 @@ fn run_motion(
     let mut tick_min: Option<Duration> = None;
     let mut tick_max: Option<Duration> = None;
     let mut reached_ticks = 0_u32;
+    // tickを呼ぶ直前の時刻と、待ち（`delay_ms`）から戻った直後の時刻（診断用）。
+    let mut tick_trace = Trace::new();
+    let mut wake_trace = Trace::new();
     // 回を途中で終える理由と、その詳細。
     let mut interrupted: Option<(&'static str, Option<String>)> = None;
     let mut done_reason: Option<&'static str> = None;
@@ -499,6 +579,7 @@ fn run_motion(
 
     // tickの境へ揃えてから最初のtick（基準を取るだけで、出力しない）を呼ぶ（module doc）。
     FreeRtos::delay_ms(1);
+    wake_trace.record(motion_start.elapsed());
 
     while interrupted.is_none() && done_reason.is_none() {
         // (a) console。動いている間に受けるのは`STOP`だけで、それ以外は拒否する。拒否のlogは、`stop`の後に出す
@@ -557,6 +638,7 @@ fn run_motion(
 
         // (b) tick。
         let now = Instant::now();
+        tick_trace.record(now.duration_since(motion_start));
         if let Some(previous) = last_tick_at.replace(now) {
             let interval = now.duration_since(previous);
             tick_min = Some(tick_min.map_or(interval, |min| min.min(interval)));
@@ -597,10 +679,12 @@ fn run_motion(
                 if wait_ticks > 0 {
                     let wait_ms = (wait_ticks * 1000).div_ceil(hz);
                     FreeRtos::delay_ms(u32::try_from(wait_ms).unwrap_or(u32::MAX));
+                    wake_trace.record(motion_start.elapsed());
                 }
                 done_reason = Some("exposure_elapsed");
             } else {
                 FreeRtos::delay_ms(CONTROL_PERIOD_NOMINAL_MS);
+                wake_trace.record(motion_start.elapsed());
             }
         }
     }
@@ -612,6 +696,8 @@ fn run_motion(
     let motion_elapsed = motion_start.elapsed();
     state.position = stopped.resume_position();
     log_limiter_counters(n, counters);
+    tick_trace.log("servo_calib_18_tick_trace", "at_us", n);
+    wake_trace.log("servo_calib_18_wake_trace", "woke_us", n);
     for (refusal, detail) in &deferred.kept {
         refuse(*refusal, detail);
     }
