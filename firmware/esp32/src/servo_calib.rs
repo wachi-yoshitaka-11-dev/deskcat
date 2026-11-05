@@ -47,7 +47,7 @@
 //!   「待ちから戻るのが遅れた」のか「戻った後のconsoleの処理などで時間を使った」のかを分ける。
 //!   さらに、どこで時間を使ったかを分けるため、`servo_calib_18_phase_trace`（`after_tick_us=`：`servo.tick()`が返った直後、
 //!   `pre_delay_us=`：`delay_ms`を呼ぶ直前。それぞれ`tick_trace`と`wake_trace`と同じ番号で対になる。`tick()`が失敗した周の
-//!   `after_tick_us`も残る）と、`servo_calib_18_stop_trace`（`stop_pre_us=`：`stop`の直前、`stop_post_us=`：`stop`の直後）を出す。
+//!   `after_tick_us`も残る）と、`servo_calib_18_stop_trace`（`stop_pre_us=`：`stop`の直前、`stop_post_us=`：`stop`の直後。どれも`motion_start`からの経過時間（µs））を出す。
 //!   起動時には`servo_calib_18_thread_info`（main taskとconsole読み取りthreadのcore・名前など）を1回出す。**tick数
 //!   （`xTaskGetTickCount`）とtaskの優先度の実値は出さない**（取るには`unsafe`のFFIが要る。tickの境は`wake_trace`の時刻から分かる）。
 //!   **診断のための記録であり、limiterの判定・許容・出力の順序は変えない。**配列は`run_motion`のstackに置くので、長さは
