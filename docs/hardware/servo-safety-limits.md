@@ -846,7 +846,7 @@ firmware（`firmware/esp32/src/servo.rs`、
 - **duty の register への書き込みは、busy-wait の前に行われる**（`ledc.c:1606`）。一方、low speed では`ledc_ls_channel_update`（para_up）が待ちの後に来る（`ledc.c:982`）ので、**source の順序だけでは、出力に出る時刻は決まらない。**[EXP-058](experiment-log.md#exp-058-段0の4回目の窓書き直さない校正buildで動作1回ごとのパルスの本数をarduinoで数え同じ回のlogと並べた)のパルス数（4本・4本・2本）は、**待ちの前に書いた値が、`duty_start`が立っている間、周期の頭ごとに出力に出る**と読むと合った（値が引き金の後に見えると読むと、6本・6本・4本になって合わない）。**観察からの当てはめで、TRM は未確認。**
 - **上の読みなら、`stop`（`set_duty(0)`）が効くのは、呼んだ次の周期の頭（最大1周期）。**`stop()`が戻るのは、前の更新が効いた後（出力した tick の直後なら最大約40 ms）。`stop_post_us`は`stop()`が戻った時刻であり、信号が止まった時刻ではない。**STOP の入力から信号が止まるまでの時間の同期した実測は、まだ無い**（実機側が持つ）。
 - 制御周期20 ms・PWM 50 Hz では、2回目の出力から`set_duty`が最大約23 ms止まり、間隔が約30〜40 msになる。**必ず起きる。**
-- **対処（[ADR-0027](../decisions/0027-servo-output-decimation-for-ledc-update-latency.md)）：**`Limiter`は毎 tick 進め、LEDC への出力は N tick に1回に間引く（3 tickから）。実装はまだ無い。**この表の`CONTROL_PERIOD_*`の値は、この節で変えていない。**
+- **対処（[ADR-0027](../decisions/0027-servo-output-decimation-for-ledc-update-latency.md)）：**`Limiter`は毎 tick 進め、LEDC への出力は N tick に1回に間引く（N の初期値は ADR-0027）。実装はまだ無い。**この表の`CONTROL_PERIOD_*`の値は、この節で変えていない。**
 
 ### 手順・停止基準・受け入れ条件
 
