@@ -39,9 +39,16 @@
 //!   生成された`sdkconfig`で100なら10 ms）で待つ。最初のtickの前に1 tick待って、tickの境に揃えてから刻む。
 //!   **実機での間隔は確かめていない**（commandごとに`tick_min_ms`／`tick_max_ms`をlogに出す。`CONTROL_PERIOD_TOLERANCE_MS`を
 //!   決めるための値である）。
+//! - **LEDCへの出力は、N tickに1回へ間引く**（`config::SERVO_OUTPUT_DECIMATION_TICKS`、ADR-0027、Issue #708。Nは`servo_calib_18_confirmed`の
+//!   `output_decimation_ticks=`に出す。回ごとの実行承認の値ではない）。`Limiter`は出力するtickでだけ進み、窓（最後の出力からの時間）の間隔で制限する（`servo.rs`のmodule doc）。**`position_deg`・`position_min_deg`・
+//!   `position_max_deg`・`reached`の判定・`stop`の後の位置は、出力したtickの位置だけで更新する**（間引いたtickには位置が作られない）。
+//!   したがって`reached`は、出力した位置が`REACHED_TOLERANCE_DEG`の内側に`REACHED_TICKS`回続いたとき（出力の数で数える）である。
+//!   **出力したtickは`servo_calib_18_output_trace`（`tick=`：`tick_trace`の何番目か、0始まり）で分かる。**そのtickの
+//!   `after_tick_us − at_us`が、`set_duty`を含む`tick`の時間である。**busy-waitが消えたことの確認は、段0でこれが全部小さいことを
+//!   実機側が見て行う**（閾値の案は`servo-safety-limits.md`の「#18の校正（案）」に書いた。PCでは確かめていない）。
 //! - **時刻の記録（`servo_calib_18_tick_trace`・`servo_calib_18_wake_trace`）。**`tick_min_ms`／`tick_max_ms`は最小と最大だけで、
 //!   どの周が伸びたかが分からないため、`motion_start`からの時刻（µs）を固定長の配列へ残し、`stop`の後にlogへ出す。
-//!   `tick_trace`（`at_us=`）は各tickの時刻で、基準のtickと`Limiter`がrejectしたtickも含む。時刻は、このloopが`servo.tick()`を呼ぶ
+//!   `tick_trace`（`at_us=`）は各tickの時刻で、基準のtickと間隔の検査でrejectしたtickも含む。時刻は、このloopが`servo.tick()`を呼ぶ
 //!   直前に取った`Instant`であり、`LimitedServo::tick`が中で取る`Instant`とは別の値である（ずれの大きさは測っていない）。`wake_trace`（`woke_us=`）は
 //!   待ち（最初の`delay_ms(1)`、各周の`delay_ms(公称周期)`、残りを待つ`delay_ms`）から戻った直後の時刻で、間隔が伸びたときに
 //!   「待ちから戻るのが遅れた」のか「戻った後のconsoleの処理などで時間を使った」のかを分ける。
@@ -92,6 +99,19 @@ const MAX_COMMANDS: u32 = calib_18_required(config::SERVO_CALIB_18_MAX_COMMANDS)
 const MIN_COMMAND_INTERVAL_MS: u32 =
     calib_18_required(config::SERVO_CALIB_18_MIN_COMMAND_INTERVAL_MS);
 const MAX_SESSION_S: u32 = calib_18_required(config::SERVO_CALIB_18_MAX_SESSION_S);
+/// LEDCへの出力を間引く間隔（制御周期の数）。**回ごとの実行承認の値ではなく、設計の定数**
+/// （`config::SERVO_OUTPUT_DECIMATION_TICKS`、ADR-0027）。
+const OUTPUT_DECIMATION_TICKS: u32 = config::SERVO_OUTPUT_DECIMATION_TICKS;
+
+// Nの下限の必要条件（`N × 制御周期 ≥ PWMの周期 × 2`）。十分条件は検査できない（`config::decimation_meets_pwm_floor`のdoc）。
+const _: () = assert!(
+    config::decimation_meets_pwm_floor(
+        OUTPUT_DECIMATION_TICKS,
+        CONTROL_PERIOD_NOMINAL_MS,
+        config::SERVO_PWM_FREQUENCY_HZ
+    ),
+    "SERVO_OUTPUT_DECIMATION_TICKS × 制御周期がPWMの周期の2倍に満たない（LEDCの更新の遅れの必要条件）"
+);
 
 /// 人間がUART0のconsoleへ入力して、servoを動かしてよいと確かめる語（仕様の起動の1）。
 const CONFIRM_TOKEN: &str = "GO18";
@@ -102,7 +122,7 @@ const MOTION_NAME: &str = "calib";
 /// consoleを待つ間（動いていないとき）の周期（ms）。人が打つ行を読むためだけの値で、
 /// 安全要件の5項目に効かない。
 const IDLE_POLL_MS: u32 = 20;
-/// 「目標へ着いた」と判定するのに要る、続けて収まるtickの数（仕様の動作の6）。
+/// 「目標へ着いた」と判定するのに要る、続けて収まる**出力の数**（仕様の動作の6。間引いた`tick`は数えない）。
 const REACHED_TICKS: u32 = 2;
 
 /// 回の終わりの後、再起動まで持ち続けるもの。dropするとLEDCがGPIO27をlowへ固定する
@@ -259,7 +279,7 @@ pub fn run() -> ! {
          control_period_nominal_ms={CONTROL_PERIOD_NOMINAL_MS} \
          control_period_tolerance_ms={CONTROL_PERIOD_TOLERANCE_MS} exposure_ms={EXPOSURE_MS} \
          max_commands={MAX_COMMANDS} min_command_interval_ms={MIN_COMMAND_INTERVAL_MS} \
-         max_session_s={MAX_SESSION_S}"
+         max_session_s={MAX_SESSION_S} output_decimation_ticks={OUTPUT_DECIMATION_TICKS}"
     );
 
     let servo = match Sg90::new(
@@ -447,7 +467,7 @@ fn session(servo: Sg90<'static>, console: &DebugConsole, started: Instant) -> He
     }
 }
 
-/// 時刻を残す配列の長さの絶対の上限（件）。**配列は`run_motion`のstack（mainのtask）に4本置くので、`EXPOSURE_MS`などの
+/// 時刻を残す配列の長さの絶対の上限（件）。**配列は`run_motion`のstack（mainのtask）に5本置くので、`EXPOSURE_MS`などの
 /// 値によらず、stackを使い切らないようにする**（1本 = この数 × 4 byte）。安全要件の5項目に効かない。
 const TRACE_CAPACITY_MAX: usize = 64;
 /// 時刻を残す配列の長さ（件）。最短の間隔（公称周期 − 許容）で`EXPOSURE_MS`が尽きるまでのtick数に、
@@ -485,8 +505,13 @@ impl Trace {
     }
 
     fn record(&mut self, elapsed: Duration) {
+        self.record_raw(u32::try_from(elapsed.as_micros()).unwrap_or(u32::MAX));
+    }
+
+    /// 時刻ではない値（`servo_calib_18_output_trace`のtickの番号）を残す。
+    fn record_raw(&mut self, value: u32) {
         if let Some(slot) = self.at_us.get_mut(self.len) {
-            *slot = u32::try_from(elapsed.as_micros()).unwrap_or(u32::MAX);
+            *slot = value;
             self.len += 1;
         } else {
             self.dropped = self.dropped.saturating_add(1);
@@ -595,6 +620,9 @@ fn run_motion(
     // `servo.tick()`が返った直後の時刻と、`delay_ms`を呼ぶ直前の時刻（診断用。それぞれ`tick_trace`と`wake_trace`と同じ番号で対になる）。
     let mut after_tick_trace = Trace::new();
     let mut pre_delay_trace = Trace::new();
+    // LEDCへ出力したtickの番号（`tick_trace`の何番目か。0始まり）。間引いた出力のうち、どのtickが出力かを分ける。
+    let mut output_trace = Trace::new();
+    let mut tick_index = 0_u32;
     // 回を途中で終える理由と、その詳細。
     let mut interrupted: Option<(&'static str, Option<String>)> = None;
     let mut done_reason: Option<&'static str> = None;
@@ -671,9 +699,14 @@ fn run_motion(
         }
         let tick_result = servo.tick();
         after_tick_trace.record(motion_start.elapsed());
+        let this_tick = tick_index;
+        tick_index = tick_index.saturating_add(1);
         match tick_result {
+            // 何も出力しなかった（targetが無い、基準のtick、または間引いたtick）。位置は最後に出力した値のままにする。
             Ok(None) => {}
             Ok(Some(setpoint)) => {
+                output_trace.record_raw(this_tick);
+                // 出力したtickの位置だけを「出した位置」とする（間引いたtickでは`Limiter`は進まず、`Setpoint`も作られない）。
                 position = setpoint.position();
                 position_min = position_min.min(position);
                 position_max = position_max.max(position);
@@ -731,6 +764,7 @@ fn run_motion(
     wake_trace.log("servo_calib_18_wake_trace", "woke_us", n);
     after_tick_trace.log("servo_calib_18_phase_trace", "after_tick_us", n);
     pre_delay_trace.log("servo_calib_18_phase_trace", "pre_delay_us", n);
+    output_trace.log("servo_calib_18_output_trace", "tick", n);
     log::info!(
         "servo_calib_18_stop_trace n={n} stop_pre_us={} stop_post_us={}",
         stop_pre.as_micros(),
