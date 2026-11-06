@@ -5,20 +5,18 @@
 //! `trajectory.rs`と同じく、`TEST_`で始まる値はtestを走らせるためだけに選んだ値であり、
 //! `servo-safety-limits.md`の承認値ではない。**このfileの値を正本へ写さない。**
 //!
-//! # 何を数えるか
+//! # 何を確かめるか
 //!
-//! `Limiter`は毎step進み、PWMへ渡すのはN stepに1回の位置だけである。servoに届くのは**出力の列**なので、
-//! 速度と加速度は**出力の間隔で**数える。窓`k`（前の出力の後から今回の出力まで、間隔`T_k`）の平均速度を
-//! `v_k = Σ(v_i·dt_i) / T_k`とする。`v_k`が表す時刻は窓の中心なので、**加速度は窓の中心どうしの間隔で数える**：
-//! `|v_k − v_(k−1)| / ((T_k + T_(k−1)) / 2)`（ADR-0027の決定3の「出力の間隔で数えて」の読み。`acceleration_by_mean`）。
-//! 間隔が公称で一定なら`T_k`で割った値（`acceleration_by_current`）と同じになり、公称の周期の検査はそれを使う。
-//! 間隔が揺れる場合、`T_k`だけで割った値は参考として別に出す。
+//! firmwareの`LimitedServo::tick`と同じ形を、時計を模擬して再現する。
 //!
-//! **`v_i`は`Setpoint::velocity()`（`Limiter`の内部状態）を使い、出力した位置の差分から求めない。**位置は
-//! f32で、100付近の分解能が約7.6e-6あるため、差分から求めた加速度は丸めで上限を外れる
-//! （ADR-0027の観察では、20 msの全stepでも50.011が出た）。内部状態から数えれば丸めが入らない。
-//! 代わりに、**出力した位置の差分が内部状態の積分に丸めの範囲で一致すること**を別に検査する
-//! （`POSITION_ROUNDING_PER_STEP`）。この2つで、内部状態の数え方が実際の出力から離れていないことを押さえる。
+//! - 各tickの間隔は`dt_tick`（公称±許容の内側で揺れる）。`OutputDecimator`が出力すると答えたtickでだけ、
+//!   `Limiter::step`を呼ぶ。`dt`は**最後の出力から今回の出力までの和（窓）**である
+//! - `Limiter`の`ControlPeriod`は、各tickの`ControlPeriod`をN倍した窓の許容である
+//!
+//! 出力の列は`Limiter`が測った間隔（窓）で制限した列そのものなので、**窓の間隔`T_k`で数えた加速度が上限を超えない**
+//! （`|v_k − v_(k−1)| / T_k`。`v_k`は`Setpoint::velocity()`、`Limiter`の内部状態）。f32の位置の差分から求めると、
+//! 位置の分解能（100付近で約7.6e-6）の丸めで、公称の周期でも上限を外れるため、内部状態で数える。
+//! 速度の分解能（`VELOCITY_ULP`）の丸めは引いて比べる。
 
 #![allow(clippy::float_cmp)]
 
@@ -34,24 +32,19 @@ const TEST_APPROVED_MAX: f32 = 25.0;
 const TEST_HARD_MAX: f32 = 35.0;
 const TEST_MAX_VELOCITY: f32 = 20.0;
 const TEST_MAX_ACCELERATION_F32: f32 = 40.0;
-const TEST_MAX_STEP: f32 = 8.0;
 /// f64で比べる上限。
 const TEST_MAX_ACCELERATION: f64 = 40.0;
+const TEST_MAX_STEP: f32 = 8.0;
 const TEST_DT_S: f32 = 0.02;
 const TEST_MOTION: &str = "test-motion";
 
-/// 1 stepの位置の丸めの上限。|位置|≦40のf32の分解能（2^-18≒3.8e-6）の2倍
-/// （`start + velocity*dt`の積と和のそれぞれの丸め）。**制限値ではない。**
-const POSITION_ROUNDING_PER_STEP: f64 = 8e-6;
+/// 速度のf32の分解能。`TEST_MAX_VELOCITY`（20）は[16, 32)にあり、そこのf32の間隔は2^-19である。
+/// `Limiter`は速度をf32で持つので、速度差はこの丸めを含む。間引かない（n = 1）でも`|Δv|/dt`は40.00001と出る
+/// （f32の丸めであり、上限の破れではない）。`(|Δv| − 2·VELOCITY_ULP) / T_k`で数える。
+const VELOCITY_ULP: f64 = 1.0 / 524_288.0;
 
 /// f64の累積誤差の許容（相対）。**制限値ではない。**
 const F64_SLACK: f64 = 1e-9;
-
-/// 速度のf32の分解能。`TEST_MAX_VELOCITY`（20）は[16, 32)にあり、そこのf32の間隔は2^-19である。
-/// `Limiter`は速度をf32で持つので、1 stepの速度差も、窓の平均速度の差も、この丸めを含む。
-/// **間引かない（n = 1）でも、`|Δv|/dt`は40.00001と出る**（f32の丸めであり、上限の破れではない）。
-/// 窓の差には最大2回分（今回と前回）の丸めを許し、`(|Δv| − 2·VELOCITY_ULP) / T_k`で数える。
-const VELOCITY_ULP: f64 = 1.0 / 524_288.0;
 
 fn limits() -> ServoLimits {
     ServoLimits::new(
@@ -89,13 +82,11 @@ impl Lcg {
 #[derive(Default)]
 struct Worst {
     /// `max(|v_k − v_(k−1)| − 2·VELOCITY_ULP, 0) / T_k`の最大（f32の丸めを引いた値）。
-    acceleration_by_current: f64,
-    /// `|v_k − v_(k−1)| / ((T_k + T_(k−1)) / 2)`の最大。
+    acceleration: f64,
+    /// 参考：`|v_k − v_(k−1)| / ((T_k + T_(k−1)) / 2)`の最大（窓の中心どうしの間隔）。
     acceleration_by_mean: f64,
     /// `|v_k|`の最大。
     velocity: f64,
-    /// 出力した位置の差分と、内部状態の積分との差の最大（窓内のstep数で割った、1 stepあたりの値）。
-    position_mismatch_per_step: f64,
     /// 出力した回数。
     outputs: usize,
 }
@@ -105,32 +96,38 @@ struct Worst {
 enum Jitter {
     /// 公称の間隔だけ。
     None,
-    /// 許容幅の内側の両端と公称を擬似乱数で選ぶ。
+    /// 許容幅の内側（許容の90%）の両端と公称を擬似乱数で選ぶ。
     Within(f32),
 }
 
-/// `steps`回`Limiter`を進め、`decimator`が出力するstepで窓を閉じて数える。
-fn run(n: u32, offset: u32, jitter: Jitter, seed: u64, switch_every: usize, steps: usize) -> Worst {
+/// `ticks`回のtickを進め、出力するtickで`Limiter`を窓の間隔で進める。
+fn run(n: u32, jitter: Jitter, seed: u64, switch_every: usize, ticks: usize) -> Worst {
     let tolerance = match jitter {
         Jitter::None => 0.0,
         Jitter::Within(t) => t,
     };
-    let period = ControlPeriod::new(TEST_DT_S, tolerance).expect("period");
-    let mut limiter = Limiter::new(limits(), period, MotionCatalog::new([TEST_MOTION]), 0.0)
-        .expect("start inside the range");
+    // firmwareと同じく、窓の許容は各tickの許容のN倍。
+    let window_period = ControlPeriod::new(
+        TEST_DT_S * f32::from(u8::try_from(n).expect("small")),
+        tolerance * f32::from(u8::try_from(n).expect("small")),
+    )
+    .expect("window period is valid");
+    let mut limiter = Limiter::new(
+        limits(),
+        window_period,
+        MotionCatalog::new([TEST_MOTION]),
+        0.0,
+    )
+    .expect("start inside the range");
     let mut decimator = OutputDecimator::new(n).expect("n >= 1");
-    for _ in 0..offset {
-        decimator.advance();
-    }
     let mut rng = Lcg(seed + 1);
     let mut worst = Worst::default();
-    // 窓の途中の積算。
-    let (mut integral, mut elapsed, mut window_steps) = (0.0f64, 0.0f64, 0u32);
-    let mut start_position = 0.0f64;
+    let mut window = 0.0f64;
     let mut previous: Option<(f64, f64)> = None;
-    for index in 0..steps {
+    for index in 0..ticks {
         let slot = (index / switch_every) as u64 + seed;
         let target = TARGETS[usize::try_from(slot % TARGETS.len() as u64).expect("< 7")];
+        // targetはいつでも受理される（出力しないtickでも）。`admit`は`Limiter`を進めない。
         let admitted = limiter
             .admit(&MotionRequest {
                 name: TEST_MOTION,
@@ -146,27 +143,31 @@ fn run(n: u32, offset: u32, jitter: Jitter, seed: u64, switch_every: usize, step
                 _ => TEST_DT_S,
             },
         };
-        let setpoint = limiter.step(admitted, dt).expect("dt is inside the period");
-        assert!(!setpoint.clamps().acceleration_bound_conceded);
-        integral += f64::from(setpoint.velocity()) * f64::from(dt);
-        elapsed += f64::from(dt);
-        window_steps += 1;
+        window += f64::from(dt);
         if !decimator.advance() {
             continue;
         }
-        // 出力する。窓を閉じる。
+        // 窓の間隔は、各tickの間隔の和をf32へ丸めて渡す（firmwareは`Instant`の差をf32秒にする）。
+        #[allow(clippy::cast_possible_truncation)]
+        let window_s = window as f32;
+        let setpoint = limiter
+            .step(admitted, window_s)
+            .expect("the window is inside the window period");
+        assert!(
+            !setpoint.clamps().acceleration_bound_conceded,
+            "n {n}: the acceleration bound was conceded"
+        );
         let output = f64::from(setpoint.position());
         assert!(
             (f64::from(TEST_APPROVED_MIN)..=f64::from(TEST_APPROVED_MAX)).contains(&output),
             "output {output} left the approved range"
         );
-        let mismatch = ((output - start_position) - integral).abs() / f64::from(window_steps);
-        worst.position_mismatch_per_step = worst.position_mismatch_per_step.max(mismatch);
-        let velocity = integral / elapsed;
+        let elapsed = f64::from(window_s);
+        let velocity = f64::from(setpoint.velocity());
         let (previous_velocity, previous_elapsed) = previous.unwrap_or((0.0, elapsed));
         let delta = (velocity - previous_velocity).abs();
-        worst.acceleration_by_current = worst
-            .acceleration_by_current
+        worst.acceleration = worst
+            .acceleration
             .max((delta - 2.0 * VELOCITY_ULP).max(0.0) / elapsed);
         worst.acceleration_by_mean = worst
             .acceleration_by_mean
@@ -174,28 +175,24 @@ fn run(n: u32, offset: u32, jitter: Jitter, seed: u64, switch_every: usize, step
         worst.velocity = worst.velocity.max(velocity.abs());
         worst.outputs += 1;
         previous = Some((velocity, elapsed));
-        start_position = output;
-        integral = 0.0;
-        elapsed = 0.0;
-        window_steps = 0;
+        window = 0.0;
     }
     worst
 }
 
 #[test]
-fn zero_interval_is_refused_and_outputs_fall_on_every_nth_step() {
+fn zero_interval_is_refused_and_outputs_fall_on_every_nth_tick() {
     assert!(OutputDecimator::new(0).is_none());
     for n in 1u32..=6 {
         let mut decimator = OutputDecimator::new(n).expect("n >= 1");
         assert_eq!(decimator.interval(), n);
-        for step in 1..=60u32 {
-            assert_eq!(decimator.advance(), step % n == 0, "n {n}, step {step}");
+        for tick in 1..=60u32 {
+            assert_eq!(decimator.advance(), tick % n == 0, "n {n}, tick {tick}");
         }
     }
 }
 
-/// 公称の間隔だけで、Nと、静止からの動き始めの位相と、再targetの位相を総当たりする。
-/// **出力の列の加速度が、どの位相でも上限を超えない**（Issue #708の受け入れ条件）。
+/// 各tickの間隔が公称で一定のとき。N、動き始めの位相、再targetの位相を総当たりする。
 #[test]
 fn nominal_interval_never_exceeds_the_bounds_for_any_phase() {
     let mut checked = 0usize;
@@ -203,24 +200,19 @@ fn nominal_interval_never_exceeds_the_bounds_for_any_phase() {
     for n in 1u32..=6 {
         for seed in 0..TARGETS.len() as u64 {
             for switch_every in 1usize..60 {
-                let worst = run(n, 0, Jitter::None, seed, switch_every, 400);
+                let worst = run(n, Jitter::None, seed, switch_every, 400);
                 assert!(
-                    worst.acceleration_by_current <= TEST_MAX_ACCELERATION * (1.0 + F64_SLACK),
+                    worst.acceleration <= TEST_MAX_ACCELERATION * (1.0 + F64_SLACK),
                     "n {n}, seed {seed}, switch {switch_every}: acceleration {}",
-                    worst.acceleration_by_current
+                    worst.acceleration
                 );
                 assert!(
                     worst.velocity <= f64::from(TEST_MAX_VELOCITY) * (1.0 + F64_SLACK),
                     "n {n}: velocity {}",
                     worst.velocity
                 );
-                assert!(
-                    worst.position_mismatch_per_step <= POSITION_ROUNDING_PER_STEP,
-                    "n {n}: output position drifted from the integral by {}",
-                    worst.position_mismatch_per_step
-                );
                 assert!(worst.outputs > 0);
-                reached = reached.max(worst.acceleration_by_current);
+                reached = reached.max(worst.acceleration);
                 checked += 1;
             }
         }
@@ -233,84 +225,54 @@ fn nominal_interval_never_exceeds_the_bounds_for_any_phase() {
     );
 }
 
-/// 出力の列がすでに途中の位相にある場合（最初の出力までのstep数が1〜N−1）も、上限を超えない。
-/// 設計は最初の出力をちょうどNstep目にするが、位相がずれた場合の余裕も押さえる。
+/// **各tickの間隔が許容幅の内側で揺れても、窓の間隔`T_k`で数えた加速度は上限を超えない**
+/// （ADR-0027の決定3。`Limiter`は窓の間隔で制限するため）。譲り（`acceleration_bound_conceded`）も立たない。
+/// 許容の90%まで揺らす3値（公称・公称±90%）で、N・揺れ幅・seed・再targetの位相を総当たりする。
 #[test]
-fn a_shifted_first_window_does_not_exceed_the_bounds_either() {
-    for n in 2u32..=6 {
-        for offset in 1..n {
-            for seed in 0..TARGETS.len() as u64 {
-                let worst = run(n, offset, Jitter::None, seed, 17, 400);
-                assert!(
-                    worst.acceleration_by_current <= TEST_MAX_ACCELERATION * (1.0 + F64_SLACK),
-                    "n {n}, offset {offset}, seed {seed}: acceleration {}",
-                    worst.acceleration_by_current
-                );
-            }
-        }
-    }
-}
-
-/// 間隔が許容幅の内側で揺れる場合。**揺れた間隔では`Limiter`自身が、step間の加速度の差を
-/// 間隔の平均で割ると上限を超える**（`step`は`最大加速度 × そのstepの間隔`で制限するため）。
-/// 間引いた出力が、窓の中心どうしの間隔（2つの窓の間隔の平均）で数えて、間引かない`n = 1`より悪くならないこと
-/// （同じ間隔の列で比べる。参考の比較であり、揺れる間隔での上限以下は保証しない）と、速度の上限を守ること、
-/// 参考として、今回の窓の間隔`T_k`だけで数えた超過が間隔の最大と最小の比以内であることを確かめる。
-#[test]
-fn jitter_inside_the_tolerance_is_no_worse_than_the_undecimated_limiter() {
-    for tolerance in [0.002f32, 0.01] {
-        let mut baseline = 0.0f64;
-        let mut by_n = Vec::new();
-        // 今回の窓の間隔`T_k`で割った値（公称の周期の検査と同じ数え方）の最大。
-        let mut worst_current = 0.0f64;
-        let shortest = f64::from(TEST_DT_S - tolerance * 0.9);
-        let longest = f64::from(TEST_DT_S + tolerance * 0.9);
-        for n in 1u32..=5 {
-            let mut worst_mean = 0.0f64;
+fn jitter_inside_the_tolerance_never_exceeds_the_bounds() {
+    let mut reached = 0.0f64;
+    for tolerance in [0.002f32, 0.005, 0.01] {
+        for n in 1u32..=6 {
             for seed in 0..40u64 {
                 for switch_every in 3usize..40 {
-                    let worst = run(n, 0, Jitter::Within(tolerance), seed, switch_every, 300);
+                    let worst = run(n, Jitter::Within(tolerance), seed, switch_every, 300);
+                    assert!(
+                        worst.acceleration <= TEST_MAX_ACCELERATION * (1.0 + F64_SLACK),
+                        "tolerance {tolerance}, n {n}, seed {seed}, switch {switch_every}: acceleration {}",
+                        worst.acceleration
+                    );
                     assert!(
                         worst.velocity <= f64::from(TEST_MAX_VELOCITY) * (1.0 + F64_SLACK),
                         "tolerance {tolerance}, n {n}: velocity {}",
                         worst.velocity
                     );
-                    assert!(
-                        worst.position_mismatch_per_step <= POSITION_ROUNDING_PER_STEP,
-                        "tolerance {tolerance}, n {n}: position drift"
-                    );
-                    worst_mean = worst_mean.max(worst.acceleration_by_mean);
-                    worst_current = worst_current.max(worst.acceleration_by_current);
+                    reached = reached.max(worst.acceleration);
                 }
             }
-            if n == 1 {
-                baseline = worst_mean;
+        }
+    }
+    assert!(
+        reached >= TEST_MAX_ACCELERATION * 0.99,
+        "sweepの最大の加速度 {reached} が上限に届いていない"
+    );
+}
+
+/// 参考：窓の中心の間隔で数えた加速度。`Limiter`は窓の間隔`T_k`で制限するので、中心の間隔で数えると
+/// 上限を超えうる（間引かない`Limiter`も、step自身の間隔で制限するため同じ）。値を出すだけで、上限は主張しない。
+#[test]
+fn centre_interval_acceleration_is_reported_for_reference() {
+    for tolerance in [0.002f32, 0.01] {
+        let mut worst_mean = 0.0f64;
+        for n in [1u32, 3] {
+            for seed in 0..40u64 {
+                for switch_every in 3usize..40 {
+                    let worst = run(n, Jitter::Within(tolerance), seed, switch_every, 300);
+                    worst_mean = worst_mean.max(worst.acceleration_by_mean);
+                }
             }
-            by_n.push(worst_mean);
         }
-        // **揺れた間隔では、`T_k`で割ると上限を超えうる**（間引かない`Limiter`は`最大加速度 × そのstepの間隔`で
-        // 制限するので超えない。窓の間隔が窓ごとに違うため、窓をまたぐと超える）。超過の大きさは、
-        // 間隔の最大と最小の比以内に収まることを、この総当たりの範囲で確かめる（**証明ではない**）。
-        assert!(
-            worst_current <= TEST_MAX_ACCELERATION * (longest / shortest),
-            "tolerance {tolerance}: acceleration by T_k {worst_current} exceeds the interval ratio"
-        );
         println!(
-            "tolerance {tolerance}: worst acceleration by T_k {worst_current:.3} ({:.3}x), by mean interval {:.3}, undecimated {baseline:.3}",
-            worst_current / TEST_MAX_ACCELERATION,
-            by_n.iter().copied().fold(0.0f64, f64::max)
+            "tolerance {tolerance}: worst acceleration by the centre interval {worst_mean:.3}"
         );
-        // 参考の比較の前提：`n = 1`（間引かない）でも、窓の中心の間隔で数えると上限を超える。
-        assert!(
-            baseline > TEST_MAX_ACCELERATION,
-            "tolerance {tolerance}: the undecimated baseline {baseline} did not exceed the bound"
-        );
-        for (index, worst_mean) in by_n.iter().enumerate() {
-            assert!(
-                *worst_mean <= baseline * (1.0 + F64_SLACK),
-                "tolerance {tolerance}, n {}: decimated acceleration {worst_mean} exceeds the undecimated {baseline}",
-                index + 1
-            );
-        }
     }
 }

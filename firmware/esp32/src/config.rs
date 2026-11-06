@@ -102,7 +102,7 @@ pub const SERVO_PWM_GPIO: u8 = 27;
 #[allow(dead_code)]
 pub const SERVO_PWM_FREQUENCY_HZ: u32 = 50;
 
-/// LEDCへの出力（`set_duty`）を、`Limiter`のN stepに1回へ間引くときのN（制御周期の数）。
+/// LEDCへの出力（`set_duty`）と`Limiter`の1 stepを、N tick（制御周期）に1回にするときのN。
 /// [ADR-0027](../../../docs/decisions/0027-servo-output-decimation-for-ledc-update-latency.md)、Issue #708。
 ///
 /// **回ごとの実行承認の値ではなく、設計の定数である。**ESP32のLEDCは`ledc_set_duty_and_update`が

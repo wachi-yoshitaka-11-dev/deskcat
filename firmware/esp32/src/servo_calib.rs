@@ -40,15 +40,15 @@
 //!   **実機での間隔は確かめていない**（commandごとに`tick_min_ms`／`tick_max_ms`をlogに出す。`CONTROL_PERIOD_TOLERANCE_MS`を
 //!   決めるための値である）。
 //! - **LEDCへの出力は、N tickに1回へ間引く**（`config::SERVO_OUTPUT_DECIMATION_TICKS`、ADR-0027、Issue #708。Nは`servo_calib_18_confirmed`の
-//!   `output_decimation_ticks=`に出す。回ごとの実行承認の値ではない）。`Limiter`は毎tick進む。**`position_deg`・`position_min_deg`・
-//!   `position_max_deg`・`reached`の判定・`stop`の後の位置は、出力したtickの位置だけで更新する**（間引いたtickの位置は使わない）。
+//!   `output_decimation_ticks=`に出す。回ごとの実行承認の値ではない）。`Limiter`は出力するtickでだけ進み、窓（最後の出力からの時間）の間隔で制限する（`servo.rs`のmodule doc）。**`position_deg`・`position_min_deg`・
+//!   `position_max_deg`・`reached`の判定・`stop`の後の位置は、出力したtickの位置だけで更新する**（間引いたtickには位置が作られない）。
 //!   したがって`reached`は、出力した位置が`REACHED_TOLERANCE_DEG`の内側に`REACHED_TICKS`回続いたとき（出力の数で数える）である。
 //!   **出力したtickは`servo_calib_18_output_trace`（`tick=`：`tick_trace`の何番目か、0始まり）で分かる。**そのtickの
 //!   `after_tick_us − at_us`が、`set_duty`を含む`tick`の時間である。**busy-waitが消えたことの確認は、段0でこれが全部小さいことを
 //!   実機側が見て行う**（閾値の案は`servo-safety-limits.md`の「#18の校正（案）」に書いた。PCでは確かめていない）。
 //! - **時刻の記録（`servo_calib_18_tick_trace`・`servo_calib_18_wake_trace`）。**`tick_min_ms`／`tick_max_ms`は最小と最大だけで、
 //!   どの周が伸びたかが分からないため、`motion_start`からの時刻（µs）を固定長の配列へ残し、`stop`の後にlogへ出す。
-//!   `tick_trace`（`at_us=`）は各tickの時刻で、基準のtickと`Limiter`がrejectしたtickも含む。時刻は、このloopが`servo.tick()`を呼ぶ
+//!   `tick_trace`（`at_us=`）は各tickの時刻で、基準のtickと間隔の検査でrejectしたtickも含む。時刻は、このloopが`servo.tick()`を呼ぶ
 //!   直前に取った`Instant`であり、`LimitedServo::tick`が中で取る`Instant`とは別の値である（ずれの大きさは測っていない）。`wake_trace`（`woke_us=`）は
 //!   待ち（最初の`delay_ms(1)`、各周の`delay_ms(公称周期)`、残りを待つ`delay_ms`）から戻った直後の時刻で、間隔が伸びたときに
 //!   「待ちから戻るのが遅れた」のか「戻った後のconsoleの処理などで時間を使った」のかを分ける。
@@ -706,7 +706,7 @@ fn run_motion(
             Ok(None) => {}
             Ok(Some(setpoint)) => {
                 output_trace.record_raw(this_tick);
-                // 出力したtickの位置だけを「出した位置」とする（間引いたtickの`Limiter`の位置は使わない）。
+                // 出力したtickの位置だけを「出した位置」とする（間引いたtickでは`Limiter`は進まず、`Setpoint`も作られない）。
                 position = setpoint.position();
                 position_min = position_min.min(position);
                 position_max = position_max.max(position);
