@@ -87,6 +87,12 @@
 //!   `最大加速度`を保証できない（`deskcat_servo::Limiter::step`のdocの「`dt_s`は
 //!   `ControlPeriod`の範囲内でなければならない」）。**jitterが許容幅を超えると、そこで新しい位置を設定しなくなる**（LEDCは最後のdutyを出し続けうる）。
 //!   新しい位置を設定しない側に倒れる既知の性質である
+//!   **#18の段0で観察した超過は、jitterではなかった。**ESP32のLEDCでは`ledc_set_duty_and_update`が、前の更新が効くまで
+//!   （`duty_start`を立ててから2回目のPWMの周期の頭。立てた位相に依って約20〜40 ms後）、critical sectionの中でbusy-waitする
+//!   （ESP-IDF v5.5.3 `components/hal/esp32/include/hal/ledc_ll.h:483-489`、`components/esp_driver_ledc/src/ledc.c:1596-1611`）。
+//!   制御周期20 ms・PWM 50 Hzでは、2回目の出力から`set_duty`が最大約23 ms止まり、間隔が約30〜40 msになる
+//!   （系統的な伸びで、必ず起きる）。止まっている間は、そのcoreの割り込みも止まる。判断は[ADR-0027](../../../docs/decisions/0027-servo-output-decimation-for-ledc-update-latency.md)
+//!   と[Issue #705](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/705)。この実装はまだ間引いていない
 //! - **`Limiter::step`の後にPWMの出力が失敗した**（[`TickError::Output`]）。`Limiter`だけが1 step進み、
 //!   LEDCに設定した位置は前の値のまま残る（esp-idf-hal 0.46.2の`LedcDriver::set_duty`が呼ぶ
 //!   ESP-IDFの`ledc_set_duty_and_update`は、失敗をregisterへ書く前の検査で返す。source を読んだ結果）。
@@ -143,7 +149,9 @@
 //! - **PWMのframeで効くこと。**esp-idf-hal 0.46.2の`LedcDriver::set_duty`はESP-IDFの
 //!   `ledc_set_duty_and_update`を呼び、それが内部で`_ledc_update_duty`を呼ぶ（`components/esp_driver_ledc/src/ledc.c`）。
 //!   新しいdutyは次のPWM cycleから効く（`components/esp_driver_ledc/include/driver/ledc.h`の
-//!   `ledc_update_duty`のnote）。servoがpulseをどの刻みで読むかは確かめていない。制御周期とPWMの
+//!   `ledc_update_duty`のnote）。dutyのregisterへの書き込みはbusy-waitの前に行われる（`ledc.c:1606`）。lowspeedでは`ledc_ls_channel_update`（para_up）が待ちの後に来る（`ledc.c:982`）ので、sourceの順序だけでは出力に出る時刻は決まらない。
+//!   #18の段0（[EXP-058](../../../docs/hardware/experiment-log.md#exp-058-段0の4回目の窓書き直さない校正buildで動作1回ごとのパルスの本数をarduinoで数え同じ回のlogと並べた)）のパルス数（4本・4本・2本）は、**待ちの前に書いた値が、`duty_start`が立っている間、周期の頭ごとに出力に出る**と読むと合った（観察からの当てはめで、TRMは未確認）。
+//!   この読みなら`stop`（`set_duty(0)`）が効くのは、呼んだ次の周期の頭（最大1周期）で、`stop`が戻るのは前の更新が効いた後になる。**STOPの同期した実測はまだ無い。**servoがpulseをどの刻みで読むかは確かめていない。制御周期とPWMの
 //!   周期の関係によって、実機が受け取る列はLEDCへ設定した列と時間の刻みが違いうる。
 //!   **制御周期は段3で決める**（このmoduleは値を持たない）
 //! - **servoが受け取った位置へどう追従するか**（速さ、遅れ、行き過ぎ）は確かめていない
