@@ -102,6 +102,34 @@ pub const SERVO_PWM_GPIO: u8 = 27;
 #[allow(dead_code)]
 pub const SERVO_PWM_FREQUENCY_HZ: u32 = 50;
 
+/// LEDCへの出力（`set_duty`）を、`Limiter`のN stepに1回へ間引くときのN（制御周期の数）。
+/// [ADR-0027](../../../docs/decisions/0027-servo-output-decimation-for-ledc-update-latency.md)、Issue #708。
+///
+/// **回ごとの実行承認の値ではなく、設計の定数である。**ESP32のLEDCは`ledc_set_duty_and_update`が
+/// 前の更新の効くまで（約40.1〜40.2 ms。2回目のPWMの周期の頭）critical sectionの中でbusy-waitする
+/// （ESP-IDF v5.5.3 `ledc.c:1596-1611`）。呼ぶ間隔が約40.2 ms以上ならこの待ちがほぼ起きない。
+/// 制御周期20 msなら2では足りない周がありうるので、3から始める
+/// （`SERVO_OUTPUT_DECIMATION_TICKS × 制御周期 ≥ PWMの周期 × 2`は[`decimation_meets_pwm_floor`]が
+/// compile時に検査する。**これは必要条件であり、十分条件ではない**）。
+/// **2へ変えるときはcodeの変更（Pull Request）で行い、`servo_calib_18_phase_trace`の出力したtickの時間で判断する。**
+#[allow(dead_code)]
+pub const SERVO_OUTPUT_DECIMATION_TICKS: u32 = 3;
+
+/// 間引きの間隔（制御周期の数）が、LEDCの更新の遅れの**必要条件**を満たすか。
+/// `n × 制御周期(ms) × PWM周波数(Hz) ≥ 2000`、つまり`n × 制御周期 ≥ PWMの周期 × 2`。
+///
+/// **十分条件ではない。**実際の更新の遅れ（約40.1〜40.2 ms）を超えるかは、PWMの周期がLEDCの
+/// timer分周の丸めで決まる（約20.06〜20.12 ms）ことと、「2回目の周期の頭」で落ちる理由がTRMで
+/// 未確認なことから、compile時には検査できない。その確認は、出力したtickの時間のlogで行う。
+#[allow(dead_code)]
+pub const fn decimation_meets_pwm_floor(
+    n: u32,
+    control_period_ms: u32,
+    pwm_frequency_hz: u32,
+) -> bool {
+    (n as u64) * (control_period_ms as u64) * (pwm_frequency_hz as u64) >= 2_000
+}
+
 /// パルス幅の下限（マイクロ秒、約1 ms）。一般値。根拠は`SERVO_PWM_FREQUENCY_HZ`と同じ。
 #[allow(dead_code)]
 pub const SERVO_PULSE_WIDTH_MIN_US: u32 = 1_000;

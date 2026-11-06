@@ -105,6 +105,7 @@
 
 pub mod counters;
 pub mod debug;
+pub mod decimation;
 pub mod dedup;
 pub mod dispatch;
 pub mod limiter;
@@ -114,6 +115,7 @@ pub use counters::{ClampReport, LimiterCounters};
 pub use debug::{
     DEBUG_MOTION_TOKEN, DebugMotion, DebugParseError, MAX_DEBUG_LINE_BYTES, parse_debug_line,
 };
+pub use decimation::OutputDecimator;
 pub use dedup::{DedupOutcome, MotionDedup};
 pub use dispatch::{DebugRefusal, MotionDecision, MotionDispatch, MotionSession};
 pub use limiter::{
