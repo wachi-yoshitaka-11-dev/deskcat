@@ -150,7 +150,7 @@
 //!   `ledc_set_duty_and_update`を呼び、それが内部で`_ledc_update_duty`を呼ぶ（`components/esp_driver_ledc/src/ledc.c`）。
 //!   新しいdutyは次のPWM cycleから効く（`components/esp_driver_ledc/include/driver/ledc.h`の
 //!   `ledc_update_duty`のnote）。dutyのregisterへの書き込みはbusy-waitの前に行われる（`ledc.c:1606`）。lowspeedでは`ledc_ls_channel_update`（para_up）が待ちの後に来る（`ledc.c:982`）ので、sourceの順序だけでは出力に出る時刻は決まらない。
-//!   #18の段0（stage0d）のパルス数（4本・4本・2本）は、**待ちの前に書いた値が、`duty_start`が立っている間、周期の頭ごとに出力に出る**と読むと合った（観察からの当てはめで、TRMは未確認）。
+//!   #18の段0（[EXP-058](../../../docs/hardware/experiment-log.md#exp-058-段0の4回目の窓書き直さない校正buildで動作1回ごとのパルスの本数をarduinoで数え同じ回のlogと並べた)）のパルス数（4本・4本・2本）は、**待ちの前に書いた値が、`duty_start`が立っている間、周期の頭ごとに出力に出る**と読むと合った（観察からの当てはめで、TRMは未確認）。
 //!   この読みなら`stop`（`set_duty(0)`）が効くのは、呼んだ次の周期の頭（最大1周期）で、`stop`が戻るのは前の更新が効いた後になる。**STOPの同期した実測はまだ無い。**servoがpulseをどの刻みで読むかは確かめていない。制御周期とPWMの
 //!   周期の関係によって、実機が受け取る列はLEDCへ設定した列と時間の刻みが違いうる。
 //!   **制御周期は段3で決める**（このmoduleは値を持たない）

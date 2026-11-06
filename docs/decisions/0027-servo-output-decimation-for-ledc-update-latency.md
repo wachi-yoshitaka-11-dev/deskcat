@@ -5,11 +5,11 @@
 
 ## 背景
 
-[#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)の段0（servo を接続しない）で、校正 build が`tick`の間隔の判定で必ず fault した（`limiter`が間隔を reject して latch する）。#703・#704 の診断 log と stage0b〜0d の観察で、原因が分かった。判断の経緯と選択肢の全体は[#705](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/705)にある。
+[#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)の段0（servo を接続しない）で、校正 build が`tick`の間隔の判定で必ず fault した（`limiter`が間隔を reject して latch する）。#703・#704 の診断 log と [EXP-056](../hardware/experiment-log.md#exp-056-段0の2回目の窓703入りの校正buildでmotion-calib-103を3回出し3回とも約101-msで止まった)〜[EXP-058](../hardware/experiment-log.md#exp-058-段0の4回目の窓書き直さない校正buildで動作1回ごとのパルスの本数をarduinoで数え同じ回のlogと並べた)（段0の窓）の観察で、原因が分かった。判断の経緯と選択肢の全体は[#705](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/705)にある。
 
 - ESP32 の LEDC では、`ledc_set_duty_and_update`が、前の更新が効くまで **critical section の中で busy-wait** する（ESP-IDF v5.5.3 `components/esp_driver_ledc/src/ledc.c:1596-1611`。待ちの本体は`components/hal/esp32/include/hal/ledc_ll.h:483-489`の`while (conf1.duty_start);`）。
 - 待ちは、前に立てた`duty_start`が落ちるまで。実測では、**立ててから2回目の PWM の周期の頭**（約 40.1〜40.2 ms 後）に落ちる。**この「2回目」の理由は ESP32 の TRM で確認していない**（log とパルス数への当てはめ）。
-- **duty のレジスタへの書き込みは、busy-wait の前に行われる**（`ledc.c:1606`の`ledc_duty_config`）。一方、low speed では`ledc_ls_channel_update`（para_up）が待ちの後に来る（`ledc.c:982`）ので、**source の順序だけでは、出力に出る時刻は決まらない。**stage0d のパルス数（4本・4本・2本）は、**待ちの前に書いた値が、`duty_start`が立っている間、周期の頭ごとに出力に出る**と読むと合った（値が引き金の後に見えると読むと 6本・6本・4本になり、合わなかった）。**観察からの当てはめで、TRM は未確認。**
+- **duty のレジスタへの書き込みは、busy-wait の前に行われる**（`ledc.c:1606`の`ledc_duty_config`）。一方、low speed では`ledc_ls_channel_update`（para_up）が待ちの後に来る（`ledc.c:982`）ので、**source の順序だけでは、出力に出る時刻は決まらない。**[EXP-058](../hardware/experiment-log.md#exp-058-段0の4回目の窓書き直さない校正buildで動作1回ごとのパルスの本数をarduinoで数え同じ回のlogと並べた)のパルス数（4本・4本・2本）は、**待ちの前に書いた値が、`duty_start`が立っている間、周期の頭ごとに出力に出る**と読むと合った（値が引き金の後に見えると読むと 6本・6本・4本になり、合わなかった）。**観察からの当てはめで、TRM は未確認。**
 - 結果として、50 Hz の PWM（周期 約 20.1 ms）で 20 ms の制御周期をとると、2回目の出力から CPU が最大で約 23 ms 止まり、`tick`の間隔が約 30〜40 ms になって許容を超える。止まっている間は、**その core の割り込みも止まる**。
 - **この問題は校正 build だけのものではない。**製品の servo task（[#19](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/19)の後続）も、同じ`Sg90::output_angle`（`firmware/esp32/src/servo.rs`）を通る。
 
@@ -71,7 +71,7 @@ ESP-IDF 公式の例`examples/peripherals/mcpwm/mcpwm_servo_control`。compare �
 2. **間引いた tick（`set_duty`を呼ばない tick）の setpoint を「出した位置」として扱わない。**`resume_position`と、`stop`の後の位置の記録は、**最後に出力した値**に合わせる。
 3. **間引いた出力の列（実際に`set_duty`へ渡す列）で、速度・加速度の上限を、出力の間隔で数えて超えない設計にする。**超える位相が残る設計のままでは、#18 の段1へ進まない。
 4. **間引いた後に busy-wait が消えたことを、測って確かめる。**出力した tick の時間（`after_tick_us − at_us`）を log に残し、段0で全部が小さいことを確かめる（閾値は実装の Issue で決める）。`tick`の間隔の条件だけだと、busy-wait が残っていても許容の内側に入る場合を見落とす。
-5. **D は採らない。**`unsafe`を足さないため、また出力は`stop`を呼んだ次の周期の頭（最大1周期）で 0 になると読めるため（stage0d のパルス数からの当てはめ。STOP の同期した実測で確かめる）。
+5. **D は採らない。**`unsafe`を足さないため、また出力は`stop`を呼んだ次の周期の頭（最大1周期）で 0 になると読めるため（[EXP-058](../hardware/experiment-log.md#exp-058-段0の4回目の窓書き直さない校正buildで動作1回ごとのパルスの本数をarduinoで数え同じ回のlogと並べた)のパルス数からの当てはめ。STOP の同期した実測で確かめる）。
 6. **C（MCPWM）は、#19 の製品の servo task を作る前に、別の判断として検討する。**A は C への道を塞がない（`Sg90::output_angle`の呼び方を変えるだけ）。
 
 ## 影響
@@ -91,7 +91,7 @@ ESP-IDF 公式の例`examples/peripherals/mcpwm/mcpwm_servo_control`。compare �
 
 | リスク | 対策 |
 |---|---|
-| **STOP の CPU の停止と、その間の割り込み禁止。**出力した tick の直後に`stop`が来ると、`set_duty(0)`が前の更新が効くまで最大約 40 ms busy-wait する（`portENTER_CRITICAL`、`ledc.c:1605`）。出力は`stop`を呼んだ次の周期の頭（最大1周期）で 0 になると読める（stage0d のパルス数からの当てはめで、TRM と同期した実測は未確認）ので、止まるのは CPU と、その core の割り込みである | 残存リスクとして記録する。D（`ledc_stop`）は`unsafe`を足さないため採らない。Arduino での STOP の同期測定は実機側が持つ |
+| **STOP の CPU の停止と、その間の割り込み禁止。**出力した tick の直後に`stop`が来ると、`set_duty(0)`が前の更新が効くまで最大約 40 ms busy-wait する（`portENTER_CRITICAL`、`ledc.c:1605`）。出力は`stop`を呼んだ次の周期の頭（最大1周期）で 0 になると読める（[EXP-058](../hardware/experiment-log.md#exp-058-段0の4回目の窓書き直さない校正buildで動作1回ごとのパルスの本数をarduinoで数え同じ回のlogと並べた)のパルス数からの当てはめで、TRM と同期した実測は未確認）ので、止まるのは CPU と、その core の割り込みである | 残存リスクとして記録する。D（`ledc_stop`）は`unsafe`を足さないため採らない。Arduino での STOP の同期測定は実機側が持つ |
 | **割り込み禁止の間の UART の受信で、byte を落としうる。**FIFO は 128 byte（ESP-IDF v5.5.3 `components/soc/esp32/include/soc/soc_caps.h:360`の`SOC_UART_FIFO_LEN`）、driver は 120 byte で割り込みを上げる（`components/esp_driver_uart/src/uart.c:69`、2035）。driver の ring buffer（`PI_PROTOCOL_UART_RX_BUFFER_BYTES`＝512 byte）は、ISR が走らないと使われない。115200 bps・8N1（[esp32-pi-protocol.md](../protocol/esp32-pi-protocol.md) §2 の`Baud`・`UART framing`、いずれも`Candidate`）では 1 byte 約 86.8 µs で、**FIFO が空から 128 byte 満ちるのに約 11.1 ms**（連続して送られ続けた場合）。ただし**受信が続いている最中は、割り込み禁止に入る時点で FIFO に最大で約 119 byte 入っていることがあり**（120 byte で割り込みが上がるため）、その場合は残り 約 9 byte（約 0.8 ms）で溢れる。**したがって、byte を落とさない十分条件は「割り込み禁止の間に受信が続かない」ことで、「11 ms を超えない」ではない。** Pi link の実際の送信量は根拠として持っていない。UART1 の割り込みをどの core に確保したかは未確認 | **#19 の設計を縛る**（次項）。console の`STOP`のような短い行（数 byte）は、FIFO がほぼ空のときに限って収まる |
 | **#19 の製品の servo task への制約。** | `stop`と出力の busy-wait が、**受信の途中に入らない**設計にする（受信が静かな区間で出力する、または busy-wait を無くす案Cを別に判断する）。`stop`を出力した tick の直後に呼ばないか、呼ぶ前後の UART の受信量を見積もる。UART1 の割り込みの core を確かめる。出力の間引き（本 ADR の決定 1〜4）を守る |
 | 出力の間引きで、速度・加速度の上限を破る位相が残る | 決定 3 を受け入れ条件にする（実装の Issue）。網羅は`tests/trajectory.rs`相当で行う |
