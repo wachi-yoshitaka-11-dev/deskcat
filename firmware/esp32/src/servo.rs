@@ -88,7 +88,7 @@
 //!   `ControlPeriod`の範囲内でなければならない」）。**jitterが許容幅を超えると、そこで新しい位置を設定しなくなる**（LEDCは最後のdutyを出し続けうる）。
 //!   新しい位置を設定しない側に倒れる既知の性質である
 //!   **#18の段0で観察した超過は、jitterではなかった。**ESP32のLEDCでは`ledc_set_duty_and_update`が、前の更新が効くまで
-//!   （`duty_start`を立ててから2回目のPWMの周期の頭、約40 ms後）、critical sectionの中でbusy-waitする
+//!   （`duty_start`を立ててから2回目のPWMの周期の頭。立てた位相に依って約20〜40 ms後）、critical sectionの中でbusy-waitする
 //!   （ESP-IDF v5.5.3 `components/hal/esp32/include/hal/ledc_ll.h:483-489`、`components/esp_driver_ledc/src/ledc.c:1596-1611`）。
 //!   制御周期20 ms・PWM 50 Hzでは、2回目の出力から`set_duty`が最大約23 ms止まり、間隔が約30〜40 msになる
 //!   （系統的な伸びで、必ず起きる）。止まっている間は、そのcoreの割り込みも止まる。判断は[ADR-0027](../../../docs/decisions/0027-servo-output-decimation-for-ledc-update-latency.md)
