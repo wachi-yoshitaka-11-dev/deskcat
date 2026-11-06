@@ -66,6 +66,10 @@
 | [EXP-052](#exp-052-組み直した3枚の板で初回通電しbringup-led-514のled点灯と導通を取った) | [#512](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/512)・[#514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)の実機の窓。ブレッドボードを3枚（ESP32の板、LCDの板、センサーの板）に組み直し、通電前の導通20項目、ESP32のUSBだけの初回通電、`bringup-led-514`の書き込み、LEDの点灯（赤→白→2本→白の点滅）、抵抗の両端と3V3の電圧を取った。導通20項目は期待どおり、LEDは設計どおりに点き、加速度センサー（`0xe5`）と温度センサー（`0x60`）のI2C読み出しが成功した | 値の正なし（観測の記録。判定は書かない） |
 | [EXP-053](#exp-053-専用キーをpiへ置き偽esp32を相手に--cloud-speechを4件通した) | [#522](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/522)の実機の窓。専用キーをPiへ置き、現在のdevelop `f2c4ea1`を直接buildして、偽ESP32を相手に`--cloud-speech`で動かした。4件の`show_text`が届いた | 値の正なし（観測の記録。専用Workspaceへの計上は未確認で、実ESP32・LCDでの表示も未確認） |
 | [EXP-054](#exp-054-首の固定方法を発泡スチロールの天板と底板に非通電で当てた) | [#34](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/34)の実機の窓（非通電）。サーボ本体を天板の切り欠きへ入れて耳の上に結束バンドをかぶせ、十字形ホーンを底板へ結束バンドで留めた | 値の正なし（観測の記録。詳細は[enclosure-and-neck.md](enclosure-and-neck.md#現物に当てた記録2026-11-03非通電発泡スチロール)。段ボールでの当て合わせと、頭の重さをかけた保持は未確認） |
+| [EXP-055](#exp-055-段0の1回目の窓校正build0fd97bfの値でサーボを接続せずpwmの波形と拒否を取り動作が141-msで止まった) | [#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)の段0の1回目の窓。サーボを接続せず、PWMの波形（周期19.97〜20.07 ms、幅1.56〜1.66 ms）と拒否を取った。動作は2回とも約141 msで止まった | 値の正なし（観測の記録。判定の語を書かない） |
+| [EXP-056](#exp-056-段0の2回目の窓703入りの校正buildでmotion-calib-103を3回出し3回とも約101-msで止まった) | [#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)の段0の2回目の窓。#703入りの校正buildで時刻の列を取り、動作は3回とも約101 msで止まった | 値の正なし（観測の記録。判定の語を書かない） |
+| [EXP-057](#exp-057-段0の3回目の窓704入りの校正buildでthreadphasestopの時刻の列を取り動作が約141-msと約101-msで止まった) | [#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)の段0の3回目の窓。#704入りの校正buildで、threadとphaseとstopの時刻の列を取った。動作は約141 msと約101 msで止まった | 値の正なし（観測の記録。判定の語を書かない） |
+| [EXP-058](#exp-058-段0の4回目の窓書き直さない校正buildで動作1回ごとのパルスの本数をarduinoで数え同じ回のlogと並べた) | [#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)の段0の4回目の窓。書き直さない校正buildで、動作1回ごとのパルスの本数をArduinoで数え、同じ回のlogと並べた（4本・4本・2本） | 値の正なし（観測の記録。判定の語を書かない） |
 
 **大容量の生dataはこのrepositoryへ入れていない。**保存場所は
 [development-foundation-plan.md](../planning/development-foundation-plan.md)の
@@ -5140,6 +5144,189 @@ Consoleの使用量の画面へ、2026-11-01 01:39〜01:43Zの試行が計上さ
 | Conclusion | 判定の語を書かない。観察は上の文書のとおり |
 | Next safe step | 段ボールでの確認、頭の重さをかけた保持（#18 の監視下の試験）、14本の線の取り回し。いずれも未実施 |
 
+## EXP-055: 段0の1回目の窓。校正build（`0fd97bf`の値）で、サーボを接続せずPWMの波形と拒否を取り、動作が141 msで止まった
+
+[#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)の段0（[servo-safety-limits.md](servo-safety-limits.md)の「#18の校正（案）」の「段0：組み直しと照合（駆動ではない）」）を、人間の立ち会いのもとで行った。**サーボの電源を入れる操作は行っていない（ACプラグを挿す操作は依頼しておらず、行っていない。ACが抜けていることの個別の申告は無い）。Piは使っていない。**ESP32はPCのUSB給電。実行の承認は、ユーザーが2026-11-05に「実行してよい」と答えたと、実機側のPMが伝えた（この窓の承認の原文は、作業セッションに見えていない）。**この記録は事実と未確認だけを書く。**ESP32のlogとArduinoのCSVは、repositoryの外の証拠用directoryにある。書き込みのlog（`flash.txt`）はESP32のMACアドレスを含むため、repositoryとIssueへ入れていない。
+
+| 項目 | 内容 |
+|---|---|
+| Test ID | `EXP-055` |
+| Date | 2026-11-05 JST（書き込み 21:39:01、最後のlog 21:46 ごろ） |
+| Operator | 端子台の照合と直し、線とクリップの付け外し、LCDのVCC線を抜く、USBの抜き挿し、Arduinoの線の接続はユーザー。ESP32の書き込み、console、Arduinoの書き込みと記録、解析は作業セッション（AI） |
+| Hardware revision／Exact components | `MCU-01`（ESP32-DevKitC V4）、`MEAS-02`（Arduino Uno R3）、`WIRE-PWR-01`（端子台）、`MEAS-01`（シャント。足をクリップで挟んだだけ）、クリップ付コード（`PROTO-01`）。`SERVO-01`・`PSU-SERVO-01`・Piは接続していない |
+| Wiring revision | 端子台の6穴は2本ずつ入っていた（ユーザーの申告。穴ごとの中身は聞いていない）。緑のjumper wire、基準の黒いクリップ、Arduinoの線、A0のクリップ、サーボのplugを外した（ユーザーの申告「外しました」）。LCDのVCC（赤）を板から抜いた。`X5`は板の−列の30番に挿し、もう一端の針をクリップ付コードで挟み、もう一方のクリップでシャントの足（Sの−側）を挟んだ。`X4`は`D7`に挿し、サーボ側は空け、Arduinoの`A0`をその針につないだ。Arduinoの`GND`はESP32の板の−列 |
+| Power supply and current limit | ESP32：PCのUSBだけ。サーボの電源・Piは接続していない（ACは上のとおり個別の申告が無い）。電流の上限は設けていない |
+| Firmware commit/profile | ローカルbranch（pushしていない）の`0fd97bf`、`--features bench-servo-calib-18`、debug。ELF sha256 `f917bcfba114777b46b1f656a0d5ab531bf33a08a1f88806f21490dab021f161`。書き込みの直前に`sha256sum -c`で一致。clippy（`-D warnings`）exit 0。2026-11-05の再buildでも同じsha256だった（実機側のPMの申告。`src/main.rs`をtouchしただけの増分buildで、cleanからの再現ではなかった。appの記述子が再compileされず、時刻の文字列が変わらなかったと読む） |
+| Configuration | 範囲90〜105°、START 105°、NEUTRAL 90°、step 2°、10°/s、着いた判定0.5°、加速度50°/s²、周期20 ms・許容10 ms、露出300 ms、N=10、間隔5000 ms、回の上限300 s（`servo_calib_18_confirmed`のlogに全部出ている）。Arduino：`hardware/measurement/arduino-transient-logger`（`0fd97bf`のcheckout。`-DLOGGER_NCH=1 -DLOGGER_REF=1`でcompile）、1ch、AVCC基準、約9615 Sample/s（104 µs刻み）、パルスの検出は閾値340カウント |
+| Measurement equipment | Arduino（`MEAS-02`）。連続streaming、`--allow-drops`付き。ESP32のlog（UART0。resetを保持して開く自作のconsole script） |
+| Procedure | 下の「手順と時刻」 |
+| Expected result | `MOTION calib 103`の動作が終わるまでPWMが出て、周期とパルス幅が読める。拒否が`command_refused`で出て、回は続く |
+| Measured result | 下記 |
+| Faults | 動作が2回とも途中で止まった（下記） |
+| Conclusion | 判定の語を書かない。観察は下記 |
+| Next safe step | 時刻の列を足したbuildでの取り直し（EXP-056以降） |
+
+### 手順と時刻
+
+- 21:36 clippy。21:38 ESP32のUSBが見えた。21:39:01〜21:39:41 書き込み（`espflash flash --after no-reset`）。
+- 21:40ごろ console を開き、resetを解除（`servo_calib_18_waiting_for_confirmation`）。21:44:20 `GO18`（`confirmed`のlogに値が出た）。21:44:23 `MOTION calib 103`。Arduinoの記録は、1回目は40秒間、2回目は30秒間取った。最初の採用sampleから`command_accepted`までは、1回目が約5.4秒、2回目が約8.4秒（算出：CSVの先頭行の壁時計〔block受信時刻。約13 msの遅れを含む〕と`run1.log`の`command_accepted`の時刻の差）。
+- 2回目：resetして`GO18`、`MOTION calib 103`。3回目：resetして`GO18`と拒否の行（動作なし）、`END`。
+
+### 結果
+
+- **波形（`X4`のサーボ側、Arduino）：**1回目と2回目の動作で、それぞれパルス4個。周期19.97／19.97／20.07 ms、幅1.56／1.56／1.66／1.56 ms（刻み約0.104 ms）。取りこぼし0。
+- **動作が途中で止まった：**1回目・2回目とも`MOTION calib 103`を受理した約141 ms後に`motion_interrupted reason=fault`、`session_end reason=fault ... error=limiter rejected the measured interval ... (out_of_range)`。`interval_rejections=1`。`tick_min_ms`は19.90／19.71、`tick_max_ms`は39.85／40.00。2回とも`elapsed_ms=141`、`position_deg`は104.83487／104.83541。
+- 1回目の後の`MOTION calib 101`と`STOP`は、回が終わっていたため`ignored_after_end`になった。
+- **拒否（動かさない回）：**`UnknownCommand`（`FOO`、`MOTION calib abc`）、`UnknownMotion`、`ExceedsMaxStep`（95）、`TargetOutOfHardRange`（107）が`command_refused`で出て、回は続いた。`END`で`session_end reason=end`。
+- **`rejected_out_of_range`：**動作を出さずに`END`した回でも`servo_calib_18_limiter_counters`に`rejected_out_of_range=1`があった。同じ回の`END`の前に`TargetOutOfHardRange`の拒否があった。実機側のPMの申告（VM側のPMがdevelop `d925d38`の`crates/deskcat-servo/src/limiter.rs`を読んだ範囲。作業セッションは読んでいない）：この数は`TargetOutOfHardRange`の拒否と間隔のreject（`IntervalOutsideControlPeriod`）の両方を数える。動作した回の1は、間隔のrejectの分。
+- **firmwareの設定（実機側のPMの申告。生成されたsdkconfigとこのELFの対応は確かめていない）：**`CONFIG_FREERTOS_HZ=100`、consoleはUART0・115200、`CONFIG_LOG_DEFAULT_LEVEL=3`。
+- **起動回数（USB・espflashの接続・port openのresetを含む）：**USB挿入1、espflash 2、console open＋release 3、reset 4、reset 5＝5。
+
+### 確かめていないこと
+
+- `RateLimited`、動作中の`Busy`、`max_commands`の後の`ignored_after_end`、`STOP`による中止、Arduinoの記録での`STOP`後の信号停止。動作が毎回途中で止まったため。
+- 通電前の現物確認(a)〜(d)の個別の確認。(c)`RES-PULL-01`（`R3`）は結線表とEXP-052の記録のみ（この窓で測っていない）。端子台の6穴の中身は穴ごとに照合していない（**段1の前に必ず照合する項目**）。tickの間隔は、動作中に止まった回の値だけ。
+
+### ログ（原本はrepositoryの外。sha256）
+
+- ESP32のlog（`run1.log`）`b7d5852d462bcbfe0a0cbf18cc737b2d259236b37e067098a5b7c4798376fc83`、Arduinoのhex `cfec7ed7b6abeb324a99fdfac3ba3f9e64930d4342f2d89b620a75a5367b8d71`、書き込みのlog（`flash.txt`。MACを含む）`f1b8edd67c166616a4f94cff1b1c00f04a26e0308d0272f1517735693eb17c81`、clippyのlog `f8a9c582cbf627e2516395535592ef2158e83b6eeab822c074445709df189da1`、PWMのCSV `pwm1.csv` `a4a3e15778601308dc487f7eae9a562c0a93478c0ec696a63a2a2e6eac635f05`・`pwm2.csv` `303795608410d464a4a90b2455df4d9143ee712cd61a54670310de37a07f0516`。
+
+## EXP-056: 段0の2回目の窓。#703入りの校正buildで、`MOTION calib 103`を3回出し、3回とも約101 msで止まった
+
+[#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)の段0を、EXP-055と同じ構成で、時刻の列（`servo_calib_18_tick_trace`・`servo_calib_18_wake_trace`）を取るためにやり直した。**サーボの電源を入れる操作は行っていない（ACプラグを挿す操作は依頼しておらず、行っていない。ACが抜けていることの個別の申告は無い）。Piは使っていない。ArduinoのUSBは挿していない（GND・A0の線は板に付いたまま）。**実行の承認：実機側のPMが「ユーザーが2026-11-05に『実行してよい』と答えた」と伝えた。伝えられた承認は数えられないため、作業セッションがユーザーへ直接確かめ、返事「はい」を得た（2026-11-05）。USB挿入の前の3点（ACが抜けているか／サーボのplugが挿さっていないか／LCDの赤い線が抜けたままか）に、個別の答えは来ていない。ユーザーの返事は「さした」だけ。**この記録は事実と未確認だけを書く。**
+
+| 項目 | 内容 |
+|---|---|
+| Test ID | `EXP-056` |
+| Date | 2026-11-05 JST（書き込み 23:29:37、最後の確認 23:44:08） |
+| Operator | USBの抜き挿しはユーザー。書き込み、console、記録は作業セッション（AI） |
+| Hardware revision／Exact components | `MCU-01`。サーボ・`PSU-SERVO-01`・Piは接続していない。`MEAS-02`（Arduino）はUSBを挿していない（線は板に付いたまま） |
+| Wiring revision | `EXP-055`の終わりの状態のまま（ユーザーの申告は無し。前の窓の記録から）：LCDのVCCは抜いたまま、`X4`・`X5`・Arduinoの線は板に付いたまま |
+| Power supply and current limit | ESP32：PCのUSBだけ。Piは接続していない（ACは冒頭のとおり個別の申告が無い） |
+| Firmware commit/profile | develop `76d0384`（[#703](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/703)）に、`0fd97bf`の`config.rs`の値を当てるpatch（commitは無い）。`--features bench-servo-calib-18`、debug、repositoryの外で`git archive`を展開してbuild。ELF sha256 `1ef29576249ce5c221b69abb466f0965364f3b382da24d05683a53d931a18009`。書き込みの直前に`sha256sum -c`で一致。patchのsha256 `cbaabf6a854e857f07ec4273f188f586dcfaa91a1983c70c0975094e71815281`。build手順（`build.sh`）とbuildのlog（`build1.txt`・`build2.txt`）はrepositoryの外 |
+| Configuration | 値は`EXP-055`と同じ（`servo_calib_18_confirmed`のlog） |
+| Measurement equipment | ESP32のlog（UART0。resetを保持して開くconsole script） |
+| Procedure | 書き込みの後、console、`GO18`、`MOTION calib 103`。止まったら、resetして`GO18`から。3回 |
+| Expected result | 時刻の列が出る |
+| Measured result | 下記 |
+| Faults | 動作が3回とも止まった（下記） |
+| Conclusion | 判定の語を書かない |
+| Next safe step | 時刻の列を足したbuildでの取り直し |
+
+### build の照合（実機側のPMの申告。作業セッションは見ていない）
+
+展開から2回buildし、sha256は`1ef29576…`と`a6306259…`で一致しない。`cmp`で違いは2 byte（offset 4213・4216）だけで、ESP-IDFのappの記述子のcompile時刻の文字列（23:10:28／23:17:24）。`CONFIG_APP_COMPILE_TIME_DATE=y`。
+
+### 結果（時刻UTC、日付は2026-11-05（UTC））
+
+- 3回とも`command_accepted n=1 target_deg=103`の約100 ms後に`motion_interrupted reason=fault`、`session_end reason=fault ... (out_of_range)`、`interval_rejections=1`、`elapsed_ms=101`、`position_deg=104.94053`、`tick_min_ms=19.61`、`tick_max_ms=30.01`、`rejected_out_of_range=1`。
+- `tick_trace n=1 count=4 dropped=0`：`at_us`は7555,27792,47400,77412（1回目）、7547,27784,47392,77404（2・3回目）。1回目の間隔は20237・19608・30012 µs。
+- `wake_trace`：`woke_us`は7334,27734,47358,77354（1回目）、7327,27727,47351,77347（2・3回目）。
+- 受理からsession_endまでの全行は、repositoryの外の`stage0b/accepted-to-end.txt`にある。
+- **起動回数：**USB挿入1、espflash 2、console open＋release 3、reset 4、reset 5＝5。
+
+### 窓の終わり
+
+ユーザーがUSBを抜いた（返事「ぬいた」）。`/dev/ttyUSB*`が消えたことを23:44:08 JSTに確かめた（抜いた時刻は記録していない）。flashは校正build（`1ef29576…`）のまま。LCDのVCCは抜いたまま。`X4`・`X5`は付いたまま。
+
+### ログ（原本はrepositoryの外。sha256）
+
+ESP32のlog `238d8d13a34534857056da3f5366c6c012c463b49149d7a519a4e8c37024f5ec`、書き込みのlog（MACを含む）`8aa498938b6cae285494f12db23f572d7df4ae1ee4a3276a19810068b71ff137`。
+
+## EXP-057: 段0の3回目の窓。#704入りの校正buildで、thread・phase・stopの時刻の列を取り、動作が約141 msと約101 msで止まった
+
+[#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)の段0を、[PR #704](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/704)で足した時刻の列を取るためにやり直した。**サーボの電源を入れる操作は行っていない（ACプラグを挿す操作は依頼しておらず、行っていない。ACが抜けていることの個別の申告は無い）。Piは使っていない。ArduinoのUSBは挿していない（GND・A0の線は板に付いたまま）。**実行の承認：実機側のPMが「ユーザーが2026-11-06に『実行してよい』と答えた」と伝えた。伝えられた承認は数えられないため、作業セッションが直接確かめ、返事「はい」を得た（2026-11-06）。USB挿入の前の3点に、個別の答えは来ていない。**この記録は事実と未確認だけを書く。**
+
+| 項目 | 内容 |
+|---|---|
+| Test ID | `EXP-057` |
+| Date | 2026-11-06 JST（書き込み 01:11:25、窓の終わりの確認 01:13:54） |
+| Operator | USBの抜き挿しはユーザー。書き込み、console、記録は作業セッション（AI） |
+| Hardware revision／Exact components | `MCU-01`。サーボ・`PSU-SERVO-01`・Piは接続していない。`MEAS-02`（Arduino）はUSBを挿していない（線は板に付いたまま） |
+| Wiring revision | `EXP-056`の終わりの状態のまま（ユーザーの申告は無し） |
+| Power supply and current limit | ESP32：PCのUSBだけ。Piは接続していない（ACは冒頭のとおり個別の申告が無い） |
+| Firmware commit/profile | develop `a3aa265`（[#704](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/704)）にEXP-056と同じpatchを当てたもの（commitは無し）。`--features bench-servo-calib-18`、debug。ELF sha256 `3d239e1451c5e859e7dd3cf3715b4b2576273aae12b57dbf27cde5c570006734`。書き込みの直前に`sha256sum -c`で一致 |
+| Configuration | 値は`EXP-055`と同じ |
+| Measurement equipment | ESP32のlog（UART0。resetを保持して開き、起動時の`servo_calib_18_thread_info`の2行を残した） |
+| Procedure | 書き込み、console、`GO18`、`MOTION calib 103`。止まったらresetして`GO18`から。3回 |
+| Expected result | thread・tick・wake・phase・stopの時刻の列が出る |
+| Measured result | 下記 |
+| Faults | 動作が3回とも止まった |
+| Conclusion | 判定の語を書かない |
+| Next safe step | Arduinoでパルスの本数を同じ回のlogと並べる（EXP-058） |
+
+### build の照合（実機側のPMの申告。作業セッションは見ていない）
+
+展開から2回buildし、もう1つは`0228d0a4d9b4a84640d143b8f5b52e2dc5514a0d6fde49fb6c3d6e0e47fcb7e8`。`cmp`で違いは3 byte（offset 4213・4215・4216）で、compile時刻の文字列（00:52:29／00:59:30）。fmt・clippy（`-D warnings`）・buildはexit 0。patch・`build.sh`・`build1.txt`・`build2.txt`はrepositoryの外。
+
+### 結果（時刻UTC、日付は2026-11-05（UTC）。JSTでは2026-11-06 01:11〜01:13）
+
+- `servo_calib_18_thread_info`は3回とも残った：`console_reader`（名前`debug_motion_console`）は`Core0`、`main`は`Core0`、`spawn_priority=none`、`freertos_hz=100`。
+- 1回目・3回目：`elapsed_ms=141`、`position_deg=104.83424`、`tick_min_ms=19.94`、`tick_max_ms=39.76`。2回目：`elapsed_ms=101`、`position_deg=104.94023`、`tick_min_ms=19.61`、`tick_max_ms=30.04`。3回とも`motion_interrupted reason=fault`、`session_end reason=fault`（out_of_range）、`rejected_out_of_range=1`。
+- 1回目：`tick_trace count=5`、`at_us`は8023,27964,48236,78212,117976。`wake_trace`の`woke_us`は7887,27878,48119,78107,117883。`phase_trace`の`after_tick_us`は8069,28680,60971,101208,118041、`pre_delay_us`は86,8112,28751,61015,101264。`stop_trace`は`stop_pre_us=118562`・`stop_post_us=141328`。
+- 2回目：`tick_trace count=4`、`at_us`は7462,27786,47398,77434。`woke_us`は7325,27705,47349,77349。`after_tick_us`は7507,28500,61286,77504、`pre_delay_us`は85,7550,28572,61349。`stop_pre_us=78028`・`stop_post_us=101369`。
+- 3回目は1回目とほぼ同じ（`at_us` 8024,27964,48237,78213,117976。`after_tick_us`の後ろ3つは61559,101796,118042。`stop_pre_us=118563`・`stop_post_us=141912`）。
+- 受理からsession_endまでの全行（27行）は、repositoryの外の`stage0c/accepted-to-end.txt`にある。
+- **起動回数：**USB挿入1、espflash 2、console open＋release 3、reset 4、reset 5＝5。
+
+### 窓の終わり
+
+ユーザーがUSBを抜いた（返事「ぬいた」）。`/dev/ttyUSB*`が消えたことを2026-11-06 01:13:54 JSTに確かめた。flashは校正build（`3d239e14…`）のまま。LCDのVCCは抜いたまま。`X4`・`X5`は付いたまま。Arduinoは挿していない。
+
+### ログ（原本はrepositoryの外。sha256）
+
+ESP32のlog `2bbde93a39136678948ac2ef53106af37fe2df83b82f42e3d340b56771ae831b`、書き込みのlog（MACを含む）`2086c0dda913db866fe4bd7cc10a0a2e88c952919a244c49e0fd13271f3ab908`、受理からsession_endまで `d92562264d7a200d8ae34b40ea2a416caebcf3a67dc1fb03012bd35e1d87f814`。
+
+## EXP-058: 段0の4回目の窓。書き直さない校正buildで、動作1回ごとのパルスの本数をArduinoで数え、同じ回のlogと並べた
+
+[#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)の段0を、`EXP-057`と同じbuildのまま、Arduino（`MEAS-02`）で1回の動作で出るパルスの本数を数えて同じ回のlogと並べるためにやり直した。**サーボの電源を入れる操作は行っていない（ACプラグを挿す操作は依頼しておらず、行っていない。ACが抜けていることの個別の申告は無い）。Piは使っていない。firmwareは書き直していない。**実行の承認：実機側のPMが「ユーザーが2026-11-06に『はい』と答えた」と伝えた。伝えられた承認は数えられないため、作業セッションが直接確かめ、返事「はい」を得た（2026-11-06）。USB挿入の前の確認は、実機側のPMの指示で取り直していない（前の窓の終わりの状態が記録にある）。ユーザーの作業はESP32とArduinoのUSBを挿すことだけ（返事「さした」）。**この記録は事実と未確認だけを書く。**
+
+| 項目 | 内容 |
+|---|---|
+| Test ID | `EXP-058` |
+| Date | 2026-11-06 JST（Arduinoの記録の開始 09:24:32、窓の終わりの確認 09:28:22） |
+| Operator | USBの抜き挿しはユーザー。console、Arduinoの記録、解析は作業セッション（AI） |
+| Hardware revision／Exact components | `MCU-01`、`MEAS-02`（Arduino Uno R3） |
+| Wiring revision | `EXP-055`の終わりの状態のまま（`X4`・`X5`・Arduinoの`GND`・`A0`の線は板に付いたまま。目では見ていない）。LCDのVCCは抜いたまま |
+| Power supply and current limit | ESP32とArduino：PCのUSBだけ。サーボの電源・Piは接続していない（ACは冒頭のとおり個別の申告が無い） |
+| Firmware commit/profile | 書き直していない。`EXP-057`の校正build（ELF sha256 `3d239e1451c5e859e7dd3cf3715b4b2576273aae12b57dbf27cde5c570006734`）が前の窓で書いたまま入っている。起動のlogに`Compile time: Nov  6 2026 00:52:29`、`ELF file SHA256: 3d239e145...`（先頭9桁のみ）が出て、`EXP-057`のbuildと合う。このcompile時刻はbuildをした端末の現地時刻（JST）で、UTCでは2026-11-05 15:52:29Z（`build1`のmtime 2026-11-06 00:54:52 +0900と合う。実機側のPMの申告）。flashの読み出しはしていない |
+| Configuration | 値は`EXP-055`と同じ。Arduino：`EXP-055`と同じhex（書き直していない）、1ch、AVCC基準、約9615 Sample/s、閾値340カウント |
+| Measurement equipment | Arduino（`MEAS-02`）。連続75秒、3回の動作をまたいで1本（`--allow-drops`付き）。ESP32のlog |
+| Procedure | consoleをresetを保持して開き、`GO18`、`MOTION calib 103`。止まったらresetして`GO18`から。3回 |
+| Expected result | 動作ごとのパルスの本数が数えられる |
+| Measured result | 下記 |
+| Faults | 動作が3回とも止まった |
+| Conclusion | 判定の語を書かない |
+| Next safe step | 本数と時刻の列の照合は、別のIssueが持つ |
+
+### 結果（時刻UTC、日付は2026-11-06（UTC））
+
+- 取りこぼし：ISRの捨て0、block欠番1件、予約bit破れ1（`pwm.out`）。欠番は、CSVの時刻の列で7669620 µsから7683036 µsまでの13416 µsの飛び1か所（他のstepは104 µs刻みで規則的）。壁時計の概算で00:24:39.49Zごろ（線形復元のため概算）。1回目のパルス列の約3.7秒前、1回目の`GO18`（00:24:40.137Z）の約0.6秒前で、3回の動作のパルス列の区間には当たらない。
+- パルスは全体で10本（4+4+2）。3回の区間の外にパルスは無かった。
+
+| 回 | `GO18` | `MOTION calib 103` | `elapsed_ms` | `position_deg` | `tick_max_ms` | パルス本数 | 最初の立ち上がり（Arduino µs／壁時計の概算） | 間隔 ms | 幅 ms（量子化のまま） |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | 00:24:40.137Z | 00:24:43.137Z | 141 | 104.83424 | 39.76 | 4 | 11403428／00:24:43.2266Z | 20.072, 19.968, 19.968 | 1.664, 1.56, 1.56, 1.664 |
+| 2 | 00:24:52.153Z | 00:24:55.154Z | 141 | 104.83424 | 39.76 | 4 | 23437268／00:24:55.2604Z | 19.968, 19.968, 20.072 | 1.56, 1.56, 1.56, 1.56 |
+| 3 | 00:25:04.155Z | 00:25:07.161Z | 101 | 104.94023 | 30.03 | 2 | 35413076／00:25:07.2362Z | 19.968 | 1.56, 1.664 |
+
+- 3回とも`motion_interrupted reason=fault`、`session_end reason=fault`（out_of_range）。`tick_trace`の`count`は5／5／4。`stop_trace`は`stop_pre_us`が118562／118562／78029、`stop_post_us`が141328／141319／101370。
+- Arduinoの時刻はmark間の線形復元で、壁時計はblockの受信時刻からの概算。
+- **起動回数：**USB挿入1、console open＋release 2、reset 3、reset 4＝4。espflashは使っていない。
+- **記録の誤り：**コマンドの相対パスの誤りで、`pwm.out`が一時的にrepository直下（未追跡）に出来た。証拠用directoryへ移し、移した後の`git status --short`は空だった（実機側のPMも確かめた）。
+
+### 窓の終わり
+
+ユーザーがESP32とArduinoのUSBを2本とも抜いた（返事「ぬいた」）。`/dev/ttyUSB*`・`/dev/ttyACM*`が消えたことを09:28:22 JSTに確かめた。flashは校正build（`3d239e14…`）のまま。LCDのVCCは抜いたまま。サーボの電源は接続していない（ACの個別の申告は無い）。
+
+### 確かめていないこと
+
+flashの読み出し、`RateLimited`・`Busy`・`max_commands`・`STOP`、板の線の目視、通電前の現物確認(a)〜(d)の個別の確認。
+
+### ログ（原本はrepositoryの外。sha256）
+
+ESP32のlog `1fddde68c2f89d9385faaae1863950065d902fe36cfc61c265b735f79e09f8fb`、PWMのCSV `319d97fd0af9362304cb36dc238b2f41f0952ab01412599314559e9df415f46a`、集計 `c333b860a261b18e8fb78517ee9e7fbcd3c8e9e5295bf674b251efed681c4e39`、受理からsession_endまで `2abb58527a68efa2cabcd340f1e0309535548792252d5a55aae7324213288fd1`。
+
 ## Revision履歴
 
 | 日付 | Revision | 変更 | 根拠 |
@@ -5206,3 +5393,4 @@ Consoleの使用量の画面へ、2026-11-01 01:39〜01:43Zの試行が計上さ
 | 2026-11-01 | 59 | [#522](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/522)。**`EXP-053`に「Consoleの観察」を足した。**Consoleのログの画面にWorkspace「DeskCat」の`claude-haiku-5-5`の要求が4件あり、使用量の画面は0（反映待ちと読んでいるが切り分けていない）。上限が効くこととキーのscopeは未確認のまま | ユーザーの画面の報告（画像はrepositoryへ入れない） |
 | 2026-11-01 | 60 | [#34](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/34)。公開の記録に PM のセッション名が入っていたため、3332 行目の PM のセッション名の表記を「実機側の PM」に置き換えた。意味は変えていない。観測値、判定、他の記述は変更していない | VM 側の PM の判断（実機側の PM 経由） |
 | 2026-11-03 | 61 | [#34](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/34)。**`EXP-054`を追加した。**首の固定方法を、発泡スチロールの天板と底板に非通電で当てた。観察は[enclosure-and-neck.md](enclosure-and-neck.md)に書き、ここには窓の条件だけを置いた。観測値の判定は書いていない | 作業セッションの記録（ユーザーの回答による） |
+| 2026-11-06 | 62 | [#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)。**`EXP-055`〜`EXP-058`を追加した。**段0の4つの窓（校正buildでサーボを接続せず、PWMの波形、拒否、tickの間隔、時刻の列、パルスの本数を取った）。動作は全回で約101〜141 msで止まった。観測値の判定は書いていない。仮説との照合はここに書かない | 作業セッションの記録（ユーザーの回答と、実機側のPMの申告による） |
