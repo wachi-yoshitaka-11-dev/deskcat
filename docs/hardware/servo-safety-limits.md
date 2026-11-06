@@ -837,6 +837,17 @@ firmware（`firmware/esp32/src/servo.rs`、
 
 **この節の値は、`動作制限`表の承認値ではない。**表の承認値と設定可能なhard boundは、#18の測定が終わった後に、実測を根拠にPull Requestで埋める。
 
+### 段0で分かったこと：`tick`の間隔が必ず外れる原因（[#705](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/705)）
+
+**校正 build の`tick`の間隔が、制御周期20 msの許容を必ず外れ、limiter が reject して latch する。原因は jitter ではなく、LEDC の更新の遅れである。**判断は[ADR-0027](../decisions/0027-servo-output-decimation-for-ledc-update-latency.md)。
+
+- ESP32 の LEDC では、`ledc_set_duty_and_update`が、前の更新が効くまで **critical section の中で busy-wait** する（ESP-IDF v5.5.3 `components/esp_driver_ledc/src/ledc.c:1596-1611`、待ちの本体は`components/hal/esp32/include/hal/ledc_ll.h:483-489`の`while (conf1.duty_start);`）。**その core の割り込みも止まる。**
+- 実測では、`duty_start`が立ってから**2回目の PWM の周期の頭**（約40.1〜40.2 ms後）に落ちる。**この「2回目」の理由は ESP32 の TRM で確認していない**（log とパルス数への当てはめ）。PWM の周期は 約 20.06〜20.12 ms（`set_duty`の戻りの時刻から。[EXP-030](experiment-log.md)の実測 19.97〜20.07 ms と近い）。
+- **duty の register への書き込みは、busy-wait の前に行われる**（`ledc.c:1606`）。一方、low speed では`ledc_ls_channel_update`（para_up）が待ちの後に来る（`ledc.c:982`）ので、**source の順序だけでは、出力に出る時刻は決まらない。**stage0d のパルス数（4本・4本・2本）は、**待ちの前に書いた値が、`duty_start`が立っている間、周期の頭ごとに出力に出る**と読むと合った（値が引き金の後に見えると読むと、6本・6本・4本になって合わない）。**観察からの当てはめで、TRM は未確認。**
+- **上の読みなら、`stop`（`set_duty(0)`）が効くのは、呼んだ次の周期の頭（最大1周期）。**`stop()`が戻るのは、前の更新が効いた後（出力した tick の直後なら最大約40 ms）。`stop_post_us`は`stop()`が戻った時刻であり、信号が止まった時刻ではない。**STOP の入力から信号が止まるまでの時間の同期した実測は、まだ無い**（実機側が持つ）。
+- 制御周期20 ms・PWM 50 Hz では、2回目の出力から`set_duty`が最大約23 ms止まり、間隔が約30〜40 msになる。**必ず起きる。**
+- **対処（[ADR-0027](../decisions/0027-servo-output-decimation-for-ledc-update-latency.md)）：**`Limiter`は毎 tick 進め、LEDC への出力は N tick に1回に間引く（3 tickから）。実装はまだ無い。**この表の`CONTROL_PERIOD_*`の値は、この節で変えていない。**
+
 ### 手順・停止基準・受け入れ条件
 
 **この節は段0と段1だけを書く。**段1は、校正 build と limiter が仕様のとおりに動くかを確かめる段であり、受け入れ条件はどれも取らない。範囲を広げる段（ホーンを付ける段、機構の制限の測定を含む）は、段1の結果を見て、別の Pull Request でこの節へ足す。**それまで、ホーンを付けた駆動と、90°〜105°の外への駆動はしない。**
