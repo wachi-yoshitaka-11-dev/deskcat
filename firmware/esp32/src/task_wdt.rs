@@ -17,6 +17,8 @@
 //! `reset_reason`が`task_watchdog`になる」ことを見るためのbuildである。**servoに触れない。**`Sg90`・LEDC・
 //! `SERVO-PWM`（GPIO27）を作らず、Pi link・I2C・LCDも持たない。**登録して`bench_wdt_711_registered`を出した後は、
 //! 一度もfeedしない**（[`run_wdt_test`]）。製品buildと校正buildには、hangを起こすcommandを入れていない。
+//! **`CONFIG_ESP_TASK_WDT_PANIC`が無効なら（`panic_on_trigger`がfalse）、登録せずに`bench_wdt_711_invalid_config`を出して止まる**
+//! （発火してもresetしないので、このbuildの目的を果たせない）。
 //! **resetの後、同じfirmwareが再び登録して、約timeoutごとにresetを繰り返す**（試験の終わりは人が決める。
 //! flashし直すか、電源を切る）。
 //! **実機では動かしていない。**
@@ -70,11 +72,21 @@ pub fn register_main_task<'a>(
 #[cfg(feature = "bench-wdt-711")]
 pub fn run_wdt_test() -> ! {
     let peripherals = Peripherals::take().expect("Peripherals::take must succeed exactly once");
+    let panic_on_trigger = TWDTConfig::new().panic_on_trigger;
     log::info!(
-        "bench_wdt_711_start timeout_s={} panic_on_trigger={}",
-        esp_idf_svc::sys::CONFIG_ESP_TASK_WDT_TIMEOUT_S,
-        TWDTConfig::new().panic_on_trigger
+        "bench_wdt_711_start timeout_s={} panic_on_trigger={panic_on_trigger}",
+        esp_idf_svc::sys::CONFIG_ESP_TASK_WDT_TIMEOUT_S
     );
+    // panicが無効だと、TWDTは発火しても警告するだけでresetしない。このbuildは「panicしてresetする」ことを
+    // 見るためのものなので、登録の前に止める（値の出所はsdkconfigの`CONFIG_ESP_TASK_WDT_PANIC`のまま）。
+    if !panic_on_trigger {
+        log::error!(
+            "bench_wdt_711_invalid_config panic_on_trigger=false. CONFIG_ESP_TASK_WDT_PANICが無効で、発火してもresetしない。main taskを登録せず、何も試験しない"
+        );
+        loop {
+            FreeRtos::delay_ms(1000);
+        }
+    }
     let mut slot = None;
     // 購読を手放さない（dropすると登録が外れ、発火しない）。
     let _subscription = match register_main_task(&mut slot, peripherals.twdt) {
