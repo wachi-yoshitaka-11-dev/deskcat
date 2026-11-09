@@ -305,7 +305,9 @@ pub fn run() -> ! {
     // （`servo`をdropするとLEDCがGPIO27をlowへ固定する）。
     // 設定は`TWDTConfig::new()`＝sdkconfigの値（timeout、`CONFIG_ESP_TASK_WDT_PANIC`）である。ここでtimeoutを決めない。
     let Ok(mut twdt) = TWDTDriver::new(peripherals.twdt, &TWDTConfig::new()) else {
-        log::error!("servo_calib_18_limits_rejected error=TWDTDriver::new failed");
+        log::error!(
+            "servo_calib_18_wdt_unavailable error=TWDTDriver::new failed. main taskはtask watchdogに未登録で、servoを動かさずに終える"
+        );
         drop(servo);
         ended(&console, None, None);
     };
@@ -313,7 +315,7 @@ pub fn run() -> ! {
         Ok(wdt) => wdt,
         Err(err) => {
             log::error!(
-                "servo_calib_18_limits_rejected error=task watchdog subscription failed: {err}"
+                "servo_calib_18_wdt_unavailable error=task watchdog subscription failed: {err}. main taskはtask watchdogに未登録で、servoを動かさずに終える"
             );
             drop(servo);
             ended(&console, None, None);
