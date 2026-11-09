@@ -85,6 +85,10 @@ debug-motion-19 = []
 # **`src/config.rs`の`SERVO_CALIB_18_*`が1つでも`None`の間は、compileが止まる**（値は回ごとの実行承認が決める。既定値を持たない）。
 # 他の試験featureとは併用できない（`main.rs`の`compile_error!`）。**実機では動かしていない。手順・停止基準のPull Requestがmergeされるまで駆動しない。**
 bench-servo-calib-18 = []
+# Issue #711 のtask WDTの検証build。main taskをTWDTへ登録し、その後は一度もfeedしない。panic resetと、再起動後の
+# `reset_reason`（`task_watchdog`）を実機で見るためのもの。servo・LEDC・GPIO27・Pi link・I2C・LCDに触れない（`src/task_wdt.rs`）。
+# 製品buildには入らない。他の試験featureとは併用できない（`main.rs`の`compile_error!`）。**実機では動かしていない。**
+bench-wdt-711 = []
 # Issue #14 の `TOUCH-01`（XPT2046）の raw 読み出し専用。SPI3（GPIO18/23/19）で X・Y・Z1・Z2 を読み、`TOUCH-IRQ`（GPIO34）の level とあわせて
 # UART0 に出す。LCD は初期化せず（`LCD-CS` を High に固定するだけ）、状態機械は配線しない（`src/touch.rs`）。単独の試験 build として使う。
 touch-sample-14 = []

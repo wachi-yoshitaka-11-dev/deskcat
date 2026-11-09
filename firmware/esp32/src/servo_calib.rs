@@ -79,12 +79,13 @@ use deskcat_servo::{
 };
 use esp_idf_svc::hal::delay::FreeRtos;
 use esp_idf_svc::hal::peripherals::Peripherals;
-use esp_idf_svc::hal::task::watchdog::{TWDTConfig, TWDTDriver, WatchdogSubscription};
+use esp_idf_svc::hal::task::watchdog::WatchdogSubscription;
 use esp_idf_svc::sys::EspError;
 
 use crate::config::{self, calib_18_required};
 use crate::debug_motion::{ConsoleEvent, DebugConsole};
 use crate::servo::{exact_pulse_width_us_for_angle, LimitedServo, Sg90, Stopped};
+use crate::task_wdt;
 
 const APPROVED_MIN_DEG: f32 = calib_18_required(config::SERVO_CALIB_18_APPROVED_MIN_DEG);
 const APPROVED_MAX_DEG: f32 = calib_18_required(config::SERVO_CALIB_18_APPROVED_MAX_DEG);
@@ -299,23 +300,17 @@ pub fn run() -> ! {
         }
     };
 
-    // main taskをtask watchdogへ登録する（Issue #711）。**`Sg90::new`の後、`session`の前**であり、
-    // `GO18`を待つ間（人を待つ。期限が無い）は登録していない。登録後の待ちは、全て`IDLE_POLL_MS`・制御周期・
-    // 数tickの待ちであり、各loopの周ごとに`feed`する。登録できなければ、servoを動かさずに終える
-    // （`servo`をdropするとLEDCがGPIO27をlowへ固定する）。
+    // main taskをtask watchdogへ登録する（Issue #711。`crate::task_wdt::register_main_task`）。
+    // **`Sg90::new`の後、`session`の前**であり、`GO18`を待つ間（人を待つ。期限が無い）は登録していない。
+    // 登録後の待ちは、全て`IDLE_POLL_MS`・制御周期・数tickの待ちであり、各loopの周ごとに`feed`する。
+    // 登録できなければ、servoを動かさずに終える（`servo`をdropするとLEDCがGPIO27をlowへ固定する）。
     // 設定は`TWDTConfig::new()`＝sdkconfigの値（timeout、`CONFIG_ESP_TASK_WDT_PANIC`）である。ここでtimeoutを決めない。
-    let Ok(mut twdt) = TWDTDriver::new(peripherals.twdt, &TWDTConfig::new()) else {
-        log::error!(
-            "servo_calib_18_wdt_unavailable error=TWDTDriver::new failed. main taskはtask watchdogに未登録で、servoを動かさずに終える"
-        );
-        drop(servo);
-        ended(&console, None, None);
-    };
-    let mut wdt = match twdt.watch_current_task() {
+    let mut twdt = None;
+    let mut wdt = match task_wdt::register_main_task(&mut twdt, peripherals.twdt) {
         Ok(wdt) => wdt,
         Err(err) => {
             log::error!(
-                "servo_calib_18_wdt_unavailable error=task watchdog subscription failed: {err}. main taskはtask watchdogに未登録で、servoを動かさずに終える"
+                "servo_calib_18_wdt_unavailable error={err}. main taskはtask watchdogに未登録で、servoを動かさずに終える"
             );
             drop(servo);
             ended(&console, None, None);
