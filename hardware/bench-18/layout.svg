@@ -63,6 +63,7 @@
 <text x="300" y="558" font-size="11" text-anchor="start" fill="#555">X4 → servo の plug の黄（段1）</text>
 <polyline points="240,584 810,584 810,370 864,370" fill="none" stroke="#222" stroke-width="3" stroke-linejoin="round" stroke-dasharray="3 3"/>
 <text x="300" y="602" font-size="11" text-anchor="start" fill="#555">X5 → クリップで、S− の穴に入ったシャントの足1を挟む（穴の導体を増やさない）</text>
+<text x="300" y="619" font-size="11" text-anchor="start" fill="#555">(A) と、9 の判断の後の段1でつなぐ。(C)〜(B) の間は外す（小節1・9）</text>
 <circle cx="330" cy="250" r="11" fill="#fff" stroke="#222" stroke-width="2"/>
 <text x="330" y="232" font-size="13" text-anchor="middle" fill="#222" font-weight="bold">A 赤</text>
 <circle cx="330" cy="350" r="11" fill="#fff" stroke="#222" stroke-width="2"/>
