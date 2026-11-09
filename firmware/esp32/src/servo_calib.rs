@@ -39,6 +39,10 @@
 //!   生成された`sdkconfig`で100なら10 ms）で待つ。最初のtickの前に1 tick待って、tickの境に揃えてから刻む。
 //!   **実機での間隔は確かめていない**（commandごとに`tick_min_ms`／`tick_max_ms`をlogに出す。`CONTROL_PERIOD_TOLERANCE_MS`を
 //!   決めるための値である）。
+//! - **main taskをtask watchdogへ登録する**（Issue #711。`sdkconfig.defaults`の`CONFIG_ESP_TASK_WDT_PANIC=y`と組で、main taskが止まったまま
+//!   LEDCが最後のdutyを出し続けることを、timeout（sdkconfigの値）で限る）。**登録は`Sg90::new`の後**であり、`GO18`を待つ間（期限が無い）は登録しない。
+//!   登録後の待ちは`IDLE_POLL_MS`（20 ms）・制御周期・tick単位の待ちだけで、`session`・`run_motion`・`ended`の各loopの周ごとに餌付けする。
+//!   tickの間隔の実測は18.44〜21.55 ms（EXP-059）で、timeout（既定5 s）より2桁小さい。**実機では確かめていない。**
 //! - **LEDCへの出力は、N tickに1回へ間引く**（`config::SERVO_OUTPUT_DECIMATION_TICKS`、ADR-0027、Issue #708。Nは`servo_calib_18_confirmed`の
 //!   `output_decimation_ticks=`に出す。回ごとの実行承認の値ではない）。`Limiter`は出力するtickでだけ進み、窓（最後の出力からの時間）の間隔で制限する（`servo.rs`のmodule doc）。**`position_deg`・`position_min_deg`・
 //!   `position_max_deg`・`reached`の判定・`stop`の後の位置は、出力したtickの位置だけで更新する**（間引いたtickには位置が作られない）。
@@ -75,6 +79,7 @@ use deskcat_servo::{
 };
 use esp_idf_svc::hal::delay::FreeRtos;
 use esp_idf_svc::hal::peripherals::Peripherals;
+use esp_idf_svc::hal::task::watchdog::{TWDTConfig, TWDTDriver, WatchdogSubscription};
 use esp_idf_svc::sys::EspError;
 
 use crate::config::{self, calib_18_required};
@@ -290,12 +295,42 @@ pub fn run() -> ! {
         Ok(servo) => servo,
         Err(err) => {
             log::error!("servo_calib_18_limits_rejected error=Sg90::new failed: {err}");
-            ended(&console, None);
+            ended(&console, None, None);
         }
     };
 
-    let held = session(servo, &console, started);
-    ended(&console, Some(held))
+    // main taskをtask watchdogへ登録する（Issue #711）。**`Sg90::new`の後、`session`の前**であり、
+    // `GO18`を待つ間（人を待つ。期限が無い）は登録していない。登録後の待ちは、全て`IDLE_POLL_MS`・制御周期・
+    // 数tickの待ちであり、各loopの周ごとに`feed`する。登録できなければ、servoを動かさずに終える
+    // （`servo`をdropするとLEDCがGPIO27をlowへ固定する）。
+    // 設定は`TWDTConfig::new()`＝sdkconfigの値（timeout、`CONFIG_ESP_TASK_WDT_PANIC`）である。ここでtimeoutを決めない。
+    let Ok(mut twdt) = TWDTDriver::new(peripherals.twdt, &TWDTConfig::new()) else {
+        log::error!(
+            "servo_calib_18_wdt_unavailable error=TWDTDriver::new failed. main taskはtask watchdogに未登録で、servoを動かさずに終える"
+        );
+        drop(servo);
+        ended(&console, None, None);
+    };
+    let mut wdt = match twdt.watch_current_task() {
+        Ok(wdt) => wdt,
+        Err(err) => {
+            log::error!(
+                "servo_calib_18_wdt_unavailable error=task watchdog subscription failed: {err}. main taskはtask watchdogに未登録で、servoを動かさずに終える"
+            );
+            drop(servo);
+            ended(&console, None, None);
+        }
+    };
+
+    let held = session(servo, &console, started, &mut wdt);
+    ended(&console, Some(held), Some(&mut wdt))
+}
+
+/// task watchdogを餌付けする。失敗は握りつぶさずlogへ出す。
+fn feed(wdt: &mut WatchdogSubscription<'_>) {
+    if let Err(err) = wdt.feed() {
+        log::error!("servo_calib_18_wdt_feed_failed error={err}");
+    }
 }
 
 /// 何もせず待ち続ける。
@@ -306,10 +341,17 @@ fn park() -> ! {
 }
 
 /// 回の終わりの後。届いた行は、logに出して捨てる（動かさない）。
-fn ended(console: &DebugConsole, held: Option<Held>) -> ! {
+fn ended(
+    console: &DebugConsole,
+    held: Option<Held>,
+    mut wdt: Option<&mut WatchdogSubscription<'_>>,
+) -> ! {
     // 手放さない（`Held`のdoc）。
     let _held = held;
     loop {
+        if let Some(wdt) = wdt.as_deref_mut() {
+            feed(wdt);
+        }
         match console.try_recv() {
             Some(ConsoleEvent::Line(line)) => {
                 log::info!("servo_calib_18_ignored_after_end len={}", line.len());
@@ -374,7 +416,12 @@ fn wait_for_confirmation(console: &DebugConsole) -> Result<(), String> {
 }
 
 /// 回を進める。回が終わったら、持ち続けるものを返す。
-fn session(servo: Sg90<'static>, console: &DebugConsole, started: Instant) -> Held {
+fn session(
+    servo: Sg90<'static>,
+    console: &DebugConsole,
+    started: Instant,
+    wdt: &mut WatchdogSubscription<'_>,
+) -> Held {
     let (limits, period) = match build_limits() {
         Ok(built) => built,
         Err(err) => {
@@ -408,6 +455,7 @@ fn session(servo: Sg90<'static>, console: &DebugConsole, started: Instant) -> He
     }
 
     loop {
+        feed(wdt);
         if started.elapsed() >= max_session {
             return finish(ready, "max_session", None, &state);
         }
@@ -458,7 +506,7 @@ fn session(servo: Sg90<'static>, console: &DebugConsole, started: Instant) -> He
                     "servo_calib_18_command_accepted n={} target_deg={target}",
                     state.accepted
                 );
-                match run_motion(console, ready, target, &mut state, started) {
+                match run_motion(console, ready, target, &mut state, started, wdt) {
                     Motion::Next(next) => ready = next,
                     Motion::Ended(held) => return held,
                 }
@@ -600,6 +648,7 @@ fn run_motion(
     target: f32,
     state: &mut State,
     session_started: Instant,
+    wdt: &mut WatchdogSubscription<'_>,
 ) -> Motion {
     let period = Duration::from_millis(CONTROL_PERIOD_NOMINAL_MS.into());
     let exposure = Duration::from_millis(EXPOSURE_MS.into());
@@ -635,6 +684,7 @@ fn run_motion(
     wake_trace.record(motion_start.elapsed());
 
     while interrupted.is_none() && done_reason.is_none() {
+        feed(wdt);
         // (a) console。動いている間に受けるのは`STOP`だけで、それ以外は拒否する。拒否のlogは、`stop`の後に出す
         // （logの時間だけdutyが残らないように）。
         while let Some(event) = console.try_recv() {
