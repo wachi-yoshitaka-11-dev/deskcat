@@ -68,6 +68,7 @@
 //! | `debug-motion-19` | UART0のconsoleから`MOTION <name> <target>`の行を別threadで読み、Pi由来の`play_motion`と同じ`MotionDispatch`のcatalogへ渡す（#19の受け入れ条件3、`crate::debug_motion`、`crate::pi_link::PiLink::on_debug_line`）。**servoを駆動せず、`LimitedServo`も`Limiter`も作らない。catalogが空のため、debugの指示も全て拒否される。同じ`Limiter`（同じcounter）を通ることは、`deskcat_servo`のhost testが示す範囲である** | **製品buildには入らない**（featureなし）。featureを指定すると製品経路のcfgが外れる。Pi linkを持つ。`bench-servo-test-17`・`touch-sample-14`・`touch-lcd-14`・`mem-probe-23`・`env-sample-16`・`accel-sample-15`・`bringup-i2c-15-16`・`bringup-led-514`とは併用できない（`compile_error!`）。実機では動かしていない |
 //! | `bench-servo-test-17` | servoの単発bench試験（#17の測定用build） | **Pi linkを外す。**正本`docs/hardware/servo-safety-limits.md`の`測定のための駆動（承認の状態の項目6）`節が、測定用のbuildは「Piとの通信linkを持たない」と定めているためである |
 //! | `bench-servo-calib-18` | #18の校正build。UART0のconsoleから`GO18`を受けた後、`MOTION calib <deg>`・`STOP`・`END`だけを受け、`LimitedServo`（`Limiter`を通る）だけでservoを駆動する（`crate::servo_calib`。仕様は`docs/hardware/servo-safety-limits.md`の`校正buildの仕様（案）`）。NVSのlatchは使わず、起動のたびに`GO18`を待つ | **Pi link・heartbeat・I2C・LCDを持たない。専用の`main`を持つ。**`config.rs`の`SERVO_CALIB_18_*`が`None`の間はcompileが止まる（値は回ごとの実行承認が決める）。単独の試験buildで、他の試験featureとは併用できない（`compile_error!`）。実機では動かしていない |
+//! | `bench-wdt-711` | #711のtask WDTの検証build。main taskをTWDTへ登録し、**その後は一度もfeedしない**。約timeout（sdkconfigの値）でpanicしてresetし、再起動後の`reset_reason`が`task_watchdog`になることを実機で見る（`crate::task_wdt`） | **servo・LEDC・GPIO27・Pi link・I2C・LCDに触れない。専用の`main`を持つ。**製品buildと校正buildには、hangを起こすcommandを入れていない。単独の試験buildで、他の試験featureとは併用できない（`compile_error!`）。**実機では動かしていない** |
 //! | `bench-servo-90-17` | 上の単発bench試験で、指令角だけを規約上の90度にする | `bench-servo-test-17`を含む。90度が機械的中央かどうかは未確認（`HW-TBD-010`） |
 //!
 //! `#487`のPR B1より前は、`pi-protocol-mode` featureを付けたbuildだけがPi linkを持ち、LCD／I2Cの
@@ -108,7 +109,7 @@
 //! `CONFIG_ESP_TASK_WDT_PANIC=y` だけである（[Issue #711](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/711)。
 //! 発火したら警告で止めず panic して reset する）。**全ての build が同じ `sdkconfig` を使うので、この設定は全 build に効く**
 //! （製品 build を含む。従来は警告だけだった）。登録するのは idle task（既定。両 core）で、main task を登録するのは
-//! `bench-servo-calib-18` の build だけである（`crate::servo_calib::run`）。**実機では確かめていない。**heartbeat loop は
+//! `bench-servo-calib-18` の build だけである（`crate::task_wdt::register_main_task`。`bench-wdt-711` の検証 build も登録するが、servo に触れない）。**実機では確かめていない。**heartbeat loop は
 //! [`FreeRtos::delay_ms`] で待つ。同 API は
 //! 「Delays bigger than `1000 /` `TICK_RATE_HZ` milliseconds … used in a loop would
 //! starve the FreeRTOS IDLE tasks as they are low prio tasks and hence the IDLE task's
@@ -190,7 +191,10 @@
 // `bench-servo-calib-18`のbuildは専用の`main`（`servo_calib::run`）を持ち、このfileの製品経路の`main`と
 // それだけが呼ぶmodule・importを使わない。使われない分の警告だけをこのfeatureで止める
 // （他のbuildの水準は変えない）。
-#![cfg_attr(feature = "bench-servo-calib-18", allow(dead_code, unused_imports))]
+#![cfg_attr(
+    any(feature = "bench-servo-calib-18", feature = "bench-wdt-711"),
+    allow(dead_code, unused_imports)
+)]
 
 mod accel;
 #[cfg(feature = "accel-sample-15")]
@@ -324,7 +328,32 @@ compile_error!(
      他の試験feature（bench-servo-test-17、bench-servo-90-17、bringup-*、*-sample-*、touch-*、face-21、tap-21、\
      mem-probe-23、debug-motion-19）とは併用しない。"
 );
-#[cfg(not(any(feature = "bench-servo-test-17", feature = "bench-servo-calib-18")))]
+// `bench-wdt-711`（#711のtask WDTの検証build）も単独の試験buildである。servoに触れず、Pi link・I2C・LCDを持たない。
+#[cfg(all(
+    feature = "bench-wdt-711",
+    any(
+        feature = "bench-servo-test-17",
+        feature = "bench-servo-90-17",
+        feature = "bench-servo-calib-18",
+        feature = "bringup-i2c-15-16",
+        feature = "bringup-display-13",
+        feature = "bringup-led-514",
+        feature = "face-21",
+        feature = "tap-21",
+        feature = "env-sample-16",
+        feature = "accel-sample-15",
+        feature = "touch-sample-14",
+        feature = "touch-lcd-14",
+        feature = "mem-probe-23",
+        feature = "debug-motion-19"
+    )
+))]
+compile_error!("bench-wdt-711は単独の試験buildとして使う。他の試験featureとは併用しない。");
+#[cfg(not(any(
+    feature = "bench-servo-test-17",
+    feature = "bench-servo-calib-18",
+    feature = "bench-wdt-711"
+)))]
 mod boot_session;
 mod config;
 mod console;
@@ -342,15 +371,25 @@ mod health;
 mod led;
 #[cfg(feature = "mem-probe-23")]
 mod mem_probe;
-#[cfg(not(any(feature = "bench-servo-test-17", feature = "bench-servo-calib-18")))]
+#[cfg(not(any(
+    feature = "bench-servo-test-17",
+    feature = "bench-servo-calib-18",
+    feature = "bench-wdt-711"
+)))]
 mod pi_link;
-#[cfg(not(any(feature = "bench-servo-test-17", feature = "bench-servo-calib-18")))]
+#[cfg(not(any(
+    feature = "bench-servo-test-17",
+    feature = "bench-servo-calib-18",
+    feature = "bench-wdt-711"
+)))]
 mod protocol;
 mod servo;
 #[cfg(feature = "bench-servo-calib-18")]
 mod servo_calib;
 mod spi_port;
 mod tap;
+#[cfg(any(feature = "bench-servo-calib-18", feature = "bench-wdt-711"))]
+mod task_wdt;
 // 製品buildは`touch::StrokeDetector`、LCDを描く試験build（`bringup-display-13`・`face-21`）は読まない`touch::IdleTouch`だけを使う。
 // 試験buildの読み出しの型（`TouchSampler`）はdead_codeになる。
 #[cfg(any(
@@ -380,14 +419,22 @@ use esp_idf_svc::hal::peripherals::Peripherals;
     deskcat_product_mode
 ))]
 use esp_idf_svc::hal::spi::SpiAnyPins;
-#[cfg(not(any(feature = "bench-servo-test-17", feature = "bench-servo-calib-18")))]
+#[cfg(not(any(
+    feature = "bench-servo-test-17",
+    feature = "bench-servo-calib-18",
+    feature = "bench-wdt-711"
+)))]
 use esp_idf_svc::hal::uart::{config::Config as UartConfig, UartDriver, UartEventPayload};
 use esp_idf_svc::hal::units::Hertz;
 
 use crate::accel::Adxl345;
 #[cfg(feature = "accel-sample-15")]
 use crate::accel_sample::AccelSampler;
-#[cfg(not(any(feature = "bench-servo-test-17", feature = "bench-servo-calib-18")))]
+#[cfg(not(any(
+    feature = "bench-servo-test-17",
+    feature = "bench-servo-calib-18",
+    feature = "bench-wdt-711"
+)))]
 use crate::boot_session::{BootRetryPolicy, BootSession};
 #[cfg(any(
     feature = "bringup-display-13",
@@ -407,7 +454,11 @@ use crate::face::FaceState;
 use crate::health::Health;
 #[cfg(any(feature = "bringup-led-514", deskcat_product_mode))]
 use crate::led::Leds;
-#[cfg(not(any(feature = "bench-servo-test-17", feature = "bench-servo-calib-18")))]
+#[cfg(not(any(
+    feature = "bench-servo-test-17",
+    feature = "bench-servo-calib-18",
+    feature = "bench-wdt-711"
+)))]
 use crate::pi_link::{FaceTargets, PiLink};
 #[cfg(any(feature = "tap-21", deskcat_product_mode))]
 use crate::tap::TapDetector;
@@ -576,7 +627,30 @@ fn main() {
     servo_calib::run()
 }
 
-#[cfg(not(feature = "bench-servo-calib-18"))]
+/// `bench-wdt-711`のbuildの`main`。main taskをTWDTへ登録し、その後は一度もfeedしない（`crate::task_wdt`）。
+/// servo・LEDC・GPIO27・Pi link・I2C・LCDに触れない。
+#[cfg(feature = "bench-wdt-711")]
+fn main() {
+    esp_idf_svc::sys::link_patches();
+    console::init_log_mode();
+    let profile = if cfg!(debug_assertions) {
+        "debug"
+    } else {
+        "release"
+    };
+    log::info!(
+        "firmware={} version={} profile={} feature=bench-wdt-711",
+        env!("CARGO_PKG_NAME"),
+        env!("CARGO_PKG_VERSION"),
+        profile
+    );
+    log::info!("board={}", config::BOARD);
+    let reason = esp_idf_svc::hal::reset::ResetReason::get();
+    log::info!("reset_reason={} raw={reason:?}", reset_reason_str(reason));
+    task_wdt::run_wdt_test()
+}
+
+#[cfg(not(any(feature = "bench-servo-calib-18", feature = "bench-wdt-711")))]
 fn main() {
     // It is necessary to call this function once. Otherwise, some patches to the runtime
     // implemented by esp-idf-sys might not link properly. See https://github.com/esp-rs/esp-idf-template/issues/71
@@ -1221,7 +1295,11 @@ fn main() {
 /// `rx_buffer_full_flg`）。FIFOも溢れたbyteは失われる。どちらの場合も、行が壊れれば
 /// `crate::pi_link::PiLink::on_bytes`が壊れた行として捨て、`boot`は§4.1の再送で
 /// 送り直される見込みである（確かめていない）。
-#[cfg(not(any(feature = "bench-servo-test-17", feature = "bench-servo-calib-18")))]
+#[cfg(not(any(
+    feature = "bench-servo-test-17",
+    feature = "bench-servo-calib-18",
+    feature = "bench-wdt-711"
+)))]
 fn drain_uart_events(uart: &UartDriver<'_>, health: &mut Health) {
     let Some(queue) = uart.event_queue() else {
         return;
@@ -1246,10 +1324,18 @@ fn drain_uart_events(uart: &UartDriver<'_>, health: &mut Health) {
 /// NVS namespace。`bench17`（`run_servo_bench_test`が使うnamespace）とは別の名前にする。
 /// 用途が異なるnamespaceを共有すると、片方のkey追加がもう片方の`erase_all`等を
 /// 誤って巻き込みうる。
-#[cfg(not(any(feature = "bench-servo-test-17", feature = "bench-servo-calib-18")))]
+#[cfg(not(any(
+    feature = "bench-servo-test-17",
+    feature = "bench-servo-calib-18",
+    feature = "bench-wdt-711"
+)))]
 const SID_NVS_NAMESPACE: &str = "pi_session";
 /// 次回起動が使う`sid`をこのkeyへ保存する。
-#[cfg(not(any(feature = "bench-servo-test-17", feature = "bench-servo-calib-18")))]
+#[cfg(not(any(
+    feature = "bench-servo-test-17",
+    feature = "bench-servo-calib-18",
+    feature = "bench-wdt-711"
+)))]
 const SID_NVS_KEY_NEXT: &str = "next_sid";
 
 /// 起動のたびに新しい`sid`を選ぶ（`PROTO-TBD-011`のうち`sid`の生成方法に
@@ -1319,7 +1405,11 @@ const SID_NVS_KEY_NEXT: &str = "next_sid";
 /// debug logへ出る（`#487`のPR Aより前、Pi linkを持つbuild（当時の`pi-protocol-mode`）は
 /// loggingを止めており、出力されなかった）。
 /// counterは持たない（`boot_session`のmodule doc「停止理由の区別」参照）。
-#[cfg(not(any(feature = "bench-servo-test-17", feature = "bench-servo-calib-18")))]
+#[cfg(not(any(
+    feature = "bench-servo-test-17",
+    feature = "bench-servo-calib-18",
+    feature = "bench-wdt-711"
+)))]
 fn generate_sid(health: &Health) -> u32 {
     use esp_idf_svc::nvs::{EspDefaultNvsPartition, EspNvs};
 
@@ -1367,7 +1457,11 @@ fn generate_sid(health: &Health) -> u32 {
 
 /// [`generate_sid`]のNVS不使用時の縮退経路が使う。`ts_ms`（`u64`）を`sid`（`u32`）へ
 /// 切り詰める（下位32 bit）。**非衝突を主張しない**（[`generate_sid`]のdoc参照）。
-#[cfg(not(any(feature = "bench-servo-test-17", feature = "bench-servo-calib-18")))]
+#[cfg(not(any(
+    feature = "bench-servo-test-17",
+    feature = "bench-servo-calib-18",
+    feature = "bench-wdt-711"
+)))]
 const fn sid_from_uptime(ts_ms: u64) -> u32 {
     ts_ms as u32
 }
