@@ -1,7 +1,7 @@
 <!-- generate.py が生成する。手で直さない。 -->
 # #18 の窓と段1の servo 電源の経路の結線表
 
-`PSU-BENCH-01` から端子台 A・B・S、`MF-R135`、シャント、jumper wire まで。**この表が正で、`layout.svg` はここから生成する。**`MEAS-02`（Arduino）の線は、測定のためだけの一時配線なので描かない（[hardware/README.md](../README.md)）。この表は配線の許可ではない。通電と駆動は [servo-safety-limits.md](../../docs/hardware/servo-safety-limits.md) の条件と、その回の実行承認に従う。
+`PSU-BENCH-01` から端子台 A・B・S、`MF-R135`、シャント、jumper wire まで。`MEAS-02`（Arduino）の線は、測定のためだけの一時配線なので描かない（[hardware/README.md](../README.md)）。この表は配線の許可ではない。通電と駆動は [servo-safety-limits.md](../../docs/hardware/servo-safety-limits.md) の条件と、その回の実行承認に従う。
 
 ## 節点（電気的に同じ点）
 
