@@ -104,10 +104,11 @@
 //! `boot=`行を目視で確認していた作業（`#7`／`#13`等）があれば、`boot=`行が
 //! 無くなったことを踏まえて確認し直すこと。
 //!
-//! **Task Watchdog Timer の設定は ESP-IDF の既定値のままである。**`sdkconfig.defaults` に watchdog の項目を足していない
-//! （timeout は既定、発火しても警告だけで reset しない）。**servo を駆動する build だけが、実行時に panic を有効にし、
-//! main task を登録する**（[Issue #711](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/711)、`crate::task_wdt`。
-//! 今は `bench-servo-calib-18` の build だけ。製品 build は servo を駆動しないので警告のまま）。**実機では確かめていない。**heartbeat loop は
+//! **Task Watchdog Timer の timeout は ESP-IDF の既定値のままである。**`sdkconfig.defaults` が足した watchdog の項目は
+//! `CONFIG_ESP_TASK_WDT_PANIC=y` だけである（[Issue #711](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/711)。
+//! 発火したら警告で止めず panic して reset する）。**全ての build が同じ `sdkconfig` を使うので、この設定は全 build に効く**
+//! （製品 build を含む。従来は警告だけだった）。登録するのは idle task（既定。両 core）で、main task を登録するのは
+//! `bench-servo-calib-18` の build だけである（`crate::servo_calib::run`）。**実機では確かめていない。**heartbeat loop は
 //! [`FreeRtos::delay_ms`] で待つ。同 API は
 //! 「Delays bigger than `1000 /` `TICK_RATE_HZ` milliseconds … used in a loop would
 //! starve the FreeRTOS IDLE tasks as they are low prio tasks and hence the IDLE task's
@@ -350,8 +351,6 @@ mod servo;
 mod servo_calib;
 mod spi_port;
 mod tap;
-#[cfg(feature = "bench-servo-calib-18")]
-mod task_wdt;
 // 製品buildは`touch::StrokeDetector`、LCDを描く試験build（`bringup-display-13`・`face-21`）は読まない`touch::IdleTouch`だけを使う。
 // 試験buildの読み出しの型（`TouchSampler`）はdead_codeになる。
 #[cfg(any(
