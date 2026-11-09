@@ -930,7 +930,7 @@ firmware（`firmware/esp32/src/servo.rs`、
 - 2回目以降は、`START_DEG`の行の(i)か(ii)を行う。
 - 軸の先に目印を付け、周りに置いた紙の目盛で位置を読む。**指令角の変化に対して軸が回る向き**（最初の回は105°からのため、指令角を減らす向きで読む）と、**指令の度の変化と軸の回転の変化が同じ大きさか**を読む。
 - 1つの回で動かす向きは1つ（90°→105°、または105°→90°）。
-- この段は可動域を広げないため、[Hardware Safety Policy](../governance/hardware-safety-policy.md#6-サーボ) §6の電流・電圧の記録は、範囲を広げる段の Pull Request で扱う。この段で見るのは、唸り・異音・熱と ESP32 の log（reset・brownout）である。
+- この段は可動域を広げないため、[Hardware Safety Policy](../governance/hardware-safety-policy.md#6-サーボ) §6の電流・電圧の記録は、範囲を広げる段の Pull Request で扱う。この段で見るのは、唸り・異音・熱と ESP32 の log（reset・brownout）に加えて、CC の LED と PSU の表示である（小節の2・3、停止基準）。
 
 #### 停止基準
 
