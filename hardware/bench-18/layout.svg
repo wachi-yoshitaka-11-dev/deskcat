@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1340 650" font-family="Noto Sans CJK JP, Hiragino Sans, Meiryo, sans-serif" font-size="13">
 <rect width="1340" height="650" fill="#fff"/>
 <text x="30" y="34" font-size="20" font-weight="bold">#18 の窓と段1の servo 電源の経路</text>
-<text x="30" y="58" fill="#444">生成元: hardware/bench-18/generate.py（結線表 wiring-table.md が正）。MEAS-02 の線は描かない。#405 の図とは別物。</text>
+<text x="30" y="58" fill="#444">生成元: hardware/bench-18/generate.py（正本はそのデータ。結線表は wiring-table.md）。MEAS-02 の線は描かない。#405 の図とは別物。</text>
 <rect x="40" y="200" width="150" height="200" rx="8" fill="#f2f2ea" stroke="#556"/>
 <text x="115" y="192" font-size="14" text-anchor="middle" fill="#222" font-weight="bold">PSU-BENCH-01</text>
 <text x="115" y="222" font-size="12" text-anchor="middle" fill="#555">（SPS-3010V）</text>

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """#18 の窓（WDT、GND、I_lim、発熱）と段1の servo 電源の経路の、図と結線表を1つのデータから作る。
 
-配線の正本は `wiring-table.md`（節点の表）である。`wiring-table.md` と `layout.svg` はこのファイルの
-データから生成し、手で直さない。`hardware/breadboard-rebuild/generate.py` と同じ作りである。
+配線の正本はこのファイルのデータである。結線表 `wiring-table.md`（節点の表）と `layout.svg` は
+そこから生成し、手で直さない。`hardware/breadboard-rebuild/generate.py` と同じ作りである。
 
 描くもの: PSU の出力端子 → 新しい線 → 端子台 A・B・S の6穴（各穴の2本）→ MF-R135 → シャント →
 jumper wire → 窓の (D)・(B) の負荷（両端メスの jumper wire 2本と MEAS-01 の予備）／段1の servo の
@@ -260,7 +260,7 @@ def build_svg():
     a(f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" font-family="Noto Sans CJK JP, Hiragino Sans, Meiryo, sans-serif" font-size="13">')
     a(f'<rect width="{W}" height="{H}" fill="#fff"/>')
     a('<text x="30" y="34" font-size="20" font-weight="bold">#18 の窓と段1の servo 電源の経路</text>')
-    a('<text x="30" y="58" fill="#444">生成元: hardware/bench-18/generate.py（結線表 wiring-table.md が正）。MEAS-02 の線は描かない。#405 の図とは別物。</text>')
+    a('<text x="30" y="58" fill="#444">生成元: hardware/bench-18/generate.py（正本はそのデータ。結線表は wiring-table.md）。MEAS-02 の線は描かない。#405 の図とは別物。</text>')
 
     def text(x, y, s, size=13, anchor="start", fill="#222", bold=False):
         w = ' font-weight="bold"' if bold else ""

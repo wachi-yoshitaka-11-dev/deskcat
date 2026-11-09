@@ -905,7 +905,7 @@ firmware（`firmware/esp32/src/servo.rs`、
 **5. 保護機能。**段1は OCP を無効にする（[#711 の決定](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/711#issuecomment-6707654178)の4）。OVP は無い前提にする（説明書に記述が無い）。
 
 **6. 接続部材と負荷のつなぎ方。**
-   - **PSU から端子台Aまで。**EXP-051 で使ったワニ口のクリップは、大電流の経路に使わない条件（`PROTO-01`の行。`WIRE-PWR-01`の端子台と線材で組む）と合わない。`WIRE-PWR-01`の線材（`111641`、AWG22相当）の端を剥き、`PSU-BENCH-01`の出力端子（ねじで締める。説明書 p.9）と、端子台Aの2つの穴（`M-12001`を外した穴）につなぐ。穴位置と線の対応は [`hardware/bench-18/wiring-table.md`](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/hardware/bench-18/wiring-table.md) が正である。クリップとブレッドボードは使わない。
+   - **PSU から端子台Aまで。**EXP-051 で使ったワニ口のクリップは、大電流の経路に使わない条件（`PROTO-01`の行。`WIRE-PWR-01`の端子台と線材で組む）と合わない。`WIRE-PWR-01`の線材（`111641`、AWG22相当）の端を剥き、`PSU-BENCH-01`の出力端子（ねじで締める。説明書 p.9）と、端子台Aの2つの穴（`M-12001`を外した穴）につなぐ。穴位置と線の対応は [`hardware/bench-18/wiring-table.md`](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/hardware/bench-18/wiring-table.md) に載せる（`generate.py` が生成する）。クリップとブレッドボードは使わない。
    - **(D)・(B) の負荷（plug の代わりの点）。**赤い jumper wire の針 → 両端メスの jumper wire（赤側） → `MEAS-01`の予備（セメント抵抗） → 両端メスの jumper wire（茶側） → 茶の jumper wire の針の順につなぐ（ユーザーの答え「ある・嵌まる」、2026-11-09。問い「両端メスのジャンパー線は今も手元にあり、セメント抵抗（予備）の足に奥まで挿さって、軽く引いても抜けませんか？」）。メス側の接点はハウジングの中にあり、プローブが届かない。ほかの負荷抵抗は入れない。
    - **段1では**、両端メスの jumper wire を外し、servo の plug を jumper wire の針に挿す。両端メスの jumper wire は窓の (D)・(B) の間だけ使う。
 
@@ -915,7 +915,7 @@ firmware（`firmware/esp32/src/servo.rs`、
 
 **9. PSU の−と ESP32 の GND の共通。**段0の2の(ii)で`X5`（GND を共通にする線）はシャントの足につながっていて、S の−は PSU の−へつながるので、`X5`をつないだままでは PSU の−と ESP32 の GND が導通する。`X5`を戻して GND を共通にしてよいかは、窓の (C) で判断する。`X5`と`MEAS-02`を外した状態（小節1）で、PSU を端子台Aへつなぎ（7・8・12。出力 OFF）、`DT830B`で PSU の−と ESP32 の GND の間を、DC 2000 mV レンジと AC 200 V レンジで、PSU の電源 OFF と ON（出力 OFF）の両方で読む（計4つ）。**4つとも表示が 0（DC は ±1 digit 以内）なら共通にしてよい。1つでも読めたら、共通にせず止めて報告する（段1へ進まない）。**PC の USB の GND との回り込みの道があるかは、この読みで確かめ、判断できなければ`X5`をつながない。控え（条件ではない）：止まった場合の候補は、前面端子（− / GND / ＋）で−と GND の間が離れているかを見ること。
 
-**10. 区間と読み方（窓の (B)）。**穴の中の導体（線の導体、jumper wire の針、メス側の接点）にはプローブが届かないため、**届く点の連なりで区切り、13区間とする**（足の無い穴〔S＋、A黒〕は隣の区間に含める）。点の名前（P1〜P14）は [`hardware/bench-18/wiring-table.md`](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/hardware/bench-18/wiring-table.md) の`プローブを当てる点と区間`が正である。
+**10. 区間と読み方（窓の (B)）。**穴の中の導体（線の導体、jumper wire の針、メス側の接点）にはプローブが届かないため、**届く点の連なりで区切り、13区間とする**（足の無い穴〔S＋、A黒〕は隣の区間に含める）。点の名前（P1〜P14）は [`hardware/bench-18/wiring-table.md`](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/hardware/bench-18/wiring-table.md) の`プローブを当てる点と区間`に載せる（`generate.py` が生成する）。
    - 区間：(1) P1↔P2（新しい線〔＋〕と、その両端の接点）、(2) P2↔P3（A赤の穴）、(3) P3↔P4（`MF-R135`）、(4) P4↔P5（B穴1）、(5) P5↔P6（W+ と両端の接点）、(6) P6↔P7（S＋の穴の jumper 側の接点、赤 jumper、針とメスの接点、両端メスの jumper〔赤側〕を1区間で）、(7) P7↔P8（負荷。抵抗の2本の足の間）、(8) P8↔P9（両端メスの jumper〔茶側〕、針とメスの接点、茶 jumper、B穴2の jumper 側の接点を1区間で）、(9) P9↔P10（B穴2の穴の、シャントの足2の接点）、(10) P10↔P11（シャント）、(11) P11↔P12（S−の穴の、シャントの足1の接点）、(12) P12↔P13（W− と両端の接点）、(13) P13↔P14（新しい線〔−〕と、その両端の接点）。
    - 出力は ON のまま、13区間を順に1回ずつ読むのを1周とする。レンジは`DT830B`の DC 200 mV に固定し、周の途中で変えない。各周の開始時刻と`MEAS-04`の温度を記録する。区間ごとの降下と`P＝V×I`、流した時間、CC の LED の状態も記録する。
    - **落ち着いた：**連続する2周で、全区間の差が 1 digit 以内。
