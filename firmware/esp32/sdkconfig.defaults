@@ -10,7 +10,3 @@ CONFIG_FREERTOS_IDLE_TASK_STACKSIZE=4096
 # that allocate large stack variables; or better yet - use 
 # `std::thread::Builder::new().stack_size(XXX)` for spawning
 CONFIG_PTHREAD_TASK_STACK_SIZE_DEFAULT=4096
-
-# task watchdogが発火したら、警告で止めずにpanicしてresetする（Issue #711）。main taskが止まった
-# （hang）まま、LEDCが最後のdutyを出し続けてservoを拘束し続けることを、時間で限る。timeout（既定5 s）は変えない。
-CONFIG_ESP_TASK_WDT_PANIC=y
