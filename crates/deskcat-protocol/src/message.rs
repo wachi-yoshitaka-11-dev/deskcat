@@ -489,23 +489,39 @@ pub enum ExpressionName {
     Dizzy,
     /// 寝顔。
     Sleeping,
+    /// 暑い顔。
+    Hot,
+    /// 寒い顔。
+    Cold,
+    /// 困った顔。
+    Worried,
 }
 
 impl ExpressionName {
     /// 全ての名前。`status.display.expression`のbyte上限の検査（`tests/limits.rs`）が列挙に使う。
-    pub const ALL: [Self; 5] = [
+    pub const ALL: [Self; 8] = [
         Self::Neutral,
         Self::Happy,
         Self::Surprised,
         Self::Dizzy,
         Self::Sleeping,
+        Self::Hot,
+        Self::Cold,
+        Self::Worried,
     ];
 
     // `ALL`の書き漏れを、variantを足したときのcompile errorで検出する（`match`が網羅でなくなる）。
     #[allow(dead_code)]
     const fn all_covers_every_variant(self) {
         match self {
-            Self::Neutral | Self::Happy | Self::Surprised | Self::Dizzy | Self::Sleeping => {}
+            Self::Neutral
+            | Self::Happy
+            | Self::Surprised
+            | Self::Dizzy
+            | Self::Sleeping
+            | Self::Hot
+            | Self::Cold
+            | Self::Worried => {}
         }
     }
 }

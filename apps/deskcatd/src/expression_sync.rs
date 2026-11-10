@@ -223,6 +223,9 @@ pub const fn to_wire(expression: Expression) -> ExpressionName {
         Expression::Surprised => ExpressionName::Surprised,
         Expression::Dizzy => ExpressionName::Dizzy,
         Expression::Sleeping => ExpressionName::Sleeping,
+        Expression::Hot => ExpressionName::Hot,
+        Expression::Cold => ExpressionName::Cold,
+        Expression::Worried => ExpressionName::Worried,
     }
 }
 
@@ -238,6 +241,9 @@ pub fn from_status_name(name: &str) -> Option<Expression> {
         "surprised" => Some(Expression::Surprised),
         "dizzy" => Some(Expression::Dizzy),
         "sleeping" => Some(Expression::Sleeping),
+        "hot" => Some(Expression::Hot),
+        "cold" => Some(Expression::Cold),
+        "worried" => Some(Expression::Worried),
         _ => None,
     }
 }
@@ -395,6 +401,9 @@ mod tests {
             Expression::Surprised,
             Expression::Dizzy,
             Expression::Sleeping,
+            Expression::Hot,
+            Expression::Cold,
+            Expression::Worried,
         ] {
             let wire = serde_json::to_value(to_wire(expression)).expect("serializeできる");
             let name = wire.as_str().expect("文字列である");

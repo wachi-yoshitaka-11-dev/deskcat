@@ -24,7 +24,7 @@ pub const SCREEN_HEIGHT: u16 = 240;
 pub const MAX_TRANSITION_MS: u32 = 2_000;
 
 /// RGB565の色。`firmware/esp32/src/display.rs`の`color`と同じく、各chをfull scaleにした値と、
-/// 見た目だけのための頬の色を持つ。
+/// 見た目だけのための色を持つ。
 pub mod color {
     /// 黒。
     pub const BLACK: u16 = 0x0000;
@@ -32,6 +32,8 @@ pub mod color {
     pub const WHITE: u16 = 0xFFFF;
     /// 頬の薄い赤。
     pub const CHEEK: u16 = 0xFBAE;
+    /// 寒い顔の頬の薄い青。
+    pub const CHILL: u16 = 0x65BF;
 }
 
 /// 塗る矩形1つ。`x1`と`y1`は端を含む（`Ili9341::fill_rect`の引数と同じ）。
@@ -116,6 +118,57 @@ const SLEEPING: [Rect; 9] = [
     rect(248, 60, 32, 6, color::WHITE),
 ];
 
+// 暑い。目は上まぶたで半分閉じ、口は大きく開けて舌を出す。頬は赤く、右上に汗を足す。
+const HOT: [Rect; 12] = [
+    BACKGROUND,
+    rect(80, 84, 48, 40, color::WHITE),
+    rect(80, 84, 48, 20, color::BLACK),
+    rect(192, 84, 48, 40, color::WHITE),
+    rect(192, 84, 48, 20, color::BLACK),
+    rect(128, 156, 64, 40, color::WHITE),
+    rect(144, 176, 32, 20, color::CHEEK),
+    rect(40, 140, 40, 20, color::CHEEK),
+    rect(240, 140, 40, 20, color::CHEEK),
+    rect(264, 54, 12, 12, color::WHITE),
+    rect(260, 66, 20, 16, color::WHITE),
+    rect(264, 82, 12, 8, color::WHITE),
+];
+
+// 寒い。目は小さく黒目を端へ寄せ、口は歯を鳴らす格子にする。頬は薄い青で、両脇に震えの縦線を足す。
+const COLD: [Rect; 13] = [
+    BACKGROUND,
+    rect(84, 84, 40, 40, color::WHITE),
+    rect(88, 98, 10, 10, color::BLACK),
+    rect(196, 84, 40, 40, color::WHITE),
+    rect(200, 98, 10, 10, color::BLACK),
+    rect(124, 168, 72, 32, color::WHITE),
+    rect(140, 168, 4, 32, color::BLACK),
+    rect(158, 168, 4, 32, color::BLACK),
+    rect(176, 168, 4, 32, color::BLACK),
+    rect(40, 150, 40, 20, color::CHILL),
+    rect(240, 150, 40, 20, color::CHILL),
+    rect(20, 90, 8, 60, color::WHITE),
+    rect(292, 90, 8, 60, color::WHITE),
+];
+
+// 困った。目は下を向く黒目、眉は内側が上がる階段、口は小さな波線。
+const WORRIED: [Rect; 14] = [
+    BACKGROUND,
+    rect(80, 84, 48, 56, color::WHITE),
+    rect(96, 112, 16, 20, color::BLACK),
+    rect(192, 84, 48, 56, color::WHITE),
+    rect(208, 112, 16, 20, color::BLACK),
+    rect(68, 66, 16, 6, color::WHITE),
+    rect(84, 58, 16, 6, color::WHITE),
+    rect(100, 50, 16, 6, color::WHITE),
+    rect(204, 50, 16, 6, color::WHITE),
+    rect(220, 58, 16, 6, color::WHITE),
+    rect(236, 66, 16, 6, color::WHITE),
+    rect(128, 180, 24, 6, color::WHITE),
+    rect(152, 174, 24, 6, color::WHITE),
+    rect(176, 180, 16, 6, color::WHITE),
+];
+
 /// `name`の表情を塗る矩形を、塗る順に返す。先頭は画面全体の背景である。
 ///
 /// 未知の名前（`ExpressionName`は`non_exhaustive`）には`None`を返す。呼び出し側は拒否する。
@@ -127,6 +180,9 @@ pub fn shapes(name: ExpressionName) -> Option<&'static [Rect]> {
         ExpressionName::Surprised => Some(&SURPRISED),
         ExpressionName::Dizzy => Some(&DIZZY),
         ExpressionName::Sleeping => Some(&SLEEPING),
+        ExpressionName::Hot => Some(&HOT),
+        ExpressionName::Cold => Some(&COLD),
+        ExpressionName::Worried => Some(&WORRIED),
         _ => None,
     }
 }
@@ -231,12 +287,15 @@ impl Painter {
 mod tests {
     use super::*;
 
-    const NAMES: [ExpressionName; 5] = [
+    const NAMES: [ExpressionName; 8] = [
         ExpressionName::Neutral,
         ExpressionName::Happy,
         ExpressionName::Surprised,
         ExpressionName::Dizzy,
         ExpressionName::Sleeping,
+        ExpressionName::Hot,
+        ExpressionName::Cold,
+        ExpressionName::Worried,
     ];
 
     #[test]

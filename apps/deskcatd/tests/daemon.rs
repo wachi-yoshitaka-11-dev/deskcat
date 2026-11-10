@@ -1430,7 +1430,7 @@ fn with_companion(duration_ms: Option<u32>, hour: u8) -> (Daemon, Fake) {
 }
 
 #[test]
-fn a_hot_environment_shows_one_bubble_and_sends_no_expression_or_motion() {
+fn a_hot_environment_shows_one_bubble_and_the_hot_expression_and_sends_no_motion() {
     let (mut d, mut t) = with_companion(Some(4_000), 12);
     let _ = t.sent();
 
@@ -1442,7 +1442,7 @@ fn a_hot_environment_shows_one_bubble_and_sends_no_expression_or_motion() {
     assert_eq!(run(&mut d, &mut t, 100), Step::Continue);
     let sent = t.sent();
     assert_eq!(texts(&sent), ["暑いにゃ"]);
-    assert!(expressions(&sent).is_empty(), "描く表情が無い顔は送らない");
+    assert_eq!(expressions(&sent), [ExpressionName::Hot]);
     let id = find_id(&sent, |m| matches!(m, Message::ShowText(_))).expect("送った");
     t.feed(ack(id, AckStatus::Ok, None), ESP_SID, 5);
 
