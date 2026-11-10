@@ -13,13 +13,16 @@
 //!   logへ出す（[#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)／
 //!   [#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16)）。
 //!   **一致判定は、`run_i2c_bringup`自身は行わない。**生byteをlogへ残すだけで、識別の断定は
-//!   log を読む人間の責務とする（[`run_i2c_bringup`]参照）。**ただし`tap-21`付きbuildでは、呼び出し側の`start_tap`が
+//!   log を読む人間の責務とする（[`run_i2c_bringup`]参照）。**ただし製品buildと`tap-21`付きbuildでは、呼び出し側（`start_product_sensors`、`start_tap`）が
 //!   `ACCEL-01`のDevice IDを`0xE5`と比べ、一致したときだけtapの設定を書く。**
+//!   **製品buildは、起動後にこのbusを`ENV-01`の周期測定と共有する**（`crate::i2c_bus`、`crate::env_report`）。
 //! - Pi link（UART1、`PI-UART-TX`＝GPIO13、`PI-UART-RX`＝GPIO14）で`boot`のACK待ち・再送・
 //!   `sid`選び直しを行う（`crate::boot_session`。[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)
 //!   PR B、[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)）。受信の異常
 //!   （ring bufferの満杯など）を数える（`drain_uart_events`）。制約は`crate::console`の
 //!   module docにまとめてある
+//! - **既定の製品buildは`ENV-01`（BME280）を60 sごとに測り、session確立後に`environment`をPiへ送る**（`crate::env_report`。
+//!   forced・×1・IIR off。変換を待つ間もmain loopを止めない。送る条件は`docs/protocol/esp32-pi-protocol.md`の§4.5）。**実機では動かしていない。**
 //! - **既定の製品buildは`DISP-01`（LCD）を描画し、tap入力を読む。`SERVO-PWM`・`ADC-*`はdriveしない。**
 //!   **`TOUCH-*`のうち`TOUCH-CS`（GPIO21）を使い、LCDと同じbusでtouchを読む。**`TOUCH-IRQ`は取らない。
 //!   状態機械で撫でを判定し、bootのACK後に`head_touched`を送る（#21、`crate::touch::StrokeDetector`。
@@ -64,7 +67,7 @@
 //! | `bringup-led-514` | #514の追加LED（GPIO2／GPIO5）の点灯試験（赤→白→両方）と、その後の白の点滅（`crate::led`）。製品buildにある赤の`happy`点灯も同じ経路を持つ。このfeatureだけのbuildは表情を持たないため`set_expression`を受理せず、赤は点灯試験の区間だけ点く。`face-21`と組み合わせたbuildは`happy`を受理し、赤を1秒点ける（この併用は`compile_error!`で止めていない） | 表情とtapは有効にしない。`bringup-display-13`とも組み合わせられる |
 //! | `face-21` | LCDの初期化とbacklightの点灯を保ち、`set_expression`の3表情を描く。Pi commandを受けなくても、描ける状態になった時点で`neutral`を1回描く（#21、`crate::face`） | `bringup-display-13`とも組み合わせられる。**表情を持たない試験buildは`set_expression`を`hardware_unavailable`で拒否する** |
 //! | `tap-21` | ADXL345のtap検出を設定し、`INT_SOURCE`をI2Cで読み、bootのACK後に`tapped`を送る（#21のF1、`crate::tap`）。ADXL345のDevice IDが`0xE5`のときだけ設定を書き、I2Cのdriverを持ち続ける（一致しなければ何も書かず、driverを手放す） | INT線は使わない（配線は要らない）。`face-21`・`bringup-display-13`とも組み合わせられる。**試験buildのうち`tap-21`も`accel-sample-15`も持たないものは、ADXL345へ書き込まず、Device IDを読むだけである**（既定・製品buildは`tap-21`と同じく書く） |
-//! | `mem-probe-23` | health snapshotと同じ周期で、空きheap・起動からの最小の空きheap・main taskのstackのhigh water markを1行logへ出す（#23の`PROTO-TBD-007`、`crate::mem_probe`）。**このfeatureのbuildだけが`unsafe`を持つ**（`unsafe_code`を`deny`へ下げ、`mem_probe`の3呼び出しだけ`allow`） | logを足すだけで、LCD・Pi link・tapの挙動は変えない。featureを指定すると製品経路のcfgが外れるので、製品buildと同じ構成で測るときは`face-21`と`tap-21`を足す（タッチの撫での判定は製品buildだけが持ち、この構成には入らない）。`bringup-display-13`とも組み合わせられる。単独の試験build（`env-sample-16`・`accel-sample-15`・`touch-sample-14`・`touch-lcd-14`）、`bringup-i2c-15-16`、`bringup-led-514`、`bench-servo-test-17`、`debug-motion-19`とは併用できない（`compile_error!`） |
+//! | `mem-probe-23` | health snapshotと同じ周期で、空きheap・起動からの最小の空きheap・main taskのstackのhigh water markを1行logへ出す（#23の`PROTO-TBD-007`、`crate::mem_probe`）。**このfeatureのbuildだけが`unsafe`を持つ**（`unsafe_code`を`deny`へ下げ、`mem_probe`の3呼び出しだけ`allow`） | logを足すだけで、LCD・Pi link・tapの挙動は変えない。featureを指定すると製品経路のcfgが外れるので、製品buildと同じ構成で測るときは`face-21`と`tap-21`を足す（タッチの撫での判定と`ENV-01`の周期測定・`environment`の送出は製品buildだけが持ち、この構成には入らない）。`bringup-display-13`とも組み合わせられる。単独の試験build（`env-sample-16`・`accel-sample-15`・`touch-sample-14`・`touch-lcd-14`）、`bringup-i2c-15-16`、`bringup-led-514`、`bench-servo-test-17`、`debug-motion-19`とは併用できない（`compile_error!`） |
 //! | `debug-motion-19` | UART0のconsoleから`MOTION <name> <target>`の行を別threadで読み、Pi由来の`play_motion`と同じ`MotionDispatch`のcatalogへ渡す（#19の受け入れ条件3、`crate::debug_motion`、`crate::pi_link::PiLink::on_debug_line`）。**servoを駆動せず、`LimitedServo`も`Limiter`も作らない。catalogが空のため、debugの指示も全て拒否される。同じ`Limiter`（同じcounter）を通ることは、`deskcat_servo`のhost testが示す範囲である** | **製品buildには入らない**（featureなし）。featureを指定すると製品経路のcfgが外れる。Pi linkを持つ。`bench-servo-test-17`・`touch-sample-14`・`touch-lcd-14`・`mem-probe-23`・`env-sample-16`・`accel-sample-15`・`bringup-i2c-15-16`・`bringup-led-514`とは併用できない（`compile_error!`）。実機では動かしていない |
 //! | `bench-servo-test-17` | servoの単発bench試験（#17の測定用build） | **Pi linkを外す。**正本`docs/hardware/servo-safety-limits.md`の`測定のための駆動（承認の状態の項目6）`節が、測定用のbuildは「Piとの通信linkを持たない」と定めているためである |
 //! | `bench-servo-calib-18` | #18の校正build。UART0のconsoleから`GO18`を受けた後、`MOTION calib <deg>`・`STOP`・`END`だけを受け、`LimitedServo`（`Limiter`を通る）だけでservoを駆動する（`crate::servo_calib`。仕様は`docs/hardware/servo-safety-limits.md`の`校正buildの仕様（案）`）。NVSのlatchは使わず、起動のたびに`GO18`を待つ | **Pi link・heartbeat・I2C・LCDを持たない。専用の`main`を持つ。**`config.rs`の`SERVO_CALIB_18_*`が`None`の間はcompileが止まる（値は回ごとの実行承認が決める）。単独の試験buildで、他の試験featureとは併用できない（`compile_error!`）。実機では動かしていない |
@@ -363,10 +366,13 @@ mod display;
 #[cfg(feature = "bringup-display-13")]
 mod display_test;
 mod env;
+#[cfg(deskcat_product_mode)]
+mod env_report;
 #[cfg(feature = "env-sample-16")]
 mod env_sample;
 mod face;
 mod health;
+mod i2c_bus;
 #[cfg(any(feature = "bringup-led-514", deskcat_product_mode))]
 mod led;
 #[cfg(feature = "mem-probe-23")]
@@ -446,6 +452,8 @@ use crate::display::Ili9341;
 #[cfg(feature = "bringup-display-13")]
 use crate::display_test::DisplayBringup;
 use crate::env::Bme280;
+#[cfg(deskcat_product_mode)]
+use crate::env_report::EnvReporter;
 #[cfg(feature = "env-sample-16")]
 use crate::env_sample::EnvSampler;
 #[cfg(any(feature = "face-21", deskcat_product_mode))]
@@ -821,17 +829,18 @@ fn main() {
         &mut health,
     );
     // 製品buildと`tap-21`付き試験buildは、ADXL345のDevice IDが一致したときだけ、
-    // I2Cのdriverを持ち続けてtap検出を始める（`crate::tap`）。一致しなければ手放す。
+    // tap検出を始める（`crate::tap`）。一致しなければ、`tap-21`付き試験buildはI2Cのdriverを手放し、
+    // 製品buildは`ENV-01`の周期測定のためにdriverを持ち続ける（`start_product_sensors`）。
     #[cfg(all(
         any(feature = "tap-21", deskcat_product_mode),
         feature = "bringup-display-13"
     ))]
     let mut tap: Option<TapDetector> = None;
-    #[cfg(all(
-        any(feature = "tap-21", deskcat_product_mode),
-        not(feature = "bringup-display-13")
-    ))]
+    #[cfg(all(feature = "tap-21", not(feature = "bringup-display-13")))]
     let mut tap = start_tap(i2c_driver, health.uptime_ms());
+    // 製品buildは、tapと`ENV-01`の周期測定が同じI2C busを共有する（`crate::i2c_bus`）。
+    #[cfg(deskcat_product_mode)]
+    let (mut tap, mut env_reporter) = start_product_sensors(i2c_driver, health.uptime_ms());
     #[cfg(feature = "env-sample-16")]
     let mut env_sampler =
         i2c_driver.map(|bringup| EnvSampler::new(bringup.driver, bringup.env_id, ENV_I2C_ADDRESS));
@@ -1108,6 +1117,23 @@ fn main() {
             }
         }
 
+        // 製品buildで`ENV-01`の測定を1段進め、sessionが確立していれば、測れた`environment`を送る（`crate::env_report`）。
+        // 確立前に測れた最新の1件は持ち越す。送った後は持たない。
+        #[cfg(deskcat_product_mode)]
+        if let Some(reporter) = env_reporter.as_mut() {
+            reporter.poll(health.uptime_ms());
+            if boot_session.is_established() {
+                if let Some(environment) = reporter.take_event() {
+                    pi_link::send_event(
+                        Message::Environment(environment),
+                        &mut boot_session,
+                        &health,
+                        &mut uart,
+                    );
+                }
+            }
+        }
+
         // FIFOを読み、窓ごとの統計をUART0へlogする（`crate::accel_sample`）。
         #[cfg(feature = "accel-sample-15")]
         if let Some(sampler) = accel_sampler.as_mut() {
@@ -1171,6 +1197,13 @@ fn main() {
         if let Some(deadline) = bus_touch
             .as_ref()
             .and_then(StrokeDetector::next_deadline_ms)
+        {
+            until = until.min(deadline);
+        }
+        #[cfg(deskcat_product_mode)]
+        if let Some(deadline) = env_reporter
+            .as_ref()
+            .and_then(EnvReporter::next_deadline_ms)
         {
             until = until.min(deadline);
         }
@@ -1686,8 +1719,8 @@ fn run_touch_sample<SPI: SpiAnyPins + 'static>(
     }
 }
 
-/// I2C bring-upが返したdriverで、tap検出を設定して始める（`tap-21`付きbuildだけ）。driverが無い、またはDevice IDが`0xE5`でない（読めなかった場合を含む）ときは、何も書かず`None`を返す。
-#[cfg(any(feature = "tap-21", deskcat_product_mode))]
+/// I2C bring-upが返したdriverで、tap検出を設定して始める（`tap-21`付きbuildだけ。製品buildは`start_product_sensors`）。driverが無い、またはDevice IDが`0xE5`でない（読めなかった場合を含む）ときは、何も書かず`None`を返す。
+#[cfg(feature = "tap-21")]
 fn start_tap(bringup: Option<I2cBringup>, now_ms: u64) -> Option<TapDetector> {
     let bringup = bringup?;
     // **ADXL345のDevice IDを確かめてから設定を書く。**IDが違う（別のdeviceがこのaddressにいる、配線が違う）、
@@ -1703,9 +1736,43 @@ fn start_tap(bringup: Option<I2cBringup>, now_ms: u64) -> Option<TapDetector> {
         );
         return None;
     }
-    let mut detector = TapDetector::new(Adxl345::new(ACCEL_I2C_ADDRESS), bringup.driver);
+    Some(configured_tap(i2c_bus::share(bringup.driver), now_ms))
+}
+
+/// `bus`でtap検出を作り、設定を書く。Device IDの確認は呼び出し側が済ませている。
+#[cfg(any(feature = "tap-21", deskcat_product_mode))]
+fn configured_tap(bus: i2c_bus::SharedI2c, now_ms: u64) -> TapDetector {
+    let mut detector = TapDetector::new(Adxl345::new(ACCEL_I2C_ADDRESS), bus);
     detector.configure(now_ms);
-    Some(detector)
+    detector
+}
+
+/// 製品buildで、tapの検出と`ENV-01`の周期測定を、1つのI2C busの上に作る（`crate::i2c_bus`）。
+///
+/// tapは`ACCEL-01`のDevice IDが`0xE5`のときだけ作る（[`start_tap`]と同じ条件）。**`ENV-01`は、tapの有無によらず作る。**
+/// Chip IDは`crate::env_report`が自分で読んで確かめる（一致するまで何も書かない）。I2C driverを作れなかったときは、どちらも作らない。
+#[cfg(deskcat_product_mode)]
+fn start_product_sensors(
+    bringup: Option<I2cBringup>,
+    now_ms: u64,
+) -> (Option<TapDetector>, Option<EnvReporter>) {
+    let Some(bringup) = bringup else {
+        return (None, None);
+    };
+    let bus = i2c_bus::share(bringup.driver);
+    let tap = if bringup.accel_id == Some(accel::EXPECTED_DEVICE_ID) {
+        Some(configured_tap(bus.clone(), now_ms))
+    } else {
+        let found = bringup
+            .accel_id
+            .map_or_else(|| "none".to_owned(), |raw| format!("0x{raw:02x}"));
+        log::error!(
+            "tap_not_started accel_id={found} expected=0x{:02x}",
+            accel::EXPECTED_DEVICE_ID
+        );
+        None
+    };
+    (tap, Some(EnvReporter::new(bus, ENV_I2C_ADDRESS, now_ms)))
 }
 
 /// `accel-sample-15`付きbuildで、ADXL345のDevice IDが`0xE5`のときだけ連続測定の設定を始める。
@@ -1748,7 +1815,7 @@ struct I2cBringup {
 /// bring-up手順の1工程である。**一致判定はここでは行わない。**`crate::accel::Adxl345`・
 /// `crate::env::Bme280`が返す生byteをそのままlogへ出すだけであり、期待値
 /// （`0xE5`／`0x60`）との一致は、logを読む人間の判断とする。**この関数へ判定を持ち込まない。**
-/// **ただし`tap-21`付きbuildでは、この関数が返す生byte（`ACCEL-01`の`accel_id`）を、呼び出し側の`start_tap`が`0xE5`と比べ、
+/// **ただし製品buildと`tap-21`付きbuildでは、この関数が返す生byte（`ACCEL-01`の`accel_id`）を、呼び出し側の`start_product_sensors`／`start_tap`が`0xE5`と比べ、
 /// 一致したときだけtapの設定を書く**（判定するのは呼び出し側であり、この関数ではない）。
 ///
 /// 2つのsensorは同じI2C bus（`GPIO25`＝SDA、`GPIO26`＝SCL）を共有するため
@@ -1876,7 +1943,7 @@ fn run_i2c_bringup(
     #[cfg(not(feature = "env-sample-16"))]
     let _ = env_id;
     service_bringup_step(health, "env_chip_id");
-    // `tap-21`付きbuildは、Device IDが一致したとき、このdriverでtap検出を続ける（`crate::tap`）。それ以外は呼び出し側が手放す。
+    // 製品buildと`tap-21`付きbuildは、Device IDが一致したとき、このdriverでtap検出を続ける（`crate::tap`）。一致しないとき、`tap-21`付きbuildは呼び出し側が手放し、製品buildは`ENV-01`の周期測定が持ち続ける。
     Some(I2cBringup {
         driver: i2c,
         accel_id,

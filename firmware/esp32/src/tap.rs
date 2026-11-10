@@ -10,9 +10,13 @@
 //!
 //! # I2C driverの所有
 //!
-//! 製品buildと`tap-21`付き試験buildで、ADXL345のDevice IDが`0xE5`のとき（`main.rs`の`start_tap`が確かめる。一致しなければ何も書かず、
-//! `I2cDriver`も手放す）、`TapDetector`が起動時のI2C bring-upの`I2cDriver`を唯一の所有者として持ち続ける。そのため、
-//! bring-upの後に`ENV-01`（BME280）をI2Cで読む経路は、このbuildには無い（今は誰も読まない）。
+//! ADXL345のDevice IDが`0xE5`のとき（製品buildは`main.rs`の`start_product_sensors`、`tap-21`付き試験buildは`start_tap`が確かめる）、
+//! `TapDetector`が起動時のI2C bring-upの`I2cDriver`を持つ。**一致しなければ何も書かず、`TapDetector`を作らない。**
+//! `tap-21`付き試験buildは、このとき`I2cDriver`も手放す。
+//! **製品buildは、同じ`I2cDriver`を`crate::env_report::EnvReporter`と共有する**（`crate::i2c_bus`。#487）。
+//! **製品buildは、Device IDが一致しなくても`I2cDriver`を手放さない**（`EnvReporter`が持ち続ける）。
+//! 共有しても、tapのbitは読むまで残るので、envのtransactionが挟まってもtapの検出は落ちない（読みが遅れるだけである）。
+//! `tap-21`付き試験buildは、envと共有しない（今は誰も`ENV-01`を読まない）。
 //!
 //! # 失敗の扱い
 //!
@@ -20,7 +24,7 @@
 //! 設定（`configure`）の滞留の**上界**は、全部成功する経路で700 ms（6書き込み＋捨て読み1。各transactionのtimeout×7の上界で、
 //! 成功したtransactionはその前に終わる）、書き込みが途中で失敗する経路で600 ms（最初の失敗で止まる）、読み出しの失敗は1周回あたり
 //! 最大100 ms）。
-//! **設定（`configure`）は、Device IDが一致したときだけ走る**（一致しなければ`start_tap`が`tap_not_started`をlogへ出す）。
+//! **設定（`configure`）は、Device IDが一致したときだけ走る**（一致しなければ`start_product_sensors`／`start_tap`が`tap_not_started`をlogへ出す）。
 //! **設定（`configure`）が走る場所はbuildで違う。**`bringup-display-13`を持たないbuildは、起動時のI2C bring-upの直後、
 //! main loopの前で走る（`BootSession::start`の前でもあるため、上の時間が最初の`boot`の送出を遅らせうる）。
 //! `bringup-display-13`付きbuildは、LCDのbring-upが済んだ後にmain loopの1周回の中で走る（その1周回が、上の時間だけ延びうる）。
@@ -38,10 +42,9 @@
 // 各試験buildでもcross-compileを確認する。
 #![allow(dead_code)]
 
-use deskcat_tap::{Decision, TapFilter};
-use esp_idf_svc::hal::i2c::I2cDriver;
-
 use crate::accel::Adxl345;
+use crate::i2c_bus::SharedI2c;
+use deskcat_tap::{Decision, TapFilter};
 
 /// `INT_SOURCE`を読む間隔（ms）。**暫定の一般値である**（安全要件の5項目に効かない）。データレート（`deskcat_tap::BW_RATE_100_HZ`＝100 Hz＝10 ms）の
 /// 2倍にした。tapのbitは読むまで残るため、読み損ねは起きない。
@@ -52,7 +55,7 @@ pub const MAX_CONSECUTIVE_ERRORS: u32 = 5;
 /// tap検出の状態。
 pub struct TapDetector {
     accel: Adxl345,
-    i2c: I2cDriver<'static>,
+    i2c: SharedI2c,
     filter: TapFilter,
     next_poll_ms: u64,
     consecutive_errors: u32,
@@ -60,8 +63,8 @@ pub struct TapDetector {
 }
 
 impl TapDetector {
-    /// 起動時のI2C bring-upが返した`I2cDriver`を受け取る。**まだ設定は書かない。**
-    pub fn new(accel: Adxl345, i2c: I2cDriver<'static>) -> Self {
+    /// 起動時のI2C bring-upが返した`I2cDriver`を、共有できる形（`crate::i2c_bus::SharedI2c`）で受け取る。**まだ設定は書かない。**
+    pub fn new(accel: Adxl345, i2c: SharedI2c) -> Self {
         Self {
             accel,
             i2c,
@@ -78,11 +81,14 @@ impl TapDetector {
 
     /// tap検出の設定を書く。失敗したら検出を始めない（logへ出す）。
     pub fn configure(&mut self, now_ms: u64) {
-        match self.accel.configure_tap(&mut self.i2c) {
+        // **借用（`RefCell`）は`let`の文で終える。**`match`の被判定式に置くと、armの中まで借用が続き、armの中の2回目の借用が`panic`する。
+        let configured = self.accel.configure_tap(&mut self.i2c.borrow_mut());
+        match configured {
             Ok(()) => {
                 // 測定modeへ入れた直後にtapのbitが過渡で立っていても、誤った`tapped`を送らないよう、
                 // `INT_SOURCE`を1回読んで捨てる（読むとtapのbitが消える。失敗しても検出は始める）。
-                match self.accel.read_int_source(&mut self.i2c) {
+                let discard = self.accel.read_int_source(&mut self.i2c.borrow_mut());
+                match discard {
                     Ok(discarded) => {
                         log::info!("tap_configure_discard int_source=0x{discarded:02x}")
                     }
@@ -137,7 +143,8 @@ impl TapDetector {
             self.log_decision("tap_confirmed", decision, None);
         }
         let mut send = confirmed == Some(Decision::Send);
-        match self.accel.read_int_source(&mut self.i2c) {
+        let int_source = self.accel.read_int_source(&mut self.i2c.borrow_mut());
+        match int_source {
             Ok(int_source) => {
                 self.consecutive_errors = 0;
                 if !deskcat_tap::is_single_tap(int_source) {

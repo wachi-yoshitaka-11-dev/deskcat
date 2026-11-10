@@ -234,6 +234,56 @@ impl Reading {
     }
 }
 
+/// 送ってよい測定量。範囲を外れた量は`None`にし、`out_of_range`へ数える。
+///
+/// 範囲は`docs/hardware/sensor-datasheet-notes.md`の`測定range`行（温度 -40〜+85 ℃、湿度 0〜100 %、
+/// 気圧 300〜1100 hPa。Bosch BME280 Data Sheet Revision 1.24 の動作範囲）である。
+/// 補償式は範囲外の値も返しうるため、送る前に検査する。範囲の端の値は範囲内である。
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Publishable {
+    /// 気温（℃）。範囲外なら`None`。
+    pub temperature_c: Option<f32>,
+    /// 相対湿度（%）。範囲外なら`None`。
+    pub humidity_pct: Option<f32>,
+    /// 気圧（hPa）。範囲外なら`None`。
+    pub pressure_hpa: Option<f32>,
+    /// 範囲外で省いた測定量の数（0〜3）。
+    pub out_of_range: u8,
+}
+
+impl Publishable {
+    /// 送れる測定量が1つも無い。
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
+        self.temperature_c.is_none() && self.humidity_pct.is_none() && self.pressure_hpa.is_none()
+    }
+}
+
+/// 値が閉区間`[low, high]`の内にあれば`f32`で返す。`NaN`は範囲外である。
+#[allow(clippy::cast_possible_truncation)]
+fn within(value: f64, low: f64, high: f64) -> Option<f32> {
+    (low..=high).contains(&value).then_some(value as f32)
+}
+
+impl Reading {
+    /// 測定range（[`Publishable`]のdoc）の内にある量だけを返す。
+    #[must_use]
+    pub fn publishable(self) -> Publishable {
+        let temperature_c = within(self.temperature_celsius(), -40.0, 85.0);
+        let humidity_pct = within(self.humidity_percent(), 0.0, 100.0);
+        let pressure_hpa = within(self.pressure_pa() / 100.0, 300.0, 1100.0);
+        let out_of_range = u8::from(temperature_c.is_none())
+            + u8::from(humidity_pct.is_none())
+            + u8::from(pressure_hpa.is_none());
+        Publishable {
+            temperature_c,
+            humidity_pct,
+            pressure_hpa,
+            out_of_range,
+        }
+    }
+}
+
 /// 入力または計算結果が式の定義域を外れた。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Error {
@@ -716,5 +766,52 @@ mod tests {
             let h = i64::from(r.humidity_q22_10_percent) - i64::from(bosch_humidity);
             assert!(h.abs() <= 2, "{sample:?}");
         }
+    }
+    #[test]
+    fn publishable_keeps_in_range_and_drops_out_of_range_per_quantity() {
+        // 温度 25.00 ℃、気圧 1013.25 hPa（101325 Pa × 256）、湿度 50 %（50 × 1024）。
+        let ok = Reading {
+            temperature_centi_c: 2500,
+            pressure_q24_8_pa: 101_325 * 256,
+            humidity_q22_10_percent: 50 * 1024,
+        };
+        let p = ok.publishable();
+        assert_eq!(p.temperature_c, Some(25.0));
+        assert_eq!(p.humidity_pct, Some(50.0));
+        assert_eq!(p.pressure_hpa, Some(1013.25));
+        assert_eq!(p.out_of_range, 0);
+        assert!(!p.is_empty());
+
+        // 端の値は範囲内。
+        let edge = Reading {
+            temperature_centi_c: -4000,
+            pressure_q24_8_pa: 30_000 * 256,
+            humidity_q22_10_percent: 100 * 1024,
+        };
+        let p = edge.publishable();
+        assert_eq!(p.temperature_c, Some(-40.0));
+        assert_eq!(p.pressure_hpa, Some(300.0));
+        assert_eq!(p.humidity_pct, Some(100.0));
+        assert_eq!(p.out_of_range, 0);
+
+        // 温度だけ範囲外（85.01 ℃）。他は残る。
+        let hot = Reading {
+            temperature_centi_c: 8501,
+            ..ok
+        };
+        let p = hot.publishable();
+        assert_eq!(p.temperature_c, None);
+        assert!(p.humidity_pct.is_some() && p.pressure_hpa.is_some());
+        assert_eq!(p.out_of_range, 1);
+
+        // 3つとも範囲外なら空。気圧は1100 hPaちょうどを超える値。
+        let bad = Reading {
+            temperature_centi_c: -4001,
+            pressure_q24_8_pa: 110_001 * 256,
+            humidity_q22_10_percent: 100 * 1024 + 1,
+        };
+        let p = bad.publishable();
+        assert!(p.is_empty());
+        assert_eq!(p.out_of_range, 3);
     }
 }
