@@ -8,7 +8,9 @@ use std::collections::VecDeque;
 use std::io;
 use std::num::NonZeroU64;
 
-use deskcat_domain::{LOCAL_SPEECH_LINES, Millis, Mind, Timing};
+use deskcat_domain::{
+    Companion, Config as CompanionConfig, LOCAL_SPEECH_LINES, LocalMinutes, Millis, Mind, Timing,
+};
 use deskcat_protocol::{
     Ack, AckStatus, Boot, DisplayStatus, Envelope, ErrorCode, ExpressionName, Frame, HeadTouched,
     HelloReason, Message, ProtocolCounters, SensorStatus, ServoStatus, Status, decode_line,
@@ -1398,4 +1400,123 @@ fn cell_set_expression_without_any_ack_stops_after_the_limit_and_resumes_when_th
         usize::try_from(SILENT_RETRY_LIMIT).expect("小さい") + 1
     );
     assert_eq!(d.counters().set_expression_stopped_silent, 2);
+}
+
+// ---- Companion（#685）----
+
+fn environment(t: Option<f32>, h: Option<f32>, p: Option<f32>) -> Message {
+    Message::Environment(deskcat_protocol::Environment {
+        temperature_c: t.and_then(deskcat_protocol::FiniteF32::new),
+        humidity_pct: h.and_then(deskcat_protocol::FiniteF32::new),
+        pressure_hpa: p.and_then(deskcat_protocol::FiniteF32::new),
+    })
+}
+
+fn texts(frames: &[Frame]) -> Vec<String> {
+    frames
+        .iter()
+        .filter_map(|f| match &f.message {
+            Message::ShowText(s) => Some(s.text.clone()),
+            _ => None,
+        })
+        .collect()
+}
+
+fn with_companion(duration_ms: Option<u32>, hour: u8) -> (Daemon, Fake) {
+    let mut d =
+        daemon().with_companion(Companion::new(CompanionConfig::MVP, Millis(0)), duration_ms);
+    d.set_local_minutes(LocalMinutes::new(hour, 0));
+    established_with(d, "neutral")
+}
+
+#[test]
+fn a_hot_environment_shows_one_bubble_and_sends_no_expression_or_motion() {
+    let (mut d, mut t) = with_companion(Some(4_000), 12);
+    let _ = t.sent();
+
+    t.feed(
+        environment(Some(31.0), Some(50.0), Some(1010.0)),
+        ESP_SID,
+        4,
+    );
+    assert_eq!(run(&mut d, &mut t, 100), Step::Continue);
+    let sent = t.sent();
+    assert_eq!(texts(&sent), ["暑いにゃ"]);
+    assert!(expressions(&sent).is_empty(), "描く表情が無い顔は送らない");
+    let id = find_id(&sent, |m| matches!(m, Message::ShowText(_))).expect("送った");
+    t.feed(ack(id, AckStatus::Ok, None), ESP_SID, 5);
+
+    // 同じ状態が続いても出し直さない。
+    t.feed(
+        environment(Some(31.5), Some(50.0), Some(1010.0)),
+        ESP_SID,
+        6,
+    );
+    assert_eq!(run(&mut d, &mut t, 60_000), Step::Continue);
+    assert!(texts(&t.sent()).is_empty());
+    assert_eq!(d.counters().show_text_sent, 1);
+    assert_eq!(d.counters().motions_not_sent, 0);
+}
+
+#[test]
+fn an_incomplete_environment_is_counted_and_does_not_reach_the_companion() {
+    let (mut d, mut t) = with_companion(Some(4_000), 12);
+    let _ = t.sent();
+
+    t.feed(environment(Some(35.0), None, Some(1010.0)), ESP_SID, 4);
+    assert_eq!(run(&mut d, &mut t, 100), Step::Continue);
+    assert!(t.sent().is_empty());
+    assert_eq!(d.counters().environment_incomplete, 1);
+}
+
+#[test]
+fn without_a_bubble_duration_the_bubble_is_counted_not_sent() {
+    let (mut d, mut t) = with_companion(None, 12);
+    let _ = t.sent();
+
+    t.feed(environment(Some(5.0), Some(50.0), Some(1010.0)), ESP_SID, 4);
+    assert_eq!(run(&mut d, &mut t, 100), Step::Continue);
+    assert!(texts(&t.sent()).is_empty());
+    assert_eq!(d.counters().companion_bubbles_unsent, 1);
+}
+
+#[test]
+fn at_night_the_companion_sleeps_and_a_tap_does_not_wake_the_face() {
+    // 夜の時刻で起動すると、最初の周で寝顔と「おやすみ」が決まり、`status`の後に送られる。
+    let (mut d, mut t) = with_companion(Some(4_000), 23);
+    let sent = t.sent();
+    assert_eq!(expressions(&sent), [ExpressionName::Sleeping]);
+    assert_eq!(texts(&sent), ["おやすみ"]);
+    assert_eq!(d.counters().motions_not_sent, 0, "夜は首振りを要求しない");
+    let id = find_id(&sent, |m| matches!(m, Message::SetExpression(_))).expect("送った");
+    t.feed(ack(id, AckStatus::Ok, None), ESP_SID, 4);
+
+    t.feed(Message::Tapped, ESP_SID, 5);
+    assert_eq!(run(&mut d, &mut t, 200), Step::Continue);
+    assert!(
+        expressions(&t.sent()).is_empty(),
+        "寝ている間はMindの表情を出さない"
+    );
+    assert_eq!(d.counters().tapped_received, 1);
+}
+
+#[test]
+fn the_rest_notice_is_a_bubble_and_the_neck_request_is_only_counted() {
+    let (mut d, mut t) = with_companion(Some(4_000), 12);
+    let _ = t.sent();
+
+    assert_eq!(run(&mut d, &mut t, 25 * 60 * 1000), Step::Continue);
+    assert_eq!(texts(&t.sent()), ["ひと休みしよう"]);
+    assert_eq!(d.counters().motions_not_sent, 1);
+}
+
+#[test]
+fn without_a_valid_clock_the_companion_does_not_tick() {
+    let mut d =
+        daemon().with_companion(Companion::new(CompanionConfig::MVP, Millis(0)), Some(4_000));
+    d.set_local_minutes(None);
+    let (mut d, mut t) = established_with(d, "neutral");
+    let _ = t.sent();
+    assert_eq!(run(&mut d, &mut t, 25 * 60 * 1000), Step::Continue);
+    assert!(t.sent().is_empty());
 }

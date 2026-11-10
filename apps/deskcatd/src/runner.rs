@@ -104,6 +104,10 @@ where
             }
             fallback = None;
         }
+        if daemon.companion_asleep() {
+            // 寝る直前に頼んだ独り言を、朝まで持ち越さない。
+            ready_text = None;
+        }
         if daemon.speech_ready()
             && let (Some(line), Some(config)) = (ready_text.take(), speech_config)
         {
@@ -132,6 +136,9 @@ where
                 daemon.queue_speech(line, config.duration_ms, config.min_interval_ms);
             }
         }
+        daemon.set_local_minutes(crate::cloud_speech::local_minutes(
+            std::time::SystemTime::now(),
+        ));
         if let Step::Exit(reason) = daemon.step(transport, now_ms) {
             report_speech_counters(speech.as_ref());
             report_cloud_counters(cloud.as_ref());

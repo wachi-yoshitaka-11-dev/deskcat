@@ -186,7 +186,10 @@
 //!
 //! [#491の決定]: https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/491#issuecomment-5965360345
 
-use deskcat_domain::{ContactEvent, Expression, Millis, Mind, Reaction};
+use deskcat_domain::Output as CompanionOutput;
+use deskcat_domain::{
+    Ambient, Companion, ContactEvent, Expression, Face, LocalMinutes, Millis, Mind, Reaction,
+};
 use deskcat_protocol::{
     AckStatus, ErrorCode, Frame, Hello, HelloReason, Message, Outcome, SetExpression, ShowText,
 };
@@ -312,8 +315,14 @@ pub struct DaemonCounters {
     pub input_faults: u64,
     /// 反応が首の動きを求めたが、送らなかった回数（`PROTO-TBD-008`）。
     pub motions_not_sent: u64,
-    /// 反応を起こさずに数えただけの`environment`。
+    /// 受け取った`environment`。
     pub environment_events: u64,
+    /// 3つの量がそろわず、`Companion`へ渡さなかった`environment`。
+    pub environment_incomplete: u64,
+    /// `Companion`が吹き出しを決めたが、表示時間の設定が無く送らなかった回数。
+    pub companion_bubbles_unsent: u64,
+    /// 送る前に、次の`Companion`の吹き出しで置き換えられた吹き出しの数。
+    pub speech_replaced: u64,
     /// `stale_session`の後に始めた再開。
     pub resumes: u64,
     /// `status`が届かない（または`get_status`が拒否された）ために、新しい`id`で送り直した回数。
@@ -341,12 +350,26 @@ enum HelloGate {
     Free,
 }
 
+/// `Companion`とdaemonの境目の状態。
+#[derive(Debug)]
+struct CompanionLink {
+    companion: Companion,
+    /// 吹き出しの`duration_ms`。無ければ吹き出しを送らない。
+    bubble_duration_ms: Option<u32>,
+    /// Piの時計の分。時計が有効でないあいだは`None`で、`tick`しない。
+    local: Option<LocalMinutes>,
+    /// 最後に`Companion`が出した表情。描く表情が無い顔のあとに`Neutral`を送らないために持つ。
+    last_face: Face,
+}
+
 /// linkの一生。
 #[derive(Debug)]
 pub struct Daemon {
     session: Session,
     peer: PeerSession,
     mind: Mind,
+    /// 無ければ`Companion`を使わない（`with_companion`）。
+    companion: Option<CompanionLink>,
     sync: ExpressionSync,
     identity: Identity,
     counters: DaemonCounters,
@@ -386,6 +409,7 @@ impl Daemon {
             session,
             peer,
             mind,
+            companion: None,
             sync: ExpressionSync::new(),
             identity,
             counters: DaemonCounters::default(),
@@ -406,6 +430,35 @@ impl Daemon {
             status_watch_until: None,
             exit: None,
         }
+    }
+
+    /// `Companion`を使う。吹き出しは`bubble_duration_ms`で送り、`None`なら送らずに数える。
+    ///
+    /// 首振りは送らない（`PROTO-TBD-008`）。揺れの入力元は無いため、`Companion::on_shake`は呼ばない。
+    #[must_use]
+    pub fn with_companion(mut self, companion: Companion, bubble_duration_ms: Option<u32>) -> Self {
+        self.companion = Some(CompanionLink {
+            companion,
+            bubble_duration_ms,
+            local: None,
+            last_face: Face::Neutral,
+        });
+        self
+    }
+
+    /// Piの時計の分を渡す。時計が有効でなければ`None`で、`Companion`は時間を進めない。
+    pub fn set_local_minutes(&mut self, local: Option<LocalMinutes>) {
+        if let Some(link) = &mut self.companion {
+            link.local = local;
+        }
+    }
+
+    /// `Companion`が寝ているか。寝ている間は、`Mind`の表情と独り言を出さない。
+    #[must_use]
+    pub fn companion_asleep(&self) -> bool {
+        self.companion
+            .as_ref()
+            .is_some_and(|link| link.companion.is_asleep())
     }
 
     /// portを開けた。`startup`の`hello`を予約する（§5.1。Piのprocessを起動した直後に送る）。
@@ -459,6 +512,7 @@ impl Daemon {
             && self.speech_pending.is_none()
             && self.speech_in_flight.is_none()
             && !self.speech_disabled
+            && !self.companion_asleep()
     }
 
     /// クラウドへ渡せる感情enumだけを返す。入力eventや識別子は渡さない。
@@ -528,6 +582,7 @@ impl Daemon {
         }
         let reaction = self.mind.tick(Millis(now_ms));
         self.apply_reaction(reaction);
+        self.tick_companion(now_ms);
         self.send_hello(now_ms);
         self.send_expression(now_ms);
         self.send_speech(now_ms);
@@ -770,8 +825,9 @@ impl Daemon {
             Message::HeadTouched(_) => Some(ContactEvent::HeadTouched),
             Message::Tapped => Some(ContactEvent::Tapped),
             Message::Lifted(_) => Some(ContactEvent::Lifted),
-            Message::Environment(_) => {
+            Message::Environment(environment) => {
                 self.counters.environment_events += 1;
+                self.on_environment(environment, now_ms);
                 None
             }
             _ => None,
@@ -782,8 +838,77 @@ impl Daemon {
         }
     }
 
+    fn on_environment(&mut self, environment: &deskcat_protocol::Environment, now_ms: u64) {
+        let (Some(temperature), Some(humidity), Some(pressure)) = (
+            environment.temperature_c,
+            environment.humidity_pct,
+            environment.pressure_hpa,
+        ) else {
+            self.counters.environment_incomplete += 1;
+            return;
+        };
+        let sample = Ambient {
+            temperature_c: temperature.get(),
+            humidity_pct: humidity.get(),
+            pressure_hpa: pressure.get(),
+        };
+        let Some(link) = &mut self.companion else {
+            return;
+        };
+        let output = link.companion.on_ambient(sample, Millis(now_ms));
+        self.apply_companion(output);
+    }
+
+    fn tick_companion(&mut self, now_ms: u64) {
+        let Some(link) = &mut self.companion else {
+            return;
+        };
+        let Some(local) = link.local else {
+            return;
+        };
+        let output = link.companion.tick(Millis(now_ms), local);
+        self.apply_companion(output);
+    }
+
+    /// `Companion`の出力を、表情の希望と吹き出しの予約にする。首振りは送らず数える。
+    fn apply_companion(&mut self, output: CompanionOutput) {
+        let Some(link) = &mut self.companion else {
+            return;
+        };
+        if let Some(face) = output.face {
+            let was_drawable = link.last_face.expression().is_some();
+            link.last_face = face;
+            // 描く表情が無い顔の後の`Neutral`は、何も描いていないので送らない（`Mind`の表情を消さない）。
+            if let Some(expression) = face.expression()
+                && (face != Face::Neutral || was_drawable)
+            {
+                self.sync.set_desired(expression);
+            }
+        }
+        if let Some(bubble) = output.bubble {
+            match link.bubble_duration_ms {
+                Some(duration_ms) => {
+                    if self.speech_pending.is_some() {
+                        self.counters.speech_replaced += 1;
+                    }
+                    // 間隔は`Companion`が持つ。ここでは送信の間隔を足さない。
+                    self.speech_pending =
+                        Some((bubble.text().to_owned(), duration_ms, NonZeroU64::MIN));
+                }
+                None => self.counters.companion_bubbles_unsent += 1,
+            }
+        }
+        if output.neck.is_some() {
+            self.counters.motions_not_sent += 1;
+            log::debug!("首の動きの意図は送らない（PROTO-TBD-008）");
+        }
+    }
+
     fn apply_reaction(&mut self, reaction: Reaction) {
-        if let Some(expression) = reaction.expression {
+        // 寝ている間は`Companion`が表情を専有する。
+        if let Some(expression) = reaction.expression
+            && !self.companion_asleep()
+        {
             self.sync.set_desired(expression);
         }
         if reaction.motion.is_some() {
@@ -978,7 +1103,11 @@ impl Daemon {
         let Some((ref text, duration_ms, min_interval_ms)) = self.speech_pending else {
             return;
         };
-        if !self.startup_complete() || !self.sync.is_ready() || self.speech_disabled {
+        if !self.startup_complete()
+            || !self.sync.is_ready()
+            || self.speech_disabled
+            || self.speech_in_flight.is_some()
+        {
             return;
         }
         // `LocalSpeech`は候補を選んだ時刻を制限する。queue満杯などで送信が
