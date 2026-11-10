@@ -1253,8 +1253,8 @@ fn main() {
         // 回らず、Task Watchdog Timerの前提を壊す。1 msは`TickType::new_millis`（esp-idf-hal
         // 0.46.2 `delay.rs`89〜95行）が1 tickへ切り上げ、`CONFIG_FREERTOS_HZ=100`（生成された`sdkconfig`、
         // debug profile）では1 tick＝10 msになる。1 tickのblockは次のtickの割り込みで解けるため、
-        // 実際の待ちは0〜10 msであり、dataが届けばそれより早く戻る。受信が続く間は`read`がblockせずに
-        // 戻るため、IDLE taskへ時間が回るという前提は、受信が途切れる間に限って成り立つ。
+        // 実際の待ちは0〜10 msであり、dataが届けばそれより早く戻る。ring bufferにdataが残っている間は
+        // `read`がblockせずに戻るため、その周は下の`post_read_yield_ms`で譲る（Issue #713）。
         #[cfg(not(feature = "bench-servo-test-17"))]
         {
             drain_uart_events(&uart, &mut health);
@@ -1299,11 +1299,61 @@ fn main() {
                     );
                 }
             }
+            // ring bufferにdataがあった周は、最初の`NON_BLOCK`の読みで戻り、blockしない
+            // （esp-idf-hal 0.46.2 `uart.rs`1179〜1246行）。受信が続くと毎周この経路になり、
+            // IDLE taskへ時間が回らないため、dataを返した周は処理の後にFreeRTOSへ譲る（Issue #713）。
+            // blockした後にdataが届いた周も`Ok(n)`を返すので、その周は余分に1 tick譲る。
+            if let Some(ms) = post_read_yield_ms(read.as_ref().map_or(0, |n| *n)) {
+                FreeRtos::delay_ms(ms);
+            }
         }
         #[cfg(feature = "bench-servo-test-17")]
         sleep_ms_until(until, health.uptime_ms());
     }
 }
+
+/// `UartDriver::read`が`read_bytes`（1以上）を返した周の後に、FreeRTOSへ譲る時間（ms）。
+/// 譲らない周は`None`を返す。
+///
+/// `read`はdataがあると最初の`NON_BLOCK`の読みで戻り、blockしない。dataが無い周は、timeout
+/// （1 tick以上）のblockで既に譲っている。**譲るときは必ず1 ms以上を返す**（`delay_ms(0)`の
+/// `vTaskDelay(0)`は同じ優先度以上のtaskにしか譲らず、優先度の低いIDLE taskは回らない。
+/// `sleep_ms_until`と同じ理由）。1 msは1 tickへ切り上がる
+/// （`CONFIG_FREERTOS_HZ=100`では10 ms）ため、値は新しく置かず、1 tickに任せる（Issue #713）。
+///
+/// firmware crateは`harness = false`でhostのtestを持たない。この関数の性質は、下の定数式が
+/// build時に確かめる（満たさなければ、このfirmwareはcompileできない）。
+#[cfg(not(any(
+    feature = "bench-servo-test-17",
+    feature = "bench-servo-calib-18",
+    feature = "bench-wdt-711"
+)))]
+const fn post_read_yield_ms(read_bytes: usize) -> Option<u32> {
+    if read_bytes > 0 {
+        Some(1)
+    } else {
+        None
+    }
+}
+
+#[cfg(not(any(
+    feature = "bench-servo-test-17",
+    feature = "bench-servo-calib-18",
+    feature = "bench-wdt-711"
+)))]
+const _: () = {
+    // dataが無い周は、既にblockしているので譲らない。
+    assert!(post_read_yield_ms(0).is_none());
+    // dataがある周は、必ず譲る。0 msは譲ったことにならない。
+    match post_read_yield_ms(1) {
+        Some(ms) => assert!(ms >= 1),
+        None => panic!("data read must yield"),
+    }
+    match post_read_yield_ms(config::PI_PROTOCOL_UART_READ_CHUNK_BYTES) {
+        Some(ms) => assert!(ms >= 1),
+        None => panic!("full chunk read must yield"),
+    }
+};
 
 /// Pi linkのUARTのevent queueを空になるまで吸い上げ、受信の異常を数えてlogへ出す。
 ///
