@@ -1,4 +1,4 @@
-//! `set_expression`（Protocol §5.2）の3表情を、LCD上の矩形の列として返す。
+//! `set_expression`（Protocol §5.2）の表情を、LCD上の矩形の列として返す。
 //!
 //! このcrateはLCDもSPIも知らない。名前から「どの矩形をどの色で、どの順に塗るか」を返すだけであり、
 //! 塗るのは`firmware/esp32`の`crate::display`である（hostでtestできるように分けた）。
@@ -88,6 +88,34 @@ const SURPRISED: [Rect; 6] = [
     rect(144, 168, 32, 40, color::WHITE),
 ];
 
+// 目を回す。目は入れ子の四角（白・黒・白・黒）で渦に見せ、内側を寄せて中心をずらす。口は段違いの波線。
+const DIZZY: [Rect; 11] = [
+    BACKGROUND,
+    rect(72, 62, 64, 64, color::WHITE),
+    rect(80, 70, 48, 48, color::BLACK),
+    rect(88, 80, 32, 32, color::WHITE),
+    rect(98, 92, 14, 14, color::BLACK),
+    rect(184, 62, 64, 64, color::WHITE),
+    rect(192, 70, 48, 48, color::BLACK),
+    rect(200, 80, 32, 32, color::WHITE),
+    rect(210, 92, 14, 14, color::BLACK),
+    rect(120, 174, 40, 8, color::WHITE),
+    rect(160, 182, 40, 8, color::WHITE),
+];
+
+// 目は閉じた細い横線、口は小さく、右上に「Z」を足す。
+const SLEEPING: [Rect; 9] = [
+    BACKGROUND,
+    rect(80, 120, 48, 8, color::WHITE),
+    rect(192, 120, 48, 8, color::WHITE),
+    rect(150, 176, 20, 6, color::WHITE),
+    rect(248, 36, 32, 6, color::WHITE),
+    rect(268, 42, 8, 6, color::WHITE),
+    rect(260, 48, 8, 6, color::WHITE),
+    rect(252, 54, 8, 6, color::WHITE),
+    rect(248, 60, 32, 6, color::WHITE),
+];
+
 /// `name`の表情を塗る矩形を、塗る順に返す。先頭は画面全体の背景である。
 ///
 /// 未知の名前（`ExpressionName`は`non_exhaustive`）には`None`を返す。呼び出し側は拒否する。
@@ -97,6 +125,8 @@ pub fn shapes(name: ExpressionName) -> Option<&'static [Rect]> {
         ExpressionName::Neutral => Some(&NEUTRAL),
         ExpressionName::Happy => Some(&HAPPY),
         ExpressionName::Surprised => Some(&SURPRISED),
+        ExpressionName::Dizzy => Some(&DIZZY),
+        ExpressionName::Sleeping => Some(&SLEEPING),
         _ => None,
     }
 }
@@ -201,10 +231,12 @@ impl Painter {
 mod tests {
     use super::*;
 
-    const NAMES: [ExpressionName; 3] = [
+    const NAMES: [ExpressionName; 5] = [
         ExpressionName::Neutral,
         ExpressionName::Happy,
         ExpressionName::Surprised,
+        ExpressionName::Dizzy,
+        ExpressionName::Sleeping,
     ];
 
     #[test]
@@ -233,11 +265,13 @@ mod tests {
     }
 
     #[test]
-    fn the_three_expressions_look_different() {
-        let [n, h, s] = NAMES.map(|name| shapes(name).expect("定義済み"));
-        assert_ne!(n, h);
-        assert_ne!(n, s);
-        assert_ne!(h, s);
+    fn all_expressions_look_different() {
+        assert_eq!(NAMES, ExpressionName::ALL);
+        for (i, a) in NAMES.iter().enumerate() {
+            for b in &NAMES[i + 1..] {
+                assert_ne!(shapes(*a), shapes(*b), "{a:?} {b:?}");
+            }
+        }
     }
 
     #[test]

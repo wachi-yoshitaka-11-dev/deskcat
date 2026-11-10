@@ -775,6 +775,8 @@ retired sessionの保持件数と保持期間は`PROTO-TBD-011`とする。保�
 - `neutral`
 - `happy`
 - `surprised`
+- `dizzy`
+- `sleeping`
 
 Firmwareは未知の名前をrejectする。Transition durationにはdisplay実装で定義する上限を設ける。
 
