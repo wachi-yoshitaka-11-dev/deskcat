@@ -224,6 +224,39 @@
       "note": "§5.2のexpression名（#685で足した）。"
     },
     {
+      "name": "set_expression_each_initial_name_hot",
+      "line": "{\"v\":1,\"sid\":90312,\"id\":915,\"ts_ms\":52030,\"type\":\"set_expression\",\"payload\":{\"name\":\"hot\",\"transition_ms\":300}}\n",
+      "canonical": true,
+      "expect": {
+        "type": "set_expression",
+        "sid": 90312,
+        "id": 915
+      },
+      "note": "§5.2のexpression名（#685で足した）。"
+    },
+    {
+      "name": "set_expression_each_initial_name_cold",
+      "line": "{\"v\":1,\"sid\":90312,\"id\":916,\"ts_ms\":52030,\"type\":\"set_expression\",\"payload\":{\"name\":\"cold\",\"transition_ms\":300}}\n",
+      "canonical": true,
+      "expect": {
+        "type": "set_expression",
+        "sid": 90312,
+        "id": 916
+      },
+      "note": "§5.2のexpression名（#685で足した）。"
+    },
+    {
+      "name": "set_expression_each_initial_name_worried",
+      "line": "{\"v\":1,\"sid\":90312,\"id\":917,\"ts_ms\":52030,\"type\":\"set_expression\",\"payload\":{\"name\":\"worried\",\"transition_ms\":300}}\n",
+      "canonical": true,
+      "expect": {
+        "type": "set_expression",
+        "sid": 90312,
+        "id": 917
+      },
+      "note": "§5.2のexpression名（#685で足した）。"
+    },
+    {
       "name": "play_motion_example",
       "line": "{\"v\":1,\"sid\":90312,\"id\":902,\"ts_ms\":52200,\"type\":\"play_motion\",\"payload\":{\"name\":\"nod\",\"speed\":0.45,\"repeat\":1}}\n",
       "canonical": true,

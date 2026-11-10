@@ -188,7 +188,7 @@
 
 use deskcat_domain::Output as CompanionOutput;
 use deskcat_domain::{
-    Ambient, Companion, ContactEvent, Expression, Face, LocalMinutes, Millis, Mind, Reaction,
+    Ambient, Companion, ContactEvent, Expression, LocalMinutes, Millis, Mind, Reaction,
 };
 use deskcat_protocol::{
     AckStatus, ErrorCode, Frame, Hello, HelloReason, Message, Outcome, SetExpression, ShowText,
@@ -358,8 +358,6 @@ struct CompanionLink {
     bubble_duration_ms: Option<u32>,
     /// Piの時計の分。時計が有効でないあいだは`None`で、`tick`しない。
     local: Option<LocalMinutes>,
-    /// 最後に`Companion`が出した表情。描く表情が無い顔のあとに`Neutral`を送らないために持つ。
-    last_face: Face,
 }
 
 /// linkの一生。
@@ -441,7 +439,6 @@ impl Daemon {
             companion,
             bubble_duration_ms,
             local: None,
-            last_face: Face::Neutral,
         });
         self
     }
@@ -876,14 +873,7 @@ impl Daemon {
             return;
         };
         if let Some(face) = output.face {
-            let was_drawable = link.last_face.expression().is_some();
-            link.last_face = face;
-            // 描く表情が無い顔の後の`Neutral`は、何も描いていないので送らない（`Mind`の表情を消さない）。
-            if let Some(expression) = face.expression()
-                && (face != Face::Neutral || was_drawable)
-            {
-                self.sync.set_desired(expression);
-            }
+            self.sync.set_desired(face.expression());
         }
         if let Some(bubble) = output.bubble {
             match link.bubble_duration_ms {

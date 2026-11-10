@@ -47,6 +47,12 @@ pub enum Expression {
     Dizzy,
     /// 寝顔。[`Mind`]は出さない（[`crate::Companion`]の[`crate::Face::Sleeping`]の対応先である）。
     Sleeping,
+    /// 暑い顔。[`Mind`]は出さない（[`crate::Companion`]の[`crate::Face::Hot`]の対応先である）。
+    Hot,
+    /// 寒い顔。[`Mind`]は出さない（[`crate::Companion`]の[`crate::Face::Cold`]の対応先である）。
+    Cold,
+    /// 困った顔。[`Mind`]は出さない（[`crate::Companion`]の[`crate::Face::Worried`]の対応先である）。
+    Worried,
 }
 
 /// 首の動きの意図。角度、速度、回数を持たない。
@@ -114,8 +120,13 @@ impl Timing {
 
     const fn hold_ms(&self, expression: Expression) -> Option<u64> {
         match expression {
-            // `Mind`は`Dizzy`と`Sleeping`を出さないため、保つ時間は持たない。
-            Expression::Neutral | Expression::Dizzy | Expression::Sleeping => None,
+            // `Mind`は`Neutral`以外の`Companion`由来の表情を出さないため、保つ時間は持たない。
+            Expression::Neutral
+            | Expression::Dizzy
+            | Expression::Sleeping
+            | Expression::Hot
+            | Expression::Cold
+            | Expression::Worried => None,
             Expression::Happy => Some(self.happy_hold_ms),
             Expression::Surprised => Some(self.surprised_hold_ms),
         }

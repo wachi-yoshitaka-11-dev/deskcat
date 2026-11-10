@@ -66,14 +66,16 @@ pub enum Face {
 }
 
 impl Face {
-    /// `set_expression`で送れる表情。描く表情が無い`Hot`・`Cold`・`Worried`は`None`。
+    /// `set_expression`で送る表情。
     #[must_use]
-    pub const fn expression(self) -> Option<crate::Expression> {
+    pub const fn expression(self) -> crate::Expression {
         match self {
-            Self::Neutral => Some(crate::Expression::Neutral),
-            Self::Dizzy => Some(crate::Expression::Dizzy),
-            Self::Sleeping => Some(crate::Expression::Sleeping),
-            Self::Hot | Self::Cold | Self::Worried => None,
+            Self::Neutral => crate::Expression::Neutral,
+            Self::Hot => crate::Expression::Hot,
+            Self::Cold => crate::Expression::Cold,
+            Self::Worried => crate::Expression::Worried,
+            Self::Dizzy => crate::Expression::Dizzy,
+            Self::Sleeping => crate::Expression::Sleeping,
         }
     }
 }
@@ -552,12 +554,12 @@ mod face_tests {
     use crate::Expression;
 
     #[test]
-    fn only_faces_that_can_be_drawn_map_to_an_expression() {
-        assert_eq!(Face::Neutral.expression(), Some(Expression::Neutral));
-        assert_eq!(Face::Dizzy.expression(), Some(Expression::Dizzy));
-        assert_eq!(Face::Sleeping.expression(), Some(Expression::Sleeping));
-        for face in [Face::Hot, Face::Cold, Face::Worried] {
-            assert_eq!(face.expression(), None, "{face:?}");
-        }
+    fn every_face_maps_to_its_own_expression() {
+        assert_eq!(Face::Neutral.expression(), Expression::Neutral);
+        assert_eq!(Face::Hot.expression(), Expression::Hot);
+        assert_eq!(Face::Cold.expression(), Expression::Cold);
+        assert_eq!(Face::Worried.expression(), Expression::Worried);
+        assert_eq!(Face::Dizzy.expression(), Expression::Dizzy);
+        assert_eq!(Face::Sleeping.expression(), Expression::Sleeping);
     }
 }
