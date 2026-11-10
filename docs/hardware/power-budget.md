@@ -883,7 +883,17 @@ Revision 39で、給電元（B-2bか`3V3` pinか）ごとに参照先の節が�
 筐体に入れた状態は、この計算に含まれない。故障時（`R5`の先の短絡）の電流上界は、`R5`の値とrail電圧だけで
 決まり、点灯の長さを入力に使っていない（`DISP-01`追加接続のbring-upの手順の前提の節）。
 `face-21`付きbuildの実行は、実行する日に、条件(7)と同じ形（`3V3` pin経路でbacklightを点けたまま
-動かすことの承認）で人間から1件得る。**`DISP-01`追加接続の手順の条件(2)は`bringup-display-13`付きbuildを要求する。**そのため、`face-21`単独、`tap-21`単独、featureなしの製品buildは、この手順でも通電してよいbuildではない（各構成にこの条件を当てた結果は、`firmware/esp32/README.md`の「build構成と通電」の表）。`tap-21`は`ACCEL-01`を測定modeにする。その約140 µA typ（`sensor-datasheet-notes.md`の`Supply Current`行、Rev. G、ODR 100 Hz以上）は、条件(3)の計算（約245.4 mA）が内訳として持つ101.54 mA（内訳は本書の「この2点限定の給電」の行）に既に含まれる。`tap-21`が足す負荷は、この計算の外には無い見込みである。
+動かすことの承認）で人間から1件得る。**`DISP-01`追加接続の手順の条件(2)は`bringup-display-13`付きbuildを要求する。**そのため、`face-21`単独と`tap-21`単独は、この手順でも通電してよいbuildではない。featureなしの製品buildの通電は、次の節が`TBD`として持つ（各構成にこの条件を当てた結果は、`firmware/esp32/README.md`の「build構成と通電」の表）。`tap-21`は`ACCEL-01`を測定modeにする。その約140 µA typ（`sensor-datasheet-notes.md`の`Supply Current`行、Rev. G、ODR 100 Hz以上）は、条件(3)の計算（約245.4 mA）が内訳として持つ101.54 mA（内訳は本書の「この2点限定の給電」の行）に既に含まれる。`tap-21`が足す負荷は、この計算の外には無い見込みである。
+
+##### 製品build（featureなし）の通電の条件
+
+[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)の範囲である。**この節は、featureなしの製品buildを`3V3` pin給電で通電してよいと書かない（`TBD`）。**
+
+**`DISP-01`追加接続の手順の条件(2)は、この`TBD`の理由ではない。**条件(2)の本文が挙げる理由は、`#13`のbring-upの受け入れ条件（初期化・fill・四隅・timing）を確かめる材料であり、電流や熱の条件ではない。製品buildは、その試験を行わない。
+
+**不可の理由。**製品buildは`TOUCH-CS`（GPIO21）で`XPT2046`を読む（`firmware/esp32/README.md`の「build構成と通電」の表）。`XPT2046`が`touch panel`へ流す駆動電流は、`touch`の5本を挿しても挿さなくても上界が無い。挿す構成は、`TOUCH-CS`がlowの割合に上界が無い（読みの間隔は`firmware/esp32/src/touch.rs`の`POLL_INTERVAL_MS`以上だが、lowの間に割り込みや他のtaskが入る時間の上限は、コードからは出せない）。挿さない構成は、module側の`T_CS`・`T_CLK`・`T_DIN`が浮き、`module`のpull-upは`TBD`である（[sensor-datasheet-notes.md](sensor-datasheet-notes.md)の`Module pull-up`行）。資料の駆動電流の上限（50 mA。同`電源電流`行）を平均として置くと、温度の増分は約7.5 ℃（約149.6 ℃/A。[HW-TBD-024の判断記録](tbd-register-history.md#hw-tbd-024)の熱の計算の式）で、LEDを足した故障時の余裕（`TSD`まで約5.2 ℃、[回路案](led-514-demo.md)の`3V3 pinへ負荷を足す条件`）を超える。実際の平均は、割合と`touch panel`の層の抵抗（資料にも本repositoryにも無い）で決まり、どちらも分からない。
+
+**要る根拠。**`touch panel`の駆動電流の上界、または同等の実測。測定手段を使うなら、その仕様を先に確定する（`MEAS-05`の値は[hardware-bom.md](hardware-bom.md)が確定値として使わないと定めている）。これまでの窓（`EXP-038`・`EXP-041`・`EXP-044`）は、記録として指すだけで、この節の根拠にしない。
 
 ##### 3.3 V railの許容電圧範囲
 
