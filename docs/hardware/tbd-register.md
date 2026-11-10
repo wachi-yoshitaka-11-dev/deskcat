@@ -102,6 +102,8 @@
 
 2026-10-27の判断（資料のsha256、`U1`のdatasheetの値、回路図の`J1`の注記、今の構成の事実）は[power-budget.md](power-budget.md)の`MSP2807の電流上限の扱いと、段階Cの測定4（2026-10-27、#556）`節にある。
 
+2026-11-10（[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)）：featureなしの製品buildの通電は、`touch`の5本の挿し有無にかかわらず、`XPT2046`が`touch panel`へ流す駆動電流に上界が無く、[power-budget.md](power-budget.md#製品buildfeatureなしの通電の条件)が`TBD`として持つ。この行が問う`MSP2807`の電流の上限とは別の未確認で、この行の状態は変えない。
+
 ### HW-TBD-025
 
 | 項目 | 現在の判定 |
