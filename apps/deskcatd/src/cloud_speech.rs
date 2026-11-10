@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use std::sync::mpsc::{self, Receiver, SyncSender, TryRecvError, TrySendError};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use deskcat_domain::Expression;
+use deskcat_domain::{Expression, LocalMinutes};
 use deskcat_face::text::TextLayout;
 use deskcat_protocol::{Message, ShowText};
 use serde::{Deserialize, Serialize};
@@ -130,6 +130,20 @@ impl Context {
 /// 時刻帯を決めるときにUTCへ足す秒数。DeskCatは日本で使うため、日本時間（UTC+9、夏時間なし）に固定する。
 /// 料金の日付判定（予算file）はUTCの日のまま変えない。
 const TIME_BAND_UTC_OFFSET_SECS: u64 = 9 * 3600;
+
+/// 時計が有効なときだけ、日本時間の時刻（0時からの分）を返す。`time_band`と同じ時計の読み方である。
+#[must_use]
+pub fn local_minutes(now: SystemTime) -> Option<LocalMinutes> {
+    let secs = now.duration_since(UNIX_EPOCH).ok()?.as_secs();
+    if secs < MIN_VALID_UNIX_SECS {
+        return None;
+    }
+    let minute_of_day = ((secs + TIME_BAND_UTC_OFFSET_SECS) % 86_400) / 60;
+    LocalMinutes::new(
+        u8::try_from(minute_of_day / 60).ok()?,
+        u8::try_from(minute_of_day % 60).ok()?,
+    )
+}
 
 /// 時計が有効なときだけ、日本時間の時刻帯を返す。料金の日付判定は別に行う。
 #[must_use]
@@ -575,6 +589,22 @@ mod tests {
     fn time_band_reports_afternoon_not_morning_at_utc_six() {
         // UTC 06:00 は JST 15:00。CodeRabbitが#599で示した、朝と送ってしまう時刻。
         assert_eq!(band_at_utc(UTC_MIDNIGHT + 6 * 3600), Some(2));
+    }
+
+    #[test]
+    fn local_minutes_uses_japan_time_and_is_omitted_before_the_clock_is_valid() {
+        // UTC 15:30 は JST 0:30、UTC 03:05 は JST 12:05。
+        let at = |secs| time_band_minutes(UTC_MIDNIGHT + secs);
+        assert_eq!(at(15 * 3600 + 30 * 60), LocalMinutes::new(0, 30));
+        assert_eq!(at(3 * 3600 + 5 * 60), LocalMinutes::new(12, 5));
+        assert_eq!(
+            local_minutes(UNIX_EPOCH + Duration::from_secs(MIN_VALID_UNIX_SECS - 1)),
+            None
+        );
+    }
+
+    fn time_band_minutes(secs: u64) -> Option<LocalMinutes> {
+        local_minutes(UNIX_EPOCH + Duration::from_secs(secs))
     }
 
     #[test]
