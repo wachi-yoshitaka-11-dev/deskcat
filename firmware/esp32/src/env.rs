@@ -5,6 +5,7 @@
 //! Chip ID と補正係数の読み出し、forced mode での測定開始、raw burst read を扱う。
 //! byte の復号・補償演算は host test 可能な `deskcat-env` が担う。
 //!
+//! 製品buildは、`crate::env_report::EnvReporter`が同じdriverを呼んで60 sごとに測る（#487。`crate::i2c_bus`でtapとbusを共有する）。
 //! `main()`は`crate::run_i2c_bringup`からこのdriverを呼び、生byteをlogへ出す
 //! （一致判定はしない。`main.rs`のmodule doc参照）。**2026-09-22に、`35bcc36`のbuildをESP32へ書き込み、ESP32`3V3` pin給電で
 //! `ACCEL-01`／`ENV-01`へ初回通電して、この読み出しに応答を得た**（生byte `0x60`。
@@ -57,29 +58,35 @@ use esp_idf_svc::hal::i2c::I2cDriver;
 use esp_idf_svc::sys::EspError;
 
 use crate::config;
-#[cfg(feature = "env-sample-16")]
+#[cfg(any(feature = "env-sample-16", deskcat_product_mode))]
 use deskcat_env::{CALIB_H_LEN, CALIB_TP_LEN, RAW_LEN};
 
 /// Chip ID register。Bosch BME280 Data Sheet Revision 1.24（module doc参照）。
 const REG_CHIP_ID: u8 = 0xD0;
-#[cfg(feature = "env-sample-16")]
+#[cfg(any(feature = "env-sample-16", deskcat_product_mode))]
 const REG_CALIB_TP: u8 = 0x88;
-#[cfg(feature = "env-sample-16")]
+#[cfg(any(feature = "env-sample-16", deskcat_product_mode))]
 const REG_CALIB_H: u8 = 0xE1;
-#[cfg(feature = "env-sample-16")]
+#[cfg(any(feature = "env-sample-16", deskcat_product_mode))]
 const REG_STATUS: u8 = 0xF3;
-#[cfg(feature = "env-sample-16")]
+#[cfg(any(feature = "env-sample-16", deskcat_product_mode))]
 const REG_CTRL_HUM: u8 = 0xF2;
-#[cfg(feature = "env-sample-16")]
+#[cfg(any(feature = "env-sample-16", deskcat_product_mode))]
 const REG_CTRL_MEAS: u8 = 0xF4;
-#[cfg(feature = "env-sample-16")]
+#[cfg(any(feature = "env-sample-16", deskcat_product_mode))]
 const REG_RAW: u8 = 0xF7;
 /// Bosch §5.4.3 Table 20（`osrs_h`）、§5.4.5 Tables 23–25（`osrs_t`・`osrs_p`・`mode`）。
 /// 既定は全 channel ×1、forced（`ctrl_meas` = `0b001_001_01`）。
 /// `env-sample-16-slow` は全 channel ×16（`osrs_*` = `0b101`、`ctrl_meas` = `0b101_101_01`）。
-#[cfg(all(feature = "env-sample-16", not(feature = "env-sample-16-slow")))]
+#[cfg(any(
+    all(feature = "env-sample-16", not(feature = "env-sample-16-slow")),
+    deskcat_product_mode
+))]
 const CTRL_HUM: u8 = 0x01;
-#[cfg(all(feature = "env-sample-16", not(feature = "env-sample-16-slow")))]
+#[cfg(any(
+    all(feature = "env-sample-16", not(feature = "env-sample-16-slow")),
+    deskcat_product_mode
+))]
 const CTRL_MEAS_FORCED: u8 = 0x25;
 #[cfg(feature = "env-sample-16-slow")]
 const CTRL_HUM: u8 = 0x05;
@@ -133,14 +140,14 @@ impl Bme280 {
     }
 
     /// §5.4.4 Table 21 の `measuring` と `im_update` を読む。
-    #[cfg(feature = "env-sample-16")]
+    #[cfg(any(feature = "env-sample-16", deskcat_product_mode))]
     pub fn read_status(&self, i2c: &mut I2cDriver<'_>) -> Result<u8, EspError> {
         self.read_byte(i2c, REG_STATUS)
     }
 
     /// §4.2.2 Table 16 の連続した補正レジスタ 2 領域を読む。
     /// byte の解釈は `deskcat_env::decode_calibration` が行う。
-    #[cfg(feature = "env-sample-16")]
+    #[cfg(any(feature = "env-sample-16", deskcat_product_mode))]
     pub fn read_calibration(
         &self,
         i2c: &mut I2cDriver<'_>,
@@ -153,14 +160,14 @@ impl Bme280 {
     }
 
     /// §5.4.3 の湿度 oversampling（既定 ×1、`env-sample-16-slow` は ×16）を設定する。ID 一致後だけ呼ぶ。
-    #[cfg(feature = "env-sample-16")]
+    #[cfg(any(feature = "env-sample-16", deskcat_product_mode))]
     pub fn configure_humidity(&self, i2c: &mut I2cDriver<'_>) -> Result<(), EspError> {
         i2c.write(self.address, &[REG_CTRL_HUM, CTRL_HUM], READ_TIMEOUT_TICKS)
     }
 
     /// §5.4.5 の温度・気圧 oversampling（既定 ×1、`env-sample-16-slow` は ×16）で forced mode を開始する。
     /// `ctrl_hum` の後に書く。ID 一致後だけ呼ぶ。
-    #[cfg(feature = "env-sample-16")]
+    #[cfg(any(feature = "env-sample-16", deskcat_product_mode))]
     pub fn start_forced(&self, i2c: &mut I2cDriver<'_>) -> Result<(), EspError> {
         i2c.write(
             self.address,
@@ -170,7 +177,7 @@ impl Bme280 {
     }
 
     /// §4.1 の 0xF7..0xFE を 1 回の burst で読む。
-    #[cfg(feature = "env-sample-16")]
+    #[cfg(any(feature = "env-sample-16", deskcat_product_mode))]
     pub fn read_raw(&self, i2c: &mut I2cDriver<'_>) -> Result<[u8; RAW_LEN], EspError> {
         let mut bytes = [0; RAW_LEN];
         i2c.write_read(self.address, &[REG_RAW], &mut bytes, READ_TIMEOUT_TICKS)?;

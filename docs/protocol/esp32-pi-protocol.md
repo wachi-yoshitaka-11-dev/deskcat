@@ -456,6 +456,13 @@ budget値は`PROTO-TBD-017`に含める。
 
 選定したsensorが対応する測定量だけを含める。最初のdraftでcompact eventからquality fieldを省略する場合でも、各実装はfreshnessとdevice errorを追跡しなければならない。
 
+製品build（構成ごとの動作は`firmware/esp32/README.md`の「build構成と通電」の表）は、`ENV-01`（BME280）を60 sごとに1回測り、次の条件で`environment`を送る（[Issue #487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)。値は一般値で、安全要件の5項目に効かない）。
+
+- **周期:** 測定の開始から次の開始まで60 s。BME280の設定は、Bosch BME280 Data Sheet BST-BME280-DS001-24 Revision 1.24 §3.5.1 Table 7（weather monitoring）の推奨である（forced mode、1 sample／分、気圧・温度・湿度とも×1、IIR filter off）。
+- **送る条件:** `boot`のACKを受けてsessionが確立した後だけ。確立前に測れた値は、最新の1件だけ持ち、確立後の最初の周回で送る（古い1件は捨てて数える）。**送った値は持たず、送り直さない。**
+- **欠測:** I2Cの失敗、不正な生値、補償の失敗、変換が終わらなかった周期、**送れる量が1つも無い周期（範囲外を含む）**は、その周期の`environment`を送らない（次の周期にやり直す）。種別ごとにcounterとlogへ残す。**欠測の周期は、持っている未送出の値も捨てる**（前の周期の値を、欠測の後の値として送らない）。
+- **範囲:** 温度 -40〜+85 ℃、湿度 0〜100 %、気圧 300〜1100 hPa（`docs/hardware/sensor-datasheet-notes.md`の`測定range`行。端の値は範囲内）の外にある量は省き、数える。範囲内の量だけを送る。送れる量が1つも無ければ送らない。
+
 ### 4.6 `status`
 
 `get_status`へのresponseとして送信し、必要に応じてrate limit付きの定期health messageとして送信する。
