@@ -188,7 +188,7 @@
 
 use deskcat_domain::Output as CompanionOutput;
 use deskcat_domain::{
-    Ambient, Companion, ContactEvent, Expression, LocalMinutes, Millis, Mind, Reaction,
+    Ambient, Companion, ContactEvent, Expression, Face, LocalMinutes, Millis, Mind, Reaction,
 };
 use deskcat_protocol::{
     AckStatus, ErrorCode, Frame, Hello, HelloReason, Message, Outcome, SetExpression, ShowText,
@@ -458,6 +458,14 @@ impl Daemon {
             .is_some_and(|link| link.companion.is_asleep())
     }
 
+    /// 今出したい表情が、`Companion`の`Neutral`以外の顔か。`Mind`が後から上書きした後は`false`。
+    fn companion_holds_face(&self) -> bool {
+        self.companion.as_ref().is_some_and(|link| {
+            let face = link.companion.face();
+            face != Face::Neutral && self.sync.desired() == face.expression()
+        })
+    }
+
     /// portを開けた。`startup`の`hello`を予約する（§5.1。Piのprocessを起動した直後に送る）。
     ///
     /// **1回だけ呼ぶ。**linkが切れたら再接続せずに終了する（module docの「linkの断は扱わない」）。
@@ -577,7 +585,12 @@ impl Daemon {
                 self.peer.mark_status_sync_pending();
             }
         }
-        let reaction = self.mind.tick(Millis(now_ms));
+        let mut reaction = self.mind.tick(Millis(now_ms));
+        // 時間切れの`Neutral`は、`Companion`が顔を持つ間は出さない。`Companion`の顔が終わるときに、
+        // `Companion`が`Neutral`を求める。
+        if self.companion_holds_face() && reaction.expression == Some(Expression::Neutral) {
+            reaction.expression = None;
+        }
         self.apply_reaction(reaction);
         self.tick_companion(now_ms);
         self.send_hello(now_ms);
