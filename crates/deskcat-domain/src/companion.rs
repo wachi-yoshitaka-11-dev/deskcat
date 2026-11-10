@@ -1,8 +1,7 @@
 //! 温湿度・気圧・揺れ・時刻から、吹き出し・表情・首振りの要求を決める（Issue #685の前半）。
 //!
-//! 接触event（[`crate::Mind`]）とは別の入力を扱う。表情の名前は[`Face`]で持ち、protocolの
-//! expression名（Protocol §5.2は`neutral`・`happy`・`surprised`だけ）への対応は、描画（#487、#21）と
-//! 一緒に決める。**この型を`set_expression`へ送る経路は、まだ無い。**
+//! 接触event（[`crate::Mind`]）とは別の入力を扱う。表情の名前は[`Face`]で持つ。
+//! **`Companion`を`deskcatd`のloopへつなぐことは、まだしていない。**
 //!
 //! 時計を読まない。単調時刻（[`Millis`]）と、時刻の分（[`LocalMinutes`]）は呼び出し側が渡す。
 //!
@@ -65,6 +64,19 @@ pub enum Face {
     Dizzy,
     /// 寝顔。
     Sleeping,
+}
+
+impl Face {
+    /// `set_expression`で送れる表情。描く表情が無い`Hot`・`Cold`・`Worried`は`None`。
+    #[must_use]
+    pub const fn expression(self) -> Option<crate::Expression> {
+        match self {
+            Self::Neutral => Some(crate::Expression::Neutral),
+            Self::Dizzy => Some(crate::Expression::Dizzy),
+            Self::Sleeping => Some(crate::Expression::Sleeping),
+            Self::Hot | Self::Cold | Self::Worried => None,
+        }
+    }
 }
 
 /// 吹き出しの文言。
@@ -532,5 +544,21 @@ fn in_sleep_window(now: LocalMinutes, sleep_at: LocalMinutes, wake_at: LocalMinu
         Ordering::Equal => false,
         Ordering::Less => (s..w).contains(&n),
         Ordering::Greater => n >= s || n < w,
+    }
+}
+
+#[cfg(test)]
+mod face_tests {
+    use super::Face;
+    use crate::Expression;
+
+    #[test]
+    fn only_faces_that_can_be_drawn_map_to_an_expression() {
+        assert_eq!(Face::Neutral.expression(), Some(Expression::Neutral));
+        assert_eq!(Face::Dizzy.expression(), Some(Expression::Dizzy));
+        assert_eq!(Face::Sleeping.expression(), Some(Expression::Sleeping));
+        for face in [Face::Hot, Face::Cold, Face::Worried] {
+            assert_eq!(face.expression(), None, "{face:?}");
+        }
     }
 }

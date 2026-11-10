@@ -1,7 +1,7 @@
 [package]
 name = "deskcat-face"
 version = "0.1.0"
-description = "set_expressionの3表情を、LCD上の矩形の列として返す純粋なlogic"
+description = "set_expressionの表情を、LCD上の矩形の列として返す純粋なlogic"
 edition.workspace = true
 # `deskcat-protocol`と同じ理由で、workspaceの`rust-version`を継承しない。
 # `firmware/esp32`からもpath dependencyで使うため、hostとESP toolchainの両方を満たす下限を宣言する。

@@ -113,7 +113,7 @@ deskcat-protocol = { path = "../../crates/deskcat-protocol" }
 # `bench-servo-test-17`付きのbuildを除くbuildで、`crate::servo`を通って角度を出せるのは、`Sg90`とこのcrateの`Limiter`を
 # 1つずつ所有する`crate::servo::LimitedServo`だけである（成立の条件は`src/servo.rs`のmodule doc）。
 deskcat-servo = { path = "../../crates/deskcat-servo" }
-# `set_expression`の3表情の図形と、受理の判定の順序（#21）。LCDもSPIも知らず、hostでtestできる。
+# `set_expression`の表情の図形と、受理の判定の順序（#21）。LCDもSPIも知らず、hostでtestできる。
 deskcat-face = { path = "../../crates/deskcat-face" }
 # `accel-sample-15`のADXL345連続測定の設定値・復号・統計（#15）。I2Cを知らず、hostでtestできる。
 deskcat-accel = { path = "../../crates/deskcat-accel" }

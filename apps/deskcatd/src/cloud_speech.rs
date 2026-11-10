@@ -111,7 +111,8 @@ pub struct Context {
 impl Context {
     fn user_prompt(self) -> String {
         let emotion = match self.expression {
-            Expression::Neutral => "neutral",
+            // ADR-0026の感情enumは3値である。`Dizzy`と`Sleeping`は新しい値を送らず`neutral`に畳む。
+            Expression::Neutral | Expression::Dizzy | Expression::Sleeping => "neutral",
             Expression::Happy => "happy",
             Expression::Surprised => "surprised",
         };
