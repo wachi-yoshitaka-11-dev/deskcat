@@ -113,7 +113,7 @@
 //!
 //! **latchは「それ以上動かさない」までであり、「出力を止める」ではない。**LEDCは最後に設定した
 //! dutyを出し続けうる。**[`TickError`]のどれを受けても、呼び出し側は[`LimitedServo::stop`]を呼ぶ。**
-//! その配線は`bench-servo-calib-18`のbuild（`crate::servo_calib`）だけが持つ（`tick`のエラーの後に`stop`を呼ぶ）。
+//! その配線は`bench-servo-calib-18`のbuild（`crate::servo_calib`）と、製品buildの`crate::servo_path`（`product()`が`None`の間は呼ばれない）が持つ（`tick`のエラーの後に`stop`を呼ぶ）。
 //!
 //! # 間隔の基準と、tickを呼び続ける前提
 //!
@@ -235,7 +235,7 @@
 
 // 既定buildは`main()`からこのmoduleを呼ばないためdead_codeになる（module doc参照）。
 // `Sg90`の一部は`bench-servo-test-17` feature付きbuildで呼ばれる。
-// `LimitedServo`、`Stopped`、`ServoFaultCounters`は、`bench-servo-calib-18`付きのbuild（`crate::servo_calib`）だけが呼ぶ。
+// `LimitedServo`、`Stopped`、`ServoFaultCounters`は、`bench-servo-calib-18`付きのbuild（`crate::servo_calib`）と`crate::servo_path`だけが呼ぶ。
 #![allow(dead_code)]
 
 use core::fmt;

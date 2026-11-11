@@ -392,6 +392,7 @@ mod protocol;
 mod servo;
 #[cfg(feature = "bench-servo-calib-18")]
 mod servo_calib;
+mod servo_path;
 mod spi_port;
 mod tap;
 #[cfg(any(feature = "bench-servo-calib-18", feature = "bench-wdt-711"))]
@@ -962,7 +963,7 @@ fn main() {
     let mut last_read_ms = health.uptime_ms();
     // Pi→ESP32方向の受信を振り分ける（`crate::pi_link`）。
     #[cfg(not(feature = "bench-servo-test-17"))]
-    let mut pi_link = PiLink::new();
+    let mut pi_link = PiLink::new(servo_path::product());
     // debug consoleの読み取り（`crate::debug_motion`。`debug-motion-19`付きのbuildだけ）。
     #[cfg(feature = "debug-motion-19")]
     let debug_console = debug_motion::DebugConsole::start();
@@ -971,6 +972,9 @@ fn main() {
     // いるかを外から確認できなかった。
     loop {
         let now = health.uptime_ms();
+        // `LimitedServo`が無い間は何もしない（`PiLink::tick_servo`）。
+        #[cfg(not(feature = "bench-servo-test-17"))]
+        pi_link.tick_servo();
         // debug consoleの行を、Pi由来と同じ`MotionDispatch`へ渡す（`PiLink::on_debug_line`）。
         #[cfg(feature = "debug-motion-19")]
         while let Some(event) = debug_console.try_recv() {
@@ -1006,7 +1010,11 @@ fn main() {
         }
 
         if now >= next_snapshot {
-            emit_health_snapshot(&mut health, now);
+            #[cfg(not(feature = "bench-servo-test-17"))]
+            let limiter = pi_link.servo_counters();
+            #[cfg(feature = "bench-servo-test-17")]
+            let limiter = None;
+            emit_health_snapshot(&mut health, now, limiter);
             #[cfg(feature = "mem-probe-23")]
             mem_probe::log(now);
             let after = health.uptime_ms();
@@ -2196,9 +2204,12 @@ fn wait_for_bench_confirmation() -> bool {
 ///
 /// **error を握りつぶさない。**serialize は事実上失敗しないが、`expect()` で潰さず
 /// 分類して log し、counter を進める。
-fn emit_health_snapshot(health: &mut Health, now: u64) {
-    // `LimitedServo`を作らないbuildなので`servo.limiter`は省略する（`Health::to_status`のdoc）。
-    let status = health.to_status(None);
+fn emit_health_snapshot(
+    health: &mut Health,
+    now: u64,
+    limiter: Option<deskcat_servo::LimiterCounters>,
+) {
+    let status = health.to_status(limiter);
     let uart = health.uart();
     match serde_json::to_string(&status) {
         Ok(payload) => log::info!(
