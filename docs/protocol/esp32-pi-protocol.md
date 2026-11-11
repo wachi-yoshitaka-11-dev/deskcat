@@ -428,7 +428,7 @@ budget値は`PROTO-TBD-017`に含める。
 
 正確なtouch hardwareが確定するまで、`strength`の意味と範囲は`TBD`とする。比較可能なstrengthが存在しない場合、値を捏造せずfieldを省略する。
 
-製品build（構成ごとの動作は`firmware/esp32/README.md`の「build構成と通電」の表）は、`TOUCH-01`（XPT2046）のraw値を状態機械（`crates/deskcat-touch`）へ渡し、撫でと判定した時点で`head_touched`を送る。**送るのは1回の接触につき1回**で、状態機械が撫でを出した時点である（離れるのを待たない）。ただし、接触の途中でSPIの転送が失敗すると、firmwareはその接触の状態を捨て、その後を別の接触として数える。そのため、指を置いたままの1回の操作で2回送りうる。`duration_ms`は、送る時点までの接触の時間（触れたと判定してから撫でと判定するまで、ms）であり、離れるまでの時間ではない。送るのは**`boot`のACKを受けてsessionが確立した後だけ**で、その前の撫では送らず捨てる（捨てた数はfirmwareのlogに数える。`status`のcounterへは出さない）。`strength`は持たず、省略する。判定のしきい値・連続sample数・移動量・pollの間隔は暫定の一般値であり、実機で詰める。**値は`firmware/esp32/src/touch.rs`の定数とそのdocが持つ**（ここへ再掲しない）。firmwareは`head_touched`のACKを待たず、再送しない（`tapped`と同じ。§4.3）。書き込みに失敗した`head_touched`は失われ、firmwareのlogにだけ残る。
+製品build（構成ごとの動作は`firmware/esp32/README.md`の「build構成と通電」の表）は、`TOUCH-01`（XPT2046）のraw値を状態機械（`crates/deskcat-touch`）へ渡し、撫でと判定した時点で`head_touched`を送る。**送るのは1回の接触につき1回**で、状態機械が撫でを出した時点である（離れるのを待たない）。ただし、接触の途中でSPIの転送が失敗すると、firmwareはその接触の状態を捨て、その後を別の接触として数える。そのため、指を置いたままの1回の操作で2回送りうる。`duration_ms`は、送る時点までの接触の時間（触れたと判定してから撫でと判定するまで、ms）であり、離れるまでの時間ではない。送るのは**`boot`のACKを受けてsessionが確立した後だけ**で、その前の撫では送らず捨てる（捨てた数はfirmwareのlogに数える。`status`のcounterへは出さない）。`strength`は持たず、省略する。判定のしきい値・連続sample数・移動量・pollの間隔の**値は`firmware/esp32/src/touch.rs`の定数とそのdocが持つ**（ここへ再掲しない）。firmwareは`head_touched`のACKを待たず、再送しない（`tapped`と同じ。§4.3）。書き込みに失敗した`head_touched`は失われ、firmwareのlogにだけ残る。
 
 ### 4.3 `tapped`
 

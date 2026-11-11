@@ -107,14 +107,13 @@ const MARK_IDLE_SLEEP_MS: u64 = 20;
 /// console の読み取り thread の stack（byte）。この stack の大きさで足りるかは、実機で確かめていない。
 const MARK_THREAD_STACK_BYTES: usize = 6144;
 
-/// 製品 build の撫での判定（[`StrokeDetector`]）に渡す値。**どれも暫定の一般値である。**触覚の感度は安全要件の 5 項目に効かない
-/// （外れても誤検出か見逃しになるだけで、何も壊れない。`deskcat_touch` の module doc）。値の置き場はここで、`deskcat_touch` は値を持たない。
+/// 製品 build の撫での判定（[`StrokeDetector`]）に渡す値。**MVP の値として採った**（採った根拠と日は `docs/hardware/tbd-register.md` の `HW-TBD-012`）。
+/// 触覚の感度は安全要件の 5 項目に効かない（外れても誤検出か見逃しになるだけで、何も壊れない。`deskcat_touch` の module doc）。値の置き場はここで、`deskcat_touch` は値を持たない。
 ///
 /// `pressure` には `Z1` の raw 値をそのまま使う。根拠は `EXP-038` と `EXP-041`（`docs/hardware/experiment-log.md`）の観測である：`EXP-038` の idle の `z1` は
 /// 0〜69（A・C の窓）、`irq_low=1` の塊 9 個のうち 8 個の `z1` は 213 以上で、残る 1 個は 1 sample で `z1`=2（`x`=0、`y`=4095）だった。`EXP-041` の五点の `z1` の中央値は 342〜2251。
 /// 移動量は隣り合う sample の `|Δx| + |Δy|` を足していくので、押したまま動かさなくても揺れが積もり、長押しが撫でと判定されうる
 /// （`EXP-038` の塊 1 は、167 sample の間に `x` が 3367〜3653 の範囲で揺れた）。誤検出の側の誤りである。
-/// **値は、製品 build を書き込む実機の窓で、撫でと長押しと軽く触れるの判定を数えてから決める。**
 pub const STROKE_PRESS_THRESHOLD: u16 = 150;
 /// 離れたと判定する `Z1` の下限（これ未満）。[`STROKE_PRESS_THRESHOLD`] の doc を参照する。
 pub const STROKE_RELEASE_THRESHOLD: u16 = 100;
