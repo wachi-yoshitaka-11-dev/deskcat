@@ -747,6 +747,10 @@ mod tests {
             (Err(Failure::Http), vec!["count", "generate"])
         );
         assert_eq!(
+            run_case(Err(Failure::Network), Ok("こんにちは。")),
+            (Err(Failure::Network), vec!["count"])
+        );
+        assert_eq!(
             run_case(Ok(513), Ok("こんにちは。")),
             (Err(Failure::InputTokens), vec!["count"])
         );
@@ -758,6 +762,27 @@ mod tests {
             run_case(Ok(42), Ok("一\n行")),
             (Err(Failure::Display), vec!["count", "generate"])
         );
+    }
+
+    #[test]
+    fn a_network_failure_is_counted_by_class_through_the_worker() {
+        let dir = std::env::temp_dir().join(format!("deskcat-network-test-{}", std::process::id()));
+        fs::create_dir_all(&dir).expect("test dir");
+        let (fake, calls) = scenario(Err(Failure::Network), Ok("こんにちは。"));
+        let mut worker = CloudSpeech::start(fake, dir.join("budget.json")).expect("start");
+        worker.submit(context(), 1000).expect("submit");
+        let result = loop {
+            if let Some(result) = worker.poll() {
+                break result;
+            }
+            std::thread::sleep(Duration::from_millis(1));
+        };
+        assert_eq!(result, Err(Failure::Network));
+        assert_eq!(worker.counters().count(Failure::Network), 1);
+        assert_eq!(worker.counters().count(Failure::Timeout), 0);
+        assert_eq!(worker.counters().success, 0);
+        assert_eq!(*calls.lock().expect("lock"), vec!["count"]);
+        fs::remove_dir_all(dir).expect("cleanup");
     }
 
     #[test]
