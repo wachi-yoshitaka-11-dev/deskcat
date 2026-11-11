@@ -257,7 +257,7 @@ module boardの値は、これとは別に現物でしか決まらない（[AGEN
 |---|---|
 | Module／IC識別情報 | Module: AE-BME280（秋月 K-09421）。IC: Bosch BME280。6pin SIP（2.54 mmピッチ）、基板16×10 mm |
 | 測定量 | 温度、湿度、気圧 |
-| Interface | I2C（最大3.4 MHz）または SPI 4線式／3線式（最大10 MHz）、選択式。**現物の`J1`／`J2`／`J3`で確定する**（[tbd-register HW-TBD-005](tbd-register.md)）。**2026-09-22追記: この行の「現物の`J1`／`J2`／`J3`で確定する」は、interfaceがI2CとSPIのどちらになるかを指す。****`J3`が2026-09-07にはんだ付けされたことでI2C側になったが、その根拠はユーザーの申告であり実測ではない。**`J3`の現在の状態と根拠の水準は下の`jumper（AE-BME280）`節が持つ。**ここへ再掲しない。****同節の記述はユーザーの申告に基づき、測定値を持たない。**したがって**この行の「確定する」は、実測による確定としては未達のままである** |
+| Interface | I2C（最大3.4 MHz）または SPI 4線式／3線式（最大10 MHz）、選択式。**現物の`J1`／`J2`／`J3`で確定する**（[tbd-register HW-TBD-005](tbd-register.md)）。**2026-09-22追記: この行の「現物の`J1`／`J2`／`J3`で確定する」は、interfaceがI2CとSPIのどちらになるかを指す。****`J3`が2026-09-07にはんだ付けされたことでI2C側になったが、その根拠はユーザーの申告であり実測ではない。**`J3`の現在の状態と根拠の水準は下の`jumper（AE-BME280）`節が持つ。**ここへ再掲しない。****同節の記述はユーザーの申告に基づき、測定値を持たない。**したがって**この行の「確定する」は、実測による確定としては未達のままである** **2026-11-11追記: DeskCatはI2Cで使う（[hardware-bom.md](hardware-bom.md)の`ENV-01`）。`J1`〜`J3`の状態は下の`jumper（AE-BME280）`節が持つ。**|
 | 供給／logic電圧（動作範囲） | VDD 1.71–3.6 V、VDDIO 1.2–3.6 V。**module上でVDDとVDDIOは接続済み**のため実効は1.71–3.6 V。**これは動作範囲であって絶対最大定格ではない。**両者は別物であり、下行と混同しない |
 | 絶対最大定格 | `Voltage at any supply pin`（VDDとVDDIO）は**−0.3 V to +4.25 V**、`Voltage at any interface pin`は−0.3 V to `VDDIO` + 0.3 V。Storage temperature（≤65 % RH）は−45 °C to +85 °C、Pressureは0 to 20,000 hPa、ESDはHBM ±2 kV／CDM ±500 V／Machine model ±200 V。Bosch datasheet Revision 1.24のTable 5、page 13。**電流の上限はこの表に記載が無い**（`HW-TBD-025`(b)、Issue [#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3)。**無いことを2026-08-12に確認した**）。**この行は2026-08-12に追加した。**それまで[hardware-bom.md](hardware-bom.md)と[tbd-register.md](tbd-register.md)がこの確認結果を引用しながら、datasheet由来値の正であるこの文書に元の記録が無かった |
 | Address／select pin | I2C: `0x76`（`SDO`→GND、既定）／`0x77`（`SDO`→VDD）。I2C選択時は`J3`をはんだジャンパする |
@@ -267,10 +267,10 @@ module boardの値は、これとは別に現物でしか決まらない（[AGEN
 | 測定range | 温度 -40〜+85 ℃、湿度 0〜100 %、気圧 300〜1100 hPa |
 | 精度と分解能 | 精度（Bosch Rev 1.24の`Table 2`〜`Table 4`。条件つきの値）: 温度 ±0.5 ℃（0〜65 ℃。内部の温度センサーの値で、PCB温度・自己加熱・周囲温度に依存し、周囲より高いのが典型、と脚注7）、湿度 ±3 %RH（20〜80 %RH、25 ℃、hysteresis込み）、気圧 ±1.0 hPa（300〜1100 hPa、0〜65 ℃）。分解能: 温度 0.01 ℃、湿度 0.008 %、気圧 0.18 Pa |
 | Calibration coefficientの処理 | `0x88`–`0xA1` と `0xE1`–`0xF0` の calibration data を読み出して補償演算に使う |
-| CRC／data integrity動作 | TBD |
+| CRC／data integrity動作 | 対象外 |
 | Heaterがある場合の動作／電流 | Heaterなし |
-| 推奨測定rate | TBD（normal modeの`t_standby`設定で決まる） |
-| Module pull-up | I2C用 4.7 kΩ×2（SDA用R1、SCL用R2）を搭載。**`J1`／`J2`のはんだジャンパで接続を選択する。**現物の実装状態を確認し、bus全体の実効pull-upを計算する |
+| 推奨測定rate | firmwareは、Bosch datasheetのTable 7（weather monitoring）の推奨設定を使う。レジスタの値は[env.rs](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/firmware/esp32/src/env.rs)、周期は[env_report.rs](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/firmware/esp32/src/env_report.rs)が持つ。**ここへ値を写さない** |
+| Module pull-up | I2C用 4.7 kΩ×2（SDA用R1、SCL用R2）を搭載。**`J1`／`J2`のはんだジャンパで接続を選択する。**DeskCatは`J1`／`J2`を付けない（[tbd-register.md](tbd-register.md)の`HW-TBD-005`の解決行）。bus全体の実効pull-upの式は[gpio-assignment.md](gpio-assignment.md)の`I2C busの実効pull-up`節が持つ |
 | 消費電流 | sleep 0.1 µA（typ）／0.3 µA（max）、standby 0.2／0.5 µA、湿度測定 340 µA（85 ℃でのmax）、気圧測定 714 µA（-40 ℃でのmax）、温度測定 350 µA（85 ℃でのmax）。**いずれも動作値であって絶対最大定格ではない** |
 
 ### jumper（AE-BME280）
@@ -325,12 +325,14 @@ module boardの値は、これとは別に現物でしか決まらない（[AGEN
 [gpio-assignment.md](gpio-assignment.md)の`I2C sensor bus`はbus全体の実効pull-upを扱うため、
 **この事実を入力にする必要がある。**同じbusにあるADXL345モジュールは`01C`（10 kΩ）を搭載しており
 （`Module搭載pull-up`）、**実効pull-upの計算はそちら側だけを数える形になる。**
-`J1`／`J2`をはんだ付けするかは、その計算の結果で決める。**まだ決めていない。**
+`J1`／`J2`をはんだ付けするかは、その計算の結果で決める。**まだ決めていない。**（2026-11-11追記: 付けないと決めた。[tbd-register.md](tbd-register.md)の`HW-TBD-005`の解決行。）
 
 **(3) アドレスは配線で決める。**`SDO`→GNDで`0x76`、`SDO`→VDDで`0x77`。
 **基板側に既定値が無いため、配線しないとアドレスが定まらない。**
 
 ##### closeまでに要ること（実装と確認を含む）
+
+**2026-11-11追記: `HW-TBD-005`を閉じた。#3〜#5の現在の状態は、各行の`2026-11-11追記`が持つ。**
 
 **この実測で済んだのは(1)だけである。**追跡は[tbd-register HW-TBD-005](tbd-register.md)が行う。（**2026-09-22追記: これは2026-08-22時点の記述である。**下の表では#2も`済`になっている。）
 
@@ -338,9 +340,9 @@ module boardの値は、これとは別に現物でしか決まらない（[AGEN
 |---|---|---|
 | 1 | `J1`／`J2`／`J3`の実装状態の確定 | **済**（2026-08-22。上の実測） |
 | 2 | **I2Cで使う場合の`J3`のはんだ付け** | **済（根拠はユーザーの申告。#1の`済`と水準が違う）**（2026-09-07に実施。**#1は測定表を持つ実測だが、この行は測定値を持たない。**実施の記録は下の`J3をはんだ付けした（2026-09-07）`節と[experiment-log.md](experiment-log.md)の`EXP-014`）。**2026-09-22までは「未実施。開放では`CSB`が`VDD`へ繋がらないため、説明書が定めるとおりはんだジャンパが要る」としていた。**その記述は2026-08-22時点では正しく、**実施から記録までの15日間は記録の欠落であって、状態の記述の誤りではない** |
-| 3 | bus全体の実効pull-upの計算と、その結果に基づく`J1`／`J2`の判断 | **まだできない。**[gpio-assignment.md](gpio-assignment.md)の`I2C sensor bus`。**ADXL345側のpin接続の確認が先に要る**（2026-09-24追記（[#472](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/472)）: ADXL345側のpin接続は2026-08-27に確定している。残る入力は`Cb`である。同文書の`I2C busの実効pull-up`節） |
-| 4 | **I2Cアドレスの配線**（`SDO`→GNDで`0x76`、`SDO`→VDDで`0x77`） | **行われた記録が無い。**基板側に既定値が無いため、配線しないとアドレスが定まらない。**（2026-09-22追記: 2026-08-22時点では「未実施」と書いていた。`J3`の件で、記録の不在を未実施と書く型が実際に外れたため、言い方を改めた。現況をユーザーへ確認したわけではない。）**（2026-09-24追記（[#472](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/472)）: これは`EXP-015`より前の記述である。[experiment-log.md](experiment-log.md)の`EXP-015`（2026-09-22）の配線は`SDO`→`GND`である。**この行の状態は変えていない**） |
-| 5 | 実装後の動作確認（Device ID register `0xD0`のreset値`0x60`の読み出し） | **行われた記録が無い**（2026-09-22追記: #4と同じ理由で「未実施」から改めた）（2026-09-24追記（[#472](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/472)）: これは`EXP-015`より前の記述である。[experiment-log.md](experiment-log.md)の`EXP-015`（2026-09-22）が、読み出しで生byte `0x60`を得たと記録している。一致判定はしていない。**この行の状態は変えていない**） |
+| 3 | bus全体の実効pull-upの計算と、その結果に基づく`J1`／`J2`の判断 | **まだできない。**[gpio-assignment.md](gpio-assignment.md)の`I2C sensor bus`。**ADXL345側のpin接続の確認が先に要る**（2026-09-24追記（[#472](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/472)）: ADXL345側のpin接続は2026-08-27に確定している。残る入力は`Cb`である。同文書の`I2C busの実効pull-up`節） **2026-11-11追記: `J1`／`J2`の判断は済**（付けない。判断と理由は[tbd-register.md](tbd-register.md)の`HW-TBD-005`の解決行）。**`Cb`は測っておらず、実効pull-upが有効範囲内であることの確認は[gpio-assignment.md](gpio-assignment.md)の受け入れchecklistが持つ。**この判断は`Cb`の測定を待たない。 |
+| 4 | **I2Cアドレスの配線**（`SDO`→GNDで`0x76`、`SDO`→VDDで`0x77`） | **行われた記録が無い。**基板側に既定値が無いため、配線しないとアドレスが定まらない。**（2026-09-22追記: 2026-08-22時点では「未実施」と書いていた。`J3`の件で、記録の不在を未実施と書く型が実際に外れたため、言い方を改めた。現況をユーザーへ確認したわけではない。）**（2026-09-24追記（[#472](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/472)）: これは`EXP-015`より前の記述である。[experiment-log.md](experiment-log.md)の`EXP-015`（2026-09-22）の配線は`SDO`→`GND`である。**この行の状態は変えていない**） **2026-11-11追記: `SDO`→`GND`の配線は済**（[experiment-log.md](experiment-log.md)の`EXP-015`、2026-09-22）。 |
+| 5 | 実装後の動作確認（Device ID register `0xD0`のreset値`0x60`の読み出し） | **行われた記録が無い**（2026-09-22追記: #4と同じ理由で「未実施」から改めた）（2026-09-24追記（[#472](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/472)）: これは`EXP-015`より前の記述である。[experiment-log.md](experiment-log.md)の`EXP-015`（2026-09-22）が、読み出しで生byte `0x60`を得たと記録している。一致判定はしていない。**この行の状態は変えていない**） **2026-11-11追記: 読み出しで生byte `0x60`を得た**（[experiment-log.md](experiment-log.md)の`EXP-015`、2026-09-22）。**`EXP-015`自身は一致の判定をしていない。** |
 
 **(2)と(4)は実装作業であり`TBD`ではない。それでもcloseの条件に含める。**
 `HW-TBD-032`が選定・購入・実装・確認を`必要な根拠`に含めているのと同じ扱いにする。
@@ -364,7 +366,7 @@ module boardの値は、これとは別に現物でしか決まらない（[AGEN
 
 ##### この記録が主張しないこと
 
-- **`J1`／`J2`をはんだ付けするかを決めていない。**bus全体の実効pull-upの計算が先である。
+- **`J1`／`J2`をはんだ付けするかを決めていない。**bus全体の実効pull-upの計算が先である。（2026-11-11追記: 付けないと決めた。[tbd-register.md](tbd-register.md)の`HW-TBD-005`の解決行。）
 - **`J3`のはんだ付けをまだ行っていない。**（**2026-09-22追記: これは2026-08-22時点の記述である。`J3`は2026-09-07にはんだ付けされた。**下の`J3をはんだ付けした（2026-09-07）`節）
 - **通電していない。**moduleへの給電は一度も行っていない。（**2026-09-22追記: これは2026-08-22時点の記述である。**2026-09-07のはんだ付け時に通電したかどうかは、下の`J3をはんだ付けした（2026-09-07）`節のとおり判定しない）
 - **抵抗値そのものを測っていない。**開放か導通かの判定であり、`4.7 kΩ`の実測値は得ていない。
@@ -523,3 +525,4 @@ M-06724に何が実装済みかが未確認である以上、外付けの要否�
 | 2026-10-21 | 22 | [#14](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/14)。`Touch controller`節の`TBD`のうち、`XPT2046 Data Sheet 2007.5`（XPTEK、販売店mirror、sha256を記録）から読める欄を埋めた。**SPI mode（Mode 0）、bus速度の上限（2.5 MHz）、制御byteの16進値、24 clock転送のbit位置、`DOUT`のhigh impedanceは、資料が明記した値ではなく導出であり、そのまま書いた。**資料の欠陥（表4の見出しの誤記、`DOUT`の説明の途切れ）も記録した。`RX-plate`、`Module pull-up`、`Calibration方法`、検証済みbus速度は`TBD`のまま。実機には触れていない |
 | 2026-10-25 | 23 | [#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16)。`Environmental sensor`節の`精度と分解能`行の精度を、Bosch Rev 1.24の`Table 2`〜`Table 4`（2026-10-24に取得し直した版で、`Table 4`の頁を画像で確かめた）の条件つきの値へ直した。温度は±1 ℃と書いていたが、表は±0.5 ℃（0〜65 ℃）で、内部の温度センサーの値であることを足した。湿度（20〜80 %RH、25 ℃、hysteresis込み）と気圧（300〜1100 hPa、0〜65 ℃）には条件を足した |
 | 2026-11-10 | 24 | [#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)。`Touch controller`節へ、XPTEK自身のsiteから取得した版（sha256を記録。2007.5の版との同一性は未照合）を足し、表へ「電源電流（VCCとIOVDDの合計）」行を足した（静止電流・power-down・touch panel駆動switchの導通抵抗と駆動電流）。ほかの行は変えていない |
+| 2026-11-11 | 25 | [#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)。`HW-TBD-005`を閉じたことに合わせ、`Environmental sensor`節の`CRC／data integrity動作`行を`対象外`に、`推奨測定rate`行を`env.rs`（レジスタの値）と`env_report.rs`（周期）への参照に、`Module pull-up`行の未決の書き方を解決行への参照に直した。日付つきの記述は書き換えず、`Interface`行、`J1`／`J2`の判断を扱う文、`closeまでに要ること`の#3〜#5へ、日付つきの`2026-11-11追記`を足した |
