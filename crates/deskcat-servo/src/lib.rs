@@ -110,6 +110,7 @@ pub mod dedup;
 pub mod dispatch;
 pub mod limiter;
 pub mod limits;
+pub mod sink;
 
 pub use counters::{ClampReport, LimiterCounters};
 pub use debug::{
@@ -122,3 +123,6 @@ pub use limiter::{
     AdmittedTarget, CommandSource, Limiter, MotionCatalog, MotionRequest, Rejection, Setpoint,
 };
 pub use limits::{Cap, ControlPeriod, LimitsError, PositionRange, ServoLimits};
+pub use sink::{
+    Drive, DriveOutcome, LimiterSink, MotionSink, PiMotion, admit_debug, admit_pi, drive_tick,
+};
