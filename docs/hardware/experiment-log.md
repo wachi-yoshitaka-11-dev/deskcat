@@ -5578,13 +5578,15 @@ ELF（wdt）`77d40227f4dca649e3cda797b3ac599087b1aef534e33ab848cb26b37e0f11bd`�
 | Hardware revision／Exact components | `MCU-01`、`ACCEL-01`。`EXP-060` の後、ユーザーが ESP32 と Arduino の USB を抜いた（ユーザーの原文「ESP32,AruduinoのUSB抜きました」）。`PSU-BENCH-01` は、POWER を切って電源プラグを抜くよう依頼したが、抜いたかの返事は記録に無い（`PSU-BENCH-01` の出力は `EXP-060` の終わりに OFF）。servo の plug は jumper wire の針に挿したまま。現物は AI が見ていない |
 | Firmware | develop `9671963` から、`git archive` を repository の外へ展開して build（`firmware/esp32/Cargo.toml` の末尾へ `[workspace]` を足した）。`--features accel-sample-15`。`cargo fmt --check` OK、clippy・build 成功。ELF sha256 `9fdd1392e776270087996de3c41bbb212c50897a85bcccbda0d4ad2fe7b90364`。この build は `SERVO-PWM`（GPIO27）を driver へ渡さない（`firmware/esp32/src/main.rs` の module doc。`SERVO-PWM` を渡すのは `bench-servo-test-17` を付けた build） |
 | Configuration | ±2 g、100 Hz、FIFO Stream、500件×6窓（1起動で約30秒）。起動 log の `accel_sample_configured data_format=0x08 bw_rate=0x0a fifo_ctl=0x80 poll_interval_ms=20 warmup=10 window=500 windows=6` |
+| Power supply and current limit | ESP32 はこの端末の USB。`ACCEL-01` は ESP32 の 3V3 から（組み直しの結線表のとおり。現物は見ていない）。電流・電圧・温度は測っていない |
 | Measurement equipment | UART0 の log（115200）。合図の時刻と log の受信時刻は PC の同じ時計 |
+| Raw data | repository の外の `deskcat-evidence/15-accel-20261111/`：`run1.log`（sha256 `f06bd26c158c33e37a8bd3d34a1dabb3e8900990c345548bc8ba210a972327d6`）、`markers.txt`、`boots.txt`、`flash.txt`、`flash-time.txt`、`commit.txt`、`build.txt` |
 | Expected result | 期待値の数は定めていない |
 | Measured result | 下記 |
 
 ### 実施したこと
 
-- 起動は4回：書き込み後の reset 1、console の release 1、叩く回の reset 1、揺らす回の reset 1。上限5の内。最初の書き込みの試みは port の名前が違い、port を開いていない（reset なし）。**書き込み後の起動は log を取っていない。**log を取った3起動の `rst:` は、どれも `POWERON_RESET`。
+- 起動は6回：USB の挿入 1、espflash の接続（書き込みの前の reset）1、書き込み後の reset 1、console の release 1、叩く回の reset 1、揺らす回の reset 1（数え方は `EXP-060` と同じ。port を開いたときの reset を含む）。承認の上限5を超えた（Faults）。最初の書き込みの試みは port の名前が違い、port を開いていない（reset なし）。**書き込み後の起動は log を取っていない。**log を取った3起動の `rst:` は、どれも `POWERON_RESET`。
 - log を取った3起動で、`accel_device_id raw=0xe5` が出た。`accel_fault`・panic は 0件。`out_of_range=0`。`accel_overrun int_source=0x83` が各起動の最初に1回（`polls_with_overrun=1`、以降増えない）。
 - 回ごとの依頼：静止は触れずに置く。叩くは、返事の5秒後から30秒の間に机を10回（2〜3秒に1回、ふつうの強さ）。揺らすは、返事の5秒後から、机を手で5秒揺らして1秒休むを5回。**叩いた回数と揺らした時刻は記録していない**（log は窓ごとの統計と、各起動の最初の100件の raw だけ）。
 
@@ -5621,7 +5623,8 @@ ELF（wdt）`77d40227f4dca649e3cda797b3ac599087b1aef534e33ab848cb26b37e0f11bd`�
 
 ### Faults（手順と実際の差。事実）
 
-- USB を挿していた時間は、少なくとも約21分（最初の書き込みの試み 11:52 から、抜いた返事 12:13 UTC まで。挿した時刻は記録していない）で、承認の上限（合計15分）を超えた。上限の時刻（12:07 頃より前）の後に、叩く回（12:08）と揺らす回（12:09）を行った。AI が経過時間を上限と照らしていなかった。ユーザーへ直接報告し、ユーザーの返事の原文は「USBの上限は私が時間をかけていただけなのできにしないで。」。
+- USB を挿していた時間は、少なくとも約21分（2回目の書き込みの試み 11:52 から、抜いた返事 12:13 UTC まで。挿した時刻と、最初の試みの時刻は記録していない）で、承認の上限（合計15分）を超えた。上限の時刻（12:07 頃より前）の後に、叩く回（12:08）と揺らす回（12:09）を行った。AI が経過時間を上限と照らしていなかった。ユーザーへ直接報告し、ユーザーの返事の原文は「USBの上限は私が時間をかけていただけなのできにしないで。」。
+- 起動は6回で、承認の上限（5回）を超えた。AI が、USB の挿入と espflash の接続の reset を数えていなかった。
 - 最初の書き込みの試みで、port の名前（`/dev/ttyUSB0`）が違った（実際は `/dev/ttyUSB1`）。
 
 ### 終わった後の状態
