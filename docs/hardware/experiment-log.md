@@ -5630,7 +5630,7 @@ ELF（wdt）`77d40227f4dca649e3cda797b3ac599087b1aef534e33ab848cb26b37e0f11bd`�
 ### 終わった後の状態
 
 - ESP32 の USB は抜いた（ユーザーの返事「抜いた」）。ESP32 には `accel-sample-15` が入っている。
-- `PSU-BENCH-01` の電源プラグは抜いたまま。servo の plug は jumper wire の針に挿したまま。
+- `PSU-BENCH-01` の電源プラグを抜いたかの返事は、記録に無い（出力は `EXP-060` の終わりから OFF）。servo の plug は jumper wire の針に挿したまま。
 
 ### 確かめていないこと
 
