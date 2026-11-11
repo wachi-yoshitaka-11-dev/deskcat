@@ -169,3 +169,47 @@ pub fn drive_tick<D: Drive>(drive: &mut D) -> DriveOutcome<D::TickError, D::Stop
         },
     }
 }
+
+/// `stop`の結果を握りつぶさず記録する。**失敗している間は「止めた」と言わない。**
+///
+/// `stop`が失敗した（duty を0へ戻せなかった）後に、次の`stop`を無条件の成功にすると、
+/// 出力が残ったまま「止めた」と読める。呼び出し側は、[`StopLatch::is_pending`]の間は`stop`を
+/// 成功するまで試し直し、結果を[`StopLatch::record`]へ渡す。
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct StopLatch {
+    pending: bool,
+    failures: u32,
+}
+
+impl StopLatch {
+    /// 失敗の記録が無い状態で作る。
+    #[must_use]
+    pub const fn new() -> Self {
+        Self {
+            pending: false,
+            failures: 0,
+        }
+    }
+
+    /// `stop`1回の結果を記録する。失敗は数え、成功は`pending`を下ろす。
+    pub fn record<E>(&mut self, result: &Result<(), E>) {
+        if result.is_err() {
+            self.pending = true;
+            self.failures = self.failures.saturating_add(1);
+        } else {
+            self.pending = false;
+        }
+    }
+
+    /// 直近の`stop`が失敗したままか（試し直しが要る）。
+    #[must_use]
+    pub const fn is_pending(&self) -> bool {
+        self.pending
+    }
+
+    /// `stop`の失敗の累計。
+    #[must_use]
+    pub const fn failures(&self) -> u32 {
+        self.failures
+    }
+}
