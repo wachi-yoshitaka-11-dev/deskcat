@@ -356,6 +356,17 @@
       "note": "§4.3の例。magnitude_gは意味が未定のため型に持たず、§3の未知の追加fieldとして無視する。"
     },
     {
+      "name": "shaken_empty",
+      "line": "{\"v\":1,\"sid\":41207,\"id\":28,\"ts_ms\":9500,\"type\":\"shaken\",\"payload\":{}}\n",
+      "canonical": true,
+      "expect": {
+        "type": "shaken",
+        "sid": 41207,
+        "id": 28
+      },
+      "note": "§4.3a。payloadは{}。"
+    },
+    {
       "name": "lifted_example",
       "line": "{\"v\":1,\"sid\":41207,\"id\":24,\"ts_ms\":11000,\"type\":\"lifted\",\"payload\":{\"duration_ms\":1200}}\n",
       "canonical": true,

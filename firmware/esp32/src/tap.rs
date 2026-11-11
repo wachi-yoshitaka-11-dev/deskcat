@@ -23,7 +23,7 @@
 //! I2Cの読み出しが失敗しても止まらない（1 transactionは有限時間で返る。上限は`config::I2C_TRANSACTION_TIMEOUT_MS`の100 ms。
 //! 設定（`configure`）の滞留の**上界**は、全部成功する経路で700 ms（6書き込み＋捨て読み1。各transactionのtimeout×7の上界で、
 //! 成功したtransactionはその前に終わる）、書き込みが途中で失敗する経路で600 ms（最初の失敗で止まる）、読み出しの失敗は1周回あたり
-//! 最大100 ms）。
+//! 最大100 ms。**揺れの設定（`deskcat_tap::shake::SHAKE`）に値が入ると、書き込みは8件になり、上の2つの上界はそれぞれ900 ms・800 msである**）。
 //! **設定（`configure`）は、Device IDが一致したときだけ走る**（一致しなければ`start_product_sensors`／`start_tap`が`tap_not_started`をlogへ出す）。
 //! **設定（`configure`）が走る場所はbuildで違う。**`bringup-display-13`を持たないbuildは、起動時のI2C bring-upの直後、
 //! main loopの前で走る（`BootSession::start`の前でもあるため、上の時間が最初の`boot`の送出を遅らせうる）。
@@ -44,6 +44,7 @@
 
 use crate::accel::Adxl345;
 use crate::i2c_bus::SharedI2c;
+use deskcat_tap::shake::{ShakeConfig, ShakeDecision, ShakeFilter};
 use deskcat_tap::{Decision, TapFilter};
 
 /// `INT_SOURCE`を読む間隔（ms）。**暫定の一般値である**（安全要件の5項目に効かない）。データレート（`deskcat_tap::BW_RATE_100_HZ`＝100 Hz＝10 ms）の
@@ -52,11 +53,23 @@ pub const POLL_INTERVAL_MS: u64 = 20;
 /// 続けて失敗したらtap検出をやめる回数。暫定の一般値である。
 pub const MAX_CONSECUTIVE_ERRORS: u32 = 5;
 
+/// 1回の[`TapDetector::poll`]で、送るべきevent。
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct PollEvents {
+    /// `tapped`を送る。
+    pub tapped: bool,
+    /// `shaken`を送る（揺れの検出が有効なときだけ`true`になる。`deskcat_tap::shake`）。
+    pub shaken: bool,
+}
+
 /// tap検出の状態。
 pub struct TapDetector {
     accel: Adxl345,
     i2c: SharedI2c,
     filter: TapFilter,
+    /// 揺れの検出。`deskcat_tap::shake::SHAKE`が`None`（`TBD`）の間は`None`で、Activityを設定せず、`shaken`も送らない。
+    shake_config: Option<ShakeConfig>,
+    shake: Option<ShakeFilter>,
     next_poll_ms: u64,
     consecutive_errors: u32,
     enabled: bool,
@@ -74,6 +87,8 @@ impl TapDetector {
             #[cfg(not(deskcat_product_mode))]
             filter: TapFilter::new(),
             next_poll_ms: 0,
+            shake_config: deskcat_tap::shake::active(deskcat_tap::shake::SHAKE),
+            shake: None,
             consecutive_errors: 0,
             enabled: false,
         }
@@ -82,7 +97,9 @@ impl TapDetector {
     /// tap検出の設定を書く。失敗したら検出を始めない（logへ出す）。
     pub fn configure(&mut self, now_ms: u64) {
         // **借用（`RefCell`）は`let`の文で終える。**`match`の被判定式に置くと、armの中まで借用が続き、armの中の2回目の借用が`panic`する。
-        let configured = self.accel.configure_tap(&mut self.i2c.borrow_mut());
+        let configured = self
+            .accel
+            .configure_tap(&mut self.i2c.borrow_mut(), self.shake_config.as_ref());
         match configured {
             Ok(()) => {
                 // 測定modeへ入れた直後にtapのbitが過渡で立っていても、誤った`tapped`を送らないよう、
@@ -94,6 +111,8 @@ impl TapDetector {
                     }
                     Err(err) => log::warn!("tap_configure_discard_failed error={err}"),
                 }
+                self.shake = self.shake_config.map(ShakeFilter::new);
+                log::info!("shake_configured enabled={}", self.shake.is_some());
                 self.enabled = true;
                 self.next_poll_ms = now_ms + POLL_INTERVAL_MS;
                 log::info!(
@@ -113,10 +132,10 @@ impl TapDetector {
         self.enabled.then_some(self.next_poll_ms)
     }
 
-    /// 時刻に達していれば、保留中のtapを決め（`TapFilter::on_tick`）、`INT_SOURCE`を1回読む。**`tapped`を送るべきなら`true`を返す。**
+    /// 時刻に達していれば、保留中のtapを決め（`TapFilter::on_tick`）、`INT_SOURCE`を1回読む。**送るべきevent（`tapped`と`shaken`）を[`PollEvents`]で返す。**
     /// `touch_blocks`は、タッチの接触中か離れた直後か（`deskcat_tap::touch_blocks_tap`。タッチを読まないbuildは`false`）。
-    /// 接触中か直後のtapは捨てて`dropped_touch`に数える。保留する構成では、見つけた周期ではなく、保留が明けた周期に`true`を返す。
-    /// 1周期に`true`は高々1回である（保留が明けた周期に新しく見つけたtapは、最小間隔未満として捨てる）。
+    /// 接触中か直後のtapは捨てて`dropped_touch`に数える。保留する構成では、見つけた周期ではなく、保留が明けた周期に`tapped`を`true`にする。
+    /// 1周期に`tapped`が`true`なのは高々1回である（保留が明けた周期に新しく見つけたtapは、最小間隔未満として捨てる）。
     /// `session_epoch`は`BootSession::session_epoch`（sessionが入れ替わったら、保留中の1件を捨てる。`TapFilter::on_session`）。
     pub fn poll(
         &mut self,
@@ -124,9 +143,10 @@ impl TapDetector {
         session_established: bool,
         session_epoch: u32,
         touch_blocks: bool,
-    ) -> bool {
+    ) -> PollEvents {
+        let mut events = PollEvents::default();
         if !self.enabled || now_ms < self.next_poll_ms {
-            return false;
+            return events;
         }
         // 次の期限は`now_ms`から積む（前の期限からではない）。main loopの1周回が延びた分だけ間隔が後ろへずれるが、
         // tapのbitは読むまで残るため、検出漏れにはならない。
@@ -142,20 +162,37 @@ impl TapDetector {
         if let Some(decision) = confirmed {
             self.log_decision("tap_confirmed", decision, None);
         }
-        let mut send = confirmed == Some(Decision::Send);
+        events.tapped = confirmed == Some(Decision::Send);
         let int_source = self.accel.read_int_source(&mut self.i2c.borrow_mut());
         match int_source {
             Ok(int_source) => {
                 self.consecutive_errors = 0;
+                // 揺れ（Activity）は、tapと同じ`INT_SOURCE`の読みから取る。tapの判定より先に見ても、tapの扱いは変わらない。
+                if deskcat_tap::shake::is_activity(int_source) {
+                    if let Some(shake) = self.shake.as_mut() {
+                        let decision = shake.on_activity(now_ms, session_established);
+                        events.shaken = decision == ShakeDecision::Send;
+                        if decision != ShakeDecision::Counting {
+                            let c = shake.counters();
+                            log::info!(
+                                "shake_detected decision={decision:?} int_source=0x{int_source:02x} activity_hits={} sent={} dropped_no_session={} dropped_too_soon={}",
+                                c.activity_hits,
+                                c.sent,
+                                c.dropped_no_session,
+                                c.dropped_too_soon
+                            );
+                        }
+                    }
+                }
                 if !deskcat_tap::is_single_tap(int_source) {
-                    return send;
+                    return events;
                 }
                 let decision = self
                     .filter
                     .on_tap(now_ms, session_established, touch_blocks);
                 self.log_decision("tap_detected", decision, Some(int_source));
-                send |= decision == Decision::Send;
-                send
+                events.tapped |= decision == Decision::Send;
+                events
             }
             Err(err) => {
                 self.consecutive_errors += 1;
@@ -173,7 +210,7 @@ impl TapDetector {
                         self.filter.counters().dropped_detection_stopped
                     );
                 }
-                send
+                events
             }
         }
     }

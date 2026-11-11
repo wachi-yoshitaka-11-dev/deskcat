@@ -1459,6 +1459,46 @@ fn a_hot_environment_shows_one_bubble_and_the_hot_expression_and_sends_no_motion
 }
 
 #[test]
+fn a_shaken_event_makes_the_companion_show_dizzy_and_requests_no_motion_to_send() {
+    let (mut d, mut t) = with_companion(Some(4_000), 12);
+    let _ = t.sent();
+
+    t.feed(Message::Shaken, ESP_SID, 4);
+    assert_eq!(run(&mut d, &mut t, 100), Step::Continue);
+    assert_eq!(expressions(&t.sent()), [ExpressionName::Dizzy]);
+    assert_eq!(d.counters().shaken_received, 1);
+    // 首振りの要求は送らず、数える（`PROTO-TBD-008`）。
+    assert_eq!(d.counters().motions_not_sent, 1);
+}
+
+#[test]
+fn a_shaken_event_without_a_companion_is_counted_and_changes_nothing() {
+    let (mut d, mut t) = established_with(daemon(), "neutral");
+    let _ = t.sent();
+
+    t.feed(Message::Shaken, ESP_SID, 4);
+    assert_eq!(run(&mut d, &mut t, 100), Step::Continue);
+    assert!(t.sent().is_empty());
+    assert_eq!(d.counters().shaken_received, 1);
+    assert_eq!(d.counters().motions_not_sent, 0);
+}
+
+#[test]
+fn a_shaken_event_while_the_companion_sleeps_is_counted_and_does_not_wake_the_face() {
+    let (mut d, mut t) = with_companion(Some(4_000), 23);
+    let sent = t.sent();
+    let id = find_id(&sent, |m| matches!(m, Message::SetExpression(_))).expect("送った");
+    t.feed(ack(id, AckStatus::Ok, None), ESP_SID, 4);
+    let _ = t.sent();
+
+    t.feed(Message::Shaken, ESP_SID, 5);
+    assert_eq!(run(&mut d, &mut t, 200), Step::Continue);
+    assert!(expressions(&t.sent()).is_empty());
+    assert_eq!(d.counters().shaken_received, 1);
+    assert_eq!(d.counters().motions_not_sent, 0);
+}
+
+#[test]
 fn an_incomplete_environment_is_counted_and_does_not_reach_the_companion() {
     let (mut d, mut t) = with_companion(Some(4_000), 12);
     let _ = t.sent();

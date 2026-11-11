@@ -287,6 +287,8 @@ pub enum Step {
 pub struct DaemonCounters {
     /// 現在のESP32 sessionから受理した`tapped` event。Mindで抑えたeventも含む。
     pub tapped_received: u64,
+    /// 現在のESP32 sessionから受理した`shaken` event。`Companion`を使わないときも数える。
+    pub shaken_received: u64,
     /// 送信queueへ入れた`show_text`（再送を除く）。
     pub show_text_sent: u64,
     /// `show_text`の受理ACK。
@@ -432,7 +434,7 @@ impl Daemon {
 
     /// `Companion`を使う。吹き出しは`bubble_duration_ms`で送り、`None`なら送らずに数える。
     ///
-    /// 首振りは送らない（`PROTO-TBD-008`）。揺れの入力元は無いため、`Companion::on_shake`は呼ばない。
+    /// 首振りは送らない（`PROTO-TBD-008`）。`shaken`（Protocol §4.3a）を受けたら`Companion::on_shake`へ渡す。
     #[must_use]
     pub fn with_companion(mut self, companion: Companion, bubble_duration_ms: Option<u32>) -> Self {
         self.companion = Some(CompanionLink {
@@ -835,6 +837,11 @@ impl Daemon {
             Message::HeadTouched(_) => Some(ContactEvent::HeadTouched),
             Message::Tapped => Some(ContactEvent::Tapped),
             Message::Lifted(_) => Some(ContactEvent::Lifted),
+            Message::Shaken => {
+                self.counters.shaken_received = self.counters.shaken_received.saturating_add(1);
+                self.on_shake(now_ms);
+                None
+            }
             Message::Environment(environment) => {
                 self.counters.environment_events += 1;
                 self.on_environment(environment, now_ms);
@@ -846,6 +853,14 @@ impl Daemon {
             let reaction = self.mind.on_event(event, Millis(now_ms));
             self.apply_reaction(reaction);
         }
+    }
+
+    fn on_shake(&mut self, now_ms: u64) {
+        let Some(link) = &mut self.companion else {
+            return;
+        };
+        let output = link.companion.on_shake(Millis(now_ms));
+        self.apply_companion(output);
     }
 
     fn on_environment(&mut self, environment: &deskcat_protocol::Environment, now_ms: u64) {

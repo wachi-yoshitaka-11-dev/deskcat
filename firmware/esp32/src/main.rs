@@ -1089,7 +1089,7 @@ fn main() {
         // 製品buildとtap試験buildで検出を1回読み、送ってよいときだけ`tapped`を送る（`crate::tap`）。
         #[cfg(any(feature = "tap-21", deskcat_product_mode))]
         if let Some(detector) = tap.as_mut() {
-            // `poll`内のI2C readと検出logも含む、検出→描画時間の保守的な始点。**ただし製品buildは保留する（`TAP_CONFIRM_MS`）ので、`poll`が`true`を返す周期は検出より保留（`TAP_CONFIRM_MS`）の分以上後であり、始点は検出から保留の分だけ遅れる。**
+            // `poll`内のI2C readと検出logも含む、検出→描画時間の保守的な始点。**ただし製品buildは保留する（`TAP_CONFIRM_MS`）ので、`poll`が`tapped`を`true`にする周期は検出より保留（`TAP_CONFIRM_MS`）の分以上後であり、始点は検出から保留の分だけ遅れる。**
             let poll_started_at_ms = health.uptime_ms();
             // 製品buildは、タッチの接触中と離れた直後のtapを送らない（撫でる力がtapと判定されると推定している。`crate::touch::TAP_HOLDOFF_AFTER_RELEASE_MS`）。
             // また、tapを見つけても`deskcat_tap::TAP_CONFIRM_MS`の間は送らず保留し、その間に接触が始まれば捨てる（`crate::tap`）。
@@ -1099,14 +1099,20 @@ fn main() {
                 .is_some_and(|touch| touch.tap_blocked(poll_started_at_ms));
             #[cfg(not(deskcat_product_mode))]
             let touch_blocks = false;
-            if detector.poll(
+            let events = detector.poll(
                 poll_started_at_ms,
                 boot_session.is_established(),
                 boot_session.session_epoch(),
                 touch_blocks,
-            ) {
+            );
+            if events.tapped {
                 log::info!("tap_event_poll_start uptime_ms={poll_started_at_ms}");
                 pi_link::send_event(Message::Tapped, &mut boot_session, &health, &mut uart);
+            }
+            // 揺れは、`deskcat_tap::shake::SHAKE`が`None`（`TBD`）の間は`false`のままで、送らない。
+            if events.shaken {
+                log::info!("shake_event_poll uptime_ms={poll_started_at_ms}");
+                pi_link::send_event(Message::Shaken, &mut boot_session, &health, &mut uart);
             }
         }
 

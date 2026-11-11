@@ -725,7 +725,7 @@ impl PeerSession {
         }
     }
 
-    /// ESP32→Piのevent（`head_touched`、`tapped`、`lifted`、`environment`。§4.2〜§4.5）を
+    /// ESP32→Piのevent（`head_touched`、`tapped`、`shaken`、`lifted`、`environment`。§4.2〜§4.5）を
     /// 受けてよいかを判定する。
     ///
     /// eventには応答を返さない（返す先の要求が無い。§8）。duplicate履歴も引かない

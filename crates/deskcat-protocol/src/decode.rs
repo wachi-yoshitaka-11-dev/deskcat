@@ -162,6 +162,7 @@ fn decode_payload(type_name: &str, payload: &RawValue) -> Result<Message, Decode
         "show_text" => parse::<ShowText>(payload).map(Message::ShowText),
         "head_touched" => parse::<HeadTouched>(payload).map(Message::HeadTouched),
         "tapped" => parse_empty(payload).map(|()| Message::Tapped),
+        "shaken" => parse_empty(payload).map(|()| Message::Shaken),
         "lifted" => parse::<Lifted>(payload).map(Message::Lifted),
         "environment" => parse::<Environment>(payload).map(Message::Environment),
         "play_motion" => parse::<PlayMotion>(payload).map(Message::PlayMotion),
@@ -253,7 +254,9 @@ fn encode_payload(message: &Message) -> Result<String, DecodeError> {
     let result = match message {
         Message::Boot(boot) => serde_json::to_string(boot),
         Message::Hello(hello) => serde_json::to_string(hello),
-        Message::Ping | Message::GetStatus | Message::Tapped => Ok("{}".to_owned()),
+        Message::Ping | Message::GetStatus | Message::Tapped | Message::Shaken => {
+            Ok("{}".to_owned())
+        }
         Message::Status(status) => serde_json::to_string(status),
         Message::Ack(ack) => serde_json::to_string(ack),
         Message::SetExpression(set_expression) => serde_json::to_string(set_expression),

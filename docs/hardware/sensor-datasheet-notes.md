@@ -185,7 +185,7 @@ ICの値はメーカーdatasheetで決まるが、module boardの値（jumper構
 | [SparkFunがhostするADXL345 Data Sheet](https://www.sparkfun.com/datasheets/Sensors/Accelerometer/ADXL345.pdf) | **Rev. 0**（作成日2009-05-29、24page）。2026-08-12に開けた。**Revision 4の時点ではこれが唯一開けた版であり、下表の値の出典であった。現在は公式Rev. Gを正とする**（差は下記のとおり） |
 | Mouser mirror（`mouser.com/datasheet/2/609/ADXL345-1517570.pdf`） | **取得できない。**curlはHTTP 200を返すが、実体はPDFではなく`Access to this page has been denied.`のHTMLである（2026-08-12確認） |
 
-**下表のICの値は、公式のRev. Gで確認した範囲である（ただし`tap検出のregister`行だけは、Rev. 0で読んだ値で、page番号もRev. 0のものである）。**page番号はRev. Gのもので、
+**下表のICの値は、公式のRev. Gで確認した範囲である（ただし`tap検出のregister`行は、Rev. 0で読んだ値で、page番号もRev. 0のものである。`揺れ検出のregister`行は、Rev. Eで読んだ値で、Rev. Gとは照合していない）。**page番号はRev. Gのもので、
 PDFのpage indexと印字page（`Rev. G | N of 36`）は一致する。
 
 **Rev. 0（Revision 4までの出典）とRev. Gには差がある。**
@@ -221,6 +221,7 @@ module boardの値は、これとは別に現物でしか決まらない（[AGEN
 | I2Cアドレスの選択方式 | pin 12 `SDO/ALT ADDRESS`で選ぶ。**7-bit addressは`0x1D`（同pinをhigh）／`0x53`（同pinをGNDへ）**。**ただしどちらになるかはmodule board上の実装で決まる**ため、現物確認まで確定しない（下表`実装済みI2C address`と[tbd-register HW-TBD-004](tbd-register.md)） |
 | Calibration要件 | offset補正用に`OFSX`／`OFSY`／`OFSZ` register（address `0x1E`–`0x20`、reset値`00000000`）を持つ。**scale factorは15.6 mg/LSBで、選択したg-rangeに依存しない**（page 24）。手順は`OFFSET CALIBRATION`節（page 30）。**実施要否と実測値は[#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)** |
 | tap検出のregister（**Rev. 0で読んだ値。Rev. Gでは未確認**） | `BW_RATE`（address `0x2C`。reset値`0x0A`＝100 Hz。`tap-21`は同じ値を明示して書く）、`THRESH_TAP`（address `0x1D`、62.5 mg/LSB）、`DUR`（`0x21`、625 µs/LSB。**0はtap機能を無効にする**）、`TAP_AXES`（`0x2A`。D2〜D0がX／Y／Z）、`POWER_CTL`（`0x2D`。D3が`Measure`）、`INT_ENABLE`（`0x2E`。D6が`SINGLE_TAP`。**tapの機能そのものの有効化を兼ねる**）、`INT_SOURCE`（`0x30`。D6が`SINGLE_TAP`。読むとtapのbitが消える）。出所はRev. 0（SparkFunがhostする版）のTable 16 p.14、p.15〜p.17、tap検出の節p.20。**同じ記述がRev. Gにあるかは、CLIからRev. Gを取得できず、独立に確認していない。**値の所在は`firmware/esp32/README.md`の「build構成と通電」の表が指す（[#21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)のF1）。閾値・持続時間は安全要件の5項目に効かない暫定の一般値で、実機で詰める。**tapは未filterのデータで検出される（p.20）ため、読みに重力の約1 gが含まれる。閾値は1 gより十分上に置く**（推論であり、実機では確かめていない。`tap-21`が使う値は`crates/deskcat-tap`が持つ） |
+| 揺れ検出のregister（Activity。**Rev. Eで読んだ値。公式のRev. Gとは照合していない**） | `THRESH_ACT`（address `0x24`。unsigned、62.5 mg/LSB。0は予期しない動作になりうる）、`ACT_INACT_CTL`（`0x27`。D7がACT ac/dc（1でac結合）、D6〜D4がACT_X／Y／Z enable）、`INT_ENABLE`と`INT_SOURCE`のD4（Activity。`THRESH_ACT`を超える加速度が参加軸のどれかに出たとき立つ。読むまで残る）。**出所は`datasheet.octopart.com`が配る販売店の写し（Rev. E、2026-11-11にPDFから文字を抽出して読んだ）である。Analog Devicesの公式のRev. Gとは照合していない**（CLIから取得できない）。値の所在は`crates/deskcat-tap`の`shake`が持つ。**閾値・軸・窓・回数・最小間隔は`TBD`で、値が`None`の間は検出を有効にしない**（[#685](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/685)）。安全要件の5項目に効かない |
 
 ### module boardの値（秋月 M-06724）
 
@@ -526,3 +527,4 @@ M-06724に何が実装済みかが未確認である以上、外付けの要否�
 | 2026-10-25 | 23 | [#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16)。`Environmental sensor`節の`精度と分解能`行の精度を、Bosch Rev 1.24の`Table 2`〜`Table 4`（2026-10-24に取得し直した版で、`Table 4`の頁を画像で確かめた）の条件つきの値へ直した。温度は±1 ℃と書いていたが、表は±0.5 ℃（0〜65 ℃）で、内部の温度センサーの値であることを足した。湿度（20〜80 %RH、25 ℃、hysteresis込み）と気圧（300〜1100 hPa、0〜65 ℃）には条件を足した |
 | 2026-11-10 | 24 | [#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)。`Touch controller`節へ、XPTEK自身のsiteから取得した版（sha256を記録。2007.5の版との同一性は未照合）を足し、表へ「電源電流（VCCとIOVDDの合計）」行を足した（静止電流・power-down・touch panel駆動switchの導通抵抗と駆動電流）。ほかの行は変えていない |
 | 2026-11-11 | 25 | [#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)。`HW-TBD-005`を閉じたことに合わせ、`Environmental sensor`節の`CRC／data integrity動作`行を`対象外`に、`推奨測定rate`行を`env.rs`（レジスタの値）と`env_report.rs`（周期）への参照に、`Module pull-up`行の未決の書き方を解決行への参照に直した。日付つきの記述は書き換えず、`Interface`行、`J1`／`J2`の判断を扱う文、`closeまでに要ること`の#3〜#5へ、日付つきの`2026-11-11追記`を足した |
+| 2026-11-11 | 26 | [#685](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/685)。ADXL345の`ICの値`の表へ、揺れ検出（Activity）のregister（`THRESH_ACT`・`ACT_INACT_CTL`・`INT_ENABLE`と`INT_SOURCE`のD4）を足した。**出所はRev. E（販売店の写し）で、公式のRev. Gとは照合していない**。値は`TBD` |
