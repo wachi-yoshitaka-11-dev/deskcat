@@ -72,6 +72,7 @@
 | [EXP-058](#exp-058-段0の4回目の窓書き直さない校正buildで動作1回ごとのパルスの本数をarduinoで数え同じ回のlogと並べた) | [#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)の段0の4回目の窓。書き直さない校正buildで、動作1回ごとのパルスの本数をArduinoで数え、同じ回のlogと並べた（4本・4本・2本） | 値の正なし（観測の記録。判定の語を書かない） |
 | [EXP-059](#exp-059-段0の5回目の窓708入りの校正buildで出力を3-tickに1回へ間引いた動作のtickの間隔と出力したtickの時間を取りstopbusyratelimitedmax_commandsの後を観察した) | [#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)の段0の5回目の窓。[#708](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/708)入りの校正buildで、tickの間隔（18.44〜21.55 ms）と出力したtickの時間（最大632 µs）を取り、STOP・Busy・RateLimited・max_commandsの後を観察した | 値の正なし（観測の記録。判定の語を書かない） |
 | [EXP-060](#exp-060-段1の前の窓と段1task-wdt-の-panic-resetpsu-の負極と-esp32-の-gnd-の読みi_limの平坦部4-countを取り段1で-servo-へ指令を出し発熱の実測は行わなかった) | [#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)の段1の前の窓と段1。task WDT の panic reset、PSU の−と ESP32 の GND の読み、`I_lim`の平坦部を取り、段1で servo へ指令を出した。発熱の実測は行わなかった | 値の正なし（観測の記録。判定の語を書かない） |
+| [EXP-061](#exp-061-accel-01adxl345で静止机を叩く机を手で揺らすの3つを各30秒取ったaccel-sample-15) | [#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)・[#685](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/685)の材料。`accel-sample-15`で、静止・机を叩く・机を手で揺らすの3つを、各30秒（5秒×6窓）取った | 値の正なし（観測の記録。判定の語を書かない） |
 
 **大容量の生dataはこのrepositoryへ入れていない。**保存場所は
 [development-foundation-plan.md](../planning/development-foundation-plan.md)の
@@ -5564,6 +5565,74 @@ ESP32のlog `3b67add0a0ca4a6e6c4f5e72d52dc37319e25d4ab2c48e4a58948dd449d0ad68`�
 
 ELF（wdt）`77d40227f4dca649e3cda797b3ac599087b1aef534e33ab848cb26b37e0f11bd`、ELF（calib）`468169f8012216a5a817e3975114b046817069749353e68f6f06ce0bbf6d4acd`、ELF（calib、`START_DEG` 90.734146 の版）`e2b44d6d5e7e8f553ea18d8a8573f924ad2c4addc8a2aa2602f352c1657e0314`。Arduino の記録：(A) の wdt 走行 `pwmA1.csv`（先頭 `d36dd73196f0`）、calib の通し `pwmA2.csv`（先頭 `161c035dd584`）、(D) `pwmD1.csv`（先頭 `8e42807054c7`）。ESP32 の log：`runA1.log`（先頭 `1e7ac0f1e97e`）、`runA2.log`（先頭 `45023b27078d`）、`runS1.log`（先頭 `406bb15ca330`。段1）。説明書の写真はrepositoryにもIssueにも置かない。
 
+## EXP-061: `ACCEL-01`（ADXL345）で、静止・机を叩く・机を手で揺らすの3つを、各30秒取った（`accel-sample-15`）
+
+[#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)の「机の振動 sample」と、[#685](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/685)の揺れのしきい値の材料を取る窓。サーボは動かしていない。人間の立ち会いのもとで1回。**この記録は事実と未確認だけを書く。受け入れ条件の判定と、しきい値の判断は書かない。**
+
+| 項目 | 内容 |
+|---|---|
+| Test ID | `EXP-061` |
+| Date | 2026-11-11。UTC 11:52（書き込み）〜12:13（USB を抜いた返事）。JST は +9 h |
+| Operator | USB の抜き挿しと、机を叩く・揺らす操作はユーザー。build、書き込み、serial の記録、集計は実機側の PM（AI） |
+| 承認 | 実機側の PM の会話でユーザーへ1問。問「加速度センサーの値を取るために、その回だけ ESP32 に通電してよいですか？」（書き込む build、手作業、PSU の電源プラグは抜いたまま、servo のプラグは挿したまま、起動5回・USB 合計15分の上限を示した）。答えの原文「はい」。[firmware/esp32/README.md](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/firmware/esp32/README.md)の表の `accel-sample-15` の可否（不可）は変えていない |
+| Hardware revision／Exact components | `MCU-01`、`ACCEL-01`。`EXP-060` の後の配線のまま（servo の plug は jumper wire の針に挿したまま、`PSU-BENCH-01` は電源プラグを抜いたまま、Arduino の USB は抜いたまま）。現物は AI が見ていない |
+| Firmware | develop `9671963` から、`git archive` を repository の外へ展開して build（`firmware/esp32/Cargo.toml` の末尾へ `[workspace]` を足した）。`--features accel-sample-15`。`cargo fmt --check` OK、clippy・build 成功。ELF sha256 `9fdd1392e776270087996de3c41bbb212c50897a85bcccbda0d4ad2fe7b90364`。この build は `SERVO-PWM`（GPIO27）を driver へ渡さない（`firmware/esp32/src/main.rs` の module doc） |
+| Configuration | ±2 g、100 Hz、FIFO Stream、500件×6窓（1起動で約30秒）。起動 log の `accel_sample_configured data_format=0x08 bw_rate=0x0a fifo_ctl=0x80 poll_interval_ms=20 warmup=10 window=500 windows=6` |
+| Measurement equipment | UART0 の log（115200）。合図の時刻と log の受信時刻は PC の同じ時計 |
+| Expected result | 期待値の数は定めていない |
+| Measured result | 下記 |
+
+### 実施したこと
+
+- 起動は4回：書き込み後の reset 1、console の release 1、叩く回の reset 1、揺らす回の reset 1。上限5の内。最初の書き込みの試みは port の名前が違い、port を開いていない（reset なし）。`rst:` はどの起動も `POWERON_RESET`。
+- `accel_device_id raw=0xe5` が出た。`accel_fault`・panic は 0件。`out_of_range=0`。`accel_overrun int_source=0x83` が各起動の最初に1回（`polls_with_overrun=1`、以降増えない）。
+- 回ごとの依頼：静止は触れずに置く。叩くは、返事の5秒後から30秒の間に机を10回（2〜3秒に1回、ふつうの強さ）。揺らすは、返事の5秒後から、机を手で5秒揺らして1秒休むを5回。**叩いた回数と揺らした時刻は記録していない**（log は窓ごとの統計と、各起動の最初の100件の raw だけ）。
+
+### 窓ごとの値（LSB。平均と標準偏差は log の mlsb を 1000 で割った値）
+
+| 回 | 窓 | 平均（X, Y, Z） | 標準偏差（X, Y, Z） | 最小（X, Y, Z） | 最大（X, Y, Z） |
+|---|---|---|---|---|---|
+| 静止 | 1 | −7.5, 12.8, −235.8 | 1.08, 1.12, 1.21 | −11, 10, −239 | −2, 19, −230 |
+| 静止 | 2 | −7.5, 12.7, −235.7 | 1.09, 1.02, 1.13 | −11, 10, −239 | −3, 17, −231 |
+| 静止 | 3 | −7.5, 12.8, −235.7 | 1.03, 1.09, 1.19 | −11, 10, −240 | −4, 18, −231 |
+| 静止 | 4 | −7.5, 12.8, −235.6 | 1.04, 1.03, 1.23 | −11, 10, −240 | −4, 17, −228 |
+| 静止 | 5 | −7.5, 12.8, −235.6 | 1.02, 1.03, 1.24 | −10, 10, −239 | −2, 17, −231 |
+| 静止 | 6 | −7.5, 12.8, −235.7 | 1.04, 1.04, 1.15 | −11, 10, −240 | −2, 18, −232 |
+| 叩く | 1 | −7.4, 12.5, −236.0 | 2.88, 5.86, 4.30 | −19, −2, −269 | 1, 30, −213 |
+| 叩く | 2 | −7.1, 12.7, −235.9 | 4.09, 4.97, 4.91 | −18, −1, −274 | 5, 29, −192 |
+| 叩く | 3 | −7.3, 12.5, −236.0 | 2.40, 3.38, 5.47 | −14, 2, −295 | 1, 24, −209 |
+| 叩く | 4 | −7.3, 12.6, −235.9 | 1.04, 1.18, 1.26 | −11, 9, −240 | −2, 18, −231 |
+| 叩く | 5 | −7.4, 12.6, −236.0 | 1.08, 1.13, 1.27 | −12, 9, −241 | −4, 18, −230 |
+| 叩く | 6 | −7.3, 12.5, −236.0 | 1.07, 1.05, 1.18 | −11, 9, −240 | −4, 17, −231 |
+| 揺らす | 1 | −7.3, 13.1, −235.9 | 7.24, 13.29, 5.46 | −31, −46, −304 | 22, 72, −205 |
+| 揺らす | 2 | −7.0, 12.5, −235.9 | 10.23, 17.11, 5.28 | −39, −26, −264 | 23, 78, −221 |
+| 揺らす | 3 | −7.0, 12.5, −236.1 | 10.71, 16.48, 4.68 | −38, −19, −265 | 19, 75, −223 |
+| 揺らす | 4 | −6.9, 12.6, −236.1 | 12.22, 18.14, 4.97 | −40, −20, −260 | 17, 81, −223 |
+| 揺らす | 5 | −6.9, 12.5, −236.1 | 15.90, 19.38, 5.04 | −47, −25, −263 | 19, 78, −222 |
+| 揺らす | 6 | −7.1, 12.7, −235.8 | 4.64, 2.26, 1.29 | −34, 1, −240 | 12, 29, −230 |
+
+- 叩く回は、窓1〜3（約15秒）で標準偏差が静止より大きく、窓4〜6 は静止と同じ程度だった。10回がどの窓に入ったかは数えていない。
+- 揺らす回は、窓1〜5 で X・Y の標準偏差が静止より大きく、窓6 で下がった。
+
+### 計画との差
+
+- 静止は 60秒の依頼だったが、取れたのは 30秒（1起動の6窓）である。build の作りが1起動で 5秒×6窓 だったことから来た。#685 のしきい値の材料として足りるかは、この記録では判断しない。
+
+### Faults（手順と実際の差。事実）
+
+- USB を挿していた時間は約21分（11:52〜12:13 UTC）で、承認の上限（合計15分）を超えた。上限の時刻（12:07 頃）の後に、叩く回（12:08）と揺らす回（12:09）を行った。AI が経過時間を上限と照らしていなかった。ユーザーへ直接報告し、ユーザーの返事の原文は「USBの上限は私が時間をかけていただけなのできにしないで。」。
+- 最初の書き込みの試みで、port の名前（`/dev/ttyUSB0`）が違った（実際は `/dev/ttyUSB1`）。
+
+### 終わった後の状態
+
+- ESP32 の USB は抜いた（ユーザーの返事「抜いた」）。ESP32 には `accel-sample-15` が入っている。
+- `PSU-BENCH-01` の電源プラグは抜いたまま。servo の plug は jumper wire の針に挿したまま。
+
+### 確かめていないこと
+
+- 叩いた回数と強さ、揺らした方向と幅。
+- servo の振動の sample（#18 の段2の後）。
+
 ## Revision履歴
 
 | 日付 | Revision | 変更 | 根拠 |
@@ -5634,3 +5703,4 @@ ELF（wdt）`77d40227f4dca649e3cda797b3ac599087b1aef534e33ab848cb26b37e0f11bd`�
 | 2026-11-07 | 63 | [#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)・[#708](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/708)。**`EXP-059`を追加した。**段0の5回目の窓（#708の間引きの入った校正buildでサーボを接続せず、tickの間隔、出力したtickの時間、`STOP`・`Busy`・`RateLimited`・`max_commands`の後を取った）。tickの間隔は18.44〜21.55 ms、出力したtickの時間の最大は632 µs。回2で`RateLimited`を出せなかった経緯を書いた。案の閾値（2 ms）の確定はここに書かない。観測値の判定は書いていない | 作業セッションの記録（ユーザーの回答と、実機側のPMの申告による） |
 | 2026-11-10 | 64 | [#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)。**`EXP-060`を追加した。**段1の前の窓（servo を接続せず、task WDT の panic reset、PSU の−と ESP32 の GND の読み、`I_lim`の平坦部を取った）と、段1（servo を接続して、105°から 90° へ向けて1方向、1回、指令を出した）。発熱の実測は行わなかった（ユーザーの原文を書いた）。判定は書いていない | 作業セッションの記録（ユーザーの回答と、実機側のPMの指示による） |
 | 2026-11-11 | 65 | [#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)。`EXP-060`の本文の PM のセッション名10か所（8行）を、「実機側の PM」「VM 側の PM」に置き換えた。記録の内容は変えていない。 | 公開する記録に PM のセッション名を書かない扱い（#677 と同じ置き換え） |
+| 2026-11-11 | 66 | [#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)・[#685](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/685)。**`EXP-061`を追加した。**`accel-sample-15`（develop `9671963`）で、静止・机を叩く・机を手で揺らすの3つを各30秒取った。USB の時間が承認の上限を超えたことを Faults に書いた。判定は書いていない | 実機側の PM の記録（ユーザーの回答による） |
