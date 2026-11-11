@@ -979,7 +979,7 @@ firmware（`firmware/esp32/src/servo.rs`、
 - 1回の範囲で、広げた端まで行って、90° へ戻る。
 
 **記録すること（[Hardware Safety Policy §6](../governance/hardware-safety-policy.md#6-サーボ)の「電流、電圧、noise、干渉、機械的clearance」）：**
-- 電流：`MEAS-02` を段1の前の窓の (D) と同じ点（GND の線を S の−のシャントの足、A0 の線を B の穴2のシャントの足へ、それぞれクリップで挟む）につなぎ、各回を記録する（count のまま。確度は主張しない）。
+- 電流：各回の、出力 ON の間の PSU の電流の表示と、CC の LED の状態を記録する（確度は主張しない）。
 - 電圧：各回の CC の LED の状態を記録する。LED が消えている間は、出力は CV の設定値で、点いている間は設定値より低い。出力端の電圧の読みは取らない（上の 12(vi)）。
 - noise・干渉：唸り・異音と、ESP32 の log（reset・brownout）。
 - 機械的 clearance：下の、天板と底板の隙間。
