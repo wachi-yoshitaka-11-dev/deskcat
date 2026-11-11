@@ -22,6 +22,8 @@
 //! 何も壊れない）。そのため一般値で始め、**暫定である**。実機で、指で軽く叩いて詰める（検出されなければ下げ、誤検出が多ければ上げる）。
 //! 値は定数にして変えやすくしてある。
 
+pub mod shake;
+
 /// `THRESH_TAP`（address 0x1D）。tapの閾値。unsigned、62.5 mg/LSB（p.15）。
 pub const REG_THRESH_TAP: u8 = 0x1D;
 /// `DUR`（address 0x21）。閾値を超えていてよい最長の時間。625 µs/LSB。**0はtap機能を無効にする**（p.15）。

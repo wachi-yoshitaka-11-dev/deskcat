@@ -12,7 +12,7 @@
 //! | `get_status` | `PiSession::handle_get_status`のACKと`status`を書く（下記） |
 //! | `set_expression` | `deskcat_face::judge`で判定する（session→値の範囲→LCDの準備の順。§8）。受理なら`crate::face::FaceState`へ記録して`ok`のACKを書く。拒否なら該当のcodeの拒否ACKを書く。**製品buildと`face-21`試験buildが受理できる。表情を持たない試験buildは`hardware_unavailable`、bring-upの間は`busy`で拒否する**（§7） |
 //! | `show_text` | 現在のPi sessionと`boot`のACKを確認し、LCDが使える場合は`crate::face::FaceDrawer::show_text`へ渡す。受理なら`ok`、文字・時間が描画範囲外なら`out_of_range`、LCDが使えなければ`busy`または`hardware_unavailable`、session未確立なら`stale_session`のACKを書く |
-//! | （受信ではない）`tapped` | 製品buildと`tap-21`試験buildが、bootのACKを受けた後に[`send_event`]で書く。受信の振り分けとは別の経路である（`crate::tap`） |
+//! | （受信ではない）`tapped`、`shaken`（揺れの設定に値が入ったときだけ） | 製品buildと`tap-21`試験buildが、bootのACKを受けた後に[`send_event`]で書く。受信の振り分けとは別の経路である（`crate::tap`） |
 //! | `boot` | `unknown_type`の拒否ACKを書く（§8の表「方向が逆のsession確立message」） |
 //! | `play_motion` | session権限（現在のPi `sid`でない、またはESP32の`boot`がACKされていない間は`stale_session`。§4.1、§8手順8）→`deskcat_servo::MotionDispatch::handle`の順に扱い、**どの経路でも拒否ACKを書く**（下記「`play_motion`」）。**`LimitedServo`を作らない間（`crate::servo_path::product`が`None`）は、どのservoのcodeにも渡さない**（[Issue #19](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/19)） |
 //! | `status` | 応答しない（ESP32→Piのmessageである）。logで分類する |
@@ -31,7 +31,7 @@
 //!
 //! `get_status`への`status: ok`のACKと`status`は、1つのbufferへ連結し、1回の[`write_line`]で
 //! 送信のring bufferへ積む。Pi linkのUARTへ書くのは、このmoduleの応答と`BootSession`の`boot`の
-//! 送出と、製品build／`tap-21`試験buildが[`send_event`]で送る`tapped`と、製品buildが同じく送る`head_touched`と`environment`だけであり、どれもmain loopの同じtaskから呼ぶ。そのため、連結した2行の間に他の行は
+//! 送出と、製品build／`tap-21`試験buildが[`send_event`]で送る`tapped`と`shaken`（揺れの設定に値が入ったときだけ）と、製品buildが同じく送る`head_touched`と`environment`だけであり、どれもmain loopの同じtaskから呼ぶ。そのため、連結した2行の間に他の行は
 //! 入らない。health snapshot（`main.rs`の`emit_health_snapshot`）はUART0のlogであり、Pi linkへ
 //! `status`を送らない。
 //!

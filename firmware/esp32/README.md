@@ -121,6 +121,7 @@ build構成の説明を書き写さない（featureの一覧と、各featureが�
 
 この表に無い組み合わせ（`bringup-led-514`、`bench-servo-test-17`・`bench-servo-90-17`（`bench-servo-test-17`を含む）、`debug-motion-19`と`face-21`・`tap-21`・`bringup-display-13`との組み合わせなど）は対象外であり、この表は通電の可否を決めていない。`bringup-led-514`は、2026-10-12にユーザーが承認した条件（LEDの2枝を足して通電すること。書き込みと各回の通電）で、ESP32単体へ通電した。承認と観察は[led-514-demo.md](../../docs/hardware/led-514-demo.md)と[EXP-025](../../docs/hardware/experiment-log.md#exp-025-追加ledの点灯試験赤だけ白だけ両方)にある。
 `tap-21`が足す負荷（測定modeの`ACCEL-01`の約140 µA typ）の扱いは、Power Budgetの`face-21`の常時点灯の段落が持つ。
+**揺れ（`shaken`。Protocol §4.3a、#685）の検出は、`deskcat_tap::shake::SHAKE`が`None`（`TBD`）の間は有効にならない**（Activityを設定せず、`shaken`も送らない）。値は実機で決める。
 デモのジェスチャは、`tap-21`では「撫でる」ではなく「指で、ADXL345のモジュールを軽く叩く」である（閾値の根拠は`crates/deskcat-tap`）。
 
 ## 未確定の前提

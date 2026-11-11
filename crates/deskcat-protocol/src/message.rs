@@ -5,7 +5,7 @@
 //! 足した。足したtypeのfieldは、安全要件の5項目（`docs/governance/hardware-safety-policy.md`）の
 //! どれにも効かない。5項目のうちmessageが関わりうるのはservoの持続的拘束だけであり、
 //! servoを動かす経路は`play_motion`（§5.3）だけで、Issue #527ではそれを足さなかったためである。
-//! `play_motion`はIssue #19で足した（下記）。
+//! `play_motion`はIssue #19で足した（下記）。`shaken`（§4.3a）はIssue #685で足した。
 //!
 //! **`play_motion`（§5.3）は、Issue #19で型だけを足した。**受信して型に解釈できることと、
 //! servoを動かしてよいことは別である。`name`は閉じたenumにせず、有界でない`String`とする。
@@ -70,6 +70,10 @@ pub enum Message {
     /// payloadは`{}`である。§4.3の例にある`magnitude_g`は、意味が決まっていないため
     /// 型に持たない（module doc）。
     Tapped,
+    /// ESP32→Pi。揺すられた（§4.3a）。
+    ///
+    /// payloadは`{}`である。`tapped`と同じく、強さは持たない。
+    Shaken,
     /// ESP32→Pi。持ち上げられた（§4.4）。
     ///
     /// 型があることは送ってよいことを意味しない。§4.4は、accelerometerのclassifierを
@@ -100,6 +104,7 @@ impl Message {
             Self::ShowText(_) => "show_text",
             Self::HeadTouched(_) => "head_touched",
             Self::Tapped => "tapped",
+            Self::Shaken => "shaken",
             Self::Lifted(_) => "lifted",
             Self::Environment(_) => "environment",
             Self::PlayMotion(_) => "play_motion",
@@ -119,7 +124,7 @@ impl Message {
     }
 
     /// 受理するtype名の一覧。[`Self::type_str`]と同じ綴りを使う。
-    const TYPE_NAMES: [&'static str; 13] = [
+    const TYPE_NAMES: [&'static str; 14] = [
         "boot",
         "hello",
         "ping",
@@ -130,6 +135,7 @@ impl Message {
         "show_text",
         "head_touched",
         "tapped",
+        "shaken",
         "lifted",
         "environment",
         "play_motion",
@@ -153,6 +159,7 @@ impl Message {
             | Self::SetExpression(_)
             | Self::HeadTouched(_)
             | Self::Tapped
+            | Self::Shaken
             | Self::Lifted(_)
             | Self::Environment(_)
             | Self::PlayMotion(_) => Ok(()),
@@ -181,6 +188,7 @@ impl Message {
             | Self::ShowText(_)
             | Self::HeadTouched(_)
             | Self::Tapped
+            | Self::Shaken
             | Self::Lifted(_)
             | Self::Environment(_)
             | Self::PlayMotion(_) => Ok(()),
