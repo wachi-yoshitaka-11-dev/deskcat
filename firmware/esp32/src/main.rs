@@ -963,7 +963,7 @@ fn main() {
     let mut last_read_ms = health.uptime_ms();
     // Pi→ESP32方向の受信を振り分ける（`crate::pi_link`）。
     #[cfg(not(feature = "bench-servo-test-17"))]
-    let mut pi_link = PiLink::new(servo_path::product());
+    let mut pi_link = PiLink::new(servo_path::product(), health.uptime_ms());
     // debug consoleの読み取り（`crate::debug_motion`。`debug-motion-19`付きのbuildだけ）。
     #[cfg(feature = "debug-motion-19")]
     let debug_console = debug_motion::DebugConsole::start();
@@ -972,9 +972,9 @@ fn main() {
     // いるかを外から確認できなかった。
     loop {
         let now = health.uptime_ms();
-        // `LimitedServo`が無い間は何もしない（`PiLink::tick_servo`）。
+        // 制御周期の期限が来たときだけ`tick`する。`LimitedServo`が無い間は何もしない（`PiLink::tick_servo`）。
         #[cfg(not(feature = "bench-servo-test-17"))]
-        pi_link.tick_servo();
+        pi_link.tick_servo(now);
         // debug consoleの行を、Pi由来と同じ`MotionDispatch`へ渡す（`PiLink::on_debug_line`）。
         #[cfg(feature = "debug-motion-19")]
         while let Some(event) = debug_console.try_recv() {
@@ -1183,6 +1183,11 @@ fn main() {
         #[cfg(not(feature = "bench-servo-test-17"))]
         if let Some(retry_deadline) = boot_session.next_deadline_ms() {
             until = until.min(retry_deadline);
+        }
+        // `tick`の期限（制御周期）。待ちはこの下のUART read timeoutで行い、blockingしない。
+        #[cfg(not(feature = "bench-servo-test-17"))]
+        if let Some(deadline) = pi_link.next_servo_deadline_ms() {
+            until = until.min(deadline);
         }
         #[cfg(feature = "bringup-display-13")]
         if let Some(bringup) = &display {

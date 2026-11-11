@@ -441,6 +441,15 @@ impl Stopped<'_> {
         self.resume_position
     }
 
+    /// `stop`が失敗したときの試し直し。dutyを0へ戻す（[`Sg90::stop`]）。**[`Sg90`]は取り出さない。**
+    ///
+    /// # Errors
+    ///
+    /// dutyを0へ戻せなかった。
+    pub fn retry_stop(&mut self) -> Result<(), EspError> {
+        self.servo.stop()
+    }
+
     /// 引き継いだcounter（[`ServoFaultCounters`]）。
     #[must_use]
     pub fn fault_counters(&self) -> ServoFaultCounters {

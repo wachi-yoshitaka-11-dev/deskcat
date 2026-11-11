@@ -77,8 +77,8 @@ use deskcat_protocol::{
     Outcome, PlayMotion, Rejection,
 };
 use deskcat_servo::{
-    admit_pi, drive_tick, DedupOutcome, DriveOutcome, LimiterCounters, MotionCatalog,
-    MotionDecision, MotionDispatch, MotionSession, MotionSink, PiMotion,
+    admit_pi, drive_tick, DedupOutcome, Drive, DriveOutcome, LimiterCounters, MotionCatalog,
+    MotionDecision, MotionDispatch, MotionSession, MotionSink, PiMotion, TickSchedule,
 };
 use esp_idf_svc::hal::uart::UartDriver;
 
@@ -86,7 +86,7 @@ use crate::boot_session::{BootSession, HelloAccepted};
 use crate::face::{FaceDrawer, FaceState};
 use crate::health::Health;
 use crate::protocol::{HelloOutcome, PiSession};
-use crate::servo_path::{resolve_target, ServoPath};
+use crate::servo_path::{resolve_target, tick_period_ms, ServoPath};
 
 /// `play_motion`の保持件数（暫定）。**確定値ではない。**`PROTO-TBD-005`が未決で、数値そのものに根拠は無い。
 ///
@@ -113,13 +113,30 @@ pub struct PiLink {
     motion_dispatch: MotionDispatch,
     /// `LimitedServo`を持つ経路。製品buildは値が無い間`None`（`crate::servo_path::product`）。
     servo: Option<ServoPath<'static>>,
+    /// `tick`を刻む期限。`servo`が`Some`で、周期（`crate::servo_path::tick_period_ms`）が決まっているときだけ`Some`。
+    tick_schedule: Option<TickSchedule>,
 }
 
 impl PiLink {
-    /// 未確立のPi sessionで作る。
-    pub fn new(servo: Option<ServoPath<'static>>) -> Self {
+    /// 未確立のPi sessionで作る。`now_ms`は`Health::uptime_ms`（`tick`の期限の起点）。
+    ///
+    /// **周期が決まっていない`ServoPath`は刻めないので、`stop`して手放す**（失敗はlogへ残す。drop後の出力は保証しない。
+    /// `product`は、周期が決まるまで`None`）。
+    pub fn new(mut servo: Option<ServoPath<'static>>, now_ms: u64) -> Self {
+        let tick_schedule = tick_period_ms().and_then(|period| TickSchedule::new(period, now_ms));
+        if tick_schedule.is_none() {
+            if let Some(mut path) = servo.take() {
+                log::error!("servo_tick_period_missing (stopして手放す)");
+                if let Err(err) = path.stop() {
+                    log::error!("servo_stop_failed error={err}");
+                }
+            }
+        }
+        // servoが無ければ刻まない（期限だけがmain loopの待ちを起こすことを避ける）。
+        let tick_schedule = tick_schedule.filter(|_| servo.is_some());
         Self {
             servo,
+            tick_schedule,
             receiver: LineReceiver::with_protocol_limit(),
             pi: PiSession::new(),
             motion_dispatch: MotionDispatch::new(
@@ -167,16 +184,39 @@ impl PiLink {
         self.servo.as_ref().map(MotionSink::counters)
     }
 
-    /// main loopの1周ごとに呼ぶ（制御周期では刻んでいない）。`LimitedServo`が無ければ何もしない。`tick`が失敗したら`stop`を呼び、
-    /// どちらの失敗もlogへ残す。
-    pub fn tick_servo(&mut self) {
-        let Some(path) = self.servo.as_mut() else {
+    /// 次の`tick`の期限（`Health::uptime_ms`の時刻）。刻まないなら`None`。main loopの待ち（`until`）へ足す。
+    pub fn next_servo_deadline_ms(&self) -> Option<u64> {
+        self.tick_schedule
+            .as_ref()
+            .map(TickSchedule::next_deadline_ms)
+    }
+
+    /// main loopの1周ごとに呼ぶ。**期限が来たときだけ`tick`する**（制御周期。blockingしない）。`LimitedServo`が無ければ何もしない。
+    /// `stop`が失敗したままなら、`tick`せずに`stop`を試し直す。`tick`が失敗したら`stop`を呼ぶ。どちらの失敗もlogへ残す。
+    pub fn tick_servo(&mut self, now_ms: u64) {
+        let (Some(path), Some(schedule)) = (self.servo.as_mut(), self.tick_schedule.as_mut())
+        else {
             return;
         };
+        if !schedule.due(now_ms) {
+            return;
+        }
+        if path.stop_pending() {
+            if let Err(err) = path.stop() {
+                log::error!(
+                    "servo_stop_retry_failed error={err} stop_failures={}",
+                    path.stop_failures()
+                );
+            }
+            return;
+        }
         if let DriveOutcome::Stopped { tick_error, stop } = drive_tick(path) {
             log::error!("servo_tick_failed_stopped error={tick_error}");
             if let Err(err) = stop {
-                log::error!("servo_stop_failed error={err}");
+                log::error!(
+                    "servo_stop_failed error={err} stop_failures={}",
+                    path.stop_failures()
+                );
             }
         }
     }
