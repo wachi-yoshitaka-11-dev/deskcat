@@ -4893,7 +4893,7 @@ ESP32のlog（最初の窓）`7483a4d39f3e7309dfc7e9e83ee3e3e564a7919a820370ba6f
 | Power supply and current limit | 設定 5.00 V、電流上限 0.100 A（本体表示）。OCP は無効（OCP の LED は全区間で消灯）。OPN の LED は消灯 |
 | Firmware commit/profile | なし（firmware を使わない） |
 | Configuration | 説明書（`SPS-3010V`、ユーザーが p.1〜p.11 を写真で提示）の操作方法どおり、電圧・電流は出力 OFF で設定し、出力ボタンで ON／OFF した |
-| Measurement equipment | 本体の表示（説明書の表示精度は 0.5%＋5digit）、`DT830B`（DCV 20 レンジ。確度は未確認） |
+| Measurement equipment | 本体の表示（説明書の表示精度は 0.5%＋5digit）、`DT830B`（DCV 20 レンジ。確度は未確認）。**2026-11-12 追記：**説明書 p.3「仕様」の原文（`SPS-3010V` の列を含む表の下）：「表示: 4桁七セグメントLED表示、電圧、電流、電力三区分表示」「表示精度: 0.5%+5digit」「表示分解能:電圧：0.01V、電流：0.001A（100V以上：0.1V、10A以上：0.01A）」。出所は、2026-11-10 にユーザーが会話に貼った説明書の写真（p.3〜p.4 の見開き。sha256 `eb402d9b47b5ae26e817860c895bfdba211c8389d25608fcb4f61eeb65d46b80`。写真は repository に置かない） |
 | Procedure | 下記 |
 | Expected result | S0：本体 5.00 V、電流 0。S1：CC に入り、電流が約 0.100 A で止まり、電圧は約 2.2 V（負荷 330 Ω×15本の並列＝約 22 Ω の申告値から。**手順を渡した時点では 20本・約 16.5 Ω・約 1.65 V と誤っていた**） |
 | Measured result | 下記 |
@@ -5708,3 +5708,4 @@ ELF（wdt）`77d40227f4dca649e3cda797b3ac599087b1aef534e33ab848cb26b37e0f11bd`�
 | 2026-11-10 | 64 | [#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)。**`EXP-060`を追加した。**段1の前の窓（servo を接続せず、task WDT の panic reset、PSU の−と ESP32 の GND の読み、`I_lim`の平坦部を取った）と、段1（servo を接続して、105°から 90° へ向けて1方向、1回、指令を出した）。発熱の実測は行わなかった（ユーザーの原文を書いた）。判定は書いていない | 作業セッションの記録（ユーザーの回答と、実機側のPMの指示による） |
 | 2026-11-11 | 65 | [#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)。`EXP-060`の本文の PM のセッション名10か所（8行）を、「実機側の PM」「VM 側の PM」に置き換えた。記録の内容は変えていない。 | 公開する記録に PM のセッション名を書かない扱い（#677 と同じ置き換え） |
 | 2026-11-11 | 66 | [#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)・[#685](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/685)。**`EXP-061`を追加した。**`accel-sample-15`（develop `9671963`）で、静止・机を叩く・机を手で揺らすの3つを各30秒取った。USB の時間が承認の上限を超えたことを Faults に書いた。判定は書いていない | 実機側の PM の記録（ユーザーの回答による） |
+| 2026-11-12 | 67 | [#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)。`EXP-051`の Measurement equipment の行に、`PSU-BENCH-01`の説明書 p.3「仕様」の原文（表示、表示精度、表示分解能）と、出所の写真の sha256 を追記した。#18 の段2が、この表示精度を電圧と電流の判定の根拠に使うため。測定の内容は変えていない | 説明書の写真（2026-11-10 にユーザーが会話に貼ったもの） |
