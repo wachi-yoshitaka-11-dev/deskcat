@@ -18,9 +18,8 @@
 //!
 //! # 値の扱い
 //!
-//! **値は全て`TBD`である。**[`SHAKE`]が`None`の間は、揺れの検出を有効にしない（Activityの設定を書かず、`INT_ENABLE`はtapだけのまま、
-//! eventを送らない）。値は実機で決める（机とサーボの振動の試料は#15の受け入れ条件の後）。値は安全要件の5項目に効かない
-//! （外れても、揺れの誤検出か検出漏れになるだけで、何も壊れない）。
+//! 値は[`SHAKE`]が持つ。**暫定の一般値であり、根拠・確定の手段・確かめていないことは[`SHAKE`]のdocに1か所だけ書く。**
+//! 値は安全要件の5項目に効かない（外れても、揺れの誤検出か検出漏れになるだけで、何も壊れない）。
 
 use crate::{
     BW_RATE_100_HZ, DUR, INT_ENABLE_SINGLE_TAP, POWER_CTL_MEASURE, REG_BW_RATE, REG_DUR,
@@ -44,7 +43,7 @@ pub const fn is_activity(int_source: u8) -> bool {
     int_source & INT_SOURCE_ACTIVITY != 0
 }
 
-/// 揺れの検出の設定。**全ての値が`TBD`である**（[`SHAKE`]）。
+/// 揺れの検出の設定。値は[`SHAKE`]。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ShakeConfig {
     /// `THRESH_ACT`。62.5 mg/LSB。0は不可。
@@ -70,11 +69,31 @@ impl ShakeConfig {
     }
 }
 
-/// 揺れの検出の値。**`None`は`TBD`で、揺れの検出を有効にしない**（Activityの設定を書かず、eventを送らない。今の挙動と同じ）。
-/// 値は実機で決める。値を入れる変更は、実機の確認の後にする。
-pub const SHAKE: Option<ShakeConfig> = None;
+/// 揺れの検出の値。**暫定の一般値である**（安全要件の5項目に効かない）。
+///
+/// - `thresh_act`＝3（3×62.5＝187.5 mg）。`act_inact_ctl`＝`0x60`（dc結合、X・Yのみ）。窓2000 ms、3回、最小間隔5000 ms。
+///
+/// **根拠は`docs/hardware/experiment-log.md`の`EXP-061`（`accel-sample-15`。full-res、±2 g、3.9 mg/LSB。187.5 mgは約48 LSB）。**
+/// - 軸：静止のZは約−236 LSB（約1 g）で、dc結合でZを入れるとActivityが立ち続ける。X・Yは静止で平均−7.5／12.8、最大絶対値19。
+///   机の叩きはX・Yのピークが最大30で、Zだけ大きい（−192〜−295）。
+/// - 閾値：揺らすのYの最大は72〜81（窓1〜5。窓6は29。Xは−47〜23）。机の叩きのX・Yの最大30と静止の最大19の上、揺れのYのピークの下に置いた。2（約32 LSB）は叩きの30に近い。
+/// - 叩きと揺れを分ける根拠は無い（EXP-061の叩きは机で最大約0.23 g、製品のtappedは1.5 g超）。
+/// - 最小間隔：暫定の一般値。1回の揺らしと1件の対応は確かめていない。
+///
+/// **確かめていないこと。**窓の中でActivityが何回立つかはEXP-061に時系列が無く不明（揺らし方によっては届かず検出漏れ）。
+/// dc結合なので基板が水平でなければX・Yに重力が乗る（約0.19 g、約11°で立ち続ける。取付が水平かは`docs`に無い）。
+/// 製品buildは`DATA_FORMAT`を書かず（10 bit）、EXP-061はfull-resである（`THRESH_ACT`はg単位なので閾値は変わらないが、10 bitのLSBの重みは未確認）。
+/// servoの振動での誤検出と、実機で`shaken`がPiへ届くことは未確認。
+/// **確定させる手段：**servoの振動のsample（#18の段2の後）と、取付姿勢が決まった後の実機の揺らし。
+pub const SHAKE: Option<ShakeConfig> = Some(ShakeConfig {
+    thresh_act: 3,
+    act_inact_ctl: 0x60,
+    window_ms: 2_000,
+    required_hits: 3,
+    min_interval_ms: 5_000,
+});
 
-/// 検出に使える設定。`SHAKE`が`None`か、値が使えない形（[`ShakeConfig::is_valid`]）なら`None`。
+/// 検出に使える設定。`config`が`None`か、値が使えない形（[`ShakeConfig::is_valid`]）なら`None`。
 #[must_use]
 pub fn active(config: Option<ShakeConfig>) -> Option<ShakeConfig> {
     config.filter(ShakeConfig::is_valid)
@@ -232,7 +251,7 @@ impl ShakeFilter {
 mod tests {
     use super::*;
 
-    // **試験用の値である。製品の値ではない**（製品の値は`SHAKE`＝`None`のまま）。
+    // **試験用の値である。製品の値ではない**（製品の値は`SHAKE`）。
     const TEST: ShakeConfig = ShakeConfig {
         thresh_act: 0x10,
         act_inact_ctl: 0b0111_0000,
@@ -242,9 +261,13 @@ mod tests {
     };
 
     #[test]
-    fn the_product_value_is_tbd_and_disables_shake() {
-        assert_eq!(SHAKE, None);
-        assert_eq!(active(SHAKE), None);
+    fn the_product_value_is_usable_and_keeps_z_out_of_the_axes() {
+        let config = SHAKE.expect("製品の値が入っている");
+        assert!(config.is_valid());
+        assert_eq!(active(SHAKE), SHAKE);
+        // dc結合（D7＝0）で、X・Yだけ（Zを入れない）。
+        assert_eq!(config.act_inact_ctl & 0b1000_0000, 0);
+        assert_eq!(config.act_inact_ctl & ACT_AXES_MASK, 0b0110_0000);
     }
 
     #[test]

@@ -450,7 +450,7 @@ budget値は`PROTO-TBD-017`に含める。
 
 `ACCEL-01`（ADXL345）のActivity（`INT_SOURCE`のD4）を、`tapped`と同じ`INT_SOURCE`の読みから取り、**窓の中でActivityが一定の回数以上立ったとき**に送る（1回の叩きでもActivityは立ちうるため、回数は2以上である）。送るのは**`boot`のACKを受けてsessionが確立した後だけ**で、前の`shaken`から最小間隔未満の揺れは送らず捨てる。**捨てた数はfirmwareのlogに数える**（`status`のcounterへは出さない）。firmwareは`shaken`のACKを待たず、再送しない（`tapped`と同じ。§4.3）。書き込みに失敗した`shaken`は失われ、firmwareのlogにだけ残る。`tapped`のタッチ・保留の条件（§4.3）は持たない。
 
-**閾値（`THRESH_ACT`）・軸とac／dc結合・窓の長さ・必要な回数・最小間隔は`TBD`であり、値は`crates/deskcat-tap`の`shake`が持つ**（ここへ再掲しない）。**値が`TBD`（`None`）の間は、揺れの検出を有効にしない**（Activityの設定を書かず、`INT_ENABLE`はtapだけのまま、`shaken`を送らない）。値は実機で決める。**servoの振動で誤って出ないことは、#15の受け入れ条件（机とサーボの振動の試料）の後に実機で詰める。**最小間隔は§8.2の送出の上限（`PROTO-TBD-012`）が決まるまでの置き場であり、決まれば置き換える。Pi側は`shaken`を`Companion::on_shake`へ渡す。
+**閾値（`THRESH_ACT`）・軸とac／dc結合・窓の長さ・必要な回数・最小間隔は、暫定の値が`crates/deskcat-tap`の`shake`の`SHAKE`にある**（ここへ再掲しない。根拠は同じ場所が持つ）。`SHAKE`が`None`なら、揺れの検出を有効にしない（Activityの設定を書かず、`INT_ENABLE`はtapだけのまま、`shaken`を送らない）。**servoの振動で誤って出ないことは、#15の受け入れ条件（机とサーボの振動の試料）の後に実機で詰める。**最小間隔は§8.2の送出の上限（`PROTO-TBD-012`）が決まるまでの置き場であり、決まれば置き換える。Pi側は`shaken`を`Companion::on_shake`へ渡す。
 
 ### 4.4 `lifted`
 
