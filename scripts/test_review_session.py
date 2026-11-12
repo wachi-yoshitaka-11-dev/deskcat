@@ -257,6 +257,38 @@ class ReviewSessionTests(unittest.TestCase):
         self.assertEqual(session.changed_paths(sub, "base"), ["outer.py", "sub/inner.md"])
         self.assertEqual(session.changed_paths(sub, "base"), session.changed_paths(self.root, "base"))
 
+    def test_same_new_file_gives_same_fingerprint_untracked_staged_and_committed(self):
+        (self.root / "new.py").write_text("print(1)\n", encoding="utf-8")
+        untracked = session.fingerprint(self.root, "base")
+        self.assertEqual(self.git("status", "--porcelain"), "?? new.py")  # The real index is untouched.
+        self.git("add", "new.py")
+        self.assertEqual(session.fingerprint(self.root, "base"), untracked)
+        self.git("commit", "-qm", "add")
+        self.assertEqual(session.fingerprint(self.root, "base"), untracked)
+
+    def test_fingerprint_changes_with_content_mode_deletion_and_rename(self):
+        (self.root / "a.py").write_text("one\n", encoding="utf-8")
+        self.git("add", "a.py")
+        self.git("commit", "-qm", "a")
+        seen = {session.fingerprint(self.root, "base")}
+        (self.root / "a.py").write_text("two\n", encoding="utf-8")
+        seen.add(session.fingerprint(self.root, "base"))
+        (self.root / "a.py").chmod(0o755)
+        seen.add(session.fingerprint(self.root, "base"))
+        self.git("mv", "a.py", "b.py")
+        seen.add(session.fingerprint(self.root, "base"))
+        (self.root / "b.py").unlink()
+        seen.add(session.fingerprint(self.root, "base"))
+        self.assertEqual(len(seen), 5)
+
+    def test_tracked_only_change_keeps_the_previous_patch_hash(self):
+        import hashlib
+        (self.root / "note.md").write_text("edited\n", encoding="utf-8")
+        patch = subprocess.check_output(
+            ["git", "-C", str(self.root), "diff", "--no-ext-diff", "--no-textconv", "--binary",
+             "--no-color", self.git("merge-base", "base", "HEAD")])
+        self.assertEqual(session.fingerprint(self.root, "base"), hashlib.sha256(patch).hexdigest())
+
     def test_lock_denies_concurrent_start(self):
         path = session.state_path(self.root, "465").with_suffix(".lock")
         path.write_text("", encoding="utf-8")
