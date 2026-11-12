@@ -3,7 +3,7 @@
 //! - [`StrokeDetector`]：製品 build の撫での判定。状態機械（`deskcat_touch::TouchTracker`）で撫でを判定し、呼び出し側が
 //!   `head_touched` を Pi へ送る（#21）。
 //! - [`TouchSampler`]：#14 の試験 build（`touch-sample-14`、`touch-lcd-14`）の raw 読み出し。下の段落と「出力と、確かめていないこと」。
-//! - [`IdleTouch`]：LCD を描く試験 build が、touch を読まずに持つ device。
+//! - [`IdleTouch`]：LCD を描く試験 build と `no-touch-487` が、touch を読まずに持つ device。
 //!
 //! 制御 byte と 3 byte 応答の復号は `deskcat_touch` が持つ（host test 済み。ここへ再掲しない）。
 //! 試験 build（[`TouchSampler`]）は `POLL_INTERVAL_MS` ごとに `X`・`Y`・`Z1`・`Z2` を 1 回ずつ読み（4 回の転送で 1 sample）、`T_IRQ`（`TOUCH-IRQ`）の level とあわせて
@@ -23,7 +23,7 @@
 //!   （`T_IRQ` の変化の記録は同じ）。
 //! - **製品 build（[`StrokeDetector`]）は LCD と `SpiDriver` を共有し、touch を読む。**`X`・`Y`・`Z1` の 3 回の転送で 1 sample で、
 //!   `T_IRQ` は読まず、`TOUCH-IRQ` は取らない。LCD の帯と帯の間（main loop の周回）で読み、帯の途中では読まない（`touch-lcd-14` と同じ）。
-//! - **LCD を描く試験 build（`bringup-display-13`、`face-21` を含む構成）は [`IdleTouch`] を持つ。**LCD と `SpiDriver` を共有し、touch の
+//! - **LCD を描く試験 build（`bringup-display-13`、`face-21` を含む構成）と `no-touch-487` は [`IdleTouch`] を持つ。**LCD と `SpiDriver` を共有し、touch の
 //!   device を足すが、**touch を読まない**（転送しない）。`TOUCH-IRQ` は取らない。
 //!
 //! 製品 build と LCD を描く試験 build は、`TOUCH-CS` を High に保ち、LCD の転送中に XPT2046 を選ばない。GPIO21 には外部 10 kΩ の

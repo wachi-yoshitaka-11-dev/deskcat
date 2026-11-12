@@ -1,7 +1,7 @@
 //! [Issue #514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)の追加LEDの
 //! bring-up。`LED-COMM`（白、GPIO2）と`LED-REACT`（赤、GPIO5）を駆動する。どちらもHighで点灯する。
 //!
-//! **製品build（featureなし）と`bringup-led-514` feature付きbuildがcompileする。**それ以外の試験buildは
+//! **製品build（featureなし）と`bringup-led-514` feature付きbuildがcompileする（`no-touch-487`は持たない）。**それ以外の試験buildは
 //! GPIO2／GPIO5に触れない。点灯試験（下の1）を行うのは`bringup-led-514`付きbuildだけで、製品buildは
 //! 点灯試験を行わない。配線、抵抗、起動時の電位、試験の順序は
 //! [led-514-demo.md](../../../docs/hardware/led-514-demo.md)が正本であり、ここへ再掲しない。

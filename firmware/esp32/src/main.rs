@@ -64,6 +64,7 @@
 //! | `touch-sample-14` | `TOUCH-01`（XPT2046）の raw 読み出し。SPI3（GPIO18/23/19）、`TOUCH-CS`＝GPIO21、`TOUCH-IRQ`＝GPIO34 で X・Y・Z1・Z2 を読み、IRQ の level とあわせて UART0 に log（#14、`crate::touch`）。`T_IRQ` の変化の時刻と、console から受けた `MARK` の時刻も log する（条件 6 の突き合わせ用）。LCD は初期化せず、`LCD-CS`（GPIO22）を High に固定する。状態機械は配線しない | 単独指定のみ。touch 用 5 本を足した配線で、`EXP-038`（develop `79f29ea`。raw を取った）と `EXP-041`（develop `b9a04e8`。`T_IRQ` の変化と `MARK` の log、`crate::spi_port` の bus の持ち方を含む版で、`MARK` 31 件に `touch_mark` 31 件、SPI の失敗 0 件）の版を実機に書き込んで動かした。次の通電・書き込みにも実機側の新たな承認が要る。Pi link の payload は変更しない |
 //! | `touch-lcd-14` | LCDを初期化して点灯し、表情（neutral→happy→surprised）を帯1本ずつ塗り続けながら、同じSPI host（SPI3）で`TOUCH-01`のrawを読む（#14の受け入れ条件「LCD通信による許容できないdata lossがない」の観察用、`crate::touch_lcd`）。LCDとタッチは`SpiDriver`を共有し、busは転送ごとに取る。帯の途中ではタッチを読まない。console（stdin）は読まず、`MARK`は受け付けない（`T_IRQ`の変化は`touch-sample-14`と同じくlogする）。状態機械は配線しない | 単独指定のみ。**製品buildも同じ共有の型を使う。busを握り続ける型は`touch-sample-14`だけ**（`crate::spi_port`）。`set_expression`は`hardware_unavailable`で拒否する。`EXP-041`で、develop `b9a04e8`の版を、LCDのVCC・9本・touch用5本が挿さった配線に書き込み、157秒動かした（帯7000本、`lcd_errors_total=0`、`touch_spi_errors_total=0`、LCDの乱れは目視の申告に無い）。次の通電・書き込みにも実機側の新たな承認が要る。Pi linkのpayloadは変更しない |
 //! | `bringup-display-13` | LCDの初期化、backlightの点灯、単色fillと四隅pattern | 表情とtapは有効にしない。描画の間のPi linkの受信とheartbeatは`crate::display_test`のmodule docを参照 |
+//! | `no-touch-487` | 製品buildと同じ。ただし`TOUCH-CS`（GPIO21）は`IdleTouch`が出力Highにして保ち、touchを読まず、`head_touched`を送らず、LED（GPIO2・GPIO5）に触れない（#487） | 単独で使う。`build.rs`はこのfeatureだけ製品経路のcfgから外さず、併用は`compile_error!`で止める。通電の条件は`docs/hardware/power-budget.md`の`touchを読まない製品build（no-touch-487）の通電の条件` |
 //! | `bringup-led-514` | #514の追加LED（GPIO2／GPIO5）の点灯試験（赤→白→両方）と、その後の白の点滅（`crate::led`）。製品buildにある赤の`happy`点灯も同じ経路を持つ。このfeatureだけのbuildは表情を持たないため`set_expression`を受理せず、赤は点灯試験の区間だけ点く。`face-21`と組み合わせたbuildは`happy`を受理し、赤を1秒点ける（この併用は`compile_error!`で止めていない） | 表情とtapは有効にしない。`bringup-display-13`とも組み合わせられる |
 //! | `face-21` | LCDの初期化とbacklightの点灯を保ち、`set_expression`の表情を描く。Pi commandを受けなくても、描ける状態になった時点で`neutral`を1回描く（#21、`crate::face`） | `bringup-display-13`とも組み合わせられる。**表情を持たない試験buildは`set_expression`を`hardware_unavailable`で拒否する** |
 //! | `tap-21` | ADXL345のtap検出を設定し、`INT_SOURCE`をI2Cで読み、bootのACK後に`tapped`を送る（#21のF1、`crate::tap`）。ADXL345のDevice IDが`0xE5`のときだけ設定を書き、I2Cのdriverを持ち続ける（一致しなければ何も書かず、driverを手放す） | INT線は使わない（配線は要らない）。`face-21`・`bringup-display-13`とも組み合わせられる。**試験buildのうち`tap-21`も`accel-sample-15`も持たないものは、ADXL345へ書き込まず、Device IDを読むだけである**（既定・製品buildは`tap-21`と同じく書く） |
@@ -198,6 +199,10 @@
     any(feature = "bench-servo-calib-18", feature = "bench-wdt-711"),
     allow(dead_code, unused_imports)
 )]
+
+// `no-touch-487`は単独で使う。他のfeatureを足すと製品経路（`build.rs`の`deskcat_product_mode`）が外れ、touchを読まない製品buildにならない。
+#[cfg(all(feature = "no-touch-487", not(deskcat_product_mode)))]
+compile_error!("no-touch-487は単独で使う。他のfeatureと併用しない。");
 
 mod accel;
 #[cfg(feature = "accel-sample-15")]
@@ -373,7 +378,7 @@ mod env_sample;
 mod face;
 mod health;
 mod i2c_bus;
-#[cfg(any(feature = "bringup-led-514", deskcat_product_mode))]
+#[cfg(any(feature = "bringup-led-514", deskcat_product_led))]
 mod led;
 #[cfg(feature = "mem-probe-23")]
 mod mem_probe;
@@ -397,7 +402,7 @@ mod spi_port;
 mod tap;
 #[cfg(any(feature = "bench-servo-calib-18", feature = "bench-wdt-711"))]
 mod task_wdt;
-// 製品buildは`touch::StrokeDetector`、LCDを描く試験build（`bringup-display-13`・`face-21`）は読まない`touch::IdleTouch`だけを使う。
+// 製品buildは`touch::StrokeDetector`、LCDを描く試験build（`bringup-display-13`・`face-21`）と`no-touch-487`は読まない`touch::IdleTouch`だけを使う。
 // 試験buildの読み出しの型（`TouchSampler`）はdead_codeになる。
 #[cfg(any(
     feature = "touch-sample-14",
@@ -461,7 +466,7 @@ use crate::env_sample::EnvSampler;
 use crate::face::FaceDrawer;
 use crate::face::FaceState;
 use crate::health::Health;
-#[cfg(any(feature = "bringup-led-514", deskcat_product_mode))]
+#[cfg(any(feature = "bringup-led-514", deskcat_product_led))]
 use crate::led::Leds;
 #[cfg(not(any(
     feature = "bench-servo-test-17",
@@ -471,28 +476,34 @@ use crate::led::Leds;
 use crate::pi_link::{FaceTargets, PiLink};
 #[cfg(any(feature = "tap-21", deskcat_product_mode))]
 use crate::tap::TapDetector;
-#[cfg(all(
-    not(deskcat_product_mode),
-    any(feature = "bringup-display-13", feature = "face-21")
+#[cfg(any(
+    feature = "no-touch-487",
+    all(
+        not(deskcat_product_mode),
+        any(feature = "bringup-display-13", feature = "face-21")
+    )
 ))]
 use crate::touch::IdleTouch;
-#[cfg(deskcat_product_mode)]
+#[cfg(deskcat_reads_touch)]
 use crate::touch::StrokeDetector;
 #[cfg(any(feature = "touch-sample-14", feature = "touch-lcd-14"))]
 use crate::touch::TouchSampler;
 #[cfg(feature = "touch-lcd-14")]
 use crate::touch_lcd::TouchLcd;
-#[cfg(deskcat_product_mode)]
+#[cfg(deskcat_reads_touch)]
 use deskcat_protocol::HeadTouched;
 #[cfg(any(feature = "tap-21", deskcat_product_mode))]
 use deskcat_protocol::Message;
 
 /// `run_display_bringup`がLCDと同じbusに足すtouchの型。製品buildは撫でを判定し、LCDを描く試験buildは読まない（`crate::touch`）。
-#[cfg(deskcat_product_mode)]
+#[cfg(deskcat_reads_touch)]
 type BusTouch = StrokeDetector;
-#[cfg(all(
-    not(deskcat_product_mode),
-    any(feature = "bringup-display-13", feature = "face-21")
+#[cfg(any(
+    feature = "no-touch-487",
+    all(
+        not(deskcat_product_mode),
+        any(feature = "bringup-display-13", feature = "face-21")
+    )
 ))]
 type BusTouch = IdleTouch;
 
@@ -702,7 +713,7 @@ fn main() {
     // **bring-upより前に作る。**両LEDを早く消灯側へ固定するためである（`crate::led`の
     // module doc「起動からの状態」）。点灯試験の時計は`bringup_done_ms`から数える。
     // 失敗してもfirmwareは止めない。LEDは表示だけを担い、ほかの機能はLEDに依存しない。
-    #[cfg(any(feature = "bringup-led-514", deskcat_product_mode))]
+    #[cfg(any(feature = "bringup-led-514", deskcat_product_led))]
     let mut leds = match Leds::new(peripherals.pins.gpio2, peripherals.pins.gpio5) {
         Ok(leds) => Some(leds),
         Err(err) => {
@@ -737,9 +748,13 @@ fn main() {
         "raw_sample"
     } else if cfg!(feature = "touch-lcd-14") {
         "raw_sample_with_lcd"
-    } else if cfg!(deskcat_product_mode) {
+    } else if cfg!(deskcat_reads_touch) {
         "stroke"
-    } else if cfg!(any(feature = "bringup-display-13", feature = "face-21")) {
+    } else if cfg!(any(
+        feature = "no-touch-487",
+        feature = "bringup-display-13",
+        feature = "face-21"
+    )) {
         "cs_high_not_read"
     } else {
         "not_driven"
@@ -765,7 +780,7 @@ fn main() {
         feature = "face-21",
         deskcat_product_mode
     ))]
-    #[cfg_attr(not(deskcat_product_mode), allow(unused_mut, unused_variables))]
+    #[cfg_attr(not(deskcat_reads_touch), allow(unused_mut, unused_variables))]
     let (lcd, mut bus_touch) = run_display_bringup(
         peripherals.spi3,
         peripherals.pins.gpio18,
@@ -905,7 +920,7 @@ fn main() {
     let bringup_done_ms = health.uptime_ms();
     let mut next_heartbeat = bringup_done_ms + u64::from(config::HEARTBEAT_PERIOD_MS);
     let mut next_snapshot = bringup_done_ms + u64::from(config::HEALTH_SNAPSHOT_PERIOD_MS);
-    #[cfg(any(feature = "bringup-led-514", deskcat_product_mode))]
+    #[cfg(any(feature = "bringup-led-514", deskcat_product_led))]
     let led_start_ms = bringup_done_ms;
 
     // Pi linkの送信も受信も、protocol専用の`UartDriver`経由に揃える。**UART0は使わない**
@@ -1095,11 +1110,11 @@ fn main() {
             let poll_started_at_ms = health.uptime_ms();
             // 製品buildは、タッチの接触中と離れた直後のtapを送らない（撫でる力がtapと判定されると推定している。`crate::touch::TAP_HOLDOFF_AFTER_RELEASE_MS`）。
             // また、tapを見つけても`deskcat_tap::TAP_CONFIRM_MS`の間は送らず保留し、その間に接触が始まれば捨てる（`crate::tap`）。
-            #[cfg(deskcat_product_mode)]
+            #[cfg(deskcat_reads_touch)]
             let touch_blocks = bus_touch
                 .as_ref()
                 .is_some_and(|touch| touch.tap_blocked(poll_started_at_ms));
-            #[cfg(not(deskcat_product_mode))]
+            #[cfg(not(deskcat_reads_touch))]
             let touch_blocks = false;
             let events = detector.poll(
                 poll_started_at_ms,
@@ -1119,7 +1134,7 @@ fn main() {
         }
 
         // 製品buildでtouchを1 sample読み、撫でと判定して送ってよいときだけ`head_touched`を送る（`crate::touch::StrokeDetector`）。
-        #[cfg(deskcat_product_mode)]
+        #[cfg(deskcat_reads_touch)]
         if let Some(detector) = bus_touch.as_mut() {
             if let Some(duration_ms) =
                 detector.poll(health.uptime_ms(), boot_session.is_established())
@@ -1219,7 +1234,7 @@ fn main() {
         if let Some(deadline) = tap.as_ref().and_then(TapDetector::next_deadline_ms) {
             until = until.min(deadline);
         }
-        #[cfg(deskcat_product_mode)]
+        #[cfg(deskcat_reads_touch)]
         if let Some(deadline) = bus_touch
             .as_ref()
             .and_then(StrokeDetector::next_deadline_ms)
@@ -1258,7 +1273,7 @@ fn main() {
         {
             until = until.min(deadline);
         }
-        #[cfg(any(feature = "bringup-led-514", deskcat_product_mode))]
+        #[cfg(any(feature = "bringup-led-514", deskcat_product_led))]
         if let Some(leds) = leds.as_mut() {
             let now_led = health.uptime_ms();
             // 受理した`happy`を取り出すのはLEDがあるときだけにする（初期化に失敗したら点ける先が無い）。
@@ -1601,7 +1616,7 @@ fn service_bringup_step(health: &mut Health, step: &str) {
 }
 
 /// `DISP-01`を初期化してbacklightを点け、driverを返す。あわせて、同じbusにtouchのdeviceを足して`TOUCH-CS`をHighに保つ
-/// （[`BusTouch`]。製品buildは`crate::touch::StrokeDetector`でmain loopから読み、LCDを描く試験buildは`crate::touch::IdleTouch`で読まない）。
+/// （[`BusTouch`]。製品buildは`crate::touch::StrokeDetector`でmain loopから読み、LCDを描く試験buildと`no-touch-487`は`crate::touch::IdleTouch`で読まない）。
 ///
 /// `bringup-display-13`付きbuildでは、呼び出し側がfillと四隅patternをmain loopの中で進める（`crate::display_test`。
 /// `#487`のPR B1より前は、この関数が1回の呼び出しで描き切っていた）。controllerのIDは読まない（`crate::display`のmodule doc）。
@@ -1649,10 +1664,10 @@ fn run_display_bringup<SPI: SpiAnyPins + 'static>(
         }
     };
     // **`TOUCH-CS`をHighにするため、touchのdeviceをLCDの初期化より前に作る。**この段では何も送らない。
-    // 作れなくてもLCDは続ける（GPIO21の外部pull-upがHighを保つ。`gpio-assignment.md`）。その場合、製品buildは撫でを判定しない。
-    #[cfg(deskcat_product_mode)]
+    // 作れなくてもLCDは続ける（GPIO21の外部pull-upがHighを保つ。`gpio-assignment.md`）。その場合、製品build（`no-touch-487`を除く）は撫でを判定しない。
+    #[cfg(deskcat_reads_touch)]
     let created = StrokeDetector::with_shared_bus(Rc::clone(&bus), touch_cs, now_ms);
-    #[cfg(not(deskcat_product_mode))]
+    #[cfg(not(deskcat_reads_touch))]
     let created = {
         let _ = now_ms;
         IdleTouch::with_shared_bus(Rc::clone(&bus), touch_cs)

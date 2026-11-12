@@ -133,6 +133,7 @@ jobs:
             face-21,bringup-display-13 \
             tap-21 \
             tap-21,face-21,bringup-display-13 \
+            no-touch-487 \
             mem-probe-23,face-21,tap-21 \
             accel-sample-15 \
             touch-sample-14 \

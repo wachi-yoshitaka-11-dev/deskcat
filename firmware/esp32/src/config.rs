@@ -335,11 +335,11 @@ pub const PI_PROTOCOL_UART_EVENT_QUEUE_LEN: usize = 32;
 /// `LED-COMM`（白、[Issue #514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)）の
 /// GPIO番号。出所は[gpio-assignment.md](../../../docs/hardware/gpio-assignment.md)の`信号inventory`。
 /// `SERVO_PWM_GPIO`と同じく確認用途のみ（[`crate::led::Leds::new`]の`debug_assert_eq!`。debug buildだけ）。
-#[cfg(any(feature = "bringup-led-514", deskcat_product_mode))]
+#[cfg(any(feature = "bringup-led-514", deskcat_product_led))]
 pub const LED_COMM_GPIO: u8 = 2;
 
 /// `LED-REACT`（赤、#514）のGPIO番号。出所と用途は[`LED_COMM_GPIO`]と同じ。
-#[cfg(any(feature = "bringup-led-514", deskcat_product_mode))]
+#[cfg(any(feature = "bringup-led-514", deskcat_product_led))]
 pub const LED_REACT_GPIO: u8 = 5;
 
 /// `LED-COMM`の点滅周期（milliseconds）。半分ずつ点灯と消灯にする。
@@ -350,7 +350,7 @@ pub const LED_REACT_GPIO: u8 = 5;
 /// [Hardware Safety Policy](../../../docs/governance/hardware-safety-policy.md)の安全要件5項目の
 /// いずれにも効かない（**どの値が5項目に効くかの判定は同policyが正本であり、ここへ再掲しない**）。
 /// **2以上の偶数**であること（[`crate::led`]の割り算の前提。`led.rs`のconst assertが検査する）。
-#[cfg(any(feature = "bringup-led-514", deskcat_product_mode))]
+#[cfg(any(feature = "bringup-led-514", deskcat_product_led))]
 pub const LED_BLINK_PERIOD_MS: u32 = 1_000;
 
 /// 起動時の点灯試験で、赤だけ・白だけ・両方の各区間を保つ時間（milliseconds）。
@@ -361,7 +361,7 @@ pub const LED_BLINK_PERIOD_MS: u32 = 1_000;
 /// 3区間の合計（この値の3倍）だけ、白の点滅が始まるのが遅れる。
 /// 0にしない（`led.rs`のconst assertが検査する）。点灯試験を行うのは`bringup-led-514`付きbuildだけである
 /// （製品buildはこの値を使わない）。
-#[cfg(any(feature = "bringup-led-514", deskcat_product_mode))]
+#[cfg(any(feature = "bringup-led-514", deskcat_product_led))]
 pub const LED_LAMP_TEST_HOLD_MS: u32 = 10_000;
 
 /// `happy`の受理で`LED-REACT`（赤）を点ける時間（milliseconds）。
@@ -371,5 +371,5 @@ pub const LED_LAMP_TEST_HOLD_MS: u32 = 10_000;
 /// 外した場合の帰結は見え方が変わるだけなので、
 /// [Hardware Safety Policy](../../../docs/governance/hardware-safety-policy.md)の安全要件5項目の
 /// いずれにも効かない（**どの値が5項目に効くかの判定は同policyが正本であり、ここへ再掲しない**）。
-#[cfg(any(feature = "bringup-led-514", deskcat_product_mode))]
+#[cfg(any(feature = "bringup-led-514", deskcat_product_led))]
 pub const LED_REACT_PULSE_MS: u32 = 1_000;
