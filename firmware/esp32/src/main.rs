@@ -974,6 +974,8 @@ fn main() {
         let now = health.uptime_ms();
         // 制御周期の期限が来たときだけ`tick`する。`LimitedServo`が無い間は何もしない（`PiLink::tick_servo`）。
         #[cfg(not(feature = "bench-servo-test-17"))]
+        pi_link.check_link(now);
+        #[cfg(not(feature = "bench-servo-test-17"))]
         pi_link.tick_servo(now);
         // debug consoleの行を、Pi由来と同じ`MotionDispatch`へ渡す（`PiLink::on_debug_line`）。
         #[cfg(feature = "debug-motion-19")]
@@ -1193,6 +1195,11 @@ fn main() {
         // `tick`の期限（制御周期）。待ちはこの下のUART read timeoutで行い、blockingしない。
         #[cfg(not(feature = "bench-servo-test-17"))]
         if let Some(deadline) = pi_link.next_servo_deadline_ms() {
+            until = until.min(deadline);
+        }
+        // Piからの受信が途切れたと判定する時刻。
+        #[cfg(not(feature = "bench-servo-test-17"))]
+        if let Some(deadline) = pi_link.next_link_deadline_ms() {
             until = until.min(deadline);
         }
         #[cfg(feature = "bringup-display-13")]
