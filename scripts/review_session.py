@@ -18,6 +18,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -45,18 +46,24 @@ def toplevel(root):
 
 
 def fingerprint(root, base):
-    """Include pending changes and nonignored new files; never key by HEAD."""
+    """Hash what git would commit: the diff of a scratch index holding every nonignored file.
+
+    The real index and the working tree are not touched, so untracked, staged and
+    committed files give the same value and git decides deletions, modes and renames.
+    """
     root = toplevel(root)
     ancestor = git(root, "merge-base", base, "HEAD").decode().strip()
-    digest = hashlib.sha256(git(
-        root, "diff", "--no-ext-diff", "--no-textconv", "--binary",
-        "--no-color", ancestor,
-    ))
-    for name in sorted(git(root, "ls-files", "--others", "--exclude-standard", "-z").split(b"\0")):
-        if name:
-            path = Path(root) / os.fsdecode(name)
-            digest.update(name + b"\0" + path.read_bytes() + b"\0")
-    return digest.hexdigest()
+    index = Path(root) / os.fsdecode(git(root, "rev-parse", "--git-path", "index").strip())
+    with tempfile.TemporaryDirectory() as scratch:
+        env = dict(os.environ, GIT_INDEX_FILE=str(Path(scratch) / "index"))
+        if index.exists():
+            shutil.copyfile(index, env["GIT_INDEX_FILE"])
+        subprocess.check_call(["git", "-C", root, "add", "-A"], env=env)
+        diff = subprocess.check_output([
+            "git", "-C", root, "diff", "--cached", "--no-ext-diff", "--no-textconv",
+            "--binary", "--no-color", ancestor,
+        ], env=env)
+    return hashlib.sha256(diff).hexdigest()
 
 
 def changed_paths(root, base):

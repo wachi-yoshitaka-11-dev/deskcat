@@ -62,8 +62,8 @@ python3 scripts/review_gate.py session begin --work 465
 ```
 
 1回の起動を1巡とし、両Passを同じ巡で実施しても巡数は増やさない。
-機械checkや実装をレビューと取り違えない。予約したdiffはbaseのmerge-baseからの差分に、
-未commit変更とignoreされていない新規fileを含めたSHA-256。Pass中にdiffが変わった場合は
+機械checkや実装をレビューと取り違えない。予約したdiffは、一時のindexへ`git add -A`した状態の、baseのmerge-baseからの
+`git diff --cached --binary`のSHA-256（本物のindexと作業treeは変えない）。Pass中にdiffが変わった場合は
 `interrupted`として記録し、新しいdiffで次の巡を予約する。修正は巡の結果保存後に行う。
 
 ## 結果と終了判定
