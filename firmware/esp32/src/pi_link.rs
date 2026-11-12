@@ -77,8 +77,9 @@ use deskcat_protocol::{
     Outcome, PlayMotion, Rejection,
 };
 use deskcat_servo::{
-    admit_pi, drive_tick, DedupOutcome, Drive, DriveOutcome, LimiterCounters, MotionCatalog,
-    MotionDecision, MotionDispatch, MotionSession, MotionSink, PiMotion, TickSchedule,
+    admit_pi, drive_tick, fail_safe_on_loss, DedupOutcome, Drive, DriveOutcome, LimiterCounters,
+    LinkWatch, MotionCatalog, MotionDecision, MotionDispatch, MotionSession, MotionSink, PiMotion,
+    TickSchedule,
 };
 use esp_idf_svc::hal::uart::UartDriver;
 
@@ -86,7 +87,7 @@ use crate::boot_session::{BootSession, HelloAccepted};
 use crate::face::{FaceDrawer, FaceState};
 use crate::health::Health;
 use crate::protocol::{HelloOutcome, PiSession};
-use crate::servo_path::{resolve_target, tick_period_ms, ServoPath};
+use crate::servo_path::{resolve_target, tick_period_ms, ServoPath, LINK_LOSS_TIMEOUT_MS};
 
 /// `play_motion`の保持件数（暫定）。**確定値ではない。**`PROTO-TBD-005`が未決で、数値そのものに根拠は無い。
 ///
@@ -115,6 +116,8 @@ pub struct PiLink {
     servo: Option<ServoPath<'static>>,
     /// `tick`を刻む期限。`servo`が`Some`で、周期（`crate::servo_path::tick_period_ms`）が決まっているときだけ`Some`。
     tick_schedule: Option<TickSchedule>,
+    /// Piからの受信の途切れの見張り（`LINK_LOSS_TIMEOUT_MS`）。
+    link_watch: LinkWatch,
 }
 
 impl PiLink {
@@ -132,11 +135,21 @@ impl PiLink {
                 }
             }
         }
+        // 途切れの時間が決まっていない`ServoPath`は、途切れでstopできないので、同じく手放す。
+        if !LinkWatch::new(LINK_LOSS_TIMEOUT_MS).is_armed() {
+            if let Some(mut path) = servo.take() {
+                log::error!("servo_link_loss_timeout_missing (stopして手放す)");
+                if let Err(err) = path.stop() {
+                    log::error!("servo_stop_failed error={err}");
+                }
+            }
+        }
         // servoが無ければ刻まない（期限だけがmain loopの待ちを起こすことを避ける）。
         let tick_schedule = tick_schedule.filter(|_| servo.is_some());
         Self {
             servo,
             tick_schedule,
+            link_watch: LinkWatch::new(LINK_LOSS_TIMEOUT_MS),
             receiver: LineReceiver::with_protocol_limit(),
             pi: PiSession::new(),
             motion_dispatch: MotionDispatch::new(
@@ -189,6 +202,32 @@ impl PiLink {
         self.tick_schedule
             .as_ref()
             .map(TickSchedule::next_deadline_ms)
+    }
+
+    /// 受信が途切れたと判定する時刻。見張っていなければ`None`。main loopの待ち（`until`）へ足す。
+    pub fn next_link_deadline_ms(&self) -> Option<u64> {
+        self.servo.as_ref()?;
+        self.link_watch.deadline_ms()
+    }
+
+    /// main loopの1周ごとに呼ぶ。Piからの受信が途切れたと最初に判定したとき、`stop`してlogへ残す。
+    /// `stop`が失敗したら、`tick_servo`が試し直す。
+    pub fn check_link(&mut self, now_ms: u64) {
+        let Some(path) = self.servo.as_mut() else {
+            return;
+        };
+        if let Some(result) = fail_safe_on_loss(&mut self.link_watch, path, now_ms) {
+            log::error!(
+                "pi_link_lost now_ms={now_ms} losses={}",
+                self.link_watch.losses()
+            );
+            if let Err(err) = result {
+                log::error!(
+                    "servo_stop_failed error={err} stop_failures={}",
+                    path.stop_failures()
+                );
+            }
+        }
     }
 
     /// main loopの1周ごとに呼ぶ。**期限が来たときだけ`tick`する**（制御周期。blockingしない）。`LimitedServo`が無ければ何もしない。
@@ -253,6 +292,10 @@ impl PiLink {
     ) {
         let Frame { envelope, message } = frame;
         let (sid, id) = (envelope.sid, envelope.id);
+        // 仮置き：現在のPi sessionのframeを受信とみなす（heartbeatの方式はPROTO-TBD-010）。
+        if self.pi.pi_sid() == Some(sid) {
+            self.link_watch.note_rx(now_ms);
+        }
         match message {
             Message::Ack(ack) => {
                 if let Some(pi_sid) = self.pi.pi_sid() {
@@ -269,6 +312,9 @@ impl PiLink {
             }
             Message::Hello(hello) => {
                 let handled = self.pi.handle_hello(sid, id, &hello);
+                if self.pi.pi_sid() == Some(sid) {
+                    self.link_watch.note_rx(now_ms);
+                }
                 log::info!(
                     "pi_rx_hello sid={sid} id={id} reason={:?} outcome={:?}",
                     hello.reason,

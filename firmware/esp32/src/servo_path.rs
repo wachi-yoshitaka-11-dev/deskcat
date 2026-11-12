@@ -25,6 +25,11 @@ pub const CONTROL_PERIOD_NOMINAL_MS: Option<u32> = None;
 /// 製品buildの制御周期の許容幅（ms）。TBD。
 pub const CONTROL_PERIOD_TOLERANCE_MS: Option<u32> = None;
 
+/// Piからの受信が途切れたと判定するまでの時間（ms）。TBD（HW-TBD-017）。
+///
+/// 何を「受信」とみなすか（heartbeatの方式。PROTO-TBD-010）も未確定で、`PiLink`の仮置きである。
+pub const LINK_LOSS_TIMEOUT_MS: Option<u32> = None;
+
 /// `tick`を刻む周期（ms）。**公称と許容幅の両方が決まるまで`None`**（`ControlPeriod`が作れない間は刻まない）。
 #[must_use]
 pub fn tick_period_ms() -> Option<u32> {
