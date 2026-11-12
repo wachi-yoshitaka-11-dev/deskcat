@@ -20,14 +20,11 @@
 //!
 //! # 失敗の扱い
 //!
-//! I2Cの読み出しが失敗しても止まらない（1 transactionは有限時間で返る。上限は`config::I2C_TRANSACTION_TIMEOUT_MS`の100 ms。
-//! 設定（`configure`）の滞留の**上界**は、全部成功する経路で700 ms（6書き込み＋捨て読み1。各transactionのtimeout×7の上界で、
-//! 成功したtransactionはその前に終わる）、書き込みが途中で失敗する経路で600 ms（最初の失敗で止まる）、読み出しの失敗は1周回あたり
-//! 最大100 ms。**揺れの設定（`deskcat_tap::shake::SHAKE`）に値が入ると、書き込みは8件になり、上の2つの上界はそれぞれ900 ms・800 msである**）。
+//! I2Cの読み出しが失敗しても止まらない（1 transactionは有限時間で返る。上限は`config::I2C_TRANSACTION_TIMEOUT_MS`の100 ms）。
 //! **設定（`configure`）は、Device IDが一致したときだけ走る**（一致しなければ`start_product_sensors`／`start_tap`が`tap_not_started`をlogへ出す）。
 //! **設定（`configure`）が走る場所はbuildで違う。**`bringup-display-13`を持たないbuildは、起動時のI2C bring-upの直後、
-//! main loopの前で走る（`BootSession::start`の前でもあるため、上の時間が最初の`boot`の送出を遅らせうる）。
-//! `bringup-display-13`付きbuildは、LCDのbring-upが済んだ後にmain loopの1周回の中で走る（その1周回が、上の時間だけ延びうる）。
+//! main loopの前で走る（`BootSession::start`の前でもあるため、`configure`の時間が最初の`boot`の送出を遅らせうる）。
+//! `bringup-display-13`付きbuildは、LCDのbring-upが済んだ後にmain loopの1周回の中で走る（その1周回が、`configure`の時間だけ延びうる）。
 //! 読み出しは、いずれのbuildでもmain loopの1周回に乗る。[`MAX_CONSECUTIVE_ERRORS`]回続けて失敗したら、
 //! 検出をやめる（bus固着のとき、main loopを毎周回I2C timeoutで塞がないため）。やめたことはlogへ出す。
 //!
@@ -67,7 +64,7 @@ pub struct TapDetector {
     accel: Adxl345,
     i2c: SharedI2c,
     filter: TapFilter,
-    /// 揺れの検出。`deskcat_tap::shake::SHAKE`が`None`（`TBD`）の間は`None`で、Activityを設定せず、`shaken`も送らない。
+    /// 揺れの検出。`deskcat_tap::shake::SHAKE`が`None`なら`None`で、Activityを設定せず、`shaken`も送らない。
     shake_config: Option<ShakeConfig>,
     shake: Option<ShakeFilter>,
     next_poll_ms: u64,

@@ -1111,7 +1111,7 @@ fn main() {
                 log::info!("tap_event_poll_start uptime_ms={poll_started_at_ms}");
                 pi_link::send_event(Message::Tapped, &mut boot_session, &health, &mut uart);
             }
-            // 揺れは、`deskcat_tap::shake::SHAKE`が`None`（`TBD`）の間は`false`のままで、送らない。
+            // 揺れは、`deskcat_tap::shake::SHAKE`が`None`なら`false`のままで、送らない。
             if events.shaken {
                 log::info!("shake_event_poll uptime_ms={poll_started_at_ms}");
                 pi_link::send_event(Message::Shaken, &mut boot_session, &health, &mut uart);
