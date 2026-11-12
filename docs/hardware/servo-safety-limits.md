@@ -984,8 +984,6 @@ firmware（`firmware/esp32/src/servo.rs`、
 
 **拘束の上界（頭が当たった、または線が張った場合）：**人が見て OFF にすることは上界ではない。電流は CC の `I_lim`、時間は calib build の露出の期限（[校正buildの仕様（案）](#校正buildの仕様案)の6、`EXPOSURE_MS` の行。期限は制御の周の単位で判定するため、厳密な上限ではない）で押さえる。firmware が hang した場合の扱いは、[#711 の 6741948327](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/711#issuecomment-6741948327) の「決まったこと」が決めた（`CONFIG_ESP_TASK_WDT_PANIC=y`、calib build の main task の task WDT への登録。task WDT が発火すると panic reset する）。段1も同じ扱いで行った（[EXP-060](experiment-log.md) の (vii)）。calib の hang での停止は確かめていない（[EXP-060](experiment-log.md) の (A)）。
 
-**時間と起動の上限：**その窓の実行承認が置く上限は、窓の始めに上限の時刻と数を記録する。起動は、USB の挿入、書き込み、console の open（reset 保持）から release まで、reset、panic reset などの意図しない reset をそれぞれ1回と数える（[EXP-060](experiment-log.md) の`起動の回数`と同じ）。上限に届いたら、途中でも止めてユーザーに訊く。
-
 **停止基準：**下の停止基準のとおり（段1と同じ）。加えて、頭が天板・servo 本体・線に触れたとき、または13本の線が張ったときは、直ちに出力を OFF にする。
 
 #### 停止基準
