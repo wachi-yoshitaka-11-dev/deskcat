@@ -895,6 +895,14 @@ Revision 39で、給電元（B-2bか`3V3` pinか）ごとに参照先の節が�
 
 **要る根拠。**`touch panel`の駆動電流の上界、または同等の実測。測定手段を使うなら、その仕様を先に確定する（`MEAS-05`の値は[hardware-bom.md](hardware-bom.md)が確定値として使わないと定めている）。これまでの窓（`EXP-038`・`EXP-041`・`EXP-044`）は、記録として指すだけで、この節の根拠にしない。
 
+##### touchを読まない製品build（`no-touch-487`）の通電の条件
+
+[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)の範囲である。feature `no-touch-487`を単独で付けた製品build（`firmware/esp32/README.md`の「build構成と通電」の表）は、`3V3` pin給電で通電してよい。実行する日に、条件(7)と同じ形で人間から1件承認を得る。実機ではまだ動かしていない。
+
+- **`XPT2046`とLEDの扱いは、通電してよいとしている`face-21,bringup-display-13`と同じである。**`TOUCH-CS`（GPIO21）は、`firmware/esp32/src/main.rs`の`run_display_bringup`が`touch::IdleTouch::with_shared_bus`で出力Highにして保つ（`firmware/esp32/src/touch.rs`の`PinDriver::output`と`set_high`。以後main loopが終わらないかぎり保持する）。この呼び出しは`face-21,bringup-display-13`の構成と同じ行で、`IdleTouch`は転送せず、`XPT2046`へ命令を送らない。LEDは、`mod led`と`Leds::new`が`bringup-led-514`か`deskcat_product_led`（`firmware/esp32/build.rs`。`no-touch-487`では出さない）のときだけ有効であり、この構成は`crate::led`を作らず、GPIO2・GPIO5に触れない。前提は、その構成と同じ配線である（`GPIO21`の外部10 kΩのpull-upと、`T_CS`が挿さっているか否か）。この節は、`XPT2046`の電流の値を新たに主張しない。
+- **ADXL345とBME280への書き込み。**安全要件の5項目に効かない（書き込みはregisterの設定であり、外れても測れないか誤検出になる）。電流は、条件(3)の計算の内訳（101.54 mA。本書の「この2点限定の給電」の行）に`ACCEL-01`と`ENV-01`が入っている。`firmware/esp32/README.md`の`env-sample-16`の行にある「新しい書き込みを含む構成の通電手順と承認は未確定」は、その試験buildの行の注記であり、この構成には当てない。
+- **`DISP-01`追加接続の手順のうち、この構成に当てるのは、条件(1)・(3)〜(7)、手順1〜4・手順6、書き込むimageをこの構成のbuildに置き換えた手順7、手順8のうち異音・発熱・火花・変色・異臭・電圧降下による停止、手順10、手順11の記録の形式だけである。**条件(2)は、電流や熱の条件ではない（直前の`製品build（featureなし）の通電の条件`の節）。
+
 ##### 3.3 V railの許容電圧範囲
 
 **この節は上の`許容電圧範囲`行の導出である。値の正はその行であり、この節ではない。**
