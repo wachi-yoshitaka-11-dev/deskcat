@@ -60,7 +60,17 @@ pub struct TouchLcd {
 
 impl TouchLcd {
     /// 初期化と backlight の点灯を済ませた LCD と、結線済みのタッチを受け取る。
-    pub fn new(lcd: Ili9341<'static>, sampler: TouchSampler) -> Self {
+    pub fn new(mut lcd: Ili9341<'static>, sampler: TouchSampler) -> Self {
+        // 表情の背景は帯（`TEXT_BAND_TOP`から下）を塗らないため、最初に1回だけ黒く塗る。
+        if let Err(err) = lcd.fill_rect(
+            0,
+            deskcat_face::TEXT_BAND_TOP,
+            crate::display::WIDTH - 1,
+            crate::display::HEIGHT - 1,
+            crate::display::color::BLACK,
+        ) {
+            log::error!("touch_lcd_band_clear_failed error={err}");
+        }
         Self {
             lcd,
             sampler,
