@@ -295,12 +295,7 @@ impl<'d> FaceDrawer<'d> {
     }
 
     /// コメントの描画の失敗を数え、表示を終える。`clear_band`なら、描きかけの帯を消す。
-    fn text_draw_failed(
-        &mut self,
-        step: &str,
-        err: esp_idf_svc::sys::EspError,
-        clear_band: bool,
-    ) {
+    fn text_draw_failed(&mut self, step: &str, err: esp_idf_svc::sys::EspError, clear_band: bool) {
         self.text_counters.draw_failed = self.text_counters.draw_failed.saturating_add(1);
         log::error!("text_draw_failed step={step} error={err}");
         self.text = None;
