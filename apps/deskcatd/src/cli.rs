@@ -18,7 +18,7 @@ use deskcat_serial::DuplicatePolicy;
 /// 使い方。
 pub const USAGE: &str = "usage: deskcatd --port <path> --baud <rate> \
 --duplicate-capacity <n> --duplicate-retention-ms <ms> --startup-deadline-ms <ms> \
-[--speech-min-interval-ms <ms> --speech-duration-ms <ms>] [--cloud-speech] [--verbose]\n\
+[--speech-min-interval-ms <ms> --speech-duration-ms <ms>] [--cloud-speech] [--no-companion] [--verbose]\n\
 \n\
 --port、--baud、--duplicate-capacity、--duplicate-retention-ms、--startup-deadline-ms は必須である。\
 既定値を持たせない。\n\
@@ -40,6 +40,8 @@ pub struct Args {
     pub speech: Option<crate::runner::SpeechConfig>,
     /// 明示した場合だけクラウド経路を試す。credentialが無ければローカルだけ。
     pub cloud_speech: bool,
+    /// `Companion`をつながない。Piの時刻（寝る時間帯）に依存しない試験のためで、運用では付けない。
+    pub no_companion: bool,
     /// `Debug`まで出す。
     pub verbose: bool,
 }
@@ -114,8 +116,7 @@ where
     let mut startup_deadline_ms = None;
     let mut speech_min_interval_ms = None;
     let mut speech_duration_ms = None;
-    let mut verbose = false;
-    let mut cloud_speech = false;
+    let (mut verbose, mut cloud_speech, mut no_companion) = (false, false, false);
     let mut argv = raw.into_iter();
 
     while let Some(flag) = argv.next() {
@@ -142,6 +143,7 @@ where
             }
             "--verbose" => verbose = true,
             "--cloud-speech" => cloud_speech = true,
+            "--no-companion" => no_companion = true,
             "-h" | "--help" => return Ok(Parsed::Help),
             other => return Err(CliError::Unknown(other.to_owned())),
         }
@@ -206,6 +208,7 @@ where
         startup_deadline_ms,
         speech,
         cloud_speech,
+        no_companion,
         verbose,
     })))
 }
@@ -256,7 +259,18 @@ mod tests {
         assert_eq!(args.startup_deadline_ms.get(), 5000);
         assert_eq!(args.speech, None);
         assert!(!args.cloud_speech);
+        assert!(!args.no_companion);
         assert!(!args.verbose);
+    }
+
+    #[test]
+    fn no_companion_is_optional() {
+        let mut v = ALL.to_vec();
+        v.push("--no-companion");
+        let Ok(Parsed::Run(args)) = run(&v) else {
+            panic!("実行になる");
+        };
+        assert!(args.no_companion);
     }
 
     #[test]
