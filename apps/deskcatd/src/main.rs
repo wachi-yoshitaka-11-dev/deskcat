@@ -35,7 +35,12 @@ use deskcatd::sid::sid_from_os;
 use deskcatd::watchdog::StartupWatchdog;
 
 /// `Companion`をMVPの既定値でつなぐ。吹き出しの表示時間は独り言の設定を使い、無ければ吹き出しを送らない。
-fn with_companion(daemon: Daemon, speech: Option<SpeechConfig>) -> Daemon {
+///
+/// `disabled`は試験用である（`--no-companion`）。
+fn with_companion(daemon: Daemon, speech: Option<SpeechConfig>, disabled: bool) -> Daemon {
+    if disabled {
+        return daemon;
+    }
     daemon.with_companion(
         Companion::new(CompanionConfig::MVP, Millis(0)),
         speech.map(|config| config.duration_ms),
@@ -118,7 +123,7 @@ fn main() -> ExitCode {
             version: env!("CARGO_PKG_VERSION").to_owned(),
         },
     );
-    let mut daemon = with_companion(daemon, args.speech);
+    let mut daemon = with_companion(daemon, args.speech, args.no_companion);
     daemon.on_connected();
 
     // unitは既定で--cloud-speechを渡さない。credentialが欠ければローカルだけで続ける。

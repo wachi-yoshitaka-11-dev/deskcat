@@ -226,3 +226,37 @@ fn time_going_backwards_is_counted_and_ignored() {
     assert_eq!(c.on_shake(Millis(5_000)), Output::NONE);
     assert_eq!(c.counters().clock_regressions, 1);
 }
+
+#[test]
+fn a_pressure_point_older_than_the_history_window_is_not_a_baseline() {
+    // 履歴は`pressure_sample_ms`×18点（このtestでは18秒）。測れない間が空いたら、古い点は基準にしない。
+    let mut c = Companion::new(C, Millis(0));
+    assert_eq!(
+        c.on_ambient(amb(22.0, 50.0, 1013.0), Millis(0)),
+        Output::NONE
+    );
+    assert_eq!(
+        c.on_ambient(amb(22.0, 50.0, 1008.0), Millis(100_000)),
+        Output::NONE,
+        "窓より古い1013を基準に、5 hPaの下がりとして数えない"
+    );
+    // 古い点が残らないので、窓の中の点との差で判定する。
+    let o = c.on_ambient(amb(22.0, 50.0, 1004.0), Millis(101_000));
+    assert_eq!(o.bubble, Some(Bubble::LowPressure));
+}
+
+#[test]
+fn a_pressure_point_inside_the_history_window_is_still_a_baseline() {
+    let mut c = Companion::new(C, Millis(0));
+    let _ = c.on_ambient(amb(22.0, 50.0, 1013.0), Millis(0));
+    let o = c.on_ambient(amb(22.0, 50.0, 1008.0), Millis(18_000));
+    assert_eq!(o.bubble, Some(Bubble::LowPressure));
+}
+
+#[test]
+fn expire_ends_a_transient_face_without_a_local_clock() {
+    let mut c = Companion::new(C, Millis(0));
+    assert_eq!(c.on_shake(Millis(100)).face, Some(Face::Dizzy));
+    assert_eq!(c.expire(Millis(3_099)), None);
+    assert_eq!(c.expire(Millis(3_100)), Some(Face::Neutral));
+}

@@ -42,6 +42,8 @@ fn args(port: &str, baud: &str, deadline_ms: &str) -> Vec<String> {
         "5000",
         "--startup-deadline-ms",
         deadline_ms,
+        // 22:00〜07:00（JST）はCompanionが寝て、Mindの表情を出さない。実際の時刻に依存させない。
+        "--no-companion",
     ]
     .iter()
     .map(|s| (*s).to_owned())
