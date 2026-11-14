@@ -139,7 +139,7 @@ B-2の経路別条件（未解決）→ 3点定常電流 + 電源/pin/単体動�
 | #23 | Host Rustでローカル発話候補・rate制限の準備 | `show_text`のwire/描画接続とPROTO-TBD-007（layout/memory計測）が未実装／未確定。既存#23で扱い、実体のない「display text機能」のclose待ちにしない |
 | #24 | 既存counter・fault/enduranceの試験設計 | #21/#22/#23の統合成果と安全条件、目標時間の人間判断。実機を壊しうるfault injectionは別途監視 |
 | #34 | 人間が実装方式・仮筐体・首固定案を選ぶ | #1全close待ちのblockedを外し、needs:decisionへ。現物servo/hornの適合・干渉と固定方法は本Issueの完了条件として残る。#18の校正完了を機構設計の前提にしない |
-| #247 | Docs / Reviewで記録を整理する。案Aを最終の給電に採る場合の再試験は、[#405の見直しの候補として引き継いだ](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/405#issuecomment-6006010028) | Pi停止の原因は、本体表記なしのUSBケーブルと決まった（[決定コメント](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/247#issuecomment-5863026168)。機序は未測定）。案Aを採る場合の再試験の条件は、段階C全条件と人間監視、観測系の復元、Safety Policy §11の安全な再開判断。この条件は、別電源＋UARTの通信検証には掛からない |
+| #247 | Docs / Reviewで記録を整理する。案Aを最終の給電に採る場合の再試験は、[#405の見直しの候補として引き継いだ](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/405#issuecomment-6006010028) | Pi停止の原因は、ユーザーが本体表記なしのUSBケーブルと決めた（[決定コメント](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/247#issuecomment-5863026168)。機序は未測定）。案Aを採る場合の再試験の条件は、段階C全条件と人間監視、観測系の復元、Safety Policy §11の安全な再開判断。この条件は、別電源＋UARTの通信検証には掛からない |
 | #446 | PR A/Bの成果からhost example→handle_boot接続（PR C）を準備 | 実機boot→ACKは未達。PR Cが要る。自己レビューは既に15巡で、PR Cの巡16開始前に有限の人間承認が必要 |
 | #461 | close済みの通常接続判断を上記の限定構成に利用 | B-2/B-2b、段階C、servo gateの解除や実機成功を意味しない |
 
@@ -154,7 +154,7 @@ B-2の経路別条件（未解決）→ 3点定常電流 + 電源/pin/単体動�
    取得時open PRは0件、#467に着手コメントなし。未公開差分の不存在は保証しない。編集直前に再照合する。
 4. B-2が現在の条件で実行できない問題は#3/#405で人間へ返す。通常接続の電流記録を代替にできるか、
    別構成にするかは安全条件の判断であり、#464では決めない。これを理由にLCD表示観測まで止めない。
-5. #247のPi停止の原因は、本体表記なしのUSBケーブルと決まった（[決定コメント](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/247#issuecomment-5863026168)。機序は未測定）。
+5. #247のPi停止の原因は、ユーザーが本体表記なしのUSBケーブルと決めた（[決定コメント](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/247#issuecomment-5863026168)。機序は未測定）。
    本体表記なしのUSBケーブルは使わない。`E226000`を型番と断定しない。BOMへの識別情報の採用は現物照合後。
    この決定は段階Cの免除でも、案Aの再試験の結果でもない。#247の取り下げ済みTest 1/2を復活させない。
 6. #17の最初の駆動方法、#34の機構、#23のlayout制限、各実機枠の日程は人間の判断を要する。
