@@ -12,8 +12,9 @@
 //!   `bringup-display-13`と組み合わせたbuildは、bring-upの間`busy`で拒否する。
 //!   **製品buildと`face-21`付き試験buildは、Pi commandを受けなくても、描ける状態になった時点（製品と`face-21`単独は起動直後、
 //!   `bringup-display-13`との組み合わせはbring-upが済んだ時点）で`neutral`を1回描く。**
-//! - `FaceDrawer`: LCD driverを持ち、受けた表情を帯1本ずつ塗る。文字表示中は文字を優先し、
-//!   表情の最新要求を保持して期限後に描き直す。1回の`FaceDrawer::poll`で帯かglyphを1本だけ
+//! - `FaceDrawer`: LCD driverを持ち、受けた表情を帯1本ずつ塗る。コメントは下の帯
+//!   （`deskcat_face::TEXT_BAND_TOP`から下。#743）だけに描き、表情は帯より上だけを塗るため、コメントの間も顔は消えず、
+//!   表情の変更は反映される。期限が来たら帯だけを消す。1回の`FaceDrawer::poll`で帯かglyphを1本だけ
 //!   塗ってmain loopへ戻るため、描画の間もheartbeatとPi linkの受信は止まらない見込みである
 //!   （`crate::display_test`の同じ方式。**実機では確かめていない**）。
 //!
@@ -121,7 +122,8 @@ pub struct FaceDrawer<'d> {
     painter: Option<Painter>,
     painter_name: Option<ExpressionName>,
     text: Option<TextLayout>,
-    text_clear_y: u16,
+    /// 帯の消去の進み。`HEIGHT`なら消去は無い。
+    band_clear_y: u16,
     text_next_index: usize,
     text_started_at: Option<Instant>,
     presentation: TextPresentation,
@@ -146,7 +148,7 @@ impl<'d> FaceDrawer<'d> {
             painter: None,
             painter_name: None,
             text: None,
-            text_clear_y: 0,
+            band_clear_y: deskcat_face::TEXT_BAND_TOP,
             text_next_index: 0,
             text_started_at: None,
             presentation: TextPresentation::new(),
@@ -156,17 +158,13 @@ impl<'d> FaceDrawer<'d> {
 
     /// `name`の表情を、最初から塗り直す。塗っている途中なら、そちらは捨てる。
     pub fn show(&mut self, name: ExpressionName) {
-        if let Some(name) = self.presentation.show_expression(name) {
-            self.painter = Painter::new(name, FACE_BAND_ROWS);
-            self.painter_name = Some(name);
-            log::info!("face_show name={name:?}");
-        } else {
-            log::info!("face_deferred_during_text name={name:?}");
-        }
+        self.painter = Painter::new(name, FACE_BAND_ROWS);
+        self.painter_name = Some(name);
+        log::info!("face_show name={name:?}");
     }
 
-    /// 文字を全画面に一時表示する。受理したら現在の表情の描画を中断する。
-    /// 期限後は文字を消して、表示中に受けた最新の表情を描き直す。
+    /// コメントを下の帯に一時表示する。帯を消してから描く。表情の描画は中断しない（表情は帯にかからない）。
+    /// 期限後は帯だけを消し、顔は描き直さない。
     ///
     /// # Errors
     ///
@@ -185,10 +183,8 @@ impl<'d> FaceDrawer<'d> {
             .inspect_err(|&error| {
                 self.record_text_rejection(error);
             })?;
-        self.painter = None;
-        self.painter_name = None;
         self.text = Some(layout);
-        self.text_clear_y = 0;
+        self.band_clear_y = deskcat_face::TEXT_BAND_TOP;
         self.text_next_index = 0;
         self.text_started_at = Some(Instant::now());
         log::info!(
@@ -224,43 +220,46 @@ impl<'d> FaceDrawer<'d> {
     #[must_use]
     pub const fn is_drawing(&self) -> bool {
         self.painter.is_some()
+            || self.band_clear_y < crate::display::HEIGHT
             || match &self.text {
-                Some(layout) => {
-                    self.text_clear_y < crate::display::HEIGHT
-                        || self.text_next_index < layout.len()
-                }
+                Some(layout) => self.text_next_index < layout.len(),
                 None => false,
             }
     }
 
     /// 帯を1本だけ塗る。**失敗してもpanicしない。**失敗したら、その表情の残りを塗らずに諦める。
     pub fn poll(&mut self, now_ms: u64) {
-        if let Some(name) = self.presentation.expire(now_ms) {
+        if self.presentation.expire(now_ms) {
             self.text = None;
             self.text_started_at = None;
-            self.painter = Painter::new(name, FACE_BAND_ROWS);
-            self.painter_name = Some(name);
-            log::info!("text_expired_restore_face name={name:?}");
+            self.band_clear_y = deskcat_face::TEXT_BAND_TOP;
+            log::info!("text_expired_clear_band");
+        }
+        if self.band_clear_y < crate::display::HEIGHT {
+            let y0 = self.band_clear_y;
+            let y1 = y0
+                .saturating_add(FACE_BAND_ROWS - 1)
+                .min(crate::display::HEIGHT - 1);
+            if let Err(err) = self
+                .lcd
+                .fill_rect(0, y0, crate::display::WIDTH - 1, y1, color::BLACK)
+            {
+                // 消去が失敗したら、同じ帯を繰り返さず諦める（無限に再試行しない）。
+                if self.text.is_some() {
+                    self.text_draw_failed("clear", err, false);
+                } else {
+                    log::error!("band_clear_failed error={err}");
+                    self.band_clear_y = crate::display::HEIGHT;
+                }
+            } else {
+                self.band_clear_y = y1 + 1;
+            }
+            return;
         }
         if let Some(layout) = self.text.as_ref() {
-            if self.text_clear_y < crate::display::HEIGHT {
-                let y0 = self.text_clear_y;
-                let y1 = y0
-                    .saturating_add(FACE_BAND_ROWS - 1)
-                    .min(crate::display::HEIGHT - 1);
-                if let Err(err) =
-                    self.lcd
-                        .fill_rect(0, y0, crate::display::WIDTH - 1, y1, color::BLACK)
-                {
-                    self.text_draw_failed("clear", err);
-                } else {
-                    self.text_clear_y = y1 + 1;
-                }
-                return;
-            }
             if let Some(cell) = layout.cell(self.text_next_index) {
                 if let Err(err) = self.lcd.draw_glyph_cell(cell) {
-                    self.text_draw_failed("glyph", err);
+                    self.text_draw_failed("glyph", err, true);
                 } else {
                     self.text_next_index += 1;
                     if self.text_next_index == layout.len() {
@@ -295,14 +294,22 @@ impl<'d> FaceDrawer<'d> {
         }
     }
 
-    fn text_draw_failed(&mut self, step: &str, err: esp_idf_svc::sys::EspError) {
+    /// コメントの描画の失敗を数え、表示を終える。`clear_band`なら、描きかけの帯を消す。
+    fn text_draw_failed(
+        &mut self,
+        step: &str,
+        err: esp_idf_svc::sys::EspError,
+        clear_band: bool,
+    ) {
         self.text_counters.draw_failed = self.text_counters.draw_failed.saturating_add(1);
         log::error!("text_draw_failed step={step} error={err}");
         self.text = None;
         self.text_started_at = None;
-        if let Some(name) = self.presentation.cancel() {
-            self.painter = Painter::new(name, FACE_BAND_ROWS);
-            self.painter_name = Some(name);
-        }
+        self.presentation.cancel();
+        self.band_clear_y = if clear_band {
+            deskcat_face::TEXT_BAND_TOP
+        } else {
+            crate::display::HEIGHT
+        };
     }
 }
