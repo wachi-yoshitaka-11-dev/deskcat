@@ -73,6 +73,7 @@
 | [EXP-059](#exp-059-段0の5回目の窓708入りの校正buildで出力を3-tickに1回へ間引いた動作のtickの間隔と出力したtickの時間を取りstopbusyratelimitedmax_commandsの後を観察した) | [#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)の段0の5回目の窓。[#708](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/708)入りの校正buildで、tickの間隔（18.44〜21.55 ms）と出力したtickの時間（最大632 µs）を取り、STOP・Busy・RateLimited・max_commandsの後を観察した | 値の正なし（観測の記録。判定の語を書かない） |
 | [EXP-060](#exp-060-段1の前の窓と段1task-wdt-の-panic-resetpsu-の負極と-esp32-の-gnd-の読みi_limの平坦部4-countを取り段1で-servo-へ指令を出し発熱の実測は行わなかった) | [#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)の段1の前の窓と段1。task WDT の panic reset、PSU の−と ESP32 の GND の読み、`I_lim`の平坦部を取り、段1で servo へ指令を出した。発熱の実測は行わなかった | 値の正なし（観測の記録。判定の語を書かない） |
 | [EXP-061](#exp-061-accel-01adxl345で静止机を叩く机を手で揺らすの3つを各30秒取ったaccel-sample-15) | [#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)・[#685](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/685)の材料。`accel-sample-15`で、静止・机を叩く・机を手で揺らすの3つを、各30秒（5秒×6窓）取った | 値の正なし（観測の記録。判定の語を書かない） |
+| [EXP-062](#exp-062-窓-b製品-buildno-touch-487を-pi-とつなぎ表情温湿度叩く揺れcompanion独り言713-を見た夜と朝の2回) | [#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)・[#713](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/713)。製品 build（`no-touch-487`）を Pi とつなぎ、表情・温湿度・叩く・揺れ・Companion・独り言・#713 を夜と朝の2回で見た | 値の正なし（観測の記録。判定の語を書かない） |
 
 **大容量の生dataはこのrepositoryへ入れていない。**保存場所は
 [development-foundation-plan.md](../planning/development-foundation-plan.md)の
@@ -5637,6 +5638,72 @@ ELF（wdt）`77d40227f4dca649e3cda797b3ac599087b1aef534e33ab848cb26b37e0f11bd`�
 - 叩いた回数と強さ、揺らした方向と幅。
 - servo の振動の sample（#18 の段2の後）。
 
+## EXP-062: 窓 B。製品 build（`no-touch-487`）を Pi とつなぎ、表情・温湿度・叩く・揺れ・Companion・独り言・#713 を見た（夜と朝の2回）
+
+[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)の製品 build を、Pi の `deskcatd` と UART でつないで動かした窓。[#713](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/713)の受信が続く場合の観察を含む。servo は動かしていない。人間の立ち会いのもと、夜（2026-11-12〜13）と朝（2026-11-14）の2回に分けた。**この記録は事実と未確認だけを書く。受け入れ条件の判定は書かない。**
+
+| 項目 | 内容 |
+|---|---|
+| Test ID | `EXP-062` |
+| Date | 夜：2026-11-12 UTC 15:22〜16:42（JST 11-13 00:22〜01:42）。朝：2026-11-14 UTC 01:19〜02:07（JST 10:19〜11:07） |
+| Operator | USB と Pi の電源の抜き挿し、線の確認、叩く・揺らす操作、画面の観察はユーザー。build、書き込み、serial と Pi の記録、Pi のプログラムの起動と停止は実機側の PM（AI） |
+| 承認 | 夜：実機側の PM の会話でユーザーへ1問。問「窓 B（製品 build の確認）を、今日行ってよいですか？」（`no-touch-487`、servo は動かさず plug は挿したまま、PSU の電源プラグが抜けていることを見る、7項目（表情、温湿度、叩く、揺れ、Companion、独り言の LCD 表示、#713）、touch の5本は挿したまま、異常で USB を抜く、終わりに LCD に触れない build を書き戻し VCC の線を抜く、時間と起動回数の上限なし）。答えの原文「どうぞ」（2026-11-12 14:46:44Z）。朝：ユーザーの原文「作業を再開しなさい」（2026-11-14） |
+| Hardware revision／Exact components | `MCU-01`、`DISP-01`、`ACCEL-01`、`ENV-01`、`SBC-01`。Pi との線は `X1`（紫、Pi pin 8）、`X2`（青、pin 10）、`X3`（黒、pin 39 と B1 A18）、`S21`（黄、K23→F1）、`S22`（橙、K26→F2）を挿した（`hardware/breadboard-rebuild/wiring-table.md`）。`PSU-BENCH-01` は電源プラグを抜いたまま。servo の plug は jumper wire の針に挿したまま |
+| Firmware | develop `5a95928` から、`git archive` を repository の外へ展開して build（`firmware/esp32/Cargo.toml` の末尾へ `[workspace]` を足した）。`--features no-touch-487`。`cargo fmt --check` OK、clippy・build 成功。ELF sha256 `fe94df671ef7e660ffd404d3d5dabc436ff0a13d6c1674c817b2ed24bc886be0`（起動 log の ELF SHA256 と一致） |
+| Pi software | develop `5a95928` の `deskcatd` を Pi で build。sha256 `b26ad01caa65ea0110ab667b62dcf7fdf58356c5e07c366f84c1e122f70ed4e9`。引数は unit と同じ（`--port /dev/serial0 --baud 115200 --duplicate-capacity 8 --duplicate-retention-ms 5000 --startup-deadline-ms 10000`）に、`--speech-min-interval-ms 60000 --speech-duration-ms 5000 --verbose` を足した。朝の `--cloud-speech` の回は、`systemd-run`（`User=deskcatd`、`LoadCredential=anthropic-api-key:…`。`EXP-053` と同じ形）で、同じ sha256 の複製を起動した。本番の `deskcatd` service は窓の間止めた |
+| Power supply and current limit | ESP32 はこの端末の USB。Pi の給電の現物は、この窓では見ていない。電流・電圧・温度は測っていない |
+| Measurement equipment | UART0 の log（115200）、Pi の `deskcatd` の log。ESP32 側の時刻はこの端末の時計（UTC）、Pi 側は Pi の時計（JST） |
+| Raw data | repository の外の `deskcat-evidence/windowB-20261112/`：`run.log`（夜、sha256 `eb7e20a4eec5cbd40afa7d6700247a35d29358926dd4d51be133b519e150b0c4`）、`run-morning.log`（朝、`514b47a609bbe9881ed2eafc1f3d9811a95c755a49d4ab8bb3ea9b64b8313cdc`）、`pi-night.log`（`6c2ce3be6aa4dab4acad92e1c73e6de307020270d37942350321aa0b179aeefb`）、`pi-morning4.log`（`a37195ea367dce2187f095ca116ff14d0a0e01dee0ddd19f39264af5c29a5d48`）、`pi-cloud2.log`（`b8df00da662413381c6a46ee692b0a45e026d9af729cecd83e928251c028af4e`）、`approval.txt`、`answers.txt`、`boots.txt`、`prechecks.txt`、`n713.txt`、`flash*.txt`、`build.txt`、`commit.txt`、`summary-night.md` |
+| Expected result | 期待値の数は定めていない |
+| Measured result | 下記 |
+
+### 実施したこと（夜）
+
+- 非通電の読み（`prechecks.txt`）：B2 の d1–d2 を 2000 Ω レンジで 1220。プローブ短絡 005。`X3` を挿す前 1（範囲外）、B1 A18 に挿した後 005。その後、ユーザーが `X1`・`X2` を Pi の pin 8・10 へ挿した。
+- 起動は4回：USB の挿入（15:24:22）、espflash の書き込み（15:25:17）、console の release（15:25:23）、`accel-sample-15` の書き戻し（16:40:29）。数え方は `EXP-060` と同じ。
+- 表情：起動直後の顔について、ユーザーの原文「一言でいうなら、問題ない」。
+- 温湿度：`env_reading` が 60 秒ごとに出た（夜の log で 75 件。最初の値は 22.68 ℃、湿度 44728/1024 ≒ 43.7 %）。
+- 叩く・揺れ：ESP32 の log に `tap_detected`・`shake_detected` の `decision=Send` が出て、Pi の `tapped_received` は合計 9。
+- Companion：Pi は起動直後に `Sleeping` を送った（22:00〜07:00 は寝る設定）。ユーザーの原文「寝顔になっている」「叩いても何も起きない」。独り言は1分見て「何も出ない」。起動直後の `show_text` 1件だけが受理された。
+- #713：`x`×1000 と改行の行を 16:38:59〜16:39:11 の間（114 行）Pi から送った。reset・task_wdt・panic・oversize・boot の再送は 0。`decode_rejected` 114。health の `pi_uart_rx_buffer_full=1`、`pi_uart_rx_fifo_overflow=1`、`max_read_gap_ms` の最大 71。
+- 夜の `deskcatd` は SIGINT で止め、終了時の counter の行は出ていない。
+
+### 実施したこと（朝）
+
+- 始めの状態：ESP32 と Pi はどちらも電源が切れていた（ユーザー）。ユーザーが ESP32 の USB と Pi の電源を入れた。Pi の GPIO14／15 は起動後 `a0`（TXD0／RXD0）だった。
+- 起動は5回：USB の挿入（01:22 頃）、espflash の書き込み（01:23:29）、console の release（01:24:26）、console の reset（01:30:34）、終わりの書き戻し（02:06:55）。
+- 最初は通信が双方向とも通らなかった（Pi の `bytes_in` 0、ESP32 は hello を受けず boot を再送し続けた）。Pi の GPIO15 を入力 pull-down にして読むと `lo` で、ESP32 からの線は届いていなかった。ユーザーが線の6か所を確かめて挿し直した（原文「さした」）後は `hi` になり、通信がつながった。どこが抜けていたかは記録していない。
+- 叩く：ユーザーの原文「驚いた顔」。揺れ：「目を回した」。
+- 揺らしていない間の揺れの検出：ユーザーの原文「揺らしていない間もたびたび目を回した顔になる」。`shake_detected` は、線を確かめている間（01:24〜01:30）に約 0.2 秒ごと（約 1300 件）、その後は 1 分に 15〜22 件出た。夜は約 75 分で 163 件。加速度センサーを挿した板（B3）は「平らに置いてある」（ユーザー）。
+- 独り言：`show_text` が 1 分ごとに送られ、受理された（`pi-morning4.log` の終了時の counter：`show_text_sent` 8、`show_text_accepted` 7、`tapped_received` 1、`shaken_received` 24）。
+- `--cloud-speech`：10:38:17 JST に起動。画面の文はユーザーの原文で「ふわぁ、おひさまあったかいにゃ」。この文は repository の source に無い。10:52:20 に `cloud_speech: Display; local fallback` が1件出た。
+- 25 分の休憩：起動の 25 分後の 11:03:17 JST に、`首の動きの意図は送らない（PROTO-TBD-008）` の行と `show_text` の受理（id=50）が出た。本文は log に出ない。
+- `--cloud-speech` の回は `systemctl kill -s TERM` で止め、終了時の counter の行は出ていない。
+
+### Faults（手順と実際の差。事実）
+
+- 夜：Pi の `deskcatd` の build の終わりを、`pgrep -f "cargo build"` のループで待った。ループ自身に当たり続け、約3時間待たせた。22:00 を過ぎ、Companion が寝る時間に入ったため、叩く・揺れの顔の反応と独り言を夜に確かめられなかった（ユーザーの原文「致命的なミスだな」「3時間だよ待ったの」）。
+- 夜：`kill -INT $(pgrep -f …)` が AI 自身の shell にも当たった。
+- 夜：窓の後のテスターの再測定は行っていない（ユーザーの原文「テスターは断る」）。
+- 朝の窓は、夜の後の朝7時以降に行う予定だったが、2026-11-13 には行わなかった（ユーザーの原文「あなたの不手際がもとで作業ができませんでした」）。
+- 朝：AI は、Pi を起動する前に ESP32 の USB を挿す順番を指示し、これまでの窓と矛盾すると指摘されて撤回した。
+- 朝：AI は、配線表を読まずに線の色と挿し先を誤って案内した（黄・橙を Pi の線とした）。
+- 朝：AI は、休憩の知らせの時刻を1時間誤って伝え、訂正した。
+
+### 終わった後の状態
+
+- ESP32 には `accel-sample-15`（ELF sha256 `9fdd1392e776270087996de3c41bbb212c50897a85bcccbda0d4ad2fe7b90364`）を書き戻した（夜と朝の両方）。
+- `S21`・`S22` は挿したまま（ユーザーの原文「黄色と橙色の通信の線は面倒なので抜きません」）。Pi の GPIO14 は、夜と朝の終わりに AI が入力 pull-down にした。
+- `DISP-01` の VCC の線と `X3` は挿したまま。承認の問いにあった「VCC の線を抜く」は行っていない。
+- 本番の `deskcatd` service は止めたまま。
+
+### 確かめていないこと
+
+- 揺らしていない間の揺れの検出の原因（振動か、しきい値か。生の値を取っていない）。
+- 25 分の休憩の文言が画面に出たこと（log は受理まで）。
+- 夜の `deskcatd` と `--cloud-speech` の回の終了時の counter。
+- 電流・電圧・温度。
+
 ## Revision履歴
 
 | 日付 | Revision | 変更 | 根拠 |
@@ -5709,3 +5776,4 @@ ELF（wdt）`77d40227f4dca649e3cda797b3ac599087b1aef534e33ab848cb26b37e0f11bd`�
 | 2026-11-11 | 65 | [#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)。`EXP-060`の本文の PM のセッション名10か所（8行）を、「実機側の PM」「VM 側の PM」に置き換えた。記録の内容は変えていない。 | 公開する記録に PM のセッション名を書かない扱い（#677 と同じ置き換え） |
 | 2026-11-11 | 66 | [#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)・[#685](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/685)。**`EXP-061`を追加した。**`accel-sample-15`（develop `9671963`）で、静止・机を叩く・机を手で揺らすの3つを各30秒取った。USB の時間が承認の上限を超えたことを Faults に書いた。判定は書いていない | 実機側の PM の記録（ユーザーの回答による） |
 | 2026-11-12 | 67 | [#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)。`EXP-051`の Measurement equipment の行に、`PSU-BENCH-01`の説明書 p.3「仕様」の原文（表示、表示精度、表示分解能）と、出所の写真の sha256 を追記した。#18 の段2が、この表示精度を電圧と電流の判定の根拠に使うため。測定の内容は変えていない | 説明書の写真（2026-11-10 にユーザーが会話に貼ったもの） |
+| 2026-11-14 | 68 | [#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)・[#713](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/713)。**`EXP-062`を追加した。**窓 B（製品 build を Pi とつないだ窓、夜と朝）の観察と、手順との差を書いた。判定は書いていない | 実機側の PM の記録（ユーザーの回答による） |
