@@ -8,6 +8,7 @@
 //! ADXL345のActivityは、`THRESH_ACT`を超える加速度が参加軸のどれかに出たときに`INT_SOURCE`のD4を立てる（読むまで残る）。
 //! **tapが読んでいる`INT_SOURCE`と同じ1回のreadでActivityも取れる**ので、I2Cの読みは増えず、tapの検出は遅れない。
 //! 1回の叩きでもActivityは1回立ちうるため、**窓の中で[`ShakeConfig::required_hits`]回（2以上）立ったときだけ揺れとする**。
+//! Activityが続けて立った読みは1回と数え、間にActivityなしの読みを挟んだものだけを別の回とする（dc結合で傾いて静止していても揺れにしない）。
 //!
 //! # 出所
 //!
@@ -81,7 +82,7 @@ impl ShakeConfig {
 /// - 最小間隔：暫定の一般値。1回の揺らしと1件の対応は確かめていない。
 ///
 /// **確かめていないこと。**窓の中でActivityが何回立つかはEXP-061に時系列が無く不明（揺らし方によっては届かず検出漏れ）。
-/// dc結合なので基板が水平でなければX・Yに重力が乗る（約0.19 g、約11°で立ち続ける。取付が水平かは`docs`に無い）。
+/// dc結合なので基板が水平でなければX・Yに重力が乗る（約0.19 g、約11°でActivityが立ち続ける。立ち続けた分は再武装で1回と数え、揺れとしない。取付が水平かは`docs`に無い）。
 /// 製品buildは`DATA_FORMAT`を書かず（10 bit）、EXP-061はfull-resである（`THRESH_ACT`はg単位なので閾値は変わらないが、10 bitのLSBの重みは未確認）。
 /// servoの振動での誤検出と、実機で`shaken`がPiへ届くことは未確認。
 /// **確定させる手段：**servoの振動のsample（#18の段2の後）と、取付姿勢が決まった後の実機の揺らし。
@@ -177,6 +178,7 @@ pub struct ShakeCounters {
 
 /// 「窓の中でActivityがN回」を数え、`shaken`を送ってよいかを決める。
 ///
+/// Activityが続けて立った読みは、1回と数える（[`ShakeFilter::on_quiet`]で再武装する）。
 /// 窓は固定である（最初のActivityから[`ShakeConfig::window_ms`]。過ぎたら数え直し、そのActivityを新しい窓の最初とする）。
 /// 揺れと判定したら、送る・捨てるに関わらず数えを0へ戻す。
 #[derive(Debug, Clone)]
@@ -184,6 +186,8 @@ pub struct ShakeFilter {
     config: ShakeConfig,
     window_start_ms: Option<u64>,
     hits: u32,
+    /// 直前の読みがActivityなしだったか（再武装）。dc結合で傾いて静止していると、読むたびにActivityが立ち続ける。
+    armed: bool,
     last_sent_ms: Option<u64>,
     counters: ShakeCounters,
 }
@@ -196,6 +200,7 @@ impl ShakeFilter {
             config,
             window_start_ms: None,
             hits: 0,
+            armed: true,
             last_sent_ms: None,
             counters: ShakeCounters {
                 activity_hits: 0,
@@ -210,6 +215,10 @@ impl ShakeFilter {
     /// `session_established`は`boot`のACKを受けたか。
     pub fn on_activity(&mut self, now_ms: u64, session_established: bool) -> ShakeDecision {
         self.counters.activity_hits = self.counters.activity_hits.saturating_add(1);
+        // 前の読みもActivityだったなら、同じ立ちっぱなしの続きである。数えない（揺れは立ったり消えたりする）。
+        if !std::mem::replace(&mut self.armed, false) {
+            return ShakeDecision::Counting;
+        }
         // 窓を過ぎていたら、このActivityを新しい窓の最初にする。時計が戻ったとき（`now_ms < start`）は経過0として窓を続ける。
         let expired = self
             .window_start_ms
@@ -238,6 +247,11 @@ impl ShakeFilter {
         self.last_sent_ms = Some(now_ms);
         self.counters.sent = self.counters.sent.saturating_add(1);
         ShakeDecision::Send
+    }
+
+    /// `INT_SOURCE`を読んで、Activityが立っていなかったときに呼ぶ。
+    pub fn on_quiet(&mut self) {
+        self.armed = true;
     }
 
     /// これまでの内訳。
@@ -322,10 +336,39 @@ mod tests {
         assert!(is_activity(0xFF));
     }
 
+    /// 静かな読み（Activityなし）を挟んでからActivityを見つけた、という1回。揺れは立ったり消えたりする。
+    fn hit(f: &mut ShakeFilter, now_ms: u64, session_established: bool) -> ShakeDecision {
+        f.on_quiet();
+        f.on_activity(now_ms, session_established)
+    }
+
+    #[test]
+    fn sustained_activity_without_a_quiet_read_is_not_a_shake() {
+        // dc結合で傾いて静止していると、`INT_SOURCE`を読むたびにActivityが立っている（Issue #751の5）。
+        let mut f = ShakeFilter::new(TEST);
+        for t in (0..1_000).step_by(10) {
+            assert_eq!(f.on_activity(t, true), ShakeDecision::Counting);
+        }
+        assert_eq!(f.counters().sent, 0);
+    }
+
+    #[test]
+    fn activity_counts_again_after_a_quiet_read() {
+        let mut f = ShakeFilter::new(TEST);
+        assert_eq!(f.on_activity(0, true), ShakeDecision::Counting);
+        // 静かな読みが無いActivityは数えない。
+        assert_eq!(f.on_activity(10, true), ShakeDecision::Counting);
+        assert_eq!(f.on_activity(20, true), ShakeDecision::Counting);
+        f.on_quiet();
+        assert_eq!(f.on_activity(30, true), ShakeDecision::Counting);
+        f.on_quiet();
+        assert_eq!(f.on_activity(40, true), ShakeDecision::Send);
+    }
+
     #[test]
     fn a_lone_activity_such_as_a_tap_is_not_a_shake() {
         let mut f = ShakeFilter::new(TEST);
-        assert_eq!(f.on_activity(100, true), ShakeDecision::Counting);
+        assert_eq!(hit(&mut f, 100, true), ShakeDecision::Counting);
         assert_eq!(f.counters().sent, 0);
         assert_eq!(f.counters().activity_hits, 1);
     }
@@ -333,68 +376,68 @@ mod tests {
     #[test]
     fn required_hits_within_the_window_send_once_and_reset_the_count() {
         let mut f = ShakeFilter::new(TEST);
-        assert_eq!(f.on_activity(100, true), ShakeDecision::Counting);
-        assert_eq!(f.on_activity(300, true), ShakeDecision::Counting);
-        assert_eq!(f.on_activity(500, true), ShakeDecision::Send);
+        assert_eq!(hit(&mut f, 100, true), ShakeDecision::Counting);
+        assert_eq!(hit(&mut f, 300, true), ShakeDecision::Counting);
+        assert_eq!(hit(&mut f, 500, true), ShakeDecision::Send);
         // 数えは0へ戻る。続くActivityは新しい窓の1回目である。
-        assert_eq!(f.on_activity(520, true), ShakeDecision::Counting);
+        assert_eq!(hit(&mut f, 520, true), ShakeDecision::Counting);
         assert_eq!(f.counters().sent, 1);
     }
 
     #[test]
     fn hits_spread_over_more_than_the_window_do_not_add_up() {
         let mut f = ShakeFilter::new(TEST);
-        assert_eq!(f.on_activity(0, true), ShakeDecision::Counting);
-        assert_eq!(f.on_activity(600, true), ShakeDecision::Counting);
+        assert_eq!(hit(&mut f, 0, true), ShakeDecision::Counting);
+        assert_eq!(hit(&mut f, 600, true), ShakeDecision::Counting);
         // 窓（最初から1000 ms）を1 ms超えた。このActivityが新しい窓の最初になる。
-        assert_eq!(f.on_activity(1_001, true), ShakeDecision::Counting);
-        assert_eq!(f.on_activity(1_100, true), ShakeDecision::Counting);
-        assert_eq!(f.on_activity(1_200, true), ShakeDecision::Send);
+        assert_eq!(hit(&mut f, 1_001, true), ShakeDecision::Counting);
+        assert_eq!(hit(&mut f, 1_100, true), ShakeDecision::Counting);
+        assert_eq!(hit(&mut f, 1_200, true), ShakeDecision::Send);
         // 窓の境界（ちょうど window_ms）は窓の中である。
         let mut g = ShakeFilter::new(TEST);
-        g.on_activity(0, true);
-        g.on_activity(500, true);
-        assert_eq!(g.on_activity(1_000, true), ShakeDecision::Send);
+        hit(&mut g, 0, true);
+        hit(&mut g, 500, true);
+        assert_eq!(hit(&mut g, 1_000, true), ShakeDecision::Send);
     }
 
     #[test]
     fn a_shake_before_the_session_is_established_is_dropped_and_counted() {
         let mut f = ShakeFilter::new(TEST);
-        f.on_activity(0, false);
-        f.on_activity(10, false);
-        assert_eq!(f.on_activity(20, false), ShakeDecision::DropNoSession);
+        hit(&mut f, 0, false);
+        hit(&mut f, 10, false);
+        assert_eq!(hit(&mut f, 20, false), ShakeDecision::DropNoSession);
         assert_eq!(f.counters().dropped_no_session, 1);
         assert_eq!(f.counters().sent, 0);
         // 捨てたものは「送った時刻」を作らない。確立後はすぐ送る。
-        f.on_activity(30, true);
-        f.on_activity(40, true);
-        assert_eq!(f.on_activity(50, true), ShakeDecision::Send);
+        hit(&mut f, 30, true);
+        hit(&mut f, 40, true);
+        assert_eq!(hit(&mut f, 50, true), ShakeDecision::Send);
     }
 
     #[test]
     fn a_shake_within_the_minimum_interval_is_dropped_and_does_not_move_the_interval() {
         let mut f = ShakeFilter::new(TEST);
         for t in [0, 10, 20] {
-            f.on_activity(t, true);
+            hit(&mut f, t, true);
         }
         assert_eq!(f.counters().sent, 1);
         for t in [100, 110] {
-            assert_eq!(f.on_activity(t, true), ShakeDecision::Counting);
+            assert_eq!(hit(&mut f, t, true), ShakeDecision::Counting);
         }
-        assert_eq!(f.on_activity(120, true), ShakeDecision::DropTooSoon);
+        assert_eq!(hit(&mut f, 120, true), ShakeDecision::DropTooSoon);
         assert_eq!(f.counters().dropped_too_soon, 1);
         // 前の送出（20 ms）から最小間隔（2000 ms）以上たてば送る。
-        f.on_activity(2_020, true);
-        f.on_activity(2_030, true);
-        assert_eq!(f.on_activity(2_040, true), ShakeDecision::Send);
+        hit(&mut f, 2_020, true);
+        hit(&mut f, 2_030, true);
+        assert_eq!(hit(&mut f, 2_040, true), ShakeDecision::Send);
         assert_eq!(f.counters().sent, 2);
     }
 
     #[test]
     fn a_clock_that_goes_backwards_does_not_panic_or_expire_the_window() {
         let mut f = ShakeFilter::new(TEST);
-        f.on_activity(5_000, true);
-        f.on_activity(4_000, true);
-        assert_eq!(f.on_activity(4_100, true), ShakeDecision::Send);
+        hit(&mut f, 5_000, true);
+        hit(&mut f, 4_000, true);
+        assert_eq!(hit(&mut f, 4_100, true), ShakeDecision::Send);
     }
 }
