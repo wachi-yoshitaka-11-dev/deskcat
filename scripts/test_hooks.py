@@ -93,8 +93,12 @@ def _git(root, *arguments):
 # 環境変数`DESKCAT_TEST_GH`のJSONから答える。**hookの解除手段ではなく、testの入力である。**
 # 未設定なら対象fileを含まない1件のPull Requestとして答える。
 GH_SHIM = f"""#!{sys.executable}
-import json, os, sys
+import json, os, sys, time
 fixture = json.loads(os.environ.get("DESKCAT_TEST_GH") or "{{}}")
+if fixture.get("log"):
+    with open(fixture["log"], "a", encoding="utf-8") as log:
+        log.write(json.dumps(sys.argv[1:]) + "\\n")
+time.sleep(fixture.get("sleep", 0))
 if fixture.get("fail"):
     sys.stderr.write("gh: boom")
     sys.exit(1)
@@ -112,9 +116,11 @@ elif args[0] == "api":
     elif path.startswith("repos/o/r/pulls/7/commits"):
         print("\\n".join(fixture.get("commits", {{}}).keys()))
     elif "/check-runs" in path:
+        time.sleep(fixture.get("sleep_commits", 0))
         sha = path.split("/commits/")[1].split("/")[0]
         print(json.dumps({{"check_runs": fixture["commits"][sha].get("check_runs", [])}}))
     elif "/statuses" in path:
+        time.sleep(fixture.get("sleep_commits", 0))
         sha = path.split("/commits/")[1].split("/")[0]
         print(json.dumps(fixture["commits"][sha].get("statuses", [])))
     else:
@@ -974,6 +980,111 @@ class CodeRabbitReviewMergeGateTests(unittest.TestCase):
 
     def test_help_is_not_checked(self):
         self.assertAllowed({"fail": True}, command="gh pr merge --help")
+
+
+class GhHookRepositoryAndDeadlineTests(unittest.TestCase):
+    """`-Rowner/repo`の読み取りと、hook全体の期限（#751）。"""
+
+    DONE = CodeRabbitReviewMergeGateTests.DONE
+    TARGET = "firmware/esp32/src/a.rs"
+    DRIVER = (
+        "import sys; sys.path.insert(0, {hooks!r}); import gh_metadata_guard as g; "
+        "g.GH_TIMEOUT_SECONDS = {timeout}; g.CHECK_DEADLINE_SECONDS = {deadline}; "
+        "sys.exit(g.main())"
+    )
+
+    def _logged(self, command, fixture):
+        with tempfile.TemporaryDirectory() as directory:
+            log = Path(directory) / "gh.log"
+            body = Path(directory) / "body.txt"
+            body.write_text(
+                f"本文\n\n{gate.TRAILER_CLASS}: c\n{gate.TRAILER_REVIEW}: s\n",
+                encoding="utf-8",
+            )
+            _invoke(GH_GUARD, command.format(body=body), environment={
+                "DESKCAT_TEST_GH": json.dumps({**fixture, "log": str(log)})})
+            return [json.loads(line) for line in log.read_text().splitlines()]
+
+    def test_attached_repo_option_selects_the_repository(self):
+        """`-Rowner/repo`でも、照会へ`-R owner/repo`を渡す。"""
+        issue = {"issue": {"number": 9, "body": "## 受け入れ条件\n- [ ] a\n"}}
+        pr = {"files": [self.TARGET], "commits": {"a": {"check_runs": [self.DONE]}}}
+        for command, fixture, view in (
+            ("gh issue close 9 -Rowner/target", issue, ["issue", "view"]),
+            ("gh issue close 9 -R owner/target", issue, ["issue", "view"]),
+            ("gh pr merge 7 --squash -Rowner/target --subject s --body-file {body}", pr, ["pr", "view"]),
+            ("gh pr merge 7 --squash -R owner/target --subject s --body-file {body}", pr, ["pr", "view"]),
+        ):
+            with self.subTest(command=command):
+                calls = [c for c in self._logged(command, fixture) if c[:2] == view]
+                self.assertEqual(len(calls), 1, calls)
+                self.assertIn("-R", calls[0])
+                self.assertEqual(calls[0][calls[0].index("-R") + 1], "owner/target")
+
+    def test_attached_repo_text_in_a_value_position_is_not_a_repository(self):
+        """`--comment -Rother/repo`の`-R...`は値であり、repositoryではない。"""
+        issue = {"issue": {"number": 9, "body": "## 受け入れ条件\n- [ ] a\n"}}
+        pr = {"files": [self.TARGET], "commits": {"a": {"check_runs": [self.DONE]}}}
+        for command, fixture, view in (
+            ("gh issue close 9 --comment -Rother/repo", issue, ["issue", "view"]),
+            ("gh pr merge 7 --squash --subject -Rother/repo --body-file {body}", pr, ["pr", "view"]),
+        ):
+            with self.subTest(command=command):
+                calls = [c for c in self._logged(command, fixture) if c[:2] == view]
+                self.assertEqual(len(calls), 1, calls)
+                self.assertNotIn("-R", calls[0])
+
+    def test_option_name_used_as_a_value_does_not_hide_a_real_repo_option(self):
+        """`--comment -c`の`-c`は値。続く`-Rowner/target`は本物の`-R`である。"""
+        issue = {"issue": {"number": 9, "body": "## 受け入れ条件\n- [ ] a\n"}}
+        command = "gh issue close 9 --comment -c -Rowner/target"
+        calls = [c for c in self._logged(command, issue) if c[:2] == ["issue", "view"]]
+        self.assertEqual(len(calls), 1, calls)
+        self.assertEqual(calls[0][calls[0].index("-R") + 1], "owner/target")
+
+    def test_short_options_of_one_subcommand_do_not_hide_the_repository_of_another(self):
+        """`pr merge`の`-r`は`--rebase`（値なし）。`issue close`の`-r`（`--reason`）と混ぜない。"""
+        pr = {"files": [self.TARGET], "commits": {"a": {"check_runs": [self.DONE]}}}
+        command = "gh pr merge 7 -r -Rowner/target --subject s --body-file {body}"
+        calls = [c for c in self._logged(command, pr) if c[:2] == ["pr", "view"]]
+        self.assertEqual(len(calls), 1, calls)
+        self.assertEqual(calls[0][calls[0].index("-R") + 1], "owner/target")
+
+    def _timed(self, fixture, deadline, timeout=10):
+        driver = self.DRIVER.format(
+            hooks=str(SCRIPTS_ROOT / "hooks"), timeout=timeout, deadline=deadline)
+        env = dict(os.environ, DESKCAT_TEST_GH=json.dumps(fixture))
+        env["PATH"] = f"{_GH_SHIM_DIR}{os.pathsep}{env['PATH']}"
+        with tempfile.TemporaryDirectory() as directory:
+            body = Path(directory) / "body.txt"
+            body.write_text(
+                f"本文\n\n{gate.TRAILER_CLASS}: c\n{gate.TRAILER_REVIEW}: s\n",
+                encoding="utf-8",
+            )
+            payload = json.dumps({"tool_name": "Bash", "tool_input": {
+                "command": f"gh pr merge 7 --squash --subject s --body-file {body}"}})
+            start = time.monotonic()
+            result = subprocess.run([sys.executable, "-c", driver], input=payload,
+                                    capture_output=True, text=True, env=env, timeout=60)
+        text = result.stdout.strip()
+        return time.monotonic() - start, (json.loads(text) if text else None)
+
+    def _fixture(self, **extra):
+        return {"files": [self.TARGET], "commits": {"a": {"check_runs": [self.DONE]}}, **extra}
+
+    def test_deadline_starts_before_the_first_lookup(self):
+        """3回の事前照会が各1.2秒でも、全体の期限（3秒）を超えたらdenyする。"""
+        elapsed, output = self._timed(self._fixture(sleep=1.2), deadline=3)
+        self.assertIsNotNone(output, "期限を超えたのに通した")
+        self.assertEqual(output["hookSpecificOutput"]["permissionDecision"], "deny")
+        self.assertLess(elapsed, 5.5)
+
+    def test_running_workers_end_by_the_deadline(self):
+        """commit照会が期限を超えて走り続けても、processは期限の直後に終わる。"""
+        elapsed, output = self._timed(self._fixture(sleep_commits=6), deadline=2)
+        self.assertIsNotNone(output)
+        self.assertEqual(output["hookSpecificOutput"]["permissionDecision"], "deny")
+        self.assertLess(elapsed, 4.5)
 
 
 class AcceptanceCriteriaCloseGateTests(unittest.TestCase):

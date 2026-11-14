@@ -57,7 +57,7 @@ def fingerprint(root, base):
     with tempfile.TemporaryDirectory() as scratch:
         env = dict(os.environ, GIT_INDEX_FILE=str(Path(scratch) / "index"))
         if index.exists():
-            shutil.copyfile(index, env["GIT_INDEX_FILE"])
+            shutil.copy2(index, env["GIT_INDEX_FILE"])
         subprocess.check_call(["git", "-C", root, "add", "-A"], env=env)
         diff = subprocess.check_output([
             "git", "-C", root, "diff", "--cached", "--no-ext-diff", "--no-textconv",
