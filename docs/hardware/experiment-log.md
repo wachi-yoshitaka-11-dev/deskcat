@@ -2217,7 +2217,7 @@ journalが続いた起動（起動2・5）では、Piは止まっておらず、
 - 最後の`health`の行: `overrun_ticks=0`、`snapshot_errors=0`、`pi_uart_rx_buffer_full=0`、`pi_uart_rx_fifo_overflow=0`。`panic`、`heartbeat_overrun`、`task_wdt`の行は0件。`health`の行46件の`max_read_gap_ms`は19〜67（最後の行は50）
 - 時刻の関係: 3つの時計がある。ESP32のuptime、PCの時計（flash完了08:23:12Zは`flash.out`、monitor停止08:31:02Zは`monitor-stop.txt`の時刻）、Piの時計（`deskcatd`の起動08:26:57Z、停止08:29:51Zごろ）。PCとPiの時計を直接照合した記録は無い。uptime 0をflash完了（08:23:12Z）に置くと、uptime 224.8秒は約08:26:57Zで、`deskcatd`の起動とほぼ一致する（uptime 0の置き方は近似。実際のuptime 0は2回目の`POWERON_RESET`で、flash完了より後なので、この置き方で算出した時刻は、実際より早い側にある）。この置き方で、最初の`Surprised`の受理（uptime 247.65秒）は約08:27:20Zで、`deskcatd`の停止まで約2分30秒、monitorの停止まで約3分40秒
 
-**ユーザーの申告**（出所は、#21のセッションの会話からの転記。commentには無い）: 叩いた後、LCDの表情が驚いた顔に変わり、2秒ほどで戻った。最初の2分のLCDの観察とUART線を挿したことへの回答は、両方とも問題なし。叩いた回数、間隔、叩き方、変わった回数は申告に無い。logの`face_show name=Surprised`から`face_show name=Neutral`まで: 4.71、2.07、4.62、2.09秒（4回。`set_expression`の受理の間隔は、上の「ESP32のlog」にある）。「2秒ほど」の申告が4回のどれに当たるかは分からない。UART線の状態と配線の変更についての質問と回答は、[#21のcomment](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21#issuecomment-6077223726)にある。
+**ユーザーの申告**（出所は、#21のセッションの会話からの転記。commentには無い）: 叩いた後、LCDの表情が驚いた顔に変わり、2秒ほどで戻った。最初の2分のLCDの観察とUART線を挿したことへの回答は、両方とも問題なし。叩いた回数、間隔、叩き方、変わった回数は申告に無い。logの`face_show name=Surprised`から`face_show name=Neutral`まで: 4.71、2.07、4.62、2.09秒（4回。`set_expression`の受理の間隔は、上の「ESP32のlog」にある）。約2秒という申告が4回のどれに当たるかは分からない。UART線の状態と配線の変更についての質問と回答は、[#21のcomment](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21#issuecomment-6077223726)にある。
 
 **Pi側**（#446のセッションの報告。Piで読んだ事実。この記録を書いたセッションは、Piの側を確かめていない。確かめた箇所は、その箇所に書く）: `deskcatd`のlog（`deskcatd-20261009T082657Z.log`、sha256 `b35a89377c2c556d7314e9076eb01b46ef0cdbcdac94ac90e0648beebba9846d`）は3行。起動の前後で`throttled=0x0`、journalの警告は0件。
 `deskcatd`の同定: sourceは`ddf16c9`（[#569](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/569)、F2）の`apps/`、`crates/`、`Cargo.toml`、`Cargo.lock`の79 file。Piには`git`も`.git`も無く、この記録の端末で`git archive`したtreeをsshでPiへ展開した。79 fileのsha256は、この端末の`git archive ddf16c9`と全件一致（`sha256sum -c`。fileの集合も一致）。**firmwareのcommit（`cd878542`）とは違う。**`ddf16c9`から`cd878542`への`apps/`、`crates/`、`Cargo.*`の差は、`crates/deskcat-tap`（追加）、`Cargo.toml`、`Cargo.lock`、`crates/README.md`（`git diff --stat`で確かめた）。`Cargo.lock`のsha256 `b1d8ca0e7a3188e9bb68c83953ef33be8ad7df2f779b0591f210729dc3461a61`、`apps/deskcatd/src/main.rs`のsha256 `60636adeb604d4bae1e2de1dcee13068db98a514611e58b6a33473d40374efff`（どちらも`git show ddf16c9:`の内容と一致を、この記録を書いたセッションが確かめた）。`rustc 1.97.1 (8bab26f4f 2026-07-14)`、`cargo 1.97.1 (c980f4866 2026-06-30)`。command `cargo build --locked -p deskcatd`、build 2026-10-09 04:09:39Z〜04:10:38Z（13:09:39〜13:10:38 JST。Piの時計）、成果物`target/debug/deskcatd`のsha256 `238339ebda46d5b1ac92e63f7740a37cec9326c8df650c227449e39762d9fc20`（8,992,404 byte。#446の報告による。この記録を書いたセッションはPiで再計算していない）。`--locked`は、#446が発行したcommandの報告による。logにcommand行は無い（記録が無い）。`Cargo.lock`のsha256は、buildの前後で一致している。buildの`Compiling`は`deskcat-domain`と`deskcatd`の2件。`SBC-01`（Pi Zero W）には低電圧検出が無く、`throttled=0x0`は電圧について何も語らない（[power-budget.md](power-budget.md)の`Pi Zero Wには低電圧検出が無い`節、`EXP-009`）。
@@ -4006,7 +4006,7 @@ A：`mem-probe-23`のbuildは、LCDをつないだESP32で動き、`show_text`�
 
 - **窓の前（通電前の目視。回答：全部合っている）：**USB抜け、AC抜け、橙・黄のESP32側が抜け、touch用の5本・LEDの枝・サーボ系が外れ、灰のGND線は前回から抜き差ししていない、LCDの9本は前回のまま。
 - **GPIO21（`TOUCH-CS`）の外部10 kΩ pull-up：**USBを挿す前、touch 5本を足す前に、ユーザーがテスター（`DT830B`、20 kΩレンジ）でESP32 boardの「21」のピンと上の＋列（3V3）の間を読み、**9.90**（kΩ。ユーザーの回答）。**この読みは、そのpinに茶のジャンパが付いているというユーザーの申告つきである。** `EXP-039`で「示せなかった」点について、10 kΩ前後の読みが得られた。ただし、読みが外部pull-up1本だけの値かは、他の経路を切り離して確かめていない。
-- **足した5本（`EXP-038`と同じ穴）：**表（LCD moduleの10〜14番の順）を示し、ユーザーが穴を目で見て確かめた（回答：表どおりに挿した）：10 紫 `T_CLK`→f29、11 青 `T_CS`→b22、12 緑 `T_DIN`→h30、13 黄 `T_DO`→a29、14 灰 `T_IRQ`→ESP32の「34」へ直接。**通電前の導通確認は、この窓では行っていない。**作業セッションが9組（つながる5組・つながらない4組）の測定を求めたのに対し、ユーザーは不要と答えた。
+- **足した5本（`EXP-038`と同じ穴）：**表（LCD moduleの10〜14番の順）を示し、ユーザーが穴を目で見て確かめた（回答：表どおりに挿した）：10 紫 `T_CLK`→f29、11 青 `T_CS`→b22、12 緑 `T_DIN`→h30、13 黄 `T_DO`→a29、14 灰 `T_IRQ`→ESP32の「34」へ直接。**通電前の導通確認は、この窓では行っていない。**作業セッションが9組（つながる5組・つながらない4組）の測定を求めたのに対し、測定を行わない判断はユーザーによる（理由は記録しない）。
 
 ### 手順と時刻（UTC）
 
@@ -4325,7 +4325,7 @@ touch用5本を足した配線で、製品buildはLCDに顔を描いた（目視
 - 数の突き合わせ：`stroke`31件のうち、受理された（直前の受理から1000 ms以上）のは23件で、Piの`set_expression_queued … Happy`23件、ESP32の`pi_rx_set_expression … Happy accepted`23件と一致する。`face_drawn Happy`21件は、この23件から上の2件を除いた数と一致する。
 - `deskcatd`は`timeout`へのSIGTERMで止めたため、終了時のcounter（`suppressed`を含む）の行はPiのlogに無い。`suppressed`の件数はPi側では確かめていない。ユーザーの申告：撫でるときにLCDが`Happy`に変わった（回答：Happy が出ていた）。
 
-**叩く（条件4、回帰）**：叩く10回の合図に対し、窓内の`tap_detected`は39件、`decision=Send`は12件（合図ごとに1,2,1,1,1,1,1,1,1,2件）。合図から最初の`Send`まで0.7〜2.6秒（1回目の合図のみ9.5秒）。全体で`Send`は88件、Piの`tapped_received`は88件で一致、`set_expression_queued Surprised`は53件、`face_drawn Surprised`は39件。ユーザーの申告：叩いたとき顔が`Surprised`に変わり、異常はなかった（回答：叩いたときにLCDの顔が驚きに変わった。異常はなかった）。
+**叩く（条件4、回帰）**：叩く10回の合図に対し、窓内の`tap_detected`は39件、`decision=Send`は12件（合図ごとに1,2,1,1,1,1,1,1,1,2件）。合図から最初の`Send`まで0.7〜2.6秒（1回目の合図のみ9.5秒）。全体で`Send`は88件、Piの`tapped_received`は88件で一致、`set_expression_queued Surprised`は53件、`face_drawn Surprised`は39件。ユーザーの申告：叩いたとき顔が`Surprised`に変わり、異常はなかった（回答。内容は上の申告と同じ）。
 
 **tapの検出の分布**：静止区間（60秒：15:07:52〜15:08:52）の`tap_detected`は34件（`Send`3件、`DropTooSoon`31件）。**34件は15:08:09.4〜15:08:12.5の約3秒に集中した1つの塊（15:08:09に17件、15:08:10に13件、15:08:12に4件）で、静止区間の最初の約17秒と、塊の後の約40秒は0件である。**原因（モジュールが動いたか、人の動作か）は調べていない。静止区間の間にユーザーがモジュールに触れたかは、logの外に根拠が無い（`EXP-040`の静止60秒×2は0件）。撫でるの窓に86件（`Send`26件）、長押しの窓に33件（`Send`17件）、軽く触れるの窓に1件。画面を押す操作が`ADXL345`に伝わったかは区別していない。起動の約26秒後〜（セッション確立の前）にも`DropNoSession`が119件ある（目視の間にユーザーが機械を扱った可能性。確認していない）。
 
@@ -4341,7 +4341,7 @@ touch用5本を足した配線で、製品buildはLCDに顔を描いた（目視
 - **承認が定めた「最初の2分」の目視は、約1分で打ち切られた**（ユーザーの求め。承認の2分に足りない）。
 - 合図は文字だけで、操作が実際に行われた時刻と回数の独立した記録が無い。軽く触れるの`pressed`が0件の理由（触れなかったか、触れたが圧が足りなかったか）は区別できない。
 - **軽く触れる10回で、touchが0回反応した**（`pressed`0件）。`EXP-041`の`touch-sample-14`では10回中4回反応した。差の原因は調べていない。
-- 静止区間の`tap_detected`は約3秒の塊（上の「tapの検出の分布」）。ADXL345の固定の仕方は、叩く前に、承認の答えがあったが、記録していない。
+- 静止区間の`tap_detected`は約3秒の塊（上の「tapの検出の分布」）。ADXL345の固定の仕方は、叩く前に、肯定の答えがあったが、記録していない。
 - Piの`WARN`は1件（helloのACKを受けたが応答送信側のsessionが未承認。`EXP-039`・`EXP-040`と同じ）。
 - 満たしていない条件：承認の範囲（#21のcomment）のとおり。GND線の導通・touch 5本の導通は測り直していない。`HW-TBD-036`は未確認。
 
@@ -4697,7 +4697,7 @@ touch用5本を足した配線で、製品buildはLCDに顔を描いた（目視
 
 ### 承認（ユーザーの直接の回答。原文は省略）
 
-- D：計画 comment の投稿（原文省略）。例外 3 つ（原文省略）。停止基準（原文省略）。D の実行（原文省略）。配線の確認（D1）は、ユーザーが訊き直す必要が無いと答えたため、記録（`EXP-045` の申告と、その後に M-12001 に触れていないこと）で扱った。
+- D：計画 comment の投稿（原文省略）。例外 3 つ（原文省略）。停止基準（原文省略）。D の実行（原文省略）。配線の確認（D1）は、訊き直さない判断はユーザーによる（理由は記録しない）ため、記録（`EXP-045` の申告と、その後に M-12001 に触れていないこと）で扱った。
 - E1：計画 comment の投稿（原文省略）。例外 4 つ（E1 の 2 回に限る）（原文省略）。停止基準（原文省略）。段 1・段 2 の実行（原文省略）。
 - E1b：計画 comment の投稿（原文省略）。例外 4 つ（E1b の 2 回に限る）（原文省略）。E1b-1（5 本）の実行（原文省略）。**取り直しの 5 本の AC は、承認の問いに答えが無いまま、ユーザーの直接の指示で実施した。****E1b は、M-12001 のまま行った**（ユーザーの答えによる。内容は記録しない）。
 
@@ -4850,7 +4850,7 @@ touch用5本を足した配線で、製品buildはLCDに顔を描いた（目視
 - **叩いてすぐ撫でる：**`Send` 4、1合図は tap を見つけなかった。
 - **`Send` 10件の内訳：**叩く5＋叩いてすぐ撫でる4＝9件。残る1件は合図の窓の外（14:17:03Z）。原因は記録に無い。Piの`tapped_received`は10（窓全体の`Send` 10件と同数）。
 - **起動回数：**アプリが走る起動5、BOOTを押したままのUSB挿入1（アプリは走らない）、`espflash`の接続3。
-- **ユーザーの申告：**撫でたとき、笑顔（Happy）になった。撫でたあとに、驚いた顔（Surprised）は混ざらなかった。乱れ・点滅・発熱・異臭は無い（最初の窓の後。取り直しの後も同じ内容）。
+- **ユーザーの申告：**撫でると`Happy`に変わり、`Surprised`は混ざらず、乱れ・点滅・発熱・異臭は無かった（最初の窓の後。取り直しの後も同じ内容）。
 
 ### Faults
 
