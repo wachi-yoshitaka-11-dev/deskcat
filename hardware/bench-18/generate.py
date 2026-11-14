@@ -179,6 +179,11 @@ def run_checks():
         errors.append("区間の数が点の数と合わない")
     if len(NETS) != 4:
         errors.append("節点が4つでない")
+    if len(net_ids) != len(NETS):
+        errors.append("節点の識別子が4つとも異なっていない")
+    psu_plus, psu_minus = point_net.get("PSU の＋端子"), point_net.get("PSU の−端子")
+    if psu_plus is not None and psu_plus == psu_minus:
+        errors.append("PSU の＋と−が同じ節点にある（短絡）")
     return errors
 
 
