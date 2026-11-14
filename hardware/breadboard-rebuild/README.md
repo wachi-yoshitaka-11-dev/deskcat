@@ -53,7 +53,7 @@ python3 -I hardware/breadboard-rebuild/generate.py --check
 | ESP32 の GND の3本（J2-14、J3-1、J3-7）が基板の中で同じ GND であること（検査の前提。Pi の GND の線 X3 を J3-7 に挿す） | 同じ公式回路図。現物の導通は測っていない |
 | ESP32 の上から見た向き（USB を右にすると J3 が上、J2 が下） | 下の行の Espressif の寸法図（裏から見た図）で、上の列が J3（左から CLK … GND）、USB が左、アンテナが右である。表から見ると左右が入れ替わり、USB が右、J3 が上になる（図からの読み）。挿すときは基板の silk で確かめる |
 | ESP32 の寸法（ヘッダー長 48.2 mm、全長 54.4 mm、幅 27.9 mm） | [Espressif ESP32-DevKitC V4 Getting Started Guide](https://docs.espressif.com/projects/esp-idf/en/v5.1/esp32/hw-reference/esp32/get-started-devkitc.html) の `Board Dimensions` の図（`esp32-devkitc-dimensions-back.jpg`、sha256 `52d81d696ebdb0c804d30b5d5361f1eaabca886cafc16b14edf48abdc0de02f1`、2026-10-23取得）。アンテナが1番ピンの先へ約6 mm 出ることは、この図の寸法の差（54.4 − 48.2 mm）から読んだもので、9〜11列を使わない根拠にした |
-| EIC-3901 の行・列（30行、6×2列、電源1組） | [秋月 112366](https://akizukidenshi.com/catalog/g/g112366/)（2026-10-23取得）。電源行数は「5×4」と書かれているが、写真では各6穴×4組に見え、ユーザーが写真の読みを「合っている」と答えた。図は写真の読みに従う |
+| EIC-3901 の行・列（30行、6×2列、電源1組） | [秋月 112366](https://akizukidenshi.com/catalog/g/g112366/)（2026-10-23取得）。電源行数は「5×4」と書かれているが、写真では各6穴×4組に見え、ユーザーが、写真の読みは合っていると答えた。図は写真の読みに従う |
 | EIC-3901 の電源列（L 行側が −、外側が ＋、穴は 1〜6・9〜14・17〜22・25〜30 列、赤の列は14と17の間を赤い部品でつなぐ） | ユーザーの写真の読みと、ユーザーの回答（2026-10-23） |
 | BB-601（17行、5×2列、45×34.5 mm） | [秋月 105155](https://akizukidenshi.com/catalog/g/g105155/)（白の品。販売終了。2026-10-23取得）。手持ちはスケルトンの品で、同じ型番として扱った |
 | `ACCEL-01` のピン（上段 CS Vs GND VDD、下段 INT1 INT2 SDO SDA SCL） | [sensor-datasheet-notes.md](../../docs/hardware/sensor-datasheet-notes.md) の `module boardの値（秋月 M-06724）`（2026-08-13の現物確認）。2026-10-23 のユーザーの写真の silk とも一致した |
