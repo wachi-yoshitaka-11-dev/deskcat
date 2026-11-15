@@ -185,10 +185,18 @@ REVIEW_COMPLETED_TEXT = "Review completed"
 # **hook全体の上限は`.claude/settings.json`の30秒である。**超えるとhookが落ち、
 # 通る側に倒れるおそれがあるため、commitごとの確認は並列で行い（昇格は100件を超える）、
 # 全体にも期限を置く。
-GH_TIMEOUT_SECONDS = 10
+#
+# **最初の1回は遅い（#760）。**しばらく照会しない後の最初の`gh`は、endpointによらず
+# （`pr view`のgraphqlも`gh api`のRESTも）10.4〜10.7秒かかり、続く照会は0.4〜1秒で返る。
+# DNS（`GODEBUG=netdns`の違い）にも依らなかった。**この遅れは照会の方法では避けられない。**
+# 上限が10秒だと、この遅れだけで「確認できない」としてmergeを止める。そのため1回の上限は
+# 遅れの約1.5倍に置く。**遅れが無ければ上限まで待たない。**照会できなければdenyする性質は同じ。
+GH_TIMEOUT_SECONDS = 15
 # **最初の`gh`照会の前に始め、残りを各照会へ渡す。**走っているworkerも同じ期限で
 # 終わるため、denyを出した後にprocessが残って時間切れになることもない。
-CHECK_DEADLINE_SECONDS = 15
+# **この期限の外で、先に`_check_merge`のgit（`GIT_TIMEOUT_SECONDS`）が走る。**
+# 両方の上限の和がhookの30秒に収まる値にする（最初の遅れの後に残りの照会も収まる）。
+CHECK_DEADLINE_SECONDS = 18
 COMMIT_CHECK_WORKERS = 16
 
 # `gh pr merge`の値を取るoption。selector（PR番号・URL・branch）を探すときに値を飛ばす。

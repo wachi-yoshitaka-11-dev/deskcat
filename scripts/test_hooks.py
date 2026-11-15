@@ -49,6 +49,7 @@ PR_TEMPLATE_PATH = REPO_ROOT_FOR_TEMPLATES / ".github" / "pull_request_template.
 sys.path.insert(0, str(SCRIPTS_ROOT / "hooks"))
 
 import push_gate  # noqa: E402
+import gh_metadata_guard as guard  # noqa: E402
 
 import inspector_readonly_guard  # noqa: E402
 
@@ -99,6 +100,10 @@ if fixture.get("log"):
     with open(fixture["log"], "a", encoding="utf-8") as log:
         log.write(json.dumps(sys.argv[1:]) + "\\n")
 time.sleep(fixture.get("sleep", 0))
+if fixture.get("cold_marker") and not os.path.exists(fixture["cold_marker"]):
+    # 最初の1回だけ遅い（#760。しばらく照会しない後の最初のgh）。
+    open(fixture["cold_marker"], "w").close()
+    time.sleep(fixture.get("cold_sleep", 0))
 if fixture.get("fail"):
     sys.stderr.write("gh: boom")
     sys.exit(1)
@@ -989,8 +994,7 @@ class GhHookRepositoryAndDeadlineTests(unittest.TestCase):
     TARGET = "firmware/esp32/src/a.rs"
     DRIVER = (
         "import sys; sys.path.insert(0, {hooks!r}); import gh_metadata_guard as g; "
-        "g.GH_TIMEOUT_SECONDS = {timeout}; g.CHECK_DEADLINE_SECONDS = {deadline}; "
-        "sys.exit(g.main())"
+        "{overrides}sys.exit(g.main())"
     )
 
     def _logged(self, command, fixture):
@@ -1050,9 +1054,12 @@ class GhHookRepositoryAndDeadlineTests(unittest.TestCase):
         self.assertEqual(len(calls), 1, calls)
         self.assertEqual(calls[0][calls[0].index("-R") + 1], "owner/target")
 
-    def _timed(self, fixture, deadline, timeout=10):
+    def _timed(self, fixture, deadline=None, timeout=10):
+        """`deadline`が`None`なら、hookの本物の上限（定数）のまま実行する。"""
+        overrides = "" if deadline is None else (
+            f"g.GH_TIMEOUT_SECONDS = {timeout}; g.CHECK_DEADLINE_SECONDS = {deadline}; ")
         driver = self.DRIVER.format(
-            hooks=str(SCRIPTS_ROOT / "hooks"), timeout=timeout, deadline=deadline)
+            hooks=str(SCRIPTS_ROOT / "hooks"), overrides=overrides)
         env = dict(os.environ, DESKCAT_TEST_GH=json.dumps(fixture))
         env["PATH"] = f"{_GH_SHIM_DIR}{os.pathsep}{env['PATH']}"
         with tempfile.TemporaryDirectory() as directory:
@@ -1078,6 +1085,26 @@ class GhHookRepositoryAndDeadlineTests(unittest.TestCase):
         self.assertIsNotNone(output, "期限を超えたのに通した")
         self.assertEqual(output["hookSpecificOutput"]["permissionDecision"], "deny")
         self.assertLess(elapsed, 5.5)
+
+    def test_cold_first_lookup_over_ten_seconds_still_passes(self):
+        """しばらく照会しない後の最初のghが11秒かかっても、確認が通れば通す（#760）。
+
+        本物の定数で走らせる。実測した遅れは10.4〜10.7秒で、上限が10秒だと
+        これだけで確認できないとしてdenyしていた。
+        """
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self._fixture(
+                cold_marker=str(Path(directory) / "cold"), cold_sleep=11)
+            elapsed, output = self._timed(fixture)
+        self.assertIsNone(output, f"最初の遅れだけで止めた: {output}")
+        self.assertGreaterEqual(elapsed, 11)
+        self.assertLess(elapsed, guard.CHECK_DEADLINE_SECONDS)
+
+    def test_hook_limits_fit_inside_the_hook_timeout(self):
+        """1回の上限は最初の遅れ（約10.7秒）を超える。期限の外で先に走るgitの上限との和は、hookの30秒に収まる。"""
+        self.assertGreater(guard.GH_TIMEOUT_SECONDS, 10.7)
+        self.assertLessEqual(guard.GH_TIMEOUT_SECONDS, guard.CHECK_DEADLINE_SECONDS)
+        self.assertLess(guard.GIT_TIMEOUT_SECONDS + guard.CHECK_DEADLINE_SECONDS, 30)
 
     def test_running_workers_end_by_the_deadline(self):
         """commit照会が期限を超えて走り続けても、processは期限の直後に終わる。"""
