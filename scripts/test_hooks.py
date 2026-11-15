@@ -1098,13 +1098,13 @@ class GhHookRepositoryAndDeadlineTests(unittest.TestCase):
             elapsed, output = self._timed(fixture)
         self.assertIsNone(output, f"最初の遅れだけで止めた: {output}")
         self.assertGreaterEqual(elapsed, 11)
-        self.assertLess(elapsed, 25)
+        self.assertLess(elapsed, guard.CHECK_DEADLINE_SECONDS)
 
     def test_hook_limits_fit_inside_the_hook_timeout(self):
-        """1回の上限は最初の遅れ（約10.7秒）を超え、全体の期限はhookの30秒の内に収まる。"""
+        """1回の上限は最初の遅れ（約10.7秒）を超える。期限の外で先に走るgitの上限との和は、hookの30秒に収まる。"""
         self.assertGreater(guard.GH_TIMEOUT_SECONDS, 10.7)
         self.assertLessEqual(guard.GH_TIMEOUT_SECONDS, guard.CHECK_DEADLINE_SECONDS)
-        self.assertLessEqual(guard.CHECK_DEADLINE_SECONDS, 27)
+        self.assertLess(guard.GIT_TIMEOUT_SECONDS + guard.CHECK_DEADLINE_SECONDS, 30)
 
     def test_running_workers_end_by_the_deadline(self):
         """commit照会が期限を超えて走り続けても、processは期限の直後に終わる。"""
