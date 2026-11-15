@@ -6591,7 +6591,7 @@
 			)
 		)
 	)
-	(gr_text "Component side. Col 1-27 from rear (left), row 1-17 from lid (top)."
+	(gr_text "Component side. Col 1 = rear, col 27 = front, row 1 = floor, row 17 = lid."
 		(at 136 137 0)
 		(layer "Cmts.User")
 		(uuid "9c7e7ccd-79f0-4511-a45a-22b2ffa2860c")
