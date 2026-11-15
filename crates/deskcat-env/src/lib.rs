@@ -106,6 +106,22 @@ pub const fn conversion_schedule(cycle_ms: u64, started_ms: u64) -> ConversionSc
     }
 }
 
+/// forced mode の書き込みを行い、**成功したときだけ、その後に** 時計を読んで変換の期限を決める。
+/// 書き込みが失敗したときは時計を読まず、書き込みの error をそのまま返す。
+/// 書き込みと時計の順序をここへ固定し、host で test できるようにする。
+///
+/// # Errors
+///
+/// `write` が返した error をそのまま返す。
+pub fn start_conversion<E>(
+    cycle_ms: u64,
+    write: impl FnOnce() -> Result<(), E>,
+    clock: impl FnOnce() -> u64,
+) -> Result<ConversionSchedule, E> {
+    write()?;
+    Ok(conversion_schedule(cycle_ms, clock()))
+}
+
 /// register の観測値から判定できる fault。I2C 自身の fault は firmware が分類する。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RegisterFault {
@@ -431,6 +447,40 @@ mod tests {
         );
         // 時計が周期の起点より前を示しても、起点より前へ戻さない。
         assert_eq!(conversion_schedule(1_000, 900).cycle_ms, 1_000);
+    }
+
+    #[test]
+    fn start_conversion_reads_the_clock_after_the_write_succeeds() {
+        use core::cell::Cell;
+        let written = Cell::new(false);
+        let schedule = start_conversion::<()>(
+            1_000,
+            || {
+                written.set(true);
+                Ok(())
+            },
+            // 書き込みの前なら 1000、後なら 1040 を返す時計。
+            || if written.get() { 1_040 } else { 1_000 },
+        )
+        .unwrap();
+        assert_eq!(schedule, conversion_schedule(1_000, 1_040));
+        assert_eq!(schedule.cycle_ms, 1_040);
+    }
+
+    #[test]
+    fn start_conversion_does_not_read_the_clock_when_the_write_fails() {
+        use core::cell::Cell;
+        let clock_reads = Cell::new(0u32);
+        let result = start_conversion(
+            1_000,
+            || Err(IoFault::Timeout),
+            || {
+                clock_reads.set(clock_reads.get() + 1);
+                1_040
+            },
+        );
+        assert_eq!(result, Err(IoFault::Timeout));
+        assert_eq!(clock_reads.get(), 0);
     }
 
     #[test]

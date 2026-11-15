@@ -57,7 +57,7 @@
 
 use deskcat_env::{
     check_calibration_ready, check_identity, check_measurement_ready, classify_io_error,
-    compensate, conversion_schedule, decode_calibration, decode_raw, Calibration, IoFault,
+    compensate, decode_calibration, decode_raw, start_conversion, Calibration, IoFault,
     RegisterFault,
 };
 use deskcat_protocol::{Environment, FiniteF32};
@@ -256,11 +256,16 @@ impl EnvReporter {
         if let Err(err) = humidity {
             return self.io_fault("ctrl_hum_write", err, cycle_ms);
         }
-        let forced = self.sensor.start_forced(&mut self.bus.borrow_mut());
+        // 周期と変換の期限は、forced modeの書き込みが成功した後の時刻から数える（順序は deskcat_env が固定する）。
+        let sensor = &self.sensor;
+        let bus = &self.bus;
+        let forced = start_conversion(
+            cycle_ms,
+            || sensor.start_forced(&mut bus.borrow_mut()),
+            clock,
+        );
         match forced {
-            Ok(()) => {
-                // 周期と変換の期限は、forced modeの書き込みが成功した後の時刻から数える（書き込みの前の時刻ではない）。
-                let schedule = conversion_schedule(cycle_ms, clock());
+            Ok(schedule) => {
                 self.state = State::Wait {
                     cycle_ms: schedule.cycle_ms,
                     next_poll_ms: schedule.next_poll_ms,
