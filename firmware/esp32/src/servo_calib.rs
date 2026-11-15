@@ -71,11 +71,12 @@
 //!   `tests/trajectory.rs`の組み合わせで1度も立たなかった）が、この校正buildの値で確かめた試験は無い。
 //!   立てば`TickError::AccelerationConceded`でlatchし、回を終える（出力しない）。
 
+use std::ops::ControlFlow;
 use std::time::{Duration, Instant};
 
 use deskcat_servo::{
-    parse_debug_line, Cap, CommandSource, ControlPeriod, LimiterCounters, LimitsError,
-    MotionCatalog, MotionRequest, PositionRange, Rejection, ServoLimits,
+    drain::drain_bounded, parse_debug_line, Cap, CommandSource, ControlPeriod, LimiterCounters,
+    LimitsError, MotionCatalog, MotionRequest, PositionRange, Rejection, ServoLimits,
 };
 use esp_idf_svc::hal::delay::FreeRtos;
 use esp_idf_svc::hal::peripherals::Peripherals;
@@ -584,6 +585,11 @@ impl Trace {
     }
 }
 
+/// 動作中の1周あたりに取り出すconsoleの事象の上限（件）。queueの深さ（`debug_motion::EVENT_QUEUE_CAPACITY`＝16）と同じで、
+/// 満杯のqueueを1周で空にできる。入力が続いても期限の確認が遅れない値で、servoの安全制限の値ではない
+/// （出力は`Limiter`だけが出す）。
+const MAX_CONSOLE_EVENTS_PER_TICK: usize = 16;
+
 /// 動作中に拒否した行のlogを、`stop`の後まで溜める上限（件）。上限のないallocationを避けるための値で、
 /// 安全要件の5項目に効かない。超えた分は件数だけ数える。
 const DEFERRED_MAX: usize = 16;
@@ -682,43 +688,57 @@ fn run_motion(
         feed(wdt);
         // (a) console。動いている間に受けるのは`STOP`だけで、それ以外は拒否する。拒否のlogは、`stop`の後に出す
         // （logの時間だけdutyが残らないように）。
-        while let Some(event) = console.try_recv() {
-            match event {
-                ConsoleEvent::Line(line) => match classify(&line) {
-                    Command::Stop => {
-                        interrupted = Some(("stop", None));
-                        break;
+        // 1周あたりの取り出しは`MAX_CONSOLE_EVENTS_PER_TICK`件までにする。入力が続いてqueueが空にならなくても、
+        // 露出とsessionの期限の確認へ戻る。残りはqueueに残り、`STOP`も次の周に届く（捨てない）。
+        drain_bounded(
+            MAX_CONSOLE_EVENTS_PER_TICK,
+            || console.try_recv(),
+            |event| {
+                match event {
+                    ConsoleEvent::Line(line) => match classify(&line) {
+                        Command::Stop => {
+                            interrupted = Some(("stop", None));
+                            return ControlFlow::Break(());
+                        }
+                        Command::End => {
+                            defer(&mut deferred, Refusal::Limiter(Rejection::Busy), || {
+                                format!("{line:?}")
+                            })
+                        }
+                        Command::Motion { name, .. } => {
+                            let refusal = if name == MOTION_NAME {
+                                Refusal::Limiter(Rejection::Busy)
+                            } else {
+                                Refusal::Limiter(Rejection::UnknownMotion)
+                            };
+                            defer(&mut deferred, refusal, || format!("{line:?}"));
+                        }
+                        Command::Unknown => defer(&mut deferred, Refusal::UnknownCommand, || {
+                            format!("{line:?}")
+                        }),
+                    },
+                    ConsoleEvent::TooLong(_) => {
+                        defer(&mut deferred, Refusal::UnknownCommand, || {
+                            "too_long".to_owned()
+                        })
                     }
-                    Command::End => defer(&mut deferred, Refusal::Limiter(Rejection::Busy), || {
-                        format!("{line:?}")
+                    ConsoleEvent::Empty => defer(&mut deferred, Refusal::UnknownCommand, || {
+                        "empty".to_owned()
                     }),
-                    Command::Motion { name, .. } => {
-                        let refusal = if name == MOTION_NAME {
-                            Refusal::Limiter(Rejection::Busy)
-                        } else {
-                            Refusal::Limiter(Rejection::UnknownMotion)
-                        };
-                        defer(&mut deferred, refusal, || format!("{line:?}"));
+                    ConsoleEvent::NotUtf8(_) => {
+                        defer(&mut deferred, Refusal::UnknownCommand, || {
+                            "not_utf8".to_owned()
+                        })
                     }
-                    Command::Unknown => defer(&mut deferred, Refusal::UnknownCommand, || {
-                        format!("{line:?}")
-                    }),
-                },
-                ConsoleEvent::TooLong(_) => defer(&mut deferred, Refusal::UnknownCommand, || {
-                    "too_long".to_owned()
-                }),
-                ConsoleEvent::Empty => defer(&mut deferred, Refusal::UnknownCommand, || {
-                    "empty".to_owned()
-                }),
-                ConsoleEvent::NotUtf8(_) => defer(&mut deferred, Refusal::UnknownCommand, || {
-                    "not_utf8".to_owned()
-                }),
-                ConsoleEvent::ReadFailed(err) => {
-                    interrupted = Some(("console_failed", Some(err)));
-                    break;
+                    ConsoleEvent::ReadFailed(err) => {
+                        interrupted = Some(("console_failed", Some(err)));
+                        return ControlFlow::Break(());
+                    }
                 }
-            }
-        }
+
+                ControlFlow::Continue(())
+            },
+        );
         if interrupted.is_none() && session_started.elapsed() >= max_session {
             interrupted = Some(("max_session", None));
         }

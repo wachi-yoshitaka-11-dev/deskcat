@@ -53,7 +53,7 @@
 |---|---|
 | 優先度 | P0 |
 | 不足している情報／判断 | 実装済みI2C address（SDO配線で選ぶ）。header〜ICの経路は未確認 |
-| 必要な根拠 | [現物確認・逐語・承認](tbd-register-history.md#hw-tbd-004)。moduleへ入れてよい電圧の判定は済み。正しく製造された個体を前提とし、経路確認済みとは主張しない |
+| 必要な根拠 | [現物確認・経緯・承認（回答の原文は省略）](tbd-register-history.md#hw-tbd-004)。moduleへ入れてよい電圧の判定は済み。正しく製造された個体を前提とし、経路確認済みとは主張しない |
 | 妨げる対象 | addressは一般値扱いで着手を止めない。給電の条件は[電源文書](power-budget.md#段階b-2の測定)で別に確認する |
 | 対応Issue | [#1](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/1)、[#3](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/3) |
 | Owner | Human |

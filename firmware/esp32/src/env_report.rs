@@ -16,8 +16,8 @@
 //!
 //! 測定を始めたら、すぐにmain loopへ戻る。読みに行くのは、変換の時間が過ぎた後の周回である。
 //! 変換の時間は§9.1の式から取る。最大は`1.25 + 2.3·T + (2.3·P + 0.575) + (2.3·H + 0.575)` ms（T・P・Hはoversampling倍率）で、
-//! ×1／×1／×1は9.3 msである（`crate::env_sample`のdocが同じ式を引く）。[`CONVERSION_MAX_MS`]はそれを切り上げた値である。
-//! 読みに行って`measuring`が立っていたら、[`POLL_INTERVAL_MS`]後に読み直し、[`DEADLINE_MS`]を過ぎても終わらなければ
+//! ×1／×1／×1は9.3 msである（`crate::env_sample`のdocが同じ式を引く）。`deskcat_env::CONVERSION_MAX_MS`はそれを切り上げた値である。
+//! 読みに行って`measuring`が立っていたら、[`POLL_INTERVAL_MS`]後に読み直し、`deskcat_env::DEADLINE_MS`を過ぎても終わらなければ
 //! `not_ready`として数え、その周期の測定を捨てる。**1周回で行うI2C transactionは3回以下である**（下の「1周回の仕事」）。
 //! 実際に待つのは1 tick（`CONFIG_FREERTOS_HZ=100`で10 ms）単位である。
 //!
@@ -57,7 +57,8 @@
 
 use deskcat_env::{
     check_calibration_ready, check_identity, check_measurement_ready, classify_io_error,
-    compensate, decode_calibration, decode_raw, Calibration, IoFault, RegisterFault,
+    compensate, conversion_schedule, decode_calibration, decode_raw, Calibration, IoFault,
+    RegisterFault,
 };
 use deskcat_protocol::{Environment, FiniteF32};
 use esp_idf_svc::sys::{EspError, ESP_ERR_TIMEOUT};
@@ -67,12 +68,8 @@ use crate::i2c_bus::SharedI2c;
 
 /// 測定の開始から次の開始までの間隔（ms）。Bosch Table 7の1 sample／分。
 pub const PERIOD_MS: u64 = 60_000;
-/// 変換を始めてから、`measuring`を読みに行くまでの時間（ms）。§9.1の最大9.3 ms（×1／×1／×1）の切り上げ。
-const CONVERSION_MAX_MS: u64 = 10;
 /// `measuring`がまだ立っていたとき、読み直すまでの間隔（ms）。
 const POLL_INTERVAL_MS: u64 = 10;
-/// 変換の開始から、`not_ready`と数えるまでの時間（ms）。最大の約3倍（`crate::env_sample`の×1と同じ）。
-const DEADLINE_MS: u64 = 30;
 
 #[derive(Clone, Copy)]
 enum State {
@@ -157,7 +154,7 @@ impl EnvReporter {
     }
 
     /// 時刻に達していれば、測定を1段進める。**1回の呼び出しで、I2C transactionは3回以下である。**
-    pub fn poll(&mut self, now_ms: u64) {
+    pub fn poll(&mut self, now_ms: u64, clock: impl Fn() -> u64) {
         match self.state {
             State::Idle { next_start_ms } => {
                 if now_ms >= next_start_ms {
@@ -172,7 +169,7 @@ impl EnvReporter {
             }
             State::CheckId { cycle_ms } => self.check_id(cycle_ms),
             State::ReadCalibration { cycle_ms } => self.read_calibration(cycle_ms),
-            State::Start { cycle_ms } => self.start(cycle_ms, now_ms),
+            State::Start { cycle_ms } => self.start(cycle_ms, clock),
             State::Wait {
                 cycle_ms,
                 next_poll_ms,
@@ -254,7 +251,7 @@ impl EnvReporter {
         }
     }
 
-    fn start(&mut self, cycle_ms: u64, now_ms: u64) {
+    fn start(&mut self, cycle_ms: u64, clock: impl Fn() -> u64) {
         let humidity = self.sensor.configure_humidity(&mut self.bus.borrow_mut());
         if let Err(err) = humidity {
             return self.io_fault("ctrl_hum_write", err, cycle_ms);
@@ -262,12 +259,12 @@ impl EnvReporter {
         let forced = self.sensor.start_forced(&mut self.bus.borrow_mut());
         match forced {
             Ok(()) => {
-                // 周期は、測定の開始（この周回の時刻）から数える。
-                let started_ms = now_ms.max(cycle_ms);
+                // 周期と変換の期限は、forced modeの書き込みが成功した後の時刻から数える（書き込みの前の時刻ではない）。
+                let schedule = conversion_schedule(cycle_ms, clock());
                 self.state = State::Wait {
-                    cycle_ms: started_ms,
-                    next_poll_ms: started_ms + CONVERSION_MAX_MS,
-                    deadline_ms: started_ms + DEADLINE_MS,
+                    cycle_ms: schedule.cycle_ms,
+                    next_poll_ms: schedule.next_poll_ms,
+                    deadline_ms: schedule.deadline_ms,
                 };
             }
             Err(err) => self.io_fault("ctrl_meas_write", err, cycle_ms),

@@ -73,6 +73,39 @@ pub const RAW_LEN: usize = 8;
 /// Bosch §5.4.1 Table 18 の Chip ID。
 pub const CHIP_ID: u8 = 0x60;
 
+/// 変換を始めてから、`measuring` を読みに行くまでの時間（ms）。§9.1 の最大 9.3 ms（×1／×1／×1）の切り上げ。
+pub const CONVERSION_MAX_MS: u64 = 10;
+/// 変換の開始から、`not_ready` と数えるまでの時間（ms）。最大の約 3 倍。
+pub const DEADLINE_MS: u64 = 30;
+
+/// forced mode の書き込みが成功した後の、変換の待ちの期限。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ConversionSchedule {
+    /// 周期の起点（ms）。
+    pub cycle_ms: u64,
+    /// 最初に `measuring` を読みに行く時刻（ms）。
+    pub next_poll_ms: u64,
+    /// `not_ready` と数える期限（ms）。
+    pub deadline_ms: u64,
+}
+
+/// 変換の待ちの起点から期限を決める。`started_ms` は **forced mode の書き込みが成功した後に読んだ** uptime（ms）である。
+/// 書き込みより前の時刻を渡すと、書き込みの前に task が遅れた分だけ期限が前へずれ、有効な変換を捨てうる。
+/// 周期の起点 `cycle_ms` より前には戻さない。
+#[must_use]
+pub const fn conversion_schedule(cycle_ms: u64, started_ms: u64) -> ConversionSchedule {
+    let started_ms = if started_ms > cycle_ms {
+        started_ms
+    } else {
+        cycle_ms
+    };
+    ConversionSchedule {
+        cycle_ms: started_ms,
+        next_poll_ms: started_ms.saturating_add(CONVERSION_MAX_MS),
+        deadline_ms: started_ms.saturating_add(DEADLINE_MS),
+    }
+}
+
 /// register の観測値から判定できる fault。I2C 自身の fault は firmware が分類する。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RegisterFault {
@@ -380,6 +413,25 @@ pub fn compensate(raw: RawSample, c: &Calibration) -> Result<Reading, Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_conversion_deadline_starts_from_the_time_after_the_write() {
+        // 書き込みの前に読んだ時刻（1000）から期限を決めると、書き込みが完了した時刻（1040）には期限（1030）が過ぎている。
+        let stale = conversion_schedule(1_000, 1_000);
+        assert!(stale.deadline_ms < 1_040);
+        // 書き込みの後（1040）を起点にすれば、期限は書き込みの完了より後である。
+        let fresh = conversion_schedule(1_000, 1_040);
+        assert_eq!(
+            fresh,
+            ConversionSchedule {
+                cycle_ms: 1_040,
+                next_poll_ms: 1_040 + CONVERSION_MAX_MS,
+                deadline_ms: 1_040 + DEADLINE_MS,
+            }
+        );
+        // 時計が周期の起点より前を示しても、起点より前へ戻さない。
+        assert_eq!(conversion_schedule(1_000, 900).cycle_ms, 1_000);
+    }
 
     #[test]
     fn calibration_register_boundaries_and_signed_nibbles() {

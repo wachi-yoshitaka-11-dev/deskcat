@@ -108,6 +108,7 @@ pub mod debug;
 pub mod decimation;
 pub mod dedup;
 pub mod dispatch;
+pub mod drain;
 pub mod limiter;
 pub mod limits;
 pub mod link;
