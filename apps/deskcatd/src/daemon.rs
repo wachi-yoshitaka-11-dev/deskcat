@@ -362,6 +362,27 @@ struct CompanionLink {
     local: Option<LocalMinutes>,
 }
 
+/// 実機確認用の表情の送信（Issue #514。`--probe-expression`／`--probe-interval-ms`）。
+///
+/// `set_expression`だけを送る。**`play_motion`は送らない。**欲しい表情を`expression`と`Neutral`で交互に
+/// 切り替える（同じ表情は`ExpressionSync`が送り直さないため、`Neutral`を挟まないと2回目が出ない）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ExpressionProbe {
+    /// 送る表情。`Neutral`は交互の相手と同じで意味が無いので、CLIが拒否する。
+    pub expression: Expression,
+    /// 切り替えの間隔（ms）。値の根拠は無い。実機確認の観察のための値である。
+    pub interval_ms: NonZeroU64,
+}
+
+#[derive(Debug)]
+struct ProbeState {
+    config: ExpressionProbe,
+    /// 次に切り替える時刻。`status`が届いて送れる状態になるまでは`None`（時計を始めない）。
+    next_ms: Option<u64>,
+    /// 今の欲しい表情が`config.expression`か。
+    showing: bool,
+}
+
 /// linkの一生。
 #[derive(Debug)]
 pub struct Daemon {
@@ -371,6 +392,8 @@ pub struct Daemon {
     /// 無ければ`Companion`を使わない（`with_companion`）。
     companion: Option<CompanionLink>,
     sync: ExpressionSync,
+    /// 無ければ表情の試験送信をしない（`with_expression_probe`）。
+    probe: Option<ProbeState>,
     identity: Identity,
     counters: DaemonCounters,
     speech_pending: Option<(String, u32, NonZeroU64)>,
@@ -411,6 +434,7 @@ impl Daemon {
             mind,
             companion: None,
             sync: ExpressionSync::new(),
+            probe: None,
             identity,
             counters: DaemonCounters::default(),
             speech_pending: None,
@@ -430,6 +454,19 @@ impl Daemon {
             status_watch_until: None,
             exit: None,
         }
+    }
+
+    /// 実機確認のため、`set_expression`を一定の間隔で送る（[`ExpressionProbe`]）。
+    ///
+    /// **`Companion`と併用しない**（`Companion`も欲しい表情を書き換える。CLIが`--no-companion`を要求する）。
+    #[must_use]
+    pub fn with_expression_probe(mut self, probe: ExpressionProbe) -> Self {
+        self.probe = Some(ProbeState {
+            config: probe,
+            next_ms: None,
+            showing: false,
+        });
+        self
     }
 
     /// `Companion`を使う。吹き出しは`bubble_duration_ms`で送り、`None`なら送らずに数える。
@@ -595,6 +632,7 @@ impl Daemon {
         }
         self.apply_reaction(reaction);
         self.tick_companion(now_ms);
+        self.tick_probe(now_ms);
         self.send_hello(now_ms);
         self.send_expression(now_ms);
         self.send_speech(now_ms);
@@ -932,6 +970,24 @@ impl Daemon {
             self.counters.motions_not_sent += 1;
             log::debug!("首の動きの意図は送らない（PROTO-TBD-008）");
         }
+    }
+
+    fn tick_probe(&mut self, now_ms: u64) {
+        let ready = self.sync.is_ready();
+        let Some(probe) = &mut self.probe else {
+            return;
+        };
+        if !ready || probe.next_ms.is_some_and(|at| now_ms < at) {
+            return;
+        }
+        probe.showing = !probe.showing;
+        probe.next_ms = Some(now_ms.saturating_add(probe.config.interval_ms.get()));
+        let expression = if probe.showing {
+            probe.config.expression
+        } else {
+            Expression::Neutral
+        };
+        self.sync.set_desired(expression);
     }
 
     fn apply_reaction(&mut self, reaction: Reaction) {

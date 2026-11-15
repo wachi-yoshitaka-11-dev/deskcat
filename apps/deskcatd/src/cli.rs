@@ -13,17 +13,26 @@ use std::fmt;
 use std::num::NonZeroU64;
 use std::time::Duration;
 
+use deskcat_domain::Expression;
 use deskcat_serial::DuplicatePolicy;
+
+use crate::daemon::ExpressionProbe;
+use crate::expression_sync::from_status_name;
 
 /// 使い方。
 pub const USAGE: &str = "usage: deskcatd --port <path> --baud <rate> \
 --duplicate-capacity <n> --duplicate-retention-ms <ms> --startup-deadline-ms <ms> \
-[--speech-min-interval-ms <ms> --speech-duration-ms <ms>] [--cloud-speech] [--no-companion] [--verbose]\n\
+[--speech-min-interval-ms <ms> --speech-duration-ms <ms>] [--cloud-speech] [--no-companion] \
+[--probe-expression <name> --probe-interval-ms <ms>] [--verbose]\n\
 \n\
 --port、--baud、--duplicate-capacity、--duplicate-retention-ms、--startup-deadline-ms は必須である。\
 既定値を持たせない。\n\
 device名は未確認であり、baudの正本は PROTO-TBD-001、duplicate履歴の正本は PROTO-TBD-005 である。\
-起動の期限は、値の根拠が無い（ESP32の起動時間は未測定）。";
+起動の期限は、値の根拠が無い（ESP32の起動時間は未測定）。\n\
+\n\
+--probe-expression と --probe-interval-ms は実機確認用で、両方と --no-companion が要る。\
+session確立後、指定した表情と neutral の set_expression を、指定の間隔で交互に送る（play_motion は送らない）。\
+neutral は指定できない。運用では付けない。";
 
 /// 解析した引数。
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -42,6 +51,8 @@ pub struct Args {
     pub cloud_speech: bool,
     /// `Companion`をつながない。Piの時刻（寝る時間帯）に依存しない試験のためで、運用では付けない。
     pub no_companion: bool,
+    /// 実機確認用の表情の送信（Issue #514）。両方の引数がある場合だけ。`--no-companion`が要る。
+    pub probe: Option<ExpressionProbe>,
     /// `Debug`まで出す。
     pub verbose: bool,
 }
@@ -100,72 +111,53 @@ where
     })
 }
 
-/// 引数（program名を除く）を解析する。
-///
-/// # Errors
-///
-/// 必須の引数が無い、値が無い、値を解釈できない、または知らない引数のとき。
-pub fn parse<I>(raw: I) -> Result<Parsed, CliError>
-where
-    I: IntoIterator<Item = String>,
-{
-    let mut port = None;
-    let mut baud = None;
-    let mut duplicate_capacity = None;
-    let mut duplicate_retention_ms = None;
-    let mut startup_deadline_ms = None;
-    let mut speech_min_interval_ms = None;
-    let mut speech_duration_ms = None;
-    let (mut verbose, mut cloud_speech, mut no_companion) = (false, false, false);
-    let mut argv = raw.into_iter();
-
-    while let Some(flag) = argv.next() {
-        let mut value = || argv.next().ok_or_else(|| CliError::NoValue(flag.clone()));
-        match flag.as_str() {
-            "--port" => port = Some(value()?),
-            "--baud" => baud = Some(number::<u32>("--baud", &value()?)?),
-            "--duplicate-capacity" => {
-                duplicate_capacity = Some(number::<usize>("--duplicate-capacity", &value()?)?);
+/// 実機確認用の表情の送信（`--probe-expression`と`--probe-interval-ms`）を解釈する。
+fn parse_probe(
+    name: Option<String>,
+    interval: Option<u64>,
+    no_companion: bool,
+) -> Result<Option<ExpressionProbe>, CliError> {
+    match (name, interval) {
+        (None, None) => Ok(None),
+        (Some(name), Some(interval)) => {
+            let expression = from_status_name(&name).ok_or_else(|| CliError::Invalid {
+                flag: "--probe-expression",
+                reason: format!("知らない表情名: {name}"),
+            })?;
+            if expression == Expression::Neutral {
+                return Err(CliError::Invalid {
+                    flag: "--probe-expression",
+                    reason: "neutralは交互の相手と同じで、何も確かめられない".to_owned(),
+                });
             }
-            "--duplicate-retention-ms" => {
-                duplicate_retention_ms =
-                    Some(number::<u64>("--duplicate-retention-ms", &value()?)?);
+            let interval_ms = NonZeroU64::new(interval).ok_or(CliError::Invalid {
+                flag: "--probe-interval-ms",
+                reason: "0は間隔にならない".to_owned(),
+            })?;
+            // Companionも欲しい表情を書き換える（寝る時間帯は専有する）。干渉させず、併用を拒否する。
+            if !no_companion {
+                return Err(CliError::Invalid {
+                    flag: "--probe-expression",
+                    reason: "--no-companionが要る（Companionと併用しない）".to_owned(),
+                });
             }
-            "--startup-deadline-ms" => {
-                startup_deadline_ms = Some(number::<u64>("--startup-deadline-ms", &value()?)?);
-            }
-            "--speech-min-interval-ms" => {
-                speech_min_interval_ms =
-                    Some(number::<u64>("--speech-min-interval-ms", &value()?)?);
-            }
-            "--speech-duration-ms" => {
-                speech_duration_ms = Some(number::<u32>("--speech-duration-ms", &value()?)?);
-            }
-            "--verbose" => verbose = true,
-            "--cloud-speech" => cloud_speech = true,
-            "--no-companion" => no_companion = true,
-            "-h" | "--help" => return Ok(Parsed::Help),
-            other => return Err(CliError::Unknown(other.to_owned())),
+            Ok(Some(ExpressionProbe {
+                expression,
+                interval_ms,
+            }))
         }
+        (None, Some(_)) => Err(CliError::Missing("--probe-expression")),
+        (Some(_), None) => Err(CliError::Missing("--probe-interval-ms")),
     }
+}
 
-    let duplicate_policy = DuplicatePolicy::new(
-        duplicate_capacity.ok_or(CliError::Missing("--duplicate-capacity"))?,
-        Duration::from_millis(
-            duplicate_retention_ms.ok_or(CliError::Missing("--duplicate-retention-ms"))?,
-        ),
-    )
-    .map_err(|e| CliError::Invalid {
-        flag: "--duplicate-capacity/--duplicate-retention-ms",
-        reason: e.to_string(),
-    })?;
-    let startup_deadline_ms =
-        startup_deadline_ms.ok_or(CliError::Missing("--startup-deadline-ms"))?;
-    let startup_deadline_ms = NonZeroU64::new(startup_deadline_ms).ok_or(CliError::Invalid {
-        flag: "--startup-deadline-ms",
-        reason: "0は起動直後に必ず超過する".to_owned(),
-    })?;
-    let speech = match (speech_min_interval_ms, speech_duration_ms) {
+/// 独り言の引数（`--speech-*`と`--cloud-speech`）を解釈する。
+fn parse_speech(
+    min_interval_ms: Option<u64>,
+    duration_ms: Option<u32>,
+    cloud_speech: bool,
+) -> Result<Option<crate::runner::SpeechConfig>, CliError> {
+    let speech = match (min_interval_ms, duration_ms) {
         (None, None) => None,
         (Some(interval), Some(duration)) => {
             let min_interval_ms = NonZeroU64::new(interval).ok_or(CliError::Invalid {
@@ -200,6 +192,82 @@ where
             ),
         });
     }
+    Ok(speech)
+}
+
+/// 引数（program名を除く）を解析する。
+///
+/// # Errors
+///
+/// 必須の引数が無い、値が無い、値を解釈できない、または知らない引数のとき。
+pub fn parse<I>(raw: I) -> Result<Parsed, CliError>
+where
+    I: IntoIterator<Item = String>,
+{
+    let mut port = None;
+    let mut baud = None;
+    let mut duplicate_capacity = None;
+    let mut duplicate_retention_ms = None;
+    let mut startup_deadline_ms = None;
+    let mut speech_min_interval_ms = None;
+    let mut speech_duration_ms = None;
+    let mut probe_expression = None;
+    let mut probe_interval_ms = None;
+    let (mut verbose, mut cloud_speech, mut no_companion) = (false, false, false);
+    let mut argv = raw.into_iter();
+
+    while let Some(flag) = argv.next() {
+        let mut value = || argv.next().ok_or_else(|| CliError::NoValue(flag.clone()));
+        match flag.as_str() {
+            "--port" => port = Some(value()?),
+            "--baud" => baud = Some(number::<u32>("--baud", &value()?)?),
+            "--duplicate-capacity" => {
+                duplicate_capacity = Some(number::<usize>("--duplicate-capacity", &value()?)?);
+            }
+            "--duplicate-retention-ms" => {
+                duplicate_retention_ms =
+                    Some(number::<u64>("--duplicate-retention-ms", &value()?)?);
+            }
+            "--startup-deadline-ms" => {
+                startup_deadline_ms = Some(number::<u64>("--startup-deadline-ms", &value()?)?);
+            }
+            "--speech-min-interval-ms" => {
+                speech_min_interval_ms =
+                    Some(number::<u64>("--speech-min-interval-ms", &value()?)?);
+            }
+            "--speech-duration-ms" => {
+                speech_duration_ms = Some(number::<u32>("--speech-duration-ms", &value()?)?);
+            }
+            "--probe-expression" => probe_expression = Some(value()?),
+            "--probe-interval-ms" => {
+                probe_interval_ms = Some(number::<u64>("--probe-interval-ms", &value()?)?);
+            }
+            "--verbose" => verbose = true,
+            "--cloud-speech" => cloud_speech = true,
+            "--no-companion" => no_companion = true,
+            "-h" | "--help" => return Ok(Parsed::Help),
+            other => return Err(CliError::Unknown(other.to_owned())),
+        }
+    }
+
+    let duplicate_policy = DuplicatePolicy::new(
+        duplicate_capacity.ok_or(CliError::Missing("--duplicate-capacity"))?,
+        Duration::from_millis(
+            duplicate_retention_ms.ok_or(CliError::Missing("--duplicate-retention-ms"))?,
+        ),
+    )
+    .map_err(|e| CliError::Invalid {
+        flag: "--duplicate-capacity/--duplicate-retention-ms",
+        reason: e.to_string(),
+    })?;
+    let startup_deadline_ms =
+        startup_deadline_ms.ok_or(CliError::Missing("--startup-deadline-ms"))?;
+    let startup_deadline_ms = NonZeroU64::new(startup_deadline_ms).ok_or(CliError::Invalid {
+        flag: "--startup-deadline-ms",
+        reason: "0は起動直後に必ず超過する".to_owned(),
+    })?;
+    let speech = parse_speech(speech_min_interval_ms, speech_duration_ms, cloud_speech)?;
+    let probe = parse_probe(probe_expression, probe_interval_ms, no_companion)?;
 
     Ok(Parsed::Run(Box::new(Args {
         port: port.ok_or(CliError::Missing("--port"))?,
@@ -209,6 +277,7 @@ where
         speech,
         cloud_speech,
         no_companion,
+        probe,
         verbose,
     })))
 }
@@ -271,6 +340,79 @@ mod tests {
             panic!("実行になる");
         };
         assert!(args.no_companion);
+    }
+
+    fn with_probe(name: &str, interval: &str, no_companion: bool) -> Vec<String> {
+        let mut v: Vec<String> = ALL.iter().map(|s| (*s).to_owned()).collect();
+        v.extend(["--probe-expression", name, "--probe-interval-ms", interval].map(str::to_owned));
+        if no_companion {
+            v.push("--no-companion".to_owned());
+        }
+        v
+    }
+
+    fn run_owned(v: Vec<String>) -> Result<Parsed, CliError> {
+        parse(v)
+    }
+
+    #[test]
+    fn probe_is_off_by_default_and_parses_happy_with_no_companion() {
+        let Ok(Parsed::Run(args)) = run(&ALL) else {
+            panic!("実行になる");
+        };
+        assert_eq!(args.probe, None);
+        let Ok(Parsed::Run(args)) = run_owned(with_probe("happy", "3000", true)) else {
+            panic!("実行になる");
+        };
+        let probe = args.probe.expect("指定した");
+        assert_eq!(probe.expression, Expression::Happy);
+        assert_eq!(probe.interval_ms.get(), 3000);
+        assert!(args.no_companion);
+    }
+
+    #[test]
+    fn probe_requires_both_flags() {
+        let mut only_name: Vec<String> = ALL.iter().map(|s| (*s).to_owned()).collect();
+        only_name.extend(["--probe-expression", "happy", "--no-companion"].map(str::to_owned));
+        assert_eq!(
+            run_owned(only_name),
+            Err(CliError::Missing("--probe-interval-ms"))
+        );
+        let mut only_interval: Vec<String> = ALL.iter().map(|s| (*s).to_owned()).collect();
+        only_interval.extend(["--probe-interval-ms", "3000", "--no-companion"].map(str::to_owned));
+        assert_eq!(
+            run_owned(only_interval),
+            Err(CliError::Missing("--probe-expression"))
+        );
+    }
+
+    #[test]
+    fn probe_rejects_bad_values() {
+        for (name, interval) in [
+            ("grumpy", "3000"),
+            ("neutral", "3000"),
+            ("happy", "0"),
+            ("happy", "soon"),
+        ] {
+            assert!(
+                matches!(
+                    run_owned(with_probe(name, interval, true)),
+                    Err(CliError::Invalid { .. })
+                ),
+                "{name} {interval}"
+            );
+        }
+    }
+
+    #[test]
+    fn probe_is_rejected_with_the_companion() {
+        assert!(matches!(
+            run_owned(with_probe("happy", "3000", false)),
+            Err(CliError::Invalid {
+                flag: "--probe-expression",
+                ..
+            })
+        ));
     }
 
     #[test]
