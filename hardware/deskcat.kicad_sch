@@ -618,7 +618,7 @@
 (label "GND" (at 487.78 551.27 0) (effects (font (size 1.27 1.27))) (uuid "5eb487d2-2d60-4e8f-bd22-b0d6338589b8"))
 (symbol (lib_id "Device:R") (at 640 515 0) (unit 1) (in_bom no) (on_board yes) (dnp no) (uuid "3bf619d2-4225-4cde-bf4d-424ba2469663")
  (property "Reference" "R18" (at 644.5 513.2 0) (effects (font (size 1.27 1.27))))
- (property "Footprint" "DeskCat:R_Vertical_P2.54" (at 640 515 0) (effects (font (size 1.27 1.27)) hide))
+ (property "Footprint" "DeskCat:R_Vertical_P5.08" (at 640 515 0) (effects (font (size 1.27 1.27)) hide))
  (property "Value" "power-budget.md 10k gate" (at 644.5 516.8 0) (effects (font (size 1.27 1.27))))
  (pin "1" (uuid "3c83f9fb-a675-478b-8d8e-70e0def1482d"))
  (pin "2" (uuid "a954eab1-7a50-4077-8380-8e742d9e5f7d"))
