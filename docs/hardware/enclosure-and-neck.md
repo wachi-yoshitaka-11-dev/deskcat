@@ -218,7 +218,7 @@ LCD の消費電流、特にバックライトは `HW-TBD-024` が未解決で�
 | B1（EIC-3901、81.28 × 50.8。ESP32 を載せる） | 床の前寄り（前の壁の内側から 24、左の壁の内側から 20）。ESP32 の USB は右を向く（[breadboard-rebuild](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/hardware/breadboard-rebuild/README.md)のとおり）ので、B1 の右に約 28 空ける | 床に外形どおりの深さ 5 の穴を掘ってはめる |
 | B2（BB-601、45 × 34.5。LCD の14本を受ける） | 床の B1 の後ろ（[breadboard-rebuild](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/hardware/breadboard-rebuild/README.md)の、B1 の J3 の側に並べる配置のとおり） | 同上 |
 | 端子台S（#18 の試験の間だけ） | 床の B2 の右 | 同上（大きさは現物に合わせる）。完成形の servo の枝の終端は power-budget.md のとおり電源の基板の上の端子台 |
-| B3（BB-601。`ENV-01`・`ACCEL-01`） | 前の壁の内側に立てる | 壁に外形どおりの溝を掘ってはめる。立てると `ACCEL-01` の向きが変わるので、取り付けた後に揺れと叩くの検出の軸と設定（`crates/deskcat-tap` の SHAKE・TAP）を取り直すまで、製品 build の揺れと叩くの検出は使えない |
+| B3（BB-601。`ENV-01`・`ACCEL-01`） | 前の壁の内側に立てる | 壁に外形どおりの溝を掘ってはめる。立てると `ACCEL-01` の向きが変わるので、取り付けた後に揺れと叩くの検出の軸と設定（`crates/deskcat-tap` の `SHAKE` と、`TAP_AXES` などの叩く検出の設定）を取り直すまで、製品 build の揺れと叩くの検出は使えない |
 | Pi Zero W（65 × 30） | 右の壁の内側の後ろ寄りに立てる（B3 から離し、ESP32 の USB より後ろ） | 同上 |
 | 電源の基板（`PROTO-02`、72 × 47.5） | 左の壁の内側に立てる | 同上（[#405](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/405) で実装するまで空けておく） |
 
