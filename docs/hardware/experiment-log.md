@@ -75,6 +75,8 @@
 | [EXP-061](#exp-061-accel-01adxl345で静止机を叩く机を手で揺らすの3つを各30秒取ったaccel-sample-15) | [#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)・[#685](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/685)の材料。`accel-sample-15`で、静止・机を叩く・机を手で揺らすの3つを、各30秒（5秒×6窓）取った | 値の正なし（観測の記録。判定の語を書かない） |
 | [EXP-062](#exp-062-窓-b製品-buildno-touch-487を-pi-とつなぎ表情温湿度叩く揺れcompanion独り言713-を見た夜と朝の2回) | [#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)・[#713](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/713)。製品 build（`no-touch-487`）を Pi とつなぎ、表情・温湿度・叩く・揺れ・Companion・独り言・#713 を夜と朝の2回で見た | 値の正なし（観測の記録。判定の語を書かない） |
 | [EXP-063](#exp-063-18-段2の窓0非通電発泡スチロールの背板に-lcd-を留め背板を底板の上の前の縁に立てた) | [#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)・[#34](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/34)。段2の窓0（非通電）。背板に LCD を留め、背板を底板に立てた。線の束ねと天板の切り込みは行っていない | 値の正なし（観測の記録） |
+| [EXP-064](#exp-064-18-段2の窓1と窓2jumper-wire-に-08-a-を30分流しi_lim-を-0070-に置きホーンなしで-servo-を動かして目印の向きを読んだ) | [#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)・[#751](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/751)。段2の窓1・2。jumper wire の試験（0.8 A、30分）、`I_lim` 0.070、ホーンなしで servo を動かした。#751 の 7（`STOP` が届く） | 値の正なし（観測の記録） |
+| [EXP-065](#exp-065-窓c製品-buildno-touch-487を-pi-とつなぎ743-のコメントの見た目と751-の揺れの検出と温湿度の報告を見た) | [#743](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/743)・[#751](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/751)。窓C。製品 build を Pi とつなぎ、コメントの見た目、揺れの検出（#751 の 5）、温湿度の報告（6）を見た | 値の正なし（観測の記録） |
 
 **大容量の生dataはこのrepositoryへ入れていない。**保存場所は
 [development-foundation-plan.md](../planning/development-foundation-plan.md)の
@@ -5737,6 +5739,123 @@ ELF（wdt）`77d40227f4dca649e3cda797b3ac599087b1aef534e33ab848cb26b37e0f11bd`�
 
 - 背板と LCD の寸法の実測。頭の質量。頭が倒れないこと。結束バンドがホーンに掛かっていないこと。
 
+## EXP-064: #18 段2の窓1と窓2。jumper wire に 0.8 A を30分流し、I_lim を 0.070 に置き、ホーンなしで servo を動かして目印の向きを読んだ
+
+[#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)の段2の窓1と窓2（[servo-safety-limits.md](servo-safety-limits.md)の段2の節。2026-11-15 から頭付きの回は行わないため、ホーンも頭も付けない回だけ）。窓2 の中で、[#751](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/751)の 7（校正 build の console の取り出しの上限の後も `STOP` が届くこと）を確かめた。この記録は事実と未確認だけを書く。
+
+| 項目 | 内容 |
+|---|---|
+| Test ID | `EXP-064` |
+| Date | 2026-11-15 |
+| Operator | 線の抜き挿し、PSU の操作、表示と目印の読み、手の背での確かめはユーザー。build、書き込み、console の操作と記録、計画は実機側の PM（AI） |
+| 承認 | 承認があった。承認者 wachi-yoshitaka-11-dev、2026-11-15T02:51Z ごろ、実機側の PM のセッション。範囲は AI の問い「段2の窓1・2（ホーンも頭も付けない）と、製品 build の窓C を、この順で今日行ってよいか」と、計画 `windows-plan-v3.md`（VM 側の PM が照らし、指摘なし） |
+| Hardware revision／Exact components | `PSU-BENCH-01`、`MEAS-01`（シャントと、負荷に使った予備）、`MEAS-02`（Arduino）、`MEAS-04`、`SERVO-01`（ホーンなし）、`MCU-01`。servo の電源の線は段1と同じ jumper wire（段2の jumper wire の例外） |
+| Firmware | 校正 build（`bench-servo-calib-18`）。develop `bc25043` に段1と同じ定数（範囲 90°〜105°、`EXPOSURE_MS` 300、`MAX_COMMANDS` 10、`MIN_COMMAND_INTERVAL_MS` 5000、`MAX_SESSION_S` 300）を当て、`START_DEG` を回ごとに直前の `position_deg` に置いた。ELF sha256（先頭8桁）：r1 `498eecf7`、r2 `728f55d4`、r3・r4 `8ddb4569`、r5 `0798777e`、r6 `8808e98c`、r7 `6c18c54b` |
+| Power supply and current limit | `PSU-BENCH-01` の CC。CV は 4.80（無負荷の表示）。`I_lim` は窓1 の後 0.070 |
+| Measurement equipment | PSU の表示（説明書の表示精度は [EXP-051](#exp-051-ベンチ電源psu-bench-01を無負荷と負荷ボードで初めて使いccに入ることを確かめた) のとおり）、`MEAS-02`（`arduino-transient-logger`、EXP-060 と同じ hex）、`MEAS-04`、手の背。目印の読みは目視（紙の分度器は手元に無い） |
+| Raw data | repository の外の `deskcat-evidence/windows-20261115/`：計画 `windows-plan-v3.md`、実行記録 `answers.txt`、起動の記録 `boots.txt`、`ilim-070.csv`、console の log `run-r1.log`・`run-r2.log`・`run-r3.log`（r3 と r4）・`run-r5.log`・`run-r6.log`・`run-r7.log`・`run-r5-failed.log`、script（`console18.py`、`drive*.py`） |
+| Expected result | 正本の段2の節の条件（この窓の時点の版：[servo-safety-limits.md（bc25043）](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/bc25043b1087ee07524ca3cf10ff0574b64e7edf/docs/hardware/servo-safety-limits.md)の段2の節の`jumper wire の試験`と`I_lim`の項）。#751 の 7 は、上限（1周16件）を超える入力の後に `STOP` が届くこと |
+| Measured result | 下記 |
+
+### 窓1（jumper wire の試験と `I_lim`）
+
+- 始めに servo の plug を針から抜き、赤と茶の針が触れていないことを、ユーザーの目視で確かめた。**PSU の銘板の型番は、窓の始めに読んでいない。**正本の段2の節は窓の始めに読んで記録することを求めるが、[EXP-051](#exp-051-ベンチ電源psu-bench-01を無負荷と負荷ボードで初めて使いccに入ることを確かめた) のラベルの読み（`3010V SPS`。同じ個体）で代えて進んだ（[EXP-060](#exp-060-段1の前の窓と段1task-wdt-の-panic-resetpsu-の負極と-esp32-の-gnd-の読みi_limの平坦部4-countを取り段1で-servo-へ指令を出し発熱の実測は行わなかった) と同じ代え）。POWER の後、OPN の LED は消え、出力は OFF。`MEAS-04` は 23.2 ℃。無負荷の電圧の表示は 4.80。
+- **PSU の出力端子と端子台A をつなぐ線（赤・黒）が、外れていた。**計画では段1からつないだままと置き、窓の始めに現物を確かめていなかった。0.3 A の段で CV の LED が点き、電流が流れていないことで分かった。ユーザーの目視で、線がつながっていないと報告があった。POWER を切り、負荷を外し、PSU の＋を赤、−を黒で端子台A の赤・黒の穴へつなぎ直し、POWER を入れ（OPN 消灯、出力 OFF）、負荷をつなぎ直して 0.3 A からやり直した。外れていた間の 0.3 A の段は、電流が流れておらず、試験に数えない。**この線のつなぎ直しは、正本の段2の節が小節12 の (i) を当てない前提（PSU から端子台への線は付け替えない）と合わない。**(i) を外したまま POWER を入れた（負荷は外してあった）。極性は線の色を合わせただけで、小節8 の節点ごとの照合はしていない。小節7 の確かめ（PSU をつなぐ前に、`M-12001` の AC プラグが抜けていて、その線が端子台A に入っていないことを現物で見る）も、この窓ではしていない。
+- 負荷は `MEAS-01` の予備を、両端メスの jumper wire で赤と茶の針の間につないだ。
+- 0.3 A：表示 0.300、CC 点灯、熱くない。0.6 A：表示 0.600、CC 点灯、熱くない。0.8 A：03:44:45Z に始め、表示 0.800、CC 点灯、熱くない（始め）。04:05Z ごろ（中ほど）も同じ。04:15Z（30分超）も同じで、出力 OFF。`MEAS-04` は 23.6 ℃。各段で、ユーザーの手の背で、熱くないと報告があった。**焦げ臭さと変色は、確かめて記録していない。**正本の jumper wire の試験は、熱い・焦げ臭い・変色が無いことを記録してから段2を開くことを求めるが、そのうち2つを記録しないまま servo への通電（r1）に進んだ。
+- `I_lim`：(D) の手順（EXP-060）をそのまま行った。負荷は試験と同じものをつないだまま使った。`MEAS-02` の個体は iSerial `75338323535351810102` で、flash の読み戻しの sha256 は EXP-060 の読み戻しと同じ（`740f34d7…`）。(D) の間は `X5` のクリップをシャントの足から外した（EXP-060 の (D) と同じ形）。設定 0.070 で、表示 0.070、CC 点灯、平坦部 3 count（9点の移動中央値の中央値。10 秒の1秒ごとの値は 2〜4。生の値は 0〜8）。参考：EXP-060 は設定 0.080 で 4 count。
+- 窓1 の終わりに、`MEAS-02` のクリップと負荷を外し、`X5` をシャントの足（端子台S の−側）に挟み直した。
+
+### 窓2（ホーンなしで servo を動かす。#751 の 7 を含む）
+
+- servo の plug を針に挿し、plug の線の色と針の色の組み合わせ（茶と茶、赤と赤、橙と黄）を、ユーザーの目視で確かめた。
+- **窓1・2 の通電の間（窓1 の PSU のつなぎ直し、jumper wire の試験と `I_lim` の通電、servo へ通電した全部の回）、Pi は起動していた。**正本は、PSU をつなぐ前と servo への通電の前に Pi が外れていることを求める（段1の`通電前の現物確認`の (a) の読み替えを段2にも当てる。給電経路の重複）。窓1 と r1〜r4 の間は、Pi は起動していて、`X1`・`X2` の Pi 側は抜けていた（06:07Z（窓C）に分かり、それより前に挿した記録は無い）。`X3`・`S21`・`S22` は、計画では窓 B の記録から挿さっていると置き、現物では見ていない。r5〜r7 の間は、Pi は起動していて、`X1`・`X2` を挿し直した後で、窓C で Pi と ESP32 の通信が両方向に通っていた（`X3`・`S21`・`S22` は現物では見ていない）。計画にこの条件を確かめる段を入れていなかった。
+- **窓1・2 の前半の通電の前に、LCD の VCC の線が抜けていることを見て記録していない。**正本は各通電の前にこれを見て記録することを求めるが、[EXP-063](#exp-063-18-段2の窓0非通電発泡スチロールの背板に-lcd-を留め背板を底板の上の前の縁に立てた) の記録に頼った。
+- **POWER を入れ直した後（03:24Z ごろ）、servo への最初の出力（r1、04:56Z）の前に、無負荷の電圧の表示を読み直していない。**読んだのは 03:09Z の 4.80 だけである。
+- 回ごとの結果（指令は1回 1.5° を目安とした。超えたのは r3 の指令（1.50317°）と r4 の1回目（1.50017°）。目標の手前の最後の指令と r1 は、それより小さい。指令の間は、r5 の2回目を除き、前の動きの終わりから 5 秒以上）：
+
+| 回 | 開始 | 指令と結果 | 終わりの `position_deg` | 終わり方 | 目印の読み |
+|---|---|---|---|---|---|
+| r1 | 90.734 | 90.0 へ1回。`reached` | 90.2852 | `end` | 読んでいない |
+| r2 | 90.2852 | 100 へ7回。増やす向き。7回とも `reached` | 100.00317 | `end` | 読んでいない |
+| r3 | 100.00317 | #751 の 7（下） | 100.00317 | `stop` | 読んでいない |
+| r4 | 100.00317 | 90 へ7回。減らす向き。5回 `reached`、最後の2回 `exposure_elapsed`（91.24、90.43） | 90.43421 | `end` | 読んでいない |
+| r5 | 90.43421 | 90 へは指令なし（差 0.43 は幅 0.5 の内）。ここで読んだ後、100 へ1回 `reached`（91.934）。2回目は `RateLimited`（下） | 91.934 | `stop` | 90°（90.43421 で） |
+| r6 | 91.934 | 100 へ6回。増やす向き。6回とも `reached` | 99.9729 | `end` | 100° |
+| r7 | 99.9729 | 90 へ7回。減らす向き。5回 `reached`、最後の2回 `exposure_elapsed`（91.21、90.40） | 90.404495 | `end` | 90° |
+
+- どの回も `faulted_ticks=0`、`output_failures=0`。reset・panic・watchdog は無かった。
+- ユーザーの目視の報告：r1 は軸が動かなかった（PSU は CV）。r2 は軸が回り、PSU は CV のままで、異音・熱は無かった。r3 は異常が無かった。r4 は軸が逆向きに回り、異常が無かった。r5〜r7 は目印の読みだけで、軸の回り方・PSU の表示・異音・熱の報告は受けていない。PSU の表示の報告があったのは r1 と r2 だけで、r3〜r7 では、動きの後に CC の LED が消えたかを見て記録していない（正本の停止基準は、動きの後も CC の LED が点いたままなら止めるとしている）。
+- r2 について、実行記録には「回らなかった」の行（05:49:45Z）と「回った」の行（05:50:25Z）が残っている。報告が改められたもので、後で確かめ直し、回ったと報告があった。
+- **r1 は停止基準に当たりうるのに、止めずに進んだ。**r1 の指令は開始 90.734146 から 90.0 への約 0.73° で、出力は 90.2852 まで約 0.45° 動いた（`reached` の幅 0.5 の内）。正本の停止基準（指令したのに動かない）は角度の下限を置いていないが、AI は動きが目で見える量より小さいとみて止めなかった。その判断は正本に無い。
+- **目印の読み（r5〜r7）：**向きは、指令の度を増やすと目盛の数字も増える向き。倍率は、firmware の位置（`position_deg`）の差 9.54（99.9729−90.43421）に対して読みの差 10 で、比は約 1.05。読みは、ユーザーが目印の位置を 1° 単位の数字で報告したもので、紙の分度器は手元に無く、何の目盛で読んだかは記録していない。報告の値が 1° 単位なので、倍率が 1対1 かはこの読みでは決まらない。90° へ戻した読みは、同じ 90° だった。
+- **減らす向きの `exposure_elapsed`：**r4 と r7 の2回とも、減らす向きの最後の2回（92° 以下）で起きた。増やす向き（r2・r6）は、すべて `reached`。原因は確かめていない。
+- **#751 の 7（r3）：**`MOTION calib 98.5`、無効な1文字の行 40件、`STOP` を、1回の書き込み（103 byte。UART の受け口 128 byte に収まる長さ）で送った。`command_accepted` の後、起きた周は 6.6 ms、26.6 ms、46.6 ms の3回で、3周目に `STOP` を受け、`motion_interrupted reason=stop`（elapsed 47 ms）、`session_end reason=stop`。`output_trace` は count=0 で、位置は変わらなかった。拒否は16件が個別に出て、残りは `refusals_dropped count=24`（合わせて40）。周ごとの取り出しの件数は log に出ないので、16＋16＋8件と `STOP` は時刻からの推定である。
+- **r5 の `RateLimited`：**AI の script が、指令の間を、前の動きの終わりではなく指令を送った時刻から数えていた。2回目の指令が `MIN_COMMAND_INTERVAL_MS` の内に届き、firmware が `RateLimited` で拒否した。script が `STOP` を送り、91.934 で止めた（fault 無し）。script を直し、模擬の相手で確かめてから r6 を行った。
+- 窓2 の向きと読みを取る回（r5〜r7）は、r1〜r4 で読みを訊く段を入れていなかったため、後でやり直した回である。その間に窓C を行い、やり直しの前に LCD の VCC の線を抜き直した。承認の問いの順（窓1 → 窓2 → 窓C）とは違い、窓C の後に窓2 の回を行った。計画の窓2 は4回で、r5〜r7 の3回は計画の回の数を越えて足した回であり、この3回の実行の承認は取っていない。また、計画の窓2 の3回目は「90° へ戻す指令」に入力を重ねる回としていたが、r3 で送った指令は 98.5° だった。
+- **やり直しの前の通電は、正本の条件を満たさずに行った。**窓2 の前半の終わりに servo の plug を針に挿したまま PSU の POWER を切り、やり直しの前に、そのまま電源プラグを挿して POWER を入れた（07:28Z ごろ）。正本は POWER を入れる前に servo も負荷もつながっていないことを求める。無負荷の電圧の表示と `MEAS-04` も、読み直していない。OPN の LED は消え、出力は OFF だった。
+- 起動の数は `boots.txt` に時刻つきで記録した（USB の挿入、書き込み、console の release と reset）。r5 の最初の書き込みは、窓C の console がポートを掴んでいて失敗した。続けて開いた console の reset と release で、製品 build のまま ESP32 が1回起動した。
+- 窓の終わりに、PSU の POWER を切って電源プラグを抜き、ESP32 と Arduino の USB を抜いた。servo の plug と `X5` は挿したまま。
+
+### 確かめていないこと
+
+- 倍率（1° 単位の報告の読みでは決まらない）。減らす向きの `exposure_elapsed` の原因。`I_lim` の表示 0.070 と平坦部 3 count の対応（EXP-060 の 0.080 で 4 count と合わせ、count と PSU の表示の対応は確かめていない）。
+- 周ごとの取り出しの件数（log に無い）。
+
+## EXP-065: 窓C。製品 build（no-touch-487）を Pi とつなぎ、#743 のコメントの見た目と、#751 の揺れの検出と温湿度の報告を見た
+
+[#743](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/743)（コメントを顔を消さずに下の帯へ出す）の見た目と、[#751](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/751)の 5（傾いて静止していても揺れと数える誤検出の直し）と 6（`ENV-01` の forced mode の書き込みの後の、変換の期限の起点の直し）を、製品 build を Pi とつないで見た窓。servo は動かしていない。この記録は事実と未確認だけを書く。
+
+| 項目 | 内容 |
+|---|---|
+| Test ID | `EXP-065` |
+| Date | 2026-11-15 |
+| Operator | 線の抜き挿し、B3 を傾ける・揺らす操作、画面の観察はユーザー。build、書き込み、console と Pi の記録、Pi のプログラムの起動と停止は実機側の PM（AI） |
+| 承認 | `EXP-064` と同じ承認（窓1・2・C を1回で） |
+| Hardware revision／Exact components | `MCU-01`、`DISP-01`、`ACCEL-01`（B3 の上。平らに置いた）、`ENV-01`、`SBC-01`。Pi との線は `X1`（紫）、`X2`（青）、`X3`（黒）、`S21`、`S22`。`PSU-BENCH-01` は電源プラグを抜いたまま。servo の plug は針に挿したまま |
+| Firmware | 製品 build `no-touch-487`、develop `bc25043`。ELF sha256 `536d630f943f275e7f64841811a6bddf4f5db87d035c968c018b8a8fd691ec99`（起動 log に出る先頭9桁 `536d630f9` と一致）。起動 log で `servo=not_driven` |
+| Pi software | develop `bc25043` の `deskcatd` を Pi で build。sha256 `699eb338afcafe864d65594ef25d813ef73c93abca7eefb3ff6a85cf9c2ecda4`。引数は unit と同じ（`--port /dev/serial0 --baud 115200 --duplicate-capacity 8 --duplicate-retention-ms 5000 --startup-deadline-ms 10000`）に、`--speech-min-interval-ms 60000 --speech-duration-ms 20000 --verbose` を足した |
+| Power supply and current limit | ESP32 はこの端末の USB。電流・電圧・温度は測っていない |
+| Measurement equipment | UART0 の log（115200）、Pi の `deskcatd` の log |
+| Raw data | repository の外の `deskcat-evidence/windows-20261115/`：`run-c.log`、`deskcatd-wC.log`、`answers.txt`、`boots.txt` |
+| Expected result | #743 の受け入れ条件の実機の見た目。#751 の 5 は、平らと傾けた静止で揺れを数えないこと、揺らすと検出すること。6 は、変換の期限の起点を直した build で、温湿度の報告が期限切れにならずに届き続けること |
+| Measured result | 下記 |
+
+### 起きたこと（つなぐまで）
+
+- LCD の VCC の線を B2 の a1 に挿した。製品 build を書き込み、Pi の GPIO14 を `a0` に戻して `deskcatd` を起動したが、ESP32 から1 byte も届かず、hello の再送が上限に達して終了した。
+- **Pi の header の `X1`（紫）と `X2`（青）が、抜けたままだった。**計画では窓 B から挿したままと置き、確かめていなかった。ユーザーの目視で、紫と青が抜けていると報告があった。AI が Pi を ssh で poweroff し、ユーザーが紫と青を header の外側の列の4本目と5本目（pin 8 と pin 10 の位置）に挿し、Pi の電源を入れ直した。どちらをどちらに挿したかは、記録で区別していない。GPIO15 を pull-down で読むと hi で、ESP32 の送る線が届いていた。
+- **Pi の再起動で、本番の `deskcatd` service（`/usr/local/bin/deskcatd`）が自動で起動し、serial を取り合った。**ESP32 の log に `pi_rx_ack_sid_mismatch` が出た。`systemctl stop` で止めた（自動起動の設定は変えていない）。その後に起動した `deskcatd` は session を確立し、`show_text` が受け付けられた。
+
+### #743（コメントの見た目）
+
+- ユーザーの目視で、次の4つを見たと報告があった。(1) コメントの間も顔が消えず、コメントは画面の下の帯に1行で出た。(2) コメントの間に B3 を叩くと顔が変わり、帯のコメントは残った。(3) 時間が来ると帯だけが消え、顔は残った。(4) 口と帯の間にすき間があった。
+- log では、コメントの間に叩いた時刻（06:18:50Z、06:19:03Z）に `tap_confirmed` → `Surprised` が出て、その後 `Neutral` に戻り、時間が来て `text_expired_clear_band` が出た。1回目の叩きの直後（06:18:50.595Z）と、`tap_confirmed` の出ていない 06:18:58Z には、`shake_detected` の `Send` → `Dizzy` も出た（平らな B3 で、(a) の3分より前）。
+
+### #751 の 5（揺れの検出）
+
+- (a) 平らで触らない 06:19:55〜06:22:55Z の3分：`shake_detected` 0件、tap 0件。続く 06:22:55〜07:08:57Z も `shake_detected` 0件。参考：[EXP-062](#exp-062-窓-b製品-buildno-touch-487を-pi-とつなぎ表情温湿度叩く揺れcompanion独り言713-を見た夜と朝の2回) の窓 B では、夜は約75分で163件、朝の線の確認の後は1分に15〜22件あった。
+- (b) B3 の片方の端の下に薄い物を差し込んで傾け、触らない 07:09:39〜07:12:39Z の3分：`shake_detected` 0件、tap 0件。差し込む作業の間（07:08:58〜07:09:04Z）は、tap と shake の検出があった（07:08:58 に `shake_detected` の `Send` と `Dizzy`）。`activity_hits` は 07:09:01 の 215 から 07:17:32 の 25,492 まで増えた。この区間には、傾けて静止した間と、(c) で揺らし始めた 07:15:59 以降が含まれ、静止の間だけの増え方は log から切り分けていない。dc 結合で、傾きの重力の成分が閾値（187.5 mg）を超えて割り込みが出続けた可能性がある。静止の3分は、揺れとしては数えていない。
+- (c) 傾けたまま揺らした。軽く・少し強めに揺らすと、衝撃は叩くとして拾われ（`tap_detected` が多くはおよそ 0.12〜0.18 秒ごと（0.02〜0.52 秒の間でばらつく）、`tap_confirmed` と Pi への `tapped` の送信が、07:16:45〜52Z の区間でおよそ 0.8〜1.2 秒ごと）、`shake_detected` は出なかった。ゆっくり大きく傾けては戻す動きでは、07:17:32〜07:20:10Z に `shake_detected` の `Send` が8回（`shaken` を送信、`Dizzy` の `face_show` あり）出たが、叩くの検出も混じって `Surprised` に戻った。ユーザーの目視で、傾けたまま B3 を揺らした3回は驚いた顔になった、または驚いた顔が続いたと報告があった。傾けたまま机を揺らすと目を回した顔にならなかったとも報告があった。
+- 平らに戻して机を揺らした：ユーザーの目視で、目を回した顔になったと報告があった。log で 07:21:57Z と 07:22:14Z に `shake_detected` の `Send` → `Dizzy`。平らに戻す動作の時刻（07:21:51〜52Z）には、tap → `Surprised` と shake → `Dizzy` が続けて出た。ユーザーの目視で、戻す動作の際に驚いた顔と目を回した顔が続けて出たと報告があった（板が実際に動いた時刻である）。平らに戻った後、`activity_hits` の増えはわずかになった。
+
+### #751 の 6（温湿度の報告）
+
+- 最後の session の確立（06:16:46Z）から `deskcatd` を止めるまで（07:25:07Z）、`environment` を 06:16:46〜07:24:39Z に69件、ほぼ1分ごとに抜けなく Pi へ送った（最初の間隔だけ約52秒）。session の確立後に `env_event_superseded` は出なかった（確立前は `session not established` で置き換えが出ていた）。
+- 07:19:19Z に、`ACCEL-01` の読み出しの失敗が4件出た（`tap_read_failed`。`ESP_ERR_TIMEOUT` が1件、`ESP_FAIL` が3件。どれも `consecutive=1`）。起動 log で `ACCEL-01` と `ENV-01` は同じ I2C bus にある（`accel=0x53 env=0x76`）。(c) で B3 を傾けては戻していた時間の中である。原因は確かめていない。
+- Pi 側の受信件数は取れていない。`deskcatd` が SIGINT で30秒以上止まらず、SIGTERM で止めたため、終了時の counter の行が出なかった。
+
+### 窓の終わり
+
+- 07:23Z ごろ、`deskcatd` へ SIGINT を送り、同じ操作で Pi の GPIO14 を入力 pull-down に設定した（直後の `pinctrl get` の表示は `ip` と `hi` で、pull-down の表示は無い）。`deskcatd` は止まらず、07:25Z ごろ SIGTERM で止めた。本番の service は止めたまま。
+- 窓C の後、窓2 の読みの回のために LCD の VCC の線を抜いた。窓2 の読みの回の後（08:06Z ごろ）、AI が Pi を ssh で poweroff し、ユーザーが Pi の電源の線と、ESP32・Arduino の USB を抜いた。
+
+### 確かめていないこと
+
+- 立てた姿勢（[#34](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/34) の完成形では、B3 を胴の前の壁に立てる）での揺れの検出。傾けた静止の3分は揺れを数えず、傾けたまま揺らすと目を回した顔は続かなかった。割り込みが出続けたかは静止の間だけでは切り分けていない。立てた姿勢で同じことが起きるかは確かめていない（[#685](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/685)）。
+- Pi 側の `environment` の受信件数。
+- 6a67b28 の [#758](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/758)（`env_report.rs`）は、この窓の build（`bc25043`）に入っていない。
+
 ## Revision履歴
 
 | 日付 | Revision | 変更 | 根拠 |
@@ -5811,3 +5930,5 @@ ELF（wdt）`77d40227f4dca649e3cda797b3ac599087b1aef534e33ab848cb26b37e0f11bd`�
 | 2026-11-12 | 67 | [#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)。`EXP-051`の Measurement equipment の行に、`PSU-BENCH-01`の説明書 p.3「仕様」の原文（表示、表示精度、表示分解能）と、出所の写真の sha256 を追記した。#18 の段2が、この表示精度を電圧と電流の判定の根拠に使うため。測定の内容は変えていない | 説明書の写真（2026-11-10 にユーザーが会話に貼ったもの） |
 | 2026-11-14 | 68 | [#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)・[#713](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/713)。**`EXP-062`を追加した。**窓 B（製品 build を Pi とつないだ窓、夜と朝）の観察と、手順との差を書いた。判定は書いていない | 実機側の PM の記録（ユーザーの回答による） |
 | 2026-11-14 | 69 | [#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)・[#34](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/34)。**`EXP-063`を追加した。**段2の窓0（非通電）で頭を組んだ記録。判定は書いていない | 実機側の PM の記録（ユーザーの回答による） |
+| 2026-11-15 | 70 | [#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)・[#751](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/751)。**`EXP-064`を追加した。**段2の窓1・2の記録。判定は書いていない | 実機側の PM の記録（ユーザーの目視の報告と log による） |
+| 2026-11-15 | 71 | [#743](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/743)・[#751](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/751)。**`EXP-065`を追加した。**窓C の記録。判定は書いていない | 実機側の PM の記録（ユーザーの目視の報告と log による） |
