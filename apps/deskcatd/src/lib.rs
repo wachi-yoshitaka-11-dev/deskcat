@@ -16,7 +16,7 @@
 //!
 //! 含まないもの（段階2bの後続のPR）:
 //!
-//! - 首の動き。`play_motion`は送らない（`PROTO-TBD-008`）
+//! - 首の動きの値。変換のコードは[`motion`]にあるが、値は`PROTO-TBD-008`で未決のため`play_motion`は送らない
 //! - Pi実機での確認（#11の後半）
 
 pub mod cli;
@@ -24,6 +24,7 @@ pub mod cloud_speech;
 pub mod daemon;
 pub mod disposition;
 pub mod expression_sync;
+pub mod motion;
 pub mod runner;
 pub mod sid;
 pub mod watchdog;

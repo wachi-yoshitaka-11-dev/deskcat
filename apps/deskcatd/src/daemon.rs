@@ -188,7 +188,8 @@
 
 use deskcat_domain::Output as CompanionOutput;
 use deskcat_domain::{
-    Ambient, Companion, ContactEvent, Expression, Face, LocalMinutes, Millis, Mind, Reaction,
+    Ambient, Companion, ContactEvent, Expression, Face, LocalMinutes, Millis, Mind, MotionIntent,
+    Reaction,
 };
 use deskcat_protocol::{
     AckStatus, ErrorCode, Frame, Hello, HelloReason, Message, Outcome, SetExpression, ShowText,
@@ -202,6 +203,7 @@ use std::num::NonZeroU64;
 
 use crate::disposition::{Answer, Disposition, Request, disposition};
 use crate::expression_sync::{ExpressionSync, SILENT_RETRY_LIMIT, from_status_name, to_wire};
+use crate::motion::{MOTION_CONFIG, MotionConfig, play_motion};
 
 /// 通常commandが`stale_session`で拒否されてから再開してよい回数。**暫定値。**
 ///
@@ -315,8 +317,12 @@ pub struct DaemonCounters {
     pub set_expression_stopped_silent: u64,
     /// messageにできなかった`set_expression`。
     pub input_faults: u64,
-    /// 反応が首の動きを求めたが、送らなかった回数（`PROTO-TBD-008`）。
+    /// 反応が首の動きを求めたが、送らなかった回数（`PROTO-TBD-008`。値が未決の間は常にここへ数える）。
     pub motions_not_sent: u64,
+    /// 送信queueへ入れた`play_motion`。
+    pub motions_sent: u64,
+    /// 送る前の検査（[`crate::motion::play_motion`]、`check_bounds`）またはencodeに失敗し、送らなかった回数。
+    pub motion_input_faults: u64,
     /// 受け取った`environment`。
     pub environment_events: u64,
     /// 3つの量がそろわず、`Companion`へ渡さなかった`environment`。
@@ -400,6 +406,10 @@ pub struct Daemon {
     speech_in_flight: Option<u32>,
     last_speech_sent_at: Option<u64>,
     speech_disabled: bool,
+    /// 首の動きの値。`None`の間は`play_motion`を送らない（`PROTO-TBD-008`）。
+    motion_config: Option<MotionConfig>,
+    /// まだ送っていない首の動きの意図。新しい意図が来たら置き換える。
+    motion_pending: Option<MotionIntent>,
     /// まだ送れていない`hello`の`reason`（`startup`だけ）。
     hello_to_send: Option<HelloReason>,
     /// 送ったがまだACKを受けていない`hello`の、送信時刻。
@@ -441,6 +451,8 @@ impl Daemon {
             speech_in_flight: None,
             last_speech_sent_at: None,
             speech_disabled: false,
+            motion_config: MOTION_CONFIG,
+            motion_pending: None,
             hello_to_send: None,
             hello_sent: None,
             hello_msg: None,
@@ -454,6 +466,13 @@ impl Daemon {
             status_watch_until: None,
             exit: None,
         }
+    }
+
+    /// 首の動きの値を差し替える。**testのためである。**製品は[`MOTION_CONFIG`]だけを使う。
+    #[must_use]
+    pub fn with_motion_config(mut self, config: Option<MotionConfig>) -> Self {
+        self.motion_config = config;
+        self
     }
 
     /// 実機確認のため、`set_expression`を一定の間隔で送る（[`ExpressionProbe`]）。
@@ -636,6 +655,7 @@ impl Daemon {
         self.send_hello(now_ms);
         self.send_expression(now_ms);
         self.send_speech(now_ms);
+        self.send_motion(now_ms);
         if let Some(reason) = self.exit {
             return Step::Exit(reason);
         }
@@ -997,10 +1017,15 @@ impl Daemon {
         {
             self.sync.set_desired(expression);
         }
-        if reaction.motion.is_some() {
-            // motion名は`PROTO-TBD-008`で未確定であり、サーボの安全制限はESP32が強制する。
-            self.counters.motions_not_sent += 1;
-            log::debug!("首の動きの意図は送らない（PROTO-TBD-008）");
+        if let Some(intent) = reaction.motion {
+            // 値は`PROTO-TBD-008`で未確定の間`None`であり、その間は送らない。
+            // サーボの安全制限はESP32が強制する。
+            if self.motion_config.is_some() {
+                self.motion_pending = Some(intent);
+            } else {
+                self.counters.motions_not_sent += 1;
+                log::debug!("首の動きの意図は送らない（PROTO-TBD-008）");
+            }
         }
     }
 
@@ -1181,6 +1206,47 @@ impl Daemon {
                 log::error!("set_expressionを送れない（未分類の失敗）。送り直さない: {err}");
                 self.counters.input_faults += 1;
                 self.sync.input_fault();
+            }
+        }
+    }
+
+    /// 値が決まっているときだけ、意図を`play_motion`にして1回送る。**追跡も再送もしない**（module `motion`の範囲）。
+    fn send_motion(&mut self, now_ms: u64) {
+        let (Some(intent), Some(config)) = (self.motion_pending, self.motion_config) else {
+            return;
+        };
+        if !self.startup_complete() {
+            return;
+        }
+        let message = match play_motion(intent, &config) {
+            Ok(payload) => Message::PlayMotion(payload),
+            Err(err) => {
+                self.motion_pending = None;
+                self.counters.motion_input_faults += 1;
+                log::error!("play_motionにできない。送らない: {err}");
+                return;
+            }
+        };
+        if let Err(err) = message.check_bounds() {
+            self.motion_pending = None;
+            self.counters.motion_input_faults += 1;
+            log::error!("play_motionの送信前検査に失敗した。送らない: {err}");
+            return;
+        }
+        match self.session.send(message, now_ms) {
+            Ok(id) => {
+                self.motion_pending = None;
+                self.counters.motions_sent += 1;
+                log::info!("play_motion_queued id={id} intent={intent:?} pi_uptime_ms={now_ms}");
+            }
+            Err(SendError::Dropped) => {
+                log::debug!("play_motionの送信queueが満杯。次の周で再試行する");
+            }
+            Err(SendError::Stopped(_) | SendError::IdSpaceExhausted) => {}
+            Err(err) => {
+                self.motion_pending = None;
+                self.counters.motion_input_faults += 1;
+                log::error!("play_motionを送れない。送り直さない: {err}");
             }
         }
     }
