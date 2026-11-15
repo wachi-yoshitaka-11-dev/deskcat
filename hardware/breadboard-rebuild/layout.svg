@@ -1224,7 +1224,7 @@
 <path d="M968 962 Q594.0 984 220 728" stroke="#111111" stroke-width="3" fill="none" stroke-dasharray="6 4"/>
 <circle cx="968" cy="962" r="5.5" fill="#fff" stroke="#111111" stroke-width="2.5"/>
 <text x="975" y="974" font-size="9" fill="#111111" stroke="#fff" stroke-width="0.4">X5</text>
-<text x="220" y="724" text-anchor="end" font-size="9" fill="#333">X5 → 端子台S の −</text>
+<text x="220" y="724" text-anchor="end" font-size="9" fill="#333">X5 → 共通 GND</text>
 <circle cx="330" cy="180" r="5.5" fill="#9b59b6" stroke="#4a235a" stroke-width="1.5"/>
 <text x="330" y="183" text-anchor="middle" font-size="7.5" fill="#fff">1</text>
 <circle cx="352" cy="180" r="5.5" fill="#9b59b6" stroke="#4a235a" stroke-width="1.5"/>
@@ -1272,7 +1272,7 @@
 <rect x="5" y="466" width="228" height="102" rx="6" fill="#f4f4f4" stroke="#555" stroke-dasharray="5 3" opacity="0.5"/>
 <text x="12" y="479" font-size="10" font-weight="bold" fill="#333">Pi Zero W（板には載らない）</text>
 <rect x="5" y="666" width="228" height="74" rx="6" fill="#f4f4f4" stroke="#555" stroke-dasharray="5 3" opacity="0.5"/>
-<text x="12" y="679" font-size="10" font-weight="bold" fill="#333">サーボ側（端子台S・サーボの plug。板には載らない）</text>
+<text x="12" y="679" font-size="10" font-weight="bold" fill="#333">サーボ側（PROTO-02 の GND・サーボの plug。板には載らない）</text>
 <text x="60" y="1070" font-size="15" font-weight="bold">凡例と注意</text>
 <text x="60" y="1096" font-size="12.5">この図は組み直した後の配置（#512。2026-10-31 に組んだ。EXP-052）。組み直す前の配線の図は Git の履歴にある。</text>
 <text x="60" y="1118" font-size="12.5">結線表と出所・TBD は hardware/breadboard-rebuild/ の wiring-table.md と README.md。図と表は generate.py から生成する。</text>
@@ -1292,7 +1292,7 @@
 <text x="60" y="1450" font-size="12">X2: B1 D6 → Pi の header pin 10（GPIO15 RXD）（Pi の側は挿していない）</text>
 <text x="60" y="1472" font-size="12">X3: B1 A18 → Pi の header pin 39（GND）（板の端を抜いておく）</text>
 <text x="60" y="1494" font-size="12">X4: B1 D7 → サーボの plug の黄の穴（板の端を抜いておく）</text>
-<text x="60" y="1516" font-size="12">X5: B1 −30 → 端子台S の −（ESP32 の GND をサーボの GND と共通にする線。EXP-034 の Wiring revision、組み直す前の基準線。Git の履歴にある組み直す前の hardware/breadboard/layout.svg）（板の端を抜いておく）</text>
+<text x="60" y="1516" font-size="12">X5: B1 −30 → 共通 GND（PROTO-02 の GND。つなぐ端子は #405 で決める）（ESP32 の GND をサーボの GND と共通にする線）（板の端を抜いておく）</text>
 <text x="60" y="1548" font-size="12">首の14本: LCD 側は MSP2807 の pin 番号。線は LCD に付いているメスオス線のオス側を B2 の a・b 行の穴へ直接挿す（細ピンヘッダは使わない）。</text>
 <text x="60" y="1570" font-size="12">SCK と T_CLK、SDI と T_DIN、SDO と T_DO は同じ列に挿して共有する（#34）。</text>
 </svg>

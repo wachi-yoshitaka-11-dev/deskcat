@@ -222,8 +222,8 @@ OFFBOARD = [
      "A18 側を抜いておく。挿す前に、gpio-assignment.md の `信号線をつないでよい条件` の6の開放側の値を読む"),
     ("X4", "B1:D7", "SERVO_SIG", "サーボの plug の黄の穴",
      "D7 側を抜いておく。挿すのは #17 のサーボの試験、または #18 の段0・段1（docs/hardware/servo-safety-limits.md の「#18の校正（案）」の段0の2）の手順と承認に従うときだけ"),
-    ("X5", "B1:-30", "GND", "端子台S の −（ESP32 の GND をサーボの GND と共通にする線。EXP-034 の Wiring revision、組み直す前の基準線。Git の履歴にある組み直す前の hardware/breadboard/layout.svg）",
-     "−30 側を抜いておく。条件は X4 と同じ。#18 の段0・段1では、板の外の端を端子台S の − の穴へ挿さず、クリップ付コードで端子台S の − に入ったシャントの足を挟む（同じ段0の2）"),
+    ("X5", "B1:-30", "GND", "共通 GND（PROTO-02 の GND。つなぐ端子は #405 で決める）（ESP32 の GND をサーボの GND と共通にする線）",
+     "−30 側を抜いておく。条件は X4 と同じ。#18 の試験の間は、板の外の端を端子台S の − の穴へ挿さず、クリップ付コードで端子台S の − に入ったシャントの足を挟む（同じ段0の2）。端子台S は #18 の試験の間だけの物である。組み直す前の基準線（EXP-034 の Wiring revision）は Git の履歴にある組み直す前の hardware/breadboard/layout.svg"),
 ]
 
 # 首を通る14本（LCD 側は MSP2807 の pin 番号。#34 の決定）。
@@ -792,9 +792,9 @@ def draw_external(out):
         color = COLOR_HEX[NECK_COLOR[n]]
         out.append(f'<line x1="{x}" y1="{top + 34}" x2="{x}" y2="{y}" stroke="{color}" stroke-width="2.6"/>')
     # Pi・サーボ: B1 の左。板の外へ出る線の行き先。
-    groups = {"Pi Zero W（板には載らない）": [], "サーボ側（端子台S・サーボの plug。板には載らない）": []}
+    groups = {"Pi Zero W（板には載らない）": [], "サーボ側（PROTO-02 の GND・サーボの plug。板には載らない）": []}
     for xid, h, _net, far, _state in OFFBOARD:
-        key = "Pi Zero W（板には載らない）" if far.startswith("Pi") else "サーボ側（端子台S・サーボの plug。板には載らない）"
+        key = "Pi Zero W（板には載らない）" if far.startswith("Pi") else "サーボ側（PROTO-02 の GND・サーボの plug。板には載らない）"
         groups[key].append(offboard_end(xid, far))
     for title, pts in groups.items():
         if not pts:
