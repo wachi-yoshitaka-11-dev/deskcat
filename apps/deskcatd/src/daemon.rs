@@ -445,7 +445,7 @@ impl Daemon {
         self
     }
 
-    /// Piの時計の分を渡す。時計が有効でなければ`None`で、`Companion`は時間を進めない。
+    /// Piの時計の分を渡す。時計が有効でなければ`None`で、`Companion`は寝起きと休憩を進めない（一時の表情の期限は進める）。
     pub fn set_local_minutes(&mut self, local: Option<LocalMinutes>) {
         if let Some(link) = &mut self.companion {
             link.local = local;
@@ -856,11 +856,12 @@ impl Daemon {
     }
 
     fn on_shake(&mut self, now_ms: u64) {
+        let held = self.companion_holds_face();
         let Some(link) = &mut self.companion else {
             return;
         };
         let output = link.companion.on_shake(Millis(now_ms));
-        self.apply_companion(output);
+        self.apply_companion(output, held);
     }
 
     fn on_environment(&mut self, environment: &deskcat_protocol::Environment, now_ms: u64) {
@@ -877,30 +878,41 @@ impl Daemon {
             humidity_pct: humidity.get(),
             pressure_hpa: pressure.get(),
         };
+        let held = self.companion_holds_face();
         let Some(link) = &mut self.companion else {
             return;
         };
         let output = link.companion.on_ambient(sample, Millis(now_ms));
-        self.apply_companion(output);
+        self.apply_companion(output, held);
     }
 
     fn tick_companion(&mut self, now_ms: u64) {
+        let held = self.companion_holds_face();
         let Some(link) = &mut self.companion else {
             return;
         };
-        let Some(local) = link.local else {
-            return;
+        let output = match link.local {
+            Some(local) => link.companion.tick(Millis(now_ms), local),
+            // 時計が有効でない間は、寝起きと休憩を進めない。一時の表情の期限は経過時間だけで決まるので終わらせる。
+            None => CompanionOutput {
+                face: link.companion.expire(Millis(now_ms)),
+                ..CompanionOutput::NONE
+            },
         };
-        let output = link.companion.tick(Millis(now_ms), local);
-        self.apply_companion(output);
+        self.apply_companion(output, held);
     }
 
     /// `Companion`の出力を、表情の希望と吹き出しの予約にする。首振りは送らず数える。
-    fn apply_companion(&mut self, output: CompanionOutput) {
+    ///
+    /// `held`は、この出力を求める前に`Companion`が`Neutral`以外の顔を持ち、それが今の希望だったか。
+    /// 持っていなかった（後から`Mind`が上書きした）なら、`Companion`の`Neutral`はその顔を消さない。
+    fn apply_companion(&mut self, output: CompanionOutput, held: bool) {
         let Some(link) = &mut self.companion else {
             return;
         };
-        if let Some(face) = output.face {
+        if let Some(face) = output.face
+            && (held || face != Face::Neutral)
+        {
             self.sync.set_desired(face.expression());
         }
         if let Some(bubble) = output.bubble {

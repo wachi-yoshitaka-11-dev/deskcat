@@ -214,5 +214,52 @@ class CommandLineTests(FixtureCase):
         self.assertEqual(self.run_cli(self.base).returncode, 0)
 
 
+class Bench18NodeCheckTests(unittest.TestCase):
+    """`hardware/bench-18/generate.py`の節点の検査（#751）。"""
+
+    def load(self):
+        import importlib.util
+        path = SCRIPTS_ROOT.parent / "hardware" / "bench-18" / "generate.py"
+        spec = importlib.util.spec_from_file_location("bench18_generate", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def test_current_data_passes(self):
+        self.assertEqual(self.load().run_checks(), [])
+
+    def test_consistent_rename_to_a_duplicate_identifier_is_rejected(self):
+        """N4をN1へ一貫して付け替えても、PSUの＋と−が同じ識別子になるため落ちる。"""
+        module = self.load()
+        module.NETS = [(("N1" if nid == "N4" else nid), sig, pts)
+                       for nid, sig, pts in module.NETS]
+        module.PROBES = [(pid, what, ("N1" if net == "N4" else net))
+                         for pid, what, net in module.PROBES]
+        errors = module.run_checks()
+        self.assertTrue(any("識別子" in e for e in errors), errors)
+        self.assertTrue(any("PSU の＋と−" in e for e in errors), errors)
+
+    def test_missing_psu_points_are_not_reported_as_a_short(self):
+        """PSUの端子が節点に無いときは、短絡ではなく「節点に無い」と報告する。"""
+        module = self.load()
+        module.NETS = [(nid, sig, [p for p in pts if not p.startswith("PSU の")])
+                       for nid, sig, pts in module.NETS]
+        errors = module.run_checks()
+        self.assertTrue(errors)
+        self.assertFalse(any("PSU の＋と−" in e for e in errors), errors)
+
+    def test_psu_terminals_in_one_net_are_rejected(self):
+        """識別子が4つ異なっていても、PSUの両端子を同じ節点へ入れたら落ちる。"""
+        module = self.load()
+        nets = [list(n) for n in module.NETS]
+        minus = "PSU の−端子"
+        for n in nets:
+            n[2] = [p for p in n[2] if p != minus]
+        nets[0][2].append(minus)
+        module.NETS = [tuple(n) for n in nets]
+        errors = module.run_checks()
+        self.assertTrue(any("PSU の＋と−" in e for e in errors), errors)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -1635,3 +1635,64 @@ fn a_mind_expiry_still_ends_a_face_the_mind_put_over_the_companions() {
     assert_eq!(run(&mut d, &mut t, 3_300), Step::Continue);
     assert_eq!(expressions(&t.sent()), [ExpressionName::Neutral]);
 }
+
+#[test]
+fn without_a_valid_clock_a_dizzy_face_still_ends_after_its_hold() {
+    let mut d =
+        daemon().with_companion(Companion::new(CompanionConfig::MVP, Millis(0)), Some(4_000));
+    d.set_local_minutes(None);
+    let (mut d, mut t) = established_with(d, "neutral");
+    let _ = t.sent();
+
+    t.feed(Message::Shaken, ESP_SID, 4);
+    assert_eq!(run(&mut d, &mut t, 100), Step::Continue);
+    let sent = t.sent();
+    assert_eq!(expressions(&sent), [ExpressionName::Dizzy]);
+    let id = find_id(&sent, |m| matches!(m, Message::SetExpression(_))).expect("送った");
+    t.feed(ack(id, AckStatus::Ok, None), ESP_SID, 5);
+
+    // `dizzy_hold_ms`（3,000 ms）を過ぎたら、時計が無くても戻る。
+    assert_eq!(run(&mut d, &mut t, 3_200), Step::Continue);
+    assert_eq!(expressions(&t.sent()), [ExpressionName::Neutral]);
+}
+
+#[test]
+fn an_expired_companion_face_does_not_clear_a_later_mind_face() {
+    let (mut d, mut t) = with_companion(Some(4_000), 12);
+    let _ = t.sent();
+
+    // 100 msにCompanionが`Hot`を求める（5,100 msに時間切れ）。
+    t.feed(
+        environment(Some(31.0), Some(50.0), Some(1010.0)),
+        ESP_SID,
+        4,
+    );
+    assert_eq!(run(&mut d, &mut t, 100), Step::Continue);
+    let sent = t.sent();
+    assert_eq!(expressions(&sent), [ExpressionName::Hot]);
+    let id = find_id(&sent, |m| matches!(m, Message::SetExpression(_))).expect("送った");
+    t.feed(ack(id, AckStatus::Ok, None), ESP_SID, 5);
+
+    // 4,900 msにMindが`Happy`で上書きする（7,900 msまで保つ）。
+    t.feed(
+        Message::HeadTouched(HeadTouched { duration_ms: 700 }),
+        ESP_SID,
+        6,
+    );
+    assert_eq!(run(&mut d, &mut t, 4_900), Step::Continue);
+    let sent = t.sent();
+    assert_eq!(expressions(&sent), [ExpressionName::Happy]);
+    let id = find_id(&sent, |m| matches!(m, Message::SetExpression(_))).expect("送った");
+    t.feed(ack(id, AckStatus::Ok, None), ESP_SID, 7);
+
+    // 5,200 msにCompanionの`Hot`が切れても、`Happy`は残る。
+    assert_eq!(run(&mut d, &mut t, 5_200), Step::Continue);
+    assert!(
+        expressions(&t.sent()).is_empty(),
+        "Companionの期限切れのNeutralがMindのHappyを消さない"
+    );
+
+    // `Happy`はMindの保つ時間で終わる。
+    assert_eq!(run(&mut d, &mut t, 8_000), Step::Continue);
+    assert_eq!(expressions(&t.sent()), [ExpressionName::Neutral]);
+}

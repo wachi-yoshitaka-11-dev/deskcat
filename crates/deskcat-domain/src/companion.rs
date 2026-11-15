@@ -257,7 +257,8 @@ pub struct Companion {
     cold: Condition,
     dry: Condition,
     low_pressure: Condition,
-    pressure: [f32; PRESSURE_HISTORY],
+    /// 点と、測った時刻。
+    pressure: [(f32, Millis); PRESSURE_HISTORY],
     pressure_len: usize,
     last_pressure_at: Option<Millis>,
     last_bubble_at: Option<Millis>,
@@ -293,7 +294,7 @@ impl Companion {
                 active: false,
                 pending: false,
             },
-            pressure: [0.0; PRESSURE_HISTORY],
+            pressure: [(0.0, Millis(0)); PRESSURE_HISTORY],
             pressure_len: 0,
             last_pressure_at: None,
             last_bubble_at: None,
@@ -352,7 +353,7 @@ impl Companion {
             sample.humidity_pct <= c.dry_on_pct,
             sample.humidity_pct > c.dry_off_pct,
         );
-        let drop = self.pressure_drop(sample.pressure_hpa);
+        let drop = self.pressure_drop(sample.pressure_hpa, now);
         self.low_pressure.update(
             drop >= c.pressure_drop_on_hpa,
             drop < c.pressure_drop_off_hpa,
@@ -386,6 +387,19 @@ impl Companion {
             bubble: None,
             neck: Some(NeckRequest::Sway),
         }
+    }
+
+    /// 表情の戻りだけを進める。Piの時計が有効でなく`tick`できない間も、一時の表情を終わらせる。
+    ///
+    /// 寝ている間は何もしない。時刻が戻っていれば数えて`None`を返す。
+    pub fn expire(&mut self, now: Millis) -> Option<Face> {
+        if !self.advance_clock(now) {
+            return None;
+        }
+        if self.asleep {
+            return None;
+        }
+        self.expire_face(now)
     }
 
     /// 時間を進める。寝起き、休憩、表情の戻り、環境の吹き出しの順送りを扱う。
@@ -492,11 +506,20 @@ impl Companion {
         None
     }
 
-    /// 履歴の最大から今の値を引いた下がり幅。履歴が無ければ0。
-    fn pressure_drop(&self, now_hpa: f32) -> f32 {
+    /// 履歴の窓。`pressure_sample_ms`の`PRESSURE_HISTORY`点分（MVPで3時間）。
+    fn pressure_window_ms(&self) -> u64 {
+        self.config
+            .pressure_sample_ms
+            .saturating_mul(PRESSURE_HISTORY as u64)
+    }
+
+    /// 窓の中の履歴の最大から今の値を引いた下がり幅。窓の中に点が無ければ0。
+    fn pressure_drop(&self, now_hpa: f32, now: Millis) -> f32 {
+        let window = self.pressure_window_ms();
         self.pressure[..self.pressure_len]
             .iter()
-            .copied()
+            .filter(|(_, at)| now.0 - at.0 <= window)
+            .map(|(hpa, _)| *hpa)
             .fold(now_hpa, f32::max)
             - now_hpa
     }
@@ -509,11 +532,19 @@ impl Companion {
             return;
         }
         self.last_pressure_at = Some(now);
+        // 窓より古い点を先に捨てる。その後、点数の上限を守る。
+        let window = self.pressure_window_ms();
+        let keep_from =
+            self.pressure[..self.pressure_len].partition_point(|(_, at)| now.0 - at.0 > window);
+        if keep_from > 0 {
+            self.pressure.copy_within(keep_from..self.pressure_len, 0);
+            self.pressure_len -= keep_from;
+        }
         if self.pressure_len == PRESSURE_HISTORY {
             self.pressure.copy_within(1.., 0);
             self.pressure_len -= 1;
         }
-        self.pressure[self.pressure_len] = hpa;
+        self.pressure[self.pressure_len] = (hpa, now);
         self.pressure_len += 1;
     }
 

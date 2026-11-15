@@ -85,6 +85,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from concurrent.futures import TimeoutError as FuturesTimeout
 from pathlib import Path
@@ -185,7 +186,9 @@ REVIEW_COMPLETED_TEXT = "Review completed"
 # 通る側に倒れるおそれがあるため、commitごとの確認は並列で行い（昇格は100件を超える）、
 # 全体にも期限を置く。
 GH_TIMEOUT_SECONDS = 10
-COMMIT_CHECK_DEADLINE_SECONDS = 15
+# **最初の`gh`照会の前に始め、残りを各照会へ渡す。**走っているworkerも同じ期限で
+# 終わるため、denyを出した後にprocessが残って時間切れになることもない。
+CHECK_DEADLINE_SECONDS = 15
 COMMIT_CHECK_WORKERS = 16
 
 # `gh pr merge`の値を取るoption。selector（PR番号・URL・branch）を探すときに値を飛ばす。
@@ -289,6 +292,28 @@ def _option_value(args, *names):
             if arg.startswith(name + "="):
                 return arg[len(name) + 1:]
     return None
+
+
+def _repo_option(args, global_repo, value_options):
+    """`-R`／`--repo`の値を返す。`-Rowner/repo`（値をつなげた短い形）も読む。
+
+    `_option_value`は連結形を読まないため、`gh issue close 9 -Rowner/target`が
+    別のrepositoryではなく作業中のcheckoutのIssueを検査していた（#751）。
+    """
+    value = _option_value(args, "--repo", "-R")
+    if value is None:
+        # 値を取るoptionの直後の語は値である（`--comment -Rx/y`のghは`-Rx/y`を値に取る）。
+        index = 0
+        while index < len(args):
+            arg = args[index]
+            if arg in value_options:
+                index += 2
+                continue
+            if arg.startswith("-R") and len(arg) > 2:
+                value = arg[2:]
+                break
+            index += 1
+    return value or global_repo
 
 
 def _option_values(args, *names):
@@ -697,12 +722,21 @@ def _merge_selector(args):
     return None
 
 
-def _gh_json(command):
-    """`gh`を実行して標準出力を返す。**失敗は例外のまま上げる。**"""
+def _gh_json(command, deadline=None):
+    """`gh`を実行して標準出力を返す。**失敗は例外のまま上げる。**
+
+    `deadline`（`time.monotonic()`の値）を渡すと、残りの時間を超えて待たない。
+    期限を過ぎていれば実行せず`TimeoutExpired`を上げる。
+    """
+    timeout = GH_TIMEOUT_SECONDS
+    if deadline is not None:
+        timeout = min(timeout, deadline - time.monotonic())
+        if timeout <= 0:
+            raise subprocess.TimeoutExpired(["gh", *command], 0)
     result = subprocess.run(
         ["gh", *command],
         capture_output=True, text=True, encoding="utf-8",
-        timeout=GH_TIMEOUT_SECONDS, check=True,
+        timeout=timeout, check=True,
     )
     return result.stdout
 
@@ -724,11 +758,11 @@ def _run_review_completed(run):
     )
 
 
-def _commit_review_state(repo, sha):
+def _commit_review_state(repo, sha, deadline=None):
     """commit 1つのCodeRabbitの状態を`(完走か, 表示用の文字列)`で返す。"""
     runs = json.loads(_gh_json([
         "api", f"repos/{repo}/commits/{sha}/check-runs?per_page=100",
-    ])).get("check_runs", [])
+    ], deadline)).get("check_runs", [])
     runs = [run for run in runs if run.get("name") == CODERABBIT_CHECK_NAME]
     if runs:
         done = any(_run_review_completed(run) for run in runs)
@@ -736,7 +770,7 @@ def _commit_review_state(repo, sha):
         return done, f"check-run `{title}`"
     statuses = json.loads(_gh_json([
         "api", f"repos/{repo}/commits/{sha}/statuses?per_page=100",
-    ]))
+    ], deadline))
     statuses = [
         item for item in statuses if item.get("context") == CODERABBIT_CHECK_NAME
     ]
@@ -765,43 +799,48 @@ def _check_coderabbit_review(args, global_repo):
     """
     if _is_help(args):
         return
-    repo_option = _option_value(args, "--repo", "-R") or global_repo
+    deadline = time.monotonic() + CHECK_DEADLINE_SECONDS
+    repo_option = _repo_option(args, global_repo, MERGE_VALUE_OPTIONS)
     selector = _merge_selector(args)
     try:
         view = ["pr", "view"] + ([selector] if selector else [])
         view += (["-R", repo_option] if repo_option else [])
         view += ["--json", "number,url"]
-        info = json.loads(_gh_json(view))
+        info = json.loads(_gh_json(view, deadline))
         number = info["number"]
         match = re.match(r"https://[^/]+/([^/]+/[^/]+)/pull/\d+", info["url"])
         repo = match.group(1)
         files = _gh_json([
             "api", "--paginate", f"repos/{repo}/pulls/{number}/files?per_page=100",
             "--jq", ".[].filename",
-        ]).split()
+        ], deadline).split()
         targets = _review_targets(files)
         if not targets:
             return
         shas = _gh_json([
             "api", "--paginate", f"repos/{repo}/pulls/{number}/commits?per_page=100",
             "--jq", ".[].sha",
-        ]).split()
+        ], deadline).split()
         head_state = None
         # 新しいcommitから順に並列で見る。完走が1つでもあれば通す。
         pool = ThreadPoolExecutor(max_workers=COMMIT_CHECK_WORKERS)
         try:
             futures = {
-                pool.submit(_commit_review_state, repo, sha): sha
+                pool.submit(_commit_review_state, repo, sha, deadline): sha
                 for sha in reversed(shas)
             }
-            for future in as_completed(futures, timeout=COMMIT_CHECK_DEADLINE_SECONDS):
+            for future in as_completed(
+                futures, timeout=max(0, deadline - time.monotonic())
+            ):
                 done, state = future.result()
                 if done:
                     return
                 if futures[future] == shas[-1]:
                     head_state = state
         finally:
-            pool.shutdown(wait=False, cancel_futures=True)
+            # **待つ。**走っているworkerは同じ期限で終わる。待たずに抜けると、
+            # denyを出してもprocessが残り、hookの時間切れでdenyが捨てられる（#751）。
+            pool.shutdown(wait=True, cancel_futures=True)
     except (OSError, subprocess.SubprocessError, ValueError, KeyError,
             AttributeError, TypeError, FuturesTimeout) as error:
         _deny(
@@ -888,7 +927,7 @@ def _check_issue_close(args, global_repo):
         # 理由のコメントが付いているときだけ受け入れ条件を見ない。boardの`Done`は完了扱いで、
         # `_check_item_done`が見る。
         return
-    repo_option = _option_value(args, "--repo", "-R") or global_repo
+    repo_option = _repo_option(args, global_repo, ISSUE_CLOSE_VALUE_OPTIONS)
     selector = None
     index = 0
     while index < len(args):

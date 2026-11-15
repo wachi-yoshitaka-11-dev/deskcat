@@ -1152,7 +1152,7 @@ fn main() {
         // 確立前に測れた最新の1件は持ち越す。送った後は持たない。
         #[cfg(deskcat_product_mode)]
         if let Some(reporter) = env_reporter.as_mut() {
-            reporter.poll(health.uptime_ms());
+            reporter.poll(health.uptime_ms(), || health.uptime_ms());
             if boot_session.is_established() {
                 if let Some(environment) = reporter.take_event() {
                     pi_link::send_event(

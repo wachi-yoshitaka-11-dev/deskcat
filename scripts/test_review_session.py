@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 # A round whose defect stays unresolved cannot converge, so its review keeps counting.
 OPEN = {"findings": [{"kind": "defect", "origin": "diff", "decision": "fix",
@@ -76,6 +77,21 @@ class ReviewSessionTests(unittest.TestCase):
                   "scope": "remaining defect D1"}
         record.update(changes)
         return record
+
+    def test_scratch_index_keeps_the_real_index_modification_time(self):
+        """Git compares entry times with the index file time; a copy must not refresh it (#751)."""
+        index = self.root / ".git" / "index"
+        os.utime(index, ns=(1_000_000_000_000_000_000, 1_000_000_000_000_000_000))
+        seen = []
+        real = subprocess.check_call
+
+        def spy(command, *args, **kwargs):
+            seen.append(os.stat(kwargs["env"]["GIT_INDEX_FILE"]).st_mtime_ns)
+            return real(command, *args, **kwargs)
+
+        with mock.patch.object(session.subprocess, "check_call", spy):
+            session.fingerprint(self.root, "base")
+        self.assertEqual(seen, [1_000_000_000_000_000_000])
 
     def test_sixth_process_never_starts(self):
         for _ in range(5):
