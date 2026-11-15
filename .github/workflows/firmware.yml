@@ -84,8 +84,15 @@ jobs:
       # `version`の固定はCI runnerの環境を記録済みの版へ合わせる設定であって、
       # 他端末を拘束するguardではない。手元buildを止める仕組みは#74が
       # `rust-toolchain.toml`側で持つ。CIがあることを理由にそちらを省かない。
+      #
+      # 中で動く`espup`はGitHub APIへ照会し、tokenが無いと未認証のrate limitで
+      # 落ちる（#759）。actionに`token`のinputは無く、`espup`は環境変数
+      # `GITHUB_TOKEN`を読むため、このstepだけへ渡す。権限はjobの
+      # `permissions`（`contents: read`）のままで、増やさない。
       - name: Install Xtensa Rust toolchain
         uses: esp-rs/xtensa-toolchain@ec6d36527049a7f4fb2cb0c1a644668c1bb8a2a4 # v1.7.0
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         with:
           version: 1.95.0.0
           name: esp-1.95.0.0
