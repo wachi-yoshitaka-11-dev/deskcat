@@ -14,35 +14,27 @@
 <polyline points="711.4,580.0 1060.0,358.2" fill="none" stroke="#555555" stroke-width="2.4"/>
 <polyline points="715.2,585.9 1063.8,364.1" fill="none" stroke="#555555" stroke-width="2.4"/>
 <text x="891.7" y="464.1" font-size="10" fill="#222">X1・X2・X3</text>
-<polyline points="790.0,580.0 790.0,580.0 790.0,350.0" fill="none" stroke="#f2c500" stroke-width="2.4"/>
-<text x="796.0" y="575.0" font-size="10" fill="#222">X4</text>
-<polyline points="573.3,440.0 561.3,160.0" fill="none" stroke="#9467bd" stroke-width="7" opacity="0.55"/>
-<text x="573.3" y="295.0" font-size="10" fill="#222">14本</text>
+<polyline points="670.4,580.0 695.2,550.0" fill="none" stroke="#f2c500" stroke-width="2.4"/>
+<text x="688.8" y="560.0" font-size="10" fill="#222">X4</text>
+<polyline points="605.1,520.0 699.3,645.0" fill="none" stroke="#9467bd" stroke-width="7" opacity="0.55"/>
+<text x="658.2" y="577.5" font-size="10" fill="#222">14本</text>
 <polyline points="164.0,267.1 262.0,333.2" fill="none" stroke="#d62728" stroke-width="2.4"/>
 <polyline points="160.1,272.9 258.0,339.0" fill="none" stroke="#111111" stroke-width="2.4"/>
 <text x="217.0" y="298.1" font-size="10" fill="#222">P1・P2</text>
 <polyline points="321.5,230.0 325.0,216.5 1123.5,220.0 1123.5,230.0" fill="none" stroke="#d62728" stroke-width="2.4"/>
 <polyline points="328.5,230.0 325.0,223.5 1116.5,220.0 1116.5,230.0" fill="none" stroke="#111111" stroke-width="2.4"/>
 <text x="728.5" y="215.0" font-size="10" fill="#222">P5・P6</text>
-<polyline points="389.6,368.1 719.6,325.6" fill="none" stroke="#d62728" stroke-width="2.4"/>
-<polyline points="390.4,375.1 720.4,332.5" fill="none" stroke="#8c564b" stroke-width="2.4"/>
-<text x="561.0" y="345.3" font-size="10" fill="#222">P3・P4</text>
+<polyline points="391.2,399.7 651.2,491.9" fill="none" stroke="#d62728" stroke-width="2.4"/>
+<polyline points="388.8,406.3 648.8,498.5" fill="none" stroke="#8c564b" stroke-width="2.4"/>
+<text x="526.0" y="444.1" font-size="10" fill="#222">P3・P4</text>
 <polyline points="373.7,535.3 441.9,673.9 461.9,671.2" fill="none" stroke="#c00" stroke-width="1.5" stroke-dasharray="5 4"/>
 <text x="413.8" y="616.6" font-size="10" fill="#c00">T1</text>
-<polyline points="596.3,439.0 584.3,159.0" fill="none" stroke="#c00" stroke-width="1.5" stroke-dasharray="5 4"/>
-<text x="596.3" y="311.0" font-size="10" fill="#c00">T2</text>
-<polyline points="394.1,403.3 724.1,360.8" fill="none" stroke="#c00" stroke-width="1.5" stroke-dasharray="5 4"/>
-<text x="565.1" y="394.1" font-size="10" fill="#c00">T3</text>
+<polyline points="586.8,533.8 680.9,658.8" fill="none" stroke="#c00" stroke-width="1.5" stroke-dasharray="5 4"/>
+<text x="639.8" y="608.3" font-size="10" fill="#c00">T2</text>
+<polyline points="379.3,433.2 639.3,525.4" fill="none" stroke="#c00" stroke-width="1.5" stroke-dasharray="5 4"/>
+<text x="515.3" y="491.3" font-size="10" fill="#c00">T3</text>
 <polyline points="454.5,616.7 477.9,644.4 424.5,514.4" fill="none" stroke="#c00" stroke-width="1.5" stroke-dasharray="5 4"/>
 <text x="472.2" y="642.5" font-size="10" fill="#c00">T4</text>
-<rect x="460" y="100" width="200" height="60" rx="6" fill="#eef4ff" stroke="#335" stroke-dasharray="5 3"/>
-<text x="466" y="116" font-size="11" font-weight="bold">LCD（DISP-01）</text>
-<text x="466" y="130" font-size="9" fill="#555">頭。背板の前の面</text>
-<text x="466" y="143" font-size="9" fill="#555">J1</text>
-<rect x="720" y="290" width="140" height="60" rx="6" fill="#eef4ff" stroke="#335" stroke-dasharray="5 3"/>
-<text x="726" y="306" font-size="11" font-weight="bold">サーボ（SERVO-01）</text>
-<text x="726" y="320" font-size="9" fill="#555">ふたの上の天板。軸は胴の真ん中</text>
-<text x="726" y="333" font-size="9" fill="#555">M1</text>
 <rect x="260" y="230" width="130" height="300" rx="6" fill="#eef4ff" stroke="#335"/>
 <text x="266" y="246" font-size="11" font-weight="bold">電源の基板 PROTO-02</text>
 <text x="266" y="260" font-size="9" fill="#555">左の壁の内側に立てる</text>
@@ -67,6 +59,14 @@
 <text x="846" y="766" font-size="11" font-weight="bold">B3（BB-601。ENV-01・ACCEL-01）</text>
 <text x="846" y="780" font-size="9" fill="#555">前の壁の内側に立てる</text>
 <text x="846" y="793" font-size="9" fill="#555">J2 J3 R10 R11</text>
+<rect x="620" y="645" width="200" height="55" rx="6" fill="#fff3dd" fill-opacity="0.9" stroke="#335" stroke-dasharray="5 3"/>
+<text x="626" y="661" font-size="11" font-weight="bold">LCD（DISP-01）</text>
+<text x="626" y="675" font-size="9" fill="#555">頭。背板の前の面（ふたの上、サーボの前寄り）</text>
+<text x="626" y="688" font-size="9" fill="#555">J1</text>
+<rect x="650" y="490" width="140" height="60" rx="6" fill="#fff3dd" fill-opacity="0.9" stroke="#335" stroke-dasharray="5 3"/>
+<text x="656" y="506" font-size="11" font-weight="bold">サーボ（SERVO-01）</text>
+<text x="656" y="520" font-size="9" fill="#555">ふたの上の天板。軸は胴の真ん中</text>
+<text x="656" y="533" font-size="9" fill="#555">M1</text>
 <text x="16" y="790" font-size="10" fill="#444">細い線＝1本ずつ（ID。サーボは黄・赤・茶）。太い線＝束（本数）。各線の節点と端は wiring-table.md。赤の破線＝TBD。描かない物：#18 の試験だけの物（端子台S、PSU、試験用の負荷、shunt）。</text>
 <text x="16" y="804" font-size="10" fill="#c00">T1: J8（logic の枝）→ ESP32 の 5 V 入力：使うかと経路は #405（power-budget.md の`ESP32の給電経路`）</text>
 <text x="16" y="818" font-size="10" fill="#c00">T2: LCD の VCC（pin 1）の電圧：今は 3V3。最終は #405（`HW-TBD-024`）</text>

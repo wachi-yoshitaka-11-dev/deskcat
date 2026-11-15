@@ -50,8 +50,8 @@ BLOCK_OF = {
 
 BLOCKS = {
     # 名前: (題, 置き場所（enclosure-and-neck.md の物理的な完成形）, 図の上の矩形 x, y, w, h)
-    "LCD": ("LCD（DISP-01）", "頭。背板の前の面", 260, 40, 200, 60),
-    "SERVO": ("サーボ（SERVO-01）", "ふたの上の天板。軸は胴の真ん中", 520, 230, 140, 60),
+    "LCD": ("LCD（DISP-01）", "頭。背板の前の面（ふたの上、サーボの前寄り）", 420, 585, 200, 55),
+    "SERVO": ("サーボ（SERVO-01）", "ふたの上の天板。軸は胴の真ん中", 450, 430, 140, 60),
     "PROTO-02": ("電源の基板 PROTO-02", "左の壁の内側に立てる", 60, 170, 130, 300),
     "M-12001": ("AC アダプター M-12001", "左の壁の後ろ寄りの穴から線が入る", -150, 160, 150, 50),
     "Pi": ("Raspberry Pi Zero W", "右の壁の内側の後ろ寄りに立てる", 860, 170, 120, 180),
@@ -91,7 +91,6 @@ TBD = [
 
 # 線の通り道（まとまりの組 → 途中の点）。ほかの枠の上を横切らないように曲げる。
 ROUTES = {
-    ("B1", "SERVO"): [(590, 520)],
     ("PROTO-02", "Pi"): [(125, 160), (920, 160)],
     ("B1", "PROTO-02"): [(240, 600)],
 }
@@ -281,10 +280,11 @@ def render_svg(wires):
         poly(pts, "#c00", 1.5, ' stroke-dasharray="5 4"')
         mx, my = mid(pts)
         o.append(f'<text x="{mx + 6:.1f}" y="{my + 12:.1f}" font-size="10" fill="#c00">{tid}</text>')
-    for blk, (title, place, x, y, w, h) in BLOCKS.items():
+    for blk, (title, place, x, y, w, h) in sorted(BLOCKS.items(), key=lambda kv: kv[0] in ("SERVO", "LCD")):
         X, Y = P(x, y)
         dash = ' stroke-dasharray="5 3"' if blk in ("SERVO", "LCD") else ""
-        o.append(f'<rect x="{X}" y="{Y}" width="{w}" height="{h}" rx="6" fill="#eef4ff" stroke="#335"{dash}/>')
+        fill = '#fff3dd" fill-opacity="0.9' if dash else '#eef4ff'
+        o.append(f'<rect x="{X}" y="{Y}" width="{w}" height="{h}" rx="6" fill="{fill}" stroke="#335"{dash}/>')
         o.append(f'<text x="{X + 6}" y="{Y + 16}" font-size="11" font-weight="bold">{esc(title)}</text>')
         o.append(f'<text x="{X + 6}" y="{Y + 30}" font-size="9" fill="#555">{esc(place)}</text>')
         refs = sorted([r for r, bl in BLOCK_OF.items() if bl == blk], key=lambda r: (r[0], int(r[1:]) if r[1:].isdigit() else 0))
