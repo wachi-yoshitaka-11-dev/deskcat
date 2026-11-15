@@ -32,7 +32,7 @@ fn starts_neutral_and_idles_without_output() {
 }
 
 #[test]
-fn head_touch_makes_happy_and_nods() {
+fn head_touch_makes_happy_and_sways() {
     let mut m = mind();
     assert_eq!(
         m.on_event(ContactEvent::HeadTouched, Millis(10)),
