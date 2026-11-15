@@ -4,9 +4,8 @@
 //!
 //! `speed`、`repeat`、および`speed`と`repeat`の上限は、サーボの校正（#18）の後に決まる。
 //! **記憶や推測で置かない。**値は[`MOTION_CONFIG`]の1か所だけに置き、決まるまで`None`とする。
-//! motion名は決めてある（[`SWAY_NAME`]）。名前はサーボの安全に効かない識別子であり、protocol §5.3の
-//! 例とfixtureが使う名前に合わせた（#766）。**名前があることは、送ってよいことを意味しない。**
-//! firmwareのcatalogが受理する名前でもまだ無い（catalogは空である）。
+//! Piが送るmotion名は`sway`である（[`SWAY_NAME`]。#766の首の動きの名前）。ESP32が受け付ける名前
+//! （catalog）はProtocol §5.3と`PROTO-TBD-008`のとおり`TBD`であり、受け付けるまでは届いても拒否される。
 //! **`None`の間は`play_motion`を送らない**（`Daemon`が数えるだけである）。これは`mind.rs`の
 //! 申し送り（PROTO-TBD-008が決まるまで送らない。Issue #491の段階2）の意味を変えない。
 //!
