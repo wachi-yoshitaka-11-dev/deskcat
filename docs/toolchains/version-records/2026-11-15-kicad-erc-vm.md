@@ -28,6 +28,11 @@ Commands run / Actual result:
   kicad-cli sch erc --format report --severity-all: 読み込み成功。Errors 0、Warnings 135。
     endpoint_off_grid 111（pin と wire の端が接続の grid 外）、
     lib_symbol_issues 24（symbol の library `DeskCat` が library table に無い。symbol は回路図に埋め込み済み）。
+  電源の経路（PROTO-02）と project の library（DeskCat.kicad_sym、DeskCat.pretty、sym-lib-table、fp-lib-table）を足した後:
+    Errors 0、Warnings 161（endpoint_off_grid 143、lib_symbol_issues 18。KiCad 標準の Device library が入っていないため）。
+  kicad-cli pcb drc --schematic-parity --severity-all（deskcat.kicad_pcb）: 違反 0、未接続 0、回路図との食い違い 0。
+  kicad-cli pcb export svg: 成功（hardware/universal-board/plan-front.svg、plan-back.svg）。
+  基板ファイルは KiCad 8.0.9 の Python API（pcbnew）で一度だけ組み、以後は KiCad で編集する正本とした。
   kicad-cli sch export netlist --format kicadxml: 成功。
   pin 番号の差分の前（d9fa34d9 の file）と後で、ERC の件数と種類は同じ。
 
@@ -36,6 +41,6 @@ Known differences from documented profile:
   この回路図を読めたことに限る。GUI での表示、別の版、別の端末は確かめていない。
   回路図の symbol の pin の電気種別はすべて passive であり、ERC の pin の種別の矛盾の検査は効かない。
 
-Conclusion: Partial（kicad-cli での読み込み・ERC・netlist の出力は成功。GUI での表示は未実施）
+Conclusion: Partial（kicad-cli での読み込み・ERC・DRC・netlist と SVG の出力は成功。GUI での表示は未実施）
 Next action: 回路図を GUI で開いて表示を確かめる場合は、KiCad 8 以上の GUI がある端末で行う。
 ```
