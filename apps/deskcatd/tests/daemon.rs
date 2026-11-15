@@ -9,7 +9,8 @@ use std::io;
 use std::num::NonZeroU64;
 
 use deskcat_domain::{
-    Companion, Config as CompanionConfig, LOCAL_SPEECH_LINES, LocalMinutes, Millis, Mind, Timing,
+    Companion, Config as CompanionConfig, Expression, LOCAL_SPEECH_LINES, LocalMinutes, Millis,
+    Mind, Timing,
 };
 use deskcat_protocol::{
     Ack, AckStatus, Boot, DisplayStatus, Envelope, ErrorCode, ExpressionName, Frame, HeadTouched,
@@ -20,8 +21,8 @@ use deskcat_serial::{
     ConnectionState, DuplicatePolicy, PeerSession, SerialConfig, Session, StopReason, Transport,
 };
 use deskcatd::daemon::{
-    Daemon, EXIT_FATAL, EXIT_SESSION_REDO, ExitReason, HELLO_RETRY_LIMIT, Identity, RESUME_LIMIT,
-    STATUS_RETRY_LIMIT, Step,
+    Daemon, EXIT_FATAL, EXIT_SESSION_REDO, ExitReason, ExpressionProbe, HELLO_RETRY_LIMIT,
+    Identity, RESUME_LIMIT, STATUS_RETRY_LIMIT, Step,
 };
 use deskcatd::expression_sync::{SILENT_RETRY_LIMIT, TRANSIENT_RETRY_LIMIT};
 
@@ -389,6 +390,80 @@ fn a_touch_sends_happy_and_time_returns_it_to_neutral() {
     assert_eq!(run(&mut d, &mut t, 3_200), Step::Continue);
     assert_eq!(expressions(&t.sent()), [ExpressionName::Neutral]);
     assert_eq!(d.counters().motions_not_sent, 1, "首の動きは送らない");
+}
+
+/// 送った2回目以降の`set_expression`のid。
+fn last_expression_id(frames: &[Frame]) -> u32 {
+    frames
+        .iter()
+        .rev()
+        .find(|f| matches!(f.message, Message::SetExpression(_)))
+        .expect("set_expressionを送った")
+        .envelope
+        .id
+}
+
+#[test]
+fn the_probe_sends_only_set_expression_alternating_with_neutral_and_never_play_motion() {
+    let d = daemon().with_expression_probe(ExpressionProbe {
+        expression: Expression::Happy,
+        interval_ms: NonZeroU64::new(1_000).expect("0ではない"),
+    });
+    let (mut d, mut t) = established_with(d, "neutral");
+    let mut all = t.sent();
+    // 確立の直後に、最初のhappyが出ている。ACKを返してから周期を回す。
+    let first = last_expression_id(&all);
+    t.feed(ack(first, AckStatus::Ok, None), ESP_SID, 400);
+    let mut now = 100;
+    // 切り替えは1000 msごと。間のACKで、1件ずつ送る。
+    for _ in 0..4 {
+        assert_eq!(run(&mut d, &mut t, now), Step::Continue);
+        let sent = t.sent();
+        if sent
+            .iter()
+            .any(|f| matches!(f.message, Message::SetExpression(_)))
+        {
+            let id = last_expression_id(&sent);
+            t.feed(ack(id, AckStatus::Ok, None), ESP_SID, 500 + id);
+        }
+        all.extend(sent);
+        now += 1_000;
+    }
+    assert_eq!(run(&mut d, &mut t, now), Step::Continue);
+    all.extend(t.sent());
+    let names = expressions(&all);
+    for (i, name) in names.iter().enumerate() {
+        let want = if i % 2 == 0 {
+            ExpressionName::Happy
+        } else {
+            ExpressionName::Neutral
+        };
+        assert_eq!(*name, want, "{i}番目: happyとneutralの交互");
+    }
+    assert!(expressions(&all).len() >= 3, "繰り返し送る");
+    assert!(
+        all.iter()
+            .all(|f| !matches!(f.message, Message::PlayMotion(_))),
+        "play_motionは送らない"
+    );
+}
+
+#[test]
+fn the_probe_waits_for_the_session_and_sends_nothing_by_default() {
+    let mut d = daemon().with_expression_probe(ExpressionProbe {
+        expression: Expression::Happy,
+        interval_ms: NonZeroU64::new(1_000).expect("0ではない"),
+    });
+    let mut t = Fake::default();
+    d.on_connected();
+    assert_eq!(run(&mut d, &mut t, 5_000), Step::Continue);
+    assert!(expressions(&t.sent()).is_empty(), "statusの前は送らない");
+
+    // 引数なしは何も足さない。
+    let (mut plain, mut pt) = established("neutral");
+    let _ = pt.sent();
+    assert_eq!(run(&mut plain, &mut pt, 10_000), Step::Continue);
+    assert!(expressions(&pt.sent()).is_empty());
 }
 
 #[test]

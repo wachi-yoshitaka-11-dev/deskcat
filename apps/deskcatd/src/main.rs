@@ -29,15 +29,25 @@ use deskcat_domain::{Companion, Config as CompanionConfig, Millis, Mind, Timing}
 use deskcat_serial::{PeerSession, SerialConfig, SerialDevice, Session};
 use deskcatd::cli::{self, Parsed};
 use deskcatd::cloud_speech::{ClaudeClient, CloudSpeech, Failure};
-use deskcatd::daemon::{Daemon, EXIT_FATAL, EXIT_SESSION_REDO, Identity};
+use deskcatd::daemon::{Daemon, EXIT_FATAL, EXIT_SESSION_REDO, ExpressionProbe, Identity};
 use deskcatd::runner::{SpeechConfig, run_loop_with_cloud};
 use deskcatd::sid::sid_from_os;
 use deskcatd::watchdog::StartupWatchdog;
 
 /// `Companion`をMVPの既定値でつなぐ。吹き出しの表示時間は独り言の設定を使い、無ければ吹き出しを送らない。
 ///
-/// `disabled`は試験用である（`--no-companion`）。
-fn with_companion(daemon: Daemon, speech: Option<SpeechConfig>, disabled: bool) -> Daemon {
+/// `disabled`は試験用である（`--no-companion`）。`probe`は実機確認用の表情の送信（`--probe-expression`）で、
+/// CLIが`--no-companion`との併用だけを許す。
+fn with_companion(
+    daemon: Daemon,
+    speech: Option<SpeechConfig>,
+    disabled: bool,
+    probe: Option<ExpressionProbe>,
+) -> Daemon {
+    let daemon = match probe {
+        Some(probe) => daemon.with_expression_probe(probe),
+        None => daemon,
+    };
     if disabled {
         return daemon;
     }
@@ -123,7 +133,7 @@ fn main() -> ExitCode {
             version: env!("CARGO_PKG_VERSION").to_owned(),
         },
     );
-    let mut daemon = with_companion(daemon, args.speech, args.no_companion);
+    let mut daemon = with_companion(daemon, args.speech, args.no_companion, args.probe);
     daemon.on_connected();
 
     // unitは既定で--cloud-speechを渡さない。credentialが欠ければローカルだけで続ける。
