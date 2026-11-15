@@ -1882,3 +1882,20 @@ fn values_over_the_limit_are_not_sent_and_are_counted() {
     assert_eq!(d.counters().motions_sent, 0);
     assert_eq!(expressions(&sent), [ExpressionName::Happy]);
 }
+
+#[test]
+fn the_probe_sends_no_play_motion_even_when_motion_values_are_given() {
+    let d = daemon()
+        .with_motion_config(Some(TEST_MOTION))
+        .with_expression_probe(ExpressionProbe {
+            expression: Expression::Happy,
+            interval_ms: NonZeroU64::new(1_000).expect("0ではない"),
+        });
+    let (mut d, mut t) = established_with(d, "neutral");
+    let _ = t.sent();
+
+    let sent = touch(&mut d, &mut t);
+    assert!(play_motions(&sent).is_empty());
+    assert_eq!(d.counters().motions_sent, 0);
+    assert_eq!(d.counters().motions_not_sent, 1);
+}

@@ -1020,7 +1020,7 @@ impl Daemon {
         if let Some(intent) = reaction.motion {
             // 値は`PROTO-TBD-008`で未確定の間`None`であり、その間は送らない。
             // サーボの安全制限はESP32が強制する。
-            if self.motion_config.is_some() {
+            if self.motion_config.is_some() && self.probe.is_none() {
                 self.motion_pending = Some(intent);
             } else {
                 self.counters.motions_not_sent += 1;
