@@ -234,7 +234,7 @@ pub struct ShakeFilter {
     config: ShakeConfig,
     window_start_ms: Option<u64>,
     hits: u32,
-    /// 直前の読みがActivityなしだったか（再武装）。基準値（ac結合）や重力（dc結合）との差が閾値を超えたままだと、読むたびにActivityが立ち続ける。
+    /// 直前の読みがActivityなし、またはInactivityありだったか（再武装）。基準値との差（ac結合）や重力を含む加速度（dc結合）が閾値を超えたままだと、読むたびにActivityが立ち続ける。
     armed: bool,
     last_sent_ms: Option<u64>,
     counters: ShakeCounters,
@@ -319,7 +319,7 @@ impl ShakeFilter {
         decision
     }
 
-    /// `INT_SOURCE`を読んで、Activityが立っていなかったときに呼ぶ。
+    /// 再武装する（Activityが立っていなかった読み、またはInactivityが立った読み。[`ShakeFilter::on_int_source`]）。
     pub fn on_quiet(&mut self) {
         self.armed = true;
     }
@@ -489,7 +489,7 @@ mod tests {
 
     #[test]
     fn with_link_every_read_that_has_activity_and_inactivity_counts_once() {
-        // Linkでは1回の読みにActivityとInactivityの両方が立つことがある（順序は不明）。毎回数える。
+        // 1回の読みにActivityとInactivityの両方が立つ場合（模擬の仮定。順序は不明）は、毎回数える。
         let both = INT_SOURCE_ACTIVITY | INT_SOURCE_INACTIVITY;
         let mut f = ShakeFilter::new(TEST);
         assert_eq!(
@@ -806,7 +806,7 @@ mod tests {
 
     #[test]
     fn without_link_a_reference_taken_at_boot_goes_stale_after_being_put_down() {
-        // Linkを使わない場合（ac結合だけ）、置き直した後は基準との差が出続けて、揺らしても検出しない。
+        // 模擬の振る舞い（Linkなしでは、起動時の基準値が置き直した後も古いまま）は仮定で、実機では確かめていない。
         let no_link = ShakeConfig {
             act_inact_ctl: 0xE0,
             link: false,
