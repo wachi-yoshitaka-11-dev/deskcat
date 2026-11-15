@@ -2,7 +2,7 @@
 <export version="E">
   <design>
     <source>hardware/deskcat.kicad_sch</source>
-    <date>2026-11-15T14:16:42+0000</date>
+    <date>2026-11-15T14:20:20+0000</date>
     <tool>Eeschema 8.0.9-8.0.9-0~ubuntu22.04.1</tool>
     <sheet number="1" name="/" tstamps="/">
       <title_block>
@@ -146,9 +146,9 @@
     </comp>
     <comp ref="J6">
       <value>TB_114217</value>
-      <footprint>DeskCat:TB_114217_WireRight</footprint>
+      <footprint>DeskCat:TB_114217_WireLid</footprint>
       <fields>
-        <field name="Footprint">DeskCat:TB_114217_WireRight</field>
+        <field name="Footprint">DeskCat:TB_114217_WireLid</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
@@ -161,9 +161,9 @@
     </comp>
     <comp ref="J7">
       <value>TB_114217</value>
-      <footprint>DeskCat:TB_114217_WireRight</footprint>
+      <footprint>DeskCat:TB_114217_WireLid</footprint>
       <fields>
-        <field name="Footprint">DeskCat:TB_114217_WireRight</field>
+        <field name="Footprint">DeskCat:TB_114217_WireLid</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
@@ -176,9 +176,9 @@
     </comp>
     <comp ref="J8">
       <value>TB_114217</value>
-      <footprint>DeskCat:TB_114217_WireRight</footprint>
+      <footprint>DeskCat:TB_114217_WireFloor</footprint>
       <fields>
-        <field name="Footprint">DeskCat:TB_114217_WireRight</field>
+        <field name="Footprint">DeskCat:TB_114217_WireFloor</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
@@ -520,7 +520,7 @@
       <tstamps>3bf619d2-4225-4cde-bf4d-424ba2469663</tstamps>
     </comp>
     <comp ref="R19">
-      <value>EXP-028 330 servo signal series</value>
+      <value>TBD（値の正本なし。現物は EXP-028 の 330 Ω）</value>
       <fields>
         <field name="Footprint"/>
         <field name="Datasheet"/>

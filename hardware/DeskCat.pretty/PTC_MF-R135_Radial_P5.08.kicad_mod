@@ -6,7 +6,7 @@
 	(property "Reference" "REF**"
 		(at 2.54 -2.7 0)
 		(layer "F.SilkS")
-		(uuid "ce832cac-1935-4af2-9eb0-07da08ff0ed6")
+		(uuid "2258bdfa-c39a-4915-b184-ea2ab59c6089")
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -18,7 +18,7 @@
 		(at 2.54 2.7 0)
 		(layer "F.Fab")
 		(hide yes)
-		(uuid "f8372211-dcef-4184-888e-58ce6ee49ae8")
+		(uuid "ec96dd3d-a981-4945-b8e0-3d3c1fa6bf5f")
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -30,7 +30,7 @@
 		(at 0 0 0)
 		(layer "F.Fab")
 		(hide yes)
-		(uuid "b0c9c416-6143-4aa1-b761-306c001aa420")
+		(uuid "da03f7c1-72f2-4b14-9d53-af2066c2381c")
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -42,7 +42,7 @@
 		(at 0 0 0)
 		(layer "F.Fab")
 		(hide yes)
-		(uuid "d31f9813-5d89-4e8c-989c-52c3a27501b4")
+		(uuid "ebb92737-aa36-4ebb-9c90-af750c3558cc")
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -54,7 +54,7 @@
 		(at 0 0 0)
 		(layer "F.Fab")
 		(hide yes)
-		(uuid "e2103a6c-ab36-4181-b79e-14e756fc1c8e")
+		(uuid "ea8cbb10-f2e1-42ff-850a-5cbcd9984f21")
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -72,7 +72,7 @@
 		)
 		(fill none)
 		(layer "F.SilkS")
-		(uuid "612eb8fc-18fc-485b-9eff-d39fd707c7f5")
+		(uuid "e56efe5c-7761-4a68-bc9d-9c6ea4038339")
 	)
 	(fp_rect
 		(start -2.16 -1.75)
@@ -83,7 +83,7 @@
 		)
 		(fill none)
 		(layer "F.CrtYd")
-		(uuid "7e1b7174-b364-41e5-85d2-76718030ebb7")
+		(uuid "5f4fb970-60ef-4df9-8f18-3a9e95f1ab5b")
 	)
 	(fp_rect
 		(start -1.91 -1.5)
@@ -94,7 +94,7 @@
 		)
 		(fill none)
 		(layer "F.Fab")
-		(uuid "80167df0-507a-4cdb-b22b-f5a03a811718")
+		(uuid "271a2cb7-0534-43ff-a19f-624e02b63ca0")
 	)
 	(pad "a" thru_hole circle
 		(at 0 0)
@@ -102,7 +102,7 @@
 		(drill 1)
 		(layers "*.Cu" "*.Mask")
 		(remove_unused_layers no)
-		(uuid "46848b15-0a0e-4791-9140-d428bf56ea39")
+		(uuid "cd9f9cab-22de-4c5d-be57-22f9f2dd6e17")
 	)
 	(pad "b" thru_hole circle
 		(at 5.08 0)
@@ -110,6 +110,6 @@
 		(drill 1)
 		(layers "*.Cu" "*.Mask")
 		(remove_unused_layers no)
-		(uuid "c88eaed2-4d09-40de-8036-38005eff73c9")
+		(uuid "edb6dd11-3aad-408c-bd1c-a105fe48b584")
 	)
 )

@@ -6,7 +6,7 @@
 	(property "Reference" "REF**"
 		(at 0 -2.45 0)
 		(layer "F.SilkS")
-		(uuid "9fa1c8f0-5c52-4948-9d1d-caa951509d6a")
+		(uuid "ef94f307-f8f7-4043-a4bd-87eced313df2")
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -18,7 +18,7 @@
 		(at 0 2.45 0)
 		(layer "F.Fab")
 		(hide yes)
-		(uuid "bd1a327f-81e5-4c84-9393-c62e7afd022f")
+		(uuid "1da0ce03-e42b-4d74-9863-c45623ed349b")
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -30,7 +30,7 @@
 		(at 0 0 0)
 		(layer "F.Fab")
 		(hide yes)
-		(uuid "73f33452-1e41-45bc-bc18-78dd4ee83117")
+		(uuid "9e55d5a3-dd0c-448c-bef3-939fb11874c5")
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -42,7 +42,7 @@
 		(at 0 0 0)
 		(layer "F.Fab")
 		(hide yes)
-		(uuid "f83120bd-871f-447c-a0cf-730b1849eaf0")
+		(uuid "3bf6a371-7f9e-4a66-89ef-f318954bb87a")
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -54,7 +54,7 @@
 		(at 0 0 0)
 		(layer "F.Fab")
 		(hide yes)
-		(uuid "2c87f1f0-8d61-42bb-84fb-23ac175625a9")
+		(uuid "a1fa3c6b-9a0b-47b7-9d97-07fe9b950a88")
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -72,7 +72,7 @@
 		)
 		(fill none)
 		(layer "F.SilkS")
-		(uuid "2f2fde98-dbfb-4cce-a7a1-897e4e44ebcf")
+		(uuid "af05c307-763d-486f-aca9-47f69b1d1d07")
 	)
 	(fp_rect
 		(start -1.5 -1.5)
@@ -83,7 +83,7 @@
 		)
 		(fill none)
 		(layer "F.CrtYd")
-		(uuid "59966d10-2a92-4801-ac4b-28acc8ad0fc4")
+		(uuid "930168f8-ac97-4410-b407-725d65d98b6a")
 	)
 	(fp_rect
 		(start -1.25 -1.25)
@@ -94,7 +94,7 @@
 		)
 		(fill none)
 		(layer "F.Fab")
-		(uuid "7ccd41e0-1e69-42db-8310-0ffdc3fa427b")
+		(uuid "32d23a52-5c0c-49b7-95f5-8ae88e8b3052")
 	)
 	(pad "1" thru_hole circle
 		(at 0 0)
@@ -102,7 +102,7 @@
 		(drill 1)
 		(layers "*.Cu" "*.Mask")
 		(remove_unused_layers no)
-		(uuid "f16bde18-313f-4e52-b942-c2d583116a63")
+		(uuid "098c2a29-abda-4681-883d-6de239aed4d2")
 	)
 	(pad "2" thru_hole circle
 		(at 0 5.08)
@@ -110,6 +110,6 @@
 		(drill 1)
 		(layers "*.Cu" "*.Mask")
 		(remove_unused_layers no)
-		(uuid "ce73cb52-878a-4745-935d-4e2bd85fbd50")
+		(uuid "052cfd82-774e-4324-9d70-5c7e9f411949")
 	)
 )

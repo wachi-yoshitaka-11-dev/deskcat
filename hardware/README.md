@@ -27,7 +27,7 @@ EXP-025 の [LED デモ回路](../docs/hardware/led-514-demo.md)は GPIO → 電
 | 層 | データ | このリポジトリ | 状態 |
 |---|---|---|---|
 | 論理 | 回路図 | [`deskcat.kicad_sch`](deskcat.kicad_sch)（信号の側と、`PROTO-02` の電源の経路） | あり。ESP32 の 5 V 入力と LCD の VCC は `TBD`（#405） |
-| 論理 | netlist（どの部品のどの pin がどの節点か） | 回路図から `kicad-cli sch export netlist` で出す。Git には置かない（回路図から作れる派生物のため）。基板ファイルとの照合は KiCad の DRC（`--schematic-parity`）が行う | 回路図から出せる |
+| 論理 | netlist（どの部品のどの pin がどの節点か） | 回路図から `kicad-cli sch export netlist` で出し、[`overview/deskcat-netlist.xml`](overview/deskcat-netlist.xml) に置く（overview の図の入力。回路図を変えたら書き出し直す）。基板ファイルとの照合は KiCad の DRC（`--schematic-parity`）が行う | 回路図から出せる |
 | 物理 | 試作のブレッドボードの配線 | [`breadboard/layout.svg`](breadboard/layout.svg)、[`breadboard-rebuild/wiring-table.md`](breadboard-rebuild/wiring-table.md) | あり（2026-10-31 の組み直し） |
 | 物理 | 試作の端子台の配線（#18 の bench） | [`bench-18/`](bench-18/wiring-table.md) | あり。#18 の試験の間だけの配線 |
 | 物理 | はんだ付けする基板の実装図 | KiCad の基板ファイル [`deskcat.kicad_pcb`](deskcat.kicad_pcb)（計画）と、書き出した図・凡例の [`universal-board/`](universal-board/plan.md) → 照合後に完成図（#405） | 計画あり。DRC（回路図との照合を含む）で違反 0 |
@@ -80,7 +80,8 @@ Wokwi の [ILI9341 部品](https://docs.wokwi.com/parts/wokwi-ili9341)では RST
 ## 現物照合待ち（TBD）
 
 - `PROTO-02` の現物：計画（[`universal-board/plan.md`](universal-board/plan.md)）は描いた。**計画図を先に描き、それに従ってはんだ付けし、付けた後に現物と照合して完成図にする（#405）。**基板の未実装状態を完成図として描かない。計画の`測る所`の寸法は、まだ測っていない。
-- 回路図の GUI での表示（`kicad-cli` での読み込みと ERC は済み）。実機の電源・安全確認は図やシミュレーションで代替できない。
+- 回路図の GUI での表示（`kicad-cli` での読み込みと ERC は済み）。
+- 回路図の `R19`（サーボ信号の直列抵抗）の値：値の正本が無い。現物は EXP-028 の 330 Ω（ブレッドボードの `R6`）。実機の電源・安全確認は図やシミュレーションで代替できない。
 
 ### 閉じた項目
 

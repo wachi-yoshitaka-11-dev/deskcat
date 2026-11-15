@@ -32,7 +32,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 SCHEMATIC = HERE.parent / "deskcat.kicad_sch"
 NETLIST = HERE / "deskcat-netlist.xml"
-SCHEMATIC_SHA256 = "8178ec119e29d2a8a54f52da85e0c607251e7b6bdbb4455c4723476e2cfc32d8"
+SCHEMATIC_SHA256 = "83f76795601a79b49cdacfa3bc4d894ef5ac415e1f323e8e71881dafaa3b56da"
 
 # ---------------------------------------------------------------- まとまり（ブロック）
 
