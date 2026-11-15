@@ -5754,7 +5754,7 @@ ELF（wdt）`77d40227f4dca649e3cda797b3ac599087b1aef534e33ab848cb26b37e0f11bd`�
 | Power supply and current limit | `PSU-BENCH-01` の CC。CV は 4.80（無負荷の表示）。`I_lim` は窓1 の後 0.070 |
 | Measurement equipment | PSU の表示（説明書の表示精度は [EXP-051](#exp-051-ベンチ電源psu-bench-01を無負荷と負荷ボードで初めて使いccに入ることを確かめた) のとおり）、`MEAS-02`（`arduino-transient-logger`、EXP-060 と同じ hex）、`MEAS-04`、手の背。目印の読みは目視（紙の分度器は手元に無い） |
 | Raw data | repository の外の `deskcat-evidence/windows-20261115/`：計画 `windows-plan-v3.md`、実行記録 `answers.txt`、起動の記録 `boots.txt`、`ilim-070.csv`、console の log `run-r1.log`・`run-r2.log`・`run-r3.log`（r3 と r4）・`run-r5.log`・`run-r6.log`・`run-r7.log`・`run-r5-failed.log`、script（`console18.py`、`drive*.py`） |
-| Expected result | 正本の段2の節の条件（jumper wire の試験は 0.8 A で表示 0.800 以上と CC の LED、熱い・焦げ臭い・変色なし。`I_lim` は平坦部 9 count 以下かつ CC の表示 0.073 以下）。#751 の 7 は、上限（1周16件）を超える入力の後に `STOP` が届くこと |
+| Expected result | 正本の段2の節の条件（この窓の時点の版：[servo-safety-limits.md（bc25043）](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/bc25043b1087ee07524ca3cf10ff0574b64e7edf/docs/hardware/servo-safety-limits.md)の段2の節の`jumper wire の試験`と`I_lim`の項）。#751 の 7 は、上限（1周16件）を超える入力の後に `STOP` が届くこと |
 | Measured result | 下記 |
 
 ### 窓1（jumper wire の試験と `I_lim`）
@@ -5804,7 +5804,7 @@ ELF（wdt）`77d40227f4dca649e3cda797b3ac599087b1aef534e33ab848cb26b37e0f11bd`�
 
 ## EXP-065: 窓C。製品 build（no-touch-487）を Pi とつなぎ、#743 のコメントの見た目と、#751 の揺れの検出と温湿度の報告を見た
 
-[#743](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/743)（コメントを顔を消さずに下の帯へ出す）の見た目と、[#751](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/751)の 5（傾いて静止していても揺れと数える誤検出の直し）と 6（温湿度の報告の期限の起点の直し）を、製品 build を Pi とつないで見た窓。servo は動かしていない。この記録は事実と未確認だけを書く。
+[#743](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/743)（コメントを顔を消さずに下の帯へ出す）の見た目と、[#751](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/751)の 5（傾いて静止していても揺れと数える誤検出の直し）と 6（`ENV-01` の forced mode の書き込みの後の、変換の期限の起点の直し）を、製品 build を Pi とつないで見た窓。servo は動かしていない。この記録は事実と未確認だけを書く。
 
 | 項目 | 内容 |
 |---|---|
@@ -5818,7 +5818,7 @@ ELF（wdt）`77d40227f4dca649e3cda797b3ac599087b1aef534e33ab848cb26b37e0f11bd`�
 | Power supply and current limit | ESP32 はこの端末の USB。電流・電圧・温度は測っていない |
 | Measurement equipment | UART0 の log（115200）、Pi の `deskcatd` の log |
 | Raw data | repository の外の `deskcat-evidence/windows-20261115/`：`run-c.log`、`deskcatd-wC.log`、`answers.txt`、`boots.txt` |
-| Expected result | #743 の受け入れ条件の実機の見た目。#751 の 5 は、平らと傾けた静止で揺れを数えないこと、揺らすと検出すること。6 は、温湿度の報告が期限切れにならずに届き続けること |
+| Expected result | #743 の受け入れ条件の実機の見た目。#751 の 5 は、平らと傾けた静止で揺れを数えないこと、揺らすと検出すること。6 は、変換の期限の起点を直した build で、温湿度の報告が期限切れにならずに届き続けること |
 | Measured result | 下記 |
 
 ### 起きたこと（つなぐまで）
