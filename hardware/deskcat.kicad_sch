@@ -628,6 +628,6 @@
 (wire (pts (xy 640 518.81) (xy 640 522.62)) (stroke (width 0) (type default)) (uuid "fac43eb9-ae99-405e-beb7-c74047dd68a4"))
 (label "GND" (at 640 522.62 0) (effects (font (size 1.27 1.27))) (uuid "4f871bd8-2ab8-4bfc-9728-02b222ef2281"))
 (text "Power path on PROTO-02 (planned, not built; #405): PS1 -> J5 -> F1 (PTC) -> Q1 D->S -> 5V-NODE -> J6 servo / J7 Pi / J8 logic. Order and Q1 orientation: power-budget.md (2026-09-03). Gate R18 to GND." (at 25 580 0) (effects (font (size 1.5 1.5)) (justify left)) (uuid "a4b5719a-9129-48c8-972c-29e9eaec4b6d"))
-(text "Hole assignment: hardware/universal-board/plan.md (generate.py checks its nets against this schematic). J8 use, ESP32 5V input and LCD VCC: TBD (#405). Servo bulk capacitor and MEAS-01 shunt: TBD (#405, #17)." (at 25 587 0) (effects (font (size 1.5 1.5)) (justify left)) (uuid "f84e9084-1fbe-4931-b9b7-30eccd71b969"))
+(text "Hole assignment: hardware/deskcat.kicad_pcb (checked against this schematic by kicad-cli pcb drc --schematic-parity). J8 use, ESP32 5V input and LCD VCC: TBD (#405). Servo bulk capacitor and MEAS-01 shunt: TBD (#405, #17)." (at 25 587 0) (effects (font (size 1.5 1.5)) (justify left)) (uuid "f84e9084-1fbe-4931-b9b7-30eccd71b969"))
  (sheet_instances (path "/" (page "1")))
 )
