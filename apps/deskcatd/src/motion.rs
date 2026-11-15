@@ -26,6 +26,8 @@
 //!   不一致）に数えられる。ACKの相関と、counterの分類を直す。
 //! - 特権的な動作（サーボ）を繋ぐ前の条件として、送り手の認証の境界と、繰り返し届くeventの扱いを
 //!   決める（`daemon`のmodule docの「認証の境界」）。
+//! - `same_kind_cooldown_ms`が安全要件の5項目に効くかを、やり直して判定する
+//!   （`deskcat-domain`の`mind.rs`の`Timing`のdoc）。
 
 use deskcat_domain::MotionIntent;
 use deskcat_protocol::{FiniteF32, PlayMotion};
