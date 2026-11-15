@@ -392,7 +392,7 @@ fn a_touch_sends_happy_and_time_returns_it_to_neutral() {
     assert_eq!(d.counters().motions_not_sent, 1, "首の動きは送らない");
 }
 
-/// 送った2回目以降の`set_expression`のid。
+/// 最後に送った`set_expression`のid。
 fn last_expression_id(frames: &[Frame]) -> u32 {
     frames
         .iter()
