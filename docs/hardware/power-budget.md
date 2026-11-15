@@ -33,10 +33,10 @@
 
 ```text
 スイッチングACアダプター(USB ACアダプター) MicroBオス 5V3A（秋月 M-12001）— 単一入力源
-│  ※plugをbreadboardへ引き込む変換部品の調達（発注・着荷）の状態は[#205](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/205)が持つ（`5 V ingress`節）
+│  ※plugを端子台で受ける変換部品の調達（発注・着荷）の状態は[#205](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/205)が持つ（`5 V ingress`節）
 ├─ 過電流保護部品（`PROT-OC-01`、5V往路へ直列。調達の状態は[#205](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/205)が持つ）
 │  ※これが無い間は段階C（合成給電）へ進まない（`過電流保護（段階Cのgate）`節）
-├─ Logic/Pi rail 5V（breadboard上で分岐、追加regulatorなし）
+├─ Logic/Pi rail 5V（`PROTO-02`の上の節点で分岐、追加regulatorなし）
 │  ├─ Raspberry Pi Zero W（PWR IN portへ）
 │  │  └─ （案Aの場合のみ）USB OTG port ──[USB cable]── ESP-WROOM-32D開発ボード（秋月電子 M-13628）
 │  │        ※案Aではこのcableのみで給電する
@@ -48,7 +48,7 @@
 │        ├─ BME280（電源電圧DC1.71～3.6V。5V直結不可）
 │        └─ MSP2807（LCD＋touch。VCC 3.3–5V対応だがlogic IOは3.3V TTL。
 │              接続条件は下記のHW-TBD-024を参照）
-└─ Servo rail 5V（breadboard上で分岐、直近にbulk capacitor）
+└─ Servo rail 5V（`PROTO-02`の上の節点で分岐、直近にbulk capacitor）
    └─ SERVO-01（TowerPro SG90）
 ```
 
@@ -61,7 +61,7 @@ ESP32側の条件は[HW-TBD-023](tbd-register.md#hw-tbd-023)、DISP-01の通常�
 
 ## 5 V ingress（物理的な引き込み経路）
 
-上図の「単一入力源」から`breadboard上で分岐`までの間には、**まだ実在しない物理interface**がある。
+上図の「単一入力源」から`PROTO-02`の上の節点での分岐までの間には、**まだ実在しない物理interface**がある。
 M-12001はMicro-Bオスplugであり、breadboardへ直接挿せない。
 
 ただし**この節が埋まるまで作業全体が止まるわけではない**。段階を分ける。
@@ -90,7 +90,7 @@ M-12001はMicro-Bオスplugであり、breadboardへ直接挿せない。
 | **A** | Piを単体でアダプターから起動する（段階Aのadapter（`hardware-bom.md`の`PSU-PI-A-02`。cable一体）のplugから`PWR IN`へ給電し、GPIOへ何も繋がない。2026-10-11の差し替えまでは`PSU-PI-A-01`から`CABLE-PI-A-01`を通して給電した。例外は下の`検証の構成の扱い`。M-12001は`EXP-012`で切断済みであり、段階Aに使えない） | gate不要。Pi単体は通常の使い方である。**2026-10-11の差し替えまで使った`PSU-PI-A-01`のlabelの出力は5.0V=1.0Aであり、Raspberry Pi公式がZero Wに推奨するPSU容量1.2 Aを下回った**（下の`(a)の一次資料は存在しない`の表の`Power supply`行）。2026-10-11以降の`PSU-PI-A-02`のlabelは`DC5V 3.0A`である（label表記であり、実測していない。極性と出力電圧も実測していない）。bssidの固定の後の1時間の監視で切断1回だった観察は、`EXP-020`の起動7にある。2026-10-11の差し替えまで使った`CABLE-PI-A-01`の型番と定格は分からなかった。**ただしこれは探索的な通電であって、電源経路の受け入れではない。**Raspberry Pi公式が要求するのは5.1 Vであり、`PSU-PI-A-02`のlabelの5 Vがそれを満たすかは未判断である。判定に使う最低電圧も未確定である（`HW-TBD-028`(a)）。**段階Aが正常に起動したことをもって、Piの電源経路を合格としない** | 不要 |
 | **B-1** | ESP32を単体でPCのUSBから給電し、flashingとADC loggingを行う | gate不要。**board上のUSB portをメーカーが意図した用途で使うだけ**であり、段階Aと同じく通常の使い方である。board自身の消費以外を足さない。**PC hostのOCPは未確認であり、保護として当てにしない**（`段階B-2の測定`） | 不要 |
 | **B-2** | B-1に周辺module3点（MSP2807、ADXL345、BME280）を足し、**選んだ給電経路（B-2aは`3V3` pin、B-2bは外部の3.3 V電源）**から給電して3.3 V側の定常電流を測る。5 V railもPiも使わない | **gate必要。**給電元により**B-2a**（`3V3` pinから。board上regulatorの定格と過電流／短絡保護の確認が条件）と**B-2b**（外部の電流制限付き3.3 V電源から。設定値の根拠と上限が条件）に分かれる。**どちらの条件も満たせない場合は実施しない。**経路ごとの実施条件・測定点・停止条件は`段階B-2の測定` | 不要 |
-| **C** | 端子台でM-12001を受けてbreadboard railへ引き出し、そこからPi（`PWR IN`へcable）・ESP32・LCD・sensorへ合成給電する（**2026-09-09、案Bにより「変換基板」から差し替え**。**2026-10-27更新：段階Cの構成にMSP2807（LCD）は接続しない**（`MSP2807の電流上限の扱いと、段階Cの測定4（2026-10-27、#556）`））。**Piの5 V GPIO pinを経由して配電しない** | **gate必要。右列の部品がすべて揃い、`経路部品と定格`表に未確定の行が無くなり、ingressで実測できるようになるまで実施しない**（`過電流保護（段階Cのgate）`） | 端子台、Piへの給電cable、過電流保護部品、大電流経路の線材・接続部材 |
+| **C** | 端子台でM-12001を受け、`PROT-OC-01`・`PROT-RP-01`の後に`PROTO-02`の上の節点で分け（この節の末尾の構成表のとおり）、そこからPi（`PWR IN`へcable）・ESP32・LCD・sensorへ合成給電する（**2026-09-09、案Bにより「変換基板」から差し替え**。**2026-10-27更新：段階Cの構成にMSP2807（LCD）は接続しない**（`MSP2807の電流上限の扱いと、段階Cの測定4（2026-10-27、#556）`））。**Piの5 V GPIO pinを経由して配電しない** | **gate必要。右列の部品がすべて揃い、`経路部品と定格`表に未確定の行が無くなり、ingressで実測できるようになるまで実施しない**（`過電流保護（段階Cのgate）`） | 端子台、Piへの給電cable、過電流保護部品、大電流経路の線材・接続部材 |
 
 **AとB-1は通常の使い方であり、gateも追加購入も要らない。**どちらもメーカーが意図した
 給電口をそのまま使い、boardやPi自身の消費以外を足さないためである。
@@ -1275,10 +1275,10 @@ servo試験以降で用いる構成を次に定める。
 
 | 項目 | 内容 |
 |---|---|
-| 必要な部品 | 端子台（`114217`、6 A。**2026-09-09、案Bにより「Micro-Bメスreceptacleの2.54 mm変換基板（DIP化キット）」から差し替え**）。M-12001のcableをMicro-Bプラグの手前で切り、そこからbreadboard railへ5 V／GNDを引き出す。**調達（発注・着荷）の状態は[#205](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/205)が持つ。この表は持たない**。着荷済み（[hardware-bom.md](hardware-bom.md) `WIRE-PWR-01`）。この区間を配線するときの手順（2026-09-09、PM判断）: (1) cableを切って端子台へネジ止めする。(2) **下流（`PROT-OC-01`以降）に何も繋がない状態で**、`通電前の配線確認手順`の`確認の方法`3（テスターで導通を読む）に従いVBUS・GNDの対応を確認する。(3) 合っていることを確認してから下流を繋ぐ。**この区間自体は`通電前の配線確認手順`の対象には含めない**（`逆接可否表`の`M-12001 → 端子台`行を参照。この区間の逆接はMOSFETの担当であり、手順の担当ではない。ここへ再掲しない）。**2026-09-10、(1)を実施した。**ユーザーがcableを切り端子台へ接続した。極性は、切り落としたplug片を手元に残る`PSU-INGRESS-01`のreceptacleへ挿して判定した（記録は[experiment-log.md](experiment-log.md)の`EXP-012`。プラグの金属シェルを基準にした判定は不成立だった）。**(2)(3)の下流接続はまだ行っていない**（`PROT-OC-01`・分岐点は未実装。通電もまだ行っていない）。**2026-09-16の訂正。**この文は`EXP-013`（2026-09-14〜09-15）より前の状態を述べたものである。いまは次のとおりである。**(2)を実施し、通電も行った**（[experiment-log.md](experiment-log.md)の`EXP-013`）。**(3)を満たしたかどうかを、`EXP-013`は判定していない。****順序は手順どおりである**（試験0を下流無接続・非通電で行い、そのあと下流を繋いで通電した。`EXP-013`の試験0と試験1）。**未決なのは、その確認が`確認の方法3`(ii)の記録要件を満たしているかであって、順序ではない。**`PROT-OC-01`と分岐点は**`PROTO-02`への実装が未了である**（`EXP-013`はブレッドボード上の仮組みで行った）。**この訂正は、(3)の未決も、`通電前の配線確認手順`の充足状態も動かさない**（同手順については`経路部品と定格`の`M-12001のcableを受ける端子台`行が持つ。**ここへ再掲しない**） |
-| 分岐点 | 端子台の直後にbreadboard railへ入れ、そこからlogic railとservo railへ分ける。この構成では**Piの5 V GPIO pinを経由して他へ配らない**（下記の定格問題） |
-| Piの5 V入力 | breadboard railからMicro-Bオスcableで`PWR IN`へ入れる。PiのUSB OTG portはPiへの給電に使わない（**2026-09-28、[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)のユーザー決定でPi linkがGPIOのUARTへ変わったため、「PiのUSB OTG portはPi link専用とし、給電に使わない」から差し替え**） |
-| Servo railの5 V入力 | breadboard railから分岐し、直近にbulk capacitorを置く |
+| 必要な部品 | 端子台（`114217`、6 A。**2026-09-09、案Bにより「Micro-Bメスreceptacleの2.54 mm変換基板（DIP化キット）」から差し替え**）。M-12001のcableをMicro-Bプラグの手前で切り、端子台で5 V／GNDを受ける。**調達（発注・着荷）の状態は[#205](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/205)が持つ。この表は持たない**。着荷済み（[hardware-bom.md](hardware-bom.md) `WIRE-PWR-01`）。この区間を配線するときの手順（2026-09-09、PM判断）: (1) cableを切って端子台へネジ止めする。(2) **下流（`PROT-OC-01`以降）に何も繋がない状態で**、`通電前の配線確認手順`の`確認の方法`3（テスターで導通を読む）に従いVBUS・GNDの対応を確認する。(3) 合っていることを確認してから下流を繋ぐ。**この区間自体は`通電前の配線確認手順`の対象には含めない**（`逆接可否表`の`M-12001 → 端子台`行を参照。この区間の逆接はMOSFETの担当であり、手順の担当ではない。ここへ再掲しない）。**2026-09-10、(1)を実施した。**ユーザーがcableを切り端子台へ接続した。極性は、切り落としたplug片を手元に残る`PSU-INGRESS-01`のreceptacleへ挿して判定した（記録は[experiment-log.md](experiment-log.md)の`EXP-012`。プラグの金属シェルを基準にした判定は不成立だった）。**(2)(3)の下流接続はまだ行っていない**（`PROT-OC-01`・分岐点は未実装。通電もまだ行っていない）。**2026-09-16の訂正。**この文は`EXP-013`（2026-09-14〜09-15）より前の状態を述べたものである。いまは次のとおりである。**(2)を実施し、通電も行った**（[experiment-log.md](experiment-log.md)の`EXP-013`）。**(3)を満たしたかどうかを、`EXP-013`は判定していない。****順序は手順どおりである**（試験0を下流無接続・非通電で行い、そのあと下流を繋いで通電した。`EXP-013`の試験0と試験1）。**未決なのは、その確認が`確認の方法3`(ii)の記録要件を満たしているかであって、順序ではない。**`PROT-OC-01`と分岐点は**`PROTO-02`への実装が未了である**（`EXP-013`はブレッドボード上の仮組みで行った）。**この訂正は、(3)の未決も、`通電前の配線確認手順`の充足状態も動かさない**（同手順については`経路部品と定格`の`M-12001のcableを受ける端子台`行が持つ。**ここへ再掲しない**） |
+| 分岐点 | 端子台の後に、`挿入位置`節と直列順序のとおり`PROT-OC-01`、`PROT-RP-01`を通してから、分岐の節点（`PROTO-02`の上のはんだ接続。下の`経路部品と定格`の`分岐点`の行）で分ける（保護部品より手前では分けない。大電流の経路にbreadboardの接点を使わない。`大電流経路にbreadboard接点とジャンパー線を使わない`節）。この構成では**Piの5 V GPIO pinを経由して他へ配らない**（下記の定格問題） |
+| Piの5 V入力 | 分岐点の端子台からMicro-Bオスcableで`PWR IN`へ入れる。PiのUSB OTG portはPiへの給電に使わない（**2026-09-28、[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)のユーザー決定でPi linkがGPIOのUARTへ変わったため、「PiのUSB OTG portはPi link専用とし、給電に使わない」から差し替え**） |
+| Servo railの5 V入力 | 分岐点のservoの枝の端子台から分け、直近にbulk capacitorを置く |
 | **ESP32の5 V入力** | **未決定。**[#405](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/405)の実装設計の見直し（はんだ付けの前）で決める。案A（PiのUSB OTG portからのVBUS単独給電）と案B（`5V` pin給電）はその候補として残す（下記`ESP32の給電経路（最終の経路は未決定）`）。**2026-09-28、[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)のユーザー決定（最終の経路は#405で決める）に合わせて「案Aで確定・実測待ち（2026-08-22、人間の判断）。PiのUSB OTG portからのVBUS単独給電。案BはA不成立時の再検討先として残す」から差し替え** |
 
 ### ESP32の給電経路（最終の経路は未決定）
@@ -1303,7 +1303,7 @@ ESP32のUSBは書き込みとdebug専用にすると決めた（[別電源とUAR
 （同じ記述が`hardware-bom.md`の`MCU-01`にもある。**食い違わせない**）。
 
 **この警告は案の選択そのものに効く。**案Aと案Bを同時に満たす配線
-（**USBを繋いだままbreadboardの5 Vを`5V` pinへも入れる**、など）は、案Aでも案Bでもなく
+（**USBを繋いだまま分岐点の5 Vを`5V` pinへも入れる**、など）は、案Aでも案Bでもなく
 **警告が禁じている状態**である。**どちらか一方を選び、選んだ側の口だけを使う。**
 
 **段階B-2aとの関係をこの文書の読みとして書いておく。**公式guideが並べる3つはいずれも
@@ -1353,7 +1353,7 @@ GPIOのUARTへ変わり（`gpio-assignment.md`のtransport節）、ESP32のUSB�
 | **段階B-2a: 同上＋`3V3` pinから周辺module3点** | `3V3`側のgateを満たしてから | 通常動作の上限は`3V3` pin電流定格の80%。**故障電流を制限するのはboard上regulatorの過電流／短絡保護（要確認）。**PC hostのOCPは`3V3` branchを守らない（`段階B-2の測定`） | 満たす（USBのみ。`5V` pinへ何も繋がない） |
 | **段階B-2b: 周辺module3点を外部3.3 V電源から** | 電流制限値の根拠と上限を定めてから | **故障電流を制限するのは電源に設定した電流制限。**`3V3` pinは使わず、GNDのみESP32と共通化する（`段階B-2の測定`） | 満たす（ESP32はUSBのみ。`5V` pinへ何も繋がない） |
 | 案A: Pi → ESP32のMicro USB | 段階Cから | **PiのUSB OTG portの供給能力。**値は未確認で、ingressでの実測とあわせて確かめる。実測するまで案Aを常用しない | 満たす（USBのみ） |
-| 案B: breadboard rail → ESP32の`5V` pin | 段階Cから、かつ回路確認後 | ingressの上限（`ingressの電流制限`） | **満たさない恐れがある。**USBを繋ぐとVBUSと`5V` pinが同時に生きる |
+| 案B: 分岐点のlogic railの枝 → ESP32の`5V` pin | 段階Cから、かつ回路確認後 | ingressの上限（`ingressの電流制限`） | **満たさない恐れがある。**USBを繋ぐとVBUSと`5V` pinが同時に生きる |
 
 **案Bは、秋月基板のVBUS保護diodeの有無を回路で確認するまで通電しない。**
 確認前に`5V` pin給電とUSB接続を同時に行うと、保護が無い場合に逆流経路ができる。
@@ -2742,11 +2742,11 @@ required_transient_current
 | 項目 | 要件 | 選定値／部品 | 根拠 | 状態 |
 |---|---|---|---|---|
 | 入力電源 | 電圧、連続電流、peak電流 | スイッチングACアダプター MicroBオス 5V／3A（秋月 M-12001） | [秋月商品ページ](https://akizukidenshi.com/catalog/g/g112001/) | Selected（実測でmargin確認要）。**なおRaspberry Pi公式documentationは全modelが5.1 V供給を要求すると述べており、この品の5 Vとは一致しない**（`受け入れ条件`の`(a)の一次資料は存在しない`。可否の判断は[HW-TBD-007](tbd-register.md)／[HW-TBD-009](tbd-register.md)） |
-| **5 V ingress interface** | Micro-Bオスplugの cable を切り、breadboard railへ5 V／GNDを引き出す物理変換 | **調達（発注・着荷）の状態は[#205](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/205)が持つ。この表は持たない**。**2026-09-09、案Bにより端子台（秋月`114217`、6 A）で受ける構成へ変わった**（旧候補はMicro-Bメスreceptacleの2.54 mm変換基板、秋月 g110972、定格1ピン1.5 A）。M-12001のplugは`EXP-012`で切断済みであり、`PWR IN`へ直挿しできない。段階A・B-1（検証の構成）の間のPiの給電は、段階Aのadapter（`hardware-bom.md`の`PSU-PI-A-02`。cable一体。2026-10-11の差し替えまでは`PSU-PI-A-01`と`CABLE-PI-A-01`）で代用する | `5 V ingress`節の段階表 | **Blocked（合成給電（段階C）までに端子台から先の実装が必要。段階A・B-1（検証の構成）は段階Aのadapterで進行可。段階B-2はPiも5 V railも使わず、この行の実装に依らない）** |
+| **5 V ingress interface** | Micro-Bオスplugの cable を切り、端子台で5 V／GNDを受ける物理変換 | **調達（発注・着荷）の状態は[#205](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/205)が持つ。この表は持たない**。**2026-09-09、案Bにより端子台（秋月`114217`、6 A）で受ける構成へ変わった**（旧候補はMicro-Bメスreceptacleの2.54 mm変換基板、秋月 g110972、定格1ピン1.5 A）。M-12001のplugは`EXP-012`で切断済みであり、`PWR IN`へ直挿しできない。段階A・B-1（検証の構成）の間のPiの給電は、段階Aのadapter（`hardware-bom.md`の`PSU-PI-A-02`。cable一体。2026-10-11の差し替えまでは`PSU-PI-A-01`と`CABLE-PI-A-01`）で代用する | `5 V ingress`節の段階表 | **Blocked（合成給電（段階C）までに端子台から先の実装が必要。段階A・B-1（検証の構成）は段階Aのadapterで進行可。段階B-2はPiも5 V railも使わず、この行の実装に依らない）** |
 | ESP32の5 V入力経路 | 3系統（Micro USB／5V pin／3V3 pin）の排他制約を守る | **未決定。**[#405](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/405)の実装設計の見直し（はんだ付けの前）で決める。案A（PiのUSB OTG portからのVBUS単独給電）と案B（`5V` pin給電）はその候補として残す。検証の構成ではPCのUSBから給電する（`gpio-assignment.md`の`信号線をつないでよい条件`の5）。**2026-09-28、[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)のユーザー決定（最終の経路は#405で決める）に合わせて「案Aで確定（2026-08-22、人間の判断）。PiのUSB OTG portからのVBUS単独給電を本線とする。案B（`5V` pin給電＋USBはdata用）は採らないが、案Aが実測で不成立の場合の再検討先として残す」から差し替え** | Espressif ESP32-DevKitC V4文書（3系統は排他）。`ESP32の給電経路（最終の経路は未決定）`節。2026-08-22の判断は同節の`案Aを本線に確定した（2026-08-22、人間の判断。2026-09-28に置き換わった。以下は当時の記録）` | **Blocked**（#405で経路を決めるまで。PiのUSB OTG portの供給能力は、**一次資料は存在しない**ためこの項目は実測しか道が無い。調査結果は同節に記録した。案Bの再検討は案Aの不成立が判定されてからであり、そのときは秋月基板のVBUS保護diodeの有無の回路確認と逆流の実測2通りが条件になる。案A・案Bを採る条件は#405で改めて決める。**2026-09-28、同じ決定に合わせて「残るgateはPiのUSB OTG portの供給能力の実測だけである」を削った**） |
-| Piの5 V入力経路 | PWR IN portから給電し、USB OTG portはPiへの給電に使わない（**2026-09-28、[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)のユーザー決定でPi linkがGPIOのUARTへ変わったため、「USB OTG portはPi link専用とする」から差し替え**） | 段階C以降: breadboard railからMicro-Bオスcableで`PWR IN`へ。段階A（Pi単体起動）: `PSU-PI-A-02`（cable一体）のplugから`PWR IN`へ給電し（2026-10-11の差し替えまでは`PSU-PI-A-01`から`CABLE-PI-A-01`を通した）、**GPIOへは何も接続しない**（例外は`5 V ingress`節の`検証の構成の扱い`） | Raspberry Pi Zero W公式回路（PWR INはdata線未接続の給電専用） | Selected（cableの調達（発注・着荷）の状態は[#205](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/205)が持つ。段階Aは合成給電ではないため電流gateの対象外） |
-| Logic regulator／経路 | Pi／ESP32／周辺deviceの要件 | 追加regulatorなし。M-12001の5Vをbreadboard rail経由でそのまま供給するのは**Piのみ確定**（ESP32は上行のとおり給電経路が未決定）。周辺module3点（MSP2807、ADXL345、BME280）は5V railへ直結せず、ESP32 board上の3V3 pinから給電する（理由は`電源rail構成案`参照） | `hardware-bom.md` PSU-PI-01、DISP-01、TOUCH-01、ACCEL-01、ENV-01 | Blocked（ESP32の給電経路が未決定。加えて定常電流の合計と3V3 pinの供給能力が未実測） |
-| Servo regulator／経路 | 正確なservo要件 | 追加regulatorなし。M-12001の5Vをbreadboard上で別railに分岐し、直近にbulk capacitorを配置 | `hardware-bom.md` PSU-SERVO-01 | Selected（bulk capacitor容量は実測待ち） |
+| Piの5 V入力経路 | PWR IN portから給電し、USB OTG portはPiへの給電に使わない（**2026-09-28、[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)のユーザー決定でPi linkがGPIOのUARTへ変わったため、「USB OTG portはPi link専用とする」から差し替え**） | 段階C以降: 分岐点の端子台からMicro-Bオスcableで`PWR IN`へ。段階A（Pi単体起動）: `PSU-PI-A-02`（cable一体）のplugから`PWR IN`へ給電し（2026-10-11の差し替えまでは`PSU-PI-A-01`から`CABLE-PI-A-01`を通した）、**GPIOへは何も接続しない**（例外は`5 V ingress`節の`検証の構成の扱い`） | Raspberry Pi Zero W公式回路（PWR INはdata線未接続の給電専用） | Selected（cableの調達（発注・着荷）の状態は[#205](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/205)が持つ。段階Aは合成給電ではないため電流gateの対象外） |
+| Logic regulator／経路 | Pi／ESP32／周辺deviceの要件 | 追加regulatorなし。M-12001の5Vを`PROTO-02`の上の節点（分岐点）経由でそのまま供給するのは**Piのみ確定**（ESP32は上行のとおり給電経路が未決定）。周辺module3点（MSP2807、ADXL345、BME280）は5V railへ直結せず、ESP32 board上の3V3 pinから給電する（理由は`電源rail構成案`参照） | `hardware-bom.md` PSU-PI-01、DISP-01、TOUCH-01、ACCEL-01、ENV-01 | Blocked（ESP32の給電経路が未決定。加えて定常電流の合計と3V3 pinの供給能力が未実測） |
+| Servo regulator／経路 | 正確なservo要件 | 追加regulatorなし。M-12001の5Vを`PROTO-02`の上の節点で別railに分岐し、直近にbulk capacitorを配置 | `hardware-bom.md` PSU-SERVO-01 | Selected（bulk capacitor容量は実測待ち） |
 | Backfeed防止 | USB／外部電源の共存 | TBD | 回路図review | Blocked |
 | Servo bulk capacitor | 測定した過渡電流への対応 | 電解コンデンサ470μF／16V（秋月 g108426、ルビコンWXA）。**10個入手済み**（2026-08-08着荷。2026-08-12に購入履歴と照合して訂正した）。使用個数は2〜3個を想定 | [秋月商品ページ](https://akizukidenshi.com/catalog/g/g108426/)。最終容量はESP32＋shunt抵抗によるADC loggingで確定 | Candidate（**部品は入手済み。使用個数が実測待ち**） |
 | 電流測定用shunt抵抗 | 波形測定の手段（Oscilloscope代替） | セメント抵抗5W0.1Ω（秋月、SQP5WJ0R1B、¥30）×1〜2個。ESP32 ADCで電圧降下をsamplingし、電流波形を近似する | [秋月商品ページ](https://akizukidenshi.com/catalog/g/g117836/) | Selected（Oscilloscope未所持のため、その購入を避けて低costで対応。**低側に挿入すること**。理由は`測定計画`参照） |
@@ -2789,7 +2789,7 @@ required_transient_current
 | 区間 | 逆接の可否 | 理由 |
 |---|---|---|
 | M-12001 → 端子台 | **可**（**2026-09-09に`不可`から改めた**。旧区間名は`M-12001 → PSU-INGRESS-01`） | **2026-09-09にPM（`deskcat-f2`）の設計判断（案B）により、この区間が手配線になったためである。**M-12001の出力cableをMicro-Bプラグの手前で切り、端子台（`114217`）へ受ける（終端方法は`経路部品と定格`の`M-12001のcableを受ける端子台`行を参照。ここへ再掲しない）。**Micro-Bの嵌合による極性固定はもう無い。**端子台でVBUSとGNDを入れ替える誤りが起こりうる。**ただしPMが基板上の配置（入力側 → `PROT-OC-01`（PTC）→ `PROT-RP-01`（MOSFET。Drain=入力側／Source=分岐点側）→ 分岐点）を実測で確認したうえで、この区間の逆接はMOSFETが守ると判定した（2026-09-09、PM判断）。**入力側で極性を入れ替えても、MOSFETより下流は守られる。逆電圧に晒されるのは`PROT-OC-01`（PTC）だけであり、**同部品のdatasheet（[MF-R Series datasheet](https://akizukidenshi.com/goodsaffix/mfr.pdf)、Bourns）には極性の指定が無く（全ページを確認した。`polarity`等の語も無く、外形図も対称形状）、PTCは非極性の受動部品であるため害が無い。**したがってこの区間は`通電前の配線確認手順`の対象には含めない**（MOSFETの担当であり、手順の担当ではない。同手順の「守る区間が違う」という既存の分担を変えない、というPMの判断）。**ただし2点、次を明記する。**(1) この区間は従来（Micro-Bの嵌合固定）は逆接が起こりえなかったが、案Bにより起こりうる区間へ変わる。**したがって案BはMOSFET（`PROT-RP-01`）の実装の重要度を上げる**（従来、この区間に対するMOSFETのingress保護は起こりえない事象への備えだったが、案Bでは起こりうる事象への備えになる）。(2) MOSFETは`未実装`である（`逆極性保護のdesign review`節）。**実装されるまで、この区間には保護が無い**（同節の`通電前の配線確認手順が主張しないこと`が既に述べる一般的な警告と同じ） |
-| 端子台 → breadboard rail（`PROT-OC-01`／`PROT-RP-01`経由） | **可** | 手配線。**2026-09-09に案Bの反映で`PSU-INGRESS-01` → breadboard railから区間名を改めた。**区間の可否・保護の扱いは変わらない |
+| 端子台 → 分岐点（`PROT-OC-01`／`PROT-RP-01`経由） | **可** | 手配線。**2026-09-09に案Bの反映で`PSU-INGRESS-01` → breadboard railから「端子台 → breadboard rail」へ、2026-11-15に分岐の位置を`PROTO-02`の上の節点に揃えて今の名前へ、区間名を改めた。**区間の可否・保護の扱いは変わらない |
 | rail → Piの`PWR IN` | **可**（**2026-08-24に`不可`から改めた**） | **rail側が手配線になったためである。**`CABLE-PI-PWR-01`は②（直付け）で確定し、rail側は端子台へのねじ止めになった（`rail側の受け方は②（直付け）で確定した（2026-08-24、人間の判断）`）。**Pi側のMicro-B plugが固定するのはpinの並びであって、どちらの導体が+5 Vかではない。**端子台でVBUSとGNDを入れ替えると、Piへ逆電圧が掛かる。**ingressのP-ch MOSFETはこの区間より上流にあり、守れない** |
 | rail → ESP32の`5V`／GND | **可** | 手配線 |
 | rail → servo rail | **可** | 手配線 |
