@@ -792,10 +792,9 @@ def draw_external(out):
         color = COLOR_HEX[NECK_COLOR[n]]
         out.append(f'<line x1="{x}" y1="{top + 34}" x2="{x}" y2="{y}" stroke="{color}" stroke-width="2.6"/>')
     # Pi・サーボ: B1 の左。板の外へ出る線の行き先。
-    groups = {"Pi Zero W（板には載らない）": [], "サーボ側（PROTO-02 の GND・サーボの plug。板には載らない）": []}
+    groups = {"板の外（Pi・サーボの信号・共通 GND）": []}
     for xid, h, _net, far, _state in OFFBOARD:
-        key = "Pi Zero W（板には載らない）" if far.startswith("Pi") else "サーボ側（PROTO-02 の GND・サーボの plug。板には載らない）"
-        groups[key].append(offboard_end(xid, far))
+        groups["板の外（Pi・サーボの信号・共通 GND）"].append(offboard_end(xid, far))
     for title, pts in groups.items():
         if not pts:
             continue
@@ -840,7 +839,7 @@ NOTES = [
     "LCD へ行く長い線は同じ信号の LCD の線の色。それ以外は、手持ちと挿し済みの線に合わせて振った。色は線の ID で決め、結線表の `色` 欄と同じ。",
     "灰の四角＝穴。金の丸＝ピン。ベージュ＝抵抗（板に沿わせて寝かせる）。太い線＝硬いジャンパー（被覆あり）。",
     "白丸と曲線＝柔らかい線（S番号、両端に同じ番号）。点線の曲線＝組み直した直後は ESP32 側を抜いておく線。",
-    "板の外へ出る線（X番号）は、線の色の曲線で左の枠（Pi・サーボ側）へ向かう。白抜きの丸＝板の端を抜いたままの線。点線の曲線＝抜いたまま、または Pi・サーボ側を挿していない線。紫の丸＝首を通る LCD の線（数字は LCD の pin 番号）。",
+    "板の外へ出る線（X番号）は、線の色の曲線で左の枠（板の外）へ向かう。白抜きの丸＝板の端を抜いたままの線。点線の曲線＝抜いたまま、または板の外の側を挿していない線。紫の丸＝首を通る LCD の線（数字は LCD の pin 番号）。",
     "＋の列＝3V3、−の列＝GND（主板の下側の1組だけ）。5 V の線は S18 だけで、ADC-5V の分圧へ行く。",
     "サーボの電源・Pi の給電はブレッドボードを通さない（power-budget.md、#34）。",
     "溝の幅、L 行から電源列までの距離は写真からの目安。部品の足の長さと硬いジャンパーの長さは現物で合わせる。",
