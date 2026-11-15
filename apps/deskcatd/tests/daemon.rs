@@ -1899,3 +1899,36 @@ fn the_probe_sends_no_play_motion_even_when_motion_values_are_given() {
     assert_eq!(d.counters().motions_sent, 0);
     assert_eq!(d.counters().motions_not_sent, 1);
 }
+
+#[test]
+fn a_motion_intent_replaced_before_it_is_sent_is_counted_as_not_sent() {
+    let timing = Timing {
+        same_kind_cooldown_ms: 0,
+        ..Timing::MVP
+    };
+    let (mut d, mut t) = established_with(
+        daemon_with(timing).with_motion_config(Some(TEST_MOTION)),
+        "neutral",
+    );
+    let _ = t.sent();
+
+    // 1回の読みで2つ届くと、送る前に次の意図が前の意図を置き換える。
+    t.feed(
+        Message::HeadTouched(HeadTouched { duration_ms: 700 }),
+        ESP_SID,
+        4,
+    );
+    t.feed(
+        Message::HeadTouched(HeadTouched { duration_ms: 700 }),
+        ESP_SID,
+        5,
+    );
+    let second = t.reads.pop_back().expect("2つ目").expect("bytes");
+    let mut first = t.reads.pop_back().expect("1つ目").expect("bytes");
+    first.extend(second);
+    t.reads.push_back(Ok(first));
+    assert_eq!(run(&mut d, &mut t, 100), Step::Continue);
+    assert_eq!(play_motions(&t.sent()).len(), 1, "送るのは1回");
+    assert_eq!(d.counters().motions_sent, 1);
+    assert_eq!(d.counters().motions_not_sent, 1, "置き換えで捨てた分");
+}

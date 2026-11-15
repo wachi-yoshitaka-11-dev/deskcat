@@ -182,7 +182,8 @@
 //! こと（[`crate::expression_sync`]）の2段で抑える。**eventには`(sid, id)`のduplicate判定を
 //! 適用しない**（`deskcat-serial`の`PeerSession::accept_event`が、eventの再送とduplicateの扱いを
 //! §9で未確定としている）。
-//! **eventに特権的な動作（サーボ、電源、設定の変更）を繋ぐ前に、送り手の認証の境界と、
+//! **eventに特権的な動作（サーボ、電源、設定の変更）を繋ぐ前に（サーボは、送り始める前。
+//! `MOTION_CONFIG`を`Some`にする前）、送り手の認証の境界と、
 //! 繰り返し届くeventの扱いを決めること。**サーボは[`crate::motion`]の「値を入れる前に」が
 //! この条件を持つ。
 //!
@@ -1023,7 +1024,10 @@ impl Daemon {
             // 値は`PROTO-TBD-008`で未確定の間`None`であり、その間は送らない。
             // サーボの安全制限はESP32が強制する。
             if self.motion_config.is_some() && self.probe.is_none() {
-                self.motion_pending = Some(intent);
+                // 送る前に次の意図が来たら、前の意図は捨てる。送らなかったものとして数える。
+                if self.motion_pending.replace(intent).is_some() {
+                    self.counters.motions_not_sent += 1;
+                }
             } else {
                 self.counters.motions_not_sent += 1;
                 log::debug!("首の動きの意図は送らない（PROTO-TBD-008）");
