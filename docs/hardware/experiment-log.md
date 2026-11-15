@@ -74,6 +74,7 @@
 | [EXP-060](#exp-060-段1の前の窓と段1task-wdt-の-panic-resetpsu-の負極と-esp32-の-gnd-の読みi_limの平坦部4-countを取り段1で-servo-へ指令を出し発熱の実測は行わなかった) | [#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)の段1の前の窓と段1。task WDT の panic reset、PSU の−と ESP32 の GND の読み、`I_lim`の平坦部を取り、段1で servo へ指令を出した。発熱の実測は行わなかった | 値の正なし（観測の記録。判定の語を書かない） |
 | [EXP-061](#exp-061-accel-01adxl345で静止机を叩く机を手で揺らすの3つを各30秒取ったaccel-sample-15) | [#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)・[#685](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/685)の材料。`accel-sample-15`で、静止・机を叩く・机を手で揺らすの3つを、各30秒（5秒×6窓）取った | 値の正なし（観測の記録。判定の語を書かない） |
 | [EXP-062](#exp-062-窓-b製品-buildno-touch-487を-pi-とつなぎ表情温湿度叩く揺れcompanion独り言713-を見た夜と朝の2回) | [#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)・[#713](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/713)。製品 build（`no-touch-487`）を Pi とつなぎ、表情・温湿度・叩く・揺れ・Companion・独り言・#713 を夜と朝の2回で見た | 値の正なし（観測の記録。判定の語を書かない） |
+| [EXP-063](#exp-063-18-段2の窓0非通電発泡スチロールの背板に-lcd-を留め背板を底板の上の前の縁に立てた) | [#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)・[#34](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/34)。段2の窓0（非通電）。背板に LCD を留め、背板を底板に立てた。線の束ねと天板の切り込みは行っていない | 値の正なし（観測の記録） |
 
 **大容量の生dataはこのrepositoryへ入れていない。**保存場所は
 [development-foundation-plan.md](../planning/development-foundation-plan.md)の
@@ -5704,6 +5705,38 @@ ELF（wdt）`77d40227f4dca649e3cda797b3ac599087b1aef534e33ab848cb26b37e0f11bd`�
 - 夜の `deskcatd` と `--cloud-speech` の回の終了時の counter。
 - 電流・電圧・温度。
 
+## EXP-063: #18 段2の窓0（非通電）。発泡スチロールの背板に LCD を留め、背板を底板の上の前の縁に立てた
+
+[#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)の段2の窓0（[servo-safety-limits.md](servo-safety-limits.md)の段2の節。電源を入れない手作業）。頭を組んだ。**servo・ESP32・Pi・ベンチ電源へ通電していない。servo の軸は回していない。ホーンは軸に押し込んでいない。**組んだ形は [enclosure-and-neck.md](enclosure-and-neck.md#物理的な完成形2026-11-14実機側の-pm-が決めユーザーが承認した)の頭の表に書いた。ここには窓の条件と、したことだけを置く。
+
+| 項目 | 内容 |
+|---|---|
+| Test ID | `EXP-063` |
+| Date | 2026-11-14 |
+| Operator | 切る・穴を開ける・結束バンドを通すなどの手作業と、見て答えることはユーザー。図と手順は実機側の PM（AI） |
+| 承認 | 段2の窓0〜4の実行の承認：ユーザー、2026-11-14、実機側の PM のセッション。範囲は窓0〜4の手作業と通電（窓の計画のとおり） |
+| Hardware revision／Exact components | `DISP-01`（LCD）、発泡スチロール（厚み約14。ユーザーの申告）、結束バンド。底板と十字形ホーンは [EXP-054](#exp-054-首の固定方法を発泡スチロールの天板と底板に非通電で当てた) のまま |
+| Power supply and current limit | 通電なし |
+| Measurement equipment | なし（寸法は図の値で、測っていない） |
+| Raw data | repository の外の `deskcat-evidence/stage2-18/`：`answers.txt`、図 `fig/backboard-v8.svg`、`fig/base-v9.svg`、`fig/final-v3.svg`。写真は撮っていない |
+| Expected result | 期待値の数は定めていない |
+| Measured result | 下記 |
+
+### したこと
+
+- LCD の VCC の線（LCD pin 1、赤）を、窓0の初めにユーザーがブレッドボードの側で抜き、抜けていると答えた（[EXP-062](#exp-062-窓-b製品-buildno-touch-487を-pi-とつなぎ表情温湿度叩く揺れcompanion独り言713-を見た夜と朝の2回) の窓の終わりでは挿したままだった）。
+- 背板：発泡スチロールを、図の寸法（109 × 86、header の側の辺に 9 × 41 の切り欠き）で切った。LCD の基板を背板の前の面に隙間なく当て、header と反対の側の角2つを結束バンドで留めた。header は切り欠きに入れ、13本の線は挿したまま。ユーザーが組み終えたと答えた。
+- 背板を底板に立てる形は、実機側の PM の図（背板を底板の後ろの面に当てる形など）を使わず、ユーザーが描いた形で行った：背板を底板の上の前の縁に立て、背板の LCD より下の穴と、底板の背板のすぐ後ろの切り込みに、結束バンドを1周させた。結束バンドの本数と、穴と切り込みの位置は訊いていない。
+- 13本の線を束ねること、VCC の線の空いた端を留めること、天板の切り込み、余長を見ることは、行っていない（物理的な完成形を決めるまで止めた）。
+
+### 手順との差
+
+- 窓の計画の窓0の2（段ボールの背板を底板の後ろの縁に立て、両面テープで補う）は、上のとおり発泡スチロールの背板を前の縁に立てる形に変わった。両面テープは使っていない。
+
+### 確かめていないこと
+
+- 背板と LCD の寸法の実測。頭の質量。頭が倒れないこと。結束バンドがホーンに掛かっていないこと。
+
 ## Revision履歴
 
 | 日付 | Revision | 変更 | 根拠 |
@@ -5777,3 +5810,4 @@ ELF（wdt）`77d40227f4dca649e3cda797b3ac599087b1aef534e33ab848cb26b37e0f11bd`�
 | 2026-11-11 | 66 | [#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)・[#685](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/685)。**`EXP-061`を追加した。**`accel-sample-15`（develop `9671963`）で、静止・机を叩く・机を手で揺らすの3つを各30秒取った。USB の時間が承認の上限を超えたことを Faults に書いた。判定は書いていない | 実機側の PM の記録（ユーザーの回答による） |
 | 2026-11-12 | 67 | [#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)。`EXP-051`の Measurement equipment の行に、`PSU-BENCH-01`の説明書 p.3「仕様」の原文（表示、表示精度、表示分解能）と、出所の写真の sha256 を追記した。#18 の段2が、この表示精度を電圧と電流の判定の根拠に使うため。測定の内容は変えていない | 説明書の写真（2026-11-10 にユーザーが会話に貼ったもの） |
 | 2026-11-14 | 68 | [#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)・[#713](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/713)。**`EXP-062`を追加した。**窓 B（製品 build を Pi とつないだ窓、夜と朝）の観察と、手順との差を書いた。判定は書いていない | 実機側の PM の記録（ユーザーの回答による） |
+| 2026-11-14 | 69 | [#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)・[#34](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/34)。**`EXP-063`を追加した。**段2の窓0（非通電）で頭を組んだ記録。判定は書いていない | 実機側の PM の記録（ユーザーの回答による） |
