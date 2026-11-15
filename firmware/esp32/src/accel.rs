@@ -125,7 +125,7 @@ impl Adxl345 {
 
     /// tap検出の設定を書く（`deskcat_tap::shake::registers`の順。`shake`が`None`なら`deskcat_tap::SETUP`と同じ）。
     /// 最初に失敗した書き込みで止めて`Err`を返す。1 transactionごとに[`READ_TIMEOUT_TICKS`]で有限時間に返る。
-    /// `shake`が`Some`のときは、揺れ（Activity）の設定も書く（`THRESH_ACT`・`ACT_INACT_CTL`・`INT_ENABLE`のD4）。
+    /// `shake`が`Some`のときは、揺れの設定も書く（書くregisterは`registers`が持つ。ここへ再掲しない）。
     pub fn configure_tap(
         &self,
         i2c: &mut I2cDriver<'_>,
