@@ -40,10 +40,10 @@ deskcatd <必須の引数> --no-companion --probe-expression happy --probe-inter
 
 - 2つの引数は**両方**要る。`--no-companion`も要る（`Companion`も欲しい表情を書き換えるため、併用を拒否する）。
 - ESP32のsession確立と`status`の受信の後、`set_expression`を**指定の表情と`neutral`で交互に**送る。切り替えは指定の間隔ごとである
-  （同じ表情は`ExpressionSync`が送り直さないため、`neutral`を挟む）。`happy`を受理したときだけ赤が約1秒点く（`neutral`など他の表情では点かない）。
+  （同じ表情は`ExpressionSync`が送り直さないため、`neutral`を挟む）。`happy`を受理したときだけ赤が点く（`neutral`など他の表情では点かない。点灯時間は[led-514-demo.md](../../docs/hardware/led-514-demo.md#役割と表示)が正本）。
 - **`play_motion`は送らない。**motion・limiter・heartbeatの経路は変えていない。引数が無ければ従来と同じである。
 - 表情名は`happy`などの`set_expression`の名前。知らない名前、`neutral`、間隔0、片方だけの指定は、終了1で拒否する。
-- 間隔の値に根拠は無い。赤の点灯が約1秒のため、1秒より十分長い値で観察する。
+- 間隔の値に根拠は無い。赤の点灯時間（[led-514-demo.md](../../docs/hardware/led-514-demo.md#役割と表示)）より長い値で観察する。
 - 赤を確かめるfirmwareは、LEDを持つ製品buildか、`bringup-led-514`と`face-21`を併せたbuildである（`no-touch-487`はLEDを持たない）。撫でるeventを読むbuildでは、`Mind`の表情が混ざる。
 
 systemdのunitは`deploy/systemd/deskcatd.service`にある。値は暫定で、根拠は無い。Pi実機で未確認である。
