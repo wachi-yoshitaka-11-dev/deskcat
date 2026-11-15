@@ -26,7 +26,7 @@
 //!
 //! | 入力 | 表情 | 首の意図 |
 //! |---|---|---|
-//! | [`ContactEvent::HeadTouched`] | [`Expression::Happy`] | [`MotionIntent::Nod`] |
+//! | [`ContactEvent::HeadTouched`] | [`Expression::Happy`] | [`MotionIntent::Sway`] |
 //! | [`ContactEvent::Tapped`] | [`Expression::Surprised`] | なし |
 //! | [`ContactEvent::Lifted`] | [`Expression::Surprised`] | なし |
 //! | 保つ時間（[`Timing`]）の経過 | [`Expression::Neutral`] | なし |
@@ -38,7 +38,7 @@
 //!
 //! # 残っている相互作用（段階1では抑えない）
 //!
-//! **[`MotionIntent::Nod`]の振動を加速度がtapとして拾うと、[`ContactEvent::Tapped`]が
+//! **[`MotionIntent::Sway`]の振動を加速度がtapとして拾うと、[`ContactEvent::Tapped`]が
 //! `Happy`を`Surprised`で上書きしうる。**このcrateはmotionがいつ終わるかを知らない
 //! （Protocol §4.7の完了eventは未導入）。どこで抑えるか（ESP32のclassifierか、
 //! 完了eventを使う`deskcatd`か）は#22と#491の段階2で決める。

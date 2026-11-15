@@ -324,7 +324,7 @@ fn a_backwards_clock_replays_when_the_monotonic_contract_is_broken() {
 fn with_an_empty_catalog_every_name_is_rejected_as_invalid_payload_and_replayed() {
     let catalog = MotionCatalog::empty();
     let mut dedup = MotionDedup::new(policy(TEST_CAPACITY, TEST_RETENTION_MS));
-    for (id, name) in [(1, TEST_MOTION), (2, ""), (3, "nod")] {
+    for (id, name) in [(1, TEST_MOTION), (2, ""), (3, "sway")] {
         // 時刻は`id`ごとに単調に増やす（`DuplicateHistory::record`の契約）。
         let now_ms = u64::from(id) * 2;
         let first = dedup.admit_once(id, now_ms, || {

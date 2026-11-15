@@ -61,8 +61,8 @@ pub enum Expression {
 /// `deskcatd`であり、PROTO-TBD-008が決まるまで送らない（Issue #491の段階2への申し送り）。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum MotionIntent {
-    /// うなずく。
-    Nod,
+    /// 首を左右に小さく振る。
+    Sway,
 }
 
 /// 1回の入力に対する判断。
@@ -86,8 +86,8 @@ impl Reaction {
 
 /// 時間に関する値。ハードウェアの値ではなく、表示と反応の振る舞いを決める値である。
 ///
-/// **`same_kind_cooldown_ms`は[`MotionIntent::Nod`]を出す頻度も決める。**撫でが続くと、
-/// 最短でこの間隔ごとに`Nod`を1回出す。それでも現時点で安全要件の5項目
+/// **`same_kind_cooldown_ms`は[`MotionIntent::Sway`]を出す頻度も決める。**撫でが続くと、
+/// 最短でこの間隔ごとに`Sway`を1回出す。それでも現時点で安全要件の5項目
 /// （docs/governance/hardware-safety-policy.md）に効かないのは、`deskcatd`が
 /// `PROTO-TBD-008`の決定まで`play_motion`を送らないと決めたためである
 /// （<https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/491#issuecomment-5945349700>）。
@@ -224,7 +224,7 @@ impl Mind {
         self.last_accepted[i] = Some(now);
 
         let (expression, motion) = match event {
-            ContactEvent::HeadTouched => (Expression::Happy, Some(MotionIntent::Nod)),
+            ContactEvent::HeadTouched => (Expression::Happy, Some(MotionIntent::Sway)),
             ContactEvent::Tapped | ContactEvent::Lifted => (Expression::Surprised, None),
         };
         self.expression = expression;

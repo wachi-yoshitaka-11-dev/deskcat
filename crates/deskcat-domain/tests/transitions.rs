@@ -36,7 +36,7 @@ fn head_touch_makes_happy_and_nods() {
     let mut m = mind();
     assert_eq!(
         m.on_event(ContactEvent::HeadTouched, Millis(10)),
-        shows(Expression::Happy, Some(MotionIntent::Nod))
+        shows(Expression::Happy, Some(MotionIntent::Sway))
     );
     assert_eq!(m.expression(), Expression::Happy);
 }
@@ -99,7 +99,7 @@ fn same_kind_at_cooldown_is_accepted_and_restarts_hold() {
         m.on_event(ContactEvent::HeadTouched, Millis(again)),
         Reaction {
             expression: None,
-            motion: Some(MotionIntent::Nod)
+            motion: Some(MotionIntent::Sway)
         }
     );
     // 保つ時間は2回目から測り直す。
@@ -133,7 +133,7 @@ fn later_event_overrides_current_expression() {
     m.on_event(ContactEvent::Tapped, Millis(0));
     assert_eq!(
         m.on_event(ContactEvent::HeadTouched, Millis(500)),
-        shows(Expression::Happy, Some(MotionIntent::Nod))
+        shows(Expression::Happy, Some(MotionIntent::Sway))
     );
 }
 
@@ -161,7 +161,7 @@ fn expired_expression_is_replaced_by_event_in_one_reaction() {
     // Surprisedは期限切れだがtickを呼んでいない。Neutralを挟まずHappyだけを返す。
     assert_eq!(
         m.on_event(ContactEvent::HeadTouched, Millis(T.surprised_hold_ms + 5)),
-        shows(Expression::Happy, Some(MotionIntent::Nod))
+        shows(Expression::Happy, Some(MotionIntent::Sway))
     );
 }
 
@@ -209,7 +209,7 @@ fn same_input_sequence_gives_same_output_sequence() {
     assert_eq!(
         first,
         vec![
-            shows(Expression::Happy, Some(MotionIntent::Nod)),
+            shows(Expression::Happy, Some(MotionIntent::Sway)),
             Reaction::NONE,
             Reaction::NONE,
             shows(Expression::Surprised, None),
