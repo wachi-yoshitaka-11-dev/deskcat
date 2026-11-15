@@ -165,7 +165,11 @@ impl TapDetector {
             Ok(int_source) => {
                 self.consecutive_errors = 0;
                 // 揺れ（Activity）は、tapと同じ`INT_SOURCE`の読みから取る。tapの判定より先に見ても、tapの扱いは変わらない。
-                if deskcat_tap::shake::is_activity(int_source) {
+                if !deskcat_tap::shake::is_activity(int_source) {
+                    if let Some(shake) = self.shake.as_mut() {
+                        shake.on_quiet();
+                    }
+                } else {
                     if let Some(shake) = self.shake.as_mut() {
                         let decision = shake.on_activity(now_ms, session_established);
                         events.shaken = decision == ShakeDecision::Send;
