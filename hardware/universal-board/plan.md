@@ -54,7 +54,7 @@
 
 電源経路は J1＋ → W1 → F1（PTC）→ W2 → Q1 の D → Q1 の S → W3（分岐点）→ J2・J3・J4 の＋である。power-budget.md の`実装方法を決定した（2026-09-03）`の直列順序（端子台 → `PROT-OC-01` → `PROT-RP-01`（Drain を PTC 側、Source を分岐点側）→ 分岐点）をそのまま写した。Gate は R1（10 kΩ）を直列に通して GND へつなぐ（同節）。
 
-分岐の順は、入力に近い方から servo（J2）、Pi（J3）、logic（J4）にした。servo の戻りの電流が、W4 の上で Pi と logic の取り出し口（列 21・26）の区間を通らないためである（power-budget.md の`GND topology`の、servo の電流で logic の GND の基準を動かさない、という条件）。**W4 は1本の芯線であり、図の上で星形の1点ではない。**この形が`GND topology`の star point に当たると言えるかは、VM 側の PM の照合に回す。
+分岐の順は、入力に近い方から servo（J2）、Pi（J3）、logic（J4）にした。servo の戻りの電流が、W4 の上で Pi と logic の取り出し口（列 21・26）の区間を通らないためである（power-budget.md の`GND topology`の、servo の電流で logic の GND の基準を動かさない、という条件）。**star point は（16,9）の節点とする。**servo の電流は W4 の（2,9）〜（16,9）だけを流れ、Pi と logic の取り出し口（21,9）（26,9）との間を流れない。shunt（`MEAS-01`）を入れる場合は、W4a（(16,8)→(16,9)）の代わりに入れる。logic GND と servo GND の間に shunt が入っていないことは、#405 の受け入れ条件の電源 off の導通 check で確かめる。
 
 ## 基板から出る線
 
@@ -69,7 +69,7 @@
 
 - `PSU-INGRESS-01`（Micro-B の変換基板）：2026-09-09 の案B で入力の経路から外れた（hardware-bom.md の `Not used`）。入力は J1 の端子台で受ける。
 - ヒューズホルダ `110521`：2026-08-26 に方式を PTC へ変えたため使わない（`PROT-OC-01` は「ガラス管ヒューズ＋ホルダは採らない」）。PTC（F1）は基板へ直接はんだ付けする。
-- shunt（`MEAS-01`）と `ADC-SHUNT`（GPIO32）の線：入れるかは #17・#405 で決める。入れる場合の位置は power-budget.md の`GND topology`（servo の戻りだけが通る位置）。
+- shunt（`MEAS-01`）と `ADC-SHUNT`（GPIO32）の線：入れるかは #17・#405 で決める。入れる場合は W4a（(16,8)→(16,9)）の代わりに入れる（power-budget.md の`GND topology`の、servo の戻りだけが通る位置）。
 - C1（servo の枝の bulk capacitor）：値と品が決まっていない（enclosure-and-neck.md の`決めていないこと`）。場所だけを空けた。
 
 ## 寸法の出所
