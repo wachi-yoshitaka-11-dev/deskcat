@@ -65,12 +65,16 @@ face-21 = []
 # Issue #21のF1。ADXL345のtap検出を設定し、`INT_SOURCE`をI2Cで読んで、bootのACK後に`tapped`を送る（`src/main.rs`）。
 # 製品buildもこの経路を持つ。`face-21`・`bringup-display-13`とも組み合わせられる。
 tap-21 = []
+# Issue #487。**製品build（featureなし）から、touchを読むことだけを外す。**`TOUCH-CS`（GPIO21）は、LCDを描く試験buildと同じ`IdleTouch`が出力Highにして保つ
+# （`src/touch.rs`）。`StrokeDetector`は作らず、`head_touched`は送らず、`crate::led`も作らない（GPIO2・GPIO5に触れない）。`build.rs`はこのfeatureだけを製品経路のcfg（`deskcat_product_mode`）から外さない。
+# 他のfeatureと併用すると製品経路が外れるため、`main.rs`の`compile_error!`で止める。通電の条件は`docs/hardware/power-budget.md`の`touchを読まない製品build（no-touch-487）の通電の条件`。
+no-touch-487 = []
 # Issue #23のPROTO-TBD-007（LCD layoutとmemory測定）用。health snapshotと同じ周期で、空きheap、
 # 起動からの最小の空きheap、main taskのstackのhigh water markを1行logへ出す（`src/mem_probe.rs`）。
 # **logを足すだけで、LCD・Pi link・tapの挙動は変えない。製品buildには入らない。**ESP-IDFの統計を読むAPIは
 # すべて`unsafe`であり、この featureのときだけ`main.rs`の`unsafe_code`が`deny`へ下がる（下の`unsafe_code`の注記）。
-# featureを1つでも指定すると製品経路のcfgが外れるため、製品buildと同じ構成で測るときは
-# `face-21`と`tap-21`を足す（タッチの撫での判定は製品buildだけが持ち、この構成には入らない）。`bench-servo-test-17`・`env-sample-16`・`accel-sample-15`・
+# featureを1つでも指定すると（`no-touch-487`を除く）製品経路のcfgが外れるため、製品buildと同じ構成で測るときは
+# `face-21`と`tap-21`を足す（タッチの撫での判定と`ENV-01`の周期測定・`environment`の送出は製品buildだけが持ち、この構成には入らない）。`bench-servo-test-17`・`env-sample-16`・`accel-sample-15`・
 # `touch-sample-14`・`touch-lcd-14`・`bringup-i2c-15-16`・`bringup-led-514`・`debug-motion-19`とは併用できない（`main.rs`の`compile_error!`）。
 mem-probe-23 = []
 # Issue #19の受け入れ条件3。UART0のconsoleから`MOTION <name> <target>`の行を読み、Pi由来の`play_motion`と同じ
@@ -79,6 +83,16 @@ mem-probe-23 = []
 # `bench-servo-test-17`・`touch-sample-14`・`touch-lcd-14`・`mem-probe-23`・`env-sample-16`・`accel-sample-15`・
 # `bringup-i2c-15-16`・`bringup-led-514`とは併用できない（`main.rs`の`compile_error!`）。
 debug-motion-19 = []
+# Issue #18の校正build。UART0のconsoleから`GO18`を受けた後、`MOTION calib <deg>`・`STOP`・`END`だけを受け、
+# `LimitedServo`（`Limiter`を通る）だけでservoを駆動する（`src/servo_calib.rs`。仕様は`docs/hardware/servo-safety-limits.md`の
+# `#18の校正（案）`の`校正buildの仕様（案）`）。**製品buildには入らない。Pi link（`boot_session`、UART1）、heartbeat、I2C、LCDを持たない。**
+# **`src/config.rs`の`SERVO_CALIB_18_*`が1つでも`None`の間は、compileが止まる**（値は回ごとの実行承認が決める。既定値を持たない）。
+# 他の試験featureとは併用できない（`main.rs`の`compile_error!`）。**実機では動かしていない。手順・停止基準のPull Requestがmergeされるまで駆動しない。**
+bench-servo-calib-18 = []
+# Issue #711 のtask WDTの検証build。main taskをTWDTへ登録し、その後は一度もfeedしない。panic resetと、再起動後の
+# `reset_reason`（`task_watchdog`）を実機で見るためのもの。servo・LEDC・GPIO27・Pi link・I2C・LCDに触れない（`src/task_wdt.rs`）。
+# 製品buildには入らない。他の試験featureとは併用できない（`main.rs`の`compile_error!`）。**実機では動かしていない。**
+bench-wdt-711 = []
 # Issue #14 の `TOUCH-01`（XPT2046）の raw 読み出し専用。SPI3（GPIO18/23/19）で X・Y・Z1・Z2 を読み、`TOUCH-IRQ`（GPIO34）の level とあわせて
 # UART0 に出す。LCD は初期化せず（`LCD-CS` を High に固定するだけ）、状態機械は配線しない（`src/touch.rs`）。単独の試験 build として使う。
 touch-sample-14 = []
@@ -103,7 +117,7 @@ deskcat-protocol = { path = "../../crates/deskcat-protocol" }
 # `bench-servo-test-17`付きのbuildを除くbuildで、`crate::servo`を通って角度を出せるのは、`Sg90`とこのcrateの`Limiter`を
 # 1つずつ所有する`crate::servo::LimitedServo`だけである（成立の条件は`src/servo.rs`のmodule doc）。
 deskcat-servo = { path = "../../crates/deskcat-servo" }
-# `set_expression`の3表情の図形と、受理の判定の順序（#21）。LCDもSPIも知らず、hostでtestできる。
+# `set_expression`の表情の図形と、受理の判定の順序（#21）。LCDもSPIも知らず、hostでtestできる。
 deskcat-face = { path = "../../crates/deskcat-face" }
 # `accel-sample-15`のADXL345連続測定の設定値・復号・統計（#15）。I2Cを知らず、hostでtestできる。
 deskcat-accel = { path = "../../crates/deskcat-accel" }

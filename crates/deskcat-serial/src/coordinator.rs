@@ -5,7 +5,7 @@
 //!
 //! - 受信した[`Frame`]をtypeごとに振り分ける（[`handle_frame`]）。`boot`は次項へ、
 //!   `ack`はPiの要求（`ping`／`get_status`／`set_expression`）との相関へ、`status`は受理へ、
-//!   event（`head_touched`、`tapped`、`lifted`、`environment`）は現在sessionの判定を
+//!   event（`head_touched`、`tapped`、`shaken`、`lifted`、`environment`）は現在sessionの判定を
 //!   通して呼び出し側へ回し、ESP32→Piで定義されていないtypeは応答せず計上する
 //!   （§3、§4.2〜§4.5、§6、§8）
 //! - `boot`を1件処理してACKを送り返す（outcomeによらず常に。§4.1）。ACKの
@@ -45,7 +45,7 @@ pub enum Received {
         /// 拒否した理由。
         rejection: PeerRejection,
     },
-    /// 現在sessionのevent（`head_touched`、`tapped`、`lifted`、`environment`。§4.2〜§4.5）を
+    /// 現在sessionのevent（`head_touched`、`tapped`、`shaken`、`lifted`、`environment`。§4.2〜§4.5）を
     /// 受けた。**応答は返さない**（§8）。何をするかは呼び出し側が決める。
     Event(Frame),
     /// ESP32→Piで定義されていないtype（`hello`・`ping`・`get_status`・`set_expression`・
@@ -62,7 +62,7 @@ pub enum Received {
 /// | `boot` | [`handle_boot`]へ渡す。ACKは拒否でも返す（§4.1） |
 /// | `ack` | [`PeerSession::correlate_ack`]でPiの要求と相関する。`reply_sid`はこの`Session`の`sid`と照合する。Piの`hello`へのACKも相関する（下記） |
 /// | `status` | [`PeerSession::accept_status`]で受理する。`get_status`への応答かどうかも返す |
-/// | `head_touched`、`tapped`、`lifted`、`environment` | [`PeerSession::accept_event`]で現在sessionかを判定し、[`Received::Event`]にする。応答しない |
+/// | `head_touched`、`tapped`、`shaken`、`lifted`、`environment` | [`PeerSession::accept_event`]で現在sessionかを判定し、[`Received::Event`]にする。応答しない |
 /// | それ以外 | ESP32→Piでは定義されていない。応答せず[`PeerSession::note_undefined_type`]で計上する |
 ///
 /// 拒否と無視は`log::warn!`へ残す。握りつぶさない。
@@ -115,6 +115,7 @@ pub fn handle_frame(
         },
         event @ (Message::HeadTouched(_)
         | Message::Tapped
+        | Message::Shaken
         | Message::Lifted(_)
         | Message::Environment(_)) => match peer.accept_event(envelope.sid) {
             Ok(()) => Received::Event(Frame {

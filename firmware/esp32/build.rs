@@ -1,15 +1,25 @@
 fn main() {
     // No non-default feature selects the product path. Any non-default Cargo
-    // feature uses the existing test path, including future features.
+    // feature except `no-touch-487` uses the existing test path, including future features.
     // This cfg is also emitted for clippy's check-cfg validation.
     println!("cargo:rustc-check-cfg=cfg(deskcat_product_mode)");
+    println!("cargo:rustc-check-cfg=cfg(deskcat_reads_touch)");
+    println!("cargo:rustc-check-cfg=cfg(deskcat_product_led)");
+    // `no-touch-487`だけは製品経路を外さない（touchを読まない製品build。`Cargo.toml`の注記）。
     let test_mode = std::env::vars_os().any(|(name, _)| {
         name.to_str().is_some_and(|name| {
-            name.starts_with("CARGO_FEATURE_") && name != "CARGO_FEATURE_DEFAULT"
+            name.starts_with("CARGO_FEATURE_")
+                && name != "CARGO_FEATURE_DEFAULT"
+                && name != "CARGO_FEATURE_NO_TOUCH_487"
         })
     });
     if !test_mode {
         println!("cargo:rustc-cfg=deskcat_product_mode");
+        // 製品経路のうちtouchを読み、LEDを駆動するもの（`no-touch-487`以外）。
+        if std::env::var_os("CARGO_FEATURE_NO_TOUCH_487").is_none() {
+            println!("cargo:rustc-cfg=deskcat_reads_touch");
+            println!("cargo:rustc-cfg=deskcat_product_led");
+        }
     }
 
     // `IDF_PATH`が設定されていると、`.cargo/config.toml`が`force = true`で固定した

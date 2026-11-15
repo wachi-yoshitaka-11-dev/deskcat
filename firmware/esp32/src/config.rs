@@ -102,6 +102,34 @@ pub const SERVO_PWM_GPIO: u8 = 27;
 #[allow(dead_code)]
 pub const SERVO_PWM_FREQUENCY_HZ: u32 = 50;
 
+/// LEDCへの出力（`set_duty`）と`Limiter`の1 stepを、N tick（制御周期）に1回にするときのN。
+/// [ADR-0027](../../../docs/decisions/0027-servo-output-decimation-for-ledc-update-latency.md)、Issue #708。
+///
+/// **回ごとの実行承認の値ではなく、設計の定数である。**ESP32のLEDCは`ledc_set_duty_and_update`が
+/// 前の更新の効くまで（約40.1〜40.2 ms。2回目のPWMの周期の頭）critical sectionの中でbusy-waitする
+/// （ESP-IDF v5.5.3 `ledc.c:1596-1611`）。呼ぶ間隔が約40.2 ms以上ならこの待ちがほぼ起きない。
+/// 制御周期20 msなら2では足りない周がありうるので、3から始める
+/// （`SERVO_OUTPUT_DECIMATION_TICKS × 制御周期 ≥ PWMの周期 × 2`は[`decimation_meets_pwm_floor`]が
+/// compile時に検査する。**これは必要条件であり、十分条件ではない**）。
+/// **2へ変えるときはcodeの変更（Pull Request）で行い、`servo_calib_18_phase_trace`の出力したtickの時間で判断する。**
+#[allow(dead_code)]
+pub const SERVO_OUTPUT_DECIMATION_TICKS: u32 = 3;
+
+/// 間引きの間隔（制御周期の数）が、LEDCの更新の遅れの**必要条件**を満たすか。
+/// `n × 制御周期(ms) × PWM周波数(Hz) ≥ 2000`、つまり`n × 制御周期 ≥ PWMの周期 × 2`。
+///
+/// **十分条件ではない。**実際の更新の遅れ（約40.1〜40.2 ms）を超えるかは、PWMの周期がLEDCの
+/// timer分周の丸めで決まる（約20.06〜20.12 ms）ことと、「2回目の周期の頭」で落ちる理由がTRMで
+/// 未確認なことから、compile時には検査できない。その確認は、出力したtickの時間のlogで行う。
+#[allow(dead_code)]
+pub const fn decimation_meets_pwm_floor(
+    n: u32,
+    control_period_ms: u32,
+    pwm_frequency_hz: u32,
+) -> bool {
+    (n as u64) * (control_period_ms as u64) * (pwm_frequency_hz as u64) >= 2_000
+}
+
 /// パルス幅の下限（マイクロ秒、約1 ms）。一般値。根拠は`SERVO_PWM_FREQUENCY_HZ`と同じ。
 #[allow(dead_code)]
 pub const SERVO_PULSE_WIDTH_MIN_US: u32 = 1_000;
@@ -142,6 +170,72 @@ pub const SERVO_BENCH_TEST_ARM_DELAY_MS: u32 = 10_000;
 /// （ミリ秒）。安全な保持時間の主張ではなく露出時間の最小化。
 #[allow(dead_code)]
 pub const SERVO_BENCH_TEST_EXPOSURE_MS: u32 = 300;
+
+// `bench-servo-calib-18`（#18の校正build）のbuild定数。仕様は
+// [servo-safety-limits.md](../../../docs/hardware/servo-safety-limits.md)の`#18の校正（案）`の
+// `校正buildの仕様（案）`節の表（定数の意味、決め方、出所はそこが正本。**ここへ写さない**）。
+//
+// **どの定数にも値を置かない（`None`）。**「運用上の値」を含め、既定値を置かない。**回ごとの実行承認が
+// 決めた値を、その回の版として`Some(..)`で書く**（`承認の状態`の項目6の(c)）。**値が1つでも`None`の間、
+// このfeature付きのbuildは、`servo_calib`の定数の評価（`calib_18_required`の`panic!`）で
+// compileが止まる。**型検査やhost testのための値を、この形で置かない。
+//
+// 単位は名前のとおり（`_DEG`は角度規約の度、`_MS`はミリ秒、`_S`は秒、`_DEG_S`は度毎秒、`_DEG_S2`は度毎秒毎秒）。
+
+/// limiterの承認値の位置範囲の下端。hard boundも同じ値にする。
+#[cfg(feature = "bench-servo-calib-18")]
+pub const SERVO_CALIB_18_APPROVED_MIN_DEG: Option<f32> = None;
+/// limiterの承認値の位置範囲の上端。hard boundも同じ値にする。
+#[cfg(feature = "bench-servo-calib-18")]
+pub const SERVO_CALIB_18_APPROVED_MAX_DEG: Option<f32> = None;
+/// `LimitedServo::new`へ渡す起動時の位置。
+#[cfg(feature = "bench-servo-calib-18")]
+pub const SERVO_CALIB_18_START_DEG: Option<f32> = None;
+/// `ServoLimits::new`へ渡すneutral。
+#[cfg(feature = "bench-servo-calib-18")]
+pub const SERVO_CALIB_18_NEUTRAL_DEG: Option<f32> = None;
+/// 単一commandの最大変化量（`Cap`の承認値。hard boundも同じ値にする）。
+#[cfg(feature = "bench-servo-calib-18")]
+pub const SERVO_CALIB_18_MAX_STEP_DEG: Option<f32> = None;
+/// limiterの速度上限（`Cap`の承認値。hard boundも同じ値にする）。
+#[cfg(feature = "bench-servo-calib-18")]
+pub const SERVO_CALIB_18_MAX_VELOCITY_DEG_S: Option<f32> = None;
+/// 「目標へ着いた」と判定する、位置と目標の差。
+#[cfg(feature = "bench-servo-calib-18")]
+pub const SERVO_CALIB_18_REACHED_TOLERANCE_DEG: Option<f32> = None;
+/// limiterの加速度上限（`Cap`の承認値。hard boundも同じ値にする）。
+#[cfg(feature = "bench-servo-calib-18")]
+pub const SERVO_CALIB_18_MAX_ACCELERATION_DEG_S2: Option<f32> = None;
+/// `ControlPeriod`の公称。
+#[cfg(feature = "bench-servo-calib-18")]
+pub const SERVO_CALIB_18_CONTROL_PERIOD_NOMINAL_MS: Option<u32> = None;
+/// `ControlPeriod`の許容幅。
+#[cfg(feature = "bench-servo-calib-18")]
+pub const SERVO_CALIB_18_CONTROL_PERIOD_TOLERANCE_MS: Option<u32> = None;
+/// 1 commandの露出時間の上限（移動時間を含む）。
+#[cfg(feature = "bench-servo-calib-18")]
+pub const SERVO_CALIB_18_EXPOSURE_MS: Option<u32> = None;
+/// 1回の起動で受理するmotion commandの数。
+#[cfg(feature = "bench-servo-calib-18")]
+pub const SERVO_CALIB_18_MAX_COMMANDS: Option<u32> = None;
+/// 前のcommandが終わってから、次を受けるまでの最短間隔。
+#[cfg(feature = "bench-servo-calib-18")]
+pub const SERVO_CALIB_18_MIN_COMMAND_INTERVAL_MS: Option<u32> = None;
+/// `GO18`から回を打ち切るまでの時間。
+#[cfg(feature = "bench-servo-calib-18")]
+pub const SERVO_CALIB_18_MAX_SESSION_S: Option<u32> = None;
+
+/// `SERVO_CALIB_18_*`の値を取り出す。**`None`（未設定）のとき、定数の評価が失敗し、compileが止まる。**
+/// 失敗の表示は、評価していた定数の名前（`crate::servo_calib`の同名の定数）を指す。
+#[cfg(feature = "bench-servo-calib-18")]
+pub const fn calib_18_required<T: Copy>(value: Option<T>) -> T {
+    match value {
+        Some(value) => value,
+        None => panic!(
+            "SERVO_CALIB_18_*が未設定である。回ごとの実行承認が決めた値を、config.rsへ書いてからbuildする"
+        ),
+    }
+}
 
 /// Pi link（`PI-UART-TX`／`PI-UART-RX`）のbaud（Hz）。
 /// **確定値ではない。**`docs/protocol/esp32-pi-protocol.md`§2の`Baud`行が`Candidate`
@@ -241,11 +335,11 @@ pub const PI_PROTOCOL_UART_EVENT_QUEUE_LEN: usize = 32;
 /// `LED-COMM`（白、[Issue #514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)）の
 /// GPIO番号。出所は[gpio-assignment.md](../../../docs/hardware/gpio-assignment.md)の`信号inventory`。
 /// `SERVO_PWM_GPIO`と同じく確認用途のみ（[`crate::led::Leds::new`]の`debug_assert_eq!`。debug buildだけ）。
-#[cfg(feature = "bringup-led-514")]
+#[cfg(any(feature = "bringup-led-514", deskcat_product_led))]
 pub const LED_COMM_GPIO: u8 = 2;
 
 /// `LED-REACT`（赤、#514）のGPIO番号。出所と用途は[`LED_COMM_GPIO`]と同じ。
-#[cfg(feature = "bringup-led-514")]
+#[cfg(any(feature = "bringup-led-514", deskcat_product_led))]
 pub const LED_REACT_GPIO: u8 = 5;
 
 /// `LED-COMM`の点滅周期（milliseconds）。半分ずつ点灯と消灯にする。
@@ -256,7 +350,7 @@ pub const LED_REACT_GPIO: u8 = 5;
 /// [Hardware Safety Policy](../../../docs/governance/hardware-safety-policy.md)の安全要件5項目の
 /// いずれにも効かない（**どの値が5項目に効くかの判定は同policyが正本であり、ここへ再掲しない**）。
 /// **2以上の偶数**であること（[`crate::led`]の割り算の前提。`led.rs`のconst assertが検査する）。
-#[cfg(feature = "bringup-led-514")]
+#[cfg(any(feature = "bringup-led-514", deskcat_product_led))]
 pub const LED_BLINK_PERIOD_MS: u32 = 1_000;
 
 /// 起動時の点灯試験で、赤だけ・白だけ・両方の各区間を保つ時間（milliseconds）。
@@ -265,6 +359,17 @@ pub const LED_BLINK_PERIOD_MS: u32 = 1_000;
 /// （[led-514-demo.md](../../../docs/hardware/led-514-demo.md)の`段階的な確認`）。
 /// **一般値である。**外した場合の帰結は「試験をやり直す」に留まり、安全要件5項目に効かない。
 /// 3区間の合計（この値の3倍）だけ、白の点滅が始まるのが遅れる。
-/// 0にしない（`led.rs`のconst assertが検査する）。
-#[cfg(feature = "bringup-led-514")]
+/// 0にしない（`led.rs`のconst assertが検査する）。点灯試験を行うのは`bringup-led-514`付きbuildだけである
+/// （製品buildはこの値を使わない）。
+#[cfg(any(feature = "bringup-led-514", deskcat_product_led))]
 pub const LED_LAMP_TEST_HOLD_MS: u32 = 10_000;
+
+/// `happy`の受理で`LED-REACT`（赤）を点ける時間（milliseconds）。
+///
+/// **一般値である。**値は[led-514-demo.md](../../../docs/hardware/led-514-demo.md)の`役割と表示`が選んだ
+/// 1秒であり、一次資料に基づかない。表示の長さは流れる電流を変えず（電流は直列抵抗`R`が決める）、
+/// 外した場合の帰結は見え方が変わるだけなので、
+/// [Hardware Safety Policy](../../../docs/governance/hardware-safety-policy.md)の安全要件5項目の
+/// いずれにも効かない（**どの値が5項目に効くかの判定は同policyが正本であり、ここへ再掲しない**）。
+#[cfg(any(feature = "bringup-led-514", deskcat_product_led))]
+pub const LED_REACT_PULSE_MS: u32 = 1_000;

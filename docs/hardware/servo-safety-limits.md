@@ -232,8 +232,8 @@ field単位の正は[TBD台帳](tbd-register.md)に定義しており、一部�
 
 駆動してよいのは、次をすべて満たすときだけである。
 
-- **電源:** 項目6の(a)の構成（`M-12001`を試験の間だけservo専用にし、予備の`MF-R135`を直列に入れる。Piは外す。ESP32はPCのUSBから給電する。servo電源の経路は端子台と線材で組み、breadboardとjumper wireを使わない）。
-- **build:** 測定用のbuildだけを使い、**Piとの通信linkを持たない。**初回（#17）は、1回の起動で1 commandだけを出し、動作角を狭い仮の制限でclampし、露出時間の後にdutyを0へ戻し、NVSのlatchで再実行を止めるbuildを使う（下の`初回動作の実行手順`の`build`と`単発動作`）。**#18の校正と#19の実機limiter試験で使うbuild（複数のcommandやlimiterを通す駆動）は、その動作と仮の制限をこの文書に書いたうえで、その回の実行承認で範囲を決める。**firmwareの変更と`compile_error!`の扱いは、項目5の、外す注記を挙げた段落（「再開の条件は、この節では定めない。」で始まる段落）とその後の2026-09-30追記の手順に従う別のPull Requestで行う（2026-10-13に行った。[承認の状態](#承認の状態)の項目6の(b)の記録）。
+- **電源:** 項目6の(a)の構成（`M-12001`を試験の間だけservo専用にし、予備の`MF-R135`を直列に入れる。Piは外す。ESP32はPCのUSBから給電する。servo電源の経路は端子台と線材で組み、breadboardとjumper wireを使わない（#18の段0・段1は、servoのplugへ行く2本のjumper wireとシャントだけを除く。段2は`PSU-BENCH-01`の CC の間に限り同じ。breadboardは通さない。[#18の校正（案）](#18の校正案)の段0の2と[#18の段2（案）](#段234-の頭を付け可動域を片側ずつ広げる)））。
+- **build:** 測定用のbuildだけを使い、**Piとの通信linkを持たない。**初回（#17）は、1回の起動で1 commandだけを出し、動作角を狭い仮の制限でclampし、露出時間の後にdutyを0へ戻し、NVSのlatchで再実行を止めるbuildを使う（下の`初回動作の実行手順`の`build`と`単発動作`）。**#18の校正と#19の実機limiter試験で使うbuild（複数のcommandやlimiterを通す駆動）は、その動作と仮の制限をこの文書に書いたうえで、その回の実行承認で範囲を決める。**（#18の分の動作と仮の制限の案は[#18の校正（案）](#18の校正案)。承認していない。）firmwareの変更と`compile_error!`の扱いは、項目5の、外す注記を挙げた段落（「再開の条件は、この節では定めない。」で始まる段落）とその後の2026-09-30追記の手順に従う別のPull Requestで行う（2026-10-13に行った。[承認の状態](#承認の状態)の項目6の(b)の記録）。
 - **負荷:** 初回は無負荷（ホーンを外す）。頭を載せる駆動（#18の校正）は、その回の実行承認で範囲を決める。
 - **監視:** 人間が立ち会い、`M-12001`を直ちに抜ける状態を保つ。無人で続けない。停止基準は`初回動作の実行手順`の`停止基準`に従う。
 
@@ -244,7 +244,7 @@ field単位の正は[TBD台帳](tbd-register.md)に定義しており、一部�
 | `HW-TBD-007`（電源とpower budget） | servoは専用の`M-12001`から給電し、ESP32はPCのUSBから給電する。servoの電流でESP32の電源が落ちる経路を作らない |
 | `HW-TBD-009`（backfeed） | 解決しない。servoとESP32が共有するのは信号線とGNDだけである。残余riskとして`初回動作の実行手順`に記録する |
 | `HW-TBD-010`／`HW-TBD-011`（可動域、速度・加速度） | この駆動が測る対象である。値が決まるまでは、狭い仮の制限で駆動する（初回は単発command。#18・#19はそのbuildに書く仮の制限） |
-| `HW-TBD-035`（servoへ入れてよい電圧） | 解決しない。`M-12001`の5 Vを監視下で入れて観察する（同行の解決手段(3)にあたる）。同行は(3)が`HW-TBD-007`／`009`のgateに従うとするが、この例外の中では、その2行を上の行の扱いで代える（どちらも解決はしていない） |
+| `HW-TBD-035`（servoへ入れてよい電圧） | 解決しない。`M-12001`の5 Vを監視下で入れて観察する（同行の解決手段(3)にあたる）。同行は(3)が`HW-TBD-007`／`009`のgateに従うとするが、この例外の中では、その2行を上の行の扱いで代える（どちらも解決はしていない）。**段1（`PSU-BENCH-01`）では、入れる電圧は小節の4が持つ**（回ごとの承認が置く値で、上限は5 V）。扱いはこの行のとおりで、監視下で観察し、解決はしない（4.8 V など5 V 未満を置いても、同じ扱いである） |
 | `HW-TBD-026`（logic閾値、PWM周期、pulse幅） | 解決しない。一般的な値で駆動し、観察を記録する |
 | `HW-TBD-017`／`018`（通信断） | 該当しない。測定用のbuildはPiとの通信linkを持たない |
 | `HW-TBD-019`／`HW-TBD-027`（起動時の状態、外部pull-down） | 解決しない。`RES-PULL-01`の実装状況を`通電前の現物確認`で記録する |
@@ -378,7 +378,7 @@ recovery／reconnect動作は`HW-TBD-018`の範囲に含める。fail-safe seque
      `PSU-SERVO-01`のRevision 5）、分岐点の接続部材と上流の過電流保護部品
      （`PROT-OC-01`）の物理的な実装・検証状況は、下記残余riskのとおり
      `通電前の現物確認`まで確認できないこと。
-4. **ユーザーから「進めてよい」の回答を得た。**この回答は2026-09-22の当初承認
+4. **ユーザーから、承認の回答を得た。**この回答は2026-09-22の当初承認
    （上記1）の範囲（本手順1回分に限る、単発command、繰り返しなし）を変えずに、
    その不備（上記2）を補うものである。**以後、この節の状態は「進めてよい」として
    扱う。**この状態は、`単発動作`が1回実行されるか、`停止基準`により中止される
@@ -406,7 +406,7 @@ gate表のいずれの行も解決していない。動かなかった場合、�
 
    **2026-09-30追記（[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)のPR B1）: 上の「`pi-protocol-mode`との排他の`compile_error!`とその注記は残し」の`compile_error!`は、もう無い。**#487で`pi-protocol-mode` featureを廃止し、Piとの通信link（UART1）を製品build（既定build）へ入れたためである。**測定用のbuild（`bench-servo-test-17`）がPiとの通信linkを持たないこと（[測定のための駆動](#測定のための駆動承認の状態の項目6)の`build`）は、`firmware/esp32/src/main.rs`の`#[cfg(not(feature = "bench-servo-test-17"))]`で保っている**（このfeature付きbuildはPi link（`crate::boot_session`とUART1）をcompileしない）。**再開のときに外すのは、#474の`compile_error!`とその注記だけである。**ただし、このfeature付きbuildは#474の`compile_error!`があるためbuildしておらず、#487でmain loopを組み替えた後に、外してcompileが通るかは確かめていない。この項目5の本文は、当時の記録として書き換えていない。
 
-6. **2026-09-28、ユーザーが初回駆動の方法を決めた（[#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)）。**判断者はユーザー（wachi-yoshitaka-11-dev）であり、決定の記録は#17のコメントにある。**あわせてユーザーは、項目5の「実行しない」について「そのルールを出していない」と述べた**（#17、[#488](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/488)）。**上の1〜5の記録は書き換えていない。**
+6. **2026-09-28、ユーザーが初回駆動の方法を決めた（[#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)）。**判断者はユーザー（wachi-yoshitaka-11-dev）であり、決定の記録は#17のコメントにある。**あわせてユーザーは、項目5の「実行しない」について述べた（内容は記録しない（ai-agent-policy.md））**（#17、[#488](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/488)）。**上の1〜5の記録は書き換えていない。**
 
    決定の内容は次のとおりである。
    - #17（電気特性）、#18（可動域・速度・加速度の校正）、#19（実機limiterの監視下試験）は、**servo専用の別電源に故障電流を制限する手段を置いて、はんだ付け（[#405](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/405)）より前に行う。**`PROT-OC-01`の実装を待たない。
@@ -430,7 +430,7 @@ gate表のいずれの行も解決していない。動かなかった場合、�
        `M-12001`の短絡時の特性は公開されていない（[#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)の2026-09-28の調査コメント）。
        **したがって短絡時に実際に電流を止める手段は、人間が電源を抜くことである。**この試験は人間の監視を前提とし、無人で続けない。
        **ただし人間が電源を抜くのでは、配線と接点の発熱に間に合わないことがある。**[Hardware Safety Policy](../governance/hardware-safety-policy.md)の`安全要件の5項目`の「短絡」は、connectorと線材の発熱は秒から分のorderで進み、人が読み取って電源を落とすのでは止まらない、としている。
-     - **経路の部品（2026-09-28、CodeRabbitの指摘を受けて追加）:** 上の弱点を小さくするため、servo電源の経路は`M-12001`の出力定格3 Aに耐える手持ちの部品だけで組む。端子台（`114217`、定格6 A。[hardware-bom.md](hardware-bom.md)の`WIRE-PWR-01`）と線材（`111641`、AWG22相当。servo railの5 V線として周囲30 ℃・2条密着で約6.6 A。[power-budget.md](power-budget.md)の`経路部品と定格`）を使い、**breadboardとjumper wireをservo電源の経路に使わない。**`MF-R135`の`Imax`は40 Aである（同datasheet）。**これで経路が守れるのは、短絡時の電流が`M-12001`の出力定格3 Aを超えない場合だけである。**`M-12001`の短絡時の特性は公開されていない（上記）。**servo本体のリード線とconnectorの定格は資料が無く、弱点として残る。**
+     - **経路の部品（2026-09-28、CodeRabbitの指摘を受けて追加）:** 上の弱点を小さくするため、servo電源の経路は`M-12001`の出力定格3 Aに耐える手持ちの部品だけで組む。端子台（`114217`、定格6 A。[hardware-bom.md](hardware-bom.md)の`WIRE-PWR-01`）と線材（`111641`、AWG22相当。servo railの5 V線として周囲30 ℃・2条密着で約6.6 A。[power-budget.md](power-budget.md)の`経路部品と定格`）を使い、**breadboardとjumper wireをservo電源の経路に使わない。**`MF-R135`の`Imax`は40 Aである（同datasheet）。**これで経路が守れるのは、短絡時の電流が`M-12001`の出力定格3 Aを超えない場合だけである。**`M-12001`の短絡時の特性は公開されていない（上記）。**servo本体のリード線とconnectorの定格は資料が無く、弱点として残る。** **2026-11-03追記：**#18の段0・段1は、この条件のうち、servoのplugへ行く2本のjumper wireとシャントだけを例外とする。breadboardは通さない（[#18の校正（案）](#18の校正案)の段0の2。ユーザーの決定）。**2026-11-11追記：**段2も、`PSU-BENCH-01`の CC の間に限り、同じ例外とする（[#18の段2（案）](#段234-の頭を付け可動域を片側ずつ広げる)。ユーザーの決定）。
      - 配線の方法（PTCの置き場所、GNDの共通化の方法）は、(b)では決めていない。初回の実行承認（(c)）を求めるときに、配線図とあわせて示す。
      - **ジャンパー線（2026-10-17追記。[EXP-028](experiment-log.md#exp-028-sg90の初回のサーボ動作の試み測定用buildジャンパー線の接続2回試みた)）:** 上の「経路の部品」の条件（breadboardとjumper wireをservo電源の経路に使わない）は、AIが2026-09-28のPR #500で、CodeRabbitの指摘を受けて足したものである。ユーザーの継続承認の範囲に書いてあるのは、breadboardを通さない条件だけであり、jumper wireは無い（[#17のcomment 5870421147](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-5870421147)の`範囲`の(2)）。jumper wireを使わない条件は、AIがPR #500のdiffで、その範囲の外へ足したものである。**この条件は、この追記では書き換えない。**EXP-028では、ユーザーの決定（[#17のcomment 6222108076](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6222108076)。#17の初回のサーボ動作とその前後の確認）で、サーボ電源の経路（端子台Sとサーボのplugの穴のあいだ）に、両端オスのジャンパー線を使った。**この条件と食い違ったまま使った。**ジャンパー線の導体の太さと定格は、記録に無い。この条件の目的は、短絡や拘束のときに、経路が発熱しないことである。EXP-028の時点で、その目的に対して置いたものは、直列のPTC（`MF-R135`。3 A付近でtripが遅い）、人間の立ち会いとACプラグを直ちに抜けること（上の弱点のとおり、配線と接点の発熱に間に合わないことがある）、単発300 ms、停止基準である。ジャンパー線の導体が耐える電流は、記録に無く、PTCの特性や`M-12001`の出力定格3 Aと比べられない（未確認）。短絡や拘束での発熱は、検証していない。EXP-028では、端子台Sの−の穴に3導体（黒い線、サーボの茶のジャンパー線の針、ESP32のGNDのジャンパー線の針）を入れた。ジャンパー線の針の断面積は記録に無く、0.64 mm角と仮定した計算では、1つの穴の導体の断面積の合計の目安（AWG18＝0.8230 mm²）を超える。引いて抜けないことは、ユーザーの申告である
      - **サーボの線の並び（2026-10-17追記。[EXP-028](experiment-log.md#exp-028-sg90の初回のサーボ動作の試み測定用buildジャンパー線の接続2回試みた)）:** 赤＝＋5 V、茶＝GND、黄＝信号は、**慣行であり、仮説である。**メーカー（TowerPro）の資料に線の説明は無く（作業セッションが2026-10-14に取得して読んだ、公式のSG90 Digitalと Analogの製品ページの記載は、`Servo Plug: JR (Fits JR and Futaba)`と`servo wire length: 25 cm`まで。取得したHTMLのsha256の先頭16桁は、Digitalが`ba35a5dd53879b20`、Analogが`b243fb8a28371761`）、袋・同梱物・本体にも説明は無い（ユーザーの申告。[#17のcomment 6166559786](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6166559786)）。無電源の抵抗の測定は、黄−茶＝約13 kΩ（向きを替えても同じ）、赤は黄・茶の両方に対して両方向とも開放（`OL`）だった。電流制限つきの通電（電源の経路に330 Ωを入れた）で、端子台Sの＋−間が+2.10 V（赤の穴の側が高い向き）、330 Ωの両端が+3.22 V（`3.22 V÷330 Ω`の資料値の計算で約9.8 mA）だった。**これらは、慣行と矛盾しない、までである。並びを確定させる実測は無い。**ユーザーの決定（[#17のcomment 6222108076](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6222108076)。測定せず、慣行を決定とする）は、出所として残す。**この決定は、[Hardware Safety Policy](../governance/hardware-safety-policy.md)が一次資料または実測を要する水準の根拠ではなく、この記録は、その水準の例外として置いたものではない。**並びが違えば、サーボが壊れうるほか、信号の線からESP32のGPIO27へ5 Vが加わりうる（信号用の330 Ωに5.0 Vが加わり、GPIO27がLowを出力している場合、電流は約15.2 mA、記録の5.35 Vなら約16.2 mAとなりうる。これは計算上の可能電流であり、安全な許容電流ではない。ESP32のclamp電流の許容値は未確認）
@@ -635,7 +635,7 @@ firmware（`firmware/esp32/src/servo.rs`、
    [experiment-log.md](experiment-log.md)へまとめて記録する）。**
    (a) この試験でRaspberry Pi（`PSU-PI-01`）が`PSU-SERVO-01`と同じM-12001に接続されて
    いるか。(b) `PROT-OC-01`（過電流保護PTC）がこの経路に物理的に入っているか。
-   **2026-09-28追記: 項目6の構成では、(a)はPiが`M-12001`から外れていること、(b)は予備の`MF-R135`がservo電源の経路に直列に入っていること、あわせてservo電源の経路が端子台と線材だけで組まれ、breadboardとjumper wireを通っていないことを確認する。**どれかを満たさなければ、servoの電源を入れずに報告する。
+   **2026-09-28追記: 項目6の構成では、(a)はPiが`M-12001`から外れていること、(b)は予備の`MF-R135`がservo電源の経路に直列に入っていること、あわせてservo電源の経路が端子台と線材だけで組まれ、breadboardとjumper wireを通っていないことを確認する（#18の段0・段1は、servoのplugへ行く2本のjumper wireとシャントだけを除く。段2は`PSU-BENCH-01`の CC の間に限り同じ。breadboardは通さない。[#18の校正（案）](#18の校正案)の段0の2と[#18の段2（案）](#段234-の頭を付け可動域を片側ずつ広げる)）。**どれかを満たさなければ、servoの電源を入れずに報告する。
    (c) `RES-PULL-01`（GPIO27の外部pull-down、4.7 kΩ）が現物に実装されているか。
    (d) `DISP-01`（MSP2807）がESP32の`3V3` pinへ接続されていないことを確認する。
    `HW-TBD-024`は2026-09-23（[#461](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/461)）で
@@ -692,7 +692,7 @@ firmware（`firmware/esp32/src/servo.rs`、
    `Sg90::stop`までの短い間（既定300 ms）はduty出力が残っており、「`arm delay`を
    過ぎたら絶対に動かない」とは言えない（`停止基準`の「動かなかった場合」はこの
    windowも逃した場合を含む）。
-   **2026-10-17追記（[EXP-028](experiment-log.md#exp-028-sg90の初回のサーボ動作の試み測定用buildジャンパー線の接続2回試みた)。実施の記録で、この手順を変えるものではない）:** 書き込みを`espflash flash --after no-reset`で行った直後は、ENを押したあとの出力が無く、`espflash reset`のあとにダウンロードモードの出力（`boot:0x3 (DOWNLOAD_BOOT...)`、`waiting for download.`）が出た。1回目の試みは、この状態だった可能性が高い（起動ログが無く、確かめていない）。pyserialでDTRを解除し、RTSでリセットを保持・解除すると、appが起動した。記録用の読み取りは、pyserialでポートを開くと、開いた直後にESP32がリセットされる。`stty -hupcl`を指定して`cat`で読むと、起動中のappの出力は読めて、リセットの出力は出なかった。2回目の試みは、ESP32をリセットしたままサーボの電源を先に入れ、そのあとでリセットを解除して起動した。**この順序は、当時のこのstepの本文（logを待ち、arm delayの間に外部5 V電源を入れる。同日の`GO17`の変更より前の版）の外である**（EXP-028は`手順書からの逸脱2`として書いている）。作業セッションの案を、PMが了承し（VMも了解）、ユーザーの指示（原文「覚えてないから再計測白」）の範囲として、作業セッションが書き添えた（[#17のcomment 6224969168](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6224969168)。「順序を変える：ユーザーが先にACを挿し…そのあとでENを押す」は、作業セッションの文で、ユーザーが見て違えば止める、と書いた）。この間、GPIO27は未設定で、実際のレベルとpull-downの有無は確かめていない。**この追記は、順序の変更を手順として認めるものではない**
+   **2026-10-17追記（[EXP-028](experiment-log.md#exp-028-sg90の初回のサーボ動作の試み測定用buildジャンパー線の接続2回試みた)。実施の記録で、この手順を変えるものではない）:** 書き込みを`espflash flash --after no-reset`で行った直後は、ENを押したあとの出力が無く、`espflash reset`のあとにダウンロードモードの出力（`boot:0x3 (DOWNLOAD_BOOT...)`、`waiting for download.`）が出た。1回目の試みは、この状態だった可能性が高い（起動ログが無く、確かめていない）。pyserialでDTRを解除し、RTSでリセットを保持・解除すると、appが起動した。記録用の読み取りは、pyserialでポートを開くと、開いた直後にESP32がリセットされる。`stty -hupcl`を指定して`cat`で読むと、起動中のappの出力は読めて、リセットの出力は出なかった。2回目の試みは、ESP32をリセットしたままサーボの電源を先に入れ、そのあとでリセットを解除して起動した。**この順序は、当時のこのstepの本文（logを待ち、arm delayの間に外部5 V電源を入れる。同日の`GO17`の変更より前の版）の外である**（EXP-028は`手順書からの逸脱2`として書いている）。作業セッションの案を、PMが了承し（VMも了解）、ユーザーの指示（内容は記録しない（ai-agent-policy.md））の範囲として、作業セッションが書き添えた（[#17のcomment 6224969168](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6224969168)。「順序を変える：ユーザーが先にACを挿し…そのあとでENを押す」は、作業セッションの文で、ユーザーが見て違えば止める、と書いた）。この間、GPIO27は未設定で、実際のレベルとpull-downの有無は確かめていない。**この追記は、順序の変更を手順として認めるものではない**
 7. **`監視維持`（人間、`起動とarm delay`と並行して行う）** `起動とarm delay`の
    電源投入と同時に、直ちに遮断できる状態を維持する（別のstepとして順番に行う
    ものではない）。動作の合図は人間の`GO17`の入力だけであり、AIへの実行指示は無い
@@ -767,6 +767,255 @@ firmware（`firmware/esp32/src/servo.rs`、
     含む）を[experiment-log.md](experiment-log.md)へ新しいEXP番号（着手時点で未使用の
     次番号）で記録する。観察から確定値を導かない。calibrationとgate解決は別途進める。
 
+## #18の校正（案）
+
+> **案である。まだ誰も承認していない。**[測定のための駆動](#測定のための駆動承認の状態の項目6)の`build`の項が求める、#18の校正で使うbuildの**動作と仮の制限**の下書きである。**手順は段0・段1と、段2の条件を書く**（下の「手順・停止基準・受け入れ条件」）。段2は #34 の頭（最終の荷重）を付ける段である。それより先の段は、別のPull Requestで足す。
+> 承認の状態は[承認の状態](#承認の状態)が持つ（ここへ再掲しない）。**この節が書いてあることは、駆動してよいことを意味しない。**駆動の回ごとの実行承認（項目6の(c)）が要る。
+> firmwareの実装は別のPull Requestで行い、**この節がmergeされた後に着手する。この節の「校正buildの仕様」だけを仕様にする。**buildの名前（feature名）は`bench-servo-calib-18`を案とする。
+> **値は「出所あり」（記録を指す）、「運用上の値」（出所は無い。監視下の測定のための仮の制限で、回ごとの実行承認が決める。5項目の根拠にはしない。小さい側・短い側へ倒した）、「TBD」（決め方を書く）に分ける。AIの記憶では決めない。**
+
+### 前提（出所つきの事実。#17）
+
+| 項目 | 値 | 限界・出所 |
+|---|---|---|
+| 指令して動いた範囲 | 角度規約（一般値。確定値ではない）の90°と105°。無負荷（ホーンなし）、露出300 ms | 規約上の90°が機械的中央かは未確認。[EXP-028](experiment-log.md#exp-028-sg90の初回のサーボ動作の試み測定用buildジャンパー線の接続2回試みた)、[EXP-045](experiment-log.md)、[EXP-049](experiment-log.md)、[#17の判定comment 6474881537](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6474881537) |
+| 動いた向きと量 | 時計回り（軸を上から見て）、90°指令で約90°、105°指令で約105°（ユーザーの申告） | 目視。動く前の位置は不明。**機械的中央・可動域の根拠にしない** |
+| PWM（実測） | 周期19.97〜20.07 ms、パルス幅1.56〜1.66 ms（16パルス、301.5 ms） | 刻み約0.104 ms。[EXP-030](experiment-log.md)の段1・段1b |
+| 電流（無負荷） | AC投入 約0.51〜0.73 A、動作 約0.76〜0.86 A（山の幅 約144 ms） | 絶対値の確度は主張しない。[#17の判定comment 6474451236](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6474451236)。連続電流との比較は、範囲を広げる段のPull Requestで書く |
+| 熱・異音・唸り | 無し（ユーザーの申告） | 荷重をかけた駆動は未実施 |
+| 速度・加速度・stall電流 | **取っていない** | 無負荷の単発のみ。stall電流は取らない方針（[#17の判定comment 6474881537](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17#issuecomment-6474881537)の(d)）。**stall電流の実測は、`HW-TBD-010`／`011`で引き続き必要であり、未解決**（[tbd-register.md](tbd-register.md)） |
+| 首の固定 | 発泡スチロールの天板に帯で固定。ホーンは軸に嵌めていない。頭の荷重は未確認 | [EXP-054](experiment-log.md#exp-054-首の固定方法を発泡スチロールの天板と底板に非通電で当てた)、[enclosure-and-neck.md](enclosure-and-neck.md) |
+
+### 校正buildの仕様（案）
+
+**firmwareの実装はこの節だけを仕様にする**（実装の担当は、この節の変更が`develop`へmergeされた後に着手する）。実装に要ることはここへ書く。**値は「出所あり」「運用上の値」「TBD」に分ける。「運用上の値」は出所が無く、監視下の測定のための仮の制限であり、回ごとの実行承認が決める。5項目の根拠にはしない（実行承認は小さくしてよい。大きくするときは、直前の回の記録を根拠に示す）。いずれも、build定数として回ごとの実行承認が決める**（下の「build定数」）。この分け方は実機側のPMの決定（2026-11-03）による。
+
+**名前と構成**
+
+| 項目 | 仕様 |
+|---|---|
+| feature名 | **`bench-servo-calib-18`**（案。`firmware/esp32/Cargo.toml`の`[features]`へ`bench-servo-calib-18 = []`。他のfeatureを含まない） |
+| Pi link | **持たない。**`crate::boot_session`とUART1を、このfeatureのbuildでcompileしない。`bench-servo-test-17`と同じく、`#[cfg(not(feature = "bench-servo-calib-18"))]`で外す（製品経路の`cfg`も外れる） |
+| 併用 | **単独の試験buildとして使う。**他の試験feature（`bench-servo-test-17`、`bench-servo-90-17`、`tap-21`、`debug-motion-19`、`mem-probe-23`、`bringup-*`、`*-sample-*`、`touch-*`、`face-21`ほか）と併用できない（`compile_error!`で理由を示して止める。`main.rs`の既存の同種の止め方に合わせる）。LCD（`DISP-01`）は通電しない（`通電前の現物確認`(d)） |
+| 製品build | 変えない。featureを付けない通常buildは、`crate::servo`を呼ばず、GPIO27を駆動しない |
+| servoを駆動する型 | **`LimitedServo`（`Limiter`を通る）だけを使う。**`Sg90::move_to_angle_once`（limiterを通らない）をこのbuildから呼ばない。`bench-servo-test-17`の`GO17`・NVSのlatch・単発の経路をこのbuildへ持ち込まない |
+| `Sg90::new`を呼ぶ時点 | `GO18`の入力を受けた後。それまでGPIO27は未設定のまま（#17と同じ） |
+
+**build定数（`firmware/esp32/src/config.rs`の`SERVO_CALIB_18_*`）。**値は**回ごとの実行承認**が決める。実行承認で決まった値を書いたものが、その回のfirmwareの版になる（書き換えはその回の承認の範囲で行い、`承認の状態`の項目6の(c)に従う）。**値が未設定の間、このfeature付きの実機buildができてはならない**（`compile_error!`等。型検査・host testのための値を、実機buildに入る形で置かない。方法は実装が決めてPR本文に示す）。
+
+| 定数 | 意味 | 値 | 決め方・出所 |
+|---|---|---|---|
+| `APPROVED_MIN_DEG`／`APPROVED_MAX_DEG` | limiterの承認値の位置範囲（角度規約の度）。hard boundも同じ値にする（範囲を変える＝再build・再flash） | **TBD**（回ごと） | **範囲は、全ての回で、実測した機構の制限（非通電で手で測る）からmarginを引いた位置の内側でなければならない**（広げる回に限らない）。**ホーンや頭など荷重をかける回は、その状態で測った機構の制限による。**ホーンなしの回（軸の周りに機構が無い回）は、**#17で指令して動いた90°〜105°の内側**で足りる（`APPROVED_MAX_DEG`が105°を含む）。測り方とmarginの決め方は範囲を広げる段のPull Requestで書く。その外へ広げる量は、直前の回の記録を見て、その回の実行承認が決める。位置範囲の不変条件は、既存のlimiterが検査する |
+| `START_DEG` | `LimitedServo::new`へ渡す起動時の位置（承認値の範囲の内側） | **TBD**（回ごと） | 前の回の最後のlogの`position_deg`を第一にする。人が目盛で読んだ位置と食い違ったら、その回の実行承認で扱う。**最初の回は105°**（[EXP-049](experiment-log.md)の指令値。到達位置は未確認）。`APPROVED_MAX_DEG`が105°未満の回は、`START_DEG`を範囲の内側へ合わせる（外だと`LimitedServo::new`が拒否する）。**実機の位置と違えば、最初の出力はlimiterの速度制限を受けない**（`servo.rs`のmodule doc。動く量の上限は、実機の位置が不明なため決まらない。実機の位置が承認値の範囲の外にあれば、範囲の幅を超えうる）**同じ版のまま再起動して`GO18`を入れると、新しい回の`LimitedServo::new`には、flashした時点の`START_DEG`が渡る（前の回の終わりの位置ではない）。**そのため、回が終わった後、次の`GO18`の前に、(i) 前の回の最後のlogの`position_deg`で`START_DEG`を書き換えてflashし直すか、(ii) 人が目盛で軸が`START_DEG`にあることを確かめるか（**(ii)で軸が`START_DEG`にあると確かめられなければ、(i)を行う**）、のどちらかを行う（どちらを行うかは実行承認が決める。buildに、再起動後に`GO18`を受けない仕組みは足さない。NVSを使わない決定と両立しないため） |
+| `NEUTRAL_DEG` | `ServoLimits::new`へ渡すneutral（承認値の範囲の内側でなければならない） | **範囲が90°を含むときは90°**（規約上の仮定。運用上の値）。含まないときは、範囲の内側の値（`START_DEG`と同じでよい） | **検証していない。**機械的neutralとして記録しない（`HW-TBD-010`） |
+| `MAX_STEP_DEG` | 単一commandの最大変化量（`Cap`の承認値） | **2°**（運用上の値。約11 µs。規約の線形変換で） | 実行承認がこの値を大きくする場合も、最初の回は#17で指令した2点の差（15°）を超えない。目盛の読みの分解能より大きいことの確かめ方は、範囲を広げる段のPull Requestで書く |
+| `MAX_VELOCITY_DEG_S` | limiterの速度上限 | **10°/s**（運用上の値） | servoの実際の速度は取っていない。2°の移動は、加速と最初の`tick`の基準取り（出力しない）の分、算術の200 msより長くかかる。収まらなければ6の`exposure_elapsed`。**TBD：上げた後の値**（上げ方と見るものは、範囲を広げる段のPull Requestで書く） |
+| `REACHED_TOLERANCE_DEG` | 「目標へ着いた」と判定する、位置と目標の差 | **TBD**（最初の回の値は実行承認が置く） | LEDCのdutyの1刻みに相当する角度より大きく、`MAX_STEP_DEG`より小さい値 |
+| `MAX_ACCELERATION_DEG_S2` | limiterの加速度上限 | **TBD**（最初の回の値は実行承認が置く） | 手持ちに角加速度を測る手段が無い。**決め方：**最初の回は低い側から置き、行き過ぎ量・追従・音を見て上げる（範囲を広げる段のPull Requestで書く）。`acceleration_bound_conceded`が立たない組み合わせ（速度上限、制御周期との関係）は、実装が`Limiter`の仕様から確かめる。**測っているのは、上限を課したときの様子であり、servoの角加速度そのものではない** |
+| `CONTROL_PERIOD_NOMINAL_MS` | `ControlPeriod`の公称 | **20 ms**（運用上の値。PWM周期に合わせる選択。[EXP-030](experiment-log.md)は、PWM周期の実測19.97〜20.07 msであり、制御周期の出所ではない） | |
+| `CONTROL_PERIOD_TOLERANCE_MS` | `ControlPeriod`の許容幅 | **TBD**（最初の回の値は実行承認が置く） | **最初の回は、この値を決めるための回でもある**（`tick`の間隔をlogに出す）。外れると（各tickの間隔は`LimitedServo`が、窓の間隔は`Limiter`が検査する）rejectしてlatchし、dutyは0になる。間隔はlogに残るので、次の回で値を決める |
+| `EXPOSURE_MS` | 1 commandの露出時間の期限（移動時間を含む。期限は制御の周の単位で判定するため、厳密な上限ではない） | **300 ms以下**（#17で駆動した値〔無負荷・ホーンなし、熱と異音の申告なし。安全の根拠ではない〕。ホーンなしより荷重をかける駆動は**TBD**） | 荷重（ホーン・底板・頭）をかけた値は#17に無い。その回の実行承認が、直前の記録（電流の山、熱、唸り）を見て決める |
+| `MAX_COMMANDS` | 1回の起動で受理するmotion commandの数（N） | **10**（運用上の値） | その回の目的に要るstep数が10を超えるときは、回を分ける（実行承認が決める） |
+| `MIN_COMMAND_INTERVAL_MS` | 前のcommandが終わってから、次を受けるまでの最短間隔 | **5000 ms**（運用上の値） | 人が結果を読む時間。`秒あたり受理command数`（`HW-TBD-020`）の仮の代わり |
+| `MAX_SESSION_S` | `GO18`から回を打ち切るまでの時間 | **TBD**（実行承認が置く） | 運用上の値 |
+
+**起動から終了までの動作**
+
+1. 起動する。**PWMを出さない（GPIO27を設定しない）。**`servo_calib_18_waiting_for_confirmation token=GO18`をlogに出し、UART0のconsoleで`GO18`（完全一致）を待つ。違う語・改行だけ・長すぎる行（16 byte超）は捨てて、`servo_calib_18_confirmation_rejected reason=mismatch|too_long`を出す。consoleの読み取りに失敗したら、**動かさずに終える（再起動まで何も受けない。`Sg90::new`を呼ばない）。`servo_calib_18_confirmation_failed error=...`をlogに出す。**待つ間の期限は置かない。**resetと書き込みとportを開いたときのresetは`GO18`を入力しないので動かない。NVSのlatchは使わない**（NVSは他のbuildの起動で消えうる。初回動作の実行手順の`再武装`stepの2026-09-30追記）。
+2. `GO18`を受けたら`servo_calib_18_confirmed`と、build定数の値（全部）を1行のlogに出す。`Sg90::new`、`LimitedServo::new`（`START_DEG`、`NEUTRAL_DEG`、上の制限、制御周期、catalog＝`calib`の1つ）を作る。作れなければ`servo_calib_18_limits_rejected error=...`を出して終える（PWMを出さない）。
+3. 以降、1つのloopで、(a) consoleの読み取り（別threadで読みmain loopへ渡す。`crate::debug_motion`と同じ形。`STOP`をtickの間隔の内で受けられるように、blockingで読まない。**読み取りthreadが失敗した場合（`ConsoleEvent::ReadFailed`、threadを起こせない）は、`servo_calib_18_console_failed error=...`を出し、dutyを0にして回を終える**）、(b) 動いている間は制御周期ごとに`LimitedServo::tick`を回す。
+4. 受けるcommandは**3種だけ**。大文字小文字を区別する。1行の長さの上限は既存の`MAX_DEBUG_LINE_BYTES`。
+   - `MOTION calib <deg>`：`<deg>`は角度規約の度（小数可）。形は`deskcat_servo::parse_debug_line`で読む。**`calib`以外のmotion名は、下の5の最初の判定で`UnknownMotion`として拒否する。**
+   - `STOP`：**進行中の動きを中止して、直ちにdutyを0にし、その回を終える**（下の「回の終わり」）。
+   - `END`：動いていないときに、dutyを0にして、その回を終える。動いている間に受けたら`Busy`で拒否する。
+   - それ以外の行は`UnknownCommand`で拒否し、logに残す。**拒否の名前は、`deskcat_servo::Rejection`の変数名をそのまま出す（`UnknownMotion`、`TargetOutOfHardRange`、`Busy`など）。校正buildが足す拒否は`UnknownCommand`、`RateLimited`、`ExceedsMaxStep`である。****無言で捨てない。**
+5. `MOTION calib <deg>`を受けたときの判定（この順）：(0) motion名が`calib`でなければ`UnknownMotion`、(i) 動いている間は`Busy`（N個目の動作中に届いたものもここ）、(ii) 前のcommandの終了から`MIN_COMMAND_INTERVAL_MS`未満なら`RateLimited`、(iii) 目標と現在位置（直前に出した位置。回の最初は`START_DEG`）の差の絶対値が`MAX_STEP_DEG`を超えるなら`ExceedsMaxStep`（**校正buildが自分で行う判定。**limiterの`max_step`は`Limiter::step`1回（N tickの窓）分のclampで、これではない。`ServoLimits`の`max_step`には`MAX_STEP_DEG`を渡す）、(iv) `LimitedServo::admit`が拒否したらその理由。拒否はどれも、dutyに触れず、動作を始めず、回も終えない。**次の目標は、前のcommandのlogの`position_deg`から`MAX_STEP_DEG`以内に置く**（着かずに終わった、または行き過ぎた後は、`ExceedsMaxStep`になりうる。人がlogを見て選び直す）。受理したら`servo_calib_18_command_accepted n=<何個目> target_deg=<値>`をlogに出す。
+6. **1 commandの動作：**受理した目標へ、`tick`ごとに間隔を検査し、N tickに1回（`SERVO_OUTPUT_DECIMATION_TICKS`）だけ、`Limiter`を窓（最後の出力から今回の出力までの時間）の間隔で進めて、その位置をLEDCへ出す。**目標へ着く（出力した位置と目標の差が`REACHED_TOLERANCE_DEG`以内の状態が、出力2回続く。N＝3なら最短6 tick）か、`EXPOSURE_MS`の期限に達した時点で`LimitedServo::stop`を呼び、dutyを0にする**（期限は周の単位で判定するため、厳密な上限ではない）（次のcommandは`LimitedServo::resume`で、`Stopped`が持つ最後の位置から作り直す）。dutyを保持しない。着いたら`servo_calib_18_motion_done reason=reached`、着かずに露出が尽きたら`reason=exposure_elapsed`。`Limiter`は目標の手前で減速しないため、加速度の上限が低いと行き過ぎて往復しうる（位置は承認値の範囲の内側）。`MAX_STEP_DEG`は目標の指定の上限で、行き過ぎの分を含まない。`position_deg=`（最後に出した位置）、`position_min_deg=`・`position_max_deg=`（そのcommandの間の最小・最大）、`pulse_us=`（位置から線形変換で計算した値。LEDCの量子化とclampの後の値ではない）、`elapsed_ms=`を出す。**limiterのcounter（`LimitedServo::counters`）の値を`stop`の前に取り、`stop`の後に`servo_calib_18_limiter_counters`としてcommandごとにlogへ出す**（dutyを先に0にするため。`stop`で捨てるため、回全体の値はlogを足して読む）。動作中に拒否した行のlog（`servo_calib_18_command_refused`）も`stop`の後に出す。**診断用に、次の時刻の列を`stop`の後にlogへ出す。値はすべて、そのcommandの`motion_start`からの経過時間（µs）である。`servo_calib_18_tick_trace`（`at_us=`）は各tickの時刻（基準のtickと、間隔の検査でrejectしたtickを含む。`tick`を呼ぶ直前に取った値で、`tick_min_ms`・`tick_max_ms`の元になる値と同じ）、`servo_calib_18_wake_trace`（`woke_us=`）は待ち（`delay_ms`）から戻った直後の時刻である。間隔が伸びたとき、待ちから戻るのが遅れたのか、戻った後の処理で時間を使ったのかを分ける。どちらも`n=`・`count=`・`dropped=`・`first=`を持ち（時刻が0件のときは`n=`・`count=0`・`dropped=`だけで、`first=`と時刻の項目は出ない）、1行に16個まで、配列の長さ（`EXPOSURE_MS`と最短の間隔から決まる件数。64件を超えない）を超えた分は`dropped=`に数える。さらに、どこで時間を使ったかを分けるため、`servo_calib_18_phase_trace`（`after_tick_us=`：`tick`が返った直後、`pre_delay_us=`：`delay_ms`を呼ぶ直前。それぞれ`tick_trace`・`wake_trace`と同じ番号で対になり、`tick`が失敗した周の`after_tick_us`も残る。形は上の2つと同じ）と、`servo_calib_18_stop_trace n= stop_pre_us= stop_post_us=`（`stop`の直前と直後。`motion_start`からのµs）を、同じく`stop`の後に出す。起動時には`servo_calib_18_thread_info`（main taskとconsole読み取りthreadのcore・名前、`CONFIG_FREERTOS_HZ`など）を1回出す。tick数とtaskの優先度の実値は出さない（取るには`unsafe`が要る）。判定・許容・出力の順序は変えない。****`stop`の失敗は握りつぶさずerrorで出し、その回を終える**（人が外部電源を切る）。
+7. **回の終わり**（次のどれか。終えたら**dutyを0にして、再起動まで何も受けない**。`servo_calib_18_session_end reason=... position_deg=<`Stopped::resume_position`>`を出し、`ServoFaultCounters`（`stop`と`resume`を越えて残る）を出す。limiterのcounterは上の6でcommandごとに出す）：`STOP`、`END`、`MAX_COMMANDS`個目の動作の終了（それまで次のcommandは上の5の(i)で`Busy`）、`MAX_SESSION_S`の経過、faultのlatch（`TickError`のどれか）、`stop`の失敗、consoleの読み取りの失敗（上の3）。**終えた後に届いた行は、`servo_calib_18_ignored_after_end len=<byte数>`をlogに出して捨てる**（無言で捨てない。動かさない。Nの後の拒否として、段0の5で観察する）。**`MAX_SESSION_S`の経過で動いている最中なら、動きを中止してdutyを0にする。**
+8. **fault：**`LimitedServo::tick`のエラー（測った間隔のreject、加速度の譲り、PWM出力の失敗）は、既存の動きどおりlatchし、`LimitedServo::stop`を呼び、回を終える。実機で確かめていないことは`servo.rs`のmodule docが持つ。
+9. logは全部UART0（`crate::console`）。**logの名前は上のとおり固定する**（人がgrepして記録する）。commandごとに`tick`の間隔の最小・最大（ms）も出す（`CONTROL_PERIOD_TOLERANCE_MS`を決めるため）。
+
+**この節の値は、`動作制限`表の承認値ではない。**表の承認値と設定可能なhard boundは、#18の測定が終わった後に、実測を根拠にPull Requestで埋める。
+
+### 段0で分かったこと：`tick`の間隔が必ず外れる原因（[#705](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/705)）
+
+**校正 build の`tick`の間隔が、制御周期20 msの許容を必ず外れ、limiter が reject して latch する。原因は jitter ではなく、LEDC の更新の遅れである。**判断は[ADR-0027](../decisions/0027-servo-output-decimation-for-ledc-update-latency.md)。
+
+- ESP32 の LEDC では、`ledc_set_duty_and_update`が、前の更新が効くまで **critical section の中で busy-wait** する（ESP-IDF v5.5.3 `components/esp_driver_ledc/src/ledc.c:1596-1611`、待ちの本体は`components/hal/esp32/include/hal/ledc_ll.h:483-489`の`while (conf1.duty_start);`）。**その core の割り込みも止まる。**
+- 実測では、`duty_start`が立ってから**2回目の PWM の周期の頭**（立てた位相に依って約20〜40.2 ms後。周期の頭の直後に立てた場合は約40.1〜40.2 ms。[EXP-057](experiment-log.md#exp-057-段0の3回目の窓704入りの校正buildでthreadphasestopの時刻の列を取り動作が約141-msと約101-msで止まった)の1回目の回で、立てた`duty_start`が落ちるまでは、最初が約32.3 ms、続く2つが約40.2 msと約40.1 ms。最初のtickは出力せず、`duty_start`を立てない）に落ちる。**この「2回目」の理由は ESP32 の TRM で確認していない**（log とパルス数への当てはめ）。PWM の周期は 約 20.06〜20.12 ms（`set_duty`の戻りの時刻から。[EXP-030](experiment-log.md)の実測 19.97〜20.07 ms と近い）。
+- **duty の register への書き込みは、busy-wait の前に行われる**（`ledc.c:1606`）。一方、low speed では`ledc_ls_channel_update`（para_up）が待ちの後に来る（`ledc.c:982`）ので、**source の順序だけでは、出力に出る時刻は決まらない。**[EXP-058](experiment-log.md#exp-058-段0の4回目の窓書き直さない校正buildで動作1回ごとのパルスの本数をarduinoで数え同じ回のlogと並べた)のパルス数（4本・4本・2本）は、**待ちの前に書いた値が、`duty_start`が立っている間、周期の頭ごとに出力に出る**と読むと合った（値が引き金の後に見えると読むと、6本・6本・4本になって合わない）。**観察からの当てはめで、TRM は未確認。**
+- **上の読みなら、`stop`（`set_duty(0)`）が効くのは、呼んだ次の周期の頭（最大1周期）。**`stop()`が戻るのは、前の更新が効いた後（出力した tick の直後なら最大約40 ms）。`stop_post_us`は`stop()`が戻った時刻であり、信号が止まった時刻ではない。**STOP の入力から信号が止まるまでの時間の同期した実測は、まだ無い**（実機側が持つ）。
+- 制御周期20 ms・PWM 50 Hz では、2回目の出力から`set_duty`が最大約23 ms止まり、間隔が約30〜40 msになる。**必ず起きる。**
+- **対処（[ADR-0027](../decisions/0027-servo-output-decimation-for-ledc-update-latency.md)、実装は[#708](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/708)）：**LEDC への出力は N tick に1回に間引き、**`Limiter`も出力する tick でだけ進める。`Limiter::step`の`dt`には、最後の出力から今回の出力までに測った時間（窓）を渡す**（ADR-0027 の追記。はじめは「`Limiter`は毎 tick 進める」だったが、揺れる間隔で決定3を満たせなかったため改めた）。**N は`firmware/esp32/src/config.rs`の`SERVO_OUTPUT_DECIMATION_TICKS`（設計の定数。3から始める。回ごとの実行承認の値ではない）で、`servo_calib_18_confirmed`の`output_decimation_ticks=`に出す。**2へ変えるのは code の変更（Pull Request）で行い、下の出力した tick の時間で判断する。**この表の`CONTROL_PERIOD_*`の値は、この節で変えていない。**
+  - **各 tick の間隔は毎回検査する**（間引いた tick でも。許容の外なら reject して latch する）。`Limiter`が持つ`ControlPeriod`は、`SERVO_CALIB_18_CONTROL_PERIOD_*`をN倍した窓の許容（公称 N×、許容 N×）で、新しい承認値ではない。各 tick の間隔が許容の内側なら、N個の和は（f32の丸めの境界ぎりぎりを除き）窓の許容の内側に収まる。境界ぎりぎりで外れたときは、`Limiter::step`が reject して latch する（安全側）。
+  - **N の下限の検査（compile 時）は必要条件までである。**`N × 制御周期 ≥ PWM の周期 × 2`を`config::decimation_meets_pwm_floor`が検査する（校正 build は`SERVO_CALIB_18_CONTROL_PERIOD_NOMINAL_MS`と`SERVO_PWM_FREQUENCY_HZ`で。N＝3・20 ms・50 Hz なら60 ms ≥ 40 ms）。**十分条件（実際の更新の遅れ 約40.1〜40.2 ms を超えること）は検査できない。**実際の PWM の周期は LEDC の timer 分周の丸めで決まり（約20.06〜20.12 ms）、「2回目の周期の頭」で落ちる理由も TRM で未確認なためである（N＝2 は必要条件を満たすが、40.2 ms に届かない周で busy-wait が入りうる）。その確認は、次の出力した tick の時間の log で行う。
+  - **出力した tick は`servo_calib_18_output_trace`（`tick=`：`tick_trace`の何番目か、0始まり）で分かる。**その tick の`after_tick_us − at_us`（`servo_calib_18_phase_trace`と`servo_calib_18_tick_trace`）が、`set_duty`を含む`tick`の時間である。**段0で、出力した tick の時間が全部小さいことを、実機側が確かめる**（ユーザーの承認を得て、窓で）。
+  - **閾値の案（#708の実装が置く。実機側が段0で確かめて確定する）：出力した tick の時間が全部 2 ms 以下。**間引かなかった実測では、`set_duty`の待ちが最大約23 ms 出た。**N＝3（60 ms）なら、`CONFIG_FREERTOS_HZ`＝100 の1 tick（10 ms）の量子化で間隔が50 msまで縮んでも約40.2 msを下回らない（20 msの余裕。ADR-0027の選択肢Aのコスト）ので、待ちは起きない見込みである。**待ちが残ったなら、その見込み（約40.2 msという読みなど）が外れている。N＝2（40 ms）にした場合は、間隔が約40.2 msをわずかに下回る周で、0 msから約10 msまでのどの長さの待ちも入りうる。どちらの場合も、小さい待ちを見落とさないよう、閾値は低く置く。待ちが無いときの`Limiter::step`と`set_duty`の処理時間は 1 ms に届かない見込みだが、**未測定である**。**2 ms を超える出力した tick が1つでもあれば、busy-wait が残っている疑いとして段1へ進まず、同じ周の他の core・task の処理（`wake_trace`などの時刻）と分けて見たうえで、N（または出力の形）を見直す。**根拠は上の観察からの見積もりで、実測した処理時間ではない（段0の log で確かめ、この値を直す）。
+  - **`Limiter`は出力する tick でしか進まないので、latch しない限り、`Limiter`の位置と最後に出力した位置は同じである**（加速度の譲りと出力の失敗で latch したときだけ`Limiter`が 1 step 先へ進むが、再開は最後に出力した位置から作り直す）。`position_deg`・`position_min_deg`・`position_max_deg`・`reached`の判定・`stop`の後の位置は、出力した tick の位置だけで更新する。`reached`は、出力した位置が許容の内側に`REACHED_TICKS`回続いたときである。
+  - **速度と加速度の上限は、出力の列を出力の間隔（窓）`T_k`で数えて、各 tick の間隔が許容の内側で揺れても超えない**（ADR-0027 の決定3）。出力の列が`Limiter`の測った間隔で制限した列そのものだからである。`crates/deskcat-servo/tests/decimation.rs`が、N（1〜6）、各 tick の間隔の揺れ（許容の90%まで）、再 target の位相を総当たりして確かめている（`acceleration_bound_conceded`も立たない）。数えるのは`Limiter`の内部状態（f32の位置の差分から求めると、100付近の分解能で20 msの全 step でも50.011が出るため）。参考：窓の中心どうしの間隔で数えると、揺れた間隔では上限を超えうる（間引かない`Limiter`も、step 自身の間隔で制限するため同じ。総当たりで、許容 ±2 ms で43.6、±10 ms で58.0）。
+  - **代償：**出力（servo へ届く位置）の更新が N tick に1回になるのは、間引きそのものの代償で、旧設計と同じ。この変更で増える代償は、`Limiter`の速度の変化が窓の単位になること（1回の出力で変えられる速度は`最大加速度 × 窓`まで）と、窓の許容が N 倍に広がるので境界への接近の見積もりが保守的になること（違反ではなく遅さ）。
+
+### 手順・停止基準・受け入れ条件
+
+**この節は段0・段1の手順と、段2の条件を書く。**段1は、校正 build と limiter が仕様のとおりに動くかを確かめる段であり、受け入れ条件はどれも取らない。段2は、#34 の頭（最終の荷重）を付けて可動域を片側ずつ広げる段である。それより先の段は、別の Pull Request でこの節へ足す。**それまで、段2の範囲（margin の内側で、片側の上限 45°〜135°）の外への駆動はしない。**
+
+**各回の最初に、その回の実行承認（[承認の状態](#承認の状態)の項目6の(c)）を取る。**承認を求めるときは、配線、手順、build 定数の値、firmware の版、動かす回の数、停止基準を示す。
+
+#### 段0：組み直しと照合（駆動ではない）
+
+1. 項目6の(a)の構成で組む（`M-12001`を servo 専用、`MF-R135`を直列、Pi はつながない、ESP32 は PC の USB、`DISP-01`は3.3 V へつながない）。**段1の servo の電源だけは、`M-12001`ではなく`PSU-BENCH-01`にする**（下の[段1の前の発熱の実測](#段1の前のservo-電源の経路の測れる区間の発熱の実測案)。段0は servo へ通電しないので、AC も出力も入れない）。
+2. **段0・段1では、servo 電源の経路を、下の配線で組む**（ユーザーの決定、2026-11-03。原文は省略。#17 の [EXP-045](experiment-log.md)・EXP-047・EXP-048・[EXP-049](experiment-log.md) で使った端子台まわりの配線である）。
+   - **組む配線（端子台の6穴）：**A の赤＝`M-12001`の赤と PTC（`MF-R135`）の足、A の黒＝`M-12001`の黒と黒い線（W−）、B の穴1＝PTC の足と赤い線（W+）、B の穴2＝シャント（`MEAS-01`）の足2と、servo の plug の茶へ行く両端オスの jumper wire の針、S の＋＝W+ と、servo の plug の赤へ行く両端オスの jumper wire の針、S の−＝W− とシャントの足1（[EXP-045](experiment-log.md)の`組んだ配線`）。
+   - **この配線に入れないもの：**EXP-049 の測定のための緑の jumper wire と分圧、組み直す前の板から出ていた基準の線のクリップ、Arduino（`MEAS-02`）の線（**段0の4と、窓の (A)・(D) の読みの間だけつなぐ（下の小節1の窓の順）。段1の配線には入れない**）、組み直す前の板から servo の黄へ行っていた jumper wire（`X4`に替える）。
+   - **例外：**この配線は、「servo電源の経路は端子台と線材で組み、breadboardとjumper wireを使わない」という条件（`測定のための駆動`の電源の項、[承認の状態](#承認の状態)の項目6の(a)の`経路の部品`、`通電前の現物確認`の2026-09-28追記）のうち、servo の plug へ行く2本の jumper wire とシャントだけの例外である。**breadboard は、servo 電源の経路に入れない。**
+   - **残る risk：**jumper wire の導体の太さと定格は記録に無く、短絡や拘束のときの発熱は確かめていない（項目6の(a)の弱点と`ジャンパー線`の追記のとおり）。端子台の6穴にはそれぞれ2本が入り、B の穴2は導体の断面積の合計が目安の上限を超える（EXP-045 の記録。針の断面積は仮定）。**範囲を広げる段（ホーンを付ける段以降）では、この例外を当てない。**ただし段2は、`PSU-BENCH-01`の CC の間に限り、この例外を当てる（[段2](#段234-の頭を付け可動域を片側ずつ広げる)の`jumper wire の例外`）。
+   - **段1へ進む条件：**jumper wire の定格は、[Hardware Safety Policy](../governance/hardware-safety-policy.md)の`5項目の中での根拠の水準`で資格として要る数（B）に当たり、公開値が無い（B-2）。最悪値になる`M-12001`の短絡時の電流も公開されていない。そのため、**段1の servo の電源を`PSU-BENCH-01`（電流上限 `I_lim` を設定できるベンチ電源）に替え、`I_lim`で定常の電流を押さえる**（出力コンデンサの放電による瞬時の電流は除く）（ユーザーの決定、2026-11-07。問い「段1の servo の電源を、今の AC アダプタ（M-12001）から、ベンチ電源（PSU-BENCH-01、Jesverty SPS-3010V）に替えてよいですか。」への回答は承認だった。原文は省略）。**段1でこの配線を通して servo へ通電する前に、下の[段1の前の、servo 電源の経路の測れる区間の発熱の実測（案）](#段1の前のservo-電源の経路の測れる区間の発熱の実測案)の記録を残す（発熱の実測 (B) は行わず、置き換えた一覧の (iv) による。[EXP-060](experiment-log.md)）。jumper wire の針と servo の plug の接点、servo 本体のリード線（測れない区間）は、この実測では扱わない。比べる相手は[#711 の決定](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/711#issuecomment-6707654178)による（段1は OCP を無効にして CC で運用する。`I_lim`は[決定の補足](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/711#issuecomment-6741451276)の2〜3のとおり、段1の前の窓の (D) で置いて固定し、段1の窓の中で上げない。ここでは議論し直さない）。**段1へ進む前に要るのは、下の`段1へ進む前に、次を確かめて記録する`の一覧のすべてである。もう1つ、段1の前に別に扱うと #711 が決めた件がある：firmware が止まったとき（hang。#712（d2b99ea）の前は、task watchdog は警告だけで reset しなかった（#711 の記録 6707317592）。#712 で PANIC=y と、calib build の main task の登録を入れた。[EXP-060](experiment-log.md)の (A) は、bench-wdt-711 の panic reset を実機で確かめた。calib が hang したときに止まることは確かめていない）の、servo の持続的拘束としての扱い**（[#711 の記録](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/711#issuecomment-6707317592)。firmware の作業は #712 で行った（[#711 の 6741948327](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/711#issuecomment-6741948327)）。この文書は決めない）。**その扱いが決まり、記録されるまで、段1へ進まない。**段0は servo へ通電しないため、この配線で組んでよい。
+   - **次の順に行う。**(i) 端子台の6穴を現物と照合し、上の`組む配線`と違っていれば、その配線に直す（[EXP-052](experiment-log.md)の組み直しでは端子台とシャントに触れていないが、EXP-049 の窓の終わりにユーザーが機材を片付けており、何をどう片付けたかは記録に無い）。上の`この配線に入れないもの`が残っていれば、すべて外す（端子台の穴に入った線、シャントの足を挟んだクリップ、servo の plug に挿さった線を含む。緑の jumper wire は、EXP-049 の後に S の＋から抜いた記録が無い）。**servo の plug が jumper wire の針に挿さっていれば、外す。**外したことを記録し、外れたと確かめられなければ、ここで止める。(ii) ESP32 の GND と信号を、組み直しの結線表の`X5`・`X4`でつなぐ（GND を共通にする線と信号線であり、servo 電源の経路ではない）。**`X5`の端は、端子台Sの−の穴へは挿さない。**`X5`の針をクリップ付コード（`PROTO-01`）で挟み、もう一方のクリップで、S の−に入ったシャントの足を、穴と本体のあいだの金属で挟む（EXP-045 の基準の線と同じつなぎ方。穴の導体を増やさない）。(iii) servo の plug は、段1まで jumper wire の針に挿さない（段0の4。(i)で外れていることを確かめた状態のまま）。その後に段0の3を行う。
+3. `通電前の現物確認`の(a)〜(d)を、配線と現物で照合して記録する。
+4. **servo を接続しない状態で、PWM の波形を確かめる**（[Calibration手順](#calibration手順)の4）。servo の plug は挿さず、AC は挿さない。ESP32 に校正 build を書き（build 定数は全部に値が要る。値は段0の実行承認が置く）、`GO18` を入れ、信号線を、`X4`の servo 側の端で Arduino（`MEAS-02`）で記録する。(i) `MOTION calib <deg>` を1つ出し、その command が終わるまで待って、**周期とパルス幅**を読む。(ii) 別の `MOTION calib <deg>` を出し、その動作の間に `STOP` を送る（console へ送るのは AI。`MOTION` を送ってから、動作が終わる前の間隔で送る）。`servo_calib_18_motion_interrupted reason=stop` と `servo_calib_18_session_end reason=stop` が出ること、Arduino の記録で信号が止まったことを確かめる。**`STOP` の入力の時刻は log に出ないため、入力から信号が止まるまでの時間は、この段では測らない。**
+5. 同じ状態で、**拒否と回の終わりを観察する**（servo を接続しないので動かない）。**回が終わると、校正 build は再起動まで何も受けないため、回が終わるたびに ESP32 を再起動し、`GO18` を入れ直してから次を観察する**（AC は挿さないので、再起動してよい）：`UnknownCommand`、`UnknownMotion`、`RateLimited`、`ExceedsMaxStep`、`TargetOutOfHardRange`、動作中の `Busy`（`MOTION` を送ってから、動作が終わる前の間隔でもう1つ `MOTION` を送る）、`MAX_COMMANDS`個目の後の `servo_calib_18_ignored_after_end`。拒否（`UnknownCommand`から`Busy`まで）は `servo_calib_18_command_refused` で確かめる（拒否しても回は続き、`servo_calib_18_session_end` は出ない）。`MAX_COMMANDS`個目の動作の終わりは `servo_calib_18_session_end reason=max_commands` で、その後に届いた行は `servo_calib_18_ignored_after_end`（`servo_calib_18_command_refused` は出ない）で確かめる。**校正 build の判定には host test が無いため、駆動の前にここで確かめる。**
+6. **tick の間隔**（log の `tick_min_ms`・`tick_max_ms`）を記録する。`CONTROL_PERIOD_TOLERANCE_MS`は、段0の build に段0の実行承認が置いた値が入っている。間隔がその値を外れると reject して latch する（各 tick の間隔は`LimitedServo`が検査して`interval_rejections`に数え、`Limiter`の counter には入らない。窓の間隔は`Limiter`が検査する）（その回は終わる。間隔は log に残る）。段1の値は、この記録を見て段1の実行承認が置く。
+
+#### 段1の前の、servo 電源の経路の測れる区間の発熱の実測（案）
+
+> **案である。まだ誰も承認していない。**CV の電圧の値は、**その回の実行承認が置く**。この小節は、段1で`PSU-BENCH-01`を使うための条件を書く。
+
+窓は1つで、順は (A) WDT、(C) GND の判断、(D) `I_lim`の読み、(B) 発熱の実測である（小節1）。**(B) は、一覧の (iv) を置き換えたため行わない（[EXP-060](experiment-log.md)）。servo は窓の最後までつながない。この小節が merge されるまで、窓を開かない。**
+
+**1. 窓の順（1つの窓。servo は最後までつながない）。**(A)→(C)→(D)→(B) の順に行う（**(B) は行わない**。この窓を「段1の前の窓」、段1で servo を動かす窓を「段1の窓」と書く）。
+
+   - **(A) WDT。**`bench-wdt-711`を書き、hang させて約 5 s で panic reset することと、reset の後に`X4`の信号が low のままであることを`MEAS-02`で見る。続けて calib build（[EXP-059](experiment-log.md)の config）を通しで動かし、誤 reset が無いことを見る。状態：PSU は端子台につながない（`M-12001`も無い）、servo の plug なし、ESP32 は USB、`X4`・`X5`は段0のまま、`MEAS-02`の A0 は`X4`の servo 側の端につなぐ。判定は log の時刻と記録で行う。
+   - **(A) の後の手順（外したことの確かめ）。**(C) の前に、`X5`（シャントの足を挟んだクリップ）と`MEAS-02`の線（Arduino の GND と A0 のピンから出た線。[EXP-045](experiment-log.md)では、A0 の線の先をクリップでシャントの足に挟んだ）を外す。外れたことは現物で見て記録し、外れたと確かめられなければここで止める（段0の2の(i)と同じ扱い）。
+   - **(C) GND の判断（9）。**PSU を端子台Aへつなぎ（7・8・12。出力 OFF）、PSU の−と ESP32 の GND の間を読んで、共通にしてよいかを判断する。**共通にしてよいと判断できなければ、(D)・(B) へ進まず、止めて報告する（段1へ進まない）。**
+   - **(D) `I_lim`の読み。**(C) で共通にしてよいときだけ行う。出力 OFF で、負荷（`MEAS-01`の予備。つなぎ方は6）を plug の代わりの点に置き、`MEAS-02`の GND の線を S の−のシャントの足、A0 の線を B の穴2のシャントの足へ、それぞれクリップで挟む（[EXP-060](experiment-log.md)の (D)）。logger の hex の sha256 と`MEAS-02`の個体の照合（[決定の補足](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/711#issuecomment-6741451276)の2。同じでなければ止める）は、この前に行う。電流のつまみを下げてから出力を ON にし、平坦部（9点の移動中央値の中央値）が 9 count 以下になる値を探して記録する（count のまま比べ、A に直さない）。**電流のつまみは出力 OFF の間だけ動かし、電圧のつまみには触れない。**読みの後は出力を OFF にして`MEAS-02`を外す。
+   - **(B) 発熱の実測。**(D) で置いた`I_lim`のまま出力を ON にし、測れる区間の電圧降下を`DT830B`で読み、`P＝V×I`を出す（10。`I`は (D) で置いた`I_lim`で、PSU の電流表示の値も各周の開始時に記録する）。発熱は直接測れない（表面温度を測る道具は手持ちに無い）ので、区間ごとの電圧降下を時間を追って読む。比べる相手は、`I_lim`を流した実測である（jumper wire の非公開の定格とは比べない。[Hardware Safety Policy](../governance/hardware-safety-policy.md)の`5項目の中での根拠の水準`のB-2）。**測れない区間（jumper wire の針と servo の plug の接点、servo 本体のリード線）は扱わない**（[#711 の決定](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/711#issuecomment-6707654178)による）。
+   - **一覧の (iv) を置き換えたため、(B) は行わない（[EXP-060](experiment-log.md)）。**
+
+**2. `I_lim`は段1の前の窓の (D) で置いて固定し、段1の窓の中で上げない**（[決定の補足](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/711#issuecomment-6741451276)の2〜4。具体値は書かず、決め方だけを書く）。次の2つのうち、いちばん低い値にする。
+   - **補足の2の値。**servo（`SERVO-01`）が普段の動作で続けて流す電流（EXP-045 の Run 1 の読み）を上限にし、補足の2の読み（`MEAS-02`の平坦部が 9 count 以下）になる値。
+   - **`MF-R135`の`Ihold`の内側。**`Ihold`は温度で下がる（23 ℃で1.35 A、40 ℃で1.12 A。datasheet の値で、[power-budget.md](power-budget.md)が持つ）。power-budget の測定の規則に従い、`MEAS-04`で読んだ温度が40 ℃以下なら、40 ℃の`Ihold`の0.8倍（0.896 A）以下に置く。40 ℃を超えたら、続けずに止める。
+
+**3. 段1で電流が`I_lim`に届いたとき（CC に入ったとき）。**段1は OCP を無効にして CC で運用する（5。[#711 の決定](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/711#issuecomment-6707654178)の4）ので、出力は切れず、電圧が下がって電流が`I_lim`に留まる。**CC に入った回の校正値の扱い**（同決定の6）：
+   - 使う：動きが止まり、CC の LED が消えた後の位置（軸の角度、指令の度と回転の対応、向き、neutral の再現）。
+   - 使わない：速度、到達までの時間、追従、動作中の電流。
+   - **速度と加速度の制限を測る段では、比べる相手を別に決める**（同決定の7。段1の`I_lim`ではその受け入れ条件は取れない）。
+
+**4. CV の電圧（電圧違いのpin、5項目）。**値は**その回の実行承認が置く。「`M-12001`と同じ 5 V だから」とは書かない。**servo へ入れてよい電圧は [HW-TBD-035](tbd-register.md) が持ち、**Open である**（servo へ入れてよい電圧を確認した文書が無い。製品ページの仕様表は `Operating voltage: 4.8v` だけで、`4.8–6 V`は Q&A 欄の1文であり、[ADR-0017](../decisions/0017-what-counts-as-a-primary-source.md)の条件を満たさず採れない）。**この小節は、5 V を入れてよいとは決めない。案：回ごとの承認が置く値の上限は 5 V とし、それを超える値は置かない**（`PSU-BENCH-01`は 0–30 V を出せ、OVP は無い前提〔5〕のため）。毎回、servo をつなぐ前に、出力端で`DT830B`で測って記録する。段1で servo に通電している間（PSU の出力が ON の間）、電圧と電流のつまみに触れない。**例外は窓の (D)（段2で行い直すものを含む）と、段2の jumper wire の試験だけで、電流のつまみを出力 OFF の間だけ動かす（電圧のつまみには触れない）。**OVP は説明書に記述が無く、無い前提にする（5）。
+
+**5. 保護機能。**段1は OCP を無効にする（[#711 の決定](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/711#issuecomment-6707654178)の4）。OVP は無い前提にする（説明書に記述が無い）。
+
+**6. 接続部材と負荷のつなぎ方。**
+   - **PSU から端子台Aまで。**EXP-051 で使ったワニ口のクリップは、大電流の経路に使わない条件（`PROTO-01`の行。`WIRE-PWR-01`の端子台と線材で組む）と合わない。`WIRE-PWR-01`の線材（`111641`、AWG22相当）の端を剥き、`PSU-BENCH-01`の出力端子（ねじで締める。説明書 p.9）と、端子台Aの2つの穴（`M-12001`を外した穴）につなぐ。穴位置と線の対応は [`hardware/bench-18/wiring-table.md`](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/hardware/bench-18/wiring-table.md) に載せる（`generate.py` が生成する）。クリップとブレッドボードは使わない。
+   - **(D)・(B) の負荷（plug の代わりの点）。**赤い jumper wire の針 → 両端メスの jumper wire（赤側） → `MEAS-01`の予備（セメント抵抗） → 両端メスの jumper wire（茶側） → 茶の jumper wire の針の順につなぐ（ユーザーの答え：手元にあり、嵌まる、2026-11-09。問い「両端メスのジャンパー線は今も手元にあり、セメント抵抗（予備）の足に奥まで挿さって、軽く引いても抜けませんか？」）。メス側の接点はハウジングの中にあり、プローブが届かない。ほかの負荷抵抗は入れない。
+   - **段1では**、両端メスの jumper wire を外し、servo の plug を jumper wire の針に挿す。両端メスの jumper wire は窓の (D)・(B) の間だけ使う。
+
+**7. 給電経路の重複（5項目）。**`PSU-BENCH-01`をつなぐ前に、`M-12001`の AC プラグが抜けていることと、その線が端子台Aの穴に入っていないことを現物で確かめて記録する。端子台Aの穴に給電する電源が、同時に2つ入らないようにする。Pi はつながない。
+
+**8. 逆極性（5項目）。**説明書は、出力端子の極性を逆にすると本機が破損する可能性があると書く（p.9）。`PSU-BENCH-01`の出力を ON にする前に、次の節点を**1つずつ**、色と穴と極性を現物で照らして記録する（PSU の端子から端子台Aまでの新しい線も、＋−を取り違えていないことを、ここで照らす）：PSU の＋ → 新しい線 → A の赤の穴（`M-12001`を外した穴） → `MF-R135` → B の穴1 → 赤い線（W+） → S の＋ → 赤い jumper wire → servo の plug（窓の (D)・(B) では、plug の代わりの負荷。6） → 茶の jumper wire → B の穴2 → シャント（足2から足1） → S の− → 黒い線（W−） → A の黒の穴 → 新しい線 → PSU の−。各穴に入る2本の導体も、どの線かを照らす。
+
+**9. PSU の−と ESP32 の GND の共通。**段0の2の(ii)で`X5`（GND を共通にする線）はシャントの足につながっていて、S の−は PSU の−へつながるので、`X5`をつないだままでは PSU の−と ESP32 の GND が導通する。`X5`を戻して GND を共通にしてよいかは、窓の (C) で判断する。`X5`と`MEAS-02`を外した状態（小節1）で、PSU を端子台Aへつなぎ（7・8・12。出力 OFF）、`DT830B`で PSU の−と ESP32 の GND の間を、DC 2000 mV レンジと AC 200 V レンジで、PSU の電源 OFF と ON（出力 OFF）の両方で読む（計4つ）。**4つとも表示が 0（DC は ±1 digit 以内）なら共通にしてよい。1つでも読めたら、共通にせず止めて報告する（段1へ進まない）。**PC の USB の GND との回り込みの道があるかは、この読みで確かめ、判断できなければ`X5`をつながない。控え（条件ではない）：止まった場合の候補は、前面端子（− / GND / ＋）で−と GND の間が離れているかを見ること。
+
+**10. 区間と読み方（窓の (B)）。**穴の中の導体（線の導体、jumper wire の針、メス側の接点）にはプローブが届かないため、**届く点の連なりで区切り、13区間とする**（足の無い穴〔S＋、A黒〕は隣の区間に含める）。点の名前（P1〜P14）は [`hardware/bench-18/wiring-table.md`](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/hardware/bench-18/wiring-table.md) の`プローブを当てる点と区間`に載せる（`generate.py` が生成する）。
+   - 区間：(1) P1↔P2（新しい線〔＋〕と、その両端の接点）、(2) P2↔P3（A赤の穴）、(3) P3↔P4（`MF-R135`）、(4) P4↔P5（B穴1）、(5) P5↔P6（W+ と両端の接点）、(6) P6↔P7（S＋の穴の jumper 側の接点、赤 jumper、針とメスの接点、両端メスの jumper〔赤側〕を1区間で）、(7) P7↔P8（負荷。抵抗の2本の足の間）、(8) P8↔P9（両端メスの jumper〔茶側〕、針とメスの接点、茶 jumper、B穴2の jumper 側の接点を1区間で）、(9) P9↔P10（B穴2の穴の、シャントの足2の接点）、(10) P10↔P11（シャント）、(11) P11↔P12（S−の穴の、シャントの足1の接点）、(12) P12↔P13（W− と両端の接点）、(13) P13↔P14（新しい線〔−〕と、その両端の接点）。
+   - 出力は ON のまま、13区間を順に1回ずつ読むのを1周とする。レンジは`DT830B`の DC 200 mV に固定し、周の途中で変えない。各周の開始時刻と`MEAS-04`の温度を記録する。区間ごとの降下と`P＝V×I`、流した時間、CC の LED の状態も記録する。
+   - **落ち着いた：**連続する2周で、全区間の差が 1 digit 以内。
+
+**11. 止める条件とプローブの当て方。**次のどれかに当たれば、出力を OFF にして止める：1つの区間でも3周続けて 1 digit を超えて増えた。`MEAS-04`が 40 ℃を超えた。におい・変色。6周で落ち着かない。**プローブは片方を先に固定してから、もう片方を当て、1区間ずつ読む。**プローブが滑って S の＋と−を短絡しても、定常の電流は`I_lim`に収まる。ただし PSU の出力コンデンサの放電による瞬時の電流は、CC では制限されず、大きさはこの実測では分からない。短絡を意図して作らない。
+
+**12. 段1の前の窓と段1の窓での PSU の設定の順。**`PSU-BENCH-01`は、電源を切る前の電圧と電流の設定値を記憶し（p.6 特長6）、電源投入時の出力状態の設定（OPN、p.7「6」）が有効だと POWER を入れた直後に出力が出る。そのため、(i) POWER を入れる前は、出力端子に何もつながない。(ii) POWER を入れ、"OPN" の LED が消灯していること、"OCP" の LED の状態、表示された設定値を記録する。(iii) 出力は OFF のまま、電圧をその回の承認が置いた値にする。電流は、段1の窓では`I_lim`（補足の2〜3の値に固定されたもの）にする。段1の前の窓では、(D) の前までは電流を小さい値にしておき、(D) の手順で置く（小節1）。(iv) POWER を切り、出力端子へ線をつなぐ（7・8）。(v) POWER を入れ直し、表示を確かめる。(vi) servo（段1の前の窓では plug の代わりの負荷）をつなぐ前に、出力を ON にして出力端で電圧を測って記録し（4）、出力を OFF にする。測った値が、その回の承認が置いた値を超えていれば（上限 5 V を超える場合を含む）、servo（段1の前の窓では負荷）をつながずに止める。(vii) 出力が OFF のまま servo の plug（段1の前の窓では負荷）をつなぎ、つないだ後で出力を ON にする（電圧が出ている出力へ servo をつながない）。
+
+**段1へ進む前に、次を確かめて記録する（TBD。手順は小節1〜12。確かめた記録は、その回に残す）。**(i) 本体の銘板の型番が`SPS-3010V`であること。(ii) は外した（守りたいのは GND を共通にしたときに回り込みの電流が流れないことで、9の4つの読みが、つなぐ2点の間の電位差を直接見ている）。(iii) 段1で OCP が無効であること。(iv) `I_lim`と、記録のある抵抗から出した`P＝I²R`の見積もり。新しい線2本（`111641`、断面積 0.3054 mm²、約 0.0565 Ω/m で、より線は更に高い。[power-budget.md](power-budget.md)の値。各 30 cm）は往復で約 0.034 Ω、`I_lim`の設定 0.080 A で約 0.2 mW。[EXP-045](experiment-log.md)の抵抗の読み（プローブ短絡 1.0 Ω を引く。A の赤↔S の＋ 約 1.0 Ω、A の黒↔S の− 約 0.6 Ω、B の穴 2↔S の− 約 0.6 Ω。`DT830B`の抵抗レンジの確度は未取得）を足した経路の抵抗は約 2.2 Ω で、0.080 A で約 14 mW。茶の jumper wire：[EXP-035](experiment-log.md)の段2bの①（約 0.272 A で 93.2 mV。茶の jumper wire と g11 の接点を含む。電流は同じ節の計算）から、0.080 A で約 27 mV、約 2 mW（比例による計算）。EXP-035 の茶の jumper wire が今の1本と同じ個体かは、記録から言わない。赤の jumper wire：抵抗の記録は無い。設定値（4.80 V、0.080 A）から計算した経路全体の電力は約 384 mW である（段1の電圧・電流は記録していない。瞬時の電流は除く）。同じ窓の`MEAS-02`の平坦部は 4 count だった。EXP-045 の換算では約 0.04 A で、理由は確かめていない。0.080 A（PSU の CC の設定。PSU が出す電流の全体で、シャントを迂回する分も含む）を使うのは、高い側を取るためである。比べる相手：定格が公開されている部品は`MF-R135`の 40 ℃基準の上限値（[power-budget.md](power-budget.md)）で、余裕は 11 倍以上。jumper wire は、定格が非公開（B-2）である。**赤・茶の jumper wire の導体の比べる相手は TBD である。**[#711 の決定](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/711#issuecomment-6707654178)の3（保守側に倒した選定）が覆うのは、servo の plug の接点とリード線であり、jumper wire の導体ではない。**比べる相手を決めて記録するまで、この例外で再通電しない。**段2では、[段2](#段234-の頭を付け可動域を片側ずつ広げる)の jumper wire の試験が比べる相手になる。その試験の通電は、比べる相手を得るための通電であり、この禁止の例外とする。**発熱を実測した記録ではない。**この置き換えで段1を行う回は、`I_lim`を合わせる前に`MEAS-04`の温度を1回読んで記録し、40 ℃を超えていたら止める（2 の`Ihold`の条件）。[EXP-060](experiment-log.md) の回では読んでいない（未記録）。(v) `I_lim`が補足の2〜3の値に固定されていること（2）。(vi) logger の hex の sha256 と`MEAS-02`の個体の照合（(D) の前に行う。同じでなければ止める）。(vii) firmware が止まったとき（hang）の扱いが決まり、記録されていること（段0の2。#711）。(viii) 9の判断。`X5`を戻して GND を共通にできると判断できなければ、段1へ進まない。確かめて記録するまで、段1へ進まない。
+
+**この小節が決めないこと：**段1で servo へ通電してよいこと。置き換えた (iv) の記録（[EXP-060](experiment-log.md)）と、(iv) の jumper wire の導体の比べる相手の記録が出て、その回の実行承認が出るまで、段1へ進まない。
+
+#### 段1：無負荷（ホーンなし）、90°〜105°の内側
+
+- **段1の servo の電源は`PSU-BENCH-01`である**（ユーザーの決定、2026-11-07）。この節より前の、`M-12001`を前提にした記述（項目6の(a)、測定のための駆動の表を含む）は、段1では`PSU-BENCH-01`に読み替える（「AC を挿す・抜く」は出力の ON／OFF。`通電前の現物確認`の(a)は、Pi と`M-12001`が外れていること）。ただし servo へ入れる電圧（HW-TBD-035）は、[小節の4](#段1の前のservo-電源の経路の測れる区間の発熱の実測案)が持つ。
+- **段1は OCP を無効にし、CC で運用する**（[#711 の決定](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/711#issuecomment-6707654178)）。`I_lim`は (D) で置いた固定値で、段1の窓の中で上げない（[小節の2](#段1の前のservo-電源の経路の測れる区間の発熱の実測案)）。**その`I_lim`で servo が目標に着かなければ、段1を止めて報告する**（`I_lim`を上げない。CC で遅くなるのは構わない）。CC に入った回は、止まった後の位置だけを校正に使い、速度・時間・追従・動作中の電流は使わない（小節の3）。速度を測る段では、比べる相手を別に決める。
+- **最初の回は、軸が`START_DEG`にあることを確かめられない。**最後の指令は105°（[EXP-049](experiment-log.md)）だが、軸がどこへ着いたかは記録に無く（同 EXP の「主張しないこと」）、角度の規約と軸の向きの対応も駆動する前には分からない。そのため、最初の出力で軸は`START_DEG`へ、limiter の速度制限を受けずに動きうる（`START_DEG`の行）。**最初の回はホーンを付けず、軸の周りに当たるものが無いため、これを受け入れて始める。**最初の回の範囲は90°〜105°の内側とし、最初の出力の後の動きは limiter を通る。
+- 2回目以降は、`START_DEG`の行の(i)か(ii)を行う。
+- 軸の先に目印を付け、周りに置いた紙の目盛で位置を読む。**指令角の変化に対して軸が回る向き**（最初の回は105°からのため、指令角を減らす向きで読む）と、**指令の度の変化と軸の回転の変化が同じ大きさか**を読む。
+- 1つの回で動かす向きは1つ（90°→105°、または105°→90°）。
+- この段は可動域を広げないため、[Hardware Safety Policy](../governance/hardware-safety-policy.md#6-サーボ) §6の電流・電圧の記録は、範囲を広げる段の Pull Request で扱う。この段で見るのは、唸り・異音・熱と ESP32 の log（reset・brownout）に加えて、CC の LED と PSU の表示である（小節の2・3、停止基準）。
+
+#### 段2（#34 の頭を付け、可動域を片側ずつ広げる）
+
+**2026-11-15 から、段2の頭付きの回（頭を軸に押し込む回と、範囲を広げる回）は行わない。**下の`機構の制限と margin`の代わりの理由が成り立たないためである（その行）。この節のうち頭付きの回を書いた所（取る受け入れ条件、頭と首の構成、記録すること、決め方、拘束の上界、頭と線についての停止基準）は、頭付きの回の範囲の決め方と拘束の間の発熱の根拠を決め直すまで当てない。それまでに行えるのは、ホーンも頭も付けない回（jumper wire の試験、`I_lim` の置き直し、指令の度と分度器の読みの対応）だけで、受け入れ条件1・2・3・5は取れない。
+
+**この節は条件だけを書く。**窓の段取り（どの順で何をするか）は、実機側の PM がその窓の実行計画として書き、VM 側の PM がこの節と照らし、ユーザーがその回の実行承認で承認する（段0・段1の窓と同じ形）。
+
+**取る受け入れ条件：**#18 の1（衝突させず低速で物理的制限を確認した）、2（Software limit に明示的な margin がある）、3（Neutral を再現できる）、5（PWM-off 時の重力による動作が明確である）。4・6 は取らない（4 は速度を測る段、6 は fail-safe の段）。
+
+**頭と首の構成：**首は [EXP-054](experiment-log.md) の発泡スチロールの天板と底板、頭は [enclosure-and-neck.md](enclosure-and-neck.md#物理的な完成形2026-11-14実機側の-pm-が決めユーザーが承認した) のとおりに組む。これが最終の頭の荷重である。LCD には通電しない（VCC の線は板から抜いたまま。`通電前の現物確認`の (d)）。
+
+**電源：**段1と同じく `PSU-BENCH-01` の CC。段1の節の `PSU-BENCH-01` への読み替え（`M-12001` を前提にした記述、「AC を挿す・抜く」は出力の ON／OFF、`通電前の現物確認`の (a)）は、段2にも当てる。
+- **jumper wire の例外：**段0の2 は、段0・段1の jumper wire の例外（ユーザーの決定、2026-11-03）に、「範囲を広げる段（ホーンを付ける段以降）では、この例外を当てない」と書いている。**段2に限り、`PSU-BENCH-01` の CC の間（下の jumper wire の試験を含む）は、段1と同じ例外を当てる**（ユーザーの決定、2026-11-11。問い「段2で、servo の電源の線に今の jumper wire をそのまま使ってよいですか？」。実機側の PM の勧めは「はい」で、理由は「いいえなら plug と端子台をつなぐ部品が手持ちに無く段2に進めない。例外を外した理由は当時の AC アダプタの短絡電流で、CC には当たらない。窓の最初に実測する」。ユーザーの（原文省略）の後の答えは承認（原文は省略）。試験の電流は、続く問い「段2の jumper wire の確かめで、流す電流を 0.090 A から 0.8 A に上げてよいですか？」への答え（承認。原文は省略）で 0.8 A にした）。
+
+**jumper wire の試験（B-2 の比べる相手。[Hardware Safety Policy](../governance/hardware-safety-policy.md)の`5項目の中での根拠の水準`の B）：**
+- 今の赤・茶の jumper wire に、表示 0.800 A を、30 分以上（運用上の値）流し、異常が無いことを記録する。余裕は、段2の最悪の定常値（下の `I_lim` の表示 0.073 以下）に対して10倍以上（桁が1つ）である。説明書 p.3 の表示精度（原文「表示精度: 0.5%+5digit」、表示分解能 電流 0.001A。[EXP-051](experiment-log.md) の Measurement equipment の行）を当てると、試験の最小の実際値は約 0.791 A、`I_lim` の最大の実際値は約 0.0784 A で、比は約 10.1 倍である。比べるのは同じ個体であり、別の品の値は持ち込まない。
+- 電流は 0.3 A → 0.6 A → 0.8 A と段を踏み、つまみは出力 OFF の間だけ動かす。各段で、PSU の電流の表示と CC の LED を読んで記録し、手の背で jumper wire（赤・茶と、負荷へつなぐ両端メス）・針・負荷の接続部を確かめる。始めと終わりに `MEAS-04` を読む。
+- 負荷は servo ではなく `MEAS-01` の予備を、小節6 のとおり両端メスの jumper wire でつなぐ。
+- 止める基準：熱い、焦げ臭い、変色がある。0.8 A の段で表示が 0.800 未満、または CC の LED が点かない（10倍が示せない）。どれかに当たれば、段2を開かない。
+- 経路の他の部品は 0.8 A の定格の内である：`MF-R135` は 40 ℃基準の上限値（[power-budget.md](power-budget.md)）の内、端子台（`114217`）は [power-budget.md](power-budget.md#経路部品と定格) の`経路部品と定格`の行の内、線材は PSU から端子台A の線も含めて `111641`（[EXP-060](experiment-log.md)）で、同じ品の連続の許容電流（同じ表の最悪側で約 4.2 A）の内である（その行は端子台から `PROT-OC-01` までを TBD とし、この段は、その TBD を解いたとは言わない。試験の電流は PSU の CC で限られる）、`MEAS-01` は 0.1 Ω／5 W（[hardware-bom.md](hardware-bom.md)）で、0.8 A では約 0.064 W。
+- 試験のつまみの操作は、小節の4 の「電流のつまみを動かしてよい例外」に入る。試験の後は、`I_lim` を下の`I_lim`のとおり置き直してから servo へ通電する。
+
+**`I_lim`：**試験の後、段1の前の窓の (D) の手順をそのまま行い直して置く（`MEAS-02` の平坦部が 9 count 以下。[#711 の決定の補足](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/711#issuecomment-6741451276)の2〜4）。加えて、CC に入った状態の電流の表示は **0.073 以下**にする（上の試験の余裕が、表示精度込みで10倍以上になる値）。置いた後は、段2の窓の中で動かさない。servo が目標に着かなければ、止めて報告する。
+
+**各通電の前に真であること：**
+- servo へ出力を出す前：plug が針に挿さり、どの穴にどの色の針が入っているかを照らして記録してある（逆極性。[EXP-060](experiment-log.md) では照らしていない）。負荷はつながっていない。`I_lim` は上のとおり置いてある。出力は OFF である。
+- 負荷へ出力を出す前（試験）：servo の plug は抜いてあり、負荷だけがつながっている。出力は OFF である。
+- PSU の POWER を入れる前：出力の先に負荷も servo もつながっておらず、開いた針どうしが触れていない。**段2では、小節12 の (i)（POWER を入れる前は出力端子に何もつながない）を当てない**（PSU から端子台への線は付け替えない。ユーザーの指示）。(i) が防ぐのは、電源を入れた瞬間に出力の先の負荷へ電圧が出ることであり、負荷を外して針を離しておけば、電流の流れる先が無い。POWER の後、"OPN" の LED が消え、出力が OFF であることを見る（小節12 の (ii)）。
+- CV：段2の CV の設定は段1と同じ 4.80 のままにし、上げない。servo も負荷もつないでいない状態で出力を ON にし、PSU の電圧の表示を読んで記録し、出力を OFF にする。**表示が 4.92 を超えていれば、servo へ出力を出さない**（説明書 p.3 の表示精度、原文「表示精度: 0.5%+5digit」、表示分解能 電圧 0.01V。[EXP-051](experiment-log.md) の Measurement equipment の行。表示 4.92 の最大の実際値は約 4.995 V で、上限 5 V（小節の4）を超えない）。**段2では、小節の4 の「毎回、servo をつなぐ前に、出力端で `DT830B` で測って記録する」と小節12 の (vi) を、この出力 ON の表示の確認で代える**（ユーザーが出力端の `DT830B` の読みを却下した。[EXP-060](experiment-log.md)）。開放の端子に出力を出すだけなので、小節12 の (i) が防ぐもの（出力の先の負荷へ電圧が出ること）には当たらない。
+- `MEAS-04` が 40 ℃以下である（小節の2 の `Ihold` の条件）。
+- LCD の VCC の線（LCD pin 1）が板から抜けていることを見て記録してある（`通電前の現物確認`の (d)）。
+- 窓の始めに、PSU の本体の銘板の型番が `SPS-3010V` であることを読んで記録してある（段1の前の一覧の (i)。上の表示精度は、この型番の説明書の値）。違えば止める。
+- 頭を軸に押し込むとき、頭を手で回すとき：出力は OFF である。servo の軸は手で回さない。
+
+**機構の制限と margin（`APPROVED_MIN_DEG`／`APPROVED_MAX_DEG` の行、決めたことの3）：**
+- 非通電で、ホーンを軸に押し込む前に、頭を軸の上に載せて軸に嵌めずに手で回し、天板・servo 本体・線に当たる角度と、天板の切り込みに通した13本の線が張る角度を、両側で紙の分度器（1° 目盛）で読む。その側の制限は、2つのうち押し込む位置（下の、90° の指令で目印が止まった位置）に近い方とする。**押し込む前に読む当たる角度は、押し込んだ後の上限を保証しない。上限は、押し込んだ後に内側から 5° ずつ広げ、各回の隙間の観察で決める（次の行のとおり、今はこの代わりを当てない）。**
+- **（2026-11-15 から当てない。この bullet の末尾のとおり。）段2に限り、`APPROVED_MIN_DEG`／`APPROVED_MAX_DEG` の行の「実測した機構の制限（非通電で手で測る）」「荷重をかける回は、その状態で測った機構の制限による」を、「押し込む前の非通電の読みから押し込む位置の側へ margin を寄せた位置（上限の候補）」と「押し込んだ後に内側から 5° ずつ広げる各回の隙間の観察」に代える。**押し込んだ後に手で回して測ると、servo の軸を手で回すことになるためである。代えてよい理由：段2の `I_lim` は、[#711 の決定](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/711#issuecomment-6707654178)の3・5のとおり、この servo が無負荷で動き続けるときの電流以下に置く（上の `I_lim` の行のとおり、`MEAS-02` の平坦部が 9 count 以下で、かつ CC に入った状態の電流の表示が 0.073 以下）。**`MEAS-02` の count は、シャントを通る電流の範囲での上界である。**シャントを迂回して戻る電流が無いことは確かめていない（[EXP-045](experiment-log.md) の Faults。[EXP-060](experiment-log.md) では、設定 0.080 A で CC の LED が点いた平坦部が 4 count で、理由は確かめていない）。そのため、この前提（`I_lim` が、この servo が無負荷で動き続けるときの総電流以下であること）は確かめていない。また、前提が成り立っても、拘束の間の発熱が普段動き続けるときの発熱以下になるとは言えない（同じ電源電圧なら、拘束の間は入力電力がすべて熱になり、動いている間は一部が機械の出力になるため）。**この代わりの理由は成り立たないので、この代わりは当てない。頭付きの回の範囲の決め方と、拘束の間の発熱の根拠（[Hardware Safety Policy](../governance/hardware-safety-policy.md)の持続的拘束）を決め直すまで、頭を軸に押し込んだ状態では servo へ指令しない（ホーンも頭も付けない回だけを行う）。**（代わりはユーザーの決定、2026-11-11、実機側の PM のセッション。問い「段2に限り、頭が当たる角度の測り方を、次のように変えてよいですか？」に、この行の原文、代えるもの、理由、当てない場面を示し、実機側の PM と VM 側の PM の勧めは「はい」。答えは原文を省略）。
+- 指令の度と分度器の読みの対応（向きと倍率）は、ホーンを付けずに2つの指令の位置で軸の目印を分度器で読んで決める。押し込む位置は、そのうち 90° の指令で目印が止まった位置とする。
+- その側の制限から分度器の度で押し込む位置の側へ **5°** 寄せた位置を、この対応で指令の度に換算し、その側の software limit の案（margin。5° は運用上の値）とする。各回の承認範囲は、この内側にする。
+
+**着いた判断：**指令した位置に着いたかは、分度器の読み（目印または頭が止まった位置）で判断する。firmware の `reached`／`exposure_elapsed` は記録するだけで、判断には使わない（`reached` は出力した位置での判定で、軸を見ていない。[校正buildの仕様（案）](#校正buildの仕様案)の6）。`EXPOSURE_MS` は、表の行のとおり、荷重をかけた値をその窓の実行承認が直前の記録を見て置く（段2の最初の回は、#17 の値（300 ms 以下）を超えない）。
+
+**動かし方：**承認範囲を、90°〜105° から片側ずつ 5° 広げる（5° は運用上の値。上の代わりを当てない間は行わない。決め直すときは、次の移動量より大きい隙間を移動の前に確かめる基準も決める。「隙間がまだある」の観察だけでは、次の移動で当たらないことを保証しないため）。片側の上限は margin の内側かつ 45°〜135°（運用上の値。出所は無く、servo 内部の端に近づけないための仮の枠）。servo 内部の端は探さない。速度・step・加速度は段1の値のままにし、上げない。目盛の分解能（1°）は `MAX_STEP_DEG`（2°）より小さい。1回の command の数は `MAX_COMMANDS` の内側にし、超えるときは回を分ける。各回の `START_DEG` は前の回の最後の log の `position_deg` で作り直し（`START_DEG` の行の (i)）、`GO18` の前に頭の向きを分度器で読んで、上の対応で直した `START_DEG` と比べる。差が 2° を超えていれば止める（2° は運用上の値で、1° 目盛の読み2つの幅）。
+
+**記録すること（[Hardware Safety Policy §6](../governance/hardware-safety-policy.md#6-サーボ)の「電流、電圧、noise、干渉、機械的clearance」）：**各回の、出力 ON の間の PSU の電流と電圧の表示と CC の LED（確度は主張しない）。唸り・異音と ESP32 の log（reset・brownout）。回の終わりの、頭と天板・servo 本体・線の隙間（「まだある」／「ほぼ無い」）と、13本の線（「たるんでいる」／「張りそう」）。回の終わりの、出力が止まった後に頭が重力で動くか、動くならどちら向きにどこで止まるか（受け入れ条件5）。
+
+**決め方：**「ほぼ無い」または「張りそう」の答えが出たら、その側の広げを止める。そのときは、その回の端から 90° の側へ 5° 寄せた値と margin の位置のうち、内側の方をその側の software limit の案にする。両側が決まった後、90° へ戻す回を3回行い、頭の向きの分度器の読みが同じ位置に戻るかを記録する（受け入れ条件3）。案の値は、測定の後に`動作制限`表を埋める Pull Request で承認を受ける（受け入れ条件7）。
+
+**拘束の上界（頭が当たった、または線が張った場合）：**電流は CC の `I_lim` で押さえる。
+
+**停止基準：**下の停止基準のとおり（段1と同じ）。加えて、頭が天板・servo 本体・線に触れたとき、または13本の線が張ったときは、直ちに出力を OFF にする。
+
+#### 停止基準
+
+[Hardware Safety Policy §6](../governance/hardware-safety-policy.md#6-サーボ)の7項目と、[初回動作の実行手順](#初回動作の実行手順人間とaiの作業順序)の`停止基準`による。次のどれかに当たれば、直ちに電源を切る（段0は`M-12001`の AC プラグを抜く。段1は`PSU-BENCH-01`の出力を OFF にする）。**段0は PSU も使わず電流と電圧を計らないため、過電流と電源の電圧降下はその場で数値では読めない。段1は区間の電圧降下と servo の電流を計らず、PSU の電圧と電流の表示を読める。**その代わりに、servo の動きが鈍る・止まる、唸り、熱、ESP32 の reset・brownout を見て止める（#17 の初回動作と同じく、人の目・耳・手の背で見る）。
+
+- 指令したのに動かない。唸りが出る。指令していないのに動く。**最初の回で、指令角の変化に対して軸が回る向きを読んだ後は、その向きと逆に動く。**（最初の回の最初の動作では、期待する向きがまだ決まっていない。）目標を行き過ぎて戻る動き（「校正buildの仕様」の6）も、この項目に含めて止める（安全側。止まった後、`MAX_ACCELERATION_DEG_S2`の置き方を次の回の実行承認で見直す）。
+- 手の背で、servo 本体・端子台・PTC・plug の接続部・servo の plug へ行く jumper wire・シャント（`MEAS-01`）が熱い（触らない。数値の基準は置かない）。
+- ESP32 の意図しない reset、USB の切断、`panic`。limiter の fault。`STOP`への応答が無い。
+- ユーザーが止めると言った。
+
+**CC に入ったこと（CC の LED の点灯）と、それによる動きの鈍り・止まりは、動作の間は停止基準に当たらない**（段1の運用。校正値の扱いは小節の3）。**ただし、その command の`servo_calib_18_motion_done`が出た後（duty が 0 になった後。小節の「校正buildの仕様」の6）も CC の LED が点いたままのときは、拘束として直ちに出力を OFF にする**（log が出ないまま止まる場合は、`STOP`への無応答、hang の扱いで当てる）（#711 の決定の6が使うのは、止まって LED が消えた後の位置である）。上の1つ目の「動かない」は、CC の LED が消えている（CC に入っていない）のに動かない場合に当てる。唸り、指令と逆の動き、熱、reset・brownout、`STOP`への無応答は、CC の間も当てる。
+
+CC に入っていないのに動かなかった場合は、そこで止めて報告する。pulse 幅を変えて繰り返し試さない。
+
+#### 受け入れ条件との対応
+
+段0・段1では、#18 の受け入れ条件はどれも取らない。段2は、受け入れ条件1・2・3・5を取る段である（段2の節）。ただし 2026-11-15 から、段2の節の冒頭のとおり頭付きの回を行わないので、決め直すまで取れない。4は速度を測る段、6は fail-safe の段の Pull Request で取る。7は、測定の後に`動作制限`表を実測で埋める Pull Request で取る。
+
+### 決めたこと（実機側のPM、2026-11-03。build に関わるもの）
+
+**これは実機側のPMの決定であり、ユーザーの承認ではない。**承認は、回ごとの実行承認（項目6の(c)）と、この変更のPull Requestのmergeである。
+
+1. **NVSのlatchをやめ、起動のたびに`GO18`を要する形にする。**NVSは他のbuildの起動で消えうるため。
+2. **「運用上の値」**（build定数の表で、そう書いたもの）は、出所の無い、監視下の測定のための仮の制限であり、回ごとの実行承認が決める。5項目の根拠にはしない。
+3. **範囲は、全ての回で、機構の制限からmarginを引いた位置の内側**（広げる回に限らない。ホーンなしの回（軸の周りに機構が無い回）は#17の範囲で足りる。build定数`APPROVED_MIN_DEG`／`APPROVED_MAX_DEG`）。
+4. **jumper wireは、#18ではservo電源の経路に使わない**（段0・段1は除く。その例外は、この節の決定ではなく、段0の2に書いたユーザーの決定による）。改めた理由：この4を置いたとき、servo の plug と端子台を jumper wire なしでつなぐ部品を決めていなかった（[hardware-bom.md](hardware-bom.md)に記録が無い）。段1へ進む条件は段0の2に書いた。**2026-11-11追記：**段2は、段2の節の jumper wire の例外による。
+5. 手順は、上の「手順・停止基準・受け入れ条件」の段0・段1だけを書く。範囲を広げる段に関わる決定（servo内部の端を探さないこと、電流・電圧の記録、加速度の扱いなど）は、その段のPull Requestで書く。**2026-11-11追記：**段2は、条件だけを段2の節に書く。
+
 ## 受け入れchecklist
 
 **2026-10-04追記。**ベンチ電源の購入申告は[hardware-bom.md](hardware-bom.md#ベンチ電源)に記録した。
@@ -838,3 +1087,10 @@ Pi最低入力電圧の復帰条件に関する現在の扱いは[power-budget.m
 | 2026-10-17 | 38 | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。**測定用のbuild（`bench-servo-test-17`）を、起動だけでは動かさず、人間がUART0のconsoleへ`GO17`を入力したときだけ1回動かす形に変えた**（`firmware/esp32/src/main.rs`の`wait_for_bench_confirmation`）。EXP-028で、起動のたびに自動で動く作りが、書き込みの手順とDTR／RTSの扱い次第で意図しない起動を動作にしうると分かったため。`決定事項`の`arm delay`の行、`build`・`起動とarm delay`・`監視維持`・`単発動作`・`latch検証`の各stepを合わせて直した。latch（NVSの実行済みflag）は残し、入力を受けた後、動かす前にcommitする。動作制限表、有効化gate表、`承認の状態`、項目6の条件は変えていない |
 | 2026-10-19 | 39 | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。測定用の90度指令を`bench-servo-90-17`で選べるようにした。既存の`bench-servo-test-17`単独の105度指令は維持した。`承認の状態`の項目6へユーザーの2026-10-19の判断と未確認の前提を追記し、`初回動作の実行手順`の`build`・`単発動作`stepを両buildに合わせた。動作制限表、有効化gate表、停止基準、NVS latch、`GO17`、arm delay、露出時間、dutyを0へ戻す処理は変更していない。実機での動作・測定は行っていない |
 | 2026-10-20 | 40 | [#17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。merge済みのPRを読み直して見つかった2点を直した。(1) **`起動とarm delay`の「`GO17`を入力した後は、servoの電源を抜き差ししない。」が、`停止基準`の「直ちに外部5 V電源を遮断する」を禁じるように読めた**（PR #608が、直前の「`arm delay`を過ぎたら、動かす意図で電源を入れない。」を置き換えた文）。意図は「動かす意図で入れ直さない」ことなので、その意図の文へ改め、`停止基準`に当たれば遮断することを同じ文に書いた。(2) **`承認の状態`の項目6の(a)の`ジャンパー線`の追記（PR #607）が、jumper wireを使わない条件もユーザーの継続承認の範囲に書いてあると読めた。**#17のcomment 5870421147の範囲にあるのはbreadboardを通さない条件だけで、jumper wireはPR #500のdiffでAIが範囲の外へ足したものである。事実のとおりに直した。手順の順序、動作制限表、有効化gate表、`承認の状態`が示す現在の状態、項目6の条件の文面は変えていない（項目6(a)の`ジャンパー線`の追記の出所の文だけを直した） |
+| 2026-11-03 | 41 | [#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)。**`#18の校正（案）`の節を足した。**測定のための駆動の`build`の項が求める、#18の校正buildの動作と仮の制限を、firmware実装の仕様として**案として**書いた（feature名`bench-servo-calib-18`、Pi linkを持たないこと、console command、log名、動作の順序、build定数）。値は、出所（#17の記録）のあるもの、出所の無い運用上の仮の制限（step 2°、速度10°/s、N＝10ほか。5項目の根拠にしない）。露出300 ms以下は#17で駆動した値、`TBD`に分けた。手順・停止基準・受け入れ条件との対応は、別のPull Requestで足す（それまでこのbuildで駆動しない）。実機側のPMの決定を、build に関わる範囲で書いた。ユーザーの承認ではない。**承認していない。**動作制限表、有効化gate表、`承認の状態`、受け入れchecklist、項目6の条件の文面は変えていない |
+| 2026-11-03 | 42 | [#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)。**`#18の校正（案）`の「手順・停止基準・受け入れ条件」に、段0（組み直し、照合、servoを接続しないPWMの波形・`STOP`で信号が止まること・拒否と回の終わりの観察）と段1（ホーンなし、90°〜105°の内側）を案として書いた。**あわせて、校正buildの仕様の2か所（counterのlogを`stop`の後に出すこと、露出の期限は周の始めで判定し厳密な上限ではないこと）を、[PR #700](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/700)の実装に合わせた。範囲を広げる段は別のPull Request。動作制限表、有効化gate表、`承認の状態`、受け入れchecklist、項目6の条件は変えていない。出所はPR #700の実装（squash `8ff836e`） |
+| 2026-11-03 | 43 | [#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)。**#18の段0・段1では、servo電源の経路を、#17のEXP-045・047・048・049で使った端子台まわりの配線で組むとした**（ユーザーの決定。servoのplugへ行く2本のjumper wireとシャントを含み、測定のための線は入れない。breadboardは経路に入れない）。例外は段0の2の1か所に書き、`測定のための駆動`の電源の項、`承認の状態`の項目6の(a)の`経路の部品`、`通電前の現物確認`の2026-09-28追記、決めたことの4は、段0の2を指す形にした。範囲を広げる段には当てない |
+| 2026-11-09 | 44 | [#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)。**段1の servo の電源を`M-12001`から`PSU-BENCH-01`に替えるとした**（ユーザーの決定、2026-11-07）。段1は OCP を無効にして CC で運用し、`I_lim`は[#711 の決定の補足](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/711#issuecomment-6741451276)のとおり段1の前の窓の (D) で置いて固定する。段1で`PSU-BENCH-01`を使う条件（給電の重複、逆極性、GND の共通、段1の窓での設定の順、段1へ進む前の一覧）を案として書いた。**あわせて、段1の前の窓（WDT、GND の判断、`I_lim`の読み、発熱の実測。順は (A)→(C)→(D)→(B)）の手順と、(B) の読み方を小節1・6・9・10・11に書いた**（設計は [#18 の設計コメント](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18#issuecomment-6742547051)。ユーザーの承認による）。電流の名前は`I_lim`の1つにした。端子台から下流の図と結線表を[`hardware/bench-18/`](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/hardware/bench-18/wiring-table.md)に置いた。承認していない |
+| 2026-11-10 | 45 | [#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)。**段1の前の窓で取れなかった2項目を、別の根拠に置き換えた。**(1) 段1へ進む前の一覧の (ii)（コードを抜いた状態の導通）を外した（9の4つの読みが2点の間の電位差を直接見るため）。(2) 一覧の (iv)（窓の (B) の記録）を、`I_lim`と記録のある抵抗から出した`P＝I²R`の見積もりに置き換えた（発熱を実測した記録ではない）。(3) 小節2の3つ目（発熱の実測で通した電流以下）を外した。(4) 小節1の「`MEAS-02`の線（GND と A0 のクリップ）」を直した。(5) 「段1へ進む条件」の発熱の実測の記述と、小節1の (B) に、(B) は行わず一覧の (iv) による旨を足した。(6) 一覧の (iv) に、`I_lim`を合わせる前の`MEAS-04`の確認と、赤・茶の jumper wire の導体の比べる相手を記録するまで再通電しないことを足した。記録は [EXP-060](experiment-log.md)。承認していない |
+| 2026-11-11 | 46 | [#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)。**`#18の校正（案）`に、段2（[#34](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/34) の頭を付け、可動域を片側ずつ 5° 広げる）の条件を足した。**窓の段取りは書かず、条件だけを書く（段取りは窓の実行計画）。受け入れ条件1・2・3・5を取る。機構の制限は非通電で当たる角度と線が張る角度を読み、margin 5° の内側だけを駆動する。着いた判断は分度器の読みで行う。`PSU-BENCH-01` の CC の間に限り、段0の2の jumper wire の例外を段2にも当て、比べる相手は同じ個体へ表示 0.800 A を段を踏んで流す試験とする（どちらもユーザーの決定）。試験の後は `I_lim` を (D) の手順で置き直し、表示を 0.073 以下にする（表示精度込みで試験との比が10倍以上）。段2では、小節の4 の出力端の読みと小節12 の (vi) を、出力 ON の電圧の表示（4.92 以下）の確認で代え、小節12 の (i) を当てない。決めたことの4・5に追記し、受け入れ条件の対応を合わせて直した。承認していない |
+| 2026-11-12 | 47 | [#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)。窓の実行承認に時間と起動の数の上限を置かないことにした（ユーザーの指摘、2026-11-12。理由は、ユーザーの発言を書かない規則（ai-agent-policy.md）により記録しない）。`手順・停止基準・受け入れ条件`の実行承認に示すものから起動の回数と AC挿しの回数・1回の時間の上限を、`停止基準`から時間の上限を超えそうになる項目を削り、`MAX_SESSION_S`の値の決め方を「実行承認が置く」にした |

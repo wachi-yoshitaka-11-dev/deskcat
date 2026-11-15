@@ -16,6 +16,7 @@ decode／encode、および共有conformance fixtureを提供する。
 - Issue #527で足したmessage type
   （`set_expression`、`show_text`、`head_touched`、`tapped`、`lifted`、`environment`）
 - Issue #19で足したmessage type `play_motion`（型だけ。motionの実行は含まない）
+- Issue #685で足したmessage type `shaken`（型だけ。空のpayload）
 - error code（§7）と、それを計上する`status`のcounterへの対応付け
 - 1 lineのdecodeとencode、およびその検証順序
 - byte列からlineを組み立てる上限付きreceiver（§8手順1〜6、Issue #10）

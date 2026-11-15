@@ -32,7 +32,7 @@
 //! 「送出を止める」という動作面だけを実装する（`boot`送出を止めた状態で`main()`は
 //! 戻らずheartbeat／health snapshotのloopを続ける）。servo出力の無効化は、
 //! Pi linkを持つbuildが`crate::servo`を呼ぶ箇所を持たない（`crate::servo`の呼び出しは
-//! `bench-servo-test-17` featureの下にしかなく、そのbuildはPi linkを持たない。`main.rs`を
+//! `bench-servo-test-17`と`bench-servo-calib-18`のfeatureの下にしかなく、どちらのbuildもPi linkを持たない。`main.rs`を
 //! 目視で確認した。`mod servo`自体はfeature条件無しでcompileされる）ため満たされる。網羅的な
 //! 呼び出し元探索（例: 静的解析）はしていない。
 //!

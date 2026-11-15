@@ -4,7 +4,7 @@
 Claude CodeのPreToolUse hookとして、Bash tool呼び出しの前に走る。stdinからhookの
 入力JSONを読み、`tool_input.command`だけを見る。実行はしない。
 
-止める対象は4つである。
+止める対象は6つである。
 
 1. `gh issue create`／`gh pr create`に`--project`が無い。Projects v2 boardへの
    item追加は`CONTRIBUTING.md`の起票規約で必須だが、**#204／#205／#206は3件とも
@@ -59,7 +59,23 @@ mergeもしない。metadataを要求しても誤検知しか生まない。**20
 **`git interpret-trailers --parse`に読ませることは字句の判定である。**見ているのは
 trailerとして解釈できる形かどうかだけで、値の正しさは見に行かない。
 
-`DESKCAT_SKIP_GH_GUARD=1`で丸ごと無効化できる。**誤検知で作業が止まったときの
+5. `gh pr merge`の対象Pull Requestが安全・protocol・firmwareの対象fileを含むのに、
+   CodeRabbitのreviewが1度も完走していない（#688）。CONTRIBUTINGの「手動で依頼する前に
+   状態を確認する」が「reviewが完走するまでmergeしない」と定めるが、2026-11-01〜02に
+   #680と#684が`Review skipped`のままmergeされた。人が覚えていても守られなかったため、
+   mergeの時点で止める。**この検査は`DESKCAT_SKIP_GH_GUARD`で無効化できない**
+   （`_check_coderabbit_review`）。
+
+6. Issueのcloseの操作（`gh issue close`、およびboardの`Status`を`Done`にする
+   `gh project item-edit`）で、そのIssueの`受け入れ条件`の節に`- [ ]`が残っている（#693）。
+   2026-11-02に受け入れ条件を照合せずに#679がcloseされた。走査するとclose済み193件のうち
+   122件に未チェックが残っていた。人が覚えていても守られなかったため、closeの時点で止める。
+   Issueはboardの`Done`で自動closeされるため、`item-edit`が主な経路である。
+   **節が無い本文もdenyする**（CONTRIBUTINGの「Issueの範囲」が受け入れ条件を必須と
+   しており、無ければ照合できない）。**この検査は`DESKCAT_SKIP_GH_GUARD`で無効化できない**
+   （`_check_issue_close`／`_check_item_done`）。
+
+`DESKCAT_SKIP_GH_GUARD=1`で5と6以外を丸ごと無効化できる。**誤検知で作業が止まったときの
 逃げ道であり、常用するものではない。**使ったら理由をPull Request本文へ書く。
 **ただしcommand行頭へ置く形では効かない**（`SKIP_ENV`の隣に実測を書いてある）。
 """
@@ -69,6 +85,9 @@ import os
 import re
 import subprocess
 import sys
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import TimeoutError as FuturesTimeout
 from pathlib import Path
 
 import command_line
@@ -86,6 +105,23 @@ import review_gate  # noqa: E402
 PR_CREATE_SUBCOMMAND = ("pr", "create")
 CREATE_SUBCOMMANDS = (("issue", "create"), PR_CREATE_SUBCOMMAND)
 MERGE_SUBCOMMAND = ("pr", "merge")
+ISSUE_CLOSE_SUBCOMMAND = ("issue", "close")
+ITEM_EDIT_SUBCOMMAND = ("project", "item-edit")
+
+# boardの`Status`fieldの`Done`のoption id（2026-11-02に`gh project field-list 5`で実測した値）。
+# **boardを作り直すと変わり、検査は素通りになる。**`Done`への変更だけを見る。
+STATUS_DONE_OPTION_ID = "98236657"
+# 見出しの書き方は揃っていない（`## この Issue の受け入れ条件・成果物`＝#546、
+# `### 測定可能な受け入れ条件`＝#236・#237）。「受け入れ条件」を含む見出しを節の始まりにする。
+HEADING = re.compile(r"^(#{1,6})\s+(.*?)\s*$")
+ACCEPTANCE_WORD = "受け入れ条件"
+NOT_PLANNED_REASON = "not planned"
+UNCHECKED_ITEM = re.compile(r"^\s*(?:[-*+]|\d+\.)\s+\[ \]\s*(.*)$")
+ISSUE_CLOSE_VALUE_OPTIONS = ("--comment", "-c", "--reason", "-r", "--duplicate-of", "--repo", "-R")
+ITEM_QUERY = (
+    "query($id: ID!) { node(id: $id) { ... on ProjectV2Item { content {"
+    " __typename ... on Issue { number state body } } } } }"
+)
 
 # squash messageが持たなければならないtrailerの名前。**値は見ない。**
 REQUIRED_MERGE_TRAILERS = (review_gate.TRAILER_CLASS, review_gate.TRAILER_REVIEW)
@@ -123,6 +159,43 @@ GIT_TIMEOUT_SECONDS = 10
 SUBJECT_PLACEHOLDER = "subject"
 
 SKIP_ENV = "DESKCAT_SKIP_GH_GUARD"
+
+# CodeRabbitのreviewが完走するまでmergeさせない対象（#688）。**範囲を広げない。**
+# CodeRabbitにはクールタイム（1時間）があり、何でも通すと作業が止まる。
+# 対象にしない: 実験記録、BOM、図、ルールの文書、検査のscript、Pi側だけのアプリ。
+REVIEW_TARGET_PREFIXES = ("firmware/esp32/src/",) + tuple(
+    f"crates/deskcat-{name}/src/"
+    for name in ("protocol", "servo", "face", "tap", "touch", "accel", "env")
+)
+REVIEW_TARGET_FILES = (
+    "docs/protocol/esp32-pi-protocol.md",
+    "docs/hardware/gpio-assignment.md",
+    "docs/hardware/power-budget.md",
+    "docs/hardware/servo-safety-limits.md",
+)
+
+# CodeRabbitの結果を持つcheck-runの名前。**2026-11時点の結果はcheck-runに残り、
+# commit statusには出ない**（#678の全commitでstatus 0件。docs/runbooks/
+# coderabbit-review-observations.mdの「check-runの表示」）。旧い記録（#397・#399）は
+# commit statusの`Review completed`で残るため、両方を見る。
+CODERABBIT_CHECK_NAME = "CodeRabbit"
+REVIEW_COMPLETED_TEXT = "Review completed"
+
+# ghを待つ上限（秒）。超えたら確認できなかったものとして扱いdenyする。
+# **hook全体の上限は`.claude/settings.json`の30秒である。**超えるとhookが落ち、
+# 通る側に倒れるおそれがあるため、commitごとの確認は並列で行い（昇格は100件を超える）、
+# 全体にも期限を置く。
+GH_TIMEOUT_SECONDS = 10
+# **最初の`gh`照会の前に始め、残りを各照会へ渡す。**走っているworkerも同じ期限で
+# 終わるため、denyを出した後にprocessが残って時間切れになることもない。
+CHECK_DEADLINE_SECONDS = 15
+COMMIT_CHECK_WORKERS = 16
+
+# `gh pr merge`の値を取るoption。selector（PR番号・URL・branch）を探すときに値を飛ばす。
+MERGE_VALUE_OPTIONS = (
+    "--subject", "-t", "--body", "-b", "--body-file", "-F",
+    "--author-email", "-A", "--match-head-commit", "--repo", "-R",
+)
 
 # **この逃げ道は`DESKCAT_SKIP_GH_GUARD=1 gh ...`という形では効かない。**hookは対象
 # commandとは別のprocessとして起動されるため、command行頭の代入はhookのenvironmentへ
@@ -219,6 +292,28 @@ def _option_value(args, *names):
             if arg.startswith(name + "="):
                 return arg[len(name) + 1:]
     return None
+
+
+def _repo_option(args, global_repo, value_options):
+    """`-R`／`--repo`の値を返す。`-Rowner/repo`（値をつなげた短い形）も読む。
+
+    `_option_value`は連結形を読まないため、`gh issue close 9 -Rowner/target`が
+    別のrepositoryではなく作業中のcheckoutのIssueを検査していた（#751）。
+    """
+    value = _option_value(args, "--repo", "-R")
+    if value is None:
+        # 値を取るoptionの直後の語は値である（`--comment -Rx/y`のghは`-Rx/y`を値に取る）。
+        index = 0
+        while index < len(args):
+            arg = args[index]
+            if arg in value_options:
+                index += 2
+                continue
+            if arg.startswith("-R") and len(arg) > 2:
+                value = arg[2:]
+                break
+            index += 1
+    return value or global_repo
 
 
 def _option_values(args, *names):
@@ -613,9 +708,281 @@ def _check_merge(args):
         )
 
 
+def _merge_selector(args):
+    """`gh pr merge`のselector（PR番号・URL・branch）を返す。無ければ`None`。"""
+    index = 0
+    while index < len(args):
+        arg = args[index]
+        if arg in MERGE_VALUE_OPTIONS:
+            index += 2
+            continue
+        if not arg.startswith("-"):
+            return arg
+        index += 1
+    return None
+
+
+def _gh_json(command, deadline=None):
+    """`gh`を実行して標準出力を返す。**失敗は例外のまま上げる。**
+
+    `deadline`（`time.monotonic()`の値）を渡すと、残りの時間を超えて待たない。
+    期限を過ぎていれば実行せず`TimeoutExpired`を上げる。
+    """
+    timeout = GH_TIMEOUT_SECONDS
+    if deadline is not None:
+        timeout = min(timeout, deadline - time.monotonic())
+        if timeout <= 0:
+            raise subprocess.TimeoutExpired(["gh", *command], 0)
+    result = subprocess.run(
+        ["gh", *command],
+        capture_output=True, text=True, encoding="utf-8",
+        timeout=timeout, check=True,
+    )
+    return result.stdout
+
+
+def _review_targets(files):
+    return [
+        name for name in files
+        if name in REVIEW_TARGET_FILES or name.startswith(REVIEW_TARGET_PREFIXES)
+    ]
+
+
+def _run_review_completed(run):
+    """check-runが完走を示すかを返す。**`success`かつsummaryが`Review completed`。**"""
+    output = run.get("output") or {}
+    return (
+        run.get("status") == "completed"
+        and run.get("conclusion") == "success"
+        and REVIEW_COMPLETED_TEXT in (output.get("summary") or "")
+    )
+
+
+def _commit_review_state(repo, sha, deadline=None):
+    """commit 1つのCodeRabbitの状態を`(完走か, 表示用の文字列)`で返す。"""
+    runs = json.loads(_gh_json([
+        "api", f"repos/{repo}/commits/{sha}/check-runs?per_page=100",
+    ], deadline)).get("check_runs", [])
+    runs = [run for run in runs if run.get("name") == CODERABBIT_CHECK_NAME]
+    if runs:
+        done = any(_run_review_completed(run) for run in runs)
+        title = (runs[-1].get("output") or {}).get("title") or runs[-1].get("conclusion")
+        return done, f"check-run `{title}`"
+    statuses = json.loads(_gh_json([
+        "api", f"repos/{repo}/commits/{sha}/statuses?per_page=100",
+    ], deadline))
+    statuses = [
+        item for item in statuses if item.get("context") == CODERABBIT_CHECK_NAME
+    ]
+    if statuses:
+        done = any(
+            item.get("state") == "success"
+            and (item.get("description") or "").startswith(REVIEW_COMPLETED_TEXT)
+            for item in statuses
+        )
+        return done, f"status `{statuses[0].get('description')}`"
+    return False, "CodeRabbitの記録なし"
+
+
+def _check_coderabbit_review(args, global_repo):
+    """対象fileを含むPull Requestは、CodeRabbitのreviewが完走するまでmergeさせない。
+
+    **headのcommitだけを見ない。**CONTRIBUTINGは「依頼したreviewが走った後の対応commitは
+    自己レビューで見て、投げ直さない」と定めており、review完走の後に指摘対応のcommitを
+    足すとheadは`Review skipped`になる（#678の`0629fc7`）。**Pull Requestのどれかの
+    commitで完走していればよい。**commitごとの確認は並列で行い、完走が見つかれば止める。
+
+    **確認できない場合もdenyする。**`gh`が失敗する、応答を読めない、のいずれでも
+    「完走している」とは言えない。**逃げ道は足さない**（`DESKCAT_SKIP_GH_GUARD`も効かない）。
+    base（`main`の昇格を含む）は区別しない。昇格もCONTRIBUTINGの昇格の節1が
+    手動reviewの対象と定めている。
+    """
+    if _is_help(args):
+        return
+    deadline = time.monotonic() + CHECK_DEADLINE_SECONDS
+    repo_option = _repo_option(args, global_repo, MERGE_VALUE_OPTIONS)
+    selector = _merge_selector(args)
+    try:
+        view = ["pr", "view"] + ([selector] if selector else [])
+        view += (["-R", repo_option] if repo_option else [])
+        view += ["--json", "number,url"]
+        info = json.loads(_gh_json(view, deadline))
+        number = info["number"]
+        match = re.match(r"https://[^/]+/([^/]+/[^/]+)/pull/\d+", info["url"])
+        repo = match.group(1)
+        files = _gh_json([
+            "api", "--paginate", f"repos/{repo}/pulls/{number}/files?per_page=100",
+            "--jq", ".[].filename",
+        ], deadline).split()
+        targets = _review_targets(files)
+        if not targets:
+            return
+        shas = _gh_json([
+            "api", "--paginate", f"repos/{repo}/pulls/{number}/commits?per_page=100",
+            "--jq", ".[].sha",
+        ], deadline).split()
+        head_state = None
+        # 新しいcommitから順に並列で見る。完走が1つでもあれば通す。
+        pool = ThreadPoolExecutor(max_workers=COMMIT_CHECK_WORKERS)
+        try:
+            futures = {
+                pool.submit(_commit_review_state, repo, sha, deadline): sha
+                for sha in reversed(shas)
+            }
+            for future in as_completed(
+                futures, timeout=max(0, deadline - time.monotonic())
+            ):
+                done, state = future.result()
+                if done:
+                    return
+                if futures[future] == shas[-1]:
+                    head_state = state
+        finally:
+            # **待つ。**走っているworkerは同じ期限で終わる。待たずに抜けると、
+            # denyを出してもprocessが残り、hookの時間切れでdenyが捨てられる（#751）。
+            pool.shutdown(wait=True, cancel_futures=True)
+    except (OSError, subprocess.SubprocessError, ValueError, KeyError,
+            AttributeError, TypeError, FuturesTimeout) as error:
+        _deny(
+            "`gh pr merge`の対象が、CodeRabbitのreviewを要する変更かを確認できなかった"
+            f"（{type(error).__name__}: {error}）。**確認できないまま通さない。**"
+            " この検査に解除の手段は無い（#688）。"
+        )
+    shown = ", ".join(f"`{name}`" for name in targets[:8])
+    more = f"（ほか{len(targets) - 8}件）" if len(targets) > 8 else ""
+    _deny(
+        f"PR #{number}は、CodeRabbitのreviewが完走するまでmergeしない変更を含むが、"
+        "どのcommitでもreviewが完走していない。"
+        f" 対象file: {shown}{more}。"
+        f" CodeRabbitの状態（head）: {head_state or 'commitを取得できない'}。"
+        " CONTRIBUTINGの「手動で依頼する前に状態を確認する」は、安全・電気・protocol・"
+        "firmwareに関わる変更をreviewの完走までmergeしないと定める。"
+        " `@coderabbitai full review`の依頼は手順に従い、完走を待つ。"
+        " この検査に解除の手段は無い（#688）。"
+    )
+
+
+def _acceptance_denial(number, body):
+    """Issue本文の`受け入れ条件`の節を見て、止める理由を返す。通してよければ`None`。
+
+    節は「受け入れ条件」を含む見出し（`##`〜`######`）から、次の同じかそれより上の階層の
+    見出しまでである。字句だけで見る。
+    """
+    open_items = []
+    found = False
+    section_level = None
+    for line in (body or "").splitlines():
+        heading = HEADING.match(line)
+        if heading:
+            level = len(heading.group(1))
+            if section_level is not None and level <= section_level:
+                section_level = None
+            if section_level is None and ACCEPTANCE_WORD in heading.group(2) and level >= 2:
+                section_level = level
+                found = True
+            continue
+        item = UNCHECKED_ITEM.match(line) if section_level is not None else None
+        if item:
+            open_items.append(item.group(1).strip() or "（空の項目）")
+    if not found:
+        return (
+            f"Issue #{number}の本文に`受け入れ条件`の節が無く、照合できない。"
+            " CONTRIBUTINGの「Issueの範囲」は測定可能な受け入れ条件をIssueに含めると定める。"
+            " 本文へ「受け入れ条件」を含む`##`見出しの節を足し、満たしたものをチェックしてからcloseする。"
+            " この検査に解除の手段は無い（#693）。"
+        )
+    if not open_items:
+        return None
+    shown = "／".join(f"`{item}`" for item in open_items[:8])
+    more = f"（ほか{len(open_items) - 8}件）" if len(open_items) > 8 else ""
+    return (
+        f"Issue #{number}の`受け入れ条件`に未チェックの項目が{len(open_items)}件残っている: "
+        f"{shown}{more}。"
+        " 満たしたものをチェックし、満たせないものはIssueをopenのままにして残りを書く"
+        "（development-workflowの「未実行のcheckが受け入れ条件ならIssueをopenのままにする」）。"
+        " この検査に解除の手段は無い（#693）。"
+    )
+
+
+def _unverifiable_close(error):
+    _deny(
+        "Issueのcloseの対象が、受け入れ条件を満たしているかを確認できなかった"
+        f"（{type(error).__name__}: {error}）。**確認できないまま通さない。**"
+        " この検査に解除の手段は無い（#693）。"
+    )
+
+
+def _check_issue_close(args, global_repo):
+    """`gh issue close`の対象Issueの受け入れ条件に、未チェックが残っていないかを見る。
+
+    **確認できない場合もdenyする。**逃げ道は足さない（`DESKCAT_SKIP_GH_GUARD`も効かない）。
+    """
+    if _is_help(args):
+        return
+    if (
+        _option_value(args, "--reason", "-r") == NOT_PLANNED_REASON
+        and (_option_value(args, "--comment", "-c") or "").strip()
+    ):
+        # 方針として閉じるIssue（close済みのうち3件がnot planned）。完了扱いではないため、
+        # 理由のコメントが付いているときだけ受け入れ条件を見ない。boardの`Done`は完了扱いで、
+        # `_check_item_done`が見る。
+        return
+    repo_option = _repo_option(args, global_repo, ISSUE_CLOSE_VALUE_OPTIONS)
+    selector = None
+    index = 0
+    while index < len(args):
+        if args[index] in ISSUE_CLOSE_VALUE_OPTIONS:
+            index += 2
+            continue
+        if not args[index].startswith("-"):
+            selector = args[index]
+            break
+        index += 1
+    try:
+        if selector is None:
+            raise ValueError("Issueの番号またはURLが指定されていない")
+        view = ["issue", "view", selector] + (["-R", repo_option] if repo_option else [])
+        info = json.loads(_gh_json(view + ["--json", "number,body"]))
+        reason = _acceptance_denial(info["number"], info["body"])
+    except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError) as error:
+        _unverifiable_close(error)
+        return
+    if reason:
+        _deny(reason)
+
+
+def _check_item_done(args):
+    """boardの`Status`を`Done`にする`gh project item-edit`の対象を見る。
+
+    `Done`はIssueを自動closeする。Pull Request itemとDraft issueは対象外である。
+    既にCLOSEDのIssueは、`Done`が閉じるものが無いため止めない。
+    """
+    if _is_help(args):
+        return
+    if _option_value(args, "--single-select-option-id") != STATUS_DONE_OPTION_ID:
+        return
+    try:
+        item_id = _option_value(args, "--id")
+        if item_id is None:
+            raise ValueError("`--id`（item id）が指定されていない")
+        node = json.loads(_gh_json([
+            "api", "graphql", "-f", f"query={ITEM_QUERY}", "-f", f"id={item_id}",
+        ]))["data"]["node"]
+        content = node["content"]
+        if content["__typename"] != "Issue":
+            return
+        if content["state"] == "CLOSED":
+            return
+        reason = _acceptance_denial(content["number"], content["body"])
+    except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError) as error:
+        _unverifiable_close(error)
+        return
+    if reason:
+        _deny(reason)
+
+
 def main():
-    if os.environ.get(SKIP_ENV) == "1":
-        return 0
+    skip = os.environ.get(SKIP_ENV) == "1"
     try:
         payload = json.load(sys.stdin)
     except (json.JSONDecodeError, UnicodeDecodeError):
@@ -629,12 +996,25 @@ def main():
     for args in command_line.invocations(command, "gh"):
         # **subcommandより前のglobal optionを外す。**外さないと`gh --repo o/r pr create`の
         # ように1語足すだけで検査が抜ける（#325で実測）。
+        global_repo = (
+            command_line.global_option_value(args, "gh", "--repo")
+            or command_line.global_option_value(args, "gh", "-R")
+        )
         args = command_line.skip_global_options(args, "gh")
         head = tuple(args[:2])
         if head in CREATE_SUBCOMMANDS:
-            _check_create(head, args[2:])
+            if not skip:
+                _check_create(head, args[2:])
         elif head == MERGE_SUBCOMMAND:
-            _check_merge(args[2:])
+            if not skip:
+                _check_merge(args[2:])
+            # **skipの指定に関わらず走らせる。**解除の手段を足さない（#688）。
+            _check_coderabbit_review(args[2:], global_repo)
+        elif head == ISSUE_CLOSE_SUBCOMMAND:
+            # **skipの指定に関わらず走らせる。**解除の手段を足さない（#693）。
+            _check_issue_close(args[2:], global_repo)
+        elif head == ITEM_EDIT_SUBCOMMAND:
+            _check_item_done(args[2:])
     return 0
 
 

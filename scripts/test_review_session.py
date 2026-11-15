@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 # A round whose defect stays unresolved cannot converge, so its review keeps counting.
 OPEN = {"findings": [{"kind": "defect", "origin": "diff", "decision": "fix",
@@ -76,6 +77,21 @@ class ReviewSessionTests(unittest.TestCase):
                   "scope": "remaining defect D1"}
         record.update(changes)
         return record
+
+    def test_scratch_index_keeps_the_real_index_modification_time(self):
+        """Git compares entry times with the index file time; a copy must not refresh it (#751)."""
+        index = self.root / ".git" / "index"
+        os.utime(index, ns=(1_000_000_000_000_000_000, 1_000_000_000_000_000_000))
+        seen = []
+        real = subprocess.check_call
+
+        def spy(command, *args, **kwargs):
+            seen.append(os.stat(kwargs["env"]["GIT_INDEX_FILE"]).st_mtime_ns)
+            return real(command, *args, **kwargs)
+
+        with mock.patch.object(session.subprocess, "check_call", spy):
+            session.fingerprint(self.root, "base")
+        self.assertEqual(seen, [1_000_000_000_000_000_000])
 
     def test_sixth_process_never_starts(self):
         for _ in range(5):
@@ -256,6 +272,38 @@ class ReviewSessionTests(unittest.TestCase):
         self.assertEqual(session.fingerprint(sub, "base"), session.fingerprint(self.root, "base"))
         self.assertEqual(session.changed_paths(sub, "base"), ["outer.py", "sub/inner.md"])
         self.assertEqual(session.changed_paths(sub, "base"), session.changed_paths(self.root, "base"))
+
+    def test_same_new_file_gives_same_fingerprint_untracked_staged_and_committed(self):
+        (self.root / "new.py").write_text("print(1)\n", encoding="utf-8")
+        untracked = session.fingerprint(self.root, "base")
+        self.assertEqual(self.git("status", "--porcelain"), "?? new.py")  # The real index is untouched.
+        self.git("add", "new.py")
+        self.assertEqual(session.fingerprint(self.root, "base"), untracked)
+        self.git("commit", "-qm", "add")
+        self.assertEqual(session.fingerprint(self.root, "base"), untracked)
+
+    def test_fingerprint_changes_with_content_mode_deletion_and_rename(self):
+        (self.root / "a.py").write_text("one\n", encoding="utf-8")
+        self.git("add", "a.py")
+        self.git("commit", "-qm", "a")
+        seen = {session.fingerprint(self.root, "base")}
+        (self.root / "a.py").write_text("two\n", encoding="utf-8")
+        seen.add(session.fingerprint(self.root, "base"))
+        (self.root / "a.py").chmod(0o755)
+        seen.add(session.fingerprint(self.root, "base"))
+        self.git("mv", "a.py", "b.py")
+        seen.add(session.fingerprint(self.root, "base"))
+        (self.root / "b.py").unlink()
+        seen.add(session.fingerprint(self.root, "base"))
+        self.assertEqual(len(seen), 5)
+
+    def test_tracked_only_change_keeps_the_previous_patch_hash(self):
+        import hashlib
+        (self.root / "note.md").write_text("edited\n", encoding="utf-8")
+        patch = subprocess.check_output(
+            ["git", "-C", str(self.root), "diff", "--no-ext-diff", "--no-textconv", "--binary",
+             "--no-color", self.git("merge-base", "base", "HEAD")])
+        self.assertEqual(session.fingerprint(self.root, "base"), hashlib.sha256(patch).hexdigest())
 
     def test_lock_denies_concurrent_start(self):
         path = session.state_path(self.root, "465").with_suffix(".lock")

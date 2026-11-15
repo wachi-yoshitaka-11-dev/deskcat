@@ -9,6 +9,7 @@ hookを子processとして起動し、stdinへhookの入力JSONを渡して、**
 また起きる。**そしてhookは失敗しても静かなため、壊れたことに気付けない。**
 """
 
+import atexit
 import json
 import os
 import re
@@ -88,6 +89,50 @@ def _git(root, *arguments):
         )
     return result.stdout
 
+# `gh`を差し替えるshim（#688）。`gh pr merge`の前にhookが呼ぶ`gh pr view`／`gh api`へ、
+# 環境変数`DESKCAT_TEST_GH`のJSONから答える。**hookの解除手段ではなく、testの入力である。**
+# 未設定なら対象fileを含まない1件のPull Requestとして答える。
+GH_SHIM = f"""#!{sys.executable}
+import json, os, sys, time
+fixture = json.loads(os.environ.get("DESKCAT_TEST_GH") or "{{}}")
+if fixture.get("log"):
+    with open(fixture["log"], "a", encoding="utf-8") as log:
+        log.write(json.dumps(sys.argv[1:]) + "\\n")
+time.sleep(fixture.get("sleep", 0))
+if fixture.get("fail"):
+    sys.stderr.write("gh: boom")
+    sys.exit(1)
+args = sys.argv[1:]
+if args[:2] == ["pr", "view"]:
+    print(json.dumps({{"number": 7, "url": "https://github.com/o/r/pull/7"}}))
+elif args[:2] == ["issue", "view"]:
+    print(json.dumps(fixture["issue"]))
+elif args[:2] == ["api", "graphql"]:
+    print(json.dumps({{"data": {{"node": fixture["item"]}}}}))
+elif args[0] == "api":
+    path = [a for a in args[1:] if a.startswith("repos/")][0]
+    if path.startswith("repos/o/r/pulls/7/files"):
+        print("\\n".join(fixture.get("files", ["README.md"])))
+    elif path.startswith("repos/o/r/pulls/7/commits"):
+        print("\\n".join(fixture.get("commits", {{}}).keys()))
+    elif "/check-runs" in path:
+        time.sleep(fixture.get("sleep_commits", 0))
+        sha = path.split("/commits/")[1].split("/")[0]
+        print(json.dumps({{"check_runs": fixture["commits"][sha].get("check_runs", [])}}))
+    elif "/statuses" in path:
+        time.sleep(fixture.get("sleep_commits", 0))
+        sha = path.split("/commits/")[1].split("/")[0]
+        print(json.dumps(fixture["commits"][sha].get("statuses", [])))
+    else:
+        sys.exit(2)
+else:
+    sys.exit(2)
+"""
+_GH_SHIM_DIR = tempfile.mkdtemp(prefix="deskcat-gh-shim-")
+atexit.register(shutil.rmtree, _GH_SHIM_DIR, ignore_errors=True)
+Path(_GH_SHIM_DIR, "gh").write_text(GH_SHIM, encoding="utf-8")
+Path(_GH_SHIM_DIR, "gh").chmod(0o755)
+
 
 def _invoke(script, command, cwd=None, environment=None):
     """hookへcommandを渡し`(exit code, 解釈した出力)`を返す。
@@ -102,6 +147,9 @@ def _invoke(script, command, cwd=None, environment=None):
     env.pop("DESKCAT_SKIP_PUSH_GATE", None)
     env.pop("DESKCAT_SKIP_TRUNCATION_GUARD", None)
     env.pop("DESKCAT_SKIP_WORKTREE_GUARD", None)
+    env.pop("DESKCAT_TEST_GH", None)
+    if script == GH_GUARD:
+        env["PATH"] = f"{_GH_SHIM_DIR}{os.pathsep}{env['PATH']}"
     if environment:
         env.update(environment)
     result = subprocess.run(
@@ -779,6 +827,434 @@ class GhMetadataGuardTests(unittest.TestCase):
         self.assertAllowed(
             'gh issue create --title t --body "## 背景\nx\n" --help'
         )
+
+
+class CodeRabbitReviewMergeGateTests(unittest.TestCase):
+    """対象fileを含むPull Requestは、CodeRabbitのreviewが完走するまでmergeさせない（#688）。"""
+
+    MERGE = "gh pr merge 7 --squash --subject s --body-file {body}"
+    DONE = {"name": "CodeRabbit", "status": "completed", "conclusion": "success",
+            "output": {"title": "Finished", "summary": "Result: Success - Review completed"}}
+    SKIPPED = {"name": "CodeRabbit", "status": "completed", "conclusion": "skipped",
+               "output": {"title": "Review skipped", "summary": "Result: Skipped - Review skipped"}}
+    LIMITED = {"name": "CodeRabbit", "status": "completed", "conclusion": "success",
+               "output": {"title": "Review rate limited", "summary": "Rate limited"}}
+    PENDING = {"name": "CodeRabbit", "status": "in_progress", "conclusion": None,
+               "output": {"title": "Review in progress", "summary": ""}}
+
+    def _run(self, fixture, command=None, environment=None):
+        with tempfile.TemporaryDirectory() as directory:
+            body = Path(directory) / "body.txt"
+            body.write_text(
+                f"本文\n\n{gate.TRAILER_CLASS}: c\n{gate.TRAILER_REVIEW}: s\n",
+                encoding="utf-8",
+            )
+            env = {"DESKCAT_TEST_GH": json.dumps(fixture)}
+            env.update(environment or {})
+            return _invoke(
+                GH_GUARD, (command or self.MERGE).format(body=body), environment=env
+            )
+
+    def assertDenied(self, fixture, *contains, **kwargs):
+        code, output = self._run(fixture, **kwargs)
+        self.assertEqual(code, 0)
+        self.assertIsNotNone(output, "通してしまった")
+        self.assertEqual(output["hookSpecificOutput"]["permissionDecision"], "deny")
+        for text in contains:
+            self.assertIn(text, _reason(output))
+
+    def assertAllowed(self, fixture, **kwargs):
+        code, output = self._run(fixture, **kwargs)
+        self.assertEqual(code, 0)
+        self.assertIsNone(output, f"止めてしまった: {output}")
+
+    def _pr(self, files, **commits):
+        return {"files": files, "commits": {
+            sha: {"check_runs": runs} for sha, runs in commits.items()}}
+
+    def test_every_target_path_is_checked(self):
+        """対象のどれか1つに当たればdenyし、理由に当たったfileと状態を出す。"""
+        targets = [
+            "firmware/esp32/src/main.rs",
+            "crates/deskcat-protocol/src/lib.rs",
+            "crates/deskcat-servo/src/lib.rs",
+            "crates/deskcat-face/src/lib.rs",
+            "crates/deskcat-tap/src/lib.rs",
+            "crates/deskcat-touch/src/lib.rs",
+            "crates/deskcat-accel/src/lib.rs",
+            "crates/deskcat-env/src/lib.rs",
+            "docs/protocol/esp32-pi-protocol.md",
+            "docs/hardware/gpio-assignment.md",
+            "docs/hardware/power-budget.md",
+            "docs/hardware/servo-safety-limits.md",
+        ]
+        for name in targets:
+            with self.subTest(name=name):
+                self.assertDenied(
+                    self._pr(["README.md", name], a=[self.SKIPPED]),
+                    f"`{name}`", "Review skipped",
+                )
+
+    def test_files_outside_the_targets_are_allowed(self):
+        """対象外は、CodeRabbitの状態によらず通す（広げない範囲）。"""
+        outside = [
+            "docs/hardware/bom.md", "docs/experiments/exp-1.md",
+            "scripts/hooks/gh_metadata_guard.py", "CONTRIBUTING.md",
+            "crates/deskcat-pi/src/lib.rs", "crates/deskcat-protocol/Cargo.toml",
+            "firmware/esp32/Cargo.toml", "firmware/esp32/srcx/a.rs",
+        ]
+        for name in outside:
+            with self.subTest(name=name):
+                self.assertAllowed(self._pr([name], a=[self.SKIPPED]))
+
+    def test_not_completed_states_are_denied(self):
+        """完走でない状態は、すべてdenyする。"""
+        for label, run in (
+            ("skipped", self.SKIPPED), ("rate limited", self.LIMITED),
+            ("in progress", self.PENDING),
+        ):
+            with self.subTest(label=label):
+                self.assertDenied(
+                    self._pr(["firmware/esp32/src/a.rs"], a=[run]),
+                    run["output"]["title"],
+                )
+
+    def test_no_coderabbit_record_is_denied(self):
+        self.assertDenied(
+            self._pr(["firmware/esp32/src/a.rs"], a=[]), "CodeRabbitの記録なし"
+        )
+
+    def test_completed_review_allows_the_merge(self):
+        self.assertAllowed(self._pr(["firmware/esp32/src/a.rs"], a=[self.DONE]))
+
+    def test_commit_added_after_the_review_is_allowed(self):
+        """**review完走の後に対応commitを足し、headが`Review skipped`でも通す。**
+
+        CONTRIBUTINGは対応commitで投げ直さないと定める（#678の`431ca0e`→`0629fc7`）。
+        """
+        self.assertAllowed(
+            self._pr(["firmware/esp32/src/a.rs"], a=[self.SKIPPED],
+                     b=[self.DONE], c=[self.SKIPPED])
+        )
+
+    def test_legacy_commit_status_counts_as_completed(self):
+        fixture = {"files": ["docs/protocol/esp32-pi-protocol.md"], "commits": {
+            "a": {"statuses": [{"context": "CodeRabbit", "state": "success",
+                                "description": "Review completed"}]}}}
+        self.assertAllowed(fixture)
+
+    def test_legacy_skipped_status_is_denied(self):
+        fixture = {"files": ["docs/protocol/esp32-pi-protocol.md"], "commits": {
+            "a": {"statuses": [{"context": "CodeRabbit", "state": "success",
+                                "description": "Review skipped: automatic reviews are disabled"}]}}}
+        self.assertDenied(fixture, "Review skipped")
+
+    def test_promotion_is_checked_like_any_other(self):
+        """base `main`の昇格（`--merge`）にも同じ検査を掛ける。"""
+        command = "gh pr merge 7 --merge --subject s --body-file {body}"
+        self.assertDenied(
+            self._pr(["firmware/esp32/src/a.rs"], a=[self.SKIPPED]),
+            "firmware/esp32/src/a.rs", command=command,
+        )
+        self.assertAllowed(
+            self._pr(["firmware/esp32/src/a.rs"], a=[self.DONE]), command=command
+        )
+
+    def test_many_commits_are_checked(self):
+        """昇格は100件を超えるcommitを持つ。完走が最古にあっても見つける。"""
+        commits = {f"c{i:03d}": [self.SKIPPED] for i in range(120)}
+        commits["c000"] = [self.DONE]
+        self.assertAllowed(self._pr(["firmware/esp32/src/a.rs"], **commits))
+        del commits["c000"]
+        self.assertDenied(self._pr(["firmware/esp32/src/a.rs"], **commits), "Review skipped")
+
+    def test_gh_failure_is_denied(self):
+        self.assertDenied({"fail": True}, "確認できないまま通さない")
+
+    def test_skip_environment_does_not_disable_this_check(self):
+        """解除の手段を足さない。`DESKCAT_SKIP_GH_GUARD=1`でも止まる。"""
+        self.assertDenied(
+            self._pr(["firmware/esp32/src/a.rs"], a=[self.SKIPPED]),
+            "Review skipped", environment={"DESKCAT_SKIP_GH_GUARD": "1"},
+        )
+
+    def test_help_is_not_checked(self):
+        self.assertAllowed({"fail": True}, command="gh pr merge --help")
+
+
+class GhHookRepositoryAndDeadlineTests(unittest.TestCase):
+    """`-Rowner/repo`の読み取りと、hook全体の期限（#751）。"""
+
+    DONE = CodeRabbitReviewMergeGateTests.DONE
+    TARGET = "firmware/esp32/src/a.rs"
+    DRIVER = (
+        "import sys; sys.path.insert(0, {hooks!r}); import gh_metadata_guard as g; "
+        "g.GH_TIMEOUT_SECONDS = {timeout}; g.CHECK_DEADLINE_SECONDS = {deadline}; "
+        "sys.exit(g.main())"
+    )
+
+    def _logged(self, command, fixture):
+        with tempfile.TemporaryDirectory() as directory:
+            log = Path(directory) / "gh.log"
+            body = Path(directory) / "body.txt"
+            body.write_text(
+                f"本文\n\n{gate.TRAILER_CLASS}: c\n{gate.TRAILER_REVIEW}: s\n",
+                encoding="utf-8",
+            )
+            _invoke(GH_GUARD, command.format(body=body), environment={
+                "DESKCAT_TEST_GH": json.dumps({**fixture, "log": str(log)})})
+            return [json.loads(line) for line in log.read_text().splitlines()]
+
+    def test_attached_repo_option_selects_the_repository(self):
+        """`-Rowner/repo`でも、照会へ`-R owner/repo`を渡す。"""
+        issue = {"issue": {"number": 9, "body": "## 受け入れ条件\n- [ ] a\n"}}
+        pr = {"files": [self.TARGET], "commits": {"a": {"check_runs": [self.DONE]}}}
+        for command, fixture, view in (
+            ("gh issue close 9 -Rowner/target", issue, ["issue", "view"]),
+            ("gh issue close 9 -R owner/target", issue, ["issue", "view"]),
+            ("gh pr merge 7 --squash -Rowner/target --subject s --body-file {body}", pr, ["pr", "view"]),
+            ("gh pr merge 7 --squash -R owner/target --subject s --body-file {body}", pr, ["pr", "view"]),
+        ):
+            with self.subTest(command=command):
+                calls = [c for c in self._logged(command, fixture) if c[:2] == view]
+                self.assertEqual(len(calls), 1, calls)
+                self.assertIn("-R", calls[0])
+                self.assertEqual(calls[0][calls[0].index("-R") + 1], "owner/target")
+
+    def test_attached_repo_text_in_a_value_position_is_not_a_repository(self):
+        """`--comment -Rother/repo`の`-R...`は値であり、repositoryではない。"""
+        issue = {"issue": {"number": 9, "body": "## 受け入れ条件\n- [ ] a\n"}}
+        pr = {"files": [self.TARGET], "commits": {"a": {"check_runs": [self.DONE]}}}
+        for command, fixture, view in (
+            ("gh issue close 9 --comment -Rother/repo", issue, ["issue", "view"]),
+            ("gh pr merge 7 --squash --subject -Rother/repo --body-file {body}", pr, ["pr", "view"]),
+        ):
+            with self.subTest(command=command):
+                calls = [c for c in self._logged(command, fixture) if c[:2] == view]
+                self.assertEqual(len(calls), 1, calls)
+                self.assertNotIn("-R", calls[0])
+
+    def test_option_name_used_as_a_value_does_not_hide_a_real_repo_option(self):
+        """`--comment -c`の`-c`は値。続く`-Rowner/target`は本物の`-R`である。"""
+        issue = {"issue": {"number": 9, "body": "## 受け入れ条件\n- [ ] a\n"}}
+        command = "gh issue close 9 --comment -c -Rowner/target"
+        calls = [c for c in self._logged(command, issue) if c[:2] == ["issue", "view"]]
+        self.assertEqual(len(calls), 1, calls)
+        self.assertEqual(calls[0][calls[0].index("-R") + 1], "owner/target")
+
+    def test_short_options_of_one_subcommand_do_not_hide_the_repository_of_another(self):
+        """`pr merge`の`-r`は`--rebase`（値なし）。`issue close`の`-r`（`--reason`）と混ぜない。"""
+        pr = {"files": [self.TARGET], "commits": {"a": {"check_runs": [self.DONE]}}}
+        command = "gh pr merge 7 -r -Rowner/target --subject s --body-file {body}"
+        calls = [c for c in self._logged(command, pr) if c[:2] == ["pr", "view"]]
+        self.assertEqual(len(calls), 1, calls)
+        self.assertEqual(calls[0][calls[0].index("-R") + 1], "owner/target")
+
+    def _timed(self, fixture, deadline, timeout=10):
+        driver = self.DRIVER.format(
+            hooks=str(SCRIPTS_ROOT / "hooks"), timeout=timeout, deadline=deadline)
+        env = dict(os.environ, DESKCAT_TEST_GH=json.dumps(fixture))
+        env["PATH"] = f"{_GH_SHIM_DIR}{os.pathsep}{env['PATH']}"
+        with tempfile.TemporaryDirectory() as directory:
+            body = Path(directory) / "body.txt"
+            body.write_text(
+                f"本文\n\n{gate.TRAILER_CLASS}: c\n{gate.TRAILER_REVIEW}: s\n",
+                encoding="utf-8",
+            )
+            payload = json.dumps({"tool_name": "Bash", "tool_input": {
+                "command": f"gh pr merge 7 --squash --subject s --body-file {body}"}})
+            start = time.monotonic()
+            result = subprocess.run([sys.executable, "-c", driver], input=payload,
+                                    capture_output=True, text=True, env=env, timeout=60)
+        text = result.stdout.strip()
+        return time.monotonic() - start, (json.loads(text) if text else None)
+
+    def _fixture(self, **extra):
+        return {"files": [self.TARGET], "commits": {"a": {"check_runs": [self.DONE]}}, **extra}
+
+    def test_deadline_starts_before_the_first_lookup(self):
+        """3回の事前照会が各1.2秒でも、全体の期限（3秒）を超えたらdenyする。"""
+        elapsed, output = self._timed(self._fixture(sleep=1.2), deadline=3)
+        self.assertIsNotNone(output, "期限を超えたのに通した")
+        self.assertEqual(output["hookSpecificOutput"]["permissionDecision"], "deny")
+        self.assertLess(elapsed, 5.5)
+
+    def test_running_workers_end_by_the_deadline(self):
+        """commit照会が期限を超えて走り続けても、processは期限の直後に終わる。"""
+        elapsed, output = self._timed(self._fixture(sleep_commits=6), deadline=2)
+        self.assertIsNotNone(output)
+        self.assertEqual(output["hookSpecificOutput"]["permissionDecision"], "deny")
+        self.assertLess(elapsed, 4.5)
+
+
+class AcceptanceCriteriaCloseGateTests(unittest.TestCase):
+    """受け入れ条件に未チェックが残るIssueをcloseさせない（#693）。"""
+
+    CLOSE = "gh issue close 9"
+    DONE_EDIT = ("gh project item-edit --id PVTI_x --project-id P --field-id F"
+                 " --single-select-option-id 98236657")
+    OPEN_BODY = "## 背景\nb\n\n## 受け入れ条件\n\n- [x] 済み\n- [ ] 残り1\n- [ ]\n\n## 検証\n- [ ] 範囲外\n"
+    DONE_BODY = "## 受け入れ条件\n\n- [x] 済み\n- [X] これも\n\n## 検証\n- [ ] 範囲外\n"
+
+    def _run(self, fixture, command, environment=None):
+        return _invoke(
+            GH_GUARD, command,
+            environment={"DESKCAT_TEST_GH": json.dumps(fixture), **(environment or {})},
+        )
+
+    def assertDenied(self, fixture, command, *contains, **kwargs):
+        code, output = self._run(fixture, command, **kwargs)
+        self.assertEqual(code, 0)
+        self.assertIsNotNone(output, "通してしまった")
+        self.assertEqual(output["hookSpecificOutput"]["permissionDecision"], "deny")
+        for text in contains:
+            self.assertIn(text, _reason(output))
+
+    def assertAllowed(self, fixture, command):
+        code, output = self._run(fixture, command)
+        self.assertEqual(code, 0)
+        self.assertIsNone(output, f"止めてしまった: {output}")
+
+    def _issue(self, body, number=9):
+        return {"issue": {"number": number, "body": body}}
+
+    def _item(self, typename="Issue", body="", state="OPEN", number=9):
+        content = {"__typename": typename}
+        if typename == "Issue":
+            content.update(number=number, body=body, state=state)
+        return {"item": {"content": content}}
+
+    def test_close_with_unchecked_items_is_denied_and_lists_them(self):
+        self.assertDenied(
+            self._issue(self.OPEN_BODY), self.CLOSE,
+            "#9", "2件", "`残り1`", "`（空の項目）`",
+        )
+
+    def test_unchecked_items_outside_the_section_are_not_counted(self):
+        code, output = self._run(self._issue(self.OPEN_BODY), self.CLOSE)
+        self.assertNotIn("範囲外", _reason(output))
+
+    def test_close_with_all_checked_is_allowed(self):
+        self.assertAllowed(self._issue(self.DONE_BODY), self.CLOSE)
+
+    def test_issue_without_the_section_is_denied(self):
+        self.assertDenied(
+            self._issue("## 背景\n- [x] a\n"), self.CLOSE, "受け入れ条件`の節が無く",
+        )
+
+    def test_section_ends_at_the_next_level2_heading_only(self):
+        body = "## 受け入れ条件\n- [x] a\n### 補足\n- [ ] 下位見出しの中\n## 検証\n"
+        self.assertDenied(self._issue(body), self.CLOSE, "下位見出しの中")
+
+    def test_heading_variants_start_the_section(self):
+        """実例: `## この Issue の受け入れ条件・成果物`（#546）、`### 測定可能な受け入れ条件`（#236）。"""
+        for heading in ("## この Issue の受け入れ条件・成果物", "### 測定可能な受け入れ条件"):
+            body = f"## 背景\n- [ ] 範囲外\n\n{heading}\n- [x] 済み\n- [ ] 残り\n"
+            with self.subTest(heading=heading):
+                self.assertDenied(self._issue(body), self.CLOSE, "`残り`")
+                self.assertAllowed(
+                    self._issue(body.replace("- [ ] 残り", "- [x] 残り")), self.CLOSE
+                )
+
+    def test_level3_section_ends_at_a_level2_heading(self):
+        body = "### 測定可能な受け入れ条件\n- [x] a\n## 検証\n- [ ] 範囲外\n"
+        self.assertAllowed(self._issue(body), self.CLOSE)
+
+    def test_not_planned_with_a_comment_is_allowed(self):
+        for command in (
+            "gh issue close 9 --reason 'not planned' --comment 方針",
+            "gh issue close 9 -r 'not planned' -c 方針",
+        ):
+            with self.subTest(command=command):
+                self.assertAllowed(self._issue(self.OPEN_BODY), command)
+
+    def test_not_planned_without_a_comment_is_denied(self):
+        for command in (
+            "gh issue close 9 --reason 'not planned'",
+            "gh issue close 9 -r 'not planned' -c ''",
+            "gh issue close 9 --reason completed -c 方針",
+            "gh issue close 9 -c 方針",
+        ):
+            with self.subTest(command=command):
+                self.assertDenied(self._issue(self.OPEN_BODY), command, "未チェック")
+
+    def test_done_is_not_exempted_by_not_planned(self):
+        self.assertDenied(self._item(body=self.OPEN_BODY), self.DONE_EDIT, "未チェック")
+
+    def test_options_and_repo_do_not_hide_the_issue(self):
+        for command in (
+            "gh issue close 9 --reason completed -c done",
+            "gh --repo o/r issue close 9",
+            "gh issue close -R o/r https://github.com/o/r/issues/9",
+        ):
+            with self.subTest(command=command):
+                self.assertDenied(self._issue(self.OPEN_BODY), command, "未チェック")
+
+    def test_done_on_an_issue_item_with_unchecked_items_is_denied(self):
+        self.assertDenied(
+            self._item(body=self.OPEN_BODY), self.DONE_EDIT, "#9", "`残り1`",
+        )
+
+    def test_done_on_an_issue_item_with_all_checked_is_allowed(self):
+        self.assertAllowed(self._item(body=self.DONE_BODY), self.DONE_EDIT)
+
+    def test_done_on_an_issue_item_without_the_section_is_denied(self):
+        self.assertDenied(self._item(body="本文"), self.DONE_EDIT, "節が無く")
+
+    def test_done_on_a_pull_request_item_is_allowed(self):
+        self.assertAllowed(self._item("PullRequest"), self.DONE_EDIT)
+
+    def test_done_on_a_draft_issue_item_is_allowed(self):
+        self.assertAllowed(self._item("DraftIssue"), self.DONE_EDIT)
+
+    def test_done_on_an_already_closed_issue_is_allowed(self):
+        """`Done`が閉じるものが無い。boardの同期を止めない。"""
+        self.assertAllowed(self._item(body=self.OPEN_BODY, state="CLOSED"), self.DONE_EDIT)
+
+    def test_other_status_changes_are_allowed(self):
+        """`Done`以外のStatusと、Status以外のfieldは、gh失敗でも見ない。"""
+        for command in (
+            "gh project item-edit --id I --project-id P --field-id F"
+            " --single-select-option-id 47fc9ee4",
+            "gh project item-edit --id I --project-id P --field-id F --date 2026-11-02",
+        ):
+            with self.subTest(command=command):
+                self.assertAllowed({"fail": True}, command)
+
+    def test_gh_failure_is_denied(self):
+        for command in (self.CLOSE, self.DONE_EDIT):
+            with self.subTest(command=command):
+                self.assertDenied({"fail": True}, command, "確認できないまま通さない")
+
+    def test_unreadable_responses_are_denied(self):
+        self.assertDenied({"issue": {"number": 9}}, self.CLOSE, "確認できないまま通さない")
+        self.assertDenied({"item": None}, self.DONE_EDIT, "確認できないまま通さない")
+        self.assertDenied(
+            {"item": {"content": None}}, self.DONE_EDIT, "確認できないまま通さない"
+        )
+
+    def test_missing_selector_or_item_id_is_denied(self):
+        self.assertDenied(self._issue(self.DONE_BODY), "gh issue close", "確認できない")
+        self.assertDenied(
+            self._item(body=self.DONE_BODY),
+            "gh project item-edit --project-id P --single-select-option-id 98236657",
+            "確認できない",
+        )
+
+    def test_skip_environment_does_not_disable_this_check(self):
+        for command, fixture in (
+            (self.CLOSE, self._issue(self.OPEN_BODY)),
+            (self.DONE_EDIT, self._item(body=self.OPEN_BODY)),
+        ):
+            with self.subTest(command=command):
+                self.assertDenied(
+                    fixture, command, "未チェック",
+                    environment={"DESKCAT_SKIP_GH_GUARD": "1"},
+                )
+
+    def test_help_is_not_checked(self):
+        self.assertAllowed({"fail": True}, "gh issue close --help")
+        self.assertAllowed({"fail": True}, self.DONE_EDIT + " --help")
 
 
 class BranchBaseGuardTests(unittest.TestCase):

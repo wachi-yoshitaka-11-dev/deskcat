@@ -13,13 +13,16 @@
 //!   logへ出す（[#15](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/15)／
 //!   [#16](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/16)）。
 //!   **一致判定は、`run_i2c_bringup`自身は行わない。**生byteをlogへ残すだけで、識別の断定は
-//!   log を読む人間の責務とする（[`run_i2c_bringup`]参照）。**ただし`tap-21`付きbuildでは、呼び出し側の`start_tap`が
+//!   log を読む人間の責務とする（[`run_i2c_bringup`]参照）。**ただし製品buildと`tap-21`付きbuildでは、呼び出し側（`start_product_sensors`、`start_tap`）が
 //!   `ACCEL-01`のDevice IDを`0xE5`と比べ、一致したときだけtapの設定を書く。**
+//!   **製品buildは、起動後にこのbusを`ENV-01`の周期測定と共有する**（`crate::i2c_bus`、`crate::env_report`）。
 //! - Pi link（UART1、`PI-UART-TX`＝GPIO13、`PI-UART-RX`＝GPIO14）で`boot`のACK待ち・再送・
 //!   `sid`選び直しを行う（`crate::boot_session`。[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)
 //!   PR B、[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)）。受信の異常
 //!   （ring bufferの満杯など）を数える（`drain_uart_events`）。制約は`crate::console`の
 //!   module docにまとめてある
+//! - **既定の製品buildは`ENV-01`（BME280）を60 sごとに測り、session確立後に`environment`をPiへ送る**（`crate::env_report`。
+//!   forced・×1・IIR off。変換を待つ間もmain loopを止めない。送る条件は`docs/protocol/esp32-pi-protocol.md`の§4.5）。**実機では動かしていない。**
 //! - **既定の製品buildは`DISP-01`（LCD）を描画し、tap入力を読む。`SERVO-PWM`・`ADC-*`はdriveしない。**
 //!   **`TOUCH-*`のうち`TOUCH-CS`（GPIO21）を使い、LCDと同じbusでtouchを読む。**`TOUCH-IRQ`は取らない。
 //!   状態機械で撫でを判定し、bootのACK後に`head_touched`を送る（#21、`crate::touch::StrokeDetector`。
@@ -31,13 +34,15 @@
 //!   [`run_display_bringup`]経由でLCDを初期化してbacklightを点ける。`bringup-display-13`は単色fill・四隅patternを
 //!   main loopの中で1段ずつ進め、`face-21`は点けたまま`set_expression`の表情を描く（`crate::face`）（`crate::display_test`、[Issue #13](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/13)。
 //!   **試験buildでの有効化の手順は下の「`DISP-01`のbring-upを有効にする手順」節。**）。
-//!   `bench-servo-test-17` feature付きbuildだけが[`run_servo_bench_test`]経由でservoを
-//!   呼ぶ（[Issue #17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。
+//!   `bench-servo-test-17` feature付きbuildが[`run_servo_bench_test`]経由で、`bench-servo-calib-18` feature付きbuildが
+//!   `crate::servo_calib`経由で、servoを呼ぶ（[Issue #17](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/17)。
 //!   詳細は[`crate::servo`]と[`run_servo_bench_test`]のdoc参照）。
-//! - **#514の追加LED（`LED-COMM`＝GPIO2、`LED-REACT`＝GPIO5）も既定のbuildではdriveしない。**
-//!   `bringup-led-514` feature付きbuildだけが`crate::led`で点灯試験と白の点滅を行う
-//!   （[Issue #514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)）。このfeatureは
-//!   `bringup-display-13`とも組み合わせられる（pinが重ならない）。
+//! - **#514の追加LED（`LED-COMM`＝GPIO2、`LED-REACT`＝GPIO5）は`crate::led`が駆動する**
+//!   （[Issue #514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)）。既定の製品buildは、
+//!   白の点滅（通信の成立と継続を確認できていない間の表示。点灯へ切り替える判定は無い）と、`set_expression`で
+//!   `happy`を受理したときの赤の1秒点灯を行う。`bringup-led-514` feature付きbuildは、その前に点灯試験
+//!   （赤→白→両方）を行う。このfeatureは`bringup-display-13`とも組み合わせられる（pinが重ならない）。
+//!   **実機で動かした記録は、点灯試験用のbuildだけである。**
 //!
 //! # buildの構成（[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)）
 //!
@@ -46,7 +51,7 @@
 //! I2Cのbring-upは起動時に1回走る（`bringup-display-13`付きbuildでは、LCDの
 //! bring-upの後にmain loopの中で1回。下の`i2c_pending`を参照）。logはどのbuildでもUART0（USB）へ出る
 //! （`crate::console`）。表の試験featureを指定すると既存の試験構成を選び、
-//! 試験feature同士は加える向きにする。**例外は`bench-servo-test-17`だけであり、Pi linkを
+//! 試験feature同士は加える向きにする。**例外は`bench-servo-test-17`（`bench-servo-90-17`を含む）と`bench-servo-calib-18`だけであり、Pi linkを
 //! 外す**（下の表。正本の要求による）。そのため、Pi linkで送る`tap-21`とは併用できない（`compile_error!`で止める）。
 //!
 //! | 試験feature | その試験buildで有効になるもの | 製品buildとの関係 |
@@ -59,12 +64,15 @@
 //! | `touch-sample-14` | `TOUCH-01`（XPT2046）の raw 読み出し。SPI3（GPIO18/23/19）、`TOUCH-CS`＝GPIO21、`TOUCH-IRQ`＝GPIO34 で X・Y・Z1・Z2 を読み、IRQ の level とあわせて UART0 に log（#14、`crate::touch`）。`T_IRQ` の変化の時刻と、console から受けた `MARK` の時刻も log する（条件 6 の突き合わせ用）。LCD は初期化せず、`LCD-CS`（GPIO22）を High に固定する。状態機械は配線しない | 単独指定のみ。touch 用 5 本を足した配線で、`EXP-038`（develop `79f29ea`。raw を取った）と `EXP-041`（develop `b9a04e8`。`T_IRQ` の変化と `MARK` の log、`crate::spi_port` の bus の持ち方を含む版で、`MARK` 31 件に `touch_mark` 31 件、SPI の失敗 0 件）の版を実機に書き込んで動かした。次の通電・書き込みにも実機側の新たな承認が要る。Pi link の payload は変更しない |
 //! | `touch-lcd-14` | LCDを初期化して点灯し、表情（neutral→happy→surprised）を帯1本ずつ塗り続けながら、同じSPI host（SPI3）で`TOUCH-01`のrawを読む（#14の受け入れ条件「LCD通信による許容できないdata lossがない」の観察用、`crate::touch_lcd`）。LCDとタッチは`SpiDriver`を共有し、busは転送ごとに取る。帯の途中ではタッチを読まない。console（stdin）は読まず、`MARK`は受け付けない（`T_IRQ`の変化は`touch-sample-14`と同じくlogする）。状態機械は配線しない | 単独指定のみ。**製品buildも同じ共有の型を使う。busを握り続ける型は`touch-sample-14`だけ**（`crate::spi_port`）。`set_expression`は`hardware_unavailable`で拒否する。`EXP-041`で、develop `b9a04e8`の版を、LCDのVCC・9本・touch用5本が挿さった配線に書き込み、157秒動かした（帯7000本、`lcd_errors_total=0`、`touch_spi_errors_total=0`、LCDの乱れは目視の申告に無い）。次の通電・書き込みにも実機側の新たな承認が要る。Pi linkのpayloadは変更しない |
 //! | `bringup-display-13` | LCDの初期化、backlightの点灯、単色fillと四隅pattern | 表情とtapは有効にしない。描画の間のPi linkの受信とheartbeatは`crate::display_test`のmodule docを参照 |
-//! | `bringup-led-514` | #514の追加LED（GPIO2／GPIO5）の点灯試験と白の点滅（`crate::led`） | 表情とtapは有効にしない。`bringup-display-13`とも組み合わせられる |
-//! | `face-21` | LCDの初期化とbacklightの点灯を保ち、`set_expression`の3表情を描く。Pi commandを受けなくても、描ける状態になった時点で`neutral`を1回描く（#21、`crate::face`） | `bringup-display-13`とも組み合わせられる。**表情を持たない試験buildは`set_expression`を`hardware_unavailable`で拒否する** |
+//! | `no-touch-487` | 製品buildと同じ。ただし`TOUCH-CS`（GPIO21）は`IdleTouch`が出力Highにして保ち、touchを読まず、`head_touched`を送らず、LED（GPIO2・GPIO5）に触れない（#487） | 単独で使う。`build.rs`はこのfeatureだけ製品経路のcfgから外さず、併用は`compile_error!`で止める。通電の条件は`docs/hardware/power-budget.md`の`touchを読まない製品build（no-touch-487）の通電の条件` |
+//! | `bringup-led-514` | #514の追加LED（GPIO2／GPIO5）の点灯試験（赤→白→両方）と、その後の白の点滅（`crate::led`）。製品buildにある赤の`happy`点灯も同じ経路を持つ。このfeatureだけのbuildは表情を持たないため`set_expression`を受理せず、赤は点灯試験の区間だけ点く。`face-21`と組み合わせたbuildは`happy`を受理し、赤を1秒点ける（この併用は`compile_error!`で止めていない） | 表情とtapは有効にしない。`bringup-display-13`とも組み合わせられる |
+//! | `face-21` | LCDの初期化とbacklightの点灯を保ち、`set_expression`の表情を描く。Pi commandを受けなくても、描ける状態になった時点で`neutral`を1回描く（#21、`crate::face`） | `bringup-display-13`とも組み合わせられる。**表情を持たない試験buildは`set_expression`を`hardware_unavailable`で拒否する** |
 //! | `tap-21` | ADXL345のtap検出を設定し、`INT_SOURCE`をI2Cで読み、bootのACK後に`tapped`を送る（#21のF1、`crate::tap`）。ADXL345のDevice IDが`0xE5`のときだけ設定を書き、I2Cのdriverを持ち続ける（一致しなければ何も書かず、driverを手放す） | INT線は使わない（配線は要らない）。`face-21`・`bringup-display-13`とも組み合わせられる。**試験buildのうち`tap-21`も`accel-sample-15`も持たないものは、ADXL345へ書き込まず、Device IDを読むだけである**（既定・製品buildは`tap-21`と同じく書く） |
-//! | `mem-probe-23` | health snapshotと同じ周期で、空きheap・起動からの最小の空きheap・main taskのstackのhigh water markを1行logへ出す（#23の`PROTO-TBD-007`、`crate::mem_probe`）。**このfeatureのbuildだけが`unsafe`を持つ**（`unsafe_code`を`deny`へ下げ、`mem_probe`の3呼び出しだけ`allow`） | logを足すだけで、LCD・Pi link・tapの挙動は変えない。featureを指定すると製品経路のcfgが外れるので、製品buildと同じ構成で測るときは`face-21`と`tap-21`を足す（タッチの撫での判定は製品buildだけが持ち、この構成には入らない）。`bringup-display-13`とも組み合わせられる。単独の試験build（`env-sample-16`・`accel-sample-15`・`touch-sample-14`・`touch-lcd-14`）、`bringup-i2c-15-16`、`bringup-led-514`、`bench-servo-test-17`、`debug-motion-19`とは併用できない（`compile_error!`） |
+//! | `mem-probe-23` | health snapshotと同じ周期で、空きheap・起動からの最小の空きheap・main taskのstackのhigh water markを1行logへ出す（#23の`PROTO-TBD-007`、`crate::mem_probe`）。**このfeatureのbuildだけが`unsafe`を持つ**（`unsafe_code`を`deny`へ下げ、`mem_probe`の3呼び出しだけ`allow`） | logを足すだけで、LCD・Pi link・tapの挙動は変えない。featureを指定すると製品経路のcfgが外れるので、製品buildと同じ構成で測るときは`face-21`と`tap-21`を足す（タッチの撫での判定と`ENV-01`の周期測定・`environment`の送出は製品buildだけが持ち、この構成には入らない）。`bringup-display-13`とも組み合わせられる。単独の試験build（`env-sample-16`・`accel-sample-15`・`touch-sample-14`・`touch-lcd-14`）、`bringup-i2c-15-16`、`bringup-led-514`、`bench-servo-test-17`、`debug-motion-19`とは併用できない（`compile_error!`） |
 //! | `debug-motion-19` | UART0のconsoleから`MOTION <name> <target>`の行を別threadで読み、Pi由来の`play_motion`と同じ`MotionDispatch`のcatalogへ渡す（#19の受け入れ条件3、`crate::debug_motion`、`crate::pi_link::PiLink::on_debug_line`）。**servoを駆動せず、`LimitedServo`も`Limiter`も作らない。catalogが空のため、debugの指示も全て拒否される。同じ`Limiter`（同じcounter）を通ることは、`deskcat_servo`のhost testが示す範囲である** | **製品buildには入らない**（featureなし）。featureを指定すると製品経路のcfgが外れる。Pi linkを持つ。`bench-servo-test-17`・`touch-sample-14`・`touch-lcd-14`・`mem-probe-23`・`env-sample-16`・`accel-sample-15`・`bringup-i2c-15-16`・`bringup-led-514`とは併用できない（`compile_error!`）。実機では動かしていない |
 //! | `bench-servo-test-17` | servoの単発bench試験（#17の測定用build） | **Pi linkを外す。**正本`docs/hardware/servo-safety-limits.md`の`測定のための駆動（承認の状態の項目6）`節が、測定用のbuildは「Piとの通信linkを持たない」と定めているためである |
+//! | `bench-servo-calib-18` | #18の校正build。UART0のconsoleから`GO18`を受けた後、`MOTION calib <deg>`・`STOP`・`END`だけを受け、`LimitedServo`（`Limiter`を通る）だけでservoを駆動する（`crate::servo_calib`。仕様は`docs/hardware/servo-safety-limits.md`の`校正buildの仕様（案）`）。NVSのlatchは使わず、起動のたびに`GO18`を待つ | **Pi link・heartbeat・I2C・LCDを持たない。専用の`main`を持つ。**`config.rs`の`SERVO_CALIB_18_*`が`None`の間はcompileが止まる（値は回ごとの実行承認が決める）。単独の試験buildで、他の試験featureとは併用できない（`compile_error!`）。実機では動かしていない |
+//! | `bench-wdt-711` | #711のtask WDTの検証build。main taskをTWDTへ登録し、**その後は一度もfeedしない**。約timeout（sdkconfigの値）でpanicしてresetし、再起動後の`reset_reason`が`task_watchdog`になることを実機で見る（`crate::task_wdt`） | **servo・LEDC・GPIO27・Pi link・I2C・LCDに触れない。専用の`main`を持つ。**製品buildと校正buildには、hangを起こすcommandを入れていない。単独の試験buildで、他の試験featureとは併用できない（`compile_error!`）。**実機では動かしていない** |
 //! | `bench-servo-90-17` | 上の単発bench試験で、指令角だけを規約上の90度にする | `bench-servo-test-17`を含む。90度が機械的中央かどうかは未確認（`HW-TBD-010`） |
 //!
 //! `#487`のPR B1より前は、`pi-protocol-mode` featureを付けたbuildだけがPi linkを持ち、LCD／I2Cの
@@ -80,8 +88,8 @@
 //! （`crate::accel`・`crate::env`のmodule doc参照）、Pi link関連（`peripherals.uart1`、GPIO13＝TX、
 //! GPIO14＝RX）、LCD関連6+1本（`crate::display`のmodule doc参照）、`TOUCH-CS`（GPIO21。idleはHigh、touchの転送の間だけLow）である。
 //! LCDに触れない試験buildはLCD関連pinを渡さない。`bench-servo-test-17` feature付きbuildは`SERVO-PWM`（GPIO27）と
-//! `peripherals.ledc.timer0`／`channel0`を追加で渡し、Pi link関連を渡さない。`bringup-led-514` feature付きbuildは
-//! GPIO2とGPIO5を追加で渡す。
+//! `peripherals.ledc.timer0`／`channel0`を追加で渡し、Pi link関連を渡さない。製品buildと`bringup-led-514` feature付きbuildは
+//! GPIO2とGPIO5を`crate::led`へ渡す。
 //!
 //! **I2Cはこの版でも実機通電していない。**この版の検証は`cargo build`でのcross-compile
 //! 確認までであり、実機へflashして確認するのは別工程である（[Hardware Safety
@@ -101,8 +109,11 @@
 //! `boot=`行を目視で確認していた作業（`#7`／`#13`等）があれば、`boot=`行が
 //! 無くなったことを踏まえて確認し直すこと。
 //!
-//! **Watchdog の設定を変えない。**Task Watchdog Timer は ESP-IDF の既定値のままである。
-//! `sdkconfig.defaults` に watchdog の項目を足していない。heartbeat loop は
+//! **Task Watchdog Timer の timeout は ESP-IDF の既定値のままである。**`sdkconfig.defaults` が足した watchdog の項目は
+//! `CONFIG_ESP_TASK_WDT_PANIC=y` だけである（[Issue #711](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/711)。
+//! 発火したら警告で止めず panic して reset する）。**全ての build が同じ `sdkconfig` を使うので、この設定は全 build に効く**
+//! （製品 build を含む。従来は警告だけだった）。登録するのは idle task（既定。両 core）で、main task を登録するのは
+//! `bench-servo-calib-18` の build だけである（`crate::task_wdt::register_main_task`。`bench-wdt-711` の検証 build も登録するが、servo に触れない）。**実機では確かめていない。**heartbeat loop は
 //! [`FreeRtos::delay_ms`] で待つ。同 API は
 //! 「Delays bigger than `1000 /` `TICK_RATE_HZ` milliseconds … used in a loop would
 //! starve the FreeRTOS IDLE tasks as they are low prio tasks and hence the IDLE task's
@@ -181,14 +192,25 @@
 // `mem_probe`の中の`#![allow(unsafe_code)]`が3つの`unsafe`を許す。他のmoduleの`unsafe`は`deny`で止まる。
 #![cfg_attr(not(feature = "mem-probe-23"), forbid(unsafe_code))]
 #![cfg_attr(feature = "mem-probe-23", deny(unsafe_code))]
+// `bench-servo-calib-18`のbuildは専用の`main`（`servo_calib::run`）を持ち、このfileの製品経路の`main`と
+// それだけが呼ぶmodule・importを使わない。使われない分の警告だけをこのfeatureで止める
+// （他のbuildの水準は変えない）。
+#![cfg_attr(
+    any(feature = "bench-servo-calib-18", feature = "bench-wdt-711"),
+    allow(dead_code, unused_imports)
+)]
+
+// `no-touch-487`は単独で使う。他のfeatureを足すと製品経路（`build.rs`の`deskcat_product_mode`）が外れ、touchを読まない製品buildにならない。
+#[cfg(all(feature = "no-touch-487", not(deskcat_product_mode)))]
+compile_error!("no-touch-487は単独で使う。他のfeatureと併用しない。");
 
 mod accel;
 #[cfg(feature = "accel-sample-15")]
 mod accel_sample;
-// Pi link（UART1）の`boot`の受理確認・再送。**`bench-servo-test-17`を有効にするbuild（`bench-servo-90-17`を含む）だけは持たない。**
+// Pi link（UART1）の`boot`の受理確認・再送。**`bench-servo-test-17`を有効にするbuild（`bench-servo-90-17`を含む）と`bench-servo-calib-18`のbuildだけは持たない。**
 // 正本`docs/hardware/servo-safety-limits.md`の`測定のための駆動（承認の状態の項目6）`節が、
 // 測定用のbuildは「Piとの通信linkを持たない」と定めているためである（`#487`でfeatureの排他を
-// やめたときの、ただ1つの例外である。featureどうしの排他ではない。Pi linkを外すだけである）。
+// やめたときの例外である（`bench-servo-calib-18`も同じ）。featureどうしの排他ではない。Pi linkを外すだけである）。
 // `tap-21`は、検出を`tapped`としてPi linkで送る。測定用build（`bench-servo-test-17`）はPi linkを
 // 持たないため、この2つは併用できない。併用すると`boot_session`と`pi_link`が無いことで
 // 分かりにくいcompile errorになるので、ここで理由を示して止める。
@@ -289,32 +311,98 @@ compile_error!(
      bench-servo-test-17、touch-sample-14、touch-lcd-14、mem-probe-23、env-sample-16、accel-sample-15、\
      bringup-i2c-15-16、bringup-led-514とは併用しない。"
 );
-#[cfg(not(feature = "bench-servo-test-17"))]
+// `bench-servo-calib-18`（#18の校正build）も、Pi link（`boot_session`、UART1）をcompileしない
+// （`docs/hardware/servo-safety-limits.md`の`校正buildの仕様`の`Pi link`行）。単独の試験buildである。
+#[cfg(all(
+    feature = "bench-servo-calib-18",
+    any(
+        feature = "bench-servo-test-17",
+        feature = "bench-servo-90-17",
+        feature = "bringup-i2c-15-16",
+        feature = "bringup-display-13",
+        feature = "bringup-led-514",
+        feature = "face-21",
+        feature = "tap-21",
+        feature = "env-sample-16",
+        feature = "accel-sample-15",
+        feature = "touch-sample-14",
+        feature = "touch-lcd-14",
+        feature = "mem-probe-23",
+        feature = "debug-motion-19"
+    )
+))]
+compile_error!(
+    "bench-servo-calib-18は単独の試験buildとして使う。Pi linkを持たず、UART0のstdinをこのbuildだけが読む。\
+     他の試験feature（bench-servo-test-17、bench-servo-90-17、bringup-*、*-sample-*、touch-*、face-21、tap-21、\
+     mem-probe-23、debug-motion-19）とは併用しない。"
+);
+// `bench-wdt-711`（#711のtask WDTの検証build）も単独の試験buildである。servoに触れず、Pi link・I2C・LCDを持たない。
+#[cfg(all(
+    feature = "bench-wdt-711",
+    any(
+        feature = "bench-servo-test-17",
+        feature = "bench-servo-90-17",
+        feature = "bench-servo-calib-18",
+        feature = "bringup-i2c-15-16",
+        feature = "bringup-display-13",
+        feature = "bringup-led-514",
+        feature = "face-21",
+        feature = "tap-21",
+        feature = "env-sample-16",
+        feature = "accel-sample-15",
+        feature = "touch-sample-14",
+        feature = "touch-lcd-14",
+        feature = "mem-probe-23",
+        feature = "debug-motion-19"
+    )
+))]
+compile_error!("bench-wdt-711は単独の試験buildとして使う。他の試験featureとは併用しない。");
+#[cfg(not(any(
+    feature = "bench-servo-test-17",
+    feature = "bench-servo-calib-18",
+    feature = "bench-wdt-711"
+)))]
 mod boot_session;
 mod config;
 mod console;
-#[cfg(feature = "debug-motion-19")]
+#[cfg(any(feature = "debug-motion-19", feature = "bench-servo-calib-18"))]
 mod debug_motion;
 mod display;
 #[cfg(feature = "bringup-display-13")]
 mod display_test;
 mod env;
+#[cfg(deskcat_product_mode)]
+mod env_report;
 #[cfg(feature = "env-sample-16")]
 mod env_sample;
 mod face;
 mod health;
-#[cfg(feature = "bringup-led-514")]
+mod i2c_bus;
+#[cfg(any(feature = "bringup-led-514", deskcat_product_led))]
 mod led;
 #[cfg(feature = "mem-probe-23")]
 mod mem_probe;
-#[cfg(not(feature = "bench-servo-test-17"))]
+#[cfg(not(any(
+    feature = "bench-servo-test-17",
+    feature = "bench-servo-calib-18",
+    feature = "bench-wdt-711"
+)))]
 mod pi_link;
-#[cfg(not(feature = "bench-servo-test-17"))]
+#[cfg(not(any(
+    feature = "bench-servo-test-17",
+    feature = "bench-servo-calib-18",
+    feature = "bench-wdt-711"
+)))]
 mod protocol;
 mod servo;
+#[cfg(feature = "bench-servo-calib-18")]
+mod servo_calib;
+mod servo_path;
 mod spi_port;
 mod tap;
-// 製品buildは`touch::StrokeDetector`、LCDを描く試験build（`bringup-display-13`・`face-21`）は読まない`touch::IdleTouch`だけを使う。
+#[cfg(any(feature = "bench-servo-calib-18", feature = "bench-wdt-711"))]
+mod task_wdt;
+// 製品buildは`touch::StrokeDetector`、LCDを描く試験build（`bringup-display-13`・`face-21`）と`no-touch-487`は読まない`touch::IdleTouch`だけを使う。
 // 試験buildの読み出しの型（`TouchSampler`）はdead_codeになる。
 #[cfg(any(
     feature = "touch-sample-14",
@@ -343,14 +431,22 @@ use esp_idf_svc::hal::peripherals::Peripherals;
     deskcat_product_mode
 ))]
 use esp_idf_svc::hal::spi::SpiAnyPins;
-#[cfg(not(feature = "bench-servo-test-17"))]
+#[cfg(not(any(
+    feature = "bench-servo-test-17",
+    feature = "bench-servo-calib-18",
+    feature = "bench-wdt-711"
+)))]
 use esp_idf_svc::hal::uart::{config::Config as UartConfig, UartDriver, UartEventPayload};
 use esp_idf_svc::hal::units::Hertz;
 
 use crate::accel::Adxl345;
 #[cfg(feature = "accel-sample-15")]
 use crate::accel_sample::AccelSampler;
-#[cfg(not(feature = "bench-servo-test-17"))]
+#[cfg(not(any(
+    feature = "bench-servo-test-17",
+    feature = "bench-servo-calib-18",
+    feature = "bench-wdt-711"
+)))]
 use crate::boot_session::{BootRetryPolicy, BootSession};
 #[cfg(any(
     feature = "bringup-display-13",
@@ -362,40 +458,52 @@ use crate::display::Ili9341;
 #[cfg(feature = "bringup-display-13")]
 use crate::display_test::DisplayBringup;
 use crate::env::Bme280;
+#[cfg(deskcat_product_mode)]
+use crate::env_report::EnvReporter;
 #[cfg(feature = "env-sample-16")]
 use crate::env_sample::EnvSampler;
 #[cfg(any(feature = "face-21", deskcat_product_mode))]
 use crate::face::FaceDrawer;
 use crate::face::FaceState;
 use crate::health::Health;
-#[cfg(feature = "bringup-led-514")]
+#[cfg(any(feature = "bringup-led-514", deskcat_product_led))]
 use crate::led::Leds;
-#[cfg(not(feature = "bench-servo-test-17"))]
+#[cfg(not(any(
+    feature = "bench-servo-test-17",
+    feature = "bench-servo-calib-18",
+    feature = "bench-wdt-711"
+)))]
 use crate::pi_link::{FaceTargets, PiLink};
 #[cfg(any(feature = "tap-21", deskcat_product_mode))]
 use crate::tap::TapDetector;
-#[cfg(all(
-    not(deskcat_product_mode),
-    any(feature = "bringup-display-13", feature = "face-21")
+#[cfg(any(
+    feature = "no-touch-487",
+    all(
+        not(deskcat_product_mode),
+        any(feature = "bringup-display-13", feature = "face-21")
+    )
 ))]
 use crate::touch::IdleTouch;
-#[cfg(deskcat_product_mode)]
+#[cfg(deskcat_reads_touch)]
 use crate::touch::StrokeDetector;
 #[cfg(any(feature = "touch-sample-14", feature = "touch-lcd-14"))]
 use crate::touch::TouchSampler;
 #[cfg(feature = "touch-lcd-14")]
 use crate::touch_lcd::TouchLcd;
-#[cfg(deskcat_product_mode)]
+#[cfg(deskcat_reads_touch)]
 use deskcat_protocol::HeadTouched;
 #[cfg(any(feature = "tap-21", deskcat_product_mode))]
 use deskcat_protocol::Message;
 
 /// `run_display_bringup`がLCDと同じbusに足すtouchの型。製品buildは撫でを判定し、LCDを描く試験buildは読まない（`crate::touch`）。
-#[cfg(deskcat_product_mode)]
+#[cfg(deskcat_reads_touch)]
 type BusTouch = StrokeDetector;
-#[cfg(all(
-    not(deskcat_product_mode),
-    any(feature = "bringup-display-13", feature = "face-21")
+#[cfg(any(
+    feature = "no-touch-487",
+    all(
+        not(deskcat_product_mode),
+        any(feature = "bringup-display-13", feature = "face-21")
+    )
 ))]
 type BusTouch = IdleTouch;
 
@@ -506,7 +614,7 @@ fn next_deadline(deadline: u64, period_ms: u32, now: u64) -> (u64, bool) {
 /// 待ち時間が `u32` に収まらない場合は `u32::MAX` で頭打ちにする。頭打ちにしても
 /// 次の周回で残りを待ち直すだけであり、期限を飛ばさない。
 ///
-/// Pi linkを持つbuild（`bench-servo-test-17`を有効にするbuild（`bench-servo-90-17`を含む）以外のすべて）は、この関数の代わりに
+/// Pi linkを持つbuild（`bench-servo-test-17`を有効にするbuild（`bench-servo-90-17`を含む）と`bench-servo-calib-18`以外のすべて）は、この関数の代わりに
 /// `UartDriver::read`のtimeoutで待つ（main loop参照。同じく1 ms以上へ丸める）。
 #[cfg(feature = "bench-servo-test-17")]
 fn sleep_ms_until(until: u64, now: u64) {
@@ -515,6 +623,54 @@ fn sleep_ms_until(until: u64, now: u64) {
     FreeRtos::delay_ms(ms);
 }
 
+/// `bench-servo-calib-18`のbuildの`main`。製品経路の`main`（下）は、このbuildにcompileしない。
+/// Pi link・heartbeat・I2C・LCDを持たず、`GO18`を待ってから`crate::servo_calib`が回を進める。
+#[cfg(feature = "bench-servo-calib-18")]
+fn main() {
+    // `main`の先頭の`link_patches`と同じ理由で、1回呼ぶ。
+    esp_idf_svc::sys::link_patches();
+    console::init_log_mode();
+    let profile = if cfg!(debug_assertions) {
+        "debug"
+    } else {
+        "release"
+    };
+    log::info!(
+        "firmware={} version={} profile={} feature=bench-servo-calib-18",
+        env!("CARGO_PKG_NAME"),
+        env!("CARGO_PKG_VERSION"),
+        profile
+    );
+    log::info!("board={}", config::BOARD);
+    let reason = esp_idf_svc::hal::reset::ResetReason::get();
+    log::info!("reset_reason={} raw={reason:?}", reset_reason_str(reason));
+    servo_calib::run()
+}
+
+/// `bench-wdt-711`のbuildの`main`。main taskをTWDTへ登録し、その後は一度もfeedしない（`crate::task_wdt`）。
+/// servo・LEDC・GPIO27・Pi link・I2C・LCDに触れない。
+#[cfg(feature = "bench-wdt-711")]
+fn main() {
+    esp_idf_svc::sys::link_patches();
+    console::init_log_mode();
+    let profile = if cfg!(debug_assertions) {
+        "debug"
+    } else {
+        "release"
+    };
+    log::info!(
+        "firmware={} version={} profile={} feature=bench-wdt-711",
+        env!("CARGO_PKG_NAME"),
+        env!("CARGO_PKG_VERSION"),
+        profile
+    );
+    log::info!("board={}", config::BOARD);
+    let reason = esp_idf_svc::hal::reset::ResetReason::get();
+    log::info!("reset_reason={} raw={reason:?}", reset_reason_str(reason));
+    task_wdt::run_wdt_test()
+}
+
+#[cfg(not(any(feature = "bench-servo-calib-18", feature = "bench-wdt-711")))]
 fn main() {
     // It is necessary to call this function once. Otherwise, some patches to the runtime
     // implemented by esp-idf-sys might not link properly. See https://github.com/esp-rs/esp-idf-template/issues/71
@@ -557,7 +713,7 @@ fn main() {
     // **bring-upより前に作る。**両LEDを早く消灯側へ固定するためである（`crate::led`の
     // module doc「起動からの状態」）。点灯試験の時計は`bringup_done_ms`から数える。
     // 失敗してもfirmwareは止めない。LEDは表示だけを担い、ほかの機能はLEDに依存しない。
-    #[cfg(feature = "bringup-led-514")]
+    #[cfg(any(feature = "bringup-led-514", deskcat_product_led))]
     let mut leds = match Leds::new(peripherals.pins.gpio2, peripherals.pins.gpio5) {
         Ok(leds) => Some(leds),
         Err(err) => {
@@ -592,9 +748,13 @@ fn main() {
         "raw_sample"
     } else if cfg!(feature = "touch-lcd-14") {
         "raw_sample_with_lcd"
-    } else if cfg!(deskcat_product_mode) {
+    } else if cfg!(deskcat_reads_touch) {
         "stroke"
-    } else if cfg!(any(feature = "bringup-display-13", feature = "face-21")) {
+    } else if cfg!(any(
+        feature = "no-touch-487",
+        feature = "bringup-display-13",
+        feature = "face-21"
+    )) {
         "cs_high_not_read"
     } else {
         "not_driven"
@@ -620,7 +780,7 @@ fn main() {
         feature = "face-21",
         deskcat_product_mode
     ))]
-    #[cfg_attr(not(deskcat_product_mode), allow(unused_mut, unused_variables))]
+    #[cfg_attr(not(deskcat_reads_touch), allow(unused_mut, unused_variables))]
     let (lcd, mut bus_touch) = run_display_bringup(
         peripherals.spi3,
         peripherals.pins.gpio18,
@@ -685,17 +845,18 @@ fn main() {
         &mut health,
     );
     // 製品buildと`tap-21`付き試験buildは、ADXL345のDevice IDが一致したときだけ、
-    // I2Cのdriverを持ち続けてtap検出を始める（`crate::tap`）。一致しなければ手放す。
+    // tap検出を始める（`crate::tap`）。一致しなければ、`tap-21`付き試験buildはI2Cのdriverを手放し、
+    // 製品buildは`ENV-01`の周期測定のためにdriverを持ち続ける（`start_product_sensors`）。
     #[cfg(all(
         any(feature = "tap-21", deskcat_product_mode),
         feature = "bringup-display-13"
     ))]
     let mut tap: Option<TapDetector> = None;
-    #[cfg(all(
-        any(feature = "tap-21", deskcat_product_mode),
-        not(feature = "bringup-display-13")
-    ))]
+    #[cfg(all(feature = "tap-21", not(feature = "bringup-display-13")))]
     let mut tap = start_tap(i2c_driver, health.uptime_ms());
+    // 製品buildは、tapと`ENV-01`の周期測定が同じI2C busを共有する（`crate::i2c_bus`）。
+    #[cfg(deskcat_product_mode)]
+    let (mut tap, mut env_reporter) = start_product_sensors(i2c_driver, health.uptime_ms());
     #[cfg(feature = "env-sample-16")]
     let mut env_sampler =
         i2c_driver.map(|bringup| EnvSampler::new(bringup.driver, bringup.env_id, ENV_I2C_ADDRESS));
@@ -759,7 +920,7 @@ fn main() {
     let bringup_done_ms = health.uptime_ms();
     let mut next_heartbeat = bringup_done_ms + u64::from(config::HEARTBEAT_PERIOD_MS);
     let mut next_snapshot = bringup_done_ms + u64::from(config::HEALTH_SNAPSHOT_PERIOD_MS);
-    #[cfg(feature = "bringup-led-514")]
+    #[cfg(any(feature = "bringup-led-514", deskcat_product_led))]
     let led_start_ms = bringup_done_ms;
 
     // Pi linkの送信も受信も、protocol専用の`UartDriver`経由に揃える。**UART0は使わない**
@@ -817,7 +978,7 @@ fn main() {
     let mut last_read_ms = health.uptime_ms();
     // Pi→ESP32方向の受信を振り分ける（`crate::pi_link`）。
     #[cfg(not(feature = "bench-servo-test-17"))]
-    let mut pi_link = PiLink::new();
+    let mut pi_link = PiLink::new(servo_path::product(), health.uptime_ms());
     // debug consoleの読み取り（`crate::debug_motion`。`debug-motion-19`付きのbuildだけ）。
     #[cfg(feature = "debug-motion-19")]
     let debug_console = debug_motion::DebugConsole::start();
@@ -826,6 +987,11 @@ fn main() {
     // いるかを外から確認できなかった。
     loop {
         let now = health.uptime_ms();
+        // 制御周期の期限が来たときだけ`tick`する。`LimitedServo`が無い間は何もしない（`PiLink::tick_servo`）。
+        #[cfg(not(feature = "bench-servo-test-17"))]
+        pi_link.check_link(now);
+        #[cfg(not(feature = "bench-servo-test-17"))]
+        pi_link.tick_servo(now);
         // debug consoleの行を、Pi由来と同じ`MotionDispatch`へ渡す（`PiLink::on_debug_line`）。
         #[cfg(feature = "debug-motion-19")]
         while let Some(event) = debug_console.try_recv() {
@@ -833,8 +999,8 @@ fn main() {
                 debug_motion::ConsoleEvent::Line(line) => {
                     pi_link.on_debug_line(&line, boot_session.is_established());
                 }
-                debug_motion::ConsoleEvent::TooLong => {
-                    log::warn!("debug_motion_unparsed reason=TooLong")
+                debug_motion::ConsoleEvent::TooLong(len) => {
+                    log::warn!("debug_motion_unparsed reason=TooLong len={len}")
                 }
                 debug_motion::ConsoleEvent::ReadFailed(err) => {
                     log::error!("debug_motion_console_read_failed error={err}");
@@ -861,7 +1027,11 @@ fn main() {
         }
 
         if now >= next_snapshot {
-            emit_health_snapshot(&mut health, now);
+            #[cfg(not(feature = "bench-servo-test-17"))]
+            let limiter = pi_link.servo_counters();
+            #[cfg(feature = "bench-servo-test-17")]
+            let limiter = None;
+            emit_health_snapshot(&mut health, now, limiter);
             #[cfg(feature = "mem-probe-23")]
             mem_probe::log(now);
             let after = health.uptime_ms();
@@ -936,29 +1106,35 @@ fn main() {
         // 製品buildとtap試験buildで検出を1回読み、送ってよいときだけ`tapped`を送る（`crate::tap`）。
         #[cfg(any(feature = "tap-21", deskcat_product_mode))]
         if let Some(detector) = tap.as_mut() {
-            // `poll`内のI2C readと検出logも含む、検出→描画時間の保守的な始点。**ただし製品buildは保留する（`TAP_CONFIRM_MS`）ので、`poll`が`true`を返す周期は検出より保留（`TAP_CONFIRM_MS`）の分以上後であり、始点は検出から保留の分だけ遅れる。**
+            // `poll`内のI2C readと検出logも含む、検出→描画時間の保守的な始点。**ただし製品buildは保留する（`TAP_CONFIRM_MS`）ので、`poll`が`tapped`を`true`にする周期は検出より保留（`TAP_CONFIRM_MS`）の分以上後であり、始点は検出から保留の分だけ遅れる。**
             let poll_started_at_ms = health.uptime_ms();
             // 製品buildは、タッチの接触中と離れた直後のtapを送らない（撫でる力がtapと判定されると推定している。`crate::touch::TAP_HOLDOFF_AFTER_RELEASE_MS`）。
             // また、tapを見つけても`deskcat_tap::TAP_CONFIRM_MS`の間は送らず保留し、その間に接触が始まれば捨てる（`crate::tap`）。
-            #[cfg(deskcat_product_mode)]
+            #[cfg(deskcat_reads_touch)]
             let touch_blocks = bus_touch
                 .as_ref()
                 .is_some_and(|touch| touch.tap_blocked(poll_started_at_ms));
-            #[cfg(not(deskcat_product_mode))]
+            #[cfg(not(deskcat_reads_touch))]
             let touch_blocks = false;
-            if detector.poll(
+            let events = detector.poll(
                 poll_started_at_ms,
                 boot_session.is_established(),
                 boot_session.session_epoch(),
                 touch_blocks,
-            ) {
+            );
+            if events.tapped {
                 log::info!("tap_event_poll_start uptime_ms={poll_started_at_ms}");
                 pi_link::send_event(Message::Tapped, &mut boot_session, &health, &mut uart);
+            }
+            // 揺れは、`deskcat_tap::shake::SHAKE`が`None`なら`false`のままで、送らない。
+            if events.shaken {
+                log::info!("shake_event_poll uptime_ms={poll_started_at_ms}");
+                pi_link::send_event(Message::Shaken, &mut boot_session, &health, &mut uart);
             }
         }
 
         // 製品buildでtouchを1 sample読み、撫でと判定して送ってよいときだけ`head_touched`を送る（`crate::touch::StrokeDetector`）。
-        #[cfg(deskcat_product_mode)]
+        #[cfg(deskcat_reads_touch)]
         if let Some(detector) = bus_touch.as_mut() {
             if let Some(duration_ms) =
                 detector.poll(health.uptime_ms(), boot_session.is_established())
@@ -969,6 +1145,23 @@ fn main() {
                     &health,
                     &mut uart,
                 );
+            }
+        }
+
+        // 製品buildで`ENV-01`の測定を1段進め、sessionが確立していれば、測れた`environment`を送る（`crate::env_report`）。
+        // 確立前に測れた最新の1件は持ち越す。送った後は持たない。
+        #[cfg(deskcat_product_mode)]
+        if let Some(reporter) = env_reporter.as_mut() {
+            reporter.poll(health.uptime_ms(), || health.uptime_ms());
+            if boot_session.is_established() {
+                if let Some(environment) = reporter.take_event() {
+                    pi_link::send_event(
+                        Message::Environment(environment),
+                        &mut boot_session,
+                        &health,
+                        &mut uart,
+                    );
+                }
             }
         }
 
@@ -1014,6 +1207,16 @@ fn main() {
         if let Some(retry_deadline) = boot_session.next_deadline_ms() {
             until = until.min(retry_deadline);
         }
+        // `tick`の期限（制御周期）。待ちはこの下のUART read timeoutで行い、blockingしない。
+        #[cfg(not(feature = "bench-servo-test-17"))]
+        if let Some(deadline) = pi_link.next_servo_deadline_ms() {
+            until = until.min(deadline);
+        }
+        // Piからの受信が途切れたと判定する時刻。
+        #[cfg(not(feature = "bench-servo-test-17"))]
+        if let Some(deadline) = pi_link.next_link_deadline_ms() {
+            until = until.min(deadline);
+        }
         #[cfg(feature = "bringup-display-13")]
         if let Some(bringup) = &display {
             until = until.min(bringup.next_deadline_ms(health.uptime_ms()));
@@ -1031,10 +1234,17 @@ fn main() {
         if let Some(deadline) = tap.as_ref().and_then(TapDetector::next_deadline_ms) {
             until = until.min(deadline);
         }
-        #[cfg(deskcat_product_mode)]
+        #[cfg(deskcat_reads_touch)]
         if let Some(deadline) = bus_touch
             .as_ref()
             .and_then(StrokeDetector::next_deadline_ms)
+        {
+            until = until.min(deadline);
+        }
+        #[cfg(deskcat_product_mode)]
+        if let Some(deadline) = env_reporter
+            .as_ref()
+            .and_then(EnvReporter::next_deadline_ms)
         {
             until = until.min(deadline);
         }
@@ -1063,12 +1273,15 @@ fn main() {
         {
             until = until.min(deadline);
         }
-        #[cfg(feature = "bringup-led-514")]
+        #[cfg(any(feature = "bringup-led-514", deskcat_product_led))]
         if let Some(leds) = leds.as_mut() {
             let now_led = health.uptime_ms();
-            let elapsed = now_led.saturating_sub(led_start_ms);
-            leds.update(elapsed, now_led);
-            until = until.min(led_start_ms + led::next_change_ms(elapsed));
+            // 受理した`happy`を取り出すのはLEDがあるときだけにする（初期化に失敗したら点ける先が無い）。
+            if face.take_react_pulse() {
+                leds.pulse_react(now_led);
+            }
+            leds.update(led_start_ms, now_led);
+            until = until.min(leds.next_deadline_ms(led_start_ms, now_led));
         }
 
         // sleepの代わりに`UartDriver::read`へ残り時間をtimeoutとして渡す。data到着があれば
@@ -1081,8 +1294,8 @@ fn main() {
         // 回らず、Task Watchdog Timerの前提を壊す。1 msは`TickType::new_millis`（esp-idf-hal
         // 0.46.2 `delay.rs`89〜95行）が1 tickへ切り上げ、`CONFIG_FREERTOS_HZ=100`（生成された`sdkconfig`、
         // debug profile）では1 tick＝10 msになる。1 tickのblockは次のtickの割り込みで解けるため、
-        // 実際の待ちは0〜10 msであり、dataが届けばそれより早く戻る。受信が続く間は`read`がblockせずに
-        // 戻るため、IDLE taskへ時間が回るという前提は、受信が途切れる間に限って成り立つ。
+        // 実際の待ちは0〜10 msであり、dataが届けばそれより早く戻る。ring bufferにdataが残っている間は
+        // `read`がblockせずに戻るため、その周は下の`post_read_yield_ms`で譲る（Issue #713）。
         #[cfg(not(feature = "bench-servo-test-17"))]
         {
             drain_uart_events(&uart, &mut health);
@@ -1127,11 +1340,61 @@ fn main() {
                     );
                 }
             }
+            // ring bufferにdataがあった周は、最初の`NON_BLOCK`の読みで戻り、blockしない
+            // （esp-idf-hal 0.46.2 `uart.rs`1179〜1246行）。受信が続くと毎周この経路になり、
+            // IDLE taskへ時間が回らないため、dataを返した周は処理の後にFreeRTOSへ譲る（Issue #713）。
+            // blockした後にdataが届いた周も`Ok(n)`を返すので、その周は余分に1 tick譲る。
+            if let Some(ms) = post_read_yield_ms(read.as_ref().map_or(0, |n| *n)) {
+                FreeRtos::delay_ms(ms);
+            }
         }
         #[cfg(feature = "bench-servo-test-17")]
         sleep_ms_until(until, health.uptime_ms());
     }
 }
+
+/// `UartDriver::read`が`read_bytes`（1以上）を返した周の後に、FreeRTOSへ譲る時間（ms）。
+/// 譲らない周は`None`を返す。
+///
+/// `read`はdataがあると最初の`NON_BLOCK`の読みで戻り、blockしない。dataが無い周は、timeout
+/// （1 tick以上）のblockで既に譲っている。**譲るときは必ず1 ms以上を返す**（`delay_ms(0)`の
+/// `vTaskDelay(0)`は同じ優先度以上のtaskにしか譲らず、優先度の低いIDLE taskは回らない。
+/// `sleep_ms_until`と同じ理由）。1 msは1 tickへ切り上がる
+/// （`CONFIG_FREERTOS_HZ=100`では10 ms）ため、値は新しく置かず、1 tickに任せる（Issue #713）。
+///
+/// firmware crateは`harness = false`でhostのtestを持たない。この関数の性質は、下の定数式が
+/// build時に確かめる（満たさなければ、このfirmwareはcompileできない）。
+#[cfg(not(any(
+    feature = "bench-servo-test-17",
+    feature = "bench-servo-calib-18",
+    feature = "bench-wdt-711"
+)))]
+const fn post_read_yield_ms(read_bytes: usize) -> Option<u32> {
+    if read_bytes > 0 {
+        Some(1)
+    } else {
+        None
+    }
+}
+
+#[cfg(not(any(
+    feature = "bench-servo-test-17",
+    feature = "bench-servo-calib-18",
+    feature = "bench-wdt-711"
+)))]
+const _: () = {
+    // dataが無い周は、既にblockしているので譲らない。
+    assert!(post_read_yield_ms(0).is_none());
+    // dataがある周は、必ず譲る。0 msは譲ったことにならない。
+    match post_read_yield_ms(1) {
+        Some(ms) => assert!(ms >= 1),
+        None => panic!("data read must yield"),
+    }
+    match post_read_yield_ms(config::PI_PROTOCOL_UART_READ_CHUNK_BYTES) {
+        Some(ms) => assert!(ms >= 1),
+        None => panic!("full chunk read must yield"),
+    }
+};
 
 /// Pi linkのUARTのevent queueを空になるまで吸い上げ、受信の異常を数えてlogへ出す。
 ///
@@ -1156,7 +1419,11 @@ fn main() {
 /// `rx_buffer_full_flg`）。FIFOも溢れたbyteは失われる。どちらの場合も、行が壊れれば
 /// `crate::pi_link::PiLink::on_bytes`が壊れた行として捨て、`boot`は§4.1の再送で
 /// 送り直される見込みである（確かめていない）。
-#[cfg(not(feature = "bench-servo-test-17"))]
+#[cfg(not(any(
+    feature = "bench-servo-test-17",
+    feature = "bench-servo-calib-18",
+    feature = "bench-wdt-711"
+)))]
 fn drain_uart_events(uart: &UartDriver<'_>, health: &mut Health) {
     let Some(queue) = uart.event_queue() else {
         return;
@@ -1181,10 +1448,18 @@ fn drain_uart_events(uart: &UartDriver<'_>, health: &mut Health) {
 /// NVS namespace。`bench17`（`run_servo_bench_test`が使うnamespace）とは別の名前にする。
 /// 用途が異なるnamespaceを共有すると、片方のkey追加がもう片方の`erase_all`等を
 /// 誤って巻き込みうる。
-#[cfg(not(feature = "bench-servo-test-17"))]
+#[cfg(not(any(
+    feature = "bench-servo-test-17",
+    feature = "bench-servo-calib-18",
+    feature = "bench-wdt-711"
+)))]
 const SID_NVS_NAMESPACE: &str = "pi_session";
 /// 次回起動が使う`sid`をこのkeyへ保存する。
-#[cfg(not(feature = "bench-servo-test-17"))]
+#[cfg(not(any(
+    feature = "bench-servo-test-17",
+    feature = "bench-servo-calib-18",
+    feature = "bench-wdt-711"
+)))]
 const SID_NVS_KEY_NEXT: &str = "next_sid";
 
 /// 起動のたびに新しい`sid`を選ぶ（`PROTO-TBD-011`のうち`sid`の生成方法に
@@ -1254,7 +1529,11 @@ const SID_NVS_KEY_NEXT: &str = "next_sid";
 /// debug logへ出る（`#487`のPR Aより前、Pi linkを持つbuild（当時の`pi-protocol-mode`）は
 /// loggingを止めており、出力されなかった）。
 /// counterは持たない（`boot_session`のmodule doc「停止理由の区別」参照）。
-#[cfg(not(feature = "bench-servo-test-17"))]
+#[cfg(not(any(
+    feature = "bench-servo-test-17",
+    feature = "bench-servo-calib-18",
+    feature = "bench-wdt-711"
+)))]
 fn generate_sid(health: &Health) -> u32 {
     use esp_idf_svc::nvs::{EspDefaultNvsPartition, EspNvs};
 
@@ -1302,7 +1581,11 @@ fn generate_sid(health: &Health) -> u32 {
 
 /// [`generate_sid`]のNVS不使用時の縮退経路が使う。`ts_ms`（`u64`）を`sid`（`u32`）へ
 /// 切り詰める（下位32 bit）。**非衝突を主張しない**（[`generate_sid`]のdoc参照）。
-#[cfg(not(feature = "bench-servo-test-17"))]
+#[cfg(not(any(
+    feature = "bench-servo-test-17",
+    feature = "bench-servo-calib-18",
+    feature = "bench-wdt-711"
+)))]
 const fn sid_from_uptime(ts_ms: u64) -> u32 {
     ts_ms as u32
 }
@@ -1333,7 +1616,7 @@ fn service_bringup_step(health: &mut Health, step: &str) {
 }
 
 /// `DISP-01`を初期化してbacklightを点け、driverを返す。あわせて、同じbusにtouchのdeviceを足して`TOUCH-CS`をHighに保つ
-/// （[`BusTouch`]。製品buildは`crate::touch::StrokeDetector`でmain loopから読み、LCDを描く試験buildは`crate::touch::IdleTouch`で読まない）。
+/// （[`BusTouch`]。製品buildは`crate::touch::StrokeDetector`でmain loopから読み、LCDを描く試験buildと`no-touch-487`は`crate::touch::IdleTouch`で読まない）。
 ///
 /// `bringup-display-13`付きbuildでは、呼び出し側がfillと四隅patternをmain loopの中で進める（`crate::display_test`。
 /// `#487`のPR B1より前は、この関数が1回の呼び出しで描き切っていた）。controllerのIDは読まない（`crate::display`のmodule doc）。
@@ -1381,10 +1664,10 @@ fn run_display_bringup<SPI: SpiAnyPins + 'static>(
         }
     };
     // **`TOUCH-CS`をHighにするため、touchのdeviceをLCDの初期化より前に作る。**この段では何も送らない。
-    // 作れなくてもLCDは続ける（GPIO21の外部pull-upがHighを保つ。`gpio-assignment.md`）。その場合、製品buildは撫でを判定しない。
-    #[cfg(deskcat_product_mode)]
+    // 作れなくてもLCDは続ける（GPIO21の外部pull-upがHighを保つ。`gpio-assignment.md`）。その場合、製品build（`no-touch-487`を除く）は撫でを判定しない。
+    #[cfg(deskcat_reads_touch)]
     let created = StrokeDetector::with_shared_bus(Rc::clone(&bus), touch_cs, now_ms);
-    #[cfg(not(deskcat_product_mode))]
+    #[cfg(not(deskcat_reads_touch))]
     let created = {
         let _ = now_ms;
         IdleTouch::with_shared_bus(Rc::clone(&bus), touch_cs)
@@ -1527,8 +1810,8 @@ fn run_touch_sample<SPI: SpiAnyPins + 'static>(
     }
 }
 
-/// I2C bring-upが返したdriverで、tap検出を設定して始める（`tap-21`付きbuildだけ）。driverが無い、またはDevice IDが`0xE5`でない（読めなかった場合を含む）ときは、何も書かず`None`を返す。
-#[cfg(any(feature = "tap-21", deskcat_product_mode))]
+/// I2C bring-upが返したdriverで、tap検出を設定して始める（`tap-21`付きbuildだけ。製品buildは`start_product_sensors`）。driverが無い、またはDevice IDが`0xE5`でない（読めなかった場合を含む）ときは、何も書かず`None`を返す。
+#[cfg(feature = "tap-21")]
 fn start_tap(bringup: Option<I2cBringup>, now_ms: u64) -> Option<TapDetector> {
     let bringup = bringup?;
     // **ADXL345のDevice IDを確かめてから設定を書く。**IDが違う（別のdeviceがこのaddressにいる、配線が違う）、
@@ -1544,9 +1827,43 @@ fn start_tap(bringup: Option<I2cBringup>, now_ms: u64) -> Option<TapDetector> {
         );
         return None;
     }
-    let mut detector = TapDetector::new(Adxl345::new(ACCEL_I2C_ADDRESS), bringup.driver);
+    Some(configured_tap(i2c_bus::share(bringup.driver), now_ms))
+}
+
+/// `bus`でtap検出を作り、設定を書く。Device IDの確認は呼び出し側が済ませている。
+#[cfg(any(feature = "tap-21", deskcat_product_mode))]
+fn configured_tap(bus: i2c_bus::SharedI2c, now_ms: u64) -> TapDetector {
+    let mut detector = TapDetector::new(Adxl345::new(ACCEL_I2C_ADDRESS), bus);
     detector.configure(now_ms);
-    Some(detector)
+    detector
+}
+
+/// 製品buildで、tapの検出と`ENV-01`の周期測定を、1つのI2C busの上に作る（`crate::i2c_bus`）。
+///
+/// tapは`ACCEL-01`のDevice IDが`0xE5`のときだけ作る（[`start_tap`]と同じ条件）。**`ENV-01`は、tapの有無によらず作る。**
+/// Chip IDは`crate::env_report`が自分で読んで確かめる（一致するまで何も書かない）。I2C driverを作れなかったときは、どちらも作らない。
+#[cfg(deskcat_product_mode)]
+fn start_product_sensors(
+    bringup: Option<I2cBringup>,
+    now_ms: u64,
+) -> (Option<TapDetector>, Option<EnvReporter>) {
+    let Some(bringup) = bringup else {
+        return (None, None);
+    };
+    let bus = i2c_bus::share(bringup.driver);
+    let tap = if bringup.accel_id == Some(accel::EXPECTED_DEVICE_ID) {
+        Some(configured_tap(bus.clone(), now_ms))
+    } else {
+        let found = bringup
+            .accel_id
+            .map_or_else(|| "none".to_owned(), |raw| format!("0x{raw:02x}"));
+        log::error!(
+            "tap_not_started accel_id={found} expected=0x{:02x}",
+            accel::EXPECTED_DEVICE_ID
+        );
+        None
+    };
+    (tap, Some(EnvReporter::new(bus, ENV_I2C_ADDRESS, now_ms)))
 }
 
 /// `accel-sample-15`付きbuildで、ADXL345のDevice IDが`0xE5`のときだけ連続測定の設定を始める。
@@ -1589,7 +1906,7 @@ struct I2cBringup {
 /// bring-up手順の1工程である。**一致判定はここでは行わない。**`crate::accel::Adxl345`・
 /// `crate::env::Bme280`が返す生byteをそのままlogへ出すだけであり、期待値
 /// （`0xE5`／`0x60`）との一致は、logを読む人間の判断とする。**この関数へ判定を持ち込まない。**
-/// **ただし`tap-21`付きbuildでは、この関数が返す生byte（`ACCEL-01`の`accel_id`）を、呼び出し側の`start_tap`が`0xE5`と比べ、
+/// **ただし製品buildと`tap-21`付きbuildでは、この関数が返す生byte（`ACCEL-01`の`accel_id`）を、呼び出し側の`start_product_sensors`／`start_tap`が`0xE5`と比べ、
 /// 一致したときだけtapの設定を書く**（判定するのは呼び出し側であり、この関数ではない）。
 ///
 /// 2つのsensorは同じI2C bus（`GPIO25`＝SDA、`GPIO26`＝SCL）を共有するため
@@ -1717,7 +2034,7 @@ fn run_i2c_bringup(
     #[cfg(not(feature = "env-sample-16"))]
     let _ = env_id;
     service_bringup_step(health, "env_chip_id");
-    // `tap-21`付きbuildは、Device IDが一致したとき、このdriverでtap検出を続ける（`crate::tap`）。それ以外は呼び出し側が手放す。
+    // 製品buildと`tap-21`付きbuildは、Device IDが一致したとき、このdriverでtap検出を続ける（`crate::tap`）。一致しないとき、`tap-21`付きbuildは呼び出し側が手放し、製品buildは`ENV-01`の周期測定が持ち続ける。
     Some(I2cBringup {
         driver: i2c,
         accel_id,
@@ -1920,9 +2237,12 @@ fn wait_for_bench_confirmation() -> bool {
 ///
 /// **error を握りつぶさない。**serialize は事実上失敗しないが、`expect()` で潰さず
 /// 分類して log し、counter を進める。
-fn emit_health_snapshot(health: &mut Health, now: u64) {
-    // `LimitedServo`を作らないbuildなので`servo.limiter`は省略する（`Health::to_status`のdoc）。
-    let status = health.to_status(None);
+fn emit_health_snapshot(
+    health: &mut Health,
+    now: u64,
+    limiter: Option<deskcat_servo::LimiterCounters>,
+) {
+    let status = health.to_status(limiter);
     let uart = health.uart();
     match serde_json::to_string(&status) {
         Ok(payload) => log::info!(

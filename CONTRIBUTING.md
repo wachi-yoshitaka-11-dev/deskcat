@@ -150,7 +150,7 @@ GitHubのIssue一覧はlabelを常にtitleの横に表示するため、titleに
 | 項目 | 必須／任意 | 値の決め方 |
 |---|---|---|
 | title | 必須 | 上記の形式 |
-| milestone | 必須 | 対応するM0〜M6 milestoneを設定する |
+| milestone | 必須 | 対応するM0〜M7 milestoneを設定する |
 | label（`type:*`／`priority:*`） | 必須 | それぞれ1つ設定する |
 | label（`area:*`） | 対象componentがある場合のみ | 対象componentに対応するlabelを設定する。repository全体の保守作業など特定componentに限らない場合は省略する |
 | label（`status:blocked`／`needs:*`） | 該当時のみ | 依存未解決なら`status:blocked`、実機証拠や人間の判断が必要なら`needs:hardware-test`／`needs:decision`を設定する |
@@ -327,6 +327,31 @@ boardでは6つのworkflowが有効である。全一覧はRepository設定に�
 merge後に、対応するIssue itemの`Status`を`Done`にする。これにより`Auto-close issue`が
 Issueをcloseする。
 
+**closeの前に、受け入れ条件を1つずつ照合し、満たしたものをIssue本文でチェックする。**
+これはhookが強制する（`scripts/hooks/gh_metadata_guard.py`。[#693](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/693)）。
+`gh issue close`と、`Status`を`Done`にする`gh project item-edit`の前に、Issue本文の
+「受け入れ条件」を含む見出し（`##`〜`######`）の節（次の同じかそれより上の階層の見出しまで）に
+`- [ ]`が1つでも残っていればdenyし、残っている項目を理由に出す。**その節が無い本文もdenyする。**
+満たせない項目があるIssueはcloseせず、openのまま残りを書く。
+**方針として閉じる場合だけ、`gh issue close --reason "not planned" --comment <理由>`は節を見ずに通す。**
+理由のコメントが無い`not planned`と、完了扱いの`Done`は止める。
+Pull Request itemと既にcloseされたIssueの`Done`は止めない。
+確認できない場合もdenyする。**解除の手段は無く、`DESKCAT_SKIP_GH_GUARD`も効かない。**
+
+**IssueをcloseしないPull Request（`Refs: #N`だけのもの）をmergeしたら、mergeした者が、
+そのIssueへ「このmergeで済んだこと・残っていること」を1コメント書く。**
+記録（EXP・docs）を`develop`へ入れても、Issueのコメントは誰も更新しない。timelineにはPull Requestと
+commitの参照が自動で出るが、何が済んで何が残ったかは書かれない。最後のコメントを今の状態と読むと、
+その後に済んだことを残りと誤る。
+
+- コメントには、このmergeで済んだこと、まだ残っていること（残りが無ければ「残り無し」）、
+  参照するPull Requestとcommitを書く。
+- **同じ者が、このmergeで満たした受け入れ条件に、Issue本文でチェックを付ける**
+  （[#696](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/696)）。本文はIssueの今の状態であり、
+  コメントだけ書くと、本文を読んだ人が済んだ条件を残りと読む。チェックを付けるのは、満たしたと確かめた
+  条件だけである。満たしていない条件には付けない。
+- Issueをcloseする場合は、上の手順に従い、このコメントは要らない。
+
 作成時に、対応するIssueと同じassignee・labelを設定し、Projects v2 board
 （`deskcat`、`https://github.com/users/wachi-yoshitaka-11-dev/projects/5`）へitemとして
 追加して`Status`を設定する。boardが進行管理の正本であり、boardに無いPull Requestは
@@ -466,7 +491,7 @@ reviewの区切りは記録にある巡の結果から決まる。巡の結果�
 新しいreviewは、前のreviewの巡を収束に数えない。
 
 **reviewは終わる前に始め直せる。**人間が新しいreviewを依頼したとき、またはPM／作業セッションが
-理由を示して始め直しを判断し人間が承認したときである。その依頼か承認の文面と出所を
+理由を示して始め直しを判断し人間が承認したときである。その依頼か承認があったこと、日時、出所、範囲を
 `review_gate.py session restart`で記録し、次の巡を0巡から数える。
 依頼か承認が新しいreviewを指すと読めないとき（上限の後の「もう一度見て」など）は、継続承認として扱う。
 PM/AIの判断だけでは始め直さない。前のreviewの未解決の欠陥は消さず、新しいreviewへ持ち越す。
@@ -487,6 +512,10 @@ PM/AIの判断だけでは始め直さない。前のreviewの未解決の欠陥
 `pre-existing`（既存）のいずれかを記録する。出所だけで採否を決めず、上の(a)〜(c)と照合する。
 修正対象外の指摘だけを理由に再巡しない。機械checkの結果は別に記録する。
 
+**指摘の直しは、削るか最小の置き換えだけにする。**理由・説明・注記を足して直さない。
+**次の巡を起動する前に、作業者が直しの差分（前の巡の版から今の版までのdiff）だけを読み、
+新しい主張を足していないことと、引いた出所を開いて確かめたことを確認する。**
+
 **1回のreviewは3巡を目安とする。**3巡目の後に(a)〜(c)に当たらない指摘だけが残るなら、
 4巡目を回さない。PM／作業セッションが全巡の指摘と最終diffを自分で読み、`capped`の判断と
 理由を一度に示して人間の承認を得る。**4巡目以降に進むのは(a)〜(c)のいずれかが残るときだけ**であり、
@@ -495,7 +524,7 @@ PM/AIの判断だけでは始め直さない。前のreviewの未解決の欠陥
 
 **継続承認は有限の範囲で保存する。**続行はPM／作業セッションが理由を示して判断し、人間が承認する。
 継続と終了を判断する側は、判断の前にこのreviewの全巡の指摘と最終diffを自分で開く。記録には、読んだdiffのhashを書く。
-実行記録とPull Request本文へ、判断と理由、人間の承認の文面と出所、承認者、対象Issue、
+実行記録とPull Request本文へ、判断と理由、人間の承認があったこと・日時・出所（ユーザーの発言は原文でも要旨でも書かない。[AI Agent Policy](docs/governance/ai-agent-policy.md#ユーザーの発言を書かない)）、承認者、対象Issue、
 承認時のreviewとその巡数、続行を許すそのreviewの最終巡数、対象の残存欠陥または範囲を書く。
 追加巡数は判断側が理由とともに示して人間が承認し、実装では絶対的な終了巡数へ換算する。固定の追加巡数は設けない。
 例えば「D1の修正確認のためこのreviewの7巡まで」は8巡目や別目的の継続を許さない。
@@ -519,7 +548,7 @@ PM/AIの判断だけでは始め直さない。前のreviewの未解決の欠陥
 `capped`の理由は、PM／作業セッションの判断を人間が承認したことを記録する。
 
 **reviewは承認を得て終えられる。**最終diffで両Passの記録が揃い、未解決の欠陥が無く、まだ`converged`で
-ない場合に、PM／作業セッションが理由を示して終了を判断し人間が承認したら、その承認の文面・承認者・出所を
+ない場合に、PM／作業セッションが理由を示して終了を判断し人間が承認したら、その承認があったこと・承認者・日時・出所を
 `review_gate.py session end`で記録する。記録した時点のdiffと巡に限って`capped`になり、
 diffが変われば無効になる。手順は[自己レビューの停止と再開](docs/runbooks/self-review-session.md)にある。
 PM/AIの判断や無回答は承認の代替にならない。
@@ -649,6 +678,21 @@ reviewがまだ走っていないPRでは空振りしうる。依頼したreview
 同じ条件を満たすまで待つ。**同じ状態で2回以上投げない。**
 安全・電気・protocol・firmwareに関わる変更は、reviewが完走するまでmergeしない
 （[Merge前の確認](#merge前の確認)）。
+
+**これはhookが強制する**（`scripts/hooks/gh_metadata_guard.py`。[#688](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/688)）。
+`gh pr merge`の前に、Pull Requestの変更fileが次のどれかを含み、かつ**どのcommitでも**CodeRabbitの
+reviewが完走していなければdenyする。完走の後に対応commitを足してheadが`Review skipped`でも通る。
+base `main`の昇格も同じ検査を受ける。**解除の手段は無く、`DESKCAT_SKIP_GH_GUARD`も効かない。**
+確認できない場合もdenyする。
+
+- `firmware/esp32/src/`
+- `crates/deskcat-protocol`・`deskcat-servo`・`deskcat-face`・`deskcat-tap`・`deskcat-touch`・`deskcat-accel`・`deskcat-env`の`src/`
+- `docs/protocol/esp32-pi-protocol.md`
+- `docs/hardware/gpio-assignment.md`・`power-budget.md`・`servo-safety-limits.md`
+
+**範囲はこれ以上広げない。**実験記録、BOM、図、規則の文書、検査のscript、Pi側だけのアプリは対象外である
+（CodeRabbitにはクールタイムがあり、何でも通すと作業が止まる）。この一覧の外で「安全・電気・protocol・
+firmwareに関わる」変更は、従来どおり人が守る。
 
 **「reviewを依頼した」を「reviewを受けた」と書かない。**`Review rate limited`は`pass`と表示されるため、
 依頼の事実だけで完了扱いにすると検出が抜ける。
@@ -879,14 +923,14 @@ squash mergeしたbranchはcommit hashが変わるため、`git branch -d`が「
 
 ## hookが止めたとき
 
-`.claude/settings.json`が8つのscriptをhookとして起動する。**検査は11である。**
+`.claude/settings.json`が8つのscriptをhookとして起動する。**検査は13である。**
 **この数は下の表と一致させる。**一致していない間、表に無いhookは「無い」ものとして
 読まれる（`truncation_guard.py`と`stop_claim_guard.py`は、追加した
 [#349](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/349)／[#350](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/350)から
 [#325](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/325)まで表に無く、
 `gh_metadata_guard.py`の本文節の検査も同じく無かった）。**数えるのは検査であって
-scriptではない。**`gh_metadata_guard.py`は1 scriptで4つを見る
-（同fileのdocstring「止める対象は4つである」）。
+scriptではない。**`gh_metadata_guard.py`は1 scriptで6つを見る
+（同fileのdocstring「止める対象は6つである」）。
 
 **文書に書いても実行されないことが実測で分かっている。**
 [#204](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/204)、
@@ -901,6 +945,8 @@ scriptではない。**`gh_metadata_guard.py`は1 scriptで4つを見る
 | `gh issue create`／`gh pr create`の前 | `--project`（短縮形`-p`）があるか | `scripts/hooks/gh_metadata_guard.py` |
 | `gh pr create`の前 | `--base`（短縮形`-B`）があるか | 同上 |
 | `gh issue create`／`gh pr create`の前 | 本文がtemplateの`## `節を持つか | 同上 |
+| `gh pr merge`の前 | 対象file（[手動で依頼する前に状態を確認する](#手動で依頼する前に状態を確認する)）を含むPull Requestで、CodeRabbitのreviewがどれかのcommitで完走しているか。**解除の手段は無い** | 同上 |
+| `gh issue close`の前、およびboardの`Status`を`Done`にする`gh project item-edit`の前 | 対象Issueの`受け入れ条件`の節に`- [ ]`が残っていないか（節が無い本文も止める）。**解除の手段は無い** | 同上 |
 | `@coderabbitai`へreviewを投げる前 | 同じ行に`review`の語があるか | `scripts/hooks/coderabbit_gate.py` |
 | `gh pr merge`の前 | squash messageから`git`が`Change-Class`と`Self-Review`をtrailerとして読むか | `scripts/hooks/gh_metadata_guard.py` |
 | `git checkout -b`／`git switch -c`の前 | 基点が最新の`origin/develop`か | `scripts/hooks/branch_base_guard.py` |
@@ -999,12 +1045,14 @@ Pull Requestを通る変更は`review-gate.yml`が`gate`を実行するためで
   （2026-08-28に[PR #250](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/250)が
   base `main`で作られ、変更まで1時間17分かかった）。
 - **`gh issue create`には`--base`を要求しない。**option自体が存在しない。
-- **`--help`／`-h`が付いた呼び出しは、`gh_metadata_guard.py`の4つの検査すべてを抜ける。**helpの表示は何も作らず、
+- **`--help`／`-h`が付いた呼び出しは、`gh_metadata_guard.py`の6つの検査すべてを抜ける。**helpの表示は何も作らず、
   mergeもしないため、誤検知しか生まない。**2026-08-28に`gh issue create --help`、
   `gh pr create --help`、`gh pr merge --help`の3つとも拒否されることを実測した。
   hookが要求するoption名を`--help`で調べる手段そのものが塞がっていた。**
   判定は完全一致であり、`--title -h`のように値として`-h`を渡した呼び出しも
   検査を抜ける。**字句だけで区別する手立てが無い。**
+- **`gh api`や画面からIssueをcloseする経路。**closeの検査は`gh issue close`と`gh project item-edit`の字句だけを見る。
+  **boardの`Done`のoption idは`Status`fieldのものであり、boardを作り直すと変わる。**
 - **squash messageをstdin（`-F -`）で渡す経路。**hookからは読めないため、
   読めないことを理由に止める。`--body-file`を使う。
 - **`gh`や`git`を、alias、shell function、`xargs`、`sh -c`の内側から起動した場合。**

@@ -81,6 +81,23 @@ GitHubはthreadが存在しないものをblockできない。**reviewの到着�
 | 安全、電気、protocol、firmware | **reviewが完走するまで待つ。**`Review rate limited`後の再依頼は[CONTRIBUTINGの手順](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/CONTRIBUTING.md#手動で依頼する前に状態を確認する)に従う。自己レビューで代替しない |
 | 上記以外 | **自己レビューで通してよい。**Pull Request本文へ機械reviewを通していない旨と、その判断の根拠を書く |
 
+## check-runの表示
+
+**2026-11時点のCodeRabbitの結果は、commit statusではなくcheck-run（名前`CodeRabbit`）に残る。**
+#678の全commitでcommit statusは0件だった。旧い記録（#397・#399）はcommit statusの`Review completed`で残る。
+`gh pr merge`のhook（`scripts/hooks/gh_metadata_guard.py`。#688）は両方を見る。
+
+実測（2026-11-02。merge済み#657〜#687の最後のcommitのcheck-run）:
+
+| `conclusion` | `output.title` | `output.summary` | 読み方 | 観測 |
+|---|---|---|---|---|
+| `success` | `Finished` | `Result: Success - Review completed` | **完走** | #658・#663・#664・#678の`431ca0e` |
+| `skipped` | `Review skipped` | `Result: Skipped - Review skipped` | 走っていない | 20件超（#680・#684の`8fd6d72`を含む） |
+| `cancelled` | `Review cancelled` | `Result: Cancelled - Pull request is closed` | 走っていない | #684の`a085364` |
+
+**`Review rate limited`のcheck-runは未観測である。**hookは完走（`success`かつsummaryが`Review completed`）以外をすべて未完走として扱う。
+**完走の後に対応commitを足すと、headは`Review skipped`になる**（#678の`0629fc7`）。判定はheadではなくPull Requestの全commitで行う。
+
 ## `rate limit`への返答時間に上限が無い
 
 **`@coderabbitai rate limit`自体への返答時間は一定ではない。**2026-09-01までに、

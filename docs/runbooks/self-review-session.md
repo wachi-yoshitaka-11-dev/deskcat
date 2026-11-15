@@ -62,8 +62,8 @@ python3 scripts/review_gate.py session begin --work 465
 ```
 
 1回の起動を1巡とし、両Passを同じ巡で実施しても巡数は増やさない。
-機械checkや実装をレビューと取り違えない。予約したdiffはbaseのmerge-baseからの差分に、
-未commit変更とignoreされていない新規fileを含めたSHA-256。Pass中にdiffが変わった場合は
+機械checkや実装をレビューと取り違えない。予約したdiffは、一時のindexへ`git add -A`した状態の、baseのmerge-baseからの
+`git diff --cached --binary`のSHA-256（本物のindexと作業treeは変えない）。Pass中にdiffが変わった場合は
 `interrupted`として記録し、新しいdiffで次の巡を予約する。修正は巡の結果保存後に行う。
 
 ## 結果と終了判定
@@ -121,8 +121,9 @@ CIの通常のgateはローカル記録を持たず、形式検査のままで�
 
 ## 承認の記録
 
-継続・終了・始め直しの承認を問うときは、実行記録とPull Request本文へ残す文面を問いに同梱する。
-回答の文面、承認者、出所を両方へ記録する。Issue／Pull Requestのcommentへ承認ごとに投稿しない。
+継続・終了・始め直しの承認を問うときは、範囲（どの巡まで、どの操作か）を問いの側の言葉で書く。
+承認があったこと、日時、承認者、出所、範囲を実行記録とPull Request本文の両方へ記録する。
+**ユーザーの回答は、原文でも要旨でも書かない**（[AI Agent Policy](../governance/ai-agent-policy.md#ユーザーの発言を書かない)）。Issue／Pull Requestのcommentへ承認ごとに投稿しない。
 
 ## 承認を得て終える
 
@@ -135,7 +136,8 @@ CIの通常のgateはローカル記録を持たず、形式検査のままで�
   "work": "465",
   "actor_kind": "human",
   "actor": "実際に承認した人間",
-  "source": "人間の終了の承認を確認できる会話と文面",
+  "source": "人間の終了の承認があったセッション（承認の文面は書かない）",
+  "approved_at": "承認があった日時（ISO 8601）",
   "after_round": 3,
   "read_diff": "判断する側が読んだ最終diffのhash"
 }
@@ -161,7 +163,8 @@ reviewが終わる前に人間が新しいreviewを依頼したとき、また�
   "work": "465",
   "actor_kind": "human",
   "actor": "実際に依頼または承認した人間",
-  "source": "人間の依頼または承認を確認できる会話と文面",
+  "source": "人間の依頼または承認があったセッション（文面は書かない）",
+  "approved_at": "承認があった日時（ISO 8601）",
   "after_round": 5
 }
 ```
@@ -184,7 +187,8 @@ AIによる記録、最新の巡が未完了、既に終わったreview（次の
   "work": "465",
   "actor_kind": "human",
   "actor": "実際に承認した人間",
-  "source": "人間の明示承認を確認できる会話と文面",
+  "source": "人間の明示承認があったセッション（文面は書かない）",
+  "approved_at": "承認があった日時（ISO 8601）",
   "review": 1,
   "review_after_round": 5,
   "review_through_round": 7,

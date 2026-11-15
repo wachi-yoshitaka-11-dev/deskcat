@@ -110,6 +110,7 @@ fn worst_case_messages() -> Vec<Message> {
             duration_ms: u32::MAX,
         }),
         Message::Tapped,
+        Message::Shaken,
         Message::Lifted(Lifted {
             duration_ms: u32::MAX,
         }),

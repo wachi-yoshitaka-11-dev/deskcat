@@ -73,6 +73,55 @@ pub const RAW_LEN: usize = 8;
 /// Bosch §5.4.1 Table 18 の Chip ID。
 pub const CHIP_ID: u8 = 0x60;
 
+/// 変換を始めてから、`measuring` を読みに行くまでの時間（ms）。§9.1 の最大 9.3 ms（×1／×1／×1）の切り上げ。
+pub const CONVERSION_MAX_MS: u64 = 10;
+/// 変換の開始から、`not_ready` と数えるまでの時間（ms）。最大の約 3 倍。
+pub const DEADLINE_MS: u64 = 30;
+
+/// forced mode の書き込みが成功した後の、変換の待ちの期限。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ConversionSchedule {
+    /// 周期の起点（ms）。
+    pub cycle_ms: u64,
+    /// 最初に `measuring` を読みに行く時刻（ms）。
+    pub next_poll_ms: u64,
+    /// `not_ready` と数える期限（ms）。
+    pub deadline_ms: u64,
+}
+
+/// 変換の待ちの起点から期限を決める。`started_ms` は **forced mode の書き込みが成功した後に読んだ** uptime（ms）である。
+/// 書き込みより前の時刻を渡すと、書き込みの前に task が遅れた分だけ期限が前へずれ、有効な変換を捨てうる。
+/// 周期の起点 `cycle_ms` より前には戻さない。
+#[must_use]
+pub const fn conversion_schedule(cycle_ms: u64, started_ms: u64) -> ConversionSchedule {
+    let started_ms = if started_ms > cycle_ms {
+        started_ms
+    } else {
+        cycle_ms
+    };
+    ConversionSchedule {
+        cycle_ms: started_ms,
+        next_poll_ms: started_ms.saturating_add(CONVERSION_MAX_MS),
+        deadline_ms: started_ms.saturating_add(DEADLINE_MS),
+    }
+}
+
+/// forced mode の書き込みを行い、**成功したときだけ、その後に** 時計を読んで変換の期限を決める。
+/// 書き込みが失敗したときは時計を読まず、書き込みの error をそのまま返す。
+/// 書き込みと時計の順序をここへ固定し、host で test できるようにする。
+///
+/// # Errors
+///
+/// `write` が返した error をそのまま返す。
+pub fn start_conversion<E>(
+    cycle_ms: u64,
+    write: impl FnOnce() -> Result<(), E>,
+    clock: impl FnOnce() -> u64,
+) -> Result<ConversionSchedule, E> {
+    write()?;
+    Ok(conversion_schedule(cycle_ms, clock()))
+}
+
 /// register の観測値から判定できる fault。I2C 自身の fault は firmware が分類する。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RegisterFault {
@@ -234,6 +283,56 @@ impl Reading {
     }
 }
 
+/// 送ってよい測定量。範囲を外れた量は`None`にし、`out_of_range`へ数える。
+///
+/// 範囲は`docs/hardware/sensor-datasheet-notes.md`の`測定range`行（温度 -40〜+85 ℃、湿度 0〜100 %、
+/// 気圧 300〜1100 hPa。Bosch BME280 Data Sheet Revision 1.24 の動作範囲）である。
+/// 補償式は範囲外の値も返しうるため、送る前に検査する。範囲の端の値は範囲内である。
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Publishable {
+    /// 気温（℃）。範囲外なら`None`。
+    pub temperature_c: Option<f32>,
+    /// 相対湿度（%）。範囲外なら`None`。
+    pub humidity_pct: Option<f32>,
+    /// 気圧（hPa）。範囲外なら`None`。
+    pub pressure_hpa: Option<f32>,
+    /// 範囲外で省いた測定量の数（0〜3）。
+    pub out_of_range: u8,
+}
+
+impl Publishable {
+    /// 送れる測定量が1つも無い。
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
+        self.temperature_c.is_none() && self.humidity_pct.is_none() && self.pressure_hpa.is_none()
+    }
+}
+
+/// 値が閉区間`[low, high]`の内にあれば`f32`で返す。`NaN`は範囲外である。
+#[allow(clippy::cast_possible_truncation)]
+fn within(value: f64, low: f64, high: f64) -> Option<f32> {
+    (low..=high).contains(&value).then_some(value as f32)
+}
+
+impl Reading {
+    /// 測定range（[`Publishable`]のdoc）の内にある量だけを返す。
+    #[must_use]
+    pub fn publishable(self) -> Publishable {
+        let temperature_c = within(self.temperature_celsius(), -40.0, 85.0);
+        let humidity_pct = within(self.humidity_percent(), 0.0, 100.0);
+        let pressure_hpa = within(self.pressure_pa() / 100.0, 300.0, 1100.0);
+        let out_of_range = u8::from(temperature_c.is_none())
+            + u8::from(humidity_pct.is_none())
+            + u8::from(pressure_hpa.is_none());
+        Publishable {
+            temperature_c,
+            humidity_pct,
+            pressure_hpa,
+            out_of_range,
+        }
+    }
+}
+
 /// 入力または計算結果が式の定義域を外れた。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Error {
@@ -330,6 +429,59 @@ pub fn compensate(raw: RawSample, c: &Calibration) -> Result<Reading, Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_conversion_deadline_starts_from_the_time_after_the_write() {
+        // 書き込みの前に読んだ時刻（1000）から期限を決めると、書き込みが完了した時刻（1040）には期限（1030）が過ぎている。
+        let stale = conversion_schedule(1_000, 1_000);
+        assert!(stale.deadline_ms < 1_040);
+        // 書き込みの後（1040）を起点にすれば、期限は書き込みの完了より後である。
+        let fresh = conversion_schedule(1_000, 1_040);
+        assert_eq!(
+            fresh,
+            ConversionSchedule {
+                cycle_ms: 1_040,
+                next_poll_ms: 1_040 + CONVERSION_MAX_MS,
+                deadline_ms: 1_040 + DEADLINE_MS,
+            }
+        );
+        // 時計が周期の起点より前を示しても、起点より前へ戻さない。
+        assert_eq!(conversion_schedule(1_000, 900).cycle_ms, 1_000);
+    }
+
+    #[test]
+    fn start_conversion_reads_the_clock_after_the_write_succeeds() {
+        use core::cell::Cell;
+        let written = Cell::new(false);
+        let schedule = start_conversion::<()>(
+            1_000,
+            || {
+                written.set(true);
+                Ok(())
+            },
+            // 書き込みの前なら 1000、後なら 1040 を返す時計。
+            || if written.get() { 1_040 } else { 1_000 },
+        )
+        .unwrap();
+        assert_eq!(schedule, conversion_schedule(1_000, 1_040));
+        assert_eq!(schedule.cycle_ms, 1_040);
+    }
+
+    #[test]
+    fn start_conversion_does_not_read_the_clock_when_the_write_fails() {
+        use core::cell::Cell;
+        let clock_reads = Cell::new(0u32);
+        let result = start_conversion(
+            1_000,
+            || Err(IoFault::Timeout),
+            || {
+                clock_reads.set(clock_reads.get() + 1);
+                1_040
+            },
+        );
+        assert_eq!(result, Err(IoFault::Timeout));
+        assert_eq!(clock_reads.get(), 0);
+    }
 
     #[test]
     fn calibration_register_boundaries_and_signed_nibbles() {
@@ -716,5 +868,52 @@ mod tests {
             let h = i64::from(r.humidity_q22_10_percent) - i64::from(bosch_humidity);
             assert!(h.abs() <= 2, "{sample:?}");
         }
+    }
+    #[test]
+    fn publishable_keeps_in_range_and_drops_out_of_range_per_quantity() {
+        // 温度 25.00 ℃、気圧 1013.25 hPa（101325 Pa × 256）、湿度 50 %（50 × 1024）。
+        let ok = Reading {
+            temperature_centi_c: 2500,
+            pressure_q24_8_pa: 101_325 * 256,
+            humidity_q22_10_percent: 50 * 1024,
+        };
+        let p = ok.publishable();
+        assert_eq!(p.temperature_c, Some(25.0));
+        assert_eq!(p.humidity_pct, Some(50.0));
+        assert_eq!(p.pressure_hpa, Some(1013.25));
+        assert_eq!(p.out_of_range, 0);
+        assert!(!p.is_empty());
+
+        // 端の値は範囲内。
+        let edge = Reading {
+            temperature_centi_c: -4000,
+            pressure_q24_8_pa: 30_000 * 256,
+            humidity_q22_10_percent: 100 * 1024,
+        };
+        let p = edge.publishable();
+        assert_eq!(p.temperature_c, Some(-40.0));
+        assert_eq!(p.pressure_hpa, Some(300.0));
+        assert_eq!(p.humidity_pct, Some(100.0));
+        assert_eq!(p.out_of_range, 0);
+
+        // 温度だけ範囲外（85.01 ℃）。他は残る。
+        let hot = Reading {
+            temperature_centi_c: 8501,
+            ..ok
+        };
+        let p = hot.publishable();
+        assert_eq!(p.temperature_c, None);
+        assert!(p.humidity_pct.is_some() && p.pressure_hpa.is_some());
+        assert_eq!(p.out_of_range, 1);
+
+        // 3つとも範囲外なら空。気圧は1100 hPaちょうどを超える値。
+        let bad = Reading {
+            temperature_centi_c: -4001,
+            pressure_q24_8_pa: 110_001 * 256,
+            humidity_q22_10_percent: 100 * 1024 + 1,
+        };
+        let p = bad.publishable();
+        assert!(p.is_empty());
+        assert_eq!(p.out_of_range, 3);
     }
 }

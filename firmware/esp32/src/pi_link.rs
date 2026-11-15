@@ -12,9 +12,9 @@
 //! | `get_status` | `PiSession::handle_get_status`のACKと`status`を書く（下記） |
 //! | `set_expression` | `deskcat_face::judge`で判定する（session→値の範囲→LCDの準備の順。§8）。受理なら`crate::face::FaceState`へ記録して`ok`のACKを書く。拒否なら該当のcodeの拒否ACKを書く。**製品buildと`face-21`試験buildが受理できる。表情を持たない試験buildは`hardware_unavailable`、bring-upの間は`busy`で拒否する**（§7） |
 //! | `show_text` | 現在のPi sessionと`boot`のACKを確認し、LCDが使える場合は`crate::face::FaceDrawer::show_text`へ渡す。受理なら`ok`、文字・時間が描画範囲外なら`out_of_range`、LCDが使えなければ`busy`または`hardware_unavailable`、session未確立なら`stale_session`のACKを書く |
-//! | （受信ではない）`tapped` | 製品buildと`tap-21`試験buildが、bootのACKを受けた後に[`send_event`]で書く。受信の振り分けとは別の経路である（`crate::tap`） |
+//! | （受信ではない）`tapped`、`shaken`（揺れの設定に値が入ったときだけ） | 製品buildと`tap-21`試験buildが、bootのACKを受けた後に[`send_event`]で書く。受信の振り分けとは別の経路である（`crate::tap`） |
 //! | `boot` | `unknown_type`の拒否ACKを書く（§8の表「方向が逆のsession確立message」） |
-//! | `play_motion` | session権限（現在のPi `sid`でない、またはESP32の`boot`がACKされていない間は`stale_session`。§4.1、§8手順8）→`deskcat_servo::MotionDispatch::handle`の順に扱い、**どの経路でも拒否ACKを書く**（下記「`play_motion`」）。**どのservoのcodeにも渡さない**（[Issue #19](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/19)） |
+//! | `play_motion` | session権限（現在のPi `sid`でない、またはESP32の`boot`がACKされていない間は`stale_session`。§4.1、§8手順8）→`deskcat_servo::MotionDispatch::handle`の順に扱い、**どの経路でも拒否ACKを書く**（下記「`play_motion`」）。**`LimitedServo`を作らない間（`crate::servo_path::product`が`None`）は、どのservoのcodeにも渡さない**（[Issue #19](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/19)） |
 //! | `status` | 応答しない（ESP32→Piのmessageである）。logで分類する |
 //! | decodeで拒否した行 | oversizeの行から`(sid, id)`と`hello`／`ping`／`get_status`のtypeを復元できた場合は`line_too_long`の拒否ACKを書く（§7）。それ以外はlogで分類し、応答しない（§2の既知の逸脱） |
 //!
@@ -31,7 +31,7 @@
 //!
 //! `get_status`への`status: ok`のACKと`status`は、1つのbufferへ連結し、1回の[`write_line`]で
 //! 送信のring bufferへ積む。Pi linkのUARTへ書くのは、このmoduleの応答と`BootSession`の`boot`の
-//! 送出と、製品build／`tap-21`試験buildが[`send_event`]で送る`tapped`と、製品buildが同じく送る`head_touched`だけであり、どれもmain loopの同じtaskから呼ぶ。そのため、連結した2行の間に他の行は
+//! 送出と、製品build／`tap-21`試験buildが[`send_event`]で送る`tapped`と`shaken`（揺れの設定に値が入ったときだけ）と、製品buildが同じく送る`head_touched`と`environment`だけであり、どれもmain loopの同じtaskから呼ぶ。そのため、連結した2行の間に他の行は
 //! 入らない。health snapshot（`main.rs`の`emit_health_snapshot`）はUART0のlogであり、Pi linkへ
 //! `status`を送らない。
 //!
@@ -41,8 +41,8 @@
 //! 未確定。Protocol §5.3）。そのため、現在の`sid`の`play_motion`は、初めての`id`なら
 //! `invalid_payload`（`MotionCatalog`に無い名前）で拒否してその結果を`MotionDedup`へ記録し、同じ`id`の再送には
 //! 記録した結果を返す。履歴から失われた`id`は`duplicate_expired`、現在のsessionでない`sid`は
-//! `stale_session`である（**ESP32の`boot`がACKされていない間も`stale_session`で、履歴へは記録しない**。§4.1の停止状態を含む）。**`MotionDispatch::handle`の`admit`のclosureは、`LimitedServo`も`Limiter`も
-//! 呼ばない**（firmwareの`main`はそれらを作らない）。**そのため`busy`は返らない。**
+//! `stale_session`である（**ESP32の`boot`がACKされていない間も`stale_session`で、履歴へは記録しない**。§4.1の停止状態を含む）。**`LimitedServo`を作らない間（`crate::servo_path::product`が`None`）は、`admit`は`UnknownMotion`で拒否し、
+//! `LimitedServo`も`Limiter`も呼ばない。****そのため`busy`は返らない。**
 //! catalogに名前がある場合も、servoへ渡す経路が無いので`invalid_payload`で拒否し、logに残す。
 //!
 //! 履歴を`clear`するのは、`hello`が新しいPi sessionを確立したとき（`HelloOutcome::Established`）だけである（§9）。保持件数と保持期間で失われた`id`の再送は`duplicate_expired`になる。
@@ -77,8 +77,9 @@ use deskcat_protocol::{
     Outcome, PlayMotion, Rejection,
 };
 use deskcat_servo::{
-    DedupOutcome, MotionCatalog, MotionDecision, MotionDispatch, MotionSession,
-    Rejection as MotionRejection,
+    admit_pi, drive_tick, fail_safe_on_loss, DedupOutcome, Drive, DriveOutcome, LimiterCounters,
+    LinkWatch, MotionCatalog, MotionDecision, MotionDispatch, MotionSession, MotionSink, PiMotion,
+    TickSchedule,
 };
 use esp_idf_svc::hal::uart::UartDriver;
 
@@ -86,6 +87,7 @@ use crate::boot_session::{BootSession, HelloAccepted};
 use crate::face::{FaceDrawer, FaceState};
 use crate::health::Health;
 use crate::protocol::{HelloOutcome, PiSession};
+use crate::servo_path::{resolve_target, tick_period_ms, ServoPath, LINK_LOSS_TIMEOUT_MS};
 
 /// `play_motion`の保持件数（暫定）。**確定値ではない。**`PROTO-TBD-005`が未決で、数値そのものに根拠は無い。
 ///
@@ -110,12 +112,44 @@ pub struct PiLink {
     pi: PiSession,
     /// 現在のPi sessionの`play_motion`の履歴と空catalog。session遷移で履歴を消す。
     motion_dispatch: MotionDispatch,
+    /// `LimitedServo`を持つ経路。製品buildは値が無い間`None`（`crate::servo_path::product`）。
+    servo: Option<ServoPath<'static>>,
+    /// `tick`を刻む期限。`servo`が`Some`で、周期（`crate::servo_path::tick_period_ms`）が決まっているときだけ`Some`。
+    tick_schedule: Option<TickSchedule>,
+    /// Piからの受信の途切れの見張り（`LINK_LOSS_TIMEOUT_MS`）。
+    link_watch: LinkWatch,
 }
 
 impl PiLink {
-    /// 未確立のPi sessionで作る。
-    pub fn new() -> Self {
+    /// 未確立のPi sessionで作る。`now_ms`は`Health::uptime_ms`（`tick`の期限の起点）。
+    ///
+    /// **周期が決まっていない`ServoPath`は刻めないので、`stop`して手放す**（失敗はlogへ残す。drop後の出力は保証しない。
+    /// `product`は、周期が決まるまで`None`）。
+    pub fn new(mut servo: Option<ServoPath<'static>>, now_ms: u64) -> Self {
+        let tick_schedule = tick_period_ms().and_then(|period| TickSchedule::new(period, now_ms));
+        if tick_schedule.is_none() {
+            if let Some(mut path) = servo.take() {
+                log::error!("servo_tick_period_missing (stopして手放す)");
+                if let Err(err) = path.stop() {
+                    log::error!("servo_stop_failed error={err}");
+                }
+            }
+        }
+        // 途切れの時間が決まっていない`ServoPath`は、途切れでstopできないので、同じく手放す。
+        if !LinkWatch::new(LINK_LOSS_TIMEOUT_MS).is_armed() {
+            if let Some(mut path) = servo.take() {
+                log::error!("servo_link_loss_timeout_missing (stopして手放す)");
+                if let Err(err) = path.stop() {
+                    log::error!("servo_stop_failed error={err}");
+                }
+            }
+        }
+        // servoが無ければ刻まない（期限だけがmain loopの待ちを起こすことを避ける）。
+        let tick_schedule = tick_schedule.filter(|_| servo.is_some());
         Self {
+            servo,
+            tick_schedule,
+            link_watch: LinkWatch::new(LINK_LOSS_TIMEOUT_MS),
             receiver: LineReceiver::with_protocol_limit(),
             pi: PiSession::new(),
             motion_dispatch: MotionDispatch::new(
@@ -131,9 +165,7 @@ impl PiLink {
     ///
     /// `boot_established`は`BootSession::is_established`である。`boot`がACKされていない間（§4.1の停止状態を含む）は、
     /// Pi由来と同じく`admit`へ届かず拒否する。**session（`sid`）・duplicateの検査は通らない**
-    /// （`MotionDispatch::handle_debug`のdoc）。**servoへは何も渡さない。**
-    /// **このfirmwareには`LimitedServo`も`Limiter`も無い**ため、`admit`のclosureは`on_play_motion`と同じく
-    /// ログを出して`UnknownMotion`で拒否する。catalogが空のため、そもそもclosureは呼ばれない。
+    /// （`MotionDispatch::handle_debug`のdoc）。**`LimitedServo`を作らない間は何も渡さず、`UnknownMotion`で拒否する**（`on_play_motion`と同じ）。
     /// debugの指示が同じ`Limiter`（同じcounter）へ届くことは、`deskcat_servo`のhost testが示す。
     /// firmwareでは、`LimitedServo`を作る後続の変更まで、limiterに届かない。
     #[cfg(feature = "debug-motion-19")]
@@ -146,15 +178,85 @@ impl PiLink {
             }
         };
         let name = motion.name;
-        let result =
-            self.motion_dispatch
-                .handle_debug(boot_established, name, motion.target, |_| {
-                    log::error!("debug_motion_catalog_without_servo name={name:?}");
-                    Err(MotionRejection::UnknownMotion)
-                });
+        let sink = self.servo.as_mut().map(|path| path as &mut dyn MotionSink);
+        let result = deskcat_servo::admit_debug(
+            &self.motion_dispatch,
+            boot_established,
+            name,
+            motion.target,
+            sink,
+        );
         match result {
             Ok(()) => log::info!("debug_motion name={name:?} outcome=admitted"),
             Err(refusal) => log::error!("debug_motion_rejected name={name:?} reason={refusal:?}"),
+        }
+    }
+
+    /// `status`の`servo.limiter`へ渡す累計。`LimitedServo`が無ければ`None`（省略）。
+    pub fn servo_counters(&self) -> Option<LimiterCounters> {
+        self.servo.as_ref().map(MotionSink::counters)
+    }
+
+    /// 次の`tick`の期限（`Health::uptime_ms`の時刻）。刻まないなら`None`。main loopの待ち（`until`）へ足す。
+    pub fn next_servo_deadline_ms(&self) -> Option<u64> {
+        self.tick_schedule
+            .as_ref()
+            .map(TickSchedule::next_deadline_ms)
+    }
+
+    /// 受信が途切れたと判定する時刻。見張っていなければ`None`。main loopの待ち（`until`）へ足す。
+    pub fn next_link_deadline_ms(&self) -> Option<u64> {
+        self.servo.as_ref()?;
+        self.link_watch.deadline_ms()
+    }
+
+    /// main loopの1周ごとに呼ぶ。Piからの受信が途切れたと最初に判定したとき、`stop`してlogへ残す。
+    /// `stop`が失敗したら、`tick_servo`が試し直す。
+    pub fn check_link(&mut self, now_ms: u64) {
+        let Some(path) = self.servo.as_mut() else {
+            return;
+        };
+        if let Some(result) = fail_safe_on_loss(&mut self.link_watch, path, now_ms) {
+            log::error!(
+                "pi_link_lost now_ms={now_ms} losses={}",
+                self.link_watch.losses()
+            );
+            if let Err(err) = result {
+                log::error!(
+                    "servo_stop_failed error={err} stop_failures={}",
+                    path.stop_failures()
+                );
+            }
+        }
+    }
+
+    /// main loopの1周ごとに呼ぶ。**期限が来たときだけ`tick`する**（制御周期。blockingしない）。`LimitedServo`が無ければ何もしない。
+    /// `stop`が失敗したままなら、`tick`せずに`stop`を試し直す。`tick`が失敗したら`stop`を呼ぶ。どちらの失敗もlogへ残す。
+    pub fn tick_servo(&mut self, now_ms: u64) {
+        let (Some(path), Some(schedule)) = (self.servo.as_mut(), self.tick_schedule.as_mut())
+        else {
+            return;
+        };
+        if !schedule.due(now_ms) {
+            return;
+        }
+        if path.stop_pending() {
+            if let Err(err) = path.stop() {
+                log::error!(
+                    "servo_stop_retry_failed error={err} stop_failures={}",
+                    path.stop_failures()
+                );
+            }
+            return;
+        }
+        if let DriveOutcome::Stopped { tick_error, stop } = drive_tick(path) {
+            log::error!("servo_tick_failed_stopped error={tick_error}");
+            if let Err(err) = stop {
+                log::error!(
+                    "servo_stop_failed error={err} stop_failures={}",
+                    path.stop_failures()
+                );
+            }
         }
     }
 
@@ -190,6 +292,10 @@ impl PiLink {
     ) {
         let Frame { envelope, message } = frame;
         let (sid, id) = (envelope.sid, envelope.id);
+        // 仮置き：現在のPi sessionのframeを受信とみなす（heartbeatの方式はPROTO-TBD-010）。
+        if self.pi.pi_sid() == Some(sid) {
+            self.link_watch.note_rx(now_ms);
+        }
         match message {
             Message::Ack(ack) => {
                 if let Some(pi_sid) = self.pi.pi_sid() {
@@ -206,6 +312,9 @@ impl PiLink {
             }
             Message::Hello(hello) => {
                 let handled = self.pi.handle_hello(sid, id, &hello);
+                if self.pi.pi_sid() == Some(sid) {
+                    self.link_watch.note_rx(now_ms);
+                }
                 log::info!(
                     "pi_rx_hello sid={sid} id={id} reason={:?} outcome={:?}",
                     hello.reason,
@@ -229,8 +338,10 @@ impl PiLink {
                 send(vec![self.pi.handle_ping(sid, id)], boot, health, uart);
             }
             Message::GetStatus => {
-                // `LimitedServo`をこのbuildは作らないため、`servo.limiter`は省略する（`Health::to_status`のdoc）。
-                let (ack, status) = self.pi.handle_get_status(sid, id, health.to_status(None));
+                let limiter = self.servo_counters();
+                let (ack, status) = self
+                    .pi
+                    .handle_get_status(sid, id, health.to_status(limiter));
                 let mut replies = vec![ack];
                 replies.extend(status);
                 send(replies, boot, health, uart);
@@ -330,7 +441,7 @@ impl PiLink {
     /// `boot_established`は`BootSession::is_established`である。**`boot`がACKされていない間（§4.1の停止状態を含む）は、
     /// motion commandを`stale_session`で拒否し、履歴へ記録しない**（§4.1、§12）。
     ///
-    /// **servoへは何も渡さない。**空catalogのため`admit`のclosureは呼ばれない。
+    /// **`LimitedServo`を作らない間は何も渡さない。**空catalogのため`admit`は呼ばれない。
     fn on_play_motion(
         &mut self,
         sid: u32,
@@ -339,17 +450,18 @@ impl PiLink {
         now_ms: u64,
         boot_established: bool,
     ) -> Message {
-        let outcome = self.motion_dispatch.handle(
+        let sink = self.servo.as_mut().map(|path| path as &mut dyn MotionSink);
+        let outcome = admit_pi(
+            &mut self.motion_dispatch,
             MotionSession::new(self.pi.pi_sid(), boot_established),
-            sid,
-            id,
-            command,
-            now_ms,
-            |_| {
-                // `LimitedServo`を作らない。catalogが誤って変わっても動かさず拒否する。
-                log::error!("pi_rx_play_motion_catalog_without_servo sid={sid} id={id}");
-                Err(MotionRejection::UnknownMotion)
+            PiMotion {
+                sid,
+                id,
+                command,
+                now_ms,
             },
+            resolve_target,
+            sink,
         );
         match outcome.code() {
             None => {

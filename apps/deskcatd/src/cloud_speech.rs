@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use std::sync::mpsc::{self, Receiver, SyncSender, TryRecvError, TrySendError};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use deskcat_domain::Expression;
+use deskcat_domain::{Expression, LocalMinutes};
 use deskcat_face::text::TextLayout;
 use deskcat_protocol::{Message, ShowText};
 use serde::{Deserialize, Serialize};
@@ -111,7 +111,13 @@ pub struct Context {
 impl Context {
     fn user_prompt(self) -> String {
         let emotion = match self.expression {
-            Expression::Neutral => "neutral",
+            // ADR-0026の感情enumは3値である。ほかの表情は新しい値を送らず`neutral`に畳む。
+            Expression::Neutral
+            | Expression::Dizzy
+            | Expression::Sleeping
+            | Expression::Hot
+            | Expression::Cold
+            | Expression::Worried => "neutral",
             Expression::Happy => "happy",
             Expression::Surprised => "surprised",
         };
@@ -129,6 +135,20 @@ impl Context {
 /// 時刻帯を決めるときにUTCへ足す秒数。DeskCatは日本で使うため、日本時間（UTC+9、夏時間なし）に固定する。
 /// 料金の日付判定（予算file）はUTCの日のまま変えない。
 const TIME_BAND_UTC_OFFSET_SECS: u64 = 9 * 3600;
+
+/// 時計が有効なときだけ、日本時間の時刻（0時からの分）を返す。`time_band`と同じ時計の読み方である。
+#[must_use]
+pub fn local_minutes(now: SystemTime) -> Option<LocalMinutes> {
+    let secs = now.duration_since(UNIX_EPOCH).ok()?.as_secs();
+    if secs < MIN_VALID_UNIX_SECS {
+        return None;
+    }
+    let minute_of_day = ((secs + TIME_BAND_UTC_OFFSET_SECS) % 86_400) / 60;
+    LocalMinutes::new(
+        u8::try_from(minute_of_day / 60).ok()?,
+        u8::try_from(minute_of_day % 60).ok()?,
+    )
+}
 
 /// 時計が有効なときだけ、日本時間の時刻帯を返す。料金の日付判定は別に行う。
 #[must_use]
@@ -577,6 +597,22 @@ mod tests {
     }
 
     #[test]
+    fn local_minutes_uses_japan_time_and_is_omitted_before_the_clock_is_valid() {
+        // UTC 15:30 は JST 0:30、UTC 03:05 は JST 12:05。
+        let at = |secs| time_band_minutes(UTC_MIDNIGHT + secs);
+        assert_eq!(at(15 * 3600 + 30 * 60), LocalMinutes::new(0, 30));
+        assert_eq!(at(3 * 3600 + 5 * 60), LocalMinutes::new(12, 5));
+        assert_eq!(
+            local_minutes(UNIX_EPOCH + Duration::from_secs(MIN_VALID_UNIX_SECS - 1)),
+            None
+        );
+    }
+
+    fn time_band_minutes(secs: u64) -> Option<LocalMinutes> {
+        local_minutes(UNIX_EPOCH + Duration::from_secs(secs))
+    }
+
+    #[test]
     fn time_band_is_omitted_before_the_clock_is_valid() {
         assert_eq!(band_at_utc(MIN_VALID_UNIX_SECS - 1), None);
     }
@@ -711,6 +747,10 @@ mod tests {
             (Err(Failure::Http), vec!["count", "generate"])
         );
         assert_eq!(
+            run_case(Err(Failure::Network), Ok("こんにちは。")),
+            (Err(Failure::Network), vec!["count"])
+        );
+        assert_eq!(
             run_case(Ok(513), Ok("こんにちは。")),
             (Err(Failure::InputTokens), vec!["count"])
         );
@@ -722,6 +762,27 @@ mod tests {
             run_case(Ok(42), Ok("一\n行")),
             (Err(Failure::Display), vec!["count", "generate"])
         );
+    }
+
+    #[test]
+    fn a_network_failure_is_counted_by_class_through_the_worker() {
+        let dir = std::env::temp_dir().join(format!("deskcat-network-test-{}", std::process::id()));
+        fs::create_dir_all(&dir).expect("test dir");
+        let (fake, calls) = scenario(Err(Failure::Network), Ok("こんにちは。"));
+        let mut worker = CloudSpeech::start(fake, dir.join("budget.json")).expect("start");
+        worker.submit(context(), 1000).expect("submit");
+        let result = loop {
+            if let Some(result) = worker.poll() {
+                break result;
+            }
+            std::thread::sleep(Duration::from_millis(1));
+        };
+        assert_eq!(result, Err(Failure::Network));
+        assert_eq!(worker.counters().count(Failure::Network), 1);
+        assert_eq!(worker.counters().count(Failure::Timeout), 0);
+        assert_eq!(worker.counters().success, 0);
+        assert_eq!(*calls.lock().expect("lock"), vec!["count"]);
+        fs::remove_dir_all(dir).expect("cleanup");
     }
 
     #[test]

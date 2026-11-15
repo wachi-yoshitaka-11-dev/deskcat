@@ -25,14 +25,27 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 use std::time::Instant;
 
-use deskcat_domain::{Millis, Mind, Timing};
+use deskcat_domain::{Companion, Config as CompanionConfig, Millis, Mind, Timing};
 use deskcat_serial::{PeerSession, SerialConfig, SerialDevice, Session};
 use deskcatd::cli::{self, Parsed};
 use deskcatd::cloud_speech::{ClaudeClient, CloudSpeech, Failure};
 use deskcatd::daemon::{Daemon, EXIT_FATAL, EXIT_SESSION_REDO, Identity};
-use deskcatd::runner::run_loop_with_cloud;
+use deskcatd::runner::{SpeechConfig, run_loop_with_cloud};
 use deskcatd::sid::sid_from_os;
 use deskcatd::watchdog::StartupWatchdog;
+
+/// `Companion`をMVPの既定値でつなぐ。吹き出しの表示時間は独り言の設定を使い、無ければ吹き出しを送らない。
+///
+/// `disabled`は試験用である（`--no-companion`）。
+fn with_companion(daemon: Daemon, speech: Option<SpeechConfig>, disabled: bool) -> Daemon {
+    if disabled {
+        return daemon;
+    }
+    daemon.with_companion(
+        Companion::new(CompanionConfig::MVP, Millis(0)),
+        speech.map(|config| config.duration_ms),
+    )
+}
 
 /// 起動からの経過（ms）。単調で、wall-clock timeではない。
 ///
@@ -101,7 +114,7 @@ fn main() -> ExitCode {
     };
 
     let started = Instant::now();
-    let mut daemon = Daemon::new(
+    let daemon = Daemon::new(
         Session::new(config, sid),
         PeerSession::new(args.duplicate_policy),
         Mind::new(Timing::MVP, Millis(0)),
@@ -110,6 +123,7 @@ fn main() -> ExitCode {
             version: env!("CARGO_PKG_VERSION").to_owned(),
         },
     );
+    let mut daemon = with_companion(daemon, args.speech, args.no_companion);
     daemon.on_connected();
 
     // unitは既定で--cloud-speechを渡さない。credentialが欠ければローカルだけで続ける。

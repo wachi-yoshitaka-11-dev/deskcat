@@ -11,7 +11,7 @@
 //! - envelope（§3）とIssue #4が承認した最小message type（`boot`、`hello`、`ping`、
 //!   `get_status`、`status`、`ack`）、およびIssue #527で足したtype（`set_expression`、
 //!   `show_text`、`head_touched`、`tapped`、`lifted`、`environment`）、およびIssue #19で足した
-//!   `play_motion`。含めないtypeと
+//!   `play_motion`、およびIssue #685で足した`shaken`。含めないtypeと
 //!   その理由は[`message`]のmodule docにある
 //! - error code（§7）と、それを計上するcounterへの対応付け
 //! - 1 lineのdecodeとencode、および検証順序

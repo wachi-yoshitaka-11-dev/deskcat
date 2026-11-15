@@ -1,11 +1,11 @@
 //! #23 の日本語独り言を、LCD/SPI を知らずに 8×12 glyph と画面上の cell へ変換する。
 //!
-//! k8x12 の ASCII・JIS X 0208 非漢字・第一水準を使う。画面全体に1行で出す仮 layout と最大表示時間は
+//! k8x12 の ASCII・JIS X 0208 非漢字・第一水準を使う。画面の下の帯（[`crate::TEXT_BAND_TOP`] から下。#743）に1行で出す仮 layout と最大表示時間は
 //! PROTO-TBD-007 の実機測定前の暫定値であり、protocol の最終制限ではない。
 
-use deskcat_protocol::{ErrorCode, ExpressionName};
+use deskcat_protocol::ErrorCode;
 
-use crate::{SCREEN_HEIGHT, SCREEN_WIDTH};
+use crate::{SCREEN_WIDTH, TEXT_BAND_HEIGHT, TEXT_BAND_TOP};
 
 #[path = "speech_glyphs.rs"]
 mod glyphs;
@@ -111,40 +111,26 @@ impl TextLayout {
         }
         Some(GlyphCell {
             x: self.start_x + u16::try_from(index).ok()? * GLYPH_WIDTH * SCALE,
-            y: (SCREEN_HEIGHT - GLYPH_HEIGHT * SCALE) / 2,
+            y: TEXT_BAND_TOP + (TEXT_BAND_HEIGHT - GLYPH_HEIGHT * SCALE) / 2,
             rows: glyphs::GLYPHS[usize::from(self.indices[index])].1,
         })
     }
 }
 
-/// 文字表示中は表情の最新要求を保持し、期限後にそれを描き直す。
+/// コメントの表示期限を数える。表情は帯より上にだけ描くため、コメントの間も表情は描き、ここでは持たない。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TextPresentation {
-    expression: ExpressionName,
     deadline_ms: Option<u64>,
 }
 
 impl TextPresentation {
-    /// 初期状態は neutral の表情で、文字表示は無い。
+    /// 初期状態は、コメントの表示が無い。
     #[must_use]
     pub const fn new() -> Self {
-        Self {
-            expression: ExpressionName::Neutral,
-            deadline_ms: None,
-        }
+        Self { deadline_ms: None }
     }
 
-    /// 最新の表情を記録する。文字表示中は画面を変えず、復元時に使う。
-    pub fn show_expression(&mut self, name: ExpressionName) -> Option<ExpressionName> {
-        self.expression = name;
-        if self.deadline_ms.is_none() {
-            Some(name)
-        } else {
-            None
-        }
-    }
-
-    /// 検証済みの文字表示を開始する。期限は要求時刻から数える。
+    /// 検証済みのコメントの表示を開始する。期限は要求時刻から数える。表示中なら期限を置き換える。
     ///
     /// # Errors
     ///
@@ -157,22 +143,22 @@ impl TextPresentation {
         Ok(())
     }
 
-    /// 期限が来たら、復元すべき最新の表情を1回だけ返す。
-    pub fn expire(&mut self, now_ms: u64) -> Option<ExpressionName> {
+    /// 期限が来たら、帯を消すべきとして1回だけ`true`を返す。
+    pub fn expire(&mut self, now_ms: u64) -> bool {
         if self.deadline_ms.is_some_and(|deadline| now_ms >= deadline) {
             self.deadline_ms = None;
-            Some(self.expression)
+            true
         } else {
-            None
+            false
         }
     }
 
-    /// 描画が失敗した場合に文字表示を終了し、復元対象を返す。
-    pub fn cancel(&mut self) -> Option<ExpressionName> {
-        self.deadline_ms.take().map(|_| self.expression)
+    /// 描画が失敗した場合にコメントの表示を終える。表示中だったなら`true`。
+    pub fn cancel(&mut self) -> bool {
+        self.deadline_ms.take().is_some()
     }
 
-    /// 現在の文字表示の終了時刻。
+    /// 現在のコメントの表示の終了時刻。
     #[must_use]
     pub const fn deadline_ms(&self) -> Option<u64> {
         self.deadline_ms
@@ -188,7 +174,9 @@ impl Default for TextPresentation {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{SCREEN_HEIGHT, shapes};
     use deskcat_domain::LOCAL_SPEECH_LINES;
+    use deskcat_protocol::ExpressionName;
 
     #[test]
     fn every_local_line_has_a_glyph_and_fits_the_provisional_row() {
@@ -198,6 +186,7 @@ mod tests {
             for i in 0..layout.len() {
                 let cell = layout.cell(i).unwrap();
                 assert!(cell.x + GLYPH_WIDTH * SCALE <= SCREEN_WIDTH);
+                assert!(cell.y >= TEXT_BAND_TOP);
                 assert!(cell.y + GLYPH_HEIGHT * SCALE <= SCREEN_HEIGHT);
                 assert!(cell.rows.iter().any(|row| *row != 0));
             }
@@ -248,21 +237,34 @@ mod tests {
     }
 
     #[test]
-    fn expression_changes_during_text_are_restored_at_expiry() {
+    fn glyphs_stay_in_the_band_and_clear_of_every_expression() {
+        let layout = TextLayout::new("い").unwrap();
+        let cell = layout.cell(0).unwrap();
+        for name in ExpressionName::ALL {
+            for r in shapes(name).unwrap() {
+                assert!(r.y1 < cell.y, "{name:?} {r:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn expiry_is_reported_once() {
         let mut state = TextPresentation::new();
-        assert_eq!(
-            state.show_expression(ExpressionName::Happy),
-            Some(ExpressionName::Happy)
-        );
+        assert!(!state.expire(0));
         assert_eq!(state.show_text(500, 100), Ok(()));
-        assert_eq!(state.show_expression(ExpressionName::Surprised), None);
-        assert_eq!(state.expire(599), None);
-        assert_eq!(state.expire(600), Some(ExpressionName::Surprised));
-        assert_eq!(state.expire(601), None);
-        assert_eq!(
-            state.show_expression(ExpressionName::Neutral),
-            Some(ExpressionName::Neutral)
-        );
+        assert!(!state.expire(599));
+        assert!(state.expire(600));
+        assert!(!state.expire(601));
+        assert_eq!(state.deadline_ms(), None);
+    }
+
+    #[test]
+    fn cancel_ends_a_running_text_only() {
+        let mut state = TextPresentation::new();
+        assert!(!state.cancel());
+        state.show_text(500, 0).unwrap();
+        assert!(state.cancel());
+        assert!(!state.expire(1000));
     }
 
     #[test]
@@ -276,6 +278,6 @@ mod tests {
         state.show_text(MAX_TEXT_DURATION_MS, 100).unwrap();
         state.show_text(10, 200).unwrap();
         assert_eq!(state.deadline_ms(), Some(210));
-        assert_eq!(state.expire(210), Some(ExpressionName::Neutral));
+        assert!(state.expire(210));
     }
 }

@@ -105,18 +105,30 @@
 
 pub mod counters;
 pub mod debug;
+pub mod decimation;
 pub mod dedup;
 pub mod dispatch;
+pub mod drain;
 pub mod limiter;
 pub mod limits;
+pub mod link;
+pub mod schedule;
+pub mod sink;
 
 pub use counters::{ClampReport, LimiterCounters};
 pub use debug::{
     DEBUG_MOTION_TOKEN, DebugMotion, DebugParseError, MAX_DEBUG_LINE_BYTES, parse_debug_line,
 };
+pub use decimation::OutputDecimator;
 pub use dedup::{DedupOutcome, MotionDedup};
 pub use dispatch::{DebugRefusal, MotionDecision, MotionDispatch, MotionSession};
 pub use limiter::{
     AdmittedTarget, CommandSource, Limiter, MotionCatalog, MotionRequest, Rejection, Setpoint,
 };
 pub use limits::{Cap, ControlPeriod, LimitsError, PositionRange, ServoLimits};
+pub use link::{LinkVerdict, LinkWatch, fail_safe_on_loss};
+pub use schedule::TickSchedule;
+pub use sink::{
+    Drive, DriveOutcome, LimiterSink, MotionSink, PiMotion, StopLatch, admit_debug, admit_pi,
+    drive_tick,
+};

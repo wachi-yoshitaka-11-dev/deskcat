@@ -88,7 +88,7 @@ Closes #
 
 最終diff hash / 同じdiffでの両Passと修正対象の新規指摘0件の巡:
 
-人間の継続・終了・始め直し（なし、または判断と理由・承認者・承認の問いと回答の文面・出所・対象Issue・承認時のreviewと巡数・終了巡数・範囲）:
+人間の継続・終了・始め直し（なし、または判断と理由・承認者・承認があったこと・日時・出所・対象Issue・承認時のreviewと巡数・終了巡数・範囲。ユーザーの発言は原文でも要旨でも書かない）:
 
 | reviewの巡（Issueの通算） | Passとdiff | [修正対象](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/CONTRIBUTING.md#自己レビュー)の該当種別と出所 | 採否・採らない理由（1行）・未解決 |
 |---|---|---|---|

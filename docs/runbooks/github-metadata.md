@@ -9,7 +9,7 @@ tokenや認証headerをplan、journal、報告へ保存しない。新規依存�
 
 | 対象 | 機械で比較するもの | 根拠・判断が必要なもの |
 |---|---|---|
-| Issue | milestoneの存在とM0–M6、type/priority各1個、label語彙、assigneeの存在 | milestoneの選択、担当者、条件付きarea/needs/blocked |
+| Issue | milestoneの存在とM0–M7、type/priority各1個、label語彙、assigneeの存在 | milestoneの選択、担当者、条件付きarea/needs/blocked |
 | PR | milestone禁止、area/type/priorityの存在。type/priorityを各1個に制限しない | 対応Issueの指定。指定されたIssue群のlabel/assigneeの和集合と照合する |
 | 両方 | 指定owner/number/titleのProject所属、Status、日付の存在・形式 | openのTodo/In Progressの選択、Issue予定・実着手日、openの完了予定 |
 | PR Start | created_atをJSTへ変換した作成実績日 | IssueのStartを作成日から推定しない |

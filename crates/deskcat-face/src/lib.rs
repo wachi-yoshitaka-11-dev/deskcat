@@ -1,4 +1,4 @@
-//! `set_expression`（Protocol §5.2）の3表情を、LCD上の矩形の列として返す。
+//! `set_expression`（Protocol §5.2）の表情を、LCD上の矩形の列として返す。
 //!
 //! このcrateはLCDもSPIも知らない。名前から「どの矩形をどの色で、どの順に塗るか」を返すだけであり、
 //! 塗るのは`firmware/esp32`の`crate::display`である（hostでtestできるように分けた）。
@@ -24,7 +24,7 @@ pub const SCREEN_HEIGHT: u16 = 240;
 pub const MAX_TRANSITION_MS: u32 = 2_000;
 
 /// RGB565の色。`firmware/esp32/src/display.rs`の`color`と同じく、各chをfull scaleにした値と、
-/// 見た目だけのための頬の色を持つ。
+/// 見た目だけのための色を持つ。
 pub mod color {
     /// 黒。
     pub const BLACK: u16 = 0x0000;
@@ -32,6 +32,8 @@ pub mod color {
     pub const WHITE: u16 = 0xFFFF;
     /// 頬の薄い赤。
     pub const CHEEK: u16 = 0xFBAE;
+    /// 寒い顔の頬の薄い青。
+    pub const CHILL: u16 = 0x65BF;
 }
 
 /// 塗る矩形1つ。`x1`と`y1`は端を含む（`Ili9341::fill_rect`の引数と同じ）。
@@ -49,6 +51,12 @@ pub struct Rect {
     pub color: u16,
 }
 
+/// コメント（`show_text`）を出す下の帯の上端。帯は`TEXT_BAND_TOP`から画面の下端まで（高さ[`TEXT_BAND_HEIGHT`]）。
+/// 表情の矩形は全部これより上にあり、表情を描いても帯は塗られない（#743）。
+pub const TEXT_BAND_TOP: u16 = 212;
+/// コメントの帯の高さ。
+pub const TEXT_BAND_HEIGHT: u16 = SCREEN_HEIGHT - TEXT_BAND_TOP;
+
 const fn rect(x0: u16, y0: u16, w: u16, h: u16, color: u16) -> Rect {
     Rect {
         x0,
@@ -59,36 +67,116 @@ const fn rect(x0: u16, y0: u16, w: u16, h: u16, color: u16) -> Rect {
     }
 }
 
-const BACKGROUND: Rect = rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, color::BLACK);
+/// 表情の背景。コメントの帯（[`TEXT_BAND_TOP`]から下）は塗らない。
+const BACKGROUND: Rect = rect(0, 0, SCREEN_WIDTH, TEXT_BAND_TOP, color::BLACK);
 
 const NEUTRAL: [Rect; 4] = [
     BACKGROUND,
-    rect(80, 70, 48, 64, color::WHITE),
-    rect(192, 70, 48, 64, color::WHITE),
-    rect(130, 176, 60, 8, color::WHITE),
+    rect(80, 54, 48, 64, color::WHITE),
+    rect(192, 54, 48, 64, color::WHITE),
+    rect(130, 160, 60, 8, color::WHITE),
 ];
 
 // 目は細い横線（笑った目）、口は広く、頬を足す。
 const HAPPY: [Rect; 6] = [
     BACKGROUND,
-    rect(76, 96, 56, 12, color::WHITE),
-    rect(188, 96, 56, 12, color::WHITE),
-    rect(110, 168, 100, 16, color::WHITE),
-    rect(40, 150, 40, 20, color::CHEEK),
-    rect(240, 150, 40, 20, color::CHEEK),
+    rect(76, 80, 56, 12, color::WHITE),
+    rect(188, 80, 56, 12, color::WHITE),
+    rect(110, 152, 100, 16, color::WHITE),
+    rect(40, 134, 40, 20, color::CHEEK),
+    rect(240, 134, 40, 20, color::CHEEK),
 ];
 
 // 目は大きく、黒目を足す。口は小さな四角。
 const SURPRISED: [Rect; 6] = [
     BACKGROUND,
-    rect(72, 50, 64, 88, color::WHITE),
-    rect(184, 50, 64, 88, color::WHITE),
-    rect(96, 82, 16, 24, color::BLACK),
-    rect(208, 82, 16, 24, color::BLACK),
-    rect(144, 168, 32, 40, color::WHITE),
+    rect(72, 34, 64, 88, color::WHITE),
+    rect(184, 34, 64, 88, color::WHITE),
+    rect(96, 66, 16, 24, color::BLACK),
+    rect(208, 66, 16, 24, color::BLACK),
+    rect(144, 152, 32, 40, color::WHITE),
 ];
 
-/// `name`の表情を塗る矩形を、塗る順に返す。先頭は画面全体の背景である。
+// 目を回す。目は入れ子の四角（白・黒・白・黒）で渦に見せ、内側を寄せて中心をずらす。口は段違いの波線。
+const DIZZY: [Rect; 11] = [
+    BACKGROUND,
+    rect(72, 46, 64, 64, color::WHITE),
+    rect(80, 54, 48, 48, color::BLACK),
+    rect(88, 64, 32, 32, color::WHITE),
+    rect(98, 76, 14, 14, color::BLACK),
+    rect(184, 46, 64, 64, color::WHITE),
+    rect(192, 54, 48, 48, color::BLACK),
+    rect(200, 64, 32, 32, color::WHITE),
+    rect(210, 76, 14, 14, color::BLACK),
+    rect(120, 158, 40, 8, color::WHITE),
+    rect(160, 166, 40, 8, color::WHITE),
+];
+
+// 目は閉じた細い横線、口は小さく、右上に「Z」を足す。
+const SLEEPING: [Rect; 9] = [
+    BACKGROUND,
+    rect(80, 104, 48, 8, color::WHITE),
+    rect(192, 104, 48, 8, color::WHITE),
+    rect(150, 160, 20, 6, color::WHITE),
+    rect(248, 20, 32, 6, color::WHITE),
+    rect(268, 26, 8, 6, color::WHITE),
+    rect(260, 32, 8, 6, color::WHITE),
+    rect(252, 38, 8, 6, color::WHITE),
+    rect(248, 44, 32, 6, color::WHITE),
+];
+
+// 暑い。目は上まぶたで半分閉じ、口は大きく開けて舌を出す。頬は赤く、右上に汗を足す。
+const HOT: [Rect; 12] = [
+    BACKGROUND,
+    rect(80, 68, 48, 40, color::WHITE),
+    rect(80, 68, 48, 20, color::BLACK),
+    rect(192, 68, 48, 40, color::WHITE),
+    rect(192, 68, 48, 20, color::BLACK),
+    rect(128, 140, 64, 40, color::WHITE),
+    rect(144, 160, 32, 20, color::CHEEK),
+    rect(40, 124, 40, 20, color::CHEEK),
+    rect(240, 124, 40, 20, color::CHEEK),
+    rect(264, 38, 12, 12, color::WHITE),
+    rect(260, 50, 20, 16, color::WHITE),
+    rect(264, 66, 12, 8, color::WHITE),
+];
+
+// 寒い。目は小さく黒目を端へ寄せ、口は歯を鳴らす格子にする。頬は薄い青で、両脇に震えの縦線を足す。
+const COLD: [Rect; 13] = [
+    BACKGROUND,
+    rect(84, 68, 40, 40, color::WHITE),
+    rect(88, 82, 10, 10, color::BLACK),
+    rect(196, 68, 40, 40, color::WHITE),
+    rect(200, 82, 10, 10, color::BLACK),
+    rect(124, 152, 72, 32, color::WHITE),
+    rect(140, 152, 4, 32, color::BLACK),
+    rect(158, 152, 4, 32, color::BLACK),
+    rect(176, 152, 4, 32, color::BLACK),
+    rect(40, 134, 40, 20, color::CHILL),
+    rect(240, 134, 40, 20, color::CHILL),
+    rect(20, 74, 8, 60, color::WHITE),
+    rect(292, 74, 8, 60, color::WHITE),
+];
+
+// 困った。目は下を向く黒目、眉は内側が上がる階段、口は小さな波線。
+const WORRIED: [Rect; 14] = [
+    BACKGROUND,
+    rect(80, 68, 48, 56, color::WHITE),
+    rect(96, 96, 16, 20, color::BLACK),
+    rect(192, 68, 48, 56, color::WHITE),
+    rect(208, 96, 16, 20, color::BLACK),
+    rect(68, 50, 16, 6, color::WHITE),
+    rect(84, 42, 16, 6, color::WHITE),
+    rect(100, 34, 16, 6, color::WHITE),
+    rect(204, 34, 16, 6, color::WHITE),
+    rect(220, 42, 16, 6, color::WHITE),
+    rect(236, 50, 16, 6, color::WHITE),
+    rect(128, 164, 24, 6, color::WHITE),
+    rect(152, 158, 24, 6, color::WHITE),
+    rect(176, 164, 16, 6, color::WHITE),
+];
+
+/// `name`の表情を塗る矩形を、塗る順に返す。先頭は、コメントの帯より上の背景である。表情の矩形は帯にかからない。
 ///
 /// 未知の名前（`ExpressionName`は`non_exhaustive`）には`None`を返す。呼び出し側は拒否する。
 #[must_use]
@@ -97,6 +185,11 @@ pub fn shapes(name: ExpressionName) -> Option<&'static [Rect]> {
         ExpressionName::Neutral => Some(&NEUTRAL),
         ExpressionName::Happy => Some(&HAPPY),
         ExpressionName::Surprised => Some(&SURPRISED),
+        ExpressionName::Dizzy => Some(&DIZZY),
+        ExpressionName::Sleeping => Some(&SLEEPING),
+        ExpressionName::Hot => Some(&HOT),
+        ExpressionName::Cold => Some(&COLD),
+        ExpressionName::Worried => Some(&WORRIED),
         _ => None,
     }
 }
@@ -201,21 +294,36 @@ impl Painter {
 mod tests {
     use super::*;
 
-    const NAMES: [ExpressionName; 3] = [
+    const NAMES: [ExpressionName; 8] = [
         ExpressionName::Neutral,
         ExpressionName::Happy,
         ExpressionName::Surprised,
+        ExpressionName::Dizzy,
+        ExpressionName::Sleeping,
+        ExpressionName::Hot,
+        ExpressionName::Cold,
+        ExpressionName::Worried,
     ];
 
     #[test]
-    fn every_expression_starts_with_a_full_screen_background() {
+    fn every_expression_starts_with_a_background_above_the_text_band() {
         for name in NAMES {
             let first = shapes(name).expect("定義済み")[0];
             assert_eq!(
                 (first.x0, first.y0, first.x1, first.y1),
-                (0, 0, SCREEN_WIDTH - 1, SCREEN_HEIGHT - 1),
+                (0, 0, SCREEN_WIDTH - 1, TEXT_BAND_TOP - 1),
                 "{name:?}"
             );
+        }
+    }
+
+    #[test]
+    fn no_rect_touches_the_text_band() {
+        assert_eq!((TEXT_BAND_TOP, TEXT_BAND_HEIGHT), (212, 28));
+        for name in NAMES {
+            for r in shapes(name).expect("定義済み") {
+                assert!(r.y1 < TEXT_BAND_TOP, "{name:?} {r:?}");
+            }
         }
     }
 
@@ -233,11 +341,13 @@ mod tests {
     }
 
     #[test]
-    fn the_three_expressions_look_different() {
-        let [n, h, s] = NAMES.map(|name| shapes(name).expect("定義済み"));
-        assert_ne!(n, h);
-        assert_ne!(n, s);
-        assert_ne!(h, s);
+    fn all_expressions_look_different() {
+        assert_eq!(NAMES, ExpressionName::ALL);
+        for (i, a) in NAMES.iter().enumerate() {
+            for b in &NAMES[i + 1..] {
+                assert_ne!(shapes(*a), shapes(*b), "{a:?} {b:?}");
+            }
+        }
     }
 
     #[test]
