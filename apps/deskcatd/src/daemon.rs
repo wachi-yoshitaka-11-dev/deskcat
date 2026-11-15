@@ -175,14 +175,16 @@
 //!
 //! **`serial link`に送り手の認証は無い。**`UART`は配線で結んだ1対1の物理linkであり、
 //! protocolも認証を持たない。`sid`の一致は**sessionの新しさ**であって、認可ではない。
-//! このprocessがeventから起こすのは**表情の変更だけ**であり、サーボを動かす経路は繋いでいない
-//! （`play_motion`は送らない。`PROTO-TBD-008`が未確定である）。繰り返し届くeventは、
+//! このprocessがeventから起こすのは表情の変更と、サーボを動かす`play_motion`である。**サーボを動かす
+//! 経路は繋いだが、[`crate::motion::MOTION_CONFIG`]が`None`の間は送らない**（`PROTO-TBD-008`が未確定である。
+//! `Some`にする前に満たす条件は[`crate::motion`]の「値を入れる前に」にある）。繰り返し届くeventは、
 //! [`deskcat_domain::Mind`]の同種eventの抑制と、`set_expression`を同時に1件しか応答待ちにしない
 //! こと（[`crate::expression_sync`]）の2段で抑える。**eventには`(sid, id)`のduplicate判定を
 //! 適用しない**（`deskcat-serial`の`PeerSession::accept_event`が、eventの再送とduplicateの扱いを
 //! §9で未確定としている）。
 //! **eventに特権的な動作（サーボ、電源、設定の変更）を繋ぐ前に、送り手の認証の境界と、
-//! 繰り返し届くeventの扱いを決めること。**
+//! 繰り返し届くeventの扱いを決めること。**サーボは[`crate::motion`]の「値を入れる前に」が
+//! この条件を持つ。
 //!
 //! [#491の決定]: https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/491#issuecomment-5965360345
 

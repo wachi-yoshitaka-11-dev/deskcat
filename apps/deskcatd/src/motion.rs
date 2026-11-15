@@ -16,8 +16,16 @@
 //! 単位時間あたりの受理数は、ESP32が強制する（Protocol §5.3）。ここで見るのは、Pi側が
 //! 意味の決まっていない値を送らないための前段だけである。
 //!
-//! 値を入れる前に、`Daemon`が`play_motion`のACKを扱う経路（拒否の分類、`stale_session`での再開）を
-//! 足す。**今は`play_motion`を追跡しないため、ACKは相関せず、再送もしない。**
+//! # 値を入れる前に
+//!
+//! **[`MOTION_CONFIG`]を`Some`にする前に、次をすべて満たす。**
+//!
+//! - `Daemon`が`play_motion`のACKを扱う経路（拒否の分類、`stale_session`での再開）を足す。
+//!   **今は`play_motion`を追跡しないため、再送もしない。**
+//! - 送った`play_motion`への正常なACKは、今のままでは相関できず`UnmatchedAck`（§6の本物の
+//!   不一致）に数えられる。ACKの相関と、counterの分類を直す。
+//! - 特権的な動作（サーボ）を繋ぐ前の条件として、送り手の認証の境界と、繰り返し届くeventの扱いを
+//!   決める（`daemon`のmodule docの「認証の境界」）。
 
 use deskcat_domain::MotionIntent;
 use deskcat_protocol::{FiniteF32, PlayMotion};
