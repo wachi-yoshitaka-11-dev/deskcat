@@ -265,7 +265,7 @@ fn an_empty_catalog_rejects_every_name() {
     .expect("start position is inside the approved range");
 
     assert!(MotionCatalog::empty().is_empty());
-    for name in [TEST_MOTION, "", "nod", "neutral"] {
+    for name in [TEST_MOTION, "", "sway", "neutral"] {
         assert_eq!(
             limiter.admit(&request(TEST_NEUTRAL, CommandSource::Pi).with_name(name)),
             Err(Rejection::UnknownMotion),

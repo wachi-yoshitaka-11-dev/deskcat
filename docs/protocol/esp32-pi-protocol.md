@@ -798,7 +798,7 @@ Firmwareは未知の名前をrejectする。Transition durationにはdisplay実�
 ### 5.3 `play_motion`
 
 ```json
-{"v":1,"sid":90312,"id":902,"ts_ms":52200,"type":"play_motion","payload":{"name":"nod","speed":0.45,"repeat":1}}
+{"v":1,"sid":90312,"id":902,"ts_ms":52200,"type":"play_motion","payload":{"name":"sway","speed":0.45,"repeat":1}}
 ```
 
 Piはraw pulse widthではなく、名前付きの高水準motionを送信する。

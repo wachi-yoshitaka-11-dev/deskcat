@@ -82,17 +82,17 @@ mod tests {
     #[test]
     fn a_well_formed_line_is_read() {
         assert_eq!(
-            parse_debug_line("MOTION nod 12.5"),
+            parse_debug_line("MOTION sway 12.5"),
             Ok(DebugMotion {
-                name: "nod",
+                name: "sway",
                 target: 12.5
             })
         );
         // 余分な空白は区切りとして扱う。
         assert_eq!(
-            parse_debug_line("  MOTION   nod\t-3  "),
+            parse_debug_line("  MOTION   sway\t-3  "),
             Ok(DebugMotion {
-                name: "nod",
+                name: "sway",
                 target: -3.0
             })
         );
@@ -103,11 +103,11 @@ mod tests {
         assert_eq!(parse_debug_line(""), Err(DebugParseError::Empty));
         assert_eq!(parse_debug_line("   "), Err(DebugParseError::Empty));
         assert_eq!(
-            parse_debug_line("motion nod 1"),
+            parse_debug_line("motion sway 1"),
             Err(DebugParseError::NotMotionCommand)
         );
         assert_eq!(
-            parse_debug_line("GO nod 1"),
+            parse_debug_line("GO sway 1"),
             Err(DebugParseError::NotMotionCommand)
         );
         assert_eq!(
@@ -115,15 +115,15 @@ mod tests {
             Err(DebugParseError::MissingName)
         );
         assert_eq!(
-            parse_debug_line("MOTION nod"),
+            parse_debug_line("MOTION sway"),
             Err(DebugParseError::MissingTarget)
         );
         assert_eq!(
-            parse_debug_line("MOTION nod up"),
+            parse_debug_line("MOTION sway up"),
             Err(DebugParseError::TargetNotANumber)
         );
         assert_eq!(
-            parse_debug_line("MOTION nod 1 2"),
+            parse_debug_line("MOTION sway 1 2"),
             Err(DebugParseError::TrailingToken)
         );
     }
@@ -141,9 +141,9 @@ mod tests {
     /// 有限でない値は読める。rejectするのはlimiterであり、この層ではない。
     #[test]
     fn non_finite_targets_are_read_not_judged() {
-        let nan = parse_debug_line("MOTION nod nan").expect("read");
+        let nan = parse_debug_line("MOTION sway nan").expect("read");
         assert!(nan.target.is_nan());
-        let inf = parse_debug_line("MOTION nod inf").expect("read");
+        let inf = parse_debug_line("MOTION sway inf").expect("read");
         assert!(inf.target.is_infinite());
     }
 }
