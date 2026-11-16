@@ -168,3 +168,110 @@ fn after_a_loss_a_new_motion_is_refused_even_when_the_link_returns() {
     };
     assert_eq!(drive.admit(&request), Err(Rejection::Busy));
 }
+
+// --- RxGapStats（HW-TBD-017の実測用。観測だけで、判定を変えない） ---
+
+use deskcat_servo::{RX_GAP_BIN_UPPER_MS, RX_GAP_BINS, RxGapStats};
+
+#[test]
+fn gap_stats_first_frame_is_only_a_baseline() {
+    let mut stats = RxGapStats::new();
+    stats.note_rx(1_000);
+    assert_eq!(stats.gaps(), 0);
+    assert_eq!(stats.max_ms(), 0);
+    assert_eq!(stats.bins(), [0; RX_GAP_BINS]);
+}
+
+#[test]
+fn gap_stats_records_max_sum_count_and_where_the_max_happened() {
+    let mut stats = RxGapStats::new();
+    for t in [0, 10, 110, 120] {
+        stats.note_rx(t);
+    }
+    assert_eq!(stats.gaps(), 3);
+    assert_eq!(stats.max_ms(), 100);
+    assert_eq!(stats.max_at_ms(), 110);
+    assert_eq!(stats.sum_ms(), 120);
+}
+
+#[test]
+fn gap_stats_bins_are_inclusive_at_the_upper_edge_and_overflow_goes_last() {
+    let mut stats = RxGapStats::new();
+    let mut t = 0u64;
+    stats.note_rx(t);
+    // 各区間の上端ちょうど、上端+1、最後の区間の外。
+    for gap in [16, 17, 4096, 4097, 1_000_000] {
+        t += gap;
+        stats.note_rx(t);
+    }
+    let bins = stats.bins();
+    assert_eq!(bins[0], 1); // 16
+    assert_eq!(bins[1], 1); // 17
+    assert_eq!(bins[RX_GAP_BINS - 2], 1); // 4096
+    assert_eq!(bins[RX_GAP_BINS - 1], 2); // 4097, 1_000_000
+    assert_eq!(bins.iter().sum::<u32>(), stats.gaps());
+    assert_eq!(RX_GAP_BIN_UPPER_MS.len(), RX_GAP_BINS - 1);
+}
+
+#[test]
+fn gap_stats_same_instant_frames_count_as_zero_gaps() {
+    let mut stats = RxGapStats::new();
+    stats.note_rx(50);
+    stats.note_rx(50);
+    assert_eq!(stats.gaps(), 1);
+    assert_eq!(stats.max_ms(), 0);
+    assert_eq!(stats.bins()[0], 1);
+}
+
+#[test]
+fn gap_stats_clock_going_back_is_a_zero_gap_and_keeps_the_latest_baseline() {
+    let mut stats = RxGapStats::new();
+    stats.note_rx(100);
+    stats.note_rx(90);
+    assert_eq!(stats.max_ms(), 0);
+    stats.note_rx(130);
+    assert_eq!(stats.max_ms(), 30);
+}
+
+#[test]
+fn gap_stats_window_max_resets_but_total_max_stays() {
+    let mut stats = RxGapStats::new();
+    for t in [0, 200, 210] {
+        stats.note_rx(t);
+    }
+    assert_eq!(stats.take_window_max_ms(), 200);
+    stats.note_rx(240);
+    assert_eq!(stats.take_window_max_ms(), 30);
+    assert_eq!(stats.take_window_max_ms(), 0);
+    assert_eq!(stats.max_ms(), 200);
+}
+
+#[test]
+fn gap_stats_restart_session_does_not_count_the_gap_between_sessions() {
+    let mut stats = RxGapStats::new();
+    stats.note_rx(0);
+    stats.note_rx(10);
+    stats.restart_session();
+    stats.note_rx(100_000);
+    stats.note_rx(100_020);
+    assert_eq!(stats.gaps(), 2);
+    assert_eq!(stats.max_ms(), 20);
+    assert_eq!(stats.sum_ms(), 30);
+}
+
+#[test]
+fn gap_stats_does_not_touch_the_loss_judgment() {
+    // 観測は`LinkWatch`と独立で、同じ時刻を渡しても判定は変わらない。
+    let mut with = LinkWatch::new(Some(TEST_TIMEOUT_MS));
+    let mut without = LinkWatch::new(Some(TEST_TIMEOUT_MS));
+    let mut stats = RxGapStats::new();
+    for t in [0, 10, 20] {
+        with.note_rx(t);
+        stats.note_rx(t);
+        without.note_rx(t);
+    }
+    for now in [20, 69, 70, 71, 500] {
+        assert_eq!(with.check(now), without.check(now));
+    }
+    assert_eq!(with.losses(), without.losses());
+}

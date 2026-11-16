@@ -81,6 +81,8 @@ use deskcat_servo::{
     LinkWatch, MotionCatalog, MotionDecision, MotionDispatch, MotionSession, MotionSink, PiMotion,
     TickSchedule,
 };
+#[cfg(feature = "link-gap-20")]
+use deskcat_servo::{RxGapStats, RX_GAP_BIN_UPPER_MS};
 use esp_idf_svc::hal::uart::UartDriver;
 
 use crate::boot_session::{BootSession, HelloAccepted};
@@ -118,6 +120,12 @@ pub struct PiLink {
     tick_schedule: Option<TickSchedule>,
     /// Piからの受信の途切れの見張り（`LINK_LOSS_TIMEOUT_MS`）。
     link_watch: LinkWatch,
+    /// 現在のPi sessionのframeの到着の間隔（`link-gap-20`のbuildだけ。観測だけで、判定に使わない）。
+    #[cfg(feature = "link-gap-20")]
+    rx_gap: RxGapStats,
+    /// `link_gap_bins`の行を出したか。
+    #[cfg(feature = "link-gap-20")]
+    link_gap_header_logged: bool,
 }
 
 impl PiLink {
@@ -150,6 +158,10 @@ impl PiLink {
             servo,
             tick_schedule,
             link_watch: LinkWatch::new(LINK_LOSS_TIMEOUT_MS),
+            #[cfg(feature = "link-gap-20")]
+            rx_gap: RxGapStats::new(),
+            #[cfg(feature = "link-gap-20")]
+            link_gap_header_logged: false,
             receiver: LineReceiver::with_protocol_limit(),
             pi: PiSession::new(),
             motion_dispatch: MotionDispatch::new(
@@ -208,6 +220,60 @@ impl PiLink {
     pub fn next_link_deadline_ms(&self) -> Option<u64> {
         self.servo.as_ref()?;
         self.link_watch.deadline_ms()
+    }
+
+    /// 現在のPi sessionのframeの到着を`link-gap-20`の統計へ足す（featureなしのbuildでは何もしない）。
+    #[cfg(feature = "link-gap-20")]
+    fn observe_rx_gap(&mut self, now_ms: u64) {
+        self.rx_gap.note_rx(now_ms);
+    }
+
+    #[cfg(not(feature = "link-gap-20"))]
+    fn observe_rx_gap(&mut self, _now_ms: u64) {}
+
+    /// 新しいPi sessionの確立で、到着の間隔の基準を戻す（featureなしのbuildでは何もしない）。
+    #[cfg(feature = "link-gap-20")]
+    fn restart_rx_gap(&mut self) {
+        self.rx_gap.restart_session();
+    }
+
+    #[cfg(not(feature = "link-gap-20"))]
+    fn restart_rx_gap(&mut self) {}
+
+    /// 到着の間隔の統計を1行logへ出す（`link-gap-20`のbuildだけ。health snapshotと同じ周期でmain loopが呼ぶ）。
+    ///
+    /// ```text
+    /// link_gap uptime_ms=<..> gaps=<n> max_ms=<..> max_at_ms=<..> window_max_ms=<..> sum_ms=<..> bins=<n0,n1,..,n9>
+    /// ```
+    ///
+    /// - `gaps`：数えた間隔の件数。`max_ms`・`max_at_ms`・`sum_ms`・`bins`は起動からの累計。
+    /// - `window_max_ms`：前の行から今までの最大（行ごとに戻る）。
+    /// - `bins`：上端が`RX_GAP_BIN_UPPER_MS`（ms、その値以下）の区間の件数。最後の区間は最大の上端を超えたもの。
+    ///   上端の一覧は、最初の1回だけ`link_gap_bins`の行で出す。
+    ///
+    /// 1行の項目は固定で、frameの数に比例して長くならない（桁数だけが変わる）。**frameの内容は出さない。**
+    #[cfg(feature = "link-gap-20")]
+    pub fn log_link_gap(&mut self, now_ms: u64) {
+        if !self.link_gap_header_logged {
+            self.link_gap_header_logged = true;
+            log::info!(
+                "link_gap_bins upper_ms={:?} last=overflow",
+                RX_GAP_BIN_UPPER_MS
+            );
+        }
+        let window_max_ms = self.rx_gap.take_window_max_ms();
+        let bins = self.rx_gap.bins();
+        log::info!(
+            "link_gap uptime_ms={now_ms} gaps={} max_ms={} max_at_ms={} window_max_ms={window_max_ms} sum_ms={} bins={}",
+            self.rx_gap.gaps(),
+            self.rx_gap.max_ms(),
+            self.rx_gap.max_at_ms(),
+            self.rx_gap.sum_ms(),
+            bins.iter()
+                .map(u32::to_string)
+                .collect::<Vec<_>>()
+                .join(",")
+        );
     }
 
     /// main loopの1周ごとに呼ぶ。Piからの受信が途切れたと最初に判定したとき、`stop`してlogへ残す。
@@ -293,8 +359,10 @@ impl PiLink {
         let Frame { envelope, message } = frame;
         let (sid, id) = (envelope.sid, envelope.id);
         // 仮置き：現在のPi sessionのframeを受信とみなす（heartbeatの方式はPROTO-TBD-010）。
-        if self.pi.pi_sid() == Some(sid) {
+        let noted_before_hello = self.pi.pi_sid() == Some(sid);
+        if noted_before_hello {
             self.link_watch.note_rx(now_ms);
+            self.observe_rx_gap(now_ms);
         }
         match message {
             Message::Ack(ack) => {
@@ -312,8 +380,18 @@ impl PiLink {
             }
             Message::Hello(hello) => {
                 let handled = self.pi.handle_hello(sid, id, &hello);
+                // 新しいPi sessionの確立では、sessionをまたぐ間隔を数えない（次のframeを基準にする）。
+                if matches!(handled.outcome, HelloOutcome::Established { .. }) {
+                    self.restart_rx_gap();
+                }
                 if self.pi.pi_sid() == Some(sid) {
                     self.link_watch.note_rx(now_ms);
+                    // 上で数えたframeを二重に数えない。確立で基準を戻した場合は、このframeを新しい基準にする。
+                    if !noted_before_hello
+                        || matches!(handled.outcome, HelloOutcome::Established { .. })
+                    {
+                        self.observe_rx_gap(now_ms);
+                    }
                 }
                 log::info!(
                     "pi_rx_hello sid={sid} id={id} reason={:?} outcome={:?}",

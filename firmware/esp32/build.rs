@@ -5,17 +5,20 @@ fn main() {
     println!("cargo:rustc-check-cfg=cfg(deskcat_product_mode)");
     println!("cargo:rustc-check-cfg=cfg(deskcat_reads_touch)");
     println!("cargo:rustc-check-cfg=cfg(deskcat_product_led)");
-    // `no-touch-487`だけは製品経路を外さない（touchを読まない製品build。`Cargo.toml`の注記）。
+    // `no-touch-487`と`link-gap-20`だけは製品経路を外さない（`Cargo.toml`の注記）。
+    // `link-gap-20`は受信の間隔をlogへ出すだけで、製品buildと同じ負荷の下で測るためである。
     let test_mode = std::env::vars_os().any(|(name, _)| {
         name.to_str().is_some_and(|name| {
             name.starts_with("CARGO_FEATURE_")
                 && name != "CARGO_FEATURE_DEFAULT"
                 && name != "CARGO_FEATURE_NO_TOUCH_487"
+                && name != "CARGO_FEATURE_LINK_GAP_20"
         })
     });
     if !test_mode {
         println!("cargo:rustc-cfg=deskcat_product_mode");
         // 製品経路のうちtouchを読み、LEDを駆動するもの（`no-touch-487`以外）。
+        // `link-gap-20`は触れない（touchもLEDも製品buildのまま）。
         if std::env::var_os("CARGO_FEATURE_NO_TOUCH_487").is_none() {
             println!("cargo:rustc-cfg=deskcat_reads_touch");
             println!("cargo:rustc-cfg=deskcat_product_led");

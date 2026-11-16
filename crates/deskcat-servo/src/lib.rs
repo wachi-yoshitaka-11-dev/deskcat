@@ -126,7 +126,9 @@ pub use limiter::{
     AdmittedTarget, CommandSource, Limiter, MotionCatalog, MotionRequest, Rejection, Setpoint,
 };
 pub use limits::{Cap, ControlPeriod, LimitsError, PositionRange, ServoLimits};
-pub use link::{LinkVerdict, LinkWatch, fail_safe_on_loss};
+pub use link::{
+    LinkVerdict, LinkWatch, RX_GAP_BIN_UPPER_MS, RX_GAP_BINS, RxGapStats, fail_safe_on_loss,
+};
 pub use schedule::TickSchedule;
 pub use sink::{
     Drive, DriveOutcome, LimiterSink, MotionSink, PiMotion, StopLatch, admit_debug, admit_pi,
