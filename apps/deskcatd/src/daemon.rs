@@ -417,8 +417,8 @@ struct ProbeState {
 /// 最後にframeを書き出した周（`ping`の間隔の起点）。
 #[derive(Debug, Clone, Copy)]
 struct LastTx {
-    /// その周の時刻（ms）。
-    at_ms: u64,
+    /// その周の時刻。
+    at: Millis,
     /// その周の後の`SessionCounters::bytes_out`。増えたら書き出しがあった。
     bytes_out: u64,
 }
@@ -1338,7 +1338,7 @@ impl Daemon {
         let out = self.session.counters().bytes_out;
         if self.last_tx.is_none_or(|last| out != last.bytes_out) {
             self.last_tx = Some(LastTx {
-                at_ms: now_ms,
+                at: Millis(now_ms),
                 bytes_out: out,
             });
         }
@@ -1360,7 +1360,7 @@ impl Daemon {
             return;
         }
         if let Some(last) = self.last_tx
-            && now_ms.saturating_sub(last.at_ms) < interval.get()
+            && now_ms.saturating_sub(last.at.0) < interval.get()
         {
             return;
         }
