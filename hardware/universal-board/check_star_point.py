@@ -84,7 +84,18 @@ def main():
         ex, ey = map(float, re.search(r"\(end ([-\d.]+) ([-\d.]+)\)", seg).groups())
         segs.append(((round(sx, 3), round(sy, 3)), (round(ex, 3), round(ey, 3))))
     star = hole_mm(*STAR_HOLE)
-    points = {p for s in segs for p in s} | set(pads.values()) | {star}
+    # 2本の芯線が互いの内側で交差する点（どちらの端点でもない穴）も節点にする。同じ穴を通る芯線は導通する
+    cross = set()
+    for i, (a1, a2) in enumerate(segs):
+        for b1, b2 in segs[i + 1:]:
+            d = (a2[0] - a1[0]) * (b2[1] - b1[1]) - (a2[1] - a1[1]) * (b2[0] - b1[0])
+            if abs(d) < 1e-9:
+                continue
+            u = ((b1[0] - a1[0]) * (b2[1] - b1[1]) - (b1[1] - a1[1]) * (b2[0] - b1[0])) / d
+            v = ((b1[0] - a1[0]) * (a2[1] - a1[1]) - (b1[1] - a1[1]) * (a2[0] - a1[0])) / d
+            if -1e-9 <= u <= 1 + 1e-9 and -1e-9 <= v <= 1 + 1e-9:
+                cross.add((round(a1[0] + u * (a2[0] - a1[0]), 3), round(a1[1] + u * (a2[1] - a1[1]), 3)))
+    points = {p for s in segs for p in s} | set(pads.values()) | {star} | cross
 
     def on(p, a, b):
         cross = (b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0])

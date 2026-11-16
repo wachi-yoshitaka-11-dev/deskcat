@@ -482,7 +482,7 @@
 			(uuid "63eac8dc-b815-4d50-93ec-df898f421858")
 		)
 		(fp_text user "+"
-			(at 1.6 0 0)
+			(at -1.6 0 0)
 			(layer "F.Fab")
 			(uuid "18fde3dd-b8e7-4b8d-b8f3-946d7ca80cae")
 			(effects
@@ -945,7 +945,7 @@
 			)
 		)
 		(fp_text user "-"
-			(at -0.94 0 0)
+			(at -4.14 0 0)
 			(layer "F.Fab")
 			(uuid "86bb0bf2-c108-4ef1-9398-6115cd6beddb")
 			(effects
@@ -1503,7 +1503,7 @@
 			)
 		)
 		(fp_text user "-"
-			(at -0.94 0 0)
+			(at -4.14 0 0)
 			(layer "F.Fab")
 			(uuid "e5fc917e-645f-475f-a589-10a9104d2c91")
 			(effects

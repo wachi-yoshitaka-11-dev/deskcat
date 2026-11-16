@@ -138,7 +138,7 @@
 		)
 	)
 	(fp_text user "-"
-		(at -0.94 0 0)
+		(at -4.14 0 0)
 		(layer "F.Fab")
 		(uuid "86bb0bf2-c108-4ef1-9398-6115cd6beddb")
 		(effects

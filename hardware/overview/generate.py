@@ -11,7 +11,7 @@ netlist（`deskcat-netlist.xml`）を入力にして生成し、手で直さな�
 
 生成の前に、次を機械で確かめる（崩れると生成せずに止まる）。
 - netlist が今の回路図から書き出したものである（回路図の sha256 が `SCHEMATIC_SHA256`、netlist の sha256 が `NETLIST_SHA256` と一致する。書き出したときの組を記録しておき、どちらかが後から変わると止まる）。
-- 図の各線の節点が netlist にあり、線の両端のまとまりがその節点の pin を持つ（板の中継は、その節点の線が2本以上付く場合だけ）。両端に部品の pin を書いた場合、その pin がその節点にある。
+- 図の各線の節点が netlist にあり、線の両端のまとまりがその節点の pin を持つ（板の中継は、その節点の線の端が板の上に2本以上あり、すべて同じ strip にある場合だけ）。両端に部品の pin を書いた場合、その pin がその節点にある。
 - netlist の各節点について、その節点の pin を持つ部品のまとまり（板・Pi・サーボなど）が、
   図の同じ節点の線だけでつながっている（線の抜け・余分の検出）。決まっていない所（`TBD`）は除く。
 
@@ -127,19 +127,24 @@ def board_of(hole):
 
 
 def collect_wires(bb):
-    """図に描く線。(id, 節点, (block, ref, pin), (block, ref, pin), 説明, 色)"""
+    """図に描く線。(id, 節点, (block, ref, pin), (block, ref, pin), 説明, 色[, (端の strip, 端の strip)])。
+    板の上の端の穴は、breadboard の導通の模型（`bb.strip_of`）で strip にして持つ。板でない端は None"""
     wires = []
+
+    def strip(hole):
+        return bb.strip_of(bb.parse_hole(hole))
+
     for wid, a, b, sig, _state in bb.SOFT:
         ba, bb_ = board_of(a), board_of(b)
         if ba in BLOCKS and bb_ in BLOCKS and ba != bb_:
-            wires.append((wid, BB_NET[sig], (ba, None, None), (bb_, None, None), f"柔らかい線 {wid}（{a} – {b}）", "#555555"))
+            wires.append((wid, BB_NET[sig], (ba, None, None), (bb_, None, None), f"柔らかい線 {wid}（{a} – {b}）", "#555555", (strip(a), strip(b))))
     for n, name, hole, sig in bb.NECK:
         wires.append((f"N{n}", BB_NET[sig], (board_of(hole), None, None), ("LCD", "J1", str(n)),
-                      f"首の線 LCD pin {n} {name}（{hole}）", "#9467bd"))
+                      f"首の線 LCD pin {n} {name}（{hole}）", "#9467bd", (strip(hole), None)))
     for xid, hole, sig, far, _state in bb.OFFBOARD:
         blk, ref, pin = OFFBOARD_END[xid]
         color = SERVO_COLOR["yellow"] if xid == "X4" else "#555555"
-        wires.append((xid, BB_NET[sig], (board_of(hole), None, None), (blk, ref, pin), f"{xid}（{hole} → {far}）", color))
+        wires.append((xid, BB_NET[sig], (board_of(hole), None, None), (blk, ref, pin), f"{xid}（{hole} → {far}）", color, (strip(hole), None)))
     wires += POWER_WIRES
     return wires
 
@@ -158,9 +163,9 @@ def run_checks(wires, pin_net, net_nodes, refs):
         if ref not in BLOCK_OF:
             errors.append(f"{ref}: どのまとまりに載るかが BLOCK_OF に無い")
     ends = {}
-    for _wid, wnet, a, b, *_ in wires:
-        for blk in (a[0], b[0]):
-            ends[(wnet, blk)] = ends.get((wnet, blk), 0) + 1
+    for _wid, wnet, a, b, _what, _c, *rest in wires:
+        for blk, s in zip((a[0], b[0]), rest[0] if rest else (None, None)):
+            ends.setdefault((wnet, blk), []).append(s)
     for wid, net, a, b, *_ in wires:
         if net not in net_nodes:
             errors.append(f"{wid}: 節点 {net} が netlist に無い")
@@ -169,9 +174,9 @@ def run_checks(wires, pin_net, net_nodes, refs):
         for blk, ref, pin in (a, b):
             if blk not in BLOCKS:
                 errors.append(f"{wid}: まとまり {blk} が無い")
-            elif blk not in on_net and not (blk.startswith("B") and ends[(net, blk)] >= 2):
-                # 板は線を中継できる（首の線は B2 の穴で受け、B2 は pin を持たない）。中継は、その節点の線が2本以上つながる場合だけ
-                errors.append(f"{wid}: まとまり {blk} は節点 {net} の pin を持たず、中継でもない（その節点の線が1本しか付かない）")
+            elif blk not in on_net and not (blk.startswith("B") and len(ends[(net, blk)]) >= 2 and len(set(ends[(net, blk)])) == 1 and None not in ends[(net, blk)]):
+                # 板は線を中継できる（首の線は B2 の穴で受け、B2 は pin を持たない）。中継は、その節点の線の端がすべて板の上の同じ strip にある場合だけ
+                errors.append(f"{wid}: まとまり {blk} は節点 {net} の pin を持たず、中継でもない（その節点の線の端が、板の上の同じ strip にない）")
             if ref is not None:
                 if pin_net.get((ref, pin)) != net:
                     errors.append(f"{wid}: {ref} pin {pin} は節点 {pin_net.get((ref, pin))} で、線の節点 {net} と違う")
@@ -334,7 +339,7 @@ def render_md(wires):
         blk, ref, pin = e
         return f"{blk}" + (f"（{ref} pin {pin}）" if ref else "")
 
-    for wid, net, a, b, what, _c in wires:
+    for wid, net, a, b, what, _c, *_ in wires:
         L.append(f"| {wid} | `{net.lstrip('/')}` | {end(a)} | {end(b)} | {what} |")
     L += ["", "サーボの3本：黄（信号）は B1 から X4、赤（5 V）と茶（GND）は PROTO-02 の J6 から（P3・P4）。",
           "", "## 決まっていない所（TBD）", "", "| ID | 間 | 何 |", "|---|---|---|"]

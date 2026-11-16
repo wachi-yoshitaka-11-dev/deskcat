@@ -127,7 +127,7 @@
 		(uuid "63eac8dc-b815-4d50-93ec-df898f421858")
 	)
 	(fp_text user "+"
-		(at 1.6 0 0)
+		(at -1.6 0 0)
 		(layer "F.Fab")
 		(uuid "18fde3dd-b8e7-4b8d-b8f3-946d7ca80cae")
 		(effects
