@@ -7,7 +7,7 @@
 
 use deskcat_protocol::ErrorCode;
 
-/// Piが送る要求の種類。`ping`は送らない（`PROTO-TBD-010`）ため無い。
+/// Piが送る要求の種類。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Request {
@@ -17,6 +17,8 @@ pub enum Request {
     GetStatus,
     /// `set_expression`（§5.2）。
     SetExpression,
+    /// `ping`（§5.7）。生きている印（`PROTO-TBD-010`の案）。ACKの内容に依らず、次の間隔で新しい`ping`を送る。
+    Ping,
 }
 
 /// 要求への結果。
@@ -55,6 +57,8 @@ pub enum Disposition {
     StopSending,
     /// processを終了する（終了コード1）。`hello`と`get_status`の決まった拒否。
     ExitFatal,
+    /// 何もしない。`ping`の結果が拒否や無応答でも、次の間隔で新しい`id`の`ping`を送る。
+    NextInterval,
 }
 
 /// `request`への`answer`の振る舞い。
@@ -69,7 +73,7 @@ pub const fn disposition(request: Request, answer: Answer) -> Disposition {
 
         (Request::Hello, Answer::Rejected(code)) => hello_rejected(code),
         (
-            Request::GetStatus | Request::SetExpression,
+            Request::GetStatus | Request::SetExpression | Request::Ping,
             Answer::Rejected(Some(ErrorCode::StaleSession)),
         ) => Disposition::Resume,
         // `get_status`は状態を読むだけで、新しい`id`で送り直しても二重実行の問題は起きない（§5.6）。
@@ -83,6 +87,11 @@ pub const fn disposition(request: Request, answer: Answer) -> Disposition {
         (Request::SetExpression, Answer::Rejected(code)) => set_expression_rejected(code),
         // 状態設定commandはidempotentである（§9）ので、結果が不明でも新しい`id`で送り直してよい。
         (Request::SetExpression, Answer::NoResponse) => Disposition::RetryLater,
+
+        // `ping`は結果を読むために送るのではなく、送ること自体が印である（`PROTO-TBD-010`の案）。
+        // `stale_session`は、通常commandと同じく再開で直す（上の腕）。他の拒否と無応答は、ESP32が行を読んだか
+        // 読めなかったかの違いでしかなく、再送も終了もせず、次の間隔の`ping`に任せる。
+        (Request::Ping, Answer::Rejected(_) | Answer::NoResponse) => Disposition::NextInterval,
     }
 }
 

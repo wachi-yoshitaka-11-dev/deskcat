@@ -8,14 +8,19 @@ use deskcat_protocol::ErrorCode;
 use deskcatd::disposition::{Answer, Disposition, Request, disposition};
 
 use Disposition::{
-    AskAgain, ExitFatal, Proceed, RestartCollision, Resume, RetryHelloSameId, RetryLater,
-    StopSending,
+    AskAgain, ExitFatal, NextInterval, Proceed, RestartCollision, Resume, RetryHelloSameId,
+    RetryLater, StopSending,
 };
 
 /// 表の「応答なし」と「ok」の列。
 #[test]
 fn ok_and_no_response_cells() {
-    for request in [Request::Hello, Request::GetStatus, Request::SetExpression] {
+    for request in [
+        Request::Hello,
+        Request::GetStatus,
+        Request::SetExpression,
+        Request::Ping,
+    ] {
         assert_eq!(disposition(request, Answer::Ok), Proceed, "{request:?}");
     }
     assert_eq!(
@@ -30,6 +35,7 @@ fn ok_and_no_response_cells() {
         disposition(Request::SetExpression, Answer::NoResponse),
         RetryLater
     );
+    assert_eq!(disposition(Request::Ping, Answer::NoResponse), NextInterval);
 }
 
 /// `hello`の11 codeを1つずつ。
@@ -99,6 +105,15 @@ fn every_code_for_every_request_has_the_documented_disposition() {
             expected_set_expression(code),
             "set_expression × {code:?}"
         );
+        assert_eq!(
+            disposition(Request::Ping, rejected),
+            if code == ErrorCode::StaleSession {
+                Resume
+            } else {
+                NextInterval
+            },
+            "ping × {code:?}"
+        );
     }
 }
 
@@ -109,6 +124,7 @@ fn a_rejection_without_a_code_falls_to_the_safe_side() {
     assert_eq!(disposition(Request::Hello, rejected), ExitFatal);
     assert_eq!(disposition(Request::GetStatus, rejected), ExitFatal);
     assert_eq!(disposition(Request::SetExpression, rejected), StopSending);
+    assert_eq!(disposition(Request::Ping, rejected), NextInterval);
 }
 
 /// `Resume`を返すのは、通常commandの`stale_session`だけである（`hello`は返さない）。
@@ -122,5 +138,6 @@ fn only_stale_session_on_a_command_resumes() {
             resumes(Request::SetExpression),
             code == ErrorCode::StaleSession
         );
+        assert_eq!(resumes(Request::Ping), code == ErrorCode::StaleSession);
     }
 }

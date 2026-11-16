@@ -22,7 +22,7 @@ use deskcat_serial::{
 };
 use deskcatd::daemon::{
     Daemon, EXIT_FATAL, EXIT_SESSION_REDO, ExitReason, ExpressionProbe, HELLO_RETRY_LIMIT,
-    Identity, RESUME_LIMIT, STATUS_RETRY_LIMIT, Step,
+    Identity, PING_INTERVAL_MS, RESUME_LIMIT, STATUS_RETRY_LIMIT, Step,
 };
 use deskcatd::expression_sync::{SILENT_RETRY_LIMIT, TRANSIENT_RETRY_LIMIT};
 use deskcatd::motion::{MOTION_CONFIG, MotionConfig, MotionSpec};
@@ -2031,4 +2031,138 @@ fn a_motion_queued_before_the_companion_falls_asleep_in_the_same_step_is_not_sen
     assert!(play_motions(&t.sent()).is_empty());
     assert_eq!(d.counters().motions_sent, 0);
     assert_eq!(d.counters().motions_not_sent, 1);
+}
+
+fn pings(frames: &[Frame]) -> usize {
+    frames
+        .iter()
+        .filter(|f| matches!(f.message, Message::Ping))
+        .count()
+}
+
+#[test]
+fn no_ping_is_sent_while_the_interval_is_none() {
+    // 製品の既定は`None`（`HW-TBD-017`の計測の後に決める）。
+    assert_eq!(PING_INTERVAL_MS, None);
+    let (mut d, mut t) = established("neutral");
+    let _ = t.sent();
+    for now in [1_000, 10_000, 100_000, 1_000_000] {
+        assert_eq!(run(&mut d, &mut t, now), Step::Continue);
+    }
+    assert_eq!(pings(&t.sent()), 0);
+    assert_eq!(d.counters().ping_sent, 0);
+}
+
+#[test]
+fn a_ping_is_sent_each_interval_when_nothing_else_is_sent() {
+    let interval = NonZeroU64::new(1_000).unwrap();
+    let (mut d, mut t) = established_with(daemon().with_ping_interval(Some(interval)), "neutral");
+    let _ = t.sent();
+    // 間隔が空く前は送らない。
+    assert_eq!(run(&mut d, &mut t, 500), Step::Continue);
+    assert_eq!(pings(&t.sent()), 0);
+    // 間隔ごとに1つ。
+    let mut ids = Vec::new();
+    for now in [1_500, 2_600, 3_700] {
+        assert_eq!(run(&mut d, &mut t, now), Step::Continue);
+        let sent = t.sent();
+        assert_eq!(pings(&sent), 1, "now={now}");
+        let id = find_id(&sent, |m| matches!(m, Message::Ping)).expect("ping");
+        // ACKを返す（返さないと、ACK timeoutの再送が書き出されて起点が動く）。
+        t.feed(ack(id, AckStatus::Ok, None), ESP_SID, 20);
+        ids.push(id);
+        // 同じ周の続きでは、もう送らない。
+        assert_eq!(run(&mut d, &mut t, now + 10), Step::Continue);
+        assert_eq!(pings(&t.sent()), 0, "now={now}");
+    }
+    assert!(
+        ids.windows(2).all(|w| w[0] < w[1]),
+        "新しいidで送る: {ids:?}"
+    );
+    assert_eq!(d.counters().ping_sent, 3);
+}
+
+#[test]
+fn a_ping_is_not_sent_right_after_another_frame() {
+    let interval = NonZeroU64::new(1_000).unwrap();
+    let (mut d, mut t) = established_with(daemon().with_ping_interval(Some(interval)), "neutral");
+    let _ = t.sent();
+    // 間隔が空く直前に`set_expression`を送る。
+    t.feed(
+        Message::HeadTouched(HeadTouched { duration_ms: 700 }),
+        ESP_SID,
+        4,
+    );
+    assert_eq!(run(&mut d, &mut t, 900), Step::Continue);
+    let sent = t.sent();
+    assert_eq!(expressions(&sent), [ExpressionName::Happy]);
+    assert_eq!(pings(&sent), 0);
+    // ACKを返し、再送を起こさない（再送も書き出しなので起点になる）。
+    let expression_id = find_id(&sent, |m| matches!(m, Message::SetExpression(_))).expect("送った");
+    t.feed(ack(expression_id, AckStatus::Ok, None), ESP_SID, 5);
+    assert_eq!(run(&mut d, &mut t, 910), Step::Continue);
+    let _ = t.sent();
+    // 最初の起点からは間隔が空いたが、最後に送ってからは空いていない。
+    assert_eq!(run(&mut d, &mut t, 1_500), Step::Continue);
+    assert_eq!(pings(&t.sent()), 0);
+    // 最後に送ってから間隔が空いた。
+    assert_eq!(run(&mut d, &mut t, 1_950), Step::Continue);
+    assert_eq!(pings(&t.sent()), 1);
+}
+
+#[test]
+fn a_ping_is_not_sent_before_the_startup_is_complete() {
+    let interval = NonZeroU64::new(1).unwrap();
+    let mut d = daemon().with_ping_interval(Some(interval));
+    let mut t = Fake::default();
+    d.on_connected();
+    assert_eq!(run(&mut d, &mut t, 0), Step::Continue);
+    assert_eq!(run(&mut d, &mut t, 5), Step::Continue);
+    assert_eq!(pings(&t.sent()), 0, "helloのACKが済むまで送らない");
+}
+
+#[test]
+fn the_ping_result_never_stops_the_daemon_and_stale_session_resumes() {
+    let interval = NonZeroU64::new(1_000).unwrap();
+    let (mut d, mut t) = established_with(daemon().with_ping_interval(Some(interval)), "neutral");
+    let _ = t.sent();
+    assert_eq!(run(&mut d, &mut t, 1_500), Step::Continue);
+    let id = find_id(&t.sent(), |m| matches!(m, Message::Ping)).expect("ping");
+    // 固定的な拒否でも終了しない。
+    t.feed(rejected(id, ErrorCode::HardwareUnavailable), ESP_SID, 10);
+    assert_eq!(run(&mut d, &mut t, 1_600), Step::Continue);
+    assert_eq!(d.counters().ping_rejected, 1);
+    assert_eq!(d.counters().resumes, 0);
+    // 次の間隔で、新しいidの`ping`を送る。
+    assert_eq!(run(&mut d, &mut t, 2_700), Step::Continue);
+    let next = find_id(&t.sent(), |m| matches!(m, Message::Ping)).expect("ping");
+    assert!(next > id);
+    // `stale_session`は通常commandと同じく再開する。
+    t.feed(rejected(next, ErrorCode::StaleSession), ESP_SID, 11);
+    assert_eq!(run(&mut d, &mut t, 2_800), Step::Continue);
+    assert_eq!(d.counters().resumes, 1);
+}
+
+#[test]
+fn an_unanswered_ping_is_counted_and_the_next_interval_sends_a_new_one() {
+    let interval = NonZeroU64::new(1_000).unwrap();
+    let (mut d, mut t) = established_with(daemon().with_ping_interval(Some(interval)), "neutral");
+    let _ = t.sent();
+    let mut now = 1_500;
+    assert_eq!(run(&mut d, &mut t, now), Step::Continue);
+    let first = find_id(&t.sent(), |m| matches!(m, Message::Ping)).expect("ping");
+    // ACKが無いまま、再送の予算を使い切る。
+    for _ in 0..40 {
+        now += 700;
+        assert_eq!(run(&mut d, &mut t, now), Step::Continue);
+    }
+    assert!(d.counters().ping_no_response >= 1);
+    assert_eq!(d.counters().resumes, 0);
+    let later = t.sent();
+    assert!(
+        later
+            .iter()
+            .any(|f| matches!(f.message, Message::Ping) && f.envelope.id > first),
+        "取り下げた後も、新しいidの`ping`を送る"
+    );
 }
