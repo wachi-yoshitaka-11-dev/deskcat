@@ -34,6 +34,7 @@ Commands run / Actual result:
   kicad-cli sch export netlist --format kicadxml: 成功（hardware/overview/deskcat-netlist.xml の元）。
   回路図を機能ごとの配置に描き直した後（A3）: Errors 0、Warnings 160（endpoint_off_grid 141、lib_symbol_issues 19）。
     描き直しの前後の netlist（kicadxml）で、net の名前と各 net の pin の集合が33本とも一致した。
+  ACCEL-01 の symbol に VDD の pin を足し、3V3 へつないだ後（2026-11-16）: Errors 0、Warnings 161（endpoint_off_grid 142、lib_symbol_issues 19）。
   kicad-cli pcb drc --schematic-parity --severity-all（deskcat.kicad_pcb）: 違反 0、未接続 0、回路図との食い違い 0。
   kicad-cli pcb export svg: 成功（hardware/universal-board/plan-front.svg、plan-back.svg）。
   基板ファイルは KiCad 8.0.9 の Python API（pcbnew）で一度だけ組み、以後は KiCad で編集する正本とした。
