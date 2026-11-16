@@ -8,7 +8,7 @@
 - star point は、servo の経路の上の (16,9) の穴である。
 - Gate 抵抗 R18 の GND 側と、Pi（J7−）・logic（J8−）の GND は、J5− へ向かう途中で
   servo の経路に最初に触れる点が star point でなければならない（servo の電流が流れる区間の
-  途中に付けない）。
+  途中に付けない）。star point を除いても servo の経路とつながる導体（迂回）があってはならない。
 
 基板ファイル（`hardware/deskcat.kicad_pcb`）の `B.Cu` の GND の配線と、部品の pad の位置だけを読む。
 KiCad は使わず、標準ライブラリだけで動く（ADR-0006）。
@@ -130,6 +130,18 @@ def main():
             first = next(u for u in route if u in servo_set)
             if first != star:
                 errors.append(f"{p[0]} の {p[1]} は servo の経路に {first} で付く（star point {star} ではない）")
+            # 最短の経路だけでは、star point を迂回する別の導体を見逃す。star point を除いても
+            # servo の経路とつながるなら、star point を通らない戻りがある
+            reach, q = {pads[p]}, deque([pads[p]])
+            while q:
+                u = q.popleft()
+                for v in graph[u]:
+                    if v != star and v not in reach:
+                        reach.add(v)
+                        q.append(v)
+            bypass = reach & (servo_set - {star})
+            if bypass:
+                errors.append(f"{p[0]} の {p[1]} は star point {star} を通らずに servo の経路（{min(bypass)}）へつながる導体がある")
     for e in errors:
         print("NG:", e, file=sys.stderr)
     if errors:

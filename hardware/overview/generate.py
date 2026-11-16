@@ -10,8 +10,8 @@ netlist（`deskcat-netlist.xml`）を入力にして生成し、手で直さな�
   netlist はどの端子台へ挿すかを持たない（同じ節点の端子が複数ある）ためである。
 
 生成の前に、次を機械で確かめる（崩れると生成せずに止まる）。
-- netlist が今の回路図から書き出したものである（回路図の sha256 が `SCHEMATIC_SHA256` と一致する）。
-- 図の各線の節点が netlist にあり、線の両端に部品の pin を書いた場合、その pin がその節点にある。
+- netlist が今の回路図から書き出したものである（回路図の sha256 が `SCHEMATIC_SHA256`、netlist の sha256 が `NETLIST_SHA256` と一致する。書き出したときの組を記録しておき、どちらかが後から変わると止まる）。
+- 図の各線の節点が netlist にあり、線の両端のまとまりがその節点の pin を持つ（板の中継は、その節点の線が2本以上付く場合だけ）。両端に部品の pin を書いた場合、その pin がその節点にある。
 - netlist の各節点について、その節点の pin を持つ部品のまとまり（板・Pi・サーボなど）が、
   図の同じ節点の線だけでつながっている（線の抜け・余分の検出）。決まっていない所（`TBD`）は除く。
 
@@ -19,7 +19,7 @@ netlist（`deskcat-netlist.xml`）を入力にして生成し、手で直さな�
 `--check` を付けると、検査し、生成した内容が file と一致するかを確かめる。
 netlist の書き出し（回路図を変えたら行う）:
 `kicad-cli sch export netlist --format kicadxml -o hardware/overview/deskcat-netlist.xml hardware/deskcat.kicad_sch`
-の後、`<source>` を `hardware/deskcat.kicad_sch` に、library の `<uri>` を `${KIPRJMOD}/DeskCat.kicad_sym` に置き換え（書き出した端末の絶対 path を残さない）、`SCHEMATIC_SHA256` を回路図の sha256 に直す。
+の後、`<source>` を `hardware/deskcat.kicad_sch` に、library の `<uri>` を `${KIPRJMOD}/DeskCat.kicad_sym` に置き換え（書き出した端末の絶対 path を残さない）、`SCHEMATIC_SHA256` を回路図の、`NETLIST_SHA256` を置き換え後の netlist の sha256 に直す。
 """
 
 import argparse
@@ -33,6 +33,7 @@ HERE = Path(__file__).resolve().parent
 SCHEMATIC = HERE.parent / "deskcat.kicad_sch"
 NETLIST = HERE / "deskcat-netlist.xml"
 SCHEMATIC_SHA256 = "01c0c7b742b6942b550748b435c33b1044083572c5b900d1b4131624d43b6983"
+NETLIST_SHA256 = "227589b3c0b028d96bb3eef9c6f10e4b7e0143637c1b3a862b52ef8e251cc035"
 
 # ---------------------------------------------------------------- まとまり（ブロック）
 
@@ -149,17 +150,28 @@ def run_checks(wires, pin_net, net_nodes, refs):
     errors = []
     sha = hashlib.sha256(SCHEMATIC.read_bytes()).hexdigest()
     if sha != SCHEMATIC_SHA256:
-        errors.append(f"netlist が今の回路図から書き出したものでない（回路図の sha256 {sha}）。書き出し直して SCHEMATIC_SHA256 を直す")
+        errors.append(f"netlist が今の回路図から書き出したものでない（回路図の sha256 {sha}）。書き出し直して SCHEMATIC_SHA256 と NETLIST_SHA256 を直す")
+    nsha = hashlib.sha256(NETLIST.read_bytes()).hexdigest()
+    if nsha != NETLIST_SHA256:
+        errors.append(f"netlist が、記録した書き出しと違う（netlist の sha256 {nsha}）。書き出し直して NETLIST_SHA256 を直す")
     for ref in refs:
         if ref not in BLOCK_OF:
             errors.append(f"{ref}: どのまとまりに載るかが BLOCK_OF に無い")
+    ends = {}
+    for _wid, wnet, a, b, *_ in wires:
+        for blk in (a[0], b[0]):
+            ends[(wnet, blk)] = ends.get((wnet, blk), 0) + 1
     for wid, net, a, b, *_ in wires:
         if net not in net_nodes:
             errors.append(f"{wid}: 節点 {net} が netlist に無い")
             continue
+        on_net = {BLOCK_OF.get(r) for r, _ in net_nodes[net]}
         for blk, ref, pin in (a, b):
             if blk not in BLOCKS:
                 errors.append(f"{wid}: まとまり {blk} が無い")
+            elif blk not in on_net and not (blk.startswith("B") and ends[(net, blk)] >= 2):
+                # 板は線を中継できる（首の線は B2 の穴で受け、B2 は pin を持たない）。中継は、その節点の線が2本以上つながる場合だけ
+                errors.append(f"{wid}: まとまり {blk} は節点 {net} の pin を持たず、中継でもない（その節点の線が1本しか付かない）")
             if ref is not None:
                 if pin_net.get((ref, pin)) != net:
                     errors.append(f"{wid}: {ref} pin {pin} は節点 {pin_net.get((ref, pin))} で、線の節点 {net} と違う")
