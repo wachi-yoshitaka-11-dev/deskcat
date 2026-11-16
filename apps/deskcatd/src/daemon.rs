@@ -414,6 +414,15 @@ struct ProbeState {
     showing: bool,
 }
 
+/// 最後にframeを書き出した周（`ping`の間隔の起点）。
+#[derive(Debug, Clone, Copy)]
+struct LastTx {
+    /// その周の時刻（ms）。
+    at_ms: u64,
+    /// その周の後の`SessionCounters::bytes_out`。増えたら書き出しがあった。
+    bytes_out: u64,
+}
+
 /// linkの一生。
 #[derive(Debug)]
 pub struct Daemon {
@@ -438,7 +447,7 @@ pub struct Daemon {
     /// `ping`を送る間隔。`None`なら送らない（[`PING_INTERVAL_MS`]）。
     ping_interval_ms: Option<NonZeroU64>,
     /// 最後にframeを書き出した周の時刻と、その時の`bytes_out`。`ping`の間隔の起点（再送とACKも含む）。
-    last_tx: Option<(u64, u64)>,
+    last_tx: Option<LastTx>,
     /// まだ送れていない`hello`の`reason`（`startup`だけ）。
     hello_to_send: Option<HelloReason>,
     /// 送ったがまだACKを受けていない`hello`の、送信時刻。
@@ -1327,8 +1336,11 @@ impl Daemon {
     /// 書き出しがあった周を、`ping`の間隔の起点として覚える。
     fn note_tx(&mut self, now_ms: u64) {
         let out = self.session.counters().bytes_out;
-        if self.last_tx.is_none_or(|(_, seen)| out != seen) {
-            self.last_tx = Some((now_ms, out));
+        if self.last_tx.is_none_or(|last| out != last.bytes_out) {
+            self.last_tx = Some(LastTx {
+                at_ms: now_ms,
+                bytes_out: out,
+            });
         }
     }
 
@@ -1347,8 +1359,8 @@ impl Daemon {
         if self.session.pending_out() > 0 {
             return;
         }
-        if let Some((at, _)) = self.last_tx
-            && now_ms.saturating_sub(at) < interval.get()
+        if let Some(last) = self.last_tx
+            && now_ms.saturating_sub(last.at_ms) < interval.get()
         {
             return;
         }
