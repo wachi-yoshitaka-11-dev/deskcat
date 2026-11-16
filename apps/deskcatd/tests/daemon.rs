@@ -25,6 +25,7 @@ use deskcatd::daemon::{
     Identity, RESUME_LIMIT, STATUS_RETRY_LIMIT, Step,
 };
 use deskcatd::expression_sync::{SILENT_RETRY_LIMIT, TRANSIENT_RETRY_LIMIT};
+use deskcatd::motion::{MOTION_CONFIG, MotionConfig, MotionSpec};
 
 const PI_SID: u32 = 1000;
 const ESP_SID: u32 = 2000;
@@ -1770,4 +1771,164 @@ fn an_expired_companion_face_does_not_clear_a_later_mind_face() {
     // `Happy`はMindの保つ時間で終わる。
     assert_eq!(run(&mut d, &mut t, 8_000), Step::Continue);
     assert_eq!(expressions(&t.sent()), [ExpressionName::Neutral]);
+}
+
+/// **test用の仮の値である。校正の値ではなく、`MOTION_CONFIG`へ写さない。**
+const TEST_MOTION: MotionConfig = MotionConfig {
+    sway: MotionSpec {
+        speed: 0.5,
+        repeat: 2,
+    },
+    speed_max: 0.5,
+    repeat_max: 2,
+};
+
+fn play_motions(frames: &[Frame]) -> Vec<deskcat_protocol::PlayMotion> {
+    frames
+        .iter()
+        .filter_map(|f| match &f.message {
+            Message::PlayMotion(p) => Some(p.clone()),
+            _ => None,
+        })
+        .collect()
+}
+
+fn touch(d: &mut Daemon, t: &mut Fake) -> Vec<Frame> {
+    t.feed(
+        Message::HeadTouched(HeadTouched { duration_ms: 700 }),
+        ESP_SID,
+        4,
+    );
+    assert_eq!(run(d, t, 100), Step::Continue);
+    t.sent()
+}
+
+#[test]
+fn while_the_motion_values_are_undecided_a_touch_sends_no_play_motion() {
+    // 製品の値（`PROTO-TBD-008`）は未決である。
+    assert_eq!(MOTION_CONFIG, None);
+    let (mut d, mut t) = established("neutral");
+    let _ = t.sent();
+
+    let sent = touch(&mut d, &mut t);
+    assert!(play_motions(&sent).is_empty());
+    assert_eq!(
+        expressions(&sent),
+        [ExpressionName::Happy],
+        "表情は変わらず送る"
+    );
+    assert_eq!(d.counters().motions_not_sent, 1);
+    assert_eq!(d.counters().motions_sent, 0);
+}
+
+#[test]
+fn with_values_a_touch_sends_one_play_motion_built_from_them() {
+    let (mut d, mut t) =
+        established_with(daemon().with_motion_config(Some(TEST_MOTION)), "neutral");
+    let _ = t.sent();
+
+    let sent = touch(&mut d, &mut t);
+    let motions = play_motions(&sent);
+    assert_eq!(motions.len(), 1);
+    assert_eq!(motions[0].name, "sway");
+    assert_eq!(motions[0].speed.get().to_bits(), 0.5_f32.to_bits());
+    assert_eq!(motions[0].repeat, 2);
+    assert_eq!(
+        expressions(&sent),
+        [ExpressionName::Happy],
+        "表情の送信は変わらない"
+    );
+    assert_eq!(d.counters().motions_sent, 1);
+    assert_eq!(d.counters().motions_not_sent, 0);
+
+    // 同じ送信が繰り返されない。
+    assert_eq!(run(&mut d, &mut t, 200), Step::Continue);
+    assert!(play_motions(&t.sent()).is_empty());
+}
+
+#[test]
+fn the_play_motion_is_encoded_as_the_section_5_3_shape() {
+    let (mut d, mut t) =
+        established_with(daemon().with_motion_config(Some(TEST_MOTION)), "neutral");
+    let _ = t.sent();
+    t.feed(
+        Message::HeadTouched(HeadTouched { duration_ms: 700 }),
+        ESP_SID,
+        4,
+    );
+    assert_eq!(run(&mut d, &mut t, 100), Step::Continue);
+    // `sent()`で復号する前の、wire上の行を見る。
+    let written = String::from_utf8(t.written.clone()).expect("UTF-8");
+    let line = written
+        .lines()
+        .find(|l| l.contains(r#""type":"play_motion""#))
+        .expect("play_motionの行がある");
+    assert!(
+        line.contains(r#""payload":{"name":"sway","speed":0.5,"repeat":2}"#),
+        "{line}"
+    );
+}
+
+#[test]
+fn values_over_the_limit_are_not_sent_and_are_counted() {
+    let mut over = TEST_MOTION;
+    over.sway.repeat = over.repeat_max + 1;
+    let (mut d, mut t) = established_with(daemon().with_motion_config(Some(over)), "neutral");
+    let _ = t.sent();
+
+    let sent = touch(&mut d, &mut t);
+    assert!(play_motions(&sent).is_empty());
+    assert_eq!(d.counters().motion_input_faults, 1);
+    assert_eq!(d.counters().motions_sent, 0);
+    assert_eq!(expressions(&sent), [ExpressionName::Happy]);
+}
+
+#[test]
+fn the_probe_sends_no_play_motion_even_when_motion_values_are_given() {
+    let d = daemon()
+        .with_motion_config(Some(TEST_MOTION))
+        .with_expression_probe(ExpressionProbe {
+            expression: Expression::Happy,
+            interval_ms: NonZeroU64::new(1_000).expect("0ではない"),
+        });
+    let (mut d, mut t) = established_with(d, "neutral");
+    let _ = t.sent();
+
+    let sent = touch(&mut d, &mut t);
+    assert!(play_motions(&sent).is_empty());
+    assert_eq!(d.counters().motions_sent, 0);
+    assert_eq!(d.counters().motions_not_sent, 1);
+}
+
+#[test]
+fn a_motion_intent_replaced_before_it_is_sent_is_counted_as_not_sent() {
+    let timing = Timing {
+        same_kind_cooldown_ms: 0,
+        ..Timing::MVP
+    };
+    let (mut d, mut t) = established_with(
+        daemon_with(timing).with_motion_config(Some(TEST_MOTION)),
+        "neutral",
+    );
+    let _ = t.sent();
+
+    // 1回の読みで2つ届くと、送る前に次の意図が前の意図を置き換える。
+    t.feed(
+        Message::HeadTouched(HeadTouched { duration_ms: 700 }),
+        ESP_SID,
+        4,
+    );
+    t.feed(
+        Message::HeadTouched(HeadTouched { duration_ms: 700 }),
+        ESP_SID,
+        5,
+    );
+    let second = t.reads.pop_back().expect("2つ目").expect("bytes");
+    let mut first = t.reads.pop_back().expect("1つ目").expect("bytes");
+    first.extend(second);
+    t.reads.push_back(Ok(first));
+    assert_eq!(run(&mut d, &mut t, 100), Step::Continue);
+    assert_eq!(play_motions(&t.sent()).len(), 1, "送るのは1回");
+    assert_eq!(d.counters().motions_sent, 1);
+    assert_eq!(d.counters().motions_not_sent, 1, "置き換えで捨てた分");
 }
