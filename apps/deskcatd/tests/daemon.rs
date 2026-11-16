@@ -1535,7 +1535,7 @@ fn a_hot_environment_shows_one_bubble_and_the_hot_expression_and_sends_no_motion
 }
 
 #[test]
-fn a_shaken_event_makes_the_companion_show_dizzy_and_requests_no_motion_to_send() {
+fn a_shaken_event_makes_the_companion_show_dizzy_and_counts_the_unsent_neck_request() {
     let (mut d, mut t) = with_companion(Some(4_000), 12);
     let _ = t.sent();
 
@@ -1543,8 +1543,9 @@ fn a_shaken_event_makes_the_companion_show_dizzy_and_requests_no_motion_to_send(
     assert_eq!(run(&mut d, &mut t, 100), Step::Continue);
     assert_eq!(expressions(&t.sent()), [ExpressionName::Dizzy]);
     assert_eq!(d.counters().shaken_received, 1);
-    // 首振りの要求は送らず、数える（`PROTO-TBD-008`）。
+    // 値が未決の間は、首振りの要求を送らず数える（`PROTO-TBD-008`）。
     assert_eq!(d.counters().motions_not_sent, 1);
+    assert_eq!(d.counters().motions_sent, 0);
 }
 
 #[test]
@@ -1931,4 +1932,103 @@ fn a_motion_intent_replaced_before_it_is_sent_is_counted_as_not_sent() {
     assert_eq!(play_motions(&t.sent()).len(), 1, "送るのは1回");
     assert_eq!(d.counters().motions_sent, 1);
     assert_eq!(d.counters().motions_not_sent, 1, "置き換えで捨てた分");
+}
+
+fn with_companion_and_motion(hour: u8) -> (Daemon, Fake) {
+    let mut d = daemon()
+        .with_motion_config(Some(TEST_MOTION))
+        .with_companion(Companion::new(CompanionConfig::MVP, Millis(0)), Some(4_000));
+    d.set_local_minutes(LocalMinutes::new(hour, 0));
+    established_with(d, "neutral")
+}
+
+#[test]
+fn with_values_a_shaken_event_sends_one_play_motion_and_the_same_expression() {
+    let (mut d, mut t) = with_companion_and_motion(12);
+    let _ = t.sent();
+
+    t.feed(Message::Shaken, ESP_SID, 4);
+    assert_eq!(run(&mut d, &mut t, 100), Step::Continue);
+    let sent = t.sent();
+    let motions = play_motions(&sent);
+    assert_eq!(motions.len(), 1);
+    assert_eq!(motions[0].name, "sway");
+    assert_eq!(expressions(&sent), [ExpressionName::Dizzy]);
+    assert_eq!(d.counters().motions_sent, 1);
+    assert_eq!(d.counters().motions_not_sent, 0);
+}
+
+#[test]
+fn with_values_the_rest_notice_sends_the_bubble_and_one_play_motion() {
+    let (mut d, mut t) = with_companion_and_motion(12);
+    let _ = t.sent();
+
+    assert_eq!(run(&mut d, &mut t, 25 * 60 * 1000), Step::Continue);
+    let sent = t.sent();
+    assert_eq!(texts(&sent), ["ひと休みしよう"]);
+    assert_eq!(play_motions(&sent).len(), 1);
+    assert_eq!(d.counters().motions_sent, 1);
+    assert_eq!(d.counters().motions_not_sent, 0);
+}
+
+#[test]
+fn with_values_nothing_moves_the_neck_while_the_companion_sleeps() {
+    let (mut d, mut t) = with_companion_and_motion(23);
+    let sent = t.sent();
+    assert_eq!(expressions(&sent), [ExpressionName::Sleeping]);
+    assert_eq!(texts(&sent), ["おやすみ"]);
+    let id = find_id(&sent, |m| matches!(m, Message::SetExpression(_))).expect("送った");
+    t.feed(ack(id, AckStatus::Ok, None), ESP_SID, 4);
+
+    // 揺れ、撫でる、休憩の時間のどれでも、寝ている間は首を動かさない。
+    t.feed(Message::Shaken, ESP_SID, 5);
+    t.feed(
+        Message::HeadTouched(HeadTouched { duration_ms: 700 }),
+        ESP_SID,
+        6,
+    );
+    assert_eq!(run(&mut d, &mut t, 200), Step::Continue);
+    assert_eq!(run(&mut d, &mut t, 26 * 60 * 1000), Step::Continue);
+    assert!(play_motions(&t.sent()).is_empty());
+    assert_eq!(d.counters().motions_sent, 0);
+}
+
+#[test]
+fn the_probe_sends_no_play_motion_for_a_companion_neck_request_either() {
+    // `Companion`との併用はCLIが拒否するが、daemon単体でもprobe中は積まない。
+    let mut d = daemon()
+        .with_motion_config(Some(TEST_MOTION))
+        .with_companion(Companion::new(CompanionConfig::MVP, Millis(0)), Some(4_000))
+        .with_expression_probe(ExpressionProbe {
+            expression: Expression::Happy,
+            interval_ms: NonZeroU64::new(1_000).expect("0ではない"),
+        });
+    d.set_local_minutes(LocalMinutes::new(12, 0));
+    let (mut d, mut t) = established_with(d, "neutral");
+    let _ = t.sent();
+
+    t.feed(Message::Shaken, ESP_SID, 4);
+    assert_eq!(run(&mut d, &mut t, 100), Step::Continue);
+    assert!(play_motions(&t.sent()).is_empty());
+    assert_eq!(d.counters().motions_sent, 0);
+    assert_eq!(d.counters().motions_not_sent, 1);
+}
+
+#[test]
+fn a_motion_queued_before_the_companion_falls_asleep_in_the_same_step_is_not_sent() {
+    let (mut d, mut t) = with_companion_and_motion(12);
+    let _ = t.sent();
+
+    // 撫でる入力で積んだ後、同じ周の`tick_companion`で夜に入って寝入る。
+    t.feed(
+        Message::HeadTouched(HeadTouched { duration_ms: 700 }),
+        ESP_SID,
+        4,
+    );
+    d.set_local_minutes(LocalMinutes::new(23, 0));
+    assert_eq!(run(&mut d, &mut t, 100), Step::Continue);
+    assert!(d.companion_asleep());
+    assert!(play_motions(&t.sent()).is_empty());
+    assert_eq!(d.counters().motions_sent, 0);
+    assert_eq!(d.counters().motions_not_sent, 1);
 }
