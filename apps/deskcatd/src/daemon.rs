@@ -192,7 +192,7 @@
 use deskcat_domain::Output as CompanionOutput;
 use deskcat_domain::{
     Ambient, Companion, ContactEvent, Expression, Face, LocalMinutes, Millis, Mind, MotionIntent,
-    Reaction,
+    NeckRequest, Reaction,
 };
 use deskcat_protocol::{
     AckStatus, ErrorCode, Frame, Hello, HelloReason, Message, Outcome, SetExpression, ShowText,
@@ -493,7 +493,8 @@ impl Daemon {
 
     /// `Companion`を使う。吹き出しは`bubble_duration_ms`で送り、`None`なら送らずに数える。
     ///
-    /// 首振りは送らない（`PROTO-TBD-008`）。`shaken`（Protocol §4.3a）を受けたら`Companion::on_shake`へ渡す。
+    /// 首振り（揺れと休憩のお知らせ）は`Mind`の首の意図と同じ経路で扱う。値が`None`の間（`PROTO-TBD-008`）は
+    /// 送らず数える。寝ている間は出さない。`shaken`（Protocol §4.3a）を受けたら`Companion::on_shake`へ渡す。
     #[must_use]
     pub fn with_companion(mut self, companion: Companion, bubble_duration_ms: Option<u32>) -> Self {
         self.companion = Some(CompanionLink {
@@ -963,7 +964,7 @@ impl Daemon {
         self.apply_companion(output, held);
     }
 
-    /// `Companion`の出力を、表情の希望と吹き出しの予約にする。首振りは送らず数える。
+    /// `Companion`の出力を、表情の希望と吹き出しの予約にする。首振りは`Mind`の首の意図と同じ経路（`queue_motion`）へ渡す。
     ///
     /// `held`は、この出力を求める前に`Companion`が`Neutral`以外の顔を持ち、それが今の希望だったか。
     /// 持っていなかった（後から`Mind`が上書きした）なら、`Companion`の`Neutral`はその顔を消さない。
@@ -989,9 +990,8 @@ impl Daemon {
                 None => self.counters.companion_bubbles_unsent += 1,
             }
         }
-        if output.neck.is_some() {
-            self.counters.motions_not_sent += 1;
-            log::debug!("首の動きの意図は送らない（PROTO-TBD-008）");
+        if let Some(NeckRequest::Sway) = output.neck {
+            self.queue_motion(MotionIntent::Sway);
         }
     }
 
@@ -1021,17 +1021,23 @@ impl Daemon {
             self.sync.set_desired(expression);
         }
         if let Some(intent) = reaction.motion {
-            // 値は`PROTO-TBD-008`で未確定の間`None`であり、その間は送らない。
-            // サーボの安全制限はESP32が強制する。
-            if self.motion_config.is_some() && self.probe.is_none() {
-                // 送る前に次の意図が来たら、前の意図は捨てる。送らなかったものとして数える。
-                if self.motion_pending.replace(intent).is_some() {
-                    self.counters.motions_not_sent += 1;
-                }
-            } else {
+            self.queue_motion(intent);
+        }
+    }
+
+    /// 首の動きの意図を、送る予約にする。`Mind`と`Companion`の両方がここを通る。
+    ///
+    /// 値は`PROTO-TBD-008`で未確定の間`None`であり、その間は送らず数える。
+    /// 寝ている間（夜の時間帯）と、probe中も送らず数える。サーボの安全制限はESP32が強制する。
+    fn queue_motion(&mut self, intent: MotionIntent) {
+        if self.motion_config.is_some() && self.probe.is_none() && !self.companion_asleep() {
+            // 送る前に次の意図が来たら、前の意図は捨てる。送らなかったものとして数える。
+            if self.motion_pending.replace(intent).is_some() {
                 self.counters.motions_not_sent += 1;
-                log::debug!("首の動きの意図は送らない（PROTO-TBD-008）");
             }
+        } else {
+            self.counters.motions_not_sent += 1;
+            log::debug!("首の動きの意図は送らない（値が未確定、寝ている間、またはprobe中）");
         }
     }
 
@@ -1218,6 +1224,12 @@ impl Daemon {
 
     /// 値が決まっているときだけ、意図を`play_motion`にして1回送る。**追跡も再送もしない**（module `motion`の範囲）。
     fn send_motion(&mut self, now_ms: u64) {
+        // 積んだ後に寝入った（同じ周の`tick_companion`、または送信queueが満杯で持ち越した間）なら送らない。
+        if self.motion_pending.is_some() && self.companion_asleep() {
+            self.motion_pending = None;
+            self.counters.motions_not_sent += 1;
+            return;
+        }
         let (Some(intent), Some(config)) = (self.motion_pending, self.motion_config) else {
             return;
         };
