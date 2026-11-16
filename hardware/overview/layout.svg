@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1220" height="880" viewBox="0 0 1220 880" font-family="sans-serif">
+<rect width="1220" height="880" fill="#fff"/>
+<text x="16" y="22" font-size="15" font-weight="bold">DeskCat 全体の配線（最終形のつながり。#512）</text>
+<text x="16" y="40" font-size="11" fill="#444">位置は胴の中の位置関係（上＝後ろ、下＝前、左＝左の壁。enclosure-and-neck.md の物理的な完成形）だけを表し、寸法は表さない。線は netlist から生成。電源の基板は未実装の計画（#405）。</text>
+<rect x="240" y="210" width="960" height="620" fill="#fafafa" stroke="#999" stroke-dasharray="6 4"/>
+<text x="246" y="224" font-size="11" fill="#777">胴（内側。上の辺＝後ろの壁、下の辺＝前の壁）</text>
+<polyline points="607.3,580.0 587.9,520.0" fill="none" stroke="#555555" stroke-width="7" opacity="0.55"/>
+<text x="603.6" y="545.0" font-size="10" fill="#222">11本</text>
+<polyline points="755.9,690.0 898.6,750.0" fill="none" stroke="#555555" stroke-width="7" opacity="0.55"/>
+<text x="833.2" y="715.0" font-size="10" fill="#222">5本</text>
+<polyline points="460.0,657.3 440.0,660.0 386.6,530.0" fill="none" stroke="#555555" stroke-width="2.4"/>
+<text x="456.0" y="653.6" font-size="10" fill="#222">X5</text>
+<polyline points="707.7,574.1 1056.2,352.3" fill="none" stroke="#555555" stroke-width="2.4"/>
+<polyline points="711.4,580.0 1060.0,358.2" fill="none" stroke="#555555" stroke-width="2.4"/>
+<polyline points="715.2,585.9 1063.8,364.1" fill="none" stroke="#555555" stroke-width="2.4"/>
+<text x="891.7" y="464.1" font-size="10" fill="#222">X1・X2・X3</text>
+<polyline points="670.4,580.0 695.2,550.0" fill="none" stroke="#f2c500" stroke-width="2.4"/>
+<text x="688.8" y="560.0" font-size="10" fill="#222">X4</text>
+<polyline points="605.1,520.0 699.3,645.0" fill="none" stroke="#9467bd" stroke-width="7" opacity="0.55"/>
+<text x="658.2" y="577.5" font-size="10" fill="#222">14本</text>
+<polyline points="164.0,267.1 262.0,333.2" fill="none" stroke="#d62728" stroke-width="2.4"/>
+<polyline points="160.1,272.9 258.0,339.0" fill="none" stroke="#111111" stroke-width="2.4"/>
+<text x="217.0" y="298.1" font-size="10" fill="#222">P1・P2</text>
+<polyline points="321.5,230.0 325.0,216.5 1123.5,220.0 1123.5,230.0" fill="none" stroke="#d62728" stroke-width="2.4"/>
+<polyline points="328.5,230.0 325.0,223.5 1116.5,220.0 1116.5,230.0" fill="none" stroke="#111111" stroke-width="2.4"/>
+<text x="728.5" y="215.0" font-size="10" fill="#222">P5・P6</text>
+<polyline points="391.2,399.7 651.2,491.9" fill="none" stroke="#d62728" stroke-width="2.4"/>
+<polyline points="388.8,406.3 648.8,498.5" fill="none" stroke="#8c564b" stroke-width="2.4"/>
+<text x="526.0" y="444.1" font-size="10" fill="#222">P3・P4</text>
+<polyline points="373.7,535.3 441.9,673.9 461.9,671.2" fill="none" stroke="#c00" stroke-width="1.5" stroke-dasharray="5 4"/>
+<text x="413.8" y="616.6" font-size="10" fill="#c00">T1</text>
+<polyline points="586.8,533.8 680.9,658.8" fill="none" stroke="#c00" stroke-width="1.5" stroke-dasharray="5 4"/>
+<text x="639.8" y="608.3" font-size="10" fill="#c00">T2</text>
+<polyline points="379.3,433.2 639.3,525.4" fill="none" stroke="#c00" stroke-width="1.5" stroke-dasharray="5 4"/>
+<text x="515.3" y="491.3" font-size="10" fill="#c00">T3</text>
+<polyline points="454.5,616.7 477.9,644.4 424.5,514.4" fill="none" stroke="#c00" stroke-width="1.5" stroke-dasharray="5 4"/>
+<text x="472.2" y="642.5" font-size="10" fill="#c00">T4</text>
+<rect x="260" y="230" width="130" height="300" rx="6" fill="#eef4ff" stroke="#335"/>
+<text x="266" y="246" font-size="11" font-weight="bold">電源の基板 PROTO-02</text>
+<text x="266" y="260" font-size="9" fill="#555">左の壁の内側に立てる</text>
+<text x="266" y="273" font-size="9" fill="#555">F1 J5 J6 J7 J8 Q1 R18</text>
+<rect x="50" y="220" width="150" height="50" rx="6" fill="#eef4ff" stroke="#335"/>
+<text x="56" y="236" font-size="11" font-weight="bold">AC アダプター M-12001</text>
+<text x="56" y="250" font-size="9" fill="#555">左の壁の後ろ寄りの穴から線が入る</text>
+<text x="56" y="263" font-size="9" fill="#555">PS1</text>
+<rect x="1060" y="230" width="120" height="180" rx="6" fill="#eef4ff" stroke="#335"/>
+<text x="1066" y="246" font-size="11" font-weight="bold">Raspberry Pi Zero W</text>
+<text x="1066" y="260" font-size="9" fill="#555">右の壁の内側の後ろ寄りに立てる</text>
+<text x="1066" y="273" font-size="9" fill="#555">J4 J9</text>
+<rect x="460" y="440" width="230" height="80" rx="6" fill="#eef4ff" stroke="#335"/>
+<text x="466" y="456" font-size="11" font-weight="bold">B2（BB-601。LCD の14本を受ける）</text>
+<text x="466" y="470" font-size="9" fill="#555">床の B1 の後ろ</text>
+<text x="466" y="483" font-size="9" fill="#555">R1 R2 R3 R6</text>
+<rect x="460" y="580" width="330" height="110" rx="6" fill="#eef4ff" stroke="#335"/>
+<text x="466" y="596" font-size="11" font-weight="bold">B1（EIC-3901。ESP32）</text>
+<text x="466" y="610" font-size="9" fill="#555">床の前寄り</text>
+<text x="466" y="623" font-size="9" fill="#555">D1 D2 R4 R5 R7 R8 R9 R12 R13 R14 R15 R16 R17 R19 U1</text>
+<rect x="840" y="750" width="260" height="60" rx="6" fill="#eef4ff" stroke="#335"/>
+<text x="846" y="766" font-size="11" font-weight="bold">B3（BB-601。ENV-01・ACCEL-01）</text>
+<text x="846" y="780" font-size="9" fill="#555">前の壁の内側に立てる</text>
+<text x="846" y="793" font-size="9" fill="#555">J2 J3 R10 R11</text>
+<rect x="620" y="645" width="200" height="55" rx="6" fill="#fff3dd" fill-opacity="0.9" stroke="#335" stroke-dasharray="5 3"/>
+<text x="626" y="661" font-size="11" font-weight="bold">LCD（DISP-01）</text>
+<text x="626" y="675" font-size="9" fill="#555">頭。背板の前の面（ふたの上、サーボの前寄り）</text>
+<text x="626" y="688" font-size="9" fill="#555">J1</text>
+<rect x="650" y="490" width="140" height="60" rx="6" fill="#fff3dd" fill-opacity="0.9" stroke="#335" stroke-dasharray="5 3"/>
+<text x="656" y="506" font-size="11" font-weight="bold">サーボ（SERVO-01）</text>
+<text x="656" y="520" font-size="9" fill="#555">ふたの上の天板。軸は胴の真ん中</text>
+<text x="656" y="533" font-size="9" fill="#555">M1</text>
+<text x="16" y="790" font-size="10" fill="#444">細い線＝1本ずつ（ID。サーボは黄・赤・茶）。太い線＝束（本数）。各線の節点と端は wiring-table.md。赤の破線＝TBD。描かない物：#18 の試験だけの物（端子台S、PSU、試験用の負荷、shunt）。</text>
+<text x="16" y="804" font-size="10" fill="#c00">T1: J8（logic の枝）→ ESP32 の 5 V 入力：使うかと経路は #405（power-budget.md の`ESP32の給電経路`）</text>
+<text x="16" y="818" font-size="10" fill="#c00">T2: LCD の VCC（pin 1）の電圧：今は 3V3。最終は #405（`HW-TBD-024`）</text>
+<text x="16" y="832" font-size="10" fill="#c00">T3: servo の枝の bulk capacitor C1 の値と品、shunt（`MEAS-01`）を入れるか：#405・#17</text>
+<text x="16" y="846" font-size="10" fill="#c00">T4: X5 を PROTO-02 のどの端子へつなぐか：#405</text>
+</svg>

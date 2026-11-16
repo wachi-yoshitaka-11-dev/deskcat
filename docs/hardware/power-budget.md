@@ -1778,7 +1778,7 @@ I = η0 * sqrt( (T1 - T) / (r * R) )
    （Pi branch・logic rail・servo railの3分岐＋予備3）。
    **1極あたり3本を1つの端子で受けるのではなく、節点を基板上に作って各branchを別々の端子台で終端する。**
    **はんだ接続そのものに定格は無く、節点の導体は`111641`が決める。**
-   **残るのは基板上の配置である**（着荷後に現物合わせ。Owner: Human）。
+   **残るのは基板上の配置である。****2026-11-15更新：**計画図を先に描き（[`hardware/universal-board/plan.md`](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/hardware/universal-board/plan.md)）、それに従ってはんだ付けし、付けた後に現物と照合して完成図にする（[#405](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/405)）。旧文は「着荷後に現物合わせ。Owner: Human」だった。
 3. ~~**`CABLE-PI-PWR-01`**: Micro-Bオスcable。**未調査。**~~
    **2026-08-25に秋月 通販109314で確定した。****ただし同品は許容電流もAWGも公開しておらず、
    上表の線材・cableの条件を満たさない。****同日、人間がこの行へ許容電流の公開を求めないと決めた**
@@ -3114,7 +3114,7 @@ backfeedの実測に基づくものではない。**次を主張しない。
 端子台（`114217`）へ変わったが、分岐点より手前に直列という配置そのものは変わらない。****MOSFETのDrainリードをPTC側（入力側）、Sourceリードを分岐点側（出力側）へ
 向け**（2026-09-04訂正。従来はSource/Drainが逆だった）、Gateリードから共通GND戻りへの
 配線は最短距離で取る（gate抵抗もこの経路に直列で挿入する）。
-**現物合わせでの正確な座標・穴位置は、`PROTO-02`の残作業と同じく着荷後に決める。**
+**正確な穴位置は、計画図（[`hardware/universal-board/plan.md`](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/hardware/universal-board/plan.md)）を先に描き、それに従ってはんだ付けし、付けた後に現物と照合して完成図にする（[#405](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/405)。2026-11-15に「`PROTO-02`の残作業と同じく着荷後に現物合わせで決める」から改めた）。**
 この節が決めるのは向き・直列順序・配線トポロジーであり、現物のレイアウト座標ではない。
 
 出典は[2SJ334 datasheet](https://akizukidenshi.com/goodsaffix/2sj334.pdf)（東芝、2006-11-14。

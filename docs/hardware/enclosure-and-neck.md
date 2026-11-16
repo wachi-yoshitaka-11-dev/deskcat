@@ -92,7 +92,7 @@ LCD の消費電流、特にバックライトは `HW-TBD-024` が未解決で�
 | 案 | 利点 | 欠点・未確認 | 出所 |
 |---|---|---|---|
 | A. breadboard 継続 | 手元にある。#13〜#16 の bring-up の配線を変えやすい | 電源の大電流経路に breadboard の接点を使わない方針と合わない。筐体内で固定できない。首振りの振動での抜けは未確認 | [BOM `PROTO-02`](hardware-bom.md)、[電源](power-budget.md) |
-| B. ユニバーサル基板 `PROTO-02`（72×47.5 mm） | 電源部品（`PROT-OC-01`、`PROT-RP-01`、端子台）の実装先として BOM が選定済み。取付穴径 3.2 mm（BOM）。取付穴の間隔は未確認 | Pi・ESP32・周辺 module をこの基板に載せるか、別に固定してコネクタで受けるかは記録が無い。基板上の座標は着荷後の現物合わせ（Owner: Human） | [BOM](hardware-bom.md)、[秋月 100517](https://akizukidenshi.com/catalog/g/g100517/)、[#405](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/405) |
+| B. ユニバーサル基板 `PROTO-02` | 電源部品（`PROT-OC-01`、`PROT-RP-01`、端子台）の実装先として BOM が選定済み。外形と取付穴径は[BOM の `PROTO-02` 行](hardware-bom.md)。取付穴の間隔は[計画図の plan.md](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/hardware/universal-board/plan.md)の`寸法の出所` | Pi・ESP32・周辺 module をこの基板に載せるか、別に固定してコネクタで受けるかは記録が無い。基板上の座標は、計画図（[`hardware/universal-board/plan.md`](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/hardware/universal-board/plan.md)）を先に描き、それに従ってはんだ付けし、付けた後に現物と照合して完成図にする（#405） | [BOM](hardware-bom.md)、[秋月 100517](https://akizukidenshi.com/catalog/g/g100517/)、[#405](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/405) |
 | C. custom 基板 | 寸法と接続を自由に決められる | 発注と費用が要る。現物配置と配線が決まる前は、寸法と接続の入力が無い | [#34 の記録（回答と承認された方針）](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/34#issuecomment-5863029148) |
 
 推奨: **仮筐体では A のまま、未結線の `PROTO-02` を置き合わせる。最終の電源実装は B。**C は仮筐体の寸法が決まってから、必要が出た場合に検討する。理由は、電源経路に A が合わず、C には根拠となる寸法がまだ無いことによる。

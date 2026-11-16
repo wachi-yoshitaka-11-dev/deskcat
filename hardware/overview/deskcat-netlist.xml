@@ -1,0 +1,968 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<export version="E">
+  <design>
+    <source>hardware/deskcat.kicad_sch</source>
+    <date>2026-11-15T14:48:00+0000</date>
+    <tool>Eeschema 8.0.9-8.0.9-0~ubuntu22.04.1</tool>
+    <sheet number="1" name="/" tstamps="/">
+      <title_block>
+        <title>DeskCat logical wiring #512</title>
+        <company/>
+        <rev>EXP-019 + EXP-022 + EXP-025 + EXP-038</rev>
+        <date/>
+        <source>deskcat.kicad_sch</source>
+        <comment number="1" value=""/>
+        <comment number="2" value=""/>
+        <comment number="3" value=""/>
+        <comment number="4" value=""/>
+        <comment number="5" value=""/>
+        <comment number="6" value=""/>
+        <comment number="7" value=""/>
+        <comment number="8" value=""/>
+        <comment number="9" value=""/>
+      </title_block>
+    </sheet>
+  </design>
+  <components>
+    <comp ref="D1">
+      <value>LED_COMM_01_white</value>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="DeskCat" part="LED_COMM_01_white" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="deskcat.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="exclude_from_board"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>1ea9e80a-715b-4b23-b5b9-f07027a5fc7f</tstamps>
+    </comp>
+    <comp ref="D2">
+      <value>LED_REACT_01_red</value>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="DeskCat" part="LED_REACT_01_red" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="deskcat.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="exclude_from_board"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>f6cddbf4-60cb-4106-be1d-e727fae5e9ae</tstamps>
+    </comp>
+    <comp ref="F1">
+      <value>PROT_OC_01_MF_R135</value>
+      <footprint>DeskCat:PTC_MF-R135_Radial_P5.08</footprint>
+      <fields>
+        <field name="Footprint">DeskCat:PTC_MF-R135_Radial_P5.08</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="DeskCat" part="PROT_OC_01_MF_R135" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="deskcat.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>ad7d9412-2078-4662-9744-00d7aac59525</tstamps>
+    </comp>
+    <comp ref="J1">
+      <value>DISP_01_MSP2807</value>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="DeskCat" part="DISP_01_MSP2807" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="deskcat.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="exclude_from_board"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>ec3356e3-d6ce-40fe-a913-ce82d93074ff</tstamps>
+    </comp>
+    <comp ref="J2">
+      <value>ACCEL_01_ADXL345</value>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="DeskCat" part="ACCEL_01_ADXL345" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="deskcat.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="exclude_from_board"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>afaefc74-0252-419c-ac49-b8a8fa4a121b</tstamps>
+    </comp>
+    <comp ref="J3">
+      <value>ENV_01_BME280</value>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="DeskCat" part="ENV_01_BME280" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="deskcat.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="exclude_from_board"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>4881e00c-f1d2-4920-9d49-376a38fca00e</tstamps>
+    </comp>
+    <comp ref="J4">
+      <value>SBC_01_Pi_Zero_W</value>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="DeskCat" part="SBC_01_Pi_Zero_W" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="deskcat.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="exclude_from_board"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>982c5376-4ef6-40e4-a963-6a3276c33851</tstamps>
+    </comp>
+    <comp ref="J5">
+      <value>TB_114217</value>
+      <footprint>DeskCat:TB_114217_WireLeft</footprint>
+      <fields>
+        <field name="Footprint">DeskCat:TB_114217_WireLeft</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="DeskCat" part="TB_114217" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="deskcat.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>04ab558b-bbef-43ed-91e7-1a33d4e6c9b7</tstamps>
+    </comp>
+    <comp ref="J6">
+      <value>TB_114217</value>
+      <footprint>DeskCat:TB_114217_WireLid</footprint>
+      <fields>
+        <field name="Footprint">DeskCat:TB_114217_WireLid</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="DeskCat" part="TB_114217" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="deskcat.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>1cece30c-71a1-4495-af65-e8b9b7111137</tstamps>
+    </comp>
+    <comp ref="J7">
+      <value>TB_114217</value>
+      <footprint>DeskCat:TB_114217_WireLid</footprint>
+      <fields>
+        <field name="Footprint">DeskCat:TB_114217_WireLid</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="DeskCat" part="TB_114217" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="deskcat.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>2ae45ec1-cece-4a76-8214-8f4961cc3771</tstamps>
+    </comp>
+    <comp ref="J8">
+      <value>TB_114217</value>
+      <footprint>DeskCat:TB_114217_WireFloor</footprint>
+      <fields>
+        <field name="Footprint">DeskCat:TB_114217_WireFloor</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="DeskCat" part="TB_114217" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="deskcat.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>1d04f74e-0a61-408b-8b5b-87491eca2ad1</tstamps>
+    </comp>
+    <comp ref="J9">
+      <value>SBC_01_PWR_IN</value>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="DeskCat" part="SBC_01_PWR_IN" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="deskcat.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="exclude_from_board"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>bd3bc327-1b73-46ba-bc40-c201f8ce6f95</tstamps>
+    </comp>
+    <comp ref="M1">
+      <value>SERVO_01_SG90</value>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="DeskCat" part="SERVO_01_SG90" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="deskcat.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="exclude_from_board"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>1dd7fe0c-598a-422f-b4a4-e86f7e58195b</tstamps>
+    </comp>
+    <comp ref="PS1">
+      <value>PSU_PI_01_M12001</value>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="DeskCat" part="PSU_PI_01_M12001" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="deskcat.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="exclude_from_board"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>1ae822d7-6812-4eef-9a41-2fba5a2ed471</tstamps>
+    </comp>
+    <comp ref="Q1">
+      <value>PROT_RP_01_2SJ334</value>
+      <footprint>DeskCat:2SJ334_SC-67_Vertical_MarkRight</footprint>
+      <fields>
+        <field name="Footprint">DeskCat:2SJ334_SC-67_Vertical_MarkRight</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="DeskCat" part="PROT_RP_01_2SJ334" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="deskcat.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>2f8ae2e4-e124-4a8b-b7a2-fbdfca502c3c</tstamps>
+    </comp>
+    <comp ref="R1">
+      <value>gpio-assignment</value>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="Device" part="R" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="deskcat.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="exclude_from_board"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>01199924-57f5-4347-aad6-a0d0f513af7e</tstamps>
+    </comp>
+    <comp ref="R2">
+      <value>gpio-assignment</value>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="Device" part="R" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="deskcat.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="exclude_from_board"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>d7144bdb-6402-455f-bb61-dae5400db632</tstamps>
+    </comp>
+    <comp ref="R3">
+      <value>gpio-assignment</value>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="Device" part="R" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="deskcat.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="exclude_from_board"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>64cdfd78-af1b-4cec-a762-cbecd20e75c3</tstamps>
+    </comp>
+    <comp ref="R4">
+      <value>gpio-assignment</value>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="Device" part="R" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="deskcat.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="exclude_from_board"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>011e6d62-4d32-4f69-a4a6-bf98576eb80f</tstamps>
+    </comp>
+    <comp ref="R5">
+      <value>gpio-assignment</value>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="Device" part="R" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="deskcat.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="exclude_from_board"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>d6128579-8fef-4346-b4e5-5f20c44538e0</tstamps>
+    </comp>
+    <comp ref="R6">
+      <value>gpio-assignment</value>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="Device" part="R" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="deskcat.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="exclude_from_board"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>37b3a25d-58a4-4102-b35d-a550462fca53</tstamps>
+    </comp>
+    <comp ref="R7">
+      <value>gpio-assignment</value>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="Device" part="R" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="deskcat.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="exclude_from_board"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>7f6dad7d-cf1c-4fda-adc1-28289036cd84</tstamps>
+    </comp>
+    <comp ref="R8">
+      <value>gpio-assignment</value>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="Device" part="R" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="deskcat.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="exclude_from_board"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>26bae8eb-1a86-4823-988f-e1c8ae352d06</tstamps>
+    </comp>
+    <comp ref="R9">
+      <value>gpio-assignment</value>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="Device" part="R" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="deskcat.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="exclude_from_board"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>f10cdd7c-0853-45d6-8e0f-12d4ac657da9</tstamps>
+    </comp>
+    <comp ref="R10">
+      <value>gpio-assignment</value>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="Device" part="R" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="deskcat.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="exclude_from_board"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>e77d4723-56d0-4598-9216-284d33d19984</tstamps>
+    </comp>
+    <comp ref="R11">
+      <value>gpio-assignment</value>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="Device" part="R" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="deskcat.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="exclude_from_board"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>fa0c4faa-7527-4ea4-8877-2928cfca2031</tstamps>
+    </comp>
+    <comp ref="R12">
+      <value>gpio-assignment</value>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="Device" part="R" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="deskcat.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="exclude_from_board"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>a231c439-295f-41bf-8eaa-2fb71bb68856</tstamps>
+    </comp>
+    <comp ref="R13">
+      <value>gpio-assignment</value>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="Device" part="R" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="deskcat.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="exclude_from_board"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>e3f8bdaf-41ce-4e0b-a9ab-9fda1bb1df71</tstamps>
+    </comp>
+    <comp ref="R14">
+      <value>led-514-demo</value>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="Device" part="R" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="deskcat.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="exclude_from_board"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>8187cdda-cc54-44cf-beb6-e07af4f61830</tstamps>
+    </comp>
+    <comp ref="R15">
+      <value>led-514-demo</value>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="Device" part="R" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="deskcat.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="exclude_from_board"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>f903dfd2-079b-42dd-95f1-5ab546220eef</tstamps>
+    </comp>
+    <comp ref="R16">
+      <value>led-514-demo</value>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="Device" part="R" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="deskcat.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="exclude_from_board"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>429c9f05-78b3-412e-9193-20d085cba0fa</tstamps>
+    </comp>
+    <comp ref="R17">
+      <value>led-514-demo</value>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="Device" part="R" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="deskcat.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="exclude_from_board"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>74ae28e7-16f0-4a1e-a1e1-ea683882119f</tstamps>
+    </comp>
+    <comp ref="R18">
+      <value>power-budget.md 10k gate</value>
+      <footprint>DeskCat:R_Vertical_P5.08</footprint>
+      <fields>
+        <field name="Footprint">DeskCat:R_Vertical_P5.08</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="Device" part="R" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="deskcat.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>3bf619d2-4225-4cde-bf4d-424ba2469663</tstamps>
+    </comp>
+    <comp ref="R19">
+      <value>TBD（値の正本なし。現物は EXP-028 の 330 Ω）</value>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="Device" part="R" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="deskcat.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="exclude_from_board"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>d9a58b85-cf0e-4154-a5cc-7c8022dfd3d7</tstamps>
+    </comp>
+    <comp ref="U1">
+      <value>MCU_01_DevKitC_V4</value>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="DeskCat" part="MCU_01_DevKitC_V4" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="deskcat.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <property name="exclude_from_board"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>f1a83d74-7d2b-4abe-9c61-ff14464b67b6</tstamps>
+    </comp>
+  </components>
+  <libparts>
+    <libpart lib="DeskCat" part="ACCEL_01_ADXL345">
+      <fields>
+        <field name="Reference">U</field>
+        <field name="Value">ACCEL_01_ADXL345</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="CS" name="CS" type="passive"/>
+        <pin num="GND" name="GND" type="passive"/>
+        <pin num="INT1" name="INT1" type="passive"/>
+        <pin num="INT2" name="INT2" type="passive"/>
+        <pin num="SCL" name="SCL" type="passive"/>
+        <pin num="SDA" name="SDA" type="passive"/>
+        <pin num="SDO" name="SDO" type="passive"/>
+        <pin num="Vs" name="Vs" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="DeskCat" part="DISP_01_MSP2807">
+      <fields>
+        <field name="Reference">U</field>
+        <field name="Value">DISP_01_MSP2807</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="VCC" type="passive"/>
+        <pin num="2" name="GND" type="passive"/>
+        <pin num="3" name="CS" type="passive"/>
+        <pin num="4" name="RESET" type="passive"/>
+        <pin num="5" name="DC" type="passive"/>
+        <pin num="6" name="SDI" type="passive"/>
+        <pin num="7" name="SCK" type="passive"/>
+        <pin num="8" name="LED" type="passive"/>
+        <pin num="9" name="SDO" type="passive"/>
+        <pin num="10" name="T_CLK" type="passive"/>
+        <pin num="11" name="T_CS" type="passive"/>
+        <pin num="12" name="T_DIN" type="passive"/>
+        <pin num="13" name="T_DO" type="passive"/>
+        <pin num="14" name="T_IRQ" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="DeskCat" part="ENV_01_BME280">
+      <fields>
+        <field name="Reference">U</field>
+        <field name="Value">ENV_01_BME280</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="VDD" type="passive"/>
+        <pin num="2" name="GND" type="passive"/>
+        <pin num="3" name="CSB_/_J3" type="passive"/>
+        <pin num="4" name="SDI" type="passive"/>
+        <pin num="5" name="SDO" type="passive"/>
+        <pin num="6" name="SCK" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="DeskCat" part="LED_COMM_01_white">
+      <fields>
+        <field name="Reference">U</field>
+        <field name="Value">LED_COMM_01_white</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="A" name="A" type="passive"/>
+        <pin num="K" name="K" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="DeskCat" part="LED_REACT_01_red">
+      <fields>
+        <field name="Reference">U</field>
+        <field name="Value">LED_REACT_01_red</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="A" name="A" type="passive"/>
+        <pin num="K" name="K" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="DeskCat" part="MCU_01_DevKitC_V4">
+      <fields>
+        <field name="Reference">U</field>
+        <field name="Value">MCU_01_DevKitC_V4</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="J2-1" name="3V3" type="passive"/>
+        <pin num="J2-3" name="GPIO36_ADC-3V3" type="passive"/>
+        <pin num="J2-5" name="GPIO34_TOUCH-IRQ" type="passive"/>
+        <pin num="J2-8" name="GPIO33_ADC-5V" type="passive"/>
+        <pin num="J2-9" name="GPIO25_I2C-SDA" type="passive"/>
+        <pin num="J2-10" name="GPIO26_I2C-SCL" type="passive"/>
+        <pin num="J2-11" name="GPIO27_SERVO-PWM" type="passive"/>
+        <pin num="J2-12" name="GPIO14_UART_RX" type="passive"/>
+        <pin num="J2-14" name="GND" type="passive"/>
+        <pin num="J2-15" name="GPIO13_UART_TX" type="passive"/>
+        <pin num="J2-19" name="5V" type="passive"/>
+        <pin num="J3-2" name="GPIO23_LCD-MOSI" type="passive"/>
+        <pin num="J3-3" name="GPIO22_LCD-CS" type="passive"/>
+        <pin num="J3-6" name="GPIO21_TOUCH-CS" type="passive"/>
+        <pin num="J3-8" name="GPIO19_LCD-MISO" type="passive"/>
+        <pin num="J3-9" name="GPIO18_LCD-SCLK" type="passive"/>
+        <pin num="J3-10" name="GPIO5_LED_red" type="passive"/>
+        <pin num="J3-11" name="GPIO17_LCD-DC" type="passive"/>
+        <pin num="J3-12" name="GPIO16_LCD-RST" type="passive"/>
+        <pin num="J3-13" name="GPIO4_LCD-BL" type="passive"/>
+        <pin num="J3-15" name="GPIO2_LED_white" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="DeskCat" part="PROT_OC_01_MF_R135">
+      <fields>
+        <field name="Reference">U</field>
+        <field name="Value">PROT_OC_01_MF_R135</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="a" name="a" type="passive"/>
+        <pin num="b" name="b" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="DeskCat" part="PROT_RP_01_2SJ334">
+      <fields>
+        <field name="Reference">U</field>
+        <field name="Value">PROT_RP_01_2SJ334</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="G" type="passive"/>
+        <pin num="2" name="D" type="passive"/>
+        <pin num="3" name="S" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="DeskCat" part="PSU_PI_01_M12001">
+      <fields>
+        <field name="Reference">U</field>
+        <field name="Value">PSU_PI_01_M12001</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="+" name="+5V" type="passive"/>
+        <pin num="-" name="GND" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="DeskCat" part="SBC_01_PWR_IN">
+      <fields>
+        <field name="Reference">U</field>
+        <field name="Value">SBC_01_PWR_IN</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="GND" name="GND" type="passive"/>
+        <pin num="VBUS" name="+5V" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="DeskCat" part="SBC_01_Pi_Zero_W">
+      <fields>
+        <field name="Reference">U</field>
+        <field name="Value">SBC_01_Pi_Zero_W</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="8" name="GPIO14_TXD" type="passive"/>
+        <pin num="10" name="GPIO15_RXD" type="passive"/>
+        <pin num="39" name="GND" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="DeskCat" part="SERVO_01_SG90">
+      <fields>
+        <field name="Reference">U</field>
+        <field name="Value">SERVO_01_SG90</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="brown" name="GND" type="passive"/>
+        <pin num="red" name="V+" type="passive"/>
+        <pin num="yellow" name="SIG" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="DeskCat" part="TB_114217">
+      <fields>
+        <field name="Reference">U</field>
+        <field name="Value">TB_114217</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="+" name="+" type="passive"/>
+        <pin num="-" name="-" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="Device" part="R">
+      <fields>
+        <field name="Reference">R</field>
+        <field name="Value">R</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="" type="passive"/>
+        <pin num="2" name="" type="passive"/>
+      </pins>
+    </libpart>
+  </libparts>
+  <libraries>
+    <library logical="DeskCat">
+      <uri>${KIPRJMOD}/DeskCat.kicad_sym</uri>
+    </library>
+  </libraries>
+  <nets>
+    <net code="1" name="/3V3">
+      <node ref="J1" pin="1" pinfunction="VCC" pintype="passive"/>
+      <node ref="J2" pin="CS" pinfunction="CS" pintype="passive"/>
+      <node ref="J2" pin="Vs" pinfunction="Vs" pintype="passive"/>
+      <node ref="J3" pin="1" pinfunction="VDD" pintype="passive"/>
+      <node ref="R1" pin="1" pintype="passive"/>
+      <node ref="R10" pin="1" pintype="passive"/>
+      <node ref="R2" pin="1" pintype="passive"/>
+      <node ref="R3" pin="1" pintype="passive"/>
+      <node ref="R4" pin="1" pintype="passive"/>
+      <node ref="R5" pin="1" pintype="passive"/>
+      <node ref="U1" pin="J2-1" pinfunction="3V3" pintype="passive"/>
+    </net>
+    <net code="2" name="/5V-BOARD">
+      <node ref="R8" pin="1" pintype="passive"/>
+      <node ref="U1" pin="J2-19" pinfunction="5V" pintype="passive"/>
+    </net>
+    <net code="3" name="/5V-IN">
+      <node ref="F1" pin="a" pinfunction="a" pintype="passive"/>
+      <node ref="J5" pin="+" pinfunction="+" pintype="passive"/>
+      <node ref="PS1" pin="+" pinfunction="+5V" pintype="passive"/>
+    </net>
+    <net code="4" name="/5V-NODE">
+      <node ref="J6" pin="+" pinfunction="+" pintype="passive"/>
+      <node ref="J7" pin="+" pinfunction="+" pintype="passive"/>
+      <node ref="J8" pin="+" pinfunction="+" pintype="passive"/>
+      <node ref="J9" pin="VBUS" pinfunction="+5V" pintype="passive"/>
+      <node ref="M1" pin="red" pinfunction="V+" pintype="passive"/>
+      <node ref="Q1" pin="3" pinfunction="S" pintype="passive"/>
+    </net>
+    <net code="5" name="/5V-PTC">
+      <node ref="F1" pin="b" pinfunction="b" pintype="passive"/>
+      <node ref="Q1" pin="2" pinfunction="D" pintype="passive"/>
+    </net>
+    <net code="6" name="/ADC-3V3">
+      <node ref="R10" pin="2" pintype="passive"/>
+      <node ref="R11" pin="1" pintype="passive"/>
+      <node ref="U1" pin="J2-3" pinfunction="GPIO36_ADC-3V3" pintype="passive"/>
+    </net>
+    <net code="7" name="/ADC-5V">
+      <node ref="R8" pin="2" pintype="passive"/>
+      <node ref="R9" pin="1" pintype="passive"/>
+      <node ref="U1" pin="J2-8" pinfunction="GPIO33_ADC-5V" pintype="passive"/>
+    </net>
+    <net code="8" name="/GND">
+      <node ref="D1" pin="K" pinfunction="K" pintype="passive"/>
+      <node ref="D2" pin="K" pinfunction="K" pintype="passive"/>
+      <node ref="J1" pin="2" pinfunction="GND" pintype="passive"/>
+      <node ref="J2" pin="GND" pinfunction="GND" pintype="passive"/>
+      <node ref="J2" pin="SDO" pinfunction="SDO" pintype="passive"/>
+      <node ref="J3" pin="2" pinfunction="GND" pintype="passive"/>
+      <node ref="J3" pin="5" pinfunction="SDO" pintype="passive"/>
+      <node ref="J4" pin="39" pinfunction="GND" pintype="passive"/>
+      <node ref="J5" pin="-" pinfunction="-" pintype="passive"/>
+      <node ref="J6" pin="-" pinfunction="-" pintype="passive"/>
+      <node ref="J7" pin="-" pinfunction="-" pintype="passive"/>
+      <node ref="J8" pin="-" pinfunction="-" pintype="passive"/>
+      <node ref="J9" pin="GND" pinfunction="GND" pintype="passive"/>
+      <node ref="M1" pin="brown" pinfunction="GND" pintype="passive"/>
+      <node ref="PS1" pin="-" pinfunction="GND" pintype="passive"/>
+      <node ref="R11" pin="2" pintype="passive"/>
+      <node ref="R15" pin="2" pintype="passive"/>
+      <node ref="R17" pin="2" pintype="passive"/>
+      <node ref="R18" pin="2" pintype="passive"/>
+      <node ref="R6" pin="2" pintype="passive"/>
+      <node ref="R7" pin="2" pintype="passive"/>
+      <node ref="R9" pin="2" pintype="passive"/>
+      <node ref="U1" pin="J2-14" pinfunction="GND" pintype="passive"/>
+    </net>
+    <net code="9" name="/I2C-SCL">
+      <node ref="J2" pin="SCL" pinfunction="SCL" pintype="passive"/>
+      <node ref="J3" pin="6" pinfunction="SCK" pintype="passive"/>
+      <node ref="R4" pin="2" pintype="passive"/>
+      <node ref="U1" pin="J2-10" pinfunction="GPIO26_I2C-SCL" pintype="passive"/>
+    </net>
+    <net code="10" name="/I2C-SDA">
+      <node ref="J2" pin="SDA" pinfunction="SDA" pintype="passive"/>
+      <node ref="J3" pin="4" pinfunction="SDI" pintype="passive"/>
+      <node ref="R5" pin="2" pintype="passive"/>
+      <node ref="U1" pin="J2-9" pinfunction="GPIO25_I2C-SDA" pintype="passive"/>
+    </net>
+    <net code="11" name="/LCD-BL">
+      <node ref="J1" pin="8" pinfunction="LED" pintype="passive"/>
+      <node ref="R6" pin="1" pintype="passive"/>
+      <node ref="U1" pin="J3-13" pinfunction="GPIO4_LCD-BL" pintype="passive"/>
+    </net>
+    <net code="12" name="/LCD-CS">
+      <node ref="J1" pin="3" pinfunction="CS" pintype="passive"/>
+      <node ref="R1" pin="2" pintype="passive"/>
+      <node ref="U1" pin="J3-3" pinfunction="GPIO22_LCD-CS" pintype="passive"/>
+    </net>
+    <net code="13" name="/LCD-DC">
+      <node ref="J1" pin="5" pinfunction="DC" pintype="passive"/>
+      <node ref="U1" pin="J3-11" pinfunction="GPIO17_LCD-DC" pintype="passive"/>
+    </net>
+    <net code="14" name="/LCD-MISO">
+      <node ref="J1" pin="13" pinfunction="T_DO" pintype="passive"/>
+      <node ref="J1" pin="9" pinfunction="SDO" pintype="passive"/>
+      <node ref="U1" pin="J3-8" pinfunction="GPIO19_LCD-MISO" pintype="passive"/>
+    </net>
+    <net code="15" name="/LCD-MOSI">
+      <node ref="J1" pin="12" pinfunction="T_DIN" pintype="passive"/>
+      <node ref="J1" pin="6" pinfunction="SDI" pintype="passive"/>
+      <node ref="U1" pin="J3-2" pinfunction="GPIO23_LCD-MOSI" pintype="passive"/>
+    </net>
+    <net code="16" name="/LCD-RST">
+      <node ref="J1" pin="4" pinfunction="RESET" pintype="passive"/>
+      <node ref="R2" pin="2" pintype="passive"/>
+      <node ref="U1" pin="J3-12" pinfunction="GPIO16_LCD-RST" pintype="passive"/>
+    </net>
+    <net code="17" name="/LCD-SCLK">
+      <node ref="J1" pin="10" pinfunction="T_CLK" pintype="passive"/>
+      <node ref="J1" pin="7" pinfunction="SCK" pintype="passive"/>
+      <node ref="U1" pin="J3-9" pinfunction="GPIO18_LCD-SCLK" pintype="passive"/>
+    </net>
+    <net code="18" name="/LED-COMM">
+      <node ref="R14" pin="1" pintype="passive"/>
+      <node ref="R15" pin="1" pintype="passive"/>
+      <node ref="U1" pin="J3-15" pinfunction="GPIO2_LED_white" pintype="passive"/>
+    </net>
+    <net code="19" name="/LED-R-A">
+      <node ref="D2" pin="A" pinfunction="A" pintype="passive"/>
+      <node ref="R16" pin="2" pintype="passive"/>
+    </net>
+    <net code="20" name="/LED-REACT">
+      <node ref="R16" pin="1" pintype="passive"/>
+      <node ref="R17" pin="1" pintype="passive"/>
+      <node ref="U1" pin="J3-10" pinfunction="GPIO5_LED_red" pintype="passive"/>
+    </net>
+    <net code="21" name="/LED-W-A">
+      <node ref="D1" pin="A" pinfunction="A" pintype="passive"/>
+      <node ref="R14" pin="2" pintype="passive"/>
+    </net>
+    <net code="22" name="/PI-UART-RX">
+      <node ref="R13" pin="2" pintype="passive"/>
+      <node ref="U1" pin="J2-12" pinfunction="GPIO14_UART_RX" pintype="passive"/>
+    </net>
+    <net code="23" name="/PI-UART-RX-Pi">
+      <node ref="J4" pin="10" pinfunction="GPIO15_RXD" pintype="passive"/>
+      <node ref="R12" pin="2" pintype="passive"/>
+    </net>
+    <net code="24" name="/PI-UART-TX">
+      <node ref="R12" pin="1" pintype="passive"/>
+      <node ref="U1" pin="J2-15" pinfunction="GPIO13_UART_TX" pintype="passive"/>
+    </net>
+    <net code="25" name="/PI-UART-TX-Pi">
+      <node ref="J4" pin="8" pinfunction="GPIO14_TXD" pintype="passive"/>
+      <node ref="R13" pin="1" pintype="passive"/>
+    </net>
+    <net code="26" name="/Q1-GATE">
+      <node ref="Q1" pin="1" pinfunction="G" pintype="passive"/>
+      <node ref="R18" pin="1" pintype="passive"/>
+    </net>
+    <net code="27" name="/SERVO-PWM">
+      <node ref="R19" pin="1" pintype="passive"/>
+      <node ref="R7" pin="1" pintype="passive"/>
+      <node ref="U1" pin="J2-11" pinfunction="GPIO27_SERVO-PWM" pintype="passive"/>
+    </net>
+    <net code="28" name="/SERVO-SIG">
+      <node ref="M1" pin="yellow" pinfunction="SIG" pintype="passive"/>
+      <node ref="R19" pin="2" pintype="passive"/>
+    </net>
+    <net code="29" name="/TOUCH-CS">
+      <node ref="J1" pin="11" pinfunction="T_CS" pintype="passive"/>
+      <node ref="R3" pin="2" pintype="passive"/>
+      <node ref="U1" pin="J3-6" pinfunction="GPIO21_TOUCH-CS" pintype="passive"/>
+    </net>
+    <net code="30" name="/TOUCH-IRQ">
+      <node ref="J1" pin="14" pinfunction="T_IRQ" pintype="passive"/>
+      <node ref="U1" pin="J2-5" pinfunction="GPIO34_TOUCH-IRQ" pintype="passive"/>
+    </net>
+    <net code="31" name="unconnected-(J2-PadINT1)">
+      <node ref="J2" pin="INT1" pinfunction="INT1" pintype="passive+no_connect"/>
+    </net>
+    <net code="32" name="unconnected-(J2-PadINT2)">
+      <node ref="J2" pin="INT2" pinfunction="INT2" pintype="passive+no_connect"/>
+    </net>
+    <net code="33" name="unconnected-(J3-CSB_{slash}_J3-Pad3)">
+      <node ref="J3" pin="3" pinfunction="CSB_/_J3" pintype="passive+no_connect"/>
+    </net>
+  </nets>
+</export>

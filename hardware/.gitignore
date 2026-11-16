@@ -1,0 +1,6 @@
+# KiCad の個人設定・自動生成物（KiCad の慣習で Git に入れない）
+*.kicad_prl
+*-backups/
+_autosave-*
+fp-info-cache
+~*.lck
