@@ -2,7 +2,7 @@
 <export version="E">
   <design>
     <source>hardware/deskcat.kicad_sch</source>
-    <date>2026-11-15T14:48:00+0000</date>
+    <date>2026-11-16T04:54:33+0000</date>
     <tool>Eeschema 8.0.9-8.0.9-0~ubuntu22.04.1</tool>
     <sheet number="1" name="/" tstamps="/">
       <title_block>
@@ -567,6 +567,7 @@
         <pin num="SCL" name="SCL" type="passive"/>
         <pin num="SDA" name="SDA" type="passive"/>
         <pin num="SDO" name="SDO" type="passive"/>
+        <pin num="VDD" name="VDD" type="passive"/>
         <pin num="Vs" name="Vs" type="passive"/>
       </pins>
     </libpart>
@@ -787,6 +788,7 @@
     <net code="1" name="/3V3">
       <node ref="J1" pin="1" pinfunction="VCC" pintype="passive"/>
       <node ref="J2" pin="CS" pinfunction="CS" pintype="passive"/>
+      <node ref="J2" pin="VDD" pinfunction="VDD" pintype="passive"/>
       <node ref="J2" pin="Vs" pinfunction="Vs" pintype="passive"/>
       <node ref="J3" pin="1" pinfunction="VDD" pintype="passive"/>
       <node ref="R1" pin="1" pintype="passive"/>
