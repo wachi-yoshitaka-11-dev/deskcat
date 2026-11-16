@@ -47,7 +47,7 @@
 //! # 要求の結果と振る舞いの表
 //!
 //! Piが送る要求（`hello`（`startup`だけ）、`get_status`、`set_expression`）と、返りうる結果の
-//! **全数**である。`ping`と、`port_reopen`・`resync`の`hello`は送らない。[`crate::disposition::disposition`]が
+//! **全数**である。`port_reopen`・`resync`の`hello`は送らない。`ping`は表の外で、下の「`ping`」に書く。[`crate::disposition::disposition`]が
 //! この表を関数にしたもので、`tests/disposition.rs`が`ErrorCode::ALL`の全codeを走査して表と一致することを、
 //! `tests/daemon.rs`の`cell_*`が振る舞いを固定している（固定していない組み合わせは、`disposition`単体の
 //! testだけが固定する）。**表を直すときは関数とtestを一緒に直す。**
@@ -71,6 +71,15 @@
 //! `set_expression`の再送が新しい`id`なのは、通常commandの`rate_limited`は最終的な拒否であり、改めて要求する
 //! 場合は新しい`id`を使うため（§9）。`hello`の`rate_limited`の再送とACKが無いときの再送だけが、同じ`(sid, id)`を扱う。
 //! `stale_session`の再開の`hello`は、新しい`id`である。
+//!
+//! # `ping`（生きている印。`PROTO-TBD-010`の案）
+//!
+//! ESP32は、現在のPi sessionのdecodeできたframeを受けるたびに通信の生存を記録する（Protocol §5.7）。Piは、
+//! 最後にframeを書き出してから[`PING_INTERVAL_MS`]が空いたら`ping`を1つ送る。**間隔が`None`の間は送らない**
+//! （値は`HW-TBD-017`の計測の後に決める）。`startup`の`hello`が済むまでは送らない。
+//! 結果は[`crate::disposition::disposition`]の`Request::Ping`に従う。`ok`は何もせず、`stale_session`は再開、
+//! 他の拒否と無応答（再送の予算は`deskcat-serial`が同じ`(sid, id)`で使う）は数えて次の間隔に任せる。
+//! 終了はしない。`ping`の結果で、表情や`get_status`の流れは変わらない。
 //!
 //! # 再開（通常commandが`stale_session`で拒否された場合）
 //!
@@ -224,6 +233,13 @@ pub const STATUS_RETRY_LIMIT: u32 = 3;
 /// §5.1は有限のbudgetを求め、値を`PROTO-TBD-012`に委ねる。根拠は無い。
 pub const HELLO_RETRY_LIMIT: u32 = 3;
 
+/// `ping`（§5.7）を送る間隔（ms）。**`None`の間は`ping`を送らない。**
+///
+/// 値は`HW-TBD-017`（loss timeout）の実機の計測の後に、それより十分短く決める（`PROTO-TBD-010`）。
+/// 根拠のある値が無いため`None`である。値を入れるのは、人間の承認を得た後に、この1か所だけで行う。
+/// 最後に送ったframe（`ping`に限らない）からこの間隔が空いたら、`ping`を1つ送る。
+pub const PING_INTERVAL_MS: Option<NonZeroU64> = None;
+
 /// 終了コード: sessionをやり直すための再起動を求める（`EX_TEMPFAIL`）。
 pub const EXIT_SESSION_REDO: u8 = 75;
 
@@ -324,6 +340,12 @@ pub struct DaemonCounters {
     pub motions_not_sent: u64,
     /// 送信queueへ入れた`play_motion`。
     pub motions_sent: u64,
+    /// 送信queueへ入れた`ping`（再送を除く）。間隔が`None`の間は0のまま。
+    pub ping_sent: u64,
+    /// 拒否された`ping`。再送も終了もせず、次の間隔の`ping`に任せる。
+    pub ping_rejected: u64,
+    /// ACK timeoutと再送の予算を使い切っても、ACKが無かった`ping`。
+    pub ping_no_response: u64,
     /// 送る前の検査（[`crate::motion::play_motion`]、`check_bounds`）またはencodeに失敗し、送らなかった回数。
     pub motion_input_faults: u64,
     /// 受け取った`environment`。
@@ -413,6 +435,10 @@ pub struct Daemon {
     motion_config: Option<MotionConfig>,
     /// まだ送っていない首の動きの意図。新しい意図が来たら置き換える。
     motion_pending: Option<MotionIntent>,
+    /// `ping`を送る間隔。`None`なら送らない（[`PING_INTERVAL_MS`]）。
+    ping_interval_ms: Option<NonZeroU64>,
+    /// 最後にframeを書き出した周の時刻と、その時の`bytes_out`。`ping`の間隔の起点（再送とACKも含む）。
+    last_tx: Option<(u64, u64)>,
     /// まだ送れていない`hello`の`reason`（`startup`だけ）。
     hello_to_send: Option<HelloReason>,
     /// 送ったがまだACKを受けていない`hello`の、送信時刻。
@@ -456,6 +482,8 @@ impl Daemon {
             speech_disabled: false,
             motion_config: MOTION_CONFIG,
             motion_pending: None,
+            ping_interval_ms: PING_INTERVAL_MS,
+            last_tx: None,
             hello_to_send: None,
             hello_sent: None,
             hello_msg: None,
@@ -475,6 +503,13 @@ impl Daemon {
     #[must_use]
     pub fn with_motion_config(mut self, config: Option<MotionConfig>) -> Self {
         self.motion_config = config;
+        self
+    }
+
+    /// `ping`の間隔を差し替える。**testのためである。**製品は[`PING_INTERVAL_MS`]だけを使う。
+    #[must_use]
+    pub fn with_ping_interval(mut self, interval_ms: Option<NonZeroU64>) -> Self {
+        self.ping_interval_ms = interval_ms;
         self
     }
 
@@ -660,11 +695,13 @@ impl Daemon {
         self.send_expression(now_ms);
         self.send_speech(now_ms);
         self.send_motion(now_ms);
+        self.send_ping(now_ms);
         if let Some(reason) = self.exit {
             return Step::Exit(reason);
         }
 
         let write = self.session.pump_write(transport);
+        self.note_tx(now_ms);
         if let ConnectionState::Stopped(reason) = self.session.state() {
             return Step::Exit(ExitReason::SessionStopped(reason));
         }
@@ -804,7 +841,16 @@ impl Daemon {
                     Answer::NoResponse => unreachable!("ACKから無応答は作らない"),
                 }
             }
-            // `ping`は送らない。`OutstandingKind`は拡張されうるため、未知の種別も何もしない。
+            OutstandingKind::Ping => match disposition(Request::Ping, answer) {
+                Disposition::Resume => self.request_resume(),
+                Disposition::NextInterval => {
+                    self.counters.ping_rejected += 1;
+                    log::warn!("pingが拒否された。次の間隔で送る: code={:?}", ack.code);
+                }
+                // 受理された。印はESP32が受け取った時点で成立している。
+                _ => {}
+            },
+            // `OutstandingKind`は拡張されうるため、未知の種別も何もしない。
             _ => {}
         }
     }
@@ -1067,6 +1113,15 @@ impl Daemon {
                     {
                         self.status_not_delivered();
                     }
+                    // 再送は同じ`(sid, id)`で`deskcat-serial`が済ませた。送り直さず、次の間隔の`ping`に任せる。
+                    OutstandingKind::Ping => {
+                        debug_assert_eq!(
+                            disposition(Request::Ping, Answer::NoResponse),
+                            Disposition::NextInterval
+                        );
+                        self.counters.ping_no_response += 1;
+                        log::warn!("pingに応答が無い。次の間隔で送る: id={id}");
+                    }
                     OutstandingKind::ShowText if self.speech_in_flight == Some(*id) => {
                         self.speech_in_flight = None;
                         self.speech_disabled = true;
@@ -1266,6 +1321,49 @@ impl Daemon {
                 self.counters.motion_input_faults += 1;
                 log::error!("play_motionを送れない。送り直さない: {err}");
             }
+        }
+    }
+
+    /// 書き出しがあった周を、`ping`の間隔の起点として覚える。
+    fn note_tx(&mut self, now_ms: u64) {
+        let out = self.session.counters().bytes_out;
+        if self.last_tx.is_none_or(|(_, seen)| out != seen) {
+            self.last_tx = Some((now_ms, out));
+        }
+    }
+
+    /// 間隔が決まっているときだけ、最後に書き出してから間隔が空いたら`ping`を1つ送る（Protocol §5.7）。
+    ///
+    /// `startup`の`hello`が済むまでは送らない（`stale_session`で拒否される）。値が`None`の間は何もしない。
+    /// 送信queueが満杯なら、次の周で再試行する。ACKは追跡し、結果に依らず再送も終了もしない（[`Disposition::NextInterval`]）。
+    fn send_ping(&mut self, now_ms: u64) {
+        let Some(interval) = self.ping_interval_ms else {
+            return;
+        };
+        if !self.startup_complete() {
+            return;
+        }
+        // 送信queueに積んだframeがあれば、それが書き出されるまで待つ（書き出しが印になる）。
+        if self.session.pending_out() > 0 {
+            return;
+        }
+        if let Some((at, _)) = self.last_tx
+            && now_ms.saturating_sub(at) < interval.get()
+        {
+            return;
+        }
+        match self.session.send(Message::Ping, now_ms) {
+            Ok(id) => {
+                // `ping`は必ず追跡対象に分類される。
+                let tracked = self.peer.note_sent(id, Message::Ping, now_ms);
+                debug_assert_eq!(tracked, Some(OutstandingKind::Ping));
+                self.counters.ping_sent += 1;
+                log::debug!("ping_queued id={id} pi_uptime_ms={now_ms}");
+            }
+            Err(SendError::Dropped) => log::debug!("pingの送信queueが満杯。次の周で再試行する"),
+            // 停止は`step`が`Session`の状態から見る。
+            Err(SendError::Stopped(_) | SendError::IdSpaceExhausted) => {}
+            Err(err) => log::error!("pingを送れない: {err}"),
         }
     }
 
