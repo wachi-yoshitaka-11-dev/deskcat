@@ -5,7 +5,7 @@
 //!
 //! # 方式
 //!
-//! ADXL345のActivityは、`THRESH_ACT`を超える加速度が参加軸のどれかに出たときに`INT_SOURCE`のD4を立てる（読むまで残る）。
+//! `ADXL345`のActivityは、`THRESH_ACT`を超える加速度が参加軸のどれかに出たときに`INT_SOURCE`のD4を立てる（読むまで残る）。
 //! **tapが読んでいる`INT_SOURCE`と同じ1回のreadでActivityも取れる**ので、I2Cの読みは増えず、tapの検出は遅れない。
 //! 1回の叩きでもActivityは1回立ちうるため、**窓の中で[`ShakeConfig::required_hits`]回（2以上）立ったときだけ揺れとする**。
 //! Activityだけが続けて立った読み（Inactivityが無い）は1回と数え、Activityなしの読み、またはInactivityが立った読み（Linkでは、Activityと同じ読みでもよい）で再武装して、別の回とする（傾いて静止していても揺れにしない）。
@@ -13,7 +13,7 @@
 //! # 出所
 //!
 //! `THRESH_ACT`（address 0x24、unsigned、62.5 mg/LSB、0は予期しない動作になりうる）、`ACT_INACT_CTL`（address 0x27。D7が
-//! ACT ac/dc、D6〜D4がACT_X／Y／Z enable）、`INT_ENABLE`と`INT_SOURCE`のD4（Activity）は、**Analog Devices ADXL345 Data Sheet
+//! ACT ac/dc、D6〜D4が`ACT_X`／`Y`／`Z` enable）、`INT_ENABLE`と`INT_SOURCE`のD4（Activity）は、**Analog Devices ADXL345 Data Sheet
 //! Rev. E**（`datasheet.octopart.com`が配る販売店の写し。2026-11-11にPDFから文字を抽出して読んだ）による。
 //! ac結合の記述（`ACT_INACT_CTL`の節。Issue #764）は、同じRev. Eを2026-11-15に読み直した。**公式のRev. Gとは照合していない**（CLIから取得できない）。`docs/hardware/sensor-datasheet-notes.md`にも同じことを書いた。
 //!
@@ -29,15 +29,15 @@ use crate::{
 
 /// `THRESH_ACT`（address 0x24）。Activityの閾値。unsigned、62.5 mg/LSB。
 pub const REG_THRESH_ACT: u8 = 0x24;
-/// `ACT_INACT_CTL`（address 0x27）。D7がACT ac/dc（1でac結合）、D6〜D4がACT_X／Y／Zの有効。
+/// `ACT_INACT_CTL`（address 0x27）。D7がACT ac/dc（1でac結合）、D6〜D4が`ACT_X`／`Y`／`Z`の有効。
 pub const REG_ACT_INACT_CTL: u8 = 0x27;
 /// `THRESH_INACT`（address 0x25）。Inactivityの閾値。unsigned、62.5 mg/LSB。0は予期しない動作になりうる。
 pub const REG_THRESH_INACT: u8 = 0x25;
 /// `TIME_INACT`（address 0x26）。加速度が`THRESH_INACT`未満である時間。1 s/LSB。0なら、出力が閾値未満になった時点でInactivity。
 pub const REG_TIME_INACT: u8 = 0x26;
-/// `ACT_INACT_CTL`のD6〜D4（ACT_X／Y／Z enable）。
+/// `ACT_INACT_CTL`のD6〜D4（`ACT_X`／`Y`／`Z` enable）。
 pub const ACT_AXES_MASK: u8 = 0b0111_0000;
-/// `ACT_INACT_CTL`のD2〜D0（INACT_X／Y／Z enable）。
+/// `ACT_INACT_CTL`のD2〜D0（`INACT_X`／`Y`／`Z` enable）。
 pub const INACT_AXES_MASK: u8 = 0b0000_0111;
 /// `POWER_CTL`のD5（Link）。ActivityとInactivityを直列につなぐ。
 pub const POWER_CTL_LINK: u8 = 1 << 5;
@@ -99,7 +99,7 @@ impl ShakeConfig {
 
 /// 揺れの検出の値。**暫定の一般値である**（安全要件の5項目に効かない）。
 ///
-/// - `thresh_act`＝3（187.5 mg）。`act_inact_ctl`＝`0xEE`（ActivityもInactivityも**ac結合**・X・Y）。`link`＝true。`thresh_inact`＝2（125 mg）。`time_inact`＝0。
+/// - `thresh_act`＝3（187.5 mg）。`act_inact_ctl`＝`0xEE`（`Activity`も`Inactivity`も**ac結合**・X・Y）。`link`＝true。`thresh_inact`＝2（125 mg）。`time_inact`＝0。
 ///   窓2000 ms、3回、最小間隔5000 ms。
 ///
 /// **根拠（Issue #764）。**
@@ -108,7 +108,7 @@ impl ShakeConfig {
 /// - 基準値の取り直し：datasheetはActivityの基準値の更新を直接書かない。`POWER_CTL`のLink（Link Bitの節）は、Activityの検出の開始をInactivityの検出まで遅らせる。
 ///   ac結合のInactivityの基準値は閾値を超えるたびに更新される（`ACT_INACT_CTL`の節）。この2つを合わせた**読み**として、置き直した後に静止すれば基準値が取り直される。
 ///   基準値を取る瞬間そのものは書かれていない。`TIME_INACT`＝0は「出力が閾値未満になったら割り込む」値で、1以上では窓2000 msで3回に届かない。
-/// - 軸：X・Y。机の叩きはZだけ大きく（`EXP-061`）、Zを入れると叩きでActivityが立つ。
+/// - 軸：X・Y。机の叩きはZだけ大きく（`EXP-061`）、Zを入れると叩きで`Activity`が立つ。
 /// - 閾値：`EXP-061`（full-res、3.9 mg/LSB。187.5 mgは約48 LSB）で、揺らすYの最大72〜81は静止の平均12.8から約59〜68 LSB、叩きのX・Yの最大30は約17 LSB、静止の最大19は約6 LSB。
 ///   `THRESH_INACT`＝2（約32 LSB）は、静止の揺らぎ（最大約9 LSB）の上、`THRESH_ACT`の下に置いた一般値。
 /// - 叩きと揺れを分ける根拠は無い。最小間隔は暫定の一般値で、1回の揺らしと1件の対応は確かめていない。
