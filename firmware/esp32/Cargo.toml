@@ -67,7 +67,7 @@ face-21 = []
 tap-21 = []
 # Issue #487。**製品build（featureなし）から、touchを読むことだけを外す。**`TOUCH-CS`（GPIO21）は、LCDを描く試験buildと同じ`IdleTouch`が出力Highにして保つ
 # （`src/touch.rs`）。`StrokeDetector`は作らず、`head_touched`は送らず、`crate::led`も作らない（GPIO2・GPIO5に触れない）。`build.rs`はこのfeatureだけを製品経路のcfg（`deskcat_product_mode`）から外さない。
-# 他のfeatureと併用すると製品経路が外れるため、`main.rs`の`compile_error!`で止める。通電の条件は`docs/hardware/power-budget.md`の`touchを読まない製品build（no-touch-487）の通電の条件`。
+# 他のfeatureと併用すると製品経路が外れるため、`main.rs`の`compile_error!`で止める（例外は、同じく製品経路を外さない`link-gap-20`だけ）。通電の条件は`docs/hardware/power-budget.md`の`touchを読まない製品build（no-touch-487）の通電の条件`。
 no-touch-487 = []
 # Issue #23のPROTO-TBD-007（LCD layoutとmemory測定）用。health snapshotと同じ周期で、空きheap、
 # 起動からの最小の空きheap、main taskのstackのhigh water markを1行logへ出す（`src/mem_probe.rs`）。
@@ -100,6 +100,15 @@ touch-sample-14 = []
 # 同じ SPI host（SPI3）で `TOUCH-01` の raw を読む（`src/touch_lcd.rs`）。LCD とタッチは `SpiDriver` を共有し、bus は転送ごとに取る。
 # 製品 build も同じ型で、bus を握り続ける型は `touch-sample-14` だけ。単独の試験 build として使う。
 touch-lcd-14 = []
+
+# Issue #20の`HW-TBD-017`（Piからの受信が途切れたと判定するまでの時間）の実測用。現在のPi sessionのframeの到着の間隔
+# （`LinkWatch::note_rx`へ渡すのと同じ時刻の差）を数え、health snapshotと同じ周期で1行logへ出す（`src/pi_link.rs`の`log_link_gap`）。
+# **観測だけを足す。**`LINK_LOSS_TIMEOUT_MS`・`LinkWatch`の判定・servo出力・Pi linkの応答は変えない。`unsafe`は持たない。
+# **製品buildの経路（`deskcat_product_mode`）を外さない**（`no-touch-487`と同じ扱い。`build.rs`）。LCDの描画・`ENV-01`の周期測定・
+# タッチの撫での判定・LEDが、製品buildと同じ負荷で動く構成の間隔を測るためである。併用してよいのは`no-touch-487`だけ（touchを読まない製品buildの下で測る）で、
+# 他のfeatureとは併用できない（`main.rs`の`compile_error!`）。
+# **実機では動かしていない。**手順は`docs/hardware/experiment-log.md`の該当EXPの計画。
+link-gap-20 = []
 
 [profile.release]
 opt-level = "s"
