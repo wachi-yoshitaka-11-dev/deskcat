@@ -78,6 +78,7 @@
 | [EXP-064](#exp-064-18-段2の窓1と窓2jumper-wire-に-08-a-を30分流しi_lim-を-0070-に置きホーンなしで-servo-を動かして目印の向きを読んだ) | [#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)・[#751](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/751)。段2の窓1・2。jumper wire の試験（0.8 A、30分）、`I_lim` 0.070、ホーンなしで servo を動かした。#751 の 7（`STOP` が届く） | 値の正なし（観測の記録） |
 | [EXP-065](#exp-065-窓c製品-buildno-touch-487を-pi-とつなぎ743-のコメントの見た目と751-の揺れの検出と温湿度の報告を見た) | [#743](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/743)・[#751](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/751)。窓C。製品 build を Pi とつなぎ、コメントの見た目、揺れの検出（#751 の 5）、温湿度の報告（6）を見た | 値の正なし（観測の記録） |
 | [EXP-066](#exp-066-計画未実施受信の間隔の-log-を足した製品-buildlink-gap-20no-touch-487でpi-が送る-frame-の到着の間隔をlcd-の描画センサーの読み出しpi-の負荷と同時に測る) | [#20](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/20)の`HW-TBD-017`（Pi からの受信が途切れたと判定するまでの時間）。**計画であり、未実施。**現在の Pi session の frame の到着の間隔を、LCD の描画、センサーの読み出し、Pi の負荷と同時に測る手順。同じ窓で [#683](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/683) の手順3・4の記録も取る | 値の正なし（計画。実施すると観測の記録になる。`HW-TBD-017`の値はここで決めない） |
+| [EXP-067](#exp-067-764-の受け入れ条件4製品-buildno-touch-487でb3-を立てた姿勢の静止と揺らしを見た2回の窓) | [#764](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/764)の受け入れ条件4。製品 build を Pi とつなぎ、B3 を立てた姿勢の静止と揺らし、平らに寝かせたときの検出を見た（2回の窓） | 値の正なし（観測の記録） |
 
 **大容量の生dataはこのrepositoryへ入れていない。**保存場所は
 [development-foundation-plan.md](../planning/development-foundation-plan.md)の
@@ -5937,6 +5938,67 @@ ELF（wdt）`77d40227f4dca649e3cda797b3ac599087b1aef534e33ab848cb26b37e0f11bd`�
 - 間隔の時刻は ESP32 の main loop が UART を読んだ時刻であり、UART 上の到着の時刻ではない（見張りが使う時刻と同じにしてあるため、見張りの判定に効く量は測れるが、byte の到着の時刻そのものは測れない）。
 - 観測の log（`link_wait` と `link_gap`）を出すこと自体が、測る待ちを変えうる。その影響はこの窓では分けて測らない。記録するときに、この点を結果と並べて書く。
 
+## EXP-067: #764 の受け入れ条件4。製品 build（no-touch-487）で、B3 を立てた姿勢の静止と揺らしを見た（2回の窓）
+
+[#764](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/764)（立てた B3 でも、静止は揺れと数えず、揺らすと検出する）の受け入れ条件4を、製品 build を Pi とつないで見た2回の窓。1回目（窓1）は日本時間の夜で、Pi の companion が寝ている時間帯だったため、揺らしたときの顔の変化を2回目（窓2）で見直した。servo は動かしていない。この記録は事実と未確認だけを書く。
+
+| 項目 | 内容 |
+|---|---|
+| Test ID | `EXP-067` |
+| Date | 窓1：2026-11-18（UTC。日本時間では 23:38〜翌 00:31）。窓2：2026-11-19（UTC 11:32〜12:02。日本時間では 20:32〜21:02） |
+| Operator | 線の抜き挿し、B3 を立てる・寝かせる・置き直す・揺らす操作、画面の観察はユーザー。build、書き込み、console と Pi の記録、Pi のプログラムの起動と停止は実機側の PM（AI） |
+| 承認 | 窓1：承認があった：承認者 wachi-yoshitaka-11-dev、2026-11-18、実機側の PM のセッション。範囲は、VM 側の PM の指示による AI の問い「製品 build を ESP32 の 3V3 pin から LCD に給電し、Pi とつないで、B3 を立てた姿勢の静止と揺らしを見る窓を、今行ってよいか」（servo は動かさない。backlight の点く起動は最大4回）。窓2：承認があった：承認者 wachi-yoshitaka-11-dev、2026-11-19、実機側の PM のセッション。範囲は、VM 側の PM の指示による AI の問い「#764 (c) の窓を、起動は最大6回で、今から行ってよいか」（書き込みはしない。servo は動かさない）。どちらも [Power Budget](power-budget.md) の `no-touch-487` の通電の条件（条件(7)と同じ形の承認）の記録 |
+| Hardware revision／Exact components | `MCU-01`、`DISP-01`（LCD の VCC の線を B2 の a1 に挿した）、`ACCEL-01`・`ENV-01`（B3 の上。B3 は板の面を垂直に、長い辺を下にして立てた）、`SBC-01`。Pi との線は `X1`（紫）、`X2`（青）、`X3`（黒）。`PSU-BENCH-01` は電源プラグを抜いたまま。`S1` は挿したまま |
+| Firmware | 製品 build `no-touch-487`、develop `fc21ee3`（`cargo build --locked --features no-touch-487`）。ELF sha256 `07477ffa005b39f15ef92da0a5ab15824a0d2c901ca0bc6fe6b6be23b71e513c`（両方の窓の起動 log の先頭9桁 `07477ffa0` と一致）。書き込みは窓1の1回だけ。起動 log で `servo=not_driven` |
+| Pi software | develop `fc21ee3` の `deskcatd` を Pi で build（`cargo build --locked --release -p deskcatd`。検証済みコマンドではない）。sha256 `b75d71cb8efb350799ef4764b7b04869e739738bbd85853fa2fa2d669e54a781`。引数は [EXP-065](#exp-065-窓c製品-buildno-touch-487を-pi-とつなぎ743-のコメントの見た目と751-の揺れの検出と温湿度の報告を見た) と同じ |
+| Power supply and current limit | ESP32 はこの端末の USB。電流・電圧・温度は測っていない |
+| Measurement equipment | UART0 の log（115200）、Pi の `deskcatd` の log |
+| Raw data | repository の外の `deskcat-evidence/windows-20261118-764/`（窓1：`run-764.log`、`notes.txt`、`boots.txt`、`flash-prod.txt`）と `deskcat-evidence/windows-20261119-764c/`（窓2：`run-764c.log`、`notes.txt`、`boots.txt`、Pi の `deskcatd-764c.log`。窓1の Pi の `deskcatd-764.log` と build log も、窓2の初めに Pi の SD から写した） |
+| Expected result | 立てた姿勢で静止の3分は `shake_detected` 0件、置き直した後の静止の3分も0件、揺らすと `shaken` が送られ LCD が Dizzy になる |
+| Measured result | 下記 |
+
+### 起動の数
+
+- 窓1：backlight の点いた起動は3回（USB の挿入 14:38Z、書き込み 14:39:34Z、console を開いて reset を放した 14:39:44Z）。
+- 窓2：2回（USB の挿入 11:32:19Z、console を開いて reset を放した 11:34:25Z）。書き込みはしていない。
+
+### 窓1：立てた静止と、寝ている時間帯の揺らし
+
+- 書き込みの後、B3 を立てる作業をしていた 14:40〜14:50:57Z に、`shake_detected` が出ていた（1分に2〜201件）。作業による検出で、静止の判定には入れていない。
+- (a) 立てて触らない 14:51:00〜14:54:00Z の3分：`shake_detected` 0件、`tap_detected` 0件。このとき `deskcatd` は build 中で、session は無かった（検出は ESP32 が行い、`DropNoSession` として log に出るので、数え方は session があるときと同じ）。
+- (b) 一度平らにしてから立て直す動作の間（14:59:08〜14:59:24Z）は、shake と tap の検出があった。立て直した後、触らない 14:59:40〜15:02:40Z の3分：`shake_detected` 0件、`tap_detected` 0件（session 無し）。
+- `deskcatd` を 15:20:36Z に起動し、ESP32 で `boot_established sid=30` が出た。Pi で `show_text` が受け付けられた。
+- (c) 立てたまま手で揺らした：15:25:28.915Z に `shake_detected decision=Send` が出て、`shaken` を Pi へ送った（`pi_tx frames=[("shaken", 13)]`）。続く検出は `DropTooSoon`。`tap_confirmed` の `Send` が2回あり、Pi の log に `tapped_received` が2件出た。ユーザーの目視で、LCD は寝た顔のまま変わらなかったと報告があった。Pi の log の起動直後の表情は `Sleeping` だった。
+- 顔が変わらなかったのは、`deskcatd` の companion が日本時間 22:00〜07:00 は寝ている状態で、寝ている間の `shaken` は顔を変えずに数えるだけの設計だからである（`crates/deskcat-domain/src/companion.rs` の `on_shake` は、`asleep` のとき `ignored_shakes` を数えて何も出さない。寝る時刻は `sleep_at` 22:00、`wake_at` 07:00。時刻は日本時間に固定）。Pi の時計と寝る時刻の設定は変えていない。
+- (d) 参考：(c) の後に平らに置いた。置いた時刻は log から特定していない。最後の検出（15:25:30.402Z）から 15:29:48Z までの4分17秒、shake と tap の検出は0件。
+
+### 窓2：起きている時間帯の揺らし
+
+- Pi の起動で、本番の `deskcatd` service（`/usr/local/bin/deskcatd`）が自動で起動していた。`systemctl stop` で止めた（自動起動の設定は変えていない）。窓1の Pi の log を写した後、上の `deskcatd` を 11:34:32Z に起動し、ESP32 で `boot_established sid=32` が出た。Pi で `show_text` が受け付けられた。Pi の時計は NTP で同期しており、日本時間 20:34 だった（companion が起きている時間帯）。
+- (c1) 立てたまま手で揺らした：11:52:38.981Z と 11:54:01.527Z に `shake_detected decision=Send` が出て、`shaken` を Pi へ送り、Pi の log に `set_expression_queued` の `Dizzy` が出た。ユーザーの目視で、揺らしたら目が回った顔になったと報告があった。
+- (c2) 一度平らに寝かせてから同じ向きで立て直し、揺らした：11:55:46.213Z と 11:55:53.293Z に `shake_detected decision=Send` が出た。ユーザーの目視で、揺らしたら目が回った顔になったと報告があった。その後、立てたまま触らない 11:55:54〜11:57:20Z は、shake と tap の検出が0件だった。
+- 窓2の間の `shake_detected decision=Send` は20件、Pi の log の `Dizzy` は20件、`Surprised` は11件。
+
+### 窓2：平らに寝かせたときの検出
+
+- (c1) と (c2) の間に平らに寝かせていた 11:54:14〜11:55:23Z ごろは、`shake_detected` と `tap_detected` が続いた（両方を合わせて10秒ごとに10〜40件。`shake_detected decision=Send` はおよそ5秒ごとに14件）。Pi の log には `Dizzy` と `Surprised` が交互に出た。ユーザーの目視で、平らに寝かせたところ、驚いた顔と目が回った顔が延々と繰り返したと報告があった。この間に B3 が手から離れて止まっていたかは、log からは分からない。
+- 見直しとして、もう一度平らに寝かせた。寝かせる動作の間（11:58:3x〜11:58:43.6Z）は、検出が40件あった。ユーザーが寝かせて手を離したと申告した 11:59:13Z から1分（記録は 11:58:44〜12:00:15Z）は、shake と tap の検出が0件だった。ユーザーから、その1分の間に線が引っ張って B3 が傾いたり、机が揺れたりはしていないと報告があった。下にした B3 の面は未確認。窓1の (d) の平らな静止も0件だった。
+- 1回目の平らの間に検出が続いた原因は、確かめていない。
+- 見直しの1分の後、窓を閉じる前の 12:01:41.523Z に、`shake_detected decision=Send` が1件出た。そのとき B3 に何が起きていたかは、log からは分からない。
+
+### 窓の終わり
+
+- 両方の窓で、`deskcatd` へ SIGINT を送ったが35秒で止まらず、SIGTERM で止めた（窓1は 15:30:05Z に SIGINT、15:30:46Z に停止を確かめた。窓2は 12:01:36Z に SIGINT、12:02:17Z に停止を確かめた）。[EXP-065](#exp-065-窓c製品-buildno-touch-487を-pi-とつなぎ743-のコメントの見た目と751-の揺れの検出と温湿度の報告を見た) でも同じだった。原因は確かめていない。終了時の counter の行は出ていない。
+- 両方の窓で、Pi の GPIO14 を入力 pull-down にした（窓2の `pinctrl get` の表示は `ip` と `hi`。窓1の表示は記録に残していない）。本番の service は止めたまま。AI が Pi を ssh で poweroff し、ユーザーが Pi の電源の線、ESP32 の USB、LCD の VCC の線を抜いた。
+
+### 確かめていないこと
+
+- 窓2の1回目に平らに寝かせた間に、検出が続いた原因と、そのとき B3 が静止していたか。
+- 下にした B3 の面（窓1の (d)、窓2の見直しのどちらも）。
+- (a)(b) の立てた静止を、session のある状態で見ること（窓2では、(c2) の後の約1分半だけ見た）。
+- Pi 側の `shaken` ごとの受理の数（`shaken` ごとの log の行は無く、counter は SIGTERM で止めたため出ていない。窓2では `Dizzy` の表情の行で見た）。
+- `deskcatd` が SIGINT で止まらない原因。
+
 ## Revision履歴
 
 | 日付 | Revision | 変更 | 根拠 |
@@ -6015,3 +6077,4 @@ ELF（wdt）`77d40227f4dca649e3cda797b3ac599087b1aef534e33ab848cb26b37e0f11bd`�
 | 2026-11-15 | 71 | [#743](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/743)・[#751](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/751)。**`EXP-065`を追加した。**窓C の記録。判定は書いていない | 実機側の PM の記録（ユーザーの目視の報告と log による） |
 | 2026-11-16 | 72 | [#20](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/20)。**`EXP-066`を追加した。**Pi → ESP32 の frame の到着の間隔を、LCD の描画、センサーの読み出し、Pi の負荷と同時に測る計画（未実施。測定値は無い）。`HW-TBD-017`の値は決めていない | 計画の追加（観測の記録ではない）。実施したら記録に書き換える |
 | 2026-11-19 | 73 | [#683](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/683)・[#20](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/20)。**`EXP-066`の計画に、#683 の手順3・4の記録を足した。**既にある log（ESP32 の `health`・`heartbeat_overrun`・`health_snapshot_overrun`、Pi の `link_wait`）を同じ窓で残す。firmware と `deskcatd` は変えていない。実行方式の判断はしていない | 計画の追加（観測の記録ではない） |
+| 2026-11-19 | 74 | [#764](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/764)。**`EXP-067`を追加した。**製品 build（`no-touch-487`、develop `fc21ee3`）を Pi とつなぎ、B3 を立てた姿勢の静止と揺らしを2回の窓で見た。立てた静止の3分は2回とも検出0件、起きている時間帯に揺らすと `Dizzy` になった。平らに寝かせた1回目の間に検出が続いたこと（原因は未確認）と、`deskcatd` が SIGINT で止まらなかったことを、観察として書いた | 窓1（2026-11-18）と窓2（2026-11-19）の UART0 の log と Pi の `deskcatd` の log、ユーザーの目視の報告 |
