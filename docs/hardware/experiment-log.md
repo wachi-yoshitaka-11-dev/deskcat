@@ -77,7 +77,7 @@
 | [EXP-063](#exp-063-18-段2の窓0非通電発泡スチロールの背板に-lcd-を留め背板を底板の上の前の縁に立てた) | [#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)・[#34](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/34)。段2の窓0（非通電）。背板に LCD を留め、背板を底板に立てた。線の束ねと天板の切り込みは行っていない | 値の正なし（観測の記録） |
 | [EXP-064](#exp-064-18-段2の窓1と窓2jumper-wire-に-08-a-を30分流しi_lim-を-0070-に置きホーンなしで-servo-を動かして目印の向きを読んだ) | [#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)・[#751](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/751)。段2の窓1・2。jumper wire の試験（0.8 A、30分）、`I_lim` 0.070、ホーンなしで servo を動かした。#751 の 7（`STOP` が届く） | 値の正なし（観測の記録） |
 | [EXP-065](#exp-065-窓c製品-buildno-touch-487を-pi-とつなぎ743-のコメントの見た目と751-の揺れの検出と温湿度の報告を見た) | [#743](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/743)・[#751](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/751)。窓C。製品 build を Pi とつなぎ、コメントの見た目、揺れの検出（#751 の 5）、温湿度の報告（6）を見た | 値の正なし（観測の記録） |
-| [EXP-066](#exp-066-計画未実施受信の間隔の-log-を足した製品-buildlink-gap-20no-touch-487でpi-が送る-frame-の到着の間隔をlcd-の描画センサーの読み出しpi-の負荷と同時に測る) | [#20](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/20)の`HW-TBD-017`（Pi からの受信が途切れたと判定するまでの時間）。**計画であり、未実施。**現在の Pi session の frame の到着の間隔を、LCD の描画、センサーの読み出し、Pi の負荷と同時に測る手順 | 値の正なし（計画。実施すると観測の記録になる。`HW-TBD-017`の値はここで決めない） |
+| [EXP-066](#exp-066-計画未実施受信の間隔の-log-を足した製品-buildlink-gap-20no-touch-487でpi-が送る-frame-の到着の間隔をlcd-の描画センサーの読み出しpi-の負荷と同時に測る) | [#20](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/20)の`HW-TBD-017`（Pi からの受信が途切れたと判定するまでの時間）。**計画であり、未実施。**現在の Pi session の frame の到着の間隔を、LCD の描画、センサーの読み出し、Pi の負荷と同時に測る手順。同じ窓で [#683](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/683) の手順3・4の記録も取る | 値の正なし（計画。実施すると観測の記録になる。`HW-TBD-017`の値はここで決めない） |
 
 **大容量の生dataはこのrepositoryへ入れていない。**保存場所は
 [development-foundation-plan.md](../planning/development-foundation-plan.md)の
@@ -5861,6 +5861,8 @@ ELF（wdt）`77d40227f4dca649e3cda797b3ac599087b1aef534e33ab848cb26b37e0f11bd`�
 
 [#20](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/20)の`HW-TBD-017`（ESP32 が Pi からの受信の途切れと判定するまでの時間）を決める材料として、**Pi → ESP32 の frame の到着の間隔**を実機で取る計画。決め方と順番は #20 の comment（2026-11-16、VM 側の PM の整理）の「順番」の 2 と 3 である。**この節は計画であり、まだ実施していない。測定値は 1 つも無い。**窓を行うときに、この節を記録（観測の事実だけ）に書き換える。それまでは、下の表の `Measured result` は未記入のままにする。**`HW-TBD-017`の値、判定の基準、`ping`の間隔は、この節では決めない。**
 
+同じ窓で、[#683](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/683)の手順の3と4（Pi の実 port の待ちと、ESP32 の main loop の周期・期限超過・UART を読みに行く間隔。LCD 等の処理時間の内訳は取らない）の記録も取る。どちらも既にある log だけで取り、firmware と `deskcatd` は変えない。**#683 の実行方式の判断（手順の5と6）は、この節では行わない。**
+
 | 項目 | 内容 |
 |---|---|
 | Test ID | `EXP-066` |
@@ -5871,7 +5873,7 @@ ELF（wdt）`77d40227f4dca649e3cda797b3ac599087b1aef534e33ab848cb26b37e0f11bd`�
 | Firmware | `--features link-gap-20,no-touch-487` の build。commit と ELF の sha256 は、build の後に記入する。**製品 build（featureなし）は touch を読み、Power Budget が通電を不可（`TBD`）としているため、この計画は touch を読まない側（`no-touch-487`）に限る**（touch を読む製品 build での間隔は、この計画の対象にしない） |
 | Pi software | `deskcatd` の commit と sha256。**この窓で Pi が送る frame の種類と送る間隔は、Pi 側の実装（`ping`の送信を含む）に依る。この計画は`ping`の間隔の値を前提にしない。**窓の前に、その時点の `deskcatd` が何を、どの契機で送るかを記録する |
 | Power supply and current limit | ESP32 はこの端末の USB（[EXP-065](#exp-065-窓c製品-buildno-touch-487を-pi-とつなぎ743-のコメントの見た目と751-の揺れの検出と温湿度の報告を見た)と同じ。電流は測らない）。`PSU-BENCH-01` は電源プラグを抜いたままにする |
-| Measurement equipment | ESP32 の UART0 の log（`link_gap`、`link_gap_bins`、`hb`、`health`、`pi_link_lost` の有無）。Pi 側の `deskcatd` の log（送った frame の時刻と種類） |
+| Measurement equipment | ESP32 の UART0 の log（`link_gap`、`link_gap_bins`、`hb`、`health`、`pi_link_lost` の有無）。Pi 側の `deskcatd` の log（送った frame の時刻と種類）。#683 の分として、ESP32 の `health` の行の `overrun_ticks`・`max_read_gap_ms`・`pi_uart_rx_buffer_full`・`pi_uart_rx_fifo_overflow` と、`heartbeat_overrun`・`health_snapshot_overrun` の行、Pi の `deskcatd` の `link_wait` の行（`apps/deskcatd/src/runner.rs`。10 秒の窓ごとの step・read・write・flush の件数と最大）を、条件ごとに残す |
 | Raw data | repository の外の証拠用 directory。ESP32 の log と Pi の記録の原本は MAC を含みうるので、repository に置かない |
 | Expected result | **観測の期待であり、合否の基準ではない。** (1) `link_gap` の行が health snapshot と同じ周期（`HEALTH_SNAPSHOT_PERIOD_MS`）で出て、1 行の項目が固定で、frame の数に比例して長くならない。(2) 条件ごとに、間隔の最大・件数・分布が取れる。(3) `pi_link_lost` は出ない（`LINK_LOSS_TIMEOUT_MS` は`None`で、この build は見張らない）。(4) 起動 log に `servo=not_driven` が出る |
 | Measured result | 未実施 |
@@ -5933,6 +5935,7 @@ ELF（wdt）`77d40227f4dca649e3cda797b3ac599087b1aef534e33ab848cb26b37e0f11bd`�
 - この build は、build-only の確認までで、実機では一度も動かしていない。`link_gap` の行の形式と値は、host の単体試験（間隔の統計）と build の通過だけが根拠である。
 - 計測の対象は製品 build の経路のうち touch を読まない側である。touch を読む製品 build の下での間隔は測らない。
 - 間隔の時刻は ESP32 の main loop が UART を読んだ時刻であり、UART 上の到着の時刻ではない（見張りが使う時刻と同じにしてあるため、見張りの判定に効く量は測れるが、byte の到着の時刻そのものは測れない）。
+- 観測の log（`link_wait` と `link_gap`）を出すこと自体が、測る待ちを変えうる。その影響はこの窓では分けて測らない。記録するときに、この点を結果と並べて書く。
 
 ## Revision履歴
 
@@ -6011,3 +6014,4 @@ ELF（wdt）`77d40227f4dca649e3cda797b3ac599087b1aef534e33ab848cb26b37e0f11bd`�
 | 2026-11-15 | 70 | [#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)・[#751](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/751)。**`EXP-064`を追加した。**段2の窓1・2の記録。判定は書いていない | 実機側の PM の記録（ユーザーの目視の報告と log による） |
 | 2026-11-15 | 71 | [#743](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/743)・[#751](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/751)。**`EXP-065`を追加した。**窓C の記録。判定は書いていない | 実機側の PM の記録（ユーザーの目視の報告と log による） |
 | 2026-11-16 | 72 | [#20](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/20)。**`EXP-066`を追加した。**Pi → ESP32 の frame の到着の間隔を、LCD の描画、センサーの読み出し、Pi の負荷と同時に測る計画（未実施。測定値は無い）。`HW-TBD-017`の値は決めていない | 計画の追加（観測の記録ではない）。実施したら記録に書き換える |
+| 2026-11-19 | 73 | [#683](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/683)・[#20](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/20)。**`EXP-066`の計画に、#683 の手順3・4の記録を足した。**既にある log（ESP32 の `health`・`heartbeat_overrun`・`health_snapshot_overrun`、Pi の `link_wait`）を同じ窓で残す。firmware と `deskcatd` は変えていない。実行方式の判断はしていない | 計画の追加（観測の記録ではない） |
