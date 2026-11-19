@@ -5902,7 +5902,7 @@ ELF（wdt）`77d40227f4dca649e3cda797b3ac599087b1aef534e33ab848cb26b37e0f11bd`�
 
 ### 通電前の確認（窓の前に 1 つずつ当てる）
 
-1. **この build の通電の可否は、まだ決まっていない。**[firmware/esp32/README.md](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/firmware/esp32/README.md)の「build構成と通電」の表で、`link-gap-20`は「未判定」である。`no-touch-487` とは I/O が同じで UART0 の log が 1 行増えるだけだが、[Power Budget](power-budget.md)の`touchを読まない製品build（no-touch-487）の通電の条件`を、この構成にそのまま当ててよいかを PM が判断し、判断を正本（Power Budget と README の表）へ反映してから通電する。**反映するまで通電しない。**
+1. **この build の通電の可否は、[Power Budget](power-budget.md)の`touchを読まない製品build（no-touch-487）の通電の条件`の、`link-gap-20`を併用した build の段落による**（[firmware/esp32/README.md](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/firmware/esp32/README.md)の「build構成と通電」の表も同じ）。承認は、その節のとおり実行する日に1件得る。
 2. 上の判断の条件（`touchを読まない製品build（no-touch-487）の通電の条件`が挙げるもの）を、窓の前に 1 つずつ現物へ当てる。ここへ条件を写さない。
 3. 書き込む ELF の sha256 を、承認に書かれた値と書き込みの直前に照合する。起動 log の `ELF file SHA256` の先頭と一致することを確かめる。
 4. **servo は動かさない。**起動 log に `servo=not_driven` が出ること。`PSU-BENCH-01` の電源プラグが抜けていること。servo の電源の線が ESP32 の電源に触れていないこと。
@@ -6078,3 +6078,4 @@ ELF（wdt）`77d40227f4dca649e3cda797b3ac599087b1aef534e33ab848cb26b37e0f11bd`�
 | 2026-11-16 | 72 | [#20](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/20)。**`EXP-066`を追加した。**Pi → ESP32 の frame の到着の間隔を、LCD の描画、センサーの読み出し、Pi の負荷と同時に測る計画（未実施。測定値は無い）。`HW-TBD-017`の値は決めていない | 計画の追加（観測の記録ではない）。実施したら記録に書き換える |
 | 2026-11-19 | 73 | [#683](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/683)・[#20](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/20)。**`EXP-066`の計画に、#683 の手順3・4の記録を足した。**既にある log（ESP32 の `health`・`heartbeat_overrun`・`health_snapshot_overrun`、Pi の `link_wait`）を同じ窓で残す。firmware と `deskcatd` は変えていない。実行方式の判断はしていない | 計画の追加（観測の記録ではない） |
 | 2026-11-19 | 74 | [#764](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/764)。**`EXP-067`を追加した。**製品 build（`no-touch-487`、develop `fc21ee3`）を Pi とつなぎ、B3 を立てた姿勢の静止と揺らしを2回の窓で見た。立てた静止の3分は2回とも検出0件、起きている時間帯に揺らすと `Dizzy` になった。平らに寝かせた1回目の間に検出が続いたこと（原因は未確認）と、`deskcatd` が SIGINT で止まらなかったことを、観察として書いた | 窓1（2026-11-18）と窓2（2026-11-19）の UART0 の log と Pi の `deskcatd` の log、ユーザーの目視の報告 |
+| 2026-11-19 | 74 | [#20](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/20)。**`EXP-066`の通電前の確認の1を、Power Budget の判断に合わせた。**`link-gap-20,no-touch-487` の通電の可否を Power Budget と README の表へ反映したので、「未判定。反映するまで通電しない」を、その節を参照する文に置き換えた。 |
