@@ -77,7 +77,7 @@
 | [EXP-063](#exp-063-18-段2の窓0非通電発泡スチロールの背板に-lcd-を留め背板を底板の上の前の縁に立てた) | [#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)・[#34](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/34)。段2の窓0（非通電）。背板に LCD を留め、背板を底板に立てた。線の束ねと天板の切り込みは行っていない | 値の正なし（観測の記録） |
 | [EXP-064](#exp-064-18-段2の窓1と窓2jumper-wire-に-08-a-を30分流しi_lim-を-0070-に置きホーンなしで-servo-を動かして目印の向きを読んだ) | [#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)・[#751](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/751)。段2の窓1・2。jumper wire の試験（0.8 A、30分）、`I_lim` 0.070、ホーンなしで servo を動かした。#751 の 7（`STOP` が届く） | 値の正なし（観測の記録） |
 | [EXP-065](#exp-065-窓c製品-buildno-touch-487を-pi-とつなぎ743-のコメントの見た目と751-の揺れの検出と温湿度の報告を見た) | [#743](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/743)・[#751](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/751)。窓C。製品 build を Pi とつなぎ、コメントの見た目、揺れの検出（#751 の 5）、温湿度の報告（6）を見た | 値の正なし（観測の記録） |
-| [EXP-066](#exp-066-計画未実施受信の間隔の-log-を足した製品-buildlink-gap-20no-touch-487でpi-が送る-frame-の到着の間隔をlcd-の描画センサーの読み出しpi-の負荷と同時に測る) | [#20](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/20)の`HW-TBD-017`（Pi からの受信が途切れたと判定するまでの時間）。**計画であり、未実施。**現在の Pi session の frame の到着の間隔を、LCD の描画、センサーの読み出し、Pi の負荷と同時に測る手順。同じ窓で [#683](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/683) の手順3・4の記録も取る | 値の正なし（計画。実施すると観測の記録になる。`HW-TBD-017`の値はここで決めない） |
+| [EXP-066](#exp-066-受信の間隔の-log-を足した製品-buildlink-gap-20no-touch-487でpi-が送る-frame-の到着の間隔をlcd-の描画センサーの読み出しpi-の負荷と同時に測った) | [#20](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/20)の`HW-TBD-017`（Pi からの受信が途切れたと判定するまでの時間）の材料。現在の Pi session の frame の到着の間隔を、LCD の描画、センサーの読み出し、Pi の負荷と同時に、5つの条件で測った。同じ窓で [#683](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/683) の手順3・4の記録も取った | 値の正なし（観測の記録。`HW-TBD-017`の値はここで決めない） |
 | [EXP-067](#exp-067-764-の受け入れ条件4製品-buildno-touch-487でb3-を立てた姿勢の静止と揺らしを見た2回の窓) | [#764](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/764)の受け入れ条件4。製品 build を Pi とつなぎ、B3 を立てた姿勢の静止と揺らし、平らに寝かせたときの検出を見た（2回の窓） | 値の正なし（観測の記録） |
 
 **大容量の生dataはこのrepositoryへ入れていない。**保存場所は
@@ -5858,85 +5858,157 @@ ELF（wdt）`77d40227f4dca649e3cda797b3ac599087b1aef534e33ab848cb26b37e0f11bd`�
 - Pi 側の `environment` の受信件数。
 - 6a67b28 の [#758](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/758)（`env_report.rs`）は、この窓の build（`bc25043`）に入っていない。
 
-## EXP-066: 計画・未実施。受信の間隔の log を足した製品 build（link-gap-20,no-touch-487）で、Pi が送る frame の到着の間隔を、LCD の描画、センサーの読み出し、Pi の負荷と同時に測る
+## EXP-066: 受信の間隔の log を足した製品 build（link-gap-20,no-touch-487）で、Pi が送る frame の到着の間隔を、LCD の描画、センサーの読み出し、Pi の負荷と同時に測った
 
-[#20](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/20)の`HW-TBD-017`（ESP32 が Pi からの受信の途切れと判定するまでの時間）を決める材料として、**Pi → ESP32 の frame の到着の間隔**を実機で取る計画。決め方と順番は #20 の comment（2026-11-16、VM 側の PM の整理）の「順番」の 2 と 3 である。**この節は計画であり、まだ実施していない。測定値は 1 つも無い。**窓を行うときに、この節を記録（観測の事実だけ）に書き換える。それまでは、下の表の `Measured result` は未記入のままにする。**`HW-TBD-017`の値、判定の基準、`ping`の間隔は、この節では決めない。**
-
-同じ窓で、[#683](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/683)の手順の3と4（Pi の実 port の待ちと、ESP32 の main loop の周期・期限超過・UART を読みに行く間隔。LCD 等の処理時間の内訳は取らない）の記録も取る。どちらも既にある log だけで取り、firmware と `deskcatd` は変えない。**#683 の実行方式の判断（手順の5と6）は、この節では行わない。**
+[#20](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/20)の`HW-TBD-017`（ESP32 が Pi からの受信の途切れと判定するまでの時間）を決める材料として、**Pi → ESP32 の frame の到着の間隔**を実機で取った窓。同じ窓で、[#683](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/683)の手順の3と4（Pi の実 port の待ちと、ESP32 の main loop の周期・期限超過・UART を読みに行く間隔）の記録も取った。servo は動かしていない。**この記録は観測の事実だけを書く。`HW-TBD-017`の値、判定の基準、`ping`の間隔は、ここでは決めない。**#683 の実行方式の判断（手順の5と6）も、ここでは行わない。
 
 | 項目 | 内容 |
 |---|---|
 | Test ID | `EXP-066` |
-| Date | 未実施（窓の日に記入する） |
-| Operator | 未定。線の抜き挿し、現物の監視、叩く・揺らす操作はユーザー。build、書き込み、console と Pi の記録、Pi の負荷の操作は実機側の PM（AI）。誰が何をするかは、窓の計画で確定する |
-| 承認 | 未取得。取るのは PM（`AGENTS.md`の外部操作と、[Hardware Safety Policy](../governance/hardware-safety-policy.md)の初回通電の条件による）。承認が出るまで、flash も通電もしない |
-| Hardware revision／Exact components | 窓の計画で確定する。構成は、LCD（`DISP-01`）、`ACCEL-01`、`ENV-01`、`MCU-01` と、Pi（`SBC-01`）を UART でつないだもの（[EXP-065](#exp-065-窓c製品-buildno-touch-487を-pi-とつなぎ743-のコメントの見た目と751-の揺れの検出と温湿度の報告を見た)と同じ種類の構成）。**servo は動かさない。** servo の電源は入れない |
-| Firmware | `--features link-gap-20,no-touch-487` の build。commit と ELF の sha256 は、build の後に記入する。**製品 build（featureなし）は touch を読み、Power Budget が通電を不可（`TBD`）としているため、この計画は touch を読まない側（`no-touch-487`）に限る**（touch を読む製品 build での間隔は、この計画の対象にしない） |
-| Pi software | `deskcatd` の commit と sha256。**この窓で Pi が送る frame の種類と送る間隔は、Pi 側の実装（`ping`の送信を含む）に依る。この計画は`ping`の間隔の値を前提にしない。**窓の前に、その時点の `deskcatd` が何を、どの契機で送るかを記録する |
-| Power supply and current limit | ESP32 はこの端末の USB（[EXP-065](#exp-065-窓c製品-buildno-touch-487を-pi-とつなぎ743-のコメントの見た目と751-の揺れの検出と温湿度の報告を見た)と同じ。電流は測らない）。`PSU-BENCH-01` は電源プラグを抜いたままにする |
-| Measurement equipment | ESP32 の UART0 の log（`link_gap`、`link_gap_bins`、`hb`、`health`、`pi_link_lost` の有無）。Pi 側の `deskcatd` の log（送った frame の時刻と種類）。#683 の分として、ESP32 の `health` の行の `overrun_ticks`・`max_read_gap_ms`・`pi_uart_rx_buffer_full`・`pi_uart_rx_fifo_overflow` と、`heartbeat_overrun`・`health_snapshot_overrun` の行、Pi の `deskcatd` の `link_wait` の行（`apps/deskcatd/src/runner.rs`。10 秒の窓ごとの step・read・write・flush の件数と最大）を、条件ごとに残す |
-| Raw data | repository の外の証拠用 directory。ESP32 の log と Pi の記録の原本は MAC を含みうるので、repository に置かない |
-| Expected result | **観測の期待であり、合否の基準ではない。** (1) `link_gap` の行が health snapshot と同じ周期（`HEALTH_SNAPSHOT_PERIOD_MS`）で出て、1 行の項目が固定で、frame の数に比例して長くならない。(2) 条件ごとに、間隔の最大・件数・分布が取れる。(3) `pi_link_lost` は出ない（`LINK_LOSS_TIMEOUT_MS` は`None`で、この build は見張らない）。(4) 起動 log に `servo=not_driven` が出る |
-| Measured result | 未実施 |
+| Date | 2026-11-20（UTC 10:18〜11:26。日本時間では 19:18〜20:26。始めは非通電の確認、終わりは USB を抜いた後の手順10の読みの申告） |
+| Operator | 線の抜き挿し（USB、Pi の電源、LCD の VCC）、テスターの読み、配線の目視、B3 を叩く・揺らす操作、現物の監視はユーザー。build、書き込み、console と Pi の記録、Pi の本番 service の停止、`deskcatd` の起動と停止、Pi の負荷の開始と停止は実機側の PM（AI） |
+| 承認 | 承認があった：承認者 wachi-yoshitaka-11-dev、2026-11-20、実機側の PM のセッション。範囲は、AI の問い「VM 側の PM の指示による EXP-066 の窓（上の内容、起動は最大7回）を、今行ってよいですか？」。問いの前に AI が示した内容は、`link-gap-20,no-touch-487`（`befc02d`、ELF sha256 `fa1894b05b29307d84c23ec80c918d94a361f1e1f3319f2a1b180d9071b21bf9`）を書き込むこと、ESP32 の 3.3 V から LCD に給電すること、Pi をつなぐこと、servo は動かさず PSU の電源プラグは抜いたままにすること、描画は ESP32 のプログラムの中で進むこと、backlight の点く起動は最大7回であること、5つの条件を測り、条件2・4 で B3 を叩く・揺らす操作、条件3・4 で Pi に負荷を掛けること、USB を挿す前に非通電の確認を行うこと、確かめないまま進む条件（条件(5)と `HW-TBD-025`(b)）である |
+| Hardware revision／Exact components | `MCU-01`、`DISP-01`（LCD の VCC の線を B2 の a1 に挿した）、`ACCEL-01`・`ENV-01`（B3 の上）、`SBC-01`。Pi との線は `X1`（紫）、`X2`（青）、`X3`（黒）。`S1` は挿したまま。`PSU-BENCH-01` は電源プラグを抜いたまま |
+| Firmware | `--features link-gap-20,no-touch-487`、develop `befc02d`（`cargo fmt --all -- --check`、`cargo clippy --locked -- -D warnings`、`cargo build --locked`。検証済みコマンドの build とは別に、この窓のために行った）。ELF sha256 `fa1894b05b29307d84c23ec80c918d94a361f1e1f3319f2a1b180d9071b21bf9`（書き込みの直前に照合し、書き込んだ後の5回の起動 log の先頭9桁 `fa1894b05` と一致）。書き込みは1回。起動 log で `servo=not_driven`、`touch=cs_high_not_read` |
+| Pi software | develop `fc21ee3` の `deskcatd`（[EXP-067](#exp-067-764-の受け入れ条件4製品-buildno-touch-487でb3-を立てた姿勢の静止と揺らしを見た2回の窓)と同じ build。sha256 `b75d71cb8efb350799ef4764b7b04869e739738bbd85853fa2fa2d669e54a781`。`fc21ee3..befc02d` で `apps/`・`crates/`・`Cargo.lock` に差分は無い）。引数は unit と同じ（`--port /dev/serial0 --baud 115200 --duplicate-capacity 8 --duplicate-retention-ms 5000 --startup-deadline-ms 10000`）に、`--verbose --no-companion --probe-expression happy --probe-interval-ms 1000` を足した。条件1・4 では、さらに `--speech-min-interval-ms 5000 --speech-duration-ms 3000` を足した。`PING_INTERVAL_MS` は `None` で、`ping` は送らない |
+| Power supply and current limit | ESP32 はこの端末の USB。Pi は別の電源で、ESP32 とは UART の2本と GND だけでつないだ。電流は測っていない |
+| Measurement equipment | ESP32 の UART0 の log（115200）、Pi の `deskcatd` の log（条件ごとに1つ）、Pi の `vcgencmd get_throttled`・`measure_temp`・load average（負荷を掛けた間は約22秒ごと。それ以外は、各条件の終わりに1回ずつ） |
+| Raw data | repository の外の `deskcat-evidence/windows-20261120-066/`（`run-066.log`、`notes.txt`、`boots.txt`、`pi-health.txt`、`flash-066.txt`、`deskcatd-066-c0.log`〜`deskcatd-066-c4.log`） |
+| Expected result | 計画の期待（観測の期待であり、合否の基準ではない）：`link_gap` の行が health snapshot と同じ周期で出て、1行の項目が固定であること。条件ごとに、間隔の最大・件数・分布が取れること。`pi_link_lost` が出ないこと。起動 log に `servo=not_driven` が出ること |
+| Measured result | 下記 |
 
-### 何を測るか（firmware が出すもの）
+### 計画から変えた点
 
-- 現在の Pi session の frame を受けるたびに、`LinkWatch::note_rx` へ渡すのと同じ時刻（main loop が UART を読んだ後の `Health::uptime_ms`）の差を数える。**つまり、ESP32 の見張りが実際に見る間隔である**（Pi が送った間隔に、UART 上の遅れと、main loop が読みに行くまでの遅れが載ったもの）。
-- health snapshot と同じ周期で 1 行出す：`link_gap uptime_ms=.. gaps=.. max_ms=.. max_at_ms=.. window_max_ms=.. sum_ms=.. bins=..`。`max_ms`・`max_at_ms`・`sum_ms`・`bins` は起動からの累計、`window_max_ms` は前の行から今までの最大。`bins` の区間の上端は最初の 1 回だけ `link_gap_bins` の行に出る（最後の区間は最大の上端を超えたもの）。**区間の上端は分布の形を見る解像度であり、判定の閾値ではない。間隔の最大は区間に丸めずに持つ。**
-- 1 回の読み出しで複数の frame を受けると、それらは同じ時刻になり、間隔は 0 と数える。新しい Pi session を確立したときは、sessionをまたぐ間隔を数えず、次の frame を基準にする。
-- **log の量は有界である**（周期ごとの項目が固定の 1 行と、起動後 1 回の `link_gap_bins`）。frame の内容は出さない。
+- **全条件で、Pi に1秒ごとに表情を切り替えさせた**（`--no-companion --probe-expression happy --probe-interval-ms 1000`）。理由：`befc02d` の `deskcatd` は `PING_INTERVAL_MS` が `None` で、描かずに定期の frame を送る手段が無い（`--probe-expression` は `neutral` を受け付けない）。companion の既定のままでは、静止の間は frame がほとんど出ず、分布が取れない（VM 側の PM の判断）。
+- 1000 ms と 5000/3000 ms は、観測の負荷として置いた値である。判定には使わない。
+- そのため、条件0にも1秒ごとの表情の描画が入る。**条件0と1の差は、描画の有無ではなく、`show_text` の有無である。**
+- `--no-companion` のため、揺らしても Pi は表情を `Dizzy` に変えない（`shaken` は Pi へ送られた）。ユーザーから、窓の間は喜ぶ顔がたびたび出て、目を回す顔は出なかったと申告があった。
 
-### 条件（何を同時に動かすか）
+### 通電前の確認
 
-**どの条件も、同じ build・同じ配線・同じ Pi の `deskcatd` で行い、条件の間で ESP32 を再起動する**（`max_ms`・`max_at_ms`・`bins`は起動からの累計で、再起動しないと前の条件の値が残り、下の表の「見るもの」を条件ごとに読めないため。再起動は、Power Budget の条件(7)が承認の問いに示すと定める、backlightが点く起動の回数に入れる）。測る長さは条件ごとに同じにする。**長さの値はこの計画では置かない。**窓の計画で PM が置き、実施したら事実として記録する。
+- [Power Budget](power-budget.md)の`DISP-01`追加接続の手順の条件(1)：今の配線（B1・B2・B3）で`gpio-assignment.md`の非通電の確認の項目1〜4を通して行った記録が無かったため、窓の始めに、USB と Pi の電源を挿す前に行った。
+  - 項目1：テスターの 20k のレンジで B2 の d1–d2（LCD の VCC の列と GND の列）を測り、落ち着いた表示は 1.20（約 1.20 kΩ）だったと申告があった。
+  - 項目2〜4：次を確認済みと申告があった。
+    - B2 の側の柔らかい線の位置と色（b1 赤、b2 黒、b3 茶、b4 橙、b5 黄、c6 緑、c7 青、b8 紫、c9 灰）
+    - 赤（`S1`）の他端が B1 の ＋26 にあること
+    - PSU の電源プラグが抜けていて、PSU の線が B1・B2・B3 に無いこと
+    - Pi との線が紫・青・黒の3本だけであること
+- 条件(5) は未達のまま進んだ（`module電源pinの独立性` はブレッドボードの配線では成り立たず、pull-up の並列合成と bus 容量は測っていない）。条件(6) は、`HW-TBD-025`(b) が MSP2807 について満たされていないことを実施者が把握した上で進んだ。どちらも承認を訊く前に示した（上の表の承認の行）。
+- Pi の本番の `deskcatd` service は `sudo systemctl stop` で止め、`inactive` であることを確かめた。Pi の時計は、`NTPSynchronized=yes` を確かめてから `deskcatd` を起動した。
 
-| 条件 | 同時に動かすもの | 見るもの |
-|---|---|---|
-| 0. 基線 | Pi が frame を送り、LCD は表情を描かない静止（`neutral`）。`ENV-01` の周期測定と `ACCEL-01` の tap 検出は製品 build のまま動く | 他の条件と比べる基線の`max_ms`と分布 |
-| 1. LCD の描画 | Pi が `set_expression` と `show_text` を繰り返し送り、LCD を描き続ける（描画は帯ごとに main loop へ戻りながら進む） | 描画中の`max_ms`。描画の時刻（ESP32 の log）と`max_at_ms`の対応 |
-| 2. センサーの読み出し | `ENV-01` の周期測定（製品 build の既定の周期）に加え、B3 を叩く・揺らして `ACCEL-01` の I2C 読み出しと`tapped`・`shaken`の送信を起こす。**touch は読まない**（`no-touch-487`） | 読み出しの時刻と`max_at_ms`の対応 |
-| 3. Pi の負荷 | Pi 側で`deskcatd`以外の負荷（CPU または I/O）を掛ける。**強さと種類は窓の計画で置き、承認を受ける。**この計画は値を決めない。Pi の負荷が重いほど Pi の送信が遅れうるので、Pi 側の log の送信時刻と突き合わせる | Pi の負荷の有無での`max_ms`の差 |
-| 4. 同時 | 1・2・3 を同時に動かす | 最悪側の`max_ms`と分布 |
+### 起動の数
 
-**読み方の注意。**ESP32 が数える間隔には、Pi が frame を送らない時間が含まれる。Pi が定期の frame を送っていない間は、間隔は Pi の送り方で決まり、ESP32 や配線の遅れを表さない。**Pi 側の送信の時刻を必ず記録し、「Pi が送った間隔」と「ESP32 が見た間隔」の差（遅れ）を条件ごとに読む。**`ping`の送信が Pi に入っていても、その間隔の値はこの計画の前提にしない。
+backlight の点いた起動は7回で、承認の上限と同じだった。
 
-### 通電前の確認（窓の前に 1 つずつ当てる）
+1. USB の挿入（10:32:30Z。前の image `07477ffa…`）
+2. 書き込み（10:33:26Z）
+3. console を開いて reset を放した（10:33:33Z。条件0）
+4. console の reset（10:38:42Z。条件1）
+5. console の reset（10:44:01Z。条件2）
+6. console の reset（10:50:23Z。条件3）
+7. console の reset（10:55:51Z。条件4）
 
-1. **この build の通電の可否は、[Power Budget](power-budget.md)の`touchを読まない製品build（no-touch-487）の通電の条件`の、`link-gap-20`を併用した build の段落による**（[firmware/esp32/README.md](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/firmware/esp32/README.md)の「build構成と通電」の表も同じ）。承認は、その節のとおり実行する日に1件得る。
-2. 上の判断の条件（`touchを読まない製品build（no-touch-487）の通電の条件`が挙げるもの）を、窓の前に 1 つずつ現物へ当てる。ここへ条件を写さない。
-3. 書き込む ELF の sha256 を、承認に書かれた値と書き込みの直前に照合する。起動 log の `ELF file SHA256` の先頭と一致することを確かめる。
-4. **servo は動かさない。**起動 log に `servo=not_driven` が出ること。`PSU-BENCH-01` の電源プラグが抜けていること。servo の電源の線が ESP32 の電源に触れていないこと。
-5. LCD・touch・Pi との線の状態を、窓の計画に書いた構成と照らす（touch の線の扱いも含めて）。EXP-065 では Pi 側の線が計画の想定と違っていた。**確かめずに置いた前提を作らない。**
-6. Pi の本番の `deskcatd` service が自動で起動して serial を取り合わないこと（EXP-065 で起きた）。窓の前に状態を確かめる。
-7. 実機に触れる作業は、flash を含めて ESP32 Flash / HIL profile の端末（実機 Linux）で行う（[Machine Profiles](../toolchains/machine-profiles.md)）。この VM では行わない。
+起動3〜7の起動 log の `reset_reason` は、5回とも `power_on` だった。
 
-### 人間の監視
+### 条件と結果
 
-- 初回通電を含む通電の間は、人間が現物の側にいて、異音・発熱・異臭・火花・変色がないか見る。
-- 線の抜き挿しと、B3 を叩く・揺らす操作は人間が行う。
-- 条件の切り替えと、停止の判断は、人間と PM が同じ記録を見ながら行う。
+各条件では、ESP32 を reset した後に `deskcatd` を起動し、止めるまで測った。長さは、`deskcatd` を起動した後と止めた後に Pi で読んだ時刻の間で 4分47秒〜6分46秒で、条件ごとに揃っていない（条件2・4 は、B3 の操作の予定に合わせて長くなった）。表の値は、各条件の最後の `link_gap` の行（起動からの累計）である。`bins` の区間の上端は `[16, 32, 64, 128, 256, 512, 1024, 2048, 4096]` ms で、最後の区間は 4096 ms を超えたもの。
 
-### 止める条件
+| 条件 | `deskcatd` を起動した後〜止めた後に Pi で読んだ時刻（UTC） / 値を取った行の時刻 | gaps | max_ms（max_at_ms） | 各条件の最初の2行を除いた window_max_ms の最大 | bins |
+|---|---|---|---|---|---|
+| 0. 基線（表情の切り替えだけ） | 10:33:55〜10:38:42 / 10:38:34 | 271 | 1384（21483） | 1384 | 0,1,0,1,0,0,2,267,0,0 |
+| 1. ＋`show_text` | 10:38:51〜10:44:01 / 10:43:53 | 351 | 4764（11483） | 1093 | 0,1,18,1,16,26,63,225,0,1 |
+| 2. ＋叩く・揺らす | 10:44:09〜10:50:23 / 10:50:22 | 388 | 4893（11483） | 1999 | 0,1,6,5,14,16,39,306,0,1 |
+| 3. ＋Pi の負荷 | 10:50:32〜10:55:51 / 10:55:44 | 283 | 4893（11483） | 3380 | 0,1,3,1,0,0,92,175,10,1 |
+| 4. 1〜3 を同時 | 10:56:00〜11:02:46 / 11:03:02 | 486 | 4104（11483） | 2801 | 0,1,26,6,36,52,172,187,5,1 |
 
-次のいずれかで、その場で測定を止め（USB を抜く、`deskcatd` を止める）、事実を記録する。**時間と起動回数の上限は置かない。**
+- 条件3では、`window_max_ms` が 2000 ms を超えた行が9行あった（各条件の最初の2行を除く。最大 3380 ms）。条件4では5行（最大 2801 ms）。条件0〜2では、最初の2行を除くと、2000 ms を超えた行は無かった。
+- 条件2：`shake_detected decision=Send` 22件、`DropTooSoon` 63件、`tap_detected` 45件、`tap_confirmed decision=Send` 28件。条件4：同じ順に 26件、116件、65件、40件（検出は 10:57:06〜11:01:57Z）。
+- `pi_link_lost` は出なかった。`panic`、`task_watchdog`、`heartbeat_overrun`、`health_snapshot_overrun` の行も出なかった。
 
-- 異音・発熱・異臭・火花・変色。
-- 起動 log に `servo=not_driven` が出ない。想定しない`reset_reason`（`task_watchdog`・`panic` を含む）が出る。
-- ESP32 の log が止まる、または `link_gap` の行が周期で出なくなる。
-- `pi_link_lost` が出る（この build は見張らないはずなので、build の取り違えを疑う）。
-- Pi が落ちる、または serial を取り合う。
-- 計画に無い動き（servo の動き、LCD の異常な点滅、予期しない再起動）。
+### 累計の最大（max_at_ms=11483）の1件
 
-### 判定は書かない
+条件1〜4の起動からの最大（4104〜4893 ms）は、4回とも `max_at_ms=11483` の1件だった。条件1の log で見た流れは次のとおり。
 
-実施したら、この節を観測の事実だけの記録に書き換える。**`HW-TBD-017`の値と、`ping`の間隔の案は、結果を受けて VM 側で作り、[Hardware Safety Policy](../governance/hardware-safety-policy.md)の根拠の水準に照らして別に決める。**この計測は loss timeout の根拠の一部（実測の分布）であり、決定そのものではない。
+- ESP32 は、起動後に `boot` を送り直した（`ts_ms` が 232、459、859、1659、3259 の後は、`phase=Recovery` で 6459、11459、…と 5000 ms ごと）。
+- `deskcatd` は起動して `hello(Startup)` を送った。ESP32 は uptime 約 6.72 s（log の tick 7279）でそれを受け、`pi_rx_hello … outcome=Established` を出した。
+- Pi の log には、`hello` の ACK を受けたが、応答した側（ESP32）の session が未承認なので受け付けない、という行がある（`sid=36 id=2`）。
+- その後 Pi の log には、次の `boot` が届くまで、serial の読みの timeout の行だけが並ぶ。
+- ESP32 は uptime 11.459 s に次の `boot`（`Recovery { attempt: 1 }`）を送り、uptime 約 11.48 s（tick 12039）に `boot_established` を出した。続いて Pi から `set_expression` が届き始めた。
 
-### 確かめていないこと（計画の時点）
+**この1件の間隔は、ESP32 が Pi の `hello` を受けた時刻から、ESP32 の次の `boot` の送り直しで session が確立するまでの間**である（4764 ≈ 11483 − 6719）。log からは、この間に Pi から ESP32 へ届いた frame は無い。
 
-- この build は、build-only の確認までで、実機では一度も動かしていない。`link_gap` の行の形式と値は、host の単体試験（間隔の統計）と build の通過だけが根拠である。
-- 計測の対象は製品 build の経路のうち touch を読まない側である。touch を読む製品 build の下での間隔は測らない。
-- 間隔の時刻は ESP32 の main loop が UART を読んだ時刻であり、UART 上の到着の時刻ではない（見張りが使う時刻と同じにしてあるため、見張りの判定に効く量は測れるが、byte の到着の時刻そのものは測れない）。
-- 観測の log（`link_wait` と `link_gap`）を出すこと自体が、測る待ちを変えうる。その影響はこの窓では分けて測らない。記録するときに、この点を結果と並べて書く。
+条件0では、`deskcatd` を ESP32 の起動の約20秒後に起動した。ESP32 が `hello` を受けたのは uptime 約 20.10 s（tick 20659）で、次の `boot` の送り直しが 21.459 s、`boot_established` が約 21.48 s（tick 22039）だった。最大は 1384 ms（`max_at_ms=21483`）で、同じ流れの1件である。条件1〜4では、`hello` が `boot` の送り直しの直後（6.459 s の後）に届いたので、次の送り直しまでの待ちが長く、条件0では次の送り直しの約 1.4 s 前に届いたので短かった。長さの差は、`hello` が届いた時刻と、5000 ms ごとの `boot` の送り直しの位置の関係による。
+
+### 条件3・4の 2 秒を超える間隔と、Pi の待ち
+
+ESP32 の uptime と Pi の時刻は、同じ `set_expression` の id（`id=4`）で対応させた。ESP32 が受けた時刻（log の tick から出した uptime）から、Pi の log の `set_expression_queued … pi_uptime_ms`（`deskcatd` の起動からの ms）を引くと、条件3は約 +6530 ms、条件4は約 +7351 ms だった（送信と UART の遅れを含む）。Pi の log の行に時刻は無い。Pi の `link_wait` の各行が覆う10秒の窓は、その行の直前の `set_expression_queued` の `pi_uptime_ms` で位置を見た（約1秒の幅で見ている）。
+
+この対応で見ると、ESP32 で `window_max_ms` が 2000 ms を超えた行（条件3の9行と条件4の5行）は、どれも、Pi の `link_wait` の `step_max_us` が約 1.1〜2.5 秒だった窓と重なった。
+
+| 条件 | ESP32 の行（覆う uptime） | window_max_ms | 重なった Pi の窓（pi_uptime の終わりの目安） | その窓の step_max_us |
+|---|---|---|---|---|
+| 3 | 30.2〜40.2 s | 2841 | 約 30 s | 2505263 |
+| 3 | 40.2〜50.2 s | 3380 | 約 40 s | 2414655 |
+| 3 | 60.2〜70.2 s | 2356 | 約 60 s | 2126436 |
+| 3 | 80.2〜90.2 s | 2291 | 約 80 s | 1407023 |
+| 3 | 120.2〜130.2 s | 2842 | 約 120 s | 1896470 |
+| 3 | 130.2〜140.2 s | 3142 | 約 130 s | 2303563 |
+| 3 | 160.2〜170.2 s | 2101 | 約 170 s | 1158314 |
+| 3 | 270.2〜280.2 s | 2050 | 約 280 s | 1566483 |
+| 3 | 300.2〜310.2 s | 2041 | 約 302 s | 1749684 |
+| 4 | 30.2〜40.2 s | 2536 | 約 30 s | 1695751 |
+| 4 | 110.2〜120.2 s | 2801 | 約 110 s | 1545470 |
+| 4 | 120.2〜130.2 s | 2273 | 約 120 s | 1477580 |
+| 4 | 130.2〜140.2 s | 2279 | 約 130 s | 1745795 |
+| 4 | 210.2〜220.2 s | 2292 | 約 212 s | 1502097 |
+
+- 逆向きの対応は成り立たない。Pi の `step_max_us` が大きくても（例：条件3の約 190 s の窓で 1356640、約 200 s の窓で 874832）、重なる ESP32 の行の `window_max_ms` が 2000 ms を超えなかった窓がある。
+- 対応は10秒の窓の粒度で見たもので、同じ1回の間隔の中身（Pi の送信が遅れたのか、他の理由か）は分けていない。
+
+### #683 の分
+
+- ESP32 の `health` の行（174行）：`overrun_ticks`、`pi_uart_rx_buffer_full`、`pi_uart_rx_fifo_overflow` は、すべて0だった。`max_read_gap_ms` の最大は、条件0から順に 86、90、91、107、109 ms。
+- Pi の `link_wait` の行（10秒ごと）の最大（µs）：
+
+| 条件 | 行数 | step_max_us | read_data_max_us | write_max_us | flush_max_us |
+|---|---|---|---|---|---|
+| 0 | 28 | 80503 | 42744 | 8191 | 29282 |
+| 1 | 30 | 82762 | 45956 | 1033 | 32044 |
+| 2 | 37 | 80761 | 46814 | 1040 | 29555 |
+| 3 | 31 | 2505263 | 47710 | 20798 | 40954 |
+| 4 | 39 | 1745795 | 58944 | 18660 | 49639 |
+
+### Pi の負荷（条件3・4）
+
+- 負荷を始めた（始めた後に Pi で読んだ時刻は 10:50:58Z）。条件4の終わり（11:02Z）まで続けた。掛けたのは次の2つである。
+  - `yes > /dev/null` を1本。
+  - `dd if=/dev/zero of=~/load-066.bin bs=1M count=64 conv=fdatasync` をくり返す loop。
+- 負荷の間（10:51:05〜11:02:51Z に約22秒ごとに33回読んだ。最後の読みは `yes` を止める前）、load average（1分）は 1.45〜4.60、Pi の温度は 37.9〜46.5 ℃ だった。`get_throttled` は、負荷の間も、それ以外に読んだときも `0x0` だった。
+
+### deskcatd の止め方
+
+5回の起動とも、`/proc/<PID>/status` の `SigIgn` は `0000000000001001`（SIGHUP と SIGPIPE）で、SIGINT は無視されていなかった。止めるのは5回とも SIGTERM で行い、止まった。
+
+### 窓の終わり
+
+11:03:14Z に console を閉じ、Pi に `poweroff` を指示した。その後（11:26:00Z に申告）、ユーザーが ESP32 の USB を抜き、[Power Budget](power-budget.md)の`DISP-01`追加接続の手順の手順10として、同じ B2 の d1–d2 を 20k のレンジで測った。表示は 4.40（約 4.40 kΩ）だったと申告があった。通電前は 1.20 だった（申告）。差は判定していない。続いて、ユーザーが Pi の電源の線と LCD の VCC の線を抜いた。
+
+### Faults
+
+- **Pi の負荷の後始末が、1回目の command で済まなかった。**
+  - 起きたこと：負荷を止める command で、`pkill -f "load-066"` が、その command を走らせている ssh の shell 自身の command line にも当たり、command が途中で切れた。
+  - 残ったもの：その後に読むと、`deskcatd` と `dd` の loop は止まっていたが、`yes` が1本残り、`~/load-066.bin` が残っていた（`dd` を書き込みの途中で止めたため）。
+  - 止め方と確かめ方：`yes` を PID で SIGTERM して止め、`load-066.bin` を消した。11:02:55Z に、`deskcatd`・`yes`・`dd` の process が0件であることと、`ls` で `load-066.bin` が無いことを確かめた。
+- **この端末から Pi の名前が解決できなくなった。**10:21〜10:30Z に、この端末から、Pi の mDNS の名前が解決できなくなった。記録してあった LAN の address へ直接 ssh すると Pi が応じ、uptime は続いていた（再起動していない）。名前が解決できなくなった原因（この端末の側か、Pi の側の mDNS の応答か）は分けていない。測定の前の出来事で、測定の時間帯には掛かっていない。
+
+### 確かめていないこと
+
+- 条件3・4で、2秒を超えた1回1回の間隔が、Pi の送信の遅れなのか、他の理由なのか（10秒の窓の粒度でしか対応を見ていない。Pi の log の行に時刻が無いため）。
+- Pi の `step_max_us` が大きくても、ESP32 の `window_max_ms` が 2000 ms を超えなかった窓がある理由。
+- 手順10の 1.20 と 4.40 の差の理由（測った時間の長さ、当てた位置、通電の影響のどれか）。
+- 観測の log（`link_wait`、`link_gap`、`--verbose`）を出すこと自体が、測る待ちをどれだけ変えたか。
+- touch を読む製品 build での間隔。
 
 ## EXP-067: #764 の受け入れ条件4。製品 build（no-touch-487）で、B3 を立てた姿勢の静止と揺らしを見た（2回の窓）
 
@@ -6079,3 +6151,4 @@ ELF（wdt）`77d40227f4dca649e3cda797b3ac599087b1aef534e33ab848cb26b37e0f11bd`�
 | 2026-11-19 | 73 | [#683](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/683)・[#20](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/20)。**`EXP-066`の計画に、#683 の手順3・4の記録を足した。**既にある log（ESP32 の `health`・`heartbeat_overrun`・`health_snapshot_overrun`、Pi の `link_wait`）を同じ窓で残す。firmware と `deskcatd` は変えていない。実行方式の判断はしていない | 計画の追加（観測の記録ではない） |
 | 2026-11-19 | 74 | [#764](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/764)。**`EXP-067`を追加した。**製品 build（`no-touch-487`、develop `fc21ee3`）を Pi とつなぎ、B3 を立てた姿勢の静止と揺らしを2回の窓で見た。立てた静止の3分は2回とも検出0件、起きている時間帯に揺らすと `Dizzy` になった。平らに寝かせた1回目の間に検出が続いたこと（原因は未確認）と、`deskcatd` が SIGINT で止まらなかったことを、観察として書いた | 窓1（2026-11-18）と窓2（2026-11-19）の UART0 の log と Pi の `deskcatd` の log、ユーザーの目視の報告 |
 | 2026-11-19 | 75 | [#20](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/20)。**`EXP-066`の通電前の確認の1を、Power Budget の判断に合わせた。**`link-gap-20,no-touch-487` の通電の可否を Power Budget と README の表へ反映したので、「未判定。反映するまで通電しない」を、その節を参照する文に置き換えた。条件の間で ESP32 を再起動するかを窓の計画に任せていたのを、再起動すると決めた（累計の値が条件をまたいで残り、条件ごとに読めないため）。 | 計画の前提の更新（観測の記録ではない） |
+| 2026-11-20 | 76 | [#20](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/20)・[#683](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/683)。**`EXP-066`を計画から記録へ書き換えた。**`link-gap-20,no-touch-487`（`befc02d`）を Pi とつなぎ、5つの条件で frame の到着の間隔を測った窓の観測の事実（計画から変えた点、条件(1)の非通電の確認、起動7回、条件ごとの値、累計の最大の1件が session の確立を待つ間だったこと、条件3・4の 2 秒を超える間隔と Pi の待ちの窓の対応、#683 の分、Faults）を書いた。`HW-TBD-017`の値と`ping`の間隔は決めていない | 窓（2026-11-20）の UART0 の log、Pi の `deskcatd` の log と状態の記録、ユーザーの申告（テスターの読み、配線の目視、表情の目視） |
