@@ -5888,7 +5888,7 @@ ELF（wdt）`77d40227f4dca649e3cda797b3ac599087b1aef534e33ab848cb26b37e0f11bd`�
 
 ### 条件（何を同時に動かすか）
 
-**どの条件も、同じ build・同じ配線・同じ Pi の `deskcatd` で行い、条件の間で ESP32 を再起動するかは窓の計画で決める**（再起動すると累計が戻るため、条件ごとの区切りは `window_max_ms` と `uptime_ms` で読む。再起動しない場合は、条件の切り替えの時刻を記録する）。測る長さは条件ごとに同じにする。**長さの値はこの計画では置かない。**窓の計画で PM が置き、実施したら事実として記録する。
+**どの条件も、同じ build・同じ配線・同じ Pi の `deskcatd` で行い、条件の間で ESP32 を再起動する**（`max_ms`・`max_at_ms`・`bins`は起動からの累計で、再起動しないと前の条件の値が残り、下の表の「見るもの」を条件ごとに読めないため。再起動は、Power Budget の条件(7)が承認の問いに示すと定める、backlightが点く起動の回数に入れる）。測る長さは条件ごとに同じにする。**長さの値はこの計画では置かない。**窓の計画で PM が置き、実施したら事実として記録する。
 
 | 条件 | 同時に動かすもの | 見るもの |
 |---|---|---|
@@ -6078,4 +6078,4 @@ ELF（wdt）`77d40227f4dca649e3cda797b3ac599087b1aef534e33ab848cb26b37e0f11bd`�
 | 2026-11-16 | 72 | [#20](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/20)。**`EXP-066`を追加した。**Pi → ESP32 の frame の到着の間隔を、LCD の描画、センサーの読み出し、Pi の負荷と同時に測る計画（未実施。測定値は無い）。`HW-TBD-017`の値は決めていない | 計画の追加（観測の記録ではない）。実施したら記録に書き換える |
 | 2026-11-19 | 73 | [#683](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/683)・[#20](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/20)。**`EXP-066`の計画に、#683 の手順3・4の記録を足した。**既にある log（ESP32 の `health`・`heartbeat_overrun`・`health_snapshot_overrun`、Pi の `link_wait`）を同じ窓で残す。firmware と `deskcatd` は変えていない。実行方式の判断はしていない | 計画の追加（観測の記録ではない） |
 | 2026-11-19 | 74 | [#764](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/764)。**`EXP-067`を追加した。**製品 build（`no-touch-487`、develop `fc21ee3`）を Pi とつなぎ、B3 を立てた姿勢の静止と揺らしを2回の窓で見た。立てた静止の3分は2回とも検出0件、起きている時間帯に揺らすと `Dizzy` になった。平らに寝かせた1回目の間に検出が続いたこと（原因は未確認）と、`deskcatd` が SIGINT で止まらなかったことを、観察として書いた | 窓1（2026-11-18）と窓2（2026-11-19）の UART0 の log と Pi の `deskcatd` の log、ユーザーの目視の報告 |
-| 2026-11-19 | 75 | [#20](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/20)。**`EXP-066`の通電前の確認の1を、Power Budget の判断に合わせた。**`link-gap-20,no-touch-487` の通電の可否を Power Budget と README の表へ反映したので、「未判定。反映するまで通電しない」を、その節を参照する文に置き換えた。 | 計画の前提の更新（観測の記録ではない） |
+| 2026-11-19 | 75 | [#20](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/20)。**`EXP-066`の通電前の確認の1を、Power Budget の判断に合わせた。**`link-gap-20,no-touch-487` の通電の可否を Power Budget と README の表へ反映したので、「未判定。反映するまで通電しない」を、その節を参照する文に置き換えた。条件の間で ESP32 を再起動するかを窓の計画に任せていたのを、再起動すると決めた（累計の値が条件をまたいで残り、条件ごとに読めないため）。 | 計画の前提の更新（観測の記録ではない） |
