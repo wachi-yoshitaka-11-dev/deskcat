@@ -153,7 +153,7 @@ def _invoke(script, command, cwd=None, environment=None):
     env.pop("DESKCAT_SKIP_TRUNCATION_GUARD", None)
     env.pop("DESKCAT_SKIP_WORKTREE_GUARD", None)
     env.pop("DESKCAT_TEST_GH", None)
-    if script == GH_GUARD:
+    if script in (GH_GUARD, CODERABBIT_GATE):
         env["PATH"] = f"{_GH_SHIM_DIR}{os.pathsep}{env['PATH']}"
     if environment:
         env.update(environment)
@@ -2921,8 +2921,9 @@ class PushGateTests(unittest.TestCase):
 class CodeRabbitGateTests(unittest.TestCase):
     """CodeRabbitのreviewを起動するcommandを見るhookのtest。
 
-    **このhookだけ`deny`ではなく`ask`を返す。**他のhookのtestは`deny`を期待するため、
-    検査する経路を別に持つ。**止めたいのはAIの独断であって、人間の依頼ではない。**
+    **人間の判断が要るものは`ask`、規則に反すると決まるものは`deny`を返す**（#781）。
+    `ask`は`assertAsked`、`deny`は`assertDecision`で検査する。
+    **止めたいのはAIの独断であって、人間の依頼ではない。**
     """
 
     def assertAsked(self, command, *, contains=None):
@@ -2941,10 +2942,9 @@ class CodeRabbitGateTests(unittest.TestCase):
         self.assertIsNone(output, f"止めてしまった: {command}")
 
     def test_review_triggers_are_asked(self):
-        """reviewを起動する語を止める。**枠を消費するのはこの2つだけである。**"""
+        """reviewを起動する語を止める。**`full review`は`ask`で止める。**"""
         for command in (
             'gh pr comment 239 --body "@coderabbitai full review"',
-            'gh pr comment 239 --body "@coderabbitai review"',
             'gh issue comment 240 --body "@coderabbitai full review"',
             'gh pr comment 239 -b "@coderabbitai full review"',
             'gh pr comment 239 --body="@coderabbitai full review"',
@@ -2952,12 +2952,209 @@ class CodeRabbitGateTests(unittest.TestCase):
             with self.subTest(command=command):
                 self.assertAsked(command)
 
+    # ---- #781: `full`の付かない`review`と、走った後の`full review`は`deny` ----
+
+    DONE = CodeRabbitReviewMergeGateTests.DONE
+    SKIPPED = CodeRabbitReviewMergeGateTests.SKIPPED
+    LIMITED = CodeRabbitReviewMergeGateTests.LIMITED
+    PENDING = CodeRabbitReviewMergeGateTests.PENDING
+    LOCK_LOSS = {"name": "CodeRabbit", "status": "completed", "conclusion": "failure",
+                 "output": {"title": "Review stopped after lock loss", "summary": ""}}
+    FULL = 'gh pr comment 7 --body "@coderabbitai full review"'
+
+    def _state(self, command, fixture=None):
+        code, output = _invoke(
+            CODERABBIT_GATE, command,
+            environment={"DESKCAT_TEST_GH": json.dumps(fixture or {})},
+        )
+        self.assertEqual(code, 0, command)
+        return output
+
+    def assertDecision(self, expected, command, fixture=None, contains=None):
+        output = self._state(command, fixture)
+        if expected is None:
+            self.assertIsNone(output, f"止めてしまった: {output}")
+            return
+        self.assertIsNotNone(output, f"通してしまった: {command}")
+        self.assertEqual(
+            output["hookSpecificOutput"]["permissionDecision"], expected, command
+        )
+        if contains:
+            self.assertIn(contains, _reason(output))
+
+    def test_bare_review_is_denied_on_every_route(self):
+        """`full`の付かない`review`は、どの経路でも`deny`で止める。理由はCONTRIBUTINGの節を指す。"""
+        with tempfile.TemporaryDirectory() as directory:
+            body = Path(directory) / "b.md"
+            body.write_text("@coderabbitai review\n", encoding="utf-8")
+            payload = Path(directory) / "p.json"
+            payload.write_text('{"body": "@coderabbitai review"}', encoding="utf-8")
+            commands = (
+                'gh pr comment 239 --body "@coderabbitai review"',
+                'gh pr comment 239 -b "@coderabbitai review"',
+                'gh pr comment 239 --body="@coderabbitai review"',
+                'gh issue comment 240 --body "@coderabbitai review"',
+                'gh pr review 239 --comment --body "@coderabbitai review"',
+                'gh api repos/o/r/issues/1/comments -f body="@coderabbitai review"',
+                'gh api repos/o/r/issues/1/comments -f body="@coderabbitai review"',
+                'gh api repos/o/r/issues/1/comments --raw-field body="@coderabbitai review"',
+                f"gh pr comment 239 --body-file {body}",
+                f"gh pr comment 239 -F {body}",
+                f"gh issue comment 240 -F {body}",
+                f"gh pr review 239 --comment -F {body}",
+                f"gh issue comment 240 --body-file {body}",
+                f"gh api repos/o/r/issues/1/comments -F body=@{body}",
+                f"gh api repos/o/r/issues/1/comments --input {payload}",
+                'gh --repo o/r pr comment 239 --body "@coderabbitai review"',
+                'cd /tmp && gh pr comment 239 --body "@CodeRabbitAI  REVIEW"',
+                'gh pr comment 239 --body "@coderabbitai rate limit and then review"',
+                'gh pr comment 239 --body "@coderabbitai full review\n@coderabbitai review"',
+            )
+            for command in commands:
+                with self.subTest(command=command):
+                    self.assertDecision(
+                        "deny", command, contains="手動で依頼する前に状態を確認する"
+                    )
+
+    def test_full_review_with_a_bare_review_in_the_same_line_is_denied(self):
+        self.assertDecision(
+            "deny", 'gh pr comment 7 --body "@coderabbitai full review and review"'
+        )
+
+    def test_full_review_after_a_completed_review_is_denied(self):
+        """どれかのcommitで完走していれば、headが`Review skipped`でも`deny`。"""
+        fixture = {"commits": {"a": {"check_runs": [self.DONE]},
+                               "b": {"check_runs": [self.SKIPPED]}}}
+        for command in (
+            self.FULL,
+            'gh issue comment 7 --body "@coderabbitai full review"',
+            'gh pr review 7 --comment --body "@coderabbitai full review"',
+            'gh api repos/o/r/issues/7/comments -f body="@coderabbitai full review"',
+            'gh api /repos/o/r/issues/7/comments -f body="@coderabbitai full review"',
+            'gh api https://api.github.com/repos/o/r/issues/7/comments -f body="@coderabbitai full review"',
+            'gh api repos/o/r/pulls/7/comments -f body="@coderabbitai full review"',
+            'gh --repo o/r pr comment 7 --body "@coderabbitai full review"',
+        ):
+            with self.subTest(command=command):
+                self.assertDecision("deny", command, fixture, contains="投げ直さない")
+
+    def test_full_review_while_a_review_is_in_progress_is_denied(self):
+        fixture = {"commits": {"a": {"check_runs": [self.PENDING]}}}
+        self.assertDecision("deny", self.FULL, fixture)
+
+    def test_a_legacy_commit_status_counts_as_completed(self):
+        fixture = {"commits": {"a": {"check_runs": [], "statuses": [
+            {"context": "CodeRabbit", "state": "success",
+             "description": "Review completed"}]}}}
+        self.assertDecision("deny", self.FULL, fixture)
+
+    def test_full_review_after_rate_limit_or_lock_loss_is_asked_not_denied(self):
+        """例外。走っていない原因が枠切れ・lock lossなら、今までどおり`ask`。"""
+        for run in (self.LIMITED, self.LOCK_LOSS):
+            with self.subTest(title=run["output"]["title"]):
+                self.assertDecision(
+                    "ask", self.FULL, {"commits": {"a": {"check_runs": [run]}}}
+                )
+
+    def test_full_review_on_a_pr_never_reviewed_is_asked(self):
+        """初回の`full review`は今までどおり`ask`。"""
+        for fixture in (
+            {"commits": {"a": {"check_runs": [self.SKIPPED]}}},
+            {"commits": {"a": {"check_runs": []}}},
+            {"commits": {}},
+        ):
+            with self.subTest(fixture=fixture):
+                self.assertDecision("ask", self.FULL, fixture)
+
+    def test_full_review_is_asked_when_the_state_cannot_be_determined(self):
+        """判定できないときは素通りさせず`ask`。`deny`でもない。"""
+        completed = {"commits": {"a": {"check_runs": [self.DONE]}}}
+        self.assertDecision(
+            "ask", self.FULL, {**completed, "fail": True}, contains="判定できない"
+        )
+        # 宛先を読めない`gh api`（graphql）。
+        self.assertDecision(
+            "ask",
+            'gh api graphql -f query="mutation { x }" -f body="@coderabbitai full review"',
+            completed, contains="判定できない",
+        )
+        # 本文を読めない経路は従来どおり`ask`。
+        self.assertDecision("ask", "gh pr comment 7 --body-file -", completed)
+
+    def test_text_without_review_still_passes_with_a_completed_review(self):
+        completed = {"commits": {"a": {"check_runs": [self.DONE]}}}
+        for command in (
+            'gh pr comment 7 --body "@coderabbitai rate limit"',
+            'gh pr comment 7 --body "@coderabbitai resolve"',
+            'gh pr comment 7 --body "reviewで出た指摘を反映しました"',
+        ):
+            with self.subTest(command=command):
+                self.assertDecision(None, command, completed)
+
+    def test_short_body_file_option_is_read_on_comment_commands(self):
+        """`gh pr comment -F -`（stdin）は読めない本文として`ask`にする。"""
+        self.assertDecision("ask", "gh pr comment 7 -F -", contains="読めない")
+
+    def test_a_later_deny_wins_over_an_earlier_ask_in_one_command(self):
+        """同じcommandの先の呼び出しが`ask`でも、後ろの`deny`は`ask`に下がらない。"""
+        first = 'gh pr comment 7 --body "@coderabbitai full review"'
+        for second in (
+            'gh pr comment 7 --body "@coderabbitai review"',
+        ):
+            self.assertDecision("deny", f"{first} && {second}", {})
+        self.assertDecision(
+            "deny", 'gh pr comment 7 --body-file - && gh pr comment 8 --body "@coderabbitai review"', {}
+        )
+        # `deny`が無ければ`ask`のまま。
+        self.assertDecision("ask", f"{first} && gh pr comment 7 --body ok", {})
+
+    def test_several_full_reviews_share_one_deadline(self):
+        """`full review`が複数あっても、照会の合計がhookの30秒を超えない（期限は1つ）。"""
+        import time as _time
+        first = 'gh pr comment 7 --body "@coderabbitai full review"'
+        command = f"{first} && {first} && {first}"
+        started = _time.monotonic()
+        # 各`gh`が遅く、期限（18秒）を超える。呼び出しごとに期限を持つと30秒を超える。
+        output = self._state(command, {"sleep": 8, "commits": {}})
+        self.assertLess(_time.monotonic() - started, 30)
+        self.assertEqual(output["hookSpecificOutput"]["permissionDecision"], "ask")
+
+    def test_an_unreadable_body_does_not_downgrade_a_deny(self):
+        """読めない経路を足しても、走った後の`full review`は`deny`のまま。"""
+        completed = {"commits": {"a": {"check_runs": [self.DONE]}}}
+        self.assertDecision(
+            "deny",
+            'gh api repos/o/r/issues/7/comments -f body="@coderabbitai full review"'
+            " --input -",
+            completed,
+        )
+
+    def test_only_the_latest_status_counts_as_in_progress(self):
+        """statusの履歴に残る古い`pending`で、枠切れ後の再依頼を`deny`にしない。"""
+        statuses = [
+            {"context": "CodeRabbit", "state": "success",
+             "description": "Review rate limited"},
+            {"context": "CodeRabbit", "state": "pending",
+             "description": "Review in progress"},
+        ]
+        self.assertDecision(
+            "ask", self.FULL, {"commits": {"a": {"check_runs": [], "statuses": statuses}}}
+        )
+        self.assertDecision(
+            "deny", self.FULL,
+            {"commits": {"a": {"check_runs": [], "statuses": statuses[::-1]}}},
+        )
+
+    def test_gh_failure_is_not_a_pass_even_for_a_completed_review(self):
+        """`gh`の失敗を「走っていない」と読まない（`ask`であって素通りではない）。"""
+        self.assertDecision("ask", self.FULL, {"fail": True})
+
     def test_global_options_do_not_hide_the_subcommand(self):
         """**global optionで検査が抜けない**（#325）。`args[:2]`で位置から読んでいた
         版では、`gh --repo o/r pr comment`が素通りしていた。"""
         for command in (
             'gh --repo owner/repo pr comment 239 --body "@coderabbitai full review"',
-            'gh -R owner/repo issue comment 240 --body "@coderabbitai review"',
+            'gh -R owner/repo issue comment 240 --body "@coderabbitai full review"',
         ):
             with self.subTest(command=command):
                 self.assertAsked(command)
@@ -2997,7 +3194,7 @@ class CodeRabbitGateTests(unittest.TestCase):
         """**引用の中の`\\`改行は今も素通りする。**#389では直していない。
 
         bashは`\\`と改行を消して1行へ繋ぐため、**この形は依頼として投稿される。**
-        `segments`は引用の中を素通しし、`_mentions_review`は行ごとに見るため、
+        `segments`は引用の中を素通しし、`_review_kinds`は行ごとに見るため、
         `@coderabbitai`と`review`が別の行になる。
         **#389より前から同じである**（2026-09-14に実測）。
         CONTRIBUTINGの「取り切れていないもの」に書いた形であり、
@@ -3193,7 +3390,7 @@ class CodeRabbitGateTests(unittest.TestCase):
         """
         for command in (
             'gh api -X GET repos/o/r/issues -f body="@coderabbitai full review"',
-            'gh api --method HEAD repos/o/r -f body="@coderabbitai review"',
+            'gh api --method HEAD repos/o/r -f body="@coderabbitai full review"',
         ):
             with self.subTest(command=command):
                 self.assertAllowed(command)
@@ -3203,7 +3400,7 @@ class CodeRabbitGateTests(unittest.TestCase):
         for command in (
             'gh api -X POST repos/o/r/issues/1/comments -f body="@coderabbitai full review"',
             'gh api repos/o/r/issues/1/comments -f body="@coderabbitai full review"',
-            'gh api graphql -f query="mutation { x(body: \\"@coderabbitai review\\") }"',
+            'gh api graphql -f query="mutation { x(body: \\"@coderabbitai full review\\") }"',
         ):
             with self.subTest(command=command):
                 self.assertAsked(command)
