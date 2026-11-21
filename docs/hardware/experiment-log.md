@@ -6087,7 +6087,7 @@ ESP32 の uptime と Pi の時刻は、同じ `set_expression` の id（`id=4`�
 | 承認 | 窓ごとの値は各窓の節に書く |
 | Hardware revision／Exact components | `PSU-BENCH-01`、`SERVO-01`、`MCU-01`。servo の電源の経路は [bench-18 の配線表](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/hardware/bench-18/wiring-table.md)の経路。servo はホーンなし、Pi は外し、LCD の VCC の線は抜いてあった（同じ日の朝の作業と EXP-064 の記録による。窓の中では確かめていない） |
 | Firmware | 校正 build（`bench-servo-calib-18`）。develop `d82d870` に段1と同じ定数（範囲 90°〜105°、`EXPOSURE_MS` 300、`MAX_COMMANDS` 10、`MIN_COMMAND_INTERVAL_MS` 5000、`MAX_SESSION_S` 300）を当て、`START_DEG` を回ごとに前の回の終わりの `position_deg` に置いた。ELF の sha256 は窓ごとの値で、各窓の節に書く |
-| Power supply and current limit | `PSU-BENCH-01`。ESP32 はこの端末の USB。電源の読みは窓ごとの値で、各窓の節に書く |
+| Power supply and current limit | `PSU-BENCH-01`。ESP32 は実機側の端末の USB。電源の読みは窓ごとの値で、各窓の節に書く |
 | Measurement equipment | テスター（表示は小数点以下2桁で、分解能 0.01 V）。5 V と GND を読んだ点は、servo の plug の針ではなく、plug と jumper wire でつながる端子台の金属（[bench-18 の配線表](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/hardware/bench-18/wiring-table.md)の P6〔S＋の端子の金属、N2〕と P9〔B穴2の端子の金属、N3〕）で、クリップで留めた。UART0 の log（115200）。テスターのレンジと計時は窓ごとの値で、各窓の節に書く |
 | Raw data | repository の外の `deskcat-evidence/windows-20261121-774d/`（窓1と EN の確かめ：`console-r1.log`、`console-en.log`、`console-en2.log`、`notes.txt`、`boots.txt`、`approval.txt`）と `deskcat-evidence/windows-20261122-774d/`（窓2：`console-r1.log`、`console-r2.log`、`notes.txt`、`boots.txt`、`approval.txt`） |
 | Expected result | 90° への指令の後に PSU の出力を OFF にし、ESP32 が信号線を駆動しない状態にする（窓ごとの条件は各窓の節に書く）と、servo の端の 5 V–GND がある時間の後に 0.00 になる |
@@ -6150,7 +6150,7 @@ ESP32 の uptime と Pi の時刻は、同じ `set_expression` の id（`id=4`�
 - EN を Low に保つ条件で 0.00 になるまでの時間。
 - 14:51:34Z ごろの出力 ON で 0.02 V・0.070 A・CC 点灯になった原因と、次の ON で 4.8 V・0.0 A に戻った理由（クリップや線の位置は確かめていない）。
 - 測った回数は2回で、最大を取り逃していないことは言わない。人の反応の遅れ（OFF からストップウォッチを始めるまで、0.00 を見てから止めるまで）の大きさは測っていない。
-- `0.00` は分解能 0.01 V の表示で、給電の経路が完全に遮断されたことは示さない。信号線の読み 0 は、駆動されていないこと以上を示さない（GPIO27 には R3 の外部 pull-down がある）。
+- `0.00` は分解能 0.01 V の表示で、給電の経路が完全に遮断されたことは示さない。信号線の読みは 0。駆動の状態は確かめていない（GPIO27 には外部の pull-down がある。番号は [breadboard-rebuild の配線表](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/hardware/breadboard-rebuild/wiring-table.md)では R3、[netlist](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/hardware/overview/deskcat-netlist.xml)では R7）。
 - 頭付きの回の条件での待つ時間（PR #774 の段2のとおり `TBD`）。
 ## EXP-069: #514 の段階的な確認4。no-touch-487,led-no-touch-514 の build を Pi とつなぎ、白と赤の LED の表示を見た
 
