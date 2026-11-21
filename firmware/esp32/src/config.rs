@@ -11,8 +11,8 @@ pub const BOARD: &str = "esp32";
 
 /// Heartbeat の周期（milliseconds）。
 ///
-/// **暫定値である。**Protocol §5.7 は `ping` について「**Heartbeatの最終用途と
-/// intervalは`TBD`とする。**」としており、この値に一次資料の根拠は無い。
+/// **暫定値である。**Protocol §5.7 が決めた `ping`（Pi→ESP32）の間隔とは別のもので（同節）、
+/// この値に一次資料の根拠は無い。
 /// serial link（#11）と session（#12）が入って用途が決まった時点で置き換える。
 ///
 /// この定数が heartbeat の rate limit そのものである。**長期の出力 rate は
