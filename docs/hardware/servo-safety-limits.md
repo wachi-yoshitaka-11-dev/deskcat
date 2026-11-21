@@ -299,7 +299,7 @@ PWMをdisableにしたときに首が落下したり予期せず動いたりす�
 
 | 項目 | 値 | 追跡ID |
 |---|---|---|
-| Heartbeat source | 案：現在のPi sessionのdecodeできたframeすべて。Piはほかに送るものが無い間、1000 msごとに`ping`を送る（[protocol §5.7](../protocol/esp32-pi-protocol.md#57-ping)）。確定ではない | HW-TBD-017／PROTO-TBD-010 |
+| Heartbeat source | 案：現在のPi sessionのdecodeできたframeすべて。Piはほかに送るものが無い間、§5.7の間隔で`ping`を送る（[protocol §5.7](../protocol/esp32-pi-protocol.md#57-ping)）。確定ではない | HW-TBD-017／PROTO-TBD-010 |
 | Loss timeout | 7000 ms。`boot`の確立から見張る。根拠は[EXP-066](experiment-log.md)（定常の到着の間隔の最大3380 msの約2倍）。**根拠の水準はAとして扱い、満たしたのは下限側（誤って断と判定しない側）だけである。上限側（`HW-TBD-020`の連続動作時間の上限より十分短いこと）は、servo出力の有効化の前に確かめる。**実機での確認は未実施 | HW-TBD-017 |
 | 選択したfail-safe sequence | TBD | HW-TBD-018 |
 | Recovery／reconnect動作 | TBD | HW-TBD-018（復帰時に受理するcommandは PROTO-TBD-013） |
