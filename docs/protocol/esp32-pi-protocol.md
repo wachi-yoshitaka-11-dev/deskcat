@@ -900,7 +900,7 @@ ESP32はACKを返し、ACK payloadにuptimeを含めてよい。
 
 **Heartbeatの方式（`PROTO-TBD-010`の案。確定ではない）:**
 
-- **生きている印は、現在のPi sessionの、decodeできたframeすべてとする。**`ping`に限らない。ESP32は、envelopeの`sid`が現在のPi sessionのframeをdecodeできるたびに、受信を記録する。現在のfirmwareの仮置き（`firmware/esp32/src/pi_link.rs`の`note_rx`。`hello`・`ack`・commandのいずれも、現在のPi sessionのframeなら記録する）と同じである。decodeできなかった行、別の`sid`のframeは印にならない。
+- **生きている印は、現在のPi sessionの、decodeできたframeすべてとする。**`ping`に限らない。ESP32は、envelopeの`sid`が現在のPi sessionのframeをdecodeできるたびに、受信を記録する。現在のfirmwareの仮置き（`firmware/esp32/src/pi_link.rs`の`note_rx_gated`。`hello`・`ack`・commandのいずれも、現在のPi sessionのframeなら記録する。見張りの開始は下の項目）と同じである。decodeできなかった行、別の`sid`のframeは印にならない。
 - **Piは、ほかに送るものが無い間、決まった間隔で`ping`を送る。**最後にframeを書き出してから、その間隔が空いたら`ping`を1つ送る。起点は最後の書き出しであり、`ping`に限らない。ほかのcommand、ACK、再送を送った直後は送らない。`startup`の`hello`が済むまでは送らない。
 - **`ping`のACKは、生きている印の判定に使わない。**`ping`の結果が拒否や無応答でも、Piは再送の予算を使い切った後に終了せず、次の間隔で新しい`id`の`ping`を送る。`stale_session`は通常commandと同じく`hello`から再開する（§3.1、§10.2）。
 - **`ping`の間隔は1000 ms、ESP32のloss timeoutは7000 msとする**（`apps/deskcatd`の`PING_INTERVAL_MS`、`firmware/esp32`の`LINK_LOSS_TIMEOUT_MS`）。根拠は[EXP-066](../hardware/experiment-log.md)で測ったPi→ESP32のframeの到着の間隔である。Piが1000 msごとに送る条件で、定常の最大は3380 ms（Piの負荷あり）だった。loss timeoutはその約2倍とした。1000 ms以外の間隔の分布は測っていない。loss timeoutの根拠の水準と、servo出力の有効化の前に残る確かめ（上限側）は[HW-TBD-017](../hardware/tbd-register.md)と[Servo Safety Limits](../hardware/servo-safety-limits.md#通信断時動作)が持つ。
