@@ -69,6 +69,11 @@ tap-21 = []
 # （`src/touch.rs`）。`StrokeDetector`は作らず、`head_touched`は送らず、`crate::led`も作らない（GPIO2・GPIO5に触れない）。`build.rs`はこのfeatureだけを製品経路のcfg（`deskcat_product_mode`）から外さない。
 # 他のfeatureと併用すると製品経路が外れるため、`main.rs`の`compile_error!`で止める（例外は、同じく製品経路を外さない`link-gap-20`だけ）。通電の条件は`docs/hardware/power-budget.md`の`touchを読まない製品build（no-touch-487）の通電の条件`。
 no-touch-487 = []
+# Issue #514。**`no-touch-487`の製品buildに、`crate::led`（GPIO2・GPIO5のLED）だけを戻す。**touchは読まない（`no-touch-487`のまま）。
+# 白は、Piからの受信の見張り（`LinkWatch`）が生きている間は点灯、それ以外は点滅する。赤は`happy`の受理で1秒点く（製品buildと同じ）。
+# `build.rs`はこのfeatureを製品経路のcfg（`deskcat_product_mode`）から外さず、`no-touch-487`と併せたときだけ`deskcat_product_led`を出す。
+# `no-touch-487`なしでは`main.rs`の`compile_error!`で止める。通電の条件は`docs/hardware/power-budget.md`の`touchを読まない製品build（no-touch-487）の通電の条件`。
+led-no-touch-514 = []
 # Issue #23のPROTO-TBD-007（LCD layoutとmemory測定）用。health snapshotと同じ周期で、空きheap、
 # 起動からの最小の空きheap、main taskのstackのhigh water markを1行logへ出す（`src/mem_probe.rs`）。
 # **logを足すだけで、LCD・Pi link・tapの挙動は変えない。製品buildには入らない。**ESP-IDFの統計を読むAPIは

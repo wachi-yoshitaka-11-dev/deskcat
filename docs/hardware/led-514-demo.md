@@ -1,6 +1,6 @@
 # #514 発光ダイオードのデモ回路案
 
-> 状態: 初回デモの配線案と、点灯試験用のfirmware（`bringup-led-514`）。2026-10-12に、赤だけ・白だけ・両方の点灯試験を実機で行った（観察は[EXP-025](experiment-log.md#exp-025-追加ledの点灯試験赤だけ白だけ両方)）。製品build（featureなし）には、白の点滅と、`set_expression`で`happy`を受理したときの赤の1秒点灯を入れた（#514。build-onlyの確認までで、**製品buildを実機で動かした記録は無い**）。白を通信成立で点灯へ切り替える判定は、通信喪失の判定（`PROTO-TBD-010`／`HW-TBD-017`）をLEDへつないでいないため入れていない。`段階的な確認`の4は未了である。2026-10-31の[EXP-052](experiment-log.md)で、組み直した板に白の枝をつないだ状態で書き込み、`R`両端の電圧の読み（赤1.38 V、白0.53 V）、`boot:` logの行（`rst:0x1 (POWERON_RESET),boot:0x12 (SPI_FAST_FLASH_BOOT)`）、3V3の列の電圧（3.34 V）を取った（値は記録で、合否には使わない）。起動時のpinの電位の確認、電流の測定、筐体への取付は未了である。
+> 状態: 初回デモの配線案と、点灯試験用のfirmware（`bringup-led-514`）。2026-10-12に、赤だけ・白だけ・両方の点灯試験を実機で行った（観察は[EXP-025](experiment-log.md#exp-025-追加ledの点灯試験赤だけ白だけ両方)）。製品build（featureなし）には、白の点滅と、`set_expression`で`happy`を受理したときの赤の1秒点灯を入れた（#514。build-onlyの確認までで、**製品buildを実機で動かした記録は無い**）。白は、Piからの受信の見張り（[#20](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/20)のloss timeout）が生きている間は点灯し、それ以外は点滅する（build-onlyの確認まで。実機で動かした記録は無い）。窓で使うbuildは`no-touch-487,led-no-touch-514`（`firmware/esp32/README.md`の「build構成と通電」の表）。`段階的な確認`の4は未了である。2026-10-31の[EXP-052](experiment-log.md)で、組み直した板に白の枝をつないだ状態で書き込み、`R`両端の電圧の読み（赤1.38 V、白0.53 V）、`boot:` logの行（`rst:0x1 (POWERON_RESET),boot:0x12 (SPI_FAST_FLASH_BOOT)`）、3V3の列の電圧（3.34 V）を取った（値は記録で、合否には使わない）。起動時のpinの電位の確認、電流の測定、筐体への取付は未了である。
 > LEDの2枝を足して通電することは、2026-10-12にユーザーが承認した（その電流は安全側の仮定として`3V3`系に数える。[#514のコメント](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514#issuecomment-6124265343)。下の`3V3 pinへ負荷を足す条件`）。
 > 対象: 筐体から見える白1本（通信）と赤1本（猫の反応）。フォトICダイオードは使わない。
 
@@ -21,7 +21,7 @@ ESP32が両LEDを駆動する。通信LEDはESP32が自分のprotocol受信状�
 
 | LED | デモで表示する状態 | 実装上の前提 |
 |---|---|---|
-| 白 `LED-COMM-01` | ESP32が起動中でPiとの通信が未成立・喪失なら1秒周期で点滅（0.5秒ずつ）。通信が継続して成立すれば点灯 | 成立・喪失を決めるheartbeat／timeoutは[PROTO-TBD-010](../protocol/esp32-pi-protocol.md)と[HW-TBD-017](tbd-register.md)に依存する。現行firmwareは`hello`／`ping`／`get_status`を受信する（`firmware/esp32/src/pi_link.rs`）が、継続通信の判定（heartbeatとtimeout）はまだ無い。`BootSession::is_established`は`boot`のACKで一度立つと、Piが止まっても下りない（`hello`による遷移か終端でだけ変わる）。点灯に使うと、Piが止まっても点灯のままで「通信正常」を誤って示すため使わない。**製品buildも`bringup-led-514`も、白は点滅だけを出す**（`bringup-led-514`は点灯試験（赤→白→両方）の後に。下の`点灯試験用のfirmware`）。点滅は「通信の成立と継続を確認できていない」の表示であり、点灯が無いことを通信の異常と読まない |
+| 白 `LED-COMM-01` | ESP32が起動中でPiとの通信が未成立・喪失なら1秒周期で点滅（0.5秒ずつ）。通信が継続して成立すれば点灯 | 成立・喪失を決めるheartbeat／timeoutは[PROTO-TBD-010](../protocol/esp32-pi-protocol.md)と[HW-TBD-017](tbd-register.md)に依存する。ESP32は、現在のPi sessionのframeを受信として記録し、`boot`の確立から見張る（`firmware/esp32/src/pi_link.rs`。loss timeoutは`LINK_LOSS_TIMEOUT_MS`）。白は見張りが生きている間（`PiLink::link_alive`）だけ点灯し、それ以外は点滅する。`BootSession::is_established`は、Piが止まっても下りないので点灯に使わない。`bringup-led-514`は点灯試験（赤→白→両方）の後に同じ表示へ入る（下の`点灯試験用のfirmware`）。点滅は「通信の成立と継続を確認できていない」の表示であり、点灯が無いことを通信の異常と読まない |
 | 赤 `LED-REACT-01` | Piが撫でられた反応として`happy`を指示したら1秒点灯し、通常時は消灯 | 既存protocolの`set_expression`を候補に使う。protocol crateには`set_expression`の型とdecodeがある（#534）。製品buildと`face-21`付きbuildは受け取った`set_expression`をLCDへ描く（#21）。**製品buildは、`pi_link`が`happy`を受理した（session・値の範囲・LCDの準備の判定を通った）ときに赤を1秒（`LED_REACT_PULSE_MS`。一般値）点けて消す。点灯中に再び受理したら、その時刻から数え直す。拒否された`happy`では点かない。**`bringup-led-514`だけのbuildは表情を持たないため、点灯試験の区間だけ赤を点ける。`face-21`と組み合わせたbuildは`happy`を受理し、製品buildと同じく赤を1秒点ける（この併用は`compile_error!`で止めていない） |
 
 ESP32自体の電源断はLEDの消灯にしか見えない。白の消灯を「通信正常」と解釈しない。
