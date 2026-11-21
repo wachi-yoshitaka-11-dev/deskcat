@@ -222,6 +222,21 @@ impl PiLink {
         self.link_watch.deadline_ms()
     }
 
+    /// Piからの受信の見張りが生きているか（`LinkWatch::is_alive`）。**servoの有無によらない**（表示のためで、
+    /// 途切れの判定とstopは`check_link`だけが行う）。見張りは`boot`の確立から始まる（`on_frame`）。
+    #[cfg(any(feature = "bringup-led-514", deskcat_product_led))]
+    pub fn link_alive(&self, now_ms: u64) -> bool {
+        self.link_watch.is_alive(now_ms)
+    }
+
+    /// `link_alive`が`false`へ変わる時刻。生きている間だけ`Some`。main loopの待ち（`until`）へ足す。
+    #[cfg(any(feature = "bringup-led-514", deskcat_product_led))]
+    pub fn link_alive_until_ms(&self, now_ms: u64) -> Option<u64> {
+        self.link_watch
+            .alive_until_ms()
+            .filter(|until| *until > now_ms)
+    }
+
     /// 現在のPi sessionのframeの到着を`link-gap-20`の統計へ足す（featureなしのbuildでは何もしない）。
     #[cfg(feature = "link-gap-20")]
     fn observe_rx_gap(&mut self, now_ms: u64) {

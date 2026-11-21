@@ -54,6 +54,34 @@ fn gated_rx_keeps_refreshing_once_started() {
 }
 
 #[test]
+fn is_alive_reads_without_judging_a_loss() {
+    let mut watch = LinkWatch::new(Some(TEST_TIMEOUT_MS));
+    assert!(!watch.is_alive(0));
+    assert_eq!(watch.alive_until_ms(), None);
+    watch.note_rx(100);
+    assert!(watch.is_alive(100 + u64::from(TEST_TIMEOUT_MS) - 1));
+    assert!(!watch.is_alive(100 + u64::from(TEST_TIMEOUT_MS)));
+    assert_eq!(
+        watch.alive_until_ms(),
+        Some(100 + u64::from(TEST_TIMEOUT_MS))
+    );
+    // 読んだだけでは、途切れと数えない。
+    assert_eq!(watch.losses(), 0);
+    assert_eq!(
+        watch.check(100 + u64::from(TEST_TIMEOUT_MS)),
+        LinkVerdict::Lost { first: true }
+    );
+}
+
+#[test]
+fn is_alive_is_false_when_the_timeout_is_unset() {
+    let mut watch = LinkWatch::new(None);
+    watch.note_rx(0);
+    assert!(!watch.is_alive(0));
+    assert_eq!(watch.alive_until_ms(), None);
+}
+
+#[test]
 fn alive_before_the_timeout_and_lost_at_it() {
     let mut watch = LinkWatch::new(Some(TEST_TIMEOUT_MS));
     watch.note_rx(100);
