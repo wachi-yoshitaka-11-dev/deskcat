@@ -1629,8 +1629,10 @@ fn the_rest_notice_is_a_bubble_and_the_neck_request_is_only_counted() {
 
 #[test]
 fn without_a_valid_clock_the_companion_does_not_tick() {
-    let mut d =
-        daemon().with_companion(Companion::new(CompanionConfig::MVP, Millis(0)), Some(4_000));
+    // `ping`（製品の間隔は1000 ms）はCompanionと関係が無いので止め、何も送らないことだけを見る。
+    let mut d = daemon()
+        .with_ping_interval(None)
+        .with_companion(Companion::new(CompanionConfig::MVP, Millis(0)), Some(4_000));
     d.set_local_minutes(None);
     let (mut d, mut t) = established_with(d, "neutral");
     let _ = t.sent();
@@ -2041,10 +2043,14 @@ fn pings(frames: &[Frame]) -> usize {
 }
 
 #[test]
+fn the_product_ping_interval_is_1000_ms() {
+    // EXP-066で到着の間隔を測った条件と同じ値（`HW-TBD-017`）。
+    assert_eq!(PING_INTERVAL_MS, NonZeroU64::new(1_000));
+}
+
+#[test]
 fn no_ping_is_sent_while_the_interval_is_none() {
-    // 製品の既定は`None`（`HW-TBD-017`の計測の後に決める）。
-    assert_eq!(PING_INTERVAL_MS, None);
-    let (mut d, mut t) = established("neutral");
+    let (mut d, mut t) = established_with(daemon().with_ping_interval(None), "neutral");
     let _ = t.sent();
     for now in [1_000, 10_000, 100_000, 1_000_000] {
         assert_eq!(run(&mut d, &mut t, now), Step::Continue);

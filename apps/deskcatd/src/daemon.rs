@@ -75,8 +75,8 @@
 //! # `ping`（生きている印。`PROTO-TBD-010`の案）
 //!
 //! ESP32は、現在のPi sessionのdecodeできたframeを受けるたびに通信の生存を記録する（Protocol §5.7）。Piは、
-//! 最後にframeを書き出してから[`PING_INTERVAL_MS`]が空いたら`ping`を1つ送る。**間隔が`None`の間は送らない**
-//! （値は`HW-TBD-017`の計測の後に決める）。`startup`の`hello`が済むまでは送らない。
+//! 最後にframeを書き出してから[`PING_INTERVAL_MS`]（1000 ms。EXP-066）が空いたら`ping`を1つ送る。**間隔が`None`なら送らない**
+//! （testが差し替える場合）。`startup`の`hello`が済むまでは送らない。
 //! 結果は[`crate::disposition::disposition`]の`Request::Ping`に従う。`ok`は何もせず、`stale_session`は再開、
 //! 他の拒否と無応答（再送の予算は`deskcat-serial`が同じ`(sid, id)`で使う）は数えて次の間隔に任せる。
 //! 終了はしない。`ping`の結果で、表情や`get_status`の流れは変わらない。
@@ -235,10 +235,10 @@ pub const HELLO_RETRY_LIMIT: u32 = 3;
 
 /// `ping`（§5.7）を送る間隔（ms）。**`None`の間は`ping`を送らない。**
 ///
-/// 値は`HW-TBD-017`（loss timeout）の実機の計測の後に、それより十分短く決める（`PROTO-TBD-010`）。
-/// 根拠のある値が無いため`None`である。値を入れるのは、人間の承認を得た後に、この1か所だけで行う。
+/// 1000 msは、EXP-066で到着の間隔を測った条件（Piが1000 msごとに送る）と同じ値である。別の間隔の分布は測っていない。
+/// ESP32の`loss timeout`（7000 ms、`HW-TBD-017`）より十分短い（`PROTO-TBD-010`）。値はこの1か所だけが持つ。
 /// 最後に送ったframe（`ping`に限らない）からこの間隔が空いたら、`ping`を1つ送る。
-pub const PING_INTERVAL_MS: Option<NonZeroU64> = None;
+pub const PING_INTERVAL_MS: Option<NonZeroU64> = NonZeroU64::new(1_000);
 
 /// 終了コード: sessionをやり直すための再起動を求める（`EX_TEMPFAIL`）。
 pub const EXIT_SESSION_REDO: u8 = 75;
