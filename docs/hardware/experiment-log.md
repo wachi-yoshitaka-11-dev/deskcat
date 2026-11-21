@@ -6074,6 +6074,70 @@ ESP32 の uptime と Pi の時刻は、同じ `set_expression` の id（`id=4`�
 - Pi 側の `shaken` ごとの受理の数（`shaken` ごとの log の行は無く、counter は SIGTERM で止めたため出ていない。窓2では `Dizzy` の表情の行で見た）。
 - `deskcatd` が SIGINT で止まらない原因。
 
+## EXP-068: #774 の待つ時間の確かめ。servo の端が 0.00 になるまで、PSU の出力 OFF と ESP32 の USB を抜く条件で 27.64 s と 25.39 s。EN ボタンでは ESP32 が reset されなかった（2回の窓）
+
+[PR #774](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/774) の servo-safety-limits.md の段2の`動かし方`（手を入れる前に待つ時間の測定）を、develop の段1の範囲（ホーンなし、校正 build 90°〜105°）で行った2回の窓。窓1は、手を入れる間に ESP32 を EN ボタンで reset に保つ条件で始めたが、EN ボタンで reset されず、1回で止めた。窓2は、#774 を ESP32 の USB を抜く条件に直した後（e11a1fe）に、その条件で2回測った。
+
+| 項目 | 内容 |
+|---|---|
+| Test ID | `EXP-068` |
+| Date | 窓1：2026-11-21（UTC 14:15〜15:14。日本時間では 23:15〜翌 00:14）。窓2：2026-11-21（UTC 15:29〜16:22。日本時間では 2026-11-22 の 00:29〜01:22） |
+| Operator | PSU の操作、EN ボタン、USB の抜き挿し、テスターの読み、クリップと jumper wire の付け外し、ストップウォッチはユーザー。build、書き込み、console と記録は実機側の PM（AI） |
+| 承認 | 窓1：承認があった：承認者 wachi-yoshitaka-11-dev、2026-11-21T14:15Z ごろ、実機側の PM のセッション。範囲は、AI の問い「VM 側の PM の指示により、#774 の待つ時間の確かめとして、段1の条件（ホーンなし、90°〜105°）で 90° へ1回指令して PSU を切り、servo の端が 0.00 になるまでの時間を5回測る窓を、今日行ってよいですか？」。EN ボタンの確かめ：承認があった：承認者 同じ、2026-11-21T15:00Z ごろ、同じセッション。範囲は、AI の問い「VM 側の PM の指示により、servo に通電せず ESP32 だけを USB でつなぎ、EN ボタンで再起動するかを3回確かめてよいですか？」。EN の電圧：承認があった：承認者 同じ、2026-11-21T15:04Z ごろ、同じセッション。範囲は、AI の問い「VM 側の PM の指示により、servo に通電せず、EN と GND の空いた穴に jumper wire を仮に挿して、EN ボタンを押す前と押している間の EN の電圧を1回読んでよいですか？」。窓2：承認があった：承認者 同じ、2026-11-21T15:29Z ごろ、同じセッション。範囲は、AI の問い「VM 側の PM の指示により、#774 の待つ時間の確かめとして、段1の条件（ホーンなし、90°〜105°）で 90° へ1回指令して PSU を切り ESP32 の USB を抜き、servo の端が 0.00 になるまでの時間を2回測る窓を行ってよいですか？」 |
+| Hardware revision／Exact components | `PSU-BENCH-01`、`SERVO-01`（ホーンなし）、`MCU-01`。servo の電源の経路は [EXP-064](#exp-064-18-段2の窓1と窓2jumper-wire-に-08-a-を30分流しi_lim-を-0070-に置きホーンなしで-servo-を動かして目印の向きを読んだ) と同じ。Pi は外した。LCD の VCC の線は抜いた |
+| Firmware | 校正 build（`bench-servo-calib-18`）。develop `d82d870` に段1と同じ定数（範囲 90°〜105°、`EXPOSURE_MS` 300、`MAX_COMMANDS` 10、`MIN_COMMAND_INTERVAL_MS` 5000、`MAX_SESSION_S` 300）を当て、`START_DEG` を回ごとに前の回の終わりの `position_deg` に置いた。ELF sha256（先頭8桁）：窓1 r1 `a5012e7b`（`START_DEG` 90.404495）、窓2 r1 `24049a54`（90.224785）、窓2 r2 `96b89af4`（90.04501） |
+| Power supply and current limit | `PSU-BENCH-01`。窓1の始め（2026-11-21T14:30Z ごろ）に読んだ値：CV の無負荷の表示 4.80、`I_lim` 表示 0.070、OCP 無効、`MEAS-04` 22.0 ℃。**窓2では、POWER の後の OPN の表示、CV の無負荷の表示、`I_lim`、OCP、`MEAS-04`（2回の出力 ON の前を含む）を読んでいない。**窓1の値（14:30Z ごろ）を当てた（実施の判断はユーザーによる）。窓1の後に PSU の電源プラグを抜いて挿し直している。窓2で読んだのは、出力 ON の間の表示（下の表）だけである。ESP32 はこの端末の USB |
+| Measurement equipment | テスター（DC 20V レンジ。表示は小数点以下2桁で、分解能 0.01 V）。5 V と GND を読んだ点は、servo の plug の針ではなく、plug と jumper wire でつながる端子台の金属（[bench-18 の配線表](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/hardware/bench-18/wiring-table.md)の P6〔S＋の端子の金属、N2〕と P9〔B穴2の端子の金属、N3〕）で、クリップで留めた。計時はスマートフォンのストップウォッチ（表示の分解能 0.01 s）。UART0 の log（115200） |
+| Raw data | repository の外の `deskcat-evidence/windows-20261121-774d/`（窓1と EN の確かめ：`console-r1.log`、`console-en.log`、`console-en2.log`、`notes.txt`、`boots.txt`、`approval.txt`）と `deskcat-evidence/windows-20261122-774d/`（窓2：`console-r1.log`、`console-r2.log`、`notes.txt`、`boots.txt`、`approval.txt`） |
+| Expected result | 90° への指令の後に PSU の出力を OFF にし、ESP32 を reset に保つ（窓1）か USB を抜く（窓2）と、servo の端の 5 V–GND がある時間の後に 0.00 になる |
+| Measured result | 下記 |
+
+### 起動の数
+
+- 窓1と EN の確かめ：7回（書き込み1、console を開いたとき3、切り分けの RTS reset 1、EN の電圧を読む作業の間の brownout 1 と POWERON_RESET 1）。EN ボタンによる起動は0回。
+- 窓2：4回（USB を挿したとき2、書き込み2）。
+
+### 窓1：EN ボタンで reset に保つ条件（1回で止めた）
+
+- 出力 ON の表示：4.8 V、0.0 A、CC の LED は消灯。
+- `MOTION calib 90` は `reached` で終わった（`position_deg` 90.224785、14:54:46.015Z の `motion_done`）。
+- 合図の後、ユーザーが PSU の出力を OFF にし、ストップウォッチを始め、EN ボタンを押し続けた。テスターが 0.00 になるまで 30 s（ユーザーの申告。このときの計時の分解能は記録していない）。
+- **EN ボタンを押していた間も、ESP32 は reset されていなかった。**14:58:15Z と 14:58:48Z に console へ1行送ると、uptime は 515389 ms → 548309 ms で途切れず、`rst:` の行は無かった。そのため、この 30 s は「`motion_done` の後で duty 0、ESP32 は動いたまま、PSU の出力 OFF だけ」の条件の時間である。
+- 信号線は読めなかった。片手で EN ボタンを押したまま、もう片手でクリップを付け替える手順になっており、手が足りなかった（手順の組み方の誤り）。
+
+### EN ボタンの確かめ（servo へは通電しない。PSU の電源プラグを抜いた）
+
+- 14:58:2xZ ごろ、ユーザーが EN ボタン（ボタンの刻印は「EN」とユーザーが申告）を1秒ほど押して放した。uptime は続き、再起動しなかった。
+- 14:58:56Z、console の RTS で reset を掛けると、`rst:0x1 (POWERON_RESET)` で再起動した。
+- 15:00:48Z、RTS・DTR を立てずに console を開き直した（開いたときに再起動した）。ユーザーが EN ボタンを1回押して放したが、uptime は 3009 ms（15:00:51Z）→ 107889 ms（15:02:36Z）で途切れず、再起動しなかった。
+- EN の電圧：オス–オスの jumper wire を B1 L13（J2-2＝EN の列）と B1 A12（J3-1＝GND の列）に仮に挿し、テスター（DC 20V）のクリップを留めた。押さない状態 **3.30 V**、EN ボタンを押し続けている間 **3.30 V**。放した後も再起動しなかった（15:12:32Z の uptime 159189 ms は、15:09:53Z の起動から連続）。
+- jumper wire を挿してクリップを留めていた頃に、2回再起動した：15:09:09.265Z `E BOD: Brownout detector was triggered` → `rst:0x3 (SW_RESET)`、15:09:53.681Z `rst:0x1 (POWERON_RESET)`。きっかけはユーザーの申告で不明。
+- 15:14:16Z に ESP32 の USB が抜かれた（PC の側で serial が切れた）。その後、仮の jumper wire とクリップを外した。
+
+### 窓2：ESP32 の USB を抜く条件（2回）
+
+| 回 | `START_DEG` | `motion_done` | 出力 ON の表示 | USB を抜いた時刻（serial が切れた時刻） | 0.00 になるまで | 信号線–GND |
+|---|---|---|---|---|---|---|
+| r1 | 90.224785 | `reached` 90.04501（15:56:40.713Z） | 4.80 V、0.000 A、CC 消灯 | 15:57:20.172Z | 27.64 s | 0 |
+| r2 | 90.04501 | `reached` 90（16:20:00.416Z） | 4.80 V、0.000 A、CC 消灯 | 16:20:13.257Z | 25.39 s | 0 |
+
+- 各回、合図の後に、ユーザーが PSU の出力を OFF にし、ストップウォッチを始め、ESP32 の USB を抜いた。テスターが 0.00 になった時点でストップウォッチを止めた。計時の始めは PSU の出力を OFF にした時点で、USB を抜いたのはその後である。
+- 信号線は、0.00 になった後に、出力 OFF・USB を抜いたまま、赤の棒を R6 の servo の側の足（B1 E7）に手で当て、黒のクリップは P9 に留めたまま読んだ。
+- [PR #774](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/774)（head e11a1fe。この記録の時点で develop へは merge していない）の servo-safety-limits.md の段2の`動かし方`の決め方（測った時間の最大に計時の分解能を足した時間以上）では、待つ時間は 27.64 s ＋ 0.01 s ＝ **27.65 s 以上**になる（計算）。
+- OFF の間の PSU の表示は記録していない。
+
+### 窓の終わり
+
+- 窓2の後、PSU の POWER を切って電源プラグを抜き、クリップを外した。ESP32 の USB は抜いたまま、servo の plug は挿したまま。
+
+### 確かめていないこと（主張しないこと）
+
+- EN ボタンを押しても EN が下がらない原因（ボタンの故障か、ボタンから EN までの経路か）。
+- 15:09:09Z の brownout と 15:09:53Z の POWERON_RESET の原因。
+- EN を Low に保つ条件で 0.00 になるまでの時間。
+- 測った回数は2回で、最大を取り逃していないことは言わない。人の反応の遅れ（OFF からストップウォッチを始めるまで、0.00 を見てから止めるまで）の大きさは測っていない。
+- `0.00` は分解能 0.01 V の表示で、給電の経路が完全に遮断されたことは示さない。信号線の読み 0 は、駆動されていないこと以上を示さない（GPIO27 には R3 の外部 pull-down がある）。
+- 頭付きの回の条件での待つ時間（PR #774 の段2のとおり `TBD`）。
 ## EXP-069: #514 の段階的な確認4。no-touch-487,led-no-touch-514 の build を Pi とつなぎ、白と赤の LED の表示を見た
 
 [#514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)の[段階的な確認](led-514-demo.md#段階的な確認)の4を、[PR #785](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/785)で足した build（`no-touch-487,led-no-touch-514`）で見た窓。servo は動かしていない。
@@ -6197,3 +6261,4 @@ ESP32 の uptime と Pi の時刻は、同じ `set_expression` の id（`id=4`�
 | 2026-11-20 | 76 | [#20](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/20)・[#683](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/683)。**`EXP-066`を計画から記録へ書き換えた。**`link-gap-20,no-touch-487`（`befc02d`）を Pi とつなぎ、5つの条件で frame の到着の間隔を測った窓の観測の事実（計画から変えた点、条件(1)の非通電の確認、起動7回、条件ごとの値、累計の最大の1件が session の確立を待つ間だったこと、条件3・4の 2 秒を超える間隔と Pi の待ちの窓の対応、#683 の分、Faults）を書いた。`HW-TBD-017`の値と`ping`の間隔は決めていない | 窓（2026-11-20）の UART0 の log、Pi の `deskcatd` の log と状態の記録、ユーザーの申告（テスターの読み、配線の目視、表情の目視） |
 | 2026-11-22 | 77 | [#683](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/683)。**`EXP-066`の導入に、実行方式の判断の置き場所（[ADR-0028](../decisions/0028-keep-single-runner-and-single-main-loop.md)）への link を足した。**`EXP-066` の Pi の serial の表に、同じ生の log から `read_idle_max_us` の列と、`step` が 1 s を超えた行での1回の呼び出しの最大を足した。それ以外の記録の内容は変えていない。判断は ADR に置いた | ADR-0028（判断の材料は `EXP-066` の記録）。`read_idle_max_us` の値は、repository の外の `deskcat-evidence/windows-20261120-066/` の `deskcatd-066-c0.log`〜`c4.log` の `link_wait` の行 |
 | 2026-11-22 | 78 | [#514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)。**`EXP-069`を追加した。**`no-touch-487,led-no-touch-514`（develop `addf99e`）を Pi とつなぎ、白の点滅・点灯・Pi を止めた後の点滅への戻りと、赤の `happy` での約1秒の点灯を見た窓の記録。拒否された `happy` は実機で確かめていない | 窓（2026-11-22）の UART0 の log、Pi の `deskcatd` の log、ユーザーの申告（LED と LCD の目視、配線の目視） |
+| 2026-11-22 | 79 | [#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)。**`EXP-068`を追加した。**[PR #774](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/774) の段2の手を入れる前に待つ時間を、段1の範囲（ホーンなし、校正 build 90°〜105°）で測った2回の窓。PSU の出力 OFF と ESP32 の USB を抜く条件で、servo の端が 0.00 になるまで 27.64 s と 25.39 s。EN ボタンを押しても EN が 3.30 V のままで ESP32 が reset されなかったことと、その切り分けの読みも記録した | 2026-11-21〜22 の実機の窓（`deskcat-evidence/windows-20261121-774d/`、`windows-20261122-774d/`） |
