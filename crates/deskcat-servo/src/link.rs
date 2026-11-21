@@ -1,7 +1,7 @@
 //! Piからの受信が途切れたことの判定と、途切れたときに`stop`を呼ぶ関数
 //! （[Issue #20](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/20)）。
 //!
-//! **値を持たない。**途切れたと判定するまでの時間は呼び出し側が渡す（製品buildの値は`TBD`。HW-TBD-017）。
+//! **値を持たない。**途切れたと判定するまでの時間は呼び出し側が渡す（製品buildの値は`firmware/esp32`の`LINK_LOSS_TIMEOUT_MS`。HW-TBD-017）。
 //! `None`の間は、途切れたと判定しない。復帰後の再開はこのmoduleの範囲外である（HW-TBD-018）。
 
 use crate::Drive;
@@ -54,6 +54,22 @@ impl LinkWatch {
     pub fn note_rx(&mut self, now_ms: u64) {
         self.last_rx_ms = Some(self.last_rx_ms.map_or(now_ms, |last| last.max(now_ms)));
         self.lost = false;
+    }
+
+    /// 受信を記録して見張りを始めたか（1度でも[`Self::note_rx`]を呼んだか）。
+    #[must_use]
+    pub const fn has_started(&self) -> bool {
+        self.last_rx_ms.is_some()
+    }
+
+    /// **見張りを始めてよいとき（`may_start`）か、既に始めているときだけ**、受信を記録する。
+    ///
+    /// 見張りの開始を、受信とは別の条件（firmwareでは`boot`のACKによるsessionの確立）に合わせるためである。
+    /// 始めた後は`may_start`によらず記録する（[`Self::note_rx`]と同じ）。
+    pub fn note_rx_gated(&mut self, now_ms: u64, may_start: bool) {
+        if may_start || self.has_started() {
+            self.note_rx(now_ms);
+        }
     }
 
     /// 途切れたと判定する時刻（単調に増える時刻、ms）。見張っていなければ`None`。

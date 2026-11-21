@@ -299,8 +299,8 @@ PWMをdisableにしたときに首が落下したり予期せず動いたりす�
 
 | 項目 | 値 | 追跡ID |
 |---|---|---|
-| Heartbeat source | TBD | HW-TBD-017／PROTO-TBD-010 |
-| Loss timeout | TBD | HW-TBD-017 |
+| Heartbeat source | 案：現在のPi sessionのdecodeできたframeすべて。Piはほかに送るものが無い間、1000 msごとに`ping`を送る（[protocol §5.7](../protocol/esp32-pi-protocol.md#57-ping)）。確定ではない | HW-TBD-017／PROTO-TBD-010 |
+| Loss timeout | 7000 ms。`boot`の確立から見張る。根拠は[EXP-066](experiment-log.md)（定常の到着の間隔の最大3380 msの約2倍）。**根拠の水準はAとして扱い、満たしたのは下限側（誤って断と判定しない側）だけである。上限側（`HW-TBD-020`の連続動作時間の上限より十分短いこと）は、servo出力の有効化の前に確かめる。**実機での確認は未実施 | HW-TBD-017 |
 | 選択したfail-safe sequence | TBD | HW-TBD-018 |
 | Recovery／reconnect動作 | TBD | HW-TBD-018（復帰時に受理するcommandは PROTO-TBD-013） |
 | Stale command rejection | TBD | PROTO-TBD-013 |
@@ -1094,3 +1094,4 @@ Pi最低入力電圧の復帰条件に関する現在の扱いは[power-budget.m
 | 2026-11-10 | 45 | [#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)。**段1の前の窓で取れなかった2項目を、別の根拠に置き換えた。**(1) 段1へ進む前の一覧の (ii)（コードを抜いた状態の導通）を外した（9の4つの読みが2点の間の電位差を直接見るため）。(2) 一覧の (iv)（窓の (B) の記録）を、`I_lim`と記録のある抵抗から出した`P＝I²R`の見積もりに置き換えた（発熱を実測した記録ではない）。(3) 小節2の3つ目（発熱の実測で通した電流以下）を外した。(4) 小節1の「`MEAS-02`の線（GND と A0 のクリップ）」を直した。(5) 「段1へ進む条件」の発熱の実測の記述と、小節1の (B) に、(B) は行わず一覧の (iv) による旨を足した。(6) 一覧の (iv) に、`I_lim`を合わせる前の`MEAS-04`の確認と、赤・茶の jumper wire の導体の比べる相手を記録するまで再通電しないことを足した。記録は [EXP-060](experiment-log.md)。承認していない |
 | 2026-11-11 | 46 | [#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)。**`#18の校正（案）`に、段2（[#34](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/34) の頭を付け、可動域を片側ずつ 5° 広げる）の条件を足した。**窓の段取りは書かず、条件だけを書く（段取りは窓の実行計画）。受け入れ条件1・2・3・5を取る。機構の制限は非通電で当たる角度と線が張る角度を読み、margin 5° の内側だけを駆動する。着いた判断は分度器の読みで行う。`PSU-BENCH-01` の CC の間に限り、段0の2の jumper wire の例外を段2にも当て、比べる相手は同じ個体へ表示 0.800 A を段を踏んで流す試験とする（どちらもユーザーの決定）。試験の後は `I_lim` を (D) の手順で置き直し、表示を 0.073 以下にする（表示精度込みで試験との比が10倍以上）。段2では、小節の4 の出力端の読みと小節12 の (vi) を、出力 ON の電圧の表示（4.92 以下）の確認で代え、小節12 の (i) を当てない。決めたことの4・5に追記し、受け入れ条件の対応を合わせて直した。承認していない |
 | 2026-11-12 | 47 | [#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)。窓の実行承認に時間と起動の数の上限を置かないことにした（ユーザーの指摘、2026-11-12。理由は、ユーザーの発言を書かない規則（ai-agent-policy.md）により記録しない）。`手順・停止基準・受け入れ条件`の実行承認に示すものから起動の回数と AC挿しの回数・1回の時間の上限を、`停止基準`から時間の上限を超えそうになる項目を削り、`MAX_SESSION_S`の値の決め方を「実行承認が置く」にした |
+| 2026-11-21 | 48 | [#20](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/20)。`通信断時動作`の表のHeartbeat sourceとLoss timeoutの行に、案と値（7000 ms。根拠は[EXP-066](experiment-log.md)）を書いた。**Loss timeoutの上限側の確かめ（`HW-TBD-020`との比較）は、servo出力の有効化の前に残る。**fail-safe sequence、recovery／reconnect動作、stale command rejectionの行、動作制限表、有効化gate表、受け入れchecklistは変えていない。どのgateも開いていない |

@@ -359,9 +359,11 @@ impl PiLink {
         let Frame { envelope, message } = frame;
         let (sid, id) = (envelope.sid, envelope.id);
         // 仮置き：現在のPi sessionのframeを受信とみなす（heartbeatの方式はPROTO-TBD-010）。
+        // 見張りは`boot`のACKでsessionが確立してから始める（起動直後の`boot`の送り直しの間隔を判定に入れない。
+        // `LINK_LOSS_TIMEOUT_MS`のdoc）。始めた後は、確立が外れても記録する。
         let noted_before_hello = self.pi.pi_sid() == Some(sid);
         if noted_before_hello {
-            self.link_watch.note_rx(now_ms);
+            self.link_watch.note_rx_gated(now_ms, boot.is_established());
             self.observe_rx_gap(now_ms);
         }
         match message {
@@ -377,6 +379,10 @@ impl PiLink {
                     }
                 }
                 boot.on_ack(ack, health, uart);
+                // このACKで確立したなら、ここから見張りを始める（上の記録は確立の前に判定している）。
+                if noted_before_hello {
+                    self.link_watch.note_rx_gated(now_ms, boot.is_established());
+                }
             }
             Message::Hello(hello) => {
                 let handled = self.pi.handle_hello(sid, id, &hello);
@@ -385,7 +391,7 @@ impl PiLink {
                     self.restart_rx_gap();
                 }
                 if self.pi.pi_sid() == Some(sid) {
-                    self.link_watch.note_rx(now_ms);
+                    self.link_watch.note_rx_gated(now_ms, boot.is_established());
                     // 上で数えたframeを二重に数えない。確立で基準を戻した場合は、このframeを新しい基準にする。
                     if !noted_before_hello
                         || matches!(handled.outcome, HelloOutcome::Established { .. })

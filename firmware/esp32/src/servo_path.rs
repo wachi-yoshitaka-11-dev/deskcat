@@ -25,10 +25,16 @@ pub const CONTROL_PERIOD_NOMINAL_MS: Option<u32> = None;
 /// 製品buildの制御周期の許容幅（ms）。TBD。
 pub const CONTROL_PERIOD_TOLERANCE_MS: Option<u32> = None;
 
-/// Piからの受信が途切れたと判定するまでの時間（ms）。TBD（HW-TBD-017）。
+/// Piからの受信が途切れたと判定するまでの時間（ms。HW-TBD-017）。
 ///
-/// 何を「受信」とみなすか（heartbeatの方式。PROTO-TBD-010）も未確定で、`PiLink`の仮置きである。
-pub const LINK_LOSS_TIMEOUT_MS: Option<u32> = None;
+/// 7000 msは、EXP-066で測った定常の到着の間隔の最大（3380 ms、Piが1000 msごとに送る条件）の約2倍である。
+/// 根拠の水準はAとして扱い、満たすのは下限側（誤って断と判定しない側）だけである。上限側（`HW-TBD-020`の
+/// 連続動作時間の上限より十分短いこと）は、servo出力の有効化の前に確かめる
+/// （`docs/hardware/servo-safety-limits.md`の「通信断時動作」）。
+/// 見張りは`boot`のACKでsessionが確立してから始める（`PiLink`）。
+///
+/// 何を「受信」とみなすか（heartbeatの方式。PROTO-TBD-010）は案であり、`PiLink`の仮置きである。
+pub const LINK_LOSS_TIMEOUT_MS: Option<u32> = Some(7_000);
 
 /// `tick`を刻む周期（ms）。**公称と許容幅の両方が決まるまで`None`**（`ControlPeriod`が作れない間は刻まない）。
 #[must_use]
