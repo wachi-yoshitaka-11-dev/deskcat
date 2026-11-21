@@ -39,7 +39,7 @@
 //!   詳細は[`crate::servo`]と[`run_servo_bench_test`]のdoc参照）。
 //! - **#514の追加LED（`LED-COMM`＝GPIO2、`LED-REACT`＝GPIO5）は`crate::led`が駆動する**
 //!   （[Issue #514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)）。既定の製品buildは、
-//!   白の点滅（通信の成立と継続を確認できていない間の表示。点灯へ切り替える判定は無い）と、`set_expression`で
+//!   白の表示（Piからの受信の見張りが生きている間は点灯、それ以外は点滅）と、`set_expression`で
 //!   `happy`を受理したときの赤の1秒点灯を行う。`bringup-led-514` feature付きbuildは、その前に点灯試験
 //!   （赤→白→両方）を行う。このfeatureは`bringup-display-13`とも組み合わせられる（pinが重ならない）。
 //!   **実機で動かした記録は、点灯試験用のbuildだけである。**
@@ -66,7 +66,7 @@
 //! | `bringup-display-13` | LCDの初期化、backlightの点灯、単色fillと四隅pattern | 表情とtapは有効にしない。描画の間のPi linkの受信とheartbeatは`crate::display_test`のmodule docを参照 |
 //! | `no-touch-487` | 製品buildと同じ。ただし`TOUCH-CS`（GPIO21）は`IdleTouch`が出力Highにして保ち、touchを読まず、`head_touched`を送らず、LED（GPIO2・GPIO5）に触れない（#487。`led-no-touch-514`と併せるとLEDだけを戻す） | 単独で使う。`build.rs`は`link-gap-20`・`led-no-touch-514`とこのfeatureだけ製品経路のcfgから外さず、併用はその2つ以外を`compile_error!`で止める。通電の条件は`docs/hardware/power-budget.md`の`touchを読まない製品build（no-touch-487）の通電の条件` |
 //! | `led-no-touch-514` | `no-touch-487`の製品buildに`crate::led`（GPIO2・GPIO5）だけを戻す（#514）。白は、Piからの受信の見張り（`crate::pi_link::PiLink::link_alive`。loss timeoutは`LINK_LOSS_TIMEOUT_MS`、見張りは`boot`の確立から始まる。[#20](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/20)）が生きている間は点灯し、それ以外は点滅する。赤は`happy`の受理で1秒点く（製品buildと同じ） | **`no-touch-487`と併せて使う**（`no-touch-487,led-no-touch-514`）。`build.rs`は製品経路のcfgから外さず、`deskcat_product_led`を出す。`no-touch-487`なし、またはそれ以外のfeature（`link-gap-20`を含む）との併用は`compile_error!`で止める。通電の条件は`docs/hardware/power-budget.md`の`touchを読まない製品build（no-touch-487）の通電の条件`。実機では動かしていない |
-//! | `bringup-led-514` | #514の追加LED（GPIO2／GPIO5）の点灯試験（赤→白→両方）と、その後の白の点滅（`crate::led`）。製品buildにある赤の`happy`点灯も同じ経路を持つ。このfeatureだけのbuildは表情を持たないため`set_expression`を受理せず、赤は点灯試験の区間だけ点く。`face-21`と組み合わせたbuildは`happy`を受理し、赤を1秒点ける（この併用は`compile_error!`で止めていない） | 表情とtapは有効にしない。`bringup-display-13`とも組み合わせられる |
+//! | `bringup-led-514` | #514の追加LED（GPIO2／GPIO5）の点灯試験（赤→白→両方）と、その後の白の表示（`crate::led`）。製品buildにある赤の`happy`点灯も同じ経路を持つ。このfeatureだけのbuildは表情を持たないため`set_expression`を受理せず、赤は点灯試験の区間だけ点く。`face-21`と組み合わせたbuildは`happy`を受理し、赤を1秒点ける（この併用は`compile_error!`で止めていない） | 表情とtapは有効にしない。`bringup-display-13`とも組み合わせられる |
 //! | `face-21` | LCDの初期化とbacklightの点灯を保ち、`set_expression`の表情を描く。Pi commandを受けなくても、描ける状態になった時点で`neutral`を1回描く（#21、`crate::face`） | `bringup-display-13`とも組み合わせられる。**表情を持たない試験buildは`set_expression`を`hardware_unavailable`で拒否する** |
 //! | `tap-21` | ADXL345のtap検出を設定し、`INT_SOURCE`をI2Cで読み、bootのACK後に`tapped`を送る（#21のF1、`crate::tap`）。ADXL345のDevice IDが`0xE5`のときだけ設定を書き、I2Cのdriverを持ち続ける（一致しなければ何も書かず、driverを手放す） | INT線は使わない（配線は要らない）。`face-21`・`bringup-display-13`とも組み合わせられる。**試験buildのうち`tap-21`も`accel-sample-15`も持たないものは、ADXL345へ書き込まず、Device IDを読むだけである**（既定・製品buildは`tap-21`と同じく書く） |
 //! | `mem-probe-23` | health snapshotと同じ周期で、空きheap・起動からの最小の空きheap・main taskのstackのhigh water markを1行logへ出す（#23の`PROTO-TBD-007`、`crate::mem_probe`）。**このfeatureのbuildだけが`unsafe`を持つ**（`unsafe_code`を`deny`へ下げ、`mem_probe`の3呼び出しだけ`allow`） | logを足すだけで、LCD・Pi link・tapの挙動は変えない。featureを指定すると製品経路のcfgが外れるので、製品buildと同じ構成で測るときは`face-21`と`tap-21`を足す（タッチの撫での判定と`ENV-01`の周期測定・`environment`の送出は製品buildだけが持ち、この構成には入らない）。`bringup-display-13`とも組み合わせられる。単独の試験build（`env-sample-16`・`accel-sample-15`・`touch-sample-14`・`touch-lcd-14`）、`bringup-i2c-15-16`、`bringup-led-514`、`bench-servo-test-17`、`debug-motion-19`とは併用できない（`compile_error!`） |
@@ -1300,11 +1300,16 @@ fn main() {
                 leds.pulse_react(now_led);
             }
             // 白は、Piからの受信の見張りが生きている間は点灯、それ以外は点滅（`crate::led`）。
+            // Pi linkを持たないbuild（`bench-servo-test-17`）は点滅だけになる。
+            #[cfg(not(feature = "bench-servo-test-17"))]
             let link_up = pi_link.link_alive(now_led);
+            #[cfg(feature = "bench-servo-test-17")]
+            let link_up = false;
             leds.update(led_start_ms, now_led, link_up);
             if let Some(deadline) = leds.next_deadline_ms(led_start_ms, now_led, link_up) {
                 until = until.min(deadline);
             }
+            #[cfg(not(feature = "bench-servo-test-17"))]
             if let Some(deadline) = pi_link.link_alive_until_ms(now_led) {
                 until = until.min(deadline);
             }

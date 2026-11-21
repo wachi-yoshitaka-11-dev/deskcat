@@ -77,7 +77,7 @@ CIでの成否は、この変更を含むPull Requestのcheck結果で確認す�
 
 **`no-touch-487` feature（[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)）を有効にする場合は、既定構成に加えて`cargo clippy`と`cargo build`へ`--features no-touch-487`を足したものも通す。**`cargo fmt`にはfeatureを付けない。`link-gap-20`以外のfeatureとは併用できない（`main.rs`の`compile_error!`）。firmware CIの`Build test modes`が確認する。
 
-**`bringup-led-514` feature（[#514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)）を有効にする場合は、既定構成に加えて`cargo clippy`と`cargo build`へ`--features bringup-led-514`を足したものも通す。**`bringup-display-13`とも組み合わせられるため、`--features bringup-display-13,bringup-led-514`も通す。**製品build（featureなし）も`crate::led`を持つ**（#514。白の点滅と、`happy`を受理したときの赤の点灯）ため、既定構成の`cargo clippy`と`cargo build`がこのcodeを確認する。firmware CIの`Format, lint, and build`は既定構成を、その中の`Build test modes`は`bringup-led-514`の両構成を確認する。いずれもbuild-onlyであり、host testは無い（firmware crateはhostで動かせない）。実機で動かした記録は点灯試験用のbuildだけである。
+**`bringup-led-514` feature（[#514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)）を有効にする場合は、既定構成に加えて`cargo clippy`と`cargo build`へ`--features bringup-led-514`を足したものも通す。**`bringup-display-13`とも組み合わせられるため、`--features bringup-display-13,bringup-led-514`も通す。**製品build（featureなし）も`crate::led`を持つ**（#514。白の点灯／点滅と、`happy`を受理したときの赤の点灯）ため、既定構成の`cargo clippy`と`cargo build`がこのcodeを確認する。firmware CIの`Format, lint, and build`は既定構成を、その中の`Build test modes`は`bringup-led-514`の両構成を確認する。いずれもbuild-onlyであり、host testは無い（firmware crateはhostで動かせない）。実機で動かした記録は点灯試験用のbuildだけである。
 
 **`face-21` feature（[#21](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/21)）を有効にする場合は、既定構成に加えて`cargo clippy`と`cargo build`へ`--features face-21`を足したものも通す。**`bringup-display-13`とも組み合わせられるため、`--features face-21,bringup-display-13`も通す。今回の差分では、firmware CIの`Build test modes`が両構成を確認する。
 

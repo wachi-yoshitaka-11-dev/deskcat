@@ -54,7 +54,7 @@ bench-servo-90-17 = ["bench-servo-test-17"]
 bringup-display-13 = []
 # Issue #514の追加LED（`LED-COMM`＝白／GPIO2、`LED-REACT`＝赤／GPIO5）を駆動する。
 # 既定ではoffであり、通常のbuildはGPIO2／GPIO5に触れない。起動時に点灯試験
-# （赤→白→両方）を行い、その後は白を点滅させる（`src/led.rs`のmodule doc）。
+# （赤→白→両方）を行い、その後は白を通信の状態で点灯／点滅させる（`src/led.rs`のmodule doc）。
 # 配線と試験の手順は`docs/hardware/led-514-demo.md`。`bringup-display-13`とも組み合わせられる。
 bringup-led-514 = []
 # Issue #21のdemo。LCDを初期化してbacklightを点け、そのまま点けておき、PiからのExpression command
