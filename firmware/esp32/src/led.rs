@@ -8,7 +8,7 @@
 //!
 //! # 表示
 //!
-//! 起動時のbring-upが終わった時刻（`main.rs`の`bringup_done_ms`）からの経過時間だけで決める
+//! 起動時のbring-upが終わった時刻（`main.rs`の`bringup_done_ms`）からの経過時間と、Piからの受信の見張りの状態で決める
 //! （[`outputs_at`]）。その後のPi linkのUART初期化と`boot`送信の分だけ、最初の区間が短くなる。
 //! `bringup-display-13`付きbuildでは、LCDの描画とI2Cのbring-upがmain loopの中で進み、点灯試験は
 //! それと並行して進む。
