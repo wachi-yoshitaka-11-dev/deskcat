@@ -903,7 +903,7 @@ ESP32はACKを返し、ACK payloadにuptimeを含めてよい。
 - **生きている印は、現在のPi sessionの、decodeできたframeすべてとする。**`ping`に限らない。ESP32は、envelopeの`sid`が現在のPi sessionのframeをdecodeできるたびに、受信を記録する。現在のfirmwareの仮置き（`firmware/esp32/src/pi_link.rs`の`note_rx_gated`。`hello`・`ack`・commandのいずれも、現在のPi sessionのframeなら記録する。見張りの開始は下の項目）と同じである。decodeできなかった行、別の`sid`のframeは印にならない。
 - **Piは、ほかに送るものが無い間、決まった間隔で`ping`を送る。**最後にframeを書き出してから、その間隔が空いたら`ping`を1つ送る。起点は最後の書き出しであり、`ping`に限らない。ほかのcommand、ACK、再送を送った直後は送らない。`startup`の`hello`が済むまでは送らない。
 - **`ping`のACKは、生きている印の判定に使わない。**`ping`の結果が拒否や無応答でも、Piは再送の予算を使い切った後に終了せず、次の間隔で新しい`id`の`ping`を送る。`stale_session`は通常commandと同じく`hello`から再開する（§3.1、§10.2）。
-- **`ping`の間隔は1000 msとする**（`apps/deskcatd`の`PING_INTERVAL_MS`）。ESP32のloss timeout（`firmware/esp32`の`LINK_LOSS_TIMEOUT_MS`）の値は[Servo Safety Limits](../hardware/servo-safety-limits.md#通信断時動作)の表が持つ。根拠は[EXP-066](../hardware/experiment-log.md)で測ったPi→ESP32のframeの到着の間隔である。Piが1000 msごとに送る条件で、定常の最大は3380 ms（Piの負荷あり）だった。loss timeoutはその約2倍とした。1000 ms以外の間隔の分布は測っていない。loss timeoutの根拠の水準と、servo出力の有効化の前に残る確かめ（上限側）は[HW-TBD-017](../hardware/tbd-register.md)と[Servo Safety Limits](../hardware/servo-safety-limits.md#通信断時動作)が持つ。
+- **`ping`の間隔は1000 msとする**（`apps/deskcatd`の`PING_INTERVAL_MS`）。ESP32のloss timeout（`firmware/esp32`の`LINK_LOSS_TIMEOUT_MS`）の値は[HW-TBD-017](../hardware/tbd-register.md)が持つ。根拠は[EXP-066](../hardware/experiment-log.md)で測ったPi→ESP32のframeの到着の間隔である。Piが1000 msごとに送る条件で、定常の最大は3380 ms（Piの負荷あり）だった。loss timeoutはその約2倍とした。1000 ms以外の間隔の分布は測っていない。servo出力の有効化の前に残る確かめ（`HW-TBD-020`の連続動作時間の上限との比較）は[HW-TBD-017](../hardware/tbd-register.md)が持つ。
 - **ESP32は、`boot`のACKでsessionが確立してから見張りを始める**（§4.1）。起動直後の、`boot`の送り直しを待つ間の間隔（EXP-066では最大4893 ms。recoveryの間隔は`PROTO-TBD-017`の暫定値）は判定に入れない。見張りを始めた後は、確立が外れても（`hello`による遷移で`boot`を送り直す間も）、現在のPi sessionのframeを受信として記録する。この間はmotion commandを`stale_session`で拒否する。
 - ESP32の`HEARTBEAT_PERIOD_MS`（ESP32自身のlogとhealthの周期）は、Piからの受信とは別のものである。
 
@@ -1462,7 +1462,7 @@ Framing／parse層について、**host workspaceのRust実装**がfixtureに合
 | 2026-10-28 | Draft 2 debug motion console input | [Issue #19](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/19)。§2の、Pi linkを持つbuildでUART0のstdinを読む例外へ、`debug-motion-19`の試験buildを足した。**wire formatは変えていない**（Pi linkのUARTではなく、UART0のconsoleである）。製品buildには入らない |
 | 2026-11-01 | Draft 2 tap touch stopped | [Issue #679](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/679)。§4の`tapped`の送出条件へ、SPIの失敗が続いてタッチの検出が止まった後は、tapを送らず捨て続けることを足した（firmwareの実装が、検出の停止中に離れてから一定の間が過ぎるとtapを送りうる誤りを直した）。**wire formatは変えていない** |
 | 2026-11-11 | Draft 2 shaken | [Issue #685](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/685)。§4.3aへ`shaken`（ESP32→Pi。空のpayload）を足した。ADXL345のActivityを窓の中で数えて判定し、値は`TBD`（`None`）の間は検出を有効にせず送らない。`deskcat-protocol`に型とfixture（`shaken_empty`）を足した。**新しいtypeであり、既存のwire formatは変えていない** |
-| 2026-11-21 | Draft 2 link loss timeout | [Issue #20](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/20)。§5.7の`ping`の間隔（1000 ms）とESP32のloss timeout（7000 ms）を、[EXP-066](../hardware/experiment-log.md)の実測から決めて書いた。ESP32が見張りを始めるのを、`hello`による確立から`boot`の確立へ移した。§13の`PROTO-TBD-010`の行を合わせた。heartbeatの方式は案のままである。**wire formatは変えていない** |
+| 2026-11-21 | Draft 2 link loss timeout | [Issue #20](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/20)。§5.7の`ping`の間隔とESP32のloss timeoutを、[EXP-066](../hardware/experiment-log.md)の実測から決めて書いた（loss timeoutの値は[HW-TBD-017](../hardware/tbd-register.md)）。ESP32が見張りを始めるのを、`hello`による確立から`boot`の確立へ移した。§13の`PROTO-TBD-010`の行を合わせた。heartbeatの方式は案のままである。**wire formatは変えていない** |
 
 ### Draft schemaの互換性
 

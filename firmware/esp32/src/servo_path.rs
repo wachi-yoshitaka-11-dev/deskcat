@@ -1,7 +1,7 @@
 //! 製品buildで、Piの`play_motion`とdebugの指示、`tick`／`stop`、`status`の`servo.limiter`が通る経路
 //! （[Issue #19](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/19)）。
 //!
-//! **値を持たない。**制限・制御周期・初期位置・name→targetの表は、HW-TBD-010／011／019／020と
+//! **値は[`LINK_LOSS_TIMEOUT_MS`]のほかは持たない。**制限・制御周期・初期位置・name→targetの表は、HW-TBD-010／011／019／020と
 //! PROTO-TBD-008が決まるまで`None`であり、[`product`]は`None`を返す（`LimitedServo`を作らない。
 //! `Sg90`も、LEDC timer・channel・GPIO27も取らない）。**この経路の中で、サーボ出力を有効にする
 //! 条件（`servo-safety-limits.md`の`サーボ出力を有効化してよい条件`）を変えない。**
