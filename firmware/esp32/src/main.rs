@@ -125,7 +125,9 @@
 //!
 //! **timeout と、製品 build の loop の1周の長さの関係。**timeout は `CONFIG_ESP_TASK_WDT_TIMEOUT_S`（`sdkconfig.defaults` は設定せず、
 //! ESP-IDF v5.5.3 の既定値。生成された `sdkconfig` で `CONFIG_ESP_TASK_WDT_TIMEOUT_S=5`（5 s）と確かめた。debug profile の build 出力）である。**この値を新しく決めていない。**
-//! 1周の長さは、health snapshot の `max_read_gap_ms`（`read` から次の `read` までの間隔の最大。loop の1周の長さに当たる）で見える。
+//! feed から次の feed までの間隔は、loop の処理と、`uart.read` の待ち（`until` まで。heartbeat の期限で最大約 `config::HEARTBEAT_PERIOD_MS`＋1 tick）と、
+//! `post_read_yield_ms` の譲りの和である。health snapshot の `max_read_gap_ms` は `read` から戻って次の `read` を始めるまでの時間の最大で、
+//! loop の処理の分だけに当たる（read の待ちと譲りは入らない）。
 //! 実測は、[EXP-066](../../../docs/hardware/experiment-log.md)の5条件（`link-gap-20,no-touch-487`、LCD の描画・センサーの読み出し・Pi の負荷と同時）で
 //! 最大 86、90、91、107、109 ms、[EXP-062](../../../docs/hardware/experiment-log.md)の窓 B（`no-touch-487`）の #713 の項（Pi が不正な行を114行送った後）で最大 71 ms である。
 //! **これは観測した最大であり、上限ではない。**
@@ -135,9 +137,9 @@
 //! - LCD は1周に帯を1本だけ塗る（`crate::face`）。1本の所要時間は測っていない。
 //! - `reselect_sid` の NVS 操作と、log 出力の所要時間は測っていない（`config::PI_PROTOCOL_UART_RX_BUFFER_BYTES` の doc）。
 //!
-//! 観測した最大（109 ms）は timeout の約45分の1（5000 ÷ 109）である。**測っていない要因が合計で timeout を超える根拠は見つけていないが、
+//! 処理の分の観測した最大（109 ms）に read の待ちの上限（約 1 s）を足しても、timeout（5 s）の約4分の1である。**測っていない要因が合計で timeout を超える根拠は見つけていないが、
 //! 超えないことも示していない。**超えれば、製品 build は panic して reset する（その回数は `reset_reason` の `task_watchdog` で数えられる）。
-//! 実機で観測する項目は、製品 build を動かす窓で、`reset_reason=task_watchdog` が0件であることと、`max_read_gap_ms` である。
+//! 実機で観測する項目は、製品 build を動かす窓で、`reset_reason=task_watchdog` が0件であることである（`max_read_gap_ms` は処理の分だけを示し、feed の間隔そのものではない）。
 //!
 //! heartbeat loop は
 //! [`FreeRtos::delay_ms`] で待つ。同 API は
