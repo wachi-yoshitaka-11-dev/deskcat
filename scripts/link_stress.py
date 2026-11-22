@@ -24,7 +24,7 @@ host の `crates/deskcat-protocol/tests/stress.rs` も同じ fixture を使う�
 
 **ESP32 の `status.protocol` の counter は firmware が増やさない**（`firmware/esp32/src/pi_link.rs`）。
 拒否の数は、ESP32 の UART0 の log（`pi_rx_decode_rejected` など）で数える。この script が表示する
-「送った数」と突き合わせる。
+`expected_rejections` と突き合わせる。
 
 `--dump` は port を開かず、送る byte 列を標準出力へ書く（host で内容を確かめる用）。
 """
@@ -244,7 +244,7 @@ def main(argv=None):
     p.add_argument("--port", help="serial device（--dump では不要）")
     p.add_argument("--baud", type=int, help="--dump では不要。baud は PROTO-TBD-001 のため既定値を持たせない")
     p.add_argument("--count", type=int, default=100, help="行数（newline-free は KiB）")
-    p.add_argument("--sid", type=int, help="hello の sid。省くと実行ごとにランダムに選ぶ（ESP32 は使った sid を retired として覚え、同じ sid の再実行を stale_session で拒否するため）")
+    p.add_argument("--sid", type=int, help="hello の sid。省くと実行ごとにランダムに選ぶ（ESP32 は置き換えられた sid を retired として覚え、同じ sid の再実行は stale_session か invalid_payload で拒否されるため）")
     p.add_argument("--probe-timeout-s", type=float, default=5.0)
     p.add_argument("--dump", action="store_true")
     args = p.parse_args(argv)

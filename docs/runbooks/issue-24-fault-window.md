@@ -37,10 +37,13 @@
 3. **通電の承認は実行する日に 1 件、人間から得る**（Power Budget の同節。条件(7)と同じ形）。承認は PM が訊く。
    この窓で足す操作（EN ボタン、信号線の抜き差し、USB の抜き差し、センサーの線の抜き差し）は、承認の問いに
    含める。**意図的な fault injection と回路変更後の試験は、人間が立ち会い、電源を遮断できる状態で行う**（Hardware Safety Policy §7）。
-4. **配線は EXP-065 と同じ構成から変えない。**Pi との UART と GND の線を変えたら、通電前の確認をやり直す（`信号線をつないでよい条件` の 6）。センサーの信号線の抜き差し（手順 5）は、挿し先の目視と記録した位置との照合を行う。**それがセンサーの線の通電前の確認として足りるかを示す正本は確かめていない**ため、手順 5 を承認の問いに含め、人間が決める（立ち会いは Hardware Safety Policy §7）。
-5. **Pi の `deskcatd` は 1 つだけ動かす。**Pi を再起動すると本番の `deskcatd` service が自動で起動し、serial を
+4. **Pi link をつなぐ試験として、ユーザーの別の承認が要る。**`信号線をつないでよい条件` の 3 は、つないでよい試験を列挙して限る
+   （#446 の AC4、#11、#12、#13 の AC6、承認済みの #21 のデモと #23 の実機確認）。**#24 はその列挙に無い。**窓の前に、PM が
+   #24 の試験を人間に訊いて承認を得て、正本へ足す（#21・#23 が先例）。**この runbook は列挙を広げず、承認の代わりにならない。**
+5. **配線は EXP-065 と同じ構成から変えない。**Pi との UART と GND の線を変えたら、通電前の確認をやり直す（`信号線をつないでよい条件` の 6）。センサーの信号線の抜き差し（手順 5）は、挿し先の目視と記録した位置との照合を行う。**それがセンサーの線の通電前の確認として足りるかを示す正本は確かめていない**ため、手順 5 を承認の問いに含め、人間が決める（立ち会いは Hardware Safety Policy §7）。
+6. **Pi の `deskcatd` は 1 つだけ動かす。**Pi を再起動すると本番の `deskcatd` service が自動で起動し、serial を
    取り合う（EXP-065 で起きた）。手順 6 の `link_stress.py` を使う前に `sudo systemctl stop deskcatd` する。
-6. **証拠は repository の外に置く**（ESP32 の log は MAC を含みうる）。記録に device 名、個人 path、SSID を残さない。
+7. **証拠は repository の外に置く**（ESP32 の log は MAC を含みうる）。記録に device 名、個人 path、SSID を残さない。
 
 **危険、異音、発熱、異臭、LCD の異常を認めたら、試験を止める**（AGENTS.md）。止めるときは電源を切る。
 **ESP32 の USB を抜くときは、先に信号線を ESP32 側で外す**（次節 A）。同じ操作を繰り返さず、log と reset reason を保存し、
@@ -73,7 +76,7 @@ ESP32 の `status.protocol` の counter は、**今の firmware では増えな�
 | reset の回数と理由 | ESP32 UART0 の `reset_reason=…` の行（起動ごとに 1 行）と、health 行の `uptime_ms` が 0 付近から始まること | 値は `power_on`／`external_pin`／`software`／`panic`／`task_watchdog`／`brownout` など（`reset_reason_str`）。**予想する値は `power_on`／`external_pin`／`software` だけ。`panic`／`task_watchdog`／`interrupt_watchdog`／`watchdog`／`brownout`／`power_glitch`／`cpu_lockup` など、それ以外が出たら異常として窓を止める**（`brownout`／`power_glitch` は電源の異常の表示で、AGENTS.md の「電圧降下を認めたら試験を停止する」に当たる） |
 | main loop の遅れ | health 行の `overrun_ticks`、`snapshot_errors` | 増え続けたら記録して PM へ |
 | Pi link の UART の溢れ | health 行の `pi_uart_rx_buffer_full`、`pi_uart_rx_fifo_overflow`、`max_read_gap_ms`、`pi_uart_event kind=… count=…` | **溢れの数は「上限」の測定値**（下の 3.3） |
-| parser の拒否 | `pi_rx_invalid_utf8`、`pi_rx_decode_rejected code=<code>`、`pi_rx_oversize_line` の行を数える | 行の数と `link_stress.py` の「送った数」を突き合わせる |
+| parser の拒否 | `pi_rx_invalid_utf8`、`pi_rx_decode_rejected code=<code>`、`pi_rx_oversize_line` の行を数える | 行の数と `link_stress.py` の `expected_rejections` を突き合わせる（3.3、手順 6） |
 | bus（I2C） | `tap_read_failed … consecutive=`、`tap_disabled`、`env_fault kind=i2c_timeout／i2c_other`（`count=`） | `ACCEL-01` と `ENV-01` は同じ bus（EXP-065） |
 | sensor | `env_reading`、`env_event_stale_dropped`、`env_event_superseded`、`env_fault kind=…`、`tap_detected`／`tap_confirmed` | 欠測は fault として数える |
 | Pi からの受信の途切れ（loss timeout 7000 ms） | **ESP32 の log には出ない。**`pi_link_lost` は servo の経路がある build だけが出し（`check_link` は servo が無いと戻る）、この build は servo を作らない。表示で見えるのは、白 LED が付く `no-touch-487,led-no-touch-514`（Power Budget は、**`touch` の `T_CS` を挿した配線に限り**可。挿さない配線では不可で、この窓の配線が `T_CS` を挿したものかは EXP-065 の記録に無く、確かめていない。実機では動かしていない。窓の承認の問いに含めるなら PM が決める） | Pi 側は `deskcatd` の終了行と `ping` の拒否の warn |
@@ -87,7 +90,7 @@ ESP32 の `status.protocol` の counter は、**今の firmware では増えな�
 
 1. `deskcatd` が `active` のまま、または終了コード 75（`EXIT_SESSION_REDO`）で終わって systemd が再起動して `active` に戻る。
 2. ESP32 の `reset_reason` が、予想した値（`power_on`／`external_pin`／`software`）だけである（3.1）。
-3. **端から端まで届く**：B3 を叩くと、`deskcatd` の log に `tapped_received … total=` が増える（EXP-062・065 と同じ観察。service のままで info の行として出る）。または手順 6 の `link_stress.py` の `recovered=yes`。
+3. **端から端まで届く**：B3 を叩くと、`deskcatd` の log に `tapped_received … total=` が増える（EXP-062・065 と同じ観察。service のままで info の行として出る）。**`link_stress.py` の `recovered=yes` は、この合格の証拠にしない**（`deskcatd` を止めて別の `sid` の `hello` を送るため、その後に `deskcatd` を起動し直す人の操作が要る。3.3 の判定にだけ使う）。
 
 **手動の復旧が要った場合は「不合格」ではなく「手動復旧が要る」と記録する。**`StartLimitBurst=30`（300 秒）に達した
 `failed` は既知（EXP-024）。**復旧までの時間の上限は置かない**（`PROTO-TBD-011`、`HW-TBD-017` が未決。測った時間を記録する）。
@@ -183,7 +186,7 @@ python3 scripts/link_stress.py --mode newline-free --count 64 --port <device> --
 python3 scripts/link_stress.py --mode flood --count 2000 --port <device> --baud 115200
 ```
 
-`--sid` は省く（実行ごとにランダム。ESP32 は使った sid を retired として覚え、同じ sid の再実行を `stale_session` で拒否する）。`--count` は出発点であり、確定値ではない。**1 回ごとに ESP32 の log の拒否の行の数を数え、script が表示する `expected_rejections`
+`--sid` は省く（実行ごとにランダム。ESP32 は置き換えられた sid を retired として覚え、同じ sid の再実行は、置き換えられていれば `stale_session`、現在の sid のままなら `invalid_payload` で拒否される）。`--count` は出発点であり、確定値ではない。**1 回ごとに ESP32 の log の拒否の行の数を数え、script が表示する `expected_rejections`
 と突き合わせる（`corpus`・`noise`・`oversize` は送った行の数、`newline-free` は 1、`flood` は 0）。**3.3 の 1〜3 を判定する。`flood` は baud が上限の速さで送る。`recovered=no` が溢れと同時に出たら、確認だけを送り直して判定する（`--mode flood --count 0`。溢れで改行が落ち、確認の行が前の行と連結された可能性がある）。溢れが出た場合は、`--count` を半分にして
 同じ手順を繰り返し、溢れない最大を記録する（測定値であり、上限の決定ではない）。
 
