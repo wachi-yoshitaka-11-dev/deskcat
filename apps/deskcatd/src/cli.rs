@@ -13,7 +13,7 @@ use std::fmt;
 use std::num::NonZeroU64;
 use std::time::Duration;
 
-use deskcat_domain::Expression;
+use deskcat_domain::{Config as CompanionConfig, Expression, LocalMinutes};
 use deskcat_serial::DuplicatePolicy;
 
 use crate::daemon::ExpressionProbe;
@@ -24,6 +24,11 @@ pub const USAGE: &str = "usage: deskcatd --port <path> --baud <rate> \
 --duplicate-capacity <n> --duplicate-retention-ms <ms> --startup-deadline-ms <ms> \
 [--speech-min-interval-ms <ms> --speech-duration-ms <ms>] [--cloud-speech] [--no-companion] \
 [--probe-expression <name> --probe-interval-ms <ms>] [--verbose]\n\
+[Companionの試験用の上書き: --companion-rest-interval-ms <ms> --companion-sleep-at <HH:MM> \
+--companion-wake-at <HH:MM> --companion-hot-on-c <v> --companion-hot-off-c <v> \
+--companion-cold-on-c <v> --companion-cold-off-c <v> --companion-dry-on-pct <v> \
+--companion-dry-off-pct <v> --companion-pressure-drop-on-hpa <v> \
+--companion-pressure-drop-off-hpa <v>]\n\
 \n\
 --port、--baud、--duplicate-capacity、--duplicate-retention-ms、--startup-deadline-ms は必須である。\
 既定値を持たせない。\n\
@@ -32,10 +37,15 @@ device名は未確認であり、baudの正本は PROTO-TBD-001、duplicate履�
 \n\
 --probe-expression と --probe-interval-ms は実機確認用で、両方と --no-companion が要る。\
 session確立後、指定した表情と neutral の set_expression を、指定の間隔で交互に送る（play_motion は送らない）。\
-neutral は指定できない。運用では付けない。";
+neutral は指定できない。運用では付けない。\n\
+\n\
+--companion-* は実機確認用で、指定した項目だけ Config::MVP を上書きする。指定が無ければ Config::MVP と同じである。\
+運用では付けない。--no-companion とは併用できない。\
+入る側と戻る側のしきい値の関係（hot/pressure は off < on、cold/dry は off > on）、\
+間隔が 0 でないこと、時刻が HH:MM（00:00..=23:59）であること、寝る時刻と起きる時刻が異なることを検査する。";
 
 /// 解析した引数。
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Args {
     /// Serial deviceのpath。
     pub port: String,
@@ -51,6 +61,8 @@ pub struct Args {
     pub cloud_speech: bool,
     /// `Companion`をつながない。Piの時刻（寝る時間帯）に依存しない試験のためで、運用では付けない。
     pub no_companion: bool,
+    /// `Companion`の値。上書きが無ければ`Config::MVP`と同じ。`--no-companion`のときは使わない。
+    pub companion: CompanionConfig,
     /// 実機確認用の表情の送信（Issue #514）。両方の引数がある場合だけ。`--no-companion`が要る。
     pub probe: Option<ExpressionProbe>,
     /// `Debug`まで出す。
@@ -61,7 +73,7 @@ pub struct Args {
 ///
 /// `--help`は**成功である。**`Err`へ畳むと終了コードが1になり、scriptから「使い方を聞いた」と
 /// 「引数を間違えた」を区別できない。
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Parsed {
     /// 実行する。
     Run(Box<Args>),
@@ -109,6 +121,163 @@ where
         flag,
         reason: format!("数値でない: {e}"),
     })
+}
+
+/// `Companion`の試験用の上書き（`--companion-*`）。指定した項目だけが`Some`である。
+#[derive(Debug, Default)]
+struct CompanionOverrides {
+    rest_interval_ms: Option<u64>,
+    sleep_at: Option<LocalMinutes>,
+    wake_at: Option<LocalMinutes>,
+    hot_on_c: Option<f32>,
+    hot_off_c: Option<f32>,
+    cold_on_c: Option<f32>,
+    cold_off_c: Option<f32>,
+    dry_on_pct: Option<f32>,
+    dry_off_pct: Option<f32>,
+    pressure_drop_on_hpa: Option<f32>,
+    pressure_drop_off_hpa: Option<f32>,
+}
+
+impl CompanionOverrides {
+    fn any(&self) -> bool {
+        self.rest_interval_ms.is_some()
+            || self.sleep_at.is_some()
+            || self.wake_at.is_some()
+            || self.hot_on_c.is_some()
+            || self.hot_off_c.is_some()
+            || self.cold_on_c.is_some()
+            || self.cold_off_c.is_some()
+            || self.dry_on_pct.is_some()
+            || self.dry_off_pct.is_some()
+            || self.pressure_drop_on_hpa.is_some()
+            || self.pressure_drop_off_hpa.is_some()
+    }
+}
+
+impl CompanionOverrides {
+    /// `--companion-*`の1つを読む。知らない引数なら`Ok(false)`。値は読めるときだけ使う。
+    fn set(&mut self, flag: &str, value: Result<String, CliError>) -> Result<bool, CliError> {
+        let name: &'static str = match flag {
+            "--companion-rest-interval-ms" => "--companion-rest-interval-ms",
+            "--companion-sleep-at" => "--companion-sleep-at",
+            "--companion-wake-at" => "--companion-wake-at",
+            "--companion-hot-on-c" => "--companion-hot-on-c",
+            "--companion-hot-off-c" => "--companion-hot-off-c",
+            "--companion-cold-on-c" => "--companion-cold-on-c",
+            "--companion-cold-off-c" => "--companion-cold-off-c",
+            "--companion-dry-on-pct" => "--companion-dry-on-pct",
+            "--companion-dry-off-pct" => "--companion-dry-off-pct",
+            "--companion-pressure-drop-on-hpa" => "--companion-pressure-drop-on-hpa",
+            "--companion-pressure-drop-off-hpa" => "--companion-pressure-drop-off-hpa",
+            _ => return Ok(false),
+        };
+        let raw = value?;
+        match name {
+            "--companion-rest-interval-ms" => self.rest_interval_ms = Some(number(name, &raw)?),
+            "--companion-sleep-at" => self.sleep_at = Some(clock(name, &raw)?),
+            "--companion-wake-at" => self.wake_at = Some(clock(name, &raw)?),
+            "--companion-hot-on-c" => self.hot_on_c = Some(finite(name, &raw)?),
+            "--companion-hot-off-c" => self.hot_off_c = Some(finite(name, &raw)?),
+            "--companion-cold-on-c" => self.cold_on_c = Some(finite(name, &raw)?),
+            "--companion-cold-off-c" => self.cold_off_c = Some(finite(name, &raw)?),
+            "--companion-dry-on-pct" => self.dry_on_pct = Some(finite(name, &raw)?),
+            "--companion-dry-off-pct" => self.dry_off_pct = Some(finite(name, &raw)?),
+            "--companion-pressure-drop-on-hpa" => {
+                self.pressure_drop_on_hpa = Some(finite(name, &raw)?);
+            }
+            _ => self.pressure_drop_off_hpa = Some(finite(name, &raw)?),
+        }
+        Ok(true)
+    }
+}
+
+/// 有限の小数を読む。`NaN`と無限大は、比較が常に偽になるため受け付けない。
+fn finite(flag: &'static str, raw: &str) -> Result<f32, CliError> {
+    let v = number::<f32>(flag, raw)?;
+    if v.is_finite() {
+        Ok(v)
+    } else {
+        Err(CliError::Invalid {
+            flag,
+            reason: "有限の数でない".to_owned(),
+        })
+    }
+}
+
+/// `HH:MM`を読む。範囲外は拒否する。
+fn clock(flag: &'static str, raw: &str) -> Result<LocalMinutes, CliError> {
+    let invalid = |reason: &str| CliError::Invalid {
+        flag,
+        reason: format!("{reason}: {raw}"),
+    };
+    let (h, m) = raw.split_once(':').ok_or_else(|| invalid("HH:MMでない"))?;
+    let two_digits = |part: &str| part.len() == 2 && part.bytes().all(|b| b.is_ascii_digit());
+    if !two_digits(h) || !two_digits(m) {
+        return Err(invalid("HH:MMでない"));
+    }
+    let h = h.parse::<u8>().map_err(|_| invalid("時が数でない"))?;
+    let m = m.parse::<u8>().map_err(|_| invalid("分が数でない"))?;
+    LocalMinutes::new(h, m).ok_or_else(|| invalid("範囲外（00:00..=23:59）"))
+}
+
+/// 上書きを`Config::MVP`へ適用し、値の関係を検査する。
+fn build_companion(o: &CompanionOverrides) -> Result<CompanionConfig, CliError> {
+    let base = CompanionConfig::MVP;
+    let config = CompanionConfig {
+        hot_on_c: o.hot_on_c.unwrap_or(base.hot_on_c),
+        hot_off_c: o.hot_off_c.unwrap_or(base.hot_off_c),
+        cold_on_c: o.cold_on_c.unwrap_or(base.cold_on_c),
+        cold_off_c: o.cold_off_c.unwrap_or(base.cold_off_c),
+        dry_on_pct: o.dry_on_pct.unwrap_or(base.dry_on_pct),
+        dry_off_pct: o.dry_off_pct.unwrap_or(base.dry_off_pct),
+        pressure_drop_on_hpa: o.pressure_drop_on_hpa.unwrap_or(base.pressure_drop_on_hpa),
+        pressure_drop_off_hpa: o
+            .pressure_drop_off_hpa
+            .unwrap_or(base.pressure_drop_off_hpa),
+        rest_interval_ms: o.rest_interval_ms.unwrap_or(base.rest_interval_ms),
+        sleep_at: o.sleep_at.unwrap_or(base.sleep_at),
+        wake_at: o.wake_at.unwrap_or(base.wake_at),
+        ..base
+    };
+    let bad = |flag: &'static str, reason: &str| CliError::Invalid {
+        flag,
+        reason: reason.to_owned(),
+    };
+    if config.rest_interval_ms == 0 {
+        return Err(bad("--companion-rest-interval-ms", "0は間隔にならない"));
+    }
+    if config.hot_off_c >= config.hot_on_c {
+        return Err(bad(
+            "--companion-hot-off-c",
+            "戻る側は入る側（hot-on-c）より低くする",
+        ));
+    }
+    if config.cold_off_c <= config.cold_on_c {
+        return Err(bad(
+            "--companion-cold-off-c",
+            "戻る側は入る側（cold-on-c）より高くする",
+        ));
+    }
+    if config.dry_off_pct <= config.dry_on_pct {
+        return Err(bad(
+            "--companion-dry-off-pct",
+            "戻る側は入る側（dry-on-pct）より高くする",
+        ));
+    }
+    if config.pressure_drop_off_hpa >= config.pressure_drop_on_hpa {
+        return Err(bad(
+            "--companion-pressure-drop-off-hpa",
+            "戻る側は入る側（pressure-drop-on-hpa）より小さくする",
+        ));
+    }
+    if config.sleep_at == config.wake_at {
+        return Err(bad(
+            "--companion-wake-at",
+            "寝る時刻と起きる時刻が同じだと、夜の時間帯が無くなる",
+        ));
+    }
+    Ok(config)
 }
 
 /// 実機確認用の表情の送信（`--probe-expression`と`--probe-interval-ms`）を解釈する。
@@ -213,6 +382,7 @@ where
     let mut speech_duration_ms = None;
     let mut probe_expression = None;
     let mut probe_interval_ms = None;
+    let mut companion = CompanionOverrides::default();
     let (mut verbose, mut cloud_speech, mut no_companion) = (false, false, false);
     let mut argv = raw.into_iter();
 
@@ -246,7 +416,12 @@ where
             "--cloud-speech" => cloud_speech = true,
             "--no-companion" => no_companion = true,
             "-h" | "--help" => return Ok(Parsed::Help),
-            other => return Err(CliError::Unknown(other.to_owned())),
+            other => {
+                let target = value();
+                if !companion.set(other, target)? {
+                    return Err(CliError::Unknown(other.to_owned()));
+                }
+            }
         }
     }
 
@@ -268,6 +443,13 @@ where
     })?;
     let speech = parse_speech(speech_min_interval_ms, speech_duration_ms, cloud_speech)?;
     let probe = parse_probe(probe_expression, probe_interval_ms, no_companion)?;
+    if no_companion && companion.any() {
+        return Err(CliError::Invalid {
+            flag: "--no-companion",
+            reason: "--companion-*と併用しない（上書きする相手が無い）".to_owned(),
+        });
+    }
+    let companion = build_companion(&companion)?;
 
     Ok(Parsed::Run(Box::new(Args {
         port: port.ok_or(CliError::Missing("--port"))?,
@@ -277,6 +459,7 @@ where
         speech,
         cloud_speech,
         no_companion,
+        companion,
         probe,
         verbose,
     })))
@@ -590,5 +773,126 @@ mod tests {
         let speech = args.speech.expect("両方を指定した");
         assert_eq!(speech.min_interval_ms.get(), 100);
         assert_eq!(speech.duration_ms, 200);
+    }
+
+    fn with_extra(extra: &[&str]) -> Result<Parsed, CliError> {
+        let mut v = ALL.to_vec();
+        v.extend(extra);
+        run(&v)
+    }
+
+    #[test]
+    fn companion_is_the_mvp_config_without_overrides() {
+        let Ok(Parsed::Run(args)) = run(&ALL) else {
+            panic!("実行になる");
+        };
+        assert_eq!(args.companion, CompanionConfig::MVP);
+    }
+
+    #[test]
+    fn companion_overrides_only_the_given_fields() {
+        let Ok(Parsed::Run(args)) = with_extra(&[
+            "--companion-rest-interval-ms",
+            "60000",
+            "--companion-sleep-at",
+            "13:05",
+            "--companion-wake-at",
+            "13:30",
+            "--companion-hot-on-c",
+            "26.5",
+            "--companion-hot-off-c",
+            "25",
+            "--companion-pressure-drop-on-hpa",
+            "1",
+            "--companion-pressure-drop-off-hpa",
+            "0.5",
+        ]) else {
+            panic!("実行になる");
+        };
+        let mvp = CompanionConfig::MVP;
+        assert_eq!(
+            args.companion,
+            CompanionConfig {
+                rest_interval_ms: 60_000,
+                sleep_at: LocalMinutes::new(13, 5).expect("範囲内"),
+                wake_at: LocalMinutes::new(13, 30).expect("範囲内"),
+                hot_on_c: 26.5,
+                hot_off_c: 25.0,
+                pressure_drop_on_hpa: 1.0,
+                pressure_drop_off_hpa: 0.5,
+                ..mvp
+            }
+        );
+    }
+
+    #[test]
+    fn companion_overrides_reject_bad_values() {
+        let cases: [&[&str]; 17] = [
+            &["--companion-sleep-at", "7:05"],
+            &["--companion-wake-at", "+7:00"],
+            &["--companion-wake-at", "007:00"],
+            &["--companion-rest-interval-ms", "0"],
+            &["--companion-sleep-at", "24:00"],
+            &["--companion-sleep-at", "22:60"],
+            &["--companion-wake-at", "7"],
+            &["--companion-wake-at", "ab:cd"],
+            &["--companion-sleep-at", "07:00"],
+            &["--companion-hot-on-c", "nan"],
+            &["--companion-hot-on-c", "inf"],
+            &["--companion-hot-on-c", "20"],
+            &["--companion-cold-off-c", "10"],
+            &["--companion-dry-off-pct", "30"],
+            &["--companion-pressure-drop-off-hpa", "4"],
+            &["--companion-rest-interval-ms", "-1"],
+            &["--companion-hot-off-c", "hot"],
+        ];
+        for extra in cases {
+            assert!(
+                matches!(with_extra(extra), Err(CliError::Invalid { .. })),
+                "{extra:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn companion_overrides_are_rejected_with_no_companion() {
+        assert!(matches!(
+            with_extra(&["--no-companion", "--companion-rest-interval-ms", "1000"]),
+            Err(CliError::Invalid {
+                flag: "--no-companion",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn a_companion_flag_without_a_value_is_an_error() {
+        assert_eq!(
+            with_extra(&["--companion-sleep-at"]),
+            Err(CliError::NoValue("--companion-sleep-at".to_owned()))
+        );
+    }
+
+    #[test]
+    fn overridden_config_drives_a_companion() {
+        use deskcat_domain::{Bubble, Companion, Face, Millis};
+        let Ok(Parsed::Run(args)) = with_extra(&[
+            "--companion-rest-interval-ms",
+            "1000",
+            "--companion-sleep-at",
+            "12:00",
+            "--companion-wake-at",
+            "12:10",
+        ]) else {
+            panic!("実行になる");
+        };
+        let noon = LocalMinutes::new(11, 0).expect("範囲内");
+        let mut c = Companion::new(args.companion, Millis(0));
+        assert_eq!(c.tick(Millis(500), noon).bubble, None);
+        assert_eq!(c.tick(Millis(1000), noon).bubble, Some(Bubble::TakeBreak));
+        // 上書きした夜の時間帯に入ると寝顔になり、MVPの夜（22時）には依存しない。
+        let night = LocalMinutes::new(12, 5).expect("範囲内");
+        assert_eq!(c.tick(Millis(1500), night).face, Some(Face::Sleeping));
+        assert!(c.is_asleep());
     }
 }

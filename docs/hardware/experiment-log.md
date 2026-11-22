@@ -79,6 +79,7 @@
 | [EXP-065](#exp-065-窓c製品-buildno-touch-487を-pi-とつなぎ743-のコメントの見た目と751-の揺れの検出と温湿度の報告を見た) | [#743](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/743)・[#751](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/751)。窓C。製品 build を Pi とつなぎ、コメントの見た目、揺れの検出（#751 の 5）、温湿度の報告（6）を見た | 値の正なし（観測の記録） |
 | [EXP-066](#exp-066-受信の間隔の-log-を足した製品-buildlink-gap-20no-touch-487でpi-が送る-frame-の到着の間隔をlcd-の描画センサーの読み出しpi-の負荷と同時に測った) | [#20](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/20)の`HW-TBD-017`（Pi からの受信が途切れたと判定するまでの時間）の材料。現在の Pi session の frame の到着の間隔を、LCD の描画、センサーの読み出し、Pi の負荷と同時に、5つの条件で測った。同じ窓で [#683](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/683) の手順3・4の記録も取った | 値の正なし（観測の記録。`HW-TBD-017`の値はここで決めない） |
 | [EXP-067](#exp-067-764-の受け入れ条件4製品-buildno-touch-487でb3-を立てた姿勢の静止と揺らしを見た2回の窓) | [#764](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/764)の受け入れ条件4。製品 build を Pi とつなぎ、B3 を立てた姿勢の静止と揺らし、平らに寝かせたときの検出を見た（2回の窓） | 値の正なし（観測の記録） |
+| [EXP-069](#exp-069-514-の段階的な確認4no-touch-487led-no-touch-514-の-build-を-pi-とつなぎ白と赤の-led-の表示を見た) | [#514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)の[段階的な確認](led-514-demo.md#段階的な確認)の4。白の点滅・点灯・Pi を止めた後の点滅への戻り、赤の `happy` での約1秒の点灯を見た | 値の正なし（観測の記録） |
 
 **大容量の生dataはこのrepositoryへ入れていない。**保存場所は
 [development-foundation-plan.md](../planning/development-foundation-plan.md)の
@@ -5860,7 +5861,7 @@ ELF（wdt）`77d40227f4dca649e3cda797b3ac599087b1aef534e33ab848cb26b37e0f11bd`�
 
 ## EXP-066: 受信の間隔の log を足した製品 build（link-gap-20,no-touch-487）で、Pi が送る frame の到着の間隔を、LCD の描画、センサーの読み出し、Pi の負荷と同時に測った
 
-[#20](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/20)の`HW-TBD-017`（ESP32 が Pi からの受信の途切れと判定するまでの時間）を決める材料として、**Pi → ESP32 の frame の到着の間隔**を実機で取った窓。同じ窓で、[#683](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/683)の手順の3と4（Pi の実 port の待ちと、ESP32 の main loop の周期・期限超過・UART を読みに行く間隔）の記録も取った。servo は動かしていない。**この記録は観測の事実だけを書く。`HW-TBD-017`の値、判定の基準、`ping`の間隔は、ここでは決めない。**#683 の実行方式の判断（手順の5と6）も、ここでは行わない。
+[#20](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/20)の`HW-TBD-017`（ESP32 が Pi からの受信の途切れと判定するまでの時間）を決める材料として、**Pi → ESP32 の frame の到着の間隔**を実機で取った窓。同じ窓で、[#683](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/683)の手順の3と4（Pi の実 port の待ちと、ESP32 の main loop の周期・期限超過・UART を読みに行く間隔）の記録も取った。servo は動かしていない。**この記録は観測の事実だけを書く。`HW-TBD-017`の値、判定の基準、`ping`の間隔は、ここでは決めない。**#683 の実行方式の判断（手順の5と6）も、ここでは行わない（[ADR-0028](../decisions/0028-keep-single-runner-and-single-main-loop.md)に置いた）。
 
 | 項目 | 内容 |
 |---|---|
@@ -5971,13 +5972,15 @@ ESP32 の uptime と Pi の時刻は、同じ `set_expression` の id（`id=4`�
 - ESP32 の `health` の行（174行）：`overrun_ticks`、`pi_uart_rx_buffer_full`、`pi_uart_rx_fifo_overflow` は、すべて0だった。`max_read_gap_ms` の最大は、条件0から順に 86、90、91、107、109 ms。
 - Pi の `link_wait` の行（10秒ごと）の最大（µs）：
 
-| 条件 | 行数 | step_max_us | read_data_max_us | write_max_us | flush_max_us |
-|---|---|---|---|---|---|
-| 0 | 28 | 80503 | 42744 | 8191 | 29282 |
-| 1 | 30 | 82762 | 45956 | 1033 | 32044 |
-| 2 | 37 | 80761 | 46814 | 1040 | 29555 |
-| 3 | 31 | 2505263 | 47710 | 20798 | 40954 |
-| 4 | 39 | 1745795 | 58944 | 18660 | 49639 |
+| 条件 | 行数 | step_max_us | read_idle_max_us | read_data_max_us | write_max_us | flush_max_us |
+|---|---|---|---|---|---|---|
+| 0 | 28 | 80503 | 78383 | 42744 | 8191 | 29282 |
+| 1 | 30 | 82762 | 54375 | 45956 | 1033 | 32044 |
+| 2 | 37 | 80761 | 53847 | 46814 | 1040 | 29555 |
+| 3 | 31 | 2505263 | 81140 | 47710 | 20798 | 40954 |
+| 4 | 39 | 1745795 | 82462 | 58944 | 18660 | 49639 |
+
+`read_idle_max_us`（data の無い poll の待ち）の列は、2026-11-22 に同じ生の log（`deskcatd-066-c0.log`〜`c4.log`）の `link_wait` の行から足した。`step_max_us` が 1 s を超えた行は条件3で11行、条件4で6行あり、そのどの行でも、serial の1回の呼び出しの最大（`read_idle`・`read_data`・`write`・`flush`）は 82.5 ms 以下だった。1回の呼び出しが `step` の大半を占めた形跡は無い。呼び出しの合計時間は log に無いので、合計が `step` を占めたかどうかは分からない。
 
 ### Pi の負荷（条件3・4）
 
@@ -6071,6 +6074,46 @@ ESP32 の uptime と Pi の時刻は、同じ `set_expression` の id（`id=4`�
 - Pi 側の `shaken` ごとの受理の数（`shaken` ごとの log の行は無く、counter は SIGTERM で止めたため出ていない。窓2では `Dizzy` の表情の行で見た）。
 - `deskcatd` が SIGINT で止まらない原因。
 
+## EXP-069: #514 の段階的な確認4。no-touch-487,led-no-touch-514 の build を Pi とつなぎ、白と赤の LED の表示を見た
+
+[#514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)の[段階的な確認](led-514-demo.md#段階的な確認)の4を、[PR #785](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/785)で足した build（`no-touch-487,led-no-touch-514`）で見た窓。servo は動かしていない。
+
+| 項目 | 内容 |
+|---|---|
+| Test ID | `EXP-069` |
+| Date | 2026-11-22（UTC 00:51〜01:39。日本時間では 09:51〜10:39） |
+| Operator | 線の抜き挿し（USB、Pi の電源、LCD の VCC、Pi との UART の2本）、LED と LCD の観察、配線の目視はユーザー。build、書き込み、console と Pi の記録、Pi の本番 service の停止、`deskcatd` の起動と停止、Pi の poweroff は実機側の PM（AI） |
+| 承認 | 承認があった：承認者 wachi-yoshitaka-11-dev、2026-11-22T00:20Z ごろ、実機側の PM のセッション。範囲は、AI の問い「VM 側の PM の指示により、#514 の確認4として、develop（addf99e）の no-touch-487,led-no-touch-514 を ESP32 に書き込み、Pi をつないで deskcatd から happy と neutral を交互に送り、白と赤の LED を見る窓を、今行ってよいですか？（servo は動かさず、PSU の電源プラグは抜いたまま）」 |
+| Hardware revision／Exact components | `MCU-01`、`DISP-01`（LCD の VCC の線を B2 の a1 に挿した）、`ACCEL-01`・`ENV-01`、`SBC-01`、`LED-COMM-01`（白）・`LED-REACT-01`（赤）の2枝（[EXP-052](#exp-052-組み直した3枚の板で初回通電しbringup-led-514のled点灯と導通を取った)で組んだまま。ユーザーの申告）。`touch` の `T_CS`（B2 a10）は挿さっていた（ユーザーの申告）。Pi との線は `X1`（紫）、`X2`（青）、`X3`（黒）、`S21`（黄）、`S22`（橙）。`S21`・`S22` は、窓の始めに B1 の F1・F2 の側を抜き、Pi と ESP32 の両方に電源が入った後に挿し、電源を切る前に抜いた。抜き差ししたのは F1・F2 の側で、[配線表](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/hardware/breadboard-rebuild/wiring-table.md)の S21・S22 の行が定める K23・K26 の側ではない（どちらも ESP32 の板の側の端）。`PSU-BENCH-01` は電源プラグを抜いたまま |
+| Firmware | `no-touch-487,led-no-touch-514`、develop `addf99e`（fmt・clippy `-D warnings`・build を通した）。ELF sha256 `81c68cbb7d648bfc7759301525f86fea513d94f9f0eb731ed92880cb466885b7`（起動 log の先頭9桁 `81c68cbb7` と一致）。書き込みは1回 |
+| Pi software | develop `addf99e` の `deskcatd` を Pi で build（`cargo build --release --locked -p deskcatd`。検証済みコマンドではない）。sha256 `7d5ff6c2cd1825dd64cde806e9b37fa6ea259ed0c4adda732b953e333acb54b6`。引数は unit と同じもの（`--port /dev/serial0 --baud 115200 --duplicate-capacity 8 --duplicate-retention-ms 5000 --startup-deadline-ms 10000`）に、`--no-companion --probe-expression happy --probe-interval-ms 3000 --verbose` を足して手で起動した。本番の service は窓の始めに failed で止まっていた（`systemctl stop` も送った） |
+| Power supply and current limit | ESP32 はこの端末の USB。Pi は別の電源で、ESP32 とは UART の2本と GND だけでつないだ。電流・電圧・温度は測っていない |
+| Measurement equipment | UART0 の log（115200。端末の UTC 時刻を付けた）、Pi の `deskcatd` の log（Pi の UTC 時刻を付けた）。Pi と端末の時計の差は、ssh で3回読んで +0.73〜+0.87 s（Pi が進み。往復 1.5〜1.8 s） |
+| Raw data | repository の外の `deskcat-evidence/windows-20261122-514/`（`console.log`、`notes.txt`、`clock-offset.txt`、`approval.txt`、`elf-sha256.txt`、`flash.log`）と、Pi の `~/deskcatd-514.log` |
+| Expected result | led-514-demo.md の`段階的な確認`の4のとおり |
+| Measured result | 下記 |
+
+### 観測
+
+- **白（起動直後）：**起動の log に `led phase=link_unconfirmed white=on red=off uptime_ms=266`。ユーザーの目視では、白が約1秒の周期で点滅し、赤は消えていた。LCD に顔が出ていた。
+- **白（Pi とつながった後）：**`deskcatd` の起動の後、01:05:15.813Z に `led phase=link_up white=on red=off uptime_ms=342314`。ユーザーの目視では、白は点きっぱなしだった。
+- **赤：**`happy` の受理（`pi_rx_set_expression … name=Happy accepted`）は301回で、`led_react_pulse … hold_ms=1000` も301回、どれも受理の直後に出た。`neutral` の受理は300回で、そのときは `led_react_pulse` は出なかった。ユーザーの目視では、赤は約6秒に1回、約1秒点いて消え、それ以外は消えていた。LCD は笑顔と普通の顔が交互に変わった。
+- **白（Pi を止めた後）：**`deskcatd` が最後に送った frame は `ping`（Pi の時計で 01:35:29.058Z。時計の差で端末の時刻へ直すと約 01:35:28.3Z）。01:35:36.035Z に `led phase=link_unconfirmed`（`uptime_ms=2162550`）。最後の送信から約 7.7 s（2つの時計の差の読みの幅を含む。ESP32 が最後に受けた時刻の log は無い）。ユーザーの目視では、白は点滅に戻り、赤は消えたままだった。
+- `set_expression` の拒否（`pi_rx_set_expression_rejected`）は0回。`panic`・`brownout` は0件。
+- **起動の数：**3回（USB を挿したとき、書き込みの後、console を開いたとき）。
+
+### 窓の終わり
+
+- `deskcatd` は SIGINT（01:34:40Z は `pkill -INT -f release/deskcatd`、01:35:05Z は `kill -INT` で PID を指定。Pi の時計）で止まらず、SIGTERM（01:35:29Z）で止めた（[EXP-067](#exp-067-764-の受け入れ条件4製品-buildno-touch-487でb3-を立てた姿勢の静止と揺らしを見た2回の窓)と同じ）。
+- `S21`（F1 の側）・`S22`（F2 の側）を抜き、AI が Pi を poweroff し、ユーザーが Pi の電源の線、ESP32 の USB、LCD の VCC の線を抜いた。Pi の GPIO14 を入力 pull-down にする操作はしていない。
+
+### 確かめていないこと（主張しないこと）
+
+- `surprised` と、拒否された `happy` で赤が点かないこと（`surprised` は送っていない。拒否はこの窓では起きなかった。VM 側の PM の判断で、実機では確かめない）。
+- 白の点滅の周期と赤の点灯の長さの実測（目視と log の `hold_ms` だけ）。
+- `deskcatd` が SIGINT で止まらない原因。
+- LED の電流、電源 rail の電圧、発熱。
+
 ## Revision履歴
 
 | 日付 | Revision | 変更 | 根拠 |
@@ -6152,3 +6195,5 @@ ESP32 の uptime と Pi の時刻は、同じ `set_expression` の id（`id=4`�
 | 2026-11-19 | 74 | [#764](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/764)。**`EXP-067`を追加した。**製品 build（`no-touch-487`、develop `fc21ee3`）を Pi とつなぎ、B3 を立てた姿勢の静止と揺らしを2回の窓で見た。立てた静止の3分は2回とも検出0件、起きている時間帯に揺らすと `Dizzy` になった。平らに寝かせた1回目の間に検出が続いたこと（原因は未確認）と、`deskcatd` が SIGINT で止まらなかったことを、観察として書いた | 窓1（2026-11-18）と窓2（2026-11-19）の UART0 の log と Pi の `deskcatd` の log、ユーザーの目視の報告 |
 | 2026-11-19 | 75 | [#20](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/20)。**`EXP-066`の通電前の確認の1を、Power Budget の判断に合わせた。**`link-gap-20,no-touch-487` の通電の可否を Power Budget と README の表へ反映したので、「未判定。反映するまで通電しない」を、その節を参照する文に置き換えた。条件の間で ESP32 を再起動するかを窓の計画に任せていたのを、再起動すると決めた（累計の値が条件をまたいで残り、条件ごとに読めないため）。 | 計画の前提の更新（観測の記録ではない） |
 | 2026-11-20 | 76 | [#20](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/20)・[#683](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/683)。**`EXP-066`を計画から記録へ書き換えた。**`link-gap-20,no-touch-487`（`befc02d`）を Pi とつなぎ、5つの条件で frame の到着の間隔を測った窓の観測の事実（計画から変えた点、条件(1)の非通電の確認、起動7回、条件ごとの値、累計の最大の1件が session の確立を待つ間だったこと、条件3・4の 2 秒を超える間隔と Pi の待ちの窓の対応、#683 の分、Faults）を書いた。`HW-TBD-017`の値と`ping`の間隔は決めていない | 窓（2026-11-20）の UART0 の log、Pi の `deskcatd` の log と状態の記録、ユーザーの申告（テスターの読み、配線の目視、表情の目視） |
+| 2026-11-22 | 77 | [#683](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/683)。**`EXP-066`の導入に、実行方式の判断の置き場所（[ADR-0028](../decisions/0028-keep-single-runner-and-single-main-loop.md)）への link を足した。**`EXP-066` の Pi の serial の表に、同じ生の log から `read_idle_max_us` の列と、`step` が 1 s を超えた行での1回の呼び出しの最大を足した。それ以外の記録の内容は変えていない。判断は ADR に置いた | ADR-0028（判断の材料は `EXP-066` の記録）。`read_idle_max_us` の値は、repository の外の `deskcat-evidence/windows-20261120-066/` の `deskcatd-066-c0.log`〜`c4.log` の `link_wait` の行 |
+| 2026-11-22 | 78 | [#514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)。**`EXP-069`を追加した。**`no-touch-487,led-no-touch-514`（develop `addf99e`）を Pi とつなぎ、白の点滅・点灯・Pi を止めた後の点滅への戻りと、赤の `happy` での約1秒の点灯を見た窓の記録。拒否された `happy` は実機で確かめていない | 窓（2026-11-22）の UART0 の log、Pi の `deskcatd` の log、ユーザーの申告（LED と LCD の目視、配線の目視） |
