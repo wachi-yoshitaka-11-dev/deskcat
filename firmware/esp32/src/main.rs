@@ -135,6 +135,8 @@
 //! - I2C の1 transaction は `config::I2C_TRANSACTION_TIMEOUT_MS`（100 ms）で返る（`crate::i2c_bus`）。1周に複数回あれば、その分が足される。
 //!   EXP-065 では `tap_read_failed` が4件（`ESP_ERR_TIMEOUT` が1件、`ESP_FAIL` が3件）出たが、同じ窓の `max_read_gap_ms` は EXP-065 の記録に無い。
 //! - LCD は1周に帯を1本だけ塗る（`crate::face`）。1本の所要時間は測っていない。
+//! - 実測はどれも `no-touch-487` の build である。touch を読む build（既定）の touch の1 sample の読み出し（SPI）と、LED を駆動する build の LED の更新は、
+//!   実測に入っていない。
 //! - `reselect_sid` の NVS 操作と、log 出力の所要時間は測っていない（`config::PI_PROTOCOL_UART_RX_BUFFER_BYTES` の doc）。
 //!
 //! `max_read_gap_ms` の観測した最大（109 ms）の2倍に read の待ちの上限（約 1 s）を足しても（約 1.2 s）、timeout（5 s）の約4分の1である。**測っていない要因が合計で timeout を超える根拠は見つけていないが、
