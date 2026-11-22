@@ -2,9 +2,11 @@
 //! （[Issue #711](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/711)）。
 //!
 //! **servoを駆動するbuildは、[`register_main_task`]で登録する。**main taskが止まったまま、LEDCが最後のdutyを
-//! 出し続けてservoを拘束し続けることを、timeoutで限るためである。今は`bench-servo-calib-18`
-//! （`crate::servo_calib`）だけが呼ぶ。後で製品buildがservoを駆動するようになったら（#19・#20）、
-//! そのbuildもこの関数で登録する。
+//! 出し続けてservoを拘束し続けることを、timeoutで限るためである。`bench-servo-calib-18`
+//! （`crate::servo_calib`）が呼ぶ。**製品build（`deskcat_product_mode`。既定、`no-touch-487`、
+//! `led-no-touch-514`、`link-gap-20`）も、servoを駆動しないが、同じ関数で登録する**（[`ProductWatchdog`]。
+//! [Issue #487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)の条件1。servoを出すより前に、
+//! main loopが止まったときにresetする経路を、servoの無い構成で先に動かすためである）。
 //!
 //! **この関数は設定を決めない。**timeout・idle taskの監視・panicは、`TWDTConfig::new()`＝sdkconfigの値のままである
 //! （`CONFIG_ESP_TASK_WDT_TIMEOUT_S`、`CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU*`、`CONFIG_ESP_TASK_WDT_PANIC`）。
@@ -23,9 +25,12 @@
 //! flashし直すか、電源を切る）。
 //! **実機では動かしていない。**
 
+#[cfg(feature = "bench-wdt-711")]
 use std::time::Instant;
 
+#[cfg(feature = "bench-wdt-711")]
 use esp_idf_svc::hal::delay::FreeRtos;
+#[cfg(feature = "bench-wdt-711")]
 use esp_idf_svc::hal::peripherals::Peripherals;
 use esp_idf_svc::hal::task::watchdog::{TWDTConfig, TWDTDriver, WatchdogSubscription, TWDT};
 use esp_idf_svc::sys::EspError;
@@ -66,6 +71,58 @@ pub fn register_main_task<'a>(
     driver
         .watch_current_task()
         .map_err(RegisterError::Subscribe)
+}
+
+/// 製品buildのmain taskのwatchdog。**登録できなくても、製品buildは動き続ける**（servoを駆動しないため。
+/// 登録できなかったことは`product_wdt_unavailable`としてlogへ出す）。**servoを駆動する製品buildにする
+/// ときは、登録できなければservoを動かさない扱いへ変える**（`bench-servo-calib-18`と同じ。#20）。
+///
+/// 設定は`TWDTConfig::new()`＝sdkconfigの値であり、ここでtimeoutを決めない
+/// （[`register_main_task`]）。**feedは、main loopの各周の初めに1回だけ行う。**
+/// timeoutと、loopの1周の最悪の長さの関係は、`main.rs`のmodule docの`Task Watchdog Timer`の段落が持つ。
+#[cfg(deskcat_product_mode)]
+pub struct ProductWatchdog<'a> {
+    subscription: Option<WatchdogSubscription<'a>>,
+    feed_failure_logged: bool,
+}
+
+#[cfg(deskcat_product_mode)]
+impl<'a> ProductWatchdog<'a> {
+    /// main taskを登録する。失敗は握りつぶさず、1回だけlogへ出し、以後`feed`は何もしない。
+    pub fn register(slot: &'a mut Option<TWDTDriver<'static>>, twdt: TWDT<'static>) -> Self {
+        let panic_on_trigger = TWDTConfig::new().panic_on_trigger;
+        let subscription = match register_main_task(slot, twdt) {
+            Ok(subscription) => {
+                log::info!(
+                    "product_wdt_registered timeout_s={} panic_on_trigger={panic_on_trigger}",
+                    esp_idf_svc::sys::CONFIG_ESP_TASK_WDT_TIMEOUT_S
+                );
+                Some(subscription)
+            }
+            Err(err) => {
+                log::error!(
+                    "product_wdt_unavailable error={err}. main taskは未登録で、製品buildはwatchdogなしで動く"
+                );
+                None
+            }
+        };
+        Self {
+            subscription,
+            feed_failure_logged: false,
+        }
+    }
+
+    /// 登録していれば餌付けする。失敗は最初の1回だけlogへ出す（毎周の出力にしない）。
+    pub fn feed(&mut self) {
+        if let Some(subscription) = self.subscription.as_mut() {
+            if let Err(err) = subscription.feed() {
+                if !self.feed_failure_logged {
+                    self.feed_failure_logged = true;
+                    log::error!("product_wdt_feed_failed error={err}. 以後の失敗はlogへ出さない");
+                }
+            }
+        }
+    }
 }
 
 /// `bench-wdt-711`のbuildの本体。**戻らない。**登録した後は一度もfeedしない。

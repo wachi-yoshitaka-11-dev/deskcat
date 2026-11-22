@@ -114,8 +114,32 @@
 //! **Task Watchdog Timer の timeout は ESP-IDF の既定値のままである。**`sdkconfig.defaults` が足した watchdog の項目は
 //! `CONFIG_ESP_TASK_WDT_PANIC=y` だけである（[Issue #711](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/711)。
 //! 発火したら警告で止めず panic して reset する）。**全ての build が同じ `sdkconfig` を使うので、この設定は全 build に効く**
-//! （製品 build を含む。従来は警告だけだった）。登録するのは idle task（既定。両 core）で、main task を登録するのは
-//! `bench-servo-calib-18` の build だけである（`crate::task_wdt::register_main_task`。`bench-wdt-711` の検証 build も登録するが、servo に触れない）。**実機では確かめていない。**heartbeat loop は
+//! （製品 build を含む。従来は警告だけだった）。登録するのは idle task（既定。両 core）と、main task である。
+//! **main task を登録する build は、`bench-servo-calib-18`、`bench-wdt-711`（servo に触れない）、そして製品 build
+//! （`deskcat_product_mode`。既定、`no-touch-487`、`led-no-touch-514`、`link-gap-20`。servo は駆動しない）である**
+//! （`crate::task_wdt`。[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)の条件1）。製品 build は、初期化の後・loop の直前に登録し、
+//! loop の各周の初めに1回 feed する。登録できなければ `product_wdt_unavailable` を出し、watchdog なしで動く（servo を駆動しないため。
+//! servo を駆動する製品 build にするときは、`bench-servo-calib-18` と同じく、登録できなければ servo を動かさない扱いへ変える）。
+//! **製品 build の登録と feed は実機では確かめていない**（`bench-wdt-711` が登録した main task を feed しないと panic reset することは
+//! [EXP-060](../../../docs/hardware/experiment-log.md)で確かめた）。
+//!
+//! **timeout と、製品 build の loop の1周の長さの関係。**timeout は `CONFIG_ESP_TASK_WDT_TIMEOUT_S`（`sdkconfig.defaults` は設定せず、
+//! ESP-IDF v5.5.3 の既定値。生成された `sdkconfig` で `CONFIG_ESP_TASK_WDT_TIMEOUT_S=5`（5 s）と確かめた。debug profile の build 出力）である。**この値を新しく決めていない。**
+//! 1周の長さは、health snapshot の `max_read_gap_ms`（`read` から次の `read` までの間隔の最大。loop の1周の長さに当たる）で見える。
+//! 実測は、[EXP-066](../../../docs/hardware/experiment-log.md)の5条件（`link-gap-20,no-touch-487`、LCD の描画・センサーの読み出し・Pi の負荷と同時）で
+//! 最大 86、90、91、107、109 ms、[EXP-062](../../../docs/hardware/experiment-log.md)の窓 B（`no-touch-487`）の #713 の項（Pi が不正な行を114行送った後）で最大 71 ms である。
+//! **これは観測した最大であり、上限ではない。**
+//! 1周を長くしうるもので、実測の最大に入っていないか、所要時間を測っていないものは次のとおり。
+//! - I2C の1 transaction は `config::I2C_TRANSACTION_TIMEOUT_MS`（100 ms）で返る（`crate::i2c_bus`）。1周に複数回あれば、その分が足される。
+//!   EXP-065 では `tap_read_failed`（`ESP_ERR_TIMEOUT`）が4件出たが、同じ窓の `max_read_gap_ms` は EXP-065 の記録に無い。
+//! - LCD は1周に帯を1本だけ塗る（`crate::face`）。1本の所要時間は測っていない。
+//! - `reselect_sid` の NVS 操作と、log 出力の所要時間は測っていない（`config::PI_PROTOCOL_UART_RX_BUFFER_BYTES` の doc）。
+//!
+//! 観測した最大（109 ms）は timeout の約45分の1（5000 ÷ 109）である。**測っていない要因が合計で timeout を超える根拠は見つけていないが、
+//! 超えないことも示していない。**超えれば、製品 build は panic して reset する（その回数は `reset_reason` の `task_watchdog` で数えられる）。
+//! 実機で観測する項目は、製品 build を動かす窓で、`reset_reason=task_watchdog` が0件であることと、`max_read_gap_ms` である。
+//!
+//! heartbeat loop は
 //! [`FreeRtos::delay_ms`] で待つ。同 API は
 //! 「Delays bigger than `1000 /` `TICK_RATE_HZ` milliseconds … used in a loop would
 //! starve the FreeRTOS IDLE tasks as they are low prio tasks and hence the IDLE task's
@@ -417,7 +441,11 @@ mod servo_calib;
 mod servo_path;
 mod spi_port;
 mod tap;
-#[cfg(any(feature = "bench-servo-calib-18", feature = "bench-wdt-711"))]
+#[cfg(any(
+    feature = "bench-servo-calib-18",
+    feature = "bench-wdt-711",
+    deskcat_product_mode
+))]
 mod task_wdt;
 // 製品buildは`touch::StrokeDetector`、LCDを描く試験build（`bringup-display-13`・`face-21`）と`no-touch-487`は読まない`touch::IdleTouch`だけを使う。
 // 試験buildの読み出しの型（`TouchSampler`）はdead_codeになる。
@@ -1000,9 +1028,20 @@ fn main() {
     #[cfg(feature = "debug-motion-19")]
     let debug_console = debug_motion::DebugConsole::start();
 
+    // main taskをtask watchdogへ登録する（#487の条件1。`crate::task_wdt::ProductWatchdog`）。
+    // **初期化（LCD・I2C・Pi linkのdriver・`boot`の最初の送信）の後、loopの直前**であり、初期化の間は登録していない
+    // （初期化の所要時間はtimeoutに含めない。この間もIDLE taskの監視は効く）。購読を手放さない（dropすると外れる）。
+    #[cfg(deskcat_product_mode)]
+    let mut twdt = None;
+    #[cfg(deskcat_product_mode)]
+    let mut product_wdt = task_wdt::ProductWatchdog::register(&mut twdt, peripherals.twdt);
+
     // **`main()` から戻らない。**#6 の firmware は戻っていたため、task が進み続けて
     // いるかを外から確認できなかった。
     loop {
+        // 各周の初めに1回だけ餌付けする。1周の最悪の長さとtimeoutの関係は、module docの`Task Watchdog Timer`の段落。
+        #[cfg(deskcat_product_mode)]
+        product_wdt.feed();
         let now = health.uptime_ms();
         // 制御周期の期限が来たときだけ`tick`する。`LimitedServo`が無い間は何もしない（`PiLink::tick_servo`）。
         #[cfg(not(feature = "bench-servo-test-17"))]
