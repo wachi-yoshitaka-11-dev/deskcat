@@ -6,7 +6,7 @@
 //!
 //! 実機では[EXP-060](../../../docs/hardware/experiment-log.md)で通した（通しの10動作）。host testは無い（firmware crateはhostで動かせない）。
 //! 回ごとの実行承認（`承認の状態`の項目6の(c)）なしに、このbuildで駆動しない。手順・停止基準は`docs/hardware/servo-safety-limits.md`の
-//! 段0・段1までで、それより先の段は未記載。
+//! `手順・停止基準・受け入れ条件`節による。
 //!
 //! # 持たないもの
 //!
