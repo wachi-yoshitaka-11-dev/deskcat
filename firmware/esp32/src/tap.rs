@@ -150,14 +150,14 @@ impl TapDetector {
         self.next_poll_ms = now_ms + POLL_INTERVAL_MS;
         // sessionの入れ替わりを、`on_tick`と`on_tap`の両方より先に反映する（新しい世代のtapを、前の世代の保留と取り違えない）。
         if self.filter.on_session(session_epoch) {
-            self.log_decision("tap_confirmed", Decision::DropNoSession, None);
+            self.log_decision("tap_confirmed", Decision::DropNoSession, None, None);
         }
         // 保留中のtapを先に決める（読み出しの失敗に関わらず）。
         let confirmed = self
             .filter
             .on_tick(now_ms, session_established, touch_blocks);
         if let Some(decision) = confirmed {
-            self.log_decision("tap_confirmed", decision, None);
+            self.log_decision("tap_confirmed", decision, None, None);
         }
         events.tapped = confirmed == Some(Decision::Send);
         let int_source = self.accel.read_int_source(&mut self.i2c.borrow_mut());
@@ -189,7 +189,8 @@ impl TapDetector {
                 let decision = self
                     .filter
                     .on_tap(now_ms, session_established, touch_blocks);
-                self.log_decision("tap_detected", decision, Some(int_source));
+                // `uptime_ms`は`poll`の開始時刻で、`face_drawn`の`uptime_ms`と同じESP32の時計。差がend-to-endの時間（#22）。
+                self.log_decision("tap_detected", decision, Some(int_source), Some(now_ms));
                 events.tapped |= decision == Decision::Send;
                 events
             }
@@ -214,11 +215,18 @@ impl TapDetector {
         }
     }
 
-    fn log_decision(&self, event: &str, decision: Decision, int_source: Option<u8>) {
+    fn log_decision(
+        &self,
+        event: &str,
+        decision: Decision,
+        int_source: Option<u8>,
+        uptime_ms: Option<u64>,
+    ) {
         let c = self.filter.counters();
+        let uptime_ms = uptime_ms.map_or(String::new(), |v| format!(" uptime_ms={v}"));
         let int_source = int_source.map_or(String::new(), |v| format!(" int_source=0x{v:02x}"));
         log::info!(
-            "{event} decision={decision:?}{int_source} sent={} dropped_no_session={} dropped_touch={} dropped_too_soon={} dropped_detection_stopped={}",
+            "{event} decision={decision:?}{int_source}{uptime_ms} sent={} dropped_no_session={} dropped_touch={} dropped_too_soon={} dropped_detection_stopped={}",
             c.sent,
             c.dropped_no_session,
             c.dropped_touch,

@@ -22,7 +22,7 @@ session が確立し、LCD の bring-up と neutral 描画が終わった状態�
 
 `E` は ESP32 の `pi_tx` と Pi の受信で一致させる。ESP32 の `pi_tx` ログには `sid` が無いため、`S` は Pi が現在の session の event として受理したことの確認に使う。`C` は Pi の送信と ESP32 の受信で一致させる。`face_draw_failed`、`pi_rx_set_expression_rejected`、session の再確立、別の `face_show`、文字表示が間に入った試行は latency の標本から除外し、除外理由と件数を残す。`face_drawn` が無ければ成功に数えない。
 
-**End-to-end latency の標本は `B - A` ms。**両方 ESP32 の起動からの uptime なので、Pi と ESP32 の時計を同期する必要はない。`A` は `tapped` を送ると決めた `poll` の開始直前に採る（`tap-21` 構成ではそれが検出に至った `poll`。製品 build では保留が明けた `poll`）。`tap-21` 構成では、I2C の `INT_SOURCE` 読み出しと `tap_detected` log の時間も含むため、検出から描画までの**保守的な上限値**（`tap-21` 構成。製品 build は上のとおり `A` が保留の分だけ遅れるので、`B - A` は検出から描画までの時間より短い）であり、物理接触の開始時刻からの時間ではない。終点は最後の帯の転送後、次の main loop で完了を記録した時刻であり、画面の物理的な発光遅延は含まない。各試行の `A`、`B`、差、対応する `S/E/C`、失敗・除外の有無を表にし、標本数、最小、中央値、最大を報告する。目標遅延値は #22 に定義されていないため、合否値を推測で置かない。
+**End-to-end latency の標本は `B - A` ms。**（`tap_detected` の log 行は、`poll` の開始時刻を `uptime_ms=` で持つ。`face_drawn` の `uptime_ms` と同じ時計である。`tap_event_poll_start` とは別の項目で、製品 build では検出の `poll` と送信を決めた `poll`（保留が明けた `poll`）が異なるため、値は一致しない。`tap_detected` から `face_drawn` までの差が検出からの時間になる。`tap_detected` に `uptime_ms=` が付く前の build の log にはこの項目が無い。）両方 ESP32 の起動からの uptime なので、Pi と ESP32 の時計を同期する必要はない。`A` は `tapped` を送ると決めた `poll` の開始直前に採る（`tap-21` 構成ではそれが検出に至った `poll`。製品 build では保留が明けた `poll`）。`tap-21` 構成では、I2C の `INT_SOURCE` 読み出しと `tap_detected` log の時間も含むため、検出から描画までの**保守的な上限値**（`tap-21` 構成。製品 build は上のとおり `A` が保留の分だけ遅れるので、`B - A` は検出から描画までの時間より短い）であり、物理接触の開始時刻からの時間ではない。終点は最後の帯の転送後、次の main loop で完了を記録した時刻であり、画面の物理的な発光遅延は含まない。各試行の `A`、`B`、差、対応する `S/E/C`、失敗・除外の有無を表にし、標本数、最小、中央値、最大を報告する。目標遅延値は #22 に定義されていないため、合否値を推測で置かない。
 
 ## 件数と誤検出
 
