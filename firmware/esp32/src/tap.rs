@@ -189,7 +189,7 @@ impl TapDetector {
                 let decision = self
                     .filter
                     .on_tap(now_ms, session_established, touch_blocks);
-                // `uptime_ms`は`poll`の開始時刻で、`face_drawn`の`uptime_ms`と同じESP32の時計。差がend-to-endの時間（#22）。
+                // `uptime_ms`は`poll`の開始時刻で、`face_drawn`の`uptime_ms`と同じESP32の時計。差が検出から描画完了までの時間（#22のrunbookの`B - D`）。
                 self.log_decision("tap_detected", decision, Some(int_source), Some(now_ms));
                 events.tapped |= decision == Decision::Send;
                 events
