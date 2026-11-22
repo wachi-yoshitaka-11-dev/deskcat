@@ -6221,6 +6221,10 @@ ESP32 の uptime と Pi の時刻は、同じ `set_expression` の id（`id=4`�
 - **信号線：**0.00 の後、黒のクリップは P9 のまま、赤のクリップを P6 から外し、赤の棒を R6 の servo の側の足（B1 E7。[breadboard-rebuild の配線表](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/hardware/breadboard-rebuild/wiring-table.md)の R6 の行）に当てた。信号線と GND の間は **0.00**（当てた所が E7 であることはユーザーの申告）。
 - **起動の数：**2回（USB を挿したとき、console を開いたとき）。`panic`・`brownout` は0件。
 
+### 窓の終わり
+
+- PSU の POWER を切って電源プラグを抜き、クリップを2つとも外した（ユーザーの申告）。ESP32 の USB は抜いたまま、servo の plug は挿したまま。
+
 ### 確かめていないこと（主張しないこと）
 
 - `0.00` は分解能 0.01 V の表示で、給電の経路が完全に遮断されたことは示さない。信号線の読み 0.00 は、駆動されていないこと以上を示さない。
