@@ -24,8 +24,8 @@ review:  full reviewを使う
 
 **この表は覚えるためのものではない。**`.claude/settings.json`のhookが、着手前・merge時・
 merge後を機械で止める。**hookが止めない段の実行手順は`.claude/skills/deskcat-preflight`が持つ**
-（規則ではなく実行だけを持ち、規則はこの文書を参照する）。**merge前の承認とreviewの投げ方は止められない**（人の判断であり、
-`review`と`full review`はどちらも同じ枠を消費するため機械で選べない）。
+（規則ではなく実行だけを持ち、規則はこの文書を参照する）。**merge前の承認は止められない**（人の判断である）。
+reviewの依頼は、規則に反する形（`full`の付かない`review`、走った後の`full review`）は`coderabbit_gate.py`が`deny`し、それ以外の`full review`は`ask`で人間に確認する。
 hookの一覧と回避手順は[hookが止めたとき](#hookが止めたとき)にある。
 
 ## 作業開始前
@@ -662,7 +662,7 @@ allowlistに言及する記述は、廃止前の設定に対する観測であ�
 
 PMは依頼を判断し、投稿前に時刻を調整する。PR担当のセッションは投稿前にPMへ知らせ、
 **開いている全PRの最新の`@coderabbitai`投稿時刻**を確認する。いずれかが1時間以内なら待ち、
-投稿直前に全PRを再確認する。投稿はPR担当のセッションが行い、`coderabbit_gate.py`がユーザーの許可を求める。
+投稿直前に全PRを再確認する。投稿はPR担当のセッションが行い、`coderabbit_gate.py`が止める。
 投稿時刻は対象Issueのコメントに残す。
 依頼前の`@coderabbitai rate limit`による残数確認は必須としない。
 
@@ -679,7 +679,21 @@ reviewがまだ走っていないPRでは空振りしうる。依頼したreview
 安全・電気・protocol・firmwareに関わる変更は、reviewが完走するまでmergeしない
 （[Merge前の確認](#merge前の確認)）。
 
-**これはhookが強制する**（`scripts/hooks/gh_metadata_guard.py`。[#688](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/688)）。
+**依頼の形は`coderabbit_gate.py`が強制する**（[#781](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/781)）。
+`@coderabbitai`と同じ行の`review`が`full review`でなければ`deny`する（`review`は、reviewがまだ走っていないPRでは空振りして枠だけ消える）。
+対象PRのどれかのcommitでCodeRabbitのreviewが完走または進行中なら、`full review`も`deny`する。
+完走も進行中も無く、checkの説明文が`Review rate limited`か`Review stopped after lock loss`のときは、
+`deny`にせず`ask`（人間の確認）になる。対象のPRやcheckを判定できないときも`ask`で、素通りさせない。
+reviewがまだ走っていないPRの初回の`full review`も`ask`である。
+
+**`ask`が人間に届くか。**Claude Codeの公式資料（permission modesとhooksの各ページ）は、
+auto modeでもhookの`ask`はpermission promptへ送られ、classifierは決めないと書く。
+promptに答える人がいない`-p`の実行では拒否される。**資料の上では届く。**
+2026-11-19に`ask`を通り抜けた3回の原因は、資料から説明できず**未確認である**
+（`dontAsk`と`bypassPermissions`での扱いも、読んだ範囲に記述が無い）。
+そのため、規則に反すると字句と記録で決まるものは`deny`にし、`ask`に頼るのは人間の判断が要る`full review`（初回、再依頼の条件に当たりうる場合、判定できない場合）と、本文を読めず判定できない経路に限った。
+
+**mergeの前の検査はhookが強制する**（`scripts/hooks/gh_metadata_guard.py`。[#688](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/688)）。
 `gh pr merge`の前に、Pull Requestの変更fileが次のどれかを含み、かつ**どのcommitでも**CodeRabbitの
 reviewが完走していなければdenyする。完走の後に対応commitを足してheadが`Review skipped`でも通る。
 base `main`の昇格も同じ検査を受ける。**解除の手段は無く、`DESKCAT_SKIP_GH_GUARD`も効かない。**
@@ -947,7 +961,7 @@ scriptではない。**`gh_metadata_guard.py`は1 scriptで6つを見る
 | `gh issue create`／`gh pr create`の前 | 本文がtemplateの`## `節を持つか | 同上 |
 | `gh pr merge`の前 | 対象file（[手動で依頼する前に状態を確認する](#手動で依頼する前に状態を確認する)）を含むPull Requestで、CodeRabbitのreviewがどれかのcommitで完走しているか。**解除の手段は無い** | 同上 |
 | `gh issue close`の前、およびboardの`Status`を`Done`にする`gh project item-edit`の前 | 対象Issueの`受け入れ条件`の節に`- [ ]`が残っていないか（節が無い本文も止める）。**解除の手段は無い** | 同上 |
-| `@coderabbitai`へreviewを投げる前 | 同じ行に`review`の語があるか | `scripts/hooks/coderabbit_gate.py` |
+| `@coderabbitai`へreviewを投げる前 | 同じ行の`review`が`full review`か（**`full`の付かない`review`は`deny`**）。対象PRのどれかのcommitでreviewが完走・進行中なら`full review`も**`deny`**。完走も進行中も無いPR（`Review rate limited`や`Review stopped after lock loss`の後を含む）への`full review`と、対象PRやcheckを判定できないときは`ask`。[`ask`の扱い](#手動で依頼する前に状態を確認する) | `scripts/hooks/coderabbit_gate.py` |
 | `gh pr merge`の前 | squash messageから`git`が`Change-Class`と`Self-Review`をtrailerとして読むか | `scripts/hooks/gh_metadata_guard.py` |
 | `git checkout -b`／`git switch -c`の前 | 基点が最新の`origin/develop`か | `scripts/hooks/branch_base_guard.py` |
 | `gh pr merge`の後 | squash commitに実際に入ったか | `scripts/hooks/merge_trailer_report.py` |

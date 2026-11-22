@@ -39,7 +39,7 @@
 //!   詳細は[`crate::servo`]と[`run_servo_bench_test`]のdoc参照）。
 //! - **#514の追加LED（`LED-COMM`＝GPIO2、`LED-REACT`＝GPIO5）は`crate::led`が駆動する**
 //!   （[Issue #514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)）。既定の製品buildは、
-//!   白の点滅（通信の成立と継続を確認できていない間の表示。点灯へ切り替える判定は無い）と、`set_expression`で
+//!   白の表示（Piからの受信の見張りが生きている間は点灯、それ以外は点滅）と、`set_expression`で
 //!   `happy`を受理したときの赤の1秒点灯を行う。`bringup-led-514` feature付きbuildは、その前に点灯試験
 //!   （赤→白→両方）を行う。このfeatureは`bringup-display-13`とも組み合わせられる（pinが重ならない）。
 //!   **実機で動かした記録は、点灯試験用のbuildだけである。**
@@ -64,17 +64,18 @@
 //! | `touch-sample-14` | `TOUCH-01`（XPT2046）の raw 読み出し。SPI3（GPIO18/23/19）、`TOUCH-CS`＝GPIO21、`TOUCH-IRQ`＝GPIO34 で X・Y・Z1・Z2 を読み、IRQ の level とあわせて UART0 に log（#14、`crate::touch`）。`T_IRQ` の変化の時刻と、console から受けた `MARK` の時刻も log する（条件 6 の突き合わせ用）。LCD は初期化せず、`LCD-CS`（GPIO22）を High に固定する。状態機械は配線しない | 単独指定のみ。touch 用 5 本を足した配線で、`EXP-038`（develop `79f29ea`。raw を取った）と `EXP-041`（develop `b9a04e8`。`T_IRQ` の変化と `MARK` の log、`crate::spi_port` の bus の持ち方を含む版で、`MARK` 31 件に `touch_mark` 31 件、SPI の失敗 0 件）の版を実機に書き込んで動かした。次の通電・書き込みにも実機側の新たな承認が要る。Pi link の payload は変更しない |
 //! | `touch-lcd-14` | LCDを初期化して点灯し、表情（neutral→happy→surprised）を帯1本ずつ塗り続けながら、同じSPI host（SPI3）で`TOUCH-01`のrawを読む（#14の受け入れ条件「LCD通信による許容できないdata lossがない」の観察用、`crate::touch_lcd`）。LCDとタッチは`SpiDriver`を共有し、busは転送ごとに取る。帯の途中ではタッチを読まない。console（stdin）は読まず、`MARK`は受け付けない（`T_IRQ`の変化は`touch-sample-14`と同じくlogする）。状態機械は配線しない | 単独指定のみ。**製品buildも同じ共有の型を使う。busを握り続ける型は`touch-sample-14`だけ**（`crate::spi_port`）。`set_expression`は`hardware_unavailable`で拒否する。`EXP-041`で、develop `b9a04e8`の版を、LCDのVCC・9本・touch用5本が挿さった配線に書き込み、157秒動かした（帯7000本、`lcd_errors_total=0`、`touch_spi_errors_total=0`、LCDの乱れは目視の申告に無い）。次の通電・書き込みにも実機側の新たな承認が要る。Pi linkのpayloadは変更しない |
 //! | `bringup-display-13` | LCDの初期化、backlightの点灯、単色fillと四隅pattern | 表情とtapは有効にしない。描画の間のPi linkの受信とheartbeatは`crate::display_test`のmodule docを参照 |
-//! | `no-touch-487` | 製品buildと同じ。ただし`TOUCH-CS`（GPIO21）は`IdleTouch`が出力Highにして保ち、touchを読まず、`head_touched`を送らず、LED（GPIO2・GPIO5）に触れない（#487） | 単独で使う。`build.rs`は`link-gap-20`とこのfeatureだけ製品経路のcfgから外さず、併用は`link-gap-20`以外を`compile_error!`で止める。通電の条件は`docs/hardware/power-budget.md`の`touchを読まない製品build（no-touch-487）の通電の条件` |
-//! | `bringup-led-514` | #514の追加LED（GPIO2／GPIO5）の点灯試験（赤→白→両方）と、その後の白の点滅（`crate::led`）。製品buildにある赤の`happy`点灯も同じ経路を持つ。このfeatureだけのbuildは表情を持たないため`set_expression`を受理せず、赤は点灯試験の区間だけ点く。`face-21`と組み合わせたbuildは`happy`を受理し、赤を1秒点ける（この併用は`compile_error!`で止めていない） | 表情とtapは有効にしない。`bringup-display-13`とも組み合わせられる |
+//! | `no-touch-487` | 製品buildと同じ。ただし`TOUCH-CS`（GPIO21）は`IdleTouch`が出力Highにして保ち、touchを読まず、`head_touched`を送らず、LED（GPIO2・GPIO5）に触れない（#487。`led-no-touch-514`と併せるとLEDだけを戻す） | 単独で使う。`build.rs`は`link-gap-20`・`led-no-touch-514`とこのfeatureだけ製品経路のcfgから外さず、併用はその2つ以外を`compile_error!`で止める。通電の条件は`docs/hardware/power-budget.md`の`touchを読まない製品build（no-touch-487）の通電の条件` |
+//! | `led-no-touch-514` | `no-touch-487`の製品buildに`crate::led`（GPIO2・GPIO5）だけを戻す（#514）。白は、Piからの受信の見張り（`crate::pi_link::PiLink::link_alive`。loss timeoutは`LINK_LOSS_TIMEOUT_MS`、見張りは`boot`の確立から始まる。[#20](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/20)）が生きている間は点灯し、それ以外は点滅する。赤は`happy`の受理で1秒点く（製品buildと同じ） | **`no-touch-487`と併せて使う**（`no-touch-487,led-no-touch-514`）。`build.rs`は製品経路のcfgから外さず、`deskcat_product_led`を出す。`no-touch-487`なし、またはそれ以外のfeature（`link-gap-20`を含む）との併用は`compile_error!`で止める。通電の条件は`docs/hardware/power-budget.md`の`touchを読まない製品build（no-touch-487）の通電の条件`。実機で動かした記録は`docs/hardware/experiment-log.md`の`EXP-069` |
+//! | `bringup-led-514` | #514の追加LED（GPIO2／GPIO5）の点灯試験（赤→白→両方）と、その後の白の表示（`crate::led`）。製品buildにある赤の`happy`点灯も同じ経路を持つ。このfeatureだけのbuildは表情を持たないため`set_expression`を受理せず、赤は点灯試験の区間だけ点く。`face-21`と組み合わせたbuildは`happy`を受理し、赤を1秒点ける（この併用は`compile_error!`で止めていない） | 表情とtapは有効にしない。`bringup-display-13`とも組み合わせられる |
 //! | `face-21` | LCDの初期化とbacklightの点灯を保ち、`set_expression`の表情を描く。Pi commandを受けなくても、描ける状態になった時点で`neutral`を1回描く（#21、`crate::face`） | `bringup-display-13`とも組み合わせられる。**表情を持たない試験buildは`set_expression`を`hardware_unavailable`で拒否する** |
 //! | `tap-21` | ADXL345のtap検出を設定し、`INT_SOURCE`をI2Cで読み、bootのACK後に`tapped`を送る（#21のF1、`crate::tap`）。ADXL345のDevice IDが`0xE5`のときだけ設定を書き、I2Cのdriverを持ち続ける（一致しなければ何も書かず、driverを手放す） | INT線は使わない（配線は要らない）。`face-21`・`bringup-display-13`とも組み合わせられる。**試験buildのうち`tap-21`も`accel-sample-15`も持たないものは、ADXL345へ書き込まず、Device IDを読むだけである**（既定・製品buildは`tap-21`と同じく書く） |
 //! | `mem-probe-23` | health snapshotと同じ周期で、空きheap・起動からの最小の空きheap・main taskのstackのhigh water markを1行logへ出す（#23の`PROTO-TBD-007`、`crate::mem_probe`）。**このfeatureのbuildだけが`unsafe`を持つ**（`unsafe_code`を`deny`へ下げ、`mem_probe`の3呼び出しだけ`allow`） | logを足すだけで、LCD・Pi link・tapの挙動は変えない。featureを指定すると製品経路のcfgが外れるので、製品buildと同じ構成で測るときは`face-21`と`tap-21`を足す（タッチの撫での判定と`ENV-01`の周期測定・`environment`の送出は製品buildだけが持ち、この構成には入らない）。`bringup-display-13`とも組み合わせられる。単独の試験build（`env-sample-16`・`accel-sample-15`・`touch-sample-14`・`touch-lcd-14`）、`bringup-i2c-15-16`、`bringup-led-514`、`bench-servo-test-17`、`debug-motion-19`とは併用できない（`compile_error!`） |
-//! | `link-gap-20` | 現在のPi sessionのframeの到着の間隔（`LinkWatch::note_rx`へ渡すのと同じ時刻の差）を数え、health snapshotと同じ周期で1行logへ出す（#20の`HW-TBD-017`の実測用、`deskcat_servo::RxGapStats`、`crate::pi_link::PiLink::log_link_gap`）。**観測だけを足す。**`LINK_LOSS_TIMEOUT_MS`・`LinkWatch`の判定・servo出力・Pi linkの応答は変えない。`unsafe`は持たない | **製品buildの経路を外さない**（`no-touch-487`と同じ扱い。`build.rs`）。LCDの描画・`ENV-01`の周期測定・撫での判定・LEDが製品buildと同じ負荷で動く（`no-touch-487`と併用すると、touchを読まない）。併用してよいのは`no-touch-487`だけで、他のfeatureとは併用できない（`compile_error!`）。通電の可否は決めていない（`firmware/esp32/README.md`の表）。実機では動かしていない。手順は`docs/hardware/experiment-log.md`の該当EXPの計画 |
+//! | `link-gap-20` | 現在のPi sessionのframeの到着の間隔を数え、health snapshotと同じ周期で1行logへ出す（#20の`HW-TBD-017`の実測用、`deskcat_servo::RxGapStats`、`crate::pi_link::PiLink::log_link_gap`）。**観測だけを足す。**`LINK_LOSS_TIMEOUT_MS`・`LinkWatch`の判定・servo出力・Pi linkの応答は変えない。`unsafe`は持たない | **製品buildの経路を外さない**（`no-touch-487`と同じ扱い。`build.rs`）。LCDの描画・`ENV-01`の周期測定・撫での判定・LEDが製品buildと同じ負荷で動く（`no-touch-487`と併用すると、touchを読まず、撫での判定とLEDは動かない）。併用してよいのは`no-touch-487`だけで、他のfeatureとは併用できない（`compile_error!`）。通電してよいのは`no-touch-487`と併用したときだけである（`firmware/esp32/README.md`の表）。実機の結果は[EXP-066](../../../docs/hardware/experiment-log.md)（`no-touch-487`と併用） |
 //! | `debug-motion-19` | UART0のconsoleから`MOTION <name> <target>`の行を別threadで読み、Pi由来の`play_motion`と同じ`MotionDispatch`のcatalogへ渡す（#19の受け入れ条件3、`crate::debug_motion`、`crate::pi_link::PiLink::on_debug_line`）。**servoを駆動せず、`LimitedServo`も`Limiter`も作らない。catalogが空のため、debugの指示も全て拒否される。同じ`Limiter`（同じcounter）を通ることは、`deskcat_servo`のhost testが示す範囲である** | **製品buildには入らない**（featureなし）。featureを指定すると製品経路のcfgが外れる。Pi linkを持つ。`bench-servo-test-17`・`touch-sample-14`・`touch-lcd-14`・`mem-probe-23`・`env-sample-16`・`accel-sample-15`・`bringup-i2c-15-16`・`bringup-led-514`とは併用できない（`compile_error!`）。実機では動かしていない |
 //! | `bench-servo-test-17` | servoの単発bench試験（#17の測定用build） | **Pi linkを外す。**正本`docs/hardware/servo-safety-limits.md`の`測定のための駆動（承認の状態の項目6）`節が、測定用のbuildは「Piとの通信linkを持たない」と定めているためである |
-//! | `bench-servo-calib-18` | #18の校正build。UART0のconsoleから`GO18`を受けた後、`MOTION calib <deg>`・`STOP`・`END`だけを受け、`LimitedServo`（`Limiter`を通る）だけでservoを駆動する（`crate::servo_calib`。仕様は`docs/hardware/servo-safety-limits.md`の`校正buildの仕様（案）`）。NVSのlatchは使わず、起動のたびに`GO18`を待つ | **Pi link・heartbeat・I2C（`accel-log-18`を足したbuildを除く）・LCDを持たない。専用の`main`を持つ。**`config.rs`の`SERVO_CALIB_18_*`が`None`の間はcompileが止まる（値は回ごとの実行承認が決める）。単独の試験buildで、`accel-log-18`以外の試験featureとは併用できない（`compile_error!`）。実機では動かしていない |
+//! | `bench-servo-calib-18` | #18の校正build。UART0のconsoleから`GO18`を受けた後、`MOTION calib <deg>`・`STOP`・`END`だけを受け、`LimitedServo`（`Limiter`を通る）だけでservoを駆動する（`crate::servo_calib`。仕様は`docs/hardware/servo-safety-limits.md`の`校正buildの仕様（案）`）。NVSのlatchは使わず、起動のたびに`GO18`を待つ | **Pi link・heartbeat・I2C（`accel-log-18`を足したbuildを除く）・LCDを持たない。専用の`main`を持つ。**`config.rs`の`SERVO_CALIB_18_*`が`None`の間はcompileが止まる（値は回ごとの実行承認が決める）。単独の試験buildで、`accel-log-18`以外の試験featureとは併用できない（`compile_error!`）。実機の結果は[EXP-060](../../../docs/hardware/experiment-log.md)（通しの10動作。`accel-log-18`なし） |
 //! | `accel-log-18` | `bench-servo-calib-18`の校正buildへ足す。別threadでADXL345（`ACCEL-01`）のDevice IDが`0xE5`のときだけ連続測定を設定し、raw値をUART0へlogする（#15・#22の材料を#18の段2の窓で同時に取る。`crate::accel_log_18`）。servoの制御・limiter・露出・停止の動作と順序は変えない | **`bench-servo-calib-18`と併用する**（単独は`compile_error!`）。校正buildのうち、このfeatureを付けたbuildだけがI2C（GPIO25／GPIO26）を持つ。実機では動かしていない |
-//! | `bench-wdt-711` | #711のtask WDTの検証build。main taskをTWDTへ登録し、**その後は一度もfeedしない**。約timeout（sdkconfigの値）でpanicしてresetし、再起動後の`reset_reason`が`task_watchdog`になることを実機で見る（`crate::task_wdt`） | **servo・LEDC・GPIO27・Pi link・I2C・LCDに触れない。専用の`main`を持つ。**製品buildと校正buildには、hangを起こすcommandを入れていない。単独の試験buildで、他の試験featureとは併用できない（`compile_error!`）。**実機では動かしていない** |
+//! | `bench-wdt-711` | #711のtask WDTの検証build。main taskをTWDTへ登録し、**その後は一度もfeedしない**。約timeout（sdkconfigの値）でpanicしてresetし、再起動後の`reset_reason`が`task_watchdog`になることを実機で見る（`crate::task_wdt`） | **servo・LEDC・GPIO27・Pi link・I2C・LCDに触れない。専用の`main`を持つ。**製品buildと校正buildには、hangを起こすcommandを入れていない。単独の試験buildで、他の試験featureとは併用できない（`compile_error!`）。実機の結果は[EXP-060](../../../docs/hardware/experiment-log.md)の (A) |
 //! | `bench-servo-90-17` | 上の単発bench試験で、指令角だけを規約上の90度にする | `bench-servo-test-17`を含む。90度が機械的中央かどうかは未確認（`HW-TBD-010`） |
 //!
 //! `#487`のPR B1より前は、`pi-protocol-mode` featureを付けたbuildだけがPi linkを持ち、LCD／I2Cの
@@ -114,8 +115,35 @@
 //! **Task Watchdog Timer の timeout は ESP-IDF の既定値のままである。**`sdkconfig.defaults` が足した watchdog の項目は
 //! `CONFIG_ESP_TASK_WDT_PANIC=y` だけである（[Issue #711](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/711)。
 //! 発火したら警告で止めず panic して reset する）。**全ての build が同じ `sdkconfig` を使うので、この設定は全 build に効く**
-//! （製品 build を含む。従来は警告だけだった）。登録するのは idle task（既定。両 core）で、main task を登録するのは
-//! `bench-servo-calib-18` の build だけである（`crate::task_wdt::register_main_task`。`bench-wdt-711` の検証 build も登録するが、servo に触れない）。**実機では確かめていない。**heartbeat loop は
+//! （製品 build を含む。従来は警告だけだった）。登録するのは idle task（既定。両 core）と、main task である。
+//! **main task を登録する build は、`bench-servo-calib-18`、`bench-wdt-711`（servo に触れない）、そして製品 build
+//! （`deskcat_product_mode`。既定、`no-touch-487`、`led-no-touch-514`、`link-gap-20`。servo は駆動しない）である**
+//! （`crate::task_wdt`。[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)の条件1）。製品 build は、初期化の後・loop の直前に登録し、
+//! loop の各周の初めに1回 feed する。登録できなければ `product_wdt_unavailable` を出し、watchdog なしで動く（servo を駆動しないため。
+//! servo を駆動する製品 build にするときは、`bench-servo-calib-18` と同じく、登録できなければ servo を動かさない扱いへ変える）。
+//! **製品 build の登録と feed は実機では確かめていない**（`bench-wdt-711` が登録した main task を feed しないと panic reset することは
+//! [EXP-060](../../../docs/hardware/experiment-log.md)で確かめた）。
+//!
+//! **timeout と、製品 build の loop の1周の長さの関係。**timeout は `CONFIG_ESP_TASK_WDT_TIMEOUT_S`（`sdkconfig.defaults` は設定せず、
+//! ESP-IDF v5.5.3 の既定値。生成された `sdkconfig` で `CONFIG_ESP_TASK_WDT_TIMEOUT_S=5`（5 s）と確かめた。debug profile の build 出力）である。**この値を新しく決めていない。**
+//! feed から次の feed までの間隔は、health snapshot の `max_read_gap_ms`（`read` から戻って次の `read` を始めるまでの時間の最大。loop の処理と
+//! `post_read_yield_ms` の譲りを含む）と、`uart.read` の待ち（`until` まで。heartbeat の期限で最大約 `config::HEARTBEAT_PERIOD_MS`＋1 tick）で決まる。feed は周の先頭にあり、gap は2つの周にまたがるので、
+//! 上限は `max_read_gap_ms` の2倍と read の待ちの和である。
+//! 実測は、[EXP-066](../../../docs/hardware/experiment-log.md)の5条件（`link-gap-20,no-touch-487`、LCD の描画・センサーの読み出し・Pi の負荷と同時）で
+//! 最大 86、90、91、107、109 ms、[EXP-062](../../../docs/hardware/experiment-log.md)の窓 B（`no-touch-487`）の #713 の項（Pi が不正な行を114行送った後）で最大 71 ms である。
+//! **これは観測した最大であり、上限ではない。**
+//! 1周を長くしうるもので、実測の最大に入っていないか、所要時間を測っていないものは次のとおり。
+//! - I2C の1 transaction は `config::I2C_TRANSACTION_TIMEOUT_MS`（100 ms）で返る（`crate::i2c_bus`）。1周に複数回あれば、その分が足される。
+//!   EXP-065 では `tap_read_failed` が4件（`ESP_ERR_TIMEOUT` が1件、`ESP_FAIL` が3件）出たが、同じ窓の `max_read_gap_ms` は EXP-065 の記録に無い。
+//! - 実測はどれも `no-touch-487` の build である。touch を読む build（既定）の touch の1 sample の読み出し（SPI）と、LED を駆動する build の LED の更新は、
+//!   実測に入っていない。
+//! - `reselect_sid` の NVS 操作と、log 出力の所要時間は測っていない（`config::PI_PROTOCOL_UART_RX_BUFFER_BYTES` の doc）。
+//!
+//! `max_read_gap_ms` の観測した最大（109 ms）の2倍に read の待ちの上限（約 1 s）を足しても（約 1.2 s）、timeout（5 s）の約4分の1である。**測っていない要因が合計で timeout を超える根拠は見つけていないが、
+//! 超えないことも示していない。**超えれば、製品 build は panic して reset する（その回数は `reset_reason` の `task_watchdog` で数えられる）。
+//! 実機で観測する項目は、製品 build を動かす窓で、`reset_reason=task_watchdog` が0件であることである（`max_read_gap_ms` は read の待ちを含まず、feed の間隔そのものではない）。
+//!
+//! heartbeat loop は
 //! [`FreeRtos::delay_ms`] で待つ。同 API は
 //! 「Delays bigger than `1000 /` `TICK_RATE_HZ` milliseconds … used in a loop would
 //! starve the FreeRTOS IDLE tasks as they are low prio tasks and hence the IDLE task's
@@ -202,9 +230,19 @@
     allow(dead_code, unused_imports)
 )]
 
-// `no-touch-487`は単独で使う（例外は、同じく製品経路を外さない`link-gap-20`だけ）。他のfeatureを足すと製品経路（`build.rs`の`deskcat_product_mode`）が外れ、touchを読まない製品buildにならない。
+// `no-touch-487`は単独で使う（例外は、同じく製品経路を外さない`link-gap-20`と`led-no-touch-514`だけ）。他のfeatureを足すと製品経路（`build.rs`の`deskcat_product_mode`）が外れ、touchを読まない製品buildにならない。
 #[cfg(all(feature = "no-touch-487", not(deskcat_product_mode)))]
-compile_error!("no-touch-487は単独で使う。併用してよいのはlink-gap-20だけである。");
+compile_error!(
+    "no-touch-487は単独で使う。併用してよいのはlink-gap-20とled-no-touch-514だけである。"
+);
+// `led-no-touch-514`（#514）は`no-touch-487`の製品buildにLEDだけを戻す。`no-touch-487`なしでは意味を持たないので止める。
+#[cfg(all(feature = "led-no-touch-514", not(feature = "no-touch-487")))]
+compile_error!("led-no-touch-514はno-touch-487と併せて使う。");
+#[cfg(any(
+    all(feature = "led-no-touch-514", not(deskcat_product_mode)),
+    all(feature = "led-no-touch-514", feature = "link-gap-20")
+))]
+compile_error!("led-no-touch-514は、no-touch-487以外のfeatureと併用しない。");
 // `link-gap-20`（#20の受信の間隔の計測）は製品経路を外さない（`build.rs`）。他のfeatureを足すと製品経路が外れ、
 // 製品buildと同じ負荷の下で測るという目的を満たさないので止める。併用してよいのは`no-touch-487`だけである
 // （`no-touch-487`も製品経路を外さない。touchを読まない製品buildの下で測る）。
@@ -412,7 +450,11 @@ mod servo_calib;
 mod servo_path;
 mod spi_port;
 mod tap;
-#[cfg(any(feature = "bench-servo-calib-18", feature = "bench-wdt-711"))]
+#[cfg(any(
+    feature = "bench-servo-calib-18",
+    feature = "bench-wdt-711",
+    deskcat_product_mode
+))]
 mod task_wdt;
 // 製品buildは`touch::StrokeDetector`、LCDを描く試験build（`bringup-display-13`・`face-21`）と`no-touch-487`は読まない`touch::IdleTouch`だけを使う。
 // 試験buildの読み出しの型（`TouchSampler`）はdead_codeになる。
@@ -995,9 +1037,20 @@ fn main() {
     #[cfg(feature = "debug-motion-19")]
     let debug_console = debug_motion::DebugConsole::start();
 
+    // main taskをtask watchdogへ登録する（#487の条件1。`crate::task_wdt::ProductWatchdog`）。
+    // **初期化（LCD・I2C・Pi linkのdriver・`boot`の最初の送信）の後、loopの直前**であり、初期化の間は登録していない
+    // （初期化の所要時間はtimeoutに含めない。この間もIDLE taskの監視は効く）。購読を手放さない（dropすると外れる）。
+    #[cfg(deskcat_product_mode)]
+    let mut twdt = None;
+    #[cfg(deskcat_product_mode)]
+    let mut product_wdt = task_wdt::ProductWatchdog::register(&mut twdt, peripherals.twdt);
+
     // **`main()` から戻らない。**#6 の firmware は戻っていたため、task が進み続けて
     // いるかを外から確認できなかった。
     loop {
+        // 各周の初めに1回だけ餌付けする。1周の最悪の長さとtimeoutの関係は、module docの`Task Watchdog Timer`の段落。
+        #[cfg(deskcat_product_mode)]
+        product_wdt.feed();
         let now = health.uptime_ms();
         // 制御周期の期限が来たときだけ`tick`する。`LimitedServo`が無い間は何もしない（`PiLink::tick_servo`）。
         #[cfg(not(feature = "bench-servo-test-17"))]
@@ -1294,8 +1347,20 @@ fn main() {
             if face.take_react_pulse() {
                 leds.pulse_react(now_led);
             }
-            leds.update(led_start_ms, now_led);
-            until = until.min(leds.next_deadline_ms(led_start_ms, now_led));
+            // 白は、Piからの受信の見張りが生きている間は点灯、それ以外は点滅（`crate::led`）。
+            // Pi linkを持たないbuild（`bench-servo-test-17`）は点滅だけになる。
+            #[cfg(not(feature = "bench-servo-test-17"))]
+            let link_up = pi_link.link_alive(now_led);
+            #[cfg(feature = "bench-servo-test-17")]
+            let link_up = false;
+            leds.update(led_start_ms, now_led, link_up);
+            if let Some(deadline) = leds.next_deadline_ms(led_start_ms, now_led, link_up) {
+                until = until.min(deadline);
+            }
+            #[cfg(not(feature = "bench-servo-test-17"))]
+            if let Some(deadline) = pi_link.link_alive_until_ms(now_led) {
+                until = until.min(deadline);
+            }
         }
 
         // sleepの代わりに`UartDriver::read`へ残り時間をtimeoutとして渡す。data到着があれば

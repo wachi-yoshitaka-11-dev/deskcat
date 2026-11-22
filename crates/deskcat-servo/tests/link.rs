@@ -31,6 +31,57 @@ fn idle_until_the_first_rx() {
 }
 
 #[test]
+fn gated_rx_does_not_start_the_watch_until_allowed() {
+    let mut watch = LinkWatch::new(Some(TEST_TIMEOUT_MS));
+    watch.note_rx_gated(10, false);
+    assert!(!watch.has_started());
+    assert_eq!(watch.deadline_ms(), None);
+    assert_eq!(watch.check(1_000_000), LinkVerdict::Idle);
+
+    watch.note_rx_gated(20, true);
+    assert!(watch.has_started());
+    assert_eq!(watch.deadline_ms(), Some(20 + u64::from(TEST_TIMEOUT_MS)));
+}
+
+#[test]
+fn gated_rx_keeps_refreshing_once_started() {
+    let mut watch = LinkWatch::new(Some(TEST_TIMEOUT_MS));
+    watch.note_rx_gated(0, true);
+    // 始めた後は、開始の条件が外れても受信を記録する。
+    watch.note_rx_gated(40, false);
+    assert_eq!(watch.check(80), LinkVerdict::Alive);
+    assert_eq!(watch.deadline_ms(), Some(40 + u64::from(TEST_TIMEOUT_MS)));
+}
+
+#[test]
+fn is_alive_reads_without_judging_a_loss() {
+    let mut watch = LinkWatch::new(Some(TEST_TIMEOUT_MS));
+    assert!(!watch.is_alive(0));
+    assert_eq!(watch.alive_until_ms(), None);
+    watch.note_rx(100);
+    assert!(watch.is_alive(100 + u64::from(TEST_TIMEOUT_MS) - 1));
+    assert!(!watch.is_alive(100 + u64::from(TEST_TIMEOUT_MS)));
+    assert_eq!(
+        watch.alive_until_ms(),
+        Some(100 + u64::from(TEST_TIMEOUT_MS))
+    );
+    // 読んだだけでは、途切れと数えない。
+    assert_eq!(watch.losses(), 0);
+    assert_eq!(
+        watch.check(100 + u64::from(TEST_TIMEOUT_MS)),
+        LinkVerdict::Lost { first: true }
+    );
+}
+
+#[test]
+fn is_alive_is_false_when_the_timeout_is_unset() {
+    let mut watch = LinkWatch::new(None);
+    watch.note_rx(0);
+    assert!(!watch.is_alive(0));
+    assert_eq!(watch.alive_until_ms(), None);
+}
+
+#[test]
 fn alive_before_the_timeout_and_lost_at_it() {
     let mut watch = LinkWatch::new(Some(TEST_TIMEOUT_MS));
     watch.note_rx(100);

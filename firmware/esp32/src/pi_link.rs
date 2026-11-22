@@ -222,6 +222,21 @@ impl PiLink {
         self.link_watch.deadline_ms()
     }
 
+    /// Piからの受信の見張りが生きているか（`LinkWatch::is_alive`）。**servoの有無によらない**（表示のためで、
+    /// 途切れの判定とstopは`check_link`だけが行う）。見張りは`boot`の確立から始まる（`on_frame`）。
+    #[cfg(any(feature = "bringup-led-514", deskcat_product_led))]
+    pub fn link_alive(&self, now_ms: u64) -> bool {
+        self.link_watch.is_alive(now_ms)
+    }
+
+    /// `link_alive`が`false`へ変わる時刻。生きている間だけ`Some`。main loopの待ち（`until`）へ足す。
+    #[cfg(any(feature = "bringup-led-514", deskcat_product_led))]
+    pub fn link_alive_until_ms(&self, now_ms: u64) -> Option<u64> {
+        self.link_watch
+            .alive_until_ms()
+            .filter(|until| *until > now_ms)
+    }
+
     /// 現在のPi sessionのframeの到着を`link-gap-20`の統計へ足す（featureなしのbuildでは何もしない）。
     #[cfg(feature = "link-gap-20")]
     fn observe_rx_gap(&mut self, now_ms: u64) {
@@ -359,9 +374,11 @@ impl PiLink {
         let Frame { envelope, message } = frame;
         let (sid, id) = (envelope.sid, envelope.id);
         // 仮置き：現在のPi sessionのframeを受信とみなす（heartbeatの方式はPROTO-TBD-010）。
+        // 見張りは`boot`のACKでsessionが確立してから始める（起動直後の`boot`の送り直しの間隔を判定に入れない。
+        // `LINK_LOSS_TIMEOUT_MS`のdoc）。始めた後は、確立が外れても記録する。
         let noted_before_hello = self.pi.pi_sid() == Some(sid);
         if noted_before_hello {
-            self.link_watch.note_rx(now_ms);
+            self.link_watch.note_rx_gated(now_ms, boot.is_established());
             self.observe_rx_gap(now_ms);
         }
         match message {
@@ -377,6 +394,10 @@ impl PiLink {
                     }
                 }
                 boot.on_ack(ack, health, uart);
+                // このACKで確立したなら、ここから見張りを始める（上の記録は確立の前に判定している）。
+                if noted_before_hello {
+                    self.link_watch.note_rx_gated(now_ms, boot.is_established());
+                }
             }
             Message::Hello(hello) => {
                 let handled = self.pi.handle_hello(sid, id, &hello);
@@ -385,7 +406,7 @@ impl PiLink {
                     self.restart_rx_gap();
                 }
                 if self.pi.pi_sid() == Some(sid) {
-                    self.link_watch.note_rx(now_ms);
+                    self.link_watch.note_rx_gated(now_ms, boot.is_established());
                     // 上で数えたframeを二重に数えない。確立で基準を戻した場合は、このframeを新しい基準にする。
                     if !noted_before_hello
                         || matches!(handled.outcome, HelloOutcome::Established { .. })

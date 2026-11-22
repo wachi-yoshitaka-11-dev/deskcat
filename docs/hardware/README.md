@@ -11,7 +11,7 @@
 - `sensor-datasheet-notes.md`
 - `sd-health-check.md`
 - `enclosure-and-neck.md`（#34 の設計案。方式は選定済み。現物適合は未了）
-- `led-514-demo.md`（#514 の LED デモ回路案。実機での点灯試験の観察は experiment-log.md の EXP-025。継続通信の判定と赤 LED の経路は未実装）
+- `led-514-demo.md`（#514 の LED デモ回路案。実機での点灯試験の観察は experiment-log.md の EXP-025）
 - `experiment-log.md`（実験記録）
 - `tbd-register.md`（未確定項目と解決状況の正本）
 
