@@ -13,7 +13,7 @@
 //! 優先度をmain task（ESP-IDFの既定で1）と同じ最低の値（1）にする。起こせなかった場合（設定の失敗、thread
 //! の失敗）は、**加速度なしでservoだけを続ける**（`accel_log_18_not_started`を出す）。優先度とcoreを決められないままthreadを
 //! 起こさない。**実機での影響は確かめていない。**確かめる材料は、同じ値の校正buildを加速度なしで動かした回の`servo_calib_18_motion_done`の
-//! `tick_min_ms`／`tick_max_ms`と、`servo_calib_18_session_end`の`interval_rejections`（各tickの間隔が許容幅の外でrejectされてlatchした回数。latchで回が終わるので、
+//! `tick_min_ms`／`tick_max_ms`と、`servo_calib_18_session_end`の`interval_rejections`（各tickの間隔、または`Limiter`へ渡す窓の間隔が許容幅の外でrejectされてlatchした回数。latchで回が終わるので、
 //! 1回の起動で最大1）を、この build の回と並べることである。**校正buildにはhealth snapshotが無く、`overrun_ticks`は出ない**
 //! （`overrun_ticks`は`crate::health`のcounterで、Pi linkを持つbuildだけが出す）。上の2つがその代わりである。
 //!
