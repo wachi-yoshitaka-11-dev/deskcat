@@ -15,7 +15,7 @@
 - Pi の `link_wait`（PR #737。`step`、serial の read／write／flush の最大の待ち）。
 - [EXP-066](../hardware/experiment-log.md#exp-066-受信の間隔の-log-を足した製品-buildlink-gap-20no-touch-487でpi-が送る-frame-の到着の間隔をlcd-の描画センサーの読み出しpi-の負荷と同時に測った)。**servo を動かさない**製品 build（`link-gap-20,no-touch-487`）を Pi とつなぎ、5つの条件（基線、`show_text`、叩く・揺らす、Pi の負荷、それらの同時）を各4分47秒〜6分46秒で測った窓。
 
-**[#683](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/683)の着手の前提（サーボまで入った1つの製品 build が動いていること。#20・#487 の完了の後）は、EXP-066 の時点で満たしていない。**EXP-066 は servo を駆動しない製品 build で測った。servo を駆動する製品 build の loop の処理（servo の指令と制限の判定）は、この測定に入っていない。**このため、この ADR は Proposed のままにする。**servo を駆動する製品 build で同じ窓を測り、下の`検証`の条件のどれも起きないことを確かめてから Accepted にする。
+EXP-066 は servo を駆動しない製品 build で測った（[#683](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/683)の安全の前提条件の「サーボ動作範囲を意図的に制限した、または機構から切り離した」の側）。servo を駆動する製品 build での確認は、下の`リスク`の行のとおり #20 の servo を動かす窓で行う。この ADR の判断は、それを待たない。
 
 ## 判断要因
 
@@ -91,7 +91,7 @@ EXP-066 の5つの条件で、ESP32 の `health` の行（174行）の `overrun_
 
 | リスク | 対策 |
 |---|---|
-| servo を動かす製品 build で、main loop の遅れが期限に近づく | [#20](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/20) の servo を動かす窓で、`overrun_ticks`・`max_read_gap_ms`・`heartbeat_overrun` を同じ形で記録する。記録するまで、この ADR は Proposed のまま |
+| servo を動かす製品 build で、main loop の遅れが期限に近づく | [#20](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/20) の servo を動かす窓で、`overrun_ticks`・`max_read_gap_ms`・`heartbeat_overrun` を同じ形で記録し、この ADR の維持を見直す |
 | touch を読む製品 build（`no-touch-487` でない build）は、読み出しの時間が loop に加わる | touch を読む build で同じ窓を測る。測るまで、ESP32 の維持は `no-touch-487` の範囲 |
 | Pi の止まりが、製品の実際の同居の負荷（`yes`・`dd` 以外）で 7000 ms を超える | `step` の内訳（serial 以外の処理と、process が動けていない時間）を分ける観測を足し、`HW-TBD-017` の値の再評価（#20）の材料にする |
 | 5〜7 分ほどの窓の最大は、長時間の最悪を上限として示さない | [#24](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/24)（耐久試験）の記録で、`overrun_ticks`・`max_read_gap_ms`・`link_wait` を同じ形で取る |
