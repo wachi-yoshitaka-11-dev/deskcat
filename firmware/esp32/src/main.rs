@@ -678,7 +678,7 @@ fn sleep_ms_until(until: u64, now: u64) {
 }
 
 /// `bench-servo-calib-18`のbuildの`main`。製品経路の`main`（下）は、このbuildにcompileしない。
-/// Pi link・heartbeat・I2C・LCDを持たず、`GO18`を待ってから`crate::servo_calib`が回を進める。
+/// Pi link・heartbeat・I2C（`accel-log-18`を足したbuildを除く）・LCDを持たず、`GO18`を待ってから`crate::servo_calib`が回を進める。
 #[cfg(feature = "bench-servo-calib-18")]
 fn main() {
     // `main`の先頭の`link_patches`と同じ理由で、1回呼ぶ。

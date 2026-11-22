@@ -31,7 +31,7 @@
 //!   出力data rateは100 Hz（公称）なので、件の間隔は約10 msで、行の最後の件が`t_us`の直前に近い。件ごとのsample時刻は持たない。
 //! - `accel_log_18_overrun`：`INT_SOURCE`のOverrunが立っていたpoll（FIFOが満杯になり、古い件が捨てられた）。
 //! - `accel_log_18_fault`：I2Cの失敗と、復号できなかった件。
-//! - `accel_log_18_summary`：threadが終わるとき。poll数、件数、overrunしたpollの数、I2Cの失敗の数、1回のpollの時間の最大（µs）。
+//! - `accel_log_18_summary`：測定のloopを抜けたとき（`accel_log_18_not_started`で終わった場合は出ない）。poll数、件数、overrunしたpollの数、I2Cの失敗の数、1回のpollの時間の最大（µs）。
 //!
 //! 時刻合わせ：servoの1 commandの時刻（`servo_calib_18_tick_trace`の`at_us`など）は`motion_start`からの経過である。
 //! `servo_calib_18_motion_clock n=<n> start_us=<S>`の`S`は、`motion_start`の`started`からの経過（µs）で、`t_us`と同じ基準である。
