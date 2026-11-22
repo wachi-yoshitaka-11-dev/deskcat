@@ -20,7 +20,7 @@
 ## 判断要因
 
 - 期限に対する待ちの大きさ。比べる期限は次のとおり。いずれも値の根拠はそれぞれの正本が持つ。ここへ新しい値は置かない。
-  - ESP32：`HEARTBEAT_PERIOD_MS`（1000 ms）、`HEALTH_SNAPSHOT_PERIOD_MS`（10000 ms）、task WDT の timeout（既定 5 s。`sdkconfig.defaults`）、`LINK_LOSS_TIMEOUT_MS`（7000 ms。[HW-TBD-017](../hardware/tbd-register.md)。#784 で置いた値であり、実機の確認は済んでいない）。
+  - ESP32：`HEARTBEAT_PERIOD_MS`（1000 ms）、`HEALTH_SNAPSHOT_PERIOD_MS`（10000 ms）、task WDT の timeout（5 s。`sdkconfig.defaults` は設定せず、ESP-IDF の既定値。値は生成された `sdkconfig` の `CONFIG_ESP_TASK_WDT_TIMEOUT_S` と EXP-060 の log の `timeout_s=5` による）、`LINK_LOSS_TIMEOUT_MS`（7000 ms。[HW-TBD-017](../hardware/tbd-register.md)。#784 で置いた値であり、実機の確認は済んでいない）。
   - Pi：ESP32 の `LINK_LOSS_TIMEOUT_MS` に対する、Pi からの frame の到着の間隔。
 - 期限超過・取りこぼしの有無（`overrun_ticks`、rx の取りこぼし、`pi_link_lost`、task WDT、`panic`）。
 - 待ちの所在が分かっているか。**所在が分からないまま分けても、直るとは言えない。**
