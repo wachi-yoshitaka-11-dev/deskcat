@@ -23,7 +23,7 @@
 //! （発火してもresetしないので、このbuildの目的を果たせない）。
 //! **resetの後、同じfirmwareが再び登録して、約timeoutごとにresetを繰り返す**（試験の終わりは人が決める。
 //! flashし直すか、電源を切る）。
-//! **実機では動かしていない。**
+//! 実機で、約 timeout で panic して reset し、`reset_reason=task_watchdog` になることを確かめた（[EXP-060](../../../docs/hardware/experiment-log.md)の (A)）。
 
 #[cfg(feature = "bench-wdt-711")]
 use std::time::Instant;
