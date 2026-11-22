@@ -83,6 +83,7 @@
 | [EXP-069](#exp-069-514-の段階的な確認4no-touch-487led-no-touch-514-の-build-を-pi-とつなぎ白と赤の-led-の表示を見た) | [#514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)の[段階的な確認](led-514-demo.md#段階的な確認)の4。白の点滅・点灯・Pi を止めた後の点滅への戻り、赤の `happy` での約1秒の点灯を見た | 値の正なし（観測の記録） |
 | [EXP-070](#exp-070-774-の手を入れる前の確かめの読みservo-を動かさずにクリップの接触000信号線の読みを取った) | [#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)。[PR #774](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/774) の段2の手を入れる前の確かめの読み（クリップを留めた点、クリップの接触、0.00、信号線の読み）を、servo を動かさずに取った | 値の正なし（観測の記録） |
 | [EXP-071](#exp-071-22685522製品-buildno-touch-487led-no-touch-514を-pi-とつなぎ叩いて驚くまでの時間休憩寝起き温湿度の反応クラウドの独り言を見た) | [#22](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/22)・[#685](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/685)・[#522](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/522)。叩いて驚くまでの時間と誤反応、休憩・寝起き・温湿度の反応、クラウドの独り言を、servo を動かさずに見た | 値の正なし（観測の記録） |
+| [EXP-072](#exp-072-514-の残りの測定リセット中の-gpio2gpio5-の電位と赤と白の-led-の電流抵抗の両端の電圧から) | [#514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)。リセット中の GPIO2・GPIO5 の電位と、赤と白の LED の電流 | 値の正なし（観測の記録） |
 
 **大容量の生dataはこのrepositoryへ入れていない。**保存場所は
 [development-foundation-plan.md](../planning/development-foundation-plan.md)の
@@ -6272,6 +6273,43 @@ ESP32 の uptime と Pi の時刻は、同じ `set_expression` の id（`id=4`�
 
 - 信号線の2本を抜き、Pi を poweroff し、Pi の電源の線、ESP32 の USB、LCD の VCC の線を抜いた。起動は4回（USB を挿したとき、書き込みの後、console を開いたとき、RTS の reset）。`panic`・`brownout` は0件。
 
+## EXP-072: #514 の残りの測定。リセット中の GPIO2・GPIO5 の電位と、赤と白の LED の電流（抵抗の両端の電圧から）
+
+[#514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514) の受け入れ条件のうち、起動・リセット時の pin の状態と、LED の電流を取った窓。`bringup-led-514` の build の点灯試験（赤だけ・白だけ・両方を `LED_LAMP_TEST_HOLD_MS` の 10 s ずつ）を使った。servo・Pi・PSU は使っていない。
+
+| 項目 | 内容 |
+|---|---|
+| Test ID | `EXP-072` |
+| Date | 2026-11-23（日本時間 02:27〜02:43。UTC では 11-22 の 17:27〜17:43） |
+| Operator | ESP32 の USB を挿すこと、テスターの棒を当てて表示を読むこと、LED の目視はユーザー。build、書き込み、console の記録、リセットの保持（USB の RTS で EN を Low に保つ）と解除は PM（AI） |
+| 承認 | 承認があった：承認者 wachi-yoshitaka-11-dev、2026-11-22T17:1xZ ごろ、PM のセッション。範囲は、AI の問い「#514 の残りの測定を、今、単独の窓で行ってよいですか？」 |
+| Hardware revision／Exact components | `MCU-01`、`LED-COMM-01`（白）・`LED-REACT-01`（赤）の2枝（[EXP-052](#exp-052-組み直した3枚の板で初回通電しbringup-led-514のled点灯と導通を取った)で組んだまま）。抵抗は [breadboard-rebuild の配線表](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/hardware/breadboard-rebuild/wiring-table.md)の R7（330 Ω、B1 H5–H1）、R8（330 Ω、B1 I2–I6）、R9（10 kΩ、B1 L5–−5）、R10（10 kΩ、B1 L2–−2）。値は表示の値で、実測していない。Pi・LCD の VCC の線・`PSU-BENCH-01` は、前の窓の終わりのまま外してある |
+| Firmware | `bringup-led-514`、develop `220b9dd`。ELF sha256 `efe0011c2b711c338645c16cc4e2f1cb7859e9df679d58ff69380cc7e8ed336a`。書き込みは1回 |
+| Power supply and current limit | ESP32 はこの端末の USB だけ。LED の電流の制限は各枝の 330 Ω |
+| Measurement equipment | テスター（DC の電圧のレンジ。ユーザーが読んだ表示をそのまま記録した）、UART0 の log（115200。端末の UTC 時刻を付けた） |
+| Raw data | repository の外の `deskcat-evidence/windows-20261123-514/`（`console.log`、`console2.log`、`readings.txt`、`sha256.txt`、`flash.log`） |
+| Expected result | リセット中の GPIO2・GPIO5 の電位と、点灯中の R7・R8 の両端の電圧が読める |
+| Measured result | 下記 |
+
+### 観測
+
+- **リセット中（EN を Low に保った間）：**R7 の H5 の側の足と R9 の −5 の側の足の間（GPIO2）は 0、R8 の I2 の側の足と R10 の −2 の側の足の間（GPIO5）は 0。白と赤は消えていた。
+- **赤だけの区間（log の `led phase=lamp_red white=off red=on`）：**R8 の I2 の側の足（＋）と I6 の側の足（−）の間は 1.37 V。電流は 1.37 ÷ 330 ＝ 約 4.15 mA。1回目の読みの 0 は、赤が消えた後に読んだと見て、値として使わない（2回目は、赤が点いている間に読んだ）。
+- **白だけの区間（log の `led phase=lamp_white white=on red=off`）：**R7 の H5 の側の足（＋）と H1 の側の足（−）の間は 0.53 V。電流は 0.53 ÷ 330 ＝ 約 1.61 mA。
+- **USB の接続が切れた：**17:42:14Z に console が `device disconnected` で止まり、ESP32 は同じ USB で別の名前（`ttyUSB1`）でつながり直した。原因は確かめていない（棒を当てる間に USB の線が動いた可能性がある）。その後の起動で、点灯試験は log のとおり進んだ。
+- `panic`・`brownout` は0件。
+- **起動の数：**log の起動の行（`rst:`）で確かめられるのは5回（console を開いたとき、リセットの解除、リセット1回、USB がつながり直した後に console を開いたとき、その後のリセット）。ほかに、書き込みの後と、17:42:14Z の USB の切断とつながり直しで起動した可能性があるが、どちらも log には残っていない。USB が切れている間に AI が送ったリセットは、実行されていない。
+
+### 窓の終わり
+
+- console を閉じた。ESP32 の USB は挿したまま（`bringup-led-514` の build が動いている）。
+
+### 確かめていないこと（主張しないこと）
+
+- 起動の途中（リセットの解除から firmware が GPIO を設定するまで）の GPIO2・GPIO5 の電位。テスターでは、その短い区間を読めない。リセット中と点灯中の値だけを取った。
+- 抵抗の実際の値（表示の 330 Ω で割った）、テスターの確度、`3V3` rail の電圧、LED の発熱。
+- USB の接続が切れた原因。
+
 ## Revision履歴
 
 | 日付 | Revision | 変更 | 根拠 |
@@ -6358,3 +6396,4 @@ ESP32 の uptime と Pi の時刻は、同じ `set_expression` の id（`id=4`�
 | 2026-11-22 | 79 | [#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)。**`EXP-068`を追加し、冒頭の一覧表に行を足した。**[PR #774](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/774) の段2の手を入れる前に待つ時間を、段1の範囲（ホーンなし、校正 build 90°〜105°）で測った2回の窓。PSU の出力 OFF と ESP32 の USB を抜く条件で、servo の端が 0.00 になるまで 27.64 s と 25.39 s。EN ボタンを押しても EN が 3.30 V のままで ESP32 が reset されなかったことと、その切り分けの読み、窓1の最初の出力 ON で 0.02 V・0.070 A・CC 点灯になり直ちに出力を OFF にしたことも記録した | 2026-11-21〜22 の実機の窓（`deskcat-evidence/windows-20261121-774d/`、`windows-20261122-774d/`） |
 | 2026-11-22 | 80 | [#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)。**`EXP-070`を追加した。**PR #774 の段2の手を入れる前の確かめの読み（クリップを留めた点、出力 ON の間のテスター 4.82、0.00、信号線の 0.00）を、servo を動かさずに取った窓の記録 | 窓（2026-11-22）の UART0 の log、ユーザーの申告（テスターの読み、PSU の表示、配線の目視） |
 | 2026-11-22 | 81 | [#22](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/22)・[#685](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/685)・[#522](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/522)。**`EXP-071`を追加した。**叩いて驚くまでの時間と誤反応、休憩・寝起き・温湿度の反応、クラウドの独り言を見た窓の記録 | 窓（2026-11-22）の UART0 の log、Pi の `deskcatd` の log と journal、ユーザーの申告（目視） |
+| 2026-11-23 | 82 | [#514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)。**`EXP-072`を追加した。**リセット中の GPIO2・GPIO5 の電位と、赤と白の LED の電流（330 Ω の両端の電圧から）を取った窓の記録 | 窓（2026-11-23）の UART0 の log、テスターの読み（ユーザーが読んだ表示） |
