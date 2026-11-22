@@ -83,7 +83,7 @@ Wokwi の [ILI9341 部品](https://docs.wokwi.com/parts/wokwi-ili9341)では RST
 
 - `PROTO-02` の現物：計画（[`universal-board/plan.md`](universal-board/plan.md)）は描いた。**はんだ付けの後に現物と照合して完成図にする作業は #405 の範囲で、追跡を #405 へ移した**（#405 の受け入れ条件に、計画図に従ったはんだ付けと、現物との照合・完成図の記録の項目がある）。**基板の未実装状態を完成図として描かない。**計画の`測る所`（M1〜M6）は、#512 の受け入れ条件の「表現できない部分と `TBD` を列挙する」に当たる列挙として `plan.md` に残す。測る作業も #405 側で行い、まだ測っていない。
 - **LCD の信号線と touch の線（2026-10-31 の組み直し後）：**導通は電源2本と短絡だけを測った（EXP-052）。`CS`・`DC`・`SDI`・`SCK`・`LED` は、組み直し後の製品 build で LCD が描かれた記録（EXP-062 など）で動作を確かめた。**`RESET`（`display.rs` は SWRESET を送るので、描画だけでは線の有無を断定できない）、`SDO`・`T_DO`（製品 build は読まない）、`T_CS`・`T_IRQ`（製品 build は `no-touch-487`）は、組み直し後の確認が無い。**#512 の受け入れ条件は導通の実測を求めておらず、LCD の touch を使う作業が出たとき、その作業の窓で1本ずつ確かめる。
-- **電源の経路の `TBD`**（`overview/wiring-table.md` の T1〜T4 と `universal-board/plan.md` の `測る所`）は #405 が持つ。`HW-TBD-024`（LCD の VCC の電圧）は [TBD Register](../docs/hardware/tbd-register.md) に項目がある。
+- **電源の経路の `TBD`**（`overview/wiring-table.md` の T1〜T4 と `universal-board/plan.md` の `測る所`）は #405 が持つ。LCD の VCC の電圧（T2）も #405 が持つ。台帳の [`HW-TBD-024`](../docs/hardware/tbd-register.md#hw-tbd-024) は、LCD が耐えられる電流の上限の項目で、電圧の項目ではない。
 
 ### 閉じた項目
 

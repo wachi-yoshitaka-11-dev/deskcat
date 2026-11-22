@@ -21,18 +21,19 @@
   片面（はんだ面だけにランド）、はんだメッキ仕上げ。出所は hardware-bom.md の `PROTO-02` 行。
 - 端子台 `114217`（Cixi Wanjie `WJEK254-2.54-02P-140-00A`）：幅 5.54 × 奥行 6.20 × 高さ 8.50、足 0.80 角。
   出所はメーカー図面 `WJEK254-2.54-XXP-1YY-00A.pdf`。外形の幅と奥行は footprint の `F.Fab` と同じ。
-- PTC `MF-R135`（Bourns）：幅 A 最大 8.9、高さ B 最大 18.9、厚み E 最大 3.0。出所は datasheet `mfr.pdf`。
+- PTC `MF-R135`（Bourns）：幅 A 最大 8.9、高さ B 最大 18.9、厚み E 最大 3.0、足の径 0.51。出所は datasheet `mfr.pdf`。
+  外見（黄色い円盤、ラジアルリード、刻印 `R135`）の出所は hardware-bom.md の Revision 89（2026-09-08、現物の照合）。
+  円盤の径＝幅、円盤の厚み＝厚み、基板の面から円盤の上端まで＝高さ、として最大値で描く。
 - `2SJ334`（東芝）：本体 10 × 15、厚み 4.5、足の幅・厚み 0.75、付け根の長さ最大 5.6、足の長さ 13 以上。
   出所は datasheet `2sj334.pdf`。
 - 芯線 `111641`：導体外径 0.75（hardware-bom.md の `WIRE-PWR-01` 行。基板ファイルの導体の幅も 0.75）。
 
 TBD（資料に無いので推測せず、破線または注記にした）：
-- 基板の色、各部品の色（見た目のための仮の色）。
+- 基板の色、PTC 以外の部品の色（見た目のための仮の色。hardware-bom.md・experiment-log.md に現物の色の記録が無い）。
 - ランドの外径（資料に無い。pad と同じ 1.8 で描く）。
 - 端子台のねじの位置・径、電線の口の高さと幅（plan.md の M4）。
 - `2SJ334` の本体の下端の高さ（plan.md の M2。図は付け根の長さの最大値 5.6 から描き、外形を破線にする）、金属板の形。
 - `R18` の本体の長さ・直径・高さ（plan.md の M3）。
-- PTC の上端の丸み（最大寸法の外形を破線で示し、中を半円の頭で描く）。
 - はんだの盛りの大きさ（見た目）。
 """
 
@@ -58,6 +59,7 @@ C_LAND = "#d6d9dd"
 C_HOLE = "#1d2a22"
 C_METAL = "#b8bcc2"
 C_WIRE = "#cfd2d6"
+C_PTC = "#e6c53c"   # 黄色（現物の記録：hardware-bom.md の Revision 89。仮の色ではない）
 
 
 # ---------------------------------------------------------------- S 式の読み込み
@@ -160,9 +162,10 @@ class Cam:
                 us.append(u)
                 vs.append(v)
         self.ox = MARGIN[0] - min(us)
-        self.oy = MARGIN[1] - min(vs) - 3.0
+        self.oy = MARGIN[1] - min(vs) + 4.0
         self.w = (max(us) - min(us) + MARGIN[0] + MARGIN[2]) * S
-        self.h = (max(vs) - min(vs) + MARGIN[1] + MARGIN[3] + 3.0) * S
+        self.h = (max(vs) - min(vs) + MARGIN[1] + MARGIN[3] + 4.0 + 9.0) * S
+        self.board_bottom = max(self.p(x, y, 0.0)[1] for x, y in ((self.x0, self.y0), (self.x1, self.y0), (self.x0, self.y1), (self.x1, self.y1)))
         # カメラの向き（板の座標。面の法線との内積が正なら見える）
         self.c = (-math.cos(THETA) * math.sin(PSI), math.cos(THETA) * math.cos(PSI), math.sin(THETA))
 
@@ -217,10 +220,10 @@ def ellipse_pts(cx, cy, z, r, n=20):
     return [(cx + r * math.cos(2 * math.pi * i / n), cy + r * math.sin(2 * math.pi * i / n), z) for i in range(n)]
 
 
-def text_at(cam, x, y, z, s, size=1.2, fill="#ffffff"):
+def text_at(cam, x, y, z, s, size=1.2, fill="#ffffff", halo="#000000"):
     u, v = cam.p(x, y, z)
     return (f'<text x="{u:.1f}" y="{v:.1f}" font-size="{size * S:.1f}" fill="{fill}" text-anchor="middle" '
-            f'stroke="#000000" stroke-width="{0.28 * S:.1f}" paint-order="stroke" stroke-linejoin="round" '
+            f'stroke="{halo}" stroke-width="{0.28 * S:.1f}" paint-order="stroke" stroke-linejoin="round" '
             f'font-family="sans-serif">{s}</text>')
 
 
@@ -241,6 +244,43 @@ def stadium_profile(cx, base, width, height, n=14):
         pts.append((cx - r * math.cos(a), base + height - r + r * math.sin(a)))
     pts += [(cx + r, base + height - r), (cx + r, base)]
     return pts
+
+
+# 図の部品の名前（出所：plan.md の「部品と向き」の表の「品」）。側は、引き出し線を上（top）か下（bottom）へ出す
+LABELS = {
+    "F1": ("F1 PTC（過電流の保護）", "top"),
+    "Q1": ("Q1 MOSFET 2SJ334（逆接の保護）", "top"),
+    "R18": ("R18 10 kΩ（Gate の抵抗）", "bottom"),
+    "J5": ("J5 入力の端子台", "bottom"),
+    "J6": ("J6 servo の端子台", "bottom"),
+    "J7": ("J7 Pi の端子台", "bottom"),
+    "J8": ("J8 logic の端子台", "top"),
+}
+LABEL_SIZE = 1.05  # mm
+
+
+def label_width(txt, size_px):
+    return sum((1.0 if ord(c) > 0x2E80 else 0.58) * size_px for c in txt)
+
+
+def place_labels(items, width, y_top0, y_bot0, line_h, mirror_order=False):
+    """引き出し線つきの部品名。items は (text, side, ax, ay)（anchor は画面の座標）。
+    上の側：左の部品ほど上に置く。下の側：右の部品ほど上に置く。こうすると、引き出し線が他の名前の文字を横切らない。"""
+    size = LABEL_SIZE * S
+    out = []
+    tops = sorted([i for i in items if i[1] == "top"], key=lambda i: i[2])
+    bots = sorted([i for i in items if i[1] == "bottom"], key=lambda i: -i[2])
+    for group, y0, sign in ((tops, y_top0, 1), (bots, y_bot0, 1)):
+        for k, (txt, side, ax, ay) in enumerate(group):
+            y = y0 + sign * k * line_h
+            w = label_width(txt, size)
+            x = min(max(ax - 6, 6), width - w - 8)
+            out.append(f'<line x1="{ax:.1f}" y1="{ay:.1f}" x2="{ax:.1f}" y2="{y + (4 if side == "top" else -size * 0.9):.1f}" '
+                       f'stroke="#33322e" stroke-width="1" stroke-dasharray="4 3"/>')
+            out.append(f'<circle cx="{ax:.1f}" cy="{ay:.1f}" r="2.6" fill="#33322e"/>')
+            out.append(f'<text x="{x:.1f}" y="{y:.1f}" font-size="{size:.1f}" fill="#1c1c1c" stroke="#f3f1ea" '
+                       f'stroke-width="{0.3 * S:.1f}" paint-order="stroke" stroke-linejoin="round">{txt}</text>')
+    return "".join(out)
 
 
 # ---------------------------------------------------------------- 部品の絵
@@ -283,23 +323,27 @@ def draw_tb(cam, fp):
 
 
 def draw_ptc(cam, fp):
+    """PTC `MF-R135`：黄色いラジアルリードの円盤（現物の記録は hardware-bom.md の Revision 89。2026-09-08）。
+    円盤の径＝幅 A（8.9）、厚み＝E（3.0）、基板の面から円盤の上端まで＝高さ B（18.9）。いずれも Bourns の
+    datasheet（`mfr.pdf`）の最大値で、その最大寸法で描く。足の径 0.51 も datasheet。"""
     x0, y0, x1, y1 = fab_rect(fp)
     cx, cy = (x0 + x1) / 2, fp["y"]
-    A, B, E = 8.9, 18.9, 3.0                    # Bourns MF-R135 の最大寸法（datasheet）
-    prof = stadium_profile(cx, BT, A, B)
+    A, B, E = 8.9, 18.9, 3.0
+    r = A / 2
+    cz = BT + B - r
     yb, yf = cy - E / 2, cy + E / 2
+    n = 36
+    prof = [(cx + r * math.cos(2 * math.pi * i / n), cz + r * math.sin(2 * math.pi * i / n)) for i in range(n)]
     o = ""
-    n = len(prof)
-    area = sum(prof[i][0] * prof[(i + 1) % n][1] - prof[(i + 1) % n][0] * prof[i][1] for i in range(n))
-    sign = 1 if area > 0 else -1               # 反時計回り（x 右・z 上）なら外向き法線は (dz, -dx)
-    for i in range(n):
+    for p in fp["pads"]:                                   # 足：基板から円盤の縁まで
+        zt = cz - math.sqrt(max(r * r - (p["x"] - cx) ** 2, 0.0))
+        o += line3(cam, (p["x"], p["y"], BT), (p["x"], p["y"], zt), C_METAL, 0.51)
+    for i in range(n):                                     # 円盤の縁（厚み）
         (xa, za), (xb, zb) = prof[i], prof[(i + 1) % n]
         dx, dz = xb - xa, zb - za
-        nx, nz = sign * dz, -sign * dx
-        o += face(cam, [(xa, yb, za), (xb, yb, zb), (xb, yf, zb), (xa, yf, za)], (nx, 0, nz), "#8e6420", "none", 0.0)
-    o += face(cam, [(x, yf, z) for x, z in prof], (0, 1, 0), "#d9a441", "#000000a0", 0.8)
-    env = [(cx - A / 2, yf, BT), (cx + A / 2, yf, BT), (cx + A / 2, yf, BT + B), (cx - A / 2, yf, BT + B)]
-    o += face(cam, env, (0, 1, 0), "none", "#222", 0.8, "4 3")   # 最大寸法の外形（頭の丸みは TBD）
+        o += face(cam, [(xa, yb, za), (xb, yb, zb), (xb, yf, zb), (xa, yf, za)], (dz, 0, -dx), "#b99a22", "#b99a22", 0.6)
+    o += face(cam, [(x, yf, z) for x, z in prof], (0, 1, 0), C_PTC, "#000000a0", 0.8)
+    o += text_at(cam, cx, yf, cz, "R135", 1.0, "#5a4608", "#e6c53c")  # 現物の刻印（Revision 89）
     return o
 
 
@@ -386,17 +430,21 @@ def front_svg(board):
                  f'data-rot="{f1(fp["rot"])}" data-pads="{pads}">')
         o.append(draw_part(cam, fp))
         o.append("</g>")
-    for fp in parts:                                    # 参照番号：背の高い部品は上端の上、ほかは手前（y の大きい側）の板の上
+    items = []
+    for fp in parts:                                    # 部品名：引き出し線の先は、上の側は部品の上端、下の側は手前の板の上
         r = fab_rect(fp)
         cxm = (r[0] + r[2]) / 2
-        if fp["lib"].startswith("PTC"):
-            o.append(text_at(cam, cxm, fp["y"], BT + 18.9 + 1.6, fp["ref"], 1.25))
-        elif fp["lib"].startswith("2SJ334"):
-            o.append(text_at(cam, cxm, (r[1] + r[3]) / 2, BT + 5.6 + 15.0 + 1.6, fp["ref"], 1.25))
+        txt, side = LABELS[fp["ref"]]
+        if side == "top":
+            ztop = {"PTC": BT + 18.9, "2SJ": BT + 5.6 + 15.0}.get(fp["lib"][:3], BT + 8.5)
+            ax, ay = cam.p(cxm, (r[1] + r[3]) / 2 if not fp["lib"].startswith("PTC") else fp["y"], ztop)
         else:
-            o.append(text_at(cam, cxm, max(r[3], max(p["y"] for p in fp["pads"])) + 2.4, BT, fp["ref"], 1.25))
-    o.append(legend(cam.w, "部品面", [("破線", "資料に無い寸法・位置（TBD）：端子台の口とねじ（M4）、2SJ334 の下端の高さ（M2）と金属板、R18 の本体（M3）、PTC の頭の丸み"),
-                                     ("色", "見た目のための仮の色（資料で確認していない）。向き：板の左を手前に、少し斜めから見下ろす。J8 の口は奥（上面の破線の矢印）")]))
+            ax, ay = cam.p(cxm, max(r[3], max(p["y"] for p in fp["pads"])) + 1.2, BT)
+        items.append((txt, side, ax, ay))
+    o.append(place_labels(items, cam.w, 7.8 * S, cam.board_bottom + 3.2 * S, 1.8 * S))
+    o.append(legend(cam.w, "部品面", [("破線", "資料に無い寸法・位置（TBD）：端子台の口とねじ（M4）、2SJ334 の下端の高さ（M2）と金属板、R18 の本体（M3）"),
+                                     ("色", "F1 の黄色い円盤は現物の記録（hardware-bom.md の Revision 89）。ほかは見た目のための仮の色（資料で確認していない）"),
+                                     ("向き", "板の左を手前に、少し斜めから見下ろす。J8 の口は奥（上面の破線の矢印）")]))
     o.append("</svg>")
     return "\n".join(o) + "\n"
 
@@ -407,10 +455,10 @@ class Flat:
     def __init__(self, edge):
         self.x0, self.y0, self.x1, self.y1 = edge
         self.w = (self.x1 - self.x0 + MARGIN[0] + MARGIN[2]) * S
-        self.h = (self.y1 - self.y0 + 3.0 + MARGIN[3] + 8.0) * S
+        self.h = (self.y1 - self.y0 + 3.0 + MARGIN[3] + 20.0) * S
 
     def p(self, x, y):
-        return ((self.x1 - x + MARGIN[0]) * S, (y - self.y0 + 8.0) * S)
+        return ((self.x1 - x + MARGIN[0]) * S, (y - self.y0 + 20.0) * S)
 
 
 def back_svg(board):
@@ -463,14 +511,15 @@ def back_svg(board):
         if tag:
             o.append(f'<circle cx="{u:.1f}" cy="{v:.1f}" r="{0.3 * S:.1f}" fill="#4a4e54"/>')
         o.append("</g>")
-    # 参照番号：足の穴の近く（板の外側ではなく、板の上の空き）に、部品ごとに1つ
+    items = []
     for fp in board["fps"]:
         if is_mount_hole(fp):
             continue
         px = sum(p["x"] for p in fp["pads"]) / len(fp["pads"])
-        u, v = view.p(px, min(p["y"] for p in fp["pads"]) - (9.5 if fp["ref"] == "R18" else 6.5))
-        o.append(f'<text x="{u:.1f}" y="{v:.1f}" font-size="{1.25 * S:.1f}" fill="#ffffff" text-anchor="middle" '
-                 f'stroke="#000" stroke-width="{0.28 * S:.1f}" paint-order="stroke" font-family="sans-serif">{fp["ref"]}</text>')
+        py = min(p["y"] for p in fp["pads"])
+        ax, ay = view.p(px, py)
+        items.append((LABELS[fp["ref"]][0], "top", ax, ay))
+    o.append(place_labels(items, view.w, 7.2 * S, 0, 1.7 * S))
     o.append(legend(view.w, "はんだ面（左右を裏返した向き）",
                     [("ランド", "外径は資料に無い（TBD）。pad と同じ 1.8 mm で描く"),
                      ("はんだ", "盛りの大きさは見た目（TBD）。足の穴は中央の暗い点で示す。芯線は被覆を剥いた区間（導体外径 0.75）")]))
