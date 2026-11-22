@@ -2,7 +2,7 @@
 <export version="E">
   <design>
     <source>hardware/deskcat.kicad_sch</source>
-    <date>2026-11-16T04:54:33+0000</date>
+    <date>2026-11-22T00:40:11+0000</date>
     <tool>Eeschema 8.0.9-8.0.9-0~ubuntu22.04.1</tool>
     <sheet number="1" name="/" tstamps="/">
       <title_block>
@@ -520,7 +520,7 @@
       <tstamps>3bf619d2-4225-4cde-bf4d-424ba2469663</tstamps>
     </comp>
     <comp ref="R19">
-      <value>TBD（値の正本なし。現物は EXP-028 の 330 Ω）</value>
+      <value>330 Ω（現物 EXP-028）</value>
       <fields>
         <field name="Footprint"/>
         <field name="Datasheet"/>
