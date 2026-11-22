@@ -73,6 +73,7 @@
 //! | `debug-motion-19` | UART0のconsoleから`MOTION <name> <target>`の行を別threadで読み、Pi由来の`play_motion`と同じ`MotionDispatch`のcatalogへ渡す（#19の受け入れ条件3、`crate::debug_motion`、`crate::pi_link::PiLink::on_debug_line`）。**servoを駆動せず、`LimitedServo`も`Limiter`も作らない。catalogが空のため、debugの指示も全て拒否される。同じ`Limiter`（同じcounter）を通ることは、`deskcat_servo`のhost testが示す範囲である** | **製品buildには入らない**（featureなし）。featureを指定すると製品経路のcfgが外れる。Pi linkを持つ。`bench-servo-test-17`・`touch-sample-14`・`touch-lcd-14`・`mem-probe-23`・`env-sample-16`・`accel-sample-15`・`bringup-i2c-15-16`・`bringup-led-514`とは併用できない（`compile_error!`）。実機では動かしていない |
 //! | `bench-servo-test-17` | servoの単発bench試験（#17の測定用build） | **Pi linkを外す。**正本`docs/hardware/servo-safety-limits.md`の`測定のための駆動（承認の状態の項目6）`節が、測定用のbuildは「Piとの通信linkを持たない」と定めているためである |
 //! | `bench-servo-calib-18` | #18の校正build。UART0のconsoleから`GO18`を受けた後、`MOTION calib <deg>`・`STOP`・`END`だけを受け、`LimitedServo`（`Limiter`を通る）だけでservoを駆動する（`crate::servo_calib`。仕様は`docs/hardware/servo-safety-limits.md`の`校正buildの仕様（案）`）。NVSのlatchは使わず、起動のたびに`GO18`を待つ | **Pi link・heartbeat・I2C・LCDを持たない。専用の`main`を持つ。**`config.rs`の`SERVO_CALIB_18_*`が`None`の間はcompileが止まる（値は回ごとの実行承認が決める）。単独の試験buildで、他の試験featureとは併用できない（`compile_error!`）。実機では動かしていない |
+//! | `accel-log-18` | `bench-servo-calib-18`の校正buildへ足す。別threadでADXL345（`ACCEL-01`）のDevice IDが`0xE5`のときだけ連続測定を設定し、raw値をUART0へlogする（#15・#22の材料を#18の段2の窓で同時に取る。`crate::accel_log_18`）。servoの制御・limiter・露出・停止の動作と順序は変えない | **`bench-servo-calib-18`と併用する**（単独は`compile_error!`）。このfeatureを付けたbuildだけがI2C（GPIO25／GPIO26）を持つ。実機では動かしていない |
 //! | `bench-wdt-711` | #711のtask WDTの検証build。main taskをTWDTへ登録し、**その後は一度もfeedしない**。約timeout（sdkconfigの値）でpanicしてresetし、再起動後の`reset_reason`が`task_watchdog`になることを実機で見る（`crate::task_wdt`） | **servo・LEDC・GPIO27・Pi link・I2C・LCDに触れない。専用の`main`を持つ。**製品buildと校正buildには、hangを起こすcommandを入れていない。単独の試験buildで、他の試験featureとは併用できない（`compile_error!`）。**実機では動かしていない** |
 //! | `bench-servo-90-17` | 上の単発bench試験で、指令角だけを規約上の90度にする | `bench-servo-test-17`を含む。90度が機械的中央かどうかは未確認（`HW-TBD-010`） |
 //!
@@ -211,6 +212,8 @@ compile_error!("no-touch-487は単独で使う。併用してよいのはlink-ga
 compile_error!("link-gap-20は単独で使う。併用してよいのはno-touch-487だけである。");
 
 mod accel;
+#[cfg(feature = "accel-log-18")]
+mod accel_log_18;
 #[cfg(feature = "accel-sample-15")]
 mod accel_sample;
 // Pi link（UART1）の`boot`の受理確認・再送。**`bench-servo-test-17`を有効にするbuild（`bench-servo-90-17`を含む）と`bench-servo-calib-18`のbuildだけは持たない。**
@@ -342,6 +345,9 @@ compile_error!(
      他の試験feature（bench-servo-test-17、bench-servo-90-17、bringup-*、*-sample-*、touch-*、face-21、tap-21、\
      mem-probe-23、debug-motion-19）とは併用しない。"
 );
+// `accel-log-18`は、`bench-servo-calib-18`の校正buildへ加速度のlogを足すfeatureであり、単独ではbuildしない。
+#[cfg(all(feature = "accel-log-18", not(feature = "bench-servo-calib-18")))]
+compile_error!("accel-log-18はbench-servo-calib-18と併用する（単独ではbuildしない）。");
 // `bench-wdt-711`（#711のtask WDTの検証build）も単独の試験buildである。servoに触れず、Pi link・I2C・LCDを持たない。
 #[cfg(all(
     feature = "bench-wdt-711",

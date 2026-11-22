@@ -89,6 +89,11 @@ debug-motion-19 = []
 # **`src/config.rs`の`SERVO_CALIB_18_*`が1つでも`None`の間は、compileが止まる**（値は回ごとの実行承認が決める。既定値を持たない）。
 # 他の試験featureとは併用できない（`main.rs`の`compile_error!`）。**実機では動かしていない。手順・停止基準のPull Requestがmergeされるまで駆動しない。**
 bench-servo-calib-18 = []
+# Issue #15・#22の材料（サーボの振動のraw sample）を、#18の校正buildの段2の窓で同時に取る。`bench-servo-calib-18`と**併用する**
+# （単独ではcompileが止まる。`main.rs`の`compile_error!`）。別threadでADXL345（`ACCEL-01`）のFIFOを読み、raw値をUART0のlogへ出す
+# （`src/accel_log_18.rs`）。servoの制御・limiter・露出・停止の動作と順序は変えない。**このfeatureを付けたbuildだけがI2C（GPIO25／GPIO26）を持つ。**
+# **実機では動かしていない。**
+accel-log-18 = []
 # Issue #711 のtask WDTの検証build。main taskをTWDTへ登録し、その後は一度もfeedしない。panic resetと、再起動後の
 # `reset_reason`（`task_watchdog`）を実機で見るためのもの。servo・LEDC・GPIO27・Pi link・I2C・LCDに触れない（`src/task_wdt.rs`）。
 # 製品buildには入らない。他の試験featureとは併用できない（`main.rs`の`compile_error!`）。**実機では動かしていない。**
