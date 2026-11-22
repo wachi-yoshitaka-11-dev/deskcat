@@ -38,7 +38,7 @@ EXP-066 は servo を駆動しない製品 build で測った（[#683](https://g
 
 利点：`step` のうち serial 以外の処理が長く止まるなら、その間も受信を読み続けられる。
 
-コスト：Pi の待ちの長い窓（約 1.1〜2.5 s）で、serial の data を返した read と write／flush の呼び出しは最大でも 59 ms（read）、21 ms（write）、50 ms（flush）だった。data の無い poll の待ち（`read_idle`）も含めて、`step` が 1 s を超えたどの窓でも、serial の1回の呼び出しの最大は 82.5 ms 以下だった（EXP-066 の表）。**1回の呼び出しが 2.5 s の `step` を占めた形跡は無い。**呼び出しの合計時間は log に無いので、合計が占めたかどうかは分からない。止まりが `step` の serial 以外の処理にあるのか、process が動けていないのかは、まだ分けていない。後者なら、I/O を別 thread にしても同じ負荷で同じ止まりが起きうる。
+コスト：Pi の待ちの長い窓（約 1.1〜2.5 s）で、serial の read（data の無い poll を除く。`read_data`）と write／flush の呼び出しは最大でも 59 ms（read）、21 ms（write）、50 ms（flush）だった。data の無い poll の待ち（`read_idle`）も含めて、`step` が 1 s を超えたどの窓でも、serial の1回の呼び出しの最大は 82.5 ms 以下だった（EXP-066 の表）。**1回の呼び出しが 2.5 s の `step` を占めた形跡は無い。**呼び出しの合計時間は log に無いので、合計が占めたかどうかは分からない。止まりが `step` の serial 以外の処理にあるのか、process が動けていないのかは、まだ分けていない。後者なら、I/O を別 thread にしても同じ負荷で同じ止まりが起きうる。
 
 ### 選択肢C：ESP32 を、`std::thread` で task に分ける
 
@@ -59,7 +59,7 @@ EXP-066 の5つの条件で、ESP32 の `health` の行（174行）の `overrun_
 ### Pi：維持（待ちの所在は未分離）
 
 - 負荷の無い条件0〜2で、`step_max_us` の最大は 80503〜82762 µs、serial の `read_data_max_us` は最大 46814 µs だった。
-- Pi に CPU の負荷（`yes`）とディスクの同期書き込み（`dd ... conv=fdatasync` のくり返し）を掛けた条件3・4では、`step_max_us` が 2505263 µs（条件3）、1745795 µs（条件4）まで伸びた。条件3・4を通した serial の呼び出しの最大は、data を返した read 58944 µs、write 20798 µs、flush 49639 µs だった。
+- Pi に CPU の負荷（`yes`）とディスクの同期書き込み（`dd ... conv=fdatasync` のくり返し）を掛けた条件3・4では、`step_max_us` が 2505263 µs（条件3）、1745795 µs（条件4）まで伸びた。条件3・4を通した serial の呼び出しの最大は、read（`read_data`）58944 µs、write 20798 µs、flush 49639 µs だった。
 - ESP32 側で `window_max_ms` が 2000 ms を超えた行（条件3で9行、条件4で5行）は、**すべて**、約 1.1〜2.5 秒の `step_max_us` を持つ Pi の窓と重なった（10秒の窓の粒度。逆は成り立たない）。
 - Pi からの frame の到着の間隔の定常の最大は 3380 ms で、`LINK_LOSS_TIMEOUT_MS`（7000 ms）に収まる。EXP-066 の build（`befc02d`）にはこの見張りがまだ無く（値は `None`）、`pi_link_lost` を出す経路も無かったので、検知そのものは確かめていない。起動からの累計の最大（4104〜4893 ms）は、4回とも ESP32 の `boot` の送り直しと Pi の `hello` の位置関係で決まる1件で、定常の値ではない。
 
