@@ -37,7 +37,7 @@
 3. **通電の承認は実行する日に 1 件、人間から得る**（Power Budget の同節。条件(7)と同じ形）。承認は PM が訊く。
    この窓で足す操作（EN ボタン、信号線の抜き差し、USB の抜き差し、センサーの線の抜き差し）は、承認の問いに
    含める。**意図的な fault injection と回路変更後の試験は、人間が立ち会い、電源を遮断できる状態で行う**（Hardware Safety Policy §7）。
-4. **配線は EXP-065 と同じ構成から変えない。**変えたら通電前の確認をやり直す（`信号線をつないでよい条件` の 6）。
+4. **配線は EXP-065 と同じ構成から変えない。**Pi との UART と GND の線を変えたら、通電前の確認をやり直す（`信号線をつないでよい条件` の 6）。センサーの信号線の抜き差し（手順 5）は、挿し先の目視と記録した位置との照合を行う。**それがセンサーの線の通電前の確認として足りるかを示す正本は確かめていない**ため、手順 5 を承認の問いに含め、人間が決める（立ち会いは Hardware Safety Policy §7）。
 5. **Pi の `deskcatd` は 1 つだけ動かす。**Pi を再起動すると本番の `deskcatd` service が自動で起動し、serial を
    取り合う（EXP-065 で起きた）。手順 6 の `link_stress.py` を使う前に `sudo systemctl stop deskcatd` する。
 6. **証拠は repository の外に置く**（ESP32 の log は MAC を含みうる）。記録に device 名、個人 path、SSID を残さない。
@@ -70,7 +70,7 @@ ESP32 の `status.protocol` の counter は、**今の firmware では増えな�
 
 | 知りたいこと | 見る場所 | 備考 |
 |---|---|---|
-| reset の回数と理由 | ESP32 UART0 の `reset_reason=…` の行（起動ごとに 1 行）と、health 行の `uptime_ms` が 0 付近から始まること | 値は `power_on`／`external_pin`／`software`／`panic`／`task_watchdog`／`brownout` など（`reset_reason_str`）。**`panic`／`task_watchdog`／`brownout` が出たら不合格の材料** |
+| reset の回数と理由 | ESP32 UART0 の `reset_reason=…` の行（起動ごとに 1 行）と、health 行の `uptime_ms` が 0 付近から始まること | 値は `power_on`／`external_pin`／`software`／`panic`／`task_watchdog`／`brownout` など（`reset_reason_str`）。**予想する値は `power_on`／`external_pin`／`software` だけ。`panic`／`task_watchdog`／`interrupt_watchdog`／`watchdog`／`brownout`／`power_glitch`／`cpu_lockup` など、それ以外が出たら異常として窓を止める**（`brownout`／`power_glitch` は電源の異常の表示で、AGENTS.md の「電圧降下を認めたら試験を停止する」に当たる） |
 | main loop の遅れ | health 行の `overrun_ticks`、`snapshot_errors` | 増え続けたら記録して PM へ |
 | Pi link の UART の溢れ | health 行の `pi_uart_rx_buffer_full`、`pi_uart_rx_fifo_overflow`、`max_read_gap_ms`、`pi_uart_event kind=… count=…` | **溢れの数は「上限」の測定値**（下の 3.3） |
 | parser の拒否 | `pi_rx_invalid_utf8`、`pi_rx_decode_rejected code=<code>`、`pi_rx_oversize_line` の行を数える | 行の数と `link_stress.py` の「送った数」を突き合わせる |
@@ -86,7 +86,7 @@ ESP32 の `status.protocol` の counter は、**今の firmware では増えな�
 **合格 = 障害を取り除いた後、人の追加操作（`reset-failed`、`restart`、再 flash）なしに、次の 3 つがそろう。**
 
 1. `deskcatd` が `active` のまま、または終了コード 75（`EXIT_SESSION_REDO`）で終わって systemd が再起動して `active` に戻る。
-2. ESP32 の log に、再起動後の `reset_reason` の行以外の異常（`panic`、`task_watchdog`、`brownout`）が無い。
+2. ESP32 の `reset_reason` が、予想した値（`power_on`／`external_pin`／`software`）だけである（3.1）。
 3. **端から端まで届く**：B3 を叩くと、`deskcatd` の log に `tapped_received … total=` が増える（EXP-062・065 と同じ観察。
    `deskcatd` を `--verbose` で起動する）。または手順 6 の `link_stress.py` の `recovered=yes`。
 
@@ -99,12 +99,13 @@ ESP32 の `status.protocol` の counter は、**今の firmware では増えな�
 **したがって数の上限で合否を決めない。**合格 = 次の 3 つ。
 
 1. ESP32 が止まらない・再起動しない（`reset_reason` の行が増えない。`hb` の行が続く）。
-2. 入力を流し終えた後に `get_status` が答えられる（`link_stress.py` が `recovered=yes`）。
+2. 入力を流し終えた後に、確認の `get_status` に `ack: ok` が返る（`link_stress.py` が `recovered=yes`。確認の `id` への応答だけで判定する）。
 3. 拒否の行の数が、流した不正な行の数と一致する（`corpus`、`noise`、`oversize`）。**ただし UART の受信が溢れた場合は一致しない**
    （`pi_uart_rx_buffer_full` などが増える）。溢れた rate と回数を**測定値として記録する**。溢れ自体は不合格にしない
    （流量制限が未実装で、溢れは予想される）。溢れの後に 1・2 が成り立つことを見る。
 
-host の `stress.rs` は、同じ入力の**parser だけ**を確かめる（組み立て中の byte 数が上限を超えない、流した行数と結果の数が
+host の `stress.rs` は、**同じ種類の入力**（分類済みの不正な行は同じ fixture、ランダムな不正 UTF-8 の行、上限を超える行、改行のない入力）の**parser だけ**を確かめる。
+`noise`・`oversize`・`newline-free` の byte 列は script と host test で別である（組み立て中の byte 数が上限を超えない、流した行数と結果の数が
 一致する、拒否が counter の field に分類できる、流し終えた後に復帰する）。**UART、ring buffer、main loop の読み取り間隔は
 試さない。**
 
@@ -155,7 +156,7 @@ host の `stress.rs` は、同じ入力の**parser だけ**を確かめる（組
 ### 手順 5: センサーの切断（電源を切ってから）
 
 1. **先に信号線を外し、USB を抜く**（操作 A）。
-2. `ENV-01` の `SDA` の線（信号線だけ。`VCC`・GND は抜かない）を**1 本**抜く。抜いた位置と線の色を記録する。
+2. `ENV-01` の `SDA` の線（信号線だけ。`VCC`・GND は抜かない）を**1 本**、**両端とも外して取り除き、他の線から離して置く**（片端だけ外した線を挿したまま通電しない。浮いた端が他の pin や rail に触れうる。EXP の先行例：「抜いて置いた」）。外した位置と線の色を記録する。
 3. USB を挿し、ESP32 が起動した（`reset_reason=power_on`）後に、信号線を ESP32 側の端でつなぐ（`信号線をつないでよい条件` の 2。
    挿す前に挿し先を目視する）。ESP32 の起動 log を取る。見るもの：`env_fault kind=i2c_*`（`count=`）が出ること、**`tap_detected`
    と `tapped` の経路が止まらないこと**（`ACCEL-01` は同じ bus を使う。bus を引きずるかどうかが「影響を分離できる」の中身）、
@@ -165,7 +166,7 @@ host の `stress.rs` は、同じ入力の**parser だけ**を確かめる（組
 5. `ACCEL-01` の `SDA` について、1〜4 を繰り返す（`ENV-01` 側は元のまま）。
 6. 戻した後に手順 1 の基線の確認をやり直す。
 
-**2〜4 の間に ESP32 が `panic`／`task_watchdog` で再起動する、`tap_disabled` が出る、LCD が止まる、のどれかが出たら**、
+**2〜4 の間に ESP32 が 予想外の `reset_reason`（3.1）で再起動する、`tap_disabled` が出る、LCD が止まる、のどれかが出たら**、
 「影響が分離できていない」として記録する。結論を急がず、どの組み合わせで出たかを残す。
 
 ### 手順 6: 不正・高 rate の入力
@@ -205,10 +206,10 @@ python3 scripts/link_stress.py --mode flood --count 2000 --port <device> --baud 
 | 症状 | 確認 | 対処 |
 |---|---|---|
 | `deskcatd` が `failed`（`Start request repeated too quickly`） | ESP32 の電源と信号線、ESP32 の `reset_reason` | 原因を取り除いた後、`sudo systemctl reset-failed deskcatd` → `sudo systemctl restart deskcatd`（EXP-024） |
-| `deskcatd` が起動するが ESP32 から 1 byte も届かない | 信号線の 2 本が Pi の pin 8・10 に挿さっているか（目視。EXP-065 で抜けていた）、GPIO15 を pull-down で読んで High か | 信号線を、**電源の入った状態で**ESP32 側の端から直す。Pi の header 側は直す前に Pi を止める |
+| `deskcatd` が起動するが ESP32 から 1 byte も届かない | 信号線の 2 本が Pi の pin 8・10 に挿さっているか（目視。EXP-065 で抜けていた）、GPIO15 を pull-down で読んで High か | ESP32 側の端は、電源の入った状態で挿し直してよい（操作 B）。Pi の header 側が抜けていた場合は、**先に信号線を ESP32 側で外し**、Pi を止めて（`poweroff`）から直す。直した後は `信号線をつないでよい条件` の 6（GND の導通測定と目視）をやり直し、両方の電源を入れてから信号線をつなぐ |
 | ESP32 が `pi_rx_ack_sid_mismatch` を出す | 本番の service と手で起動した `deskcatd` が同じ port を開いていないか | 一方を止める（`systemctl stop deskcatd`） |
 | ESP32 が応答しない | UART0 の log が続いているか（`hb`）。止まっていれば ESP32 の USB、`reset_reason` | 信号線を ESP32 側で外し、EN ボタン。それで戻らなければ USB を抜き挿し（先に信号線を外す）。**原因が分からない停止は EXP-030 にもある。**log を残して PM へ |
-| `reset_reason` が `panic`／`task_watchdog`／`brownout` | その直前の log | **その窓を止める。**再通電しない。log と配線を記録して PM へ（brownout は電源の問題として人間の判断） |
+| `reset_reason` が予想した値（`power_on`／`external_pin`／`software`）以外 | その直前の log | **その窓を止める。**再通電しない。log と配線を記録して PM へ（brownout は電源の問題として人間の判断） |
 | センサーの `env_fault`／`tap_read_failed` が続く | どのセンサーか、bus が共有（`accel=0x53 env=0x76`）か | USB を抜いて（先に信号線を外す）、線の挿し先を目視し、挿し直す。通電中に直さない |
 | 温度・異臭・火花・LCD の異常 | — | **すぐ止める。**USB を抜く前に信号線を ESP32 側で外せるなら外す。間に合わなければ USB を先に抜き、その事実を記録する。log と reset reason を保存し、配線を記録する（§11 の 3・4） |
 

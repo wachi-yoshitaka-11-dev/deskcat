@@ -7,8 +7,9 @@
 
 使う前に **`deskcatd` を止める**（同じ port を 2 つの process が開くと、行が混ざる）。
 
-入力の出所は `crates/deskcat-protocol/tests/fixtures/{valid,invalid}.json` である。同じ fixture を host の
-`crates/deskcat-protocol/tests/stress.rs` も使う。host で分類が通った行だけを実機へ流す。
+入力の出所のうち `corpus` と `hello`・`get_status` の行は `crates/deskcat-protocol/tests/fixtures/{valid,invalid}.json` で、
+host の `crates/deskcat-protocol/tests/stress.rs` も同じ fixture を使う。`noise`・`oversize`・`newline-free` はこの script が
+自分で作る（host test が作る byte 列とは別。同じ種類の入力の性質を host で確かめている）。
 
 モード:
 
@@ -18,7 +19,7 @@
 - `newline-free`: 改行なしの byte を `--count` KiB 流してから改行を 1 つ送る。
 - `flood`   : `hello` の後に `get_status` を `--count` 行、間を空けずに（baud が上限）送る。
 
-どのモードも、最後に `get_status` を 1 件送り、`status` が `--probe-timeout-s` 以内に返れば復帰とみなす
+どのモードも、最後に `get_status`（id=900000）を 1 件送り、その `ack: ok`（`reply_to` が一致）が `--probe-timeout-s` 以内に返れば復帰とみなす
 （終了 code 0）。返らなければ 1。**この復帰の確認は `hello` を前提にする**ため、`corpus` などでも先に `hello` を送る。
 
 **ESP32 の `status.protocol` の counter は firmware が増やさない**（`firmware/esp32/src/pi_link.rs`）。
@@ -43,6 +44,9 @@ FIXTURES = REPO / "crates" / "deskcat-protocol" / "tests" / "fixtures"
 # 仕様 §2。crates/deskcat-protocol/src/limits.rs の MAX_LINE_BYTES（改行を含む）。
 MAX_LINE_BYTES = 1024
 SEED = 0x24
+
+# 復帰の確認に使う `get_status` の id。flood の id（100 から）と重ならない。
+PROBE_ID = 900_000
 
 MODES = ("corpus", "noise", "oversize", "newline-free", "flood")
 
@@ -130,6 +134,7 @@ class Reader:
         self.counts = {}
         self.acks = {}
         self.status_seen = 0
+        self.ok_reply_tos = set()
         self.unparsed = 0
 
     def pump(self, wait_s=0.0):
@@ -159,6 +164,8 @@ class Reader:
             payload = obj.get("payload", {})
             key = payload.get("status", "?") + ":" + str(payload.get("code", "-"))
             self.acks[key] = self.acks.get(key, 0) + 1
+            if payload.get("status") == "ok":
+                self.ok_reply_tos.add(payload.get("reply_to"))
 
 
 def write_all(fd, reader, data):
@@ -202,12 +209,12 @@ def run(args):
     while time.monotonic() < end:
         reader.pump(0.1)
 
-    before = reader.status_seen
-    send(get_status_line(sid, 900_000))
+    # 復帰は、確認の `get_status`（id=PROBE_ID）への `ack: ok` が届いたことで判定する。flood の残りの応答では成り立たない。
+    send(get_status_line(sid, PROBE_ID))
     deadline = time.monotonic() + args.probe_timeout_s
-    while time.monotonic() < deadline and reader.status_seen == before:
+    while time.monotonic() < deadline and PROBE_ID not in reader.ok_reply_tos:
         reader.pump(0.1)
-    recovered = reader.status_seen > before
+    recovered = PROBE_ID in reader.ok_reply_tos
 
     elapsed = time.monotonic() - started
     print(f"mode={args.mode} sent_lines={len(payload)} sent_bytes={sent_bytes} elapsed_s={elapsed:.1f}")
