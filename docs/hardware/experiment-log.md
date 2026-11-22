@@ -6211,7 +6211,7 @@ ESP32 の uptime と Pi の時刻は、同じ `set_expression` の id（`id=4`�
 | Power supply and current limit | `PSU-BENCH-01`。設定（CV 4.80、`I_lim` 0.070、OCP 無効）は前の窓と同じ（ユーザーの申告）。ESP32 はこの端末の USB |
 | Measurement equipment | テスター（DC 20V レンジ。表示の分解能 0.01 V）。クリップは [bench-18 の配線表](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/hardware/bench-18/wiring-table.md)の P6（赤、S＋の端子の金属）と P9（黒、B穴2の端子の金属）。UART0 の log（115200） |
 | Raw data | repository の外の `deskcat-evidence/windows-20261122-774r/`（`console.log`、`notes.txt`、`approval.txt`、`sha256.txt`） |
-| Expected result | PR #774 の 991 行の確かめの読みが取れる |
+| Expected result | PR #774 の段2の`動かし方`の、手を入れる前の確かめの読みが取れる |
 | Measured result | 下記 |
 
 ### 観測
