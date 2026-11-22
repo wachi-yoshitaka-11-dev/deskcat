@@ -6104,7 +6104,7 @@ ESP32 の uptime と Pi の時刻は、同じ `set_expression` の id（`id=4`�
 
 ### 窓の終わり
 
-- `deskcatd` は SIGINT（01:34:40Z と 01:35:05Z。Pi の時計）で止まらず、SIGTERM（01:35:29Z）で止めた（[EXP-067](#exp-067-764-の受け入れ条件4製品-buildno-touch-487でb3-を立てた姿勢の静止と揺らしを見た2回の窓)と同じ）。
+- `deskcatd` は SIGINT（01:34:40Z は `pkill -INT -f release/deskcatd`、01:35:05Z は `kill -INT` で PID を指定。Pi の時計）で止まらず、SIGTERM（01:35:29Z）で止めた（[EXP-067](#exp-067-764-の受け入れ条件4製品-buildno-touch-487でb3-を立てた姿勢の静止と揺らしを見た2回の窓)と同じ）。
 - `S21`（F1 の側）・`S22`（F2 の側）を抜き、AI が Pi を poweroff し、ユーザーが Pi の電源の線、ESP32 の USB、LCD の VCC の線を抜いた。Pi の GPIO14 を入力 pull-down にする操作はしていない。
 
 ### 確かめていないこと（主張しないこと）
