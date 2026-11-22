@@ -5860,7 +5860,7 @@ ELF（wdt）`77d40227f4dca649e3cda797b3ac599087b1aef534e33ab848cb26b37e0f11bd`�
 
 ## EXP-066: 受信の間隔の log を足した製品 build（link-gap-20,no-touch-487）で、Pi が送る frame の到着の間隔を、LCD の描画、センサーの読み出し、Pi の負荷と同時に測った
 
-[#20](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/20)の`HW-TBD-017`（ESP32 が Pi からの受信の途切れと判定するまでの時間）を決める材料として、**Pi → ESP32 の frame の到着の間隔**を実機で取った窓。同じ窓で、[#683](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/683)の手順の3と4（Pi の実 port の待ちと、ESP32 の main loop の周期・期限超過・UART を読みに行く間隔）の記録も取った。servo は動かしていない。**この記録は観測の事実だけを書く。`HW-TBD-017`の値、判定の基準、`ping`の間隔は、ここでは決めない。**#683 の実行方式の判断（手順の5と6）も、ここでは行わない。
+[#20](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/20)の`HW-TBD-017`（ESP32 が Pi からの受信の途切れと判定するまでの時間）を決める材料として、**Pi → ESP32 の frame の到着の間隔**を実機で取った窓。同じ窓で、[#683](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/683)の手順の3と4（Pi の実 port の待ちと、ESP32 の main loop の周期・期限超過・UART を読みに行く間隔）の記録も取った。servo は動かしていない。**この記録は観測の事実だけを書く。`HW-TBD-017`の値、判定の基準、`ping`の間隔は、ここでは決めない。**#683 の実行方式の判断（手順の5と6）も、ここでは行わない（[ADR-0028](../decisions/0028-keep-single-runner-and-single-main-loop.md)に置いた）。
 
 | 項目 | 内容 |
 |---|---|
@@ -6152,3 +6152,4 @@ ESP32 の uptime と Pi の時刻は、同じ `set_expression` の id（`id=4`�
 | 2026-11-19 | 74 | [#764](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/764)。**`EXP-067`を追加した。**製品 build（`no-touch-487`、develop `fc21ee3`）を Pi とつなぎ、B3 を立てた姿勢の静止と揺らしを2回の窓で見た。立てた静止の3分は2回とも検出0件、起きている時間帯に揺らすと `Dizzy` になった。平らに寝かせた1回目の間に検出が続いたこと（原因は未確認）と、`deskcatd` が SIGINT で止まらなかったことを、観察として書いた | 窓1（2026-11-18）と窓2（2026-11-19）の UART0 の log と Pi の `deskcatd` の log、ユーザーの目視の報告 |
 | 2026-11-19 | 75 | [#20](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/20)。**`EXP-066`の通電前の確認の1を、Power Budget の判断に合わせた。**`link-gap-20,no-touch-487` の通電の可否を Power Budget と README の表へ反映したので、「未判定。反映するまで通電しない」を、その節を参照する文に置き換えた。条件の間で ESP32 を再起動するかを窓の計画に任せていたのを、再起動すると決めた（累計の値が条件をまたいで残り、条件ごとに読めないため）。 | 計画の前提の更新（観測の記録ではない） |
 | 2026-11-20 | 76 | [#20](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/20)・[#683](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/683)。**`EXP-066`を計画から記録へ書き換えた。**`link-gap-20,no-touch-487`（`befc02d`）を Pi とつなぎ、5つの条件で frame の到着の間隔を測った窓の観測の事実（計画から変えた点、条件(1)の非通電の確認、起動7回、条件ごとの値、累計の最大の1件が session の確立を待つ間だったこと、条件3・4の 2 秒を超える間隔と Pi の待ちの窓の対応、#683 の分、Faults）を書いた。`HW-TBD-017`の値と`ping`の間隔は決めていない | 窓（2026-11-20）の UART0 の log、Pi の `deskcatd` の log と状態の記録、ユーザーの申告（テスターの読み、配線の目視、表情の目視） |
+| 2026-11-22 | 77 | [#683](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/683)。**`EXP-066`の導入に、実行方式の判断の置き場所（[ADR-0028](../decisions/0028-keep-single-runner-and-single-main-loop.md)）への link を足した。**記録の内容（観測の事実）は変えていない。判断は ADR に置いた | ADR-0028（判断の材料は `EXP-066` の記録だけ） |
