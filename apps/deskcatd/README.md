@@ -46,4 +46,28 @@ deskcatd <必須の引数> --no-companion --probe-expression happy --probe-inter
 - 間隔の値に根拠は無い。赤の点灯時間（[led-514-demo.md](../../docs/hardware/led-514-demo.md#役割と表示)）より長い値で観察する。
 - 赤を確かめるfirmwareは、LEDを持つ製品buildか、`bringup-led-514`と`face-21`を併せたbuildである（`no-touch-487`はLEDを持たない）。撫でるeventを読むbuildでは、`Mind`の表情が混ざる。
 
+## Companionの値の上書き（`--companion-*`）
+
+[Issue #685](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/685)の休憩・寝起き・環境の反応を、1回の実機の窓で
+確かめるための試験用の引数である。**運用では付けない。**systemdのunitにも指定しない。Piの時計は動かさず、`Config::MVP`
+（`crates/deskcat-domain/src/companion.rs`）の値だけを起動時に上書きする。**指定した項目だけ**を上書きし、1つも指定しなければ
+`Config::MVP`と同じである。値はすべて一般値の初期値で、安全要件の5項目に効かない。首振り・motionの経路と安全制限は変えない。
+
+| 引数 | 上書きする値 | 形式 |
+|---|---|---|
+| `--companion-rest-interval-ms` | 休憩のお知らせの間隔 | ミリ秒。0は不可 |
+| `--companion-sleep-at` / `--companion-wake-at` | 寝る時刻 / 起きる時刻（日本時間。UTC+9固定。`cloud_speech::local_minutes`） | `HH:MM`（`00:00`〜`23:59`）。2つは異なる値 |
+| `--companion-hot-on-c` / `--companion-hot-off-c` | 暑い（上側）の入る側 / 戻る側（℃） | 小数。`off` < `on` |
+| `--companion-cold-on-c` / `--companion-cold-off-c` | 寒い（下側）の入る側 / 戻る側（℃） | 小数。`off` > `on` |
+| `--companion-dry-on-pct` / `--companion-dry-off-pct` | 乾燥（下側）の入る側 / 戻る側（%） | 小数。`off` > `on` |
+| `--companion-pressure-drop-on-hpa` / `--companion-pressure-drop-off-hpa` | 気圧低下の入る側 / 戻る側（下がり幅、hPa） | 小数。`off` < `on` |
+
+- 起動時に検査し、不正なら終了1で起動しない。小数は有限の値だけを受け付ける。**片側だけを指定した場合も、`Config::MVP`の残り片側との関係を検査する**（例: `--companion-hot-on-c 20`だけだと`hot_off_c`の28と矛盾して拒否される）。
+- `--no-companion`とは併用できない（上書きする相手が無い）。
+- 例（休憩を1分、夜を窓の時刻から10分間にして、1回の窓で見る）:
+
+```text
+deskcatd <必須の引数> --companion-rest-interval-ms 60000 --companion-sleep-at 14:30 --companion-wake-at 14:40
+```
+
 systemdのunitは`deploy/systemd/deskcatd.service`にある。値は暫定で、根拠は無い。Pi実機で未確認である。
