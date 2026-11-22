@@ -20,7 +20,7 @@ EXP-066 は servo を駆動しない製品 build で測った（[#683](https://g
 ## 判断要因
 
 - 期限に対する待ちの大きさ。比べる期限は次のとおり。いずれも値の根拠はそれぞれの正本が持つ。ここへ新しい値は置かない。
-  - ESP32：`HEARTBEAT_PERIOD_MS`（1000 ms）、`HEALTH_SNAPSHOT_PERIOD_MS`（10000 ms）、`LINK_LOSS_TIMEOUT_MS`（7000 ms。[HW-TBD-017](../hardware/tbd-register.md)。#784 で置いた値であり、実機の確認は済んでいない）。
+  - ESP32：`HEARTBEAT_PERIOD_MS`（1000 ms）、`HEALTH_SNAPSHOT_PERIOD_MS`（10000 ms）、`LINK_LOSS_TIMEOUT_MS`（値は[HW-TBD-017](../hardware/tbd-register.md)。#784 で置いた値であり、実機の確認は済んでいない）。
   - Pi：ESP32 の `LINK_LOSS_TIMEOUT_MS` に対する、Pi からの frame の到着の間隔。
 - 期限超過・取りこぼしの有無（`overrun_ticks`、rx の取りこぼし、`pi_link_lost`、task WDT、`panic`）。
 - 待ちの所在が分かっているか。**所在が分からないまま分けても、直るとは言えない。**
@@ -61,7 +61,7 @@ EXP-066 の5つの条件で、ESP32 の `health` の行（174行）の `overrun_
 - 負荷の無い条件0〜2で、`step_max_us` の最大は 80503〜82762 µs、serial の `read_data_max_us` は最大 46814 µs だった。
 - Pi に CPU の負荷（`yes`）とディスクの同期書き込み（`dd ... conv=fdatasync` のくり返し）を掛けた条件3・4では、`step_max_us` が 2505263 µs（条件3）、1745795 µs（条件4）まで伸びた。条件3・4を通した serial の呼び出しの最大は、read（`read_data`）58944 µs、write 20798 µs、flush 49639 µs だった。
 - ESP32 側で `window_max_ms` が 2000 ms を超えた行（条件3で9行、条件4で5行）は、**すべて**、約 1.1〜2.5 秒の `step_max_us` を持つ Pi の窓と重なった（10秒の窓の粒度。逆は成り立たない）。
-- Pi からの frame の到着の間隔の定常の最大は 3380 ms で、`LINK_LOSS_TIMEOUT_MS`（7000 ms）に収まる。EXP-066 の build（`befc02d`）にはこの見張りがまだ無く（値は `None`）、`pi_link_lost` を出す経路も無かったので、検知そのものは確かめていない。起動からの累計の最大（4104〜4893 ms）は、4回とも ESP32 の `boot` の送り直しと Pi の `hello` の位置関係で決まる1件で、定常の値ではない。
+- Pi からの frame の到着の間隔の定常の最大は 3380 ms で、`LINK_LOSS_TIMEOUT_MS`（値は HW-TBD-017）に収まる。EXP-066 の build（`befc02d`）にはこの見張りがまだ無く（値は `None`）、`pi_link_lost` を出す経路も無かったので、検知そのものは確かめていない。起動からの累計の最大（4104〜4893 ms）は、4回とも ESP32 の `boot` の送り直しと Pi の `hello` の位置関係で決まる1件で、定常の値ではない。
 - `deskcatd` は5回とも、止める SIGTERM まで動き続けた（EXP-066 の`deskcatd の止め方`）。再試行の上限を超えたときの終了（75。`apps/deskcatd/src/daemon.rs` の module doc）は起きていない。再試行の回数は数えていない。
 
 負荷は人為的で、製品が通常出会う負荷ではない。条件を掛けても、測った範囲で期限を超えなかった。分ける構造（独立した I/O と bounded channel）を決めるには、止まりが `step` のどこにあるかが要る。いまは、それを分けた材料が無い。
@@ -94,7 +94,7 @@ EXP-066 の5つの条件で、ESP32 の `health` の行（174行）の `overrun_
 |---|---|
 | servo を動かす製品 build で、main loop の遅れが期限に近づく | [#20](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/20) の servo を動かす窓で、`overrun_ticks`・`max_read_gap_ms`・`heartbeat_overrun` を同じ形で記録し、この ADR の維持を見直す |
 | touch を読む製品 build（`no-touch-487` でない build）は、読み出しの時間が loop に加わる | touch を読む build で同じ窓を測る。測るまで、ESP32 の維持は `no-touch-487` の範囲 |
-| Pi の止まりが、製品の実際の同居の負荷（`yes`・`dd` 以外）で 7000 ms を超える | `step` の内訳（serial 以外の処理と、process が動けていない時間）を分ける観測を足し、`HW-TBD-017` の値の再評価（#20）の材料にする |
+| Pi の止まりが、製品の実際の同居の負荷（`yes`・`dd` 以外）で `LINK_LOSS_TIMEOUT_MS` を超える | `step` の内訳（serial 以外の処理と、process が動けていない時間）を分ける観測を足し、`HW-TBD-017` の値の再評価（#20）の材料にする |
 | 5〜7 分ほどの窓の最大は、長時間の最悪を上限として示さない | [#24](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/24)（耐久試験）の記録で、`overrun_ticks`・`max_read_gap_ms`・`link_wait` を同じ形で取る |
 | 観測の log 自体が、測った待ちを変えている | EXP-066 の「確かめていないこと」に残してある。影響の大きさは未確認 |
 
