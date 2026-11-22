@@ -4,7 +4,7 @@
 
 | データ | 対象と状態 |
 | --- | --- |
-| [`deskcat.kicad_pro`](deskcat.kicad_pro)、[`deskcat.kicad_sch`](deskcat.kicad_sch) | #512 の論理回路。EXP-019 測定前の基準配線に、EXP-022 の UART と EXP-025 の LED 2枝を加えた設計上の合成図。抵抗の `Value` は数値の代わりに値の正本文書名を示す（正本が無い `R19` は `TBD`）。2026-11-15 に、`PROTO-02` の電源の経路（入力 → 端子台 → PTC → MOSFET → 分岐点 → servo・Pi・logic の枝。未実装の計画）を同じ図に足した。pin 番号の出所は下の`回路図の pin 番号`。KiCad 8.0.9 の `kicad-cli` で読み込み、ERC を実行した（下の`KiCad の ERC`）。 |
+| [`deskcat.kicad_pro`](deskcat.kicad_pro)、[`deskcat.kicad_sch`](deskcat.kicad_sch) | #512 の論理回路。EXP-019 測定前の基準配線に、EXP-022 の UART と EXP-025 の LED 2枝を加えた設計上の合成図。抵抗の `Value` は数値の代わりに値の正本文書名を示す（値の正本が無い `R19` だけは、現在組んである値を出所の EXP-028 とともに書く。設計値ではない）。2026-11-15 に、`PROTO-02` の電源の経路（入力 → 端子台 → PTC → MOSFET → 分岐点 → servo・Pi・logic の枝。未実装の計画）を同じ図に足した。pin 番号の出所は下の`回路図の pin 番号`。KiCad 8.0.9 の `kicad-cli` で読み込み、ERC を実行した（下の`KiCad の ERC`）。 |
 | [`universal-board/`](universal-board/plan.md)、[`deskcat.kicad_pcb`](deskcat.kicad_pcb) | `PROTO-02`（電源の基板）の**実装の計画（未実装）**。どの穴にどの部品をどの向きで挿し、どこをはんだでつなぎ、どの線をどこへ出すか。**正本は KiCad の基板ファイル `deskcat.kicad_pcb`**（回路図と同じ project）。図 `plan-front.svg`・`plan-back.svg` は KiCad から書き出した派生物で、`plan.md` は凡例・向き・測る所である。GND の star point の規則は `check_star_point.py` が基板ファイルを読んで確かめる。**完成図ではない。**#405 のはんだ付けはこの計画に従い、付けた後に現物と照合して完成図にする。 |
 | [`overview/`](overview/wiring-table.md) | 最終形の全体の配線（ブレッドボード B1・B2・B3、`PROTO-02`、Pi、サーボ、LCD、M-12001）のつながり。位置は胴の中の位置関係だけで、寸法は表さない。`generate.py` が回路図から書き出した netlist（`deskcat-netlist.xml`）を入力にして `layout.svg` と `wiring-table.md` を生成し、図の線と netlist が合うことを検査する。板どうしの線はブレッドボードの `breadboard-rebuild/generate.py` のデータを読み込む。#18 の試験だけの物（端子台S、PSU、試験用の負荷、shunt）は描かない。 |
 | [`breadboard/layout.svg`](breadboard/layout.svg) | 最終の配線の図。2026-10-31（EXP-052）に、組み直した後の配置（`breadboard-rebuild/layout.svg`）で置き換えた。測定のためだけの一時配線（EXP-030〜035 の Arduino・分圧・シャント・測定用の戻り線）は描かない。柔らかい線の色と穴は `breadboard-rebuild/wiring-table.md` が正である。組み直す前の図は Git の履歴にある。 |
@@ -52,20 +52,22 @@ EXP-025 の [LED デモ回路](../docs/hardware/led-514-demo.md)は GPIO → 電
 
 基板ファイルの DRC（`kicad-cli pcb drc --schematic-parity --severity-all`）は、違反 0、未接続 0、回路図との食い違い 0 だった。
 
-**この ERC が保証しないこと：**symbol の pin はすべて passive なので、出力どうしの衝突のような pin の種別の検査は効かない。GUI での表示は確かめていない。
+**この ERC が保証しないこと：**symbol の pin はすべて passive なので、出力どうしの衝突のような pin の種別の検査は効かない。GUI の窓での表示は確かめていない（`DISPLAY` が無い端末のため）。作業セッション（AI）が `kicad-cli sch export pdf` で描画して画像にし、確かめた（下の`閉じた項目`）。**人は見ていない。**
 
 ## Wokwi と物理図の評価
 
 [Wokwi の diagram.json 形式](https://docs.wokwi.com/diagram-format)は JSON で部品と pin 間の接続を編集できる。抵抗の `value` 属性には数値が必須であり、[GPIO Assignment](../docs/hardware/gpio-assignment.md) と [LED デモ回路](../docs/hardware/led-514-demo.md)を写した値を入れている。値の変更時は正本と同じ PR で照合する。[Wokwi の抵抗モデル](https://docs.wokwi.com/parts/wokwi-resistor)は簡易的なアナログモデルで、起動時の pull を配置できても実機の起動挙動は立証できない。
 
-**ブラウザで試した結果（2026-11-15）。**ログインせずに `wokwi.com` の新しい ESP32 project を開き、`diagram.json` を貼り替え、sketch を「外部 pull のある pin を入力にして読み、serial へ出す」ものに替えて simulation を始めた。project は保存していない（保存にはログインが要る）。API トークンは使っていない。
+**ブラウザで試した結果（2026-11-15）。**ログインせずに `wokwi.com` の新しい ESP32 project を開き、`diagram.json` を貼り替え、sketch を「外部 pull のある pin を入力にして読み、serial へ出す」ものに替えて simulation を始めた。project は保存していない（保存にはログインが要る）。API トークンは使っていない。**この試行を誰が行い、誰が画面を見たかの記録は無い**（記録の出所の PR #769 は「ブラウザから試した」と書くだけで、主語が無い）。
 
-- 表示：`diagram.json` を読み込み、ESP32・抵抗・LCD と線が描かれた（画面に入った範囲を見た）。
+- 表示：`diagram.json` を読み込み、ESP32・抵抗・LCD と線が描かれた（画面に入った範囲を確かめたとの記録がある。誰が見たかの記録は無い）。
 - 起動：ROM の log は `rst:0x1 (POWERON_RESET),boot:0x13 (SPI_FAST_FLASH_BOOT)` で、sketch まで進んだ。読んだ値は、pull-down の GPIO2・4・5・27 が 0、pull-up の GPIO16・21・22・25・26 が 1 で、図の pull の向きと合った。
 - **boot mode は再現されない。**`GPIO0` を GND へ直結する線を足して起動し直すと、sketch は `GPIO0=0` を読んだが、ROM の log は同じ `boot:0x13 (SPI_FAST_FLASH_BOOT)` のままだった（download mode に入らない）。Wokwi は strapping pin の電圧から boot mode を決めていない。実機の起動 log は `boot:0x12`（EXP-052）で、値も一致しない。
 - したがって Wokwi で言えるのは「外部 pull の論理接続を、起動後に入力として読むと図の向きになる」ことまでで、strapping pin の起動挙動は確かめられない。
 
 Wokwi の [ILI9341 部品](https://docs.wokwi.com/parts/wokwi-ili9341)では RST と backlight はシミュレーションされない。`DISP-01` の touch は XPT2046 だが同部品の touch とは一致しない。Wokwi の汎用 LED も `LED-COMM-01`／`LED-REACT-01` の電気特性を保証するモデルではない。`ACCEL-01` の ADXL345、`ENV-01` の BME280、Pi Zero W の UART、ブレッドボードの実際の穴位置は、この評価構成にモデル化していない。外部 pull の論理接続には Wokwi を使い、実際の穴位置には SVG を使う。同じ回路を Wokwi と Fritzing で二重に手編集しない。
+
+**カスタムチップ（2026-11-22 に公式文書を読んだ）。**[Getting Started](https://docs.wokwi.com/chips-api/getting-started)は、Custom Chips API で「新しい simulation model を作り、センサー、表示器、メモリなどを作れる」と述べ、chip は C（または WebAssembly にコンパイルできる言語）で書き、**API は beta** だと注記する。[I2C API](https://docs.wokwi.com/chips-api/i2c)は、`i2c_init` に SCL・SDA の pin、7 ビットの I2C アドレス、connect・read・write・disconnect の callback を渡して I2C の device を作ると述べる。したがって、`ACCEL-01`（ADXL345）と `ENV-01`（BME280）を、アドレスと register の読み書きを返す I2C の chip として**書くこと自体は、公式の記述の範囲でできる**。**作らない。**理由は3つである。(1) 作った chip が返す値は、datasheet から起こした自作の model であり、実物の挙動を保証しない。DeskCat の firmware の driver がその model で動いても、実物のセンサーで動く根拠にならない。(2) Wokwi は外部 pull の論理接続の評価にだけ使うと決めた（下の採否）。外部 pull の評価に I2C のセンサーは要らない。(3) Wokwi で確かめられない起動挙動と電源・安全は、chip を足しても確かめられない（上）。**確かめていない：**この2ページに、ADXL345 や BME280 の既製の chip の有無の記述は無い（標準部品の一覧は 2026-09-30 の確認のまま）。自作した chip の保存や共有に、ログインが要るかどうかも確かめていない。
 
 ### 採否（2026-11-15）
 
@@ -79,12 +81,12 @@ Wokwi の [ILI9341 部品](https://docs.wokwi.com/parts/wokwi-ili9341)では RST
 
 ## 現物照合待ち（TBD）
 
-- `PROTO-02` の現物：計画（[`universal-board/plan.md`](universal-board/plan.md)）は描いた。**計画図を先に描き、それに従ってはんだ付けし、付けた後に現物と照合して完成図にする（#405）。**基板の未実装状態を完成図として描かない。計画の`測る所`の寸法は、まだ測っていない。
-- 回路図の GUI での表示（`kicad-cli` での読み込みと ERC は済み）。
-- 回路図の `R19`（サーボ信号の直列抵抗）の値：値の正本が無い。現物は EXP-028 の 330 Ω（ブレッドボードの `R6`）。実機の電源・安全確認は図やシミュレーションで代替できない。
+- `PROTO-02` の現物：計画（[`universal-board/plan.md`](universal-board/plan.md)）は描いた。**はんだ付けの後に現物と照合して完成図にする作業は #405 の範囲で、追跡を #405 へ移した**（#405 の受け入れ条件に、計画図に従ったはんだ付けと、現物との照合・完成図の記録の項目がある）。**基板の未実装状態を完成図として描かない。**計画の`測る所`（M1〜M6）は、#512 の受け入れ条件の「表現できない部分と `TBD` を列挙する」に当たる列挙として `plan.md` に残す。測る作業も #405 側で行い、まだ測っていない。
 
 ### 閉じた項目
 
+- **回路図の `R19`（サーボ信号の直列抵抗）の値：現在組んである値として記入した。**値は回路図の `Value` が持つ（ここへ写さない）。出所は [EXP-028](../docs/hardware/experiment-log.md#exp-028-sg90の初回のサーボ動作の試み測定用buildジャンパー線の接続2回試みた) の記録で、ブレッドボードでは [`breadboard-rebuild/wiring-table.md`](breadboard-rebuild/wiring-table.md) の `R6` にあたる。**これは設計値の正本ではない。**値を決める正本が無いまま、現物に合わせて図へ書いたものである。図は実機の電源・安全確認の代わりにならない。
+- **回路図の KiCad での表示（2026-11-22）：** 作業セッション（AI）が `kicad-cli sch export pdf` で回路図を描画し、画像にして確かめた。**人は見ていない。**画像で、回路図の全体（枝ごとの配置・label・注記）が描かれることと、`R19` の `Value` が隣の `R7`・`R8` の文字に重なっていること（初稿の長い `Value`。短くして直した）を確かめた。**GUI の窓（`eeschema`）は起動していない。**この端末に画面が無い（`DISPLAY` が空）ためで、描画は同じ KiCad 8.0.9 の plot の経路による。受け入れ条件の「対応するツールで開け」は、読み込み・ERC（上の`KiCad の ERC`）・この描画で満たすと扱う。
 - **`ENV-01` の `CSB`–`VDD` はんだジャンパ `J3` の導通：測らずに閉じた（2026-11-15）。**根拠は次の3つである。
   1. [EXP-014](../docs/hardware/experiment-log.md#exp-014-env-01bme280のj3はんだジャンパの実施記録)：`J3` ははんだ付け済み（2026-09-07）。確認の方法は写真とテスターである（申告の記録）。**測定値は無い。**
   2. EXP-052 の起動で `env_chip_id raw=0x60`（BME280）が読め、EXP-065 の起動 log は `env=0x76`、温湿度は Pi へ1分ごとに送られた。**これは `J3` の導通を測ったことではない。**言えるのは「それらの起動のたびに、`CSB` が `VDD` の側にあった」ことである。BME280 は `CSB` が `VDDIO` につながると I2C、一度 low に引かれると次の power-on-reset まで I2C を止める（Bosch BME280 Data Sheet、`BST-BME280-DS001-24`、Revision 1.24 の 6.1 `Interface selection`）。`J3` の抵抗値や、はんだの状態は分からない。
