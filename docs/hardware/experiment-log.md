@@ -6280,7 +6280,7 @@ ESP32 の uptime と Pi の時刻は、同じ `set_expression` の id（`id=4`�
 | 項目 | 内容 |
 |---|---|
 | Test ID | `EXP-072` |
-| Date | 2026-11-22（UTC 17:27〜17:43。日本時間では 11-23 の 02:27〜02:43） |
+| Date | 2026-11-23（日本時間 02:27〜02:43。UTC では 11-22 の 17:27〜17:43） |
 | Operator | ESP32 の USB を挿すこと、テスターの棒を当てて表示を読むこと、LED の目視はユーザー。build、書き込み、console の記録、リセットの保持（USB の RTS で EN を Low に保つ）と解除は PM（AI） |
 | 承認 | 承認があった：承認者 wachi-yoshitaka-11-dev、2026-11-22T17:1xZ ごろ、PM のセッション。範囲は、AI の問い「#514 の残りの測定を、今、単独の窓で行ってよいですか？」 |
 | Hardware revision／Exact components | `MCU-01`、`LED-COMM-01`（白）・`LED-REACT-01`（赤）の2枝（[EXP-052](#exp-052-組み直した3枚の板で初回通電しbringup-led-514のled点灯と導通を取った)で組んだまま）。抵抗は [breadboard-rebuild の配線表](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/hardware/breadboard-rebuild/wiring-table.md)の R7（330 Ω、B1 H5–H1）、R8（330 Ω、B1 I2–I6）、R9（10 kΩ、B1 L5–−5）、R10（10 kΩ、B1 L2–−2）。値は表示の値で、実測していない。Pi・LCD の VCC の線・`PSU-BENCH-01` は、前の窓の終わりのまま外してある |
@@ -6396,4 +6396,4 @@ ESP32 の uptime と Pi の時刻は、同じ `set_expression` の id（`id=4`�
 | 2026-11-22 | 79 | [#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)。**`EXP-068`を追加し、冒頭の一覧表に行を足した。**[PR #774](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/774) の段2の手を入れる前に待つ時間を、段1の範囲（ホーンなし、校正 build 90°〜105°）で測った2回の窓。PSU の出力 OFF と ESP32 の USB を抜く条件で、servo の端が 0.00 になるまで 27.64 s と 25.39 s。EN ボタンを押しても EN が 3.30 V のままで ESP32 が reset されなかったことと、その切り分けの読み、窓1の最初の出力 ON で 0.02 V・0.070 A・CC 点灯になり直ちに出力を OFF にしたことも記録した | 2026-11-21〜22 の実機の窓（`deskcat-evidence/windows-20261121-774d/`、`windows-20261122-774d/`） |
 | 2026-11-22 | 80 | [#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)。**`EXP-070`を追加した。**PR #774 の段2の手を入れる前の確かめの読み（クリップを留めた点、出力 ON の間のテスター 4.82、0.00、信号線の 0.00）を、servo を動かさずに取った窓の記録 | 窓（2026-11-22）の UART0 の log、ユーザーの申告（テスターの読み、PSU の表示、配線の目視） |
 | 2026-11-22 | 81 | [#22](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/22)・[#685](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/685)・[#522](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/522)。**`EXP-071`を追加した。**叩いて驚くまでの時間と誤反応、休憩・寝起き・温湿度の反応、クラウドの独り言を見た窓の記録 | 窓（2026-11-22）の UART0 の log、Pi の `deskcatd` の log と journal、ユーザーの申告（目視） |
-| 2026-11-22 | 82 | [#514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)。**`EXP-072`を追加した。**リセット中の GPIO2・GPIO5 の電位と、赤と白の LED の電流（330 Ω の両端の電圧から）を取った窓の記録 | 窓（2026-11-22）の UART0 の log、テスターの読み（ユーザーが読んだ表示） |
+| 2026-11-23 | 82 | [#514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)。**`EXP-072`を追加した。**リセット中の GPIO2・GPIO5 の電位と、赤と白の LED の電流（330 Ω の両端の電圧から）を取った窓の記録 | 窓（2026-11-23）の UART0 の log、テスターの読み（ユーザーが読んだ表示） |
