@@ -5,7 +5,7 @@
 「Gate は共通 GND 戻り（star point）へ抵抗を介してつなぐ」）：
 
 - servo の戻りの電流は、J6− から J5− までの GND の導体を流れる（servo の経路）。
-- star point は、servo の経路の上の (16,9) の穴である。
+- star point は、servo の経路の上の (7,17) の穴である（J6− の足の穴 (7,16) から GND の母線へ上がる点）。
 - Gate 抵抗 R18 の GND 側と、Pi（J7−）・logic（J8−）の GND は、J5− へ向かう途中で
   servo の経路に最初に触れる点が star point でなければならない（servo の電流が流れる区間の
   途中に付けない）。star point を除いても servo の経路とつながる導体（迂回）があってはならない。
@@ -24,7 +24,7 @@ from pathlib import Path
 PCB = Path(__file__).resolve().parent.parent / "deskcat.kicad_pcb"
 ORIGIN = (100.0, 100.0)          # 基板の左上の角（基板ファイルの座標）
 X0, Y0, PITCH = 3.0, 3.45, 2.54  # 穴の格子（plan.md の`寸法の出所`）
-STAR_HOLE = (16, 9)
+STAR_HOLE = (7, 17)
 SERVO = ("J6", "-")
 RETURN = ("J5", "-")
 MUST_JOIN_AT_STAR = [("R18", "2"), ("J7", "-"), ("J8", "-")]
@@ -68,14 +68,16 @@ def main():
     for fp in blocks(text, "footprint "):
         ref = re.search(r'\(property "Reference" "([^"]+)"', fp).group(1)
         at = re.search(r'\n\t\t\(at ([-\d.]+) ([-\d.]+)( [-\d.]+)?\)', fp)
-        if at.group(3) and float(at.group(3)) != 0:
-            print(f"NG: {ref} は回転しており、この検査は読めない", file=sys.stderr)
+        rot = float(at.group(3)) if at.group(3) else 0.0
+        if rot not in (0.0, 180.0):
+            print(f"NG: {ref} は 0 度と 180 度以外に回転しており、この検査は読めない", file=sys.stderr)
             return 1
+        sign = -1 if rot == 180.0 else 1  # 180 度回すと、足の相対位置の符号が逆になる
         fx, fy = float(at.group(1)), float(at.group(2))
         for pad in blocks(fp, "pad "):
             num = re.match(r'\(pad "([^"]*)"', pad).group(1)
             px, py = map(float, re.search(r'\(at ([-\d.]+) ([-\d.]+)', pad).groups())
-            pads[(ref, num)] = (round(fx + px, 3), round(fy + py, 3))
+            pads[(ref, num)] = (round(fx + sign * px, 3), round(fy + sign * py, 3))
     segs = []
     for seg in blocks(text, "segment"):
         if f"(net {gnd[0]})" not in seg or '"B.Cu"' not in seg:

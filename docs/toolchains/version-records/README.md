@@ -22,6 +22,7 @@ file 名と Record ID は初回検証日で固定し、以後の再検証でも�
 | [#16 BME280 firmware (VM)](2026-10-16-env-16-vm.md) | ESP32 Build | `Partial` | 2026-10-16 | 2026-10-16 |
 | [#15 ADXL345 sample firmware (実機 Linux x86_64)](2026-10-17-accel-15-native-linux.md) | ESP32 Build | `Partial` | 2026-10-17 | 2026-10-20 |
 | [#512 KiCad の読み込みと ERC (VM)](2026-11-15-kicad-erc-vm.md) | Docs / Review＋KiCad | `Partial` | 2026-11-15 | 2026-11-15 |
+| [#512 PROTO-02 の基板ファイルの更新と DRC (実機 Linux x86_64)](2026-11-23-kicad-pcb-native-linux.md) | Docs / Review＋KiCad | `Partial` | 2026-11-23 | 2026-11-23 |
 
 **同じ profile の記録も、端末・日時・対象作業を区別する。**`2026-08-06`と`2026-08-10`は VM 上、
 `2026-08-15`の2件は実機で取得した。`2026-10-16`の #16 記録は VM 上の当該差分に限る。
