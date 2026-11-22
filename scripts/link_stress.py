@@ -230,6 +230,7 @@ def run(args):
         f"mode={args.mode} sent_items={len(payload)} expected_rejections={expected_rejections(args.mode, payload)} "
         f"sent_bytes={sent_bytes} elapsed_s={elapsed:.1f}"
     )
+    print(f"sid={sid}")
     print(f"received_types={json.dumps(reader.counts, sort_keys=True)}")
     print(f"received_acks={json.dumps(reader.acks, sort_keys=True)} unparsed_lines={reader.unparsed}")
     print(f"recovered={'yes' if recovered else 'no'}")
@@ -243,12 +244,14 @@ def main(argv=None):
     p.add_argument("--port", help="serial device（--dump では不要）")
     p.add_argument("--baud", type=int, help="--dump では不要。baud は PROTO-TBD-001 のため既定値を持たせない")
     p.add_argument("--count", type=int, default=100, help="行数（newline-free は KiB）")
-    p.add_argument("--sid", type=int, default=24_000_001, help="hello の sid（deskcatd の sid と区別する）")
+    p.add_argument("--sid", type=int, help="hello の sid。省くと実行ごとにランダムに選ぶ（ESP32 は使った sid を retired として覚え、同じ sid の再実行を stale_session で拒否するため）")
     p.add_argument("--probe-timeout-s", type=float, default=5.0)
     p.add_argument("--dump", action="store_true")
     args = p.parse_args(argv)
     if not args.dump and not (args.port and args.baud):
         p.error("--port と --baud が要る（--dump を除く）")
+    if args.sid is None:
+        args.sid = random.SystemRandom().randrange(1, 0xFFFFFFFF)
     if not (0 < args.sid <= 0xFFFFFFFF):
         p.error("--sid は 1 以上 u32 以下")
     return run(args)

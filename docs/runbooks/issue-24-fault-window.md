@@ -87,8 +87,7 @@ ESP32 の `status.protocol` の counter は、**今の firmware では増えな�
 
 1. `deskcatd` が `active` のまま、または終了コード 75（`EXIT_SESSION_REDO`）で終わって systemd が再起動して `active` に戻る。
 2. ESP32 の `reset_reason` が、予想した値（`power_on`／`external_pin`／`software`）だけである（3.1）。
-3. **端から端まで届く**：B3 を叩くと、`deskcatd` の log に `tapped_received … total=` が増える（EXP-062・065 と同じ観察。
-   `deskcatd` を `--verbose` で起動する）。または手順 6 の `link_stress.py` の `recovered=yes`。
+3. **端から端まで届く**：B3 を叩くと、`deskcatd` の log に `tapped_received … total=` が増える（EXP-062・065 と同じ観察。service のままで info の行として出る）。または手順 6 の `link_stress.py` の `recovered=yes`。
 
 **手動の復旧が要った場合は「不合格」ではなく「手動復旧が要る」と記録する。**`StartLimitBurst=30`（300 秒）に達した
 `failed` は既知（EXP-024）。**復旧までの時間の上限は置かない**（`PROTO-TBD-011`、`HW-TBD-017` が未決。測った時間を記録する）。
@@ -112,7 +111,7 @@ host の `stress.rs` は、**同じ種類の入力**（分類済みの不正な�
 ## 4. 窓の手順
 
 準備：UART0 の log を端末で取り続ける（pty を割り当てる。[検証済みコマンド](../toolchains/verified-commands.md)の
-`flash と serial monitor`）。Pi では `deskcatd` を `--verbose` で動かすか、service のまま `journalctl -u deskcatd -f` を取る。
+`flash と serial monitor`）。Pi では service のまま `journalctl -u deskcatd -f` を取る（`tapped_received` は info の行で、`--verbose` は要らない）。
 **各手順の前後の時刻を記録し、log と突き合わせる。**
 
 ### 手順 1: 基線
@@ -137,7 +136,7 @@ host の `stress.rs` は、**同じ種類の入力**（分類済みの不正な�
 
 ### 手順 3: ESP32 の再起動
 
-- 3a. EN ボタンを押す（電源は切れない。`reset_reason=external_pin` を予想）。
+- 3a. EN ボタンを押す（電源は切れない）。**`reset_reason` は `power_on` を予想する**（experiment-log の記録では、RTS で EN を駆動した reset が `power_on` だった。EN ボタンの値は未確認で、`external_pin` が出てもよい。EN と電源の入れ直しは `reset_reason` で区別できない場合がある）。
 - 3b. 繰り返し 3 回（`deskcatd` が `EspRebooted` で終了コード 75 → systemd が再起動 → `StartLimitBurst=30` に近づかないこと。
   **回数は 3 回に限る。**増やす判断は PM）。
 
@@ -184,8 +183,8 @@ python3 scripts/link_stress.py --mode newline-free --count 64 --port <device> --
 python3 scripts/link_stress.py --mode flood --count 2000 --port <device> --baud 115200
 ```
 
-`--count` は出発点であり、確定値ではない。**1 回ごとに ESP32 の log の拒否の行の数を数え、script が表示する `expected_rejections`
-と突き合わせる（`corpus`・`noise`・`oversize` は送った行の数、`newline-free` は 1、`flood` は 0）。**3.3 の 1〜3 を判定する。`flood` は baud が上限の速さで送る。溢れが出た場合は、`--count` を半分にして
+`--sid` は省く（実行ごとにランダム。ESP32 は使った sid を retired として覚え、同じ sid の再実行を `stale_session` で拒否する）。`--count` は出発点であり、確定値ではない。**1 回ごとに ESP32 の log の拒否の行の数を数え、script が表示する `expected_rejections`
+と突き合わせる（`corpus`・`noise`・`oversize` は送った行の数、`newline-free` は 1、`flood` は 0）。**3.3 の 1〜3 を判定する。`flood` は baud が上限の速さで送る。`recovered=no` が溢れと同時に出たら、確認だけを送り直して判定する（`--mode flood --count 0`。溢れで改行が落ち、確認の行が前の行と連結された可能性がある）。溢れが出た場合は、`--count` を半分にして
 同じ手順を繰り返し、溢れない最大を記録する（測定値であり、上限の決定ではない）。
 
 終わったら `sudo systemctl start deskcatd` し、手順 1 の基線の確認をやり直す。
