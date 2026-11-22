@@ -17,7 +17,7 @@
 //!
 //! Pi link（`crate::boot_session`、UART1）、heartbeat、health snapshot、I2C（`accel-log-18`のbuildを除く）、LCD、NVSを持たない。
 //! `main.rs`の`servo_calib`用の`main`は、識別のlogを出してから[`run`]を呼ぶだけである。
-//! **仕様が書いていないheartbeatとI2Cを足さなかった**（`bench-servo-test-17`はI2CのID読み出しとheartbeatを持つ）。
+//! **仕様が書いていないheartbeatとI2Cを足さなかった（I2Cは`accel-log-18`のbuildだけが持つ。上の「加速度のlog」）**（`bench-servo-test-17`はI2CのID読み出しとheartbeatを持つ）。
 //!
 //! # servoを駆動する型
 //!
