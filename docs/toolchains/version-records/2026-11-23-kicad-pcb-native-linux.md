@@ -49,10 +49,21 @@ Commands run / Actual result:
     kicad-cli pcb export svg: 成功（hardware/universal-board/plan-front.svg、plan-back.svg）。
       firefox の headless で描画して読んだ（作業セッションが画像を読んだ。人は見ていない）。
 
+  v5 の更新（shunt R20・C1・C2・出口 W1・J8 を足し、部品を角に寄せた配置。2026-11-23）:
+    回路図・基板ファイルを、KiCad 8.0.9 の kicad-cli と Python API（pcbnew）で更新した。手順の script は repository に入れていない。
+    kicad-cli pcb drc --schematic-parity --severity-all: 違反 0、未接続 0、回路図との食い違い 0
+      （部品の外形 courtyard の重なりを含む。途中、J8 と J5・F1、J7 と J5 の courtyard の重なり error 4 件が出て、配置を直して 0 にした）。
+    kicad-cli sch erc --severity-all: Errors 0、Warnings 168（endpoint_off_grid 148、lib_symbol_issues 20）。
+    python3 -I hardware/universal-board/check_star_point.py: OK（90 度の倍数の回転を読めるよう改め、star point を
+      「B から J5− への経路上で、経路の外へ枝が出る最初の点（B 自身でもよい）」とした。負の例として、
+      J7− を J8− へ直結した版（迂回）と、J7− を servo の node A へつないだ版は、NG になることを実行して確かめた）。
+    kicad-cli sch export netlist（kicadxml）で overview の netlist を書き出し直した。
+    kicad-cli pcb export svg: 成功。firefox の headless で描画して読んだ（作業セッションが画像を読んだ。人は見ていない）。
+
 Known differences from documented profile:
   machine-profiles.md に KiCad の扱いが無い。この記録は、この端末でこの版の kicad-cli と pcbnew が
   この基板ファイルを読み・更新し・DRC と書き出しを実行できたことに限る。
-  GUI（pcbnew）は起動していない（DISPLAY が無い）。回路図の ERC はこの記録では実行していない。
+  GUI（pcbnew）は起動していない（DISPLAY が無い）。回路図の ERC は、上の v5 の更新で実行した（記録の前半の更新では実行していない）。
   別の版、別の端末は確かめていない。
 
 Conclusion: Partial（kicad-cli と pcbnew での更新・DRC・書き出しは成功。GUI での表示は未実施）

@@ -32,8 +32,8 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 SCHEMATIC = HERE.parent / "deskcat.kicad_sch"
 NETLIST = HERE / "deskcat-netlist.xml"
-SCHEMATIC_SHA256 = "e5b295d80b74496df07918c3cc9a03e5fb14c2cd07e8ae8d54cd265e54e6f910"
-NETLIST_SHA256 = "2fe640ae161ce1ff2ee5b533c543a0ae3cde9389e6ac1ad3cb84ba2514a13afd"
+SCHEMATIC_SHA256 = "aa5984d7e45a93d146394418a03922a2cf0ead8e0e9ad815373a439636a4b4d5"
+NETLIST_SHA256 = "2be5ff168840838e217a22a9ceb2c091dbafdbfc2a845f6d0da301369bcf37da"
 
 # ---------------------------------------------------------------- まとまり（ブロック）
 
@@ -47,6 +47,7 @@ BLOCK_OF = {
     "J1": "LCD", "J4": "Pi", "J9": "Pi", "M1": "SERVO", "PS1": "M-12001",
     "J5": "PROTO-02", "J6": "PROTO-02", "J7": "PROTO-02", "J8": "PROTO-02",
     "F1": "PROTO-02", "Q1": "PROTO-02", "R18": "PROTO-02",
+    "R20": "PROTO-02", "C1": "PROTO-02", "C2": "PROTO-02", "W1": "PROTO-02",
 }
 
 BLOCKS = {
@@ -68,26 +69,26 @@ BB_NET = {
     "GPIO21": "/TOUCH-CS", "GPIO34": "/TOUCH-IRQ", "GPIO25": "/I2C-SDA", "GPIO26": "/I2C-SCL",
     "GPIO36": "/ADC-3V3", "PI_TXD": "/PI-UART-TX-Pi", "PI_RXD": "/PI-UART-RX-Pi", "SERVO_SIG": "/SERVO-SIG",
 }
-# 板の外へ出る線（X1〜X5）の、板の外の端の部品 pin。X5 の PROTO-02 の側の端子は #405 で決める。
+# 板の外へ出る線（X1〜X5）の、板の外の端の部品 pin。X5 は J8−（ESP32 の GND の戻り。案B、PM の判断 2026-11-23）へ挿す。
 OFFBOARD_END = {"X1": ("Pi", "J4", "8"), "X2": ("Pi", "J4", "10"), "X3": ("Pi", "J4", "39"),
-                "X4": ("SERVO", "M1", "yellow"), "X5": ("PROTO-02", None, None)}
+                "X4": ("SERVO", "M1", "yellow"), "X5": ("PROTO-02", "J8", "-")}
 
 # PROTO-02 の端子台から出る線。(id, 節点, 端1 (block, ref, pin), 端2, 線, 色)
 POWER_WIRES = [
     ("P1", "/5V-IN", ("M-12001", "PS1", "+"), ("PROTO-02", "J5", "+"), "M-12001 の線（Micro-B の手前で切った導体）", "#d62728"),
     ("P2", "/GND", ("M-12001", "PS1", "-"), ("PROTO-02", "J5", "-"), "M-12001 の線（同上）", "#111111"),
     ("P3", "/5V-NODE", ("PROTO-02", "J6", "+"), ("SERVO", "M1", "red"), "サーボの赤（`111641` で延ばす。plug とのつなぎ方は #405）", "#d62728"),
-    ("P4", "/GND", ("PROTO-02", "J6", "-"), ("SERVO", "M1", "brown"), "サーボの茶（同上）", "#8c564b"),
+    ("P4", "/ADC-SHUNT", ("PROTO-02", "J6", "-"), ("SERVO", "M1", "brown"), "サーボの茶（同上）。節点は shunt のサーボ側（`/ADC-SHUNT`）", "#8c564b"),
     ("P5", "/5V-NODE", ("PROTO-02", "J7", "+"), ("Pi", "J9", "VBUS"), "`CABLE-PI-PWR-01`（`109314` を切った導体）→ Pi の `PWR IN`", "#d62728"),
     ("P6", "/GND", ("PROTO-02", "J7", "-"), ("Pi", "J9", "GND"), "`CABLE-PI-PWR-01`（同上）", "#111111"),
+    ("P7", "/5V-NODE", ("PROTO-02", "J8", "+"), ("B1", "U1", "J2-19"), "ESP32 の 5V pin へ（案B。`111641` 1本）", "#d62728"),
+    ("P8", "/ADC-SHUNT", ("PROTO-02", "W1", "1"), ("B1", "U1", "J2-7"), "`ADC-SHUNT`（GPIO32）へ。`111641` 1本を床側へ通す（`W1`）", "#7b2d8e"),
 ]
 
 # 決まっていない所。図に破線と `TBD` で描き、線の検査からは除く。
 TBD = [
-    ("T1", "PROTO-02", "B1", "J8（logic の枝）→ ESP32 の 5 V 入力：使うかと経路は #405（power-budget.md の`ESP32の給電経路`）"),
-    ("T2", "B2", "LCD", "LCD の VCC（pin 1）の電圧：今は 3V3。最終は #405（`HW-TBD-024`）"),
-    ("T3", "PROTO-02", "SERVO", "servo の枝の bulk capacitor C1 の値と品、shunt（`MEAS-01`）を入れるか：#405・#17"),
-    ("T4", "B1", "PROTO-02", "X5 を PROTO-02 のどの端子へつなぐか：#405"),
+    ("T1", "B2", "LCD", "LCD の VCC（pin 1）の電圧：今は 3V3。最終は `HW-TBD-024`（PROTO-02 は変えない。#461）"),
+    ("T2", "PROTO-02", "SERVO", "サーボの plug とのつなぎ方（servo の枝の線の先）：#405"),
 ]
 
 # 線の通り道（まとまりの組 → 途中の点）。ほかの枠の上を横切らないように曲げる。
@@ -308,7 +309,7 @@ def render_svg(wires):
         o.append(f'<text x="{X + 6}" y="{Y + 43}" font-size="9" fill="#555">{esc(" ".join(refs))}</text>')
     ly = 790
     o.append(f'<text x="16" y="{ly}" font-size="10" fill="#444">細い線＝1本ずつ（ID。サーボは黄・赤・茶）。太い線＝束（本数）。各線の節点と端は wiring-table.md。赤の破線＝TBD。'
-             '描かない物：#18 の試験だけの物（端子台S、PSU、試験用の負荷、shunt）。</text>')
+             '描かない物：#18 の試験だけの物（端子台S、PSU、試験用の負荷、試験用の shunt。PROTO-02 の R20 とは別）。</text>')
     for i, (tid, _a, _b, what) in enumerate(TBD):
         o.append(f'<text x="16" y="{ly + 14 * (i + 1)}" font-size="10" fill="#c00">{tid}: {esc(what)}</text>')
     o.append("</svg>")
@@ -324,7 +325,7 @@ def render_md(wires):
          "位置は胴の中の位置関係（[enclosure-and-neck.md](../../docs/hardware/enclosure-and-neck.md) の`物理的な完成形`）だけで、寸法は表さない。"
          "電源の基板は未実装の計画である（[universal-board/plan.md](../universal-board/plan.md)、#405）。この表は配線・通電の許可ではない。",
          "",
-         "**描かない物：**#18 の試験の間だけの物（端子台S、`PSU-BENCH-01`、試験用の負荷、shunt）。それらは [`../bench-18/`](../bench-18/wiring-table.md) にある。",
+         "**描かない物：**#18 の試験の間だけの物（端子台S、`PSU-BENCH-01`、試験用の負荷、試験用の shunt。PROTO-02 の R20 とは別）。それらは [`../bench-18/`](../bench-18/wiring-table.md) にある。",
          "",
          "## まとまりと置き場所",
          "",
