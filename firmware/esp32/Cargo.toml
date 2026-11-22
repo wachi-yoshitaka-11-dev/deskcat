@@ -92,7 +92,7 @@ debug-motion-19 = []
 # `LimitedServo`（`Limiter`を通る）だけでservoを駆動する（`src/servo_calib.rs`。仕様は`docs/hardware/servo-safety-limits.md`の
 # `#18の校正（案）`の`校正buildの仕様（案）`）。**製品buildには入らない。Pi link（`boot_session`、UART1）、heartbeat、I2C、LCDを持たない。**
 # **`src/config.rs`の`SERVO_CALIB_18_*`が1つでも`None`の間は、compileが止まる**（値は回ごとの実行承認が決める。既定値を持たない）。
-# 他の試験featureとは併用できない（`main.rs`の`compile_error!`）。実機の結果は`docs/hardware/experiment-log.md`のEXP-060（通しの10動作）。**回ごとの実行承認なしに駆動しない。**
+# 他の試験featureとは併用できない（`main.rs`の`compile_error!`）。実機の結果は`docs/hardware/experiment-log.md`のEXP-060（通しの10動作）。**回ごとの実行承認なしに駆動しない。手順・停止基準は`docs/hardware/servo-safety-limits.md`の段0・段1までで、それより先の段は未記載。**
 bench-servo-calib-18 = []
 # Issue #711 のtask WDTの検証build。main taskをTWDTへ登録し、その後は一度もfeedしない。panic resetと、再起動後の
 # `reset_reason`（`task_watchdog`）を実機で見るためのもの。servo・LEDC・GPIO27・Pi link・I2C・LCDに触れない（`src/task_wdt.rs`）。
