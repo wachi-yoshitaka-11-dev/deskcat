@@ -38,7 +38,7 @@
 
 利点：`step` のうち serial 以外の処理が長く止まるなら、その間も受信を読み続けられる。
 
-コスト：Pi の待ちの長い窓（約 1.1〜2.5 s）で、serial の data を返した read と write／flush の呼び出しは最大でも 59 ms（read）、21 ms（write）、50 ms（flush）だった。data の無い poll の待ち（`read_idle`）の最大は記録に無く、2.5 s の `step` を serial の呼び出しが占めているかどうかは分からない。止まりが `step` の serial 以外の処理にあるのか、process が動けていないのかは、まだ分けていない。後者なら、I/O を別 thread にしても同じ負荷で同じ止まりが起きうる。
+コスト：Pi の待ちの長い窓（約 1.1〜2.5 s）で、serial の data を返した read と write／flush の呼び出しは最大でも 59 ms（read）、21 ms（write）、50 ms（flush）だった。data の無い poll の待ち（`read_idle`）も含めて、`step` が 1 s を超えたどの窓でも、serial の1回の呼び出しの最大は 82.5 ms 以下だった（EXP-066 の表）。**1回の呼び出しが 2.5 s の `step` を占めた形跡は無い。**呼び出しの合計時間は log に無いので、合計が占めたかどうかは分からない。止まりが `step` の serial 以外の処理にあるのか、process が動けていないのかは、まだ分けていない。後者なら、I/O を別 thread にしても同じ負荷で同じ止まりが起きうる。
 
 ### 選択肢C：ESP32 を、`std::thread` で task に分ける
 
