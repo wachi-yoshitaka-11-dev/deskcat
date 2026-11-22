@@ -11,6 +11,7 @@
 - [GitHub Pages公開](github-pages-publishing.md)
 - [GitHub Wiki入口の保守](github-wiki-home.md)
 - [CodeRabbitのreview状態の観測記録](coderabbit-review-observations.md)
+- [Issue #24: サーボを使わないfaultの窓とrecovery runbook](issue-24-fault-window.md)
 
 予定runbook:
 
