@@ -81,6 +81,7 @@
 | [EXP-067](#exp-067-764-の受け入れ条件4製品-buildno-touch-487でb3-を立てた姿勢の静止と揺らしを見た2回の窓) | [#764](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/764)の受け入れ条件4。製品 build を Pi とつなぎ、B3 を立てた姿勢の静止と揺らし、平らに寝かせたときの検出を見た（2回の窓） | 値の正なし（観測の記録） |
 | [EXP-068](#exp-068-774-の待つ時間の確かめservo-の端が-000-になるまでpsu-の出力-off-と-esp32-の-usb-を抜く条件で-2764-s-と-2539-sen-ボタンでは-esp32-が-reset-されなかった2回の窓) | [#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)・[PR #774](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/774)。段2の手を入れる前に待つ時間を、段1の範囲で測った（2回の窓）。EN ボタンでは ESP32 が reset されなかった | 値の正なし（観測の記録） |
 | [EXP-069](#exp-069-514-の段階的な確認4no-touch-487led-no-touch-514-の-build-を-pi-とつなぎ白と赤の-led-の表示を見た) | [#514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)の[段階的な確認](led-514-demo.md#段階的な確認)の4。白の点滅・点灯・Pi を止めた後の点滅への戻り、赤の `happy` での約1秒の点灯を見た | 値の正なし（観測の記録） |
+| [EXP-070](#exp-070-774-の手を入れる前の確かめの読みservo-を動かさずにクリップの接触000信号線の読みを取った) | [#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)。[PR #774](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/774) の段2の手を入れる前の確かめの読み（クリップを留めた点、クリップの接触、0.00、信号線の読み）を、servo を動かさずに取った | 値の正なし（観測の記録） |
 
 **大容量の生dataはこのrepositoryへ入れていない。**保存場所は
 [development-foundation-plan.md](../planning/development-foundation-plan.md)の
@@ -6193,6 +6194,39 @@ ESP32 の uptime と Pi の時刻は、同じ `set_expression` の id（`id=4`�
 - `deskcatd` が SIGINT で止まらない原因。
 - LED の電流、電源 rail の電圧、発熱。
 
+## EXP-070: #774 の手を入れる前の確かめの読み。servo を動かさずに、クリップの接触、0.00、信号線の読みを取った
+
+[PR #774](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/774) の `servo-safety-limits.md` の段2の`動かし方`の、手を入れる前の確かめ（テスターのクリップを留めた点、クリップがつながっていることの確かめ、5 V と GND の 0.00、信号線と GND の読み）を、実際の配線で取った窓。指令は送らず、servo は動かしていない。
+
+| 項目 | 内容 |
+|---|---|
+| Test ID | `EXP-070` |
+| Date | 2026-11-22（UTC 09:49〜10:0x。日本時間では 18:49〜19:0x） |
+| Operator | PSU の操作、ESP32 の USB の抜き挿し、テスターの読み、クリップと棒の付け外し、PSU の表示と LED の読み、配線の目視はユーザー。console と記録は実機側の PM（AI） |
+| 承認 | 承認があった：承認者 wachi-yoshitaka-11-dev、2026-11-22T09:29Z ごろ、実機側の PM のセッション。範囲は、AI の問い「VM 側の PM の指示により、次を行ってよいですか？ #774 を push し、servo を動かさずに PSU の出力を入れてテスターの読み4つと R3 の目視を取る短い窓を今行い、その記録を #774 に足して push し、#774・#786 の CodeRabbit へ返信して、resolve されたら #774・#786 を merge する。」 |
+| Hardware revision／Exact components | `PSU-BENCH-01`、`SERVO-01`（ホーンなし）、`MCU-01`。servo の電源の経路は [EXP-068](#exp-068-774-の待つ時間の確かめservo-の端が-000-になるまでpsu-の出力-off-と-esp32-の-usb-を抜く条件で-2764-s-と-2539-sen-ボタンでは-esp32-が-reset-されなかった2回の窓) と同じ。Pi の電源の線と LCD の VCC の線は抜いたまま（[EXP-069](#exp-069-514-の段階的な確認4no-touch-487led-no-touch-514-の-build-を-pi-とつなぎ白と赤の-led-の表示を見た) の窓の終わりのまま） |
+| 窓の始めの確かめ | PSU の出力端子と端子台の線がつながっていることは、ユーザーが目視した（申告）。経路の逆極性の照合と、外して挿し直せる接点（PSU の出力端子の赤と黒、servo の plug の針）は、EXP-068 の照合の後に経路の上の線に触れた記録が無いので、記録で代えた。この窓では目視していない（VM 側の PM の判断）。`通電前の現物確認`の (c)：`RES-PULL-01` は、配線表では R3（netlist では R7）。現物はこの窓では確かめていない |
+| Firmware | ESP32 の flash は [EXP-069](#exp-069-514-の段階的な確認4no-touch-487led-no-touch-514-の-build-を-pi-とつなぎ白と赤の-led-の表示を見た) の `no-touch-487,led-no-touch-514`（develop `addf99e`）のまま。書き込みはしていない。起動 log の `app_init: ELF file SHA256:  81c68cbb7...`、`servo=not_driven` |
+| Power supply and current limit | `PSU-BENCH-01`。設定（CV 4.80、`I_lim` 0.070、OCP 無効）は前の窓と同じ（ユーザーの申告）。ESP32 はこの端末の USB |
+| Measurement equipment | テスター（DC 20V レンジ。表示の分解能 0.01 V）。クリップは [bench-18 の配線表](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/hardware/bench-18/wiring-table.md)の P6（赤、S＋の端子の金属）と P9（黒、B穴2の端子の金属）。UART0 の log（115200） |
+| Raw data | repository の外の `deskcat-evidence/windows-20261122-774r/`（`console.log`、`notes.txt`、`approval.txt`、`sha256.txt`） |
+| Expected result | PR #774 の 991 行の確かめの読みが取れる |
+| Measured result | 下記 |
+
+### 観測
+
+- **クリップを留めた点：**赤を P6、黒を P9 に、出力 OFF で留めた（ユーザーの申告）。
+- **クリップの接触：**出力 ON の間の PSU の表示は 4.80 V、0.000 A、CC の LED は消灯（前の窓と同じ。ユーザーの申告）。そのときのテスターは **4.82**。
+- **0.00：**出力を OFF にし、ESP32 の USB を抜いた後、テスターは **0.00** になった（ユーザーの申告）。USB が切れたのは 09:57:13Z（端末の serial が切れた時刻）。0.00 になるまでの時間は測っていない。
+- **信号線：**0.00 の後、黒のクリップは P9 のまま、赤のクリップを P6 から外し、赤の棒を R6 の servo の側の足（B1 E7。[breadboard-rebuild の配線表](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/hardware/breadboard-rebuild/wiring-table.md)の R6 の行）に当てた。信号線と GND の間は **0.00**（当てた所が E7 であることはユーザーの申告）。
+- **起動の数：**2回（USB を挿したとき、console を開いたとき）。`panic`・`brownout` は0件。
+
+### 確かめていないこと（主張しないこと）
+
+- `0.00` は分解能 0.01 V の表示で、給電の経路が完全に遮断されたことは示さない。信号線の読み 0.00 は、駆動されていないこと以上を示さない。
+- 外して挿し直せる接点の極性と、R3 の現物（この窓では目視していない）。
+- 0.00 になるまでの時間（この窓では測っていない）。
+
 ## Revision履歴
 
 | 日付 | Revision | 変更 | 根拠 |
@@ -6277,3 +6311,4 @@ ESP32 の uptime と Pi の時刻は、同じ `set_expression` の id（`id=4`�
 | 2026-11-22 | 77 | [#683](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/683)。**`EXP-066`の導入に、実行方式の判断の置き場所（[ADR-0028](../decisions/0028-keep-single-runner-and-single-main-loop.md)）への link を足した。**`EXP-066` の Pi の serial の表に、同じ生の log から `read_idle_max_us` の列と、`step` が 1 s を超えた行での1回の呼び出しの最大を足した。それ以外の記録の内容は変えていない。判断は ADR に置いた | ADR-0028（判断の材料は `EXP-066` の記録）。`read_idle_max_us` の値は、repository の外の `deskcat-evidence/windows-20261120-066/` の `deskcatd-066-c0.log`〜`c4.log` の `link_wait` の行 |
 | 2026-11-22 | 78 | [#514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)。**`EXP-069`を追加した。**`no-touch-487,led-no-touch-514`（develop `addf99e`）を Pi とつなぎ、白の点滅・点灯・Pi を止めた後の点滅への戻りと、赤の `happy` での約1秒の点灯を見た窓の記録。拒否された `happy` は実機で確かめていない | 窓（2026-11-22）の UART0 の log、Pi の `deskcatd` の log、ユーザーの申告（LED と LCD の目視、配線の目視） |
 | 2026-11-22 | 79 | [#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)。**`EXP-068`を追加し、冒頭の一覧表に行を足した。**[PR #774](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/774) の段2の手を入れる前に待つ時間を、段1の範囲（ホーンなし、校正 build 90°〜105°）で測った2回の窓。PSU の出力 OFF と ESP32 の USB を抜く条件で、servo の端が 0.00 になるまで 27.64 s と 25.39 s。EN ボタンを押しても EN が 3.30 V のままで ESP32 が reset されなかったことと、その切り分けの読み、窓1の最初の出力 ON で 0.02 V・0.070 A・CC 点灯になり直ちに出力を OFF にしたことも記録した | 2026-11-21〜22 の実機の窓（`deskcat-evidence/windows-20261121-774d/`、`windows-20261122-774d/`） |
+| 2026-11-22 | 80 | [#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)。**`EXP-070`を追加した。**PR #774 の段2の手を入れる前の確かめの読み（クリップを留めた点、出力 ON の間のテスター 4.82、0.00、信号線の 0.00）を、servo を動かさずに取った窓の記録 | 窓（2026-11-22）の UART0 の log、ユーザーの申告（テスターの読み、PSU の表示、配線の目視） |
