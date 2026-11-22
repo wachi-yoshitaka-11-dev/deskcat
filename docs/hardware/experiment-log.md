@@ -6210,7 +6210,7 @@ ESP32 の uptime と Pi の時刻は、同じ `set_expression` の id（`id=4`�
 ### #22（叩いて驚くまでの時間と誤反応）
 
 - `deskcatd` は `--no-companion` で起動した。
-- 最初の起動（10:21Z）で `accel_device_id_read_failed error=ESP_FAIL` と `tap_not_started` が出て、叩いた5回は検出されなかった。11:16:23Z に console の RTS で reset した後は `accel_device_id raw=0xe5` で、叩く検出が始まった。
+- console を開いたときの起動（10:21Z。起動の3回目。起動1・2の log は無い）で `accel_device_id_read_failed error=ESP_FAIL` と `tap_not_started` が出て、叩いた5回は検出されなかった。11:16:23Z に console の RTS で reset した後は `accel_device_id raw=0xe5` で、叩く検出が始まった。
 - 叩いた5回は、どれも `tap_detected decision=Hold` → `tap_confirmed decision=Send` → `face_drawn name=Some(Surprised)` になった（ユーザーの目視でも驚いた顔）。`tap_detected` の `uptime_ms` から `face_drawn` の `uptime_ms` まで（B − D）は 980、930、940、930、930 ms。最小 930、中央値 930、最大 980。`tap_confirmed` の行の console の時刻は、`tap_detected` の約 0.3 s 後。
 - 叩き終えた 11:17:48Z から、センサーの板に触れ始めた 11:19:33Z まで（約1分45秒）、`tap_detected` は0件。
 
