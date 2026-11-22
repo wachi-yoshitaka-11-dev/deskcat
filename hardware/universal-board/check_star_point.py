@@ -6,15 +6,17 @@
 `/ADC-SHUNT`（shunt `R20` の servo の側の端 A の node。J6−、C1〜C3 の−、`W1`）と `/GND`（shunt の
 star の側の端 B から先。J5−、J7−、J8−、R18 の足2）。
 
-1. shunt `R20` の足1 が `/ADC-SHUNT`、足2（B）が `/GND` にある（shunt は servo の戻りだけにある）。
-2. `/ADC-SHUNT` の導体は、J6−、C1〜C3 の−、`W1`、R20 の足1 だけをつなぎ、Pi・logic・ingress の GND
+1. shunt `R20` の足1 が `/ADC-SHUNT`（servo の側 A）、足2（B）が `/GND` にある（shunt は servo の戻りだけにある）。
+2. `/ADC-SHUNT` の導体は、J6−、C1・C2 の−、`W1`、R20 の足1 だけをつなぎ、Pi・logic・ingress の GND
    （J5−・J7−・J8−・R18 の足2）を含まない（shunt を通らずに servo の戻りが GND へ流れる道が無い）。
-3. star point（B の導体が GND の母線に付く点）から J5− への経路が、servo の戻りが流れる区間である。
-   J7−（Pi）はその区間の下流で付き、J7− の戻りは shunt（A〜B）と、star point を通らない。
-4. J8−（ESP32 の GND）と R18 の足2 は、star point から見て J5− と反対の側（上流）にあり、star point へ向かう途中で
-   J7−・J5− の足を通らない。star point を除くと、J8−・R18 の側と J5−・J7− の側はつながらない（迂回する導体が無い）。
-5. R18 の足2 と J8− は、star point を通らずに互いにつながる（Gate は ESP32 の GND を基準にする）。
-6. 導体の端と折れ曲がり、通る穴は、基板に実在する穴（`Dwgs.User` の円）の上にある。四隅の穴は無い。
+3. **star point は B（shunt の足2）の node である。**J5−（5 V ingress の GND）は B に短い導体（2 穴以内）で直接つく。
+   servo の戻りは J6− → A → shunt → B と流れ、B で初めてほかの GND に合流する。
+4. **J7−（Pi）・J8−（ESP32）・R18 の足2 は、それぞれ別の導体で star point の node（B と J5− の間）へ直接つく。**
+   3 本の導体は互いに穴を共有せず、star point の node を除くと互いにつながらない（Pi と ESP32 の GND の間に、
+   servo の電流が流れる導体も、共有する導体も無い。UART の GND と輪を作らない）。
+   したがって J5−・J7−・J8−・R18 と B の間の導体に servo の電流は流れない（B と J5− の間の短い導体だけが、
+   全部の戻りを一緒に運ぶ）。
+5. 導体の端と折れ曲がり、通る穴は、基板に実在する穴（`Dwgs.User` の円）の上にある。四隅の穴は無い。
 
 基板ファイル（`hardware/deskcat.kicad_pcb`）の `B.Cu` の導体と、部品の pad の位置・net だけを読む。
 KiCad は使わず、標準ライブラリだけで動く（ADR-0006）。90 度の倍数の回転を読む（KiCad の向き：画面で反時計回り）。
@@ -182,40 +184,53 @@ def main():
         if p not in gnd:
             errors.append(f"{name} が /GND の導体につながっていない")
     if not errors:
-        servo = path(gnd, B, J5)
-        if servo is None:
+        # 3. star point の node ＝ B から J5− への最短の導体。長さは 2 穴（2 ピッチ）以内
+        node = path(gnd, B, J5)
+        if node is None:
             errors.append("B から J5− まで /GND の導体がつながっていない")
         else:
-            sset = set(servo)
-            # star point ＝ B から J5− へ向かう経路上で、経路の外へ枝が出る最初の点（B 自身でもよい。B の導体が母線に付く点）
-            B = next((u_ for u_ in servo if any(v_ not in sset for v_ in gnd[u_])), None)
-            if B is None:
-                errors.append("B から J5− への経路の上に、ほかの導体と分かれる点（star point）が無い")
-                raise SystemExit(_report(errors))
-            # 3. J7− の戻りは B を通らない（shunt と、servo だけが流れる区間の始まり B を通らない）
-            r7 = path(gnd, J7, J5)
-            if r7 is None:
-                errors.append("J7− から J5− まで /GND の導体がつながっていない")
-            elif B in r7:
-                errors.append("J7− の戻りが shunt の star の側 B を通る（servo だけが流れる区間を共有）")
-            # 4. J8−・R18 は B の上流（J5− の反対の側）。B へ向かう途中で J7−・J5− を通らない
-            for nm, p in (("J8−", J8), ("R18 の足2", R2)):
-                route = path(gnd, p, J5)
-                if route is None:
-                    errors.append(f"{nm} から J5− まで /GND の導体がつながっていない")
+            length = sum(((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2) ** 0.5 for a, b in zip(node, node[1:]))
+            if length > 2 * PITCH + 1e-6:
+                errors.append(f"B と J5− の間の導体が {length:.1f} mm で、2 穴（{2 * PITCH:.2f} mm）より長い（servo の電流が長い導体を流れる）")
+            nset = set(node)
+            # 4. J7−・J8−・R18 の足2 は、それぞれ別の導体で node へ。node を除くと互いにつながらない
+            terms = {"J7−": J7, "J8−": J8, "R18 の足2": R2}
+            branch = {}
+            for nm, p in terms.items():
+                # node の穴のどれかに最初に着く経路（B でも J5− の穴でも、node の穴であればよい）
+                hit = None
+                prev, qd = {p: None}, deque([p])
+                while qd:
+                    u_ = qd.popleft()
+                    if u_ in nset:
+                        hit = u_
+                        break
+                    for v_ in gnd[u_]:
+                        if v_ not in prev:
+                            prev[v_] = u_
+                            qd.append(v_)
+                if hit is None:
+                    errors.append(f"{nm} が star point の node（B と J5− の間）につながっていない")
                     continue
-                first = next(u_ for u_ in route if u_ in sset)
-                if first != B:
-                    errors.append(f"{nm} は servo の戻りの区間に B ではなく {first} で付く")
-                toB = path(gnd, p, B)
-                if toB is None or J7 in toB or J5 in toB:
-                    errors.append(f"{nm} から B へ向かう途中に J7−・J5− の足がある（上流でない）")
-                # B を除くと J5−・J7− の側へつながらない（B を迂回する導体が無い）
-                if path(gnd, p, J5, skip={B}) is not None or path(gnd, p, J7, skip={B}) is not None:
-                    errors.append(f"{nm} は B を通らずに J5−・J7− の側へつながる導体がある（迂回）")
-            # 5. R18 の足2 と J8− は、B へ向かう同じ導体の上流の端につながる（B を除いて互いにつながる）
-            if path(gnd, R2, J8, skip={B}) is None:
-                errors.append("R18 の足2 と J8− が、B を通らずにつながっていない（ESP32 の GND と Gate の基準が別の導体）")
+                cells, u_ = set(), hit
+                while u_ is not None:
+                    cells.add(u_)
+                    u_ = prev[u_]
+                branch[nm] = cells - nset
+            names = list(branch)
+            for a_ in range(len(names)):
+                for b_ in range(a_ + 1, len(names)):
+                    if branch[names[a_]] & branch[names[b_]]:
+                        errors.append(f"{names[a_]} と {names[b_]} の導体が穴を共有している（戻りが node の手前で合流する）")
+            # node を除くと互いにつながらない（node を迂回する導体が無い）
+            for a_ in range(len(names)):
+                for b_ in range(len(names)):
+                    if a_ != b_ and path(gnd, terms[names[a_]], terms[names[b_]], skip=nset) is not None:
+                        errors.append(f"{names[a_]} は node を通らずに {names[b_]} へつながる導体がある（迂回）")
+            # J5−・J7−・J8−・R18 の足が、B と J5− の間の導体の上にない
+            for nm, p in terms.items():
+                if p in nset:
+                    errors.append(f"{nm} の足が B と J5− の間の導体の上にある（servo の電流が流れる穴）")
     # 2'. ADC-SHUNT の導体は、Pi・logic・ingress の足を含まない
     for k in (J5M, J7M, J8M, R18_2):
         if pads[k] in A:

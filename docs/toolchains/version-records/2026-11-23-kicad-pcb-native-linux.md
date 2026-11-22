@@ -57,6 +57,12 @@ Commands run / Actual result:
     python3 -I hardware/universal-board/check_star_point.py: OK（90 度の倍数の回転を読めるよう改め、star point を
       「B から J5− への経路上で、経路の外へ枝が出る最初の点（B 自身でもよい）」とした。負の例として、
       J7− を J8− へ直結した版（迂回）と、J7− を servo の node A へつないだ版は、NG になることを実行して確かめた）。
+    その後の更新（レビューの指摘で GND を「J5−・shunt の B・J7−・J8−・R18 が同じ node」にした配置 v6。2026-11-23）:
+      kicad-cli pcb drc --schematic-parity --severity-all: 違反 0、未接続 0、回路図との食い違い 0。
+      kicad-cli sch erc --severity-all: Errors 0、Warnings 168（回路図は変えていない）。
+      python3 -I hardware/universal-board/check_star_point.py: OK。規則を「B と J5− の間の導体が 2 穴以内、J7−・J8−・R18 の
+        導体が別々に node へつき、穴を共有せず、node を迂回しない」へ強めた。負の例として、直前の版（v5。B と J5− の間に
+        45.7 mm の導体があり、Pi の GND がその途中につく）と、J8− と J7− の導体を直結した版は、NG になることを実行して確かめた。
     kicad-cli sch export netlist（kicadxml）で overview の netlist を書き出し直した。
     kicad-cli pcb export svg: 成功。firefox の headless で描画して読んだ（作業セッションが画像を読んだ。人は見ていない）。
 

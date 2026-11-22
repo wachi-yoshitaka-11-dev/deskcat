@@ -946,27 +946,13 @@
 <circle cx="86.0" cy="725.4" r="13.9" fill="#fff" stroke="#888"/>
 <circle cx="657.6" cy="366.0" r="13.9" fill="#fff" stroke="#888"/>
 <text x="60.0" y="773.4" font-size="17" font-weight="bold">PROTO-02 はんだ面</text>
-<g data-solder="1,6"><circle cx="657.6" cy="479.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+<g data-solder="2,7"><circle cx="635.6" cy="501.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 </g>
-<g data-solder="1,7"><circle cx="657.6" cy="501.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+<g data-solder="2,8"><circle cx="635.6" cy="523.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 </g>
-<g data-solder="1,8"><circle cx="657.6" cy="523.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+<g data-solder="2,9"><circle cx="635.6" cy="545.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 </g>
-<g data-solder="1,9"><circle cx="657.6" cy="545.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
-</g>
-<g data-solder="1,10"><circle cx="657.6" cy="567.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
-</g>
-<g data-solder="1,11"><circle cx="657.6" cy="589.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
-</g>
-<g data-solder="1,12"><circle cx="657.6" cy="611.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
-</g>
-<g data-solder="1,13"><circle cx="657.6" cy="633.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
-</g>
-<g data-solder="1,14"><circle cx="657.6" cy="655.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
-</g>
-<g data-solder="1,15"><circle cx="657.6" cy="677.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
-</g>
-<g data-solder="2,6"><circle cx="635.6" cy="479.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+<g data-solder="2,10"><circle cx="635.6" cy="567.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 </g>
 <g data-solder="2,11" data-leg="J5:+"><circle cx="635.6" cy="589.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 <circle cx="635.6" cy="589.9" r="2.6" fill="#555"/>
@@ -974,283 +960,314 @@
 <g data-solder="2,12" data-leg="J5:-"><circle cx="635.6" cy="611.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 <circle cx="635.6" cy="611.9" r="2.6" fill="#555"/>
 </g>
-<g data-solder="2,13"><circle cx="635.6" cy="633.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+<g data-solder="3,7"><circle cx="613.6" cy="501.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 </g>
-<g data-solder="2,14"><circle cx="635.6" cy="655.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
-</g>
-<g data-solder="2,15" data-leg="J7:-"><circle cx="635.6" cy="677.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
-<circle cx="635.6" cy="677.9" r="2.6" fill="#555"/>
-</g>
-<g data-solder="3,6"><circle cx="613.6" cy="479.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
-</g>
-<g data-solder="3,8" data-leg="J8:+"><circle cx="613.6" cy="523.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
-<circle cx="613.6" cy="523.9" r="2.6" fill="#555"/>
-</g>
-<g data-solder="3,9"><circle cx="613.6" cy="545.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
-</g>
-<g data-solder="3,11"><circle cx="613.6" cy="589.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
-</g>
-<g data-solder="3,14"><circle cx="613.6" cy="655.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
-</g>
-<g data-solder="3,15" data-leg="J7:+"><circle cx="613.6" cy="677.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
-<circle cx="613.6" cy="677.9" r="2.6" fill="#555"/>
-</g>
-<g data-solder="4,6"><circle cx="591.6" cy="479.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+<g data-solder="3,12"><circle cx="613.6" cy="611.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 </g>
 <g data-solder="4,7"><circle cx="591.6" cy="501.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 </g>
-<g data-solder="4,8" data-leg="J8:-"><circle cx="591.6" cy="523.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
-<circle cx="591.6" cy="523.9" r="2.6" fill="#555"/>
+<g data-solder="4,8"><circle cx="591.6" cy="523.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 </g>
 <g data-solder="4,9"><circle cx="591.6" cy="545.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 </g>
+<g data-solder="4,10"><circle cx="591.6" cy="567.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+</g>
 <g data-solder="4,11"><circle cx="591.6" cy="589.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 </g>
-<g data-solder="4,14"><circle cx="591.6" cy="655.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+<g data-solder="4,12" data-leg="R20:2"><circle cx="591.6" cy="611.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+<circle cx="591.6" cy="611.9" r="2.6" fill="#555"/>
 </g>
-<g data-solder="5,6"><circle cx="569.6" cy="479.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+<g data-solder="4,13"><circle cx="591.6" cy="633.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 </g>
-<g data-solder="5,7"><circle cx="569.6" cy="501.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+<g data-solder="5,7" data-leg="F1:a"><circle cx="569.6" cy="501.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+<circle cx="569.6" cy="501.9" r="2.6" fill="#555"/>
+</g>
+<g data-solder="5,8"><circle cx="569.6" cy="523.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 </g>
 <g data-solder="5,9"><circle cx="569.6" cy="545.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 </g>
-<g data-solder="5,11" data-leg="F1:a"><circle cx="569.6" cy="589.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
-<circle cx="569.6" cy="589.9" r="2.6" fill="#555"/>
+<g data-solder="5,10"><circle cx="569.6" cy="567.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 </g>
-<g data-solder="5,14"><circle cx="569.6" cy="655.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+<g data-solder="5,11"><circle cx="569.6" cy="589.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 </g>
-<g data-solder="6,6" data-leg="R20:2"><circle cx="547.6" cy="479.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
-<circle cx="547.6" cy="479.9" r="2.6" fill="#555"/>
+<g data-solder="5,12"><circle cx="569.6" cy="611.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+</g>
+<g data-solder="5,13"><circle cx="569.6" cy="633.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+</g>
+<g data-solder="6,3"><circle cx="547.6" cy="413.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+</g>
+<g data-solder="6,4"><circle cx="547.6" cy="435.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+</g>
+<g data-solder="6,5"><circle cx="547.6" cy="457.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+</g>
+<g data-solder="6,6"><circle cx="547.6" cy="479.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 </g>
 <g data-solder="6,7"><circle cx="547.6" cy="501.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 </g>
+<g data-solder="6,8"><circle cx="547.6" cy="523.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+</g>
 <g data-solder="6,9"><circle cx="547.6" cy="545.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 </g>
-<g data-solder="6,10"><circle cx="547.6" cy="567.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+<g data-solder="6,13"><circle cx="547.6" cy="633.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 </g>
-<g data-solder="6,11"><circle cx="547.6" cy="589.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+<g data-solder="7,3"><circle cx="525.6" cy="413.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 </g>
-<g data-solder="6,12"><circle cx="547.6" cy="611.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+<g data-solder="7,7" data-leg="F1:b"><circle cx="525.6" cy="501.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+<circle cx="525.6" cy="501.9" r="2.6" fill="#555"/>
 </g>
-<g data-solder="6,14"><circle cx="547.6" cy="655.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+<g data-solder="7,9"><circle cx="525.6" cy="545.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 </g>
-<g data-solder="7,6"><circle cx="525.6" cy="479.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+<g data-solder="7,13"><circle cx="525.6" cy="633.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 </g>
-<g data-solder="7,7"><circle cx="525.6" cy="501.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+<g data-solder="8,3" data-leg="R18:2"><circle cx="503.6" cy="413.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+<circle cx="503.6" cy="413.9" r="2.6" fill="#555"/>
 </g>
-<g data-solder="7,11" data-leg="F1:b"><circle cx="525.6" cy="589.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
-<circle cx="525.6" cy="589.9" r="2.6" fill="#555"/>
+<g data-solder="8,5" data-leg="R18:1"><circle cx="503.6" cy="457.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+<circle cx="503.6" cy="457.9" r="2.6" fill="#555"/>
 </g>
-<g data-solder="7,12"><circle cx="525.6" cy="611.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+<g data-solder="8,7"><circle cx="503.6" cy="501.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 </g>
-<g data-solder="7,14"><circle cx="525.6" cy="655.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
-</g>
-<g data-solder="7,15" data-leg="J6:-"><circle cx="525.6" cy="677.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
-<circle cx="525.6" cy="677.9" r="2.6" fill="#555"/>
-</g>
-<g data-solder="7,16"><circle cx="525.6" cy="699.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
-</g>
-<g data-solder="8,6"><circle cx="503.6" cy="479.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
-</g>
-<g data-solder="8,11"><circle cx="503.6" cy="589.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
-</g>
-<g data-solder="8,12"><circle cx="503.6" cy="611.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+<g data-solder="8,9"><circle cx="503.6" cy="545.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 </g>
 <g data-solder="8,13"><circle cx="503.6" cy="633.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 </g>
-<g data-solder="8,14"><circle cx="503.6" cy="655.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+<g data-solder="9,5"><circle cx="481.6" cy="457.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 </g>
-<g data-solder="8,15" data-leg="J6:+"><circle cx="503.6" cy="677.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
-<circle cx="503.6" cy="677.9" r="2.6" fill="#555"/>
+<g data-solder="9,7"><circle cx="481.6" cy="501.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 </g>
-<g data-solder="8,16"><circle cx="503.6" cy="699.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+<g data-solder="9,9"><circle cx="481.6" cy="545.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 </g>
-<g data-solder="9,6"><circle cx="481.6" cy="479.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+<g data-solder="9,13"><circle cx="481.6" cy="633.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 </g>
-<g data-solder="9,11"><circle cx="481.6" cy="589.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+<g data-solder="10,5"><circle cx="459.6" cy="457.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 </g>
-<g data-solder="9,12"><circle cx="481.6" cy="611.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+<g data-solder="10,6" data-leg="Q1:1"><circle cx="459.6" cy="479.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+<circle cx="459.6" cy="479.9" r="2.6" fill="#555"/>
 </g>
-<g data-solder="9,16"><circle cx="481.6" cy="699.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+<g data-solder="10,7" data-leg="Q1:2"><circle cx="459.6" cy="501.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+<circle cx="459.6" cy="501.9" r="2.6" fill="#555"/>
 </g>
-<g data-solder="10,6"><circle cx="459.6" cy="479.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+<g data-solder="10,8" data-leg="Q1:3"><circle cx="459.6" cy="523.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+<circle cx="459.6" cy="523.9" r="2.6" fill="#555"/>
 </g>
-<g data-solder="10,10" data-leg="Q1:1"><circle cx="459.6" cy="567.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
-<circle cx="459.6" cy="567.9" r="2.6" fill="#555"/>
+<g data-solder="10,9"><circle cx="459.6" cy="545.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 </g>
-<g data-solder="10,11" data-leg="Q1:2"><circle cx="459.6" cy="589.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
-<circle cx="459.6" cy="589.9" r="2.6" fill="#555"/>
+<g data-solder="10,13"><circle cx="459.6" cy="633.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 </g>
-<g data-solder="10,12" data-leg="Q1:3"><circle cx="459.6" cy="611.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
-<circle cx="459.6" cy="611.9" r="2.6" fill="#555"/>
+<g data-solder="11,8"><circle cx="437.6" cy="523.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 </g>
-<g data-solder="10,16"><circle cx="459.6" cy="699.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+<g data-solder="11,9"><circle cx="437.6" cy="545.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 </g>
-<g data-solder="11,6"><circle cx="437.6" cy="479.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
-</g>
-<g data-solder="11,10"><circle cx="437.6" cy="567.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
-</g>
-<g data-solder="11,12"><circle cx="437.6" cy="611.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
-</g>
-<g data-solder="11,16"><circle cx="437.6" cy="699.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
-</g>
-<g data-solder="12,6"><circle cx="415.6" cy="479.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+<g data-solder="11,13"><circle cx="437.6" cy="633.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 </g>
 <g data-solder="12,7"><circle cx="415.6" cy="501.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 </g>
-<g data-solder="12,8"><circle cx="415.6" cy="523.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+<g data-solder="12,8" data-leg="J8:+"><circle cx="415.6" cy="523.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+<circle cx="415.6" cy="523.9" r="2.6" fill="#555"/>
 </g>
-<g data-solder="12,9" data-leg="R18:2"><circle cx="415.6" cy="545.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
-<circle cx="415.6" cy="545.9" r="2.6" fill="#555"/>
-</g>
-<g data-solder="12,10"><circle cx="415.6" cy="567.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
-</g>
-<g data-solder="12,11" data-leg="R18:1"><circle cx="415.6" cy="589.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
-<circle cx="415.6" cy="589.9" r="2.6" fill="#555"/>
-</g>
-<g data-solder="12,12"><circle cx="415.6" cy="611.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+<g data-solder="12,9"><circle cx="415.6" cy="545.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 </g>
 <g data-solder="12,13"><circle cx="415.6" cy="633.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 </g>
-<g data-solder="12,14" data-leg="C1:+"><circle cx="415.6" cy="655.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
-<circle cx="415.6" cy="655.9" r="2.6" fill="#555"/>
+<g data-solder="13,7"><circle cx="393.6" cy="501.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 </g>
-<g data-solder="12,16" data-leg="C1:-"><circle cx="415.6" cy="699.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
-<circle cx="415.6" cy="699.9" r="2.6" fill="#555"/>
+<g data-solder="13,8" data-leg="J8:-"><circle cx="393.6" cy="523.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+<circle cx="393.6" cy="523.9" r="2.6" fill="#555"/>
+</g>
+<g data-solder="13,9"><circle cx="393.6" cy="545.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+</g>
+<g data-solder="13,13"><circle cx="393.6" cy="633.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 </g>
 <g data-solder="13,14"><circle cx="393.6" cy="655.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 </g>
-<g data-solder="13,16"><circle cx="393.6" cy="699.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+<g data-solder="14,7"><circle cx="371.6" cy="501.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+</g>
+<g data-solder="14,8"><circle cx="371.6" cy="523.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+</g>
+<g data-solder="14,9"><circle cx="371.6" cy="545.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+</g>
+<g data-solder="14,10"><circle cx="371.6" cy="567.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+</g>
+<g data-solder="14,11"><circle cx="371.6" cy="589.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+</g>
+<g data-solder="14,12"><circle cx="371.6" cy="611.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+</g>
+<g data-solder="14,13"><circle cx="371.6" cy="633.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 </g>
 <g data-solder="14,14"><circle cx="371.6" cy="655.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 </g>
-<g data-solder="14,16"><circle cx="371.6" cy="699.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+<g data-solder="14,15"><circle cx="371.6" cy="677.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+</g>
+<g data-solder="15,7"><circle cx="349.6" cy="501.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+</g>
+<g data-solder="15,12" data-leg="R20:1"><circle cx="349.6" cy="611.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+<circle cx="349.6" cy="611.9" r="2.6" fill="#555"/>
+</g>
+<g data-solder="15,13"><circle cx="349.6" cy="633.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 </g>
 <g data-solder="15,14"><circle cx="349.6" cy="655.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 </g>
-<g data-solder="15,16"><circle cx="349.6" cy="699.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+<g data-solder="15,15"><circle cx="349.6" cy="677.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 </g>
-<g data-solder="16,14" data-leg="C2:+"><circle cx="327.6" cy="655.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
-<circle cx="327.6" cy="655.9" r="2.6" fill="#555"/>
+<g data-solder="16,7"><circle cx="327.6" cy="501.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+</g>
+<g data-solder="16,9"><circle cx="327.6" cy="545.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+</g>
+<g data-solder="16,10"><circle cx="327.6" cy="567.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+</g>
+<g data-solder="16,11" data-leg="W1:1"><circle cx="327.6" cy="589.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+<circle cx="327.6" cy="589.9" r="2.6" fill="#555"/>
+</g>
+<g data-solder="16,12"><circle cx="327.6" cy="611.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+</g>
+<g data-solder="16,13" data-leg="J6:-"><circle cx="327.6" cy="633.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+<circle cx="327.6" cy="633.9" r="2.6" fill="#555"/>
+</g>
+<g data-solder="16,14"><circle cx="327.6" cy="655.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 </g>
 <g data-solder="16,15"><circle cx="327.6" cy="677.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 </g>
-<g data-solder="16,16" data-leg="C2:-"><circle cx="327.6" cy="699.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
-<circle cx="327.6" cy="699.9" r="2.6" fill="#555"/>
+<g data-solder="17,6"><circle cx="305.6" cy="479.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 </g>
-<g data-solder="17,6" data-leg="R20:1"><circle cx="305.6" cy="479.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
-<circle cx="305.6" cy="479.9" r="2.6" fill="#555"/>
-</g>
-<g data-solder="17,7"><circle cx="305.6" cy="501.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+<g data-solder="17,7" data-leg="C2:+"><circle cx="305.6" cy="501.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+<circle cx="305.6" cy="501.9" r="2.6" fill="#555"/>
 </g>
 <g data-solder="17,8"><circle cx="305.6" cy="523.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 </g>
-<g data-solder="17,9"><circle cx="305.6" cy="545.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+<g data-solder="17,9" data-leg="C2:-"><circle cx="305.6" cy="545.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+<circle cx="305.6" cy="545.9" r="2.6" fill="#555"/>
 </g>
-<g data-solder="17,10"><circle cx="305.6" cy="567.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
-</g>
-<g data-solder="17,11"><circle cx="305.6" cy="589.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
-</g>
-<g data-solder="17,12"><circle cx="305.6" cy="611.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
-</g>
-<g data-solder="17,13"><circle cx="305.6" cy="633.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+<g data-solder="17,13" data-leg="J6:+"><circle cx="305.6" cy="633.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+<circle cx="305.6" cy="633.9" r="2.6" fill="#555"/>
 </g>
 <g data-solder="17,14"><circle cx="305.6" cy="655.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 </g>
 <g data-solder="17,15"><circle cx="305.6" cy="677.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 </g>
-<g data-solder="18,10"><circle cx="283.6" cy="567.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+<g data-solder="18,6"><circle cx="283.6" cy="479.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 </g>
-<g data-solder="19,10" data-leg="W1:1"><circle cx="261.6" cy="567.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
-<circle cx="261.6" cy="567.9" r="2.6" fill="#555"/>
+<g data-solder="18,8"><circle cx="283.6" cy="523.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 </g>
-<g data-track="/5V-IN:110.62,128.85-113.16,128.85" data-layer="B.Cu"><line x1="591.6" y1="589.9" x2="569.6" y2="589.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-track="/5V-IN:105.54,128.85-110.62,128.85" data-layer="B.Cu"><line x1="635.6" y1="589.9" x2="591.6" y2="589.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-track="/5V-PTC:118.24,128.85-123.32,128.85" data-layer="B.Cu"><line x1="525.6" y1="589.9" x2="481.6" y2="589.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-track="/5V-PTC:123.32,128.85-125.86,128.85" data-layer="B.Cu"><line x1="481.6" y1="589.9" x2="459.6" y2="589.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-track="/5V-NODE:110.62,123.77-108.08,123.77" data-layer="B.Cu"><line x1="591.6" y1="545.9" x2="613.6" y2="545.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-track="/5V-NODE:115.7,126.31-115.7,123.77" data-layer="B.Cu"><line x1="547.6" y1="567.9" x2="547.6" y2="545.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-track="/5V-NODE:115.7,123.77-110.62,123.77" data-layer="B.Cu"><line x1="547.6" y1="545.9" x2="591.6" y2="545.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-track="/5V-NODE:120.78,131.39-120.78,136.47" data-layer="B.Cu"><line x1="503.6" y1="611.9" x2="503.6" y2="655.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-track="/5V-NODE:125.86,131.39-120.78,131.39" data-layer="B.Cu"><line x1="459.6" y1="611.9" x2="503.6" y2="611.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-track="/5V-NODE:130.94,136.47-136.02,136.47" data-layer="B.Cu"><line x1="415.6" y1="655.9" x2="371.6" y2="655.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-track="/5V-NODE:120.78,131.39-115.7,131.39" data-layer="B.Cu"><line x1="503.6" y1="611.9" x2="547.6" y2="611.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-track="/5V-NODE:110.62,136.47-108.08,136.47" data-layer="B.Cu"><line x1="591.6" y1="655.9" x2="613.6" y2="655.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-track="/5V-NODE:125.86,131.39-130.94,131.39" data-layer="B.Cu"><line x1="459.6" y1="611.9" x2="415.6" y2="611.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-track="/5V-NODE:130.94,131.39-130.94,136.47" data-layer="B.Cu"><line x1="415.6" y1="611.9" x2="415.6" y2="655.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-track="/5V-NODE:115.7,136.47-110.62,136.47" data-layer="B.Cu"><line x1="547.6" y1="655.9" x2="591.6" y2="655.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-track="/5V-NODE:108.08,123.77-108.08,121.23" data-layer="B.Cu"><line x1="613.6" y1="545.9" x2="613.6" y2="523.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-track="/5V-NODE:115.7,131.39-115.7,126.31" data-layer="B.Cu"><line x1="547.6" y1="611.9" x2="547.6" y2="567.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-track="/5V-NODE:120.78,136.47-115.7,136.47" data-layer="B.Cu"><line x1="503.6" y1="655.9" x2="547.6" y2="655.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-track="/5V-NODE:136.02,136.47-141.1,136.47" data-layer="B.Cu"><line x1="371.6" y1="655.9" x2="327.6" y2="655.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-track="/5V-NODE:108.08,136.47-108.08,139.01" data-layer="B.Cu"><line x1="613.6" y1="655.9" x2="613.6" y2="677.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-track="/5V-NODE:120.78,136.47-120.78,139.01" data-layer="B.Cu"><line x1="503.6" y1="655.9" x2="503.6" y2="677.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-track="/Q1-GATE:125.86,126.31-130.94,126.31" data-layer="B.Cu"><line x1="459.6" y1="567.9" x2="415.6" y2="567.9" stroke="#ff7f0e" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-track="/Q1-GATE:130.94,126.31-130.94,128.85" data-layer="B.Cu"><line x1="415.6" y1="567.9" x2="415.6" y2="589.9" stroke="#ff7f0e" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-track="/GND:125.86,116.15-130.94,116.15" data-layer="B.Cu"><line x1="459.6" y1="479.9" x2="415.6" y2="479.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-track="/GND:105.54,131.39-105.54,136.47" data-layer="B.Cu"><line x1="635.6" y1="611.9" x2="635.6" y2="655.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-track="/GND:103,133.93-103,128.85" data-layer="B.Cu"><line x1="657.6" y1="633.9" x2="657.6" y2="589.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-track="/GND:103,128.85-103,123.77" data-layer="B.Cu"><line x1="657.6" y1="589.9" x2="657.6" y2="545.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-track="/GND:105.54,139.01-103,139.01" data-layer="B.Cu"><line x1="635.6" y1="677.9" x2="657.6" y2="677.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-track="/GND:115.7,116.15-120.78,116.15" data-layer="B.Cu"><line x1="547.6" y1="479.9" x2="503.6" y2="479.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-track="/GND:103,123.77-103,118.69" data-layer="B.Cu"><line x1="657.6" y1="545.9" x2="657.6" y2="501.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-track="/GND:130.94,116.15-130.94,121.23" data-layer="B.Cu"><line x1="415.6" y1="479.9" x2="415.6" y2="523.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-track="/GND:110.62,121.23-110.62,118.69" data-layer="B.Cu"><line x1="591.6" y1="523.9" x2="591.6" y2="501.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-track="/GND:120.78,116.15-125.86,116.15" data-layer="B.Cu"><line x1="503.6" y1="479.9" x2="459.6" y2="479.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-track="/GND:113.16,116.15-115.7,116.15" data-layer="B.Cu"><line x1="569.6" y1="479.9" x2="547.6" y2="479.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-track="/GND:115.7,118.69-118.24,118.69" data-layer="B.Cu"><line x1="547.6" y1="501.9" x2="525.6" y2="501.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-track="/GND:103,139.01-103,133.93" data-layer="B.Cu"><line x1="657.6" y1="677.9" x2="657.6" y2="633.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-track="/GND:130.94,121.23-130.94,123.77" data-layer="B.Cu"><line x1="415.6" y1="523.9" x2="415.6" y2="545.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-track="/GND:105.54,136.47-105.54,139.01" data-layer="B.Cu"><line x1="635.6" y1="655.9" x2="635.6" y2="677.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-track="/GND:103,116.15-108.08,116.15" data-layer="B.Cu"><line x1="657.6" y1="479.9" x2="613.6" y2="479.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-track="/GND:103,118.69-103,116.15" data-layer="B.Cu"><line x1="657.6" y1="501.9" x2="657.6" y2="479.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-track="/GND:110.62,118.69-115.7,118.69" data-layer="B.Cu"><line x1="591.6" y1="501.9" x2="547.6" y2="501.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-track="/GND:108.08,116.15-113.16,116.15" data-layer="B.Cu"><line x1="613.6" y1="479.9" x2="569.6" y2="479.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-track="/GND:118.24,118.69-118.24,116.15" data-layer="B.Cu"><line x1="525.6" y1="501.9" x2="525.6" y2="479.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-track="/ADC-SHUNT:141.1,141.55-141.1,139.01" data-layer="B.Cu"><line x1="327.6" y1="699.9" x2="327.6" y2="677.9" stroke="#9467bd" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-track="/ADC-SHUNT:118.24,139.01-118.24,141.55" data-layer="B.Cu"><line x1="525.6" y1="677.9" x2="525.6" y2="699.9" stroke="#9467bd" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-track="/ADC-SHUNT:143.64,126.31-148.72,126.31" data-layer="B.Cu"><line x1="305.6" y1="567.9" x2="261.6" y2="567.9" stroke="#9467bd" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-track="/ADC-SHUNT:143.64,133.93-143.64,128.85" data-layer="B.Cu"><line x1="305.6" y1="633.9" x2="305.6" y2="589.9" stroke="#9467bd" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-track="/ADC-SHUNT:143.64,128.85-143.64,123.77" data-layer="B.Cu"><line x1="305.6" y1="589.9" x2="305.6" y2="545.9" stroke="#9467bd" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-track="/ADC-SHUNT:136.02,141.55-141.1,141.55" data-layer="B.Cu"><line x1="371.6" y1="699.9" x2="327.6" y2="699.9" stroke="#9467bd" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-track="/ADC-SHUNT:128.4,141.55-130.94,141.55" data-layer="B.Cu"><line x1="437.6" y1="699.9" x2="415.6" y2="699.9" stroke="#9467bd" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-track="/ADC-SHUNT:130.94,141.55-136.02,141.55" data-layer="B.Cu"><line x1="415.6" y1="699.9" x2="371.6" y2="699.9" stroke="#9467bd" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-track="/ADC-SHUNT:118.24,141.55-123.32,141.55" data-layer="B.Cu"><line x1="525.6" y1="699.9" x2="481.6" y2="699.9" stroke="#9467bd" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-track="/ADC-SHUNT:143.64,118.69-143.64,116.15" data-layer="B.Cu"><line x1="305.6" y1="501.9" x2="305.6" y2="479.9" stroke="#9467bd" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-track="/ADC-SHUNT:143.64,139.01-143.64,133.93" data-layer="B.Cu"><line x1="305.6" y1="677.9" x2="305.6" y2="633.9" stroke="#9467bd" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-track="/ADC-SHUNT:143.64,123.77-143.64,118.69" data-layer="B.Cu"><line x1="305.6" y1="545.9" x2="305.6" y2="501.9" stroke="#9467bd" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-track="/ADC-SHUNT:141.1,139.01-143.64,139.01" data-layer="B.Cu"><line x1="327.6" y1="677.9" x2="305.6" y2="677.9" stroke="#9467bd" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-track="/ADC-SHUNT:123.32,141.55-128.4,141.55" data-layer="B.Cu"><line x1="481.6" y1="699.9" x2="437.6" y2="699.9" stroke="#9467bd" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<line x1="261.6" y1="567.9" x2="261.6" y2="100.0" stroke="#666" stroke-width="1" stroke-dasharray="4 3"/>
-<circle cx="261.6" cy="567.9" r="2.5" fill="#666"/>
-<text x="255.6" y="96.0" font-size="11" fill="#222">W1 ADC-SHUNT の線の出口</text>
-<line x1="327.6" y1="655.9" x2="327.6" y2="121.0" stroke="#666" stroke-width="1" stroke-dasharray="4 3"/>
-<circle cx="327.6" cy="655.9" r="2.5" fill="#666"/>
-<text x="321.6" y="117.0" font-size="11" fill="#222">C2 servo の bulk capacitor</text>
-<line x1="415.6" y1="655.9" x2="415.6" y2="142.0" stroke="#666" stroke-width="1" stroke-dasharray="4 3"/>
-<circle cx="415.6" cy="655.9" r="2.5" fill="#666"/>
-<text x="409.6" y="138.0" font-size="11" fill="#222">C1 servo の bulk capacitor</text>
-<line x1="415.6" y1="545.9" x2="415.6" y2="163.0" stroke="#666" stroke-width="1" stroke-dasharray="4 3"/>
-<circle cx="415.6" cy="545.9" r="2.5" fill="#666"/>
-<text x="409.6" y="159.0" font-size="11" fill="#222">R18 10 kΩ（Gate の抵抗）</text>
-<line x1="426.6" y1="479.9" x2="426.6" y2="184.0" stroke="#666" stroke-width="1" stroke-dasharray="4 3"/>
-<circle cx="426.6" cy="479.9" r="2.5" fill="#666"/>
-<text x="420.6" y="180.0" font-size="11" fill="#222">R20 shunt 0.1 Ω 5 W（servo の電流を測る）</text>
-<line x1="459.6" y1="567.9" x2="459.6" y2="205.0" stroke="#666" stroke-width="1" stroke-dasharray="4 3"/>
-<circle cx="459.6" cy="567.9" r="2.5" fill="#666"/>
-<text x="453.6" y="201.0" font-size="11" fill="#222">Q1 MOSFET 2SJ334（逆接の保護）</text>
-<line x1="514.6" y1="677.9" x2="514.6" y2="226.0" stroke="#666" stroke-width="1" stroke-dasharray="4 3"/>
-<circle cx="514.6" cy="677.9" r="2.5" fill="#666"/>
-<text x="508.6" y="222.0" font-size="11" fill="#222">J6 servo の端子台</text>
-<line x1="547.6" y1="589.9" x2="547.6" y2="247.0" stroke="#666" stroke-width="1" stroke-dasharray="4 3"/>
-<circle cx="547.6" cy="589.9" r="2.5" fill="#666"/>
-<text x="541.6" y="243.0" font-size="11" fill="#222">F1 PTC（過電流の保護）</text>
-<line x1="602.6" y1="523.9" x2="602.6" y2="268.0" stroke="#666" stroke-width="1" stroke-dasharray="4 3"/>
-<circle cx="602.6" cy="523.9" r="2.5" fill="#666"/>
-<text x="596.6" y="264.0" font-size="11" fill="#222">J8 logic の端子台</text>
-<line x1="624.6" y1="677.9" x2="624.6" y2="289.0" stroke="#666" stroke-width="1" stroke-dasharray="4 3"/>
-<circle cx="624.6" cy="677.9" r="2.5" fill="#666"/>
-<text x="618.6" y="285.0" font-size="11" fill="#222">J7 Pi の端子台</text>
+<g data-solder="18,14"><circle cx="283.6" cy="655.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+</g>
+<g data-solder="18,15"><circle cx="283.6" cy="677.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+</g>
+<g data-solder="19,6"><circle cx="261.6" cy="479.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+</g>
+<g data-solder="19,8"><circle cx="261.6" cy="523.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+</g>
+<g data-solder="19,14"><circle cx="261.6" cy="655.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+</g>
+<g data-solder="19,15" data-leg="J7:-"><circle cx="261.6" cy="677.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+<circle cx="261.6" cy="677.9" r="2.6" fill="#555"/>
+</g>
+<g data-solder="20,6"><circle cx="239.6" cy="479.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+</g>
+<g data-solder="20,8"><circle cx="239.6" cy="523.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+</g>
+<g data-solder="20,14"><circle cx="239.6" cy="655.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+</g>
+<g data-solder="20,15" data-leg="J7:+"><circle cx="239.6" cy="677.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+<circle cx="239.6" cy="677.9" r="2.6" fill="#555"/>
+</g>
+<g data-solder="21,6" data-leg="C1:+"><circle cx="217.6" cy="479.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+<circle cx="217.6" cy="479.9" r="2.6" fill="#555"/>
+</g>
+<g data-solder="21,8" data-leg="C1:-"><circle cx="217.6" cy="523.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+<circle cx="217.6" cy="523.9" r="2.6" fill="#555"/>
+</g>
+<g data-track="/5V-IN:105.54,128.85-105.54,123.77" data-layer="B.Cu"><line x1="635.6" y1="589.9" x2="635.6" y2="545.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/5V-IN:105.54,123.77-105.54,118.69" data-layer="B.Cu"><line x1="635.6" y1="545.9" x2="635.6" y2="501.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/5V-IN:105.54,118.69-110.62,118.69" data-layer="B.Cu"><line x1="635.6" y1="501.9" x2="591.6" y2="501.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/5V-IN:110.62,118.69-113.16,118.69" data-layer="B.Cu"><line x1="591.6" y1="501.9" x2="569.6" y2="501.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/5V-PTC:123.32,118.69-125.86,118.69" data-layer="B.Cu"><line x1="481.6" y1="501.9" x2="459.6" y2="501.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/5V-PTC:118.24,118.69-123.32,118.69" data-layer="B.Cu"><line x1="525.6" y1="501.9" x2="481.6" y2="501.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/5V-NODE:136.02,118.69-136.02,123.77" data-layer="B.Cu"><line x1="371.6" y1="501.9" x2="371.6" y2="545.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/5V-NODE:136.02,128.85-136.02,133.93" data-layer="B.Cu"><line x1="371.6" y1="589.9" x2="371.6" y2="633.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/5V-NODE:136.02,118.69-141.1,118.69" data-layer="B.Cu"><line x1="371.6" y1="501.9" x2="327.6" y2="501.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/5V-NODE:143.64,136.47-143.64,133.93" data-layer="B.Cu"><line x1="305.6" y1="655.9" x2="305.6" y2="633.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/5V-NODE:130.94,118.69-136.02,118.69" data-layer="B.Cu"><line x1="415.6" y1="501.9" x2="371.6" y2="501.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/5V-NODE:136.02,133.93-138.56,133.93" data-layer="B.Cu"><line x1="371.6" y1="633.9" x2="349.6" y2="633.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/5V-NODE:151.26,136.47-151.26,139.01" data-layer="B.Cu"><line x1="239.6" y1="655.9" x2="239.6" y2="677.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/5V-NODE:143.64,136.47-148.72,136.47" data-layer="B.Cu"><line x1="305.6" y1="655.9" x2="261.6" y2="655.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/5V-NODE:138.56,136.47-143.64,136.47" data-layer="B.Cu"><line x1="349.6" y1="655.9" x2="305.6" y2="655.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/5V-NODE:136.02,123.77-136.02,128.85" data-layer="B.Cu"><line x1="371.6" y1="545.9" x2="371.6" y2="589.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/5V-NODE:143.64,118.69-143.64,116.15" data-layer="B.Cu"><line x1="305.6" y1="501.9" x2="305.6" y2="479.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/5V-NODE:125.86,121.23-130.94,121.23" data-layer="B.Cu"><line x1="459.6" y1="523.9" x2="415.6" y2="523.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/5V-NODE:138.56,133.93-138.56,136.47" data-layer="B.Cu"><line x1="349.6" y1="633.9" x2="349.6" y2="655.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/5V-NODE:141.1,118.69-143.64,118.69" data-layer="B.Cu"><line x1="327.6" y1="501.9" x2="305.6" y2="501.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/5V-NODE:143.64,116.15-148.72,116.15" data-layer="B.Cu"><line x1="305.6" y1="479.9" x2="261.6" y2="479.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/5V-NODE:130.94,121.23-130.94,118.69" data-layer="B.Cu"><line x1="415.6" y1="523.9" x2="415.6" y2="501.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/5V-NODE:148.72,116.15-153.8,116.15" data-layer="B.Cu"><line x1="261.6" y1="479.9" x2="217.6" y2="479.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/5V-NODE:148.72,136.47-151.26,136.47" data-layer="B.Cu"><line x1="261.6" y1="655.9" x2="239.6" y2="655.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/Q1-GATE:125.86,116.15-125.86,113.61" data-layer="B.Cu"><line x1="459.6" y1="479.9" x2="459.6" y2="457.9" stroke="#ff7f0e" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/Q1-GATE:125.86,113.61-120.78,113.61" data-layer="B.Cu"><line x1="459.6" y1="457.9" x2="503.6" y2="457.9" stroke="#ff7f0e" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/GND:133.48,121.23-133.48,123.77" data-layer="B.Cu"><line x1="393.6" y1="523.9" x2="393.6" y2="545.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/GND:113.16,128.85-113.16,131.39" data-layer="B.Cu"><line x1="569.6" y1="589.9" x2="569.6" y2="611.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/GND:123.32,123.77-118.24,123.77" data-layer="B.Cu"><line x1="481.6" y1="545.9" x2="525.6" y2="545.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/GND:110.62,121.23-110.62,126.31" data-layer="B.Cu"><line x1="591.6" y1="523.9" x2="591.6" y2="567.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/GND:115.7,121.23-110.62,121.23" data-layer="B.Cu"><line x1="547.6" y1="523.9" x2="591.6" y2="523.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/GND:105.54,131.39-110.62,131.39" data-layer="B.Cu"><line x1="635.6" y1="611.9" x2="591.6" y2="611.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/GND:138.56,139.01-136.02,139.01" data-layer="B.Cu"><line x1="349.6" y1="677.9" x2="371.6" y2="677.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/GND:148.72,139.01-143.64,139.01" data-layer="B.Cu"><line x1="261.6" y1="677.9" x2="305.6" y2="677.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/GND:115.7,118.69-115.7,121.23" data-layer="B.Cu"><line x1="547.6" y1="501.9" x2="547.6" y2="523.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/GND:136.02,136.47-133.48,136.47" data-layer="B.Cu"><line x1="371.6" y1="655.9" x2="393.6" y2="655.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/GND:120.78,108.53-115.7,108.53" data-layer="B.Cu"><line x1="503.6" y1="413.9" x2="547.6" y2="413.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/GND:133.48,123.77-128.4,123.77" data-layer="B.Cu"><line x1="393.6" y1="545.9" x2="437.6" y2="545.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/GND:123.32,133.93-118.24,133.93" data-layer="B.Cu"><line x1="481.6" y1="633.9" x2="525.6" y2="633.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/GND:115.7,113.61-115.7,118.69" data-layer="B.Cu"><line x1="547.6" y1="457.9" x2="547.6" y2="501.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/GND:118.24,123.77-113.16,123.77" data-layer="B.Cu"><line x1="525.6" y1="545.9" x2="569.6" y2="545.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/GND:136.02,139.01-136.02,136.47" data-layer="B.Cu"><line x1="371.6" y1="677.9" x2="371.6" y2="655.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/GND:133.48,133.93-128.4,133.93" data-layer="B.Cu"><line x1="393.6" y1="633.9" x2="437.6" y2="633.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/GND:110.62,133.93-110.62,131.39" data-layer="B.Cu"><line x1="591.6" y1="633.9" x2="591.6" y2="611.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/GND:115.7,108.53-115.7,113.61" data-layer="B.Cu"><line x1="547.6" y1="413.9" x2="547.6" y2="457.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/GND:113.16,123.77-113.16,128.85" data-layer="B.Cu"><line x1="569.6" y1="545.9" x2="569.6" y2="589.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/GND:113.16,131.39-110.62,131.39" data-layer="B.Cu"><line x1="569.6" y1="611.9" x2="591.6" y2="611.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/GND:128.4,133.93-123.32,133.93" data-layer="B.Cu"><line x1="437.6" y1="633.9" x2="481.6" y2="633.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/GND:118.24,133.93-113.16,133.93" data-layer="B.Cu"><line x1="525.6" y1="633.9" x2="569.6" y2="633.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/GND:110.62,126.31-110.62,131.39" data-layer="B.Cu"><line x1="591.6" y1="567.9" x2="591.6" y2="611.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/GND:133.48,136.47-133.48,133.93" data-layer="B.Cu"><line x1="393.6" y1="655.9" x2="393.6" y2="633.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/GND:143.64,139.01-138.56,139.01" data-layer="B.Cu"><line x1="305.6" y1="677.9" x2="349.6" y2="677.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/GND:113.16,133.93-110.62,133.93" data-layer="B.Cu"><line x1="569.6" y1="633.9" x2="591.6" y2="633.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/GND:128.4,123.77-123.32,123.77" data-layer="B.Cu"><line x1="437.6" y1="545.9" x2="481.6" y2="545.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/ADC-SHUNT:141.1,131.39-141.1,126.31" data-layer="B.Cu"><line x1="327.6" y1="611.9" x2="327.6" y2="567.9" stroke="#9467bd" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/ADC-SHUNT:143.64,121.23-148.72,121.23" data-layer="B.Cu"><line x1="305.6" y1="523.9" x2="261.6" y2="523.9" stroke="#9467bd" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/ADC-SHUNT:141.1,131.39-138.56,131.39" data-layer="B.Cu"><line x1="327.6" y1="611.9" x2="349.6" y2="611.9" stroke="#9467bd" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/ADC-SHUNT:141.1,133.93-141.1,131.39" data-layer="B.Cu"><line x1="327.6" y1="633.9" x2="327.6" y2="611.9" stroke="#9467bd" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/ADC-SHUNT:141.1,126.31-141.1,123.77" data-layer="B.Cu"><line x1="327.6" y1="567.9" x2="327.6" y2="545.9" stroke="#9467bd" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/ADC-SHUNT:148.72,121.23-153.8,121.23" data-layer="B.Cu"><line x1="261.6" y1="523.9" x2="217.6" y2="523.9" stroke="#9467bd" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/ADC-SHUNT:143.64,123.77-143.64,121.23" data-layer="B.Cu"><line x1="305.6" y1="545.9" x2="305.6" y2="523.9" stroke="#9467bd" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/ADC-SHUNT:141.1,123.77-143.64,123.77" data-layer="B.Cu"><line x1="327.6" y1="545.9" x2="305.6" y2="545.9" stroke="#9467bd" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<line x1="217.6" y1="479.9" x2="217.6" y2="100.0" stroke="#666" stroke-width="1" stroke-dasharray="4 3"/>
+<circle cx="217.6" cy="479.9" r="2.5" fill="#666"/>
+<text x="211.6" y="96.0" font-size="11" fill="#222">C1 servo の bulk capacitor</text>
+<line x1="250.6" y1="677.9" x2="250.6" y2="121.0" stroke="#666" stroke-width="1" stroke-dasharray="4 3"/>
+<circle cx="250.6" cy="677.9" r="2.5" fill="#666"/>
+<text x="244.6" y="117.0" font-size="11" fill="#222">J7 Pi の端子台</text>
+<line x1="305.6" y1="501.9" x2="305.6" y2="142.0" stroke="#666" stroke-width="1" stroke-dasharray="4 3"/>
+<circle cx="305.6" cy="501.9" r="2.5" fill="#666"/>
+<text x="299.6" y="138.0" font-size="11" fill="#222">C2 servo の bulk capacitor</text>
+<line x1="316.6" y1="633.9" x2="316.6" y2="163.0" stroke="#666" stroke-width="1" stroke-dasharray="4 3"/>
+<circle cx="316.6" cy="633.9" r="2.5" fill="#666"/>
+<text x="310.6" y="159.0" font-size="11" fill="#222">J6 servo の端子台</text>
+<line x1="327.6" y1="589.9" x2="327.6" y2="184.0" stroke="#666" stroke-width="1" stroke-dasharray="4 3"/>
+<circle cx="327.6" cy="589.9" r="2.5" fill="#666"/>
+<text x="321.6" y="180.0" font-size="11" fill="#222">W1 ADC-SHUNT の線の出口</text>
+<line x1="404.6" y1="523.9" x2="404.6" y2="205.0" stroke="#666" stroke-width="1" stroke-dasharray="4 3"/>
+<circle cx="404.6" cy="523.9" r="2.5" fill="#666"/>
+<text x="398.6" y="201.0" font-size="11" fill="#222">J8 logic の端子台</text>
+<line x1="459.6" y1="479.9" x2="459.6" y2="226.0" stroke="#666" stroke-width="1" stroke-dasharray="4 3"/>
+<circle cx="459.6" cy="479.9" r="2.5" fill="#666"/>
+<text x="453.6" y="222.0" font-size="11" fill="#222">Q1 MOSFET 2SJ334（逆接の保護）</text>
+<line x1="470.6" y1="611.9" x2="470.6" y2="247.0" stroke="#666" stroke-width="1" stroke-dasharray="4 3"/>
+<circle cx="470.6" cy="611.9" r="2.5" fill="#666"/>
+<text x="464.6" y="243.0" font-size="11" fill="#222">R20 shunt 0.1 Ω 5 W（servo の電流を測る）</text>
+<line x1="503.6" y1="413.9" x2="503.6" y2="268.0" stroke="#666" stroke-width="1" stroke-dasharray="4 3"/>
+<circle cx="503.6" cy="413.9" r="2.5" fill="#666"/>
+<text x="497.6" y="264.0" font-size="11" fill="#222">R18 10 kΩ（Gate の抵抗）</text>
+<line x1="547.6" y1="501.9" x2="547.6" y2="289.0" stroke="#666" stroke-width="1" stroke-dasharray="4 3"/>
+<circle cx="547.6" cy="501.9" r="2.5" fill="#666"/>
+<text x="541.6" y="285.0" font-size="11" fill="#222">F1 PTC（過電流の保護）</text>
 <line x1="635.6" y1="589.9" x2="635.6" y2="310.0" stroke="#666" stroke-width="1" stroke-dasharray="4 3"/>
 <circle cx="635.6" cy="589.9" r="2.5" fill="#666"/>
 <text x="629.6" y="306.0" font-size="11" fill="#222">J5 入力の端子台</text>
