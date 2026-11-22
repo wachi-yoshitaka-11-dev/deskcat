@@ -52,7 +52,7 @@
 
 ### ESP32：維持
 
-EXP-066 の5つの条件で、ESP32 の `health` の行（174行）の `overrun_ticks`、`pi_uart_rx_buffer_full`、`pi_uart_rx_fifo_overflow` は**すべて 0** だった。`max_read_gap_ms` の最大は、条件0から順に 86、90、91、107、109 ms で、`HEARTBEAT_PERIOD_MS`（1000 ms）の約 1/9、task WDT の timeout（5 s）の約 1/46 に当たる。`heartbeat_overrun`、`health_snapshot_overrun`、`task_watchdog`、`panic`、`pi_link_lost` の行は出なかった。LCD の描画、センサーの読み出し、B3 を叩く・揺らす操作、Pi の負荷を同時に掛けた条件4でも、`max_read_gap_ms` は 109 ms で、他の数は 0 のままだった。
+EXP-066 の5つの条件で、ESP32 の `health` の行（174行）の `overrun_ticks`、`pi_uart_rx_buffer_full`、`pi_uart_rx_fifo_overflow` は**すべて 0** だった。`max_read_gap_ms` の最大は、条件0から順に 86、90、91、107、109 ms で、`HEARTBEAT_PERIOD_MS`（1000 ms）の約 1/9、task WDT の timeout（5 s）の約 1/46 に当たる。`heartbeat_overrun`、`health_snapshot_overrun`、`task_watchdog`、`panic` の行は出なかった。LCD の描画、センサーの読み出し、B3 を叩く・揺らす操作、Pi の負荷を同時に掛けた条件4でも、`max_read_gap_ms` は 109 ms で、他の数は 0 のままだった。
 
 この条件では、main loop が heartbeat・health snapshot・受信を読みに行く間隔の期限を脅かす待ちは測れなかった。分ける根拠が無い。
 
@@ -61,7 +61,7 @@ EXP-066 の5つの条件で、ESP32 の `health` の行（174行）の `overrun_
 - 負荷の無い条件0〜2で、`step_max_us` の最大は 80503〜82762 µs、serial の `read_data_max_us` は最大 46814 µs だった。
 - Pi に CPU の負荷（`yes`）とディスクの同期書き込み（`dd ... conv=fdatasync` のくり返し）を掛けた条件3・4では、`step_max_us` が 2505263 µs（条件3）、1745795 µs（条件4）まで伸びた。条件3・4を通した serial の呼び出しの最大は、read 58944 µs、write 20798 µs、flush 49639 µs だった。
 - ESP32 側で `window_max_ms` が 2000 ms を超えた行（条件3で9行、条件4で5行）は、**すべて**、約 1.1〜2.5 秒の `step_max_us` を持つ Pi の窓と重なった（10秒の窓の粒度。逆は成り立たない）。Pi の止まりは、Pi からの frame の到着の間隔に出る。
-- その間隔の定常の最大は 3380 ms で、`LINK_LOSS_TIMEOUT_MS`（7000 ms）に収まり、`pi_link_lost` は出なかった。起動からの累計の最大（4104〜4893 ms）は、4回とも ESP32 の `boot` の送り直しと Pi の `hello` の位置関係で決まる1件で、定常の値ではない。
+- その間隔の定常の最大は 3380 ms で、`LINK_LOSS_TIMEOUT_MS`（7000 ms）に収まる。EXP-066 の build（`befc02d`）にはこの見張りがまだ無く（値は `None`）、`pi_link_lost` を出す経路も無かったので、検知そのものは確かめていない。起動からの累計の最大（4104〜4893 ms）は、4回とも ESP32 の `boot` の送り直しと Pi の `hello` の位置関係で決まる1件で、定常の値ではない。
 
 負荷は人為的で、製品が通常出会う負荷ではない。条件を掛けても、測った範囲で期限を超えなかった。分ける構造（独立した I/O と bounded channel）を決めるには、止まりが `step` のどこにあるかが要る。いまは、それを分けた材料が無い。
 
