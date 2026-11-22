@@ -8,11 +8,17 @@
 //! 回ごとの実行承認（`承認の状態`の項目6の(c)）なしに、このbuildで駆動しない。手順・停止基準は`docs/hardware/servo-safety-limits.md`の
 //! `手順・停止基準・受け入れ条件`節による。
 //!
+//! # 加速度のlog（`accel-log-18` feature）
+//!
+//! `accel-log-18`を足したbuildだけが、`crate::accel_log_18`の別threadで加速度のraw sampleをlogへ出す（#15・#22の材料。
+//! servoの制御・limiter・露出・停止の動作と順序は変えない）。足すのは、`run`の中の起動（`session`の前）と停止の伝達（`session`の後）、
+//! `run_motion`の`servo_calib_18_motion_clock`の1行（`stop`の後に出す）だけである。このfeatureのbuildだけがI2Cを持つ（下の「持たないもの」の例外）。
+//!
 //! # 持たないもの
 //!
-//! Pi link（`crate::boot_session`、UART1）、heartbeat、health snapshot、I2C、LCD、NVSを持たない。
+//! Pi link（`crate::boot_session`、UART1）、heartbeat、health snapshot、I2C（`accel-log-18`のbuildを除く）、LCD、NVSを持たない。
 //! `main.rs`の`servo_calib`用の`main`は、識別のlogを出してから[`run`]を呼ぶだけである。
-//! **仕様が書いていないheartbeatとI2Cを足さなかった**（`bench-servo-test-17`はI2CのID読み出しとheartbeatを持つ）。
+//! **仕様が書いていないheartbeatとI2Cを足さなかった（I2Cは`accel-log-18`のbuildだけが持つ。上の「加速度のlog」）**（`bench-servo-test-17`はI2CのID読み出しとheartbeatを持つ）。
 //!
 //! # servoを駆動する型
 //!
@@ -319,7 +325,22 @@ pub fn run() -> ! {
         }
     };
 
+    // 加速度のlog（`accel-log-18`）。**`session`の前**に別threadで始める。起こせなくても、servoは動かす（`crate::accel_log_18::start`のdoc）。
+    #[cfg(feature = "accel-log-18")]
+    let accel_log = crate::accel_log_18::start(
+        peripherals.i2c0,
+        peripherals.pins.gpio25,
+        peripherals.pins.gpio26,
+        started,
+        Duration::from_secs(MAX_SESSION_S.into()),
+    );
+
     let held = session(servo, &console, started, &mut wdt);
+    // 回が終わったら、加速度のlogのthreadへ終わりを伝える（待たない）。
+    #[cfg(feature = "accel-log-18")]
+    if let Some(accel_log) = &accel_log {
+        accel_log.stop();
+    }
     ended(&console, Some(held), Some(&mut wdt))
 }
 
@@ -831,6 +852,12 @@ fn run_motion(
     after_tick_trace.log("servo_calib_18_phase_trace", "after_tick_us", n);
     pre_delay_trace.log("servo_calib_18_phase_trace", "pre_delay_us", n);
     output_trace.log("servo_calib_18_output_trace", "tick", n);
+    // `motion_start`の、回の`started`（`accel_log_18_raw`の`t_us`と同じ基準）からの経過。加速度のlogと時刻を合わせる。
+    #[cfg(feature = "accel-log-18")]
+    log::info!(
+        "servo_calib_18_motion_clock n={n} start_us={}",
+        motion_start.duration_since(session_started).as_micros()
+    );
     log::info!(
         "servo_calib_18_stop_trace n={n} stop_pre_us={} stop_post_us={}",
         stop_pre.as_micros(),
