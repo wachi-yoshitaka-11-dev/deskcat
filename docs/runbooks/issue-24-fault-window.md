@@ -186,7 +186,7 @@ python3 scripts/link_stress.py --mode newline-free --count 64 --port <device> --
 python3 scripts/link_stress.py --mode flood --count 2000 --port <device> --baud 115200
 ```
 
-`--sid` は省く（実行ごとにランダム。ESP32 は置き換えられた sid を retired として覚え、同じ sid の再実行は、置き換えられていれば `stale_session`、現在の sid のままなら `invalid_payload` で拒否される）。`--count` は出発点であり、確定値ではない。**1 回ごとに ESP32 の log の拒否の行の数を数え、script が表示する `expected_rejections`
+`--sid` は省く（実行ごとにランダム。ESP32 は置き換えられた sid を retired として覚え、その sid の `hello` を `stale_session` で拒否する。現在の sid のままの再実行は、同じ `id` なら確立したときの ACK が返る）。`--count` は出発点であり、確定値ではない。**1 回ごとに ESP32 の log の拒否の行の数を数え、script が表示する `expected_rejections`
 と突き合わせる（`corpus`・`noise`・`oversize` は送った行の数、`newline-free` は 1、`flood` は 0）。**3.3 の 1〜3 を判定する。`flood` は baud が上限の速さで送る。`recovered=no` が溢れと同時に出たら、確認だけを送り直して判定する（`--mode flood --count 0`。溢れで改行が落ち、確認の行が前の行と連結された可能性がある）。溢れが出た場合は、`--count` を半分にして
 同じ手順を繰り返し、溢れない最大を記録する（測定値であり、上限の決定ではない）。
 
@@ -208,7 +208,7 @@ python3 scripts/link_stress.py --mode flood --count 2000 --port <device> --baud 
 | 症状 | 確認 | 対処 |
 |---|---|---|
 | `deskcatd` が `failed`（`Start request repeated too quickly`） | ESP32 の電源と信号線、ESP32 の `reset_reason` | 原因を取り除いた後、`sudo systemctl reset-failed deskcatd` → `sudo systemctl restart deskcatd`（EXP-024） |
-| `deskcatd` が起動するが ESP32 から 1 byte も届かない | 信号線の 2 本が Pi の pin 8・10 に挿さっているか（目視。EXP-065 で抜けていた）、GPIO15 を pull-down で読んで High か（**この読み方は Pi の pin を UART の機能から外す。**読んだ後に UART の機能へ戻し〔EXP-065 は `a0` に戻した〕、`deskcatd` を起動し直すまで、症状は残る） | ESP32 側の端は、電源の入った状態で挿し直してよい（操作 B）。Pi の header 側が抜けていた場合は、**先に信号線を ESP32 側で外し**、Pi を止めて（`poweroff`）から直す。直した後は `信号線をつないでよい条件` の 6（GND の導通測定と目視）をやり直し、両方の電源を入れてから信号線をつなぐ |
+| `deskcatd` が起動するが ESP32 から 1 byte も届かない | 信号線の 2 本が Pi の pin 8・10 に挿さっているか（目視。EXP-065 で抜けていた）、GPIO15 を pull-down で読んで High か（**この読み方は Pi の pin を UART の機能から外す。**読んだ後に UART の機能へ戻し〔EXP-065 は、読む前に GPIO14 を `a0` に戻してから `deskcatd` を起動した〕、`deskcatd` を起動し直すまで、症状は残る） | ESP32 側の端は、電源の入った状態で挿し直してよい（操作 B）。Pi の header 側が抜けていた場合は、**先に信号線を ESP32 側で外し**、Pi を止めて（`poweroff`）から直す。直した後は `信号線をつないでよい条件` の 6（GND の導通測定と目視）をやり直し、両方の電源を入れてから信号線をつなぐ |
 | ESP32 が `pi_rx_ack_sid_mismatch` を出す | 本番の service と手で起動した `deskcatd` が同じ port を開いていないか | 一方を止める（`systemctl stop deskcatd`） |
 | ESP32 が応答しない | UART0 の log が続いているか（`hb`）。止まっていれば ESP32 の USB、`reset_reason` | 信号線を ESP32 側で外し、EN ボタン。それで戻らなければ USB を抜き挿し（先に信号線を外す）。**原因が分からない停止は EXP-030 にもある。**log を残して PM へ |
 | `reset_reason` が予想した値（`power_on`／`external_pin`／`software`）以外 | その直前の log | **その窓を止める。**再通電しない。log と配線を記録して PM へ（brownout は電源の問題として人間の判断） |
