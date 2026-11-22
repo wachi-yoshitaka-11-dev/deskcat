@@ -10,7 +10,7 @@
 //! # 制御周期を乱さないための構成
 //!
 //! I2Cの読み出し（1件が100 kHzで約1 ms）をservoのloopへ入れず、**別threadで行う。**threadは、main taskと**別のcore**に固定し、
-//! 優先度をmain task（ESP-IDFの既定で1）と同じ最低の値（1）にする。起こせなかった場合（設定の失敗、thread
+//! 優先度をmain task（ESP-IDFの既定で1）と同じ値（1）にする。起こせなかった場合（設定の失敗、thread
 //! の失敗）は、**加速度なしでservoだけを続ける**（`accel_log_18_not_started`を出す）。優先度とcoreを決められないままthreadを
 //! 起こさない。**実機での影響は確かめていない。**確かめる材料は、同じ値の校正buildを加速度なしで動かした回の`servo_calib_18_motion_done`の
 //! `tick_min_ms`／`tick_max_ms`と、`servo_calib_18_session_end`の`interval_rejections`（各tickの間隔、または`Limiter`へ渡す窓の間隔が許容幅の外でrejectされてlatchした回数。latchで回が終わるので、
@@ -75,7 +75,7 @@ const WARMUP_SAMPLES: u32 = 10;
 const MAX_CONSECUTIVE_ERRORS: u32 = 5;
 /// threadのstack（byte）。`format!`とlogに足りる一般値で、安全要件の5項目に効かない。
 const THREAD_STACK_BYTES: usize = 6144;
-/// threadの優先度。main taskの既定（ESP-IDFの`ESP_TASK_MAIN_PRIO`＝1）と同じ最低値にする。**main taskの値そのものは確かめていない**
+/// threadの優先度。main taskの既定（ESP-IDFの`ESP_TASK_MAIN_PRIO`＝1）と同じ値にする。**main taskの値そのものは確かめていない**
 /// （取るには`unsafe`のFFIが要る。`servo_calib::log_main_thread_info`のdoc）。
 const THREAD_PRIORITY: u8 = 1;
 
