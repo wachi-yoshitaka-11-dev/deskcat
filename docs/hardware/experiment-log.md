@@ -6152,6 +6152,7 @@ ESP32 の uptime と Pi の時刻は、同じ `set_expression` の id（`id=4`�
 - 測った回数は2回で、最大を取り逃していないことは言わない。人の反応の遅れ（OFF からストップウォッチを始めるまで、0.00 を見てから止めるまで）の大きさは測っていない。
 - `0.00` は分解能 0.01 V の表示で、給電の経路が完全に遮断されたことは示さない。信号線の読みは 0。駆動の状態は確かめていない（GPIO27 には外部の pull-down がある。番号は [breadboard-rebuild の配線表](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/hardware/breadboard-rebuild/wiring-table.md)では R3、[netlist](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/hardware/overview/deskcat-netlist.xml)では R7）。R3 の現物（取り付けと値）は、この窓では確かめていない。
 - 頭付きの回の条件での待つ時間（PR #774 の段2のとおり `TBD`）。
+
 ## EXP-069: #514 の段階的な確認4。no-touch-487,led-no-touch-514 の build を Pi とつなぎ、白と赤の LED の表示を見た
 
 [#514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)の[段階的な確認](led-514-demo.md#段階的な確認)の4を、[PR #785](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/785)で足した build（`no-touch-487,led-no-touch-514`）で見た窓。servo は動かしていない。
