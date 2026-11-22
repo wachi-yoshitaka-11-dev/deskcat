@@ -212,6 +212,10 @@ fn clock(flag: &'static str, raw: &str) -> Result<LocalMinutes, CliError> {
         reason: format!("{reason}: {raw}"),
     };
     let (h, m) = raw.split_once(':').ok_or_else(|| invalid("HH:MMでない"))?;
+    let two_digits = |part: &str| part.len() == 2 && part.bytes().all(|b| b.is_ascii_digit());
+    if !two_digits(h) || !two_digits(m) {
+        return Err(invalid("HH:MMでない"));
+    }
     let h = h.parse::<u8>().map_err(|_| invalid("時が数でない"))?;
     let m = m.parse::<u8>().map_err(|_| invalid("分が数でない"))?;
     LocalMinutes::new(h, m).ok_or_else(|| invalid("範囲外（00:00..=23:59）"))
@@ -823,7 +827,10 @@ mod tests {
 
     #[test]
     fn companion_overrides_reject_bad_values() {
-        let cases: [&[&str]; 14] = [
+        let cases: [&[&str]; 17] = [
+            &["--companion-sleep-at", "7:05"],
+            &["--companion-wake-at", "+7:00"],
+            &["--companion-wake-at", "007:00"],
             &["--companion-rest-interval-ms", "0"],
             &["--companion-sleep-at", "24:00"],
             &["--companion-sleep-at", "22:60"],
