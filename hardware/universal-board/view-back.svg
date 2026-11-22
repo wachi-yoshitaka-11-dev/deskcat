@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 855" font-family="Noto Sans CJK JP, Hiragino Sans, Meiryo, sans-serif" font-size="13">
-<rect width="900" height="855" fill="#fff"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 899" font-family="Noto Sans CJK JP, Hiragino Sans, Meiryo, sans-serif" font-size="13">
+<rect width="900" height="899" fill="#fff"/>
 <text x="30" y="36" font-size="22" font-weight="bold">PROTO-02 の実装の計画（はんだ面。真上から、左右を裏返した向き）</text>
 <text x="30" y="62" fill="#444">生成元: hardware/universal-board/render_view.py（基板ファイルから）。描き方はブレッドボードの図と同じ。</text>
 <rect x="60.0" y="250.0" width="623.6" height="411.4" rx="10" fill="#f4f4f0" stroke="#888"/>
@@ -1122,8 +1122,10 @@
 <circle cx="635.6" cy="521.9" r="2.5" fill="#666"/>
 <text x="629.6" y="222.0" font-size="11" fill="#222">J5 入力の端子台</text>
 <text x="60" y="711.4173228346457" font-size="15" font-weight="bold">凡例と注意</text>
-<text x="60" y="737.4173228346457" font-size="12.5">はんだ面（左右を裏返した向き。部品面の図と同じ穴が、鏡の位置に出る）。基板ファイルの B.Cu の導体と、足の穴を描く。</text>
-<text x="60" y="759.4173228346457" font-size="12.5">線の色は部品面の図と同じ：赤＝＋、黒＝GND、橙＝Gate。太い線＝芯線（111641、被覆を剥いた区間。導体外径 0.75）。</text>
-<text x="60" y="781.4173228346457" font-size="12.5">銀の丸＝はんだの盛り（導体が通る穴と足の穴。通る穴ごとにはんだ付けする）。中央の暗い点＝足の穴。灰の円＝ランド。</text>
-<text x="60" y="803.4173228346457" font-size="12.5">TBD（資料に無い）：ランドの外径（pad と同じ 1.8 mm で描く）、はんだの盛りの大きさ（見た目）、基板の色。</text>
+<text x="60" y="737.4173228346457" font-size="12.5">この基板は、完成形の電源（段階C）で、M-12001 の 5 V を servo・Pi・B1 へ分ける基板（未実装）。</text>
+<text x="60" y="759.4173228346457" font-size="12.5">はんだ付けは #405、初回通電は #525。まだはんだ付けしていない。部品の役目は部品面の図の凡例。</text>
+<text x="60" y="781.4173228346457" font-size="12.5">はんだ面（左右を裏返した向き。部品面の図と同じ穴が、鏡の位置に出る）。基板ファイルの B.Cu の導体と、足の穴を描く。</text>
+<text x="60" y="803.4173228346457" font-size="12.5">線の色は部品面の図と同じ：赤＝＋、黒＝GND、橙＝Gate。太い線＝芯線（111641、被覆を剥いた区間。導体外径 0.75）。</text>
+<text x="60" y="825.4173228346457" font-size="12.5">銀の丸＝はんだの盛り（導体が通る穴と足の穴。通る穴ごとにはんだ付けする）。中央の暗い点＝足の穴。灰の円＝ランド。</text>
+<text x="60" y="847.4173228346457" font-size="12.5">TBD（資料に無い）：ランドの外径（pad と同じ 1.8 mm で描く）、はんだの盛りの大きさ（見た目）、基板の色。</text>
 </svg>
