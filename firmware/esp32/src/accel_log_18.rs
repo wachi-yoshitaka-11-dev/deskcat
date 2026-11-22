@@ -28,7 +28,7 @@
 //! - `accel_log_18_raw t_us=<T> n=<N> k=<K> xyz=x,y,z;x,y,z;...`：1回のpollで読んだ**K件**のraw値（LSB。±2 g・full resolution。
 //!   warm-upの件を除く）。`n`はその行の最初の件の通し番号（1始まり）。`t_us`は、そのpollがFIFOを読み終えた時刻で、
 //!   `servo_calib::run`の`started`（`GO18`を受けた後に取る`Instant`）からの経過（µs）である。**件ごとの時刻ではない。**
-//!   出力data rateは100 Hz（公称）なので、件の間隔は約10 msで、行の最後の件が`t_us`の直前に近い。件ごとのsample時刻は持たない。
+//!   出力data rateは100 Hz（公称）なので、件の間隔は約10 msである。件ごとのsample時刻は持たない。
 //! - `accel_log_18_overrun`：`INT_SOURCE`のOverrunが立っていたpoll（FIFOが満杯になり、古い件が捨てられた）。
 //! - `accel_log_18_fault`：I2Cの失敗と、復号できなかった件。
 //! - `accel_log_18_summary`：測定のloopを抜けたとき（`accel_log_18_not_started`で終わった場合は出ない）。poll数、件数、overrunしたpollの数、I2Cの失敗の数、1回のpollの時間の最大（µs）。
