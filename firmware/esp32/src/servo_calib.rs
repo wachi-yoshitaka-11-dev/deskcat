@@ -38,12 +38,12 @@
 //!   `console_failed`、`limits_rejected`）は実装が付けた。
 //! - **tickの間隔は、`delay_ms(公称周期)`で刻む。**`FreeRtos::delay_ms`はtick単位（`CONFIG_FREERTOS_HZ`。
 //!   生成された`sdkconfig`で100なら10 ms）で待つ。最初のtickの前に1 tick待って、tickの境に揃えてから刻む。
-//!   **実機での間隔は確かめていない**（commandごとに`tick_min_ms`／`tick_max_ms`をlogに出す。`CONTROL_PERIOD_TOLERANCE_MS`を
+//!   実機での間隔は[EXP-059](../../../docs/hardware/experiment-log.md)で測った（commandごとに`tick_min_ms`／`tick_max_ms`をlogに出す。`CONTROL_PERIOD_TOLERANCE_MS`を
 //!   決めるための値である）。
 //! - **main taskをtask watchdogへ登録する**（Issue #711。`sdkconfig.defaults`の`CONFIG_ESP_TASK_WDT_PANIC=y`と組で、main taskが止まったまま
 //!   LEDCが最後のdutyを出し続けることを、timeout（sdkconfigの値）で限る）。**登録は`Sg90::new`の後**であり、`GO18`を待つ間（期限が無い）は登録しない。
 //!   登録後の待ちは`IDLE_POLL_MS`（20 ms）・制御周期・tick単位の待ちだけで、`session`・`run_motion`・`ended`の各loopの周ごとに餌付けする。
-//!   tickの間隔の実測は18.44〜21.55 ms（EXP-059）で、timeout（既定5 s）より2桁小さい。**実機では確かめていない。**
+//!   tickの間隔の実測は18.44〜21.55 ms（EXP-059）で、timeout（既定5 s）より2桁小さい。実機の通し（10動作）で誤ってresetしないことは[EXP-060](../../../docs/hardware/experiment-log.md)の(A)で確かめた。**calibがhangしたときに止まることは確かめていない。**
 //! - **LEDCへの出力は、N tickに1回へ間引く**（`config::SERVO_OUTPUT_DECIMATION_TICKS`、ADR-0027、Issue #708。Nは`servo_calib_18_confirmed`の
 //!   `output_decimation_ticks=`に出す。回ごとの実行承認の値ではない）。`Limiter`は出力するtickでだけ進み、窓（最後の出力からの時間）の間隔で制限する（`servo.rs`のmodule doc）。**`position_deg`・`position_min_deg`・
 //!   `position_max_deg`・`reached`の判定・`stop`の後の位置は、出力したtickの位置だけで更新する**（間引いたtickには位置が作られない）。
