@@ -5,10 +5,14 @@
 「Gate は共通 GND 戻り（star point）へ抵抗を介してつなぐ」）：
 
 - servo の戻りの電流は、J6− から J5− までの GND の導体を流れる（servo の経路）。
-- star point は、servo の経路の上の (7,17) の穴である（J6− の足の穴 (7,16) から GND の母線へ上がる点）。
+- star point は、servo の経路の上の (5,16) の穴である（R18 の足2 の穴そのもの。J6− の足、servo の経路、Pi・logic の母線が集まる点）。
 - Gate 抵抗 R18 の GND 側と、Pi（J7−）・logic（J8−）の GND は、J5− へ向かう途中で
   servo の経路に最初に触れる点が star point でなければならない（servo の電流が流れる区間の
   途中に付けない）。star point を除いても servo の経路とつながる導体（迂回）があってはならない。
+- R18 の足2 は、star point へ導体で直接つなぐ（途中の節点を通らず、Pi・logic の戻りの導体を共有しない）。
+  Gate は star point の電位を基準にするため、Pi・logic の戻りの電流が流れる区間に付けない。
+- 導体の端と折れ曲がり、通る穴は、基板に実在する穴（`Dwgs.User` の穴の図）の上にある。
+  ユニバーサル基板の四隅の穴は無い（例：(2,17)）。
 
 基板ファイル（`hardware/deskcat.kicad_pcb`）の `B.Cu` の GND の配線と、部品の pad の位置だけを読む。
 KiCad は使わず、標準ライブラリだけで動く（ADR-0006）。
@@ -24,7 +28,7 @@ from pathlib import Path
 PCB = Path(__file__).resolve().parent.parent / "deskcat.kicad_pcb"
 ORIGIN = (100.0, 100.0)          # 基板の左上の角（基板ファイルの座標）
 X0, Y0, PITCH = 3.0, 3.45, 2.54  # 穴の格子（plan.md の`寸法の出所`）
-STAR_HOLE = (7, 17)
+STAR_HOLE = (5, 16)
 SERVO = ("J6", "-")
 RETURN = ("J5", "-")
 MUST_JOIN_AT_STAR = [("R18", "2"), ("J7", "-"), ("J8", "-")]
@@ -86,6 +90,30 @@ def main():
         ex, ey = map(float, re.search(r"\(end ([-\d.]+) ([-\d.]+)\)", seg).groups())
         segs.append(((round(sx, 3), round(sy, 3)), (round(ex, 3), round(ey, 3))))
     star = hole_mm(*STAR_HOLE)
+    # 基板の穴（Dwgs.User の円。取付穴は footprint なのでここには入らない）
+    holes = set()
+    for c in blocks(text, "gr_circle"):
+        if '"Dwgs.User"' not in c:
+            continue
+        cx, cy = map(float, re.search(r"\(center ([-\d.]+) ([-\d.]+)\)", c).groups())
+        holes.add((round(cx, 2), round(cy, 2)))
+    def is_hole(p):
+        return (round(p[0], 2), round(p[1], 2)) in holes
+    all_segs = []
+    for seg in blocks(text, "segment"):
+        sx, sy = map(float, re.search(r"\(start ([-\d.]+) ([-\d.]+)\)", seg).groups())
+        ex, ey = map(float, re.search(r"\(end ([-\d.]+) ([-\d.]+)\)", seg).groups())
+        all_segs.append(((sx, sy), (ex, ey)))
+    off = set()
+    for (sx, sy), (ex, ey) in all_segs:
+        n = max(round(abs(ex - sx) / PITCH), round(abs(ey - sy) / PITCH))
+        for i in range(n + 1):
+            q = (sx + (ex - sx) * i / max(n, 1), sy + (ey - sy) * i / max(n, 1))
+            if not is_hole(q):
+                off.add((round((q[0] - ORIGIN[0] - X0) / PITCH + 1), round((q[1] - ORIGIN[1] - Y0) / PITCH + 1)))
+    if not holes:
+        print("NG: 基板の穴（Dwgs.User の円）が読めない", file=sys.stderr)
+        return 1
     # 2本の芯線が互いの内側で交差する点（どちらの端点でもない穴）も節点にする。同じ穴を通る芯線は導通する
     cross = set()
     for i, (a1, a2) in enumerate(segs):
@@ -143,6 +171,8 @@ def main():
             first = next(u for u in route if u in servo_set)
             if first != star:
                 errors.append(f"{p[0]} の {p[1]} は servo の経路に {first} で付く（star point {star} ではない）")
+            if pads[p] == star:
+                continue  # 足の穴が star point そのもの（迂回の経路は無い）
             # 最短の経路だけでは、star point を迂回する別の導体を見逃す。star point を除いても
             # servo の経路とつながるなら、star point を通らない戻りがある
             reach, q = {pads[p]}, deque([pads[p]])
@@ -155,6 +185,21 @@ def main():
             bypass = reach & (servo_set - {star})
             if bypass:
                 errors.append(f"{p[0]} の {p[1]} は star point {star} を通らずに servo の経路（{min(bypass)}）へつながる導体がある")
+    for h in sorted(off):
+        errors.append(f"導体が基板に無い穴 {h}（列, 行）を通る")
+    # R18 の足2 は star point へ直接つなぐ：最初の1歩が star point で、Pi・logic の戻りの経路と star point 以外を共有しない
+    if servo is not None and star in servo:
+        r18 = path(pads[("R18", "2")], pads[RETURN])
+        if r18 is None or not (r18[0] == star or (len(r18) > 1 and r18[1] == star)):
+            errors.append(f"R18 の足2 が star point {STAR_HOLE} へ直接つながっていない（経路 {r18[:3] if r18 else None}）")
+        else:
+            shared = set()
+            for p in (("J7", "-"), ("J8", "-")):
+                route = path(pads[p], pads[RETURN])
+                if route:
+                    shared |= (set(route[:route.index(star) + 1]) & set(r18[:2])) - {star}
+            if shared:
+                errors.append(f"R18 の足2 の導体が Pi・logic の戻りの経路と {sorted(shared)} で共有している")
     for e in errors:
         print("NG:", e, file=sys.stderr)
     if errors:

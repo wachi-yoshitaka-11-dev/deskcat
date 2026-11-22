@@ -39,8 +39,13 @@ Commands run / Actual result:
     （一度、R18 の参照番号が J8 の silk と重なる警告 1 件が出て、文字の位置を動かして 0 にした。
       同じ file を別の directory で実行すると library table が無いため library の警告が出るので、repository の中で実行した）
     python3 -I hardware/universal-board/check_star_point.py: OK
-      （Q1 の 180 度回転を読めるよう改め、star point の穴を (7,17) へ変えた。
-        star point を (9,17) にした負の例で NG になることを、別に実行して確かめた）
+      （Q1 の 180 度回転を読めるよう改めた。後のレビューの指摘で、基板に実在する穴だけを導体が通ること、
+        R18 の足2 が star point に直接つながり Pi・logic の戻りの導体を共有しないことの検査を足し、
+        star point の穴を (5,16)（R18 の足2 の穴そのもの）にした。負の例として、(a) 指摘前の版
+        （R18 が母線に付き、導体が基板に無い穴 (2,17) を通る）、(b) (2,17) を通る GND の線を足した版、
+        (c) star point を (9,17) にした版は、いずれも NG になることを実行して確かめた）
+    指摘の後の更新：R18 を (5,14)・(5,16) へ、GND の導体を実在の穴だけで置き直し、C1 の枠を1列左へ移した。
+      DRC は違反 0（一度、R18 の外形が F1・J6 の外形と重なる error 2 件が出て、R18 の位置を変えて 0 にした）。
     kicad-cli pcb export svg: 成功（hardware/universal-board/plan-front.svg、plan-back.svg）。
       firefox の headless で描画して読んだ（作業セッションが画像を読んだ。人は見ていない）。
 
