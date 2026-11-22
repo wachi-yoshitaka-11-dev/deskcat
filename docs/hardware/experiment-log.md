@@ -81,6 +81,7 @@
 | [EXP-067](#exp-067-764-の受け入れ条件4製品-buildno-touch-487でb3-を立てた姿勢の静止と揺らしを見た2回の窓) | [#764](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/764)の受け入れ条件4。製品 build を Pi とつなぎ、B3 を立てた姿勢の静止と揺らし、平らに寝かせたときの検出を見た（2回の窓） | 値の正なし（観測の記録） |
 | [EXP-068](#exp-068-774-の待つ時間の確かめservo-の端が-000-になるまでpsu-の出力-off-と-esp32-の-usb-を抜く条件で-2764-s-と-2539-sen-ボタンでは-esp32-が-reset-されなかった2回の窓) | [#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)・[PR #774](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/774)。段2の手を入れる前に待つ時間を、段1の範囲で測った（2回の窓）。EN ボタンでは ESP32 が reset されなかった | 値の正なし（観測の記録） |
 | [EXP-069](#exp-069-514-の段階的な確認4no-touch-487led-no-touch-514-の-build-を-pi-とつなぎ白と赤の-led-の表示を見た) | [#514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)の[段階的な確認](led-514-demo.md#段階的な確認)の4。白の点滅・点灯・Pi を止めた後の点滅への戻り、赤の `happy` での約1秒の点灯を見た | 値の正なし（観測の記録） |
+| [EXP-071](#exp-071-22685522製品-buildno-touch-487led-no-touch-514を-pi-とつなぎ叩いて驚くまでの時間休憩寝起き温湿度の反応クラウドの独り言を見た) | [#22](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/22)・[#685](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/685)・[#522](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/522)。叩いて驚くまでの時間と誤反応、休憩・寝起き・温湿度の反応、クラウドの独り言を、servo を動かさずに見た | 値の正なし（観測の記録） |
 
 **大容量の生dataはこのrepositoryへ入れていない。**保存場所は
 [development-foundation-plan.md](../planning/development-foundation-plan.md)の
@@ -6193,6 +6194,46 @@ ESP32 の uptime と Pi の時刻は、同じ `set_expression` の id（`id=4`�
 - `deskcatd` が SIGINT で止まらない原因。
 - LED の電流、電源 rail の電圧、発熱。
 
+## EXP-071: #22・#685・#522。製品 build（no-touch-487,led-no-touch-514）を Pi とつなぎ、叩いて驚くまでの時間、休憩・寝起き・温湿度の反応、クラウドの独り言を見た
+
+| 項目 | 内容 |
+|---|---|
+| Test ID | `EXP-071` |
+| Date | 2026-11-22（UTC 10:18〜11:52。日本時間では 19:18〜20:52） |
+| Operator | 線と電源の抜き挿し、センサーの板を叩く・温める・息を掛ける操作、LCD の目視はユーザー。build、書き込み、console と Pi の操作と記録は実機側の PM（AI） |
+| 承認 | 承認があった：承認者 wachi-yoshitaka-11-dev、2026-11-22T10:11Z ごろ、実機側の PM のセッション。範囲は、AI の問い「VM 側の PM の指示により、合同の窓（#522 のクラウドの独り言、#22 の叩いて驚くまでの時間、#685 の休憩・寝起き・温湿度。servo は動かさない）を、Pi をつなぐ試験として今行い、記録を EXP にして PR・CodeRabbit への依頼まで進めてよいですか？」 |
+| Firmware | `no-touch-487,led-no-touch-514`、develop `f9e7f7a`。ELF sha256 `14d84654bd1383d5403442d2f78a870fa51ce49a8d342bc2ae8a937a3ab06cf4`（起動 log の先頭9桁と一致） |
+| Pi software | develop `f9e7f7a` の `deskcatd` を Pi で build。sha256 `a293d7a1022ad620ebcf6431efe318f32d517f0a42c3e9b818e6cbcf4cad03b4`。引数は各節 |
+| Power supply | ESP32 はこの端末の USB、Pi は別の電源。LCD の VCC を挿した後、通電の前に LCD の板の d1–d2 を 1214 Ω と読んだ（短絡なし）。servo へは通電していない |
+| Raw data | repository の外の `deskcat-evidence/windows-20261122-joint/`（`console.log`、`joint-notes.txt`、`args-685.txt`、`joint-approval.txt`、`sha256.txt`）と、Pi の `~/deskcatd-joint-*.log`・journal（`deskcatd-522`） |
+
+### #22（叩いて驚くまでの時間と誤反応）
+
+- `deskcatd` は `--no-companion` で起動した。
+- console を開いたときの起動（10:21Z。起動の3回目。起動1・2の log は無い）で `accel_device_id_read_failed error=ESP_FAIL` と `tap_not_started` が出て、叩いた5回は検出されなかった。11:16:23Z に console の RTS で reset した後は `accel_device_id raw=0xe5` で、叩く検出が始まった。
+- 叩いた5回は、どれも `tap_detected decision=Hold` → `tap_confirmed decision=Send` → `face_drawn name=Some(Surprised)` になった（ユーザーの目視でも驚いた顔）。`tap_detected` の `uptime_ms` から `face_drawn` の `uptime_ms` まで（B − D）は 980、930、940、930、930 ms。最小 930、中央値 930、最大 980。`tap_confirmed` の行の console の時刻は、`tap_detected` の約 0.3 s 後。
+- 叩き終えた 11:17:48Z から、センサーの板に触れ始めた 11:19:33Z まで（約1分45秒）、`tap_detected` は0件。
+
+### #685（休憩・寝起き・温湿度）
+
+- しきい値は起動の直前の読み（温度 21.17 ℃、湿度 30.8 %）から置いた：`--companion-hot-on-c 22.2 --companion-hot-off-c 21.7 --companion-dry-on-pct 32.8 --companion-dry-off-pct 34.8 --companion-pressure-drop-on-hpa -1 --companion-pressure-drop-off-hpa -2 --companion-rest-interval-ms 120000`。
+- 1回目の起動（11:18:48Z）は `--speech-*` を付けておらず、吹き出しは送られなかった。指で温めて 11:20:24Z に温度 28.45 ℃、`set_expression` は Hot（11:20:24.67Z）。その 40 ms 後に触れた揺れの Dizzy を受け付け、Hot の顔は描かれず、Dizzy が描かれた。寝る時刻（20:22 JST）に Sleeping（`face_drawn` 11:22:00Z、ユーザーの目視でも寝顔）。
+- 2回目の起動（11:22:03Z）は `--speech-min-interval-ms 60000 --speech-duration-ms 5000` を足し、寝る 20:28・起きる 20:31 JST に置いた。表示時間 5000 ms は試験の値で、根拠は無い。
+  - 起動直後に吹き出し1回（11:22:08Z）。Hot と吹き出し（11:22:24Z）。Worried と吹き出しが 30 s の間隔で2回（11:22:54Z・11:23:24Z）。湿度と気圧のどちらの反応かは log で区別できていない。気圧の反応を見たとは言わない。
+  - 11:24〜11:27Z に1分ごとの吹き出し4回。休憩（120000 ms）の吹き出しと独り言の吹き出しは、log では区別できない。
+  - 20:28 JST に Sleeping と吹き出し、寝ている間（11:29〜11:30Z）は吹き出し0件、20:31 JST に Neutral と吹き出し。
+  - どの吹き出しも ESP32 で `text_drawn` になった。本文は目視していない。
+
+### #522（クラウドの独り言）
+
+- Pi の Wi-Fi は OS 標準の接続（`wlan0` が connected）。
+- `deskcatd` を `systemd-run`（`LoadCredential` で鍵を渡す。unit は変えていない）で、`--speech-min-interval-ms 60000 --speech-duration-ms 5000 --cloud-speech` を付けて 11:32:54Z〜11:36:54Z に起動した。
+- 吹き出しは1分ごとに4回、ESP32 で `text_drawn`（12・17・17・19 文字）。`cloud_speech: …; local fallback` の warn は0件。終了時の counter は SIGTERM で止めたため出ていない。4回のうち休憩の吹き出しが混じるかは区別できない。本文は目視していない。
+
+### 窓の終わり
+
+- 信号線の2本を抜き、Pi を poweroff し、Pi の電源の線、ESP32 の USB、LCD の VCC の線を抜いた。起動は4回（USB を挿したとき、書き込みの後、console を開いたとき、RTS の reset）。`panic`・`brownout` は0件。
+
 ## Revision履歴
 
 | 日付 | Revision | 変更 | 根拠 |
@@ -6277,3 +6318,4 @@ ESP32 の uptime と Pi の時刻は、同じ `set_expression` の id（`id=4`�
 | 2026-11-22 | 77 | [#683](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/683)。**`EXP-066`の導入に、実行方式の判断の置き場所（[ADR-0028](../decisions/0028-keep-single-runner-and-single-main-loop.md)）への link を足した。**`EXP-066` の Pi の serial の表に、同じ生の log から `read_idle_max_us` の列と、`step` が 1 s を超えた行での1回の呼び出しの最大を足した。それ以外の記録の内容は変えていない。判断は ADR に置いた | ADR-0028（判断の材料は `EXP-066` の記録）。`read_idle_max_us` の値は、repository の外の `deskcat-evidence/windows-20261120-066/` の `deskcatd-066-c0.log`〜`c4.log` の `link_wait` の行 |
 | 2026-11-22 | 78 | [#514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)。**`EXP-069`を追加した。**`no-touch-487,led-no-touch-514`（develop `addf99e`）を Pi とつなぎ、白の点滅・点灯・Pi を止めた後の点滅への戻りと、赤の `happy` での約1秒の点灯を見た窓の記録。拒否された `happy` は実機で確かめていない | 窓（2026-11-22）の UART0 の log、Pi の `deskcatd` の log、ユーザーの申告（LED と LCD の目視、配線の目視） |
 | 2026-11-22 | 79 | [#18](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/18)。**`EXP-068`を追加し、冒頭の一覧表に行を足した。**[PR #774](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/774) の段2の手を入れる前に待つ時間を、段1の範囲（ホーンなし、校正 build 90°〜105°）で測った2回の窓。PSU の出力 OFF と ESP32 の USB を抜く条件で、servo の端が 0.00 になるまで 27.64 s と 25.39 s。EN ボタンを押しても EN が 3.30 V のままで ESP32 が reset されなかったことと、その切り分けの読み、窓1の最初の出力 ON で 0.02 V・0.070 A・CC 点灯になり直ちに出力を OFF にしたことも記録した | 2026-11-21〜22 の実機の窓（`deskcat-evidence/windows-20261121-774d/`、`windows-20261122-774d/`） |
+| 2026-11-22 | 81 | [#22](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/22)・[#685](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/685)・[#522](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/522)。**`EXP-071`を追加した。**叩いて驚くまでの時間と誤反応、休憩・寝起き・温湿度の反応、クラウドの独り言を見た窓の記録 | 窓（2026-11-22）の UART0 の log、Pi の `deskcatd` の log と journal、ユーザーの申告（目視） |
