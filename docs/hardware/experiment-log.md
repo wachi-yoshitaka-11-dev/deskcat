@@ -6217,7 +6217,7 @@ ESP32 の uptime と Pi の時刻は、同じ `set_expression` の id（`id=4`�
 ### #685（休憩・寝起き・温湿度・気圧）
 
 - しきい値は起動の直前の読み（温度 21.17 ℃、湿度 30.8 %）から置いた：`--companion-hot-on-c 22.2 --companion-hot-off-c 21.7 --companion-dry-on-pct 32.8 --companion-dry-off-pct 34.8 --companion-pressure-drop-on-hpa -1 --companion-pressure-drop-off-hpa -2 --companion-rest-interval-ms 120000`。
-- 1回目の起動（11:18:48Z）は `--speech-*` を付けておらず、吹き出しは送られなかった。指で温めて 11:20:24Z に温度 28.45 ℃、`set_expression` は Hot。触れた揺れで 10 s 後に Dizzy・Surprised に置き換わった。寝る時刻（20:22 JST）に Sleeping（`face_drawn` 11:22:00Z、ユーザーの目視でも寝顔）。
+- 1回目の起動（11:18:48Z）は `--speech-*` を付けておらず、吹き出しは送られなかった。指で温めて 11:20:24Z に温度 28.45 ℃、`set_expression` は Hot（11:20:24.67Z）。その 40 ms 後に触れた揺れの Dizzy を受け付け、Hot の顔は描かれず、Dizzy が描かれた。寝る時刻（20:22 JST）に Sleeping（`face_drawn` 11:22:00Z、ユーザーの目視でも寝顔）。
 - 2回目の起動（11:22:03Z）は `--speech-min-interval-ms 60000 --speech-duration-ms 5000` を足し、寝る 20:28・起きる 20:31 JST に置いた。表示時間 5000 ms は試験の値で、根拠は無い。
   - 起動直後に吹き出し1回（11:22:08Z）。Hot と吹き出し（11:22:24Z）。Worried と吹き出しが 30 s の間隔で2回（11:22:54Z・11:23:24Z）。
   - 11:24〜11:27Z に1分ごとの吹き出し4回。休憩（120000 ms）の吹き出しと独り言の吹き出しは、log では区別できない。
@@ -6228,7 +6228,7 @@ ESP32 の uptime と Pi の時刻は、同じ `set_expression` の id（`id=4`�
 
 - Pi の Wi-Fi は OS 標準の接続（`wlan0` が connected）。
 - `deskcatd` を `systemd-run`（`LoadCredential` で鍵を渡す。unit は変えていない）で、`--speech-min-interval-ms 60000 --speech-duration-ms 5000 --cloud-speech` を付けて 11:32:54Z〜11:36:54Z に起動した。
-- 吹き出しは1分ごとに4回、ESP32 で `text_drawn`（17・17・19 文字）。`cloud_speech: …; local fallback` の warn は0件。終了時の counter は SIGTERM で止めたため出ていない。4回のうち休憩の吹き出しが混じるかは区別できない。本文は目視していない。
+- 吹き出しは1分ごとに4回、ESP32 で `text_drawn`（12・17・17・19 文字）。`cloud_speech: …; local fallback` の warn は0件。終了時の counter は SIGTERM で止めたため出ていない。4回のうち休憩の吹き出しが混じるかは区別できない。本文は目視していない。
 
 ### 窓の終わり
 
