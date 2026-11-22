@@ -20,7 +20,7 @@
 ## 判断要因
 
 - 期限に対する待ちの大きさ。比べる期限は次のとおり。いずれも値の根拠はそれぞれの正本が持つ。ここへ新しい値は置かない。
-  - ESP32：`HEARTBEAT_PERIOD_MS`（1000 ms）、`HEALTH_SNAPSHOT_PERIOD_MS`（10000 ms）、task WDT の timeout（5 s。`sdkconfig.defaults` は設定せず、ESP-IDF の既定値。値は生成された `sdkconfig` の `CONFIG_ESP_TASK_WDT_TIMEOUT_S` と EXP-060 の log の `timeout_s=5` による）、`LINK_LOSS_TIMEOUT_MS`（7000 ms。[HW-TBD-017](../hardware/tbd-register.md)。#784 で置いた値であり、実機の確認は済んでいない）。
+  - ESP32：`HEARTBEAT_PERIOD_MS`（1000 ms）、`HEALTH_SNAPSHOT_PERIOD_MS`（10000 ms）、`LINK_LOSS_TIMEOUT_MS`（7000 ms。[HW-TBD-017](../hardware/tbd-register.md)。#784 で置いた値であり、実機の確認は済んでいない）。
   - Pi：ESP32 の `LINK_LOSS_TIMEOUT_MS` に対する、Pi からの frame の到着の間隔。
 - 期限超過・取りこぼしの有無（`overrun_ticks`、rx の取りこぼし、`pi_link_lost`、task WDT、`panic`）。
 - 待ちの所在が分かっているか。**所在が分からないまま分けても、直るとは言えない。**
@@ -38,7 +38,7 @@
 
 利点：`step` のうち serial 以外の処理が長く止まるなら、その間も受信を読み続けられる。
 
-コスト：Pi の待ちの長い窓（約 1.1〜2.5 s）で、serial の read／write／flush の呼び出しは最大でも 59 ms（read）、21 ms（write）、50 ms（flush）だった。**2.5 s の `step` は、serial の呼び出しが占めていない。**止まりが `step` の serial 以外の処理にあるのか、process が動けていないのかは、まだ分けていない。後者なら、I/O を別 thread にしても同じ負荷で同じ止まりが起きうる。
+コスト：Pi の待ちの長い窓（約 1.1〜2.5 s）で、serial の data を返した read と write／flush の呼び出しは最大でも 59 ms（read）、21 ms（write）、50 ms（flush）だった。data の無い poll の待ち（`read_idle`）の最大は記録に無く、2.5 s の `step` を serial の呼び出しが占めているかどうかは分からない。止まりが `step` の serial 以外の処理にあるのか、process が動けていないのかは、まだ分けていない。後者なら、I/O を別 thread にしても同じ負荷で同じ止まりが起きうる。
 
 ### 選択肢C：ESP32 を、`std::thread` で task に分ける
 
@@ -52,14 +52,14 @@
 
 ### ESP32：維持
 
-EXP-066 の5つの条件で、ESP32 の `health` の行（174行）の `overrun_ticks`、`pi_uart_rx_buffer_full`、`pi_uart_rx_fifo_overflow` は**すべて 0** だった。`max_read_gap_ms` の最大は、条件0から順に 86、90、91、107、109 ms で、`HEARTBEAT_PERIOD_MS`（1000 ms）の約 1/9、task WDT の timeout（5 s）の約 1/46 に当たる。`heartbeat_overrun`、`health_snapshot_overrun`、`task_watchdog`、`panic` の行は出なかった。LCD の描画、センサーの読み出し、B3 を叩く・揺らす操作、Pi の負荷を同時に掛けた条件4でも、`max_read_gap_ms` は 109 ms で、他の数は 0 のままだった。
+EXP-066 の5つの条件で、ESP32 の `health` の行（174行）の `overrun_ticks`、`pi_uart_rx_buffer_full`、`pi_uart_rx_fifo_overflow` は**すべて 0** だった。`max_read_gap_ms` の最大は、条件0から順に 86、90、91、107、109 ms で、`HEARTBEAT_PERIOD_MS`（1000 ms）の約 1/9 に当たる。`heartbeat_overrun`、`health_snapshot_overrun`、`task_watchdog`、`panic` の行は出なかった。LCD の描画、センサーの読み出し、B3 を叩く・揺らす操作、Pi の負荷を同時に掛けた条件4でも、`max_read_gap_ms` は 109 ms で、他の数は 0 のままだった。
 
 この条件では、main loop が heartbeat・health snapshot・受信を読みに行く間隔の期限を脅かす待ちは測れなかった。分ける根拠が無い。
 
 ### Pi：維持（待ちの所在は未分離）
 
 - 負荷の無い条件0〜2で、`step_max_us` の最大は 80503〜82762 µs、serial の `read_data_max_us` は最大 46814 µs だった。
-- Pi に CPU の負荷（`yes`）とディスクの同期書き込み（`dd ... conv=fdatasync` のくり返し）を掛けた条件3・4では、`step_max_us` が 2505263 µs（条件3）、1745795 µs（条件4）まで伸びた。条件3・4を通した serial の呼び出しの最大は、read 58944 µs、write 20798 µs、flush 49639 µs だった。
+- Pi に CPU の負荷（`yes`）とディスクの同期書き込み（`dd ... conv=fdatasync` のくり返し）を掛けた条件3・4では、`step_max_us` が 2505263 µs（条件3）、1745795 µs（条件4）まで伸びた。条件3・4を通した serial の呼び出しの最大は、data を返した read 58944 µs、write 20798 µs、flush 49639 µs だった。
 - ESP32 側で `window_max_ms` が 2000 ms を超えた行（条件3で9行、条件4で5行）は、**すべて**、約 1.1〜2.5 秒の `step_max_us` を持つ Pi の窓と重なった（10秒の窓の粒度。逆は成り立たない）。Pi の止まりは、Pi からの frame の到着の間隔に出る。
 - その間隔の定常の最大は 3380 ms で、`LINK_LOSS_TIMEOUT_MS`（7000 ms）に収まる。EXP-066 の build（`befc02d`）にはこの見張りがまだ無く（値は `None`）、`pi_link_lost` を出す経路も無かったので、検知そのものは確かめていない。起動からの累計の最大（4104〜4893 ms）は、4回とも ESP32 の `boot` の送り直しと Pi の `hello` の位置関係で決まる1件で、定常の値ではない。
 
