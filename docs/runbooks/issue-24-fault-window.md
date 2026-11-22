@@ -76,7 +76,7 @@ ESP32 の `status.protocol` の counter は、**今の firmware では増えな�
 | parser の拒否 | `pi_rx_invalid_utf8`、`pi_rx_decode_rejected code=<code>`、`pi_rx_oversize_line` の行を数える | 行の数と `link_stress.py` の「送った数」を突き合わせる |
 | bus（I2C） | `tap_read_failed … consecutive=`、`tap_disabled`、`env_fault kind=i2c_timeout／i2c_other`（`count=`） | `ACCEL-01` と `ENV-01` は同じ bus（EXP-065） |
 | sensor | `env_reading`、`env_event_stale_dropped`、`env_event_superseded`、`env_fault kind=…`、`tap_detected`／`tap_confirmed` | 欠測は fault として数える |
-| Pi からの受信の途切れ（loss timeout 7000 ms） | **ESP32 の log には出ない。**`pi_link_lost` は servo の経路がある build だけが出し（`check_link` は servo が無いと戻る）、この build は servo を作らない。表示で見えるのは、白 LED が付く `no-touch-487,led-no-touch-514`（Power Budget は可。実機では動かしていない。窓の承認の問いに含めるなら PM が決める） | Pi 側は `deskcatd` の終了行と `ping` の拒否の warn |
+| Pi からの受信の途切れ（loss timeout 7000 ms） | **ESP32 の log には出ない。**`pi_link_lost` は servo の経路がある build だけが出し（`check_link` は servo が無いと戻る）、この build は servo を作らない。表示で見えるのは、白 LED が付く `no-touch-487,led-no-touch-514`（Power Budget は、**`touch` の `T_CS` を挿した配線に限り**可。挿さない配線では不可で、この窓の配線が `T_CS` を挿したものかは EXP-065 の記録に無く、確かめていない。実機では動かしていない。窓の承認の問いに含めるなら PM が決める） | Pi 側は `deskcatd` の終了行と `ping` の拒否の warn |
 | queue（Pi 側の送信） | `deskcatd` の終了行 `session: SessionCounters { dropped_out, discarded_on_disconnect, disconnects, reconnect_attempts, timeouts, retries, … }` | `peer:` に `session_switches`、`stale_sessions`、`unapproved_hello_acks` など |
 | queue（ESP32 側） | **観測できない。**firmware に queue の深さの counter が無い | 未確認に残す |
 | memory | **記録できない。**空き heap と stack の残量は `mem-probe-23` の build だけが出し、その構成は通電不可（Power Budget。承認が要る）で、`no-touch-487` と併用できない（`compile_error!`） | 製品 build に出すには `unsafe`（製品は `forbid(unsafe_code)`）が要り、この作業では足さない。**#23 の窓の記録（mem-probe 付き）を指すだけで、この窓の根拠にしない** |
@@ -173,8 +173,8 @@ host の `stress.rs` は、**同じ種類の入力**（分類済みの不正な�
 
 **`deskcatd` を止めてから行う**（`sudo systemctl stop deskcatd`。Pi の再起動後は本番の service が自動で起動していないか
 `systemctl is-active deskcatd` で確かめる）。`link_stress.py` と、それが読む fixture（`crates/deskcat-protocol/tests/fixtures/`）を
-Pi か PC に置く。**Pi に置く場合は、Pi の UART（`/dev/serial0`）を使う。PC の USB serial は ESP32 の UART0（debug）であり、
-Pi link ではない。**
+**Pi に置き、Pi の UART（`/dev/serial0`）を使う。**PC の USB serial は ESP32 の UART0（debug）であり、Pi link ではない
+（PC から流しても Pi link の受信は試さない）。
 
 ```bash
 python3 scripts/link_stress.py --mode corpus --port <device> --baud 115200
@@ -184,8 +184,8 @@ python3 scripts/link_stress.py --mode newline-free --count 64 --port <device> --
 python3 scripts/link_stress.py --mode flood --count 2000 --port <device> --baud 115200
 ```
 
-`--count` は出発点であり、確定値ではない。**1 回ごとに ESP32 の log の拒否の行の数を数え、script が表示する `sent_lines`
-と突き合わせる。**3.3 の 1〜3 を判定する。`flood` は baud が上限の速さで送る。溢れが出た場合は、`--count` を半分にして
+`--count` は出発点であり、確定値ではない。**1 回ごとに ESP32 の log の拒否の行の数を数え、script が表示する `expected_rejections`
+と突き合わせる（`corpus`・`noise`・`oversize` は送った行の数、`newline-free` は 1、`flood` は 0）。**3.3 の 1〜3 を判定する。`flood` は baud が上限の速さで送る。溢れが出た場合は、`--count` を半分にして
 同じ手順を繰り返し、溢れない最大を記録する（測定値であり、上限の決定ではない）。
 
 終わったら `sudo systemctl start deskcatd` し、手順 1 の基線の確認をやり直す。

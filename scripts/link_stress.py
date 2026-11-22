@@ -109,6 +109,15 @@ def build_payload(mode, count, sid):
     raise ValueError(mode)
 
 
+def expected_rejections(mode, payload):
+    """ESP32 が拒否の行を出すと予想する数。wire 上の行ではなく、拒否の対象の数で数える。
+
+    `newline-free` は 1 行（`line_too_long` が 1 度）、`flood` は有効な行だけなので 0。
+    """
+    return {"corpus": len(payload), "noise": len(payload), "oversize": len(payload),
+            "newline-free": 1, "flood": 0}[mode]
+
+
 def open_port(path, baud):
     import termios
     import tty
@@ -217,7 +226,10 @@ def run(args):
     recovered = PROBE_ID in reader.ok_reply_tos
 
     elapsed = time.monotonic() - started
-    print(f"mode={args.mode} sent_lines={len(payload)} sent_bytes={sent_bytes} elapsed_s={elapsed:.1f}")
+    print(
+        f"mode={args.mode} sent_items={len(payload)} expected_rejections={expected_rejections(args.mode, payload)} "
+        f"sent_bytes={sent_bytes} elapsed_s={elapsed:.1f}"
+    )
     print(f"received_types={json.dumps(reader.counts, sort_keys=True)}")
     print(f"received_acks={json.dumps(reader.acks, sort_keys=True)} unparsed_lines={reader.unparsed}")
     print(f"recovered={'yes' if recovered else 'no'}")
