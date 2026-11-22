@@ -14,8 +14,7 @@
 //! の失敗）は、**加速度なしでservoだけを続ける**（`accel_log_18_not_started`を出す）。優先度とcoreを決められないままthreadを
 //! 起こさない。**実機での影響は確かめていない。**確かめる材料は、同じ値の校正buildを加速度なしで動かした回の`servo_calib_18_motion_done`の
 //! `tick_min_ms`／`tick_max_ms`と、`servo_calib_18_session_end`の`interval_rejections`（各tickの間隔、または`Limiter`へ渡す窓の間隔が許容幅の外でrejectされてlatchした回数。latchで回が終わるので、
-//! 1回の起動で最大1）を、この build の回と並べることである。**校正buildにはhealth snapshotが無く、`overrun_ticks`は出ない**
-//! （`overrun_ticks`は`crate::health`のcounterで、Pi linkを持つbuildだけが出す）。上の2つがその代わりである。
+//! 1回の起動で最大1）を、この build の回と並べることである。**校正buildにはheartbeat loopもhealth snapshotも無く、`overrun_ticks`は出ない。**上の2つがその代わりである。
 //!
 //! I2Cのbus（`GPIO25`＝SDA、`GPIO26`＝SCL）はこのthreadだけが持つ（校正buildはI2Cを他に使わない）。
 //! ISRからは呼ばない（I2Cはblockする。ここはthreadで、ISRではない）。
@@ -47,7 +46,7 @@
 //!
 //! - **実機では動かしていない。**host testは無い（firmware crateはhostで動かせない）。復号・設定値は`deskcat_accel`のhost testが持つ。
 //! - 別threadの優先度・core固定が、servoの周期（`tick_min_ms`／`tick_max_ms`）に影響しないこと。
-//! - 1行のlogがUART0（115200 baud想定）へ出る時間。poll 1回の読み出しが最大8件のとき1行は約250 byteで、連続して出すと、
+//! - 1行のlogがUART0（115200 baud想定）へ出る時間。poll 1回の読み出しが最大8件のとき、1行が長くなり、連続して出すと、
 //!   他のthreadのlogを遅らせうる（main taskは動作中にlogを出さない）。
 //! - warm-upの件数は`accel_sample`と同じ一般値であり、安全要件の5項目に効かない。
 
