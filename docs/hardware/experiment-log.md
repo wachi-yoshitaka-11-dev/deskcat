@@ -6084,7 +6084,7 @@ ESP32 の uptime と Pi の時刻は、同じ `set_expression` の id（`id=4`�
 | Date | 2026-11-22（UTC 00:51〜01:39。日本時間では 09:51〜10:39） |
 | Operator | 線の抜き挿し（USB、Pi の電源、LCD の VCC、Pi との UART の2本）、LED と LCD の観察、配線の目視はユーザー。build、書き込み、console と Pi の記録、Pi の本番 service の停止、`deskcatd` の起動と停止、Pi の poweroff は実機側の PM（AI） |
 | 承認 | 承認があった：承認者 wachi-yoshitaka-11-dev、2026-11-22T00:20Z ごろ、実機側の PM のセッション。範囲は、AI の問い「VM 側の PM の指示により、#514 の確認4として、develop（addf99e）の no-touch-487,led-no-touch-514 を ESP32 に書き込み、Pi をつないで deskcatd から happy と neutral を交互に送り、白と赤の LED を見る窓を、今行ってよいですか？（servo は動かさず、PSU の電源プラグは抜いたまま）」 |
-| Hardware revision／Exact components | `MCU-01`、`DISP-01`（LCD の VCC の線を B2 の a1 に挿した）、`ACCEL-01`・`ENV-01`、`SBC-01`、`LED-COMM-01`（白）・`LED-REACT-01`（赤）の2枝（[EXP-052](#exp-052-組み直した3枚の板で初回通電しbringup-led-514のled点灯と導通を取った)で組んだまま。ユーザーの申告）。`touch` の `T_CS`（B2 a10）は挿さっていた（ユーザーの申告）。Pi との線は `X1`（紫）、`X2`（青）、`X3`（黒）、`S21`（黄）、`S22`（橙）。`S21`・`S22` は、窓の始めに B1 の F1・F2 の側を抜き、Pi と ESP32 の両方に電源が入った後に挿し、電源を切る前に抜いた。`PSU-BENCH-01` は電源プラグを抜いたまま |
+| Hardware revision／Exact components | `MCU-01`、`DISP-01`（LCD の VCC の線を B2 の a1 に挿した）、`ACCEL-01`・`ENV-01`、`SBC-01`、`LED-COMM-01`（白）・`LED-REACT-01`（赤）の2枝（[EXP-052](#exp-052-組み直した3枚の板で初回通電しbringup-led-514のled点灯と導通を取った)で組んだまま。ユーザーの申告）。`touch` の `T_CS`（B2 a10）は挿さっていた（ユーザーの申告）。Pi との線は `X1`（紫）、`X2`（青）、`X3`（黒）、`S21`（黄）、`S22`（橙）。`S21`・`S22` は、窓の始めに B1 の F1・F2 の側を抜き、Pi と ESP32 の両方に電源が入った後に挿し、電源を切る前に抜いた。抜き差ししたのは F1・F2 の側で、[配線表](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/hardware/breadboard-rebuild/wiring-table.md)の S21・S22 の行が定める K23・K26 の側ではない（どちらも ESP32 の板の側の端）。`PSU-BENCH-01` は電源プラグを抜いたまま |
 | Firmware | `no-touch-487,led-no-touch-514`、develop `addf99e`（fmt・clippy `-D warnings`・build を通した）。ELF sha256 `81c68cbb7d648bfc7759301525f86fea513d94f9f0eb731ed92880cb466885b7`（起動 log の先頭9桁 `81c68cbb7` と一致）。書き込みは1回 |
 | Pi software | develop `addf99e` の `deskcatd` を Pi で build（`cargo build --release --locked -p deskcatd`。検証済みコマンドではない）。sha256 `7d5ff6c2cd1825dd64cde806e9b37fa6ea259ed0c4adda732b953e333acb54b6`。引数は unit と同じもの（`--port /dev/serial0 --baud 115200 --duplicate-capacity 8 --duplicate-retention-ms 5000 --startup-deadline-ms 10000`）に、`--no-companion --probe-expression happy --probe-interval-ms 3000 --verbose` を足して手で起動した。本番の service は窓の始めに failed で止まっていた（`systemctl stop` も送った） |
 | Power supply and current limit | ESP32 はこの端末の USB。Pi は別の電源で、ESP32 とは UART の2本と GND だけでつないだ。電流・電圧・温度は測っていない |
@@ -6109,7 +6109,7 @@ ESP32 の uptime と Pi の時刻は、同じ `set_expression` の id（`id=4`�
 
 ### 確かめていないこと（主張しないこと）
 
-- 拒否された `happy` で赤が点かないこと（この窓では拒否が起きなかった。VM 側の PM の判断で、実機では確かめない）。
+- `surprised` と、拒否された `happy` で赤が点かないこと（`surprised` は送っていない。拒否はこの窓では起きなかった。VM 側の PM の判断で、実機では確かめない）。
 - 白の点滅の周期と赤の点灯の長さの実測（目視と log の `hold_ms` だけ）。
 - `deskcatd` が SIGINT で止まらない原因。
 - LED の電流、電源 rail の電圧、発熱。
