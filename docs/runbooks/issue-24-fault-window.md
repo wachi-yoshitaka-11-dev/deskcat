@@ -40,7 +40,7 @@
 4. **Pi link をつなぐ試験として、ユーザーの別の承認が要る。**`信号線をつないでよい条件` の 3 は、つないでよい試験を列挙して限る
    （#446 の AC4、#11、#12、#13 の AC6、承認済みの #21 のデモと #23 の実機確認）。**#24 はその列挙に無い。**窓の前に、PM が
    #24 の試験を人間に訊いて承認を得て、正本へ足す（#21・#23 が先例）。**この runbook は列挙を広げず、承認の代わりにならない。**
-5. **配線は EXP-065 と同じ構成から変えない。**Pi との UART と GND の線を変えたら、通電前の確認をやり直す（`信号線をつないでよい条件` の 6）。センサーの信号線の抜き差し（手順 5）は、挿し先の目視と記録した位置との照合を行う。**それがセンサーの線の通電前の確認として足りるかを示す正本は確かめていない**ため、手順 5 を承認の問いに含め、人間が決める（立ち会いは Hardware Safety Policy §7）。
+5. **配線は、サーボの plug を抜くことを除き、EXP-065 と同じ構成から変えない。**サーボの plug は電源を切った状態で抜く（電源を足す変更ではない）。Pi との UART と GND の線を変えたら、通電前の確認をやり直す（`信号線をつないでよい条件` の 6）。センサーの信号線の抜き差し（手順 5）は、挿し先の目視と記録した位置との照合を行う。**それがセンサーの線の通電前の確認として足りるかを示す正本は確かめていない**ため、手順 5 を承認の問いに含め、人間が決める（立ち会いは Hardware Safety Policy §7）。
 6. **Pi の `deskcatd` は 1 つだけ動かす。**Pi を再起動すると本番の `deskcatd` service が自動で起動し、serial を
    取り合う（EXP-065 で起きた）。手順 6 の `link_stress.py` を使う前に `sudo systemctl stop deskcatd` する。
 7. **証拠は repository の外に置く**（ESP32 の log は MAC を含みうる）。記録に device 名、個人 path、SSID を残さない。
@@ -208,7 +208,7 @@ python3 scripts/link_stress.py --mode flood --count 2000 --port <device> --baud 
 | 症状 | 確認 | 対処 |
 |---|---|---|
 | `deskcatd` が `failed`（`Start request repeated too quickly`） | ESP32 の電源と信号線、ESP32 の `reset_reason` | 原因を取り除いた後、`sudo systemctl reset-failed deskcatd` → `sudo systemctl restart deskcatd`（EXP-024） |
-| `deskcatd` が起動するが ESP32 から 1 byte も届かない | 信号線の 2 本が Pi の pin 8・10 に挿さっているか（目視。EXP-065 で抜けていた）、GPIO15 を pull-down で読んで High か | ESP32 側の端は、電源の入った状態で挿し直してよい（操作 B）。Pi の header 側が抜けていた場合は、**先に信号線を ESP32 側で外し**、Pi を止めて（`poweroff`）から直す。直した後は `信号線をつないでよい条件` の 6（GND の導通測定と目視）をやり直し、両方の電源を入れてから信号線をつなぐ |
+| `deskcatd` が起動するが ESP32 から 1 byte も届かない | 信号線の 2 本が Pi の pin 8・10 に挿さっているか（目視。EXP-065 で抜けていた）、GPIO15 を pull-down で読んで High か（**この読み方は Pi の pin を UART の機能から外す。**読んだ後に UART の機能へ戻し〔EXP-065 は `a0` に戻した〕、`deskcatd` を起動し直すまで、症状は残る） | ESP32 側の端は、電源の入った状態で挿し直してよい（操作 B）。Pi の header 側が抜けていた場合は、**先に信号線を ESP32 側で外し**、Pi を止めて（`poweroff`）から直す。直した後は `信号線をつないでよい条件` の 6（GND の導通測定と目視）をやり直し、両方の電源を入れてから信号線をつなぐ |
 | ESP32 が `pi_rx_ack_sid_mismatch` を出す | 本番の service と手で起動した `deskcatd` が同じ port を開いていないか | 一方を止める（`systemctl stop deskcatd`） |
 | ESP32 が応答しない | UART0 の log が続いているか（`hb`）。止まっていれば ESP32 の USB、`reset_reason` | 信号線を ESP32 側で外し、EN ボタン。それで戻らなければ USB を抜き挿し（先に信号線を外す）。**原因が分からない停止は EXP-030 にもある。**log を残して PM へ |
 | `reset_reason` が予想した値（`power_on`／`external_pin`／`software`）以外 | その直前の log | **その窓を止める。**再通電しない。log と配線を記録して PM へ（brownout は電源の問題として人間の判断） |
