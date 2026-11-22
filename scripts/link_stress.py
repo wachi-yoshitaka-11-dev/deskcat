@@ -19,7 +19,7 @@ host の `crates/deskcat-protocol/tests/stress.rs` も同じ fixture を使う�
 - `newline-free`: 改行なしの byte を `--count` KiB 流してから改行を 1 つ送る。
 - `flood`   : `hello` の後に `get_status` を `--count` 行、間を空けずに（baud が上限）送る。
 
-どのモードも、最後に `get_status`（id=900000）を 1 件送り、その `ack: ok`（`reply_to` が一致）が `--probe-timeout-s` 以内に返れば復帰とみなす。`flood` は先に全応答を待つ（`--drain-timeout-s`。`drained=no` なら、確認の応答が滞留の後ろに並ぶだけの可能性があり、復帰の判定を保留する）
+どのモードも、最後に `get_status`（id=900000）を 1 件送り、その `ack: ok`（`reply_to` が一致）が `--probe-timeout-s` 以内に返れば復帰とみなす。`flood` は先に応答が止むのを待つ（送った id 全部の `ack: ok`、または `--quiet-s` の間 1 byte も届かない状態。上限は `--drain-timeout-s`）。`flood_acked=x/N` の N 未満は、要求が落ちた（受信の溢れ）ことを示す
 （終了 code 0）。返らなければ 1。**この復帰の確認は `hello` を前提にする**ため、`corpus` などでも先に `hello` を送る。
 
 **ESP32 の `status.protocol` の counter は firmware が増やさない**（`firmware/esp32/src/pi_link.rs`）。
@@ -144,6 +144,7 @@ class Reader:
         self.acks = {}
         self.status_seen = 0
         self.ok_reply_tos = set()
+        self.last_rx = time.monotonic()
         self.unparsed = 0
 
     def pump(self, wait_s=0.0):
@@ -155,6 +156,7 @@ class Reader:
         except BlockingIOError:
             return
         self.buf += data
+        self.last_rx = time.monotonic()
         while b"\n" in self.buf:
             line, self.buf = self.buf.split(b"\n", 1)
             self.take(line)
@@ -214,14 +216,15 @@ def run(args):
     for item in payload:
         send(item)
     # 流し終えた応答を待つ。flood では、ESP32 の応答（ack と status）が要求より大きく、同じ baud で返るため、
-    # 全部の応答（送った id への ack: ok）が届くまで待つ。待てなかったら `drained=no` とし、復帰の判定を保留する。
+    # 応答が止むのを待ってから確認する。止む = 送った id 全部に ack: ok が届く、または `--quiet-s` の間 1 byte も届かない
+    # （受信の溢れで要求が落ちた場合は、前者にならない）。上限は `--drain-timeout-s`。
     flood_ids = {100 + i for i in range(args.count)} if args.mode == "flood" else set()
-    drained = True
     if flood_ids:
         end = time.monotonic() + args.drain_timeout_s
         while time.monotonic() < end and not flood_ids <= reader.ok_reply_tos:
             reader.pump(0.1)
-        drained = flood_ids <= reader.ok_reply_tos
+            if time.monotonic() - reader.last_rx >= args.quiet_s:
+                break
     else:
         end = time.monotonic() + 1.0
         while time.monotonic() < end:
@@ -243,7 +246,7 @@ def run(args):
     print(f"received_types={json.dumps(reader.counts, sort_keys=True)}")
     print(f"received_acks={json.dumps(reader.acks, sort_keys=True)} unparsed_lines={reader.unparsed}")
     if flood_ids:
-        print(f"flood_acked={len(flood_ids & reader.ok_reply_tos)}/{len(flood_ids)} drained={'yes' if drained else 'no'}")
+        print(f"flood_acked={len(flood_ids & reader.ok_reply_tos)}/{len(flood_ids)}")
     print(f"recovered={'yes' if recovered else 'no'}")
     os.close(fd)
     return 0 if recovered else 1
@@ -257,7 +260,8 @@ def main(argv=None):
     p.add_argument("--count", type=int, default=100, help="行数（newline-free は KiB）")
     p.add_argument("--sid", type=int, help="hello の sid。省くと実行ごとにランダムに選ぶ（ESP32 は置き換えられた sid を retired として覚え、その sid の hello を stale_session で拒否するため）")
     p.add_argument("--probe-timeout-s", type=float, default=5.0)
-    p.add_argument("--drain-timeout-s", type=float, default=300.0, help="flood の全応答を待つ時間（応答は要求より大きい）")
+    p.add_argument("--drain-timeout-s", type=float, default=300.0, help="flood の応答を待つ時間の上限（応答は要求より大きい）")
+    p.add_argument("--quiet-s", type=float, default=10.0, help="flood で、この間 1 byte も届かなければ応答が止んだとみなす")
     p.add_argument("--dump", action="store_true")
     args = p.parse_args(argv)
     if not args.dump and not (args.port and args.baud):

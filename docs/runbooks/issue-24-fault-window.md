@@ -101,7 +101,7 @@ ESP32 の `status.protocol` の counter は、**今の firmware では増えな�
 **したがって数の上限で合否を決めない。**合格 = 次の 3 つ。
 
 1. ESP32 が止まらない・再起動しない（`reset_reason` の行が増えない。`hb` の行が続く）。
-2. 入力を流し終えた後に、確認の `get_status` に `ack: ok` が返る（`link_stress.py` が `recovered=yes`。確認の `id` への応答だけで判定する）。**`flood` は `drained=yes`（送った全部の `get_status` に `ack: ok` が返った）のときだけ判定する。**`drained=no` は、応答が滞留して確認の応答が間に合わなかっただけの可能性があり、復帰の成否を示さない（`--count` を減らして繰り返す）。応答は要求より大きい（fixture の行長で見積もると 8 倍前後。実測していない）。
+2. 入力を流し終えた後に、確認の `get_status` に `ack: ok` が返る（`link_stress.py` が `recovered=yes`。確認の `id` への応答だけで判定する）。**`flood` は、応答が止むのを待ってから確認を送る**（ESP32 の応答は要求より大きい。fixture の行長で見積もると 8 倍前後で、実測していない）。`flood_acked=x/N` は記録する（N 未満は要求が落ちた。受信の溢れの測定値）。判定は `recovered` で行う。
 3. 拒否の行の数が、流した不正な行の数と一致する（`corpus`、`noise`、`oversize`）。**ただし UART の受信が溢れた場合は一致しない**
    （`pi_uart_rx_buffer_full` などが増える）。溢れた rate と回数を**測定値として記録する**。溢れ自体は不合格にしない
    （流量制限が未実装で、溢れは予想される）。溢れの後に 1・2 が成り立つことを見る。
