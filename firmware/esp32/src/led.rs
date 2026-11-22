@@ -1,14 +1,14 @@
 //! [Issue #514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)の追加LEDの
 //! bring-up。`LED-COMM`（白、GPIO2）と`LED-REACT`（赤、GPIO5）を駆動する。どちらもHighで点灯する。
 //!
-//! **製品build（featureなし）と`bringup-led-514` feature付きbuildがcompileする（`no-touch-487`は持たない）。**それ以外の試験buildは
+//! **製品build（featureなし）、`link-gap-20`単独、`no-touch-487,led-no-touch-514`、`bringup-led-514` feature付きbuildがcompileする（`no-touch-487`単独は持たない）。**それ以外の試験buildは
 //! GPIO2／GPIO5に触れない。点灯試験（下の1）を行うのは`bringup-led-514`付きbuildだけで、製品buildは
 //! 点灯試験を行わない。配線、抵抗、起動時の電位、試験の順序は
 //! [led-514-demo.md](../../../docs/hardware/led-514-demo.md)が正本であり、ここへ再掲しない。
 //!
 //! # 表示
 //!
-//! 起動時のbring-upが終わった時刻（`main.rs`の`bringup_done_ms`）からの経過時間だけで決める
+//! 起動時のbring-upが終わった時刻（`main.rs`の`bringup_done_ms`）からの経過時間と、Piからの受信の見張りの状態で決める
 //! （[`outputs_at`]）。その後のPi linkのUART初期化と`boot`送信の分だけ、最初の区間が短くなる。
 //! `bringup-display-13`付きbuildでは、LCDの描画とI2Cのbring-upがmain loopの中で進み、点灯試験は
 //! それと並行して進む。
@@ -16,18 +16,19 @@
 //! 1. 点灯試験（`bringup-led-514`付きbuildだけ）。赤だけ→白だけ→両方を、それぞれ
 //!    [`crate::config::LED_LAMP_TEST_HOLD_MS`]ずつ点ける。人間が極性・明るさ・抵抗の両端電圧を確かめる
 //!    ための区間である。製品buildにこの区間は無く、起動直後から2へ入る。
-//! 2. その後は、白を[`crate::config::LED_BLINK_PERIOD_MS`]周期で点滅させ、赤を消す。
+//! 2. その後は、白を、Piからの受信の見張りが生きている間（`crate::pi_link::PiLink::link_alive`）は点け、
+//!    それ以外は[`crate::config::LED_BLINK_PERIOD_MS`]周期で点滅させる。赤は消す。
 //! 3. **赤の反応。**Piの`set_expression`で`happy`を受理したら、赤を[`crate::config::LED_REACT_PULSE_MS`]
 //!    だけ点けて消す（[`Leds::pulse_react`]）。受理は`crate::pi_link`の判定を通った後であり
 //!    （session・値の範囲・LCDの準備。拒否された`happy`では点かない）、`crate::face::FaceState`が
 //!    `happy`の受理を1回分覚える。点灯中にもう一度受理したら、その時刻から数え直す。
 //!
-//! **白を点灯（通信成立）へ切り替える経路は無い。**`BootSession::is_established`は`boot`のACKで一度
-//! 立つと、`hello`による遷移か終端まで下りない。Piが止まっても下りないため、点灯に使うと
-//! 通信喪失を点滅で示せず、「通信正常」を誤って示す。喪失を決めるには時間の値（heartbeatとloss timeout。
-//! `PROTO-TBD-010`／`HW-TBD-017`）が要り、サーボの安全にも効くため、ここでは作らない。
-//! 白の点滅は「成立と継続を確認できていない」の表示であり、点灯が無いことを通信の異常と読まない。
-//! `HW-TBD-037`が追う。
+//! **白の点灯は`BootSession::is_established`では決めない。**それは`boot`のACKで一度立つと、`hello`による
+//! 遷移か終端まで下りず、Piが止まっても下りないためである。点灯は`PiLink::link_alive`（`LinkWatch::is_alive`）で
+//! 決める。見張りは`boot`の確立から始まり、最後に受信してから`LINK_LOSS_TIMEOUT_MS`が過ぎると点滅へ戻る。
+//! **読むだけで、途切れの判定とservoのstopは変えない**（それは`PiLink::check_link`が行う）。
+//! heartbeatの方式（`PROTO-TBD-010`）は案である。白の点滅は「成立と継続を確認できていない」の表示であり、
+//! 点灯が無いことを通信の異常と読まない。実機での確認は`HW-TBD-037`が追う。
 //!
 //! # 起動からの状態
 //!
@@ -64,6 +65,8 @@ pub enum Phase {
     LampBoth,
     /// 通信成立を確認できていない。白を点滅させ、赤を消す。
     LinkUnconfirmed,
+    /// Piからの受信の見張りが生きている（`crate::pi_link::PiLink::link_alive`）。白を点け、赤を消す。
+    LinkUp,
 }
 
 impl Phase {
@@ -74,6 +77,7 @@ impl Phase {
             Phase::LampWhite => "lamp_white",
             Phase::LampBoth => "lamp_both",
             Phase::LinkUnconfirmed => "link_unconfirmed",
+            Phase::LinkUp => "link_up",
         }
     }
 }
@@ -99,13 +103,17 @@ const LAMP_TEST_END_MS: u64 = if cfg!(feature = "bringup-led-514") {
 const _: () = assert!(LED_BLINK_PERIOD_MS >= 2 && LED_BLINK_PERIOD_MS % 2 == 0);
 const _: () = assert!(LED_LAMP_TEST_HOLD_MS > 0);
 
-/// 経過時間`elapsed_ms`での区間。
+/// 経過時間`elapsed_ms`での区間。`link_up`は`crate::pi_link::PiLink::link_alive`の値で、点灯試験の後だけ効く。
 // 製品buildは`LAMP_TEST_END_MS`が0で、`elapsed_ms >= 0`は常に真になる（点灯試験の区間を持たない意図どおり）。
 #[allow(clippy::absurd_extreme_comparisons)]
-pub fn phase_at(elapsed_ms: u64) -> Phase {
+pub fn phase_at(elapsed_ms: u64, link_up: bool) -> Phase {
     let hold = u64::from(LED_LAMP_TEST_HOLD_MS);
     if elapsed_ms >= LAMP_TEST_END_MS {
-        Phase::LinkUnconfirmed
+        if link_up {
+            Phase::LinkUp
+        } else {
+            Phase::LinkUnconfirmed
+        }
     } else if elapsed_ms < hold {
         Phase::LampRed
     } else if elapsed_ms < 2 * hold {
@@ -116,8 +124,8 @@ pub fn phase_at(elapsed_ms: u64) -> Phase {
 }
 
 /// 経過時間`elapsed_ms`での出力。点滅は点灯試験の終わりを位相の起点とし、前半を点灯にする。
-pub fn outputs_at(elapsed_ms: u64) -> Outputs {
-    match phase_at(elapsed_ms) {
+pub fn outputs_at(elapsed_ms: u64, link_up: bool) -> Outputs {
+    match phase_at(elapsed_ms, link_up) {
         Phase::LampRed => Outputs {
             white_on: false,
             red_on: true,
@@ -129,6 +137,10 @@ pub fn outputs_at(elapsed_ms: u64) -> Outputs {
         Phase::LampBoth => Outputs {
             white_on: true,
             red_on: true,
+        },
+        Phase::LinkUp => Outputs {
+            white_on: true,
+            red_on: false,
         },
         Phase::LinkUnconfirmed => {
             let period = u64::from(LED_BLINK_PERIOD_MS);
@@ -142,16 +154,20 @@ pub fn outputs_at(elapsed_ms: u64) -> Outputs {
 }
 
 /// `elapsed_ms`より後で、出力が次に変わる経過時間。main loopの待ちの上限に使う。
+/// 白を点けている間（`link_up`）は点滅が無いので`None`を返す。見張りが切れる時刻は呼び出し側が足す。
 // 製品buildは`LAMP_TEST_END_MS`が0で、`elapsed_ms < 0`は常に偽になる（`phase_at`と同じ）。
 #[allow(clippy::absurd_extreme_comparisons)]
-pub fn next_change_ms(elapsed_ms: u64) -> u64 {
+pub fn next_change_ms(elapsed_ms: u64, link_up: bool) -> Option<u64> {
     let hold = u64::from(LED_LAMP_TEST_HOLD_MS);
     if elapsed_ms < LAMP_TEST_END_MS {
-        return (elapsed_ms / hold + 1) * hold;
+        return Some((elapsed_ms / hold + 1) * hold);
+    }
+    if link_up {
+        return None;
     }
     let half = u64::from(LED_BLINK_PERIOD_MS / 2);
     let since = elapsed_ms - LAMP_TEST_END_MS;
-    LAMP_TEST_END_MS + (since / half + 1) * half
+    Some(LAMP_TEST_END_MS + (since / half + 1) * half)
 }
 
 /// 2本のLEDのdriver。
@@ -203,23 +219,25 @@ impl<'d> Leds<'d> {
         log::info!("led_react_pulse uptime_ms={now_ms} hold_ms={LED_REACT_PULSE_MS}");
     }
 
-    /// 次に`update`を呼ぶべきuptime。白の切り替えか赤の消灯の早い方。`start_ms`は`update`へ渡すものと同じ。
-    pub fn next_deadline_ms(&self, start_ms: u64, now_ms: u64) -> u64 {
+    /// 次に`update`を呼ぶべきuptime。白の切り替えか赤の消灯の早い方。どちらも無ければ`None`。
+    /// `start_ms`と`link_up`は`update`へ渡すものと同じ。見張りが切れる時刻は呼び出し側が足す。
+    pub fn next_deadline_ms(&self, start_ms: u64, now_ms: u64, link_up: bool) -> Option<u64> {
         let elapsed = now_ms.saturating_sub(start_ms);
-        let blink = start_ms + next_change_ms(elapsed);
-        match self.react_until_ms {
-            Some(until) if until > now_ms => blink.min(until),
-            _ => blink,
+        let blink = next_change_ms(elapsed, link_up).map(|change| start_ms + change);
+        let react = self.react_until_ms.filter(|until| *until > now_ms);
+        match (blink, react) {
+            (Some(blink), Some(react)) => Some(blink.min(react)),
+            (blink, react) => blink.or(react),
         }
     }
 
-    /// 起動からの経過時間`now_ms - start_ms`の出力をpinへ書く。`now_ms`はuptime。
+    /// 起動からの経過時間`now_ms - start_ms`と見張りの状態`link_up`の出力をpinへ書く。`now_ms`はuptime。
     ///
     /// 書き込みの失敗は数えてlogへ出し、次の呼び出しで書き直す。**表示のためにmain loopを止めない。**
-    pub fn update(&mut self, start_ms: u64, now_ms: u64) {
+    pub fn update(&mut self, start_ms: u64, now_ms: u64, link_up: bool) {
         let elapsed_ms = now_ms.saturating_sub(start_ms);
-        let phase = phase_at(elapsed_ms);
-        let mut out = outputs_at(elapsed_ms);
+        let phase = phase_at(elapsed_ms, link_up);
+        let mut out = outputs_at(elapsed_ms, link_up);
         // 赤の反応は区間の表示に重ねる。期限が過ぎたら消す。
         match self.react_until_ms {
             Some(until) if until > now_ms => out.red_on = true,

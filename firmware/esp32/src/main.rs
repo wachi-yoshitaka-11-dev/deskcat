@@ -39,7 +39,7 @@
 //!   詳細は[`crate::servo`]と[`run_servo_bench_test`]のdoc参照）。
 //! - **#514の追加LED（`LED-COMM`＝GPIO2、`LED-REACT`＝GPIO5）は`crate::led`が駆動する**
 //!   （[Issue #514](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/514)）。既定の製品buildは、
-//!   白の点滅（通信の成立と継続を確認できていない間の表示。点灯へ切り替える判定は無い）と、`set_expression`で
+//!   白の表示（Piからの受信の見張りが生きている間は点灯、それ以外は点滅）と、`set_expression`で
 //!   `happy`を受理したときの赤の1秒点灯を行う。`bringup-led-514` feature付きbuildは、その前に点灯試験
 //!   （赤→白→両方）を行う。このfeatureは`bringup-display-13`とも組み合わせられる（pinが重ならない）。
 //!   **実機で動かした記録は、点灯試験用のbuildだけである。**
@@ -64,8 +64,9 @@
 //! | `touch-sample-14` | `TOUCH-01`（XPT2046）の raw 読み出し。SPI3（GPIO18/23/19）、`TOUCH-CS`＝GPIO21、`TOUCH-IRQ`＝GPIO34 で X・Y・Z1・Z2 を読み、IRQ の level とあわせて UART0 に log（#14、`crate::touch`）。`T_IRQ` の変化の時刻と、console から受けた `MARK` の時刻も log する（条件 6 の突き合わせ用）。LCD は初期化せず、`LCD-CS`（GPIO22）を High に固定する。状態機械は配線しない | 単独指定のみ。touch 用 5 本を足した配線で、`EXP-038`（develop `79f29ea`。raw を取った）と `EXP-041`（develop `b9a04e8`。`T_IRQ` の変化と `MARK` の log、`crate::spi_port` の bus の持ち方を含む版で、`MARK` 31 件に `touch_mark` 31 件、SPI の失敗 0 件）の版を実機に書き込んで動かした。次の通電・書き込みにも実機側の新たな承認が要る。Pi link の payload は変更しない |
 //! | `touch-lcd-14` | LCDを初期化して点灯し、表情（neutral→happy→surprised）を帯1本ずつ塗り続けながら、同じSPI host（SPI3）で`TOUCH-01`のrawを読む（#14の受け入れ条件「LCD通信による許容できないdata lossがない」の観察用、`crate::touch_lcd`）。LCDとタッチは`SpiDriver`を共有し、busは転送ごとに取る。帯の途中ではタッチを読まない。console（stdin）は読まず、`MARK`は受け付けない（`T_IRQ`の変化は`touch-sample-14`と同じくlogする）。状態機械は配線しない | 単独指定のみ。**製品buildも同じ共有の型を使う。busを握り続ける型は`touch-sample-14`だけ**（`crate::spi_port`）。`set_expression`は`hardware_unavailable`で拒否する。`EXP-041`で、develop `b9a04e8`の版を、LCDのVCC・9本・touch用5本が挿さった配線に書き込み、157秒動かした（帯7000本、`lcd_errors_total=0`、`touch_spi_errors_total=0`、LCDの乱れは目視の申告に無い）。次の通電・書き込みにも実機側の新たな承認が要る。Pi linkのpayloadは変更しない |
 //! | `bringup-display-13` | LCDの初期化、backlightの点灯、単色fillと四隅pattern | 表情とtapは有効にしない。描画の間のPi linkの受信とheartbeatは`crate::display_test`のmodule docを参照 |
-//! | `no-touch-487` | 製品buildと同じ。ただし`TOUCH-CS`（GPIO21）は`IdleTouch`が出力Highにして保ち、touchを読まず、`head_touched`を送らず、LED（GPIO2・GPIO5）に触れない（#487） | 単独で使う。`build.rs`は`link-gap-20`とこのfeatureだけ製品経路のcfgから外さず、併用は`link-gap-20`以外を`compile_error!`で止める。通電の条件は`docs/hardware/power-budget.md`の`touchを読まない製品build（no-touch-487）の通電の条件` |
-//! | `bringup-led-514` | #514の追加LED（GPIO2／GPIO5）の点灯試験（赤→白→両方）と、その後の白の点滅（`crate::led`）。製品buildにある赤の`happy`点灯も同じ経路を持つ。このfeatureだけのbuildは表情を持たないため`set_expression`を受理せず、赤は点灯試験の区間だけ点く。`face-21`と組み合わせたbuildは`happy`を受理し、赤を1秒点ける（この併用は`compile_error!`で止めていない） | 表情とtapは有効にしない。`bringup-display-13`とも組み合わせられる |
+//! | `no-touch-487` | 製品buildと同じ。ただし`TOUCH-CS`（GPIO21）は`IdleTouch`が出力Highにして保ち、touchを読まず、`head_touched`を送らず、LED（GPIO2・GPIO5）に触れない（#487。`led-no-touch-514`と併せるとLEDだけを戻す） | 単独で使う。`build.rs`は`link-gap-20`・`led-no-touch-514`とこのfeatureだけ製品経路のcfgから外さず、併用はその2つ以外を`compile_error!`で止める。通電の条件は`docs/hardware/power-budget.md`の`touchを読まない製品build（no-touch-487）の通電の条件` |
+//! | `led-no-touch-514` | `no-touch-487`の製品buildに`crate::led`（GPIO2・GPIO5）だけを戻す（#514）。白は、Piからの受信の見張り（`crate::pi_link::PiLink::link_alive`。loss timeoutは`LINK_LOSS_TIMEOUT_MS`、見張りは`boot`の確立から始まる。[#20](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/20)）が生きている間は点灯し、それ以外は点滅する。赤は`happy`の受理で1秒点く（製品buildと同じ） | **`no-touch-487`と併せて使う**（`no-touch-487,led-no-touch-514`）。`build.rs`は製品経路のcfgから外さず、`deskcat_product_led`を出す。`no-touch-487`なし、またはそれ以外のfeature（`link-gap-20`を含む）との併用は`compile_error!`で止める。通電の条件は`docs/hardware/power-budget.md`の`touchを読まない製品build（no-touch-487）の通電の条件`。実機では動かしていない |
+//! | `bringup-led-514` | #514の追加LED（GPIO2／GPIO5）の点灯試験（赤→白→両方）と、その後の白の表示（`crate::led`）。製品buildにある赤の`happy`点灯も同じ経路を持つ。このfeatureだけのbuildは表情を持たないため`set_expression`を受理せず、赤は点灯試験の区間だけ点く。`face-21`と組み合わせたbuildは`happy`を受理し、赤を1秒点ける（この併用は`compile_error!`で止めていない） | 表情とtapは有効にしない。`bringup-display-13`とも組み合わせられる |
 //! | `face-21` | LCDの初期化とbacklightの点灯を保ち、`set_expression`の表情を描く。Pi commandを受けなくても、描ける状態になった時点で`neutral`を1回描く（#21、`crate::face`） | `bringup-display-13`とも組み合わせられる。**表情を持たない試験buildは`set_expression`を`hardware_unavailable`で拒否する** |
 //! | `tap-21` | ADXL345のtap検出を設定し、`INT_SOURCE`をI2Cで読み、bootのACK後に`tapped`を送る（#21のF1、`crate::tap`）。ADXL345のDevice IDが`0xE5`のときだけ設定を書き、I2Cのdriverを持ち続ける（一致しなければ何も書かず、driverを手放す） | INT線は使わない（配線は要らない）。`face-21`・`bringup-display-13`とも組み合わせられる。**試験buildのうち`tap-21`も`accel-sample-15`も持たないものは、ADXL345へ書き込まず、Device IDを読むだけである**（既定・製品buildは`tap-21`と同じく書く） |
 //! | `mem-probe-23` | health snapshotと同じ周期で、空きheap・起動からの最小の空きheap・main taskのstackのhigh water markを1行logへ出す（#23の`PROTO-TBD-007`、`crate::mem_probe`）。**このfeatureのbuildだけが`unsafe`を持つ**（`unsafe_code`を`deny`へ下げ、`mem_probe`の3呼び出しだけ`allow`） | logを足すだけで、LCD・Pi link・tapの挙動は変えない。featureを指定すると製品経路のcfgが外れるので、製品buildと同じ構成で測るときは`face-21`と`tap-21`を足す（タッチの撫での判定と`ENV-01`の周期測定・`environment`の送出は製品buildだけが持ち、この構成には入らない）。`bringup-display-13`とも組み合わせられる。単独の試験build（`env-sample-16`・`accel-sample-15`・`touch-sample-14`・`touch-lcd-14`）、`bringup-i2c-15-16`、`bringup-led-514`、`bench-servo-test-17`、`debug-motion-19`とは併用できない（`compile_error!`） |
@@ -201,9 +202,19 @@
     allow(dead_code, unused_imports)
 )]
 
-// `no-touch-487`は単独で使う（例外は、同じく製品経路を外さない`link-gap-20`だけ）。他のfeatureを足すと製品経路（`build.rs`の`deskcat_product_mode`）が外れ、touchを読まない製品buildにならない。
+// `no-touch-487`は単独で使う（例外は、同じく製品経路を外さない`link-gap-20`と`led-no-touch-514`だけ）。他のfeatureを足すと製品経路（`build.rs`の`deskcat_product_mode`）が外れ、touchを読まない製品buildにならない。
 #[cfg(all(feature = "no-touch-487", not(deskcat_product_mode)))]
-compile_error!("no-touch-487は単独で使う。併用してよいのはlink-gap-20だけである。");
+compile_error!(
+    "no-touch-487は単独で使う。併用してよいのはlink-gap-20とled-no-touch-514だけである。"
+);
+// `led-no-touch-514`（#514）は`no-touch-487`の製品buildにLEDだけを戻す。`no-touch-487`なしでは意味を持たないので止める。
+#[cfg(all(feature = "led-no-touch-514", not(feature = "no-touch-487")))]
+compile_error!("led-no-touch-514はno-touch-487と併せて使う。");
+#[cfg(any(
+    all(feature = "led-no-touch-514", not(deskcat_product_mode)),
+    all(feature = "led-no-touch-514", feature = "link-gap-20")
+))]
+compile_error!("led-no-touch-514は、no-touch-487以外のfeatureと併用しない。");
 // `link-gap-20`（#20の受信の間隔の計測）は製品経路を外さない（`build.rs`）。他のfeatureを足すと製品経路が外れ、
 // 製品buildと同じ負荷の下で測るという目的を満たさないので止める。併用してよいのは`no-touch-487`だけである
 // （`no-touch-487`も製品経路を外さない。touchを読まない製品buildの下で測る）。
@@ -1288,8 +1299,20 @@ fn main() {
             if face.take_react_pulse() {
                 leds.pulse_react(now_led);
             }
-            leds.update(led_start_ms, now_led);
-            until = until.min(leds.next_deadline_ms(led_start_ms, now_led));
+            // 白は、Piからの受信の見張りが生きている間は点灯、それ以外は点滅（`crate::led`）。
+            // Pi linkを持たないbuild（`bench-servo-test-17`）は点滅だけになる。
+            #[cfg(not(feature = "bench-servo-test-17"))]
+            let link_up = pi_link.link_alive(now_led);
+            #[cfg(feature = "bench-servo-test-17")]
+            let link_up = false;
+            leds.update(led_start_ms, now_led, link_up);
+            if let Some(deadline) = leds.next_deadline_ms(led_start_ms, now_led, link_up) {
+                until = until.min(deadline);
+            }
+            #[cfg(not(feature = "bench-servo-test-17"))]
+            if let Some(deadline) = pi_link.link_alive_until_ms(now_led) {
+                until = until.min(deadline);
+            }
         }
 
         // sleepの代わりに`UartDriver::read`へ残り時間をtimeoutとして渡す。data到着があれば
