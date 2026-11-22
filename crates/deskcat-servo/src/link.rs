@@ -72,6 +72,22 @@ impl LinkWatch {
         }
     }
 
+    /// 見張りを始めていて、最後の受信から時間が過ぎていないか。**読むだけで、途切れの判定（[`Self::check`]）と
+    /// 累計を変えない。**表示（firmwareの`LED-COMM`）のためである。時間が決まっていなければ`false`。
+    #[must_use]
+    pub fn is_alive(&self, now_ms: u64) -> bool {
+        match (self.timeout_ms, self.last_rx_ms) {
+            (Some(timeout), Some(last)) => now_ms.saturating_sub(last) < u64::from(timeout),
+            _ => false,
+        }
+    }
+
+    /// [`Self::is_alive`]が`false`へ変わる時刻。見張りを始めていなければ`None`。
+    #[must_use]
+    pub fn alive_until_ms(&self) -> Option<u64> {
+        Some(self.last_rx_ms?.saturating_add(u64::from(self.timeout_ms?)))
+    }
+
     /// 途切れたと判定する時刻（単調に増える時刻、ms）。見張っていなければ`None`。
     #[must_use]
     pub fn deadline_ms(&self) -> Option<u64> {

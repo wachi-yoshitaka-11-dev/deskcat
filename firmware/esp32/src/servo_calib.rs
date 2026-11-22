@@ -4,14 +4,21 @@
 //! `校正buildの仕様（案）`節だけである（**この文書へ値も規則も写さない**）。この文書が書くのは、
 //! 仕様の各項目を実装のどこが持つかと、仕様が決めていないために実装が選んだことだけである。
 //!
-//! **実機では動かしていない。**host testも無い（firmware crateはhostで動かせない）。
-//! 回ごとの実行承認（`承認の状態`の項目6の(c)）と、手順・停止基準の文書が揃うまで、このbuildで駆動しない。
+//! 実機では[EXP-060](../../../docs/hardware/experiment-log.md)で通した（通しの10動作）。host testは無い（firmware crateはhostで動かせない）。
+//! 回ごとの実行承認（`承認の状態`の項目6の(c)）なしに、このbuildで駆動しない。手順・停止基準は`docs/hardware/servo-safety-limits.md`の
+//! `手順・停止基準・受け入れ条件`節による。
+//!
+//! # 加速度のlog（`accel-log-18` feature）
+//!
+//! `accel-log-18`を足したbuildだけが、`crate::accel_log_18`の別threadで加速度のraw sampleをlogへ出す（#15・#22の材料。
+//! servoの制御・limiter・露出・停止の動作と順序は変えない）。足すのは、`run`の中の起動（`session`の前）と停止の伝達（`session`の後）、
+//! `run_motion`の`servo_calib_18_motion_clock`の1行（`stop`の後に出す）だけである。このfeatureのbuildだけがI2Cを持つ（下の「持たないもの」の例外）。
 //!
 //! # 持たないもの
 //!
-//! Pi link（`crate::boot_session`、UART1）、heartbeat、health snapshot、I2C、LCD、NVSを持たない。
+//! Pi link（`crate::boot_session`、UART1）、heartbeat、health snapshot、I2C（`accel-log-18`のbuildを除く）、LCD、NVSを持たない。
 //! `main.rs`の`servo_calib`用の`main`は、識別のlogを出してから[`run`]を呼ぶだけである。
-//! **仕様が書いていないheartbeatとI2Cを足さなかった**（`bench-servo-test-17`はI2CのID読み出しとheartbeatを持つ）。
+//! **仕様が書いていないheartbeatとI2Cを足さなかった（I2Cは`accel-log-18`のbuildだけが持つ。上の「加速度のlog」）**（`bench-servo-test-17`はI2CのID読み出しとheartbeatを持つ）。
 //!
 //! # servoを駆動する型
 //!
@@ -37,12 +44,12 @@
 //!   `console_failed`、`limits_rejected`）は実装が付けた。
 //! - **tickの間隔は、`delay_ms(公称周期)`で刻む。**`FreeRtos::delay_ms`はtick単位（`CONFIG_FREERTOS_HZ`。
 //!   生成された`sdkconfig`で100なら10 ms）で待つ。最初のtickの前に1 tick待って、tickの境に揃えてから刻む。
-//!   **実機での間隔は確かめていない**（commandごとに`tick_min_ms`／`tick_max_ms`をlogに出す。`CONTROL_PERIOD_TOLERANCE_MS`を
+//!   実機での間隔は[EXP-059](../../../docs/hardware/experiment-log.md)で測った（commandごとに`tick_min_ms`／`tick_max_ms`をlogに出す。`CONTROL_PERIOD_TOLERANCE_MS`を
 //!   決めるための値である）。
 //! - **main taskをtask watchdogへ登録する**（Issue #711。`sdkconfig.defaults`の`CONFIG_ESP_TASK_WDT_PANIC=y`と組で、main taskが止まったまま
 //!   LEDCが最後のdutyを出し続けることを、timeout（sdkconfigの値）で限る）。**登録は`Sg90::new`の後**であり、`GO18`を待つ間（期限が無い）は登録しない。
 //!   登録後の待ちは`IDLE_POLL_MS`（20 ms）・制御周期・tick単位の待ちだけで、`session`・`run_motion`・`ended`の各loopの周ごとに餌付けする。
-//!   tickの間隔の実測は18.44〜21.55 ms（EXP-059）で、timeout（既定5 s）より2桁小さい。**実機では確かめていない。**
+//!   tickの間隔の実測は18.44〜21.55 ms（EXP-059）で、timeout（既定5 s）より2桁小さい。実機の通し（10動作）で誤ってresetしないことは[EXP-060](../../../docs/hardware/experiment-log.md)の(A)で確かめた。**calibがhangしたときに止まることは確かめていない。**
 //! - **LEDCへの出力は、N tickに1回へ間引く**（`config::SERVO_OUTPUT_DECIMATION_TICKS`、ADR-0027、Issue #708。Nは`servo_calib_18_confirmed`の
 //!   `output_decimation_ticks=`に出す。回ごとの実行承認の値ではない）。`Limiter`は出力するtickでだけ進み、窓（最後の出力からの時間）の間隔で制限する（`servo.rs`のmodule doc）。**`position_deg`・`position_min_deg`・
 //!   `position_max_deg`・`reached`の判定・`stop`の後の位置は、出力したtickの位置だけで更新する**（間引いたtickには位置が作られない）。
@@ -318,7 +325,22 @@ pub fn run() -> ! {
         }
     };
 
+    // 加速度のlog（`accel-log-18`）。**`session`の前**に別threadで始める。起こせなくても、servoは動かす（`crate::accel_log_18::start`のdoc）。
+    #[cfg(feature = "accel-log-18")]
+    let accel_log = crate::accel_log_18::start(
+        peripherals.i2c0,
+        peripherals.pins.gpio25,
+        peripherals.pins.gpio26,
+        started,
+        Duration::from_secs(MAX_SESSION_S.into()),
+    );
+
     let held = session(servo, &console, started, &mut wdt);
+    // 回が終わったら、加速度のlogのthreadへ終わりを伝える（待たない）。
+    #[cfg(feature = "accel-log-18")]
+    if let Some(accel_log) = &accel_log {
+        accel_log.stop();
+    }
     ended(&console, Some(held), Some(&mut wdt))
 }
 
@@ -830,6 +852,12 @@ fn run_motion(
     after_tick_trace.log("servo_calib_18_phase_trace", "after_tick_us", n);
     pre_delay_trace.log("servo_calib_18_phase_trace", "pre_delay_us", n);
     output_trace.log("servo_calib_18_output_trace", "tick", n);
+    // `motion_start`の、回の`started`（`accel_log_18_raw`の`t_us`と同じ基準）からの経過。加速度のlogと時刻を合わせる。
+    #[cfg(feature = "accel-log-18")]
+    log::info!(
+        "servo_calib_18_motion_clock n={n} start_us={}",
+        motion_start.duration_since(session_started).as_micros()
+    );
     log::info!(
         "servo_calib_18_stop_trace n={n} stop_pre_us={} stop_post_us={}",
         stop_pre.as_micros(),
