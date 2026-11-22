@@ -25,25 +25,22 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 use std::time::Instant;
 
-use deskcat_domain::{Companion, Config as CompanionConfig, Millis, Mind, Timing};
+use deskcat_domain::{Companion, Millis, Mind, Timing};
 use deskcat_serial::{PeerSession, SerialConfig, SerialDevice, Session};
 use deskcatd::cli::{self, Parsed};
 use deskcatd::cloud_speech::{ClaudeClient, CloudSpeech, Failure};
-use deskcatd::daemon::{Daemon, EXIT_FATAL, EXIT_SESSION_REDO, ExpressionProbe, Identity};
-use deskcatd::runner::{SpeechConfig, run_loop_with_cloud};
+use deskcatd::daemon::{Daemon, EXIT_FATAL, EXIT_SESSION_REDO, Identity};
+use deskcatd::runner::run_loop_with_cloud;
 use deskcatd::sid::sid_from_os;
 use deskcatd::watchdog::StartupWatchdog;
 
-/// `Companion`をMVPの既定値でつなぐ。吹き出しの表示時間は独り言の設定を使い、無ければ吹き出しを送らない。
+/// `Companion`をつなぐ。値は`--companion-*`で上書きしない限り`Config::MVP`である。吹き出しの表示時間は独り言の設定を使い、無ければ吹き出しを送らない。
 ///
 /// `disabled`は試験用である（`--no-companion`）。`probe`は実機確認用の表情の送信（`--probe-expression`）で、
 /// CLIが`--no-companion`との併用だけを許す。
-fn with_companion(
-    daemon: Daemon,
-    speech: Option<SpeechConfig>,
-    disabled: bool,
-    probe: Option<ExpressionProbe>,
-) -> Daemon {
+fn with_companion(daemon: Daemon, args: &cli::Args) -> Daemon {
+    let (speech, disabled, companion, probe) =
+        (args.speech, args.no_companion, args.companion, args.probe);
     let daemon = match probe {
         Some(probe) => daemon.with_expression_probe(probe),
         None => daemon,
@@ -52,7 +49,7 @@ fn with_companion(
         return daemon;
     }
     daemon.with_companion(
-        Companion::new(CompanionConfig::MVP, Millis(0)),
+        Companion::new(companion, Millis(0)),
         speech.map(|config| config.duration_ms),
     )
 }
@@ -126,14 +123,14 @@ fn main() -> ExitCode {
     let started = Instant::now();
     let daemon = Daemon::new(
         Session::new(config, sid),
-        PeerSession::new(args.duplicate_policy),
+        PeerSession::new(args.duplicate_policy.clone()),
         Mind::new(Timing::MVP, Millis(0)),
         Identity {
             host: "deskcatd".to_owned(),
             version: env!("CARGO_PKG_VERSION").to_owned(),
         },
     );
-    let mut daemon = with_companion(daemon, args.speech, args.no_companion, args.probe);
+    let mut daemon = with_companion(daemon, &args);
     daemon.on_connected();
 
     // unitは既定で--cloud-speechを渡さない。credentialが欠ければローカルだけで続ける。
