@@ -102,7 +102,7 @@ FAR = {
     "J5": "M-12001（5 V の入力。赤＝＋、黒＝GND）",
     "J6": "servo（赤＝5 V、茶＝GND。ふたの切り込みから。plug とのつなぎ方は #405）",
     "J7": "Pi（PWR IN。CABLE-PI-PWR-01）",
-    "J8": "B1（ESP32 の 5V pin へ。J8− は ESP32 の GND の戻り）",
+    "J8": "ESP32 の 5V pin へ（線とつなぎは TBD、#405）。J8− は ESP32 の GND の戻り",
     "W1": "B1 の GPIO32（ADC-SHUNT。線は床の側へ）",
 }
 

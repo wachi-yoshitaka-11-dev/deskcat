@@ -1290,7 +1290,7 @@
 <text x="60" y="1450" font-size="12">X2: B1 D6 → Pi の header pin 10（GPIO15 RXD）（Pi の側は挿していない）</text>
 <text x="60" y="1472" font-size="12">X3: B1 A18 → Pi の header pin 39（GND）（板の端を抜いておく）</text>
 <text x="60" y="1494" font-size="12">X4: B1 D7 → サーボの plug の黄の穴（板の端を抜いておく）</text>
-<text x="60" y="1516" font-size="12">X5: B1 −30 → 共通 GND（PROTO-02 の J8−。ESP32 の GND の戻りで、J8− が star point へ直結する。案B、ユーザーの決定 2026-11-23）（ESP32 の GND をサーボの GND と共通にする線）（板の端を抜いておく）</text>
+<text x="60" y="1516" font-size="12">X5: B1 −30 → 共通 GND（PROTO-02 の J8−。ESP32 の GND の戻りで、J8− が star point へ直結する。案B、ユーザーの決定 2026-11-23。案Bの戻りの線とつなぎの部材は TBD（#405）で、ブレッドボードの接点とジャンパー線は使わない）（ESP32 の GND をサーボの GND と共通にする線）（板の端を抜いておく）</text>
 <text x="60" y="1548" font-size="12">首の14本: LCD 側は MSP2807 の pin 番号。線は LCD に付いているメスオス線のオス側を B2 の a・b 行の穴へ直接挿す（細ピンヘッダは使わない）。</text>
 <text x="60" y="1570" font-size="12">SCK と T_CLK、SDI と T_DIN、SDO と T_DO は同じ列に挿して共有する（#34）。</text>
 </svg>
