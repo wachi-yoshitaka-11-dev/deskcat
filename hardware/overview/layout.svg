@@ -33,6 +33,8 @@
 <text x="521.3" y="474.3" font-size="10" fill="#c00">T1</text>
 <polyline points="586.8,533.8 680.9,658.8" fill="none" stroke="#c00" stroke-width="1.5" stroke-dasharray="5 4"/>
 <text x="639.8" y="608.3" font-size="10" fill="#c00">T2</text>
+<polyline points="357.0,542.2 444.3,691.7 464.3,689.0" fill="none" stroke="#c00" stroke-width="1.5" stroke-dasharray="5 4"/>
+<text x="406.6" y="628.9" font-size="10" fill="#c00">T3</text>
 <rect x="260" y="230" width="130" height="300" rx="6" fill="#eef4ff" stroke="#335"/>
 <text x="266" y="246" font-size="11" font-weight="bold">電源の基板 PROTO-02</text>
 <text x="266" y="260" font-size="9" fill="#555">左の壁の内側に立てる</text>
@@ -68,4 +70,5 @@
 <text x="16" y="790" font-size="10" fill="#444">細い線＝1本ずつ（ID。サーボは黄・赤・茶）。太い線＝束（本数）。各線の節点と端は wiring-table.md。赤の破線＝TBD。描かない物：#18 の試験だけの物（端子台S、PSU、試験用の負荷、試験用の shunt。PROTO-02 の R20 とは別）。</text>
 <text x="16" y="804" font-size="10" fill="#c00">T1: サーボの plug とのつなぎ方（servo の枝の線の先）：#405</text>
 <text x="16" y="818" font-size="10" fill="#c00">T2: LCD の VCC（pin 1）の電圧：今は 3V3（J1 開放）。最終は、決める事実（`HW-TBD-024`・`HW-TBD-025`(a)）が揃うまで決められず、揃えば #405</text>
+<text x="16" y="832" font-size="10" fill="#c00">T3: J8 の枝（P7・X5）の線とつなぎの部材（ESP32 board の `5V` pin・GND pin へ。ブレッドボードの接点とジャンパー線は使わない）：#405。決まるまで J8 から ESP32 へ給電しない</text>
 </svg>
