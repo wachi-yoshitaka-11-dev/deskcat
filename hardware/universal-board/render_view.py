@@ -8,7 +8,7 @@
 - `view-front.svg`：部品面。**真上から見る。**板・穴・部品・文字・凡例の描き方、色、線の太さ、文字の大きさは
   ブレッドボードの図（`hardware/breadboard-rebuild/generate.py`）に合わせた（1 ピッチの画素 `P`、
   色 `COLOR_HEX`、`esc`、`text_width` はその file から読み込んで同じものを使う）。はんだ面の芯線
-  （`111641`）を、部品面の図の上に色の付いた線で重ねて描く（赤＝＋、黒＝GND、緑＝Gate）。
+  （`111641`）を、部品面の図の上に色の付いた線で重ねて描く（赤＝＋、黒＝GND、緑＝Gate、紫＝ADC-SHUNT）。
   端子台の口の向きと、つながる先は、ブレッドボードの図の「板の外へ出る線」と同じ描き方にした。
 - `view-back.svg`：はんだ面（真上から。左右を裏返した向き）。ランド、芯線、はんだの盛り。
 
@@ -29,6 +29,9 @@
   出所は datasheet `mfr.pdf`。外見（黄色い円盤、ラジアルリード、刻印 `R135`）の出所は hardware-bom.md の
   Revision 89（2026-09-08、現物の照合）。
 - `2SJ334`（東芝）：本体 厚み 4.5 × 長さ 10（真上から見た形）。出所は datasheet `2sj334.pdf`。
+- セメント抵抗 `SQP5WJ0R1B`（R20。`MEAS-01` の shunt）：長さ 22.0 × 幅 10.0、足の径 0.8、足の長さ 38 ± 3（本体の両側）。
+  高さ H は表に無い。出所は秋月 g117836 と datasheet `CementResistor.pdf` p.3。
+- 電解コンデンサ `16WXA470MEFC8X9`（C1・C2）：径 8、長さ 9、足の間隔 3.5 ± 0.5。出所は秋月 g108426 と Rubycon `j_wxa.pdf`。
 - 芯線 `111641`：導体外径 0.75（hardware-bom.md の `WIRE-PWR-01` 行。基板ファイルの導体の幅も 0.75）。
 - 部品の名前の出所は plan.md の「部品と向き」の表の「品」。端子台の行き先は plan.md の「基板から出る線」。
 - 凡例の用途と部品の役目の出所：hardware-bom.md の `PROT-OC-01`・`PROT-RP-01`・`WIRE-PWR-01` の行（R18 は
@@ -38,7 +41,8 @@ TBD（資料に無いので推測せず、破線または注記にした）：
 - 基板の色、PTC 以外の部品の色（hardware-bom.md・experiment-log.md に現物の色の記録が無い）。
 - ランドの外径（資料に無い。pad と同じ 1.8 で描く）。
 - 端子台のねじの位置・径、電線の口の幅（plan.md の M7。破線。真上からの図に口の高さ M4 は出ない）。
-- `R18` の本体の大きさ（plan.md の M3。footprint の仮の 2.5 × 2.5）。
+- `R18` の本体の大きさは慣行の値（長さ約 6.5・径約 2.4）で暫定（plan.md の M3・A12）。図は基板ファイルの footprint の仮の 2.5 × 2.5 を破線で描き、慣行の値は図に使っていない。
+- `R20` の高さ H（plan.md の M8）。足の間隔 11 穴は設計の値で確定（A5）なので TBD ではない。
 - はんだの盛りの大きさ（見た目）。
 """
 
@@ -72,7 +76,7 @@ text_width = BB.text_width
 K = P / PITCH                 # 1 mm の画素
 FONT = "Noto Sans CJK JP, Hiragino Sans, Meiryo, sans-serif"   # generate.py の build_svg と同じ
 
-# 線の色（ブレッドボードの図の決まり：赤＝3V3／＋、黒＝GND。Gate は手持ちの緑）
+# 線の色（ブレッドボードの図の決まり：赤＝3V3／＋、黒＝GND。Gate は手持ちの緑、ADC-SHUNT は紫）
 NET_COLOR = {
     "/5V-IN": COLOR_HEX["赤"], "/5V-PTC": COLOR_HEX["赤"], "/5V-NODE": COLOR_HEX["赤"],
     "/GND": COLOR_HEX["黒"], "/Q1-GATE": COLOR_HEX["緑"], "/ADC-SHUNT": COLOR_HEX["紫"],
@@ -335,7 +339,7 @@ def draw_mosfet(out, fr, fp):
 
 def draw_resistor(out, fr, fp):
     """R18：立てて挿し、片方の足を本体の横に沿わせて下ろす（足の間隔 2 穴）。足は generate.py の抵抗と同じ茶の線、
-    本体は同じベージュ。本体の大きさは TBD（M3）なので、footprint の仮の 2.5 × 2.5 を破線で描く。"""
+    本体は同じベージュ。本体の大きさは慣行の値（長さ約 6.5・径約 2.4）で暫定（M3・A12）。図は基板ファイルの footprint の仮の 2.5 × 2.5 を破線で描き、慣行の値は図に使っていない。"""
     x0, y0, x1, y1 = fab_rect(fp)
     p1, p2 = sorted(fp["pads"], key=lambda p: p["name"])
     (ax, ay), (bx, by) = fr.p(p1["x"], p1["y"]), fr.p(p2["x"], p2["y"])

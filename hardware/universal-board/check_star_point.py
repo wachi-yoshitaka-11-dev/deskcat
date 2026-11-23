@@ -4,7 +4,7 @@
 規則（docs/hardware/power-budget.md の`GND topology`と、`実装方法を決定した（2026-09-03）`の
 「Gate は共通 GND 戻り（star point）へ抵抗を介してつなぐ」）。基板の net は次のとおり：
 `/ADC-SHUNT`（shunt `R20` の servo の側の端 A の node。J6−、`W1`）と `/GND`（shunt の
-star の側の端 B から先。J5−、J7−、J8−、R18 の足2）。
+star の側の端 B から先。R20 の足2、J5−、J7−、J8−、R18 の足2、C1・C2 の−）。
 
 1. shunt `R20` の足1 が `/ADC-SHUNT`（servo の側 A）、足2（B）が `/GND` にある（shunt は servo の戻りだけにある）。
 2. `/ADC-SHUNT` の導体は、J6−、`W1`、R20 の足1 だけをつなぐ。**C1・C2 の−は A の node に無い**（servo の過渡電流が
@@ -193,7 +193,7 @@ def main():
             if length > 2 * PITCH + 1e-6:
                 errors.append(f"B と J5− の間の導体が {length:.1f} mm で、2 穴（{2 * PITCH:.2f} mm）より長い（servo の電流が長い導体を流れる）")
             nset = set(node)
-            # 4. J7−・J8−・R18 の足2 は、それぞれ別の導体で node へ。node を除くと互いにつながらない
+            # 4. J7−・J8−・R18 の足2・C1−・C2− は、それぞれ別の導体で node へ（C1− と C2− の間は共有してよい）。node を除くと互いにつながらない
             terms = {"J7−": J7, "J8−": J8, "R18 の足2": R2}
             for cref in ("C1", "C2"):
                 if (cref, "-") in pads:
@@ -237,7 +237,7 @@ def main():
                 for b_ in range(len(names)):
                     if a_ != b_ and {names[a_], names[b_]} != {"C1−", "C2−"} and path(gnd, terms[names[a_]], terms[names[b_]], skip=nset) is not None:
                         errors.append(f"{names[a_]} は node を通らずに {names[b_]} へつながる導体がある（迂回）")
-            # J5−・J7−・J8−・R18 の足が、B と J5− の間の導体の上にない
+            # J5−・J7−・J8−・R18 の足2・C1−・C2− の足が、B と J5− の間の導体の上にない
             for nm, p in terms.items():
                 if p in nset:
                     errors.append(f"{nm} の足が B と J5− の間の導体の上にある（servo の電流が流れる穴）")
