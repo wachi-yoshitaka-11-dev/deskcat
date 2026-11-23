@@ -1,4 +1,4 @@
-(footprint "WireJumper_dx7_dy-4"
+(footprint "WireJumper_dx9_dy-4"
 	(version 20240108)
 	(generator "pcbnew")
 	(generator_version "8.0")
@@ -14,7 +14,7 @@
 			)
 		)
 	)
-	(property "Value" "WireJumper_dx7_dy-4"
+	(property "Value" "WireJumper_dx9_dy-4"
 		(at 0 2.45 0)
 		(layer "F.Fab")
 		(hide yes)
@@ -65,7 +65,7 @@
 	(attr through_hole exclude_from_bom)
 	(fp_line
 		(start 0 0)
-		(end 17.78 -10.16)
+		(end 22.86 -10.16)
 		(stroke
 			(width 0.6)
 			(type dash)
@@ -82,7 +82,7 @@
 		(uuid "b8dd499a-834d-469a-8fdc-c4aeecdfeda7")
 	)
 	(pad "2" thru_hole circle
-		(at 17.78 -10.16)
+		(at 22.86 -10.16)
 		(size 1.8 1.8)
 		(drill 1)
 		(layers "*.Cu" "*.Mask")

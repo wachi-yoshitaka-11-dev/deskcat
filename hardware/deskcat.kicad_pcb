@@ -1379,7 +1379,7 @@
 			(uuid "674c6d9b-30b3-4c0d-87f8-c53ced707b70")
 		)
 	)
-	(footprint "DeskCat:WireJumper_dx7_dy-4"
+	(footprint "DeskCat:WireJumper_dx9_dy-4"
 		(layer "F.Cu")
 		(uuid "7f35ef26-8d33-4140-8b55-87572783617e")
 		(at 105.54 123.77)
@@ -1445,7 +1445,7 @@
 		(attr through_hole exclude_from_bom)
 		(fp_line
 			(start 0 0)
-			(end 17.78 -10.16)
+			(end 22.86 -10.16)
 			(stroke
 				(width 0.6)
 				(type dash)
@@ -1468,7 +1468,7 @@
 			(uuid "82a9dfa4-f051-4be4-8212-c26ea7ba1753")
 		)
 		(pad "2" thru_hole circle
-			(at 17.78 -10.16)
+			(at 22.86 -10.16)
 			(size 1.8 1.8)
 			(drill 1)
 			(layers "*.Cu" "*.Mask" "In1.Cu" "In2.Cu" "In3.Cu" "In4.Cu" "In5.Cu" "In6.Cu"
@@ -7360,14 +7360,6 @@
 		(uuid "29375494-67e7-456f-af54-6b2c8aff39cc")
 	)
 	(segment
-		(start 128.4 113.61)
-		(end 123.32 113.61)
-		(width 0.5)
-		(layer "F.Cu")
-		(net 1)
-		(uuid "4e86e7bf-2c4c-4532-9b47-ab0972618534")
-	)
-	(segment
 		(start 105.54 125.294)
 		(end 128.4 125.294)
 		(width 0.5)
@@ -7377,7 +7369,7 @@
 	)
 	(segment
 		(start 118.24 113.61)
-		(end 123.32 113.61)
+		(end 128.4 113.61)
 		(width 0.75)
 		(layer "B.Cu")
 		(net 1)

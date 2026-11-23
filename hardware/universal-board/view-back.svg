@@ -1039,8 +1039,7 @@
 </g>
 <g data-solder="8,15"><circle cx="503.6" cy="677.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 </g>
-<g data-solder="9,5" data-leg="W2:2"><circle cx="481.6" cy="457.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
-<circle cx="481.6" cy="457.9" r="2.6" fill="#555"/>
+<g data-solder="9,5"><circle cx="481.6" cy="457.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 </g>
 <g data-solder="9,6"><circle cx="481.6" cy="479.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 </g>
@@ -1061,6 +1060,8 @@
 </g>
 <g data-solder="9,15"><circle cx="481.6" cy="677.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 </g>
+<g data-solder="10,5"><circle cx="459.6" cy="457.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+</g>
 <g data-solder="10,6"><circle cx="459.6" cy="479.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 </g>
 <g data-solder="10,7"><circle cx="459.6" cy="501.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
@@ -1073,6 +1074,9 @@
 <g data-solder="10,14"><circle cx="459.6" cy="655.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 </g>
 <g data-solder="10,15"><circle cx="459.6" cy="677.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+</g>
+<g data-solder="11,5" data-leg="W2:2"><circle cx="437.6" cy="457.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
+<circle cx="437.6" cy="457.9" r="2.6" fill="#555"/>
 </g>
 <g data-solder="11,6"><circle cx="437.6" cy="479.9" r="9.1" fill="#e3e6ea" stroke="#6b7078" stroke-width="1"/>
 </g>
@@ -1240,9 +1244,8 @@
 </g>
 <g data-track="/5V-IN:128.4,125.29-128.4,113.61" data-layer="F.Cu"><line x1="437.6" y1="559.1" x2="437.6" y2="457.9" stroke="#d62728" stroke-width="3" stroke-dasharray="9 5" stroke-linecap="butt"/></g>
 <g data-track="/5V-IN:105.54,123.77-105.54,125.29" data-layer="F.Cu"><line x1="635.6" y1="545.9" x2="635.6" y2="559.1" stroke="#d62728" stroke-width="3" stroke-dasharray="9 5" stroke-linecap="butt"/></g>
-<g data-track="/5V-IN:128.4,113.61-123.32,113.61" data-layer="F.Cu"><line x1="437.6" y1="457.9" x2="481.6" y2="457.9" stroke="#d62728" stroke-width="3" stroke-dasharray="9 5" stroke-linecap="butt"/></g>
 <g data-track="/5V-IN:105.54,125.29-128.4,125.29" data-layer="F.Cu"><line x1="635.6" y1="559.1" x2="437.6" y2="559.1" stroke="#d62728" stroke-width="3" stroke-dasharray="9 5" stroke-linecap="butt"/></g>
-<g data-track="/5V-IN:118.24,113.61-123.32,113.61" data-layer="B.Cu"><line x1="525.6" y1="457.9" x2="481.6" y2="457.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-track="/5V-IN:118.24,113.61-128.4,113.61" data-layer="B.Cu"><line x1="525.6" y1="457.9" x2="437.6" y2="457.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
 <g data-track="/5V-IN:105.54,128.85-105.54,123.77" data-layer="B.Cu"><line x1="635.6" y1="589.9" x2="635.6" y2="545.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
 <g data-track="/5V-NODE:123.32,116.15-128.4,116.15" data-layer="B.Cu"><line x1="481.6" y1="479.9" x2="437.6" y2="479.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
 <g data-track="/5V-NODE:133.48,116.15-133.48,113.61" data-layer="B.Cu"><line x1="393.6" y1="479.9" x2="393.6" y2="457.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
@@ -1347,9 +1350,9 @@
 <line x1="525.6" y1="435.9" x2="525.6" y2="289.0" stroke="#666" stroke-width="1" stroke-dasharray="4 3"/>
 <circle cx="525.6" cy="435.9" r="2.5" fill="#666"/>
 <text x="519.6" y="285.0" font-size="11" fill="#222">Q1 MOSFET 2SJ334（逆接の保護）</text>
-<line x1="558.6" y1="457.9" x2="558.6" y2="310.0" stroke="#666" stroke-width="1" stroke-dasharray="4 3"/>
-<circle cx="558.6" cy="457.9" r="2.5" fill="#666"/>
-<text x="552.6" y="306.0" font-size="11" fill="#222">W2 ジャンパー（5V-IN。絶縁した線を部品面の上へ渡す）</text>
+<line x1="536.6" y1="457.9" x2="536.6" y2="310.0" stroke="#666" stroke-width="1" stroke-dasharray="4 3"/>
+<circle cx="536.6" cy="457.9" r="2.5" fill="#666"/>
+<text x="530.6" y="306.0" font-size="11" fill="#222">W2 ジャンパー（5V-IN。絶縁した線を部品面の上へ渡す）</text>
 <line x1="569.6" y1="435.9" x2="569.6" y2="331.0" stroke="#666" stroke-width="1" stroke-dasharray="4 3"/>
 <circle cx="569.6" cy="435.9" r="2.5" fill="#666"/>
 <text x="563.6" y="327.0" font-size="11" fill="#222">R18 10 kΩ（Gate の抵抗）</text>

@@ -681,7 +681,7 @@
 (label "ADC-SHUNT" (at 380.00 195.00 0) (effects (font (size 1.27 1.27))) (uuid "571492d2-2625-4579-9da2-85938d933978"))
 (symbol (lib_id "DeskCat:WIRE_JUMPER") (at 160.00 270.00 0) (unit 1) (in_bom no) (on_board yes) (dnp no) (uuid "09f4e966-c6b9-4838-b6a9-f963cce31992")
  (property "Reference" "W2" (at 164.50 268.00 0) (effects (font (size 1.27 1.27))))
- (property "Footprint" "DeskCat:WireJumper_dx7_dy-4" (at 160.00 270.00 0) (effects (font (size 1.27 1.27)) hide))
+ (property "Footprint" "DeskCat:WireJumper_dx9_dy-4" (at 160.00 270.00 0) (effects (font (size 1.27 1.27)) hide))
  (property "Value" "絶縁した線（111641 の被覆付き）のジャンパー。5V-IN：J5＋の側の穴と Q1 D の側の穴" (at 164.50 271.80 0) (effects (font (size 1.27 1.27)) hide))
  (pin "1" (uuid "1b6a8289-7224-4a2e-a6f0-c6e739a528a3"))
  (pin "2" (uuid "2b5a432d-3b79-4815-a87a-959c833aefa1"))

@@ -85,6 +85,15 @@ Commands run / Actual result:
     kicad-cli sch export netlist（kicadxml）で overview の netlist を書き出し直した。
     kicad-cli pcb export svg: 成功。firefox の headless で描画して読んだ（作業セッションが画像を読んだ。人は見ていない）。
 
+  巡10の指摘の後の更新（W2 の端を (9,5) から (11,5) へ移し、J8 の口の正面から外した。2026-11-23）:
+    pcbnew で W2 の足2、F.Cu の線、B.Cu の 5V-IN の導体（(7,5)→(11,5)）を直し、footprint を WireJumper_dx9_dy-4 に替えた。
+    kicad-cli pcb drc --schematic-parity: 違反 0、未接続 0、footprint の誤り 0。
+    kicad-cli sch erc: Errors 0（Warnings 167）。
+    check_star_point.py・render_view.py --check・overview と breadboard-rebuild の generate.py --check・
+    validate_doc_links.py・validate_table_columns.py: OK。
+    plan.md の部品表の穴を、基板ファイルの足の位置と script で突き合わせ、全部品で一致を確かめた。
+    kicad-cli pcb export svg: plan-front.svg・plan-back.svg を書き出し直した。
+
 Known differences from documented profile:
   machine-profiles.md に KiCad の扱いが無い。この記録は、この端末でこの版の kicad-cli と pcbnew が
   この基板ファイルを読み・更新し・DRC と書き出しを実行できたことに限る。
