@@ -2,7 +2,7 @@
 <export version="E">
   <design>
     <source>hardware/deskcat.kicad_sch</source>
-    <date>2026-11-23T10:44:32+0900</date>
+    <date>2026-11-23T23:13:19+0900</date>
     <tool>Eeschema 8.0.9-8.0.9-0~ubuntu24.04.1</tool>
     <sheet number="1" name="/" tstamps="/">
       <title_block>
@@ -10,7 +10,7 @@
         <company/>
         <rev>EXP-019 + EXP-022 + EXP-025 + EXP-038</rev>
         <date/>
-        <source>deskcat.kicad_sch</source>
+        <source>hardware/deskcat.kicad_sch</source>
         <comment number="1" value=""/>
         <comment number="2" value=""/>
         <comment number="3" value=""/>

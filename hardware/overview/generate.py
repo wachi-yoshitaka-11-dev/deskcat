@@ -32,8 +32,8 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 SCHEMATIC = HERE.parent / "deskcat.kicad_sch"
 NETLIST = HERE / "deskcat-netlist.xml"
-SCHEMATIC_SHA256 = "7f4613c954bee0b2f52d42206d738ef74f5abd4a5e59093f92aa0d253f1fc20e"
-NETLIST_SHA256 = "8bac3697e03e17ab3ff329b9542996818e74ff738ee26364a55e57b886d99c73"
+SCHEMATIC_SHA256 = "b00b2d7b6bc59829a3693a3c7acb24b50f3ca45ae8018622651ba61bcf942d28"
+NETLIST_SHA256 = "8e83dba3deac6770c6f1e534c9774614eea4df64eb5de6b622dacc039dd72421"
 
 # ---------------------------------------------------------------- まとまり（ブロック）
 
@@ -88,6 +88,7 @@ POWER_WIRES = [
 # 決まっていない所。図に破線と `TBD` で描き、線の検査からは除く。
 TBD = [
     ("T1", "PROTO-02", "SERVO", "サーボの plug とのつなぎ方（servo の枝の線の先）：#405"),
+    ("T2", "B2", "LCD", "LCD の VCC（pin 1）の電圧：今は 3V3（J1 開放）。最終は、決める事実（`HW-TBD-024`・`HW-TBD-025`(a)）が揃うまで決められず、揃えば #405"),
 ]
 
 # 線の通り道（まとまりの組 → 途中の点）。ほかの枠の上を横切らないように曲げる。

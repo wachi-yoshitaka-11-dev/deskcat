@@ -26,7 +26,7 @@ EXP-025 の [LED デモ回路](../docs/hardware/led-514-demo.md)は GPIO → 電
 
 | 層 | データ | このリポジトリ | 状態 |
 |---|---|---|---|
-| 論理 | 回路図 | [`deskcat.kicad_sch`](deskcat.kicad_sch)（信号の側と、`PROTO-02` の電源の経路） | あり。LCD の VCC は 3V3（B1）に決めた（#512。`HW-TBD-024` は電流の上限の項目）。ESP32 の 5 V 入力は案B（`J8`、ユーザーの決定 2026-11-23）で決めた |
+| 論理 | 回路図 | [`deskcat.kicad_sch`](deskcat.kicad_sch)（信号の側と、`PROTO-02` の電源の経路） | あり。LCD の VCC は今の構成のまま（3V3 pin から給電、J1 は開放）。最終の VCC は決めるための事実が揃っておらず今は決められない（`PROTO-02` の配線には効かない）。ESP32 の 5 V 入力は案B（`J8`、ユーザーの決定 2026-11-23）で決めた |
 | 論理 | netlist（どの部品のどの pin がどの節点か） | 回路図から `kicad-cli sch export netlist` で出し、[`overview/deskcat-netlist.xml`](overview/deskcat-netlist.xml) に置く（overview の図の入力。回路図を変えたら書き出し直す）。基板ファイルとの照合は KiCad の DRC（`--schematic-parity`）が行う | 回路図から出せる |
 | 物理 | 試作のブレッドボードの配線 | [`breadboard/layout.svg`](breadboard/layout.svg)、[`breadboard-rebuild/wiring-table.md`](breadboard-rebuild/wiring-table.md) | あり（2026-10-31 の組み直し） |
 | 物理 | 試作の端子台の配線（#18 の bench） | [`bench-18/`](bench-18/wiring-table.md) | あり。#18 の試験の間だけの配線 |
@@ -83,7 +83,7 @@ Wokwi の [ILI9341 部品](https://docs.wokwi.com/parts/wokwi-ili9341)では RST
 
 - `PROTO-02` の現物：計画（[`universal-board/plan.md`](universal-board/plan.md)）は描いた。**はんだ付けの後に現物と照合して完成図にする作業は #405 の範囲で、追跡を #405 へ移した**（#405 の受け入れ条件に、計画図に従ったはんだ付けと、現物との照合・完成図の記録の項目がある）。**基板の未実装状態を完成図として描かない。**計画の`測る所`（M1〜M8。M1・M3・M5 は決めて閉じた）は、#512 の受け入れ条件の「表現できない部分と `TBD` を列挙する」に当たる列挙として `plan.md` に残す。測る作業も #405 側で行い、まだ測っていない。
 - **LCD の信号線と touch の線（2026-10-31 の組み直し後）：**導通は電源2本と短絡だけを測った（EXP-052）。`CS`・`DC`・`SDI`・`SCK`・`LED` は、組み直し後の製品 build で LCD が描かれた記録（EXP-062 など）で動作を確かめた。**`RESET`（`display.rs` は SWRESET を送るので、描画だけでは線の有無を断定できない）、`SDO`・`T_DO`（製品 build は読まない）、`T_CS`・`T_IRQ`（製品 build は `no-touch-487`）は、組み直し後の確認が無い。**#512 の受け入れ条件は導通の実測を求めておらず、LCD の touch を使う作業が出たとき、その作業の窓で1本ずつ確かめる。
-- **`TBD`**（`overview/wiring-table.md` の T1 と `universal-board/plan.md` の `未決の一覧`）：ESP32 の 5 V 入力（`J8`）は案B に決めた（ユーザーの決定、2026-11-23。記録は power-budget.md の`ESP32の給電経路`節）。サーボの plug とのつなぎ方（T1）は #405 が持つ。LCD の VCC は 3V3（B1）に決めた（#512。`PROTO-02` は変えない）。台帳の [`HW-TBD-024`](../docs/hardware/tbd-register.md#hw-tbd-024) は、LCD が耐えられる電流の上限の項目で、電圧の項目ではない。
+- **`TBD`**（`overview/wiring-table.md` の T1 と `universal-board/plan.md` の `未決の一覧`）：ESP32 の 5 V 入力（`J8`）は案B に決めた（ユーザーの決定、2026-11-23。記録は power-budget.md の`ESP32の給電経路`節）。サーボの plug とのつなぎ方（T1）は #405 が持つ。LCD の VCC は今の構成のまま（3V3 pin から給電、J1 は開放）。最終の VCC は、`HW-TBD-025`(a)の2点と回路図の版の一致が未確認で、`HW-TBD-024` が未解決のため今は決められない（揃えば #405 の見直しで決める）。台帳の [`HW-TBD-024`](../docs/hardware/tbd-register.md#hw-tbd-024) は、LCD が耐えられる電流の上限の項目で、電圧の項目ではない。
 
 ### 閉じた項目
 
