@@ -26,7 +26,7 @@ EXP-025 の [LED デモ回路](../docs/hardware/led-514-demo.md)は GPIO → 電
 
 | 層 | データ | このリポジトリ | 状態 |
 |---|---|---|---|
-| 論理 | 回路図 | [`deskcat.kicad_sch`](deskcat.kicad_sch)（信号の側と、`PROTO-02` の電源の経路） | あり。LCD の VCC は 3V3（B1）に決めた（#512。`HW-TBD-024` は電流の上限の項目）。ESP32 の 5 V 入力は案B（`J8`、PM の判断 2026-11-23）で決めた |
+| 論理 | 回路図 | [`deskcat.kicad_sch`](deskcat.kicad_sch)（信号の側と、`PROTO-02` の電源の経路） | あり。LCD の VCC は 3V3（B1）に決めた（#512。`HW-TBD-024` は電流の上限の項目）。ESP32 の 5 V 入力は案B（`J8`、ユーザーの決定 2026-11-23）で決めた |
 | 論理 | netlist（どの部品のどの pin がどの節点か） | 回路図から `kicad-cli sch export netlist` で出し、[`overview/deskcat-netlist.xml`](overview/deskcat-netlist.xml) に置く（overview の図の入力。回路図を変えたら書き出し直す）。基板ファイルとの照合は KiCad の DRC（`--schematic-parity`）が行う | 回路図から出せる |
 | 物理 | 試作のブレッドボードの配線 | [`breadboard/layout.svg`](breadboard/layout.svg)、[`breadboard-rebuild/wiring-table.md`](breadboard-rebuild/wiring-table.md) | あり（2026-10-31 の組み直し） |
 | 物理 | 試作の端子台の配線（#18 の bench） | [`bench-18/`](bench-18/wiring-table.md) | あり。#18 の試験の間だけの配線 |

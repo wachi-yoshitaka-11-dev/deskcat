@@ -69,7 +69,7 @@ BB_NET = {
     "GPIO21": "/TOUCH-CS", "GPIO34": "/TOUCH-IRQ", "GPIO25": "/I2C-SDA", "GPIO26": "/I2C-SCL",
     "GPIO36": "/ADC-3V3", "PI_TXD": "/PI-UART-TX-Pi", "PI_RXD": "/PI-UART-RX-Pi", "SERVO_SIG": "/SERVO-SIG",
 }
-# 板の外へ出る線（X1〜X5）の、板の外の端の部品 pin。X5 は J8−（ESP32 の GND の戻り。案B、PM の判断 2026-11-23）へ挿す。
+# 板の外へ出る線（X1〜X5）の、板の外の端の部品 pin。X5 は J8−（ESP32 の GND の戻り。案B、ユーザーの決定 2026-11-23）へ挿す。
 OFFBOARD_END = {"X1": ("Pi", "J4", "8"), "X2": ("Pi", "J4", "10"), "X3": ("Pi", "J4", "39"),
                 "X4": ("SERVO", "M1", "yellow"), "X5": ("PROTO-02", "J8", "-")}
 

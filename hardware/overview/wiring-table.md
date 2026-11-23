@@ -56,7 +56,7 @@
 | X2 | `PI-UART-RX-Pi` | B1 | Pi（J4 pin 10） | X2（B1:D6 → Pi の header pin 10（GPIO15 `RXD`）） |
 | X3 | `GND` | B1 | Pi（J4 pin 39） | X3（B1:A18 → Pi の header pin 39（GND）） |
 | X4 | `SERVO-SIG` | B1 | SERVO（M1 pin yellow） | X4（B1:D7 → サーボの plug の黄の穴） |
-| X5 | `GND` | B1 | PROTO-02（J8 pin -） | X5（B1:-30 → 共通 GND（PROTO-02 の J8−。ESP32 の GND の戻りで、J8− が star point へ直結する。案B、PM の判断 2026-11-23）（ESP32 の GND をサーボの GND と共通にする線）） |
+| X5 | `GND` | B1 | PROTO-02（J8 pin -） | X5（B1:-30 → 共通 GND（PROTO-02 の J8−。ESP32 の GND の戻りで、J8− が star point へ直結する。案B、ユーザーの決定 2026-11-23）（ESP32 の GND をサーボの GND と共通にする線）） |
 | P1 | `5V-IN` | M-12001（PS1 pin +） | PROTO-02（J5 pin +） | M-12001 の線（Micro-B の手前で切った導体） |
 | P2 | `GND` | M-12001（PS1 pin -） | PROTO-02（J5 pin -） | M-12001 の線（同上） |
 | P3 | `5V-NODE` | PROTO-02（J6 pin +） | SERVO（M1 pin red） | サーボの赤（`111641` で延ばす。plug とのつなぎ方は #405） |
