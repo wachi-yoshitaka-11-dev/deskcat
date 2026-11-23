@@ -63,7 +63,7 @@
 | P5 | `5V-NODE` | PROTO-02（J7 pin +） | Pi（J9 pin VBUS） | `CABLE-PI-PWR-01`（`109314` を切った導体）→ Pi の `PWR IN` |
 | P6 | `GND` | PROTO-02（J7 pin -） | Pi（J9 pin GND） | `CABLE-PI-PWR-01`（同上） |
 | P7 | `5V-NODE` | PROTO-02（J8 pin +） | B1（U1 pin J2-19） | ESP32 の 5V pin へ（案B。往路の線とつなぎの部材は TBD（#405）。ブレッドボードの接点とジャンパー線は使わない。決まるまで J8 から ESP32 へ給電しない） |
-| X5 | `GND` | PROTO-02（J8 pin -） | B1（U1 pin J2-14） | 共通 GND の戻り（案B、ユーザーの決定 2026-11-23）。J8− が star point へ直結する。ESP32 board の GND pin（U1 pin J2-14）へ直接つなぐ。線とつなぎの部材は TBD（#405）で、ブレッドボードの接点とジャンパー線は使わない。B1 のレールの GND は、ESP32 board の別の GND pin を通る小電流の枝（周辺 module の 3V3 の枝）である |
+| X5 | `GND` | PROTO-02（J8 pin -） | B1（U1 pin J2-14） | 共通 GND の戻り（J8− を戻りにするのは plan.md の A7〔PM の判断〕。案Bのユーザーの決定は J8＋から 5V pin への給電）。J8− が star point へ直結する。ESP32 board の GND pin（U1 pin J2-14）へ直接つなぐ。線とつなぎの部材は TBD（#405）で、ブレッドボードの接点とジャンパー線は使わない。B1 のレールの GND は、ESP32 board の別の GND pin を通る小電流の枝（周辺 module の 3V3 の枝）である |
 | P8 | `ADC-SHUNT` | PROTO-02（W1 pin 1） | B1（U1 pin J2-7） | `ADC-SHUNT`（GPIO32）へ。`111641` 1本を床側へ通す（`W1`） |
 
 サーボの3本：黄（信号）は B1 から X4、赤（5 V）と茶（GND）は PROTO-02 の J6 から（P3・P4）。

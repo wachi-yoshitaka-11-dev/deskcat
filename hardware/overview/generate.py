@@ -32,8 +32,8 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 SCHEMATIC = HERE.parent / "deskcat.kicad_sch"
 NETLIST = HERE / "deskcat-netlist.xml"
-SCHEMATIC_SHA256 = "06bfa263c0d11d83f39caedc8583b3db2001d3904e549483e89c699d0e40f08f"
-NETLIST_SHA256 = "077d26a8bcac1ac835f1b52f9f0cce0cae02f02a61a36555ab8591c34cc91420"
+SCHEMATIC_SHA256 = "d9014280fbbeb10a39549fddb726d1fc4f7ce1483379a09380da92e9a8013e71"
+NETLIST_SHA256 = "cd6b9e9195c6930604c53c141b565bc6c402fc96ea6fd02c36af4ddf3e76c08c"
 
 # ---------------------------------------------------------------- まとまり（ブロック）
 
@@ -82,7 +82,7 @@ POWER_WIRES = [
     ("P5", "/5V-NODE", ("PROTO-02", "J7", "+"), ("Pi", "J9", "VBUS"), "`CABLE-PI-PWR-01`（`109314` を切った導体）→ Pi の `PWR IN`", "#d62728"),
     ("P6", "/GND", ("PROTO-02", "J7", "-"), ("Pi", "J9", "GND"), "`CABLE-PI-PWR-01`（同上）", "#111111"),
     ("P7", "/5V-NODE", ("PROTO-02", "J8", "+"), ("B1", "U1", "J2-19"), "ESP32 の 5V pin へ（案B。往路の線とつなぎの部材は TBD（#405）。ブレッドボードの接点とジャンパー線は使わない。決まるまで J8 から ESP32 へ給電しない）", "#d62728"),
-    ("X5", "/GND", ("PROTO-02", "J8", "-"), ("B1", "U1", "J2-14"), "共通 GND の戻り（案B、ユーザーの決定 2026-11-23）。J8− が star point へ直結する。ESP32 board の GND pin（U1 pin J2-14）へ直接つなぐ。線とつなぎの部材は TBD（#405）で、ブレッドボードの接点とジャンパー線は使わない。B1 のレールの GND は、ESP32 board の別の GND pin を通る小電流の枝（周辺 module の 3V3 の枝）である", "#111111"),
+    ("X5", "/GND", ("PROTO-02", "J8", "-"), ("B1", "U1", "J2-14"), "共通 GND の戻り（J8− を戻りにするのは plan.md の A7〔PM の判断〕。案Bのユーザーの決定は J8＋から 5V pin への給電）。J8− が star point へ直結する。ESP32 board の GND pin（U1 pin J2-14）へ直接つなぐ。線とつなぎの部材は TBD（#405）で、ブレッドボードの接点とジャンパー線は使わない。B1 のレールの GND は、ESP32 board の別の GND pin を通る小電流の枝（周辺 module の 3V3 の枝）である", "#111111"),
     ("P8", "/ADC-SHUNT", ("PROTO-02", "W1", "1"), ("B1", "U1", "J2-7"), "`ADC-SHUNT`（GPIO32）へ。`111641` 1本を床側へ通す（`W1`）", "#7b2d8e"),
 ]
 
