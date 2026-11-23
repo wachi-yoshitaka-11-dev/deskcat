@@ -8,10 +8,10 @@
 <text x="603.6" y="545.0" font-size="10" fill="#222">11本</text>
 <polyline points="755.9,690.0 898.6,750.0" fill="none" stroke="#555555" stroke-width="7" opacity="0.55"/>
 <text x="833.2" y="715.0" font-size="10" fill="#222">5本</text>
-<polyline points="460.9,664.2 433.5,662.7 380.1,532.7" fill="none" stroke="#555555" stroke-width="2.4"/>
-<polyline points="460.0,657.3 440.0,660.0 386.6,530.0" fill="none" stroke="#d62728" stroke-width="2.4"/>
+<polyline points="460.9,664.2 433.5,662.7 380.1,532.7" fill="none" stroke="#d62728" stroke-width="2.4"/>
+<polyline points="460.0,657.3 440.0,660.0 386.6,530.0" fill="none" stroke="#111111" stroke-width="2.4"/>
 <polyline points="459.1,650.4 446.5,657.3 393.1,527.3" fill="none" stroke="#7b2d8e" stroke-width="2.4"/>
-<text x="456.0" y="653.6" font-size="10" fill="#222">X5・P7・P8</text>
+<text x="456.0" y="653.6" font-size="10" fill="#222">P7・X5・P8</text>
 <polyline points="707.7,574.1 1056.2,352.3" fill="none" stroke="#555555" stroke-width="2.4"/>
 <polyline points="711.4,580.0 1060.0,358.2" fill="none" stroke="#555555" stroke-width="2.4"/>
 <polyline points="715.2,585.9 1063.8,364.1" fill="none" stroke="#555555" stroke-width="2.4"/>

@@ -69,9 +69,9 @@ BB_NET = {
     "GPIO21": "/TOUCH-CS", "GPIO34": "/TOUCH-IRQ", "GPIO25": "/I2C-SDA", "GPIO26": "/I2C-SCL",
     "GPIO36": "/ADC-3V3", "PI_TXD": "/PI-UART-TX-Pi", "PI_RXD": "/PI-UART-RX-Pi", "SERVO_SIG": "/SERVO-SIG",
 }
-# 板の外へ出る線（X1〜X5）の、板の外の端の部品 pin。X5 は J8−（ESP32 の GND の戻り。案B、ユーザーの決定 2026-11-23）へ挿す。
+# 板の外へ出る線（X1〜X4）の、板の外の端の部品 pin。X5 は、案Bの構成では B1 のレールを通らず、J8−（ESP32 の GND の戻り）から ESP32 board の GND pin へ直接つなぐ線として、下の POWER_WIRES に置く。
 OFFBOARD_END = {"X1": ("Pi", "J4", "8"), "X2": ("Pi", "J4", "10"), "X3": ("Pi", "J4", "39"),
-                "X4": ("SERVO", "M1", "yellow"), "X5": ("PROTO-02", "J8", "-")}
+                "X4": ("SERVO", "M1", "yellow")}
 
 # PROTO-02 の端子台から出る線。(id, 節点, 端1 (block, ref, pin), 端2, 線, 色)
 POWER_WIRES = [
@@ -82,6 +82,7 @@ POWER_WIRES = [
     ("P5", "/5V-NODE", ("PROTO-02", "J7", "+"), ("Pi", "J9", "VBUS"), "`CABLE-PI-PWR-01`（`109314` を切った導体）→ Pi の `PWR IN`", "#d62728"),
     ("P6", "/GND", ("PROTO-02", "J7", "-"), ("Pi", "J9", "GND"), "`CABLE-PI-PWR-01`（同上）", "#111111"),
     ("P7", "/5V-NODE", ("PROTO-02", "J8", "+"), ("B1", "U1", "J2-19"), "ESP32 の 5V pin へ（案B。往路の線とつなぎの部材は TBD（#405）。ブレッドボードの接点とジャンパー線は使わない。決まるまで J8 から ESP32 へ給電しない）", "#d62728"),
+    ("X5", "/GND", ("PROTO-02", "J8", "-"), ("B1", "U1", "J2-14"), "共通 GND の戻り（案B、ユーザーの決定 2026-11-23）。J8− が star point へ直結する。ESP32 board の GND pin（U1 pin J2-14）へ直接つなぐ。線とつなぎの部材は TBD（#405）で、ブレッドボードの接点とジャンパー線は使わない。B1 のレールの GND は、ESP32 board の別の GND pin を通る小電流の枝（周辺 module の 3V3 の枝）である", "#111111"),
     ("P8", "/ADC-SHUNT", ("PROTO-02", "W1", "1"), ("B1", "U1", "J2-7"), "`ADC-SHUNT`（GPIO32）へ。`111641` 1本を床側へ通す（`W1`）", "#7b2d8e"),
 ]
 
@@ -143,6 +144,8 @@ def collect_wires(bb):
         wires.append((f"N{n}", BB_NET[sig], (board_of(hole), None, None), ("LCD", "J1", str(n)),
                       f"首の線 LCD pin {n} {name}（{hole}）", "#9467bd", (strip(hole), None)))
     for xid, hole, sig, far, _state in bb.OFFBOARD:
+        if xid == "X5":
+            continue  # 案Bの構成の X5 は POWER_WIRES（B1 のレール穴を経路に入れない）
         blk, ref, pin = OFFBOARD_END[xid]
         color = SERVO_COLOR["yellow"] if xid == "X4" else "#555555"
         wires.append((xid, BB_NET[sig], (board_of(hole), None, None), (blk, ref, pin), f"{xid}（{hole} → {far}）", color, (strip(hole), None)))

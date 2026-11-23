@@ -56,7 +56,6 @@
 | X2 | `PI-UART-RX-Pi` | B1 | Pi（J4 pin 10） | X2（B1:D6 → Pi の header pin 10（GPIO15 `RXD`）） |
 | X3 | `GND` | B1 | Pi（J4 pin 39） | X3（B1:A18 → Pi の header pin 39（GND）） |
 | X4 | `SERVO-SIG` | B1 | SERVO（M1 pin yellow） | X4（B1:D7 → サーボの plug の黄の穴） |
-| X5 | `GND` | B1 | PROTO-02（J8 pin -） | X5（B1:-30 → 共通 GND（PROTO-02 の J8−。ESP32 の GND の戻りで、J8− が star point へ直結する。案B、ユーザーの決定 2026-11-23。案Bの戻りの線とつなぎの部材は TBD（#405）で、ブレッドボードの接点とジャンパー線は使わない）（ESP32 の GND をサーボの GND と共通にする線）） |
 | P1 | `5V-IN` | M-12001（PS1 pin +） | PROTO-02（J5 pin +） | M-12001 の線（Micro-B の手前で切った導体） |
 | P2 | `GND` | M-12001（PS1 pin -） | PROTO-02（J5 pin -） | M-12001 の線（同上） |
 | P3 | `5V-NODE` | PROTO-02（J6 pin +） | SERVO（M1 pin red） | サーボの赤（`111641` で延ばす。plug とのつなぎ方は #405） |
@@ -64,6 +63,7 @@
 | P5 | `5V-NODE` | PROTO-02（J7 pin +） | Pi（J9 pin VBUS） | `CABLE-PI-PWR-01`（`109314` を切った導体）→ Pi の `PWR IN` |
 | P6 | `GND` | PROTO-02（J7 pin -） | Pi（J9 pin GND） | `CABLE-PI-PWR-01`（同上） |
 | P7 | `5V-NODE` | PROTO-02（J8 pin +） | B1（U1 pin J2-19） | ESP32 の 5V pin へ（案B。往路の線とつなぎの部材は TBD（#405）。ブレッドボードの接点とジャンパー線は使わない。決まるまで J8 から ESP32 へ給電しない） |
+| X5 | `GND` | PROTO-02（J8 pin -） | B1（U1 pin J2-14） | 共通 GND の戻り（案B、ユーザーの決定 2026-11-23）。J8− が star point へ直結する。ESP32 board の GND pin（U1 pin J2-14）へ直接つなぐ。線とつなぎの部材は TBD（#405）で、ブレッドボードの接点とジャンパー線は使わない。B1 のレールの GND は、ESP32 board の別の GND pin を通る小電流の枝（周辺 module の 3V3 の枝）である |
 | P8 | `ADC-SHUNT` | PROTO-02（W1 pin 1） | B1（U1 pin J2-7） | `ADC-SHUNT`（GPIO32）へ。`111641` 1本を床側へ通す（`W1`） |
 
 サーボの3本：黄（信号）は B1 から X4、赤（5 V）と茶（GND）は PROTO-02 の J6 から（P3・P4）。
