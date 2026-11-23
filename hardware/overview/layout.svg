@@ -69,6 +69,6 @@
 <text x="656" y="533" font-size="9" fill="#555">M1</text>
 <text x="16" y="790" font-size="10" fill="#444">細い線＝1本ずつ（ID。サーボは黄・赤・茶）。太い線＝束（本数）。各線の節点と端は wiring-table.md。赤の破線＝TBD。描かない物：#18 の試験だけの物（端子台S、PSU、試験用の負荷、試験用の shunt。PROTO-02 の R20 とは別）。</text>
 <text x="16" y="804" font-size="10" fill="#c00">T1: サーボの plug とのつなぎ方（servo の枝の線の先）：#405</text>
-<text x="16" y="818" font-size="10" fill="#c00">T2: LCD の VCC（pin 1）の電圧：今は 3V3（J1 開放）。最終は、決める事実（`HW-TBD-024`・`HW-TBD-025`(a)）が揃うまで決められず、揃えば #405</text>
+<text x="16" y="818" font-size="10" fill="#c00">T2: LCD の VCC（pin 1）の電圧：今の構成（3V3 pin、J1 開放）は #461 の承認範囲で、段階Cへ広げない（段階Cでは DISP-01 を使わない）。最終は、`HW-TBD-024`・`HW-TBD-025`(a) と回路図の版の一致が揃えば #405</text>
 <text x="16" y="832" font-size="10" fill="#c00">T3: J8 の枝（P7・X5）の線とつなぎの部材（ESP32 board の `5V` pin・GND pin へ。ブレッドボードの接点とジャンパー線は使わない）：#405。決まるまで J8 から ESP32 へ給電しない</text>
 </svg>

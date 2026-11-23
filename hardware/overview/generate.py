@@ -32,8 +32,8 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 SCHEMATIC = HERE.parent / "deskcat.kicad_sch"
 NETLIST = HERE / "deskcat-netlist.xml"
-SCHEMATIC_SHA256 = "b00b2d7b6bc59829a3693a3c7acb24b50f3ca45ae8018622651ba61bcf942d28"
-NETLIST_SHA256 = "8e83dba3deac6770c6f1e534c9774614eea4df64eb5de6b622dacc039dd72421"
+SCHEMATIC_SHA256 = "06bfa263c0d11d83f39caedc8583b3db2001d3904e549483e89c699d0e40f08f"
+NETLIST_SHA256 = "077d26a8bcac1ac835f1b52f9f0cce0cae02f02a61a36555ab8591c34cc91420"
 
 # ---------------------------------------------------------------- まとまり（ブロック）
 
@@ -89,7 +89,7 @@ POWER_WIRES = [
 # 決まっていない所。図に破線と `TBD` で描き、線の検査からは除く。
 TBD = [
     ("T1", "PROTO-02", "SERVO", "サーボの plug とのつなぎ方（servo の枝の線の先）：#405"),
-    ("T2", "B2", "LCD", "LCD の VCC（pin 1）の電圧：今は 3V3（J1 開放）。最終は、決める事実（`HW-TBD-024`・`HW-TBD-025`(a)）が揃うまで決められず、揃えば #405"),
+    ("T2", "B2", "LCD", "LCD の VCC（pin 1）の電圧：今の構成（3V3 pin、J1 開放）は #461 の承認範囲で、段階Cへ広げない（段階Cでは DISP-01 を使わない）。最終は、`HW-TBD-024`・`HW-TBD-025`(a) と回路図の版の一致が揃えば #405"),
     ("T3", "PROTO-02", "B1", "J8 の枝（P7・X5）の線とつなぎの部材（ESP32 board の `5V` pin・GND pin へ。ブレッドボードの接点とジャンパー線は使わない）：#405。決まるまで J8 から ESP32 へ給電しない"),
 ]
 
