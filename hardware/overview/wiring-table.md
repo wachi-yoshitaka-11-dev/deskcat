@@ -1,7 +1,7 @@
 <!-- generate.py が生成する。手で直さない。 -->
 # 全体の配線（最終形のつながり）
 
-ブレッドボード（B1・B2・B3）、電源の基板 `PROTO-02`、Pi、サーボ、LCD、AC アダプター M-12001 の、**最終形のつながり**である。つながりの正本は回路図 [`../deskcat.kicad_sch`](../deskcat.kicad_sch) で、この表と [`layout.svg`](layout.svg) は、回路図から書き出した netlist（[`deskcat-netlist.xml`](deskcat-netlist.xml)）から生成する。位置は胴の中の位置関係（[enclosure-and-neck.md](../../docs/hardware/enclosure-and-neck.md) の`物理的な完成形`）だけで、寸法は表さない。電源の基板は未実装の計画である（[universal-board/plan.md](../universal-board/plan.md)、#405）。この表は配線・通電の許可ではない。
+ブレッドボード（B1・B2・B3）、電源の基板 `PROTO-02`、Pi、サーボ、LCD、AC アダプター M-12001 の、**最終形のつながり**である。つながりの正本は回路図 [`../deskcat.kicad_sch`](../deskcat.kicad_sch) で、この表と [`layout.svg`](layout.svg) は、回路図から書き出した netlist（[`deskcat-netlist.xml`](deskcat-netlist.xml)）から生成する。位置は胴の中の位置関係（[enclosure-and-neck.md](../../docs/hardware/enclosure-and-neck.md) の`物理的な完成形`）だけで、寸法は表さない。電源の基板は未実装の計画である（[universal-board/plan.md](../universal-board/plan.md)、#405）。この表は配線・通電の許可ではない。X1〜X3（Pi との UART の2本と GND の線）は、案Bの構成では、gpio-assignment.md の`信号線をつないでよい条件`の5との関係が #405 で決まるまでつながない（power-budget.md の`ESP32の給電経路`。X3 の扱いは #803）。この表の X1〜X3 は、つなぐときの接続先の記録である。
 
 **描かない物：**#18 の試験の間だけの物（端子台S、`PSU-BENCH-01`、試験用の負荷、試験用の shunt。PROTO-02 の R20 とは別）。それらは [`../bench-18/`](../bench-18/wiring-table.md) にある。
 
