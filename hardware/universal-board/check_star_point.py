@@ -170,7 +170,7 @@ def main():
     # 1. shunt は ADC-SHUNT（servo の側）と GND（star の側）の間だけにある
     if padnet[(SHUNT, "1")] != "/ADC-SHUNT" or padnet[(SHUNT, "2")] != "/GND":
         errors.append(f"{SHUNT} の足1 が /ADC-SHUNT、足2 が /GND でない（{padnet[(SHUNT, '1')]}、{padnet[(SHUNT, '2')]}）")
-    # 2. ADC-SHUNT の導体の net に、Pi・logic・ingress の GND の足が無い
+    # 2. ADC-SHUNT の導体の net に、ingress（J5−）・Pi（J7−）・logic（J8−）の GND と Gate の戻り（R18 の足2）が無い
     for k in (J5M, J7M, J8M, R18_2):
         if padnet[k] != "/GND":
             errors.append(f"{k[0]} の {k[1]} が /GND の net でない（{padnet[k]}）")
@@ -237,7 +237,7 @@ def main():
                 for b_ in range(len(names)):
                     if a_ != b_ and {names[a_], names[b_]} != {"C1−", "C2−"} and path(gnd, terms[names[a_]], terms[names[b_]], skip=nset) is not None:
                         errors.append(f"{names[a_]} は node を通らずに {names[b_]} へつながる導体がある（迂回）")
-            # J5−・J7−・J8−・R18 の足2・C1−・C2− の足が、B と J5− の間の導体の上にない
+            # J7−・J8−・R18 の足2・C1−・C2− の足が、B と J5− の間の導体の上にない
             for nm, p in terms.items():
                 if p in nset:
                     errors.append(f"{nm} の足が B と J5− の間の導体の上にある（servo の電流が流れる穴）")
@@ -247,7 +247,7 @@ def main():
                 errors.append(f"{cref} の − が /GND の net でない（{padnet[(cref, '-')]}。servo の過渡電流が shunt を通らない）")
             if pads[(cref, "-")] in A:
                 errors.append(f"{cref} の − が /ADC-SHUNT の導体（A の node）の上にある")
-    # 2'. ADC-SHUNT の導体は、Pi・logic・ingress の足を含まない
+    # 2'. ADC-SHUNT の導体は、J5−・J7−・J8−・R18 の足2 を含まない（C1・C2 の−は下で別に確かめる）
     for k in (J5M, J7M, J8M, R18_2):
         if pads[k] in A:
             errors.append(f"{k[0]} の足が /ADC-SHUNT の導体の上にある")

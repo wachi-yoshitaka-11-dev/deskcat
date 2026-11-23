@@ -530,7 +530,7 @@ def front_svg(board):
     o.append(f'<text x="{wbx + 8:.1f}" y="{wtop + 14:.1f}" font-size="10" font-weight="bold" fill="#333">{esc(ttl)}</text>')
     o.append(f'<text x="{wbx + 8:.1f}" y="{wtop + 28:.1f}" font-size="9" fill="#333">{esc(wtxt)}</text>')
     o.append(f'<path d="M{wx:.1f} {wy:.1f} C{wx + 70:.1f} {wy:.1f} {wbx + 20:.1f} {(wy + wtop) / 2:.1f} {wbx + 20:.1f} {wtop + 36:.1f}" stroke="{COLOR_HEX["紫"]}" stroke-width="3" fill="none" stroke-dasharray="7 4"/>')
-    # 部品の名前：板の下の空き（列 2〜12、行 3〜8）に左揃えで積み、各部品へ引き出し線を引く
+    # 部品の名前：板の右上の空き（図の上が行1。列 22.6 から右、行 3.2 から 1.15 行ずつ下）に左揃えで積み、各部品へ引き出し線を引く
     def anchor_of(ref, where):
         f = next(q for q in parts if q["ref"] == ref)
         r = fab_rect(f)
