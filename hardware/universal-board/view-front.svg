@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1360 1271" font-family="Noto Sans CJK JP, Hiragino Sans, Meiryo, sans-serif" font-size="13">
-<rect width="1360" height="1271" fill="#fff"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1360 1315" font-family="Noto Sans CJK JP, Hiragino Sans, Meiryo, sans-serif" font-size="13">
+<rect width="1360" height="1315" fill="#fff"/>
 <text x="30" y="36" font-size="22" font-weight="bold">PROTO-02 の実装の計画（部品面。真上から見る）</text>
 <text x="30" y="62" fill="#444">生成元: hardware/universal-board/render_view.py（基板ファイルから）。描き方はブレッドボードの図（hardware/breadboard-rebuild/generate.py）と同じ。</text>
 <rect x="360.0" y="240.0" width="623.6" height="411.4" rx="10" fill="#f4f4f0" stroke="#888"/>
@@ -499,16 +499,16 @@
 <circle cx="957.6" cy="625.4" r="13.9" fill="#fff" stroke="#888"/>
 <circle cx="386.0" cy="266.0" r="13.9" fill="#fff" stroke="#888"/>
 <text x="360.0" y="228.0" font-size="17" font-weight="bold">PROTO-02 部品面</text>
-<rect x="616.0" y="164.0" width="371.8" height="36" rx="6" fill="#f4f4f4" stroke="#555" stroke-dasharray="5 3" opacity="0.5"/>
-<text x="624.0" y="178.0" font-size="10" font-weight="bold" fill="#333">板の外（B1）</text>
-<text x="624.0" y="192.0" font-size="9" fill="#333">J8 logic の端子台 → B1（ESP32 の 5V pin へ。J8− は ESP32 の GND の戻り）</text>
-<path d="M628.0 423.9 Q628.0 311.9 628.0 200.0" stroke="#d62728" stroke-width="3" fill="none"/>
-<path d="M650.0 423.9 Q650.0 311.9 650.0 200.0" stroke="#111111" stroke-width="3" fill="none"/>
+<rect x="550.0" y="164.0" width="371.8" height="36" rx="6" fill="#f4f4f4" stroke="#555" stroke-dasharray="5 3" opacity="0.5"/>
+<text x="558.0" y="178.0" font-size="10" font-weight="bold" fill="#333">板の外（B1）</text>
+<text x="558.0" y="192.0" font-size="9" fill="#333">J8 logic の端子台 → B1（ESP32 の 5V pin へ。J8− は ESP32 の GND の戻り）</text>
+<path d="M562.0 423.9 Q562.0 311.9 562.0 200.0" stroke="#d62728" stroke-width="3" fill="none"/>
+<path d="M584.0 423.9 Q584.0 311.9 584.0 200.0" stroke="#111111" stroke-width="3" fill="none"/>
 <rect x="770.0" y="751.4" width="249.4" height="36" rx="6" fill="#f4f4f4" stroke="#555" stroke-dasharray="5 3" opacity="0.5"/>
 <text x="778.0" y="765.4" font-size="10" font-weight="bold" fill="#333">板の外（Pi）</text>
 <text x="778.0" y="779.4" font-size="9" fill="#333">J7 Pi の端子台 → Pi（PWR IN。CABLE-PI-PWR-01）</text>
-<path d="M804.0 533.9 Q804.0 642.6 804.0 751.4" stroke="#d62728" stroke-width="3" fill="none"/>
-<path d="M782.0 533.9 Q782.0 642.6 782.0 751.4" stroke="#111111" stroke-width="3" fill="none"/>
+<path d="M804.0 555.9 Q804.0 653.6 804.0 751.4" stroke="#d62728" stroke-width="3" fill="none"/>
+<path d="M782.0 555.9 Q782.0 653.6 782.0 751.4" stroke="#111111" stroke-width="3" fill="none"/>
 <rect x="82.8" y="449.9" width="203.2" height="86.0" rx="6" fill="#f4f4f4" stroke="#555" stroke-dasharray="5 3" opacity="0.5"/>
 <text x="90.8" y="465.9" font-size="10" font-weight="bold" fill="#333">板の外（M-12001）</text>
 <text x="278.0" y="485.9" text-anchor="end" font-size="9" fill="#333">J5 入力の端子台</text>
@@ -518,35 +518,45 @@
 <rect x="704.0" y="701.4" width="452.4" height="36" rx="6" fill="#f4f4f4" stroke="#555" stroke-dasharray="5 3" opacity="0.5"/>
 <text x="712.0" y="715.4" font-size="10" font-weight="bold" fill="#333">板の外（servo）</text>
 <text x="712.0" y="729.4" font-size="9" fill="#333">J6 servo の端子台 → servo（赤＝5 V、茶＝GND。ふたの切り込みから。plug とのつなぎ方は #405）</text>
-<path d="M738.0 511.9 Q738.0 606.6 738.0 701.4" stroke="#d62728" stroke-width="3" fill="none"/>
-<path d="M716.0 511.9 Q716.0 606.6 716.0 701.4" stroke="#111111" stroke-width="3" fill="none"/>
-<g data-ref="R18" data-lib="R_Vertical_P5.08" data-at="120.78,113.61" data-rot="180" data-pads="1@120.78,113.61=/Q1-GATE;2@120.78,108.53=/GND">
-<line x1="540.0" y1="357.9" x2="540.0" y2="313.9" stroke="#7a6a50" stroke-width="3"/>
-<rect x="529.2" y="347.1" width="21.7" height="21.7" rx="4" fill="#e9d3a5" stroke="#7a6a50" stroke-dasharray="3 2"/>
+<path d="M738.0 467.9 Q738.0 584.6 738.0 701.4" stroke="#d62728" stroke-width="3" fill="none"/>
+<path d="M716.0 467.9 Q716.0 584.6 716.0 701.4" stroke="#111111" stroke-width="3" fill="none"/>
+<g data-ref="C2" data-lib="C_Radial_D8_P5.08" data-at="156.34,111.07" data-rot="90" data-pads="+@156.34,111.07=/5V-SERVO;-@156.34,116.15=/GND">
+<circle cx="848.0" cy="357.9" r="34.6" fill="#33415c" stroke="#111" stroke-width="1.2"/>
+<path d="M813.3 357.9 A34.6 34.6 0 0 0 882.6 357.9 Z" fill="#9aa4b8" opacity="0.7"/>
 </g>
-<g data-ref="F1" data-lib="PTC_MF-R135_Radial_P5.08" data-at="113.16,118.69" data-rot="0" data-pads="a@113.16,118.69=/5V-IN;b@118.24,118.69=/5V-PTC">
-<rect x="457.4" y="388.9" width="77.1" height="26.0" rx="13.0" fill="#e6c53c" stroke="#8a7414" stroke-width="1.2"/>
+<g data-ref="F2" data-lib="PTC_MF-R135_Radial_P5.08" data-at="143.64,113.61" data-rot="0" data-pads="a@143.64,113.61=/5V-NODE;b@148.72,113.61=/5V-SERVO">
+<rect x="721.4" y="344.9" width="77.1" height="26.0" rx="13.0" fill="#e6c53c" stroke="#8a7414" stroke-width="1.2"/>
 </g>
-<g data-ref="C2" data-lib="C_Radial_D8_P5.08" data-at="143.64,118.69" data-rot="90" data-pads="+@143.64,118.69=/5V-NODE;-@143.64,123.77=/GND">
-<circle cx="738.0" cy="423.9" r="34.6" fill="#33415c" stroke="#111" stroke-width="1.2"/>
-<path d="M703.3 423.9 A34.6 34.6 0 0 0 772.6 423.9 Z" fill="#9aa4b8" opacity="0.7"/>
+<g data-ref="R18" data-lib="R_Vertical_P5.08" data-at="113.16,116.15" data-rot="180" data-pads="1@113.16,116.15=/Q1-GATE;2@113.16,111.07=/GND">
+<line x1="474.0" y1="379.9" x2="474.0" y2="335.9" stroke="#7a6a50" stroke-width="3"/>
+<rect x="463.2" y="369.1" width="21.7" height="21.7" rx="4" fill="#e9d3a5" stroke="#7a6a50" stroke-dasharray="3 2"/>
 </g>
-<g data-ref="C1" data-lib="C_Radial_D8_P5.08" data-at="153.8,118.69" data-rot="90" data-pads="+@153.8,118.69=/5V-NODE;-@153.8,123.77=/GND">
-<circle cx="826.0" cy="423.9" r="34.6" fill="#33415c" stroke="#111" stroke-width="1.2"/>
-<path d="M791.3 423.9 A34.6 34.6 0 0 0 860.6 423.9 Z" fill="#9aa4b8" opacity="0.7"/>
+<g data-ref="Q1" data-lib="2SJ334_SC-67_Vertical_MarkRight" data-at="118.24,116.15" data-rot="180" data-pads="1@118.24,111.07=/Q1-GATE;2@118.24,113.61=/5V-IN;3@118.24,116.15=/5V-NODE">
+<rect x="498.5" y="314.6" width="39.0" height="86.6" rx="2" fill="#555a62" stroke="#222" stroke-width="1.2"/>
+<line x1="498.5" y1="316.6" x2="498.5" y2="399.2" stroke="#d8d8d8" stroke-width="3"/>
 </g>
-<g data-ref="Q1" data-lib="2SJ334_SC-67_Vertical_MarkRight" data-at="125.86,121.23" data-rot="180" data-pads="1@125.86,116.15=/Q1-GATE;2@125.86,118.69=/5V-PTC;3@125.86,121.23=/5V-NODE">
-<rect x="564.5" y="358.6" width="39.0" height="86.6" rx="2" fill="#555a62" stroke="#222" stroke-width="1.2"/>
-<line x1="564.5" y1="360.6" x2="564.5" y2="443.2" stroke="#d8d8d8" stroke-width="3"/>
+<g data-ref="F1" data-lib="PTC_MF-R135_Radial_P5.08" data-at="130.94,116.15" data-rot="0" data-pads="a@130.94,116.15=/5V-NODE;b@136.02,116.15=/5V-LOGIC">
+<rect x="611.4" y="366.9" width="77.1" height="26.0" rx="13.0" fill="#e6c53c" stroke="#8a7414" stroke-width="1.2"/>
 </g>
-<g data-ref="J8" data-lib="TB_114217_WireFloor" data-at="130.94,121.23" data-rot="0" data-pads="+@130.94,121.23=/5V-NODE;-@133.48,121.23=/GND">
-<rect x="615.0" y="397.0" width="48.0" height="53.7" rx="3" fill="#dde6f5" stroke="#335" stroke-width="1.2"/>
-<rect x="619.1" y="397.0" width="39.8" height="11.3" fill="#334" opacity="0.8" stroke="#000" stroke-dasharray="3 2"/>
-<circle cx="628.0" cy="423.9" r="8.7" fill="#c9ccd0" stroke="#222" stroke-dasharray="3 2"/>
-<circle cx="650.0" cy="423.9" r="8.7" fill="#c9ccd0" stroke="#222" stroke-dasharray="3 2"/>
+<g data-ref="J8" data-lib="TB_114217_WireFloor" data-at="123.32,121.23" data-rot="0" data-pads="+@123.32,121.23=/5V-LOGIC;-@125.86,121.23=/GND">
+<rect x="549.0" y="397.0" width="48.0" height="53.7" rx="3" fill="#dde6f5" stroke="#335" stroke-width="1.2"/>
+<rect x="553.1" y="397.0" width="39.8" height="11.3" fill="#334" opacity="0.8" stroke="#000" stroke-dasharray="3 2"/>
+<circle cx="562.0" cy="423.9" r="8.7" fill="#c9ccd0" stroke="#222" stroke-dasharray="3 2"/>
+<circle cx="584.0" cy="423.9" r="8.7" fill="#c9ccd0" stroke="#222" stroke-dasharray="3 2"/>
 </g>
-<g data-ref="W1" data-lib="WireExit_1.0" data-at="138.56,126.31" data-rot="0" data-pads="1@138.56,126.31=/ADC-SHUNT">
-<circle cx="694.0" cy="467.9" r="11.3" fill="#fff" stroke="#9467bd" stroke-width="2.5"/>
+<g data-ref="W2" data-lib="WireJumper_dx7_dy-4" data-at="105.54,123.77" data-rot="0" data-pads="1@105.54,123.77=/5V-IN;2@123.32,113.61=/5V-IN">
+<circle cx="408.0" cy="445.9" r="11.3" fill="#fff" stroke="#d62728" stroke-width="2.5"/>
+<circle cx="562.0" cy="357.9" r="11.3" fill="#fff" stroke="#d62728" stroke-width="2.5"/>
+</g>
+<g data-ref="C1" data-lib="C_Radial_D8_P5.08" data-at="151.26,123.77" data-rot="90" data-pads="+@151.26,123.77=/5V-SERVO;-@151.26,128.85=/GND">
+<circle cx="804.0" cy="467.9" r="34.6" fill="#33415c" stroke="#111" stroke-width="1.2"/>
+<path d="M769.3 467.9 A34.6 34.6 0 0 0 838.6 467.9 Z" fill="#9aa4b8" opacity="0.7"/>
+</g>
+<g data-ref="J6" data-lib="TB_114217_WireLid" data-at="143.64,126.31" data-rot="0" data-pads="+@143.64,126.31=/5V-SERVO;-@141.1,126.31=/ADC-SHUNT">
+<rect x="703.0" y="441.0" width="48.0" height="53.7" rx="3" fill="#dde6f5" stroke="#335" stroke-width="1.2"/>
+<rect x="707.1" y="483.5" width="39.8" height="11.3" fill="#334" opacity="0.8" stroke="#000" stroke-dasharray="3 2"/>
+<circle cx="738.0" cy="467.9" r="8.7" fill="#c9ccd0" stroke="#222" stroke-dasharray="3 2"/>
+<circle cx="716.0" cy="467.9" r="8.7" fill="#c9ccd0" stroke="#222" stroke-dasharray="3 2"/>
 </g>
 <g data-ref="J5" data-lib="TB_114217_WireLeft" data-at="105.54,128.85" data-rot="0" data-pads="+@105.54,128.85=/5V-IN;-@105.54,131.39=/GND">
 <rect x="381.1" y="476.9" width="53.7" height="48.0" rx="3" fill="#dde6f5" stroke="#335" stroke-width="1.2"/>
@@ -554,176 +564,206 @@
 <circle cx="408.0" cy="489.9" r="8.7" fill="#c9ccd0" stroke="#222" stroke-dasharray="3 2"/>
 <circle cx="408.0" cy="511.9" r="8.7" fill="#c9ccd0" stroke="#222" stroke-dasharray="3 2"/>
 </g>
+<g data-ref="W1" data-lib="WireExit_1.0" data-at="138.56,128.85" data-rot="0" data-pads="1@138.56,128.85=/ADC-SHUNT">
+<circle cx="694.0" cy="489.9" r="11.3" fill="#fff" stroke="#9467bd" stroke-width="2.5"/>
+</g>
 <g data-ref="R20" data-lib="SHUNT_SQP5W_Lying_P27.94" data-at="138.56,131.39" data-rot="90" data-pads="1@138.56,131.39=/ADC-SHUNT;2@110.62,131.39=/GND">
 <line x1="694.0" y1="511.9" x2="668.3" y2="511.9" stroke="#7a6a50" stroke-width="3"/>
 <line x1="452.0" y1="511.9" x2="477.7" y2="511.9" stroke="#7a6a50" stroke-width="3"/>
 <rect x="477.7" y="468.6" width="190.6" height="86.6" rx="4" fill="#f3efe6" stroke="#7a6a50" stroke-width="1.2"/>
 <text x="573.0" y="515.9" text-anchor="middle" font-size="11" fill="#5a4a30">0.1Ω 5W</text>
 </g>
-<g data-ref="J6" data-lib="TB_114217_WireLid" data-at="143.64,131.39" data-rot="0" data-pads="+@143.64,131.39=/5V-NODE;-@141.1,131.39=/ADC-SHUNT">
-<rect x="703.0" y="485.0" width="48.0" height="53.7" rx="3" fill="#dde6f5" stroke="#335" stroke-width="1.2"/>
-<rect x="707.1" y="527.5" width="39.8" height="11.3" fill="#334" opacity="0.8" stroke="#000" stroke-dasharray="3 2"/>
-<circle cx="738.0" cy="511.9" r="8.7" fill="#c9ccd0" stroke="#222" stroke-dasharray="3 2"/>
-<circle cx="716.0" cy="511.9" r="8.7" fill="#c9ccd0" stroke="#222" stroke-dasharray="3 2"/>
+<g data-ref="J7" data-lib="TB_114217_WireLid" data-at="151.26,136.47" data-rot="0" data-pads="+@151.26,136.47=/5V-LOGIC;-@148.72,136.47=/GND">
+<rect x="769.0" y="529.0" width="48.0" height="53.7" rx="3" fill="#dde6f5" stroke="#335" stroke-width="1.2"/>
+<rect x="773.1" y="571.5" width="39.8" height="11.3" fill="#334" opacity="0.8" stroke="#000" stroke-dasharray="3 2"/>
+<circle cx="804.0" cy="555.9" r="8.7" fill="#c9ccd0" stroke="#222" stroke-dasharray="3 2"/>
+<circle cx="782.0" cy="555.9" r="8.7" fill="#c9ccd0" stroke="#222" stroke-dasharray="3 2"/>
 </g>
-<g data-ref="J7" data-lib="TB_114217_WireLid" data-at="151.26,133.93" data-rot="0" data-pads="+@151.26,133.93=/5V-NODE;-@148.72,133.93=/GND">
-<rect x="769.0" y="507.0" width="48.0" height="53.7" rx="3" fill="#dde6f5" stroke="#335" stroke-width="1.2"/>
-<rect x="773.1" y="549.5" width="39.8" height="11.3" fill="#334" opacity="0.8" stroke="#000" stroke-dasharray="3 2"/>
-<circle cx="804.0" cy="533.9" r="8.7" fill="#c9ccd0" stroke="#222" stroke-dasharray="3 2"/>
-<circle cx="782.0" cy="533.9" r="8.7" fill="#c9ccd0" stroke="#222" stroke-dasharray="3 2"/>
-</g>
-<g data-ftrack="/5V-IN:105.54,123.77-105.54,118.69" data-layer="B.Cu"><line x1="408.0" y1="445.9" x2="408.0" y2="401.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/5V-IN:128.4,125.29-128.4,113.61" data-layer="F.Cu"><line x1="606.0" y1="459.1" x2="606.0" y2="357.9" stroke="#d62728" stroke-width="3" stroke-dasharray="9 5" stroke-linecap="butt"/></g>
+<g data-ftrack="/5V-IN:105.54,123.77-105.54,125.29" data-layer="F.Cu"><line x1="408.0" y1="445.9" x2="408.0" y2="459.1" stroke="#d62728" stroke-width="3" stroke-dasharray="9 5" stroke-linecap="butt"/></g>
+<g data-ftrack="/5V-IN:128.4,113.61-123.32,113.61" data-layer="F.Cu"><line x1="606.0" y1="357.9" x2="562.0" y2="357.9" stroke="#d62728" stroke-width="3" stroke-dasharray="9 5" stroke-linecap="butt"/></g>
+<g data-ftrack="/5V-IN:105.54,125.29-128.4,125.29" data-layer="F.Cu"><line x1="408.0" y1="459.1" x2="606.0" y2="459.1" stroke="#d62728" stroke-width="3" stroke-dasharray="9 5" stroke-linecap="butt"/></g>
+<g data-ftrack="/5V-IN:118.24,113.61-123.32,113.61" data-layer="B.Cu"><line x1="518.0" y1="357.9" x2="562.0" y2="357.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
 <g data-ftrack="/5V-IN:105.54,128.85-105.54,123.77" data-layer="B.Cu"><line x1="408.0" y1="489.9" x2="408.0" y2="445.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/5V-IN:110.62,118.69-113.16,118.69" data-layer="B.Cu"><line x1="452.0" y1="401.9" x2="474.0" y2="401.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/5V-IN:105.54,118.69-110.62,118.69" data-layer="B.Cu"><line x1="408.0" y1="401.9" x2="452.0" y2="401.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/5V-PTC:118.24,118.69-123.32,118.69" data-layer="B.Cu"><line x1="518.0" y1="401.9" x2="562.0" y2="401.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/5V-PTC:123.32,118.69-125.86,118.69" data-layer="B.Cu"><line x1="562.0" y1="401.9" x2="584.0" y2="401.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/5V-NODE:143.64,126.31-143.64,131.39" data-layer="B.Cu"><line x1="738.0" y1="467.9" x2="738.0" y2="511.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/5V-NODE:130.94,118.69-136.02,118.69" data-layer="B.Cu"><line x1="628.0" y1="401.9" x2="672.0" y2="401.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/5V-NODE:141.1,118.69-141.1,123.77" data-layer="B.Cu"><line x1="716.0" y1="401.9" x2="716.0" y2="445.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/5V-NODE:125.86,121.23-130.94,121.23" data-layer="B.Cu"><line x1="584.0" y1="423.9" x2="628.0" y2="423.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/5V-NODE:143.64,118.69-148.72,118.69" data-layer="B.Cu"><line x1="738.0" y1="401.9" x2="782.0" y2="401.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/5V-NODE:136.02,118.69-141.1,118.69" data-layer="B.Cu"><line x1="672.0" y1="401.9" x2="716.0" y2="401.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/5V-NODE:141.1,126.31-143.64,126.31" data-layer="B.Cu"><line x1="716.0" y1="467.9" x2="738.0" y2="467.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/5V-NODE:141.1,123.77-141.1,126.31" data-layer="B.Cu"><line x1="716.0" y1="445.9" x2="716.0" y2="467.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/5V-NODE:130.94,121.23-130.94,118.69" data-layer="B.Cu"><line x1="628.0" y1="423.9" x2="628.0" y2="401.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/5V-NODE:143.64,131.39-148.72,131.39" data-layer="B.Cu"><line x1="738.0" y1="511.9" x2="782.0" y2="511.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/5V-NODE:148.72,118.69-153.8,118.69" data-layer="B.Cu"><line x1="782.0" y1="401.9" x2="826.0" y2="401.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/5V-NODE:148.72,131.39-151.26,131.39" data-layer="B.Cu"><line x1="782.0" y1="511.9" x2="804.0" y2="511.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/5V-NODE:151.26,131.39-151.26,133.93" data-layer="B.Cu"><line x1="804.0" y1="511.9" x2="804.0" y2="533.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/5V-NODE:141.1,118.69-143.64,118.69" data-layer="B.Cu"><line x1="716.0" y1="401.9" x2="738.0" y2="401.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/Q1-GATE:125.86,116.15-125.86,113.61" data-layer="B.Cu"><line x1="584.0" y1="379.9" x2="584.0" y2="357.9" stroke="#ff7f0e" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/Q1-GATE:125.86,113.61-120.78,113.61" data-layer="B.Cu"><line x1="584.0" y1="357.9" x2="540.0" y2="357.9" stroke="#ff7f0e" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:153.8,136.47-148.72,136.47" data-layer="B.Cu"><line x1="826.0" y1="555.9" x2="782.0" y2="555.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:153.8,123.77-153.8,128.85" data-layer="B.Cu"><line x1="826.0" y1="445.9" x2="826.0" y2="489.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:133.48,136.47-128.4,136.47" data-layer="B.Cu"><line x1="650.0" y1="555.9" x2="606.0" y2="555.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:138.56,136.47-133.48,136.47" data-layer="B.Cu"><line x1="694.0" y1="555.9" x2="650.0" y2="555.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:115.7,118.69-115.7,121.23" data-layer="B.Cu"><line x1="496.0" y1="401.9" x2="496.0" y2="423.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:118.24,133.93-113.16,133.93" data-layer="B.Cu"><line x1="518.0" y1="533.9" x2="474.0" y2="533.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:128.4,136.47-123.32,136.47" data-layer="B.Cu"><line x1="606.0" y1="555.9" x2="562.0" y2="555.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:128.4,133.93-123.32,133.93" data-layer="B.Cu"><line x1="606.0" y1="533.9" x2="562.0" y2="533.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:110.62,126.31-110.62,131.39" data-layer="B.Cu"><line x1="452.0" y1="467.9" x2="452.0" y2="511.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:113.16,131.39-110.62,131.39" data-layer="B.Cu"><line x1="474.0" y1="511.9" x2="452.0" y2="511.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:120.78,108.53-115.7,108.53" data-layer="B.Cu"><line x1="540.0" y1="313.9" x2="496.0" y2="313.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:113.16,123.77-113.16,128.85" data-layer="B.Cu"><line x1="474.0" y1="445.9" x2="474.0" y2="489.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:128.4,123.77-123.32,123.77" data-layer="B.Cu"><line x1="606.0" y1="445.9" x2="562.0" y2="445.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:148.72,123.77-153.8,123.77" data-layer="B.Cu"><line x1="782.0" y1="445.9" x2="826.0" y2="445.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:113.16,133.93-110.62,133.93" data-layer="B.Cu"><line x1="474.0" y1="533.9" x2="452.0" y2="533.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:148.72,133.93-143.64,133.93" data-layer="B.Cu"><line x1="782.0" y1="533.9" x2="738.0" y2="533.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:113.16,136.47-108.08,136.47" data-layer="B.Cu"><line x1="474.0" y1="555.9" x2="430.0" y2="555.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:118.24,136.47-113.16,136.47" data-layer="B.Cu"><line x1="518.0" y1="555.9" x2="474.0" y2="555.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:143.64,123.77-148.72,123.77" data-layer="B.Cu"><line x1="738.0" y1="445.9" x2="782.0" y2="445.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:110.62,133.93-110.62,131.39" data-layer="B.Cu"><line x1="452.0" y1="533.9" x2="452.0" y2="511.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:133.48,121.23-133.48,123.77" data-layer="B.Cu"><line x1="650.0" y1="423.9" x2="650.0" y2="445.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:133.48,133.93-128.4,133.93" data-layer="B.Cu"><line x1="650.0" y1="533.9" x2="606.0" y2="533.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:143.64,136.47-138.56,136.47" data-layer="B.Cu"><line x1="738.0" y1="555.9" x2="694.0" y2="555.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:118.24,123.77-113.16,123.77" data-layer="B.Cu"><line x1="518.0" y1="445.9" x2="474.0" y2="445.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:123.32,136.47-118.24,136.47" data-layer="B.Cu"><line x1="562.0" y1="555.9" x2="518.0" y2="555.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:110.62,121.23-110.62,126.31" data-layer="B.Cu"><line x1="452.0" y1="423.9" x2="452.0" y2="467.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:153.8,128.85-153.8,133.93" data-layer="B.Cu"><line x1="826.0" y1="489.9" x2="826.0" y2="533.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:138.56,133.93-133.48,133.93" data-layer="B.Cu"><line x1="694.0" y1="533.9" x2="650.0" y2="533.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:143.64,133.93-138.56,133.93" data-layer="B.Cu"><line x1="738.0" y1="533.9" x2="694.0" y2="533.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:123.32,123.77-118.24,123.77" data-layer="B.Cu"><line x1="562.0" y1="445.9" x2="518.0" y2="445.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:115.7,108.53-115.7,113.61" data-layer="B.Cu"><line x1="496.0" y1="313.9" x2="496.0" y2="357.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:153.8,133.93-153.8,136.47" data-layer="B.Cu"><line x1="826.0" y1="533.9" x2="826.0" y2="555.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:123.32,133.93-118.24,133.93" data-layer="B.Cu"><line x1="562.0" y1="533.9" x2="518.0" y2="533.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/5V-NODE:123.32,116.15-128.4,116.15" data-layer="B.Cu"><line x1="562.0" y1="379.9" x2="606.0" y2="379.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/5V-NODE:133.48,116.15-133.48,113.61" data-layer="B.Cu"><line x1="650.0" y1="379.9" x2="650.0" y2="357.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/5V-NODE:130.94,116.15-133.48,116.15" data-layer="B.Cu"><line x1="628.0" y1="379.9" x2="650.0" y2="379.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/5V-NODE:118.24,116.15-123.32,116.15" data-layer="B.Cu"><line x1="518.0" y1="379.9" x2="562.0" y2="379.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/5V-NODE:138.56,113.61-143.64,113.61" data-layer="B.Cu"><line x1="694.0" y1="357.9" x2="738.0" y2="357.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/5V-NODE:133.48,113.61-138.56,113.61" data-layer="B.Cu"><line x1="650.0" y1="357.9" x2="694.0" y2="357.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/5V-NODE:128.4,116.15-130.94,116.15" data-layer="B.Cu"><line x1="606.0" y1="379.9" x2="628.0" y2="379.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/Q1-GATE:118.24,111.07-115.7,111.07" data-layer="B.Cu"><line x1="518.0" y1="335.9" x2="496.0" y2="335.9" stroke="#2ca02c" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/Q1-GATE:115.7,116.15-113.16,116.15" data-layer="B.Cu"><line x1="496.0" y1="379.9" x2="474.0" y2="379.9" stroke="#2ca02c" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/Q1-GATE:115.7,111.07-115.7,116.15" data-layer="B.Cu"><line x1="496.0" y1="335.9" x2="496.0" y2="379.9" stroke="#2ca02c" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
 <g data-ftrack="/GND:148.72,136.47-143.64,136.47" data-layer="B.Cu"><line x1="782.0" y1="555.9" x2="738.0" y2="555.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:133.48,123.77-128.4,123.77" data-layer="B.Cu"><line x1="650.0" y1="445.9" x2="606.0" y2="445.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:113.16,128.85-113.16,131.39" data-layer="B.Cu"><line x1="474.0" y1="489.9" x2="474.0" y2="511.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:115.7,121.23-110.62,121.23" data-layer="B.Cu"><line x1="496.0" y1="423.9" x2="452.0" y2="423.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:108.08,133.93-108.08,131.39" data-layer="B.Cu"><line x1="430.0" y1="533.9" x2="430.0" y2="511.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:153.8,139.01-148.72,139.01" data-layer="B.Cu"><line x1="826.0" y1="577.9" x2="782.0" y2="577.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:123.32,136.47-118.24,136.47" data-layer="B.Cu"><line x1="562.0" y1="555.9" x2="518.0" y2="555.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:128.4,139.01-123.32,139.01" data-layer="B.Cu"><line x1="606.0" y1="577.9" x2="562.0" y2="577.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:156.34,128.85-156.34,123.77" data-layer="B.Cu"><line x1="848.0" y1="489.9" x2="848.0" y2="445.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:138.56,139.01-133.48,139.01" data-layer="B.Cu"><line x1="694.0" y1="577.9" x2="650.0" y2="577.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:113.16,139.01-108.08,139.01" data-layer="B.Cu"><line x1="474.0" y1="577.9" x2="430.0" y2="577.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:123.32,139.01-118.24,139.01" data-layer="B.Cu"><line x1="562.0" y1="577.9" x2="518.0" y2="577.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:153.8,128.85-153.8,133.93" data-layer="B.Cu"><line x1="826.0" y1="489.9" x2="826.0" y2="533.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:118.24,131.39-113.16,131.39" data-layer="B.Cu"><line x1="518.0" y1="511.9" x2="474.0" y2="511.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:151.26,128.85-156.34,128.85" data-layer="B.Cu"><line x1="804.0" y1="489.9" x2="848.0" y2="489.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:110.62,118.69-110.62,123.77" data-layer="B.Cu"><line x1="452.0" y1="401.9" x2="452.0" y2="445.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:113.16,111.07-113.16,113.61" data-layer="B.Cu"><line x1="474.0" y1="335.9" x2="474.0" y2="357.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:123.32,123.77-123.32,128.85" data-layer="B.Cu"><line x1="562.0" y1="445.9" x2="562.0" y2="489.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:156.34,118.69-156.34,116.15" data-layer="B.Cu"><line x1="848.0" y1="401.9" x2="848.0" y2="379.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:148.72,139.01-143.64,139.01" data-layer="B.Cu"><line x1="782.0" y1="577.9" x2="738.0" y2="577.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:156.34,123.77-156.34,118.69" data-layer="B.Cu"><line x1="848.0" y1="445.9" x2="848.0" y2="401.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:123.32,128.85-123.32,131.39" data-layer="B.Cu"><line x1="562.0" y1="489.9" x2="562.0" y2="511.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:110.62,136.47-110.62,131.39" data-layer="B.Cu"><line x1="452.0" y1="555.9" x2="452.0" y2="511.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:153.8,133.93-153.8,139.01" data-layer="B.Cu"><line x1="826.0" y1="533.9" x2="826.0" y2="577.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:110.62,128.85-110.62,131.39" data-layer="B.Cu"><line x1="452.0" y1="489.9" x2="452.0" y2="511.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:128.4,136.47-123.32,136.47" data-layer="B.Cu"><line x1="606.0" y1="555.9" x2="562.0" y2="555.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:125.86,123.77-123.32,123.77" data-layer="B.Cu"><line x1="584.0" y1="445.9" x2="562.0" y2="445.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:118.24,136.47-113.16,136.47" data-layer="B.Cu"><line x1="518.0" y1="555.9" x2="474.0" y2="555.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:110.62,113.61-110.62,118.69" data-layer="B.Cu"><line x1="452.0" y1="357.9" x2="452.0" y2="401.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
 <g data-ftrack="/GND:105.54,131.39-110.62,131.39" data-layer="B.Cu"><line x1="408.0" y1="511.9" x2="452.0" y2="511.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:108.08,136.47-108.08,131.39" data-layer="B.Cu"><line x1="430.0" y1="555.9" x2="430.0" y2="511.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:115.7,113.61-115.7,118.69" data-layer="B.Cu"><line x1="496.0" y1="357.9" x2="496.0" y2="401.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/ADC-SHUNT:138.56,131.39-138.56,126.31" data-layer="B.Cu"><line x1="694.0" y1="511.9" x2="694.0" y2="467.9" stroke="#9467bd" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:113.16,131.39-110.62,131.39" data-layer="B.Cu"><line x1="474.0" y1="511.9" x2="452.0" y2="511.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:110.62,123.77-110.62,128.85" data-layer="B.Cu"><line x1="452.0" y1="445.9" x2="452.0" y2="489.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:118.24,139.01-113.16,139.01" data-layer="B.Cu"><line x1="518.0" y1="577.9" x2="474.0" y2="577.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:143.64,139.01-138.56,139.01" data-layer="B.Cu"><line x1="738.0" y1="577.9" x2="694.0" y2="577.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:138.56,136.47-133.48,136.47" data-layer="B.Cu"><line x1="694.0" y1="555.9" x2="650.0" y2="555.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:143.64,136.47-138.56,136.47" data-layer="B.Cu"><line x1="738.0" y1="555.9" x2="694.0" y2="555.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:133.48,136.47-128.4,136.47" data-layer="B.Cu"><line x1="650.0" y1="555.9" x2="606.0" y2="555.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:108.08,139.01-108.08,133.93" data-layer="B.Cu"><line x1="430.0" y1="577.9" x2="430.0" y2="533.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:125.86,121.23-125.86,123.77" data-layer="B.Cu"><line x1="584.0" y1="423.9" x2="584.0" y2="445.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:133.48,139.01-128.4,139.01" data-layer="B.Cu"><line x1="650.0" y1="577.9" x2="606.0" y2="577.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:113.16,136.47-110.62,136.47" data-layer="B.Cu"><line x1="474.0" y1="555.9" x2="452.0" y2="555.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:123.32,131.39-118.24,131.39" data-layer="B.Cu"><line x1="562.0" y1="511.9" x2="518.0" y2="511.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:113.16,113.61-110.62,113.61" data-layer="B.Cu"><line x1="474.0" y1="357.9" x2="452.0" y2="357.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
 <g data-ftrack="/ADC-SHUNT:141.1,131.39-138.56,131.39" data-layer="B.Cu"><line x1="716.0" y1="511.9" x2="694.0" y2="511.9" stroke="#9467bd" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<text x="650.0" y="393.9" text-anchor="middle" font-size="9" fill="#d62728" stroke="#fff" stroke-width="0.4">5V-NODE</text>
-<text x="694.0" y="481.9" text-anchor="middle" font-size="9" fill="#9467bd" stroke="#fff" stroke-width="0.4">ADC-SHUNT</text>
-<text x="672.0" y="572.9" text-anchor="middle" font-size="9" fill="#111111" stroke="#fff" stroke-width="0.4">GND</text>
-<text x="562.0" y="349.9" text-anchor="middle" font-size="9" fill="#ff7f0e" stroke="#fff" stroke-width="0.4">Q1-GATE</text>
-<circle cx="584.0" cy="379.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
-<text x="584.0" y="370.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">1</text>
-<circle cx="584.0" cy="401.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
-<text x="584.0" y="392.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">2</text>
+<g data-ftrack="/ADC-SHUNT:141.1,126.31-141.1,131.39" data-layer="B.Cu"><line x1="716.0" y1="467.9" x2="716.0" y2="511.9" stroke="#9467bd" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/ADC-SHUNT:138.56,131.39-138.56,128.85" data-layer="B.Cu"><line x1="694.0" y1="511.9" x2="694.0" y2="489.9" stroke="#9467bd" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/5V-LOGIC:136.02,116.15-136.02,118.69" data-layer="B.Cu"><line x1="672.0" y1="379.9" x2="672.0" y2="401.9" stroke="#e8590c" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/5V-LOGIC:146.18,133.93-151.26,133.93" data-layer="B.Cu"><line x1="760.0" y1="533.9" x2="804.0" y2="533.9" stroke="#e8590c" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/5V-LOGIC:136.02,123.77-136.02,128.85" data-layer="B.Cu"><line x1="672.0" y1="445.9" x2="672.0" y2="489.9" stroke="#e8590c" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/5V-LOGIC:151.26,133.93-151.26,136.47" data-layer="B.Cu"><line x1="804.0" y1="533.9" x2="804.0" y2="555.9" stroke="#e8590c" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/5V-LOGIC:125.86,118.69-123.32,118.69" data-layer="B.Cu"><line x1="584.0" y1="401.9" x2="562.0" y2="401.9" stroke="#e8590c" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/5V-LOGIC:136.02,133.93-141.1,133.93" data-layer="B.Cu"><line x1="672.0" y1="533.9" x2="716.0" y2="533.9" stroke="#e8590c" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/5V-LOGIC:123.32,118.69-123.32,121.23" data-layer="B.Cu"><line x1="562.0" y1="401.9" x2="562.0" y2="423.9" stroke="#e8590c" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/5V-LOGIC:136.02,118.69-136.02,123.77" data-layer="B.Cu"><line x1="672.0" y1="401.9" x2="672.0" y2="445.9" stroke="#e8590c" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/5V-LOGIC:130.94,118.69-125.86,118.69" data-layer="B.Cu"><line x1="628.0" y1="401.9" x2="584.0" y2="401.9" stroke="#e8590c" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/5V-LOGIC:141.1,133.93-146.18,133.93" data-layer="B.Cu"><line x1="716.0" y1="533.9" x2="760.0" y2="533.9" stroke="#e8590c" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/5V-LOGIC:136.02,118.69-130.94,118.69" data-layer="B.Cu"><line x1="672.0" y1="401.9" x2="628.0" y2="401.9" stroke="#e8590c" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/5V-LOGIC:136.02,128.85-136.02,133.93" data-layer="B.Cu"><line x1="672.0" y1="489.9" x2="672.0" y2="533.9" stroke="#e8590c" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/5V-SERVO:146.18,126.31-143.64,126.31" data-layer="B.Cu"><line x1="760.0" y1="467.9" x2="738.0" y2="467.9" stroke="#8b1a1a" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/5V-SERVO:151.26,126.31-146.18,126.31" data-layer="B.Cu"><line x1="804.0" y1="467.9" x2="760.0" y2="467.9" stroke="#8b1a1a" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/5V-SERVO:151.26,118.69-151.26,123.77" data-layer="B.Cu"><line x1="804.0" y1="401.9" x2="804.0" y2="445.9" stroke="#8b1a1a" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/5V-SERVO:151.26,113.61-151.26,111.07" data-layer="B.Cu"><line x1="804.0" y1="357.9" x2="804.0" y2="335.9" stroke="#8b1a1a" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/5V-SERVO:151.26,111.07-156.34,111.07" data-layer="B.Cu"><line x1="804.0" y1="335.9" x2="848.0" y2="335.9" stroke="#8b1a1a" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/5V-SERVO:151.26,123.77-151.26,126.31" data-layer="B.Cu"><line x1="804.0" y1="445.9" x2="804.0" y2="467.9" stroke="#8b1a1a" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/5V-SERVO:151.26,113.61-151.26,118.69" data-layer="B.Cu"><line x1="804.0" y1="357.9" x2="804.0" y2="401.9" stroke="#8b1a1a" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/5V-SERVO:148.72,113.61-151.26,113.61" data-layer="B.Cu"><line x1="782.0" y1="357.9" x2="804.0" y2="357.9" stroke="#8b1a1a" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<text x="764.4" y="520.7" text-anchor="middle" font-size="9" fill="#e8590c" stroke="#fff" stroke-width="0.4">5V-LOGIC</text>
+<text x="672.0" y="340.3" text-anchor="middle" font-size="9" fill="#d62728" stroke="#fff" stroke-width="0.4">5V-NODE</text>
+<text x="815.0" y="318.3" text-anchor="middle" font-size="9" fill="#8b1a1a" stroke="#fff" stroke-width="0.4">5V-SERVO</text>
+<text x="716.0" y="481.9" text-anchor="middle" font-size="9" fill="#9467bd" stroke="#fff" stroke-width="0.4">ADC-SHUNT</text>
+<text x="672.0" y="594.9" text-anchor="middle" font-size="9" fill="#111111" stroke="#fff" stroke-width="0.4">GND</text>
+<text x="456.4" y="322.7" text-anchor="middle" font-size="9" fill="#2ca02c" stroke="#fff" stroke-width="0.4">Q1-GATE</text>
+<circle cx="518.0" cy="335.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
+<text x="518.0" y="326.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">1</text>
+<circle cx="518.0" cy="357.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
+<text x="518.0" y="348.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">2</text>
+<circle cx="518.0" cy="379.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
+<text x="518.0" y="370.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">3</text>
+<circle cx="848.0" cy="335.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
+<text x="848.0" y="326.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">＋</text>
+<circle cx="848.0" cy="379.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
+<text x="848.0" y="370.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">−</text>
+<circle cx="562.0" cy="423.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
+<text x="562.0" y="414.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">＋</text>
 <circle cx="584.0" cy="423.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
-<text x="584.0" y="414.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">3</text>
-<circle cx="628.0" cy="423.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
-<text x="628.0" y="414.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">＋</text>
-<circle cx="650.0" cy="423.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
-<text x="650.0" y="414.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">−</text>
-<circle cx="738.0" cy="401.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
-<text x="738.0" y="392.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">＋</text>
-<circle cx="738.0" cy="445.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
-<text x="738.0" y="436.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">−</text>
-<circle cx="540.0" cy="357.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
-<text x="540.0" y="348.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">1</text>
-<circle cx="540.0" cy="313.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
-<text x="540.0" y="304.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">2</text>
-<circle cx="804.0" cy="533.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
-<text x="804.0" y="524.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">＋</text>
-<circle cx="782.0" cy="533.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
-<text x="782.0" y="524.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">−</text>
-<circle cx="408.0" cy="489.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
-<text x="408.0" y="480.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">＋</text>
-<circle cx="408.0" cy="511.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
-<text x="408.0" y="502.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">−</text>
+<text x="584.0" y="414.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">−</text>
 <circle cx="694.0" cy="511.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
 <text x="694.0" y="502.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">A</text>
 <circle cx="452.0" cy="511.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
 <text x="452.0" y="502.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">B</text>
-<circle cx="826.0" cy="401.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
-<text x="826.0" y="392.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">＋</text>
-<circle cx="826.0" cy="445.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
-<text x="826.0" y="436.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">−</text>
-<circle cx="474.0" cy="401.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
-<text x="474.0" y="392.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">a</text>
-<circle cx="518.0" cy="401.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
-<text x="518.0" y="392.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">b</text>
-<circle cx="738.0" cy="511.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
-<text x="738.0" y="502.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">＋</text>
-<circle cx="716.0" cy="511.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
-<text x="716.0" y="502.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">−</text>
-<circle cx="694.0" cy="467.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
-<text x="694.0" y="458.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">1</text>
+<circle cx="738.0" cy="357.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
+<text x="738.0" y="348.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">a</text>
+<circle cx="782.0" cy="357.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
+<text x="782.0" y="348.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">b</text>
+<circle cx="474.0" cy="379.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
+<text x="474.0" y="370.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">1</text>
+<circle cx="474.0" cy="335.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
+<text x="474.0" y="326.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">2</text>
+<circle cx="804.0" cy="555.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
+<text x="804.0" y="546.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">＋</text>
+<circle cx="782.0" cy="555.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
+<text x="782.0" y="546.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">−</text>
+<circle cx="408.0" cy="445.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
+<text x="408.0" y="436.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">1</text>
+<circle cx="562.0" cy="357.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
+<text x="562.0" y="348.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">2</text>
+<circle cx="408.0" cy="489.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
+<text x="408.0" y="480.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">＋</text>
+<circle cx="408.0" cy="511.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
+<text x="408.0" y="502.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">−</text>
+<circle cx="694.0" cy="489.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
+<text x="694.0" y="480.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">1</text>
+<circle cx="804.0" cy="445.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
+<text x="804.0" y="436.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">＋</text>
+<circle cx="804.0" cy="489.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
+<text x="804.0" y="480.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">−</text>
+<circle cx="628.0" cy="379.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
+<text x="628.0" y="370.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">a</text>
+<circle cx="672.0" cy="379.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
+<text x="672.0" y="370.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">b</text>
+<circle cx="738.0" cy="467.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
+<text x="738.0" y="458.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">＋</text>
+<circle cx="716.0" cy="467.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
+<text x="716.0" y="458.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">−</text>
 <rect x="738.0" y="106.0" width="336.2" height="36" rx="6" fill="#f4f4f4" stroke="#555" stroke-dasharray="5 3" opacity="0.5"/>
 <text x="746.0" y="120.0" font-size="10" font-weight="bold" fill="#333">板の外（B1 の GPIO32）</text>
 <text x="746.0" y="134.0" font-size="9" fill="#333">W1 ADC-SHUNT の線の出口 → B1 の GPIO32（ADC-SHUNT。線は床の側へ）</text>
-<path d="M694.0 467.9 C764.0 467.9 758.0 286.9 758.0 142.0" stroke="#9467bd" stroke-width="3" fill="none" stroke-dasharray="7 4"/>
-<text x="861.2" y="318.3" font-size="10" fill="#222" stroke="#f4f4f0" stroke-width="3" paint-order="stroke">F1 PTC（過電流の保護）</text>
-<line x1="857.2" y1="315.3" x2="496.0" y2="388.9" stroke="#666" stroke-width="1" stroke-dasharray="4 3"/>
-<circle cx="496.0" cy="388.9" r="2.5" fill="#666"/>
-<text x="861.2" y="343.6" font-size="10" fill="#222" stroke="#f4f4f0" stroke-width="3" paint-order="stroke">Q1 MOSFET 2SJ334（逆接の保護）</text>
-<line x1="857.2" y1="340.6" x2="584.0" y2="358.6" stroke="#666" stroke-width="1" stroke-dasharray="4 3"/>
-<circle cx="584.0" cy="358.6" r="2.5" fill="#666"/>
-<text x="861.2" y="368.9" font-size="10" fill="#222" stroke="#f4f4f0" stroke-width="3" paint-order="stroke">R20 shunt 0.1 Ω 5 W（servo の電流を測る）</text>
-<line x1="857.2" y1="365.9" x2="573.0" y2="468.6" stroke="#666" stroke-width="1" stroke-dasharray="4 3"/>
+<path d="M694.0 489.9 C764.0 489.9 758.0 297.9 758.0 142.0" stroke="#9467bd" stroke-width="3" fill="none" stroke-dasharray="7 4"/>
+<text x="900.8" y="318.3" font-size="10" fill="#222" stroke="#f4f4f0" stroke-width="3" paint-order="stroke">F1 PTC（logic の枝。J7・J8）</text>
+<line x1="896.8" y1="315.3" x2="650.0" y2="366.9" stroke="#666" stroke-width="1" stroke-dasharray="4 3"/>
+<circle cx="650.0" cy="366.9" r="2.5" fill="#666"/>
+<text x="900.8" y="343.6" font-size="10" fill="#222" stroke="#f4f4f0" stroke-width="3" paint-order="stroke">F2 PTC（servo の枝。J6・C1・C2）</text>
+<line x1="896.8" y1="340.6" x2="760.0" y2="344.9" stroke="#666" stroke-width="1" stroke-dasharray="4 3"/>
+<circle cx="760.0" cy="344.9" r="2.5" fill="#666"/>
+<text x="900.8" y="368.9" font-size="10" fill="#222" stroke="#f4f4f0" stroke-width="3" paint-order="stroke">W2 ジャンパー（絶縁した線。5V-IN）</text>
+<line x1="896.8" y1="365.9" x2="408.0" y2="445.9" stroke="#666" stroke-width="1" stroke-dasharray="4 3"/>
+<circle cx="408.0" cy="445.9" r="2.5" fill="#666"/>
+<text x="900.8" y="394.2" font-size="10" fill="#222" stroke="#f4f4f0" stroke-width="3" paint-order="stroke">Q1 MOSFET 2SJ334（逆接の保護）</text>
+<line x1="896.8" y1="391.2" x2="518.0" y2="314.6" stroke="#666" stroke-width="1" stroke-dasharray="4 3"/>
+<circle cx="518.0" cy="314.6" r="2.5" fill="#666"/>
+<text x="900.8" y="419.5" font-size="10" fill="#222" stroke="#f4f4f0" stroke-width="3" paint-order="stroke">R20 shunt 0.1 Ω 5 W（servo の電流を測る）</text>
+<line x1="896.8" y1="416.5" x2="573.0" y2="468.6" stroke="#666" stroke-width="1" stroke-dasharray="4 3"/>
 <circle cx="573.0" cy="468.6" r="2.5" fill="#666"/>
-<text x="861.2" y="394.2" font-size="10" fill="#222" stroke="#f4f4f0" stroke-width="3" paint-order="stroke">R18 10 kΩ（Gate の抵抗）</text>
-<line x1="857.2" y1="391.2" x2="550.8" y2="357.9" stroke="#666" stroke-width="1" stroke-dasharray="4 3"/>
-<circle cx="550.8" cy="357.9" r="2.5" fill="#666"/>
-<text x="861.2" y="419.5" font-size="10" fill="#222" stroke="#f4f4f0" stroke-width="3" paint-order="stroke">C1・C2 servo の bulk capacitor（470 µF。2 個分の穴）</text>
-<line x1="857.2" y1="416.5" x2="860.6" y2="423.9" stroke="#666" stroke-width="1" stroke-dasharray="4 3"/>
-<circle cx="860.6" cy="423.9" r="2.5" fill="#666"/>
-<line x1="857.2" y1="416.5" x2="772.6" y2="423.9" stroke="#666" stroke-width="1" stroke-dasharray="4 3"/>
-<circle cx="772.6" cy="423.9" r="2.5" fill="#666"/>
-<text x="861.2" y="444.8" font-size="10" fill="#222" stroke="#f4f4f0" stroke-width="3" paint-order="stroke">W1 ADC-SHUNT の線の出口（B1 の GPIO32 へ）</text>
-<line x1="857.2" y1="441.8" x2="694.0" y2="467.9" stroke="#666" stroke-width="1" stroke-dasharray="4 3"/>
-<circle cx="694.0" cy="467.9" r="2.5" fill="#666"/>
+<text x="900.8" y="444.8" font-size="10" fill="#222" stroke="#f4f4f0" stroke-width="3" paint-order="stroke">R18 10 kΩ（Gate の抵抗）</text>
+<line x1="896.8" y1="441.8" x2="484.8" y2="379.9" stroke="#666" stroke-width="1" stroke-dasharray="4 3"/>
+<circle cx="484.8" cy="379.9" r="2.5" fill="#666"/>
+<text x="900.8" y="470.1" font-size="10" fill="#222" stroke="#f4f4f0" stroke-width="3" paint-order="stroke">C1・C2 servo の bulk capacitor（470 µF。2 個分の穴）</text>
+<line x1="896.8" y1="467.1" x2="838.6" y2="467.9" stroke="#666" stroke-width="1" stroke-dasharray="4 3"/>
+<circle cx="838.6" cy="467.9" r="2.5" fill="#666"/>
+<line x1="896.8" y1="467.1" x2="882.6" y2="357.9" stroke="#666" stroke-width="1" stroke-dasharray="4 3"/>
+<circle cx="882.6" cy="357.9" r="2.5" fill="#666"/>
+<text x="900.8" y="495.4" font-size="10" fill="#222" stroke="#f4f4f0" stroke-width="3" paint-order="stroke">W1 ADC-SHUNT の線の出口（B1 の GPIO32 へ）</text>
+<line x1="896.8" y1="492.4" x2="694.0" y2="489.9" stroke="#666" stroke-width="1" stroke-dasharray="4 3"/>
+<circle cx="694.0" cy="489.9" r="2.5" fill="#666"/>
 <text x="60" y="841.4173228346457" font-size="15" font-weight="bold">凡例と注意</text>
 <text x="60" y="867.4173228346457" font-size="12.5">この基板は、完成形の電源（段階C）で、M-12001 の 5 V を servo・Pi・B1 へ分ける基板。まだはんだ付けしていない（未実装）。</text>
 <text x="60" y="889.4173228346457" font-size="12.5">はんだ付けは #405、初回通電は #525。この図は PROTO-02 の実装の計画で、基板ファイル hardware/deskcat.kicad_pcb から render_view.py が生成する。</text>
-<text x="60" y="911.4173228346457" font-size="12.5">F1 PTC＝過電流の保護（PROT-OC-01、Bourns MF-R135）。Q1 MOSFET 2SJ334＝電源の逆接の保護（PROT-RP-01。方式の判断は tbd-register.md の HW-TBD-030）。</text>
-<text x="60" y="933.4173228346457" font-size="12.5">R18＝Q1 の Gate の抵抗 10 kΩ（plan.md の部品表の R18 の行）。J5〜J8＝端子台 114217（WIRE-PWR-01）：J5＝M-12001 の入力、J6＝servo、J7＝Pi、J8＝logic（B1 の ESP32 の 5V pin へ。案B）。</text>
-<text x="60" y="955.4173228346457" font-size="12.5">R20＝servo の戻りだけに入れる shunt（MEAS-01。0.1 Ω 5 W。power-budget.md の GND topology）。W1＝ADC-SHUNT の線の出口。</text>
-<text x="60" y="977.4173228346457" font-size="12.5">C1・C2＝servo の bulk capacitor の穴（470 µF／16 V。2 個分。3 個目が要るかは実測で決める）。</text>
-<text x="60" y="999.4173228346457" font-size="12.5">寸法・位置の正本は基板ファイルと plan.md。この図は見た目で、寸法の正本ではない。図を電源・安全の実機確認に使わない。</text>
-<text x="60" y="1021.4173228346457" font-size="12.5">線は、はんだ面の芯線（111641、導体外径 0.75）を部品面の図の上に重ねて描いたもの。色はブレッドボードの図の決まりに合わせる。</text>
-<text x="60" y="1043.4173228346458" font-size="12.5">赤＝＋（5 V の経路：J5 → F1 → Q1 → 分岐点 → J6・J7・J8・C1・C2）、黒＝GND、橙＝Gate（Q1 の G → R18）、紫＝ADC-SHUNT（shunt の servo の側の node。J6−・W1）。</text>
-<text x="60" y="1065.4173228346458" font-size="12.5">C1・C2 の−は GND（黒）で、B の node へ、Pi・ESP32・R18 と共有しない別の導体でつく（servo の過渡電流は shunt を必ず通る）。</text>
-<text x="60" y="1087.4173228346458" font-size="12.5">GND：J7−（Pi）・J8−（ESP32）・R18 は、別々の導体で shunt の B の node（B と J5− を結ぶ短い導体）へ直接つく。</text>
-<text x="60" y="1109.4173228346458" font-size="12.5">servo の戻りは J6− → A → R20 → B と流れ、B で初めてほかの GND に合流する（check_star_point.py が確かめる）。</text>
-<text x="60" y="1131.4173228346458" font-size="12.5">金の丸＝足の穴（＋・−・a・b・G・D・S・1・2・A・B は足の名前）。灰の四角＝穴。太い線＝はんだ面の芯線。R18 は縦の2つの穴を使い、茶の線が足。</text>
-<text x="60" y="1153.4173228346458" font-size="12.5">F1（黄色い円盤）：真上からは幅 8.9 × 厚み 3.0。現物の外見は hardware-bom.md の Revision 89。Q1：太い白線は刻印面の側（後ろ向き）。R20 は横に寝かせた本体 22 × 10 mm。C1・C2 は径 8 mm。</text>
-<text x="60" y="1175.4173228346458" font-size="12.5">破線＝資料に無い寸法（TBD）：端子台のねじの位置・径と電線の口の幅（plan.md の M7）。慣行の値で暫定：R18 の本体。R20 の足の間隔 11 穴は設計の値で確定（足を曲げる側が選ぶ）。R20 の高さ H は TBD。</text>
-<text x="60" y="1197.4173228346458" font-size="12.5">色は PTC（黄）以外、見た目のための仮の色（資料で確認していない）。</text>
-<text x="60" y="1219.4173228346458" font-size="12.5">端子台の口の向きは、口の帯とそこから出る曲線で示す。曲線の行き先が板の外（M-12001・servo・Pi・B1）。ブレッドボードの図の「板の外へ出る線」と同じ描き方。W1 の破線は、床の側へ出る線。</text>
+<text x="60" y="911.4173228346457" font-size="12.5">F1・F2 PTC＝過電流の保護（PROT-OC-01、Bourns MF-R135）。F1＝logic の枝（J7・J8）、F2＝servo の枝（J6・C1・C2）で、共有しない。</text>
+<text x="60" y="933.4173228346457" font-size="12.5">Q1 MOSFET 2SJ334＝電源の逆接の保護（PROT-RP-01。方式の判断は tbd-register.md の HW-TBD-030）。</text>
+<text x="60" y="955.4173228346457" font-size="12.5">W2＝絶縁した線（111641 の被覆付き）のジャンパー。部品面の上を渡し、破線で描く（plan.md の部品表の W2 の行）。はんだ面の芯線どうしは交わらない。</text>
+<text x="60" y="977.4173228346457" font-size="12.5">R18＝Q1 の Gate の抵抗 10 kΩ（plan.md の部品表の R18 の行）。J5〜J8＝端子台 114217（WIRE-PWR-01）：J5＝M-12001 の入力、J6＝servo、J7＝Pi、J8＝logic（B1 の ESP32 の 5V pin へ。案B）。</text>
+<text x="60" y="999.4173228346457" font-size="12.5">R20＝servo の戻りだけに入れる shunt（MEAS-01。0.1 Ω 5 W。power-budget.md の GND topology）。W1＝ADC-SHUNT の線の出口。</text>
+<text x="60" y="1021.4173228346457" font-size="12.5">C1・C2＝servo の bulk capacitor の穴（470 µF／16 V。2 個分。3 個目が要るかは実測で決める）。</text>
+<text x="60" y="1043.4173228346458" font-size="12.5">寸法・位置の正本は基板ファイルと plan.md。この図は見た目で、寸法の正本ではない。図を電源・安全の実機確認に使わない。</text>
+<text x="60" y="1065.4173228346458" font-size="12.5">線は、はんだ面の芯線（111641、導体外径 0.75）を部品面の図の上に重ねて描いたもの。色はブレッドボードの図の決まりに合わせる。</text>
+<text x="60" y="1087.4173228346458" font-size="12.5">赤＝＋（5 V の経路：J5 → Q1 → 分岐点 5V-NODE → F1 → J7・J8（橙赤）、→ F2 → J6・C1・C2（暗い赤））、黒＝GND、緑＝Gate（Q1 の G → R18）、紫＝ADC-SHUNT（shunt の servo の側の node。J6−・W1）。</text>
+<text x="60" y="1109.4173228346458" font-size="12.5">C1・C2 の−は GND（黒）で、B の node へ、Pi・ESP32・R18 と共有しない別の導体でつく（servo の過渡電流は shunt を必ず通る）。</text>
+<text x="60" y="1131.4173228346458" font-size="12.5">GND：J7−（Pi）・J8−（ESP32）・R18 は、別々の導体で shunt の B の node（B と J5− を結ぶ短い導体）へ直接つく。</text>
+<text x="60" y="1153.4173228346458" font-size="12.5">servo の戻りは J6− → A → R20 → B と流れ、B で初めてほかの GND に合流する（check_star_point.py が確かめる）。</text>
+<text x="60" y="1175.4173228346458" font-size="12.5">金の丸＝足の穴（＋・−・a・b・G・D・S・1・2・A・B は足の名前）。灰の四角＝穴。太い線＝はんだ面の芯線。R18 は縦の2つの穴を使い、茶の線が足。</text>
+<text x="60" y="1197.4173228346458" font-size="12.5">F1（黄色い円盤）：真上からは幅 8.9 × 厚み 3.0。現物の外見は hardware-bom.md の Revision 89。Q1：太い白線は刻印面の側（後ろ向き）。R20 は横に寝かせた本体 22 × 10 mm。C1・C2 は径 8 mm。</text>
+<text x="60" y="1219.4173228346458" font-size="12.5">破線＝資料に無い寸法（TBD）：端子台のねじの位置・径と電線の口の幅（plan.md の M7）。慣行の値で暫定：R18 の本体。R20 の足の間隔 11 穴は設計の値で確定（足を曲げる側が選ぶ）。R20 の高さ H は TBD。</text>
+<text x="60" y="1241.4173228346458" font-size="12.5">色は PTC（黄）以外、見た目のための仮の色（資料で確認していない）。</text>
+<text x="60" y="1263.4173228346458" font-size="12.5">端子台の口の向きは、口の帯とそこから出る曲線で示す。曲線の行き先が板の外（M-12001・servo・Pi・B1）。ブレッドボードの図の「板の外へ出る線」と同じ描き方。W1 の破線は、床の側へ出る線。</text>
 </svg>

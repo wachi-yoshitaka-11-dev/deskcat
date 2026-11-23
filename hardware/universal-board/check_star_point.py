@@ -16,7 +16,11 @@ star の側の端 B から先。J5−、J7−、J8−、R18 の足2）。
    servo の電流が流れる導体も、共有する導体も無い。UART の GND と輪を作らない）。
    したがって J5−・J7−・J8−・R18 と B の間の導体に servo の電流は流れない（B と J5− の間の短い導体だけが、
    全部の戻りを一緒に運ぶ）。**R18 の足2 の導体は B の穴に直接つく**（B と J5− の間の導体の途中につかない）。C1・C2 の−も、J7−・J8−・R18 と導体を共有しない別の導体で node へつく（C1 と C2 の間は共有してよい）。
-5. 導体の端と折れ曲がり、通る穴は、基板に実在する穴（`Dwgs.User` の円）の上にある。四隅の穴は無い。
+5. **PTC は枝ごとに 1 個で、共有しない。**J5＋ → Q1（D→S）→ 分岐の節点 → F1（logic の枝：J7＋・J8＋）／F2（servo の枝：
+   J6＋・C1＋・C2＋）。F1 の b と F2 の b は別の net で、PTC を飛ばす道は無い。PTC は F1・F2 の 2 個だけ。
+6. **ジャンパー（部品面の絶縁した線）は 2 本まで。**部品面（`F.Cu`）の線として基板ファイルに描き、導体として数える
+   （net ごとの足が、はんだ面の導体とジャンパーを合わせて 1 つにつながることを確かめる）。
+7. 導体の端と折れ曲がり、通る穴は、基板に実在する穴（`Dwgs.User` の円）の上にある。四隅の穴は無い。
 
 基板ファイル（`hardware/deskcat.kicad_pcb`）の `B.Cu` の導体と、部品の pad の位置・net だけを読む。
 KiCad は使わず、標準ライブラリだけで動く（ADR-0006）。90 度の倍数の回転を読む（KiCad の向き：画面で反時計回り）。
@@ -103,10 +107,14 @@ def main():
     errors = []
     segs_by_net = {}
     off = set()
+    jumper_segs = []                 # 部品面（F.Cu）の絶縁した線（ジャンパー）。穴の上に無くてよい
     for seg in blocks(text, "segment"):
         sx, sy = map(float, re.search(r"\(start ([-\d.]+) ([-\d.]+)\)", seg).groups())
         ex, ey = map(float, re.search(r"\(end ([-\d.]+) ([-\d.]+)\)", seg).groups())
         netid = re.search(r"\(net (\d+)\)", seg).group(1)
+        if '(layer "F.Cu")' in seg:
+            jumper_segs.append((nets[netid], (round(sx, 3), round(sy, 3)), (round(ex, 3), round(ey, 3))))
+            continue
         segs_by_net.setdefault(nets[netid], []).append(((round(sx, 3), round(sy, 3)), (round(ex, 3), round(ey, 3))))
         n = max(round(abs(ex - sx) / PITCH), round(abs(ey - sy) / PITCH))
         for i in range(n + 1):
@@ -251,7 +259,72 @@ def main():
     for k in (J5M, J7M, J8M, R18_2):
         if pads[k] in A:
             errors.append(f"{k[0]} の足が /ADC-SHUNT の導体の上にある")
+    errors += check_ptc_and_jumpers(pads, padnet, segs_by_net, jumper_segs, holes)
     return _report(errors)
+
+
+def check_ptc_and_jumpers(pads, padnet, segs_by_net, jumper_segs, holes):
+    """PTC は枝ごとに 1 個（共有しない）と、ジャンパー（部品面の絶縁した線）の規則。
+    - Q1 の D は J5＋と同じ net、S は F1 a・F2 a と同じ net（分岐の節点）。D と S は別の net（Q1 を飛ばす道が無い）。
+    - F1 b は logic の枝（J7＋・J8＋）、F2 b は servo の枝（J6＋・C1＋・C2＋）の net で、2 つの枝の net は別。
+    - どの枝の net にも、ほかの枝の部品の＋が無い。PTC は 2 個（F1・F2）だけ。
+    - ジャンパーは 2 本まで。両端は、足（W の pad）の穴で、同じ net。各 net の足は、導体とジャンパーを合わせて 1 つにつながる。"""
+    err = []
+    need = [("Q1", "2"), ("Q1", "3"), ("F1", "a"), ("F1", "b"), ("F2", "a"), ("F2", "b"), ("J5", "+"), ("J6", "+"), ("J7", "+"), ("J8", "+"), ("C1", "+"), ("C2", "+")]
+    miss = [k for k in need if k not in padnet]
+    if miss:
+        return [f"PTC の規則に要る足が基板ファイルに無い: {miss}"]
+    nd, ns = padnet[("Q1", "2")], padnet[("Q1", "3")]
+    if nd != padnet[("J5", "+")]:
+        err.append(f"Q1 の D ({nd}) が J5＋の net ({padnet[('J5', '+')]}) と違う")
+    if nd == ns:
+        err.append("Q1 の D と S が同じ net（Q1 を飛ばす道がある）")
+    for k in (("F1", "a"), ("F2", "a")):
+        if padnet[k] != ns:
+            err.append(f"{k[0]} の a ({padnet[k]}) が Q1 の S の net ({ns}) と違う（PTC の入り口は分岐の節点）")
+    logic, servo = padnet[("F1", "b")], padnet[("F2", "b")]
+    if logic == servo:
+        err.append("F1 の b と F2 の b が同じ net（PTC を共有している）")
+    if logic in (ns, nd) or servo in (ns, nd):
+        err.append("PTC の出口が分岐の節点・入力と同じ net（PTC を飛ばす道がある）")
+    for k in (("J7", "+"), ("J8", "+")):
+        if padnet[k] != logic:
+            err.append(f"{k[0]} の＋が logic の枝（F1 の b の net {logic}）に無い（{padnet[k]}）")
+    for k in (("J6", "+"), ("C1", "+"), ("C2", "+")):
+        if padnet[k] != servo:
+            err.append(f"{k[0]} の＋が servo の枝（F2 の b の net {servo}）に無い（{padnet[k]}）")
+    ptcs = sorted({r for r, _ in padnet if r.startswith("F")})
+    if ptcs != ["F1", "F2"]:
+        err.append(f"PTC が F1・F2 の 2 個でない: {ptcs}")
+    # ジャンパー
+    wrefs = sorted({r for r, _ in padnet if r.startswith("W") and r != "W1"})
+    if len(wrefs) > 2:
+        err.append(f"ジャンパーが 3 本以上: {wrefs}")
+    for r in wrefs:
+        if padnet.get((r, "1")) != padnet.get((r, "2")):
+            err.append(f"ジャンパー {r} の両端が別の net")
+    # net ごとの接続（導体の B.Cu：線上の穴、ジャンパー：端点どうし）
+    parent = {}
+    def find(x):
+        parent.setdefault(x, x)
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+    def union(a, b): parent[find(a)] = find(b)
+    for net, segs in segs_by_net.items():
+        for a, b in segs:
+            n = max(round(abs(b[0] - a[0]) / PITCH), round(abs(b[1] - a[1]) / PITCH), 1)
+            pts = [(net, round(a[0] + (b[0] - a[0]) * i / n, 2), round(a[1] + (b[1] - a[1]) * i / n, 2)) for i in range(n + 1)]
+            for p, q in zip(pts, pts[1:]):
+                union(p, q)
+    for net, a, b in jumper_segs:
+        union((net, round(a[0], 2), round(a[1], 2)), (net, round(b[0], 2), round(b[1], 2)))
+    for net in (ns, nd, logic, servo, padnet[("Q1", "1")]):
+        ps = [(net, round(pads[k][0], 2), round(pads[k][1], 2)) for k, v in padnet.items() if v == net]
+        if ps and len({find(p) for p in ps}) > 1:
+            err.append(f"net {net} の足が、導体とジャンパーを合わせても 1 つにつながっていない")
+    return err
 
 
 if __name__ == "__main__":

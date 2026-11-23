@@ -73,6 +73,15 @@ Commands run / Actual result:
       DRC は違反 0、未接続 0、食い違い 0。ERC は Errors 0、Warnings 168。
       check_star_point.py に「R18 の足2 の導体が B の穴に直接つく」を足した。負の例として、R18 が B と J5− の間の (3,12) につく
       直前の版は NG になることを実行して確かめた。
+    PTC を枝ごとに分けた更新（F1：logic の枝、F2：servo の枝、ジャンパー W2。2026-11-23）:
+      回路図に F2・ジャンパー W2（新しい symbol `WIRE_JUMPER`）を足し、5V の節点を 5V-NODE・5V-LOGIC・5V-SERVO に分けた。
+      kicad-cli sch erc --severity-all: Errors 0、Warnings 167。
+      kicad-cli pcb drc --schematic-parity --severity-all: 違反 0、未接続 0、回路図との食い違い 0
+        （途中、ジャンパーの部品面の線を 1 本の直線にして Q1 の足と短絡した error、部品の silk と参照番号の重なりの warning が出て、
+         ジャンパーの通り道と参照番号の位置を直して 0 にした）。
+      python3 -I hardware/universal-board/check_star_point.py: OK。「PTC は枝ごとに1個で共有しない」「ジャンパーは2本まで。部品面の線も導体として
+        数え、net ごとの足がつながる」を足した。負の例として、F2 を外した版、F2 の b を logic の net にした版、J6＋を logic の net にした版、
+        ジャンパーの線を外した版は、いずれも NG になることを実行して確かめた。
     kicad-cli sch export netlist（kicadxml）で overview の netlist を書き出し直した。
     kicad-cli pcb export svg: 成功。firefox の headless で描画して読んだ（作業セッションが画像を読んだ。人は見ていない）。
 

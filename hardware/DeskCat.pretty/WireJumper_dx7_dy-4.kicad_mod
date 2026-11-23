@@ -1,0 +1,92 @@
+(footprint "WireJumper_dx7_dy-4"
+	(version 20240108)
+	(generator "pcbnew")
+	(generator_version "8.0")
+	(layer "F.Cu")
+	(property "Reference" "REF**"
+		(at 0 -2.45 0)
+		(layer "F.SilkS")
+		(uuid "c34a0470-a945-465a-9237-c7a065220b96")
+		(effects
+			(font
+				(size 1.27 1.27)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Value" "WireJumper_dx7_dy-4"
+		(at 0 2.45 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "79da27b7-f2d6-4558-bae3-5c25252e3cd3")
+		(effects
+			(font
+				(size 1.27 1.27)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Footprint" ""
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "ebdcb2f7-0907-4f09-867e-ccbffa09e2f2")
+		(effects
+			(font
+				(size 1.27 1.27)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Datasheet" ""
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "c565cf21-150c-4f7b-abd8-1355dcad1a2d")
+		(effects
+			(font
+				(size 1.27 1.27)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Description" ""
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "eab19727-2efc-4495-b213-29cb56d5ab3b")
+		(effects
+			(font
+				(size 1.27 1.27)
+				(thickness 0.15)
+			)
+		)
+	)
+	(attr through_hole exclude_from_bom)
+	(fp_line
+		(start 0 0)
+		(end 17.78 -10.16)
+		(stroke
+			(width 0.6)
+			(type dash)
+		)
+		(layer "F.Fab")
+		(uuid "1e2b135b-92b3-4dd2-94d3-d2d9f18524d2")
+	)
+	(pad "1" thru_hole circle
+		(at 0 0)
+		(size 1.8 1.8)
+		(drill 1)
+		(layers "*.Cu" "*.Mask")
+		(remove_unused_layers no)
+		(uuid "b8dd499a-834d-469a-8fdc-c4aeecdfeda7")
+	)
+	(pad "2" thru_hole circle
+		(at 17.78 -10.16)
+		(size 1.8 1.8)
+		(drill 1)
+		(layers "*.Cu" "*.Mask")
+		(remove_unused_layers no)
+		(uuid "d1a55d54-adbd-4e24-920e-65b01af8b829")
+	)
+)

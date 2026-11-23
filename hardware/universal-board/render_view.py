@@ -8,7 +8,7 @@
 - `view-front.svg`：部品面。**真上から見る。**板・穴・部品・文字・凡例の描き方、色、線の太さ、文字の大きさは
   ブレッドボードの図（`hardware/breadboard-rebuild/generate.py`）に合わせた（1 ピッチの画素 `P`、
   色 `COLOR_HEX`、`esc`、`text_width` はその file から読み込んで同じものを使う）。はんだ面の芯線
-  （`111641`）を、部品面の図の上に色の付いた線で重ねて描く（赤＝＋、黒＝GND、橙＝Gate）。
+  （`111641`）を、部品面の図の上に色の付いた線で重ねて描く（赤＝＋、黒＝GND、緑＝Gate）。
   端子台の口の向きと、つながる先は、ブレッドボードの図の「板の外へ出る線」と同じ描き方にした。
 - `view-back.svg`：はんだ面（真上から。左右を裏返した向き）。ランド、芯線、はんだの盛り。
 
@@ -72,12 +72,12 @@ text_width = BB.text_width
 K = P / PITCH                 # 1 mm の画素
 FONT = "Noto Sans CJK JP, Hiragino Sans, Meiryo, sans-serif"   # generate.py の build_svg と同じ
 
-# 線の色（ブレッドボードの図の決まり：赤＝3V3／＋、黒＝GND。Gate は手持ちの橙）
+# 線の色（ブレッドボードの図の決まり：赤＝3V3／＋、黒＝GND。Gate は手持ちの緑）
 NET_COLOR = {
-    "/5V-IN": COLOR_HEX["赤"], "/5V-PTC": COLOR_HEX["赤"], "/5V-NODE": COLOR_HEX["赤"],
-    "/GND": COLOR_HEX["黒"], "/Q1-GATE": COLOR_HEX["橙"], "/ADC-SHUNT": COLOR_HEX["紫"],
+    "/5V-IN": COLOR_HEX["赤"], "/5V-NODE": COLOR_HEX["赤"], "/5V-LOGIC": "#e8590c", "/5V-SERVO": "#8b1a1a",
+    "/GND": COLOR_HEX["黒"], "/Q1-GATE": COLOR_HEX["緑"], "/ADC-SHUNT": COLOR_HEX["紫"],
 }
-NET_SHORT = {"/5V-IN": "5V-IN", "/5V-PTC": "5V-PTC", "/5V-NODE": "5V-NODE", "/GND": "GND", "/Q1-GATE": "Q1-GATE", "/ADC-SHUNT": "ADC-SHUNT"}
+NET_SHORT = {"/5V-IN": "5V-IN", "/5V-NODE": "5V-NODE", "/5V-LOGIC": "5V-LOGIC", "/5V-SERVO": "5V-SERVO", "/GND": "GND", "/Q1-GATE": "Q1-GATE", "/ADC-SHUNT": "ADC-SHUNT"}
 C_PTC = "#e6c53c"             # 黄色（現物の記録：hardware-bom.md の Revision 89）
 C_BEIGE = "#e9d3a5"           # 抵抗の色（generate.py の draw_parts と同じ）
 C_BEIGE_LINE = "#7a6a50"
@@ -85,7 +85,9 @@ C_PIN = "#caa53d"             # 足の丸（generate.py の ESP32 のピンと�
 
 # 図の部品の名前（出所：plan.md の「部品と向き」の表の「品」）
 LABELS = {
-    "F1": "F1 PTC（過電流の保護）",
+    "F1": "F1 PTC（logic の枝の過電流の保護）",
+    "F2": "F2 PTC（servo の枝の過電流の保護）",
+    "W2": "W2 ジャンパー（5V-IN。絶縁した線を部品面の上へ渡す）",
     "Q1": "Q1 MOSFET 2SJ334（逆接の保護）",
     "R18": "R18 10 kΩ（Gate の抵抗）",
     "J5": "J5 入力の端子台",
@@ -203,6 +205,8 @@ def tb_mouth(lib):
 
 def fab_rect(fp):
     """footprint の F.Fab の矩形を、向きを掛けて基板の座標にする（x0, y0, x1, y1）。"""
+    if fp["fab"] is None:             # 外形が無い部品（ジャンパー）：最初の足の位置の点
+        return (fp["x"], fp["y"], fp["x"], fp["y"])
     a = rot(fp["fab"][0], fp["fab"][1], fp["rot"])
     b = rot(fp["fab"][2], fp["fab"][3], fp["rot"])
     return (fp["x"] + min(a[0], b[0]), fp["y"] + min(a[1], b[1]), fp["x"] + max(a[0], b[0]), fp["y"] + max(a[1], b[1]))
@@ -271,12 +275,17 @@ def draw_tracks(out, fr, board, tag):
     for t in board["tracks"]:
         (x1, y1), (x2, y2) = fr.p(t["x1"], t["y1"]), fr.p(t["x2"], t["y2"])
         color = NET_COLOR.get(t["net"], "#9e9e9e")
+        if t["layer"] == "F.Cu":      # 部品面の絶縁した線（ジャンパー）：破線
+            out.append(f'<g data-{tag}="{t["net"]}:{f1(t["x1"])},{f1(t["y1"])}-{f1(t["x2"])},{f1(t["y2"])}" data-layer="{t["layer"]}">'
+                       f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}" stroke="{color}" stroke-width="3" '
+                       f'stroke-dasharray="9 5" stroke-linecap="butt"/></g>')
+            continue
         out.append(f'<g data-{tag}="{t["net"]}:{f1(t["x1"])},{f1(t["y1"])}-{f1(t["x2"])},{f1(t["y2"])}" data-layer="{t["layer"]}">'
                    f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}" stroke="{color}" stroke-width="5" '
                    f'stroke-linecap="round" opacity="0.85"/></g>')
 
 
-def net_labels(out, fr, board, offsets, skip=()):
+def net_labels(out, fr, board, offsets, skip=(), absolute=None):
     """線の名前（net）を、各 net の一番長い線の脇に小さく書く（ブレッドボードの線の ID と同じ 9 の文字）。"""
     best = {}
     for t in board["tracks"]:
@@ -289,6 +298,8 @@ def net_labels(out, fr, board, offsets, skip=()):
         (x1, y1), (x2, y2) = fr.p(t["x1"], t["y1"]), fr.p(t["x2"], t["y2"])
         dx, dy = offsets.get(net, (0, -8))
         mx, my = (x1 + x2) / 2 + dx, (y1 + y2) / 2 + dy
+        if absolute and net in absolute:      # 穴の座標（col, row）で置く：線・部品に重ならない空きの位置
+            mx, my = fr.p(103 + (absolute[net][0] - 1) * 2.54, 103.45 + (absolute[net][1] - 1) * 2.54)
         out.append(f'<text x="{mx:.1f}" y="{my:.1f}" text-anchor="middle" font-size="9" fill="{NET_COLOR.get(net, "#333")}" '
                    f'stroke="#fff" stroke-width="0.4">{NET_SHORT.get(net, net)}</text>')
 
@@ -396,6 +407,10 @@ def draw_part(out, fr, fp):
         draw_cap(out, fr, fp)
     elif lib.startswith("WireExit"):
         draw_exit(out, fr, fp)
+    elif lib.startswith("WireJumper"):
+        for p in fp["pads"]:        # ジャンパーの両端の穴（線は基板ファイルの F.Cu の線として別に描く）
+            x, y = fr.p(p["x"], p["y"])
+            out.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="{1.3 * K:.1f}" fill="#fff" stroke="{NET_COLOR.get(p["net"], "#333")}" stroke-width="2.5"/>')
     else:
         raise SystemExit(f"NG: footprint {lib} の絵が render_view.py に無い（{fp['ref']}）")
 
@@ -427,13 +442,15 @@ def lines_fit(lines, width, height):
 FRONT_NOTES = [
     "この基板は、完成形の電源（段階C）で、M-12001 の 5 V を servo・Pi・B1 へ分ける基板。まだはんだ付けしていない（未実装）。",
     "はんだ付けは #405、初回通電は #525。この図は PROTO-02 の実装の計画で、基板ファイル hardware/deskcat.kicad_pcb から render_view.py が生成する。",
-    "F1 PTC＝過電流の保護（PROT-OC-01、Bourns MF-R135）。Q1 MOSFET 2SJ334＝電源の逆接の保護（PROT-RP-01。方式の判断は tbd-register.md の HW-TBD-030）。",
+    "F1・F2 PTC＝過電流の保護（PROT-OC-01、Bourns MF-R135）。F1＝logic の枝（J7・J8）、F2＝servo の枝（J6・C1・C2）で、共有しない。",
+    "Q1 MOSFET 2SJ334＝電源の逆接の保護（PROT-RP-01。方式の判断は tbd-register.md の HW-TBD-030）。",
+    "W2＝絶縁した線（111641 の被覆付き）のジャンパー。部品面の上を渡し、破線で描く（plan.md の部品表の W2 の行）。はんだ面の芯線どうしは交わらない。",
     "R18＝Q1 の Gate の抵抗 10 kΩ（plan.md の部品表の R18 の行）。J5〜J8＝端子台 114217（WIRE-PWR-01）：J5＝M-12001 の入力、J6＝servo、J7＝Pi、J8＝logic（B1 の ESP32 の 5V pin へ。案B）。",
     "R20＝servo の戻りだけに入れる shunt（MEAS-01。0.1 Ω 5 W。power-budget.md の GND topology）。W1＝ADC-SHUNT の線の出口。",
     "C1・C2＝servo の bulk capacitor の穴（470 µF／16 V。2 個分。3 個目が要るかは実測で決める）。",
     "寸法・位置の正本は基板ファイルと plan.md。この図は見た目で、寸法の正本ではない。図を電源・安全の実機確認に使わない。",
     "線は、はんだ面の芯線（111641、導体外径 0.75）を部品面の図の上に重ねて描いたもの。色はブレッドボードの図の決まりに合わせる。",
-    "赤＝＋（5 V の経路：J5 → F1 → Q1 → 分岐点 → J6・J7・J8・C1・C2）、黒＝GND、橙＝Gate（Q1 の G → R18）、紫＝ADC-SHUNT（shunt の servo の側の node。J6−・W1）。",
+    "赤＝＋（5 V の経路：J5 → Q1 → 分岐点 5V-NODE → F1 → J7・J8（橙赤）、→ F2 → J6・C1・C2（暗い赤））、黒＝GND、緑＝Gate（Q1 の G → R18）、紫＝ADC-SHUNT（shunt の servo の側の node。J6−・W1）。",
     "C1・C2 の−は GND（黒）で、B の node へ、Pi・ESP32・R18 と共有しない別の導体でつく（servo の過渡電流は shunt を必ず通る）。",
     "GND：J7−（Pi）・J8−（ESP32）・R18 は、別々の導体で shunt の B の node（B と J5− を結ぶ短い導体）へ直接つく。",
     "servo の戻りは J6− → A → R20 → B と流れ、B で初めてほかの GND に合流する（check_star_point.py が確かめる）。",
@@ -508,7 +525,8 @@ def front_svg(board):
         draw_part(o, fr, fp)
         o.append("</g>")
     draw_tracks(o, fr, board, "ftrack")
-    net_labels(o, fr, board, {"/5V-NODE": (0, -8), "/GND": (0, 17), "/Q1-GATE": (0, -8)}, skip=("/5V-IN", "/5V-PTC"))
+    net_labels(o, fr, board, {"/5V-NODE": (0, -8), "/5V-LOGIC": (0, 14), "/5V-SERVO": (0, -8), "/GND": (0, 17), "/Q1-GATE": (0, -8)}, skip=("/5V-IN",),
+               absolute={"/Q1-GATE": (4.2, 3.4), "/5V-SERVO": (20.5, 3.2), "/5V-LOGIC": (18.2, 12.4), "/5V-NODE": (14.0, 4.2)})
     for fp in parts:
         draw_pins(o, fr, fp)
     # ADC-SHUNT の線の出口 W1 → 板の外（B1 の GPIO32）：床の側（図の上）へ出る破線の線。generate.py の「板の外へ出る線」と同じ描き方
@@ -530,7 +548,9 @@ def front_svg(board):
         return {"top": fr.p((r[0] + r[2]) / 2, r[1]), "left": fr.p(r[0], (r[1] + r[3]) / 2), "right": fr.p(r[2], (r[1] + r[3]) / 2), "bottom": fr.p((r[0] + r[2]) / 2, r[3]),
                 "pad": fr.p(f["pads"][0]["x"], f["pads"][0]["y"])}[where]
     callouts = [
-        ("F1 PTC（過電流の保護）", [anchor_of("F1", "top")]),
+        ("F1 PTC（logic の枝。J7・J8）", [anchor_of("F1", "top")]),
+        ("F2 PTC（servo の枝。J6・C1・C2）", [anchor_of("F2", "top")]),
+        ("W2 ジャンパー（絶縁した線。5V-IN）", [anchor_of("W2", "pad")]),
         ("Q1 MOSFET 2SJ334（逆接の保護）", [anchor_of("Q1", "top")]),
         ("R20 shunt 0.1 Ω 5 W（servo の電流を測る）", [anchor_of("R20", "top")]),
         ("R18 10 kΩ（Gate の抵抗）", [anchor_of("R18", "right")]),
@@ -538,7 +558,7 @@ def front_svg(board):
         ("W1 ADC-SHUNT の線の出口（B1 の GPIO32 へ）", [anchor_of("W1", "pad")]),
     ]
     for k, (txt, anchors) in enumerate(callouts):
-        lx, ly = fr.p(103.0 + (22.6 - 1) * PITCH, 103.45 + (3.2 + k * 1.15 - 1) * PITCH)
+        lx, ly = fr.p(103.0 + (24.4 - 1) * PITCH, 103.45 + (3.2 + k * 1.15 - 1) * PITCH)
         w = text_width(txt, 10)
         o.append(f'<text x="{lx:.1f}" y="{ly:.1f}" font-size="10" fill="#222" stroke="#f4f4f0" stroke-width="3" paint-order="stroke">{esc(txt)}</text>')
         for ax, ay in anchors:
@@ -557,7 +577,7 @@ BACK_NOTES = [
     "この基板は、完成形の電源（段階C）で、M-12001 の 5 V を servo・Pi・B1 へ分ける基板（未実装）。",
     "はんだ付けは #405、初回通電は #525。まだはんだ付けしていない。部品の役目は部品面の図の凡例。",
     "はんだ面（左右を裏返した向き。部品面の図と同じ穴が、鏡の位置に出る）。基板ファイルの B.Cu の導体と、足の穴を描く。",
-    "線の色は部品面の図と同じ：赤＝＋、黒＝GND、橙＝Gate、紫＝ADC-SHUNT。太い線＝芯線（111641、被覆を剥いた区間。導体外径 0.75）。",
+    "線の色は部品面の図と同じ：赤＝＋、黒＝GND、緑＝Gate、紫＝ADC-SHUNT。太い線＝芯線（111641、被覆を剥いた区間。導体外径 0.75）。",
     "銀の丸＝はんだの盛り（導体が通る穴と足の穴。通る穴ごとにはんだ付けする）。灰の円＝ランド、その中の黒い点＝穴（使わない穴も同じ）。",
     "銀の丸の中の小さい濃い点＝部品の足が入る穴。",
     "TBD（資料に無い）：ランドの外径（pad と同じ 1.8 mm で描く）、はんだの盛りの大きさ（見た目）、基板の色。",
@@ -580,6 +600,8 @@ def back_svg(board):
     o.append(f'<text x="{BX:.1f}" y="{bottom + 22:.1f}" font-size="17" font-weight="bold">PROTO-02 はんだ面</text>')
     solder = set()
     for t in board["tracks"]:
+        if t["layer"] != "B.Cu":
+            continue                     # 部品面の絶縁した線（ジャンパー）は、はんだの盛りを作らない
         n = int(round(max(abs(t["x2"] - t["x1"]), abs(t["y2"] - t["y1"])) / PITCH))
         for i in range(n + 1):
             solder.add(hole_rc(t["x1"] + (t["x2"] - t["x1"]) * i / max(n, 1), t["y1"] + (t["y2"] - t["y1"]) * i / max(n, 1)))

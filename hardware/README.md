@@ -38,7 +38,7 @@ EXP-025 の [LED デモ回路](../docs/hardware/led-514-demo.md)は GPIO → 電
 | 製造 | BOM（部品表） | [`docs/hardware/hardware-bom.md`](../docs/hardware/hardware-bom.md) | あり（手編集の正本は1つ） |
 | 製造 | Gerber・drill・Pick & Place・3D（STEP） | 無い | 要らない。工場で基板を作らず、筐体との寸法連携は #34・#405 の現物合わせで行う（#512 の本文）。必要になれば基板ファイルから KiCad で出せる |
 
-**論理と物理のつながり：**回路図・基板ファイル・部品の library は1つの KiCad project（`deskcat.kicad_pro`）である。基板の部品の参照番号（`J5`〜`J8`、`F1`、`Q1`、`R18`、`R20`、`C1`・`C2`、`W1`）と節点は回路図から来ており、`kicad-cli pcb drc --schematic-parity hardware/deskcat.kicad_pcb` が食い違いを検出する。#512 の本文は「専用 PCB の `.kicad_pcb` は成果物に含めない」としている。ここでの `.kicad_pcb` は既製のユニバーサル基板の上の配置の計画であり、工場へ出す基板ではない（Gerber 等は作らない）。データの形式を業界標準の KiCad に揃えるために使う。KiCad の個人設定（`*.kicad_prl`）とバックアップは [`.gitignore`](.gitignore) で Git に入れない。
+**論理と物理のつながり：**回路図・基板ファイル・部品の library は1つの KiCad project（`deskcat.kicad_pro`）である。基板の部品の参照番号（`J5`〜`J8`、`F1`・`F2`、`Q1`、`R18`、`R20`、`C1`・`C2`、`W1`・`W2`）と節点は回路図から来ており、`kicad-cli pcb drc --schematic-parity hardware/deskcat.kicad_pcb` が食い違いを検出する。#512 の本文は「専用 PCB の `.kicad_pcb` は成果物に含めない」としている。ここでの `.kicad_pcb` は既製のユニバーサル基板の上の配置の計画であり、工場へ出す基板ではない（Gerber 等は作らない）。データの形式を業界標準の KiCad に揃えるために使う。KiCad の個人設定（`*.kicad_prl`）とバックアップは [`.gitignore`](.gitignore) で Git に入れない。
 
 ## 回路図の pin 番号
 
@@ -48,7 +48,7 @@ EXP-025 の [LED デモ回路](../docs/hardware/led-514-demo.md)は GPIO → 電
 
 ## KiCad の ERC
 
-2026-11-23（最初の実行は 2026-11-16）、KiCad 8.0.9 の `kicad-cli` で回路図を読み込み、ERC を実行した（環境は [Version Record](../docs/toolchains/version-records/2026-11-23-kicad-pcb-native-linux.md)。native Linux の KiCad 8.0.9。最初の実行は [2026-11-15 の VM](../docs/toolchains/version-records/2026-11-15-kicad-erc-vm.md)）。**Errors 0、Warnings 168** である（電源の経路、サーボ信号の直列抵抗 R19、project の library を足し、機能ごとの配置に描き直し、`PROTO-02` の shunt `R20`・bulk capacitor `C1`・`C2`・`ADC-SHUNT` の出口 `W1`・`J8` の経路を足した後）。警告の内訳は、pin と wire の端が接続の grid の外にある（`endpoint_off_grid`）148件と、抵抗の記号の KiCad 標準 library `Device` がこの VM に入っていない（`lib_symbol_issues`、記号は回路図に埋め込み済み）20件で、どちらも接続を変えるものではない。netlist を出力し、`MCU-01` の各 pin の net が上の header 番号と [GPIO Assignment](../docs/hardware/gpio-assignment.md) の GPIO に合うこと、`ACCEL-01` の `SDO` と `ENV-01` の `SDO` が GND（address `0x53` と `0x76`。EXP-065 の起動 log の `accel=0x53 env=0x76`）にあることを確かめた。
+2026-11-23（最初の実行は 2026-11-16）、KiCad 8.0.9 の `kicad-cli` で回路図を読み込み、ERC を実行した（環境は [Version Record](../docs/toolchains/version-records/2026-11-23-kicad-pcb-native-linux.md)。native Linux の KiCad 8.0.9。最初の実行は [2026-11-15 の VM](../docs/toolchains/version-records/2026-11-15-kicad-erc-vm.md)）。**Errors 0、Warnings 167** である（電源の経路、サーボ信号の直列抵抗 R19、project の library を足し、機能ごとの配置に描き直し、`PROTO-02` の shunt `R20`・bulk capacitor `C1`・`C2`・`ADC-SHUNT` の出口 `W1`・`J8` の経路を足した後）。警告の内訳は、pin と wire の端が接続の grid の外にある（`endpoint_off_grid`）147件と、抵抗の記号の KiCad 標準 library `Device` がこの VM に入っていない（`lib_symbol_issues`、記号は回路図に埋め込み済み）20件で、どちらも接続を変えるものではない。netlist を出力し、`MCU-01` の各 pin の net が上の header 番号と [GPIO Assignment](../docs/hardware/gpio-assignment.md) の GPIO に合うこと、`ACCEL-01` の `SDO` と `ENV-01` の `SDO` が GND（address `0x53` と `0x76`。EXP-065 の起動 log の `accel=0x53 env=0x76`）にあることを確かめた。
 
 基板ファイルの DRC（`kicad-cli pcb drc --schematic-parity --severity-all`）は、違反 0、未接続 0、回路図との食い違い 0 だった。
 
