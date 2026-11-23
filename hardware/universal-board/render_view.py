@@ -345,7 +345,7 @@ def draw_resistor(out, fr, fp):
 
 
 def draw_shunt(out, fr, fp):
-    """R20（MEAS-01 の shunt、セメント抵抗 SQP5WJ0R1B）：本体 22 × 10 mm（datasheet）。寝かせる。足の間隔 27.94 mm（11 穴）は慣行の値で暫定、
+    """R20（MEAS-01 の shunt、セメント抵抗 SQP5WJ0R1B）：本体 22 × 10 mm（datasheet）。寝かせる。足の間隔 27.94 mm（11 穴）は設計の値で確定（plan.md の A5）、
     本体の高さ H は資料に無い（TBD）。足は本体の端から足の穴まで、茶の線で描く。"""
     x0, y0, x1, y1 = fab_rect(fp)
     p1, p2 = sorted(fp["pads"], key=lambda p: p["name"])
