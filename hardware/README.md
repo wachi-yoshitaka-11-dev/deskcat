@@ -48,11 +48,11 @@ EXP-025 の [LED デモ回路](../docs/hardware/led-514-demo.md)は GPIO → 電
 
 ## KiCad の ERC
 
-2026-11-23（最初の実行は 2026-11-16）、KiCad 8.0.9 の `kicad-cli` で回路図を読み込み、ERC を実行した（環境は [Version Record](../docs/toolchains/version-records/2026-11-23-kicad-pcb-native-linux.md)。native Linux の KiCad 8.0.9。最初の実行は [2026-11-15 の VM](../docs/toolchains/version-records/2026-11-15-kicad-erc-vm.md)）。**Errors 0、Warnings 168** である（電源の経路、サーボ信号の直列抵抗 R19、project の library を足し、機能ごとの配置に描き直し、`PROTO-02` の shunt `R20`・bulk capacitor `C1`・`C2`・`ADC-SHUNT` の出口 `W1`・`J8` の経路を足した後）。警告の内訳は、pin と wire の端が接続の grid の外にある（`endpoint_off_grid`）148件と、抵抗の記号の KiCad 標準 library `Device` がこの VM に入っていない（`lib_symbol_issues`、記号は回路図に埋め込み済み）20件で、どちらも接続を変えるものではない。netlist を出力し、`MCU-01` の各 pin の net が上の header 番号と [GPIO Assignment](../docs/hardware/gpio-assignment.md) の GPIO に合うこと、`ACCEL-01` の `SDO` と `ENV-01` の `SDO` が GND（address `0x53` と `0x76`。EXP-065 の起動 log の `accel=0x53 env=0x76`）にあることを確かめた。
+2026-11-23（最初の実行は 2026-11-16）、KiCad 8.0.9 の `kicad-cli` で回路図を読み込み、ERC を実行した（環境は [Version Record](../docs/toolchains/version-records/2026-11-23-kicad-pcb-native-linux.md)。native Linux の KiCad 8.0.9。最初の実行は [2026-11-15 の VM](../docs/toolchains/version-records/2026-11-15-kicad-erc-vm.md)）。**Errors 0、Warnings 168** である（電源の経路、サーボ信号の直列抵抗 R19、project の library を足し、機能ごとの配置に描き直し、`PROTO-02` の shunt `R20`・bulk capacitor `C1`・`C2`・`ADC-SHUNT` の出口 `W1`・`J8` の経路を足した後）。警告の内訳は、pin と wire の端が接続の grid の外にある（`endpoint_off_grid`）148件と、抵抗の記号の KiCad 標準 library `Device` が実行した環境（native Linux の KiCad 8.0.9。`/usr/share/kicad` に `symbols` が無い）に入っていない（`lib_symbol_issues`、記号は回路図に埋め込み済み）20件で、どちらも接続を変えるものではない。netlist を出力し、`MCU-01` の各 pin の net が上の header 番号と [GPIO Assignment](../docs/hardware/gpio-assignment.md) の GPIO に合うこと、`ACCEL-01` の `SDO` と `ENV-01` の `SDO` が GND（address `0x53` と `0x76`。EXP-065 の起動 log の `accel=0x53 env=0x76`）にあることを確かめた。
 
 基板ファイルの DRC（`kicad-cli pcb drc --schematic-parity --severity-all`）は、違反 0、未接続 0、回路図との食い違い 0 だった。
 
-**この ERC が保証しないこと：**symbol の pin はすべて passive なので、出力どうしの衝突のような pin の種別の検査は効かない。GUI の窓での表示は確かめていない（`DISPLAY` が無い端末のため）。作業セッション（AI）が `kicad-cli sch export pdf` で描画して画像にし、確かめた（下の`閉じた項目`）。**人は見ていない。**
+**この ERC が保証しないこと：**symbol の pin はすべて passive なので、出力どうしの衝突のような pin の種別の検査は効かない。GUI の窓での表示は確かめていない（ERC を実行した native Linux の環境に `DISPLAY` が無いため）。作業セッション（AI）が `kicad-cli sch export pdf` で描画して画像にし、確かめた（下の`閉じた項目`）。**人は見ていない。**
 
 ## Wokwi と物理図の評価
 
@@ -83,7 +83,7 @@ Wokwi の [ILI9341 部品](https://docs.wokwi.com/parts/wokwi-ili9341)では RST
 
 - `PROTO-02` の現物：計画（[`universal-board/plan.md`](universal-board/plan.md)）は描いた。**はんだ付けの後に現物と照合して完成図にする作業は #405 の範囲で、追跡を #405 へ移した**（#405 の受け入れ条件に、計画図に従ったはんだ付けと、現物との照合・完成図の記録の項目がある）。**基板の未実装状態を完成図として描かない。**計画の`測る所`（M1〜M8。M1・M3・M5 は決めて閉じた）は、#512 の受け入れ条件の「表現できない部分と `TBD` を列挙する」に当たる列挙として `plan.md` に残す。測る作業も #405 側で行い、まだ測っていない。
 - **LCD の信号線と touch の線（2026-10-31 の組み直し後）：**導通は電源2本と短絡だけを測った（EXP-052）。`CS`・`DC`・`SDI`・`SCK`・`LED` は、組み直し後の製品 build で LCD が描かれた記録（EXP-062 など）で動作を確かめた。**`RESET`（`display.rs` は SWRESET を送るので、描画だけでは線の有無を断定できない）、`SDO`・`T_DO`（製品 build は読まない）、`T_CS`・`T_IRQ`（製品 build は `no-touch-487`）は、組み直し後の確認が無い。**#512 の受け入れ条件は導通の実測を求めておらず、LCD の touch を使う作業が出たとき、その作業の窓で1本ずつ確かめる。
-- **`TBD`**（`overview/wiring-table.md` の T1 と `universal-board/plan.md` の `未決の一覧`）：ESP32 の 5 V 入力（`J8`）は案B に決めた（ユーザーの決定、2026-11-23。記録は power-budget.md の`ESP32の給電経路`節）。サーボの plug とのつなぎ方（T1）は #405 が持つ。LCD の VCC は決めていない（段階C では DISP-01 を使わない。今の構成の 3V3 pin 給電・J1 開放は #461 の承認範囲で、段階Cへ広げない。最終の VCC は、`HW-TBD-024`・`HW-TBD-025`(a) と回路図の版の一致が揃えば #405 の見直しで決める）。台帳の [`HW-TBD-024`](../docs/hardware/tbd-register.md#hw-tbd-024) は、LCD が耐えられる電流の上限の項目で、電圧の項目ではない。
+- **`TBD`**（`overview/wiring-table.md` の T1〜T3 と `universal-board/plan.md` の `未決の一覧`）：ESP32 の 5 V 入力（`J8`）は案B に決めた（ユーザーの決定、2026-11-23。記録は power-budget.md の`ESP32の給電経路`節）。サーボの plug とのつなぎ方（T1）は #405 が持つ。J8 の枝（P7・X5）の線とつなぎの部材（T3）も #405 が持ち、決まるまで J8 から ESP32 へ給電しない（案Bを採る条件は T3 が指す power-budget.md の`案Bを採る条件`行が持つ）。LCD の VCC（T2）は決めていない（段階C では DISP-01 を使わない。今の構成の 3V3 pin 給電・J1 開放は #461 の承認範囲で、段階Cへ広げない。最終の VCC は、`HW-TBD-024`・`HW-TBD-025`(a) と回路図の版の一致が揃えば #405 の見直しで決める）。台帳の [`HW-TBD-024`](../docs/hardware/tbd-register.md#hw-tbd-024) は、LCD が耐えられる電流の上限の項目で、電圧の項目ではない。
 
 ### 閉じた項目
 

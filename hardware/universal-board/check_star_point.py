@@ -7,7 +7,7 @@
 star の側の端 B から先。R20 の足2、J5−、J7−、J8−、R18 の足2、C1・C2 の−）。
 
 1. shunt `R20` の足1 が `/ADC-SHUNT`（servo の側 A）、足2（B）が `/GND` にある（shunt は servo の戻りだけにある）。
-2. `/ADC-SHUNT` の導体は、J6−、`W1`、R20 の足1 だけをつなぐ。**C1・C2 の−は A の node に無い**（servo の過渡電流が
+2. `/ADC-SHUNT` の導体の上にある pad は、J6−、R20 の足1、`W1` の3つだけで、`W1` の pad の net が `/ADC-SHUNT` である。**C1・C2 の−は A の node に無い**（servo の過渡電流が
    J6− → A → shunt → B → C− と流れ、shunt を必ず通る）。Pi・logic・ingress の GND（J5−・J7−・J8−・R18 の足2）も含まない（shunt を通らずに servo の戻りが GND へ流れる道が無い）。
 3. **star point は B（shunt の足2）の node である。**J5−（5 V ingress の GND）は B に短い導体（2 穴以内）で直接つく。
    servo の戻りは J6− → A → shunt → B と流れ、B で初めてほかの GND に合流する。
@@ -247,6 +247,21 @@ def main():
                 errors.append(f"{cref} の − が /GND の net でない（{padnet[(cref, '-')]}。servo の過渡電流が shunt を通らない）")
             if pads[(cref, "-")] in A:
                 errors.append(f"{cref} の − が /ADC-SHUNT の導体（A の node）の上にある")
+    # 2''. A の node（/ADC-SHUNT の導体）の上にある pad は、J6−・R20 の足1・W1 の3つだけ。W1 の pad は /ADC-SHUNT の net
+    if ("W1", "1") not in pads:
+        errors.append("部品 W1 の足 1 が基板ファイルに無い")
+    else:
+        if padnet[("W1", "1")] != "/ADC-SHUNT":
+            errors.append(f"W1 の足1 が /ADC-SHUNT の net でない（{padnet[('W1', '1')]}）")
+
+        def on_seg(p, a, b):
+            cr = (b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0])
+            return abs(cr) < 1e-6 and min(a[0], b[0]) - 1e-6 <= p[0] <= max(a[0], b[0]) + 1e-6 \
+                and min(a[1], b[1]) - 1e-6 <= p[1] <= max(a[1], b[1]) + 1e-6
+        on_a = {k for k, p in pads.items() if any(on_seg(p, a, b) for a, b in segs_by_net.get("/ADC-SHUNT", []))}
+        want = {J6M, (SHUNT, "1"), ("W1", "1")}
+        if on_a != want:
+            errors.append(f"/ADC-SHUNT の導体の上の pad が J6−・R20 の足1・W1 の3つだけでない（余り {sorted(on_a - want)}、不足 {sorted(want - on_a)}）")
     # 2'. ADC-SHUNT の導体は、J5−・J7−・J8−・R18 の足2 を含まない（C1・C2 の−は下で別に確かめる）
     for k in (J5M, J7M, J8M, R18_2):
         if pads[k] in A:
