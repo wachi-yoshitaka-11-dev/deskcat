@@ -167,12 +167,4 @@
  (symbol "WIRE_EXIT_1_1"
   (pin passive line (at 0 8.89 270) (length 5.08) (name "1" (effects (font (size 1.27 1.27)))) (number "1" (effects (font (size 1.27 1.27)))))
  ))
-(symbol "WIRE_JUMPER" (pin_names (offset 1.016) hide) (in_bom no) (on_board no)
- (property "Reference" "W" (at 0 7.31 0) (effects (font (size 1.27 1.27))))
- (property "Value" "WIRE_JUMPER" (at 0 -7.31 0) (effects (font (size 1.27 1.27))))
- (symbol "WIRE_JUMPER_0_1" (rectangle (start -1.27 1.27) (end 1.27 -1.27) (stroke (width 0.254) (type default)) (fill (type background))))
- (symbol "WIRE_JUMPER_1_1"
-  (pin passive line (at 0 8.89 270) (length 5.08) (name "1" (effects (font (size 1.27 1.27)))) (number "1" (effects (font (size 1.27 1.27)))))
-  (pin passive line (at 0 -8.89 90) (length 5.08) (name "2" (effects (font (size 1.27 1.27)))) (number "2" (effects (font (size 1.27 1.27)))))
- ))
 )

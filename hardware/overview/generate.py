@@ -32,8 +32,8 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 SCHEMATIC = HERE.parent / "deskcat.kicad_sch"
 NETLIST = HERE / "deskcat-netlist.xml"
-SCHEMATIC_SHA256 = "75e0dcade6b3a5f9bd8e2424ed5cc4f15b01a7456884a6201975217850327b83"
-NETLIST_SHA256 = "e390c192cca06e6130a63f98990028e04dce6757ce18610dce75492e411364ac"
+SCHEMATIC_SHA256 = "7f4613c954bee0b2f52d42206d738ef74f5abd4a5e59093f92aa0d253f1fc20e"
+NETLIST_SHA256 = "8bac3697e03e17ab3ff329b9542996818e74ff738ee26364a55e57b886d99c73"
 
 # ---------------------------------------------------------------- まとまり（ブロック）
 
@@ -46,7 +46,7 @@ BLOCK_OF = {
     "R10": "B3", "R11": "B3", "J2": "B3", "J3": "B3",
     "J1": "LCD", "J4": "Pi", "J9": "Pi", "M1": "SERVO", "PS1": "M-12001",
     "J5": "PROTO-02", "J6": "PROTO-02", "J7": "PROTO-02", "J8": "PROTO-02",
-    "F1": "PROTO-02", "F2": "PROTO-02", "W2": "PROTO-02", "Q1": "PROTO-02", "R18": "PROTO-02",
+    "F1": "PROTO-02", "Q1": "PROTO-02", "R18": "PROTO-02",
     "R20": "PROTO-02", "C1": "PROTO-02", "C2": "PROTO-02", "W1": "PROTO-02",
 }
 
@@ -77,11 +77,11 @@ OFFBOARD_END = {"X1": ("Pi", "J4", "8"), "X2": ("Pi", "J4", "10"), "X3": ("Pi", 
 POWER_WIRES = [
     ("P1", "/5V-IN", ("M-12001", "PS1", "+"), ("PROTO-02", "J5", "+"), "M-12001 の線（Micro-B の手前で切った導体）", "#d62728"),
     ("P2", "/GND", ("M-12001", "PS1", "-"), ("PROTO-02", "J5", "-"), "M-12001 の線（同上）", "#111111"),
-    ("P3", "/5V-SERVO", ("PROTO-02", "J6", "+"), ("SERVO", "M1", "red"), "サーボの赤（`111641` で延ばす。plug とのつなぎ方は #405）", "#d62728"),
+    ("P3", "/5V-NODE", ("PROTO-02", "J6", "+"), ("SERVO", "M1", "red"), "サーボの赤（`111641` で延ばす。plug とのつなぎ方は #405）", "#d62728"),
     ("P4", "/ADC-SHUNT", ("PROTO-02", "J6", "-"), ("SERVO", "M1", "brown"), "サーボの茶（同上）。節点は shunt のサーボ側（`/ADC-SHUNT`）", "#8c564b"),
-    ("P5", "/5V-LOGIC", ("PROTO-02", "J7", "+"), ("Pi", "J9", "VBUS"), "`CABLE-PI-PWR-01`（`109314` を切った導体）→ Pi の `PWR IN`", "#d62728"),
+    ("P5", "/5V-NODE", ("PROTO-02", "J7", "+"), ("Pi", "J9", "VBUS"), "`CABLE-PI-PWR-01`（`109314` を切った導体）→ Pi の `PWR IN`", "#d62728"),
     ("P6", "/GND", ("PROTO-02", "J7", "-"), ("Pi", "J9", "GND"), "`CABLE-PI-PWR-01`（同上）", "#111111"),
-    ("P7", "/5V-LOGIC", ("PROTO-02", "J8", "+"), ("B1", "U1", "J2-19"), "ESP32 の 5V pin へ（案B。`111641` 1本）", "#d62728"),
+    ("P7", "/5V-NODE", ("PROTO-02", "J8", "+"), ("B1", "U1", "J2-19"), "ESP32 の 5V pin へ（案B。`111641` 1本）", "#d62728"),
     ("P8", "/ADC-SHUNT", ("PROTO-02", "W1", "1"), ("B1", "U1", "J2-7"), "`ADC-SHUNT`（GPIO32）へ。`111641` 1本を床側へ通す（`W1`）", "#7b2d8e"),
 ]
 
