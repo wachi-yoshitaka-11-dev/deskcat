@@ -63,6 +63,12 @@ Commands run / Actual result:
       python3 -I hardware/universal-board/check_star_point.py: OK。規則を「B と J5− の間の導体が 2 穴以内、J7−・J8−・R18 の
         導体が別々に node へつき、穴を共有せず、node を迂回しない」へ強めた。負の例として、直前の版（v5。B と J5− の間に
         45.7 mm の導体があり、Pi の GND がその途中につく）と、J8− と J7− の導体を直結した版は、NG になることを実行して確かめた。
+    さらにその後の更新（レビューの指摘で C1・C2 の−を A の node から GND の star point の側へ移した配置。2026-11-23）:
+      kicad-cli pcb drc --schematic-parity --severity-all: 違反 0、未接続 0、回路図との食い違い 0。
+      kicad-cli sch erc --severity-all: Errors 0、Warnings 168（回路図の C1・C2 の − の label を ADC-SHUNT から GND へ変えた）。
+      python3 -I hardware/universal-board/check_star_point.py: OK。規則に「C1・C2 の−が A の node に無く、Pi・ESP32・R18 と導体を
+        共有しない別の導体で star point の node へつく」を足した。負の例として、C の−が A の node にある直前の版は NG になることを
+        実行して確かめた。W1 の footprint から外形（courtyard）を外した（本体が無い穴のため）。
     kicad-cli sch export netlist（kicadxml）で overview の netlist を書き出し直した。
     kicad-cli pcb export svg: 成功。firefox の headless で描画して読んだ（作業セッションが画像を読んだ。人は見ていない）。
 

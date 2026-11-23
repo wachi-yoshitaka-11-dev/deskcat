@@ -72,5 +72,4 @@
 
 | ID | 間 | 何 |
 |---|---|---|
-| T1 | B2 – LCD | LCD の VCC（pin 1）の電圧：今は 3V3。最終は `HW-TBD-024`（PROTO-02 は変えない。#461） |
-| T2 | PROTO-02 – SERVO | サーボの plug とのつなぎ方（servo の枝の線の先）：#405 |
+| T1 | PROTO-02 – SERVO | サーボの plug とのつなぎ方（servo の枝の線の先）：#405 |

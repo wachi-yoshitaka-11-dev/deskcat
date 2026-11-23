@@ -2,7 +2,7 @@
 <export version="E">
   <design>
     <source>hardware/deskcat.kicad_sch</source>
-    <date>2026-11-23T04:22:50+0900</date>
+    <date>2026-11-23T10:44:32+0900</date>
     <tool>Eeschema 8.0.9-8.0.9-0~ubuntu24.04.1</tool>
     <sheet number="1" name="/" tstamps="/">
       <title_block>
@@ -917,8 +917,6 @@
       <node ref="U1" pin="J2-8" pinfunction="GPIO33_ADC-5V" pintype="passive"/>
     </net>
     <net code="7" name="/ADC-SHUNT">
-      <node ref="C1" pin="-" pinfunction="-" pintype="passive"/>
-      <node ref="C2" pin="-" pinfunction="-" pintype="passive"/>
       <node ref="J6" pin="-" pinfunction="-" pintype="passive"/>
       <node ref="M1" pin="brown" pinfunction="GND" pintype="passive"/>
       <node ref="R20" pin="1" pintype="passive"/>
@@ -926,6 +924,8 @@
       <node ref="W1" pin="1" pinfunction="1" pintype="passive"/>
     </net>
     <net code="8" name="/GND">
+      <node ref="C1" pin="-" pinfunction="-" pintype="passive"/>
+      <node ref="C2" pin="-" pinfunction="-" pintype="passive"/>
       <node ref="D1" pin="K" pinfunction="K" pintype="passive"/>
       <node ref="D2" pin="K" pinfunction="K" pintype="passive"/>
       <node ref="J1" pin="2" pinfunction="GND" pintype="passive"/>

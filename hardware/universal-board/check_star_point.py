@@ -3,19 +3,19 @@
 
 規則（docs/hardware/power-budget.md の`GND topology`と、`実装方法を決定した（2026-09-03）`の
 「Gate は共通 GND 戻り（star point）へ抵抗を介してつなぐ」）。基板の net は次のとおり：
-`/ADC-SHUNT`（shunt `R20` の servo の側の端 A の node。J6−、C1〜C3 の−、`W1`）と `/GND`（shunt の
+`/ADC-SHUNT`（shunt `R20` の servo の側の端 A の node。J6−、`W1`）と `/GND`（shunt の
 star の側の端 B から先。J5−、J7−、J8−、R18 の足2）。
 
 1. shunt `R20` の足1 が `/ADC-SHUNT`（servo の側 A）、足2（B）が `/GND` にある（shunt は servo の戻りだけにある）。
-2. `/ADC-SHUNT` の導体は、J6−、C1・C2 の−、`W1`、R20 の足1 だけをつなぎ、Pi・logic・ingress の GND
-   （J5−・J7−・J8−・R18 の足2）を含まない（shunt を通らずに servo の戻りが GND へ流れる道が無い）。
+2. `/ADC-SHUNT` の導体は、J6−、`W1`、R20 の足1 だけをつなぐ。**C1・C2 の−は A の node に無い**（servo の過渡電流が
+   J6− → A → shunt → B → C− と流れ、shunt を必ず通る）。Pi・logic・ingress の GND（J5−・J7−・J8−・R18 の足2）も含まない（shunt を通らずに servo の戻りが GND へ流れる道が無い）。
 3. **star point は B（shunt の足2）の node である。**J5−（5 V ingress の GND）は B に短い導体（2 穴以内）で直接つく。
    servo の戻りは J6− → A → shunt → B と流れ、B で初めてほかの GND に合流する。
 4. **J7−（Pi）・J8−（ESP32）・R18 の足2 は、それぞれ別の導体で star point の node（B と J5− の間）へ直接つく。**
    3 本の導体は互いに穴を共有せず、star point の node を除くと互いにつながらない（Pi と ESP32 の GND の間に、
    servo の電流が流れる導体も、共有する導体も無い。UART の GND と輪を作らない）。
    したがって J5−・J7−・J8−・R18 と B の間の導体に servo の電流は流れない（B と J5− の間の短い導体だけが、
-   全部の戻りを一緒に運ぶ）。
+   全部の戻りを一緒に運ぶ）。C1・C2 の−も、J7−・J8−・R18 と導体を共有しない別の導体で node へつく（C1 と C2 の間は共有してよい）。
 5. 導体の端と折れ曲がり、通る穴は、基板に実在する穴（`Dwgs.User` の円）の上にある。四隅の穴は無い。
 
 基板ファイル（`hardware/deskcat.kicad_pcb`）の `B.Cu` の導体と、部品の pad の位置・net だけを読む。
@@ -195,9 +195,15 @@ def main():
             nset = set(node)
             # 4. J7−・J8−・R18 の足2 は、それぞれ別の導体で node へ。node を除くと互いにつながらない
             terms = {"J7−": J7, "J8−": J8, "R18 の足2": R2}
+            for cref in ("C1", "C2"):
+                if (cref, "-") in pads:
+                    terms[cref + "−"] = pads[(cref, "-")]
             branch = {}
             for nm, p in terms.items():
                 # node の穴のどれかに最初に着く経路（B でも J5− の穴でも、node の穴であればよい）
+                if p not in gnd:
+                    errors.append(f"{nm} が /GND の導体につながっていない")
+                    continue
                 hit = None
                 prev, qd = {p: None}, deque([p])
                 while qd:
@@ -220,17 +226,25 @@ def main():
             names = list(branch)
             for a_ in range(len(names)):
                 for b_ in range(a_ + 1, len(names)):
+                    if {names[a_], names[b_]} == {"C1−", "C2−"}:
+                        continue
                     if branch[names[a_]] & branch[names[b_]]:
                         errors.append(f"{names[a_]} と {names[b_]} の導体が穴を共有している（戻りが node の手前で合流する）")
             # node を除くと互いにつながらない（node を迂回する導体が無い）
             for a_ in range(len(names)):
                 for b_ in range(len(names)):
-                    if a_ != b_ and path(gnd, terms[names[a_]], terms[names[b_]], skip=nset) is not None:
+                    if a_ != b_ and {names[a_], names[b_]} != {"C1−", "C2−"} and path(gnd, terms[names[a_]], terms[names[b_]], skip=nset) is not None:
                         errors.append(f"{names[a_]} は node を通らずに {names[b_]} へつながる導体がある（迂回）")
             # J5−・J7−・J8−・R18 の足が、B と J5− の間の導体の上にない
             for nm, p in terms.items():
                 if p in nset:
                     errors.append(f"{nm} の足が B と J5− の間の導体の上にある（servo の電流が流れる穴）")
+    for cref in ("C1", "C2"):
+        if (cref, "-") in pads:
+            if padnet[(cref, "-")] != "/GND":
+                errors.append(f"{cref} の − が /GND の net でない（{padnet[(cref, '-')]}。servo の過渡電流が shunt を通らない）")
+            if pads[(cref, "-")] in A:
+                errors.append(f"{cref} の − が /ADC-SHUNT の導体（A の node）の上にある")
     # 2'. ADC-SHUNT の導体は、Pi・logic・ingress の足を含まない
     for k in (J5M, J7M, J8M, R18_2):
         if pads[k] in A:
