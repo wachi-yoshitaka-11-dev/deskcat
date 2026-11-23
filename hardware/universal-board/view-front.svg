@@ -572,73 +572,71 @@
 <circle cx="804.0" cy="533.9" r="8.7" fill="#c9ccd0" stroke="#222" stroke-dasharray="3 2"/>
 <circle cx="782.0" cy="533.9" r="8.7" fill="#c9ccd0" stroke="#222" stroke-dasharray="3 2"/>
 </g>
-<g data-ftrack="/5V-IN:105.54,128.85-105.54,123.77" data-layer="B.Cu"><line x1="408.0" y1="489.9" x2="408.0" y2="445.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
 <g data-ftrack="/5V-IN:105.54,123.77-105.54,118.69" data-layer="B.Cu"><line x1="408.0" y1="445.9" x2="408.0" y2="401.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/5V-IN:105.54,128.85-105.54,123.77" data-layer="B.Cu"><line x1="408.0" y1="489.9" x2="408.0" y2="445.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
 <g data-ftrack="/5V-IN:110.62,118.69-113.16,118.69" data-layer="B.Cu"><line x1="452.0" y1="401.9" x2="474.0" y2="401.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
 <g data-ftrack="/5V-IN:105.54,118.69-110.62,118.69" data-layer="B.Cu"><line x1="408.0" y1="401.9" x2="452.0" y2="401.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
 <g data-ftrack="/5V-PTC:118.24,118.69-123.32,118.69" data-layer="B.Cu"><line x1="518.0" y1="401.9" x2="562.0" y2="401.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
 <g data-ftrack="/5V-PTC:123.32,118.69-125.86,118.69" data-layer="B.Cu"><line x1="562.0" y1="401.9" x2="584.0" y2="401.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/5V-NODE:141.1,118.69-141.1,123.77" data-layer="B.Cu"><line x1="716.0" y1="401.9" x2="716.0" y2="445.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
 <g data-ftrack="/5V-NODE:143.64,126.31-143.64,131.39" data-layer="B.Cu"><line x1="738.0" y1="467.9" x2="738.0" y2="511.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/5V-NODE:130.94,121.23-130.94,118.69" data-layer="B.Cu"><line x1="628.0" y1="423.9" x2="628.0" y2="401.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/5V-NODE:143.64,118.69-148.72,118.69" data-layer="B.Cu"><line x1="738.0" y1="401.9" x2="782.0" y2="401.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/5V-NODE:141.1,126.31-143.64,126.31" data-layer="B.Cu"><line x1="716.0" y1="467.9" x2="738.0" y2="467.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/5V-NODE:148.72,131.39-151.26,131.39" data-layer="B.Cu"><line x1="782.0" y1="511.9" x2="804.0" y2="511.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
 <g data-ftrack="/5V-NODE:130.94,118.69-136.02,118.69" data-layer="B.Cu"><line x1="628.0" y1="401.9" x2="672.0" y2="401.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/5V-NODE:143.64,131.39-148.72,131.39" data-layer="B.Cu"><line x1="738.0" y1="511.9" x2="782.0" y2="511.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/5V-NODE:151.26,131.39-151.26,133.93" data-layer="B.Cu"><line x1="804.0" y1="511.9" x2="804.0" y2="533.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/5V-NODE:141.1,118.69-141.1,123.77" data-layer="B.Cu"><line x1="716.0" y1="401.9" x2="716.0" y2="445.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
 <g data-ftrack="/5V-NODE:125.86,121.23-130.94,121.23" data-layer="B.Cu"><line x1="584.0" y1="423.9" x2="628.0" y2="423.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/5V-NODE:148.72,118.69-153.8,118.69" data-layer="B.Cu"><line x1="782.0" y1="401.9" x2="826.0" y2="401.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/5V-NODE:143.64,118.69-148.72,118.69" data-layer="B.Cu"><line x1="738.0" y1="401.9" x2="782.0" y2="401.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
 <g data-ftrack="/5V-NODE:136.02,118.69-141.1,118.69" data-layer="B.Cu"><line x1="672.0" y1="401.9" x2="716.0" y2="401.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/5V-NODE:141.1,118.69-143.64,118.69" data-layer="B.Cu"><line x1="716.0" y1="401.9" x2="738.0" y2="401.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/5V-NODE:141.1,126.31-143.64,126.31" data-layer="B.Cu"><line x1="716.0" y1="467.9" x2="738.0" y2="467.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
 <g data-ftrack="/5V-NODE:141.1,123.77-141.1,126.31" data-layer="B.Cu"><line x1="716.0" y1="445.9" x2="716.0" y2="467.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/5V-NODE:130.94,121.23-130.94,118.69" data-layer="B.Cu"><line x1="628.0" y1="423.9" x2="628.0" y2="401.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/5V-NODE:143.64,131.39-148.72,131.39" data-layer="B.Cu"><line x1="738.0" y1="511.9" x2="782.0" y2="511.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/5V-NODE:148.72,118.69-153.8,118.69" data-layer="B.Cu"><line x1="782.0" y1="401.9" x2="826.0" y2="401.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/5V-NODE:148.72,131.39-151.26,131.39" data-layer="B.Cu"><line x1="782.0" y1="511.9" x2="804.0" y2="511.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/5V-NODE:151.26,131.39-151.26,133.93" data-layer="B.Cu"><line x1="804.0" y1="511.9" x2="804.0" y2="533.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/5V-NODE:141.1,118.69-143.64,118.69" data-layer="B.Cu"><line x1="716.0" y1="401.9" x2="738.0" y2="401.9" stroke="#d62728" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
 <g data-ftrack="/Q1-GATE:125.86,116.15-125.86,113.61" data-layer="B.Cu"><line x1="584.0" y1="379.9" x2="584.0" y2="357.9" stroke="#ff7f0e" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
 <g data-ftrack="/Q1-GATE:125.86,113.61-120.78,113.61" data-layer="B.Cu"><line x1="584.0" y1="357.9" x2="540.0" y2="357.9" stroke="#ff7f0e" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:115.7,121.23-110.62,121.23" data-layer="B.Cu"><line x1="496.0" y1="423.9" x2="452.0" y2="423.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:136.02,131.39-130.94,131.39" data-layer="B.Cu"><line x1="672.0" y1="511.9" x2="628.0" y2="511.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:123.32,133.93-118.24,133.93" data-layer="B.Cu"><line x1="562.0" y1="533.9" x2="518.0" y2="533.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:110.62,123.77-110.62,128.85" data-layer="B.Cu"><line x1="452.0" y1="445.9" x2="452.0" y2="489.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:133.48,136.47-133.48,133.93" data-layer="B.Cu"><line x1="650.0" y1="555.9" x2="650.0" y2="533.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:115.7,113.61-115.7,118.69" data-layer="B.Cu"><line x1="496.0" y1="357.9" x2="496.0" y2="401.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:115.7,118.69-115.7,121.23" data-layer="B.Cu"><line x1="496.0" y1="401.9" x2="496.0" y2="423.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:153.8,133.93-153.8,136.47" data-layer="B.Cu"><line x1="826.0" y1="533.9" x2="826.0" y2="555.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:148.72,123.77-153.8,123.77" data-layer="B.Cu"><line x1="782.0" y1="445.9" x2="826.0" y2="445.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:108.08,121.23-108.08,126.31" data-layer="B.Cu"><line x1="430.0" y1="423.9" x2="430.0" y2="467.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:115.7,108.53-115.7,113.61" data-layer="B.Cu"><line x1="496.0" y1="313.9" x2="496.0" y2="357.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:148.72,133.93-143.64,133.93" data-layer="B.Cu"><line x1="782.0" y1="533.9" x2="738.0" y2="533.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:123.32,123.77-118.24,123.77" data-layer="B.Cu"><line x1="562.0" y1="445.9" x2="518.0" y2="445.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:110.62,121.23-108.08,121.23" data-layer="B.Cu"><line x1="452.0" y1="423.9" x2="430.0" y2="423.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:133.48,121.23-133.48,123.77" data-layer="B.Cu"><line x1="650.0" y1="423.9" x2="650.0" y2="445.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:133.48,123.77-128.4,123.77" data-layer="B.Cu"><line x1="650.0" y1="445.9" x2="606.0" y2="445.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:110.62,133.93-110.62,131.39" data-layer="B.Cu"><line x1="452.0" y1="533.9" x2="452.0" y2="511.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:120.78,108.53-115.7,108.53" data-layer="B.Cu"><line x1="540.0" y1="313.9" x2="496.0" y2="313.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:148.72,136.47-143.64,136.47" data-layer="B.Cu"><line x1="782.0" y1="555.9" x2="738.0" y2="555.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:138.56,136.47-133.48,136.47" data-layer="B.Cu"><line x1="694.0" y1="555.9" x2="650.0" y2="555.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:143.64,136.47-138.56,136.47" data-layer="B.Cu"><line x1="738.0" y1="555.9" x2="694.0" y2="555.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:143.64,123.77-148.72,123.77" data-layer="B.Cu"><line x1="738.0" y1="445.9" x2="782.0" y2="445.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:118.24,123.77-113.16,123.77" data-layer="B.Cu"><line x1="518.0" y1="445.9" x2="474.0" y2="445.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:136.02,133.93-136.02,131.39" data-layer="B.Cu"><line x1="672.0" y1="533.9" x2="672.0" y2="511.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:133.48,133.93-128.4,133.93" data-layer="B.Cu"><line x1="650.0" y1="533.9" x2="606.0" y2="533.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:125.86,131.39-120.78,131.39" data-layer="B.Cu"><line x1="584.0" y1="511.9" x2="540.0" y2="511.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:153.8,128.85-153.8,133.93" data-layer="B.Cu"><line x1="826.0" y1="489.9" x2="826.0" y2="533.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:110.62,128.85-110.62,131.39" data-layer="B.Cu"><line x1="452.0" y1="489.9" x2="452.0" y2="511.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:143.64,133.93-138.56,133.93" data-layer="B.Cu"><line x1="738.0" y1="533.9" x2="694.0" y2="533.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:108.08,126.31-108.08,131.39" data-layer="B.Cu"><line x1="430.0" y1="467.9" x2="430.0" y2="511.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:138.56,133.93-136.02,133.93" data-layer="B.Cu"><line x1="694.0" y1="533.9" x2="672.0" y2="533.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
 <g data-ftrack="/GND:153.8,136.47-148.72,136.47" data-layer="B.Cu"><line x1="826.0" y1="555.9" x2="782.0" y2="555.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:118.24,133.93-113.16,133.93" data-layer="B.Cu"><line x1="518.0" y1="533.9" x2="474.0" y2="533.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
 <g data-ftrack="/GND:153.8,123.77-153.8,128.85" data-layer="B.Cu"><line x1="826.0" y1="445.9" x2="826.0" y2="489.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:128.4,123.77-123.32,123.77" data-layer="B.Cu"><line x1="606.0" y1="445.9" x2="562.0" y2="445.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:130.94,131.39-125.86,131.39" data-layer="B.Cu"><line x1="628.0" y1="511.9" x2="584.0" y2="511.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:115.7,131.39-110.62,131.39" data-layer="B.Cu"><line x1="496.0" y1="511.9" x2="452.0" y2="511.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:113.16,133.93-110.62,133.93" data-layer="B.Cu"><line x1="474.0" y1="533.9" x2="452.0" y2="533.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:120.78,131.39-115.7,131.39" data-layer="B.Cu"><line x1="540.0" y1="511.9" x2="496.0" y2="511.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:105.54,131.39-110.62,131.39" data-layer="B.Cu"><line x1="408.0" y1="511.9" x2="452.0" y2="511.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<g data-ftrack="/GND:113.16,123.77-110.62,123.77" data-layer="B.Cu"><line x1="474.0" y1="445.9" x2="452.0" y2="445.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:133.48,136.47-128.4,136.47" data-layer="B.Cu"><line x1="650.0" y1="555.9" x2="606.0" y2="555.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:138.56,136.47-133.48,136.47" data-layer="B.Cu"><line x1="694.0" y1="555.9" x2="650.0" y2="555.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:115.7,118.69-115.7,121.23" data-layer="B.Cu"><line x1="496.0" y1="401.9" x2="496.0" y2="423.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:118.24,133.93-113.16,133.93" data-layer="B.Cu"><line x1="518.0" y1="533.9" x2="474.0" y2="533.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:128.4,136.47-123.32,136.47" data-layer="B.Cu"><line x1="606.0" y1="555.9" x2="562.0" y2="555.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
 <g data-ftrack="/GND:128.4,133.93-123.32,133.93" data-layer="B.Cu"><line x1="606.0" y1="533.9" x2="562.0" y2="533.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:110.62,126.31-110.62,131.39" data-layer="B.Cu"><line x1="452.0" y1="467.9" x2="452.0" y2="511.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:113.16,131.39-110.62,131.39" data-layer="B.Cu"><line x1="474.0" y1="511.9" x2="452.0" y2="511.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:120.78,108.53-115.7,108.53" data-layer="B.Cu"><line x1="540.0" y1="313.9" x2="496.0" y2="313.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:113.16,123.77-113.16,128.85" data-layer="B.Cu"><line x1="474.0" y1="445.9" x2="474.0" y2="489.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:128.4,123.77-123.32,123.77" data-layer="B.Cu"><line x1="606.0" y1="445.9" x2="562.0" y2="445.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:148.72,123.77-153.8,123.77" data-layer="B.Cu"><line x1="782.0" y1="445.9" x2="826.0" y2="445.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:113.16,133.93-110.62,133.93" data-layer="B.Cu"><line x1="474.0" y1="533.9" x2="452.0" y2="533.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:148.72,133.93-143.64,133.93" data-layer="B.Cu"><line x1="782.0" y1="533.9" x2="738.0" y2="533.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:113.16,136.47-108.08,136.47" data-layer="B.Cu"><line x1="474.0" y1="555.9" x2="430.0" y2="555.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:118.24,136.47-113.16,136.47" data-layer="B.Cu"><line x1="518.0" y1="555.9" x2="474.0" y2="555.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:143.64,123.77-148.72,123.77" data-layer="B.Cu"><line x1="738.0" y1="445.9" x2="782.0" y2="445.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:110.62,133.93-110.62,131.39" data-layer="B.Cu"><line x1="452.0" y1="533.9" x2="452.0" y2="511.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:133.48,121.23-133.48,123.77" data-layer="B.Cu"><line x1="650.0" y1="423.9" x2="650.0" y2="445.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:133.48,133.93-128.4,133.93" data-layer="B.Cu"><line x1="650.0" y1="533.9" x2="606.0" y2="533.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:143.64,136.47-138.56,136.47" data-layer="B.Cu"><line x1="738.0" y1="555.9" x2="694.0" y2="555.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:118.24,123.77-113.16,123.77" data-layer="B.Cu"><line x1="518.0" y1="445.9" x2="474.0" y2="445.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:123.32,136.47-118.24,136.47" data-layer="B.Cu"><line x1="562.0" y1="555.9" x2="518.0" y2="555.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:110.62,121.23-110.62,126.31" data-layer="B.Cu"><line x1="452.0" y1="423.9" x2="452.0" y2="467.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:153.8,128.85-153.8,133.93" data-layer="B.Cu"><line x1="826.0" y1="489.9" x2="826.0" y2="533.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:138.56,133.93-133.48,133.93" data-layer="B.Cu"><line x1="694.0" y1="533.9" x2="650.0" y2="533.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:143.64,133.93-138.56,133.93" data-layer="B.Cu"><line x1="738.0" y1="533.9" x2="694.0" y2="533.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:123.32,123.77-118.24,123.77" data-layer="B.Cu"><line x1="562.0" y1="445.9" x2="518.0" y2="445.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:115.7,108.53-115.7,113.61" data-layer="B.Cu"><line x1="496.0" y1="313.9" x2="496.0" y2="357.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:153.8,133.93-153.8,136.47" data-layer="B.Cu"><line x1="826.0" y1="533.9" x2="826.0" y2="555.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:123.32,133.93-118.24,133.93" data-layer="B.Cu"><line x1="562.0" y1="533.9" x2="518.0" y2="533.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:148.72,136.47-143.64,136.47" data-layer="B.Cu"><line x1="782.0" y1="555.9" x2="738.0" y2="555.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:133.48,123.77-128.4,123.77" data-layer="B.Cu"><line x1="650.0" y1="445.9" x2="606.0" y2="445.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:113.16,128.85-113.16,131.39" data-layer="B.Cu"><line x1="474.0" y1="489.9" x2="474.0" y2="511.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:115.7,121.23-110.62,121.23" data-layer="B.Cu"><line x1="496.0" y1="423.9" x2="452.0" y2="423.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:105.54,131.39-110.62,131.39" data-layer="B.Cu"><line x1="408.0" y1="511.9" x2="452.0" y2="511.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:108.08,136.47-108.08,131.39" data-layer="B.Cu"><line x1="430.0" y1="555.9" x2="430.0" y2="511.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
+<g data-ftrack="/GND:115.7,113.61-115.7,118.69" data-layer="B.Cu"><line x1="496.0" y1="357.9" x2="496.0" y2="401.9" stroke="#111111" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
 <g data-ftrack="/ADC-SHUNT:138.56,131.39-138.56,126.31" data-layer="B.Cu"><line x1="694.0" y1="511.9" x2="694.0" y2="467.9" stroke="#9467bd" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
 <g data-ftrack="/ADC-SHUNT:141.1,131.39-138.56,131.39" data-layer="B.Cu"><line x1="716.0" y1="511.9" x2="694.0" y2="511.9" stroke="#9467bd" stroke-width="5" stroke-linecap="round" opacity="0.85"/></g>
-<text x="760.0" y="393.9" text-anchor="middle" font-size="9" fill="#d62728" stroke="#fff" stroke-width="0.4">5V-NODE</text>
+<text x="650.0" y="393.9" text-anchor="middle" font-size="9" fill="#d62728" stroke="#fff" stroke-width="0.4">5V-NODE</text>
 <text x="694.0" y="481.9" text-anchor="middle" font-size="9" fill="#9467bd" stroke="#fff" stroke-width="0.4">ADC-SHUNT</text>
 <text x="672.0" y="572.9" text-anchor="middle" font-size="9" fill="#111111" stroke="#fff" stroke-width="0.4">GND</text>
 <text x="562.0" y="349.9" text-anchor="middle" font-size="9" fill="#ff7f0e" stroke="#fff" stroke-width="0.4">Q1-GATE</text>
@@ -652,12 +650,10 @@
 <text x="628.0" y="414.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">＋</text>
 <circle cx="650.0" cy="423.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
 <text x="650.0" y="414.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">−</text>
-<circle cx="826.0" cy="401.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
-<text x="826.0" y="392.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">＋</text>
-<circle cx="826.0" cy="445.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
-<text x="826.0" y="436.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">−</text>
-<circle cx="694.0" cy="467.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
-<text x="694.0" y="458.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">1</text>
+<circle cx="738.0" cy="401.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
+<text x="738.0" y="392.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">＋</text>
+<circle cx="738.0" cy="445.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
+<text x="738.0" y="436.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">−</text>
 <circle cx="540.0" cy="357.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
 <text x="540.0" y="348.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">1</text>
 <circle cx="540.0" cy="313.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
@@ -666,10 +662,6 @@
 <text x="804.0" y="524.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">＋</text>
 <circle cx="782.0" cy="533.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
 <text x="782.0" y="524.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">−</text>
-<circle cx="738.0" cy="401.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
-<text x="738.0" y="392.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">＋</text>
-<circle cx="738.0" cy="445.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
-<text x="738.0" y="436.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">−</text>
 <circle cx="408.0" cy="489.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
 <text x="408.0" y="480.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">＋</text>
 <circle cx="408.0" cy="511.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
@@ -678,6 +670,10 @@
 <text x="694.0" y="502.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">A</text>
 <circle cx="452.0" cy="511.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
 <text x="452.0" y="502.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">B</text>
+<circle cx="826.0" cy="401.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
+<text x="826.0" y="392.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">＋</text>
+<circle cx="826.0" cy="445.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
+<text x="826.0" y="436.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">−</text>
 <circle cx="474.0" cy="401.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
 <text x="474.0" y="392.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">a</text>
 <circle cx="518.0" cy="401.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
@@ -686,6 +682,8 @@
 <text x="738.0" y="502.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">＋</text>
 <circle cx="716.0" cy="511.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
 <text x="716.0" y="502.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">−</text>
+<circle cx="694.0" cy="467.9" r="4" fill="#caa53d" stroke="#4a3b10" stroke-width="0.8"/>
+<text x="694.0" y="458.9" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">1</text>
 <rect x="738.0" y="106.0" width="336.2" height="36" rx="6" fill="#f4f4f4" stroke="#555" stroke-dasharray="5 3" opacity="0.5"/>
 <text x="746.0" y="120.0" font-size="10" font-weight="bold" fill="#333">板の外（B1 の GPIO32）</text>
 <text x="746.0" y="134.0" font-size="9" fill="#333">W1 ADC-SHUNT の線の出口 → B1 の GPIO32（ADC-SHUNT。線は床の側へ）</text>

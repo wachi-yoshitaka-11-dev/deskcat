@@ -15,7 +15,7 @@ star の側の端 B から先。J5−、J7−、J8−、R18 の足2）。
    3 本の導体は互いに穴を共有せず、star point の node を除くと互いにつながらない（Pi と ESP32 の GND の間に、
    servo の電流が流れる導体も、共有する導体も無い。UART の GND と輪を作らない）。
    したがって J5−・J7−・J8−・R18 と B の間の導体に servo の電流は流れない（B と J5− の間の短い導体だけが、
-   全部の戻りを一緒に運ぶ）。C1・C2 の−も、J7−・J8−・R18 と導体を共有しない別の導体で node へつく（C1 と C2 の間は共有してよい）。
+   全部の戻りを一緒に運ぶ）。**R18 の足2 の導体は B の穴に直接つく**（B と J5− の間の導体の途中につかない）。C1・C2 の−も、J7−・J8−・R18 と導体を共有しない別の導体で node へつく（C1 と C2 の間は共有してよい）。
 5. 導体の端と折れ曲がり、通る穴は、基板に実在する穴（`Dwgs.User` の円）の上にある。四隅の穴は無い。
 
 基板ファイル（`hardware/deskcat.kicad_pcb`）の `B.Cu` の導体と、部品の pad の位置・net だけを読む。
@@ -218,6 +218,8 @@ def main():
                 if hit is None:
                     errors.append(f"{nm} が star point の node（B と J5− の間）につながっていない")
                     continue
+                if nm == "R18 の足2" and hit != B:
+                    errors.append("R18 の足2 の導体が B の穴に直接つかず、B と J5− の間の導体の途中につく（Gate の基準が servo の戻りの導体を経由する）")
                 cells, u_ = set(), hit
                 while u_ is not None:
                     cells.add(u_)

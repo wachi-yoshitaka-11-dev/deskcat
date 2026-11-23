@@ -425,7 +425,7 @@ I2C busの速度と無関係である。加速度の軽打検出は`ACCEL-IRQ`�
 **2026-09-28、ユーザーの決定で、PiとESP32の間をGPIO UARTで直接つなぐ方式へ変えた。**
 最終の製品構成でもUARTを使い、ESP32のUSB portは書き込みとdebug専用にする。
 検証の構成では、PiとESP32を別の電源から給電し（2026-09-28の決定の時点では、PiはM-12001（段階A）、ESP32はPCのUSBとした。M-12001のplugは`EXP-012`で切断済みであり、2026-10-02以降の段階Aは`PSU-PI-A-01`、2026-10-11以降は`PSU-PI-A-02`（cable一体。差し替えの出所は[#446の記録](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446#issuecomment-6109307768)）である。[#446の記録](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446#issuecomment-5952463629)）、GNDを共通にする。
-**最終構成でのESP32の給電経路は、この決定では決めていない**（[#405](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/405)の実装設計の見直しで決める）。
+**最終構成でのESP32の給電経路は、この決定では決めていない**（[#405](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/405)の実装設計の見直しで決める）。その見直しを[#512](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/512)で行い、案Bに決めた（PMの判断、2026-11-23。`power-budget.md`の`ESP32の給電経路`。ユーザーの決定には数えない）。
 決定の記録は[#446](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446)の次のコメントにある。
 
 - 別電源とUARTの採用: https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/446#issuecomment-5863027108
@@ -522,7 +522,7 @@ USB-UARTブリッジ経由でUART0（GPIO1／GPIO3）を使う方式である（
 USB OTG変換cable（`hardware-bom.md`の`CABLE-PI-LINK-01`）はこの方式のために手持ちで充当していた。
 **firmwareは、[#487](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/487)でこの方式（UART0）からGPIO13／GPIO14のUARTへ移した**（PR Aで当時の`pi-protocol-mode`を移し、PR B1でそのfeatureをやめて製品build（既定build）へ入れた）。
 **`power-budget.md`の`ESP32の給電経路（最終の経路は未決定）`節（案A「USB VBUS単独給電」）は、この以前の方式を前提にしていた。**
-同節の改訂は[#488](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/488)の一覧の`A4`で行った（ESP32の最終の給電経路は[#405](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/405)の実装設計の見直しで決める）。
+同節の改訂は[#488](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/488)の一覧の`A4`で行った（ESP32の最終の給電経路は[#405](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/405)の実装設計の見直しで決める。その見直しを#512で行い、案Bに決めた（PMの判断、2026-11-23））。
 
 ## Bus計画
 

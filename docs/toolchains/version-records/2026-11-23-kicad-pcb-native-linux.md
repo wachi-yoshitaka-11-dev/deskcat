@@ -69,6 +69,10 @@ Commands run / Actual result:
       python3 -I hardware/universal-board/check_star_point.py: OK。規則に「C1・C2 の−が A の node に無く、Pi・ESP32・R18 と導体を
         共有しない別の導体で star point の node へつく」を足した。負の例として、C の−が A の node にある直前の版は NG になることを
         実行して確かめた。W1 の footprint から外形（courtyard）を外した（本体が無い穴のため）。
+    巡9 の指摘後の更新（R18 の足2 の導体を B の穴へ直接つけた。2026-11-23）:
+      DRC は違反 0、未接続 0、食い違い 0。ERC は Errors 0、Warnings 168。
+      check_star_point.py に「R18 の足2 の導体が B の穴に直接つく」を足した。負の例として、R18 が B と J5− の間の (3,12) につく
+      直前の版は NG になることを実行して確かめた。
     kicad-cli sch export netlist（kicadxml）で overview の netlist を書き出し直した。
     kicad-cli pcb export svg: 成功。firefox の headless で描画して読んだ（作業セッションが画像を読んだ。人は見ていない）。
 
