@@ -35,7 +35,7 @@ ESP-WROOM-32D の datasheet v2.7 には **PSRAM を内蔵する variant の記�
 
 [HW-TBD-001](../hardware/tbd-register.md) の**照合は 2026-08-13 に完了し、一致した。**38pin ヘッダ両側の silk が公式 `J2`／`J3` と 19pin×2 列すべてで一致した（GND の位置を含む）。**これにより、この文書の確定条件のうち「公式 pin 表と現物 pin 表記を照合した」は満たされる見込みである**（close 判定は台帳の解決手順 1–8 に従う）。
 
-なお、**旧記載の「Espressif 公式の ESP32-DevKitC ではない／秋月電子の独自基板である」は 2026-08-10 に削除した。**この断定を支持する資料が存在せず、秋月商品ページ自身がメーカーを `Espressif Systems`、型番を `ESP32-DevKitC-32D` と表示していたためである。詳細は [hardware-bom.md](../hardware/hardware-bom.md) の Revision 29。**照合が必要である点は変わらない**（理由が変わっただけである）。
+なお、**旧記載の「Espressif 公式の ESP32-DevKitC ではない／秋月電子の独自基板である」は 2026-08-10 に削除した。**この断定を支持する資料が存在せず、秋月商品ページ自身がメーカーを `Espressif Systems`、型番を `ESP32-DevKitC-32D` と表示していたためである。詳細は [hardware-bom.md](../hardware/hardware-bom.md) の [Revision 29](../hardware/hardware-bom-history.md#revision履歴)。**照合が必要である点は変わらない**（理由が変わっただけである）。
 
 これとは別に、**chip の刻印は非破壊では読めないことが 2026-08-15 に確定した。**中核 chip `ESP32-D0WD` は ESP-WROOM-32D の半田付けされた金属シールドの内側にあり、シールドを外さない限りどのような撮影手段でも見えない。**旧記載の「現物写真が反射で判読不能」は、撮影条件の問題として書いていたが誤りである。**撮り直しても解決しない。
 
