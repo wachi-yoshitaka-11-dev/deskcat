@@ -102,7 +102,7 @@
 | X2 | B1 D6 | Pi の header pin 10（GPIO15 `RXD`） | PI_RXD（Pi pin 10 RXD 側） | 青 | 板の側を挿す。Pi の header 側は挿していない（EXP-052）。以後の抜き差しは S22 の K26 側で行い、Pi の header 側では抜き差ししない |
 | X3 | B1 A18 | Pi の header pin 39（GND） | GND | 黒 | A18 側を抜いておく。挿す前に、gpio-assignment.md の `信号線をつないでよい条件` の6の開放側の値を読む |
 | X4 | B1 D7 | サーボの plug の黄の穴 | SERVO_SIG（サーボの黄の線の側） | 黄 | D7 側を抜いておく。挿すのは #17 のサーボの試験、または #18 の段0・段1（docs/hardware/servo-safety-limits.md の「#18の校正（案）」の段0の2）の手順と承認に従うときだけ |
-| X5 | B1 −30 | 共通 GND（PROTO-02 の GND。つなぐ端子は #405 で決める）（ESP32 の GND をサーボの GND と共通にする線） | GND | 黒 | −30 側を抜いておく。条件は X4 と同じ。#18 の試験の間は、板の外の端を端子台S の − の穴へ挿さず、クリップ付コードで端子台S の − に入ったシャントの足を挟む（同じ段0の2）。端子台S は #18 の試験の間だけの物である。組み直す前の基準線（EXP-034 の Wiring revision）は Git の履歴にある組み直す前の hardware/breadboard/layout.svg |
+| X5 | B1 −30 | 共通 GND（この組み直しの配置での線。`PROTO-02` を使う最終の構成（案B）では、ESP32 の GND の戻りは B1 のレール穴を通さず、J8− から ESP32 board の GND pin へ直接つなぐ。universal-board/plan.md の A7）（ESP32 の GND をサーボの GND と共通にする線） | GND | 黒 | −30 側を抜いておく。条件は X4 と同じ。#18 の試験の間は、板の外の端を端子台S の − の穴へ挿さず、クリップ付コードで端子台S の − に入ったシャントの足を挟む（同じ段0の2）。端子台S は #18 の試験の間だけの物である。組み直す前の基準線（EXP-034 の Wiring revision）は Git の履歴にある組み直す前の hardware/breadboard/layout.svg |
 
 ## 首を通る LCD の14本（メスオス線のオス側を直接挿す）
 
@@ -135,5 +135,5 @@
 ## 載せないもの
 
 - `MEAS-02`（Arduino）の線（A0・GND）と、EXP-030 の Arduino 用の 10 kΩ 分圧（a10–a12、b12–b14）。測定器であり、必要なら実機側が試験のときに足す。
-- `MEAS-01` の shunt と GPIO32（`ADC-SHUNT`）の線。shunt はサーボの電流を通すのでブレッドボードに載せない。GPIO32 の線は今の配線に無く、足すかどうかは #17・#405 で決める（J2-7 の列 B1 K18・L18 を空けてある）。
+- `MEAS-01` の shunt と GPIO32（`ADC-SHUNT`）の線。shunt はサーボの電流を通すのでブレッドボードに載せない。GPIO32 の線は今の配線に無い。最終の構成では `PROTO-02` の W1 から J2-7 へつなぐ（universal-board/plan.md の A6。R20 の開放のときの保護が決まるまでつながない。同じ plan.md の`未決の一覧`）。J2-7 の列 B1 K18・L18 を空けてある。
 

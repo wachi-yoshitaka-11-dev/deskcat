@@ -5,7 +5,7 @@
 | データ | 対象と状態 |
 | --- | --- |
 | [`deskcat.kicad_pro`](deskcat.kicad_pro)、[`deskcat.kicad_sch`](deskcat.kicad_sch) | #512 の論理回路。EXP-019 測定前の基準配線に、EXP-022 の UART と EXP-025 の LED 2枝を加えた設計上の合成図。抵抗の `Value` は数値の代わりに値の正本文書名を示す（値の正本が無い `R19` だけは、現在組んである値を出所の EXP-028 とともに書く。設計値ではない）。2026-11-15 に、`PROTO-02` の電源の経路（入力 → 端子台 → PTC → MOSFET → 分岐点 → servo・Pi・logic の枝。未実装の計画）を同じ図に足した。pin 番号の出所は下の`回路図の pin 番号`。KiCad 8.0.9 の `kicad-cli` で読み込み、ERC を実行した（下の`KiCad の ERC`）。 |
-| [`universal-board/`](universal-board/plan.md)、[`deskcat.kicad_pcb`](deskcat.kicad_pcb) | `PROTO-02`（電源の基板）の**実装の計画（未実装）**。どの穴にどの部品をどの向きで挿し、どこをはんだでつなぎ、どの線をどこへ出すか。**正本は KiCad の基板ファイル `deskcat.kicad_pcb`**（回路図と同じ project）。図 `plan-front.svg`・`plan-back.svg` は KiCad から書き出した派生物で、`plan.md` は凡例・向き・測る所である。GND の star point の規則は `check_star_point.py` が基板ファイルを読んで確かめる。**完成図ではない。**#405 のはんだ付けはこの計画に従い、付けた後に現物と照合して完成図にする。 |
+| [`universal-board/`](universal-board/plan.md)、[`deskcat.kicad_pcb`](deskcat.kicad_pcb) | `PROTO-02`（電源の基板）の**実装の計画（未実装）**。どの穴にどの部品をどの向きで挿し、どこをはんだでつなぎ、どの線をどこへ出すか。**正本は KiCad の基板ファイル `deskcat.kicad_pcb`**（回路図と同じ project）。図 `plan-front.svg`・`plan-back.svg` は KiCad から書き出した派生物で、`plan.md` は凡例・向き・測る所である。見た目の図 `view-front.svg`・`view-back.svg`（部品面とはんだ面）は、基板ファイルから `universal-board/render_view.py` が書く派生物である（寸法の正本ではない。資料に無いものは破線または注記で `TBD`）。GND の star point の規則は `check_star_point.py` が基板ファイルを読んで確かめる。**完成図ではない。**#405 のはんだ付けはこの計画に従い、付けた後に現物と照合して完成図にする。 |
 | [`overview/`](overview/wiring-table.md) | 最終形の全体の配線（ブレッドボード B1・B2・B3、`PROTO-02`、Pi、サーボ、LCD、M-12001）のつながり。位置は胴の中の位置関係だけで、寸法は表さない。`generate.py` が回路図から書き出した netlist（`deskcat-netlist.xml`）を入力にして `layout.svg` と `wiring-table.md` を生成し、図の線と netlist が合うことを検査する。板どうしの線はブレッドボードの `breadboard-rebuild/generate.py` のデータを読み込む。#18 の試験だけの物（端子台S、PSU、試験用の負荷、shunt）は描かない。 |
 | [`breadboard/layout.svg`](breadboard/layout.svg) | 最終の配線の図。2026-10-31（EXP-052）に、組み直した後の配置（`breadboard-rebuild/layout.svg`）で置き換えた。測定のためだけの一時配線（EXP-030〜035 の Arduino・分圧・シャント・測定用の戻り線）は描かない。柔らかい線の色と穴は `breadboard-rebuild/wiring-table.md` が正である。組み直す前の図は Git の履歴にある。 |
 | [`breadboard-rebuild/`](breadboard-rebuild/README.md) | #512 の組み直しの配置（2026-10-31 に組んだ。EXP-052）。配置図 `layout.svg` と結線表 `wiring-table.md` は `generate.py` のデータから生成する。組み直した後のこの配置で、上の図を置き換えた。組み直す前の図は Git の履歴にある。 |
@@ -26,7 +26,7 @@ EXP-025 の [LED デモ回路](../docs/hardware/led-514-demo.md)は GPIO → 電
 
 | 層 | データ | このリポジトリ | 状態 |
 |---|---|---|---|
-| 論理 | 回路図 | [`deskcat.kicad_sch`](deskcat.kicad_sch)（信号の側と、`PROTO-02` の電源の経路） | あり。ESP32 の 5 V 入力と LCD の VCC は `TBD`（#405） |
+| 論理 | 回路図 | [`deskcat.kicad_sch`](deskcat.kicad_sch)（信号の側と、`PROTO-02` の電源の経路） | あり。LCD の VCC は決めていない（段階C では DISP-01 を使わない。今の構成の 3V3 pin 給電・J1 開放は #461 の承認範囲で、段階Cへ広げない。最終の VCC は #405 の見直しで決める。`PROTO-02` の配線には効かない）。ESP32 の 5 V 入力は案B（`J8`、ユーザーの決定 2026-11-23）で決めた |
 | 論理 | netlist（どの部品のどの pin がどの節点か） | 回路図から `kicad-cli sch export netlist` で出し、[`overview/deskcat-netlist.xml`](overview/deskcat-netlist.xml) に置く（overview の図の入力。回路図を変えたら書き出し直す）。基板ファイルとの照合は KiCad の DRC（`--schematic-parity`）が行う | 回路図から出せる |
 | 物理 | 試作のブレッドボードの配線 | [`breadboard/layout.svg`](breadboard/layout.svg)、[`breadboard-rebuild/wiring-table.md`](breadboard-rebuild/wiring-table.md) | あり（2026-10-31 の組み直し） |
 | 物理 | 試作の端子台の配線（#18 の bench） | [`bench-18/`](bench-18/wiring-table.md) | あり。#18 の試験の間だけの配線 |
@@ -38,7 +38,7 @@ EXP-025 の [LED デモ回路](../docs/hardware/led-514-demo.md)は GPIO → 電
 | 製造 | BOM（部品表） | [`docs/hardware/hardware-bom.md`](../docs/hardware/hardware-bom.md) | あり（手編集の正本は1つ） |
 | 製造 | Gerber・drill・Pick & Place・3D（STEP） | 無い | 要らない。工場で基板を作らず、筐体との寸法連携は #34・#405 の現物合わせで行う（#512 の本文）。必要になれば基板ファイルから KiCad で出せる |
 
-**論理と物理のつながり：**回路図・基板ファイル・部品の library は1つの KiCad project（`deskcat.kicad_pro`）である。基板の部品の参照番号（`J5`〜`J8`、`F1`、`Q1`、`R18`）と節点は回路図から来ており、`kicad-cli pcb drc --schematic-parity hardware/deskcat.kicad_pcb` が食い違いを検出する。#512 の本文は「専用 PCB の `.kicad_pcb` は成果物に含めない」としている。ここでの `.kicad_pcb` は既製のユニバーサル基板の上の配置の計画であり、工場へ出す基板ではない（Gerber 等は作らない）。データの形式を業界標準の KiCad に揃えるために使う。KiCad の個人設定（`*.kicad_prl`）とバックアップは [`.gitignore`](.gitignore) で Git に入れない。
+**論理と物理のつながり：**回路図・基板ファイル・部品の library は1つの KiCad project（`deskcat.kicad_pro`）である。基板の部品の参照番号（`J5`〜`J8`、`F1`、`Q1`、`R18`、`R20`、`C1`・`C2`、`W1`）と節点は回路図から来ており、`kicad-cli pcb drc --schematic-parity hardware/deskcat.kicad_pcb` が食い違いを検出する。#512 の本文は「専用 PCB の `.kicad_pcb` は成果物に含めない」としている。ここでの `.kicad_pcb` は既製のユニバーサル基板の上の配置の計画であり、工場へ出す基板ではない（Gerber 等は作らない）。データの形式を業界標準の KiCad に揃えるために使う。KiCad の個人設定（`*.kicad_prl`）とバックアップは [`.gitignore`](.gitignore) で Git に入れない。
 
 ## 回路図の pin 番号
 
@@ -48,11 +48,11 @@ EXP-025 の [LED デモ回路](../docs/hardware/led-514-demo.md)は GPIO → 電
 
 ## KiCad の ERC
 
-2026-11-16、KiCad 8.0.9 の `kicad-cli` で回路図を読み込み、ERC を実行した（環境は [Version Record](../docs/toolchains/version-records/2026-11-15-kicad-erc-vm.md)）。**Errors 0、Warnings 161** である（電源の経路、サーボ信号の直列抵抗 R19、project の library を足し、機能ごとの配置に描き直した後）。警告の内訳は、pin と wire の端が接続の grid の外にある（`endpoint_off_grid`）142件と、抵抗の記号の KiCad 標準 library `Device` がこの VM に入っていない（`lib_symbol_issues`、記号は回路図に埋め込み済み）19件で、どちらも接続を変えるものではない。netlist を出力し、`MCU-01` の各 pin の net が上の header 番号と [GPIO Assignment](../docs/hardware/gpio-assignment.md) の GPIO に合うこと、`ACCEL-01` の `SDO` と `ENV-01` の `SDO` が GND（address `0x53` と `0x76`。EXP-065 の起動 log の `accel=0x53 env=0x76`）にあることを確かめた。
+2026-11-23（最初の実行は 2026-11-16）、KiCad 8.0.9 の `kicad-cli` で回路図を読み込み、ERC を実行した（環境は [Version Record](../docs/toolchains/version-records/2026-11-23-kicad-pcb-native-linux.md)。native Linux の KiCad 8.0.9。最初の実行は [2026-11-15 の VM](../docs/toolchains/version-records/2026-11-15-kicad-erc-vm.md)）。**Errors 0、Warnings 168** である（電源の経路、サーボ信号の直列抵抗 R19、project の library を足し、機能ごとの配置に描き直し、`PROTO-02` の shunt `R20`・bulk capacitor `C1`・`C2`・`ADC-SHUNT` の出口 `W1`・`J8` の経路を足した後）。警告の内訳は、pin と wire の端が接続の grid の外にある（`endpoint_off_grid`）148件と、抵抗の記号の KiCad 標準 library `Device` が実行した環境（native Linux の KiCad 8.0.9。`/usr/share/kicad` に `symbols` が無い）に入っていない（`lib_symbol_issues`、記号は回路図に埋め込み済み）20件で、どちらも接続を変えるものではない。netlist を出力し、`MCU-01` の各 pin の net が上の header 番号と [GPIO Assignment](../docs/hardware/gpio-assignment.md) の GPIO に合うこと、`ACCEL-01` の `SDO` と `ENV-01` の `SDO` が GND（address `0x53` と `0x76`。EXP-065 の起動 log の `accel=0x53 env=0x76`）にあることを確かめた。
 
 基板ファイルの DRC（`kicad-cli pcb drc --schematic-parity --severity-all`）は、違反 0、未接続 0、回路図との食い違い 0 だった。
 
-**この ERC が保証しないこと：**symbol の pin はすべて passive なので、出力どうしの衝突のような pin の種別の検査は効かない。GUI の窓での表示は確かめていない（`DISPLAY` が無い端末のため）。作業セッション（AI）が `kicad-cli sch export pdf` で描画して画像にし、確かめた（下の`閉じた項目`）。**人は見ていない。**
+**この ERC が保証しないこと：**symbol の pin はすべて passive なので、出力どうしの衝突のような pin の種別の検査は効かない。GUI の窓での表示は確かめていない（ERC を実行した native Linux の環境に `DISPLAY` が無いため）。作業セッション（AI）が `kicad-cli sch export pdf` で描画して画像にし、確かめた（下の`閉じた項目`）。**人は見ていない。**
 
 ## Wokwi と物理図の評価
 
@@ -79,9 +79,11 @@ Wokwi の [ILI9341 部品](https://docs.wokwi.com/parts/wokwi-ili9341)では RST
 
 **Wokwi は、外部 pull の論理接続の評価構成としてだけ使い続ける**（`esp32-boot-pulls/` のまま広げない）。起動の安全の確認には使わない。**Fritzing は採らない。**実物（秋月の module・端子台）に合う部品図を探すか作り、端子対応とライセンスを確かめる手間が要り、それでも `.fzz` は差分を読めない。`PROTO-02` は KiCad で、ブレッドボードは生成した SVG で表せている。Fritzing の部品 library に実物に合う図があるかは、この判断では探していない。`hardware/deskcat.fzz` と `hardware/fritzing/` は作らない。ブレッドボードの図と KiCad の回路図との接続差分は、結線表（`wiring-table.md`）と netlist を照らして見る。
 
-## 現物照合待ち（TBD）
+## 残っている TBD と、閉じた項目
 
-- `PROTO-02` の現物：計画（[`universal-board/plan.md`](universal-board/plan.md)）は描いた。**はんだ付けの後に現物と照合して完成図にする作業は #405 の範囲で、追跡を #405 へ移した**（#405 の受け入れ条件に、計画図に従ったはんだ付けと、現物との照合・完成図の記録の項目がある）。**基板の未実装状態を完成図として描かない。**計画の`測る所`（M1〜M6）は、#512 の受け入れ条件の「表現できない部分と `TBD` を列挙する」に当たる列挙として `plan.md` に残す。測る作業も #405 側で行い、まだ測っていない。
+- `PROTO-02` の現物：計画（[`universal-board/plan.md`](universal-board/plan.md)）は描いた。**はんだ付けの後に現物と照合して完成図にする作業は #405 の範囲で、追跡を #405 へ移した**（#405 の受け入れ条件に、計画図に従ったはんだ付けと、現物との照合・完成図の記録の項目がある）。**基板の未実装状態を完成図として描かない。**計画の`測る所`（M1〜M8。M1・M3・M5 は決めて閉じた）は、#512 の受け入れ条件の「表現できない部分と `TBD` を列挙する」に当たる列挙として `plan.md` に残す。測る作業も #405 側で行い、まだ測っていない。
+- **LCD の信号線と touch の線（2026-10-31 の組み直し後）：**導通は電源2本と短絡だけを測った（EXP-052）。`CS`・`DC`・`SDI`・`SCK`・`LED` は、組み直し後の製品 build で LCD が描かれた記録（EXP-062 など）で動作を確かめた。**`RESET`（`display.rs` は SWRESET を送るので、描画だけでは線の有無を断定できない）、`SDO`（製品 build は読まない）、`T_DO`・`T_CS`（組み直し後の窓で使った build は touch を読まない `no-touch-487`。既定の製品 build は読む）、`T_IRQ`（製品 build は既定も `no-touch-487` も読まない。`touch.rs`）は、組み直し後の確認が無い。**#512 の受け入れ条件は導通の実測を求めておらず、LCD の touch を使う作業が出たとき、その作業の窓で1本ずつ確かめる。
+- **`TBD`**（`overview/wiring-table.md` の T1〜T3 と `universal-board/plan.md` の `未決の一覧`）：ESP32 の 5 V 入力（`J8`）は案B に決めた（ユーザーの決定、2026-11-23。記録は power-budget.md の`ESP32の給電経路`節）。サーボの plug とのつなぎ方（T1）は #405 が持つ。J8 の枝（P7・X5）の線とつなぎの部材と、案Bで 5V-NODE に載る B1 の上の要素（`J2-19` の列の接点、ADC-5V の分圧の上の抵抗（回路図の R8、B1 の配線表の R11）とその接点・線）の扱い（T3）も #405 が持ち、決まるまで J8 から ESP32 へ給電しない（案Bの条件は power-budget.md の`案Bを採る条件`の行が持つ）。LCD の VCC（T2）は決めていない（段階C では DISP-01 を使わない。今の構成の 3V3 pin 給電・J1 開放は #461 の承認範囲で、段階Cへ広げない。最終の VCC は、`HW-TBD-024`・`HW-TBD-025`(a) と回路図の版の一致が揃えば #405 の見直しで決める）。台帳の [`HW-TBD-024`](../docs/hardware/tbd-register.md#hw-tbd-024) は、LCD が耐えられる電流の上限の項目で、電圧の項目ではない。
 
 ### 閉じた項目
 

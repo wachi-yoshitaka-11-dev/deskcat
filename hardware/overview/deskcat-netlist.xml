@@ -2,15 +2,15 @@
 <export version="E">
   <design>
     <source>hardware/deskcat.kicad_sch</source>
-    <date>2026-11-22T00:40:11+0000</date>
-    <tool>Eeschema 8.0.9-8.0.9-0~ubuntu22.04.1</tool>
+    <date>2026-11-24T00:20:55+0900</date>
+    <tool>Eeschema 8.0.9-8.0.9-0~ubuntu24.04.1</tool>
     <sheet number="1" name="/" tstamps="/">
       <title_block>
         <title>DeskCat logical wiring #512</title>
         <company/>
         <rev>EXP-019 + EXP-022 + EXP-025 + EXP-038</rev>
         <date/>
-        <source>deskcat.kicad_sch</source>
+        <source>hardware/deskcat.kicad_sch</source>
         <comment number="1" value=""/>
         <comment number="2" value=""/>
         <comment number="3" value=""/>
@@ -24,6 +24,36 @@
     </sheet>
   </design>
   <components>
+    <comp ref="C1">
+      <value>470 µF／16 V（g108426。power-budget.md。2 個分の穴。3 個目が要るかは実測で決める）</value>
+      <footprint>DeskCat:C_Radial_D8_P5.08</footprint>
+      <fields>
+        <field name="Footprint">DeskCat:C_Radial_D8_P5.08</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="DeskCat" part="C1_BULK" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="deskcat.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>f9c71ecb-8ee3-4088-8571-f2b4ad077a6d</tstamps>
+    </comp>
+    <comp ref="C2">
+      <value>470 µF／16 V（g108426。power-budget.md。2 個分の穴。3 個目が要るかは実測で決める）</value>
+      <footprint>DeskCat:C_Radial_D8_P5.08</footprint>
+      <fields>
+        <field name="Footprint">DeskCat:C_Radial_D8_P5.08</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="DeskCat" part="C1_BULK" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="deskcat.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>866ed3d8-7fe8-464f-afb9-033d579ff9f0</tstamps>
+    </comp>
     <comp ref="D1">
       <value>LED_COMM_01_white</value>
       <fields>
@@ -534,6 +564,21 @@
       <sheetpath names="/" tstamps="/"/>
       <tstamps>d9a58b85-cf0e-4154-a5cc-7c8022dfd3d7</tstamps>
     </comp>
+    <comp ref="R20">
+      <value>0.1 Ω 5 W（MEAS-01。SQP5WJ0R1B。power-budget.md GND topology）</value>
+      <footprint>DeskCat:SHUNT_SQP5W_Lying_P27.94</footprint>
+      <fields>
+        <field name="Footprint">DeskCat:SHUNT_SQP5W_Lying_P27.94</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="Device" part="R" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="deskcat.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>95048c37-a4ba-47f6-bafb-5995f2c7c444</tstamps>
+    </comp>
     <comp ref="U1">
       <value>MCU_01_DevKitC_V4</value>
       <fields>
@@ -548,6 +593,21 @@
       <property name="exclude_from_board"/>
       <sheetpath names="/" tstamps="/"/>
       <tstamps>f1a83d74-7d2b-4abe-9c61-ff14464b67b6</tstamps>
+    </comp>
+    <comp ref="W1">
+      <value>ADC-SHUNT の線の出口（B1 GPIO32 へ）</value>
+      <footprint>DeskCat:WireExit_1.0</footprint>
+      <fields>
+        <field name="Footprint">DeskCat:WireExit_1.0</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="DeskCat" part="WIRE_EXIT" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="deskcat.kicad_sch"/>
+      <property name="exclude_from_bom"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>050fac35-1831-4cad-ab3a-73a9e43e95d4</tstamps>
     </comp>
   </components>
   <libparts>
@@ -569,6 +629,19 @@
         <pin num="SDO" name="SDO" type="passive"/>
         <pin num="VDD" name="VDD" type="passive"/>
         <pin num="Vs" name="Vs" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="DeskCat" part="C1_BULK">
+      <fields>
+        <field name="Reference">C</field>
+        <field name="Value">C1_BULK</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="+" name="+" type="passive"/>
+        <pin num="-" name="-" type="passive"/>
       </pins>
     </libpart>
     <libpart lib="DeskCat" part="DISP_01_MSP2807">
@@ -651,6 +724,7 @@
         <pin num="J2-1" name="3V3" type="passive"/>
         <pin num="J2-3" name="GPIO36_ADC-3V3" type="passive"/>
         <pin num="J2-5" name="GPIO34_TOUCH-IRQ" type="passive"/>
+        <pin num="J2-7" name="GPIO32_ADC-SHUNT" type="passive"/>
         <pin num="J2-8" name="GPIO33_ADC-5V" type="passive"/>
         <pin num="J2-9" name="GPIO25_I2C-SDA" type="passive"/>
         <pin num="J2-10" name="GPIO26_I2C-SCL" type="passive"/>
@@ -765,6 +839,18 @@
         <pin num="-" name="-" type="passive"/>
       </pins>
     </libpart>
+    <libpart lib="DeskCat" part="WIRE_EXIT">
+      <fields>
+        <field name="Reference">W</field>
+        <field name="Value">WIRE_EXIT</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+      </pins>
+    </libpart>
     <libpart lib="Device" part="R">
       <fields>
         <field name="Reference">R</field>
@@ -799,38 +885,47 @@
       <node ref="R5" pin="1" pintype="passive"/>
       <node ref="U1" pin="J2-1" pinfunction="3V3" pintype="passive"/>
     </net>
-    <net code="2" name="/5V-BOARD">
-      <node ref="R8" pin="1" pintype="passive"/>
-      <node ref="U1" pin="J2-19" pinfunction="5V" pintype="passive"/>
-    </net>
-    <net code="3" name="/5V-IN">
+    <net code="2" name="/5V-IN">
       <node ref="F1" pin="a" pinfunction="a" pintype="passive"/>
       <node ref="J5" pin="+" pinfunction="+" pintype="passive"/>
       <node ref="PS1" pin="+" pinfunction="+5V" pintype="passive"/>
     </net>
-    <net code="4" name="/5V-NODE">
+    <net code="3" name="/5V-NODE">
+      <node ref="C1" pin="+" pinfunction="+" pintype="passive"/>
+      <node ref="C2" pin="+" pinfunction="+" pintype="passive"/>
       <node ref="J6" pin="+" pinfunction="+" pintype="passive"/>
       <node ref="J7" pin="+" pinfunction="+" pintype="passive"/>
       <node ref="J8" pin="+" pinfunction="+" pintype="passive"/>
       <node ref="J9" pin="VBUS" pinfunction="+5V" pintype="passive"/>
       <node ref="M1" pin="red" pinfunction="V+" pintype="passive"/>
       <node ref="Q1" pin="3" pinfunction="S" pintype="passive"/>
+      <node ref="R8" pin="1" pintype="passive"/>
+      <node ref="U1" pin="J2-19" pinfunction="5V" pintype="passive"/>
     </net>
-    <net code="5" name="/5V-PTC">
+    <net code="4" name="/5V-PTC">
       <node ref="F1" pin="b" pinfunction="b" pintype="passive"/>
       <node ref="Q1" pin="2" pinfunction="D" pintype="passive"/>
     </net>
-    <net code="6" name="/ADC-3V3">
+    <net code="5" name="/ADC-3V3">
       <node ref="R10" pin="2" pintype="passive"/>
       <node ref="R11" pin="1" pintype="passive"/>
       <node ref="U1" pin="J2-3" pinfunction="GPIO36_ADC-3V3" pintype="passive"/>
     </net>
-    <net code="7" name="/ADC-5V">
+    <net code="6" name="/ADC-5V">
       <node ref="R8" pin="2" pintype="passive"/>
       <node ref="R9" pin="1" pintype="passive"/>
       <node ref="U1" pin="J2-8" pinfunction="GPIO33_ADC-5V" pintype="passive"/>
     </net>
+    <net code="7" name="/ADC-SHUNT">
+      <node ref="J6" pin="-" pinfunction="-" pintype="passive"/>
+      <node ref="M1" pin="brown" pinfunction="GND" pintype="passive"/>
+      <node ref="R20" pin="1" pintype="passive"/>
+      <node ref="U1" pin="J2-7" pinfunction="GPIO32_ADC-SHUNT" pintype="passive"/>
+      <node ref="W1" pin="1" pinfunction="1" pintype="passive"/>
+    </net>
     <net code="8" name="/GND">
+      <node ref="C1" pin="-" pinfunction="-" pintype="passive"/>
+      <node ref="C2" pin="-" pinfunction="-" pintype="passive"/>
       <node ref="D1" pin="K" pinfunction="K" pintype="passive"/>
       <node ref="D2" pin="K" pinfunction="K" pintype="passive"/>
       <node ref="J1" pin="2" pinfunction="GND" pintype="passive"/>
@@ -840,16 +935,15 @@
       <node ref="J3" pin="5" pinfunction="SDO" pintype="passive"/>
       <node ref="J4" pin="39" pinfunction="GND" pintype="passive"/>
       <node ref="J5" pin="-" pinfunction="-" pintype="passive"/>
-      <node ref="J6" pin="-" pinfunction="-" pintype="passive"/>
       <node ref="J7" pin="-" pinfunction="-" pintype="passive"/>
       <node ref="J8" pin="-" pinfunction="-" pintype="passive"/>
       <node ref="J9" pin="GND" pinfunction="GND" pintype="passive"/>
-      <node ref="M1" pin="brown" pinfunction="GND" pintype="passive"/>
       <node ref="PS1" pin="-" pinfunction="GND" pintype="passive"/>
       <node ref="R11" pin="2" pintype="passive"/>
       <node ref="R15" pin="2" pintype="passive"/>
       <node ref="R17" pin="2" pintype="passive"/>
       <node ref="R18" pin="2" pintype="passive"/>
+      <node ref="R20" pin="2" pintype="passive"/>
       <node ref="R6" pin="2" pintype="passive"/>
       <node ref="R7" pin="2" pintype="passive"/>
       <node ref="R9" pin="2" pintype="passive"/>

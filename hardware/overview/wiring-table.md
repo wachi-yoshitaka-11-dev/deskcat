@@ -1,9 +1,9 @@
 <!-- generate.py が生成する。手で直さない。 -->
 # 全体の配線（最終形のつながり）
 
-ブレッドボード（B1・B2・B3）、電源の基板 `PROTO-02`、Pi、サーボ、LCD、AC アダプター M-12001 の、**最終形のつながり**である。つながりの正本は回路図 [`../deskcat.kicad_sch`](../deskcat.kicad_sch) で、この表と [`layout.svg`](layout.svg) は、回路図から書き出した netlist（[`deskcat-netlist.xml`](deskcat-netlist.xml)）から生成する。位置は胴の中の位置関係（[enclosure-and-neck.md](../../docs/hardware/enclosure-and-neck.md) の`物理的な完成形`）だけで、寸法は表さない。電源の基板は未実装の計画である（[universal-board/plan.md](../universal-board/plan.md)、#405）。この表は配線・通電の許可ではない。
+ブレッドボード（B1・B2・B3）、電源の基板 `PROTO-02`、Pi、サーボ、LCD、AC アダプター M-12001 の、**最終形のつながり**である。つながりの正本は回路図 [`../deskcat.kicad_sch`](../deskcat.kicad_sch) で、この表と [`layout.svg`](layout.svg) は、回路図から書き出した netlist（[`deskcat-netlist.xml`](deskcat-netlist.xml)）から生成する。位置は胴の中の位置関係（[enclosure-and-neck.md](../../docs/hardware/enclosure-and-neck.md) の`物理的な完成形`）だけで、寸法は表さない。電源の基板は未実装の計画である（[universal-board/plan.md](../universal-board/plan.md)、#405）。この表は配線・通電の許可ではない。X1〜X3（Pi との UART の2本と GND の線）は、案Bの構成では、gpio-assignment.md の`信号線をつないでよい条件`の5との関係が #405 で決まるまでつながない（power-budget.md の`ESP32の給電経路`。X3 の扱いは #803）。この表の X1〜X3 は、つなぐときの接続先の記録である。
 
-**描かない物：**#18 の試験の間だけの物（端子台S、`PSU-BENCH-01`、試験用の負荷、shunt）。それらは [`../bench-18/`](../bench-18/wiring-table.md) にある。
+**描かない物：**#18 の試験の間だけの物（端子台S、`PSU-BENCH-01`、試験用の負荷、試験用の shunt。PROTO-02 の R20 とは別）。それらは [`../bench-18/`](../bench-18/wiring-table.md) にある。
 
 ## まとまりと置き場所
 
@@ -11,7 +11,7 @@
 |---|---|---|---|
 | LCD | LCD（DISP-01） | 頭。背板の前の面（ふたの上、サーボの前寄り） | J1 |
 | SERVO | サーボ（SERVO-01） | ふたの上の天板。軸は胴の真ん中 | M1 |
-| PROTO-02 | 電源の基板 PROTO-02 | 左の壁の内側に立てる | F1、J5、J6、J7、J8、Q1、R18 |
+| PROTO-02 | 電源の基板 PROTO-02 | 左の壁の内側に立てる | C1、C2、F1、J5、J6、J7、J8、Q1、R18、R20、W1 |
 | M-12001 | AC アダプター M-12001 | 左の壁の後ろ寄りの穴から線が入る | PS1 |
 | Pi | Raspberry Pi Zero W | 右の壁の内側の後ろ寄りに立てる | J4、J9 |
 | B2 | B2（BB-601。LCD の14本を受ける） | 床の B1 の後ろ | R1、R2、R3、R6 |
@@ -56,13 +56,15 @@
 | X2 | `PI-UART-RX-Pi` | B1 | Pi（J4 pin 10） | X2（B1:D6 → Pi の header pin 10（GPIO15 `RXD`）） |
 | X3 | `GND` | B1 | Pi（J4 pin 39） | X3（B1:A18 → Pi の header pin 39（GND）） |
 | X4 | `SERVO-SIG` | B1 | SERVO（M1 pin yellow） | X4（B1:D7 → サーボの plug の黄の穴） |
-| X5 | `GND` | B1 | PROTO-02 | X5（B1:-30 → 共通 GND（PROTO-02 の GND。つなぐ端子は #405 で決める）（ESP32 の GND をサーボの GND と共通にする線）） |
 | P1 | `5V-IN` | M-12001（PS1 pin +） | PROTO-02（J5 pin +） | M-12001 の線（Micro-B の手前で切った導体） |
 | P2 | `GND` | M-12001（PS1 pin -） | PROTO-02（J5 pin -） | M-12001 の線（同上） |
-| P3 | `5V-NODE` | PROTO-02（J6 pin +） | SERVO（M1 pin red） | サーボの赤（`111641` で延ばす。plug とのつなぎ方は #405） |
-| P4 | `GND` | PROTO-02（J6 pin -） | SERVO（M1 pin brown） | サーボの茶（同上） |
+| P3 | `5V-NODE` | PROTO-02（J6 pin +） | SERVO（M1 pin red） | サーボの赤（`111641` で延ばす。plug とのつなぎ方は #405）。R20 の開放のときの扱いが決まるまで（`HW-TBD-038`、#405）、J6 から給電しない |
+| P4 | `ADC-SHUNT` | PROTO-02（J6 pin -） | SERVO（M1 pin brown） | サーボの茶（同上）。節点は shunt のサーボ側（`/ADC-SHUNT`） |
 | P5 | `5V-NODE` | PROTO-02（J7 pin +） | Pi（J9 pin VBUS） | `CABLE-PI-PWR-01`（`109314` を切った導体）→ Pi の `PWR IN` |
 | P6 | `GND` | PROTO-02（J7 pin -） | Pi（J9 pin GND） | `CABLE-PI-PWR-01`（同上） |
+| P7 | `5V-NODE` | PROTO-02（J8 pin +） | B1（U1 pin J2-19） | ESP32 の 5V pin へ（案B。往路の線とつなぎの部材は TBD（#405）。ブレッドボードの接点とジャンパー線は使わない。決まるまで J8 から ESP32 へ給電しない） |
+| X5 | `GND` | PROTO-02（J8 pin -） | B1（U1 pin J2-14） | 共通 GND の戻り（J8− を戻りにするのは plan.md の A7〔PM の判断〕。案Bのユーザーの決定は J8＋から 5V pin への給電）。J8− が star point へ直結する。ESP32 board の GND pin（U1 pin J2-14）へ直接つなぐ。線とつなぎの部材は TBD（#405）で、ブレッドボードの接点とジャンパー線は使わない。B1 のレールの GND と ESP32 の GND のつなぎには、周辺 module の 3V3 の枝と ADC-5V の分圧の戻り（R9）の電流が流れる（扱いは #405） |
+| P8 | `ADC-SHUNT` | PROTO-02（W1 pin 1） | B1（U1 pin J2-7） | `ADC-SHUNT`（GPIO32）へ。`111641` 1本を床側へ通す（`W1`）。R20 の開放のときの保護が決まるまで（`HW-TBD-038`、#405）、GPIO32 につながない |
 
 サーボの3本：黄（信号）は B1 から X4、赤（5 V）と茶（GND）は PROTO-02 の J6 から（P3・P4）。
 
@@ -70,7 +72,6 @@
 
 | ID | 間 | 何 |
 |---|---|---|
-| T1 | PROTO-02 – B1 | J8（logic の枝）→ ESP32 の 5 V 入力：使うかと経路は #405（power-budget.md の`ESP32の給電経路`） |
-| T2 | B2 – LCD | LCD の VCC（pin 1）の電圧：今は 3V3。最終は #405（`HW-TBD-024`） |
-| T3 | PROTO-02 – SERVO | servo の枝の bulk capacitor C1 の値と品、shunt（`MEAS-01`）を入れるか：#405・#17 |
-| T4 | B1 – PROTO-02 | X5 を PROTO-02 のどの端子へつなぐか：#405 |
+| T1 | PROTO-02 – SERVO | サーボの plug とのつなぎ方（servo の枝の線の先）：#405 |
+| T2 | B2 – LCD | LCD の VCC（pin 1）の電圧：今の構成（3V3 pin、J1 開放）は #461 の承認範囲で、段階Cへ広げない（段階Cでは DISP-01 を使わない）。最終は、`HW-TBD-024`・`HW-TBD-025`(a) と回路図の版の一致が揃えば #405 |
+| T3 | PROTO-02 – B1 | J8 の枝（P7・X5）の線とつなぎの部材（ESP32 board の `5V` pin・GND pin へ。ブレッドボードの接点とジャンパー線は使わない）と、案Bで 5V-NODE に載る B1 の上の要素（`J2-19` の列の接点、ADC-5V の分圧の上の抵抗（回路図の R8、B1 の配線表の R11）とその接点・線（B1 の配線表の S18 を含む））の扱い：#405。決まるまで J8 から ESP32 へ給電しない |

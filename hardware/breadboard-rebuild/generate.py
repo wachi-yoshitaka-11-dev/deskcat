@@ -222,7 +222,7 @@ OFFBOARD = [
      "A18 側を抜いておく。挿す前に、gpio-assignment.md の `信号線をつないでよい条件` の6の開放側の値を読む"),
     ("X4", "B1:D7", "SERVO_SIG", "サーボの plug の黄の穴",
      "D7 側を抜いておく。挿すのは #17 のサーボの試験、または #18 の段0・段1（docs/hardware/servo-safety-limits.md の「#18の校正（案）」の段0の2）の手順と承認に従うときだけ"),
-    ("X5", "B1:-30", "GND", "共通 GND（PROTO-02 の GND。つなぐ端子は #405 で決める）（ESP32 の GND をサーボの GND と共通にする線）",
+    ("X5", "B1:-30", "GND", "共通 GND（この組み直しの配置での線。`PROTO-02` を使う最終の構成（案B）では、ESP32 の GND の戻りは B1 のレール穴を通さず、J8− から ESP32 board の GND pin へ直接つなぐ。universal-board/plan.md の A7）（ESP32 の GND をサーボの GND と共通にする線）",
      "−30 側を抜いておく。条件は X4 と同じ。#18 の試験の間は、板の外の端を端子台S の − の穴へ挿さず、クリップ付コードで端子台S の − に入ったシャントの足を挟む（同じ段0の2）。端子台S は #18 の試験の間だけの物である。組み直す前の基準線（EXP-034 の Wiring revision）は Git の履歴にある組み直す前の hardware/breadboard/layout.svg"),
 ]
 
@@ -993,7 +993,7 @@ def build_table():
     L.append("## 載せないもの")
     L.append("")
     L.append("- `MEAS-02`（Arduino）の線（A0・GND）と、EXP-030 の Arduino 用の 10 kΩ 分圧（a10–a12、b12–b14）。測定器であり、必要なら実機側が試験のときに足す。")
-    L.append("- `MEAS-01` の shunt と GPIO32（`ADC-SHUNT`）の線。shunt はサーボの電流を通すのでブレッドボードに載せない。GPIO32 の線は今の配線に無く、足すかどうかは #17・#405 で決める（J2-7 の列 B1 K18・L18 を空けてある）。")
+    L.append("- `MEAS-01` の shunt と GPIO32（`ADC-SHUNT`）の線。shunt はサーボの電流を通すのでブレッドボードに載せない。GPIO32 の線は今の配線に無い。最終の構成では `PROTO-02` の W1 から J2-7 へつなぐ（universal-board/plan.md の A6。R20 の開放のときの保護が決まるまでつながない。同じ plan.md の`未決の一覧`）。J2-7 の列 B1 K18・L18 を空けてある。")
     L.append("")
     return "\n".join(L) + "\n"
 
