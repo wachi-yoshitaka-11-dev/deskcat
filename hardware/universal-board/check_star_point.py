@@ -7,7 +7,7 @@
 star の側の端 B から先。R20 の足2、J5−、J7−、J8−、R18 の足2、C1・C2 の−）。
 
 1. shunt `R20` の足1 が `/ADC-SHUNT`（servo の側 A）、足2（B）が `/GND` にある（shunt は servo の戻りだけにある）。
-2. `/ADC-SHUNT` の導体の上にある pad は、J6−、R20 の足1、`W1` の3つだけで、`W1` の pad の net が `/ADC-SHUNT` である。**C1・C2 の−は A の node に無い**（servo の過渡電流が
+2. `/ADC-SHUNT` の導体の上にある pad は、J6−、R20 の足1、`W1` の3つだけで、`W1` の pad の net が `/ADC-SHUNT` である。R20 の足1 から J6− と `W1` の足1 まで、`/ADC-SHUNT` の導体がつながっている。**C1・C2 の−は A の node に無い**（servo の過渡電流が
    J6− → A → shunt → B → C− と流れ、shunt を必ず通る）。Pi・logic・ingress の GND（J5−・J7−・J8−・R18 の足2）も含まない（shunt を通らずに servo の戻りが GND へ流れる道が無い）。
 3. **star point は B（shunt の足2）の node である。**J5−（5 V ingress の GND）は B に短い導体（2 穴以内）で直接つく。
    servo の戻りは J6− → A → shunt → B と流れ、B で初めてほかの GND に合流する。
@@ -18,7 +18,7 @@ star の側の端 B から先。R20 の足2、J5−、J7−、J8−、R18 の足
    全部の戻りを一緒に運ぶ）。**R18 の足2 の導体は B の穴に直接つく**（B と J5− の間の導体の途中につかない）。C1・C2 の−も、J7−・J8−・R18 と導体を共有しない別の導体で node へつく（C1 と C2 の間は共有してよい）。
 5. 導体の端と折れ曲がり、通る穴は、基板に実在する穴（`Dwgs.User` の円）の上にある。四隅の穴は無い。
 
-基板ファイル（`hardware/deskcat.kicad_pcb`）の `B.Cu` の導体と、部品の pad の位置・net だけを読む。
+基板ファイル（`hardware/deskcat.kicad_pcb`）の `B.Cu` の導体と、部品の pad の位置・net だけを読む。`B.Cu` 以外の層の導体があれば NG にする（片面基板で via が無いため）。
 KiCad は使わず、標準ライブラリだけで動く（ADR-0006）。90 度の倍数の回転を読む（KiCad の向き：画面で反時計回り）。
 
 使い方: `python3 -I hardware/universal-board/check_star_point.py`。規則を満たせば `OK` を出して 0 で終わる。
@@ -107,6 +107,10 @@ def main():
         sx, sy = map(float, re.search(r"\(start ([-\d.]+) ([-\d.]+)\)", seg).groups())
         ex, ey = map(float, re.search(r"\(end ([-\d.]+) ([-\d.]+)\)", seg).groups())
         netid = re.search(r"\(net (\d+)\)", seg).group(1)
+        layer = re.search(r'\(layer "([^"]+)"\)', seg)
+        if layer is None or layer.group(1) != "B.Cu":
+            errors.append(f"導体が B.Cu 以外の層にある（{layer.group(1) if layer else '層なし'}。片面基板で、この検査は B.Cu だけを読む）")
+            continue
         segs_by_net.setdefault(nets[netid], []).append(((round(sx, 3), round(sy, 3)), (round(ex, 3), round(ey, 3))))
         n = max(round(abs(ex - sx) / PITCH), round(abs(ey - sy) / PITCH))
         for i in range(n + 1):
@@ -262,6 +266,9 @@ def main():
         want = {J6M, (SHUNT, "1"), ("W1", "1")}
         if on_a != want:
             errors.append(f"/ADC-SHUNT の導体の上の pad が J6−・R20 の足1・W1 の3つだけでない（余り {sorted(on_a - want)}、不足 {sorted(want - on_a)}）")
+        for k in (J6M, ("W1", "1")):
+            if path(A, pads[(SHUNT, "1")], pads[k]) is None:
+                errors.append(f"R20 の足1 から {k[0]} の足 {k[1]} まで /ADC-SHUNT の導体がつながっていない")
     # 2'. ADC-SHUNT の導体は、J5−・J7−・J8−・R18 の足2 を含まない（C1・C2 の−は下で別に確かめる）
     for k in (J5M, J7M, J8M, R18_2):
         if pads[k] in A:

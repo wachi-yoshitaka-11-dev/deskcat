@@ -8,6 +8,7 @@ Rust・ESP32・Raspberry Pi の項目は、この作業で使っていないた�
 ```text
 Record ID: VR-2026-11-23-KICAD-PCB-NATIVE-LINUX
 Date: 2026-11-23
+最終有効な検証日時: 2026-11-24T13:53:47Z（commit f805e15 の基板ファイルで kicad-cli pcb drc --schematic-parity --severity-all。違反 0、未接続 0、食い違い 0）
 Machine profile: Docs / Review に KiCad を追加（machine-profiles.md の Profile一覧に KiCad を扱う profile は無い。
   VR-2026-11-15-KICAD-ERC-VM と同じ扱い）
 Operator role: AI agent（作業セッション）。KiCad の導入の操作はユーザーが行った

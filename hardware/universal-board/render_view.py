@@ -112,10 +112,10 @@ LABELS = {
 # 端子台の行き先（出所：plan.md の「基板から出る線」）
 FAR = {
     "J5": "M-12001（5 V の入力。赤＝＋、黒＝GND）",
-    "J6": "servo（赤＝5 V、茶＝GND。ふたの切り込みから。plug とのつなぎ方は #405）",
+    "J6": "servo（赤＝5 V、茶＝GND。ふたの切り込みから。plug とのつなぎ方は #405。HW-TBD-038 が閉じるまで給電しない）",
     "J7": "Pi（PWR IN。CABLE-PI-PWR-01）",
-    "J8": "ESP32 の 5V pin へ（線とつなぎは TBD、#405）。J8− は ESP32 の GND の戻り",
-    "W1": "B1 の GPIO32（ADC-SHUNT。線は床の側へ）",
+    "J8": "ESP32 の 5V pin へ（線とつなぎは TBD、#405。HW-TBD-038 が閉じるまで給電しない）。J8− は ESP32 の GND の戻り",
+    "W1": "B1 の GPIO32（ADC-SHUNT。線は床の側へ。HW-TBD-038 が閉じるまでつながない）",
 }
 
 
@@ -455,6 +455,7 @@ FRONT_NOTES = [
     "F1 PTC＝過電流の保護（PROT-OC-01、Bourns MF-R135）。Q1 MOSFET 2SJ334＝電源の逆接の保護（PROT-RP-01。方式の判断は tbd-register.md の HW-TBD-030）。",
     "R18＝Q1 の Gate の抵抗 10 kΩ（plan.md の部品表の R18 の行）。J5〜J8＝端子台 114217（WIRE-PWR-01）：J5＝M-12001 の入力、J6＝servo、J7＝Pi、J8＝logic（B1 の ESP32 の 5V pin へ。案B）。",
     "R20＝servo の戻りだけに入れる shunt（MEAS-01。0.1 Ω 5 W。power-budget.md の GND topology）。W1＝ADC-SHUNT の線の出口。",
+    "HW-TBD-038（#405）：R20 の開放のときの保護が決まるまで、W1 を GPIO32 につながず、J6 から servo へ給電せず、案Bで J8 から ESP32 へ給電しない。",
     "C1・C2＝servo の bulk capacitor の穴（470 µF／16 V。2 個分。3 個目が要るかは実測で決める）。",
     "寸法・位置の正本は基板ファイルと plan.md。この図は見た目で、寸法の正本ではない。図を電源・安全の実機確認に使わない。",
     "線は、はんだ面の芯線（111641、導体外径 0.75）を部品面の図の上に重ねて描いたもの。色はブレッドボードの図の決まりに合わせる。",

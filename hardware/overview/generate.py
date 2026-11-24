@@ -268,6 +268,7 @@ def render_svg(wires):
     notes = [("#444", wrap_note("細い線＝1本ずつ（ID。サーボは黄・赤・茶）。太い線＝束（本数）。各線の節点と端は wiring-table.md。赤の破線＝TBD。"
                                 "描かない物：#18 の試験だけの物（端子台S、PSU、試験用の負荷、試験用の shunt。PROTO-02 の R20 とは別）。"))]
     notes += [("#c00", wrap_note(f"{tid}: {what}")) for tid, _a, _b, what in TBD]
+    notes += [("#c00", wrap_note("HW-TBD-038（#405）：R20 の開放のときの保護が決まるまで、W1 を GPIO32 につながず（P8）、J6 から servo へ給電せず（P3）、案Bで J8 から ESP32 へ給電しない（P7）。"))]
     n_lines = sum(len(ls) for _c, ls in notes)
     OX, OY, W, H = 200, 20, 1220, LEGEND_Y + 14 * n_lines + 10
     o = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}" font-family="sans-serif">',
