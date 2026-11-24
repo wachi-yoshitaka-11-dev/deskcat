@@ -75,24 +75,24 @@ BB_NET = {
 OFFBOARD_END = {"X1": ("Pi", "J4", "8"), "X2": ("Pi", "J4", "10"), "X3": ("Pi", "J4", "39"),
                 "X4": ("SERVO", "M1", "yellow")}
 
-# PROTO-02 の端子台から出る線。(id, 節点, 端1 (block, ref, pin), 端2, 線, 色)
+# PROTO-02 から出る線（端子台 J5〜J8 と、出口の穴 W1）。(id, 節点, 端1 (block, ref, pin), 端2, 線, 色)
 POWER_WIRES = [
     ("P1", "/5V-IN", ("M-12001", "PS1", "+"), ("PROTO-02", "J5", "+"), "M-12001 の線（Micro-B の手前で切った導体）", "#d62728"),
     ("P2", "/GND", ("M-12001", "PS1", "-"), ("PROTO-02", "J5", "-"), "M-12001 の線（同上）", "#111111"),
-    ("P3", "/5V-NODE", ("PROTO-02", "J6", "+"), ("SERVO", "M1", "red"), "サーボの赤（`111641` で延ばす。plug とのつなぎ方は #405）。R20 の開放のときの扱いが決まるまで（TBD、#405。universal-board/plan.md の`未決の一覧`）、J6 から給電しない", "#d62728"),
+    ("P3", "/5V-NODE", ("PROTO-02", "J6", "+"), ("SERVO", "M1", "red"), "サーボの赤（`111641` で延ばす。plug とのつなぎ方は #405）。R20 の開放のときの扱いが決まるまで（`HW-TBD-038`、#405）、J6 から給電しない", "#d62728"),
     ("P4", "/ADC-SHUNT", ("PROTO-02", "J6", "-"), ("SERVO", "M1", "brown"), "サーボの茶（同上）。節点は shunt のサーボ側（`/ADC-SHUNT`）", "#8c564b"),
     ("P5", "/5V-NODE", ("PROTO-02", "J7", "+"), ("Pi", "J9", "VBUS"), "`CABLE-PI-PWR-01`（`109314` を切った導体）→ Pi の `PWR IN`", "#d62728"),
     ("P6", "/GND", ("PROTO-02", "J7", "-"), ("Pi", "J9", "GND"), "`CABLE-PI-PWR-01`（同上）", "#111111"),
     ("P7", "/5V-NODE", ("PROTO-02", "J8", "+"), ("B1", "U1", "J2-19"), "ESP32 の 5V pin へ（案B。往路の線とつなぎの部材は TBD（#405）。ブレッドボードの接点とジャンパー線は使わない。決まるまで J8 から ESP32 へ給電しない）", "#d62728"),
     ("X5", "/GND", ("PROTO-02", "J8", "-"), ("B1", "U1", "J2-14"), "共通 GND の戻り（J8− を戻りにするのは plan.md の A7〔PM の判断〕。案Bのユーザーの決定は J8＋から 5V pin への給電）。J8− が star point へ直結する。ESP32 board の GND pin（U1 pin J2-14）へ直接つなぐ。線とつなぎの部材は TBD（#405）で、ブレッドボードの接点とジャンパー線は使わない。B1 のレールの GND と ESP32 の GND のつなぎには、周辺 module の 3V3 の枝と ADC-5V の分圧の戻り（R9）の電流が流れる（扱いは #405）", "#111111"),
-    ("P8", "/ADC-SHUNT", ("PROTO-02", "W1", "1"), ("B1", "U1", "J2-7"), "`ADC-SHUNT`（GPIO32）へ。`111641` 1本を床側へ通す（`W1`）。R20 の開放のときの保護が決まるまで（TBD、#405。universal-board/plan.md の`未決の一覧`）、GPIO32 につながない", "#7b2d8e"),
+    ("P8", "/ADC-SHUNT", ("PROTO-02", "W1", "1"), ("B1", "U1", "J2-7"), "`ADC-SHUNT`（GPIO32）へ。`111641` 1本を床側へ通す（`W1`）。R20 の開放のときの保護が決まるまで（`HW-TBD-038`、#405）、GPIO32 につながない", "#7b2d8e"),
 ]
 
 # 決まっていない所。図に破線と `TBD` で描き、線の検査からは除く。
 TBD = [
     ("T1", "PROTO-02", "SERVO", "サーボの plug とのつなぎ方（servo の枝の線の先）：#405"),
     ("T2", "B2", "LCD", "LCD の VCC（pin 1）の電圧：今の構成（3V3 pin、J1 開放）は #461 の承認範囲で、段階Cへ広げない（段階Cでは DISP-01 を使わない）。最終は、`HW-TBD-024`・`HW-TBD-025`(a) と回路図の版の一致が揃えば #405"),
-    ("T3", "PROTO-02", "B1", "J8 の枝（P7・X5）の線とつなぎの部材（ESP32 board の `5V` pin・GND pin へ。ブレッドボードの接点とジャンパー線は使わない）と、案Bで 5V-NODE に載る B1 の上の要素（`J2-19` の列の接点、ADC-5V の分圧の上の R8 とその接点・線）の扱い：#405。決まるまで J8 から ESP32 へ給電しない"),
+    ("T3", "PROTO-02", "B1", "J8 の枝（P7・X5）の線とつなぎの部材（ESP32 board の `5V` pin・GND pin へ。ブレッドボードの接点とジャンパー線は使わない）と、案Bで 5V-NODE に載る B1 の上の要素（`J2-19` の列の接点、ADC-5V の分圧の上の抵抗（回路図の R8、B1 の配線表の R11）とその接点・線（B1 の配線表の S18 を含む））の扱い：#405。決まるまで J8 から ESP32 へ給電しない"),
 ]
 
 # 線の通り道（まとまりの組 → 途中の点）。ほかの枠の上を横切らないように曲げる。
@@ -248,8 +248,28 @@ def bundles(wires):
     return out
 
 
+def wrap_note(text, limit=112):
+    """凡例の1行を、図の幅に収まる長さ（全角1・半角0.55で数える）で区切る。"""
+    lines, cur, width = [], "", 0.0
+    for ch in text:
+        cw = 0.55 if ord(ch) < 0x80 else 1.0
+        if width + cw > limit and cur:
+            lines.append(cur)
+            cur, width = "", 0.0
+        cur += ch
+        width += cw
+    if cur:
+        lines.append(cur)
+    return lines
+
+
 def render_svg(wires):
-    OX, OY, W, H = 200, 20, 1220, 880
+    LEGEND_Y = 840  # 凡例の1行目。下端のまとまり（B3）の枠の下に置く
+    notes = [("#444", wrap_note("細い線＝1本ずつ（ID。サーボは黄・赤・茶）。太い線＝束（本数）。各線の節点と端は wiring-table.md。赤の破線＝TBD。"
+                                "描かない物：#18 の試験だけの物（端子台S、PSU、試験用の負荷、試験用の shunt。PROTO-02 の R20 とは別）。"))]
+    notes += [("#c00", wrap_note(f"{tid}: {what}")) for tid, _a, _b, what in TBD]
+    n_lines = sum(len(ls) for _c, ls in notes)
+    OX, OY, W, H = 200, 20, 1220, LEGEND_Y + 14 * n_lines + 10
     o = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}" font-family="sans-serif">',
          f'<rect width="{W}" height="{H}" fill="#fff"/>',
          '<text x="16" y="22" font-size="15" font-weight="bold">DeskCat 全体の配線（最終形のつながり。#512）</text>',
@@ -313,11 +333,11 @@ def render_svg(wires):
         o.append(f'<text x="{X + 6}" y="{Y + 30}" font-size="9" fill="#555">{esc(place)}</text>')
         refs = sorted([r for r, bl in BLOCK_OF.items() if bl == blk], key=lambda r: (r[0], int(r[1:]) if r[1:].isdigit() else 0))
         o.append(f'<text x="{X + 6}" y="{Y + 43}" font-size="9" fill="#555">{esc(" ".join(refs))}</text>')
-    ly = 790
-    o.append(f'<text x="16" y="{ly}" font-size="10" fill="#444">細い線＝1本ずつ（ID。サーボは黄・赤・茶）。太い線＝束（本数）。各線の節点と端は wiring-table.md。赤の破線＝TBD。'
-             '描かない物：#18 の試験だけの物（端子台S、PSU、試験用の負荷、試験用の shunt。PROTO-02 の R20 とは別）。</text>')
-    for i, (tid, _a, _b, what) in enumerate(TBD):
-        o.append(f'<text x="16" y="{ly + 14 * (i + 1)}" font-size="10" fill="#c00">{tid}: {esc(what)}</text>')
+    ly = LEGEND_Y
+    for color, lines in notes:
+        for line in lines:
+            o.append(f'<text x="16" y="{ly}" font-size="10" fill="{color}">{esc(line)}</text>')
+            ly += 14
     o.append("</svg>")
     return "\n".join(o) + "\n"
 
