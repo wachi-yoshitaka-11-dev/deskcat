@@ -2,7 +2,7 @@
 <rect width="900" height="1011" fill="#fff"/>
 <text x="30" y="36" font-size="22" font-weight="bold">PROTO-02 の実装の計画（はんだ面。真上から、左右を裏返した向き）</text>
 <text x="30" y="62" fill="#444">生成元: hardware/universal-board/render_view.py（基板ファイルから）。描き方はブレッドボードの図と同じ。</text>
-<rect x="60.0" y="340.0" width="623.6" height="411.4" rx="10" fill="#f4f4f0" stroke="#888"/>
+<rect x="60.0" y="340.0" width="623.6" height="411.4" rx="10" fill="#dcd69c" stroke="#888"/>
 <text x="657.6" y="354.0" text-anchor="middle" font-size="10" fill="#666">1</text>
 <text x="635.6" y="354.0" text-anchor="middle" font-size="10" fill="#666">2</text>
 <text x="613.6" y="354.0" text-anchor="middle" font-size="10" fill="#666">3</text>
@@ -1306,5 +1306,5 @@
 <text x="60" y="893.4173228346457" font-size="12.5">線の色は部品面の図と同じ：赤＝＋、黒＝GND、緑＝Gate、紫＝ADC-SHUNT。太い線＝芯線（111641、被覆を剥いた区間。導体外径 0.75）。</text>
 <text x="60" y="915.4173228346457" font-size="12.5">銀の丸＝はんだの盛り（導体が通る穴と足の穴。通る穴ごとにはんだ付けする）。灰の円＝ランド、その中の黒い点＝穴（使わない穴も同じ）。</text>
 <text x="60" y="937.4173228346457" font-size="12.5">銀の丸の中の小さい濃い点＝部品の足が入る穴。</text>
-<text x="60" y="959.4173228346457" font-size="12.5">TBD（資料に無い）：ランドの外径（pad と同じ 1.8 mm で描く）、はんだの盛りの大きさ（見た目）、基板の色。</text>
+<text x="60" y="959.4173228346457" font-size="12.5">TBD（資料に無い）：ランドの外径（pad と同じ 1.8 mm で描く）、はんだの盛りの大きさ（見た目）。基板の色は秋月 100517 の商品写真。</text>
 </svg>

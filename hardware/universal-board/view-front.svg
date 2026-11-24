@@ -2,7 +2,7 @@
 <rect width="1360" height="1293" fill="#fff"/>
 <text x="30" y="36" font-size="22" font-weight="bold">PROTO-02 の実装の計画（部品面。真上から見る）</text>
 <text x="30" y="62" fill="#444">生成元: hardware/universal-board/render_view.py（基板ファイルから）。描き方はブレッドボードの図（hardware/breadboard-rebuild/generate.py）と同じ。</text>
-<rect x="360.0" y="240.0" width="623.6" height="411.4" rx="10" fill="#f4f4f0" stroke="#888"/>
+<rect x="360.0" y="240.0" width="623.6" height="411.4" rx="10" fill="#dcd69c" stroke="#888"/>
 <text x="386.0" y="254.0" text-anchor="middle" font-size="10" fill="#666">1</text>
 <text x="408.0" y="254.0" text-anchor="middle" font-size="10" fill="#666">2</text>
 <text x="430.0" y="254.0" text-anchor="middle" font-size="10" fill="#666">3</text>
@@ -523,21 +523,25 @@
 <g data-ref="R18" data-lib="R_Vertical_P5.08" data-at="120.78,113.61" data-rot="180" data-pads="1@120.78,113.61=/Q1-GATE;2@120.78,108.53=/GND">
 <line x1="540.0" y1="357.9" x2="540.0" y2="313.9" stroke="#7a6a50" stroke-width="2.5"/>
 <rect x="535.0" y="321.9" width="10" height="28" rx="4" fill="#e9d3a5" stroke="#7a6a50"/>
+<rect x="535.0" y="326.9" width="10" height="2.5" fill="#7a4a22"/>
+<rect x="535.0" y="331.9" width="10" height="2.5" fill="#111111"/>
+<rect x="535.0" y="336.9" width="10" height="2.5" fill="#e0602a"/>
+<rect x="535.0" y="341.9" width="10" height="2.5" fill="#c9a227"/>
 <text x="549.0" y="338.9" font-size="8.5" fill="#5a4a30" stroke="#fff" stroke-width="2.5" paint-order="stroke">R18</text>
 </g>
 <g data-ref="F1" data-lib="PTC_MF-R135_Radial_P5.08" data-at="113.16,118.69" data-rot="0" data-pads="a@113.16,118.69=/5V-IN;b@118.24,118.69=/5V-PTC">
 <rect x="457.4" y="388.9" width="77.1" height="26.0" rx="13.0" fill="#e6c53c" stroke="#8a7414" stroke-width="1.2"/>
 </g>
 <g data-ref="C2" data-lib="C_Radial_D8_P5.08" data-at="143.64,118.69" data-rot="90" data-pads="+@143.64,118.69=/5V-NODE;-@143.64,123.77=/GND">
-<circle cx="738.0" cy="423.9" r="34.6" fill="#33415c" stroke="#111" stroke-width="1.2"/>
+<circle cx="738.0" cy="423.9" r="34.6" fill="#1a1718" stroke="#000" stroke-width="1.2"/>
 <path d="M703.3 423.9 A34.6 34.6 0 0 0 772.6 423.9 Z" fill="#9aa4b8" opacity="0.7"/>
 </g>
 <g data-ref="C1" data-lib="C_Radial_D8_P5.08" data-at="153.8,118.69" data-rot="90" data-pads="+@153.8,118.69=/5V-NODE;-@153.8,123.77=/GND">
-<circle cx="826.0" cy="423.9" r="34.6" fill="#33415c" stroke="#111" stroke-width="1.2"/>
+<circle cx="826.0" cy="423.9" r="34.6" fill="#1a1718" stroke="#000" stroke-width="1.2"/>
 <path d="M791.3 423.9 A34.6 34.6 0 0 0 860.6 423.9 Z" fill="#9aa4b8" opacity="0.7"/>
 </g>
 <g data-ref="Q1" data-lib="2SJ334_SC-67_Vertical_MarkRight" data-at="125.86,121.23" data-rot="180" data-pads="1@125.86,116.15=/Q1-GATE;2@125.86,118.69=/5V-PTC;3@125.86,121.23=/5V-NODE">
-<rect x="564.5" y="358.6" width="39.0" height="86.6" rx="2" fill="#555a62" stroke="#222" stroke-width="1.2"/>
+<rect x="564.5" y="358.6" width="39.0" height="86.6" rx="2" fill="#1c1c1f" stroke="#000" stroke-width="1.2"/>
 <line x1="564.5" y1="360.6" x2="564.5" y2="443.2" stroke="#d8d8d8" stroke-width="3"/>
 </g>
 <g data-ref="J8" data-lib="TB_114217_WireFloor" data-at="130.94,121.23" data-rot="0" data-pads="+@130.94,121.23=/5V-NODE;-@133.48,121.23=/GND">
@@ -725,6 +729,6 @@
 <text x="60" y="1153.4173228346458" font-size="12.5">R18 は足が2本で、縦の2つの穴（1・2）に入る。現物は立てて挿すが、図は2つの穴の間に本体を置いた記号で描く（ブレッドボードの図の抵抗と同じ）。</text>
 <text x="60" y="1175.4173228346458" font-size="12.5">F1（黄色い円盤）：真上からは幅 8.9 × 厚み 3.0。現物の外見は hardware-bom.md の Revision 89。Q1：太い白線は刻印面の側（後ろ向き）。R20 は横に寝かせた本体 22 × 10 mm。C1・C2 は径 8 mm。</text>
 <text x="60" y="1197.4173228346458" font-size="12.5">破線＝資料に無い寸法（TBD）：端子台のねじの位置・径と電線の口の幅（plan.md の M7）。R20 の足の間隔 11 穴は設計の値で確定（足を曲げる側が選ぶ）。R20 の高さ H は TBD。</text>
-<text x="60" y="1219.4173228346458" font-size="12.5">色：PTC の黄（現物の記録）、端子台の緑（商品ページ）、R20 の白（datasheet の写真）は資料による。基板・Q1・C1・C2 の色は仮。</text>
+<text x="60" y="1219.4173228346458" font-size="12.5">色：PTC の黄は現物の記録、R20 の白は datasheet の写真、ほかの部品と基板は秋月の商品ページ・写真による。</text>
 <text x="60" y="1241.4173228346458" font-size="12.5">端子台の口の向きは、口の帯とそこから出る曲線で示す。曲線の行き先が板の外（M-12001・servo・Pi・B1）。ブレッドボードの図の「板の外へ出る線」と同じ描き方。W1 の破線は、床の側へ出る線。</text>
 </svg>

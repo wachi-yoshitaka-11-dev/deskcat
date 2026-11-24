@@ -5,7 +5,7 @@
 外形（footprint の `F.Fab` の矩形）、はんだ面（`B.Cu`）の導体、基板の穴（`Dwgs.User` の円）、
 基板の外形（`Edge.Cuts`）を読み、2 枚の SVG を書く。
 
-- `view-front.svg`：部品面。**真上から見る。**板・穴・部品・文字・凡例の描き方、色、線の太さ、文字の大きさは
+- `view-front.svg`：部品面。**真上から見る。**板・穴・部品・文字・凡例の描き方、線の色、線の太さ、文字の大きさは
   ブレッドボードの図（`hardware/breadboard-rebuild/generate.py`）に合わせた（1 ピッチの画素 `P`、
   色 `COLOR_HEX`、`esc`、`text_width` はその file から読み込んで同じものを使う）。はんだ面の芯線
   （`111641`）を、部品面の図の上に色の付いた線で重ねて描く（赤＝＋、黒＝GND、緑＝Gate、紫＝ADC-SHUNT）。
@@ -37,8 +37,10 @@
 - 凡例の用途と部品の役目の出所：hardware-bom.md の `PROT-OC-01`・`PROT-RP-01`・`WIRE-PWR-01` の行（R18 は
   plan.md の部品表の行。BOM に Gate の抵抗の行が無いことは plan.md の「BOM に無いもの」）、tbd-register.md の `HW-TBD-030`、Issue #405（段階Cの実装）・#525（段階Cの初回通電の前提）の題。
 
+色の出所：PTC の黄は hardware-bom.md の Revision 89。端子台の緑は秋月 114217 の商品ページ。R20 の白は datasheet `CementResistor.pdf` p.3 の写真。
+基板（100517）・C1・C2（108426）・Q1（102846）・R18（125103）の色は、秋月の商品写真による。
+
 TBD（資料に無いので推測せず、破線または注記にした）：
-- 基板の色、Q1 と C1・C2 の色（現物の記録も資料も無い）。PTC の黄は hardware-bom.md の Revision 89、端子台の緑は秋月 114217 の商品ページ、R20 の白は datasheet `CementResistor.pdf` p.3 の写真による。
 - ランドの外径（資料に無い。pad と同じ 1.8 で描く）。
 - 端子台のねじの位置・径、電線の口の幅（plan.md の M7。破線。真上からの図に口の高さ M4 は出ない）。
 - `R18` の本体の大きさは慣行の値（長さ約 6.5・径約 2.4）で暫定（plan.md の M3・A12）。図は本体を寸法で描かず、足の2つの穴の間に置いた記号で描く（ブレッドボードの図の抵抗と同じ）。
@@ -85,6 +87,10 @@ NET_SHORT = {"/5V-IN": "5V-IN", "/5V-PTC": "5V-PTC", "/5V-NODE": "5V-NODE", "/GN
 C_PTC = "#e6c53c"             # 黄色（現物の記録：hardware-bom.md の Revision 89）
 C_TB = "#3f9a52"              # 端子台の本体の緑（秋月 114217 の商品ページ「本体色：緑」）
 C_SHUNT = "#ffffff"           # セメント抵抗の白（datasheet CementResistor.pdf p.3 の写真）
+C_BOARD = "#dcd69c"           # 基板の淡い黄緑（FR-4。秋月 100517 の商品写真）
+C_CAP = "#1a1718"             # 電解コンデンサのスリーブの黒（秋月 108426 の商品写真。−の帯は灰）
+C_Q1 = "#1c1c1f"              # 2SJ334 の本体の黒（秋月 102846 の商品写真）
+R18_BANDS = ("#7a4a22", "#111111", "#e0602a", "#c9a227")   # 10 kΩ の帯：茶・黒・橙・金（秋月 125103 の商品写真）
 C_BEIGE = "#e9d3a5"           # 抵抗の色（generate.py の draw_parts と同じ）
 C_BEIGE_LINE = "#7a6a50"
 C_PIN = "#caa53d"             # 足の丸（generate.py の ESP32 のピンと同じ）
@@ -248,8 +254,8 @@ def svg_open(w, h, title, sub):
 
 
 def draw_board(out, fr, board, back):
-    """板：ブレッドボードの図と同じ（角丸の矩形 #f4f4f0、灰の四角の穴、列と行の番号）。"""
-    out.append(f'<rect x="{fr.bx:.1f}" y="{fr.by:.1f}" width="{fr.w:.1f}" height="{fr.h:.1f}" rx="10" fill="#f4f4f0" stroke="#888"/>')
+    """板：ブレッドボードの図と同じ描き方（角丸の矩形、灰の四角の穴、列と行の番号）。色は C_BOARD。"""
+    out.append(f'<rect x="{fr.bx:.1f}" y="{fr.by:.1f}" width="{fr.w:.1f}" height="{fr.h:.1f}" rx="10" fill="{C_BOARD}" stroke="#888"/>')
     ncols, nrows = 27, 17
     for c in range(1, ncols + 1):
         x, _ = fr.p(103.0 + (c - 1) * PITCH, 103.45)
@@ -334,13 +340,13 @@ def draw_ptc(out, fr, fp):
 def draw_mosfet(out, fr, fp):
     x0, y0, x1, y1 = fab_rect(fp)
     (ux, uy), (vx, vy) = fr.p(x0, y0), fr.p(x1, y1)
-    out.append(f'<rect x="{ux:.1f}" y="{uy:.1f}" width="{vx - ux:.1f}" height="{vy - uy:.1f}" rx="2" fill="#555a62" stroke="#222" stroke-width="1.2"/>')
+    out.append(f'<rect x="{ux:.1f}" y="{uy:.1f}" width="{vx - ux:.1f}" height="{vy - uy:.1f}" rx="2" fill="{C_Q1}" stroke="#000" stroke-width="1.2"/>')
     mark_x = ux if fp["rot"] == 180 else vx      # 刻印面の側（footprint の `MARK`。180 度回した向きでは x の小さい側）
     out.append(f'<line x1="{mark_x:.1f}" y1="{uy + 2:.1f}" x2="{mark_x:.1f}" y2="{vy - 2:.1f}" stroke="#d8d8d8" stroke-width="3"/>')
 
 
 def draw_resistor(out, fr, fp):
-    """R18：足の2つの穴を茶の線で結び、その間に本体を置いて描く（breadboard-rebuild/generate.py の draw_parts の抵抗と同じ描き方・色）。
+    """R18：足の2つの穴を茶の線で結び、その間に本体を置いて描く（breadboard-rebuild/generate.py の draw_parts の抵抗と同じ描き方・色。帯は R18_BANDS）。
     現物は立てて挿す（足の間隔 2 穴）。図の本体は、足が2本あり2つの穴に入ることを示す記号で、寸法どおりではない
     （本体の大きさは慣行の値で暫定。plan.md の M3・A12）。"""
     p1, p2 = sorted(fp["pads"], key=lambda p: p["name"])
@@ -349,8 +355,12 @@ def draw_resistor(out, fr, fp):
     mx, my = (ax + bx) / 2, (ay + by) / 2
     if abs(ax - bx) >= abs(ay - by):
         out.append(f'<rect x="{mx - 14:.1f}" y="{my - 5:.1f}" width="28" height="10" rx="4" fill="{C_BEIGE}" stroke="{C_BEIGE_LINE}"/>')
+        for i, c in enumerate(R18_BANDS):
+            out.append(f'<rect x="{mx - 9 + 5 * i:.1f}" y="{my - 5:.1f}" width="2.5" height="10" fill="{c}"/>')
     else:
         out.append(f'<rect x="{mx - 5:.1f}" y="{my - 14:.1f}" width="10" height="28" rx="4" fill="{C_BEIGE}" stroke="{C_BEIGE_LINE}"/>')
+        for i, c in enumerate(R18_BANDS):
+            out.append(f'<rect x="{mx - 5:.1f}" y="{my - 9 + 5 * i:.1f}" width="10" height="2.5" fill="{c}"/>')
     out.append(f'<text x="{mx + 9:.1f}" y="{my + 3:.1f}" font-size="8.5" fill="#5a4a30" stroke="#fff" stroke-width="2.5" paint-order="stroke">{esc(fp["ref"])}</text>')
 
 
@@ -372,10 +382,10 @@ def draw_shunt(out, fr, fp):
 
 
 def draw_cap(out, fr, fp):
-    """C1・C2（秋月 g108426、Rubycon 16WXA470MEFC8X9）：径 8 mm（datasheet j_wxa.pdf）。足の間隔は 3.5 を 5.08 へ広げる。色は仮。"""
+    """C1・C2（秋月 g108426、Rubycon 16WXA470MEFC8X9）：径 8 mm（datasheet j_wxa.pdf）。足の間隔は 3.5 を 5.08 へ広げる。色は C_CAP。"""
     x0, y0, x1, y1 = fab_rect(fp)
     cx, cy = fr.p((x0 + x1) / 2, (y0 + y1) / 2)
-    out.append(f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="{(x1 - x0) / 2 * K:.1f}" fill="#33415c" stroke="#111" stroke-width="1.2"/>')
+    out.append(f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="{(x1 - x0) / 2 * K:.1f}" fill="{C_CAP}" stroke="#000" stroke-width="1.2"/>')
     neg = next(p for p in fp["pads"] if p["name"] == "-")
     nx, ny = fr.p(neg["x"], neg["y"])
     rr = (x1 - x0) / 2 * K
@@ -456,7 +466,7 @@ FRONT_NOTES = [
     "R18 は足が2本で、縦の2つの穴（1・2）に入る。現物は立てて挿すが、図は2つの穴の間に本体を置いた記号で描く（ブレッドボードの図の抵抗と同じ）。",
     "F1（黄色い円盤）：真上からは幅 8.9 × 厚み 3.0。現物の外見は hardware-bom.md の Revision 89。Q1：太い白線は刻印面の側（後ろ向き）。R20 は横に寝かせた本体 22 × 10 mm。C1・C2 は径 8 mm。",
     "破線＝資料に無い寸法（TBD）：端子台のねじの位置・径と電線の口の幅（plan.md の M7）。R20 の足の間隔 11 穴は設計の値で確定（足を曲げる側が選ぶ）。R20 の高さ H は TBD。",
-    "色：PTC の黄（現物の記録）、端子台の緑（商品ページ）、R20 の白（datasheet の写真）は資料による。基板・Q1・C1・C2 の色は仮。",
+    "色：PTC の黄は現物の記録、R20 の白は datasheet の写真、ほかの部品と基板は秋月の商品ページ・写真による。",
     "端子台の口の向きは、口の帯とそこから出る曲線で示す。曲線の行き先が板の外（M-12001・servo・Pi・B1）。ブレッドボードの図の「板の外へ出る線」と同じ描き方。W1 の破線は、床の側へ出る線。",
 ]
 
@@ -577,7 +587,7 @@ BACK_NOTES = [
     "線の色は部品面の図と同じ：赤＝＋、黒＝GND、緑＝Gate、紫＝ADC-SHUNT。太い線＝芯線（111641、被覆を剥いた区間。導体外径 0.75）。",
     "銀の丸＝はんだの盛り（導体が通る穴と足の穴。通る穴ごとにはんだ付けする）。灰の円＝ランド、その中の黒い点＝穴（使わない穴も同じ）。",
     "銀の丸の中の小さい濃い点＝部品の足が入る穴。",
-    "TBD（資料に無い）：ランドの外径（pad と同じ 1.8 mm で描く）、はんだの盛りの大きさ（見た目）、基板の色。",
+    "TBD（資料に無い）：ランドの外径（pad と同じ 1.8 mm で描く）、はんだの盛りの大きさ（見た目）。基板の色は秋月 100517 の商品写真。",
 ]
 
 
