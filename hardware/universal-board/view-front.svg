@@ -718,7 +718,7 @@
 <text x="60" y="911.4173228346457" font-size="12.5">F1 PTC＝過電流の保護（PROT-OC-01、Bourns MF-R135）。Q1 MOSFET 2SJ334＝電源の逆接の保護（PROT-RP-01。方式の判断は tbd-register.md の HW-TBD-030）。</text>
 <text x="60" y="933.4173228346457" font-size="12.5">R18＝Q1 の Gate の抵抗 10 kΩ（plan.md の部品表の R18 の行）。J5〜J8＝端子台 114217（WIRE-PWR-01）：J5＝M-12001 の入力、J6＝servo、J7＝Pi、J8＝logic（B1 の ESP32 の 5V pin へ。案B）。</text>
 <text x="60" y="955.4173228346457" font-size="12.5">R20＝servo の戻りだけに入れる shunt（MEAS-01。0.1 Ω 5 W。power-budget.md の GND topology）。W1＝ADC-SHUNT の線の出口。</text>
-<text x="60" y="977.4173228346457" font-size="12.5">HW-TBD-038（#405）：R20 の開放のときの保護が決まるまで、W1 を GPIO32 につながず、J6 から servo へ給電せず、案Bで J8 から ESP32 へ給電しない。</text>
+<text x="60" y="977.4173228346457" font-size="12.5">HW-TBD-038（#405）が閉じるまで：(a) R20 の開放に備えて、W1 を GPIO32 につながず、J6 から servo へ給電しない。(b) 案Bで J8− だけが外れたときに備えて、J8 から ESP32 へ給電しない。</text>
 <text x="60" y="999.4173228346457" font-size="12.5">C1・C2＝servo の bulk capacitor の穴（470 µF／16 V。2 個分。3 個目が要るかは実測で決める）。</text>
 <text x="60" y="1021.4173228346457" font-size="12.5">寸法・位置の正本は基板ファイルと plan.md。この図は見た目で、寸法の正本ではない。図を電源・安全の実機確認に使わない。</text>
 <text x="60" y="1043.4173228346458" font-size="12.5">線は、はんだ面の芯線（111641、導体外径 0.75）を部品面の図の上に重ねて描いたもの。色はブレッドボードの図の決まりに合わせる。</text>

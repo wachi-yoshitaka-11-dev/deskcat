@@ -72,5 +72,5 @@
 <text x="16" y="868" font-size="10" fill="#c00">T2: LCD の VCC（pin 1）の電圧：今の構成（3V3 pin、J1 開放）は #461 の承認範囲で、段階Cへ広げない（段階Cでは DISP-01 を使わない）。最終は、`HW-TBD-024`・`HW-TBD-025`(a) と回路図の版の一致が揃えば #405</text>
 <text x="16" y="882" font-size="10" fill="#c00">T3: J8 の枝（P7・X5）の線とつなぎの部材（ESP32 board の `5V` pin・GND pin へ。ブレッドボードの接点とジャンパー線は使わない）と、案Bで 5V-NODE に載る B1 の上の要素（`J2-19` の列の接点、ADC-5V の分圧の上の抵抗（回路図の</text>
 <text x="16" y="896" font-size="10" fill="#c00"> R8、B1 の配線表の R11）とその接点・線（B1 の配線表の S18 を含む））の扱い：#405。決まるまで J8 から ESP32 へ給電しない</text>
-<text x="16" y="910" font-size="10" fill="#c00">HW-TBD-038（#405）：R20 の開放のときの保護が決まるまで、W1 を GPIO32 につながず（P8）、J6 から servo へ給電せず（P3）、案Bで J8 から ESP32 へ給電しない（P7）。</text>
+<text x="16" y="910" font-size="10" fill="#c00">HW-TBD-038（#405）が閉じるまで：(a) R20 の開放に備えて、W1 を GPIO32 につながず（P8）、J6 から servo へ給電しない（P3）。(b) 案Bで J8−（X5）だけが外れたときに備えて、J8 から ESP32 へ給電しない（P7）。</text>
 </svg>

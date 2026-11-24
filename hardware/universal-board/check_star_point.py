@@ -18,7 +18,7 @@ star の側の端 B から先。R20 の足2、J5−、J7−、J8−、R18 の足
    全部の戻りを一緒に運ぶ）。**R18 の足2 の導体は B の穴に直接つく**（B と J5− の間の導体の途中につかない）。C1・C2 の−も、J7−・J8−・R18 と導体を共有しない別の導体で node へつく（C1 と C2 の間は共有してよい）。
 5. 導体の端と折れ曲がり、通る穴は、基板に実在する穴（`Dwgs.User` の円）の上にある。四隅の穴は無い。
 
-基板ファイル（`hardware/deskcat.kicad_pcb`）の `B.Cu` の導体と、部品の pad の位置・net だけを読む。`B.Cu` 以外の層の導体があれば NG にする（片面基板で via が無いため）。
+基板ファイル（`hardware/deskcat.kicad_pcb`）の `B.Cu` の導体と、部品の pad の位置・net だけを読む。導体は直線（`segment`）だけを読み、`B.Cu` 以外の層の `segment` と、`arc`・`via`・`zone` が1つでもあれば NG にする（片面基板で、芯線は直線だけのため）。
 KiCad は使わず、標準ライブラリだけで動く（ADR-0006）。90 度の倍数の回転を読む（KiCad の向き：画面で反時計回り）。
 
 使い方: `python3 -I hardware/universal-board/check_star_point.py`。規則を満たせば `OK` を出して 0 で終わる。
@@ -103,6 +103,9 @@ def main():
     errors = []
     segs_by_net = {}
     off = set()
+    other = sorted(set(re.findall(r"\((arc|via|zone)[\s)]", text)))
+    if other:
+        errors.append(f"直線（segment）以外の導体がある（{'・'.join(other)}。この検査は B.Cu の segment だけを読む）")
     for seg in blocks(text, "segment"):
         sx, sy = map(float, re.search(r"\(start ([-\d.]+) ([-\d.]+)\)", seg).groups())
         ex, ey = map(float, re.search(r"\(end ([-\d.]+) ([-\d.]+)\)", seg).groups())
