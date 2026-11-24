@@ -38,10 +38,10 @@
   plan.md の部品表の行。BOM に Gate の抵抗の行が無いことは plan.md の「BOM に無いもの」）、tbd-register.md の `HW-TBD-030`、Issue #405（段階Cの実装）・#525（段階Cの初回通電の前提）の題。
 
 TBD（資料に無いので推測せず、破線または注記にした）：
-- 基板の色、PTC 以外の部品の色（hardware-bom.md・experiment-log.md に現物の色の記録が無い）。
+- 基板の色、Q1 と C1・C2 の色（現物の記録も資料も無い）。PTC の黄は hardware-bom.md の Revision 89、端子台の緑は秋月 114217 の商品ページ、R20 の白は datasheet `CementResistor.pdf` p.3 の写真による。
 - ランドの外径（資料に無い。pad と同じ 1.8 で描く）。
 - 端子台のねじの位置・径、電線の口の幅（plan.md の M7。破線。真上からの図に口の高さ M4 は出ない）。
-- `R18` の本体の大きさは慣行の値（長さ約 6.5・径約 2.4）で暫定（plan.md の M3・A12）。図は基板ファイルの footprint の仮の 2.5 × 2.5 を破線で描き、慣行の値は図に使っていない。
+- `R18` の本体の大きさは慣行の値（長さ約 6.5・径約 2.4）で暫定（plan.md の M3・A12）。図は本体を寸法で描かず、足の2つの穴の間に置いた記号で描く（ブレッドボードの図の抵抗と同じ）。
 - `R20` の高さ H（plan.md の M8）。足の間隔 11 穴は設計の値で確定（A5）なので TBD ではない。
 - はんだの盛りの大きさ（見た目）。
 """
@@ -83,6 +83,8 @@ NET_COLOR = {
 }
 NET_SHORT = {"/5V-IN": "5V-IN", "/5V-PTC": "5V-PTC", "/5V-NODE": "5V-NODE", "/GND": "GND", "/Q1-GATE": "Q1-GATE", "/ADC-SHUNT": "ADC-SHUNT"}
 C_PTC = "#e6c53c"             # 黄色（現物の記録：hardware-bom.md の Revision 89）
+C_TB = "#3f9a52"              # 端子台の本体の緑（秋月 114217 の商品ページ「本体色：緑」）
+C_SHUNT = "#ffffff"           # セメント抵抗の白（datasheet CementResistor.pdf p.3 の写真）
 C_BEIGE = "#e9d3a5"           # 抵抗の色（generate.py の draw_parts と同じ）
 C_BEIGE_LINE = "#7a6a50"
 C_PIN = "#caa53d"             # 足の丸（generate.py の ESP32 のピンと同じ）
@@ -304,7 +306,7 @@ def net_labels(out, fr, board, offsets, skip=(), absolute=None):
 def draw_tb(out, fr, fp):
     x0, y0, x1, y1 = fab_rect(fp)
     (ux, uy), (vx, vy) = fr.p(x0, y0), fr.p(x1, y1)
-    out.append(f'<rect x="{ux:.1f}" y="{uy:.1f}" width="{vx - ux:.1f}" height="{vy - uy:.1f}" rx="3" fill="#dde6f5" stroke="#335" stroke-width="1.2"/>')
+    out.append(f'<rect x="{ux:.1f}" y="{uy:.1f}" width="{vx - ux:.1f}" height="{vy - uy:.1f}" rx="3" fill="{C_TB}" stroke="#1f4a28" stroke-width="1.2"/>')
     mx, my = tb_mouth(fp["lib"])
     pads = [p for p in fp["pads"] if p["name"] in ("+", "-")]
     cx = sum(p["x"] for p in pads) / len(pads)
@@ -338,14 +340,18 @@ def draw_mosfet(out, fr, fp):
 
 
 def draw_resistor(out, fr, fp):
-    """R18：立てて挿し、片方の足を本体の横に沿わせて下ろす（足の間隔 2 穴）。足は generate.py の抵抗と同じ茶の線、
-    本体は同じベージュ。本体の大きさは慣行の値（長さ約 6.5・径約 2.4）で暫定（M3・A12）。図は基板ファイルの footprint の仮の 2.5 × 2.5 を破線で描き、慣行の値は図に使っていない。"""
-    x0, y0, x1, y1 = fab_rect(fp)
+    """R18：足の2つの穴を茶の線で結び、その間に本体を置いて描く（breadboard-rebuild/generate.py の draw_parts の抵抗と同じ描き方・色）。
+    現物は立てて挿す（足の間隔 2 穴）。図の本体は、足が2本あり2つの穴に入ることを示す記号で、寸法どおりではない
+    （本体の大きさは慣行の値で暫定。plan.md の M3・A12）。"""
     p1, p2 = sorted(fp["pads"], key=lambda p: p["name"])
     (ax, ay), (bx, by) = fr.p(p1["x"], p1["y"]), fr.p(p2["x"], p2["y"])
-    out.append(f'<line x1="{ax:.1f}" y1="{ay:.1f}" x2="{bx:.1f}" y2="{by:.1f}" stroke="{C_BEIGE_LINE}" stroke-width="3"/>')   # 足 2 は本体の横を通って 2 つ目の穴へ
-    (ux, uy), (vx, vy) = fr.p(x0, y0), fr.p(x1, y1)
-    out.append(f'<rect x="{ux:.1f}" y="{uy:.1f}" width="{vx - ux:.1f}" height="{vy - uy:.1f}" rx="4" fill="{C_BEIGE}" stroke="{C_BEIGE_LINE}" stroke-dasharray="3 2"/>')
+    out.append(f'<line x1="{ax:.1f}" y1="{ay:.1f}" x2="{bx:.1f}" y2="{by:.1f}" stroke="{C_BEIGE_LINE}" stroke-width="2.5"/>')
+    mx, my = (ax + bx) / 2, (ay + by) / 2
+    if abs(ax - bx) >= abs(ay - by):
+        out.append(f'<rect x="{mx - 14:.1f}" y="{my - 5:.1f}" width="28" height="10" rx="4" fill="{C_BEIGE}" stroke="{C_BEIGE_LINE}"/>')
+    else:
+        out.append(f'<rect x="{mx - 5:.1f}" y="{my - 14:.1f}" width="10" height="28" rx="4" fill="{C_BEIGE}" stroke="{C_BEIGE_LINE}"/>')
+    out.append(f'<text x="{mx + 9:.1f}" y="{my + 3:.1f}" font-size="8.5" fill="#5a4a30" stroke="#fff" stroke-width="2.5" paint-order="stroke">{esc(fp["ref"])}</text>')
 
 
 def draw_shunt(out, fr, fp):
@@ -357,7 +363,7 @@ def draw_shunt(out, fr, fp):
         (ax, ay), (bx, by) = fr.p(p["x"], p["y"]), fr.p(min(max(p["x"], x0), x1), min(max(p["y"], y0), y1))
         out.append(f'<line x1="{ax:.1f}" y1="{ay:.1f}" x2="{bx:.1f}" y2="{by:.1f}" stroke="{C_BEIGE_LINE}" stroke-width="3"/>')
     (ux, uy), (vx, vy) = fr.p(x0, y0), fr.p(x1, y1)
-    out.append(f'<rect x="{ux:.1f}" y="{uy:.1f}" width="{vx - ux:.1f}" height="{vy - uy:.1f}" rx="4" fill="#f3efe6" stroke="{C_BEIGE_LINE}" stroke-width="1.2"/>')
+    out.append(f'<rect x="{ux:.1f}" y="{uy:.1f}" width="{vx - ux:.1f}" height="{vy - uy:.1f}" rx="4" fill="{C_SHUNT}" stroke="{C_BEIGE_LINE}" stroke-width="1.2"/>')
     cx, cy = (ux + vx) / 2, (uy + vy) / 2
     if (x1 - x0) >= (y1 - y0):
         out.append(f'<text x="{cx:.1f}" y="{cy + 4:.1f}" text-anchor="middle" font-size="11" fill="#5a4a30">0.1Ω 5W</text>')
@@ -414,6 +420,9 @@ def draw_pins(out, fr, fp):
         name = {"+": "＋", "-": "−"}.get(p["name"], p["name"])
         if fp["ref"] == "R20":
             name = {"1": "A", "2": "B"}[p["name"]]
+        if fp["ref"] == "R18":   # 足の上下に本体の記号があるので、足の名前は穴の左に出す
+            out.append(f'<text x="{x - 7:.1f}" y="{y + 3:.1f}" text-anchor="end" font-size="8.5" fill="#222" stroke="#fff" stroke-width="2.5" paint-order="stroke">{esc(name)}</text>')
+            continue
         out.append(f'<text x="{x:.1f}" y="{y - 9:.1f}" text-anchor="middle" font-size="8.5" fill="#222" stroke="#fff" stroke-width="0.4">{esc(name)}</text>')
 
 
@@ -443,10 +452,11 @@ FRONT_NOTES = [
     "C1・C2 の−は GND（黒）で、B の node へ、Pi・ESP32・R18 と共有しない別の導体でつく（servo の過渡電流は shunt を必ず通る）。",
     "GND：J7−（Pi）・J8−（ESP32）・R18 は、別々の導体で shunt の B の node（B と J5− を結ぶ短い導体）へ直接つく。",
     "servo の戻りは J6− → A → R20 → B と流れ、B で初めてほかの GND に合流する（check_star_point.py が確かめる）。",
-    "金の丸＝足の穴（＋・−・a・b・G・D・S・1・2・A・B は足の名前）。灰の四角＝穴。太い線＝はんだ面の芯線。R18 は縦の2つの穴を使い、茶の線が足。",
+    "金の丸＝足の穴（＋・−・a・b・G・D・S・1・2・A・B は足の名前）。灰の四角＝穴。太い線＝はんだ面の芯線。",
+    "R18 は足が2本で、縦の2つの穴（1・2）に入る。現物は立てて挿すが、図は2つの穴の間に本体を置いた記号で描く（ブレッドボードの図の抵抗と同じ）。",
     "F1（黄色い円盤）：真上からは幅 8.9 × 厚み 3.0。現物の外見は hardware-bom.md の Revision 89。Q1：太い白線は刻印面の側（後ろ向き）。R20 は横に寝かせた本体 22 × 10 mm。C1・C2 は径 8 mm。",
-    "破線＝資料に無い寸法（TBD）：端子台のねじの位置・径と電線の口の幅（plan.md の M7）。慣行の値で暫定：R18 の本体。R20 の足の間隔 11 穴は設計の値で確定（足を曲げる側が選ぶ）。R20 の高さ H は TBD。",
-    "色は PTC（黄）以外、見た目のための仮の色（資料で確認していない）。",
+    "破線＝資料に無い寸法（TBD）：端子台のねじの位置・径と電線の口の幅（plan.md の M7）。R20 の足の間隔 11 穴は設計の値で確定（足を曲げる側が選ぶ）。R20 の高さ H は TBD。",
+    "色：PTC の黄（現物の記録）、端子台の緑（商品ページ）、R20 の白（datasheet の写真）は資料による。基板・Q1・C1・C2 の色は仮。",
     "端子台の口の向きは、口の帯とそこから出る曲線で示す。曲線の行き先が板の外（M-12001・servo・Pi・B1）。ブレッドボードの図の「板の外へ出る線」と同じ描き方。W1 の破線は、床の側へ出る線。",
 ]
 
