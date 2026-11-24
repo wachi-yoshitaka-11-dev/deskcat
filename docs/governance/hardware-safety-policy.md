@@ -377,7 +377,7 @@ GPIO割り当ては`docs/hardware/gpio-assignment.md`を正本とする。
 **この行は2026-09-22に書き換えた。**旧文「電流制限を設定でき、十分な定格を持つ電源を使用する。」は
 commit `19853d0`（2026-07-28、リポジトリ最初のcommit「Establish DeskCat development foundation」）で
 定型文として入り、この行に対応するユーザーの判断・承認の記録は、この文書にも、
-`power-budget.md`・`hardware-bom.md`・`servo-safety-limits.md`のRevision履歴にも見つからなかった。
+`power-budget.md`・`hardware-bom.md`・`servo-safety-limits.md`のRevision履歴（現在は各文書の`*-history.md`）にも見つからなかった。
 ユーザーが2026-09-22に明示的に外した（判断はユーザーによる。理由は、ユーザーの発言を書かない規則（ai-agent-policy.md）により記録しない）（[#454](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/454)）。
 単に削除すると、この行が守ろうとしていた「故障電流を止める手段が要る」という問いそのものが
 記録から消えるため、上の形へ置き換えた。**この書き換えは、実行できない要求を、記録できる
@@ -515,7 +515,8 @@ Next safe step:
 
 ## Revision履歴
 
-**この文書には従来Revision履歴の節が無かった。**この変更を機に追加した。過去の変更は追跡していない。
+**この文書には従来Revision履歴の節が無かった。**#454の変更を機に追加した。過去の変更は追跡していない。
+手動連番はこの1行（Revision 1）で止め、以後は追加せず、GitのcommitとIssue／PRで版を識別する。
 
 | 日付 | Revision | 変更 | 根拠 |
 |---|---|---|---|
