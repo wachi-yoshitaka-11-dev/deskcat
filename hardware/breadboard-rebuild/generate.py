@@ -993,7 +993,7 @@ def build_table():
     L.append("## 載せないもの")
     L.append("")
     L.append("- `MEAS-02`（Arduino）の線（A0・GND）と、EXP-030 の Arduino 用の 10 kΩ 分圧（a10–a12、b12–b14）。測定器であり、必要なら実機側が試験のときに足す。")
-    L.append("- `MEAS-01` の shunt と GPIO32（`ADC-SHUNT`）の線。shunt はサーボの電流を通すのでブレッドボードに載せない。GPIO32 の線は今の配線に無い。最終の構成では `PROTO-02` の W1 から J2-7 へつなぐ（universal-board/plan.md の A6）。J2-7 の列 B1 K18・L18 を空けてある。")
+    L.append("- `MEAS-01` の shunt と GPIO32（`ADC-SHUNT`）の線。shunt はサーボの電流を通すのでブレッドボードに載せない。GPIO32 の線は今の配線に無い。最終の構成では `PROTO-02` の W1 から J2-7 へつなぐ（universal-board/plan.md の A6。R20 の開放のときの保護が決まるまでつながない。同じ plan.md の`未決の一覧`）。J2-7 の列 B1 K18・L18 を空けてある。")
     L.append("")
     return "\n".join(L) + "\n"
 
