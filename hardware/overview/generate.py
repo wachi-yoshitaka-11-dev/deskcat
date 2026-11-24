@@ -4,9 +4,11 @@
 つながりの正本は KiCad の回路図 `hardware/deskcat.kicad_sch` である。この図は、回路図から書き出した
 netlist（`deskcat-netlist.xml`）を入力にして生成し、手で直さない。図に描く線は次の2つから取る。
 
-- 板どうしの線（B1–B2、B1–B3）と首の14本（B2–LCD）、板の外へ出る線（X1〜X5）は、
-  `hardware/breadboard-rebuild/generate.py` のデータを読み込む（ここに写さない）。
-- PROTO-02 の端子台から出る線（M-12001、サーボの赤・茶、Pi の PWR IN）は、下の `POWER_WIRES` に書く。
+- 板どうしの線（B1–B2、B1–B3）と首の14本（B2–LCD）、板の外へ出る線（X1〜X4）は、
+  `hardware/breadboard-rebuild/generate.py` のデータを読み込む（ここに写さない）。同じデータの X5 は使わない
+  （案Bの構成の X5 は B1 のレールを通らないため、下の `POWER_WIRES` に置く）。
+- PROTO-02 から出る線（M-12001、サーボの赤・茶、Pi の PWR IN、J8 から ESP32 の 5V pin と GND pin〔P7・X5〕、
+  W1 から ESP32 の GPIO32〔P8〕）は、下の `POWER_WIRES` に書く。
   netlist はどの端子台へ挿すかを持たない（同じ節点の端子が複数ある）ためである。
 
 生成の前に、次を機械で確かめる（崩れると生成せずに止まる）。
