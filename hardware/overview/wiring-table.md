@@ -58,7 +58,7 @@
 | X4 | `SERVO-SIG` | B1 | SERVO（M1 pin yellow） | X4（B1:D7 → サーボの plug の黄の穴） |
 | P1 | `5V-IN` | M-12001（PS1 pin +） | PROTO-02（J5 pin +） | M-12001 の線（Micro-B の手前で切った導体） |
 | P2 | `GND` | M-12001（PS1 pin -） | PROTO-02（J5 pin -） | M-12001 の線（同上） |
-| P3 | `5V-NODE` | PROTO-02（J6 pin +） | SERVO（M1 pin red） | サーボの赤（`111641` で延ばす。plug とのつなぎ方は #405） |
+| P3 | `5V-NODE` | PROTO-02（J6 pin +） | SERVO（M1 pin red） | サーボの赤（`111641` で延ばす。plug とのつなぎ方は #405）。R20 の開放のときの扱いが決まるまで（TBD、#405。universal-board/plan.md の`未決の一覧`）、J6 から給電しない |
 | P4 | `ADC-SHUNT` | PROTO-02（J6 pin -） | SERVO（M1 pin brown） | サーボの茶（同上）。節点は shunt のサーボ側（`/ADC-SHUNT`） |
 | P5 | `5V-NODE` | PROTO-02（J7 pin +） | Pi（J9 pin VBUS） | `CABLE-PI-PWR-01`（`109314` を切った導体）→ Pi の `PWR IN` |
 | P6 | `GND` | PROTO-02（J7 pin -） | Pi（J9 pin GND） | `CABLE-PI-PWR-01`（同上） |
