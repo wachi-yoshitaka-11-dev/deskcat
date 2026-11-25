@@ -9,11 +9,11 @@
   Markdownは**失敗にして知らせる**（`UNCLASSIFIED`）。文書を足すときは、種類を先に決める。
   記録（追記だけ）と#806で消す文書は`exempt`に置き、消えるまで対象外にする。
 - 測り方は種類で決まる。`lines`（行数）、`chars`（Unicodeの文字数）、`pages`（A4のページ数）。
-  ページは、Pagesのbuildが出したHTMLをrunnerのGoogle Chrome（headless）でA4のPDFに印刷して
-  数える（`--site-root`を渡したときだけ。Chromeの無い端末では測らない）。A4は、HTMLの写しへ
-  `@page { size: A4 }`を足して指定する。余白はChromeの既定のままにする。
+  ページは、Pagesのbuildが出したHTMLからサイトの装飾（stylesheet・font・bar・footer）を外した
+  本文を、runnerのGoogle Chrome（headless）の既定の組みでA4に印刷して数える（`--site-root`を
+  渡したときだけ。Chromeの無い端末では測らない）。余白・文字の大きさ・行間の数値を足さない。
 - 今上限を超えている文書は`doc_size_baseline.json`に現在値を記録する（棚卸し）。**下げる方向にしか
-  動かさない。**縮約のPRが小さくしたら、同じPRで下げる（下げられる場合は通知する）。baselineが
+  動かさない。**縮約のPRが小さくしたら、同じPRで下げる（下げ忘れは失敗にする）。baselineが
   空になることが#806の完了条件である。
 """
 
@@ -116,24 +116,34 @@ def count_pdf_pages(data):
     return pages
 
 
-BASEURL = "/deskcat/"
+_MAIN = re.compile(r'<main\b[^>]*\bid="content"[^>]*>(.*)</main>', re.S)
+_ARTICLE = re.compile(r'<article\b[^>]*\bclass="dc-doc"[^>]*>(.*)</article>', re.S)
 
 
-def printable_html(text, site_root):
-    """印刷用のHTML。site内の絶対path（`/deskcat/...`）をfile URLへ直し（CSSを読ませる）、
-    `@page { size: A4 }`を足す。余白はChromeの既定のままにする。"""
-    text = text.replace(f'"{BASEURL}', f'"{Path(site_root).resolve().as_uri()}/')
-    style = "<style>@page { size: A4 }</style>"
-    return text.replace("</head>", style + "</head>", 1) if "</head>" in text else style + text
+def printable_html(text):
+    """印刷用のHTML。サイトのlayoutの本文（`<main id="content">`の中身。pageの
+    layoutなら`<article class="dc-doc">`の中身）だけを取り出し、stylesheet・font・bar・footerを
+    外した最小のHTMLで包む。余白・文字の大きさ・行間はChromeの既定のままにする（数値を足さない）。
+    本文が見つからなければ例外（測れないものを黙って通さない）。"""
+    main = _MAIN.search(text)
+    if main is None:
+        raise ValueError('<main id="content"> not found in the built HTML.')
+    body = main.group(1)
+    article = _ARTICLE.search(body)
+    if article is not None:
+        body = article.group(1)
+    return (
+        '<!doctype html><html lang="ja"><head><meta charset="utf-8">'
+        "<style>@page { size: A4 }</style></head><body>" + body + "</body></html>"
+    )
 
 
-def render_pages(chrome, html_path, site_root):
-    """HTML fileをChrome headlessでA4のPDFに印刷し、ページ数を返す。"""
+def render_pages(chrome, html_path):
+    """HTML fileの本文をChrome headlessでA4のPDFに印刷し、ページ数を返す。"""
     html_path = Path(html_path)
-    printable = printable_html(html_path.read_text(encoding="utf-8"), site_root)
+    printable = printable_html(html_path.read_text(encoding="utf-8"))
     with tempfile.TemporaryDirectory() as temporary:
-        # 出力directory（Docker actionが作り、書けるとは限らない）へは書かない。site内の参照は
-        # `printable_html`が絶対のfile URLへ直してあるので、写しはどこに置いても同じに読める。
+        # 一時directoryへ置く（出力directoryはDocker actionが作り、書けるとは限らない）。
         copy = Path(temporary) / "print.html"
         pdf = Path(temporary) / "out.pdf"
         copy.write_text(printable, encoding="utf-8")
@@ -359,7 +369,7 @@ def main(argv=None):
             if base is None:
                 raise RuntimeError(f"{relative} needs --measure-root.")
             # 出力が無いのは失敗（測れないものを黙って通さない）。
-            return render_pages(arguments.chrome, base / site_path(relative), base)
+            return render_pages(arguments.chrome, base / site_path(relative))
 
     try:
         values, unclassified = measure(files, counter)

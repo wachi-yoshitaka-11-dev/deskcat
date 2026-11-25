@@ -96,16 +96,36 @@ class PdfPageTests(unittest.TestCase):
 
 
 class PrintableHtmlTests(unittest.TestCase):
-    def test_site_absolute_paths_become_file_urls_and_a4_is_set(self):
-        out = size.printable_html(
-            '<html><head><link href="/deskcat/assets/a.css"></head><body></body></html>',
-            "/tmp/site")
-        self.assertIn('href="file:///tmp/site/assets/a.css"', out)
-        self.assertIn("@page { size: A4 }", out)
-        self.assertLess(out.index("@page"), out.index("</head>"))
+    PAGE = (
+        '<html><head><link href="/deskcat/assets/a.css"><style>p{font-size:17px}</style></head>'
+        '<body><header>BAR</header><main id="content" class="dc-main" tabindex="-1">'
+        '<article class="dc-doc"><h1>題</h1><p>本文</p></article></main>'
+        "<footer>FOOT</footer></body></html>"
+    )
 
-    def test_html_without_head_still_gets_the_page_rule(self):
-        self.assertIn("@page { size: A4 }", size.printable_html("<p>x</p>", "/tmp/site"))
+    def test_only_the_article_body_is_kept_in_a_minimal_document(self):
+        out = size.printable_html(self.PAGE)
+        self.assertIn("<h1>題</h1><p>本文</p>", out)
+        for decoration in ("BAR", "FOOT", "a.css", "17px", "<article", "<main"):
+            self.assertNotIn(decoration, out)
+        self.assertTrue(out.startswith('<!doctype html><html lang="ja"><head><meta charset="utf-8">'))
+        self.assertIn("<style>@page { size: A4 }</style>", out)
+
+    def test_a_layout_without_an_article_uses_the_main_content(self):
+        out = size.printable_html(
+            '<body><header>BAR</header><main id="content"><h2>題</h2></main><footer>F</footer></body>')
+        self.assertIn("<h2>題</h2>", out)
+        self.assertNotIn("BAR", out)
+
+    def test_no_main_is_an_error_not_a_pass(self):
+        with self.assertRaises(ValueError):
+            size.printable_html("<html><body><p>x</p></body></html>")
+
+    def test_only_the_page_rule_is_added_no_other_numbers(self):
+        out = size.printable_html(self.PAGE)
+        self.assertEqual(out.count("<style>"), 1)
+        self.assertNotIn("margin", out)
+        self.assertNotIn("font", out)
 
 
 class StageMeasureSourceTests(unittest.TestCase):
