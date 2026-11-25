@@ -21,7 +21,7 @@ buildを実行するworkflowは、そのbuild commandが確定してから追加
 ### `pages.yml` — 公開文書
 
 - Rust、ESP-IDF、firmware、実機をbuildしない。
-- Pull Requestでは、指示entrypointの検査（`validate_instruction_entrypoint.py`）とそのtest（`test_instruction_entrypoint.py`）、link検査（`validate_doc_links.py`）、validator自身のtest（`test_link_validators.py`）、Pages sourceの生成、Jekyll build、生成物の検査（`validate_pages_output.py`）、公開境界の回帰test（`test_pages_guards.py`）を行う。**deployはしない。**
+- Pull Requestでは、指示entrypoint・linkの検査、Pages sourceの生成、Jekyll build、生成物の検査、公開境界の回帰test、文書の量の検査（`check_doc_size.py`）、消えた値の一覧（`check_condense_loss.py`。失敗にしない）と各testを行う（[script一覧](../../scripts/README.md)）。**deployはしない。**
 - `main`で同じcheckに成功した場合だけPages artifactをdeployする。
 - 通常権限はread-onlyとし、deploy jobだけに`pages: write`と`id-token: write`を付与する。
 - Actionはreview済みのcommit SHAへ固定する。
