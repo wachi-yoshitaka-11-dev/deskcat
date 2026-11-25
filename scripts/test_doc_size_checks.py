@@ -205,7 +205,7 @@ class PrintSessionTests(unittest.TestCase):
         url = dict(FakeDriver.log)["/session/s1/url"]["url"]
         self.assertTrue(url.startswith("data:text/html;charset=utf-8;base64,"))
         self.assertEqual(dict(FakeDriver.log)["/session/s1/print"],
-                         {"page": {"width": 21.0, "height": 29.7}})
+                         {"page": {"width": 21.0, "height": 29.7}, "shrinkToFit": False})
         self.assertEqual(dict(FakeDriver.log)["/session"]["capabilities"]["alwaysMatch"]
                          ["moz:firefoxOptions"]["args"], ["-headless"])
 

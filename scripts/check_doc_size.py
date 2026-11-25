@@ -10,7 +10,8 @@
   記録（追記だけ）と#806で消す文書は`exempt`に置き、消えるまで対象外にする。
 - 測り方は種類で決まる。`lines`（行数）、`chars`（Unicodeの文字数）、`pages`（A4のページ数）。
   ページは、GitHubのMarkdown API（GFM）が作ったHTMLを、stylesheetを付けない最小のHTMLで包み、
-  Firefox（headless）をgeckodriverのW3C WebDriverの`print`（A4。ほかは既定）で印刷して数える。
+  Firefox（headless）をgeckodriverのW3C WebDriverの`print`（A4。縮小は切る。ほかは既定）で印刷して数える。
+  縮小は幅の広い要素の有無で倍率が変わり、ページ数が文書の量を表さなくなるため切る。
   文書のページを測るためサイトの装飾は付けず、余白・文字の大きさ・行間の数値を足さない。
   CIはrunnerのFirefox・geckodriver（Ubuntu 24.04のimage:
   https://github.com/actions/runner-images/blob/main/images/ubuntu/Ubuntu2404-Readme.md）と、
@@ -113,6 +114,8 @@ def count_pdf_pages(data):
 
 REPOSITORY = "wachi-yoshitaka-11-dev/deskcat"
 A4_CM = {"width": 21.0, "height": 29.7}
+# 縮小（shrinkToFit。既定はtrue）は、幅の広い表やcodeの有無で倍率が変わり、ページ数が文書の量を表さなくなるため切る。
+PRINT_OPTIONS = {"page": A4_CM, "shrinkToFit": False}
 
 
 API_LIMIT_BYTES = 300_000  # Markdown APIは400 KBまで。余裕を持たせる。
@@ -217,7 +220,7 @@ class PrintSession:
         url = "data:text/html;charset=utf-8;base64," + base64.b64encode(
             html.encode("utf-8")).decode("ascii")
         self._request("POST", f"/session/{self.session}/url", {"url": url})
-        printed = self._request("POST", f"/session/{self.session}/print", {"page": A4_CM})
+        printed = self._request("POST", f"/session/{self.session}/print", PRINT_OPTIONS)
         return count_pdf_pages(base64.b64decode(printed["value"]))
 
     def close(self):
