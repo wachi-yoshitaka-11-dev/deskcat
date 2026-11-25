@@ -102,12 +102,18 @@ def classify(relative):
 
 
 def count_pdf_pages(data):
-    """PDF（bytes）のページ数。`/Type /Page`の数を数え、根の`/Count`と食い違えば例外。"""
-    pages = len(re.findall(rb"/Type\s*/Page(?![A-Za-z])", data))
-    counts = [int(n) for n in re.findall(rb"/Count\s+(\d+)", data)]
-    if pages == 0 or (counts and max(counts) != pages):
+    """PDF（bytes）のページ数。`/Type /Page`のobjectの数を数え、頁の木（`/Type /Pages`）の
+    `/Count`の最大（根）と食い違えば例外。outlineなど他のobjectの`/Count`は読まない。"""
+    pages = 0
+    roots = []
+    for chunk in data.split(b"endobj"):
+        if re.search(rb"/Type\s*/Pages(?![A-Za-z])", chunk):
+            roots += [int(n) for n in re.findall(rb"/Count\s+(\d+)", chunk)]
+        elif re.search(rb"/Type\s*/Page(?![A-Za-z])", chunk):
+            pages += 1
+    if pages == 0 or not roots or max(roots) != pages:
         raise ValueError(
-            f"Cannot count PDF pages reliably (page objects={pages}, /Count={counts})."
+            f"Cannot count PDF pages reliably (page objects={pages}, page tree /Count={roots})."
         )
     return pages
 
@@ -420,7 +426,10 @@ def main(argv=None):
             session = PrintSession(arguments.geckodriver)
 
             def counter(relative):
-                return session.pages(wrap_html(markdown_to_html(files[relative], arguments.gh)))
+                try:
+                    return session.pages(wrap_html(markdown_to_html(files[relative], arguments.gh)))
+                except (RuntimeError, ValueError) as error:
+                    raise RuntimeError(f"{relative}: {error}") from error
 
         values, unclassified = measure(files, counter)
     except (RuntimeError, ValueError, OSError, KeyError, subprocess.SubprocessError) as error:

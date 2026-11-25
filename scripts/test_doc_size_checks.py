@@ -93,6 +93,21 @@ class PdfPageTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             size.count_pdf_pages(_pdf(3, count=4))
 
+    def test_outline_counts_are_not_read_as_the_page_tree(self):
+        pdf = _pdf(3) + (b"9 0 obj\n<</Type /Outlines /Count 184>>\nendobj\n"
+                         b"10 0 obj\n<</Title (h) /Count 183 /Parent 9 0 R>>\nendobj\n")
+        self.assertEqual(size.count_pdf_pages(pdf), 3)
+
+    def test_count_before_type_in_the_pages_object_is_read(self):
+        pdf = (b"%PDF-1.4\n1 0 obj\n<</Count 2 /Type /Pages>>\nendobj\n"
+               b"2 0 obj\n<</Type /Page>>\nendobj\n3 0 obj\n<</Type /Page>>\nendobj\n")
+        self.assertEqual(size.count_pdf_pages(pdf), 2)
+
+    def test_a_disagreeing_page_tree_fails_even_with_an_outline(self):
+        pdf = _pdf(3, count=4) + b"9 0 obj\n<</Type /Outlines /Count 3>>\nendobj\n"
+        with self.assertRaises(ValueError):
+            size.count_pdf_pages(pdf)
+
     def test_no_page_is_an_error(self):
         with self.assertRaises(ValueError):
             size.count_pdf_pages(b"%PDF-1.4\n")
@@ -418,6 +433,29 @@ class SizeCommandTests(unittest.TestCase):
     def test_no_markdown_is_an_error(self):
         self.assertEqual(_run(SIZE, self._repo()).returncode, 2)
 
+    def test_a_failure_names_the_document(self):
+        root = self._repo()
+        _write(root, "docs/hardware/a.md", "x\n")
+        _git(root, "add", "-A")
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        stub = Path(temporary.name) / "gh"
+        stub.write_text("#!/bin/sh\necho boom >&2\nexit 1\n", encoding="utf-8")
+        stub.chmod(0o755)
+        driver = Path(temporary.name) / "driver.py"
+        server = SCRIPTS_ROOT / "test_doc_size_checks.py"
+        # 偽のWebDriverを`python3 driver --port N`で起動する。
+        driver.write_text(
+            "import sys, runpy\nsys.argv = ['x', '--fake-driver'] + sys.argv[1:]\n"
+            f"runpy.run_path({str(server)!r}, run_name='__main__')\n", encoding="utf-8")
+        launcher = Path(temporary.name) / "geckodriver"
+        launcher.write_text(f"#!/bin/sh\nexec {sys.executable} {driver} \"$@\"\n", encoding="utf-8")
+        launcher.chmod(0o755)
+        result = _run(SIZE, root, "--measure-pages", "--geckodriver", str(launcher),
+                      "--gh", str(stub))
+        self.assertEqual(result.returncode, 2, result.stdout)
+        self.assertIn("docs/hardware/a.md", result.stdout)
+
     def test_missing_geckodriver_is_an_error_not_a_pass(self):
         root = self._repo()
         _write(root, "docs/hardware/a.md", "x\n")
@@ -673,4 +711,9 @@ class CommandTests(unittest.TestCase):
 
 
 if __name__ == "__main__":
+    if len(sys.argv) > 1 and sys.argv[1] == "--fake-driver":
+        # `geckodriver --port N`の代わり（FakeDriverをそのportで動かす）。
+        FakeDriver.pdf = _pdf(1)
+        port = int(sys.argv[sys.argv.index("--port") + 1])
+        http.server.HTTPServer(("127.0.0.1", port), FakeDriver).serve_forever()
     unittest.main()
