@@ -16,7 +16,8 @@
   CIはrunnerのFirefox・geckodriver（Ubuntu 24.04のimage:
   https://github.com/actions/runner-images/blob/main/images/ubuntu/Ubuntu2404-Readme.md）と、
   日本語fontの`fonts-noto-cjk`を使う。手元でも同じcommandで測れる（`--measure-pages`）。
-  描画の部品（font・Firefoxの版）が違えばページ数がずれるため、CIと手元で同じ部品に揃える。
+  描画の部品（font・Firefoxの版）が違えばページ数が1ページずれることがある。合否はCIで決め、
+  手元はpush前の確認用である（baselineにはCIの値を入れる）。
 - 今上限を超えている文書は`doc_size_baseline.json`に現在値を記録する（棚卸し）。**下げる方向にしか
   動かさない。**縮約のPRが小さくしたら、同じPRで下げる（下げ忘れは失敗にする）。baselineが
   空になることが#806の完了条件である。
