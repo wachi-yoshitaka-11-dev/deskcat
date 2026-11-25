@@ -42,7 +42,7 @@ commit前の検査は`.githooks/pre-commit`と`.githooks/commit-msg`が呼ぶ。
 | `test_instruction_entrypoint.py` | 上のtest | Pages workflowとlocal |
 | `validate_table_columns.py` | Markdownの表で、header行とセル数が食い違う行を検出して止める | Pages workflowとlocal |
 | `test_table_columns.py` | 上のtest | Pages workflowとlocal |
-| `check_doc_size.py` | 文書の目標の量（行数・文字数・A4のページ数）の検査。仕様は先頭のdocstring | Pages workflow（ページ数はCIのみ）とlocal |
+| `check_doc_size.py` | 文書の目標の量（行数・文字数・A4のページ数）の検査。仕様は先頭のdocstring | Pages workflowとlocal（ページ数は`--measure-pages`でFirefoxが要る） |
 | `check_condense_loss.py` | 書き直しで文書から消えた値・ID・URL・codeの一覧（失敗にしない）。仕様は先頭のdocstring | Pages workflow（Pull Requestのみ）とlocal |
 | `test_doc_size_checks.py` | 上記2つのtest | Pages workflowとlocal |
 | `report_promotion_closing_keywords.py` | 昇格Pull Requestの範囲内commitにあるclosing keywordの報告（止めない） | Review gate workflowとlocal |

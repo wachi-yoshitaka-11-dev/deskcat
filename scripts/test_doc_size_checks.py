@@ -3,13 +3,16 @@
 
 単体testは関数を直接呼ぶ。子processのtestはCLIを起動し、exit codeと診断まで検査する。
 サイズの検査は一時directoryへ書いたfileを、消えた値の一覧はfixture repositoryへ実際にcommitして
-起動する。ページ数はChromeが無い端末でも検査できるよう、小さなPDFのfixtureで数える関数を試す。
+起動する。ページ数を数える部分は、小さなPDFと偽のWebDriver・`gh`で試す（Firefoxが無い端末でも検査できる）。
 """
 
+import base64
+import http.server
 import json
 import subprocess
 import sys
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 
@@ -53,7 +56,7 @@ def _run(script, root, *arguments):
 
 
 def _pdf(pages, count=None):
-    """ページ数だけが意味を持つ最小のPDF風のbytes（Chromeの出力と同じ`/Type /Page`の形）。"""
+    """ページ数だけが意味を持つ最小のPDF風のbytes（PDFの`/Type /Page`の形）。"""
     body = b"".join(b"%d 0 obj\n<</Type /Page /Parent 1 0 R>>\nendobj\n" % (i + 2)
                     for i in range(pages))
     root = b"1 0 obj\n<</Type /Pages /Count %d>>\nendobj\n" % (pages if count is None else count)
@@ -95,70 +98,122 @@ class PdfPageTests(unittest.TestCase):
             size.count_pdf_pages(b"%PDF-1.4\n")
 
 
-class PrintableHtmlTests(unittest.TestCase):
-    PAGE = (
-        '<html><head><link href="/deskcat/assets/a.css"><style>p{font-size:17px}</style></head>'
-        '<body><header>BAR</header><main id="content" class="dc-main" tabindex="-1">'
-        '<article class="dc-doc"><h1>題</h1><p>本文</p></article></main>'
-        "<footer>FOOT</footer></body></html>"
-    )
-
-    def test_only_the_article_body_is_kept_in_a_minimal_document(self):
-        out = size.printable_html(self.PAGE)
-        self.assertIn("<h1>題</h1><p>本文</p>", out)
-        for decoration in ("BAR", "FOOT", "a.css", "17px", "<article", "<main"):
-            self.assertNotIn(decoration, out)
-        self.assertTrue(out.startswith('<!doctype html><html lang="ja"><head><meta charset="utf-8">'))
-        self.assertIn("<style>@page { size: A4 }</style>", out)
-
-    def test_a_layout_without_an_article_uses_the_main_content(self):
-        out = size.printable_html(
-            '<body><header>BAR</header><main id="content"><h2>題</h2></main><footer>F</footer></body>')
-        self.assertIn("<h2>題</h2>", out)
-        self.assertNotIn("BAR", out)
-
-    def test_no_main_is_an_error_not_a_pass(self):
-        with self.assertRaises(ValueError):
-            size.printable_html("<html><body><p>x</p></body></html>")
-
-    def test_only_the_page_rule_is_added_no_other_numbers(self):
-        out = size.printable_html(self.PAGE)
-        self.assertEqual(out.count("<style>"), 1)
-        self.assertNotIn("margin", out)
-        self.assertNotIn("font", out)
+class WrapHtmlTests(unittest.TestCase):
+    def test_minimal_document_without_stylesheet_or_numbers(self):
+        out = size.wrap_html("<h1>題</h1>")
+        self.assertEqual(
+            out,
+            '<!doctype html><html lang="ja"><head><meta charset="utf-8"></head>'
+            "<body><h1>題</h1></body></html>",
+        )
+        for word in ("style", "margin", "font", "link"):
+            self.assertNotIn(word, out)
 
 
-class StageMeasureSourceTests(unittest.TestCase):
-    def test_only_design_documents_under_hardware_are_staged_with_the_portal(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary) / "repo"
-            pages = Path(temporary) / "pages"
-            _write(root, "hardware/a/plan.md", "x")
-            _write(root, "hardware/a/README.md", "readme")
-            _write(root, "docs/hardware/b.md", "y")
-            _write(pages, "_config.yml", "title: t\n")
-            _write(pages, "_layouts/default.html", "{{ content }}")
-            _write(pages, "docs/other.md", "z")
-            staged = size.stage_measure_source(
-                root, pages, Path(temporary) / "out",
-                ["hardware/a/plan.md", "hardware/a/README.md", "docs/hardware/b.md"])
-            self.assertEqual(staged, ["hardware/a/plan.md"])
-            out = Path(temporary) / "out"
-            self.assertTrue((out / "hardware/a/plan.md").is_file())
-            self.assertTrue((out / "_config.yml").is_file())
-            self.assertTrue((out / "_layouts/default.html").is_file())
-            self.assertFalse((out / "docs").exists())
+class SplitMarkdownTests(unittest.TestCase):
+    def test_small_text_is_one_chunk(self):
+        self.assertEqual(size.split_markdown("a\n\nb\n"), ["a\n\nb\n"])
+
+    def test_large_text_is_split_at_blank_lines_outside_fences_and_loses_nothing(self):
+        block = "段落" * 20 + "\n\n"
+        fence = "```\n" + ("x\n\n" * 30) + "```\n\n"
+        text = (block * 40 + fence + block * 40)
+        chunks = size.split_markdown(text, limit=1000)
+        self.assertGreater(len(chunks), 2)
+        self.assertEqual("\n".join(chunks), text)
+        for chunk in chunks:
+            self.assertEqual(chunk.count("```") % 2, 0, "a fence was cut")
 
 
-class SitePathTests(unittest.TestCase):
-    def test_published_paths(self):
-        self.assertEqual(size.site_path("docs/hardware/a.md"), "docs/hardware/a.html")
-        self.assertEqual(size.site_path("docs/hardware/README.md"), "docs/hardware/index.html")
-        self.assertEqual(size.site_path("CONTRIBUTING.md"), "CONTRIBUTING.html")
+class MarkdownToHtmlTests(unittest.TestCase):
+    def _stub(self, body):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        stub = Path(temporary.name) / "gh"
+        stub.write_text("#!/bin/sh\n" + body, encoding="utf-8")
+        stub.chmod(0o755)
+        return str(stub)
 
-    def test_hardware_plans_have_a_path_in_the_measure_build(self):
-        self.assertEqual(size.site_path("hardware/universal-board/plan.md"),
-                         "hardware/universal-board/plan.html")
+    def test_returns_the_api_output_and_sends_the_text_and_mode(self):
+        stub = self._stub('echo "$@" > "$0.args"; cat "${@: -1}" | sed "s/^text=@//" > /dev/null; echo "<p>ok</p>"\n')
+        self.assertEqual(size.markdown_to_html("# a", gh=stub).strip(), "<p>ok</p>")
+        args = Path(stub + ".args").read_text()
+        self.assertIn("api markdown", args)
+        self.assertIn("mode=gfm", args)
+
+    def test_failure_is_an_error(self):
+        with self.assertRaises(RuntimeError):
+            size.markdown_to_html("# a", gh=self._stub("echo boom >&2; exit 1\n"))
+
+    def test_empty_output_is_an_error(self):
+        with self.assertRaises(RuntimeError):
+            size.markdown_to_html("# a", gh=self._stub("exit 0\n"))
+
+
+class FakeDriver(http.server.BaseHTTPRequestHandler):
+    log = []
+    pdf = b""
+
+    def _reply(self, value):
+        data = json.dumps({"value": value}).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+    def _body(self):
+        length = int(self.headers.get("Content-Length") or 0)
+        return json.loads(self.rfile.read(length) or b"null")
+
+    def do_GET(self):
+        self._reply({"ready": True})
+
+    def do_POST(self):
+        body = self._body()
+        FakeDriver.log.append((self.path, body))
+        if self.path == "/session":
+            self._reply({"sessionId": "s1"})
+        elif self.path.endswith("/print"):
+            self._reply(base64.b64encode(FakeDriver.pdf).decode("ascii"))
+        else:
+            self._reply(None)
+
+    def do_DELETE(self):
+        FakeDriver.log.append((self.path, None))
+        self._reply(None)
+
+    def log_message(self, *args):
+        pass
+
+
+class PrintSessionTests(unittest.TestCase):
+    def setUp(self):
+        FakeDriver.log = []
+        FakeDriver.pdf = _pdf(3)
+        self.server = http.server.HTTPServer(("127.0.0.1", 0), FakeDriver)
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+        self.addCleanup(self.server.server_close)
+        self.addCleanup(self.server.shutdown)
+        self.url = f"http://127.0.0.1:{self.server.server_address[1]}"
+
+    def test_prints_a_data_url_on_a4_and_counts_the_pdf_pages(self):
+        with size.PrintSession(base_url=self.url) as session:
+            self.assertEqual(session.pages("<p>日本語</p>"), 3)
+        paths = [path for path, _ in FakeDriver.log]
+        self.assertEqual(paths, ["/session", "/session/s1/url", "/session/s1/print",
+                                 "/session/s1"])
+        url = dict(FakeDriver.log)["/session/s1/url"]["url"]
+        self.assertTrue(url.startswith("data:text/html;charset=utf-8;base64,"))
+        self.assertEqual(dict(FakeDriver.log)["/session/s1/print"],
+                         {"page": {"width": 21.0, "height": 29.7}})
+        self.assertEqual(dict(FakeDriver.log)["/session"]["capabilities"]["alwaysMatch"]
+                         ["moz:firefoxOptions"]["args"], ["-headless"])
+
+    def test_an_unreadable_pdf_is_an_error(self):
+        FakeDriver.pdf = b"%PDF-1.4\n"
+        with size.PrintSession(base_url=self.url) as session:
+            with self.assertRaises(ValueError):
+                session.pages("<p>x</p>")
 
 
 class MeasureTests(unittest.TestCase):
@@ -179,14 +234,6 @@ class MeasureTests(unittest.TestCase):
         values, _ = size.measure(files, lambda r: 2)
         self.assertEqual(values[size.DESIGN_TOTAL_KEY], 4)
         self.assertEqual(values["docs/decisions/c.md"], 2)
-
-    def test_hardware_design_docs_are_paged_through_the_measure_build(self):
-        seen = []
-        values, _ = size.measure({"hardware/x/plan.md": ""}, lambda r: seen.append(r) or 2)
-        self.assertEqual(seen, ["hardware/x/plan.md"])
-        self.assertEqual(values["hardware/x/plan.md"], 2)
-        self.assertTrue(size.uses_measure_build("hardware/x/plan.md"))
-        self.assertFalse(size.uses_measure_build("docs/hardware/a.md"))
 
     def test_pages_are_skipped_without_a_counter(self):
         values, _ = size.measure({"docs/hardware/a.md": ""})
@@ -330,30 +377,52 @@ class SizeCommandTests(unittest.TestCase):
     def test_no_markdown_is_an_error(self):
         self.assertEqual(_run(SIZE, self._repo()).returncode, 2)
 
-    def test_a_design_doc_without_html_is_an_error_not_a_pass(self):
-        root = self._repo()
-        _write(root, "docs/hardware/a.md", "x\n")
-        _git(root, "add", "-A")
-        (root / "_site").mkdir()
-        result = _run(SIZE, root, "--site-root", str(root / "_site"), "--chrome", "true")
-        self.assertEqual(result.returncode, 2, result.stdout)
+    def test_this_repositorys_baseline_matches_the_documents(self):
+        """baselineが実測とずれると、CIが落ちる。文書を直したあとに作り直し忘れるのを止める。"""
+        result = subprocess.run(
+            [sys.executable, SIZE], capture_output=True, text=True, encoding="utf-8")
+        self.assertEqual(result.returncode, 0, result.stdout)
 
-    def test_stage_mode_fails_when_nothing_is_staged(self):
+    def _base_repo(self, base_baseline, current_baseline):
         root = self._repo()
-        _write(root, "docs/hardware/a.md", "x\n")
+        _write(root, "docs/governance/a.md", "x" * 9000)
+        _write(root, "scripts/doc_size_baseline.json", json.dumps(base_baseline))
         _git(root, "add", "-A")
-        result = _run(SIZE, root, "--stage-measure-source", str(root / "out"),
-                      "--pages-source", str(root / "none"))
-        self.assertEqual(result.returncode, 2)
+        _git(root, "commit", "-q", "-m", "base")
+        _git(root, "branch", "base")
+        _write(root, "scripts/doc_size_baseline.json", json.dumps(current_baseline))
+        _git(root, "add", "-A")
+        _git(root, "commit", "-q", "--allow-empty", "-m", "change")
+        return root
 
-    def test_missing_chrome_is_an_error_not_a_pass(self):
+    def test_base_flag_rejects_a_raised_baseline(self):
+        root = self._base_repo({"docs/governance/a.md": 9000}, {"docs/governance/a.md": 9500})
+        result = _run(SIZE, root, "--base", "base")
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("baseline rose", result.stdout)
+
+    def test_base_flag_accepts_an_unchanged_baseline(self):
+        root = self._base_repo({"docs/governance/a.md": 9000}, {"docs/governance/a.md": 9000})
+        self.assertEqual(_run(SIZE, root, "--base", "base").returncode, 0)
+
+    def test_unknown_base_is_an_error(self):
+        root = self._base_repo({"docs/governance/a.md": 9000}, {"docs/governance/a.md": 9000})
+        self.assertEqual(_run(SIZE, root, "--base", "no-such-ref").returncode, 2)
+
+    def test_markdown_extension_files_are_classified_too(self):
+        root = self._repo()
+        _write(root, "notes/new.markdown", "x\n")
+        _git(root, "add", "-A")
+        self.assertIn("UNCLASSIFIED", _run(SIZE, root).stdout)
+
+    def test_no_markdown_is_an_error(self):
+        self.assertEqual(_run(SIZE, self._repo()).returncode, 2)
+
+    def test_missing_geckodriver_is_an_error_not_a_pass(self):
         root = self._repo()
         _write(root, "docs/hardware/a.md", "x\n")
         _git(root, "add", "-A")
-        site = root / "_site" / "docs" / "hardware"
-        site.mkdir(parents=True)
-        (site / "a.html").write_text("<html><head></head><body>x</body></html>")
-        result = _run(SIZE, root, "--site-root", str(root / "_site"), "--chrome", "no-such-chrome")
+        result = _run(SIZE, root, "--measure-pages", "--geckodriver", "no-such-geckodriver")
         self.assertEqual(result.returncode, 2, result.stdout)
 
 

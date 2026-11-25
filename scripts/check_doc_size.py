@@ -9,22 +9,30 @@
   Markdownは**失敗にして知らせる**（`UNCLASSIFIED`）。文書を足すときは、種類を先に決める。
   記録（追記だけ）と#806で消す文書は`exempt`に置き、消えるまで対象外にする。
 - 測り方は種類で決まる。`lines`（行数）、`chars`（Unicodeの文字数）、`pages`（A4のページ数）。
-  ページは、Pagesのbuildが出したHTMLからサイトの装飾（stylesheet・font・bar・footer）を外した
-  本文を、runnerのGoogle Chrome（headless）の既定の組みでA4に印刷して数える（`--site-root`を
-  渡したときだけ。Chromeの無い端末では測らない）。余白・文字の大きさ・行間の数値を足さない。
+  ページは、GitHubのMarkdown API（GFM）が作ったHTMLを、stylesheetを付けない最小のHTMLで包み、
+  Firefox（headless）をgeckodriverのW3C WebDriverの`print`（A4。ほかは既定）で印刷して数える。
+  文書のページを測るためサイトの装飾は付けず、余白・文字の大きさ・行間の数値を足さない。
+  CIはrunnerのFirefox・geckodriver（Ubuntu 24.04のimage:
+  https://github.com/actions/runner-images/blob/main/images/ubuntu/Ubuntu2404-Readme.md）と、
+  日本語fontの`fonts-noto-cjk`を使う。手元でも同じcommandで測れる（`--measure-pages`）。
+  描画の部品（font・Firefoxの版）が違えばページ数がずれるため、CIと手元で同じ部品に揃える。
 - 今上限を超えている文書は`doc_size_baseline.json`に現在値を記録する（棚卸し）。**下げる方向にしか
   動かさない。**縮約のPRが小さくしたら、同じPRで下げる（下げ忘れは失敗にする）。baselineが
   空になることが#806の完了条件である。
 """
 
 import argparse
+import base64
 import fnmatch
 import json
 import re
-import shutil
+import socket
 import subprocess
 import sys
 import tempfile
+import time
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 SCRIPTS_ROOT = Path(__file__).resolve().parent
@@ -92,19 +100,6 @@ def classify(relative):
     return None
 
 
-def uses_measure_build(relative):
-    """Pagesに載らず、計測用のbuild（`_measure`）で数える文書（`hardware/`の計画と配線表）。"""
-    return relative.startswith("hardware/")
-
-
-def site_path(relative):
-    """Markdownをbuildしたあとの、出力root相対のHTML。"""
-    stem = str(Path(relative).with_suffix(""))
-    if stem.endswith("/README"):
-        stem = stem[: -len("README")] + "index"
-    return stem + ".html"
-
-
 def count_pdf_pages(data):
     """PDF（bytes）のページ数。`/Type /Page`の数を数え、根の`/Count`と食い違えば例外。"""
     pages = len(re.findall(rb"/Type\s*/Page(?![A-Za-z])", data))
@@ -116,70 +111,133 @@ def count_pdf_pages(data):
     return pages
 
 
-_MAIN = re.compile(r'<main\b[^>]*\bid="content"[^>]*>(.*)</main>', re.S)
-_ARTICLE = re.compile(r'<article\b[^>]*\bclass="dc-doc"[^>]*>(.*)</article>', re.S)
+REPOSITORY = "wachi-yoshitaka-11-dev/deskcat"
+A4_CM = {"width": 21.0, "height": 29.7}
 
 
-def printable_html(text):
-    """印刷用のHTML。サイトのlayoutの本文（`<main id="content">`の中身。pageの
-    layoutなら`<article class="dc-doc">`の中身）だけを取り出し、stylesheet・font・bar・footerを
-    外した最小のHTMLで包む。余白・文字の大きさ・行間はChromeの既定のままにする（数値を足さない）。
-    本文が見つからなければ例外（測れないものを黙って通さない）。"""
-    main = _MAIN.search(text)
-    if main is None:
-        raise ValueError('<main id="content"> not found in the built HTML.')
-    body = main.group(1)
-    article = _ARTICLE.search(body)
-    if article is not None:
-        body = article.group(1)
-    return (
-        '<!doctype html><html lang="ja"><head><meta charset="utf-8">'
-        "<style>@page { size: A4 }</style></head><body>" + body + "</body></html>"
-    )
+API_LIMIT_BYTES = 300_000  # Markdown APIは400 KBまで。余裕を持たせる。
 
 
-def render_pages(chrome, html_path):
-    """HTML fileの本文をChrome headlessでA4のPDFに印刷し、ページ数を返す。"""
-    html_path = Path(html_path)
-    printable = printable_html(html_path.read_text(encoding="utf-8"))
+def split_markdown(text, limit=API_LIMIT_BYTES):
+    """`limit` byte以下のかたまりへ、fence外の空行で分ける（表は空行を含まないため割れない）。"""
+    if len(text.encode("utf-8")) <= limit:
+        return [text]
+    chunks = []
+    current = []
+    size = 0
+    in_fence = False
+    for line in text.split("\n"):
+        if line.lstrip().startswith(("```", "~~~")):
+            in_fence = not in_fence
+        current.append(line)
+        size += len(line.encode("utf-8")) + 1
+        if not in_fence and not line.strip() and size >= limit * 2 // 3:
+            chunks.append("\n".join(current))
+            current, size = [], 0
+    if current:
+        chunks.append("\n".join(current))
+    return chunks
+
+
+def _render(text, gh):
     with tempfile.TemporaryDirectory() as temporary:
-        # 一時directoryへ置く（出力directoryはDocker actionが作り、書けるとは限らない）。
-        copy = Path(temporary) / "print.html"
-        pdf = Path(temporary) / "out.pdf"
-        copy.write_text(printable, encoding="utf-8")
+        source = Path(temporary) / "source.md"
+        source.write_text(text, encoding="utf-8")
         result = subprocess.run(
-            [chrome, "--headless", "--no-sandbox", "--disable-gpu",
-             "--no-pdf-header-footer", f"--print-to-pdf={pdf}", copy.as_uri()],
-            capture_output=True, text=True, timeout=120,
+            [gh, "api", "markdown", "-f", "mode=gfm", "-f", f"context={REPOSITORY}",
+             "-F", f"text=@{source}"],
+            capture_output=True, text=True, encoding="utf-8", timeout=120,
         )
-        if result.returncode != 0 or not pdf.exists():
-            raise RuntimeError(f"Chrome failed on {html_path}: {result.stderr[-300:]}")
-        return count_pdf_pages(pdf.read_bytes())
+    if result.returncode != 0 or not result.stdout.strip():
+        raise RuntimeError(f"Markdown API failed: {result.stderr[-300:]}")
+    return result.stdout
 
 
-PORTAL_ENTRIES = ("_config.yml", "_layouts", "assets", "favicon.ico")
+def markdown_to_html(text, gh="gh"):
+    """GitHubのMarkdown API（GFM）でHTMLにする。`gh`の認証（CIでは`GH_TOKEN`）を使う。
+    APIの上限（400 KB）を超える文書は、fence外の空行で分けて作り、つなぐ。"""
+    return "\n".join(_render(chunk, gh) for chunk in split_markdown(text))
 
 
-def stage_measure_source(root, pages_source, destination, names):
-    """`hardware/`の設計文書だけを、公開と同じlayout・設定でbuildするためのsourceを作る。"""
-    destination = Path(destination)
-    if destination.exists():
-        shutil.rmtree(destination)
-    destination.mkdir(parents=True)
-    for entry in PORTAL_ENTRIES:
-        source = Path(pages_source) / entry
-        if source.is_dir():
-            shutil.copytree(source, destination / entry)
-        elif source.is_file():
-            shutil.copy2(source, destination / entry)
-    staged = []
-    for name in names:
-        if uses_measure_build(name) and classify(name) == "design":
-            target = destination / name
-            target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(Path(root) / name, target)
-            staged.append(name)
-    return staged
+def wrap_html(body):
+    """stylesheetを付けない最小のHTML。余白・文字の大きさ・行間はブラウザの既定のままにする。"""
+    return ('<!doctype html><html lang="ja"><head><meta charset="utf-8"></head><body>'
+            + body + "</body></html>")
+
+
+class PrintSession:
+    """geckodriverのW3C WebDriverでFirefox（headless）を起動し、HTMLをA4のPDFへ印刷する。
+
+    `base_url`を渡すと、起動済みのWebDriverに接続する（test用）。無ければ`geckodriver`を起動する。
+    """
+
+    def __init__(self, geckodriver="geckodriver", base_url=""):
+        self.process = None
+        self.session = ""
+        self.base_url = base_url
+        if not base_url:
+            with socket.socket() as probe:
+                probe.bind(("127.0.0.1", 0))
+                port = probe.getsockname()[1]
+            self.process = subprocess.Popen(
+                [geckodriver, "--port", str(port)],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            )
+            self.base_url = f"http://127.0.0.1:{port}"
+        self._wait_ready()
+        created = self._request("POST", "/session", {"capabilities": {"alwaysMatch": {
+            "browserName": "firefox",
+            "moz:firefoxOptions": {"args": ["-headless"]},
+        }}})
+        self.session = created["value"]["sessionId"]
+
+    def _request(self, method, path, body=None):
+        request = urllib.request.Request(
+            self.base_url + path,
+            data=None if body is None else json.dumps(body).encode("utf-8"),
+            method=method, headers={"Content-Type": "application/json"},
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=120) as response:
+                return json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as error:
+            raise RuntimeError(f"WebDriver {method} {path}: {error.read().decode('utf-8')[:300]}")
+
+    def _wait_ready(self):
+        for _ in range(100):
+            try:
+                self._request("GET", "/status")
+                return
+            except (OSError, RuntimeError):
+                time.sleep(0.1)
+        raise RuntimeError("WebDriver did not become ready.")
+
+    def pages(self, html):
+        """HTMLをA4で印刷したときのページ数。"""
+        url = "data:text/html;charset=utf-8;base64," + base64.b64encode(
+            html.encode("utf-8")).decode("ascii")
+        self._request("POST", f"/session/{self.session}/url", {"url": url})
+        printed = self._request("POST", f"/session/{self.session}/print", {"page": A4_CM})
+        return count_pdf_pages(base64.b64decode(printed["value"]))
+
+    def close(self):
+        try:
+            if self.session:
+                self._request("DELETE", f"/session/{self.session}")
+        except (OSError, RuntimeError):
+            pass
+        if self.process is not None:
+            self.process.terminate()
+            try:
+                self.process.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                self.process.kill()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self.close()
 
 
 def measure(files, page_counter=None):
@@ -329,17 +387,16 @@ def list_markdown(root):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repository-root", default="")
-    parser.add_argument("--site-root", default="", help="ページ数を測る。Pagesのbuild出力（`_site`）")
-    parser.add_argument("--measure-root", default="",
-                        help="`hardware/`の設計文書を計測用にbuildした出力（`_measure`）")
-    parser.add_argument("--stage-measure-source", default="",
-                        help="計測用buildのsourceをここへ作って終わる（`--pages-source`が要る）")
-    parser.add_argument("--pages-source", default=".pages-src")
-    parser.add_argument("--chrome", default="google-chrome")
+    parser.add_argument("--measure-pages", action="store_true",
+                        help="ページ数を測る（Firefox・geckodriver・`gh`の認証が要る）")
+    parser.add_argument("--geckodriver", default="geckodriver")
+    parser.add_argument("--gh", default="gh")
     parser.add_argument("--base", default="",
                         help="比較元のrefまたはsha。baselineが増えた・キーが増えたら失敗にする")
     parser.add_argument("--print-baseline", action="store_true",
                         help="上限を超える現在値をJSONで出す（fileは書かない）")
+    parser.add_argument("--print-values", action="store_true",
+                        help="測った全文書の現在値をJSONで出す（fileは書かない）")
     arguments = parser.parse_args(argv)
     root = Path(arguments.repository_root or SCRIPTS_ROOT.parent).resolve()
 
@@ -353,31 +410,27 @@ def main(argv=None):
         print("No Markdown files resolved. The size check is not working.")
         return 2
 
-    if arguments.stage_measure_source:
-        staged = stage_measure_source(
-            root, arguments.pages_source, arguments.stage_measure_source, names)
-        print(f"STAGED={len(staged)}")
-        return 0 if staged else 2
-
-    counter = None
-    if arguments.site_root:
-        site = Path(arguments.site_root)
-        measure_site = Path(arguments.measure_root) if arguments.measure_root else None
-
-        def counter(relative):
-            base = measure_site if uses_measure_build(relative) else site
-            if base is None:
-                raise RuntimeError(f"{relative} needs --measure-root.")
-            # 出力が無いのは失敗（測れないものを黙って通さない）。
-            return render_pages(arguments.chrome, base / site_path(relative))
-
+    session = None
     try:
+        counter = None
+        if arguments.measure_pages:
+            session = PrintSession(arguments.geckodriver)
+
+            def counter(relative):
+                return session.pages(wrap_html(markdown_to_html(files[relative], arguments.gh)))
+
         values, unclassified = measure(files, counter)
-    except (RuntimeError, ValueError, OSError, subprocess.SubprocessError) as error:
+    except (RuntimeError, ValueError, OSError, KeyError, subprocess.SubprocessError) as error:
         print(f"Page counting failed: {error}")
         return 2
+    finally:
+        if session is not None:
+            session.close()
     kinds = kinds_of(files)
 
+    if arguments.print_values:
+        print(json.dumps(values, ensure_ascii=False, indent=2, sort_keys=True))
+        return 0
     if arguments.print_baseline:
         print(json.dumps(make_baseline(values, kinds), ensure_ascii=False, indent=2))
         return 0

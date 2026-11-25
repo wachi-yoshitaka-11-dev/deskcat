@@ -137,6 +137,24 @@ jobs:
         working-directory: ${{ runner.temp }}
         run: python3 "$GITHUB_WORKSPACE/scripts/test_doc_size_checks.py"
 
+      # 文書の「目標の量」をすべて検査する（#806）。行数・文字数・A4のページ数。ページは、GitHubの
+      # Markdown APIが作ったHTMLを、runnerのFirefox（headless）とgeckodriverで印刷して数える。
+      # 手元と同じ描画の部品（日本語fontはNoto Sans CJK）に揃えるため、fontを入れる。数値と出典は
+      # `scripts/check_doc_size.py`の`LIMITS`の1か所だけ。現在上限を超えている文書は
+      # `scripts/doc_size_baseline.json`に記録してあり、値は下げる方向にしか動かさない。
+      # Pull Requestでは、baselineが増えていないことも比較元（base sha）と照らす。
+      - name: Install Japanese font for page counting
+        run: sudo apt-get update && sudo apt-get install -y fonts-noto-cjk
+
+      - name: Check document size
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DOC_SIZE_BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          args=(--measure-pages)
+          if [ -n "$DOC_SIZE_BASE" ]; then args+=(--base "$DOC_SIZE_BASE"); fi
+          python3 scripts/check_doc_size.py "${args[@]}"
+
       - name: Prepare public source
         run: python3 scripts/prepare_pages.py
 
@@ -151,30 +169,6 @@ jobs:
 
       - name: Validate output
         run: python3 scripts/validate_pages_output.py --site-root ./_site
-
-      # `hardware/`の計画と配線表はPagesに載らない。ページ数を数えるためだけに、同じpin済みの
-      # actionを公開と同じlayout・設定でもう1回走らせる。出力（`_measure`）は公開しない。
-      - name: Stage hardware documents for page counting
-        run: python3 scripts/check_doc_size.py --stage-measure-source ./.measure-src --pages-source ./.pages-src
-
-      - name: Build hardware documents for page counting
-        uses: actions/jekyll-build-pages@44a6e6beabd48582f863aeeb6cb2151cc1716697 # v1
-        with:
-          source: ./.measure-src
-          destination: ./_measure
-
-      # 文書の「目標の量」をすべて検査する（#806）。行数・文字数・A4のページ数。ページは、上の
-      # buildが出したHTMLをrunnerのGoogle Chrome（headless）でA4のPDFに印刷して数える。
-      # 数値と出典は`scripts/check_doc_size.py`の`LIMITS`の1か所だけ。現在上限を超えている文書は
-      # `scripts/doc_size_baseline.json`に記録してあり、値は下げる方向にしか動かさない。
-      # Pull Requestでは、baselineが増えていないことも比較元（base sha）と照らす。
-      - name: Check document size
-        env:
-          DOC_SIZE_BASE: ${{ github.event.pull_request.base.sha }}
-        run: |
-          args=(--site-root ./_site --measure-root ./_measure --chrome google-chrome)
-          if [ -n "$DOC_SIZE_BASE" ]; then args+=(--base "$DOC_SIZE_BASE"); fi
-          python3 scripts/check_doc_size.py "${args[@]}"
 
       # 公開境界の回帰test。未宣言asset、追跡外asset、hash不一致、size超過で
       # stagingが失敗することを確認する。`_site`は既に検証済みで影響しない。
