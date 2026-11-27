@@ -77,7 +77,7 @@ Issueには次を含める。
 | 規約、仕様、安全、電気、protocol、GPIO、電源、toolchain、CI、依存の**意味**を変えるもの | **必須** | **必要** |
 | 複数のPull Requestに跨る、または他の作業をblockするもの | **必須** | **必要** |
 
-repository変更はIssue不要の側でも、**変更内容の承認を必ず得る。**GitHub操作の承認区分は[AI Agent Policy](docs/governance/ai-agent-policy.md#6-責務マトリクス)に従う。
+Issue不要の側でも、人間の承認が要るかは[Pull Requestのレビュー](#pull-requestのレビュー)が決める（文書や言葉だけの変更で[慎重に扱う path](#慎重に扱う-path)に当たらないものは、自動のレビューとセキュリティの確認が通れば要らない）。GitHub操作の承認区分は[AI Agent Policy](docs/governance/ai-agent-policy.md#6-責務マトリクス)に従う。
 判断に迷うものはIssue必須の側として扱う。安全に関わる範囲は緩めない。
 
 **「言い回しの修正」と「意味の変更」の境界は機械的に判定できない。**
@@ -564,7 +564,7 @@ headが`Review skipped`でも通る。base `main`の昇格も同じ検査を受�
 定めが無かったため、[#316](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/316)で
 手動reviewを2回投げる違反と、未解決を残してmergeしかける判断が起きた（追跡は[#327](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/327)）。
 
-**1. 昇格は手動reviewの対象である。**`main`に載るためである。
+**1. 昇格も、範囲が[慎重に扱う path](#慎重に扱う-path)に触れるときに手動reviewの対象である。**ほかのPull Requestと同じ条件であり、merge前のhookも昇格に同じ条件で掛かる。
 **回数は[手動依頼の手順](#手動で依頼する前に状態を確認する)のとおりで、昇格も例外ではない。**
 
 **2. 未解決threadを残してmergeしない。**`main`をbaseとするmerge済みPull Request 18本を全数走査した結果、
