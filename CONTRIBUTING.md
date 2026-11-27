@@ -406,6 +406,10 @@ Anthropicの[Code Reviewの文書](https://code.claude.com/docs/en/code-review)�
   subagentは`Bash`を持たずgitを使えないため、呼ぶ側がbaseとの差分を
   作業ツリーの外のfileに書き出し、そのpathを渡す。置き場所はセッションのscratchpadにする（subagentが許可なしで読める。ほかの場所は許可を求められ、backgroundのsubagentでは拒否されうる）。
   作業ツリーはレビューするheadと同じcommitにしておく（subagentは周りのコードを作業ツリーから読む）。
+  差分がレビューの基準の文書（`AGENTS.md`、`CLAUDE.md`、`CONTRIBUTING.md`、`.claude/`配下、baseの版の`AGENTS.md`の「作業開始時に読むもの」に挙がる文書）を
+  変えるときは、変えた文書のうちbaseに在ったものごとにbaseの版（`git show <base>:<path>`）も同じ置き場所に書き出し、元のpathと書き出したfileのpathの組を渡す。
+  subagentはmerge前の基準を使わない。baseの版が無ければレビューせずにそう報告し、baseに無い新しい文書は基準にせずレビューの対象としてだけ読む。
+  `.claude/agents/fresh-context-reviewer.md`そのものを変えるPull Requestでは、subagentの定義がheadの版で読み込まれ、この手順では防げないため、このsubagentを使わない。
   `/security-review`も走らせる。`/security-review`はoriginの既定のbranch（`main`）との差分を見るため、
   `develop`にあって`main`に無い変更も含まれる。**このPull Requestの差分の外の指摘はPre-existingとして扱う。**
 - **`/code-review`のeffortは毎回指定する。**指定しないと前回の値が使われる。安全・電気・サーボの制限・
