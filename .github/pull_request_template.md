@@ -4,6 +4,12 @@
 
 Closes #
 
+<!-- 作業リストの最後の項目でなく、Issueを閉じないpull requestでは`Refs: #N`を使う（CONTRIBUTINGの「関連Issueの書き方」）。 -->
+
+## 作業リストの項目
+
+<!-- このpull requestが埋める、Issueの作業リストの項目を書く（CONTRIBUTINGの「作業リストの決まり」）。Issueが不要な変更では、その理由を書く。 -->
+
 ## 範囲
 
 対象:
@@ -100,6 +106,17 @@ Pre-existingの追跡Issue:
 - [ ] CodeRabbitに依頼した場合、checkの**説明文**を読み、`Review completed`であることを確かめた。`Review rate limited`と`Review skipped`は**`pass`と表示されるがreviewは走っていない**（[GitHubが強制しないもの](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/CONTRIBUTING.md#githubが強制しないもの)）
 - [ ] 未解決のreview threadが0件である（GraphQLの`reviewThreads.isResolved`で確認した。REST APIのcomment一覧では判定できない）
 - [ ] 承認が要る変更では、承認するcommitのSHAを書いた承認のコメントがある
+
+## 消した規則
+
+<!-- 規則を消した場合は、消した規則ごとに移した先かやめた理由を書く。消していなければ「無し」と書く。 -->
+
+| 消した規則 | 扱い | 移した先／やめた理由 |
+|---|---|---|
+
+## 戻し方
+
+<!-- mergeの後に戻すとき、何を戻せばよいか（revertするcommit、一緒に戻す設定やIssueの記述）。 -->
 
 ## Riskと残作業
 
