@@ -5,7 +5,7 @@ hookを子processとして起動し、stdinへhookの入力JSONを渡して、**
 診断文を検査する。基点の検査はfixture repositoryを作って実際に`git fetch`させる。
 
 **主に見るのは、素通りしないことである。**guardが黙って通るようになると、
-止めているはずの失敗（boardへのitem追加漏れ、trailerの引き継ぎ漏れ、古い基点）が
+止めているはずの失敗（boardへのitem追加漏れ、mergeのmessageの指定漏れ、古い基点）が
 また起きる。**そしてhookは失敗しても静かなため、壊れたことに気付けない。**
 """
 
@@ -29,7 +29,6 @@ import publish_guards as guards  # noqa: E402
 
 sys.path.insert(0, str(SCRIPTS_ROOT))
 
-import review_gate as gate  # noqa: E402
 
 sys.path.insert(0, str(SCRIPTS_ROOT / "hooks"))
 
@@ -37,23 +36,18 @@ import command_line  # noqa: E402
 
 GH_GUARD = str(SCRIPTS_ROOT / "hooks" / "gh_metadata_guard.py")
 BASE_GUARD = str(SCRIPTS_ROOT / "hooks" / "branch_base_guard.py")
-MERGE_REPORT = str(SCRIPTS_ROOT / "hooks" / "merge_trailer_report.py")
-PUSH_GATE = str(SCRIPTS_ROOT / "hooks" / "push_gate.py")
 CODERABBIT_GATE = str(SCRIPTS_ROOT / "hooks" / "coderabbit_gate.py")
 INSPECTOR_GUARD = str(SCRIPTS_ROOT / "hooks" / "inspector_readonly_guard.py")
-MERGE_REPORT = str(SCRIPTS_ROOT / "hooks" / "merge_trailer_report.py")
 REPO_ROOT_FOR_TEMPLATES = SCRIPTS_ROOT.parent
 ISSUE_TEMPLATE_DIR = REPO_ROOT_FOR_TEMPLATES / ".github" / "ISSUE_TEMPLATE"
 PR_TEMPLATE_PATH = REPO_ROOT_FOR_TEMPLATES / ".github" / "pull_request_template.md"
 
 sys.path.insert(0, str(SCRIPTS_ROOT / "hooks"))
 
-import push_gate  # noqa: E402
 import gh_metadata_guard as guard  # noqa: E402
 
 import inspector_readonly_guard  # noqa: E402
 
-import merge_trailer_report  # noqa: E402
 
 # fixtureのcommitに使うidentity。実行者の設定に依存させない。
 GIT_IDENTITY = (
@@ -149,7 +143,6 @@ def _invoke(script, command, cwd=None, environment=None):
     # 呼び出し側の環境に無効化用の変数が残っていても、testの前提を壊さない。
     env.pop("DESKCAT_SKIP_GH_GUARD", None)
     env.pop("DESKCAT_SKIP_BASE_GUARD", None)
-    env.pop("DESKCAT_SKIP_PUSH_GATE", None)
     env.pop("DESKCAT_SKIP_TRUNCATION_GUARD", None)
     env.pop("DESKCAT_SKIP_WORKTREE_GUARD", None)
     env.pop("DESKCAT_TEST_GH", None)
@@ -193,7 +186,7 @@ class GhMetadataGuardTests(unittest.TestCase):
 
         `args[:2]`で位置から読んでいた版では、`gh --repo o/r pr create`と
         `gh -R o/r pr merge`が**denyを素通りしていた。**`--project`の要求も
-        squash messageのtrailerの要求も、**global optionを1語足すだけで抜けた。**
+        mergeのmessageの要求も、**global optionを1語足すだけで抜けた。**
         """
         for command in (
             "gh --repo owner/repo pr create --title x --body y",
@@ -204,9 +197,10 @@ class GhMetadataGuardTests(unittest.TestCase):
                 self.assertDenied(command)
 
     def test_global_options_do_not_hide_the_merge_subcommand(self):
-        """merge側も同じである。trailerの検査が素通りしていた。"""
+        """merge側も同じである。messageの検査が素通りしていた。"""
         self.assertDenied(
-            'gh -R owner/repo pr merge 1 --squash --subject "x" --body "y"'
+            'gh -R owner/repo pr merge 1 --squash --body "y"',
+            contains="`--subject`が無い",
         )
 
     def test_create_without_project_is_denied(self):
@@ -400,8 +394,8 @@ class GhMetadataGuardTests(unittest.TestCase):
         self.assertAllowed("gh pr view 1 && echo --project")
 
     def test_merge_without_message_is_denied(self):
-        """messageを渡さないmergeを止める。GitHubが合成したmessageにはtrailerが入らない。"""
-        self.assertDenied("gh pr merge 1 --squash", contains="18298ae")
+        """messageを渡さないmergeを止める。GitHubが合成したmessageでは経緯が残らない。"""
+        self.assertDenied("gh pr merge 1 --squash", contains="afc86cf")
 
     def test_merge_with_unreadable_message_is_denied(self):
         """本文を読めない経路を「入っている」と扱わない。"""
@@ -411,139 +405,14 @@ class GhMetadataGuardTests(unittest.TestCase):
             contains="読み出しに失敗",
         )
 
-    def test_merge_message_trailers_are_checked(self):
-        """squash messageのtrailerを、fileとinlineの両方で見る。
+    def test_merge_message_without_trailers_is_allowed(self):
+        """messageの中身は見ない。trailerが無くても、`--subject`と本文があれば通す。"""
+        self.assertAllowed('gh pr merge 1 --squash --subject s --body "本文だけ"')
+        self.assertAllowed('gh pr merge 1 --subject s --body "本文だけ"')
+        self.assertAllowed('gh pr merge 1 --rebase --subject s --body "本文だけ"')
 
-        **すべての呼び出しに`--subject`を付ける。**`--subject`が無ければ
-        strategyを問わず先にdenyされるため（`#423`）、trailerの検査そのものを
-        見るにはここで`--subject`を満たしておく必要がある。
-        """
-        with tempfile.TemporaryDirectory() as directory:
-            complete = Path(directory) / "complete.txt"
-            complete.write_text(
-                f"body\n\n{gate.TRAILER_CLASS}: x\n{gate.TRAILER_REVIEW}: y\n",
-                encoding="utf-8",
-            )
-            partial = Path(directory) / "partial.txt"
-            partial.write_text(
-                f"body\n\n{gate.TRAILER_REVIEW}: y\n", encoding="utf-8"
-            )
-            self.assertAllowed(
-                f"gh pr merge 1 --squash --subject s --body-file {complete}"
-            )
-            self.assertDenied(
-                f"gh pr merge 1 --squash --subject s --body-file {partial}",
-                contains=gate.TRAILER_CLASS,
-            )
-        self.assertAllowed(
-            'gh pr merge 1 --squash --subject s --body '
-            f'"x\n\n{gate.TRAILER_CLASS}: c\n{gate.TRAILER_REVIEW}: s"'
-        )
-        self.assertDenied(
-            'gh pr merge 1 --squash --subject s --body "本文だけ"',
-            contains=gate.TRAILER_CLASS,
-        )
-
-    def test_merge_message_must_parse_as_trailers(self):
-        """**`git`がtrailerとして読める形かを見る。文字列の一致では足りない。**
-
-        `c171c52`（[PR #307](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/307)）は、
-        trailer blockの直前へ空行なしでコロンの無い`Closes #304`を置いた。
-        `git interpret-trailers`は最後の段落がすべてtrailerでないとその段落を
-        認めないため、`Change-Class`・`Self-Review`・`Instruction-Change`・`Refs`が
-        まるごと無効になり、`develop`のsquash commitは宣言を1つも持たなかった。
-
-        **このhookは通していた。**当時の判定が`f"{name}:" not in text`という
-        部分一致で、**文字列としては存在した**ためである（`c171c52`では3種類とも）。
-        下のfixtureも同じ性質を持たせてあり、`assertIn`が固定しているのはそこである。
-        **部分一致へ戻すとこのtestは落ちる。**
-        """
-        with tempfile.TemporaryDirectory() as directory:
-            broken = Path(directory) / "broken.txt"
-            broken.write_text(
-                "本文である。\n\n"
-                f"Closes #304\n{gate.TRAILER_CLASS}: c\n{gate.TRAILER_REVIEW}: s\n",
-                encoding="utf-8",
-            )
-            separated = Path(directory) / "separated.txt"
-            separated.write_text(
-                "本文である。\n\nCloses #304\n\n"
-                f"{gate.TRAILER_CLASS}: c\n{gate.TRAILER_REVIEW}: s\n",
-                encoding="utf-8",
-            )
-            text = broken.read_text(encoding="utf-8")
-            for name in (gate.TRAILER_CLASS, gate.TRAILER_REVIEW):
-                self.assertIn(f"{name}:", text, "回帰testの前提が崩れている")
-            self.assertDenied(
-                f"gh pr merge 1 --squash --subject s --body-file {broken}",
-                contains=gate.TRAILER_CLASS,
-            )
-            # 同じ宣言を空行で区切っただけのmessageは通る。**直し方が示されている。**
-            self.assertAllowed(
-                f"gh pr merge 1 --squash --subject s --body-file {separated}"
-            )
-
-    def test_merge_message_of_only_trailers_is_allowed(self):
-        """**本文がtrailerだけの形を誤検知しない。**
-
-        `gh pr merge`が作るcommit messageは`--subject`と本文を空行で連結した形に
-        なる。**本文だけを`git`へ渡すと本文の先頭行がsubjectとして扱われ**、段落が
-        1つしか無い形になってtrailerが0件と読まれる（2026-09-02に実測）。
-        実際のcommitでは有効なtrailer blockであり、**止めれば正しいmergeが
-        通らなくなる。**hookはsubjectの行を補ってから`git`へ渡す。
-        """
-        with tempfile.TemporaryDirectory() as directory:
-            only = Path(directory) / "only.txt"
-            only.write_text(
-                f"{gate.TRAILER_CLASS}: c\n{gate.TRAILER_REVIEW}: s\n",
-                encoding="utf-8",
-            )
-            self.assertAllowed(
-                f"gh pr merge 1 --squash --subject s --body-file {only}"
-            )
-
-    def test_merge_is_denied_when_git_cannot_be_run(self):
-        """**`git`を実行できない場合は通さない。**
-
-        この検査が守っているのは「宣言がsquash commitへ入るか」であり、
-        **入らなかったときの手当ては`DECLARATION_EXEMPT`への登録＝Pull Request
-        1本である**（`c171c52`が実例）。確認できないまま通すほうが高くつく。
-        **止まったときの逃げ道は`DESKCAT_SKIP_GH_GUARD`であり、診断文に書いてある。**
-        それを検査しているのが最後の`assertIn`である。
-        """
-        with tempfile.TemporaryDirectory() as directory:
-            body = Path(directory) / "body.txt"
-            body.write_text(
-                "本文である。\n\n"
-                f"{gate.TRAILER_CLASS}: c\n{gate.TRAILER_REVIEW}: s\n",
-                encoding="utf-8",
-            )
-            command = f"gh pr merge 1 --squash --subject s --body-file {body}"
-            # 同じmessageが、gitを引ける状態では通ることを先に確かめる。
-            self.assertAllowed(command)
-            # `git`の無いPATHで起動する。hook自身は絶対pathのpythonで動くため、
-            # PATHを空にしてもhookの起動そのものは妨げない。
-            empty = Path(directory) / "bin"
-            empty.mkdir()
-            code, output = _invoke(GH_GUARD, command, environment={"PATH": str(empty)})
-            self.assertEqual(code, 0)
-            self.assertIsNotNone(output, "gitを実行できないまま通してしまった")
-            self.assertEqual(
-                output["hookSpecificOutput"]["permissionDecision"], "deny"
-            )
-            self.assertIn("DESKCAT_SKIP_GH_GUARD", _reason(output))
-
-    def test_merge_strategy_allows_main_promotion_without_trailers(self):
-        """**`--merge`（`main`昇格）はtrailerが無くても通す。**
-
-        `CONTRIBUTING.md`の`Merge方式`は`main`昇格のmerge commitへ`Change-Class`／
-        `Self-Review`のtrailerを要求しない。`review_gate.py`の`_check_history`も
-        `git rev-list --no-merges`でmerge commitを検査対象から外している。
-        以前はこのhookが`--squash`と区別せず一律に要求しており、`#383`の
-        main昇格で`gh pr merge --merge`が2回denyされ、ブラウザでのmergeを
-        強いた結果、merge commit `afc86cf`のmessageがGitHub既定のまま入り、
-        直前の昇格が持っていた検証経緯が失われた（`#417`）。
-        """
+    def test_merge_strategy_allows_main_promotion(self):
+        """`--merge`（`main`昇格）も、`--subject`と本文があれば通す。"""
         self.assertAllowed(
             'gh pr merge 383 --merge --subject "s" --body "develop を main へ昇格する"'
         )
@@ -552,13 +421,7 @@ class GhMetadataGuardTests(unittest.TestCase):
     def test_merge_strategy_still_requires_a_message(self):
         """**`--merge`でも、messageの指定そのものは省略できない。**
 
-        2026-09-17に、`_is_main_promotion_merge`がtrueのとき`_body_text`より
-        前でreturnする版が入りかけた。**`gh pr merge N --merge`をmessageの
-        指定なしで実行できてしまい、GitHubが既定messageを合成する経路が
-        開いていた。**それは`afc86cf`（`#383`）で実際に起きた損失そのものであり、
-        `#417`が防ごうとした事象を修正自体が再び開けるところだった。
-        trailerの要求（`--squash`のみ）と、messageの要求（両strategy共通）は
-        別であり、混ぜてはいけない。
+        省略するとGitHubが既定messageを合成する。`afc86cf`（`#383`）で実際に起きた損失である。
         """
         self.assertDenied(
             "gh pr merge 383 --merge", contains="messageを確認できない"
@@ -572,7 +435,7 @@ class GhMetadataGuardTests(unittest.TestCase):
 
         `_body_text`は`--body`／`--body-file`の有無しか見ておらず、
         `gh pr merge N --merge --body "本文"`（`--subject`無し）が
-        main昇格の早期returnまで素通りしていた。`CONTRIBUTING.md`の
+        素通りしていた。`CONTRIBUTING.md`の
         `Merge方式`は`--subject`と`--body-file`の両方を明示すると定めている。
         2026-09-17にCodeRabbitのreviewが指摘し、push前に直した。
 
@@ -596,31 +459,20 @@ class GhMetadataGuardTests(unittest.TestCase):
             )
             self.assertAllowed(f"gh pr merge 383 -m -t s -F {body}")
 
-    def test_squash_strategy_still_requires_trailers(self):
-        """**`--squash`は引き続きtrailerを要求する。**既存の動作を変えない。"""
-        self.assertDenied(
-            'gh pr merge 1 --squash --subject "s" --body "trailerなし"',
-            contains=gate.TRAILER_CLASS,
-        )
-
     def test_squash_strategy_requires_subject_too(self):
         """**`--squash`も`--subject`が無ければ拒否する（`#423`）。**
 
-        `#417`／`#418`では`--merge`（main昇格）側にだけ`--subject`の有無を
-        見る検査を足し、`--squash`側は既存test`test_merge_message_trailers_are_checked`
-        の前提（`--subject`無しのsquash呼び出しを許可する）を理由に対象外と
-        していた。この穴が`#423`として報告され、strategyを問わず`--subject`
-        を見るよう修正した。
+        strategyを問わず`--subject`を見る。
         """
         self.assertDenied(
             'gh pr merge 1 --squash --body '
-            f'"x\n\n{gate.TRAILER_CLASS}: c\n{gate.TRAILER_REVIEW}: s"',
+            '"x\n\n本文"',
             contains="`--subject`が無い",
         )
         with tempfile.TemporaryDirectory() as directory:
             body = Path(directory) / "body.txt"
             body.write_text(
-                f"x\n\n{gate.TRAILER_CLASS}: c\n{gate.TRAILER_REVIEW}: s",
+                "x\n\n本文",
                 encoding="utf-8",
             )
             # 短縮形（`-s`／`-t`）でも同じ判定になることを確かめる。
@@ -642,48 +494,13 @@ class GhMetadataGuardTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             body = Path(directory) / "body.txt"
             body.write_text(
-                f"x\n\n{gate.TRAILER_CLASS}: c\n{gate.TRAILER_REVIEW}: s",
+                "x\n\n本文",
                 encoding="utf-8",
             )
             self.assertAllowed(f"gh pr merge 1 --squash -ts --body-file {body}")
             self.assertAllowed(
                 f"gh pr merge 1 --merge -ts --body-file {body}"
             )
-
-    def test_rebase_strategy_still_requires_trailers(self):
-        """**`--rebase`は`CONTRIBUTING.md`に定義が無く、要求を外さない。**
-
-        `Merge方式`が定めるのは`develop`（squash）と`main`（merge commit）だけで
-        あり、`--rebase`の扱いは決まっていない。分からないものは、従来どおり
-        trailerを要求する側へ倒す。
-        """
-        self.assertDenied(
-            'gh pr merge 1 --rebase --subject "s" --body "trailerなし"',
-            contains=gate.TRAILER_CLASS,
-        )
-
-    def test_no_strategy_flag_still_requires_trailers(self):
-        """**戦略flagが無い呼び出しは、`main`昇格として扱わない。**
-
-        `gh`はflag省略時にrepositoryの既定戦略を使うが、hookはcommand文字列
-        しか見ないため既定が何かを知りようが無い。`_body_text`が特定できない
-        messageを`deny`するのと同じ理由で、分からないものは要求を掛けたままにする。
-        """
-        self.assertDenied(
-            'gh pr merge 1 --subject "s" --body "trailerなし"',
-            contains=gate.TRAILER_CLASS,
-        )
-
-    def test_merge_and_squash_together_still_requires_trailers(self):
-        """**`--merge`と`--squash`が同時に指定された場合は主昇格として扱わない。**
-
-        `gh`自身がこの組み合わせを拒否するため通常は起きないが、字句だけで
-        見ている以上、単独で`--merge`が立っている場合だけに限定する。
-        """
-        self.assertDenied(
-            'gh pr merge 1 --merge --squash --subject "s" --body "trailerなし"',
-            contains=gate.TRAILER_CLASS,
-        )
 
     def test_unrelated_commands_are_allowed(self):
         """`gh`以外と、`gh`の他のsubcommandは通す。"""
@@ -851,7 +668,7 @@ class CodeRabbitReviewMergeGateTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             body = Path(directory) / "body.txt"
             body.write_text(
-                f"本文\n\n{gate.TRAILER_CLASS}: c\n{gate.TRAILER_REVIEW}: s\n",
+                "本文\n",
                 encoding="utf-8",
             )
             env = {"DESKCAT_TEST_GH": json.dumps(fixture)}
@@ -883,15 +700,30 @@ class CodeRabbitReviewMergeGateTests(unittest.TestCase):
             "firmware/esp32/src/main.rs",
             "crates/deskcat-protocol/src/lib.rs",
             "crates/deskcat-servo/src/lib.rs",
-            "crates/deskcat-face/src/lib.rs",
-            "crates/deskcat-tap/src/lib.rs",
-            "crates/deskcat-touch/src/lib.rs",
-            "crates/deskcat-accel/src/lib.rs",
-            "crates/deskcat-env/src/lib.rs",
             "docs/protocol/esp32-pi-protocol.md",
             "docs/hardware/gpio-assignment.md",
             "docs/hardware/power-budget.md",
             "docs/hardware/servo-safety-limits.md",
+            "docs/governance/hardware-safety-policy.md",
+            ".github/workflows/pages.yml",
+            "scripts/hooks/gh_metadata_guard.py",
+            ".githooks/pre-commit",
+            ".claude/settings.json",
+            "AGENTS.md",
+            "CLAUDE.md",
+            "CONTRIBUTING.md",
+            "hardware/deskcat.kicad_pcb",
+            "hardware/deskcat.kicad_sch",
+            "hardware/DeskCat.kicad_sym",
+            "hardware/DeskCat.pretty/R_Vertical_P5.08.kicad_mod",
+            "hardware/overview/deskcat-netlist.xml",
+            "hardware/breadboard/layout.svg",
+            "hardware/breadboard-rebuild/generate.py",
+            "hardware/universal-board/check_star_point.py",
+            "hardware/deskcat.kicad_pro",
+            "hardware/fp-lib-table",
+            "hardware/sym-lib-table",
+            "scripts/check_wiring_figure_sync.py",
         ]
         for name in targets:
             with self.subTest(name=name):
@@ -904,9 +736,13 @@ class CodeRabbitReviewMergeGateTests(unittest.TestCase):
         """対象外は、CodeRabbitの状態によらず通す（広げない範囲）。"""
         outside = [
             "docs/hardware/bom.md", "docs/experiments/exp-1.md",
-            "scripts/hooks/gh_metadata_guard.py", "CONTRIBUTING.md",
+            "scripts/README.md", "scripts/test_hooks.py", "docs/CONTRIBUTING.md",
             "crates/deskcat-pi/src/lib.rs", "crates/deskcat-protocol/Cargo.toml",
+            "crates/deskcat-face/src/lib.rs", "crates/deskcat-env/src/lib.rs",
             "firmware/esp32/Cargo.toml", "firmware/esp32/srcx/a.rs",
+            "hardware/README.md", "hardware/measurement/test_adc_stream_rate.py",
+            "hardware/wokwi/esp32-boot-pulls/diagram.json",
+            "hardware/bench-18/layout.svg",
         ]
         for name in outside:
             with self.subTest(name=name):
@@ -1002,7 +838,7 @@ class GhHookRepositoryAndDeadlineTests(unittest.TestCase):
             log = Path(directory) / "gh.log"
             body = Path(directory) / "body.txt"
             body.write_text(
-                f"本文\n\n{gate.TRAILER_CLASS}: c\n{gate.TRAILER_REVIEW}: s\n",
+                "本文\n",
                 encoding="utf-8",
             )
             _invoke(GH_GUARD, command.format(body=body), environment={
@@ -1065,7 +901,7 @@ class GhHookRepositoryAndDeadlineTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             body = Path(directory) / "body.txt"
             body.write_text(
-                f"本文\n\n{gate.TRAILER_CLASS}: c\n{gate.TRAILER_REVIEW}: s\n",
+                "本文\n",
                 encoding="utf-8",
             )
             payload = json.dumps({"tool_name": "Bash", "tool_input": {
@@ -1101,10 +937,10 @@ class GhHookRepositoryAndDeadlineTests(unittest.TestCase):
         self.assertLess(elapsed, guard.CHECK_DEADLINE_SECONDS)
 
     def test_hook_limits_fit_inside_the_hook_timeout(self):
-        """1回の上限は最初の遅れ（約10.7秒）を超える。期限の外で先に走るgitの上限との和は、hookの30秒に収まる。"""
+        """1回の上限は最初の遅れ（約10.7秒）を超える。全体の期限は、hookの30秒に収まる。"""
         self.assertGreater(guard.GH_TIMEOUT_SECONDS, 10.7)
         self.assertLessEqual(guard.GH_TIMEOUT_SECONDS, guard.CHECK_DEADLINE_SECONDS)
-        self.assertLess(guard.GIT_TIMEOUT_SECONDS + guard.CHECK_DEADLINE_SECONDS, 30)
+        self.assertLess(guard.CHECK_DEADLINE_SECONDS, 30)
 
     def test_running_workers_end_by_the_deadline(self):
         """commit照会が期限を超えて走り続けても、processは期限の直後に終わる。"""
@@ -1722,7 +1558,7 @@ class WorktreeGuardTests(unittest.TestCase):
         `command_line.skip_global_options`が`-C`しか知らなかった版では、
         `git --no-pager reset --hard`と`git -c key=value reset --hard`は
         `remaining[0]`がoptionになり、**検査ごと素通りしていた**
-        （2026-09-16実測）。`push_gate.py`は同じ形を前から外していた。
+        （2026-09-16実測）。
         """
         self._dirty_note()
         for command in (
@@ -2448,474 +2284,63 @@ class StopClaimGuardTests(unittest.TestCase):
                 self.assertEqual(result.stdout.strip(), "")
 
 
-class MergeTrailerReportTests(unittest.TestCase):
-    """merge後の確認hookのtest。
+class ReviewTargetListTests(unittest.TestCase):
+    """CONTRIBUTINGの「慎重に扱う path」と、hookがCodeRabbitの完走を求めるpathの一致。"""
 
-    **`gh`と実際のPull Requestを要する経路は検査しない。**testがnetworkとGitHubの
-    状態に依存すると、落ちた理由がhookの誤りか環境かを区別できなくなる。
-    ここで見るのは、対象外のcommandで`gh`を呼ばずに抜けることである。
-    """
+    HEADING = "### 慎重に扱う path"
 
-    def test_global_options_do_not_hide_the_merge(self):
-        """**global optionで`gh pr merge`を見失わない**（#325）。
+    def _documented_paths(self):
+        text = (REPO_ROOT_FOR_TEMPLATES / "CONTRIBUTING.md").read_text(encoding="utf-8")
+        self.assertEqual(text.count(self.HEADING + "\n"), 1, "見出しが1つではない")
+        section = text.split(self.HEADING + "\n", 1)[1]
+        section = re.split(r"^#{1,3} ", section, maxsplit=1, flags=re.MULTILINE)[0]
+        paths = []
+        bullet = False
+        for line in section.splitlines():
+            if line.startswith("- "):
+                bullet = True
+            elif not line.startswith("  "):
+                bullet = False
+            if bullet:
+                # 項目名と「：」の後ろにあるpathだけを読む。
+                body = line.split("：", 1)[1] if "：" in line else line
+                paths.extend(re.findall(r"`([^`]+)`", body))
+        return paths
 
-        `args[:2]`で位置から読んでいた版では、`gh --repo o/r pr merge`を
-        対象外として黙って抜けていた。**このhookは事後の報告であり、
-        見失うと「trailerが入ったか」を誰も確かめないまま終わる。**
-        """
-        for command, expected in (
-            ("gh pr merge 413 --squash", "413"),
-            ("gh --repo owner/repo pr merge 413 --squash", "413"),
-            ("gh -R owner/repo pr merge 413 --squash", "413"),
-            ("gh --repo owner/repo pr merge --squash", None),
-        ):
-            with self.subTest(command=command):
-                found, number = merge_trailer_report._pr_merge(command)
-                self.assertTrue(found, command)
-                self.assertEqual(number, expected, command)
+    def test_documented_list_matches_the_hook(self):
+        documented = self._documented_paths()
+        self.assertEqual(len(documented), len(set(documented)), "一覧に重複がある")
+        hook = list(guard.REVIEW_TARGET_PREFIXES) + list(guard.REVIEW_TARGET_FILES)
+        self.assertEqual(sorted(documented), sorted(hook))
 
-    def test_non_merge_commands_are_ignored(self):
-        for command in (
-            "git status",
-            "gh pr view 1 --json state",
-            "gh pr create --title t --project deskcat",
-            "echo gh pr merge",
-        ):
-            with self.subTest(command=command):
-                code, output = _invoke(MERGE_REPORT, command)
-                self.assertEqual(code, 0, command)
-                self.assertIsNone(output, f"報告してしまった: {command}")
-
-    def test_merge_on_a_later_line_is_found(self):
-        """複数行commandの2行目の`gh pr merge`を見つける（#389）。
-
-        **`gh`を呼ぶ経路は通さない。**判定だけを`_pr_merge`で直接見る。
-        """
-        self.assertEqual(
-            merge_trailer_report._pr_merge("git status\ngh pr merge 12 --squash"),
-            (True, "12"),
-        )
-
-    def test_merge_written_in_a_heredoc_body_is_not_found(self):
-        """heredocのbodyの`gh pr merge`は見つけない（#389）。**mergeしていない。**"""
-        self.assertEqual(
-            merge_trailer_report._pr_merge(
-                "cat > note.md <<'EOF'\ngh pr merge 12 --squash\nEOF\n"
-            ),
-            (False, None),
-        )
-
-    def test_broken_input_is_ignored(self):
+    def test_every_hardware_file_is_classified(self):
+        """`hardware/`の追跡fileは、対象か、CONTRIBUTINGが挙げた対象外のどちらかに入る。"""
+        text = (REPO_ROOT_FOR_TEMPLATES / "CONTRIBUTING.md").read_text(encoding="utf-8")
+        line = [x for x in text.splitlines() if x.startswith("`hardware/`のうち対象外は次だけである")]
+        self.assertEqual(len(line), 1, "対象外の一覧の行が1つではない")
+        outside = re.findall(r"`([^`]+)`", line[0].split("：", 1)[1])
         result = subprocess.run(
-            [sys.executable, MERGE_REPORT], input="{ではないJSON",
-            capture_output=True, text=True, encoding="utf-8", timeout=60,
+            ["git", "ls-files", "-z", "hardware"],
+            cwd=REPO_ROOT_FOR_TEMPLATES, capture_output=True, check=True,
         )
-        self.assertEqual(result.returncode, 0)
-        self.assertEqual(result.stdout.strip(), "")
+        names = [n for n in result.stdout.decode("utf-8").split("\0") if n]
+        self.assertTrue(names)
+        for name in names:
+            with self.subTest(name=name):
+                inside = bool(guard._review_targets([name]))
+                excluded = any(
+                    name == item or (item.endswith("/") and name.startswith(item))
+                    for item in outside
+                )
+                self.assertTrue(inside != excluded, "対象と対象外のどちらか一方だけに入らない")
 
-
-class PushGateTests(unittest.TestCase):
-    """`develop`への直接pushを`gate`で見るhookのtest。
-
-    **fixture repositoryへ`review_gate.py`を複製して実際に実行させる。**
-    hookが呼ぶのはsubprocessであり、呼べているかどうかを模擬では確かめられない。
-    """
-
-    # `docs/decisions/`は`INSTRUCTION_SOURCES`に入る。`Instruction-Change`が要る。
-    INSTRUCTION_FILE = "docs/decisions/0001-x.md"
-
-    def setUp(self):
-        self.directory = tempfile.mkdtemp()
-        self.addCleanup(guards.remove_tree, Path(self.directory))
-        root = Path(self.directory)
-        self.root = root
-        _git(str(root), "init", "--quiet", ".")
-        (root / "scripts").mkdir()
-        (root / "scripts" / "review_gate.py").write_text(
-            (SCRIPTS_ROOT / "review_gate.py").read_text(encoding="utf-8"),
-            encoding="utf-8",
-        )
-        (root / "note.md").write_text("最初\n", encoding="utf-8")
-        _git(str(root), "add", "-A")
-        _git(str(root), "commit", "--quiet", "-m", "first")
-        # 自分自身をoriginにする。networkへ出ずに`origin/develop`を成立させる。
-        _git(str(root), "branch", "--force", "trunk", "HEAD")
-        _git(str(root), "remote", "add", "origin", str(root))
-        _git(
-            str(root), "config", "remote.origin.fetch",
-            "+refs/heads/trunk:refs/remotes/origin/develop",
-        )
-        _git(str(root), "fetch", "--quiet", "origin")
-
-    def _instruction_commit(self, declared):
-        """指示sourceを触るcommitを1つ積む。`declared`で宣言の有無を切り替える。"""
-        target = self.root / self.INSTRUCTION_FILE
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text("# 決定\n\n本文\n", encoding="utf-8")
-        trailers = [
-            f"{gate.TRAILER_CLASS}: {gate.CLASS_FIXUP}",
-            *(
-                f"{gate.TRAILER_REVIEW}: {value}"
-                for value in gate.REVIEW_DECLARATIONS
-            ),
-            f"{gate.TRAILER_REFS}: #1",
-        ]
-        if declared:
-            trailers.append(
-                f"{gate.TRAILER_INSTRUCTION}: {gate.INSTRUCTION_ACK}"
-            )
-        _git(str(self.root), "add", "-A")
-        _git(
-            str(self.root), "commit", "--quiet",
-            "-m", "決定を足す\n\n" + "\n".join(trailers) + "\n",
-        )
-
-    def _review_gate(self, command):
-        return subprocess.run(
-            [
-                sys.executable, str(self.root / "scripts" / "review_gate.py"),
-                command, "--repository-root", str(self.root),
-                "--base", "origin/develop", "--head", "HEAD",
-            ],
-            capture_output=True, text=True, encoding="utf-8", cwd=str(self.root),
-        ).returncode
-
-    def assertDenied(self, command, cwd=None):
-        code, output = _invoke(PUSH_GATE, command, cwd=cwd or str(self.root))
-        self.assertEqual(code, 0, command)
-        self.assertIsNotNone(output, f"通してしまった: {command}")
-        return _reason(output)
-
-    def assertAllowed(self, command, cwd=None):
-        code, output = _invoke(PUSH_GATE, command, cwd=cwd or str(self.root))
-        self.assertEqual(code, 0, command)
-        self.assertIsNone(output, f"止めてしまった: {command}")
-
-    def test_undeclared_instruction_change_is_denied(self):
-        """`Instruction-Change`を持たないまま`develop`へ押すのを止める。
-
-        **`b93b309`で実際に起きた形である。**
-        """
-        self._instruction_commit(declared=False)
-        reason = self.assertDenied("git push origin HEAD:develop")
-        self.assertIn(gate.TRAILER_INSTRUCTION, reason)
-
-    def test_push_on_a_later_line_is_denied(self):
-        """複数行commandの2行目以降のpushを止める（#389）。
-
-        **迂回を試みた形ではない。**`git fetch`や`git status`を先に書く、
-        `add`／`commit`／`push`を並べる、空行と字下げを挟む、`\\`で行を継ぐ——
-        いずれも通常の書き方であり、**5つとも素通りしていた。**
-        **旧挙動は、`origin/develop`の`command_line.py`だけを別directoryへ取り出し、
-        `sys.path`の先頭に置いた状態で`push_gate.pushed_source`を呼んで測った**
-        （2026-09-14。5形すべてが`None`だった。この門は`pushed_source`が`None`なら
-        何も検査せずに通す）。**この形のtestは置いていない。**`pushed_source`は
-        `command_line.invocations`を呼ぶだけなので、旧走査（`_invocations_in`）を差し込めば
-        再現はできる。**差し込みを前提にしたtestを置かないのは、旧走査を残す約束になるためである。**
-        `invocations`の層での旧挙動は`CommandLineSegmentsTests`が形ごとに固定する
-        （改行を挟む4形は`test_the_walk_without_segments_missed_the_second_line`、
-        `\\`で継ぐ形は`test_the_walk_without_segments_broke_the_line_continuation`）。
-        """
-        self._instruction_commit(declared=False)
-        # `git push origin develop`は押す側のrefを`develop`として解決する。
-        # **局所に`develop`が無いと検査対象を決められない**（既存の refspec test と同じ前提）。
-        _git(str(self.root), "branch", "--force", "develop", "HEAD")
-        for command in (
-            "git fetch origin\ngit push origin develop",
-            "git status\ngit push origin HEAD:develop",
-            "git add -A\ngit commit -m x\ngit push origin develop",
-            "cat note.md\n\n  git push origin develop",
-            "git push \\\n  origin develop",
-        ):
-            with self.subTest(command=command):
-                reason = self.assertDenied(command)
-                self.assertIn(gate.TRAILER_INSTRUCTION, reason)
-
-    def test_push_written_in_a_heredoc_body_is_allowed(self):
-        """heredocのbodyに書いた`git push origin develop`では止めない（#389）。
-
-        **bashはbodyを実行しない。**手順を文書へ書く操作はこのリポジトリでは日常であり、
-        **そこで止める門は誤検知としてhookごと無効化される。**
-        """
-        self._instruction_commit(declared=False)
-        # **`develop`を張らないと、refが解けずどのみち素通りする。**
-        # 張らないままでは、通った理由がbodyを落としたからなのか区別できない。
-        _git(str(self.root), "branch", "--force", "develop", "HEAD")
-        self.assertAllowed("cat > note.md <<'EOF'\ngit push origin develop\nEOF\n")
-
-    def test_comment_after_a_push_is_not_read_as_a_refspec(self):
-        """`git push origin main # develop`を`develop`へのpushとして読まない。
-
-        **bashは語頭の`#`から行末までをコメントとして落とす。**残すと`develop`が
-        refspecの位置に現れ、`main`へのpushをこの門が拒否する。**#389より前からの
-        誤検知であり、同じ走査で直した。**
-        """
-        self._instruction_commit(declared=False)
-        _git(str(self.root), "branch", "--force", "develop", "HEAD")
-        self.assertAllowed("git push origin main # develop")
-
-    def test_push_after_a_heredoc_body_is_denied(self):
-        """bodyの後ろのpushは止める。**bodyの引用符で検査が止まらない。**
-
-        bodyを落とさずに`tokenize`へ渡すと、body の`'`1つで`shlex`が失敗し、
-        **同じcommandのpushまで検査できない。**
-        """
-        self._instruction_commit(declared=False)
-        _git(str(self.root), "branch", "--force", "develop", "HEAD")
-        self.assertDenied(
-            "cat > note.md <<'EOF'\nそれはできない。don't\nEOF\n"
-            "git push origin develop"
-        )
-
-    def test_receipt_alone_would_have_passed(self):
-        """同じcommitが`receipt`だけなら通る。**この差がhookの存在理由である。**"""
-        self._instruction_commit(declared=False)
-        self.assertEqual(self._review_gate("receipt"), 0)
-        self.assertEqual(self._review_gate("gate"), 1)
-
-    def test_declared_instruction_change_is_allowed(self):
-        """宣言が揃っていれば通す。"""
-        self._instruction_commit(declared=True)
-        self.assertAllowed("git push origin HEAD:develop")
-
-    def test_refspec_forms_that_update_develop_are_inspected(self):
-        """`develop`を更新する書き方をひととおり拾う。"""
-        self._instruction_commit(declared=False)
-        _git(str(self.root), "branch", "--force", "develop", "HEAD")
-        for command in (
-            "git push origin HEAD:develop",
-            "git push origin develop",
-            "git push origin HEAD:refs/heads/develop",
-            "git push origin +HEAD:develop",
-            "git push --force-with-lease origin HEAD:develop",
-            "cd . && git push origin HEAD:develop",
-            "/usr/bin/git push origin HEAD:develop",
-            "git -c core.pager=cat push origin HEAD:develop",
-            "git --no-pager push origin HEAD:develop",
-        ):
-            self.assertDenied(command)
-
-    def test_deleting_develop_is_not_read_as_pushing_head(self):
-        """`git push origin :develop`はbranchの削除であり、押すcommitが無い。
-
-        `HEAD`を押すものとして扱うと、**無関係な範囲を検査する。**
-        """
-        self._instruction_commit(declared=False)
-        self.assertIsNone(push_gate.pushed_source("git push origin :develop"))
-        self.assertAllowed("git push origin :develop")
-
-    def test_tag_option_does_not_hide_an_explicit_refspec(self):
-        """`--tags`を併記しても、`develop`を指すrefspecは見る。
-
-        **`--tags`をskip対象に置くと、この形を取り落とす。**
-        """
-        self._instruction_commit(declared=False)
-        self.assertDenied("git push --tags origin HEAD:develop")
-
-    def test_forms_without_a_refspec_are_not_inspected(self):
-        """refspecを書かない形は対象にならない。**gapとして文書に書いてある。**"""
-        self._instruction_commit(declared=False)
-        for command in (
-            "git push --mirror origin",
-            "git push --all origin",
-            "git push --tags origin",
-        ):
-            self.assertIsNone(push_gate.pushed_source(command), command)
-
-    def test_prefix_of_develop_is_not_matched(self):
-        """`develop`で始まるだけのbranchを取り違えない。"""
-        self._instruction_commit(declared=False)
-        for command in (
-            "git push origin HEAD:developer",
-            "git push origin HEAD:develop-2",
-            "git push origin HEAD:feature/develop",
-        ):
-            self.assertAllowed(command)
-
-    def test_directory_option_selects_the_repository(self):
-        """`git -C <dir> push`は、そのdirectoryのrepositoryを検査する。
-
-        **cwdの側を検査すると、別treeの結果で判断することになる。**
-        """
-        self._instruction_commit(declared=False)
-        other = tempfile.mkdtemp()
-        self.addCleanup(guards.remove_tree, Path(other))
-        source, directory, env = push_gate.pushed_source(
-            f"git -C {self.root} push origin HEAD:develop"
-        )
-        self.assertEqual((source, directory, env), ("HEAD", str(self.root), {}))
-        # cwdをrepositoryの外に置いても、`-C`の先を見て拒否する。
-        reason = self.assertDenied(
-            f"git -C {self.root} push origin HEAD:develop", cwd=other
-        )
-        self.assertIn(gate.TRAILER_INSTRUCTION, reason)
-
-    def test_directory_option_outside_a_repository_is_not_inspected(self):
-        """`-C`の先がrepositoryでなければ見ない。どこを検査すべきか決まらない。"""
-        self._instruction_commit(declared=False)
-        other = tempfile.mkdtemp()
-        self.addCleanup(guards.remove_tree, Path(other))
-        self.assertAllowed(f"git -C {other} push origin HEAD:develop")
-
-    def test_repeated_directory_options_resolve_relative_to_the_previous_one(self):
-        """`git -C a -C b push`は`a/b`を検査する（#472）。
-
-        gitは相対pathの`-C`を前の`-C`からの相対で解決する。**最後の値だけを見ると、
-        `b`をcwdからの相対で探し、別のtreeを検査するか検査しない。**
-        """
-        self._instruction_commit(declared=False)
-        other = tempfile.mkdtemp()
-        self.addCleanup(guards.remove_tree, Path(other))
-        parent, name = str(self.root.parent), self.root.name
-        command = f"git -C {parent} -C {name} push origin HEAD:develop"
-        source, directory, _ = push_gate.pushed_source(command)
-        self.assertEqual((source, directory), ("HEAD", str(self.root)))
-        reason = self.assertDenied(command, cwd=other)
-        self.assertIn(gate.TRAILER_INSTRUCTION, reason)
-
-    def test_value_options_are_not_read_as_the_subcommand(self):
-        """`--git-dir X push`の`X`を subcommand と読まない（#472）。
-
-        **1語として飛ばしていた版では、`X`が先頭語になって`push`と一致せず、
-        検査せずに通していた。**`--git-dir=X`の1語の形も同じに扱う。
-        """
-        self._instruction_commit(declared=False)
-        git_dir = self.root / ".git"
-        for command in (
-            f"git --git-dir {git_dir} --work-tree {self.root} push origin HEAD:develop",
-            f"git --git-dir={git_dir} --work-tree={self.root} push origin HEAD:develop",
-            f"git --git-dir {git_dir} push origin HEAD:develop",
-            f"git --work-tree {self.root} push origin HEAD:develop",
-        ):
-            with self.subTest(command=command):
-                self.assertIsNotNone(push_gate.pushed_source(command), command)
-
-    def test_git_dir_and_work_tree_forms_are_denied(self):
-        """`--git-dir`／`--work-tree`／`--namespace`を付けた`develop`へのpushは止める（#472）。
-
-        **検査するrepository・tree・refを一意に決められない。**`--git-dir`だけならgitはcwdを
-        work treeとして扱い、`--work-tree`だけならrepositoryをcwdから探す。
-        `--namespace`はrefの探し方を変える（検査側で再現しない）。
-        **宣言の揃ったcommitでも止める**（gateの結果ではなく、形で止めている）。
-        """
-        self._instruction_commit(declared=True)
-        other = tempfile.mkdtemp()
-        self.addCleanup(guards.remove_tree, Path(other))
-        git_dir = self.root / ".git"
-        for command in (
-            f"git --git-dir {git_dir} --work-tree {self.root} push origin HEAD:develop",
-            f"git --git-dir {git_dir} push origin HEAD:develop",
-            f"git --work-tree {self.root} push origin HEAD:develop",
-            f"git --namespace n push origin HEAD:develop",
-            f"git --namespace=n push origin HEAD:develop",
-        ):
-            with self.subTest(command=command):
-                reason = self.assertDenied(command, cwd=other)
-                self.assertIn("`-C`とcwd", reason)
-
-
-    def test_relative_git_dir_is_resolved_from_the_directory_option(self):
-        """相対の`--git-dir`は`-C`の後のdirectoryから解決する。gitと同じである（#472）。"""
-        self._instruction_commit(declared=False)
-        _, directory, env = push_gate.pushed_source(
-            f"git -C {self.root} --git-dir .git push origin HEAD:develop"
-        )
-        self.assertEqual(directory, str(self.root))
-        self.assertEqual(env, {"GIT_DIR": str((self.root / ".git").resolve())})
-
-    def test_other_destinations_are_out_of_scope(self):
-        """`develop`以外へのpushは見ない。Pull Requestが`gate`を通す。"""
-        self._instruction_commit(declared=False)
-        for command in (
-            "git push origin HEAD:feature/x",
-            "git push origin HEAD:main",
-            "git push fork HEAD:develop",
-            "git push --dry-run origin HEAD:develop",
-            "git push --delete origin develop",
-            "git push --tags origin",
-            "git status",
-        ):
-            self.assertAllowed(command)
-
-    def test_the_word_push_in_an_argument_is_not_an_invocation(self):
-        """`echo git push origin HEAD:develop`を呼び出しと読まない。"""
-        self._instruction_commit(declared=False)
-        self.assertAllowed("echo git push origin HEAD:develop")
-
-    def test_nothing_to_push_is_allowed(self):
-        """押すcommitが無ければ検査しない。範囲が空でheadのtrailerを問わない。"""
-        _git(str(self.root), "checkout", "--quiet", "-B", "work", "origin/develop")
-        self.assertAllowed("git push origin HEAD:develop")
-
-    def test_bare_push_follows_the_upstream(self):
-        """`git push`だけの形は、upstreamが`origin/develop`のときだけ対象になる。"""
-        self._instruction_commit(declared=False)
-        _git(str(self.root), "branch", "--set-upstream-to", "origin/develop")
-        self.assertDenied("git push")
-
-    def test_two_guarded_pushes_in_one_command_are_denied(self):
-        """1つのcommandの中に`develop`へのpushが2件あれば止める（#472。PR #473のreview指摘）。
-
-        **最初の1件で止めていた版では、1つ目が通れば2つ目の`--git-dir`を見ずに通していた。**
-        1件でも各段の上限を合わせるとhookの制限時間を超えうる（変更前から同じ）。件数が増えるとさらに延びるため、
-        2件以上ある形そのものを止める。1つ目は宣言の揃ったcommitで`gate`を通る形にしてある。
-        """
-        self._instruction_commit(declared=True)
-        other = tempfile.mkdtemp()
-        self.addCleanup(guards.remove_tree, Path(other))
-        command = (
-            f"git -C {self.root} push origin HEAD:develop"
-            f" && git --git-dir={self.root / '.git'} push origin HEAD:develop"
-        )
-        self.assertEqual(len(push_gate.pushed_sources(command)), 2)
-        reason = self.assertDenied(command, cwd=other)
-        self.assertIn("1件ずつpushし直す", reason)
-        # 1件だけなら、宣言の揃ったcommitは通る。
-        self.assertAllowed(f"git -C {self.root} push origin HEAD:develop", cwd=other)
-
-    def test_bare_push_with_git_dir_follows_the_upstream_of_that_repository(self):
-        """refspecを書かない`git --git-dir X push`は、`X`のupstreamを引いて止める（#472）。
-
-        **cwdのupstreamを引くと、cwdがrepositoryでなければ`None`になり、止める判定まで届かない。**
-        """
-        self._instruction_commit(declared=False)
-        _git(str(self.root), "branch", "--set-upstream-to", "origin/develop")
-        other = tempfile.mkdtemp()
-        self.addCleanup(guards.remove_tree, Path(other))
-        command = f"git --git-dir {self.root / '.git'} --work-tree {self.root} push"
-        self.assertIsNotNone(push_gate.pushed_source(command))
-        reason = self.assertDenied(command, cwd=other)
-        self.assertIn("`-C`とcwd", reason)
-
-    def test_bare_push_to_another_upstream_is_out_of_scope(self):
-        """upstreamが`origin/develop`でなければ見ない。"""
-        self._instruction_commit(declared=False)
-        branch = _git(str(self.root), "rev-parse", "--abbrev-ref", "HEAD").strip()
-        # `--set-upstream-to`はremote-tracking refの実在を要求するため、configで置く。
-        _git(str(self.root), "config", f"branch.{branch}.remote", "origin")
-        _git(str(self.root), "config", f"branch.{branch}.merge", "refs/heads/other")
-        self.assertAllowed("git push")
-
-    def test_skip_environment_disables_the_guard(self):
-        """逃げ道が効く。**使ったら理由を残すのは人間の側の規則である。**"""
-        self._instruction_commit(declared=False)
-        code, output = _invoke(
-            PUSH_GATE, "git push origin HEAD:develop", cwd=str(self.root),
-            environment={"DESKCAT_SKIP_PUSH_GATE": "1"},
-        )
-        self.assertEqual(code, 0)
-        self.assertIsNone(output)
-
-    def test_broken_input_does_not_block(self):
-        """壊れた入力で作業を止めない。"""
-        result = subprocess.run(
-            [sys.executable, PUSH_GATE], input="{壊れている",
-            capture_output=True, text=True, encoding="utf-8",
-            timeout=60, cwd=str(self.root),
-        )
-        self.assertEqual(result.returncode, 0)
-        self.assertEqual(result.stdout.strip(), "")
-
+    def test_prefixes_end_with_a_slash_and_files_do_not(self):
+        for prefix in guard.REVIEW_TARGET_PREFIXES:
+            with self.subTest(prefix=prefix):
+                self.assertTrue(prefix.endswith("/"))
+        for name in guard.REVIEW_TARGET_FILES:
+            with self.subTest(name=name):
+                self.assertFalse(name.endswith("/"))
 
 
 class CodeRabbitGateTests(unittest.TestCase):
@@ -3162,7 +2587,7 @@ class CodeRabbitGateTests(unittest.TestCase):
     def test_trigger_on_a_later_line_is_asked(self):
         """複数行commandの2行目のreview依頼も止める（#389）。
 
-        **`command_line.invocations`を`push_gate`と共有している。**改行対応で
+        **`command_line.invocations`を他のhookと共有している。**改行対応で
         このhookの範囲も広がる。**広がる向きは、これまで素通りしていた形を
         `ask`へ入れる側である。**
         """
@@ -3548,7 +2973,6 @@ class CodeRabbitGateTests(unittest.TestCase):
         for name in (
             "DESKCAT_SKIP_GH_GUARD",
             "DESKCAT_SKIP_CODERABBIT_GATE",
-            "DESKCAT_SKIP_PUSH_GATE",
         ):
             with self.subTest(name=name):
                 code, output = _invoke(CODERABBIT_GATE, command, environment={name: "1"})
@@ -3634,7 +3058,7 @@ class CommandFromTests(unittest.TestCase):
 class CommandLineSegmentsTests(unittest.TestCase):
     """`command_line.segments`のtest（#389）。**改行もcommandの区切りである。**
 
-    #389が挙げた3つのhook（`push_gate`／`branch_base_guard`／`gh_metadata_guard`）は
+    `branch_base_guard`と`gh_metadata_guard`は
     `invocations`で呼び出しを探す。**2行目が見えないと、止める門が通常の書き方で
     反応しない。**（`deny`を出すhookはこの3つに限らない。`inspector_readonly_guard.py`も
     出す。**あちらは自分で行分割しているため、改行については変わらない。**
@@ -3662,10 +3086,6 @@ class CommandLineSegmentsTests(unittest.TestCase):
         `cat x &&`改行`git push origin develop`は、**旧走査でも拾えていた**
         （2026-09-14に実測）。#389が挙げたのは区切り語を置かない形である。
 
-        **`push`から始まるかどうかが門の反応と一致するのも、この7形に限る。**
-        `push_gate.pushed_source`はglobal optionを外した後の先頭語を見るため、
-        `git -C sub push origin develop`では割れる（`invocations`の戻りは`-C`から始まるが、
-        門は検出する。`test_directory_option_selects_the_repository`が固定している形である）。
         """
         for command in (
             "cat x\ngit push origin develop",
@@ -3693,7 +3113,7 @@ class CommandLineSegmentsTests(unittest.TestCase):
         r"""行継続では、旧走査は改行1文字を語として返していた。
 
         `git push \`改行`origin develop`の第1引数が改行1文字になるため、
-        **`push_gate`は`origin`を読めず、`develop`へのpushとして扱えなかった。**
+        **引数を読むhookは`origin`を読めなかった。**
         """
         command = "git push \\\n  origin develop"
         self.assertEqual(
@@ -3707,8 +3127,7 @@ class CommandLineSegmentsTests(unittest.TestCase):
     def test_the_walk_without_segments_counted_a_comment_as_a_refspec(self):
         """コメントを落とさない走査では、`# develop`の`develop`が引数に残っていた。
 
-        **`push_gate`はこれを`develop`へのrefspecとして数える。**#389より前からの
-        誤検知であり、同じ走査で直した。
+        引数を読むhookは、これを引数として数えていた。同じ走査で直した。
         """
         command = "git push origin main # develop"
         self.assertEqual(
@@ -4251,7 +3670,7 @@ class HookPayloadShapeTests(unittest.TestCase):
     のに、この一覧へ入れ忘れていた。**一覧に無いhookは、壊れても静かに素通りする）。
     """
 
-    HOOKS = (GH_GUARD, BASE_GUARD, PUSH_GATE, MERGE_REPORT, CODERABBIT_GATE,
+    HOOKS = (GH_GUARD, BASE_GUARD, CODERABBIT_GATE,
              INSPECTOR_GUARD, TRUNCATION_GUARD, WORKTREE_GUARD)
 
     MALFORMED = (
@@ -4277,7 +3696,6 @@ class HookPayloadShapeTests(unittest.TestCase):
                         env={**os.environ,
                              "DESKCAT_SKIP_GH_GUARD": "",
                              "DESKCAT_SKIP_BASE_GUARD": "",
-                             "DESKCAT_SKIP_PUSH_GATE": "",
                              "DESKCAT_SKIP_TRUNCATION_GUARD": "",
                              "DESKCAT_SKIP_WORKTREE_GUARD": ""},
                     )
@@ -5019,14 +4437,14 @@ class InspectorReadonlyGuardTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr[:300])
         self.assertEqual(result.stdout.strip(), "")
 
-    def test_both_inspector_agents_wire_the_guard(self):
-        """**2つの agent 定義が実際にこのhookを呼んでいることを固定する。**
+    def test_inspector_agent_wires_the_guard(self):
+        """**agent 定義が実際にこのhookを呼んでいることを固定する。**
 
         hookを置いただけでは何も起きない。`.claude/agents/`のfrontmatterへ
-        書かれていて初めて掛かる。**片方だけ書き忘れる形を止める。**
+        書かれていて初めて掛かる。
         """
         agents = REPO_ROOT_FOR_TEMPLATES / ".claude" / "agents"
-        for name in ("consistency-inspector.md", "fresh-context-reviewer.md"):
+        for name in ("fresh-context-reviewer.md",):
             with self.subTest(agent=name):
                 text = (agents / name).read_text(encoding="utf-8")
                 self.assertIn("inspector_readonly_guard.py", text,
@@ -5197,7 +4615,7 @@ class InspectorReadonlyGuardTests(unittest.TestCase):
         guardが無い場合とpython3が無い場合の両方を測る。
         """
         write = json.dumps({"tool_input": {"command": "rm -rf /"}})
-        for agent in ("consistency-inspector.md", "fresh-context-reviewer.md"):
+        for agent in ("fresh-context-reviewer.md",):
             with tempfile.TemporaryDirectory() as empty:
                 with self.subTest(agent=agent, case="guard missing"):
                     result = self._run_wrapper(agent, {"CLAUDE_PROJECT_DIR": empty}, write)
@@ -5214,7 +4632,7 @@ class InspectorReadonlyGuardTests(unittest.TestCase):
     def test_wrapper_passes_through_a_working_guard(self):
         """**fail closedにしたことで、正常系まで落としていないことを測る。**"""
         env = {"CLAUDE_PROJECT_DIR": str(REPO_ROOT_FOR_TEMPLATES)}
-        for agent in ("consistency-inspector.md", "fresh-context-reviewer.md"):
+        for agent in ("fresh-context-reviewer.md",):
             with self.subTest(agent=agent, case="read-only"):
                 result = self._run_wrapper(
                     agent, env, json.dumps({"tool_input": {"command": "git show --no-ext-diff --no-textconv HEAD"}}))
@@ -5230,7 +4648,7 @@ class InspectorReadonlyGuardTests(unittest.TestCase):
 
     def test_the_wrapper_does_not_fail_open(self):
         """`|| exit 0`という形が戻っていないことを、文字列でも固定する。"""
-        for agent in ("consistency-inspector.md", "fresh-context-reviewer.md"):
+        for agent in ("fresh-context-reviewer.md",):
             with self.subTest(agent=agent):
                 command = self._wrapper_command(agent)
                 self.assertNotIn("|| exit 0", command)

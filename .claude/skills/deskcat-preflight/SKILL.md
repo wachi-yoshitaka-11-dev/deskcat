@@ -37,8 +37,7 @@ gh issue view <番号> --json body --jq .body | grep -n "^\s*- \[[ x]\]"
 ## push前
 
 ```bash
-python3 scripts/review_gate.py gate --base origin/develop --head HEAD
-python3 scripts/test_review_gate.py && python3 scripts/test_hooks.py
+python3 scripts/test_hooks.py && python3 scripts/test_check_wiring_figure_sync.py
 python3 scripts/test_link_validators.py && python3 scripts/test_pages_guards.py
 python3 scripts/test_instruction_entrypoint.py
 python3 scripts/validate_doc_links.py && python3 scripts/validate_instruction_entrypoint.py
@@ -47,10 +46,8 @@ python3 scripts/prepare_pages.py && git status --short
 
 **`git status`が汚れていたら`git restore pages/assets-manifest.json`。**
 
-自己レビューの収束条件は
-[CONTRIBUTINGの「自己レビュー」](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/CONTRIBUTING.md#自己レビュー)が持つ。
-
-**追加commitをしたら[2つのPass](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/CONTRIBUTING.md#2つのpass)をやり直す**（差分が変わると両方無効になる）。**merge commitも追加commitである。**
+Pull Requestを作る前のレビューの手順は
+[CONTRIBUTINGの「自己レビュー」](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/CONTRIBUTING.md#自己レビュー)が持つ。
 
 ## merge前
 
@@ -71,34 +68,17 @@ gh api graphql -f query='query { repository(owner:"wachi-yoshitaka-11-dev", name
 CodeRabbitへ投げる場合の時刻確認、投稿、再依頼の条件は
 [手動で依頼する前に状態を確認する](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/CONTRIBUTING.md#手動で依頼する前に状態を確認する)が持つ。
 
-**人間の承認を得る。CIが緑でも機械reviewが完走しても承認ではない。**
+**承認が要るかと、その残し方は[Pull Requestのレビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/CONTRIBUTING.md#pull-requestのレビュー)が持つ。**
+CIが緑でも機械reviewが完走しても承認ではない。
 
 ## merge時
 
 `--subject`と`--body-file`を明示する。**messageを渡さないとGitHubが合成したmessageになり、
-trailerがsquash commitへ入らない。**`18298ae`と`619c843`で実際に起きた。
-
-**`Refs`をtrailerとして使う場合はコロンが要る**（`Refs: #204`）。
-**コロンの無い行をtrailer blockと同じ段落へ置くと、blockごと無効になる。**
+検証の経緯がcommitに残らない。**`afc86cf`（#383）で実際に起きた。
 
 ## merge後
 
-```bash
-git fetch origin && git log -1 --format=%B origin/develop | git interpret-trailers --parse
-python3 scripts/review_gate.py history --base origin/main --head origin/develop
-```
-
-**`PostToolUse` hookが自動で確認するが、直接commitでは走らない。**
-
 Issueをcloseしたら、boardの`Target date`をJSTのclose実績日へ設定する。
-
-## 直接commitしてよい範囲
-
-`CLASS=minor`、または`Change-Class: fixup`と`Refs: #<番号>`。
-
-**範囲の上限を、ここへ写さない。**
-[後始末（`fixup`）の範囲](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/CONTRIBUTING.md#後始末fixupの範囲)を
-**その都度開く。**対象外の列挙は変わりうる。写すと片方だけを見た判断が起きる。
 
 ## このskillを長くしない
 

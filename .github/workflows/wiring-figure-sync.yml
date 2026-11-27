@@ -32,7 +32,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # merge baseとcommit messageのtrailerを読むため、履歴を切り詰めない。
+          # merge baseを求めるため、履歴を切り詰めない。
           fetch-depth: 0
           # このstepの後にPR側のscriptを実行する。checkoutが残すtokenを
           # そのscriptから読めないようにする。

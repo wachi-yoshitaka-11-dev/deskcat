@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """検査 subagent の`Bash`を、読み取りだけに機構で制限する。
 
-`.claude/agents/consistency-inspector.md`と`.claude/agents/fresh-context-reviewer.md`の
+`.claude/agents/fresh-context-reviewer.md`の
 frontmatterへ`hooks.PreToolUse`として書き、**その subagent の`Bash`呼び出しにだけ**掛ける。
 `.claude/settings.json`へは置かない。**置くと通常の作業 session まで止まる。**
 

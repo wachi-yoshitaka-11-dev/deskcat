@@ -1,0 +1,37 @@
+name: Promotion closing keywords
+
+# base が`main`の昇格 Pull Request で、範囲内の commit message にある closing keyword を報告する。
+# 範囲内の`Closes #N`は Pull Request 本文（`closingIssuesReferences`）からは検出できず、merge 時に発火する。
+# 報告だけで、merge は止めない。
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: promotion-closing-keywords-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  report-closing-keywords:
+    name: Report closing keywords in the promotion range
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Report closing keywords
+        # `--check-issue-state`は付けない（`persist-credentials: false`により、この job は`gh`の認証を持たない）。
+        env:
+          GATE_BASE: ${{ github.event.pull_request.base.sha }}
+          GATE_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python3 scripts/report_promotion_closing_keywords.py \
+            --base "$GATE_BASE" --head "$GATE_HEAD"

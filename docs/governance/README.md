@@ -74,7 +74,7 @@ Pagesから公開対象外のCONTRIBUTING等へは絶対URLでリンクするた
 | 一次資料に当たるもの | [Hardware Safety Policy](hardware-safety-policy.md#一次資料に当たるもの) |
 | 「承認済みのリポジトリポリシー」の範囲 | [AI Agent Policy](ai-agent-policy.md)の「「承認済みのリポジトリポリシー」の範囲」節 |
 | ハードウェアTBDの状態と解決手順 | [Hardware TBD Register](../hardware/tbd-register.md) |
-| Issueを立てずに直接反映してよい範囲（後始末／`fixup`を含む） | [CONTRIBUTING](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/CONTRIBUTING.md#後始末fixupの範囲)の「後始末（`fixup`）の範囲」節 |
+| Issueを立てずに直接反映してよい範囲 | [CONTRIBUTING](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/CONTRIBUTING.md#issueを立てずに直接反映してよい範囲)の「Issueを立てずに直接反映してよい範囲」節 |
 
 同じ値を複数の文書で再定義しない。他の文書からは正本の定義へリンクする。
 **この表に足す用語は、3箇所以上の file で説明なしに使われ、かつADR番号に紐づかないものに限る**

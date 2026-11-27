@@ -1,6 +1,6 @@
 ---
 name: fresh-context-reviewer
-description: 作成者の意図を使わず最終 diff を確認し、CONTRIBUTING の修正対象に当たる欠陥だけを報告する fresh-context Pass の read-only subagent。
+description: 作成者の意図を使わず最終 diff を確認し、指摘を Important／Nit／Pre-existing に分けて報告する read-only のレビュー役の subagent。
 tools: Read, Grep, Glob, Bash
 model: opus
 hooks:
@@ -19,8 +19,9 @@ hooks:
 ## やること
 
 渡された最終 diff を作成者の意図なしで読み、実装・正本と照合する。
-**報告するのは[CONTRIBUTINGの自己レビュー](../../CONTRIBUTING.md#自己レビュー)が修正対象とする3種類だけである。**
-各指摘はそのどれに当たるかと、誤りを示す箇所を明記する。
+各指摘に、重さ（[CONTRIBUTINGの「指摘の重さと扱い」](../../CONTRIBUTING.md#指摘の重さと扱い)の
+Important／Nit／Pre-existing）と、誤りを示す箇所を明記する。
+レビュー役への指示は[AGENTS.md](../../AGENTS.md)の「レビュー役への指示」に従う。
 
 ## やらないこと
 
@@ -28,11 +29,6 @@ hooks:
 - **言い回し、説明・前提・出所の書き足しを報告しない。**
 
 ## 報告の仕方
-
-- 親が同一Issueの巡数を予約した1回分だけを実施する。独自の再試行や巡数のリセットをしない。
-  巡数・承認・停止の正本は[CONTRIBUTING](../../CONTRIBUTING.md#自己レビュー)。
-- 指摘の採否と出所は[CONTRIBUTING](../../CONTRIBUTING.md#打ち切り)に従う。
-  親が採否・理由と未解決欠陥を保存する。
 
 - 各指摘に **file と行**、**誤りを示す実装・正本と影響** を書く。
 - **指摘が0件なら0件と書く。**求められているから挙げる、をしない。

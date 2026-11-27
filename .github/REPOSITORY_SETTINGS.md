@@ -243,11 +243,11 @@ PR mergeのたびにhead branchを削除する。`develop`のような恒久的�
 | 項目 | 値 | 理由 |
 |---|---|---|
 | `required_conversation_resolution` | **`true`** | 本設定の目的。未解決threadがあると`mergeStateStatus`が`BLOCKED`になる |
-| `required_pull_request_reviews` | **`null`** | **設定しない。**設定すると`develop`への直接commitが塞がり、記述の維持管理を直接反映してよい運用（[CONTRIBUTING](../CONTRIBUTING.md)）と両立しない |
+| `required_pull_request_reviews` | **`null`** | 設定していない。**CONTRIBUTINGはrepositoryへの変更に必ずPull Requestを通すと定めるが、この設定が無い間は`develop`への直接commitをGitHubが止めない。**必須checkの設定は#814の作業リストの8で扱う |
 | `required_status_checks` | `null` | CIの安定を確認してから別途判断する（上記「Branch protectionの時期」） |
 | `allow_force_pushes` | `false` | force pushを禁止 |
 | `allow_deletions` | `false` | 2026-08-03の削除事故と同じ事象を、Rulesetに加えてprotection側でも防ぐ |
-| `enforce_admins` | `false` | 管理者は強制mergeできる。未解決を残す場合の手順は[CONTRIBUTING](../CONTRIBUTING.md)に従う |
+| `enforce_admins` | `false` | 管理者は強制mergeできる。CONTRIBUTINGは未解決のthreadを残してmergeしないと定める |
 
 動作確認（2026-08-10、[PR #88](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/88)）:
 

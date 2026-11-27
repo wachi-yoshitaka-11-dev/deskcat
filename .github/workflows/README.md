@@ -30,60 +30,22 @@ buildを実行するworkflowは、そのbuild commandが確定してから追加
 top-level directoryを列挙すると検査対象と起動条件がずれる。実際に`apps/`、`crates/`、
 `firmware/`等の14 fileが対象外で、component READMEだけの変更は検査を素通りしていた。
 
-### `review-gate.yml` — 分類と自己レビューの宣言確認
+### `promotion-closing-keywords.yml` — 昇格Pull Requestのclosing keywordの報告
 
-- base が`develop`と`main`のPull Requestで起動する。
-- 含まれる変更の分類と、Pull Request head commitのtrailer（分類、自己レビュー、指示source変更の
-  宣言）を`scripts/review_gate.py`で検証する（[ADR-0010](../../docs/decisions/0010-change-class-and-review-declaration.md)）。
-- **`develop`側でも掛ける。**宣言が無効になる仕組みは、Pull Requestのhead commitを見て初めて
-  働く。`main`側だけに掛けると、宣言はsquash commitにしか現れない。
-- **base が`main`のPull Requestでは、範囲の各commitの宣言も検証する**（`history`）。
-  範囲に複数のsquash commitが入るため、head commitだけでは宣言を持たないcommitが混ざっても
-  通る。**`develop`側では実行しない。**feature branchの中間commitへ宣言を要求しない。
-- **未解決threadと必要CIは検証しない。**branch protectionが強制しており、同じ条件を2箇所で持たない。
-- commit messageのtrailerを読むため`fetch-depth: 0`でcheckoutする。
-- 権限はread-onlyとし、tokenをscriptから読めないよう`persist-credentials: false`を指定する。
+- base が`main`のPull Requestだけで起動する。
+- 範囲の各commitに含まれる`Closes #N`等を`scripts/report_promotion_closing_keywords.py`で検出し、**報告だけ行う。**mergeを止めない。
+- 範囲の各commitを読むため`fetch-depth: 0`、tokenをscriptから読めないよう`persist-credentials: false`を指定する。
 
 ### `wiring-figure-sync.yml` — 配線の記録と配線図の同期確認
 
 - base が`develop`のPull Requestだけで起動する。**`main`への昇格では走らせない。**範囲に多くのcommitを含み、`develop`で通った変更を再検査しても得るものが無く、過去の範囲のずれで昇格が止まるためである。
 - `docs/hardware/experiment-log.md`の`Wiring revision`の行が追加・変更され、
   `hardware/breadboard/layout.svg`が同じ範囲で変わっていなければ、`scripts/check_wiring_figure_sync.py`が落とす（[#512](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/512)）。
-- 図に関係しない変更は、head commitのtrailerまたはPull Request本文の`Wiring-Figure: not-applicable <理由>`
-  （理由10字以上）だけで通す。Pull Request本文は環境変数で渡し、宣言の行を探すためだけに読む。
+- 図に関係しない変更は、Pull Request本文の`Wiring-Figure: not-applicable <理由>`
+  （理由10字以上）だけで通す。commit messageは読まない。Pull Request本文は環境変数で渡し、宣言の行を探すためだけに読む。
 - Pull Request本文の編集（`edited`）でも走り直す。落ちた後に本文へ宣言を足せば通る。
 - 判定は字句だけである。図の内容が記録と合うかは判定しない。
-- merge baseとcommit messageのtrailerを読むため`fetch-depth: 0`、tokenをscriptから読めないよう`persist-credentials: false`を指定する。
-
-### `declaration-audit.yml` — 共有branchへ入った後の宣言確認
-
-- `main`と`develop`への**push**で起動する。**Pull Requestでは起動しない。**
-- pushされた範囲（`before..after`）の各commitを`scripts/review_gate.py history`で検証する。
-- **`review-gate.yml`との違いは見る位置である。**あちらはPull Requestを見るが、
-  **squash commitへtrailerが載るかは merge を実行する経路が決める。**
-  `gh_metadata_guard.py`はBash tool経由の`gh pr merge`しか見ないため、
-  GitHub MCPの`merge_pull_request`やweb UIからのmergeは素通りする
-  （[#373](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/373)で実際に起きた）。
-- **阻止ではなく事後検出である。**pushは既に完了している。
-  **`main`昇格の直前ではなく、原因を作ったmergeの直後に気付けるようにする**のが目的である
-  （[ADR-0021](../../docs/decisions/0021-declaration-audit-on-push.md)）。
-- `before`が解決できない場合（branch作成、force push後）は、**3つの状況を分ける。**
-  **どの経路でも直前の1 commitへ縮めない。**縮めると、force pushが複数のcommitを
-  持ち込んだときに中間のcommitを1つも見ない（[ADR-0021](../../docs/decisions/0021-declaration-audit-on-push.md)の`検証`で実測）。
-
-  | `git merge-base <after> origin/main` | 意味 | 見る範囲 |
-  |---|---|---|
-  | head と一致する | **`main`自身への push** | 直前の1 commit。**範囲は昇格 Pull Request で検査済みである** |
-  | 空を返す | **`origin/main`と共通祖先が無い** | `review_gate.py history --from-root`。**head から辿れるcommitをすべて見る** |
-  | それ以外 | 通常の branch 作成・force push | `main`へ入っていない範囲をすべて見る |
-
-  **2つに畳まない。**共通祖先が無い場合を「`main`への push」と同じ扱いにすると、
-  中間のcommitを1つも見ない（[#385](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/385)で実測）。
-  `--from-root`では`--base`は`CLASS`の計算にだけ使う。**`--not <起点>`は変わらず効くため、
-  起点より前を検査しない規則は弱まらない。**
-- `fetch-depth: 0`、`persist-credentials: false`は`review-gate.yml`と同じ理由である。
-- **`cancel-in-progress`を有効にしない。**pushごとに範囲が違うため、後のpushで
-  前の範囲の検査を打ち切ると、その範囲を誰も見なくなる。
+- merge baseを求めるため`fetch-depth: 0`、tokenをscriptから読めないよう`persist-credentials: false`を指定する。
 
 ### `host.yml` — host workspace
 
