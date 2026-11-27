@@ -159,6 +159,10 @@ hotfix/<issue>-<short-name>
 ```
 
 一つのbranchを、一Issue、一つのreview可能な目的に絞る。
+
+**共有branch（`main`／`develop`）の履歴を書き換えない。**他者がpullした可能性のあるbranchも共有として扱う。
+判断に迷うものは共有として扱う。
+
 `main`から緊急hotfixを行った場合は、同じ修正を`develop`にも取り込む。
 詳細は[ADR-0004](docs/decisions/0004-main-develop-branch-strategy.md)と
 [Development Workflow](docs/governance/development-workflow.md)を参照する。
@@ -399,7 +403,9 @@ Anthropicの[Code Reviewの文書](https://code.claude.com/docs/en/code-review)�
 - 変更は小さく保つ。見やすく、直しやすく、戻しやすくするためである。
 - 作業者がbuild・test・lintを走らせ、その出力をPull Request本文に示す。
 - 新しいcontextのsubagent（`.claude/agents/fresh-context-reviewer.md`）か`/code-review`で差分をレビューし、
-  `/security-review`も走らせる。`/security-review`はoriginの既定のbranch（`main`）との差分を見るため、
+  `/security-review`も走らせる。subagentは`Bash`を持たずgitを使えないため、呼ぶ側がbaseとの差分を
+  作業ツリーの外のfileに書き出し、そのpathを渡す。置き場所はセッションのscratchpadにする（subagentが許可なしで読める。ほかの場所は許可を求められ、backgroundのsubagentでは拒否されうる）。
+  作業ツリーはレビューするheadと同じcommitにしておく（subagentは周りのコードを作業ツリーから読む）。`/security-review`はoriginの既定のbranch（`main`）との差分を見るため、
   `develop`にあって`main`に無い変更も含まれる。**このPull Requestの差分の外の指摘はPre-existingとして扱う。**
 - **`/code-review`のeffortは毎回指定する。**指定しないと前回の値が使われる。安全・電気・サーボの制限・
   配線図と基板の変更は`high`で走らせる。
@@ -715,7 +721,6 @@ squash mergeしたbranchはcommit hashが変わるため、`git branch -d`が「
 | `@coderabbitai`へreviewを投げる前 | 同じ行の`review`が`full review`か（**`full`の付かない`review`は`deny`**）。対象PRのどれかのcommitでreviewが完走・進行中なら`full review`も**`deny`**。完走も進行中も無いPR（`Review rate limited`や`Review stopped after lock loss`の後を含む）への`full review`と、対象PRやcheckを判定できないときは`ask`。[`ask`の扱い](#手動で依頼する前に状態を確認する) | `scripts/hooks/coderabbit_gate.py` |
 | `gh pr merge`の前 | `--subject`と`--body`／`--body-file`があるか | `scripts/hooks/gh_metadata_guard.py` |
 | `git checkout -b`／`git switch -c`の前 | 基点が最新の`origin/develop`か | `scripts/hooks/branch_base_guard.py` |
-| 件数・不在の根拠になりうる列挙commandの前 | 明示的な切り詰め（`head -N`／`-n N`／`--limit N`）があるか | `scripts/hooks/truncation_guard.py` |
 | `git reset --hard`／`git clean`／checkout・switch・restoreによる破棄の前 | 捨てる範囲に未commitの変更があるか | `scripts/hooks/worktree_guard.py` |
 | 応答を終える前 | 完了の主張に、対応するtool呼び出しがあるか | `scripts/hooks/stop_claim_guard.py` |
 
@@ -777,8 +782,6 @@ hookは対象commandとは別のprocessとして起動されるため、command�
   **この穴で失うものは、hookによって違う。**申告の監査漏れで済む側と、
   **戻らない未commitの変更**が消える側がある。`SEPARATORS`に`|`／`(`／`)`は入っているが、
   **空白で囲まれていない限り`shlex`が語を切らないため届かない。**
-  `inspector_readonly_guard.py`は別の形で塞いでいる（**引用の外のmetacharacterと、
-  区切り語そのものを拒否する。**[ADR-0020](docs/decisions/0020-inspector-readonly-by-hook.md)）。
 - **heredocのbodyを、bodyをcommandとして実行する側へ流した場合。**`bash <<'EOF' … EOF`／
   `sh <<EOF`／`ssh host <<EOF`のbodyはbashが実行するが、hookはbodyを落とすため見ない。
   **`cat > file <<EOF`のためにbodyを落としており、受け取る側の綴りで絞っていない。**

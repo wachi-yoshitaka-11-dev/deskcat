@@ -10,18 +10,11 @@ Claude CodeのPreToolUse hookとして、Bash tool呼び出しの前に走る。
 なく、未commitの変更を失う操作である）。実行前にworking treeを確認する」と定めて
 いるが、**強制する仕組みが無く、モデルが規則を守ることだけに依存していた**
 （[#325](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/325)の候補1）。
-**`.claude/settings.json`が起動する8 hookに、捨てる側を見るものが無かった**
-（2026-09-16に`.claude/settings.json`と`scripts/hooks/`を読んで確認した。
-#325が同じことを2026-09-03に確認しているが、**その時点では`truncation_guard.py`と
-`stop_claim_guard.py`がまだ無い**。commitは2026-09-05／2026-09-06である）。
+**`.claude/settings.json`が起動するhookに、捨てる側を見るものが無かった**
+（2026-09-16に`.claude/settings.json`と`scripts/hooks/`を読んで確認した）。
 見ているのは、作る側（`branch_base_guard.py`）、
 申告する側（`gh_metadata_guard.py`／`coderabbit_gate.py`）、数える側
-（`truncation_guard.py`）、主張する側（`stop_claim_guard.py`）である。
-
-**`inspector_readonly_guard.py`だけは例外である。**allowlistで`reset`／`clean`／
-`checkout`を拒否しており、**捨てる側を既に見ている。**ただし対象は検査subagentの
-`Bash`だけであり（[ADR-0020](../../docs/decisions/0020-inspector-readonly-by-hook.md)）、
-`.claude/settings.json`へは意図的に置かれていない。**通常のsessionは通らない。**
+（`truncation_guard.py`。2026-11に削除）、主張する側（`stop_claim_guard.py`）である。
 
 **失った未commitの変更は戻らない。**commit済みのものはreflogから戻せるが、
 未commitの変更はどこにも残らない。**この検査が守るのはその差である。**
@@ -35,7 +28,7 @@ Claude CodeのPreToolUse hookとして、Bash tool呼び出しの前に走る。
 **working treeが汚れていなければ通す**（#325の「working treeが汚れていない場合の
 扱いを決め、記録する」への決定である）。失うものが無い呼び出しまで毎回askすると、
 `git checkout <branch>`のような日常の操作が止まり、**hookそのものが無視される側の
-失敗になる**（`truncation_guard.py`が同じ理由で対象を狭めている）。
+失敗になる**。
 
 **この決定には範囲がある。**次の2つは対象にしていない。
 

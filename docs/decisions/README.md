@@ -30,7 +30,7 @@
 | [ADR-0017](0017-what-counts-as-a-primary-source.md) | Accepted | 「一次資料」に当たるものを、出した主体と載り方で定める |
 | [ADR-0018](0018-instruction-file-structure.md) | Accepted (partially superseded) | 指示 file を、常時読み込みと path 限定に分ける |
 | [ADR-0019](0019-provenance-scope-by-nature.md) | Accepted (partially superseded) | 出所検証の範囲を性質で定め、機械の分類とは一致させない |
-| [ADR-0020](0020-inspector-readonly-by-hook.md) | Accepted | 検査 subagent の read-only を、sandbox ではなく agent 単位の hook で絞る |
+| [ADR-0020](0020-inspector-readonly-by-hook.md) | Superseded | 検査 subagent の read-only を、sandbox ではなく agent 単位の hook で絞る |
 | [ADR-0021](0021-declaration-audit-on-push.md) | Superseded | 宣言 trailer の検出を、hook ではなく共有 branch への push に置く |
 | [ADR-0022](0022-wokwi-not-a-ci-simulation-gate.md) | Accepted | Wokwi を CI の simulation gate として採らない |
 | [ADR-0023](0023-no-model-checking-for-now.md) | Accepted | サーボ安全制限と通信断の状態機械へ、いまモデル検査を導入しない |

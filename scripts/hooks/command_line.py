@@ -1,19 +1,16 @@
 #!/usr/bin/env python3
 """hookが受け取ったcommand文字列から、目的のprogramの呼び出しを取り出す。
 
-`hooks/`配下の他の9 hookが使う。**同じ判定を各hookへ複製しない。**
-**`invocations`を使うのは8 hookである。`truncation_guard.py`だけが使わず、`tokenize`／
-`SEPARATORS`／`TRANSPARENT_PREFIXES`／`is_program`を直接使う。**`invocations`を変えると
-8 hook、語の切り方（`tokenize`）を変えると9 hook全部の判定が動く。
+`hooks/`配下の他のhookが使う。**同じ判定を各hookへ複製しない。**
+`invocations`や語の切り方（`tokenize`）を変えると、使うhookすべての判定が動く。
 
 **hookの入力からcommandを取り出す`command_from`も持つ。**payloadの形の検査を
 各hookへ複製しないためである（#242）。
 
 **global optionの読み飛ばし（`skip_global_options`／`global_option_value`）も持つ。**
-**`inspector_readonly_guard.py`を除く8 hookが使う。**subcommandを位置で読む hook は、
+subcommandを位置で読む hook は、
 `gh --repo o/r pr create`のように**global optionを1語足すだけで検査が抜ける**
 （2026-09-17に`gh_metadata_guard.py`で実測。#325）。
-**`truncation_guard.py`はこれと`tokenize`系だけを使い、`invocations`は使わない。**
 
 **語がcommand位置にあるかを見る。**単に`gh`という語を探すと、`echo gh pr merge`のような
 引数を呼び出しと読んでしまう。実際にそれで、merge後に報告するhook（2026-11に削除）が誤報告した。
@@ -45,19 +42,12 @@ bashが実行しないheredocのbodyである。**#389が挙げたのは改行�
 **bashでは失敗するpushを証拠として数える。**これは`shlex`が`\r`を落とす以前からの性質であり、
 #389では変えていない。
 
-**`inspector_readonly_guard.py`は自分でも`\n+`で行分割する**（`LINE_SPLIT_RE`）。
-**`\r`ではそちらも割らず、CRを含む行をtokenize前に拒否する**（#384。[ADR-0020](../../docs/decisions/0020-inspector-readonly-by-hook.md)）。
-同hookは行へ割ってから`command_starts`を呼ぶため、**heredocの読み飛ばしはそこでは起きない**
-（`segments`へ改行が渡らない）。**判定が動くのはコメントの除去だけである。**
-向きは`segments`のdocstringに書いた。
-
 **取れないものは取れないままにする。**推測で拾うと誤検知になり、誤検知はhookそのものを
 無効化される側の失敗である。取り切れない範囲はCONTRIBUTINGの「hookが止めたとき」に書く。
 
 **このfileが「実測」と書いた挙動は、2026-09-12と2026-09-14に
 bash 5.1.16(1)-release／python3 3.10.12／git 2.34.1（Linux x86_64）で取得した。**
-**2026-09-14の分には日付を付けてある**（`inspector_readonly_guard.py`が#384で変わった後に
-測り直した分と、新しく測った分である）。**このfileの中では、日付の無い「実測」は
+**2026-09-14の分には日付を付けてある。このfileの中では、日付の無い「実測」は
 2026-09-12の分である。**
 **この規則をこのfileの外へ当てない。**`scripts/test_hooks.py`の「実測」は#389より前の
 Issueで書いたものを含み、日付の無いものが同じ日の測定だとは限らない。
@@ -275,46 +265,19 @@ def segments(command):
 
     **語頭の`#`から行末までは落とす。**bashと同じ扱いである（残すと
     `git push origin main # develop`の`develop`をrefspecとして数える）。
-    **`inspector_readonly_guard.py`の判定はこれで通る側へだけ動く。**動くのは2経路であり、
-    どちらも2026-09-14に実測した。
-    **1つはcommand位置の`#`である。**同hookはcommand位置のprogramをallowlistで見るため、
-    以前は`#`という語をallowlist外のprogramとして拒否していた。`# メモ`、
-    `# メモ`改行`git show …`、`git show …`改行`# メモ`が通るようになる。
-    `cat x # メモ`のように語の後ろへ置いた形は、以前からcommand位置ではない。
-    **これは行が語へ分けられる場合の話である。**同hookはコメントを落とす前に生の行を
-    `tokenize`するため、**コメントの中に閉じない引用符があると、行ごと拒否される**
-    （`git show … HEAD # それはできない。don't`。2026-09-14に実測。前後で変わらない）。
-    **もう1つは、コメントの中に書いた、拒否される側のoptionである。**同hookのoption検査は
-    `invocations`越しに引数を読むため、コメントごと落ちる。
-    `git show --no-ext-diff --no-textconv HEAD # --ext-diff`、`git version # --help`、
-    `git log --no-ext-diff --no-textconv -1 # %GK`、`rg pattern file # --pre sha1sum`は、
-    **以前は拒否され、今は通る。bashはどれも渡さない。**コメントの外へ同じoptionを出せば今も拒否する。
-    **拒否が増える形は無く、allowlistの外へ出る経路も増えない。**落とすのはbashも
-    実行しない範囲だからである。
-    **引用の外のmetacharacterと区切り語の拒否は、コメントを落とす前に決まる。**同hookは#384で
-    区切り語を、#396で引用の外のmetacharacterを、生の行に対して拒否する
-    （[ADR-0020](../../docs/decisions/0020-inspector-readonly-by-hook.md)）。
-    `cat x && # メモ`は`&&`という区切り語で、`git show … HEAD # ; rm -rf /`は
-    引用の外の`;`で拒否され、**前後で変わらない。**
-    **必須option側の抜け道も、ここでは閉じていない。**`git diff`／`show`／`log`／`blame`が要求する
-    2 optionは#384から**subcommandの直後2語**に無ければならず、
-    `git diff HEAD # --no-ext-diff --no-textconv`は**#389より前から拒否されている。**
-    **コメントを落としても結論は変わらない。**
 
     採らなかった案:
 
-    - **各hookで`\\n`で切る**（`inspector_readonly_guard.py`と同じ形）。同じ判定を
-      **#389が挙げた3 hookだけを直せば3箇所だが、`invocations`を使う7 hookは同じ区切りで
-      読む必要がある。**自分で分割済みの`inspector_readonly_guard.py`を除いて
-      **6箇所への複製になる。**加えて素朴に切ると、`git commit -m "題\\n\\n本文" && git push`の
+    - **各hookで`\\n`で切る**。同じ判定を
+      **#389が挙げた3 hookだけを直せば3箇所だが、`invocations`を使うhookはすべて同じ区切りで
+      読む必要があり、その数だけ複製になる。**加えて素朴に切ると、`git commit -m "題\\n\\n本文" && git push`の
       引用符が途中で切れて`tokenize`が失敗し、**同じcommandのpushを取り落とす。**
       `cat > doc.md <<'EOF'`のbodyに書いた`git push origin develop`は、
       **bashが実行しないのに呼び出しとして数える。**誤検知はhookそのものを
       無効化される側の失敗である
     - **`shlex`の設定で改行を語として出す**（`punctuation_chars="\\n"`かつ
       `whitespace=" \\t"`）。実測し、`['cat', 'x', '\\n', 'git', ...]`が
-      得られることは確かめた（**採らなかった案であり、testは持たない**）。採らないのは、**`tokenize`を`truncation_guard.py`と
-      `inspector_readonly_guard.py`が共有しており**、区切りの定義が変わると
+      得られることは確かめた（**採らなかった案であり、testは持たない**）。採らないのは、**`tokenize`をhookが共有しており**、区切りの定義が変わると
       それらの判定まで動くためである。**heredocのbodyもtokenizeの前に落とせない。**
     """
     found = []
@@ -492,9 +455,9 @@ def skip_global_options(tokens, program):
     **値を伴うoptionは2語、それ以外の`--`始まりと`GLOBAL_FLAGS`は1語として飛ばす。**
     値を伴う側を先に見る。逆にすると`gh --repo x pr list`の`x`をsubcommandと読む。
 
-    2026-09-16に[#325](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/325)で`truncation_guard.py`から移した。**2つ目のhookが同じ読み飛ばしを
+    2026-09-16に[#325](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/325)で、列挙commandの切り詰めを検査していたhook（2026-11に削除）から移した。**2つ目のhookが同じ読み飛ばしを
     要った時点で、複製ではなくここへ置く**（このmoduleの「同じ判定を各hookへ複製しない」）。
-    **移したのは`truncation_guard.py`の版だが、規則はpushを検査していたhook（2026-11に削除）の版に揃えた。**
+    **移したのはそのhookの版だが、規則はpushを検査していたhook（2026-11に削除）の版に揃えた。**
     前者は`-C`しか知らず、**`git --no-pager reset --hard`と`git -c key=value reset --hard`が
     subcommandを取り落として素通りしていた**（2026-09-16実測。git 2.43.0／
     python3 3.11.15／Linux x86_64）。**私有の版を残さない。**
@@ -516,75 +479,6 @@ def global_option_value(tokens, program, option):
     """
     _, values = _global_prefix(tokens, program)
     return values.get(option)
-
-
-def command_starts(command):
-    """command位置ごとに`(読み飛ばした前置語の並び, program語)`を返す。
-
-    `invocations`と`programs`が捨てている**前置語そのもの**を残す。
-    allowlistで判定するhook（`inspector_readonly_guard.py`）は、
-    **`sudo cat x`の`sudo`と`FOO=bar cat x`の`FOO=bar`を見る必要がある。**
-    透過させたまま`cat`だけを見ると、`sudo`付きの呼び出しが素通りする。
-
-    `sudo cat x && git show HEAD`は
-    `[(("sudo",), "cat"), ((), "git")]`を返す。
-
-    program語が無いまま区切りへ達した場合（`sudo && ls`の`sudo`）は
-    `(前置語, None)`を返す。**捨てない。**捨てると、呼び出し側が
-    「前置語だけの command は無かった」と読む。
-
-    **`invocations`と同じく`segments`で分けてから見る。**片方だけが改行を区切りとして
-    扱うと、2つの関数で command 位置の定義がずれる。
-    """
-    found = []
-    for segment in segments(command):
-        found.extend(_starts_in(segment))
-    return found
-
-
-def _starts_in(command):
-    """改行を含まない1つのcommandから、command位置の並びを取り出す。"""
-    found = []
-    skipped = []
-    at_command_position = True
-    for token in tokenize(command):
-        if token in SEPARATORS:
-            if skipped:
-                found.append((tuple(skipped), None))
-                skipped = []
-            at_command_position = True
-            continue
-        if not at_command_position:
-            continue
-        if token in TRANSPARENT_PREFIXES:
-            skipped.append(token)
-            continue
-        if "=" in token and not token.startswith("-"):
-            # `VAR=value`の代入は、後ろのcommandへ透過する。
-            skipped.append(token)
-            continue
-        found.append((tuple(skipped), token))
-        skipped = []
-        at_command_position = False
-    if skipped:
-        found.append((tuple(skipped), None))
-    return found
-
-
-def programs(command):
-    """command位置に現れたprogram語を、現れた順に返す。
-
-    `invocations`が「特定のprogramを探す」のに対し、こちらは**何が呼ばれているかを
-    列挙する。**列挙する側を各hookへ複製せず、command位置の判定をこの module へ寄せる。
-
-    `cat x && git show HEAD`は`["cat", "git"]`を返す。`echo git`は`["echo"]`だけを返す。
-    **前置語は落ちる。**前置語まで要る呼び出し側は`command_starts`を使う。
-
-    **`tokenize`が空を返した場合と、実際にcommandが空の場合を区別しない。**
-    呼び出し側が「空なら安全」と読まないよう、この関数は判定をしない。
-    `inspector_readonly_guard.py`は tokenize の失敗を別途 fail closed で扱う。
-    """
-    return [program for _, program in command_starts(command) if program is not None]
 
 
 def command_from(payload):

@@ -282,4 +282,6 @@ path限定で正しく届く。**採らない。**`.claude/`は公開されな�
 
 ## 後継の決定
 
-[#813](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/813)の「レビューの仕組み」を[#814](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/814)の作業リストの2で`CONTRIBUTING.md`へ書いたとき、本ADRの決定4（read-onlyの検査subagentを2つ置く）を置き換えた。`consistency-inspector`を消し、`fresh-context-reviewer`に1本化した。**決定4のそのほかの部分（`tools`と`model`）と、ほかの決定は本ADRのままである。**
+[#813](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/813)の「レビューの仕組み」を[#814](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/814)の作業リストの2で`CONTRIBUTING.md`へ書いたとき、本ADRの決定4（read-onlyの検査subagentを2つ置く）を置き換えた。`consistency-inspector`を消し、`fresh-context-reviewer`に1本化した。
+
+作業リストの4では、決定4の`tools`を置き換えた。`fresh-context-reviewer`の`tools`から`Bash`を外して`Read, Grep, Glob`にし、差分は呼ぶ側が作業ツリーの外のfileに書き出して渡す（[CONTRIBUTINGの「自己レビュー」](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/CONTRIBUTING.md#自己レビュー)）。**決定4のそのほかの部分（`model`）と、ほかの決定は本ADRのままである。**
