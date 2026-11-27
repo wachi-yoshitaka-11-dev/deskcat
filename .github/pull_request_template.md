@@ -8,7 +8,7 @@ Closes #
 
 ## 作業リストの項目
 
-<!-- このpull requestが埋める、Issueの作業リストの項目を書く（CONTRIBUTINGの「作業リストの決まり」）。Issueが不要な変更では、その理由を書く。 -->
+<!-- このpull requestが埋める、Issueの作業リストの項目を書く（CONTRIBUTINGの「作業リストの決まり」）。Issueが不要な変更では「Issueなし：」と理由を書く（この節は消さない）。 -->
 
 ## 範囲
 
