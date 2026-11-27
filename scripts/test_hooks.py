@@ -705,6 +705,8 @@ class CodeRabbitReviewMergeGateTests(unittest.TestCase):
             "docs/hardware/power-budget.md",
             "docs/hardware/servo-safety-limits.md",
             "docs/governance/hardware-safety-policy.md",
+            "docs/governance/ai-agent-policy.md",
+            "docs/governance/development-workflow.md",
             ".github/workflows/pages.yml",
             "scripts/hooks/gh_metadata_guard.py",
             ".githooks/pre-commit",
