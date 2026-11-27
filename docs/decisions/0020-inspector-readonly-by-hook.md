@@ -575,4 +575,4 @@ subagent を使い捨ての git worktree で動かす `isolation` field があ�
 
 ## 後継の決定
 
-[#813](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/813)の「レビューの仕組み」を[#814](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/814)の作業リストの4で進めたとき、本ADRの決定をすべて置き換えた。再評価の条件の3つ目（検査 agent が `git` を必要としなくなったとき）に当たる。`fresh-context-reviewer`の`tools`から`Bash`を外して`Read, Grep, Glob`にし、差分は呼ぶ側が作業ツリーの外のfileに書き出して渡す（[CONTRIBUTINGの「自己レビュー」](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/CONTRIBUTING.md#自己レビュー)）。`Bash`が無いため、agent の frontmatter の`hooks`と`scripts/hooks/inspector_readonly_guard.py`を消した。
+[#813](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/813)の「レビューの仕組み」を[#814](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/814)の作業リストの4で進めたとき、本ADRの決定をすべて置き換えた。差分を呼ぶ側が作業ツリーの外のfileに書き出して渡す形に変えたため、検査 agent が `git` を必要としなくなった。これが再評価の条件の3つ目に当たる。そのうえで`fresh-context-reviewer`の`tools`から`Bash`を外して`Read, Grep, Glob`にした（[CONTRIBUTINGの「自己レビュー」](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/CONTRIBUTING.md#自己レビュー)）。`Bash`が無いため、agent の frontmatter の`hooks`と`scripts/hooks/inspector_readonly_guard.py`を消した。

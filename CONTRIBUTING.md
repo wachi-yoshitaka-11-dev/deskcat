@@ -402,10 +402,11 @@ Anthropicの[Code Reviewの文書](https://code.claude.com/docs/en/code-review)�
 
 - 変更は小さく保つ。見やすく、直しやすく、戻しやすくするためである。
 - 作業者がbuild・test・lintを走らせ、その出力をPull Request本文に示す。
-- 新しいcontextのsubagent（`.claude/agents/fresh-context-reviewer.md`）か`/code-review`で差分をレビューし、
-  `/security-review`も走らせる。subagentは`Bash`を持たずgitを使えないため、呼ぶ側がbaseとの差分を
+- 新しいcontextのsubagent（`.claude/agents/fresh-context-reviewer.md`）か`/code-review`で差分をレビューする。
+  subagentは`Bash`を持たずgitを使えないため、呼ぶ側がbaseとの差分を
   作業ツリーの外のfileに書き出し、そのpathを渡す。置き場所はセッションのscratchpadにする（subagentが許可なしで読める。ほかの場所は許可を求められ、backgroundのsubagentでは拒否されうる）。
-  作業ツリーはレビューするheadと同じcommitにしておく（subagentは周りのコードを作業ツリーから読む）。`/security-review`はoriginの既定のbranch（`main`）との差分を見るため、
+  作業ツリーはレビューするheadと同じcommitにしておく（subagentは周りのコードを作業ツリーから読む）。
+  `/security-review`も走らせる。`/security-review`はoriginの既定のbranch（`main`）との差分を見るため、
   `develop`にあって`main`に無い変更も含まれる。**このPull Requestの差分の外の指摘はPre-existingとして扱う。**
 - **`/code-review`のeffortは毎回指定する。**指定しないと前回の値が使われる。安全・電気・サーボの制限・
   配線図と基板の変更は`high`で走らせる。
