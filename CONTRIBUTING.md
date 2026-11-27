@@ -441,7 +441,7 @@ Anthropicの[Code Reviewの文書](https://code.claude.com/docs/en/code-review)�
 
 - CIのworkflow：`.github/workflows/`
 - hook：`scripts/hooks/`、`.githooks/`、`.claude/settings.json`
-- 指示と規則：`AGENTS.md`、`CLAUDE.md`、`CONTRIBUTING.md`
+- 指示と規則：`AGENTS.md`、`CLAUDE.md`、`CONTRIBUTING.md`、`docs/governance/ai-agent-policy.md`、`docs/governance/development-workflow.md`
 - 安全・電気・サーボの制限・ピンの割り当て・電源の正本の文書：`docs/governance/hardware-safety-policy.md`、
   `docs/hardware/servo-safety-limits.md`、`docs/hardware/gpio-assignment.md`、`docs/hardware/power-budget.md`
 - 基板（KiCadのfile）：`hardware/deskcat.kicad_pcb`、`hardware/deskcat.kicad_sch`、`hardware/deskcat.kicad_pro`、

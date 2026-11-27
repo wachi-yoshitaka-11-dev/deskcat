@@ -127,6 +127,8 @@ REVIEW_TARGET_FILES = (
     "docs/hardware/gpio-assignment.md",
     "docs/hardware/power-budget.md",
     "docs/hardware/servo-safety-limits.md",
+    "docs/governance/ai-agent-policy.md",
+    "docs/governance/development-workflow.md",
     "docs/governance/hardware-safety-policy.md",
     "hardware/deskcat.kicad_pcb",
     "hardware/deskcat.kicad_sch",
@@ -630,8 +632,8 @@ def _check_coderabbit_review(args, global_repo):
 
     **確認できない場合もdenyする。**`gh`が失敗する、応答を読めない、のいずれでも
     「完走している」とは言えない。**逃げ道は足さない**（`DESKCAT_SKIP_GH_GUARD`も効かない）。
-    base（`main`の昇格を含む）は区別しない。昇格もCONTRIBUTINGの昇格の節1が
-    手動reviewの対象と定めている。
+    base（`main`の昇格を含む）は区別しない。CONTRIBUTINGの昇格の節1も、範囲が
+    慎重に扱うpathに触れるときに手動reviewの対象と定めている。
     """
     if _is_help(args):
         return
