@@ -277,7 +277,9 @@ boardへのitem追加はPull Requestが存在しないと行えないため、�
 
 ### 関連Issueの書き方
 
-Issue branchからのPull Request（base `develop`）では`Closes #N`を使う。これはtraceability
+Issue branchからのPull Request（base `develop`）では`Closes #N`を使う。**ただし、[作業リスト](#作業リストの決まり)の
+途中の項目を埋め、Issueを閉じないPull Requestでは`Refs: #N`を使う**（下の「IssueをcloseしないPull Request」の手順に従う）。
+`Closes #N`はtraceability
 目的の記載であり、GitHub純正の自動close機能は使わない。closeを起こすのはdefault branch
 （`main`）へのmergeだけであり、base `develop`のmergeでは働かないためである。
 
