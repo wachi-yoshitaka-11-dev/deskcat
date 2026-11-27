@@ -1,6 +1,6 @@
 # ADR-0019: 出所検証の範囲を性質で定め、機械の分類とは一致させない
 
-> 状態: Accepted
+> 状態: Accepted (partially superseded)
 > 日付: 2026-09-10
 
 ## 背景
@@ -135,3 +135,7 @@ Development Workflow、Hardware Safety Policy、ADR、`docs/hardware/`、`docs/p
 
 なし。[ADR-0018](0018-instruction-file-structure.md)を補足する。同ADRは指示 file の**置き場所**を決めたが、
 **出所検証の適用範囲**は扱っていない。
+
+## 後継の決定
+
+[#813](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/813)の「レビューの仕組み」を[#814](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/814)の作業リストの2で`CONTRIBUTING.md`へ書いたとき、本ADRの決定5（出所検証の範囲と`INSTRUCTION_SOURCES`を一致させない）の対象が無くなった。`INSTRUCTION_SOURCES`は`review_gate.py`と一緒に消した。**決定1〜4（出所検証を性質で判定すること）は本ADRのままである。**

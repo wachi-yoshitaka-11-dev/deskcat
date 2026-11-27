@@ -1,6 +1,6 @@
 # ADR-0010: 変更の分類を機械化し、自己レビューをcommit trailerで宣言する
 
-> 状態: Accepted
+> 状態: Superseded
 > 日付: 2026-08-21
 
 ## 背景
@@ -142,3 +142,5 @@ Markdownの差分を解析し、typoの修正か意味の変更かを判定す�
 **本ADRの決定3は変わらない。**「規約の言い回し」は軽微経路（Issue不要かつPull Request不要）へ
 戻っていない。ADR-0011が動かしたのはIssueの要否だけであり、意味を変えない記述修正は
 Issue不要でPull Requestは必要になった。
+
+[#813](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/813)の「レビューの仕組み」を[#814](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/814)の作業リストの2で`CONTRIBUTING.md`へ書いたとき、本ADRの決定をすべて置き換えた。変更の分類（`review_gate.py`）と、trailerによる自己レビューの宣言とその検査をやめた。直接反映の経路は無く、repositoryへの変更は必ずPull Requestを通す（[CONTRIBUTINGの「Issueを立てずに直接反映してよい範囲」](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/CONTRIBUTING.md#issueを立てずに直接反映してよい範囲)）。レビューは[CONTRIBUTINGの「自己レビュー」](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/CONTRIBUTING.md#自己レビュー)と[CONTRIBUTINGの「Pull Requestのレビュー」](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/CONTRIBUTING.md#pull-requestのレビュー)が持つ。

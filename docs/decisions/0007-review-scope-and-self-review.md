@@ -1,6 +1,6 @@
 # ADR-0007: 自動reviewを高リスク変更へ限定し、自己レビューを主軸とする
 
-> 状態: Accepted
+> 状態: Accepted (partially superseded)
 > 日付: 2026-08-10
 
 ## 背景
@@ -161,3 +161,5 @@ label allowlistによる自動reviewの発火制御は廃止され、reviewは�
 **置き換えられたのは決定1だけである。**決定2（自己レビューのchecklistと回数）、
 決定4（branch protection）、決定5（templateを変更しない）は本ADRのままである。
 決定3（直接反映の範囲）は上記のとおりADR-0010とADR-0011が狭めた。
+
+[#813](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/813)の「レビューの仕組み」を[#814](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/814)の作業リストの2で`CONTRIBUTING.md`へ書いたとき、本ADRの決定2（自己レビューのchecklistと回数）、決定3（直接反映の範囲）、決定5（templateを変更しない）を置き換えた。自己レビューは[CONTRIBUTINGの「自己レビュー」](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/CONTRIBUTING.md#自己レビュー)と[CONTRIBUTINGの「Pull Requestのレビュー」](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/CONTRIBUTING.md#pull-requestのレビュー)が持つ。repositoryへの変更は必ずPull Requestを通す（[CONTRIBUTINGの「Issueを立てずに直接反映してよい範囲」](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/CONTRIBUTING.md#issueを立てずに直接反映してよい範囲)）。templateは同じ変更で書き換えた。**決定4（`Require conversation resolution before merging`）は本ADRのままである。**

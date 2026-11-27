@@ -1,6 +1,6 @@
 # ADR-0021: 宣言 trailer の検出を、hook ではなく共有 branch への push に置く
 
-> 状態: Accepted
+> 状態: Superseded
 > 日付: 2026-09-10
 
 ## 背景
@@ -197,3 +197,7 @@ squash commit が`Change-Class`・`Self-Review`・`Instruction-Change`を失う�
 
 なし。[ADR-0010](0010-change-class-and-review-declaration.md)が定めた宣言の検査に、
 **経路に依らない検出点を 1 つ足す。**同 ADR の分類も宣言も変えていない。
+
+## 後継の決定
+
+[#813](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/813)の「レビューの仕組み」を[#814](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/814)の作業リストの2で`CONTRIBUTING.md`へ書いたとき、本ADRの決定をすべて置き換えた。宣言trailerをやめたため、`declaration-audit.yml`と、それが呼ぶ`review_gate.py`を消した。

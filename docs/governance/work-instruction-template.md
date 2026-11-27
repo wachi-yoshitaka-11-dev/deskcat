@@ -94,7 +94,7 @@ merge後に機械で確かめられることをまとめてある。**同skill�
 （[ADR-0018](../decisions/0018-instruction-file-structure.md)で`AGENTS.md`から移した）。**その作業だけに必要な追加の検証があるときだけ、
 「この作業に固有のこと」へ1行で書く。**
 
-**`## Pull Requestの規約`を書かない。**base、squash、label、milestone、trailer、
+**`## Pull Requestの規約`を書かない。**base、squash、label、milestone、
 関連Issueの書き方、merge前の承認は、すべてCONTRIBUTINGが持つ。
 
 ## 渡す側と受け取る側の確認

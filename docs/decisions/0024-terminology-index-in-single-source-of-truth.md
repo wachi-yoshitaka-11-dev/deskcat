@@ -70,7 +70,7 @@
 **確認したのは、各用語について定義そのものを
 持つと見出しから分かるfile（[Hardware Safety Policy](../governance/hardware-safety-policy.md)の
 `### 安全要件の5項目`と`#### 一次資料に当たるもの`、[AI Agent Policy](../governance/ai-agent-policy.md)の
-`### 「承認済みのリポジトリポリシー」の範囲`、[CONTRIBUTING](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/CONTRIBUTING.md#後始末fixupの範囲)の
+`### 「承認済みのリポジトリポリシー」の範囲`、[CONTRIBUTING](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/097a677801eefa7342512c8fc0abe684b9a72407/CONTRIBUTING.md#後始末fixupの範囲)の
 `### 後始末（fixup）の範囲`、および`docs/hardware/tbd-register.md`自体）と、
 残りのfileのうち数件を無作為に開き、**定義を書き直さずその用語をそのまま使っている
 ことを確認した。**残りの全fileを1件ずつ照合してはいない。**「1つだけ」は、この確認の範囲での
@@ -171,7 +171,7 @@ Single Source of Truth表へ、ADR番号を持たない用語の行を数行足�
    | 一次資料に当たるもの | [Hardware Safety Policy](../governance/hardware-safety-policy.md#一次資料に当たるもの) |
    | 「承認済みのリポジトリポリシー」の範囲 | [AI Agent Policy](../governance/ai-agent-policy.md)の「「承認済みのリポジトリポリシー」の範囲」節 |
    | ハードウェアTBDの状態と解決手順 | [Hardware TBD Register](../hardware/tbd-register.md) |
-   | Issueを立てずに直接反映してよい範囲（後始末／`fixup`を含む） | [CONTRIBUTING](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/CONTRIBUTING.md#後始末fixupの範囲)の「後始末（`fixup`）の範囲」節 |
+   | Issueを立てずに直接反映してよい範囲（後始末／`fixup`を含む） | [CONTRIBUTING](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/097a677801eefa7342512c8fc0abe684b9a72407/CONTRIBUTING.md#後始末fixupの範囲)の「後始末（`fixup`）の範囲」節 |
 
    **「承認済みのリポジトリポリシー」の行にanchorを付けていない。**該当見出し
    （`docs/governance/ai-agent-policy.md`の`### 「承認済みのリポジトリポリシー」の範囲`）は

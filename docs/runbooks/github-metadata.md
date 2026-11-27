@@ -74,7 +74,7 @@ closeは`state: closed`、`Status: Done`、`Target date: @closed`を同じplan�
 DoneはIssueを自動closeし得るため、stateを省いたDone更新は拒否する。
 reopenは`state: open`、active Status、新しいTarget dateのplanと新しいjournalを用意する。
 再closeは再び`@closed`を使う。日付は操作後のtimestampを読み戻して決める。
-PR merge自体は既存の承認・trailer手順で実施し、その後にcheck/applyで実績を確認する。
+PR merge自体は既存の承認と`--subject`／`--body-file`の手順で実施し、その後にcheck/applyで実績を確認する。
 このCLIはmerge権限を追加しない。
 
 ## 部分成功・反映待ちからの復旧
@@ -104,7 +104,7 @@ GitHubとのcompare-and-swapは無いためread/write間の競合余地は残る
 | ローカルapply | 既存認証でAPI更新と再取得。不一致・API失敗で完了を止める。このcommandを通った操作に効く |
 | ローカルcheck/audit | CLI/MCP/UIなど経路を問わず保存済みの実値を事後検出。実行時点だけを見る |
 | Metadata audit CI | Issue/PRイベントと手動dispatchでrepository内fieldだけをread-back。Project・日付・条件の意味は未検査。trusted baseのcodeを使い、PR headをtoken付きで実行しない |
-| 既存Bash hook | create option/template、merge trailerの事前検査。実値検査と同義ではなく、MCP/UI/Codexを網羅しない |
+| 既存Bash hook | create option/template、mergeの`--subject`／本文の事前検査。実値検査と同義ではなく、MCP/UI/Codexを網羅しない |
 | merge前後 | merge実施者がcheckを行う。CI checkは現在必須ではなく、管理者を含む全merge経路の強制停止にはならない |
 
 CIは短期`GITHUB_TOKEN`のread権限のみ。Project tokenや新しいsecretは追加しない。

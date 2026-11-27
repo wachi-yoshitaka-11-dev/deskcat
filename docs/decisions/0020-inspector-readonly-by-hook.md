@@ -124,7 +124,7 @@ subagent を使い捨ての git worktree で動かす `isolation` field があ�
 `git worktree add wt HEAD` を実行し、**元の file は変更後、worktree 側の file は変更前**だった）。
 **ただし、subagent の `isolation` が内部で `git worktree add` を使うと公式文書が書いているわけではない。**
 `isolation` の実装は確かめていない。**この却下は、`git worktree` の挙動からの推論である。**
-**自己レビューは未 commit の最終 diff に対して行う**（[CONTRIBUTING の「2つのPass」](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/CONTRIBUTING.md#2つのpass)が
+**自己レビューは未 commit の最終 diff に対して行う**（[CONTRIBUTING の「2つのPass」](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/097a677801eefa7342512c8fc0abe684b9a72407/CONTRIBUTING.md#2つのpass)が
 「最終diffに対して行う」と定め、commit 前に宣言 trailer を書く運用になっている）。
 **そのため、この用途では成立しない。**
 
