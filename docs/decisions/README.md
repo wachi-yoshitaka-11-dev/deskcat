@@ -17,21 +17,21 @@
 | [ADR-0004](0004-main-develop-branch-strategy.md) | Accepted | `main`と`develop`の二段階branch運用 |
 | [ADR-0005](0005-standard-development-os.md) | Accepted | 開発環境の標準OSを実機Linuxとする |
 | [ADR-0006](0006-validation-script-language.md) | Accepted | 検証scriptの実装言語をPythonとする |
-| [ADR-0007](0007-review-scope-and-self-review.md) | Accepted | 自動reviewを高リスク変更へ限定し、自己レビューを主軸とする |
+| [ADR-0007](0007-review-scope-and-self-review.md) | Accepted (partially superseded) | 自動reviewを高リスク変更へ限定し、自己レビューを主軸とする |
 | [ADR-0008](0008-firmware-protocol-crate-reuse.md) | Accepted | Firmwareから`deskcat-protocol`をpath dependencyで再利用する |
 | [ADR-0009](0009-pages-own-layout.md) | Accepted | Pagesのlayoutとstylesheetを自前で保持する |
-| [ADR-0010](0010-change-class-and-review-declaration.md) | Accepted | 変更の分類を機械化し、自己レビューをcommit trailerで宣言する |
-| [ADR-0011](0011-issue-optional-pull-request-required.md) | Accepted | Issueの要否とPull Requestの要否を分ける |
+| [ADR-0010](0010-change-class-and-review-declaration.md) | Superseded | 変更の分類を機械化し、自己レビューをcommit trailerで宣言する |
+| [ADR-0011](0011-issue-optional-pull-request-required.md) | Accepted (partially superseded) | Issueの要否とPull Requestの要否を分ける |
 | [ADR-0012](0012-milestones-count-issues-only.md) | Accepted | milestoneはIssueだけに設定する |
 | [ADR-0013](0013-manual-only-coderabbit-review.md) | Accepted (partially superseded) | CodeRabbitの自動reviewを廃止し、手動依頼だけにする |
 | [ADR-0014](0014-safety-requirements-and-general-values.md) | Accepted | 安全要件を5項目に固定し、それ以外は一般値で開始してよいものとする |
-| [ADR-0015](0015-fixup-class-and-direct-commit-scope.md) | Accepted | 後始末を宣言専用の区分として足し、直接commitの基準を到達できる形へ変える |
+| [ADR-0015](0015-fixup-class-and-direct-commit-scope.md) | Superseded | 後始末を宣言専用の区分として足し、直接commitの基準を到達できる形へ変える |
 | [ADR-0016](0016-evidence-bar-inside-the-safety-requirements.md) | Accepted | 安全要件の中で、判定に効く数と資格として求める数を分ける |
 | [ADR-0017](0017-what-counts-as-a-primary-source.md) | Accepted | 「一次資料」に当たるものを、出した主体と載り方で定める |
-| [ADR-0018](0018-instruction-file-structure.md) | Accepted | 指示 file を、常時読み込みと path 限定に分ける |
-| [ADR-0019](0019-provenance-scope-by-nature.md) | Accepted | 出所検証の範囲を性質で定め、機械の分類とは一致させない |
+| [ADR-0018](0018-instruction-file-structure.md) | Accepted (partially superseded) | 指示 file を、常時読み込みと path 限定に分ける |
+| [ADR-0019](0019-provenance-scope-by-nature.md) | Accepted (partially superseded) | 出所検証の範囲を性質で定め、機械の分類とは一致させない |
 | [ADR-0020](0020-inspector-readonly-by-hook.md) | Accepted | 検査 subagent の read-only を、sandbox ではなく agent 単位の hook で絞る |
-| [ADR-0021](0021-declaration-audit-on-push.md) | Accepted | 宣言 trailer の検出を、hook ではなく共有 branch への push に置く |
+| [ADR-0021](0021-declaration-audit-on-push.md) | Superseded | 宣言 trailer の検出を、hook ではなく共有 branch への push に置く |
 | [ADR-0022](0022-wokwi-not-a-ci-simulation-gate.md) | Accepted | Wokwi を CI の simulation gate として採らない |
 | [ADR-0023](0023-no-model-checking-for-now.md) | Accepted | サーボ安全制限と通信断の状態機械へ、いまモデル検査を導入しない |
 | [ADR-0024](0024-terminology-index-in-single-source-of-truth.md) | Accepted | 用語の索引を、既存の Single Source of Truth 表へ追加する形で置く |

@@ -13,10 +13,8 @@
 図の更新漏れとして落とす。意味は判定しない。
 
 図に関係しない変更（配線を変えていない試験の記録など）は、**理由を書いた明示の宣言**が
-あるときだけ通す。宣言は次のどちらかで、理由が`MIN_REASON_LENGTH`字未満なら受け付けない。
-
-- head commit messageのtrailer `Wiring-Figure: not-applicable <理由>`
-- Pull Request本文の行 `Wiring-Figure: not-applicable <理由>`
+あるときだけ通す。宣言はPull Request本文の行 `Wiring-Figure: not-applicable <理由>` で、
+理由が`MIN_REASON_LENGTH`字未満なら受け付けない。commit messageは読まない。
 
 `kicad_sch`は要求しない。穴位置や線色の変更は論理回路を変えないためである。論理接続が
 変わる場合は`hardware/README.md`のとおり同じPRで更新する（この検査の対象外）。
@@ -29,28 +27,61 @@ import subprocess
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-
-import review_gate  # noqa: E402
-
 LOG_PATH = "docs/hardware/experiment-log.md"
 FIGURE_PATH = "hardware/breadboard/layout.svg"
 
 WIRING_ROW_PREFIX = "| Wiring revision |"
 
-TRAILER_NAME = "Wiring-Figure"
+DECLARATION_NAME = "Wiring-Figure"
 DECLARATION_VALUE = "not-applicable"
 MIN_REASON_LENGTH = 10
 
 BODY_DECLARATION_RE = re.compile(
-    rf"^[ \t]*{TRAILER_NAME}:[ \t]*{DECLARATION_VALUE}[ \t]+(?P<reason>\S.*?)[ \t]*$",
+    rf"^[ \t]*{DECLARATION_NAME}:[ \t]*{DECLARATION_VALUE}[ \t]+(?P<reason>\S.*?)[ \t]*$",
     re.MULTILINE,
 )
 
 
+def _git(root, arguments):
+    """`git`を実行して標準出力を返す。失敗は`SystemExit`にする。"""
+    try:
+        result = subprocess.run(
+            ["git", "-C", root, *arguments],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+    except OSError as error:
+        raise SystemExit(f"git {' '.join(arguments)} failed: {error}") from error
+    if result.returncode != 0:
+        raise SystemExit(
+            f"git {' '.join(arguments)} failed: {result.stdout}{result.stderr}".strip()
+        )
+    return result.stdout
+
+
+def _merge_base(root, base, head):
+    """差分の起点を merge base にする。共通の祖先が無ければ`base`を返す。
+
+    `base`に渡るのは base branch の tip である。端点の差分にすると、branch 点より後に
+    base branch へ入った変更が、このPull Requestの変更として混ざる。
+    """
+    result = subprocess.run(
+        ["git", "-C", root, "merge-base", base, head],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    if result.returncode != 0:
+        return base
+    return result.stdout.strip() or base
+
+
 def changed_wiring_rows(root, merge_base, head):
     """`experiment-log.md`で追加・変更された`Wiring revision`の行を返す。"""
-    diff = review_gate._git(
+    diff = _git(
         root,
         ["diff", "--unified=0", "--no-color", merge_base, head, "--", LOG_PATH],
     )
@@ -69,7 +100,7 @@ def figure_changed(root, merge_base, head):
     **削除は更新に数えない。**`--diff-filter=d`で削除を除く。図を消したPull Requestは、
     理由つきの宣言（`declared_reason`）が無ければ通らない。
     """
-    names = review_gate._git(
+    names = _git(
         root,
         ["diff", "--name-only", "--diff-filter=d", merge_base, head, "--", FIGURE_PATH],
     )
@@ -88,12 +119,8 @@ def _valid_reason(reason):
     return not (reason.startswith("<") and reason.endswith(">"))
 
 
-def declared_reason(root, head, pr_body):
-    """理由つきの宣言があればその理由を返す。無い、または理由が短ければ`None`。"""
-    for value in review_gate.trailers(root, head).get(TRAILER_NAME, []):
-        prefix, _, reason = value.partition(" ")
-        if prefix == DECLARATION_VALUE and _valid_reason(reason):
-            return reason.strip()
+def declared_reason(pr_body):
+    """本文に理由つきの宣言があればその理由を返す。無い、または理由が短ければ`None`。"""
     for match in BODY_DECLARATION_RE.finditer(pr_body or ""):
         if _valid_reason(match.group("reason")):
             return match.group("reason")
@@ -102,21 +129,21 @@ def declared_reason(root, head, pr_body):
 
 def check(root, base, head, pr_body=""):
     """`(ok, message)`を返す。"""
-    merge_base = review_gate._merge_base(root, base, head)
+    merge_base = _merge_base(root, base, head)
     rows = changed_wiring_rows(root, merge_base, head)
     if not rows:
         return True, "Wiring revision の行の追加・変更は無い。検査対象外。"
     if figure_changed(root, merge_base, head):
         return True, f"{FIGURE_PATH} が同じ範囲で更新されている。"
-    reason = declared_reason(root, head, pr_body)
+    reason = declared_reason(pr_body)
     if reason is not None:
         return True, f"{FIGURE_PATH} は更新していないが、理由つきの宣言がある: {reason}"
     return False, (
         f"{LOG_PATH} の `Wiring revision` の行が {len(rows)} 行追加・変更されたが、"
         f"{FIGURE_PATH} が更新されていない。\n"
         "配線を変えたなら、同じPRで配線図を更新する（hardware/README.md）。\n"
-        "図に関係しない変更なら、head commit のtrailer または PR 本文に、"
-        f"`{TRAILER_NAME}: {DECLARATION_VALUE} <理由（{MIN_REASON_LENGTH}字以上）>` を書く。"
+        "図に関係しない変更なら、PR 本文に、"
+        f"`{DECLARATION_NAME}: {DECLARATION_VALUE} <理由（{MIN_REASON_LENGTH}字以上）>` を書く。"
     )
 
 

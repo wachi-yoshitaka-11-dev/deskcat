@@ -56,11 +56,10 @@ https://code.claude.com/docs/en/hooks は、auto modeのhookの`ask`は
    reviewが走った後の直しの commit、1回は初回で空振りした。
 
 **AI側の記憶には禁止規則が既にあり、すべて破った。**記憶は参照するかどうかが
-AIの判断に依存する。**同じ型を記憶では止められていない。**`push_gate.py`が
-`develop`への直接pushを門で止めているのと同じ扱いにする。
+AIの判断に依存する。**同じ型を記憶では止められていない。**そのため機構で止める。
 
 **判定は字句と、対象PRのcheck-runの状態で行う。**意味は判定しない。
-`review_gate.py`と同じ方針である。GitHubの読み方と、読めないときに通さない扱いは
+GitHubの読み方と、読めないときに通さない扱いは
 `gh_metadata_guard.py`の完走の判定に揃えた。
 """
 

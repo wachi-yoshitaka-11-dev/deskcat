@@ -6,7 +6,7 @@ Claude CodeのPreToolUse hookとして、Bash tool呼び出しの前に走る。
 
 **なぜ作るか。**件数や不在を主張する根拠として使った列挙commandが、切り詰められた
 出力を全数として読まれた事例が起きている。`head -8`で17件を8件と読んだ（2回）。
-既存hook（`gh_metadata_guard.py`／`branch_base_guard.py`／`push_gate.py`）は
+既存hook（`gh_metadata_guard.py`／`branch_base_guard.py`）は
 commandの構造（`--project`の有無等）だけを見ており、出力の完全性は見ていない
 （[#349](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/349)）。
 
@@ -53,7 +53,7 @@ boardのitem 352件。1000はいずれの3倍前後ある。**この閾値を超
 区別できない。**`coderabbit_gate.py`が同種の判断（誤検知の代償は確認1回、見逃しの
 代償はこの検査が在る理由そのもの）で`ask`を採っており、同じ理由でここも`ask`にする。
 
-**判定は字句だけで行う。**`review_gate.py`／`gh_metadata_guard.py`と同じ方針である。
+**判定は字句だけで行う。**`gh_metadata_guard.py`と同じ方針である。
 shellの意味論は再現しない。`command_line.py`が取れない範囲（alias、`xargs`経由等）は
 ここでも取れない。
 

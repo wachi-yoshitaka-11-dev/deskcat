@@ -1,6 +1,6 @@
 # ADR-0018: 指示 file を、常時読み込みと path 限定に分ける
 
-> 状態: Accepted
+> 状態: Accepted (partially superseded)
 > 日付: 2026-09-09
 > 起案: AIが起案した。**方針はユーザーが選択した。**
 > **内容に対する人間の承認は、この決定を含むPull Requestのmergeで得る。**
@@ -279,3 +279,7 @@ path限定で正しく届く。**採らない。**`.claude/`は公開されな�
 なし。**[ADR-0010](0010-change-class-and-review-declaration.md)を置き換えない。**
 `.claude/`と`AGENTS.md`は引き続き`review_gate.py`の`INSTRUCTION_SOURCES`であり、
 **軽微経路へ入らない。**この決定はその分類を変更していない。
+
+## 後継の決定
+
+[#813](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/813)の「レビューの仕組み」を[#814](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/814)の作業リストの2で`CONTRIBUTING.md`へ書いたとき、本ADRの決定4（read-onlyの検査subagentを2つ置く）を置き換えた。`consistency-inspector`を消し、`fresh-context-reviewer`に1本化した。**決定4のそのほかの部分（`tools`と`model`）と、ほかの決定は本ADRのままである。**

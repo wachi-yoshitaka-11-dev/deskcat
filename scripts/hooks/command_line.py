@@ -16,7 +16,7 @@
 **`truncation_guard.py`はこれと`tokenize`系だけを使い、`invocations`は使わない。**
 
 **語がcommand位置にあるかを見る。**単に`gh`という語を探すと、`echo gh pr merge`のような
-引数を呼び出しと読んでしまう。実際にそれで`merge_trailer_report.py`が誤報告し、
+引数を呼び出しと読んでしまう。実際にそれで、merge後に報告するhook（2026-11に削除）が誤報告した。
 `gh_metadata_guard.py`なら誤って拒否する（偽陽性でhookごと無効化される側の失敗である）。
 
 **判定は字句だけで行う。**shellの意味論は再現しない。次は取れない。
@@ -425,7 +425,7 @@ def _invocations_in(command, program):
 GLOBAL_VALUE_OPTIONS = {
     # `--git-dir`／`--work-tree`／`--namespace`／`--config-env`／`--super-prefix`は値を次の語で
     # 取れる（`--git-dir=X`の形も取れる。git 2.34.1で確認）。**1語として飛ばすと値の方をsubcommandとして読み、
-    # `git --git-dir X push`を`push_gate.py`が検査しない**（#472。PR #471のreview指摘）。
+    # `git --git-dir X push`のsubcommandを読み落とす**（#472。PR #471のreview指摘）。
     "git": ("-C", "-c", "--git-dir", "--work-tree", "--namespace", "--config-env", "--super-prefix"),
     "gh": ("--repo", "-R"),
 }
@@ -494,14 +494,13 @@ def skip_global_options(tokens, program):
 
     2026-09-16に[#325](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/325)で`truncation_guard.py`から移した。**2つ目のhookが同じ読み飛ばしを
     要った時点で、複製ではなくここへ置く**（このmoduleの「同じ判定を各hookへ複製しない」）。
-    **移したのは`truncation_guard.py`の版だが、規則は`push_gate.py`の版に揃えた。**
+    **移したのは`truncation_guard.py`の版だが、規則はpushを検査していたhook（2026-11に削除）の版に揃えた。**
     前者は`-C`しか知らず、**`git --no-pager reset --hard`と`git -c key=value reset --hard`が
     subcommandを取り落として素通りしていた**（2026-09-16実測。git 2.43.0／
-    python3 3.11.15／Linux x86_64）。**私有の版を残さないため、`push_gate.py`も
-    この関数を呼ぶ。**
+    python3 3.11.15／Linux x86_64）。**私有の版を残さない。**
 
     **subcommandを位置で読んでいた5 hookも、後からここへ寄せた**
-    （`gh_metadata_guard.py`／`coderabbit_gate.py`／`merge_trailer_report.py`／
+    （`gh_metadata_guard.py`／`coderabbit_gate.py`／merge後に報告するhook（2026-11に削除）／
     `stop_claim_guard.py`／`branch_base_guard.py`）。**`gh --repo o/r pr create`で
     `deny`が素通りすることを実測している**（2026-09-17）。
     """

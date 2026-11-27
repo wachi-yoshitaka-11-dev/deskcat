@@ -14,10 +14,9 @@ Claude CodeのPreToolUse hookとして、Bash tool呼び出しの前に走る。
 （2026-09-16に`.claude/settings.json`と`scripts/hooks/`を読んで確認した。
 #325が同じことを2026-09-03に確認しているが、**その時点では`truncation_guard.py`と
 `stop_claim_guard.py`がまだ無い**。commitは2026-09-05／2026-09-06である）。
-見ているのは、作る側（`branch_base_guard.py`）、押す側（`push_gate.py`）、
+見ているのは、作る側（`branch_base_guard.py`）、
 申告する側（`gh_metadata_guard.py`／`coderabbit_gate.py`）、数える側
-（`truncation_guard.py`）、主張する側（`stop_claim_guard.py`）、
-報告する側（`merge_trailer_report.py`）である。
+（`truncation_guard.py`）、主張する側（`stop_claim_guard.py`）である。
 
 **`inspector_readonly_guard.py`だけは例外である。**allowlistで`reset`／`clean`／
 `checkout`を拒否しており、**捨てる側を既に見ている。**ただし対象は検査subagentの
@@ -76,7 +75,7 @@ import command_line
 SKIP_ENV = "DESKCAT_SKIP_WORKTREE_GUARD"
 
 # `git status`1回あたりの制限。**`.claude/settings.json`のhook timeout（30秒）より
-# 十分小さく取る**（`push_gate.py`と同じ作法。同値だと、遅い環境でhook自体が先に
+# 十分小さく取る**（同値だと、遅い環境でhook自体が先に
 # 殺され、`_check`のfail-closedなaskへ到達しないまま素通りする）。
 TIMEOUT = 10
 

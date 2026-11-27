@@ -1,6 +1,6 @@
 # ADR-0015: 後始末を宣言専用の区分として足し、直接commitの基準を到達できる形へ変える
 
-> 状態: Accepted
+> 状態: Superseded
 > 日付: 2026-08-25
 > 起案: AIが起案し、AIが`Accepted`とした（2026-08-26）。
 > **人間の承認は2段階で得た。**Pull Requestのmerge承認を先に得て、
@@ -158,3 +158,7 @@ CLASS=review-required
 
 **[ADR-0011](0011-issue-optional-pull-request-required.md)も置き換えない。**
 Issueの要否とPull Requestの要否を分ける決定は維持し、Pull Request不要の側へ1行足している。
+
+## 後継の決定
+
+[#813](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/813)の「レビューの仕組み」を[#814](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/814)の作業リストの2で`CONTRIBUTING.md`へ書いたとき、本ADRの決定をすべて置き換えた。`Change-Class: fixup`と`CLASS=minor`の経路をやめ、IssueとPull Requestなしで`develop`へ入れてよい範囲は無くなった（[CONTRIBUTINGの「Issueを立てずに直接反映してよい範囲」](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/CONTRIBUTING.md#issueを立てずに直接反映してよい範囲)）。

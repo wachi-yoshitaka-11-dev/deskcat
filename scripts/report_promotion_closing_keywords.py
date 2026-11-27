@@ -13,7 +13,7 @@ base が`main`のPull Requestでは、範囲内commit（squash mergeで`develop`
 
 **このscriptは報告のみで、何も止めない。**検出しても消せない
 （共有branchの履歴を書き換えない）。できるのは、発火を知ってboardを
-先に手当てすることだけである。設計は`scripts/hooks/merge_trailer_report.py`に倣う。
+先に手当てすることだけである。
 
 参照先Issueの状態（OPEN／CLOSED）は`gh`が使えるときだけ確認する。`gh`が
 無い・認証が無い環境では確認できないと明記し、「CLOSEDである」と決め付けない。

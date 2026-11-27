@@ -131,28 +131,16 @@ class DeclarationTests(FixtureCase):
         self.write(sync.LOG_PATH, f"# log\n\n{ROW_CHANGED}\n| Other | x |\n")
         return self.commit(message)
 
-    def test_trailer_with_reason_passes(self):
+    def test_commit_message_declaration_is_not_read(self):
         head = self.changed_head(
             f"change\n\nWiring-Figure: not-applicable {LONG_REASON}"
         )
         ok, _ = self.run_check(head)
-        self.assertTrue(ok)
-
-    def test_trailer_without_reason_fails(self):
-        head = self.changed_head("change\n\nWiring-Figure: not-applicable")
-        ok, _ = self.run_check(head)
         self.assertFalse(ok)
 
-    def test_trailer_with_short_reason_fails(self):
-        head = self.changed_head("change\n\nWiring-Figure: not-applicable なし")
-        ok, _ = self.run_check(head)
-        self.assertFalse(ok)
-
-    def test_trailer_with_placeholder_reason_fails(self):
-        head = self.changed_head(
-            "change\n\nWiring-Figure: not-applicable <配線を変えていない理由>"
-        )
-        ok, _ = self.run_check(head)
+    def test_body_declaration_with_short_reason_fails(self):
+        head = self.changed_head()
+        ok, _ = self.run_check(head, "Wiring-Figure: not-applicable なし")
         self.assertFalse(ok)
 
     def test_body_declaration_with_placeholder_reason_fails(self):
@@ -160,9 +148,9 @@ class DeclarationTests(FixtureCase):
         ok, _ = self.run_check(head, "Wiring-Figure: not-applicable <配線を変えていない理由>")
         self.assertFalse(ok)
 
-    def test_trailer_with_other_value_fails(self):
-        head = self.changed_head(f"change\n\nWiring-Figure: skip {LONG_REASON}")
-        ok, _ = self.run_check(head)
+    def test_body_declaration_with_other_value_fails(self):
+        head = self.changed_head()
+        ok, _ = self.run_check(head, f"Wiring-Figure: skip {LONG_REASON}")
         self.assertFalse(ok)
 
     def test_body_declaration_with_reason_passes(self):
@@ -184,8 +172,8 @@ class DeclarationTests(FixtureCase):
 
     def test_declaration_is_harmless_when_figure_changed(self):
         self.write(sync.FIGURE_PATH, "<svg><g/></svg>\n")
-        head = self.changed_head("change\n\nWiring-Figure: not-applicable なし")
-        ok, _ = self.run_check(head)
+        head = self.changed_head()
+        ok, _ = self.run_check(head, "Wiring-Figure: not-applicable なし")
         self.assertTrue(ok)
 
 

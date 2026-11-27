@@ -8,22 +8,22 @@ DeskCatはfirmware、Linux software、電子回路、可動機構を組み合わ
 
 ```text
 着手前:  git fetch origin && git rev-parse --short origin/develop
-merge前: 人間の承認を得る
-merge時: squash messageへChange-ClassとSelf-Review 3値を入れる
-merge後: 入ったことをmerge commitで確認する
-review:  full reviewを使う
+PRの前:  build・test・lintの出力を示し、/code-reviewと/security-reviewを走らせる
+merge前: CIが通り、指摘が解決し、要る承認がある
+merge時: --subjectと--body-fileを明示する
+review:  CodeRabbitにはfull reviewを使う
 ```
 
 | 段 | 落としたときに起きること | 正本 |
 |---|---|---|
 | 着手前 | 古い基点で判断する。**後から入った文書を「存在しない」と読み、そこから誤った断定へ進む** | 下の[作業開始前](#作業開始前) |
-| merge前 | **CIが緑でも機械reviewが完走しても承認ではない** | [Merge前の確認](#merge前の確認) |
-| merge時 | trailerがsquash commitへ引き継がれない | [Merge方式](#merge方式) |
-| merge後 | 引き継がれなかったことに次の昇格まで気付かない | [Merge方式](#merge方式) |
+| PRの前 | 誤りを見つけないまま、reviewを受ける側へ渡す | [自己レビュー](#自己レビュー) |
+| merge前 | **CIが緑でも機械reviewが完走しても承認ではない** | [Pull Requestのレビュー](#pull-requestのレビュー) |
+| merge時 | GitHubが合成したmessageでmergeされ、検証の経緯がcommitに残らない | [Merge方式](#merge方式) |
 | review | `review`はincrementalで空振りし、枠だけ消費する | [手動で依頼する前に状態を確認する](#手動で依頼する前に状態を確認する) |
 
-**この表は覚えるためのものではない。**`.claude/settings.json`のhookが、着手前・merge時・
-merge後を機械で止める。**hookが止めない段の実行手順は`.claude/skills/deskcat-preflight`が持つ**
+**この表は覚えるためのものではない。**`.claude/settings.json`のhookが、着手前とmerge時を
+機械で止める。**hookが止めない段の実行手順は`.claude/skills/deskcat-preflight`が持つ**
 （規則ではなく実行だけを持ち、規則はこの文書を参照する）。**merge前の承認は止められない**（人の判断である）。
 reviewの依頼は、規則に反する形（`full`の付かない`review`、走った後の`full review`）は`coderabbit_gate.py`が`deny`し、それ以外の`full review`は`ask`で人間に確認する。
 hookの一覧と回避手順は[hookが止めたとき](#hookが止めたとき)にある。
@@ -73,68 +73,18 @@ Issueには次を含める。
 | 対象 | Issue | Pull Request |
 |---|---|---|
 | boardのmetadata記入漏れ。repositoryの変更ではない | 不要 | 不要。`Status: Done`を含む操作の承認区分は[AI Agent Policy](docs/governance/ai-agent-policy.md#6-責務マトリクス)に従う |
-| `review_gate.py`が`CLASS=minor`と判定した変更 | 不要 | 不要。承認を得たうえで`develop`へ直接反映してよい |
-| **既にmergeされreviewを通った作業の後始末。**`Change-Class: fixup`と`Refs: #<番号>`を宣言する | 不要 | 不要。承認を得たうえで`develop`へ直接反映してよい |
 | typo、リンク修正、表記ゆれ、言い回しの修正で、**意味を変えないもの** | 不要 | **必要** |
 | 規約、仕様、安全、電気、protocol、GPIO、電源、toolchain、CI、依存の**意味**を変えるもの | **必須** | **必要** |
 | 複数のPull Requestに跨る、または他の作業をblockするもの | **必須** | **必要** |
 
-repository変更はIssue不要の側でも、**変更内容の承認を必ず得る。**GitHub操作の承認区分は[AI Agent Policy](docs/governance/ai-agent-policy.md#6-責務マトリクス)に従う。
+Issue不要の側でも、人間の承認が要るかは[Pull Requestのレビュー](#pull-requestのレビュー)が決める（文書や言葉だけの変更で[慎重に扱う path](#慎重に扱う-path)に当たらないものは、自動のレビューとセキュリティの確認が通れば要らない）。GitHub操作の承認区分は[AI Agent Policy](docs/governance/ai-agent-policy.md#6-責務マトリクス)に従う。
 判断に迷うものはIssue必須の側として扱う。安全に関わる範囲は緩めない。
 
-**「言い回しの修正」と「意味の変更」の境界は機械的に判定できない。**両者を区別するcodeは
-無い（[ADR-0010](docs/decisions/0010-change-class-and-review-declaration.md)）。
+**「言い回しの修正」と「意味の変更」の境界は機械的に判定できない。**
 **迷ったら「意味を変えるもの」として扱う。**
-**ただし「言い回しの修正」もPull Requestを通る。**判断を誤っても、Review gateと自己レビューが
-その差分を見る。黙って`develop`へ入ることはない。
 
-**repositoryへの変更でPull Requestを省けるのは、`CLASS=minor`と後始末（`fixup`）の2つだけである。**
-前者はscriptが判定し、後者は宣言する側が申告する（下の「後始末（`fixup`）の範囲」）。
+**repositoryへの変更は、必ずPull Requestを通す。**Pull Requestを省いて`develop`へ入れる経路は設けない。**これは規則であり、今はGitHubもhookも直接pushを止めない**（`develop`には必須reviewも必須checkも無い。必須checkは[#814](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/814)の作業リストの8で置く）。
 boardのmetadata記入漏れはrepositoryの変更ではないため、Pull Requestという単位が無い。
-
-**scriptが決めるのは`CLASS`だけである。**Issueが要るかどうかはscriptの判定ではない。
-
-```bash
-python3 scripts/review_gate.py classify --base origin/develop --head HEAD
-```
-
-`CLASS=minor`のときは、Pull Requestなしで`develop`へ直接反映してよい。
-**`CLASS=review-required`でも、後始末として申告する経路がある**（下の
-「[後始末（`fixup`）の範囲](#後始末fixupの範囲)」）。**それ以外で
-`CLASS=review-required`を人の判断で覆さない。**scriptは軽微と証明できるものだけを`minor`に
-するため、本当は軽微な変更も`review-required`へ落ちる。それは意図した失敗方向であり、
-Pull Requestを1本作れば済む。
-
-**この表を強制する仕組みは無い。**Review gateはPull Requestで起動するため、直接pushした変更は
-見ない。`develop`のbranch protectionにも必須reviewと必須status checkを設定していない
-（[ADR-0007](docs/decisions/0007-review-scope-and-self-review.md)の決定4）。
-`classify`を実行する場面は、`develop`へ直接反映すると決めた場面と同じである。
-
-### 後始末（`fixup`）の範囲
-
-**`CLASS=minor`は構造的に出ない。**`INSTRUCTION_SOURCES`にpathが該当した時点で
-`review-required`が決まり、行の中身の判定へ届かない。**この repository の文書作業は
-ほぼ全部が該当する。**そのため上の表の`CLASS=minor`の行は、実際には空である。
-
-そこで**申告による軽い経路**を置いた。`Change-Class: fixup`と`Refs: #<番号>`を宣言する。
-
-対象:
-
-- 既にmergeされreviewを通った作業の**後始末**。typo、リンク切れ、指摘対応の漏れ、記録の整理
-- `Refs`でその Issue または Pull Request を指す。**後始末である以上、対象が存在する**
-
-**絶対に対象外:**
-
-- **安全値、protocol、GPIO、電源値、firmware、`crates/`。**新しい判断
-- `docs/hardware/`の**値**の変更。**節の整理は可**
-
-**この経路には強制点がある。**直接commitは`gate`を通らない（`gate`はPull Requestで起動する）。
-しかし`history`が`develop`から`main`への昇格時に**範囲の各commitを検査する**ため、
-宣言が壊れていれば次の昇格で落ちる。**`minor`経路が完全に無検証であるのより強い。**
-
-**`fixup`は「軽微である」と主張しない。**`classify`の出力は変わらず、`review-required`の
-まま出る。主張しているのは「後始末である」だけである。**そのため`minor`の判定も
-`review-required`の判定も緩んでいない**（[ADR-0015](docs/decisions/0015-fixup-class-and-direct-commit-scope.md)）。
 
 ## Issueの命名
 
@@ -241,7 +191,7 @@ PC testはLCD、電気、timing、sensor、機構の検証を代替しない。
 
 初回通電、初回サーボ動作、動作範囲拡張、電源・GPIO変更後のtestでは、人間がactuator電源を切れる状態にする。
 
-**配線を変えたら、記録だけで終わらせず、同じPull Requestでブレッドボード配線図（`hardware/breadboard/layout.svg`）も更新する**（`hardware/README.md`）。**図は最終的な配線を描く。測定のためだけの一時配線は描かない。**そのPull Requestは、下の`Wiring-Figure: not-applicable <理由>`で通す。配線図は3つ（`hardware/breadboard/layout.svg`、`hardware/universal-board/`の電源の基板の図、`hardware/overview/layout.svg`）である（電源の基板の図は`plan-front.svg`・`plan-back.svg`の計画で、完成図は[#405](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/405)で現物と照合して作る。`overview`は#512で回路図のnetlistから生成する）。`docs/hardware/experiment-log.md`の`Wiring revision`の行を追加・変更し、配線図を更新しないPull Requestは、`Wiring figure sync` workflow（`scripts/check_wiring_figure_sync.py`）が落とす。この検査は、base が`develop`のPull Requestだけで走る。配線を変えていない試験の記録など、図に関係しない場合だけ、head commitのtrailerまたはPull Request本文に次の1行を書く。**コロンが要る**（`Refs`と同じ理由で、コロンの無い行はtrailerとして読まれない）。理由は10字以上が要り、名前と値の正本は`scripts/check_wiring_figure_sync.py`である。
+**配線を変えたら、記録だけで終わらせず、同じPull Requestでブレッドボード配線図（`hardware/breadboard/layout.svg`）も更新する**（`hardware/README.md`）。**図は最終的な配線を描く。測定のためだけの一時配線は描かない。**そのPull Requestは、下の`Wiring-Figure: not-applicable <理由>`で通す。配線図は3つ（`hardware/breadboard/layout.svg`、`hardware/universal-board/`の電源の基板の図、`hardware/overview/layout.svg`）である（電源の基板の図は`plan-front.svg`・`plan-back.svg`の計画で、完成図は[#405](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/405)で現物と照合して作る。`overview`は#512で回路図のnetlistから生成する）。`docs/hardware/experiment-log.md`の`Wiring revision`の行を追加・変更し、配線図を更新しないPull Requestは、`Wiring figure sync` workflow（`scripts/check_wiring_figure_sync.py`）が落とす。この検査は、base が`develop`のPull Requestだけで走る。配線を変えていない試験の記録など、図に関係しない場合だけ、Pull Request本文に次の1行を書く。**コロンが要る。**commit messageは読まない。理由は10字以上が要り、名前と値の正本は`scripts/check_wiring_figure_sync.py`である。
 
 ```text
 Wiring-Figure: not-applicable <配線を変えていない理由>
@@ -302,7 +252,7 @@ gh pr create --base develop --title "<title>" --body-file <path> \
 理由はCodeRabbitが対象判定をPull Requestの作成直後に行うことだけであり、
 **自動reviewを廃止したため判定そのものが無い。**当時の実測はADR-0013へ移した。
 
-labelは引き続き必須である。仕分けと`review_gate.py`の分類に要る。
+labelは引き続き必須である。仕分けに要る。
 boardへのitem追加はPull Requestが存在しないと行えないため、作成直後に行う。
 
 ### 関連Issueの書き方
@@ -418,181 +368,92 @@ CIのrepository内field検査はProject・日付の保証ではなく、保護�
 
 ### 自己レビュー
 
-pushする前に、作成者自身が差分を見直す。**開始前に実行記録とPull Request本文（引き継ぎ時は
-Issue／Pull Requestに保存したJSON）から同一作業の既実施巡数と継続承認を確認する。
-不明は0巡ではない。**
-**巡数の上限は1回のreviewごとに数える**（[#526](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/526)）。
-機械の起動上限と3巡目後の終了・続行判断は[打ち切り](#打ち切り)に従う。
-reviewは`converged`に達した巡か、人間が承認した終了（下の[打ち切り](#打ち切り)）で終わる。
-終わった後の次のreviewは、きっかけ（pushの前、人間の依頼）を問わず0巡から数える。
-進行中のreviewを0巡に戻すのは、下の[打ち切り](#打ち切り)の始め直しだけである。
-実行記録より前の巡は、どこでreviewが終わったかが記録に無いため、最初のreviewへ数え込む。
-同じreviewの中では、差分更新、commit、rebase、push、外部review対応、セッション・端末の変更でも巡数を戻さない。
-Issueの通算は情報として記録に残し、上限の判定には使わない。
-収束は、同じ最終diffで修正対象の新規指摘と未解決欠陥が0件の巡が2巡続いた状態とする。
-採らない指摘には1行で理由を残す。上限で止まっただけでは収束・完了にならない。
+Pull Requestを作る前に、作業者が次を行う。
+基準は[#813](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/813)の「レビューの仕組み」であり、
+Anthropicの[Code Reviewの文書](https://code.claude.com/docs/en/code-review)と
+[Claude Codeチームのやり方](https://claude.dev/blog/solving-code-review-at-anthropic/)に合わせている。
+資料に無い所有者の規則は「（所有者の規則）」と書く。
+
+- 変更は小さく保つ。見やすく、直しやすく、戻しやすくするためである。
+- 作業者がbuild・test・lintを走らせ、その出力をPull Request本文に示す。
+- 新しいcontextのsubagent（`.claude/agents/fresh-context-reviewer.md`）か`/code-review`で差分をレビューし、
+  `/security-review`も走らせる。`/security-review`はoriginの既定のbranch（`main`）との差分を見るため、
+  `develop`にあって`main`に無い変更も含まれる。**このPull Requestの差分の外の指摘はPre-existingとして扱う。**
+- **`/code-review`のeffortは毎回指定する。**指定しないと前回の値が使われる。安全・電気・サーボの制限・
+  配線図と基板の変更は`high`で走らせる。
+- **`/code-review`には`--max-findings all`を付ける。**付けないと件数の上限で切られ、残りの指摘が出ない。
+- 1巡は、レビューを1回走らせ、その指摘を直すまでとする。巡を重ねるのは危険度の高い変更でよく、
+  すべてのPull Requestでは要らない。
 
 **自動reviewは行わない**（[ADR-0013](docs/decisions/0013-manual-only-coderabbit-review.md)）。
 [`.coderabbit.yaml`](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/.coderabbit.yaml)は
-`enabled: false`だけを持つ。**したがって、この自己レビューが既定で唯一のreviewである。**
+`enabled: false`だけを持つ。CodeRabbitへは[慎重に扱う path](#慎重に扱う-path)に触れるときに手動で依頼する。
 
-**意味上criticalな変更では、自己レビューの後で手動でreviewを依頼する。**
-依頼するかはPMが判断し、機械的な判定は置かない。安全・電気・protocol・firmwareに関わる変更を
-自己レビューで代替しない。手順は[手動で依頼する前に状態を確認する](#手動で依頼する前に状態を確認する)にある。
+### Pull Requestのレビュー
 
-回数だけを守っても、同じ観点を繰り返しなぞるだけになる。次の観点で見る。
+- **CI（lint、test、build）が通らない間はmergeしない。**`develop`と`main`のbranch protectionに
+  required status checksを置く（所有者の規則）。**まだ置いていない**（[#814](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/814)の
+  作業リストの8）。置くまでは、CIが赤でもGitHubはmergeを止めない。
+- **すべてのPull Requestで、Claudeのレビューを走らせる。**`/code-review`に`--comment`を付け、
+  指摘をPull Requestの行に投稿する。
+- **[慎重に扱う path](#慎重に扱う-path)に触れるPull Requestでは、加えてCodeRabbitに`full review`で依頼する**
+  （所有者の規則。2つ目の独立したレビュー役として使う）。手順は
+  [手動で依頼する前に状態を確認する](#手動で依頼する前に状態を確認する)にある。
+- **誤りのレビューとセキュリティのレビューの指摘が未解決の間はmergeしない。**指摘は、直すか、
+  理由を書いてresolveする。
+- **人間の承認は、作った人ではなく変更の中身で決める。**
+  - 文書や言葉だけの変更：自動のレビューとセキュリティの確認が通れば要らない。
+    ただし[慎重に扱う path](#慎重に扱う-path)に当たる文書を除く。
+  - それ以外：所有者が承認する。AIに作らせたPull Requestでは、作らせた人が承認する。
+  - [慎重に扱う path](#慎重に扱う-path)は必ず所有者が承認する。
+  - AIの承認は人間の承認に数えない。**承認は、そのcommitにだけ効く。**新しいcommitが入ったら承認し直す。
+    所有者は自分のPull RequestをGitHubでapproveできないため、承認はPull Requestのコメントに、
+    承認するcommitのSHAを書いて残す（所有者の規則）。
+- 人間が見るもの：作るべきかどうか、後の作りを決める設計、示された証拠（testの出力、指摘）。
+  検査が何を見逃し得るか言えないときは、すぐ承認せず、しっかりしたレビューを求める。
 
-- [ ] **受け入れ条件を1つずつ差分と突き合わせた。**「だいたい満たしている」で通さない
-- [ ] **正本文書と矛盾する記述を新たに作っていない。**同じ定数・同じ規約を2箇所に書いていない。
-      片方だけを見た判断が起きる
-- [ ] **未確認の値を確定として書いていない。**実測していない値、一次資料で確かめていない型番、
-      未検証の動作を、断定形で書いていない（[AGENTS.md](AGENTS.md)の推測禁止を自分の差分へ適用する）
-- [ ] **参照先が実在する。**リンク先の文書・節・表が存在し、そこに書いてあると主張した内容が実際にある
-- [ ] **公開されない路への相対linkを張っていない。**`CONTRIBUTING.md`、`.coderabbit.yaml`、
-      `.github/`配下などはGitHub Pagesへ公開されない。公開文書からこれらへ相対linkを張ると
-      `validate_doc_links.py`が失敗する。**絶対URLを使う。**
-      [PR #90](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/90)ではこの誤りだけでCIを3回落とした
-- [ ] **差分に、このPull Requestの目的と無関係な変更が混ざっていない**
-- [ ] **Pull Request本文の記述が、実際の差分と一致している。**対象file数、含まれる変更、
-      検証欄の「実行した／していない」が実態と合っている
+#### 指摘の重さと扱い
 
-各観点の由来は[過去事例](docs/runbooks/contributing-history.md#自己レビュー観点の由来)を参照する。
+| 重さ | 意味 | 扱い |
+|---|---|---|
+| Important | mergeの前に直すべき誤り | 直す。指摘が誤りなら、理由を書いてresolveする |
+| Nit | 小さな問題。止めない | 直すか、理由を書いてresolveする |
+| Pre-existing | このPull Requestが持ち込んだのではない誤り | このPull Requestでは直さない。追跡Issueを作り、似たIssueがあればそこへ足す。resolveする前に作り、指摘に番号を書く。安全・電気・サーボの制限・配線図と基板に関わるものは`priority:high`にし、その作業リストより先に着手する（所有者の規則） |
 
-#### 2つのPass
+レビュー役への指示は[AGENTS.md](AGENTS.md)の「レビュー役への指示」が持つ。`/code-review`は`CLAUDE.md`を読み、
+`CLAUDE.md`が`AGENTS.md`を読み込むためである。
 
-回数とは別に、**最終diffに対して次の2つを別々に実施する。**同じ読み方を2回繰り返しても、
-拾えるものは増えない。
+#### レビューの自己改善
 
-**要件照合Pass。**受け入れ条件、Issueの対象範囲、上のchecklistの観点を、差分と1つずつ
-突き合わせる。「だいたい満たしている」で通さない。**満たしていない項目は、満たしていないと
-書く。**このPassは、何を作るはずだったかを手元に置いて読む。
+- 指摘を、作業者の対応で4つに分けて数える：直した、指摘が誤り、意図どおり、影響が無い。
+  何巡で通ったかと合わせてPull Request本文に残し、レビュー役の誤検出と収束を見る。
+- 同じ指摘が繰り返し出たら、元で直す：skill、lintの規則、`AGENTS.md`のどれかに足す。
+- mergeの後に見つかった誤りと、戻した変更は、見逃した例として1つのIssueに集める。
+  レビューの指示や道具を変えたときは、その例で見逃さないかを確かめる。
+- 見逃しを減らすことを先に、巡を減らすことを次に置く。
 
-**fresh-context Pass。****何を作るつもりだったかを一旦忘れて、最終diffを読む。**
-作成者の意図で誤りを補完せず、下の修正対象3種類に当たるかを実装・正本と照合する。
-言い回し、説明・前提・出所の書き足しは、このPassでも修正対象にしない。
+### 慎重に扱う path
 
-**2つのPassは同じ最終diffに対して行う。**どちらかの後に差分が変わったら、
-**両方が無効**になる。差分を変えたら2つとも実施し直す。
-**無効になるのは最終diffへのPassの証拠であり、そのreviewの巡数ではない。**
-1回のまとまった見直しを1巡と数え、別々に起動したreviewerはそれぞれ1巡とする。
-1巡内で両Passを行った場合はPassを2つ記録するが、2巡とは数えない。
-開始した巡は中断・失敗しても消さない。機械checkや修正作業はreview巡と分けて記録する。
+次のpathに触れるPull Requestは、CodeRabbitの`full review`と所有者の承認が要る。
+**`gh pr merge`の前に、`scripts/hooks/gh_metadata_guard.py`がCodeRabbitのreviewの完走を確かめる。**
+この一覧とhookの一覧（`REVIEW_TARGET_PREFIXES`・`REVIEW_TARGET_FILES`）は一致させる。
+`scripts/test_hooks.py`が一致を検査する。`/`で終わるものはその配下のすべてである。
 
-#### 打ち切り
+- CIのworkflow：`.github/workflows/`
+- hook：`scripts/hooks/`、`.githooks/`、`.claude/settings.json`
+- 指示と規則：`AGENTS.md`、`CLAUDE.md`、`CONTRIBUTING.md`、`docs/governance/ai-agent-policy.md`、`docs/governance/development-workflow.md`
+- 安全・電気・サーボの制限・ピンの割り当て・電源の正本の文書：`docs/governance/hardware-safety-policy.md`、
+  `docs/hardware/servo-safety-limits.md`、`docs/hardware/gpio-assignment.md`、`docs/hardware/power-budget.md`
+- 基板（KiCadのfile）：`hardware/deskcat.kicad_pcb`、`hardware/deskcat.kicad_sch`、`hardware/deskcat.kicad_pro`、
+  `hardware/DeskCat.kicad_sym`、`hardware/DeskCat.pretty/`、`hardware/fp-lib-table`、`hardware/sym-lib-table`
+- 配線図、結線表、netlistとその生成の道具：`hardware/overview/`、`hardware/breadboard/`、
+  `hardware/breadboard-rebuild/`、`hardware/universal-board/`
+- 配線図の検査：`scripts/check_wiring_figure_sync.py`
+- ピンと安全の強制：`firmware/esp32/src/`
+- サーボの制限：`crates/deskcat-servo/src/`
+- 通信が切れたときの止め方：`crates/deskcat-protocol/src/`、`docs/protocol/esp32-pi-protocol.md`
 
-**実行ガードの無承認起動上限は、1回のreviewにつき5巡である。**必要な欠陥を巡数で無視する規則ではない。
-**レビューするdiffがMarkdown fileだけで、どれも`scripts/review_gate.py`の`INSTRUCTION_SOURCES`
-（安全・指示の正本）に入らない場合は、3巡までとする**（[#490](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/490)）。
-code、script、安全・指示の正本を1つでも含むdiffと、空のdiffは5巡のままである。
-これは機械が起動を拒否する上限であり、下の3巡目後の判断を省く許可ではない。
-`converged`と`capped`の要件も変えない。
-判定は各巡の開始時にそのdiffで行い、実行記録の各巡へ残す。
-reviewの区切りは記録にある巡の結果から決まる。巡の結果で`capped`を申告しただけでは終わらない。
-新しいreviewは、前のreviewの巡を収束に数えない。
-
-**reviewは終わる前に始め直せる。**人間が新しいreviewを依頼したとき、またはPM／作業セッションが
-理由を示して始め直しを判断し人間が承認したときである。その依頼か承認があったこと、日時、出所、範囲を
-`review_gate.py session restart`で記録し、次の巡を0巡から数える。
-依頼か承認が新しいreviewを指すと読めないとき（上限の後の「もう一度見て」など）は、継続承認として扱う。
-PM/AIの判断だけでは始め直さない。前のreviewの未解決の欠陥は消さず、新しいreviewへ持ち越す。
-過去の巡数・指摘内容は[記録](docs/runbooks/contributing-history.md#レビュー巡数の過去事例)に分離する。
-
-**指摘は重要度と出所を別々に記録する。**型ごとに根拠、採否、理由を短く残す。
-**自己レビューで指摘を受けて直すのは、(a) コードの論理・動作の誤り、
-(b) 実装または正本と食い違う事実の誤り、(c) [Hardware Safety Policy](docs/governance/hardware-safety-policy.md#安全要件の5項目)の
-安全要件5項目に関わる欠陥だけである。**reviewerとCodeRabbitの指摘にも同じ基準を当てる。
-
-| 種類 | 採否の基準・例 |
-|---|---|
-| 今回の差分が作った欠陥（`defect`） | 上の(a)〜(c)だけを修正する。未解決なら完了にしない |
-| 既存の範囲外問題（`out-of-scope`） | baseにもある別機能の問題は本差分へ混ぜず、既存Issueへの参照または残件として残す |
-| 修正対象外（`optional`） | 言い回し、説明・前提・出所の書き足し、「もっと書いたほうがよい」は採らない。理由を1行残して閉じる |
-
-出所は`diff`（今回の差分）、`prior-explanation`（前巡で自分が加えた説明）、
-`pre-existing`（既存）のいずれかを記録する。出所だけで採否を決めず、上の(a)〜(c)と照合する。
-修正対象外の指摘だけを理由に再巡しない。機械checkの結果は別に記録する。
-
-**指摘の直しは、削るか最小の置き換えだけにする。**理由・説明・注記を足して直さない。
-**次の巡を起動する前に、作業者が直しの差分（前の巡の版から今の版までのdiff）だけを読み、
-新しい主張を足していないことと、引いた出所を開いて確かめたことを確認する。**
-
-**1回のreviewは3巡を目安とする。**3巡目の後に(a)〜(c)に当たらない指摘だけが残るなら、
-4巡目を回さない。PM／作業セッションが全巡の指摘と最終diffを自分で読み、`capped`の判断と
-理由を一度に示して人間の承認を得る。**4巡目以降に進むのは(a)〜(c)のいずれかが残るときだけ**であり、
-その場合も終了巡数と理由を一度に示して人間の承認を得る。
-数行のdocs変更は、1巡目の指摘が0件なら2巡目で終える。
-
-**継続承認は有限の範囲で保存する。**続行はPM／作業セッションが理由を示して判断し、人間が承認する。
-継続と終了を判断する側は、判断の前にこのreviewの全巡の指摘と最終diffを自分で開く。記録には、読んだdiffのhashを書く。
-実行記録とPull Request本文へ、判断と理由、人間の承認があったこと・日時・出所（ユーザーの発言は原文でも要旨でも書かない。[AI Agent Policy](docs/governance/ai-agent-policy.md#ユーザーの発言を書かない)）、承認者、対象Issue、
-承認時のreviewとその巡数、続行を許すそのreviewの最終巡数、対象の残存欠陥または範囲を書く。
-追加巡数は判断側が理由とともに示して人間が承認し、実装では絶対的な終了巡数へ換算する。固定の追加巡数は設けない。
-例えば「D1の修正確認のためこのreviewの7巡まで」は8巡目や別目的の継続を許さない。
-承認はそのreviewにだけ効き、次のreviewへ持ち越さない。
-終了巡数に到達した場合や範囲が変わる場合は再承認が要る。PM/AIの判断、無回答、時間経過、
-出所の無い「承認済み」は承認の代替にならない。既存の無期限な承認を新たな無期限許可へ転記しない。
-
-**打ち切ったときに記録する。**Pull Request本文の自己レビュー欄へ次を書く。
-
-- 巡ごとの指摘件数（要件照合Pass／fresh-context Pass）と、採用／不採用の内訳
-- 採らなかった理由（型ごとでよい。1件ずつ書く必要はない）
-- 凍結した最終diffのhash（`git diff <base>..HEAD`のsha256などで固定した値）
-- 最後の版に、2つのPassの両方を実施したかどうか
-
-| 状態 | 意味とgateの扱い |
-|---|---|
-| `stopped` | 上限で判断待ち、未完了の巡、最終diffのPass不足、未解決欠陥など。完了宣言はできない。上限で止まった場合は継続承認、未完了巡は結果の保存が次巡の前提。receiptの終端値には使えない |
-| `capped` | 人間が承認した収束前の終了。(a)〜(c)の未解決欠陥がなく、同一最終diffの両Passを実施し、採らなかった指摘の理由を残した場合だけ宣言できる。上限到達による自動付与はしない |
-| `converged` | 同じ最終diffで修正対象の新規指摘0件が2巡続き、未解決欠陥がなく両Passの証拠が揃った状態。上限や承認の有無とは別軸 |
-
-`capped`の理由は、PM／作業セッションの判断を人間が承認したことを記録する。
-
-**reviewは承認を得て終えられる。**最終diffで両Passの記録が揃い、未解決の欠陥が無く、まだ`converged`で
-ない場合に、PM／作業セッションが理由を示して終了を判断し人間が承認したら、その承認があったこと・承認者・日時・出所を
-`review_gate.py session end`で記録する。記録した時点のdiffと巡に限って`capped`になり、
-diffが変われば無効になる。手順は[自己レビューの停止と再開](docs/runbooks/self-review-session.md)にある。
-PM/AIの判断や無回答は承認の代替にならない。
-`requirements-pass`と`fresh-context-pass`はどちらの終端値でも必要である。
-宣言形式の正本は`scripts/review_gate.py`、実行記録の検査は同scriptの`session`経路が持つ。
-
-**`main`昇格時の`history`検査でも区別できる。**値はcommitのtrailerに残り続けるため、
-`git log`から常に読める。`history`が値の組み合わせを検証しないのは、過去のcommitへの
-要求をhead commitより軽くする既存の設計（`Self-Review`が1つ以上あることだけを見る。
-下の「Merge方式」）と一貫させたためであり、区別できないからではない。
-
-[#397での打ち切りの解釈](docs/runbooks/contributing-history.md#打ち切りの過去事例)は履歴として残す。過去のcommitを遡って書き換えない。
-
-宣言はcommit trailerで行う。**書式の例は[Merge方式](#merge方式)にあり、値の正本は
-`scripts/review_gate.py`である。**trailerはcommitへ結び付くため、差分を変えると宣言が
-自動的に無効になる。**収束の宣言も同じtrailerで行う。**回数と2つのPassは別の軸であり、
-1つの値にまとめるとどちらをやっていないのかが分からなくなる。
-
-#### 実行経路と引き継ぎ
-
-操作例・JSON形式・強制の限界は[自己レビューの停止と再開](docs/runbooks/self-review-session.md)を参照する。
-`review_gate.py session`とClaudeの`Agent|Task` hookは、同じIssueの実行記録を使う。
-開始の予約はreviewer起動前に保存し、そのreviewの上限を超える未承認の起動を拒否する。
-既存のBash parserやread-only guardへshell構文を追加しない。
-Claudeの登録reviewerを使うworktreeでは、既存のIssue記録を
-`session select --work <Issue番号> --base <base> --scope <scope>`で選ぶ
-（baseとscopeの指定は省略可）。hookは呼び出し時に選択だけを読むため、
-起動済みセッションでも適用される。
-
-**記録はgit-common-dirに置き、同じrepositoryのworktree間で共有する。**branch名やdiff hashを
-作業IDにしない。通常は各巡の結果と承認を実行記録へ保存し、Pull Request本文へ要約する。
-選択はworktree専用のgit-dirへ保存し、巡数や承認は持たない。
-Issue／Pull Requestのcommentへ各巡や承認を重複投稿しない。別clone・別端末へ渡すと決めた時点で、
-元cloneの最後の操作後に`session status`のJSON全体を既存Issue／Pull Requestへ保存し、
-次の担当がそれを復元する。同時に複数cloneで同じ作業を進めず、担当を引き継ぐ。
-既実施巡数が不明なら開始せず照合する。記録の削除・作り直し、終端の偽の申告で上限を回避しない。
-
-**全ツールを強制する仕組みではない。**登録対象reviewerのClaude Agent/Task呼び出しとCLIの
-`session run`が強制範囲である。Codexの会話内レビュー、別種agent、直接CLI/MCP、hookを
-無効化した環境を自動捕捉しない。その経路では各巡の前に`session begin`を実行し、拒否されたら
-見直しを開始せず人へ返す。これは手順による停止であり、プラットフォームによる強制ではない。
-承認者の本人性、申告した指摘・Passの真偽、改ざんされた記録は保証しない。判断元を人間が確認する。
-`receipt`だけは従来どおり形式検査であり、実行記録も照合する場合は`--review-work <Issue番号>`を使う。
-CIはローカル記録を持たず、通常のreceiptをレビュー内容の証明として扱わない。
+`hardware/`のうち対象外は次だけである（`scripts/test_hooks.py`が、`hardware/`の追跡fileがすべて上の一覧かこの一覧のどちらかに入ることを検査する）：`hardware/README.md`、`hardware/.gitignore`、`hardware/measurement/`、`hardware/bench-18/`、`hardware/wokwi/`。
 
 ### Merge前の確認
 
@@ -607,14 +468,10 @@ base が`develop`でも`main`でも適用する。
 
 **ただし強制されるのは管理者以外である。**`develop`は`enforce_admins`を`false`にしており
 （[Repository設定](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/.github/REPOSITORY_SETTINGS.md)）、
-管理者は`BLOCKED`のままmergeできる。**この経路を使う場合は自動化が何も止めないため、
-[未解決を残してmergeする場合](#未解決を残してmergeする場合)の手順を必ず踏む。**
-「GitHubが止めるはずだ」を根拠にしない。
+管理者は`BLOCKED`のままmergeできる。**未解決を残してmergeしない。**範囲外の指摘はPre-existingとして
+追跡Issueへ回してからresolveする（[指摘の重さと扱い](#指摘の重さと扱い)）。
 
-**thread のresolveは、reviewerの応答を読んでから行う。**指摘へ返信しただけで自動でresolveしない。
-返信に対する応答（自動reviewなら指摘を取り下げたかの判定）を読み、解決したと確認できるthreadだけ
-resolveする。自分の返信をもって直ちにresolveすると、`isResolved`が「対応したという主張」に退化し、
-GitHubの強制が意味を失う。
+**threadは、直すか、理由を書いてresolveする。**理由を書かずにresolveしない。
 
 #### GitHubが強制しないもの
 
@@ -660,7 +517,7 @@ allowlistに言及する記述は、廃止前の設定に対する観測であ�
 
 #### 手動で依頼する前に状態を確認する
 
-PMは依頼を判断し、投稿前に時刻を調整する。PR担当のセッションは投稿前にPMへ知らせ、
+依頼するのは[慎重に扱う path](#慎重に扱う-path)に触れるPull Requestである。PR担当のセッションは投稿前に
 **開いている全PRの最新の`@coderabbitai`投稿時刻**を確認する。いずれかが1時間以内なら待ち、
 投稿直前に全PRを再確認する。投稿はPR担当のセッションが行い、`coderabbit_gate.py`が止める。
 投稿時刻は対象Issueのコメントに残す。
@@ -676,8 +533,7 @@ reviewがまだ走っていないPRでは空振りしうる。依頼したreview
 `Review stopped after lock loss`でreviewが完走していないと確定した場合（checkが`failure`で、`Review completed`へ到達していない）も、この1回に数えず、PMへ知らせ、1時間以上の間隔と投稿直前の再確認という同じ条件を満たせば`full review`を再依頼できる。再依頼は1回のlock lossにつき1回で、再び止まった場合も同じ条件を満たすまで待つ。
 `Review in progress`など結果が確定していない間は再依頼しない。枠切れのまま再び投稿した場合も
 同じ条件を満たすまで待つ。**同じ状態で2回以上投げない。**
-安全・電気・protocol・firmwareに関わる変更は、reviewが完走するまでmergeしない
-（[Merge前の確認](#merge前の確認)）。
+[慎重に扱う path](#慎重に扱う-path)に触れる変更は、reviewが完走するまでmergeしない。
 
 **依頼の形は`coderabbit_gate.py`が強制する**（[#781](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/781)）。
 `@coderabbitai`と同じ行の`review`が`full review`でなければ`deny`する（`review`は、reviewがまだ走っていないPRでは空振りして枠だけ消える）。
@@ -694,36 +550,13 @@ promptに答える人がいない`-p`の実行では拒否される。**資料�
 そのため、規則に反すると字句と記録で決まるものは`deny`にし、`ask`に頼るのは人間の判断が要る`full review`（初回、再依頼の条件に当たりうる場合、判定できない場合）と、本文を読めず判定できない経路に限った。
 
 **mergeの前の検査はhookが強制する**（`scripts/hooks/gh_metadata_guard.py`。[#688](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/688)）。
-`gh pr merge`の前に、Pull Requestの変更fileが次のどれかを含み、かつ**どのcommitでも**CodeRabbitの
-reviewが完走していなければdenyする。完走の後に対応commitを足してheadが`Review skipped`でも通る。
-base `main`の昇格も同じ検査を受ける。**解除の手段は無く、`DESKCAT_SKIP_GH_GUARD`も効かない。**
-確認できない場合もdenyする。
-
-- `firmware/esp32/src/`
-- `crates/deskcat-protocol`・`deskcat-servo`・`deskcat-face`・`deskcat-tap`・`deskcat-touch`・`deskcat-accel`・`deskcat-env`の`src/`
-- `docs/protocol/esp32-pi-protocol.md`
-- `docs/hardware/gpio-assignment.md`・`power-budget.md`・`servo-safety-limits.md`
-
-**範囲はこれ以上広げない。**実験記録、BOM、図、規則の文書、検査のscript、Pi側だけのアプリは対象外である
-（CodeRabbitにはクールタイムがあり、何でも通すと作業が止まる）。この一覧の外で「安全・電気・protocol・
-firmwareに関わる」変更は、従来どおり人が守る。
+`gh pr merge`の前に、Pull Requestの変更fileが[慎重に扱う path](#慎重に扱う-path)のどれかを含み、
+かつ**どのcommitでも**CodeRabbitのreviewが完走していなければdenyする。完走の後に対応commitを足して
+headが`Review skipped`でも通る。base `main`の昇格も同じ検査を受ける。
+**解除の手段は無く、`DESKCAT_SKIP_GH_GUARD`も効かない。**確認できない場合もdenyする。
 
 **「reviewを依頼した」を「reviewを受けた」と書かない。**`Review rate limited`は`pass`と表示されるため、
 依頼の事実だけで完了扱いにすると検出が抜ける。
-
-#### 未解決を残してmergeする場合
-
-branch protectionの`enforce_admins`は無効であり、管理者は強制mergeできる。その場合は次をすべて行う。
-**追跡Issueなしにmergeしない。**
-
-1. 追跡Issueを起票する
-2. 該当threadへ返信し、追跡Issue番号を書く
-3. Pull Request本文の`Review thread`節の`追跡Issue`欄へ番号を書く
-4. merge報告に未解決だったことと追跡Issue番号を記載する
-
-[#40](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/40)では26 threadのうち1件が未解決のまま
-mergeされ、追跡も無かった。後から[#74](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/74)として
-起票し直している。
 
 #### 昇格Pull Requestでの手動reviewと未解決thread
 
@@ -731,11 +564,10 @@ mergeされ、追跡も無かった。後から[#74](https://github.com/wachi-yo
 定めが無かったため、[#316](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/316)で
 手動reviewを2回投げる違反と、未解決を残してmergeしかける判断が起きた（追跡は[#327](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/327)）。
 
-**1. 昇格は手動reviewの対象である。**`main`に載るためである。
+**1. 昇格も、範囲が[慎重に扱う path](#慎重に扱う-path)に触れるときに手動reviewの対象である。**ほかのPull Requestと同じ条件であり、merge前のhookも昇格に同じ条件で掛かる。
 **回数は[手動依頼の手順](#手動で依頼する前に状態を確認する)のとおりで、昇格も例外ではない。**
 
-**2. 未解決threadを残してmergeしない。**[未解決を残してmergeする場合](#未解決を残してmergeする場合)は
-**昇格では使わない。**`main`をbaseとするmerge済みPull Request 18本を全数走査した結果、
+**2. 未解決threadを残してmergeしない。**`main`をbaseとするmerge済みPull Request 18本を全数走査した結果、
 `Require conversation resolution before merging`の強制後（2026-08-10）の13本は
 **すべて未解決0件**である（#316自身を含む。2026-09-03時点の実測）。未解決を残した2本（#32／#52）は強制より前であり、
 [Repository設定](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/.github/REPOSITORY_SETTINGS.md)が「導入の契機は#40で未解決thread 1件を
@@ -821,112 +653,13 @@ baseで決まる。
 | `develop` | **squash merge** | Issue branchの試行錯誤を1 commitにまとめ、`develop`の履歴を「1 Issue = 1 commit」に保つ |
 | `main` | **squashしない。merge commitにする** | 昇格をsquashすると`develop`側の個々のcommitが`main`の履歴から消え、両branchが別系列になる |
 
-**squash merge時に、分類と自己レビューをtrailerで宣言する。**trailerはcommitへ結び付くため、
-review後にcommitが増えると宣言が自動的に無効になる（[ADR-0010](docs/decisions/0010-change-class-and-review-declaration.md)）。
-base が`develop`のPull Requestでは、Review gate workflowがhead commitにこの宣言があることを要求する。
-**`main`昇格では要求しない。**`develop`のtip commitは範囲の1本にすぎず、自分の変更しか宣言していない。
-head commit 1本の宣言を範囲全体のdiffへ当てると、**指示sourceを0 path触りながら`Instruction-Change`を
-持つcommitで通り、正しく付けなかったcommitで落ちる。**偽陽性と偽陰性の両方を出すため、保証を持たない。
-`main`昇格で見るのは`history`であり、**範囲の各commitを1本ずつ検査する**（次節）。
+**`gh pr merge`には`--subject`と`--body-file`を明示する。**省略するとGitHubが合成したmessageで
+mergeされ、検証の経緯や測定値がcommitに残らない（`main`昇格の#383で、merge commit `afc86cf`の
+messageがGitHubの既定のまま入った）。`scripts/hooks/gh_metadata_guard.py`が省略を止める。
 
 ```bash
 gh pr merge <N> --squash --subject "<Pull Requestの題名>" --body-file <path>
 ```
-
-**`--subject`と`--body-file`を省略しない。**引数なしの`gh pr merge --squash`はGitHubが合成した
-messageでmergeし、**Pull Requestのhead commitが持っていたtrailerは引き継がれない。**
-mergeは成功し、警告も出ない。
-
-`--body-file`の内容には、末尾へ次のtrailerを置く。**指示sourceを変更していない場合、
-`Instruction-Change`の行は書かない。**残る`Change-Class` 1行と`Self-Review` 3行
-（`requirements-pass`・`fresh-context-pass`・`converged`または`capped`のどちらか1つ）は
-すべて要る。**打ち切ったか収束したかで最後の1行が変わる**（下の「打ち切り」を参照）。
-
-```text
-Change-Class: review-required
-Self-Review: requirements-pass
-Self-Review: fresh-context-pass
-Self-Review: converged
-Instruction-Change: reviewed-as-data
-```
-
-**[打ち切り](#打ち切り)の条件で終える場合は、最後の1行を`capped`にする。**
-`converged`と`capped`は同時に書けない（どちらか一方だけを要求する）。
-
-```text
-Change-Class: review-required
-Self-Review: requirements-pass
-Self-Review: fresh-context-pass
-Self-Review: capped
-Instruction-Change: reviewed-as-data
-```
-
-**`Change-Class: fixup`を宣言する場合は、`Refs`で後始末の対象を示す。**
-番号を含まない`Refs`は通らない。
-
-```text
-Change-Class: fixup
-Self-Review: requirements-pass
-Self-Review: fresh-context-pass
-Self-Review: converged
-Refs: #206
-```
-
-**`Refs`にはコロンが要る。**`git interpret-trailers`はコロンの無い行をtrailerとして
-読まない。この repository のcommit messageは`Refs #204`（コロンなし）を本文の段落として
-書いてきたが、**それはtrailerではない。**
-
-**そしてコロンの無い行をtrailer blockと同じ段落へ置くと、blockごと無効になる。**
-`Change-Class`も`Self-Review`も消え、gateは「trailerが無い」と報告する。実測した。
-
-```text
-本文
-
-Refs #200
-Change-Class: review-required
-Self-Review: converged
-```
-
-上のmessageから`git interpret-trailers --parse`が返すのは**空である。**
-本文の段落として`Refs #204`を書く場合は、**trailer blockと空行で分ける。**
-`fixup`の宣言に使う場合は、**block の中へ`Refs: #204`と書く。**
-
-**trailerの名前と値の正本は`scripts/review_gate.py`である。**
-
-**trailerは行番号で指定せず名前で指定する。**[以前の参照ずれ](docs/runbooks/contributing-history.md#trailerを行番号で指した経緯)を参照する。
-
-**`main`昇格で検証されるのは、範囲の各commitの宣言である。**squash commitへtrailerを書き忘れると、その回のmergeは通っても次の昇格で落ちる。
-**head commit 1本を見る検査は`main`昇格では走らない**（上の「Merge方式」を参照）。
-
-**ただし検査に起点がある。**trailer運用を導入したcommit（[#161](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/161)のsquash）より前は検査しない。**宣言を求める規則が存在しなかったためである。**起点より後にも、宣言を持たないことを許しているcommitがある。`AGENTS.md`が共有branchの履歴書き換えを禁じているため、後からtrailerを付けられない。**起点と免除の正本は`scripts/review_gate.py`の`DECLARATION_CUTOVER`と`DECLARATION_EXEMPT`であり、免除の理由も同fileが持つ**（登録と同じ場所に置いてある。commentだけに書いていた間、どの免除が指示sourceを触るかの列挙が2回遅れた）。
-
-**免除が飛ばすのは`Change-Class`と`Self-Review`だけである。**指示source変更の宣言（`Instruction-Change`）は飛ばさない。
-免除commitが指示sourceを触る場合、`DECLARATION_EXEMPT`の記録が**その差分をdataとしてreviewしたと言えること**を示していなければ`history`が落ちる。
-**免除はreviewを飛ばすためにあるのではなく、後から付けられない宣言の記録を飛ばすためにある。**
-
-そのため**`HISTORY_CHECKED`は昇格範囲のcommit数より少なくなりうる。取りこぼしではない。**検査した件数、skipしたmerge commitの件数、免除した件数を必ず出すため、差はその内訳で説明できる。**この数を期待値として引用しない。**範囲は昇格ごとに変わる。
-
-**過去のcommitへの要求は、head commitより軽い。**`Change-Class`が計算結果より緩くないことと、`Self-Review`が1つ以上あることだけを見る。`Self-Review`の値の集合は時期によって変わっており、**過去のcommitを現在の集合で測ると、当時は正しかった宣言が落ちる。**
-
-**Pull Requestのhead commitにも同じtrailerを置く。**Review gate workflowがそれを見る。
-head commitへ置いておけば、review後にcommitを足したときにworkflowが落ちる。
-**squash commitのtrailerは、mergeするまで存在しないためmerge前に検査できない。**
-merge前にlocalで確認できるのは、自分のbranchのhead commitに対する次である。
-
-```bash
-python3 scripts/review_gate.py gate --base origin/develop --head HEAD
-```
-
-merge後に`develop`のtipへ宣言が入ったことは、次で確認する。ここが`main`昇格の前提になる。
-
-```bash
-python3 scripts/review_gate.py receipt --base origin/develop~1 --head origin/develop
-```
-
-**この確認をskipすると取り返しがつかない。**`AGENTS.md`が共有branchの履歴書き換えを禁じているため、
-mergeしたsquash commitへ後からtrailerを付ける手段は無い。残るのは`DECLARATION_EXEMPT`へ
-登録する判断だけであり、それはIssueとPull Requestを1本ずつ要する。
-[#197](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/197)で実際に2 commit分を払っている。
 
 squash mergeしたbranchはcommit hashが変わるため、`git branch -d`が「未merge」と判定する。
 削除前に`git diff <branch> origin/develop`が空であることを確認してから`-D`する。
@@ -937,14 +670,10 @@ squash mergeしたbranchはcommit hashが変わるため、`git branch -d`が「
 
 ## hookが止めたとき
 
-`.claude/settings.json`が8つのscriptをhookとして起動する。**検査は13である。**
-**この数は下の表と一致させる。**一致していない間、表に無いhookは「無い」ものとして
-読まれる（`truncation_guard.py`と`stop_claim_guard.py`は、追加した
-[#349](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/349)／[#350](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/350)から
-[#325](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/325)まで表に無く、
-`gh_metadata_guard.py`の本文節の検査も同じく無かった）。**数えるのは検査であって
-scriptではない。**`gh_metadata_guard.py`は1 scriptで6つを見る
-（同fileのdocstring「止める対象は6つである」）。
+`.claude/settings.json`がhookとして起動するscriptのうち、下の表は6つ、**検査は11である。**
+**この数は下の表と一致させる。**一致していない間、表に無いhookは「無い」ものとして読まれる。
+**数えるのは検査であってscriptではない。**`gh_metadata_guard.py`は1 scriptで6つを見る
+（同fileのdocstring「止める対象は6つである」）。公開前の検査（`publication_guard_hook.py`）は、この表とは別に起動する。
 
 **文書に書いても実行されないことが実測で分かっている。**
 [#204](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/204)、
@@ -959,94 +688,35 @@ scriptではない。**`gh_metadata_guard.py`は1 scriptで6つを見る
 | `gh issue create`／`gh pr create`の前 | `--project`（短縮形`-p`）があるか | `scripts/hooks/gh_metadata_guard.py` |
 | `gh pr create`の前 | `--base`（短縮形`-B`）があるか | 同上 |
 | `gh issue create`／`gh pr create`の前 | 本文がtemplateの`## `節を持つか | 同上 |
-| `gh pr merge`の前 | 対象file（[手動で依頼する前に状態を確認する](#手動で依頼する前に状態を確認する)）を含むPull Requestで、CodeRabbitのreviewがどれかのcommitで完走しているか。**解除の手段は無い** | 同上 |
+| `gh pr merge`の前 | [慎重に扱う path](#慎重に扱う-path)を含むPull Requestで、CodeRabbitのreviewがどれかのcommitで完走しているか。**解除の手段は無い** | 同上 |
 | `gh issue close`の前、およびboardの`Status`を`Done`にする`gh project item-edit`の前 | 対象Issueの`受け入れ条件`の節に`- [ ]`が残っていないか（節が無い本文も止める）。**解除の手段は無い** | 同上 |
 | `@coderabbitai`へreviewを投げる前 | 同じ行の`review`が`full review`か（**`full`の付かない`review`は`deny`**）。対象PRのどれかのcommitでreviewが完走・進行中なら`full review`も**`deny`**。完走も進行中も無いPR（`Review rate limited`や`Review stopped after lock loss`の後を含む）への`full review`と、対象PRやcheckを判定できないときは`ask`。[`ask`の扱い](#手動で依頼する前に状態を確認する) | `scripts/hooks/coderabbit_gate.py` |
-| `gh pr merge`の前 | squash messageから`git`が`Change-Class`と`Self-Review`をtrailerとして読むか | `scripts/hooks/gh_metadata_guard.py` |
+| `gh pr merge`の前 | `--subject`と`--body`／`--body-file`があるか | `scripts/hooks/gh_metadata_guard.py` |
 | `git checkout -b`／`git switch -c`の前 | 基点が最新の`origin/develop`か | `scripts/hooks/branch_base_guard.py` |
-| `gh pr merge`の後 | squash commitに実際に入ったか | `scripts/hooks/merge_trailer_report.py` |
-| `develop`へ直接pushする前 | 押す範囲が`review_gate.py gate`を通るか | `scripts/hooks/push_gate.py` |
 | 件数・不在の根拠になりうる列挙commandの前 | 明示的な切り詰め（`head -N`／`-n N`／`--limit N`）があるか | `scripts/hooks/truncation_guard.py` |
 | `git reset --hard`／`git clean`／checkout・switch・restoreによる破棄の前 | 捨てる範囲に未commitの変更があるか | `scripts/hooks/worktree_guard.py` |
 | 応答を終える前 | 完了の主張に、対応するtool呼び出しがあるか | `scripts/hooks/stop_claim_guard.py` |
 
-**判定は字句だけで行う。**意味は判定しない（`scripts/review_gate.py`と同じ方針）。
+**判定は字句だけで行う。**意味は判定しない。
 **字句だけでは決まらない検査は、repositoryの状態も見る。**`branch_base_guard.py`は
-基点を、`worktree_guard.py`は捨てる対象が在るかを、`push_gate.py`は`gate`の結果を、
-`merge_trailer_report.py`はsquash commitを、それぞれ子processのgitで読む。
+基点を、`worktree_guard.py`は捨てる対象が在るかを、それぞれ子processのgitで読む。
 **`git reset --hard`は、汚れたtreeでは破壊的で、汚れていないtreeでは何も失わない。
 同じcommandである。**
-**`git interpret-trailers --parse`へ読ませることも字句の判定である**
-（理由は`scripts/hooks/gh_metadata_guard.py`のdocstringが持つ。**ここへ複製しない**）。
 
-**改行もcommandの区切りとして見る。**`git fetch origin`改行`git push origin develop`の
-`push`も検査の対象である。**以前はこの形が素通りしていた**（[#389](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/389)。
-**迂回を試みた形ではなく、通常の書き方で門が反応しなかった**）。
-**当たるのは`command_line.invocations`を使うhookである**（`inspector_readonly_guard.py`は使うが、
-自分で行分割しているため改行については変わらない。**ただし後述のコメント除去では、
-通す側へ動く**）。**向きは hook によって逆になる。**
-止める側（`push_gate.py`等）は止める形が増え、**やった証拠として読む側（`stop_claim_guard.py`）は、
-2行目のpushを証拠として数えるようになる**（止めなくなる側である）。
-
-**同じ走査で、bashが実行しない範囲も落とす。**heredocのbody、語頭の`#`以降である。
-**こちらは向きが逆になる。**止める側では止める形が減り、**証拠として読む側では、
-bodyに書いたpushを証拠として数えなくなる**（`stop_claim_guard.py`が止める側へ動く）。
-**「在るか」を見る検査ではさらに逆になる。**`gh_metadata_guard.py`は`--project`や`--base`が
-引数に在るかを見るため、**コメントの中に書いた`--project`は充足として数えなくなり、拒否が増える**
-（`gh pr create --title t --base develop # --project deskcat`。bashは渡さない）。
-**hookの種別だけで向きを決められない。**増える側と減る側が同じ変更に入っている。
-
-**command位置の判定では、引用の外で開いたheredocのbodyを、開いているheredocのすべてに終端行があるときに限って見ない。**
-終端行の無いheredocでは残りの行をcommandとして検査する（**bashは実行しない。
-検査しすぎる側の乖離であり、理由はdocstringが持つ**）。**引用の中へ入ったbodyは引数の文字列として読む**
-（`gh pr comment --body "$(cat <<'EOF' … EOF)"`の本文は`coderabbit_gate.py`が照合する）。
-**条件分岐の中の行は、独立した行にあれば検査の対象になる。実行されるかは判定しない。**
-**理由と、判定の細かい境界は`scripts/hooks/command_line.py`のdocstringが持つ。ここへ複製しない。**
-
-[merge hookをtrailer解釈へ変更した経緯](docs/runbooks/contributing-history.md#merge-hookの変更履歴)を参照する。
+**改行、heredoc、コメントをどう読むかと、その境界は`scripts/hooks/command_line.py`のdocstringが持つ。
+ここへ複製しない。**
 
 ### 止まったときにどうするか
 
 **まず、指摘が当たっているかを見る。**当たっていれば、足りないものを足して再実行する。
 
-誤検知のときは環境変数で無効化できる。**逃げ道であって常用するものではない。**
-使ったらPull Request本文へ理由を書く。
-
-```bash
-DESKCAT_SKIP_GH_GUARD=1 gh pr create --title "..." --body-file body.md
-DESKCAT_SKIP_BASE_GUARD=1 git checkout -b experiment/scratch
-DESKCAT_SKIP_PUSH_GATE=1 git push origin HEAD:develop
-DESKCAT_SKIP_TRUNCATION_GUARD=1 gh pr list --limit 50
-DESKCAT_SKIP_WORKTREE_GUARD=1 git reset --hard origin/develop
-```
-
-> **上の1行目の形は効かない。**2026-08-28に
-> `DESKCAT_SKIP_GH_GUARD=1 gh issue create --help`を実行し、**拒否された。**
-> hookは対象commandとは別のprocessとして起動されるため、command行頭の環境変数代入は
-> hookのenvironmentへ届かない。**例はこれまでの記述のまま残してある。**
->
-> **`DESKCAT_SKIP_BASE_GUARD`、`DESKCAT_SKIP_PUSH_GATE`、
-> `DESKCAT_SKIP_TRUNCATION_GUARD`、`DESKCAT_SKIP_WORKTREE_GUARD`は実測していない。**
-> hookの起動のされ方が同じであるため同じ見込みだが、**同じであると断定しない。**
-> **上の例はすべてcommand行頭の代入である。**効く形が未確定である以上、
-> 4行目と5行目についても「この形で効く」とは読まない。
->
-> **効く形は未確定である。**hookのprocessが継ぐenvironmentへ入れる必要がある、
-> というところまでしか分かっていない。**機構の扱いは別に判断する。**
+**誤検知で止まったときは、所有者の承認を得て通す。**`DESKCAT_SKIP_*`の環境変数をcommand行頭に
+書いても効かない。2026-08-28に`DESKCAT_SKIP_GH_GUARD=1 gh issue create --help`を実行し、拒否された。
+hookは対象commandとは別のprocessとして起動されるため、command行頭の代入はhookのenvironmentへ届かない。
 
 `branch_base_guard.py`は、基点を明示した場合（`git checkout -b <name> <start>`）と
 `hotfix/`で始まるbranchを対象外にする。`hotfix/`は`main`から作るのが正しい
 （[ADR-0004](docs/decisions/0004-main-develop-branch-strategy.md)）。
-
-`push_gate.py`は`develop`を更新するpushだけを見る。**他のbranchへのpushは見ない。**
-Pull Requestを通る変更は`review-gate.yml`が`gate`を実行するためである。
-**直接pushはCIを通らないため、そこだけが検査の無い経路だった。**
-
-**このhookは`gate`を実行するだけで、直接commitしてよい基準そのものは検査しない。**
-検査すると、trailerを落としたsquash commitをamendして直す手順
-（[Merge方式](#merge方式)）を誤って止める。その手順の対象は
-`Change-Class: review-required`を持つため、基準で測ると拒否になる。
-**字句で区別する手立てが無い。**
 
 ### 取り切れていないもの
 
@@ -1099,25 +769,6 @@ Pull Requestを通る変更は`review-gate.yml`が`gate`を実行するためで
 - **branchをhook以外の経路で作った場合。**worktreeを外部の道具が作ると
   `git checkout -b`を通らないため、基点は検査されない。
 - **`git fetch`ができない環境。**基点の検査は行わず、黙って通る。
-- **merge後の確認は事後である。**入っていなければ履歴書き換えなしには直せない。
-  それでも報告するのは、免除へ回す判断を次の昇格まで先延ばしにしないためである。
-- **`develop`へ入る経路のうち、`gh pr merge`によるものは`push_gate.py`を通らない。**
-  そちらはPull RequestのCIで`gate`が済んでいる。
-- **`push_gate.py`が見る`develop`の書き方は`develop`と`refs/heads/develop`だけである。**
-  `--mirror`と`--all`のように、refspecを書かずに複数branchを更新する形は拾えない。
-- **`push_gate.py`は、`git push`の字句を完全には解釈しない。下の各項目は2026-09-24に実測で確かめた例であり、網羅ではない。**
-  **通ったことを、検査したことと読まない。**
-- **`push_gate.py`は、環境変数を前に付けた形を見ない。**`GIT_DIR=/o/.git git push origin HEAD:develop`は
-  `VAR=value`を読み捨てるため、cwd側のrepositoryを検査する（2026-09-24実測）。**[#472](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/472)より前から同じである。**
-- **`push_gate.py`は、値を次の語で取るpushのoptionを読み違える。**`git push -o ci.skip origin HEAD:develop`は
-  `ci.skip`をremoteと読み、検査しない（`--push-option`も同じ。2026-09-24実測）。**#472より前から同じである。**
-- **`push_gate.py`は、refspecを書かない`git push origin`を見ない。**upstreamを引くのは`git push`だけの形である。**#472より前から同じである。**
-- **`push_gate.py`は、remoteを`origin`以外の綴りで書いた形を見ない。**`git push https://github.com/wachi-yoshitaka-11-dev/deskcat.git HEAD:develop`は検査しない。**#472より前から同じである。**
-- **`push_gate.py`は、dry-runの判定を値の位置でも一致させる。**`git push -o -n origin HEAD:develop`は`-n`を見て検査しない。**#472より前から同じである。**
-- **`push_gate.py`は、commandの中で`cd`した先を見ない。**`cd other && git push origin HEAD:develop`はhookのcwdのrepositoryを検査する。**#472より前から同じである。**
-- **`push_gate.py`は、`-C`の値にshellの展開が要る形を検査しない。**`git -C ~/x push origin HEAD:develop`は`~`を展開できずrepositoryを決められないため通す。**#472より前から同じである。**
-- **`gate`が時間内に終わらない場合は通す。**止めないのは、遅い環境で作業を止めないためである。
-  **通ったことを、検査したことと読まない。**
 - **`git stash drop`／`git stash clear`／`git rm -f`／`git worktree remove --force`／
   `git checkout-index -f`。**いずれも未commitの変更を失いうるが、
   `worktree_guard.py`の対象は[#325](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/325)の候補1が挙げた3系統
@@ -1172,8 +823,7 @@ Issue本文）に残るべきものは、成果物へ書く。**報告と成果�
 
 **道具そのものは正しく動いていても、効かない条件が書かれていなければ誤読する。**
 2026-09-01と2026-09-02に、10件の道具でこれが起きた（[#289](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/289)）。
-`scripts/review_gate.py`固有の2件は同fileのdocstringにある。**残りの8件をここへ記載する。**
-**数と箇条書きの件数が食い違っていた**（7件と書いて8件並べていた）。数を書くなら数える。
+**ここに8件を記載する。**数を書くなら数える。
 
 - **`git cherry`は、squash mergeされたbranchに対して逆の答えを返しうる。**
   1 commitのbranchでは`-`（取り込み済み）を返すが、複数commitを1つへ畳んだbranchでは
@@ -1202,11 +852,11 @@ Issue本文）に残るべきものは、成果物へ書く。**報告と成果�
   この呼び出しだけでは分からない。**ブラウザ側の解決は別に確認する。**
 - **`origin/*`を検査するscriptを、自分のworktreeの版で実行すると、遅れた判定になる。**
   `origin/develop`や`origin/main`は`git fetch`しないと更新されない。fetchせずに
-  過去の版へ対して`history`等を走らせると、既に解決済みの問題を「まだ落ちている」
+  過去の版へ対して検査を走らせると、既に解決済みの問題を「まだ落ちている」
   と読みうる。**実行前に`git fetch origin`する。**
 - **`git log -S<文字列>`は、既存の定数へ1行足しただけのcommitを検出しない。**
-  `-S`は指定した文字列の**出現数の変化**を見る。定数名（例:
-  `DECLARATION_EXEMPT`）そのものへ1行足しても、定数名の出現数は変わらないため
+  `-S`は指定した文字列の**出現数の変化**を見る。定数名
+  そのものへ1行足しても、定数名の出現数は変わらないため
   hitしない。**個々の値（SHAや識別子）で検索し直す必要がある。**
 - **`closingIssuesReferences`は、本文にclosing keywordがあってもしばらく0件のことがある。**
   **merge時点の0件は最終状態ではない。**反映の遅れであり、幅は測っていない。

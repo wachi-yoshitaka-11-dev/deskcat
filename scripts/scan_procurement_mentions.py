@@ -15,7 +15,7 @@ Markdownしか見ない。GitHubのIssue本文・Pull Request本文・commentは
 区別できず、日付を打った過去の事実として残す記述を誤って問題として報告し
 うる。ヒットの分類（既存台帳行が包含する／新規登録する／台帳の対象外／
 規則文等）は、`tbd-register.md`の[区別の基準](../docs/hardware/tbd-register.md#区別の基準)
-に従って人が行う。設計は`scripts/hooks/merge_trailer_report.py`に倣う。
+に従って人が行う。
 
 GitHub APIのrate limitは未測定であり、走査頻度に影響しうる（#305）。
 """

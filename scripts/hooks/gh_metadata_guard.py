@@ -15,28 +15,9 @@ Claude CodeのPreToolUse hookとして、Bash tool呼び出しの前に走る。
    [PR #250](https://github.com/wachi-yoshitaka-11-dev/deskcat/pull/250)がbase `main`で
    作られ、baseの変更まで1時間17分かかった（timelineの`base_ref_changed`で実測）。
    **`gh issue create`に`--base`は存在しないため、そちらへは要求しない。**
-3. `gh pr merge`のsquash messageから、`git`が`Change-Class`と`Self-Review`を
-   trailerとして読めない。PR側のgateがSUCCESSでも、squash commitへtrailerが
-   引き継がれないと次の昇格で落ちる（`18298ae`／`619c843`。どちらも
-   `DECLARATION_EXEMPT`へ登録済み）。**「文字列としてあるか」では足りない。**
-   `c171c52`は`Change-Class`・`Self-Review`・`Instruction-Change`を文字列として
-   持っていたが、最後の段落にコロン無しの`Closes #304`が混じっていたため、
-   `git interpret-trailers`は段落ごとtrailerと認めなかった。部分一致で見ていた
-   当時のこの検査は素通りさせ、CIの`history`だけが検出した。
-   **`--merge`（`main`昇格のmerge commit）にはこの要求を掛けない**
-   （`_is_main_promotion_merge`）。`CONTRIBUTING.md`の`Merge方式`が`main`昇格へ
-   これらのtrailerを要求しないと定めており、`_check_history`（`review_gate.py`）も
-   `git rev-list --no-merges`でmerge commitを検査対象から外している。
-   2026-09-16まで`--squash`と区別せず一律に要求しており（`#417`）、`#383`の
-   main昇格でこの誤検知が`gh pr merge --merge`を2回denyし、ブラウザでの
-   mergeを強いた結果、merge commit `afc86cf`のmessageがGitHub既定のまま入り、
-   直前の昇格が持っていた検証経緯・実測値が失われた（main の履歴は書き換えない
-   ため戻せない）。**この判定はPRのbaseを見ていない。**`--merge`の指定と
-   `CONTRIBUTING.md`の規約（`develop`はsquash、`main`はmerge commit）に頼る
-   heuristicであり、規約に反して`develop`へ`--merge`でmergeされた場合は
-   誤って通す。`--rebase`は同節に定義が無く、trailerの扱いを定めていないため
-   要求を掛けたままにする。戦略flagが1つも無い呼び出しも、`gh`がrepositoryの
-   既定を使い hookからは何になるか分からないため、要求を掛けたままにする。
+3. `gh pr merge`に`--subject`と`--body`／`--body-file`が無い。messageを渡さないと
+   GitHubが合成したmessageでmergeされ、検証の経緯や測定値がcommitに残らない
+   （main昇格の`#383`／`afc86cf`で実際に失われた）。
 4. `gh issue create`／`gh pr create`に`--body`／`--body-file`が付いており、その
    本文が対応するtemplate（`.github/ISSUE_TEMPLATE/*.md`／
    `.github/pull_request_template.md`）の`## `節を欠いている。`--body`系は
@@ -55,11 +36,10 @@ mergeもしない。metadataを要求しても誤検知しか生まない。**20
 拒否されることを実測した。**`gh pr merge`はとりわけ効く。`--subject`と`--body-file`の
 明示をCONTRIBUTINGが要求しているのに、**そのoption名を`--help`で確認できなかった。**
 
-**判定は字句だけで行う。**意味は判定しない。`review_gate.py`と同じ方針である。
-**`git interpret-trailers --parse`に読ませることは字句の判定である。**見ているのは
-trailerとして解釈できる形かどうかだけで、値の正しさは見に行かない。
+**判定は字句だけで行う。**意味は判定しない。
 
-5. `gh pr merge`の対象Pull Requestが安全・protocol・firmwareの対象fileを含むのに、
+5. `gh pr merge`の対象Pull Requestが慎重に扱うpath（`REVIEW_TARGET_PREFIXES`・
+   `REVIEW_TARGET_FILES`。一覧はCONTRIBUTINGの「慎重に扱う path」と同じ）を含むのに、
    CodeRabbitのreviewが1度も完走していない（#688）。CONTRIBUTINGの「手動で依頼する前に
    状態を確認する」が「reviewが完走するまでmergeしない」と定めるが、2026-11-01〜02に
    #680と#684が`Review skipped`のままmergeされた。人が覚えていても守られなかったため、
@@ -92,14 +72,6 @@ from pathlib import Path
 
 import command_line
 
-# trailerの名前と、messageからtrailerを読む判定は`scripts/review_gate.py`が正本で
-# ある。**hook側へ複製しない。**名前がずれると、gateが要求するものとhookが見るものが
-# 食い違い、hookが素通りする。**判定も同じである。**名前だけを共有して存在の判定を
-# 部分一致で別実装していたことが`c171c52`の穴だった。
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-import review_gate  # noqa: E402
-
 # 検査する`gh`のsubcommand。`gh`の呼び出しに続く2語がこの組のときだけ見る。
 # 呼び出しの切り出しは`command_line.invocations`が行う。
 PR_CREATE_SUBCOMMAND = ("pr", "create")
@@ -123,55 +95,48 @@ ITEM_QUERY = (
     " __typename ... on Issue { number state body } } } } }"
 )
 
-# squash messageが持たなければならないtrailerの名前。**値は見ない。**
-REQUIRED_MERGE_TRAILERS = (review_gate.TRAILER_CLASS, review_gate.TRAILER_REVIEW)
-
-# `gh pr merge`の戦略flag。**`CONTRIBUTING.md`の`Merge方式`が定義するのは
-# squash（`develop`向け）とmerge commit（`main`昇格）の2つだけである。**
-# `--rebase`は同節に定義が無く、trailerの扱いも定めていない。
-MERGE_STRATEGY_FLAGS = ("--merge", "-m")
-SQUASH_STRATEGY_FLAGS = ("--squash", "-s")
-REBASE_STRATEGY_FLAGS = ("--rebase", "-r")
-
 # repositoryの正本template。**hookの起動位置に依存させない。**`__file__`から
-# 辿るため、cwdがどこであっても同じfileを見る（`GIT_ROOT`とは別の理由で位置に
-# 依存させている。こちらはgitを呼ばない純粋なfile読み出しである）。
+# 辿るため、cwdがどこであっても同じfileを見る。
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 ISSUE_TEMPLATE_DIR = REPO_ROOT / ".github" / "ISSUE_TEMPLATE"
 PR_TEMPLATE_PATH = REPO_ROOT / ".github" / "pull_request_template.md"
 
-# gitへ渡す作業ディレクトリ。**`interpret-trailers --parse`はrepositoryの外でも
-# 動く**（2026-09-02に`/tmp`で実測。EXIT=0）。見ているのはstdinのmessageだけで、
-# repositoryの状態もrevisionも読まない。hookの起動位置に依存させない。
-GIT_ROOT = "."
-
-# gitを待つ上限（秒）。**hookはtool呼び出しの前に走るため、返らないと作業が止まる。**
-# 超えたら「確認できなかった」として扱う（`_merge_trailers`）。
-GIT_TIMEOUT_SECONDS = 10
-
-# 本文の前に置く1行。`gh pr merge`が作るcommit messageは`--subject`と本文を空行で
-# 連結した形になるため、**本文だけをgitへ渡すと本文の先頭行がsubjectとして扱われる。**
-# 本文がtrailerだけで構成されている場合、実際のcommitでは有効なtrailer blockなのに、
-# 本文単体では段落が1つしか無い形になりtrailer 0件と読まれる（2026-09-02に実測）。
-# **subjectの中身は解釈に効かない**（効くのは「空行の前に1行あること」だけ）ため、
-# `--subject`の値は読まずにこの1行を前へ付ける。**値を読むと、渡されなかった場合に
-# GitHubがPull Request titleで補う分を推測することになる。**
-SUBJECT_PLACEHOLDER = "subject"
-
 SKIP_ENV = "DESKCAT_SKIP_GH_GUARD"
 
-# CodeRabbitのreviewが完走するまでmergeさせない対象（#688）。**範囲を広げない。**
-# CodeRabbitにはクールタイム（1時間）があり、何でも通すと作業が止まる。
-# 対象にしない: 実験記録、BOM、図、ルールの文書、検査のscript、Pi側だけのアプリ。
-REVIEW_TARGET_PREFIXES = ("firmware/esp32/src/",) + tuple(
-    f"crates/deskcat-{name}/src/"
-    for name in ("protocol", "servo", "face", "tap", "touch", "accel", "env")
+# CodeRabbitのreviewが完走するまでmergeさせない対象（#688）。CONTRIBUTINGの「慎重に扱う path」と
+# 同じ一覧にする（`scripts/test_hooks.py`が両者の一致を検査する）。
+REVIEW_TARGET_PREFIXES = (
+    "firmware/esp32/src/",
+    "crates/deskcat-protocol/src/",
+    "crates/deskcat-servo/src/",
+    ".github/workflows/",
+    "scripts/hooks/",
+    ".githooks/",
+    "hardware/DeskCat.pretty/",
+    "hardware/overview/",
+    "hardware/breadboard/",
+    "hardware/breadboard-rebuild/",
+    "hardware/universal-board/",
 )
 REVIEW_TARGET_FILES = (
+    ".claude/settings.json",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "CONTRIBUTING.md",
     "docs/protocol/esp32-pi-protocol.md",
     "docs/hardware/gpio-assignment.md",
     "docs/hardware/power-budget.md",
     "docs/hardware/servo-safety-limits.md",
+    "docs/governance/ai-agent-policy.md",
+    "docs/governance/development-workflow.md",
+    "docs/governance/hardware-safety-policy.md",
+    "hardware/deskcat.kicad_pcb",
+    "hardware/deskcat.kicad_sch",
+    "hardware/DeskCat.kicad_sym",
+    "hardware/deskcat.kicad_pro",
+    "hardware/fp-lib-table",
+    "hardware/sym-lib-table",
+    "scripts/check_wiring_figure_sync.py",
 )
 
 # CodeRabbitの結果を持つcheck-runの名前。**2026-11時点の結果はcheck-runに残り、
@@ -194,8 +159,7 @@ REVIEW_COMPLETED_TEXT = "Review completed"
 GH_TIMEOUT_SECONDS = 15
 # **最初の`gh`照会の前に始め、残りを各照会へ渡す。**走っているworkerも同じ期限で
 # 終わるため、denyを出した後にprocessが残って時間切れになることもない。
-# **この期限の外で、先に`_check_merge`のgit（`GIT_TIMEOUT_SECONDS`）が走る。**
-# 両方の上限の和がhookの30秒に収まる値にする（最初の遅れの後に残りの照会も収まる）。
+# hookの30秒に収まる値にする（最初の遅れの後に残りの照会も収まる）。
 CHECK_DEADLINE_SECONDS = 18
 COMMIT_CHECK_WORKERS = 16
 
@@ -554,165 +518,31 @@ def _check_create(subcommand, args):
     _check_body_sections(subcommand, args)
 
 
-def _merge_trailers(text, source):
-    """squash messageから、`git`がtrailerとして読む組を返す。
-
-    **読めなかった場合は`deny`する。**gitを実行できない、返らない、想定外の入力で
-    落ちる、のいずれでも「trailerがある」とは言えない。この検査が守っているのは
-    「宣言がsquash commitへ入るか」であり、**入らなかったときの手当ては
-    `DECLARATION_EXEMPT`への登録＝Pull Request 1本である**（`c171c52`が実例）。
-    確認できないまま通すほうが高くつく。**止まったときの逃げ道は`DESKCAT_SKIP_GH_GUARD`
-    であり、診断文にも書く。**
-    """
-    message = f"{SUBJECT_PLACEHOLDER}\n\n{text}"
-    try:
-        return review_gate.trailers_from_message(
-            GIT_ROOT, message, timeout=GIT_TIMEOUT_SECONDS
-        )
-    except (SystemExit, OSError, subprocess.SubprocessError) as error:
-        _deny(
-            f"`gh pr merge`のsquash message（{source}）を`git`で解釈できなかった"
-            f"（{type(error).__name__}: {error}）。"
-            " **確認できないまま通さない。**trailerがsquash commitへ入らなかった"
-            "場合の手当ては`DECLARATION_EXEMPT`への登録＝Pull Request 1本であり"
-            "（`c171c52`が実例）、通すほうが高くつく。"
-            f" gitを実行できない環境で作業する場合は{SKIP_ENV}=1で無効化し、"
-            " 理由をPull Request本文へ書く。"
-        )
-
-
-def _is_main_promotion_merge(args):
-    """`--merge`（merge commit戦略）が指定されているかを返す。
-
-    **これはPRのbaseを見ていない。**`CONTRIBUTING.md`の`Merge方式`が
-    `develop`はsquash、`main`はmerge commitと定めていることに基づく
-    heuristicであり、**その規約が守られている前提のもとでのみ正しい。**
-    baseを実際に問い合わせて判定する形はここでは採らない
-    （`gh pr view --json baseRefName`が必要になり、hookからの追加のnetwork
-    呼び出しを増やす。字句だけで判定する既存方針（module docstring）に合わせ、
-    flagの有無だけで判定する）。
-
-    **`--squash`／`--rebase`が同時に指定されている場合は主昇格として扱わない。**
-    `gh`自身が複数戦略の同時指定を拒否するため通常は起きないが、字句だけで
-    見ている以上、単独で`--merge`が立っている場合だけに限定する。
-    **`--rebase`単独の場合は、この関数はFalseを返す**（`CONTRIBUTING.md`が
-    `--rebase`の扱いを定めていないため、trailerを要求する既存の扱いのままにする）。
-    **戦略flagが1つも無い場合もFalseを返す。**`gh`はrepositoryの既定を使うが、
-    hookはcommand文字列しか見ないため既定が何かを知りようが無い。
-    `_body_text`が「特定できない場合はdeny」としているのと同じ理由で、
-    分からないものは従来どおりtrailerを要求する側へ倒す。
-    """
-    if any(flag in SQUASH_STRATEGY_FLAGS for flag in args):
-        return False
-    if any(flag in REBASE_STRATEGY_FLAGS for flag in args):
-        return False
-    return any(flag in MERGE_STRATEGY_FLAGS for flag in args)
-
-
 def _check_merge(args):
-    """`gh pr merge`のmessageが指定されているか、squash messageなら宣言trailerも見る。
+    """`gh pr merge`に`--subject`と`--body`／`--body-file`があるかを見る。
 
-    **この関数は判定を持たない。**trailerの名前も、messageからtrailerを読む判定も
-    `scripts/review_gate.py`が正本である（名前は`REQUIRED_MERGE_TRAILERS`経由で、
-    判定は`trailers_from_message`で受け取る）。ここがするのは、その2つを突き合わせて
-    欠けている名前を診断文にすることだけである。
-    **hook側へ複製しない。**名前だけを共有して存在の判定を部分一致で別実装して
-    いたことが`c171c52`の穴だった（module docstringの3を参照）。
-
-    **messageの有無と、trailerの有無は別の要求であり、分けて見る。**
-    `CONTRIBUTING.md`の`Merge方式`は「`--subject`と`--body-file`を省略しない」と
-    定めており、これは`--squash`／`--merge`のどちらにも掛かる。**trailer
-    （`Change-Class`／`Self-Review`）を要求しないのは`--merge`（`main`昇格）だけ**
-    である。
-
-    **2026-09-17に、この2つを分けずに書いた版が入りかけた。**`_is_main_promotion_merge`
-    がtrueのとき`_body_text`より前でreturnしており、**`gh pr merge N --merge`を
-    messageの指定なしで実行できた。**message省略はGitHubが既定messageを合成する
-    経路であり、これは`afc86cf`（`#383`）で実際に起きた損失そのものである。
-    **`#417`が防ごうとした事象を、この修正自体が再び開けるところだった。**
-    push前のreviewで実行順の問題として発見し、通す前に直した。
-
-    見る順は5つである。**helpの表示は何もmergeしないため対象外**、
-    **messageを特定できない場合は`deny`**（`_body_text`。strategyを問わない）、
-    **`--subject`の有無も見て、無ければ`deny`**（strategyを問わない。
-    `_body_text`は`--body`／`--body-file`の有無しか見ておらず、`--subject`は
-    見ていない。2026-09-17にCodeRabbitのreviewが`--merge`側の欠如を指摘し
-    （`#417`）、その時点では`--squash`側の同じ穴を既存test
-    `test_merge_message_trailers_are_checked`の前提を理由に対象外としたが、
-    その穴は`#423`として別途報告され、この修正でstrategyを問わず塞いだ。
-    `CONTRIBUTING.md`の`Merge方式`は`--subject`と`--body-file`の両方を
-    明示すると定めている）、
-    **`--merge`（`main`昇格）はここでtrailerを要求せず終える**
-    （`_is_main_promotion_merge`。`CONTRIBUTING.md`の`Merge方式`が`main`昇格へ
-    これらのtrailerを要求しないと明記しており、`scripts/review_gate.py`の
-    `_check_history`も`git rev-list --no-merges`でmerge commitを検査対象から
-    外している。このhookが`--squash`と区別せず一律に要求していたことが
-    2026-09-16に`#417`として報告された。実際に`#383`のmain昇格でこの誤検知により
-    `gh pr merge --merge`が2回denyされ、ブラウザでのmergeを強いた結果、
-    merge commit `afc86cf`のmessageがGitHub既定のまま入り、直前の昇格が
-    持っていた検証経緯・実測値が失われた。この記録は戻せない）、
-    そのうえで（`--merge`でない場合）`git`がtrailerとして読むかを見る。
+    messageを渡さないとGitHubが合成したmessageでmergeされ、検証の経緯や測定値が
+    commitに残らない（main昇格の`#383`／`afc86cf`）。strategyを問わず見る。
+    helpの表示は何もmergeしないため対象外である。
     """
     if _is_help(args):
-        # helpの表示だけを求める呼び出しはmergeしない。**messageを要求しない。**
         return
     text, source = _body_text(args)
     if text is None:
-        strategy_note = (
-            "main昇格（`--merge`）でもmessageの指定を省略しない。"
-            if _is_main_promotion_merge(args)
-            else "trailerがsquash commitへ引き継がれたかを後から辿れない。"
-        )
         _deny(
             f"`gh pr merge`のmessageを確認できない（{source}）。"
-            f" 確認できないmessageでmergeすると、{strategy_note}"
             " messageを渡さない場合はGitHubが合成したmessageになり、"
-            " 検証経緯や測定値が失われる"
-            "（main昇格の`#383`／`afc86cf`で実際に起きた。squashでは"
-            "`18298ae`／`619c843`でtrailerが入らなかった）。"
+            " 検証経緯や測定値が失われる（main昇格の`#383`／`afc86cf`で実際に起きた）。"
             " `--subject`と`--body-file`を明示する（CONTRIBUTINGの「Merge方式」）。"
         )
     if not _has_option(args, "--subject", "-t"):
-        # `_body_text`は`--body`／`--body-file`の有無しか見ておらず、
-        # `--subject`無しの呼び出しがここまで素通りしていた。`--merge`側は
-        # 2026-09-17にCodeRabbitのreviewが指摘し（`#417`）、`--squash`側の
-        # 同じ穴は`#423`として別途報告された。**strategyを問わず見る**ため、
-        # 診断文もstrategy名を決め打ちしない（`--rebase`／flag無しでも
-        # 同じ理由でdenyされる）。
-        # **値は使わず、有無だけを見るため`_option_value`ではなく`_has_option`
-        # を使う。**`gh`の`-t`はpflagの短縮string flagであり、`-ts`（`-t s`の
-        # 結合形）でも値を渡せる。`_option_value`はこの結合形を読まず、
-        # `-ts`を指定していても`--subject`が無いと誤判定していた
-        # （2026-09-17のCodeRabbit reviewが指摘）。
+        # 値は使わず、有無だけを見る。`-t`は結合形（`-ts`）でも値を渡せるため、
+        # `_option_value`ではなく`_has_option`を使う。
         _deny(
             "`gh pr merge`に`--subject`が無い。"
-            " `CONTRIBUTING.md`の`Merge方式`は`--subject`と`--body-file`の"
-            "両方を明示すると定めており、`--body`／`--body-file`の"
-            "有無だけでは足りない。"
-            " `--subject`を省略すると、GitHubがPull Request titleを"
-            "推測で補う可能性があり、messageの内容を呼び出し側が"
+            " `--subject`と`--body-file`の両方を明示する（CONTRIBUTINGの「Merge方式」）。"
+            " 省略すると、GitHubがPull Request titleで補い、messageを呼び出し側が"
             "制御できなくなる。"
-        )
-    if _is_main_promotion_merge(args):
-        # `main`昇格のmerge commitである。messageの指定（`--subject`を含む）は
-        # 上で確認済みであり、**squash向けのtrailer要求だけをここで掛けない。**
-        return
-    found = _merge_trailers(text, source)
-    missing = [name for name in REQUIRED_MERGE_TRAILERS if name not in found]
-    if missing:
-        _deny(
-            f"`gh pr merge`のsquash message（{source}）から"
-            f" {', '.join(missing)} を`git`がtrailerとして読めない。"
-            " **文字列として書いてあるかではなく、`git interpret-trailers --parse`が"
-            "trailerとして返すかを見ている。**messageの最後の段落にコロンの無い行が"
-            "1行でも混じると、その段落はまるごとtrailerでなくなる"
-            "（`c171c52`は`Closes #304`をtrailerと同じ段落へ置き、`Change-Class`・"
-            "`Self-Review`・`Instruction-Change`・`Refs`をすべて失った）。"
-            " 宣言はmessage末尾の段落へまとめ、その段落へ他の行を混ぜない。"
-            " 引き継がれないと、そのmergeは通っても次の`main`昇格で"
-            " `review_gate.py history`が落ちる。"
-            " 値の正本は`scripts/review_gate.py`である。"
-            f" 誤検知で止まった場合は{SKIP_ENV}=1で無効化し、理由を残す。"
         )
 
 
@@ -802,8 +632,8 @@ def _check_coderabbit_review(args, global_repo):
 
     **確認できない場合もdenyする。**`gh`が失敗する、応答を読めない、のいずれでも
     「完走している」とは言えない。**逃げ道は足さない**（`DESKCAT_SKIP_GH_GUARD`も効かない）。
-    base（`main`の昇格を含む）は区別しない。昇格もCONTRIBUTINGの昇格の節1が
-    手動reviewの対象と定めている。
+    base（`main`の昇格を含む）は区別しない。CONTRIBUTINGの昇格の節1も、範囲が
+    慎重に扱うpathに触れるときに手動reviewの対象と定めている。
     """
     if _is_help(args):
         return
@@ -863,8 +693,7 @@ def _check_coderabbit_review(args, global_repo):
         "どのcommitでもreviewが完走していない。"
         f" 対象file: {shown}{more}。"
         f" CodeRabbitの状態（head）: {head_state or 'commitを取得できない'}。"
-        " CONTRIBUTINGの「手動で依頼する前に状態を確認する」は、安全・電気・protocol・"
-        "firmwareに関わる変更をreviewの完走までmergeしないと定める。"
+        " CONTRIBUTINGの「慎重に扱う path」に触れる変更は、reviewの完走までmergeしない。"
         " `@coderabbitai full review`の依頼は手順に従い、完走を待つ。"
         " この検査に解除の手段は無い（#688）。"
     )

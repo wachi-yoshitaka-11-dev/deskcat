@@ -71,44 +71,35 @@ Closes #
 
 ## 自己レビュー
 
-- [ ] 開始時に同一作業の既実施巡数と人間の継続承認を確認した（同じreviewの中では差分・rebase・push・セッション変更でもリセットしない）
-- [ ] [自己レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/CONTRIBUTING.md#自己レビュー)の観点で見直し、下記の終端状態と未解決欠陥を記録した
-- [ ] **要件照合Pass**と**fresh-context Pass**を、同じ最終diffに対して別々に実施した（[2つのPass](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/CONTRIBUTING.md#2つのpass)）
+手順は[自己レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/CONTRIBUTING.md#自己レビュー)と[Pull Requestのレビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/CONTRIBUTING.md#pull-requestのレビュー)に従う。
 
-**自動reviewは行わない。**既定ではこれが唯一のreviewである（[ADR-0013](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/docs/decisions/0013-manual-only-coderabbit-review.md)）。
+- [ ] build・test・lintを走らせ、その出力を「検証」に示した
+- [ ] `/code-review`（effortを指定し、`--max-findings all`を付けた）か`fresh-context-reviewer`で差分をレビューした
+- [ ] `/security-review`を走らせた
+- [ ] [慎重に扱う path](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/CONTRIBUTING.md#慎重に扱う-path)に触れる場合は、CodeRabbitに`full review`で依頼した（触れない場合は「触れない」と書く）
 
-宣言はhead commitのtrailerで行う。**checkboxとtrailerの両方が要る。**checkboxは本文の記述であり、
-差分が変わっても残る。trailerはcommitへ結び付くため、差分を変えると無効になる。
+使ったレビューとeffort:
 
-対象Issue / 実行経路:
+巡の数:
 
-このreviewの巡数（開始時の既実施 / 現在） / Issueの通算（情報。最終diffの確認回数とは別）:
+指摘の対応（[指摘の重さと扱い](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/CONTRIBUTING.md#指摘の重さと扱い)）:
 
-状態（`stopped` / `capped` / `converged`）と理由 / 未解決欠陥:
+| 対応 | 件数 |
+|---|---|
+| 直した | |
+| 指摘が誤り | |
+| 意図どおり | |
+| 影響が無い | |
 
-最終diff hash / 同じdiffでの両Passと修正対象の新規指摘0件の巡:
-
-人間の継続・終了・始め直し（なし、または判断と理由・承認者・承認があったこと・日時・出所・対象Issue・承認時のreviewと巡数・終了巡数・範囲。ユーザーの発言は原文でも要旨でも書かない）:
-
-| reviewの巡（Issueの通算） | Passとdiff | [修正対象](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/CONTRIBUTING.md#自己レビュー)の該当種別と出所 | 採否・採らない理由（1行）・未解決 |
-|---|---|---|---|
-| | | | |
-
-引き継ぎ時: 元cloneの最後の操作後に`review_gate.py session status`のJSON全体をこのPRまたは対応Issueへ保存する。
-上限による停止は完了ではない。`stopped`をreceiptの終端値にしない。
+Pre-existingの追跡Issue:
 
 ## Review thread
 
 **この節はmerge直前に確認して更新する。**作成時点ではthreadが無いため空欄でよい。
 
-- [ ] CodeRabbitのcheckの**説明文**を読んだ。checkの色だけで判断しない。**自動reviewは行わない設定であり、`Review skipped`が既定である**（[ADR-0013](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/docs/decisions/0013-manual-only-coderabbit-review.md)）。手動で依頼した場合は`Review completed`であること。`Review rate limited`と`Review skipped`は**`pass`と表示されるがreviewは走っていない**（[GitHubが強制しないもの](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/CONTRIBUTING.md#githubが強制しないもの)）
-- [ ] reviewが走らなかった場合、[初回reviewが得られなかったとき](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/CONTRIBUTING.md#merge前の確認)の表に従った。**安全・電気・protocol・firmwareに関わる変更を自己レビューで代替しない。**その範囲の変更では、自己レビューの後で手動でreviewを依頼したかを確認した
+- [ ] CodeRabbitに依頼した場合、checkの**説明文**を読み、`Review completed`であることを確かめた。`Review rate limited`と`Review skipped`は**`pass`と表示されるがreviewは走っていない**（[GitHubが強制しないもの](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/CONTRIBUTING.md#githubが強制しないもの)）
 - [ ] 未解決のreview threadが0件である（GraphQLの`reviewThreads.isResolved`で確認した。REST APIのcomment一覧では判定できない）
-- [ ] 未解決を残す場合は追跡Issueを起票し、下欄と該当threadへ番号を記載した
-
-確認commandと未解決を残す場合の手順は[Merge前の確認](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/CONTRIBUTING.md#merge前の確認)に従う。
-
-追跡Issue:
+- [ ] 承認が要る変更では、承認するcommitのSHAを書いた承認のコメントがある
 
 ## Riskと残作業
 
