@@ -535,7 +535,9 @@ class ReviewCoverageMergeTests(unittest.TestCase):
         side = self.repo._git("rev-parse", "HEAD").strip()
         self.repo._git("checkout", "-q", "main")
         self._log((self.base, side))
-        self.assertDenied(self._merge(refs=promotion, squashed=(self.head,)), self.mid[:7])
+        output = self._merge(refs=promotion, squashed=(self.head,))
+        self.assertDenied(output, self.mid[:7])
+        self.assertIn("終わりが昇格の範囲の中", _reason(output))
 
     def test_promotion_git_calls_do_not_grow_with_the_log(self):
         promotion = ("main", "develop")
@@ -547,6 +549,18 @@ class ReviewCoverageMergeTests(unittest.TestCase):
         self._log(*self._stale(), (self.base, self.mid))
         large, output = self._git_calls(refs=promotion, squashed=(self.head,))
         self.assertIsNone(output)
+        self.assertEqual(small, large)
+
+    def test_promotion_git_calls_do_not_grow_with_repeated_records(self):
+        """同じ範囲を何度もレビューして記録が重なっても、git を呼ぶ回数は変わらない（#822）。"""
+        promotion = ("main", "develop")
+        # mid は PR を通らずに入った commit。`mid..head` は mid の変更を含まないので覆わない。
+        self._log((self.mid, self.head))
+        small, output = self._git_calls(refs=promotion, squashed=(self.head,))
+        self.assertIsNotNone(output)
+        self._log(*[(self.mid, self.head)] * self.STALE_RANGES)
+        large, output = self._git_calls(refs=promotion, squashed=(self.head,))
+        self.assertIsNotNone(output)
         self.assertEqual(small, large)
 
     def test_git_calls_run_under_the_check_deadline(self):
@@ -573,6 +587,8 @@ class WithinTests(unittest.TestCase):
     def test_only_ranges_ending_in_the_given_commits_are_kept(self):
         ranges = [("a", "b"), ("b", "c"), ("x", "y")]
         self.assertEqual(rc.within(ranges, ["b", "c"]), [("a", "b"), ("b", "c")])
+        # 同じ範囲の記録が重なっても、1本として返す。
+        self.assertEqual(rc.within(ranges * 3, ["c"]), [("b", "c")])
         self.assertEqual(rc.within(ranges, []), [])
 
     def test_expired_deadline_raises_without_running_git(self):

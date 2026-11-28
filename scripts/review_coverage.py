@@ -104,12 +104,14 @@ def commits_between(base, head, cwd=None, deadline=None):
 
 
 def within(ranges, ends):
-    """範囲 `(from, to)` のうち、終わり（`to`）が `ends`（SHA の集合）に入るものだけを返す。
+    """範囲 `(from, to)` のうち、終わり（`to`）が `ends`（SHA の集合）に入るものだけを、重複を除いて返す。
 
     git を呼ばない。log の範囲を、照らし合わせる前に PR の commit で絞るために使う（#822）。
+    同じ範囲を何度もレビューすると、log に同じ範囲の記録が重なる。重なった分だけ git を
+    呼ばないよう、重複を除く。
     """
     ends = set(ends)
-    return [(a, b) for a, b in ranges if b in ends]
+    return sorted({(a, b) for a, b in ranges if b in ends})
 
 
 def covers_commit(sha, ranges, cwd=None, ancestor=None, deadline=None):
