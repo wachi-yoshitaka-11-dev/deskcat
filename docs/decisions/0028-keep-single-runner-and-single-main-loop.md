@@ -3,7 +3,7 @@
 > 状態: Proposed
 > 日付: 2026-11-22（**2026-11-28 に状態を Accepted から Proposed へ戻した。**採用の承認の記録が見つからないためである。[#820](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/820)）
 >
-> **Proposed の間は、この ADR の全体（決定・影響・検証を含む）を作業の根拠にしない。**今のコードはそのまま残るが、それはこの ADR が決めたからではない。変える方向も変えない方向も、この ADR を根拠にしない。**Accepted にするときは、この段落を消し、日付の行の括弧書きと [ADR の一覧](README.md)の状態も直す。**
+> **Proposed の間は、この ADR の全体（決定・影響・検証を含む）を作業の根拠にしない。**今のコードはそのまま残るが、それはこの ADR が決めたからではない。変える方向も変えない方向も、この ADR を根拠にしない。採用するかは、[#813](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/813) の項目4で決める。
 
 ## 背景
 

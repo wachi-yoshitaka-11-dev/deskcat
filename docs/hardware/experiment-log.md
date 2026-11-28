@@ -5865,7 +5865,7 @@ ELF（wdt）`77d40227f4dca649e3cda797b3ac599087b1aef534e33ab848cb26b37e0f11bd`�
 
 ## EXP-066: 受信の間隔の log を足した製品 build（link-gap-20,no-touch-487）で、Pi が送る frame の到着の間隔を、LCD の描画、センサーの読み出し、Pi の負荷と同時に測った
 
-[#20](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/20)の`HW-TBD-017`（ESP32 が Pi からの受信の途切れと判定するまでの時間）を決める材料として、**Pi → ESP32 の frame の到着の間隔**を実機で取った窓。同じ窓で、[#683](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/683)の手順の3と4（Pi の実 port の待ちと、ESP32 の main loop の周期・期限超過・UART を読みに行く間隔）の記録も取った。servo は動かしていない。**この記録は観測の事実だけを書く。`HW-TBD-017`の値、判定の基準、`ping`の間隔は、ここでは決めない。**#683 の実行方式の判断（手順の5と6）も、ここでは行わない（[ADR-0028](../decisions/0028-keep-single-runner-and-single-main-loop.md)に置いた）。
+[#20](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/20)の`HW-TBD-017`（ESP32 が Pi からの受信の途切れと判定するまでの時間）を決める材料として、**Pi → ESP32 の frame の到着の間隔**を実機で取った窓。同じ窓で、[#683](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/683)の手順の3と4（Pi の実 port の待ちと、ESP32 の main loop の周期・期限超過・UART を読みに行く間隔）の記録も取った。servo は動かしていない。**この記録は観測の事実だけを書く。`HW-TBD-017`の値、判定の基準、`ping`の間隔は、ここでは決めない。**#683 の実行方式の判断（手順の5と6）も、ここでは行わない（[ADR-0028](../decisions/0028-keep-single-runner-and-single-main-loop.md)に置いた。ADR-0028 は Proposed である。[#820](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/820)）。
 
 | 項目 | 内容 |
 |---|---|
