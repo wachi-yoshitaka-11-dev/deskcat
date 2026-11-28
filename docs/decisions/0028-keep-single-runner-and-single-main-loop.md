@@ -48,6 +48,8 @@ EXP-066 は servo を駆動しない製品 build で測った（[#683](https://g
 
 ## 決定
 
+**この節は提案中の決定である。採用の承認があるまで、作業の根拠にしない**（[#820](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/820)）。
+
 **Pi の単一 runner と ESP32 の単一 main loop を、どちらも今は分けない（選択肢A）。**両側を別々に判断した。
 
 ### ESP32：維持
