@@ -430,10 +430,14 @@ Anthropicの[Code Reviewの文書](https://code.claude.com/docs/en/code-review)�
   - **記録はcloneごとにある。Pull Requestは、その範囲をレビューしたcloneでmergeする。**
     同じcloneのworktreeの間では記録を共有し、別のclone（別の端末や環境）とは共有しない。
   - Pull Request本文の「自己レビュー」に、記録の範囲をbacktickで囲んだ`A..B`の形ですべて書く。
-    hookとCIは、commitを読めない範囲（rebaseで消えたcommit、曖昧な短いSHAを含む）を飛ばす。
-    飛ばしても範囲がつながらなければ止まるので、40桁のSHAで書くと取り違えない。
+    hookとCIは、commitを読めない範囲を飛ばす。CIのcloneでは、rebaseやforce pushで消えたcommitが
+    読めない。手元のcloneでは、消えたcommitもgcまではreflogで読めるので飛ばさない（読めて記録の無い
+    範囲は止まる）。曖昧な短いSHAは、どちらでも読めない。飛ばしても範囲がつながらなければ止まるので、
+    40桁のSHAで書くと取り違えない。
   - `gh pr merge`の前に`scripts/hooks/gh_metadata_guard.py`が、記録の範囲がmerge-baseから
-    headまでつながっているか、本文の範囲が記録と一致するかを確かめる。
+    headまでつながっているか、本文の範囲が記録と一致するかを確かめる。照らし合わせるのは
+    読める範囲だけで、読めない範囲を本文に書いても判定は緩まない（つながりは読める範囲だけで判定し、
+    CIはlogを読まずに本文の範囲のつながりだけを見る）。
     CI（`review-coverage.yml`）は本文の範囲がつながっているかだけを見る（手元のlogを読めない）。
   - 昇格（`develop`→`main`）では、範囲のつながりの代わりに、範囲の各commitが`develop`へmerge済みの
     Pull Requestのsquashのcommitかを見る。Pull Requestを通らずに入ったcommitは、`<sha>^..<sha>`を
@@ -446,11 +450,13 @@ Anthropicの[Code Reviewの文書](https://code.claude.com/docs/en/code-review)�
     （`.github/`は慎重に扱うpathなので、所有者の承認が要る）。hookが時間切れになると、
     止める側に倒れない。rebaseすると前の範囲のSHAがheadの祖先でなくなり、つながらなくなる（レビューし直す）。
   - **hookが読まない呼び出し方：**hookはうっかりを防ぐもので、意図的な迂回は前提にしない。
-    別のshellを通した呼び出し（`bash -c "gh pr merge ..."`、`pwsh -Command`など）は、`gh`の検査を通らない。
-    WindowsのPowerShellのtoolでは、`gh`の検査（`gh_metadata_guard.py`、`coderabbit_gate.py`）と、`git`の検査
-    （`branch_base_guard.py`、`worktree_guard.py`）が働かない（[ADR-0005](docs/decisions/0005-standard-development-os.md)で
-    Windowsはsupportの対象外）。logへの書き込みを止める検査は、PowerShellのtoolでも働く。
-    Windowsでは、Bashで`GH`や`gh.exe`と書いた呼び出しも通る。
+    別のshell（`bash -c`、`pwsh -Command`、`cmd /c`など）に渡したcommandは、検査が呼び出しとして
+    読み解かないので、通りうる。
+    Claude Codeのhookは、`.claude/settings.json`で登録したtoolにだけ働く。この repositoryの
+    PreToolUseの検査は、logへの書き込みを止めるもの（`review_record.py`）を除き、Bashのtoolにだけ
+    登録している（正本は`.claude/settings.json`）。WindowsのPowerShellのtoolでは、それらの検査は働かない
+    （[ADR-0005](docs/decisions/0005-standard-development-os.md)でWindowsはsupportの対象外）。
+    Windowsでは、Bashで`GH`や`gh.exe`と書いた呼び出しも通る。gitのcommitのhook（`.githooks`）は、toolによらず走る。
     **Windowsのcloneで作業する間は、`gh`と`git`をBashのtoolで、小文字の`gh`で走らせる。**
 
 **自動reviewは行わない**（[ADR-0013](docs/decisions/0013-manual-only-coderabbit-review.md)）。
@@ -746,8 +752,9 @@ squash mergeしたbranchはcommit hashが変わるため、`git branch -d`が「
 `.claude/settings.json`がhookとして起動するscriptのうち、下の表は6つ、**検査は12である。**
 **この数は下の表と一致させる。**一致していない間、表に無いhookは「無い」ものとして読まれる。
 **数えるのは検査であってscriptではない。**`gh_metadata_guard.py`は1 scriptで7つを見る
-（同fileのdocstring「止める対象は7つである」）。表の`gh`と`git`の検査は、Bashのtoolのcommandだけを見る。
-「解除の手段は無い」もBashのtoolでの話で、PowerShellのtoolでは働かない（[自己レビュー](#自己レビュー)の「hookが読まない呼び出し方」）。`review_record.py`は、止める検査のほかに
+（同fileのdocstring「止める対象は7つである」）。表のPreToolUseの検査は、logへの書き込みを止めるものを除き、Bashのtoolのcommandだけを見る
+（正本は`.claude/settings.json`）。「解除の手段は無い」もBashのtoolでの話で、PowerShellのtoolでは働かない
+（[自己レビュー](#自己レビュー)の「hookが読まない呼び出し方」）。`review_record.py`は、止める検査のほかに
 レビューの記録を書く（記録は止めない）。公開前の検査（`publication_guard_hook.py`）は、この表とは別に起動する。
 
 **文書に書いても実行されないことが実測で分かっている。**
