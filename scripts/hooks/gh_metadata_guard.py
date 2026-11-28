@@ -918,8 +918,11 @@ def _check_review_chain(number, base, head, body):
         )
 
 
-# 承認のコメントに書いた head の SHA。短い形（7桁以上）も読む。
-APPROVAL_SHA_RE = re.compile(r"\b[0-9a-f]{7,40}\b")
+# 承認のコメントに書いた head の SHA。短い形（7桁以上）も読む。`\b`は使わない（Pythonの
+# Unicodeの`\b`はかなと漢字を語の文字として扱い、`f831629で承認`を拾えない）。
+APPROVAL_SHA_RE = re.compile(r"(?<![0-9A-Fa-f])[0-9A-Fa-f]{7,40}(?![0-9A-Fa-f])")
+# 承認のコメントに要る語。SHA だけでは、CodeRabbit の要約のように SHA を載せるコメントと見分けられない。
+APPROVAL_WORD = "承認"
 
 # 昇格の Pull Request の (base, head)。CONTRIBUTING の「Branches」の共有 branch である。
 PROMOTION_REFS = ("main", "develop")
@@ -973,10 +976,12 @@ def _check_review_coverage(args, global_repo):
         ], deadline).split()
         if not _review_targets(files):
             return
-        comments = _gh_json([
-            "api", "--paginate", f"repos/{repo}/issues/{number}/comments?per_page=100",
-            "--jq", ".[].body",
-        ], deadline)
+        # bot（CodeRabbit など）のコメントは数えない。本文に head の SHA を載せることがある。
+        comments = json.loads(_gh_json([
+            "api", "--paginate", "--slurp",
+            f"repos/{repo}/issues/{number}/comments?per_page=100",
+        ], deadline))
+        comments = [item for page in comments for item in page]
     except (OSError, subprocess.SubprocessError, ValueError, KeyError,
             AttributeError, TypeError, FuturesTimeout) as error:
         _deny(
@@ -984,7 +989,13 @@ def _check_review_coverage(args, global_repo):
             f"（{type(error).__name__}: {error}）。**確認できないまま通さない。**"
             " この検査に解除の手段は無い（#814 の作業リストの9）。"
         )
-    if not any(head.startswith(token) for token in APPROVAL_SHA_RE.findall(comments)):
+    if not any(
+        (comment.get("user") or {}).get("type") == "User"
+        and APPROVAL_WORD in (comment.get("body") or "")
+        and any(head.startswith(token.lower())
+                for token in APPROVAL_SHA_RE.findall(comment.get("body") or ""))
+        for comment in comments
+    ):
         _deny(
             f"PR #{number} は慎重に扱う path に触れるが、head（{head[:7]}）の SHA を書いた"
             "承認のコメントが無い。所有者の承認を得て、承認した head の SHA をコメントに書く"

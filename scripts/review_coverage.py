@@ -157,20 +157,28 @@ def uncovered(base_sha, head_sha, ranges, ancestor=is_ancestor):
 
     つながっていれば `None` を返す。`ancestor(a, b)` は a が b の祖先（同じを含む）か。
     """
-    usable = [(a, b) for a, b in ranges if ancestor(b, head_sha)]
-    current = base_sha
-    while current != head_sha:
-        steps = [b for a, b in usable
-                 if b != current and ancestor(a, current) and ancestor(current, b)]
-        if not steps:
-            return current
-        # 一番先まで進む範囲を選ぶ。どれも head の祖先なので、祖先の関係で並ぶ。
-        farthest = steps[0]
-        for candidate in steps[1:]:
-            if ancestor(farthest, candidate):
-                farthest = candidate
-        current = farthest
-    return None
+    cache = {}
+
+    def known(a, b):
+        # 同じ組の git の呼び出しを繰り返さない（log は消さないので、範囲は増え続ける）。
+        if (a, b) not in cache:
+            cache[(a, b)] = ancestor(a, b)
+        return cache[(a, b)]
+
+    usable = [(a, b) for a, b in sorted(set(ranges)) if known(b, head_sha)]
+    # 届く点を幅で探す。1つの道だけを選ぶと、merge commit のある履歴で、別の道でつながるのに
+    # 行き止まりを報告する。
+    reached, frontier, last = {base_sha}, [base_sha], base_sha
+    while frontier:
+        current = frontier.pop(0)
+        if current == head_sha:
+            return None
+        for a, b in usable:
+            if b not in reached and known(a, current) and known(current, b):
+                reached.add(b)
+                frontier.append(b)
+                last = b
+    return last
 
 
 def body_section(body):

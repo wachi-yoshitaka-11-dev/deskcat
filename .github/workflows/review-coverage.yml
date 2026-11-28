@@ -48,6 +48,14 @@ jobs:
           GATE_BASE: ${{ github.event.pull_request.base.sha }}
           GATE_HEAD: ${{ github.event.pull_request.head.sha }}
           PR_BODY: ${{ github.event.pull_request.body }}
+        # **base の版の判定を使う。**PR の版を走らせると、PR が判定を書き換えて自分の検査を
+        # 通せる。base にまだ無いとき（この判定を足す PR）だけ、PR の版を使う。
         run: |
-          python3 scripts/review_coverage.py \
-            --base "$GATE_BASE" --head "$GATE_HEAD" --pr-body-env PR_BODY
+          script="$RUNNER_TEMP/review_coverage.py"
+          if git show "$GATE_BASE:scripts/review_coverage.py" > "$script" 2>/dev/null; then
+            echo "base（${GATE_BASE:0:7}）の版の判定を使う。"
+          else
+            cp scripts/review_coverage.py "$script"
+            echo "base に判定が無いので、PR の版を使う。"
+          fi
+          python3 "$script" --base "$GATE_BASE" --head "$GATE_HEAD" --pr-body-env PR_BODY

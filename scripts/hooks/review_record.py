@@ -16,6 +16,9 @@
    含む Bash／PowerShell を拒否する。log を書くのはこの hook だけである。
 
 **限界：**この hook は、fork が範囲の全部を実際に読んだかまでは確かめない。
+**log を止めるのは明らかな形だけである。**shell の command に log の名前か記録の hook の名前が
+そのまま書かれたものを止める。名前を組み立てる script を書いて走らせれば、記録を偽れる。
+log は改ざんを防ぐものではなく、レビューの実行を残すための記録である。
 hook の入力を読めないとき、git が使えないときは、何も記録せず、何も止めない
 （記録が無ければ merge の前の検査で止まるので、記録の側で止める必要が無い）。
 """
@@ -34,6 +37,8 @@ import review_coverage  # noqa: E402
 SKILL_NAME = "code-review"
 WRITE_TOOLS = ("Write", "Edit", "MultiEdit", "NotebookEdit")
 SHELL_TOOLS = ("Bash", "PowerShell")
+# shell の command に含まれていたら止める語。log の名前と、偽の入力を流し込める記録の hook の名前。
+SHELL_DENY_WORDS = (review_coverage.LOG_NAME, "review_record.py")
 
 
 def _deny(reason):
@@ -58,8 +63,14 @@ def _is_review_skill(tool_input):
 
 def _append(path, record):
     path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "a", encoding="utf-8", newline="\n") as handle:
-        handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+    # 1行を1回の write で追記する。並行する hook の行が混ざらないようにする。
+    data = (json.dumps(record, ensure_ascii=False) + "\n").encode("utf-8")
+    descriptor = os.open(path, os.O_WRONLY | os.O_APPEND | os.O_CREAT | getattr(os, "O_BINARY", 0),
+                         0o644)
+    try:
+        os.write(descriptor, data)
+    finally:
+        os.close(descriptor)
 
 
 def _now():
@@ -96,8 +107,12 @@ def _record(payload, event):
     else:
         response = payload.get("tool_response")
         response = response if isinstance(response, dict) else {}
+        result = response.get("result")
+        # 完了と数えるのは、`success` が真で、結果（レビューの報告）が届いたときだけである。
+        # 2026-11-28 の実験で、fork の中の実行の後の hook には、レビューの報告が `result` に届いた。
         _append(path, {**base, "event": "completed",
-                       "success": response.get("success") is True,
+                       "success": response.get("success") is True
+                       and isinstance(result, str) and bool(result.strip()),
                        "status": response.get("status")})
 
 
@@ -119,10 +134,11 @@ def _guard(payload):
         return
     if tool in SHELL_TOOLS:
         command = tool_input.get("command")
-        if isinstance(command, str) and review_coverage.LOG_NAME in command:
+        if isinstance(command, str) and any(word in command for word in SHELL_DENY_WORDS):
             _deny(
-                f"レビューの記録の log（`{review_coverage.LOG_NAME}`）を含む command は使えない。"
-                " log を書くのは `scripts/hooks/review_record.py` だけである（#814 の作業リストの9）。"
+                f"レビューの記録の log（`{review_coverage.LOG_NAME}`）か、記録の hook"
+                " （`review_record.py`）を含む command は使えない。記録は Claude Code が起動する"
+                " hook だけが書く（#814 の作業リストの9）。"
             )
         return
     if tool in WRITE_TOOLS:
@@ -155,8 +171,11 @@ def main():
             _guard(payload)
         elif event in ("PreToolUse", "PostToolUse") and tool == "Skill":
             _record(payload, event)
-    except (OSError, ValueError, TypeError, subprocess.SubprocessError):
-        # 記録できないことは、merge の前の検査（記録が無い）で止まる。ここでは止めない。
+    except (OSError, ValueError, TypeError, subprocess.SubprocessError) as error:
+        # 記録できないことは、merge の前の検査（記録が無い）で止まる。ここでは止めないが、
+        # 黙らない。stderr に分類を出す（hook の stderr は Claude Code の debug の出力に残る）。
+        print(f"review_record: {event}/{tool} を記録できなかった"
+              f"（{type(error).__name__}: {error}）", file=sys.stderr)
         return 0
     return 0
 

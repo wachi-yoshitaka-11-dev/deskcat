@@ -125,7 +125,8 @@ elif args[0] == "api":
         here = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True,
                               text=True).stdout.strip()
         default = ["承認 " + fixture.get("head", here)]
-        print("\\n".join(fixture.get("comments", default)))
+        print(json.dumps([[{{"user": {{"type": "User"}}, "body": body}}
+                           for body in fixture.get("comments", default)]]))
     elif path.startswith("repos/o/r/pulls/7/commits"):
         print("\\n".join(fixture.get("commits", {{}}).keys()))
     elif "/check-runs" in path:

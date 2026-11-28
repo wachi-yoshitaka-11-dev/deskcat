@@ -60,6 +60,16 @@ class UncoveredTests(unittest.TestCase):
         self.assertEqual(rc.uncovered("m", "h", [], self.ANCESTOR), "m")
         self.assertIsNone(rc.uncovered("h", "h", [], self.ANCESTOR))
 
+    def test_a_dead_end_does_not_hide_another_path(self):
+        # m から b1 と b2 に分かれ、b2 だけが h へつながる（merge commit のある履歴）。
+        edges = {("m", "b1"), ("m", "b2"), ("b2", "h"), ("m", "h"), ("b1", "h")}
+
+        def ancestor(a, b):
+            return a == b or (a, b) in edges
+
+        ranges = [("m", "b1"), ("m", "b2"), ("b2", "h")]
+        self.assertIsNone(rc.uncovered("m", "h", ranges, ancestor))
+
     def test_range_off_the_head_path_is_not_used(self):
         # x は head の祖先でない（rebase の前の commit など）。
         ancestor = _linear("m", "c1", "h")
@@ -151,9 +161,20 @@ class ReviewRecordHookTests(unittest.TestCase):
     def test_fork_run_is_recorded_with_full_shas(self):
         first, _, last = self.repo.shas
         self._skill("PreToolUse", f"high {first[:7]}..HEAD --max-findings all")
-        self._skill("PostToolUse", "x", response={"success": True, "status": "forked"})
+        self._skill("PostToolUse", "x", response={"success": True, "status": "forked",
+                                                  "result": "指摘は0件"})
         records = rc.read_log(self.repo.log)
         self.assertEqual(rc.completed_ranges(records), [(first, last)])
+
+    def test_run_without_a_report_is_not_counted(self):
+        first = self.repo.shas[0]
+        for index, response in enumerate(({"success": True, "status": "forked"},
+                                          {"success": True, "result": "  "},
+                                          {"success": False, "result": "途中で止まった"})):
+            key = f"t{index}"
+            self._skill("PreToolUse", f"{first}..HEAD", tool_use_id=key)
+            self._skill("PostToolUse", "x", tool_use_id=key, response=response)
+        self.assertEqual(rc.completed_ranges(rc.read_log(self.repo.log)), [])
 
     def test_main_context_run_is_not_recorded(self):
         self._skill("PreToolUse", "high HEAD~2..HEAD", agent=False)
@@ -181,6 +202,7 @@ class ReviewRecordHookTests(unittest.TestCase):
             ("Edit", {"file_path": f".git/{rc.LOG_NAME}"}),
             ("Bash", {"command": f"echo x >> .git/{rc.LOG_NAME}"}),
             ("PowerShell", {"command": f"Add-Content .git/{rc.LOG_NAME} x"}),
+            ("Bash", {"command": "echo '{}' | python3 scripts/hooks/review_record.py"}),
         ):
             with self.subTest(tool=tool):
                 payload = {"hook_event_name": "PreToolUse", "tool_name": tool,
@@ -239,7 +261,10 @@ class ReviewCoverageMergeTests(unittest.TestCase):
             if "/files" in path:
                 return "\n".join(files)
             if "/comments" in path:
-                return "\n".join(comments)
+                # 文字列は人のコメント、(type, 本文) の組はその type のコメントにする。
+                items = [{"user": {"type": "User"}, "body": c} if isinstance(c, str)
+                         else {"user": {"type": c[0]}, "body": c[1]} for c in comments]
+                return json.dumps([items])
             raise AssertionError(command)
 
         out, here = io.StringIO(), os.getcwd()
@@ -307,6 +332,13 @@ class ReviewCoverageMergeTests(unittest.TestCase):
         self.assertDenied(self._merge(ranges, files, ["承認 " + self.mid]), "承認のコメント")
         self.assertIsNone(self._merge(ranges, files, ["承認 " + self.head[:7]]))
         self.assertIsNone(self._merge(ranges, ["README.md"], []))
+        # 日本語の文に続けて書いた SHA と、大文字の SHA も読む。
+        self.assertIsNone(self._merge(ranges, files, [self.head[:7] + "で承認した"]))
+        self.assertIsNone(self._merge(ranges, files, ["承認" + self.head[:9].upper()]))
+        # bot のコメントと、「承認」の語の無いコメントは数えない。
+        self.assertDenied(self._merge(ranges, files, [("Bot", "承認 " + self.head)]),
+                          "承認のコメント")
+        self.assertDenied(self._merge(ranges, files, ["between " + self.head]), "承認のコメント")
 
 
 class CiEntryPointTests(unittest.TestCase):

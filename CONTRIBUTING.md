@@ -429,10 +429,13 @@ Anthropicの[Code Reviewの文書](https://code.claude.com/docs/en/code-review)�
   - `gh pr merge`の前に`scripts/hooks/gh_metadata_guard.py`が、記録の範囲がmerge-baseから
     headまでつながっているか、本文の範囲が記録と一致するかを確かめる。
     CI（`review-coverage.yml`）は本文の範囲がつながっているかだけを見る（手元のlogを読めない）。
-  - **限界：**hookは、subagentが範囲の全部を実際に読んだかまでは確かめない。所有者が画面から
-    mergeする経路はhookを通らず、CIは本文に書いた範囲を信じるしかない。rebaseすると前の範囲の
-    SHAがheadの祖先でなくなり、つながらなくなる（レビューし直す）。昇格（`develop`→`main`）は範囲を見ない
-    （[昇格の節](#昇格pull-requestでの手動reviewと未解決thread)）。
+  - 昇格（`develop`→`main`）では、範囲のつながりの代わりに、範囲の各commitが`develop`へmerge済みの
+    Pull Requestのsquashのcommitかを見る。Pull Requestを通らずに入ったcommitは、`<sha>^..<sha>`を
+    含む範囲の記録があるときだけ通す。
+  - **限界：**hookは、subagentが範囲の全部を実際に読んだかまでは確かめない。logへの書き込みを
+    止めるのは明らかな形だけで、名前を組み立てるscriptを走らせれば記録を偽れる。所有者が画面から
+    mergeする経路はhookを通らず、CIは本文に書いた範囲を信じるしかない。hookが時間切れになると、
+    止める側に倒れない。rebaseすると前の範囲のSHAがheadの祖先でなくなり、つながらなくなる（レビューし直す）。
 
 **自動reviewは行わない**（[ADR-0013](docs/decisions/0013-manual-only-coderabbit-review.md)）。
 [`.coderabbit.yaml`](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/.coderabbit.yaml)は
@@ -485,6 +488,9 @@ Anthropicの[Code Reviewの文書](https://code.claude.com/docs/en/code-review)�
 
 次のpathに触れるPull Requestは、CodeRabbitの`full review`と所有者の承認が要る。
 **`gh pr merge`の前に、`scripts/hooks/gh_metadata_guard.py`がCodeRabbitのreviewの完走を確かめる。**
+承認を得たら、「承認」の語と承認したheadのSHAを書いたコメントを残す。hookはそのコメントがあるかを確かめる
+（botのコメントは数えない）。**これは記録の確認であって、承認そのものの確認ではない。**所有者とAIは
+同じaccountで書くため、書き手で見分けられない（承認の関門は[#814](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/814)の作業リストの11）。
 この一覧とhookの一覧（`REVIEW_TARGET_PREFIXES`・`REVIEW_TARGET_FILES`）は一致させる。
 `scripts/test_hooks.py`が一致を検査する。`/`で終わるものはその配下のすべてである。
 
@@ -742,8 +748,8 @@ squash mergeしたbranchはcommit hashが変わるため、`git branch -d`が「
 | `gh issue close`の前、およびboardの`Status`を`Done`にする`gh project item-edit`の前 | 対象Issueの`受け入れ条件`の節に`- [ ]`が残っていないか（節が無い本文も止める）。**解除の手段は無い** | 同上 |
 | `@coderabbitai`へreviewを投げる前 | 同じ行の`review`が`full review`か（**`full`の付かない`review`は`deny`**）。対象PRのどれかのcommitでreviewが完走・進行中なら`full review`も**`deny`**。完走も進行中も無いPR（`Review rate limited`や`Review stopped after lock loss`の後を含む）への`full review`と、対象PRやcheckを判定できないときは`ask`。[`ask`の扱い](#手動で依頼する前に状態を確認する) | `scripts/hooks/coderabbit_gate.py` |
 | `gh pr merge`の前 | `--subject`と`--body`／`--body-file`があるか | `scripts/hooks/gh_metadata_guard.py` |
-| `gh pr merge`の前 | レビューの記録が merge-base から head まで途切れずにつながっているか。本文の「自己レビュー」の範囲が手元の log の完了した記録と一致するか。慎重に扱うpathに触れるPull Requestで、headのSHAを書いた承認のコメントがあるか（昇格は最後だけを見る）。**解除の手段は無い**（[自己レビュー](#自己レビュー)） | 同上 |
-| Write／Edit／MultiEdit／NotebookEdit／Bash／PowerShellの前 | レビューの記録のlog（`deskcat-review-log.jsonl`）へ書き込まないか | `scripts/hooks/review_record.py` |
+| `gh pr merge`の前 | レビューの記録が merge-base から head まで途切れずにつながっているか。本文の「自己レビュー」の範囲が手元の log の完了した記録と一致するか。慎重に扱うpathに触れるPull Requestで、人のコメントに「承認」の語とheadのSHAがあるか。昇格では、範囲のつながりの代わりに、各commitがPull Requestを通ったか、記録を持つかを見る。**解除の手段は無い**（[自己レビュー](#自己レビュー)） | 同上 |
+| Write／Edit／MultiEdit／NotebookEdit／Bash／PowerShellの前 | レビューの記録のlog（`deskcat-review-log.jsonl`）へ書き込まないか。shellのcommandに、logの名前か記録のhookの名前（`review_record.py`）が無いか | `scripts/hooks/review_record.py` |
 | `git checkout -b`／`git switch -c`の前 | 基点が最新の`origin/develop`か | `scripts/hooks/branch_base_guard.py` |
 | `git reset --hard`／`git clean`／checkout・switch・restoreによる破棄の前 | 捨てる範囲に未commitの変更があるか | `scripts/hooks/worktree_guard.py` |
 | 応答を終える前 | 完了の主張に、対応するtool呼び出しがあるか | `scripts/hooks/stop_claim_guard.py` |
