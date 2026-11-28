@@ -86,7 +86,7 @@ Closes #
 
 使ったレビューとeffort:
 
-レビューの範囲（backtickで囲んだ`A..B`をすべて。[自己レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/CONTRIBUTING.md#自己レビュー)）:
+レビューの範囲（backtickで囲んだ`A..B`をすべて。AとBはcommitのSHA（16進の7〜40桁）で、branch名や`HEAD`は読まない。[自己レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/CONTRIBUTING.md#自己レビュー)）:
 
 巡の数:
 

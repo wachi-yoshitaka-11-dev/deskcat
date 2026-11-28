@@ -25,6 +25,8 @@ log は改ざんを防ぐものではなく、レビューの実行を残すた�
 hook の入力を読めないとき、git が使えないときは、何も記録せず、何も止めない
 （記録が無ければ merge の前の検査で止まるので、記録の側で止める必要が無い）。
 **ただし黙らない。**失敗を stderr に出し、exit 1（`hook_input.NOTICE`）で終える。
+exit 1 は、Claude Code では tool を止めないエラーとして扱われ、その stderr がモデルへ届くとは
+限らない。人が画面で見る前提で書く（モデルに確実に知らせる手段ではない）。
 入力は `hook_input.read_payload` で UTF-8 として読む。既定の文字コード（Windows の cp932）で
 読んでいたとき、ASCII でない報告の本文を読めず、完了の記録を黙って落としていた（2026-11-28）。
 """
@@ -106,7 +108,8 @@ def _record(payload, event):
     base = {"tool_use_id": tool_use_id, "agent_id": agent_id, "at": _now()}
     if event == "PreToolUse":
         # 範囲を使えないときは記録しないが、黙らない。`ValueError` にして、main が stderr に
-        # 理由を出す（実行は止めない）。黙って落とすと、merge の前の検査で止まるまで気付けない。
+        # 理由を出す（実行は止めない。stderr は人が画面で見るもので、モデルへ届くとは限らない）。
+        # 黙って落とすと、merge の前の検査で止まるまで、人も気付けない。
         args = tool_input.get("args")
         pair = review_coverage.parse_arg_range(args)
         if pair is None:

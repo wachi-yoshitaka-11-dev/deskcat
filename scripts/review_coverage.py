@@ -254,6 +254,17 @@ def resolve_ranges(pairs, cwd=None):
     return resolved, unresolved
 
 
+def skipped_ranges_message(unresolved):
+    """本文の範囲のうち、commit を読めずに飛ばしたものを知らせる文。hook と CI で同じ文にする。
+
+    読めない範囲は飛ばす。rebase や force push で消えた commit は、CI の clone では読めず、
+    手元の clone でも `git gc` の後は読めない。止めると、clone によって結果が食い違う。
+    読めない範囲は merge-base から head への鎖に入りえないので、飛ばしても判定は緩まない。
+    """
+    return ("本文の「自己レビュー」の範囲のうち、commit を読めないものを飛ばした: "
+            + ", ".join(unresolved))
+
+
 def _main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--base", required=True, help="PR の base の SHA")
@@ -273,11 +284,7 @@ def _main():
     pairs = body_ranges(body)
     ranges, unresolved = resolve_ranges(pairs)
     if unresolved:
-        # 読めない範囲は飛ばす。rebase や force push で消えた commit は、CI の clone では読めない
-        # （手元の clone では読めるので、止めると hook と CI の結果が食い違う）。読めない範囲は
-        # merge-base から head への鎖に入りえないので、飛ばしても判定は緩まない。
-        print("::warning::本文の「自己レビュー」の範囲のうち、commit を読めないものを飛ばした: "
-              + ", ".join(unresolved), file=sys.stderr)
+        print("::warning::" + skipped_ranges_message(unresolved), file=sys.stderr)
     reached = uncovered(start, head, ranges)
     if reached:
         print(

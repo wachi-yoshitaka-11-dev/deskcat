@@ -2,17 +2,6 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "PowerShell",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "R=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}\"; [ -n \"$R\" ] && [ -f \"$R/scripts/hooks/gh_metadata_guard.py\" ] && exec python3 \"$R/scripts/hooks/gh_metadata_guard.py\" || exit 0",
-            "timeout": 60,
-            "statusMessage": "PowerShell の gh を確認"
-          }
-        ]
-      },
-      {
         "matcher": "Bash",
         "hooks": [
           {

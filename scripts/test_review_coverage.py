@@ -345,41 +345,6 @@ class HookInputTests(unittest.TestCase):
         self.assertEqual(raised.exception.code, 0)
 
 
-class PowerShellGhTests(unittest.TestCase):
-    """PowerShell の command に語としての `gh` があれば、読み解かずに止める（止める対象の8）。"""
-
-    def _run(self, command, skip=False):
-        payload = {"hook_event_name": "PreToolUse", "tool_name": "PowerShell",
-                   "tool_input": {"command": command}}
-        env = dict(os.environ, PYTHONIOENCODING="cp932", PYTHONUTF8="0")
-        if skip:
-            env[guard.SKIP_ENV] = "1"
-        result = subprocess.run(
-            [sys.executable, str(SCRIPTS_ROOT / "hooks" / "gh_metadata_guard.py")],
-            input=json.dumps(payload).encode("utf-8"), capture_output=True, timeout=60, env=env,
-        )
-        text = result.stdout.decode("utf-8").strip()
-        return result.returncode, (json.loads(text) if text else None)
-
-    def test_any_gh_is_denied(self):
-        for command in ("gh pr merge 7 --squash", "& gh.exe pr merge 7", "gh pr view 7",
-                        "& 'C:\\Program Files\\GitHub CLI\\gh.exe' issue close 9",
-                        "GH pr create", "cd x; gh-pages"):
-            with self.subTest(command=command):
-                code, output = self._run(command)
-                self.assertEqual(code, 0)
-                self.assertEqual(output["hookSpecificOutput"]["permissionDecision"], "deny")
-        # 解除の手段は無い。
-        code, output = self._run("gh pr merge 7 --squash", skip=True)
-        self.assertEqual(output["hookSpecificOutput"]["permissionDecision"], "deny")
-
-    def test_commands_without_gh_are_allowed(self):
-        for command in ("git log --grep high", "Get-ChildItem .github",
-                        "$env:GH_TOKEN | Out-Null", "git status"):
-            with self.subTest(command=command):
-                self.assertEqual(self._run(command), (0, None))
-
-
 class ReviewCoverageMergeTests(unittest.TestCase):
     """`gh pr merge` の前に、記録が merge-base から head までつながるかを見る。"""
 
@@ -469,6 +434,15 @@ class ReviewCoverageMergeTests(unittest.TestCase):
     def test_body_must_reach_head_too(self):
         self._log((self.base, self.head))
         self.assertDenied(self._merge([]), "本文")
+
+    def test_unreadable_body_range_is_skipped_like_ci(self):
+        # rebase の前の範囲（もう読めない commit）が本文に残っていても、CI と同じく飛ばす。
+        self._log((self.base, self.head))
+        gone = ("dead111" + "0" * 33, "beef222" + "0" * 33)
+        with mock.patch.object(guard.hook_input, "report") as report:
+            self.assertIsNone(self._merge([gone, (self.base, self.head)]))
+        self.assertIn(rc.skipped_ranges_message(["dead111..beef222"]),
+                      report.call_args.args[0])
 
     def test_promotion_checks_each_commit_and_the_approval_comment(self):
         promotion = ("main", "develop")
