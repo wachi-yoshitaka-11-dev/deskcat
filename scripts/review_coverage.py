@@ -16,9 +16,9 @@
 - 到達点が head に届けば、つながっている。
 
 **git を呼ぶ回数：**log は clone ごとに消えずに増え続ける（#822）。`gh pr merge` の前の
-hook は、log の範囲を先に `within` で、終わり（`to`）が merge-base..head の commit か merge-base の
-ものだけに絞る（git の呼び出しは `rev-list` の1回）。終わりがそれ以外の範囲は、つながりの判定に
-使われえない（終わりが head の祖先なら、merge-base の祖先であり、到達点より先へ進めない）。
+hook は、log の範囲を先に `within` で、終わり（`to`）が merge-base..head の commit のものだけに
+絞る（git の呼び出しは `rev-list` の1回）。終わりがそれ以外の範囲は、つながりの判定に使われえない
+（終わりが head の祖先なら、merge-base かその祖先であり、到達点より先へ進めない）。
 hook は期限（`deadline`、`time.monotonic()` の値）を渡し、git の呼び出しごとに残りを見て、
 超えたら `subprocess.TimeoutExpired` を上げる（hook は止める側へ倒す）。
 

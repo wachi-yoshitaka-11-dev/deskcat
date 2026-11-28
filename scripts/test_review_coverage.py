@@ -504,13 +504,23 @@ class ReviewCoverageMergeTests(unittest.TestCase):
         self._log(*ranges)
         small, output = self._git_calls(body_ranges=ranges)
         self.assertIsNone(output)
-        # 鎖の外の範囲と、終わりが merge-base の範囲（鎖に入りうる）を足す。
+        # 鎖の外の範囲と、終わりが merge-base の範囲（到達点より先へ進めない）を足す。
         self._log(*self._stale(), (self.base, self.base))
         large, output = self._git_calls(body_ranges=ranges)
         self.assertIsNone(output)
-        # 増えてよいのは、終わりが merge-base の1本を照らす分（数回）だけである。
-        self.assertLess(large - small, 5, (small, large))
-        self.assertLess(large, self.STALE_RANGES, (small, large))
+        self.assertEqual(small, large)
+
+    def test_logged_body_range_off_the_chain_is_not_reported_missing(self):
+        """本文に残った rebase の前の範囲は、log に記録があれば「記録が無い」と言わない（#822）。"""
+        self.repo._git("checkout", "-q", "-b", "old", self.base)
+        Path(self.repo.root, "g.txt").write_text("old", encoding="utf-8")
+        self.repo._git("add", "g.txt")
+        self.repo._git("commit", "-q", "-m", "old")
+        old = self.repo._git("rev-parse", "HEAD").strip()
+        self.repo._git("checkout", "-q", "main")
+        ranges = [(self.base, old), (self.base, self.head)]
+        self._log(*ranges)
+        self.assertIsNone(self._merge(ranges))
 
     def test_promotion_git_calls_do_not_grow_with_the_log(self):
         promotion = ("main", "develop")

@@ -856,7 +856,9 @@ def _check_promotion_commits(number, repo, base, head, deadline):
     `_check_review_chain` を通っている。**`develop` の branch protection は PR を求めておらず、
     PR を通らずに入った commit がある**（2026-11-28 時点の `main..develop` に `006d12e` と
     `8137320`）。そうした commit は、`<sha>^..<sha>` を含む範囲の完了した記録があるときだけ通す。
-    記録の範囲の終わりは、昇格の範囲（`base..head`）の commit でなければならない。
+    **記録の範囲の終わりは、昇格の範囲（`base..head`）の commit でなければならない**（#822）。
+    終わりが範囲の外の記録（消えた branch、squash の前の commit）は、log の大きさで git の
+    呼び出しを増やさないために照らさない。判定は前より厳しい（止めすぎの側）。
     """
     if not review_coverage.resolve(head, deadline=deadline) \
             or not review_coverage.resolve(base, deadline=deadline):
@@ -882,9 +884,10 @@ def _check_promotion_commits(number, repo, base, head, deadline):
     if unreviewed:
         shown = ", ".join(f"`{sha[:7]}`" for sha in sorted(unreviewed)[:8])
         _deny(
-            f"昇格 PR #{number} の範囲に、PR を通らずに `develop` へ入り、レビューの記録も無い"
-            f" commit がある: {shown}。各 commit を `<sha>^..<sha>` の範囲で、background の"
-            " subagent の `/code-review` で見てから merge する（#814 の作業リストの9）。"
+            f"昇格 PR #{number} の範囲に、PR を通らずに `develop` へ入り、その commit を含み"
+            f"終わりが昇格の範囲の中にあるレビューの記録も無い commit がある: {shown}。"
+            "各 commit を `<sha>^..<sha>` の範囲で、background の subagent の `/code-review` で"
+            "見てから merge する（#814 の作業リストの9、#822）。"
         )
 
 
@@ -906,12 +909,13 @@ def _check_review_chain(number, base, head, body, deadline):
     def ancestor(a, b):
         return review_coverage.is_ancestor(a, b, deadline=deadline)
 
-    # 終わりが merge-base..head の commit か merge-base の記録だけを照らす。それ以外の記録は
+    # 鎖の判定では、終わりが merge-base..head の commit の記録だけを照らす。それ以外の記録は
     # 鎖に入りえない（`review_coverage` の docstring）。log が増えても git の呼び出しを増やさない（#822）。
-    ends = review_coverage.commits_between(start, head, deadline=deadline) + [start]
+    # 本文の範囲が log にあるかの照合（下の `missing`）は git を呼ばないので、絞る前の記録で見る。
+    ends = review_coverage.commits_between(start, head, deadline=deadline)
     path = review_coverage.log_path(deadline=deadline)
-    logged = review_coverage.within(review_coverage.completed_ranges(
-        review_coverage.read_log(path) if path else []), ends)
+    completed = review_coverage.completed_ranges(review_coverage.read_log(path) if path else [])
+    logged = review_coverage.within(completed, ends)
     reached = review_coverage.uncovered(start, head, logged, ancestor)
     if reached:
         _deny(
@@ -928,7 +932,7 @@ def _check_review_chain(number, base, head, body, deadline):
         # 読めない範囲は鎖に入りえないので、飛ばしても判定は緩まない。
         hook_input.report("gh_metadata_guard: "
                           + review_coverage.skipped_ranges_message(unresolved))
-    logged_set = set(logged)
+    logged_set = set(completed)
     missing = [
         f"{a[:7]}..{b[:7]}" for a, b in written if (a, b) not in logged_set]
     if missing:
@@ -992,7 +996,7 @@ def _check_review_coverage(args, global_repo):
        account で書くので、書き手で見分けられない（承認の関門は #814 の作業リストの11）。
 
     昇格（base `main`、head `develop`）は1と2の代わりに、範囲の各 commit が `develop` へ merge 済みの
-    PR の squash の commit か、その commit を含む範囲の完了した記録を持つかを見る
+    PR の squash の commit か、その commit を含み、終わりが昇格の範囲の中にある完了した記録を持つかを見る
     （`_check_promotion_commits`）。3は見る。
 
     **確認できない場合も deny する。**逃げ道は置かない（`DESKCAT_SKIP_GH_GUARD` も効かない）。
@@ -1040,9 +1044,10 @@ def _check_review_coverage(args, global_repo):
         # head が `develop` でない PR は昇格と見なされず、記録の鎖の判定で止まる（`PROMOTION_REFS`）。
         late = ""
         if isinstance(error, (subprocess.TimeoutExpired, FuturesTimeout)):
-            late = (f" 検査の期限（{CHECK_DEADLINE_SECONDS}秒）を超えた。gh の応答が遅いときと、"
-                    "昇格の範囲の commit が多いときに超えうる。時間を置いて再実行し、"
-                    "続けて超えるなら所有者に相談する（#822）。")
+            late = (" gh か git の照会が時間内に終わらなかった（検査の期限は"
+                    f"{CHECK_DEADLINE_SECONDS}秒、gh の1回の上限は{GH_TIMEOUT_SECONDS}秒）。"
+                    "gh の応答が遅いときと、昇格の範囲の commit が多いときに起きうる。"
+                    "時間を置いて再実行し、続けて起きるなら所有者に相談する（#822）。")
         _deny(
             "`gh pr merge` の前に、レビューの記録がつながっているかを確認できなかった"
             f"（{type(error).__name__}: {error}）。**確認できないまま通さない。**{late}"
