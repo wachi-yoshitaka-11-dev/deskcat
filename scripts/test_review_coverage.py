@@ -519,8 +519,23 @@ class ReviewCoverageMergeTests(unittest.TestCase):
         old = self.repo._git("rev-parse", "HEAD").strip()
         self.repo._git("checkout", "-q", "main")
         ranges = [(self.base, old), (self.base, self.head)]
-        self._log(*ranges)
+        # log に無ければ、鎖の外の範囲でも「記録が無い」で止める。
+        self._log((self.base, self.head))
+        self.assertDenied(self._merge(ranges), "記録が無い")
+        self._log((self.base, old))
         self.assertIsNone(self._merge(ranges))
+
+    def test_promotion_record_ending_outside_the_range_is_not_counted(self):
+        """昇格では、`mid^..mid` を含んでも、終わりが昇格の範囲の外の記録は数えない（#822）。"""
+        promotion = ("main", "develop")
+        self.repo._git("checkout", "-q", "-b", "side", self.mid)
+        Path(self.repo.root, "g.txt").write_text("side", encoding="utf-8")
+        self.repo._git("add", "g.txt")
+        self.repo._git("commit", "-q", "-m", "side")
+        side = self.repo._git("rev-parse", "HEAD").strip()
+        self.repo._git("checkout", "-q", "main")
+        self._log((self.base, side))
+        self.assertDenied(self._merge(refs=promotion, squashed=(self.head,)), self.mid[:7])
 
     def test_promotion_git_calls_do_not_grow_with_the_log(self):
         promotion = ("main", "develop")
