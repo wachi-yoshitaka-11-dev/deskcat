@@ -862,6 +862,9 @@ class GhHookRepositoryAndDeadlineTests(unittest.TestCase):
 
     DONE = CodeRabbitReviewMergeGateTests.DONE
     TARGET = "firmware/esp32/src/a.rs"
+    # 1回の hook の中の照会の回数。`gh pr merge` は CodeRabbit の確認とレビューの記録の検査が
+    # それぞれ `pr view` を呼ぶ。`gh issue close` は `issue view` を1回呼ぶ。
+    VIEWS = {"pr": 2, "issue": 1}
     DRIVER = (
         "import sys; sys.path.insert(0, {hooks!r}); import gh_metadata_guard as g; "
         "{overrides}sys.exit(g.main())"
@@ -890,10 +893,10 @@ class GhHookRepositoryAndDeadlineTests(unittest.TestCase):
             ("gh pr merge 7 --squash -R owner/target --subject s --body-file {body}", pr, ["pr", "view"]),
         ):
             with self.subTest(command=command):
-                # 回数は数えない。merge の前は、検査ごとに `pr view` を呼ぶ（#814 の作業リストの9）。
-                # どの照会も同じ repository を見ることを確かめる。
+                # merge の前は、CodeRabbit の確認とレビューの記録の検査が、それぞれ `pr view` を
+                # 呼ぶ（#814 の作業リストの9）。どの照会も同じ repository を見ることを確かめる。
                 calls = [c for c in self._logged(command, fixture) if c[:2] == view]
-                self.assertTrue(calls)
+                self.assertEqual(len(calls), self.VIEWS[view[0]], calls)
                 for call in calls:
                     self.assertIn("-R", call)
                     self.assertEqual(call[call.index("-R") + 1], "owner/target")
@@ -908,7 +911,7 @@ class GhHookRepositoryAndDeadlineTests(unittest.TestCase):
         ):
             with self.subTest(command=command):
                 calls = [c for c in self._logged(command, fixture) if c[:2] == view]
-                self.assertTrue(calls)
+                self.assertEqual(len(calls), self.VIEWS[view[0]], calls)
                 for call in calls:
                     self.assertNotIn("-R", call)
 
@@ -925,7 +928,7 @@ class GhHookRepositoryAndDeadlineTests(unittest.TestCase):
         pr = {"files": [self.TARGET], "commits": {"a": {"check_runs": [self.DONE]}}}
         command = "gh pr merge 7 -r -Rowner/target --subject s --body-file {body}"
         calls = [c for c in self._logged(command, pr) if c[:2] == ["pr", "view"]]
-        self.assertTrue(calls)
+        self.assertEqual(len(calls), self.VIEWS["pr"], calls)
         for call in calls:
             self.assertEqual(call[call.index("-R") + 1], "owner/target")
 
