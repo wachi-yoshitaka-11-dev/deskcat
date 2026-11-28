@@ -918,18 +918,18 @@ def _check_review_chain(number, base, head, body):
         )
 
 
-# 承認のコメント。空白だけの行を除いて、**本文が1行だけ**で、その行が「承認」と head の SHA
-# （7桁以上）だけのものを数える。本文の中から行を探すと、code block、字下げ、HTML のコメントのように、
-# markdown の読み方の端の場合を全部扱う必要があり、閉じない。承認を頼むコメントは他の文を含むので
-# 数えない。空白は全角（U+3000）も読む（日本語の入力でそのまま打てる形）。
+# 承認のコメント。本文の前後の空白（全角の空白、改行、tab を含む）を除いたものの**全体**が、
+# 「承認」と空白と head の 40 桁の SHA だけのものを数える。行に分けず、場合分けもしない。
+# 本文の中から行を探したり、字下げや空白の場合を足したりすると、そのたびに markdown の読み方の
+# 端の場合が残り、閉じなかった（#814 の作業リストの9のレビュー）。他の文を含むコメント
+# （承認を頼むもの、code block に承認の行を示すもの）は、全体が合わないので数えない。
+# 字下げした1行だけの本文も数えるが、本文がその1行だけなら承認の意図は変わらない。
 # 承認の日時や範囲の記録は、このコメントに書かず、PR の本文か別のコメントに書く（CONTRIBUTING）。
-# 行頭の半角の空白は3つまで読む。4つ以上か tab で字下げした行は、GitHub では code として表示される
-# （全角の空白は字下げにならないので、行頭でも読む）。
-APPROVAL_RE = re.compile(r"　* {0,3}　*承認[ \t　]*[:：]?[ \t　]*([0-9A-Fa-f]{7,40})")
+APPROVAL_RE = re.compile(r"承認\s+([0-9a-fA-F]{40})")
 
 
 def _approved(comments, head):
-    """人のコメントに、本文の全体が `承認 <head の SHA>` のものがあるか。"""
+    """人のコメントに、本文の全体が `承認 <head の 40 桁の SHA>` のものがあるか。"""
     for comment in comments:
         if not isinstance(comment, dict):
             raise TypeError("コメントの形が想定と違う")
@@ -939,10 +939,9 @@ def _approved(comments, head):
         body = comment.get("body") or ""
         if not isinstance(body, str):
             raise TypeError("コメントの本文の形が想定と違う")
-        # 空白だけの行を除き、行末の空白を除く。行頭の字下げは残して、code の行を数えない。
-        lines = [line.rstrip() for line in body.splitlines() if line.strip()]
-        match = APPROVAL_RE.fullmatch(lines[0]) if len(lines) == 1 else None
-        if match and head.startswith(match.group(1).lower()):
+        match = APPROVAL_RE.fullmatch(body.strip())
+        # head の SHA は API から小文字で返る。コメントの側を小文字にそろえて比べる。
+        if match and match.group(1).lower() == head.lower():
             return True
     return False
 
@@ -960,7 +959,7 @@ def _check_review_coverage(args, global_repo):
        PR の base と head の merge-base から head までつながっている。
     2. PR の本文の「自己レビュー」に書いた範囲が、すべて log の完了した記録にある。
        そのうえで、本文の範囲もつながっている（CI が読むのは本文だけなので、本文を log に結び付ける）。
-    3. 慎重に扱う path に触れる PR では、本文の全体が `承認 <head の SHA>` だけの人のコメントがある。
+    3. 慎重に扱う path に触れる PR では、本文の全体が `承認 <head の 40 桁の SHA>` だけの人のコメントがある。
        **これは記録の確認であって、承認そのものの確認ではない。**所有者と AI は同じ
        account で書くので、書き手で見分けられない（承認の関門は #814 の作業リストの11）。
 
@@ -1015,7 +1014,7 @@ def _check_review_coverage(args, global_repo):
     if not approved:
         _deny(
             f"PR #{number} は慎重に扱う path に触れるが、head（{head[:7]}）の承認のコメントが無い。"
-            "所有者の承認を得て、本文の全体が `承認 <head の SHA>` だけのコメントを書く"
+            "所有者の承認を得て、本文の全体が `承認 <head の 40 桁の SHA>` だけのコメントを書く"
             "（CONTRIBUTING の「慎重に扱う path」）。この確認は記録の確認であって、"
             "承認そのものの確認ではない。"
         )

@@ -341,7 +341,7 @@ class ReviewCoverageMergeTests(unittest.TestCase):
         files = ["AGENTS.md"]
         self.assertDenied(self._merge(files=files, refs=promotion, squashed=squashed),
                           "承認のコメント")
-        self.assertIsNone(self._merge(files=files, comments=["承認 " + self.head],
+        self.assertIsNone(self._merge(files=files, comments=[f"承認 {self.head}"],
                                       refs=promotion, squashed=squashed))
 
     def test_promotion_direct_commit_needs_a_record(self):
@@ -357,25 +357,19 @@ class ReviewCoverageMergeTests(unittest.TestCase):
         self._log((self.base, self.head))
         ranges = [(self.base, self.head)]
         files = ["scripts/hooks/review_record.py"]
-        self.assertDenied(self._merge(ranges, files, ["承認 " + self.mid]), "承認のコメント")
-        self.assertIsNone(self._merge(ranges, files, ["承認 " + self.head[:7]]))
         self.assertIsNone(self._merge(ranges, ["README.md"], []))
-        # 区切りの「：」、大文字の SHA、3つまでの字下げ、前後の空白だけの行（画面で書いた `\r\n` を
-        # 含む）、行頭と行末の全角の空白も読む。
-        for comment in (f"承認：{self.head[:9].upper()}", f"\r\n  承認 {self.head[:7]}\r\n",
-                        f"  \r\n承認 {self.head[:7]}\r\n \r\n",
-                        f"　承認　{self.head[:7]}　"):
+        # 本文の前後の空白を除いた全体が「承認」＋空白＋40桁の SHA なら数える。前後の空白・改行・
+        # 全角の空白、画面で書いた `\r\n`、大文字の SHA を読む。字下げした1行だけの本文
+        # （U+2028 で区切ったものを含む）も、意図どおり数える。
+        head = self.head
+        for comment in (f"承認 {head}", f"\r\n  承認 {head}\r\n", f"　承認　{head}　",
+                        f"承認 {head.upper()}", f"     承認 {head}"):
             with self.subTest(comment=comment):
                 self.assertIsNone(self._merge(ranges, files, [comment]))
-        # 本文の全体が承認の1行でないコメントは数えない。他の文を含むもの、code block・字下げ・
-        # HTML のコメントの中に書いたもの、bot のもの、承認を頼むだけのもの、否定のものである。
-        for comment in (("Bot", "承認 " + self.head), f"承認をお願いします {self.head[:7]}",
-                        f"未承認 {self.head[:7]}", f"{self.head[:7]}で承認した",
-                        f"確認した。\n承認 {self.head[:7]}",
-                        f"次の行を書いてください。\n```\n承認 {self.head[:7]}\n```",
-                        f"```\n承認 {self.head[:7]}\n```", f"    承認 {self.head[:7]}\n    例",
-                        f"<!--\n承認 {self.head[:7]}\n-->", f"    承認 {self.head[:7]}",
-                        f"\t承認 {self.head[:7]}", "between " + self.head):
+        # 他の文があるもの、SHA が 40 桁でないもの、別の commit の SHA、bot のものは数えない。
+        for comment in (f"承認をお願いします {head}", f"確認した。\n承認 {head}",
+                        f"```\n承認 {head}\n```", f"承認 {head[:7]}", f"承認 {self.mid}",
+                        ("Bot", f"承認 {head}")):
             with self.subTest(comment=comment):
                 self.assertDenied(self._merge(ranges, files, [comment]), "承認のコメント")
         # 想定と違う形の応答は、落ちずに止める。

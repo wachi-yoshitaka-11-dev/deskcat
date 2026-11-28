@@ -491,7 +491,7 @@ Anthropicの[Code Reviewの文書](https://code.claude.com/docs/en/code-review)�
 
 次のpathに触れるPull Requestは、CodeRabbitの`full review`と所有者の承認が要る。
 **`gh pr merge`の前に、`scripts/hooks/gh_metadata_guard.py`がCodeRabbitのreviewの完走を確かめる。**
-承認を得たら、本文の全体が`承認 <承認したheadのSHA>`の1行だけのコメントを残す。hookはそのコメントがあるかを確かめる
+承認を得たら、本文の全体が`承認 <承認したheadの40桁のSHA>`の1行だけのコメントを残す（短いSHAは数えない）。hookはそのコメントがあるかを確かめる
 （botのコメントと、他の文を含むコメントは数えない）。承認があったこと・承認者・日時・出所・範囲の記録は、
 このコメントに書かず、Pull Requestの本文か別のコメントに書く（[AI Agent Policy](docs/governance/ai-agent-policy.md)の
 「ユーザーの発言を書かない」）。**これは記録の確認であって、承認そのものの確認ではない。**所有者とAIは
@@ -753,7 +753,7 @@ squash mergeしたbranchはcommit hashが変わるため、`git branch -d`が「
 | `gh issue close`の前、およびboardの`Status`を`Done`にする`gh project item-edit`の前 | 対象Issueの`受け入れ条件`の節に`- [ ]`が残っていないか（節が無い本文も止める）。**解除の手段は無い** | 同上 |
 | `@coderabbitai`へreviewを投げる前 | 同じ行の`review`が`full review`か（**`full`の付かない`review`は`deny`**）。対象PRのどれかのcommitでreviewが完走・進行中なら`full review`も**`deny`**。完走も進行中も無いPR（`Review rate limited`や`Review stopped after lock loss`の後を含む）への`full review`と、対象PRやcheckを判定できないときは`ask`。[`ask`の扱い](#手動で依頼する前に状態を確認する) | `scripts/hooks/coderabbit_gate.py` |
 | `gh pr merge`の前 | `--subject`と`--body`／`--body-file`があるか | `scripts/hooks/gh_metadata_guard.py` |
-| `gh pr merge`の前 | レビューの記録が merge-base から head まで途切れずにつながっているか。本文の「自己レビュー」の範囲が手元の log の完了した記録と一致するか。慎重に扱うpathに触れるPull Requestで、本文の全体が`承認 <headのSHA>`だけの人のコメントがあるか。昇格では、範囲のつながりの代わりに、各commitがPull Requestを通ったか、記録を持つかを見る。**解除の手段は無い**（[自己レビュー](#自己レビュー)） | 同上 |
+| `gh pr merge`の前 | レビューの記録が merge-base から head まで途切れずにつながっているか。本文の「自己レビュー」の範囲が手元の log の完了した記録と一致するか。慎重に扱うpathに触れるPull Requestで、本文の全体が`承認 <headの40桁のSHA>`だけの人のコメントがあるか。昇格では、範囲のつながりの代わりに、各commitがPull Requestを通ったか、記録を持つかを見る。**解除の手段は無い**（[自己レビュー](#自己レビュー)） | 同上 |
 | Write／Edit／MultiEdit／NotebookEdit／Bash／PowerShellの前 | レビューの記録のlog（`deskcat-review-log.jsonl`）へ書き込まないか。shellのcommandに、logの名前が無いか | `scripts/hooks/review_record.py` |
 | `git checkout -b`／`git switch -c`の前 | 基点が最新の`origin/develop`か | `scripts/hooks/branch_base_guard.py` |
 | `git reset --hard`／`git clean`／checkout・switch・restoreによる破棄の前 | 捨てる範囲に未commitの変更があるか | `scripts/hooks/worktree_guard.py` |
