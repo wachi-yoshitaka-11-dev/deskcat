@@ -116,16 +116,17 @@ def parse_arg_range(args):
 def read_log(path):
     """log の行を読む。読めない行は飛ばす（壊れた行を証拠に数えない）。
 
-    書き込みが多バイト文字の途中で切れても読み続ける。その byte は置き換え文字になり、
-    その行は JSON として読めないので飛ばす（log を直すまでどの merge も通らない、を避ける）。
+    書き込みが多バイト文字の途中で切れても読み続ける。行ごとに UTF-8 として厳密に読み、
+    読めない行は飛ばす（log を直すまでどの merge も通らない、を避ける。壊れた byte を
+    置き換えて読んだ行を、証拠に数えない）。
     """
     records = []
     try:
-        with open(path, encoding="utf-8", errors="replace") as handle:
-            for line in handle:
+        with open(path, "rb") as handle:
+            for raw in handle:
                 try:
-                    record = json.loads(line)
-                except json.JSONDecodeError:
+                    record = json.loads(raw.decode("utf-8"))
+                except (UnicodeDecodeError, json.JSONDecodeError):
                     continue
                 if isinstance(record, dict):
                     records.append(record)

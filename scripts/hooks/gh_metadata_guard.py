@@ -918,13 +918,14 @@ def _check_review_chain(number, base, head, body):
         )
 
 
-# 承認のコメント。**本文の全体**（前後の空白と改行を除く）が「承認」と head の SHA（7桁以上）
-# だけのものを数える。本文の中から行を探すと、code block、字下げ、HTML のコメントのように、
+# 承認のコメント。空白だけの行を除いて、**本文が1行だけ**で、その行が「承認」と head の SHA
+# （7桁以上）だけのものを数える。本文の中から行を探すと、code block、字下げ、HTML のコメントのように、
 # markdown の読み方の端の場合を全部扱う必要があり、閉じない。承認を頼むコメントは他の文を含むので
 # 数えない。空白は全角（U+3000）も読む（日本語の入力でそのまま打てる形）。
 # 承認の日時や範囲の記録は、このコメントに書かず、PR の本文か別のコメントに書く（CONTRIBUTING）。
-# 行頭の空白は3つまで読む。4つ以上か tab で字下げした行は、GitHub では code として表示される。
-APPROVAL_RE = re.compile(r" {0,3}承認[ \t　]*[:：]?[ \t　]*([0-9A-Fa-f]{7,40})")
+# 行頭の半角の空白は3つまで読む。4つ以上か tab で字下げした行は、GitHub では code として表示される
+# （全角の空白は字下げにならないので、行頭でも読む）。
+APPROVAL_RE = re.compile(r"　* {0,3}　*承認[ \t　]*[:：]?[ \t　]*([0-9A-Fa-f]{7,40})")
 
 
 def _approved(comments, head):
@@ -938,8 +939,9 @@ def _approved(comments, head):
         body = comment.get("body") or ""
         if not isinstance(body, str):
             raise TypeError("コメントの本文の形が想定と違う")
-        # 前後の空の行と行末の空白だけを除く。行頭の字下げは残して、code の行を数えない。
-        match = APPROVAL_RE.fullmatch(body.strip("\r\n").rstrip())
+        # 空白だけの行を除き、行末の空白を除く。行頭の字下げは残して、code の行を数えない。
+        lines = [line.rstrip() for line in body.splitlines() if line.strip()]
+        match = APPROVAL_RE.fullmatch(lines[0]) if len(lines) == 1 else None
         if match and head.startswith(match.group(1).lower()):
             return True
     return False

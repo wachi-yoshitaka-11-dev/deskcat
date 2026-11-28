@@ -360,9 +360,11 @@ class ReviewCoverageMergeTests(unittest.TestCase):
         self.assertDenied(self._merge(ranges, files, ["承認 " + self.mid]), "承認のコメント")
         self.assertIsNone(self._merge(ranges, files, ["承認 " + self.head[:7]]))
         self.assertIsNone(self._merge(ranges, ["README.md"], []))
-        # 区切りの「：」、大文字の SHA、前後の空白と改行（画面で書いた `\r\n` を含む）、全角の空白も読む。
+        # 区切りの「：」、大文字の SHA、3つまでの字下げ、前後の空白だけの行（画面で書いた `\r\n` を
+        # 含む）、行頭と行末の全角の空白も読む。
         for comment in (f"承認：{self.head[:9].upper()}", f"\r\n  承認 {self.head[:7]}\r\n",
-                        f"承認　{self.head[:7]}　"):
+                        f"  \r\n承認 {self.head[:7]}\r\n \r\n",
+                        f"　承認　{self.head[:7]}　"):
             with self.subTest(comment=comment):
                 self.assertIsNone(self._merge(ranges, files, [comment]))
         # 本文の全体が承認の1行でないコメントは数えない。他の文を含むもの、code block・字下げ・
