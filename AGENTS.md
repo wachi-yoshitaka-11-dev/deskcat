@@ -15,7 +15,7 @@
 2. この `AGENTS.md`
 3. [AI Agent Policy](docs/governance/ai-agent-policy.md)
 4. [Development Workflow](docs/governance/development-workflow.md)
-5. [CONTRIBUTING の「自己レビュー」（通常開発版）](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/CONTRIBUTING.md#自己レビュー)
+5. [CONTRIBUTING の「自己レビュー」（通常開発版）](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/CONTRIBUTING.md#自己レビュー)。Issue・branch・Pull Request を作る前は、同じ CONTRIBUTING の[「Branches」](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/CONTRIBUTING.md#branches)と[「作業リストの決まり」](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/CONTRIBUTING.md#作業リストの決まり)も読む
 6. [Hardware Safety Policy](docs/governance/hardware-safety-policy.md)
 7. 承認済みの ADR、プロトコル、GPIO、電源、安全制限
 8. メーカー公式資料と実験結果
@@ -101,7 +101,7 @@
 
 ## 変更規則
 
-- 一 Issue 一目的を維持する。
+- **Issue と Pull Request の規則は [CONTRIBUTING](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/CONTRIBUTING.md) が正本である。**一 Issue 一目的、作業リスト、必ず Pull Request を通すこと、共有 branch の扱いを含む。ここへ写さない。
 - 既存の未コミット変更を確認し、関係のない差分を変更しない。
 - 最終形を一度に作らず、単体から統合へ進める。
 - ハードウェア依存コード、プロトコル、ドメイン判断を分離する。
@@ -133,10 +133,8 @@
 ## Git と公開
 
 - ユーザーから依頼されない限り commit、push、force push、tag、release を行わない。
-- **共有 branch（`main`／`develop`）の履歴を書き換えない。**依頼があっても force push しない。
-- **他者が pull した可能性のある branch は共有として扱う。**判断に迷うものは共有として扱う。
+- **共有 branch の履歴を書き換えない。**どの branch が共有かは [CONTRIBUTING の「Branches」](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/CONTRIBUTING.md#branches) が決める。**共有 branch へは、依頼があっても force push しない。**
 - 自分の未 push・未 merge branch では rebase と force push を使ってよい。**許すのは操作の種類であって、push の依頼を省いてよいという意味ではない。**
-- **repository への変更は、必ず Pull Request を通す。**Pull Request を省いて `develop` へ入れる経路は無い。
 - `.env`、資格情報、秘密鍵、ローカル設定をコミットしない。
 - ユーザーの既存変更を破棄、整形、移動しない。**`git reset --hard` と強制 checkout はこの規則で扱う**（履歴書き換えではなく、未 commit の変更を失う操作である）。実行前に working tree を確認する。
 

@@ -1,6 +1,6 @@
 # ADR-0020: 検査 subagent の read-only を、sandbox ではなく agent 単位の hook で絞る
 
-> 状態: Accepted
+> 状態: Superseded
 > 日付: 2026-09-10（**2026-09-11 に改訂。**題を含め全体に及ぶ。**主張を「保証する」から
 > 「best effort で絞る」へ下げた。**範囲と理由は `検証` と `欠点` を参照）
 
@@ -572,3 +572,7 @@ subagent を使い捨ての git worktree で動かす `isolation` field があ�
 ## 置き換える決定
 
 なし。[ADR-0018](0018-instruction-file-structure.md)の決定4が残した欠点へ機構の門を足す。**閉じてはいない**（`欠点`を参照）。同決定の`tools`と`model`は変えない。
+
+## 後継の決定
+
+[#813](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/813)の「レビューの仕組み」を[#814](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/814)の作業リストの4で進めたとき、本ADRの決定をすべて置き換えた。差分を呼ぶ側が作業ツリーの外のfileに書き出して渡す形に変えたため、検査 agent が `git` を必要としなくなった。これが再評価の条件の3つ目に当たる。そのうえで`fresh-context-reviewer`の`tools`から`Bash`を外して`Read, Grep, Glob`にした（[CONTRIBUTINGの「自己レビュー」](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/CONTRIBUTING.md#自己レビュー)）。`Bash`が無いため、agent の frontmatter の`hooks`と`scripts/hooks/inspector_readonly_guard.py`を消した。
