@@ -863,7 +863,9 @@ class GhHookRepositoryAndDeadlineTests(unittest.TestCase):
     DONE = CodeRabbitReviewMergeGateTests.DONE
     TARGET = "firmware/esp32/src/a.rs"
     # 1回の hook の中の照会の回数。`gh pr merge` は CodeRabbit の確認とレビューの記録の検査が
-    # それぞれ `pr view` を呼ぶ。`gh issue close` は `issue view` を1回呼ぶ。
+    # それぞれ `pr view` を呼ぶ。2回になるのは、fixture の commit が CodeRabbit の確認を通る
+    # （`DONE`）ときだけである。そこで止まると、記録の検査は走らず1回になる。
+    # `gh issue close` は `issue view` を1回呼ぶ。
     VIEWS = {"pr": 2, "issue": 1}
     DRIVER = (
         "import sys; sys.path.insert(0, {hooks!r}); import gh_metadata_guard as g; "
@@ -920,7 +922,7 @@ class GhHookRepositoryAndDeadlineTests(unittest.TestCase):
         issue = {"issue": {"number": 9, "body": "## 受け入れ条件\n- [ ] a\n"}}
         command = "gh issue close 9 --comment -c -Rowner/target"
         calls = [c for c in self._logged(command, issue) if c[:2] == ["issue", "view"]]
-        self.assertEqual(len(calls), 1, calls)
+        self.assertEqual(len(calls), self.VIEWS["issue"], calls)
         self.assertEqual(calls[0][calls[0].index("-R") + 1], "owner/target")
 
     def test_short_options_of_one_subcommand_do_not_hide_the_repository_of_another(self):
