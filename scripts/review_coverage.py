@@ -114,13 +114,29 @@ def within(ranges, ends):
     return sorted({(a, b) for a, b in ranges if b in ends})
 
 
-def covers_commit(sha, ranges, cwd=None, ancestor=None, deadline=None):
-    """完了した記録の範囲のどれかが、commit `sha` 1つの変更（`sha^..sha`）を含むか。"""
-    ancestor = ancestor or (lambda a, b: is_ancestor(a, b, cwd, deadline))
+def covers_commit(sha, ranges, head, cwd=None, deadline=None):
+    """完了した記録の範囲のどれかが、commit `sha` 1つの変更（`sha^..sha`）を含むか。
+
+    範囲 `(a, b)` が含むのは、a が `sha^` の祖先（同じを含む）で、`sha` が b の祖先（同じを含む）の
+    ときである。b は `head` の祖先に限る（呼ぶ側が `within` で絞る）。
+    **git を呼ぶ回数は、範囲の本数によらず3回である**（#822）。範囲ごとに祖先かを問わず、
+    `sha^` の祖先の集合と、`sha` から `head` までの子孫の集合を1回ずつ取り、集合で照らす。
+    求められなければ例外を上げる。
+    """
+    if not ranges:
+        return False
     code, parent = _git(["rev-parse", "--verify", "--quiet", f"{sha}^"], cwd, deadline)
     if code != 0 or not SHA_RE.match(parent):
         return False
-    return any(ancestor(a, parent) and ancestor(sha, b) for a, b in ranges)
+    code, out = _git(["rev-list", parent], cwd, deadline)
+    if code != 0:
+        raise ValueError(f"{parent[:7]} の祖先を列挙できない")
+    ancestors = set(out.splitlines())
+    code, out = _git(["rev-list", "--ancestry-path", f"{sha}..{head}"], cwd, deadline)
+    if code != 0:
+        raise ValueError(f"{sha[:7]}..{head[:7]} の子孫を列挙できない")
+    descendants = set(out.splitlines()) | {sha}
+    return any(a in ancestors and b in descendants for a, b in ranges)
 
 
 def log_path(cwd=None, deadline=None):

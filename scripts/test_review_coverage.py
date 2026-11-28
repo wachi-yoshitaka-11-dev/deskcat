@@ -563,6 +563,41 @@ class ReviewCoverageMergeTests(unittest.TestCase):
         self.assertIsNotNone(output)
         self.assertEqual(small, large)
 
+    def test_promotion_record_ends_at_the_commit_or_at_the_head(self):
+        """終わりが commit そのもの、head そのもの、commit が head と同じ、のどれでも覆う（#822）。"""
+        promotion = ("main", "develop")
+        cases = (
+            # (PR を通らずに入った commit, 記録の範囲)
+            (self.mid, (self.base, self.mid)),   # 終わりが commit そのもの（`<sha>^..<sha>`）
+            (self.mid, (self.base, self.head)),  # 終わりが head そのもの
+            (self.head, (self.mid, self.head)),  # commit が head と同じ
+        )
+        for direct, record in cases:
+            with self.subTest(direct=direct[:7], record=(record[0][:7], record[1][:7])):
+                Path(self.repo.log).unlink(missing_ok=True)
+                squashed = tuple(sha for sha in (self.mid, self.head) if sha != direct)
+                self.assertDenied(self._merge(refs=promotion, squashed=squashed), direct[:7])
+                self._log(record)
+                self.assertIsNone(self._merge(refs=promotion, squashed=squashed))
+
+    def test_promotion_git_calls_do_not_grow_with_distinct_records(self):
+        """終わりが範囲の中にある別々の記録が増えても、git を呼ぶ回数は変わらない（#822）。
+
+        覆う記録は、並べたときに最後に来る。覆わない記録を先に照らしても、範囲ごとには git を呼ばない。
+        """
+        promotion = ("main", "develop")
+        # head は PR を通らずに入った commit。`base..head` が `head^..head` を含む。
+        self._log((self.base, self.head))
+        small, output = self._git_calls(refs=promotion, squashed=(self.mid,))
+        self.assertIsNone(output)
+        # 始まりが別々（手元に無い commit）で、終わりが範囲の中（mid）の記録。並べると先に来る。
+        Path(self.repo.log).unlink()
+        self._log(*[(f"{index:040x}", self.mid) for index in range(self.STALE_RANGES)],
+                  (self.base, self.head))
+        large, output = self._git_calls(refs=promotion, squashed=(self.mid,))
+        self.assertIsNone(output)
+        self.assertEqual(small, large)
+
     def test_git_calls_run_under_the_check_deadline(self):
         """gh の照会の後に期限が尽きたら、git の呼び出しの前で止める（#822）。"""
         ranges = [(self.base, self.head)]

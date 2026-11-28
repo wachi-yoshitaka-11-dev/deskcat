@@ -165,7 +165,9 @@ REVIEW_COMPLETED_TEXT = "Review completed"
 # ghを待つ上限（秒）。超えたら確認できなかったものとして扱いdenyする。
 # **hook全体の上限は`.claude/settings.json`の60秒である。**超えるとhookが落ち、
 # 通る側に倒れるおそれがあるため、commitごとの確認は並列で行い（昇格は100件を超える）、
-# 全体にも期限を置く。
+# 検査ごとにも期限（`CHECK_DEADLINE_SECONDS`）を置く。**期限はhook全体ではなく、検査ごとに
+# 数え始める。**1つのcommandに`gh pr merge`が2つ以上あると、合計が60秒を超えうる（#822の
+# 作業リストの3）。
 #
 # **最初の1回は遅い（#760）。**しばらく照会しない後の最初の`gh`は、endpointによらず
 # （`pr view`のgraphqlも`gh api`のRESTも）10.4〜10.7秒かかり、続く照会は0.4〜1秒で返る。
@@ -880,7 +882,7 @@ def _check_promotion_commits(number, repo, base, head, deadline):
     finally:
         pool.shutdown(wait=True, cancel_futures=True)
     unreviewed = [sha for sha in direct
-                  if not review_coverage.covers_commit(sha, logged, deadline=deadline)]
+                  if not review_coverage.covers_commit(sha, logged, head, deadline=deadline)]
     if unreviewed:
         shown = ", ".join(f"`{sha[:7]}`" for sha in sorted(unreviewed)[:8])
         _deny(
