@@ -55,6 +55,11 @@ jobs:
         # その PR には所有者の承認が要る（CONTRIBUTING の「慎重に扱う path」）。
         run: |
           script="$RUNNER_TEMP/review_coverage.py"
+          # base の commit そのものを読めないときは、PR の版へ切り替えずに失敗させる。
+          if ! git cat-file -e "$GATE_BASE^{commit}"; then
+            echo "::error::base の commit（${GATE_BASE:0:7}）を clone の中で読めない。"
+            exit 1
+          fi
           if git cat-file -e "$GATE_BASE:scripts/review_coverage.py" 2>/dev/null; then
             # base に有るのに読めないときは、PR の版へ切り替えずに失敗させる。
             git show "$GATE_BASE:scripts/review_coverage.py" > "$script"

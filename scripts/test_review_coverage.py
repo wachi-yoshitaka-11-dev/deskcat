@@ -202,7 +202,8 @@ class ReviewRecordHookTests(unittest.TestCase):
             ("Edit", {"file_path": f".git/{rc.LOG_NAME}"}),
             ("Bash", {"command": f"echo x >> .git/{rc.LOG_NAME}"}),
             ("PowerShell", {"command": f"Add-Content .git/{rc.LOG_NAME} x"}),
-            ("Bash", {"command": "echo '{}' | python3 scripts/hooks/review_record.py"}),
+            ("Bash", {"command": f"printf x | tee -a .git/{rc.LOG_NAME}"}),
+            ("Bash", {"command": f"sed -i 1d .git/{rc.LOG_NAME}"}),
         ):
             with self.subTest(tool=tool):
                 payload = {"hook_event_name": "PreToolUse", "tool_name": tool,
@@ -211,20 +212,14 @@ class ReviewRecordHookTests(unittest.TestCase):
                 self.assertEqual(output["hookSpecificOutput"]["permissionDecision"], "deny")
 
     def test_commands_that_only_name_the_hook_are_allowed(self):
+        # hook の名前では止めない（止めるのは log の名前だけ）。
         hook = "scripts/hooks/" + "review_record" + ".py"
         for command in (f"git add scripts/review_coverage.py {hook}", f"git diff -- {hook}",
-                        f"sed -n 1,20p {hook}", f"python3 -m compileall scripts && cat {hook}"):
+                        f"sed -n 1,20p {hook}", f"python3 -m py_compile {hook}"):
             with self.subTest(command=command):
                 payload = {"hook_event_name": "PreToolUse", "tool_name": "Bash",
                            "cwd": self.repo.root, "tool_input": {"command": command}}
                 self.assertEqual(_hook(payload, self.repo.root), (0, None))
-        for command in (f"py -3 {hook} < x.json", f"C:/Python312/python.exe {hook}",
-                        f"cat x | /usr/bin/python3 -I {hook}"):
-            with self.subTest(command=command):
-                payload = {"hook_event_name": "PreToolUse", "tool_name": "Bash",
-                           "cwd": self.repo.root, "tool_input": {"command": command}}
-                _, output = _hook(payload, self.repo.root)
-                self.assertEqual(output["hookSpecificOutput"]["permissionDecision"], "deny")
 
     def test_other_writes_are_allowed(self):
         payload = {"hook_event_name": "PreToolUse", "tool_name": "Write",
@@ -350,6 +345,15 @@ class ReviewCoverageMergeTests(unittest.TestCase):
         self.assertIsNone(self._merge(ranges, ["README.md"], []))
         # 他の行に挟んだ承認の行、区切りの「：」、大文字の SHA も読む。
         self.assertIsNone(self._merge(ranges, files, [f"確認した。\n承認：{self.head[:9].upper()}\n"]))
+        # 画面で書いたコメントの `\r\n`（承認の行が最後でない）と、全角の空白も読む。
+        self.assertIsNone(self._merge(ranges, files, [f"承認 {self.head[:7]}\r\n以上\r\n"]))
+        self.assertIsNone(self._merge(ranges, files, [f"承認　{self.head[:7]}"]))
+        # code block の中の行は数えない。
+        self.assertDenied(self._merge(ranges, files, [
+            f"承認をお願いします。次の行を書いてください。\n```\n承認 {self.head[:7]}\n```\n"]),
+            "承認のコメント")
+        self.assertIsNone(self._merge(ranges, files, [
+            f"```\n例\n```\n承認 {self.head[:7]}\n"]))
         # bot のコメント、承認を頼むだけのコメント、否定のコメント、語の無いコメントは数えない。
         for comment in (("Bot", "承認 " + self.head), f"承認をお願いします {self.head[:7]}",
                         f"未承認 {self.head[:7]}", f"{self.head[:7]}で承認した",

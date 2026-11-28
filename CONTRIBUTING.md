@@ -433,7 +433,8 @@ Anthropicの[Code Reviewの文書](https://code.claude.com/docs/en/code-review)�
     Pull Requestのsquashのcommitかを見る。Pull Requestを通らずに入ったcommitは、`<sha>^..<sha>`を
     含む範囲の記録があるときだけ通す。
   - **限界：**hookは、subagentが範囲の全部を実際に読んだかまでは確かめない。logへの書き込みを
-    止めるのは明らかな形だけで、名前を組み立てるscriptを走らせれば記録を偽れる。所有者が画面から
+    止めるのはうっかりの書き込みだけで、名前を組み立てるscriptを走らせるか、記録のhookに偽の入力を
+    流せば記録を偽れる（意図的な偽りは前提にしない）。所有者が画面から
     mergeする経路はhookを通らず、CIは本文に書いた範囲を信じるしかない。CIはPull Request側の
     workflowの版で動くので、workflowを書き換えたPull Requestは自分の検査を変えられる
     （`.github/`は慎重に扱うpathなので、所有者の承認が要る）。hookが時間切れになると、
@@ -751,7 +752,7 @@ squash mergeしたbranchはcommit hashが変わるため、`git branch -d`が「
 | `@coderabbitai`へreviewを投げる前 | 同じ行の`review`が`full review`か（**`full`の付かない`review`は`deny`**）。対象PRのどれかのcommitでreviewが完走・進行中なら`full review`も**`deny`**。完走も進行中も無いPR（`Review rate limited`や`Review stopped after lock loss`の後を含む）への`full review`と、対象PRやcheckを判定できないときは`ask`。[`ask`の扱い](#手動で依頼する前に状態を確認する) | `scripts/hooks/coderabbit_gate.py` |
 | `gh pr merge`の前 | `--subject`と`--body`／`--body-file`があるか | `scripts/hooks/gh_metadata_guard.py` |
 | `gh pr merge`の前 | レビューの記録が merge-base から head まで途切れずにつながっているか。本文の「自己レビュー」の範囲が手元の log の完了した記録と一致するか。慎重に扱うpathに触れるPull Requestで、人のコメントに`承認 <headのSHA>`だけの行があるか。昇格では、範囲のつながりの代わりに、各commitがPull Requestを通ったか、記録を持つかを見る。**解除の手段は無い**（[自己レビュー](#自己レビュー)） | 同上 |
-| Write／Edit／MultiEdit／NotebookEdit／Bash／PowerShellの前 | レビューの記録のlog（`deskcat-review-log.jsonl`）へ書き込まないか。shellのcommandに、logの名前が無いか。記録のhook（`review_record.py`）をpythonで起動していないか | `scripts/hooks/review_record.py` |
+| Write／Edit／MultiEdit／NotebookEdit／Bash／PowerShellの前 | レビューの記録のlog（`deskcat-review-log.jsonl`）へ書き込まないか。shellのcommandに、logの名前が無いか | `scripts/hooks/review_record.py` |
 | `git checkout -b`／`git switch -c`の前 | 基点が最新の`origin/develop`か | `scripts/hooks/branch_base_guard.py` |
 | `git reset --hard`／`git clean`／checkout・switch・restoreによる破棄の前 | 捨てる範囲に未commitの変更があるか | `scripts/hooks/worktree_guard.py` |
 | 応答を終える前 | 完了の主張に、対応するtool呼び出しがあるか | `scripts/hooks/stop_claim_guard.py` |

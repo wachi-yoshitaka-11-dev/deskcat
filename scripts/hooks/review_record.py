@@ -12,14 +12,13 @@
    - 前と後は `tool_use_id` で組にする。判定は `scripts/review_coverage.py` が持つ。
    main の文脈での実行（`agent_id` が無い）は記録しない。2026-11-28 の実験で、
    main の文脈の Skill の後の hook には結果が届かず、レビューが終わったかを知る手段が無かった。
-2. **log を守る。**log の path への Write／Edit／MultiEdit／NotebookEdit、log の file 名を
-   含む Bash／PowerShell、この hook を python で起動する Bash／PowerShell を拒否する。
-   log を書くのはこの hook だけである。
+2. **log を守る。**log の path への Write／Edit／MultiEdit／NotebookEdit と、log の file 名を
+   含む Bash／PowerShell を拒否する。log を書くのはこの hook だけである。
 
 **限界：**この hook は、fork が範囲の全部を実際に読んだかまでは確かめない。
-**log を止めるのは明らかな形だけである。**shell の command に log の名前がそのまま書かれたものと、
-この hook の名前を python の起動の後に書いたものを止める。名前を組み立てる script を書いて
-走らせれば、記録を偽れる。
+**止めるのはうっかりの書き込みで、意図的な偽りは前提にしない。**shell の command に log の名前が
+そのまま書かれたものだけを止める。名前を組み立てる script を走らせる、この hook に偽の入力を
+流す、のどちらでも記録を偽れる（起動の形の列挙では抜けが尽きないので、hook の名前では止めない）。
 log は改ざんを防ぐものではなく、レビューの実行を残すための記録である。
 hook の入力を読めないとき、git が使えないときは、何も記録せず、何も止めない
 （記録が無ければ merge の前の検査で止まるので、記録の側で止める必要が無い）。
@@ -28,7 +27,6 @@ hook の入力を読めないとき、git が使えないときは、何も記�
 import datetime
 import json
 import os
-import re
 import subprocess
 import sys
 from pathlib import Path
@@ -40,16 +38,6 @@ import review_coverage  # noqa: E402
 SKILL_NAME = "code-review"
 WRITE_TOOLS = ("Write", "Edit", "MultiEdit", "NotebookEdit")
 SHELL_TOOLS = ("Bash", "PowerShell")
-HOOK_NAME = "review_record.py"
-# 記録の hook を python で起動する command。偽の入力を流し込めば記録を偽れる。
-# hook の名前を含むだけの command（`git add`、`git diff`、`sed` など）は止めない。
-# python の command の名前は、語の頭（行頭か空白・区切りの後。path を前に付けてもよい）にあるものに限る。
-# `a.py` の `py` を command と読まない。
-HOOK_RUN_RE = re.compile(
-    r"(?:^|[\s;&|(`])(?:[^\s;&|(`]*[/\\])?py(?:thon[0-9.]*)?(?:\.exe)?\s[^\n;&|]*"
-    + re.escape(HOOK_NAME),
-    re.IGNORECASE,
-)
 
 
 def _deny(reason):
@@ -82,10 +70,12 @@ def _append(path, record):
                          0o644)
     try:
         written = os.write(descriptor, data)
+        if written != len(data):
+            # 途中で切れた行を改行で閉じる。閉じないと、次の記録がその断片に続いて壊れる。
+            os.write(descriptor, b"\n")
+            raise OSError(f"log に {len(data)} byte のうち {written} byte しか書けなかった")
     finally:
         os.close(descriptor)
-    if written != len(data):
-        raise OSError(f"log に {len(data)} byte のうち {written} byte しか書けなかった")
 
 
 def _now():
@@ -149,11 +139,9 @@ def _guard(payload):
         return
     if tool in SHELL_TOOLS:
         command = tool_input.get("command")
-        if isinstance(command, str) and (review_coverage.LOG_NAME in command
-                                         or HOOK_RUN_RE.search(command)):
+        if isinstance(command, str) and review_coverage.LOG_NAME in command:
             _deny(
-                f"レビューの記録の log（`{review_coverage.LOG_NAME}`）を含む command と、"
-                f"記録の hook（`{HOOK_NAME}`）を python で起動する command は使えない。"
+                f"レビューの記録の log（`{review_coverage.LOG_NAME}`）を含む command は使えない。"
                 "記録は Claude Code が起動する hook だけが書く（#814 の作業リストの9）。"
             )
         return

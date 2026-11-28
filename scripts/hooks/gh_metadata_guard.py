@@ -920,8 +920,30 @@ def _check_review_chain(number, base, head, body):
 
 # 承認のコメントの行。行の全体が「承認」と head の SHA（7桁以上）だけのものを読む。
 # 語を含むだけで数えると、「承認をお願いします f831629」や「未承認 f831629」も通ってしまう。
-APPROVAL_LINE_RE = re.compile(r"^[ \t]*承認[ \t]*[:：]?[ \t]*([0-9A-Fa-f]{7,40})[ \t]*$",
-                              re.MULTILINE)
+# 空白は全角（U+3000）も読む（日本語の入力でそのまま打てる形）。
+APPROVAL_LINE_RE = re.compile(r"[ \t　]*承認[ \t　]*[:：]?[ \t　]*"
+                              r"([0-9A-Fa-f]{7,40})[ \t　]*")
+# code block（``` か ~~~ で囲む）の始まりと終わりの行。
+FENCE_RE = re.compile(r"^[ \t]*(```|~~~)")
+
+
+def _approval_lines(body):
+    """コメントの本文のうち、code block の外の行。改行は `\\r\\n` も `\\n` も読む。
+
+    GitHub の画面で書いたコメントは `\\r\\n` で届く。code block の中の行は数えない。
+    承認を頼むコメントが、書いてほしい行を code block で示すことがあるためである。
+    """
+    inside = None
+    for line in body.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
+        fence = FENCE_RE.match(line)
+        if fence:
+            if inside is None:
+                inside = fence.group(1)
+            elif fence.group(1) == inside:
+                inside = None
+            continue
+        if inside is None:
+            yield line
 
 
 def _approved(comments, head):
@@ -935,8 +957,10 @@ def _approved(comments, head):
         body = comment.get("body") or ""
         if not isinstance(body, str):
             raise TypeError("コメントの本文の形が想定と違う")
-        if any(head.startswith(sha.lower()) for sha in APPROVAL_LINE_RE.findall(body)):
-            return True
+        for line in _approval_lines(body):
+            match = APPROVAL_LINE_RE.fullmatch(line)
+            if match and head.startswith(match.group(1).lower()):
+                return True
     return False
 
 # 昇格の Pull Request の (base, head)。CONTRIBUTING の「Branches」の共有 branch である。
