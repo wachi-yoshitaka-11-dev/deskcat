@@ -114,10 +114,14 @@ def parse_arg_range(args):
 
 
 def read_log(path):
-    """log の行を読む。読めない行は飛ばす（壊れた行を証拠に数えない）。"""
+    """log の行を読む。読めない行は飛ばす（壊れた行を証拠に数えない）。
+
+    書き込みが多バイト文字の途中で切れても読み続ける。その byte は置き換え文字になり、
+    その行は JSON として読めないので飛ばす（log を直すまでどの merge も通らない、を避ける）。
+    """
     records = []
     try:
-        with open(path, encoding="utf-8") as handle:
+        with open(path, encoding="utf-8", errors="replace") as handle:
             for line in handle:
                 try:
                     record = json.loads(line)

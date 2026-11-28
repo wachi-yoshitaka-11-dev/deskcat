@@ -105,7 +105,7 @@ Pre-existingの追跡Issue:
 
 - [ ] CodeRabbitに依頼した場合、checkの**説明文**を読み、`Review completed`であることを確かめた。`Review rate limited`と`Review skipped`は**`pass`と表示されるがreviewは走っていない**（[GitHubが強制しないもの](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/CONTRIBUTING.md#githubが強制しないもの)）
 - [ ] 未解決のreview threadが0件である（GraphQLの`reviewThreads.isResolved`で確認した。REST APIのcomment一覧では判定できない）
-- [ ] 承認が要る変更では、本文の全体が`承認 <承認したheadのSHA>`の1行だけのコメントがある。承認の日時や範囲の記録は、そのコメントに書かず、この本文か別のコメントに書いた（[慎重に扱う path](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/CONTRIBUTING.md#慎重に扱う-path)）
+- [ ] 承認が要る変更では、承認するcommitのSHAを書いた承認のコメントがある。[慎重に扱う path](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/CONTRIBUTING.md#慎重に扱う-path)に触れる変更では、そのコメントの本文の全体が`承認 <承認したheadのSHA>`の1行だけで、承認の日時や範囲の記録は、この本文か別のコメントに書いた
 
 ## 消した規則
 

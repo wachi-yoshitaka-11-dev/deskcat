@@ -175,6 +175,14 @@ class ReviewRecordHookTests(unittest.TestCase):
         self._skill("PostToolUse", "x", response={"success": True, "result": "指摘は0件"})
         self.assertEqual(rc.completed_ranges(rc.read_log(self.repo.log)), [(first, last)])
 
+    def test_log_cut_inside_a_multibyte_character_is_still_read(self):
+        first, _, last = self.repo.shas
+        self.repo.log.parent.mkdir(parents=True, exist_ok=True)
+        self.repo.log.write_bytes('{"args": "指摘'.encode("utf-8")[:-1])
+        self._skill("PreToolUse", f"{first[:7]}..HEAD")
+        self._skill("PostToolUse", "x", response={"success": True, "result": "指摘は0件"})
+        self.assertEqual(rc.completed_ranges(rc.read_log(self.repo.log)), [(first, last)])
+
     def test_run_without_a_report_is_not_counted(self):
         first = self.repo.shas[0]
         for index, response in enumerate(({"success": True, "status": "forked"},
@@ -364,7 +372,8 @@ class ReviewCoverageMergeTests(unittest.TestCase):
                         f"確認した。\n承認 {self.head[:7]}",
                         f"次の行を書いてください。\n```\n承認 {self.head[:7]}\n```",
                         f"```\n承認 {self.head[:7]}\n```", f"    承認 {self.head[:7]}\n    例",
-                        f"<!--\n承認 {self.head[:7]}\n-->", "between " + self.head):
+                        f"<!--\n承認 {self.head[:7]}\n-->", f"    承認 {self.head[:7]}",
+                        f"\t承認 {self.head[:7]}", "between " + self.head):
             with self.subTest(comment=comment):
                 self.assertDenied(self._merge(ranges, files, [comment]), "承認のコメント")
         # 想定と違う形の応答は、落ちずに止める。
