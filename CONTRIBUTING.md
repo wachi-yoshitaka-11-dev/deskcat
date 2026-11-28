@@ -417,6 +417,42 @@ Anthropicの[Code Reviewの文書](https://code.claude.com/docs/en/code-review)�
 - **`/code-review`には`--max-findings all`を付ける。**付けないと件数の上限で切られ、残りの指摘が出ない。
 - 1巡は、レビューを1回走らせ、その指摘を直すまでとする。巡を重ねるのは危険度の高い変更でよく、
   すべてのPull Requestでは要らない。
+- **レビューの記録は、最後のcommitまで途切れずにつなぐ**（[#814](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/814)の作業リストの9）。
+  - commitしてから、`/code-review`をbackgroundのsubagentの中で、範囲`A..B`を明示して走らせる。
+    Aは前の記録の終わりのSHA（初回はPull Requestのbaseとのmerge-base）、BはHEADである。
+    範囲は1回に1つだけ書く。`...`（3点）とPR番号での実行は記録に数えない。
+  - **mainの文脈での実行と、ユーザーが打った`/code-review`は記録に数えない。**hookに
+    `agent_id`も結果も届かず、レビューが終わったかを知る手段が無いためである。
+  - 記録は`scripts/hooks/review_record.py`が、gitの共通のdirの`deskcat-review-log.jsonl`に書く。
+    このlogへ書き込む操作は止める。
+  - 完了と数えるのは、報告の本文が指摘の一覧の形（`` ```json ``の囲みがちょうど1つで、中身がobjectの配列。
+    空の配列も数える）だったときだけである。利用の上限で止まった実行も、成功として届くためである。
+  - **記録はcloneごとにある。Pull Requestは、その範囲をレビューしたcloneでmergeする。**
+    同じcloneのworktreeの間では記録を共有し、別のclone（別の端末や環境）とは共有しない。
+  - Pull Request本文の「自己レビュー」に、記録の範囲をbacktickで囲んだ`A..B`の形ですべて書く。
+    hookとCIは、commitを読めない範囲を飛ばす。どの範囲を読めるかはcloneによって違うので、40桁のSHAで書く。
+  - `gh pr merge`の前に`scripts/hooks/gh_metadata_guard.py`が、記録の範囲がmerge-baseから
+    headまでつながっているか、本文の範囲が記録と一致するかを確かめる。
+    CI（`review-coverage.yml`）は本文の範囲がつながっているかだけを見る（手元のlogを読めない）。
+  - 昇格（`develop`→`main`）では、範囲のつながりの代わりに、範囲の各commitが`develop`へmerge済みの
+    Pull Requestのsquashのcommitかを見る。Pull Requestを通らずに入ったcommitは、`<sha>^..<sha>`を
+    含む範囲の記録があるときだけ通す。
+  - **限界：**hookは、subagentが範囲の全部を実際に読んだかまでは確かめない。logへの書き込みを
+    止めるのはうっかりの書き込みだけで、名前を組み立てるscriptを走らせるか、記録のhookに偽の入力を
+    流せば記録を偽れる（意図的な偽りは前提にしない）。所有者が画面から
+    mergeする経路はhookを通らず、CIは本文に書いた範囲を信じるしかない。CIはPull Request側の
+    workflowの版で動くので、workflowを書き換えたPull Requestは自分の検査を変えられる
+    （`.github/`は慎重に扱うpathなので、所有者の承認が要る）。hookが時間切れになると、
+    止める側に倒れない。rebaseすると前の範囲のSHAがheadの祖先でなくなり、つながらなくなる（レビューし直す）。
+  - **hookが読まない呼び出し方：**hookはうっかりを防ぐもので、意図的な迂回は前提にしない。
+    別のshell（`bash -c`、`pwsh -Command`、`cmd /c`など）に渡したcommandは、検査が呼び出しとして
+    読み解かないので、通りうる。
+    Claude Codeのhookは、`.claude/settings.json`で登録したtoolにだけ働く。この repositoryの
+    PreToolUseの検査は、logへの書き込みを止めるもの（`review_record.py`）を除き、Bashのtoolにだけ
+    登録している（正本は`.claude/settings.json`）。WindowsのPowerShellのtoolでは、それらの検査は働かない
+    （[ADR-0005](docs/decisions/0005-standard-development-os.md)でWindowsはsupportの対象外）。
+    Windowsでは、Bashで`GH`や`gh.exe`と書いた呼び出しも通る。
+    **Windowsのcloneで作業する間は、`gh`と`git`をBashのtoolで、小文字の`gh`で走らせる。**
 
 **自動reviewは行わない**（[ADR-0013](docs/decisions/0013-manual-only-coderabbit-review.md)）。
 [`.coderabbit.yaml`](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/.coderabbit.yaml)は
@@ -469,11 +505,16 @@ Anthropicの[Code Reviewの文書](https://code.claude.com/docs/en/code-review)�
 
 次のpathに触れるPull Requestは、CodeRabbitの`full review`と所有者の承認が要る。
 **`gh pr merge`の前に、`scripts/hooks/gh_metadata_guard.py`がCodeRabbitのreviewの完走を確かめる。**
+承認を得たら、本文の全体が`承認 <承認したheadの40桁のSHA>`の1行だけのコメントを残す（短いSHAは数えない）。hookはそのコメントがあるかを確かめる
+（botのコメントと、他の文を含むコメントは数えない）。承認があったこと・承認者・日時・出所・範囲の記録は、
+このコメントに書かず、Pull Requestの本文か別のコメントに書く（[AI Agent Policy](docs/governance/ai-agent-policy.md)の
+「ユーザーの発言を書かない」）。**これは記録の確認であって、承認そのものの確認ではない。**所有者とAIは
+同じaccountで書くため、書き手で見分けられない（承認の関門は[#814](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/814)の作業リストの11）。
 この一覧とhookの一覧（`REVIEW_TARGET_PREFIXES`・`REVIEW_TARGET_FILES`）は一致させる。
 `scripts/test_hooks.py`が一致を検査する。`/`で終わるものはその配下のすべてである。
 
 - CIのworkflow：`.github/workflows/`
-- hook：`scripts/hooks/`、`.githooks/`、`.claude/settings.json`
+- hook：`scripts/hooks/`、`.githooks/`、`.claude/settings.json`、`scripts/review_coverage.py`（hook と CI が共有するレビューの記録の判定）
 - 指示と規則：`AGENTS.md`、`CLAUDE.md`、`CONTRIBUTING.md`、`docs/governance/ai-agent-policy.md`、`docs/governance/development-workflow.md`
 - 安全・電気・サーボの制限・ピンの割り当て・電源の正本の文書：`docs/governance/hardware-safety-policy.md`、
   `docs/hardware/servo-safety-limits.md`、`docs/hardware/gpio-assignment.md`、`docs/hardware/power-budget.md`
@@ -703,10 +744,13 @@ squash mergeしたbranchはcommit hashが変わるため、`git branch -d`が「
 
 ## hookが止めたとき
 
-`.claude/settings.json`がhookとして起動するscriptのうち、下の表は6つ、**検査は11である。**
+`.claude/settings.json`がhookとして起動するscriptのうち、下の表は6つ、**検査は12である。**
 **この数は下の表と一致させる。**一致していない間、表に無いhookは「無い」ものとして読まれる。
-**数えるのは検査であってscriptではない。**`gh_metadata_guard.py`は1 scriptで6つを見る
-（同fileのdocstring「止める対象は6つである」）。公開前の検査（`publication_guard_hook.py`）は、この表とは別に起動する。
+**数えるのは検査であってscriptではない。**`gh_metadata_guard.py`は1 scriptで7つを見る
+（同fileのdocstring「止める対象は7つである」）。表のPreToolUseの検査は、logへの書き込みを止めるものを除き、Bashのtoolのcommandだけを見る
+（正本は`.claude/settings.json`）。「解除の手段は無い」もBashのtoolでの話で、PowerShellのtoolでは働かない
+（[自己レビュー](#自己レビュー)の「hookが読まない呼び出し方」）。`review_record.py`は、止める検査のほかに
+レビューの記録を書く（記録は止めない）。公開前の検査（`publication_guard_hook.py`）は、この表とは別に起動する。
 
 **文書に書いても実行されないことが実測で分かっている。**
 [#204](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/204)、
@@ -725,6 +769,8 @@ squash mergeしたbranchはcommit hashが変わるため、`git branch -d`が「
 | `gh issue close`の前、およびboardの`Status`を`Done`にする`gh project item-edit`の前 | 対象Issueの`受け入れ条件`の節に`- [ ]`が残っていないか（節が無い本文も止める）。**解除の手段は無い** | 同上 |
 | `@coderabbitai`へreviewを投げる前 | 同じ行の`review`が`full review`か（**`full`の付かない`review`は`deny`**）。対象PRのどれかのcommitでreviewが完走・進行中なら`full review`も**`deny`**。完走も進行中も無いPR（`Review rate limited`や`Review stopped after lock loss`の後を含む）への`full review`と、対象PRやcheckを判定できないときは`ask`。[`ask`の扱い](#手動で依頼する前に状態を確認する) | `scripts/hooks/coderabbit_gate.py` |
 | `gh pr merge`の前 | `--subject`と`--body`／`--body-file`があるか | `scripts/hooks/gh_metadata_guard.py` |
+| `gh pr merge`の前 | レビューの記録が merge-base から head まで途切れずにつながっているか。本文の「自己レビュー」の範囲が手元の log の完了した記録と一致するか。慎重に扱うpathに触れるPull Requestで、本文の全体が`承認 <headの40桁のSHA>`だけの人のコメントがあるか。昇格では、範囲のつながりの代わりに、各commitがPull Requestを通ったか、記録を持つかを見る。**解除の手段は無い**（[自己レビュー](#自己レビュー)） | 同上 |
+| Write／Edit／MultiEdit／NotebookEdit／Bash／PowerShellの前 | レビューの記録のlog（`deskcat-review-log.jsonl`）へ書き込まないか。shellのcommandに、logの名前が無いか | `scripts/hooks/review_record.py` |
 | `git checkout -b`／`git switch -c`の前 | 基点が最新の`origin/develop`か | `scripts/hooks/branch_base_guard.py` |
 | `git reset --hard`／`git clean`／checkout・switch・restoreによる破棄の前 | 捨てる範囲に未commitの変更があるか | `scripts/hooks/worktree_guard.py` |
 | 応答を終える前 | 完了の主張に、対応するtool呼び出しがあるか | `scripts/hooks/stop_claim_guard.py` |

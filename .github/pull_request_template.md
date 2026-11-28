@@ -86,6 +86,8 @@ Closes #
 
 使ったレビューとeffort:
 
+レビューの範囲（backtickで囲んだ`A..B`をすべて。読むのは16進の7〜40桁の字句だけで、AとBにはcommitの40桁のSHAを書く（短いSHAは曖昧になると飛ばされる。`HEAD`や、16進でない名前は読まない）。[自己レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/CONTRIBUTING.md#自己レビュー)）:
+
 巡の数:
 
 指摘の対応（[指摘の重さと扱い](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/CONTRIBUTING.md#指摘の重さと扱い)）:
@@ -105,7 +107,7 @@ Pre-existingの追跡Issue:
 
 - [ ] CodeRabbitに依頼した場合、checkの**説明文**を読み、`Review completed`であることを確かめた。`Review rate limited`と`Review skipped`は**`pass`と表示されるがreviewは走っていない**（[GitHubが強制しないもの](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/CONTRIBUTING.md#githubが強制しないもの)）
 - [ ] 未解決のreview threadが0件である（GraphQLの`reviewThreads.isResolved`で確認した。REST APIのcomment一覧では判定できない）
-- [ ] 承認が要る変更では、承認するcommitのSHAを書いた承認のコメントがある
+- [ ] 承認が要る変更では、承認するcommitのSHAを書いた承認のコメントがある。[慎重に扱う path](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/CONTRIBUTING.md#慎重に扱う-path)に触れる変更では、そのコメントの本文の全体が`承認 <承認したheadの40桁のSHA>`の1行だけで、承認の日時や範囲の記録は、この本文か別のコメントに書いた
 
 ## 消した規則
 

@@ -1,0 +1,71 @@
+name: Review coverage
+
+# PR の本文の「自己レビュー」に書いたレビューの範囲が、PR の base との merge-base から
+# head まで途切れずにつながっているかを見る（#814 の作業リストの9）。
+# 手元では `scripts/hooks/gh_metadata_guard.py` が、同じ判定に加えて、本文の範囲が
+# 手元の log の完了した記録と一致するかも見る。CI は手元の log を読めないので、本文だけを見る。
+# 判定は `scripts/review_coverage.py` が持つ。
+#
+# **限界：**所有者が画面から merge する経路では、この job だけが見る。その経路では、
+# 本文に書いた範囲を信じるしかない。
+on:
+  pull_request:
+    # 本文に範囲を書き足したら走り直すため、本文の編集（`edited`）でも走らせる。
+    # PR のコメントは使わない。`issue_comment` の workflow は default branch（`main`）の版で
+    # 動くので、`develop` へ merge しても `main` へ昇格するまで効かない。
+    types: [opened, synchronize, reopened, edited]
+    # base が `develop` の PR だけを見る。昇格（`develop` → `main`）の commit は squash で
+    # 入っており、記録の SHA と別物なので、範囲でつなげない。
+    branches:
+      - develop
+
+permissions:
+  contents: read
+
+concurrency:
+  group: review-coverage-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Verify review ranges reach the head
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # merge-base と祖先の関係を求めるため、履歴を切り詰めない。
+          fetch-depth: 0
+          # この step の後に PR 側の script を実行する。checkout が残す token を
+          # その script から読めないようにする。
+          persist-credentials: false
+
+      - name: Check review ranges
+        # 値は環境変数で渡す。`run` へ直接展開すると、PR 本文や sha が shell の構文として
+        # 解釈される余地が残る。PR 本文は範囲を探すためだけに読み、実行しない。
+        env:
+          GATE_BASE: ${{ github.event.pull_request.base.sha }}
+          GATE_HEAD: ${{ github.event.pull_request.head.sha }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        # 判定の script は base の版を使う。script だけを書き換えた PR が、自分の検査を通せない
+        # ようにする。base にまだ無いとき（この判定を足す PR）だけ、PR の版を使う。
+        # **限界：**この workflow の file そのものは PR 側の版で動く（`pull_request` の event）。
+        # workflow を書き換えた PR は、この検査を変えられる。`.github/` は慎重に扱う path なので、
+        # その PR には所有者の承認が要る（CONTRIBUTING の「慎重に扱う path」）。
+        run: |
+          script="$RUNNER_TEMP/review_coverage.py"
+          # base の commit そのものを読めないときは、PR の版へ切り替えずに失敗させる。
+          if ! git cat-file -e "$GATE_BASE^{commit}"; then
+            echo "::error::base の commit（${GATE_BASE:0:7}）を clone の中で読めない。"
+            exit 1
+          fi
+          if git cat-file -e "$GATE_BASE:scripts/review_coverage.py" 2>/dev/null; then
+            # base に有るのに読めないときは、PR の版へ切り替えずに失敗させる。
+            git show "$GATE_BASE:scripts/review_coverage.py" > "$script"
+            echo "base（${GATE_BASE:0:7}）の版の判定を使う。"
+          else
+            cp scripts/review_coverage.py "$script"
+            echo "base に判定が無いので、PR の版を使う。"
+          fi
+          python3 "$script" --base "$GATE_BASE" --head "$GATE_HEAD" --pr-body-env PR_BODY
