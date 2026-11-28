@@ -1,7 +1,7 @@
 # ADR-0028: Pi の単一 runner と ESP32 の単一 main loop を、いまは分けない
 
-> 状態: Accepted
-> 日付: 2026-11-22
+> 状態: Proposed
+> 日付: 2026-11-22（**2026-11-28 に状態を Accepted から Proposed へ戻した。**採用の承認の記録が見つからないためである。[#820](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/820)）
 
 ## 背景
 

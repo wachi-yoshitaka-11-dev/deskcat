@@ -38,7 +38,7 @@
 | [ADR-0025](0025-coderabbit-rate-limit-retry.md) | Accepted | CodeRabbitの事前残数確認を外し、枠切れ後の再依頼を定める |
 | [ADR-0026](0026-cloud-speech-generation.md) | Accepted | 独り言のクラウド生成を表示可能な文字と費用上限の内側で行う |
 | [ADR-0027](0027-servo-output-decimation-for-ledc-update-latency.md) | Accepted | servo の出力を、LEDC の更新の遅れに合わせて間引く |
-| [ADR-0028](0028-keep-single-runner-and-single-main-loop.md) | Accepted | Pi の単一 runner と ESP32 の単一 main loop を、いまは分けない |
+| [ADR-0028](0028-keep-single-runner-and-single-main-loop.md) | Proposed | Pi の単一 runner と ESP32 の単一 main loop を、いまは分けない |
 
 ## 新規作成
 
