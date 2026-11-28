@@ -163,7 +163,7 @@ CODERABBIT_CHECK_NAME = "CodeRabbit"
 REVIEW_COMPLETED_TEXT = "Review completed"
 
 # ghを待つ上限（秒）。超えたら確認できなかったものとして扱いdenyする。
-# **hook全体の上限は`.claude/settings.json`の30秒である。**超えるとhookが落ち、
+# **hook全体の上限は`.claude/settings.json`の60秒である。**超えるとhookが落ち、
 # 通る側に倒れるおそれがあるため、commitごとの確認は並列で行い（昇格は100件を超える）、
 # 全体にも期限を置く。
 #
@@ -175,10 +175,11 @@ REVIEW_COMPLETED_TEXT = "Review completed"
 GH_TIMEOUT_SECONDS = 15
 # **最初の`gh`照会の前に始め、残りを各照会へ渡す。**走っているworkerも同じ期限で
 # 終わるため、denyを出した後にprocessが残って時間切れになることもない。
-# hookの30秒に収まる値にする（最初の遅れの後に残りの照会も収まる）。
 # **`gh pr merge`では、CodeRabbitの検査とレビューの記録の検査（#814 の作業リストの9）が
 # それぞれこの期限を持つ。**合わせて36秒になるので、`.claude/settings.json`でこのhookの
-# timeoutを60秒にした。時間切れのhookは止める側に倒れない。
+# timeoutを60秒にした。合計がhookの60秒に収まる値にする（最初の遅れの後に残りの照会も収まる）。
+# **レビューの記録の検査では、gitの呼び出しも同じ期限の下で走る**（#822）。時間切れのhookは
+# 止める側に倒れない。
 CHECK_DEADLINE_SECONDS = 18
 COMMIT_CHECK_WORKERS = 16
 
@@ -855,16 +856,20 @@ def _check_promotion_commits(number, repo, base, head, deadline):
     `_check_review_chain` を通っている。**`develop` の branch protection は PR を求めておらず、
     PR を通らずに入った commit がある**（2026-11-28 時点の `main..develop` に `006d12e` と
     `8137320`）。そうした commit は、`<sha>^..<sha>` を含む範囲の完了した記録があるときだけ通す。
+    記録の範囲の終わりは、昇格の範囲（`base..head`）の commit でなければならない。
     """
-    if not review_coverage.resolve(head) or not review_coverage.resolve(base):
+    if not review_coverage.resolve(head, deadline=deadline) \
+            or not review_coverage.resolve(base, deadline=deadline):
         _deny(
             f"PR #{number} の base（{base[:7]}）か head（{head[:7]}）の commit が手元に無い。"
             " `git fetch` してから merge する。"
         )
-    shas = review_coverage.commits_between(base, head)
-    path = review_coverage.log_path()
-    logged = review_coverage.completed_ranges(
-        review_coverage.read_log(path) if path else [])
+    shas = review_coverage.commits_between(base, head, deadline=deadline)
+    path = review_coverage.log_path(deadline=deadline)
+    # 終わりが昇格の範囲の commit でない記録は照らさない（log の大きさで git の呼び出しを
+    # 増やさない。#822）。`<sha>^..<sha>` の記録の終わりは、範囲の commit そのものである。
+    logged = review_coverage.within(review_coverage.completed_ranges(
+        review_coverage.read_log(path) if path else []), shas)
     pool = ThreadPoolExecutor(max_workers=COMMIT_CHECK_WORKERS)
     try:
         futures = {pool.submit(_merged_into_develop, repo, sha, deadline): sha for sha in shas}
@@ -872,7 +877,8 @@ def _check_promotion_commits(number, repo, base, head, deadline):
             futures, timeout=max(0, deadline - time.monotonic())) if not future.result()]
     finally:
         pool.shutdown(wait=True, cancel_futures=True)
-    unreviewed = [sha for sha in direct if not review_coverage.covers_commit(sha, logged)]
+    unreviewed = [sha for sha in direct
+                  if not review_coverage.covers_commit(sha, logged, deadline=deadline)]
     if unreviewed:
         shown = ", ".join(f"`{sha[:7]}`" for sha in sorted(unreviewed)[:8])
         _deny(
@@ -882,20 +888,31 @@ def _check_promotion_commits(number, repo, base, head, deadline):
         )
 
 
-def _check_review_chain(number, base, head, body):
-    """記録と本文の範囲が merge-base から head までつながるかを見る（`_check_review_coverage` の1と2）。"""
-    if not review_coverage.resolve(head) or not review_coverage.resolve(base):
+def _check_review_chain(number, base, head, body, deadline):
+    """記録と本文の範囲が merge-base から head までつながるかを見る（`_check_review_coverage` の1と2）。
+
+    git の呼び出しは、`deadline` を過ぎたら `subprocess.TimeoutExpired` を上げる（#822）。
+    """
+    if not review_coverage.resolve(head, deadline=deadline) \
+            or not review_coverage.resolve(base, deadline=deadline):
         _deny(
             f"PR #{number} の base（{base[:7]}）か head（{head[:7]}）の commit が手元に無い。"
             " `git fetch` してから merge する（レビューの記録を手元の履歴で照らすため）。"
         )
-    start = review_coverage.merge_base(base, head)
+    start = review_coverage.merge_base(base, head, deadline=deadline)
     if not start:
         raise ValueError("base と head の merge-base を求められない")
-    path = review_coverage.log_path()
-    logged = review_coverage.completed_ranges(
-        review_coverage.read_log(path) if path else [])
-    reached = review_coverage.uncovered(start, head, logged)
+
+    def ancestor(a, b):
+        return review_coverage.is_ancestor(a, b, deadline=deadline)
+
+    # 終わりが merge-base..head の commit か merge-base の記録だけを照らす。それ以外の記録は
+    # 鎖に入りえない（`review_coverage` の docstring）。log が増えても git の呼び出しを増やさない（#822）。
+    ends = review_coverage.commits_between(start, head, deadline=deadline) + [start]
+    path = review_coverage.log_path(deadline=deadline)
+    logged = review_coverage.within(review_coverage.completed_ranges(
+        review_coverage.read_log(path) if path else []), ends)
+    reached = review_coverage.uncovered(start, head, logged, ancestor)
     if reached:
         _deny(
             f"PR #{number} のレビューの記録が、merge-base（{start[:7]}）から head（{head[:7]}）"
@@ -904,7 +921,8 @@ def _check_review_chain(number, base, head, body):
             "（CONTRIBUTING の「自己レビュー」）。main の文脈での実行と、ユーザーが打った"
             " `/code-review` は記録に数えない（#814 の作業リストの9）。"
         )
-    written, unresolved = review_coverage.resolve_ranges(review_coverage.body_ranges(body))
+    written, unresolved = review_coverage.resolve_ranges(
+        review_coverage.body_ranges(body), deadline=deadline)
     if unresolved:
         # CI と同じく、読めない範囲は飛ばす（`review_coverage.skipped_ranges_message`）。
         # 読めない範囲は鎖に入りえないので、飛ばしても判定は緩まない。
@@ -919,7 +937,7 @@ def _check_review_chain(number, base, head, body):
             f"記録が無いものがある: {', '.join(missing)}。本文には、記録のある範囲だけを書く"
             "（CI は本文の範囲を読む。#814 の作業リストの9）。"
         )
-    body_reached = review_coverage.uncovered(start, head, written)
+    body_reached = review_coverage.uncovered(start, head, written, ancestor)
     if body_reached:
         _deny(
             f"PR #{number} の本文の「自己レビュー」に書いた範囲が、merge-base（{start[:7]}）から"
@@ -981,6 +999,8 @@ def _check_review_coverage(args, global_repo):
     **限界：**fork が範囲の全部を実際に読んだかまでは確かめない。所有者が画面から merge する
     経路はこの hook を通らない。hook が時間切れになると、止める側に倒れない（Claude Code の
     hook の時間切れは拒否にならない。timeout は `.claude/settings.json` で60秒にした）。
+    そのため git の呼び出しも、gh の照会と同じ期限（`CHECK_DEADLINE_SECONDS`）の下で走らせ、
+    超えたら deny する（#822）。
     """
     if _is_help(args):
         return
@@ -1001,7 +1021,7 @@ def _check_review_coverage(args, global_repo):
         if (info.get("baseRefName"), info.get("headRefName")) == PROMOTION_REFS:
             _check_promotion_commits(number, repo, base, head, deadline)
         else:
-            _check_review_chain(number, base, head, body)
+            _check_review_chain(number, base, head, body, deadline)
         files = _gh_json([
             "api", "--paginate", f"repos/{repo}/pulls/{number}/files?per_page=100",
             "--jq", ".[].filename",
@@ -1016,9 +1036,16 @@ def _check_review_coverage(args, global_repo):
         approved = _approved([item for page in comments for item in page], head)
     except (OSError, subprocess.SubprocessError, ValueError, KeyError,
             AttributeError, TypeError, FuturesTimeout) as error:
+        # 期限切れのときは、読んだ人が取れる手当てを書く。範囲を分けて昇格する手順は書かない。
+        # head が `develop` でない PR は昇格と見なされず、記録の鎖の判定で止まる（`PROMOTION_REFS`）。
+        late = ""
+        if isinstance(error, (subprocess.TimeoutExpired, FuturesTimeout)):
+            late = (f" 検査の期限（{CHECK_DEADLINE_SECONDS}秒）を超えた。gh の応答が遅いときと、"
+                    "昇格の範囲の commit が多いときに超えうる。時間を置いて再実行し、"
+                    "続けて超えるなら所有者に相談する（#822）。")
         _deny(
             "`gh pr merge` の前に、レビューの記録がつながっているかを確認できなかった"
-            f"（{type(error).__name__}: {error}）。**確認できないまま通さない。**"
+            f"（{type(error).__name__}: {error}）。**確認できないまま通さない。**{late}"
             " この検査に解除の手段は無い（#814 の作業リストの9）。"
         )
     if not approved:
