@@ -8,6 +8,7 @@
    - 前の hook：引数から範囲 `A..B` を1つだけ取り、A と B を 40 桁の SHA に直し、
      A が B の祖先であることを確かめて、`started` の行を書く。範囲が無い、2つ以上ある、
      SHA に直せない、A が B の祖先でない、のどれでも記録しない。**実行そのものは止めない。**
+     記録しない理由は stderr に出し、exit 1 で終える（黙って落とさない）。
    - 後の hook：`completed` の行に、完了の状態（`success`、`report`、`status`）を書く。
      `report` は、報告が指摘の一覧の形だったか（`review_coverage.is_findings_report`）。
    - 前と後は `tool_use_id` で組にする。判定は `scripts/review_coverage.py` が持つ。
@@ -104,15 +105,18 @@ def _record(payload, event):
         return
     base = {"tool_use_id": tool_use_id, "agent_id": agent_id, "at": _now()}
     if event == "PreToolUse":
-        pair = review_coverage.parse_arg_range(tool_input.get("args"))
+        # 範囲を使えないときは記録しないが、黙らない。`ValueError` にして、main が stderr に
+        # 理由を出す（実行は止めない）。黙って落とすと、merge の前の検査で止まるまで気付けない。
+        args = tool_input.get("args")
+        pair = review_coverage.parse_arg_range(args)
         if pair is None:
-            return
+            raise ValueError(f"引数（{args!r}）から範囲 `A..B` を1つだけ取れないので、記録しない")
         start = review_coverage.resolve(pair[0], cwd)
         end = review_coverage.resolve(pair[1], cwd)
         if not start or not end or start == end:
-            return
+            raise ValueError(f"範囲 {pair[0]}..{pair[1]} を2つの違う commit に直せないので、記録しない")
         if not review_coverage.is_ancestor(start, end, cwd):
-            return
+            raise ValueError(f"範囲 {pair[0]}..{pair[1]} の始まりが終わりの祖先でないので、記録しない")
         _append(path, {**base, "event": "started", "from": start, "to": end,
                        "args": tool_input.get("args")})
     else:

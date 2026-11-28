@@ -102,10 +102,12 @@ def log_path(cwd=None):
 def parse_arg_range(args):
     """`/code-review` の引数から、範囲の字句（A, B）を1つだけ取る。
 
-    範囲の字句が無い、2つ以上ある、`...`（3点）である、のどれでも `None` を返す。
+    範囲の字句が無い、2つ以上ある、`...`（3点）である、引数が文字列でない、のどれでも `None` を返す。
     """
+    if not isinstance(args, str):
+        return None
     found = []
-    for token in (args or "").split():
+    for token in args.split():
         if ".." not in token:
             continue
         if "..." in token:
@@ -271,9 +273,11 @@ def _main():
     pairs = body_ranges(body)
     ranges, unresolved = resolve_ranges(pairs)
     if unresolved:
-        print("::error::本文の「自己レビュー」の範囲のうち、commit を読めないものがある: "
+        # 読めない範囲は飛ばす。rebase や force push で消えた commit は、CI の clone では読めない
+        # （手元の clone では読めるので、止めると hook と CI の結果が食い違う）。読めない範囲は
+        # merge-base から head への鎖に入りえないので、飛ばしても判定は緩まない。
+        print("::warning::本文の「自己レビュー」の範囲のうち、commit を読めないものを飛ばした: "
               + ", ".join(unresolved), file=sys.stderr)
-        return 1
     reached = uncovered(start, head, ranges)
     if reached:
         print(

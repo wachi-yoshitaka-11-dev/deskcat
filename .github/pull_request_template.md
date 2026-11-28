@@ -86,6 +86,8 @@ Closes #
 
 使ったレビューとeffort:
 
+レビューの範囲（backtickで囲んだ`A..B`をすべて。[自己レビュー](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/CONTRIBUTING.md#自己レビュー)）:
+
 巡の数:
 
 指摘の対応（[指摘の重さと扱い](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/develop/CONTRIBUTING.md#指摘の重さと扱い)）:

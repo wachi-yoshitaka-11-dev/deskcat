@@ -734,10 +734,10 @@ squash mergeしたbranchはcommit hashが変わるため、`git branch -d`が「
 
 ## hookが止めたとき
 
-`.claude/settings.json`がhookとして起動するscriptのうち、下の表は7つ、**検査は13である。**
+`.claude/settings.json`がhookとして起動するscriptのうち、下の表は7つ、**検査は14である。**
 **この数は下の表と一致させる。**一致していない間、表に無いhookは「無い」ものとして読まれる。
-**数えるのは検査であってscriptではない。**`gh_metadata_guard.py`は1 scriptで7つを見る
-（同fileのdocstring「止める対象は7つである」）。`review_record.py`は、止める検査のほかに
+**数えるのは検査であってscriptではない。**`gh_metadata_guard.py`は1 scriptで8つを見る
+（同fileのdocstring「止める対象は8つである」）。`review_record.py`は、止める検査のほかに
 レビューの記録を書く（記録は止めない）。公開前の検査（`publication_guard_hook.py`）は、この表とは別に起動する。
 
 **文書に書いても実行されないことが実測で分かっている。**
@@ -758,6 +758,7 @@ squash mergeしたbranchはcommit hashが変わるため、`git branch -d`が「
 | `@coderabbitai`へreviewを投げる前 | 同じ行の`review`が`full review`か（**`full`の付かない`review`は`deny`**）。対象PRのどれかのcommitでreviewが完走・進行中なら`full review`も**`deny`**。完走も進行中も無いPR（`Review rate limited`や`Review stopped after lock loss`の後を含む）への`full review`と、対象PRやcheckを判定できないときは`ask`。[`ask`の扱い](#手動で依頼する前に状態を確認する) | `scripts/hooks/coderabbit_gate.py` |
 | `gh pr merge`の前 | `--subject`と`--body`／`--body-file`があるか | `scripts/hooks/gh_metadata_guard.py` |
 | `gh pr merge`の前 | レビューの記録が merge-base から head まで途切れずにつながっているか。本文の「自己レビュー」の範囲が手元の log の完了した記録と一致するか。慎重に扱うpathに触れるPull Requestで、本文の全体が`承認 <headの40桁のSHA>`だけの人のコメントがあるか。昇格では、範囲のつながりの代わりに、各commitがPull Requestを通ったか、記録を持つかを見る。**解除の手段は無い**（[自己レビュー](#自己レビュー)） | 同上 |
+| PowerShellの前 | commandに語としての`gh`（`gh.exe`を含む）が無いか。あれば読み解かずに止め、Bashで走らせるよう求める（上の`gh`の検査はbashの書き方でcommandを読むため）。**解除の手段は無い** | `scripts/hooks/gh_metadata_guard.py` |
 | Write／Edit／MultiEdit／NotebookEdit／Bash／PowerShellの前 | レビューの記録のlog（`deskcat-review-log.jsonl`）へ書き込まないか。shellのcommandに、logの名前が無いか | `scripts/hooks/review_record.py` |
 | `git checkout -b`／`git switch -c`の前 | 基点が最新の`origin/develop`か | `scripts/hooks/branch_base_guard.py` |
 | `git reset --hard`／`git clean`／checkout・switch・restoreによる破棄の前 | 捨てる範囲に未commitの変更があるか | `scripts/hooks/worktree_guard.py` |

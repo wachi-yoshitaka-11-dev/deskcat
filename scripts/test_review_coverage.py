@@ -263,11 +263,14 @@ class ReviewRecordHookTests(unittest.TestCase):
         self.assertFalse(self.repo.log.exists())
 
     def test_bad_ranges_are_not_recorded_but_not_blocked(self):
-        for args in ("high --max-findings all", "HEAD..HEAD~2", "nope..HEAD", "HEAD..HEAD"):
+        for args in ("high --max-findings all", "HEAD..HEAD~2", "nope..HEAD", "HEAD..HEAD",
+                     "HEAD~2...HEAD", ["HEAD~2..HEAD"]):
             with self.subTest(args=args):
                 code, output = self._skill("PreToolUse", args)
-                self.assertEqual(code, 0)
+                # 止めない（deny を出さない）が、黙らない（exit 1 と stderr の理由）。
+                self.assertEqual(code, 1)
                 self.assertIsNone(output)
+                self.assertIn("記録しない", _hook.stderr.decode("utf-8"))
         self.assertFalse(self.repo.log.exists())
 
     def test_other_skills_are_ignored(self):
@@ -340,6 +343,41 @@ class HookInputTests(unittest.TestCase):
         with self.assertRaises(SystemExit) as raised:
             self._main("gh pr merge 7 --squash", SystemExit(0))
         self.assertEqual(raised.exception.code, 0)
+
+
+class PowerShellGhTests(unittest.TestCase):
+    """PowerShell の command に語としての `gh` があれば、読み解かずに止める（止める対象の8）。"""
+
+    def _run(self, command, skip=False):
+        payload = {"hook_event_name": "PreToolUse", "tool_name": "PowerShell",
+                   "tool_input": {"command": command}}
+        env = dict(os.environ, PYTHONIOENCODING="cp932", PYTHONUTF8="0")
+        if skip:
+            env[guard.SKIP_ENV] = "1"
+        result = subprocess.run(
+            [sys.executable, str(SCRIPTS_ROOT / "hooks" / "gh_metadata_guard.py")],
+            input=json.dumps(payload).encode("utf-8"), capture_output=True, timeout=60, env=env,
+        )
+        text = result.stdout.decode("utf-8").strip()
+        return result.returncode, (json.loads(text) if text else None)
+
+    def test_any_gh_is_denied(self):
+        for command in ("gh pr merge 7 --squash", "& gh.exe pr merge 7", "gh pr view 7",
+                        "& 'C:\\Program Files\\GitHub CLI\\gh.exe' issue close 9",
+                        "GH pr create", "cd x; gh-pages"):
+            with self.subTest(command=command):
+                code, output = self._run(command)
+                self.assertEqual(code, 0)
+                self.assertEqual(output["hookSpecificOutput"]["permissionDecision"], "deny")
+        # 解除の手段は無い。
+        code, output = self._run("gh pr merge 7 --squash", skip=True)
+        self.assertEqual(output["hookSpecificOutput"]["permissionDecision"], "deny")
+
+    def test_commands_without_gh_are_allowed(self):
+        for command in ("git log --grep high", "Get-ChildItem .github",
+                        "$env:GH_TOKEN | Out-Null", "git status"):
+            with self.subTest(command=command):
+                self.assertEqual(self._run(command), (0, None))
 
 
 class ReviewCoverageMergeTests(unittest.TestCase):
@@ -498,6 +536,19 @@ class CiEntryPointTests(unittest.TestCase):
         gap = self._run(f"## 自己レビュー\n`{base[:7]}..{mid[:7]}`\n")
         self.assertEqual(gap.returncode, 1)
         self.assertIn("つながっていない", gap.stderr)
+
+    def test_unreadable_ranges_are_skipped_with_a_warning(self):
+        # rebase の前の範囲（CI の clone では読めない commit）が本文に残っていても、今の範囲が
+        # つながっていれば通す。読めない範囲だけでは通さない。
+        base, mid, head = self.repo.shas
+        gone = "`dead111..beef222`"
+        ok = self._run(f"## 自己レビュー\n{gone} `{base[:7]}..{head[:7]}`\n")
+        self.assertEqual(ok.returncode, 0, ok.stderr)
+        self.assertIn("::warning::", ok.stderr)
+        self.assertIn("dead111..beef222", ok.stderr)
+        only_gone = self._run(f"## 自己レビュー\n{gone}\n")
+        self.assertEqual(only_gone.returncode, 1)
+        self.assertIn("つながっていない", only_gone.stderr)
 
 
 if __name__ == "__main__":

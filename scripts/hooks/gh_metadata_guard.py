@@ -4,7 +4,7 @@
 Claude CodeのPreToolUse hookとして、Bash tool呼び出しの前に走る。stdinからhookの
 入力JSONを読み、`tool_input.command`だけを見る。実行はしない。
 
-止める対象は7つである。
+止める対象は8つである。
 
 1. `gh issue create`／`gh pr create`に`--project`が無い。Projects v2 boardへの
    item追加は`CONTRIBUTING.md`の起票規約で必須だが、**#204／#205／#206は3件とも
@@ -62,7 +62,16 @@ mergeもしない。metadataを要求しても誤検知しか生まない。**20
    見た」と書き、#817 ではレビューしていない直しを commit・push した。**この検査は
    `DESKCAT_SKIP_GH_GUARD`で無効化できない**（`_check_review_coverage`）。
 
-`DESKCAT_SKIP_GH_GUARD=1`で5〜7以外を丸ごと無効化できる。**誤検知で作業が止まったときの
+8. PowerShell の command に、語としての `gh`（`gh.exe` を含む。大文字と小文字を区別しない）がある。
+   1〜7 は bash の書き方で command を読むので、PowerShell の command は読み解かずに止め、
+   Bash で走らせるよう求める。この hook が Bash にしか登録されていなかったため、PowerShell の
+   tool で走らせた `gh pr merge` は 1〜7 のどれも通らなかった（#814 の作業リストの9）。
+   読むだけの `gh pr view` も止める（止めすぎだが、Bash で走らせれば済む）。subcommand を
+   探して止める形にしないのは、`& gh.exe` や変数を通した呼び出しなど、PowerShell の呼び方を
+   並べても閉じないためである。**この検査は`DESKCAT_SKIP_GH_GUARD`で無効化できない**
+   （`_check_powershell`）。
+
+`DESKCAT_SKIP_GH_GUARD=1`で5〜8以外を丸ごと無効化できる。**誤検知で作業が止まったときの
 逃げ道であり、常用するものではない。**使ったら理由をPull Request本文へ書く。
 **ただしcommand行頭へ置く形では効かない**（`SKIP_ENV`の隣に実測を書いてある）。
 """
@@ -90,6 +99,10 @@ CREATE_SUBCOMMANDS = (("issue", "create"), PR_CREATE_SUBCOMMAND)
 MERGE_SUBCOMMAND = ("pr", "merge")
 ISSUE_CLOSE_SUBCOMMAND = ("issue", "close")
 ITEM_EDIT_SUBCOMMAND = ("project", "item-edit")
+
+# PowerShell の command で止める語（止める対象の8）。前後が語の文字（英数字と `_`）でない `gh` か
+# `gh.exe`。`high`、`github`、`$env:GH_TOKEN` は止めない。`gh-pages` は止める（止めすぎの側）。
+POWERSHELL_GH_RE = re.compile(r"(?<!\w)gh(?:\.exe)?(?!\w)", re.IGNORECASE)
 
 # boardの`Status`fieldの`Done`のoption id（2026-11-02に`gh project field-list 5`で実測した値）。
 # **boardを作り直すと変わり、検査は素通りになる。**`Done`への変更だけを見る。
@@ -1021,6 +1034,17 @@ def _check_review_coverage(args, global_repo):
         )
 
 
+def _check_powershell(command):
+    """PowerShell の command に語としての `gh` があれば止める（止める対象の8）。"""
+    if isinstance(command, str) and POWERSHELL_GH_RE.search(command):
+        _deny(
+            "PowerShell では `gh` を走らせない。`gh` の検査（board への追加、merge の前のレビューの記録"
+            "と承認のコメント、Issue の close の前の受け入れ条件など）は bash の書き方で command を"
+            "読むので、PowerShell の command は読み解かずに止める。同じ command を Bash の tool で"
+            "走らせる（#814 の作業リストの9）。"
+        )
+
+
 def main():
     skip = os.environ.get(SKIP_ENV) == "1"
     try:
@@ -1031,6 +1055,10 @@ def main():
         hook_input.report(f"gh_metadata_guard: hookの入力を読めないので止める（{error}）")
         return hook_input.BLOCK
     command = command_line.command_from(payload)
+    if isinstance(payload, dict) and payload.get("tool_name") == "PowerShell":
+        # **skipの指定に関わらず走らせる。**解除の手段を足さない（#814 の作業リストの9）。
+        _check_powershell(command)
+        return 0
     if command is None or "gh" not in command:
         # 全Bash呼び出しでこのhookが走る。`if`条件でBash(gh *)へ絞ると
         # `cd x && gh pr create`が素通りするため、絞らずここで安く抜ける。
