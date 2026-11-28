@@ -22,6 +22,9 @@
 log は改ざんを防ぐものではなく、レビューの実行を残すための記録である。
 hook の入力を読めないとき、git が使えないときは、何も記録せず、何も止めない
 （記録が無ければ merge の前の検査で止まるので、記録の側で止める必要が無い）。
+**ただし黙らない。**失敗を stderr に出し、exit 1（`hook_input.NOTICE`）で終える。
+入力は `hook_input.read_payload` で UTF-8 として読む。既定の文字コード（Windows の cp932）で
+読んでいたとき、ASCII でない報告の本文を読めず、完了の記録を黙って落としていた（2026-11-28）。
 """
 
 import datetime
@@ -30,6 +33,8 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+
+import hook_input
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -163,9 +168,10 @@ def _guard(payload):
 
 def main():
     try:
-        payload = json.load(sys.stdin)
-    except (json.JSONDecodeError, UnicodeDecodeError):
-        return 0
+        payload = hook_input.read_payload()
+    except hook_input.HookInputError as error:
+        hook_input.report(f"review_record: hook の入力を読めないので、記録しなかった（{error}）")
+        return hook_input.NOTICE
     if not isinstance(payload, dict):
         return 0
     event = payload.get("hook_event_name")
@@ -177,10 +183,10 @@ def main():
             _record(payload, event)
     except (OSError, ValueError, TypeError, subprocess.SubprocessError) as error:
         # 記録できないことは、merge の前の検査（記録が無い）で止まる。ここでは止めないが、
-        # 黙らない。stderr に分類を出す（hook の stderr は Claude Code の debug の出力に残る）。
-        print(f"review_record: {event}/{tool} を記録できなかった"
-              f"（{type(error).__name__}: {error}）", file=sys.stderr)
-        return 0
+        # 黙らない。stderr に分類を出し、exit 1 で失敗を知らせる。
+        hook_input.report(f"review_record: {event}/{tool} を記録できなかった"
+                          f"（{type(error).__name__}: {error}）")
+        return hook_input.NOTICE
     return 0
 
 

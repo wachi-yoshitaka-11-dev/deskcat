@@ -130,13 +130,19 @@ class _Repo:
         return Path(self.root, ".git", rc.LOG_NAME)
 
 
-def _hook(payload, cwd):
+def _hook(payload, cwd, raw=None):
+    """記録の hook を、Claude Code と同じく UTF-8 の byte で入力して走らせる。
+
+    既定の文字コードを cp932 にする（Windows の既定）。前に `PYTHONIOENCODING=utf-8` で走らせて
+    いたため、hook が cp932 で読んで ASCII でない本文を落とすことを隠していた（2026-11-28）。
+    """
+    data = raw if raw is not None else json.dumps(payload, ensure_ascii=False).encode("utf-8")
     result = subprocess.run(
-        [sys.executable, RECORD_HOOK], input=json.dumps(payload),
-        capture_output=True, text=True, encoding="utf-8", cwd=cwd, timeout=60,
-        env=dict(os.environ, PYTHONIOENCODING="utf-8"),
+        [sys.executable, RECORD_HOOK], input=data, capture_output=True, cwd=cwd, timeout=60,
+        env=dict(os.environ, PYTHONIOENCODING="cp932", PYTHONUTF8="0"),
     )
-    text = result.stdout.strip()
+    text = result.stdout.decode("utf-8").strip()
+    _hook.stderr = result.stderr
     return result.returncode, (json.loads(text) if text else None)
 
 
@@ -182,6 +188,21 @@ class ReviewRecordHookTests(unittest.TestCase):
         self._skill("PreToolUse", f"{first[:7]}..HEAD")
         self._skill("PostToolUse", "x", response={"success": True, "result": "指摘は0件"})
         self.assertEqual(rc.completed_ranges(rc.read_log(self.repo.log)), [(first, last)])
+
+    def test_report_with_non_ascii_text_is_recorded(self):
+        # 2026-11-28 に完了の記録を落とした形：cp932 で読めない文字を含む報告の本文。
+        first, _, last = self.repo.shas
+        self._skill("PreToolUse", f"{first[:7]}..HEAD")
+        self._skill("PostToolUse", "x", response={
+            "success": True, "result": "指摘は0件 ✓   — \U0001f600 ①"})
+        self.assertEqual(rc.completed_ranges(rc.read_log(self.repo.log)), [(first, last)])
+
+    def test_unreadable_input_is_reported_with_exit_1(self):
+        code, output = _hook(None, self.repo.root, raw=b"\xff\xfe not json")
+        self.assertEqual(code, 1)
+        self.assertIsNone(output)
+        self.assertIn(b"review_record", _hook.stderr)
+        self.assertFalse(self.repo.log.exists())
 
     def test_run_without_a_report_is_not_counted(self):
         first = self.repo.shas[0]

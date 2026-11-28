@@ -84,11 +84,14 @@ bot／noreply形式のmailboxを例外とする。接尾辞だけがbot形のmai
 | `hooks/branch_base_guard.py` | Claude CodeのPreToolUse hook。`git checkout -b`／`git switch -c`の基点が最新の`origin/develop`から遅れている場合に**拒否**する。**`git fetch`を伴う**（fetchしないとlocalの`origin/develop`自体が古いままで一致し、本当の失敗を検出できない）。基点を明示した場合と`hotfix/`で始まるbranchは対象外。`DESKCAT_SKIP_BASE_GUARD=1`で無効化できる | Claude Codeのhook |
 | `hooks/worktree_guard.py` | Claude CodeのPreToolUse hook。`git reset --hard`、checkout系（`git checkout`／`git switch`／`git restore`）による破棄、`git clean`の前に、**捨てる範囲に未commitの変更があるかを`git status`で見て`ask`する**（[#325](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/325)）。**汚れていなければ通す**（失うものが無い呼び出しで毎回止めると、hookごと無視される）。**`git clean`だけは状態を見ない**（`-x`が消す無視fileを`git status`で数え切れない）。`DESKCAT_SKIP_WORKTREE_GUARD=1`で無効化できる | Claude Codeのhook |
 | `hooks/command_line.py` | hookが受け取ったcommand文字列から、目的のprogramの呼び出しを取り出す。**語がcommand位置にあるかを見る**（単に語を探すと`echo gh pr merge`を呼び出しと読む。実際にそれで誤報告した）。区切り、絶対path、`sudo`／`env`等の前置語、`VAR=value`の代入を扱う。**改行もcommandの区切りである**（#389。引用の外で開いたheredocのbodyと語頭の`#`以降は落とす）。**理由と取り切れない範囲は、このfileのdocstringとCONTRIBUTINGの「hookが止めたとき」が持つ。****shellの意味論は再現しない。**alias、function、変数展開経由の呼び出しは取れない。**`hooks/`配下の他のhookはすべてこれをimportする**（どの関数をどのhookが使うか、変えたときに動く範囲はdocstringが持つ） | import専用 |
+| `hooks/hook_input.py` | hookの入力（stdinのJSON）を**UTF-8と明示して読む**。既定の文字コード（Windowsのcp932）で読むと、ASCIIでない入力を読めないことがある（2026-11-28に、`hooks/review_record.py`が完了の記録を黙って落とした）。読めないときの動きはhookの役割で決める：止める側は`BLOCK`（exit 2）、記録の側は`NOTICE`（exit 1）。stderrへは書けない文字を`\uXXXX`にして書く。今使うのは`hooks/review_record.py`と`hooks/gh_metadata_guard.py`だけである（[#814](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/814)の作業リストの9） | import専用 |
 | `test_hooks.py` | `hooks/`配下の回帰test。hookを子processとして起動し、stdinへ入力JSONを渡して**拒否したか通したか**と診断文を検査する。基点の検査はfixture repositoryを作り、自分自身をoriginにして実際に`git fetch`させる（networkへ出ない）。`gh`と実際のPull Requestを要する経路は検査しない（落ちた理由がhookの誤りか環境かを区別できなくなるため） | Pages workflowとlocal |
 
 `lib/publish_guards.py`は単体で実行しない。secretや個人pathのpatternはこのfileだけで定義し、各scriptへ複製しない。
 
 `hooks/command_line.py`も単体で実行しない。commandの語がcommand位置にあるかの判定はこのfileだけで持ち、各hookへ複製しない。
+
+`hooks/hook_input.py`も単体で実行しない。hookの入力の読み方はこのfileだけで持ち、各hookへ複製しない。
 
 `hooks/`配下は Claude Code の hook として自動で起動される。**`.claude/settings.json`が起動元であり、hookの一覧と回避手順の正本は[CONTRIBUTINGの「hookが止めたとき」](https://github.com/wachi-yoshitaka-11-dev/deskcat/blob/main/CONTRIBUTING.md#hookが止めたとき)である。**stdinからhookの入力JSONを読み、`tool_input.command`だけを見る。**対象commandを実行しない。**
 

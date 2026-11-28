@@ -78,6 +78,7 @@ from concurrent.futures import TimeoutError as FuturesTimeout
 from pathlib import Path
 
 import command_line
+import hook_input
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import review_coverage  # noqa: E402
@@ -1023,10 +1024,12 @@ def _check_review_coverage(args, global_repo):
 def main():
     skip = os.environ.get(SKIP_ENV) == "1"
     try:
-        payload = json.load(sys.stdin)
-    except (json.JSONDecodeError, UnicodeDecodeError):
-        # hookの入力を読めないことを、対象commandの問題として扱わない。
-        return 0
+        payload = hook_input.read_payload()
+    except hook_input.HookInputError as error:
+        # 読めない入力を通さない。前は何もせずに通していたので、日本語の`--subject`を付けた
+        # `gh pr merge`が、解除できないはずのレビューの記録の検査ごと素通りしえた（#814の作業リストの9）。
+        hook_input.report(f"gh_metadata_guard: hookの入力を読めないので止める（{error}）")
+        return hook_input.BLOCK
     command = command_line.command_from(payload)
     if command is None or "gh" not in command:
         # 全Bash呼び出しでこのhookが走る。`if`条件でBash(gh *)へ絞ると

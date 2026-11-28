@@ -551,14 +551,28 @@ class GhMetadataGuardTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIsNone(output)
 
-    def test_broken_input_does_not_block(self):
-        """hookの入力やcommandが壊れていることを、対象commandの問題として扱わない。"""
+    def test_unreadable_input_blocks_and_broken_command_does_not(self):
+        """読めない入力は exit 2 で止める（前は通していた。#814 の作業リストの9）。"""
         result = subprocess.run(
             [sys.executable, GH_GUARD], input="{ではないJSON",
-            capture_output=True, text=True, encoding="utf-8", timeout=60,
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60,
         )
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("gh_metadata_guard", result.stderr)
+        # 既定の文字コードが cp932 でも、UTF-8 の日本語の command を読んで検査する。
+        payload = json.dumps({"tool_name": "Bash", "tool_input": {
+            "command": 'gh pr merge 7 --squash --subject "日本語の件名 ✓"'}}, ensure_ascii=False)
+        env = {k: v for k, v in os.environ.items() if not k.startswith("DESKCAT_")}
+        env.update({"PYTHONIOENCODING": "cp932", "PYTHONUTF8": "0",
+                    "PATH": f"{_GH_SHIM_DIR}{os.pathsep}{env['PATH']}"})
+        result = subprocess.run(
+            [sys.executable, GH_GUARD], input=payload.encode("utf-8"), capture_output=True,
+            timeout=120, env=env, cwd=str(REPO_ROOT_FOR_TEMPLATES),
+        )
+        # 本文が無い merge なので、入力を読めていれば deny になる（前は読めずに何も出さずに通した）。
         self.assertEqual(result.returncode, 0)
-        self.assertEqual(result.stdout.strip(), "")
+        decision = json.loads(result.stdout.decode("utf-8"))
+        self.assertEqual(decision["hookSpecificOutput"]["permissionDecision"], "deny")
         # 引用符が閉じていないcommandは、shell自身が落とす。ここで二重に報告しない。
         self.assertAllowed('gh pr create --title "閉じていない')
 
