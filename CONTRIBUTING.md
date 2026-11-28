@@ -430,14 +430,9 @@ Anthropicの[Code Reviewの文書](https://code.claude.com/docs/en/code-review)�
   - **記録はcloneごとにある。Pull Requestは、その範囲をレビューしたcloneでmergeする。**
     同じcloneのworktreeの間では記録を共有し、別のclone（別の端末や環境）とは共有しない。
   - Pull Request本文の「自己レビュー」に、記録の範囲をbacktickで囲んだ`A..B`の形ですべて書く。
-    hookとCIは、commitを読めない範囲を飛ばす。CIのcloneでは、rebaseやforce pushで消えたcommitが
-    読めない。手元のcloneでは、消えたcommitもgcまではreflogで読めるので飛ばさない（読めて記録の無い
-    範囲は止まる）。曖昧な短いSHAは、どちらでも読めない。飛ばしても範囲がつながらなければ止まるので、
-    40桁のSHAで書くと取り違えない。
+    hookとCIは、commitを読めない範囲を飛ばす。どの範囲を読めるかはcloneによって違うので、40桁のSHAで書く。
   - `gh pr merge`の前に`scripts/hooks/gh_metadata_guard.py`が、記録の範囲がmerge-baseから
-    headまでつながっているか、本文の範囲が記録と一致するかを確かめる。照らし合わせるのは
-    読める範囲だけで、読めない範囲を本文に書いても判定は緩まない（つながりは読める範囲だけで判定し、
-    CIはlogを読まずに本文の範囲のつながりだけを見る）。
+    headまでつながっているか、本文の範囲が記録と一致するかを確かめる。
     CI（`review-coverage.yml`）は本文の範囲がつながっているかだけを見る（手元のlogを読めない）。
   - 昇格（`develop`→`main`）では、範囲のつながりの代わりに、範囲の各commitが`develop`へmerge済みの
     Pull Requestのsquashのcommitかを見る。Pull Requestを通らずに入ったcommitは、`<sha>^..<sha>`を
@@ -456,7 +451,7 @@ Anthropicの[Code Reviewの文書](https://code.claude.com/docs/en/code-review)�
     PreToolUseの検査は、logへの書き込みを止めるもの（`review_record.py`）を除き、Bashのtoolにだけ
     登録している（正本は`.claude/settings.json`）。WindowsのPowerShellのtoolでは、それらの検査は働かない
     （[ADR-0005](docs/decisions/0005-standard-development-os.md)でWindowsはsupportの対象外）。
-    Windowsでは、Bashで`GH`や`gh.exe`と書いた呼び出しも通る。gitのcommitのhook（`.githooks`）は、toolによらず走る。
+    Windowsでは、Bashで`GH`や`gh.exe`と書いた呼び出しも通る。
     **Windowsのcloneで作業する間は、`gh`と`git`をBashのtoolで、小文字の`gh`で走らせる。**
 
 **自動reviewは行わない**（[ADR-0013](docs/decisions/0013-manual-only-coderabbit-review.md)）。

@@ -257,8 +257,8 @@ def resolve_ranges(pairs, cwd=None):
 def skipped_ranges_message(unresolved):
     """本文の範囲のうち、commit を読めずに飛ばしたものを知らせる文。hook と CI で同じ文にする。
 
-    読めない範囲は飛ばす。rebase や force push で消えた commit は、CI の clone では読めず、
-    手元の clone でも `git gc` の後は読めない。止めると、clone によって結果が食い違う。
+    読めない範囲は飛ばす。どの範囲を読めるかは clone によって違う（rebase や force push で
+    消えた commit は、CI の clone では読めない）。止めると、clone によって結果が食い違う。
     読めない範囲は merge-base から head への鎖に入りえないので、飛ばしても判定は緩まない。
     """
     return ("本文の「自己レビュー」の範囲のうち、commit を読めないものを飛ばした: "
