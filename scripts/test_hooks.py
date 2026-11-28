@@ -890,10 +890,13 @@ class GhHookRepositoryAndDeadlineTests(unittest.TestCase):
             ("gh pr merge 7 --squash -R owner/target --subject s --body-file {body}", pr, ["pr", "view"]),
         ):
             with self.subTest(command=command):
+                # 回数は数えない。merge の前は、検査ごとに `pr view` を呼ぶ（#814 の作業リストの9）。
+                # どの照会も同じ repository を見ることを確かめる。
                 calls = [c for c in self._logged(command, fixture) if c[:2] == view]
-                self.assertEqual(len(calls), 1, calls)
-                self.assertIn("-R", calls[0])
-                self.assertEqual(calls[0][calls[0].index("-R") + 1], "owner/target")
+                self.assertTrue(calls)
+                for call in calls:
+                    self.assertIn("-R", call)
+                    self.assertEqual(call[call.index("-R") + 1], "owner/target")
 
     def test_attached_repo_text_in_a_value_position_is_not_a_repository(self):
         """`--comment -Rother/repo`の`-R...`は値であり、repositoryではない。"""
@@ -905,8 +908,9 @@ class GhHookRepositoryAndDeadlineTests(unittest.TestCase):
         ):
             with self.subTest(command=command):
                 calls = [c for c in self._logged(command, fixture) if c[:2] == view]
-                self.assertEqual(len(calls), 1, calls)
-                self.assertNotIn("-R", calls[0])
+                self.assertTrue(calls)
+                for call in calls:
+                    self.assertNotIn("-R", call)
 
     def test_option_name_used_as_a_value_does_not_hide_a_real_repo_option(self):
         """`--comment -c`の`-c`は値。続く`-Rowner/target`は本物の`-R`である。"""
@@ -921,8 +925,9 @@ class GhHookRepositoryAndDeadlineTests(unittest.TestCase):
         pr = {"files": [self.TARGET], "commits": {"a": {"check_runs": [self.DONE]}}}
         command = "gh pr merge 7 -r -Rowner/target --subject s --body-file {body}"
         calls = [c for c in self._logged(command, pr) if c[:2] == ["pr", "view"]]
-        self.assertEqual(len(calls), 1, calls)
-        self.assertEqual(calls[0][calls[0].index("-R") + 1], "owner/target")
+        self.assertTrue(calls)
+        for call in calls:
+            self.assertEqual(call[call.index("-R") + 1], "owner/target")
 
     def _timed(self, fixture, deadline=None, timeout=10):
         """`deadline`が`None`なら、hookの本物の上限（定数）のまま実行する。"""
@@ -941,8 +946,12 @@ class GhHookRepositoryAndDeadlineTests(unittest.TestCase):
             payload = json.dumps({"tool_name": "Bash", "tool_input": {
                 "command": f"gh pr merge 7 --squash --subject s --body-file {body}"}})
             start = time.monotonic()
+            # `_invoke` と同じく repository の中で走らせる。CI は test を repository の外
+            # （`runner.temp`）で走らせるので、そのままでは shim が HEAD を読めず、merge の前の
+            # レビューの記録の検査が base と head を空として止める（#814 の作業リストの9）。
             result = subprocess.run([sys.executable, "-c", driver], input=payload,
-                                    capture_output=True, text=True, env=env, timeout=60)
+                                    capture_output=True, text=True, env=env, timeout=60,
+                                    cwd=str(REPO_ROOT_FOR_TEMPLATES))
         text = result.stdout.strip()
         return time.monotonic() - start, (json.loads(text) if text else None)
 
