@@ -62,6 +62,10 @@ mergeもしない。metadataを要求しても誤検知しか生まない。**20
    見た」と書き、#817 ではレビューしていない直しを commit・push した。**この検査は
    `DESKCAT_SKIP_GH_GUARD`で無効化できない**（`_check_review_coverage`）。
 
+**この hook の登録は Bash の tool だけである。**PowerShell の tool の command は見ないので、
+「無効化できない」も Bash の tool での話である（CONTRIBUTING の「自己レビュー」の
+「hookが読まない呼び出し方」。Windows は ADR-0005 で support の対象外）。
+
 `DESKCAT_SKIP_GH_GUARD=1`で5〜7以外を丸ごと無効化できる。**誤検知で作業が止まったときの
 逃げ道であり、常用するものではない。**使ったら理由をPull Request本文へ書く。
 **ただしcommand行頭へ置く形では効かない**（`SKIP_ENV`の隣に実測を書いてある）。
