@@ -425,6 +425,10 @@ Anthropicの[Code Reviewの文書](https://code.claude.com/docs/en/code-review)�
     `agent_id`も結果も届かず、レビューが終わったかを知る手段が無いためである。
   - 記録は`scripts/hooks/review_record.py`が、gitの共通のdirの`deskcat-review-log.jsonl`に書く。
     このlogへ書き込む操作は止める。
+  - 完了と数えるのは、報告の本文が指摘の一覧の形（`` ```json ``の囲みがちょうど1つで、中身がobjectの配列。
+    空の配列も数える）だったときだけである。利用の上限で止まった実行も、成功として届くためである。
+  - **記録はcloneごとにある。Pull Requestは、その範囲をレビューしたcloneでmergeする。**
+    同じcloneのworktreeの間では記録を共有し、別のclone（別の端末や環境）とは共有しない。
   - Pull Request本文の「自己レビュー」に、記録の範囲をbacktickで囲んだ`A..B`の形ですべて書く。
   - `gh pr merge`の前に`scripts/hooks/gh_metadata_guard.py`が、記録の範囲がmerge-baseから
     headまでつながっているか、本文の範囲が記録と一致するかを確かめる。

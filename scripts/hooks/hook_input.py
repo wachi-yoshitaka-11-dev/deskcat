@@ -35,16 +35,19 @@ def read_payload(stream=None):
     （`command_line.command_from` など）。形の違う入力を止めずに通す決まりは、各 hook の
     test（`HookPayloadShapeTests`）が持つ。
     """
-    stream = stream if stream is not None else sys.stdin.buffer
-    raw = stream.read()
     try:
+        # stdin が無い（`None`）、byte で読めない、読む途中で OS が失敗する、のどれも読めない入力として扱う。
+        raw = (stream if stream is not None else sys.stdin.buffer).read()
         return json.loads(raw.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+    except (OSError, AttributeError, UnicodeDecodeError, json.JSONDecodeError) as error:
         raise HookInputError(f"{type(error).__name__}: {error}") from error
 
 
 def report(message):
-    """stderr へ1行書く。stderr の文字コードで書けない文字は `\\uXXXX` の形にして、書くところで落ちない。"""
-    data = (message + "\n").encode(sys.stderr.encoding or "utf-8", errors="backslashreplace")
-    sys.stderr.buffer.write(data)
+    """stderr へ1行を UTF-8 で書く。
+
+    **stderr の文字コードによらず UTF-8 で書く。**入力と同じく、文字コードを UTF-8 の1つに決める。
+    stderr の文字コード（Windows の cp932）で書くと、UTF-8 として読む側で日本語の理由が文字化けする。
+    """
+    sys.stderr.buffer.write((message + "\n").encode("utf-8"))
     sys.stderr.buffer.flush()

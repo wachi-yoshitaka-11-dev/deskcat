@@ -1048,12 +1048,21 @@ def main():
             if not skip:
                 _check_create(head, args[2:])
         elif head == MERGE_SUBCOMMAND:
-            if not skip:
-                _check_merge(args[2:])
-            # **skipの指定に関わらず走らせる。**解除の手段を足さない（#688）。
-            _check_coderabbit_review(args[2:], global_repo)
-            # **skipの指定に関わらず走らせる。**解除の手段を足さない（#814 の作業リストの9）。
-            _check_review_coverage(args[2:], global_repo)
+            try:
+                if not skip:
+                    _check_merge(args[2:])
+                # **skipの指定に関わらず走らせる。**解除の手段を足さない（#688）。
+                _check_coderabbit_review(args[2:], global_repo)
+                # **skipの指定に関わらず走らせる。**解除の手段を足さない（#814 の作業リストの9）。
+                _check_review_coverage(args[2:], global_repo)
+            except Exception as error:
+                # 例外のまま終わると exit 1 になり、Claude Code は tool を止めない。merge の前の
+                # 検査の途中の失敗で `gh pr merge` が素通りしないよう、分類を出して exit 2 で止める
+                # （#814 の作業リストの9）。`_deny` の `SystemExit` は `Exception` ではないので受けない。
+                # merge 以外の subcommand の扱いは変えない。
+                hook_input.report("gh_metadata_guard: merge の前の検査の途中で予想しない例外が"
+                                  f"出たので止める（{type(error).__name__}: {error}）")
+                return hook_input.BLOCK
         elif head == ISSUE_CLOSE_SUBCOMMAND:
             # **skipの指定に関わらず走らせる。**解除の手段を足さない（#693）。
             _check_issue_close(args[2:], global_repo)

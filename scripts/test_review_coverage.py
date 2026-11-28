@@ -20,6 +20,9 @@ from test_hooks import GIT_IDENTITY, _reason, guard  # noqa: E402
 
 RECORD_HOOK = str(SCRIPTS_ROOT / "hooks" / "review_record.py")
 
+# レビューが行われたときの報告の形（指摘の一覧の JSON の囲み）。
+REPORT = '```json\n[{"file": "a.py", "summary": "x"}]\n```'
+
 
 def _linear(*names):
     """名前の列を1本の履歴とみなす ancestor 関数を返す。"""
@@ -79,18 +82,51 @@ class UncoveredTests(unittest.TestCase):
 class CompletedRangesTests(unittest.TestCase):
     A, B, C = "a" * 40, "b" * 40, "c" * 40
 
-    def test_pairs_by_tool_use_id_and_needs_success(self):
+    def test_pairs_by_tool_use_id_and_needs_success_and_report(self):
         records = [
             {"event": "started", "tool_use_id": "t1", "from": self.A, "to": self.B},
-            {"event": "completed", "tool_use_id": "t1", "success": True},
+            {"event": "completed", "tool_use_id": "t1", "success": True, "report": True},
             {"event": "started", "tool_use_id": "t2", "from": self.B, "to": self.C},
-            {"event": "completed", "tool_use_id": "t2", "success": False},
+            {"event": "completed", "tool_use_id": "t2", "success": False, "report": True},
             {"event": "started", "tool_use_id": "t3", "from": self.B, "to": self.C},
-            {"event": "completed", "tool_use_id": "zz", "success": True},
+            {"event": "completed", "tool_use_id": "zz", "success": True, "report": True},
             {"event": "started", "tool_use_id": "t4", "from": "short", "to": self.C},
-            {"event": "completed", "tool_use_id": "t4", "success": True},
+            {"event": "completed", "tool_use_id": "t4", "success": True, "report": True},
+            # 印の無い記録（印を付ける前の記録）と、報告の形でなかった記録は数えない。
+            {"event": "started", "tool_use_id": "t5", "from": self.B, "to": self.C},
+            {"event": "completed", "tool_use_id": "t5", "success": True},
+            {"event": "started", "tool_use_id": "t6", "from": self.B, "to": self.C},
+            {"event": "completed", "tool_use_id": "t6", "success": True, "report": False},
         ]
         self.assertEqual(rc.completed_ranges(records), [(self.A, self.B)])
+
+
+class FindingsReportTests(unittest.TestCase):
+    """完了と数える報告の形（`is_findings_report`）。"""
+
+    def test_reports_with_one_fence_of_objects_count(self):
+        for result in (
+            REPORT,
+            "```json\n[]\n```",
+            '前置き\n```json\n[{"file": "a.py"}, {"file": "b.py"}]\n```\n後書き',
+        ):
+            with self.subTest(result=result):
+                self.assertTrue(rc.is_findings_report(result))
+
+    def test_other_results_do_not_count(self):
+        for result in (
+            # 2026-11-28 に、利用の上限で止まった fork が返した実際の文。
+            "You've hit your 5-hour limit · resets 6:50pm (Asia/Tokyo)",
+            '[{"file": "a.py"}]',
+            REPORT + "\n" + REPORT,
+            "```json\n{\"file\": \"a.py\"}\n```",
+            "```json\n[1, 2]\n```",
+            "```json\n[not json]\n```",
+            "",
+            None,
+        ):
+            with self.subTest(result=result):
+                self.assertFalse(rc.is_findings_report(result))
 
 
 class BodyRangesTests(unittest.TestCase):
@@ -168,7 +204,7 @@ class ReviewRecordHookTests(unittest.TestCase):
         first, _, last = self.repo.shas
         self._skill("PreToolUse", f"high {first[:7]}..HEAD --max-findings all")
         self._skill("PostToolUse", "x", response={"success": True, "status": "forked",
-                                                  "result": "指摘は0件"})
+                                                  "result": REPORT})
         records = rc.read_log(self.repo.log)
         self.assertEqual(rc.completed_ranges(records), [(first, last)])
 
@@ -178,7 +214,7 @@ class ReviewRecordHookTests(unittest.TestCase):
         self.repo.log.parent.mkdir(parents=True, exist_ok=True)
         self.repo.log.write_bytes(b'{"event": "started", "tool_use_id": "cut"')
         self._skill("PreToolUse", f"{first[:7]}..HEAD")
-        self._skill("PostToolUse", "x", response={"success": True, "result": "指摘は0件"})
+        self._skill("PostToolUse", "x", response={"success": True, "result": REPORT})
         self.assertEqual(rc.completed_ranges(rc.read_log(self.repo.log)), [(first, last)])
 
     def test_log_cut_inside_a_multibyte_character_is_still_read(self):
@@ -186,7 +222,7 @@ class ReviewRecordHookTests(unittest.TestCase):
         self.repo.log.parent.mkdir(parents=True, exist_ok=True)
         self.repo.log.write_bytes('{"args": "指摘'.encode("utf-8")[:-1])
         self._skill("PreToolUse", f"{first[:7]}..HEAD")
-        self._skill("PostToolUse", "x", response={"success": True, "result": "指摘は0件"})
+        self._skill("PostToolUse", "x", response={"success": True, "result": REPORT})
         self.assertEqual(rc.completed_ranges(rc.read_log(self.repo.log)), [(first, last)])
 
     def test_report_with_non_ascii_text_is_recorded(self):
@@ -194,21 +230,28 @@ class ReviewRecordHookTests(unittest.TestCase):
         first, _, last = self.repo.shas
         self._skill("PreToolUse", f"{first[:7]}..HEAD")
         self._skill("PostToolUse", "x", response={
-            "success": True, "result": "指摘は0件 ✓   — \U0001f600 ①"})
+            "success": True,
+            "result": '```json\n[{"summary": "指摘は0件 ✓   — \U0001f600 ①"}]\n```'})
         self.assertEqual(rc.completed_ranges(rc.read_log(self.repo.log)), [(first, last)])
 
     def test_unreadable_input_is_reported_with_exit_1(self):
         code, output = _hook(None, self.repo.root, raw=b"\xff\xfe not json")
         self.assertEqual(code, 1)
         self.assertIsNone(output)
-        self.assertIn(b"review_record", _hook.stderr)
+        # 既定の文字コードが cp932 でも、stderr は UTF-8 で書く。
+        self.assertIn("記録しなかった", _hook.stderr.decode("utf-8"))
         self.assertFalse(self.repo.log.exists())
 
     def test_run_without_a_report_is_not_counted(self):
         first = self.repo.shas[0]
-        for index, response in enumerate(({"success": True, "status": "forked"},
-                                          {"success": True, "result": "  "},
-                                          {"success": False, "result": "途中で止まった"})):
+        for index, response in enumerate((
+            {"success": True, "status": "forked"},
+            {"success": True, "result": "  "},
+            {"success": False, "result": REPORT},
+            # 2026-11-28 に、利用の上限で止まった fork の結果。`success` は真で届いた。
+            {"success": True, "status": "forked", "agentId": "a",
+             "result": "You've hit your 5-hour limit · resets 6:50pm (Asia/Tokyo)"},
+        )):
             key = f"t{index}"
             self._skill("PreToolUse", f"{first}..HEAD", tool_use_id=key)
             self._skill("PostToolUse", "x", tool_use_id=key, response=response)
@@ -265,6 +308,40 @@ class ReviewRecordHookTests(unittest.TestCase):
         self.assertEqual(_hook(payload, self.repo.root), (0, None))
 
 
+class HookInputTests(unittest.TestCase):
+    """`hooks/hook_input.py` と、merge の前の検査が失敗をどちらへ倒すか。"""
+
+    def test_failures_to_read_the_stream_are_input_errors(self):
+        class Broken:
+            def read(self):
+                raise OSError("stdin を読めない")
+
+        for stream in (Broken(), object(), io.BytesIO(b"\xff"), io.BytesIO(b"{")):
+            with self.subTest(stream=type(stream).__name__):
+                with self.assertRaises(guard.hook_input.HookInputError):
+                    guard.hook_input.read_payload(stream)
+
+    def _main(self, command, error):
+        payload = {"tool_name": "Bash", "tool_input": {"command": command}}
+        with mock.patch.object(guard.hook_input, "read_payload", return_value=payload), \
+                mock.patch.object(guard.hook_input, "report") as report, \
+                mock.patch.object(guard, "_check_merge"), \
+                mock.patch.object(guard, "_check_coderabbit_review"), \
+                mock.patch.object(guard, "_check_review_coverage", side_effect=error):
+            return guard.main(), report
+
+    def test_unexpected_error_in_the_merge_checks_blocks(self):
+        code, report = self._main("gh pr merge 7 --squash", RuntimeError("想定外"))
+        self.assertEqual(code, guard.hook_input.BLOCK)
+        self.assertIn("RuntimeError", report.call_args.args[0])
+
+    def test_deny_in_the_merge_checks_is_not_turned_into_a_block(self):
+        # `_deny` の `SystemExit(0)` は、予想しない例外として受けない。
+        with self.assertRaises(SystemExit) as raised:
+            self._main("gh pr merge 7 --squash", SystemExit(0))
+        self.assertEqual(raised.exception.code, 0)
+
+
 class ReviewCoverageMergeTests(unittest.TestCase):
     """`gh pr merge` の前に、記録が merge-base から head までつながるかを見る。"""
 
@@ -283,7 +360,7 @@ class ReviewCoverageMergeTests(unittest.TestCase):
                 handle.write(json.dumps({"event": "started", "tool_use_id": key,
                                          "from": a, "to": b}) + "\n")
                 handle.write(json.dumps({"event": "completed", "tool_use_id": key,
-                                         "success": True}) + "\n")
+                                         "success": True, "report": True}) + "\n")
 
     def _merge(self, body_ranges=(), files=("README.md",), comments=(), refs=("develop", "x"),
                squashed=()):

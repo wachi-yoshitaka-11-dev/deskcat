@@ -42,6 +42,10 @@ ARG_RANGE_RE = re.compile(r"^([^.\s]+(?:\.[^.\s]+)*)\.\.([^.\s]+(?:\.[^.\s]+)*)$
 
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 
+# レビューの報告の、指摘の一覧の囲み。
+REPORT_FENCE = "```json"
+REPORT_FENCE_RE = re.compile(r"```json[ \t]*\r?\n(.*?)\r?\n[ \t]*```", re.S)
+
 
 def _git(args, cwd=None):
     result = subprocess.run(
@@ -135,10 +139,38 @@ def read_log(path):
     return records
 
 
+def is_findings_report(result):
+    """Skill の結果が、レビューが行われたときの報告（指摘の一覧）の形か。
+
+    **規則は1つに固定する。**`` ```json `` の囲みがちょうど1つあり、その中身が JSON の配列で、
+    要素がすべて object であること。空の配列（指摘が0件）も数える。囲みの外の文は見ない。
+    囲みが無い、2つ以上ある、中身が配列でない、のどれでも数えない。要素の key は見ない
+    （報告の形に縛りすぎて、skill の小さな変更で止まらないようにする）。
+
+    Skill の結果に付く情報（`success`、`status` など）は、レビューが行われた回と、利用の上限で
+    止まった回とで同じだった。違うのは報告の本文だけだった（2026-11-28 に、fork の `/code-review`
+    17回で確かめた。行われた16回はどれもこの規則を通り、止まった1回は囲みが無かった）。
+    報告の形が変われば止めすぎになるが、止まれば目に見えるので、素通りよりよい。
+    """
+    if not isinstance(result, str) or result.count(REPORT_FENCE) != 1:
+        return False
+    blocks = REPORT_FENCE_RE.findall(result)
+    if len(blocks) != 1:
+        return False
+    try:
+        findings = json.loads(blocks[0])
+    except json.JSONDecodeError:
+        return False
+    return isinstance(findings, list) and all(isinstance(item, dict) for item in findings)
+
+
 def completed_ranges(records):
     """完了した記録の範囲 `(from, to)` の一覧。前と後の記録を `tool_use_id` で組にする。
 
-    後の記録の `success` が真のものだけを数える。前の記録だけ（途中で止まった実行）は数えない。
+    後の記録の `success` と `report` がどちらも真のものだけを数える。前の記録だけ（途中で
+    止まった実行）は数えない。`report` は、報告が指摘の一覧の形だったことの印である
+    （`is_findings_report`）。**印の無い記録は数えない。**印を付ける前の記録には、利用の上限で
+    止まった実行を完了と記録したものがあった（2026-11-28）。
     """
     started = {}
     done = []
@@ -151,7 +183,8 @@ def completed_ranges(records):
             if isinstance(start, str) and isinstance(end, str) \
                     and SHA_RE.match(start) and SHA_RE.match(end):
                 started[key] = (start, end)
-        elif record.get("event") == "completed" and record.get("success") is True:
+        elif record.get("event") == "completed" and record.get("success") is True \
+                and record.get("report") is True:
             if key in started:
                 done.append(started[key])
     return done

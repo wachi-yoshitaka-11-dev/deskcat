@@ -8,7 +8,8 @@
    - 前の hook：引数から範囲 `A..B` を1つだけ取り、A と B を 40 桁の SHA に直し、
      A が B の祖先であることを確かめて、`started` の行を書く。範囲が無い、2つ以上ある、
      SHA に直せない、A が B の祖先でない、のどれでも記録しない。**実行そのものは止めない。**
-   - 後の hook：`completed` の行に、完了の状態（`success`、`status`）を書く。
+   - 後の hook：`completed` の行に、完了の状態（`success`、`report`、`status`）を書く。
+     `report` は、報告が指摘の一覧の形だったか（`review_coverage.is_findings_report`）。
    - 前と後は `tool_use_id` で組にする。判定は `scripts/review_coverage.py` が持つ。
    main の文脈での実行（`agent_id` が無い）は記録しない。2026-11-28 の実験で、
    main の文脈の Skill の後の hook には結果が届かず、レビューが終わったかを知る手段が無かった。
@@ -120,9 +121,13 @@ def _record(payload, event):
         result = response.get("result")
         # 完了と数えるのは、`success` が真で、結果（レビューの報告）が届いたときだけである。
         # 2026-11-28 の実験で、fork の中の実行の後の hook には、レビューの報告が `result` に届いた。
+        # `report` は、報告が指摘の一覧の形だったことの印である。利用の上限で止まった実行も
+        # `success` は真で届くので、`success` だけでは完了と見分けられない
+        # （`review_coverage.is_findings_report`）。
         _append(path, {**base, "event": "completed",
                        "success": response.get("success") is True
                        and isinstance(result, str) and bool(result.strip()),
+                       "report": review_coverage.is_findings_report(result),
                        "status": response.get("status")})
 
 
