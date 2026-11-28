@@ -15,6 +15,13 @@
   到達点を B まで進める。B が head の祖先でない範囲（rebase の前の範囲など）は使わない。
 - 到達点が head に届けば、つながっている。
 
+**git を呼ぶ回数：**log は clone ごとに消えずに増え続ける（#822）。`gh pr merge` の前の
+hook は、log の範囲を先に `within` で、終わり（`to`）が merge-base..head の commit のものだけに
+絞る（git の呼び出しは `rev-list` の1回）。終わりがそれ以外の範囲は、つながりの判定に使われえない
+（終わりが head の祖先なら、merge-base かその祖先であり、到達点より先へ進めない）。
+hook は期限（`deadline`、`time.monotonic()` の値）を渡し、git の呼び出しごとに残りを見て、
+超えたら `subprocess.TimeoutExpired` を上げる（hook は止める側へ倒す）。
+
 **限界：**
 - hook は、fork が範囲の全部を実際に読んだかまでは確かめない。
 - 所有者が画面から merge する経路は、手元の hook を通らない。その経路では CI だけが見るので、
@@ -27,6 +34,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 LOG_NAME = "deskcat-review-log.jsonl"
@@ -47,53 +55,93 @@ REPORT_FENCE = "```json"
 REPORT_FENCE_RE = re.compile(r"```json[ \t]*\r?\n(.*?)\r?\n[ \t]*```", re.S)
 
 
-def _git(args, cwd=None):
+GIT_TIMEOUT_SECONDS = 30
+
+
+def _git(args, cwd=None, deadline=None):
+    """git を実行して `(終了コード, 標準出力)` を返す。
+
+    `deadline`（`time.monotonic()` の値）を渡すと、残りの時間を超えて待たない。
+    期限を過ぎていれば実行せず `subprocess.TimeoutExpired` を上げる。
+    """
+    timeout = GIT_TIMEOUT_SECONDS
+    if deadline is not None:
+        timeout = min(timeout, deadline - time.monotonic())
+        if timeout <= 0:
+            raise subprocess.TimeoutExpired(["git", *args], 0)
     result = subprocess.run(
         ["git", *args], cwd=cwd, capture_output=True, text=True, encoding="utf-8",
-        timeout=30,
+        timeout=timeout,
     )
     return result.returncode, result.stdout.strip()
 
 
-def resolve(rev, cwd=None):
+def resolve(rev, cwd=None, deadline=None):
     """revision を 40 桁の commit の SHA に直す。直せなければ `None`。"""
     if rev.startswith("-"):
         return None
-    code, out = _git(["rev-parse", "--verify", "--quiet", f"{rev}^{{commit}}"], cwd)
+    code, out = _git(["rev-parse", "--verify", "--quiet", f"{rev}^{{commit}}"], cwd, deadline)
     return out if code == 0 and SHA_RE.match(out) else None
 
 
-def is_ancestor(a, b, cwd=None):
+def is_ancestor(a, b, cwd=None, deadline=None):
     """a が b の祖先（同じ commit を含む）か。"""
-    code, _ = _git(["merge-base", "--is-ancestor", a, b], cwd)
+    code, _ = _git(["merge-base", "--is-ancestor", a, b], cwd, deadline)
     return code == 0
 
 
-def merge_base(a, b, cwd=None):
-    code, out = _git(["merge-base", a, b], cwd)
+def merge_base(a, b, cwd=None, deadline=None):
+    code, out = _git(["merge-base", a, b], cwd, deadline)
     return out if code == 0 and SHA_RE.match(out) else None
 
 
-def commits_between(base, head, cwd=None):
+def commits_between(base, head, cwd=None, deadline=None):
     """`base..head` の commit の SHA の一覧。求められなければ例外を上げる。"""
-    code, out = _git(["rev-list", f"{base}..{head}"], cwd)
+    code, out = _git(["rev-list", f"{base}..{head}"], cwd, deadline)
     if code != 0:
         raise ValueError(f"{base[:7]}..{head[:7]} の commit を列挙できない")
     return [line for line in out.splitlines() if SHA_RE.match(line)]
 
 
-def covers_commit(sha, ranges, cwd=None, ancestor=None):
-    """完了した記録の範囲のどれかが、commit `sha` 1つの変更（`sha^..sha`）を含むか。"""
-    ancestor = ancestor or (lambda a, b: is_ancestor(a, b, cwd))
-    code, parent = _git(["rev-parse", "--verify", "--quiet", f"{sha}^"], cwd)
+def within(ranges, ends):
+    """範囲 `(from, to)` のうち、終わり（`to`）が `ends`（SHA の集合）に入るものだけを、重複を除いて返す。
+
+    git を呼ばない。log の範囲を、照らし合わせる前に PR の commit で絞るために使う（#822）。
+    同じ範囲を何度もレビューすると、log に同じ範囲の記録が重なる。重なった分だけ git を
+    呼ばないよう、重複を除く。
+    """
+    ends = set(ends)
+    return sorted({(a, b) for a, b in ranges if b in ends})
+
+
+def covers_commit(sha, ranges, head, cwd=None, deadline=None):
+    """完了した記録の範囲のどれかが、commit `sha` 1つの変更（`sha^..sha`）を含むか。
+
+    範囲 `(a, b)` が含むのは、a が `sha^` の祖先（同じを含む）で、`sha` が b の祖先（同じを含む）の
+    ときである。b は `head` の祖先に限る（呼ぶ側が `within` で絞る）。
+    **git を呼ぶ回数は、範囲の本数によらず3回である**（#822）。範囲ごとに祖先かを問わず、
+    `sha^` の祖先の集合と、`sha` から `head` までの子孫の集合を1回ずつ取り、集合で照らす。
+    求められなければ例外を上げる。
+    """
+    if not ranges:
+        return False
+    code, parent = _git(["rev-parse", "--verify", "--quiet", f"{sha}^"], cwd, deadline)
     if code != 0 or not SHA_RE.match(parent):
         return False
-    return any(ancestor(a, parent) and ancestor(sha, b) for a, b in ranges)
+    code, out = _git(["rev-list", parent], cwd, deadline)
+    if code != 0:
+        raise ValueError(f"{parent[:7]} の祖先を列挙できない")
+    ancestors = set(out.splitlines())
+    code, out = _git(["rev-list", "--ancestry-path", f"{sha}..{head}"], cwd, deadline)
+    if code != 0:
+        raise ValueError(f"{sha[:7]}..{head[:7]} の子孫を列挙できない")
+    descendants = set(out.splitlines()) | {sha}
+    return any(a in ancestors and b in descendants for a, b in ranges)
 
 
-def log_path(cwd=None):
+def log_path(cwd=None, deadline=None):
     """手元の log の path。worktree でも同じ場所になるよう、git の共通の dir に置く。"""
-    code, out = _git(["rev-parse", "--path-format=absolute", "--git-common-dir"], cwd)
+    code, out = _git(["rev-parse", "--path-format=absolute", "--git-common-dir"], cwd, deadline)
     if code != 0 or not out:
         return None
     return Path(out) / LOG_NAME
@@ -242,11 +290,11 @@ def body_ranges(body):
     return BODY_RANGE_RE.findall(body_section(body))
 
 
-def resolve_ranges(pairs, cwd=None):
+def resolve_ranges(pairs, cwd=None, deadline=None):
     """字句の範囲を 40 桁に直す。直せないものは `unresolved` に入れて返す。"""
     resolved, unresolved = [], []
     for a, b in pairs:
-        full_a, full_b = resolve(a, cwd), resolve(b, cwd)
+        full_a, full_b = resolve(a, cwd, deadline), resolve(b, cwd, deadline)
         if full_a and full_b:
             resolved.append((full_a, full_b))
         else:

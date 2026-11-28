@@ -858,7 +858,11 @@ class CodeRabbitReviewMergeGateTests(unittest.TestCase):
 
 
 class GhHookRepositoryAndDeadlineTests(unittest.TestCase):
-    """`-Rowner/repo`の読み取りと、hook全体の期限（#751）。"""
+    """`-Rowner/repo`の読み取りと、検査ごとの期限（#751、#822）。
+
+    期限（`CHECK_DEADLINE_SECONDS`）は hook 全体ではなく、検査ごとに数え始める。`gh pr merge` では
+    CodeRabbit の検査とレビューの記録の検査がそれぞれ持つ。
+    """
 
     DONE = CodeRabbitReviewMergeGateTests.DONE
     TARGET = "firmware/esp32/src/a.rs"
@@ -983,11 +987,32 @@ class GhHookRepositoryAndDeadlineTests(unittest.TestCase):
         self.assertGreaterEqual(elapsed, 11)
         self.assertLess(elapsed, guard.CHECK_DEADLINE_SECONDS)
 
+    # `gh pr merge` で期限を持つ検査の数（`_check_coderabbit_review` と `_check_review_coverage`）。
+    MERGE_CHECKS_WITH_DEADLINE = 2
+    # 期限の外で走る処理（python の起動、log の読み込み、期限を超えた最後の1回の後始末）に残す秒数。
+    HOOK_MARGIN_SECONDS = 10
+
+    def _hook_timeout(self):
+        """`.claude/settings.json` に登録した、このhookの timeout（秒）。"""
+        settings = json.loads(
+            (REPO_ROOT_FOR_TEMPLATES / ".claude" / "settings.json").read_text(encoding="utf-8"))
+        timeouts = [
+            hook["timeout"]
+            for group in settings["hooks"]["PreToolUse"]
+            for hook in group["hooks"]
+            if "scripts/hooks/gh_metadata_guard.py" in hook.get("command", "")
+        ]
+        self.assertEqual(len(timeouts), 1, timeouts)
+        return timeouts[0]
+
     def test_hook_limits_fit_inside_the_hook_timeout(self):
-        """1回の上限は最初の遅れ（約10.7秒）を超える。全体の期限は、hookの30秒に収まる。"""
+        """1回の上限は最初の遅れ（約10.7秒）を超える。検査ごとの期限の合計は、hookのtimeoutに収まる。"""
         self.assertGreater(guard.GH_TIMEOUT_SECONDS, 10.7)
         self.assertLessEqual(guard.GH_TIMEOUT_SECONDS, guard.CHECK_DEADLINE_SECONDS)
-        self.assertLess(guard.CHECK_DEADLINE_SECONDS, 30)
+        self.assertLessEqual(
+            guard.CHECK_DEADLINE_SECONDS * self.MERGE_CHECKS_WITH_DEADLINE
+            + self.HOOK_MARGIN_SECONDS,
+            self._hook_timeout())
 
     def test_running_workers_end_by_the_deadline(self):
         """commit照会が期限を超えて走り続けても、processは期限の直後に終わる。"""

@@ -485,6 +485,153 @@ class ReviewCoverageMergeTests(unittest.TestCase):
         # 想定と違う形の応答は、落ちずに止める。
         self.assertDenied(self._merge(ranges, files, [("User", ["x"])]), "確認できなかった")
 
+    # log に足す、鎖に入りえない範囲の本数。終わりは手元に無い commit（別の clone や rebase の前）。
+    STALE_RANGES = 300
+
+    def _stale(self):
+        return [(f"{index:040x}", f"{index + 1:040x}") for index in range(self.STALE_RANGES)]
+
+    def _git_calls(self, **merge):
+        """`_merge` の間に git を呼んだ回数と、その出力。"""
+        real = rc._git
+        with mock.patch.object(rc, "_git", side_effect=real) as spy:
+            output = self._merge(**merge)
+        return spy.call_count, output
+
+    def test_git_calls_do_not_grow_with_the_log(self):
+        """log の範囲の本数が増えても、merge の前の検査で git を呼ぶ回数は変わらない（#822）。"""
+        ranges = [(self.base, self.mid), (self.mid, self.head)]
+        self._log(*ranges)
+        small, output = self._git_calls(body_ranges=ranges)
+        self.assertIsNone(output)
+        # 鎖の外の範囲と、終わりが merge-base の範囲（到達点より先へ進めない）を足す。
+        self._log(*self._stale(), (self.base, self.base))
+        large, output = self._git_calls(body_ranges=ranges)
+        self.assertIsNone(output)
+        self.assertEqual(small, large)
+
+    def test_logged_body_range_off_the_chain_is_not_reported_missing(self):
+        """本文に残った rebase の前の範囲は、log に記録があれば「記録が無い」と言わない（#822）。"""
+        self.repo._git("checkout", "-q", "-b", "old", self.base)
+        Path(self.repo.root, "g.txt").write_text("old", encoding="utf-8")
+        self.repo._git("add", "g.txt")
+        self.repo._git("commit", "-q", "-m", "old")
+        old = self.repo._git("rev-parse", "HEAD").strip()
+        self.repo._git("checkout", "-q", "main")
+        ranges = [(self.base, old), (self.base, self.head)]
+        # log に無ければ、鎖の外の範囲でも「記録が無い」で止める。
+        self._log((self.base, self.head))
+        self.assertDenied(self._merge(ranges), "記録が無い")
+        self._log((self.base, old))
+        self.assertIsNone(self._merge(ranges))
+
+    def test_promotion_record_ending_outside_the_range_is_not_counted(self):
+        """昇格では、`mid^..mid` を含んでも、終わりが昇格の範囲の外の記録は数えない（#822）。"""
+        promotion = ("main", "develop")
+        self.repo._git("checkout", "-q", "-b", "side", self.mid)
+        Path(self.repo.root, "g.txt").write_text("side", encoding="utf-8")
+        self.repo._git("add", "g.txt")
+        self.repo._git("commit", "-q", "-m", "side")
+        side = self.repo._git("rev-parse", "HEAD").strip()
+        self.repo._git("checkout", "-q", "main")
+        self._log((self.base, side))
+        output = self._merge(refs=promotion, squashed=(self.head,))
+        self.assertDenied(output, self.mid[:7])
+        self.assertIn("終わりが昇格の範囲の中", _reason(output))
+
+    def test_promotion_git_calls_do_not_grow_with_the_log(self):
+        promotion = ("main", "develop")
+        self._log((self.base, self.mid))
+        small, output = self._git_calls(refs=promotion, squashed=(self.head,))
+        self.assertIsNone(output)
+        # 鎖の外の範囲を、本物の記録より前に置く（後ろに置くと、照らし合わせが先に打ち切られる）。
+        Path(self.repo.log).unlink()
+        self._log(*self._stale(), (self.base, self.mid))
+        large, output = self._git_calls(refs=promotion, squashed=(self.head,))
+        self.assertIsNone(output)
+        self.assertEqual(small, large)
+
+    def test_promotion_git_calls_do_not_grow_with_repeated_records(self):
+        """同じ範囲を何度もレビューして記録が重なっても、git を呼ぶ回数は変わらない（#822）。"""
+        promotion = ("main", "develop")
+        # mid は PR を通らずに入った commit。`mid..head` は mid の変更を含まないので覆わない。
+        self._log((self.mid, self.head))
+        small, output = self._git_calls(refs=promotion, squashed=(self.head,))
+        self.assertIsNotNone(output)
+        self._log(*[(self.mid, self.head)] * self.STALE_RANGES)
+        large, output = self._git_calls(refs=promotion, squashed=(self.head,))
+        self.assertIsNotNone(output)
+        self.assertEqual(small, large)
+
+    def test_promotion_record_ends_at_the_commit_or_at_the_head(self):
+        """終わりが commit そのもの、head そのもの、commit が head と同じ、のどれでも覆う（#822）。"""
+        promotion = ("main", "develop")
+        cases = (
+            # (PR を通らずに入った commit, 記録の範囲)
+            (self.mid, (self.base, self.mid)),   # 終わりが commit そのもの（`<sha>^..<sha>`）
+            (self.mid, (self.base, self.head)),  # 終わりが head そのもの
+            (self.head, (self.mid, self.head)),  # commit が head と同じ
+        )
+        for direct, record in cases:
+            with self.subTest(direct=direct[:7], record=(record[0][:7], record[1][:7])):
+                Path(self.repo.log).unlink(missing_ok=True)
+                squashed = tuple(sha for sha in (self.mid, self.head) if sha != direct)
+                self.assertDenied(self._merge(refs=promotion, squashed=squashed), direct[:7])
+                self._log(record)
+                self.assertIsNone(self._merge(refs=promotion, squashed=squashed))
+
+    def test_promotion_git_calls_do_not_grow_with_distinct_records(self):
+        """終わりが範囲の中にある別々の記録が増えても、git を呼ぶ回数は変わらない（#822）。
+
+        覆う記録は、並べたときに最後に来る。覆わない記録を先に照らしても、範囲ごとには git を呼ばない。
+        """
+        promotion = ("main", "develop")
+        # head は PR を通らずに入った commit。`base..head` が `head^..head` を含む。
+        self._log((self.base, self.head))
+        small, output = self._git_calls(refs=promotion, squashed=(self.mid,))
+        self.assertIsNone(output)
+        # 始まりが別々（手元に無い commit）で、終わりが範囲の中（mid）の記録。並べると先に来る。
+        Path(self.repo.log).unlink()
+        self._log(*[(f"{index:040x}", self.mid) for index in range(self.STALE_RANGES)],
+                  (self.base, self.head))
+        large, output = self._git_calls(refs=promotion, squashed=(self.mid,))
+        self.assertIsNone(output)
+        self.assertEqual(small, large)
+
+    def test_git_calls_run_under_the_check_deadline(self):
+        """gh の照会の後に期限が尽きたら、git の呼び出しの前で止める（#822）。"""
+        ranges = [(self.base, self.head)]
+        self._log(*ranges)
+        for refs in (("develop", "x"), ("main", "develop")):
+            with self.subTest(refs=refs), \
+                    mock.patch.object(guard, "CHECK_DEADLINE_SECONDS", 0):
+                output = self._merge(ranges, refs=refs, squashed=(self.head,))
+                self.assertDenied(output, "TimeoutExpired")
+                # 取れる手当て（再実行、所有者への相談）を書き、範囲を分ける手順は書かない。
+                self.assertIn("時間を置いて再実行", _reason(output))
+                self.assertNotIn("分け", _reason(output))
+
+    def test_other_failures_do_not_mention_the_deadline(self):
+        self._log((self.base, self.head))
+        output = self._merge([(self.base, self.head)], ["AGENTS.md"], [("User", ["x"])])
+        self.assertDenied(output, "確認できなかった")
+        self.assertNotIn("期限", _reason(output))
+
+
+class WithinTests(unittest.TestCase):
+    def test_only_ranges_ending_in_the_given_commits_are_kept(self):
+        ranges = [("a", "b"), ("b", "c"), ("x", "y")]
+        self.assertEqual(rc.within(ranges, ["b", "c"]), [("a", "b"), ("b", "c")])
+        # 同じ範囲の記録が重なっても、1本として返す。
+        self.assertEqual(rc.within(ranges * 3, ["c"]), [("b", "c")])
+        self.assertEqual(rc.within(ranges, []), [])
+
+    def test_expired_deadline_raises_without_running_git(self):
+        with mock.patch.object(rc.subprocess, "run") as run:
+            with self.assertRaises(subprocess.TimeoutExpired):
+                rc.resolve("HEAD", deadline=0)
+        run.assert_not_called()
+
 
 class CiEntryPointTests(unittest.TestCase):
     def setUp(self):

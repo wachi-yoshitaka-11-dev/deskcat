@@ -436,7 +436,7 @@ Anthropicの[Code Reviewの文書](https://code.claude.com/docs/en/code-review)�
     CI（`review-coverage.yml`）は本文の範囲がつながっているかだけを見る（手元のlogを読めない）。
   - 昇格（`develop`→`main`）では、範囲のつながりの代わりに、範囲の各commitが`develop`へmerge済みの
     Pull Requestのsquashのcommitかを見る。Pull Requestを通らずに入ったcommitは、`<sha>^..<sha>`を
-    含む範囲の記録があるときだけ通す。
+    含み、範囲の終わりが昇格の範囲のcommitである記録があるときだけ通す（終わりが範囲の外の記録は数えない）。
   - **限界：**hookは、subagentが範囲の全部を実際に読んだかまでは確かめない。logへの書き込みを
     止めるのはうっかりの書き込みだけで、名前を組み立てるscriptを走らせるか、記録のhookに偽の入力を
     流せば記録を偽れる（意図的な偽りは前提にしない）。所有者が画面から
