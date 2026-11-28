@@ -166,6 +166,15 @@ class ReviewRecordHookTests(unittest.TestCase):
         records = rc.read_log(self.repo.log)
         self.assertEqual(rc.completed_ranges(records), [(first, last)])
 
+    def test_record_after_a_cut_fragment_still_counts(self):
+        # 前の書き込みが途中で切れて、改行の無い断片が残っていても、次の記録は壊れない。
+        first, _, last = self.repo.shas
+        self.repo.log.parent.mkdir(parents=True, exist_ok=True)
+        self.repo.log.write_bytes(b'{"event": "started", "tool_use_id": "cut"')
+        self._skill("PreToolUse", f"{first[:7]}..HEAD")
+        self._skill("PostToolUse", "x", response={"success": True, "result": "指摘は0件"})
+        self.assertEqual(rc.completed_ranges(rc.read_log(self.repo.log)), [(first, last)])
+
     def test_run_without_a_report_is_not_counted(self):
         first = self.repo.shas[0]
         for index, response in enumerate(({"success": True, "status": "forked"},
@@ -343,21 +352,19 @@ class ReviewCoverageMergeTests(unittest.TestCase):
         self.assertDenied(self._merge(ranges, files, ["承認 " + self.mid]), "承認のコメント")
         self.assertIsNone(self._merge(ranges, files, ["承認 " + self.head[:7]]))
         self.assertIsNone(self._merge(ranges, ["README.md"], []))
-        # 他の行に挟んだ承認の行、区切りの「：」、大文字の SHA も読む。
-        self.assertIsNone(self._merge(ranges, files, [f"確認した。\n承認：{self.head[:9].upper()}\n"]))
-        # 画面で書いたコメントの `\r\n`（承認の行が最後でない）と、全角の空白も読む。
-        self.assertIsNone(self._merge(ranges, files, [f"承認 {self.head[:7]}\r\n以上\r\n"]))
-        self.assertIsNone(self._merge(ranges, files, [f"承認　{self.head[:7]}"]))
-        # code block の中の行は数えない。
-        self.assertDenied(self._merge(ranges, files, [
-            f"承認をお願いします。次の行を書いてください。\n```\n承認 {self.head[:7]}\n```\n"]),
-            "承認のコメント")
-        self.assertIsNone(self._merge(ranges, files, [
-            f"```\n例\n```\n承認 {self.head[:7]}\n"]))
-        # bot のコメント、承認を頼むだけのコメント、否定のコメント、語の無いコメントは数えない。
+        # 区切りの「：」、大文字の SHA、前後の空白と改行（画面で書いた `\r\n` を含む）、全角の空白も読む。
+        for comment in (f"承認：{self.head[:9].upper()}", f"\r\n  承認 {self.head[:7]}\r\n",
+                        f"承認　{self.head[:7]}　"):
+            with self.subTest(comment=comment):
+                self.assertIsNone(self._merge(ranges, files, [comment]))
+        # 本文の全体が承認の1行でないコメントは数えない。他の文を含むもの、code block・字下げ・
+        # HTML のコメントの中に書いたもの、bot のもの、承認を頼むだけのもの、否定のものである。
         for comment in (("Bot", "承認 " + self.head), f"承認をお願いします {self.head[:7]}",
                         f"未承認 {self.head[:7]}", f"{self.head[:7]}で承認した",
-                        "between " + self.head):
+                        f"確認した。\n承認 {self.head[:7]}",
+                        f"次の行を書いてください。\n```\n承認 {self.head[:7]}\n```",
+                        f"```\n承認 {self.head[:7]}\n```", f"    承認 {self.head[:7]}\n    例",
+                        f"<!--\n承認 {self.head[:7]}\n-->", "between " + self.head):
             with self.subTest(comment=comment):
                 self.assertDenied(self._merge(ranges, files, [comment]), "承認のコメント")
         # 想定と違う形の応答は、落ちずに止める。

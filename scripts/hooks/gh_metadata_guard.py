@@ -918,36 +918,16 @@ def _check_review_chain(number, base, head, body):
         )
 
 
-# 承認のコメントの行。行の全体が「承認」と head の SHA（7桁以上）だけのものを読む。
-# 語を含むだけで数えると、「承認をお願いします f831629」や「未承認 f831629」も通ってしまう。
-# 空白は全角（U+3000）も読む（日本語の入力でそのまま打てる形）。
-APPROVAL_LINE_RE = re.compile(r"[ \t　]*承認[ \t　]*[:：]?[ \t　]*"
-                              r"([0-9A-Fa-f]{7,40})[ \t　]*")
-# code block（``` か ~~~ で囲む）の始まりと終わりの行。
-FENCE_RE = re.compile(r"^[ \t]*(```|~~~)")
-
-
-def _approval_lines(body):
-    """コメントの本文のうち、code block の外の行。改行は `\\r\\n` も `\\n` も読む。
-
-    GitHub の画面で書いたコメントは `\\r\\n` で届く。code block の中の行は数えない。
-    承認を頼むコメントが、書いてほしい行を code block で示すことがあるためである。
-    """
-    inside = None
-    for line in body.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
-        fence = FENCE_RE.match(line)
-        if fence:
-            if inside is None:
-                inside = fence.group(1)
-            elif fence.group(1) == inside:
-                inside = None
-            continue
-        if inside is None:
-            yield line
+# 承認のコメント。**本文の全体**（前後の空白と改行を除く）が「承認」と head の SHA（7桁以上）
+# だけのものを数える。本文の中から行を探すと、code block、字下げ、HTML のコメントのように、
+# markdown の読み方の端の場合を全部扱う必要があり、閉じない。承認を頼むコメントは他の文を含むので
+# 数えない。空白は全角（U+3000）も読む（日本語の入力でそのまま打てる形）。
+# 承認の日時や範囲の記録は、このコメントに書かず、PR の本文か別のコメントに書く（CONTRIBUTING）。
+APPROVAL_RE = re.compile(r"承認[ \t　]*[:：]?[ \t　]*([0-9A-Fa-f]{7,40})")
 
 
 def _approved(comments, head):
-    """人のコメントに、head の SHA を書いた承認の行があるか。"""
+    """人のコメントに、本文の全体が `承認 <head の SHA>` のものがあるか。"""
     for comment in comments:
         if not isinstance(comment, dict):
             raise TypeError("コメントの形が想定と違う")
@@ -957,11 +937,11 @@ def _approved(comments, head):
         body = comment.get("body") or ""
         if not isinstance(body, str):
             raise TypeError("コメントの本文の形が想定と違う")
-        for line in _approval_lines(body):
-            match = APPROVAL_LINE_RE.fullmatch(line)
-            if match and head.startswith(match.group(1).lower()):
-                return True
+        match = APPROVAL_RE.fullmatch(body.strip())
+        if match and head.startswith(match.group(1).lower()):
+            return True
     return False
+
 
 # 昇格の Pull Request の (base, head)。CONTRIBUTING の「Branches」の共有 branch である。
 PROMOTION_REFS = ("main", "develop")
@@ -976,7 +956,7 @@ def _check_review_coverage(args, global_repo):
        PR の base と head の merge-base から head までつながっている。
     2. PR の本文の「自己レビュー」に書いた範囲が、すべて log の完了した記録にある。
        そのうえで、本文の範囲もつながっている（CI が読むのは本文だけなので、本文を log に結び付ける）。
-    3. 慎重に扱う path に触れる PR では、`承認 <head の SHA>` だけの行を書いた人のコメントがある。
+    3. 慎重に扱う path に触れる PR では、本文の全体が `承認 <head の SHA>` だけの人のコメントがある。
        **これは記録の確認であって、承認そのものの確認ではない。**所有者と AI は同じ
        account で書くので、書き手で見分けられない（承認の関門は #814 の作業リストの11）。
 
@@ -1031,7 +1011,7 @@ def _check_review_coverage(args, global_repo):
     if not approved:
         _deny(
             f"PR #{number} は慎重に扱う path に触れるが、head（{head[:7]}）の承認のコメントが無い。"
-            "所有者の承認を得て、`承認 <head の SHA>` だけの行をコメントに書く"
+            "所有者の承認を得て、本文の全体が `承認 <head の SHA>` だけのコメントを書く"
             "（CONTRIBUTING の「慎重に扱う path」）。この確認は記録の確認であって、"
             "承認そのものの確認ではない。"
         )

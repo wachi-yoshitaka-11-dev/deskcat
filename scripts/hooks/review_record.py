@@ -65,17 +65,17 @@ def _append(path, record):
     # 1行を1回の write で追記する。書けた長さが足りなければ例外にする（main が分類して出す）。
     # 並行する hook の行が混ざらないことは保証しない（Windows の O_APPEND は不可分でない）。
     # 混ざった行は JSON として読めないので、`review_coverage.read_log` が飛ばし、証拠に数えない。
-    data = (json.dumps(record, ensure_ascii=False) + "\n").encode("utf-8")
+    # 行の頭にも改行を置く。前の書き込みが途中で切れていても、その断片をこの行の頭で閉じ、
+    # この記録まで壊さない（空の行は `read_log` が飛ばす）。
+    data = ("\n" + json.dumps(record, ensure_ascii=False) + "\n").encode("utf-8")
     descriptor = os.open(path, os.O_WRONLY | os.O_APPEND | os.O_CREAT | getattr(os, "O_BINARY", 0),
                          0o644)
     try:
         written = os.write(descriptor, data)
-        if written != len(data):
-            # 途中で切れた行を改行で閉じる。閉じないと、次の記録がその断片に続いて壊れる。
-            os.write(descriptor, b"\n")
-            raise OSError(f"log に {len(data)} byte のうち {written} byte しか書けなかった")
     finally:
         os.close(descriptor)
+    if written != len(data):
+        raise OSError(f"log に {len(data)} byte のうち {written} byte しか書けなかった")
 
 
 def _now():
