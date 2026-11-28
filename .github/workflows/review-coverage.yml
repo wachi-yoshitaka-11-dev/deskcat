@@ -48,11 +48,16 @@ jobs:
           GATE_BASE: ${{ github.event.pull_request.base.sha }}
           GATE_HEAD: ${{ github.event.pull_request.head.sha }}
           PR_BODY: ${{ github.event.pull_request.body }}
-        # **base の版の判定を使う。**PR の版を走らせると、PR が判定を書き換えて自分の検査を
-        # 通せる。base にまだ無いとき（この判定を足す PR）だけ、PR の版を使う。
+        # 判定の script は base の版を使う。script だけを書き換えた PR が、自分の検査を通せない
+        # ようにする。base にまだ無いとき（この判定を足す PR）だけ、PR の版を使う。
+        # **限界：**この workflow の file そのものは PR 側の版で動く（`pull_request` の event）。
+        # workflow を書き換えた PR は、この検査を変えられる。`.github/` は慎重に扱う path なので、
+        # その PR には所有者の承認が要る（CONTRIBUTING の「慎重に扱う path」）。
         run: |
           script="$RUNNER_TEMP/review_coverage.py"
-          if git show "$GATE_BASE:scripts/review_coverage.py" > "$script" 2>/dev/null; then
+          if git cat-file -e "$GATE_BASE:scripts/review_coverage.py" 2>/dev/null; then
+            # base に有るのに読めないときは、PR の版へ切り替えずに失敗させる。
+            git show "$GATE_BASE:scripts/review_coverage.py" > "$script"
             echo "base（${GATE_BASE:0:7}）の版の判定を使う。"
           else
             cp scripts/review_coverage.py "$script"

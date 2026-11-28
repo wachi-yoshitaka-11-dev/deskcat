@@ -918,11 +918,26 @@ def _check_review_chain(number, base, head, body):
         )
 
 
-# 承認のコメントに書いた head の SHA。短い形（7桁以上）も読む。`\b`は使わない（Pythonの
-# Unicodeの`\b`はかなと漢字を語の文字として扱い、`f831629で承認`を拾えない）。
-APPROVAL_SHA_RE = re.compile(r"(?<![0-9A-Fa-f])[0-9A-Fa-f]{7,40}(?![0-9A-Fa-f])")
-# 承認のコメントに要る語。SHA だけでは、CodeRabbit の要約のように SHA を載せるコメントと見分けられない。
-APPROVAL_WORD = "承認"
+# 承認のコメントの行。行の全体が「承認」と head の SHA（7桁以上）だけのものを読む。
+# 語を含むだけで数えると、「承認をお願いします f831629」や「未承認 f831629」も通ってしまう。
+APPROVAL_LINE_RE = re.compile(r"^[ \t]*承認[ \t]*[:：]?[ \t]*([0-9A-Fa-f]{7,40})[ \t]*$",
+                              re.MULTILINE)
+
+
+def _approved(comments, head):
+    """人のコメントに、head の SHA を書いた承認の行があるか。"""
+    for comment in comments:
+        if not isinstance(comment, dict):
+            raise TypeError("コメントの形が想定と違う")
+        user = comment.get("user") or {}
+        if not isinstance(user, dict) or user.get("type") != "User":
+            continue
+        body = comment.get("body") or ""
+        if not isinstance(body, str):
+            raise TypeError("コメントの本文の形が想定と違う")
+        if any(head.startswith(sha.lower()) for sha in APPROVAL_LINE_RE.findall(body)):
+            return True
+    return False
 
 # 昇格の Pull Request の (base, head)。CONTRIBUTING の「Branches」の共有 branch である。
 PROMOTION_REFS = ("main", "develop")
@@ -937,7 +952,7 @@ def _check_review_coverage(args, global_repo):
        PR の base と head の merge-base から head までつながっている。
     2. PR の本文の「自己レビュー」に書いた範囲が、すべて log の完了した記録にある。
        そのうえで、本文の範囲もつながっている（CI が読むのは本文だけなので、本文を log に結び付ける）。
-    3. 慎重に扱う path に触れる PR では、head の SHA を書いたコメントがある。
+    3. 慎重に扱う path に触れる PR では、`承認 <head の SHA>` だけの行を書いた人のコメントがある。
        **これは記録の確認であって、承認そのものの確認ではない。**所有者と AI は同じ
        account で書くので、書き手で見分けられない（承認の関門は #814 の作業リストの11）。
 
@@ -981,7 +996,7 @@ def _check_review_coverage(args, global_repo):
             "api", "--paginate", "--slurp",
             f"repos/{repo}/issues/{number}/comments?per_page=100",
         ], deadline))
-        comments = [item for page in comments for item in page]
+        approved = _approved([item for page in comments for item in page], head)
     except (OSError, subprocess.SubprocessError, ValueError, KeyError,
             AttributeError, TypeError, FuturesTimeout) as error:
         _deny(
@@ -989,16 +1004,10 @@ def _check_review_coverage(args, global_repo):
             f"（{type(error).__name__}: {error}）。**確認できないまま通さない。**"
             " この検査に解除の手段は無い（#814 の作業リストの9）。"
         )
-    if not any(
-        (comment.get("user") or {}).get("type") == "User"
-        and APPROVAL_WORD in (comment.get("body") or "")
-        and any(head.startswith(token.lower())
-                for token in APPROVAL_SHA_RE.findall(comment.get("body") or ""))
-        for comment in comments
-    ):
+    if not approved:
         _deny(
-            f"PR #{number} は慎重に扱う path に触れるが、head（{head[:7]}）の SHA を書いた"
-            "承認のコメントが無い。所有者の承認を得て、承認した head の SHA をコメントに書く"
+            f"PR #{number} は慎重に扱う path に触れるが、head（{head[:7]}）の承認のコメントが無い。"
+            "所有者の承認を得て、`承認 <head の SHA>` だけの行をコメントに書く"
             "（CONTRIBUTING の「慎重に扱う path」）。この確認は記録の確認であって、"
             "承認そのものの確認ではない。"
         )

@@ -168,7 +168,7 @@ def uncovered(base_sha, head_sha, ranges, ancestor=is_ancestor):
     usable = [(a, b) for a, b in sorted(set(ranges)) if known(b, head_sha)]
     # 届く点を幅で探す。1つの道だけを選ぶと、merge commit のある履歴で、別の道でつながるのに
     # 行き止まりを報告する。
-    reached, frontier, last = {base_sha}, [base_sha], base_sha
+    reached, frontier = {base_sha}, [base_sha]
     while frontier:
         current = frontier.pop(0)
         if current == head_sha:
@@ -177,8 +177,11 @@ def uncovered(base_sha, head_sha, ranges, ancestor=is_ancestor):
             if b not in reached and known(a, current) and known(current, b):
                 reached.add(b)
                 frontier.append(b)
-                last = b
-    return last
+    # 抜けの始まりとして、届いた点のうち、他の届いた点の祖先でないもの（一番先まで届いた点）を返す。
+    # 候補が複数あるときは SHA の順で1つに決める。
+    tips = [p for p in sorted(reached)
+            if not any(q != p and known(p, q) for q in reached)]
+    return tips[0]
 
 
 def body_section(body):

@@ -12,12 +12,14 @@
    - 前と後は `tool_use_id` で組にする。判定は `scripts/review_coverage.py` が持つ。
    main の文脈での実行（`agent_id` が無い）は記録しない。2026-11-28 の実験で、
    main の文脈の Skill の後の hook には結果が届かず、レビューが終わったかを知る手段が無かった。
-2. **log を守る。**log の path への Write／Edit／MultiEdit／NotebookEdit と、log の file 名を
-   含む Bash／PowerShell を拒否する。log を書くのはこの hook だけである。
+2. **log を守る。**log の path への Write／Edit／MultiEdit／NotebookEdit、log の file 名を
+   含む Bash／PowerShell、この hook を python で起動する Bash／PowerShell を拒否する。
+   log を書くのはこの hook だけである。
 
 **限界：**この hook は、fork が範囲の全部を実際に読んだかまでは確かめない。
-**log を止めるのは明らかな形だけである。**shell の command に log の名前か記録の hook の名前が
-そのまま書かれたものを止める。名前を組み立てる script を書いて走らせれば、記録を偽れる。
+**log を止めるのは明らかな形だけである。**shell の command に log の名前がそのまま書かれたものと、
+この hook の名前を python の起動の後に書いたものを止める。名前を組み立てる script を書いて
+走らせれば、記録を偽れる。
 log は改ざんを防ぐものではなく、レビューの実行を残すための記録である。
 hook の入力を読めないとき、git が使えないときは、何も記録せず、何も止めない
 （記録が無ければ merge の前の検査で止まるので、記録の側で止める必要が無い）。
@@ -26,6 +28,7 @@ hook の入力を読めないとき、git が使えないときは、何も記�
 import datetime
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -37,8 +40,16 @@ import review_coverage  # noqa: E402
 SKILL_NAME = "code-review"
 WRITE_TOOLS = ("Write", "Edit", "MultiEdit", "NotebookEdit")
 SHELL_TOOLS = ("Bash", "PowerShell")
-# shell の command に含まれていたら止める語。log の名前と、偽の入力を流し込める記録の hook の名前。
-SHELL_DENY_WORDS = (review_coverage.LOG_NAME, "review_record.py")
+HOOK_NAME = "review_record.py"
+# 記録の hook を python で起動する command。偽の入力を流し込めば記録を偽れる。
+# hook の名前を含むだけの command（`git add`、`git diff`、`sed` など）は止めない。
+# python の command の名前は、語の頭（行頭か空白・区切りの後。path を前に付けてもよい）にあるものに限る。
+# `a.py` の `py` を command と読まない。
+HOOK_RUN_RE = re.compile(
+    r"(?:^|[\s;&|(`])(?:[^\s;&|(`]*[/\\])?py(?:thon[0-9.]*)?(?:\.exe)?\s[^\n;&|]*"
+    + re.escape(HOOK_NAME),
+    re.IGNORECASE,
+)
 
 
 def _deny(reason):
@@ -63,14 +74,18 @@ def _is_review_skill(tool_input):
 
 def _append(path, record):
     path.parent.mkdir(parents=True, exist_ok=True)
-    # 1行を1回の write で追記する。並行する hook の行が混ざらないようにする。
+    # 1行を1回の write で追記する。書けた長さが足りなければ例外にする（main が分類して出す）。
+    # 並行する hook の行が混ざらないことは保証しない（Windows の O_APPEND は不可分でない）。
+    # 混ざった行は JSON として読めないので、`review_coverage.read_log` が飛ばし、証拠に数えない。
     data = (json.dumps(record, ensure_ascii=False) + "\n").encode("utf-8")
     descriptor = os.open(path, os.O_WRONLY | os.O_APPEND | os.O_CREAT | getattr(os, "O_BINARY", 0),
                          0o644)
     try:
-        os.write(descriptor, data)
+        written = os.write(descriptor, data)
     finally:
         os.close(descriptor)
+    if written != len(data):
+        raise OSError(f"log に {len(data)} byte のうち {written} byte しか書けなかった")
 
 
 def _now():
@@ -134,11 +149,12 @@ def _guard(payload):
         return
     if tool in SHELL_TOOLS:
         command = tool_input.get("command")
-        if isinstance(command, str) and any(word in command for word in SHELL_DENY_WORDS):
+        if isinstance(command, str) and (review_coverage.LOG_NAME in command
+                                         or HOOK_RUN_RE.search(command)):
             _deny(
-                f"レビューの記録の log（`{review_coverage.LOG_NAME}`）か、記録の hook"
-                " （`review_record.py`）を含む command は使えない。記録は Claude Code が起動する"
-                " hook だけが書く（#814 の作業リストの9）。"
+                f"レビューの記録の log（`{review_coverage.LOG_NAME}`）を含む command と、"
+                f"記録の hook（`{HOOK_NAME}`）を python で起動する command は使えない。"
+                "記録は Claude Code が起動する hook だけが書く（#814 の作業リストの9）。"
             )
         return
     if tool in WRITE_TOOLS:

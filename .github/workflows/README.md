@@ -54,6 +54,7 @@ top-level directoryを列挙すると検査対象と起動条件がずれる。�
 - 手元の`scripts/hooks/gh_metadata_guard.py`は同じ判定に加えて、本文の範囲が手元のlogの完了した記録と一致するかも見る。CIは手元のlogを読めないので、本文だけを見る。所有者が画面からmergeする経路では、この job だけが見る。
 - Pull Request本文の編集（`edited`）でも走り直す。PRのコメントは使わない（`issue_comment`のworkflowは`main`の版で動くため）。
 - merge-baseと祖先の関係を求めるため`fetch-depth: 0`、tokenをscriptから読めないよう`persist-credentials: false`を指定する。
+- 判定のscriptはbaseの版を使い、baseにまだ無いときだけPull Requestの版を使う。**限界：**このworkflowのfileそのものはPull Request側の版で動くので、workflowを書き換えたPull Requestは検査を変えられる（`.github/`は慎重に扱うpathなので、所有者の承認が要る）。
 
 ### `host.yml` — host workspace
 

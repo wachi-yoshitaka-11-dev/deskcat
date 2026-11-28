@@ -210,6 +210,22 @@ class ReviewRecordHookTests(unittest.TestCase):
                 _, output = _hook(payload, self.repo.root)
                 self.assertEqual(output["hookSpecificOutput"]["permissionDecision"], "deny")
 
+    def test_commands_that_only_name_the_hook_are_allowed(self):
+        hook = "scripts/hooks/" + "review_record" + ".py"
+        for command in (f"git add scripts/review_coverage.py {hook}", f"git diff -- {hook}",
+                        f"sed -n 1,20p {hook}", f"python3 -m compileall scripts && cat {hook}"):
+            with self.subTest(command=command):
+                payload = {"hook_event_name": "PreToolUse", "tool_name": "Bash",
+                           "cwd": self.repo.root, "tool_input": {"command": command}}
+                self.assertEqual(_hook(payload, self.repo.root), (0, None))
+        for command in (f"py -3 {hook} < x.json", f"C:/Python312/python.exe {hook}",
+                        f"cat x | /usr/bin/python3 -I {hook}"):
+            with self.subTest(command=command):
+                payload = {"hook_event_name": "PreToolUse", "tool_name": "Bash",
+                           "cwd": self.repo.root, "tool_input": {"command": command}}
+                _, output = _hook(payload, self.repo.root)
+                self.assertEqual(output["hookSpecificOutput"]["permissionDecision"], "deny")
+
     def test_other_writes_are_allowed(self):
         payload = {"hook_event_name": "PreToolUse", "tool_name": "Write",
                    "cwd": self.repo.root, "tool_input": {"file_path": "a.txt"}}
@@ -332,13 +348,16 @@ class ReviewCoverageMergeTests(unittest.TestCase):
         self.assertDenied(self._merge(ranges, files, ["承認 " + self.mid]), "承認のコメント")
         self.assertIsNone(self._merge(ranges, files, ["承認 " + self.head[:7]]))
         self.assertIsNone(self._merge(ranges, ["README.md"], []))
-        # 日本語の文に続けて書いた SHA と、大文字の SHA も読む。
-        self.assertIsNone(self._merge(ranges, files, [self.head[:7] + "で承認した"]))
-        self.assertIsNone(self._merge(ranges, files, ["承認" + self.head[:9].upper()]))
-        # bot のコメントと、「承認」の語の無いコメントは数えない。
-        self.assertDenied(self._merge(ranges, files, [("Bot", "承認 " + self.head)]),
-                          "承認のコメント")
-        self.assertDenied(self._merge(ranges, files, ["between " + self.head]), "承認のコメント")
+        # 他の行に挟んだ承認の行、区切りの「：」、大文字の SHA も読む。
+        self.assertIsNone(self._merge(ranges, files, [f"確認した。\n承認：{self.head[:9].upper()}\n"]))
+        # bot のコメント、承認を頼むだけのコメント、否定のコメント、語の無いコメントは数えない。
+        for comment in (("Bot", "承認 " + self.head), f"承認をお願いします {self.head[:7]}",
+                        f"未承認 {self.head[:7]}", f"{self.head[:7]}で承認した",
+                        "between " + self.head):
+            with self.subTest(comment=comment):
+                self.assertDenied(self._merge(ranges, files, [comment]), "承認のコメント")
+        # 想定と違う形の応答は、落ちずに止める。
+        self.assertDenied(self._merge(ranges, files, [("User", ["x"])]), "確認できなかった")
 
 
 class CiEntryPointTests(unittest.TestCase):
