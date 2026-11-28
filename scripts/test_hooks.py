@@ -863,8 +863,7 @@ class GhHookRepositoryAndDeadlineTests(unittest.TestCase):
     DONE = CodeRabbitReviewMergeGateTests.DONE
     TARGET = "firmware/esp32/src/a.rs"
     # 1回の hook の中の照会の回数。`gh pr merge` は CodeRabbit の確認とレビューの記録の検査が
-    # それぞれ `pr view` を呼ぶ。2回になるのは、fixture の commit が CodeRabbit の確認を通る
-    # （`DONE`）ときだけである。そこで止まると、記録の検査は走らず1回になる。
+    # それぞれ `pr view` を呼ぶ（CodeRabbit の確認が止めると、記録の検査は走らず1回になる）。
     # `gh issue close` は `issue view` を1回呼ぶ。
     VIEWS = {"pr": 2, "issue": 1}
     DRIVER = (
