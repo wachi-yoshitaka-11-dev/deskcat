@@ -1,0 +1,53 @@
+name: Review coverage
+
+# PR の本文の「自己レビュー」に書いたレビューの範囲が、PR の base との merge-base から
+# head まで途切れずにつながっているかを見る（#814 の作業リストの9）。
+# 手元では `scripts/hooks/gh_metadata_guard.py` が、同じ判定に加えて、本文の範囲が
+# 手元の log の完了した記録と一致するかも見る。CI は手元の log を読めないので、本文だけを見る。
+# 判定は `scripts/review_coverage.py` が持つ。
+#
+# **限界：**所有者が画面から merge する経路では、この job だけが見る。その経路では、
+# 本文に書いた範囲を信じるしかない。
+on:
+  pull_request:
+    # 本文に範囲を書き足したら走り直すため、本文の編集（`edited`）でも走らせる。
+    # PR のコメントは使わない。`issue_comment` の workflow は default branch（`main`）の版で
+    # 動くので、`develop` へ merge しても `main` へ昇格するまで効かない。
+    types: [opened, synchronize, reopened, edited]
+    # base が `develop` の PR だけを見る。昇格（`develop` → `main`）の commit は squash で
+    # 入っており、記録の SHA と別物なので、範囲でつなげない。
+    branches:
+      - develop
+
+permissions:
+  contents: read
+
+concurrency:
+  group: review-coverage-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Verify review ranges reach the head
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # merge-base と祖先の関係を求めるため、履歴を切り詰めない。
+          fetch-depth: 0
+          # この step の後に PR 側の script を実行する。checkout が残す token を
+          # その script から読めないようにする。
+          persist-credentials: false
+
+      - name: Check review ranges
+        # 値は環境変数で渡す。`run` へ直接展開すると、PR 本文や sha が shell の構文として
+        # 解釈される余地が残る。PR 本文は範囲を探すためだけに読み、実行しない。
+        env:
+          GATE_BASE: ${{ github.event.pull_request.base.sha }}
+          GATE_HEAD: ${{ github.event.pull_request.head.sha }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          python3 scripts/review_coverage.py \
+            --base "$GATE_BASE" --head "$GATE_HEAD" --pr-body-env PR_BODY

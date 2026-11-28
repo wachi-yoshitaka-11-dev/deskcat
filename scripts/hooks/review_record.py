@@ -1,0 +1,165 @@
+#!/usr/bin/env python3
+"""`/code-review` の実行を手元の log に残し、log への書き込みを止める hook（#814 の作業リストの9）。
+
+登録は `.claude/settings.json` の PreToolUse と PostToolUse である。役目は2つある。
+
+1. **記録する。**Skill の前と後の hook のうち、`agent_id` を持つもの（background の
+   subagent の中の実行）で、skill が `code-review` のものだけを記録する。
+   - 前の hook：引数から範囲 `A..B` を1つだけ取り、A と B を 40 桁の SHA に直し、
+     A が B の祖先であることを確かめて、`started` の行を書く。範囲が無い、2つ以上ある、
+     SHA に直せない、A が B の祖先でない、のどれでも記録しない。**実行そのものは止めない。**
+   - 後の hook：`completed` の行に、完了の状態（`success`、`status`）を書く。
+   - 前と後は `tool_use_id` で組にする。判定は `scripts/review_coverage.py` が持つ。
+   main の文脈での実行（`agent_id` が無い）は記録しない。2026-11-28 の実験で、
+   main の文脈の Skill の後の hook には結果が届かず、レビューが終わったかを知る手段が無かった。
+2. **log を守る。**log の path への Write／Edit／MultiEdit／NotebookEdit と、log の file 名を
+   含む Bash／PowerShell を拒否する。log を書くのはこの hook だけである。
+
+**限界：**この hook は、fork が範囲の全部を実際に読んだかまでは確かめない。
+hook の入力を読めないとき、git が使えないときは、何も記録せず、何も止めない
+（記録が無ければ merge の前の検査で止まるので、記録の側で止める必要が無い）。
+"""
+
+import datetime
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+import review_coverage  # noqa: E402
+
+SKILL_NAME = "code-review"
+WRITE_TOOLS = ("Write", "Edit", "MultiEdit", "NotebookEdit")
+SHELL_TOOLS = ("Bash", "PowerShell")
+
+
+def _deny(reason):
+    json.dump(
+        {
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "permissionDecision": "deny",
+                "permissionDecisionReason": reason,
+            }
+        },
+        sys.stdout,
+    )
+    sys.stdout.write("\n")
+    raise SystemExit(0)
+
+
+def _is_review_skill(tool_input):
+    name = tool_input.get("skill") if isinstance(tool_input, dict) else None
+    return isinstance(name, str) and (name == SKILL_NAME or name.endswith(":" + SKILL_NAME))
+
+
+def _append(path, record):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "a", encoding="utf-8", newline="\n") as handle:
+        handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+
+def _now():
+    return datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")
+
+
+def _record(payload, event):
+    tool_input = payload.get("tool_input")
+    if not _is_review_skill(tool_input):
+        return
+    agent_id = payload.get("agent_id")
+    tool_use_id = payload.get("tool_use_id")
+    if not isinstance(agent_id, str) or not agent_id:
+        return
+    if not isinstance(tool_use_id, str) or not tool_use_id:
+        return
+    cwd = payload.get("cwd") or None
+    path = review_coverage.log_path(cwd)
+    if path is None:
+        return
+    base = {"tool_use_id": tool_use_id, "agent_id": agent_id, "at": _now()}
+    if event == "PreToolUse":
+        pair = review_coverage.parse_arg_range(tool_input.get("args"))
+        if pair is None:
+            return
+        start = review_coverage.resolve(pair[0], cwd)
+        end = review_coverage.resolve(pair[1], cwd)
+        if not start or not end or start == end:
+            return
+        if not review_coverage.is_ancestor(start, end, cwd):
+            return
+        _append(path, {**base, "event": "started", "from": start, "to": end,
+                       "args": tool_input.get("args")})
+    else:
+        response = payload.get("tool_response")
+        response = response if isinstance(response, dict) else {}
+        _append(path, {**base, "event": "completed",
+                       "success": response.get("success") is True,
+                       "status": response.get("status")})
+
+
+def _same_path(candidate, target, cwd):
+    try:
+        raw = Path(candidate)
+        if not raw.is_absolute() and cwd:
+            raw = Path(cwd) / raw
+        return os.path.normcase(os.path.realpath(raw)) == \
+            os.path.normcase(os.path.realpath(target))
+    except (OSError, ValueError):
+        return False
+
+
+def _guard(payload):
+    tool = payload.get("tool_name")
+    tool_input = payload.get("tool_input")
+    if not isinstance(tool_input, dict):
+        return
+    if tool in SHELL_TOOLS:
+        command = tool_input.get("command")
+        if isinstance(command, str) and review_coverage.LOG_NAME in command:
+            _deny(
+                f"レビューの記録の log（`{review_coverage.LOG_NAME}`）を含む command は使えない。"
+                " log を書くのは `scripts/hooks/review_record.py` だけである（#814 の作業リストの9）。"
+            )
+        return
+    if tool in WRITE_TOOLS:
+        cwd = payload.get("cwd") or None
+        target = review_coverage.log_path(cwd)
+        if target is None:
+            return
+        for key in ("file_path", "notebook_path", "path"):
+            value = tool_input.get(key)
+            if isinstance(value, str) and (
+                Path(value).name == review_coverage.LOG_NAME or _same_path(value, target, cwd)
+            ):
+                _deny(
+                    "レビューの記録の log へは書き込めない。log を書くのは"
+                    " `scripts/hooks/review_record.py` だけである（#814 の作業リストの9）。"
+                )
+
+
+def main():
+    try:
+        payload = json.load(sys.stdin)
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return 0
+    if not isinstance(payload, dict):
+        return 0
+    event = payload.get("hook_event_name")
+    tool = payload.get("tool_name")
+    try:
+        if event == "PreToolUse" and tool != "Skill":
+            _guard(payload)
+        elif event in ("PreToolUse", "PostToolUse") and tool == "Skill":
+            _record(payload, event)
+    except (OSError, ValueError, TypeError, subprocess.SubprocessError):
+        # 記録できないことは、merge の前の検査（記録が無い）で止まる。ここでは止めない。
+        return 0
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

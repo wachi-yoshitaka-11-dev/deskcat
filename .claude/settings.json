@@ -7,7 +7,7 @@
           {
             "type": "command",
             "command": "R=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}\"; [ -n \"$R\" ] && [ -f \"$R/scripts/hooks/gh_metadata_guard.py\" ] && exec python3 \"$R/scripts/hooks/gh_metadata_guard.py\" || exit 0",
-            "timeout": 30,
+            "timeout": 60,
             "statusMessage": "gh の必須 metadata を確認"
           },
           {
@@ -33,6 +33,30 @@
             "command": "R=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}\"; [ -n \"$R\" ] && [ -f \"$R/scripts/hooks/worktree_guard.py\" ] && exec python3 \"$R/scripts/hooks/worktree_guard.py\" || exit 0",
             "timeout": 30,
             "statusMessage": "未 commit の変更を失う git 操作を確認"
+          }
+        ]
+      },
+      {
+        "matcher": "Skill|Write|Edit|MultiEdit|NotebookEdit|Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "R=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}\"; [ -n \"$R\" ] && [ -f \"$R/scripts/hooks/review_record.py\" ] && exec python3 \"$R/scripts/hooks/review_record.py\" || exit 0",
+            "timeout": 30,
+            "statusMessage": "レビューの記録を残し、記録の log を守る"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Skill",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "R=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}\"; [ -n \"$R\" ] && [ -f \"$R/scripts/hooks/review_record.py\" ] && exec python3 \"$R/scripts/hooks/review_record.py\" || exit 0",
+            "timeout": 30,
+            "statusMessage": "レビューの完了を記録する"
           }
         ]
       }

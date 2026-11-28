@@ -47,6 +47,14 @@ top-level directoryを列挙すると検査対象と起動条件がずれる。�
 - 判定は字句だけである。図の内容が記録と合うかは判定しない。
 - merge baseを求めるため`fetch-depth: 0`、tokenをscriptから読めないよう`persist-credentials: false`を指定する。
 
+### `review-coverage.yml` — レビューの範囲のつながり
+
+- base が`develop`のPull Requestだけで起動する。昇格の commit は squash で入っており、記録の SHA と別物なので、範囲でつなげない。
+- Pull Request本文の「自己レビュー」に書いた範囲（backtickで囲んだ`A..B`）が、baseとのmerge-baseからheadまで途切れずにつながっているかを、`scripts/review_coverage.py`で見る（[#814](https://github.com/wachi-yoshitaka-11-dev/deskcat/issues/814)の作業リストの9）。
+- 手元の`scripts/hooks/gh_metadata_guard.py`は同じ判定に加えて、本文の範囲が手元のlogの完了した記録と一致するかも見る。CIは手元のlogを読めないので、本文だけを見る。所有者が画面からmergeする経路では、この job だけが見る。
+- Pull Request本文の編集（`edited`）でも走り直す。PRのコメントは使わない（`issue_comment`のworkflowは`main`の版で動くため）。
+- merge-baseと祖先の関係を求めるため`fetch-depth: 0`、tokenをscriptから読めないよう`persist-credentials: false`を指定する。
+
 ### `host.yml` — host workspace
 
 - **実機、firmware、ESP-IDF、ESP32 toolchainを触らない。**`firmware/esp32`はroot workspaceから

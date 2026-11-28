@@ -101,7 +101,16 @@ if fixture.get("fail"):
     sys.exit(1)
 args = sys.argv[1:]
 if args[:2] == ["pr", "view"]:
-    print(json.dumps({{"number": 7, "url": "https://github.com/o/r/pull/7"}}))
+    # base と head を指定しない fixture では、どちらも作業ツリーの HEAD にする。
+    # merge-base と head が同じなので、レビューの記録の検査（#814 の作業リストの9）は
+    # 範囲を要さずに通る。記録の検査そのものは ReviewCoverageMergeTests が見る。
+    import subprocess
+    here = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True,
+                          text=True).stdout.strip()
+    print(json.dumps({{"number": 7, "url": "https://github.com/o/r/pull/7",
+                      "baseRefOid": fixture.get("base", here),
+                      "headRefOid": fixture.get("head", here),
+                      "body": fixture.get("body", "")}}))
 elif args[:2] == ["issue", "view"]:
     print(json.dumps(fixture["issue"]))
 elif args[:2] == ["api", "graphql"]:
@@ -110,6 +119,13 @@ elif args[0] == "api":
     path = [a for a in args[1:] if a.startswith("repos/")][0]
     if path.startswith("repos/o/r/pulls/7/files"):
         print("\\n".join(fixture.get("files", ["README.md"])))
+    elif path.startswith("repos/o/r/issues/7/comments"):
+        # 指定が無ければ、head の SHA を書いた承認のコメントが1件ある扱いにする。
+        import subprocess
+        here = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True,
+                              text=True).stdout.strip()
+        default = ["承認 " + fixture.get("head", here)]
+        print("\\n".join(fixture.get("comments", default)))
     elif path.startswith("repos/o/r/pulls/7/commits"):
         print("\\n".join(fixture.get("commits", {{}}).keys()))
     elif "/check-runs" in path:
@@ -145,6 +161,10 @@ def _invoke(script, command, cwd=None, environment=None):
     env.pop("DESKCAT_TEST_GH", None)
     if script in (GH_GUARD, CODERABBIT_GATE):
         env["PATH"] = f"{_GH_SHIM_DIR}{os.pathsep}{env['PATH']}"
+    if script == GH_GUARD and cwd is None:
+        # `gh pr merge` の検査は、手元の git で base と head を照らす（#814 の作業リストの9）。
+        # CI は test を repository の外（`runner.temp`）で走らせるので、repository の中で走らせる。
+        cwd = str(REPO_ROOT_FOR_TEMPLATES)
     if environment:
         env.update(environment)
     result = subprocess.run(

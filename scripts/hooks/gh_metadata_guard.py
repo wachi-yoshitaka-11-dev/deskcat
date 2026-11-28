@@ -4,7 +4,7 @@
 Claude CodeのPreToolUse hookとして、Bash tool呼び出しの前に走る。stdinからhookの
 入力JSONを読み、`tool_input.command`だけを見る。実行はしない。
 
-止める対象は6つである。
+止める対象は7つである。
 
 1. `gh issue create`／`gh pr create`に`--project`が無い。Projects v2 boardへの
    item追加は`CONTRIBUTING.md`の起票規約で必須だが、**#204／#205／#206は3件とも
@@ -55,7 +55,14 @@ mergeもしない。metadataを要求しても誤検知しか生まない。**20
    しており、無ければ照合できない）。**この検査は`DESKCAT_SKIP_GH_GUARD`で無効化できない**
    （`_check_issue_close`／`_check_item_done`）。
 
-`DESKCAT_SKIP_GH_GUARD=1`で5と6以外を丸ごと無効化できる。**誤検知で作業が止まったときの
+7. `gh pr merge`の対象Pull Requestで、レビューの記録が merge-base から head まで
+   途切れずにつながっていない。本文の「自己レビュー」に書いた範囲が手元の log の完了した
+   記録と一致しない。慎重に扱うpathに触れるのに、head の SHA を書いた承認のコメントが無い
+   （#814 の作業リストの9）。#815・#816 でレビューしていない commit を本文に「自己レビューで
+   見た」と書き、#817 ではレビューしていない直しを commit・push した。**この検査は
+   `DESKCAT_SKIP_GH_GUARD`で無効化できない**（`_check_review_coverage`）。
+
+`DESKCAT_SKIP_GH_GUARD=1`で5〜7以外を丸ごと無効化できる。**誤検知で作業が止まったときの
 逃げ道であり、常用するものではない。**使ったら理由をPull Request本文へ書く。
 **ただしcommand行頭へ置く形では効かない**（`SKIP_ENV`の隣に実測を書いてある）。
 """
@@ -71,6 +78,9 @@ from concurrent.futures import TimeoutError as FuturesTimeout
 from pathlib import Path
 
 import command_line
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+import review_coverage  # noqa: E402
 
 # 検査する`gh`のsubcommand。`gh`の呼び出しに続く2語がこの組のときだけ見る。
 # 呼び出しの切り出しは`command_line.invocations`が行う。
@@ -120,6 +130,7 @@ REVIEW_TARGET_PREFIXES = (
 )
 REVIEW_TARGET_FILES = (
     ".claude/settings.json",
+    "scripts/review_coverage.py",
     "AGENTS.md",
     "CLAUDE.md",
     "CONTRIBUTING.md",
@@ -160,6 +171,9 @@ GH_TIMEOUT_SECONDS = 15
 # **最初の`gh`照会の前に始め、残りを各照会へ渡す。**走っているworkerも同じ期限で
 # 終わるため、denyを出した後にprocessが残って時間切れになることもない。
 # hookの30秒に収まる値にする（最初の遅れの後に残りの照会も収まる）。
+# **`gh pr merge`では、CodeRabbitの検査とレビューの記録の検査（#814 の作業リストの9）が
+# それぞれこの期限を持つ。**合わせて36秒になるので、`.claude/settings.json`でこのhookの
+# timeoutを60秒にした。時間切れのhookは止める側に倒れない。
 CHECK_DEADLINE_SECONDS = 18
 COMMIT_CHECK_WORKERS = 16
 
@@ -818,6 +832,167 @@ def _check_item_done(args):
         _deny(reason)
 
 
+def _merged_into_develop(repo, sha, deadline):
+    """commit `sha` が、`develop` へ merge 済みの PR の squash の commit かを返す。"""
+    pulls = json.loads(_gh_json(["api", f"repos/{repo}/commits/{sha}/pulls"], deadline))
+    return any(
+        pull.get("merge_commit_sha") == sha
+        and pull.get("merged_at")
+        and (pull.get("base") or {}).get("ref") == "develop"
+        for pull in pulls
+    )
+
+
+def _check_promotion_commits(number, repo, base, head, deadline):
+    """昇格の範囲の各 commit が、PR を通ったか、範囲を明示したレビューの記録を持つかを見る。
+
+    `develop` の commit は、PR の squash で入ったものなら、その PR が merge の前に
+    `_check_review_chain` を通っている。**`develop` の branch protection は PR を求めておらず、
+    PR を通らずに入った commit がある**（2026-11-28 時点の `main..develop` に `006d12e` と
+    `8137320`）。そうした commit は、`<sha>^..<sha>` を含む範囲の完了した記録があるときだけ通す。
+    """
+    if not review_coverage.resolve(head) or not review_coverage.resolve(base):
+        _deny(
+            f"PR #{number} の base（{base[:7]}）か head（{head[:7]}）の commit が手元に無い。"
+            " `git fetch` してから merge する。"
+        )
+    shas = review_coverage.commits_between(base, head)
+    path = review_coverage.log_path()
+    logged = review_coverage.completed_ranges(
+        review_coverage.read_log(path) if path else [])
+    pool = ThreadPoolExecutor(max_workers=COMMIT_CHECK_WORKERS)
+    try:
+        futures = {pool.submit(_merged_into_develop, repo, sha, deadline): sha for sha in shas}
+        direct = [futures[future] for future in as_completed(
+            futures, timeout=max(0, deadline - time.monotonic())) if not future.result()]
+    finally:
+        pool.shutdown(wait=True, cancel_futures=True)
+    unreviewed = [sha for sha in direct if not review_coverage.covers_commit(sha, logged)]
+    if unreviewed:
+        shown = ", ".join(f"`{sha[:7]}`" for sha in sorted(unreviewed)[:8])
+        _deny(
+            f"昇格 PR #{number} の範囲に、PR を通らずに `develop` へ入り、レビューの記録も無い"
+            f" commit がある: {shown}。各 commit を `<sha>^..<sha>` の範囲で、background の"
+            " subagent の `/code-review` で見てから merge する（#814 の作業リストの9）。"
+        )
+
+
+def _check_review_chain(number, base, head, body):
+    """記録と本文の範囲が merge-base から head までつながるかを見る（`_check_review_coverage` の1と2）。"""
+    if not review_coverage.resolve(head) or not review_coverage.resolve(base):
+        _deny(
+            f"PR #{number} の base（{base[:7]}）か head（{head[:7]}）の commit が手元に無い。"
+            " `git fetch` してから merge する（レビューの記録を手元の履歴で照らすため）。"
+        )
+    start = review_coverage.merge_base(base, head)
+    if not start:
+        raise ValueError("base と head の merge-base を求められない")
+    path = review_coverage.log_path()
+    logged = review_coverage.completed_ranges(
+        review_coverage.read_log(path) if path else [])
+    reached = review_coverage.uncovered(start, head, logged)
+    if reached:
+        _deny(
+            f"PR #{number} のレビューの記録が、merge-base（{start[:7]}）から head（{head[:7]}）"
+            f"までつながっていない。{reached[:7]} から先が抜けている。"
+            f" `{reached[:7]}..{head[:7]}` を background の subagent の `/code-review` で見る"
+            "（CONTRIBUTING の「自己レビュー」）。main の文脈での実行と、ユーザーが打った"
+            " `/code-review` は記録に数えない（#814 の作業リストの9）。"
+        )
+    written, unresolved = review_coverage.resolve_ranges(review_coverage.body_ranges(body))
+    logged_set = set(logged)
+    missing = unresolved + [
+        f"{a[:7]}..{b[:7]}" for a, b in written if (a, b) not in logged_set]
+    if missing:
+        _deny(
+            f"PR #{number} の本文の「自己レビュー」に書いた範囲のうち、手元の log に完了した"
+            f"記録が無いものがある: {', '.join(missing)}。本文には、記録のある範囲だけを書く"
+            "（CI は本文の範囲を読む。#814 の作業リストの9）。"
+        )
+    body_reached = review_coverage.uncovered(start, head, written)
+    if body_reached:
+        _deny(
+            f"PR #{number} の本文の「自己レビュー」に書いた範囲が、merge-base（{start[:7]}）から"
+            f" head（{head[:7]}）までつながっていない。{body_reached[:7]} から先の範囲を"
+            "本文に書く。"
+        )
+
+
+# 承認のコメントに書いた head の SHA。短い形（7桁以上）も読む。
+APPROVAL_SHA_RE = re.compile(r"\b[0-9a-f]{7,40}\b")
+
+# 昇格の Pull Request の (base, head)。CONTRIBUTING の「Branches」の共有 branch である。
+PROMOTION_REFS = ("main", "develop")
+
+
+def _check_review_coverage(args, global_repo):
+    """レビューの記録が、PR の merge-base から head まで途切れずにつながるまで merge させない。
+
+    #814 の作業リストの9。判定は `scripts/review_coverage.py` と共有する。次の3つを見る。
+
+    1. 手元の log（`scripts/hooks/review_record.py` が書く）の完了した記録の範囲が、
+       PR の base と head の merge-base から head までつながっている。
+    2. PR の本文の「自己レビュー」に書いた範囲が、すべて log の完了した記録にある。
+       そのうえで、本文の範囲もつながっている（CI が読むのは本文だけなので、本文を log に結び付ける）。
+    3. 慎重に扱う path に触れる PR では、head の SHA を書いたコメントがある。
+       **これは記録の確認であって、承認そのものの確認ではない。**所有者と AI は同じ
+       account で書くので、書き手で見分けられない（承認の関門は #814 の作業リストの11）。
+
+    昇格（base `main`、head `develop`）は1と2の代わりに、範囲の各 commit が `develop` へ merge 済みの
+    PR の squash の commit か、その commit を含む範囲の完了した記録を持つかを見る
+    （`_check_promotion_commits`）。3は見る。
+
+    **確認できない場合も deny する。**逃げ道は置かない（`DESKCAT_SKIP_GH_GUARD` も効かない）。
+    **限界：**fork が範囲の全部を実際に読んだかまでは確かめない。所有者が画面から merge する
+    経路はこの hook を通らない。hook が時間切れになると、止める側に倒れない（Claude Code の
+    hook の時間切れは拒否にならない。timeout は `.claude/settings.json` で60秒にした）。
+    """
+    if _is_help(args):
+        return
+    deadline = time.monotonic() + CHECK_DEADLINE_SECONDS
+    repo_option = _repo_option(args, global_repo, MERGE_VALUE_OPTIONS)
+    selector = _merge_selector(args)
+    try:
+        view = ["pr", "view"] + ([selector] if selector else [])
+        view += (["-R", repo_option] if repo_option else [])
+        view += ["--json", "number,url,baseRefOid,headRefOid,baseRefName,headRefName,body"]
+        info = json.loads(_gh_json(view, deadline))
+        number, body = info["number"], info.get("body") or ""
+        base, head = info["baseRefOid"], info["headRefOid"]
+        repo = re.match(r"https://[^/]+/([^/]+/[^/]+)/pull/\d+", info["url"]).group(1)
+        # 昇格（`develop` → `main`）は、範囲のつながりの代わりに、各 commit が PR を通ったか、
+        # レビューの記録を持つかを見る。squash の commit は記録の SHA と別物なので、
+        # 昇格の範囲を記録でつなぐことはできない。承認のコメントの確認は残す。
+        if (info.get("baseRefName"), info.get("headRefName")) == PROMOTION_REFS:
+            _check_promotion_commits(number, repo, base, head, deadline)
+        else:
+            _check_review_chain(number, base, head, body)
+        files = _gh_json([
+            "api", "--paginate", f"repos/{repo}/pulls/{number}/files?per_page=100",
+            "--jq", ".[].filename",
+        ], deadline).split()
+        if not _review_targets(files):
+            return
+        comments = _gh_json([
+            "api", "--paginate", f"repos/{repo}/issues/{number}/comments?per_page=100",
+            "--jq", ".[].body",
+        ], deadline)
+    except (OSError, subprocess.SubprocessError, ValueError, KeyError,
+            AttributeError, TypeError, FuturesTimeout) as error:
+        _deny(
+            "`gh pr merge` の前に、レビューの記録がつながっているかを確認できなかった"
+            f"（{type(error).__name__}: {error}）。**確認できないまま通さない。**"
+            " この検査に解除の手段は無い（#814 の作業リストの9）。"
+        )
+    if not any(head.startswith(token) for token in APPROVAL_SHA_RE.findall(comments)):
+        _deny(
+            f"PR #{number} は慎重に扱う path に触れるが、head（{head[:7]}）の SHA を書いた"
+            "承認のコメントが無い。所有者の承認を得て、承認した head の SHA をコメントに書く"
+            "（CONTRIBUTING の「慎重に扱う path」）。この確認は記録の確認であって、"
+            "承認そのものの確認ではない。"
+        )
+
+
 def main():
     skip = os.environ.get(SKIP_ENV) == "1"
     try:
@@ -847,6 +1022,8 @@ def main():
                 _check_merge(args[2:])
             # **skipの指定に関わらず走らせる。**解除の手段を足さない（#688）。
             _check_coderabbit_review(args[2:], global_repo)
+            # **skipの指定に関わらず走らせる。**解除の手段を足さない（#814 の作業リストの9）。
+            _check_review_coverage(args[2:], global_repo)
         elif head == ISSUE_CLOSE_SUBCOMMAND:
             # **skipの指定に関わらず走らせる。**解除の手段を足さない（#693）。
             _check_issue_close(args[2:], global_repo)

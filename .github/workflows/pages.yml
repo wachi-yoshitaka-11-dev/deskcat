@@ -85,6 +85,11 @@ jobs:
         working-directory: ${{ runner.temp }}
         run: python3 "$GITHUB_WORKSPACE/scripts/test_hooks.py"
 
+      - name: Test review coverage
+        # レビューの記録の判定、記録の hook、merge の前の検査（#814 の作業リストの9）。
+        working-directory: ${{ runner.temp }}
+        run: python3 "$GITHUB_WORKSPACE/scripts/test_review_coverage.py"
+
       - name: Test publication guard
         working-directory: ${{ runner.temp }}
         run: python3 "$GITHUB_WORKSPACE/scripts/test_publication_guard.py"
